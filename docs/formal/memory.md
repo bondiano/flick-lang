@@ -10,8 +10,8 @@ are not evidence for this contract.
 
 | Obligation | Current implementation | Still required for the phase gate |
 | - | - | - |
-| M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), Stage 3 pure and pure-effect stdlib counted lowering/primitives (`core`, `Bytes`/`Chunk`/`HashMap`/`HashSet`/`Json`/`Decimal`/`RegExp`/`Duration`/`Exit`/`Cause`, `Path`/`DateTime`/`Cron`/`Graph`, `Schema`/`Codec`/`Check`/`JsonSchema`/`Route`/`Optic`/`Open`/`ByteSize`, deterministic `Test`/`Gen`/`Arbitrary` counted runner), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs`) | Complete cooperative async/fiber/layer/stream runtime (Stage 4) and explicit counted host/FFI bridge (Stage 5) so 100% of the corpus passes on this path in both profiles with zero live objects |
-| M2: `Arena s` | Public `Arena.make/alloc/get`, existing by-use checker rules, counted scope/selected-owner execution with LIFO finalizers running before arena retirement, JS/Go storage retirement after finalizers, scope-release/use/retention regressions | Counted execution of concurrent/cancellable owned work (Stage 4) and the whole heap/region proof |
+| M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), Stage 3 pure/pure-effect stdlib counted lowering/primitives, Stage 4 cooperative single-threaded async/fiber/layer/STM/observability/config/arbitrary/streaming runtime (`Fiber`, `Deferred`, `FiberGroup`, `Layer` dynamic/memo/merge, `Context.Reference`, `Clock`/`TestClock`, `Schedule`/`ExecutionPlan`, `Latch`/`Semaphore`/`PartitionedSemaphore`, `Queue`/`PubSub`/`SynchronizedRef`/`SubscriptionRef`, `Cache`/`ScopedCache`/`Pool`/`RcRef`/`RcMap`/`LayerMap`/`LayerRef`, `Tx` STM, `Events`/`ErrorReporter`/`Tracer`/`Logger`/`Metric`/`Request`/`Crypto`, `Config`/`ConfigProvider`, `Arbitrary`, `Channel`/`Sink`/`Stream`), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs`: 762 clean profiles across `tests/run`, `tests/rt`, `docs`, and 26/26 `tests/language` suites in both profiles with zero live objects) | Explicit counted host/FFI bridge for `.mjs`/DOM/UI/HTTP/RPC/FileSystem/CLI/Reactivity.Atom fixtures and OS-environment host services so 100% of the corpus passes on this path in both profiles with zero live objects |
+| M2: `Arena s` | Public `Arena.make/alloc/get`, existing by-use checker rules, counted scope/selected-owner execution with LIFO finalizers and child-fiber cancellation running before arena retirement, JS/Go storage retirement after finalizers, scope-release/use/retention and concurrent cancellation regressions | Whole heap/region proof and counted host/FFI boundary |
 | M3: FBIP and cycles | Dynamic uniqueness/layout-checked reuse for a last borrowed receiver followed by construction; root-owned counted cells, strong reads/replacement and detach-all teardown, with closure/cell-cycle tests | Full constructor/destructor lowering and backend implementation |
 | M4: Lean | `Formal/MemoryInsert.lean`: whole-function token balance for the executable cached insertion projection, before output validation, with distinct parameters and every selected-path prefix; `Formal/MemoryPass.lean`: independent token checking and computed live-in availability; `Formal/Memory.lean`: local arithmetic; `Formal/MemoryArena.lean` and `MemoryScopes.lean`: root inventories and selected-owner storage retirement | Verified Rust correspondence, machine bounds, operation/heap and exception-unwind semantics, dynamic reuse and physical reclamation remain outside these proofs |
 | M5: Native split (2026-11-13) | Backend boundary below | Implementation belongs to phase N, not a replacement for M1–M4 |
@@ -139,6 +139,27 @@ Because Stage 3 only adds consuming `Intrinsic` variants and ordinary lowered
 Flick helpers without changing `Operation` or `Exit`, `Formal/MemoryPass.lean`
 and `Formal/MemoryInsert.lean` remain unaffected; primitive implementations and
 counted heap execution remain tested rather than Lean-proved.
+
+Stage 4 extends the counted path with the cooperative single-threaded async,
+fiber, layer, synchronization, STM, observability, configuration, arbitrary,
+and streaming runtime (`memory_stage4a.rs`, `memory_stage4b.rs`,
+`memory_stage4c.rs`, `memory_stage4d.rs`, `memory_stage4e.rs`, plus all 26/26
+`tests/language` suites in `memory_language.rs` and all 91/91 `tests/run/model.txt`
+cases in `memory_stage2.rs`). Cooperative fiber scheduling enforces G7g
+(interruption skips ordinary `try` error/operation handlers and runs finalizers
+in LIFO order before retiring scope arenas), inherits `OpClass::Tail` handler
+operations across spawned child fibers, keeps pure `Ref.modify` callbacks
+atomic against quantum preemption, and implements shared single-flight `Lazy`
+execution (`Pending`/`Running`/`DoneOk`/`DoneCause`) with waiter handoff on
+interruption and pure-abort reset. Like Stage 3, Stage 4 adds only consuming
+`Intrinsic` variants (`AsyncIntrinsic`, `LayerIntrinsic`, `CryptoIntrinsic`,
+`ConfigIntrinsic`, `ArbitraryIntrinsic`, `OutcomeIntrinsic`) and pure lowered
+Flick templates without changing `Operation` or `Exit`, so
+`Formal/MemoryPass.lean` and `Formal/MemoryInsert.lean` remain unaffected;
+cooperative scheduling, concurrency, and primitive semantics remain tested
+rather than Lean-proved. The remaining unsupported corpus cases are exclusively
+explicit host/FFI/UI/HTTP/RPC/FileSystem/CLI/`Reactivity.Atom`/`.mjs` surfaces
+plus `effect/host_services` (which asserts host OS `PATH` in `Platform.vars ()`).
 
 ## 2. Owned tokens and objects
 

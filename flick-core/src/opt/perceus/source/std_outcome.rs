@@ -25,12 +25,29 @@ impl Lower<'_> {
             return self.effect_outcome_foreign(from, bind, stages, span, block);
         }
         if value.mode == ForeignMode::Sync {
+            if from == "flick:Cause" && bind == "flickFrameStack" && stages == 1 {
+                let b = ExprBuilder::new(span, "$fs");
+                let expr = b.lam(
+                    &["fr"],
+                    b.match_(
+                        b.loc("fr"),
+                        vec![arm(
+                            b.tup_pat(&["_nm", "st", "_par"]),
+                            b.if_(
+                                b.bin(flick_ir::BinOp::Eq, b.loc("st"), b.str_("")),
+                                b.none(),
+                                b.some(b.loc("st")),
+                            ),
+                        )],
+                    ),
+                );
+                return Some(self.expr(&expr, &Env::new(), block));
+            }
             let kind = match (from, bind, stages) {
                 ("flick:Cause", "flickPretty", 1) => Some(OutcomeIntrinsic::CausePretty),
                 ("flick:Cause", "flickPrettyErrors", 1) => {
                     Some(OutcomeIntrinsic::CausePrettyErrors)
                 }
-                ("flick:Cause", "flickFrameStack", 1) => Some(OutcomeIntrinsic::CauseNoneFrame),
                 _ => None,
             }?;
             return Some(self.intrinsic(Intrinsic::Outcome(kind), false, vec![], block, span));
@@ -84,14 +101,6 @@ impl Lower<'_> {
             }
             ("flick:rt", "failureRethrow", 1) => {
                 Some(self.intrinsic(Intrinsic::FailureRethrow, false, vec![], block, span))
-            }
-            ("flick:Effect", "ensuring", 2) => {
-                let expr = effect_ensuring_template(&ExprBuilder::new(span, "$ens"));
-                Some(self.expr(&expr, &Env::new(), block))
-            }
-            ("flick:Effect", "flickOnExit", 2) => {
-                let expr = effect_on_exit_template(&ExprBuilder::new(span, "$oex"));
-                Some(self.expr(&expr, &Env::new(), block))
             }
             ("flick:Effect", "flickFailCauseSync", 1) => {
                 let b = ExprBuilder::new(span, "$fcs");
@@ -218,10 +227,11 @@ fn direct_pure_intrinsic(from: &str, bind: &str, stages: usize) -> Option<Intrin
         ("flick:Cause", "flickFilterInterruptors") => {
             Intrinsic::Outcome(OutcomeIntrinsic::CauseFilterInterruptors)
         }
-        (
-            "flick:Cause",
-            "flickStackTrace" | "flickInterruptorStackTrace" | "flickReasonStackTrace",
-        ) => Intrinsic::Outcome(OutcomeIntrinsic::CauseNoneFrame),
+        ("flick:Cause", "flickStackTrace") => Intrinsic::Outcome(OutcomeIntrinsic::CauseStackTrace),
+        ("flick:Cause", "flickAnnotate") => Intrinsic::Outcome(OutcomeIntrinsic::CauseAnnotate),
+        ("flick:Cause", "flickInterruptorStackTrace" | "flickReasonStackTrace") => {
+            Intrinsic::Outcome(OutcomeIntrinsic::CauseNoneFrame)
+        }
         _ => return None,
     };
     (kind.arity() == stages).then_some(kind)
@@ -229,6 +239,20 @@ fn direct_pure_intrinsic(from: &str, bind: &str, stages: usize) -> Option<Intrin
 
 fn pure_template(b: &ExprBuilder, from: &str, bind: &str, stages: usize) -> Option<Expr> {
     match (from, bind, stages) {
+        ("flick:Cause", "flickFrameName", 1) => Some(b.lam(
+            &["fr"],
+            b.match_(
+                b.loc("fr"),
+                vec![arm(b.tup_pat(&["nm", "_st", "_par"]), b.loc("nm"))],
+            ),
+        )),
+        ("flick:Cause", "flickFrameParent", 1) => Some(b.lam(
+            &["fr"],
+            b.match_(
+                b.loc("fr"),
+                vec![arm(b.tup_pat(&["_nm", "_st", "par"]), b.loc("par"))],
+            ),
+        )),
         ("flick:rt", "failureRawCause", 1) => Some(b.lam(&["f"], b.loc("f"))),
         ("flick:Effect", "void", 0) => Some(b.at(ExprKind::Task(Box::new(b.unit())))),
         ("flick:Exit", "flickFilterFailure", 1) => Some(b.lam(
@@ -318,87 +342,6 @@ fn cause_map_template(b: &ExprBuilder) -> Expr {
                 ),
                 arm(Pat::Wild, b.loc("c")),
             ],
-        ),
-    )
-}
-
-fn effect_on_exit_template(b: &ExprBuilder) -> Expr {
-    b.lam(
-        &["handler", "body"],
-        b.block(
-            vec![
-                b.let_("ex", b.app(b.global("Effect.Core", "exit"), b.loc("body"))),
-                b.let_(
-                    "fin_ex",
-                    b.app(
-                        b.global("Effect.Core", "exit"),
-                        b.at(ExprKind::Task(Box::new(
-                            b.app(b.loc("handler"), b.loc("ex")),
-                        ))),
-                    ),
-                ),
-            ],
-            b.match_(
-                b.app(b.global("Exit", "failure"), b.loc("ex")),
-                vec![
-                    arm(
-                        b.some_pat("orig"),
-                        b.match_(
-                            b.app(b.global("Exit", "failure"), b.loc("fin_ex")),
-                            vec![
-                                arm(
-                                    b.some_pat("fc"),
-                                    b.app(
-                                        b.global("Failure", "rethrow"),
-                                        b.app2(
-                                            b.global("Cause", "combine"),
-                                            b.loc("fc"),
-                                            b.loc("orig"),
-                                        ),
-                                    ),
-                                ),
-                                arm(
-                                    Pat::Wild,
-                                    b.app(b.global("Failure", "rethrow"), b.loc("orig")),
-                                ),
-                            ],
-                        ),
-                    ),
-                    arm(
-                        Pat::Wild,
-                        b.match_(
-                            b.app(b.global("Exit", "failure"), b.loc("fin_ex")),
-                            vec![
-                                arm(
-                                    b.some_pat("fc"),
-                                    b.app(b.global("Failure", "rethrow"), b.loc("fc")),
-                                ),
-                                arm(
-                                    Pat::Wild,
-                                    b.match_(
-                                        b.app(b.global("Exit", "value"), b.loc("ex")),
-                                        vec![
-                                            arm(b.some_pat("v"), b.loc("v")),
-                                            arm(Pat::Wild, b.unit()),
-                                        ],
-                                    ),
-                                ),
-                            ],
-                        ),
-                    ),
-                ],
-            ),
-        ),
-    )
-}
-
-fn effect_ensuring_template(b: &ExprBuilder) -> Expr {
-    b.lam(
-        &["fin", "body"],
-        b.app2(
-            b.global("Effect.Errors", "on_exit"),
-            b.lam(&["_e"], b.at(ExprKind::Await(Box::new(b.loc("fin"))))),
-            b.loc("body"),
         ),
     )
 }

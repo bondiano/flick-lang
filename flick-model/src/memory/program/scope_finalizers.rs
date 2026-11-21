@@ -1,4 +1,4 @@
-// Lazy cells, LIFO Scope/Resource finalizers, and frame-resource cleanup/draining.
+// Lazy cells, resource acquisition, finalizer registration, and scope-close entry points.
 impl<'p> Machine<'p, '_> {
     fn control_intrinsic(&mut self, kind: Intrinsic, binding: Local) -> Result<bool, Error> {
         match kind {
@@ -21,50 +21,68 @@ impl<'p> Machine<'p, '_> {
             Intrinsic::LazyForce => self.lazy_force(binding)?,
             Intrinsic::ScopeAddFinalizer => {
                 let task = self.scratch.pop().expect("finalizer task");
-                self.register_scope_finalizer(binding, Finalizer::Task(task))?;
+                let services = self.snapshot_active_services()?;
+                self.register_scope_finalizer(binding, Finalizer::Task { task, services })?;
             }
             Intrinsic::ScopeAddFinalizerExit => {
                 let func = self.scratch.pop().expect("exit finalizer");
-                self.register_scope_finalizer(binding, Finalizer::WithCause(func))?;
+                let services = self.snapshot_active_services()?;
+                self.register_scope_finalizer(binding, Finalizer::WithCause { func, services })?;
             }
             Intrinsic::ScopeAddClose => {
                 let func = self.scratch.pop().expect("close callback");
-                self.register_scope_finalizer(binding, Finalizer::WithExit(func))?;
+                let services = self.snapshot_active_services()?;
+                self.register_scope_finalizer(binding, Finalizer::WithExit { func, services })?;
             }
             Intrinsic::AcquireRelease => {
                 let release = self.scratch.pop().expect("release fn");
                 let acquire = self.scratch.pop().expect("acquire task");
                 let owner = self.current_owner;
-                if self.owners[owner].closed || self.owners[owner].closing {
+                if self.owners[owner].is_finalizing_or_closed() {
                     self.scratch.extend([acquire, release]);
                     self.raise_defect(DefectSpec::arena_owner_closed())?;
                     return Ok(true);
                 }
-                self.scratch.push(acquire);
-                self.scratch.push(Value::Unit);
-                self.await_task(Destination::AcquireRegister {
-                    owner,
-                    release,
-                    binding,
+                let saved_mask = self.mask_depth;
+                self.mask_depth += 1;
+                self.scratch.extend([acquire, Value::Unit]);
+                self.await_task_fresh(Destination::RestoreMask {
+                    saved_mask,
+                    check_on_exit: true,
+                    next: Box::new(Destination::AcquireRegister {
+                        owner,
+                        release,
+                        binding,
+                    }),
                 })?;
             }
             Intrinsic::Bracket => {
                 let release_fn = self.scratch.pop().expect("bracket release");
                 let use_fn = self.scratch.pop().expect("bracket use");
                 let acquire = self.scratch.pop().expect("bracket acquire");
-                self.scratch.push(acquire);
-                self.scratch.push(Value::Unit);
-                self.await_task(Destination::BracketUse {
-                    use_fn,
-                    release_fn,
-                    binding,
+                let saved_mask = self.mask_depth;
+                self.mask_depth += 1;
+                self.scratch.extend([acquire, Value::Unit]);
+                self.await_task_fresh(Destination::RestoreMask {
+                    saved_mask,
+                    check_on_exit: true,
+                    next: Box::new(Destination::BracketUse {
+                        use_fn,
+                        release_fn,
+                        binding,
+                    }),
                 })?;
             }
             Intrinsic::Uninterruptible => {
                 let task = self.scratch.pop().expect("masked task");
-                self.scratch.push(task);
-                self.scratch.push(Value::Unit);
-                self.await_task(Destination::Bind(binding))?;
+                let saved_mask = self.mask_depth;
+                self.mask_depth += 1;
+                self.scratch.extend([task, Value::Unit]);
+                self.await_task_fresh(Destination::RestoreMask {
+                    saved_mask,
+                    check_on_exit: true,
+                    next: Box::new(Destination::Bind(binding)),
+                })?;
             }
             Intrinsic::SeqOfList => {
                 let list = self.scratch.pop().expect("list for Seq.of_list");
@@ -80,7 +98,8 @@ impl<'p> Machine<'p, '_> {
     fn lazy_force(&mut self, binding: Local) -> Result<(), Error> {
         enum LazyAction {
             Return(Value),
-            Raise(Value),
+            FailCause(CauseToken),
+            Wait,
             Start(Value),
         }
         let Value::Lazy(handle) = &self.scratch[0] else {
@@ -91,6 +110,7 @@ impl<'p> Machine<'p, '_> {
             execution: handle.execution,
         };
         self.release_operands()?;
+        let active = self.active_fiber;
         let action = {
             let slot = self.heap.lazy_state_mut(self.execution, &handle)?;
             match slot {
@@ -98,17 +118,25 @@ impl<'p> Machine<'p, '_> {
                     let rep = value.representation();
                     LazyAction::Return(self.heap.dup(&rep)?)
                 }
-                Some(LazyState::DoneErr(err)) => {
-                    let rep = err.representation();
-                    LazyAction::Raise(self.heap.dup(&rep)?)
+                Some(LazyState::DoneCause(cause)) => {
+                    let id = cause.object_id();
+                    LazyAction::FailCause(self.heap.dup_cause_id(id)?)
                 }
-                Some(LazyState::Running(_)) => return Err(Error::LazyCycle),
+                Some(LazyState::Running { owner, .. }) => {
+                    if *owner == active {
+                        return Err(Error::LazyCycle);
+                    }
+                    LazyAction::Wait
+                }
                 Some(LazyState::Pending(_)) => {
                     let Some(LazyState::Pending(task)) = slot.take() else {
                         unreachable!()
                     };
                     let rep = task.representation();
-                    *slot = Some(LazyState::Running(task));
+                    *slot = Some(LazyState::Running {
+                        task,
+                        owner: active,
+                    });
                     LazyAction::Start(self.heap.dup(&rep)?)
                 }
                 None => return Err(Error::ClosedLazy),
@@ -116,9 +144,19 @@ impl<'p> Machine<'p, '_> {
         };
         match action {
             LazyAction::Return(value) => self.store(binding, value),
-            LazyAction::Raise(err) => {
-                self.scratch.push(err);
-                self.raise_ordinary()
+            LazyAction::FailCause(cause) => {
+                if let Some(prev) = self.failure.replace(cause) {
+                    self.heap.drop_cause(prev)?;
+                }
+                self.failure_elected = true;
+                Ok(())
+            }
+            LazyAction::Wait => {
+                self.lazy_waiters
+                    .entry(handle.id)
+                    .or_default()
+                    .push((active, binding));
+                self.park_current(ParkReason::Lazy { lazy_id: handle.id })
             }
             LazyAction::Start(task) => {
                 self.scratch.push(task);
@@ -136,187 +174,94 @@ impl<'p> Machine<'p, '_> {
         binding: Local,
         finalizer: Finalizer,
     ) -> Result<(), Error> {
-        if self.owners[self.current_owner].closed || self.owners[self.current_owner].closing {
+        let owner = self.current_owner;
+        if self.owners[owner].is_closed() {
             Self::finalizer_roots(finalizer, &mut self.scratch);
             return self.raise_defect(DefectSpec::arena_owner_closed());
         }
-        self.owners[self.current_owner].finalizers.push(finalizer);
+        if self.owners[owner].is_finalizing() {
+            let exit_cause = match &self.owners[owner].exit_cause {
+                Some(c) => Some(self.heap.dup_cause(c)?),
+                None => None,
+            };
+            let saved_mask = self.mask_depth;
+            self.mask_depth += 1;
+            let next = Destination::RestoreMask {
+                saved_mask,
+                check_on_exit: true,
+                next: Box::new(Destination::Bind(binding)),
+            };
+            let res = self.run_single_finalizer(finalizer, exit_cause.as_ref(), next);
+            if let Some(c) = exit_cause {
+                self.heap.drop_cause(c)?;
+            }
+            return res;
+        }
+        self.owners[owner].finalizers.push(finalizer);
         self.store(binding, Value::Unit)
     }
 
-    fn begin_close_scope(
+    pub(super) fn owner_needs_async_close(&self, owner: usize) -> bool {
+        let o = &self.owners[owner];
+        !o.is_closed()
+            && (!o.hooks.is_empty()
+                || !o.children.is_empty()
+                || o.watchers > 0
+                || !o.finalizers.is_empty())
+    }
+
+    pub(super) fn begin_close_scope(
         &mut self,
         owner: usize,
         previous: usize,
         outcome: ScopeOutcome<'p>,
     ) -> Result<(), Error> {
-        let finalizers = mem::take(&mut self.owners[owner].finalizers);
-        if finalizers.is_empty() {
+        self.begin_close_scope_elect(owner, previous, outcome, false)
+    }
+
+    pub(super) fn begin_close_scope_elect(
+        &mut self,
+        owner: usize,
+        previous: usize,
+        outcome: ScopeOutcome<'p>,
+        elect_on_fail: bool,
+    ) -> Result<(), Error> {
+        self.begin_close_scope_with_override(owner, previous, outcome, None, elect_on_fail)
+    }
+
+    pub(super) fn begin_close_scope_with_override(
+        &mut self,
+        owner: usize,
+        previous: usize,
+        outcome: ScopeOutcome<'p>,
+        exit_override: Option<CauseToken>,
+        elect_on_fail: bool,
+    ) -> Result<(), Error> {
+        if !self.owner_needs_async_close(owner) {
+            if !self.owners[owner].is_closed() {
+                self.owners[owner].phase = OwnerPhase::Closing;
+            }
+            if let Some(c) = exit_override {
+                self.heap.drop_cause(c)?;
+            }
             self.close_owner(owner)?;
             self.current_owner = previous;
-            return self.complete_scope_outcome(outcome, None);
+            return self.complete_scope_outcome(outcome, None, elect_on_fail);
         }
-        self.owners[owner].closing = true;
+        self.owners[owner].phase = OwnerPhase::Closing;
         self.current_owner = owner;
         let state = Box::new(ClosingScopeState {
             owner,
             previous,
-            remaining: finalizers,
+            phase: ClosePhase::Hooks,
+            remaining: Vec::new(),
             outcome,
+            exit_override,
             finalizer_failure: None,
+            elect_on_fail,
+            saved_mask: self.mask_depth,
+            masked: false,
         });
         self.step_close_scope(state)
-    }
-
-    fn step_close_scope(&mut self, mut state: Box<ClosingScopeState<'p>>) -> Result<(), Error> {
-        let Some(finalizer) = state.remaining.pop() else {
-            let owner = state.owner;
-            let previous = state.previous;
-            let outcome = state.outcome;
-            let finalizer_failure = state.finalizer_failure;
-            self.close_owner(owner)?;
-            self.current_owner = previous;
-            return self.complete_scope_outcome(outcome, finalizer_failure);
-        };
-        self.current_owner = state.owner;
-        match finalizer {
-            Finalizer::Task(task) => {
-                self.scratch.push(task);
-                self.scratch.push(Value::Unit);
-                self.await_task(Destination::ClosingScope { state })
-            }
-            Finalizer::WithCause(func) => {
-                let arg = match &state.outcome {
-                    ScopeOutcome::Failure(cause) => {
-                        let dup = self.heap.dup_cause(cause)?;
-                        self.heap
-                            .construct("Prelude.Option.Some", vec![dup.into_value()])?
-                    }
-                    ScopeOutcome::Normal { .. } | ScopeOutcome::Discard(_) => {
-                        self.heap.construct("Prelude.Option.None", vec![])?
-                    }
-                };
-                self.scratch.extend([func, arg]);
-                self.apply(Destination::ClosingScope { state })
-            }
-            Finalizer::WithExit(func) => {
-                let exit = match &state.outcome {
-                    ScopeOutcome::Normal { value, .. } => {
-                        let dup = self.heap.dup(value)?;
-                        self.heap.allocate(Data::Exit(ExitData::Success(dup)))
-                    }
-                    ScopeOutcome::Failure(cause) => {
-                        let dup = self.heap.dup_cause(cause)?;
-                        self.heap
-                            .allocate(Data::Exit(ExitData::Failure(dup.into_value())))
-                    }
-                    ScopeOutcome::Discard(_) => self
-                        .heap
-                        .allocate(Data::Exit(ExitData::Success(Value::Unit))),
-                };
-                self.scratch.extend([func, exit]);
-                self.apply(Destination::ClosingScope { state })
-            }
-            Finalizer::Release { value, release_fn } => {
-                self.scratch.extend([release_fn, value]);
-                self.apply(Destination::ClosingScope { state })
-            }
-        }
-    }
-
-    fn finalizer_failed(&mut self, mut state: Box<ClosingScopeState<'p>>) -> Result<(), Error> {
-        let cause = self.failure.take().expect("finalizer failure cause");
-        state.finalizer_failure = Some(match state.finalizer_failure.take() {
-            None => cause,
-            Some(prev) => {
-                let combined =
-                    primitives::concat_causes(self.heap, &prev, &cause, &mut self.fuel);
-                self.heap.drop_cause(prev)?;
-                self.heap.drop_cause(cause)?;
-                match combined {
-                    Ok(c) => c,
-                    Err(err) => {
-                        let mut roots = Vec::new();
-                        self.drain_closing_scope_roots(*state, &mut roots);
-                        self.heap.drop_values(roots)?;
-                        return Err(err);
-                    }
-                }
-            }
-        });
-        self.step_close_scope(state)
-    }
-
-    fn complete_scope_outcome(
-        &mut self,
-        outcome: ScopeOutcome<'p>,
-        finalizer_failure: Option<CauseToken>,
-    ) -> Result<(), Error> {
-        match outcome {
-            ScopeOutcome::Normal { binding, value } => {
-                if let Some(cause) = finalizer_failure {
-                    self.heap.drop_value(value)?;
-                    self.failure = Some(cause);
-                    self.failure_elected = true;
-                } else if let Some(binding) = binding {
-                    self.store(binding, value)?;
-                } else {
-                    self.top = Some(value);
-                }
-            }
-            ScopeOutcome::Failure(cause) => {
-                let joined = if let Some(fin_cause) = finalizer_failure {
-                    let res = primitives::join_causes(self.heap, &cause, &fin_cause, &mut self.fuel);
-                    self.heap.drop_cause(cause)?;
-                    self.heap.drop_cause(fin_cause)?;
-                    res?
-                } else {
-                    cause
-                };
-                self.failure = Some(joined);
-                self.failure_elected = true;
-            }
-            ScopeOutcome::Discard(discard) => {
-                if let Some(fin_cause) = finalizer_failure {
-                    let mut discard = *discard;
-                    let preserved = Self::take_saved_failure(&mut discard.next);
-                    let mut roots = Vec::new();
-                    self.drain_transfer_next_roots(&mut discard.next, &mut roots);
-                    self.heap.drop_values(roots)?;
-                    let combined = if let Some(prev) = preserved {
-                        let res =
-                            primitives::join_causes(self.heap, &prev, &fin_cause, &mut self.fuel);
-                        self.heap.drop_cause(prev)?;
-                        self.heap.drop_cause(fin_cause)?;
-                        match res {
-                            Ok(c) => c,
-                            Err(err) => {
-                                let mut droots = Vec::new();
-                                self.drain_discard_roots(discard, &mut droots);
-                                self.heap.drop_values(droots)?;
-                                return Err(err);
-                            }
-                        }
-                    } else {
-                        fin_cause
-                    };
-                    self.failure = Some(combined);
-                    self.failure_elected = true;
-                    discard.next = TransferNext::Raise;
-                    self.discard = Some(discard);
-                } else {
-                    self.discard = Some(*discard);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn take_saved_failure(next: &mut TransferNext<'p>) -> Option<CauseToken> {
-        match next {
-            TransferNext::ResumeRunning { saved_failure } => saved_failure.take(),
-            TransferNext::Chain(chained) => Self::take_saved_failure(&mut chained.next),
-            _ => None,
-        }
     }
 }

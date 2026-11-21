@@ -22,12 +22,15 @@ impl Machine<'_, '_> {
     /// Detach every arena slot and unrun finalizer before dropping owners.
     fn close_owner(&mut self, owner: usize) -> Result<(), Error> {
         let state = &mut self.owners[owner];
-        if state.closed {
+        if state.is_closed() {
             return Ok(());
         }
-        state.closed = true;
-        state.closing = false;
+        state.phase = OwnerPhase::Closed;
+        state.hooks.clear();
+        state.children.clear();
+        state.close_waiter = None;
         let mut roots = mem::take(&mut state.arenas);
+        let exit_cause = state.exit_cause.take();
         let finalizers = mem::take(&mut state.finalizers);
         let mut detached = Vec::new();
         let mut failure = None;
@@ -49,6 +52,9 @@ impl Machine<'_, '_> {
                     failure.get_or_insert(error);
                 }
             }
+        }
+        if let Some(c) = exit_cause {
+            roots.push(c.into_value());
         }
         for fin in finalizers {
             Self::finalizer_roots(fin, &mut roots);
@@ -86,8 +92,12 @@ impl Machine<'_, '_> {
             }
         }
         self.cleanup_recoveries(&mut roots);
+        self.cleanup_async_roots(&mut roots);
         for provider in mem::take(&mut self.providers).into_values() {
             roots.push(provider.layer);
+            if let MemoRestore::Restore(Some(prev_memo)) = provider.restore_memo {
+                roots.push(prev_memo);
+            }
         }
         roots.extend(mem::take(&mut self.globals).into_values().flatten());
         // Scope arenas and any unrun finalizers close even on fuel exhaustion.
@@ -133,9 +143,9 @@ impl Machine<'_, '_> {
                     if let Some(prev) = state.take() {
                         match prev {
                             LazyState::Pending(v)
-                            | LazyState::Running(v)
-                            | LazyState::DoneOk(v)
-                            | LazyState::DoneErr(v) => detached.push(v),
+                            | LazyState::Running { task: v, .. }
+                            | LazyState::DoneOk(v) => detached.push(v),
+                            LazyState::DoneCause(c) => detached.push(c.into_value()),
                         }
                     }
                 }

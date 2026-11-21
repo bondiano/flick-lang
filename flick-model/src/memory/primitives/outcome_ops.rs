@@ -6,7 +6,7 @@ use flick_core::ir::memory::OutcomeIntrinsic;
 use super::cause_ops::{append_cause_reasons, drop_stored, run_cause};
 use super::list_ops::slice_reps;
 use super::{Data, Error, ExitData, Heap, Value, charge};
-use crate::memory::causes::{Reason, StoredReason};
+use crate::memory::causes::{CauseData, Reason, StoredReason};
 
 pub(super) fn run(
     heap: &mut Heap,
@@ -17,7 +17,9 @@ pub(super) fn run(
     charge(fuel, 1)?;
     match op {
         OutcomeIntrinsic::ExitVoid => Ok(heap.allocate(Data::Exit(ExitData::Success(Value::Unit)))),
-        OutcomeIntrinsic::CauseEmpty => Ok(heap.allocate(Data::Cause(Vec::new()))),
+        OutcomeIntrinsic::CauseEmpty => {
+            Ok(heap.allocate(Data::Cause(CauseData::plain(Vec::new()))))
+        }
         OutcomeIntrinsic::ExitValue => exit_value(heap, &args[0]),
         OutcomeIntrinsic::ExitFailure => exit_failure(heap, &args[0]),
         OutcomeIntrinsic::ExitSucceed => {
@@ -79,10 +81,10 @@ pub(super) fn expect_cause_reasons<'a>(
     let Value::Object(tok) = val else {
         return Err(Error::ExpectedCause);
     };
-    let Data::Cause(reasons) = &heap.object(tok.id)?.data else {
+    let Data::Cause(data) = &heap.object(tok.id)?.data else {
         return Err(Error::ExpectedCause);
     };
-    Ok(reasons)
+    Ok(&data.reasons)
 }
 
 pub(super) fn expect_reason<'a>(heap: &'a Heap, val: &Value) -> Result<&'a StoredReason, Error> {
@@ -327,6 +329,6 @@ fn exit_as_void_all(heap: &mut Heap, list_val: &Value, fuel: &mut u64) -> Result
     if !had_failure {
         return Ok(heap.allocate(Data::Exit(ExitData::Success(Value::Unit))));
     }
-    let cause = heap.allocate(Data::Cause(stored));
+    let cause = heap.allocate(Data::Cause(CauseData::plain(stored)));
     Ok(heap.allocate(Data::Exit(ExitData::Failure(cause))))
 }

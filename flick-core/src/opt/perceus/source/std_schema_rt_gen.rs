@@ -157,6 +157,22 @@ pub(super) fn draw_schema_helper(b: &ExprBuilder) -> Expr {
                 needs_gen(b, b.loc("what")),
             ),
             arm(
+                Pat::Con(kc("$Duration", 0), vec![]),
+                needs_gen(b, str_lit(b, "a check")),
+            ),
+            arm(
+                Pat::Con(kc("$BigDecimal", 0), vec![]),
+                needs_gen(b, str_lit(b, "BigDecimal")),
+            ),
+            arm(
+                Pat::Con(kc("$Chunk", 1), vec![Pat::Wild]),
+                needs_gen(b, str_lit(b, "Chunk")),
+            ),
+            arm(
+                Pat::Con(kc("$CodecType", 1), vec![Pat::Wild]),
+                needs_gen(b, str_lit(b, "a declared type")),
+            ),
+            arm(
                 Pat::Con(kc("$Enum", 1), vec![Pat::Bind(b.name("vals"))]),
                 enum_expr,
             ),

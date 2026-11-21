@@ -2,8 +2,19 @@
 enum LayerData {
     Succeed { tag: Value, implementation: Value },
     // Strong graph edges: duplicate roots retain their independent tokens.
-    // Dynamic acquisition constructors are deliberately not represented yet.
     Merge { left: Value, right: Value },
+    /// Constant empty layer (`Layer.empty`).
+    Empty,
+    /// Constant layer built from an existing `Data::Context` (`Layer.succeed_context`).
+    Context(Value),
+    /// Dynamic layer built by calling `build(memo_map)` in a fresh/memoized scope.
+    Dynamic { memo: bool, build: Value },
+    /// Builds `inner` with a fresh unshared `MemoMap` (`Layer.fresh`).
+    Fresh(Value),
+    /// Builds every layer concurrently, later services replacing earlier ones.
+    MergeAll(Vec<Value>),
+    /// Builds `inner`, turning typed build failures into defects (`Layer.or_die`).
+    OrDie(Value),
 }
 
 #[derive(Debug)]
@@ -29,11 +40,14 @@ impl DictionaryValue {
 #[derive(Debug)]
 enum LazyState {
     Pending(Value),
-    /// Retains the original task until normal or typed-error completion so a
-    /// defect/abort/signal restores Pending cleanly (`#626`).
-    Running(Value),
+    /// Retains the original task and owning fiber until completion so a
+    /// defect/abort/signal restores Pending or hands off to waiters cleanly (`#626`).
+    Running {
+        task: Value,
+        owner: usize,
+    },
     DoneOk(Value),
-    DoneErr(Value),
+    DoneCause(CauseToken),
 }
 
 #[derive(Debug)]
@@ -139,7 +153,7 @@ enum Data {
         recovery_id: usize,
         selected: Option<Value>,
     },
-    Cause(Vec<causes::StoredReason>),
+    Cause(causes::CauseData),
     CauseReason(causes::StoredReason),
     Duration(DurationData),
     Defect(DefectSpec),
@@ -223,6 +237,60 @@ enum Data {
     Cron(Box<CronData>),
     Graph(Box<GraphData>),
     GraphWalker(GraphWalkerData),
+    /// Immutable built service context (`Context r`).
+    Context(BTreeMap<String, Value>),
+    /// Fiber-local reference definition (`Context.Reference a`).
+    ContextRef {
+        key: String,
+        default_fn: Value,
+    },
+    /// Execution-scoped handle to a cooperative fiber (`Fiber e a`).
+    FiberHandle {
+        execution: usize,
+        id: usize,
+    },
+    /// Execution-scoped handle to a one-shot `Deferred e a`.
+    Deferred {
+        execution: usize,
+        id: usize,
+    },
+    /// Execution-scoped handle to a `Layer.MemoMap`.
+    MemoMap {
+        execution: usize,
+        id: usize,
+    },
+    /// Execution-scoped handle to a `FiberSet` / `FiberMap` / `FiberHandle`.
+    FiberGroup {
+        execution: usize,
+        id: usize,
+    },
+    /// Callable `restore : Eff -> Eff` passed to `uninterruptible_mask`/`interruptible_mask`.
+    MaskRestore {
+        execution: usize,
+        outer_mask: usize,
+    },
+    /// Task returned by `MaskRestore(task)` running at `target_mask`.
+    MaskedTask {
+        target_mask: usize,
+        task: Value,
+    },
+    /// Task returned by `Effect.cached*` that reads or runs `CachedCell(id)`.
+    CachedRunTask {
+        execution: usize,
+        id: usize,
+    },
+    /// Task returned by `Effect.cached_invalidate_with_ttl` clearing `CachedCell(id)`.
+    CachedInvalidateTask {
+        execution: usize,
+        id: usize,
+    },
+    /// Task returned by `Deferred.poll` yielding or failing with `ExitData`.
+    ExitTask(ExitData),
+    /// Captured services and fiber-local refs for running acquired resources later.
+    CapturedEnv {
+        services: Vec<Value>,
+        refs: BTreeMap<String, Value>,
+    },
 }
 
 #[derive(Debug)]

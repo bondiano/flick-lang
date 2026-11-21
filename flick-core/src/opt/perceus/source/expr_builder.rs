@@ -98,6 +98,102 @@ impl ExprBuilder {
         self.app(fab, c)
     }
 
+    pub(super) fn app4(&self, func: Expr, a1: Expr, a2: Expr, a3: Expr, a4: Expr) -> Expr {
+        let fabc = self.app3(func, a1, a2, a3);
+        self.app(fabc, a4)
+    }
+
+    pub(super) fn app5(
+        &self,
+        func: Expr,
+        a1: Expr,
+        a2: Expr,
+        a3: Expr,
+        a4: Expr,
+        a5: Expr,
+    ) -> Expr {
+        let fabcd = self.app4(func, a1, a2, a3, a4);
+        self.app(fabcd, a5)
+    }
+
+    pub(super) fn app6(&self, func: Expr, args: [Expr; 6]) -> Expr {
+        args.into_iter().fold(func, |acc, arg| self.app(acc, arg))
+    }
+
+    pub(super) fn str_(&self, s: &str) -> Expr {
+        self.at(ExprKind::Lit(Lit::String(s.into())))
+    }
+
+    pub(super) fn task(&self, body: Expr) -> Expr {
+        self.at(ExprKind::Task(Box::new(body)))
+    }
+
+    pub(super) fn await_(&self, t: Expr) -> Expr {
+        self.at(ExprKind::Await(Box::new(t)))
+    }
+
+    pub(super) fn tup_pat(&self, names: &[&str]) -> Pat {
+        Pat::Tuple(
+            names
+                .iter()
+                .map(|n| {
+                    if *n == "_" {
+                        Pat::Wild
+                    } else {
+                        Pat::Bind(self.name(n))
+                    }
+                })
+                .collect(),
+        )
+    }
+
+    pub(super) fn loop_ctrl(&self, id: &str, body: Expr) -> Expr {
+        self.at(ExprKind::ControlLoop {
+            id: id.into(),
+            condition: None,
+            body: Box::new(body),
+            iterable: false,
+        })
+    }
+
+    pub(super) fn rmake(&self, v: Expr) -> Expr {
+        self.app(self.global("Ref", "make"), v)
+    }
+
+    pub(super) fn rget(&self, r: Expr) -> Expr {
+        self.app(self.global("Ref", "get"), r)
+    }
+
+    pub(super) fn rset(&self, r: Expr, v: Expr) -> Stmt {
+        Stmt::Expr(self.app2(self.global("Ref", "set"), r, v))
+    }
+
+    pub(super) fn dmake(&self) -> Expr {
+        self.app(self.global("Deferred", "make"), self.unit())
+    }
+
+    pub(super) fn dsucceed(&self, v: Expr, d: Expr) -> Stmt {
+        self.let_("_dw", self.app2(self.global("Deferred", "succeed"), v, d))
+    }
+
+    pub(super) fn dawait(&self, d: Expr) -> Expr {
+        self.app(self.global("Deferred", "await_"), d)
+    }
+
+    pub(super) fn no_preempt(&self, body: Expr) -> Expr {
+        let pref = self.app2(
+            self.global("Context", "reference"),
+            self.str_("flick/Scheduler/PreventYield"),
+            self.lam(&["_u"], self.bool_(false)),
+        );
+        self.app3(
+            self.global("Context", "with_reference"),
+            pref,
+            self.bool_(true),
+            self.task(body),
+        )
+    }
+
     pub(super) fn bin(&self, op: BinOp, l: Expr, r: Expr) -> Expr {
         self.at(ExprKind::Binary(op, Box::new(l), Box::new(r)))
     }
@@ -122,8 +218,8 @@ impl ExprBuilder {
         self.at(ExprKind::If(Box::new(c), Box::new(t), Box::new(e)))
     }
 
-    pub(super) fn block(&self, stmts: Vec<Stmt>, tail: Expr) -> Expr {
-        self.at(ExprKind::Block(stmts, Box::new(tail)))
+    pub(super) fn block(&self, stmts: impl Into<Vec<Stmt>>, tail: Expr) -> Expr {
+        self.at(ExprKind::Block(stmts.into(), Box::new(tail)))
     }
 
     pub(super) fn let_(&self, name: &str, val: Expr) -> Stmt {
@@ -138,12 +234,16 @@ impl ExprBuilder {
         Stmt::Assign(self.name(name), val)
     }
 
-    pub(super) fn tuple(&self, items: Vec<Expr>) -> Expr {
-        self.at(ExprKind::Tuple(items))
+    pub(super) fn assign_e(&self, name: &str, val: Expr) -> Expr {
+        self.block(vec![self.assign(name, val)], self.unit())
     }
 
-    pub(super) fn list(&self, items: Vec<Expr>) -> Expr {
-        self.at(ExprKind::List(items))
+    pub(super) fn tuple(&self, items: impl Into<Vec<Expr>>) -> Expr {
+        self.at(ExprKind::Tuple(items.into()))
+    }
+
+    pub(super) fn list(&self, items: impl Into<Vec<Expr>>) -> Expr {
+        self.at(ExprKind::List(items.into()))
     }
 
     pub(super) fn yield_(&self, v: Expr) -> Expr {
@@ -191,8 +291,8 @@ impl ExprBuilder {
         })
     }
 
-    pub(super) fn match_(&self, scr: Expr, arms: Vec<Arm>) -> Expr {
-        self.at(ExprKind::Match(Box::new(scr), arms))
+    pub(super) fn match_(&self, scr: Expr, arms: impl Into<Vec<Arm>>) -> Expr {
+        self.at(ExprKind::Match(Box::new(scr), arms.into()))
     }
 
     pub(super) fn con(module: &str, ty: &str, name: &str, arity: usize) -> Constructor {

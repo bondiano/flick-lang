@@ -344,36 +344,7 @@ impl Heap {
                     field,
                 })
             }
-            Data::RecoveryResult { .. }
-            | Data::Cause(_)
-            | Data::CauseReason(_)
-            | Data::Duration(_)
-            | Data::Defect(_)
-            | Data::ServiceTag { .. }
-            | Data::Layer(_)
-            | Data::String(_)
-            | Data::Utf16(_)
-            | Data::Bytes(_)
-            | Data::JsonNull
-            | Data::BigDecimal { .. }
-            | Data::RegExp { .. }
-            | Data::BigInt(_)
-            | Data::Record(_)
-            | Data::Dictionary(_)
-            | Data::Continuation { .. }
-            | Data::Cell { .. }
-            | Data::Var { .. }
-            | Data::Lazy { .. }
-            | Data::Arena { .. }
-            | Data::Seq(_)
-            | Data::Iterator { .. }
-            | Data::Label(_)
-            | Data::Exit(_)
-            | Data::DateTime(_)
-            | Data::TimeZone(_)
-            | Data::Cron(_)
-            | Data::Graph(_)
-            | Data::GraphWalker(_) => Err(Error::ExpectedObject),
+            _ => Err(Error::ExpectedObject),
         }
     }
 
@@ -392,38 +363,7 @@ impl Heap {
                 Ok(tag)
             }
             Data::ListSlice { .. } => Ok("$list"),
-            Data::RecoveryResult { .. }
-            | Data::Cause(_)
-            | Data::CauseReason(_)
-            | Data::Duration(_)
-            | Data::Defect(_)
-            | Data::ServiceTag { .. }
-            | Data::Layer(_)
-            | Data::String(_)
-            | Data::Utf16(_)
-            | Data::Bytes(_)
-            | Data::JsonNull
-            | Data::BigDecimal { .. }
-            | Data::RegExp { .. }
-            | Data::BigInt(_)
-            | Data::Record(_)
-            | Data::Dictionary(_)
-            | Data::Closure { .. }
-            | Data::Task { .. }
-            | Data::Continuation { .. }
-            | Data::Cell { .. }
-            | Data::Var { .. }
-            | Data::Lazy { .. }
-            | Data::Arena { .. }
-            | Data::Seq(_)
-            | Data::Iterator { .. }
-            | Data::Label(_)
-            | Data::Exit(_)
-            | Data::DateTime(_)
-            | Data::TimeZone(_)
-            | Data::Cron(_)
-            | Data::Graph(_)
-            | Data::GraphWalker(_) => Err(Error::ExpectedObject),
+            _ => Err(Error::ExpectedObject),
         }
     }
 

@@ -46,6 +46,21 @@ pub enum Reason<'a> {
 }
 
 #[derive(Debug)]
+pub(super) struct CauseData {
+    pub(super) reasons: Vec<StoredReason>,
+    pub(super) trace: Option<Value>,
+}
+
+impl CauseData {
+    pub(super) fn plain(reasons: Vec<StoredReason>) -> Self {
+        Self {
+            reasons,
+            trace: None,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(super) enum StoredReason {
     Fail(Value),
     Die(Value),
@@ -53,7 +68,7 @@ pub(super) enum StoredReason {
 }
 
 impl StoredReason {
-    fn borrowed(&self) -> Reason<'_> {
+    pub(super) fn borrowed(&self) -> Reason<'_> {
         match self {
             Self::Fail(value) => Reason::Fail(value),
             Self::Die(value) => Reason::Die(value),
@@ -120,6 +135,12 @@ impl DefectSpec {
     pub(super) fn arena_closed() -> Self {
         Self {
             code: DefectCode::ArenaClosed,
+        }
+    }
+
+    pub(super) fn custom(msg: impl Into<String>) -> Self {
+        Self {
+            code: DefectCode::Assert(msg.into()),
         }
     }
 
@@ -220,90 +241,7 @@ impl StepFailure {
             Error::Todo(msg) => DefectCode::Todo(msg),
             Error::Assert(msg) => DefectCode::Assert(msg),
             Error::RangeError(msg) => DefectCode::RangeError(msg),
-            evaluator @ (Error::InvalidFunction(_)
-            | Error::InvalidProgram(_)
-            | Error::NeedsProgram
-            | Error::UnsupportedOperation(_)
-            | Error::OperationArgumentCount { .. }
-            | Error::HandlerIdentityOverflow
-            | Error::ExpectedResult
-            | Error::UnhandledFailure
-            | Error::OutOfFuel
-            | Error::ConstructorFieldOverflow
-            | Error::InvalidTaggedBoundary { .. }
-            | Error::ReservedConstructorEvidence(_)
-            | Error::PatternEvidenceLayout { .. }
-            | Error::PatternKind(_)
-            | Error::PatternLayout { .. }
-            | Error::UnknownGlobal(_)
-            | Error::GlobalCycle(_)
-            | Error::ExpectedServiceTag
-            | Error::ExpectedLayer
-            | Error::ExpectedClosure
-            | Error::ForeignClosure
-            | Error::ExpectedTask
-            | Error::ForeignTask
-            | Error::ExpectedCell
-            | Error::ForeignCell
-            | Error::ClosedCell
-            | Error::ExpectedVar
-            | Error::ForeignVar
-            | Error::ClosedVar
-            | Error::ExpectedLazy
-            | Error::ForeignLazy
-            | Error::ClosedLazy
-            | Error::ForeignContinuation
-            | Error::MissingLoopTarget(_)
-            | Error::MissingFunctionBoundary
-            | Error::MissingGeneratorBoundary
-            | Error::ExpectedSeq
-            | Error::ForeignSeq
-            | Error::ExpectedIterator
-            | Error::ForeignIterator
-            | Error::ClosedIterator
-            | Error::ExpectedLabel
-            | Error::ExpectedExit
-            | Error::ExpectedOption
-            | Error::ExpectedInt
-            | Error::ExpectedFloat
-            | Error::ExpectedModifyPair
-            | Error::ExpectedOwner
-            | Error::ForeignOwner
-            | Error::ClosedOwner
-            | Error::ExpectedArena
-            | Error::ExpectedArenaView
-            | Error::ForeignArena
-            | Error::ClosedArena
-            | Error::MissingArenaSlot(_)
-            | Error::ExpectedRecord
-            | Error::ExpectedDictionary
-            | Error::MissingMethod(_)
-            | Error::ExpectedStructure
-            | Error::StructureArity { .. }
-            | Error::MissingNamedField(_)
-            | Error::DuplicateField(_)
-            | Error::UnsupportedPrimitive(_)
-            | Error::InvalidBigInt(_)
-            | Error::ArgumentCount { .. }
-            | Error::InvalidObject(_)
-            | Error::ReferenceOverflow(_)
-            | Error::InsufficientReferences { .. }
-            | Error::ExpectedObject
-            | Error::ExpectedString
-            | Error::ExpectedBigInt
-            | Error::ExpectedBoolean
-            | Error::MissingField { .. }
-            | Error::NoToken(_)
-            | Error::Leftover(_)
-            | Error::LiveObjects(_)
-            | Error::LiveCountMismatch { .. }
-            | Error::ExpectedCause
-            | Error::ExpectedDefect
-            | Error::RecoveryOutsideSelection
-            | Error::ExpectedRecoveryResult
-            | Error::ForeignRecoveryResult
-            | Error::RecoveryEscape
-            | Error::RecoveryIdentityOverflow) => return Self::Evaluator(evaluator),
+            evaluator => return Self::Evaluator(evaluator),
         };
         Self::Language(DefectSpec { code })
     }
@@ -324,7 +262,7 @@ impl Heap {
             )?;
             return Err(error);
         }
-        let Value::Object(token) = self.allocate(Data::Cause(stored)) else {
+        let Value::Object(token) = self.allocate(Data::Cause(CauseData::plain(stored))) else {
             unreachable!("cause allocation")
         };
         Ok(CauseToken { token })
@@ -356,11 +294,11 @@ impl Heap {
         charge(fuel, 1)
     }
 
-    fn cause_data(&self, cause: &CauseToken) -> Result<&[StoredReason], Error> {
-        let Data::Cause(reasons) = &self.object(cause.token.id)?.data else {
+    pub(super) fn cause_data(&self, cause: &CauseToken) -> Result<&[StoredReason], Error> {
+        let Data::Cause(data) = &self.object(cause.token.id)?.data else {
             return Err(Error::ExpectedCause);
         };
-        Ok(reasons)
+        Ok(&data.reasons)
     }
 
     pub fn cause_reasons(
@@ -371,9 +309,14 @@ impl Heap {
     }
 
     pub fn dup_cause(&mut self, cause: &CauseToken) -> Result<CauseToken, Error> {
-        self.cause_data(cause)?;
-        let Value::Object(token) = self.dup(&Value::Object(ObjectToken { id: cause.token.id }))?
-        else {
+        self.dup_cause_id(cause.token.id)
+    }
+
+    pub(super) fn dup_cause_id(&mut self, id: super::ObjectId) -> Result<CauseToken, Error> {
+        if !matches!(self.object(id)?.data, Data::Cause(_)) {
+            return Err(Error::ExpectedCause);
+        }
+        let Value::Object(token) = self.dup(&Value::Object(ObjectToken { id }))? else {
             unreachable!("cause reference")
         };
         Ok(CauseToken { token })
@@ -456,98 +399,5 @@ impl Heap {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use flick_core::ir::Lit;
-
-    #[test]
-    fn overflow_after_a_valid_duplicate_prefix_releases_every_accepted_edge() {
-        let mut heap = Heap::new();
-        let first = heap
-            .literal(&Lit::String("first".into()))
-            .expect("first root");
-        let overflow = heap
-            .literal(&Lit::String("overflow".into()))
-            .expect("overflow root");
-        let id = overflow.object_id().expect("object identity");
-        heap.object_mut(id)
-            .expect("private overflow fixture")
-            .references = usize::MAX;
-        assert_eq!(
-            heap.cause(&[Reason::Fail(&first), Reason::Die(&overflow)], &mut 100),
-            Err(Error::ReferenceOverflow(id))
-        );
-        assert_eq!(heap.reference_count(&first), Ok(1));
-        assert_eq!(heap.reference_count(&overflow), Ok(usize::MAX));
-        heap.object_mut(id)
-            .expect("restore fixture reference count")
-            .references = 1;
-        heap.drop_values(vec![first, overflow])
-            .expect("original roots released");
-        heap.finish().expect("accepted duplicates reclaimed");
-    }
-
-    #[test]
-    fn malformed_payload_after_valid_prefix_does_not_lose_accepted_duplicates() {
-        let mut heap = Heap::new();
-        let first = heap
-            .literal(&Lit::String("first".into()))
-            .expect("first root");
-        let stale = heap
-            .literal(&Lit::String("stale".into()))
-            .expect("stale root");
-        let id = stale.object_id().expect("diagnostic identity only");
-        heap.drop_value(stale).expect("retire original object");
-        // Private integrity injection, deliberately impossible through public token construction.
-        let invalid = Value::Object(ObjectToken { id });
-        assert_eq!(
-            heap.cause(&[Reason::Fail(&first), Reason::Die(&invalid)], &mut 100),
-            Err(Error::InvalidObject(id))
-        );
-        assert_eq!(heap.reference_count(&first), Ok(1));
-        heap.drop_value(first).expect("original release");
-        heap.finish()
-            .expect("failed builder drains accepted duplicates");
-    }
-
-    #[test]
-    fn cause_duplicate_overflow_and_malformed_kind_do_not_mutate_owned_edges() {
-        let mut heap = Heap::new();
-        let payload = heap
-            .literal(&Lit::String("original".into()))
-            .expect("payload");
-        let cause = heap
-            .cause(&[Reason::Die(&payload)], &mut 10)
-            .expect("cause");
-        let id = cause.token.id;
-        heap.object_mut(id)
-            .expect("private overflow fixture")
-            .references = usize::MAX;
-        assert_eq!(heap.dup_cause(&cause), Err(Error::ReferenceOverflow(id)));
-        assert_eq!(heap.reference_count(&payload), Ok(2));
-        heap.object_mut(id)
-            .expect("restore fixture count")
-            .references = 1;
-        let invalid = CauseToken {
-            token: ObjectToken {
-                id: payload.object_id().expect("payload identity"),
-            },
-        };
-        assert_eq!(heap.dup_cause(&invalid), Err(Error::ExpectedCause));
-        heap.drop_cause(cause).expect("actual owned cause release");
-        heap.drop_value(payload).expect("original release");
-        let stats = heap.finish().expect("no dropped cause edge was lost");
-        assert_eq!(stats.allocations, stats.frees);
-    }
-    #[test]
-    fn closed_resource_errors_are_not_globally_promoted() {
-        assert!(matches!(
-            StepFailure::classify(Error::ClosedOwner),
-            StepFailure::Evaluator(Error::ClosedOwner)
-        ));
-        assert!(matches!(
-            StepFailure::classify(Error::ClosedArena),
-            StepFailure::Evaluator(Error::ClosedArena)
-        ));
-    }
-}
+#[path = "causes_tests.rs"]
+mod tests;

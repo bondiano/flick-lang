@@ -18,7 +18,9 @@ const STAGE3_PURE_SUITES: &[&str] = &[
     "BigInts",
     "Bytes",
     "Chunk",
+    "ClassVariance",
     "Collections",
+    "Effects",
     "Equality",
     "Floats",
     "Functions",
@@ -35,12 +37,16 @@ const STAGE3_PURE_SUITES: &[&str] = &[
     "Show",
     "Strings",
     "Syntax",
+    "Time",
 ];
 
 #[test]
 fn stage3_language_suites_pass_with_zero_leaks() {
     let lang_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/language");
-    let mut files = vec![lang_root.join("src/Language/Shapes.fl")];
+    let mut files = vec![
+        lang_root.join("src/Language/Shapes.fl"),
+        lang_root.join("src/Language/ClassVarianceDefs.fl"),
+    ];
     let suites: Vec<(&str, &[&str])> = STAGE3_PURE_SUITES.iter().map(|&s| (s, &[][..])).collect();
 
     for &(suite, _) in &suites {

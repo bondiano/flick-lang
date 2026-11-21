@@ -118,7 +118,7 @@ pub(super) fn js_number_parse(s: &str) -> f64 {
     t.parse::<f64>().unwrap_or(f64::NAN)
 }
 
-fn is_finite_text(s: &str) -> bool {
+pub(super) fn is_finite_text(s: &str) -> bool {
     let bytes = s.as_bytes();
     let mut i = 0;
     if i < bytes.len() && matches!(bytes[i], b'+' | b'-') {

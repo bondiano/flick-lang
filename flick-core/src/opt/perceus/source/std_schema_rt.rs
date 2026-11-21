@@ -64,12 +64,36 @@ impl Lower<'_> {
             )?
         } else if name.name == "Int.ToBigInt" {
             self.intrinsic(Intrinsic::ToBigInt, false, vec![], &mut block, span)?
+        } else if name.name == "Metric.Registry" {
+            let b = ExprBuilder::new(span, "$mr");
+            let init = b.rmake(b.list(vec![]));
+            self.expr(&init, &Env::new(), &mut block)?
         } else if let Some(kind) = super::std_ext_rt::ext_rt_intrinsic(&name.name) {
             self.intrinsic(kind, false, vec![], &mut block, span)?
         } else if let Some(helper) = name.name.strip_prefix("Helper.") {
             let expr = helper_expr(helper, span)
                 .or_else(|| super::std_schema_rt_more::helper_expr(helper, span))
                 .or_else(|| super::std_schema_rt_route::helper_expr(helper, span))
+                .or_else(|| super::std_config::config_helper_expr(helper, span))
+                .or_else(|| super::std_config_prov::prov_helper_expr(helper, span))
+                .or_else(|| super::std_arbitrary_model::arb_model_helper(helper, span))
+                .or_else(|| super::std_arbitrary_entries::arb_entries_helper(helper, span))
+                .or_else(|| super::std_arbitrary_run::arb_run_helper(helper, span))
+                .or_else(|| super::std_arbitrary_node::arb_node_helper(helper, span))
+                .or_else(|| super::std_arbitrary_schema::arb_schema_helper(helper, span))
+                .or_else(|| super::std_channel_core::channel_core_helper(helper, span))
+                .or_else(|| super::std_channel_transform::channel_transform_helper(helper, span))
+                .or_else(|| super::std_channel_text::channel_text_helper(helper, span))
+                .or_else(|| super::std_channel_control::channel_control_helper(helper, span))
+                .or_else(|| super::std_channel_run::channel_run_helper(helper, span))
+                .or_else(|| super::std_sink_core::sink_core_helper(helper, span))
+                .or_else(|| super::std_sink_folds::sink_folds_helper(helper, span))
+                .or_else(|| super::std_stream_core::stream_core_helper(helper, span))
+                .or_else(|| super::std_stream_transform::stream_transform_helper(helper, span))
+                .or_else(|| super::std_stream_window::stream_window_helper(helper, span))
+                .or_else(|| super::std_stream_combine::stream_combine_helper(helper, span))
+                .or_else(|| super::std_stream_split::stream_split_helper(helper, span))
+                .or_else(|| super::std_stream_pipe::stream_pipe_helper(helper, span))
                 .ok_or_else(|| LowerError::UnknownGlobal {
                     name: name.clone(),
                     span: Some(span),
@@ -169,15 +193,11 @@ pub(super) fn con_app(b: &ExprBuilder, m: &str, ty: &str, c: &str, args: Vec<Exp
 }
 
 pub(super) fn pair_pat(b: &ExprBuilder, a: &str, c: &str) -> Pat {
-    Pat::Tuple(vec![Pat::Bind(b.name(a)), Pat::Bind(b.name(c))])
+    b.tup_pat(&[a, c])
 }
 
 pub(super) fn triple_pat(b: &ExprBuilder, a: &str, c: &str, d: &str) -> Pat {
-    Pat::Tuple(vec![
-        Pat::Bind(b.name(a)),
-        Pat::Bind(b.name(c)),
-        Pat::Bind(b.name(d)),
-    ])
+    b.tup_pat(&[a, c, d])
 }
 
 pub(super) fn make_codec(

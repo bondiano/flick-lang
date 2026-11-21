@@ -34,16 +34,12 @@ fn exceptional_boundaries_use_saved_owner_not_current_selection() {
     machine.owners = vec![
         OwnerState::default(),
         OwnerState {
-            closing: false,
-            closed: false,
-            finalizers: vec![],
             arenas: vec![first],
+            ..OwnerState::default()
         },
         OwnerState {
-            closing: false,
-            closed: false,
-            finalizers: vec![],
             arenas: vec![selected],
+            ..OwnerState::default()
         },
     ];
     machine.current_owner = 2;
@@ -56,8 +52,8 @@ fn exceptional_boundaries_use_saved_owner_not_current_selection() {
     machine.fuel = 100;
     machine.main_stage = MainStage::Done;
     machine.unwind().expect("valid typed-failure test");
-    assert!(machine.owners[1].closed);
-    assert!(!machine.owners[2].closed);
+    assert!(machine.owners[1].is_closed());
+    assert!(!machine.owners[2].is_closed());
     assert_eq!(machine.current_owner, 0);
     assert_eq!(machine.heap.stats().arenas_freed, 1);
     machine.current_owner = 2;
@@ -68,7 +64,7 @@ fn exceptional_boundaries_use_saved_owner_not_current_selection() {
     machine.unwind().expect("valid typed-failure test");
     assert_eq!(machine.current_owner, 0);
     assert!(
-        !machine.owners[2].closed,
+        !machine.owners[2].is_closed(),
         "selection restores without closing storage"
     );
     assert_eq!(machine.heap.stats().arenas_freed, 1);
@@ -180,45 +176,11 @@ fn owner_selection_validates_identity_but_not_resource_admission() {
         globals: vec![],
     };
     let mut heap = Heap::new();
-    let mut machine = Machine {
-        heap: &mut heap,
-        program: &program,
-        execution: 7,
-        globals: BTreeMap::new(),
-        cells: vec![],
-        lazies: vec![],
-        owners: vec![OwnerState {
-            closing: false,
-            closed: true,
-            finalizers: vec![],
-            arenas: vec![],
-        }],
-        current_owner: 0,
-        current_evidence: None,
-        frames: vec![],
-        activations: BTreeMap::new(),
-        providers: BTreeMap::new(),
-        segments: BTreeMap::new(),
-        continuations: BTreeMap::new(),
-        generators: BTreeMap::new(),
-        invocations: BTreeMap::new(),
-        discard: None,
-        ready: None,
-        next_handler: 0,
-        arguments: VecDeque::new(),
-        scratch: vec![],
-        pending: None,
-        failure: None,
-        failure_elected: false,
-        recoveries: BTreeMap::new(),
-        next_recovery: 0,
-        pending_handler: None,
-        top: None,
-        stdout: String::new(),
-        fuel: 100,
-        main_stage: MainStage::Done,
-        root: None,
-    };
+    let mut machine = Machine::new(&mut heap, &program, 7, vec![], 100, MainStage::Done);
+    machine.owners = vec![OwnerState {
+        phase: OwnerPhase::Closed,
+        ..OwnerState::default()
+    }];
     assert_eq!(
         machine.owner_index(&Value::Int(42)),
         Err(Error::ExpectedOwner)

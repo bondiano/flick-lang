@@ -1,16 +1,22 @@
 //! Complete providers retain caller evidence and own a real lexical scope.
-use super::{Destination, Invocation, InvocationEnd, Machine, OwnerState};
+use super::{Destination, Invocation, InvocationEnd, Machine, OwnerState, ScopeOutcome};
 use crate::memory::{Data, Error, Heap, LayerData, Value};
 use flick_core::ir::memory::{Intrinsic, Local};
 use std::mem;
+
+pub(super) enum MemoRestore {
+    Unchanged,
+    Restore(Option<Value>),
+}
 
 pub(super) struct Provider {
     pub(super) layer: Value,
     pub(super) owner: usize,
     pub(super) previous: usize,
+    pub(super) restore_memo: MemoRestore,
 }
 
-impl Machine<'_, '_> {
+impl<'p> Machine<'p, '_> {
     pub(super) fn layer_intrinsic(&mut self, kind: Intrinsic, binding: Local) -> Result<(), Error> {
         match kind {
             Intrinsic::LayerSucceed => {
@@ -39,25 +45,32 @@ impl Machine<'_, '_> {
             }
             Intrinsic::LayerRun => {
                 layer_data(self.heap, &self.scratch[0])?;
-                let id = self.handler_identity()?;
-                let previous = self.current_owner;
-                let owner = self.owners.len();
-                self.owners.push(OwnerState::default());
-                self.current_owner = owner;
-                let layer = self.scratch.remove(0);
-                self.providers.insert(
-                    id,
-                    Provider {
-                        layer,
-                        owner,
-                        previous,
-                    },
-                );
-                self.scratch.push(Value::Unit);
-                self.apply(Destination::LayerRun {
-                    provider: id,
-                    binding,
-                })?;
+                if self.layer_is_static(&self.scratch[0])? {
+                    let id = self.handler_identity()?;
+                    let previous = self.current_owner;
+                    let owner = self.owners.len();
+                    self.owners.push(OwnerState::default());
+                    self.current_owner = owner;
+                    let layer = self.scratch.remove(0);
+                    self.providers.insert(
+                        id,
+                        Provider {
+                            layer,
+                            owner,
+                            previous,
+                            restore_memo: MemoRestore::Unchanged,
+                        },
+                    );
+                    self.scratch.push(Value::Unit);
+                    self.apply(Destination::LayerRun {
+                        provider: id,
+                        binding,
+                    })?;
+                } else {
+                    let body_thunk = self.scratch.pop().expect("layer body thunk");
+                    let layer = self.scratch.pop().expect("dynamic layer");
+                    self.begin_dynamic_layer_run(layer, body_thunk, binding)?;
+                }
             }
             _ => unreachable!("layer intrinsic"),
         }
@@ -70,7 +83,7 @@ impl Machine<'_, '_> {
         effect: &str,
         fuel: &mut u64,
     ) -> Result<bool, Error> {
-        Ok(implementation(heap, &provider.layer, effect, fuel)?.is_some())
+        Ok(lookup_layer_service(heap, &provider.layer, effect, fuel)?.is_some())
     }
 
     pub(super) fn invoke_provider(
@@ -80,7 +93,7 @@ impl Machine<'_, '_> {
         effect: &str,
         op: &str,
     ) -> Result<(), Error> {
-        let implementation = implementation(
+        let implementation = lookup_layer_service(
             self.heap,
             &self.providers[&id].layer,
             effect,
@@ -90,6 +103,22 @@ impl Machine<'_, '_> {
         let function = self.heap.named_field(implementation, op)?.representation();
         let function = self.heap.dup(&function)?;
         self.scratch.insert(0, function);
+        self.queue_service_invocation(binding)
+    }
+
+    pub(super) fn invoke_service_impl(
+        &mut self,
+        impl_rep: &Value,
+        binding: Local,
+        op: &str,
+    ) -> Result<(), Error> {
+        let function = self.heap.named_field(impl_rep, op)?.representation();
+        let function = self.heap.dup(&function)?;
+        self.scratch.insert(0, function);
+        self.queue_service_invocation(binding)
+    }
+
+    fn queue_service_invocation(&mut self, binding: Local) -> Result<(), Error> {
         // Reserve identity while every owned argument is still rooted.
         let invocation = self.handler_identity()?;
         let mut operands = mem::take(&mut self.scratch).into_iter();
@@ -119,6 +148,7 @@ impl Machine<'_, '_> {
                 layer,
                 owner,
                 previous: owner,
+                restore_memo: MemoRestore::Unchanged,
             },
         );
         self.root = Some(id);
@@ -134,19 +164,30 @@ impl Machine<'_, '_> {
         Ok(Self::provider_matches(self.heap, provider, effect, &mut self.fuel)?.then_some(root))
     }
 
-    pub(super) fn leave_provider(&mut self, id: usize) -> Result<(), Error> {
+    pub(super) fn leave_provider_outcome(
+        &mut self,
+        id: usize,
+        outcome: ScopeOutcome<'p>,
+    ) -> Result<(), Error> {
         let provider = self.providers.remove(&id).expect("departed provider");
+        if let MemoRestore::Restore(prev_memo) = provider.restore_memo {
+            self.restore_fiber_memo(prev_memo)?;
+        }
+        let owner = provider.owner;
+        let previous = provider.previous;
+        if self.owner_needs_async_close(owner) {
+            self.heap.drop_value(provider.layer)?;
+            return self.begin_close_scope(owner, previous, outcome);
+        }
         self.scratch.push(provider.layer);
-        self.close_owner(provider.owner)?;
-        self.current_owner = provider.previous;
+        self.close_owner(owner)?;
+        self.current_owner = previous;
         self.heap
-            .drop_value(self.scratch.pop().expect("provider layer"))
+            .drop_value(self.scratch.pop().expect("provider layer"))?;
+        self.complete_scope_outcome(outcome, None, false)
     }
 }
 
-// All currently representable constructors are pure graph nodes. Adding dynamic
-// acquisition requires an actual build phase; it must not be approximated by
-// this lookup or by installing nested providers with different owners/evidence.
 fn layer_data<'a>(heap: &'a Heap, value: &Value) -> Result<&'a LayerData, Error> {
     let Value::Object(value) = value else {
         return Err(Error::ExpectedLayer);
@@ -157,25 +198,35 @@ fn layer_data<'a>(heap: &'a Heap, value: &Value) -> Result<&'a LayerData, Error>
     Ok(layer)
 }
 
-fn implementation<'a>(
+pub(super) fn lookup_layer_service<'a>(
     heap: &'a Heap,
-    layer: &'a Value,
+    value: &'a Value,
     effect: &str,
     fuel: &mut u64,
 ) -> Result<Option<&'a Value>, Error> {
-    let mut pending = vec![layer];
-    while let Some(layer) = pending.pop() {
+    let mut pending = vec![value];
+    while let Some(cur) = pending.pop() {
         *fuel = fuel.checked_sub(1).ok_or(Error::OutOfFuel)?;
-        match layer_data(heap, layer)? {
-            LayerData::Merge { left, right } => {
+        let Value::Object(tok) = cur else {
+            return Err(Error::ExpectedLayer);
+        };
+        match &heap.object(tok.id)?.data {
+            Data::Context(map) => {
+                if let Some(imp) = map.get(effect) {
+                    return Ok(Some(imp));
+                }
+            }
+            Data::Layer(LayerData::Empty) => {}
+            Data::Layer(LayerData::Context(ctx)) => pending.push(ctx),
+            Data::Layer(LayerData::Merge { left, right }) => {
                 // Native servicesOf processes left-to-right with replacement;
                 // searching right-first gives the same complete-provider key.
                 pending.extend([left, right]);
             }
-            LayerData::Succeed {
+            Data::Layer(LayerData::Succeed {
                 tag,
                 implementation,
-            } => {
+            }) => {
                 let Value::Object(tag) = tag else {
                     return Err(Error::ExpectedServiceTag);
                 };
@@ -186,6 +237,7 @@ fn implementation<'a>(
                     return Ok(Some(implementation));
                 }
             }
+            _ => return Err(Error::ExpectedLayer),
         }
     }
     Ok(None)
