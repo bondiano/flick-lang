@@ -20,7 +20,6 @@ codegen/for_comprehension # the model's (≡) rejects `App.Main.main`
 codegen/for_loop # the model's (≡) rejects `App.Main.main`
 codegen/fusion # a `for` or a `Seq` has no λFlick form
 codegen/interpolation # runs in the model; not in portable.txt
-codegen/known_defaults # prints something else
 codegen/known_failure # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/ints # no native for `checked_add` (flick:rt intCheckedAdd)
 codegen/let_assert # no native for `get` (flick:rt listGet)

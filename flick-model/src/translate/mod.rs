@@ -186,15 +186,20 @@ impl Tr {
             Term::Global(instance(&info.module, &info.name)),
             context.iter().map(|d| Term::Var(d.clone())),
         );
-        let mut fields: Vec<(Name, Term)> = match &info.derived {
-            Some((dicts, constructors)) => {
-                let dicts: Vec<Term> = dicts.iter().map(dict).collect();
-                derive::methods(&info.class.1, &dicts, constructors.as_deref())
-            }
-            None => methods
+        // A derived instance whose methods lowering already wrote out is
+        // translated from those methods, as both backends and the counted path
+        // do; an `InstanceInfo.derived` without method bodies falls back to
+        // `derive::methods`.
+        let mut fields: Vec<(Name, Term)> = if methods.is_empty()
+            && let Some((dicts, constructors)) = &info.derived
+        {
+            let dicts: Vec<Term> = dicts.iter().map(dict).collect();
+            derive::methods(&info.class.1, &dicts, constructors.as_deref())
+        } else {
+            methods
                 .iter()
                 .map(|(m, e)| (Name::from(m.as_str()), self.expr(e)))
-                .collect(),
+                .collect()
         };
         for (class, d) in &info.supers {
             fields.push((format!("${class}").into(), dict(d)));
@@ -395,5 +400,54 @@ mod foreign_staging_tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn derived_instance_without_ir_methods_falls_back_to_derive_methods() {
+        use std::rc::Rc;
+
+        use flick_core::ir::ItemKind;
+        use flick_core::types::{Constructor, InstanceInfo, Rep};
+
+        use crate::syntax::Lit;
+
+        let con = Constructor {
+            module: "App.Main".to_owned(),
+            ty: "Flag".to_owned(),
+            name: "Flag".to_owned(),
+            arity: 0,
+            rep: Rep::Tagged,
+            dicts: 0,
+        };
+        let info = InstanceInfo {
+            module: "App.Main".to_owned(),
+            name: "Show Flag".to_owned(),
+            class: ("Classes".to_owned(), "Show".to_owned()),
+            span: (0, 0),
+            context: Vec::new(),
+            supers: Vec::new(),
+            derived: Some((Vec::new(), Some(vec![con.clone()]))),
+            defaults: Vec::new(),
+            generic: None,
+            enumerates: None,
+        };
+        let mut program = Program::default();
+        super::Tr::new("App.Main").item(
+            &ItemKind::Instance {
+                info: Box::new(info),
+                methods: Vec::new(),
+            },
+            &mut program,
+        );
+        let dict_path = super::instance("App.Main", "Show Flag");
+        assert!(program.derived.contains(&dict_path));
+        let call = Term::app(
+            Term::Field(Rc::new(Term::Global(dict_path)), "show".into()),
+            Term::konst_con(super::expr::con(&con)),
+        );
+        assert!(matches!(
+            Machine::new(&program, 100).run(call),
+            Outcome::Value(Term::Lit(Lit::String(text))) if &*text == "Flag"
+        ));
     }
 }
