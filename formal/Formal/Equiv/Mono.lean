@@ -124,6 +124,15 @@ theorem Sim.lower {x : Pos} {a b : Tm} (h : Sim W x a b) : Sim W .any a b := by
   | bornS hB hl hc hs => exact .bornS hB hl hc hs
   | bornV hB hl hc hc' hn => exact .bornV hB hl hc hc' hn
   | dead hB hn => exact .dead hB hn
+  | hloc hB hH => exact .hloc hB hH
+  | o4A hB hf hbr hpe hpe' he hb hne hnb _ _ => exact .o4A hB hf hbr hpe hpe' he hb hne hnb
+  | o4B hB hbr hf' hpe hpe' he hb hne hnb _ _ => exact .o4B hB hbr hf' hpe hpe' he hb hne hnb
+  | o4Fix1 hB hr hf hf' hcl hpe he hb hnb _ _ => exact .o4Fix1 hB hr hf hf' hcl hpe he hb hnb
+  | o4Fix2 hB hl hf hf' hcl hpe he hb hne hnb _ _ => exact .o4Fix2 hB hl hf hf' hcl hpe he hb hne hnb
+  | o4Alloc1 hB hr hs' hcl hpe he hc hnc _ _ => exact .o4Alloc1 hB hr hs' hcl hpe he hc hnc
+  | o4AllocR hB hl hs hcl hpe he hc _ _ => exact .o4AllocR hB hl hs hcl hpe he hc
+  | o4Bind hB hc _ => exact .o4Bind hB hc
+  | o4Settle hB hH hhl hce hct hpt => exact .o4Settle hB hH hhl hce hct hpt
   | aconsD hd hn _ ih => exact .aconsD hd hn ih
   | _ => constructor <;> first | assumption | decide
 
@@ -151,6 +160,22 @@ theorem Sim.mono {W' : World} (hW : W.le W') {x : Pos} {a b : Tm} (h : Sim W x a
   | bornA hB hv hv' _ ih => exact .bornA (hW.B.1 hB) hv hv' ih
   | bornB hB hv hv' _ ih => exact .bornB (hW.B.1 hB) hv hv' ih
   | dead hB hn => exact .dead (hW.B.1 hB) hn
+  | hloc hB hH => exact .hloc (hW.B.1 hB) (hW.H _ _ hH)
+  | o4A hB hf hbr hpe hpe' _ _ hne hnb ihe ihb =>
+    exact .o4A (hW.B.1 hB) hf hbr (hW.R ▸ hpe) (hW.R ▸ hpe') ihe ihb hne hnb
+  | o4B hB hbr hf' hpe hpe' _ _ hne hnb ihe ihb =>
+    exact .o4B (hW.B.1 hB) hbr hf' (hW.R ▸ hpe) (hW.R ▸ hpe') ihe ihb hne hnb
+  | o4Fix1 hB hr hf hf' hcl hpe _ _ hnb ihe ihb =>
+    exact .o4Fix1 (hW.B.1 hB) (hW.HR _ _ hr) hf hf' hcl (hW.R ▸ hpe) ihe ihb hnb
+  | o4Fix2 hB hl hf hf' hcl hpe _ _ hne hnb ihe ihb =>
+    exact .o4Fix2 (hW.B.1 hB) (hW.HL _ _ hl) hf hf' hcl (hW.R ▸ hpe) ihe ihb hne hnb
+  | o4Alloc1 hB hr hs' hcl hpe _ _ hnc ihe ihc =>
+    exact .o4Alloc1 (hW.B.1 hB) (hW.HR _ _ hr) hs' hcl (hW.R ▸ hpe) ihe ihc hnc
+  | o4AllocR hB hl hs hcl hpe _ _ ihe ihc =>
+    exact .o4AllocR (hW.B.1 hB) (hW.HL _ _ hl) hs hcl (hW.R ▸ hpe) ihe ihc
+  | o4Bind hB _ ih => exact .o4Bind (hW.B.1 hB) ih
+  | o4Settle hB hH hhl hce hct hpt =>
+    exact .o4Settle (hW.B.1 hB) (hW.H _ _ hH) (hW.HL _ _ hhl) hce hct (hW.R ▸ hpt)
   | appK hs _ _ ih₁ ih₂ => exact .appK hs ih₁ ih₂
   | appV hv _ _ ih₁ ih₂ => exact .appV hv ih₁ ih₂
   | rconsK hs _ _ ih₁ ih₂ => exact .rconsK hs ih₁ ih₂

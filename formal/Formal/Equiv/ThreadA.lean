@@ -27,7 +27,9 @@ theorem _root_.Flick.Redex.app {r f a : Tm} (h : Redex r) (he : r = .app f a) : 
 /-- A special pair holds the focus. -/
 theorem dec_act {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm}
     {τ : Option (Nat × Nat)} {E : List Frame} {r t₂ t' : Tm} (hE : OkE E) (hst : StR W μ μ₂)
-    (hcl₁ : (plug E r).Closed) (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
+    (hR : W.R = root) (hglob : ∀ g v, root.glob g = some v → v.Src)
+    (hcl₁ : (plug E r).Closed) (hcl₁' : t'.Closed)
+    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
     (hs : Step root l Λ μ (plug E r) (.cfg Λ' μ' t'))
     (hd : ∃ W' μ₂' E₀ E₁ a b E₂, RJ W μ₂ t₂ W' μ₂' (plug E₂ b) ∧ E = E₀ ++ E₁ ∧
       a = plug E₀ r ∧ FrL W' E₁ E₂ ∧ OkE E₂ ∧ Act W' a b) :
@@ -36,7 +38,8 @@ theorem dec_act {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ : Lis
   rw [plug_append] at hs hcl₁ ⊢
   have hk₀ : KSteps root μ₂ t₂ μ₂' (plug E₂ (b)) := hj.ksteps
   obtain ⟨rfl, W'', μ₂'', t₂'', hW, hk, ht, hst', hko⟩ :=
-    act_sim (τ := τ) (fun G hG => hE G (List.mem_append_right _ hG)) hE₂ hfr hact (hj.st _ hst) hcl₁
+    act_sim (τ := τ) (fun G hG => hE G (List.mem_append_right _ hG)) hE₂ hfr hact (hj.st _ hst)
+      (hj.le.R.symm.trans hR) hglob hcl₁ hcl₁'
       (fun μ'' t'' h => hcl₂ μ'' t'' (hk₀.trans h)) hs
   refine ⟨rfl, W'', μ₂'', t₂'', hj.le.trans hW, ?_, ht, hst', hko.mono hj.le⟩
   rcases hk with hk | ⟨rfl, rfl, hz⟩
@@ -75,17 +78,25 @@ theorem oneshot_sim {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ :
 /-- **A pure head step** of a thread. -/
 theorem pure_sim {root : Roots} {μ μ₂ : List Tm} {τ : Option (Nat × Nat)}
     {E : List Frame} {r r' t₂ : Tm} (hE : OkE E) (hh : PHead r r')
-    (ht : Sim W .any (plug E r) t₂) (hst : StR W μ μ₂) (hcl₁ : (plug E r).Closed)
+    (ht : Sim W .any (plug E r) t₂) (hst : StR W μ μ₂)
+    (hR : W.R = root) (hglob : ∀ g v, root.glob g = some v → v.Src)
+    (hcl₁ : (plug E r).Closed) (hcl₁' : (plug E r').Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
+    (hmvl : (plug E r).MatchVals) (hmvr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.MatchVals)
     (hzl : ¬ (plug E r').LzTop .any)
     (hzr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ¬ t''.LzTop .any) :
     KAns root W τ μ₂ t₂ μ μ (plug E r) (plug E r') := by
   have hr := hh.redex
   rcases ht.dec hr.1 (fun _ _ he => Redex.app hr he) (fun _ _ _ he => by subst he; cases hh)
-      (fun ha => by cases hh <;> exact ha) _ _ rfl hE μ₂ with hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
+      (fun ha => by cases hh <;> exact ha) _ _ rfl hE μ₂ (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
+    hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
     ⟨W', μ₂', E₂, n, a, b, hj, hfr, hE₂, rfl, hn, hs⟩
-  · exact (dec_act (τ := τ) (Λ := []) hE hst hcl₁ hcl₂ (.pure hE hh) hd).2
-  · obtain ⟨W₁, μ₁, a₂, r₂', hj₁, hh₂, hs₂⟩ := phead_sim hh hs μ₂' (fun h => hzl (h.plug E))
+  · exact (dec_act (τ := τ) (Λ := []) hE hst hR hglob hcl₁ hcl₁' hcl₂ (.pure hE hh) hd).2
+  · obtain ⟨W₁, μ₁, a₂, r₂', hj₁, hh₂, hs₂⟩ := phead_sim hh hs μ₂'
+      (fun _ => ⟨plug_closed hcl₁, plug_closed (hcl₂ _ _ hj.ksteps)⟩)
+      (hmvl.plug_inner hE)
+      (fun _ _ ha => (hmvr _ _ (hj.ksteps.trans (ha.plug hE₂).ksteps)).plug_inner hE₂)
+      (fun h => hzl (h.plug E))
       (fun _ _ _ ha hp hz => hzr _ _ (hj.ksteps.trans ((ha.plug hE₂).ksteps.trans
         (.step (fun _ => ⟨_, .pure hE₂ hp⟩) .refl))) (hz.plug E₂))
     exact ⟨W₁, μ₁, plug E₂ r₂', hj.le.trans hj₁.le,
@@ -101,8 +112,12 @@ theorem _root_.Flick.RHead.keep {Λ Λ' : List Rgn} {μ μ' : List Tm} {r r' : T
 /-- **A runtime head step** of a thread that keeps the regions. -/
 theorem rt_sim {root : Roots} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {τ : Option (Nat × Nat)}
     {E : List Frame} {r r' t₂ : Tm} (hE : OkE E) (hh : RHead Λ μ r Λ' μ' r') (hreg : ¬ r.Reg)
-    (ht : Sim W .any (plug E r) t₂) (hst : StR W μ μ₂) (hcl₁ : (plug E r).Closed)
+    (ht : Sim W .any (plug E r) t₂) (hst : StR W μ μ₂)
+    (hR : W.R = root) (hglob : ∀ g v, root.glob g = some v → v.Src)
+    (hcl₁ : (plug E r).Closed) (hcl₁' : (plug E r').Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
+    (hmvl : (plug E r).MatchVals) (hmvr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.MatchVals)
+    (hcell : ∀ (l : Nat) (c : Tm), μ[l]? = some c → c.IsCell → ∃ c', μ'[l]? = some c' ∧ c'.IsCell)
     (hzl : ¬ (plug E r').LzTop .any)
     (hzr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ¬ t''.LzTop .any) :
     Λ' = Λ ∧ KAns root W τ μ₂ t₂ μ μ' (plug E r) (plug E r') := by
@@ -114,16 +129,23 @@ theorem rt_sim {root : Roots} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {τ :
     · cases F <;> simp [Frame.plug] at he <;> cases hh <;> (rename_i hv; cases hv)
     · cases F <;> simp [Frame.plug] at he <;> cases hh <;> (rename_i hv; cases hv)
   rcases ht.dec hh.not_value happ (fun _ _ _ he => by subst he; cases hh)
-      (fun ha => by cases hh <;> exact ha) _ _ rfl hE μ₂ with hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
+      (fun ha => by cases hh <;> exact ha) _ _ rfl hE μ₂ (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
+    hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
     ⟨W', μ₂', E₂, n, a, b, hj, hfr, hE₂, rfl, hn, hs⟩
-  · exact dec_act hE hst hcl₁ hcl₂ (.rt hE hh) hd
+  · exact dec_act hE hst hR hglob hcl₁ hcl₁' hcl₂ (.rt hE hh) hd
   · obtain ⟨W₁, μ₁, r₁, W'', μ₂'', r₂', hj₁, hq, hW, hs₂, hst', hjk⟩ :=
-      rhead_sim hh hreg hs (hj.st _ hst) (fun h => hzl (h.plug E))
+      rhead_sim hh hreg hs (hj.st _ hst)
+        ((hj.le.R.symm.trans hR) ▸ hglob)
+        (fun _ => ⟨plug_closed hcl₁, plug_closed (hcl₂ _ _ hj.ksteps)⟩)
+        (hmvl.plug_inner hE) ((hmvr _ _ hj.ksteps).plug_inner hE₂)
+        hcell
+        (fun h => hzl (h.plug E))
         (fun _ hr hz => hzr _ _ (hj.ksteps.trans (.step (fun Λ => ⟨_, .rt hE₂ (hr Λ)⟩) .refl))
           (hz.plug E₂))
     refine ⟨hΛ, W'', μ₂'', plug E₂ r₂', hj.le.trans (hj₁.le.trans hW), ?_,
       .inl ((hfr.mono (hj₁.le.trans hW)).plugs hs₂), hst', ?_⟩
-    · rcases hq.kpos (root := root) hE₂ with hq | ⟨hB, rfl, rfl⟩
+    · rcases hq.kpos (root := root) (hj₁.le.R.symm.trans (hj.le.R.symm.trans hR)) hE₂ with
+        hq | ⟨hB, rfl, rfl⟩
       · exact .inl (hj.ksteps.pos ((hj₁.plug hE₂).ksteps.pos hq))
       · exact (hj.ksteps.trans (hj₁.plug hE₂).ksteps).ans ((hj.le.trans hj₁.le).B.2 hB)
     exact KeepO.of_junk hst fun n hn' => hjk n (hj.le.J₁ _ hn')
