@@ -2,6 +2,7 @@
 // wrapped with the witness of its collection, which gives Effect's Equal and
 // Hash protocols the witness's `eq` and `hash`.
 import { Equal, Hash, HashMap, HashSet, Option } from "effect";
+import { type Seq, seq } from "@flick-lang/runtime/core/seq";
 
 import { type HashDict, none, some } from "../data.ts";
 
@@ -47,10 +48,23 @@ export interface FlickHashSet<A> {
 
 export const hashSetOf = <A>(w: Witness<A>, native: HashSet.HashSet<HashKey<A>>): FlickHashSet<A> => Object.freeze({ witness: w, native });
 
+const boxIterable = <A>(w: Witness<A>, xs: Seq<A>): Iterable<HashKey<A>> => ({
+  [Symbol.iterator](): Iterator<HashKey<A>> {
+    const it = xs[Symbol.iterator]();
+    return {
+      next(): IteratorResult<HashKey<A>> {
+        const step = it.next();
+        return step.done ? { done: true, value: undefined } : { done: false, value: new HashKey(step.value, w) };
+      },
+    };
+  },
+});
+
 export const hashSetWith = <A>(w: Witness<A>): FlickHashSet<A> => hashSetOf(w, HashSet.empty());
 export const hashSetEmpty = <A>(dHash: HashDict<A>): FlickHashSet<A> => hashSetWith(eqHashCanonical(dHash));
-export const hashSetFromList = <A>(w: Witness<A>, xs: ReadonlyArray<A>): FlickHashSet<A> =>
-  hashSetOf(w, HashSet.fromIterable(xs.map((x) => new HashKey(x, w))));
+export const hashSetFromSeq = <A>(w: Witness<A>, xs: Seq<A>): FlickHashSet<A> =>
+  hashSetOf(w, HashSet.fromIterable(boxIterable(w, xs)));
+export const hashSetFromList = <A>(w: Witness<A>, xs: ReadonlyArray<A>): FlickHashSet<A> => hashSetFromSeq(w, xs);
 export const hashSetInsert = <A>(x: A, s: FlickHashSet<A>): FlickHashSet<A> =>
   hashSetOf(s.witness, HashSet.add(s.native, new HashKey(x, s.witness)));
 export const hashSetRemove = <A>(x: A, s: FlickHashSet<A>): FlickHashSet<A> =>
@@ -58,9 +72,13 @@ export const hashSetRemove = <A>(x: A, s: FlickHashSet<A>): FlickHashSet<A> =>
 export const hashSetMember = <A>(x: A, s: FlickHashSet<A>): boolean => HashSet.has(s.native, new HashKey(x, s.witness));
 export const hashSetSize = <A>(s: FlickHashSet<A>): number => HashSet.size(s.native);
 export const hashSetToList = <A>(s: FlickHashSet<A>): Array<A> => Array.from(s.native, (k) => k.value);
+export const hashSetToSeq = <A>(s: FlickHashSet<A>): Seq<A> =>
+  seq(function* () {
+    for (const k of s.native) yield k.value;
+  });
 export const hashSetUnion = <A>(a: FlickHashSet<A>, b: FlickHashSet<A>): FlickHashSet<A> =>
   hashSetOf(a.witness, HashSet.union(a.native, b.native));
-export const hashSetRehash = <A>(w: Witness<A>, s: FlickHashSet<A>): FlickHashSet<A> => hashSetFromList(w, hashSetToList(s));
+export const hashSetRehash = <A>(w: Witness<A>, s: FlickHashSet<A>): FlickHashSet<A> => hashSetFromSeq(w, hashSetToSeq(s));
 
 /** `HashMap w k v`. */
 export interface FlickHashMap<K, V> {
@@ -73,6 +91,22 @@ export const hashMapOf = <K, V>(w: Witness<K>, native: HashMap.HashMap<HashKey<K
 
 export const hashMapWith = <K, V>(w: Witness<K>): FlickHashMap<K, V> => hashMapOf(w, HashMap.empty());
 export const hashMapEmpty = <K, V>(dHash: HashDict<K>): FlickHashMap<K, V> => hashMapWith(eqHashCanonical(dHash));
+export const hashMapFromSeq = <K, V>(w: Witness<K>, entries: Seq<readonly [K, V]>): FlickHashMap<K, V> => {
+  let map = HashMap.beginMutation(HashMap.empty<HashKey<K>, V>());
+  for (const [k, v] of entries) {
+    const key = new HashKey(k, w);
+    const existing = HashMap.get(map, key);
+    if (Option.isSome(existing)) {
+      if (Object.is(existing.value, v)) continue;
+      // Effect's mutable LeafNode.set retains the previous key; an immutable set
+      // updates both key and value while preserving collision order.
+      map = HashMap.beginMutation(HashMap.set(HashMap.endMutation(map), key, v));
+    } else {
+      HashMap.set(map, key, v);
+    }
+  }
+  return hashMapOf(w, HashMap.endMutation(map));
+};
 export const hashMapInsert = <K, V>(k: K, v: V, m: FlickHashMap<K, V>): FlickHashMap<K, V> =>
   hashMapOf(m.witness, HashMap.set(m.native, new HashKey(k, m.witness), v));
 export const hashMapRemove = <K, V>(k: K, m: FlickHashMap<K, V>): FlickHashMap<K, V> =>
@@ -83,7 +117,11 @@ export const hashMapGet = <K, V>(k: K, m: FlickHashMap<K, V>): Option.Option<V> 
 };
 export const hashMapSize = <K, V>(m: FlickHashMap<K, V>): number => HashMap.size(m.native);
 export const hashMapToList = <K, V>(m: FlickHashMap<K, V>): Array<[K, V]> => Array.from(m.native, ([k, v]) => [k.value, v]);
+export const hashMapToSeq = <K, V>(m: FlickHashMap<K, V>): Seq<[K, V]> =>
+  seq(function* () {
+    for (const [k, v] of m.native) yield [k.value, v];
+  });
 export const hashMapUnion = <K, V>(a: FlickHashMap<K, V>, b: FlickHashMap<K, V>): FlickHashMap<K, V> =>
   hashMapOf(a.witness, HashMap.union(a.native, b.native));
 export const hashMapRehash = <K, V>(w: Witness<K>, m: FlickHashMap<K, V>): FlickHashMap<K, V> =>
-  hashMapOf(w, HashMap.fromIterable(hashMapToList(m).map(([k, v]) => [new HashKey(k, w), v] as const)));
+  hashMapFromSeq(w, hashMapToSeq(m));

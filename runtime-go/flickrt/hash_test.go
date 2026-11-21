@@ -1,9 +1,11 @@
 package flickrt
 
 import (
+	"iter"
 	"math"
 	"math/big"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -97,5 +99,289 @@ func BenchmarkHashMapInsert(b *testing.B) {
 		for i, k := range keys {
 			m = HashMapInsert(nil, k, int32(i), m)
 		}
+	}
+}
+
+func intIdentityWitness() *Witness {
+	return &Witness{
+		eq:   Curry2(func(_ *Fiber, a, b Value) Value { return a == b }),
+		hash: Fn(func(_ *Fiber, a Value) Value { return a.(int32) }),
+	}
+}
+
+func caseBlindWitness() *Witness {
+	return &Witness{
+		eq: Curry2(func(_ *Fiber, a, b Value) Value {
+			return strings.EqualFold(a.(string), b.(string))
+		}),
+		hash: Fn(func(_ *Fiber, a Value) Value {
+			return Hash(strings.ToLower(a.(string)))
+		}),
+	}
+}
+
+func TestHashMapAndSetSeqEmptyRepeatPartialCollisionsSnapshots(t *testing.T) {
+	w := intIdentityWitness()
+
+	// Empty collections
+	if got := List(SeqToList(nil, HashMapToSeq(HashMapWith(w)))); len(got) != 0 {
+		t.Fatalf("empty map to_seq = %v", got)
+	}
+	if got := List(SeqToList(nil, HashSetToSeq(HashSetWith(w)))); len(got) != 0 {
+		t.Fatalf("empty set to_seq = %v", got)
+	}
+	if got := HashMapFromSeq(nil, w, SeqRange(int32(0), int32(0))); hmap(got).size != 0 || hmap(got).w != w {
+		t.Fatalf("empty map from_seq size=%d witness=%v", hmap(got).size, hmap(got).w == w)
+	}
+	if got := HashSetFromSeq(nil, w, SeqRange(int32(0), int32(0))); set(got).size != 0 || set(got).w != w {
+		t.Fatalf("empty set from_seq size=%d witness=%v", set(got).size, set(got).w == w)
+	}
+
+	// Single-pass consumption + custom witness + duplicates
+	mapRuns, mapPulls := 0, 0
+	mapPairs := []Value{
+		[]Value{"A", int32(1)},
+		[]Value{"b", int32(2)},
+		[]Value{"a", int32(10)},
+		[]Value{"B", int32(20)},
+		[]Value{"c", int32(3)},
+	}
+	cw := caseBlindWitness()
+	mapInput := seq(func(_ *Fiber, yield func(Value) bool) {
+		mapRuns++
+		if mapRuns > 1 {
+			t.Fatalf("HashMapFromSeq iterated input %d times", mapRuns)
+		}
+		for _, pair := range mapPairs {
+			mapPulls++
+			if !yield(pair) {
+				return
+			}
+		}
+	})
+	m := HashMapFromSeq(nil, cw, mapInput)
+	if mapRuns != 1 || mapPulls != 5 {
+		t.Fatalf("map input runs=%d pulls=%d", mapRuns, mapPulls)
+	}
+	if hmap(m).w != cw || hmap(m).size != 3 {
+		t.Fatalf("custom map witness=%v size=%d", hmap(m).w == cw, hmap(m).size)
+	}
+	if got := HashMapGet(nil, "A", m); !Equals(got, Some(int32(10))) {
+		t.Fatalf("last-value-wins failed for A: %v", got)
+	}
+	if got := HashMapGet(nil, "b", m); !Equals(got, Some(int32(20))) {
+		t.Fatalf("last-value-wins failed for b: %v", got)
+	}
+
+	setRuns, setPulls := 0, 0
+	setItems := []Value{"Ada", "ada", "Bob", "BOB", "Cid"}
+	setInput := seq(func(_ *Fiber, yield func(Value) bool) {
+		setRuns++
+		if setRuns > 1 {
+			t.Fatalf("HashSetFromSeq iterated input %d times", setRuns)
+		}
+		for _, item := range setItems {
+			setPulls++
+			if !yield(item) {
+				return
+			}
+		}
+	})
+	s := HashSetFromSeq(nil, cw, setInput)
+	if setRuns != 1 || setPulls != 5 {
+		t.Fatalf("set input runs=%d pulls=%d", setRuns, setPulls)
+	}
+	if set(s).w != cw || set(s).size != 3 {
+		t.Fatalf("custom set witness=%v size=%d", set(s).w == cw, set(s).size)
+	}
+	if !Bool(HashSetMember(nil, "ADA", s)) || !Bool(HashSetMember(nil, "bob", s)) {
+		t.Fatalf("custom set lost equality")
+	}
+
+	// Collisions + repeat + partial + interleaved iterators + persistent snapshots
+	mod3 := &Witness{
+		eq:   Curry2(func(_ *Fiber, a, b Value) Value { return a == b }),
+		hash: Fn(func(_ *Fiber, a Value) Value { return a.(int32) % 3 }),
+	}
+	collSet := HashSetFromSeq(nil, mod3, []Value{int32(7), int32(4), int32(1), int32(9), int32(6), int32(2), int32(5), int32(8), int32(3)})
+	collSeq := HashSetToSeq(collSet)
+	wantPrefix := []Value{int32(9), int32(6), int32(3), int32(7)}
+	wantFull := []Value{int32(9), int32(6), int32(3), int32(7), int32(4), int32(1), int32(2), int32(5), int32(8)}
+	if got := SeqToList(nil, SeqTake(int32(4), collSeq)); !Equals(got, wantPrefix) {
+		t.Fatalf("collision prefix = %v, want %v", got, wantPrefix)
+	}
+	if got := SeqToList(nil, collSeq); !Equals(got, wantFull) {
+		t.Fatalf("collision full repeat = %v, want %v", got, wantFull)
+	}
+
+	// Interleaved pull iterators over the same Seq
+	nextA, stopA := iter.Pull(Iter(nil, collSeq))
+	defer stopA()
+	nextB, stopB := iter.Pull(Iter(nil, collSeq))
+	defer stopB()
+	v1, _ := nextA()
+	v2, _ := nextA()
+	w1, _ := nextB()
+	if v1 != int32(9) || v2 != int32(6) || w1 != int32(9) {
+		t.Fatalf("interleaved iterators got (%v, %v, %v)", v1, v2, w1)
+	}
+
+	// Persistent snapshot isolation after owned construction (`fromSeq`)
+	m0 := HashMapFromSeq(nil, w, []Value{
+		[]Value{int32(0), "zero"},
+		[]Value{int32(32), "thirty-two"},
+		[]Value{int32(1), "one"},
+		[]Value{int32(2), "two"},
+	})
+	m0Seq := HashMapToSeq(m0)
+	_ = SeqToList(nil, SeqTake(int32(2), m0Seq))
+	m1 := HashMapInsert(nil, int32(33), "thirty-three", HashMapInsert(nil, int32(0), "ZERO", HashMapRemove(nil, int32(32), m0)))
+	wantM0 := []Value{
+		[]Value{int32(0), "zero"},
+		[]Value{int32(32), "thirty-two"},
+		[]Value{int32(1), "one"},
+		[]Value{int32(2), "two"},
+	}
+	wantM1 := []Value{
+		[]Value{int32(0), "ZERO"},
+		[]Value{int32(1), "one"},
+		[]Value{int32(33), "thirty-three"},
+		[]Value{int32(2), "two"},
+	}
+	if got := SeqToList(nil, m0Seq); !Equals(got, wantM0) {
+		t.Fatalf("snapshot m0 mutated: got %v, want %v", got, wantM0)
+	}
+	if got := SeqToList(nil, HashMapToSeq(m1)); !Equals(got, wantM1) {
+		t.Fatalf("derived m1 mismatch: got %v, want %v", got, wantM1)
+	}
+}
+
+func TestHashSeqPrefixAvoidsEagerTraversal(t *testing.T) {
+	w := intIdentityWitness()
+	buildMap := func(n int32) Value {
+		pairs := seq(func(_ *Fiber, yield func(Value) bool) {
+			for i := int32(0); i < n; i++ {
+				if !yield([]Value{i, i * 2}) {
+					return
+				}
+			}
+		})
+		return HashMapFromSeq(nil, w, pairs)
+	}
+	smallMap := buildMap(64)
+	largeMap := buildMap(4096)
+	smallSet := HashSetFromSeq(nil, w, SeqRange(int32(0), int32(64)))
+	largeSet := HashSetFromSeq(nil, w, SeqRange(int32(0), int32(4096)))
+
+	wantMapPrefix := []Value{
+		[]Value{int32(0), int32(0)},
+		[]Value{int32(1024), int32(2048)},
+		[]Value{int32(2048), int32(4096)},
+	}
+	if got := SeqToList(nil, SeqTake(int32(3), HashMapToSeq(largeMap))); !Equals(got, wantMapPrefix) {
+		t.Fatalf("large map prefix = %v, want %v", got, wantMapPrefix)
+	}
+	wantSetPrefix := []Value{int32(0), int32(1024), int32(2048)}
+	if got := SeqToList(nil, SeqTake(int32(3), HashSetToSeq(largeSet))); !Equals(got, wantSetPrefix) {
+		t.Fatalf("large set prefix = %v, want %v", got, wantSetPrefix)
+	}
+
+	// Allocations for consuming a 3-element prefix must stay O(1) and not grow with collection size.
+	smallMapAllocs := testing.AllocsPerRun(50, func() {
+		_ = SeqToList(nil, SeqTake(int32(3), HashMapToSeq(smallMap)))
+	})
+	largeMapAllocs := testing.AllocsPerRun(50, func() {
+		_ = SeqToList(nil, SeqTake(int32(3), HashMapToSeq(largeMap)))
+	})
+	if largeMapAllocs > 32 || largeMapAllocs > smallMapAllocs+4 {
+		t.Fatalf("HashMap.to_seq prefix looks eager: small=%.1f allocs, large=%.1f allocs", smallMapAllocs, largeMapAllocs)
+	}
+
+	smallSetAllocs := testing.AllocsPerRun(50, func() {
+		_ = SeqToList(nil, SeqTake(int32(3), HashSetToSeq(smallSet)))
+	})
+	largeSetAllocs := testing.AllocsPerRun(50, func() {
+		_ = SeqToList(nil, SeqTake(int32(3), HashSetToSeq(largeSet)))
+	})
+	if largeSetAllocs > 32 || largeSetAllocs > smallSetAllocs+4 {
+		t.Fatalf("HashSet.to_seq prefix looks eager: small=%.1f allocs, large=%.1f allocs", smallSetAllocs, largeSetAllocs)
+	}
+}
+
+var benchmarkHashSeqSink Value
+
+func BenchmarkHashSeq(b *testing.B) {
+	w := intIdentityWitness()
+	for _, size := range []int32{1024, 4096} {
+		pairs := seq(func(_ *Fiber, yield func(Value) bool) {
+			for i := int32(0); i < size; i++ {
+				if !yield([]Value{i, i * 2}) {
+					return
+				}
+			}
+		})
+		ints := SeqRange(int32(0), size)
+		m := HashMapFromSeq(nil, w, pairs)
+		s := HashSetFromSeq(nil, w, ints)
+
+		b.Run(strconv.Itoa(int(size)), func(b *testing.B) {
+			b.Run("MapPrefix5Lazy", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(5), HashMapToSeq(m)))
+				}
+			})
+			b.Run("MapPrefix5Eager", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(5), SeqOfList(HashMapToList(m))))
+				}
+			})
+			b.Run("SetPrefix5Lazy", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(5), HashSetToSeq(s)))
+				}
+			})
+			b.Run("SetPrefix5Eager", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(5), SeqOfList(HashSetToList(s))))
+				}
+			})
+			b.Run("MapFromSeq", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					benchmarkHashSeqSink = HashMapFromSeq(nil, w, pairs)
+				}
+			})
+			b.Run("MapFromListOfSeq", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					t := empty(w)
+					for _, kv := range List(SeqToList(nil, pairs)) {
+						pair := kv.([]Value)
+						t = t.set(nil, pair[0], pair[1], t.w.of(nil, pair[0]), false)
+					}
+					benchmarkHashSeqSink = mapOf(t)
+				}
+			})
+			b.Run("SetFromSeq", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					benchmarkHashSeqSink = HashSetFromSeq(nil, w, ints)
+				}
+			})
+			b.Run("SetFromListOfSeq", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					t := empty(w)
+					for _, x := range List(SeqToList(nil, ints)) {
+						t = t.set(nil, x, Unit, t.w.of(nil, x), true)
+					}
+					benchmarkHashSeqSink = setOf(t)
+				}
+			})
+		})
 	}
 }

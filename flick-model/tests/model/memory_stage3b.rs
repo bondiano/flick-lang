@@ -189,6 +189,7 @@ import Chunk
 import Combiner
 import EqHash
 import HashMap
+import HashSet
 import Reducer
 
 main : Unit ->{Host.Console} Unit
@@ -196,12 +197,19 @@ let main () =
   let b = Bytes.encode_utf8 "hi😀"
   let b64 = Bytes.encode_base64url b
   let c = Chunk.from_list [3, 1, 2] |> Chunk.sort
-  let m = HashMap.from_list EqHash.canonical [("b", 2), ("a", 1)]
+  let m = HashMap.from_seq EqHash.canonical (Seq.of_list [("b", 2), ("a", 1), ("a", 10)])
+  let ms = HashMap.to_seq m
+  let s = HashSet.from_seq EqHash.canonical (Seq.range 0 4)
+  let prefix = Seq.to_list (Seq.take 2 (HashSet.to_seq s))
   let r = Reducer.combine_all Reducer.number_sum [1, 2, 3]
   Platform.stdout_line
-    (b64 ++ "|" ++ show (Chunk.to_list c) ++ "|" ++ show (HashMap.get "a" m) ++ "|" ++ show r)
+    (b64 ++ "|" ++ show (Chunk.to_list c) ++ "|" ++ show (HashMap.get "a" m) ++ "|" ++ show (Seq.to_list (Seq.take 1 ms)) ++ "|" ++ show prefix ++ "|" ++ show r)
 "#;
-    assert_fuel_prefix_zero_leaks(source, "aGnwn5iA|[1, 2, 3]|Some 1|6\n", 15_000);
+    assert_fuel_prefix_zero_leaks(
+        source,
+        "aGnwn5iA|[1, 2, 3]|Some 10|[(\"a\", 10)]|[0, 1]|6\n",
+        25_000,
+    );
 }
 
 #[test]
