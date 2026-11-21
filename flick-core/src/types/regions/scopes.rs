@@ -34,6 +34,7 @@ impl Checker<'_> {
         let Type::Skolem(id) = region else {
             unreachable!("a skolem")
         };
+        #[cfg(not(target_arch = "wasm32"))]
         self.typing.scope_skolems.insert(id, node.range());
         self.cx.regions.scopes.push(Scope {
             region: id,

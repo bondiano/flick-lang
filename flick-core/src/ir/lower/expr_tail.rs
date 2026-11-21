@@ -251,6 +251,7 @@ impl Lower<'_> {
             (decl.nodes().find(|n| n.kind == K::VarPat)).map_or(decl.range().0, |n| n.range().0);
         if parts.rec {
             let unique = self.bind(&name, at);
+            #[cfg(not(target_arch = "wasm32"))]
             self.record_local_scheme(decl, &unique);
             let value = self.definition(decl);
             return Stmt::Fun {
@@ -266,6 +267,7 @@ impl Lower<'_> {
             self.vars.insert(unique.clone());
             return Stmt::Var(unique, value);
         }
+        #[cfg(not(target_arch = "wasm32"))]
         self.record_local_scheme(decl, &unique);
         if parts.params.is_empty() && dicts.is_empty() {
             Stmt::Let(Pat::Bind(unique), value)

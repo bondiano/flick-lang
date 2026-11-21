@@ -220,11 +220,15 @@ pub struct Typing {
     /// Local `let` / `let rec` signatures and annotations keyed by `K::LetDecl`
     /// range, keeping enclosing `Type::Skolem` ids until lowering resolves
     /// scope regions to their unique IR names.
+    #[cfg(not(target_arch = "wasm32"))]
     pub local_schemes: HashMap<Range, Type>,
+    #[cfg(not(target_arch = "wasm32"))]
     pub(super) pending_local_schemes: Vec<(Range, Type)>,
     /// Source `scope` expression range for each scope skolem id.
+    #[cfg(not(target_arch = "wasm32"))]
     pub scope_skolems: HashMap<u32, Range>,
     /// Source name of each skolem id referenced in `local_schemes`.
+    #[cfg(not(target_arch = "wasm32"))]
     pub skolem_names: HashMap<u32, String>,
 }
 

@@ -33,21 +33,26 @@ fn relocate_declarations(
         to.entity(&mut support.entity);
         to.definition(&mut support.definition);
     }
-    let mut local_schemes = interface.local_schemes.clone();
-    for entry in &mut local_schemes {
-        if let Some(rest) = entry.item.strip_prefix("instance ")
-            && let Some((inst, method)) = rest.rsplit_once("::")
-        {
-            entry.item = format!("instance {}::{method}", runtime_name(local, inst));
-        } else if !entry.item.starts_with("destructure ") {
-            entry.item = runtime_name(local, &entry.item);
+    #[cfg(not(target_arch = "wasm32"))]
+    let local_schemes = {
+        let mut local_schemes = interface.local_schemes.clone();
+        for entry in &mut local_schemes {
+            if let Some(rest) = entry.item.strip_prefix("instance ")
+                && let Some((inst, method)) = rest.rsplit_once("::")
+            {
+                entry.item = format!("instance {}::{method}", runtime_name(local, inst));
+            } else if !entry.item.starts_with("destructure ") {
+                entry.item = runtime_name(local, &entry.item);
+            }
+            to.ty(&mut entry.scheme);
         }
-        to.ty(&mut entry.scheme);
-    }
+        local_schemes
+    };
     let mut declarations = Interface {
         exports,
         support_types,
         instances,
+        #[cfg(not(target_arch = "wasm32"))]
         local_schemes,
         ..Interface::default()
     };
@@ -106,6 +111,7 @@ impl Relocation<'_> {
             }
             self.ty(&mut instance.head);
         }
+        #[cfg(not(target_arch = "wasm32"))]
         for entry in &mut declarations.local_schemes {
             self.ty(&mut entry.scheme);
         }

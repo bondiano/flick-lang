@@ -166,6 +166,7 @@ pub struct SupportType {
 /// A local `let` or `let rec` signature (or explicit annotation) kept on
 /// `Compiled.declarations` for the reference model (`flick-model`). Never
 /// written to published `.iface` files.
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LocalScheme {
     /// Enclosing top-level item key (`name`, `instance <name>::<method>`,
@@ -254,6 +255,7 @@ pub struct Interface {
     pub targets: Vec<Target>,
     /// Local `let` / `let rec` schemes recorded only on `Compiled.declarations`
     /// for the reference model; always empty in published `.iface` files.
+    #[cfg(not(target_arch = "wasm32"))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub local_schemes: Vec<LocalScheme>,
 }
@@ -348,6 +350,7 @@ pub fn fingerprint(interface: &Interface) -> String {
     // where declarations are written, and their comments, change nothing for importers
     bare.source = None;
     bare.docs.clear();
+    #[cfg(not(target_arch = "wasm32"))]
     bare.local_schemes.clear();
     for export in &mut bare.exports {
         export.at = None;

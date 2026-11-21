@@ -226,6 +226,7 @@ impl Checker<'_> {
             if parts.rec {
                 self.cx.locals.pop();
             } else if parts.params.is_empty() && parts.header.is_some() {
+                #[cfg(not(target_arch = "wasm32"))]
                 self.typing
                     .pending_local_schemes
                     .push((decl.range(), ty.clone()));
@@ -255,6 +256,7 @@ impl Checker<'_> {
         scheme: Type,
         explicit: bool,
     ) {
+        #[cfg(not(target_arch = "wasm32"))]
         self.typing
             .pending_local_schemes
             .push((decl.range(), scheme.clone()));

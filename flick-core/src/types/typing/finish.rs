@@ -62,10 +62,12 @@ impl Checker<'_> {
         for (at, _, dict) in dicts {
             typing.dicts.entry(at).or_default().push(dict);
         }
+        #[cfg(not(target_arch = "wasm32"))]
         self.finish_local_schemes(&mut typing);
         typing
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn finish_local_schemes(&mut self, typing: &mut Typing) {
         for (at, ty) in mem::take(&mut typing.pending_local_schemes) {
             let exported = self.exported(&ty);

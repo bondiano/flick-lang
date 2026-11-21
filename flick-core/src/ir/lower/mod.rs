@@ -17,6 +17,7 @@ mod interpolation;
 mod lambda;
 mod lazy;
 mod literals;
+#[cfg(not(target_arch = "wasm32"))]
 mod local_schemes;
 mod loops;
 mod numeric;
@@ -31,6 +32,7 @@ mod wire;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter;
+use std::mem;
 use std::sync::Arc;
 
 use super::{
@@ -38,6 +40,7 @@ use super::{
 };
 use crate::diagnostics::{Diagnostic, codes};
 use crate::effects::key;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::iface::LocalScheme;
 use crate::resolve;
 use crate::source::{FileId, Span};
@@ -50,15 +53,23 @@ use crate::types::{
 
 /// Lowers `module`, which checked without errors, with what its check recorded.
 pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Diagnostic>> {
-    lower_with_local_schemes(module, typing).map(|(ir, _)| ir)
+    lower_inner(module, typing).map(|(ir, _)| ir)
 }
 
 /// [`lower`], alongside the module's lowered local `let` / `let rec` schemes
 /// keyed by enclosing top-level item and unique local name (for `flick-model`).
+#[cfg(not(target_arch = "wasm32"))]
 pub fn lower_with_local_schemes(
     module: &resolve::Module,
     typing: &Typing,
 ) -> Result<(Module, Vec<LocalScheme>), Vec<Diagnostic>> {
+    lower_inner(module, typing).map(|(ir, lower)| (ir, lower.local_schemes))
+}
+
+fn lower_inner<'a>(
+    module: &'a resolve::Module,
+    typing: &'a Typing,
+) -> Result<(Module, Lower<'a>), Vec<Diagnostic>> {
     let pending = typing.pending_foreign_diagnostics();
     if !pending.is_empty() {
         return Err(pending);
@@ -92,17 +103,18 @@ pub fn lower_with_local_schemes(
         });
     }
     if lower.diagnostics.is_empty() {
+        let records = mem::take(&mut lower.records);
         Ok((
             Module {
                 name: module.name.to_owned(),
                 items,
                 labels: typing.labelled.clone(),
                 initialization: flick_ir::Initialization::default(),
-                records: lower.records,
+                records,
                 package: None,
                 exports: flick_ir::Exports::default(),
             },
-            lower.local_schemes,
+            lower,
         ))
     } else {
         Err(lower.diagnostics)
@@ -126,7 +138,9 @@ impl<'a> Lower<'a> {
             owners: HashMap::new(),
             entry_owners: HashMap::new(),
             records: BTreeMap::new(),
+            #[cfg(not(target_arch = "wasm32"))]
             current_item: String::new(),
+            #[cfg(not(target_arch = "wasm32"))]
             local_schemes: Vec::new(),
             diagnostics: Vec::new(),
         }
@@ -177,8 +191,10 @@ struct Lower<'a> {
     /// its labels (`Module::records`).
     records: BTreeMap<String, Vec<String>>,
     /// Key of the top-level definition currently being lowered.
+    #[cfg(not(target_arch = "wasm32"))]
     current_item: String,
     /// Lowered local `let` / `let rec` schemes for `declarations`.
+    #[cfg(not(target_arch = "wasm32"))]
     local_schemes: Vec<LocalScheme>,
     diagnostics: Vec<Diagnostic>,
 }
@@ -269,6 +285,7 @@ impl Lower<'_> {
         self.scope.clear();
         self.used.clear();
         self.vars.clear();
+        #[cfg(not(target_arch = "wasm32"))]
         self.current_item.clear();
     }
 
@@ -280,6 +297,7 @@ impl Lower<'_> {
                 let parts = let_parts(decl, self.text);
                 let kind = match (&parts.name, parts.pattern) {
                     (Some(name), _) => {
+                        #[cfg(not(target_arch = "wasm32"))]
                         self.current_item.clone_from(name);
                         ItemKind::Value {
                             name: name.clone(),
@@ -288,7 +306,10 @@ impl Lower<'_> {
                         }
                     }
                     (None, Some(pattern)) => {
-                        self.current_item = format!("destructure {}..{}", span.start, span.end);
+                        #[cfg(not(target_arch = "wasm32"))]
+                        {
+                            self.current_item = format!("destructure {}..{}", span.start, span.end);
+                        }
                         let body = self.definition(decl);
                         let pattern = self.pattern(pattern);
                         ItemKind::Destructure { pattern, body }
@@ -344,6 +365,7 @@ impl Lower<'_> {
                 for (method, member) in class_defaults(decl, self.text) {
                     self.fresh_definition();
                     let name = default_method(&class, &method);
+                    #[cfg(not(target_arch = "wasm32"))]
                     self.current_item.clone_from(&name);
                     let kind = ItemKind::Value {
                         name,
@@ -448,6 +470,8 @@ impl Lower<'_> {
 
     /// The methods an instance defines.
     fn methods(&mut self, decl: &Node, instance: &str) -> Vec<(String, Expr)> {
+        #[cfg(target_arch = "wasm32")]
+        let _ = instance;
         decl.nodes()
             .filter(|n| n.kind == K::Members)
             .flat_map(Node::nodes)
@@ -455,7 +479,10 @@ impl Lower<'_> {
             .filter_map(|member| {
                 self.fresh_definition();
                 let name = let_parts(member, self.text).name?;
-                self.current_item = format!("instance {instance}::{name}");
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    self.current_item = format!("instance {instance}::{name}");
+                }
                 let dicts = self.givens(member);
                 let value = self.definition(member);
                 let value = if dicts.is_empty() {
