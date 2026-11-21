@@ -327,7 +327,7 @@ fn identity_binding(
     fs::write(&reviewed_path, reviewed.replace(&wrong, &provenance)).expect("reviewed");
     let check = flick(&dir, &["ffi", "check"]);
     assert!(check.status.success(), "{}", text(&check.stderr));
-    let build = flick(&dir, &["build", "--emit", "js"]);
+    let build = flick(&dir, &["build", "--target", "js"]);
     assert!(build.status.success(), "{}", text(&build.stderr));
     let run = Command::new("node")
         .arg(dir.join("dist").join(runner_path(false)))
@@ -455,7 +455,7 @@ fn the_backend_adds_ffi_and_a_go_project_names_who_does() {
 
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[build]\nemit = \"go\"\n",
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[build]\ntarget = \"go\"\n",
     )
     .expect("a Go project");
     let out = flick(&dir, &["ffi", "check"]);

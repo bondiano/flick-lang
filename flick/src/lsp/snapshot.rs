@@ -11,7 +11,6 @@ use std::time::Instant;
 
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
-use flick_core::project::config::Emit;
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, ModuleCache};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{resolve, syntax, types};
@@ -113,8 +112,8 @@ pub struct Snapshot {
     pub sources: SourceMap,
     /// The project's root, where `node_modules` is.
     pub root: PathBuf,
-    /// The target selected by the project's build configuration.
-    pub emit: Emit,
+    /// Whether the project targets Go.
+    pub go: bool,
     pub(super) context: Context,
 }
 
@@ -206,7 +205,7 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
     let cache = caches.entry(context.clone()).or_default();
     let mut analysis = project::analyze_with(&host, &mut sources, found.as_ref(), &roots, cache);
     analysis.diagnostics.extend(unread);
-    let emit = found.as_ref().map_or(Emit::Js, |p| p.config.build.emit);
+    let go = found.as_ref().is_some_and(|p| p.config.is_go());
     let root = found.map_or(dir, |p| p.root);
     debug!(
         root = %root.display(),
@@ -219,7 +218,7 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
         analysis,
         sources,
         root,
-        emit,
+        go,
         context,
     }
 }
@@ -291,7 +290,7 @@ pub(super) fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         },
         sources,
         root: path.parent().expect("source directory").to_path_buf(),
-        emit: Emit::Js,
+        go: false,
         context: Context::Builtin(path.to_path_buf()),
     }
 }

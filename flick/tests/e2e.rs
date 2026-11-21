@@ -157,15 +157,23 @@ fn run_case_with(
 fn build_case(case: &Path, out_dir: &Path, emit: &str, profile: &str, flags: &[&str]) -> Ran {
     let _ = fs::remove_dir_all(out_dir);
     let started = Instant::now();
+    let target_args: &[&str] = match emit {
+        "go" => &["--target", "go", "--allow-tool", "go"],
+        "ts" => &["--target", "js", "--typescript"],
+        _ => &["--target", "js"],
+    };
+    let runtime_args: &[&str] = if emit != "go" && !flags.contains(&"--runtime") {
+        &["--runtime", "effect"]
+    } else {
+        &[]
+    };
     let build = Command::new(env!("CARGO_BIN_EXE_flick"))
         .arg("build")
         .arg(case)
         .arg("--out-dir")
         .arg(out_dir)
-        .arg("--emit")
-        .arg(emit)
-        // outside a project, only the flag lets the Go backend run `go build`
-        .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+        .args(target_args)
+        .args(runtime_args)
         .arg("--profile")
         .arg(profile)
         .args(flags)

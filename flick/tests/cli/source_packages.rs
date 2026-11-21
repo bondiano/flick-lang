@@ -97,8 +97,12 @@ let main () =
 /// `emit`, the package linked into its `node_modules` as pnpm links one.
 fn workspace(name: &str, app_main: &str, emit: &str, effect: bool) -> PathBuf {
     let config = format!(
-        "{APP}\n[build]\nemit = \"{emit}\"\n{}",
-        if effect { "effect = \"effect\"\n" } else { "" }
+        "{APP}\n[build]\ntarget = \"{emit}\"\n{}",
+        if effect {
+            "\n[target.js]\nruntime = \"effect\"\n"
+        } else {
+            ""
+        }
     );
     let package = if effect {
         "{ \"name\": \"@acme/app\", \"dependencies\": { \"@acme/contract\": \"workspace:*\", \"@flick-lang/effect-ts\": \"workspace:*\" } }\n"

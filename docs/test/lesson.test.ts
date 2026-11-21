@@ -24,7 +24,7 @@ const nativeOperations = (dir: string, starterError = "FLICK-T003", rt = false):
   },
   compile: async () => {
     execFileSync(flick, ["check", "Main.fl", "--warnings-as-errors"], { cwd: dir });
-    execFileSync(flick, ["build", "Main.fl", "--emit-dts", "--out-dir", "build", ...(rt ? ["--rt"] : [])], { cwd: dir });
+    execFileSync(flick, ["build", "Main.fl", "--declarations", "--out-dir", "build", ...(rt ? ["--runtime", "rt"] : [])], { cwd: dir });
     const output = path.join(dir, "build");
     const dts = readFileSync(path.join(output, "Main.d.ts"), "utf8");
     const names = readdirSync(output, { recursive: true, encoding: "utf8" }).map((name) => name.replaceAll("\\", "/")).filter((name) => name.endsWith(".d.ts") && name !== "Main.d.ts");

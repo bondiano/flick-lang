@@ -45,13 +45,15 @@ fn a_generation_uses_the_successful_build_selection_after_config_changes() {
         assert!(!generation.go);
         drop(generation);
     }
-    options.devtools = Some("http://localhost:9000".into());
+    options
+        .backend_options
+        .insert("devtools".into(), vec!["http://localhost:9000".into()]);
     assert!(
         matches!(
             build_into_generation(&stale, &options, &args.global, None),
-            Err(1)
+            Err(2)
         ),
-        "refreshed component selection gates devtools"
+        "refreshed component selection refuses undeclared devtools option"
     );
     assert_eq!(
         fs::read_dir(generations(&root))
@@ -60,10 +62,10 @@ fn a_generation_uses_the_successful_build_selection_after_config_changes() {
         0,
         "refusal leaves no generation"
     );
-    options.devtools = None;
+    options.backend_options.clear();
     fs::write(
         root.join("flick.toml"),
-        format!("{config}\n[build]\neffect = \"rt\"\n"),
+        format!("{config}\n[target.js]\nruntime = \"rt\"\n"),
     )
     .expect("default RT selection");
     let generation = build_into_generation(&stale, &options, &args.global, None)

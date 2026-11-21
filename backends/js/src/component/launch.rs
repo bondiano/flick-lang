@@ -38,18 +38,13 @@ pub(super) fn generate(
             None if data.rt => Start::RunMainRt(facts.host.clone()),
             None => Start::RunMain(facts.host.clone()),
         };
-        let schema = request
-            .target
-            .required_capabilities
-            .iter()
-            .any(|c| c.name == "schema-aot")
-            .then(|| {
-                if entry.name == "main" {
-                    "schemas.aot.js".into()
-                } else {
-                    format!("schemas.{}.aot.js", entry.name)
-                }
-            });
+        let schema = data.schema_aot.then(|| {
+            if entry.name == "main" {
+                "schemas.aot.js".into()
+            } else {
+                format!("schemas.{}.aot.js", entry.name)
+            }
+        });
         let contents = named_runner(
             &relative(&file, &options.path(&facts.module)),
             &ident(&entry.symbol.name),

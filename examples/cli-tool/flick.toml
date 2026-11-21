@@ -8,8 +8,10 @@ test-dir = "test"
 
 [build]
 out-dir = "dist"
-emit = "js"
-effect = "effect"
+target = "js"
+
+[target.js]
+runtime = "effect"
 
 [tools]
 "flick/go" = ["go"]

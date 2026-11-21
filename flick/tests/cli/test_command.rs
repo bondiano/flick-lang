@@ -126,7 +126,7 @@ fn outcomes_are_reported_apart_on_flicks_own_runtime() {
     let dir = project("outcomes_rt");
     let toml = dir.join("flick.toml");
     let config = fs::read_to_string(&toml).expect("read");
-    fs::write(&toml, format!("{config}\n[build]\neffect = \"rt\"\n")).expect("write");
+    fs::write(&toml, format!("{config}\n[target.js]\nruntime = \"rt\"\n")).expect("write");
     outcomes(&dir);
 }
 
@@ -228,7 +228,7 @@ fn test_preparation_reports_phases_without_changing_json() {
     )
     .expect("write suite");
     for emit in ["js", "go"] {
-        let out = flick_in(&dir, &["test", "--emit", emit, "--filter", "adds"]);
+        let out = flick_in(&dir, &["test", "--target", emit, "--filter", "adds"]);
         assert!(out.status.success(), "{emit}: {out:?}");
         let stderr = String::from_utf8_lossy(&out.stderr);
         assert!(!stderr.contains(['\r', '\x1b']), "{emit}: {stderr}");
@@ -263,7 +263,7 @@ fn test_preparation_reports_phases_without_changing_json() {
             .expect("runner")
             .modified()
             .expect("mtime");
-        let repeated = flick_in(&dir, &["test", "--emit", emit, "--filter", "adds"]);
+        let repeated = flick_in(&dir, &["test", "--target", emit, "--filter", "adds"]);
         assert!(repeated.status.success(), "{emit}: {repeated:?}");
         assert!(String::from_utf8_lossy(&repeated.stderr).contains("Reusing test build"));
         assert_eq!(
@@ -275,7 +275,7 @@ fn test_preparation_reports_phases_without_changing_json() {
         );
         assert!(String::from_utf8_lossy(&repeated.stdout).contains("✓ [1/1]"));
         fs::remove_file(&runner).expect("remove runner");
-        let restored = flick_in(&dir, &["test", "--emit", emit, "--filter", "adds"]);
+        let restored = flick_in(&dir, &["test", "--target", emit, "--filter", "adds"]);
         assert!(restored.status.success(), "{emit}: {restored:?}");
         assert!(runner.is_file(), "{emit}: runner restored");
 
@@ -283,7 +283,7 @@ fn test_preparation_reports_phases_without_changing_json() {
             &dir,
             &[
                 "test",
-                "--emit",
+                "--target",
                 emit,
                 "--filter",
                 "adds",
@@ -414,13 +414,13 @@ fn clock_tests_run_on_virtual_time() {
 #[test]
 #[ignore = "needs Node and pnpm install"]
 fn clock_tests_run_on_virtual_time_on_flicks_own_runtime() {
-    clock_tests_pass("clocks_rt", &["--rt"]);
+    clock_tests_pass("clocks_rt", &["--runtime", "rt"]);
 }
 
 #[test]
 #[ignore = "needs Go"]
 fn clock_tests_run_on_virtual_time_on_go() {
-    clock_tests_pass("clocks_go", &["--emit", "go"]);
+    clock_tests_pass("clocks_go", &["--target", "go"]);
 }
 
 /// Properties over `Schema.arbitrary`, each failing at once so its report
@@ -467,7 +467,7 @@ fn schema_arbitrary_draws_alike_on_go() {
         let config = fs::read_to_string(dir.join("flick.toml")).expect("config");
         fs::write(
             dir.join("flick.toml"),
-            format!("{config}\n[build]\neffect = \"effect\"\n"),
+            format!("{config}\n[target.js]\nruntime = \"effect\"\n"),
         )
         .expect("Effect configuration");
         fs::write(dir.join("test/Test/Sample.fl"), DRAWS).expect("write");
@@ -502,7 +502,7 @@ fn schema_arbitrary_draws_alike_on_go() {
         "{js:?}"
     );
     assert_eq!(js[4].2, "defect", "{js:?}");
-    let go = report("draws_go", &["--emit", "go"]);
+    let go = report("draws_go", &["--target", "go"]);
     for (j, g) in js.iter().zip(&go).take(4) {
         assert_eq!(j, g);
     }

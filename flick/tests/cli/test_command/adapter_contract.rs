@@ -8,7 +8,11 @@ fn cached_tests_reject_a_new_invalid_adapter_contract() {
     let dir = project("adapter_contract_cache");
     let config = dir.join("flick.toml");
     let text = fs::read_to_string(&config).expect("config");
-    fs::write(config, format!("{text}\n[build]\neffect = \"effect\"\n")).expect("effect backend");
+    fs::write(
+        config,
+        format!("{text}\n[target.js]\nruntime = \"effect\"\n"),
+    )
+    .expect("effect backend");
     fs::write(
         dir.join("test/Test/Sample.fl"),
         "module Test.Sample exposing (tests)\n\ntests : List Test.Test\nlet tests = [Test.test \"adds\" (fun () -> Test.equal 2 (1 + 1))]\n",
@@ -28,12 +32,12 @@ fn cached_tests_reject_a_new_invalid_adapter_contract() {
         String::from_utf8_lossy(&empty.stderr).contains("FLICK-P015"),
         "{empty:?}"
     );
-    assert_eq!(empty.status.code(), Some(1));
+    assert_eq!(empty.status.code(), Some(2));
     fs::remove_file(manifest).expect("remove manifest");
     let unreadable = run();
     assert!(
         String::from_utf8_lossy(&unreadable.stderr).contains("FLICK-P015"),
         "{unreadable:?}"
     );
-    assert_eq!(unreadable.status.code(), Some(1));
+    assert_eq!(unreadable.status.code(), Some(2));
 }

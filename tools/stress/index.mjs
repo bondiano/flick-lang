@@ -64,8 +64,10 @@ for (const name of cases) {
     const build = spawnSync(
       flick,
       target === "rt"
-        ? ["build", join(root, "tests/run", `${name}.fl`), "--out-dir", dir, "--rt"]
-        : ["build", join(root, "tests/run", `${name}.fl`), "--out-dir", dir, "--emit", target],
+        ? ["build", join(root, "tests/run", `${name}.fl`), "--out-dir", dir, "--target", "js", "--runtime", "rt"]
+        : target === "js"
+          ? ["build", join(root, "tests/run", `${name}.fl`), "--out-dir", dir, "--target", "js", "--runtime", "effect"]
+          : ["build", join(root, "tests/run", `${name}.fl`), "--out-dir", dir, "--target", target],
       { encoding: "utf8" },
     );
     if (build.status !== 0) {

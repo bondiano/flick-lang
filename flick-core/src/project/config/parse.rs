@@ -7,6 +7,7 @@ use serde::Deserialize;
 use toml::{Spanned, de};
 
 use super::deps::{RawDependency, RawGrants, RawPackage, dependencies, grants, package};
+use super::parse_targets::{RawBuild, RawTargets, parse_build, parse_targets};
 use super::workspace::RawWorkspace;
 use super::{Build, Config, Entry, Kind, MAIN_ENTRY, Manifest, Script};
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
@@ -28,7 +29,8 @@ struct Raw {
     #[serde(rename = "schema-version")]
     _schema_version: i64,
     project: Option<Spanned<RawProject>>,
-    build: Option<Spanned<Build>>,
+    build: Option<Spanned<RawBuild>>,
+    target: Option<Spanned<RawTargets>>,
     sql: Option<Spanned<RawSql>>,
     lint: Option<Spanned<RawLint>>,
     dependencies: Option<Spanned<BTreeMap<String, Spanned<RawDependency>>>>,
@@ -163,6 +165,7 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
         }
         let settings = [
             ("build", raw.build.map(|b| b.span())),
+            ("target", raw.target.map(|t| t.span())),
             ("sql", raw.sql.map(|s| s.span())),
             ("lint", raw.lint.map(|l| l.span())),
             ("dependencies", raw.dependencies.map(|d| d.span())),
@@ -307,15 +310,12 @@ fn config(
         span,
     )?;
     let build = match raw.build {
-        Some(build) => {
-            if let Some(backend) = &build.get_ref().backend {
-                backend
-                    .validate()
-                    .map_err(|why| Diagnostic::error(codes::P005, why, span(build.span())))?;
-            }
-            build.into_inner()
-        }
+        Some(raw_build) => parse_build(raw_build, span)?,
         None => Build::default(),
+    };
+    let targets = match raw.target {
+        Some(raw_targets) => parse_targets(raw_targets.into_inner(), span)?,
+        None => BTreeMap::new(),
     };
     Ok(Config {
         kind: project.kind,
@@ -327,6 +327,7 @@ fn config(
         js_dependencies,
         package,
         build,
+        targets,
         sql_dialect,
         allow,
         no_let_assert: lint.no_let_assert,

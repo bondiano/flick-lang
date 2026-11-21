@@ -320,7 +320,7 @@ compiler and runtime versions.
 
 ## On the go target
 
-A program built with `emit = "go"` serves and calls procedures as on
+A program built with `[build] target = "go"` (or `--target go`) serves and calls procedures as on
 Node, message for message: the same requests, exits, chunks and acks in
 each serialization, `binary` included, over HTTP, WebSocket and TCP. A Go
 server answers a client built for the js target from the same modules, a

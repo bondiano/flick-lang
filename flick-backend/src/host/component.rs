@@ -250,6 +250,7 @@ impl WasmBackend {
         if descriptor.identity != pin.identity {
             return Err("backend descriptor does not match its pinned id and version".into());
         }
+        crate::validate_options(&descriptor)?;
         Ok(Self {
             pin,
             descriptor,

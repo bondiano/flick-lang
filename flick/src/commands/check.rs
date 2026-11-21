@@ -102,7 +102,7 @@ impl CheckCommand {
         };
         // Projects select class-derived stages on RT. Persist that set of
         // builtin interfaces, rather than checking std anew in every process.
-        let rt = project::stages_by_class(project.as_ref(), false);
+        let rt = project::stages_by_class(project.as_ref(), None);
         timings::stage("Preparing compiler");
         if let Err(diagnostic) = builtins::prepare_in(rt) {
             return (

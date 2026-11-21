@@ -15,11 +15,10 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 #[cfg(unix)]
 use std::os::unix::fs::symlink as unix_symlink;
 
-use flick_core::build::{self, Extras, Settings};
+use flick_core::build::{self, Backend, Extras, Settings};
 use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::Severity;
 use flick_core::markdown::{self, Mode};
-use flick_core::project::config::Backend;
 use flick_core::project::{self, Analysis, Project};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::types::builtin_sources;
@@ -90,10 +89,11 @@ fn run(
     path: &Path,
     name: &str,
 ) -> Option<String> {
-    let effect = checked
-        .project
-        .as_ref()
-        .map_or(Backend::Rt, |p| p.config.build.effect);
+    let effect = if checked.project.as_ref().is_none_or(|p| p.config.js_is_rt()) {
+        Backend::Rt
+    } else {
+        Backend::Effect
+    };
     let entries = [("main".to_owned(), name.to_owned())];
     let source_path = |_: FileId| format!("file://{}", path.display());
     let source_dir = |_: &str| path.parent().map(Path::to_path_buf);

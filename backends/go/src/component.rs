@@ -8,7 +8,8 @@ mod optimize;
 
 use flick_backend::{
     Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment, Inputs,
-    Mode, NamedRange, Profile, Severity, TargetSupport, VersionRange,
+    Mode, NamedRange, OptionDescriptor, Parameter, Profile, Severity, TargetSupport, ValueKind,
+    Verb, VersionRange,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -50,6 +51,19 @@ impl Backend for Go {
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::WholeProgram],
             capabilities: vec![],
+            options: vec![OptionDescriptor {
+                parameter: Parameter {
+                    name: "cgo".into(),
+                    kind: ValueKind::Flag,
+                    multiple: false,
+                    required: false,
+                    help: "Enable cgo (sets CGO_ENABLED=1 instead of CGO_ENABLED=0).".into(),
+                },
+                default: Some("false".into()),
+                implicit_value: None,
+                choices: vec![],
+                verbs: vec![Verb::Build, Verb::Run, Verb::Dev, Verb::Test],
+            }],
         }
     }
 

@@ -224,19 +224,18 @@ fn standalone_main_preserves_exports_and_runs_in_all_emit_profiles() {
     .expect("write");
     for (emit, profile) in [("js", "debug"), ("ts", "debug"), ("js", "release")] {
         let output = format!("{emit}-{profile}");
-        let build = flick_in(
-            &dir,
-            &[
-                "build",
-                "Main.fl",
-                "--out-dir",
-                &output,
-                "--emit",
-                emit,
-                "--profile",
-                profile,
-            ],
-        );
+        let mut args = vec![
+            "build",
+            "Main.fl",
+            "--out-dir",
+            &output,
+            "--profile",
+            profile,
+        ];
+        if emit == "ts" {
+            args.push("--typescript");
+        }
+        let build = flick_in(&dir, &args);
         assert!(build.status.success(), "{emit}/{profile}: {build:?}");
         let out = dir.join(output);
         let imported = Command::new("node")
@@ -308,18 +307,11 @@ fn dotted_and_underscored_modules_run_in_all_emit_profiles() {
     .expect("write");
     for (emit, profile) in [("js", "debug"), ("ts", "debug"), ("js", "release")] {
         let output = format!("{emit}-{profile}");
-        let build = flick_in(
-            &dir,
-            &[
-                "build",
-                "--emit",
-                emit,
-                "--profile",
-                profile,
-                "--out-dir",
-                &output,
-            ],
-        );
+        let mut args = vec!["build", "--profile", profile, "--out-dir", &output];
+        if emit == "ts" {
+            args.push("--typescript");
+        }
+        let build = flick_in(&dir, &args);
         assert!(build.status.success(), "{emit}/{profile}: {build:?}");
         let node = Command::new("node")
             .args(["--input-type=module", "--eval"])
@@ -362,7 +354,15 @@ fn schema_aot_writes_compiled_decoders_the_runner_installs() {
     fs::write(dir.join("Main.fl"), AOT_APP).expect("write");
     let out = flick_in(
         &dir,
-        &["build", "Main.fl", "--out-dir", "out", "--schema-aot"],
+        &[
+            "build",
+            "Main.fl",
+            "--out-dir",
+            "out",
+            "--runtime",
+            "effect",
+            "--schema-aot",
+        ],
     );
     assert!(out.status.success(), "{out:?}");
     let aot = fs::read_to_string(dir.join("out/schemas.aot.js")).expect("compiled decoders");

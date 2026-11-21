@@ -12,7 +12,6 @@ use crate::project::target_preflight;
 use super::{Loader, Project};
 use crate::diagnostics::{Diagnostic, codes};
 
-use crate::project::config::{Backend, Emit};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
@@ -46,10 +45,10 @@ pub(crate) fn js_only(name: &str) -> bool {
 /// P030 for a module of the js target only, named at `at`.
 pub(super) fn js_only_error(module: &str, at: Span) -> Diagnostic {
     let message =
-        format!("`{module}` is available on the js target only, and this project emits go");
+        format!("`{module}` is available on the js target only, and this project targets go");
     Diagnostic::error(codes::P030, message, at).with_fix(|| {
         (
-            "remove the import, or build the project with `emit = \"js\"`".to_owned(),
+            "remove the import, or build the project with `[build] target = \"js\"`".to_owned(),
             Vec::new(),
         )
     })
@@ -75,7 +74,7 @@ impl Loader<'_> {
     /// P030 for each import of a program built for go that the go target
     /// does not have, and each `deriving Form`.
     pub(super) fn check_targets(&mut self) {
-        if self.project.is_none_or(|p| p.config.build.emit != Emit::Go) {
+        if self.project.is_none_or(|p| !p.config.is_go()) {
             return;
         }
         let mut found = Vec::new();
@@ -139,9 +138,13 @@ pub(super) fn check_environment(
 }
 
 /// Whether a run over `project` checks with the stages of a class derived
-/// from it, as Flick's own runtime has them: asked for with `rt`, or the
-/// project's runtime, whatever the target of the build. A host prepares the
-/// built-in modules checked this way before it runs.
-pub fn stages_by_class(project: Option<&Project>, rt: bool) -> bool {
-    rt || project.is_some_and(|p| p.config.build.effect == Backend::Rt)
+/// from it, as Flick's own runtime has them: explicit `Some(true)`/`Some(false)`
+/// overrides the project, while `None` follows the project's `[target.js]`
+/// runtime (`"rt"` by default). A host prepares the built-in modules checked
+/// this way before it runs.
+pub fn stages_by_class(project: Option<&Project>, rt: Option<bool>) -> bool {
+    match rt {
+        Some(explicit) => explicit,
+        None => project.is_some_and(|p| !p.config.is_go() && p.config.js_is_rt()),
+    }
 }

@@ -1,5 +1,7 @@
 //! Arguments of the project, run, dependency and tooling commands.
 
+use std::collections::BTreeMap;
+
 use clap::{Args, Subcommand, ValueEnum};
 
 use super::ProfileArgument;
@@ -49,19 +51,18 @@ pub struct RunArguments {
     #[arg(long, value_name = "MODULE")]
     pub entry: Option<String>,
 
+    /// Target backend, such as `js` or `go`; by default `build.target` of the
+    /// project.
+    #[arg(long, value_name = "NAME")]
+    pub target: Option<String>,
+
     /// `debug` or `release`; by default `build.profile` of the project.
     #[arg(long, value_enum)]
     pub profile: Option<ProfileArgument>,
 
-    /// Sends the spans of the application, and the debug log of its atom
-    /// writes, to the Effect `DevTools` listening at this URL.
-    #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "ws://localhost:34437")]
-    pub devtools: Option<String>,
-
-    /// Run on Flick's own runtime, as `build.effect = "rt"` does. Only Node
-    /// has it, and without `DevTools`: `--devtools` is left out.
-    #[arg(long)]
-    pub rt: bool,
+    /// Backend-declared options parsed from the command line.
+    #[arg(skip)]
+    pub backend_options: BTreeMap<String, Vec<String>>,
 
     /// Arguments of the application, or the script's `"$@"`, after `--`.
     #[arg(last = true)]
@@ -234,8 +235,7 @@ pub struct ExpandArguments {
 pub enum Representation {
     Ast,
     TypedIr,
-    Js,
-    Ts,
+    Output,
     Iface,
     Variance,
     Mapping,
@@ -249,6 +249,15 @@ pub struct InspectArguments {
     /// What to print.
     #[arg(long, value_enum)]
     pub emit: Representation,
+
+    /// Target backend for `--emit output`, such as `js` or `go`; by default
+    /// `build.target` of the project.
+    #[arg(long, value_name = "NAME")]
+    pub target: Option<String>,
+
+    /// Backend-declared options parsed from the command line.
+    #[arg(skip)]
+    pub backend_options: BTreeMap<String, Vec<String>>,
 }
 
 #[derive(Args)]

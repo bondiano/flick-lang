@@ -5,5 +5,5 @@ kind = "app"
 runner = "Runner.Node"
 entries = { api = "App.Api", web = { module = "App.Web", runner = "Runner.Browser", target = "client" } }
 
-[build]
-effect = "effect"
+[target.js]
+runtime = "effect"

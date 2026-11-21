@@ -73,7 +73,7 @@ fn a_project_builds_runs_and_tests_under_a_non_ascii_path() {
     let emits: &[&str] = if go_only { &["go"] } else { &["js", "go"] };
     let mut reports = Vec::new();
     for &emit in emits {
-        let config = format!("{APP}test-dir = \"test\"\n\n[build]\nemit = \"{emit}\"\n");
+        let config = format!("{APP}test-dir = \"test\"\n\n[build]\ntarget = \"{emit}\"\n");
         fs::write(dir.join("flick.toml"), config).expect("write");
         let build = flick_in(&dir, &["build"]);
         assert!(build.status.success(), "{emit}: {build:?}");

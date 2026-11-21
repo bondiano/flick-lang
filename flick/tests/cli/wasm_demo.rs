@@ -27,7 +27,7 @@ fn session(source: &str) -> Session {
     session
 }
 
-/// The playground builds for Flick's own runtime, as `flick build --rt` does.
+/// The playground builds for Flick's own runtime, as `flick build --runtime rt` does.
 #[test]
 fn the_demo_compiles_a_module_as_flick_build_rt_does() {
     let session = session(MODULE);
@@ -41,10 +41,11 @@ fn the_demo_compiles_a_module_as_flick_build_rt_does() {
             &[
                 "build",
                 "Main.fl",
-                "--rt",
+                "--runtime",
+                "rt",
                 "--profile",
                 profile,
-                "--emit-dts",
+                "--declarations",
             ],
         );
         assert!(out.status.success(), "{out:?}");

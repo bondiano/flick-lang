@@ -33,7 +33,7 @@ fn hom_package_templates_survive_serialization_and_missing_sources() {
         Some(&project),
         &roots,
         Some(&empty),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -65,7 +65,7 @@ fn hom_package_templates_survive_serialization_and_missing_sources() {
         Some(&project),
         &roots,
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -118,7 +118,7 @@ fn hom_save_package(
         Some(project),
         &[PathBuf::from("/p/src/App/Root.fl")],
         Some(&empty),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -165,7 +165,7 @@ fn hom_package_private_implementation_access_stays_lexical() {
         Some(&project),
         slice::from_ref(&root),
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -179,7 +179,7 @@ fn hom_package_private_implementation_access_stays_lexical() {
         Some(&project),
         &[root],
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(
@@ -211,7 +211,7 @@ fn hom_package_templates_detect_modified_immutable_sources() {
         Some(&project),
         &[PathBuf::from("/p/src/App/Root.fl")],
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(
@@ -297,7 +297,7 @@ let narrow_sink s = s
         Some(&project),
         &roots,
         Some(&empty),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -325,7 +325,7 @@ let narrow_sink s = s
         Some(&project),
         &roots,
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(
@@ -349,7 +349,7 @@ let narrow_box b = b
         Some(&project),
         &roots,
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(
@@ -386,7 +386,7 @@ let widen_box b = b
         None,
         &local_roots,
         None,
-        false,
+        None,
         Some(&mut modules),
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -404,7 +404,7 @@ let widen_box b = b
         None,
         &local_roots,
         None,
-        false,
+        None,
         Some(&mut modules),
     );
     assert!(

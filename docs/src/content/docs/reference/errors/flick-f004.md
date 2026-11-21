@@ -2,7 +2,7 @@
 title: "FLICK-F004"
 ---
 
-`--emit-dts` writes a TypeScript declaration for every export, and refuses
+`--declarations` (`[target.js] declarations = true`) writes a TypeScript declaration for every export, and refuses
 to write a false one: a higher-kinded type variable, a value holding a
 region, an open record or a service implementation has no faithful
 TypeScript form. Export a concrete function instead (a façade), or leave the

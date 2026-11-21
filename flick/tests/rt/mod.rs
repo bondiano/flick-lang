@@ -108,7 +108,15 @@ fn rt_cases() {
             // `../rt/x` stays under the profile's directory, which may not exist yet
             let under = rel.strip_prefix("..").unwrap_or(rel);
             let out_dir = out_root.join(profile).join(under.with_extension(""));
-            let ran = run_case_with(case, rel, &out_dir, "js", profile, &["--rt"], None);
+            let ran = run_case_with(
+                case,
+                rel,
+                &out_dir,
+                "js",
+                profile,
+                &["--runtime", "rt"],
+                None,
+            );
             (
                 ran.problem
                     .map(|p| format!("{} ({profile}):\n{p}", rel.display())),
@@ -196,7 +204,15 @@ fn unlisted_passing(
         let rel = case.strip_prefix(root).expect("case under root");
         let out_dir = out_root.join("unlisted").join(rel.with_extension(""));
         let limit = Some(UNLISTED_LIMIT);
-        let ran = run_case_with(case, rel, &out_dir, "js", "debug", &["--rt"], limit);
+        let ran = run_case_with(
+            case,
+            rel,
+            &out_dir,
+            "js",
+            "debug",
+            &["--runtime", "rt"],
+            limit,
+        );
         ran.problem.is_none().then(|| {
             let rel = rel.with_extension("");
             let rel = rel.display();

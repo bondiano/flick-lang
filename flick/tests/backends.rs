@@ -335,10 +335,10 @@ fn component_devtools_is_refused_before_building_a_generation() {
     )
     .expect("pin");
     let result = flick_in(&root, &["run", "--devtools", "http://127.0.0.1:4319"]);
-    assert_eq!(result.status.code(), Some(1), "{result:?}");
+    assert_eq!(result.status.code(), Some(2), "{result:?}");
     let errors = String::from_utf8_lossy(&result.stderr);
     assert!(
-        errors.contains("FLICK-P012") && errors.contains("--devtools"),
+        errors.contains("FLICK-P058") && errors.contains("--devtools"),
         "{errors}"
     );
     assert!(

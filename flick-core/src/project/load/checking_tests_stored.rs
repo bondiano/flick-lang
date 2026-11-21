@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::{CachedModule, ModuleStore, PackageCache};
 use crate::diagnostics::Diagnostic;
-use crate::project::config::Backend;
+use crate::project::config::{TargetOption, TargetValue};
 use crate::source::Span;
 
 /// What a host keeps of the modules of a project between processes.
@@ -179,7 +179,21 @@ fn a_saved_module_serves_only_the_run_it_was_checked_in() {
         0,
         "another compiler"
     );
-    let effect = |p: &mut Project| p.config.build.effect = Backend::Effect;
+    let effect = |p: &mut Project| {
+        let span = Span::new(p.config_file, 0, 0);
+        p.config
+            .targets
+            .entry("js".into())
+            .or_default()
+            .insert(
+                "runtime".into(),
+                TargetOption {
+                    value: TargetValue::String("effect".into()),
+                    key_span: span,
+                    value_span: span,
+                },
+            );
+    };
     assert_eq!(
         taken_by(&host, &saved, "one", &one, effect),
         0,

@@ -11,14 +11,13 @@ use flick_backend::{Abi, InputKind, OptionValue};
 use flick_backend::{
     ForeignBinding, Projection, TypescriptFile, TypescriptModuleProjection, TypescriptProjection,
 };
-use flick_core::build::{Artifact as FrontendArtifact, Settings};
+use flick_core::build::{Artifact as FrontendArtifact, Backend, Settings};
 use flick_core::codegen::ts::Typing;
 use flick_core::codegen::{EffectBridge, Resolved};
 use flick_core::diagnostics::Diagnostic;
 use flick_core::diagnostics::Severity;
 use flick_core::iface::Interface;
 use flick_core::ir;
-use flick_core::project::config::Backend;
 use flick_core::source::SourceMap;
 use flick_core::{build, codegen, types};
 
@@ -52,21 +51,11 @@ impl Prepared {
                 return;
             }
             self.javascript_facts(compilation, settings, interfaces, &entries);
-            let rt = settings.backend == Backend::Rt;
             let bridge = build::javascript_effect_bridge(
                 compilation,
                 settings.effect_bridge,
                 settings.runners,
             );
-            if let Some(mode) = self
-                .request
-                .target
-                .options
-                .iter_mut()
-                .find(|o| o.key == "js.runtime")
-            {
-                mode.value = if rt { "rt" } else { "effect" }.into();
-            }
             self.request.target.options.push(OptionValue {
                 key: "js.effect-bridge".into(),
                 value: match bridge {

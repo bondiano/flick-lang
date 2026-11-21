@@ -247,6 +247,7 @@ fn check_language_exports(fuel: u64, summary: &mut CorpusSummary) {
             js_dependencies: vec![],
             package: None,
             build: project::config::Build::default(),
+            targets: BTreeMap::new(),
             sql_dialect: "postgres",
             allow: vec![],
             no_let_assert: false,

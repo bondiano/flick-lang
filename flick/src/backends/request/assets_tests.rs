@@ -1,7 +1,9 @@
 use super::*;
 
 use crate::backends::Selected;
-use flick_backend::{BackendId, DeclaredInputs, Limits, validate_request};
+use crate::backends::options::{self, ResolvedOptions};
+use flick_backend::{Backend as _, BackendId, DeclaredInputs, Limits, Verb, validate_request};
+use flick_backend_js::Javascript;
 use flick_core::diagnostics::{Severity, codes};
 use flick_core::project::config;
 use std::path::{Path, PathBuf};
@@ -57,6 +59,16 @@ fn library_outputs(missing: bool, typescript: bool, extras: build::Extras) -> Pr
     let output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
+        target: "js".into(),
+        target_overridden: false,
+        options: ResolvedOptions::js(
+            typescript,
+            extras.dts,
+            extras.promise_facade,
+            extras.schema_aot,
+            extras.rt,
+        ),
+        inspect_module: None,
         out_dir: "unused-assets-output".into(),
         entries: vec![],
         typescript,
@@ -225,7 +237,7 @@ fn a_project_runtime_setting_reaches_the_component_without_a_cli_override() {
     let host = FsHost::new();
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/backend-inputs");
     let mut sources = SourceMap::default();
-    let text = "schema-version = 1\n[project]\nkind = \"lib\"\nsource-dir = \".\"\n[build]\neffect = \"rt\"\n";
+    let text = "schema-version = 1\n[project]\nkind = \"lib\"\nsource-dir = \".\"\n[target.js]\nruntime = \"rt\"\n";
     let config_file = sources.add("fixture/flick.toml", text);
     let project = Project {
         root: dir.clone(),
@@ -243,18 +255,31 @@ fn a_project_runtime_setting_reaches_the_component_without_a_cli_override() {
         !diagnostics.iter().any(|d| d.severity == Severity::Error),
         "{diagnostics:?}"
     );
+    let resolved = options::resolve(
+        &Javascript.describe(),
+        Verb::Build,
+        Some(&project),
+        &BTreeMap::new(),
+    )
+    .expect("resolve JS options from project");
     let output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
+        target: "js".into(),
+        target_overridden: false,
+        options: resolved.clone(),
+        inspect_module: None,
         out_dir: "unused-runtime-output".into(),
         entries: vec![],
         typescript: true,
         go: false,
         suites: vec![],
-        extras: build::Extras::default(),
+        extras: build::Extras {
+            rt: resolved.is_rt(),
+            ..build::Extras::default()
+        },
         release: false,
     };
-    assert!(!output.extras.rt, "this exercises project configuration");
     let prepared = Prepared::new(
         &host,
         &mut sources,
@@ -275,6 +300,6 @@ fn a_project_runtime_setting_reaches_the_component_without_a_cli_override() {
             .target
             .options
             .iter()
-            .any(|o| o.key == "js.runtime" && o.value == "rt")
+            .any(|o| o.key == "option.runtime" && o.value == "rt")
     );
 }

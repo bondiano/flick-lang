@@ -149,13 +149,13 @@ fn a_new_project_builds_runs_and_tests_on_rt_without_effect() {
     let grant = "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n";
     let granted = config.replacen("schema-version = 1\n", grant, 1);
     fs::write(app.join("flick.toml"), granted).expect("grant go");
-    let go = flick_in(&app, &["test", "--emit", "go", "--reporter", "json"]);
+    let go = flick_in(&app, &["test", "--target", "go", "--reporter", "json"]);
     assert!(
         go.status.success(),
         "the Go target still runs its own runtime: {go:?}"
     );
 
-    let declarations = flick_in(&app, &["build", "--emit-dts", "--out-dir", "typed"]);
+    let declarations = flick_in(&app, &["build", "--declarations", "--out-dir", "typed"]);
     assert!(declarations.status.success(), "{declarations:?}");
     assert!(app.join("typed/App/Main.d.ts").is_file());
     let declaration = fs::read_to_string(app.join("typed/App/Main.d.ts")).expect("declaration");
@@ -178,7 +178,7 @@ fn a_new_project_builds_runs_and_tests_on_rt_without_effect() {
         .output()
         .expect("TypeScript checker runs");
     assert!(tsc.status.success(), "RT declarations typecheck: {tsc:?}");
-    let typescript = flick_in(&app, &["build", "--emit", "ts", "--out-dir", "ts"]);
+    let typescript = flick_in(&app, &["build", "--typescript", "--out-dir", "ts"]);
     assert!(typescript.status.success(), "{typescript:?}");
     assert!(app.join("ts/App/Main.ts").is_file());
     let source = fs::read_to_string(app.join("ts/App/Main.ts")).expect("typescript");
@@ -204,11 +204,11 @@ fn with_library(name: &str, build_section: &str, main: &str) -> PathBuf {
 #[ignore = "needs Node and pnpm install"]
 fn a_control_effect_of_a_library_read_from_its_saved_interface() {
     let app = with_library("rt_stages/library", "", LIB_MAIN);
-    build(&app, &["--rt"]);
+    build(&app, &["--runtime", "rt"]);
     assert_eq!(run(&app), "60\n");
     // the app changes, the library is taken from what the first build saved
     append(&app.join("src/App/Main.fl"), "// edited");
-    build(&app, &["--rt"]);
+    build(&app, &["--runtime", "rt"]);
     assert_eq!(run(&app), "60\n");
 }
 
@@ -217,7 +217,7 @@ fn a_control_effect_of_a_library_read_from_its_saved_interface() {
 fn a_project_on_the_runtime_by_its_configuration() {
     let app = with_library(
         "rt_stages/configured",
-        "\n[build]\neffect = \"rt\"\n",
+        "\n[target.js]\nruntime = \"rt\"\n",
         LIB_MAIN,
     );
     build(&app, &[]);
@@ -243,7 +243,7 @@ fn a_project_of_two_modules_built_again_and_after_an_edit_of_each() {
             append(&dir.join(file), "// edited");
         }
         for _ in 0..2 {
-            build(&dir, &["--rt"]);
+            build(&dir, &["--runtime", "rt"]);
             assert_eq!(run(&dir), "60\n", "after editing {edited:?}");
         }
     }
@@ -274,7 +274,10 @@ fn optional_effect_arguments_cross_the_bridge_only_when_present() {
             ),
         ],
     );
-    for args in [vec!["--rt"], vec!["--rt", "--profile", "release"]] {
+    for args in [
+        vec!["--runtime", "rt"],
+        vec!["--runtime", "rt", "--profile", "release"],
+    ] {
         build(&app, &args);
         assert_eq!(run(&app), "42\n7\n");
     }
@@ -294,11 +297,11 @@ fn on_the_kernel(app: &Path, out: &str) -> (bool, bool) {
 fn the_two_modes_do_not_read_what_the_other_saved() {
     let app = with_library(
         "rt_stages/modes",
-        "\n[build]\neffect = \"effect\"\n",
+        "\n[target.js]\nruntime = \"effect\"\n",
         PLAIN_MAIN,
     );
     let default = ["--out-dir", "default"];
-    let kernel = ["--out-dir", "kernel", "--rt"];
+    let kernel = ["--out-dir", "kernel", "--runtime", "rt"];
     build(&app, &default);
     assert_eq!(on_the_kernel(&app, "default"), (false, false));
     assert!(

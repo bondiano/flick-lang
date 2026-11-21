@@ -1,6 +1,7 @@
 //! `flick.toml`: the schema version, `[project]`, `[package]`, `[build]`,
-//! `[sql]`, `[lint]`, `[dependencies]`, `[js.dependencies]`, `[workspace]` and `[scripts]`. Unknown
-//! keys are errors so that a typo never silently means a default.
+//! `[target.<name>]`, `[sql]`, `[lint]`, `[dependencies]`, `[js.dependencies]`,
+//! `[workspace]` and `[scripts]`. Unknown keys are errors so that a typo never
+//! silently means a default.
 
 use std::collections::BTreeMap;
 
@@ -18,6 +19,8 @@ pub use backend::{BackendEnvironment, BackendPackage};
 mod deps;
 #[cfg(feature = "native-project")]
 mod parse;
+#[cfg(feature = "native-project")]
+mod parse_targets;
 #[cfg(feature = "native-project")]
 mod workspace;
 #[cfg(feature = "native-project")]
@@ -158,6 +161,8 @@ pub struct Config {
     /// `[package]`, which a library others fetch has.
     pub package: Option<Package>,
     pub build: Build,
+    /// `[target.<name>]`: backend-declared options by target short name.
+    pub targets: BTreeMap<String, BTreeMap<String, TargetOption>>,
     /// `[sql] dialect`: the dialect of the database `sql` blocks are for.
     pub sql_dialect: &'static str,
     /// `[lint] allow`: warnings that are not reported.
@@ -203,32 +208,40 @@ pub enum Kind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "native-project", derive(serde::Deserialize))]
-#[cfg_attr(
-    feature = "native-project",
-    serde(deny_unknown_fields, rename_all = "kebab-case", default)
-)]
 pub struct Build {
     pub out_dir: String,
     pub profile: Profile,
-    pub emit: Emit,
-    /// An exact backend package pin. `emit` remains the output-format alias.
+    /// Default target backend name (e.g. `"js"`, `"go"`).
+    pub target: Option<String>,
+    /// An exact backend package pin.
     pub backend: Option<BackendPackage>,
-    /// Backend plus platform; absent means the compatible alias default.
+    /// Backend plus platform; absent means the selected backend's default.
     pub environment: Option<BackendEnvironment>,
-    pub emit_dts: bool,
-    /// Write Promise façades of runtime functions beside the modules.
-    pub promise_facade: bool,
-    pub schema_aot: bool,
     /// Instance resolution budget per definition.
     pub solver_steps: u32,
     pub solver_depth: u32,
     /// What a release build labels `Module.name` for debugging tools.
     pub labels: Labels,
-    /// What runs effects: Effect, or nothing, so that only pure code builds.
-    pub effect: Backend,
-    /// The module that renders and mounts views, instead of React.
-    pub ui: Option<String>,
+}
+
+/// A backend option value read from `[target.<name>]` in `flick.toml`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TargetValue {
+    Bool(bool),
+    String(String),
+    List(Vec<(String, Span)>),
+    /// A TOML value whose type cannot represent a backend option yet, kept
+    /// with its type name so the selected backend's validator reports `P058`.
+    Unsupported(String),
+}
+
+/// One key/value entry inside `[target.<name>]`, with source spans for both
+/// the key (unknown option) and the value (invalid type or choice).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TargetOption {
+    pub value: TargetValue,
+    pub key_span: Span,
+    pub value_span: Span,
 }
 
 /// What checking a module reads of a project's configuration: the key of
@@ -263,6 +276,50 @@ impl Config {
             thresholds: self.thresholds,
         }
     }
+
+    /// The project's default target short name: `[build.backend]` short name,
+    /// else `[build] target`, else `[build] environment` backend prefix, else
+    /// `"js"`.
+    pub fn default_target(&self) -> &str {
+        if let Some(backend) = &self.build.backend {
+            return backend.id.rsplit('/').next().unwrap_or(&backend.id);
+        }
+        if let Some(target) = &self.build.target {
+            return target.as_str();
+        }
+        if let Some(environment) = &self.build.environment {
+            return environment.backend.as_str();
+        }
+        "js"
+    }
+
+    /// Whether the project's default target is Go.
+    pub fn is_go(&self) -> bool {
+        self.default_target() == "go"
+    }
+
+    /// Whether `[target.js]` selects Flick's own runtime (`"rt"`, the default)
+    /// rather than the Effect adapter (`"effect"`).
+    pub fn js_is_rt(&self) -> bool {
+        !matches!(
+            self.targets
+                .get("js")
+                .and_then(|t| t.get("runtime"))
+                .map(|o| &o.value),
+            Some(TargetValue::String(s)) if s == "effect"
+        )
+    }
+
+    /// The boolean value of `[target.js] <key>`, or `false` when unset.
+    pub fn js_flag(&self, key: &str) -> bool {
+        matches!(
+            self.targets
+                .get("js")
+                .and_then(|t| t.get(key))
+                .map(|o| &o.value),
+            Some(TargetValue::Bool(true))
+        )
+    }
 }
 
 impl Default for Build {
@@ -270,17 +327,12 @@ impl Default for Build {
         Build {
             out_dir: "dist".into(),
             profile: Profile::Debug,
-            emit: Emit::Js,
+            target: None,
             backend: None,
             environment: None,
-            emit_dts: false,
-            promise_facade: false,
-            schema_aot: false,
             solver_steps: types::Limits::default().steps,
             solver_depth: types::Limits::default().depth,
             labels: Labels::default(),
-            effect: Backend::Rt,
-            ui: None,
         }
     }
 }
@@ -291,26 +343,6 @@ impl Default for Build {
 pub enum Profile {
     Debug,
     Release,
-}
-
-/// `[build] effect`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "native-project", derive(serde::Deserialize))]
-#[cfg_attr(feature = "native-project", serde(rename_all = "lowercase"))]
-pub enum Backend {
-    Effect,
-    /// Flick's own runtime, without Effect.
-    Rt,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "native-project", derive(serde::Deserialize))]
-#[cfg_attr(feature = "native-project", serde(rename_all = "lowercase"))]
-pub enum Emit {
-    Js,
-    Ts,
-    /// A Go module per entry, built into an executable.
-    Go,
 }
 
 #[cfg(all(test, feature = "native-project"))]

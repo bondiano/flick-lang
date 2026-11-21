@@ -320,7 +320,7 @@ Each place a program runs provides some of the `Host` services at its root:
 | Where | `Host` services |
 | - | - |
 | Node | all six: `Runner.Node` provides `Host.Live`, and the launcher of an entry without a runner the ones `main` names |
-| Go (`emit = "go"`) | all six, whatever `main` names |
+| Go (`[build] target = "go"`) | all six, whatever `main` names |
 | `Runner.Browser`, `Runner.Cloudflare` | `Host.BrowserLive`: `Console`, `Clock` and `Random`; Cloudflare provides its `Env` beside them |
 | the [playground](../../play/) | the ones `main` names, with no environment variables and no arguments; a child process cannot start there |
 | `flick test` | `Host.Live`, to `Test.effect_test`, `clock_test`, `suite` and `it` |

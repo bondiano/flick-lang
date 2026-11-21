@@ -182,10 +182,11 @@ fn assert_hom_execution(source: &Path, dir: &Path, case: &str, expected: &[u8]) 
                 .arg(source.join("Main.fl"))
                 .arg("--out-dir")
                 .arg(&out)
-                .arg("--emit")
-                .arg(emit)
-                // outside a project, only the flag lets the Go backend run `go build`
-                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+                .args(match emit {
+                    "go" => &["--target", "go", "--allow-tool", "go"][..],
+                    "ts" => &["--target", "js", "--typescript", "--runtime", "effect"][..],
+                    _ => &["--target", "js", "--runtime", "effect"][..],
+                })
                 .arg("--profile")
                 .arg(profile)
                 .output()
@@ -265,10 +266,11 @@ fn higher_order_dictionary_scopes_execute_locally_on_js_and_go() {
                 .arg(source.join("Main.fl"))
                 .arg("--out-dir")
                 .arg(&out)
-                .arg("--emit")
-                .arg(emit)
-                // outside a project, only the flag lets the Go backend run `go build`
-                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+                .args(match emit {
+                    "go" => &["--target", "go", "--allow-tool", "go"][..],
+                    "ts" => &["--target", "js", "--typescript", "--runtime", "effect"][..],
+                    _ => &["--target", "js", "--runtime", "effect"][..],
+                })
                 .arg("--profile")
                 .arg(profile)
                 .output()

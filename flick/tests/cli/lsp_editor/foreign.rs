@@ -8,7 +8,7 @@ const GO: &str =
 #[test]
 fn local_foreign_definition_follows_build_target() {
     for (target, expected_file, expected_line) in [("js", "count.mjs", 1), ("go", "count.go", 2)] {
-        let config = format!("{LIB}\n[build]\nemit = \"{target}\"\n");
+        let config = format!("{LIB}\n[build]\ntarget = \"{target}\"\n");
         let dir = project(
             &format!("lsp_foreign_{target}"),
             &[

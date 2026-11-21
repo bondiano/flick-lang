@@ -9,6 +9,8 @@ use crate::common;
 mod doc_tests;
 #[path = "cli_project/foreign_inputs.rs"]
 mod foreign_inputs;
+#[path = "cli_project/inspect.rs"]
+mod inspect_tests;
 #[path = "cli_project/output_guards.rs"]
 mod output_guards;
 #[path = "cli_project/variance.rs"]
@@ -192,8 +194,8 @@ fn the_cache_key_follows_every_input_and_a_miss_changes_nothing() {
     assert_eq!(dist(&dir), first, "a hit writes what the build wrote");
     build(&["--profile", "release"]);
     assert_eq!(cached(&dir), 2, "the profile is in the key");
-    build(&["--emit", "ts"]);
-    assert_eq!(cached(&dir), 3, "the emit mode is in the key");
+    build(&["--typescript"]);
+    assert_eq!(cached(&dir), 3, "backend options are in the key");
     fs::write(
         dir.join("flick.toml"),
         format!("{APP}\n[build]\nsolver-steps = 5000\n"),
@@ -361,30 +363,6 @@ fn local_std() -> String {
 }
 
 include!("cli_project/pnpm.rs");
-#[test]
-fn inspect_prints_each_representation() {
-    let dir = project(
-        "cli_inspect",
-        &[("flick.toml", LIB), ("src/Lib/Api.fl", API)],
-    );
-    for (emit, expected) in [
-        ("ast", "SourceFile"),
-        ("typed-ir", "module Lib.Api"),
-        ("js", "export const measure"),
-        ("ts", "export const measure"),
-        ("iface", "\"module\": \"Lib.Api\""),
-        ("mapping", "\"mappings\""),
-    ] {
-        let out = flick_in(&dir, &["inspect", "Lib.Api", "--emit", emit]);
-        assert_eq!(code(&out), Some(0), "{emit}: {out:?}");
-        let text = String::from_utf8_lossy(&out.stdout);
-        assert!(text.contains(expected), "{emit}: `{expected}` in\n{text}");
-    }
-    assert_eq!(
-        code(&flick_in(&dir, &["inspect", "Lib.Nope", "--emit", "js"])),
-        Some(2)
-    );
-}
 
 #[test]
 fn doctor_reports_without_failing_on_a_missing_content_mapper() {

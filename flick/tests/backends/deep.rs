@@ -44,7 +44,7 @@ fn programs_of_the_target_sizes_run_on_both_official_components() {
     for emit in ["js", "go"] {
         for (name, (source, expected), profile) in &cases {
             let config =
-                format!("{CONFIG}[build]\nemit = \"{emit}\"\n[tools]\n\"flick/go\" = [\"go\"]\n");
+                format!("{CONFIG}[build]\ntarget = \"{emit}\"\n[tools]\n\"flick/go\" = [\"go\"]\n");
             let root = project(
                 &format!("{name}_program_{emit}"),
                 &[("flick.toml", &config), ("src/App.fl", source)],

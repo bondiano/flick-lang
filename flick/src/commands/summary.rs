@@ -19,6 +19,7 @@ pub struct Built {
     pub backend: Option<flick_backend::BackendPin>,
     #[cfg(feature = "wasm-backends")]
     pub devtools: bool,
+    pub devtools_url: Option<String>,
     pub go: bool,
     pub rt: bool,
     /// How many modules it compiled; `None` when it reused a cached build.
@@ -164,6 +165,7 @@ mod tests {
             backend: None,
             #[cfg(feature = "wasm-backends")]
             devtools: true,
+            devtools_url: None,
             go: false,
             rt: false,
             modules: Some(3),
@@ -204,6 +206,7 @@ mod tests {
             backend: None,
             #[cfg(feature = "wasm-backends")]
             devtools: true,
+            devtools_url: None,
             go: false,
             rt: false,
             modules: Some(1),

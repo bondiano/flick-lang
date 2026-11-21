@@ -25,8 +25,7 @@ let baseline;
 for (const runtime of ["effect", "rt"]) {
   for (const profile of ["debug", "release"]) {
     const label = `${runtime}-${profile}`;
-    const args = ["test", "--emit", "js", "--profile", profile, "--seed", "42", "--reporter", "json", "--offline"];
-    if (runtime === "rt") args.push("--rt");
+    const args = ["test", "--target", "js", "--runtime", runtime, "--profile", profile, "--seed", "42", "--reporter", "json", "--offline"];
     const result = spawnSync(compiler, args, {
       cwd: project,
       env: { ...process.env, FLICK_STD_PATH: join(root, "packages/std") },

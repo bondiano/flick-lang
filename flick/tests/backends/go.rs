@@ -12,7 +12,7 @@ const MAIN: &str = "module App exposing (main)\nmain : Unit ->{Host.Console} Uni
 #[test]
 #[ignore = "requires Go"]
 fn official_go_component_builds_runs_and_tests_with_independent_results() {
-    let config = format!("{CONFIG}[build]\nemit = \"go\"\n[tools]\n\"flick/go\" = [\"go\"]\n");
+    let config = format!("{CONFIG}[build]\ntarget = \"go\"\n[tools]\n\"flick/go\" = [\"go\"]\n");
     let root = project(
         "official_go_component",
         &[
@@ -86,4 +86,27 @@ fn official_go_component_builds_runs_and_tests_with_independent_results() {
         fs::read(root.join("dist/go/main/go.mod")).expect("kept"),
         published
     );
+}
+
+#[test]
+#[ignore = "requires Go"]
+fn official_go_cgo_option_builds_and_invalidates_cache() {
+    let config = format!("{CONFIG}[build]\ntarget = \"go\"\n[tools]\n\"flick/go\" = [\"go\"]\n");
+    let root = project(
+        "official_go_cgo",
+        &[("flick.toml", &config), ("src/App.fl", MAIN)],
+    );
+    let default_build = flick_in(&root, &["build", "--offline"]);
+    assert!(default_build.status.success(), "{default_build:?}");
+    let after_default = fs::read_dir(root.join(".flick/cache"))
+        .expect("cache")
+        .count();
+    assert_eq!(after_default, 1);
+
+    let cgo_build = flick_in(&root, &["build", "--offline", "--cgo"]);
+    assert!(cgo_build.status.success(), "{cgo_build:?}");
+    let after_cgo = fs::read_dir(root.join(".flick/cache"))
+        .expect("cache")
+        .count();
+    assert_eq!(after_cgo, 2);
 }

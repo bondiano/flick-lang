@@ -266,9 +266,9 @@ conversions and JSON patches.
 Schemas and codecs are Effect Schema values: a `Schema a` is an Effect
 Schema of the program's values of `a`, and a codec an Effect Schema codec
 from its wire form, so JS code can use them with Effect directly, and
-`--emit-dts` projects them as `Schema.Codec<A, I, RD, RE>`. The Effect Schema
+`--declarations` projects them as `Schema.Codec<A, I, RD, RE>`. The Effect Schema
 interpreter is the baseline. `flick build --schema-aot` (or
-`schema-aot = true`) loads the app's modules once on Node, hands the codecs
+`[target.js] schema-aot = true`) loads the app's modules once on Node, hands the codecs
 they make while loading to the `SchemaAOTCompiler` of Effect and writes the
 static module `schemas.aot.js`; the runner collects the same codecs and
 installs it before `main` starts. A codec made later, or a node the

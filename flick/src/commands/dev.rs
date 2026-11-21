@@ -21,7 +21,7 @@ use flick_core::project::ModuleCache;
 use flick_core::source::SourceMap;
 use signal_hook::consts::SIGTERM;
 
-use super::run::{Generation, build_into_generation, dev_entries, find_project, launch, vite};
+use super::run::{Generation, build_into_generation_for, dev_entries, find_project, launch, vite};
 use super::test::{settled_snapshot, watch_snapshot, watched_roots};
 use crate::args::{GlobalArguments, RunArguments};
 use crate::child::{self, Running};
@@ -97,7 +97,8 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
                 timings::discard();
             }
             seen = Some(now);
-            let built = build_into_generation(&project, options, global, Some(modules.clone()));
+            let built =
+                build_into_generation_for(&project, options, global, Some(modules.clone()), true);
             // each build reports itself, before the version it built starts
             timings::report(global);
             if let Ok(generation) = built {

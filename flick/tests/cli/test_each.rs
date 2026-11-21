@@ -30,7 +30,7 @@ test.each [true] "alone {0}" (flag) { Test.check (Test.is_true "true" flag) }
 fn a_test_each_is_a_case_for_each_row_on_every_engine() {
     for (name, effect, emit) in ENGINES {
         let dir = library(&format!("test_each_{name}"), effect, EACH);
-        let out = flick_in(&dir, &["test", "--emit", emit, "--reporter", "json"]);
+        let out = flick_in(&dir, &["test", "--target", emit, "--reporter", "json"]);
         let stdout = String::from_utf8_lossy(&out.stdout);
         assert_eq!(out.status.code(), Some(1), "{name}: {out:?}");
         let (_, results) = report(name, &format!("\n{stdout}"));

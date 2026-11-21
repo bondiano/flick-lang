@@ -12,7 +12,7 @@ fn build_ui_names_the_renderer_in_place_of_react() {
     fs::create_dir_all(dir.join("src/App")).expect("dir");
     fs::write(
         dir.join("flick.toml"),
-        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[build]\nui = \"./renderer.mjs\"\n",
+        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[target.js]\nui = \"./renderer.mjs\"\n",
     )
     .expect("write");
     fs::write(

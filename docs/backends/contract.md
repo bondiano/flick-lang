@@ -14,13 +14,13 @@ language that implements this world.
 ## Status
 
 This is an initial 0.x contract and validation library. It does not freeze
-IR 1.0 or complete every semantic prerequisite of R3a. Ordinary JS/TS
-`build/run/test` select the distributed JS component by default. The portable
-IR is 0.13.0. The official
-JS emitter lives in `backends/js`, independently of `flick-core`; the Go
-emitter remains in `flick-core`. The contract probe exercises both with IR
-and plain data without `Compilation` or `Settings`. The distributed component
-is checked against its Rust/WIT sources; real release-binary tests require
+IR 1.0 or complete every semantic prerequisite of R3a. Ordinary JS/TS and Go
+`build/run/dev/test/inspect` select the distributed `flick/js` or `flick/go`
+component by default. The portable IR is 0.13.0. The official
+JS and Go emitters live in `backends/js` and `backends/go`, independently of
+`flick-core`. The contract probe exercises both with IR
+and plain data without `Compilation` or `Settings`. The distributed components
+are checked against their Rust/WIT sources; real release-binary tests require
 component selection for build/run/test. The native trait remains a development
 and parity interface.
 
@@ -33,8 +33,16 @@ version with another component digest is rejected. The driver checks the
 host's loaded pin before snapshotting any input, even when that input is
 unavailable; a mismatch remains a P013 diagnostic with no reader calls.
 The CLI supports [explicit pinned package selection](registry.md) through
-this world for build/run/test. Projects without a pin select the shipped JS
-component for JS/TS, while Go retains its temporary native baseline. The browser
+this world for `build`, `run`, `dev`, `test` and `inspect --emit output`.
+Projects without a pin select the shipped `flick/js` component by default or
+`flick/go` when `[build] target = "go"` / `--target go` is selected.
+Each backend declares its own CLI and `[target.<name>]` options in
+`descriptor.options` (`option-descriptor`: `parameter`, `default`,
+`implicit-value`, `choices`, `verbs`), cached by component digest in
+`<store>/descriptors/<sha256>.cbor` so `--help` never reaches the network.
+Resolved active options arrive in `TargetRequest.options` as `option.<name>`
+entries alongside `command` (`build`, `run`, `dev`, `test` or `inspect`) and,
+for `inspect`, `inspect.module`. The browser
 loader, atomic publication and generic tool execution adapters remain integration work.
 Accepting a graph here does not execute it or establish that a tool's arguments
 access only declared files.

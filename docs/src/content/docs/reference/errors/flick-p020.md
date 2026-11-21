@@ -8,6 +8,6 @@ exists, and each dependency interface has the fingerprint the modules were
 built against.
 
 ```sh
-flick build --profile release --emit-dts
+flick build --profile release --declarations
 flick pack --out-dir artifacts
 ```

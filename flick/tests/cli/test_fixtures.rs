@@ -72,7 +72,15 @@ fn fixtures_are_made_on_first_use_and_released_after_the_hooks_on_every_engine()
     ];
     for (name, effect, emit) in ENGINES {
         let dir = library(&format!("test_fixtures_{name}"), effect, FIXTURES);
-        let args = ["test", "--emit", emit, "--reporter", "json", "--jobs", "4"];
+        let args = [
+            "test",
+            "--target",
+            emit,
+            "--reporter",
+            "json",
+            "--jobs",
+            "4",
+        ];
         let out = flick_in(&dir, &args);
         let stdout = String::from_utf8_lossy(&out.stdout);
         assert_eq!(out.status.code(), Some(1), "{name}: {out:?}");
@@ -102,7 +110,7 @@ suite "broken" {
 fn a_case_whose_fixture_fails_fails_its_setup_on_every_engine() {
     for (name, effect, emit) in ENGINES {
         let dir = library(&format!("test_fixtures_broken_{name}"), effect, BROKEN);
-        let out = flick_in(&dir, &["test", "--emit", emit, "--reporter", "json"]);
+        let out = flick_in(&dir, &["test", "--target", emit, "--reporter", "json"]);
         let stdout = String::from_utf8_lossy(&out.stdout);
         assert_eq!(out.status.code(), Some(1), "{name}: {out:?}");
         let (_, results) = report(name, &format!("\n{stdout}"));

@@ -1,0 +1,18 @@
+---
+title: "FLICK-P057"
+---
+
+This CLI flag or `[build]` configuration key belonged to a single backend and
+was removed when backend-specific options moved out of the core CLI. There are
+no compatibility aliases; replace it with `--target <name>` and the selected
+backend's own options or `[target.<name>]` table.
+
+```toml
+[build]
+target = "js"
+
+[target.js]
+typescript = true
+declarations = true
+runtime = "rt"
+```

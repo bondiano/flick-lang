@@ -8,7 +8,7 @@ fn compiled_ui_core_imports_without_a_dom_renderer() {
         .arg(repo.join("tests/check/pass/ui/views.fl"))
         .arg("--out-dir")
         .arg(&dir)
-        .args(["--emit", "js"])
+        .args(["--target", "js", "--runtime", "effect"])
         .output()
         .expect("flick runs");
     assert!(build.status.success(), "{build:?}");
@@ -87,6 +87,7 @@ fn passing_fixtures_compile_to_valid_js() {
             .arg(case)
             .arg("--out-dir")
             .arg(&out_dir)
+            .args(["--runtime", "effect"])
             .output()
             .expect("flick runs");
         let stderr = String::from_utf8_lossy(&build.stderr);

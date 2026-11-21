@@ -1,6 +1,6 @@
 ---
 title: "Решения по реализации"
-source_hash: e4fde932b7df67b4
+source_hash: 0e2158394dd7c04d
 ---
 
 ## Архитектура компилятора
@@ -27,10 +27,10 @@ source_hash: e4fde932b7df67b4
 | Типизированный IR | `flick-core/src/ir` | проверенный модуль, в котором явно выражены стадии применения, словари, подъёмы и диапазоны исходного кода; `ir/lower` разворачивает `do`, списковые выражения и `sql` |
 | Вычисление констант | `flick-core/src/consteval` | выражения из литералов сворачиваются с семантикой JS бит в бит |
 | Оптимизатор | `flick-core/src/opt` | проходы профиля release над типизированным IR (специализация, встраивание, слияние, скалярная замена, свёртка), сохраняющие все наблюдаемые контракты отладочной трансляции; их выполняют оба бэкенда (см. [Профиль выпуска](../../reference/codegen/#профиль-выпуска)) |
-| JS-бэкенд | `backends/js/src/codegen/js`, `runtime/`, `packages/effect-ts/` | ESM с картами исходного кода. По умолчанию стадии выполняет собственная среда RT без Effect; `effect = "effect"` выбирает `@flick-lang/effect-ts`, а `--rt` переопределяет этот выбор на один вызов |
+| JS-бэкенд | `backends/js/src/codegen/js`, `runtime/`, `packages/effect-ts/` | ESM с картами исходного кода. По умолчанию стадии выполняет собственная среда RT без Effect; `[target.js] runtime = "effect"` выбирает `@flick-lang/effect-ts`, а `--runtime rt` переопределяет этот выбор на один вызов |
 | Поддержка бэкендов | `flick-backend-support/` | имена, lang items, анализ хвостовых вызовов и циклов, порядок, достижимость и политика bindings пакетов, которые действительно используют генераторы и общие проекции frontend |
-| Go-бэкенд | `flick-core/src/codegen/go`, `flick-core/src/build/go.rs`, `runtime-go/flickrt` | `[build] emit = "go"`: Go-модуль для каждого входа поверх пакета среды выполнения `flickrt`, который компилирует `go build` (см. [Go-target](../../reference/codegen/#go-target)) |
-| Генератор TypeScript | `flick-core/src/codegen/ts` | типы для `--emit ts`, `.d.ts` для `--emit-dts` и Promise-фасады для `--promise-facade`; тип без формы в TypeScript отвергается и никогда не записывается как `any` |
+| Go-бэкенд | `backends/go/src/codegen`, `runtime-go/flickrt` | `[build] target = "go"` (`--target go`): Go-модуль для каждого входа поверх пакета среды выполнения `flickrt`, который компилирует `go build` (см. [Go-target](../../reference/codegen/#go-target)) |
+| Генератор TypeScript | `flick-core/src/codegen/ts` | типы для `--typescript`, `.d.ts` для `--declarations` и Promise-фасады для `--promise-facade`; тип без формы в TypeScript отвергается и никогда не записывается как `any` |
 | Интерфейсы | `flick-core/src/iface.rs`, `flick-core/src/build` | версионируемый JSON `.iface` каждого модуля с ABI данных и словарей и отпечатками, которые добавляет сборка (см. [Интерфейсы](../../reference/iface/)) |
 | Импорт FFI | `flick-ffi/src/ffi`, `tools/dts-importer` | `flick ffi import` и `ffi check` над описанием, которое вспомогательная программа на Node читает из `.d.ts` с помощью TypeScript |
 | Редактор | `flick-core/src/ide`, `flick-core/src/projection.rs`, `flick/src/lsp`, `flick/src/commands/contributed/projection.rs`, `backends/js/src/component/mapper.rs` | подсказки, переход к определению, ссылки, автодополнение, переименование и действия над кодом по одному анализу; их обслуживает `flick lsp --stdio`, а сессия `content-mapper` JavaScript-бэкенда превращает проекции, которые даёт хост, в карты диапазонов TypeScript (см. [Редакторы](../../reference/editor/)) |
@@ -62,7 +62,7 @@ plain-data options/проекции TypeScript. Его native-адаптер о�
 | pnpm | Шаблон проекта закрепляет версию через `packageManager` (`pnpm@12.16.1`); `flick doctor` сверяет с ней установленный pnpm. Команды зависимостей отключают автоматическую загрузку, смену и закрепление менеджера перед его проверкой и запуском, поэтому отказ установки с `--locked` не переписывает метаданные менеджера в lockfile |
 | Effect | Ровно 4.1.2, commit `506eef143bcc1750ce58920aac1e45da7265d103` (см. [Сложный Cause](../../spec/05-errors-and-concurrency/#сложный-cause-что-обещает-строка-ошибок), [Архитектура компилятора](#архитектура-компилятора) и [Версия Effect](../../reference/runtime/#версия-effect)) |
 | Покрытие Effect API | Каждый экспорт `effect`, `effect/cli`, `effect/http`, `effect/http-api` классифицирован в манифесте; линтер в `cargo test` завершается с ошибкой при неклассифицированном, устаревшем или изменившем сигнатуру экспорте (см. [Покрытие Effect](../../reference/runtime/#покрытие-effect)) |
-| Бэкенды | Правила выполнения Flick — контракт: JS по умолчанию использует собственную среду `rt` и может подключить адаптер Effect, а `runtime-go` реализует Go. `[build] emit = "go"` выбирает Go, `[build] effect = "effect"` — адаптер JS. Типизированный IR хранит числовые литералы как значения, а `foreign` сохраняет соглашение вызова JS |
+| Бэкенды | Правила выполнения Flick — контракт: JS по умолчанию использует собственную среду `rt` и может подключить адаптер Effect, а `runtime-go` реализует Go. `[build] target = "go"` выбирает Go, `[target.js] runtime = "effect"` — адаптер JS. Типизированный IR хранит числовые литералы как значения, а `foreign` сохраняет соглашение вызова JS |
 | Платформа Node для Effect | Серверный HTTP и `Terminal`/`FileSystem`/`Path` для CLI предоставляет `@effect/platform-node`. Пакет закреплён на 4.1.2 вместе с Effect как зависимость `@flick-lang/effect-ts` |
 | Драйвер PostgreSQL | `pg` (node-postgres) — необязательная peer-зависимость `@flick-lang/effect-ts`, привязанная через `foreign` в модуле стандартной библиотеки `Database` (`Database.pg`) |
 | React | React 19 и `react-dom/client` — необязательные peer-зависимости обоих пакетов: общие узлы UI и DOM-мост находятся в `@flick-lang/runtime`, а адаптер Effect предоставляет собственную политику монтирования |

@@ -3,8 +3,11 @@ package flick:backend@0.1.0;
 /// Compiler-owned data. This package has no checker, filesystem, clock,
 /// network or process imports. IR bytes carry their own version as well.
 interface types {
+    use flick:command/types@0.1.0.{parameter, value-kind};
     enum profile { debug, release }
     enum mode { per-module, whole-program }
+    /// Core CLI verbs that may accept backend-declared options.
+    enum verb { build, run, dev, test, inspect }
     record environment { backend: string, platform: string }
     record abi { name: string, version: string }
     record version-range { minimum: string, maximum-exclusive: string }
@@ -13,6 +16,14 @@ interface types {
     /// SHA-256 of the exact component bytes, supplied by the host.
     record backend-pin { identity: backend-id, sha256: string }
     record capability { name: string, version: string }
+    /// An option a backend declares for core verbs and `[target.<name>]`.
+    record option-descriptor {
+        parameter: parameter,
+        default: option<string>,
+        implicit-value: option<string>,
+        choices: list<string>,
+        verbs: list<verb>,
+    }
     record descriptor {
         identity: backend-id,
         backend-api: version-range,
@@ -23,6 +34,7 @@ interface types {
         profiles: list<profile>,
         modes: list<mode>,
         capabilities: list<capability>,
+        options: list<option-descriptor>,
     }
     record option-value { key: string, value: string }
     /// Available before IR generation; the host checks descriptor ranges

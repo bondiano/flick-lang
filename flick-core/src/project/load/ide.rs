@@ -97,7 +97,8 @@ pub fn analyze(
 }
 
 /// [`analyze`] with the stages Flick's own runtime gives a class, whatever
-/// `project` says, as `build --rt` checks: the playground builds only for it.
+/// `project` says, as `build --runtime rt` checks: the playground builds only
+/// for it.
 pub fn analyze_rt(
     host: &dyn Host,
     sources: &mut SourceMap,
@@ -112,7 +113,7 @@ pub fn analyze_rt(
         Mode::Analyze,
         None,
         None,
-        true,
+        Some(true),
     );
     Analysis {
         modules: output.analyzed,

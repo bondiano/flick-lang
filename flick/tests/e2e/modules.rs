@@ -37,10 +37,14 @@ fn abstract_class_requirement_method_runs_on_js_and_go() {
                 .arg(&main)
                 .arg("--out-dir")
                 .arg(&out)
-                .arg("--emit")
+                .arg("--target")
                 .arg(emit)
                 // outside a project, only the flag lets the Go backend run `go build`
-                .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+                .args(if emit == "go" {
+                    &["--allow-tool", "go"][..]
+                } else {
+                    &["--runtime", "effect"][..]
+                })
                 .arg("--profile")
                 .arg(profile)
                 .output()
@@ -100,10 +104,14 @@ fn unpack_uses_its_packed_dictionary_on_js_and_go() {
             .arg(&main)
             .arg("--out-dir")
             .arg(&out)
-            .arg("--emit")
+            .arg("--target")
             .arg(emit)
             // outside a project, only the flag lets the Go backend run `go build`
-            .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+            .args(if emit == "go" {
+                &["--allow-tool", "go"][..]
+            } else {
+                &["--runtime", "effect"][..]
+            })
             .arg("--profile")
             .arg("debug")
             .output()
@@ -170,10 +178,14 @@ fn existential_module_result_opens_on_js_and_go() {
             .arg(&main)
             .arg("--out-dir")
             .arg(&out)
-            .arg("--emit")
+            .arg("--target")
             .arg(emit)
             // outside a project, only the flag lets the Go backend run `go build`
-            .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+            .args(if emit == "go" {
+                &["--allow-tool", "go"][..]
+            } else {
+                &["--runtime", "effect"][..]
+            })
             .arg("--profile")
             .arg("debug")
             .output()
@@ -248,8 +260,12 @@ let main () = Platform.stdout_line (describe pair ++ \" \" ++ show pair ++ \" \"
             .arg("build")
             .arg(source.join("Main.fl"))
             // outside a project, only the flag lets the Go backend run `go build`
-            .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
-            .args(["--emit", emit, "--out-dir"])
+            .args(if emit == "go" {
+                &["--allow-tool", "go"][..]
+            } else {
+                &["--runtime", "effect"][..]
+            })
+            .args(["--target", emit, "--out-dir"])
             .arg(&out)
             .output()
             .expect("build runs");
@@ -314,10 +330,14 @@ fn a_re_exported_type_keeps_its_companions_on_js_and_go() {
             .arg(&main)
             .arg("--out-dir")
             .arg(&out)
-            .arg("--emit")
+            .arg("--target")
             .arg(emit)
             // outside a project, only the flag lets the Go backend run `go build`
-            .args(if emit == "go" { &["--allow-tool", "go"][..] } else { &[] })
+            .args(if emit == "go" {
+                &["--allow-tool", "go"][..]
+            } else {
+                &["--runtime", "effect"][..]
+            })
             .output()
             .expect("build runs");
         assert!(

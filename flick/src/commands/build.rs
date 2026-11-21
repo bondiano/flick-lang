@@ -3,10 +3,11 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Duration;
 
+use flick_backend::Verb;
 use flick_core::build::{self, Extras};
 use flick_core::codegen::Labels;
-use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::{Backend, Build, Emit, Kind, MAIN_ENTRY, Profile};
+use flick_core::diagnostics::{Diagnostic, Severity};
+use flick_core::project::config::{Build, Kind, MAIN_ENTRY, Profile};
 use flick_core::project::{self, Compilation, Compiled, ModuleCache, Project};
 use flick_core::source::SourceMap;
 
@@ -14,8 +15,9 @@ use super::check::select;
 use super::emit_ir;
 use super::out_dir::overlap;
 use super::summary::{self, Built};
-use crate::args::{BuildArguments, EmitArgument, LabelsArgument, ProfileArgument};
+use crate::args::{BuildArguments, LabelsArgument, ProfileArgument};
 use crate::artifact::{Artifact, resolve_root};
+use crate::backends::options::{self, ResolvedOptions, TargetChoice};
 use crate::backends::{self, Selected};
 use crate::command::{Command, Outcome};
 use crate::package_cache;
@@ -55,6 +57,8 @@ pub struct BuildCommand {
     /// A build into a run generation, which lives only while it runs: no
     /// manifest entry, and a cache key without its number.
     pub generation: bool,
+    /// `flick dev` runs in a generation under `Verb::Dev`.
+    pub dev: bool,
     /// What the last run wrote, for its summary.
     pub built: RefCell<Option<Built>>,
     /// What the builds before this one compiled, for a command that builds
@@ -71,7 +75,18 @@ impl BuildCommand {
             display,
             entry: None,
             generation: false,
+            dev: false,
             built: RefCell::default(),
+        }
+    }
+
+    fn verb(&self) -> Verb {
+        if self.dev {
+            Verb::Dev
+        } else if self.generation {
+            Verb::Run
+        } else {
+            Verb::Build
         }
     }
 
@@ -105,6 +120,7 @@ impl BuildCommand {
             backend: output.backend.pin(),
             #[cfg(feature = "wasm-backends")]
             devtools: output.backend.supports_host("host-node-devtools"),
+            devtools_url: output.options.get("devtools").map(str::to_owned),
             go: output.go,
             rt: output.extras.rt,
             modules,
@@ -147,38 +163,53 @@ impl Command for BuildCommand {
         if self.options.inputs {
             return super::inputs::describe(&host, sources, project.as_ref(), &roots);
         }
-        let front = self.plan(&host, project.as_ref(), Vec::new(), &Selected::Native);
-        let go = front.go;
-        if front.extras.rt && go {
-            return Outcome {
-                sources,
-                diagnostics: vec![Diagnostic::new(
-                    codes::F004,
-                    Severity::Error,
-                    "Flick's own runtime does not support Go output",
-                )],
+        let (backend, choice, target_overridden) =
+            match Selected::load_target(&host, project.as_ref(), self.options.target.as_deref()) {
+                Ok(loaded) => loaded,
+                Err(diagnostic) => {
+                    return Outcome {
+                        sources,
+                        diagnostics: vec![diagnostic],
+                    };
+                }
             };
-        }
+        let resolved = match backend.descriptor() {
+            Some(descriptor) => match options::resolve(
+                &descriptor,
+                self.verb(),
+                project.as_ref(),
+                &self.options.backend_options,
+            ) {
+                Ok(resolved) => resolved,
+                Err(diagnostics) => {
+                    return Outcome {
+                        sources,
+                        diagnostics,
+                    };
+                }
+            },
+            None => ResolvedOptions::default(),
+        };
+        let go = choice.is_go();
+        let rt = !go && resolved.is_rt();
         if let Some(problem) = project
             .as_ref()
-            .filter(|_| !go)
-            .and_then(|p| backends::check_runtime(p, front.extras.rt))
+            .and_then(|p| backends::check_runtime(p, &backend, rt))
         {
             return Outcome {
                 sources,
                 diagnostics: vec![problem],
             };
         }
-        let backend = match Selected::load(&host, project.as_ref(), go, front.extras.rt) {
-            Ok(backend) => backend,
-            Err(diagnostic) => {
-                return Outcome {
-                    sources,
-                    diagnostics: vec![diagnostic],
-                };
-            }
-        };
-        let plan = self.plan(&host, project.as_ref(), Vec::new(), &backend);
+        let plan = self.plan(
+            &host,
+            project.as_ref(),
+            Vec::new(),
+            &backend,
+            &choice,
+            target_overridden,
+            &resolved,
+        );
         if let Err(diagnostic) = backend.validate_environment(project.as_ref(), go) {
             return Outcome {
                 sources,
@@ -187,24 +218,35 @@ impl Command for BuildCommand {
         }
         *self.built.borrow_mut() = None;
         if let Some(p) = &project
-            && let Some(problem) =
-                overlap(p, &self.plan(&host, Some(p), Vec::new(), &backend).out_dir)
+            && let Some(problem) = overlap(p, &plan.out_dir)
         {
             return Outcome {
                 sources,
                 diagnostics: vec![problem],
             };
         }
-        let initial_key = project.as_ref().map(|p| {
-            let output = self.plan(&host, Some(p), self.entries(p), &backend);
-            self.key(p, &roots, &output)
+        let cached_plan = project.as_ref().map(|p| {
+            self.plan(
+                &host,
+                Some(p),
+                self.entries(p),
+                &backend,
+                &choice,
+                target_overridden,
+                &resolved,
+            )
         });
+        let initial_key = project
+            .as_ref()
+            .zip(cached_plan.as_ref())
+            .map(|(p, output)| self.key(p, &roots, output));
         // a cached build has no IR to write
         let cached = project
             .as_ref()
+            .zip(cached_plan.as_ref())
             .zip(initial_key.as_ref())
             .filter(|_| self.options.emit_ir.is_none())
-            .and_then(|(p, key)| self.cached(p, &host, &progress, key, &backend));
+            .and_then(|((p, output), key)| self.cached(p, output, &progress, key));
         if let Some(diagnostics) = cached {
             return Outcome {
                 sources,
@@ -216,7 +258,7 @@ impl Command for BuildCommand {
         if let Err(outcome) = self.prepare(&progress) {
             return outcome;
         }
-        if project::stages_by_class(project.as_ref(), plan.extras.rt)
+        if project::stages_by_class(project.as_ref(), Some(plan.extras.rt))
             && let Err(diagnostic) = builtins::prepare_in(true)
         {
             return Outcome {
@@ -231,7 +273,7 @@ impl Command for BuildCommand {
             &mut sources,
             project.as_ref(),
             &roots,
-            plan.extras.rt,
+            Some(plan.extras.rt),
             kept.as_deref_mut(),
         );
         if diagnostics.iter().any(|d| d.severity == Severity::Error) {
@@ -258,7 +300,15 @@ impl Command for BuildCommand {
                 }
             }
         };
-        let output = self.plan(&host, project.as_ref(), entries, &backend);
+        let output = self.plan(
+            &host,
+            project.as_ref(),
+            entries,
+            &backend,
+            &choice,
+            target_overridden,
+            &resolved,
+        );
         progress.stage(match (output.go, output.typescript) {
             (true, _) => "Emitting Go",
             (false, true) => "Emitting TypeScript",
@@ -329,52 +379,52 @@ impl BuildCommand {
             .collect()
     }
 
-    fn emit(&self, project: Option<&Project>) -> Emit {
-        match (self.options.emit, project) {
-            (Some(EmitArgument::Ts), _) => Emit::Ts,
-            (Some(EmitArgument::Go), _) => Emit::Go,
-            (None, Some(p)) => p.config.build.emit,
-            (Some(EmitArgument::Js), _) | (None, None) => Emit::Js,
-        }
-    }
-
     /// What the build writes where.
+    #[allow(clippy::too_many_arguments)]
     fn plan(
         &self,
         host: &FsHost,
         project: Option<&Project>,
         entries: Vec<(String, String)>,
         backend: &Selected,
+        choice: &TargetChoice,
+        target_overridden: bool,
+        resolved: &ResolvedOptions,
     ) -> BuildPlan {
         let out_dir = match (&self.options.out_dir, project) {
             (Some(dir), _) => host.cwd.join(dir),
             (None, Some(p)) => p.root.join(&p.config.build.out_dir),
             (None, None) => host.cwd.join("dist"),
         };
-        let emit = self.emit(project);
         let config = project.map(|p| &p.config.build);
+        let go = choice.is_go();
+        let rt = !go && resolved.is_rt();
         BuildPlan {
-            purpose: if self.generation {
+            purpose: if self.dev {
+                Purpose::Dev
+            } else if self.generation {
                 Purpose::Run
             } else {
                 Purpose::Build
             },
             backend: backend.clone(),
+            target: choice.short().to_owned(),
+            target_overridden,
+            options: resolved.clone(),
+            inspect_module: None,
             out_dir: resolve_root(
                 project.map_or(host.cwd.as_path(), |project| project.root.as_path()),
                 &project::normalize(&out_dir),
             ),
             entries,
-            typescript: emit == Emit::Ts,
-            go: emit == Emit::Go,
+            typescript: resolved.flag("typescript"),
+            go,
             suites: Vec::new(),
             extras: Extras {
-                dts: self.options.emit_dts || config.is_some_and(|b| b.emit_dts),
-                promise_facade: self.options.promise_facade
-                    || config.is_some_and(|b| b.promise_facade),
-                rt: self.options.rt
-                    || (emit != Emit::Go && config.is_some_and(|b| b.effect == Backend::Rt)),
-                schema_aot: self.options.schema_aot || config.is_some_and(|b| b.schema_aot),
+                dts: resolved.flag("declarations"),
+                promise_facade: resolved.flag("promise-facade"),
+                rt,
+                schema_aot: resolved.flag("schema-aot"),
                 labels: match self.options.labels {
                     Some(LabelsArgument::All) => Labels::All,
                     Some(LabelsArgument::Components) => Labels::Components,
@@ -394,7 +444,14 @@ impl BuildCommand {
             output.out_dir.clone()
         };
         let package = project::project_name(&FsHost::new(), &project.root).unwrap_or_default();
-        let backend = format!("{} {:?}", output.backend.cache_identity(), output.purpose);
+        let effect = !output.go && !output.extras.rt;
+        let backend = format!(
+            "{} {:?} {} {}",
+            output.backend.cache_identity(effect),
+            output.purpose,
+            output.target,
+            output.options.cache_key(),
+        );
         let settings = format!(
             "{} {:?} {} {} {:?} {} {package} {backend}",
             out_dir.display(),
@@ -404,7 +461,7 @@ impl BuildCommand {
             output.extras,
             output.release
         );
-        cache::key(project, roots, &settings, !output.go && !output.extras.rt)
+        cache::key(project, roots, &settings, effect)
     }
 }
 
@@ -421,12 +478,22 @@ pub fn release(profile: Option<ProfileArgument>, config: Option<&Build>) -> bool
 pub enum Purpose {
     Build,
     Run,
+    Dev,
     Test,
+    Inspect,
 }
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "build plan flags mirror independent build dimensions"
+)]
 pub struct BuildPlan {
     pub purpose: Purpose,
     pub backend: Selected,
+    pub target: String,
+    pub target_overridden: bool,
+    pub options: ResolvedOptions,
+    pub inspect_module: Option<String>,
     pub out_dir: PathBuf,
     /// The entries a runner is written for, by name and module.
     pub entries: Vec<(String, String)>,

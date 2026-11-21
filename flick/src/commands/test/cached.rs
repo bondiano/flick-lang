@@ -2,6 +2,7 @@
 
 use super::super::build::{BuildPlan, Emission, Purpose, publication_paths, publish_artifacts};
 use super::Runner;
+use crate::backends::options::ResolvedOptions;
 use crate::progress::Progress;
 use crate::{backends::Selected, cache};
 use flick_core::build::Extras;
@@ -28,6 +29,10 @@ pub(super) fn cached_prepare(
     let output = BuildPlan {
         purpose: Purpose::Test,
         backend: backend.clone(),
+        target: String::new(),
+        target_overridden: false,
+        options: ResolvedOptions::default(),
+        inspect_module: None,
         out_dir: out.to_path_buf(),
         entries: Vec::new(),
         typescript: false,

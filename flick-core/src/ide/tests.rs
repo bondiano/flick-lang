@@ -171,6 +171,7 @@ pub(super) fn fixture_with_dependencies(
             js_dependencies: Vec::new(),
             package: None,
             build: Build::default(),
+            targets: BTreeMap::new(),
             sql_dialect: Default::default(),
             allow: Vec::new(),
             no_let_assert: false,

@@ -12,13 +12,13 @@ use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use flick_core::build::{self, Extras, Settings};
+use flick_core::build::{self, Backend, Extras, Settings};
 use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::render::json_events;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::fmt;
 use flick_core::ide::{CompletionKind, Ide};
-use flick_core::project::config::{Backend, Build, Config, Kind};
+use flick_core::project::config::{Build, Config, Kind};
 use flick_core::project::{self, Analysis, Host, ModuleCache, Project};
 use flick_core::source::{FileId, SourceMap};
 use serde_json::{Value, json};
@@ -453,10 +453,8 @@ fn rt_project() -> Project {
         dependencies: Vec::new(),
         js_dependencies: Vec::new(),
         package: None,
-        build: Build {
-            effect: Backend::Rt,
-            ..Build::default()
-        },
+        build: Build::default(),
+        targets: BTreeMap::new(),
         sql_dialect: "",
         allow: Vec::new(),
         no_let_assert: false,

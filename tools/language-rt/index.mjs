@@ -1,4 +1,4 @@
-// The language tests on Flick's own runtime: runs `flick test --rt` in
+// The language tests on Flick's own runtime: runs `flick test --runtime rt` in
 // tests/language with the seed of `just language`, and holds its report to
 // the one on Effect, but for the tests tests/language/rt-gaps.txt lists. A
 // line of it is a module, which the run leaves out (it does not load on the
@@ -24,7 +24,7 @@ const modules = new Set(gaps.filter((gap) => !gap.includes(" > ")));
 const files = readdirSync(join(dir, "test/Language"))
   .filter((file) => file.endsWith(".fl") && !modules.has(`Language.${file.slice(0, -3)}`))
   .map((file) => `test/Language/${file}`);
-const run = spawnSync(resolve(flick), ["test", "--rt", "--emit", "js", "--seed", seed, "--reporter", "json", ...files], {
+const run = spawnSync(resolve(flick), ["test", "--target", "js", "--runtime", "rt", "--seed", seed, "--reporter", "json", ...files], {
   cwd: dir,
   encoding: "utf8",
 });
@@ -32,7 +32,7 @@ let rt;
 try {
   rt = JSON.parse(run.stdout);
 } catch {
-  console.error(`flick test --rt wrote no report (exit ${run.status}):\n${run.stdout}${run.stderr}`);
+  console.error(`flick test --runtime rt wrote no report (exit ${run.status}):\n${run.stdout}${run.stderr}`);
   process.exit(1);
 }
 const effect = JSON.parse(readFileSync(effectReport, "utf8"));

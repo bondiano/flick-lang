@@ -1,6 +1,6 @@
 ---
 title: "Schema and standard data types"
-source_hash: 4ab8e6c371dbe058
+source_hash: ec7fe24753f4d1cb
 ---
 
 ## The boundary between the language core and the library
@@ -197,7 +197,7 @@ The [Effect Standard Schema adapter](https://effect.website/docs/v4/schema/stand
 
 **Optimizing Effect Schema execution.** v4 has [JIT and AOT schema compilers](https://effect.website/docs/v4/schema/compilers). They generate JS for the supported part of the AST and leave the other nodes to the interpreter. AOT produces a static module; the API is still experimental.
 
-The interpreter is the mandatory baseline; AOT is an opt-in build optimization: `flick build --schema-aot` (or `schema-aot = true`) writes the static module `schemas.aot.js`, which the entry runner installs before `main` starts. Implicit runtime JIT is not enabled. A codec made later or an unsupported node stays interpreted, with the same outcome on every input; this does not allow approximation in wire export.
+The interpreter is the mandatory baseline; AOT is an opt-in build optimization: `flick build --schema-aot` (or `[target.js] schema-aot = true`) writes the static module `schemas.aot.js`, which the entry runner installs before `main` starts. Implicit runtime JIT is not enabled. A codec made later or an unsupported node stays interpreted, with the same outcome on every input; this does not allow approximation in wire export.
 
 A fast path may repeat checks/getters on invalid input when building a detailed diagnostic; pure schema optimizations require a consistent inert data ABI. The Effect compiler skips fast paths that could repeat defaults, transformations or other effects. The Flick adapter preserves these conditions.
 
