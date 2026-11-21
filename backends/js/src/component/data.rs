@@ -10,6 +10,10 @@ use flick_ir::{Expr, ExprKind, OpClass, Program};
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
 
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "one per declared JS backend option"
+)]
 pub(super) struct Data {
     pub program: Program,
     pub facts: BTreeMap<String, JavascriptProjection>,
@@ -21,6 +25,9 @@ pub(super) struct Data {
     pub foreign: Vec<Resolved>,
     pub rt: bool,
     pub typescript: bool,
+    pub declarations: bool,
+    pub schema_aot: bool,
+    pub inspect: bool,
     pub labels: Labels,
     pub bridge: EffectBridge,
 }
@@ -91,12 +98,7 @@ impl Data {
                 String::from_utf8(bytes).map_err(|e| failure(format!("source encoding: {e}")))
             })
             .collect::<Result<_, _>>()?;
-        let (rt, bridge, labels) = runtime_options(request)?;
-        let typescript = request
-            .target
-            .required_capabilities
-            .iter()
-            .any(|c| c.name == "typescript");
+        let parsed = runtime_options(request)?;
         let packages = request
             .modules
             .iter()
@@ -112,10 +114,13 @@ impl Data {
             sources,
             packages,
             foreign,
-            rt,
-            typescript,
-            labels,
-            bridge,
+            rt: parsed.rt,
+            typescript: parsed.typescript,
+            declarations: parsed.declarations,
+            schema_aot: parsed.schema_aot,
+            inspect: parsed.inspect,
+            labels: parsed.labels,
+            bridge: parsed.bridge,
         })
     }
 
@@ -203,8 +208,8 @@ fn control(expr: &Expr, diagnostics: &mut Vec<Diagnostic>) {
             .any(|h| h.operations.iter().any(|o| o.class == OpClass::Control))
     {
         let mut diagnostic = failure(
-            "the Effect adapter (`effect = \"effect\"`) does not run handlers of `control` \
-             operations; Flick's own runtime (`effect = \"rt\"`) and Go do",
+            "the Effect adapter (`[target.js] runtime = \"effect\"`) does not run handlers of `control` \
+             operations; Flick's own runtime (`[target.js] runtime = \"rt\"`) and Go do",
         )
         .remove(0);
         diagnostic.span = Some(flick_backend::Span {
@@ -217,9 +222,21 @@ fn control(expr: &Expr, diagnostics: &mut Vec<Diagnostic>) {
     expr.each_child(&mut |e| control(e, diagnostics));
 }
 
-fn runtime_options(
-    request: &BuildRequest,
-) -> Result<(bool, EffectBridge, Labels), Vec<Diagnostic>> {
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "one per declared JS backend option"
+)]
+struct ParsedOptions {
+    rt: bool,
+    typescript: bool,
+    declarations: bool,
+    schema_aot: bool,
+    inspect: bool,
+    bridge: EffectBridge,
+    labels: Labels,
+}
+
+fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnostic>> {
     let option = |key| {
         request
             .target
@@ -228,11 +245,20 @@ fn runtime_options(
             .find(|o| o.key == key)
             .map(|o| o.value.as_str())
     };
-    let rt = match option("js.runtime") {
-        Some("rt") => true,
-        Some("effect") => false,
-        _ => return Err(failure("missing or unknown js.runtime")),
+    let flag = |key| match option(key) {
+        None | Some("false") => Ok(false),
+        Some("true") => Ok(true),
+        Some(other) => Err(failure(format!("invalid boolean `{other}` for {key}"))),
     };
+    let rt = match option("option.runtime") {
+        Some("rt") | None => true,
+        Some("effect") => false,
+        Some(other) => return Err(failure(format!("unknown runtime `{other}`"))),
+    };
+    let typescript = flag("option.typescript")?;
+    let declarations = flag("option.declarations")?;
+    let _promise_facade = flag("option.promise-facade")?;
+    let schema_aot = flag("option.schema-aot")?;
     let bridge = match option("js.effect-bridge") {
         Some("absent") => EffectBridge::Absent,
         Some("available") => EffectBridge::Available,
@@ -252,7 +278,16 @@ fn runtime_options(
         if !seen.insert(&option.key)
             || !matches!(
                 option.key.as_str(),
-                "command" | "js.runtime" | "js.effect-bridge" | "labels"
+                "command"
+                    | "js.effect-bridge"
+                    | "labels"
+                    | "option.typescript"
+                    | "option.declarations"
+                    | "option.promise-facade"
+                    | "option.schema-aot"
+                    | "option.runtime"
+                    | "option.devtools"
+                    | "option.ui"
             )
         {
             return Err(failure(format!(
@@ -261,10 +296,20 @@ fn runtime_options(
             )));
         }
     }
-    if !matches!(option("command"), Some("build" | "run" | "test")) {
-        return Err(failure("missing or unknown command"));
-    }
-    Ok((rt, bridge, labels))
+    let inspect = match option("command") {
+        Some("build" | "run" | "dev" | "test") => false,
+        Some("inspect") => true,
+        _ => return Err(failure("missing or unknown command")),
+    };
+    Ok(ParsedOptions {
+        rt,
+        typescript,
+        declarations,
+        schema_aot,
+        inspect,
+        bridge,
+        labels,
+    })
 }
 
 fn foreign_bindings(request: &BuildRequest) -> Result<Vec<Resolved>, Vec<Diagnostic>> {

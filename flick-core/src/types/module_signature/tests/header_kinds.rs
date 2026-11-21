@@ -12,6 +12,7 @@ fn header_kinds_use_the_canonical_real_service_implementation_entity() {
                     operations: Vec::new(),
                     effect: false,
                 },
+                variance: Vec::new(),
             })),
             methods: Vec::new(),
         }],

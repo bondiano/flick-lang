@@ -99,7 +99,7 @@ example (S : Sig) :
 example (S : Sig) (hc : S.dict 0 = some (0, [("f", Scheme.mono thunk)])) :
     Typ S [] Facts.none [] (.drec 0 (.rcons "f" holdsOnly .rnil))
       (.ex (.dict 0 (Ty.spine [])) .pure) := by
-  refine .drec (us := []) hc rfl ?_ (by simp [holdsOnly, Tm.NoIns, Tm.Has])
+  refine .drec (us := []) hc rfl ?_ (by simp [holdsOnly, Tm.NoIns, Tm.Has]) .refl
   have hf : (Scheme.mono thunk).substT (instT []) = Scheme.mono thunk := by
     simp [Scheme.substT, Scheme.mono, thunk, Ty.substT]
   simp only [List.map_cons, List.map_nil, hf]
@@ -293,6 +293,7 @@ theorem named_row_invariant {S : Sig} {T : Name} {us : List Ty} {b : Ty}
     rw [hb, ← hX]
     exact ((Ty.ArgsEquiv.of_get hl fun j a b ha hb =>
       hinv j a b ha hb (by rw [hT]; simp) (hv j)).tcon T).symm
+  | dict => exact absurd hX.symm Ty.dict_ne_tcon
 
 /-- The field of `type K (c : CaptureRow) = K ((Unit ->{} Unit)^c ->{} Unit)`: the row
 qualifies a parameter of the field. -/

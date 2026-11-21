@@ -14,10 +14,12 @@ fn build(source: &str, out: &Path, rt: bool) {
         .join("tests/rpc_rt")
         .join(source);
     let mut command = Command::new(env!("CARGO_BIN_EXE_flick"));
-    command.arg("build").arg(source).arg("--out-dir").arg(out);
-    if rt {
-        command.arg("--rt");
-    }
+    command
+        .arg("build")
+        .arg(source)
+        .arg("--out-dir")
+        .arg(out)
+        .args(["--runtime", if rt { "rt" } else { "effect" }]);
     let built = command.output().expect("flick runs");
     assert!(built.status.success(), "{built:?}");
 }

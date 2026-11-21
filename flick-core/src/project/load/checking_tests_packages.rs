@@ -33,7 +33,7 @@ fn hom_package_templates_survive_serialization_and_missing_sources() {
         Some(&project),
         &roots,
         Some(&empty),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -65,7 +65,7 @@ fn hom_package_templates_survive_serialization_and_missing_sources() {
         Some(&project),
         &roots,
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -118,7 +118,7 @@ fn hom_save_package(
         Some(project),
         &[PathBuf::from("/p/src/App/Root.fl")],
         Some(&empty),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -165,7 +165,7 @@ fn hom_package_private_implementation_access_stays_lexical() {
         Some(&project),
         slice::from_ref(&root),
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -179,7 +179,7 @@ fn hom_package_private_implementation_access_stays_lexical() {
         Some(&project),
         &[root],
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(
@@ -211,7 +211,7 @@ fn hom_package_templates_detect_modified_immutable_sources() {
         Some(&project),
         &[PathBuf::from("/p/src/App/Root.fl")],
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(
@@ -246,4 +246,169 @@ fn hom_package_private_static_artifacts_stay_private() {
         .find(|m| m.name == "Lib.Published.Selected")
         .expect("public factory");
     assert!(!selected.interface.private);
+}
+
+#[test]
+fn opaque_variance_survives_saved_offline_package() {
+    use crate::diagnostics::codes;
+    use crate::project::{CachedModule, PackageCache, compile_with};
+    use crate::source::Span;
+
+    let lib_src = "\
+module Lib.Var exposing (Box, Sink)
+opaque type Box a = Box { value : a }
+opaque type Sink a = Sink (a -> Unit)
+";
+    let root_src = "\
+module App.Root exposing (widen_box, narrow_sink)
+import Lib.Var exposing (Box, Sink)
+
+widen_box : Box (Float -> Float) -> Box (Float ->{Async} Float)
+let widen_box b = b
+
+narrow_sink : Sink (Float ->{Async} Float) -> Sink (Float -> Float)
+let narrow_sink s = s
+";
+    let mut host = Memory(BTreeMap::from([
+        (
+            PathBuf::from("/lib/flick.toml"),
+            "schema-version = 1\n[project]\nkind = \"lib\"\n".into(),
+        ),
+        (PathBuf::from("/lib/src/Lib/Var.fl"), lib_src.into()),
+        (PathBuf::from("/p/src/App/Root.fl"), root_src.into()),
+    ]));
+    let mut sources = SourceMap::default();
+    let mut project = library(&mut sources);
+    project.config.dependencies.push(Dependency {
+        name: "lib".into(),
+        source: Source::Path("../lib".into()),
+        span: Span::new(project.config_file, 0, 0),
+    });
+    let identity = |_: &Path, _: Option<&str>| Some("immutable-var-pkg-v1".to_owned());
+    let empty = PackageCache {
+        salt: "var",
+        identity: &identity,
+        saved: &|_| None,
+    };
+    let roots = [PathBuf::from("/p/src/App/Root.fl")];
+    let (diagnostics, _, fresh) = compile_with(
+        &host,
+        &mut sources,
+        Some(&project),
+        &roots,
+        Some(&empty),
+        None,
+        None,
+    );
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+
+    let saved: BTreeMap<_, Vec<CachedModule>> = fresh
+        .into_iter()
+        .map(|package| {
+            let json = serde_json::to_vec(&package.modules).expect("package serializes");
+            (
+                package.key,
+                serde_json::from_slice(&json).expect("package round trips"),
+            )
+        })
+        .collect();
+
+    host.0.retain(|path, _| !path.starts_with("/lib/src"));
+    let cache = PackageCache {
+        salt: "var",
+        identity: &identity,
+        saved: &|key| saved.get(key).cloned(),
+    };
+    let (diagnostics, _, _) = compile_with(
+        &host,
+        &mut sources,
+        Some(&project),
+        &roots,
+        Some(&cache),
+        None,
+        None,
+    );
+    assert!(
+        diagnostics.is_empty(),
+        "offline saved variance: {diagnostics:?}"
+    );
+
+    host.0.insert(
+        PathBuf::from("/p/src/App/Root.fl"),
+        "\
+module App.Root exposing (narrow_box)
+import Lib.Var exposing (Box)
+narrow_box : Box ((Float -> Float)^{c, d}) -> Box ((Float -> Float)^{c})
+let narrow_box b = b
+"
+        .into(),
+    );
+    let (diagnostics, _, _) = compile_with(
+        &host,
+        &mut sources,
+        Some(&project),
+        &roots,
+        Some(&cache),
+        None,
+        None,
+    );
+    assert!(
+        diagnostics.iter().any(|d| d.code == codes::G001),
+        "offline narrowing must fail G001: {diagnostics:?}"
+    );
+}
+
+#[test]
+fn edited_opaque_variance_invalidates_module_cache() {
+    use crate::diagnostics::codes;
+    use crate::project::{ModuleCache, compile_with};
+
+    let lib_src = "module App.Lib exposing (Box)\nopaque type Box a = Box { value : a }\n";
+    let root_src = "\
+module App.Root exposing (widen_box)
+import App.Lib exposing (Box)
+widen_box : Box (Float -> Float) -> Box (Float ->{Async} Float)
+let widen_box b = b
+";
+    let mut sources = SourceMap::default();
+    let mut project_host = Memory(BTreeMap::from([
+        (PathBuf::from("/p/src/App/Lib.fl"), lib_src.into()),
+        (PathBuf::from("/p/src/App/Root.fl"), root_src.into()),
+    ]));
+    let mut modules = ModuleCache::default();
+    let local_roots = [
+        PathBuf::from("/p/src/App/Lib.fl"),
+        PathBuf::from("/p/src/App/Root.fl"),
+    ];
+    let (diagnostics, _, _) = compile_with(
+        &project_host,
+        &mut sources,
+        None,
+        &local_roots,
+        None,
+        None,
+        Some(&mut modules),
+    );
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+
+    project_host.0.insert(
+        PathBuf::from("/p/src/App/Lib.fl"),
+        lib_src.replace(
+            "opaque type Box a = Box { value : a }",
+            "opaque type Box a = Box (Ref a)",
+        ),
+    );
+    let (diagnostics, _, _) = compile_with(
+        &project_host,
+        &mut sources,
+        None,
+        &local_roots,
+        None,
+        None,
+        Some(&mut modules),
+    );
+    assert!(
+        diagnostics.iter().any(|d| d.code == codes::T003),
+        "edited variance must reject stale cached consumer: {diagnostics:?}"
+    );
 }

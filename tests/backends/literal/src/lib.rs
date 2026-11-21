@@ -13,8 +13,8 @@ use std::time::SystemTime;
 use flick_backend::command;
 use flick_backend::{
     Artifact, ArtifactKind, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic,
-    Environment, Inputs, Mode, ModuleRole, NamedRange, Profile, Severity, Span, TargetSupport,
-    VersionRange,
+    Environment, Inputs, Mode, ModuleRole, NamedRange, OptionDescriptor, Parameter, Profile,
+    Severity, Span, TargetSupport, ValueKind, Verb, VersionRange,
 };
 use flick_ir::{ExprKind, ItemKind, Lit, Program, Stage};
 
@@ -38,7 +38,14 @@ fn case(request: &BuildRequest) -> &str {
         .target
         .options
         .iter()
-        .find(|o| o.key == "fixture.case")
+        .find(|o| o.key == "option.case")
+        .or_else(|| {
+            request
+                .target
+                .options
+                .iter()
+                .find(|o| o.key == "fixture.case")
+        })
         .map_or_else(
             || {
                 request
@@ -59,6 +66,27 @@ fn case(request: &BuildRequest) -> &str {
             },
             |o| &o.value,
         )
+}
+
+fn banner(request: &BuildRequest) -> Option<&str> {
+    request
+        .target
+        .options
+        .iter()
+        .find(|o| o.key == "option.banner")
+        .map(|o| o.value.as_str())
+}
+
+fn is_inspect(request: &BuildRequest) -> bool {
+    request
+        .target
+        .options
+        .iter()
+        .any(|o| o.key == "command" && o.value == "inspect")
+}
+
+fn selected(request: &BuildRequest, module: &str) -> bool {
+    request.target.mode != Mode::PerModule || request.module_root.as_deref() == Some(module)
 }
 
 impl Backend for Literal {
@@ -126,7 +154,7 @@ impl Backend for Literal {
                 version: "1.0.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.12.0", "0.13.0"),
+            ir: range("0.13.0", "0.14.0"),
             language: range("0.1.0", "0.2.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
@@ -138,10 +166,35 @@ impl Backend for Literal {
             }],
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::PerModule, Mode::WholeProgram],
-            capabilities: vec![flick_backend::Capability {
-                name: "schema-aot".into(),
-                version: "1.0.0".into(),
-            }],
+            capabilities: vec![],
+            options: vec![
+                OptionDescriptor {
+                    parameter: Parameter {
+                        name: "case".into(),
+                        kind: ValueKind::Text,
+                        multiple: false,
+                        required: false,
+                        help: "Select a test fixture behavior.".into(),
+                    },
+                    default: None,
+                    implicit_value: None,
+                    choices: vec![],
+                    verbs: vec![Verb::Build, Verb::Run, Verb::Test],
+                },
+                OptionDescriptor {
+                    parameter: Parameter {
+                        name: "banner".into(),
+                        kind: ValueKind::Text,
+                        multiple: false,
+                        required: false,
+                        help: "Prepend a comment banner to generated JavaScript output.".into(),
+                    },
+                    default: None,
+                    implicit_value: None,
+                    choices: vec![],
+                    verbs: vec![Verb::Build, Verb::Inspect],
+                },
+            ],
         }
     }
 
@@ -239,18 +292,16 @@ impl Backend for Literal {
                 .read(&source.input)
                 .map_err(|_| diagnostic("source input is unavailable", None))?;
         }
-        let mut artifacts: Vec<_> = request
-            .modules
-            .iter()
-            .filter(|m| m.role == ModuleRole::Own)
-            .map(|m| Artifact {
-                id: format!("module:{}", m.name),
-                path: m.output.clone(),
-                kind: ArtifactKind::Source,
-                bytes: tests::source(request, &m.name)
-                    .unwrap_or_else(|| b"export const main = (_) => undefined;\n".to_vec()),
-            })
-            .collect();
+        let mut artifacts = module_artifacts(request);
+        if is_inspect(request) {
+            return Ok(BuildResult {
+                steps: vec![],
+                artifacts,
+                runtime_dependencies: vec![],
+                launches: vec![],
+                diagnostics: vec![],
+            });
+        }
         artifacts.push(Artifact {
             id: "binary".into(),
             path: "data.bin".into(),
@@ -313,6 +364,28 @@ impl Backend for Literal {
             diagnostics,
         })
     }
+}
+
+fn module_artifacts(request: &BuildRequest) -> Vec<Artifact> {
+    let prefix = banner(request).map(|b| format!("// {b}\n").into_bytes());
+    request
+        .modules
+        .iter()
+        .filter(|m| m.role == ModuleRole::Own && selected(request, &m.name))
+        .map(|m| {
+            let mut bytes = prefix.clone().unwrap_or_default();
+            bytes.extend(
+                tests::source(request, &m.name)
+                    .unwrap_or_else(|| b"export const main = (_) => undefined;\n".to_vec()),
+            );
+            Artifact {
+                id: format!("module:{}", m.name),
+                path: m.output.clone(),
+                kind: ArtifactKind::Source,
+                bytes,
+            }
+        })
+        .collect()
 }
 
 #[cfg(feature = "guest")]

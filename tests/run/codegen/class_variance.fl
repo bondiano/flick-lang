@@ -1,0 +1,83 @@
+// Variance-directed class instance resolution executes the expected
+// dictionaries across JS (Effect-TS and Flick RT), Go and the reference model.
+module App.Main exposing (main)
+
+type Box a = Box { value : a }
+
+type Sink a = Sink (a -> Unit)
+
+service Tick =
+  step : Unit ->{} Int
+
+class Default a =
+  default : a
+
+class Describe a =
+  describe : a -> String
+
+class RunTick a =
+  run_tick : a ->{Tick} Int
+
+class Convert a b =
+  convert : a -> b
+
+class Combine a =
+  combine : a -> a -> a
+
+instance Default (Box (Unit -> Int)) =
+  let default = Box { value = fun () -> 41 }
+
+instance Describe (Unit ->{Tick} Int) =
+  let describe _ = "tick-fn"
+
+instance Describe (Sink (Unit -> Int)) =
+  let describe _ = "sink-pure"
+
+instance RunTick (Unit ->{Tick} Int) =
+  let run_tick f = f ()
+
+instance Convert (Unit ->{Tick} Int) (Unit -> Int) =
+  let convert _ = fun () -> 99
+
+instance Combine (Unit -> Int) =
+  let combine f g = fun () -> f () + g ()
+
+instance Combine (Unit ->{Tick} Int) =
+  let combine f g = fun () -> f () + g ()
+
+base_rt : Unit ->{} Int
+let base_rt () = 7
+
+tick_rt : Unit ->{Tick} Int
+let tick_rt () = Tick.step ()
+
+run_scoped_default : Unit ->{} Int
+let run_scoped_default () = scope s {
+  let b : (Box ((Unit -> Int)^{s}))^{s} = default
+  match b with
+  | Box r -> r.value ()
+}
+
+run_convert_scoped : Unit ->{} Int
+let run_convert_scoped () = scope s {
+  f : (Unit -> Int)^{s}
+  let f = convert base_rt
+  f ()
+}
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let a = run_scoped_default ()
+  let b = describe (fun () -> 1)
+  let c = describe base_rt
+  let d = describe (Sink (fun (_ : Unit ->{Tick} Int) -> ()))
+  let e = provide (Layer.succeed Tick { step = fun () -> 10 }) {
+    let n1 = run_tick base_rt
+    let n2 = run_tick tick_rt
+    let both_rt = combine base_rt tick_rt
+    n1 + n2 + both_rt ()
+  }
+  let f = run_convert_scoped ()
+  let both_pure = combine (fun () -> 3) (fun () -> 4)
+  Platform.stdout_line (show a ++ " " ++ b ++ " " ++ c ++ " " ++ d)
+  Platform.stdout_line (show e ++ " " ++ show f ++ " " ++ show (both_pure ()))

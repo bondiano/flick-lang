@@ -55,6 +55,8 @@ change needs.
 | [No build without a runtime](#no-build-without-a-runtime) | no | `FLICK-P005` |
 | [A provided instance leaves the body no other](#a-provided-instance-leaves-the-body-no-other) | no | `FLICK-E019` |
 | [Backends find the built-in types by lang item](#backends-find-the-built-in-types-by-lang-item) | no | `FLICK-S014` |
+| [`Detached` forbids `abort`; `lazy` uses `NoControl`](#detached-forbids-abort-lazy-uses-nocontrol) | no | `FLICK-E017`, `FLICK-F002` |
+| [Backend options move to `--target` and `[target.<name>]`](#backend-options-move-to---target-and-targetname) | no | `FLICK-P057`, `FLICK-P058`, `FLICK-P059` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -645,3 +647,59 @@ store a capability of its private region in an outer `Ref`; this reports
 `FLICK-T007`. A separately bound polymorphic task remains a valid acquisition.
 The container's owning region and the callback's ordinary service requirements
 remain independent of the private acquisition region.
+
+## `Detached` forbids `abort`; `lazy` uses `NoControl`
+
+`Detached r` now requires that no effect in `r` has either a `control` or an
+`abort` operation (`FLICK-E017`). Previously only `control` was rejected, so an
+`abort` inside a child fiber (`Fiber.spawn`, `parallel`, `race_success`,
+`Effect.cached`, concurrent `Effect.for_each` / `partition` / `validate` /
+`filter` / `filter_map_effect`, `Effect.timeout_or_else`) or a scope finalizer
+could reach a kept handler from outside its installing fiber. Handle `abort`
+effects inside the child or finalizer, or use typed errors (`type error`) and
+`join` / `Channel` to report outcomes back to the parent.
+
+A `lazy` initializer still allows `abort` because it runs synchronously in the
+forcing fiber; `lazy` and `lazy_make` now require the superclass `NoControl r`
+(`class NoControl r => Detached r`), so every `Detached r` constraint still
+satisfies `NoControl r`. Foreign declarations with `retention owner` and more
+than one region must also include `Detached r` alongside `Fiber.Provided r s`
+(`FLICK-F002`). Typed IR advances to `0.13.0` to include the `no_control` lang
+item.
+
+## Backend options move to `--target` and `[target.<name>]`
+
+Target-specific CLI flags and `[build]` keys have been replaced by backend-declared
+options with no compatibility aliases. Every removed flag or `[build]` key fails
+with `FLICK-P057` (exit code `2`) naming its exact replacement:
+
+### CLI flags
+
+| Removed | Replacement |
+| - | - |
+| `flick build --emit js` / `flick test --emit js` | `--target js` (or omit; `js` is default) |
+| `flick build --emit ts` | `flick build --target js --typescript` (or `[target.js] typescript = true`) |
+| `flick build --emit go` / `flick test --emit go` | `--target go` (or `[build] target = "go"`) |
+| `flick build --emit-dts` | `flick build --declarations` (or `[target.js] declarations = true`) |
+| `flick build\|run\|dev\|test --rt` | `--runtime rt` (default for `flick/js`; use `--runtime effect` for Effect) |
+| `flick inspect <M> --emit js` | `flick inspect <M> --emit output --target js` |
+| `flick inspect <M> --emit ts` | `flick inspect <M> --emit output --target js --typescript` |
+
+### `flick.toml` keys
+
+| Removed `[build]` key | Replacement |
+| - | - |
+| `[build] emit = "js"` | `[build] target = "js"` (or omit) |
+| `[build] emit = "ts"` | `[build] target = "js"` and `[target.js] typescript = true` |
+| `[build] emit = "go"` | `[build] target = "go"` |
+| `[build] emit-dts = true` | `[target.js] declarations = true` |
+| `[build] promise-facade = true` | `[target.js] promise-facade = true` |
+| `[build] schema-aot = true` | `[target.js] schema-aot = true` |
+| `[build] effect = "rt"` | `[target.js] runtime = "rt"` (or omit; `"rt"` is default) |
+| `[build] effect = "effect"` | `[target.js] runtime = "effect"` |
+| `[build] ui = "./renderer.mjs"` | `[target.js] ui = "./renderer.mjs"` |
+
+Run `flick <cmd> --help` (or `flick <cmd> --target <name> --help`) to inspect
+the options declared by the selected backend for that command. Unknown or invalid
+options report `FLICK-P058`, and unknown target names report `FLICK-P059`.
+`flick inspect <M> --emit iface` no longer loads any backend.

@@ -11,6 +11,8 @@ structure GenSig (S : Sig) : Prop where
   dict : ∀ c, (genDict c).isSome → S.dict c = genDict c
   /-- A type of the generator has the variances the model gives it. -/
   var : ∀ T, genAdtCtors T ≠ [] → ∀ j, S.var T j = genVar T j
+  /-- A class of the generator has the variances the model gives it. -/
+  dictVar : ∀ c, (genDict c).isSome → ∀ j, S.dictVar c j = genDictVar c j
 
 /-- The arguments of an instance of a service of the generator, as many as its parameters. -/
 theorem GenSig.arity_of {S : Sig} (hS : GenSig S) {E : Name} {us : List Ty} (hE : genOps E ≠ [])
@@ -21,11 +23,25 @@ theorem GenSig.var_of {S : Sig} (hS : GenSig S) {T : Name} {j : Nat} {v : Varian
     (h : S.var T j = v) (hT : genAdtCtors T ≠ []) : genVar T j = v :=
   (hS.var T hT j).symm.trans h
 
+theorem GenSig.dictVar_of {S : Sig} (hS : GenSig S) {c j : Nat} {v : Variance}
+    (h : S.dictVar c j = v) (hc : (genDict c).isSome) : genDictVar c j = v :=
+  (hS.dictVar c hc j).symm.trans h
+
 macro_rules
   | `(tactic| var_absurd) => `(tactic| (
     rename_i hv
     have := GenSig.var_of ‹GenSig _› hv (by simp [genAdtCtors])
     simp [genVar] at this))
+
+macro_rules
+  | `(tactic| dict_var_absurd) => `(tactic| (
+    rename_i hv
+    first
+    | (have := GenSig.dictVar_of ‹GenSig _› hv (by simp [genDict])
+       simp [genDictVar] at this)
+    | (rcases hv with hv | hv <;>
+       have := GenSig.dictVar_of ‹GenSig _› hv (by simp [genDict]) <;>
+       simp [genDictVar] at this)))
 
 /-- `t.NoV i` of a concrete type. -/
 macro "no_v" : tactic => `(tactic| (
@@ -54,6 +70,29 @@ macro_rules
         intro j u hu hv <;> rcases j with $CASESj <;> simp at hu <;> (try subst hu) <;>
         first | (simp [genVar] at hv; done) | pol | (intro _; no_v) | (intro _ _; no_v) | no_v))
 
+/-- `Ty.PolD genVar genDictVar i s true f` of a field of the generator's dictionaries. -/
+syntax "pol_d" : tactic
+macro_rules
+  | `(tactic| pol_d) => `(tactic| first
+    | exact Ty.PolD.var (.inl ⟨rfl, rfl⟩)
+    | exact Ty.PolD.var (.inr ⟨rfl, rfl⟩)
+    | (apply Ty.PolD.none; no_v)
+    | (refine Ty.PolD.rcons ?_ ?_ <;> pol_d)
+    | (refine Ty.PolD.arrow ?_ ?_ ?_ ?_ ?_ <;> first
+        | (intro h; cases h)
+        | (intro _; no_v)
+        | pol_d
+        | no_v
+        | (left; no_v)
+        | exact .inr (.inl ⟨rfl, rfl⟩)
+        | exact .inr (.inr ⟨rfl, rfl⟩))
+    | (refine Ty.PolD.data ?_ ?_ ?_ ?_ ?_ (Ty.unspine_eq rfl) <;>
+        intro j u hu hv <;> rcases j with $CASESj <;> simp at hu <;> (try subst hu) <;>
+        first | (simp [genVar] at hv; done) | pol_d | (intro _; no_v) | (intro _ _; no_v) | no_v)
+    | (refine Ty.PolD.dict ?_ ?_ ?_ ?_ <;>
+        intro j u hu hv <;> rcases j with $DICT_CASESj <;> simp at hu <;> (try subst hu) <;>
+        first | (simp [genDictVar] at hv; done) | (intro h; cases h) | pol_d | (intro _; no_v) | no_v))
+
 theorem idTs_noV {k j i : Nat} {u : Ty} (h : (idTs k)[j]? = some u) (hj : j ≠ i) : u.NoV i := by
   simp only [idTs, List.getElem?_map, Option.map_eq_some_iff] at h
   obtain ⟨n, hn, rfl⟩ := h
@@ -76,6 +115,22 @@ theorem genVar_ok : ∀ T i, genVar T i ≠ .inv → ∀ K k ts, genCtor K = som
     (try exact absurd rfl hv) <;>
     refine ⟨by decide, by simp [idTs], fun f hf => ⟨fun h => (nomatch h), fun _ => ?_⟩⟩ <;>
     simp at hf <;> (try rcases hf with rfl | rfl) <;> (try subst hf) <;> pol
+
+/-- Each class of the generator holds a parameter in its superclasses and methods only where
+its inferred variance allows (`Sig.dictVar_ok`). -/
+theorem genDictVar_ok : ∀ c k fs i, genDict c = some (k, fs) → genDictVar c i ≠ .inv →
+    ∀ l s, (l, s) ∈ fs → s.cs.NoV (s.k + i) ∧
+      (genDictVar c i = .bi → s.t.NoV (s.k + i)) ∧
+      (genDictVar c i = .pos ∨ genDictVar c i = .neg →
+        Ty.PolD genVar genDictVar (s.k + i) (genDictVar c i) true s.t) := by
+  intro c k fs i hc hv l s hm
+  unfold genDict at hc
+  split at hc <;> cases hc <;> rcases i with $DICT_CASESi <;> simp only [genDictVar] at hv ⊢ <;>
+    (try exact absurd rfl hv) <;>
+    simp only [List.mem_cons, List.mem_nil_iff, or_false, Prod.mk.injEq] at hm <;>
+    rcases hm with $DICT_FIELDS <;> subst_vars <;>
+    refine ⟨by simp [Facts.NoV, Facts.none_substT], fun h => (nomatch h), fun _ => ?_⟩ <;>
+    simp only [Nat.zero_add] <;> pol_d
 
 theorem genAdtCtors_complete : ∀ K k ts T, genCtor K = some (k, ts, T) →
     (K, ts.length) ∈ genAdtCtors T := by
@@ -153,10 +208,12 @@ def genSig : Sig where
   op_field _ _ _ _ _ h := (h rfl).elim
   var := genVar
   var_ok := genVar_ok
+  dictVar := genDictVar
+  dictVar_ok := genDictVar_ok
 
 /-- The assumption of a certificate holds of a signature. -/
 theorem GenSig.inhabited : ∃ S, GenSig S :=
   ⟨genSig, fun _ _ => rfl, fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ _ h _ => h, fun _ _ _ => rfl,
-    fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ => rfl⟩
+    fun _ _ => rfl, fun _ _ => rfl, fun _ _ _ => rfl, fun _ _ _ => rfl⟩
 
 end Flick.Cert

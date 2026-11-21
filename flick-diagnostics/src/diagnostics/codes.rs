@@ -176,7 +176,7 @@ codes! {
     E014 = Effects 14, "`abort` operation that may return";
     E015 = Effects 15, "handler `return` arm that may not match";
     E016 = Effects 16, "`provide` of an effect that is not a service";
-    E017 = Effects 17, "task in a fiber of its own needs a `control` effect";
+    E017 = Effects 17, "task needs a `control` or `abort` effect its handler cannot answer";
     E018 = Effects 18, "`tail` arm that may suspend";
     E019 = Effects 19, "row variable that may hold another instance of a provided service";
     E020 = Effects 20, "unhandled effect on the selected environment";
@@ -304,6 +304,9 @@ codes! {
     P054 = Project 54, "a contributor adds a command of flick itself";
     P055 = Project 55, "a command's plan does not keep to what it declares";
     P056 = Project 56, "official backend cannot be resolved";
+    P057 = Project 57, "removed build flag or configuration key";
+    P058 = Project 58, "unknown or invalid backend option";
+    P059 = Project 59, "unknown target backend";
 }
 
 #[cfg(test)]

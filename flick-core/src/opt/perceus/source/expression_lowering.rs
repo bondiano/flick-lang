@@ -9,6 +9,40 @@ impl Lower<'_> {
             ExprKind::Lit(value) => block.emit(Operation::Literal(value.clone()), span),
             ExprKind::ServiceTag(key) => block.emit(Operation::ServiceTag(key.clone()), span),
             ExprKind::Local(name) => lookup(env, name, span),
+            ExprKind::Var(name) => {
+                let handle = lookup(env, name, span)?;
+                block.emit(Operation::VarGet(handle), span)
+            }
+            ExprKind::Label(name) => block.emit(Operation::Label(name.clone()), span),
+            ExprKind::Unwrap(operand) => {
+                let option = self.expr(operand, env, block)?;
+                block.emit(Operation::UnwrapOption(option), span)
+            }
+            ExprKind::Loop { condition, body } => {
+                self.loop_expr(condition, body, env, block, span)
+            }
+            ExprKind::ControlLoop {
+                id,
+                condition,
+                body,
+                iterable,
+            } => self.control_loop(id, condition.as_deref(), body, *iterable, env, block, span),
+            ExprKind::LoopExit { id, value } => {
+                self.loop_exit(id, value.as_deref(), env, block, span)
+            }
+            ExprKind::Generate {
+                body,
+                strict,
+                sync,
+                limit,
+            } => self.generate(body, *strict, *sync, limit.as_deref(), env, block, span),
+            ExprKind::Each {
+                stop,
+                pat,
+                source,
+                body,
+            } => self.each(stop.as_deref(), pat, source, body, env, block, span),
+            ExprKind::Yield(value) => self.yield_expr(value, env, block, span),
             ExprKind::Global { module, name } => {
                 let name = Name::new(module, name);
                 self.global(&name, Some(span))?;
@@ -174,9 +208,6 @@ impl Lower<'_> {
             ExprKind::Perform { effect, op, stages } => {
                 self.perform(effect, op, stages, vec![], block, span)
             }
-            // Nonlocal returns and handler control still need their own
-            // semantics; a helper return is not a source-function return.
-            other => Err(unsupported(form(other), span)),
         }
     }
 
@@ -231,8 +262,21 @@ impl Lower<'_> {
                     };
                     env.insert(name.clone(), local);
                 }
-                Stmt::Var(_, value) | Stmt::Assign(_, value) => {
-                    return Err(unsupported("local mutation", value.span));
+                Stmt::Var(name, value) => {
+                    let init = self.expr(value, &env, block)?;
+                    let handle = block.emit(Operation::VarMake(init), value.span)?;
+                    env.insert(name.clone(), handle);
+                }
+                Stmt::Assign(name, value) => {
+                    let var = lookup(&env, name, value.span)?;
+                    let replacement = self.expr(value, &env, block)?;
+                    block.emit(
+                        Operation::VarSet {
+                            var,
+                            value: replacement,
+                        },
+                        value.span,
+                    )?;
                 }
             }
         }
@@ -284,13 +328,20 @@ impl Lower<'_> {
             inside.insert(name.to_owned(), 0);
         }
         self.pattern(&first.pat, 1, &mut inside, &mut function, span)?;
+        let saved_for = self.active_for_loop.take();
         let result = if rest.is_empty() {
-            self.expr(body, &inside, &mut function)?
+            if loops::contains_direct_unwrap(body) {
+                self.function_boundary(body, &inside, &mut function, span)
+            } else {
+                self.expr(body, &inside, &mut function)
+            }
         } else {
             // Later curried stages capture the OUTER recursive self. They
             // must not remap its source name to their own inner self token.
-            self.lambda(rest, body, &inside, None, &mut function, span)?
+            self.lambda(rest, body, &inside, None, &mut function, span)
         };
+        self.active_for_loop = saved_for;
+        let result = result?;
         self.finish(code, &function.finish(result))?;
         block.emit(Operation::Closure { code, captures }, span)
     }
@@ -314,7 +365,14 @@ impl Lower<'_> {
             let value = function.emit(Operation::Project { object: 0, field }, span)?;
             inside.insert(name, value);
         }
-        let result = self.expr(body, &inside, &mut function)?;
+        let saved_for = self.active_for_loop.take();
+        let result = if loops::contains_direct_unwrap(body) {
+            self.function_boundary(body, &inside, &mut function, span)
+        } else {
+            self.expr(body, &inside, &mut function)
+        };
+        self.active_for_loop = saved_for;
+        let result = result?;
         self.finish(code, &function.finish(result))?;
         block.emit(Operation::Task { code, captures }, span)
     }

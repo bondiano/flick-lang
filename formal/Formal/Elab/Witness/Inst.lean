@@ -61,7 +61,7 @@ theorem inst_typ {I ins b} (hI : insts I = some ins) (hb : instBody I = some b) 
   split at hI <;> cases hI <;> simp only [instBody, Option.some.injEq] at hb <;> subst hb <;>
     refine .drec (us := [trT N (.con _)]) rfl rfl ?_ (fun h => by
       simp [eqInt, effPure, effMap2, effBind, mkEff, unEff, optPure, optMap2, optBind, un1, someQ,
-        noneQ, iterL, caseLQ, scons, snil, pvars, Flick.Tm.Has] at h)
+        noneQ, iterL, caseLQ, scons, snil, pvars, Flick.Tm.Has] at h) .refl
   · exact dcons_m (s := ((methSch 0).get rfl).2) (fun _ _ => .const (ι := default) trivial .refl) .dnil
   · exact dcons_m (s := ((methSch 1).get rfl).2) (fun _ _ => typ_effPure_tr hmk hmkr N rfl (by decide) (by decide) _ _)
       (dcons_m (s := ((methSch 2).get rfl).2)

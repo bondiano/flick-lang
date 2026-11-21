@@ -9,7 +9,7 @@ use flick_core::{
 };
 use std::rc::Rc;
 
-impl Tr {
+impl Tr<'_> {
     /// `Scope.run arg`, which is `scope s { body }`: the core's form of it.
     pub(super) fn scope(&mut self, arg: &ir::Expr) -> Term {
         self.scope_with(arg, &|tr, body| tr.expr(body))
@@ -120,7 +120,7 @@ impl Tr {
 }
 
 /// How the body of a `scope` or a `provide` is translated.
-pub(super) type Body<'b> = &'b dyn Fn(&mut Tr, &ir::Expr) -> Term;
+pub(super) type Body<'b> = &'b dyn Fn(&mut Tr<'_>, &ir::Expr) -> Term;
 
 fn binding(name: &Name, value: &ir::Expr, body: ir::Expr) -> ir::Expr {
     ir::Expr::new(

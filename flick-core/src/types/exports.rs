@@ -153,7 +153,13 @@ impl Checker<'_> {
                 module: module.to_owned(),
                 name: name.to_owned(),
             });
+        let variance = if matches!(d.form, Form::Alias { .. }) {
+            Vec::new()
+        } else {
+            self.exported_variance(module, name, d)
+        };
         let mut d = d.clone();
+        d.variance = variance;
         d.form = match d.form {
             // an opaque enum keeps what its values are: its literals
             Form::Adt {

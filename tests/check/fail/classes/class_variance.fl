@@ -1,0 +1,136 @@
+// Wrong variance directions, invariant/marker classes, and reach-dropping
+// (`SafeUse`) dictionary uses are rejected (`docs/formal/regions.md` §2.2.1).
+module App.ClassVarianceFail exposing (..)
+
+type Box a = Box { value : a }
+
+type Proxy a = Proxy
+
+type File (s : Region)
+
+service Files =
+  open_f : forall s. Unit ->{Scope s} File s
+  read_f : forall s. File s ->{} Int
+
+type Hold a = Hold (Unit ->{Files} a)
+
+class Default a =
+  default : a
+
+class Describe a =
+  describe : a -> String
+
+class Combine a =
+  combine : a -> a -> a
+
+class Cont a =
+  cont : (a -> Int) -> Int
+
+class Marker a =
+  marker : String
+
+instance Default (Box (Unit ->{Async} Unit)) =
+  let default = Box { value = fun () -> () }
+
+instance Describe (Unit -> Unit) =
+  let describe _ = "pure"
+
+instance Combine (Unit -> Unit) =
+  let combine f _ = f
+
+instance Cont (Unit -> Unit) =
+  let cont k = k (fun () -> ())
+
+instance Marker (Unit -> Unit) =
+  let marker = "pure"
+
+// Wrong direction for `+`: runtime box cannot serve pure box.
+bad_plus : Box (Unit -> Unit)
+let bad_plus = default
+
+// Wrong direction for `-`: pure arrow instance cannot serve runtime arrow.
+bad_minus : (Unit ->{Async} Unit) -> String
+let bad_minus f = describe f
+
+// Mixed-use `Combine` stays invariant.
+bad_combine : (Unit ->{Async} Unit) -> (Unit ->{Async} Unit)
+let bad_combine f = combine f f
+
+// Double-flip `Cont` stays invariant (reach preservation forbids `+`).
+bad_cont : ((Unit ->{Async} Unit) -> Int) -> Int
+let bad_cont k = cont k
+
+// Unused marker `Marker` (`bi`) stays exact.
+check_marker : Marker a => a -> Int
+let check_marker _ = 1
+
+bad_marker : (Unit ->{Async} Unit) -> Int
+let bad_marker f = check_marker f
+
+// SafeUse: a capture-free `-` instance cannot consume a scoped closure holding `s`.
+bad_drop_cap_inst : Unit ->{Files} String
+let bad_drop_cap_inst () =
+  scope s {
+    let f = Files.open_f ()
+    thunk : (Unit -> Unit)^{s}
+    let thunk () =
+      let _ = f
+      ()
+    describe thunk
+  }
+
+// SafeUse: a capture-free `-` given cannot serve a captured query.
+bad_drop_cap_given : forall s. Describe (Unit -> Unit) => (Unit -> Unit)^{s} -> String
+let bad_drop_cap_given thunk = describe thunk
+
+// SafeUse: a box produced by a `+` dictionary at `Box ((Unit -> Unit)^{s})`
+// still cannot escape its `scope`.
+class PureBox a =
+  pure_box : a
+
+instance PureBox (Box (Unit -> Unit)) =
+  let pure_box = Box { value = fun () -> () }
+
+bad_escape : Unit ->{} Box (Unit -> Unit)
+let bad_escape () =
+  scope s {
+    let b : (Box ((Unit -> Unit)^{s}))^{s} = pure_box
+    b
+  }
+
+// Phantom `bi` data parameters stay exact: Default (Proxy Int) cannot serve Proxy String.
+instance Default (Proxy Int) =
+  let default = Proxy
+
+bad_phantom : Proxy String
+let bad_phantom = default
+
+// Hidden-capture `Hold` cannot match capture-free `-` `Leak (Hold Int)` inside
+// either an instance method body or a class default body.
+class Leak a =
+  leak : a -> Int
+
+instance Leak (Hold Int) =
+  let leak _ = 0
+
+class BadInst t =
+  bad_inst : forall s. t -> File s ->{Files} Int
+
+instance BadInst Unit =
+  let bad_inst () f = leak (Hold (fun () -> Files.read_f f))
+
+class BadDefault t =
+  bad_def : forall s. t -> File s ->{Files} Int
+  let bad_def _ f = leak (Hold (fun () -> Files.read_f f))
+
+//~ FLICK-C001 @49:16-49:23 no instance for `Default (Box (Unit -> Unit))`
+//~ FLICK-C001 @53:19-53:27 no instance for `Describe (Unit ->{Async} Unit)`
+//~ FLICK-C001 @57:21-57:28 no instance for `Combine (Unit ->{Async} Unit)`
+//~ FLICK-C001 @61:18-61:22 no instance for `Cont (Unit ->{Async} Unit)`
+//~ FLICK-C001 @68:20-68:32 no instance for `Marker (Unit ->{Async} Unit)`
+//~ FLICK-C001 @79:5-79:13 cannot deduce `Describe (Unit -> Unit)^{s}`
+//~ FLICK-C001 @84:32-84:40 cannot deduce `Describe (Unit -> Unit)^{s}`
+//~ FLICK-G001 @98:5-98:6 this value holds region `s`
+//~ FLICK-C001 @106:19-106:26 no instance for `Default (Proxy String)`
+//~ FLICK-C001 @120:23-120:27 cannot deduce `Leak (Hold Int)^{s}`
+//~ FLICK-C001 @124:21-124:25 cannot deduce `Leak (Hold Int)^{s}`

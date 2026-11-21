@@ -1,0 +1,119 @@
+module App.Main exposing (..)
+
+import App.Lib exposing
+  ( Box
+  , Sink
+  , Cell
+  , Phantom
+  , Secret
+  , Thunk
+  , Alias
+  , Abstract
+  , SecretFn
+  , AliasFn
+  , PairBox
+  , make_thunk
+  )
+
+// Opaque covariant ADT widens across module boundaries.
+box_of_pure : Box (Float -> Float) -> Box (Float ->{Async} Float)
+let box_of_pure b = b
+
+box_widens : Box ((Float -> Float)^{c}) -> Box ((Float -> Float)^{c, d})
+let box_widens b = b
+
+box_narrows : Box ((Float -> Float)^{c, d}) -> Box ((Float -> Float)^{c})
+let box_narrows b = b
+//                  ^ FLICK-G001 this value holds `d`
+
+// Opaque contravariant ADT narrows across module boundaries.
+sink_narrows : Sink (Float ->{Async} Float) -> Sink (Float -> Float)
+let sink_narrows s = s
+
+sink_widens : Sink (Float -> Float) -> Sink (Float ->{Async} Float)
+let sink_widens s = s
+//                  ^ FLICK-T003 expected `Sink (Float ->{Async} Float)`, found `Sink (Float -> Float)`
+
+// Opaque invariant ADT stays invariant.
+cell_widens : Cell (Float -> Float) -> Cell (Float ->{Async} Float)
+let cell_widens c = c
+//                  ^ FLICK-T003 expected `Cell (Float ->{Async} Float)`, found `Cell (Float -> Float)`
+
+// ADT exported without constructors still preserves its variance.
+secret_of_pure : Secret (Float -> Float) -> Secret (Float ->{Async} Float)
+let secret_of_pure s = s
+
+secret_narrows : Secret ((Float -> Float)^{c, d}) -> Secret ((Float -> Float)^{c})
+let secret_narrows s = s
+//                     ^ FLICK-G001 this value holds `d`
+
+// Opaque data with hidden storage stays covariant in `a` and invariant in
+// `r : ServiceRow` while preserving `hidden: true` capture checks.
+thunk_of_pure : (Thunk none (Float -> Float))^{c} -> (Thunk none (Float ->{Async} Float))^{c}
+let thunk_of_pure t = t
+
+thunk_service_widens : (Thunk none Int)^{c} -> (Thunk {Async} Int)^{c}
+let thunk_service_widens t = t
+//                           ^ FLICK-T003
+
+type Handle (s : Region)
+
+service Handles =
+  open : forall s. Unit ->{Scope s} Handle s
+  use_handle : forall s. Handle s ->{} Unit
+
+leaked_thunk : Unit ->{Handles} (Thunk {Handles} Unit)^{}
+let leaked_thunk () = scope {
+  let h = Handles.open ()
+  make_thunk (fun () -> Handles.use_handle h)
+//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-G001
+}
+
+// Conservative limits: opaque type alias and abstract type remain invariant.
+alias_widens : Alias (Float -> Float) -> Alias (Float ->{Async} Float)
+let alias_widens x = x
+//                   ^ FLICK-T003 expected `Alias (Float ->{Async} Float)`, found `Alias (Float -> Float)`
+
+abstract_widens : Abstract (Float -> Float) -> Abstract (Float ->{Async} Float)
+let abstract_widens x = x
+//                      ^ FLICK-T003 expected `Abstract (Float ->{Async} Float)`, found `Abstract (Float -> Float)`
+
+// A wrapper over an imported opaque covariant type inherits covariance.
+type Wrap a = Wrap (Box a)
+
+wrap_of_pure : Wrap (Float -> Float) -> Wrap (Float ->{Async} Float)
+let wrap_of_pure w = w
+
+// GADT upward-closure soundness: opaque/alias/abstract 0-param types are NOT closed.
+type IntTag a =
+  | MkInt : IntTag Int
+  | MkVal a : IntTag a
+
+int_tag_widens : IntTag (Float -> Float) -> IntTag (Float ->{Async} Float)
+let int_tag_widens t = t
+
+type OpaqueFnTag a =
+  | MkSecretFn : OpaqueFnTag SecretFn
+  | MkSecretFnVal a : OpaqueFnTag a
+
+opaque_fn_tag_widens : OpaqueFnTag (Float -> Float) -> OpaqueFnTag (Float ->{Async} Float)
+let opaque_fn_tag_widens t = t
+//                           ^ FLICK-T003 expected `OpaqueFnTag (Float ->{Async} Float)`, found `OpaqueFnTag (Float -> Float)`
+
+type AliasFnTag a =
+  | MkAliasFn : AliasFnTag AliasFn
+  | MkAliasFnVal a : AliasFnTag a
+
+alias_fn_tag_widens : AliasFnTag (Float -> Float) -> AliasFnTag (Float ->{Async} Float)
+let alias_fn_tag_widens t = t
+//                          ^ FLICK-T003 expected `AliasFnTag (Float ->{Async} Float)`, found `AliasFnTag (Float -> Float)`
+
+type PairBoxTag a =
+  | MkPairBox : PairBoxTag PairBox
+  | MkPairBoxVal a : PairBoxTag a
+
+pair_box_tag_widens : PairBoxTag (Float -> Float) -> PairBoxTag (Float ->{Async} Float)
+let pair_box_tag_widens t = t
+//                          ^ FLICK-T003 expected `PairBoxTag (Float ->{Async} Float)`, found `PairBoxTag (Float -> Float)`
+
+type Unused = Unused (Phantom Int)

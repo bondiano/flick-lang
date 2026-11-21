@@ -9,11 +9,10 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::{env, fs, process};
 
-use flick_core::build::{self, Extras, Settings};
+use flick_core::build::{self, Backend, Extras, Settings};
 use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::Severity;
 use flick_core::implicit_packages::IMPLICIT_PACKAGES;
-use flick_core::project::config::Backend;
 use flick_core::project::{self, Host};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::types;

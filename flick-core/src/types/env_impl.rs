@@ -369,7 +369,7 @@ impl<'b> Env<'b> {
             .builtins
             .interfaces
             .get_key_value(module)
-            .filter(|(q, _)| !self.qualifiers.contains_key(*q))
+            .filter(|(q, i)| !i.private && !self.qualifiers.contains_key(*q))
             .map(|(q, _)| q.as_str());
         self.qualifiers
             .iter()
@@ -377,6 +377,67 @@ impl<'b> Env<'b> {
             .map(|(q, _)| q.as_str())
             .chain(builtin)
             .min_by_key(|q| (q.len(), *q))
+    }
+
+    /// The shortest accessible qualifier through which `module.name` resolves
+    /// as a type constructor (direct qualifier, import alias, re-exporting
+    /// module, static parameter view, or nested child module), skipping any
+    /// qualifier shadowed by `shadowed`.
+    pub fn type_qualifier(
+        &self,
+        module: &str,
+        name: &str,
+        shadowed: &dyn Fn(&str) -> bool,
+    ) -> Option<String> {
+        fn visit(
+            env: &Env<'_>,
+            qualifier: &str,
+            iface: &Interface,
+            exports: &dyn Fn(&Interface) -> bool,
+            shadowed: &dyn Fn(&str) -> bool,
+            best: &mut Option<String>,
+        ) {
+            if !shadowed(qualifier)
+                && exports(iface)
+                && let Some((_, Some(resolved))) = env.qualified_module(qualifier)
+                && resolved.module == iface.module
+            {
+                let shorter = best
+                    .as_ref()
+                    .is_none_or(|b| (qualifier.len(), qualifier) < (b.len(), b.as_str()));
+                if shorter {
+                    *best = Some(qualifier.to_owned());
+                }
+            }
+            for (child_name, child_iface) in &iface.modules {
+                let child = format!("{qualifier}.{child_name}");
+                visit(env, &child, child_iface, exports, shadowed, best);
+            }
+        }
+        let exports = |iface: &Interface| {
+            iface
+                .find(Namespace::Type, name)
+                .is_some_and(|e| e.entity.module == module && e.entity.name == name)
+        };
+        if let Some(q) = self.qualifier_of(module)
+            && !shadowed(q)
+            && let Some((_, Some(iface))) = self.qualified_module(q)
+            && exports(iface)
+        {
+            return Some(q.to_owned());
+        }
+        let mut best = None;
+        for q in self.qualifiers.keys() {
+            if let Some((_, Some(iface))) = self.qualified_module(q) {
+                visit(self, q, iface, &exports, shadowed, &mut best);
+            }
+        }
+        for (q, iface) in &self.builtins.interfaces {
+            if !iface.private && !self.qualifiers.contains_key(q) {
+                visit(self, q, iface.as_ref(), &exports, shadowed, &mut best);
+            }
+        }
+        best
     }
 
     /// The interface of an imported or built-in module.

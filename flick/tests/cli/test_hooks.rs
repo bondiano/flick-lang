@@ -91,7 +91,7 @@ suite "long" {
 /// A library whose tests are `test`, run on `effect`'s engine.
 pub fn library(name: &str, effect: &str, test: &str) -> PathBuf {
     let manifest = format!(
-        "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[project]\nkind = \"lib\"\n\n[build]\neffect = \"{effect}\"\n"
+        "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[project]\nkind = \"lib\"\n\n[target.js]\nruntime = \"{effect}\"\n"
     );
     project(
         name,
@@ -145,7 +145,7 @@ fn hooks_run_around_the_selected_cases_on_every_engine() {
             &dir,
             &[
                 "test",
-                "--emit",
+                "--target",
                 emit,
                 "--reporter",
                 "json",
@@ -225,7 +225,7 @@ fn a_hung_hook_times_out_under_the_run_s_timeout_on_every_engine() {
             &dir,
             &[
                 "test",
-                "--emit",
+                "--target",
                 emit,
                 "--reporter",
                 "json",
@@ -269,11 +269,11 @@ fn an_interrupted_run_still_runs_the_after_hooks_on_every_engine() {
             INTERRUPTED,
         );
         // the run is built first, so that the signal finds it running
-        let built = flick_in(&dir, &["test", "--emit", emit, "--list"]);
+        let built = flick_in(&dir, &["test", "--target", emit, "--list"]);
         assert!(built.status.success(), "{name}: {built:?}");
         let log = dir.join("out.log");
         let mut child = Command::new(env!("CARGO_BIN_EXE_flick"))
-            .args(["test", "--emit", emit])
+            .args(["test", "--target", emit])
             .current_dir(&dir)
             .stdout(fs::File::create(&log).expect("log"))
             .stderr(Stdio::piped())

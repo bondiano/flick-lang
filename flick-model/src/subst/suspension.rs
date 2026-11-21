@@ -18,9 +18,24 @@ fn inert_value(value: &Term) -> bool {
     }
 }
 
+/// Whether `value` contains an inert suspension (`Lam` or `Task`).
+fn has_suspension(value: &Term) -> bool {
+    match value {
+        Term::Lam(..) | Term::Task(_) => true,
+        Term::Tuple(values) | Term::List(values) => values.iter().any(has_suspension),
+        Term::Record(fields) => fields.iter().any(|(_, value)| has_suspension(value)),
+        _ => false,
+    }
+}
+
 /// Remove an administrative, single-use suspension binding. Constructing a
 /// task or lambda, or an aggregate of inert values, performs no computation:
 /// suspension bodies still run only at await/application.
+/// For a record holding both a suspension field and evaluated fields (such as
+/// `Pool.make_with_ttl` options), hoist the non-inert fields into `let`s in
+/// their original left-to-right order before `body` and inline the now-inert
+/// record so bidirectional checking supplies rank-two expectations to its
+/// suspension fields without moving any computation.
 /// Unlike evaluator substitution, the value may be open. Freshening conflicting
 /// binders first preserves lexical captures and region names in signatures.
 /// Multiple uses retain their shared binding; computations are never moved.
@@ -30,10 +45,27 @@ pub(crate) fn inline_suspension(
     body: &Term,
     fresh: &mut impl FnMut() -> Name,
 ) -> Option<Term> {
-    if !inert_value(value) {
+    let mut hoisted: Vec<(Name, Term)> = Vec::new();
+    let inlined = if inert_value(value) {
+        value.clone()
+    } else if let Term::Record(fields) = value
+        && fields.iter().any(|(_, field)| has_suspension(field))
+    {
+        let mut rebuilt = Vec::with_capacity(fields.len());
+        for (label, field) in fields.iter() {
+            if inert_value(field) || matches!(field, Term::Var(_)) {
+                rebuilt.push((label.clone(), field.clone()));
+            } else {
+                let temp = unused_name(body, value, fresh);
+                hoisted.push((temp.clone(), field.clone()));
+                rebuilt.push((label.clone(), Term::Var(temp)));
+            }
+        }
+        Term::Record(rebuilt.into())
+    } else {
         return None;
-    }
-    let marker = unused_name(body, value, fresh);
+    };
+    let marker = unused_name(body, &inlined, fresh);
     let counted = subst(body, &[(name.clone(), Term::Var(marker.clone()))]);
     let count = Cell::new(0);
     any(&counted, &|term| {
@@ -45,9 +77,12 @@ pub(crate) fn inline_suspension(
     if count.get() != 1 {
         return None;
     }
-    let avoid = free_vars(value);
-    let safe = freshen(body, value, &avoid, fresh);
-    Some(subst(&safe, &[(name.clone(), value.clone())]))
+    let avoid = free_vars(&inlined);
+    let safe = freshen(body, &inlined, &avoid, fresh);
+    let substituted = subst(&safe, &[(name.clone(), inlined)]);
+    Some(hoisted.into_iter().rev().fold(substituted, |rest, (var, expr)| {
+        Term::Let(var, None, Rc::new(expr), Rc::new(rest))
+    }))
 }
 
 fn unused_name(a: &Term, b: &Term, fresh: &mut impl FnMut() -> Name) -> Name {

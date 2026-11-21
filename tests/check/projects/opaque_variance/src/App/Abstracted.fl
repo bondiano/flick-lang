@@ -1,0 +1,16 @@
+module App.Abstracted(X : App.Contracts.Contract) : App.Contracts.Empty
+
+box_widens : X.Box (Float -> Float) -> X.Box (Float ->{Async} Float)
+let box_widens b = b
+//                 ^ FLICK-T003 expected `Box (Float ->{Async} Float)`, found `Box (Float -> Float)`
+
+type ParamTag a =
+  | MkParam : ParamTag X.T
+  | MkParamVal a : ParamTag a
+
+param_tag_widens : ParamTag (Float -> Float) -> ParamTag (Float ->{Async} Float)
+let param_tag_widens t = t
+//                       ^ FLICK-T003 expected `ParamTag (Float ->{Async} Float)`, found `ParamTag (Float -> Float)`
+
+unit : Unit
+let unit = ()

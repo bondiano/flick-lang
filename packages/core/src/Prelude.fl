@@ -281,7 +281,7 @@ foreign effect from_result from "flick:rt" "fromResult"
 
 @lang lazy_make
 /// The lazy of `task`, which `lazy { … }` builds: nothing runs yet.
-lazy_make : Detached r => (Eff r e a)^c ->{} Lazy r e a
+lazy_make : NoControl r => (Eff r e a)^c ->{} Lazy r e a
 foreign effect lazy_make from "flick:rt" "lazyMake"
   retention call
 
@@ -303,13 +303,21 @@ foreign effect lazy_read from "flick:rt" "lazyForce"
 lazy_done : a ->{} Lazy r e a
 foreign effect lazy_done from "flick:rt" "lazyDone"
 
+@lang no_control
+/// No effect of the services `r` has a `control` operation, so a `lazy`
+/// initializer may use them without splitting a forcing fiber's continuation.
+/// An `abort` operation is still allowed because the initializer runs
+/// synchronously in the fiber that forces it. The compiler decides it from
+/// the effects of the row; a signature names it for a row variable.
+class NoControl (r : ServiceRow)
+
 @lang detached
-/// No effect of the services `r` has a `control` operation, so a task that
-/// needs them may run in a fiber of its own: the handler of such an effect,
-/// and the rest of the computation it resumes, are in the fiber that
+/// No effect of the services `r` has a `control` or `abort` operation, so a
+/// task that needs them may run in a fiber of its own or as work an owner
+/// keeps: both `control` and `abort` unwind to the handler in the fiber that
 /// installed it. The compiler decides it from the effects of the row; a
 /// signature names it for a row variable.
-class Detached (r : ServiceRow)
+class NoControl r => Detached (r : ServiceRow)
 
 /// Runs both, as children: on a failure the other one is interrupted and
 /// awaited. The results keep the order of the arguments.

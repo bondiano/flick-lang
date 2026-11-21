@@ -1,6 +1,6 @@
 // Building a lazy allocates a cell, as `Ref.make` does, so a pure function
 // cannot; forcing one may wait for another fiber, so it needs `Async`; its
-// task may run in another fiber, so it cannot use a `control` operation.
+// initializer cannot split a forcing fiber's continuation with `control`.
 module App.Stages exposing (..)
 
 pure_lazy : Int -> Lazy {} {} Int
@@ -15,6 +15,14 @@ effect Emit =
 emitting : Unit ->{Emit} Lazy {Emit} {} Unit
 let emitting () = lazy { Emit.emit 1 }
 
+missing_no_control : (Unit ->{r} Int)^{} ->{} Lazy r none Int
+let missing_no_control f = lazy { f () }
+
+no_control_not_detached : NoControl r => (Unit ->{r} Int)^{} ->{r} (Int, Int)
+let no_control_not_detached f = parallel (task { f () }) (task { f () })
+
 //~ FLICK-E001 @7:19-7:29 `pure_lazy` is pure
 //~ FLICK-E002 @10:18-10:25 does not allow service `Async`
-//~ FLICK-E017 @16:19-16:39 `Detached {Emit}` does not hold
+//~ FLICK-E017 @16:19-16:39 `NoControl {Emit}` does not hold
+//~ FLICK-E017 @19:28-19:41 cannot deduce `NoControl r` from the constraints
+//~ FLICK-E017 @22:33-22:41 cannot deduce `Detached r` from the constraints

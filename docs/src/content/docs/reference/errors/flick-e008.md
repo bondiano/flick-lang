@@ -8,7 +8,7 @@ own runtime, which bundles only the helpers the program calls. The code
 stays reserved.
 
 ```toml
-# flick.toml: no `effect`, or the default
-[build]
-effect = "rt"
+# flick.toml: no `runtime`, or the default
+[target.js]
+runtime = "rt"
 ```

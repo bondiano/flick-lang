@@ -58,12 +58,16 @@ fn unchanged_go_build_reuses_and_restores_its_executable() {
         &[("flick.toml", APP), ("src/App/Main.fl", main)],
     );
     let binary = dir.join("dist").join(executable("main"));
-    assert!(flick_in(&dir, &["build", "--emit", "go"]).status.success());
+    assert!(
+        flick_in(&dir, &["build", "--target", "go"])
+            .status
+            .success()
+    );
     let before = fs::metadata(&binary)
         .expect("binary")
         .modified()
         .expect("mtime");
-    let repeated = flick_in(&dir, &["build", "--emit", "go"]);
+    let repeated = flick_in(&dir, &["build", "--target", "go"]);
     assert!(repeated.status.success(), "{repeated:?}");
     assert_eq!(
         fs::metadata(&binary)
@@ -74,7 +78,7 @@ fn unchanged_go_build_reuses_and_restores_its_executable() {
     );
     fs::remove_file(&binary).expect("remove binary");
     // the executable is an artifact of the cached build, not built again
-    let restored = flick_in(&dir, &["build", "--emit", "go"]);
+    let restored = flick_in(&dir, &["build", "--target", "go"]);
     assert!(restored.status.success(), "{restored:?}");
     assert!(String::from_utf8_lossy(&restored.stderr).contains("Restoring cached artifacts"));
     assert!(binary.is_file());
@@ -97,7 +101,7 @@ fn exit_codes_follow_the_outcome_and_signals() {
     }
     for (name, source, signal_name, expected) in cases {
         let dir = project(name, &[("flick.toml", APP), ("src/App/Main.fl", source)]);
-        let build = flick_in(&dir, &["build", "--emit", "go"]);
+        let build = flick_in(&dir, &["build", "--target", "go"]);
         assert!(build.status.success(), "{name}: {build:?}");
         let mut child = Command::new(dir.join("dist").join(executable("main")))
             .stdout(Stdio::piped())
@@ -130,7 +134,7 @@ fn exit_codes_follow_the_outcome_and_signals() {
 #[test]
 #[ignore = "needs Go"]
 fn run_and_test_use_the_go_executable() {
-    let config = format!("{APP}test-dir = \"test\"\n\n[build]\nemit = \"go\"\n");
+    let config = format!("{APP}test-dir = \"test\"\n\n[build]\ntarget = \"go\"\n");
     let main = "module App.Main exposing (main)\n\nmain : Unit ->{Host.Arguments, Host.Console; AppError} Unit\nlet main () = Platform.stdout_line (String.join \",\" (Platform.args ()))\n";
     let tests = "module App.MainTest exposing (tests)
 
@@ -213,7 +217,15 @@ let tests = [
     let run = |emit| {
         flick_in(
             &dir,
-            &["test", "--seed", "42", "--emit", emit, "--reporter", "json"],
+            &[
+                "test",
+                "--seed",
+                "42",
+                "--target",
+                emit,
+                "--reporter",
+                "json",
+            ],
         )
     };
     let (js, go) = (run("js"), run("go"));
@@ -260,7 +272,7 @@ let tests =
             let output = flick_in(
                 &dir,
                 &[
-                    "test", "--emit", emit, "--jobs", jobs, "--color", "always", "--seed", "7",
+                    "test", "--target", emit, "--jobs", jobs, "--color", "always", "--seed", "7",
                 ],
             );
             assert!(output.status.success(), "{emit}, jobs={jobs}: {output:?}");
@@ -318,7 +330,7 @@ fn a_module_that_drops_out_leaves_no_go_file_behind() {
         let args = [
             "build",
             "A.fl",
-            "--emit",
+            "--target",
             "go",
             "--out-dir",
             "out",

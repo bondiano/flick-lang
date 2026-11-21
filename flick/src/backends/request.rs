@@ -6,9 +6,8 @@ use std::collections::BTreeMap;
 use std::env;
 
 use flick_backend::{
-    Abi, BackendPin, BuildRequest, Capability, Entry, Environment, Input, InputKind, Mode,
-    ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile, RootHandler, Source, Symbol,
-    TargetRequest,
+    Abi, BackendPin, BuildRequest, Entry, Environment, Input, InputKind, Mode, ModuleInput,
+    ModuleRole, OptionValue, PackageTarget, Profile, RootHandler, Source, Symbol, TargetRequest,
 };
 use std::collections::HashSet;
 
@@ -102,12 +101,13 @@ impl Prepared {
     ) -> Self {
         let (program, files) = program(sources, compilation, by_class(project, output));
         let package = project.and_then(|p| project::project_name(host, &p.root));
+        let (target_request, module_root) = target(project, output);
         let mut data = Self {
             request: BuildRequest {
-                target: target(project, output),
+                target: target_request,
                 backend: pin,
                 program: program.to_cbor(),
-                module_root: None,
+                module_root,
                 modules: vec![],
                 sources: vec![],
                 entries: output
@@ -318,22 +318,27 @@ impl Prepared {
 /// The built-in modules a build compiles: the go target's are always those
 /// of the non-class stages, as its runtime implements them.
 fn by_class(project: Option<&Project>, output: &BuildPlan) -> bool {
-    !output.go && project::stages_by_class(project, output.extras.rt)
+    !output.go && project::stages_by_class(project, Some(output.extras.rt))
 }
 
-fn target(project: Option<&Project>, output: &BuildPlan) -> TargetRequest {
-    let environment = project
-        .and_then(|p| p.config.build.environment.as_ref())
-        .map_or_else(
-            || Environment {
+fn target(project: Option<&Project>, output: &BuildPlan) -> (TargetRequest, Option<String>) {
+    let default_env = || {
+        output
+            .backend
+            .descriptor()
+            .and_then(|d| d.environments.into_iter().next())
+            .unwrap_or_else(|| Environment {
                 backend: if output.go { "go" } else { "js" }.into(),
                 platform: if output.go { "native" } else { "node" }.into(),
-            },
-            |e| Environment {
-                backend: e.backend.clone(),
-                platform: e.platform.clone(),
-            },
-        );
+            })
+    };
+    let environment = project
+        .and_then(|p| p.config.build.environment.as_ref())
+        .filter(|e| !output.target_overridden || e.backend == output.target)
+        .map_or_else(default_env, |e| Environment {
+            backend: e.backend.clone(),
+            platform: e.platform.clone(),
+        });
     let extras = output.extras;
     let option = |key: &str, value: &str| OptionValue {
         key: key.into(),
@@ -344,48 +349,58 @@ fn target(project: Option<&Project>, output: &BuildPlan) -> TargetRequest {
         match output.purpose {
             Purpose::Test => "test",
             Purpose::Run => "run",
+            Purpose::Dev => "dev",
             Purpose::Build => "build",
+            Purpose::Inspect => "inspect",
         },
     );
-    let options = if environment.backend == "go" {
-        vec![command, option("host.os", env::consts::OS)]
+    let mut options = vec![command];
+    if environment.backend == "go" {
+        options.push(option("host.os", env::consts::OS));
     } else {
-        vec![
-            command,
-            option("js.runtime", if extras.rt { "rt" } else { "effect" }),
-            option("labels", &format!("{:?}", extras.labels).to_lowercase()),
-        ]
-    };
-    let mut capabilities = vec![];
-    for (needed, name) in [
-        (output.typescript, "typescript"),
-        (extras.dts, "declarations"),
-        (extras.promise_facade, "promise-facade"),
-        (extras.schema_aot, "schema-aot"),
-    ] {
-        if needed {
-            capabilities.push(Capability {
-                name: name.into(),
-                version: "1.0.0".into(),
-            });
-        }
+        options.push(option(
+            "labels",
+            &format!("{:?}", extras.labels).to_lowercase(),
+        ));
     }
-    TargetRequest {
-        backend_api: flick_backend::VERSION.into(),
-        ir_version: flick_ir::VERSION.into(),
-        language_version: toolchain::COMPILER.into(),
-        runtime_abis: vec![Abi {
-            name: "flickrt".into(),
-            version: toolchain::RUNTIME.into(),
-        }],
-        environment,
-        profile: if output.release {
-            Profile::Release
+    options.extend(output.options.to_wire());
+
+    let (mode, module_root) = if output.purpose == Purpose::Inspect {
+        let supports_per_module = output
+            .backend
+            .descriptor()
+            .is_some_and(|d| d.modes.contains(&Mode::PerModule));
+        if supports_per_module {
+            (Mode::PerModule, output.inspect_module.clone())
         } else {
-            Profile::Debug
+            if let Some(module) = &output.inspect_module {
+                options.push(option("inspect.module", module));
+            }
+            (Mode::WholeProgram, None)
+        }
+    } else {
+        (Mode::WholeProgram, None)
+    };
+
+    (
+        TargetRequest {
+            backend_api: flick_backend::VERSION.into(),
+            ir_version: flick_ir::VERSION.into(),
+            language_version: toolchain::COMPILER.into(),
+            runtime_abis: vec![Abi {
+                name: "flickrt".into(),
+                version: toolchain::RUNTIME.into(),
+            }],
+            environment,
+            profile: if output.release {
+                Profile::Release
+            } else {
+                Profile::Debug
+            },
+            mode,
+            required_capabilities: vec![],
+            options,
         },
-        mode: Mode::WholeProgram,
-        required_capabilities: capabilities,
-        options,
-    }
+        module_root,
+    )
 }

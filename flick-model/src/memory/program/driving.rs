@@ -35,19 +35,65 @@ impl Machine<'_, '_> {
         }
     }
 
+    fn combine_root_defects(
+        &mut self,
+        base: Option<CauseToken>,
+    ) -> Result<Option<CauseToken>, Error> {
+        let mut acc = base;
+        while !self.root_defects.is_empty() {
+            let defect = self.root_defects.remove(0);
+            acc = Some(match acc {
+                None => defect,
+                Some(prev) => {
+                    let res = primitives::join_causes(self.heap, &prev, &defect, &mut self.fuel);
+                    self.heap.drop_cause(prev)?;
+                    self.heap.drop_cause(defect)?;
+                    res?
+                }
+            });
+        }
+        Ok(acc)
+    }
+
     fn run(&mut self) -> Result<LanguageExit, Error> {
         loop {
+            if let Some(owner) = self.pending_resume_close.take() {
+                self.resume_owner_close(owner)?;
+                continue;
+            }
+            if let Some(res) = self.pending_provide_result.take() {
+                match res {
+                    PendingProvideResult::Ready(pid, ctx) => {
+                        self.complete_dynamic_provide_ok(pid, ctx)?;
+                    }
+                    PendingProvideResult::Failed(pid, cause) => {
+                        self.complete_dynamic_provide_err(pid, cause)?;
+                    }
+                }
+                continue;
+            }
+            if let Some((layer, memo_id, sub_owner)) = self.pending_layer_build.take() {
+                self.begin_build_layer(layer, memo_id, sub_owner, false, LayerBuildTarget::Top)?;
+                continue;
+            }
             if self.failure.is_some() && !self.failure_elected {
                 self.prepare_failure()?;
             }
+            self.drain_dropped_continuations();
             if self.discard.is_none()
                 && self.ready.is_none()
                 && self.failure.is_some()
                 && self.frames.is_empty()
             {
-                return Ok(LanguageExit::Failure(
-                    self.failure.take().expect("failure root"),
-                ));
+                let cause = self.failure.take().expect("failure root");
+                if self.active_fiber != 1 {
+                    self.complete_child_fiber(FiberOutcome::Failure(cause))?;
+                    continue;
+                }
+                let final_cause = self
+                    .combine_root_defects(Some(cause))?
+                    .expect("root failure");
+                return Ok(LanguageExit::Failure(final_cause));
             }
             if self.discard.is_none()
                 && self.ready.is_none()
@@ -55,18 +101,41 @@ impl Machine<'_, '_> {
                 && self.arguments.is_empty()
                 && self.top.is_some()
             {
+                if self.active_fiber != 1 {
+                    let val = self.top.take().expect("child fiber return");
+                    self.complete_child_fiber(FiberOutcome::Success(val))?;
+                    continue;
+                }
                 if self.main_stage != MainStage::Done {
                     self.advance_main()?;
                     continue;
                 }
-                return Ok(LanguageExit::Success(
-                    self.top.take().expect("completed top outcome"),
+                let val = self.top.take().expect("completed top outcome");
+                if !self.root_defects.is_empty() {
+                    self.heap.drop_value(val)?;
+                    let cause = self.combine_root_defects(None)?.expect("root defects");
+                    return Ok(LanguageExit::Failure(cause));
+                }
+                return Ok(LanguageExit::Success(val));
+            }
+            if self.discard.is_none()
+                && self.ready.is_none()
+                && self.failure.is_none()
+                && self.frames.is_empty()
+                && self.top.is_none()
+            {
+                return Err(Error::UnsupportedOperation(
+                    "deadlock: no runnable fibers remain",
                 ));
             }
             if self.fuel == 0 {
                 return Err(Error::OutOfFuel);
             }
             self.fuel -= 1;
+            self.maybe_quantum_preempt()?;
+            if self.pending_resume_close.is_some() || self.pending_provide_result.is_some() {
+                continue;
+            }
             if self.discard.is_some() {
                 self.discard_step()?;
             } else if let Some(id) = self.ready.take() {
@@ -81,62 +150,12 @@ impl Machine<'_, '_> {
                         .expect("top application has an argument"),
                 );
                 self.apply(Destination::Top)?;
-            } else {
+            } else if !self.frames.is_empty() {
                 self.step()?;
+            } else {
+                // Current fiber parked inside quantum preempt or has no frame; loop to re-check.
             }
         }
-    }
-
-    /// Each suspended-frame crossing consumes one ordinary VM step.
-    fn unwind(&mut self) -> Result<(), Error> {
-        let frame = self.frames.pop().expect("raised frame");
-        self.restore_evidence();
-        if let Destination::Handle {
-            activation,
-            binding,
-        } = frame.destination
-        {
-            self.heap
-                .drop_values(frame.locals.into_values().flatten().collect())?;
-            return self.handler_failed(activation, binding);
-        }
-        if let Destination::Catch { handler, binding } = frame.destination {
-            self.pending_handler = Some(handler);
-            self.heap
-                .drop_values(frame.locals.into_values().flatten().collect())?;
-            self.begin_recovery(binding)?;
-            return Ok(());
-        }
-        self.heap
-            .drop_values(frame.locals.into_values().flatten().collect())?;
-        match frame.destination {
-            Destination::RecoverySelection { id } => self.abandon_recovery(id)?,
-            Destination::RecoveryBody {
-                owner, evidence, ..
-            } => {
-                self.current_owner = owner;
-                self.current_evidence = evidence;
-            }
-            Destination::LayerRun { provider, .. } => self.leave_provider(provider)?,
-            Destination::Invocation(id) => self.invocation_failed(id)?,
-            Destination::Initialize { name, .. } => {
-                self.globals.remove(&name);
-            }
-            Destination::CloseScope {
-                owner, previous, ..
-            } => {
-                self.close_owner(owner)?;
-                self.current_owner = previous;
-            }
-            Destination::RestoreOwner { previous, .. } => self.current_owner = previous,
-            Destination::RecoveryHelper { .. }
-            | Destination::Top
-            | Destination::Bind(_)
-            | Destination::Modify { .. } => {}
-            Destination::Catch { .. } => unreachable!("catch handled above"),
-            Destination::Handle { .. } => unreachable!("handler handled above"),
-        }
-        Ok(())
     }
 
     fn step(&mut self) -> Result<(), Error> {
@@ -158,7 +177,7 @@ impl Machine<'_, '_> {
                 Instruction::Dup(local) => {
                     let frame = self.frames.last_mut().expect("running frame");
                     let value = self.heap.dup(peek(&frame.locals, *local)?)?;
-                    frame.locals.entry(*local).or_default().push(value);
+                    frame.locals.push(*local, value);
                 }
                 Instruction::Drop(local) => {
                     let value = take(
@@ -183,17 +202,13 @@ impl Machine<'_, '_> {
                         .admit_ordinary(self.pending.as_ref().expect("return root"))?;
                 }
                 if !frame.locals.is_empty() {
-                    return Err(Error::Leftover(
-                        frame
-                            .locals
-                            .iter()
-                            .map(|(id, values)| (*id, values.len()))
-                            .collect(),
-                    ));
+                    return Err(Error::Leftover(frame.locals.leftover()));
                 }
-                let frame = self.frames.pop().expect("returning frame");
+                let mut frame = self.frames.pop().expect("returning frame");
+                let gen_frames = self.release_frame_resources(&mut frame)?;
                 self.restore_evidence();
                 self.returned_frame(frame.destination)?;
+                self.queue_discard_frames(gen_frames);
             }
             Exit::Branch {
                 condition,
@@ -209,79 +224,6 @@ impl Machine<'_, '_> {
                 let _ = take(&mut frame.locals, *condition)?;
                 frame.block = if condition_value { then_ } else { else_ };
                 frame.at = 0;
-            }
-        }
-        Ok(())
-    }
-
-    fn returned_frame(&mut self, destination: Destination) -> Result<(), Error> {
-        match destination {
-            Destination::RecoverySelection { id } => self.complete_recovery(id)?,
-            Destination::RecoveryHelper { id, binding } => {
-                let value = self.pending.take().expect("helper result");
-                self.store_transport(binding, value, id)?;
-            }
-            Destination::RecoveryBody {
-                binding,
-                owner,
-                evidence,
-            } => {
-                self.current_owner = owner;
-                self.current_evidence = evidence;
-                let value = self.pending.take().expect("selected body result");
-                self.store(binding, value)?;
-            }
-            Destination::LayerRun { provider, binding } => {
-                self.leave_provider(provider)?;
-                let value = self.pending.take().expect("layer result");
-                self.store(binding, value)?;
-            }
-            Destination::Handle {
-                activation,
-                binding,
-            } => self.handler_returned(activation, binding)?,
-            Destination::Invocation(id) => {
-                self.invocations
-                    .get_mut(&id)
-                    .expect("running invocation")
-                    .callee = self.pending.take();
-                self.ready = Some(id);
-            }
-            Destination::Catch { handler, binding } => {
-                self.pending_handler = Some(handler);
-                self.heap
-                    .drop_value(self.pending_handler.take().expect("unused handler"))?;
-                let value = self.pending.take().expect("try result");
-                self.store(binding, value)?;
-            }
-            Destination::Initialize { name, binding } => {
-                let value = self.pending.take().expect("returned token");
-                self.globals.insert(name.clone(), Some(value));
-                let root = self.globals[&name].as_ref().expect("initialized global");
-                let owned = self.heap.dup(root)?;
-                self.deliver(&binding.map_or(Destination::Top, Destination::Bind), owned)?;
-            }
-            Destination::Modify { cell, binding } => {
-                self.complete_modify(&cell, binding)?;
-            }
-            Destination::CloseScope {
-                owner,
-                previous,
-                binding,
-            } => {
-                self.close_owner(owner)?;
-                self.current_owner = previous;
-                let value = self.pending.take().expect("scope result");
-                self.store(binding, value)?;
-            }
-            Destination::RestoreOwner { previous, binding } => {
-                self.current_owner = previous;
-                let value = self.pending.take().expect("selected-owner result");
-                self.store(binding, value)?;
-            }
-            destination => {
-                let value = self.pending.take().expect("returned token");
-                self.deliver(&destination, value)?;
             }
         }
         Ok(())

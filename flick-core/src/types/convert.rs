@@ -117,7 +117,8 @@ impl Checker<'_> {
         self.annotation_contexts.pop();
         self.hole_ok = hole_ok;
         self.cx.tyvars.truncate(mark);
-        self.default_kinds(&ty)
+        let ty = self.default_kinds(&ty);
+        self.place_qualifiers(&ty)
     }
 
     /// Kinds of `forall` binders, with what stayed unknown made `Type`.

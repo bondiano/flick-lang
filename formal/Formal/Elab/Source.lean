@@ -1,5 +1,5 @@
 import Formal.Elab.Unify
-import Formal.Elab.TyRen
+import Formal.Elab.Variance
 
 /-!
 # Elaboration: the source and `Γ; Δ ⊢ e : τ ! φ ⇝ e'` (elaboration.md §2.2, §2.4)
@@ -43,19 +43,6 @@ def Scheme.subst (σ : Nat → Ty) (s : Scheme) : Scheme :=
   ⟨s.k, s.ctx.map (·.subst (lift s.k σ)), s.ty.subst (lift s.k σ), s.q.subst (lift s.k σ),
     s.bd.map (Bound.subst (lift s.k σ))⟩
 
-/-- The variables of `t` that a translated value reaches: those of `t` but the rows of the
-stages of its arrows, which the qualifier of an arrow does not count. -/
-def Ty.Shown : Ty → Nat → Prop
-  | .var m, n => m = n
-  | .con _, _ => False
-  | .app t u, n => t.Shown n ∨ u.Shown n
-  | .arr _ a b q, n => a.Shown n ∨ b.Shown n ∨ q.Shown n
-  | .cnil, _ => False
-  | .cun q q', n => q.Shown n ∨ q'.Shown n
-  | .rnm _ t, n => t.Shown n
-  | .run r r', n => r.Shown n ∨ r'.Shown n
-  | .all k t, n => t.Shown (n + k)
-
 /-- The value bounds hold: what each `t` shows is within what its `D` shows, (Inst) of
 regions.md §2.3 at the instance the bounds are substituted with. -/
 def Bounds.Hold (bd : List (Ty × Ty)) : Prop := ∀ b ∈ bd, ∀ n, b.1.Shown n → b.2.Shown n
@@ -64,31 +51,6 @@ theorem Bounds.hold_nil : Bounds.Hold [] := fun _ h => nomatch h
 
 theorem Bounds.hold_one {t D : Ty} (h : ∀ n, t.Shown n → D.Shown n) : Bounds.Hold [(t, D)] := by
   intro b hb; rw [List.mem_singleton] at hb; subst hb; exact h
-
-theorem Ty.Shown.occurs {t : Ty} {n : Nat} (h : t.Shown n) : t.Occurs n := by
-  induction t using Ty.ind generalizing n with
-  | var m => exact h
-  | con c => exact h.elim
-  | app t u iht ihu => exact Or.imp iht ihu h
-  | arr φ a b q iha ihb ihq _ =>
-    rcases h with h | h | h
-    · exact .inl (iha h)
-    · exact .inr (.inl (ihb h))
-    · exact .inr (.inr (.inl (ihq h)))
-  | cnil => exact h.elim
-  | cun q q' ihq ihq' => exact Or.imp ihq ihq' h
-  | rnm c t iht => exact iht h
-  | run r r' ihr ihr' => exact Or.imp ihr ihr' h
-  | all k t iht => exact iht h
-
-/-- The row `r` keeps `n` live: a variable of the index of a named element, as `Scope s`
-keeps `s`, or of a type written in the row, as `Live q` is the capture row `q` there. A row
-variable keeps nothing. -/
-def Ty.Keeps : Ty → Nat → Prop
-  | .var _, _ => False
-  | .rnm _ t, n => t.Shown n
-  | .run r r', n => r.Keeps n ∨ r'.Keeps n
-  | t, n => t.Shown n
 
 /-- The stage `φ` keeps the qualifier `q` live: its row of services keeps each variable `q`
 shows. -/

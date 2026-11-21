@@ -10,7 +10,7 @@ use flick_core::{
     source::Span,
 };
 
-impl Tr {
+impl Tr<'_> {
     pub(super) fn normalize_resumptions(&mut self, body: &ir::Expr, id: &str) -> ir::Expr {
         let roots = self
             .resumptions
@@ -28,8 +28,8 @@ impl Tr {
     }
 }
 
-struct Normalize<'a> {
-    tr: &'a mut Tr,
+struct Normalize<'a, 'b> {
+    tr: &'a mut Tr<'b>,
     roots: HashSet<String>,
     aliases: HashMap<String, ir::Expr>,
     active: Vec<Path>,
@@ -44,7 +44,7 @@ fn mentions(e: &ir::Expr, roots: &HashSet<String>) -> bool {
     found
 }
 
-impl Normalize<'_> {
+impl Normalize<'_, '_> {
     /// A strict prefix of a known lambda only constructs a closure. Merely
     /// being pure is insufficient: a full application can diverge or die.
     fn value(&self, e: &ir::Expr) -> bool {

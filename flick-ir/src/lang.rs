@@ -151,6 +151,7 @@ lang_items! {
     Owner = "owner",
     Outlives = "outlives",
     Provided = "provided",
+    NoControl = "no_control",
     Detached = "detached",
     // the module of the built-in instances
     Instances = "instances",

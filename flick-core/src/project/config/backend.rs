@@ -5,9 +5,9 @@ use semver::Version;
 use std::str::FromStr;
 
 /// Exact identity and bytes of a component, resolved by the host.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "native-project", derive(serde::Deserialize))]
-#[cfg_attr(feature = "native-project", serde(deny_unknown_fields))]
+#[cfg(feature = "native-project")]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BackendPackage {
     pub id: String,
     pub version: String,

@@ -8,7 +8,7 @@ test-dir = "test"
 
 [build]
 out-dir = "dist"
-emit = "js"
+target = "js"
 
 [tools]
 "flick/go" = ["go"]

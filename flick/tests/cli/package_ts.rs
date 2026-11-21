@@ -42,8 +42,8 @@ entry = \"Main\"
 [dependencies]
 lib = { path = \"../lib\" }
 
-[build]
-emit-dts = true
+[target.js]
+declarations = true
 ";
 
 const MAIN: &str = "module Main exposing (main, today, later)

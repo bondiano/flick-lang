@@ -19,16 +19,19 @@ impl Machine<'_, '_> {
         Ok(owner.index)
     }
 
-    /// Detach every slot before dropping any contents or arena owners.
-    /// Scope finalizers remain unsupported on this counted path; handler
-    /// transfers close only their explicitly departed lexical scopes.
+    /// Detach every arena slot and unrun finalizer before dropping owners.
     fn close_owner(&mut self, owner: usize) -> Result<(), Error> {
         let state = &mut self.owners[owner];
-        if state.closed {
+        if state.is_closed() {
             return Ok(());
         }
-        state.closed = true;
+        state.phase = OwnerPhase::Closed;
+        state.hooks.clear();
+        state.children.clear();
+        state.close_waiter = None;
         let mut roots = mem::take(&mut state.arenas);
+        let exit_cause = state.exit_cause.take();
+        let finalizers = mem::take(&mut state.finalizers);
         let mut detached = Vec::new();
         let mut failure = None;
         for root in &roots {
@@ -50,6 +53,12 @@ impl Machine<'_, '_> {
                 }
             }
         }
+        if let Some(c) = exit_cause {
+            roots.push(c.into_value());
+        }
+        for fin in finalizers {
+            Self::finalizer_roots(fin, &mut roots);
+        }
         roots.extend(detached);
         let released = self.heap.drop_values(roots);
         failure.map_or(released, Err)
@@ -66,20 +75,32 @@ impl Machine<'_, '_> {
         roots.extend(self.pending_handler.take());
         roots.extend(self.top.take());
         roots.extend(self.arguments.drain(..));
-        for frame in self.frames.drain(..) {
-            roots.extend(frame.locals.into_values().flatten());
-            if let Destination::Catch { handler, .. } = frame.destination {
-                roots.push(handler);
-            }
+        let active_frames = mem::take(&mut self.frames);
+        for frame in active_frames {
+            self.drain_frame_roots(frame, &mut roots);
         }
         self.cleanup_handlers(&mut roots);
+        for slot in mem::take(&mut self.generators).into_values() {
+            match slot.run {
+                GeneratorRun::Fresh { seq, .. } => roots.push(seq),
+                GeneratorRun::Suspended { frames, .. } => {
+                    for frame in frames {
+                        self.drain_frame_roots(frame, &mut roots);
+                    }
+                }
+                GeneratorRun::Running | GeneratorRun::Done => {}
+            }
+        }
         self.cleanup_recoveries(&mut roots);
+        self.cleanup_async_roots(&mut roots);
         for provider in mem::take(&mut self.providers).into_values() {
             roots.push(provider.layer);
+            if let MemoRestore::Restore(Some(prev_memo)) = provider.restore_memo {
+                roots.push(prev_memo);
+            }
         }
         roots.extend(mem::take(&mut self.globals).into_values().flatten());
-        // Scope arenas close even if a callback, selected-owner helper or
-        // fuel exhaustion prevented its normal return boundary.
+        // Scope arenas and any unrun finalizers close even on fuel exhaustion.
         let mut failure = None;
         for owner in (0..self.owners.len()).rev() {
             if let Err(error) = self.close_owner(owner) {
@@ -87,8 +108,8 @@ impl Machine<'_, '_> {
             }
         }
         let mut detached = Vec::new();
-        // Detach ALL arena slots before releasing any of their values.
-        // This walks only our explicit cell roots, never heap reachability.
+        // Detach ALL cell and lazy slots before releasing any of their values.
+        // This walks only our explicit roots, never heap reachability.
         for root in &self.cells {
             let Value::Object(token) = root else {
                 failure.get_or_insert(Error::ExpectedCell);
@@ -108,9 +129,39 @@ impl Machine<'_, '_> {
                 }
             }
         }
+        for root in &self.lazies {
+            let Value::Object(token) = root else {
+                failure.get_or_insert(Error::ExpectedLazy);
+                continue;
+            };
+            match self
+                .heap
+                .object_mut(token.id)
+                .map(|object| &mut object.data)
+            {
+                Ok(Data::Lazy { state, .. }) => {
+                    if let Some(prev) = state.take() {
+                        match prev {
+                            LazyState::Pending(v)
+                            | LazyState::Running { task: v, .. }
+                            | LazyState::DoneOk(v) => detached.push(v),
+                            LazyState::DoneCause(c) => detached.push(c.into_value()),
+                        }
+                    }
+                }
+                Ok(_) => {
+                    failure.get_or_insert(Error::ExpectedLazy);
+                }
+                Err(error) => {
+                    failure.get_or_insert(error);
+                }
+            }
+        }
         roots.extend(mem::take(&mut self.cells));
+        roots.extend(mem::take(&mut self.lazies));
         roots.extend(detached);
         let released = self.heap.drop_values(roots);
+        let _ = self.heap.take_dropped_continuations(self.execution);
         failure.map_or(released, Err)
     }
 }

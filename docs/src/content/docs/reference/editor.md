@@ -66,6 +66,10 @@ by the named module; hidden members stay hidden.
 Type-alias hover includes generic parameters and the written definition, even
 for private aliases. On the declaration name, its hover range includes the
 parameters (`Planner a`); navigation and semantic tokens still target `Planner`.
+Hover on a parameterized data type or class (local, imported, built-in or from
+an installed package) and on its declaration type parameters shows its inferred
+parameter variance (such as `` `a` (`+`, covariant) ``), updating immediately on
+edits; abstract types and opaque type aliases keep no fabricated variance.
 Hover on a label inside `codec` shows the decoded record field's type, such as
 `email : Email` or `nickname : Option String`, rather than its field codec.
 These signatures use a `flick` code block for editor syntax highlighting.
@@ -182,7 +186,7 @@ path fails to start rather than silently falling back to another binary.
 
 For editors of TypeScript the compiler projects each module to a virtual
 `App/Main.flick.ts`: a declaration per export, in the same TypeScript form
-as `--emit-dts` (a type without one becomes `unknown` with the reason), and
+as `--declarations` (a type without one becomes `unknown` with the reason), and
 span maps between the projection and the `.fl` source. A name maps exactly
 (the same text on both sides), a type does not; only an exact mapping can
 carry a rename across languages. The first line names the fingerprint of

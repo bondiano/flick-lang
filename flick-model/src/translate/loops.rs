@@ -4,10 +4,10 @@ mod for_each;
 
 use super::{
     Tr,
-    expr::{cond, is_lang, layer_run, pat},
+    expr::{cond, is_lang, layer_run, pat, stuck},
     mutation::modified,
 };
-use crate::syntax::{Arm, Con, Name, Pat, Path, Term};
+use crate::syntax::{Arm, Con, Const, Name, Pat, Path, Term};
 use flick_core::ir::{self, ExprKind, Stmt};
 use flick_core::types::lang::Lang;
 use std::iter;
@@ -52,8 +52,22 @@ pub(super) fn effectful(e: &ir::Expr) -> bool {
             ..
         } | ExprKind::Await(_)
             | ExprKind::Handle(_)
+            | ExprKind::Generate {
+                strict: false,
+                sync: true,
+                ..
+            }
     ) {
         return true;
+    }
+    if let ExprKind::Generate {
+        strict: false,
+        sync: false,
+        limit,
+        ..
+    } = &e.kind
+    {
+        return limit.as_deref().is_some_and(effectful);
     }
     if matches!(e.kind, ExprKind::Lambda { .. } | ExprKind::Task(_)) {
         return false;
@@ -84,17 +98,24 @@ pub(super) fn state_function(arg: &Name, first: Pat, names: &[Name], body: Term)
     )
 }
 
-pub(super) fn list_step(list: &Name, head: Name, tail: Name, empty: Term, matched: Term) -> Term {
+pub(super) fn seq_iter(source: Term) -> Term {
+    Term::app(Term::konst(Const::SeqIter), source)
+}
+
+pub(super) fn seq_step(seq: &Name, head: Name, tail: Name, empty: Term, matched: Term) -> Term {
     Term::Match(
-        Rc::new(Term::Var(list.clone())),
+        Rc::new(Term::app(
+            Term::konst(Const::SeqNext),
+            Term::Var(seq.clone()),
+        )),
         Rc::from([
             Arm {
-                pat: Pat::List(Rc::from([]), None),
+                pat: none(),
                 guard: None,
                 body: empty,
             },
             Arm {
-                pat: Pat::List(Rc::from([Pat::Var(head)]), Some(Rc::new(Pat::Var(tail)))),
+                pat: some(Pat::Tuple(Rc::from([Pat::Var(head), Pat::Var(tail)]))),
                 guard: None,
                 body: matched,
             },
@@ -102,7 +123,7 @@ pub(super) fn list_step(list: &Name, head: Name, tail: Name, empty: Term, matche
     )
 }
 
-impl Tr {
+impl Tr<'_> {
     pub(super) fn exit_payload(&self, target: &str, value: Option<Term>) -> Term {
         let opt = option(value);
         let Some(pos) = self.control_loops.iter().rposition(|id| id == target) else {
@@ -186,6 +207,21 @@ impl Tr {
                 tr.versions.pop();
                 Term::Let(name, None, Rc::new(v), Rc::new(body))
             }),
+            Stmt::Let(ir::Pat::Bind(x), e) => self.loop_with(e, id, xs, &|tr, v| {
+                let body = tr.loop_block(rest, tail, id, xs);
+                if let Some(sig) = tr.local_scheme(x) {
+                    Term::Let(x.as_str().into(), Some(sig), Rc::new(v), Rc::new(body))
+                } else {
+                    Term::Match(
+                        Rc::new(v),
+                        Rc::from([Arm {
+                            pat: Pat::Var(x.as_str().into()),
+                            guard: None,
+                            body,
+                        }]),
+                    )
+                }
+            }),
             Stmt::Let(p, e) => self.loop_with(e, id, xs, &|tr, v| {
                 let body = tr.loop_block(rest, tail, id, xs);
                 Term::Match(
@@ -249,13 +285,11 @@ impl Tr {
             }
             ExprKind::Handle(h) => self.loop_handler(h, id, xs),
             ExprKind::Each {
+                stop,
                 pat: p,
                 source,
                 body,
-                ..
-            } => self.loop_with(source, id, xs, &|tr, source| {
-                tr.source_each(p, source, body, id, xs)
-            }),
+            } => self.loop_each(stop.is_some(), p, source, body, id, xs),
             ExprKind::Block(stmts, tail) => self.loop_block(stmts, tail, id, xs),
             ExprKind::If(c, a, b) => self.loop_with(c, id, xs, &|tr, c| {
                 let a = tr.loop_value(a, id, xs);
@@ -309,6 +343,24 @@ impl Tr {
             }
         }
     }
+    fn loop_each(
+        &mut self,
+        has_stop: bool,
+        p: &ir::Pat,
+        source: &ir::Expr,
+        body: &ir::Expr,
+        id: &str,
+        xs: &[String],
+    ) -> Term {
+        if has_stop {
+            self.loop_pack(true, stuck("a `for` loop with a stop predicate"), xs)
+        } else {
+            self.loop_with(source, id, xs, &|tr, source| {
+                tr.source_each(p, source, body, id, xs)
+            })
+        }
+    }
+
     fn nested_control_loop(
         &mut self,
         child_id: &str,

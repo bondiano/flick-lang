@@ -17,6 +17,7 @@ mod provide;
 mod raise;
 mod scope;
 pub mod sig;
+mod sig_lean;
 mod term;
 
 use std::fmt::Write;

@@ -256,7 +256,7 @@ impl Checker<'_> {
                 self.error_help(codes::T003, span, &head, incomplete, |this| {
                     this.mismatch_hint(&a, &b, &actual, &expected)
                 });
-                self.explain_assumed_pure(&a, &b, span);
+                self.explain_assumed_pure(&a, &b, source_types, span);
             }
             Mismatch::Label { label, left } if matches!(label, Elem::Capture(_)) => {
                 self.capture_mismatch(&head, label, *left, span);

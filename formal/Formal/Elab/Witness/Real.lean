@@ -59,5 +59,18 @@ theorem real : Real P Sg N where
   ctor h := by cases h
   ctor_holds h := by cases h
   con_inj h := by cases h
+  dataVar T j h := by
+    simp only [P] at h ⊢
+    split at h
+    · rename_i hTj
+      obtain ⟨hT | hT, rfl⟩ := hTj <;> simp [Sg, varF, N, conName, trVar, hT]
+    · exact absurd rfl h
+  clsVar C n j h := by
+    simp only [P] at h ⊢
+    split at h
+    · rename_i hCj
+      obtain ⟨rfl, rfl⟩ := hCj
+      simp [Sg, dictVarF, N, cEq, trVar]
+    · exact absurd rfl h
 
 end Flick.Elab.Witness

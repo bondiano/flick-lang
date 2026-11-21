@@ -399,7 +399,7 @@ let main () = Platform.stdout_line (Lib.Greet.hi \"there\")
 /// from `source`, built from the store by `emit`.
 fn built_with_foreign(name: &str, source: &str, store: &Path, emit: &str) -> PathBuf {
     let manifest = format!(
-        "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[dependencies]\nlib = {source}\n\n[build]\nemit = \"{emit}\"\n"
+        "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[dependencies]\nlib = {source}\n\n[build]\ntarget = \"{emit}\"\n"
     );
     let app = project(
         name,

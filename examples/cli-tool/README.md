@@ -36,15 +36,15 @@ the JavaScript runtime:
 
 ```sh
 cargo build -p flick
-./target/debug/flick build --project examples/cli-tool --emit go
+./target/debug/flick build --project examples/cli-tool --target go
 ./examples/cli-tool/dist/flick-main --help
 ./examples/cli-tool/dist/flick-main init
 NOTES_FILE=/tmp/work.txt ./examples/cli-tool/dist/flick-main add review
 ./examples/cli-tool/dist/flick-main --completions bash
-./target/debug/flick test --project examples/cli-tool --emit go
+./target/debug/flick test --project examples/cli-tool --target go
 ```
 
-Set `emit = "go"` in `flick.toml` to make Go the default for `build`, `run`
+Set `target = "go"` in `[build]` of `flick.toml` to make Go the default for `build`, `run`
 and `test`. The checked-in example keeps JavaScript as its default.
 
 On Go, the CLI has its own implementation: commands, prompts, help,

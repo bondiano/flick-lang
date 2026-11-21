@@ -1,11 +1,11 @@
 ---
 title: "Среда выполнения и адаптер Effect"
-source_hash: 9226c5942df7f54e
+source_hash: 7d922d242e92a78c
 ---
 
 По умолчанию скомпилированный код импортирует `@flick-lang/runtime/rt` —
-собственную среду выполнения Flick без зависимости от Effect. Параметр `--rt`
-также выбирает её для одного вызова `build`, `run` или `test` в проекте,
+собственную среду выполнения Flick без зависимости от Effect. Параметр `--runtime rt`
+также выбирает её для одного вызова `build`, `run`, `dev`, `test` или `inspect` в проекте,
 настроенном на Effect.
 
 Если проект на RT использует библиотечную привязку, пока реализованную через
@@ -53,7 +53,7 @@ Effect, для неё импортируется `@flick-lang/effect-ts/bridge`.
 Для HTTP-тела с потоком, которому нужен только `Async`, используйте
 `Http.Body.stream_async` или `Http.ServerResponse.stream_async` / `stream_text_async`.
 
-Проекты с `effect = "effect"` используют `@flick-lang/effect-ts` (см. [Ошибки,
+Проекты с `[target.js] runtime = "effect"` используют `@flick-lang/effect-ts` (см. [Ошибки,
 сервисы, ресурсы и конкурентность](../../spec/05-errors-and-concurrency/),
 [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
 Адаптер рассчитан на выпуск Effect, закреплённый в

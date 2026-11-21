@@ -136,9 +136,9 @@ theorem Typ.subst {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _ hσ; exact .inside hF (ih (hσ.mono (Entails.union_left _ _))) hφ' ht hε hφ hT
   | cap => intro _ _ _; exact .cap
   | own => intro _ _ _; exact .own
-  | drec hc hk hr hn ih =>
+  | drec hc hk hr hn hT ih =>
     intro _ _ hσ
-    exact .drec hc hk (ih hσ) (SubOk.noIns hσ hr.frees hn)
+    exact .drec hc hk (ih hσ) (SubOk.noIns hσ hr.frees hn) hT
   | dnil => intro _ _ _; exact .dnil
   | dcons _ _ ih₁ ih₂ => intro _ _ hσ; exact .dcons (ih₁ (SubOk.up hσ _ _)) (ih₂ hσ)
   | dproj _ hc hk hl hts hH hT ih => intro _ _ hσ; exact .dproj (ih hσ) hc hk hl hts hH hT

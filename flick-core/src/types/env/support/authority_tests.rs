@@ -10,6 +10,7 @@ fn class_definition() -> TypeDef {
             default_sigs: vec![],
             derive: false,
         },
+        variance: Vec::new(),
     }
 }
 
@@ -36,6 +37,7 @@ fn class_support_interface(class_support: bool, dictionary_support: bool) -> Int
                     body: Type::con("Prelude", "String"),
                     opaque: false,
                 },
+                variance: Vec::new(),
             },
             dictionary_support,
         ),
@@ -147,6 +149,7 @@ fn identified_nested_real_class_retains_nominal_dictionary_authority() {
                 methods: vec![],
             }],
         },
+        variance: Vec::new(),
     });
     assert!(read(write(&interface).as_bytes(), "Provider").is_err());
     let mut abstract_view = interface.clone();
@@ -210,6 +213,7 @@ fn public_service_projections_do_not_acquire_support_authority() {
                     operations: vec![],
                     effect: true,
                 },
+                variance: Vec::new(),
             }),
             blocked: None,
             at: None,
@@ -273,6 +277,7 @@ fn nested_nominal_views_establish_companions_not_global_definition_equality() {
                         methods: vec![],
                     }],
                 },
+                variance: Vec::new(),
             },
             owner_path: vec![],
         }],

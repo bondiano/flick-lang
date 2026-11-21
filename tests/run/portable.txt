@@ -78,6 +78,7 @@ codegen/question
 codegen/ranges
 codegen/recursion
 codegen/mutual_rec_arity
+codegen/class_variance
 codegen/repeated_superclass
 codegen/stage_order
 codegen/strings_utf16
@@ -262,6 +263,7 @@ stdlib/effect/metric
 stdlib/effect/tracer
 stdlib/effect/observe
 stdlib/observability/prometheus
+runtime/lazy_abort_and_defect
 runtime/leases
 stdlib/effect/cache
 stdlib/effect/request
@@ -314,6 +316,9 @@ stdlib/server/node
 runtime/counted_layer_merge
 runtime/lazy_once
 runtime/lazy_abort
+runtime/detached_lazy
+runtime/abort_cleanup_die
+runtime/abort_error_combinators
 runtime/lazy_shared
 runtime/suspended
 runtime/suspended_std

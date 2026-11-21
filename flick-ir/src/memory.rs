@@ -20,6 +20,8 @@ mod pattern;
 pub use pattern::pattern_bindings;
 mod handlers;
 pub use handlers::{HandlerEffect, HandlerOperation};
+mod intrinsics;
+pub use intrinsics::{HostPrimitive, Intrinsic};
 
 pub type Local = u32;
 pub type CodeId = u32;
@@ -250,209 +252,67 @@ pub enum Operation {
     RecoveryResult {
         selected: Option<Local>,
     },
+    /// Allocates a frame-scoped mutable variable owned by the current frame.
+    /// Consumes initial value; returns a non-owning Var handle released on frame exit/unwind.
+    VarMake(Local),
+    /// Consumes a non-owning Var handle and returns a retained owned value from its slot.
+    VarGet(Local),
+    /// Consumes a non-owning Var handle and replacement value; drops previous contents; returns Unit.
+    VarSet {
+        var: Local,
+        value: Local,
+    },
+    /// Installs a lexical loop frame for `id` and invokes `code(args)` repeatedly until
+    /// a matching `LoopExit` breaks it. Consumes `args`.
+    Loop {
+        id: String,
+        code: CodeId,
+        args: Vec<Local>,
+    },
+    /// Unwinds to the enclosing `Loop { id }` (closing departed scopes/handlers/vars):
+    /// `None` starts the next iteration, `Some(value)` delivers `value` as the loop result.
+    LoopExit {
+        id: String,
+        value: Option<Local>,
+    },
+    /// Marks a source-function return boundary for `UnwrapOption` (`Option?`).
+    /// Runs static helper `code(args)`; synthetic branch/match helpers never emit this.
+    FunctionBoundary {
+        code: CodeId,
+        args: Vec<Local>,
+    },
+    /// Consumes an `Option a`: returns owned `v` on `Some v`, or unwinds to the nearest
+    /// `FunctionBoundary` (closing departed scopes) and delivers `Prelude.Option.None`.
+    UnwrapOption(Local),
+    /// Runs `code(args)` with a frame-owned list builder collecting `Yield` values; returns `$list`.
+    GenerateStrict {
+        code: CodeId,
+        args: Vec<Local>,
+    },
+    /// Allocates a replayable lazy `Seq` owning `captures` and generator `code` (`[self, Unit]`),
+    /// with optional element `limit`. Consumes `captures` and optional `limit`.
+    GenerateLazy {
+        code: CodeId,
+        captures: Vec<Local>,
+        limit: Option<Local>,
+        sync: bool,
+    },
+    /// Yields an owned element to the innermost active `GenerateStrict` or lazy `Seq` iterator.
+    Yield(Local),
+    /// Consumes a list or `Seq`, opening a frame-owned iteration cursor (released on frame exit/unwind).
+    SeqOpen(Local),
+    /// Consumes a non-owning iterator cursor and yields `Prelude.Option.Some elem` or `None`.
+    SeqNext(Local),
+    /// First-class nominal record label value (`Record.label`).
+    Label(String),
 }
 
-/// Platform-independent operations whose host bindings have a known
-/// ownership contract. Unknown foreign bindings are not silently accepted.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Intrinsic {
-    PrintLine,
-    Show,
-    RefMake,
-    RefGet,
-    RefSet,
-    RefModify,
-    RefSame,
-    ScopeRun,
-    ScopeCurrent,
-    ArenaMake,
-    ArenaAlloc,
-    ArenaGet,
-    /// No-argument failure for a match with no selected arm; never returns.
-    MatchFail,
-    /// Calls the body with Unit and catches typed raises only.
-    Try,
-    /// Unwraps an exact Prelude.Result or raises its Err payload.
-    FromResult,
-    /// Raises an owned typed payload; never returns.
-    Raise,
-    /// Consumes an opaque tag and implementation into an owned constant Layer.
-    LayerSucceed,
-    /// Consumes a Layer and callback, supplies Unit under a complete provider,
-    /// then closes that run's owner before delivering the callback outcome.
-    LayerRun,
-    /// Subject-last, exact string prefix predicate; consumes two owned inputs.
-    StringStartsWith,
-    /// Subject-last, exact string substring predicate; consumes two owned inputs.
-    StringIncludes,
-    /// Total primitive comparison (NaN last), returning Prelude.Ordering.
-    PrimitiveCompare,
-    /// Canonical rt/Go primitive hash, including exact Ordering nullaries.
-    PrimitiveHash,
-    /// Consumes two Layer roots into a shared graph; later services win.
-    LayerMerge,
-    /// Signed Int quotient truncated toward zero; zero divisor is a defect.
-    IntUnsafeDiv,
-    /// Signed Int remainder; zero divisor is a defect, MIN % -1 is zero.
-    IntUnsafeRem,
-    /// Number of UTF-16 code units, consuming one owned string token.
-    StringLength,
-    /// Scalar global Number conversions from Int, `BigInt` or Float.
-    NumberToFloat,
-    /// Pinned Number.min(that)(self): NaN least, equality selects self.
-    FloatMin,
-    /// Pinned Number.max(that)(self): NaN least, equality selects self.
-    FloatMax,
-    /// Shallow readonly array ABI normalization: list identity or tuple fields
-    /// retained into a list. Other representations are rejected.
-    ArrayToList,
-    /// Audited global `BigInt` conversion over checked language primitives.
-    ToBigInt,
-    /// A primitive of the host that `Host.live` adapts; it takes one argument.
-    Host(HostPrimitive),
-}
-
-/// The host primitives of `Host.live` besides `PrintLine`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum HostPrimitive {
-    /// Writes a line to stderr; borrows the text and returns Unit.
-    StderrLine,
-    /// Writes text to stdout without a line break; returns Unit.
-    StdoutWrite,
-    /// The host's environment variable of a name, as an `Option String`.
-    Env,
-    /// The host's environment variables of Unit, as a `List (String, String)`.
-    Vars,
-    /// The host's arguments of Unit, as a `List String`.
-    Args,
-    /// The host's wall clock of Unit, in milliseconds as a Float.
-    CurrentTimeMillis,
-    /// The host's wall clock of Unit, in nanoseconds as a `BigInt`.
-    CurrentTimeNanos,
-    /// The host's monotonic clock of Unit, in nanoseconds as a `BigInt`.
-    MonotonicTimeNanos,
-    /// A draw of the host's random source of Unit, a Float in [0, 1).
-    RandomNext,
-    /// A child process the host starts for a command, in the caller's scope.
-    ProcessSpawn,
-}
-
-impl Intrinsic {
-    pub fn arity(self) -> usize {
-        match self {
-            Self::MatchFail => 0,
-            Self::PrintLine
-            | Self::Show
-            | Self::RefMake
-            | Self::RefGet
-            | Self::ScopeRun
-            | Self::ScopeCurrent
-            | Self::ArenaMake
-            | Self::ArenaGet
-            | Self::FromResult
-            | Self::Raise
-            | Self::PrimitiveHash
-            | Self::StringLength
-            | Self::NumberToFloat
-            | Self::ArrayToList
-            | Self::ToBigInt
-            | Self::Host(_) => 1,
-            Self::RefSet
-            | Self::RefModify
-            | Self::RefSame
-            | Self::ArenaAlloc
-            | Self::Try
-            | Self::LayerSucceed
-            | Self::LayerRun
-            | Self::LayerMerge
-            | Self::StringStartsWith
-            | Self::StringIncludes
-            | Self::PrimitiveCompare
-            | Self::IntUnsafeDiv
-            | Self::IntUnsafeRem
-            | Self::FloatMin
-            | Self::FloatMax => 2,
-        }
-    }
-}
-
-impl Operation {
-    pub fn consumed(&self) -> Vec<Local> {
-        match self {
-            Self::Literal(_)
-            | Self::ReadOwnerEvidence
-            | Self::Project { .. }
-            | Self::Field { .. }
-            | Self::Method { .. }
-            | Self::Structure { .. }
-            | Self::Match { .. }
-            | Self::Global(_)
-            | Self::ServiceTag(_) => Vec::new(),
-            Self::RecoveryResult { selected } => selected.iter().copied().collect(),
-            Self::Construct { fields, .. } => fields.clone(),
-            Self::ConstructWithDicts { fields, dicts, .. } => {
-                fields.iter().chain(dicts).copied().collect()
-            }
-            Self::Record { fields } => fields.iter().map(|(_, local)| *local).collect(),
-            Self::Dictionary { entries } => {
-                entries.iter().map(|(_, entry)| entry.local()).collect()
-            }
-            Self::Update { object, fields } => iter::once(*object)
-                .chain(fields.iter().map(|(_, local)| *local))
-                .collect(),
-            Self::Closure { captures, .. } | Self::Task { captures, .. } => captures.clone(),
-            Self::Call { args, .. } | Self::Intrinsic { args, .. } => args.clone(),
-            Self::Handle {
-                body,
-                effects,
-                ret,
-                errors,
-            } => iter::once(*body)
-                .chain(
-                    effects
-                        .iter()
-                        .flat_map(|effect| effect.operations.iter().map(|op| op.function)),
-                )
-                .chain(*ret)
-                .chain(*errors)
-                .collect(),
-            Self::Perform { dicts, args, .. } => dicts.iter().chain(args).copied().collect(),
-            Self::Within { owner, args, .. } | Self::WithOwnerEvidence { owner, args, .. } => {
-                let mut operands = vec![*owner];
-                operands.extend(args);
-                operands
-            }
-            Self::Apply { function, argument } => vec![*function, *argument],
-            Self::Binary { left, right, .. } => vec![*left, *right],
-            Self::Not(value) | Self::Neg { value, .. } | Self::Await(value) => vec![*value],
-            Self::ReuseWithDicts {
-                object,
-                fields,
-                dicts,
-                ..
-            } => iter::once(*object)
-                .chain(fields.iter().copied())
-                .chain(dicts.iter().copied())
-                .collect(),
-            Self::Reuse { object, fields, .. } => {
-                let mut operands = vec![*object];
-                operands.extend(fields);
-                operands
-            }
-        }
-    }
-
-    pub fn borrowed(&self) -> Option<Local> {
-        match self {
-            Self::Project { object, .. }
-            | Self::Field { object, .. }
-            | Self::Structure { object, .. }
-            | Self::Match { object, .. } => Some(*object),
-            Self::Method { dictionary, .. } => Some(*dictionary),
-            _ => None,
-        }
-    }
-}
+include!("memory/std_intrinsics.rs");
+include!("memory/std_intrinsics_more.rs");
+include!("memory/std_intrinsics_schema.rs");
+include!("memory/std_intrinsics_ext.rs");
+include!("memory/std_intrinsics_async.rs");
+include!("memory/operations.rs");
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Exit {

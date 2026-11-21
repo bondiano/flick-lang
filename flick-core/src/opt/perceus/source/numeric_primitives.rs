@@ -1,8 +1,10 @@
 //! Exact compare/hash and unsafe Int adapters, not arbitrary FFI erasure.
-use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
+use flick_ir::{Adapter, Arith, Copies, Foreign, ForeignMode, Lit, Num, ResultAdapter, Shape};
 
 #[path = "scalar.rs"]
 mod scalar;
+#[cfg(test)]
+mod tests;
 
 use super::{
     BinOp, Code, Env, Expr, ExprKind, Intrinsic, Local, Lower, LowerError, Name, Operation, Param,
@@ -19,6 +21,15 @@ impl Lower<'_> {
     ) -> Option<Result<Local, LowerError>> {
         if super::list_range::is_binding(value) {
             return Some(self.list_range(value, name, span, block));
+        }
+        if let Some(result) = self.lazy_scope_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.record_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.seq_foreign(value, span, block) {
+            return Some(result);
         }
         if let Some(kind) = scalar::candidate(value) {
             return Some(self.scalar_foreign(value, name, kind, span, block));
@@ -49,10 +60,194 @@ impl Lower<'_> {
         if let Some(expression) = equality_expression(value, span) {
             return Some(self.expr(&expression, &Env::new(), block));
         }
-        strings::intrinsic(value)
+        if let Some(kind) = strings::intrinsic(value)
             .or_else(|| layers::intrinsic(value))
             .or_else(|| intrinsic(value))
-            .map(|kind| self.intrinsic(kind, false, vec![], block, span))
+        {
+            return Some(self.intrinsic(kind, false, vec![], block, span));
+        }
+        self.core_and_std_foreign(value, name, span, block)
+    }
+
+    fn core_and_std_foreign(
+        &mut self,
+        value: &Foreign,
+        name: &Name,
+        span: Span,
+        block: &mut Code,
+    ) -> Option<Result<Local, LowerError>> {
+        if let Some(result) = self.core_scalar_foreign(value, name, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.core_string_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.core_list_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.core_record_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_functional_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_combine_foreign(value, name, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_chunk_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_hash_map_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_json_decimal_regexp_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_duration_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_outcome_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_test_gen_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_schema_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_codec_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_check_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_path_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_datetime_cron_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_graph_foreign(value, span, block) {
+            return Some(result);
+        }
+        self.std_effect_and_runtime_foreign(value, span, block)
+    }
+
+    fn std_effect_and_runtime_foreign(
+        &mut self,
+        value: &Foreign,
+        span: Span,
+        block: &mut Code,
+    ) -> Option<Result<Local, LowerError>> {
+        if let Some(result) = self.std_async_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_effect_ops_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_effect_coll_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_schedule_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_sync_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_part_sem_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_queue_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_pubsub_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_scoped_res_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_rc_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_cache_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_scoped_cache_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_pool_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_layer_map_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_tx_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_tx_lock_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_tx_queue_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_tx_coll_foreign(value, span, block) {
+            return Some(result);
+        }
+        self.std_observe_and_stream_foreign(value, span, block)
+    }
+
+    fn std_observe_and_stream_foreign(
+        &mut self,
+        value: &Foreign,
+        span: Span,
+        block: &mut Code,
+    ) -> Option<Result<Local, LowerError>> {
+        if let Some(result) = self.std_sched_plan_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_events_rep_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_observe_refs_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_observe_trace_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_observe_span_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_observe_log_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_crypto_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_metric_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_request_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_config_prov_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_config_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_arbitrary_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_channel_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_sink_foreign(value, span, block) {
+            return Some(result);
+        }
+        if let Some(result) = self.std_stream_foreign(value, span, block) {
+            return Some(result);
+        }
+        self.std_layer_foreign(value, span, block)
     }
 
     fn scalar_foreign(
@@ -111,32 +306,96 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
 }
 
 pub(super) fn equality_expression(value: &Foreign, span: Span) -> Option<Expr> {
-    if value.binding.name != "equals" || !supports(value, 2, true, false) {
-        return None;
+    let at = |kind| Expr::new(kind, span);
+    let params = |left: &str, right: &str| {
+        [left, right]
+            .into_iter()
+            .map(|name| Param {
+                pat: Pat::Bind(name.into()),
+                stage: Stage::Pure,
+                ty: None,
+            })
+            .collect()
+    };
+    if value.binding.name == "equals" && supports(value, 2, true, false) {
+        let left = "$primitiveEquals.left";
+        let right = "$primitiveEquals.right";
+        return Some(at(ExprKind::Lambda {
+            params: params(left, right),
+            body: Box::new(at(ExprKind::Binary(
+                BinOp::Eq,
+                Box::new(at(ExprKind::Local(left.into()))),
+                Box::new(at(ExprKind::Local(right.into()))),
+            ))),
+        }));
     }
-    let left = "$primitiveEquals.left";
-    let right = "$primitiveEquals.right";
-    Some(Expr::new(
-        ExprKind::Lambda {
-            params: [left, right]
-                .into_iter()
-                .map(|name| Param {
-                    pat: Pat::Bind(name.into()),
-                    stage: Stage::Pure,
-                    ty: None,
-                })
-                .collect(),
-            body: Box::new(Expr::new(
-                ExprKind::Binary(
-                    BinOp::Eq,
-                    Box::new(Expr::new(ExprKind::Local(left.into()), span)),
-                    Box::new(Expr::new(ExprKind::Local(right.into()), span)),
-                ),
-                span,
-            )),
-        },
-        span,
-    ))
+    if value.binding.name == "numberStrictEqual" && supports(value, 2, false, false) {
+        let left = "$strictEq.left";
+        let right = "$strictEq.right";
+        return Some(at(ExprKind::Lambda {
+            params: params(left, right),
+            body: Box::new(at(ExprKind::Binary(
+                BinOp::Same,
+                Box::new(at(ExprKind::Local(left.into()))),
+                Box::new(at(ExprKind::Local(right.into()))),
+            ))),
+        }));
+    }
+    if value.binding.name == "numberSameValue" && supports(value, 2, false, false) {
+        // Object.is(a, b): if a === b then (a !== 0.0 || 1.0 / a === 1.0 / b) else (a !== a && b !== b)
+        let left = "$sameVal.left";
+        let right = "$sameVal.right";
+        let a = || at(ExprKind::Local(left.into()));
+        let b = || at(ExprKind::Local(right.into()));
+        let zero = at(ExprKind::Lit(Lit::Float(0.0)));
+        let one_div = |x| {
+            at(ExprKind::Binary(
+                BinOp::Arith(Arith::Div, Num::Float),
+                Box::new(at(ExprKind::Lit(Lit::Float(1.0)))),
+                Box::new(x),
+            ))
+        };
+        let same_eq = at(ExprKind::Binary(BinOp::Same, Box::new(a()), Box::new(b())));
+        let nonzero = at(ExprKind::Binary(
+            BinOp::NotSame,
+            Box::new(a()),
+            Box::new(zero),
+        ));
+        let same_sign = at(ExprKind::Binary(
+            BinOp::Same,
+            Box::new(one_div(a())),
+            Box::new(one_div(b())),
+        ));
+        let nonzero_or_same_sign = at(ExprKind::Binary(
+            BinOp::Or,
+            Box::new(nonzero),
+            Box::new(same_sign),
+        ));
+        let a_nan = at(ExprKind::Binary(
+            BinOp::NotSame,
+            Box::new(a()),
+            Box::new(a()),
+        ));
+        let b_nan = at(ExprKind::Binary(
+            BinOp::NotSame,
+            Box::new(b()),
+            Box::new(b()),
+        ));
+        let both_nan = at(ExprKind::Binary(
+            BinOp::And,
+            Box::new(a_nan),
+            Box::new(b_nan),
+        ));
+        return Some(at(ExprKind::Lambda {
+            params: params(left, right),
+            body: Box::new(at(ExprKind::If(
+                Box::new(same_eq),
+                Box::new(nonzero_or_same_sign),
+                Box::new(both_nan),
+            ))),
+        }));
+    }
+    None
 }
 
 fn supports(value: &Foreign, arity: usize, copies_args: bool, copies_result: bool) -> bool {
@@ -168,117 +427,4 @@ fn supports(value: &Foreign, arity: usize, copies_args: bool, copies_result: boo
                 shapes: vec![Shape::Data; arity],
                 result_shape: Shape::Data,
             }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{equality_expression, intrinsic};
-    use crate::build::builtin_modules;
-    use crate::ir::{Expr, ExprKind, ItemKind, Lit, memory};
-    use crate::opt::perceus::source::{LowerError, lower};
-    use crate::source::{FileId, Span};
-    use flick_ir::{Foreign, ForeignMode, Shape};
-
-    #[test]
-    fn actual_numeric_adapters_match_the_complete_declared_contract() {
-        let mut count = 0;
-        for module in builtin_modules() {
-            for item in &module.items {
-                let ItemKind::Foreign(value) = &item.kind else {
-                    continue;
-                };
-                if module.name == "Instances"
-                    && matches!(value.binding.name.as_str(), "compare" | "hash" | "equals")
-                {
-                    count += 1;
-                    assert!(
-                        intrinsic(value).is_some()
-                            || equality_expression(value, item.span).is_some(),
-                        "{value:#?}"
-                    );
-                    let entry = memory::Name::new(&module.name, &value.name);
-                    assert!(lower([module], &entry).is_ok(), "live adapter lowers");
-                    for (index, mutate) in mutations(value.arity).into_iter().enumerate() {
-                        let mut changed = module.clone();
-                        let declaration = changed
-                            .items
-                            .iter_mut()
-                            .find(|candidate| candidate.span == item.span)
-                            .expect("same declaration");
-                        let ItemKind::Foreign(foreign) = &mut declaration.kind else {
-                            unreachable!()
-                        };
-                        mutate(foreign);
-                        assert!(
-                            matches!(lower([&changed], &entry), Err(LowerError::Unsupported { span, .. }) if span == item.span),
-                            "{} mutation{index}",
-                            value.binding.name
-                        );
-                    }
-                }
-            }
-        }
-        assert_eq!(count, 3);
-    }
-
-    type Mutation = Box<dyn Fn(&mut Foreign)>;
-
-    fn mutations(arity: usize) -> Vec<Mutation> {
-        let mut out: Vec<Mutation> = vec![
-            Box::new(|v| v.binding.from = None),
-            Box::new(|v| v.binding.from = Some("other".into())),
-            Box::new(|v| v.binding.name.push('!')),
-            Box::new(|v| v.mode = ForeignMode::Sync),
-            Box::new(|v| v.mode = ForeignMode::Async),
-            Box::new(|v| v.mode = ForeignMode::Effect),
-            Box::new(|v| v.arity = 0),
-            Box::new(|v| v.arity += 1),
-            Box::new(|v| v.dicts = 1),
-            Box::new(|v| v.stages.clear()),
-            Box::new(|v| v.stages.push(false)),
-            Box::new(|v| {
-                v.catch = Some(Expr::new(
-                    ExprKind::Lit(Lit::Unit),
-                    Span::new(FileId::new(0), 0, 0),
-                ));
-            }),
-            Box::new(|v| v.adapter.receiver = true),
-            Box::new(|v| v.adapter.cancel = true),
-            Box::new(|v| v.adapter.optional.push(0)),
-            Box::new(|v| v.adapter.variadic = true),
-            Box::new(|v| v.adapter.result.nullable = true),
-            Box::new(|v| v.adapter.result.unit = true),
-            Box::new(|v| v.adapter.callbacks.clear()),
-            Box::new(|v| v.adapter.callbacks.push(None)),
-            Box::new(|v| v.adapter.copies.args.clear()),
-            Box::new(|v| v.adapter.copies.args.push(true)),
-            Box::new(|v| v.adapter.copies.result = !v.adapter.copies.result),
-            Box::new(|v| v.adapter.copies.callbacks.clear()),
-            Box::new(|v| v.adapter.copies.callbacks.push(None)),
-            Box::new(|v| v.adapter.shapes.clear()),
-            Box::new(|v| v.adapter.shapes.push(Shape::Data)),
-            Box::new(|v| v.adapter.result_shape = Shape::Layer),
-            Box::new(|v| {
-                v.adapter.result_shape = Shape::Fun {
-                    args: vec![Shape::Data],
-                    result: Box::new(Shape::Data),
-                    runtime: false,
-                    sync: false,
-                }
-            }),
-        ];
-        for index in 0..arity {
-            out.push(Box::new(move |v| v.stages[index] = true));
-            out.push(Box::new(move |v| v.adapter.callbacks[index] = Some(1)));
-            out.push(Box::new(move |v| v.adapter.copies.args[index] = false));
-            out.push(Box::new(move |v| {
-                v.adapter.copies.callbacks[index] = Some((vec![true], false));
-            }));
-            out.push(Box::new(move |v| {
-                v.adapter.copies.callbacks[index] = Some((vec![], true));
-            }));
-            out.push(Box::new(move |v| v.adapter.shapes[index] = Shape::Layer));
-        }
-        out
-    }
 }

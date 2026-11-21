@@ -16,7 +16,7 @@ use flick_core::{
     types::OpClass,
 };
 
-impl Tr {
+impl Tr<'_> {
     pub(super) fn protected_resumption(&mut self, e: &ir::Expr, id: &str, xs: &[String]) -> Term {
         let completion = self.loop_result(e, id);
         let name = self.fresh("completion");

@@ -1,9 +1,9 @@
 //! Entry runners of the native JavaScript build.
 
+use super::super::Backend;
 use crate::codegen;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::Namespace;
-use crate::project::config::Backend;
 use crate::project::{Compiled, MainKind, host_services, main_kind};
 use crate::source::Span;
 

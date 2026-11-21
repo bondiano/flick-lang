@@ -11,14 +11,15 @@ use std::io::{ErrorKind, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command as Process, ExitCode};
 use std::rc::Rc;
+#[cfg(feature = "wasm-backends")]
+use std::slice;
 use std::sync::atomic::AtomicUsize;
 use std::{fs, io, process};
 
+use flick_backend::Verb;
 use flick_core::build::{go, runner_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-#[cfg(feature = "wasm-backends")]
-use flick_core::project::config::Backend;
-use flick_core::project::config::{Emit, MAIN_ENTRY};
+use flick_core::project::config::MAIN_ENTRY;
 use flick_core::project::{self, ModuleCache, Project, cache};
 use flick_core::source::SourceMap;
 #[cfg(unix)]
@@ -27,9 +28,10 @@ use rustix::io::Errno;
 use rustix::process::{Pid, test_kill_process};
 
 use super::build::BuildCommand;
-use crate::args::{BuildArguments, EmitArgument, GlobalArguments, RunArguments};
+use crate::args::{BuildArguments, GlobalArguments, RunArguments};
 use crate::artifact::resolve_root;
 use crate::backends;
+use crate::backends::options;
 use crate::child::{self, Running};
 use crate::command::Command;
 use crate::sources::FsHost;
@@ -49,6 +51,8 @@ pub struct Generation {
     rt: bool,
     /// Built for go: each entry is an executable, not a module for node.
     go: bool,
+    /// Resolved `DevTools` URL from CLI or `[target.js]`.
+    devtools: Option<String>,
 }
 
 impl Generation {
@@ -67,6 +71,7 @@ impl Generation {
                         backend: None,
                         rt: false,
                         go: false,
+                        devtools: None,
                     });
                 }
                 Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
@@ -222,27 +227,60 @@ pub fn build_into_generation(
     global: &GlobalArguments,
     modules: Option<Rc<RefCell<ModuleCache>>>,
 ) -> Result<Generation, u8> {
+    build_into_generation_for(project, options, global, modules, false)
+}
+
+/// Builds the app into a new generation for `run` (`dev = false`) or `dev` (`dev = true`).
+pub fn build_into_generation_for(
+    project: &Project,
+    options: &RunArguments,
+    global: &GlobalArguments,
+    modules: Option<Rc<RefCell<ModuleCache>>>,
+    dev: bool,
+) -> Result<Generation, u8> {
     let current = find_project_at(Some(&project.root)).map_err(|(sources, diagnostics)| {
+        let code = report::code(&diagnostics).max(1);
         report::render(global, &sources, &diagnostics);
-        1
+        code
     })?;
     let project = &current;
     #[cfg(feature = "wasm-backends")]
-    if options.devtools.is_some() {
-        let go = project.config.build.emit == Emit::Go;
-        let rt = options.rt || project.config.build.effect == Backend::Rt;
-        let backend = backends::Selected::load(&FsHost::new(), Some(project), go, rt).map_err(
-            |diagnostic| {
-                report::render(global, &SourceMap::default(), &[diagnostic]);
-                1
-            },
-        )?;
-        check_devtools(
-            !backend.supports_host("host-node-devtools"),
-            options,
-            global,
-        )?;
+    {
+        let (backend, _, _) = backends::Selected::load_target(
+            &FsHost::new(),
+            Some(project),
+            options.target.as_deref(),
+        )
+        .map_err(|diagnostic| {
+            let code = report::code(slice::from_ref(&diagnostic)).max(1);
+            report::render(global, &SourceMap::default(), &[diagnostic]);
+            code
+        })?;
+        let verb = if dev { Verb::Dev } else { Verb::Run };
+        if let Some(descriptor) = backend.descriptor() {
+            let resolved =
+                options::resolve(&descriptor, verb, Some(project), &options.backend_options)
+                    .map_err(|diagnostics| {
+                        let code = report::code(&diagnostics).max(1);
+                        let mut sources = SourceMap::default();
+                        let _ = project::discover(
+                            &FsHost::new(),
+                            &mut sources,
+                            &project.root,
+                            Some(&project.root),
+                        );
+                        report::render(global, &sources, &diagnostics);
+                        code
+                    })?;
+            check_devtools(
+                !backend.supports_host("host-node-devtools"),
+                resolved.get("devtools").is_some(),
+                global,
+            )?;
+        }
     }
+    #[cfg(not(feature = "wasm-backends"))]
+    let _ = (Verb::Run, options::short_name);
     let mut generation = match Generation::reserve(&project.root) {
         Ok(generation) => generation,
         Err(err) => {
@@ -258,26 +296,20 @@ pub fn build_into_generation(
     let build = BuildCommand {
         options: BuildArguments {
             paths: Vec::new(),
+            target: options.target.clone(),
             out_dir: Some(generation.path().to_string_lossy().into_owned()),
-            emit: Some(if project.config.build.emit == Emit::Go {
-                EmitArgument::Go
-            } else {
-                EmitArgument::Js
-            }),
-            emit_dts: false,
-            promise_facade: false,
             emit_ir: None,
-            schema_aot: false,
             profile: options.profile,
             labels: None,
-            rt: options.rt,
             watch: false,
             inputs: false,
+            backend_options: options.backend_options.clone(),
         },
         project: Some(project.root.to_string_lossy().into_owned()),
         display: None,
         entry: options.entry.clone(),
         generation: true,
+        dev,
         built: RefCell::default(),
         modules,
     };
@@ -298,21 +330,18 @@ pub fn build_into_generation(
     };
     generation.go = completed.go;
     generation.rt = completed.rt;
+    generation.devtools = completed.devtools_url;
     #[cfg(feature = "wasm-backends")]
     {
-        check_devtools(!completed.devtools, options, global)?;
+        check_devtools(!completed.devtools, generation.devtools.is_some(), global)?;
         generation.backend = completed.backend;
     }
     Ok(generation)
 }
 
 #[cfg(feature = "wasm-backends")]
-fn check_devtools(
-    component: bool,
-    options: &RunArguments,
-    global: &GlobalArguments,
-) -> Result<(), u8> {
-    if component && options.devtools.is_some() {
+fn check_devtools(unsupported: bool, requested: bool, global: &GlobalArguments) -> Result<(), u8> {
+    if unsupported && requested {
         let diagnostic = Diagnostic::new(
             codes::P012,
             Severity::Error,
@@ -336,7 +365,7 @@ pub fn launch(
     let go = generation.go;
     #[cfg(feature = "wasm-backends")]
     let component = generation.backend.as_ref().map(|pin| {
-        let import = options.devtools.as_ref().filter(|_| !go).map(|_| {
+        let import = generation.devtools.as_ref().filter(|_| !go).map(|_| {
             if generation.rt {
                 "@flick-lang/runtime/rt/runner/devtools"
             } else {
@@ -366,7 +395,7 @@ pub fn launch(
     } else {
         let mut command = Process::new("node");
         command.arg("--enable-source-maps");
-        if let Some(url) = &options.devtools {
+        if let Some(url) = &generation.devtools {
             // the module that sends the program's spans to the DevTools
             let client = if generation.rt {
                 "@flick-lang/runtime/rt/runner/devtools"
@@ -380,7 +409,7 @@ pub fn launch(
         command.arg(generation.path().join(runner_file(name, false)));
         command
     };
-    if let Some(url) = &options.devtools {
+    if let Some(url) = &generation.devtools {
         command.env("FLICK_DEVTOOLS", url);
     }
     command.args(&options.args);
@@ -506,75 +535,5 @@ fn append_pid(lock: &Path, pid: u32) -> io::Result<()> {
 mod backend_tests;
 
 #[cfg(test)]
-mod tests {
-    use std::env;
-    use std::sync::{Barrier, mpsc};
-    use std::thread;
-
-    use crate::commands::clean::clean_generations;
-
-    use super::*;
-
-    #[test]
-    fn locks_keep_live_or_unknown_processes() {
-        assert!(process_alive(&format!("\n{}\n", process::id())));
-        #[cfg(unix)]
-        assert!(!process_alive("999999999"));
-        for pid in [
-            "",
-            " \n",
-            "0",
-            "-1",
-            "-999999999",
-            "2147483648",
-            "1 2",
-            "../1",
-            "/proc/1",
-            "1; exit 1",
-        ] {
-            assert!(process_alive(pid), "{pid:?}");
-        }
-    }
-
-    #[test]
-    fn concurrent_reservations_survive_clean_before_launch_and_other_cleanup() {
-        let root = env::temp_dir().join(format!("flick-reservations-{}", process::id()));
-        let _ = fs::remove_dir_all(&root);
-        let gate = Barrier::new(2);
-        thread::scope(|scope| {
-            let (reserved, paths) = mpsc::channel();
-            let (release, released) = mpsc::channel();
-            let root = &root;
-            let gate = &gate;
-            let first = scope.spawn(move || {
-                gate.wait();
-                let generation = Generation::reserve(root).expect("first reservation");
-                fs::write(generation.path().join("Main.js"), "first").expect("first artifact");
-                reserved
-                    .send(generation.path().to_path_buf())
-                    .expect("path");
-                released.recv().expect("release first");
-            });
-            gate.wait();
-            let second = Generation::reserve(root).expect("second reservation");
-            fs::write(second.path().join("Main.js"), "second").expect("second artifact");
-            let first_path = paths.recv().expect("reserved path");
-            assert_ne!(first_path, second.path());
-            assert_eq!(clean_generations(root), 2, "construction owns both paths");
-            assert!(first_path.join("Main.js").exists());
-            assert!(second.path().join("Main.js").exists());
-            release.send(()).expect("finish first");
-            first.join().expect("first cleanup");
-            assert!(!first_path.exists());
-            assert_eq!(clean_generations(root), 1);
-            assert_eq!(
-                fs::read_to_string(second.path().join("Main.js")).expect("surviving artifact"),
-                "second"
-            );
-            let second_path = second.path().to_path_buf();
-            drop(second);
-            assert!(!second_path.exists());
-        });
-        fs::remove_dir_all(root).expect("fixture cleanup");
-    }
-}
+#[path = "run/tests.rs"]
+mod tests;

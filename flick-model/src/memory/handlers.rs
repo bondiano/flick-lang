@@ -1,7 +1,8 @@
 //! Explicit owned handler activations, parked frames and metered transfers.
 use super::{
-    Activation, Destination, Discard, Error, InstalledOperation, Invocation, InvocationEnd, Local,
-    Machine, Operation, Segment, TransferNext, Value, charge, iter, mem,
+    Activation, BracketOutcome, CapturedContinuation, Data, Destination, Discard, Error,
+    GeneratorRun, InstalledOperation, Invocation, InvocationEnd, Local, Machine, Operation,
+    ScopeOutcome, Segment, TransferNext, Value, charge, iter, mem,
 };
 use flick_core::ir::memory::HandlerEffect;
 use flick_core::types::OpClass;
@@ -39,7 +40,7 @@ impl Machine<'_, '_> {
         Ok(id)
     }
 
-    fn transfer_fuel(&mut self, frames: usize) -> Result<(), Error> {
+    pub(super) fn transfer_fuel(&mut self, frames: usize) -> Result<(), Error> {
         let amount = u64::try_from(frames).map_err(|_| Error::OutOfFuel)?;
         self.fuel = self.fuel.checked_sub(amount).ok_or(Error::OutOfFuel)?;
         Ok(())
@@ -53,13 +54,6 @@ impl Machine<'_, '_> {
         ret: Option<Local>,
         errors: Option<Local>,
     ) -> Result<(), Error> {
-        if effects
-            .iter()
-            .flat_map(|e| &e.operations)
-            .any(|op| op.class == OpClass::Control)
-        {
-            return Err(Error::UnsupportedOperation("control handler"));
-        }
         self.stage(
             iter::once(body)
                 .chain(
@@ -115,46 +109,33 @@ impl Machine<'_, '_> {
         self.stage(dicts.iter().chain(args).copied())?;
         let mut selected = None;
         for at in (0..self.frames.len()).rev() {
-            match self.frames[at].destination {
-                Destination::LayerRun { provider, .. }
-                    if Self::provider_matches(
-                        self.heap,
-                        &self.providers[&provider],
-                        effect,
-                        &mut self.fuel,
-                    )? =>
+            if let Some(impl_rep) = Self::find_dest_service(
+                self.heap,
+                &self.frames[at].destination,
+                &self.providers,
+                effect,
+                &mut self.fuel,
+            )? {
+                return self.invoke_service_impl(&impl_rep, binding, op);
+            }
+            if let Destination::Handle {
+                activation,
+                binding,
+            } = self.frames[at].destination
+            {
+                let handler = &self.activations[&activation];
+                if let Some(operation) = handler
+                    .operations
+                    .iter()
+                    .find(|operation| operation.effect == effect && operation.name == op)
                 {
-                    return self.invoke_provider(provider, binding, effect, op);
+                    selected = Some((at, binding, handler.owner, operation));
+                    break;
                 }
-                Destination::Handle {
-                    activation,
-                    binding,
-                } => {
-                    let handler = &self.activations[&activation];
-                    if let Some(operation) = handler
-                        .operations
-                        .iter()
-                        .find(|operation| operation.effect == effect && operation.name == op)
-                    {
-                        selected = Some((at, binding, handler.owner, operation));
-                        break;
-                    }
-                }
-                _ => {}
             }
         }
         let Some((at, result_binding, outer_owner, operation)) = selected else {
-            if let Some(root) = self.root_with(effect)? {
-                return self.invoke_provider(root, binding, effect, op);
-            }
-            charge(
-                &mut self.fuel,
-                effect.len().saturating_add(op.len()).saturating_add(1),
-            )?;
-            return Err(Error::MissingHandler {
-                effect: effect.into(),
-                op: op.into(),
-            });
+            return self.perform_fallback(binding, effect, op, dicts.len(), args.len());
         };
         if operation.dicts != dicts.len() || operation.arity != args.len() {
             return Err(Error::OperationArgumentCount {
@@ -166,34 +147,149 @@ impl Machine<'_, '_> {
                 actual_args: args.len(),
             });
         }
-        if operation.class == OpClass::Control {
-            return Err(Error::UnsupportedOperation("control operation"));
-        }
         let class = operation.class;
-        let function = self.heap.dup(&operation.function)?;
+        let fn_rep = operation.function.representation();
+        if class == OpClass::Control && self.maybe_cutoff_control(at)? {
+            return Ok(());
+        }
+        let function = self.heap.dup(&fn_rep)?;
         self.scratch.insert(0, function);
+        self.dispatch_handler_operation(at, binding, result_binding, outer_owner, class)
+    }
+
+    fn perform_fallback(
+        &mut self,
+        binding: Local,
+        effect: &str,
+        op: &str,
+        dict_count: usize,
+        arg_count: usize,
+    ) -> Result<(), Error> {
+        let mut inherited_rep = None;
+        for s in &self.inherited_services {
+            if let Some(imp) =
+                super::layers::lookup_layer_service(self.heap, s, effect, &mut self.fuel)?
+            {
+                inherited_rep = Some(imp.representation());
+                break;
+            }
+        }
+        if let Some(rep) = inherited_rep {
+            return self.invoke_service_impl(&rep, binding, op);
+        }
+        let inherited_op = self
+            .inherited_tail_ops
+            .iter()
+            .find(|candidate| candidate.effect == effect && candidate.name == op)
+            .map(|candidate| {
+                (
+                    candidate.dicts,
+                    candidate.arity,
+                    candidate.function.representation(),
+                )
+            });
+        if let Some((expected_dicts, expected_args, fn_rep)) = inherited_op {
+            if expected_dicts != dict_count || expected_args != arg_count {
+                return Err(Error::OperationArgumentCount {
+                    effect: effect.into(),
+                    op: op.into(),
+                    expected_dicts,
+                    actual_dicts: dict_count,
+                    expected_args,
+                    actual_args: arg_count,
+                });
+            }
+            let function = self.heap.dup(&fn_rep)?;
+            self.scratch.insert(0, function);
+            return self.apply(Destination::Bind(binding));
+        }
+        if let Some(root) = self.root_with(effect)? {
+            return self.invoke_provider(root, binding, effect, op);
+        }
+        charge(
+            &mut self.fuel,
+            effect.len().saturating_add(op.len()).saturating_add(1),
+        )?;
+        Err(Error::MissingHandler {
+            effect: effect.into(),
+            op: op.into(),
+        })
+    }
+
+    fn maybe_cutoff_control(&mut self, at: usize) -> Result<bool, Error> {
+        let mut cutoff_at = None;
+        for idx in (at + 1..self.frames.len()).rev() {
+            if self.is_cutoff_cleanup_destination(&self.frames[idx].destination)? {
+                cutoff_at = Some(idx);
+                break;
+            }
+        }
+        let Some(idx) = cutoff_at else {
+            return Ok(false);
+        };
+        self.release_operands()?;
+        self.transfer_fuel(self.frames.len() - (idx + 1))?;
+        let cleanup_frames = self.frames.split_off(idx + 1);
+        self.discard = Some(Discard {
+            frames: cleanup_frames,
+            owner: Some(self.current_owner),
+            next: TransferNext::FinishCutoff,
+        });
+        Ok(true)
+    }
+
+    fn dispatch_handler_operation(
+        &mut self,
+        at: usize,
+        binding: Local,
+        result_binding: Local,
+        outer_owner: usize,
+        class: OpClass,
+    ) -> Result<(), Error> {
         self.transfer_fuel(self.frames.len() - at)?;
         let segment_id = self.handler_identity()?;
         let frames = self.frames.split_off(at);
         let old_owner = self.current_owner;
         self.current_owner = outer_owner;
-        let end = if class == OpClass::Tail {
-            self.segments.insert(
-                segment_id,
-                Segment {
+        let end = match class {
+            OpClass::Tail => {
+                self.segments.insert(
+                    segment_id,
+                    Segment {
+                        frames,
+                        owner: old_owner,
+                        binding,
+                    },
+                );
+                InvocationEnd::Tail(segment_id)
+            }
+            OpClass::Abort => {
+                self.discard = Some(Discard {
                     frames,
-                    owner: old_owner,
-                    binding,
-                },
-            );
-            InvocationEnd::Tail(segment_id)
-        } else {
-            self.discard = Some(Discard {
-                frames,
-                owner: outer_owner,
-                next: TransferNext::Raise,
-            });
-            InvocationEnd::Abort(result_binding)
+                    owner: Some(outer_owner),
+                    next: TransferNext::Raise,
+                });
+                InvocationEnd::Abort(result_binding)
+            }
+            OpClass::Control => {
+                self.continuations.insert(
+                    segment_id,
+                    Some(CapturedContinuation {
+                        frames,
+                        owner: old_owner,
+                        binding,
+                    }),
+                );
+                let cont = self.heap.allocate(Data::Continuation {
+                    execution: self.execution,
+                    id: segment_id,
+                });
+                self.scratch.push(cont);
+                InvocationEnd::Control {
+                    cont_id: segment_id,
+                    binding: result_binding,
+                }
+            }
         };
         let invocation = self.handler_identity()?;
         let mut operands = mem::take(&mut self.scratch).into_iter();
@@ -206,7 +302,7 @@ impl Machine<'_, '_> {
                 evidence: self.current_evidence,
             },
         );
-        if class == OpClass::Tail {
+        if matches!(class, OpClass::Tail | OpClass::Control) {
             self.ready = Some(invocation);
         } else {
             self.discard.as_mut().expect("abort transfer").next = TransferNext::Invoke(invocation);
@@ -217,6 +313,19 @@ impl Machine<'_, '_> {
     pub(super) fn invoke_step(&mut self, id: usize) -> Result<(), Error> {
         let invocation = self.invocations.get_mut(&id).expect("pending invocation");
         self.current_evidence = invocation.evidence;
+        if invocation.arguments.len() == 1
+            && matches!(invocation.end, InvocationEnd::Control { .. })
+        {
+            let mut invocation = self.invocations.remove(&id).expect("final invocation step");
+            self.scratch
+                .push(invocation.callee.take().expect("invocation function"));
+            self.scratch
+                .push(invocation.arguments.pop_front().expect("final argument"));
+            let InvocationEnd::Control { cont_id, binding } = invocation.end else {
+                unreachable!("control invocation matched above")
+            };
+            return self.apply(Destination::Discontinue { cont_id, binding });
+        }
         if let Some(argument) = invocation.arguments.pop_front() {
             self.scratch
                 .push(invocation.callee.take().expect("invocation function"));
@@ -240,6 +349,21 @@ impl Machine<'_, '_> {
                     self.restore_evidence();
                     let value = self.pending.take().expect("abort arm value");
                     self.store(binding, value)?;
+                }
+                InvocationEnd::Control { cont_id, binding } => {
+                    self.restore_evidence();
+                    let value = self.pending.take().expect("control arm value");
+                    if let Some(Some(captured)) =
+                        self.continuations.get_mut(&cont_id).map(Option::take)
+                    {
+                        self.discard = Some(Discard {
+                            frames: captured.frames,
+                            owner: Some(self.current_owner),
+                            next: TransferNext::DeliverValue { binding, value },
+                        });
+                    } else {
+                        self.store(binding, value)?;
+                    }
                 }
             }
             Ok(())
@@ -287,96 +411,49 @@ impl Machine<'_, '_> {
         let mut roots: Vec<_> = invocation.arguments.into_iter().collect();
         roots.extend(invocation.callee);
         self.heap.drop_values(roots)?;
-        if let InvocationEnd::Tail(id) = invocation.end {
-            let segment = self.segments.remove(&id).expect("failed tail segment");
-            self.discard = Some(Discard {
-                frames: segment.frames,
-                owner: self.current_owner,
-                next: TransferNext::Raise,
-            });
-        }
-        Ok(())
-    }
-
-    /// Internal abort/discontinuation cannot be intercepted by ordinary Try.
-    pub(super) fn discard_step(&mut self) -> Result<(), Error> {
-        let frame = self.discard.as_mut().expect("active transfer").frames.pop();
-        let Some(frame) = frame else {
-            let discard = self.discard.take().expect("completed transfer");
-            self.current_owner = discard.owner;
-            if let TransferNext::Invoke(id) = discard.next {
-                self.ready = Some(id);
+        match invocation.end {
+            InvocationEnd::Tail(id) => {
+                let segment = self.segments.remove(&id).expect("failed tail segment");
+                self.discard = Some(Discard {
+                    frames: segment.frames,
+                    owner: Some(self.current_owner),
+                    next: TransferNext::Raise,
+                });
             }
-            return Ok(());
-        };
-        self.heap
-            .drop_values(frame.locals.into_values().flatten().collect())?;
-        let mut roots = Vec::new();
-        match frame.destination {
-            Destination::RecoverySelection { id } => self.abandon_recovery(id)?,
-            Destination::RecoveryBody {
-                owner, evidence, ..
-            } => {
-                self.current_owner = owner;
-                self.current_evidence = evidence;
-            }
-            Destination::LayerRun { provider, .. } => self.leave_provider(provider)?,
-            Destination::Handle { activation, .. } => {
-                Self::activation_roots(
-                    self.activations
-                        .remove(&activation)
-                        .expect("departed handler"),
-                    &mut roots,
-                );
-            }
-            Destination::Invocation(id) => {
-                let invocation = self.invocations.remove(&id).expect("departed invocation");
-                roots.extend(invocation.callee);
-                roots.extend(invocation.arguments);
-                if let InvocationEnd::Tail(id) = invocation.end {
-                    let segment = self.segments.remove(&id).expect("departed tail segment");
-                    self.discard
-                        .as_mut()
-                        .expect("active transfer")
-                        .frames
-                        .extend(segment.frames);
+            InvocationEnd::Control { cont_id, .. } => {
+                if let Some(Some(captured)) = self.continuations.get_mut(&cont_id).map(Option::take)
+                {
+                    let cause = self.failure.take();
+                    self.discard = Some(Discard {
+                        frames: captured.frames,
+                        owner: Some(self.current_owner),
+                        next: TransferNext::ResumeRunning {
+                            saved_failure: cause,
+                        },
+                    });
                 }
             }
-            Destination::Catch { handler, .. } => roots.push(handler),
-            Destination::Initialize { name, .. } => {
-                self.globals.remove(&name);
-            }
-            Destination::CloseScope {
-                owner, previous, ..
-            } => {
-                self.close_owner(owner)?;
-                self.current_owner = previous;
-            }
-            Destination::RestoreOwner { previous, .. } => self.current_owner = previous,
-            Destination::RecoveryHelper { .. }
-            | Destination::Top
-            | Destination::Bind(_)
-            | Destination::Modify { .. } => {}
+            InvocationEnd::Caller(_) | InvocationEnd::Abort(_) => {}
         }
-        self.heap.drop_values(roots)
+        Ok(())
     }
 
     pub(super) fn cleanup_handlers(&mut self, roots: &mut Vec<Value>) {
         for activation in mem::take(&mut self.activations).into_values() {
             Self::activation_roots(activation, roots);
         }
-        let mut frames = Vec::new();
         for segment in mem::take(&mut self.segments).into_values() {
-            frames.extend(segment.frames);
+            for frame in segment.frames {
+                self.drain_frame_roots(frame, roots);
+            }
+        }
+        for captured in mem::take(&mut self.continuations).into_values().flatten() {
+            for frame in captured.frames {
+                self.drain_frame_roots(frame, roots);
+            }
         }
         if let Some(discard) = self.discard.take() {
-            frames.extend(discard.frames);
-        }
-        for frame in frames {
-            roots.extend(frame.locals.into_values().flatten());
-            if let Destination::Catch { handler, .. } = frame.destination {
-                roots.push(handler);
-            }
+            self.drain_discard_roots(discard, roots);
         }
         for invocation in mem::take(&mut self.invocations).into_values() {
             roots.extend(invocation.callee);
@@ -384,3 +461,5 @@ impl Machine<'_, '_> {
         }
     }
 }
+
+include!("handlers_discard.rs");

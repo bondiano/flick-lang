@@ -21,7 +21,7 @@ use crate::types::classes::args_of;
 use crate::types::convert::is_type;
 use crate::types::gadt::branch::type_eqs;
 use crate::types::lang::{self, Lang};
-use crate::types::ty::{Norm, Row, Type};
+use crate::types::ty::{Row, Type};
 
 /// A `provide` around the code being checked.
 #[derive(Debug, Clone)]
@@ -55,6 +55,17 @@ pub struct Want {
     span: Span,
     at: Lexical,
     settled: Vec<String>,
+}
+
+impl Want {
+    fn claim(&mut self, key: String) -> bool {
+        if self.settled.contains(&key) {
+            false
+        } else {
+            self.settled.push(key);
+            true
+        }
+    }
 }
 
 impl Checker<'_> {
@@ -114,13 +125,23 @@ impl Checker<'_> {
     /// inferred yet, as of a function applied to fewer arguments, waits for
     /// the end of the declaration.
     pub fn settle_provided(&mut self, mark: usize) {
-        let wanted: Vec<Want> = self.cx.regions.provided.drain(mark..).collect();
-        for mut want in wanted {
-            let equalities = type_eqs(&want.at.givens);
-            if self.under(&equalities, |this| this.settle_want(&mut want, false)) {
-                self.cx.regions.provided_late.push(want);
-            }
+        let late = self.cx.regions.provided_late.len();
+        self.settle_provided_since(mark, late);
+    }
+
+    /// Settles `Provided` constraints wanted since `mark`, and those deferred
+    /// during a sub-call since `late_mark` whose owner or row an outer step
+    /// (such as `|>`) just supplied.
+    pub fn settle_provided_since(&mut self, mark: usize, late_mark: usize) {
+        if self.cx.regions.provided.len() == mark
+            && self.cx.regions.provided_late.len() == late_mark
+        {
+            return;
         }
+        self.grow();
+        let mut wanted: Vec<Want> = self.cx.regions.provided.drain(mark..).collect();
+        wanted.extend(self.cx.regions.provided_late.drain(late_mark..));
+        self.settle_wants(wanted, false);
     }
 
     /// At the end of the declaration, when rows no longer grow: what is
@@ -128,10 +149,7 @@ impl Checker<'_> {
     pub fn settle_late_provided(&mut self) {
         let mut wanted = mem::take(&mut self.cx.regions.provided);
         wanted.append(&mut self.cx.regions.provided_late);
-        for mut want in wanted {
-            let equalities = type_eqs(&want.at.givens);
-            self.under(&equalities, |this| this.settle_want(&mut want, true));
-        }
+        self.settle_wants(wanted, true);
         for (provide, owner, service, span) in mem::take(&mut self.cx.regions.late_owners) {
             let owner = self.store.resolve(&owner);
             match self.scope_index(&owner) {
@@ -139,6 +157,15 @@ impl Checker<'_> {
                 Some(_) => self.outlived_provide(&service, provide, &owner, span),
                 // never solved: an error was reported already
                 None => {}
+            }
+        }
+    }
+
+    fn settle_wants(&mut self, wanted: Vec<Want>, last: bool) {
+        for mut want in wanted {
+            let equalities = type_eqs(&want.at.givens);
+            if self.under(&equalities, |this| this.settle_want(&mut want, last)) {
+                self.cx.regions.provided_late.push(want);
             }
         }
     }
@@ -154,9 +181,7 @@ impl Checker<'_> {
         let mut keep = Vec::new();
         for (label, ty) in norm.entries {
             if matches!(label, Elem::Live) {
-                let key = format!("{label}{ty:?}");
-                if !want.settled.contains(&key) {
-                    want.settled.push(key);
+                if want.claim(format!("live{ty:?}")) {
                     let span = want.span;
                     self.keep_live(&ty, &want.owner, &want.at.givens, span, last);
                 }
@@ -164,15 +189,13 @@ impl Checker<'_> {
             }
             // `Async` is the root's: no owner provides it
             let root = lang::label(Lang::Async) == label.name();
-            let key = label.to_string();
             if root
                 || label.name() == Some(scope())
                 || matches!(label, Elem::Provided(_))
-                || want.settled.contains(&key)
+                || !want.claim(label.to_string())
             {
                 continue;
             }
-            want.settled.push(key);
             if !self.discharge(&label, &want.owner, &want.at, want.span) {
                 keep.push(obligation(&label, ty, &want.owner));
             }
@@ -181,12 +204,16 @@ impl Checker<'_> {
         for tail in &norm.tails {
             match tail {
                 Type::Meta(_) => open = true,
-                Type::Var(_) | Type::Skolem(_)
-                    if !self.discharge_tail(tail, &want.owner, &want.at) =>
-                {
-                    let (service, region) = (self.show_exact(tail), self.show_exact(&want.owner));
-                    let named = self.signed(tail) && self.signed(&want.owner);
-                    self.unprovided(&service, &region, named, want.span);
+                Type::Var(_) | Type::Skolem(_) => {
+                    let service = self.show_exact(tail);
+                    let owner = self.store.resolve(&want.owner);
+                    if want.claim(service.clone())
+                        && !self.scope_or_given(&want.at, &owner, None, Some(tail))
+                    {
+                        let region = self.show_exact(&want.owner);
+                        let named = self.signed(tail) && self.signed(&want.owner);
+                        self.unprovided(&service, &region, named, want.span);
+                    }
                 }
                 _ => {}
             }
@@ -202,6 +229,9 @@ impl Checker<'_> {
     /// The obligations of a row performed in the current stage that it
     /// settles are left out of the row.
     pub fn settle_performed(&mut self, services: &Type, span: Span) -> Type {
+        if self.cx.regions.passed_provided {
+            self.grow();
+        }
         let mut norm = self.store.normalize(services);
         if !norm
             .entries
@@ -250,31 +280,34 @@ impl Checker<'_> {
             }
             return true;
         }
-        self.scope_index(&owner)
-            .is_some_and(|i| at.scopes.contains(&i))
-            || self.given(at, &owner, |row| row.get(service).is_some())
+        self.scope_or_given(at, &owner, Some(service), None)
     }
 
-    /// A row variable's services come from what runs the stage: settled
-    /// when the owner's scope is the stage's, or by a given.
-    fn discharge_tail(&self, tail: &Type, owner: &Type, at: &Lexical) -> bool {
-        let owner = self.store.resolve(owner);
-        self.scope_index(&owner)
+    /// Whether `owner` is a `scope` of `at`, or a given `Provided R owner`
+    /// names `service` or `tail`.
+    fn scope_or_given(
+        &self,
+        at: &Lexical,
+        owner: &Type,
+        service: Option<&Elem>,
+        tail: Option<&Type>,
+    ) -> bool {
+        self.scope_index(owner)
             .is_some_and(|i| at.scopes.contains(&i))
-            || self.given(at, &owner, |row| row.tails.contains(tail))
-    }
-
-    /// Whether a given `Provided R owner` has a row `R` that `names`.
-    fn given(&self, at: &Lexical, owner: &Type, names: impl Fn(&Norm) -> bool) -> bool {
-        at.givens.iter().any(|g| match args_of(g, Lang::Provided) {
-            Some(args) => match args[..] {
-                [row, region] => {
-                    self.store.resolve(region) == *owner && names(&self.store.normalize(row))
+            || at.givens.iter().any(|g| {
+                let Some(args) = args_of(g, Lang::Provided) else {
+                    return false;
+                };
+                let [row, region] = &args[..] else {
+                    return false;
+                };
+                if self.store.resolve(region) != *owner {
+                    return false;
                 }
-                _ => false,
-            },
-            _ => false,
-        })
+                let norm = self.store.normalize(row);
+                service.is_some_and(|s| norm.get(s).is_some())
+                    || tail.is_some_and(|t| norm.tails.contains(t))
+            })
     }
 
     /// Obligations the stage cannot settle go to its row.
@@ -282,6 +315,7 @@ impl Checker<'_> {
         if entries.is_empty() || at.pure {
             return;
         }
+        self.cx.regions.passed_provided = true;
         let row = Type::Row(Row {
             entries,
             tail: None,

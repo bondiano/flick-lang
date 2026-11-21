@@ -103,6 +103,35 @@ pub struct Fields {
     pub tail: Option<Var>,
 }
 
+/// Module prefix for abstract type members inside a translated module contract.
+pub const CONTRACT_SCOPE: &str = "$contract";
+/// Module prefix for existential binder references (`$exists:K`) from flick-core.
+pub const EXISTS_PREFIX: &str = "$exists:";
+/// Module prefix for freshly opened witness identities (`$witness:N`).
+pub const WITNESS_PREFIX: &str = "$witness:";
+/// Module prefix for partially applied manifest contract aliases (`$manifest:Mod.Sig`).
+pub const MANIFEST_PREFIX: &str = "$manifest:";
+
+/// The rigid nominal type standing for abstract member `member` of opened witness `id`.
+pub fn witness_type(id: u32, member: &str) -> Type {
+    Type::Con(Path::new(&format!("{WITNESS_PREFIX}{id}"), member))
+}
+
+/// The witness id of a `$witness:N` module path, if it is one.
+pub fn witness_id(module: &str) -> Option<u32> {
+    module.strip_prefix(WITNESS_PREFIX)?.parse().ok()
+}
+
+/// The module path for references to existential binder `binder`.
+pub fn exists_module(binder: &str) -> String {
+    format!("{EXISTS_PREFIX}{binder}")
+}
+
+/// The module path for partially applied manifest members of contract `sig`.
+pub fn manifest_module(sig: &Path) -> String {
+    format!("{MANIFEST_PREFIX}{sig}")
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Type {
     Var(Var),
@@ -129,6 +158,15 @@ pub enum Type {
     Tag(Row),
     /// `C.Dict τ̄`, the dictionary of a class (§1.6).
     Dict(Path, Rc<[Type]>),
+    /// `Module Sig`: a packed first-class module value of contract `Sig`.
+    Module(Path),
+    /// An opened `Module Sig` inside `unpack`, carrying a unique witness id.
+    OpenedModule(Path, u32),
+    /// `exists K : Sig. T`: a packed module witness and payload value.
+    Exists(Name, Path, Rc<Type>),
+    /// An opened `exists K : Sig. T` inside `unpack`, carrying its witness id
+    /// and opened payload type.
+    OpenedExists(Path, u32, Rc<Type>),
     /// `Env ρ`, only at run time (§3.6).
     Env(Row),
     /// A `∀` of a higher-rank parameter: checking against it is (Let-Sig).
@@ -414,7 +452,10 @@ impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Type::Var(v) => write!(f, "{v}"),
-            Type::Con(p) => write!(f, "{}", p.name),
+            Type::Con(p) => match witness_id(&p.module) {
+                Some(id) => write!(f, "{}#{id}", p.name),
+                None => write!(f, "{}", p.name),
+            },
             Type::App(h, a) => write!(f, "{h} {}", Atom(a)),
             Type::Fun(p, s, r) => write!(f, "{} {s} {r}", Atom(p)),
             Type::Eff(r, e, t) => write!(f, "Eff {r} {e} {}", Atom(t)),
@@ -450,6 +491,9 @@ impl fmt::Display for Type {
                 }
                 Ok(())
             }
+            Type::Module(sig) | Type::OpenedModule(sig, _) => write!(f, "Module {}", sig.name),
+            Type::Exists(k, sig, body) => write!(f, "exists {k} : {}. {body}", sig.name),
+            Type::OpenedExists(sig, _, body) => write!(f, "exists _ : {}. {body}", sig.name),
             Type::Env(r) => write!(f, "Env {r}"),
             Type::Forall(s) => {
                 let vars: Vec<&str> = s.vars.iter().map(|(n, _)| &**n).collect();

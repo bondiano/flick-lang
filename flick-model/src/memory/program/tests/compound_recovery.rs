@@ -59,25 +59,26 @@ fn compound_first_fail_reaches_recovery_selection_before_final_reporting() {
     });
     let mut machine = fixture_machine(&program, &mut heap);
     let block = &program.functions[&0].body;
-    machine.frames.push(Frame {
+    let push_frame = |at, destination| Frame {
         recovery_id: None,
         evidence: None,
         block,
-        at: block.instructions.len(),
+        at,
         locals: Locals::new(),
-        destination: Destination::Top,
-    });
-    machine.frames.push(Frame {
-        recovery_id: None,
-        evidence: None,
-        block,
-        at: 0,
-        locals: Locals::new(),
-        destination: Destination::Catch {
+        vars: vec![],
+        iterators: vec![],
+        destination,
+    };
+    machine
+        .frames
+        .push(push_frame(block.instructions.len(), Destination::Top));
+    machine.frames.push(push_frame(
+        0,
+        Destination::Catch {
             handler: selector,
             binding: 0,
         },
-    });
+    ));
     machine.failure = Some(original);
     let result = machine.run();
     let outcome = machine.finish(result);
@@ -181,6 +182,8 @@ fn compound_miss_keeps_identity_order_interrupt_metadata_and_all_prefix_roots() 
                 block,
                 at: block.instructions.len(),
                 locals: Locals::new(),
+                vars: vec![],
+                iterators: vec![],
                 destination: Destination::Top,
             });
             machine.frames.push(Frame {
@@ -189,6 +192,8 @@ fn compound_miss_keeps_identity_order_interrupt_metadata_and_all_prefix_roots() 
                 block,
                 at: 0,
                 locals: Locals::new(),
+                vars: vec![],
+                iterators: vec![],
                 destination: Destination::Catch {
                     handler: selector,
                     binding: 0,
@@ -259,7 +264,7 @@ mod recovery_timing {
                             .heap
                             .objects
                             .iter()
-                            .flatten()
+                            .filter_map(|slot| slot.object.as_ref())
                             .filter(|object| matches!(object.data, Data::Cause(_)))
                             .count();
                         assert_eq!(
@@ -286,7 +291,7 @@ mod recovery_timing {
                                 .heap
                                 .objects
                                 .iter()
-                                .flatten()
+                                .filter_map(|slot| slot.object.as_ref())
                                 .any(|object| matches!(object.data, Data::Cause(_))),
                             "C released BEFORE selected body"
                         );

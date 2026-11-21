@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
+use std::mem;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -36,18 +37,13 @@ pub(crate) struct Package {
     tools: Vec<Tool>,
     /// The tools `[tools]` lets the steps of this backend run.
     allowed: Vec<String>,
-    runtimes: Vec<flick_backend::RuntimeDependency>,
     /// An official component, which the compiler's own host integrations
     /// approve; a third-party descriptor cannot grant itself host authority.
     official: bool,
 }
 
 impl Package {
-    pub(super) fn load(
-        project: &Project,
-        package: &BackendPackage,
-        rt: bool,
-    ) -> Result<Self, Diagnostic> {
+    pub(super) fn load(project: &Project, package: &BackendPackage) -> Result<Self, Diagnostic> {
         let pin = BackendPin {
             identity: BackendId {
                 id: package.id.clone(),
@@ -71,7 +67,6 @@ impl Package {
             &project.root,
             pin,
             &bytes,
-            rt,
             Some(&project.config.tools),
             official,
         )
@@ -81,7 +76,6 @@ impl Package {
         root: &Path,
         pin: BackendPin,
         bytes: &[u8],
-        rt: bool,
         allowed: Option<&BTreeMap<String, Vec<String>>>,
         official: bool,
     ) -> Result<Self, Diagnostic> {
@@ -98,6 +92,7 @@ impl Package {
                 pin.identity.id, pin.identity.version, pin.sha256
             ))
         })?;
+        super::options::save_descriptor(&pin.sha256, &backend.describe());
         // outside a project only `--allow-tool` grants a tool
         let allowed = allowed.map_or_else(
             || super::allowed_tools().to_vec(),
@@ -108,20 +103,26 @@ impl Package {
             .filter(|&id| id != "node")
             .chain(["node"]);
         let tools = ids.filter_map(|id| Tool::find(id, None).ok()).collect();
-        let runtimes = super::dependencies::installed_for(root, !rt).map_err(failure)?;
         Ok(Self {
             pin,
             root: root.to_path_buf(),
             backend,
             tools,
             allowed,
-            runtimes,
             official,
         })
     }
 
     pub(super) fn pin(&self) -> BackendPin {
         self.pin.clone()
+    }
+
+    pub(super) fn descriptor(&self) -> flick_backend::Descriptor {
+        self.backend.describe()
+    }
+
+    pub(super) fn is_official_js(&self) -> bool {
+        self.official && self.pin.identity.id == super::options::OFFICIAL_JS
     }
 
     /// These compiler-owned host integrations are approved for the exact shipped
@@ -161,7 +162,8 @@ impl Package {
         let mut diagnostics = host_preflight(host, project, compilation, output);
         if self.supports_host("host-source-build")
             && self.tools.is_empty()
-            && (output.purpose != Purpose::Build || output.extras.schema_aot)
+            && (!matches!(output.purpose, Purpose::Build | Purpose::Inspect)
+                || output.extras.schema_aot)
         {
             diagnostics.push(failure(
                 "the selected JavaScript operation requires an installed Node runtime",
@@ -203,17 +205,25 @@ impl Package {
                 diagnostics: prepared.diagnostics,
             };
         }
-        prepared.request.runtime_dependencies = match self.runtime_dependencies(&prepared.request) {
-            Ok(pins) => pins,
-            Err(diagnostic) => {
-                return Emission {
-                    artifacts: vec![],
-                    diagnostics: vec![diagnostic],
-                };
+        prepared.request.runtime_dependencies = if output.purpose == Purpose::Inspect {
+            Vec::new()
+        } else {
+            match self.runtime_dependencies(&prepared.request) {
+                Ok(pins) => pins,
+                Err(diagnostic) => {
+                    return Emission {
+                        artifacts: vec![],
+                        diagnostics: vec![diagnostic],
+                    };
+                }
             }
         };
         prepared.request.toolchains = self.tools.iter().map(|t| t.pin.clone()).collect();
-        let reserved = reserved_outputs(&prepared, output, project);
+        let reserved = if output.purpose == Purpose::Inspect {
+            Vec::new()
+        } else {
+            reserved_outputs(&prepared, output, project)
+        };
         let environment = tools::settable();
         let policy = Policy {
             toolchains: &prepared.request.toolchains,
@@ -223,22 +233,54 @@ impl Package {
             authorize_step: &tools::authorize,
         };
         component::cancel_on_signals();
-        let mut emission = match flick_backend::generate(
-            &self.backend,
-            &prepared.request,
-            &policy,
-            |id| prepared.bytes.get(id).cloned(),
-            true,
-        ) {
+        let mut emission = self.finish_generation(
+            flick_backend::generate(
+                &self.backend,
+                &prepared.request,
+                &policy,
+                |id| prepared.bytes.get(id).cloned(),
+                true,
+            ),
+            &mut prepared,
+            output,
+        );
+        if project.is_none() && output.purpose != Purpose::Inspect {
+            standalone_files(&mut emission);
+        }
+        emission.diagnostics.splice(0..0, prepared.diagnostics);
+        emission
+    }
+
+    fn finish_generation(
+        &self,
+        result: Result<Generated, Failure>,
+        prepared: &mut Prepared,
+        output: &BuildPlan,
+    ) -> Emission {
+        match result {
+            Ok(generated) if output.purpose == Purpose::Inspect => {
+                let result = generated.result();
+                Emission {
+                    artifacts: result
+                        .artifacts
+                        .iter()
+                        .cloned()
+                        .map(Artifact::from)
+                        .collect(),
+                    diagnostics: (result.diagnostics.iter())
+                        .map(|d| self.diagnostic(d, &prepared.files))
+                        .collect(),
+                }
+            }
             Ok(generated) => {
-                if let Err(diagnostic) = self.outputs(&generated, &mut prepared, output) {
+                if let Err(diagnostic) = self.outputs(&generated, prepared, output) {
                     return Emission {
                         artifacts: vec![],
                         diagnostics: vec![*diagnostic],
                     };
                 }
                 Emission {
-                    artifacts: prepared.shared,
+                    artifacts: mem::take(&mut prepared.shared),
                     diagnostics: (generated.result().diagnostics.iter())
                         .map(|d| self.diagnostic(d, &prepared.files))
                         .collect(),
@@ -256,12 +298,7 @@ impl Package {
                     prepared.request.target.environment.platform,
                 ))],
             },
-        };
-        if project.is_none() {
-            standalone_files(&mut emission);
         }
-        emission.diagnostics.splice(0..0, prepared.diagnostics);
-        emission
     }
 
     /// Adds the launch manifest, the artifacts of a generation and the
@@ -338,13 +375,10 @@ impl Package {
         request: &BuildRequest,
     ) -> Result<Vec<RuntimeDependency>, Diagnostic> {
         let effect = request.target.options.iter().any(|o| {
-            (o.key == "js.runtime" && o.value == "effect")
+            (o.key == "option.runtime" && o.value == "effect")
                 || (o.key == "js.effect-bridge" && o.value != "absent")
-        }) || request
-            .target
-            .required_capabilities
-            .iter()
-            .any(|c| c.name == "schema-aot");
+                || (o.key == "option.schema-aot" && o.value == "true")
+        });
         super::dependencies::installed_for(&self.root, effect).map_err(failure)
     }
 
@@ -366,11 +400,12 @@ impl Package {
         launch::run_paths(files, &self.pin)
     }
 
-    pub(super) fn cache_identity(&self) -> String {
+    pub(super) fn cache_identity(&self, effect: bool) -> String {
+        let runtimes = super::dependencies::installed_for(&self.root, effect).unwrap_or_default();
         format!(
             "{:?} {:?} {:?}",
             self.pin,
-            self.runtimes,
+            runtimes,
             self.tools.iter().map(|t| &t.pin).collect::<Vec<_>>()
         )
     }

@@ -230,6 +230,8 @@ fn install_injected_catch(machine: &mut Machine<'_, '_>, cause: CauseToken) {
         block,
         at: block.instructions.len(),
         locals: Locals::new(),
+        vars: vec![],
+        iterators: vec![],
         destination: Destination::Top,
     });
     machine.frames.push(Frame {
@@ -238,6 +240,8 @@ fn install_injected_catch(machine: &mut Machine<'_, '_>, cause: CauseToken) {
         block,
         at: 0,
         locals: Locals::new(),
+        vars: vec![],
+        iterators: vec![],
         destination: Destination::Catch {
             handler: selector,
             binding: 0,

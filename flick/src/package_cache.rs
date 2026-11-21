@@ -47,7 +47,7 @@ pub fn compile(
     sources: &mut SourceMap,
     project: Option<&Project>,
     roots: &[PathBuf],
-    rt: bool,
+    rt: Option<bool>,
     kept: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Compilation) {
     with_modules(kept, |kept| {

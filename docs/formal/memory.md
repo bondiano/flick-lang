@@ -10,8 +10,8 @@ are not evidence for this contract.
 
 | Obligation | Current implementation | Still required for the phase gate |
 | - | - | - |
-| M1: explicit ownership | Shared memory IR, Perceus insertion, source closure/dictionary conversion, guarded pattern matches and immutable record updates, pure list callbacks, left/right folds and list observers, typed failures and tail/abort handlers, counted nominal tags and constant Layer providers, owned outcomes and explicit source runners | Extend lowering/execution to every language form and outcome; run the entire corpus on this path in both profiles with zero live objects after releasing results and closing owned regions |
-| M2: `Arena s` | Public `Arena.make/alloc/get`, existing by-use checker rules, counted scope/selected-owner execution, JS/Go storage retirement after finalizers, scope-release/use/retention regressions | Counted execution of arbitrary finalizers/handlers/owned work and the whole heap/region proof |
+| M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), Stage 3 pure/pure-effect stdlib counted lowering/primitives, Stage 4 cooperative single-threaded async/fiber/layer/STM/observability/config/arbitrary/streaming runtime (`Fiber`, `Deferred`, `FiberGroup`, `Layer` dynamic/memo/merge, `Context.Reference`, `Clock`/`TestClock`, `Schedule`/`ExecutionPlan`, `Latch`/`Semaphore`/`PartitionedSemaphore`, `Queue`/`PubSub`/`SynchronizedRef`/`SubscriptionRef`, `Cache`/`ScopedCache`/`Pool`/`RcRef`/`RcMap`/`LayerMap`/`LayerRef`, `Tx` STM, `Events`/`ErrorReporter`/`Tracer`/`Logger`/`Metric`/`Request`/`Crypto`, `Config`/`ConfigProvider`, `Arbitrary`, `Channel`/`Sink`/`Stream`), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs`: 762 clean profiles across `tests/run`, `tests/rt`, `docs`, and 26/26 `tests/language` suites in both profiles with zero live objects) | Explicit counted host/FFI bridge for `.mjs`/DOM/UI/HTTP/RPC/FileSystem/CLI/Reactivity.Atom fixtures and OS-environment host services so 100% of the corpus passes on this path in both profiles with zero live objects |
+| M2: `Arena s` | Public `Arena.make/alloc/get`, existing by-use checker rules, counted scope/selected-owner execution with LIFO finalizers and child-fiber cancellation running before arena retirement, JS/Go storage retirement after finalizers, scope-release/use/retention and concurrent cancellation regressions | Whole heap/region proof and counted host/FFI boundary |
 | M3: FBIP and cycles | Dynamic uniqueness/layout-checked reuse for a last borrowed receiver followed by construction; root-owned counted cells, strong reads/replacement and detach-all teardown, with closure/cell-cycle tests | Full constructor/destructor lowering and backend implementation |
 | M4: Lean | `Formal/MemoryInsert.lean`: whole-function token balance for the executable cached insertion projection, before output validation, with distinct parameters and every selected-path prefix; `Formal/MemoryPass.lean`: independent token checking and computed live-in availability; `Formal/Memory.lean`: local arithmetic; `Formal/MemoryArena.lean` and `MemoryScopes.lean`: root inventories and selected-owner storage retirement | Verified Rust correspondence, machine bounds, operation/heap and exception-unwind semantics, dynamic reuse and physical reclamation remain outside these proofs |
 | M5: Native split (2026-11-13) | Backend boundary below | Implementation belongs to phase N, not a replacement for M1–M4 |
@@ -97,10 +97,69 @@ then optional return/error functions; dispatch consumes dictionaries before
 ordinary arguments. Repeated operands require separate tokens. Metadata
 rejects duplicate effects/operations and invocation-count overflow, including
 Control's extra resume argument, in every function before execution. Source
-lowering and counted execution support tail/abort operation handlers and
-return/error arms. Control metadata is representable, but source lowering
-and raw counted execution explicitly reject it until real one-shot
-continuation ownership is implemented; it is never substituted with tail.
+lowering and counted execution support tail, abort, and one-shot `control`
+operation handlers as well as return/error arms. A `control` arm receives an
+owned `Data::Continuation` handle; resuming once restores the captured frames
+(popping tail-resumed control arm frames in O(1) stack space), resuming twice
+raises a structured `ResumeTwice` defect, and exiting a control arm without
+resuming discontinues the captured frames through `Destination::Discontinue`
+(running inner `Scope` finalizers in LIFO order after the arm completes).
+
+Tail-call optimization reuses the current frame in place when it has no
+remaining instructions, locals, frame-owned variables/iterators, or recovery
+boundary. List tail patterns (`[x, ...rest]`) produce O(1) `Data::ListSlice`
+views over the flat backing list instead of copying tails, and `List.range`
+lowers to linear `Intrinsic::ListRange`. `flick-model/tests/model/memory_stage2.rs`
+pins 89/91 `tests/run/model.txt` cases (all except the two dynamic `Layer.effect`
+cases deferred to Stage 4), newly unlocked Stage 2 `tests/run` and `tests/rt`
+cases, and fuel-prefix sweeps with external aliases across destructuring,
+mutation/loops/finalizers, `Option?`, lazy `Seq`, `control` handlers, `Lazy`,
+`Resource`/`Exit`, `Record.*`, and bounded-memory deep recursion. `memory_inventory.rs`
+provides a live repeatable inventory across `tests/run`, `tests/rt`, `docs`,
+and `tests/language` in both debug and release profiles. The Lean local-token
+and whole-pass theorems (`Formal/MemoryPass.lean`, `Formal/MemoryInsert.lean`)
+remain unaffected because every added `Operation` uses only consuming operands
+with no new `Exit` variant; full heap, continuation, and finalizer soundness
+remain outside the Lean proofs.
+
+Stage 3 extends the counted path across pure and pure-effect standard-library
+modules (`packages/core` and `packages/std`, including `Bytes`, `Chunk`,
+`HashMap`, `HashSet`, `Json`, `JsonPointer`, `JsonPatch`, `Decimal`, `RegExp`,
+`Duration`, `Exit`, `Cause`, `Path`, `DateTime`, `Cron`, `Graph`, `Schema`,
+`Codec`, `Check`, `JsonSchema`, `Route`, `Differ.json_patch`, `Optic`, `Open`,
+`ByteSize`, and the deterministic `Test`/`Gen`/`Arbitrary` counted runner).
+Lexical `scope` close concatenates failing finalizers (`⧺`) and joins the body
+cause with finalizer failures via deduplicating `Cause.combine` (`⊕`) without
+electing defects, while `try` and `Resource.bracket` elect typed failures beside
+a defect (`elect`). `memory_stage3a.rs`, `memory_stage3b.rs`,
+`memory_stage3b_more.rs`, `memory_stage3c.rs`, and `memory_language.rs` pin the
+unlocked corpus fixtures, 23/25 `tests/language` suites (leaving `Effects` and
+`Concurrency` for Stage 4), and exhaustive fuel-prefix sweeps with zero leaks.
+Because Stage 3 only adds consuming `Intrinsic` variants and ordinary lowered
+Flick helpers without changing `Operation` or `Exit`, `Formal/MemoryPass.lean`
+and `Formal/MemoryInsert.lean` remain unaffected; primitive implementations and
+counted heap execution remain tested rather than Lean-proved.
+
+Stage 4 extends the counted path with the cooperative single-threaded async,
+fiber, layer, synchronization, STM, observability, configuration, arbitrary,
+and streaming runtime (`memory_stage4a.rs`, `memory_stage4b.rs`,
+`memory_stage4c.rs`, `memory_stage4d.rs`, `memory_stage4e.rs`, plus all 26/26
+`tests/language` suites in `memory_language.rs` and all 91/91 `tests/run/model.txt`
+cases in `memory_stage2.rs`). Cooperative fiber scheduling enforces G7g
+(interruption skips ordinary `try` error/operation handlers and runs finalizers
+in LIFO order before retiring scope arenas), inherits `OpClass::Tail` handler
+operations across spawned child fibers, keeps pure `Ref.modify` callbacks
+atomic against quantum preemption, and implements shared single-flight `Lazy`
+execution (`Pending`/`Running`/`DoneOk`/`DoneCause`) with waiter handoff on
+interruption and pure-abort reset. Like Stage 3, Stage 4 adds only consuming
+`Intrinsic` variants (`AsyncIntrinsic`, `LayerIntrinsic`, `CryptoIntrinsic`,
+`ConfigIntrinsic`, `ArbitraryIntrinsic`, `OutcomeIntrinsic`) and pure lowered
+Flick templates without changing `Operation` or `Exit`, so
+`Formal/MemoryPass.lean` and `Formal/MemoryInsert.lean` remain unaffected;
+cooperative scheduling, concurrency, and primitive semantics remain tested
+rather than Lean-proved. The remaining unsupported corpus cases are exclusively
+explicit host/FFI/UI/HTTP/RPC/FileSystem/CLI/`Reactivity.Atom`/`.mjs` surfaces
+plus `effect/host_services` (which asserts host OS `PATH` in `Platform.vars ()`).
 
 ## 2. Owned tokens and objects
 
@@ -509,7 +568,7 @@ Its host primitives are intrinsics on a fixed host, the same as the
 evaluator's natives: `stdoutLine` and `stdoutWrite` write the captured
 stdout, `stderrLine` borrows its text and writes nothing, `platformEnv`
 allocates `None`, `platformVars` and `platformArgs` an empty list, the wall clock reads
-1 700 000 000 000 ms and the same instant in nanoseconds, the monotonic clock
+1 750 000 000 000 ms and the same instant in nanoseconds, the monotonic clock
 0 ns, and every `flickNext` draw is 0.5. The host has no processes:
 `processSpawn` stops the run as an unsupported operation. `platformEnv`, `platformVars` and `platformArgs` allocate their result
 afresh in Flick's representation, which discharges the host result copy and
@@ -684,9 +743,12 @@ tuple consumers, named tasks, callback/task results, pipes and higher-rank
 scope entry. `memory_lexical_owners.rs` sweeps fuel cuts in both profiles,
 retaining an independent caller root and checking actual heap/arena balance.
 `arena_layer_finalizers.fl` requires the caller's finalizer to run after
-the provider returns, while its arena is still readable. The counted runner
-still rejects scope finalizers instead of erasing their effects; completing this path
-for the whole corpus remains an M1/M2 obligation.
+the provider returns, while its arena is still readable; the counted runner
+now executes LIFO scope finalizers (`Scope.add_finalizer`, `add_finalizer_exit`,
+`defer`, `Resource.acquire_release`, `bracket`) before retiring scope arenas
+and runs `arena_finalizers.fl` and `arena_layer_finalizers.fl` in both profiles
+with zero leaks. Concurrent/cancellable finalizer and child-fiber phases
+remain Stage 4 obligations for the whole corpus.
 
 `Formal/MemoryScopes.lean` models one private storage-object owner per arena
 and arbitrarily many strong slots, rather than one cell object per slot.

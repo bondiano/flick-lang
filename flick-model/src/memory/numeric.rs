@@ -1,6 +1,8 @@
 //! Primitive ordering and the canonical rt/Go hashes, borrowing staged roots.
 use std::cmp::Ordering;
 
+use flick_core::ir::memory::HashIntrinsic;
+
 use super::super::{Data, Error, Heap, Value, charge, tagged_boundary};
 use super::{bigint_order, normalize_bigint, unsupported};
 
@@ -26,6 +28,18 @@ pub(super) fn compare(
                 (Data::String(a), Data::String(b)) => {
                     charge(fuel, a.len().saturating_add(b.len()))?;
                     a.encode_utf16().cmp(b.encode_utf16())
+                }
+                (Data::Utf16(a), Data::Utf16(b)) => {
+                    charge(fuel, a.len().saturating_add(b.len()))?;
+                    a.cmp(b)
+                }
+                (Data::String(a), Data::Utf16(b)) => {
+                    charge(fuel, a.len().saturating_add(b.len()))?;
+                    a.encode_utf16().cmp(b.iter().copied())
+                }
+                (Data::Utf16(a), Data::String(b)) => {
+                    charge(fuel, a.len().saturating_add(b.len()))?;
+                    a.iter().copied().cmp(b.encode_utf16())
                 }
                 (Data::BigInt(a), Data::BigInt(b)) => {
                     let a = normalize_bigint(a, |work| charge(fuel, work))?;
@@ -58,6 +72,7 @@ pub(super) fn hash(heap: &Heap, value: &Value, fuel: &mut u64) -> Result<i32, Er
         Value::Unit => signed(optimize(mix(hash_string("undefined", fuel)?))),
         Value::Object(token) => match &heap.object(token.id)?.data {
             Data::String(text) => signed(hash_string(text, fuel)?),
+            Data::Utf16(units) => signed(hash_utf16(units, fuel)?),
             Data::BigInt(text) => {
                 let decimal = normalize_bigint(text, |work| charge(fuel, work))?;
                 signed(hash_string(&decimal, fuel)?)
@@ -94,8 +109,12 @@ pub(super) fn hash(heap: &Heap, value: &Value, fuel: &mut u64) -> Result<i32, Er
 fn hash_string(text: &str, fuel: &mut u64) -> Result<u32, Error> {
     charge(fuel, text.len())?;
     let units: Vec<_> = text.encode_utf16().collect();
+    hash_utf16(&units, fuel)
+}
+
+fn hash_utf16(units: &[u16], fuel: &mut u64) -> Result<u32, Error> {
     let mut hash = 5381_u32;
-    for unit in units.into_iter().rev() {
+    for &unit in units.iter().rev() {
         charge(fuel, 1)?;
         hash = hash.wrapping_mul(33) ^ u32::from(unit);
     }
@@ -150,4 +169,52 @@ fn combine(left: u32, right: u32) -> u32 {
     mix(left
         .wrapping_mul(0x9e37_79b1)
         .wrapping_add(right.wrapping_mul(0x85eb_ca6b)))
+}
+
+fn hamt_walk_key(h: i32) -> u64 {
+    let u = unsigned(h);
+    let mut key = 0_u64;
+    let mut shift = 0;
+    while shift < 35 {
+        key = (key << 5) | u64::from((u.checked_shr(shift).unwrap_or(0)) & 31);
+        shift += 5;
+    }
+    key
+}
+
+pub(super) fn hash_op(
+    heap: &mut Heap,
+    op: HashIntrinsic,
+    args: &[Value],
+    fuel: &mut u64,
+) -> Result<Value, Error> {
+    charge(fuel, 1)?;
+    match op {
+        HashIntrinsic::Optimize => {
+            let Value::Int(n) = args[0] else {
+                return Err(Error::ExpectedInt);
+            };
+            Ok(Value::Int(signed(optimize(unsigned(n)))))
+        }
+        HashIntrinsic::Combine => {
+            let (Value::Int(b), Value::Int(self_val)) = (&args[0], &args[1]) else {
+                return Err(Error::ExpectedInt);
+            };
+            Ok(Value::Int(signed(combine(
+                unsigned(*self_val),
+                unsigned(*b),
+            ))))
+        }
+        HashIntrinsic::WalkCompare => {
+            let (Value::Int(a), Value::Int(b)) = (&args[0], &args[1]) else {
+                return Err(Error::ExpectedInt);
+            };
+            let tag = match hamt_walk_key(*a).cmp(&hamt_walk_key(*b)) {
+                Ordering::Less => "Prelude.Ordering.LT",
+                Ordering::Equal => "Prelude.Ordering.EQ",
+                Ordering::Greater => "Prelude.Ordering.GT",
+            };
+            heap.construct(tag, vec![])
+        }
+    }
 }

@@ -349,6 +349,7 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
                 if let Some(export) = actual.find(Namespace::Type, name) {
                     let mut export = export.clone();
                     if let Some(def) = &mut export.definition {
+                        def.variance.clear();
                         def.form = manifest.as_ref().map_or(Form::NOMINAL, |ty| Form::Alias {
                             params: params.iter().map(|p| p.name.clone()).collect(),
                             body: substitute_type_kinds(&ty.substitute(&subst), &kinds),

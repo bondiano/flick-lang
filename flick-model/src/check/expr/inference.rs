@@ -23,7 +23,7 @@ impl Checker<'_> {
             Term::Lit(l) => Ok(lit(l)),
             Term::Lam(x, body) => self.lam(x, body),
             Term::App(f, a) => self.app(f, a),
-            Term::Let(x, sig, e1, e2) => self.let_(x, sig.as_deref(), e1, e2, None),
+            Term::Let(x, sig, e1, e2) => self.let_(e, x, sig.as_deref(), e1, e2, None),
             Term::LetRec(f, sig, lam, e2) => self.let_rec(f, sig.as_deref(), lam, e2, None),
             Term::Match(e, arms) => self.match_(e, arms, None),
             Term::Tuple(xs) => Ok(Type::Tuple(
@@ -54,6 +54,9 @@ impl Checker<'_> {
             Term::Handler(h) => self.handler(h, None),
             Term::Apply(Head::Con(c), args) if args.len() == c.arity => {
                 self.construct(c, args.iter(), e)
+            }
+            Term::Apply(Head::Const(Const::SeqIter), args) if args.len() == 1 => {
+                self.seq_iter(&args[0])
             }
             Term::Apply(head, args) => {
                 let t = match head {
@@ -95,7 +98,7 @@ impl Checker<'_> {
     /// Compiler-only context operands cannot carry arbitrary source values.
     /// Activation dynamically validates an opaque candidate; literal absence
     /// is only admitted by the inert bracket.
-    fn owner_context(&mut self, owner: &Term, raw: bool) -> Check<()> {
+    pub(in crate::check) fn owner_context(&mut self, owner: &Term, raw: bool) -> Check<()> {
         let t = self.infer(owner)?;
         let t = self.resolve(&t);
         let valid = matches!(&t, Type::App(head, _) if **head == Type::con("Fiber", "Owner"))
@@ -123,8 +126,11 @@ impl Checker<'_> {
                 self.check(body, &full)
             }
             (_, Type::Forall(s)) => {
-                let qualifier = self.qualifier(&full);
-                self.check_qualified_forall(e, s, qualifier, None)
+                let qualifier = self
+                    .hidden_qualifiers(&full)
+                    .into_iter()
+                    .fold(Caps::default(), |a, b| a.union(&b));
+                self.check_qualified_forall(e, s, qualifier, None, false)
             }
             // (Lam) against `(τ₁ →φ τ₂)^C` takes `C`, against a bare arrow `∅`
             (Term::Lam(x, body), Type::Fun(p, s, r)) => {
@@ -149,9 +155,9 @@ impl Checker<'_> {
                 let t = self.construct(c, args.iter(), e)?;
                 self.fit(e, &t, &full)
             }
-            (Term::Let(x, sig, e1, e2), _) => {
-                self.let_(x, sig.as_deref(), e1, e2, Some(&full)).map(drop)
-            }
+            (Term::Let(x, sig, e1, e2), _) => self
+                .let_(e, x, sig.as_deref(), e1, e2, Some(&full))
+                .map(drop),
             (Term::LetRec(f, sig, lam, e2), _) => self
                 .let_rec(f, sig.as_deref(), lam, e2, Some(&full))
                 .map(drop),
@@ -168,6 +174,10 @@ impl Checker<'_> {
                 self.record_against(fields, &f)
             }
             (Term::Record(fields), Type::Dict(c, args)) => self.dictionary(fields, c, args),
+            (Term::Record(fields), Type::Module(sig)) => self.check_pack_module(fields, sig),
+            (Term::Record(fields), Type::Exists(k, sig, body)) => {
+                self.check_pack_exists(fields, k, sig, body)
+            }
             (Term::With(..) | Term::Handle(..) | Term::Inside(..), _) => {
                 self.runtime_form(e, Some(&full)).map(drop)
             }
@@ -197,27 +207,30 @@ impl Checker<'_> {
     /// (Let-Sig) with `σ` a `∀`: the value is checked with rigid variables,
     /// and a runtime step while it is built is `FLICK-T013` (`docs/formal/core.md#an-annotation-with-forall-bypasses-let-sig`).
     pub(super) fn check_forall(&mut self, e: &Term, s: &Scheme) -> Check<()> {
-        self.check_qualified_forall(e, s, Caps::default(), None)
+        self.check_qualified_forall(e, s, Caps::default(), None, true)
     }
 
     /// (Let-Sig) against `(∀ᾱ. τ)^C`: the value has `τ^C`. A signed `let
     /// rec` binds `f` in `e` at `own`, its regions those `e` is checked at.
+    /// When `bind_tyvars` is true, the scheme's binders enter scope for local
+    /// signatures inside `e`.
     pub(super) fn check_qualified_forall(
         &mut self,
         e: &Term,
         s: &Scheme,
         qualifier: Caps,
         rec: Option<(&Name, &Scheme)>,
+        bind_tyvars: bool,
     ) -> Check<()> {
-        let (facts, givens) = (self.regions.facts.len(), self.givens());
-        let (mut body, rigid) = self.skolemize(s);
+        let (facts, givens, tyvars) = (self.regions.facts.len(), self.givens(), self.tyvars.len());
+        let (mut body, rigid) = self.skolemize(s, bind_tyvars);
         if let Some((f, own)) = rec {
             let own = own_regions(own, &s.vars, &rigid);
             self.locals.push((f.clone(), own));
         }
         self.note(e, |n| n.rigid = Some(rigid));
         if !qualifier.is_empty() {
-            body = Type::Captured(Rc::new(body), qualifier);
+            body = Self::qualify_hidden(body, &[qualifier]);
         }
         let outer = mem::replace(&mut self.stage, Stage::Pure);
         let checked = self.check(e, &body);
@@ -225,6 +238,7 @@ impl Checker<'_> {
             self.locals.pop();
         }
         let inner = mem::replace(&mut self.stage, outer);
+        self.tyvars.truncate(tyvars);
         self.regions.facts.truncate(facts);
         self.forget_givens(givens);
         checked?;

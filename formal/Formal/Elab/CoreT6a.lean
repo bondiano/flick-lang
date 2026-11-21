@@ -42,6 +42,7 @@ def typingTarget (hR : Real P Sg N) : Target P where
   inst := has_inst hR
   strct := has_strct hR
   prim := has_prim hR
+  dictLe := has_dictLe hR
   St := Unit
   load _ := ()
   Step _ _ := False

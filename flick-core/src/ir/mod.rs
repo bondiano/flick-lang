@@ -16,11 +16,13 @@ pub(crate) use flick_backend_support::reach;
 
 pub use exports::exports;
 pub use flick_ir::{
-    Adapter, Arm, BinOp, Binding, Copies, Expr, ExprKind, Foreign, ForeignMode, Handled, Handler,
-    Item, ItemKind, Label, LangItem, Lit, Module, OpArm, Param, Pat, ResultAdapter, Stage, Stmt,
-    TypeName, memory, operation_arity,
+    Adapter, Arm, BinOp, Binding, Copies, EnumLit, Expr, ExprKind, Foreign, ForeignMode, Handled,
+    Handler, Item, ItemKind, JsClass, Label, LangItem, Lit, Module, OpArm, Param, Pat, Rep,
+    ResultAdapter, Stage, Stmt, TypeName, memory, operation_arity,
 };
 pub use lower::lower;
+#[cfg(not(target_arch = "wasm32"))]
+pub use lower::lower_with_local_schemes;
 pub use lower::proofs::{LoweredProof, Proven, Run, check_proofs, laws_of, lower_proofs};
 pub use print::print;
 

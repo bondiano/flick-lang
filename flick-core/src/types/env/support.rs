@@ -11,7 +11,7 @@ use crate::types::services::impl_def;
 #[derive(Debug)]
 pub(super) enum CompanionRole {
     Class,
-    Service(TypeDef),
+    Service(Box<TypeDef>),
 }
 
 impl Env<'_> {
@@ -183,7 +183,7 @@ impl Env<'_> {
                     }
                     if let Some(derived) = impl_def(definition) {
                         self.support_roles
-                            .insert(entity.clone(), CompanionRole::Service(derived));
+                            .insert(entity.clone(), CompanionRole::Service(Box::new(derived)));
                         let mut implementation = entity.clone();
                         implementation.name.push_str(".Impl");
                         self.support_authorities.insert(implementation);
@@ -344,9 +344,10 @@ impl Env<'_> {
                 }
                 CompanionRole::Service(expected) => {
                     companion.name.push_str(".Impl");
-                    if (&companion == entity && definition != expected)
+                    if (&companion == entity && definition != expected.as_ref())
                         || (owner == entity
-                            && impl_def(definition).is_some_and(|actual| actual != *expected))
+                            && impl_def(definition)
+                                .is_some_and(|actual| actual != *expected.as_ref()))
                     {
                         return Err(format!(
                             "conflicting service support for {}.{}",

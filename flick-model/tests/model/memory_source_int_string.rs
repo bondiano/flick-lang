@@ -52,6 +52,69 @@ let main () =
 }
 
 #[test]
+fn int_parse_uses_ecmascript_whitespace_and_32_bit_signed_bounds() {
+    success(
+        r#"module App.IntParse exposing (main)
+main : Unit ->{Host.Console} Unit
+let main () =
+  let cases = [
+    "\u{FEFF}36",
+    "36\u{FEFF}",
+    "\u{FEFF}36\u{00A0}",
+    "\u{00A0}36\u{FEFF}",
+    " \t\n\u{000B}\u{000C}\r 36 \r\u{000C}\u{000B}\n\t ",
+    "\u{0085}36",
+    "36\u{0085}",
+    "3 6",
+    "3\u{00A0}6",
+    "3\u{FEFF}6",
+    "+ 36",
+    "- 36",
+    "",
+    "   ",
+    "+",
+    "-",
+    "+36",
+    "-36",
+    "-0",
+    "+0",
+    "-2147483648",
+    "-2147483649",
+    "2147483647",
+    "2147483648",
+  ]
+  List.each_effect (fun s -> Platform.stdout_line (show (Int.parse s))) cases
+"#,
+        concat!(
+            "Some 36\n",
+            "Some 36\n",
+            "Some 36\n",
+            "Some 36\n",
+            "Some 36\n",
+            "None\n",
+            "None\n",
+            "None\n",
+            "None\n",
+            "None\n",
+            "None\n",
+            "None\n",
+            "None\n",
+            "None\n",
+            "None\n",
+            "None\n",
+            "Some 36\n",
+            "Some -36\n",
+            "Some 0\n",
+            "Some 0\n",
+            "Some -2147483648\n",
+            "None\n",
+            "Some 2147483647\n",
+            "None\n",
+        ),
+    );
+}
+
+#[test]
 fn string_length_counts_utf16_units_without_normalizing_text() {
     success(
         r#"module App.TextLength exposing (main)

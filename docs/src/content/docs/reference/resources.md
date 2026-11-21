@@ -253,13 +253,15 @@ most the graceful shutdown timeout. Run cases:
 
 A finalizer of a scope, the release of `Resource.acquire_release` and the
 close of an owned value run when the scope closes, after its handlers may
-have let the body go, so they perform no `control` operation
+have let the body go, so they perform no `control` or `abort` operation
 (`Detached`, `FLICK-E017`). The cleanup of `Effect.ensuring`,
 `Effect.on_exit`, `Effect.on_interrupt` and the release of
 `Resource.bracket` runs in the fiber of the body, right after it, and may:
 
 - when the body ended with a value, a typed error or a defect, the cleanup
-  runs as any code, and its operations are answered;
+  runs as any code, and its operations are answered (if a defect and an
+  `abort` combine, the defect wins cleanly without being swallowed by the
+  `abort` handler);
 - when the body was interrupted, or an `abort` (or a `control` arm that let
   it go) unwinds through it, a `control` operation of a handler around the
   cleanup is cut off: its arm does not run and the cleanup stops there,

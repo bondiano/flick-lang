@@ -265,7 +265,7 @@ fn with_library(name: &str, emit: &str) -> PathBuf {
             ("lib/src/Lib/greet.go", GREET_GO),
             (
                 "app/flick.toml",
-                &format!("{LIB_APP}\n[build]\nemit = \"{emit}\"\n"),
+                &format!("{LIB_APP}\n[build]\ntarget = \"{emit}\"\n"),
             ),
             ("app/src/Main.fl", LIB_MAIN),
         ],

@@ -53,7 +53,7 @@ fn higher_order_templates_run_offline_without_package_sources_on_js_and_go() {
                     &[
                         "build",
                         "--offline",
-                        "--emit",
+                        "--target",
                         emit,
                         "--profile",
                         profile,

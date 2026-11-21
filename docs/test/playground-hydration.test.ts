@@ -31,7 +31,7 @@ let compiled: Promise<Playground> | undefined;
 const compile = (): Promise<Playground> => compiled ??= (async () => {
   const out = path.join(repo, "target/tmp/playground-hydration");
   rmSync(out, { recursive: true, force: true });
-  execFileSync(flick, ["build", path.join(here, "../src/playground/Playground.fl"), "--project", path.join(here, "../src/playground"), "--out-dir", out, "--rt", "--color", "never"]);
+  execFileSync(flick, ["build", path.join(here, "../src/playground/Playground.fl"), "--project", path.join(here, "../src/playground"), "--out-dir", out, "--runtime", "rt", "--color", "never"]);
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the compiled module exports what `Playground.fl` exposes
   return (await import(pathToFileURL(path.join(out, "Playground.js")).href)) as Playground;
 })();

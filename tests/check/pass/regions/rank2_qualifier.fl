@@ -1,0 +1,198 @@
+// A called rank-2 or curried parameter is accepted when its qualifier outlives
+// the owner, when it has no region capture, or when used within its live scope;
+// closed-row curried/rank-2 qualified expectations allow using their region.
+module App.Rank2QualifierPass exposing (..)
+
+type Handle (s : Region) = Handle
+
+open_handle : Unit ->{Scope s} Handle s
+let open_handle () = Handle
+
+use_handle : Handle s ->{} Unit
+let use_handle _ = ()
+
+make_release : Handle s -> (forall e b. Unit -> Exit e b ->{} Unit)^{s}
+let make_release h = fun _ _ -> use_handle h
+
+// With Fiber.Outlives c s: direct call, partial application, inner forall, Eff, Lazy
+rank2_outlives :
+  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
+  a -> (forall e b. a -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let rank2_outlives v f =
+  Scope.defer (fun exit ->
+    f v exit
+    ()
+  )
+
+rank2_partial_outlives :
+  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
+  a -> (forall e b. a -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let rank2_partial_outlives v f = Scope.defer (f v)
+
+rank2_let_outlives :
+  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
+  a -> (forall e b. a -> Exit e b ->{r} Unit)^c ->{Scope s | r} Unit
+let rank2_let_outlives v f =
+  let g = f v
+  Scope.defer (fun exit ->
+    g exit
+    ()
+  )
+
+inner_forall_outlives :
+  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
+  a -> (a -> (forall e b. Exit e b ->{r} Unit))^c ->{Scope s | r} Unit
+let inner_forall_outlives v f = Scope.defer (f v)
+
+rank2_eff_outlives :
+  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
+  a -> (forall x. a -> x -> Eff r none Unit)^c ->{Scope s | r} Unit
+let rank2_eff_outlives v f =
+  Scope.add_finalizer (f v 1)
+  Scope.defer (fun _ -> await (f v 1))
+
+rank2_lazy_outlives :
+  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
+  a -> (forall x. a -> x -> Lazy {Async | r} none Unit)^c ->{Scope s, Async | r} Unit
+let rank2_lazy_outlives v f = Scope.defer (fun _ -> await (f v 1))
+
+// Pure rank-2 without any region capture
+rank2_no_capture :
+  (Detached r, Fiber.Provided r s) =>
+  a -> (forall e b. a -> Exit e b ->{r} Unit) ->{Scope s | r} Unit
+let rank2_no_capture v f =
+  Scope.defer (fun exit ->
+    f v exit
+    ()
+  )
+
+// Used inside its own live scope (same owner)
+defer_same_scope : Unit ->{} Unit
+let defer_same_scope () = scope {
+  let h = open_handle ()
+  let f = make_release h
+  Scope.defer (fun exit ->
+    f () exit
+    ()
+  )
+  Scope.defer (f ())
+}
+
+// Passing a captured rank-2 value to rank2_outlives inside its own scope
+subsumed_rank2 : Unit ->{} Unit
+let subsumed_rank2 () = scope {
+  let h = open_handle ()
+  let f = make_release h
+  rank2_outlives () f
+}
+
+// Closed-row curried / rank-2 / Eff-returning lambdas against qualified types
+take_curried : (Int -> Unit ->{} Unit)^c ->{} Unit
+let take_curried f = f 1 ()
+
+take_curried_eff : (Int -> Eff none none Unit)^c ->{} Unit
+let take_curried_eff f = await (f 1)
+
+take_rank2_closed : (forall e b. Int -> Exit e b ->{} Unit)^c ->{} Unit
+let take_rank2_closed f = f 1 (Exit.succeed ())
+
+closed_row_callbacks : Handle s ->{} Unit
+let closed_row_callbacks h =
+  take_curried (fun _ () -> use_handle h)
+  take_curried (fun _ -> fun () -> use_handle h)
+  take_curried_eff (fun _ -> task { use_handle h })
+  take_rank2_closed (fun _ _ -> use_handle h)
+
+// Ref storing curried closures whose type explicitly keeps the region live
+keeps_curried : Handle s -> Ref ((Int -> Unit ->{} Unit)^{s}) ->{} Unit
+let keeps_curried h cell = Ref.set cell (fun _ () -> use_handle h)
+
+// Resource.make with a closed-row release callback using an outer handle
+resource_make_outer_handle : Unit ->{} Unit
+let resource_make_outer_handle () = scope {
+  let h = open_handle ()
+  scope {
+    let _ = Resource.make (task { () }) (fun _ _ -> use_handle h)
+    ()
+  }
+}
+
+// Value-bounded record and acquired curried callables accepted when outliving / in scope
+record_rank2_outlives :
+  (Detached r, Fiber.Provided r s, Fiber.Outlives c s) =>
+  a -> ({ cb : forall e b. a -> Exit e b ->{r} Unit })^c ->{Scope s | r} Unit
+let record_rank2_outlives v box =
+  Scope.defer (fun exit ->
+    box.cb v exit
+    ()
+  )
+
+acquired_curried_in_scope : Unit ->{} Unit
+let acquired_curried_in_scope () = scope {
+  let f = Resource.acquire_release (task { fun (_ : Int) () -> () }) (fun _ -> ())
+  f 1 ()
+}
+
+// Checked `lazy` against qualified `Lazy`, Ref storage, and `Lazy` qualifier widening
+keeps_lazy : Handle s -> Ref ((Lazy none none Unit)^{s}) ->{} Unit
+let keeps_lazy h cell = Ref.set cell (lazy { use_handle h })
+
+checked_lazy_qualified : Handle s ->{} (Lazy none none Unit)^{s}
+let checked_lazy_qualified h = lazy { use_handle h }
+
+widen_lazy_qualifier : (Lazy {Async} none Unit)^{s} -> (Lazy {Async} none Unit)^{s, t}
+let widen_lazy_qualifier l = l
+
+// Curried / rank-2 qualifier subsumption in both directions without eta-expansion
+adapt_inner_to_outer : (Int -> (Unit ->{} Unit)^c) -> (Int -> Unit ->{} Unit)^c
+let adapt_inner_to_outer f = f
+
+adapt_outer_to_inner : (Int -> Unit ->{} Unit)^c -> (Int -> (Unit ->{} Unit)^c)
+let adapt_outer_to_inner f = f
+
+adapt_rank2_inner_to_outer :
+  (forall e b. Int -> (Exit e b ->{} Unit)^c) -> (forall e b. Int -> Exit e b ->{} Unit)^c
+let adapt_rank2_inner_to_outer f = f
+
+adapt_rank2_outer_to_inner :
+  (forall e b. Int -> Exit e b ->{} Unit)^c -> (forall e b. Int -> (Exit e b ->{} Unit)^c)
+let adapt_rank2_outer_to_inner f = f
+
+make_curried : Handle s -> Int -> (Unit ->{} Unit)^{s}
+let make_curried h _ = fun () -> use_handle h
+
+call_make_curried : Handle s ->{} Unit
+let call_make_curried h = take_curried (make_curried h)
+
+// Dual outer + inner qualifiers on curried and rank-2 callables are reflexive
+// and allow using both regions
+id_dual_curried : (Int -> (Unit ->{} Unit)^{t})^{s} -> (Int -> (Unit ->{} Unit)^{t})^{s}
+let id_dual_curried f = f
+
+make_dual_curried : Handle s -> Handle t -> (Int -> (Unit ->{} Unit)^{t})^{s}
+let make_dual_curried hs ht = fun _ () ->
+  use_handle hs
+  use_handle ht
+
+id_dual_rank2 : (forall a. (a ->{} Unit)^{t})^{s} -> (forall a. (a ->{} Unit)^{t})^{s}
+let id_dual_rank2 f = f
+
+make_dual_rank2 : Handle s -> Handle t -> (forall a. (a ->{} Unit)^{t})^{s}
+let make_dual_rank2 hs ht = fun _ ->
+  use_handle hs
+  use_handle ht
+
+// Value-bounded all-pure functions fit bare pure types across all arities
+pure_record_fn : ({ f : Int -> Int })^{s} -> (Int -> Int)
+let pure_record_fn box = box.f
+
+pure_record_curried : ({ f : Int -> Int -> Int })^{s} -> (Int -> Int -> Int)
+let pure_record_curried box = box.f
+
+pure_record_rank2 : ({ f : forall a. a -> a })^{s} -> (forall a. a -> a)
+let pure_record_rank2 box = box.f
+
+// Storing a value-bounded curried callable into a cell whose type keeps the region live
+stash_record_curried_qualified :
+  Ref ((Int -> Unit ->{} Unit)^{s}) -> ({ f : Int -> Unit ->{} Unit })^{s} ->{} Unit
+let stash_record_curried_qualified cell box = Ref.set cell box.f

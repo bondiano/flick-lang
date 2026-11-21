@@ -25,7 +25,7 @@ fn native_service_declarations_pass_tsc_without_effect_types() {
         "module Lib.Service exposing (Greeter)\nservice Greeter =\n  hello : String ->{} String\n",
     )
     .expect("source");
-    let built = flick_in(&dir, &["build", "--emit-dts"]);
+    let built = flick_in(&dir, &["build", "--declarations"]);
     assert!(built.status.success(), "{built:?}");
     let declaration = fs::read_to_string(dir.join("dist/Lib/Service.d.ts")).expect("declaration");
     assert!(!declaration.contains("$Context"), "{declaration}");

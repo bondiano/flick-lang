@@ -184,7 +184,7 @@ would be left to whoever serves it.
 
 ## On the go target
 
-A server entry built with `emit = "go"` serves `server fn` as one built
+A server entry built with `[build] target = "go"` (or `--target go`) serves `server fn` as one built
 for the js target does: `Server.handler` answers the same POSTs of
 `Server.path`, calls made in its process run in memory, and its other
 calls go to the origin of `Server.with_origin`. So a Go backend serves a

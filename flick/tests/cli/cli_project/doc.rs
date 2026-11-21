@@ -255,3 +255,51 @@ fn doc_builtin_reexport_keeps_comment_without_inventing_project_source_url() {
     assert!(page.contains(&comment), "{page}");
     assert!(!page.contains("[Source]"), "{page}");
 }
+
+#[test]
+fn doc_includes_inferred_data_variance() {
+    let source = "\
+module Lib.Var exposing (Box, Sink, Pair(..), Plain(..), Alias)
+
+/// A covariant opaque container.
+opaque type Box a = Box { value : a }
+
+opaque type Sink a = Sink (a -> Unit)
+
+type Pair a b = Pair (a -> b)
+
+type Plain = Plain Int
+
+type alias Alias a = List a
+";
+    let dir = project(
+        "cli_doc_variance",
+        &[("flick.toml", LIB), ("src/Lib/Var.fl", source)],
+    );
+    let out = flick_in(&dir, &["doc", "--out-dir", "api"]);
+    assert_eq!(code(&out), Some(0), "{out:?}");
+    let page = fs::read_to_string(dir.join("api/Lib.Var.md")).expect("page");
+    for expected in [
+        "### `Box`\n\nA covariant opaque container.\n\nKind: `Type -> Type`\n\nVariance: `a` (`+`, covariant)",
+        "### `Sink`\n\nKind: `Type -> Type`\n\nVariance: `a` (`-`, contravariant)",
+        "### `Pair`\n\nKind: `Type -> Type -> Type`\n\nVariance: `a` (`-`, contravariant), `b` (`+`, covariant)",
+    ] {
+        assert!(page.contains(expected), "`{expected}` in\n{page}");
+    }
+    let plain_section = page
+        .split("### `Plain`")
+        .nth(1)
+        .expect("Plain")
+        .split("### ")
+        .next()
+        .expect("section");
+    assert!(!plain_section.contains("Variance:"), "{plain_section}");
+    let alias_section = page
+        .split("### `Alias`")
+        .nth(1)
+        .expect("Alias")
+        .split("### ")
+        .next()
+        .expect("section");
+    assert!(!alias_section.contains("Variance:"), "{alias_section}");
+}

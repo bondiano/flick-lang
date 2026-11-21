@@ -53,6 +53,19 @@ inductive LeLive (S : Sig) : Ty → Ty → Prop
       (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' → S.hidden T ≠ some j →
         S.var T j = .inv → Ty.Equiv u u') →
       a = Ty.tcon T us → b = Ty.tcon T us' → LeLive S a b
+  /-- A dictionary record `D_C ūs` compares its arguments by the variance of each class
+  parameter (`Sig.dictVar`, regions.md §2.2.1): `+` covariantly, `-` contravariantly while
+  keeping reach, `inv` and `bi` by exact type equivalence. -/
+  | dict {c : Nat} {us us' : List Ty} : us.length = us'.length →
+      (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' →
+        S.dictVar c j = .pos → LeLive S u u') →
+      (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' →
+        S.dictVar c j = .neg → LeLive S u' u) →
+      (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' →
+        S.dictVar c j = .neg → Caps.Sub u.reach u'.reach) →
+      (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' →
+        (S.dictVar c j = .inv ∨ S.dictVar c j = .bi) → Ty.Equiv u u') →
+      LeLive S (.dict c (Ty.spine us)) (.dict c (Ty.spine us'))
 
 /-- A type application or a type name. -/
 def Ty.isData : Ty → Bool
@@ -70,9 +83,9 @@ theorem Ty.tcon_isData (T : Name) (us : List Ty) : (Ty.tcon T us).isData = true 
   Ty.foldl_tapp_isData us _ rfl
 
 /-- A type that subtyping relates only to equivalent types: not an arrow,
-a computation, a record field or data. -/
+a computation, a record field, data, or a dictionary. -/
 def Ty.isPlain : Ty → Bool
-  | .arrow .. | .eff .. | .rcons .. | .adt _ | .tapp _ _ => false
+  | .arrow .. | .eff .. | .rcons .. | .adt _ | .tapp _ _ | .dict .. => false
   | _ => true
 
 theorem Ty.ne_tcon_of_plain {t : Ty} (h : t.isPlain = true) {T : Name} {us : List Ty} :
@@ -89,6 +102,9 @@ theorem Ty.eff_ne_tcon {r e t C T us} : Ty.eff r e t C ≠ Ty.tcon T us := by
   intro h; have := Ty.tcon_isData T us; rw [← h] at this; simp [Ty.isData] at this
 
 theorem Ty.rcons_ne_tcon {l t r T us} : Ty.rcons l t r ≠ Ty.tcon T us := by
+  intro h; have := Ty.tcon_isData T us; rw [← h] at this; simp [Ty.isData] at this
+
+theorem Ty.dict_ne_tcon {c U T us} : Ty.dict c U ≠ Ty.tcon T us := by
   intro h; have := Ty.tcon_isData T us; rw [← h] at this; simp [Ty.isData] at this
 
 /-- Polymorphic instantiation uses live subtyping at its leaves. -/

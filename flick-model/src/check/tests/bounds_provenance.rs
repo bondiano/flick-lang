@@ -124,7 +124,7 @@ fn bound_facts_are_scoped_and_obligations_keep_only_their_original_facts() {
     let d = decls();
     let mut checker = Checker::new(&d);
     let before = checker.givens();
-    let (_, rigid) = checker.skolemize(&signature);
+    let (_, rigid) = checker.skolemize(&signature, true);
     let held = Type::Var(Var::Named(rigid[0].clone()));
     checker.hold(slice::from_ref(&held), &[], &Caps::default(), "Inst");
     checker.forget_givens(before);
@@ -148,7 +148,7 @@ fn bound_facts_do_not_chain_through_another_rigid_atom() {
     );
     let d = decls();
     let mut checker = Checker::new(&d);
-    let (_, rigid) = checker.skolemize(&signature);
+    let (_, rigid) = checker.skolemize(&signature, true);
     let held = Type::Tuple(
         rigid
             .into_iter()
@@ -286,7 +286,7 @@ fn a_capture_row_bound_is_allowed_by_the_same_capture_row() {
         vec![("a".into(), Kind::Type), ("c".into(), Kind::Captures)],
         Type::Bounded(Rc::new(a()), Caps::var(Var::Named("c".into()))),
     );
-    let (_, rigid) = checker.skolemize(&signature);
+    let (_, rigid) = checker.skolemize(&signature, true);
     checker.hold(
         &[Type::Var(Var::Named(rigid[0].clone()))],
         &[],
@@ -304,7 +304,7 @@ fn a_capture_row_bound_grows_an_open_allowance_without_inventing_a_type_atom() {
         vec![("a".into(), Kind::Type), ("c".into(), Kind::Captures)],
         Type::Bounded(Rc::new(a()), Caps::var(Var::Named("c".into()))),
     );
-    let (_, rigid) = checker.skolemize(&signature);
+    let (_, rigid) = checker.skolemize(&signature, true);
     let allowed = checker.fresh_caps();
     checker.hold(
         &[Type::Var(Var::Named(rigid[0].clone()))],
@@ -420,4 +420,29 @@ fn signature_elision_does_not_require_live_for_a_capture_free_scalar() {
         panic!("a function signature remains a function");
     };
     assert_eq!(stage, rt());
+}
+
+#[test]
+fn subsume_forall_assumes_expected_provided_and_rejects_missing_service() {
+    let greeter = Row::one(Path::new("App", "Greeter"));
+    let log = Row::one(Path::new("App", "Log"));
+    let both = greeter.sum(&log).expect("distinct services");
+    let lookup = |services: &Row| {
+        let region = Type::Var(Var::Named("t".into()));
+        let mut row = services.clone();
+        row.elems
+            .insert(Path::new("Prelude", "Scope"), Rc::from([region.clone()]));
+        Type::Forall(Rc::new(Scheme::new(
+            vec![("t".into(), Kind::Region)],
+            Type::fun(ty("Unit"), Stage::Runtime(row, Row::none()), ty("Unit"))
+                .with_provided(services, &region),
+        )))
+    };
+    let d = decls();
+    let mut checker = Checker::new(&d);
+    assert_eq!(checker.subsume(&lookup(&greeter), &lookup(&both)), Ok(()));
+    assert_eq!(checker.finish(), Ok(()));
+
+    let mut checker = Checker::new(&d);
+    rejected_by(checker.subsume(&lookup(&both), &lookup(&greeter)), "⊆");
 }

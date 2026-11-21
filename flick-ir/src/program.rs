@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use crate::{FileId, LangItem, Module};
 
 /// The version of the IR this crate reads and writes.
-pub const VERSION: &str = "0.12.0";
+pub const VERSION: &str = "0.13.0";
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Program {
@@ -331,9 +331,10 @@ mod tests {
         assert!(!compatible("0.1"));
         assert!(!compatible("0.10.0"));
         assert!(!compatible("0.11.0"));
+        assert!(!compatible("0.12.0"));
         let mut p = program(1.0);
-        p.ir_version = "0.13.0".to_owned();
-        let found = "0.13.0".to_owned();
+        p.ir_version = "0.14.0".to_owned();
+        let found = "0.14.0".to_owned();
         assert_eq!(
             Program::from_json(&p.to_json()),
             Err(Error::Version { found })

@@ -3,6 +3,7 @@ import Formal.Elab.T6a
 import Formal.Elab.Coherence
 import Formal.Elab.CoreT6a
 import Formal.Elab.CoreRun
+import Formal.Elab.ClassVariance
 import Formal.LetMut
 import Formal.LetMut.LazyWitness
 import Formal.Live.T4Live
@@ -80,6 +81,34 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Elab.T6b_core' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Elab.T6b_core
+
+/-- info: 'Flick.Elab.inferClassVar_sound' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Elab.inferClassVar_sound
+
+/-- info: 'Flick.Elab.Prog.ClsVarOk.super_serves' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Elab.Prog.ClsVarOk.super_serves
+
+/-- info: 'Flick.Elab.dict_transport' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Elab.dict_transport
+
+/-- info: 'Flick.Elab.closed_unique_common' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Elab.closed_unique_common
+
+/-- info: 'Flick.Elab.Cn.Serves.tr' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Elab.Cn.Serves.tr
+
+/-- info: 'Flick.Elab.has_dictLe' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Elab.has_dictLe
+
+/-- info: 'Flick.Elab.T6a_safeUse' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Elab.T6a_safeUse
 
 /-- info: 'Flick.T7' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in

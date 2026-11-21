@@ -2,7 +2,7 @@
 title: "FLICK-P030"
 ---
 
-`emit = "go"` builds the program for the go target, and it imports a module
+`target = "go"` builds the program for the go target, and it imports a module
 that exists on the js target only, or a package module no build compiled for
 go. The browser UI (`Ui`, `Atom`, `Reactivity.Atom`, `Action`),
 `Otlp`, `DevTools`, JS interop (`Js`) and the JS hosts (`Runner.Node`,
@@ -13,5 +13,5 @@ Remove the import, or build the project for the js target:
 
 ```toml
 [build]
-emit = "js"
+target = "js"
 ```

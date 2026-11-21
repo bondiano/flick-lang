@@ -189,6 +189,7 @@ fn nominal_row_source(owner: &str) -> Interface {
                         operations: Vec::new(),
                         effect: false,
                     },
+                    variance: Vec::new(),
                 })),
             },
         ],

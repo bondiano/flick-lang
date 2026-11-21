@@ -1,13 +1,13 @@
 //! Iterable `for` / `each` control loops, match arm continuations, and state thunks.
 use super::super::Tr;
 use super::super::expr::{cond, pat};
-use super::{list_step, none, result, rpat, some, state_function, state_pattern};
+use super::{none, result, rpat, seq_iter, seq_step, some, state_function, state_pattern};
 use crate::syntax::{Arm, Name, Pat, Term};
 use flick_core::ir;
 use std::iter;
 use std::rc::Rc;
 
-impl Tr {
+impl Tr<'_> {
     pub(in crate::translate) fn source_for(
         &mut self,
         id: &str,
@@ -76,12 +76,12 @@ impl Tr {
         let nested = self.control_loops.len() > 1;
         let name = self.fresh("each");
         let arg = self.fresh("state");
-        let list = self.fresh("list");
+        let seq = self.fresh("seq");
         let head = self.fresh("head");
         let tail = self.fresh("tail");
         let task = self.iteration_effectful(body);
         let call = |t| if task { Term::Await(Rc::new(t)) } else { t };
-        let initial = self.pack(source, xs);
+        let initial = self.pack(seq_iter(source), xs);
         let names: Vec<_> = xs.iter().map(|x| self.fresh(x)).collect();
         let mark = self.versions.len();
         self.versions
@@ -155,13 +155,13 @@ impl Tr {
                 },
             ]),
         );
-        let step = list_step(&list, head, tail, empty, matched);
+        let step = seq_step(&seq, head, tail, empty, matched);
         let step = if task {
             Term::Task(Rc::new(step))
         } else {
             step
         };
-        let function = state_function(&arg, Pat::Var(list), &names, step);
+        let function = state_function(&arg, Pat::Var(seq), &names, step);
         Term::LetRec(
             name.clone(),
             None,

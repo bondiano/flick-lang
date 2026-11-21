@@ -14,10 +14,15 @@ impl Checker<'_> {
     /// data with such a field (§1.2).
     pub(super) fn hidden(&self, t: &Type, seen: &mut Vec<Path>) -> bool {
         match self.resolve(t) {
-            Type::Var(_) => false,
+            Type::Var(_) | Type::Module(_) | Type::OpenedModule(..) => false,
+            Type::Bounded(t, _) => self.hidden(&t, seen),
             Type::Tuple(ts) => ts.iter().any(|t| self.hidden(t, seen)),
-            Type::Record(f) => f.fields.values().any(|t| self.hidden(t, seen)),
+            Type::Record(f) => {
+                let f = self.zonk_fields(&f);
+                f.tail.is_some() || f.fields.values().any(|t| self.hidden(t, seen))
+            }
             Type::Forall(s) => self.hidden(&s.body, seen),
+            Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => self.hidden(&b, seen),
             t @ (Type::Con(_) | Type::App(..)) => {
                 let mut args = Vec::new();
                 let mut head = t;
@@ -106,6 +111,9 @@ impl Checker<'_> {
 
     /// (Proj): a part of a value of `(T ῡ)^C` taken apart has `C` too.
     pub(in crate::check) fn project_part(&self, whole: &Type, part: Type) -> Type {
+        if self.holds_nothing(&part) {
+            return part;
+        }
         match self.follow(whole) {
             Type::Captured(t, c) | Type::Bounded(t, c)
                 if !c.is_empty() && self.hidden(&t, &mut Vec::new()) =>

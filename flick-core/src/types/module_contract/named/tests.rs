@@ -23,6 +23,7 @@ fn define(checker: &mut Checker<'_>, requirements: Vec<R>) {
         TypeDef {
             kind: Kind::Module,
             form: Form::ModuleContract { requirements },
+            variance: Vec::new(),
         },
     );
 }
@@ -39,6 +40,7 @@ fn service(operations: Vec<Operation>) -> R {
                 operations,
                 effect: false,
             },
+            variance: Vec::new(),
         })),
         methods: Vec::new(),
     }

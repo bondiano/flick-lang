@@ -5,9 +5,9 @@ use std::collections::BTreeMap;
 use flick_backend::{
     Abi, InputKind, JavascriptEntry, JavascriptFile, JavascriptProjection, Projection,
 };
-use flick_core::build::{self, EntryFacts, Settings};
+use flick_core::build::{self, Backend, EntryFacts, Settings};
 use flick_core::iface::{Interface, Namespace};
-use flick_core::project::{Compilation, config::Backend};
+use flick_core::project::Compilation;
 use flick_core::{codegen, types};
 
 use super::Prepared;

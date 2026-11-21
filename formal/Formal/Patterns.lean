@@ -48,6 +48,7 @@ theorem LeLive.res_tcon {a b : Ty} {T : Name} {us : List Ty}
     rw [Ty.tcon_res] at ha ⊢
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq ha
     exact ⟨_, rfl, hl, hr, hp, hn, hi⟩
+  | dict => exact absurd ha Ty.dict_ne_tcon
 
 theorem LeLive.res_tcon' {a b : Ty} {T : Name} {us : List Ty}
     (h : LeLive S a b) (hb : b.res = Ty.tcon T us) :
@@ -70,6 +71,7 @@ theorem LeLive.res_tcon' {a b : Ty} {T : Name} {us : List Ty}
     rw [Ty.tcon_res] at hb ⊢
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq hb
     exact ⟨_, rfl, hl, hr, hp, hn, hi⟩
+  | dict => exact absurd hb Ty.dict_ne_tcon
 
 /-- The final type of a value's spine is the pattern's, or narrower at the hidden row. -/
 def ResBelow (S : Sig) (t' t : Ty) : Prop :=
@@ -113,6 +115,7 @@ theorem LeLive.adt_eq {T : Name} {U : Ty} (h : LeLive S (.adt T) U) : U = .adt T
     subst hb
     obtain ⟨rfl, rfl⟩ := Ty.tcon_eq_adt (ha.symm.trans hX.symm)
     rw [List.eq_nil_of_length_eq_zero hl.symm]; exact hX
+  | dict => cases hX
 
 /-- A narrower spine at a type without parameters is the type. -/
 theorem SpW.adt {Z : Ty} {T : Name} (h : SpW S Z (.adt T)) : Z = .adt T := by

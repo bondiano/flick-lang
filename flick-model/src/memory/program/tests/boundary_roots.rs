@@ -20,79 +20,51 @@ fn exceptional_boundaries_use_saved_owner_not_current_selection() {
     let failure = heap
         .cause(&[Reason::Fail(&Value::Unit)], &mut 3)
         .expect("typed fixture cause");
-    let mut machine = Machine {
-        heap: &mut heap,
-        program: &program,
-        execution: 0,
-        globals: BTreeMap::new(),
-        cells: vec![],
-        owners: vec![
-            OwnerState::default(),
-            OwnerState {
-                closed: false,
-                arenas: vec![first],
-            },
-            OwnerState {
-                closed: false,
-                arenas: vec![selected],
-            },
-        ],
-        current_owner: 2,
-        current_evidence: None,
-        frames: vec![Frame {
-            recovery_id: None,
-            evidence: None,
-            block: &block,
-            at: 0,
-            locals: Locals::new(),
-            destination: Destination::CloseScope {
-                owner: 1,
-                previous: 0,
-                binding: 0,
-            },
-        }],
-        activations: BTreeMap::new(),
-        providers: BTreeMap::new(),
-        segments: BTreeMap::new(),
-        invocations: BTreeMap::new(),
-        discard: None,
-        ready: None,
-        next_handler: 0,
-        arguments: VecDeque::new(),
-        scratch: vec![],
-        pending: None,
-        failure: Some(failure),
-        failure_elected: false,
-        recoveries: BTreeMap::new(),
-        next_recovery: 0,
-        pending_handler: None,
-        top: None,
-        stdout: String::new(),
-        fuel: 100,
-        main_stage: MainStage::Done,
-        root: None,
-    };
-    machine.unwind().expect("valid typed-failure test");
-    assert!(machine.owners[1].closed);
-    assert!(!machine.owners[2].closed);
-    assert_eq!(machine.current_owner, 0);
-    assert_eq!(machine.heap.stats().arenas_freed, 1);
-    machine.current_owner = 2;
-    machine.frames.push(Frame {
+    let frame_with = |destination| Frame {
         recovery_id: None,
         evidence: None,
         block: &block,
         at: 0,
         locals: Locals::new(),
-        destination: Destination::RestoreOwner {
-            previous: 0,
-            binding: 0,
+        vars: vec![],
+        iterators: vec![],
+        destination,
+    };
+    let mut machine = fixture_machine(&program, &mut heap);
+    machine.owners = vec![
+        OwnerState::default(),
+        OwnerState {
+            arenas: vec![first],
+            ..OwnerState::default()
         },
-    });
+        OwnerState {
+            arenas: vec![selected],
+            ..OwnerState::default()
+        },
+    ];
+    machine.current_owner = 2;
+    machine.frames.push(frame_with(Destination::CloseScope {
+        owner: 1,
+        previous: 0,
+        binding: Some(0),
+    }));
+    machine.failure = Some(failure);
+    machine.fuel = 100;
+    machine.main_stage = MainStage::Done;
+    machine.unwind().expect("valid typed-failure test");
+    assert!(machine.owners[1].is_closed());
+    assert!(!machine.owners[2].is_closed());
+    assert_eq!(machine.current_owner, 0);
+    assert_eq!(machine.heap.stats().arenas_freed, 1);
+    machine.current_owner = 2;
+    machine.frames.push(frame_with(Destination::RestoreOwner {
+        previous: 0,
+        binding: 0,
+    }));
     machine.unwind().expect("valid typed-failure test");
     assert_eq!(machine.current_owner, 0);
     assert!(
-        !machine.owners[2].closed,
+        !machine.owners[2].is_closed(),
         "selection restores without closing storage"
     );
     assert_eq!(machine.heap.stats().arenas_freed, 1);
@@ -130,19 +102,25 @@ fn catching_releases_frame_locals_before_handler_execution() {
     let failure = heap
         .cause(&[Reason::Fail(&Value::Unit)], &mut 3)
         .expect("typed fixture cause");
-    let cause_id = ObjectId {
-        heap: heap.identity,
-        index: heap
-            .objects
-            .iter()
-            .position(|slot| {
-                slot.as_ref()
-                    .is_some_and(|object| matches!(object.data, Data::Cause(_)))
-            })
-            .expect("single original cause"),
-    };
+    let cause_id = heap
+        .objects
+        .iter()
+        .enumerate()
+        .find_map(|(index, slot)| {
+            slot.object
+                .as_ref()
+                .filter(|object| matches!(object.data, Data::Cause(_)))
+                .map(|_| ObjectId {
+                    heap: heap.identity,
+                    index,
+                    generation: slot.generation,
+                })
+        })
+        .expect("single original cause");
     let mut machine = fixture_machine(&program, &mut heap);
     machine.fuel = 100;
+    let mut catch_locals = Locals::new();
+    catch_locals.insert_one(0, local);
     machine.frames = vec![
         Frame {
             recovery_id: None,
@@ -150,6 +128,8 @@ fn catching_releases_frame_locals_before_handler_execution() {
             block,
             at: 0,
             locals: Locals::new(),
+            vars: vec![],
+            iterators: vec![],
             destination: Destination::Top,
         },
         Frame {
@@ -157,7 +137,9 @@ fn catching_releases_frame_locals_before_handler_execution() {
             evidence: None,
             block,
             at: 0,
-            locals: BTreeMap::from([(0, vec![local])]),
+            locals: catch_locals,
+            vars: vec![],
+            iterators: vec![],
             destination: Destination::Catch {
                 handler,
                 binding: 1,
@@ -194,40 +176,11 @@ fn owner_selection_validates_identity_but_not_resource_admission() {
         globals: vec![],
     };
     let mut heap = Heap::new();
-    let mut machine = Machine {
-        heap: &mut heap,
-        program: &program,
-        execution: 7,
-        globals: BTreeMap::new(),
-        cells: vec![],
-        owners: vec![OwnerState {
-            closed: true,
-            arenas: vec![],
-        }],
-        current_owner: 0,
-        current_evidence: None,
-        frames: vec![],
-        activations: BTreeMap::new(),
-        providers: BTreeMap::new(),
-        segments: BTreeMap::new(),
-        invocations: BTreeMap::new(),
-        discard: None,
-        ready: None,
-        next_handler: 0,
-        arguments: VecDeque::new(),
-        scratch: vec![],
-        pending: None,
-        failure: None,
-        failure_elected: false,
-        recoveries: BTreeMap::new(),
-        next_recovery: 0,
-        pending_handler: None,
-        top: None,
-        stdout: String::new(),
-        fuel: 100,
-        main_stage: MainStage::Done,
-        root: None,
-    };
+    let mut machine = Machine::new(&mut heap, &program, 7, vec![], 100, MainStage::Done);
+    machine.owners = vec![OwnerState {
+        phase: OwnerPhase::Closed,
+        ..OwnerState::default()
+    }];
     assert_eq!(
         machine.owner_index(&Value::Int(42)),
         Err(Error::ExpectedOwner)

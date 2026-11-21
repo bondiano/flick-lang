@@ -250,20 +250,23 @@ In both runtimes the following run under a mask:
 
 #### Cleanup off the normal path
 
-The cleanup of `ensuring`, `on_exit` (`on_exit_if`, `on_exit_filter`, `on_exit_primitive`), `on_interrupt` and the release of `bracket` runs in the fiber of the body, after it, whatever it ended with, an unwind to a handler of effects included. Unlike a finalizer of a region, which needs `Detached` and so performs no `control` operation (`reference/effects.md`, `FLICK-E017`), it may perform one. The rule depends on how the body ended:
+The cleanup of `ensuring`, `on_exit` (`on_exit_if`, `on_exit_filter`, `on_exit_primitive`), `on_interrupt` and the release of `bracket` runs in the fiber of the body, after it, whatever it ended with, an unwind to a handler of effects included. Unlike a finalizer of a region, which needs `Detached` and so performs no `control` or `abort` operation (`reference/effects.md`, `FLICK-E017`), it may perform either. The rule depends on how the body ended:
 
 ```text
 (Clean)      body ended with a value, a typed failure or a defect:
-             the cleanup runs as any code; its operations are answered
+             the cleanup runs as any code; its operations are answered;
+             if a defect and an `abort` signal combine (body died + cleanup aborted,
+             or body aborted + cleanup died), the defect supersedes the unwind:
+             handler signals are dropped rather than elected to defects or matched by `handle`
 (Clean-Cut)  body interrupted, or ended by an unwind (an `abort`, a `control` arm that let it go):
              a `control` operation of a handler older than the cleanup is cut off:
              its arm does not run, the cleanup stops there, the cut adds nothing to the cause,
              and the body's outcome goes on as it was
 ```
 
-A handler the cleanup installs itself answers as usual, and an `abort` in such a cleanup keeps the outcome already. Answering the operation would hand the rest of the cleanup to an arm in the middle of an interruption or an unwind: an arm that let it go would drop the interruption or run the code the unwind leaves ([an interrupted cleanup answered a `control` operation](#go-an-interrupted-cleanup-answered-a-control-operation), [an unwind answered the `control` operation of its cleanup](#an-unwind-answered-the-control-operation-of-its-cleanup)). Implementation: `cleanupAfter` in `runtime/src/rt/handle.ts` and `runtime-go/flickrt/handle.go`, which the combinators call; JS on Effect runs no `control` arm (`FLICK-P012`). Case: `tests/run/runtime/cleanup_control.fl`.
+A handler the cleanup installs itself answers as usual. When a body succeeds (or fails only with a typed error) and its cleanup performs an `abort`, the `abort` unwinds to the installing handler; when a defect is also present, handler unwinding signals are dropped so the defect is neither swallowed by the `abort` handler nor polluted with a raw signal reason (`tests/run/runtime/abort_cleanup_die.fl`). As defense-in-depth for child fibers (unreachable in typed Flick because `Detached` forbids `abort`), all three runtimes also check the logical fiber identity when an `abort` is performed and die with a defect if it runs in a fiber other than the handler's; same-fiber combinators (`Effect.first_success_of`, `Effect.eventually`) propagate handler signals instead of treating them as typed errors. Answering a cut-off `control` operation would hand the rest of the cleanup to an arm in the middle of an interruption or an unwind: an arm that let it go would drop the interruption or run the code the unwind leaves ([an interrupted cleanup answered a `control` operation](#go-an-interrupted-cleanup-answered-a-control-operation), [an unwind answered the `control` operation of its cleanup](#an-unwind-answered-the-control-operation-of-its-cleanup)). Implementation: `cleanupAfter` in `runtime/src/rt/handle.ts` and `runtime-go/flickrt/handle.go`, which the combinators call; JS on Effect runs no `control` arm (`FLICK-P012`). Cases: `tests/run/runtime/cleanup_control.fl`, `tests/run/runtime/abort_cleanup_die.fl`.
 
-The Lean core has no form of these combinators: its only cleanup is the finalizer of `inside`, under the handlers it keeps, where a `control` operation is stuck (§3.7 of `core.md`, `KeptStuck`). (Clean-Cut) is a rule of the runtime contract, and T5 (R1–R7) is unchanged by it.
+The Lean core has no form of these combinators: its only cleanup is the finalizer of `inside`, under the handlers it keeps, where a `control` or `abort` operation is stuck (§3.7 of `core.md`, `KeptStuck`). (Clean-Cut) is a rule of the runtime contract, and T5 (R1–R7) is unchanged by it.
 
 ### 3.3 The owner
 

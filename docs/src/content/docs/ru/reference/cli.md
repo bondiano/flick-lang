@@ -1,6 +1,6 @@
 ---
 title: "Командная строка"
-source_hash: c0be39af4a1439d1
+source_hash: 6775a9e3fbf19ad1
 ---
 
 `flick` — исполняемый файл с командами компилятора. Все команды принимают
@@ -29,11 +29,11 @@ source_hash: c0be39af4a1439d1
 | `init [--template app\|cli\|fullstack\|lib]` | создаёт те же файлы в рабочем каталоге; перед записью сообщает обо всех файлах, которые уже существуют (`FLICK-P019`), кроме `AGENTS.md`: существующий остаётся как есть |
 | `check [paths] [--watch] [--fix [--only codes]]` | проверяет код; если пути не указаны, проверяет корневые каталоги исходников и тестов; `--fix` применяет к этим файлам исправления, не меняющие смысла программы (например, убирает избыточную аннотацию типа, `FLICK-T021`), и сообщает об оставшихся проблемах; `--only E002,F001` применяет только исправления этих кодов — для миграции, которая больше ничего не меняет |
 | `prove [paths] [--watch]` | проверяет доказательства каталога доказательств (`project.proof-dir`) или указанных файлов вместе с кодом, который они называют; `check`, `build` и `test` этот каталог не читают (см. [контракт доказательств](https://github.com/bondiano/flick-lang/blob/main/docs/formal/proofs.md)) |
-| `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--promise-facade] [--emit-ir[=json\|cbor]] [--schema-aot] [--out-dir] [--watch]` | записывает ESM, карты исходников и файлы `.iface` (`--emit go` — исполняемый файл Go для каждого входа, см. [Go-target](../codegen/#go-target)); `--emit-dts` добавляет файлы `.d.ts`, а `--promise-facade` — Promise-фасады `A/B.promise.js` (см. [TypeScript](../codegen/#typescript)); `--emit-ir` добавляет `program.ir.json` (или `program.ir.cbor`) — IR, который получает бэкенд, оптимизированный в release-сборке, с версией IR, в которой он записан; показывает в stderr этапы сборки, затем число модулей и раннеры входов либо число и расположение ошибок; `--silent`/`--quiet` и `--diagnostics json` отключают прогресс и итог |
+| `build [paths] [--target <name>] [--profile] [--labels all\|components\|none] [--emit-ir[=json\|cbor]] [--out-dir] [--watch] [<опции бэкенда>]` | компилирует проект выбранным бэкендом (`js` по умолчанию: ESM, карты исходников и файлы `.iface`; `--target go` — исполняемый файл Go для каждого входа, см. [Go-target](../codegen/#go-target)); специфичные для таргета флаги вроде `--typescript`, `--declarations`, `--promise-facade`, `--schema-aot`, `--runtime`, `--ui` (`flick/js`) или `--cgo` (`flick/go`) объявляет выбранный бэкенд (см. [Таргет и опции бэкенда](#таргет-и-опции-бэкенда)); `--emit-ir` добавляет `program.ir.json` (или `program.ir.cbor`) — IR, который получает бэкенд, оптимизированный в release-сборке, с версией IR, в которой он записан; показывает в stderr этапы сборки, затем число модулей и раннеры входов либо число и расположение ошибок; `--silent`/`--quiet` и `--diagnostics json` отключают прогресс и итог |
 | `build [paths] --inputs` | выводит консервативный JSON-инвентарь входов (`key`, `files`, `roots`, `modules`), не записывая артефакты и кеш |
-| `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | собирает JavaScript (исполняемый файл Go при `emit = "go"`) и запускает `main` входа `name` (единственного, если имя не указано); `name`, который не является входом, запускает скрипт из [`[scripts]`](../project/#скрипты): его команды по порядку до первой упавшей, `args` — их `"$@"`; клиентский вход (`target = "client"`) собирает страницу через Vite и запускает Vite preview; `--devtools` отправляет спаны серверного входа в Effect DevTools ([наблюдаемость](../observability/#devtools)) |
-| `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | пересобирает при изменениях и заменяет работающее приложение; в проекте с несколькими входами без имени запускает каждый неклиентский вход и, если есть клиентский, Vite (`node_modules/.bin/vite`) для страниц: изменённый модуль заменяется в странице, а помеченные атомы сохраняют значения |
-| `test [paths] [--filter] [--list] [--forbid-only] [--jobs] [--seed] [--timeout] [--reporter human\|json] [--watch] [--profile] [--emit js\|go] [--rt]` | запускает тесты из корневого каталога тестов на Node или исполняемым файлом Go (см. [тестирование](../testing/)) |
+| `run [name] [--target <name>] [--entry M] [--profile] [<опции бэкенда>] -- args` | собирает выбранным бэкендом (по умолчанию JavaScript; исполняемый файл Go при `--target go` или `[build] target = "go"`) и запускает `main` входа `name` (единственного, если имя не указано); `name`, который не является входом, запускает скрипт из [`[scripts]`](../project/#скрипты): его команды по порядку до первой упавшей, `args` — их `"$@"`; клиентский вход (`target = "client"`) собирает страницу через Vite и запускает Vite preview; на `flick/js` флаг `--devtools[=url]` отправляет спаны серверного входа в Effect DevTools ([наблюдаемость](../observability/#devtools)) |
+| `dev [name] [--target <name>] [--entry M] [--profile] [<опции бэкенда>] -- args` | пересобирает при изменениях и заменяет работающее приложение; в проекте с несколькими входами без имени запускает каждый неклиентский вход и, если есть клиентский, Vite (`node_modules/.bin/vite`) для страниц: изменённый модуль заменяется в странице, а помеченные атомы сохраняют значения |
+| `test [paths] [--target <name>] [--filter] [--list] [--forbid-only] [--jobs] [--seed] [--timeout] [--reporter human\|json] [--watch] [--profile] [<опции бэкенда>]` | запускает тесты из корневого каталога тестов выбранным бэкендом — на Node (`--target js`, с `--runtime rt\|effect`) или исполняемым файлом Go (`--target go`, см. [тестирование](../testing/)) |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | записывает код в каноническом формате ([форматирование](../syntax/#форматирование)); если пути не указаны, обрабатывает корневые каталоги исходников и тестов |
 | `clean [--cache]` | удаляет артефакты сборки; с `--cache` — также кеш сборки |
 | `install [--locked]` | устанавливает зависимости с помощью pnpm (`--frozen-lockfile`, а с глобальным `--offline` — `--offline`); в корне workspace — каждого участника |
@@ -46,11 +46,11 @@ source_hash: c0be39af4a1439d1
 | `ffi check [paths]` | команда JavaScript-бэкенда: сверяет сгенерированные и проверенные привязки и их политики с установленными пакетами; если пути не указаны, проверяет корневой каталог исходников |
 | `schema export <M.codec> --target json-schema-2020-12 --out <file>` | выводит строгую JSON Schema кодека `PureCodec Json a` |
 | `schema export <M.api> --target openapi-3.1 --out <file>` | выводит значение `HttpApi.Api` как документ OpenAPI 3.1 — тот же, что строит `HttpApi.openapi` (см. [Клиенты и документы](../http-api/#клиенты-и-документы)) |
-| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | создаёт Markdown-страницы публичного API: типы, кинды, ограничения, эффекты, захваты |
+| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | создаёт Markdown-страницы публичного API: типы, кинды, вариантность, ограничения, эффекты, захваты |
 | `explain <code>` | объясняет сообщение диагностики по его коду, в том числе код плагина, как `std/L001` |
 | `expand [paths]` | выводит код, в который раскрывается каждый блок [плагина](../plugins/) проекта или файлов |
 | `doctor` | показывает сведения о компиляторе, Node.js, pnpm, git, Content Mapper для TypeScript, установленной среде выполнения и Effect, о необязательных адаптерах и о Go, если он установлен; всё, кроме компилятора, Node.js и pnpm, — заметка, а не ошибка |
-| `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | выводит одно представление модуля |
+| `inspect <M> --emit ast\|typed-ir\|output\|iface\|variance\|mapping [--target <name>] [<опции бэкенда>]` | выводит одно представление модуля; `--emit output` запрашивает сгенерированный код модуля у выбранного бэкенда (например, JS по умолчанию, TS с `--typescript`, Go с `--target go`); `--emit iface` показывает типизированный интерфейс без загрузки какого-либо бэкенда; `--emit variance` печатает выведенную вариантность параметров экспортированных типов и классов (включая установленные пакеты и встроенные модули, отмечая неизвестные метаданные как `inv (unknown)`) |
 | `lsp --stdio` | запускает [языковой сервер](../editor/#языковой-сервер); stdio — его единственный транспорт |
 | `content-mapper [--declarations <paths>…]` | сессионная команда JavaScript-бэкенда (`js:content-mapper`): обслуживает через stdio запросы [Content Mapper](../editor/#content-mapper) TypeScript для файлов `.fl`; его запускает `@flick-lang/content-mapper`; с `--declarations` вместо этого записывает проекцию каждого файла `.fl` из указанных путей рядом с ним как `Name.d.fl.ts` и завершается |
 
@@ -66,9 +66,52 @@ source_hash: c0be39af4a1439d1
 Код верхнего уровня этого модуля чистый.
 Экспорт JSON Schema использует выбранную проектом среду выполнения. Для
 экспорта `HttpApi.Api` в OpenAPI нужен адаптер Effect: задайте
-`effect = "effect"` и установите `@flick-lang/effect-ts`.
+`[target.js] runtime = "effect"` и установите `@flick-lang/effect-ts`.
 
 `test` выводит human-результаты сразу после освобождения ресурсов каждого теста: маркер успеха или ошибки, счётчик и время, затем общий итог. Node и Go используют один формат и учитывают `--color`; автоматический цвет проверяет stdout, `NO_COLOR` и `TERM=dumb`. `--reporter json` выводит один итоговый объект в порядке объявления, без цвета и длительностей.
+
+## Таргет и опции бэкенда
+
+Команды `build`, `run`, `dev`, `test` и `inspect` принимают `--target <name>`
+для выбора компонента бэкенда (`js` для `flick/js`, `go` для `flick/go` или
+короткое имя закреплённого `[build.backend]`). Без `--target` таргет берётся из
+`[build.backend]`, затем из `[build] target`, затем из префикса бэкенда в
+`[build] environment`, а иначе равен `js`. Неизвестный таргет — `FLICK-P059`
+(код выхода `2`).
+
+Специфичные для бэкенда флаги объявляет сам выбранный компонент бэкенда —
+отдельно для каждой команды. `flick <cmd> --help` и `flick help <cmd>`
+показывают только опции выбранного бэкенда для этой команды в разделе
+`Options of \`<id>\`:` (передайте `--target <name> --help`, чтобы посмотреть
+опции другого таргета). Те же опции задаются постоянно в `flick.toml` в разделе
+`[target.<name>]`; флаги CLI имеют приоритет над `flick.toml` (булевы флаги
+принимают `--<flag>=false`, чтобы переопределить `true` из `flick.toml`).
+
+- **Опции `flick/js`**: `--typescript` (`build`, `inspect`), `--declarations`
+  (`build`), `--promise-facade` (`build`), `--schema-aot` (`build`),
+  `--runtime rt|effect` (`build`, `run`, `dev`, `test`, `inspect`; по умолчанию
+  `rt`), `--devtools[=url]` (`run`, `dev`; URL по умолчанию
+  `ws://localhost:34437`) и `--ui <specifier>` (`build`, `run`, `dev`, `test`).
+- **Опции `flick/go`**: `--cgo` (`build`, `run`, `dev`, `test`; включает
+  `CGO_ENABLED=1`, по умолчанию `false`).
+
+Неизвестная опция, опция от другой команды или другого бэкенда либо
+недопустимое значение приводят к `FLICK-P058` (код выхода `2`). Прежние
+жёстко встроенные флаги удалены без псевдонимов совместимости и завершаются с
+`FLICK-P057` (код выхода `2`), называя замену:
+
+| Удалённый флаг | Замена |
+| - | - |
+| `build --emit js` / `test --emit js` | `--target js` (или не указывать; `js` — по умолчанию) |
+| `build --emit ts` | `--target js --typescript` (или `[target.js] typescript = true`) |
+| `build --emit go` / `test --emit go` | `--target go` (или `[build] target = "go"`) |
+| `build --emit-dts` | `--declarations` (или `[target.js] declarations = true`) |
+| `build\|run\|dev\|test --rt` | `--runtime rt` (по умолчанию для `flick/js`; для Effect — `--runtime effect`) |
+| `inspect <M> --emit js` | `inspect <M> --emit output --target js` |
+| `inspect <M> --emit ts` | `inspect <M> --emit output --target js --typescript` |
+
+Аргументы после `--` (например, `flick run app -- --rt`) передаются напрямую
+программе или скрипту и не разбираются самим `flick`.
 
 ## Выходные файлы и кеш
 
@@ -95,7 +138,8 @@ source_hash: c0be39af4a1439d1
 
 ## Запуск и замена приложения
 
-`run` и `dev` собирают JavaScript, а при `emit = "go"` — исполняемый файл Go
+`run` и `dev` собирают JavaScript, а при таргете Go (`[build] target = "go"`
+или `--target go`) — исполняемый файл Go
 для каждого входа. Каждая
 сборка хранится в атомарно зарезервированном каталоге `.flick/run/<pid>-<n>/`.
 После запуска процесса файлы поколения больше не перезаписываются, поэтому
@@ -137,7 +181,7 @@ npm-пакетов команды используют pnpm. Перед изме
 вместе с раннером каждого входа, который подготовленный
 `package.json` указывает в `bin` (см. [проект](../project/#точки-входа)).
 Затем команда проверяет, что у каждого модуля есть `.iface`
-(и `.d.ts` при `emit-dts`), отпечатки интерфейсов внутри пакета согласованы
+(и `.d.ts` при `[target.js] declarations = true`), отпечатки интерфейсов внутри пакета согласованы
 друг с другом, а пути из `exports` существуют (`FLICK-P020`).
 После этого `pack` записывает tar-архив с помощью `pnpm pack`.
 

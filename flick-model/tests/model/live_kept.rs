@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use flick_model::eval::Outcome;
 use flick_model::syntax::{Name, Path, Term};
-use flick_model::types::{Caps, Row, Scheme, Type, Var};
+use flick_model::types::{Caps, Kind, Row, Scheme, Stage, Type, Var};
 
 use live_support::{core, g, probe, thunk_program, v};
 
@@ -129,4 +129,88 @@ fn a_child_qualified_by_a_younger_region_is_rejected() {
             "{name}"
         );
     }
+}
+
+/// Calling a qualified rank-2 or curried parameter inside a child keeps its
+/// qualifier live: if its qualifier is younger than the owner, the child is
+/// rejected with `FLICK-G003`; if it outlives the owner, it is accepted.
+#[test]
+fn a_called_rank2_parameter_keeps_its_qualifier_in_a_child() {
+    let runtime = || Stage::Runtime(Row::none(), Row::none());
+    let rank2_1 = |q: &str| {
+        let body = Type::fun(Type::Var(Var::Named("a".into())), runtime(), unit());
+        Type::Captured(
+            Rc::new(Type::Forall(Rc::new(Scheme::new(
+                vec![("a".into(), Kind::Type)],
+                body,
+            )))),
+            Caps::atom(Var::Named(q.into())),
+        )
+    };
+    let rank2_2 = |q: &str| {
+        let inner = Type::fun(Type::Var(Var::Named("a".into())), runtime(), unit());
+        let body = Type::fun(unit(), Stage::Pure, inner);
+        Type::Captured(
+            Rc::new(Type::Forall(Rc::new(Scheme::new(
+                vec![("a".into(), Kind::Type)],
+                body,
+            )))),
+            Caps::atom(Var::Named(q.into())),
+        )
+    };
+    let call_1 = Term::app(v("f"), Term::unit());
+    let call_2 = Term::app(Term::app(v("f"), Term::unit()), Term::unit());
+
+    let younger_1 = scope(
+        "o",
+        scope(
+            "s",
+            let_sig(
+                "f",
+                rank2_1("s"),
+                Term::lam("x", Term::unit()),
+                spawn("o", Term::Task(Rc::new(call_1))),
+            ),
+        ),
+    );
+    let younger_2 = scope(
+        "o",
+        scope(
+            "s",
+            let_sig(
+                "f",
+                rank2_2("s"),
+                Term::lam("u", Term::lam("x", Term::unit())),
+                spawn("o", Term::Task(Rc::new(call_2.clone()))),
+            ),
+        ),
+    );
+    for (name, e) in [("rank2 1-arg", younger_1), ("rank2 2-arg", younger_2)] {
+        let p = thunk_program(e);
+        let (live, _) = probe(name, &p);
+        assert!(
+            matches!(&live, Err(e) if e.starts_with("(Outlives)") && e.contains("FLICK-G003")),
+            "{name}: {live:?}"
+        );
+        assert!(
+            core(&p).iter().any(|e| e.starts_with("FLICK-G003")),
+            "{name}"
+        );
+    }
+
+    let older_2 = scope(
+        "p",
+        scope(
+            "o",
+            let_sig(
+                "f",
+                rank2_2("p"),
+                Term::lam("u", Term::lam("x", Term::unit())),
+                spawn("o", Term::Task(Rc::new(call_2))),
+            ),
+        ),
+    );
+    let (live, outcome) = probe("rank2 2-arg older", &thunk_program(older_2));
+    assert!(live.is_ok(), "{live:?}");
+    assert!(matches!(outcome, Outcome::Value(_)));
 }

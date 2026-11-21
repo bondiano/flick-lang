@@ -2,7 +2,6 @@
 //! type into lambdas, branches and literals, so a higher-rank parameter type
 //! from a signature reaches the callback that must satisfy it; [`Checker::infer`] synthesizes a type otherwise.
 
-use crate::types::Elided;
 use std::mem;
 
 use super::Checker;
@@ -114,6 +113,9 @@ impl<'c> Checker<'c> {
             (K::TaskExpr, _) => {
                 actual_type = self.check_task(node, &target, expected);
             }
+            (K::LazyExpr, _) => {
+                actual_type = self.check_lazy(node, &target, expected);
+            }
             _ => {
                 let actual = self.infer(node);
                 self.expect(&actual, expected, self.span(node));
@@ -138,6 +140,11 @@ impl<'c> Checker<'c> {
         self.store.level += 1;
         let mark = self.classes.givens.len();
         let (body, _, givens) = self.skolemize(target);
+        let hidden = self.hidden_qualifier(expected);
+        let body = match hidden {
+            Some(hidden) => Self::qualify_hidden(body, hidden),
+            None => body,
+        };
         let body = match captures {
             Some(captures) if matches!(self.bound_head(expected), Type::Bounded { .. }) => {
                 Type::Bounded {
@@ -145,13 +152,7 @@ impl<'c> Checker<'c> {
                     captures: Box::new(captures),
                 }
             }
-            Some(captures) => Type::Captured {
-                ty: Box::new(body),
-                captures: Box::new(captures),
-                value: false,
-                elided: Elided::default(),
-            },
-            None => body,
+            _ => body,
         };
         self.record_givens(self.span(node), &givens);
         self.classes.givens.extend(givens);
@@ -238,6 +239,18 @@ impl<'c> Checker<'c> {
     fn check_task(&mut self, node: &Node, target: &Type, expected: &Type) -> Option<Type> {
         if self.eff_parts(target).is_some() {
             self.task(node, Some(expected));
+            return None;
+        }
+        let actual = self.infer(node);
+        self.expect(&actual, expected, self.span(node));
+        Some(actual)
+    }
+
+    /// A `lazy` against `expected`, or the type it was inferred with when
+    /// `expected` is not a `Lazy`.
+    fn check_lazy(&mut self, node: &Node, target: &Type, expected: &Type) -> Option<Type> {
+        if self.lazy_parts(target).is_some() {
+            self.lazy_expr(node, Some(expected));
             return None;
         }
         let actual = self.infer(node);

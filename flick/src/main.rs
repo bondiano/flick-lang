@@ -4,9 +4,6 @@ use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
 
-use clap::Parser;
-#[cfg(feature = "wasm-backends")]
-use clap::{CommandFactory, FromArgMatches};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::pnpm;
 use flick_core::source::SourceMap;
@@ -85,36 +82,24 @@ fn dependency_command(cmd: Commands, offline: bool) -> pnpm::Command {
 }
 
 fn main() -> ExitCode {
-    let args = parse();
+    let raw_argv: Vec<OsString> = env::args_os().collect();
+    let args = match backends::options::parse_cli(&raw_argv, None) {
+        backends::options::ParseOutcome::Parsed(args) => *args,
+        backends::options::ParseOutcome::Exit(code) => return code,
+    };
     builtins::keep_modules();
     let global = args.global.clone();
     // the language server sets its own subscriber for its log
     if global.timings && !matches!(args.cmd, Commands::Lsp(_)) {
         timings::install();
     }
-    let code = run(args);
+    let code = run(args, &raw_argv);
     timings::report(&global);
     code
 }
 
-/// The arguments; the top-level help lists the commands the project's
-/// backend and plugins add, read from their cached descriptors.
-fn parse() -> CommandArguments {
-    #[cfg(feature = "wasm-backends")]
-    {
-        let argv: Vec<OsString> = env::args_os().skip(1).collect();
-        if matches!(argv.as_slice(), [a] if a == "--help" || a == "-h" || a == "help") {
-            let sections = commands::contributed::help();
-            let command = CommandArguments::command().after_help(sections);
-            return CommandArguments::from_arg_matches(&command.get_matches())
-                .unwrap_or_else(|e| e.exit());
-        }
-    }
-    CommandArguments::parse()
-}
-
 /// Runs the command of `args` on its project, or on each member of its workspace.
-fn run(args: CommandArguments) -> ExitCode {
+fn run(args: CommandArguments, raw_argv: &[OsString]) -> ExitCode {
     plugins::set_offline(args.global.offline || env::var_os("CI").is_some());
     backends::allow_tools(args.global.allow_tool.clone());
     backends::set_offline(args.global.offline);
@@ -180,7 +165,15 @@ fn run(args: CommandArguments) -> ExitCode {
     let several = members.len() > 1;
     let mut code = ExitCode::SUCCESS;
     for member in members {
-        let mut args = CommandArguments::parse();
+        let mut args = match backends::options::parse_cli(raw_argv, Some(&member)) {
+            backends::options::ParseOutcome::Parsed(args) => *args,
+            backends::options::ParseOutcome::Exit(exit) => {
+                if code == ExitCode::SUCCESS {
+                    code = exit;
+                }
+                continue;
+            }
+        };
         if several {
             report::log(&args.global, &format!("in `{member}`"));
         }

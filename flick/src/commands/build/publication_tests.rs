@@ -1,4 +1,5 @@
 use crate::backends::Selected;
+use crate::backends::options::ResolvedOptions;
 use std::{env, fs, process};
 
 use flick_backend::{Artifact as BackendArtifact, ArtifactKind};
@@ -18,6 +19,10 @@ fn plan(name: &str) -> BuildPlan {
     BuildPlan {
         purpose: super::Purpose::Build,
         backend: Selected::Native,
+        target: "js".into(),
+        target_overridden: false,
+        options: ResolvedOptions::default(),
+        inspect_module: None,
         out_dir: root.join("output"),
         entries: vec![],
         typescript: false,

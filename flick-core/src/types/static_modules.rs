@@ -49,6 +49,7 @@ impl Checker<'_> {
                         form: Form::ModuleContract {
                             requirements: requirements.clone(),
                         },
+                        variance: Vec::new(),
                     };
                     for (head, dictionary) in
                         module_local_dictionaries(&contract, &abstract_interface)

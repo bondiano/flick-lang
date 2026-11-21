@@ -16,7 +16,9 @@ pub(super) const BINDINGS: &str = "go/bindings/";
 pub(super) enum Command {
     Build,
     Run,
+    Dev,
     Test,
+    Inspect,
 }
 
 pub(super) struct Data {
@@ -31,6 +33,10 @@ pub(super) struct Data {
     pub command: Command,
     /// The host runs Windows executables, named `.exe`.
     pub windows: bool,
+    /// Enable cgo (`CGO_ENABLED=1`).
+    pub cgo: bool,
+    /// Module selected for `inspect --emit output`.
+    pub inspect_module: Option<String>,
 }
 
 impl Data {
@@ -87,7 +93,7 @@ impl Data {
                 .map_err(|e| failure("P012", format!("binding table encoding: {e}")))?;
             tables.push(text);
         }
-        let (command, windows) = options(request)?;
+        let (command, windows, cgo, inspect_module) = options(request)?;
         Ok(Self {
             program,
             facts,
@@ -98,24 +104,46 @@ impl Data {
             bindings: Bindings::parse(tables.iter().map(String::as_str)),
             command,
             windows,
+            cgo,
+            inspect_module,
         })
     }
 }
 
-fn options(request: &BuildRequest) -> Result<(Command, bool), Vec<Diagnostic>> {
+fn options(
+    request: &BuildRequest,
+) -> Result<(Command, bool, bool, Option<String>), Vec<Diagnostic>> {
     let mut command = None;
     let mut windows = None;
+    let mut cgo = None;
+    let mut inspect_module = None;
     for option in &request.target.options {
         let duplicate = match option.key.as_str() {
             "command" => command
                 .replace(match option.value.as_str() {
                     "build" => Command::Build,
                     "run" => Command::Run,
+                    "dev" => Command::Dev,
                     "test" => Command::Test,
+                    "inspect" => Command::Inspect,
                     other => return Err(failure("P012", format!("unknown command `{other}`"))),
                 })
                 .is_some(),
             "host.os" => windows.replace(option.value == "windows").is_some(),
+            "inspect.module" => inspect_module.replace(option.value.clone()).is_some(),
+            "option.cgo" => {
+                let value = match option.value.as_str() {
+                    "true" => true,
+                    "false" => false,
+                    other => {
+                        return Err(failure(
+                            "P012",
+                            format!("invalid boolean `{other}` for option `cgo`"),
+                        ));
+                    }
+                };
+                cgo.replace(value).is_some()
+            }
             other => {
                 return Err(failure(
                     "P012",
@@ -130,5 +158,10 @@ fn options(request: &BuildRequest) -> Result<(Command, bool), Vec<Diagnostic>> {
             ));
         }
     }
-    Ok((command.unwrap_or(Command::Build), windows.unwrap_or(false)))
+    Ok((
+        command.unwrap_or(Command::Build),
+        windows.unwrap_or(false),
+        cgo.unwrap_or(false),
+        inspect_module,
+    ))
 }

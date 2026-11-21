@@ -85,7 +85,7 @@ fn released_source_packages_are_fetched_pinned_and_run_offline_without_the_adapt
     .expect("exact adapter version");
     fs::write(
         app.join("flick.toml"),
-        format!("{manifest}\n[build]\neffect = \"effect\"\n"),
+        format!("{manifest}\n[target.js]\nruntime = \"effect\"\n"),
     )
     .expect("mixed consumer");
     fs::write(

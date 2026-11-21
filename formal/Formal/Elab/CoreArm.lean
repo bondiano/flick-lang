@@ -15,17 +15,6 @@ namespace Flick.Elab
 
 variable {P : Prog} {S : Sig} {N : Names}
 
-theorem trT_foldl_app (us : List Ty) (f : Ty) :
-    trT N (us.foldl .app f) = (us.map (trT N)).foldl .tapp (trT N f) := by
-  induction us generalizing f with
-  | nil => rfl
-  | cons u us ih => exact ih (.app f u)
-
-theorem trT_tcon {T : Nat} (h2 : T ≠ 2) (h4 : T ≠ 4) (us : List Ty) :
-    trT N (Ty.tcon T us) = Flick.Ty.tcon (N.con T) (us.map (trT N)) := by
-  rw [Ty.tcon, trT_foldl_app]
-  simp [trT, h2, h4, Flick.Ty.tcon]
-
 theorem trT_ctor_ty (c : Ctor) :
     trT N c.ty = Flick.Ty.arrows (c.fields.map (trT N)) (trT N (Ty.tcon c.T c.res)) := by
   simp only [Ctor.ty]

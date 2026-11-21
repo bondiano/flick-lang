@@ -7,7 +7,7 @@
 // 10% under its budget prints a note that the budget can be lowered. It
 // also prints what labelling atoms costs: release with `labels = "all"`,
 // the default, against `"components"`. A program with `rt` is built for
-// Flick's own runtime (`--rt`). Host foreign modules (`.ts`/`.mjs`
+// Flick's own runtime (`--runtime rt`). Host foreign modules (`.ts`/`.mjs`
 // beside the source) are not Flick output and stay external.
 import { execFileSync } from "node:child_process";
 import { rmSync } from "node:fs";
@@ -128,7 +128,7 @@ export const measure = async (entry) => {
  */
 export const build = (flick, source, out, profile, labels, rt = false) => {
   rmSync(out, { recursive: true, force: true });
-  const options = [...(labels === undefined ? [] : ["--labels", labels]), ...(rt ? ["--rt"] : [])];
+  const options = [...(labels === undefined ? [] : ["--labels", labels]), "--runtime", rt ? "rt" : "effect"];
   const project = !source.endsWith(".fl");
   const file = project ? [] : [path.join(root, source)];
   execFileSync(flick, ["build", ...file, "--out-dir", out, "--profile", profile, ...options, "--quiet", "--color", "never"], {

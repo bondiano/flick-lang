@@ -1,7 +1,7 @@
 ---
 title: Переход на версию 0.2
 description: Изменения после Flick 0.1.0 и инструкции по обновлению проекта до версии 0.2.
-source_hash: c26b5994b4a9e201
+source_hash: 398cbd247cd68df2
 ---
 
 До версии 1.0 минорные выпуски могут содержать несовместимые изменения.
@@ -58,6 +58,8 @@ flick check --fix
 | [Сборки без среды выполнения больше нет](#сборки-без-среды-выполнения-больше-нет) | нет | `FLICK-P005` |
 | [Предоставленный экземпляр не оставляет телу другого](#предоставленный-экземпляр-не-оставляет-телу-другого) | нет | `FLICK-E019` |
 | [Бэкенды находят встроенные типы по lang item](#бэкенды-находят-встроенные-типы-по-lang-item) | нет | `FLICK-S014` |
+| [`Detached` запрещает `abort`; `lazy` использует `NoControl`](#detached-запрещает-abort-lazy-использует-nocontrol) | нет | `FLICK-E017`, `FLICK-F002` |
+| [Опции бэкенда перенесены в `--target` и `[target.<name>]`](#опции-бэкенда-перенесены-в---target-и-targetname) | нет | `FLICK-P057`, `FLICK-P058`, `FLICK-P059` |
 
 Команда `flick check --fix page.md` исправляет блоки кода `flick` на странице
 Markdown. Каждый блок проверяется отдельно.
@@ -699,3 +701,61 @@ memory IR не становится новым полем сериализова
 `FLICK-T007`. Отдельно связанная полиморфная задача остаётся допустимым
 приобретением. Регион владельца контейнера и обычные требования callback к
 сервисам остаются независимыми от внутреннего региона приобретения.
+
+## `Detached` запрещает `abort`; `lazy` использует `NoControl`
+
+Ограничение `Detached r` теперь требует, чтобы в строке `r` не было эффектов ни
+с операцией `control`, ни с операцией `abort` (`FLICK-E017`). Раньше
+запрещалась только операция `control`, из-за чего `abort` в дочернем файбере
+(`Fiber.spawn`, `parallel`, `race_success`, `Effect.cached`, конкурентные
+`Effect.for_each` / `partition` / `validate` / `filter` / `filter_map_effect`,
+`Effect.timeout_or_else`) или финализаторе области мог обратиться к
+сохранённому обработчику вне его файбера. Обрабатывайте эффекты с `abort`
+внутри дочерней задачи или финализатора, либо передавайте ошибки родителю через
+типизированные ошибки (`type error`), `join` или `Channel`.
+
+Инициализатор `lazy` по-прежнему допускает `abort`, так как выполняется
+синхронно в форсирующем файбере; `lazy` и `lazy_make` теперь требуют суперкласс
+`NoControl r` (`class NoControl r => Detached r`), так что любое ограничение
+`Detached r` по-прежнему влечёт `NoControl r`. Внешние объявления с
+`retention owner` и более чем одним регионом должны указывать `Detached r`
+наряду с `Fiber.Provided r s` (`FLICK-F002`). Версия типизированного IR
+повышена до `0.13.0` из-за добавления lang item `no_control`.
+
+## Опции бэкенда перенесены в `--target` и `[target.<name>]`
+
+Специфичные для таргетов флаги CLI и ключи `[build]` заменены опциями, которые
+объявляют сами бэкенды, без псевдонимов совместимости. Каждый удалённый флаг
+или ключ `[build]` завершается с `FLICK-P057` (код выхода `2`) и называет
+точную замену:
+
+### Флаги CLI
+
+| Удалено | Замена |
+| - | - |
+| `flick build --emit js` / `flick test --emit js` | `--target js` (или не указывать; `js` — по умолчанию) |
+| `flick build --emit ts` | `flick build --target js --typescript` (или `[target.js] typescript = true`) |
+| `flick build --emit go` / `flick test --emit go` | `--target go` (или `[build] target = "go"`) |
+| `flick build --emit-dts` | `flick build --declarations` (или `[target.js] declarations = true`) |
+| `flick build\|run\|dev\|test --rt` | `--runtime rt` (по умолчанию для `flick/js`; для Effect — `--runtime effect`) |
+| `flick inspect <M> --emit js` | `flick inspect <M> --emit output --target js` |
+| `flick inspect <M> --emit ts` | `flick inspect <M> --emit output --target js --typescript` |
+
+### Ключи `flick.toml`
+
+| Удалённый ключ `[build]` | Замена |
+| - | - |
+| `[build] emit = "js"` | `[build] target = "js"` (или не указывать) |
+| `[build] emit = "ts"` | `[build] target = "js"` и `[target.js] typescript = true` |
+| `[build] emit = "go"` | `[build] target = "go"` |
+| `[build] emit-dts = true` | `[target.js] declarations = true` |
+| `[build] promise-facade = true` | `[target.js] promise-facade = true` |
+| `[build] schema-aot = true` | `[target.js] schema-aot = true` |
+| `[build] effect = "rt"` | `[target.js] runtime = "rt"` (или не указывать; `"rt"` — по умолчанию) |
+| `[build] effect = "effect"` | `[target.js] runtime = "effect"` |
+| `[build] ui = "./renderer.mjs"` | `[target.js] ui = "./renderer.mjs"` |
+
+Запустите `flick <cmd> --help` (или `flick <cmd> --target <name> --help`), чтобы
+увидеть опции выбранного бэкенда для данной команды. Неизвестные или
+недопустимые опции сообщают `FLICK-P058`, а неизвестный таргет — `FLICK-P059`.
+Команда `flick inspect <M> --emit iface` больше не загружает никакой бэкенд.

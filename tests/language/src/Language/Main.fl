@@ -2,4 +2,4 @@
 module Language.Main exposing (main)
 
 main : Unit ->{Host.Console; AppError} Unit
-let main () = Platform.stdout_line "run `flick test --emit js` or `flick test --emit go`"
+let main () = Platform.stdout_line "run `flick test --target js` or `flick test --target go`"

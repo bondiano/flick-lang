@@ -17,16 +17,23 @@ pub fn lazy(services: Type, errors: Type, result: Type) -> Type {
 
 impl Checker<'_> {
     pub fn lazy_expr(&mut self, node: &Node, expected: Option<&Type>) -> Type {
-        let expected_task = (expected.and_then(|t| self.lazy_parts(t)))
-            .map(|(services, errors, result)| eff(services, errors, result));
+        let expected_task = expected.and_then(|t| {
+            let (services, errors, result) = self.lazy_parts(t)?;
+            let task = eff(services, errors, result);
+            Some(match self.hidden_qualifier(t) {
+                Some(captures) => Self::qualify_hidden(task, captures),
+                None => task,
+            })
+        });
         let task = self.task(node, expected_task.as_ref());
         let Some((services, errors, result)) = self.eff_parts(&task) else {
             return Type::Error;
         };
         let span = self.span(node);
-        // its first force may come from a fiber other than the one that built it
+        // its initializer runs synchronously in the forcing fiber, so `abort`
+        // can unwind to the forcer's handler, while `control` cannot split it
         self.want(
-            Type::app(Type::lang(Lang::Detached), services.clone()),
+            Type::app(Type::lang(Lang::NoControl), services.clone()),
             span,
         );
         let cell = Effects::new(Type::empty_row(), Type::empty_row());
@@ -54,6 +61,7 @@ impl Checker<'_> {
             self.perform(&waits, &Type::empty_row(), span);
         }
         if self.runtime_allowed(span) {
+            let services = self.live_await(ty, services);
             self.perform(&services, &errors, span);
         }
         Some(result)

@@ -8,6 +8,7 @@
 //! packs the runner of each entry, which the manifest's `bin` names.
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::Command as Process;
 use std::{env, fs};
@@ -24,9 +25,7 @@ use super::build::{BuildCommand, write};
 use super::diff;
 use super::run::find_project;
 use super::tarball;
-use crate::args::{
-    BuildArguments, EmitArgument, GlobalArguments, OutDirArguments, ProfileArgument,
-};
+use crate::args::{BuildArguments, GlobalArguments, OutDirArguments, ProfileArgument};
 use crate::cache::files_under;
 use crate::child;
 use crate::command::{Command, Outcome};
@@ -66,27 +65,33 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
     }
     let stage = root.join(cache::DIR).join("pack");
     let _ = fs::remove_dir_all(&stage);
-    let dts = project.config.build.emit_dts;
+    let dts = project.config.js_flag("declarations");
+    let mut backend_options = BTreeMap::new();
+    backend_options.insert("typescript".into(), vec!["false".into()]);
+    if dts {
+        backend_options.insert("declarations".into(), vec!["true".into()]);
+    }
+    if project.config.js_flag("promise-facade") {
+        backend_options.insert("promise-facade".into(), vec!["true".into()]);
+    }
     let build = BuildCommand {
         options: BuildArguments {
             paths: Vec::new(),
+            target: Some("js".into()),
             out_dir: Some(stage.join("dist").to_string_lossy().into_owned()),
-            emit: Some(EmitArgument::Js),
-            emit_dts: dts,
-            promise_facade: project.config.build.promise_facade,
             emit_ir: None,
-            schema_aot: false,
             profile: Some(ProfileArgument::Release),
             labels: None,
-            rt: false,
             watch: false,
             inputs: false,
+            backend_options,
         },
         project: Some(root.to_string_lossy().into_owned()),
         display: None,
         // an app packs its runners, a library none
         entry: None,
         generation: false,
+        dev: false,
         built: RefCell::default(),
         modules: None,
     };
@@ -385,7 +390,7 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         write(
             &root.join("flick.toml"),
-            "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\neffect = \"effect\"\n",
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[target.js]\nruntime = \"effect\"\n",
         )
         .expect("config");
         write(
@@ -393,20 +398,19 @@ mod tests {
             "module Lib.Greeting exposing (greet)\ngreet : String -> String\nlet greet name = \"Hello, \" ++ name\n",
         )
         .expect("module");
+        let mut backend_options = BTreeMap::new();
+        backend_options.insert("declarations".into(), vec!["true".into()]);
         let built = BuildCommand::new(
             BuildArguments {
                 paths: Vec::new(),
+                target: Some("js".into()),
                 out_dir: None,
-                emit: Some(EmitArgument::Js),
-                emit_dts: true,
-                promise_facade: false,
                 emit_ir: None,
-                schema_aot: false,
                 profile: Some(ProfileArgument::Release),
                 labels: None,
-                rt: false,
                 inputs: false,
                 watch: false,
+                backend_options,
             },
             Some(root.to_string_lossy().into_owned()),
             None,

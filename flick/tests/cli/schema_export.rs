@@ -42,6 +42,80 @@ fn rt_schema_export_uses_the_native_codec() {
     );
 }
 
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn schema_export_succeeds_on_typescript_and_declarations_projects() {
+    let config = format!(
+        "{LIB}\n[target.js]\ntypescript = true\ndeclarations = true\npromise-facade = true\nschema-aot = true\n"
+    );
+    let dir = project(
+        "schema_export_typescript_project",
+        &[("flick.toml", &config), ("src/Lib/Wire.fl", RT_WIRE)],
+    );
+    let out = flick_in(
+        &dir,
+        &[
+            "schema",
+            "export",
+            "Lib.Wire.item_json",
+            "--target",
+            "json-schema-2020-12",
+            "--out",
+            "item.json",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    let item = fs::read_to_string(dir.join("item.json")).expect("schema");
+    assert!(
+        item.contains("\"id\"") && item.contains("2020-12"),
+        "{item}"
+    );
+}
+
+#[test]
+#[ignore = "needs Node and pnpm install"]
+fn schema_export_succeeds_on_go_target_project() {
+    let config = format!("{LIB}\n[build]\ntarget = \"go\"\n");
+    let go_wire = "module Lib.Wire exposing (Item, item_json, checked_id)
+
+effect Ask =
+  control ask : Int ->{} Int
+
+checked_id : Unit ->{} Int
+let checked_id () =
+  try Ask.ask 1 with
+  | Ask.ask x -> resume (x + 1)
+
+type alias Item = { id : String }
+  deriving Schema
+
+item_json : PureCodec Json Item
+let item_json = Codec.json Item.schema
+";
+    let dir = project(
+        "schema_export_go_project",
+        &[("flick.toml", &config), ("src/Lib/Wire.fl", go_wire)],
+    );
+    let out = flick_in(
+        &dir,
+        &[
+            "schema",
+            "export",
+            "Lib.Wire.item_json",
+            "--target",
+            "json-schema-2020-12",
+            "--out",
+            "item.json",
+        ],
+    );
+    assert_eq!(out.status.code(), Some(0), "{out:?}");
+    let item = fs::read_to_string(dir.join("item.json")).expect("schema");
+    assert!(
+        item.contains("\"id\"") && item.contains("2020-12"),
+        "{item}"
+    );
+}
+
 const WIRE: &str = r#"module Lib.Wire exposing (..)
 
 type alias Upload = { name : String; data : Unknown }
@@ -74,7 +148,7 @@ fn strict_export_refuses_what_it_cannot_state() {
         &[
             (
                 "flick.toml",
-                &format!("{LIB}\n[build]\neffect = \"effect\"\n"),
+                &format!("{LIB}\n[target.js]\nruntime = \"effect\"\n"),
             ),
             ("src/Lib/Wire.fl", WIRE),
         ],

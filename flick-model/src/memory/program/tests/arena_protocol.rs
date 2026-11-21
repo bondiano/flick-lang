@@ -31,6 +31,7 @@ fn assert_arena_protocol_fault(kind: Intrinsic, case: &str) {
                 heap.identity
             },
             index: usize::MAX,
+            generation: 0,
         });
     let expected = match case {
         "heap" | "exec" | "dataexec" => Error::ForeignArena,
@@ -192,7 +193,7 @@ fn arena_die_unwinds_live_scope_and_provider_before_final_cleanup() {
     assert!(machine.frames.is_empty());
     assert!(machine.globals.is_empty());
     assert!(machine.providers.is_empty());
-    assert!(machine.owners[1..].iter().all(|owner| owner.closed));
+    assert!(machine.owners[1..].iter().all(OwnerState::is_closed));
     assert_eq!(machine.current_owner, 0);
     assert!(machine.current_evidence.is_none());
     assert_eq!(machine.heap.stats().arenas_allocated, 3);

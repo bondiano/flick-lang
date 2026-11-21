@@ -3,6 +3,7 @@
 module RcMap exposing (..)
 
 import Duration
+import Fiber
 
 /// Resources of `a` by keys of `k`, of region `s`, whose lookup fails with
 /// `e`.
@@ -13,13 +14,15 @@ type error ExceededCapacity = ExceededCapacity String
   deriving Eq, Show
 
 /// A map owned by the innermost `scope` (or the one of region `s`);
-/// `lookup` runs with the services of this call. A resource stays for
-/// `idleTimeToLive key` after its last holder (`None`: no time), and the map
-/// holds at most `capacity` keys (`None`: no bound).
-/// Each lookup has a fresh region `t`; a type that names it cannot escape.
+/// `lookup` runs with the services of this call, whose providers must
+/// outlive `s`. A resource stays for `idleTimeToLive key` after its last
+/// holder (`None`: no time), and the map holds at most `capacity` keys
+/// (`None`: no bound). Each lookup has a fresh region `t`, where releases
+/// may use those services; a type that names `t` cannot escape.
 make :
+  Fiber.Provided r s =>
   {
-    lookup : forall t. k ->{Scope t | r; e} a^{t}
+    lookup : forall t. Fiber.Provided r t => k ->{Scope t | r; e} a^{t}
     idleTimeToLive : Option (k -> Duration.Duration)
     capacity : Option Int
   } ->{Scope s | r}

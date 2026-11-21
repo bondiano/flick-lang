@@ -12,6 +12,7 @@
 //! declaration is inferred (see [`solve`]).
 
 mod applied;
+mod bounds;
 mod captures;
 mod compare;
 mod data;
@@ -21,6 +22,7 @@ mod live;
 mod live_rows;
 mod outlives;
 mod provided;
+mod qualifiers;
 mod scopes;
 mod solve;
 mod unfold;
@@ -64,6 +66,9 @@ pub struct State {
     /// and those whose row may still grow (`provided.rs`).
     pub provided: Vec<provided::Want>,
     pub provided_late: Vec<provided::Want>,
+    /// Whether `pass_on` placed a `Provided` obligation into a stage row,
+    /// so `settle_performed` grows open rows before checking them.
+    pub passed_provided: bool,
     /// A `provide` compared with an owner not known yet: its scope, the
     /// owner, the service and where.
     pub late_owners: Vec<(usize, Type, Elem, Span)>,
@@ -477,8 +482,8 @@ impl Checker<'_> {
     }
 }
 
-/// `t` with `held` added to its qualifier.
-fn qualify(t: Type, held: Type) -> Type {
+/// `t` with `held` added to its qualifier, without duplicating identical leaves.
+pub(super) fn qualify(t: Type, held: Type) -> Type {
     match t {
         Type::Captured {
             ty,
@@ -487,7 +492,7 @@ fn qualify(t: Type, held: Type) -> Type {
             elided,
         } => Type::Captured {
             ty,
-            captures: Box::new(Type::Union(captures, Box::new(held))),
+            captures: Box::new(union_captures(*captures, held)),
             value,
             elided,
         },
@@ -498,6 +503,31 @@ fn qualify(t: Type, held: Type) -> Type {
             elided: Elided::default(),
         },
     }
+}
+
+/// Joins two capture terms without duplicating structurally equal leaves.
+pub(super) fn union_captures(left: Type, right: Type) -> Type {
+    fn is_empty_row(t: &Type) -> bool {
+        matches!(t, Type::Row(r) if r.entries.is_empty() && r.tail.is_none())
+    }
+    fn has_leaf(haystack: &Type, needle: &Type) -> bool {
+        if haystack == needle {
+            return true;
+        }
+        match haystack {
+            Type::Union(a, b) => has_leaf(a, needle) || has_leaf(b, needle),
+            _ => false,
+        }
+    }
+    fn append(acc: Type, term: Type) -> Type {
+        match term {
+            Type::Union(a, b) => append(append(acc, *a), *b),
+            leaf if is_empty_row(&leaf) || has_leaf(&acc, &leaf) => acc,
+            leaf if is_empty_row(&acc) => leaf,
+            leaf => Type::Union(Box::new(acc), Box::new(leaf)),
+        }
+    }
+    append(left, right)
 }
 
 /// Whether types differ only in what they capture: the hold, not the type,

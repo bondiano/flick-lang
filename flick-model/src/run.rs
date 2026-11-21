@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::{fs, io, iter, path};
+use std::{fs, io, path, slice};
 
 use flick_core::diagnostics::Severity;
 use flick_core::ir::memory::Name as MemoryName;
@@ -60,18 +60,30 @@ impl Host for Source<'_> {
 /// The modules of the program in `file`, or its errors.
 pub fn compile(file: &path::Path) -> Result<Vec<Compiled>, String> {
     let file = fs::canonicalize(file).map_err(|e| format!("{}: {e}", file.display()))?;
-    compile_with(&Files, &project::normalize(&file))
+    compile_with(&Files, &[project::normalize(&file)])
+}
+
+/// The modules of a multi-file program in `files`, or its errors.
+pub fn compile_files(files: &[path::PathBuf]) -> Result<Vec<Compiled>, String> {
+    let roots: Vec<_> = files
+        .iter()
+        .map(|f| {
+            fs::canonicalize(f)
+                .map(|p| project::normalize(&p))
+                .map_err(|e| format!("{}: {e}", f.display()))
+        })
+        .collect::<Result<_, _>>()?;
+    compile_with(&Files, &roots)
 }
 
 /// The modules of the program of the one module `text`, or its errors.
 pub fn compile_source(text: &str) -> Result<Vec<Compiled>, String> {
-    compile_with(&Source(text), path::Path::new(SOURCE))
+    compile_with(&Source(text), &[path::PathBuf::from(SOURCE)])
 }
 
-fn compile_with(host: &dyn Host, root: &path::Path) -> Result<Vec<Compiled>, String> {
+fn compile_with(host: &dyn Host, roots: &[path::PathBuf]) -> Result<Vec<Compiled>, String> {
     let mut sources = SourceMap::default();
-    let (diagnostics, compilation) =
-        project::compile(host, &mut sources, None, &[root.to_path_buf()]);
+    let (diagnostics, compilation) = project::compile(host, &mut sources, None, roots);
     let errors: Vec<String> = diagnostics
         .iter()
         .filter(|d| d.severity == Severity::Error)
@@ -87,7 +99,8 @@ fn compile_with(host: &dyn Host, root: &path::Path) -> Result<Vec<Compiled>, Str
 /// The program of `modules` and the built-in modules.
 pub fn program(modules: &[Compiled]) -> Program {
     let builtins: &[ir::Module] = build::builtin_modules();
-    translate::program(modules.iter().map(|m| &m.ir).chain(builtins))
+    let decls = decls(modules);
+    translate::program_with_decls(modules.iter().map(|m| &m.ir).chain(builtins), &decls)
 }
 
 /// What the checker knows of `modules` and the built-in modules.
@@ -243,6 +256,20 @@ pub fn counted_main(
     main: &Path,
     release: bool,
 ) -> Result<CountedMain, String> {
+    let (program, root) = counted_program(modules, slice::from_ref(main), release)?;
+    Ok(CountedMain {
+        program,
+        entry: MemoryName::new(&main.module, &main.name),
+        root,
+    })
+}
+
+/// Lowers multiple entry roots and the root layer once for the counted executor.
+pub fn counted_program(
+    modules: &[Compiled],
+    entries: &[Path],
+    release: bool,
+) -> Result<(ir::memory::Program, Option<MemoryName>), String> {
     let ir: Vec<_> = modules
         .iter()
         .map(|module| {
@@ -253,7 +280,10 @@ pub fn counted_main(
             }
         })
         .collect();
-    let entry = MemoryName::new(&main.module, &main.name);
+    let entry_names: Vec<_> = entries
+        .iter()
+        .map(|p| MemoryName::new(&p.module, &p.name))
+        .collect();
     let declarations = counted_inputs::declarations(modules)?;
     let ir = counted_inputs::modules(&ir);
     // the root services, as the evaluator's `run_main` provides them
@@ -265,18 +295,14 @@ pub fn counted_main(
     let root = (ir.iter())
         .any(|m| *m.name == *layer.module && defines(m))
         .then(|| MemoryName::new(&layer.module, &layer.name));
-    let roots: Vec<&MemoryName> = iter::once(&entry).chain(&root).collect();
+    let roots: Vec<&MemoryName> = entry_names.iter().chain(&root).collect();
     let program = perceus::lower_roots_with_declarations(
         ir.iter().map(AsRef::as_ref),
         declarations.iter().map(AsRef::as_ref),
         &roots,
     )
     .map_err(|error| error.to_string())?;
-    Ok(CountedMain {
-        program,
-        entry,
-        root,
-    })
+    Ok((program, root))
 }
 
 /// Success-only convenience runner with its own heap. Function and task

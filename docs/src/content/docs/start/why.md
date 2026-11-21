@@ -135,7 +135,7 @@ it builds, never at run time.
 Flick does not need its own copy of every library. A `foreign` declaration binds
 a JavaScript function to a Flick signature, and `flick ffi import <package>`
 writes most of them from the package's `.d.ts`, with a report on every export.
-In the other direction, `flick build --emit-dts` writes TypeScript declarations
+In the other direction, `flick build --declarations` writes TypeScript declarations
 of Flick modules. On Go, bindings are written by hand for now. See
 [Foreign functions](../../reference/ffi/).
 
@@ -169,7 +169,7 @@ check.
   target is planned and not on `main` yet.
 - **Teams already productive with TypeScript and Effect.** On JavaScript, Flick
   runs on its own runtime by default, or on the same Effect through an adapter
-  (`effect = "effect"`), where adopting it is a choice of source language, not
+  (`[target.js] runtime = "effect"`), where adopting it is a choice of source language, not
   of runtime. [Effect coverage](../../reference/runtime/#effect-coverage) lists what of
   Effect Flick reaches.
 

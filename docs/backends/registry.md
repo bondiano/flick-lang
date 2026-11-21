@@ -22,12 +22,14 @@ component receives its identity and digest, not filesystem access. Version
 ranges, missing fields, unknown fields and malformed digests are errors.
 
 `environment` is an open backend/platform pair: `js/node` and `js/browser`
-are different targets. Without it the compatibility default is `js/node`
-for JS/TS output and `go/native` for Go. The existing `js`, `ts`, `go` output
-choices remain compatible. Unpinned JS/TS selects the official `flick/js`
-component and Go the official `flick/go` component, whose `go build` step
-needs `[tools]` `"flick/go" = ["go"]` (or `--allow-tool go` outside a
-project).
+are different targets. Without it the default is `js/node` for `flick/js` and
+`go/native` for `flick/go`. Target selection uses `[build] target = "js" | "go"`
+(or `--target <name>` on `build`, `run`, `dev`, `test` and `inspect`), and
+backend-specific options live in `[target.<name>]` and on the CLI as declared
+by the selected backend's `describe` descriptor. Unpinned `js` selects the
+official `flick/js` component and `go` selects the official `flick/go`
+component, whose `go build` step needs `[tools]` `"flick/go" = ["go"]` (or
+`--allow-tool go` outside a project).
 
 The compiler holds no component. The official ones are release assets: a tag
 `backend-<name>-v<version>` publishes `component.wasm` and `backend.json`, and
@@ -45,7 +47,7 @@ from a checkout takes that checkout's `backends/<name>/package` instead, as
 does `FLICK_BACKENDS_PATH=<dir>/<name>/package`'s parent; `FLICK_BACKENDS_INDEX`
 names another index, a URL or a file. Environment support is
 checked against the selected backend before a cache hit is reused.
-The JS runtime setting `[build] effect = "rt"`
+The JS runtime setting `[target.js] runtime = "rt"`
 or `"effect"` remains independent of component identity.
 The compiler's JS runtime version check applies to the default component and
 an explicit pin matching the distributed JS image. Other components negotiate

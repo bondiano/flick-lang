@@ -123,9 +123,9 @@ theorem Typ.pureTy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       obtain ⟨_, le, te, -⟩ := ih₂ hve rfl
       exact ⟨_, lt.trans hT, .app t₀ (te.sub ⟨le.trans la, Stage.le_refl _⟩) (by trivial) LeLive.refl,
         by simp [Tm.head], fun _ h => (by cases h)⟩
-  | drec hc hk hr hn =>
+  | drec hc hk hr hn hT =>
     intro _ _ _ hJ; cases hJ
-    exact ⟨_, LeLive.refl, .drec hc hk hr hn, by simp [Tm.head], by simp⟩
+    exact ⟨_, hT, .drec hc hk hr hn LeLive.refl, by simp [Tm.head], by simp⟩
   | perform hus hop hT =>
     intro _ _ _ hJ; cases hJ
     refine ⟨_, hT, .perform hus hop LeLive.refl, by simp [Tm.head], fun _ h _ => ?_⟩

@@ -1,0 +1,142 @@
+// Cross-runtime contract for `Effect.Errors` combinators and mixed-arm handlers
+// under `abort` and `Die + Signal`:
+// - handler with both op and error arms elects `Die + Fail(TypedErr)` to `["D", "D"]`
+// - `Effect.or_die`, `Effect.ignore_`, `Effect.ignore_cause` propagate `abort`
+// - `Effect.catch_defect` and `Effect.tap_defect` ignore handler signals and see the real defect
+// - `Effect.tap_cause`, `Effect.tap_cause_if`, `Effect.on_error`, `Effect.on_error_if` skip pure `abort`
+// - `Effect.on_exit` strips handler signals before handing `Exit` to its callback
+module App.Main exposing (main)
+
+type error MyErr = MyErr
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+view : Failure e -> List String
+let view f =
+  label : Cause.Reason e -> String
+  let label r = if Cause.is_fail_reason r then "F" else if Cause.is_die_reason r then "D" else "I"
+  List.map label (Cause.reasons f)
+
+outcome : Exit e String -> String
+let outcome ex = Exit.match_ (fun v -> "ok:" ++ v) (fun f -> "fail:" ++ show (view f)) ex
+
+stopping : (Unit ->{Stop | r; e} String) ->{r; e} String
+let stopping body =
+  try body () with
+  | Stop.stop s -> "stopped:" ++ s
+
+abort_with_fin_die : Unit ->{Stop} String
+let abort_with_fin_die () = scope {
+  Scope.add_finalizer (task { Effect.die "fin-boom" })
+  Stop.stop "body-abort"
+}
+
+abort_with_ensuring_die : Unit ->{Stop} String
+let abort_with_ensuring_die () =
+  Effect.ensuring (task { Stop.stop "cleanup-abort" }) (task { Effect.die "fin-boom" })
+
+main : Unit ->{Host.Console, Async; AppError} Unit
+let main () =
+  // 1. Handler with both operation arms and error arms elects Die + Fail(MyErr) to ["D", "D"]
+  let mixed =
+    Effect.exit
+      (task {
+        try
+          Effect.fail_cause_sync (fun () -> Cause.combine (Cause.die "boom") (Cause.fail MyErr))
+        with
+        | Stop.stop s -> s
+        | MyErr -> "caught"
+      })
+  say ("mixed handler: " ++ outcome mixed)
+
+  // 2. or_die propagates pure abort and strips signals on Die + Signal
+  let or_die_abort =
+    Effect.exit (task { stopping (fun () -> Effect.or_die (task { Stop.stop "halt" })) })
+  say ("or_die abort: " ++ outcome or_die_abort)
+  let or_die_die =
+    Effect.exit (task { stopping (fun () -> Effect.or_die (task { abort_with_ensuring_die () })) })
+  say ("or_die die+abort: " ++ outcome or_die_die)
+
+  // 3. ignore_ and ignore_cause propagate pure abort
+  let ign =
+    Effect.exit
+      (task {
+        stopping (fun () ->
+          Effect.ignore_ None (task { Stop.stop "ig" })
+          "ignored"
+        )
+      })
+  say ("ignore_ abort: " ++ outcome ign)
+  let ign_c =
+    Effect.exit
+      (task {
+        stopping (fun () ->
+          Effect.ignore_cause None (task { Stop.stop "igc" })
+          "ignored"
+        )
+      })
+  say ("ignore_cause abort: " ++ outcome ign_c)
+
+  // 4. catch_defect and tap_defect see real defect, never raw signal
+  let cd =
+    Effect.exit
+      (task {
+        stopping (fun () ->
+          Effect.catch_defect (fun d -> "caught:" ++ d) (task { abort_with_fin_die () })
+        )
+      })
+  say ("catch_defect die+abort: " ++ outcome cd)
+
+  let tapped_defects = Ref.make ""
+  let td =
+    Effect.exit
+      (task {
+        stopping (fun () ->
+          Effect.tap_defect
+            (fun d -> Ref.set tapped_defects d)
+            (task { abort_with_ensuring_die () })
+        )
+      })
+  say ("tap_defect die+abort: " ++ outcome td ++ ", tapped=" ++ Ref.get tapped_defects)
+
+  // 5. tap_cause, tap_cause_if, on_error, on_error_if skip pure abort
+  let skipped = Ref.make 0
+  let bump () = Ref.set skipped (Ref.get skipped + 1)
+  let tc1 = stopping (fun () -> Effect.tap_cause (fun _ -> bump ()) (task { Stop.stop "tc" }))
+  let tc2 =
+    stopping (fun () ->
+      Effect.tap_cause_if (fun _ -> true) (fun _ -> bump ()) (task { Stop.stop "tci" })
+    )
+  let oe1 = stopping (fun () -> Effect.on_error (fun _ -> bump ()) (task { Stop.stop "oe" }))
+  let oe2 =
+    stopping (fun () ->
+      Effect.on_error_if (fun _ -> true) (fun _ -> bump ()) (task { Stop.stop "oei" })
+    )
+  say
+    ("skip pure abort: "
+      ++ tc1
+      ++ ","
+      ++ tc2
+      ++ ","
+      ++ oe1
+      ++ ","
+      ++ oe2
+      ++ ", ran="
+      ++ show (Ref.get skipped))
+
+  // 6. on_exit strips signals before invoking callback
+  let on_exit_seen = Ref.make ""
+  let ox =
+    Effect.exit
+      (task {
+        stopping (fun () ->
+          Effect.on_exit
+            (fun ex -> Ref.set on_exit_seen (outcome ex))
+            (task { abort_with_fin_die () })
+        )
+      })
+  say ("on_exit die+abort: seen=" ++ Ref.get on_exit_seen ++ ", outer=" ++ outcome ox)

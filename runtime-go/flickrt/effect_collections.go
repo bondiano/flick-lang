@@ -47,10 +47,12 @@ func partition(fb *Fiber, concurrency, f, xs Value) ([]Value, []Value) {
 			if c == nil {
 				return Ok(v)
 			}
-			if r := c.firstOf(causeFail); r != nil {
-				return Err(r.err)
+			if !c.hasRealDie() && !unwinds(c) {
+				if r := c.firstOf(causeFail); r != nil {
+					return Err(r.err)
+				}
 			}
-			return failCause(c)
+			return failCause(cleanCause(c))
 		})
 	}
 	passes, fails := []Value{}, []Value{}
@@ -149,8 +151,8 @@ func EffectFirstSuccessOf(fb *Fiber, tasks Value) Value {
 		if c == nil {
 			return v
 		}
-		if !c.has(causeFail) {
-			return failCause(c)
+		if !c.has(causeFail) || c.hasRealDie() || unwinds(c) {
+			return failCause(cleanCause(c))
 		}
 	}
 	return Run(fb, in[len(in)-1])

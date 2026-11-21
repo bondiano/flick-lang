@@ -1,15 +1,26 @@
 //! The variance of each parameter of a declared type (`docs/formal/regions.md`
-//! §2.2.1, Lean `Sig.var` with `Sig.var_ok`): the least fixed point over the
+//! §2.2.1, Lean `Sig.var` with `Sig.var_ok`): the fixed point over the
 //! declarations, read from the fields of the constructors, as the model reads
 //! it (`flick-model/src/variance.rs`). Subtyping compares the arguments of
 //! data by it, and records and tuples field by field.
 
+mod class_solve;
+mod class_walk;
+mod format;
+mod solve;
+
+pub use format::{
+    decl_param_names, format_interface_summary, format_markdown, format_parameter_markdown,
+    format_plain,
+};
+
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use serde::{Deserialize, Serialize};
+
 use super::Checker;
-use super::elem::{Atom, Elem};
-use super::env::Form;
+use super::env::{Form, TypeDef};
 use super::kinds::Kind;
 use super::lang::Lang;
 use super::regions::{Hold, Visible};
@@ -18,98 +29,63 @@ use super::ty::Type;
 use super::unify::Unified;
 use crate::iface::{Entity, Namespace};
 use crate::logic::RULES;
+use crate::numeric::{Num, NumLang};
 use crate::source::Span;
+use solve::{bare, fields};
 
-/// `+`, `−`, `inv` or `bi` (unused).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum Sign {
-    Bi,
-    Pos,
-    Neg,
-    Inv,
+/// The variance of a type or class parameter: `+` (covariant), `-`
+/// (contravariant), `inv` (invariant) or `bi` (bivariant / unused).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Variance {
+    Bivariant,
+    Covariant,
+    Contravariant,
+    Invariant,
 }
 
-impl Sign {
-    fn join(self, other: Sign) -> Sign {
+impl Variance {
+    /// Least upper bound in the variance lattice (`bi < {+, -} < inv`).
+    #[must_use]
+    pub fn join(self, other: Variance) -> Variance {
         match (self, other) {
-            (Sign::Bi, s) | (s, Sign::Bi) => s,
+            (Variance::Bivariant, s) | (s, Variance::Bivariant) => s,
             (a, b) if a == b => a,
-            _ => Sign::Inv,
+            _ => Variance::Invariant,
+        }
+    }
+
+    /// Short symbol used in developer tools (`+`, `-`, `inv`, `bi`).
+    #[must_use]
+    pub fn symbol(self) -> &'static str {
+        match self {
+            Variance::Covariant => "+",
+            Variance::Contravariant => "-",
+            Variance::Invariant => "inv",
+            Variance::Bivariant => "bi",
+        }
+    }
+
+    /// Lowercase name matching the `.iface` serialization.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Variance::Covariant => "covariant",
+            Variance::Contravariant => "contravariant",
+            Variance::Invariant => "invariant",
+            Variance::Bivariant => "bivariant",
         }
     }
 }
 
 /// A type by its module and name.
-type Key = (String, String);
+pub(super) type Key = (String, String);
 
 /// The signs found so far, by type; `None` for a type without them.
-pub(super) type Signs = HashMap<Key, Option<Rc<[Sign]>>>;
-
-/// What the positions of a parameter in the fields allow, joined. A `+`
-/// parameter stands under no flip (Lean `Ty.Pol.arrow`): there its argument
-/// would grow what the field reaches where it must shrink.
-struct Uses(Sign);
-
-impl Uses {
-    fn at(&mut self, q: bool, flipped: bool) {
-        self.0 = self.0.join(match (q, flipped) {
-            (true, false) => Sign::Pos,
-            (true, true) => Sign::Inv,
-            (false, _) => Sign::Neg,
-        });
-    }
-
-    /// Where only `≡` relates its argument, if it stands there.
-    fn fixed(&mut self, stands: bool) {
-        if stands {
-            self.0 = Sign::Inv;
-        }
-    }
-}
-
-fn names(l: &Elem, a: &str) -> bool {
-    match l {
-        Elem::Capture(Atom::Var(n)) | Elem::Error(Atom::Var(n)) | Elem::Service(Atom::Var(n)) => {
-            n == a
-        }
-        Elem::Provided(e) => names(e, a),
-        _ => false,
-    }
-}
-
-/// Whether `a` stands anywhere in `t`, rows and qualifiers included.
-fn occurs(a: &str, t: &Type) -> bool {
-    t.contains(&mut |t| match t {
-        Type::Var(n) => n == a,
-        Type::Record(r) | Type::Row(r) => r.entries.iter().any(|(l, _)| names(l, a)),
-        _ => false,
-    })
-}
-
-/// `t` without the qualifiers of a value of it.
-fn bare(mut t: &Type) -> &Type {
-    while let Type::Captured { ty, .. } | Type::Bounded { ty, .. } = t {
-        t = ty;
-    }
-    t
-}
-
-/// The fields of a constructor's scheme, and the type it builds.
-fn fields(scheme: &Type) -> (Vec<&Type>, &Type) {
-    let mut t = match scheme {
-        Type::Forall { body, .. } => &**body,
-        t => t,
-    };
-    let mut out = Vec::new();
-    while let Type::Fun { param, result, .. } = t {
-        out.push(&**param);
-        t = result;
-    }
-    (out, bare(t))
-}
+pub(super) type Signs = HashMap<Key, Option<Rc<[Variance]>>>;
 
 /// The kinds of the parameters a kind takes.
-fn params(mut k: &Kind) -> Vec<&Kind> {
+pub(crate) fn param_kinds(mut k: &Kind) -> Vec<&Kind> {
     let mut out = Vec::new();
     while let Kind::Arrow(p, r) = k {
         out.push(&**p);
@@ -118,59 +94,167 @@ fn params(mut k: &Kind) -> Vec<&Kind> {
     out
 }
 
-/// A declared type: the kinds of its parameters and its constructors'
-/// schemes, `None` for one of them it cannot see.
-struct Data<'t> {
-    kinds: Vec<Kind>,
-    ctors: Option<Vec<&'t Type>>,
+/// Validates serialized parameter variance against `kinds`.
+///
+/// Only parameterized declarations with exact arity and `Invariant` on every
+/// non-`Type` parameter are trusted; unknown or malformed metadata stays
+/// conservative (`None`).
+pub(crate) fn valid_exported_variance<'a>(
+    kinds: &[Kind],
+    variance: &'a [Variance],
+) -> Option<&'a [Variance]> {
+    if kinds.is_empty() || variance.len() != kinds.len() {
+        return None;
+    }
+    if kinds
+        .iter()
+        .zip(variance)
+        .any(|(kind, v)| *kind != Kind::Type && *v != Variance::Invariant)
+    {
+        return None;
+    }
+    Some(variance)
+}
+
+/// Built-in scalar types subtyping moves neither up nor down (Lean `Ty.Closed`).
+fn is_closed_scalar(t: &Type) -> bool {
+    const SCALARS: [Lang; 7] = [
+        Lang::Int,
+        Lang::Float,
+        Lang::BigInt,
+        Lang::String,
+        Lang::Bool,
+        Lang::Unit,
+        Lang::Never,
+    ];
+    SCALARS.iter().any(|&lang| t.is_lang(lang)) || Num::ALL.iter().any(|num| t.is_lang(num.lang()))
+}
+
+/// A declared type: the kinds of its parameters, its constructors' schemes
+/// (`None` when any constructor is hidden or opaque), and validated serialized
+/// variance when imported or when constructors are unavailable.
+pub(super) struct Data<'t> {
+    pub(super) kinds: Vec<Kind>,
+    pub(super) ctors: Option<Vec<&'t Type>>,
+    pub(super) exported: Option<&'t [Variance]>,
 }
 
 impl Checker<'_> {
+    /// Computes and records inferred parameter variances on this module's own
+    /// data and class declarations so exports, support types and local
+    /// declarations all carry them.
+    pub(super) fn populate_own_variances(&mut self) {
+        let module = self.env.module.clone();
+        let mut data_candidates: Vec<String> = Vec::new();
+        let mut class_candidates: Vec<String> = Vec::new();
+        for (name, def) in self.env.own_types() {
+            match def.form {
+                Form::Adt { .. } | Form::Error => data_candidates.push(name.to_owned()),
+                Form::Nominal { .. } if Type::con(&module, name).is_lang(Lang::List) => {
+                    data_candidates.push(name.to_owned());
+                }
+                Form::Class { .. } => class_candidates.push(name.to_owned()),
+                _ => {}
+            }
+        }
+        data_candidates.sort();
+        for name in data_candidates {
+            if let Some(signs) = self.signs(&module, &name)
+                && !signs.is_empty()
+                && let Some(def) = self.env.type_def_mut(&name)
+            {
+                def.variance = signs.to_vec();
+            }
+        }
+        class_candidates.sort();
+        for name in class_candidates {
+            if let Some(signs) = self.class_signs(&module, &name)
+                && !signs.is_empty()
+                && let Some(def) = self.env.type_def_mut(&name)
+            {
+                def.variance = signs.to_vec();
+            }
+        }
+    }
+
+    /// Variance of `module.name` for export/declaration projection without
+    /// mutating the checker cache.
+    pub(super) fn exported_variance(
+        &self,
+        module: &str,
+        name: &str,
+        def: &TypeDef,
+    ) -> Vec<Variance> {
+        let kinds: Vec<Kind> = param_kinds(&def.kind).into_iter().cloned().collect();
+        if kinds.is_empty() {
+            return Vec::new();
+        }
+        match &def.form {
+            Form::Adt { .. } | Form::Error => {
+                if valid_exported_variance(&kinds, &def.variance).is_some() {
+                    return def.variance.clone();
+                }
+                self.compute_signs(module, name)
+                    .map_or_else(Vec::new, |s| s.to_vec())
+            }
+            Form::Class { .. } => {
+                if valid_exported_variance(&kinds, &def.variance).is_some() {
+                    return def.variance.clone();
+                }
+                self.compute_class_signs(module, name)
+                    .map_or_else(Vec::new, |s| s.to_vec())
+            }
+            Form::Nominal { .. } => {
+                if valid_exported_variance(&kinds, &def.variance).is_some() {
+                    return def.variance.clone();
+                }
+                if Type::con(module, name).is_lang(Lang::List) && kinds == [Kind::Type] {
+                    vec![Variance::Covariant]
+                } else {
+                    Vec::new()
+                }
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    /// The sign of each parameter of class `module.name`, inferred from its
+    /// superclasses and methods for local classes or read from validated `.iface`
+    /// metadata for imported classes (falling back conservatively to `Invariant`).
+    pub(super) fn class_signs(&mut self, module: &str, name: &str) -> Option<Rc<[Variance]>> {
+        let key = (module.to_owned(), name.to_owned());
+        if let Some(found) = self.class_signs.get(&key) {
+            return found.clone();
+        }
+        let solved = self.solve_class_group(&key);
+        for (k, s) in solved {
+            self.class_signs.insert(k, Some(s.into()));
+        }
+        let found = self.class_signs.get(&key).cloned().flatten();
+        self.class_signs.insert(key, found.clone());
+        found
+    }
+
+    /// Pure `&self` class-sign lookup for export projection.
+    pub(super) fn compute_class_signs(&self, module: &str, name: &str) -> Option<Rc<[Variance]>> {
+        let key = (module.to_owned(), name.to_owned());
+        if let Some(found) = self.class_signs.get(&key) {
+            return found.clone();
+        }
+        let solved = self.solve_class_group(&key);
+        solved.get(&key).map(|s| Rc::from(s.as_slice()))
+    }
+
     /// The sign of each parameter of the type `module.name`, `None` but for
-    /// a declared type or the built-in list.
-    pub(super) fn signs(&mut self, module: &str, name: &str) -> Option<Rc<[Sign]>> {
+    /// a declared type, a nominal type with validated exported variance, or
+    /// the built-in list.
+    pub(super) fn signs(&mut self, module: &str, name: &str) -> Option<Rc<[Variance]>> {
         let key = (module.to_owned(), name.to_owned());
         if let Some(found) = self.signs.get(&key) {
             return found.clone();
         }
-        // the types the fields reach, to solve together
-        let mut group: Vec<Key> = Vec::new();
-        let mut todo = vec![key.clone()];
-        while let Some(k) = todo.pop() {
-            if group.contains(&k) || self.signs.contains_key(&k) {
-                continue;
-            }
-            let Some(data) = self.data(&k) else { continue };
-            for scheme in data.ctors.iter().flatten() {
-                scheme.visit(&mut |t| {
-                    if let Type::Con { module, name } = t {
-                        todo.push((module.clone(), name.clone()));
-                    }
-                });
-            }
-            group.push(k);
-        }
-        let mut current: HashMap<Key, Vec<Sign>> = HashMap::new();
-        for k in &group {
-            let n = self.data(k).map_or(0, |d| d.kinds.len());
-            current.insert(k.clone(), vec![Sign::Bi; n]);
-        }
-        loop {
-            let mut changed = false;
-            for k in &group {
-                let next = self.sign_of(k, &current);
-                let old = &current[k];
-                let joined: Vec<Sign> = old.iter().zip(&next).map(|(a, b)| a.join(*b)).collect();
-                if &joined != old {
-                    current.insert(k.clone(), joined);
-                    changed = true;
-                }
-            }
-            if !changed {
-                break;
-            }
-        }
-        for (k, s) in current {
+        let solved = self.solve_group(&key);
+        for (k, s) in solved {
             self.signs.insert(k, Some(s.into()));
         }
         let found = self.signs.get(&key).cloned().flatten().or_else(|| {
@@ -179,170 +263,104 @@ impl Checker<'_> {
                 name: name.to_owned(),
             };
             // the built-in list is immutable and has no declaration
-            list.is_lang(Lang::List).then(|| Rc::from([Sign::Pos]))
+            list.is_lang(Lang::List)
+                .then(|| Rc::from([Variance::Covariant]))
         });
         self.signs.insert(key, found.clone());
         found
     }
 
-    fn data(&self, (module, name): &Key) -> Option<Data<'_>> {
-        let def = self.env.type_def(module, name)?;
-        let names: Vec<&str> = match &def.form {
-            Form::Adt { constructors, .. } => constructors.iter().map(String::as_str).collect(),
-            Form::Error => vec![name.as_str()],
-            _ => return None,
-        };
-        let ctors = names
-            .into_iter()
-            .map(|c| {
-                self.env.value(&Entity {
-                    module: module.clone(),
-                    namespace: Namespace::Constructor,
-                    name: c.to_owned(),
-                })
-            })
-            .collect();
-        Some(Data {
-            kinds: params(&def.kind).into_iter().cloned().collect(),
-            ctors,
-        })
-    }
-
-    /// The signs the constructors of `k` justify, given the current signs.
-    fn sign_of(&self, k: &Key, current: &HashMap<Key, Vec<Sign>>) -> Vec<Sign> {
-        let Some(data) = self.data(k) else {
-            return Vec::new();
-        };
-        let n = data.kinds.len();
-        let Some(ctors) = data.ctors else {
-            return vec![Sign::Inv; n];
-        };
-        let mut uses: Vec<Uses> = (0..n).map(|_| Uses(Sign::Bi)).collect();
-        let mut fixed = vec![false; n];
-        for scheme in ctors {
-            let (fields, res) = fields(scheme);
-            let (_, res) = res.spine();
-            for (j, u) in uses.iter_mut().enumerate() {
-                let Some(r) = res.get(j) else {
-                    u.0 = Sign::Inv;
-                    continue;
-                };
-                let alone =
-                    |v: &str| !(res.iter().enumerate()).any(|(m, o)| m != j && occurs(v, o));
-                match bare(r) {
-                    // an ordinary variable of the constructor, which nothing
-                    // else it builds fixes (A1)
-                    Type::Var(v) if alone(v) => {
-                        for f in &fields {
-                            self.walk(current, v, f, true, false, u);
-                        }
-                    }
-                    // a GADT constructor that fixes the argument to a type
-                    // subtyping does not move (A2)
-                    c if self.closed(c, &mut Vec::new()) => fixed[j] = true,
-                    _ => u.0 = Sign::Inv,
-                }
-            }
+    /// Pure `&self` sign lookup for projection paths that cannot mutate `self`.
+    fn compute_signs(&self, module: &str, name: &str) -> Option<Rc<[Variance]>> {
+        let key = (module.to_owned(), name.to_owned());
+        if let Some(found) = self.signs.get(&key) {
+            return found.clone();
         }
-        (data.kinds.iter().zip(uses.iter().zip(&fixed)))
-            .map(|(k, (u, f))| match (k, u.0) {
-                (Kind::Type, Sign::Bi) if *f => Sign::Pos,
-                (Kind::Type, s) => s,
-                _ => Sign::Inv,
-            })
-            .collect()
+        let solved = self.solve_group(&key);
+        if let Some(s) = solved.get(&key) {
+            return Some(Rc::from(s.as_slice()));
+        }
+        let list = Type::Con {
+            module: module.to_owned(),
+            name: name.to_owned(),
+        };
+        list.is_lang(Lang::List)
+            .then(|| Rc::from([Variance::Covariant]))
     }
 
-    /// Where `a` stands in `t`, at polarity `q` (`true`: covariant),
-    /// `flipped` once a flip is above it.
-    fn walk(
-        &self,
-        current: &HashMap<Key, Vec<Sign>>,
-        parameter: &str,
-        ty: &Type,
-        positive: bool,
-        flipped: bool,
-        out: &mut Uses,
-    ) {
-        match ty {
-            Type::Var(name) if name == parameter => out.at(positive, flipped),
-            Type::Fun {
-                param,
-                effects,
-                result,
-            } => {
-                self.walk(current, parameter, param, !positive, true, out);
-                out.fixed(effects.as_ref().is_some_and(|errors| {
-                    occurs(parameter, &errors.services) || occurs(parameter, &errors.errors)
-                }));
-                self.walk(current, parameter, result, positive, flipped, out);
+    pub(super) fn data(&self, (module, name): &Key) -> Option<Data<'_>> {
+        let def = self.env.type_def(module, name)?;
+        let kinds: Vec<Kind> = param_kinds(&def.kind).into_iter().cloned().collect();
+        let imported = module != &self.env.module;
+        match &def.form {
+            Form::Adt { constructors, .. } => {
+                let ctors = constructors
+                    .iter()
+                    .map(|c| {
+                        self.env.value(&Entity {
+                            module: module.clone(),
+                            namespace: Namespace::Constructor,
+                            name: c.clone(),
+                        })
+                    })
+                    .collect::<Option<Vec<_>>>();
+                let exported = (imported || ctors.is_none())
+                    .then(|| valid_exported_variance(&kinds, &def.variance))
+                    .flatten();
+                Some(Data {
+                    kinds,
+                    ctors,
+                    exported,
+                })
             }
-            Type::Captured { ty, captures, .. } | Type::Bounded { ty, captures } => {
-                if occurs(parameter, captures) {
-                    out.at(positive, flipped);
-                }
-                self.walk(current, parameter, ty, positive, flipped, out);
+            Form::Error => {
+                let ctors = self
+                    .env
+                    .value(&Entity {
+                        module: module.clone(),
+                        namespace: Namespace::Constructor,
+                        name: name.clone(),
+                    })
+                    .map(|scheme| vec![scheme]);
+                let exported = (imported || ctors.is_none())
+                    .then(|| valid_exported_variance(&kinds, &def.variance))
+                    .flatten();
+                Some(Data {
+                    kinds,
+                    ctors,
+                    exported,
+                })
             }
-            Type::Record(row) if !row.tail.as_ref().is_some_and(|ty| occurs(parameter, ty)) => {
-                for (label, field) in &row.entries {
-                    out.fixed(names(label, parameter));
-                    self.walk(current, parameter, field, positive, flipped, out);
-                }
+            Form::Nominal { .. } => {
+                let exported = valid_exported_variance(&kinds, &def.variance)?;
+                Some(Data {
+                    kinds,
+                    ctors: None,
+                    exported: Some(exported),
+                })
             }
-            Type::Tuple(items) => {
-                for item in items {
-                    self.walk(current, parameter, item, positive, flipped, out);
-                }
-            }
-            Type::App { .. } => {
-                let (head, args) = ty.spine();
-                match (head, &args[..]) {
-                    (callee, [row, errors, item]) if callee.is_lang(Lang::Eff) => {
-                        out.fixed(occurs(parameter, row) || occurs(parameter, errors));
-                        self.walk(current, parameter, item, positive, flipped, out);
-                    }
-                    (Type::Con { module, name }, _) => {
-                        let key = (module.clone(), name.clone());
-                        let theirs = (current.get(&key).cloned())
-                            .or_else(|| self.signs.get(&key).cloned().flatten().map(|s| s.to_vec()))
-                            .or_else(|| head.is_lang(Lang::List).then(|| vec![Sign::Pos]));
-                        for (index, item) in args.into_iter().enumerate() {
-                            // an unused parameter holds `parameter` only where `parameter`
-                            // itself may stand (Lean `Ty.Pol.data`)
-                            match theirs.as_ref().and_then(|s| s.get(index)).copied() {
-                                Some(Sign::Pos | Sign::Bi) => {
-                                    self.walk(current, parameter, item, positive, flipped, out);
-                                }
-                                Some(Sign::Neg) => {
-                                    self.walk(current, parameter, item, !positive, true, out);
-                                }
-                                Some(Sign::Inv) | None => out.fixed(occurs(parameter, item)),
-                            }
-                        }
-                    }
-                    _ => out.fixed(occurs(parameter, ty)),
-                }
-            }
-            _ => out.fixed(occurs(parameter, ty)),
+            _ => None,
         }
     }
 
     /// A type subtyping moves neither up nor down (Lean `Ty.Closed`): a
-    /// nominal type without parameters, representation or hidden storage
-    /// whose fields are such types (a cycle of them is).
-    fn closed(&self, t: &Type, seen: &mut Vec<Key>) -> bool {
+    /// built-in scalar, or a declared data type without parameters whose
+    /// visible constructor fields are such types (a cycle of them is).
+    /// Opaque, abstract and module-parameter nominal types stay conservatively
+    /// non-closed because their representations are unavailable.
+    pub(super) fn closed(&self, t: &Type, seen: &mut Vec<Key>) -> bool {
         let Type::Con { module, name } = t else {
             return false;
         };
         let Some(def) = self.env.type_def(module, name) else {
             return false;
         };
-        if !params(&def.kind).is_empty() {
+        if !param_kinds(&def.kind).is_empty() {
             return false;
         }
         let key = (module.clone(), name.clone());
         match &def.form {
-            Form::Nominal { hidden, .. } => !hidden,
+            Form::Nominal { .. } => is_closed_scalar(t),
             Form::Adt { .. } | Form::Error if seen.contains(&key) => true,
             Form::Adt { .. } | Form::Error => {
                 let Some(Data {
@@ -417,7 +435,14 @@ impl Checker<'_> {
                         && name == other_name
                         && args.len() == expected_args.len() =>
                     {
-                        self.signs(module, name).filter(|s| s.len() == args.len())
+                        if let Some(class_name) = name.strip_suffix("$Dict")
+                            && self.class_info(module, class_name).is_some()
+                        {
+                            self.class_signs(module, class_name)
+                                .filter(|s| s.len() == args.len())
+                        } else {
+                            self.signs(module, name).filter(|s| s.len() == args.len())
+                        }
                     }
                     _ => None,
                 };
@@ -433,17 +458,17 @@ impl Checker<'_> {
                     // as it is, its bound too, as `≡` of the whole type did
                     let open = |t: &Type| self.whnf(t).inference_meta_root().is_some();
                     match s {
-                        Sign::Pos if !open(x) && open(y) => {
+                        Variance::Covariant if !open(x) && open(y) => {
                             self.bind_subsumed_meta(x, y, false)
                                 .unwrap_or_else(|| self.unify(x, y))?;
                         }
                         _ if open(x) || open(y) => self.unify(x, y)?,
-                        Sign::Pos => self.subsume(x, y, span)?,
-                        Sign::Neg => {
+                        Variance::Covariant => self.subsume(x, y, span)?,
+                        Variance::Contravariant => {
                             self.subsume(y, x, span)?;
                             self.keeps_reach(x, y, span);
                         }
-                        Sign::Inv | Sign::Bi => self.unify(x, y)?,
+                        Variance::Invariant | Variance::Bivariant => self.unify(x, y)?,
                     }
                 }
                 Ok(())

@@ -178,4 +178,15 @@ theorem Ty.Equiv.spine_args {as bs : List Ty} (h : Ty.Equiv (Ty.spine as) (Ty.sp
       | rows hr _ => cases hr
       | tapp ha hr => exact .cons ha (ih hr)
 
+theorem Ty.Equiv.spine_left {as : List Ty} {U : Ty} (h : Ty.Equiv (Ty.spine as) U) :
+    ∃ bs, U = Ty.spine bs ∧ Ty.ArgsEquiv as bs := by
+  induction as generalizing U with
+  | nil => exact ⟨[], h.symm.rnil_right, .nil⟩
+  | cons a as ih =>
+    cases h.form with
+    | rows hr _ => cases hr
+    | tapp ha hr =>
+      obtain ⟨bs, rfl, hbs⟩ := ih hr
+      exact ⟨_ :: bs, rfl, .cons ha hbs⟩
+
 end Flick

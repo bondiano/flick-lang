@@ -2,6 +2,9 @@
 //! library from the saved modules while its sources, the compiler and the
 //! project's configuration stay the same, and checks it again otherwise.
 
+#[path = "package_cache/variance.rs"]
+mod variance;
+
 use crate::common;
 
 use std::fs;
@@ -253,7 +256,7 @@ fn installed_private_module_public_facade_runs_on_js_and_go() {
                     cache,
                     &[
                         "build",
-                        "--emit",
+                        "--target",
                         emit,
                         "--profile",
                         profile,
@@ -402,7 +405,7 @@ fn the_declarations_of_a_saved_library_keep_its_docs() {
         }
     }
     assert_eq!(saved, 1);
-    let build = ["build", "--emit-dts", "--out-dir", "out"];
+    let build = ["build", "--declarations", "--out-dir", "out"];
     assert_eq!(flick(&root, "cache", &build), Some(0));
     let dts = fs::read_to_string(root.join("app/out/Geo.d.ts")).expect("declarations");
     assert!(

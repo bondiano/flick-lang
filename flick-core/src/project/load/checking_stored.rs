@@ -150,6 +150,8 @@ impl Checking<'_> {
             return None;
         }
         let mut key = Hashed::default();
+        key.add("iface-version", IFACE_VERSION.to_le_bytes());
+        key.add("ir-version", flick_ir::VERSION);
         key.add("salt", store.salt.as_str());
         key.add(
             "mode",

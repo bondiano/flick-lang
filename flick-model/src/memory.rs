@@ -12,6 +12,7 @@ use std::{error, fmt};
 
 use flick_core::ir::Lit;
 use flick_core::ir::memory::{self, Exit, Function, Instruction, Local, Operation};
+use regex_automata::meta::Regex;
 
 mod causes;
 pub use causes::{CauseToken, DefectClass, DefectCode, DefectSpec, LanguageExit, Reason};
@@ -20,16 +21,19 @@ mod patterns;
 mod primitives;
 mod program;
 pub use program::{
-    Executed, ExecutionReport, ProgramOutcome, execute_main_program, execute_main_program_outcome,
-    execute_program, execute_program_outcome, execute_rooted_main_program_outcome,
+    Executed, ExecutionReport, ProgramOutcome, TestCaseResult, execute_main_program,
+    execute_main_program_outcome, execute_program, execute_program_outcome,
+    execute_rooted_main_program_outcome, execute_tests_program,
 };
 
-/// An allocation's identity includes its heap. Slots are never recycled, so
-/// a stale or foreign handle cannot silently name a later allocation.
+/// An allocation's identity includes its heap and generation. Recycled backing
+/// slots increment their generation, so a stale or foreign handle can never
+/// silently name a later allocation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ObjectId {
     heap: usize,
     index: usize,
+    generation: usize,
 }
 
 /// An owned reference issued only by the counted heap. The private payload
@@ -87,6 +91,27 @@ pub struct ArenaView {
     index: usize,
 }
 
+/// Nonowning handle to a frame-owned mutable local variable (`let mut`).
+#[derive(Debug, PartialEq, Eq)]
+pub struct VarHandle {
+    id: ObjectId,
+    execution: usize,
+}
+
+/// Nonowning handle to a root-owned single-flight `Lazy` cell.
+#[derive(Debug, PartialEq, Eq)]
+pub struct LazyHandle {
+    id: ObjectId,
+    execution: usize,
+}
+
+/// Nonowning handle to a frame-owned `Seq`/list iteration cursor.
+#[derive(Debug, PartialEq, Eq)]
+pub struct IteratorHandle {
+    id: ObjectId,
+    execution: usize,
+}
+
 /// An owned memory-IR token. Inspecting an [`ObjectId`] does not duplicate
 /// ownership: a second owned handle must be obtained with [`Heap::dup`].
 ///
@@ -114,6 +139,9 @@ pub enum Value {
     Owner(OwnerHandle),
     Arena(ArenaHandle),
     ArenaView(ArenaView),
+    Var(VarHandle),
+    Lazy(LazyHandle),
+    Iterator(IteratorHandle),
 }
 
 impl Value {
@@ -160,6 +188,18 @@ impl Value {
             Self::Cell(cell) => Self::Cell(CellHandle {
                 id: cell.id,
                 execution: cell.execution,
+            }),
+            Self::Var(var) => Self::Var(VarHandle {
+                id: var.id,
+                execution: var.execution,
+            }),
+            Self::Lazy(lazy) => Self::Lazy(LazyHandle {
+                id: lazy.id,
+                execution: lazy.execution,
+            }),
+            Self::Iterator(iterator) => Self::Iterator(IteratorHandle {
+                id: iterator.id,
+                execution: iterator.execution,
             }),
         }
     }

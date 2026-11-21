@@ -160,11 +160,7 @@ fn malformed_operation_counts_missing_handlers_and_noncallables_are_faults() {
             ) | (
                 ProgramOutcome::Fault(Error::OperationArgumentCount { .. }),
                 "argcount"
-            ) | (ProgramOutcome::Fault(Error::ExpectedClosure), "callable")
-                | (
-                    ProgramOutcome::Fault(Error::UnsupportedOperation("control handler")),
-                    "control",
-                )
+            ) | (ProgramOutcome::Fault(Error::ExpectedClosure), "callable" | "control")
         );
         let diagnostic = format!("{malformed}: {report:?}");
         report

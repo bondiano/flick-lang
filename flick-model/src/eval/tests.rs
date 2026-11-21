@@ -6,7 +6,8 @@ use std::rc::Rc;
 use flick_core::numeric::{Arith, Num};
 
 use super::{Machine, Outcome, Program};
-use crate::syntax::{Arm, Con, Const, Lit, Pat, Path, Prim, Term};
+use crate::handler::{Handled, Handler, Op, OpClass};
+use crate::syntax::{Arm, Con, Const, Lit, Pat, Path, Prim, RegionOp, Term};
 
 fn int(n: i32) -> Term {
     Term::Lit(Lit::Int(n))
@@ -230,4 +231,83 @@ fn layer_service_uses_the_callers_provider() {
 #[test]
 fn todo_dies() {
     assert!(matches!(run(Term::Die("todo".into())), Outcome::Die(_)));
+}
+
+/// Helper: a region whose child performs `op` of class `class` against a kept
+/// handler installed outside the scope.
+fn kept_handler_child(class: OpClass) -> Term {
+    let effect = Path::new("T", "E");
+    let arm_fn = match class {
+        OpClass::Tail => Term::lam("_", int(42)),
+        OpClass::Abort => Term::lam("_", Term::string("aborted")),
+        OpClass::Control => Term::lam("_", Term::lam("_k", Term::string("controlled"))),
+    };
+    let perform = Term::app(
+        Term::Field(
+            Rc::new(konst(Const::Ask(effect.clone()), vec![Term::unit()])),
+            "op".into(),
+        ),
+        Term::unit(),
+    );
+    let spawn = konst(
+        Const::Region(Path::new("Fiber", "spawn"), RegionOp::Spawn),
+        vec![
+            var("s"),
+            Term::lam("_", Term::unit()),
+            Term::Task(Rc::new(perform)),
+        ],
+    );
+    let scoped = Term::Scope("s".into(), Rc::new(let_("_", spawn, int(7))));
+    let handler = Handler {
+        body: scoped,
+        effects: vec![Handled {
+            effect,
+            ops: vec![Op {
+                name: "op".into(),
+                class,
+                dicts: 0,
+                arity: 1,
+                covers: true,
+                function: arm_fn,
+            }],
+        }],
+        ret: None,
+        errors: Rc::from([]),
+    };
+    Term::Handler(Rc::new(handler))
+}
+
+#[test]
+fn kept_handler_answers_tail() {
+    assert_eq!(
+        value(run_task(kept_handler_child(OpClass::Tail))),
+        Lit::Int(7)
+    );
+}
+
+#[test]
+fn kept_handler_stucks_on_abort() {
+    let out = run(run_task(kept_handler_child(OpClass::Abort)));
+    assert!(
+        matches!(&out, Outcome::Stuck(why) if why.contains("kept")),
+        "expected kept-handler stuck on abort, got {out:?}"
+    );
+}
+
+#[test]
+fn kept_handler_stucks_on_control() {
+    let out = run(run_task(kept_handler_child(OpClass::Control)));
+    assert!(
+        matches!(&out, Outcome::Stuck(why) if why.contains("kept")),
+        "expected kept-handler stuck on control, got {out:?}"
+    );
+}
+
+#[test]
+fn seq_iter_stucks_on_unsupported_collection_source() {
+    let out = run(konst(Const::SeqIter, vec![int(1)]));
+    assert!(
+        matches!(&out, Outcome::Stuck(why) if why.contains("unsupported `for` collection source")),
+        "expected unsupported collection source stuck, got {out:?}"
+    );
 }

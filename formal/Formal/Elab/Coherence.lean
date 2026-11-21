@@ -1,161 +1,124 @@
-import Formal.Elab.Basic
+import Formal.Elab.CoherenceBase
 
 /-!
-# Elaboration: coherence (elaboration.md §4.2)
-
-`closed_rep`: after `ρ`, every derived dictionary is `≈` a closed derivation of the
-substituted constraint. `slot_ok`: projecting a superclass slot from a closed dictionary is
-`≈` a closed derivation of the superclass (well-founded induction by K5). `closed_unique`:
-closed derivations are unique (K1, K5, K6). Lemma 6.1, Lemma 6.2 and T6(b) follow.
+# Uniqueness of closed entailments, superclass slots, and T6b (`Formal.Elab.Coherence`)
 -/
 
 namespace Flick.Elab
 
 variable {P : Prog} {lt : Cn → Cn → Prop}
 
-/-- Projecting a slot of a closed dictionary of `Q` gives a closed dictionary of the
-superclass, up to `≈`. -/
-def SlotOK (P : Prog) (Q : Cn) : Prop :=
-  ∀ d₀ i S, Ent P [] [Q] [d₀] → P.super Q i = some S →
-    ∃ d, Eqv P (.slot d₀ i) d ∧ Ent P [] [S] [d]
+/-- **Uniqueness under a common query (K1', K5, K6)**: two closed derivations whose constraints
+both serve a common query `Q₀` yield `≈`-equivalent dictionaries. -/
+theorem closed_unique_common (h : Coherent P lt) (Q₀ : Cn) :
+    ∀ {Q₁ Q₂ : Cn} {d₁ d₂ : Dict},
+      Cn.Serves P Q₀ Q₁ → Cn.Serves P Q₀ Q₂ →
+      Ent P [] [Q₁] [d₁] → Ent P [] [Q₂] [d₂] → Eqv P d₁ d₂ := by
+  induction Q₀ using h.lt_wf.induction with
+  | _ Q₀ ih =>
+    intro Q₁ Q₂ d₁ d₂ hs₁ hs₂ h₁ h₂
+    rcases h₁.single with hc₁ | ⟨p₁, hp₁, hpr₁, rfl⟩ | ⟨C₁, τ₁, ts₁, ds₁, rfl, hC₁, hf₁, hds₁, rfl⟩ |
+        ⟨I₁, ins₁, σ₁, ds₁, hI₁, hserv₁, hds₁, rfl⟩
+    · exact (hc₁.not_nil).elim
+    · rcases h₂.single with hc₂ | ⟨p₂, hp₂, hpr₂, rfl⟩ | ⟨C₂, τ₂, ts₂, ds₂, rfl, hC₂, hf₂, -, rfl⟩ |
+          ⟨I₂, ins₂, σ₂, ds₂, hI₂, hserv₂, -, rfl⟩
+      · exact (hc₂.not_nil).elim
+      · have hinv : ∀ j, P.clsVar Q₀.cls j = .inv ∨ P.clsVar Q₀.cls j = .bi := fun j =>
+          .inl (hs₁.1 ▸ h.primVar hp₁ j)
+        obtain rfl := Cn.Serves.eq_of_inv hinv hs₁
+        obtain rfl := Cn.Serves.eq_of_inv hinv hs₂
+        rw [hpr₁] at hpr₂; cases hpr₂; exact .refl
+      · have hcc : C₂ = Q₁.cls := hs₂.1.trans hs₁.1.symm
+        subst hcc; rw [h.primStruct hp₁] at hC₂; cases hC₂
+      · exact (h.k6prim hp₁ hI₂ ((hserv₂.1.trans hs₂.1).trans hs₁.1.symm)).elim
+    · rcases h₂.single with hc₂ | ⟨p₂, hp₂, -, rfl⟩ | ⟨C₂, τ₂, ts₂, ds₂, rfl, hC₂, hf₂, hds₂, rfl⟩ |
+          ⟨I₂, ins₂, σ₂, ds₂, hI₂, hserv₂, -, rfl⟩
+      · exact (hc₂.not_nil).elim
+      · have hcc : C₁ = Q₂.cls := hs₁.1.trans hs₂.1.symm
+        subst hcc; rw [h.primStruct hp₂] at hC₁; cases hC₁
+      · cases Q₀ with
+        | mk C₀ args₀ =>
+          have hC10 : C₁ = C₀ := hs₁.1
+          have hC20 : C₂ = C₀ := hs₂.1
+          subst C₁; subst C₂
+          cases args₀ with
+          | nil => exact absurd hs₁.2.1 (Nat.zero_ne_add_one 0)
+          | cons τ₀ rest =>
+            cases rest with
+            | cons _ _ => exact absurd (Nat.succ.inj hs₁.2.1) (Nat.succ_ne_zero _)
+            | nil =>
+              obtain ⟨hlen, hfs⟩ := h.fields_serves hC₁ hf₁ hf₂ hs₁ hs₂
+              have key : ∀ (us vs : List Ty) (es₁ es₂ : List Dict),
+                  us.length = vs.length →
+                  (∀ (j : Nat) (u v : Ty), us[j]? = some u → vs[j]? = some v →
+                    ∃ q, lt q ⟨C₀, [τ₀]⟩ ∧ Cn.Serves P q ⟨C₀, [u]⟩ ∧ Cn.Serves P q ⟨C₀, [v]⟩) →
+                  Ent P [] (us.map fun t => ⟨C₀, [t]⟩) es₁ →
+                  Ent P [] (vs.map fun t => ⟨C₀, [t]⟩) es₂ →
+                  All2 (Eqv P) es₁ es₂ := by
+                intro us
+                induction us with
+                | nil =>
+                  intro vs es₁ es₂ hlu _ he₁ he₂
+                  cases vs with
+                  | nil => cases he₁; cases he₂; exact .nil
+                  | cons _ _ => exact absurd hlu (Nat.zero_ne_add_one _)
+                | cons u us ihu =>
+                  intro vs es₁ es₂ hlu hq he₁ he₂
+                  cases vs with
+                  | nil => exact absurd hlu (Nat.add_one_ne_zero _)
+                  | cons v vs =>
+                    obtain ⟨e₁, es₁', rfl, ha₁, hb₁⟩ := he₁.uncons
+                    obtain ⟨e₂, es₂', rfl, ha₂, hb₂⟩ := he₂.uncons
+                    obtain ⟨q, hlt, hq₁, hq₂⟩ := hq 0 u v rfl rfl
+                    exact .cons (ih q hlt hq₁ hq₂ ha₁ ha₂)
+                      (ihu vs es₁' es₂' (Nat.succ.inj hlu)
+                        (fun j x y hx hy => hq (j + 1) x y hx hy)
+                        hb₁ hb₂)
+              have a := key ts₁ ts₂ ds₁ ds₂ hlen hfs hds₁ hds₂
+              exact Eqv.apps (.strctLe hC₁ hf₁ hf₂ ⟨τ₀, hs₁, hs₂⟩) a
+      · exact (h.k6struct hC₁ hf₁ hI₂ hs₁ (hs₂.trans hserv₂)).elim
+    · rcases h₂.single with hc₂ | ⟨p₂, hp₂, -, rfl⟩ | ⟨C₂, τ₂, ts₂, ds₂, rfl, hC₂, hf₂, -, rfl⟩ |
+          ⟨I₂, ins₂, σ₂, ds₂, hI₂, hserv₂, hds₂, rfl⟩
+      · exact (hc₂.not_nil).elim
+      · exact (h.k6prim hp₂ hI₁ ((hserv₁.1.trans hs₁.1).trans hs₂.1.symm)).elim
+      · exact (h.k6struct hC₂ hf₂ hI₁ hs₂ (hs₁.trans hserv₁)).elim
+      · have hsI₁ : Cn.Serves P Q₀ ⟨ins₁.cls, ins₁.head.map (·.subst σ₁)⟩ := hs₁.trans hserv₁
+        have hsI₂ : Cn.Serves P Q₀ ⟨ins₂.cls, ins₂.head.map (·.subst σ₂)⟩ := hs₂.trans hserv₂
+        have hII := h.k1' hI₁ hI₂ hsI₁ hsI₂
+        subst hII; rw [hI₁] at hI₂; cases hI₂
+        have hmono := h.k5mono hI₁ hsI₁ hsI₂
+        have key : ∀ (cs : List Cn) (es₁ es₂ : List Dict),
+            (∀ c ∈ cs, ∃ q, lt q Q₀ ∧ Cn.Serves P q (c.subst σ₁) ∧ Cn.Serves P q (c.subst σ₂)) →
+            Ent P [] (cs.map (·.subst σ₁)) es₁ →
+            Ent P [] (cs.map (·.subst σ₂)) es₂ →
+            All2 (Eqv P) es₁ es₂ := by
+          intro cs
+          induction cs with
+          | nil => intro es₁ es₂ _ he₁ he₂; cases he₁; cases he₂; exact .nil
+          | cons c cs ihc =>
+            intro es₁ es₂ hm he₁ he₂
+            obtain ⟨e₁, es₁', rfl, ha₁, hb₁⟩ := he₁.uncons
+            obtain ⟨e₂, es₂', rfl, ha₂, hb₂⟩ := he₂.uncons
+            obtain ⟨q, hlt, hq₁, hq₂⟩ := hm c List.mem_cons_self
+            exact .cons (ih q hlt hq₁ hq₂ ha₁ ha₂)
+              (ihc es₁' es₂' (fun c' hc' => hm c' (List.mem_cons_of_mem _ hc')) hb₁ hb₂)
+        exact Eqv.apps .refl (key ins₁.ctx ds₁ ds₂ hmono hds₁ hds₂)
 
-theorem All2.single {R : Dict → Dict → Prop} {a : Dict} {l : List Dict} (h : All2 R [a] l) :
-    ∃ b, l = [b] ∧ R a b := by
-  cases h with
-  | cons r t => cases t; exact ⟨_, rfl, r⟩
+/-- Closed derivations are unique up to `≈` (K1', K5, K6). -/
+theorem closed_unique (h : Coherent P lt) {qs : List Cn} {ds₁ ds₂ : List Dict}
+    (h₁ : Ent P [] qs ds₁) (h₂ : Ent P [] qs ds₂) : All2 (Eqv P) ds₁ ds₂ := by
+  induction qs generalizing ds₁ ds₂ with
+  | nil => cases h₁; cases h₂; exact .nil
+  | cons Q qs ih =>
+    obtain ⟨d₁, ds₁', rfl, e₁, t₁⟩ := h₁.uncons
+    obtain ⟨d₂, ds₂', rfl, e₂, t₂⟩ := h₂.uncons
+    exact .cons (closed_unique_common h Q (.refl Q) (.refl Q) e₁ e₂) (ih t₁ t₂)
 
-theorem All2.trans_symm {a b c : List Dict} (h₁ : All2 (Eqv P) a b) (h₂ : All2 (Eqv P) c b) :
-    All2 (Eqv P) a c := by
-  induction h₁ generalizing c with
-  | nil => cases h₂; exact .nil
-  | cons r _ ih => cases h₂ with
-    | cons r' t' => exact .cons (.trans r (.symm r')) (ih t')
-
-theorem Ent.uncons {Δ : List Cn} {Q : Cn} {qs : List Cn} {ds : List Dict}
-    (h : Ent P Δ (Q :: qs) ds) : ∃ d ds', ds = d :: ds' ∧ Ent P Δ [Q] [d] ∧ Ent P Δ qs ds' := by
-  cases h with
-  | cons h₁ h₂ => exact ⟨_, _, rfl, h₁, h₂⟩
-  | given hc => exact ⟨_, _, rfl, .given hc, .nil⟩
-  | prim h₁ h₂ => exact ⟨_, _, rfl, .prim h₁ h₂, .nil⟩
-  | strct h₁ h₂ h₃ => exact ⟨_, _, rfl, .strct h₁ h₂ h₃, .nil⟩
-  | inst h₁ h₂ h₃ h₄ => exact ⟨_, _, rfl, .inst h₁ h₂ h₃ h₄, .nil⟩
-
-theorem clo_rep {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat → Dict} (hρ : Closes P Δ θ ρ)
-    (ho : ∀ d Q, Clo P Δ d Q → SlotOK P (Q.subst θ)) {d : Dict} {Q : Cn} (h : Clo P Δ d Q) :
-    ∃ d', Eqv P (d.subst ρ) d' ∧ Ent P [] [Q.subst θ] [d'] := by
-  induction h with
-  | given hk => exact ⟨_, .refl, hρ _ _ hk⟩
-  | super hc hs ih =>
-    obtain ⟨d₀, he, hd₀⟩ := ih
-    obtain ⟨d', h1, h2⟩ := ho _ _ hc d₀ _ _ hd₀ (Prog.super_subst _ hs)
-    exact ⟨d', .trans (.slot he) h1, h2⟩
-
-/-- After `ρ`, a derivation is `≈` a closed derivation of the substituted constraints. -/
-theorem closed_rep (h : Coherent P lt) {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat → Dict}
-    (hρ : Closes P Δ θ ρ) (ho : ∀ d Q, Clo P Δ d Q → SlotOK P (Q.subst θ))
-    {qs : List Cn} {ds : List Dict} (he : Ent P Δ qs ds) :
-    ∃ ds', Ent P [] (qs.map (·.subst θ)) ds' ∧ All2 (Eqv P) (ds.map (·.subst ρ)) ds' := by
-  induction he with
-  | nil => exact ⟨[], .nil, .nil⟩
-  | cons _ _ ih₁ ih₂ =>
-    obtain ⟨d₁, e₁, a₁⟩ := ih₁
-    obtain ⟨ds₂, e₂, a₂⟩ := ih₂
-    cases a₁ with
-    | cons r a => cases a; exact ⟨_, .cons e₁ e₂, .cons r a₂⟩
-  | given hc =>
-    obtain ⟨d', h1, h2⟩ := clo_rep hρ ho hc
-    exact ⟨[d'], h2, .cons h1 .nil⟩
-  | prim h1 h2 => exact ⟨[_], .prim h1 (h.prims_subst h2), .cons (.primSub h1 h2) .nil⟩
-  | @strct C τ ts ds h1 h2 _ ih =>
-    obtain ⟨ds', e, a⟩ := ih
-    refine ⟨[apps (.strct C (τ.subst θ)) ds'], ?_, .cons ?_ .nil⟩
-    · have : (ts.map fun t => (⟨C, [t]⟩ : Cn)).map (·.subst θ) =
-          (ts.map (·.subst θ)).map fun t => (⟨C, [t]⟩ : Cn) := by
-        simp [List.map_map, Function.comp, Cn.subst]
-      rw [this] at e
-      exact .strct h1 (h.fields_subst h2) e
-    · simp only [apps_subst]; exact Eqv.apps (.strctSub h1 h2) a
-  | @inst Q I ins σ ds h1 h2 h3 _ ih =>
-    obtain ⟨ds', e, a⟩ := ih
-    refine ⟨[apps (.inst I) ds'], ?_, .cons ?_ .nil⟩
-    · refine .inst (σ := fun n => (σ n).subst θ) h1 h2 ?_ ?_
-      · show Q.args.map (·.subst θ) = _
-        rw [h3, List.map_map]; exact List.map_congr_left fun t _ => Ty.subst_comp t σ θ
-      · have : ins.ctx.map (fun c => c.subst fun n => (σ n).subst θ) =
-            (ins.ctx.map (·.subst σ)).map (·.subst θ) := by
-          rw [List.map_map]; exact List.map_congr_left fun c _ => (Cn.subst_comp c σ θ).symm
-        rw [this]; exact e
-    · simp only [apps_subst]; exact Eqv.apps .refl a
-
-theorem map_eq_mem {α β : Type} {f g : α → β} {l : List α} (h : l.map f = l.map g) :
-    ∀ x ∈ l, f x = g x := by
-  induction l with
-  | nil => intro x hx; cases hx
-  | cons a l ih =>
-    simp only [List.map_cons, List.cons.injEq] at h
-    intro x hx; rcases List.mem_cons.1 hx with rfl | hx
-    · exact h.1
-    · exact ih h.2 x hx
-
-/-- K5: equal heads fix the context. -/
-theorem ctx_agree (h : Coherent P lt) {I : Nat} {ins : Inst} {σ σ' : Nat → Ty}
-    (hI : P.insts I = some ins) (heq : ins.head.map (·.subst σ) = ins.head.map (·.subst σ')) :
-    ins.ctx.map (·.subst σ) = ins.ctx.map (·.subst σ') := by
-  refine List.map_congr_left fun c hc => ?_
-  simp only [Cn.subst, Cn.mk.injEq, true_and]
-  refine List.map_congr_left fun t ht => Ty.subst_agree fun n hn => ?_
-  obtain ⟨hd, hmem, hocc⟩ := h.k5vars hI hc ht hn
-  exact Ty.agree_of_eq (map_eq_mem heq hd hmem) n hocc
-
-/-- Closed derivations are unique (K1, K5, K6). -/
-theorem closed_unique (h : Coherent P lt) {qs : List Cn} {ds₁ : List Dict}
-    (h₁ : Ent P [] qs ds₁) : ∀ {ds₂}, Ent P [] qs ds₂ → ds₁ = ds₂ := by
-  induction h₁ with
-  | nil => intro ds₂ h₂; cases h₂; rfl
-  | cons _ _ ih₁ ih₂ =>
-    intro ds₂ h₂
-    obtain ⟨d, ds', rfl, e₁, e₂⟩ := h₂.uncons
-    have := ih₁ e₁; cases this; rw [ih₂ e₂]
-  | given hc => exact (hc.not_nil).elim
-  | @prim Q p hp hpr =>
-    intro ds₂ h₂
-    obtain ⟨d₂, ds₀, rfl, h₂, hn⟩ := h₂.uncons
-    cases hn
-    rcases h₂.single with hc | ⟨p', -, hp', rfl⟩ | ⟨C, τ, ts, ds, rfl, hC, -⟩ | ⟨I, ins, σ, ds, hI, hcls, -⟩
-    · exact (hc.not_nil).elim
-    · rw [hpr] at hp'; cases hp'; rfl
-    · rw [h.primStruct hp] at hC; cases hC
-    · exact (h.k6prim hp hI hcls).elim
-  | @strct C τ ts ds hC hf _ ih =>
-    intro ds₂ h₂
-    obtain ⟨d₂, ds₀, rfl, h₂, hn⟩ := h₂.uncons
-    cases hn
-    rcases h₂.single with hc | ⟨p', hp, -⟩ | ⟨C', τ', ts', ds', hq, -, hf', he', rfl⟩ |
-        ⟨I, ins, σ, ds', hI, hcls, hargs, -⟩
-    · exact (hc.not_nil).elim
-    · rw [h.primStruct hp] at hC; cases hC
-    · simp only [Cn.mk.injEq, List.cons.injEq, and_true] at hq; obtain ⟨rfl, rfl⟩ := hq
-      rw [hf] at hf'; cases hf'; rw [ih he']
-    · exact (h.k6struct hC hf hI hcls hargs).elim
-  | @inst Q I ins σ ds hI hcls hargs _ ih =>
-    intro ds₂ h₂
-    obtain ⟨d₂, ds₀, rfl, h₂, hn⟩ := h₂.uncons
-    cases hn
-    rcases h₂.single with hc | ⟨p', hp, -⟩ | ⟨C', τ', ts', ds', rfl, hC, hf', -⟩ |
-        ⟨I', ins', σ', ds', hI', hcls', hargs', he', rfl⟩
-    · exact (hc.not_nil).elim
-    · exact (h.k6prim hp hI hcls).elim
-    · exact (h.k6struct hC hf' hI hcls hargs).elim
-    · have hII := h.k1 hI hI' (hcls.trans hcls'.symm) (hargs.symm.trans hargs')
-      subst hII; rw [hI] at hI'; cases hI'
-      rw [ctx_agree h hI (hargs.symm.trans hargs')] at ih
-      rw [ih he']
-
-theorem clo_lt (h : Coherent P lt) {I : Nat} {ins : Inst} {σ : Nat → Ty} (hI : P.insts I = some ins)
-    {d : Dict} {Q : Cn} (hc : Clo P ins.ctx d Q) :
-    lt (Q.subst σ) ⟨ins.cls, ins.head.map (·.subst σ)⟩ := by
+theorem clo_lt (h : Coherent P lt) {I : Nat} {ins : Inst} {σ : Nat → Ty} {Q : Cn}
+    (hI : P.insts I = some ins) (hserv : Cn.Serves P Q ⟨ins.cls, ins.head.map (·.subst σ)⟩)
+    {d : Dict} {Q' : Cn} (hc : Clo P ins.ctx d Q') : lt (Q'.subst σ) Q := by
   induction hc with
-  | given hk => exact h.k5inst hI (List.mem_of_getElem? hk)
+  | given hk => exact h.k5inst hI (List.mem_of_getElem? hk) hserv
   | super _ hs ih => exact h.lt_trans (h.k5super (Prog.super_subst σ hs)) ih
 
 /-- A superclass slot of a closed dictionary is `≈` a closed dictionary of the superclass. -/
@@ -164,7 +127,7 @@ theorem slot_ok (h : Coherent P lt) (Q : Cn) : SlotOK P Q := by
   | _ Q ih =>
   intro d₀ i S hd hs
   rcases hd.single with hc | ⟨p, hp, -, rfl⟩ | ⟨C, τ, ts, ds, rfl, hC, hf, hds, rfl⟩ |
-      ⟨I, ins, σ, ds, hI, hcls, hargs, hds, rfl⟩
+      ⟨I, ins, σ, ds, hI, hserv, hds, rfl⟩
   · exact (hc.not_nil).elim
   · simp [Prog.super, h.primSupers hp] at hs
   · unfold Prog.super at hs
@@ -194,10 +157,8 @@ theorem slot_ok (h : Coherent P lt) (Q : Cn) : SlotOK P Q := by
       have : S₀.subst (params [τ]) = ⟨S₀.cls, [τ]⟩ := by
         simp [Cn.subst, hSa, Ty.subst, params]
       rw [this]; exact .strct hSC hf he'
-  · -- the slot of an instance: K7, then the context
-    have hQ : Q = Cn.subst σ ⟨ins.cls, ins.head⟩ := by
-      cases Q with
-      | mk c a => simp only [Cn.subst, Cn.mk.injEq]; exact ⟨hcls.symm, hargs⟩
+  · -- the slot of an instance under B1: K7 on head, then transport along `super_serves`
+    have hcls : ins.cls = Q.cls := hserv.1
     unfold Prog.super at hs
     cases hS₀ : (P.supers Q.cls)[i]? with
     | none => rw [hS₀] at hs; cases hs
@@ -208,14 +169,17 @@ theorem slot_ok (h : Coherent P lt) (Q : Cn) : SlotOK P Q := by
       have hρ : Closes P ins.ctx σ (args ds) := fun k c hk =>
         hds.get.2 k _ (by simp [hk])
       have ho : ∀ d Q', Clo P ins.ctx d Q' → SlotOK P (Q'.subst σ) := fun d Q' hc =>
-        ih _ (hQ ▸ clo_lt h hI hc)
+        ih _ (clo_lt h hI hserv hc)
       obtain ⟨ds', e, a⟩ := closed_rep h hρ ho hse
       obtain ⟨d', rfl, r⟩ := a.single
-      refine ⟨_, .trans (.instSlot hI hsl hds) r, ?_⟩
-      have hS : S = (S₀.subst (params ins.head)).subst σ := by
-        rw [hS₀] at hs; simp only [Option.map_some, Option.some.injEq] at hs
-        rw [← hs, Cn.subst_comp]; congr 1; funext n; rw [params_subst, ← hargs]
-      rw [hS]; simpa using e
+      have hsupH : P.super ⟨ins.cls, ins.head.map (·.subst σ)⟩ i =
+          some ((S₀.subst (params ins.head)).subst σ) :=
+        Prog.super_subst σ hsup
+      have hsupQ : P.super Q i = some S := by unfold Prog.super; exact hs
+      have hSS : Cn.Serves P S ((S₀.subst (params ins.head)).subst σ) :=
+        h.super_serves hserv hsupQ hsupH
+      obtain ⟨d'', r', hd''⟩ := ent_serves h _ (by simpa using e) hSS
+      exact ⟨d'', .trans (.instSlot hI hsl hds) (.trans r r'), hd''⟩
 
 /-- **Lemma 6.1 (superclass paths).** Two derivations of one constraint agree after `ρ`. -/
 theorem lemma_6_1 (h : Coherent P lt) {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat → Dict}
@@ -226,8 +190,9 @@ theorem lemma_6_1 (h : Coherent P lt) {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat
   obtain ⟨_, e₂, a₂⟩ := closed_rep h hρ ho h₂
   obtain ⟨_, rfl, r₁⟩ := a₁.single
   obtain ⟨_, rfl, r₂⟩ := a₂.single
-  cases closed_unique h e₁ e₂
-  exact .trans r₁ (.symm r₂)
+  obtain ⟨_, hb, r₁₂⟩ := (closed_unique h e₁ e₂).single
+  cases hb
+  exact .trans r₁ (.trans r₁₂ (.symm r₂))
 
 theorem Ty.subst_var (t : Ty) : t.subst .var = t := Ty.subst_id t
 
@@ -248,8 +213,9 @@ theorem lemma_6_2 (h : Coherent P lt) {Δ : List Cn} {θ : Nat → Ty} {ρ : Nat
       rw [show t = t.subst .var from (Ty.subst_var t).symm, Ty.subst_comp]
       exact Ty.subst_agree fun n hn => absurd hn (hg t ht n)
   simp only [List.map_cons, List.map_nil, hQ] at e
-  cases closed_unique h e h₀
-  exact r
+  obtain ⟨_, hb, r'⟩ := (closed_unique h e h₀).single
+  cases hb
+  exact .trans r r'
 
 /-- **T6(b) (coherence).** Two elaborations that differ only in the derivations of their
 dictionaries agree after `ρ` up to `≈` in every dictionary position; with the simulation
@@ -263,8 +229,7 @@ theorem T6b (h : Coherent P lt) {X : Exprs} (hsim : Sim P X) (s : X.Skel) {Δ : 
   have ho : ∀ d Q, Clo P Δ d Q → SlotOK P (Q.subst θ) := fun _ _ _ => slot_ok h _
   obtain ⟨_, e₁, a₁⟩ := closed_rep h hρ ho h₁
   obtain ⟨_, e₂, a₂⟩ := closed_rep h hρ ho h₂
-  cases closed_unique h e₁ e₂
-  have a := All2.trans_symm a₁ a₂
+  have a := All2.trans a₁ (All2.trans_symm (closed_unique h e₁ e₂) a₂)
   exact ⟨a, hsim s _ _ a o₁ o₂⟩
 
 end Flick.Elab

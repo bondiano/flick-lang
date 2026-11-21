@@ -21,10 +21,14 @@ entry = "App.Main"
 [build]
 out-dir = "dist"
 profile = "debug"
-emit = "js"
-emit-dts = false
+target = "js"
+
+[target.js]
+typescript = false
+declarations = false
 promise-facade = false
 schema-aot = false
+runtime = "rt"
 
 [sql]
 dialect = "postgresql"
@@ -50,16 +54,11 @@ max-params = 5
 | `project.runner` | the module that starts each entry without a runner of its own: it exports `type alias Main`, the type `main` must have (`FLICK-P026` otherwise), and `run`, which takes `main` and whose result the runner exports as `default`; built in are `"Runner.Node"`, `"Runner.Browser"` and `"Runner.Cloudflare"`, a Worker whose `fetch` gives `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` the request and the context (`wait_until`), and provides the bindings as the service `Env` (`Runner.Cloudflare.var`, `binding`) and the live browser services `Host.BrowserLive`; a runner may provide services this way, and `main` may need any of those its `Main` names; a package may provide another; without one, a pure `main` is called and an effect runs as on Node | — |
 | `build.out-dir` | base directory of artifacts; not the project's root, the directory of its sources or tests, or one above them (`FLICK-P028`, before anything is written) | `"dist"` |
 | `build.profile` | `"debug"` or `"release"` (see [codegen.md](../codegen/)); `--profile` of `build` and `test` overrides it | `"debug"` |
-| `build.emit` | `"js"`, `"ts"`, or `"go"`: a Go module per entry under `go/<entry>/`, which `go build` compiles into the executable `flick-<entry>`; Go must be on `PATH` and allowed in `[tools]` as `"flick/go" = ["go"]` (`FLICK-P029`), an import of a module of the js target only (`Ui`, `Atom`, `Action`, `Otlp`, `DevTools`, `Js`, the `Node`/`Browser`/`Cloudflare` runners) or of a package not built for go is `FLICK-P030` already in `flick check`, and what the go target does not compile yet is `FLICK-P012` (see [Go target](../codegen/#go-target)) | `"js"` |
-| `build.environment` | backend/platform pair such as `"js/node"`, `"js/browser"` or `"go/native"`; when set, `flick check`, the editor and build share environment preflight: a reachable gated effect without a root handler for that pair is `FLICK-E020` (`unhandled effect Db on js/browser` at the use). Unused unsupported code does not fail; public library exports are checked. Without it, check stays portable typing only. Toolchain gaps stay `FLICK-P015` / `FLICK-P029`. This does not promise arbitrary IR or emit-plugin correctness | the compatible alias default for the selected backend |
-| `build.emit-dts` | boolean | `false` |
-| `build.promise-facade` | boolean | `false` |
-| `build.schema-aot` | boolean | `false` |
+| `build.target` | default target backend short name (`"js"`, `"go"`, or the short name of a pinned `[build.backend]`); overridden by `--target <name>` on `build`, `run`, `dev`, `test` and `inspect`. On `"go"`, Go must be on `PATH` and allowed in `[tools]` as `"flick/go" = ["go"]` (`FLICK-P029`), an import of a module of the js target only (`Ui`, `Atom`, `Action`, `Otlp`, `DevTools`, `Js`, the `Node`/`Browser`/`Cloudflare` runners) or of a package not built for go is `FLICK-P030` already in `flick check`, and what the go target does not compile yet is `FLICK-P012` (see [Go target](../codegen/#go-target)) | `"js"` (or the backend prefix of `build.environment`) |
+| `build.environment` | backend/platform pair such as `"js/node"`, `"js/browser"` or `"go/native"`; when set, `flick check`, the editor and build share environment preflight: a reachable gated effect without a root handler for that pair is `FLICK-E020` (`unhandled effect Db on js/browser` at the use). Unused unsupported code does not fail; public library exports are checked. Without it, check stays portable typing only. Toolchain gaps stay `FLICK-P015` / `FLICK-P029`. This does not promise arbitrary IR or emit-plugin correctness | the default environment of the selected backend |
 | `build.solver-steps` | instance resolution steps per definition | `100000` |
 | `build.solver-depth` | depth of nested class constraints | `256` |
 | `build.labels` | what a release build labels `Module.name` for debugging tools: `"all"` (the values of every type marked `@label`: atoms, views, actions), `"components"` (those of the kind `component`: views and actions) or `"none"`; debug labels all; `flick build --labels` overrides it | `"all"` |
-| `build.effect` | what runs effects: `"rt"` on Flick's own runtime, or `"effect"` through the Effect adapter; a library a project depends on is compiled with the project's `effect` | `"rt"` |
-| `build.ui` | the module that renders and mounts views in place of React: it exports every name `Ui` and `Action` bind from `@flick-lang/effect-ts/ui` and `@flick-lang/effect-ts/ui/react`; a relative path is relative to the project's root | React |
 | `sql.dialect` | the SQL dialect of `sql table` and `sql { … }` (see [sql.md](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` and `"oracle"` are recognized but not supported yet | `"postgresql"` |
 | `lint.allow` | warning codes not reported, such as `"FLICK-T021"`; errors cannot be turned off | `[]` |
 | `lint.no-let-assert` | `true` makes every `let assert` an error (`FLICK-T027`), in `flick check`, `build`, `test` and the editor | `false` |
@@ -72,13 +71,51 @@ max-params = 5
 
 The same T036–T038 limits apply to `component`: setup and render are measured together in the source, without generated wrappers. Local functions are measured separately.
 
-`flick new` creates an RT project with `@flick-lang/runtime` and no Effect dependency. `flick build --rt`, `flick run --rt` and `flick test --rt` also select RT for one invocation of an older Effect project. Set `effect = "effect"` explicitly when a project needs the Effect adapter and add `@flick-lang/effect-ts` to its dependencies.
+### Target options (`[target.<name>]`)
+
+Backend-specific build and runtime options live in `[target.<name>]`, where
+`<name>` is the backend's short name (`js` for `flick/js`, `go` for `flick/go`,
+or the segment after `/` in a pinned `[build.backend]`). Multiple
+`[target.<name>]` tables may coexist in one `flick.toml` for cross-target
+projects; each invocation validates and applies only the table for its selected
+target, and CLI flags override `flick.toml`. `[target]` is not allowed at a
+virtual workspace root (`FLICK-P005`).
+
+| Table and key | Values | Default |
+| - | - | - |
+| `target.js.typescript` | boolean; emit `.ts` instead of `.js` | `false` |
+| `target.js.declarations` | boolean; emit `.d.ts` public TypeScript declarations | `false` |
+| `target.js.promise-facade` | boolean; emit `A/B.promise.js` Promise façades | `false` |
+| `target.js.schema-aot` | boolean; compile pure codecs ahead of use in entry runners | `false` |
+| `target.js.runtime` | `"rt"` on Flick's own runtime, or `"effect"` through the Effect adapter; a library a project depends on is compiled with the project's `runtime` | `"rt"` |
+| `target.js.devtools` | boolean (`true` = `"ws://localhost:34437"`) or WebSocket URL string for `run` / `dev` | off |
+| `target.js.ui` | module specifier rendering and mounting views in place of React (exports every name `Ui` and `Action` bind from `@flick-lang/effect-ts/ui` and `@flick-lang/effect-ts/ui/react`; relative paths are from the project root) | React |
+| `target.go.cgo` | boolean; enable cgo (`CGO_ENABLED=1`) when building Go executables | `false` |
+
+`flick new` creates an RT project with `@flick-lang/runtime` and no Effect dependency. Pass `--runtime rt` to `build`, `run`, `dev`, `test` or `inspect` to select RT for one invocation of an Effect project. Set `[target.js] runtime = "effect"` explicitly when a project needs the Effect adapter and add `@flick-lang/effect-ts` to its dependencies.
+
+Legacy `[build]` keys (`emit`, `emit-dts`, `promise-facade`, `schema-aot`, `effect`, `ui`) are removed with no compatibility aliases and fail with `FLICK-P057`, naming the replacement under `[build] target` or `[target.js]`:
+
+| Removed `[build]` key | Replacement |
+| - | - |
+| `[build] emit = "js"` | `[build] target = "js"` (or omit; `"js"` is default) |
+| `[build] emit = "ts"` | `[build] target = "js"` and `[target.js] typescript = true` |
+| `[build] emit = "go"` | `[build] target = "go"` |
+| `[build] emit-dts = true` | `[target.js] declarations = true` |
+| `[build] promise-facade = true` | `[target.js] promise-facade = true` |
+| `[build] schema-aot = true` | `[target.js] schema-aot = true` |
+| `[build] effect = "rt"` | `[target.js] runtime = "rt"` (or omit; `"rt"` is default) |
+| `[build] effect = "effect"` | `[target.js] runtime = "effect"` |
+| `[build] ui = "./renderer.mjs"` | `[target.js] ui = "./renderer.mjs"` |
 
 Errors in the configuration exit with code `2`:
 
 | Problem | Diagnostic |
 | - | - |
 | TOML syntax, an unknown key, a value of the wrong type or outside its set | `FLICK-P005` |
+| a removed `[build]` key (`emit`, `emit-dts`, `promise-facade`, `schema-aot`, `effect`, `ui`) | `FLICK-P057` |
+| an unknown or invalid key or value in `[target.<name>]` | `FLICK-P058` |
+| an unknown `[build] target` or `--target` name | `FLICK-P059` |
 | a `schema-version` other than `1`, or none | `FLICK-P006` |
 | `kind = "app"` without `entry` or `entries`, or with an empty `entries` | `FLICK-P007` |
 | both `entry` and `entries`, or an entry name that is not one | `FLICK-P005` |
@@ -115,7 +152,7 @@ and no arguments, and a child process cannot start there (see
 layers and handle other errors inside `main`, not in the launcher.
 
 A pure `main` is called directly. Normally its launcher imports no runtime;
-`schema-aot = true` still imports the schema installation helpers.
+`[target.js] schema-aot = true` still imports the schema installation helpers.
 A runtime `main` is started through the entry runner, which observes its
 final `Exit` (see [code generation](../codegen/)). Invalid signatures produce
 `FLICK-P026` during project checking, or during a standalone file build.
@@ -262,7 +299,7 @@ rather than change the lock, `flick update <name>` fetches a library again,
 or `--path DIR`) adds one and `flick remove <name>` drops it.
 
 The official backend a project builds with when it pins none (`flick/js`,
-or `flick/go` with `emit = "go"`) is not part of the compiler either: it is a
+or `flick/go` with `[build] target = "go"` or `--target go`) is not part of the compiler either: it is a
 release asset. The first build, or `flick install`, takes the newest release
 the compiler accepts from the backends index, keeps it in the package store
 and pins it in `flick.lock` under `[[backend]]`; later builds work offline.

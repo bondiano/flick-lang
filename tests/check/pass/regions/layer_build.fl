@@ -40,6 +40,14 @@ let launched () = Layer.launch memo_box
 built : Unit ->{} String
 let built () = provide greeter { scope { (Context.get Box (Layer.build box)).value () } }
 
+awaited_outside : Unit ->{} Unit
+let awaited_outside () = provide greeter {
+  scope {
+    let start = task { ignore (Layer.build box) }
+    await start
+  }
+}
+
 // the input comes from the caller, which runs the whole function
 from_caller : Unit ->{Greeter} Unit
 let from_caller () = scope {

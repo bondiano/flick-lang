@@ -39,7 +39,9 @@ impl Lower<'_> {
             .zip(arguments.iter().copied())
             .collect();
         let generated;
-        let methods = if let Some((fields, constructors)) = &info.derived {
+        let methods = if methods.is_empty()
+            && let Some((fields, constructors)) = &info.derived
+        {
             generated =
                 super::derived::methods(&info.class.1, fields, constructors.as_deref(), span)?;
             &generated

@@ -97,11 +97,11 @@ fn files(name: &str, template: Template) -> Vec<(&'static str, String)> {
         String::new()
     };
     let mut config = format!(
-        "schema-version = 1\n\n{package}[project]\n{project}source-dir = \"src\"\ntest-dir = \"test\"\n\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\nemit = \"js\"\n"
+        "schema-version = 1\n\n{package}[project]\n{project}source-dir = \"src\"\ntest-dir = \"test\"\n\n[build]\nout-dir = \"dist\"\nprofile = \"debug\"\ntarget = \"js\"\n"
     );
     let needs_effect = matches!(template, Template::Cli | Template::Fullstack);
     if needs_effect {
-        config.push_str("effect = \"effect\"\n");
+        config.push_str("\n[target.js]\nruntime = \"effect\"\n");
     }
     let mut package = serde_json::json!({
         "name": name,

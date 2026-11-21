@@ -33,6 +33,7 @@ fn paired_semantic_label_root_follows_late_solution_but_literal_twin_does_not() 
                         }),
                     }],
                 },
+                variance: Vec::new(),
             },
         );
         let literal_pair = checker
@@ -55,6 +56,7 @@ fn paired_semantic_label_root_follows_late_solution_but_literal_twin_does_not() 
                         },
                     }],
                 },
+                variance: Vec::new(),
             },
         );
         let b = checker
@@ -100,6 +102,7 @@ fn paired_alignment_refreshes_late_completion_and_keeps_canonical_alias_reads_li
                     body: Type::Tuple(Vec::new()),
                     opaque: false,
                 },
+                variance: Vec::new(),
             },
         );
         define(
@@ -137,6 +140,7 @@ fn paired_alignment_refreshes_late_completion_and_keeps_canonical_alias_reads_li
                     body: changed.clone(),
                     opaque: false,
                 },
+                variance: Vec::new(),
             },
         );
         let current = checker
@@ -205,6 +209,7 @@ fn paired_late_descendants_are_in_the_live_scope_support_footprint() {
                         ty: Type::con("A.Child", "T"),
                     }],
                 },
+                variance: Vec::new(),
             },
         );
         checker
@@ -390,6 +395,7 @@ fn paired_external_constructor_kind_rejects_aborted_target_before_resolution() {
         let wrapper = |kind| TypeDef {
             kind,
             form: Form::NOMINAL,
+            variance: Vec::new(),
         };
         checker.env.define_type("Wrapper", wrapper(stale.clone()));
         checker.env.define_type(
@@ -402,6 +408,7 @@ fn paired_external_constructor_kind_rejects_aborted_target_before_resolution() {
                         ty: Type::app(Type::con("Probe", "Wrapper"), Type::Tuple(Vec::new())),
                     }],
                 },
+                variance: Vec::new(),
             },
         );
         let dependent = checker
@@ -457,6 +464,7 @@ fn paired_late_type_dependency_cannot_escape_a_thinned_telescope() {
                 TypeDef {
                     kind: Kind::Type,
                     form: Form::NOMINAL,
+                    variance: Vec::new(),
                 },
             );
             checker.env.define_type(
@@ -469,6 +477,7 @@ fn paired_late_type_dependency_cannot_escape_a_thinned_telescope() {
                             ty: root.clone(),
                         }],
                     },
+                    variance: Vec::new(),
                 },
             );
             let b = checker

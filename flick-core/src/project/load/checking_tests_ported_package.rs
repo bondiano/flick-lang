@@ -33,7 +33,7 @@ fn ported_review_cached_alias_templates_preserve_canonical_materialized_targets(
         Some(&project),
         &roots,
         Some(&empty),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
@@ -65,7 +65,7 @@ fn ported_review_cached_alias_templates_preserve_canonical_materialized_targets(
         Some(&project),
         &roots,
         Some(&cache),
-        false,
+        None,
         None,
     );
     assert!(diagnostics.is_empty(), "{diagnostics:?}");

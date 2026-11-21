@@ -69,7 +69,7 @@ theorem dtyp_slot : DTyp P [] (.slot (.inst 2) 0) (.dict effApp) := .slot dtyp_i
 
 theorem ent_inst (I : Nat) {Δ Q ins} (h : insts I = some ins) (hc : ins.cls = Q.cls)
     (ha : Q.args = ins.head) (hx : ins.ctx = []) : Ent P Δ [Q] [.inst I] := by
-  have := Ent.inst (P := P) (Δ := Δ) (Q := Q) (σ := Ty.var) (ds := []) h hc
+  have := Ent.inst_eq (P := P) (Δ := Δ) (Q := Q) (σ := Ty.var) (ds := []) h hc
     (by rw [ha]; simp [Ty.subst_var])
     (by rw [hx]; exact .nil)
   exact this

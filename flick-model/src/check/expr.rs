@@ -11,7 +11,7 @@ use super::dicts::at_args;
 use super::generalize::own_regions;
 use super::regions::live_stage;
 use super::{Check, Checker, error};
-use crate::syntax::{Head, Lit, Name, Path, Term};
+use crate::syntax::{Const, Head, Lit, Name, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 pub(super) fn prelude(name: &str) -> Type {
@@ -20,6 +20,14 @@ pub(super) fn prelude(name: &str) -> Type {
 
 pub(super) fn list(t: Type) -> Type {
     Type::app(prelude("List"), t)
+}
+
+pub(super) fn seq(t: Type) -> Type {
+    Type::app(prelude("Seq"), t)
+}
+
+pub(super) fn option(t: Type) -> Type {
+    Type::app(prelude("Option"), t)
 }
 
 pub(super) fn var(n: &str) -> Type {

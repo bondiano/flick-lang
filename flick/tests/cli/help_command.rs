@@ -19,7 +19,14 @@ fn help_describes_global_and_build_options() {
             assert!(help.contains(option), "{help}");
         }
         if command == Some("build") {
-            for option in ["--inputs", "--emit", "js", "ts", "go"] {
+            for option in [
+                "--inputs",
+                "--target",
+                "Options of `flick/js`",
+                "--typescript",
+                "--declarations",
+                "--runtime",
+            ] {
                 assert!(help.contains(option), "{help}");
             }
         }

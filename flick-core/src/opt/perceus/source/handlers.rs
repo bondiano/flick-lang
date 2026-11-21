@@ -1,9 +1,7 @@
 //! Delayed handler bodies and operation saturation through unary owned code.
-use flick_ir::{Handler, OpClass, operation_arity};
+use flick_ir::{Handler, operation_arity};
 
-use super::{
-    Code, Env, Local, Lower, LowerError, Operation, Param, Pat, Span, Stage, memory, unsupported,
-};
+use super::{Code, Env, Local, Lower, LowerError, Operation, Param, Pat, Span, Stage, memory};
 
 impl Lower<'_> {
     pub(super) fn handler(
@@ -13,15 +11,6 @@ impl Lower<'_> {
         block: &mut Code,
         span: Span,
     ) -> Result<Local, LowerError> {
-        // Do not fake one-shot continuation ownership with an ordinary closure.
-        if handler.effects.iter().any(|effect| {
-            effect
-                .operations
-                .iter()
-                .any(|op| op.class == OpClass::Control)
-        }) {
-            return Err(unsupported("control handler", span));
-        }
         let mut effects = Vec::new();
         for effect in &handler.effects {
             let mut operations = Vec::new();

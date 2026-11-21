@@ -43,10 +43,12 @@ fn fixture(name: &str, case: &str) -> PathBuf {
 fn a_component_cannot_enter_the_native_schema_aot_postprocessor() {
     let root = fixture("backend_schema_aot", "App");
     let result = flick_in(&root, &["build", "--schema-aot", "--diagnostics", "json"]);
-    assert_eq!(result.status.code(), Some(1), "{result:?}");
+    assert_eq!(result.status.code(), Some(2), "{result:?}");
     let diagnostics = String::from_utf8_lossy(&result.stderr);
     assert!(
-        diagnostics.contains("FLICK-P012") && diagnostics.contains("schema"),
+        diagnostics.contains("FLICK-P058")
+            && diagnostics.contains("schema-aot")
+            && diagnostics.contains("flick/js"),
         "{result:?}"
     );
     assert!(
@@ -260,15 +262,10 @@ fn third_party_components_do_not_inherit_the_official_js_runtime_check() {
         serde_json::to_vec(&manifest).expect("JSON"),
     )
     .expect("manifest");
-    for rt in [false, true] {
-        for command in ["build", "test"] {
-            let mut args = vec![command, "--offline"];
-            if rt {
-                args.push("--rt");
-            }
-            let result = flick_in(&root, &args);
-            assert!(result.status.success(), "third-party {args:?}: {result:?}");
-        }
+    for command in ["build", "test"] {
+        let args = [command, "--offline"];
+        let result = flick_in(&root, &args);
+        assert!(result.status.success(), "third-party {args:?}: {result:?}");
     }
     assert_eq!(
         fs::read(root.join("dist/data.bin")).expect("third-party output"),
@@ -291,10 +288,16 @@ fn third_party_components_do_not_inherit_the_official_js_runtime_check() {
         for command in ["build", "test"] {
             let result = flick_in(
                 &root,
-                &[command, "--offline", "--rt", "--diagnostics", "json"],
+                &[
+                    command,
+                    "--offline",
+                    "--runtime",
+                    "rt",
+                    "--diagnostics",
+                    "json",
+                ],
             );
-            let expected_status = if command == "build" { 2 } else { 1 };
-            assert_eq!(result.status.code(), Some(expected_status), "{result:?}");
+            assert_eq!(result.status.code(), Some(2), "{result:?}");
             let diagnostics = String::from_utf8_lossy(&result.stderr);
             assert!(
                 diagnostics.contains("FLICK-P015") && diagnostics.contains("999.0.0"),
@@ -302,4 +305,73 @@ fn third_party_components_do_not_inherit_the_official_js_runtime_check() {
             );
         }
     }
+}
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn third_party_backend_declares_its_own_help_toml_cli_options_cache_and_inspect() {
+    let root = fixture("backend_third_party_options", "App");
+
+    // `build --help` shows only `test/literal`'s options, never `flick/js` or `flick/go`.
+    let help = flick_in(&root, &["build", "--help"]);
+    assert!(help.status.success(), "{help:?}");
+    let help_text = String::from_utf8_lossy(&help.stdout);
+    assert!(
+        help_text.contains("Options of `test/literal`:"),
+        "{help_text}"
+    );
+    assert!(help_text.contains("--case"), "{help_text}");
+    assert!(help_text.contains("--banner"), "{help_text}");
+    for forbidden in ["--typescript", "--declarations", "--runtime", "--cgo"] {
+        assert!(
+            !help_text.contains(forbidden),
+            "{forbidden} in:\n{help_text}"
+        );
+    }
+
+    // `[target.literal] banner = "from-toml"` flows to the guest.
+    let base = fs::read_to_string(root.join("flick.toml")).expect("config");
+    fs::write(
+        root.join("flick.toml"),
+        format!("{base}\n[target.literal]\nbanner = \"from-toml\"\n"),
+    )
+    .expect("target config");
+    let built_toml = flick_in(&root, &["build", "--offline"]);
+    assert!(built_toml.status.success(), "{built_toml:?}");
+    let from_toml = fs::read_to_string(root.join("dist/_flick/App.js")).expect("App.js");
+    assert!(from_toml.starts_with("// from-toml\n"), "{from_toml}");
+    let cache_after_toml = fs::read_dir(root.join(".flick/cache"))
+        .expect("cache")
+        .count();
+    assert_eq!(cache_after_toml, 1);
+
+    // CLI `--banner` overrides TOML and invalidates the cache.
+    let built_cli = flick_in(&root, &["build", "--offline", "--banner", "from-cli"]);
+    assert!(built_cli.status.success(), "{built_cli:?}");
+    let from_cli = fs::read_to_string(root.join("dist/_flick/App.js")).expect("App.js");
+    assert!(from_cli.starts_with("// from-cli\n"), "{from_cli}");
+    let cache_after_cli = fs::read_dir(root.join(".flick/cache"))
+        .expect("cache")
+        .count();
+    assert_eq!(cache_after_cli, 2);
+
+    // `inspect --emit output` passes `--banner` to `test/literal` and prints its output.
+    let inspected = flick_in(
+        &root,
+        &[
+            "inspect",
+            "App",
+            "--emit",
+            "output",
+            "--banner",
+            "from-inspect",
+            "--offline",
+        ],
+    );
+    assert!(inspected.status.success(), "{inspected:?}");
+    let inspected_text = String::from_utf8_lossy(&inspected.stdout);
+    assert!(
+        inspected_text.starts_with("// from-inspect\n"),
+        "{inspected_text}"
+    );
 }

@@ -293,6 +293,7 @@ mod transaction_tests {
                         body: Type::Tuple(Vec::new()),
                         opaque: false,
                     },
+                    variance: Vec::new(),
                 },
             );
             let variable = checker.fresh();

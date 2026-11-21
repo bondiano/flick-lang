@@ -261,18 +261,19 @@ theorem Typ.dcons_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {v r : T
   exact .dcons (s := s.substT σ) h₁ (ih₂ σ (hσ.sub fun _ h => .inr h))
 
 theorem Typ.drec_substT {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {c k : Nat} {r : Tm}
-    {fs : List (Label × Scheme)} {us : List Ty} {φ : Stage} (hc : S.dict c = some (k, fs))
+    {fs : List (Label × Scheme)} {us : List Ty} {T : Ty} {φ : Stage} (hc : S.dict c = some (k, fs))
     (hk : us.length = k)
     (ih : ∀ σ, Fits σ r → Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) r
       (J.substT σ (.dfs (fs.map fun f => (f.1, f.2.substT (instT us))))))
-    (hn : r.NoIns)
+    (hn : r.NoIns) (hT : LeLive S (.dict c (Ty.spine us)) T)
     (σ : Atom → Ty) (hσ : Fits σ (.drec c r)) :
     Typ S (Ψ.map (Ty.substT σ)) (Θ.substT σ) (Γ.map (Scheme.substT σ)) (.drec c r)
-      (J.substT σ (.ex (.dict c (Ty.spine us)) φ)) := by
+      (J.substT σ (.ex T φ)) := by
   have h₁ := ih σ hσ
   simp only [Flick.J.substT, S.fields_substT hc hk] at h₁
-  simp only [Flick.J.substT, Ty.substT, Ty.spine_substT]
-  exact .drec hc (by simpa using hk) h₁ hn
+  have hT' := hT.substT σ
+  simp only [Ty.substT, Ty.spine_substT] at hT'
+  exact .drec hc (by simpa using hk) h₁ hn hT'
 
 /-- (Proj) of a dictionary after a substitution, in any context. -/
 theorem Typ.dproj_at {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme} {c k : Nat} {e : Tm}

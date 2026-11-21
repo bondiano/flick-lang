@@ -6,7 +6,7 @@ use crate::types::infer::eff;
 use crate::types::lang::Lang;
 use crate::types::ty::{Effects, Row, Type, Written};
 use crate::types::unify::Unified;
-use crate::types::variance::Sign;
+use crate::types::variance::Variance;
 use crate::types::{Checker, Kind};
 
 impl Checker<'_> {
@@ -225,11 +225,14 @@ impl Checker<'_> {
             let Type::Con { module, name } = head else {
                 return None;
             };
-            let signs = self.signs(module, name)?;
+            let signs = name
+                .strip_suffix("$Dict")
+                .and_then(|class| self.class_signs(module, class))
+                .or_else(|| self.signs(module, name))?;
             if signs.len() != args.len() {
                 return None;
             }
-            if args.len() == 1 && signs[0] == Sign::Pos {
+            if args.len() == 1 && signs[0] == Variance::Covariant {
                 let head = head.clone();
                 let arg = args[0].clone();
                 chain.push(head);
@@ -252,14 +255,16 @@ impl Checker<'_> {
             let mut out = Vec::with_capacity(args.len());
             for (arg, sign) in args.into_iter().zip(signs.iter()) {
                 match sign {
-                    Sign::Pos => match self.widen_at(&arg, false, added) {
+                    Variance::Covariant => match self.widen_at(&arg, false, added) {
                         Some(widened) => {
                             changed = true;
                             out.push(widened);
                         }
                         None => out.push(arg),
                     },
-                    Sign::Neg | Sign::Inv | Sign::Bi => out.push(arg),
+                    Variance::Contravariant | Variance::Invariant | Variance::Bivariant => {
+                        out.push(arg);
+                    }
                 }
             }
             if !changed {

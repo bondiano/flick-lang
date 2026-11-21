@@ -41,11 +41,20 @@ use paths::specifier;
 
 use crate::codegen::{EffectBridge, Labels};
 use crate::project::Compiled;
-use crate::project::config::{Backend, BackendEnvironment, MAIN_ENTRY};
+use crate::project::config::{BackendEnvironment, MAIN_ENTRY};
 use crate::source::FileId;
 use crate::{ir, opt, types};
 
 pub use crate::codegen::BUILTIN_DIR;
+
+/// Which JS effect runtime the native JS emitter targets (used by internal
+/// emitter tests and the browser playground).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Backend {
+    Effect,
+    /// Flick's own runtime, without Effect.
+    Rt,
+}
 
 /// The launcher of the entry `main`, the one `entry` names: a hyphen
 /// cannot occur in a module name.

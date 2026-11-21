@@ -87,12 +87,33 @@ fn build_and_check_never_read_a_companion() {
     for dir in [&with, &without] {
         let check = flick_in(dir, &["check"]);
         assert_eq!(check.status.code(), Some(0), "{check:?}");
-        for emit in ["js", "ts"] {
-            let out = flick_in(
-                dir,
-                &["build", "--emit", emit, "--emit-dts", "--out-dir", emit],
-            );
-            assert_eq!(out.status.code(), Some(0), "{emit}: {out:?}");
+        for (name, flags) in [
+            (
+                "js",
+                &[
+                    "build",
+                    "--target",
+                    "js",
+                    "--declarations",
+                    "--out-dir",
+                    "js",
+                ][..],
+            ),
+            (
+                "ts",
+                &[
+                    "build",
+                    "--target",
+                    "js",
+                    "--typescript",
+                    "--declarations",
+                    "--out-dir",
+                    "ts",
+                ][..],
+            ),
+        ] {
+            let out = flick_in(dir, flags);
+            assert_eq!(out.status.code(), Some(0), "{name}: {out:?}");
         }
     }
     for emit in ["js", "ts"] {
@@ -122,7 +143,11 @@ fn build_and_check_never_read_a_companion() {
 #[ignore = "needs Node, pnpm install and Go"]
 fn a_companion_tests_what_its_module_keeps_on_every_target() {
     let dir = library("companion_tests", Some(COMPANION));
-    for flags in [&["--emit", "js"][..], &["--emit", "go"], &["--rt"]] {
+    for flags in [
+        &["--target", "js", "--runtime", "effect"][..],
+        &["--target", "go"],
+        &["--target", "js", "--runtime", "rt"],
+    ] {
         let out = flick_in(&dir, &[&["test"], flags].concat());
         let stdout = String::from_utf8_lossy(&out.stdout);
         assert_eq!(out.status.code(), Some(0), "{flags:?}: {out:?}");
@@ -142,7 +167,7 @@ fn a_companion_tests_what_its_module_keeps_on_every_target() {
     // a module of the test root sees only the exports
     let private = BY_EXPORTS.replace("(greet \"Bo\")", "(Lib.Users.trim \"Bo\")");
     fs::write(dir.join("test/Lib/Users_test.fl"), private).expect("write");
-    let out = flick_in(&dir, &["test", "--emit", "js"]);
+    let out = flick_in(&dir, &["test", "--target", "js"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     assert!(stderr.contains("trim"), "{stderr}");

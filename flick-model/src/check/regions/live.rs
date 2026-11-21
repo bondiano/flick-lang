@@ -16,6 +16,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
+use std::slice;
 
 use super::super::Checker;
 use super::super::generalize::{rigid_inst, substitute, substitute_caps};
@@ -88,6 +89,138 @@ pub(in crate::check) fn drop_empty_live(r: &mut Row) {
     }
 }
 
+/// Places any outer surface hidden qualifier (`Type::Captured`) on a
+/// syntactically curried or rank-2 callable starting with a pure arrow onto
+/// its inner callable stage after the pure arrows, before instantiation.
+pub(in crate::check) fn place_qualifiers(t: &Type) -> Type {
+    match t {
+        Type::Captured(ty, c) => {
+            let ty = place_qualifiers(ty);
+            let ty = if starts_with_pure_to_runtime(&ty) {
+                push_past_pure_arrows(&ty, c)
+            } else {
+                ty
+            };
+            Type::Captured(Rc::new(ty), c.clone())
+        }
+        Type::Bounded(ty, c) => Type::Bounded(Rc::new(place_qualifiers(ty)), c.clone()),
+        Type::Fun(p, s, r) => Type::Fun(
+            Rc::new(place_qualifiers(p)),
+            s.clone(),
+            Rc::new(place_qualifiers(r)),
+        ),
+        Type::Eff(r, e, a) => Type::Eff(r.clone(), e.clone(), Rc::new(place_qualifiers(a))),
+        Type::Forall(s) => Type::Forall(Rc::new(Scheme {
+            body: place_qualifiers(&s.body),
+            ..(**s).clone()
+        })),
+        Type::App(a, b) => Type::App(Rc::new(place_qualifiers(a)), Rc::new(place_qualifiers(b))),
+        Type::Ref(x) => Type::Ref(Rc::new(place_qualifiers(x))),
+        Type::Tuple(ts) => Type::Tuple(ts.iter().map(place_qualifiers).collect()),
+        Type::Record(f) => Type::Record(Fields {
+            fields: f
+                .fields
+                .iter()
+                .map(|(l, t)| (l.clone(), place_qualifiers(t)))
+                .collect(),
+            tail: f.tail.clone(),
+        }),
+        Type::Exists(k, sig, b) => {
+            Type::Exists(k.clone(), sig.clone(), Rc::new(place_qualifiers(b)))
+        }
+        Type::OpenedExists(sig, w, b) => {
+            Type::OpenedExists(sig.clone(), *w, Rc::new(place_qualifiers(b)))
+        }
+        other => other.clone(),
+    }
+}
+
+fn has_runtime_stage(t: &Type) -> bool {
+    match t {
+        Type::Fun(_, Stage::Runtime(..), _) | Type::Eff(..) => true,
+        Type::Fun(_, Stage::Pure, r) => has_runtime_stage(r),
+        Type::Forall(s) => has_runtime_stage(&s.body),
+        Type::Captured(ty, _) => has_runtime_stage(ty),
+        _ => false,
+    }
+}
+
+fn starts_with_pure_to_runtime(t: &Type) -> bool {
+    match t {
+        Type::Fun(_, Stage::Pure, r) => has_runtime_stage(r),
+        Type::Forall(s) => starts_with_pure_to_runtime(&s.body),
+        Type::Captured(ty, _) => starts_with_pure_to_runtime(ty),
+        _ => false,
+    }
+}
+
+fn push_past_pure_arrows(t: &Type, c: &Caps) -> Type {
+    match t {
+        Type::Fun(p, Stage::Pure, r) => {
+            let r = if starts_with_pure_to_runtime(r) {
+                push_past_pure_arrows(r, c)
+            } else {
+                Checker::qualify_hidden((**r).clone(), slice::from_ref(c))
+            };
+            Type::Fun(p.clone(), Stage::Pure, Rc::new(r))
+        }
+        Type::Forall(s) => {
+            let mentions = |n: &Name| {
+                c.atoms
+                    .iter()
+                    .chain(&c.vars)
+                    .any(|v| matches!(v, Var::Named(m) if m == n))
+            };
+            let mut renamed = HashMap::new();
+            let mut used: BTreeSet<Name> = s.vars.iter().map(|(n, _)| n.clone()).collect();
+            let vars: Vec<(Name, Kind)> = s
+                .vars
+                .iter()
+                .map(|(n, k)| {
+                    if !mentions(n) {
+                        return (n.clone(), k.clone());
+                    }
+                    let mut idx = 0usize;
+                    let fresh = loop {
+                        let candidate = Name::from(format!("{n}${idx}"));
+                        if !used.contains(&candidate) && !mentions(&candidate) {
+                            break candidate;
+                        }
+                        idx += 1;
+                    };
+                    used.insert(fresh.clone());
+                    renamed.insert(n.clone(), rigid_inst(&fresh, k));
+                    (fresh, k.clone())
+                })
+                .collect();
+            let body = if renamed.is_empty() {
+                s.body.clone()
+            } else {
+                substitute(&s.body, &renamed)
+            };
+            let outlives = if renamed.is_empty() {
+                s.outlives.clone()
+            } else {
+                s.outlives
+                    .iter()
+                    .map(|(cs, r)| (substitute_caps(cs, &renamed), substitute(r, &renamed)))
+                    .collect()
+            };
+            Type::Forall(Rc::new(Scheme {
+                body: push_past_pure_arrows(&body, c),
+                vars,
+                outlives,
+            }))
+        }
+        Type::Captured(ty, inner) => {
+            let combined = inner.union(c);
+            let ty = push_past_pure_arrows(ty, &combined);
+            Type::Captured(Rc::new(ty), inner.clone())
+        }
+        other => other.clone(),
+    }
+}
+
 pub(in crate::check) fn arg_caps(t: &Type) -> Caps {
     match t {
         Type::Captured(_, c) => c.clone(),
@@ -103,7 +236,7 @@ impl Checker<'_> {
     /// `Scheme.elide` of the core (`formal/Formal/Live/Elide.lean`).
     pub(in crate::check) fn live_scheme(&self, s: &Scheme) -> Scheme {
         let mut vars = s.vars.clone();
-        let body = self.fresh_rows(&s.body, &mut vars);
+        let body = place_qualifiers(&self.fresh_rows(&s.body, &mut vars));
         Scheme {
             body: self.elide(
                 &body,
@@ -255,6 +388,10 @@ impl Checker<'_> {
                     .collect(),
                 tail: f.tail.clone(),
             }),
+            Type::Exists(k, sig, b) => Type::Exists(k.clone(), sig.clone(), Rc::new(go(b, &none))),
+            Type::OpenedExists(sig, w, b) => {
+                Type::OpenedExists(sig.clone(), *w, Rc::new(go(b, &none)))
+            }
             other => other.clone(),
         }
     }

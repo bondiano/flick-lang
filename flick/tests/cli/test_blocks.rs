@@ -54,12 +54,12 @@ fn project(name: &str) -> PathBuf {
     dir
 }
 
-/// The flags of a run on `emit`: `js`, `go` or Flick's own runtime, `rt`.
+/// The flags of a run on `emit`: `js` (Effect adapter), `go` or Flick's own runtime, `rt`.
 fn on(emit: &str) -> Vec<&str> {
-    if emit == "rt" {
-        vec!["--rt"]
-    } else {
-        vec!["--emit", emit]
+    match emit {
+        "rt" => vec!["--target", "js", "--runtime", "rt"],
+        "js" => vec!["--target", "js", "--runtime", "effect"],
+        _ => vec!["--target", emit],
     }
 }
 

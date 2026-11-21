@@ -9,5 +9,7 @@ test-dir = "test"
 [build]
 out-dir = "dist"
 profile = "release"
-emit = "js"
-effect = "effect"
+target = "js"
+
+[target.js]
+runtime = "effect"

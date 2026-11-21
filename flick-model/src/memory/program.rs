@@ -3,16 +3,18 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{iter, mem};
 
-use flick_core::ir::Pat;
+use flick_core::ir::{Lit, Pat};
 use flick_core::types::OpClass;
 
 use flick_core::ir::memory::{
-    self, Block, CodeId, Exit, Instruction, Intrinsic, Local, Name, Operation, Program,
+    self, Block, CodeId, Exit, HostPrimitive, Instruction, Intrinsic, Local, Name, Operation,
+    Program,
 };
 
 use super::{
-    ArenaHandle, ArenaView, CellHandle, Data, Error, Heap, Locals, OwnerHandle, Value, patterns,
-    peek, primitives, tagged_boundary, take,
+    ArenaHandle, ArenaView, CellHandle, Data, Error, ExitData, Heap, IteratorHandle, IteratorState,
+    LayerData, LazyHandle, LazyState, Locals, ObjectId, ObjectToken, OwnerHandle, SeqData, Value,
+    VarHandle, patterns, peek, primitives, tagged_boundary, take,
 };
 
 #[path = "dictionaries.rs"]
@@ -25,7 +27,7 @@ mod handlers;
 mod layers;
 use super::causes::StepFailure;
 use super::{CauseToken, DefectSpec, LanguageExit, Reason, charge};
-use layers::Provider;
+use layers::{MemoRestore, Provider};
 #[path = "recovery.rs"]
 mod recovery;
 use recovery::RecoveryState;
@@ -203,37 +205,7 @@ fn execute(
     let execution = NEXT_EXECUTION
         .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
         .expect("fewer than usize::MAX model executions");
-    let mut machine = Machine {
-        heap,
-        program,
-        execution,
-        globals: BTreeMap::new(),
-        cells: Vec::new(),
-        owners: vec![OwnerState::default()],
-        current_owner: 0,
-        current_evidence: None,
-        frames: Vec::new(),
-        activations: BTreeMap::new(),
-        providers: BTreeMap::new(),
-        segments: BTreeMap::new(),
-        invocations: BTreeMap::new(),
-        discard: None,
-        ready: None,
-        next_handler: 0,
-        arguments: arguments.into(),
-        scratch: Vec::new(),
-        pending: None,
-        failure: None,
-        failure_elected: false,
-        recoveries: BTreeMap::new(),
-        next_recovery: 0,
-        pending_handler: None,
-        top: None,
-        stdout: String::new(),
-        fuel,
-        main_stage,
-        root: None,
-    };
+    let mut machine = Machine::new(heap, program, execution, arguments, fuel, main_stage);
     let result = machine.global(entry, None).and_then(|()| machine.run());
     let outcome = machine.finish(result);
     ExecutionReport {
@@ -242,7 +214,7 @@ fn execute(
     }
 }
 
-enum Destination {
+enum Destination<'p> {
     RecoverySelection {
         id: usize,
     },
@@ -263,8 +235,19 @@ enum Destination {
         activation: usize,
         binding: Local,
     },
+    Discontinue {
+        cont_id: usize,
+        binding: Local,
+    },
     Invocation(usize),
     Catch {
+        handler: Value,
+        binding: Local,
+    },
+    CaptureExit {
+        binding: Local,
+    },
+    CatchDefect {
         handler: Value,
         binding: Local,
     },
@@ -281,12 +264,154 @@ enum Destination {
     CloseScope {
         owner: usize,
         previous: usize,
-        binding: Local,
+        binding: Option<Local>,
+    },
+    ClosingScope {
+        state: Box<ClosingScopeState<'p>>,
     },
     RestoreOwner {
         previous: usize,
         binding: Local,
     },
+    Loop {
+        id: String,
+        code: CodeId,
+        args: Vec<Value>,
+        binding: Local,
+    },
+    FunctionBoundary {
+        binding: Local,
+    },
+    GenerateStrict {
+        items: Vec<Value>,
+        remaining: Option<usize>,
+        binding: Local,
+    },
+    GeneratorStep {
+        gen_id: usize,
+        binding: Local,
+    },
+    LazyComplete {
+        lazy: LazyHandle,
+        binding: Local,
+    },
+    AcquireRegister {
+        owner: usize,
+        release: Value,
+        binding: Local,
+    },
+    BracketUse {
+        use_fn: Value,
+        release_fn: Value,
+        binding: Local,
+    },
+    BracketRelease {
+        resource: Value,
+        release_fn: Value,
+        binding: Local,
+    },
+    BracketFinish {
+        outcome: BracketOutcome,
+        saved_mask: usize,
+        binding: Local,
+    },
+    DiscardCleanupDone {
+        saved_mask: usize,
+        masked: bool,
+        paused: Box<Discard<'p>>,
+    },
+    OnExitDiscardRunFin {
+        saved_mask: usize,
+        masked: bool,
+        paused: Box<Discard<'p>>,
+    },
+    RestoreMask {
+        saved_mask: usize,
+        check_on_exit: bool,
+        next: Box<Destination<'p>>,
+    },
+    EnsuringFinish {
+        finalizer: Value,
+        binding: Local,
+    },
+    EnsuringDone {
+        outcome: BracketOutcome,
+        saved_mask: usize,
+        binding: Local,
+    },
+    OnExitDecide {
+        interruptible: bool,
+        decide: Value,
+        binding: Local,
+    },
+    OnExitRunFin {
+        outcome: BracketOutcome,
+        saved_mask: usize,
+        binding: Local,
+    },
+    OnExitFinish {
+        outcome: BracketOutcome,
+        saved_mask: usize,
+        binding: Local,
+    },
+    CatchCause {
+        handler: Value,
+        binding: Local,
+    },
+    OrDie {
+        binding: Local,
+    },
+    TimedFinish {
+        start_ns: u64,
+        binding: Local,
+    },
+    CachedComplete {
+        cell_id: usize,
+        next: Box<Destination<'p>>,
+    },
+    ProvideContext {
+        context: Value,
+        binding: Local,
+    },
+    WithServices {
+        services: Vec<Value>,
+        next: Box<Destination<'p>>,
+    },
+    RestoreFiberRef {
+        key: String,
+        previous: Option<Value>,
+        binding: Local,
+    },
+    RestoreOwnerEvidence {
+        previous: usize,
+        evidence: Option<OwnerEvidence>,
+        binding: Local,
+    },
+    RestoreEnvRefs {
+        previous: BTreeMap<String, Value>,
+        binding: Local,
+    },
+    RestoreRandom {
+        previous: Option<usize>,
+        rng_id: usize,
+        binding: Local,
+    },
+    LayerBuildFinish {
+        inner_owner: usize,
+        parent_scope: usize,
+        prev_owner: usize,
+        prev_ev: Option<OwnerEvidence>,
+        prev_memo: Option<Value>,
+        memo_entry: Option<(usize, ObjectId)>,
+        or_die: bool,
+        target: LayerBuildTarget,
+    },
+    DiscardFinalizer,
+}
+
+enum BracketOutcome {
+    Success(Value),
+    Failure(CauseToken),
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -329,7 +454,9 @@ struct Frame<'p> {
     block: &'p Block,
     at: usize,
     locals: Locals,
-    destination: Destination,
+    vars: Vec<Value>,
+    iterators: Vec<Value>,
+    destination: Destination<'p>,
     evidence: Option<OwnerEvidence>,
 }
 
@@ -355,10 +482,36 @@ struct Segment<'p> {
     binding: Local,
 }
 
+struct CapturedContinuation<'p> {
+    frames: Vec<Frame<'p>>,
+    owner: usize,
+    binding: Local,
+}
+
+enum GeneratorRun<'p> {
+    Fresh {
+        seq: Value,
+        code: CodeId,
+    },
+    Suspended {
+        frames: Vec<Frame<'p>>,
+        owner: usize,
+        yield_binding: Local,
+    },
+    Running,
+    Done,
+}
+
+struct GeneratorSlot<'p> {
+    run: GeneratorRun<'p>,
+    remaining: Option<usize>,
+}
+
 enum InvocationEnd {
     Caller(Local),
     Tail(usize),
     Abort(Local),
+    Control { cont_id: usize, binding: Local },
 }
 
 struct Invocation {
@@ -368,22 +521,40 @@ struct Invocation {
     evidence: Option<OwnerEvidence>,
 }
 
-enum TransferNext {
+enum TransferNext<'p> {
     Invoke(usize),
     Raise,
+    LoopContinue {
+        id: String,
+        code: CodeId,
+        args: Vec<Value>,
+        binding: Local,
+    },
+    DeliverValue {
+        binding: Local,
+        value: Value,
+    },
+    ReturnNone {
+        binding: Local,
+    },
+    ResumeRunning {
+        saved_failure: Option<CauseToken>,
+    },
+    FinishGenerateStrict {
+        binding: Local,
+        items: Vec<Value>,
+    },
+    DeliverNone {
+        binding: Local,
+    },
+    FinishCutoff,
+    Chain(Box<Discard<'p>>),
 }
 
 struct Discard<'p> {
     frames: Vec<Frame<'p>>,
-    owner: usize,
-    next: TransferNext,
-}
-
-#[derive(Default)]
-struct OwnerState {
-    closed: bool,
-    /// Sole counted owners, never a reachability-derived disposal set.
-    arenas: Vec<Value>,
+    owner: Option<usize>,
+    next: TransferNext<'p>,
 }
 
 struct Machine<'p, 'h> {
@@ -392,9 +563,10 @@ struct Machine<'p, 'h> {
     execution: usize,
     /// None marks an initializer currently on the frame stack.
     globals: BTreeMap<Name, Option<Value>>,
-    /// The sole strong owners of actual cell allocations. User cell
-    /// handles do not own contents, so cycles through them need no tracing.
+    /// The sole strong owners of actual cell allocations.
     cells: Vec<Value>,
+    /// The sole strong owners of root-owned single-flight `Lazy` cells.
+    lazies: Vec<Value>,
     owners: Vec<OwnerState>,
     current_owner: usize,
     current_evidence: Option<OwnerEvidence>,
@@ -402,6 +574,8 @@ struct Machine<'p, 'h> {
     activations: BTreeMap<usize, Activation>,
     providers: BTreeMap<usize, Provider>,
     segments: BTreeMap<usize, Segment<'p>>,
+    continuations: BTreeMap<usize, Option<CapturedContinuation<'p>>>,
+    generators: BTreeMap<usize, GeneratorSlot<'p>>,
     invocations: BTreeMap<usize, Invocation>,
     discard: Option<Discard<'p>>,
     ready: Option<usize>,
@@ -423,14 +597,80 @@ struct Machine<'p, 'h> {
     main_stage: MainStage,
     /// The provider of `Σ₀`, which no frame holds.
     root: Option<usize>,
+    // Stage 4A cooperative concurrency, virtual clock, and dynamic layers.
+    active_fiber: usize,
+    next_fiber: usize,
+    quantum: u32,
+    parked_fibers: BTreeMap<usize, FiberContext<'p>>,
+    fiber_table: BTreeMap<usize, FiberRecord>,
+    run_queue: VecDeque<usize>,
+    virtual_now_ns: u64,
+    test_clock_mode: bool,
+    test_clock_waiter: Option<TestClockAdvance>,
+    timers: BTreeMap<(u64, usize), TimerEntry>,
+    next_timer: usize,
+    deferreds: BTreeMap<usize, DeferredState>,
+    next_deferred: usize,
+    coords: BTreeMap<usize, CoordState>,
+    next_coord: usize,
+    fiber_groups: BTreeMap<usize, FiberGroupState>,
+    next_group: usize,
+    memo_maps: BTreeMap<usize, MemoMapState>,
+    next_memo: usize,
+    cached_cells: BTreeMap<usize, CachedCellState>,
+    next_cached: usize,
+    isaac_rngs: BTreeMap<usize, primitives::IsaacRng>,
+    next_rng: usize,
+    closing_scopes: BTreeMap<usize, Box<ClosingScopeState<'p>>>,
+    pending_provides: BTreeMap<usize, PendingProvide>,
+    next_provide: usize,
+    pending_resume_close: Option<usize>,
+    pending_provide_result: Option<PendingProvideResult>,
+    pending_layer_build: Option<(Value, usize, usize)>,
+    inherited_services: Vec<Value>,
+    inherited_tail_ops: Vec<InstalledOperation>,
+    lazy_waiters: BTreeMap<ObjectId, Vec<(usize, Local)>>,
+    fiber_refs: BTreeMap<String, Value>,
+    mask_depth: usize,
+    interrupt_requested: Option<u64>,
+    seeded_random: Option<usize>,
+    root_defects: Vec<CauseToken>,
+    runtime_fibers_started: u64,
 }
 
+include!("program/async_state.rs");
 include!("program/driving.rs");
+include!("program/driving_unwind.rs");
+include!("program/returns.rs");
 include!("program/calls.rs");
 include!("program/values.rs");
 include!("program/contexts.rs");
 include!("program/scoped_values.rs");
+include!("program/control_flow.rs");
+include!("program/generators.rs");
+include!("program/scope_finalizers.rs");
+include!("program/owner_close.rs");
+include!("program/frame_roots.rs");
 include!("program/cleanup.rs");
+include!("program/fibers.rs");
+include!("program/fibers_wake.rs");
+include!("program/scheduler.rs");
+include!("program/coords.rs");
+include!("program/coords_race.rs");
+include!("program/concurrency.rs");
+include!("program/concurrency_par.rs");
+include!("program/concurrency_race.rs");
+include!("program/concurrency_def.rs");
+include!("program/async_dests.rs");
+include!("program/async_dests_unwind.rs");
+include!("program/fiber_groups.rs");
+include!("program/fiber_groups_stop.rs");
+include!("program/context_ops.rs");
+include!("program/context_pure.rs");
+include!("program/manual_scope.rs");
+include!("program/layer_build.rs");
+include!("program/layer_merge.rs");
+include!("program/test_runner.rs");
 
 #[cfg(test)]
 mod tests {

@@ -3,8 +3,8 @@ title: "Runtime and Effect adapter"
 ---
 
 By default, compiled code imports `@flick-lang/runtime/rt`, Flick's own runtime
-without an Effect dependency. The `--rt` flag also selects it for one build,
-run or test of a project configured for Effect.
+without an Effect dependency. The `--runtime rt` flag also selects it for one build,
+run, dev, test or inspect of a project configured for Effect.
 
 An RT project that uses a library binding still implemented by Effect imports
 `@flick-lang/effect-ts/bridge` for that binding. Add `@flick-lang/effect-ts`
@@ -51,7 +51,7 @@ consuming a server-rendered stream require `Async` in the caller's effect row.
 For an HTTP body whose stream requires only `Async`, use `Http.Body.stream_async`
 or `Http.ServerResponse.stream_async` / `stream_text_async`.
 
-Projects with `effect = "effect"` use `@flick-lang/effect-ts` (see [Errors,
+Projects with `[target.js] runtime = "effect"` use `@flick-lang/effect-ts` (see [Errors,
 services, resources and concurrency](../../spec/05-errors-and-concurrency/),
 [Compiler architecture](../../contributing/implementation-decisions/#compiler-architecture)).
 This adapter targets the Effect release `packages/effect-ts/package.json`

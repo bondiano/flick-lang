@@ -164,6 +164,7 @@ impl Checker<'_> {
                 format!("`{}` lacks method {}", instance.name, missing.join(", ")),
             );
         }
+        self.solve_rows();
         self.solve_classes(true);
         self.classes.givens.truncate(assumed);
         self.cx.tyvars.truncate(mark);

@@ -11,6 +11,7 @@ mod execute;
 pub(crate) mod launch;
 #[cfg(feature = "wasm-backends")]
 mod official;
+pub(crate) mod options;
 #[cfg(feature = "wasm-backends")]
 mod request;
 #[cfg(feature = "wasm-backends")]
@@ -59,17 +60,9 @@ pub(crate) enum Selected {
 
 /// Preserve the compiler-owned JS runtime diagnostic before loading packages.
 /// Other components negotiate their runtime requirements through the backend ABI.
-pub(crate) fn check_runtime(project: &Project, rt: bool) -> Option<Diagnostic> {
-    if let Some(package) = &project.config.build.backend {
-        #[cfg(feature = "wasm-backends")]
-        if !official::matches(package, project) {
-            return None;
-        }
-        #[cfg(not(feature = "wasm-backends"))]
-        {
-            let _ = package;
-            return None;
-        }
+pub(crate) fn check_runtime(project: &Project, backend: &Selected, rt: bool) -> Option<Diagnostic> {
+    if !backend.is_official_js() {
+        return None;
     }
     toolchain::check_runtime(&project.root, rt)
 }
@@ -80,6 +73,22 @@ impl Selected {
         match self {
             Self::Native => true,
             Self::Component(package) => package.supports_host(capability),
+        }
+    }
+
+    pub(crate) fn descriptor(&self) -> Option<flick_backend::Descriptor> {
+        match self {
+            Self::Native => None,
+            #[cfg(feature = "wasm-backends")]
+            Self::Component(package) => Some(package.descriptor()),
+        }
+    }
+
+    pub(crate) fn is_official_js(&self) -> bool {
+        match self {
+            Self::Native => true,
+            #[cfg(feature = "wasm-backends")]
+            Self::Component(package) => package.is_official_js(),
         }
     }
 
@@ -114,19 +123,23 @@ impl Selected {
             }
             #[cfg(feature = "wasm-backends")]
             Self::Component(_) => Some(
-                request::program(sources, compilation, project::stages_by_class(project, rt)).0,
+                request::program(
+                    sources,
+                    compilation,
+                    project::stages_by_class(project, Some(rt)),
+                )
+                .0,
             ),
         }
     }
 
-    /// Resolve and verify a pin before consulting cached output. Selecting an
-    /// unavailable or incompatible component never selects native codegen.
-    pub(crate) fn load(
+    /// Resolve and verify a target backend pin before consulting cached output.
+    /// Selecting an unavailable or incompatible component never selects native codegen.
+    pub(crate) fn load_target(
         host: &FsHost,
         project: Option<&Project>,
-        go: bool,
-        rt: bool,
-    ) -> Result<Self, Diagnostic> {
+        cli_target: Option<&str>,
+    ) -> Result<(Self, options::TargetChoice, bool), Diagnostic> {
         if project.is_some() && !allowed_tools().is_empty() {
             return Err(Diagnostic::new(
                 codes::P051,
@@ -134,37 +147,43 @@ impl Selected {
                 "`--allow-tool` grants a tool outside a project; a project allows its tools in `[tools]`",
             ));
         }
-        let Some((project, package)) =
-            project.and_then(|p| Some((p, p.config.build.backend.as_ref()?)))
-        else {
-            #[cfg(feature = "wasm-backends")]
-            {
-                let root = project.map_or(host.cwd.as_path(), |p| p.root.as_path());
-                let tools = project.map(|p| &p.config.tools);
-                let package = if go {
-                    official::go(root, project, tools)
-                } else {
-                    official::javascript(root, rt, project, tools)
-                };
-                return package.map(|p| Self::Component(Arc::new(p)));
+        let (choice, overridden) = options::resolve_target(cli_target, project)?;
+        match &choice {
+            options::TargetChoice::Pinned { package, .. } => {
+                let project = project.expect("pinned target comes from a project");
+                #[cfg(feature = "wasm-backends")]
+                {
+                    let loaded = component::Package::load(project, package)
+                        .map(|p| Self::Component(Arc::new(p)))?;
+                    Ok((loaded, choice, overridden))
+                }
+                #[cfg(not(feature = "wasm-backends"))]
+                {
+                    let _ = project;
+                    Err(failure(format!(
+                        "backend {}@{}#{}: this compiler was built without WebAssembly backends",
+                        package.id, package.version, package.sha256
+                    )))
+                }
             }
-            #[cfg(not(feature = "wasm-backends"))]
-            {
-                let _ = (host, go, rt);
-                return Err(failure("builds require WebAssembly backend support"));
+            options::TargetChoice::Official { id, .. } => {
+                #[cfg(feature = "wasm-backends")]
+                {
+                    let root = project.map_or(host.cwd.as_path(), |p| p.root.as_path());
+                    let tools = project.map(|p| &p.config.tools);
+                    let package = if *id == official::GO {
+                        official::go(root, project, tools)
+                    } else {
+                        official::javascript(root, project, tools)
+                    };
+                    package.map(|p| (Self::Component(Arc::new(p)), choice, overridden))
+                }
+                #[cfg(not(feature = "wasm-backends"))]
+                {
+                    let _ = (host, id);
+                    Err(failure("builds require WebAssembly backend support"))
+                }
             }
-        };
-        #[cfg(feature = "wasm-backends")]
-        {
-            component::Package::load(project, package, rt).map(|p| Self::Component(Arc::new(p)))
-        }
-        #[cfg(not(feature = "wasm-backends"))]
-        {
-            let _ = (project, rt);
-            Err(failure(format!(
-                "backend {}@{}#{}: this compiler was built without WebAssembly backends",
-                package.id, package.version, package.sha256
-            )))
         }
     }
 
@@ -209,11 +228,14 @@ impl Selected {
         }
     }
 
-    pub(crate) fn cache_identity(&self) -> String {
+    pub(crate) fn cache_identity(&self, effect: bool) -> String {
         match self {
-            Self::Native => "native-baseline".into(),
+            Self::Native => {
+                let _ = effect;
+                "native-baseline".into()
+            }
             #[cfg(feature = "wasm-backends")]
-            Self::Component(package) => package.cache_identity(),
+            Self::Component(package) => package.cache_identity(effect),
         }
     }
 
@@ -242,7 +264,7 @@ pub(crate) fn pin_official(
     if project.config.build.backend.is_some() {
         return Ok(());
     }
-    let id = if project.config.build.emit == config::Emit::Go {
+    let id = if project.config.is_go() {
         official::GO
     } else {
         official::JS
@@ -257,7 +279,7 @@ pub(crate) fn selected_pin(project: &Project) -> Option<(String, String)> {
     if let Some(package) = &project.config.build.backend {
         return Some((package.id.clone(), package.sha256.clone()));
     }
-    let id = if project.config.build.emit == config::Emit::Go {
+    let id = if project.config.is_go() {
         official::GO
     } else {
         official::JS
@@ -268,11 +290,11 @@ pub(crate) fn selected_pin(project: &Project) -> Option<(String, String)> {
 /// The backend `project` selects, as a contributor of commands.
 #[cfg(feature = "wasm-backends")]
 pub(crate) fn contributor(project: &Project) -> Result<Arc<dyn Contributor>, String> {
-    let go = project.config.build.emit == config::Emit::Go;
-    let rt = project.config.build.effect == config::Backend::Rt;
-    match Selected::load(&FsHost::new(), Some(project), go, rt) {
-        Ok(Selected::Component(package)) => Ok(package),
-        Ok(Selected::Native) => Err("the native development backend adds no commands".into()),
+    match Selected::load_target(&FsHost::new(), Some(project), None) {
+        Ok((Selected::Component(package), _, _)) => Ok(package),
+        Ok((Selected::Native, _, _)) => {
+            Err("the native development backend adds no commands".into())
+        }
         Err(diagnostic) => Err(diagnostic.message),
     }
 }
@@ -296,7 +318,7 @@ pub(crate) fn official_contributor(
     let package = if id == official::GO {
         official::go(&project.root, Some(project), tools)
     } else {
-        official::javascript(&project.root, false, Some(project), tools)
+        official::javascript(&project.root, Some(project), tools)
     };
     match package {
         Ok(package) => Ok(Arc::new(package)),

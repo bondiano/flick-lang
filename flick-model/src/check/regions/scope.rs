@@ -7,11 +7,11 @@ use std::mem;
 use std::rc::Rc;
 
 use super::super::expr::mono;
-use super::super::generalize::in_regions;
+use super::super::generalize::Inst;
 use super::super::{Check, Checker, error};
 use super::{owner, scope_service};
 use crate::syntax::{Name, Term};
-use crate::types::{Caps, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Row, Stage, Type, Var};
 
 impl Checker<'_> {
     /// (Scope): `s` fresh one level deeper, `s : Owner s` in the body, the
@@ -85,6 +85,8 @@ impl Checker<'_> {
         self.regions.open.push(s.clone());
         self.regions.nest.push(s.clone());
         self.regions.renamed.push((name.clone(), s.clone()));
+        self.tyvars
+            .push((name.clone(), Inst::Type(Type::Var(region.clone()))));
         self.locals.push((name.clone(), mono(owner(&s))));
         // The body can acquire in this scope, in addition to the surrounding
         // requirements. A pre-existing Scope requirement may instead pass
@@ -105,6 +107,7 @@ impl Checker<'_> {
         let checked = self.own_stage(body, expected);
         self.stage_bound = outer_bound;
         self.locals.pop();
+        self.tyvars.pop();
         self.regions.renamed.pop();
         self.regions.nest.pop();
         self.regions.open.pop();
@@ -139,7 +142,7 @@ impl Checker<'_> {
             Type::Errors(self.zonk_row(&r)),
             Type::Errors(self.zonk_row(&e)),
         ]));
-        if self.names(&left).contains(s) {
+        if self.free_regions(&left).contains(s) {
             return error(
                 "Scope",
                 format!(
@@ -153,16 +156,10 @@ impl Checker<'_> {
         Ok(t)
     }
 
-    /// A signature written in the body of `scope`s: the regions it names
-    /// are theirs.
-    pub(in crate::check) fn in_scopes(&self, s: &Scheme) -> Scheme {
-        in_regions(s, &self.regions.renamed)
-    }
-
     /// Whether a value at `level` may take what `t` names: no region of a
     /// `scope` deeper than it (§2.3 (Scope), §2.6).
     pub(in crate::check) fn escapes(&self, t: &Type, level: u32) -> Check<()> {
-        for n in self.names(t) {
+        for n in self.free_regions(t) {
             if let Some((l, _)) = self.regions.scopes.get(&n)
                 && *l > level
             {
@@ -172,6 +169,12 @@ impl Checker<'_> {
                 );
             }
         }
+        if let Some(w) = self.escaping_witness(t, level) {
+            return error(
+                "Module",
+                format!("abstract type witness `#{w}` would leave its `unpack` scope"),
+            );
+        }
         Ok(())
     }
 
@@ -180,6 +183,96 @@ impl Checker<'_> {
         let mut out = BTreeSet::new();
         names_into(&self.zonk(t), &mut out);
         out
+    }
+
+    /// `fr(τ)` for (Scope) (`docs/formal/regions.md` §2.3): free named
+    /// variables of `t`, including its rows and hidden qualifiers, while
+    /// ignoring vacuous value bounds on types that hold nothing.
+    fn free_regions(&self, t: &Type) -> BTreeSet<Name> {
+        let mut out = BTreeSet::new();
+        self.free_regions_into(&self.zonk(t), &mut out);
+        out
+    }
+
+    fn free_regions_into(&self, t: &Type, out: &mut BTreeSet<Name>) {
+        let row = |r: &Row, out: &mut BTreeSet<Name>| {
+            for args in r.elems.values() {
+                args.iter().for_each(|a| self.free_regions_into(a, out));
+            }
+            for v in &r.vars {
+                if let Var::Named(n) = v {
+                    out.insert(n.clone());
+                }
+            }
+        };
+        let caps = |c: &Caps, out: &mut BTreeSet<Name>| {
+            for v in c.atoms.iter().chain(&c.vars) {
+                if let Var::Named(n) = v {
+                    out.insert(n.clone());
+                }
+            }
+        };
+        match t {
+            Type::Var(Var::Named(n)) => {
+                out.insert(n.clone());
+            }
+            Type::Var(_) | Type::Con(_) | Type::Module(_) | Type::OpenedModule(..) => {}
+            Type::App(a, b) => {
+                self.free_regions_into(a, out);
+                self.free_regions_into(b, out);
+            }
+            Type::Fun(p, s, r) => {
+                self.free_regions_into(p, out);
+                if let Stage::Runtime(a, b) = s {
+                    row(a, out);
+                    row(b, out);
+                }
+                self.free_regions_into(r, out);
+            }
+            Type::Eff(a, b, x) => {
+                row(a, out);
+                row(b, out);
+                self.free_regions_into(x, out);
+            }
+            Type::EffOf(a, b) => {
+                row(a, out);
+                row(b, out);
+            }
+            Type::Ref(x) => self.free_regions_into(x, out),
+            Type::Layer(a, b, c) => [a, b, c].iter().for_each(|r| row(r, out)),
+            Type::Record(f) => f
+                .fields
+                .values()
+                .for_each(|t| self.free_regions_into(t, out)),
+            Type::Tuple(ts) | Type::Dict(_, ts) => {
+                ts.iter().for_each(|t| self.free_regions_into(t, out));
+            }
+            Type::Caps(c) => caps(c, out),
+            Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => row(r, out),
+            Type::Forall(s) => {
+                let mut inner = BTreeSet::new();
+                self.free_regions_into(&s.body, &mut inner);
+                for (c, r) in &s.outlives {
+                    caps(c, &mut inner);
+                    self.free_regions_into(r, &mut inner);
+                }
+                for (bound, _) in &s.vars {
+                    inner.remove(bound);
+                }
+                out.extend(inner);
+            }
+            Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => self.free_regions_into(b, out),
+            Type::Captured(x, c) => {
+                caps(c, out);
+                self.free_regions_into(x, out);
+            }
+            Type::Bounded(x, c) => {
+                if !self.holds_nothing(x) {
+                    caps(c, out);
+                }
+                self.free_regions_into(x, out);
+            }
+        }
     }
 
     /// A step that needs `Scope ϱ`, `ϱ` not known yet, acquires into the
@@ -302,7 +395,7 @@ pub(in crate::check) fn names_into(t: &Type, out: &mut BTreeSet<Name>) {
         Type::Var(Var::Named(n)) => {
             out.insert(n.clone());
         }
-        Type::Var(_) | Type::Con(_) => {}
+        Type::Var(_) | Type::Con(_) | Type::Module(_) | Type::OpenedModule(..) => {}
         Type::App(a, b) => {
             names_into(a, out);
             names_into(b, out);
@@ -331,6 +424,7 @@ pub(in crate::check) fn names_into(t: &Type, out: &mut BTreeSet<Name>) {
         Type::Caps(c) => caps(c, out),
         Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => row(r, out),
         Type::Forall(s) => names_into(&s.body, out),
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => names_into(b, out),
         Type::Captured(x, c) | Type::Bounded(x, c) => {
             caps(c, out);
             names_into(x, out);

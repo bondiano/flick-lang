@@ -8,10 +8,12 @@ use std::collections::BTreeSet;
 use std::rc::Rc;
 use std::slice;
 
-use super::generalize::{Inst, rigid_inst, substitute_all};
+use super::generalize::{
+    Inst, names as inst_names, rigid_inst, substitute, substitute_all, substitute_caps,
+};
 use super::{Check, Checker, Slot, Solved, error};
 use crate::syntax::Path;
-use crate::types::{Caps, Fields, Row, Stage, Type, Var};
+use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
 impl Checker<'_> {
     pub(super) fn meta(&mut self) -> u32 {
@@ -32,6 +34,10 @@ impl Checker<'_> {
 
     /// The metas of `t`, with the level each is at.
     pub(super) fn metas(&self, t: &Type, out: &mut BTreeSet<u32>) {
+        self.metas_zonked(&self.zonk(t), false, out);
+    }
+
+    fn metas_zonked(&self, t: &Type, skip_vacuous_bounds: bool, out: &mut BTreeSet<u32>) {
         let row = |r: &Row, out: &mut BTreeSet<u32>| {
             for v in &r.vars {
                 if let Var::Meta(m) = v {
@@ -39,7 +45,8 @@ impl Checker<'_> {
                 }
             }
             for args in r.elems.values() {
-                args.iter().for_each(|a| self.metas(a, out));
+                args.iter()
+                    .for_each(|a| self.metas_zonked(a, skip_vacuous_bounds, out));
             }
         };
         let caps = |c: &Caps, out: &mut BTreeSet<u32>| {
@@ -49,45 +56,58 @@ impl Checker<'_> {
                 }
             }
         };
-        match self.zonk(t) {
-            Type::Captured(t, c) | Type::Bounded(t, c) => {
-                caps(&c, out);
-                self.metas(&t, out);
+        match t {
+            Type::Captured(t, c) => {
+                caps(c, out);
+                self.metas_zonked(t, skip_vacuous_bounds, out);
+            }
+            Type::Bounded(t, c) => {
+                if !(skip_vacuous_bounds && self.holds_nothing(t)) {
+                    caps(c, out);
+                }
+                self.metas_zonked(t, skip_vacuous_bounds, out);
             }
             Type::Var(Var::Meta(m)) => {
-                out.insert(m);
+                out.insert(*m);
             }
-            Type::Var(_) | Type::Con(_) => {}
+            Type::Var(_) | Type::Con(_) | Type::Module(_) | Type::OpenedModule(..) => {}
             Type::App(h, a) => {
-                self.metas(&h, out);
-                self.metas(&a, out);
+                self.metas_zonked(h, skip_vacuous_bounds, out);
+                self.metas_zonked(a, skip_vacuous_bounds, out);
             }
             Type::Fun(p, s, r) => {
-                self.metas(&p, out);
-                if let Stage::Runtime(a, b) = &s {
+                self.metas_zonked(p, skip_vacuous_bounds, out);
+                if let Stage::Runtime(a, b) = s {
                     row(a, out);
                     row(b, out);
                 }
-                self.metas(&r, out);
+                self.metas_zonked(r, skip_vacuous_bounds, out);
             }
             Type::Eff(r, e, t) => {
-                row(&r, out);
-                row(&e, out);
-                self.metas(&t, out);
+                row(r, out);
+                row(e, out);
+                self.metas_zonked(t, skip_vacuous_bounds, out);
             }
             Type::EffOf(r, e) => [r, e].iter().for_each(|r| row(r, out)),
-            Type::Ref(t) => self.metas(&t, out),
+            Type::Ref(t) => self.metas_zonked(t, skip_vacuous_bounds, out),
             Type::Layer(i, e, o) => [i, e, o].iter().for_each(|r| row(r, out)),
             Type::Record(f) => {
-                f.fields.values().for_each(|t| self.metas(t, out));
+                f.fields
+                    .values()
+                    .for_each(|t| self.metas_zonked(t, skip_vacuous_bounds, out));
                 if let Some(Var::Meta(m)) = f.tail {
                     out.insert(m);
                 }
             }
-            Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().for_each(|t| self.metas(t, out)),
-            Type::Caps(c) => caps(&c, out),
-            Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => row(&r, out),
-            Type::Forall(s) => self.metas(&s.body, out),
+            Type::Tuple(ts) | Type::Dict(_, ts) => ts
+                .iter()
+                .for_each(|t| self.metas_zonked(t, skip_vacuous_bounds, out)),
+            Type::Caps(c) => caps(c, out),
+            Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => row(r, out),
+            Type::Forall(s) => self.metas_zonked(&s.body, skip_vacuous_bounds, out),
+            Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => {
+                self.metas_zonked(b, skip_vacuous_bounds, out);
+            }
         }
     }
 
@@ -95,7 +115,7 @@ impl Checker<'_> {
     /// that level is solved to is reachable from there.
     pub(super) fn lower(&mut self, t: &Type, level: u32) {
         let mut ms = BTreeSet::new();
-        self.metas(t, &mut ms);
+        self.metas_zonked(&self.zonk(t), true, &mut ms);
         for m in ms {
             let slot = &mut self.slots[m as usize];
             slot.level = slot.level.min(level);
@@ -223,21 +243,51 @@ impl Checker<'_> {
                 self.equalities.push((n.clone(), Solved::Type(t.clone())));
                 Ok(())
             }
-            (Type::Forall(s), Type::Forall(t)) if s.vars.len() == t.vars.len() => {
-                let names: Vec<Inst> = s
-                    .vars
-                    .iter()
-                    .map(|(_, k)| {
-                        self.rigid += 1;
-                        rigid_inst(&format!("#{}", self.rigid), k)
-                    })
-                    .collect();
-                let x = substitute_all(&s.body, &s.vars, &names);
-                let y = substitute_all(&t.body, &t.vars, &names);
-                self.unify(&x, &y)
-            }
-            _ => self.mismatch(&a, &b),
+            (Type::Forall(s), Type::Forall(t)) => self.unify_forall_pair(&a, &b, s, t),
+            _ => self.unify_module(&a, &b),
         }
+    }
+
+    fn unify_forall_pair(&mut self, a: &Type, b: &Type, s: &Scheme, t: &Scheme) -> Check<()> {
+        if s.vars.len() == t.vars.len()
+            && s.vars
+                .iter()
+                .zip(&t.vars)
+                .all(|((_, k1), (_, k2))| k1 == k2)
+            && s.outlives.len() == t.outlives.len()
+        {
+            self.unify_forall(s, t)
+        } else {
+            self.mismatch(a, b)
+        }
+    }
+
+    fn unify_forall(&mut self, s: &Scheme, t: &Scheme) -> Check<()> {
+        let names: Vec<Inst> = s
+            .vars
+            .iter()
+            .map(|(_, k)| {
+                self.rigid += 1;
+                let name = format!("#{}", self.rigid);
+                if *k == Kind::Region {
+                    self.regions.kinds.insert(Var::Named(name.clone().into()));
+                }
+                rigid_inst(&name, k)
+            })
+            .collect();
+        let map_s = inst_names(&s.vars, &names);
+        let map_t = inst_names(&t.vars, &names);
+        for ((cs, rs), (ct, rt)) in s.outlives.iter().zip(&t.outlives) {
+            let cs = substitute_caps(cs, &map_s);
+            let ct = substitute_caps(ct, &map_t);
+            let rs = substitute(rs, &map_s);
+            let rt = substitute(rt, &map_t);
+            self.unify_caps(&cs, &ct)?;
+            self.unify(&rs, &rt)?;
+        }
+        let x = substitute_all(&s.body, &s.vars, &names);
+        let y = substitute_all(&t.body, &t.vars, &names);
+        self.unify(&x, &y)
     }
 
     fn unify_meta(&mut self, m: u32, t: &Type) -> Check<()> {

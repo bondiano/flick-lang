@@ -10,6 +10,7 @@ fn support_learning_is_types_only_idempotent_and_conflict_atomic() {
     let definition = TypeDef {
         kind: Kind::Type,
         form: Form::NOMINAL,
+        variance: Vec::new(),
     };
     let entity = Entity {
         module: "Provider".into(),
@@ -79,6 +80,7 @@ fn alias_only_discovery_learns_external_types_and_real_service_companions_only()
                     body: Type::con("External", "Clock.Impl"),
                     opaque: false,
                 },
+                variance: Vec::new(),
             }),
         )],
         ..Interface::default()
@@ -96,6 +98,7 @@ fn alias_only_discovery_learns_external_types_and_real_service_companions_only()
                         operations: vec![],
                         effect: true,
                     },
+                    variance: Vec::new(),
                 }),
             ),
             export("External", "notImported", None),
@@ -144,6 +147,7 @@ fn same_tree_support_cannot_override_a_child_public_definition() {
             body: Type::con("Prelude", name),
             opaque: false,
         },
+        variance: Vec::new(),
     };
     let mut parent = Interface {
         module: "Provider".into(),
@@ -216,6 +220,7 @@ fn support_cannot_override_a_child_services_generated_implementation() {
             definition: TypeDef {
                 kind: Kind::Type,
                 form: Form::NOMINAL,
+                variance: Vec::new(),
             },
             owner_path: vec!["Child".into()],
         }],
@@ -238,6 +243,7 @@ fn support_cannot_override_a_child_services_generated_implementation() {
                         operations: vec![],
                         effect: true,
                     },
+                    variance: Vec::new(),
                 }),
                 blocked: None,
                 at: None,
@@ -296,6 +302,7 @@ fn support_service_cannot_override_a_child_public_implementation() {
                     operations: vec![],
                     effect: true,
                 },
+                variance: Vec::new(),
             },
             owner_path: vec!["Child".into()],
         }],
@@ -318,6 +325,7 @@ fn support_service_cannot_override_a_child_public_implementation() {
                         body: Type::con("Prelude", "String"),
                         opaque: false,
                     },
+                    variance: Vec::new(),
                 }),
                 blocked: None,
                 at: None,

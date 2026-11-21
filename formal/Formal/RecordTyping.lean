@@ -34,7 +34,10 @@ private theorem Typ.fieldCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     split at hw
     · simp_all
     · next hne => simp only [hne, if_false] at hR; exact ih _ _ _ _ _ rfl hw hR
-  | allI | drec | errVal => intro R φ l w t hJ _ hR; cases hJ; simp [Ty.field] at hR
+  | allI | errVal => intro R φ l w t hJ _ hR; cases hJ; simp [Ty.field] at hR
+  | drec _ _ _ _ hT =>
+    intro R φ l w t hJ _ hR; cases hJ
+    obtain ⟨_, rfl, _⟩ := hT.dict_left; simp [Ty.field] at hR
   | _ => intro R φ l w t hJ hw _; cases hJ <;> simp [Tm.field] at hw
 
 theorem field_typ {Ψ Θ Γ l φ} {v w R t} (h : Typ S Ψ Θ Γ v (.ex R φ))
@@ -56,7 +59,10 @@ private theorem Typ.valueFieldCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       split at hw
       · cases hw; exact hv₁
       · next hne => simp only [hne, if_false] at hR; exact ih hv₂ _ _ _ _ _ rfl hw hR
-  | allI | drec | errVal => intro _ R φ l w t hJ _ hR; cases hJ; simp [Ty.field] at hR
+  | allI | errVal => intro _ R φ l w t hJ _ hR; cases hJ; simp [Ty.field] at hR
+  | drec _ _ _ _ hT =>
+    intro _ R φ l w t hJ _ hR; cases hJ
+    obtain ⟨_, rfl, _⟩ := hT.dict_left; simp [Ty.field] at hR
   | _ => intro _ R φ l w t hJ hw _; cases hJ <;> simp [Tm.field] at hw
 
 /-- A field of a record value is a value. A dictionary is not a record. -/

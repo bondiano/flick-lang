@@ -78,11 +78,15 @@ impl Checker<'_> {
         self.borrowed_head_observing(t, false, &mut |_, _| {})
     }
 
+    /// [`Self::witness_head`] without the copy of a type that does not reduce.
+    pub(in crate::types) fn borrowed_witness_head<'a>(&'a self, ty: &'a Type) -> Cow<'a, Type> {
+        self.borrowed_head_observing(ty, true, &mut |_, _| {})
+    }
+
     /// Ordinary head reduction, retaining opaque identities and qualifiers at
     /// the witness-publication boundary. No second alias expander is used.
     pub(in crate::types) fn witness_head(&self, ty: &Type) -> Type {
-        self.borrowed_head_observing(ty, true, &mut |_, _| {})
-            .into_owned()
+        self.borrowed_witness_head(ty).into_owned()
     }
 
     fn borrowed_head_observing<'a>(
@@ -387,21 +391,41 @@ impl Checker<'_> {
             }
             (
                 Type::Forall {
-                    vars: v1, body: b1, ..
+                    vars: v1,
+                    constraints: c1,
+                    body: b1,
                 },
                 Type::Forall {
-                    vars: v2, body: b2, ..
+                    vars: v2,
+                    constraints: c2,
+                    body: b2,
                 },
-            ) if v1.len() == v2.len() && v1.iter().zip(v2).all(|(x, y)| x.kind == y.kind) => {
+            ) if v1.len() == v2.len()
+                && v1.iter().zip(v2).all(|(x, y)| x.kind == y.kind)
+                && c1.len() == c2.len() =>
+            {
                 self.store.level += 1;
-                let skolems: Vec<Type> = v1.iter().map(|v| self.store.skolem(&v.name)).collect();
+                let skolems: Vec<Type> = v1
+                    .iter()
+                    .map(|v| {
+                        let skolem = self.store.skolem(&v.name);
+                        if let Type::Skolem(s) = &skolem {
+                            self.cx.regions.rigid_kinds.push((*s, v.kind.clone()));
+                        }
+                        skolem
+                    })
+                    .collect();
                 let s1: Vec<_> = v1
                     .iter()
                     .map(|v| v.name.clone())
                     .zip(skolems.clone())
                     .collect();
                 let s2: Vec<_> = v2.iter().map(|v| v.name.clone()).zip(skolems).collect();
-                let result = self.unify(&b1.substitute(&s1), &b2.substitute(&s2));
+                let result = c1
+                    .iter()
+                    .zip(c2)
+                    .try_for_each(|(x, y)| self.unify(&x.substitute(&s1), &y.substitute(&s2)))
+                    .and_then(|()| self.unify(&b1.substitute(&s1), &b2.substitute(&s2)));
                 self.store.level -= 1;
                 result
             }

@@ -253,6 +253,102 @@ theorem resF_closed : ∀ K k ts T σ, ctorF K = some (k, ts, T) →
   simp only [Function.comp, Flick.Ty.substT]
   exact hσ i (List.mem_range.mp hi)
 
+/-- Covariant data parameters of the witness (`Option a`, `List a`). -/
+def varF (T : Name) (j : Nat) : Flick.Variance :=
+  if (T = "Option" ∨ T = "List") ∧ j = 0 then .pos else .inv
+
+/-- Contravariant dictionary parameters of the witness (`Eq a`, class `0`). -/
+def dictVarF (c j : Nat) : Flick.Variance :=
+  if c % 8 = 0 ∧ j = 0 then .neg else .inv
+
+theorem varF_ok : ∀ T i, varF T i ≠ .inv → ∀ K k ts, ctorF K = some (k, ts, T) →
+    (∀ j u, (resF K)[j]? = some u → j ≠ i → u.NoV i) ∧
+    ((i < k ∧ (resF K)[i]? = some (.tvar i) ∧ ∀ f ∈ ts, (varF T i = .bi → f.NoV i) ∧
+        (varF T i = .pos ∨ varF T i = .neg → Flick.Ty.Pol varF i (varF T i) true f)) ∨
+      (varF T i ≠ .bi ∧ (∃ c, (resF K)[i]? = some c ∧ c.Closed) ∧ ∀ f ∈ ts, f.NoV i)) := by
+  intro T i hne K k ts hK
+  have hTi : (T = "Option" ∨ T = "List") ∧ i = 0 := by
+    unfold varF at hne; split at hne
+    · assumption
+    · exact absurd rfl hne
+  obtain ⟨hT, rfl⟩ := hTi
+  have hv : varF T 0 = .pos := by simp [varF, hT]
+  unfold ctorF at hK
+  split at hK <;> cases hK
+  all_goals try (rcases hT with hT | hT <;> simp at hT)
+  · refine ⟨fun j u hu hj => by cases j with | zero => exact absurd rfl hj | succ j => simp [resF, ctorF, idTs] at hu,
+      .inl ⟨by decide, rfl, fun f hf => ?_⟩⟩
+    simp at hf; subst hf
+    exact ⟨(fun h => by rw [hv] at h; cases h), fun _ => by rw [hv]; exact .var (.inl ⟨rfl, rfl⟩)⟩
+  · exact ⟨fun j u hu hj => by cases j with | zero => exact absurd rfl hj | succ j => simp [resF, ctorF, idTs] at hu,
+      .inl ⟨by decide, rfl, fun _ hf => by simp at hf⟩⟩
+  · exact ⟨fun j u hu hj => by cases j with | zero => exact absurd rfl hj | succ j => simp [resF, ctorF, idTs] at hu,
+      .inl ⟨by decide, rfl, fun _ hf => by simp at hf⟩⟩
+  · refine ⟨fun j u hu hj => by cases j with | zero => exact absurd rfl hj | succ j => simp [resF, ctorF, idTs] at hu,
+      .inl ⟨by decide, rfl, fun f hf => ?_⟩⟩
+    simp only [hv]
+    refine ⟨(fun h => by cases h), fun _ => ?_⟩
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hf
+    rcases hf with rfl | rfl
+    · exact .var (.inl ⟨rfl, rfl⟩)
+    · refine .data (T := "List") (us := [.tvar 0]) ?_ ?_ ?_ ?_ ?_ rfl
+      · intro j u hu _
+        cases j with
+        | zero => simp at hu; subst hu; exact .var (.inl ⟨rfl, rfl⟩)
+        | succ j => simp at hu
+      · intro j u hu hd
+        cases j with
+        | zero => simp [varF] at hd
+        | succ j => simp at hu
+      · intro j u hu hd
+        cases j with
+        | zero => simp [varF] at hd
+        | succ j => simp at hu
+      · intro j u hu hd
+        cases j with
+        | zero => simp [varF] at hd
+        | succ j => simp at hu
+      · intro j u hu hd
+        cases j with
+        | zero => simp [varF] at hd
+        | succ j => simp at hu
+
+theorem dictVarF_ok : ∀ c k fs i, some (c / 8, dfields (c % 8) (c / 8)) = some (k, fs) →
+    dictVarF c i ≠ .inv →
+    ∀ l s, (l, s) ∈ fs → s.cs.NoV (s.k + i) ∧
+      (dictVarF c i = .bi → s.t.NoV (s.k + i)) ∧
+      (dictVarF c i = .pos ∨ dictVarF c i = .neg →
+        Flick.Ty.PolD varF dictVarF (s.k + i) (dictVarF c i) true s.t) := by
+  intro c k fs i h hne l s hs
+  cases h
+  have hci : c % 8 = 0 ∧ i = 0 := by
+    unfold dictVarF at hne; split at hne
+    · assumption
+    · exact absurd rfl hne
+  obtain ⟨hc, rfl⟩ := hci
+  have hv : dictVarF c 0 = .neg := by simp [dictVarF, hc]
+  rw [hc] at hs
+  simp only [dfields, supers, List.map_nil, List.nil_append] at hs
+  split at hs
+  · simp only [methFs, methsOf, methSch, List.filterMap_cons, List.filterMap_nil,
+      Option.map_some, List.mem_cons, List.not_mem_nil, or_false, Prod.mk.injEq] at hs
+    obtain ⟨_, rfl⟩ := hs
+    simp only [mfield, hv]
+    have hcs : ((trBd N []).substT (rot 1 0)).NoV 0 := by
+      simp [Facts.NoV, trBd, Facts.none_substT]
+    have ht : (trTT N (methTy [] (arrP (.var 0) (arrP (.var 0) boolTy)))).substT (rot 1 0) =
+        .arrow (.tvar 0) .pure (.arrow (.tvar 0) .pure (.base .bool) Caps.none) Caps.none := by
+      simp [methTy, dicts, arrP, boolTy, trTT, trT, Flick.Ty.substT, rot,
+        Flick.Ty.reach, Caps.none_substT]
+    refine ⟨hcs, (fun h => by cases h), fun _ => ?_⟩
+    rw [ht]
+    have hcap : (Flick.Ty.caps Caps.none).NoV 0 := by
+      simp [Flick.Ty.NoV, Flick.Ty.substT, Caps.none_substT]
+    exact .arrow (fun h => by cases h) (.var (.inr ⟨rfl, rfl⟩)) rfl
+      (.arrow (fun h => by cases h) (.var (.inr ⟨rfl, rfl⟩)) rfl (.none rfl) (.inl hcap))
+      (.inl hcap)
+  · simp at hs
+
 def Sg : Sig where
   ctor := ctorF
   impl _ := .rnil
@@ -269,6 +365,10 @@ def Sg : Sig where
   op_closed _ _ _ _ _ _ h := by cases h
   op_impl _ _ _ _ _ h := by cases h
   op_field _ _ _ _ h := by cases h
+  var := varF
+  var_ok := varF_ok
+  dictVar := dictVarF
+  dictVar_ok := dictVarF_ok
 
 /-- Every constructor of the witness is an ordinary one. -/
 theorem sg_plain {K k ts T} (h : Sg.ctor K = some (k, ts, T)) : Sg.res K = idTs k := by

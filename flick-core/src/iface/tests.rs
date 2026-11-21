@@ -135,9 +135,18 @@ fn rejects_other_versions_and_modules() {
             .contains("describes `A`")
     );
     let current = format!("\"iface-version\": {IFACE_VERSION}");
-    let previous = json.replace(&current, "\"iface-version\": 24");
+    let previous = json.replace(
+        &current,
+        &format!("\"iface-version\": {}", IFACE_VERSION - 1),
+    );
     assert!(
         read(previous.as_bytes(), "A")
+            .expect_err("previous interface version is incompatible")
+            .contains(&format!("`iface-version` {}", IFACE_VERSION - 1))
+    );
+    let older = json.replace(&current, "\"iface-version\": 24");
+    assert!(
+        read(older.as_bytes(), "A")
             .expect_err("old owner-execution contract is incompatible")
             .contains("`iface-version` 24")
     );

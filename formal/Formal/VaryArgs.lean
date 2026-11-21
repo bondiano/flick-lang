@@ -156,6 +156,7 @@ theorem Ty.Closed.le_eq {c u : Ty} (h : c.Closed) (hl : LeLive S c u) : u = c :=
     subst ha; subst hb
     obtain rfl := h.tcon
     rw [List.eq_nil_of_length_eq_zero hl.symm]
+  | dict => exact h.elim
 
 /-- Subtyping cannot move a closed type down. -/
 theorem Ty.Closed.ge_eq {c u : Ty} (h : c.Closed) (hl : LeLive S u c) : u = c := by
@@ -169,6 +170,7 @@ theorem Ty.Closed.ge_eq {c u : Ty} (h : c.Closed) (hl : LeLive S u c) : u = c :=
     subst ha; subst hb
     obtain rfl := h.tcon
     rw [List.eq_nil_of_length_eq_zero hl]
+  | dict => exact h.elim
 
 /-- What a substitution sends to a closed type is a variable or the type itself, and
 subtyping moves neither. -/

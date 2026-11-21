@@ -280,7 +280,7 @@ fn supported_native_members_emit_typechecking_typescript() {
     for profile in ["debug", "release"] {
         let out = flick_in(
             &app,
-            &["build", "--offline", "--emit", "ts", "--profile", profile],
+            &["build", "--offline", "--typescript", "--profile", profile],
         );
         assert!(out.status.success(), "{out:?}");
         let checked =

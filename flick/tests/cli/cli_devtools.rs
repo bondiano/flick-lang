@@ -46,7 +46,7 @@ fn spans_reach_the_devtools(name: &str, effect: &str) {
         &[
             (
                 "flick.toml",
-                &format!("{APP}\n[build]\neffect = \"{effect}\"\n"),
+                &format!("{APP}\n[target.js]\nruntime = \"{effect}\"\n"),
             ),
             ("src/App/Main.fl", SPANS),
             ("devtools.mjs", DEVTOOLS),
@@ -96,12 +96,12 @@ let main () =
   Effect.sleep (Result.with_default Duration.zero (Duration.millis 1))
   Platform.stdout_line \"on the kernel\"
 ";
-    let config = format!("{APP}\n[build]\neffect = \"rt\"\n");
+    let config = format!("{APP}\n[target.js]\nruntime = \"rt\"\n");
     for (name, toml, args) in [
         (
             "run_rt_flag",
             APP,
-            &["run", "--rt", "--devtools=ws://127.0.0.1:9"][..],
+            &["run", "--runtime", "rt", "--devtools=ws://127.0.0.1:9"][..],
         ),
         (
             "run_rt_config",

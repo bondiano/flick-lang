@@ -187,6 +187,7 @@ fn late_alias_body_and_binder_kind_solutions_are_not_frozen_in_owner_templates()
                     body: body.clone(),
                     opaque: false,
                 },
+                variance: Vec::new(),
             },
         );
         checker.foreign_info(foreign(tree), &Type::con("Probe", "Later"));
@@ -205,6 +206,7 @@ fn late_alias_body_and_binder_kind_solutions_are_not_frozen_in_owner_templates()
                     body: hole.clone(),
                     opaque: false,
                 },
+                variance: Vec::new(),
             },
         );
         checker.foreign_info(foreign(tree), &Type::con("Probe", "Later"));
@@ -282,6 +284,7 @@ fn a_late_constructor_kind_is_checked_without_defaulting_or_dropping_metadata() 
                     literals: Vec::new(),
                     hidden: false,
                 },
+                variance: Vec::new(),
             },
         );
         let original = Type::pure_fun(Type::con("Probe", "Later"), Type::lang(Lang::Unit));

@@ -1,0 +1,55 @@
+// Exported classes and instances with inferred variance for cross-module
+// runtime resolution tests (`Language.ClassVariance`).
+module Language.ClassVarianceDefs exposing (
+  Box(..),
+  Sink(..),
+  Tick,
+  Default(..),
+  Describe(..),
+  RunTick(..),
+  Convert(..),
+  Combine(..),
+)
+
+type Box a = Box { value : a }
+
+type Sink a = Sink (a -> Unit)
+
+service Tick =
+  step : Unit ->{} Int
+
+class Default a =
+  default : a
+
+class Describe a =
+  describe : a -> String
+
+class RunTick a =
+  run_tick : a ->{Tick} Int
+
+class Convert a b =
+  convert : a -> b
+
+class Combine a =
+  combine : a -> a -> a
+
+instance Default (Box (Unit -> Int)) =
+  let default = Box { value = fun () -> 41 }
+
+instance Describe (Unit ->{Tick} Int) =
+  let describe _ = "tick-fn"
+
+instance Describe (Sink (Unit -> Int)) =
+  let describe _ = "sink-pure"
+
+instance RunTick (Unit ->{Tick} Int) =
+  let run_tick f = f ()
+
+instance Convert (Unit ->{Tick} Int) (Unit -> Int) =
+  let convert _ = fun () -> 99
+
+instance Combine (Unit -> Int) =
+  let combine f g = fun () -> f () + g ()
+
+instance Combine (Unit ->{Tick} Int) =
+  let combine f g = fun () -> f () + g ()

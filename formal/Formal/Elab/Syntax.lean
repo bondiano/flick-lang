@@ -132,6 +132,85 @@ abbrev Ty.reach (t : Ty) (n : Nat) : Prop := t.Occurs n
 /-- A ground type has no variables. -/
 def Ty.Ground (t : Ty) : Prop := ∀ n, ¬ t.Occurs n
 
+/-- The variables of `t` that a translated value reaches: those of `t` but the rows of the
+stages of its arrows, which the qualifier of an arrow does not count. -/
+def Ty.Shown : Ty → Nat → Prop
+  | .var m, n => m = n
+  | .con _, _ => False
+  | .app t u, n => t.Shown n ∨ u.Shown n
+  | .arr _ a b q, n => a.Shown n ∨ b.Shown n ∨ q.Shown n
+  | .cnil, _ => False
+  | .cun q q', n => q.Shown n ∨ q'.Shown n
+  | .rnm _ t, n => t.Shown n
+  | .run r r', n => r.Shown n ∨ r'.Shown n
+  | .all k t, n => t.Shown (n + k)
+
+/-- The row `r` keeps `n` live: a variable of the index of a named element, as `Scope s`
+keeps `s`, or of a type written in the row, as `Live q` is the capture row `q` there. A row
+variable keeps nothing. -/
+def Ty.Keeps : Ty → Nat → Prop
+  | .var _, _ => False
+  | .rnm _ t, n => t.Shown n
+  | .run r r', n => r.Keeps n ∨ r'.Keeps n
+  | t, n => t.Shown n
+
+/-- Parameter variance: covariant (`+`, producer-only), contravariant (`-`, consumer-only),
+invariant (`inv`, mixed/higher-kinded), or bivariant/unused (`bi`). -/
+inductive Variance where
+  | pos | neg | inv | bi
+  deriving DecidableEq
+
+/-- A parameter of variance `s` may stand at polarity `q` (`true`: covariant). -/
+def Variance.at (s : Variance) (q : Bool) : Prop :=
+  (q = true ∧ s = .pos) ∨ (q = false ∧ s = .neg)
+
+/-- Inclusion of service rows in the elaboration layer. -/
+inductive RowLe : Ty → Ty → Prop
+  | refl {r} : RowLe r r
+  | cnil {r} : RowLe .cnil r
+  | runL {r₁ r₂ r} : RowLe r₁ r → RowLe r₂ r → RowLe (.run r₁ r₂) r
+  | runRL {r r₁ r₂} : RowLe r r₁ → RowLe r (.run r₁ r₂)
+  | runRR {r r₁ r₂} : RowLe r r₂ → RowLe r (.run r₁ r₂)
+  | keeps {q r} : (∀ n, q.Shown n → r.Keeps n) → RowLe (.cun q .cnil) r
+
+/-- Use-stage comparison `(φ₁, q₁) ⊑ (φ₂, q₂)` for arrows `a →φ₁^q₁ b` and `a' →φ₂^q₂ b'`:
+a pure arrow fits any stage; a runtime arrow widens its service row (including moving
+qualifier atoms into a row that keeps them live) and keeps its error row. -/
+def Stage.UseLe : Stage → Ty → Stage → Ty → Prop
+  | .P, _, _, _ => True
+  | .R _ _, _, .P, _ => False
+  | .R r₁ e₁, q₁, .R r₂ e₂, q₂ =>
+      RowLe r₁ r₂ ∧ e₁ = e₂ ∧ ∀ n, q₁.Shown n → q₂.Shown n ∨ r₂.Keeps n
+
+/-- `T τ̄`: a type constructor applied to its arguments. -/
+def Ty.tcon (T : Nat) (us : List Ty) : Ty := us.foldl .app (.con T)
+
+/-- Subtyping on elaboration types, parameterized by data-constructor variances `dvar`:
+- arrows compare contravariantly in the parameter, covariantly in the result, by
+  `Stage.UseLe` on stages/qualifiers, and preserve shown variables (`Ty.Shown`);
+- nominal data `T ū` (`T ≠ 2, 4`, not `Bool`/`Int`) compares arguments by `dvar T j`
+  while preserving shown variables at every argument. -/
+inductive Ty.Le (dvar : Nat → Nat → Variance) : Ty → Ty → Prop
+  | refl {t} : Ty.Le dvar t t
+  | arr {φ₁ φ₂ a₁ a₂ b₁ b₂ q₁ q₂} :
+      Ty.Le dvar a₂ a₁ →
+      Stage.UseLe φ₁ q₁ φ₂ q₂ →
+      Ty.Le dvar b₁ b₂ →
+      (∀ n, (Ty.arr φ₁ a₁ b₁ q₁).Shown n → (Ty.arr φ₂ a₂ b₂ q₂).Shown n) →
+      Ty.Le dvar (.arr φ₁ a₁ b₁ q₁) (.arr φ₂ a₂ b₂ q₂)
+  | data {T : Nat} {us us' : List Ty} :
+      T ≠ 2 → T ≠ 4 →
+      us.length = us'.length →
+      (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' →
+        ∀ n, u.Shown n → u'.Shown n) →
+      (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' →
+        dvar T j = .pos → Ty.Le dvar u u') →
+      (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' →
+        dvar T j = .neg → Ty.Le dvar u' u) →
+      (∀ (j : Nat) (u u' : Ty), us[j]? = some u → us'[j]? = some u' →
+        dvar T j = .inv → u = u') →
+      Ty.Le dvar (Ty.tcon T us) (Ty.tcon T us')
+
 /-- A constraint `C τ̄`. -/
 structure Cn where
   cls : Nat
@@ -192,9 +271,6 @@ structure Inst where
   ctx : List Cn
   slots : List Dict
 
-/-- `T τ̄`: a type constructor applied to its arguments. -/
-def Ty.tcon (T : Nat) (us : List Ty) : Ty := us.foldl .app (.con T)
-
 /-- A constructor `K : ∀ᾱ. Q̄ ⇒ τ̄ → T ρ̄` of a data type, `ᾱ` its `k` variables
 `var 0 … var (k-1)`: the constraints whose dictionaries a value of `K` carries, the types of its
 fields, its type constructor and the arguments `ρ̄` of the type it builds. An ordinary
@@ -211,7 +287,9 @@ structure Ctor where
 the compiler's classes: structural (`Eq`, `Ord`, `Hash`, `Show` of records) and primitives of
 `Record` rows, whose rules (Struct) and (Prim) are black boxes. `methods m` is the class of the
 method `m` and its scheme `∀ᾱ β̄. (C ᾱ, Q̄) ⇒ τ` of §1.1: the class constraint comes first.
-`consts c` is the scheme of a constant of Γ₀, `ctors K` a constructor of a data type. -/
+`consts c` is the scheme of a constant of Γ₀, `ctors K` a constructor of a data type.
+`dataVar` and `clsVar` give the inferred variances of data and class parameters (defaulting to
+`inv`). -/
 structure Prog where
   supers : Nat → List Cn
   insts : Nat → Option Inst
@@ -222,8 +300,24 @@ structure Prog where
   methods : Nat → Option (Nat × Scheme)
   consts : Nat → Option Scheme
   ctors : Nat → Option Ctor
+  dataVar : Nat → Nat → Variance := fun _ _ => .inv
+  clsVar : Nat → Nat → Variance := fun _ _ => .inv
 
 variable (P : Prog)
+
+/-- `H` serves the wanted query `Q` in the direction of `P.clsVar` (B1):
+- `+` (producer-only): `H_j ≤ Q_j`;
+- `-` (consumer-only): `Q_j ≤ H_j` while keeping shown variables (`⌈H_j⌉ ⊆ ⌈Q_j⌉`);
+- `inv` or `bi` (mixed/higher-kinded or unused marker): exact equality `Q_j = H_j`. -/
+def Cn.Serves (P : Prog) (Q H : Cn) : Prop :=
+  H.cls = Q.cls ∧
+  Q.args.length = H.args.length ∧
+  (∀ (j : Nat) (q h : Ty), Q.args[j]? = some q → H.args[j]? = some h →
+    P.clsVar Q.cls j = .pos → Ty.Le P.dataVar h q) ∧
+  (∀ (j : Nat) (q h : Ty), Q.args[j]? = some q → H.args[j]? = some h →
+    P.clsVar Q.cls j = .neg → Ty.Le P.dataVar q h ∧ ∀ n, h.Shown n → q.Shown n) ∧
+  (∀ (j : Nat) (q h : Ty), Q.args[j]? = some q → H.args[j]? = some h →
+    (P.clsVar Q.cls j = .inv ∨ P.clsVar Q.cls j = .bi) → q = h)
 
 /-- The `i`-th superclass of `Q = C τ̄`: `Sᵢ ῡᵢ[ᾱ := τ̄]`. -/
 def Prog.super (Q : Cn) (i : Nat) : Option Cn :=
@@ -235,6 +329,7 @@ inductive Clo (Δ : List Cn) : Dict → Cn → Prop
   | super {d Q i S} : Clo Δ d Q → P.super Q i = some S → Clo Δ (.slot d i) S
 
 /-- `Δ ⊩ Q̄ ⇝ d̄`, for a list of constraints at once: (Given), (Prim), (Struct), (Inst).
+In (Inst), the instantiated head serves `Q` in the class's variance direction (`Cn.Serves`, B1).
 (Improve) yields no dictionary; the constraints here are the improved ones. -/
 inductive Ent (Δ : List Cn) : List Cn → List Dict → Prop
   | nil : Ent Δ [] []
@@ -243,8 +338,9 @@ inductive Ent (Δ : List Cn) : List Cn → List Dict → Prop
   | prim {Q p} : P.primC Q.cls = true → P.prims Q = some p → Ent Δ [Q] [.prim p Q]
   | strct {C τ ts ds} : P.structC C = true → P.fields τ = some ts →
       Ent Δ (ts.map fun t => ⟨C, [t]⟩) ds → Ent Δ [⟨C, [τ]⟩] [apps (.strct C τ) ds]
-  | inst {Q I ins σ ds} : P.insts I = some ins → ins.cls = Q.cls →
-      Q.args = ins.head.map (·.subst σ) → Ent Δ (ins.ctx.map (·.subst σ)) ds →
+  | inst {Q I ins σ ds} : P.insts I = some ins →
+      Cn.Serves P Q ⟨ins.cls, ins.head.map (·.subst σ)⟩ →
+      Ent Δ (ins.ctx.map (·.subst σ)) ds →
       Ent Δ [Q] [apps (.inst I) ds]
 
 /-- `ρ` of Lemma 6.1: types `θ` and closed dictionaries `ρ(δ)` with `· ⊩ Q'θ ⇝ ρ(δ)`. -/
@@ -271,6 +367,12 @@ inductive Eqv : Dict → Dict → Prop
   /-- `struct_C^τ ≈ struct_C^{τθ}` (`docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type`) -/
   | strctSub {C τ ts θ} : P.structC C = true → P.fields τ = some ts →
       Eqv (.strct C τ) (.strct C (τ.subst θ))
+  /-- `struct_C^{τ₁} ≈ struct_C^{τ₂}` when both records serve a common constraint `C τ`: the
+  run erases the record type. -/
+  | strctLe {C τ₁ τ₂ ts₁ ts₂} : P.structC C = true → P.fields τ₁ = some ts₁ →
+      P.fields τ₂ = some ts₂ →
+      (∃ τ, Cn.Serves P ⟨C, [τ]⟩ ⟨C, [τ₁]⟩ ∧ Cn.Serves P ⟨C, [τ]⟩ ⟨C, [τ₂]⟩) →
+      Eqv (.strct C τ₁) (.strct C τ₂)
   /-- `prim_q ℓ̄ ≈ prim_{qθ} ℓ̄` (`docs/formal/elaboration.md#the-structural-dictionary-term-carries-its-type`) -/
   | primSub {p q θ} : P.primC q.cls = true → P.prims q = some p →
       Eqv (.prim p q) (.prim p (q.subst θ))

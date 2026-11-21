@@ -127,7 +127,8 @@ foreign effect timed from "flick:Effect" "timed"
 
 /// Runs `fallback` instead when `task` does not end within the duration;
 /// `task` is interrupted.
-timeout_or_else : Duration.Duration -> ~(Eff r2 e2 a)^c -> ~(Eff r e a)^c ->{r + r2; e + e2} a
+timeout_or_else :
+  Detached r => Duration.Duration -> ~(Eff r2 e2 a)^c -> ~(Eff r e a)^c ->{r + r2; e + e2} a
 foreign effect timeout_or_else from "flick:Effect" "flickTimeoutOrElse"
   arity 2
   retention call

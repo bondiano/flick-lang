@@ -28,6 +28,17 @@ impl Machine<'_, '_> {
     pub(super) fn begin_recovery(&mut self, binding: Local) -> Result<(), Error> {
         self.prepare_failure()?;
         let original = self.failure.as_ref().expect("failure root");
+        let has_die = self
+            .heap
+            .cause_reasons(original)?
+            .any(|reason| matches!(reason, super::Reason::Die(_)));
+        if has_die {
+            self.failure_elected = false;
+            self.prepare_failure()?;
+            self.heap
+                .drop_value(self.pending_handler.take().expect("unused selector"))?;
+            return Ok(());
+        }
         let Some(payload) = self.heap.first_fail(original, &mut self.fuel)? else {
             self.heap
                 .drop_value(self.pending_handler.take().expect("unused selector"))?;

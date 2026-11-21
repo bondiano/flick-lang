@@ -57,7 +57,7 @@ impl Scratch {
             "sha256": hex(&component()),
             "url": self.dir.join("index/component.wasm"),
             "backend_api": { "minimum": "0.1.0", "maximum_exclusive": "0.2.0" },
-            "ir": { "minimum": "0.12.0", "maximum_exclusive": "0.13.0" },
+            "ir": { "minimum": "0.13.0", "maximum_exclusive": "0.14.0" },
         });
         change(&mut entry);
         let index = json!({ "backends": [entry] });
@@ -207,4 +207,183 @@ fn the_compiler_holds_no_backend_component() {
             "the binary holds the {name} component"
         );
     }
+}
+
+#[test]
+fn fresh_project_and_standalone_accept_backend_options_via_index_and_cached_descriptor() {
+    let s = Scratch::new("options_via_index");
+    s.index(|_| {});
+    let sha = hex(&component());
+
+    // A bogus option on a fresh project fails with FLICK-P058 and does not mutate flick.lock.
+    let bogus = s.flick("store", &["build", "--bogus"]);
+    assert_eq!(bogus.status.code(), Some(2), "{}", stderr(&bogus));
+    assert!(stderr(&bogus).contains("FLICK-P058"), "{}", stderr(&bogus));
+    assert!(!s.dir.join("app/flick.lock").exists());
+
+    // A fresh project without flick.lock resolves flick/js from the index and accepts --typescript.
+    let ts_project = s.flick("store-fresh", &["build", "--typescript"]);
+    assert!(ts_project.status.success(), "{}", stderr(&ts_project));
+    assert!(s.dir.join("app/dist/Lib.ts").is_file());
+    assert!(!s.dir.join("app/dist/Lib.js").exists());
+    assert!(
+        s.dir
+            .join(format!("store-fresh/descriptors/{sha}.cbor"))
+            .is_file()
+    );
+
+    // Empty store + --offline with --typescript fails with FLICK-P056, not a misleading FLICK-P058.
+    let s_offline = Scratch::new("options_offline_empty");
+    s_offline.index(|_| {});
+    let offline = s_offline.flick("empty-store", &["build", "--typescript", "--offline"]);
+    assert!(!offline.status.success());
+    assert!(
+        stderr(&offline).contains("FLICK-P056"),
+        "{}",
+        stderr(&offline)
+    );
+
+    // Standalone file (no flick.toml) on a fresh empty store accepts --typescript,
+    // and once cached, --help and subsequent --typescript builds reuse the cached descriptor.
+    let standalone = s.dir.join("standalone");
+    fs::create_dir_all(&standalone).expect("standalone dir");
+    fs::write(standalone.join("Main.fl"), MODULE).expect("standalone module");
+    let run_standalone = |store: &str, args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_flick"))
+            .args(args)
+            .current_dir(&standalone)
+            .env("FLICK_BACKENDS_INDEX", s.dir.join("index/backends.json"))
+            .env("FLICK_STORE", s.dir.join(store))
+            .env("NO_COLOR", "1")
+            .output()
+            .expect("flick runs")
+    };
+
+    // First build with no flags populates store/descriptors/<sha>.cbor.
+    let first = run_standalone(
+        "standalone-store",
+        &["build", "Main.fl", "--out-dir", "out-js"],
+    );
+    assert!(first.status.success(), "{}", stderr(&first));
+    assert!(standalone.join("out-js/Lib.js").is_file());
+    assert!(
+        s.dir
+            .join(format!("standalone-store/descriptors/{sha}.cbor"))
+            .is_file()
+    );
+
+    // Subsequent standalone --typescript succeeds using the cached descriptor.
+    let second = run_standalone(
+        "standalone-store",
+        &["build", "Main.fl", "--typescript", "--out-dir", "out-ts"],
+    );
+    assert!(second.status.success(), "{}", stderr(&second));
+    assert!(standalone.join("out-ts/Lib.ts").is_file());
+
+    // Standalone --typescript on a brand-new empty store fetches the descriptor and succeeds.
+    let cold = run_standalone(
+        "standalone-cold",
+        &["build", "Main.fl", "--typescript", "--out-dir", "out-cold"],
+    );
+    assert!(cold.status.success(), "{}", stderr(&cold));
+    assert!(standalone.join("out-cold/Lib.ts").is_file());
+
+    // Even after removing the index, `--help` reads `<store>/descriptors/*.cbor` with zero network.
+    fs::remove_file(s.dir.join("index/backends.json")).expect("remove index");
+    let help = run_standalone("standalone-store", &["build", "--help"]);
+    assert!(help.status.success(), "{}", stderr(&help));
+    let help_stdout = String::from_utf8_lossy(&help.stdout);
+    assert!(
+        help_stdout.contains("Options of `flick/js`:") && help_stdout.contains("--typescript"),
+        "{help_stdout}"
+    );
+}
+
+#[test]
+fn non_backend_commands_never_fetch_or_load_backends() {
+    let s = Scratch::new("no_backend_load");
+    fs::write(
+        s.dir.join("app/flick.toml"),
+        format!("{LIB}\n[scripts]\nhello = \"printf 'from-script'\"\n"),
+    )
+    .expect("config with script");
+
+    let unreachable = "http://127.0.0.1:1/backends.json";
+    let store = s.dir.join("empty-store");
+    let run_unreachable = |dir: &Path, args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_flick"))
+            .args(args)
+            .current_dir(dir)
+            .env("FLICK_BACKENDS_INDEX", unreachable)
+            .env("FLICK_STORE", &store)
+            .env("NO_COLOR", "1")
+            .output()
+            .expect("flick runs")
+    };
+
+    // Every non-`output` `inspect` representation succeeds without touching the store or network.
+    for emit in ["iface", "ast", "typed-ir", "variance", "mapping"] {
+        let out = run_unreachable(&s.dir.join("app"), &["inspect", "Lib", "--emit", emit]);
+        assert!(out.status.success(), "{emit}: {}", stderr(&out));
+    }
+
+    // `inspect --emit iface` with a backend option rejects it with FLICK-P058 without loading any backend.
+    let bad_iface = run_unreachable(
+        &s.dir.join("app"),
+        &["inspect", "Lib", "--emit", "iface", "--typescript"],
+    );
+    assert_eq!(bad_iface.status.code(), Some(2), "{}", stderr(&bad_iface));
+    assert!(
+        stderr(&bad_iface).contains("FLICK-P058"),
+        "{}",
+        stderr(&bad_iface)
+    );
+
+    // `build --inputs` succeeds without loading or fetching any backend.
+    let inputs = run_unreachable(&s.dir.join("app"), &["build", "--inputs"]);
+    assert!(inputs.status.success(), "{}", stderr(&inputs));
+    let inputs_stdout = String::from_utf8_lossy(&inputs.stdout);
+    assert!(inputs_stdout.contains("\"modules\""), "{inputs_stdout}");
+
+    // `run <script>` succeeds without loading or fetching any backend.
+    let script = run_unreachable(&s.dir.join("app"), &["run", "hello"]);
+    assert!(script.status.success(), "{}", stderr(&script));
+    assert_eq!(String::from_utf8_lossy(&script.stdout), "from-script");
+
+    assert!(
+        !store.join("descriptors").exists(),
+        "descriptors dir must remain empty"
+    );
+    assert!(
+        !store.join("backends").exists(),
+        "backends dir must remain empty"
+    );
+
+    // Even with a real, valid, uncached `[build.backend]` component on disk,
+    // `inspect --emit iface` never compiles or caches its descriptor.
+    let pinned_dir = s.dir.join("pinned");
+    fs::create_dir_all(pinned_dir.join("src")).expect("pinned project");
+    let wasm = component();
+    let sha = hex(&wasm);
+    fs::write(pinned_dir.join("custom.wasm"), &wasm).expect("copy wasm");
+    fs::write(
+        pinned_dir.join("flick.toml"),
+        format!(
+            "{LIB}\n[build.backend]\nid = \"flick/js\"\nversion = \"0.1.0\"\nsha256 = \"{sha}\"\ncomponent = \"custom.wasm\"\n"
+        ),
+    )
+    .expect("pinned config");
+    fs::write(pinned_dir.join("src/Lib.fl"), MODULE).expect("pinned module");
+
+    let pinned_iface = run_unreachable(&pinned_dir, &["inspect", "Lib", "--emit", "iface"]);
+    assert!(pinned_iface.status.success(), "{}", stderr(&pinned_iface));
+    assert!(String::from_utf8_lossy(&pinned_iface.stdout).contains("Lib"));
+    assert!(
+        !store.join("descriptors").exists(),
+        "inspect --emit iface must not load or cache [build.backend]"
+    );
+    assert!(
+        !store.join("backends").exists(),
+        "inspect --emit iface must not touch store/backends"
+    );
 }

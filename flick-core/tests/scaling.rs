@@ -12,10 +12,9 @@ use std::time::Duration;
 use std::time::Instant as Cpu;
 use std::{io, thread};
 
-use flick_core::build::{self, Extras, Settings};
+use flick_core::build::{self, Backend, Extras, Settings};
 use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::Severity;
-use flick_core::project::config::Backend;
 use flick_core::project::{self, Compilation, Host};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::syntax::{self, lexer};

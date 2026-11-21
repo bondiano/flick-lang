@@ -4,22 +4,18 @@ use flick_core::project::Project;
 use tracing::debug;
 
 use super::{BuildCommand, BuildPlan, Emission, publish_artifacts};
-use crate::backends::Selected;
 use crate::cache;
 use crate::progress::Progress;
-use crate::sources::FsHost;
 
 impl BuildCommand {
     /// The artifacts of an earlier build with the same key, written again.
     pub(super) fn cached(
         &self,
         project: &Project,
-        host: &FsHost,
+        output: &BuildPlan,
         progress: &Progress,
         key: &cache::Signed,
-        backend: &Selected,
     ) -> Option<Vec<Diagnostic>> {
-        let output = self.plan(host, Some(project), self.entries(project), backend);
         if output.extras.schema_aot {
             return None;
         }
@@ -28,15 +24,15 @@ impl BuildCommand {
             debug!(miss = %cache::missed(&project.root, key));
             return None;
         };
-        if !backend.accepts_cached(&artifacts) {
+        if !output.backend.accepts_cached(&artifacts) {
             return None;
         }
-        let paths = super::publication::paths(&output, &artifacts);
+        let paths = super::publication::paths(output, &artifacts);
         let current = validate_destination_paths(&output.out_dir, paths.iter().map(String::as_str))
             .is_ok()
             && cache::artifacts_current(&output.out_dir, &artifacts);
         progress.stage("Restoring cached artifacts");
-        self.record(&output, None, &output.entries, &artifacts);
+        self.record(output, None, &output.entries, &artifacts);
         if current && !self.generation {
             if !cache::outputs_current(&project.root, &output.out_dir, &paths) {
                 progress.stage("Recording build outputs");
@@ -57,7 +53,7 @@ impl BuildCommand {
             artifacts,
             diagnostics: Vec::new(),
         };
-        self.publish(Some(project), &output, &mut emitted, None, progress);
+        self.publish(Some(project), output, &mut emitted, None, progress);
         Some(emitted.diagnostics)
     }
 

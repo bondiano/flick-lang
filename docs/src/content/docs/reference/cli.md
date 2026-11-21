@@ -28,11 +28,11 @@ of their own. `flick --help` lists them by contributor, and they run as
 | `init [--template app\|cli\|fullstack\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`), except an existing `AGENTS.md`, which is kept |
 | `check [paths] [--watch] [--fix [--only codes]]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left; `--only E002,F001` applies only the fixes of those codes, for a migration that changes nothing else |
 | `prove [paths] [--watch]` | checks the proofs of the proof root (`project.proof-dir`), or of the files given, with the code they name; `check`, `build` and `test` never read the proof root (see [the proof contract](https://github.com/bondiano/flick-lang/blob/main/docs/formal/proofs.md)) |
-| `build [paths] [--profile] [--labels all\|components\|none] [--emit js\|ts\|go] [--emit-dts] [--promise-facade] [--emit-ir[=json\|cbor]] [--schema-aot] [--out-dir] [--watch]` | writes ESM, source maps and `.iface` files (`--emit go`: a Go executable per entry, see [Go target](../codegen/#go-target)); `--emit-dts` adds `.d.ts` files and `--promise-facade` Promise façades `A/B.promise.js` (see [TypeScript](../codegen/#typescript)); `--emit-ir` adds `program.ir.json` (or `program.ir.cbor`): the IR the backend gets, optimized in a release build, with the version of the IR it is written in; shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
+| `build [paths] [--target <name>] [--profile] [--labels all\|components\|none] [--emit-ir[=json\|cbor]] [--out-dir] [--watch] [<backend options>]` | compiles the project with the selected target backend (`js` by default: ESM, source maps and `.iface` files; `--target go`: a Go executable per entry, see [Go target](../codegen/#go-target)); target-specific flags such as `--typescript`, `--declarations`, `--promise-facade`, `--schema-aot`, `--runtime`, `--ui` (`flick/js`) or `--cgo` (`flick/go`) are declared by the selected backend (see [Target and backend options](#target-and-backend-options)); `--emit-ir` adds `program.ir.json` (or `program.ir.cbor`): the IR the backend gets, optimized in a release build, with the version of the IR it is written in; shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
 | `build [paths] --inputs` | prints a conservative JSON input inventory (`key`, `files`, `roots`, `modules`) without writing build artifacts or cache entries |
-| `run [name] [--entry M] [--profile] [--devtools[=url]] -- args` | builds JavaScript (a Go executable when `emit = "go"`) and runs the `main` of the entry `name` (the only one when left out); a `name` that is not an entry runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails, with `args` as their `"$@"`; a client entry (`target = "client"`) builds with Vite and serves the page with Vite preview; `--devtools` sends server entry spans to the Effect DevTools ([observability](../observability/#devtools)) |
-| `dev [name] [--entry M] [--profile] [--devtools[=url]] -- args` | rebuilds on changes and replaces the running app; in a project with several entries and none named, it runs every entry that is not a client's and, if one is, Vite (`node_modules/.bin/vite`) for the pages, which replaces a changed module in the page keeping the labelled atoms' values |
-| `test [paths] [--filter] [--list] [--forbid-only] [--jobs] [--seed] [--timeout] [--reporter human\|json] [--watch] [--profile] [--emit js\|go] [--rt]` | runs the tests of the test root, on Node or as a Go executable (see [testing](../testing/)) |
+| `run [name] [--target <name>] [--entry M] [--profile] [<backend options>] -- args` | builds with the selected target backend (JavaScript by default; a Go executable with `--target go` or `[build] target = "go"`) and runs the `main` of the entry `name` (the only one when left out); a `name` that is not an entry runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails, with `args` as their `"$@"`; a client entry (`target = "client"`) builds with Vite and serves the page with Vite preview; on `flick/js`, `--devtools[=url]` sends server entry spans to the Effect DevTools ([observability](../observability/#devtools)) |
+| `dev [name] [--target <name>] [--entry M] [--profile] [<backend options>] -- args` | rebuilds on changes and replaces the running app; in a project with several entries and none named, it runs every entry that is not a client's and, if one is, Vite (`node_modules/.bin/vite`) for the pages, which replaces a changed module in the page keeping the labelled atoms' values |
+| `test [paths] [--target <name>] [--filter] [--list] [--forbid-only] [--jobs] [--seed] [--timeout] [--reporter human\|json] [--watch] [--profile] [<backend options>]` | runs the tests of the test root with the selected target backend, on Node (`--target js`, with `--runtime rt\|effect`) or as a Go executable (`--target go`, see [testing](../testing/)) |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | writes the canonical layout ([formatting](../syntax/#formatting)); without paths the source and test roots |
 | `clean [--cache]` | removes the build artifacts; `--cache` also the build cache |
 | `install [--locked]` | installs with pnpm (`--frozen-lockfile`, and `--offline` with the global `--offline`); at a workspace root, each member's |
@@ -45,11 +45,11 @@ of their own. `flick --help` lists them by contributor, and they run as
 | `ffi check [paths]` | a command of the JavaScript backend: checks generated and reviewed bindings and their policies against the installed packages; without paths the source root |
 | `schema export <M.codec> --target json-schema-2020-12 --out <file>` | the strict JSON Schema of a `PureCodec Json a` |
 | `schema export <M.api> --target openapi-3.1 --out <file>` | an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes (see [Clients and documents](../http-api/#clients-and-documents)) |
-| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | Markdown pages of the public API: types, kinds, constraints, effects, captures |
+| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | Markdown pages of the public API: types, kinds, variances, constraints, effects, captures |
 | `explain <code>` | the explanation of a diagnostic code, a plugin's too, as `std/L001` |
 | `expand [paths]` | the code each [plugin](../plugins/) block of the project or of the files stands for |
 | `doctor` | the compiler, Node.js, pnpm, git, the TypeScript Content Mapper, the installed runtime and Effect, the optional adapters, and Go when it is installed; everything but the compiler, Node.js and pnpm is a note, not a failure |
-| `inspect <M> --emit ast\|typed-ir\|js\|ts\|iface\|mapping` | one representation of a module |
+| `inspect <M> --emit ast\|typed-ir\|output\|iface\|variance\|mapping [--target <name>] [<backend options>]` | one representation of a module; `--emit output` asks the selected backend for the module's emitted code (e.g. JS by default, TS with `--typescript`, Go with `--target go`); `--emit iface` inspects the typed interface without loading any backend; `--emit variance` prints inferred parameter variances of exported types and classes (including installed packages and built-in modules, reporting unknown metadata as `inv (unknown)`) |
 | `lsp --stdio` | the [language server](../editor/#language-server); stdio is its only transport |
 | `content-mapper [--declarations <paths>…]` | a session command of the JavaScript backend (`js:content-mapper`): serves TypeScript's [Content Mapper](../editor/#content-mapper) requests for `.fl` files on stdio, started by `@flick-lang/content-mapper`; `--declarations` instead writes the projection of each `.fl` file under the paths beside it as `Name.d.fl.ts` and exits |
 
@@ -63,10 +63,53 @@ nothing, run no `main` and load no foreign module. An installed
 pins stops them with `FLICK-P015` (exit code 2). `schema export` loads the
 module that makes the codec, whose top level is pure, and nothing else.
 JSON Schema export uses the project's selected runtime. OpenAPI export uses the
-Effect adapter; set `effect = "effect"` and install `@flick-lang/effect-ts` for
+Effect adapter; set `[target.js] runtime = "effect"` and install `@flick-lang/effect-ts` for
 an `HttpApi.Api` export.
 
 `test` streams human results after each test's cleanup, with success/failure markers, completion counts and timings, then prints a summary. Node and Go share the format and honor `--color`; auto color checks stdout, `NO_COLOR` and `TERM=dumb`. `--reporter json` writes one final object in declaration order, without color or timings.
+
+## Target and backend options
+
+`build`, `run`, `dev`, `test` and `inspect` take `--target <name>` to select
+which backend component runs (`js` for `flick/js`, `go` for `flick/go`, or the
+short name of a pinned `[build.backend]`). Without `--target`, the target comes
+from `[build.backend]`, then `[build] target`, then the backend prefix of
+`[build] environment`, and otherwise `js`. An unknown target is `FLICK-P059`
+(exit code `2`).
+
+Backend-specific flags are declared by the selected backend component itself,
+per command. `flick <cmd> --help` and `flick help <cmd>` display only the
+selected backend's options for that command under `Options of \`<id>\`:` (pass
+`--target <name> --help` to inspect another target's options). Options are also
+configured persistently in `flick.toml` under `[target.<name>]`; CLI flags
+override `flick.toml` (boolean flags accept `--<flag>=false` to override `true`
+in `flick.toml`).
+
+- **`flick/js` options**: `--typescript` (`build`, `inspect`), `--declarations`
+  (`build`), `--promise-facade` (`build`), `--schema-aot` (`build`),
+  `--runtime rt|effect` (`build`, `run`, `dev`, `test`, `inspect`; default `rt`),
+  `--devtools[=url]` (`run`, `dev`; default URL `ws://localhost:34437`), and
+  `--ui <specifier>` (`build`, `run`, `dev`, `test`).
+- **`flick/go` options**: `--cgo` (`build`, `run`, `dev`, `test`; enables
+  `CGO_ENABLED=1`, default `false`).
+
+Passing an unknown option, a wrong-verb option, a cross-backend option or an
+invalid value fails with `FLICK-P058` (exit code `2`). The legacy hardcoded
+flags are removed with no compatibility aliases and fail with `FLICK-P057`
+(exit code `2`), naming their replacement:
+
+| Removed flag | Replacement |
+| - | - |
+| `build --emit js` / `test --emit js` | `--target js` (or omit; `js` is default) |
+| `build --emit ts` | `--target js --typescript` (or `[target.js] typescript = true`) |
+| `build --emit go` / `test --emit go` | `--target go` (or `[build] target = "go"`) |
+| `build --emit-dts` | `--declarations` (or `[target.js] declarations = true`) |
+| `build\|run\|dev\|test --rt` | `--runtime rt` (default on `flick/js`; use `--runtime effect` for Effect) |
+| `inspect <M> --emit js` | `inspect <M> --emit output --target js` |
+| `inspect <M> --emit ts` | `inspect <M> --emit output --target js --typescript` |
+
+Arguments after `--` (such as `flick run app -- --rt`) are passed straight to
+the program or script and are never parsed by `flick`.
 
 ## Outputs and the cache
 
@@ -92,7 +135,7 @@ creation and deletion; one unrelated timestamp cannot hide another edit.
 ## Running and replacing an app
 
 `run` and `dev` build JavaScript, or a Go executable per entry when
-`emit = "go"`. Each build
+targeting Go (`[build] target = "go"` or `--target go`). Each build
 goes into an atomically reserved generation `.flick/run/<pid>-<n>/`, never
 written again once its process starts, so a late `import()` sees the files
 it started with. The CLI owns the generation from construction through
@@ -128,7 +171,7 @@ readme and license under `package/`, without times or owners, so the same
 sources give the same bytes; stdout shows the sha256 a `url` dependency
 names. An app packs a staging package, with the runner of each entry, which the staged
 `package.json` names in `bin` (see [project.md](../project/#entry-points)), checks that every module has its `.iface` (and
-`.d.ts` with `emit-dts`), that interfaces in the package agree on each
+`.d.ts` with `[target.js] declarations = true`), that interfaces in the package agree on each
 other's fingerprints and that the paths `exports` names exist
 (`FLICK-P020`), and writes the tarball with `pnpm pack`.
 

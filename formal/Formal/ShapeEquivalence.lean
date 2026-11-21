@@ -60,7 +60,7 @@ theorem Ty.Equiv.opaque {a b : Ty} (h : Ty.Equiv a b) : a.Opaque ↔ b.Opaque :=
 
 theorem LeLive.kind {a b : Ty} (h : LeLive S a b) : a.kind = b.kind := by
   cases h with
-  | refl | arrow | eff | rcons => rfl
+  | refl | arrow | eff | rcons | dict => rfl
   | equiv he => exact he.kind
   | hide _ _ _ _ ha hb => subst ha; subst hb; rw [Ty.tcon_kind', Ty.tcon_kind']
   | data _ _ _ _ _ ha hb => subst ha; subst hb; rw [Ty.tcon_kind', Ty.tcon_kind']
@@ -85,6 +85,7 @@ theorem LeLive.opaque {a b : Ty} (h : LeLive S a b) (ha : a.Opaque) : b.Opaque :
   | arrow => simp [Ty.Opaque, Ty.hd]
   | eff => simp [Ty.Opaque, Ty.hd]
   | rcons => simp [Ty.Opaque, Ty.hd] at ha
+  | dict => simp [Ty.Opaque, Ty.hd]
   | hide _ _ _ _ ha' hb => subst ha'; subst hb; rw [Ty.Opaque, Ty.tcon_hd] at ha ⊢; exact ha
   | data _ _ _ _ _ ha' hb => subst ha'; subst hb; rw [Ty.Opaque, Ty.tcon_hd] at ha ⊢; exact ha
 

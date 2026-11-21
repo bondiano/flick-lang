@@ -22,12 +22,14 @@ mod generalize;
 mod handle;
 mod handlers;
 mod match_errors;
+mod modules;
 mod pattern;
 mod regions;
 mod row_facts;
 mod row_instances;
 mod rows;
 mod runtime;
+mod subtyping;
 pub mod trace;
 mod unify;
 mod widen;
@@ -44,7 +46,7 @@ mod tests_stores;
 #[cfg(test)]
 mod tests_variance;
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fmt;
 use std::hash::BuildHasher;
 use std::mem;
@@ -125,8 +127,13 @@ pub struct Checker<'d> {
     structural: Vec<(Name, Rc<[Term]>, Type)>,
     /// Operands of `<`, `<=`, `>`, `>=`, checked once their type is known.
     ordered: Vec<Type>,
+    /// `for` sources whose container type was still a meta at `Const::SeqIter`:
+    /// `(source_type, element_meta, Iterable givens in scope)`.
+    iterables: Vec<(Type, Type, Vec<Type>)>,
     /// Counter of the rigid variables a signature introduces.
     rigid: u32,
+    /// Lexical level at which each opened existential module witness was introduced.
+    witness_levels: HashMap<u32, u32>,
     /// `Ψ`: the type of each cell of `μ`, when a configuration is checked.
     store: Vec<Type>,
     /// Whether a configuration is checked: the rules of §3.6 apply.
@@ -158,6 +165,9 @@ pub struct Checker<'d> {
     /// skolemized, at the regions the body is checked at, through which its
     /// recursive uses go.
     pub own: Option<(Path, Scheme)>,
+    /// Enclosing lexical type, row, capture and region variables in scope for
+    /// local signatures, innermost last.
+    tyvars: Vec<(Name, Inst)>,
 }
 
 /// `σ` as the model reads a signature: with the `Live` elision adds
@@ -182,7 +192,9 @@ impl<'d> Checker<'d> {
             solving_row_upper: false,
             structural: Vec::new(),
             ordered: Vec::new(),
+            iterables: Vec::new(),
             rigid: 0,
+            witness_levels: HashMap::new(),
             store: Vec::new(),
             config: false,
             regions: regions::Regions::default(),
@@ -196,6 +208,7 @@ impl<'d> Checker<'d> {
             unfolding: Vec::new(),
             error_rows: None,
             own: None,
+            tyvars: Vec::new(),
         }
     }
 
@@ -203,12 +216,15 @@ impl<'d> Checker<'d> {
     /// as (Let-Sig) checks the right side of a `let` with a signature.
     pub fn check_top(&mut self, e: &Term, scheme: &Scheme) -> Check<()> {
         self.stage = Stage::Pure;
-        let (expected, rigid) = self.skolemize(scheme);
+        let tyvars = self.tyvars.len();
+        let (expected, rigid) = self.skolemize(scheme, true);
         if let Some((path, s)) = self.own.take() {
             let own = generalize::own_regions(&self.live_scheme(&s), &s.vars, &rigid);
             self.own = Some((path, own));
         }
-        self.check(e, &expected)?;
+        let checked = self.check(e, &expected);
+        self.tyvars.truncate(tyvars);
+        checked?;
         self.finish()?;
         if self.stage != Stage::Pure {
             return error(
@@ -238,6 +254,12 @@ impl<'d> Checker<'d> {
 
     /// Settles the rows and checks what waited for a type.
     fn finish(&mut self) -> Check<()> {
+        for (src, elem, givens) in mem::take(&mut self.iterables) {
+            let found = self
+                .iterable_element(&src, &givens, true)?
+                .expect("final iterable check either resolves an element or errors");
+            self.unify(&elem, &found)?;
+        }
         for (class, fields, t) in mem::take(&mut self.structural) {
             self.structural_fields(&class, &fields, &t)?;
         }

@@ -9,6 +9,7 @@
 mod common;
 
 // `pub`, as each was a crate root: what a file exports still counts as used
+pub mod backend_options;
 pub mod build_command;
 pub mod build_inputs;
 pub mod build_runner;

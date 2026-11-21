@@ -1,6 +1,6 @@
-// What the acquisition of a `Resource` registers in its own region may use
-// the services the acquisition runs with: their providers outlive that
-// region as they outlive the resource's (`Fiber.Provided`).
+// What the acquisition of a scoped library resource registers in its own
+// region may use the services the acquisition runs with: their providers
+// outlive that region as they outlive the resource's (`Fiber.Provided`).
 module App.AcquisitionServices exposing (..)
 
 service Greeter =
@@ -33,3 +33,170 @@ let refreshed () = provide greeter {
     Resource.refresh res
   }
 }
+
+scoped_ref : Unit ->{Async} Unit
+let scoped_ref () = provide greeter {
+  scope {
+    let r =
+      ScopedRef.from_acquire
+        (task {
+          Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release"))
+        })
+    ScopedRef.set
+      (task { Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release")) })
+      r
+  }
+}
+
+scoped_ref_from_caller : Unit ->{Greeter} Unit
+let scoped_ref_from_caller () = scope {
+  let r =
+    ScopedRef.from_acquire
+      (task { Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release")) })
+  ScopedRef.set
+    (task { Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release")) })
+    r
+}
+
+scoped_ref_set_given : Fiber.Provided {Greeter} s => ScopedRef.ScopedRef s String ->{Greeter} Unit
+let scoped_ref_set_given r =
+  ScopedRef.set
+    (task { Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release")) })
+    r
+
+scoped_ref_set_given_used : Unit ->{} Unit
+let scoped_ref_set_given_used () = provide greeter {
+  scope {
+    let r = ScopedRef.make (fun () -> "init")
+    scoped_ref_set_given r
+  }
+}
+
+scoped_ref_set_in_use : Unit ->{} Unit
+let scoped_ref_set_in_use () = provide greeter {
+  scope {
+    let r = ScopedRef.make (fun () -> "init")
+    ScopedRef.use r (fun _ ->
+      ScopedRef.set
+        (task {
+          Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release"))
+        })
+        r
+      r
+      |> ScopedRef.set
+        (task {
+          Resource.acquire_release (task { "w" }) (fun _ -> ignore (Greeter.greet "release"))
+        })
+    )
+  }
+}
+
+pool : Unit ->{Async} Unit
+let pool () = provide greeter {
+  scope {
+    ignore (Pool.make {
+      acquire = task {
+        Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release"))
+      }
+      size = 1
+      concurrency = None
+      targetUtilization = None
+    })
+  }
+}
+
+pool_with_ttl : Unit ->{Async} Unit
+let pool_with_ttl () = provide greeter {
+  scope {
+    ignore (Pool.make_with_ttl {
+      acquire = task {
+        Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release"))
+      }
+      min = 1
+      max = 2
+      concurrency = None
+      targetUtilization = None
+      timeToLive = Duration.zero
+      timeToLiveStrategy = Some Pool.Usage
+    })
+  }
+}
+
+rc_ref : Unit ->{Async} Unit
+let rc_ref () = provide greeter {
+  scope {
+    ignore (RcRef.make {
+      acquire = task {
+        Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release"))
+      }
+      idleTimeToLive = None
+    })
+  }
+}
+
+rc_map : Unit ->{Async} Unit
+let rc_map () = provide greeter {
+  scope {
+    ignore (RcMap.make {
+      lookup = fun (k : String) ->
+        Resource.acquire_release (task { k }) (fun _ -> ignore (Greeter.greet "release"))
+      idleTimeToLive = None
+      capacity = None
+    })
+  }
+}
+
+scoped_cache : Unit ->{Async} Unit
+let scoped_cache () = provide greeter {
+  scope {
+    ignore (ScopedCache.make {
+      lookup = fun (k : String) ->
+        Resource.acquire_release (task { k }) (fun _ -> ignore (Greeter.greet "release"))
+      capacity = 1
+      timeToLive = None
+    })
+  }
+}
+
+scoped_cache_with : Unit ->{Async} Unit
+let scoped_cache_with () = provide greeter {
+  scope {
+    ignore (ScopedCache.make_with {
+      lookup = fun (k : String) ->
+        Resource.acquire_release (task { k }) (fun _ -> ignore (Greeter.greet "release"))
+      capacity = 1
+      timeToLive = Some (fun _ _ -> Duration.zero)
+    })
+  }
+}
+
+into_caller : Fiber.Provided {Greeter} s => Unit ->{Scope s, Greeter} Unit
+let into_caller () =
+  ignore (ScopedRef.from_acquire
+    (task { Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release")) }))
+  ignore (Pool.make {
+    acquire = task {
+      Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release"))
+    }
+    size = 1
+    concurrency = None
+    targetUtilization = None
+  })
+  ignore (RcRef.make {
+    acquire = task {
+      Resource.acquire_release (task { "v" }) (fun _ -> ignore (Greeter.greet "release"))
+    }
+    idleTimeToLive = None
+  })
+  ignore (RcMap.make {
+    lookup = fun (k : String) ->
+      Resource.acquire_release (task { k }) (fun _ -> ignore (Greeter.greet "release"))
+    idleTimeToLive = None
+    capacity = None
+  })
+  ignore (ScopedCache.make {
+    lookup = fun (k : String) ->
+      Resource.acquire_release (task { k }) (fun _ -> ignore (Greeter.greet "release"))
+    capacity = 1
+    timeToLive = None
+  })
