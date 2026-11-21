@@ -193,11 +193,6 @@ impl Checker<'_> {
                 Type::Error
             }
         };
-        if self.cx.regions.provided.len() > provided
-            || self.cx.regions.provided_late.len() > provided_late
-        {
-            self.grow();
-        }
         self.settle_provided_since(provided, provided_late);
         ty
     }
@@ -382,7 +377,7 @@ impl Checker<'_> {
                 Type::Error
             }
         };
-        if !defaults.is_empty() || self.cx.regions.provided.len() > provided {
+        if !defaults.is_empty() {
             self.grow();
         }
         self.settle_defaults(defaults);
