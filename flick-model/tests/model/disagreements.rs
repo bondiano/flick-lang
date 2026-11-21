@@ -270,3 +270,74 @@ let anchor path =
     assert_eq!(err.rule, "Scope", "{err}");
     assert!(err.message.contains("FLICK-G002"), "{err}");
 }
+
+/// Derived `Show` of types declared in an inline module (and nested inline
+/// modules) prints the source constructor name, not the relocated internal name.
+#[test]
+fn derived_show_in_inline_modules_prints_source_constructor_names() {
+    prints(
+        r#"module App.Main exposing (main)
+
+module Points exposing (Spot(..), Kind(..), Tree(..)) =
+  type Spot = Spot Int Int
+    deriving Eq, Ord, Hash, Show
+
+  type Kind = Empty | Named String | Wrapped Spot
+    deriving Eq, Ord, Hash, Show
+
+  type Tree a = Leaf | Node (Tree a) a (Tree a)
+    deriving Eq, Ord, Hash, Show
+
+module Outer exposing (deep_spot, deep_summary) =
+  module Inner exposing (Spot(..), Method(..), Oops(..), Expr(..), Label, label) =
+    type Spot = Spot Int Int
+      deriving Eq, Ord, Hash, Show
+
+    untagged type Method = Get = "GET" | Post = "POST"
+      deriving Eq, Ord, Hash, Show
+
+    type error Oops = Oops String
+      deriving Eq, Ord, Hash, Show
+
+    type Expr a =
+      | IntLit Int : Expr Int
+      | Lit a
+      deriving Eq, Show
+
+    opaque type alias Label = String
+      deriving Eq, Ord, Hash, Show
+
+    label : String -> Label
+    let label s = s
+
+  deep_spot : Inner.Spot
+  let deep_spot = Inner.Spot 3 4
+
+  deep_summary : Unit -> String
+  let deep_summary () =
+    show deep_spot
+      ++ " | "
+      ++ show Inner.Get
+      ++ " | "
+      ++ show (Inner.Oops "bad")
+      ++ "\n"
+      ++ show (Inner.IntLit 5)
+      ++ " | "
+      ++ show (Inner.Lit deep_spot)
+      ++ " | "
+      ++ show (Inner.label "ok")
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let spot = Points.Spot 1 2
+  let wrapped = Points.Wrapped spot
+  let tree = Points.Node (Points.Node Points.Leaf spot Points.Leaf) (Points.Spot 3 4) Points.Leaf
+  Platform.stdout_line (show spot ++ " | " ++ show Points.Empty ++ " | " ++ show wrapped)
+  Platform.stdout_line (show tree)
+  Platform.stdout_line (show (spot == Points.Spot 1 2, compare Points.Empty wrapped, hash spot == hash (Points.Spot 1 2)))
+  Platform.stdout_line (show Outer.deep_spot)
+  Platform.stdout_line (Outer.deep_summary ())
+"#,
+        "Spot 1 2 | Empty | Wrapped (Spot 1 2)\nNode (Node Leaf (Spot 1 2) Leaf) (Spot 3 4) Leaf\n(true, LT, true)\nSpot 3 4\nSpot 3 4 | Get | Oops \"bad\"\nIntLit 5 | Lit (Spot 3 4) | \"ok\"\n",
+    );
+}

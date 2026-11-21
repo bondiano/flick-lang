@@ -80,6 +80,7 @@ codegen/given_shadow
 codegen/implicit
 codegen/instance_names
 codegen/known_contexts
+codegen/known_defaults
 codegen/known_instances
 codegen/unpack_dictionary
 codegen/record_constructor
