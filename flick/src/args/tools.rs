@@ -7,18 +7,32 @@ use clap::{Args, Subcommand, ValueEnum};
 use super::ProfileArgument;
 use flick_core::project::config::Source;
 
-#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum Template {
-    App,
-    /// An application whose `main` parses its command line with a `cli` block.
-    Cli,
-    /// A server and a browser page sharing the calls of a `server fn`
-    /// module; `flick dev` runs both.
-    Fullstack,
-    Lib,
-    /// A library with a plugin: blocks `tagged "name" { value }` of the
-    /// programs that import it, the plugin's crate in `plugin/`.
-    Plugin,
+#[derive(Args, Clone)]
+pub struct ScaffoldArguments {
+    /// Target backend whose templates to use, such as `js` or `go` (default: `js`).
+    #[arg(long, value_name = "NAME", conflicts_with = "from")]
+    pub target: Option<String>,
+
+    /// Template name provided by the selected backend or `--from` package.
+    #[arg(long, value_name = "NAME")]
+    pub template: Option<String>,
+
+    /// Third-party template package: local directory, tarball URL (with `--sha256`),
+    /// or git repository URL (with `--tag`).
+    #[arg(long, value_name = "SOURCE", conflicts_with = "target")]
+    pub from: Option<String>,
+
+    /// Git tag for a `--from` git repository.
+    #[arg(long, requires = "from", conflicts_with = "sha256")]
+    pub tag: Option<String>,
+
+    /// Subdirectory inside a `--from` git repository.
+    #[arg(long, requires = "tag")]
+    pub subdir: Option<String>,
+
+    /// SHA-256 hex digest of a `--from` tarball URL.
+    #[arg(long, requires = "from", conflicts_with = "tag")]
+    pub sha256: Option<String>,
 }
 
 #[derive(Args)]
@@ -26,18 +40,14 @@ pub struct NewArguments {
     /// The directory to create.
     pub directory: String,
 
-    /// An application with `main`, a command-line application, a server
-    /// with a browser page, or a library.
-    #[arg(long, value_enum, default_value_t = Template::App)]
-    pub template: Template,
+    #[command(flatten)]
+    pub scaffold: ScaffoldArguments,
 }
 
 #[derive(Args)]
 pub struct InitArguments {
-    /// An application with `main`, a command-line application, a server
-    /// with a browser page, or a library.
-    #[arg(long, value_enum, default_value_t = Template::App)]
-    pub template: Template,
+    #[command(flatten)]
+    pub scaffold: ScaffoldArguments,
 }
 
 #[derive(Args)]

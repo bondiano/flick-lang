@@ -319,6 +319,15 @@ macro_rules! export {
             fn close(state: ::std::vec::Vec<u8>) -> $crate::command::Plan {
                 $crate::Plugin::close(&$plugin, state)
             }
+            fn templates() -> ::std::vec::Vec<$crate::command::TemplateDescriptor> {
+                $crate::Plugin::templates(&$plugin)
+            }
+            fn scaffold(
+                request: $crate::command::TemplateRequest,
+            ) -> ::std::result::Result<$crate::command::Plan, ::std::vec::Vec<$crate::command::Diagnostic>>
+            {
+                $crate::Plugin::scaffold(&$plugin, &request)
+            }
         }
 
         impl $crate::guest::bindings::Guest for FlickPluginComponent {

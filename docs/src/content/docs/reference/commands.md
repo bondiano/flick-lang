@@ -145,3 +145,24 @@ keeps it open, as an editor integration does. The host owns stdio:
 - `exit`, or the end of stdin, calls `close`, whose plan the host carries
   out. What that plan prints goes to stderr, since stdout belongs to the
   protocol.
+
+## Templates
+
+Backends and library plugins also contribute project templates for `flick new`
+and `flick init` on the same `flick:command/command` interface:
+
+- `templates()` returns a list of `TemplateDescriptor { name, summary }`.
+- `scaffold(request)` receives a `TemplateRequest { template, name, compiler, init }`
+  (with the normalized package name and the running compiler's version) and
+  returns a `Plan` of all template files — including `flick.toml` — plus
+  optional next-step guidance in `stdout`.
+
+Template plans are pure file plans: the host refuses any template plan that
+includes host tool `steps`, `resume`, `needs`, or escaping paths with
+`FLICK-P055` before creating directories or writing files. Unknown templates
+return `FLICK-P060` listing the contributor's available templates.
+
+Users select an official backend's templates with `--target <name>` (`js` by
+default, or `go`), or load a third-party plugin or backend template package
+with `--from <path|url|git>` (verified like `flick add` and pinned under
+`[[template]]` in `flick.lock`).

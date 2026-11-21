@@ -241,16 +241,18 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::New(options) => run_command(
             &ScaffoldCommand {
                 dir: options.directory.into(),
-                template: options.template,
+                options: options.scaffold,
                 fresh: true,
+                offline: global.offline,
             },
             global,
         ),
         Commands::Init(options) => run_command(
             &ScaffoldCommand {
                 dir: ".".into(),
-                template: options.template,
+                options: options.scaffold,
                 fresh: false,
+                offline: global.offline,
             },
             global,
         ),

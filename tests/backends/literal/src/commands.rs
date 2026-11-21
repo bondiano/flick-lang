@@ -8,7 +8,7 @@ use std::path::Path;
 
 use flick_backend::command::{
     self, Descriptor, Diagnostic, File, Handled, Invocation, Parameter, Plan, Severity, Span, Step,
-    Style, Tool, ToolStep, ValueKind,
+    Style, TemplateDescriptor, TemplateRequest, Tool, ToolStep, ValueKind,
 };
 
 fn descriptor(
@@ -205,4 +205,87 @@ pub(super) fn resume(state: &[u8], outputs: &[File]) -> Plan {
 
 pub(super) fn unknown(name: &str) -> Vec<Diagnostic> {
     command::unknown(name)
+}
+
+pub(super) fn templates() -> Vec<TemplateDescriptor> {
+    vec![
+        TemplateDescriptor {
+            name: "starter".into(),
+            summary: "Minimal literal starter project".into(),
+        },
+        TemplateDescriptor {
+            name: "escape".into(),
+            summary: "Fixture template that escapes the target directory".into(),
+        },
+        TemplateDescriptor {
+            name: "stepped".into(),
+            summary: "Fixture template that returns a disallowed tool step".into(),
+        },
+        TemplateDescriptor {
+            name: "bad-lock".into(),
+            summary: "Fixture template that writes a malformed flick.lock".into(),
+        },
+    ]
+}
+
+pub(super) fn scaffold(request: &TemplateRequest) -> Result<Plan, Vec<Diagnostic>> {
+    let mut plan = Plan::empty();
+    match request.template.as_str() {
+        "starter" => {
+            let name = &request.name;
+            let compiler = &request.compiler;
+            let init = request.init;
+            plan.files = vec![
+                file(
+                    "flick.toml",
+                    "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+                ),
+                file(
+                    "src/App/Main.fl",
+                    &format!(
+                        "module App.Main exposing (main)\n\nmain : Unit ->{{Host.Console; AppError}} Unit\nlet main () = Platform.stdout_line \"hello from {name}\"\n"
+                    ),
+                ),
+                file(
+                    "README.md",
+                    &format!("# {name}\ncompiler: {compiler}\ninit: {init}\n"),
+                ),
+                file("AGENTS.md", "# Literal template agents\n"),
+            ];
+            plan.stdout = format!("Next: literal starter `{name}` ready\n").into_bytes();
+            Ok(plan)
+        }
+        "escape" => {
+            plan.files.push(file("../outside.txt", "escaped\n"));
+            Ok(plan)
+        }
+        "stepped" => {
+            plan.files.push(file("flick.toml", "schema-version = 1\n"));
+            plan.steps.push(Step::Tool(ToolStep {
+                id: "forbidden".into(),
+                tool: Tool {
+                    id: "node".into(),
+                    version: "0.0.0".into(),
+                    sha256: "0".repeat(64),
+                },
+                arguments: vec![],
+                environment: vec![],
+                inputs: vec![],
+                reads: vec![],
+                outputs: vec!["made.txt".into()],
+            }));
+            Ok(plan)
+        }
+        "bad-lock" => {
+            plan.files = vec![
+                file(
+                    "flick.toml",
+                    "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+                ),
+                file("flick.lock", "version = \"broken\"\n"),
+            ];
+            Ok(plan)
+        }
+        other => Err(command::unknown_template(other, &templates())),
+    }
 }

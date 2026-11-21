@@ -174,3 +174,21 @@ pub fn handled(h: w::Handled) -> n::Handled {
         needs: h.needs.into_iter().map(need).collect(),
     }
 }
+
+pub fn template_descriptors(ds: Vec<w::TemplateDescriptor>) -> Vec<n::TemplateDescriptor> {
+    ds.into_iter()
+        .map(|d| n::TemplateDescriptor {
+            name: d.name,
+            summary: d.summary,
+        })
+        .collect()
+}
+
+pub fn template_request(r: &n::TemplateRequest) -> w::TemplateRequest {
+    w::TemplateRequest {
+        template: r.template.clone(),
+        name: r.name.clone(),
+        compiler: r.compiler.clone(),
+        init: r.init,
+    }
+}

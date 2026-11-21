@@ -316,13 +316,9 @@ pub(super) fn finish(
     report::exit_code(&all)
 }
 
-/// The compiler's form of `d`, its span into the input it names.
-fn diagnostic(
-    d: &command::Diagnostic,
-    invocation: &Invocation,
-    sources: &mut SourceMap,
-    files: &mut BTreeMap<String, FileId>,
-) -> Diagnostic {
+/// The compiler's form of `d`, without an invocation's input map (used for
+/// template scaffolding diagnostics).
+pub(crate) fn standalone_diagnostic(d: &command::Diagnostic) -> Diagnostic {
     let code = codes::lookup(&format!("FLICK-{}", d.code)).map_or(codes::P013, |info| info.code);
     let severity = match d.severity {
         command::Severity::Error => Severity::Error,
@@ -335,6 +331,20 @@ fn diagnostic(
         message.push_str(note);
     }
     let mut out = Diagnostic::new(code, severity, message);
+    if let Some(help) = &d.help {
+        out = out.with_fix(|| (help.clone(), Vec::new()));
+    }
+    out
+}
+
+/// The compiler's form of `d`, its span into the input it names.
+fn diagnostic(
+    d: &command::Diagnostic,
+    invocation: &Invocation,
+    sources: &mut SourceMap,
+    files: &mut BTreeMap<String, FileId>,
+) -> Diagnostic {
+    let mut out = standalone_diagnostic(d);
     if let Some(span) = &d.span {
         let file = files.get(&span.path).copied().or_else(|| {
             let input = invocation.inputs.iter().find(|f| f.path == span.path)?;
@@ -350,9 +360,6 @@ fn diagnostic(
         {
             out = out.with_span(Span::new(file, span.start, span.end));
         }
-    }
-    if let Some(help) = &d.help {
-        out = out.with_fix(|| (help.clone(), Vec::new()));
     }
     out
 }

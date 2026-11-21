@@ -4,15 +4,17 @@
 //! session on stdio.
 
 use std::fs;
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use flick_backend::sha256;
 use serde_json::Value;
 
-use super::{MAIN, app, flick};
+use super::{LIB, MAIN, app, component, flick};
 
 /// The fixture backend, as `just wasm-backends` builds it.
 fn backend() -> Vec<u8> {
@@ -29,7 +31,7 @@ fn project(name: &str) -> PathBuf {
     let config = fs::read_to_string(root.join("app/flick.toml")).expect("config");
     let pin = format!(
         "\n[build.backend]\nid = \"test/literal\"\nversion = \"1.0.0\"\nsha256 = \"{}\"\ncomponent = \"backend.wasm\"\n",
-        flick_backend::sha256(&bytes)
+        sha256(&bytes)
     );
     fs::write(root.join("app/flick.toml"), config + &pin).expect("pin");
     root
@@ -274,4 +276,126 @@ fn a_command_gets_its_inputs_and_resumes_after_a_step_that_reads_in_place() {
             && stderr.contains("reads `src`, which the command does not declare"),
         "{stderr}"
     );
+}
+
+fn serve_plugin_tarball(body: Vec<u8>) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("port");
+    let port = listener.local_addr().expect("addr").port();
+    thread::spawn(move || {
+        for mut stream in listener.incoming().map_while(Result::ok) {
+            let mut reader = BufReader::new(stream.try_clone().expect("clone"));
+            let mut request = String::new();
+            let _ = reader.read_line(&mut request);
+            let mut line = String::new();
+            while reader.read_line(&mut line).is_ok_and(|n| n > 2) {
+                line.clear();
+            }
+            let head = format!(
+                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                body.len()
+            );
+            let _ = stream.write_all(head.as_bytes());
+            let _ = stream.write_all(&body);
+            if request.starts_with("GET /pairs-tpl.tgz ") {
+                break;
+            }
+        }
+    });
+    format!("http://127.0.0.1:{port}/pairs-tpl.tgz")
+}
+
+#[test]
+fn a_plugin_package_scaffolds_via_from_path_and_url_and_pins_in_lock() {
+    let root = super::project("plugin_templates", &[]);
+    let store = root.join("store");
+    let pkg = root.join("pairs-pkg");
+    fs::create_dir_all(&pkg).expect("pkg");
+    fs::write(pkg.join("flick.toml"), LIB).expect("manifest");
+    fs::copy(component(), pkg.join("pairs.wasm")).expect("component");
+    let wasm_sha = sha256(&fs::read(pkg.join("pairs.wasm")).expect("bytes"));
+
+    let run = |args: &[&str]| {
+        Command::new(env!("CARGO_BIN_EXE_flick"))
+            .args(args)
+            .current_dir(&root)
+            .env("FLICK_STORE", &store)
+            .env("XDG_CACHE_HOME", root.join("cache"))
+            .env("NO_COLOR", "1")
+            .output()
+            .expect("flick runs")
+    };
+
+    // Omitting `--template` picks the plugin's sole template `pair-app`.
+    let out = run(&["new", "from-plugin", "--from", pkg.to_str().expect("utf8")]);
+    assert!(out.status.success(), "{:?}", text(&out));
+    assert!(
+        text(&out)
+            .0
+            .contains("Next: pairs template `from-plugin` ready")
+    );
+    let created = root.join("from-plugin");
+    let notes = fs::read_to_string(created.join("NOTES.md")).expect("notes");
+    assert!(notes.contains("pair-app from-plugin"), "{notes}");
+    let lock = fs::read_to_string(created.join("flick.lock")).expect("lock");
+    assert!(
+        lock.contains("[[template]]")
+            && lock.contains("template = \"pair-app\"")
+            && lock.contains("package = \"pairs\"")
+            && lock.contains("source = \"path+../pairs-pkg\"")
+            && lock.contains(&format!("component = \"sha256:{wasm_sha}\"")),
+        "{lock}"
+    );
+    let checked = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args(["check"])
+        .current_dir(&created)
+        .env("FLICK_STORE", &store)
+        .output()
+        .expect("check");
+    assert!(checked.status.success(), "{:?}", text(&checked));
+
+    // Tarball URL with `--sha256` works for a library plugin package too.
+    let tgz = root.join("pairs-tpl.tgz");
+    let packed = Command::new("tar")
+        .args(["czf", "pairs-tpl.tgz", "pairs-pkg"])
+        .env("COPYFILE_DISABLE", "1")
+        .current_dir(&root)
+        .status()
+        .expect("tar");
+    assert!(packed.success());
+    let tgz_bytes = fs::read(&tgz).expect("tgz");
+    let tgz_sha = sha256(&tgz_bytes);
+    let url = serve_plugin_tarball(tgz_bytes);
+    let out = run(&[
+        "new",
+        "from-plugin-url",
+        "--from",
+        &url,
+        "--sha256",
+        &tgz_sha,
+    ]);
+    assert!(out.status.success(), "{:?}", text(&out));
+    let url_lock = fs::read_to_string(root.join("from-plugin-url/flick.lock")).expect("lock");
+    assert!(
+        url_lock.contains("[[template]]")
+            && url_lock.contains("template = \"pair-app\"")
+            && url_lock.contains(&format!("archive = \"sha256:{tgz_sha}\"")),
+        "{url_lock}"
+    );
+
+    // Incompatible `[package] flick` constraint fails with FLICK-P033 and creates nothing.
+    let bad_pkg = root.join("old-pkg");
+    fs::create_dir_all(&bad_pkg).expect("bad pkg");
+    fs::write(
+        bad_pkg.join("flick.toml"),
+        LIB.replace(
+            "version = \"1.0.0\"",
+            "version = \"1.0.0\"\nflick = \"<0.0.1\"",
+        ),
+    )
+    .expect("manifest");
+    fs::copy(component(), bad_pkg.join("pairs.wasm")).expect("component");
+    let bad = run(&["new", "too-new", "--from", bad_pkg.to_str().expect("utf8")]);
+    assert!(!bad.status.success());
+    assert!(text(&bad).1.contains("FLICK-P033"), "{:?}", text(&bad));
+    assert!(!root.join("too-new").exists());
 }

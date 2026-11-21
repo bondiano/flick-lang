@@ -17,6 +17,9 @@ use flick_core::project::{self, CONFIG_FILE, store};
 use flick_core::source::SourceMap;
 use sha2::{Digest, Sha256};
 
+#[cfg(feature = "wasm-backends")]
+use crate::saved;
+
 /// How far `install` may go to get what the lock lacks.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Options {
@@ -53,9 +56,13 @@ pub fn install(
         mut lock, fetched, ..
     } = install;
     lock.plugins = plugins(root, dependencies)?;
-    // the backend pin is the backends' to keep or move
+    // the backend and template pins are theirs to keep or move
     lock.backends.clone_from(&old.backends);
-    let empty = lock.packages.is_empty() && lock.plugins.is_empty();
+    lock.templates.clone_from(&old.templates);
+    let empty = lock.packages.is_empty()
+        && lock.plugins.is_empty()
+        && lock.backends.is_empty()
+        && lock.templates.is_empty();
     let changed = lock.render() != old.render() || !lock_path.exists() && !empty;
     if changed && options.locked {
         let rebuilt = (lock.plugins.iter())
@@ -114,6 +121,199 @@ pub fn relative(root: &Path, path: &Path) -> String {
     let up = from.map(|_| "..".to_owned());
     let down = to.map(|c| c.as_os_str().to_string_lossy().into_owned());
     up.chain(down).collect::<Vec<_>>().join("/")
+}
+
+/// The directory and pin metadata of a remote template package fetched into the
+/// package store for `flick new --from` or `flick init --from`.
+#[cfg(feature = "wasm-backends")]
+pub struct FetchedTemplate {
+    pub dir: PathBuf,
+    /// `url+<url>` or `git+<url>?tag=<tag>[&subdir=<dir>]#<commit>`.
+    pub source: String,
+    /// `sha256:` and the tree hash of the unpacked/cloned package.
+    pub checksum: String,
+    /// For `url` sources, `sha256:` and the verified tarball digest.
+    pub archive: Option<String>,
+}
+
+/// Why fetching a remote template package failed.
+#[cfg(feature = "wasm-backends")]
+pub enum FetchTemplateError {
+    /// Network, store, verification, or missing subdirectory failure (`FLICK-P034`).
+    Fetch(String),
+    /// A subdirectory symlink escapes the fetched package directory (`FLICK-P055`).
+    Escape(String),
+}
+
+#[cfg(feature = "wasm-backends")]
+fn is_hex_sha256(hash: &str) -> bool {
+    hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Fetches a `git` or `url` template source into the package store, reusing
+/// cached verified trees for repeated or `--offline` runs.
+#[cfg(feature = "wasm-backends")]
+pub fn fetch_template(
+    source: &Source,
+    offline: bool,
+) -> Result<FetchedTemplate, FetchTemplateError> {
+    let store = store::store_dir().ok_or_else(|| {
+        FetchTemplateError::Fetch(
+            "no cache directory for the package store: set FLICK_STORE".to_owned(),
+        )
+    })?;
+    match source {
+        Source::Url { sha256, .. } => fetch_url_template(&store, source, sha256, offline),
+        Source::Git { subdir, .. } => {
+            fetch_git_template(&store, source, subdir.as_deref(), offline)
+        }
+        Source::Path(_) => Err(FetchTemplateError::Fetch(
+            "a path template is not fetched".to_owned(),
+        )),
+    }
+}
+
+#[cfg(feature = "wasm-backends")]
+fn fetch_url_template(
+    store: &Path,
+    source: &Source,
+    sha256: &str,
+    offline: bool,
+) -> Result<FetchedTemplate, FetchTemplateError> {
+    let digest = sha256.to_ascii_lowercase();
+    let pin_path = store.join("url-pins").join(&digest);
+    if let Ok(tree) = fs::read_to_string(&pin_path) {
+        let hash = tree.trim();
+        let dir = store.join(hash);
+        if is_hex_sha256(hash) && dir.is_dir() {
+            let canon_dir = fs::canonicalize(&dir).map_err(|e| {
+                FetchTemplateError::Fetch(format!(
+                    "cannot inspect cached template `{}`: {e}",
+                    dir.display()
+                ))
+            })?;
+            return Ok(FetchedTemplate {
+                dir: canon_dir,
+                source: source.key(),
+                checksum: format!("sha256:{hash}"),
+                archive: Some(format!("sha256:{digest}")),
+            });
+        }
+    }
+    if offline {
+        return Err(FetchTemplateError::Fetch(format!(
+            "template source `{}` is not in the package store, and `--offline` fetches nothing",
+            source.key()
+        )));
+    }
+    let stored = download::fetch(source, store).map_err(FetchTemplateError::Fetch)?;
+    let hash = stored
+        .checksum
+        .strip_prefix("sha256:")
+        .unwrap_or(&stored.checksum);
+    let _ = saved::write(&pin_path, hash.as_bytes());
+    let dir = store.join(hash);
+    let canon_dir = fs::canonicalize(&dir).map_err(|e| {
+        FetchTemplateError::Fetch(format!(
+            "cannot inspect fetched template `{}`: {e}",
+            dir.display()
+        ))
+    })?;
+    Ok(FetchedTemplate {
+        dir: canon_dir,
+        source: source.key(),
+        checksum: stored.checksum,
+        archive: Some(format!("sha256:{digest}")),
+    })
+}
+
+#[cfg(feature = "wasm-backends")]
+fn fetch_git_template(
+    store: &Path,
+    source: &Source,
+    subdir: Option<&str>,
+    offline: bool,
+) -> Result<FetchedTemplate, FetchTemplateError> {
+    let key = source.key();
+    let key_hash = hex(&Sha256::digest(key.as_bytes()));
+    let pin_path = store.join("git-pins").join(&key_hash);
+    let (root, commit, checksum) = if offline {
+        let cached = fs::read_to_string(&pin_path).ok().and_then(|text| {
+            let mut lines = text.lines();
+            let commit = lines.next()?.trim().to_owned();
+            let hash = lines.next()?.trim().to_owned();
+            let dir = store.join(&hash);
+            (!commit.is_empty() && is_hex_sha256(&hash) && dir.is_dir()).then_some((
+                dir,
+                commit,
+                format!("sha256:{hash}"),
+            ))
+        });
+        cached.ok_or_else(|| {
+            FetchTemplateError::Fetch(format!(
+                "template source `{key}` is not in the package store, and `--offline` fetches nothing"
+            ))
+        })?
+    } else {
+        let stored = download::fetch(source, store).map_err(FetchTemplateError::Fetch)?;
+        let commit = stored.pin.unwrap_or_default();
+        let hash = stored
+            .checksum
+            .strip_prefix("sha256:")
+            .unwrap_or(&stored.checksum)
+            .to_owned();
+        let _ = saved::write(&pin_path, format!("{commit}\n{hash}\n").as_bytes());
+        (store.join(&hash), commit, stored.checksum)
+    };
+    let canon_root = fs::canonicalize(&root).map_err(|e| {
+        FetchTemplateError::Fetch(format!("cannot inspect template repository `{key}`: {e}"))
+    })?;
+    let dir = match subdir {
+        Some(sub) => resolve_git_subdir(&root, &canon_root, sub, &key)?,
+        None => canon_root,
+    };
+    let pinned_source = if commit.is_empty() {
+        key
+    } else {
+        format!("{key}#{commit}")
+    };
+    Ok(FetchedTemplate {
+        dir,
+        source: pinned_source,
+        checksum,
+        archive: None,
+    })
+}
+
+#[cfg(feature = "wasm-backends")]
+fn resolve_git_subdir(
+    root: &Path,
+    canon_root: &Path,
+    sub: &str,
+    key: &str,
+) -> Result<PathBuf, FetchTemplateError> {
+    let at = root.join(sub);
+    if fs::symlink_metadata(&at).is_err() {
+        return Err(FetchTemplateError::Fetch(format!(
+            "subdirectory `{sub}` does not exist in template repository `{key}`"
+        )));
+    }
+    let canon_at = fs::canonicalize(&at).map_err(|e| {
+        FetchTemplateError::Fetch(format!(
+            "cannot inspect subdirectory `{sub}` in template repository `{key}`: {e}"
+        ))
+    })?;
+    if !canon_at.starts_with(canon_root) {
+        return Err(FetchTemplateError::Escape(format!(
+            "subdirectory `{sub}` escapes template repository `{key}`"
+        )));
+    }
+    if !canon_at.is_dir() {
+        return Err(FetchTemplateError::Fetch(format!(
+            "subdirectory `{sub}` does not exist in template repository `{key}`"
+        )));
+    }
+    Ok(canon_at)
 }
 
 /// The `flick.lock` of the project at `root`; none is an empty one.
