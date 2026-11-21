@@ -12,6 +12,8 @@ mod collection;
 mod control_handlers;
 mod derive;
 mod expr;
+#[cfg(test)]
+mod expr_tests;
 pub mod lean;
 mod loops;
 mod mutation;
@@ -26,10 +28,12 @@ use flick_core::ir::{self, ItemKind};
 use flick_core::types::{Dict, InstanceInfo, OpClass, default_method};
 
 use self::expr::pat;
+use crate::decls::Decls;
 use crate::eval::Program;
 use crate::native;
 use crate::subst::binders;
 use crate::syntax::{Arm, Const, GETTER, Lit, Name, Path, RegionOp, Term};
+use crate::types::Scheme;
 
 fn control(e: &ir::Expr) -> bool {
     if let ir::ExprKind::Handle(h) = &e.kind
@@ -47,6 +51,14 @@ fn control(e: &ir::Expr) -> bool {
 
 /// The program of `modules`: those of a build and the built-in ones.
 pub fn program<'a>(modules: impl IntoIterator<Item = &'a ir::Module>) -> Program {
+    program_with_decls(modules, &Decls::default())
+}
+
+/// [`program`], attaching local `let` / `let rec` signatures recorded in `decls`.
+pub fn program_with_decls<'a>(
+    modules: impl IntoIterator<Item = &'a ir::Module>,
+    decls: &Decls,
+) -> Program {
     let modules: Vec<_> = modules.into_iter().collect();
     let needs_functions = modules.iter().any(|m| {
         m.items
@@ -75,10 +87,10 @@ pub fn program<'a>(modules: impl IntoIterator<Item = &'a ir::Module>) -> Program
     };
     let mut program = Program::default();
     for module in modules {
-        let mut tr = Tr::new(&module.name);
+        let mut tr = Tr::with_local_schemes(&module.name, Some(&decls.local_schemes));
         tr.functions = Rc::clone(&functions);
         for item in &module.items {
-            tr.item(&item.kind, &mut program);
+            tr.item(item, &mut program);
         }
     }
     program
@@ -103,8 +115,10 @@ pub fn lams(names: impl IntoIterator<Item = Name>, body: Term) -> Term {
         .fold(body, |body, x| Term::Lam(x, Rc::new(body)))
 }
 
-struct Tr {
+struct Tr<'a> {
     module: String,
+    current_item: String,
+    local_schemes: Option<&'a HashMap<(Name, String, Name), Scheme>>,
     fresh: usize,
     /// Each `let mut` variable in scope and the name of its current value,
     /// innermost last.
@@ -117,10 +131,20 @@ struct Tr {
     pub(super) control_loops: Vec<String>,
 }
 
-impl Tr {
-    fn new(module: &str) -> Self {
+impl<'a> Tr<'a> {
+    #[cfg(test)]
+    fn new(module: &str) -> Tr<'static> {
+        Tr::with_local_schemes(module, None)
+    }
+
+    fn with_local_schemes(
+        module: &str,
+        local_schemes: Option<&'a HashMap<(Name, String, Name), Scheme>>,
+    ) -> Self {
         Tr {
             module: module.to_owned(),
+            current_item: String::new(),
+            local_schemes,
             fresh: 0,
             versions: Vec::new(),
             cells: Vec::new(),
@@ -132,6 +156,21 @@ impl Tr {
         }
     }
 
+    pub(super) fn local_scheme(&self, name: &str) -> Option<Rc<Scheme>> {
+        let schemes = self.local_schemes?;
+        if self.current_item.is_empty() {
+            return None;
+        }
+        schemes
+            .get(&(
+                Name::from(self.module.as_str()),
+                self.current_item.clone(),
+                Name::from(name),
+            ))
+            .cloned()
+            .map(Rc::new)
+    }
+
     fn fresh(&mut self, what: &str) -> Name {
         self.fresh += 1;
         format!("${what}{}", self.fresh).into()
@@ -141,14 +180,17 @@ impl Tr {
         Path::new(&self.module, name)
     }
 
-    fn item(&mut self, item: &ItemKind, program: &mut Program) {
+    fn item(&mut self, item: &ir::Item, program: &mut Program) {
+        self.current_item.clear();
         let globals = &mut program.globals;
-        match item {
+        match &item.kind {
             ItemKind::Value { name, dicts, body } => {
+                self.current_item.clone_from(name);
                 let value = lams(dicts.iter().map(|d| given(d)), self.expr(body));
                 globals.insert(self.path(name), value);
             }
             ItemKind::Destructure { pattern, body } => {
+                self.current_item = format!("destructure {}..{}", item.span.start, item.span.end);
                 let value = Rc::new(self.expr(body));
                 let pat = pat(pattern);
                 let mut names = Vec::new();
@@ -198,7 +240,10 @@ impl Tr {
         } else {
             methods
                 .iter()
-                .map(|(m, e)| (Name::from(m.as_str()), self.expr(e)))
+                .map(|(m, e)| {
+                    self.current_item = format!("instance {}::{m}", info.name);
+                    (Name::from(m.as_str()), self.expr(e))
+                })
                 .collect()
         };
         for (class, d) in &info.supers {
@@ -406,7 +451,8 @@ mod foreign_staging_tests {
     fn derived_instance_without_ir_methods_falls_back_to_derive_methods() {
         use std::rc::Rc;
 
-        use flick_core::ir::ItemKind;
+        use flick_core::ir::{Item, ItemKind};
+        use flick_core::source::{FileId, Span};
         use flick_core::types::{Constructor, InstanceInfo, Rep};
 
         use crate::syntax::Lit;
@@ -433,9 +479,12 @@ mod foreign_staging_tests {
         };
         let mut program = Program::default();
         super::Tr::new("App.Main").item(
-            &ItemKind::Instance {
-                info: Box::new(info),
-                methods: Vec::new(),
+            &Item {
+                kind: ItemKind::Instance {
+                    info: Box::new(info),
+                    methods: Vec::new(),
+                },
+                span: Span::new(FileId::new(0), 0, 0),
             },
             &mut program,
         );

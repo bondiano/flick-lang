@@ -7,11 +7,11 @@ use std::mem;
 use std::rc::Rc;
 
 use super::super::expr::mono;
-use super::super::generalize::in_regions;
+use super::super::generalize::Inst;
 use super::super::{Check, Checker, error};
 use super::{owner, scope_service};
 use crate::syntax::{Name, Term};
-use crate::types::{Caps, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Row, Stage, Type, Var};
 
 impl Checker<'_> {
     /// (Scope): `s` fresh one level deeper, `s : Owner s` in the body, the
@@ -85,6 +85,8 @@ impl Checker<'_> {
         self.regions.open.push(s.clone());
         self.regions.nest.push(s.clone());
         self.regions.renamed.push((name.clone(), s.clone()));
+        self.tyvars
+            .push((name.clone(), Inst::Type(Type::Var(region.clone()))));
         self.locals.push((name.clone(), mono(owner(&s))));
         // The body can acquire in this scope, in addition to the surrounding
         // requirements. A pre-existing Scope requirement may instead pass
@@ -105,6 +107,7 @@ impl Checker<'_> {
         let checked = self.own_stage(body, expected);
         self.stage_bound = outer_bound;
         self.locals.pop();
+        self.tyvars.pop();
         self.regions.renamed.pop();
         self.regions.nest.pop();
         self.regions.open.pop();
@@ -151,12 +154,6 @@ impl Checker<'_> {
         self.lower(&left, self.level);
         self.perform(&Stage::Runtime(r, e))?;
         Ok(t)
-    }
-
-    /// A signature written in the body of `scope`s: the regions it names
-    /// are theirs.
-    pub(in crate::check) fn in_scopes(&self, s: &Scheme) -> Scheme {
-        in_regions(s, &self.regions.renamed)
     }
 
     /// Whether a value at `level` may take what `t` names: no region of a

@@ -7,7 +7,7 @@ use flick_core::ir;
 use std::iter;
 use std::rc::Rc;
 
-impl Tr {
+impl Tr<'_> {
     pub(in crate::translate) fn source_for(
         &mut self,
         id: &str,

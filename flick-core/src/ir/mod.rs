@@ -20,8 +20,8 @@ pub use flick_ir::{
     Handler, Item, ItemKind, JsClass, Label, LangItem, Lit, Module, OpArm, Param, Pat, Rep,
     ResultAdapter, Stage, Stmt, TypeName, memory, operation_arity,
 };
-pub use lower::lower;
 pub use lower::proofs::{LoweredProof, Proven, Run, check_proofs, laws_of, lower_proofs};
+pub use lower::{lower, lower_with_local_schemes};
 pub use print::print;
 
 use flick_ir::Namespace as IrNamespace;

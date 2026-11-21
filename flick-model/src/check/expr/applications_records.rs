@@ -75,7 +75,7 @@ impl Checker<'_> {
 
     /// (App): `φ₁ ⊔ φ₂ ⊔ φ`. A callee of unknown type is a pure arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`).
     /// A constructor with all its fields is (Con).
-    fn app(&mut self, f: &Term, a: &Term) -> Check<Type> {
+    pub(in crate::check) fn app(&mut self, f: &Term, a: &Term) -> Check<Type> {
         if let (true, Term::Lam(x, body)) = (self.config, f) {
             return self.redex(x, body, a, None);
         }

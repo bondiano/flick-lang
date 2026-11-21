@@ -8,7 +8,7 @@ use crate::syntax::{Arm, Const, Name, Pat, Term};
 use flick_core::ir::{self, ExprKind};
 use flick_core::types::OpClass;
 
-impl Tr {
+impl Tr<'_> {
     pub(super) fn protected_handler(&mut self, h: &ir::Handler, xs: &[String]) -> Term {
         if tail_only(h) && h.errors.is_empty() {
             let effects = self.handled_effects(h);

@@ -325,12 +325,13 @@ impl Checking<'_> {
             proofs = proven;
         }
         interface.proofs = typing.proofs.iter().map(|p| p.name.clone()).collect();
-        let declarations = typing.declarations.clone();
+        let mut declarations = typing.declarations.clone();
         let mut ir = self.lower_if_clean(
             loaded,
             &module,
             &typing,
             clean && interface.parameterized.is_none(),
+            &mut declarations,
             &mut diagnostics,
         );
         if let Some(ir) = &mut ir {
@@ -402,6 +403,7 @@ impl Checking<'_> {
         module: &resolve::Module<'_>,
         typing: &types::Typing,
         clean: bool,
+        declarations: &mut Arc<Interface>,
         diagnostics: &mut Vec<Diagnostic>,
     ) -> Option<ir::Module> {
         let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
@@ -411,8 +413,13 @@ impl Checking<'_> {
             && loaded.scope_of.is_none()
             && !Self::is_module_template(loaded)
         {
-            match ir::lower(module, typing) {
-                Ok(lowered) => return Some(lowered),
+            match ir::lower_with_local_schemes(module, typing) {
+                Ok((lowered, local_schemes)) => {
+                    if !local_schemes.is_empty() {
+                        Arc::make_mut(declarations).local_schemes = local_schemes;
+                    }
+                    return Some(lowered);
+                }
                 Err(d) => diagnostics.extend(d),
             }
         }
@@ -425,60 +432,5 @@ include!("checking_inline_values.rs");
 include!("checking_visibility.rs");
 
 #[cfg(test)]
-mod template_fallback_tests {
-    use super::*;
-    use crate::syntax;
-
-    fn loaded(source: &str, broken: bool) -> Loaded {
-        let mut sources = SourceMap::default();
-        let file = sources.add("A/Parent.fl", source);
-        let parse = syntax::parse(source, file).into_module();
-        let syntax = resolve::module_syntax(&parse.tree, source, file);
-        let diagnostics = if broken {
-            vec![Diagnostic::error(
-                codes::S007,
-                "unexpected `)`",
-                Span::new(file, 6, 7),
-            )]
-        } else {
-            Vec::new()
-        };
-        Loaded {
-            path: PathBuf::from("A/Parent.fl"),
-            file,
-            root: Root::Other(None),
-            parse: Arc::new(Parse {
-                tree: parse.tree,
-                diagnostics,
-            }),
-            syntax: Arc::new(syntax),
-            name: "A.Parent".into(),
-            expansion: None,
-            editing: Vec::new(),
-            loader: None,
-            virtual_of: None,
-            member_of: None,
-            scope_of: None,
-        }
-    }
-
-    /// A template fallback has no structure to export, so it must not invent
-    /// names; it marks the module incomplete exactly when parsing failed.
-    #[test]
-    fn the_template_fallback_is_incomplete_only_when_the_parser_reported() {
-        let source = "module A.Parent exposing (x)\nlet x = 1\n";
-        let broken = Checking::module_template(&loaded(source, true));
-        assert!(broken.exported.incomplete);
-        assert!(!broken.interface.incomplete);
-        assert!(broken.exported.exports.is_empty());
-        assert!(broken.exported.parameterized.is_none());
-        assert_eq!(broken.diagnostics.len(), 1);
-        assert_eq!(broken.diagnostics[0].code, codes::S007);
-
-        let clean = Checking::module_template(&loaded(source, false));
-        assert!(!clean.exported.incomplete);
-        assert!(!clean.interface.incomplete);
-        assert!(clean.exported.exports.is_empty());
-        assert!(clean.diagnostics.is_empty());
-    }
-}
+#[path = "checking_core_tests.rs"]
+mod template_fallback_tests;

@@ -102,7 +102,8 @@ fn lower_builtins(stages_by_class: bool) -> (BuiltinModules, Vec<Arc<Interface>>
                 let file = FileId::new(
                     u32::try_from(bundle.sources.len()).expect("built-in source count fits u32"),
                 );
-                let mut lowered = ir::lower(module, typing).expect("built-in modules compile");
+                let (mut lowered, local_schemes) =
+                    ir::lower_with_local_schemes(module, typing).expect("built-in modules compile");
                 lowered.each_span_mut(&mut |span| {
                     assert_eq!(
                         span.file, module.file,
@@ -115,7 +116,11 @@ fn lower_builtins(stages_by_class: bool) -> (BuiltinModules, Vec<Arc<Interface>>
                     text: module.text.to_owned(),
                 });
                 bundle.modules.push(lowered);
-                declarations.push(typing.declarations.clone());
+                let mut decl = typing.declarations.clone();
+                if !local_schemes.is_empty() {
+                    Arc::make_mut(&mut decl).local_schemes = local_schemes;
+                }
+                declarations.push(decl);
             },
         );
         for (module, interface) in bundle.modules.iter_mut().zip(&interfaces) {

@@ -18,7 +18,7 @@ pub use template::{
 };
 
 /// Bumped for schema changes or incompatible embedded-IR execution contracts.
-pub const IFACE_VERSION: u32 = 32;
+pub const IFACE_VERSION: u32 = 33;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -163,6 +163,20 @@ pub struct SupportType {
     pub owner_path: Vec<String>,
 }
 
+/// A local `let` or `let rec` signature (or explicit annotation) kept on
+/// `Compiled.declarations` for the reference model (`flick-model`). Never
+/// written to published `.iface` files.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocalScheme {
+    /// Enclosing top-level item key (`name`, `instance <name>::<method>`,
+    /// or `destructure <start>..<end>`).
+    pub item: String,
+    /// Unique lowered local name inside that item.
+    pub local: String,
+    /// Exported scheme with enclosing rigid variables as free `Type::Var`.
+    pub scheme: Type,
+}
+
 pub(crate) mod support;
 
 /// What a module exposes to its importers.
@@ -238,6 +252,10 @@ pub struct Interface {
     /// no build wrote.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub targets: Vec<Target>,
+    /// Local `let` / `let rec` schemes recorded only on `Compiled.declarations`
+    /// for the reference model; always empty in published `.iface` files.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub local_schemes: Vec<LocalScheme>,
 }
 
 // serde's predicate receives a reference to the serialized field.
@@ -330,6 +348,7 @@ pub fn fingerprint(interface: &Interface) -> String {
     // where declarations are written, and their comments, change nothing for importers
     bare.source = None;
     bare.docs.clear();
+    bare.local_schemes.clear();
     for export in &mut bare.exports {
         export.at = None;
     }

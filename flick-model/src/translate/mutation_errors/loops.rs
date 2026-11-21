@@ -4,7 +4,7 @@ use super::{
     state_function, state_pattern,
 };
 
-impl Tr {
+impl Tr<'_> {
     pub(super) fn protected_source_loop(
         &mut self,
         id: &str,
@@ -106,7 +106,7 @@ impl Tr {
     }
 }
 
-impl Tr {
+impl Tr<'_> {
     pub(super) fn protected_source_for(
         &mut self,
         id: &str,

@@ -102,7 +102,7 @@ pub(super) fn list_step(list: &Name, head: Name, tail: Name, empty: Term, matche
     )
 }
 
-impl Tr {
+impl Tr<'_> {
     pub(super) fn exit_payload(&self, target: &str, value: Option<Term>) -> Term {
         let opt = option(value);
         let Some(pos) = self.control_loops.iter().rposition(|id| id == target) else {
@@ -185,6 +185,21 @@ impl Tr {
                 let body = tr.loop_block(rest, tail, id, xs);
                 tr.versions.pop();
                 Term::Let(name, None, Rc::new(v), Rc::new(body))
+            }),
+            Stmt::Let(ir::Pat::Bind(x), e) => self.loop_with(e, id, xs, &|tr, v| {
+                let body = tr.loop_block(rest, tail, id, xs);
+                if let Some(sig) = tr.local_scheme(x) {
+                    Term::Let(x.as_str().into(), Some(sig), Rc::new(v), Rc::new(body))
+                } else {
+                    Term::Match(
+                        Rc::new(v),
+                        Rc::from([Arm {
+                            pat: Pat::Var(x.as_str().into()),
+                            guard: None,
+                            body,
+                        }]),
+                    )
+                }
             }),
             Stmt::Let(p, e) => self.loop_with(e, id, xs, &|tr, v| {
                 let body = tr.loop_block(rest, tail, id, xs);

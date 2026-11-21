@@ -26,7 +26,7 @@ fn collected(e: &ir::Expr) -> ir::Expr {
     ir::Expr::new(kind, e.span)
 }
 
-impl Tr {
+impl Tr<'_> {
     pub(super) fn strict_collection(&mut self, e: &ir::Expr) -> Term {
         let ExprKind::Each {
             pat: p,

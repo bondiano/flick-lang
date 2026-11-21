@@ -104,7 +104,9 @@ impl Checker<'_> {
     /// The body of `s` with its variables rigid and the stages of its
     /// signature holding their parameters: what (Let-Sig) checks, with the
     /// names of the rigid variables. Its facts `Θ` are given from here on.
-    pub(super) fn skolemize(&mut self, s: &Scheme) -> (Type, Vec<Name>) {
+    /// When `bind_tyvars` is true, its binders enter scope for local
+    /// signatures inside its body.
+    pub(super) fn skolemize(&mut self, s: &Scheme, bind_tyvars: bool) -> (Type, Vec<Name>) {
         let mut rigid = Vec::new();
         let insts: Vec<Inst> = s
             .vars
@@ -119,6 +121,11 @@ impl Checker<'_> {
                 rigid_inst(&name, k)
             })
             .collect();
+        if bind_tyvars {
+            for ((n, _), inst) in s.vars.iter().zip(&insts) {
+                self.tyvars.push((n.clone(), inst.clone()));
+            }
+        }
         let map = names(&s.vars, &insts);
         self.give_bounds(s, &map);
         for (c, r) in &s.outlives {
@@ -134,6 +141,32 @@ impl Checker<'_> {
         self.remember_row_instances(&body);
         self.give_provided(&body);
         (body, rigid)
+    }
+
+    /// `s` with free variables from enclosing signatures and `scope`s replaced
+    /// by their active rigid variables, respecting shadowing by `s.vars`.
+    pub(super) fn in_enclosing(&self, s: &Scheme) -> Scheme {
+        if self.tyvars.is_empty() {
+            return s.clone();
+        }
+        let mut map = HashMap::new();
+        for (n, inst) in &self.tyvars {
+            if !s.vars.iter().any(|(v, _)| v == n) {
+                map.insert(n.clone(), inst.clone());
+            }
+        }
+        if map.is_empty() {
+            return s.clone();
+        }
+        Scheme {
+            vars: s.vars.clone(),
+            body: substitute(&s.body, &map),
+            outlives: s
+                .outlives
+                .iter()
+                .map(|(c, r)| (substitute_caps(c, &map), substitute(r, &map)))
+                .collect(),
+        }
     }
 
     /// `Gen(Γ, τ)`: the type metas of `t` deeper than the current level.
