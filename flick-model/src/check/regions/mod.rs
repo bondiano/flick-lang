@@ -253,10 +253,11 @@ impl Checker<'_> {
 
     /// A qualifier on a value that can hold nothing adds nothing (`docs/formal/regions.md#a-value-bound-survives-an-unknown-type-position`).
     pub(super) fn holds_nothing(&self, t: &Type) -> bool {
-        self.scalar(t)
-            || (!matches!(self.resolve(t), Type::Var(_))
-                && self.reach(t).is_empty()
-                && !self.hidden(t, &mut Vec::new()))
+        match self.resolve(t) {
+            Type::Bounded(x, _) => self.holds_nothing(&x),
+            Type::Var(_) | Type::Module(_) | Type::OpenedModule(..) => false,
+            _ => self.scalar(t) || (self.reach(t).is_empty() && !self.hidden(t, &mut Vec::new())),
+        }
     }
 
     /// Records `⋃ ⌈held⌉ ⊆ ⋃ ⌈within⌉ ∪ allowed`, decided at the end.

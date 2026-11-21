@@ -320,7 +320,7 @@ s ∉ fr(τ) ∪ fr(r) ∪ fr(ε)
 Γ ⊢ scope s { e } : τ ! R⟨r; ε⟩
 ```
 
-- `fr(τ)` are the free regions of `τ`, including qualifiers and rows.
+- `fr(τ)` are the free regions of `τ`, including its hidden qualifiers and rows. A value bound is a fact of its scheme (`⌈τ⌉ ⊆ C`, [value bounds in the core](#value-bounds-in-the-core)), not part of `τ`: on a value that can hold nothing (a scalar, or data without hidden storage and without captures in its type, `holds_nothing`), a value bound carries no region, whereas on an opaque foreign capability such as `a^{s}` of `Resource.acquire_release` (G4) the region remains part of the value's reach.
 - `Scope.run f` is `scope s { f s_owner }` for a function `f` of any form: a lambda, or a variable. Its region is the binder of the parameter of `Scope.run` (§1.5), so the three conditions on `s` hold by scoping. `Scope.run (λo. e)` and `scope s { e }` step to the same `inside` form and type each other, with one difference: a `scope` knows that what is outside outlives `s` (§2.4), while a function of `∀s` can be called at any region and knows nothing about it. A child of `s` that holds an atom from outside is typed under `scope` only.
 - `R⟨r; ε⟩` is always part of the result: `scope` is a runtime step, and a pure function cannot open one (`FLICK-E001`).
 - `scope` discharges only the `Scope s` of its own region; every other `Scope ϱ` passes outwards in `r`.
@@ -1023,6 +1023,7 @@ let group () =
 - work two owners keep that uses one service is kept by the outer owner when one `scope` encloses the other: the provider outlives both (§2.7).
 - `Async` of work an owner keeps makes no `Provided` obligation: the root gives it to every fiber, as the checker reads it (§2.7); the model had rejected `Resource.own`, whose close runs with `{Async}`.
 - a `Fiber.Provided` constraint over a task, `forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t}` of `Resource.manual`, is given to the task as to the body of a λ; the model had dropped it, as it placed the constraint only in the row of a runtime arrow (`Type::with_provided`).
+- (Scope) in the model (`check/regions/scope.rs` `free_regions`, `unify.rs` `lower`, `check/regions/data.rs` `project_part`) ignores vacuous value bounds on types that hold nothing (`holds_nothing`: scalars and parameter-only data with empty reach, such as `String^{≤s}` from `RcMap.get`), while keeping bounds on opaque/hidden types (`Raw^{≤s}` from `Resource.acquire_release`, G4) and type variables; and `take_open_region` (`check/regions/solve.rs`) binds only an unsolved `Kind::Region` meta in a written qualifier (`qualifiers` / `allowed`), never an error-row, type, or argument meta in the underlying type (which previously bound the error-row meta of `Stream.partition_effect` to the scope's region and prevented the stream's capture-row meta from growing before leaving `scope`).
 
 Fixtures: the cases of `accepted.rs`; `flick-model/tests/model/live.rs` `live_on_std` lists the std values the model still cannot type.
 

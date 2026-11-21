@@ -8,9 +8,6 @@
 # that rejects a program flick-core accepts is a divergence still to be read.
 # loops_owners exercises the existing G6 explicit-owner limit (docs/formal/regions.md
 # section 1.4); its native and rt oracle remains in portable.txt and rt.txt.
-# stream_combine, and the (Scope) error behind cache's first reason: the model's (Scope)
-# is stricter than docs/formal/regions.md there (a value bound, a region named by
-# inference); issue #710.
 bootstrap/app_fail # no native for `fail` (flick:rt appFail)
 bootstrap/debug # no native for `echoed` (flick:rt flickEcho)
 codegen/abi # no native for `js_type` (./abi.mjs kind)
