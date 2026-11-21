@@ -4,6 +4,7 @@ import (
 	"iter"
 	"math"
 	"math/big"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -256,6 +257,19 @@ func TestHashMapAndSetSeqEmptyRepeatPartialCollisionsSnapshots(t *testing.T) {
 	}
 }
 
+func allocStatsPerRun(runs int, fn func()) (bytesPerOp, allocsPerOp float64) {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
+	fn() // warm up
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	for range runs {
+		fn()
+	}
+	runtime.ReadMemStats(&after)
+	return float64(after.TotalAlloc-before.TotalAlloc) / float64(runs),
+		float64(after.Mallocs-before.Mallocs) / float64(runs)
+}
+
 func TestHashSeqPrefixAvoidsEagerTraversal(t *testing.T) {
 	w := intIdentityWitness()
 	buildMap := func(n int32) Value {
@@ -286,25 +300,53 @@ func TestHashSeqPrefixAvoidsEagerTraversal(t *testing.T) {
 		t.Fatalf("large set prefix = %v, want %v", got, wantSetPrefix)
 	}
 
-	// Allocations for consuming a 3-element prefix must stay O(1) and not grow with collection size.
-	smallMapAllocs := testing.AllocsPerRun(50, func() {
-		_ = SeqToList(nil, SeqTake(int32(3), HashMapToSeq(smallMap)))
+	// Allocated bytes and counts for consuming a 3-element prefix must stay O(1)
+	// and not scale with collection size. Checking bytes (not only alloc count)
+	// catches single-allocation eager materialization such as `HashSetToList`.
+	smallMapBytes, smallMapAllocs := allocStatsPerRun(50, func() {
+		benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(3), HashMapToSeq(smallMap)))
 	})
-	largeMapAllocs := testing.AllocsPerRun(50, func() {
-		_ = SeqToList(nil, SeqTake(int32(3), HashMapToSeq(largeMap)))
+	largeMapBytes, largeMapAllocs := allocStatsPerRun(50, func() {
+		benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(3), HashMapToSeq(largeMap)))
 	})
-	if largeMapAllocs > 32 || largeMapAllocs > smallMapAllocs+4 {
-		t.Fatalf("HashMap.to_seq prefix looks eager: small=%.1f allocs, large=%.1f allocs", smallMapAllocs, largeMapAllocs)
+	eagerMapBytes, _ := allocStatsPerRun(10, func() {
+		benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(3), SeqOfList(HashMapToList(largeMap))))
+	})
+	if largeMapBytes > 2048 || largeMapBytes > smallMapBytes+256 ||
+		largeMapAllocs > 32 || largeMapAllocs > smallMapAllocs+4 {
+		t.Fatalf("HashMap.to_seq prefix looks eager: small=%.0f B (%.1f allocs), large=%.0f B (%.1f allocs)",
+			smallMapBytes, smallMapAllocs, largeMapBytes, largeMapAllocs)
+	}
+	if eagerMapBytes < 65536 {
+		t.Fatalf("expected eager HashMapToList baseline >= 65536 B, got %.0f B", eagerMapBytes)
 	}
 
-	smallSetAllocs := testing.AllocsPerRun(50, func() {
-		_ = SeqToList(nil, SeqTake(int32(3), HashSetToSeq(smallSet)))
+	smallSetBytes, smallSetAllocs := allocStatsPerRun(50, func() {
+		benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(3), HashSetToSeq(smallSet)))
 	})
-	largeSetAllocs := testing.AllocsPerRun(50, func() {
-		_ = SeqToList(nil, SeqTake(int32(3), HashSetToSeq(largeSet)))
+	largeSetBytes, largeSetAllocs := allocStatsPerRun(50, func() {
+		benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(3), HashSetToSeq(largeSet)))
 	})
-	if largeSetAllocs > 32 || largeSetAllocs > smallSetAllocs+4 {
-		t.Fatalf("HashSet.to_seq prefix looks eager: small=%.1f allocs, large=%.1f allocs", smallSetAllocs, largeSetAllocs)
+	eagerSetBytes, _ := allocStatsPerRun(10, func() {
+		benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(3), SeqOfList(HashSetToList(largeSet))))
+	})
+	if largeSetBytes > 1024 || largeSetBytes > smallSetBytes+256 ||
+		largeSetAllocs > 32 || largeSetAllocs > smallSetAllocs+4 {
+		t.Fatalf("HashSet.to_seq prefix looks eager: small=%.0f B (%.1f allocs), large=%.0f B (%.1f allocs)",
+			smallSetBytes, smallSetAllocs, largeSetBytes, largeSetAllocs)
+	}
+	if eagerSetBytes < 32768 {
+		t.Fatalf("expected eager HashSetToList baseline >= 32768 B, got %.0f B", eagerSetBytes)
+	}
+
+	zeroMapBytes, _ := allocStatsPerRun(50, func() {
+		benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(0), HashMapToSeq(largeMap)))
+	})
+	zeroSetBytes, _ := allocStatsPerRun(50, func() {
+		benchmarkHashSeqSink = SeqToList(nil, SeqTake(int32(0), HashSetToSeq(largeSet)))
+	})
+	if zeroMapBytes > 512 || zeroSetBytes > 512 {
+		t.Fatalf("take 0 should not walk the trie: map=%.0f B, set=%.0f B", zeroMapBytes, zeroSetBytes)
 	}
 }
 
