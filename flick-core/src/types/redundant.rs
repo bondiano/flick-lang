@@ -48,6 +48,7 @@ impl Checker<'_> {
                 | K::IfExpr
                 | K::MatchExpr
                 | K::TryExpr
+                | K::ResultExpr
                 | K::ProvideExpr
                 | K::ScopeExpr
                 | K::TupleExpr

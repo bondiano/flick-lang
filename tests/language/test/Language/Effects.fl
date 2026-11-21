@@ -323,4 +323,85 @@ let tests = [
         Test.check (Test.equal "timed out" outcome)
       }),
   ],
+  Test.group "result blocks" [
+    Test.effect_test
+      "reifies typed failures eagerly without flattening"
+      (task {
+        let runs = Ref.make 0
+        let ok = result {
+          Ref.set runs (Ref.get runs + 1)
+          lookup "a" 2
+        }
+        let err = result {
+          Ref.set runs (Ref.get runs + 1)
+          let x = lookup "b" 2
+          Ref.set runs 99
+          x
+        }
+        let nested = result { (Err "raw" : Result String Int) }
+        let nested_s =
+          match nested with
+          | Ok inner -> "Ok (" ++ show inner ++ ")"
+          | Err _ -> "Err"
+        Test.check
+          (Test.equal (2, "Ok 3", "Err (NotFound \"b\")", "Ok (Err \"raw\")") (
+            Ref.get runs,
+            show_lookup ok,
+            show_lookup err,
+            nested_s,
+          ))
+      }),
+    Test.effect_test
+      "does not run cold tasks and propagates defects"
+      (task {
+        let runs = Ref.make 0
+        let cold = result {
+          task {
+            Ref.set runs (Ref.get runs + 1)
+            find "missing"
+          }
+        }
+        Test.check (Test.equal 0 (Ref.get runs))
+        let ran =
+          match cold with
+          | Ok t -> result { await t }
+          | Err _ -> Ok 0
+        Test.check (Test.equal (1, "Err (NotFound \"missing\")") (Ref.get runs, show ran))
+        let die =
+          defect_of
+            (task {
+              let r : Result NotFound Int = result { Effect.die "boom" }
+              show r
+            })
+        Test.check (Test.equal "defect: boom" die)
+      }),
+    Test.effect_test
+      "scope defer observes failure inside result and success outside"
+      (task {
+        let log = Ref.make []
+        let inner = result {
+          scope {
+            Scope.defer (fun ex -> note log ("in:" ++ show (Exit.is_failure ex)))
+            find "x"
+          }
+        }
+        let outer = scope {
+          Scope.defer (fun ex -> note log ("out:" ++ show (Exit.is_success ex)))
+          result { find "y" }
+        }
+        Test.check
+          (Test.equal ("Err (NotFound \"x\")", "Err (NotFound \"y\")", ["in:true", "out:true"]) (
+            show inner,
+            show outer,
+            Ref.get log,
+          ))
+      }),
+  ],
 ]
+
+show_lookup : Result (Errors {NotFound, Invalid}) Int -> String
+let show_lookup r =
+  match r with
+  | Ok v -> "Ok " ++ show v
+  | Err (NotFound k) -> "Err (NotFound " ++ show k ++ ")"
+  | Err (Invalid n) -> "Err (Invalid " ++ show n ++ ")"

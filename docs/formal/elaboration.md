@@ -14,6 +14,7 @@ Elaborated here:
 - `do` with `<-`, `and`, an `if` guard and `let`;
 - `for … yield`, `[for …]`, `for … do`;
 - postfix `?`;
+- eager `result { … }` blocks;
 - direct calls;
 - `let mut` variables and assignment;
 - `CallSite`, the place of a use, which the checker gives.
@@ -84,12 +85,12 @@ constitute a proof of the Rust checker's rewrite.
 ### 1.3 Sugar
 
 ```text
-e ::= … | do { s̄ } | for { c̄ } yield e | [for { c̄ } yield e] | for { c̄ } do e | e?
+e ::= … | do { s̄ } | for { c̄ } yield e | [for { c̄ } yield e] | for { c̄ } do e | e? | result { s̄ }
 s ::= p <- e | p₁ <- e₁ and … and pₙ <- eₙ | let p = e | if e | e
 c ::= p <- e | if e | let p = e
 ```
 
-The last statement of a `do` is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`. Syntax: `reference/syntax.md` "`do`", "`for`", `?`.
+The last statement of a `do` or `result` block is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`, `handlers.rs`. Syntax: `reference/syntax.md` "`do`", "`for`", `?`, `result`.
 
 ## 2. Dictionaries
 
@@ -469,6 +470,41 @@ the state. `x = v` of a `let lazy mut` is `Some (Ok v)`.
 the typing of blocks, so T7 covers them (`formal/Formal/LetMut/Lazy.lean`),
 given the Prelude's `Option` and `Result` in the signature (`LzSig`, which
 the witness signature has: `Elab.Witness.lzSig`).
+
+### 3.7 `result { … }`
+
+`result { body }` is an eager runtime typed-error boundary whose canonical
+elaboration into the core is an error-catching `Handle` with hygienic binders
+and built-in `Result` constructors:
+
+```text
+⟦result { body }⟧ = try ⟦body⟧ with | return $result_value -> Ok $result_value | $result_error -> Err $result_error
+```
+
+- **Typing and rows.** The body is checked in a runtime stage with the
+  enclosing service row `r` and an error row `e`, producing
+  `Result (Errors e) a` (with `Errors none = Never` when `body` raises no typed
+  errors and `Errors {E} = E` for a single error type). `result { … }` removes
+  typed failures `e` from the enclosing stage's error channel while leaving
+  service requirements `r` unchanged; in v1 it remains a runtime-stage
+  construct even when `r = none` and `e = none` (`FLICK-E001` under pure `->`).
+- **Regions, captures, and payloads.** Because `Ok v` returns the body's value
+  directly, any region or capture carried by `v` stays on the resulting
+  `Result` (`FLICK-G002` if it leaves its owning `scope`). Raised error
+  payloads remain subject to the existing raised-error check (`FLICK-E005`).
+- **Execution semantics.** Lowering emits `ExprKind::Handle` (`ir/lower/handle.rs`
+  `result_expr`) with empty `effects`, `ret = Some(λ$result_value. Ok $result_value)`,
+  and `errors = [Arm(Bind($result_error), None, Err $result_error)]`. Because it
+  targets the existing core `Handle` construct with Prelude `Ok`/`Err`
+  constructors, it inherits `try`'s exact behavior for eager single evaluation,
+  defects, interruption, `abort`/`control` unwind, mixed causes, pending
+  cancellation (`skipHandler`), `scope` cleanup, and local mutable state / loop
+  completion in both backends and `flick-model`.
+- **Lean contract.** No new core term, typing rule, evaluation rule, or Prelude
+  scheme is added: the elaboration strictly targets the existing core `Handle`
+  term, so the core soundness and region proofs in `formal/` remain valid
+  unchanged (as noted in `AGENTS.md`, the model proof does not prove the Rust
+  compiler or either runtime).
 
 ## 4. Coherence and T6
 

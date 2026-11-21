@@ -1,0 +1,181 @@
+// Eager `result { BODY }` blocks: single evaluation, short-circuiting, row
+// inference and polymorphism, non-flattening, cold task/lazy handling, `?`,
+// contextual head hygiene, and `let mut` / loop interactions.
+module App.Main exposing (main)
+
+type error NotFound = NotFound Int
+  deriving Eq, Show
+
+type error Timeout = Timeout
+  deriving Eq, Show
+
+service Clock =
+  now : Unit ->{} Int
+
+type ShadowRes e a = Ok a | Err e
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+show_never : (a -> String) -> Result Never a -> String
+let show_never fmt r =
+  match r with
+  | Prelude.Ok v -> "Ok " ++ fmt v
+  | Prelude.Err _ -> "Err <never>"
+
+show_res : (e -> String) -> (a -> String) -> Result e a -> String
+let show_res fmt_e fmt_a r =
+  match r with
+  | Prelude.Ok v -> "Ok " ++ fmt_a v
+  | Prelude.Err e -> "Err (" ++ fmt_e e ++ ")"
+
+show_both : Errors {NotFound, Timeout} -> String
+let show_both e =
+  match e with
+  | NotFound n -> "NotFound " ++ show n
+  | Timeout -> "Timeout"
+
+capture : (Unit ->{r; e} a) ->{r} Result (Errors e) a
+let capture f = result { f () }
+
+rethrow : Int ->{; NotFound} Int
+let rethrow n = result { if n < 0 then Fail.fail (NotFound n) else n * 2 }?
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  // R01: eager single evaluation with Ref and let mut
+  let count = Ref.make 0
+  let mut mut_count = 0
+  let r1 = result {
+    Ref.set count (Ref.get count + 1)
+    mut_count = mut_count + 1
+    Ref.get count + mut_count
+  }
+  say
+    ("R01: "
+      ++ show_never show r1
+      ++ ", ref="
+      ++ show (Ref.get count)
+      ++ ", mut="
+      ++ show mut_count)
+
+  // R02: short-circuit on typed failure; later side effects skipped, earlier ones kept
+  let log = Ref.make []
+  let mut step = 0
+  let r2 : Result NotFound Int = result {
+    Ref.set log (Ref.get log ++ ["before"])
+    step = 1
+    let x = Fail.fail (NotFound 7)
+    Ref.set log (Ref.get log ++ ["after"])
+    step = 2
+    x + 1
+  }
+  say ("R02: " ++ show r2 ++ ", log=" ++ show (Ref.get log) ++ ", step=" ++ show step)
+
+  // R03: nested try handles NotFound, result catches Timeout
+  let r3a : Result Timeout Int = result {
+    try Fail.fail (NotFound 1) with
+    | NotFound n -> n + 10
+  }
+  let r3b : Result Timeout Int = result {
+    try Fail.fail Timeout with
+    | NotFound n -> n + 10
+  }
+  say ("R03: " ++ show r3a ++ ", " ++ show r3b)
+
+  // R04: polymorphic open row `e` and service row `r`
+  let p0 : Result Never Int = capture (fun () -> 5)
+  let p1 : Result NotFound Int = capture (fun () -> Fail.fail (NotFound 2))
+  let pick_err = fun flag -> if flag then Fail.fail (NotFound 2) else Fail.fail Timeout
+  let p2 : Result (Errors {NotFound, Timeout}) Int = capture (fun () -> pick_err false)
+  let p_svc : Result Never Int = provide (Layer.succeed Clock { now = fun () -> 99 }) {
+    capture (fun () -> Clock.now () + 1)
+  }
+  say
+    ("R04: "
+      ++ show_never show p0
+      ++ ", "
+      ++ show p1
+      ++ ", "
+      ++ show_res show_both show p2
+      ++ ", "
+      ++ show_never show p_svc)
+
+  // R05: does not flatten Result; nested result produces Ok (Err ...)
+  let r5a = result { (Prelude.Err "raw" : Result String Int) }
+  let r5b : Result Never (Result NotFound Int) = result { result { Fail.fail (NotFound 9) } }
+  say
+    ("R05: "
+      ++ show_never (fun inner -> "(" ++ show inner ++ ")") r5a
+      ++ ", "
+      ++ show_never (fun inner -> "(" ++ show inner ++ ")") r5b)
+
+  // R06 & R07: cold task is not run until awaited; await inside result runs once
+  let task_runs = Ref.make 0
+  let r6 = result {
+    task {
+      Ref.set task_runs (Ref.get task_runs + 1)
+      Fail.fail (NotFound 3)
+    }
+  }
+  let before_await = Ref.get task_runs
+  let after_await : Result NotFound Int =
+    match r6 with
+    | Prelude.Ok t -> result { await t }
+    | Prelude.Err _ -> Prelude.Ok 0
+  say
+    ("R06/R07: before="
+      ++ show before_await
+      ++ ", after="
+      ++ show (Ref.get task_runs)
+      ++ ", res="
+      ++ show after_await)
+
+  // R08: result? re-raises, and Result? works inside result { ... }
+  let r8a = result { rethrow (-4) }
+  let r8b : Result NotFound Int = result {
+    let a = (Prelude.Ok 10 : Result NotFound Int)?
+    let b = (Prelude.Err (NotFound 5) : Result NotFound Int)?
+    a + b
+  }
+  let r8c : Result NotFound Int = result {
+    let a = (Prelude.Ok 10 : Result NotFound Int)?
+    a + 5
+  }
+  say ("R08: " ++ show r8a ++ ", " ++ show r8b ++ ", " ++ show r8c)
+
+  // R17: result { () }, contextual identifier, (result) { field = 1 },
+  // hygienic shadowing of Ok/Err/result_value/result_error, and loop break/continue
+  let r17_unit = result { () }
+  let result = fun r -> r.field + 1
+  let called = (result) { field = 41 }
+  let result_value = 100
+  let result_error = 200
+  let hygienic_ok = result { result_value + result_error }
+  let hygienic_err : Result NotFound Int = result { Fail.fail (NotFound result_value) }
+  let _shadow = Ok 1
+  let _shadow2 = Err "s"
+  let mut sum = 0
+  let mut i = 0
+  let loop_res =
+    loop {
+      i = i + 1
+      let step_res = result {
+        if i == 2 then continue
+        if i == 4 then break sum
+        sum = sum + i
+        sum
+      }
+      ignore step_res
+    }
+  say
+    ("R17: "
+      ++ show_never show r17_unit
+      ++ ", call="
+      ++ show called
+      ++ ", ok="
+      ++ show_never show hygienic_ok
+      ++ ", err="
+      ++ show hygienic_err
+      ++ ", loop="
+      ++ show loop_res)

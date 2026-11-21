@@ -746,6 +746,10 @@
     "named": false
   },
   {
+    "type": "result",
+    "named": false
+  },
+  {
     "type": "scope",
     "named": false
   },

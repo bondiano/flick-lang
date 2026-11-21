@@ -110,6 +110,7 @@ syntax_kinds! {
         WhenKw = "when",
         LoopKw,
         WhileKw,
+        ResultKw,
         BreakKw = "break",
         ContinueKw = "continue",
         ForKw = "for",
@@ -317,6 +318,8 @@ syntax_kinds! {
         MatchArm,
         Guard,
         TryExpr,
+        /// `result { … }`: eager typed-error boundary returning `Result (Errors e) a`.
+        ResultExpr,
         IfExpr,
         TaskExpr,
         /// `lazy { … }`: a computation run at most once, at its first `await`.

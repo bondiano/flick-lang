@@ -151,6 +151,19 @@ impl Ide<'_> {
                 "Handles the errors of its body: an error leaves the row when an \
                  arm without a guard matches every value of it.",
             ),
+            K::ResultKw => {
+                let mut note = String::from(
+                    "Runs its body eagerly in the current fiber at runtime, wrapping its value \
+                     in `Ok` and catching its typed failures as `Err`.",
+                );
+                if let Some(services) = m.typing.result_services.get(&at) {
+                    let services = show_type(services);
+                    let _ = write!(note, "\n\nRemaining services: `{services}`.");
+                } else {
+                    note.push_str("\n\nRemaining services: `none`.");
+                }
+                return Some((format!("result {{ … }} : {shown}"), note, at));
+            }
             K::MatchKw => ("match … with", "The value of the arm that matches."),
             K::IfKw => ("if … then … else …", "The value of the branch taken."),
             K::FunKw => ("fun … -> …", "An anonymous function."),

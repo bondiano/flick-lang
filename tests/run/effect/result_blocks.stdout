@@ -1,0 +1,8 @@
+R01: Ok 2, ref=1, mut=1
+R02: Err (NotFound 7), log=["before"], step=1
+R03: Ok 11, Err Timeout
+R04: Ok 5, Err (NotFound 2), Err (Timeout), Ok 100
+R05: Ok (Err "raw"), Ok (Err (NotFound 9))
+R06/R07: before=0, after=1, res=Err (NotFound 3)
+R08: Err (NotFound -4), Err (NotFound 5), Ok 15
+R17: Ok (), call=42, ok=Ok 300, err=Err (NotFound 100), loop=4

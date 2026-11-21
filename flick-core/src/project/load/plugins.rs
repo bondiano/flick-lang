@@ -275,6 +275,14 @@ impl Loader<'_> {
                 )));
             }
             for item in &import.plugins {
+                if item.name == "result" {
+                    diagnostics.push(Diagnostic::error(
+                        codes::P044,
+                        "`result` is a built-in block head (`result { … }`), so no plugin can give it",
+                        item.span,
+                    ));
+                    continue;
+                }
                 if package != std && first_party::HEADS.iter().any(|(h, _)| *h == item.name) {
                     diagnostics.push(Diagnostic::error(
                         codes::P044,

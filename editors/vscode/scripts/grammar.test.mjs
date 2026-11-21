@@ -210,6 +210,7 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor("for x <- xs yield x", "yield").includes("keyword.control.flick"));
   assert.ok(scopesFor("'outer: loop { continue 'outer }", "continue").includes("keyword.control.flick"));
   assert.ok(scopesFor("let shared = lazy { load id }", "lazy").includes("keyword.control.flick"));
+  assert.ok(scopesFor("let r = result { work () }", "result").includes("keyword.control.flick"));
 });
 
 test("word boundaries prevent spurious keyword matches on partial identifiers and member accesses", () => {
@@ -257,6 +258,10 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["let law = 1", "law"],
     ["let require = 1", "require"],
     ["let x = ensure y", "ensure"],
+    ["let result = 1", "result"],
+    ["let x = (result) { field = 1 }", "result"],
+    ["let x = obj.result", "result"],
+    ["let result_value = 1", "result_value"],
   ];
 
   for (const [line, word] of nonKeywordCases) {

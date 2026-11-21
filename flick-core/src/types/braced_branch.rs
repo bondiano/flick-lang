@@ -59,7 +59,7 @@ impl Checker<'_> {
     /// variable, and one a field: a name not in scope or, with `valued`, a
     /// name no `let` binds, or the name itself. A plain `let` is left to
     /// `FLICK-T069`, which says how to make it a variable.
-    fn assigns_fields(&self, block: &Node, valued: bool) -> bool {
+    pub(super) fn assigns_fields(&self, block: &Node, valued: bool) -> bool {
         let mut field = false;
         for statement in block.nodes() {
             let target = (statement.kind == K::AssignStmt)

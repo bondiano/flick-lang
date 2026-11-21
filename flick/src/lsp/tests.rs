@@ -319,3 +319,75 @@ fn a_dotted_completion_waits_for_the_background_analysis_and_reads_its_snapshot(
         "{out}"
     );
 }
+
+#[test]
+fn result_block_lsp_hover_actions_and_edits_handle_utf16_without_stale_results() {
+    let written = Written::default();
+    let mut server = server(Box::new(written.clone()));
+    let dir = env::temp_dir().join(format!("flick-lsp-result-{}", process::id()));
+    let path = dir.join("A.fl");
+    // "é𝄞" on line 5 before `result { ... }`: 6 UTF-8 bytes, 3 UTF-16 units
+    let source = "module A exposing (run)\n\ntype error Boom = Boom\n\nrun : Bool ->{} (String, Result Boom String)\nlet run flag = (\"é𝄞\", result { if flag then Fail.fail Boom else \"ok\" })\n";
+    server.notify("textDocument/didOpen", &opened(&path, source));
+    settle(&mut server);
+
+    // Hover on `result` keyword on line 5 using UTF-16 character column
+    let line5 = source.lines().nth(5).expect("line 5");
+    let byte_col = line5.find("result {").expect("result");
+    let utf16_col: usize = line5[..byte_col].chars().map(char::len_utf16).sum();
+    let hover = json!({
+        "textDocument": { "uri": protocol::uri_of(&path) },
+        "position": { "line": 5, "character": utf16_col + 1 }
+    });
+    let reply = server
+        .request("textDocument/hover", &hover)
+        .expect("hover reply");
+    let out = reply.to_string();
+    assert!(
+        out.contains("result { … } : Result Boom String")
+            && out.contains("Remaining services: `none`"),
+        "{out}"
+    );
+
+    // Code action on `result` offers expansion to `try … with`
+    let code_action = json!({
+        "textDocument": { "uri": protocol::uri_of(&path) },
+        "range": {
+            "start": { "line": 5, "character": utf16_col },
+            "end": { "line": 5, "character": utf16_col + 6 }
+        },
+        "context": { "diagnostics": [] }
+    });
+    let reply = server
+        .request("textDocument/codeAction", &code_action)
+        .expect("codeAction reply");
+    let out = reply.to_string();
+    assert!(out.contains("expand `result"), "{out}");
+
+    // Edit `result { ... }` into an ordinary variable `result` and verify no stale keyword hover
+    let edited = "module A exposing (run)\n\ntype error Boom = Boom\n\nrun : Bool ->{} (String, String)\nlet run _ =\n  let result = \"ok\"\n  (\"é𝄞\", result)\n";
+    let full_change = json!({
+        "textDocument": { "uri": protocol::uri_of(&path), "version": 2 },
+        "contentChanges": [{ "text": edited }]
+    });
+    server.notify("textDocument/didChange", &full_change);
+    settle(&mut server);
+
+    let edited_line7 = edited.lines().nth(7).expect("edited line 7");
+    let edited_col: usize = edited_line7[..edited_line7.rfind("result").expect("result var")]
+        .chars()
+        .map(char::len_utf16)
+        .sum();
+    let hover_after = json!({
+        "textDocument": { "uri": protocol::uri_of(&path) },
+        "position": { "line": 7, "character": edited_col + 1 }
+    });
+    let reply = server
+        .request("textDocument/hover", &hover_after)
+        .expect("hover reply after edit");
+    let out = reply.to_string();
+    assert!(
+        out.contains("result : String") && !out.contains("result { … }"),
+        "{out}"
+    );
+}

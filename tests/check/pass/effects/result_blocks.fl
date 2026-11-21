@@ -1,0 +1,95 @@
+module App.ResultBlocksPass exposing (..)
+
+type error NotFound = NotFound Int
+
+type error Timeout = Timeout
+
+service Users =
+  get : Int ->{; NotFound} String
+
+service Clock =
+  now : Unit ->{} Int
+
+type Handle (s : Region)
+
+service Files =
+  open : forall s. String ->{Scope s} Handle s
+  read : forall s. Handle s ->{; NotFound} String
+
+// R03 & R09: removes typed errors from outer row, accepted under `->{}`
+load : Int ->{Users} Result NotFound String
+let load id = result { Users.get id }
+
+// R03: nested `try` removes `NotFound`, `result` catches remaining `Timeout`
+nested_try : Bool ->{} Result Timeout Int
+let nested_try flag = result {
+  try
+    if flag then Fail.fail (NotFound 1) else Fail.fail Timeout
+  with
+  | NotFound _ -> 0
+}
+
+// R04: open error row `e` and service row `r` preserved
+capture : (Unit ->{r; e} a) ->{r} Result (Errors e) a
+let capture f = result { f () }
+
+// R04: open error row extended with local error
+capture_plus : Bool -> (Unit ->{r; e} a) ->{r} Result (Errors {NotFound | e}) a
+let capture_plus flag f = result { if flag then Fail.fail (NotFound 0) else f () }
+
+// R04: empty error row simplifies to `Never`
+empty_errors : Unit ->{} Result Never Int
+let empty_errors () = result { 42 }
+
+// R05: does not flatten nested `Result`
+no_flatten : Unit ->{} Result Never (Result String Int)
+let no_flatten () = result { Err "raw" }
+
+nested_result : Int ->{Users} Result Never (Result NotFound String)
+let nested_result id = result { result { Users.get id } }
+
+// R06: does not auto-run cold `Eff` or `Lazy`
+returns_task : Int ->{} Result Never (Eff {Users} {NotFound} String)
+let returns_task id = result { task { Users.get id } }
+
+returns_lazy : Int ->{} Result Never (Lazy {Users} {NotFound} String)
+let returns_lazy id = result { lazy { Users.get id } }
+
+// R07: `await` inside `result` runs the task and catches its typed errors
+awaits_task : Eff {Users} {NotFound} String ->{Users} Result NotFound String
+let awaits_task work = result { await work }
+
+// R08: `result { ... }?` re-raises into outer error row; typed Result `?` works inside
+rethrow : Int ->{Users; NotFound} String
+let rethrow id = result { Users.get id }?
+
+unwrap_inside : Result NotFound Int ->{} Result NotFound Int
+let unwrap_inside r = result {
+  let n = r?
+  n + 1
+}
+
+// R13: scoped handle and closure inside `result { ... }` staying inside owning `scope`
+in_scope : String ->{Files} Result NotFound String
+let in_scope path = scope {
+  let r = result {
+    let h = Files.open path
+    fun () -> Files.read h
+  }
+  match r with
+  | Ok reader -> result { reader () }
+  | Err e -> Err e
+}
+
+// R17: `result { () }`, contextual identifier, `(result) { field = 1 }`, `provide result { ... }`
+unit_block : Unit ->{} Result Never Unit
+let unit_block () = result { () }
+
+contextual_ident : Int -> Int
+let contextual_ident result = result + 1
+
+parenthesized_record_call : ({ field : Int } -> Int) -> Int
+let parenthesized_record_call result = (result) { field = 1 }
+
+provide_named_result : Layer none none {Clock} ->{} Int
+let provide_named_result result = provide result { Clock.now () }

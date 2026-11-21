@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: 61fccd2cba83efe4
+source_hash: 3a6dc67f41807f86
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -129,7 +129,7 @@ in when for yield do break continue
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
 
-- `loop` перед `{` и `while` перед условием, за которым идёт `do`;
+- `loop` перед `{`, `result` перед `{` и `while` перед условием, за которым идёт `do`;
 - `private` перед `module` в заголовке файла (см. [модули](../modules/)) и
   `plugin` перед головой в списке `exposing` (см.
   [плагины](../plugins/#как-подключить-плагин));
@@ -214,6 +214,7 @@ in when for yield do break continue
 | `when` | Задаёт дополнительное условие ветки сопоставления | `\| Rect w h when w == h -> "square"` |
 | `with` | Также вводит обработчики `try` и обновление записи | `{ user with name = "Ada" }` |
 | `try` | Обрабатывает ожидаемые ошибки своего тела | `try find id with \| NotFound _ -> None` |
+| `result` | Контекстное слово: перед `{` сразу выполняет блок и собирает его ожидаемые ошибки в `Result (Errors e) a`; в других местах остаётся именем | `result { find id }` |
 | `not` | Отрицает логическое значение; в `sql table` входит в ограничение `not null` | `not done` |
 | `true` `false` | Два значения типа `Bool` | `if ok then true else false` |
 | `none` | Обозначает пустую строку в типе | `a ->{none; NotFound} b` |
