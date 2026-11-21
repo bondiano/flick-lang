@@ -110,9 +110,11 @@ fn existential_module_witnesses_run_in_the_model() {
     let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/modules/App/Main.fl");
     let modules = run::compile(&file).expect("module fixture compiles");
     let program = run::program(&modules);
-    // The core model has records and nominal types, but no existential
-    // introduction/elimination rules. The source checker establishes the
-    // witness type; this checks its elaborated runtime representation.
+    let errors = run::check(&modules, &program);
+    assert!(
+        errors.is_empty(),
+        "model rejects the existential module fixture: {errors:?}"
+    );
     let main = run::main_of(&modules).expect("main");
     let ran = run::run_main(&program, &main, FUEL);
     assert_eq!(ran.stdout, "ok\n", "{:?}", ran.outcome);
@@ -124,8 +126,11 @@ fn inline_module_contract_pack_runs_in_the_model() {
         .join("../tests/run/bootstrap/inline_pack_nominals.fl");
     let modules = run::compile(&file).expect("inline module fixture compiles");
     let program = run::program(&modules);
-    // The core model checks the elaborated runtime record. It does not yet
-    // type-check source-level `Module Sig` packing or opening.
+    let errors = run::check(&modules, &program);
+    assert!(
+        errors.is_empty(),
+        "model rejects the inline packed module fixture: {errors:?}"
+    );
     let main = run::main_of(&modules).expect("main");
     let ran = run::run_main(&program, &main, FUEL);
     assert_eq!(ran.stdout, "hello Ada\n", "{:?}", ran.outcome);

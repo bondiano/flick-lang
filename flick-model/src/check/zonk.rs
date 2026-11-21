@@ -30,7 +30,7 @@ impl Checker<'_> {
     /// is its representation.
     pub(super) fn follow(&self, t: &Type) -> Type {
         let t = self.heads(t);
-        match self.unfold(&t) {
+        match self.unfold(&t).or_else(|| self.unfold_manifest(&t)) {
             Some(u) => self.follow(&u),
             None => t,
         }
@@ -94,7 +94,7 @@ impl Checker<'_> {
         match self.heads(t) {
             Type::Captured(t, c) => Type::Captured(z(&t), self.zonk_caps(&c)),
             Type::Bounded(t, c) => Type::Bounded(z(&t), self.zonk_caps(&c)),
-            t @ (Type::Var(_) | Type::Con(_)) => t,
+            t @ (Type::Var(_) | Type::Con(_) | Type::Module(_) | Type::OpenedModule(..)) => t,
             Type::App(h, a) => Type::App(z(&h), z(&a)),
             Type::Fun(p, s, r) => Type::Fun(z(&p), self.zonk_stage(&s), z(&r)),
             Type::Eff(r, e, t) => Type::Eff(self.zonk_row(&r), self.zonk_row(&e), z(&t)),
@@ -116,6 +116,8 @@ impl Checker<'_> {
                 body: self.zonk(&s.body),
                 outlives: s.outlives.clone(),
             })),
+            Type::Exists(k, sig, b) => Type::Exists(k, sig, z(&b)),
+            Type::OpenedExists(sig, w, b) => Type::OpenedExists(sig, w, z(&b)),
         }
     }
 

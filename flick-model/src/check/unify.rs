@@ -59,7 +59,7 @@ impl Checker<'_> {
             Type::Var(Var::Meta(m)) => {
                 out.insert(m);
             }
-            Type::Var(_) | Type::Con(_) => {}
+            Type::Var(_) | Type::Con(_) | Type::Module(_) | Type::OpenedModule(..) => {}
             Type::App(h, a) => {
                 self.metas(&h, out);
                 self.metas(&a, out);
@@ -90,6 +90,7 @@ impl Checker<'_> {
             Type::Caps(c) => caps(&c, out),
             Type::Errors(r) | Type::Impl(r) | Type::Tag(r) | Type::Env(r) => row(&r, out),
             Type::Forall(s) => self.metas(&s.body, out),
+            Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => self.metas(&b, out),
         }
     }
 
@@ -225,17 +226,22 @@ impl Checker<'_> {
                 self.equalities.push((n.clone(), Solved::Type(t.clone())));
                 Ok(())
             }
-            (Type::Forall(s), Type::Forall(t))
-                if s.vars.len() == t.vars.len()
-                    && s.vars
-                        .iter()
-                        .zip(&t.vars)
-                        .all(|((_, k1), (_, k2))| k1 == k2)
-                    && s.outlives.len() == t.outlives.len() =>
-            {
-                self.unify_forall(s, t)
-            }
-            _ => self.mismatch(&a, &b),
+            (Type::Forall(s), Type::Forall(t)) => self.unify_forall_pair(&a, &b, s, t),
+            _ => self.unify_module(&a, &b),
+        }
+    }
+
+    fn unify_forall_pair(&mut self, a: &Type, b: &Type, s: &Scheme, t: &Scheme) -> Check<()> {
+        if s.vars.len() == t.vars.len()
+            && s.vars
+                .iter()
+                .zip(&t.vars)
+                .all(|((_, k1), (_, k2))| k1 == k2)
+            && s.outlives.len() == t.outlives.len()
+        {
+            self.unify_forall(s, t)
+        } else {
+            self.mismatch(a, b)
         }
     }
 

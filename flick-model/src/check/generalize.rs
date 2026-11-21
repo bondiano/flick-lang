@@ -209,6 +209,7 @@ impl Checker<'_> {
             Type::Record(f) => f.fields.values().any(|t| self.mentions(v, t)),
             Type::Tuple(ts) | Type::Dict(_, ts) => ts.iter().any(|t| self.mentions(v, t)),
             Type::Forall(s) => self.mentions(v, &s.body),
+            Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => self.mentions(v, &b),
             _ => false,
         }
     }
@@ -226,6 +227,7 @@ fn in_errors(v: &Var, t: &Type) -> bool {
         Type::Record(f) => f.fields.values().any(|t| in_errors(v, t)),
         Type::Tuple(ts) | Type::Dict(_, ts) => any(ts),
         Type::Forall(s) => in_errors(v, &s.body),
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => in_errors(v, b),
         _ => false,
     }
 }
@@ -286,6 +288,7 @@ fn free_atoms(t: &Type, out: &mut Caps) {
         Type::Record(f) => f.fields.values().for_each(|t| free_atoms(t, out)),
         Type::Errors(r) => row_atoms(r, out),
         Type::Caps(c) => *out = out.union(c),
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => free_atoms(b, out),
         _ => {}
     }
 }
@@ -334,7 +337,7 @@ pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
         },
         Type::Captured(x, c) => Type::Captured(s(x), substitute_caps(c, map)),
         Type::Bounded(x, c) => Type::Bounded(s(x), substitute_caps(c, map)),
-        Type::Var(_) | Type::Con(_) => t.clone(),
+        Type::Var(_) | Type::Con(_) | Type::Module(_) | Type::OpenedModule(..) => t.clone(),
         Type::App(h, a) => Type::App(s(h), s(a)),
         Type::Fun(p, st, r) => Type::Fun(s(p), substitute_stage(st, map), s(r)),
         Type::Eff(r, e, x) => Type::Eff(substitute_row(r, map), substitute_row(e, map), s(x)),
@@ -382,6 +385,8 @@ pub(crate) fn substitute(t: &Type, map: &HashMap<Name, Inst>) -> Type {
                     .collect(),
             }))
         }
+        Type::Exists(k, sig, b) => Type::Exists(k.clone(), sig.clone(), s(b)),
+        Type::OpenedExists(sig, w, b) => Type::OpenedExists(sig.clone(), *w, s(b)),
     }
 }
 

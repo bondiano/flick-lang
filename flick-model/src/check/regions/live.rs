@@ -125,6 +125,12 @@ fn place_qualifiers(t: &Type) -> Type {
                 .collect(),
             tail: f.tail.clone(),
         }),
+        Type::Exists(k, sig, b) => {
+            Type::Exists(k.clone(), sig.clone(), Rc::new(place_qualifiers(b)))
+        }
+        Type::OpenedExists(sig, w, b) => {
+            Type::OpenedExists(sig.clone(), *w, Rc::new(place_qualifiers(b)))
+        }
         other => other.clone(),
     }
 }
@@ -382,6 +388,10 @@ impl Checker<'_> {
                     .collect(),
                 tail: f.tail.clone(),
             }),
+            Type::Exists(k, sig, b) => Type::Exists(k.clone(), sig.clone(), Rc::new(go(b, &none))),
+            Type::OpenedExists(sig, w, b) => {
+                Type::OpenedExists(sig.clone(), *w, Rc::new(go(b, &none)))
+            }
             other => other.clone(),
         }
     }
