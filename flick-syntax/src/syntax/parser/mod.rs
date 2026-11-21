@@ -207,6 +207,19 @@ impl<'t> Parser<'t> {
 
     // ---- layout ----
 
+    fn continues_at(&self, i: usize) -> bool {
+        let kind = self.toks[i].kind;
+        if kind.is_record_label()
+            && self
+                .toks
+                .get(i + 1)
+                .is_some_and(|next| matches!(next.kind, K::Eq | K::Colon))
+        {
+            return false;
+        }
+        continues(kind)
+    }
+
     fn sep_at(&self, i: usize) -> Option<Sep> {
         let t = self.toks[i];
         if t.kind == K::Eof {
@@ -217,7 +230,7 @@ impl<'t> Parser<'t> {
         }
         match self.ctx.last().map_or(Ctx::Aligned { col: 0 }, |c| c.0) {
             Ctx::Aligned { col } if t.col < col => Some(Sep::End),
-            Ctx::Aligned { col } if t.col == col && !continues(t.kind) => Some(Sep::Next),
+            Ctx::Aligned { col } if t.col == col && !self.continues_at(i) => Some(Sep::Next),
             Ctx::Aligned { .. } => None,
             Ctx::Inline { threshold } => (t.col <= threshold).then_some(Sep::End),
             Ctx::Bracket if t.kind.is_closer() => None,
@@ -284,6 +297,10 @@ impl<'t> Parser<'t> {
 
     fn at(&self, kind: SyntaxKind) -> bool {
         self.current() == kind
+    }
+
+    fn at_record_label(&self) -> bool {
+        self.current().is_record_label()
     }
 
     /// The current token ignoring layout.

@@ -5,6 +5,7 @@
 mod extract;
 mod import_class;
 mod match_on;
+mod orelse;
 mod qualify;
 mod signature;
 mod to_ref;
@@ -29,6 +30,8 @@ impl Ide<'_> {
         out.extend(self.infer_todo_signature(file, start));
         out.extend(self.import_class(file, start));
         out.extend(self.match_on(file, start));
+        out.extend(self.expand_orelse(file, start));
+        out.extend(self.fold_match_to_orelse(file, start));
         out.extend(self.qualify(file, start));
         out.extend(self.extract(file, start, end));
         out.extend(self.inline(file, start));
@@ -68,6 +71,8 @@ fn to_u32(n: usize) -> u32 {
     u32::try_from(n).expect("source offsets fit in u32")
 }
 
+#[cfg(test)]
+mod orelse_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

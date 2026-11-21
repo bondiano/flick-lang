@@ -151,7 +151,24 @@ fn paren_pattern(p: &mut Parser) -> K {
 /// `field = pattern`, or `field` alone to bind a variable of the same name.
 fn record_pattern_field(p: &mut Parser) {
     let m = p.start();
-    if p.expect(K::Ident) && p.eat(K::Eq) {
+    if p.at_record_label() {
+        if p.nth(1) == K::Eq {
+            p.bump_as(K::Ident);
+            p.bump();
+            or_pattern(p);
+        } else {
+            let tok = p.raw();
+            let word = p.text_of(tok);
+            p.error_at(
+                codes::S007,
+                p.span(tok.start, tok.end),
+                format!(
+                    "`{word}` is a reserved keyword and cannot be bound by record punning; write `{word} = name`"
+                ),
+            );
+            p.bump();
+        }
+    } else if p.expect(K::Ident) && p.eat(K::Eq) {
         or_pattern(p);
     }
     p.complete(m, K::RecordPatField);

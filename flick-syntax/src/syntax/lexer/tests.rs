@@ -222,6 +222,12 @@ fn keyword_context_requires_whole_words_and_adjacent_qualifiers() {
         ("echo == value", "echo", K::EchoKw),
         ("todo => value", "todo", K::TodoKw),
         ("todo :: value", "todo", K::TodoKw),
+        ("a orelse b", "orelse", K::OrElse),
+        ("let orelse = 1", "orelse", K::OrElse),
+        ("orelse : Int", "orelse", K::OrElse),
+        ("foreign pure orelse from", "orelse", K::OrElse),
+        ("{ orelse = 1 }", "orelse", K::OrElse),
+        ("orelse_val", "orelse_val", K::Ident),
     ] {
         let (tokens, errors) = kinds(src);
         assert!(errors.is_empty(), "{src}: {errors:?}");

@@ -1,6 +1,6 @@
 ---
 title: "Числа и операторы"
-source_hash: 345b662a6c63f6f2
+source_hash: 4fd3742fee110559
 ---
 
 Во Flick три числовых типа: `Int`, `Float` и `BigInt`, и неявных
@@ -105,6 +105,7 @@ U+2000–U+200A, U+2028, U+2029, U+202F, U+205F, U+3000 и U+FEFF; но не U+0
 | `< <= > >=` | оба `Int`, `Float`, `BigInt` или `String` либо оба другого типа с `Ord` | `Bool` |
 | `== !=` | одного типа | `Bool` |
 | `&& \|\|`, `not` | `Bool` | `Bool` |
+| `option orelse fallback` | `Option a` и `a` | `a` (вычисляет `fallback` только при `None`) |
 | `x \|> f`, `f <\| x` | `f x` | результат `f` |
 | `f >> g`, `g << f` | функции | функция, которая применяет `f`, затем `g` |
 
@@ -120,6 +121,28 @@ let g' = g; fun x -> g' (f' x)`: она вычисляет операнды од
 `1.5 + 1n` и `"a" ++ 1` вызывают `FLICK-T003`. Если тип операнда не следует
 из других условий, выбирается `Int`, а для `++` — `String`. Диапазоны `a..b`,
 `a..<b` и `a..` считают в `Int`.
+
+`left orelse right` — ленивый fallback для `Option`, эквивалентный
+`match left with | Some value -> value | None -> right`. Левая часть
+вычисляется один раз, а правая — не более одного раза и только если слева
+оказалось `None`. Если левая часть завершилась типизированной ошибкой или
+дефектом, правая часть не выполняется. Оператор снимает ровно один слой
+`Option` (`Some None orelse Some 1` даёт `None : Option Int`), не запускает
+холодные значения `Eff` и `Lazy` и позволяет правой части завершаться ошибкой
+в строку ошибок функции (например, `opt orelse Fail.fail Missing`). В отличие
+от `Option.with_default`, который энергично вычисляет значение по умолчанию
+до вызова, `orelse` не вычисляет дорогой или эффектный fallback при `Some`.
+
+```flick
+fallback : Option String -> String
+let fallback host = host orelse "localhost"
+
+first_valid : Option Int -> Option Int -> Int
+let first_valid a b = a orelse b orelse 8080
+
+nested_layer : Option (Option Int) -> Option Int
+let nested_layer value = value orelse Some 1
+```
 
 ## Числовые классы
 

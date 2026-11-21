@@ -79,6 +79,9 @@ impl<'c> Checker<'c> {
             (K::BinExpr, _) if super::pipes::composes(node) => {
                 self.compose(node, Some(expected));
             }
+            (K::BinExpr, _) if node.has_token(K::OrElse) => {
+                self.orelse(node, &children, Some(expected));
+            }
             (K::LoopExpr | K::WhileExpr, _) => {
                 self.control_loop(node, Some(expected));
             }

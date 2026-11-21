@@ -660,6 +660,10 @@
               },
               {
                 "type": "STRING",
+                "value": "orelse"
+              },
+              {
+                "type": "STRING",
                 "value": "none"
               },
               {
@@ -973,6 +977,10 @@
         {
           "type": "STRING",
           "value": "not"
+        },
+        {
+          "type": "STRING",
+          "value": "orelse"
         },
         {
           "type": "STRING",

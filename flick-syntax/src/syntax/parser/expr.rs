@@ -35,10 +35,10 @@ pub(super) fn expr(p: &mut Parser) -> Option<Done> {
 }
 
 /// Operand of a prefix operator: binds tighter than `*`, looser than `**`.
-const PREFIX_OPERAND: u8 = 18;
+const PREFIX_OPERAND: u8 = 22;
 
 /// A range binds looser than `++` and arithmetic, tighter than comparisons.
-const RANGE: (u8, u8) = (9, 10);
+const RANGE: (u8, u8) = (13, 14);
 
 fn is_comparison(kind: K) -> bool {
     matches!(kind, K::EqEq | K::NotEq | K::Lt | K::Le | K::Gt | K::Ge)
@@ -310,7 +310,11 @@ fn accesses(p: &mut Parser, mut lhs: Done) -> Option<Done> {
         if p.at(K::Dot) && p.adjacent() {
             let m = p.precede(lhs);
             p.bump();
-            p.expect(K::Ident);
+            if p.at_record_label() && p.adjacent() {
+                p.bump_as(K::Ident);
+            } else {
+                p.expect(K::Ident);
+            }
             lhs = p.complete(m, K::FieldExpr);
         } else if p.at(K::Question) && p.adjacent() {
             let m = p.precede(lhs);
@@ -504,18 +508,19 @@ fn record(p: &mut Parser) -> K {
         return K::RecordExpr;
     }
     p.push_aligned_here();
-    let kind = if matches!(p.current(), K::Ident | K::Con) && p.nth(1) == K::Eq {
-        p.items(record_field, true, |_| false);
-        K::RecordExpr
-    } else {
-        expr(p);
-        if p.expect(K::WithKw) {
-            p.push_aligned_here();
+    let kind =
+        if (matches!(p.current(), K::Ident | K::Con) || p.at_record_label()) && p.nth(1) == K::Eq {
             p.items(record_field, true, |_| false);
-            p.pop();
-        }
-        K::RecordUpdate
-    };
+            K::RecordExpr
+        } else {
+            expr(p);
+            if p.expect(K::WithKw) {
+                p.push_aligned_here();
+                p.items(record_field, true, |_| false);
+                p.pop();
+            }
+            K::RecordUpdate
+        };
     p.pop();
     p.expect_closer(K::RBrace, opener);
     kind
@@ -525,6 +530,8 @@ fn record_field(p: &mut Parser) {
     let m = p.start();
     if matches!(p.current(), K::Ident | K::Con) {
         p.bump();
+    } else if p.at_record_label() {
+        p.bump_as(K::Ident);
     } else {
         p.error_expected("a record field name");
     }

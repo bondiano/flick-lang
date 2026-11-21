@@ -10,8 +10,8 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::handle::{arm_pattern, failed_pattern, operation_path};
 use crate::types::lang::{self, Lang};
 use crate::types::{
-    Dict, Identity, Owner, Range, Ref, StageKey, applied_order, children, composed_key,
-    composition, is_pattern, let_parts, param_key, result_key, right_application,
+    Constructor, Dict, Identity, Owner, Range, Ref, StageKey, applied_order, children,
+    composed_key, composition, is_pattern, let_parts, param_key, result_key, right_application,
 };
 
 impl Lower<'_> {

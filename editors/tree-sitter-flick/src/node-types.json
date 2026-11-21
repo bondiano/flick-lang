@@ -726,6 +726,10 @@
     "named": false
   },
   {
+    "type": "orelse",
+    "named": false
+  },
+  {
     "type": "parallel",
     "named": false
   },

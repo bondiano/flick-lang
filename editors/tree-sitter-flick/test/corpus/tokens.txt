@@ -574,3 +574,33 @@ let r = r"raw"
   (identifier)
   (operator)
   (raw_string))
+
+==================
+OrElse fallback and member
+==================
+
+let x = a orelse b
+let r = { orelse = 1 }
+let y = r.orelse
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (keyword)
+  (identifier)
+  (keyword)
+  (identifier)
+  (operator)
+  (braces
+    (keyword)
+    (operator)
+    (number))
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (member))

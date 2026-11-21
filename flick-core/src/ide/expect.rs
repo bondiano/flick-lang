@@ -227,8 +227,29 @@ fn type_of<'m>(m: &'m Analyzed, node: &Node) -> Option<&'m Type> {
             let head = node.nodes().next()?;
             peel(type_of(m, head)?, node.nodes().count() - 1).map(|(_, t)| t)
         }
+        K::BinExpr => m.typing.types.get(&node.range()).or_else(|| {
+            let op = node.child_tokens().find(|t| t.kind.is_binary_op())?;
+            m.typing.types.get(&(op.start, op.end))
+        }),
         _ => m.typing.types.get(&node.range()),
     }
+}
+
+/// The payload type of `Option a`.
+fn option_inner(ty: &Type) -> Option<Type> {
+    let (head, args) = strip(ty).spine();
+    match args[..] {
+        [inner] if head.is_lang(Lang::Option) => Some(inner.clone()),
+        _ => None,
+    }
+}
+
+/// The expected type of the right side of `left orelse right` when `left`
+/// already resolves to a concrete `Option a`.
+fn orelse_expected(m: &Analyzed, node: &Node) -> Option<Type> {
+    let lhs = node.nodes().next()?;
+    let inner = option_inner(type_of(m, lhs)?)?;
+    (!wildcard(&inner)).then_some(inner)
 }
 
 /// The type the argument `index` of `head` takes.
@@ -334,6 +355,11 @@ fn around(m: &Analyzed, path: &[&Node], text: &str) -> (Vec<Type>, bool) {
                 let head = node.nodes().next().unwrap_or(node);
                 return (argument(m, head, index), false);
             }
+            K::BinExpr if !first && node.has_token(K::OrElse) => {
+                if let Some(inner) = orelse_expected(m, node) {
+                    return (vec![inner], false);
+                }
+            }
             K::LetDecl if i >= 2 && last && child.kind == K::Block => {
                 return (body(m, path[i - 2], node, text), false);
             }
@@ -347,9 +373,18 @@ fn around(m: &Analyzed, path: &[&Node], text: &str) -> (Vec<Type>, bool) {
 
 /// What a hole after the code that ends at `before`, the end of `path`,
 /// expects: the body after `=` of a `let`, the pattern after `|` of an
-/// arm, or the next argument of the call or name that ends there.
+/// arm, the fallback after `orelse`, or the next argument of the call or
+/// name that ends there.
 fn after(m: &Analyzed, path: &[&Node], before: u32, text: &str) -> (Vec<Type>, bool) {
     let mut j = path.len() - 1;
+    if path[j].kind == K::Error
+        && j > 1
+        && path[j - 1].kind == K::BinExpr
+        && path[j - 1].has_token(K::OrElse)
+        && path[j - 1].range().1 == before
+    {
+        j -= 1;
+    }
     // `f x |` ends at `x`: its call takes the next argument
     while j > 1 && path[j - 1].kind == K::AppExpr && path[j - 1].range().1 == before {
         j -= 1;
@@ -361,6 +396,10 @@ fn after(m: &Analyzed, path: &[&Node], before: u32, text: &str) -> (Vec<Type>, b
     match node.kind {
         K::LetDecl => (body(m, path[j - 1], node, text), false),
         K::MatchArm => pattern(m, path[j - 1]),
+        K::BinExpr if node.has_token(K::OrElse) => match orelse_expected(m, node) {
+            Some(inner) => (vec![inner], false),
+            None => around(m, &path[..=j], text),
+        },
         K::AppExpr => {
             let head = node.nodes().next().unwrap_or(node);
             (

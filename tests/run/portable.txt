@@ -71,6 +71,7 @@ codegen/local_functions
 codegen/match_graph
 codegen/numbers
 codegen/numeric_classes
+codegen/orelse
 codegen/patterns
 codegen/question
 codegen/ranges

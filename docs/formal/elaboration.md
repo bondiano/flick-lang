@@ -14,6 +14,7 @@ Elaborated here:
 - `do` with `<-`, `and`, an `if` guard and `let`;
 - `for … yield`, `[for …]`, `for … do`;
 - postfix `?`;
+- lazy `Option` fallback `orelse`;
 - direct calls;
 - `let mut` variables and assignment;
 - `CallSite`, the place of a use, which the checker gives.
@@ -84,12 +85,12 @@ constitute a proof of the Rust checker's rewrite.
 ### 1.3 Sugar
 
 ```text
-e ::= … | do { s̄ } | for { c̄ } yield e | [for { c̄ } yield e] | for { c̄ } do e | e?
+e ::= … | do { s̄ } | for { c̄ } yield e | [for { c̄ } yield e] | for { c̄ } do e | e? | e₁ orelse e₂
 s ::= p <- e | p₁ <- e₁ and … and pₙ <- eₙ | let p = e | if e | e
 c ::= p <- e | if e | let p = e
 ```
 
-The last statement of a `do` is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`. Syntax: `reference/syntax.md` "`do`", "`for`", `?`.
+The last statement of a `do` is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`, `binary.rs` (`orelse`). Syntax: `reference/syntax.md` "`do`", "`for`", `?`, `orelse`.
 
 ## 2. Dictionaries
 
@@ -469,6 +470,35 @@ the state. `x = v` of a `let lazy mut` is `Some (Ok v)`.
 the typing of blocks, so T7 covers them (`formal/Formal/LetMut/Lazy.lean`),
 given the Prelude's `Option` and `Result` in the signature (`LzSig`, which
 the witness signature has: `Elab.Witness.lzSig`).
+
+### 3.7 `orelse`
+
+`e₁ orelse e₂` is surface sugar for matching one layer of Prelude `Option` with
+a fresh hygienic binder `v` (`v ∉ fv(e₂)`):
+
+```text
+⟦e₁ orelse e₂⟧  =  match ⟦e₁⟧ with | Some v -> v | None -> ⟦e₂⟧
+```
+
+- `e₁` is inferred to `Option τ` (retaining any capture qualifier on the
+  `Option` value via `data_field` when projecting `τ`), and `e₂` is checked
+  against the result type `τ'`, with `τ ≤ τ'` (any `≤-Fun` lift or `@implicit`
+  conversion applies to `v` in the `Some` arm, never to `e₁` itself).
+- `e₁` is evaluated once; `e₂` is evaluated at most once and only when `e₁`
+  evaluates to `None`. If `e₁` fails with a typed error or defect, `e₂` is
+  never evaluated.
+- Exactly one `Option` layer is unwrapped (`Option (Option a)` unwraps to
+  `Option a`), and cold values (`Eff`, `Lazy`) remain unstarted values.
+- Effects, error rows, regions, captures, `let mut` updates, loop exits and
+  the value restriction (`φ = φ₁ ⊔ φ₂`) follow directly from the two-arm core
+  `match` rule without introducing any new core term, typing rule, evaluation
+  rule or Lean proof obligation.
+
+Checker: `binary.rs` `orelse` (checked bidirectionally from `infer.rs`
+`check_value`). IR: `ir/lower/expr_tail.rs` `orelse`, lowering directly to
+`ExprKind::Match` on `Lang::Some` / `Lang::None`. The reference model
+(`flick-model`) translates that IR `Match` without special cases; model and
+Lean theorems do not constitute a proof of the Rust compiler or either runtime.
 
 ## 4. Coherence and T6
 

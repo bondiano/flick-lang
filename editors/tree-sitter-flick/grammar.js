@@ -6,7 +6,7 @@ const KEYWORDS = [
   'try', 'if', 'then', 'else', 'task', 'await', 'lazy', 'scope', 'provide', 'ignore',
   'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
-  'instance', 'deriving', 'forall', 'not', 'none',
+  'instance', 'deriving', 'forall', 'not', 'orelse', 'none',
   'ui', 'in', 'when', 'for', 'yield', 'do', 'break', 'continue',
 ];
 
