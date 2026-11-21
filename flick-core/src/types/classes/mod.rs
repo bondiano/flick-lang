@@ -20,6 +20,7 @@ mod variance_match;
 
 pub use flick_ir::Dict;
 pub use matching::{Match, match_type};
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 use super::Checker;
@@ -219,7 +220,16 @@ impl Checker<'_> {
     }
 
     fn expand(&self, t: &Type) -> Type {
-        self.expand_all(t, &|t| self.class_head(t), &mut Vec::new())
+        self.expand_all_borrowed(t, &Self::borrowed_class_head, &mut Vec::new())
+    }
+
+    fn borrowed_class_head<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
+        let head = self.borrowed_head(t);
+        if matches!(&*head, Type::Bounded { .. } | Type::Captured { .. }) {
+            Cow::Owned(self.class_head(&head))
+        } else {
+            head
+        }
     }
 
     /// Head reduction for class constraints: expands aliases and erases

@@ -172,9 +172,9 @@ impl Checker<'_> {
                 Some(Kind::ServiceRow | Kind::Symbol) => {}
                 Some(Kind::ErrorRow) if head.is_lang(Lang::Eff) => {}
                 Some(Kind::ErrorRow) => self.error_row_captures(arg, out, bounded, path),
-                _ => match self.store.resolve(arg) {
+                _ => match &*self.store.head(arg) {
                     row @ (Type::Row(_) | Type::Union(..)) => {
-                        self.capture_row_filtered(&row, out, bounded, path);
+                        self.capture_row_filtered(row, out, bounded, path);
                     }
                     _ => self.collect_bounded_captures(arg, out, bounded, path),
                 },

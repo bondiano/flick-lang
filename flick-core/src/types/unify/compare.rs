@@ -78,11 +78,15 @@ impl Checker<'_> {
         self.borrowed_head_observing(t, false, &mut |_, _| {})
     }
 
+    /// [`Self::witness_head`] without the copy of a type that does not reduce.
+    pub(in crate::types) fn borrowed_witness_head<'a>(&'a self, ty: &'a Type) -> Cow<'a, Type> {
+        self.borrowed_head_observing(ty, true, &mut |_, _| {})
+    }
+
     /// Ordinary head reduction, retaining opaque identities and qualifiers at
     /// the witness-publication boundary. No second alias expander is used.
     pub(in crate::types) fn witness_head(&self, ty: &Type) -> Type {
-        self.borrowed_head_observing(ty, true, &mut |_, _| {})
-            .into_owned()
+        self.borrowed_witness_head(ty).into_owned()
     }
 
     fn borrowed_head_observing<'a>(

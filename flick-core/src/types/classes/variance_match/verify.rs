@@ -4,7 +4,7 @@
 use super::VarBounds;
 use super::caps::{
     intersect_norm, live_caps_in_row, merge_norm, norm_has_meta_tail, norm_within, reach_within,
-    row_without_live_norm, split_caps, stage_norm, wrap_caps,
+    row_without_live_norm, split_caps_cow, stage_norm, wrap_caps,
 };
 use crate::types::Checker;
 use crate::types::classes::matching::{Match, Subst};
@@ -17,7 +17,7 @@ impl Checker<'_> {
     pub(super) fn solve_var_bounds(
         &mut self,
         head_vars: &[Binder],
-        bounds: &VarBounds,
+        mut bounds: VarBounds,
     ) -> Option<Subst> {
         let mut subst = Subst::new();
         for b in head_vars {
@@ -25,29 +25,30 @@ impl Checker<'_> {
             let chosen = match &b.kind {
                 Kind::ServiceRow | Kind::ErrorRow => bounds
                     .rows
-                    .get(v)
-                    .or_else(|| bounds.exact.get(v))
-                    .cloned()
+                    .remove(v)
+                    .or_else(|| bounds.exact.remove(v))
                     .unwrap_or_else(Type::empty_row),
                 Kind::CaptureRow => bounds
                     .caps
-                    .get(v)
-                    .map(|n| n.clone().into_type())
-                    .or_else(|| bounds.exact.get(v).cloned())
+                    .remove(v)
+                    .map(Norm::into_type)
+                    .or_else(|| bounds.exact.remove(v))
                     .unwrap_or_else(Type::empty_row),
                 _ => {
-                    if let Some(t) = bounds.exact.get(v) {
-                        t.clone()
-                    } else if let Some(lows) = bounds.lower.get(v) {
-                        let mut acc = lows[0].clone();
-                        for t in &lows[1..] {
-                            acc = self.join_ty(&acc, t)?;
+                    if let Some(t) = bounds.exact.remove(v) {
+                        t
+                    } else if let Some(lows) = bounds.lower.remove(v) {
+                        let mut iter = lows.into_iter();
+                        let mut acc = iter.next()?;
+                        for t in iter {
+                            acc = self.join_ty(&acc, &t)?;
                         }
                         acc
-                    } else if let Some(highs) = bounds.upper.get(v) {
-                        let mut acc = highs[0].clone();
-                        for t in &highs[1..] {
-                            acc = self.meet_ty(&acc, t)?;
+                    } else if let Some(highs) = bounds.upper.remove(v) {
+                        let mut iter = highs.into_iter();
+                        let mut acc = iter.next()?;
+                        for t in iter {
+                            acc = self.meet_ty(&acc, &t)?;
                         }
                         acc
                     } else {
@@ -71,12 +72,12 @@ impl Checker<'_> {
         if reach_m == Match::No {
             return Match::No;
         }
-        let (ba, ca) = split_caps(self, sub);
-        let (bb, cb) = split_caps(self, sup);
-        if matches!(ba, Type::Meta(_)) || matches!(bb, Type::Meta(_)) {
+        let (ba, ca) = split_caps_cow(self, sub);
+        let (bb, cb) = split_caps_cow(self, sup);
+        if matches!(&*ba, Type::Meta(_)) || matches!(&*bb, Type::Meta(_)) {
             return Match::Unknown;
         }
-        let body_m = match (&ba, &bb) {
+        let body_m = match (&*ba, &*bb) {
             (
                 Type::Fun {
                     param: p1,
@@ -211,10 +212,7 @@ impl Checker<'_> {
         if m1 != m2 || n1 != n2 {
             return Match::No;
         }
-        let (m1, n1) = (m1.clone(), n1.clone());
-        let args1: Vec<Type> = args1.into_iter().cloned().collect();
-        let args2: Vec<Type> = args2.into_iter().cloned().collect();
-        let Some(signs) = self.app_variances(&m1, &n1, args1.len()) else {
+        let Some(signs) = self.app_variances(m1, n1, args1.len()) else {
             return self.match_rigid_eq(a, b);
         };
         let is_dict = n1.ends_with("$Dict");
@@ -247,11 +245,11 @@ impl Checker<'_> {
         if self.verify_ty_le(b, a) == Match::Yes {
             return Some(a.clone());
         }
-        let (ba, ca) = split_caps(self, a);
-        let (bb, cb) = split_caps(self, b);
+        let (ba, ca) = split_caps_cow(self, a);
+        let (bb, cb) = split_caps_cow(self, b);
         let mut caps = ca;
         merge_norm(&mut caps, &cb);
-        let inner = match (&ba, &bb) {
+        let inner = match (&*ba, &*bb) {
             (
                 Type::Fun {
                     param: p1,
@@ -306,16 +304,13 @@ impl Checker<'_> {
                 if m1 != m2 || n1 != n2 || xs.len() != ys.len() {
                     return None;
                 }
-                let (m1, n1) = (m1.clone(), n1.clone());
-                let xs: Vec<Type> = xs.into_iter().cloned().collect();
-                let ys: Vec<Type> = ys.into_iter().cloned().collect();
-                let signs = self.app_variances(&m1, &n1, xs.len())?;
-                let mut out = Type::con(&m1, &n1);
+                let signs = self.app_variances(m1, n1, xs.len())?;
+                let mut out = Type::con(m1, n1);
                 for ((x, y), sign) in xs.iter().zip(&ys).zip(&signs) {
                     let arg = match sign {
                         Variance::Covariant => self.join_ty(x, y)?,
                         Variance::Contravariant => self.meet_ty(x, y)?,
-                        Variance::Invariant | Variance::Bivariant if x == y => x.clone(),
+                        Variance::Invariant | Variance::Bivariant if x == y => (*x).clone(),
                         _ => return None,
                     };
                     out = Type::app(out, arg);
@@ -334,10 +329,10 @@ impl Checker<'_> {
         if self.verify_ty_le(b, a) == Match::Yes {
             return Some(b.clone());
         }
-        let (ba, ca) = split_caps(self, a);
-        let (bb, cb) = split_caps(self, b);
+        let (ba, ca) = split_caps_cow(self, a);
+        let (bb, cb) = split_caps_cow(self, b);
         let caps = intersect_norm(&ca, &cb);
-        let inner = match (&ba, &bb) {
+        let inner = match (&*ba, &*bb) {
             (
                 Type::Fun {
                     param: p1,
@@ -392,16 +387,13 @@ impl Checker<'_> {
                 if m1 != m2 || n1 != n2 || xs.len() != ys.len() {
                     return None;
                 }
-                let (m1, n1) = (m1.clone(), n1.clone());
-                let xs: Vec<Type> = xs.into_iter().cloned().collect();
-                let ys: Vec<Type> = ys.into_iter().cloned().collect();
-                let signs = self.app_variances(&m1, &n1, xs.len())?;
-                let mut out = Type::con(&m1, &n1);
+                let signs = self.app_variances(m1, n1, xs.len())?;
+                let mut out = Type::con(m1, n1);
                 for ((x, y), sign) in xs.iter().zip(&ys).zip(&signs) {
                     let arg = match sign {
                         Variance::Covariant => self.meet_ty(x, y)?,
                         Variance::Contravariant => self.join_ty(x, y)?,
-                        Variance::Invariant | Variance::Bivariant if x == y => x.clone(),
+                        Variance::Invariant | Variance::Bivariant if x == y => (*x).clone(),
                         _ => return None,
                     };
                     out = Type::app(out, arg);

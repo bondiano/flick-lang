@@ -7,6 +7,7 @@
 //! `matching::unify_heads`). This module handles only variance-directed
 //! dictionary matching (`Cn.Serves`) and K1' common-query overlap detection.
 
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 
 use super::matching::{Match, Subst, match_type};
@@ -20,7 +21,7 @@ mod collect;
 mod overlap;
 mod verify;
 
-use caps::{norm_has_meta_tail, norm_within, reach_within, row_without_live_norm, split_caps};
+use caps::{norm_has_meta_tail, norm_within, reach_within, row_without_live_norm, split_caps_cow};
 use overlap::{OverlapMode, OverlapSolver};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum Dir {
@@ -94,72 +95,66 @@ impl Checker<'_> {
         if qm != gm || qn != gn || q_args.len() != g_args.len() {
             return Match::No;
         }
-        let q_args: Vec<Type> = q_args.into_iter().cloned().collect();
-        let g_args: Vec<Type> = g_args.into_iter().cloned().collect();
-        let (qm, qn) = (qm.to_owned(), qn.to_owned());
+        let signs = self.class_variances(qm, qn, q_args.len());
         let mut subst = Subst::new();
-        self.match_args_variance((&qm, &qn), &[], &g_args, &q_args, &mut subst)
+        self.match_args_variance(&signs, &[], &g_args, &q_args, &mut subst)
     }
 
-    /// Direction-aware matching of an instance head against query `args`.
+    /// Direction-aware matching of an instance head against query `args` using
+    /// precomputed class parameter `signs`.
     ///
     /// - `Covariant` (`+`): `head[σ] ≤ query`
     /// - `Contravariant` (`-`): `query ≤ head[σ]` and `⌈head[σ]⌉ ⊆ ⌈query⌉`
     /// - `Invariant` / `Bivariant`: exact equality (`match_type`)
-    pub(super) fn match_head_variance(
+    pub(super) fn match_head_variance_with_signs(
         &mut self,
+        signs: &[Variance],
         head_vars: &[Binder],
         head: &Type,
         args: &[Type],
         subst: &mut Subst,
     ) -> Match {
-        let Some(((cm, cn), pattern)) = split(head) else {
+        let Some((_, pattern)) = split(head) else {
             return Match::No;
         };
         if pattern.len() != args.len() {
             return Match::No;
         }
-        let (cm, cn) = (cm.to_owned(), cn.to_owned());
-        let pattern: Vec<Type> = pattern.into_iter().cloned().collect();
-        self.match_args_variance((&cm, &cn), head_vars, &pattern, args, subst)
+        self.match_args_variance(signs, head_vars, &pattern, args, subst)
     }
 
-    fn match_args_variance(
+    fn match_args_variance<P: Borrow<Type>, A: Borrow<Type>>(
         &mut self,
-        class: (&str, &str),
+        signs: &[Variance],
         head_vars: &[Binder],
-        pattern: &[Type],
-        args: &[Type],
+        pattern: &[P],
+        args: &[A],
         subst: &mut Subst,
     ) -> Match {
-        let signs = self.class_variances(class.0, class.1, args.len());
         // Fast path: all invariant/bivariant matches via exact equality.
         if signs
             .iter()
             .all(|v| matches!(v, Variance::Invariant | Variance::Bivariant))
         {
             if head_vars.is_empty() {
-                return pattern
-                    .iter()
-                    .zip(args)
-                    .fold(Match::Yes, |m, (p, t)| m.and(|| self.match_rigid_eq(p, t)));
+                return pattern.iter().zip(args).fold(Match::Yes, |m, (p, t)| {
+                    m.and(|| self.match_rigid_eq(p.borrow(), t.borrow()))
+                });
             }
-            return pattern
-                .iter()
-                .zip(args)
-                .fold(Match::Yes, |m, (p, t)| m.and(|| match_type(p, t, subst)));
+            return pattern.iter().zip(args).fold(Match::Yes, |m, (p, t)| {
+                m.and(|| match_type(p.borrow(), t.borrow(), subst))
+            });
         }
 
-        let head_var_set: HashSet<String> = head_vars.iter().map(|b| b.name.clone()).collect();
         let mut bounds = VarBounds::default();
         let mut outcome = Match::Yes;
-        for ((p, t), sign) in pattern.iter().zip(args).zip(&signs) {
+        for ((p, t), sign) in pattern.iter().zip(args).zip(signs) {
             let dir = match sign {
                 Variance::Covariant => Dir::Sub,
                 Variance::Contravariant => Dir::Sup,
                 Variance::Invariant | Variance::Bivariant => Dir::Eq,
             };
-            let step = self.collect_match(&head_var_set, p, t, dir, &mut bounds);
+            let step = self.collect_match(head_vars, p.borrow(), t.borrow(), dir, &mut bounds);
             outcome = outcome.and(|| step);
             if outcome == Match::No {
                 return Match::No;
@@ -169,15 +164,19 @@ impl Checker<'_> {
             return outcome;
         }
 
-        let Some(solved) = self.solve_var_bounds(head_vars, &bounds) else {
+        let Some(solved) = self.solve_var_bounds(head_vars, bounds) else {
             return Match::No;
         };
 
         // Final verification against `Cn.Serves`: confirms subtyping AND
         // reach preservation (`SafeUse`) for every `-` and `+` argument.
         let mut final_match = Match::Yes;
-        for ((p, q), sign) in pattern.iter().zip(args).zip(&signs) {
-            let h = p.substitute(&solved);
+        for ((p, q), sign) in pattern.iter().zip(args).zip(signs) {
+            let q = q.borrow();
+            let h = p.borrow().substitute(&solved);
+            if h == *q {
+                continue;
+            }
             let step = match sign {
                 Variance::Covariant => self.verify_ty_le(&h, q),
                 Variance::Contravariant => {
@@ -205,16 +204,16 @@ impl Checker<'_> {
         if a == b {
             return Match::Yes;
         }
-        let (ba, ca) = split_caps(self, a);
-        let (bb, cb) = split_caps(self, b);
-        if matches!(ba, Type::Meta(_)) || matches!(bb, Type::Meta(_)) {
+        let (ba, ca) = split_caps_cow(self, a);
+        let (bb, cb) = split_caps_cow(self, b);
+        if matches!(&*ba, Type::Meta(_)) || matches!(&*bb, Type::Meta(_)) {
             return Match::Unknown;
         }
         let caps_m = norm_within(&ca, &cb).and(|| norm_within(&cb, &ca));
         if caps_m == Match::No {
             return Match::No;
         }
-        let body_m = match (&ba, &bb) {
+        let body_m = match (&*ba, &*bb) {
             (Type::App { head: h1, arg: a1 }, Type::App { head: h2, arg: a2 }) => self
                 .match_rigid_eq(h1, h2)
                 .and(|| self.match_rigid_eq(a1, a2)),
@@ -247,7 +246,7 @@ impl Checker<'_> {
             (Type::Record(r1), Type::Record(r2)) | (Type::Row(r1), Type::Row(r2)) => {
                 self.match_rigid_row_eq(&Type::Row(r1.clone()), &Type::Row(r2.clone()))
             }
-            _ if ba == bb => Match::Yes,
+            _ if *ba == *bb => Match::Yes,
             _ => Match::No,
         };
         caps_m.and(|| body_m)

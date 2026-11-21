@@ -1,14 +1,20 @@
 //! Capture-row, reach-set, and stage-row normalization helpers for variance
 //! matching and K1' overlap checks.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
+use std::ptr;
 
 use super::{Dir, VarBounds};
 use crate::types::Checker;
 use crate::types::classes::matching::Match;
 use crate::types::elem::{Atom, Elem};
 use crate::types::lang::{self, Lang};
-use crate::types::ty::{Elided, Norm, Row, Type};
+use crate::types::ty::{Binder, Elided, Norm, Row, Type};
+
+pub(super) fn is_head_var(head_vars: &[Binder], name: &str) -> bool {
+    head_vars.iter().any(|b| b.name == name)
+}
 
 pub(super) fn norm_is_empty(norm: &Norm) -> bool {
     norm.entries.is_empty() && norm.tails.is_empty()
@@ -27,6 +33,20 @@ pub(super) fn merge_norm(into: &mut Norm, other: &Norm) {
             into.tails.push(tail.clone());
         }
     }
+}
+
+pub(super) fn split_caps_cow<'t>(checker: &Checker<'_>, ty: &'t Type) -> (Cow<'t, Type>, Norm) {
+    if !matches!(
+        ty,
+        Type::Meta(_) | Type::Captured { .. } | Type::Bounded { .. }
+    ) && matches!(
+        checker.borrowed_witness_head(ty),
+        Cow::Borrowed(r) if ptr::eq(r, ty)
+    ) {
+        return (Cow::Borrowed(ty), Norm::default());
+    }
+    let (bare, caps) = split_caps(checker, ty);
+    (Cow::Owned(bare), caps)
 }
 
 pub(super) fn split_caps(checker: &Checker<'_>, ty: &Type) -> (Type, Norm) {
@@ -134,6 +154,9 @@ pub(super) fn norm_within(sub: &Norm, sup: &Norm) -> Match {
 }
 
 pub(super) fn reach_within(checker: &Checker<'_>, sub: &Type, sup: &Type) -> Match {
+    if sub == sup {
+        return Match::Yes;
+    }
     let lower = reach_of(checker, sub);
     let upper = reach_of(checker, sup);
     norm_within(&lower, &upper)
@@ -160,7 +183,7 @@ pub(super) fn has_type_var_in(ty: &Type, vars: &HashSet<String>) -> bool {
 }
 
 pub(super) fn match_caps_dir(
-    head_vars: &HashSet<String>,
+    head_vars: &[Binder],
     p_caps: &Norm,
     t_caps: &Norm,
     dir: Dir,
@@ -170,7 +193,7 @@ pub(super) fn match_caps_dir(
         .tails
         .iter()
         .filter_map(|t| match t {
-            Type::Var(v) if head_vars.contains(v) => Some(v.clone()),
+            Type::Var(v) if is_head_var(head_vars, v) => Some(v.clone()),
             _ => None,
         })
         .collect();

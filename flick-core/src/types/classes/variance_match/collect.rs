@@ -1,10 +1,8 @@
 //! Variance-directed bound collection for instance head matching.
 
-use std::collections::HashSet;
-
 use super::caps::{
-    live_caps_in_row, match_caps_dir, merge_norm, norm_has_meta_tail, norm_is_empty, norm_within,
-    row_without_live_norm, split_caps, stage_norm,
+    is_head_var, live_caps_in_row, match_caps_dir, merge_norm, norm_has_meta_tail, norm_is_empty,
+    norm_within, row_without_live_norm, split_caps_cow, stage_norm,
 };
 use super::{Dir, VarBounds};
 use crate::types::Checker;
@@ -12,13 +10,13 @@ use crate::types::classes::has_metas;
 use crate::types::classes::matching::Match;
 use crate::types::elem::Elem;
 use crate::types::lang::Lang;
-use crate::types::ty::{Effects, Norm, Stage, Type, stage_of};
+use crate::types::ty::{Binder, Effects, Norm, Stage, Type, stage_of};
 use crate::types::variance::Variance;
 
 impl Checker<'_> {
     pub(super) fn collect_match(
         &mut self,
-        head_vars: &HashSet<String>,
+        head_vars: &[Binder],
         pat: &Type,
         target: &Type,
         dir: Dir,
@@ -29,14 +27,14 @@ impl Checker<'_> {
         }
         // Head variable binds the whole target (including any qualifier).
         if let Type::Var(v) = pat
-            && head_vars.contains(v)
+            && is_head_var(head_vars, v)
         {
             return self.bind_head_var(v, target, dir, bounds);
         }
 
-        let (p_bare, p_caps) = split_caps(self, pat);
-        let (t_bare, t_caps) = split_caps(self, target);
-        if matches!(t_bare, Type::Meta(_)) {
+        let (p_bare, p_caps) = split_caps_cow(self, pat);
+        let (t_bare, t_caps) = split_caps_cow(self, target);
+        if matches!(&*t_bare, Type::Meta(_)) {
             return Match::Unknown;
         }
         let caps_m = match_caps_dir(head_vars, &p_caps, &t_caps, dir, bounds);
@@ -44,7 +42,7 @@ impl Checker<'_> {
             return Match::No;
         }
 
-        let body_m = match (&p_bare, &t_bare) {
+        let body_m = match (&*p_bare, &*t_bare) {
             (
                 Type::Fun {
                     param: p1,
@@ -103,13 +101,13 @@ impl Checker<'_> {
             (Type::Row(_) | Type::Union(..), Type::Row(_) | Type::Union(..)) => {
                 self.match_row_dir(head_vars, &p_bare, &t_bare, dir, false, bounds)
             }
-            (Type::Var(v), _) if head_vars.contains(v) => {
+            (Type::Var(v), _) if is_head_var(head_vars, v) => {
                 self.bind_head_var(v, &t_bare, dir, bounds)
             }
             (Type::App { .. }, Type::App { .. }) => {
                 self.collect_match_app(head_vars, &p_bare, &t_bare, dir, bounds)
             }
-            _ if p_bare == t_bare => Match::Yes,
+            _ if *p_bare == *t_bare => Match::Yes,
             _ => Match::No,
         };
         caps_m.and(|| body_m)
@@ -159,7 +157,7 @@ impl Checker<'_> {
 
     fn collect_match_app(
         &mut self,
-        head_vars: &HashSet<String>,
+        head_vars: &[Binder],
         p_bare: &Type,
         t_bare: &Type,
         dir: Dir,
@@ -205,10 +203,7 @@ impl Checker<'_> {
             if m1 != m2 || n1 != n2 {
                 return Match::No;
             }
-            let (m1, n1) = (m1.clone(), n1.clone());
-            let p_args: Vec<Type> = p_args.into_iter().cloned().collect();
-            let t_args: Vec<Type> = t_args.into_iter().cloned().collect();
-            let signs = self.app_variances(&m1, &n1, p_args.len());
+            let signs = self.app_variances(m1, n1, p_args.len());
             return p_args
                 .iter()
                 .zip(&t_args)
@@ -235,11 +230,7 @@ impl Checker<'_> {
                 });
         }
         // Higher-kinded application `f a` vs `g b`: always exact equality.
-        let p_head = p_head.clone();
-        let t_head = t_head.clone();
-        let p_args: Vec<Type> = p_args.into_iter().cloned().collect();
-        let t_args: Vec<Type> = t_args.into_iter().cloned().collect();
-        self.collect_match(head_vars, &p_head, &t_head, Dir::Eq, bounds)
+        self.collect_match(head_vars, p_head, t_head, Dir::Eq, bounds)
             .and(|| {
                 p_args.iter().zip(&t_args).fold(Match::Yes, |m, (p, t)| {
                     m.and(|| self.collect_match(head_vars, p, t, Dir::Eq, bounds))
@@ -250,7 +241,7 @@ impl Checker<'_> {
     #[allow(clippy::too_many_arguments)]
     fn match_stage_dir(
         &mut self,
-        head_vars: &HashSet<String>,
+        head_vars: &[Binder],
         e1: Option<&Effects>,
         p_caps: &Norm,
         e2: Option<&Effects>,
@@ -303,7 +294,7 @@ impl Checker<'_> {
                     .normalize(&x.services)
                     .tails
                     .iter()
-                    .any(|t| matches!(t, Type::Var(v) if head_vars.contains(v)));
+                    .any(|t| matches!(t, Type::Var(v) if is_head_var(head_vars, v)));
                 let live_ok = if pat_has_row_var {
                     Match::Yes
                 } else {
@@ -334,7 +325,7 @@ impl Checker<'_> {
 
     fn match_row_dir(
         &mut self,
-        head_vars: &HashSet<String>,
+        head_vars: &[Binder],
         pat: &Type,
         target: &Type,
         dir: Dir,
@@ -353,7 +344,7 @@ impl Checker<'_> {
         };
         let t_open = norm_has_meta_tail(&t_norm);
         let p_head_var: Option<String> = p_norm.tails.iter().find_map(|t| match t {
-            Type::Var(v) if head_vars.contains(v) => Some(v.clone()),
+            Type::Var(v) if is_head_var(head_vars, v) => Some(v.clone()),
             _ => None,
         });
         match dir {
@@ -365,7 +356,7 @@ impl Checker<'_> {
 
     fn match_row_eq(
         &mut self,
-        head_vars: &HashSet<String>,
+        head_vars: &[Binder],
         p_norm: &Norm,
         t_norm: &Norm,
         t_open: bool,
@@ -416,7 +407,7 @@ impl Checker<'_> {
 
     fn match_row_sub(
         &mut self,
-        head_vars: &HashSet<String>,
+        head_vars: &[Binder],
         p_norm: &Norm,
         t_norm: &Norm,
         t_open: bool,
@@ -454,7 +445,7 @@ impl Checker<'_> {
 
     fn match_row_sup(
         &mut self,
-        head_vars: &HashSet<String>,
+        head_vars: &[Binder],
         p_norm: &Norm,
         t_norm: &Norm,
         t_open: bool,

@@ -197,9 +197,16 @@ impl Checker<'_> {
             .filter(|i| split(&i.head).is_some_and(|((m, n), _)| m == class.0 && n == class.1))
             .cloned()
             .collect();
+        let signs = self.class_variances(&class.0, &class.1, args.len());
         instances.is_empty()
             || instances.iter().any(|i| {
-                self.match_head_variance(&i.vars, &i.head, &args, &mut Subst::new()) != Match::No
+                self.match_head_variance_with_signs(
+                    &signs,
+                    &i.vars,
+                    &i.head,
+                    &args,
+                    &mut Subst::new(),
+                ) != Match::No
             })
     }
 
@@ -354,11 +361,18 @@ impl Checker<'_> {
             .filter(|i| split(&i.head).is_some_and(|(k, _)| k == class))
             .cloned()
             .collect();
+        let signs = self.class_variances(class.0, class.1, args.len());
         let mut unknown = false;
         let mut matched: Vec<(&Instance, Subst)> = Vec::new();
         for instance in &instances {
             let mut subst = Subst::new();
-            match self.match_head_variance(&instance.vars, &instance.head, args, &mut subst) {
+            match self.match_head_variance_with_signs(
+                &signs,
+                &instance.vars,
+                &instance.head,
+                args,
+                &mut subst,
+            ) {
                 Match::Yes => matched.push((instance, subst)),
                 Match::Unknown => unknown = true,
                 Match::No => {}

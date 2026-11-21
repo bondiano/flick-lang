@@ -4,6 +4,8 @@
 //! again inside its own unfolding adds nothing of its own, only what its
 //! arguments add, the least solution of the equation the alias is.
 
+use std::borrow::Cow;
+
 use crate::types::Checker;
 use crate::types::env::Form;
 use crate::types::ty::Type;
@@ -101,6 +103,24 @@ impl Checker<'_> {
             Unfold::Again => t.map_children(&mut |c| self.expand_all(c, head, path)),
             unfold => {
                 let out = head(t).map_children(&mut |c| self.expand_all(c, head, path));
+                leave_alias(path, unfold);
+                out
+            }
+        }
+    }
+
+    /// [`Self::expand_all`] without cloning subtrees whose head does not reduce.
+    pub(in crate::types) fn expand_all_borrowed(
+        &self,
+        t: &Type,
+        head: &impl for<'a> Fn(&'a Self, &'a Type) -> Cow<'a, Type>,
+        path: &mut Vec<AliasKey>,
+    ) -> Type {
+        match self.enter_alias(t, path) {
+            Unfold::Again => t.map_children(&mut |c| self.expand_all_borrowed(c, head, path)),
+            unfold => {
+                let reduced = head(self, t);
+                let out = reduced.map_children(&mut |c| self.expand_all_borrowed(c, head, path));
                 leave_alias(path, unfold);
                 out
             }
