@@ -83,8 +83,14 @@ impl Checker<'_> {
         givens: &[Type],
         f: impl FnOnce(&mut Self) -> T,
     ) -> T {
-        let mark = self.store.equalities.len();
-        let rows = self.store.row_equalities.len();
+        let marks = self.push_givens(givens);
+        let out = f(self);
+        self.pop_givens(marks);
+        out
+    }
+
+    fn push_givens(&mut self, givens: &[Type]) -> (usize, usize) {
+        let marks = (self.store.equalities.len(), self.store.row_equalities.len());
         for g in givens {
             if let Some(row) = Equation::from_given(g) {
                 self.store.row_equalities.push(row);
@@ -98,10 +104,12 @@ impl Checker<'_> {
                 });
             }
         }
-        let out = f(self);
-        self.store.equalities.truncate(mark);
+        marks
+    }
+
+    fn pop_givens(&mut self, (equalities, rows): (usize, usize)) {
+        self.store.equalities.truncate(equalities);
         self.store.row_equalities.truncate(rows);
-        out
     }
 
     /// Records the type `ty` at `at` in a GADT branch as the branch knows

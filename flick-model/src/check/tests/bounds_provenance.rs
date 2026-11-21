@@ -421,3 +421,28 @@ fn signature_elision_does_not_require_live_for_a_capture_free_scalar() {
     };
     assert_eq!(stage, rt());
 }
+
+#[test]
+fn subsume_forall_assumes_expected_provided_and_rejects_missing_service() {
+    let greeter = Row::one(Path::new("App", "Greeter"));
+    let log = Row::one(Path::new("App", "Log"));
+    let both = greeter.sum(&log).expect("distinct services");
+    let lookup = |services: &Row| {
+        let region = Type::Var(Var::Named("t".into()));
+        let mut row = services.clone();
+        row.elems
+            .insert(Path::new("Prelude", "Scope"), Rc::from([region.clone()]));
+        Type::Forall(Rc::new(Scheme::new(
+            vec![("t".into(), Kind::Region)],
+            Type::fun(ty("Unit"), Stage::Runtime(row, Row::none()), ty("Unit"))
+                .with_provided(services, &region),
+        )))
+    };
+    let d = decls();
+    let mut checker = Checker::new(&d);
+    assert_eq!(checker.subsume(&lookup(&greeter), &lookup(&both)), Ok(()));
+    assert_eq!(checker.finish(), Ok(()));
+
+    let mut checker = Checker::new(&d);
+    rejected_by(checker.subsume(&lookup(&both), &lookup(&greeter)), "⊆");
+}

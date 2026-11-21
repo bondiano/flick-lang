@@ -375,4 +375,25 @@ mod suspension_tests {
             "{error:?}"
         );
     }
+
+    #[test]
+    fn mixed_record_hoists_evaluated_fields_in_order_and_inlines_suspensions() {
+        let value = Term::Record(Rc::from([
+            ("acquire".into(), Term::Task(Rc::new(Term::unit()))),
+            ("first".into(), Term::Stuck("first field".into())),
+            ("second".into(), Term::Stuck("second field".into())),
+        ]));
+        let body = Term::Let(
+            "later".into(),
+            None,
+            Rc::new(Term::Stuck("later computation".into())),
+            Rc::new(Term::Var("operand".into())),
+        );
+        let normalized = inline(&value, &body).expect("record with suspension field");
+        let program = Program::default();
+        assert!(
+            matches!(Machine::new(&program, 100).run(normalized), Outcome::Stuck(message) if message == "first field"),
+            "evaluated fields stay before body in left-to-right order"
+        );
+    }
 }

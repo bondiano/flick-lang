@@ -344,7 +344,9 @@ use : forall c s r e a b. ScopedRef s a -> (forall t. a^{t} ->{r; e} b)^c ->{r; 
 # let use = ScopedRef.use
 
 from_acquire :
-  forall c s r e a. (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
+  forall c s r e a.
+  Fiber.Provided r s =>
+  (forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
 # let from_acquire = ScopedRef.from_acquire
 ```
 
@@ -357,7 +359,7 @@ call (`Scope t`) and keep it until that scope closes, so their `get` gives
 `a^{t}`.
 
 `RcRef.make` also acquires into a fresh region for each resource. Its
-`acquire` field has type `(forall t. Eff {Scope t | r} e a^{t})^c`: the
+`acquire` field has type `(forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t})^c`: the
 acquisition cannot store the resource in a cell outside that region.
 
 ## Children

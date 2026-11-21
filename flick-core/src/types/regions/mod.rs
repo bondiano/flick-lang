@@ -66,6 +66,9 @@ pub struct State {
     /// and those whose row may still grow (`provided.rs`).
     pub provided: Vec<provided::Want>,
     pub provided_late: Vec<provided::Want>,
+    /// Whether `pass_on` placed a `Provided` obligation into a stage row,
+    /// so `settle_performed` grows open rows before checking them.
+    pub passed_provided: bool,
     /// A `provide` compared with an owner not known yet: its scope, the
     /// owner, the service and where.
     pub late_owners: Vec<(usize, Type, Elem, Span)>,

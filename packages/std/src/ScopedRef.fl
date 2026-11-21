@@ -4,14 +4,20 @@
 /// region closes.
 module ScopedRef exposing (..)
 
+import Fiber
+
 /// A reference of region `s` to a resource of `a`.
 type ScopedRef (s : Region) a
 
 /// A reference owned by the innermost `scope` (or the one of region `s`),
 /// holding the resource `acquire` gives. `acquire` acquires into a region
 /// `t` of its own, which ends when the resource is released: a value of a
-/// type that names its region, such as `File t`, cannot be kept here.
-from_acquire : (forall t. Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
+/// type that names its region, such as `File t`, cannot be kept here. What
+/// `acquire` registers there may use the services `r` of this call, whose
+/// providers must outlive `s`.
+from_acquire :
+  Fiber.Provided r s =>
+  (forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t})^c ->{Scope s | r; e} ScopedRef s a
 foreign effect from_acquire from "flick:ScopedRef" "flickFromAcquire"
   retention call
 
@@ -28,7 +34,11 @@ foreign effect use from "flick:ScopedRef" "flickUse"
 
 /// Acquires a new resource with `acquire`; the previous one is released
 /// once no `use` holds it. If `acquire` fails, the previous one stays.
-set : (forall t. Eff {Scope t | r} e a^{t})^c -> ScopedRef s a ->{r; e} Unit
+/// What `acquire` registers in its region `t` may use the services `r` of
+/// this call, whose providers must outlive `s`.
+set :
+  Fiber.Provided r s =>
+  (forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t})^c -> ScopedRef s a ->{r; e} Unit
 foreign effect set from "flick:ScopedRef" "flickSet"
   arity 1
   retention call

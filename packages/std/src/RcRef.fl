@@ -4,6 +4,7 @@
 module RcRef exposing (..)
 
 import Duration
+import Fiber
 
 /// A shared resource of `a` of region `s`, whose acquisition fails with `e`.
 type RcRef (s : Region) (e : ErrorRow) a
@@ -11,10 +12,14 @@ type RcRef (s : Region) (e : ErrorRow) a
 /// A reference owned by the innermost `scope` (or the one of region `s`);
 /// `acquire` runs with the services of this call, and the resource stays
 /// for `idleTimeToLive` after its last holder (`None`: no time).
-/// Each acquisition has its own region `t`, closed when the resource is released.
+/// Each acquisition has its own region `t`, closed when the resource is
+/// released; what it registers there may use those services, whose providers
+/// outlive `t` as they outlive `s`.
 make :
-  { acquire : (forall t. Eff {Scope t | r} e a^{t})^c; idleTimeToLive : Option Duration.Duration } ->{Scope
-    s | r}
+  {
+    acquire : (forall t. Fiber.Provided r t => Eff {Scope t | r} e a^{t})^c
+    idleTimeToLive : Option Duration.Duration
+  } ->{Scope s | r}
   RcRef s e a
 foreign effect make from "flick:RcRef" "flickMake"
   retention owner

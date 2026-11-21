@@ -153,9 +153,11 @@ struct Chain<'a, 'n> {
 impl Checker<'_> {
     /// `x |> f` applies `f` to `x`, of type `arg`: `x` is evaluated first.
     pub(super) fn pipe_from(&mut self, arg: Type, lhs: &Node, rhs: &Node) -> Type {
+        let provided = self.cx.regions.provided.len();
+        let provided_late = self.cx.regions.provided_late.len();
         let function = self.infer(rhs);
         let call = (lhs.range().0, rhs.range().1);
-        match self.ui_callable(&function, call, self.span(rhs)) {
+        let ty = match self.ui_callable(&function, call, self.span(rhs)) {
             Type::Fun {
                 param,
                 effects,
@@ -190,7 +192,9 @@ impl Checker<'_> {
                 );
                 Type::Error
             }
-        }
+        };
+        self.settle_provided_since(provided, provided_late);
+        ty
     }
 
     /// `f a <| x` is the application `f a x`. Without its `x`, which the
