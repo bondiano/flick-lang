@@ -266,6 +266,33 @@ fn evidence_operations_round_trip_without_changing_old_wire_shapes() {
     }
 }
 
+#[cfg(feature = "json")]
+fn round_trip_operations(operations: &[Operation]) {
+    let json = serde_json::to_string(operations).expect("serialize stage2 ops");
+    let back: Vec<Operation> = serde_json::from_str(&json).expect("deserialize stage2 ops");
+    assert_eq!(back, operations);
+    #[cfg(feature = "cbor")]
+    {
+        let mut bytes = Vec::new();
+        ciborium::into_writer(operations, &mut bytes).expect("serialize stage2 CBOR");
+        let back: Vec<Operation> =
+            ciborium::from_reader(bytes.as_slice()).expect("deserialize stage2 CBOR");
+        assert_eq!(back, operations);
+    }
+}
+
+#[cfg(feature = "json")]
+fn push_intrinsics(operations: &mut Vec<Operation>, kinds: &[Intrinsic]) {
+    for &kind in kinds {
+        operations.push(Operation::Intrinsic {
+            kind,
+            args: (0..kind.arity())
+                .map(|i| u32::try_from(i).expect("small arity"))
+                .collect(),
+        });
+    }
+}
+
 #[test]
 #[cfg(feature = "json")]
 fn stage2_operations_and_intrinsics_round_trip() {
@@ -306,52 +333,77 @@ fn stage2_operations_and_intrinsics_round_trip() {
         Operation::SeqNext(15),
         Operation::Label("field".into()),
     ];
-    for kind in [
-        Intrinsic::ListRange,
-        Intrinsic::LazyMake,
-        Intrinsic::LazyForce,
-        Intrinsic::ScopeAddFinalizer,
-        Intrinsic::ScopeAddFinalizerExit,
-        Intrinsic::ScopeAddClose,
-        Intrinsic::AcquireRelease,
-        Intrinsic::Bracket,
-        Intrinsic::Uninterruptible,
-        Intrinsic::RecordGet,
-        Intrinsic::RecordExtend,
-        Intrinsic::RecordRemove,
-        Intrinsic::RecordProject,
-        Intrinsic::RecordMergeDisjoint,
-        Intrinsic::RecordLabels,
-        Intrinsic::SeqOfList,
-        Intrinsic::SeqToList,
-        Intrinsic::ExitIsSuccess,
-        Intrinsic::ExitIsFailure,
-        Intrinsic::ExitHasInterrupts,
-        Intrinsic::Int(IntIntrinsic::Parse),
-        Intrinsic::Int(IntIntrinsic::CheckedAdd),
-        Intrinsic::Float(FloatIntrinsic::Remainder),
-        Intrinsic::BigInt(BigIntIntrinsic::Gcd),
-        Intrinsic::String(StringIntrinsic::Slice),
-        Intrinsic::List(ListIntrinsic::InsertAt),
-        Intrinsic::Record(RecordIntrinsic::Difference),
-        Intrinsic::Debug(DebugIntrinsic::Assert),
-    ] {
-        operations.push(Operation::Intrinsic {
-            kind,
-            args: (0..kind.arity())
-                .map(|i| u32::try_from(i).expect("small arity"))
-                .collect(),
-        });
-    }
-    let json = serde_json::to_string(&operations).expect("serialize stage2 ops");
-    let back: Vec<Operation> = serde_json::from_str(&json).expect("deserialize stage2 ops");
-    assert_eq!(back, operations);
-    #[cfg(feature = "cbor")]
-    {
-        let mut bytes = Vec::new();
-        ciborium::into_writer(&operations, &mut bytes).expect("serialize stage2 CBOR");
-        let back: Vec<Operation> =
-            ciborium::from_reader(bytes.as_slice()).expect("deserialize stage2 CBOR");
-        assert_eq!(back, operations);
-    }
+    push_intrinsics(
+        &mut operations,
+        &[
+            Intrinsic::ListRange,
+            Intrinsic::LazyMake,
+            Intrinsic::LazyForce,
+            Intrinsic::ScopeAddFinalizer,
+            Intrinsic::ScopeAddFinalizerExit,
+            Intrinsic::ScopeAddClose,
+            Intrinsic::AcquireRelease,
+            Intrinsic::Bracket,
+            Intrinsic::Uninterruptible,
+            Intrinsic::RecordGet,
+            Intrinsic::RecordExtend,
+            Intrinsic::RecordRemove,
+            Intrinsic::RecordProject,
+            Intrinsic::RecordMergeDisjoint,
+            Intrinsic::RecordLabels,
+            Intrinsic::SeqOfList,
+            Intrinsic::SeqToList,
+            Intrinsic::ExitIsSuccess,
+            Intrinsic::ExitIsFailure,
+            Intrinsic::ExitHasInterrupts,
+            Intrinsic::Int(IntIntrinsic::Parse),
+            Intrinsic::Int(IntIntrinsic::CheckedAdd),
+            Intrinsic::Float(FloatIntrinsic::Remainder),
+            Intrinsic::BigInt(BigIntIntrinsic::Gcd),
+            Intrinsic::String(StringIntrinsic::Slice),
+            Intrinsic::List(ListIntrinsic::InsertAt),
+            Intrinsic::Record(RecordIntrinsic::Difference),
+            Intrinsic::Debug(DebugIntrinsic::Assert),
+        ],
+    );
+    round_trip_operations(&operations);
+}
+
+#[test]
+#[cfg(feature = "json")]
+fn stage4_intrinsics_round_trip() {
+    let mut operations = Vec::new();
+    push_intrinsics(
+        &mut operations,
+        &[
+            Intrinsic::Async(AsyncIntrinsic::FiberSpawn),
+            Intrinsic::Async(AsyncIntrinsic::DeferredAwait),
+            Intrinsic::Async(AsyncIntrinsic::Parallel),
+            Intrinsic::Async(AsyncIntrinsic::FiberGroupRun),
+            Intrinsic::Layer(LayerIntrinsic::LayerEmpty),
+            Intrinsic::Layer(LayerIntrinsic::LayerFromBuild),
+            Intrinsic::Layer(LayerIntrinsic::ContextWithReference),
+            Intrinsic::Layer(LayerIntrinsic::OwnerNew),
+            Intrinsic::Layer(LayerIntrinsic::OwnerRun),
+            Intrinsic::Layer(LayerIntrinsic::OwnerClose),
+            Intrinsic::Layer(LayerIntrinsic::EnvCapture),
+            Intrinsic::Layer(LayerIntrinsic::EnvRun),
+            Intrinsic::Layer(LayerIntrinsic::ContextSetFiberRef),
+            Intrinsic::Layer(LayerIntrinsic::MetricRuntimeFibersStarted),
+            Intrinsic::Outcome(OutcomeIntrinsic::CauseAnnotate),
+            Intrinsic::Outcome(OutcomeIntrinsic::CauseStackTrace),
+            Intrinsic::Crypto(CryptoIntrinsic::Digest),
+            Intrinsic::Crypto(CryptoIntrinsic::Pbkdf2),
+            Intrinsic::Config(ConfigIntrinsic::ConfigCase),
+            Intrinsic::Config(ConfigIntrinsic::ParseDotEnv),
+            Intrinsic::Config(ConfigIntrinsic::UnknownNode),
+            Intrinsic::Config(ConfigIntrinsic::EnvNode),
+            Intrinsic::Arbitrary(ArbitraryIntrinsic::HashSeed),
+            Intrinsic::Arbitrary(ArbitraryIntrinsic::AttemptRandom),
+            Intrinsic::Arbitrary(ArbitraryIntrinsic::RandomNumber),
+            Intrinsic::Arbitrary(ArbitraryIntrinsic::ShrinkNumber),
+            Intrinsic::Arbitrary(ArbitraryIntrinsic::FormatSpaced),
+        ],
+    );
+    round_trip_operations(&operations);
 }

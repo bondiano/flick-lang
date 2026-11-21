@@ -49,6 +49,12 @@ pub enum Error {
     GlobalCycle(memory::Name),
     ExpectedServiceTag,
     ExpectedLayer,
+    ExpectedContext,
+    ExpectedContextRef,
+    ExpectedFiber,
+    ExpectedDeferred,
+    ExpectedMemoMap,
+    ExpectedFiberGroup,
     ExpectedClosure,
     ForeignClosure,
     ExpectedTask,
@@ -139,54 +145,96 @@ pub enum Error {
 }
 
 impl Error {
-    fn fmt_counts(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InsufficientReferences {
-                object,
-                required,
-                actual,
-            } => {
-                write!(
-                    f,
-                    "object {object:?} has {actual} references, needs {required}"
-                )
+    fn expected_message(&self) -> Option<&'static str> {
+        Some(match self {
+            Self::ExpectedRecoveryResult => "expected a sealed recovery-selection result",
+            Self::ForeignRecoveryResult => {
+                "recovery result belongs to another selection or execution"
             }
-            Self::LiveCountMismatch { tracked, actual } => write!(
-                f,
-                "memory live counter reports {tracked}, but {actual} allocation slots are occupied"
-            ),
-            _ => unreachable!("count-specific error formatting"),
-        }
+            Self::ExpectedCause => "expected an owned counted cause",
+            Self::ExpectedDefect => "expected a structured counted defect",
+            Self::ExpectedResult => {
+                "expected Prelude.Result.Ok or Err with exactly one ordinary field"
+            }
+            Self::ExpectedServiceTag => "expected a nominal service tag",
+            Self::ExpectedLayer => "expected a counted Layer",
+            Self::ExpectedContext => "expected a counted Context",
+            Self::ExpectedContextRef => "expected a Context.Reference",
+            Self::ExpectedFiber => "expected a counted Fiber handle",
+            Self::ExpectedDeferred => "expected a counted Deferred handle",
+            Self::ExpectedMemoMap => "expected a counted Layer.MemoMap",
+            Self::ExpectedFiberGroup => "expected a counted FiberSet/Map/Handle",
+            Self::ExpectedDictionary => "expected a counted dictionary",
+            Self::ExpectedStructure => "expected a record or exact tuple",
+            Self::ExpectedModifyPair => "Ref.modify callback must return (result, new contents)",
+            Self::ExpectedClosure => "expected a counted closure",
+            Self::ForeignClosure => "closure belongs to another program execution",
+            Self::ExpectedTask => "expected a counted task",
+            Self::ForeignTask => "task belongs to another program execution",
+            Self::ExpectedCell => "expected a root-arena cell handle",
+            Self::ForeignCell => "cell belongs to another program execution",
+            Self::ClosedCell => "cell arena is closed",
+            Self::ExpectedVar => "expected a frame-local variable handle",
+            Self::ForeignVar => "variable belongs to another program execution",
+            Self::ClosedVar => "frame-local variable is closed",
+            Self::ExpectedLazy => "expected a Lazy handle",
+            Self::ForeignLazy => "Lazy cell belongs to another program execution",
+            Self::ClosedLazy => "Lazy cell is closed",
+            Self::ForeignContinuation => "continuation belongs to another program execution",
+            Self::ExpectedSeq => "expected a List or Seq",
+            Self::ForeignSeq => "Seq belongs to another program execution",
+            Self::ExpectedIterator => "expected a sequence iterator handle",
+            Self::ForeignIterator => "iterator belongs to another program execution",
+            Self::ClosedIterator => "sequence iterator is closed",
+            Self::ExpectedLabel => "expected a record label",
+            Self::ExpectedExit => "expected an Exit value",
+            Self::ExpectedOption => "expected Prelude.Option.Some or None",
+            Self::ExpectedInt => "expected an Int",
+            Self::ExpectedFloat => "expected a Float",
+            Self::ExpectedOwner => "expected a scoped owner handle",
+            Self::ForeignOwner => "owner belongs to another execution or heap",
+            Self::ClosedOwner => "scope owner is closed",
+            Self::ExpectedArena => "expected an arena handle",
+            Self::ExpectedArenaView => "expected an arena view",
+            Self::ForeignArena => "arena belongs to another execution or heap",
+            Self::ClosedArena => "arena is closed",
+            Self::ExpectedRecord => "expected a named memory record",
+            Self::ExpectedObject => "expected a tagged memory object",
+            Self::ExpectedString => "expected a memory string",
+            Self::ExpectedBigInt => "expected a memory BigInt",
+            Self::ExpectedBoolean => "expected an immediate Bool condition",
+            _ => return None,
+        })
     }
 
-    fn fmt_operation(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn static_message(&self) -> Option<&'static str> {
+        Some(match self {
+            Self::UnhandledFailure => "unhandled typed failure",
+            Self::NeedsProgram => "this memory operation requires a program execution",
+            Self::RecoveryOutsideSelection => "recovery result created outside executing selection",
+            Self::RecoveryEscape => "recovery-selection result used as an ordinary value",
+            Self::RecoveryIdentityOverflow => "recovery identity overflow",
+            Self::HandlerIdentityOverflow => "counted handler identity overflow",
+            Self::IntDivisionByZero { remainder } => int_zero_message(*remainder),
+            Self::BigIntNegativeExponent => "RangeError: Exponent must be non-negative",
+            Self::BigIntNonIntegralNumber => "RangeError: BigInt requires a finite integer Number",
+            Self::BigIntInvalidString => "SyntaxError: invalid BigInt integer string",
+            Self::BigIntUndefined => "TypeError: cannot convert undefined to BigInt",
+            Self::ConstructorFieldOverflow => "constructor total field count overflows",
+            Self::NoMatch => "no pattern matched",
+            Self::OutOfFuel => "counted program exhausted its execution fuel",
+            Self::LazyCycle => "cyclic lazy initializer",
+            Self::ResumeTwice => "`resume` ran twice",
+            Self::MissingFunctionBoundary => {
+                "Option `?` ran without an enclosing function boundary"
+            }
+            Self::MissingGeneratorBoundary => "`yield` ran without an enclosing generator boundary",
+            _ => return None,
+        })
+    }
+
+    fn fmt_counts(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::RecoveryOutsideSelection => {
-                f.write_str("recovery result created outside executing selection")
-            }
-            Self::ExpectedRecoveryResult => {
-                f.write_str("expected a sealed recovery-selection result")
-            }
-            Self::ForeignRecoveryResult => {
-                f.write_str("recovery result belongs to another selection or execution")
-            }
-            Self::RecoveryEscape => {
-                f.write_str("recovery-selection result used as an ordinary value")
-            }
-            Self::RecoveryIdentityOverflow => f.write_str("recovery identity overflow"),
-            Self::ExpectedCause => f.write_str("expected an owned counted cause"),
-            Self::ExpectedDefect => f.write_str("expected a structured counted defect"),
-            Self::ExpectedResult => {
-                f.write_str("expected Prelude.Result.Ok or Err with exactly one ordinary field")
-            }
-            Self::ExpectedServiceTag => f.write_str("expected a nominal service tag"),
-            Self::ExpectedLayer => f.write_str("expected a counted Layer"),
-            Self::UnsupportedOperation(operation) => {
-                write!(f, "counted execution does not yet support {operation}")
-            }
-            Self::MissingHandler { effect, op } => {
-                write!(f, "no handler of {effect}.{op} is in effect")
-            }
             Self::OperationArgumentCount {
                 effect,
                 op,
@@ -198,46 +246,6 @@ impl Error {
                 f,
                 "operation {effect}.{op} expects {expected_dicts} dictionaries and {expected_args} arguments, got {actual_dicts} dictionaries and {actual_args} arguments"
             ),
-            Self::ArgumentCount { expected, actual } => {
-                write!(
-                    f,
-                    "memory function expects {expected} arguments, got {actual}"
-                )
-            }
-            Self::HandlerIdentityOverflow => f.write_str("counted handler identity overflow"),
-            Self::ExpectedDictionary => f.write_str("expected a counted dictionary"),
-            Self::MissingMethod(name) => write!(f, "counted dictionary has no method {name}"),
-            Self::ExpectedStructure => f.write_str("expected a record or exact tuple"),
-            Self::StructureArity { expected, actual } => {
-                write!(f, "structural view expects {expected} fields, got {actual}")
-            }
-            Self::PatternLayout { expected, actual } => write!(
-                f,
-                "pattern value layout expects {expected} fields, got {actual}"
-            ),
-            Self::IntDivisionByZero { remainder } => f.write_str(int_zero_message(*remainder)),
-            Self::BigIntNegativeExponent => {
-                f.write_str("RangeError: Exponent must be non-negative")
-            }
-            Self::BigIntNonIntegralNumber => {
-                f.write_str("RangeError: BigInt requires a finite integer Number")
-            }
-            Self::BigIntInvalidString => f.write_str("SyntaxError: invalid BigInt integer string"),
-            Self::BigIntUndefined => f.write_str("TypeError: cannot convert undefined to BigInt"),
-            Self::ConstructorFieldOverflow => {
-                f.write_str("constructor total field count overflows")
-            }
-            Self::ExpectedModifyPair => {
-                f.write_str("Ref.modify callback must return (result, new contents)")
-            }
-            Self::InvalidTaggedBoundary { ordinary, physical } => write!(
-                f,
-                "tagged ordinary boundary {ordinary} exceeds physical field count {physical}"
-            ),
-            Self::ReservedConstructorEvidence(tag) => write!(
-                f,
-                "reserved constructor {tag} cannot carry dictionary evidence"
-            ),
             Self::PatternEvidenceLayout {
                 expected_fields,
                 actual_fields,
@@ -246,6 +254,58 @@ impl Error {
             } => write!(
                 f,
                 "constructor pattern expects {expected_fields} ordinary fields and {expected_dicts} dictionaries, got {actual_fields} and {actual_dicts}"
+            ),
+            Self::InsufficientReferences {
+                object,
+                required,
+                actual,
+            } => write!(
+                f,
+                "object {object:?} has {actual} references, needs {required}"
+            ),
+            Self::LiveCountMismatch { tracked, actual } => write!(
+                f,
+                "memory live counter reports {tracked}, but {actual} allocation slots are occupied"
+            ),
+            _ => unreachable!("count-specific error formatting"),
+        }
+    }
+
+    fn fmt_dynamic(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidFunction(error) | Self::InvalidProgram(error) => {
+                fmt::Display::fmt(error, f)
+            }
+            Self::UnsupportedOperation(operation) => {
+                write!(f, "counted execution does not yet support {operation}")
+            }
+            Self::MissingHandler { effect, op } => {
+                write!(f, "no handler of {effect}.{op} is in effect")
+            }
+            Self::OperationArgumentCount { .. }
+            | Self::PatternEvidenceLayout { .. }
+            | Self::InsufficientReferences { .. }
+            | Self::LiveCountMismatch { .. } => self.fmt_counts(f),
+            Self::ArgumentCount { expected, actual } => write!(
+                f,
+                "memory function expects {expected} arguments, got {actual}"
+            ),
+            Self::MissingMethod(name) => write!(f, "counted dictionary has no method {name}"),
+            Self::StructureArity { expected, actual } => {
+                write!(f, "structural view expects {expected} fields, got {actual}")
+            }
+            Self::PatternKind(kind) => write!(f, "expected {kind} for pattern matching"),
+            Self::PatternLayout { expected, actual } => write!(
+                f,
+                "pattern value layout expects {expected} fields, got {actual}"
+            ),
+            Self::InvalidTaggedBoundary { ordinary, physical } => write!(
+                f,
+                "tagged ordinary boundary {ordinary} exceeds physical field count {physical}"
+            ),
+            Self::ReservedConstructorEvidence(tag) => write!(
+                f,
+                "reserved constructor {tag} cannot carry dictionary evidence"
             ),
             Self::UnknownGlobal(name) => {
                 write!(f, "unknown memory entry {}.{}", name.module, name.name)
@@ -256,43 +316,20 @@ impl Error {
             Self::MissingField { object, field } => {
                 write!(f, "object {object:?} has no field {field}")
             }
-            _ => unreachable!("operation-specific error formatting"),
-        }
-    }
-
-    fn fmt_control(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::ExpectedVar => f.write_str("expected a frame-local variable handle"),
-            Self::ForeignVar => f.write_str("variable belongs to another program execution"),
-            Self::ClosedVar => f.write_str("frame-local variable is closed"),
-            Self::ExpectedLazy => f.write_str("expected a Lazy handle"),
-            Self::ForeignLazy => f.write_str("Lazy cell belongs to another program execution"),
-            Self::ClosedLazy => f.write_str("Lazy cell is closed"),
-            Self::LazyCycle => f.write_str("cyclic lazy initializer"),
-            Self::ResumeTwice => f.write_str("`resume` ran twice"),
-            Self::ForeignContinuation => {
-                f.write_str("continuation belongs to another program execution")
-            }
             Self::MissingLoopTarget(id) => write!(f, "no enclosing loop `{id}` is active"),
-            Self::MissingFunctionBoundary => {
-                f.write_str("Option `?` ran without an enclosing function boundary")
-            }
-            Self::MissingGeneratorBoundary => {
-                f.write_str("`yield` ran without an enclosing generator boundary")
-            }
-            Self::ExpectedSeq => f.write_str("expected a List or Seq"),
-            Self::ForeignSeq => f.write_str("Seq belongs to another program execution"),
-            Self::ExpectedIterator => f.write_str("expected a sequence iterator handle"),
-            Self::ForeignIterator => f.write_str("iterator belongs to another program execution"),
-            Self::ClosedIterator => f.write_str("sequence iterator is closed"),
-            Self::ExpectedLabel => f.write_str("expected a record label"),
-            Self::ExpectedExit => f.write_str("expected an Exit value"),
-            Self::ExpectedOption => f.write_str("expected Prelude.Option.Some or None"),
-            Self::ExpectedInt => f.write_str("expected an Int"),
-            Self::ExpectedFloat => f.write_str("expected a Float"),
             Self::Todo(msg) | Self::Assert(msg) => write!(f, "Error: {msg}"),
             Self::RangeError(msg) => write!(f, "RangeError: {msg}"),
-            _ => unreachable!("control-flow error formatting"),
+            Self::MissingArenaSlot(index) => write!(f, "arena has no slot {index}"),
+            Self::MissingNamedField(name) => write!(f, "memory record has no field {name}"),
+            Self::DuplicateField(name) => write!(f, "memory record repeats field {name}"),
+            Self::UnsupportedPrimitive(what) => write!(f, "unsupported counted primitive: {what}"),
+            Self::InvalidBigInt(text) => write!(f, "invalid counted BigInt literal {text}"),
+            Self::InvalidObject(id) => write!(f, "invalid or released memory object {id:?}"),
+            Self::ReferenceOverflow(id) => write!(f, "reference count overflow for {id:?}"),
+            Self::NoToken(local) => write!(f, "memory local {local} has no owned token"),
+            Self::Leftover(tokens) => write!(f, "unreleased memory tokens: {tokens:?}"),
+            Self::LiveObjects(count) => write!(f, "{count} memory objects are still live"),
+            _ => unreachable!("static error formatted earlier"),
         }
     }
 }
@@ -307,104 +344,13 @@ fn int_zero_message(remainder: bool) -> &'static str {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidFunction(error) | Self::InvalidProgram(error) => error.fmt(f),
-            Self::UnhandledFailure => f.write_str("unhandled typed failure"),
-            Self::NeedsProgram => f.write_str("this memory operation requires a program execution"),
-            Self::RecoveryOutsideSelection
-            | Self::ExpectedRecoveryResult
-            | Self::ForeignRecoveryResult
-            | Self::RecoveryEscape
-            | Self::RecoveryIdentityOverflow
-            | Self::ExpectedCause
-            | Self::ExpectedDefect
-            | Self::ExpectedResult
-            | Self::ExpectedServiceTag
-            | Self::ExpectedLayer
-            | Self::UnsupportedOperation(_)
-            | Self::MissingHandler { .. }
-            | Self::OperationArgumentCount { .. }
-            | Self::HandlerIdentityOverflow
-            | Self::ArgumentCount { .. }
-            | Self::ExpectedDictionary
-            | Self::MissingMethod(_)
-            | Self::ExpectedStructure
-            | Self::StructureArity { .. }
-            | Self::PatternLayout { .. }
-            | Self::IntDivisionByZero { .. }
-            | Self::BigIntNegativeExponent
-            | Self::BigIntNonIntegralNumber
-            | Self::BigIntInvalidString
-            | Self::BigIntUndefined
-            | Self::ConstructorFieldOverflow
-            | Self::ExpectedModifyPair
-            | Self::InvalidTaggedBoundary { .. }
-            | Self::ReservedConstructorEvidence(_)
-            | Self::PatternEvidenceLayout { .. }
-            | Self::UnknownGlobal(_)
-            | Self::GlobalCycle(_)
-            | Self::MissingField { .. } => self.fmt_operation(f),
-            Self::NoMatch => f.write_str("no pattern matched"),
-            Self::PatternKind(kind) => write!(f, "expected {kind} for pattern matching"),
-            Self::OutOfFuel => f.write_str("counted program exhausted its execution fuel"),
-            Self::ExpectedClosure => f.write_str("expected a counted closure"),
-            Self::ForeignClosure => f.write_str("closure belongs to another program execution"),
-            Self::ExpectedTask => f.write_str("expected a counted task"),
-            Self::ForeignTask => f.write_str("task belongs to another program execution"),
-            Self::ExpectedCell => f.write_str("expected a root-arena cell handle"),
-            Self::ForeignCell => f.write_str("cell belongs to another program execution"),
-            Self::ClosedCell => f.write_str("cell arena is closed"),
-            Self::ExpectedVar
-            | Self::ForeignVar
-            | Self::ClosedVar
-            | Self::ExpectedLazy
-            | Self::ForeignLazy
-            | Self::ClosedLazy
-            | Self::LazyCycle
-            | Self::ResumeTwice
-            | Self::ForeignContinuation
-            | Self::MissingLoopTarget(_)
-            | Self::MissingFunctionBoundary
-            | Self::MissingGeneratorBoundary
-            | Self::ExpectedSeq
-            | Self::ForeignSeq
-            | Self::ExpectedIterator
-            | Self::ForeignIterator
-            | Self::ClosedIterator
-            | Self::ExpectedLabel
-            | Self::ExpectedExit
-            | Self::ExpectedOption
-            | Self::ExpectedInt
-            | Self::ExpectedFloat
-            | Self::Todo(_)
-            | Self::Assert(_)
-            | Self::RangeError(_) => self.fmt_control(f),
-            Self::ExpectedOwner => f.write_str("expected a scoped owner handle"),
-            Self::ForeignOwner => f.write_str("owner belongs to another execution or heap"),
-            Self::ClosedOwner => f.write_str("scope owner is closed"),
-            Self::ExpectedArena => f.write_str("expected an arena handle"),
-            Self::ExpectedArenaView => f.write_str("expected an arena view"),
-            Self::ForeignArena => f.write_str("arena belongs to another execution or heap"),
-            Self::ClosedArena => f.write_str("arena is closed"),
-            Self::MissingArenaSlot(index) => write!(f, "arena has no slot {index}"),
-            Self::ExpectedRecord => f.write_str("expected a named memory record"),
-            Self::MissingNamedField(name) => write!(f, "memory record has no field {name}"),
-            Self::DuplicateField(name) => write!(f, "memory record repeats field {name}"),
-            Self::UnsupportedPrimitive(what) => write!(f, "unsupported counted primitive: {what}"),
-            Self::InvalidBigInt(text) => write!(f, "invalid counted BigInt literal {text}"),
-            Self::InvalidObject(id) => write!(f, "invalid or released memory object {id:?}"),
-            Self::ReferenceOverflow(id) => write!(f, "reference count overflow for {id:?}"),
-            Self::InsufficientReferences { .. } | Self::LiveCountMismatch { .. } => {
-                self.fmt_counts(f)
-            }
-            Self::ExpectedObject => f.write_str("expected a tagged memory object"),
-            Self::ExpectedString => f.write_str("expected a memory string"),
-            Self::ExpectedBigInt => f.write_str("expected a memory BigInt"),
-            Self::ExpectedBoolean => f.write_str("expected an immediate Bool condition"),
-            Self::NoToken(local) => write!(f, "memory local {local} has no owned token"),
-            Self::Leftover(tokens) => write!(f, "unreleased memory tokens: {tokens:?}"),
-            Self::LiveObjects(count) => write!(f, "{count} memory objects are still live"),
+        if let Some(message) = self.expected_message() {
+            return f.write_str(message);
         }
+        if let Some(message) = self.static_message() {
+            return f.write_str(message);
+        }
+        self.fmt_dynamic(f)
     }
 }
 

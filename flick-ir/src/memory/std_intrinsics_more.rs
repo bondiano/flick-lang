@@ -208,6 +208,8 @@ pub enum OutcomeIntrinsic {
     CauseNoneFrame,
     CauseCombine,
     CauseReplaceFirstFail,
+    CauseAnnotate,
+    CauseStackTrace,
 }
 
 impl OutcomeIntrinsic {
@@ -215,7 +217,24 @@ impl OutcomeIntrinsic {
         match self {
             Self::ExitVoid | Self::CauseEmpty => 0,
             Self::CauseCombine | Self::CauseReplaceFirstFail => 2,
+            Self::CauseAnnotate => 3,
             _ => 1,
+        }
+    }
+}
+
+/// Metered pure cryptographic digest and PBKDF2 primitives (Stage 4D).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CryptoIntrinsic {
+    Digest,
+    Pbkdf2,
+}
+
+impl CryptoIntrinsic {
+    pub fn arity(self) -> usize {
+        match self {
+            Self::Digest => 2,
+            Self::Pbkdf2 => 5,
         }
     }
 }
@@ -234,6 +253,92 @@ impl GenIntrinsic {
         match self {
             Self::Step | Self::OneOfCheck => 1,
             Self::DrawString | Self::DrawOneOf => 2,
+        }
+    }
+}
+
+/// Pure metered `Config` and `ConfigProvider` helper primitives (Stage 4D).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConfigIntrinsic {
+    ConfigCase,
+    ParseDotEnv,
+    ParseUrl,
+    ParseDate,
+    DecodeByteSize,
+    DecodeNumber,
+    SegmentInfo,
+    UnknownNode,
+    EnvNode,
+}
+
+impl ConfigIntrinsic {
+    pub fn arity(self) -> usize {
+        match self {
+            Self::ConfigCase
+            | Self::ParseUrl
+            | Self::ParseDate
+            | Self::DecodeByteSize
+            | Self::DecodeNumber
+            | Self::SegmentInfo => 1,
+            Self::ParseDotEnv => 2,
+            Self::UnknownNode | Self::EnvNode => 3,
+        }
+    }
+}
+
+/// Pure metered `Arbitrary` RNG, shrinking, constraint, and formatting primitives (Stage 4D).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ArbitraryIntrinsic {
+    HashSeed,
+    AttemptRandom,
+    XoshiroNext,
+    XoshiroDouble,
+    RandomInt,
+    RandomNumber,
+    RandomBigIntBiased,
+    RandomDecimal,
+    RandomString,
+    RandomCodePointString,
+    ShrinkNumber,
+    ShrinkBigInt,
+    ShrinkDecimalCands,
+    DecimalMidpoint,
+    ShrinkString,
+    NumberBounds,
+    ExtractConstraint,
+    MergeConstraint,
+    FormatSpaced,
+    MakeDuration,
+    IsNonNegativeDuration,
+    MakeZonedDateTime,
+    MakeZone,
+    JsString,
+    QuoteJson,
+}
+
+impl ArbitraryIntrinsic {
+    pub fn arity(self) -> usize {
+        match self {
+            Self::HashSeed
+            | Self::XoshiroNext
+            | Self::XoshiroDouble
+            | Self::RandomDecimal
+            | Self::ExtractConstraint
+            | Self::FormatSpaced
+            | Self::IsNonNegativeDuration
+            | Self::MakeZone
+            | Self::JsString
+            | Self::QuoteJson => 1,
+            Self::ShrinkString | Self::MergeConstraint | Self::MakeDuration | Self::MakeZonedDateTime => 2,
+            Self::AttemptRandom
+            | Self::RandomInt
+            | Self::ShrinkBigInt
+            | Self::DecimalMidpoint => 3,
+            Self::RandomBigIntBiased | Self::RandomString | Self::ShrinkDecimalCands => 4,
+            Self::RandomNumber
+            | Self::RandomCodePointString
+            | Self::ShrinkNumber
+            | Self::NumberBounds => 5,
         }
     }
 }

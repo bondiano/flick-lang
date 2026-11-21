@@ -217,7 +217,28 @@ fn is_opaque_data(data: &Data) -> bool {
             | Data::Iterator { .. }
             | Data::Graph(_)
             | Data::GraphWalker(_)
+            | Data::Context(_)
+            | Data::ContextRef { .. }
+            | Data::FiberHandle { .. }
+            | Data::Deferred { .. }
+            | Data::MemoMap { .. }
+            | Data::FiberGroup { .. }
+            | Data::MaskRestore { .. }
+            | Data::MaskedTask { .. }
+            | Data::CachedRunTask { .. }
+            | Data::CachedInvalidateTask { .. }
+            | Data::ExitTask(_)
     )
+}
+
+pub(in crate::memory) fn values_equal(
+    heap: &Heap,
+    left: &Value,
+    right: &Value,
+    fuel: &mut u64,
+) -> Result<bool, Error> {
+    super::charge(fuel, 1)?;
+    equal(heap, left, right)
 }
 
 fn equal_objects<'a>(

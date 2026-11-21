@@ -1,11 +1,16 @@
 //! Audited `Check` pure IR adapters (`packages/std/src/Check.fl`).
 
-use flick_ir::{BinOp, Dict, Foreign, ForeignMode};
+mod ops;
+
+use flick_ir::{Foreign, ForeignMode};
 
 use super::expr_builder::{ExprBuilder, arm};
 use super::lazy_scope::has_standard_shape;
-use super::std_schema_rt::{cat, con_app, make_codec, meta_con, rt, str_lit};
-use super::{Code, Env, Expr, ExprKind, Local, Lower, LowerError, Pat, Span};
+use super::std_check_props::{
+    check_property_names, check_props_between, check_props_one, check_size_between, check_size_one,
+};
+use super::std_schema_rt::{cat, con_app, rt, str_lit};
+use super::{Code, Env, Expr, Local, Lower, LowerError, Pat, Span};
 
 impl Lower<'_> {
     pub(super) fn std_check_foreign(
@@ -43,7 +48,7 @@ impl Lower<'_> {
 
         // `Check.*_by` carries 1 `Ord` dictionary.
         if value.dicts == 1 {
-            let expr = ord_check_template(&b, bind, stages)?;
+            let expr = ops::ord_check_template(&b, bind, stages)?;
             return Some(self.expr(&expr, &Env::new(), block));
         }
         if value.dicts != 0 {
@@ -55,83 +60,49 @@ impl Lower<'_> {
 }
 
 pub(super) fn atom(b: &ExprBuilder, run_fn: Expr, meta: Expr) -> Expr {
-    con_app(b, "Check", "$Atom", "$Atom", vec![run_fn, meta])
+    atom_with_spec(b, run_fn, meta, b.none())
+}
+
+fn atom_with_spec(b: &ExprBuilder, run_fn: Expr, meta: Expr, spec_opt: Expr) -> Expr {
+    con_app(b, "Check", "$Atom", "$Atom", vec![run_fn, meta, spec_opt])
 }
 
 fn builtin_check(b: &ExprBuilder, kind: &str, param: Expr) -> Expr {
+    let spec_pat = Pat::Con(
+        ExprBuilder::con("Check", "$Spec", "$Spec", 3),
+        vec![Pat::Wild, Pat::Wild, Pat::Bind(b.name("m"))],
+    );
+    let item = atom_with_spec(
+        b,
+        b.app(rt(b, "Schema.RunCheck"), b.loc("sp")),
+        b.loc("m"),
+        b.some(b.loc("sp")),
+    );
     b.block(
-        vec![b.let_(
+        [b.let_(
             "sp",
             b.app2(rt(b, "Schema.MakeCheck"), str_lit(b, kind), param),
         )],
-        b.match_(
-            b.loc("sp"),
-            vec![arm(
-                Pat::Con(
-                    ExprBuilder::con("Check", "$Spec", "$Spec", 3),
-                    vec![Pat::Wild, Pat::Wild, Pat::Bind(b.name("m"))],
-                ),
-                b.list(vec![atom(
-                    b,
-                    b.app(rt(b, "Schema.RunCheck"), b.loc("sp")),
-                    b.loc("m"),
-                )]),
-            )],
-        ),
+        b.match_(b.loc("sp"), [arm(spec_pat, b.list([item]))]),
     )
 }
 
 pub(super) fn expected_fail(b: &ExprBuilder, desc: Expr, val: Expr) -> Expr {
-    b.some(cat(
+    let tail = cat(
         b,
-        str_lit(b, "expected "),
-        cat(
-            b,
-            desc,
-            cat(
-                b,
-                str_lit(b, ", got "),
-                b.app(rt(b, "Schema.DescribeInput"), val),
-            ),
-        ),
-    ))
+        str_lit(b, ", got "),
+        b.app(rt(b, "Schema.DescribeInput"), val),
+    );
+    b.some(cat(b, str_lit(b, "expected "), cat(b, desc, tail)))
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "central Check combinator template dispatch"
-)]
-fn check_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr> {
+fn string_and_num_check_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr> {
     match (bind, stages) {
-        ("flickCheck", 2) => Some(check_apply(b)),
-        ("makeFilterGroup", 1) => Some(b.lam(
-            &["chks"],
-            b.gen_strict(b.each(
-                "grp",
-                b.loc("chks"),
-                b.each("a", b.loc("grp"), b.yield_(b.loc("a"))),
-            )),
-        )),
-        ("flickMakeFilter", 2) => Some(b.lam(
-            &["pred", "msg"],
-            b.list(vec![atom(
-                b,
-                b.lam(
-                    &["v"],
-                    b.if_(
-                        b.app(b.loc("pred"), b.loc("v")),
-                        b.none(),
-                        b.some(b.loc("msg")),
-                    ),
-                ),
-                con_app(b, "Check", "$Meta", "$None", vec![b.loc("msg")]),
-            )]),
-        )),
         ("isMinLength", 1) => Some(b.lam(&["n"], builtin_check(b, "min_length", b.loc("n")))),
         ("isMaxLength", 1) => Some(b.lam(&["n"], builtin_check(b, "max_length", b.loc("n")))),
         ("isBetweenLength", 2) => Some(b.lam(
             &["lo", "hi"],
-            builtin_check(b, "length_between", b.tuple(vec![b.loc("lo"), b.loc("hi")])),
+            builtin_check(b, "length_between", b.tuple([b.loc("lo"), b.loc("hi")])),
         )),
         ("flickIsNonEmpty", 0) => Some(builtin_check(b, "min_length", b.int(1))),
         ("isMinCodePoints", 1) => {
@@ -145,7 +116,7 @@ fn check_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr> {
             builtin_check(
                 b,
                 "code_points_between",
-                b.tuple(vec![b.loc("lo"), b.loc("hi")]),
+                b.tuple([b.loc("lo"), b.loc("hi")]),
             ),
         )),
         ("flickIsPattern", 1) => Some(b.lam(&["src"], builtin_check(b, "pattern", b.loc("src")))),
@@ -171,8 +142,38 @@ fn check_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr> {
         ("isMultipleOf", 1) => Some(b.lam(&["d"], builtin_check(b, "multiple_of", b.loc("d")))),
         ("flickIsInt", 0) => Some(builtin_check(b, "int", b.unit())),
         ("flickIsFinite", 0) => Some(builtin_check(b, "finite", b.unit())),
-        ("flickIsInt32", 0) => Some(int_range_check(b, -2_147_483_648.0, 2_147_483_647.0)),
-        ("flickIsUint32", 0) => Some(int_range_check(b, 0.0, 4_294_967_295.0)),
+        ("flickIsInt32", 0) => Some(ops::int_range_check(b, -2_147_483_648.0, 2_147_483_647.0)),
+        ("flickIsUint32", 0) => Some(ops::int_range_check(b, 0.0, 4_294_967_295.0)),
+        _ => None,
+    }
+}
+
+fn check_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr> {
+    if let Some(expr) = string_and_num_check_template(b, bind, stages) {
+        return Some(expr);
+    }
+    match (bind, stages) {
+        ("flickCheck", 2) => Some(ops::check_apply(b)),
+        ("makeFilterGroup", 1) => Some(b.lam(
+            &["chks"],
+            b.gen_strict(b.each(
+                "grp",
+                b.loc("chks"),
+                b.each("a", b.loc("grp"), b.yield_(b.loc("a"))),
+            )),
+        )),
+        ("flickMakeFilter", 2) => {
+            let run_fn = b.lam(
+                &["v"],
+                b.if_(
+                    b.app(b.loc("pred"), b.loc("v")),
+                    b.none(),
+                    b.some(b.loc("msg")),
+                ),
+            );
+            let meta = con_app(b, "Check", "$Meta", "$None", vec![b.loc("msg")]);
+            Some(b.lam(&["pred", "msg"], b.list([atom(b, run_fn, meta)])))
+        }
         ("isGreaterThanBigInt", 1) => {
             Some(b.lam(&["x"], builtin_check(b, "gt_bigint", b.loc("x"))))
         }
@@ -203,280 +204,14 @@ fn check_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr> {
         }
         ("flickIsUnique", 0) => Some(builtin_check(b, "unique", b.unit())),
         ("flickIsUniqueKey", 0) => Some(builtin_check(b, "unique_keys", b.unit())),
-        ("flickMakeIsMultipleOf", 3) => Some(check_multiple_of_by(b)),
-        ("flickIsMinSize", 1) => Some(super::std_check_props::check_size_one(b, true)),
-        ("flickIsMaxSize", 1) => Some(super::std_check_props::check_size_one(b, false)),
-        ("flickIsBetweenSize", 2) => Some(super::std_check_props::check_size_between(b)),
-        ("flickIsMinProperties", 2) => Some(super::std_check_props::check_props_one(b, true)),
-        ("flickIsMaxProperties", 2) => Some(super::std_check_props::check_props_one(b, false)),
-        ("flickIsBetweenProperties", 3) => Some(super::std_check_props::check_props_between(b)),
-        ("flickIsPropertyNames", 2) => Some(super::std_check_props::check_property_names(b)),
+        ("flickMakeIsMultipleOf", 3) => Some(ops::check_multiple_of_by(b)),
+        ("flickIsMinSize", 1) => Some(check_size_one(b, true)),
+        ("flickIsMaxSize", 1) => Some(check_size_one(b, false)),
+        ("flickIsBetweenSize", 2) => Some(check_size_between(b)),
+        ("flickIsMinProperties", 2) => Some(check_props_one(b, true)),
+        ("flickIsMaxProperties", 2) => Some(check_props_one(b, false)),
+        ("flickIsBetweenProperties", 3) => Some(check_props_between(b)),
+        ("flickIsPropertyNames", 2) => Some(check_property_names(b)),
         _ => None,
     }
-}
-
-fn check_apply(b: &ExprBuilder) -> Expr {
-    b.lam(
-        &["chk", "c"],
-        b.block(
-            vec![
-                b.let_(
-                    "new_ms",
-                    b.gen_strict(b.each(
-                        "a",
-                        b.loc("chk"),
-                        b.match_(
-                            b.loc("a"),
-                            vec![arm(
-                                Pat::Con(
-                                    ExprBuilder::con("Check", "$Atom", "$Atom", 2),
-                                    vec![Pat::Wild, Pat::Bind(b.name("m"))],
-                                ),
-                                b.yield_(b.loc("m")),
-                            )],
-                        ),
-                    )),
-                ),
-                b.let_("om", b.app(rt(b, "Helper.codec_meta"), b.loc("c"))),
-                b.let_(
-                    "nm",
-                    b.match_(
-                        b.loc("om"),
-                        vec![
-                            arm(
-                                Pat::Con(
-                                    ExprBuilder::con("Codec", "$Meta", "$Checked", 4),
-                                    vec![
-                                        Pat::Bind(b.name("bm")),
-                                        Pat::Bind(b.name("cs")),
-                                        Pat::Wild,
-                                        Pat::Wild,
-                                    ],
-                                ),
-                                meta_con(
-                                    b,
-                                    "$Checked",
-                                    vec![
-                                        b.loc("bm"),
-                                        b.app2(
-                                            b.global("List.Core", "append"),
-                                            b.loc("cs"),
-                                            b.loc("new_ms"),
-                                        ),
-                                        b.none(),
-                                        b.none(),
-                                    ],
-                                ),
-                            ),
-                            arm(
-                                Pat::Wild,
-                                meta_con(
-                                    b,
-                                    "$Checked",
-                                    vec![b.loc("om"), b.loc("new_ms"), b.none(), b.none()],
-                                ),
-                            ),
-                        ],
-                    ),
-                ),
-            ],
-            make_codec(
-                b,
-                b.lam(
-                    &["in"],
-                    b.match_(
-                        b.app(b.app(rt(b, "Helper.codec_dec"), b.loc("c")), b.loc("in")),
-                        vec![
-                            arm(
-                                b.ok_pat("v"),
-                                b.app2(rt(b, "Helper.run_checks"), b.loc("chk"), b.loc("v")),
-                            ),
-                            arm(b.err_pat("e"), b.err(b.loc("e"))),
-                        ],
-                    ),
-                ),
-                b.lam(
-                    &["v"],
-                    b.match_(
-                        b.app2(rt(b, "Helper.run_checks"), b.loc("chk"), b.loc("v")),
-                        vec![
-                            arm(
-                                b.ok_pat("_"),
-                                b.app(b.app(rt(b, "Helper.codec_enc"), b.loc("c")), b.loc("v")),
-                            ),
-                            arm(b.err_pat("e"), b.err(b.loc("e"))),
-                        ],
-                    ),
-                ),
-                b.app(rt(b, "Helper.codec_acc"), b.loc("c")),
-                b.loc("nm"),
-                b.app(rt(b, "Helper.codec_extra"), b.loc("c")),
-            ),
-        ),
-    )
-}
-
-fn int_range_check(b: &ExprBuilder, lo: f64, hi: f64) -> Expr {
-    let range = b.at(ExprKind::Record(vec![
-        ("exclusiveMaximum".into(), b.bool_(false)),
-        ("exclusiveMinimum".into(), b.bool_(false)),
-        ("maximum".into(), b.float(hi)),
-        ("minimum".into(), b.float(lo)),
-    ]));
-    b.app2(
-        b.global("List.Core", "append"),
-        builtin_check(b, "int", b.unit()),
-        builtin_check(b, "between", range),
-    )
-}
-
-#[expect(clippy::too_many_lines, reason = "central Ord check template dispatch")]
-fn ord_check_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr> {
-    let cmp_fn = || {
-        b.at(ExprKind::Method {
-            dict: Dict::Field(b.name("ord")),
-            name: "compare".into(),
-        })
-    };
-    let less_than = |e: Expr| {
-        b.match_(
-            e,
-            vec![
-                arm(
-                    Pat::Con(ExprBuilder::con("Prelude", "Ordering", "LT", 0), vec![]),
-                    b.bool_(true),
-                ),
-                arm(Pat::Wild, b.bool_(false)),
-            ],
-        )
-    };
-    let greater_than = |e: Expr| {
-        b.match_(
-            e,
-            vec![
-                arm(
-                    Pat::Con(ExprBuilder::con("Prelude", "Ordering", "GT", 0), vec![]),
-                    b.bool_(true),
-                ),
-                arm(Pat::Wild, b.bool_(false)),
-            ],
-        )
-    };
-    let at_most = |e: Expr| b.not(greater_than(e));
-    let at_least = |e: Expr| b.not(less_than(e));
-
-    match (bind, stages) {
-        (
-            "flickMakeIsGreaterThan"
-            | "flickMakeIsGreaterThanOrEqualTo"
-            | "flickMakeIsLessThan"
-            | "flickMakeIsLessThanOrEqualTo",
-            1,
-        ) => {
-            let word = match bind {
-                "flickMakeIsGreaterThan" => "a value greater than ",
-                "flickMakeIsGreaterThanOrEqualTo" => "a value greater than or equal to ",
-                "flickMakeIsLessThan" => "a value less than ",
-                _ => "a value less than or equal to ",
-            };
-            let cmp_call = b.app2(cmp_fn(), b.loc("v"), b.loc("bound"));
-            let pass = match bind {
-                "flickMakeIsGreaterThan" => greater_than(cmp_call),
-                "flickMakeIsGreaterThanOrEqualTo" => at_least(cmp_call),
-                "flickMakeIsLessThan" => less_than(cmp_call),
-                _ => at_most(cmp_call),
-            };
-            Some(b.lam(
-                &["ord", "bound"],
-                b.block(
-                    vec![b.let_(
-                        "desc",
-                        cat(
-                            b,
-                            str_lit(b, word),
-                            b.app(rt(b, "Schema.FormatValue"), b.loc("bound")),
-                        ),
-                    )],
-                    b.list(vec![atom(
-                        b,
-                        b.lam(
-                            &["v"],
-                            b.if_(pass, b.none(), expected_fail(b, b.loc("desc"), b.loc("v"))),
-                        ),
-                        con_app(b, "Check", "$Meta", "$None", vec![b.loc("desc")]),
-                    )]),
-                ),
-            ))
-        }
-        ("flickMakeIsBetween", 2) => Some(b.lam(
-            &["ord", "lo", "hi"],
-            b.block(
-                vec![b.let_(
-                    "desc",
-                    cat(
-                        b,
-                        str_lit(b, "a value between "),
-                        cat(
-                            b,
-                            b.app(rt(b, "Schema.FormatValue"), b.loc("lo")),
-                            cat(
-                                b,
-                                str_lit(b, " and "),
-                                b.app(rt(b, "Schema.FormatValue"), b.loc("hi")),
-                            ),
-                        ),
-                    ),
-                )],
-                b.list(vec![atom(
-                    b,
-                    b.lam(
-                        &["v"],
-                        b.if_(
-                            b.bin(
-                                BinOp::And,
-                                at_least(b.app2(cmp_fn(), b.loc("v"), b.loc("lo"))),
-                                at_most(b.app2(cmp_fn(), b.loc("v"), b.loc("hi"))),
-                            ),
-                            b.none(),
-                            expected_fail(b, b.loc("desc"), b.loc("v")),
-                        ),
-                    ),
-                    con_app(b, "Check", "$Meta", "$None", vec![b.loc("desc")]),
-                )]),
-            ),
-        )),
-        _ => None,
-    }
-}
-
-fn check_multiple_of_by(b: &ExprBuilder) -> Expr {
-    b.lam(
-        &["rem", "zero", "div"],
-        b.block(
-            vec![b.let_(
-                "desc",
-                cat(
-                    b,
-                    str_lit(b, "a value that is a multiple of "),
-                    b.app(rt(b, "Schema.FormatValue"), b.loc("div")),
-                ),
-            )],
-            b.list(vec![atom(
-                b,
-                b.lam(
-                    &["v"],
-                    b.if_(
-                        b.app2(
-                            rt(b, "Schema.SameValue"),
-                            b.app2(b.loc("rem"), b.loc("v"), b.loc("div")),
-                            b.loc("zero"),
-                        ),
-                        b.none(),
-                        expected_fail(b, b.loc("desc"), b.loc("v")),
-                    ),
-                ),
-                con_app(b, "Check", "$Meta", "$None", vec![b.loc("desc")]),
-            )]),
-        ),
-    )
 }

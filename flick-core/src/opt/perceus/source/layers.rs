@@ -253,32 +253,27 @@ mod tests {
     }
 
     #[test]
-    fn all_other_layer_builtins_remain_explicitly_unsupported() {
-        let module = builtin_modules()
+    fn all_dynamic_layer_builtins_lower_cleanly() {
+        let builtins = builtin_modules();
+        let module = builtins
             .iter()
             .find(|module| module.name == "Layer")
             .expect("Layer module");
-        let mut rejected = 0;
+        let mut lowered = 0;
         for item in &module.items {
             let ItemKind::Foreign(value) = &item.kind else {
                 continue;
             };
-            if matches!(
-                value.binding.name.as_str(),
-                "layerSucceed" | "layerRun" | "layerMerge" | "layerOverride"
-            ) {
-                continue;
-            }
-            assert!(intrinsic(value).is_none());
             let entry = memory::Name::new(&module.name, &value.name);
             assert!(
-                matches!(lower([module], &entry), Err(LowerError::Unsupported { span, .. }) if span == item.span),
-                "{}",
-                value.name
+                lower(builtins.iter(), &entry).is_ok(),
+                "Layer.{} failed to lower: {:?}",
+                value.name,
+                lower(builtins.iter(), &entry).err()
             );
-            rejected += 1;
+            lowered += 1;
         }
-        assert!(rejected > 0);
+        assert!(lowered >= 25);
     }
 
     fn reject(

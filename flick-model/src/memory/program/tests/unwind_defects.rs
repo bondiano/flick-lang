@@ -1,38 +1,5 @@
 fn fixture_machine<'p, 'h>(program: &'p Program, heap: &'h mut Heap) -> Machine<'p, 'h> {
-    Machine {
-        heap,
-        program,
-        execution: 0,
-        globals: BTreeMap::new(),
-        cells: vec![],
-        lazies: vec![],
-        owners: vec![OwnerState::default()],
-        current_owner: 0,
-        current_evidence: None,
-        frames: vec![],
-        activations: BTreeMap::new(),
-        providers: BTreeMap::new(),
-        segments: BTreeMap::new(),
-        continuations: BTreeMap::new(),
-        generators: BTreeMap::new(),
-        invocations: BTreeMap::new(),
-        discard: None,
-        ready: None,
-        next_handler: 0,
-        arguments: VecDeque::new(),
-        scratch: vec![],
-        pending: None,
-        failure: None,
-        failure_elected: false,
-        recoveries: BTreeMap::new(),
-        next_recovery: 0,
-        pending_handler: None,
-        top: None,
-        stdout: String::new(),
-        fuel: 1000,
-        main_stage: MainStage::Done,
-        root: None,
-    }
+    Machine::new(heap, program, 0, vec![], 1000, MainStage::Done)
 }
 
 #[test]
@@ -250,7 +217,7 @@ fn die_retires_scope_and_provider_during_unwind_before_final_cleanup() {
         machine.providers.is_empty(),
         "departed provider released during unwind"
     );
-    assert!(machine.owners[1..].iter().all(|owner| owner.closed));
+    assert!(machine.owners[1..].iter().all(OwnerState::is_closed));
     assert_eq!(machine.current_owner, 0);
     assert!(machine.current_evidence.is_none());
     assert_eq!(machine.heap.stats().arenas_allocated, 1);

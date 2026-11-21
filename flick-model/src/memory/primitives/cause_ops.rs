@@ -1,17 +1,18 @@
 //! Counted `Cause` and `Failure` pure primitive implementations.
 
-use std::collections::BTreeSet;
-
-use flick_core::ir::Lit;
 use flick_core::ir::memory::OutcomeIntrinsic;
 
 use super::list_ops::slice_reps;
 use super::outcome_ops::{
-    ReasonKind, cause_of_single, decode_fiber_id, describe_defect, expect_cause_reasons,
-    expect_reason, matches_kind,
+    ReasonKind, cause_of_single, decode_fiber_id, expect_cause_reasons, expect_reason, matches_kind,
 };
-use super::{Data, Error, Heap, ObjectId, Value, charge};
-use crate::memory::causes::{CauseToken, Reason, StoredReason};
+use super::{Data, Error, Heap, Value, charge};
+use crate::memory::causes::{CauseData, CauseToken, Reason, StoredReason};
+
+#[path = "cause_ops/query.rs"]
+mod query;
+
+pub(in crate::memory) use query::first_defect_message;
 
 pub(super) fn run_cause(
     heap: &mut Heap,
@@ -77,22 +78,32 @@ pub(super) fn run_cause(
                 .any(|r| matches_kind(r, ReasonKind::Interrupt)),
         )),
         OutcomeIntrinsic::CauseCombine => cause_combine(heap, &args[1], &args[0], fuel),
-        OutcomeIntrinsic::CauseFindFail => cause_find_reason(heap, &args[0], ReasonKind::Fail),
-        OutcomeIntrinsic::CauseFindError => cause_find_error(heap, &args[0], false),
-        OutcomeIntrinsic::CauseFindErrorOption => cause_find_error(heap, &args[0], true),
-        OutcomeIntrinsic::CauseFindDie => cause_find_reason(heap, &args[0], ReasonKind::Die),
-        OutcomeIntrinsic::CauseFindDefect => cause_find_defect(heap, &args[0]),
-        OutcomeIntrinsic::CauseFindInterrupt => {
-            cause_find_reason(heap, &args[0], ReasonKind::Interrupt)
+        OutcomeIntrinsic::CauseFindFail => {
+            query::cause_find_reason(heap, &args[0], ReasonKind::Fail)
         }
-        OutcomeIntrinsic::CauseInterruptors => cause_interruptors(heap, &args[0], false),
-        OutcomeIntrinsic::CauseFilterInterruptors => cause_interruptors(heap, &args[0], true),
-        OutcomeIntrinsic::CausePretty => cause_pretty(heap, &args[0], fuel),
-        OutcomeIntrinsic::CausePrettyErrors => cause_pretty_errors(heap, &args[0], fuel),
+        OutcomeIntrinsic::CauseFindError => query::cause_find_error(heap, &args[0], false),
+        OutcomeIntrinsic::CauseFindErrorOption => query::cause_find_error(heap, &args[0], true),
+        OutcomeIntrinsic::CauseFindDie => query::cause_find_reason(heap, &args[0], ReasonKind::Die),
+        OutcomeIntrinsic::CauseFindDefect => query::cause_find_defect(heap, &args[0]),
+        OutcomeIntrinsic::CauseFindInterrupt => {
+            query::cause_find_reason(heap, &args[0], ReasonKind::Interrupt)
+        }
+        OutcomeIntrinsic::CauseInterruptors => query::cause_interruptors(heap, &args[0], false),
+        OutcomeIntrinsic::CauseFilterInterruptors => {
+            query::cause_interruptors(heap, &args[0], true)
+        }
+        OutcomeIntrinsic::CausePretty => super::cause_pretty::cause_pretty(heap, &args[0], fuel),
+        OutcomeIntrinsic::CausePrettyErrors => {
+            super::cause_pretty::cause_pretty_errors(heap, &args[0], fuel)
+        }
         OutcomeIntrinsic::CauseNoneFrame => heap.construct("Prelude.Option.None", vec![]),
         OutcomeIntrinsic::CauseReplaceFirstFail => {
-            cause_replace_first_fail(heap, &args[0], &args[1], fuel)
+            query::cause_replace_first_fail(heap, &args[0], &args[1], fuel)
         }
+        OutcomeIntrinsic::CauseAnnotate => {
+            query::cause_annotate(heap, &args[0], &args[1], &args[2], fuel)
+        }
+        OutcomeIntrinsic::CauseStackTrace => query::cause_stack_trace(heap, &args[0]),
         _ => unreachable!("handled in outcome_ops::run"),
     }
 }
@@ -160,7 +171,7 @@ fn cause_from_reasons(heap: &mut Heap, list_val: &Value, fuel: &mut u64) -> Resu
             }
         }
     }
-    Ok(heap.allocate(Data::Cause(stored)))
+    Ok(heap.allocate(Data::Cause(CauseData::plain(stored))))
 }
 
 fn cause_reasons_list(heap: &mut Heap, cause: &Value, fuel: &mut u64) -> Result<Value, Error> {
@@ -224,6 +235,16 @@ fn combine_cause_values(
     dedup: bool,
     fuel: &mut u64,
 ) -> Result<Value, Error> {
+    if dedup {
+        if expect_cause_reasons(heap, left)?.is_empty() {
+            charge(fuel, 1)?;
+            return heap.dup(right);
+        }
+        if expect_cause_reasons(heap, right)?.is_empty() {
+            charge(fuel, 1)?;
+            return heap.dup(left);
+        }
+    }
     let mut snaps = snapshot_reasons(heap, left)?;
     snaps.extend(snapshot_reasons(heap, right)?);
     charge(fuel, snaps.len().max(1))?;
@@ -256,7 +277,7 @@ fn combine_cause_values(
             }
         }
     }
-    Ok(heap.allocate(Data::Cause(stored)))
+    Ok(heap.allocate(Data::Cause(CauseData::plain(stored))))
 }
 
 fn cause_combine(
@@ -300,185 +321,46 @@ pub(in crate::memory) fn join_causes(
     CauseToken::from_cause_value(heap, out)
 }
 
-fn cause_find_reason(heap: &mut Heap, cause: &Value, kind: ReasonKind) -> Result<Value, Error> {
-    let found = expect_cause_reasons(heap, cause)?
-        .iter()
-        .find(|r| matches_kind(r, kind))
-        .map(|r| match r {
-            StoredReason::Fail(v) => (ReasonKind::Fail, Some(v.representation()), None),
-            StoredReason::Die(v) => (ReasonKind::Die, Some(v.representation()), None),
-            StoredReason::Interrupt { fiber_id } => (ReasonKind::Interrupt, None, *fiber_id),
-        });
-    if let Some((k, v, fiber_id)) = found {
-        let owned = match k {
-            ReasonKind::Fail => StoredReason::Fail(heap.dup(&v.expect("fail"))?),
-            ReasonKind::Die => StoredReason::Die(heap.dup(&v.expect("die"))?),
-            ReasonKind::Interrupt => StoredReason::Interrupt { fiber_id },
-        };
-        let r_val = heap.allocate(Data::CauseReason(owned));
-        heap.construct("Prelude.Result.Ok", vec![r_val])
-    } else {
-        let c = heap.dup(cause)?;
-        heap.construct("Prelude.Result.Err", vec![c])
-    }
-}
-
-fn cause_find_error(heap: &mut Heap, cause: &Value, as_option: bool) -> Result<Value, Error> {
-    let found = expect_cause_reasons(heap, cause)?
-        .iter()
-        .find_map(|r| match r {
-            StoredReason::Fail(e) => Some(e.representation()),
-            _ => None,
-        });
-    match (found, as_option) {
-        (Some(e), true) => {
-            let owned = heap.dup(&e)?;
-            heap.construct("Prelude.Option.Some", vec![owned])
-        }
-        (None, true) => heap.construct("Prelude.Option.None", vec![]),
-        (Some(e), false) => {
-            let owned = heap.dup(&e)?;
-            heap.construct("Prelude.Result.Ok", vec![owned])
-        }
-        (None, false) => {
-            let c = heap.dup(cause)?;
-            heap.construct("Prelude.Result.Err", vec![c])
-        }
-    }
-}
-
-fn cause_find_defect(heap: &mut Heap, cause: &Value) -> Result<Value, Error> {
-    let found = expect_cause_reasons(heap, cause)?
-        .iter()
-        .find_map(|r| match r {
-            StoredReason::Die(d) => Some(describe_defect(heap, d)),
-            _ => None,
-        })
-        .transpose()?;
-    if let Some(msg) = found {
-        let s = heap.literal(&Lit::String(msg))?;
-        heap.construct("Prelude.Result.Ok", vec![s])
-    } else {
-        let c = heap.dup(cause)?;
-        heap.construct("Prelude.Result.Err", vec![c])
-    }
-}
-
-fn cause_interruptors(heap: &mut Heap, cause: &Value, filter: bool) -> Result<Value, Error> {
-    let rs = expect_cause_reasons(heap, cause)?;
-    let has_any = rs
-        .iter()
-        .any(|r| matches!(r, StoredReason::Interrupt { .. }));
-    if filter && !has_any {
-        let c = heap.dup(cause)?;
-        return heap.construct("Prelude.Result.Err", vec![c]);
-    }
-    let mut seen = BTreeSet::new();
-    let mut ids = Vec::new();
-    for r in rs {
-        if let StoredReason::Interrupt { fiber_id: Some(id) } = *r
-            && id != 0
-            && seen.insert(id)
-        {
-            #[expect(clippy::cast_precision_loss, reason = "fiber ids are small")]
-            ids.push(Value::Float(id as f64));
-        }
-    }
-    let list = heap.construct("$list", ids)?;
-    if filter {
-        heap.construct("Prelude.Result.Ok", vec![list])
-    } else {
-        Ok(list)
-    }
-}
-
-fn cause_pretty(heap: &mut Heap, cause: &Value, fuel: &mut u64) -> Result<Value, Error> {
-    let rs = expect_cause_reasons(heap, cause)?;
-    charge(fuel, rs.len())?;
-    let mut lines = Vec::new();
-    for r in rs {
-        match r {
-            StoredReason::Fail(e) => lines.push(super::show_value(heap, e)?),
-            StoredReason::Die(d) => lines.push(describe_defect(heap, d)?),
-            StoredReason::Interrupt { .. } => {}
-        }
-    }
-    let out = if lines.is_empty() {
-        "InterruptError: All fibers interrupted without error".into()
-    } else {
-        lines.join("\n")
-    };
-    heap.literal(&Lit::String(out))
-}
-
-fn cause_pretty_errors(heap: &mut Heap, cause: &Value, fuel: &mut u64) -> Result<Value, Error> {
-    let rs = expect_cause_reasons(heap, cause)?;
-    charge(fuel, rs.len())?;
-    let mut texts = Vec::new();
-    for r in rs {
-        match r {
-            StoredReason::Fail(e) => texts.push(format!("Error: {}", super::show_value(heap, e)?)),
-            StoredReason::Die(d) => texts.push(format!("Error: {}", describe_defect(heap, d)?)),
-            StoredReason::Interrupt { .. } => {
-                texts.push("InterruptError: Fiber interrupted".into());
-            }
-        }
-    }
-    let mut vals = Vec::with_capacity(texts.len());
-    for t in texts {
-        match heap.literal(&Lit::String(t)) {
-            Ok(v) => vals.push(v),
-            Err(err) => {
-                heap.drop_values(vals)?;
-                return Err(err);
-            }
-        }
-    }
-    heap.construct("$list", vals)
-}
-
-fn cause_replace_first_fail(
+/// G7g (`docs/formal/runtime.md#an-interruption-that-skips-a-handler-erases-fail-effect`):
+/// drop every `Fail` reason from `prev` and append `Interrupt { fiber_id }` if absent.
+pub(in crate::memory) fn strip_fail_and_add_interrupt(
     heap: &mut Heap,
-    new_err: &Value,
-    cause: &Value,
+    prev: Option<&CauseToken>,
+    fiber_id: Option<usize>,
     fuel: &mut u64,
-) -> Result<Value, Error> {
-    let snap = snapshot_reasons(heap, cause)?;
-    charge(fuel, snap.len())?;
-    let mut out = Vec::with_capacity(snap.len());
-    let mut replaced = false;
-    for (kind, val, fiber_id) in snap {
-        let next = match kind {
-            ReasonKind::Fail if !replaced => {
-                replaced = true;
-                heap.dup(new_err).map(StoredReason::Fail)
-            }
-            ReasonKind::Fail => heap.dup(&val.expect("fail")).map(StoredReason::Fail),
-            ReasonKind::Die => heap.dup(&val.expect("die")).map(StoredReason::Die),
-            ReasonKind::Interrupt => Ok(StoredReason::Interrupt { fiber_id }),
-        };
-        match next {
-            Ok(r) => out.push(r),
-            Err(err) => {
-                drop_stored(heap, out)?;
-                return Err(err);
+) -> Result<CauseToken, Error> {
+    let mut stored: Vec<StoredReason> = Vec::new();
+    let mut has_int = false;
+    if let Some(tok) = prev {
+        let pv = Value::Object(super::ObjectToken {
+            id: tok.object_id(),
+        });
+        let snaps = snapshot_reasons(heap, &pv)?;
+        charge(fuel, snaps.len().max(1))?;
+        for (kind, val, fid) in snaps {
+            match kind {
+                ReasonKind::Fail => {}
+                ReasonKind::Die => match heap.dup(val.as_ref().expect("die")) {
+                    Ok(v) => stored.push(StoredReason::Die(v)),
+                    Err(err) => {
+                        drop_stored(heap, stored)?;
+                        return Err(err);
+                    }
+                },
+                ReasonKind::Interrupt => {
+                    if fid == fiber_id {
+                        has_int = true;
+                    }
+                    stored.push(StoredReason::Interrupt { fiber_id: fid });
+                }
             }
         }
+    } else {
+        charge(fuel, 1)?;
     }
-    Ok(heap.allocate(Data::Cause(out)))
-}
-
-pub(in crate::memory) fn first_defect_message(
-    heap: &Heap,
-    cause_id: ObjectId,
-) -> Result<Option<String>, Error> {
-    let Data::Cause(rs) = &heap.object(cause_id)?.data else {
-        return Err(Error::ExpectedCause);
-    };
-    for r in rs {
-        if let StoredReason::Die(d) = r {
-            return Ok(Some(describe_defect(heap, d)?));
-        }
+    if !has_int {
+        stored.push(StoredReason::Interrupt { fiber_id });
     }
-    Ok(None)
+    let out = heap.allocate(Data::Cause(CauseData::plain(stored)));
+    CauseToken::from_cause_value(heap, out)
 }

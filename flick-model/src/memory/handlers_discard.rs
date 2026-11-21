@@ -78,6 +78,15 @@ impl<'p> Machine<'p, '_> {
                 let list = self.heap.construct("$list", items)?;
                 self.store(binding, list)?;
             }
+            TransferNext::FinishCutoff => {
+                let mut frame = self.frames.pop().expect("cutoff cleanup frame");
+                self.heap
+                    .drop_values(mem::take(&mut frame.locals).into_values_vec())?;
+                let gen_frames = self.release_frame_resources(&mut frame)?;
+                self.restore_evidence();
+                self.complete_cutoff_destination(frame.destination)?;
+                self.queue_discard_frames(gen_frames);
+            }
             TransferNext::Chain(next_discard) => {
                 self.discard = Some(*next_discard);
             }
@@ -95,7 +104,12 @@ impl<'p> Machine<'p, '_> {
                 self.current_owner = owner;
                 self.current_evidence = evidence;
             }
-            Destination::LayerRun { provider, .. } => self.leave_provider(provider)?,
+            Destination::LayerRun { provider, .. } => {
+                let paused = self.discard.take().expect("active transfer");
+                self.heap.drop_values(roots)?;
+                return self
+                    .leave_provider_outcome(provider, ScopeOutcome::Discard(Box::new(paused)));
+            }
             Destination::Handle { activation, .. } => {
                 let activation = self
                     .activations
@@ -124,7 +138,7 @@ impl<'p> Machine<'p, '_> {
             Destination::CloseScope {
                 owner, previous, ..
             } => {
-                if !self.owners[owner].finalizers.is_empty() {
+                if self.owner_needs_async_close(owner) {
                     let paused = self.discard.take().expect("active transfer");
                     self.heap.drop_values(roots)?;
                     return self.begin_close_scope(
@@ -139,24 +153,33 @@ impl<'p> Machine<'p, '_> {
             Destination::ClosingScope { state } => {
                 let owner = state.owner;
                 let previous = state.previous;
+                if state.masked {
+                    self.mask_depth = state.saved_mask;
+                }
                 self.drain_closing_scope_roots(*state, &mut roots);
                 self.close_owner(owner)?;
                 self.current_owner = previous;
             }
             Destination::RestoreOwner { previous, .. } => self.current_owner = previous,
-            Destination::Loop { args, .. } => roots.extend(args),
-            Destination::GenerateStrict { items, .. } => roots.extend(items),
+            Destination::Loop { args: items, .. } | Destination::GenerateStrict { items, .. } => {
+                roots.extend(items);
+            }
             Destination::GeneratorStep { gen_id, .. } => {
                 if let Some(slot) = self.generators.get_mut(&gen_id) {
                     slot.run = GeneratorRun::Done;
                 }
             }
             Destination::LazyComplete { lazy, .. } => {
-                let slot = self.heap.lazy_state_mut(self.execution, &lazy)?;
-                if let Some(LazyState::Running(task)) = slot.take() {
-                    *slot = Some(LazyState::Pending(task));
-                }
+                self.reset_lazy_or_handoff(&lazy)?;
             }
+            other => return self.discard_cleanup_destination(other),
+        }
+        self.heap.drop_values(roots)
+    }
+
+    fn discard_cleanup_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+        let mut roots = Vec::new();
+        match destination {
             Destination::AcquireRegister { release, .. } => roots.push(release),
             Destination::BracketUse {
                 use_fn, release_fn, ..
@@ -169,18 +192,210 @@ impl<'p> Machine<'p, '_> {
                 release_fn,
                 ..
             } => return self.discard_bracket_release(resource, release_fn, roots),
-            Destination::BracketFinish { outcome, .. } => match outcome {
-                BracketOutcome::Success(v) => roots.push(v),
-                BracketOutcome::Failure(cause) => roots.push(cause.into_value()),
-            },
-            Destination::RecoveryHelper { .. }
+            Destination::BracketFinish {
+                outcome,
+                saved_mask,
+                ..
+            }
+            | Destination::EnsuringDone {
+                outcome,
+                saved_mask,
+                ..
+            }
+            | Destination::OnExitRunFin {
+                outcome,
+                saved_mask,
+                ..
+            }
+            | Destination::OnExitFinish {
+                outcome,
+                saved_mask,
+                ..
+            } => {
+                self.mask_depth = saved_mask;
+                if let Some(cause) = self.take_defect_outcome(outcome, &mut roots)? {
+                    return self.escalate_discard_defect(cause, roots);
+                }
+            }
+            Destination::DiscardCleanupDone {
+                saved_mask,
+                masked,
+                paused,
+            }
+            | Destination::OnExitDiscardRunFin {
+                saved_mask,
+                masked,
+                paused,
+            } => {
+                if masked {
+                    self.mask_depth = saved_mask;
+                }
+                self.drain_discard_roots(*paused, &mut roots);
+            }
+            Destination::RestoreMask {
+                saved_mask, next, ..
+            } => {
+                self.mask_depth = saved_mask;
+                self.heap.drop_values(roots)?;
+                return self.discard_frame_destination(*next);
+            }
+            Destination::EnsuringFinish { finalizer, .. } => {
+                return self.discard_ensuring_finish(finalizer, roots);
+            }
+            Destination::OnExitDecide {
+                interruptible,
+                decide,
+                ..
+            } => return self.discard_on_exit_decide(interruptible, decide, roots),
+            other => return self.discard_env_destination(other),
+        }
+        self.heap.drop_values(roots)
+    }
+
+    fn discard_ensuring_finish(
+        &mut self,
+        finalizer: Value,
+        roots: Vec<Value>,
+    ) -> Result<(), Error> {
+        let paused = self.discard.take().expect("active transfer");
+        self.heap.drop_values(roots)?;
+        let saved_mask = self.mask_depth;
+        self.mask_depth += 1;
+        self.scratch.extend([finalizer, Value::Unit]);
+        self.await_task_fresh(Destination::DiscardCleanupDone {
+            saved_mask,
+            masked: true,
+            paused: Box::new(paused),
+        })
+    }
+
+    fn discard_on_exit_decide(
+        &mut self,
+        interruptible: bool,
+        decide: Value,
+        roots: Vec<Value>,
+    ) -> Result<(), Error> {
+        let paused = self.discard.take().expect("active transfer");
+        self.heap.drop_values(roots)?;
+        let saved_mask = self.mask_depth;
+        if !interruptible {
+            self.mask_depth += 1;
+        }
+        let exit_val = self
+            .heap
+            .allocate(Data::Exit(super::ExitData::Success(Value::Unit)));
+        self.scratch.extend([decide, exit_val]);
+        self.apply_fresh(Destination::OnExitDiscardRunFin {
+            saved_mask,
+            masked: !interruptible,
+            paused: Box::new(paused),
+        })
+    }
+
+    fn discard_env_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+        let mut roots = Vec::new();
+        match destination {
+            Destination::CatchCause { handler, .. }
+            | Destination::ProvideContext {
+                context: handler, ..
+            } => roots.push(handler),
+            Destination::WithServices { services, next } => {
+                roots.extend(services);
+                self.heap.drop_values(roots)?;
+                return self.discard_frame_destination(*next);
+            }
+            Destination::CachedComplete { next, .. } => {
+                self.heap.drop_values(roots)?;
+                return self.discard_frame_destination(*next);
+            }
+            Destination::RestoreFiberRef { key, previous, .. } => {
+                let old = match previous {
+                    Some(v) => self.fiber_refs.insert(key, v),
+                    None => self.fiber_refs.remove(&key),
+                };
+                roots.extend(old);
+            }
+            Destination::RestoreOwnerEvidence {
+                previous, evidence, ..
+            } => {
+                self.current_owner = previous;
+                self.current_evidence = evidence;
+            }
+            Destination::RestoreEnvRefs { previous, .. } => {
+                let old = mem::replace(&mut self.fiber_refs, previous);
+                roots.extend(old.into_values());
+            }
+            Destination::RestoreRandom {
+                previous, rng_id, ..
+            } => {
+                self.seeded_random = previous;
+                self.isaac_rngs.remove(&rng_id);
+            }
+            Destination::LayerBuildFinish {
+                inner_owner,
+                prev_owner,
+                prev_ev,
+                prev_memo,
+                ..
+            } => {
+                self.current_owner = prev_owner;
+                self.current_evidence = prev_ev;
+                self.restore_fiber_memo(prev_memo)?;
+                self.close_owner(inner_owner)?;
+            }
+            Destination::OrDie { .. }
+            | Destination::TimedFinish { .. }
+            | Destination::RecoveryHelper { .. }
             | Destination::CaptureExit { .. }
             | Destination::Top
             | Destination::Bind(_)
             | Destination::Modify { .. }
             | Destination::FunctionBoundary { .. }
             | Destination::DiscardFinalizer => {}
+            _ => unreachable!("handled in discard_frame_destination"),
         }
+        self.heap.drop_values(roots)
+    }
+
+    fn take_defect_outcome(
+        &self,
+        outcome: BracketOutcome,
+        roots: &mut Vec<Value>,
+    ) -> Result<Option<super::CauseToken>, Error> {
+        match outcome {
+            BracketOutcome::Success(v) => {
+                roots.push(v);
+                Ok(None)
+            }
+            BracketOutcome::Failure(cause) => {
+                let has_die = self
+                    .heap
+                    .cause_reasons(&cause)?
+                    .any(|r| matches!(r, super::Reason::Die(_)));
+                if has_die {
+                    Ok(Some(cause))
+                } else {
+                    roots.push(cause.into_value());
+                    Ok(None)
+                }
+            }
+        }
+    }
+
+    fn escalate_discard_defect(
+        &mut self,
+        cause: super::CauseToken,
+        mut roots: Vec<Value>,
+    ) -> Result<(), Error> {
+        if let Some(mut discard) = self.discard.take() {
+            self.drain_transfer_next_roots(&mut discard.next, &mut roots);
+            self.frames.extend(discard.frames);
+            self.restore_evidence();
+        }
+        if let Some(prev) = self.failure.replace(cause) {
+            roots.push(prev.into_value());
+        }
+        self.failure_elected = true;
         self.heap.drop_values(roots)
     }
 
@@ -192,15 +407,14 @@ impl<'p> Machine<'p, '_> {
     ) -> Result<(), Error> {
         let paused = self.discard.take().expect("active transfer");
         self.heap.drop_values(roots)?;
+        let saved_mask = self.mask_depth;
+        self.mask_depth += 1;
         self.scratch.extend([release_fn, resource]);
-        let state = Box::new(super::ClosingScopeState {
-            owner: self.current_owner,
-            previous: self.current_owner,
-            remaining: Vec::new(),
-            outcome: ScopeOutcome::Discard(Box::new(paused)),
-            finalizer_failure: None,
-        });
-        self.apply(Destination::ClosingScope { state })
+        self.apply_fresh(Destination::DiscardCleanupDone {
+            saved_mask,
+            masked: true,
+            paused: Box::new(paused),
+        })
     }
 
     fn discard_invocation(&mut self, id: usize, roots: &mut Vec<Value>) {

@@ -1,3 +1,53 @@
+fn is_metered_primitive(kind: Intrinsic) -> bool {
+    matches!(
+        kind,
+        Intrinsic::ArrayToList
+            | Intrinsic::ListRange
+            | Intrinsic::PrimitiveCompare
+            | Intrinsic::PrimitiveHash
+            | Intrinsic::IntUnsafeDiv
+            | Intrinsic::IntUnsafeRem
+            | Intrinsic::NumberToFloat
+            | Intrinsic::ToBigInt
+            | Intrinsic::FloatMin
+            | Intrinsic::FloatMax
+            | Intrinsic::StringLength
+            | Intrinsic::RecordGet
+            | Intrinsic::RecordExtend
+            | Intrinsic::RecordRemove
+            | Intrinsic::RecordProject
+            | Intrinsic::RecordMergeDisjoint
+            | Intrinsic::RecordLabels
+            | Intrinsic::ExitIsSuccess
+            | Intrinsic::ExitIsFailure
+            | Intrinsic::ExitHasInterrupts
+            | Intrinsic::Int(_)
+            | Intrinsic::Float(_)
+            | Intrinsic::BigInt(_)
+            | Intrinsic::String(_)
+            | Intrinsic::List(_)
+            | Intrinsic::Record(_)
+            | Intrinsic::Debug(_)
+            | Intrinsic::Bytes(_)
+            | Intrinsic::Hash(_)
+            | Intrinsic::Json(_)
+            | Intrinsic::BigDecimal(_)
+            | Intrinsic::RegExp(_)
+            | Intrinsic::Duration(_)
+            | Intrinsic::Outcome(_)
+            | Intrinsic::Gen(_)
+            | Intrinsic::Schema(_)
+            | Intrinsic::JsonSchema(_)
+            | Intrinsic::Path(_)
+            | Intrinsic::DateTime(_)
+            | Intrinsic::Cron(_)
+            | Intrinsic::Graph(_)
+            | Intrinsic::Crypto(_)
+            | Intrinsic::Config(_)
+            | Intrinsic::Arbitrary(_)
+    )
+}
+
 impl Machine<'_, '_> {
     fn within(
         &mut self,
@@ -46,48 +96,10 @@ impl Machine<'_, '_> {
         if self.control_intrinsic(kind, binding)? {
             return Ok(());
         }
+        if is_metered_primitive(kind) {
+            return self.metered_primitive(kind, binding);
+        }
         match kind {
-            Intrinsic::ArrayToList
-            | Intrinsic::ListRange
-            | Intrinsic::PrimitiveCompare
-            | Intrinsic::PrimitiveHash
-            | Intrinsic::IntUnsafeDiv
-            | Intrinsic::IntUnsafeRem
-            | Intrinsic::NumberToFloat
-            | Intrinsic::ToBigInt
-            | Intrinsic::FloatMin
-            | Intrinsic::FloatMax
-            | Intrinsic::StringLength
-            | Intrinsic::RecordGet
-            | Intrinsic::RecordExtend
-            | Intrinsic::RecordRemove
-            | Intrinsic::RecordProject
-            | Intrinsic::RecordMergeDisjoint
-            | Intrinsic::RecordLabels
-            | Intrinsic::ExitIsSuccess
-            | Intrinsic::ExitIsFailure
-            | Intrinsic::ExitHasInterrupts
-            | Intrinsic::Int(_)
-            | Intrinsic::Float(_)
-            | Intrinsic::BigInt(_)
-            | Intrinsic::String(_)
-            | Intrinsic::List(_)
-            | Intrinsic::Record(_)
-            | Intrinsic::Debug(_)
-            | Intrinsic::Bytes(_)
-            | Intrinsic::Hash(_)
-            | Intrinsic::Json(_)
-            | Intrinsic::BigDecimal(_)
-            | Intrinsic::RegExp(_)
-            | Intrinsic::Duration(_)
-            | Intrinsic::Outcome(_)
-            | Intrinsic::Gen(_)
-            | Intrinsic::Schema(_)
-            | Intrinsic::JsonSchema(_)
-            | Intrinsic::Path(_)
-            | Intrinsic::DateTime(_)
-            | Intrinsic::Cron(_)
-            | Intrinsic::Graph(_) => self.metered_primitive(kind, binding)?,
             Intrinsic::StringStartsWith | Intrinsic::StringIncludes => {
                 let value = primitives::string_predicate(
                     self.heap,
@@ -100,6 +112,8 @@ impl Machine<'_, '_> {
             Intrinsic::LayerSucceed | Intrinsic::LayerRun | Intrinsic::LayerMerge => {
                 self.layer_intrinsic(kind, binding)?;
             }
+            Intrinsic::Async(op) => self.async_intrinsic(op, binding)?,
+            Intrinsic::Layer(op) => self.layer_std_intrinsic(op, binding)?,
             Intrinsic::Try => {
                 self.pending_handler = self.scratch.pop();
                 self.scratch.push(Value::Unit);
@@ -127,21 +141,16 @@ impl Machine<'_, '_> {
             | Intrinsic::RefSet
             | Intrinsic::RefSame
             | Intrinsic::RefModify => self.ref_intrinsic(kind, binding)?,
-            Intrinsic::PrintLine | Intrinsic::Show | Intrinsic::Host(_) => {
+            Intrinsic::PrintLine | Intrinsic::Show => {
                 let value =
                     primitives::intrinsic(self.heap, kind, &self.scratch[0], &mut self.stdout)?;
                 self.primitive_result(binding, value)?;
             }
-            Intrinsic::LazyMake
-            | Intrinsic::LazyForce
-            | Intrinsic::ScopeAddFinalizer
-            | Intrinsic::ScopeAddFinalizerExit
-            | Intrinsic::ScopeAddClose
-            | Intrinsic::AcquireRelease
-            | Intrinsic::Bracket
-            | Intrinsic::Uninterruptible
-            | Intrinsic::SeqOfList
-            | Intrinsic::SeqToList => unreachable!("control intrinsics dispatched above"),
+            Intrinsic::Host(primitive) => {
+                let value = self.host_primitive(primitive)?;
+                self.primitive_result(binding, value)?;
+            }
+            _ => unreachable!("control and metered intrinsics dispatched above"),
         }
         Ok(())
     }
@@ -154,9 +163,7 @@ impl Machine<'_, '_> {
             }
             Intrinsic::EffectDie => {
                 let msg = self.scratch.pop().expect("die message");
-                let cause = self
-                    .heap
-                    .cause(&[super::Reason::Die(&msg)], &mut self.fuel);
+                let cause = self.heap.cause(&[super::Reason::Die(&msg)], &mut self.fuel);
                 self.heap.drop_value(msg)?;
                 self.failure = Some(cause?);
                 self.failure_elected = false;
@@ -244,6 +251,35 @@ impl Machine<'_, '_> {
     fn metered_primitive(&mut self, kind: Intrinsic, binding: Local) -> Result<(), Error> {
         let value = primitives::metered_primitive(self.heap, kind, &self.scratch, &mut self.fuel)?;
         self.primitive_result(binding, value)
+    }
+
+    fn host_primitive(&mut self, primitive: HostPrimitive) -> Result<Value, Error> {
+        match primitive {
+            HostPrimitive::CurrentTimeMillis => {
+                #[expect(clippy::cast_precision_loss, reason = "virtual ms fits f64")]
+                let ms = (self.virtual_now_ns / 1_000_000) as f64;
+                return Ok(Value::Float(ms));
+            }
+            HostPrimitive::CurrentTimeNanos | HostPrimitive::MonotonicTimeNanos => {
+                return self
+                    .heap
+                    .literal(&Lit::BigInt(self.virtual_now_ns.to_string()));
+            }
+            HostPrimitive::RandomNext => {
+                if let Some(rng_id) = self.seeded_random
+                    && let Some(rng) = self.isaac_rngs.get_mut(&rng_id)
+                {
+                    return Ok(Value::Float(rng.next_f64()));
+                }
+            }
+            _ => {}
+        }
+        primitives::intrinsic(
+            self.heap,
+            Intrinsic::Host(primitive),
+            &self.scratch[0],
+            &mut self.stdout,
+        )
     }
 
     fn unwrap_result(&mut self, binding: Local) -> Result<(), Error> {

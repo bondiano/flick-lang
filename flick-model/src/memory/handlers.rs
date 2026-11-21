@@ -1,8 +1,8 @@
 //! Explicit owned handler activations, parked frames and metered transfers.
 use super::{
     Activation, BracketOutcome, CapturedContinuation, Data, Destination, Discard, Error,
-    GeneratorRun, InstalledOperation, Invocation, InvocationEnd, LazyState, Local, Machine,
-    Operation, ScopeOutcome, Segment, TransferNext, Value, charge, iter, mem,
+    GeneratorRun, InstalledOperation, Invocation, InvocationEnd, Local, Machine, Operation,
+    ScopeOutcome, Segment, TransferNext, Value, charge, iter, mem,
 };
 use flick_core::ir::memory::HandlerEffect;
 use flick_core::types::OpClass;
@@ -109,46 +109,33 @@ impl Machine<'_, '_> {
         self.stage(dicts.iter().chain(args).copied())?;
         let mut selected = None;
         for at in (0..self.frames.len()).rev() {
-            match self.frames[at].destination {
-                Destination::LayerRun { provider, .. }
-                    if Self::provider_matches(
-                        self.heap,
-                        &self.providers[&provider],
-                        effect,
-                        &mut self.fuel,
-                    )? =>
+            if let Some(impl_rep) = Self::find_dest_service(
+                self.heap,
+                &self.frames[at].destination,
+                &self.providers,
+                effect,
+                &mut self.fuel,
+            )? {
+                return self.invoke_service_impl(&impl_rep, binding, op);
+            }
+            if let Destination::Handle {
+                activation,
+                binding,
+            } = self.frames[at].destination
+            {
+                let handler = &self.activations[&activation];
+                if let Some(operation) = handler
+                    .operations
+                    .iter()
+                    .find(|operation| operation.effect == effect && operation.name == op)
                 {
-                    return self.invoke_provider(provider, binding, effect, op);
+                    selected = Some((at, binding, handler.owner, operation));
+                    break;
                 }
-                Destination::Handle {
-                    activation,
-                    binding,
-                } => {
-                    let handler = &self.activations[&activation];
-                    if let Some(operation) = handler
-                        .operations
-                        .iter()
-                        .find(|operation| operation.effect == effect && operation.name == op)
-                    {
-                        selected = Some((at, binding, handler.owner, operation));
-                        break;
-                    }
-                }
-                _ => {}
             }
         }
         let Some((at, result_binding, outer_owner, operation)) = selected else {
-            if let Some(root) = self.root_with(effect)? {
-                return self.invoke_provider(root, binding, effect, op);
-            }
-            charge(
-                &mut self.fuel,
-                effect.len().saturating_add(op.len()).saturating_add(1),
-            )?;
-            return Err(Error::MissingHandler {
-                effect: effect.into(),
-                op: op.into(),
-            });
+            return self.perform_fallback(binding, effect, op, dicts.len(), args.len());
         };
         if operation.dicts != dicts.len() || operation.arity != args.len() {
             return Err(Error::OperationArgumentCount {
@@ -161,9 +148,94 @@ impl Machine<'_, '_> {
             });
         }
         let class = operation.class;
-        let function = self.heap.dup(&operation.function)?;
+        let fn_rep = operation.function.representation();
+        if class == OpClass::Control && self.maybe_cutoff_control(at)? {
+            return Ok(());
+        }
+        let function = self.heap.dup(&fn_rep)?;
         self.scratch.insert(0, function);
         self.dispatch_handler_operation(at, binding, result_binding, outer_owner, class)
+    }
+
+    fn perform_fallback(
+        &mut self,
+        binding: Local,
+        effect: &str,
+        op: &str,
+        dict_count: usize,
+        arg_count: usize,
+    ) -> Result<(), Error> {
+        let mut inherited_rep = None;
+        for s in &self.inherited_services {
+            if let Some(imp) =
+                super::layers::lookup_layer_service(self.heap, s, effect, &mut self.fuel)?
+            {
+                inherited_rep = Some(imp.representation());
+                break;
+            }
+        }
+        if let Some(rep) = inherited_rep {
+            return self.invoke_service_impl(&rep, binding, op);
+        }
+        let inherited_op = self
+            .inherited_tail_ops
+            .iter()
+            .find(|candidate| candidate.effect == effect && candidate.name == op)
+            .map(|candidate| {
+                (
+                    candidate.dicts,
+                    candidate.arity,
+                    candidate.function.representation(),
+                )
+            });
+        if let Some((expected_dicts, expected_args, fn_rep)) = inherited_op {
+            if expected_dicts != dict_count || expected_args != arg_count {
+                return Err(Error::OperationArgumentCount {
+                    effect: effect.into(),
+                    op: op.into(),
+                    expected_dicts,
+                    actual_dicts: dict_count,
+                    expected_args,
+                    actual_args: arg_count,
+                });
+            }
+            let function = self.heap.dup(&fn_rep)?;
+            self.scratch.insert(0, function);
+            return self.apply(Destination::Bind(binding));
+        }
+        if let Some(root) = self.root_with(effect)? {
+            return self.invoke_provider(root, binding, effect, op);
+        }
+        charge(
+            &mut self.fuel,
+            effect.len().saturating_add(op.len()).saturating_add(1),
+        )?;
+        Err(Error::MissingHandler {
+            effect: effect.into(),
+            op: op.into(),
+        })
+    }
+
+    fn maybe_cutoff_control(&mut self, at: usize) -> Result<bool, Error> {
+        let mut cutoff_at = None;
+        for idx in (at + 1..self.frames.len()).rev() {
+            if self.is_cutoff_cleanup_destination(&self.frames[idx].destination)? {
+                cutoff_at = Some(idx);
+                break;
+            }
+        }
+        let Some(idx) = cutoff_at else {
+            return Ok(false);
+        };
+        self.release_operands()?;
+        self.transfer_fuel(self.frames.len() - (idx + 1))?;
+        let cleanup_frames = self.frames.split_off(idx + 1);
+        self.discard = Some(Discard {
+            frames: cleanup_frames,
+            owner: Some(self.current_owner),
+            next: TransferNext::FinishCutoff,
+        });
+        Ok(true)
     }
 
     fn dispatch_handler_operation(

@@ -227,10 +227,10 @@ fn exit_predicate(
             let Value::Object(cause_tok) = cause else {
                 return Err(Error::ExpectedCause);
             };
-            let Data::Cause(reasons) = &heap.object(cause_tok.id)?.data else {
+            let Data::Cause(data) = &heap.object(cause_tok.id)?.data else {
                 return Err(Error::ExpectedCause);
             };
-            reasons
+            data.reasons
                 .iter()
                 .any(|r| matches!(r, super::causes::StoredReason::Interrupt { .. }))
         }

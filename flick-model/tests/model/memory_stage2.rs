@@ -45,9 +45,6 @@ fn all_model_txt_cases_run_on_counted_path_in_both_profiles() {
         "expected full model.txt list, got {}",
         cases.len()
     );
-    // Stage 4 dynamic `Layer.effect` build phase is intentionally deferred to Stage 4;
-    // every other case in `tests/run/model.txt` (89/91, 178 profiles) must pass on the counted path.
-    let stage4_layer_effect = ["effect/service_params", "codegen/loops_guards"];
     let mut unexpected_skips = Vec::new();
     let mut ran_count = 0usize;
     for case in cases {
@@ -60,11 +57,6 @@ fn all_model_txt_cases_run_on_counted_path_in_both_profiles() {
             let counted = match run::counted_main(&modules, &main, release) {
                 Ok(c) => c,
                 Err(err) => {
-                    if stage4_layer_effect.contains(&case)
-                        && err.contains("Some(\"flick:Layer\"):effect")
-                    {
-                        continue;
-                    }
                     unexpected_skips.push(format!("{case} (release={release}): {err}"));
                     continue;
                 }
@@ -91,7 +83,7 @@ fn all_model_txt_cases_run_on_counted_path_in_both_profiles() {
         "unexpected model.txt skips on counted path:\n{}",
         unexpected_skips.join("\n")
     );
-    assert!(ran_count >= 178);
+    assert!(ran_count >= 182);
 }
 
 #[test]
