@@ -7,7 +7,7 @@ use std::ptr;
 
 use super::{Ide, Symbol, navigate::Source, tree};
 use crate::doc;
-use crate::iface::{Decl, Namespace};
+use crate::iface::Namespace;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -19,6 +19,7 @@ mod attributes;
 #[cfg(test)]
 mod attributes_tests;
 pub(super) mod companions;
+mod exposing;
 mod kinds;
 mod operators;
 mod types;
@@ -37,7 +38,7 @@ fn local_code(name: &str, ty: &str, mutable: bool) -> String {
     code
 }
 
-fn documentation(source: &Source, name: &str) -> Option<String> {
+pub(super) fn documentation(source: &Source, name: &str) -> Option<String> {
     source
         .tree
         .nodes()
@@ -154,6 +155,19 @@ impl Ide<'_> {
             K::MatchKw => ("match … with", "The value of the arm that matches."),
             K::IfKw => ("if … then … else …", "The value of the branch taken."),
             K::FunKw => ("fun … -> …", "An anonymous function."),
+            K::LetKw if parent.kind == K::LetDecl && parent.has_token(K::ElseKw) => (
+                "let … = … else …",
+                "Binds the pattern for the remainder of the current block; if the pattern \
+                 does not match, the `else` fallback becomes the result of the current \
+                 block and skips the remaining statements. Pattern bindings are monomorphic \
+                 (as in `match`) and only in scope after `else`.",
+            ),
+            K::ElseKw if parent.kind == K::LetDecl => (
+                "let … = … else …",
+                "If the pattern does not match, this fallback value becomes the result of \
+                 the current block, skipping the remaining statements. Pattern bindings are \
+                 monomorphic (as in `match`) and only in scope after `else`.",
+            ),
             K::AwaitKw => {
                 let ran = match ty.spine() {
                     (h, args) if h.is_lang(Lang::Eff) && args.len() == 3 => show_type(args[2]),
@@ -256,59 +270,6 @@ impl Ide<'_> {
             format!("```flick\n{name} : {}\n```", m.typing.shown(range, ty)),
             range,
         ))
-    }
-
-    fn exposing_hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
-        let m = self.module(file)?;
-        let text = self.text(file);
-        let path = tree::path_to(&m.tree, offset);
-        let item = path.iter().find(|n| n.kind == K::ExposeItem)?;
-        let dots = item
-            .child_tokens()
-            .find(|t| t.kind == K::DotDot && t.start <= offset && offset < t.end)?;
-        let name = tree::name_of(item, K::Con, text)?;
-        let declaration = path
-            .iter()
-            .find(|n| matches!(n.kind, K::ImportDecl | K::ModuleHeader))?;
-        let module: String = declaration
-            .nodes()
-            .find(|n| n.kind == K::ModulePath)?
-            .text(text)
-            .split_whitespace()
-            .collect();
-        let interface = self.interface(&module)?;
-        let parent = interface.find(Namespace::Type, name)?;
-        let members = match parent.decl {
-            Decl::Class => "methods",
-            Decl::Kind => "kind members",
-            Decl::Adt | Decl::Error => "constructors",
-            _ => return None,
-        };
-        let direction = if declaration.kind == K::ImportDecl {
-            "imported"
-        } else {
-            "exported"
-        };
-        let mut markdown = format!("**`{name}(..)` — {direction} {members}**\n\nfrom `{module}`");
-        let source = self.source(&parent.entity.module);
-        let mut any = false;
-        for member in interface.members(name) {
-            any = true;
-            let name = &member.entity.name;
-            let code = match (&member.scheme, &member.definition) {
-                (Some(scheme), _) => format!("{name} : {}", show_signature(scheme)),
-                (_, Some(definition)) => format!("{name} : {}", definition.kind),
-                _ => name.clone(),
-            };
-            let _ = write!(markdown, "\n\n```flick\n{code}\n```");
-            if let Some(doc) = source.as_ref().and_then(|s| documentation(s, name)) {
-                let _ = write!(markdown, "\n\n{doc}");
-            }
-        }
-        if !any {
-            markdown.push_str("\n\nNo public members.");
-        }
-        Some((markdown, (dots.start, dots.end)))
     }
 
     /// Markdown for the symbol at `offset`, and the range it covers.

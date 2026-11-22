@@ -65,6 +65,30 @@ let float_case x =
   | -0.0 -> "zero"
   | _ -> "other"
 
+inner_only : Option String -> String
+let inner_only opt =
+  let label =
+    let Some s = opt else "guest"
+    s ++ "!"
+  "hi " ++ label
+
+shadow_let_else : String -> Option String -> String
+let shadow_let_else x opt =
+  let Some x = opt else "outer:" ++ x
+  "inner:" ++ x
+
+shadow_match : String -> Option String -> String
+let shadow_match x opt =
+  match opt with
+  | Some x -> "inner:" ++ x
+  | _ -> "outer:" ++ x
+
+let_else_question : Option (Option Int) -> Option Int -> Option Int
+let let_else_question m backup =
+  let Some inner = m else Some (backup? + 100)
+  let Some n = Some inner? else None
+  Some (n + 5)
+
 tests : List Test.Test
 let tests = [
   Test.test "nested or-patterns" (fun () ->
@@ -113,5 +137,49 @@ let tests = [
   Test.test "let destructures a tuple" (fun () ->
     let (a, (b, c)) = (1, ("two", [3]))
     Test.equal "1 two [3]" (show a ++ " " ++ b ++ " " ++ show c)
+  ),
+  Test.test "let-else completes the nearest block and evaluates initializer once" (fun () ->
+    let mut evals = 0
+    let a =
+      let [h, ..._] =
+        evals = evals + 1
+        [3, 4]
+      else
+        -1
+      h * 10
+    let b =
+      let [h, ..._] =
+        evals = evals + 1
+        []
+      else
+        -1
+      h * 10
+    Test.equal ((30, -1, 2), ("hi ada!", "hi guest")) (
+      (a, b, evals),
+      (inner_only (Some "ada"), inner_only None),
+    )
+  ),
+  Test.test "let-else preserves outer shadowing and matches canonical match" (fun () ->
+    let cases = [("a", Some "b"), ("a", None)]
+    let actual = List.map (fun (x, o) -> shadow_let_else x o) cases
+    let expected = List.map (fun (x, o) -> shadow_match x o) cases
+    Test.equal (["inner:b", "outer:a"], true) (actual, actual == expected)
+  ),
+  Test.test "let-else in loops supports continue and break" (fun () ->
+    let mut sum = 0
+    for item <- [Some 2, None, Some 4, Some (-1), Some 100] do {
+      let Some n = item else continue
+      if n < 0 then break
+      sum = sum + n
+    }
+    Test.equal 6 sum
+  ),
+  Test.test "let-else preserves Option ? in initializer, fallback, and remainder" (fun () ->
+    Test.equal [Some 15, None, Some 102, None] [
+      let_else_question (Some (Some 10)) None,
+      let_else_question (Some None) (Some 1),
+      let_else_question None (Some 2),
+      let_else_question None None,
+    ]
   ),
 ]

@@ -278,6 +278,7 @@ with what the keyword does:
 | `scope` | `scope { … } : Float`: the value the block returns once its resources are released |
 | `provide`, `try` | the value of the block, with the services or errors it removes |
 | `match`, `if` | `match … with : String`: the value of the arm or branch taken |
+| `let`, `else` | `let … = … else … : Result InputError User`: in `let ... else`, the result of the current block, explaining that mismatch finishes the current block and bindings are monomorphic |
 | `fun` | `fun … -> … : Float -> Float`: the function |
 | `sql`, `ui` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
 | `await` | `await … : Float`: the result, with the `Eff` it runs |
@@ -652,7 +653,8 @@ save_with :
 
 ```text
 block       = statement { line break statement }
-statement   = "let" ["lazy"] ["mut"] … | signature | name "=" block | expr
+statement   = "let" pattern "=" block "else" block
+            | "let" ["lazy"] ["mut"] … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | [label [":"]] "loop" "{" block "}"
             | [label [":"]] "while" expr "do" block

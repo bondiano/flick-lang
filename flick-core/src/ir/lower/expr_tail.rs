@@ -202,6 +202,12 @@ impl Lower<'_> {
                     result = Some(self.let_assert(statement, span, then));
                     break;
                 }
+                K::LetDecl if statement.has_token(K::ElseKw) => {
+                    let rest = &statements[i + 1..];
+                    let then = |l: &mut Self| l.statements(rest, span, siblings);
+                    result = Some(self.let_else(statement, span, then));
+                    break;
+                }
                 K::LetDecl => self.local_let(statement, &mut stmts),
                 K::AssignStmt => stmts.push(self.assign(statement)),
                 _ if siblings.is_some() => lines.push(self.expr(statement)),
@@ -228,6 +234,47 @@ impl Lower<'_> {
             return result;
         }
         Expr::new(ExprKind::Block(stmts, Box::new(result)), span)
+    }
+
+    /// `let pattern = initializer else fallback` and the statements after it:
+    /// `match initializer with | pattern -> rest | _ -> fallback`.
+    fn let_else(
+        &mut self,
+        decl: &Node,
+        span: Span,
+        rest: impl FnOnce(&mut Self) -> Expr,
+    ) -> Expr {
+        let parts = let_parts(decl, self.text);
+        let value = parts.body.map_or_else(
+            || Expr::new(ExprKind::Lit(Lit::Unit), span),
+            |b| self.expr(b),
+        );
+        let fallback = parts.fallback.map_or_else(
+            || Expr::new(ExprKind::Lit(Lit::Unit), span),
+            |b| self.expr(b),
+        );
+        let mut arms = Vec::new();
+        if !self.typing.dead_arms.contains(&decl.range()) {
+            let mark = self.scope.len();
+            let pat = parts.pattern.map_or(Pat::Wild, |p| self.pattern(p));
+            let body = rest(self);
+            self.scope.truncate(mark);
+            arms.push(Arm {
+                pat,
+                guard: None,
+                body,
+            });
+        }
+        arms.push(Arm {
+            pat: Pat::Wild,
+            guard: None,
+            body: fallback,
+        });
+        let mut expr = Expr::new(ExprKind::Match(Box::new(value), arms), span);
+        if let Some(ty) = self.typing.values.get(&decl.range()) {
+            expr.ty = type_name(ty);
+        }
+        expr
     }
 
     /// The statements of a local `let`: those of a `let lazy`, or one.

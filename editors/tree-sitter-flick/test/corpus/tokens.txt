@@ -574,3 +574,22 @@ let r = r"raw"
   (identifier)
   (operator)
   (raw_string))
+
+==================
+Let else
+==================
+
+let Some x = m else
+  fallback x
+
+---
+
+(source_file
+  (keyword)
+  (constructor)
+  (identifier)
+  (operator)
+  (identifier)
+  (keyword)
+  (identifier)
+  (identifier))

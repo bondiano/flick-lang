@@ -1,0 +1,48 @@
+// `let ... else` exclusions in v1: not at module level, not in `do` or `for`
+// bind clauses, no modifiers (`rec`, `mut`, `lazy`, `assert`), no function
+// parameters, no inline whole-binding signature, no `when` guard, no `as`,
+// and no `where` contract.
+module App.LetElseSyntaxFail exposing (..)
+
+let Some top = Some 1 else 0
+
+in_do : Option Int -> Option Int
+let in_do o = do {
+  let Some x = o else pure 0
+  pure x
+}
+
+in_for : List (Option Int) -> List Int
+let in_for xs = [for item <- xs; let Some x = item else 0 yield x]
+
+modifiers : Option Int -> Int
+let modifiers o =
+  let mut x = o else 0
+  let lazy y = o else 0
+  let rec f = o else 0
+  let assert Some z = o else 0
+  0
+
+params_and_sig : Option Int -> Int
+let params_and_sig o =
+  let f a = o else 0
+  let Some n : Option Int = o else 0
+  0
+
+guard_and_as : Option Int -> Int
+let guard_and_as o =
+  let Some n when n > 0 = o else 0
+  let Some m = o else 0 as "bad"
+  n + m
+
+//~ FLICK-S007 @7:23-7:27 `let ... else` is only allowed inside a block, not as a module declaration
+//~ FLICK-S007 @11:18-11:22 `let ... else` is not allowed directly in a `do` block: use `match` instead
+//~ FLICK-S007 @16:52-16:56 `let ... else` is not allowed in `for` clauses: use it in the body or use `match`
+//~ FLICK-S007 @20:7-20:10 `let ... else` cannot use `mut`
+//~ FLICK-S007 @21:7-21:11 `let ... else` cannot use `lazy`
+//~ FLICK-S007 @22:7-22:10 `let ... else` cannot use `rec`
+//~ FLICK-S007 @23:7-23:13 `let ... else` cannot be combined with `assert`
+//~ FLICK-S007 @28:9-28:10 `let ... else` cannot declare function parameters
+//~ FLICK-S007 @29:14-29:15 `let ... else` does not take a type annotation: annotate the initializer or pattern instead
+//~ FLICK-S007 @34:14-34:18 `when` guards are not supported in `let` or `let ... else`: use `match` instead
+//~ FLICK-S007 @35:25-35:27 expected the end of `let ... else`: only `let assert` takes `as "message"`, found `as`

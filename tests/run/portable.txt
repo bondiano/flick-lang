@@ -63,6 +63,7 @@ codegen/unpack_dictionary
 codegen/implicit
 codegen/ints
 codegen/let_assert
+codegen/let_else
 codegen/let_mut
 codegen/loops
 codegen/lift

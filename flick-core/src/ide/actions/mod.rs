@@ -4,6 +4,7 @@
 
 mod extract;
 mod import_class;
+mod let_else;
 mod match_on;
 mod qualify;
 mod signature;
@@ -28,6 +29,7 @@ impl Ide<'_> {
         out.extend(self.add_signature(file, start));
         out.extend(self.infer_todo_signature(file, start));
         out.extend(self.import_class(file, start));
+        out.extend(self.let_else_actions(file, start));
         out.extend(self.match_on(file, start));
         out.extend(self.qualify(file, start));
         out.extend(self.extract(file, start, end));

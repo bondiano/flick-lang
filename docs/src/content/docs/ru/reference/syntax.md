@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: 61fccd2cba83efe4
+source_hash: 7a4c0778da6bf0f5
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -291,6 +291,7 @@ in when for yield do break continue
 | `scope` | `scope { … } : Float` — результат блока, возвращаемый после освобождения ресурсов |
 | `provide`, `try` | Результат блока и сервисы или ошибки, которые он устраняет |
 | `match`, `if` | `match … with : String` — результат выбранной ветки |
+| `let`, `else` | `let … = … else … : Result InputError User` — в `let ... else`, результат текущего блока с пояснением, что несовпадение завершает текущий блок и привязки мономорфны |
 | `fun` | `fun … -> … : Float -> Float` — тип функции |
 | `sql`, `ui` | Значение, создаваемое блоком, например `sql { … } : Template Pg {} { label : String }` |
 | `await` | `await … : Float` — результат и запускаемое вычисление `Eff` |
@@ -682,7 +683,8 @@ save_with :
 
 ```text
 block       = statement { line break statement }
-statement   = "let" ["lazy"] ["mut"] … | signature | name "=" block | expr
+statement   = "let" pattern "=" block "else" block
+            | "let" ["lazy"] ["mut"] … | signature | name "=" block | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | [label [":"]] "loop" "{" block "}"
             | [label [":"]] "while" expr "do" block

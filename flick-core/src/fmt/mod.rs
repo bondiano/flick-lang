@@ -80,6 +80,7 @@ mod contract;
 mod decl;
 mod expr;
 pub(crate) mod foralls;
+mod let_else;
 mod lines;
 mod plugins;
 mod printer;

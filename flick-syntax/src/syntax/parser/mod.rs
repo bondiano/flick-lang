@@ -616,6 +616,8 @@ mod contract_tests;
 #[cfg(test)]
 mod exposing_tests;
 #[cfg(test)]
+mod let_else_tests;
+#[cfg(test)]
 mod operator_tests;
 #[cfg(test)]
 mod plugin_tests;

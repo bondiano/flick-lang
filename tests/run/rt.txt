@@ -73,6 +73,7 @@ codegen/known_failure
 codegen/known_instances
 codegen/unpack_dictionary
 codegen/let_assert
+codegen/let_else
 codegen/let_mut
 codegen/loops
 codegen/lift

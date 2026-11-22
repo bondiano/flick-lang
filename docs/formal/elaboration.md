@@ -16,6 +16,7 @@ Elaborated here:
 - postfix `?`;
 - direct calls;
 - `let mut` variables and assignment;
+- `let ... else` block-remainder pattern bindings;
 - `CallSite`, the place of a use, which the checker gives.
 
 | Not covered | Where | How the model accounts for it |
@@ -85,11 +86,11 @@ constitute a proof of the Rust checker's rewrite.
 
 ```text
 e ::= … | do { s̄ } | for { c̄ } yield e | [for { c̄ } yield e] | for { c̄ } do e | e?
-s ::= p <- e | p₁ <- e₁ and … and pₙ <- eₙ | let p = e | if e | e
+s ::= p <- e | p₁ <- e₁ and … and pₙ <- eₙ | let p = e | let p = e₁ else e₂ | if e | e
 c ::= p <- e | if e | let p = e
 ```
 
-The last statement of a `do` is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`. Syntax: `reference/syntax.md` "`do`", "`for`", `?`.
+The last statement of a `do` is an expression; `let p = e₁ else e₂` is permitted only in an ordinary statement block (not directly in `do`, `for` clauses, or module declarations). Checker: `bindings.rs`, `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`. Syntax: `reference/syntax.md` "`do`", "`for`", `?`, `reference/bindings.md` "`let ... else`".
 
 ## 2. Dictionaries
 
@@ -469,6 +470,41 @@ the state. `x = v` of a `let lazy mut` is `Some (Ok v)`.
 the typing of blocks, so T7 covers them (`formal/Formal/LetMut/Lazy.lean`),
 given the Prelude's `Option` and `Result` in the signature (`LzSig`, which
 the witness signature has: `Elab.Witness.lzSig`).
+
+### 3.7 `let ... else`
+
+Inside an ordinary statement block, `let p = e₁ else e₂` followed by a non-empty
+block remainder `s̄` elaborates directly to a two-arm core `match`:
+
+```text
+⟦let p = e₁ else e₂ ; s̄⟧  =  match e₁ with p → ⟦s̄⟧ | _ → e₂
+```
+
+Statements preceding `let p = e₁ else e₂` remain outside the `match`, so their
+evaluation and completed `let mut` assignments persist regardless of which arm
+runs. The initializer `e₁` is evaluated once before matching; if `e₁` raises a
+typed error or defect, control propagates out without running `e₂`.
+
+- **Scope and hygiene.** Pattern binders of `p` are in scope only in `⟦s̄⟧` and
+  never in `e₁` or `e₂`; if `p` shadows an outer binding, `e₂` resolves to the
+  outer binding. Local bindings inside `e₂` stay confined to `e₂`.
+- **Typing and generalization.** Every variable bound by `p` is monomorphic,
+  matching `(Branch)` / `(Case-Dict)` even when `p` is an irrefutable single
+  variable. GADT type equalities, row equalities, existentials and held class
+  dictionaries introduced by `p` apply strictly within the `p → ⟦s̄⟧` branch
+  frame (`gadt/branch.rs`) and cannot leak into `e₂` or escape the block result.
+  Both `⟦s̄⟧` and `e₂` are checked against the common expected type of the
+  nearest ordinary block; no divergence (`Never`) requirement is imposed on `e₂`.
+  Effect/error rows and captures are the standard `match` join of `e₁`, `⟦s̄⟧`
+  and `e₂`.
+- **Formal impact.** Because `let ... else` lowers exclusively into existing
+  `ExprKind::Match` IR (`ir/lower/expr_tail.rs` `let_else`) with unchanged core
+  statics and dynamics, the λFlick calculus, `flick-model` rules, Prelude
+  schemes and Lean mechanization (`formal/`) require no new terms, typing rules
+  or axioms; T1–T7 apply directly to the elaborated core term. As stated in
+  `formal/README.md`, model and Lean theorems do not prove the Rust compiler or
+  the JS/Go runtimes; differential fixtures verify implementation equivalence
+  across the model and both backends.
 
 ## 4. Coherence and T6
 

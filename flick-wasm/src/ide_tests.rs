@@ -221,3 +221,46 @@ fn signature_help_reaches_the_call_under_the_parenthesis() {
         "{help}"
     );
 }
+
+#[test]
+fn let_else_hover_actions_and_emission_work_in_wasm_session() {
+    let source = "module Main exposing (main)\n\ngreet : Option String -> String\nlet greet raw =\n  let tag = \"é𝄞:\"\n  let Some name = raw else \"guest\"\n  tag ++ name\n\nmain : Unit -> Unit\nlet main () =\n  if greet (Some \"ada\") == \"\" then ()\n";
+    let mut session = Session::new();
+    assert_eq!(json(&session.update(source)), Value::Array(Vec::new()));
+
+    // UTF-16 offset of `else` (3 less than UTF-8 byte offset because of `é𝄞`).
+    let else_byte = source.find("else \"guest\"").expect("else");
+    let else_utf16 = u32::try_from(else_byte - 3).expect("utf16");
+    let hover = json(&session.hover(else_utf16));
+    assert!(
+        hover["text"]
+            .as_str()
+            .is_some_and(|c| c.contains("String") && c.contains("does not match")),
+        "{hover}"
+    );
+
+    let let_byte = source.find("let Some name").expect("let");
+    let let_utf16 = u32::try_from(let_byte - 3).expect("utf16");
+    let actions = json(&session.code_actions(let_utf16, let_utf16 + 3));
+    assert!(
+        actions
+            .as_array()
+            .expect("actions")
+            .iter()
+            .any(|a| a["title"] == "expand `let ... else` to `match`"),
+        "{actions}"
+    );
+
+    // Edit & undo reuses cache and emits identical debug/release output to a cold session.
+    let edited = source.replace("\"guest\"", "\"anon\"");
+    assert_eq!(json(&session.update(&edited)), Value::Array(Vec::new()));
+    assert_eq!(json(&session.update(source)), Value::Array(Vec::new()));
+    let mut cold_session = Session::new();
+    cold_session.update(source);
+    for profile in ["debug", "release"] {
+        assert_eq!(
+            json(&session.emit(profile)),
+            json(&cold_session.emit(profile))
+        );
+    }
+}

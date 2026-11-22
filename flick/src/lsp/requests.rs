@@ -137,6 +137,9 @@ impl Server {
             "textDocument/semanticTokens/full" => Ok(features::semantic_tokens(&ide, file)),
             "textDocument/foldingRange" => Ok(features::folding_ranges(&ide, file)),
             "textDocument/inlayHint" => Ok(features::inlay_hints(&ide, file)),
+            "textDocument/documentHighlight" => {
+                Ok(features::document_highlights(&ide, file, offset))
+            }
             "textDocument/signatureHelp" => Ok(features::signature_help(&ide, file, offset)),
             "textDocument/typeDefinition" => ide
                 .type_definition(file, offset)
@@ -349,6 +352,7 @@ fn capabilities() -> Value {
         "capabilities": {
             "textDocumentSync": { "openClose": true, "change": 2, "save": true },
             "hoverProvider": true,
+            "documentHighlightProvider": true,
             "definitionProvider": true,
             "referencesProvider": true,
             "completionProvider": { "triggerCharacters": ["."] },

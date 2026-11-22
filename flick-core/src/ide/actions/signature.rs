@@ -189,7 +189,10 @@ impl Ide<'_> {
         let i = path.iter().rposition(|n| n.kind == K::LetDecl)?;
         let (decl, parent) = (path[i], *path.get(i.checked_sub(1)?)?);
         let eq = decl.child_tokens().find(|t| t.kind == K::Eq)?;
-        if offset > eq.start || decl.nodes().any(|n| n.kind == K::Params) {
+        if offset > eq.start
+            || decl.nodes().any(|n| n.kind == K::Params)
+            || decl.has_token(K::ElseKw)
+        {
             return None;
         }
         let pattern = decl.nodes().find(|n| n.kind == K::VarPat)?;
