@@ -61,7 +61,16 @@ fn prepare_project_doc(
             sources: err_sources,
             diagnostics,
         })?;
-    let checked = compile_with_extra(explicit, &[], Some(prepared.rt), true)?;
+    let override_cfg = super::target_override(
+        &prepared.backend,
+        &prepared.choice,
+        prepared.target_overridden,
+        &prepared.options,
+        prepared.rt,
+        false,
+        Vec::new(),
+    );
+    let checked = compile_with_extra(explicit, &[], Some(&override_cfg), true)?;
     Ok((checked, Some(prepared)))
 }
 

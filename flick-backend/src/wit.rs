@@ -77,11 +77,12 @@ macro_rules! wit_conversions {
             BackendId { id, version }
             BackendPin { identity, sha256 }
             Capability { name, version }
+            TagAxis { name, tags, default, exclusive }
             Parameter { name, kind, multiple, required, help }
             OptionDescriptor { parameter, default, implicit_value, choices, verbs }
-            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, profiles, modes, capabilities, options }
+            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, tags, axes, profiles, modes, capabilities, options }
             OptionValue { key, value }
-            TargetRequest { backend_api, ir_version, language_version, runtime_abis, environment, profile, mode, required_capabilities, options }
+            TargetRequest { backend_api, ir_version, language_version, runtime_abis, environment, tags, host_package, profile, mode, required_capabilities, options }
             TargetSupport { capabilities }
             Span { file, start, end }
             Diagnostic { code, severity, message, span, notes }

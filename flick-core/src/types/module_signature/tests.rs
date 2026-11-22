@@ -213,6 +213,7 @@ fn nominal_row_source(owner: &str) -> Interface {
         definition: None,
         blocked: None,
         at: None,
+        via: Vec::new(),
         scheme: Some(Type::Fun {
             param: Box::new(Type::con("Prelude", "Unit")),
             effects: Some(Box::new(Effects::new(

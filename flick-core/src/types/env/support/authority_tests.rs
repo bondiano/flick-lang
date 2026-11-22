@@ -57,6 +57,7 @@ fn class_support_interface(class_support: bool, dictionary_support: bool) -> Int
                 definition: Some(definition),
                 blocked: None,
                 at: None,
+                via: Vec::new(),
             });
         }
     }
@@ -217,6 +218,7 @@ fn public_service_projections_do_not_acquire_support_authority() {
             }),
             blocked: None,
             at: None,
+            via: Vec::new(),
         }],
         ..Interface::default()
     };
@@ -259,6 +261,7 @@ fn nested_nominal_views_establish_companions_not_global_definition_equality() {
             definition: Some(public),
             blocked: None,
             at: None,
+            via: Vec::new(),
         }],
         support_types: vec![SupportType {
             entity: Entity {

@@ -1,6 +1,7 @@
 /// The runner of a program in a browser or a worker:
 /// `[project] runner = "Runner.Browser"`. It runs `main` with `()` under the
 /// root owner and reports a failure on the console.
+@when "js"
 module Runner.Browser exposing (Main, run)
 
 import Host

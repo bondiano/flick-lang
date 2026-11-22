@@ -232,7 +232,7 @@ pub fn try_builtins(stages_by_class: bool) -> Result<&'static [Interface], Strin
         return Ok(done);
     }
     let mut problem = None;
-    let report = |name: &str, mut diagnostics: Vec<Diagnostic>| {
+    let mut report = |name: &str, mut diagnostics: Vec<Diagnostic>| {
         diagnostics.retain(|d| !ALLOWED.contains(&d.code));
         let Some(first) = diagnostics.first() else {
             return;
@@ -242,7 +242,12 @@ pub fn try_builtins(stages_by_class: bool) -> Result<&'static [Interface], Strin
         };
         problem.get_or_insert_with(|| format!("`{name}` of `{package}`: {}", first.message));
     };
-    let done = check_reporting(builtin_sources(), report, stages_by_class, |_, _| {});
+    let done = check_reporting(
+        builtin_sources(),
+        &mut report,
+        stages_by_class,
+        &mut |_, _| {},
+    );
     match problem {
         Some(problem) => Err(problem),
         None => Ok(slot.get_or_init(|| done)),
@@ -277,24 +282,24 @@ fn check_allowing(
     modules: &[(&str, &str)],
     allowed: &[Code],
     stages_by_class: bool,
-    each: impl FnMut(&Module, &Typing),
+    mut each: impl FnMut(&Module, &Typing),
 ) -> Vec<Interface> {
-    let report = |name: &str, mut diagnostics: Vec<Diagnostic>| {
+    let mut report = |name: &str, mut diagnostics: Vec<Diagnostic>| {
         diagnostics.retain(|d| !allowed.contains(&d.code));
         assert!(
             diagnostics.is_empty(),
             "built-in module {name} does not check: {diagnostics:?}"
         );
     };
-    check_reporting(modules, report, stages_by_class, each)
+    check_reporting(modules, &mut report, stages_by_class, &mut each)
 }
 
 /// [`check_each`], giving what each module's check says to `report`.
 fn check_reporting(
     modules: &[(&str, &str)],
-    mut report: impl FnMut(&str, Vec<Diagnostic>),
+    report: &mut dyn FnMut(&str, Vec<Diagnostic>),
     stages_by_class: bool,
-    mut each: impl FnMut(&Module, &Typing),
+    each: &mut dyn FnMut(&Module, &Typing),
 ) -> Vec<Interface> {
     let mut done: Vec<Interface> = Vec::new();
     let mut known = Builtins::default();

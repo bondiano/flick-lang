@@ -100,6 +100,7 @@ impl Checker<'_> {
         Header {
             name: path.to_owned(),
             private: true,
+            when: None,
             span,
             exposing: (!node.nodes().any(|n| n.kind == K::ModuleResult)).then(|| {
                 vec![Item {

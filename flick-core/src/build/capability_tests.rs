@@ -3,12 +3,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::{env, fs};
 
-use super::capabilities::needs_adapter;
 use super::{Backend, Extras, Settings, builtin_modules_of, emit};
 use crate::codegen::EffectBridge;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::ir::ItemKind;
 use crate::ir::tests::check_text;
+use crate::project::target_preflight::needs_adapter;
 use crate::project::{Compilation, Compiled};
 use crate::source::SourceMap;
 
@@ -81,7 +81,7 @@ fn rt_rejects_a_reachable_cron_without_the_effect_adapter() {
         assert_eq!(found.len(), 3, "release={release}: {found:?}");
         let mut uses = Vec::new();
         for diagnostic in &found {
-            assert_eq!(diagnostic.code, codes::P012);
+            assert_eq!(diagnostic.code, codes::P064);
             let span = diagnostic
                 .span
                 .expect("the unsupported use has a source span");
@@ -129,7 +129,7 @@ let cron = Schedule.cron
 ";
     let found = diagnostics_for(source, EffectBridge::Absent, false, false);
     assert_eq!(found.len(), 1, "{found:?}");
-    assert_eq!(found[0].code, codes::P012);
+    assert_eq!(found[0].code, codes::P064);
     let span = found[0]
         .span
         .expect("the exported binding has a source span");
@@ -182,7 +182,7 @@ fn a_library_reexport_requires_its_runtime_capability() {
     for release in [false, true] {
         let found = diagnostics_for(source, EffectBridge::Absent, release, false);
         assert_eq!(found.len(), 1, "release={release}: {found:?}");
-        assert_eq!(found[0].code, codes::P012);
+        assert_eq!(found[0].code, codes::P064);
         let span = found[0].span.expect("the reexport has a source span");
         assert_eq!(&source[span.start as usize..span.end as usize], "cron");
         assert!(diagnostics_for(source, EffectBridge::Available, release, false).is_empty());
@@ -196,7 +196,7 @@ fn a_scoped_foreign_keeps_its_source_name_in_capability_diagnostics() {
         let found = diagnostics_for(source, EffectBridge::Absent, release, false);
         assert_eq!(found.len(), 1, "release={release}: {found:?}");
         let diagnostic = &found[0];
-        assert_eq!(diagnostic.code, codes::P012);
+        assert_eq!(diagnostic.code, codes::P064);
         assert!(
             diagnostic
                 .message
@@ -223,7 +223,7 @@ fn eager_dictionary_values_and_discarded_initializers_need_their_capabilities() 
         for release in [false, true] {
             let found = diagnostics(&source, EffectBridge::Absent, release);
             assert_eq!(found.len(), 1, "{source}: {found:?}");
-            assert_eq!(found[0].code, codes::P012);
+            assert_eq!(found[0].code, codes::P064);
             let span = found[0].span.expect("initializer reference");
             assert_eq!(
                 &source[span.start as usize..span.end as usize],

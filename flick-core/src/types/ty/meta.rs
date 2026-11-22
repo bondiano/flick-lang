@@ -246,8 +246,9 @@ mod tests {
     use std::hash::{Hash, Hasher};
 
     use super::{MetaOccurrence, Ordering};
+    use crate::iface::{Decl, Entity, Export, Namespace, closed};
     use crate::types::module_contract::context::{Context, Embedding, Scopes};
-    use crate::types::{Atom, Elem, Kind, Type};
+    use crate::types::{Atom, Elem, Kind, Row, Type};
 
     fn hash(value: &MetaOccurrence) -> u64 {
         let mut state = DefaultHasher::new();
@@ -361,7 +362,30 @@ mod tests {
             Elem::Service(Atom::Meta(occurrence)),
         ] {
             assert!(serde_json::to_string(&label).is_err());
-            assert!(serde_json::to_string(&Elem::Provided(Box::new(label))).is_err());
+            assert!(serde_json::to_string(&Elem::Provided(Box::new(label.clone()))).is_err());
+            let mut export = Export {
+                entity: Entity {
+                    module: "M".into(),
+                    namespace: Namespace::Value,
+                    name: "x".into(),
+                },
+                decl: Decl::Let,
+                parent: None,
+                scheme: Some(Type::Without {
+                    row: Box::new(Type::Var("r".into())),
+                    gone: vec![Elem::Provided(Box::new(label))],
+                }),
+                definition: None,
+                blocked: None,
+                at: None,
+                via: Vec::new(),
+            };
+            assert!(!closed::export_is_closed(&export));
+            export.scheme = Some(Type::Record(Row::closed(vec![(
+                Elem::Capture(Atom::Meta(MetaOccurrence::legacy(1))),
+                Type::con("Core", "Int"),
+            )])));
+            assert!(closed::export_is_closed(&export));
         }
     }
 }

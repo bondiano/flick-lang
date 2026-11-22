@@ -7,13 +7,13 @@
 
 use std::path::{Component, Path, PathBuf};
 
-use super::config::{self, Dependency, Kind, Source, TargetDependency};
+use super::config::{self, Dependency, HostConfig, Kind, Source, TargetDependency};
 use super::lock::{LOCK_FILE, Lock};
 use super::store;
 use super::{Host, Project};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::implicit_packages::is_implicit_package;
-use crate::source::SourceMap;
+use crate::source::{SourceMap, Span};
 
 #[derive(Debug, Default)]
 pub(super) struct Packages {
@@ -37,6 +37,10 @@ struct Package {
     hooks: Vec<String>,
     /// The names whose places of call that plugin checks.
     watch: Vec<String>,
+    /// Package-level `[package] when = "<cond>"`, if declared.
+    when: Option<(String, Span)>,
+    /// Host declaration `[host]`, if this package defines a host environment.
+    host: Option<HostConfig>,
 }
 
 /// What the modules of a library of `[dependencies]` depend on besides the
@@ -110,6 +114,8 @@ impl Packages {
                 load: Vec::new(),
                 hooks: Vec::new(),
                 watch: Vec::new(),
+                when: None,
+                host: None,
             });
         }
         packages.extend(installed);
@@ -174,6 +180,21 @@ impl Packages {
             .filter(|p| !p.installed)
             .map(|p| p.name.as_str())
             .collect()
+    }
+
+    /// Each dependency package that declares `[package] when`.
+    pub fn package_when(&self) -> impl Iterator<Item = (&str, &str, Span)> {
+        self.packages.iter().filter_map(|p| {
+            let (cond, span) = p.when.as_ref()?;
+            Some((p.name.as_str(), cond.as_str(), *span))
+        })
+    }
+
+    /// Each dependency package that declares `[host]`.
+    pub fn hosts(&self) -> impl Iterator<Item = (&str, &HostConfig)> {
+        self.packages
+            .iter()
+            .filter_map(|p| Some((p.name.as_str(), p.host.as_ref()?)))
     }
 }
 
@@ -379,6 +400,8 @@ impl Libraries<'_> {
             load: (library.package.as_ref()).map_or_else(Vec::new, |p| p.load.clone()),
             hooks: (library.package.as_ref()).map_or_else(Vec::new, |p| p.hooks.clone()),
             watch: (library.package.as_ref()).map_or_else(Vec::new, |p| p.watch.clone()),
+            when: library.package.as_ref().and_then(|p| p.when.clone()),
+            host: library.host,
         });
         Some((at, library.dependencies))
     }

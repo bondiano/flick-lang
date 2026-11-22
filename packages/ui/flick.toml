@@ -4,6 +4,7 @@ schema-version = 1
 name = "ui"
 version = "0.1.0"
 flick = ">=0.1, <0.2"
+when = "js"
 
 [project]
 kind = "lib"

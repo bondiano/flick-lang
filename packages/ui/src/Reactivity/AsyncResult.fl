@@ -1,6 +1,7 @@
 /// The value of an atom an effect computes. It is not there yet, it
 /// succeeded, or it failed, and each case may be waiting for a run that has
 /// started again. The module is experimental.
+@when "js"
 module Reactivity.AsyncResult exposing (..)
 
 /// The state of an effect's result: initial, a success of `a` or a failure

@@ -6,6 +6,7 @@
 /// attributes and version among it, comes from the current
 /// `ConfigProvider`, or else from the variables `Host.Environment` lists.
 /// The module is experimental.
+@when "js"
 module Otlp exposing (..)
 
 import Duration

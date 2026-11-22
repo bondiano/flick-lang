@@ -6,7 +6,9 @@ use std::{mem, ops};
 use serde::Deserialize;
 use toml::{Spanned, de};
 
-use super::deps::{RawDependency, RawGrants, RawPackage, dependencies, grants, package};
+use super::deps::{
+    RawDependency, RawGrants, RawHost, RawPackage, dependencies, grants, host, package,
+};
 use super::parse_targets::{RawBuild, RawTargets, parse_build, parse_targets};
 use super::workspace::RawWorkspace;
 use super::{Build, Config, Entry, Kind, MAIN_ENTRY, Manifest, Script};
@@ -37,6 +39,7 @@ struct Raw {
     /// and a migration fix hint to `[target.js.dependencies]`.
     js: Option<Spanned<toml::Value>>,
     package: Option<Spanned<RawPackage>>,
+    host: Option<Spanned<RawHost>>,
     plugins: Option<Spanned<BTreeMap<String, Spanned<RawGrants>>>>,
     tools: Option<Spanned<BTreeMap<String, Vec<String>>>>,
     workspace: Option<RawWorkspace>,
@@ -174,7 +177,7 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
         None => (None, Vec::new()),
     };
     let project = if let Some(project) = raw.project.take() {
-        Some(config(project, raw, &span)?)
+        Some(config(project, raw, text, &span)?)
     } else {
         if members.is_none() {
             return Err(Diagnostic::error(
@@ -190,6 +193,7 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
             ("lint", raw.lint.map(|l| l.span())),
             ("dependencies", raw.dependencies.map(|d| d.span())),
             ("package", raw.package.map(|p| p.span())),
+            ("host", raw.host.map(|h| h.span())),
             ("plugins", raw.plugins.map(|p| p.span())),
             ("tools", raw.tools.map(|t| t.span())),
         ];
@@ -253,6 +257,7 @@ fn scripts(
 fn config(
     project: Spanned<RawProject>,
     raw: Raw,
+    text: &str,
     span: &dyn Fn(ops::Range<usize>) -> Span,
 ) -> Result<Config, Diagnostic> {
     let project_span = span(project.span());
@@ -319,7 +324,21 @@ fn config(
     let package = match raw.package {
         Some(raw) => {
             let at = span(raw.span());
-            Some(package(raw, at)?)
+            Some(package(raw, at, text, span)?)
+        }
+        None => None,
+    };
+    let host = match raw.host {
+        Some(raw) => {
+            let at = span(raw.span());
+            if project.kind != Kind::Lib {
+                return Err(Diagnostic::error(
+                    codes::P032,
+                    "`[host]` is only valid on a library (`kind = \"lib\"`)",
+                    at,
+                ));
+            }
+            Some(host(raw, at, text, span)?)
         }
         None => None,
     };
@@ -344,6 +363,7 @@ fn config(
         dependencies,
         target_dependencies,
         package,
+        host,
         build,
         targets,
         sql_dialect,

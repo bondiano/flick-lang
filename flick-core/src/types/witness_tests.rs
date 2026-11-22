@@ -199,6 +199,7 @@ fn inferred_witness_kind_is_closed_before_json_and_reopens_in_a_fresh_consumer()
             }),
             blocked: None,
             at: None,
+            via: Vec::new(),
         }],
         ..Interface::default()
     };

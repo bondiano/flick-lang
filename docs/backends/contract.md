@@ -55,7 +55,7 @@ A `BuildRequest` carries these independent facts:
 | --- | --- |
 | API, IR and language versions | Host; explicit handshake ranges in the descriptor |
 | Backend selection | Project pin: id, version and SHA-256 of component bytes |
-| Environment | Backend plus platform, such as `js/browser`, `js/node` or `go/native` |
+| Environment | Backend plus host/platform (`js/browser`, `js/node`, `go/native`, or a `[host]` package), resolved active `tags`, and optional `host-package` |
 | Runtime ABI and toolchain pins | Host/project; independent of backend API and IR |
 | Portable program | Versioned CBOR `flick_ir::Program`, including declared lang items |
 | Compilation mode | Whole program, or explicit module root with the surrounding graph and external interfaces |

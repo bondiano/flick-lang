@@ -5,6 +5,7 @@
 /// value. The task of an action writes them through `Write`. `Registry`,
 /// which roots and server markup read atoms from, is
 /// `Reactivity.Atom.Registry`, re-exported.
+@when "js"
 module Atom exposing (.., Registry)
 
 import CallSite exposing (CallSite)

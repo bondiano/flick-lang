@@ -1,5 +1,6 @@
 /// What a page may carry as it is: URLs of a safe scheme and HTML the
 /// program vouches for. `Ui` exports them all.
+@when "js"
 module Ui.Safe exposing (..)
 
 /// A URL with a safe scheme (`http`, `https`, `mailto`) or relative.
