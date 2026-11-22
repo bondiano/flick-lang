@@ -4,6 +4,7 @@
 //! constraint either holds or names what its bound lacks.
 
 use crate::types::Elem;
+use std::collections::HashMap;
 use std::mem;
 
 use crate::source::Span;
@@ -53,6 +54,18 @@ use tails::{growth_allows, less, owed, unknown};
 
 pub(super) fn unknown_tail(tail: &Type) -> Option<u32> {
     unknown(tail)
+}
+
+/// A closed service inclusion that can only constrain live regions.
+fn live_only(constraint: &SubRow, actual: &Norm) -> bool {
+    !constraint.errors
+        && constraint.provides.is_none()
+        && actual.tails.is_empty()
+        && !actual.entries.is_empty()
+        && actual
+            .entries
+            .iter()
+            .all(|(label, _)| matches!(label, Elem::Live))
 }
 
 impl Checker<'_> {
@@ -195,6 +208,7 @@ impl Checker<'_> {
         };
         let mut close = Vec::new();
         let mut pending = Vec::new();
+        let mut scoped_tails = HashMap::new();
         for c in &self.cx.subrows {
             let actual = self.store.normalize(&c.actual);
             if level == 0 {
@@ -208,15 +222,24 @@ impl Checker<'_> {
             {
                 continue;
             }
+            // A closed call needing only Live can still constrain the
+            // bound's qualifier or tail. It cannot unify a service payload.
+            // A region the call needs live is lowered through its qualifier.
+            if live_only(c, &actual) {
+                pending.extend(actual.entries.into_iter().map(|(_, payload)| payload));
+                pending.extend(
+                    declared
+                        .entries
+                        .iter()
+                        .filter(|(label, _)| matches!(label, Elem::Live))
+                        .map(|(_, payload)| payload.clone()),
+                );
+                pending.extend(declared_deep().cloned());
+                continue;
+            }
             // Matching entries do not need to be lowered once the actual
             // row cannot gain another label from a pending call.
-            let closed = actual.tails.is_empty();
-            let scoped = c.provides.is_some();
-            if (closed || scoped)
-                && (!scoped || actual.get(regions::scope()).is_none())
-                && self.matched_call_labels(&actual, &declared)
-                && (closed || self.scope_tail_settled(&actual.tails))
-            {
+            if self.call_row_settled(&actual, &declared, c.provides.is_some(), &mut scoped_tails) {
                 pending.extend(
                     actual
                         .tails
@@ -243,26 +266,45 @@ impl Checker<'_> {
         self.close_holds(Some(level));
     }
 
-    /// The actual labels are fixed and their payloads already agree with the bound.
-    fn matched_call_labels(&self, actual: &Norm, declared: &Norm) -> bool {
-        actual.entries.iter().all(|(label, ty)| {
+    /// The inclusion can no longer constrain its matched label payloads.
+    fn call_row_settled(
+        &self,
+        actual: &Norm,
+        declared: &Norm,
+        scoped: bool,
+        scoped_tails: &mut HashMap<u32, bool>,
+    ) -> bool {
+        if scoped {
+            if actual.get(regions::scope()).is_some() {
+                return false;
+            }
+        } else if !actual.tails.is_empty() {
+            return false;
+        }
+        let matched = actual.entries.iter().all(|(label, ty)| {
             matches!(label, Elem::Named(_))
                 && declared
                     .get(label)
                     .is_some_and(|bound| self.store.zonk(ty) == self.store.zonk(bound))
-        })
+        });
+        matched && (actual.tails.is_empty() || self.scope_tail_settled(&actual.tails, scoped_tails))
     }
 
-    /// A scope's inferred body row can stay open after all its calls have
-    /// settled. A call with an open or unmatched actual row can still grow
-    /// that tail, including when it forwards another scope's open row.
-    fn scope_tail_settled(&self, tails: &[Type]) -> bool {
+    /// A scope's inferred body row stays open while its calls settle.
+    /// Follow a nested scope's forwarded row to its own calls. An unknown
+    /// call row, unmatched payload or cycle keeps the inclusion pending.
+    fn scope_tail_settled(&self, tails: &[Type], scoped_tails: &mut HashMap<u32, bool>) -> bool {
         let [tail] = tails else {
             return false;
         };
         let Some(root) = unknown(tail) else {
             return false;
         };
+        if let Some(&settled) = scoped_tails.get(&root) {
+            return settled;
+        }
+        // A forwarding cycle is pending until all the rows on its path settle.
+        scoped_tails.insert(root, false);
         let mut settled = false;
         for c in self.cx.subrows.iter().filter(|c| !c.errors) {
             let declared = self.store.normalize(&c.declared);
@@ -274,11 +316,16 @@ impl Checker<'_> {
                 continue;
             }
             let actual = self.store.normalize(&c.actual);
-            if !actual.tails.is_empty() || !self.matched_call_labels(&actual, &declared) {
+            // Live-only producers can grow qualifiers, which settle_rows
+            // keeps pending separately. They cannot change named payloads.
+            if !live_only(c, &actual)
+                && !self.call_row_settled(&actual, &declared, c.provides.is_some(), scoped_tails)
+            {
                 return false;
             }
             settled = true;
         }
+        scoped_tails.insert(root, settled);
         settled
     }
 

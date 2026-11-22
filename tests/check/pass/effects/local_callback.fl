@@ -67,15 +67,27 @@ let parameterized () =
   let save = (fun value -> Store.save value)
   let save_direct value = Store.save value
   let save_scoped = (fun value -> scope { Store.save value })
+  let save_nested = (fun value -> scope { scope { Store.save value } })
+  let calls = Ref.make 0
+  let save_nested_with_live value = scope {
+    scope {
+      Ref.update calls (fun n -> n + 1)
+      Store.save value
+    }
+  }
   provide int_store {
     save 1
     save_direct 2
     save_scoped 3
+    save_nested 4
+    save_nested_with_live 5
   }
   provide string_store {
     save "two"
     save_direct "three"
     save_scoped "four"
+    save_nested "five"
+    save_nested_with_live "six"
   }
 
 save_int : Unit ->{Store Int} Unit

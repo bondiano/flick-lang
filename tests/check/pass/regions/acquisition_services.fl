@@ -105,6 +105,23 @@ let pool () = provide greeter {
   }
 }
 
+// The pool supplies a fresh owner to the acquisition stored in a local task.
+acquire_pool_item : String ->{Scope s} String
+let acquire_pool_item value = Resource.acquire_release (task { value }) (fun _ -> ())
+
+pool_from_task : Unit ->{Async} Unit
+let pool_from_task () =
+  let made = Ref.make 0
+  let item = task {
+    Ref.update made (fun n -> n + 1)
+    acquire_pool_item ("item " ++ show (Ref.get made))
+  }
+  scope s {
+    let pool : Pool.Pool s none String =
+      Pool.make { acquire = item; size = 2; concurrency = None; targetUtilization = None }
+    ignore (Pool.use (fun i -> i) pool)
+  }
+
 pool_with_ttl : Unit ->{Async} Unit
 let pool_with_ttl () = provide greeter {
   scope {
