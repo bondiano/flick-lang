@@ -70,7 +70,10 @@ impl Checker<'_> {
     }
 
     /// Quantifies the variables of `ty` that are deeper than the current level.
-    pub fn generalize(&mut self, ty: &Type) -> Type {
+    /// `operands` counts the operators and the `==` written before the
+    /// binding: their operands were lowered by the bindings they are in, or
+    /// are of none the binding can reach.
+    pub fn generalize(&mut self, ty: &Type, operands: (usize, usize)) -> Type {
         self.settle_rows();
         // a variable that an unsolved class constraint mentions stays monomorphic
         self.solve_classes(false);
@@ -79,7 +82,7 @@ impl Checker<'_> {
         }
         // so does an operand type a pending operator has yet to settle: it
         // takes one of the operator's types, as an integer literal's does
-        for op in &self.cx.operators {
+        for op in self.cx.operators.iter().skip(operands.0) {
             keep_operand(
                 &mut self.store,
                 &mut self.cx.kept_operands,
@@ -90,7 +93,7 @@ impl Checker<'_> {
         }
         // and an operand type of `==` or `!=`: the type a use settles decides
         // whether it compares by identity
-        for (ty, span, op, _) in &self.equalities {
+        for (ty, span, op, _) in self.equalities.iter().skip(operands.1) {
             keep_operand(&mut self.store, &mut self.cx.kept_operands, ty, *span, op);
         }
         // a value a pending hold still checks stays monomorphic: its unknown

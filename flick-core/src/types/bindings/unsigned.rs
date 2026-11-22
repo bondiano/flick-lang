@@ -7,6 +7,8 @@ impl Checker<'_> {
         let function = parts.is_function();
         let header = self.header_types(decl, parts, false);
         self.recursive_value(decl, parts, name);
+        // the operators before the binding hold none of its variables
+        let operands = (self.cx.operators.len(), self.equalities.len());
         self.store.level += 1;
         let saved = mem::take(&mut self.cx.runtime);
         let signed = mem::take(&mut self.gadt.signed);
@@ -65,7 +67,7 @@ impl Checker<'_> {
             if self.store.level > 0 {
                 self.lower_cells(&ty);
             }
-            let ty = self.generalize(&ty);
+            let ty = self.generalize(&ty, operands);
             // an annotation was checked as the value's type already
             if let (None, Some(body)) = (parts.header, parts.body) {
                 self.polymorphic_cell(Some(name), &ty, self.span(body));

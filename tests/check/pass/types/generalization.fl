@@ -58,3 +58,11 @@ fields : Unit ->{} (Int, String)
 let fields () =
   let get r = r.value
   (get { value = 1 }, get { value = "a"; other = 2 })
+
+// an operator of a local function in another keeps the outer one of one type
+nested : Int ->{} (Int, Int)
+let nested n =
+  let outer x =
+    let inner y = y + x
+    (inner x, n)
+  outer 2
