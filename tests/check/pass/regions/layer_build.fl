@@ -19,6 +19,16 @@ let box =
     Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
   )
 
+// a named task awaited in the build registers its finalizer there, as a
+// direct call does
+named_box : Layer {Greeter} none {Box}
+let named_box =
+  Layer.from_build (fun memo ->
+    let release = task { Scope.add_finalizer (task { ignore (Greeter.greet "release") }) }
+    await release
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+
 memo_box : Layer {Greeter} none {Box}
 let memo_box =
   Layer.from_build_memo (fun memo ->

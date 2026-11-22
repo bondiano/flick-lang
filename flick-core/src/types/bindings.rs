@@ -285,11 +285,12 @@ impl Checker<'_> {
             let alias = self.let_alias(&parts);
             self.push_local(&name, at, ty);
             self.proof_alias(at, alias);
-            if let Some(local) = self.cx.locals.last_mut() {
-                local.unsigned = parts.is_function();
-                if !parts.is_function() && !parts.rec {
-                    local.binding = super::mutation::Binding::Let;
-                }
+            self.note_local_params(at, &parts);
+            if let Some(local) = self.cx.locals.last_mut()
+                && !parts.is_function()
+                && !parts.rec
+            {
+                local.binding = super::mutation::Binding::Let;
             }
         }
         if let (Some(binder), Some(local)) = (binder, self.cx.locals.last()) {
@@ -319,7 +320,6 @@ impl Checker<'_> {
                 generated: at >= self.generated,
                 ty: scheme.clone(),
                 rec,
-                unsigned: false,
                 binding: super::mutation::Binding::Other,
             });
             rec

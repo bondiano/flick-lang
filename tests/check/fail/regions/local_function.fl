@@ -1,0 +1,40 @@
+// A local function without a signature that uses a resource cannot leave the
+// resource's scope, generic or not, as a parenthesized `fun` cannot.
+module App.LocalFunction exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+escaping : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
+let escaping path = scope {
+  let file = FileSystem.open_scoped path
+  let read () = FileSystem.read_all file
+  read
+}
+
+generic : Path ->{FileSystem; OpenError} (Int ->{FileSystem; ReadError} (Int, String))
+let generic path = scope {
+  let file = FileSystem.open_scoped path
+  let with_text x = (x, FileSystem.read_all file)
+  with_text
+}
+
+paren : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
+let paren path = scope {
+  let file = FileSystem.open_scoped path
+  let read = (fun () -> FileSystem.read_all file)
+  read
+}
+
+//~ FLICK-G002 @21:3-21:7 this uses region `s`, which the expected type `Unit ->{FileSystem; ReadError} String` does not keep live
+//~ FLICK-G002 @28:3-28:12 this uses region `s`
+//~ FLICK-G002 @35:3-35:7 this uses region `s`, which the expected type `Unit ->{FileSystem; ReadError} String` does not keep live

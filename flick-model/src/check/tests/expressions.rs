@@ -28,6 +28,30 @@ fn let_gen_generalizes_a_pure_right_side() {
 }
 
 #[test]
+fn let_gen_generalizes_list_elements_after_a_reflexive_hold() {
+    let concat = |left, right| konst(Const::Prim(Prim::ListConcat), vec![left, right]);
+    let append = Term::lam(
+        "xs",
+        Term::lam("ys", concat(var("xs"), concat(var("ys"), Term::List(Rc::from([]))))),
+    );
+    let applied = |left, right| {
+        Term::apps(
+            var("append"),
+            [Term::List(Rc::from([left])), Term::List(Rc::from([right]))],
+        )
+    };
+    let uses = tuple(vec![
+        applied(int(1), int(2)),
+        applied(Term::string("a"), Term::string("b")),
+    ]);
+    let list = |name| Type::app(ty("List"), ty(name));
+    assert_eq!(
+        infer(&let_("append", append, uses)).expect("typed"),
+        (Type::Tuple(Rc::from([list("Int"), list("String")])), Stage::Pure)
+    );
+}
+
+#[test]
 fn let_mono_keeps_the_result_of_a_runtime_step_monomorphic() {
     let once = let_("f", cell_id(), Term::app(var("f"), int(1)));
     assert!(infer(&task(once)).is_ok());

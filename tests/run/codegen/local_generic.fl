@@ -1,0 +1,28 @@
+// A local function without a signature is generic: each use gives it its own
+// types, on both targets. Its callback may call a service.
+module App.Main exposing (main)
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let same x = x
+  let get = fun r -> r.value
+  let twice f x = f (f x)
+  let add x y = x + y
+  Platform.stdout_line (show (same 1))
+  Platform.stdout_line (same "two")
+  Platform.stdout_line (show (get { value = 3 }))
+  Platform.stdout_line (get { value = "four" })
+  Platform.stdout_line (show (twice (add 2) 1))
+  Platform.stdout_line (twice (fun s -> s ++ "!") "five")
+  let each_line f = Seq.each_effect f (Seq.of_list ["six", "seven"])
+  each_line Platform.stdout_line
+  let append_lists xs ys = xs ++ (ys ++ [])
+  let same_lists = (fun xs ys -> (xs ++ []) == ys)
+  match append_lists [8] [9] with
+  | [first, second] -> Platform.stdout_line (show first ++ "," ++ show second)
+  | _ -> Platform.stdout_line "wrong integer list length"
+  match append_lists ["eight"] ["nine"] with
+  | [first, second] -> Platform.stdout_line (first ++ "," ++ second)
+  | _ -> Platform.stdout_line "wrong string list length"
+  Platform.stdout_line (show (same_lists [8] [8]))
+  Platform.stdout_line (show (same_lists ["eight"] ["nine"]))
