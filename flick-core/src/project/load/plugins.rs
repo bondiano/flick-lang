@@ -96,12 +96,7 @@ impl Loader<'_> {
                 sink.take(self, i, node, new(node), &mut diagnostics);
             }
         }
-        let previous = self.cache.as_mut().map(|c| mem::take(&mut c.plugins));
-        let mut results = Results {
-            host: self.host,
-            previous: previous.unwrap_or_default(),
-            kept: HashMap::new(),
-        };
+        let mut results = Results::new(self.host, self.cache.as_deref_mut());
         let mut expanded = Vec::new();
         let mut publications = Publications::new();
         // the blocks of the modules, then those nested in 1 to ROUNDS blocks
@@ -162,9 +157,7 @@ impl Loader<'_> {
                 &format!("is nested in more than {ROUNDS} blocks"),
             )
         }));
-        if let Some(cache) = &mut self.cache {
-            cache.plugins = results.kept;
-        }
+        results.finish(self.cache.as_deref_mut());
         for (i, block) in editing {
             self.modules[i].editing.push(block);
         }

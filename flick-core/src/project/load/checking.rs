@@ -139,6 +139,7 @@ use graph::parallel;
 pub struct ModuleCache {
     entries: HashMap<PathBuf, (Key, Output)>,
     /// What plugins gave in the last run, by the key of each call.
+    #[cfg(feature = "native-project")]
     pub(super) plugins: HashMap<Vec<u8>, Vec<u8>>,
     /// The parse of each module, and the file and the text it is of.
     parses: HashMap<PathBuf, (FileId, String, Parsed)>,

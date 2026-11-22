@@ -21,6 +21,23 @@ pub fn interface(
     imports: &[String],
     interface_of: &dyn Fn(&str) -> Option<Interface>,
 ) -> Interface {
+    let mut out = interface_without_dependencies(module, interface, package, interface_of);
+    // `extend`, not `collect`: collecting compiles a sort of its own into the
+    // wasm compiler, where `insert` of this map type is already there
+    out.dependencies
+        .extend((imports.iter()).filter_map(|m| Some((m.clone(), fingerprint(&interface_of(m)?)))));
+    out
+}
+
+/// The interface with its ABI and empty `dependencies`: callers that compute
+/// fingerprints in a second pass (or omit them without `native-project`) avoid
+/// pulling interface serialization into the browser compiler.
+pub(super) fn interface_without_dependencies(
+    module: &Module,
+    interface: &Interface,
+    package: Option<&str>,
+    interface_of: &dyn Fn(&str) -> Option<Interface>,
+) -> Interface {
     let mut out = interface.clone();
     out.abi = Some(Abi {
         data: data(module, package),
@@ -29,11 +46,7 @@ pub fn interface(
     });
     // only the js target compiles a library's modules
     out.targets = vec![Target::Js];
-    // `extend`, not `collect`: collecting compiles a sort of its own into the
-    // wasm compiler, where `insert` of this map type is already there
     out.dependencies = BTreeMap::new();
-    out.dependencies
-        .extend((imports.iter()).filter_map(|m| Some((m.clone(), fingerprint(&interface_of(m)?)))));
     out
 }
 

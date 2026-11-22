@@ -15,17 +15,30 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+#[cfg(feature = "native-project")]
 use flick_plugin::Place;
 
 use super::Loader;
-use crate::diagnostics::{Diagnostic, codes};
+use crate::diagnostics::Diagnostic;
+#[cfg(feature = "native-project")]
+use crate::diagnostics::codes;
+use crate::plugin::Expander;
+#[cfg(feature = "native-project")]
 use crate::plugin::expansion::Expansion;
+#[cfg(feature = "native-project")]
 use crate::plugin::render::render;
-use crate::plugin::{Expander, Failure, placed};
+#[cfg(feature = "native-project")]
+use crate::plugin::{Failure, placed};
 use crate::project::module_name;
-use crate::resolve::{Header, Item, ItemKind, ModuleSyntax};
-use crate::source::{FileId, Span};
-use crate::syntax::{self, Parse};
+use crate::resolve::ModuleSyntax;
+#[cfg(feature = "native-project")]
+use crate::resolve::{Header, Item, ItemKind};
+use crate::source::FileId;
+#[cfg(feature = "native-project")]
+use crate::source::Span;
+#[cfg(feature = "native-project")]
+use crate::syntax;
+use crate::syntax::Parse;
 
 /// The name a module at `path` under `dir` must declare: a `loaded` file's is
 /// that of the `.fl` file at its place.
@@ -40,61 +53,66 @@ type Plugins = HashMap<String, Result<Arc<dyn Expander>, String>>;
 
 impl Loader<'_> {
     /// The package whose plugin loads the files of `path`'s extension.
+    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
     pub(super) fn loader_of(&self, path: &Path) -> Option<String> {
-        let ext = path.extension()?.to_str()?;
-        self.loaders()
-            .into_iter()
-            .find(|(e, _)| e == ext)
-            .map(|(_, p)| p)
+        #[cfg(not(feature = "native-project"))]
+        {
+            let _ = path;
+            None
+        }
+        #[cfg(feature = "native-project")]
+        {
+            let ext = path.extension()?.to_str()?;
+            self.loaders()
+                .into_iter()
+                .find(|(e, _)| e == ext)
+                .map(|(_, p)| p)
+        }
     }
 
     /// Each extension a plugin loads and its package, the first that names it.
-    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
+    #[cfg(feature = "native-project")]
     pub(super) fn loaders(&self) -> Vec<(String, String)> {
-        #[cfg(feature = "native-project")]
-        {
-            let mut out: Vec<(String, String)> = Vec::new();
-            for (ext, package) in self.packages.loaders() {
-                if !out.iter().any(|(e, _)| e == ext) {
-                    out.push((ext.to_owned(), package.to_owned()));
-                }
+        let mut out: Vec<(String, String)> = Vec::new();
+        for (ext, package) in self.packages.loaders() {
+            if !out.iter().any(|(e, _)| e == ext) {
+                out.push((ext.to_owned(), package.to_owned()));
             }
-            out
         }
-        #[cfg(not(feature = "native-project"))]
-        Vec::new()
+        out
     }
 
     /// `FLICK-P045` on each extension the plugins of two packages load.
-    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
+    #[cfg(feature = "native-project")]
     pub(super) fn loader_conflicts(&self, at: Span) -> Vec<Diagnostic> {
-        #[cfg(feature = "native-project")]
-        {
-            let all: Vec<(&str, &str)> = self.packages.loaders().collect();
-            (self.loaders().iter())
-                .filter_map(|(ext, first)| {
-                    let other = all.iter().find(|(e, p)| e == ext && p != first)?.1;
-                    Some(Diagnostic::error(
-                        codes::P045,
-                        format!("the plugins of `{first}` and `{other}` both load `.{ext}` files"),
-                        at,
-                    ))
-                })
-                .collect()
-        }
-        #[cfg(not(feature = "native-project"))]
-        {
-            let _ = at;
-            Vec::new()
-        }
+        let all: Vec<(&str, &str)> = self.packages.loaders().collect();
+        (self.loaders().iter())
+            .filter_map(|(ext, first)| {
+                let other = all.iter().find(|(e, p)| e == ext && p != first)?.1;
+                Some(Diagnostic::error(
+                    codes::P045,
+                    format!("the plugins of `{first}` and `{other}` both load `.{ext}` files"),
+                    at,
+                ))
+            })
+            .collect()
     }
 
     /// The file a module `name` may be under `dir` other than its `.fl`.
+    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
     pub(super) fn loaded_paths(&self, dir: &Path, name: &str) -> Vec<PathBuf> {
-        let path = dir.join(super::module_path(name));
-        (self.loaders().into_iter())
-            .map(|(ext, _)| path.with_extension(ext))
-            .collect()
+        #[cfg(not(feature = "native-project"))]
+        {
+            let _ = (dir, name);
+            Vec::new()
+        }
+        #[cfg(feature = "native-project")]
+        {
+            let path = dir.join(super::module_path(name));
+            (self.loaders().into_iter())
+                .map(|(ext, _)| path.with_extension(ext))
+                .collect()
+        }
     }
 
     /// The parse of the file at `path`, or for a `loaded` one no Flick and the
@@ -106,15 +124,18 @@ impl Loader<'_> {
         loaded: bool,
         name: Option<&str>,
     ) -> (Arc<Parse>, Arc<ModuleSyntax>) {
+        #[cfg(feature = "native-project")]
         if loaded {
-            Self::unparsed(file, name.unwrap_or(""))
-        } else {
-            self.parsed(path, file)
+            return Self::unparsed(file, name.unwrap_or(""));
         }
+        #[cfg(not(feature = "native-project"))]
+        let _ = (loaded, name);
+        self.parsed(path, file)
     }
 
     /// A loaded file before its plugin gives its code: no Flick of its own,
     /// and a header that exposes all the code will declare.
+    #[cfg(feature = "native-project")]
     fn unparsed(file: FileId, name: &str) -> (Arc<Parse>, Arc<ModuleSyntax>) {
         let at = Span::new(file, 0, 0);
         let all = Item {
@@ -145,63 +166,71 @@ impl Loader<'_> {
     }
 
     /// The code of each module a plugin loads, from its file.
+    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
     pub(super) fn load_files(&mut self, plugins: &mut Plugins, diagnostics: &mut Vec<Diagnostic>) {
-        if let Some(p) = self.project {
-            diagnostics.extend(self.loader_conflicts(Span::new(p.config_file, 0, 0)));
+        #[cfg(not(feature = "native-project"))]
+        {
+            let _ = (plugins, diagnostics);
         }
-        for i in 0..self.modules.len() {
-            let Some(package) = self.modules[i].loader.clone() else {
-                continue;
-            };
-            let m = &self.modules[i];
-            let text = self.sources.get(m.file).text.clone();
-            let len = u32::try_from(text.len()).expect("source fits in u32");
-            let whole = Span::new(m.file, 0, len);
-            let path = self.host.display(&m.path);
-            let plugin = match self.load_plugin(plugins, &package) {
-                Ok(plugin) => plugin,
-                Err(why) => {
-                    let message =
-                        format!("the plugin of package `{package}` cannot be loaded: {why}");
-                    diagnostics.push(Diagnostic::error(codes::P035, message, whole));
+        #[cfg(feature = "native-project")]
+        {
+            if let Some(p) = self.project {
+                diagnostics.extend(self.loader_conflicts(Span::new(p.config_file, 0, 0)));
+            }
+            for i in 0..self.modules.len() {
+                let Some(package) = self.modules[i].loader.clone() else {
                     continue;
-                }
-            };
-            let failed = |why: String| {
-                Diagnostic::error(codes::P036, format!("plugin `{package}` {why}"), whole)
-            };
-            let arena = match plugin.load(&path, text.as_bytes()) {
-                Ok(arena) => arena,
-                Err(Failure::Refused(found)) => {
-                    diagnostics.extend(
-                        found
-                            .iter()
-                            .map(|d| placed(d, &package, whole, whole, false)),
-                    );
-                    continue;
-                }
-                Err(Failure::Broken(why)) => {
-                    diagnostics.push(failed(format!("failed to load this file: {why}")));
-                    continue;
-                }
-            };
-            let rendered = match render(&arena, len, Place::Declaration, &[]) {
-                Ok(rendered) if rendered.holes.is_empty() => rendered,
-                Ok(_) => {
-                    diagnostics.push(failed(
-                        "gave code with holes for a file, which has no user's code".into(),
-                    ));
-                    continue;
-                }
-                Err(why) => {
-                    diagnostics.push(failed(format!("gave code that is not valid: {why}")));
-                    continue;
-                }
-            };
-            match Expansion::whole(&text, m.file, &rendered, &package, plugin.id()) {
-                Ok(expansion) => self.modules[i].expansion = Some(Arc::new(expansion)),
-                Err(why) => {
-                    diagnostics.push(failed(format!("gave code that cannot be placed: {why}")));
+                };
+                let m = &self.modules[i];
+                let text = self.sources.get(m.file).text.clone();
+                let len = u32::try_from(text.len()).expect("source fits in u32");
+                let whole = Span::new(m.file, 0, len);
+                let path = self.host.display(&m.path);
+                let plugin = match self.load_plugin(plugins, &package) {
+                    Ok(plugin) => plugin,
+                    Err(why) => {
+                        let message =
+                            format!("the plugin of package `{package}` cannot be loaded: {why}");
+                        diagnostics.push(Diagnostic::error(codes::P035, message, whole));
+                        continue;
+                    }
+                };
+                let failed = |why: String| {
+                    Diagnostic::error(codes::P036, format!("plugin `{package}` {why}"), whole)
+                };
+                let arena = match plugin.load(&path, text.as_bytes()) {
+                    Ok(arena) => arena,
+                    Err(Failure::Refused(found)) => {
+                        diagnostics.extend(
+                            found
+                                .iter()
+                                .map(|d| placed(d, &package, whole, whole, false)),
+                        );
+                        continue;
+                    }
+                    Err(Failure::Broken(why)) => {
+                        diagnostics.push(failed(format!("failed to load this file: {why}")));
+                        continue;
+                    }
+                };
+                let rendered = match render(&arena, len, Place::Declaration, &[]) {
+                    Ok(rendered) if rendered.holes.is_empty() => rendered,
+                    Ok(_) => {
+                        diagnostics.push(failed(
+                            "gave code with holes for a file, which has no user's code".into(),
+                        ));
+                        continue;
+                    }
+                    Err(why) => {
+                        diagnostics.push(failed(format!("gave code that is not valid: {why}")));
+                        continue;
+                    }
+                };
+                match Expansion::whole(&text, m.file, &rendered, &package, plugin.id()) {
+                    Ok(expansion) => self.modules[i].expansion = Some(Arc::new(expansion)),
+                    Err(why) => {
+                        diagnostics.push(failed(format!("gave code that cannot be placed: {why}")));
+                    }
                 }
             }
         }
