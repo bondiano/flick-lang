@@ -20,6 +20,7 @@ import {
   equals as flickEquals,
   gadt,
   hash as flickHash,
+  sameValue as flickSameValue,
   recordExtend,
   recordLabels,
   recordMergeDisjoint,
@@ -174,8 +175,8 @@ test("Effect Cell identity and Reactivity.Atom.family align with Flick structura
   assert.equal(created, 1);
 
   // GADT held dictionary keys ($0) are ignored even inside Result/Option
-  const g1 = Result.succeed({ _tag: "Box", _0: 1, $0: { tag: "first" } });
-  const g2 = Result.succeed({ _tag: "Box", _0: 1, $0: { tag: "second" } });
+  const g1 = Result.succeed(gadt({ _tag: "Box", _0: 1, $0: { tag: "first" } }));
+  const g2 = Result.succeed(gadt({ _tag: "Box", _0: 1, $0: { tag: "second" } }));
   assert.equal(byKey(g1), byKey(g2));
   assert.equal(created, 2);
 
@@ -359,18 +360,58 @@ test("Effect TxHashMap overwrites replace keys unconditionally without observing
   assert.equal(Object.is(zgot.value, -0), true);
 });
 
-test("Effect GADT values skip held dictionaries in equals, hash, Cache, Chunk.dedupe, Filter, and copyData", () => {
+test("Effect GADT values skip held dictionaries while plain $-prefixed objects and Effect Chunks preserve exact semantics", () => {
   const g1 = gadt({ _tag: "Box", _0: { z: 1, a: "x" }, $0: { show: (): string => "first" } });
   const g2 = gadt({ _tag: "Box", _0: { a: "x", z: 1 }, $0: { show: (): string => "second" } });
-  const raw1 = { _tag: "Box", _0: { z: 1, a: "x" }, $0: { show: (): string => "first" } };
-  const raw2 = { _tag: "Box", _0: { a: "x", z: 1 }, $0: { show: (): string => "second" } };
 
-  // Direct Flick equals/hash handle both gadt-tagged and raw $-holding objects
+  // Direct Flick equals/hash skip held dictionaries on gadt-tagged values
   assert.equal(flickEquals(g1, g2), true);
+  assert.equal(flickSameValue(g1, g2), true);
   assert.equal(flickHash(g1), flickHash(g2));
-  assert.equal(flickEquals(raw1, raw2), true);
-  assert.equal(flickHash(raw1), flickHash(raw2));
-  assert.equal(flickHash(g1), flickHash(raw1));
+
+  // Plain objects (Json / ReadonlyRecord) preserve $-prefixed keys ($ref, $schema, $defs, $id)
+  const refA: Record<string, string> = { $ref: "A" };
+  const refB: Record<string, string> = { $ref: "B" };
+  const schemaV1: Record<string, string> = { $schema: "v1" };
+  assert.equal(flickEquals(refA, refB), false);
+  assert.equal(flickEquals(schemaV1, {}), false);
+  assert.equal(flickSameValue(refA, refB), false);
+  assert.equal(flickSameValue(schemaV1, {}), false);
+  assert.notEqual(flickHash(refA), flickHash(refB));
+  assert.notEqual(flickHash(schemaV1), flickHash({}));
+  assert.equal(Equal.equals(refA, refB), false);
+  assert.notEqual(Hash.hash(refA), Hash.hash(refB));
+  assert.equal(Result.isFailure(filterEquals(refA)(refB)), true);
+  assert.equal(Result.isFailure(filterEqualsStrict(refA)(refB)), true);
+  assert.equal(Result.isFailure(filterEqualsStrict(schemaV1)({})), true);
+
+  const byKey = family((key: unknown) => ({ key }));
+  assert.notEqual(byKey(refA), byKey(refB));
+  assert.notEqual(byKey(schemaV1), byKey({}));
+  const registry = AtomRegistry.make();
+  const doc = flickState<Record<string, string>>(refA);
+  let docCalls = 0;
+  registry.subscribe(doc, () => { docCalls++; }, { immediate: true });
+  registry.set(doc, refB);
+  assert.equal(docCalls, 2);
+
+  // Effect Chunk distinguishes 0.0 from -0.0 under sameValue, Filter.equalsStrict, and Atom updates
+  const chPos = Chunk.fromIterable([0]);
+  const chNeg = Chunk.fromIterable([-0]);
+  const chRecPos = Chunk.fromIterable([{ x: 0 }]);
+  const chRecNeg = Chunk.fromIterable([{ x: -0 }]);
+  assert.equal(flickEquals(chPos, chNeg), true);
+  assert.equal(flickSameValue(chPos, chNeg), false);
+  assert.equal(flickSameValue(chRecPos, chRecNeg), false);
+  assert.equal(flickSameValue(chPos, [0]), false);
+  assert.equal(Result.isFailure(filterEqualsStrict(chPos)(chNeg)), true);
+  assert.equal(Result.isFailure(filterEqualsStrict(chRecPos)(chRecNeg)), true);
+  assert.equal(Result.isSuccess(filterEquals(chPos)(chNeg)), true);
+  const chunkAtom = flickState(chPos);
+  let chunkCalls = 0;
+  registry.subscribe(chunkAtom, () => { chunkCalls++; }, { immediate: true });
+  registry.set(chunkAtom, chNeg);
+  assert.equal(chunkCalls, 2);
 
   // Effect's native Equal/Hash and polymorphic stdlib structures ignore $0 via GADT_PROTO
   assert.equal(Equal.equals(g1, g2), true);

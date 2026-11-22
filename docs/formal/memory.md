@@ -217,7 +217,7 @@ insufficient, because that count also includes existing internal edges.
 
 Audit result for data identity and record field order (issue #740):
 
-- **Value equality vs. object identity**: `flick-model/src/memory/operators.rs`
+- **Value equality vs. object identity**: `flick-model/src/memory/primitives/operators.rs`
   (`equal`) compares `Data::Record` order-independently, skips GADT held
   dictionary suffixes, rejects `Value::Cell` (explicit `Ref.same` observes cell
   identity), and uses `seen.insert((a.id, b.id))` solely as an internal memo/cycle

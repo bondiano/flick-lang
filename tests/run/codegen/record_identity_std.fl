@@ -33,6 +33,13 @@ let check_filter () =
   let c2 = Ref.make 1
   let cell_same = Filter.to_predicate (Filter.equals_strict c1) c1
   let cell_diff = Filter.to_predicate (Filter.equals_strict c1) c2
+  let ch_pos = Chunk.from_list [0.0]
+  let ch_neg = Chunk.from_list [-0.0]
+  let ch_rec_pos = Chunk.from_list [{ x = 0.0 }]
+  let ch_rec_neg = Chunk.from_list [{ x = -0.0 }]
+  let ch_eq = Filter.to_predicate (Filter.equals ch_pos) ch_neg
+  let ch_strict = Filter.to_predicate (Filter.equals_strict ch_pos) ch_neg
+  let ch_rec_strict = Filter.to_predicate (Filter.equals_strict ch_rec_pos) ch_rec_neg
   Platform.stdout_line
     ("filter: "
       ++ show (
@@ -45,6 +52,9 @@ let check_filter () =
         nan_strict,
         cell_same,
         cell_diff,
+        ch_eq,
+        ch_strict,
+        ch_rec_strict,
       ))
 
 check_tx_hashmap : Unit ->{Host.Console} Unit
@@ -112,6 +122,50 @@ let check_zero_diff () =
     | _ -> (-1, false)
   Platform.stdout_line ("zero_diff: " ++ Json.stringify diff ++ " | " ++ show jp_result)
 
+check_dollar_keys : Unit ->{Host.Console} Unit
+let check_dollar_keys () =
+  let d_ref_a = Record.from_entries [("$ref", "A")]
+  let d_ref_b = Record.from_entries [("$ref", "B")]
+  let d_schema = Record.from_entries [("$schema", "v1")]
+  let d_empty : Record.ReadonlyRecord String = Record.from_entries []
+  let rec_distinct = (
+    d_ref_a == d_ref_b,
+    d_schema == d_empty,
+    Filter.to_predicate (Filter.equals d_ref_a) d_ref_b,
+    Filter.to_predicate (Filter.equals_strict d_ref_a) d_ref_b,
+    Filter.to_predicate (Filter.equals_strict d_schema) d_empty,
+  )
+  let json_distinct =
+    match
+      (
+        Json.parse "{\"$ref\":\"A\"}",
+        Json.parse "{\"$ref\":\"B\"}",
+        Json.parse "{\"$schema\":\"v1\"}",
+        Json.parse "{}",
+      )
+    with
+    | (Ok ua, Ok ub, Ok us, Ok ue) ->
+      (
+        match
+          (
+            Codec.decode_result Json.json ua,
+            Codec.decode_result Json.json ub,
+            Codec.decode_result Json.json us,
+            Codec.decode_result Json.json ue,
+          )
+        with
+        | (Ok ja, Ok jb, Ok js, Ok je) -> (
+          ja == jb,
+          js == je,
+          Filter.to_predicate (Filter.equals_strict ja) jb,
+          List.length (JsonPatch.get ja jb),
+          List.length (JsonPatch.get js je),
+        )
+        | _ -> (true, true, true, -1, -1)
+      )
+    | _ -> (true, true, true, -2, -2)
+  Platform.stdout_line ("dollar_keys: " ++ show rec_distinct ++ " | " ++ show json_distinct)
+
 check_gadt : Unit ->{Host.Console, Async} Unit
 let check_gadt () =
   // Two ShowBox values carrying parameterized Show (List Int) dictionaries
@@ -144,4 +198,5 @@ let main () =
   check_filter ()
   check_tx_hashmap ()
   check_zero_diff ()
+  check_dollar_keys ()
   check_gadt ()

@@ -25,6 +25,7 @@ codegen/let_assert # no native for `get` (flick:rt listGet)
 codegen/pure_main # no native for `say` (global console.log)
 codegen/question # `?` on an `Option`, a return from the function, has no λFlick form
 codegen/record_ffi # no native for `dict_keys` (./record_ffi.mjs keysOf)
+codegen/record_identity_std # the model's (≤-Cap) rejects `App.Main.pack`
 codegen/record_order # the instance `Ord` of a record or tuple
 codegen/record_order_std # the row primitive `Labels { a : String; z : Int }`
 codegen/recursion # runs out of the model's steps

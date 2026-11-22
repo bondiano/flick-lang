@@ -3,6 +3,7 @@
 // struct combiners/reducers, JSON diffs, hashes, and reactive atom families.
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { ChunkBranch } from "../src/core/chunk.ts";
 import { copyData, equals, gadt, gadtMarker, hash as coreHash, sameValue } from "../src/core/data.ts";
 import { tag } from "../src/tags.ts";
 import { Registry, readable, state } from "../src/rt/atoms/registry.ts";
@@ -141,13 +142,57 @@ test("Reactivity.Atom.family keys structurally on data values without observing 
   assert.equal(created, 4);
 });
 
-test("rt hash ignores written field order and GADT held dictionary keys", () => {
-  const a = { _tag: "Box", _0: 1, $0: { tag: "first" } };
-  const b = { _tag: "Box", _0: 1, $0: { tag: "second" } };
+test("rt hash ignores written field order and GADT held dictionary keys, while preserving $-prefixed keys on plain objects", () => {
+  const a = gadt({ _tag: "Box", _0: 1, $0: { tag: "first" } });
+  const b = gadt({ _tag: "Box", _0: 1, $0: { tag: "second" } });
   assert.equal(equals(a, b), true);
   assert.equal(coreHash(a), coreHash(b));
   assert.equal(rtHash(a), rtHash(b));
   assert.equal(rtHash({ z: 1, a: 2 }), rtHash({ a: 2, z: 1 }));
+
+  // Plain objects (Json / ReadonlyRecord) preserve $-prefixed keys ($ref, $schema, $defs, $id)
+  const refA: Record<string, string> = { $ref: "A" };
+  const refB: Record<string, string> = { $ref: "B" };
+  const schemaV1: Record<string, string> = { $schema: "v1" };
+  assert.equal(equals(refA, refB), false);
+  assert.equal(equals(schemaV1, {}), false);
+  assert.equal(sameValue(refA, refB), false);
+  assert.equal(sameValue(schemaV1, {}), false);
+  assert.notEqual(coreHash(refA), coreHash(refB));
+  assert.notEqual(rtHash(refA), rtHash(refB));
+  assert.notEqual(rtHash(schemaV1), rtHash({}));
+  assert.equal(filterEquals(refA)(refB)._tag, "Failure");
+  assert.equal(filterEqualsStrict(refA)(refB)._tag, "Failure");
+  assert.equal(filterEqualsStrict(schemaV1)({})._tag, "Failure");
+
+  // Differ & JsonPatch preserve changes to $-prefixed JSON keys ($ref, $schema)
+  const refPatch = flickGet(refA, refB);
+  assert.equal(refPatch.length, 1);
+  assert.equal(refPatch[0]?._0, "/$ref");
+  assert.equal(refPatch[0]?._1, "B");
+  const removeSchema = flickGet(schemaV1, {});
+  assert.equal(removeSchema.length, 1);
+  assert.equal(removeSchema[0]?._0, "/$schema");
+
+  // Reactive Atom and Atom.family distinguish plain objects differing only in $-prefixed keys
+  const byKey = family((key: unknown) => ({ key }));
+  assert.notEqual(byKey(refA), byKey(refB));
+  assert.notEqual(byKey(schemaV1), byKey({}));
+  const registry = new Registry(currentCtx());
+  const doc = state<Record<string, string>>(refA);
+  let calls = 0;
+  registry.subscribe(doc, () => calls++, true);
+  registry.set(doc, refB);
+  assert.equal(calls, 2);
+
+  // Concatenated ChunkBranch distinguishes 0.0 from -0.0 under sameValue / Filter.equalsStrict
+  const chPos = new ChunkBranch<unknown>([0], [{ x: 0 }]);
+  const chNeg = new ChunkBranch<unknown>([-0], [{ x: 0 }]);
+  const chNestedNeg = new ChunkBranch<unknown>([0], [{ x: -0 }]);
+  assert.equal(equals(chPos, chNeg), true);
+  assert.equal(sameValue(chPos, chNeg), false);
+  assert.equal(sameValue(chPos, chNestedNeg), false);
+  assert.equal(filterEqualsStrict(chPos)(chNeg)._tag, "Failure");
 });
 
 test("HashMap overwrites replace keys unconditionally without observing value identity or conflating -0.0", () => {

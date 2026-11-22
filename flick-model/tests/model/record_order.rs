@@ -279,7 +279,19 @@ let main () =
     match (Codec.encode_result num_codec 0.0, Codec.encode_result num_codec (-0.0)) with
     | (Ok z0, Ok zn) -> List.length (JsonPatch.get z0 zn)
     | _ -> -1
-  Platform.stdout_line (show (rec_ok, tup_ok, tup_no, zero_diff, neg_zero_same, nan_same, cell_same, cell_diff, patch_len))
+  let d_ref_a = Record.from_entries [("$ref", "A")]
+  let d_ref_b = Record.from_entries [("$ref", "B")]
+  let dollar_diff = Filter.to_predicate (Filter.equals_strict d_ref_a) d_ref_b
+  let json_dollar_len =
+    match (Json.parse "{\"$ref\":\"A\"}", Json.parse "{\"$ref\":\"B\"}") with
+    | (Ok ua, Ok ub) ->
+      (
+        match (Codec.decode_result Json.json ua, Codec.decode_result Json.json ub) with
+        | (Ok ja, Ok jb) -> List.length (JsonPatch.get ja jb)
+        | _ -> -1
+      )
+    | _ -> -2
+  Platform.stdout_line (show (rec_ok, tup_ok, tup_no, zero_diff, neg_zero_same, nan_same, cell_same, cell_diff, patch_len, dollar_diff, json_dollar_len))
 "#;
     let compiled = run::compile_source(source).expect("Filter.equals_strict source compiles");
     let main = run::main_of(&compiled).expect("main export");
@@ -287,7 +299,7 @@ let main () =
         let ran = run::run_main_counted(&compiled, &main, 2_000_000, release)
             .unwrap_or_else(|err| panic!("release={release}: {err}"));
         assert_eq!(
-            ran.stdout, "(true, true, false, false, true, true, true, false, 1)\n",
+            ran.stdout, "(true, true, false, false, true, true, true, false, 1, false, 1)\n",
             "release={release}"
         );
         assert_eq!(ran.memory.live_objects, 0, "release={release}");

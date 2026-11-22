@@ -330,6 +330,17 @@ func TestGADTDictFieldsSkippedInHashAndEquality(t *testing.T) {
 	if SameValue(gz1, gz2) {
 		t.Errorf("SameValue should distinguish GADT(0.0) and GADT(-0.0)")
 	}
+	// Plain records ($ref, $schema) must NEVER strip $-prefixed keys
+	refA := Rec("$ref", "A")
+	refB := Rec("$ref", "B")
+	schemaV1 := Rec("$schema", "v1")
+	empty := Rec()
+	if Equals(refA, refB) || SameValue(refA, refB) || Equals(schemaV1, empty) || SameValue(schemaV1, empty) {
+		t.Errorf("plain records must preserve $-prefixed keys in equality")
+	}
+	if Hash(refA) == Hash(refB) || Hash(schemaV1) == Hash(empty) {
+		t.Errorf("plain records must preserve $-prefixed keys in Hash")
+	}
 }
 
 func TestTxHashMapOverwritesKeyUnconditionallyAndPreservesNegZero(t *testing.T) {

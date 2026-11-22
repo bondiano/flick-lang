@@ -47,9 +47,11 @@ const eqFields = (
   a: Readonly<Record<PropertyKey, unknown>>,
   b: Readonly<Record<PropertyKey, unknown>>,
   strictZero: boolean,
+  skipHeld = false,
 ): boolean => {
-  const ak = ownKeys(a);
-  return ak.length === ownKeys(b).length && ak.every((k) => has(b, k) && eqValues(a[k], b[k], strictZero));
+  const ak = skipHeld ? ownKeys(a) : keys(a);
+  const bk = skipHeld ? ownKeys(b) : keys(b);
+  return ak.length === bk.length && ak.every((k) => has(b, k) && eqValues(a[k], b[k], strictZero));
 };
 
 const eqValues = (a: unknown, b: unknown, strictZero: boolean): boolean => {
@@ -125,8 +127,8 @@ const identityHash = (value: object): number => {
   return code;
 };
 
-const hashFields = (a: Readonly<Record<PropertyKey, unknown>>): number =>
-  ownKeys(a)
+const hashFields = (a: Readonly<Record<PropertyKey, unknown>>, skipHeld = false): number =>
+  (skipHeld ? ownKeys(a) : keys(a))
     .toSorted()
     .reduce((h, k) => combine(combine(h, hashString(k)), hash(a[k])), 13);
 
@@ -162,21 +164,21 @@ export const hash = (a: unknown): number => {
 };
 
 const isGadtLike = (value: unknown): value is Readonly<Record<PropertyKey, unknown>> =>
-  isObject(value) && (Object.getPrototypeOf(value) === GADT_PROTO || gadtMarker in value);
+  isObject(value) && gadtMarker in value;
 
 const GADT_PROTO: Record<PropertyKey, unknown> = /*#__PURE__*/ Object.freeze({
   [gadtMarker]: true,
   [runtimeEquals](this: Readonly<Record<PropertyKey, unknown>>, that: unknown, strictZero = false): boolean {
-    return isGadtLike(that) && eqFields(this, that, strictZero);
+    return isGadtLike(that) && eqFields(this, that, strictZero, true);
   },
   [runtimeHash](this: Readonly<Record<PropertyKey, unknown>>): number {
-    return hashFields(this);
+    return hashFields(this, true);
   },
   ["~effect/Equal"](this: Readonly<Record<PropertyKey, unknown>>, that: unknown): boolean {
-    return isGadtLike(that) && eqFields(this, that, false);
+    return isGadtLike(that) && eqFields(this, that, false, true);
   },
   ["~effect/Hash"](this: Readonly<Record<PropertyKey, unknown>>): number {
-    return hashFields(this);
+    return hashFields(this, true);
   },
 });
 
