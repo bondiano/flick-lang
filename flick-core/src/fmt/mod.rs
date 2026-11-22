@@ -73,6 +73,7 @@ use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::{parse, parse_with_heads};
 
+mod binary;
 mod block;
 mod comments;
 mod conditional;
@@ -80,6 +81,7 @@ mod contract;
 mod decl;
 mod expr;
 pub(crate) mod foralls;
+mod handlers;
 mod let_else;
 mod lines;
 mod plugins;

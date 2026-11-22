@@ -196,6 +196,34 @@ const fieldCodec = (f: Field): AnySchema => {
 /** What a block was made of, for `ignore_extra_fields`. */
 const blocks = /*#__PURE__*/ new WeakMap<AnySchema, { readonly name: string; readonly fields: ReadonlyArray<Field> }>();
 
+const canonicalizeRecord = (value: unknown): unknown => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(value).toSorted()) {
+    Object.defineProperty(out, key, {
+      value: Reflect.get(value, key),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return out;
+};
+
+const canonicalStruct = (name: string, fields: ReadonlyArray<Field>): AnySchema => {
+  const sorted = fields.toSorted((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0));
+  const props: Record<string, AnySchema> = {};
+  for (const f of sorted) {
+    Object.defineProperty(props, f.label, {
+      value: Schema.toType(fieldCodec(f)),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
+  }
+  return Schema.Struct(props).annotate({ expected: "an object", "flick/block": name });
+};
+
 /** A record codec of the `codec` DSL. */
 export const codecFields = (name: string, fields: ReadonlyArray<Field>, ignoreExtra: boolean): AnySchema => {
   const wireNames = Object.fromEntries(fields.map((f) => [f.label, f.wire]));
@@ -206,7 +234,7 @@ export const codecFields = (name: string, fields: ReadonlyArray<Field>, ignoreEx
   });
   const renamed: AnySchema = fields.some((f) => f.label !== f.wire) ? struct.pipe(Schema.encodeKeys(wireNames)) : struct;
   const wires = new Set(fields.map((f) => f.wire));
-  const codec: AnySchema = ignoreExtra
+  const inner: AnySchema = ignoreExtra
     ? Schema.Record(Schema.String, Schema.Unknown)
         .annotate({ expected: "an object", "flick/ignoreExtra": true })
         .pipe(
@@ -219,6 +247,18 @@ export const codecFields = (name: string, fields: ReadonlyArray<Field>, ignoreEx
           }),
         )
     : renamed;
+  const alreadyCanonical = fields.every((f, i) => {
+    const prev = fields[i - 1];
+    return prev === undefined || prev.label <= f.label;
+  });
+  const codec: AnySchema = alreadyCanonical
+    ? inner
+    : inner.pipe(
+        Schema.decodeTo(canonicalStruct(name, fields), {
+          decode: SchemaGetter.transform((o: unknown) => canonicalizeRecord(o)),
+          encode: SchemaGetter.passthrough({ strict: false }),
+        }),
+      );
   blocks.set(codec, { name, fields });
   return codec;
 };

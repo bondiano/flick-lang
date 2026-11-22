@@ -1,0 +1,221 @@
+// Lazy Option fallback (`orelse`): evaluation order, short-circuiting,
+// right-associative chaining, single-layer unwrapping, typed errors,
+// cold Eff/Lazy values, let mut persistence, pure->effectful lift,
+// record labels named `orelse`, and equivalence with canonical `match`.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+emit_opt : String -> Option Int ->{Host.Console} Option Int
+let emit_opt label value =
+  say ("lhs:" ++ label)
+  value
+
+emit_val : String -> Int ->{Host.Console} Int
+let emit_val label value =
+  say ("rhs:" ++ label)
+  value
+
+lookup : String -> Option String
+let lookup key = if key == "hit" then Some "found" else None
+
+tag : String -> String
+let tag s = "[" ++ s ++ "]"
+
+fail_lhs : String ->{Host.Console; Boom} Option Int
+let fail_lhs label =
+  say ("fail-lhs:" ++ label)
+  Fail.fail (Boom label)
+
+fail_rhs : String ->{Host.Console; Boom} Int
+let fail_rhs label =
+  say ("fail-rhs:" ++ label)
+  Fail.fail (Boom label)
+
+run_orelse : Int ->{Host.Console} String
+let run_orelse mode =
+  try
+    let value =
+      if mode == 0 then
+        emit_opt "m0" (Some 10) orelse emit_val "m0" 99
+      else if mode == 1 then
+        emit_opt "m1" None orelse emit_val "m1" 20
+      else if mode == 2 then
+        fail_lhs "m2" orelse emit_val "m2" 30
+      else
+        emit_opt "m3" None orelse fail_rhs "m3"
+    "ok:" ++ show value
+  with
+  | Boom why -> "err:" ++ why
+
+run_match : Int ->{Host.Console} String
+let run_match mode =
+  try
+    let value =
+      if mode == 0 then
+        match emit_opt "m0" (Some 10) with
+        | Some v -> v
+        | None -> emit_val "m0" 99
+      else if mode == 1 then
+        match emit_opt "m1" None with
+        | Some v -> v
+        | None -> emit_val "m1" 20
+      else if mode == 2 then
+        match fail_lhs "m2" with
+        | Some v -> v
+        | None -> emit_val "m2" 30
+      else
+        match emit_opt "m3" None with
+        | Some v -> v
+        | None -> fail_rhs "m3"
+    "ok:" ++ show value
+  with
+  | Boom why -> "err:" ++ why
+
+pure_inc : Int -> Int
+let pure_inc n = n + 1
+
+effectful_fallback : Int ->{Host.Console} Int
+let effectful_fallback n =
+  say "fallback-fn"
+  n + 100
+
+apply_fn : (Int ->{Host.Console} Int)^c -> Int ->{Host.Console} Int
+let apply_fn f n = f n
+
+pick_fn : Option (Int -> Int) -> Int ->{Host.Console} Int
+let pick_fn opt n = apply_fn (opt orelse effectful_fallback) n
+
+type alias Box = { orelse : Option Int }
+
+run_basics : Unit ->{Host.Console} Unit
+let run_basics () =
+  // 1. Some skips RHS; LHS runs once
+  let a = emit_opt "some" (Some 1) orelse emit_val "skip" 2
+  say ("a=" ++ show a)
+
+  // 2. None runs RHS once
+  let b = emit_opt "none" None orelse emit_val "used" 2
+  say ("b=" ++ show b)
+
+  // 3. 3-source right-associative chains
+  let c1 = emit_opt "c1-1" (Some 10) orelse emit_opt "c1-2" (Some 20) orelse emit_val "c1-3" 30
+  let c2 = emit_opt "c2-1" None orelse emit_opt "c2-2" (Some 20) orelse emit_val "c2-3" 30
+  let c3 = emit_opt "c3-1" None orelse emit_opt "c3-2" None orelse emit_val "c3-3" 30
+  say ("chains=" ++ show [c1, c2, c3])
+
+  // 4. Precedence with |> and <| and ||
+  let p1 = ("hit" |> lookup) orelse "miss"
+  let p2 = ("other" |> lookup) orelse "fallback"
+  let p3 = tag <| (lookup "other" orelse "inner")
+  let p4 = None orelse false || true
+  let p5 = Some false orelse true
+  say ("prec=" ++ p1 ++ "," ++ p2 ++ "," ++ p3 ++ "," ++ show p4 ++ "," ++ show p5)
+
+  // 5. Single-layer unwrap (never flatten Option (Option a))
+  let n1 : Option Int = Some None orelse Some 1
+  let n2 : Option Int = None orelse Some 1
+  let n3 = (Some None orelse Some 1) orelse 9
+  say ("nested=" ++ show n1 ++ "," ++ show n2 ++ "," ++ show n3)
+
+run_cold : Unit ->{Async, Host.Console} Unit
+let run_cold () =
+  // 6. Cold Eff and Lazy stay unstarted
+  let cold_some : Eff {Host.Console} {} Int =
+    Some
+      (task {
+        say "task-some"
+        7
+      })
+      orelse task {
+        say "task-rhs"
+        8
+      }
+  let cold_none : Eff {Host.Console} {} Int =
+    None
+      orelse task {
+        say "task-rhs"
+        8
+      }
+  let lazy_some : Lazy {Host.Console} {} Int =
+    Some
+      (lazy {
+        say "lazy-some"
+        11
+      })
+      orelse lazy {
+        say "lazy-rhs"
+        12
+      }
+  say "before-await"
+  let r1 = await cold_some
+  let r2 = await cold_none
+  let r3 = await lazy_some
+  say ("cold=" ++ show [r1, r2, r3])
+
+run_mut : Unit ->{Host.Console} Unit
+let run_mut () =
+  // 7. let mut persistence (no rollback on None)
+  let mut steps = 0
+  let m1 =
+    (
+      match () with
+      | () ->
+        steps = steps + 1
+        None
+    )
+      orelse (
+        match () with
+        | () ->
+          steps = steps + 10
+          steps
+      )
+  let m2 =
+    (
+      match () with
+      | () ->
+        steps = steps + 100
+        Some steps
+    )
+      orelse (
+        match () with
+        | () ->
+          steps = steps + 1000
+          steps
+      )
+  say ("mut=" ++ show [m1, m2, steps])
+
+main : Unit ->{Async, Host.Console} Unit
+let main () =
+  run_basics ()
+  run_cold ()
+  run_mut ()
+
+  // 8. Pure -> effectful function lift on Some payload
+  let f1 = pick_fn (Some pure_inc) 5
+  let f2 = pick_fn None 5
+  say ("lift=" ++ show [f1, f2])
+
+  // 9. Record field label `orelse`
+  let box : Box = { orelse = Some 41 }
+  let { orelse = raw } = box
+  let box2 = { box with orelse = None }
+  let v1 = box.orelse orelse 0
+  let v2 = box2.orelse orelse (raw orelse 0)
+  say ("rec=" ++ show [v1, v2])
+
+  // 10. Differential parity against canonical match
+  say
+    ("diff-orelse="
+      ++ run_orelse 0
+      ++ ","
+      ++ run_orelse 1
+      ++ ","
+      ++ run_orelse 2
+      ++ ","
+      ++ run_orelse 3)
+  say
+    ("diff-match=" ++ run_match 0 ++ "," ++ run_match 1 ++ "," ++ run_match 2 ++ "," ++ run_match 3)

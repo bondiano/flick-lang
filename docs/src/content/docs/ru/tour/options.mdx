@@ -2,7 +2,7 @@
 title: Option и Result
 description: "Без `null`: `Option` для значения, которое может отсутствовать, и `Result` для результата или ошибки."
 tableOfContents: false
-source_hash: e77e7597a2277e0c
+source_hash: ce8a16efd0922cc1
 ---
 
 import TourLesson from "../../../../components/TourLesson.astro";
@@ -22,6 +22,8 @@ import TourLesson from "../../../../components/TourLesson.astro";
 
 **Попробуйте:** напечатайте `Int.parse "36" + 1`. Компилятор сообщит
 `FLICK-T003`: сложение требует `Int`, но `Int.parse` возвращает
-`Option Int`. Извлеките число с помощью `match` или `Option.with_default`.
+`Option Int`. Извлеките число с помощью `match`, `orelse` или
+`Option.with_default` (`orelse` вычисляет запасное значение лениво, только
+при `None`).
 
 </TourLesson>

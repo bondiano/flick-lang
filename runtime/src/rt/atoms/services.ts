@@ -8,7 +8,8 @@ import { bridgeHooks, implementation, service } from "../handle.ts";
 import { type Layer, memoizable } from "../layer.ts";
 import { Failure } from "../outcome.ts";
 import { addTo } from "../owner.ts";
-import { type AsyncResult, type Atom, Registry } from "./registry.ts";
+import { type Atom, Registry } from "./registry.ts";
+import type { AsyncResult } from "./task.ts";
 
 export const READ = /*#__PURE__*/ service("Atom.Read");
 export const WRITE = /*#__PURE__*/ service("Atom.Write");

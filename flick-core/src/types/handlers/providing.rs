@@ -43,6 +43,7 @@ impl Checker<'_> {
         let needed = self.fresh();
         let mut stage = self.cx.stage.clone();
         stage.services = needed.clone();
+        stage.in_result = false;
         stage.returns = None;
         let outer = mem::replace(&mut self.cx.stage, stage);
         self.enter_provide(node, span, labels, unknown);
@@ -147,6 +148,7 @@ impl Checker<'_> {
         let needed = self.fresh();
         let mut stage = self.cx.stage.clone();
         stage.services = needed.clone();
+        stage.in_result = false;
         stage.returns = None;
         let outer = mem::replace(&mut self.cx.stage, stage);
         let label = Elem::Named(label);

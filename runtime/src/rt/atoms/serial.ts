@@ -7,7 +7,8 @@ import { tag } from "../../tags.ts";
 import { fail, raise } from "../cause.ts";
 import { Failure } from "../outcome.ts";
 import type { Codec } from "../schema.ts";
-import { type Atom, type Reading, type Registry, type Serial, mapped, patched, taskAtom } from "./registry.ts";
+import { type Atom, type Reading, type Registry, type Serial, mapped, patched } from "./registry.ts";
+import { taskAtom } from "./task.ts";
 import { toAsync } from "./services.ts";
 
 const LOADED = /*#__PURE__*/ tag("Atom.Async.Loaded");

@@ -228,6 +228,10 @@ impl Lexer<'_> {
     /// name of a top-level signature (`with : …` at the start of a line), of
     /// a `let` or of a `foreign` declaration.
     fn member_name(&self, start: usize) -> bool {
+        let word = &self.text[start..self.pos];
+        if word == "orelse" {
+            return false;
+        }
         let bytes = self.text.as_bytes();
         if start >= 2 && bytes[start - 1] == b'.' && is_ident_byte(bytes[start - 2]) {
             return true;
@@ -243,7 +247,6 @@ impl Lexer<'_> {
             .unwrap_or_default()
             .split_whitespace()
             .collect();
-        let word = &self.text[start..self.pos];
         // the debugging keywords stay usable as labels: `{ echo = … }`
         if matches!(word, "todo" | "echo") {
             let rest = self.text[self.pos..].trim_start_matches(' ');
@@ -259,7 +262,7 @@ impl Lexer<'_> {
         ) || (matches!(
             before[..],
             ["let"] | ["let", "rec" | "mut" | "lazy"] | ["let", "lazy", "mut"]
-        ) && !matches!(word, "rec" | "assert" | "mut" | "lazy"))
+        ) && !matches!(word, "rec" | "assert" | "mut" | "lazy" | "catch"))
     }
 
     /// Length and kind of the operator or delimiter at `pos`, if any.

@@ -91,6 +91,47 @@ impl Lower<'_> {
         }
     }
 
+    /// `result { body }`: canonical eager lowering
+    /// `try body with | return $result_value -> Ok $result_value | $result_error -> Err $result_error`.
+    pub(super) fn result_expr(&mut self, body: &Node, span: Span) -> ExprKind {
+        let at = |kind| Expr::new(kind, span);
+        let body = self.expr(body);
+        let val = self.hidden("$result_value");
+        let err = self.hidden("$result_error");
+        let ok_con = super::enums::native(Lang::Ok, Lang::Result);
+        let err_con = super::enums::native(Lang::Err, Lang::Result);
+        let ok_body = at(ExprKind::App {
+            func: Box::new(at(ExprKind::Con(ok_con))),
+            arg: Box::new(at(ExprKind::Local(val.clone()))),
+            stage: Stage::Pure,
+            arg_first: false,
+        });
+        let err_body = at(ExprKind::App {
+            func: Box::new(at(ExprKind::Con(err_con))),
+            arg: Box::new(at(ExprKind::Local(err.clone()))),
+            stage: Stage::Pure,
+            arg_first: false,
+        });
+        let ret = at(ExprKind::Lambda {
+            params: vec![Param {
+                pat: Pat::Bind(val),
+                stage: Stage::Runtime,
+                ty: None,
+            }],
+            body: Box::new(ok_body),
+        });
+        ExprKind::Handle(Box::new(Handler {
+            effects: Vec::new(),
+            body,
+            ret: Some(ret),
+            errors: vec![Arm {
+                pat: Pat::Bind(err),
+                guard: None,
+                body: err_body,
+            }],
+        }))
+    }
+
     /// `try body with …` with arms for operations, or `provide S impl { body }`.
     pub(super) fn handler(&mut self, node: &Node) -> ExprKind {
         let children: Vec<&Node> = node.nodes().collect();

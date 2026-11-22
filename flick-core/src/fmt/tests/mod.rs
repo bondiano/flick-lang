@@ -7,6 +7,8 @@ use flick_test_support::files as fixture_files;
 
 mod decl;
 mod layout;
+mod let_else;
+mod orelse;
 mod plugins;
 
 /// The formatted text, checked to be a fixed point of the formatter, to keep

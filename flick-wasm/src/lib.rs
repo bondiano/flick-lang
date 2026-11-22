@@ -480,43 +480,4 @@ impl Host for Demo<'_> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::Session;
-    use serde_json::Value;
-
-    #[test]
-    fn playground_compiles_and_queries_an_inline_module() {
-        let source = "module Main exposing (main)\nmodule Child exposing (answer) =\n  let answer = 42\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n";
-        let mut session = Session::new();
-        let diagnostics: Value = serde_json::from_str(&session.update(source)).expect("JSON");
-        assert_eq!(diagnostics, serde_json::json!([]));
-        let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
-        assert!(
-            built["js"]
-                .as_str()
-                .is_some_and(|js| js.contains("Child$answer")),
-            "{built}"
-        );
-        let at = u32::try_from(source.find("Child.answer").expect("use") + 6).expect("offset");
-        let hover: Value = serde_json::from_str(&session.hover(at)).expect("JSON");
-        assert!(
-            hover["text"]
-                .as_str()
-                .is_some_and(|text| text.contains("Int")),
-            "{hover}"
-        );
-    }
-
-    #[test]
-    fn a_playground_program_runs_on_flicks_own_runtime() {
-        let mut session = Session::new();
-        session.update("module Main exposing (main)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line \"hi\"\n");
-        let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
-        let runner = built["files"]["flick-main.js"].as_str().expect("a runner");
-        assert!(
-            runner.contains("from \"@flick-lang/runtime/rt\""),
-            "{runner}"
-        );
-        assert!(!runner.contains("@flick-lang/effect-ts"), "{runner}");
-    }
-}
+mod tests;

@@ -576,6 +576,66 @@ let r = r"raw"
   (raw_string))
 
 ==================
+OrElse fallback and member
+==================
+
+let x = a orelse b
+let r = { orelse = 1 }
+let y = r.orelse
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (keyword)
+  (identifier)
+  (keyword)
+  (identifier)
+  (operator)
+  (braces
+    (keyword)
+    (operator)
+    (number))
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (member))
+
+==================
+Postfix catch
+==================
+
+let name = load id catch
+  | NotFound _ -> "guest"
+let f = Layer.catch r.catch
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (identifier)
+  (keyword)
+  (operator)
+  (constructor)
+  (identifier)
+  (operator)
+  (string)
+  (keyword)
+  (identifier)
+  (operator)
+  (constructor)
+  (member)
+  (identifier)
+  (member))
+
+==================
 Let else
 ==================
 

@@ -18,7 +18,7 @@ message. Its `match` takes both apart, and `when n >= 0` refines an arm.
 `List.head` of an empty list is `None`, not a crash.
 
 **Try:** print `Int.parse "36" + 1`. The compiler reports `FLICK-T003`: an
-`Option Int` is not an `Int` until a `match` or `Option.with_default` takes
-the number out.
+`Option Int` is not an `Int` until `match`, `orelse`, or `Option.with_default`
+takes the number out (`orelse` evaluates its fallback lazily, only on `None`).
 
 </TourLesson>

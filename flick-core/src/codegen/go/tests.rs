@@ -132,13 +132,13 @@ fn the_labels_of_a_record_literal_are_placed_once() {
     let go = app("module App exposing (main)\n\n\
          type alias Point = { x : Int; y : Int }\n\n\
          point : Int -> Point\nlet point n = { y = n; x = n + 1 }\n\n\
-         moved : Point -> Point\nlet moved p = { y = p.x; x = p.y }\n\n\
+         moved : Point -> Point\nlet moved p = { x = p.y; y = p.x }\n\n\
          raised : Point -> Point\nlet raised p = { p with y = p.y + 1 }\n\n\
          main : Unit ->{Host.Console; AppError} Unit\n\
          let main () = Platform.stdout_line (show (raised (moved (point 1))).x)\n");
-    // two literals of the same labels in the same order: one shape, no label where a record is made
+    // two literals of the same labels in opposite written orders share one canonical shape
     assert_eq!(
-        go.matches("flickrt.ShapeOf(\"y\", \"x\")").count(),
+        go.matches("flickrt.ShapeOf(\"x\", \"y\")").count(),
         1,
         "{go}"
     );

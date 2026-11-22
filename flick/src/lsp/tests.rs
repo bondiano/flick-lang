@@ -320,101 +320,156 @@ fn a_dotted_completion_waits_for_the_background_analysis_and_reads_its_snapshot(
     );
 }
 
-#[test]
-fn let_else_hover_highlights_code_action_and_utf16_edit_requery() {
-    let mut server = server(Box::new(io::sink()));
-    let init = server
-        .request("initialize", &json!({ "capabilities": {} }))
-        .expect("initialized");
-    assert_eq!(init["capabilities"]["documentHighlightProvider"], true);
+mod let_else;
+mod orelse;
 
-    let dir = env::temp_dir().join(format!("flick-lsp-let-else-{}", process::id()));
+#[test]
+fn result_block_lsp_hover_actions_and_edits_handle_utf16_without_stale_results() {
+    let written = Written::default();
+    let mut server = server(Box::new(written.clone()));
+    let dir = env::temp_dir().join(format!("flick-lsp-result-{}", process::id()));
     let path = dir.join("A.fl");
-    // Non-ASCII `é` (1 UTF-16 unit, 2 UTF-8 bytes) and `𝄞` (2 UTF-16 units, 4 UTF-8 bytes)
-    // precede `let ... else` to exercise UTF-16 conversion across every query.
-    let source = "module A exposing (run)\n\nrun : Option String -> String\nlet run m =\n  let prefix = \"é𝄞:\"\n  let Some s = m else \"é𝄞\"\n  prefix ++ s\n";
-    let uri = protocol::uri_of(&path);
+    // "é𝄞" on line 5 before `result { ... }`: 6 UTF-8 bytes, 3 UTF-16 units
+    let source = "module A exposing (run)\n\ntype error Boom = Boom\n\nrun : Bool ->{} (String, Result Boom String)\nlet run flag = (\"é𝄞\", result { if flag then Fail.fail Boom else \"ok\" })\n";
     server.notify("textDocument/didOpen", &opened(&path, source));
     settle(&mut server);
 
-    // Line 5: `  let Some s = m else "é𝄞"` -> `else` starts at UTF-16 col 17.
+    // Hover on `result` keyword on line 5 using UTF-16 character column
+    let line5 = source.lines().nth(5).expect("line 5");
+    let byte_col = line5.find("result {").expect("result");
+    let utf16_col: usize = line5[..byte_col].chars().map(char::len_utf16).sum();
+    let hover = json!({
+        "textDocument": { "uri": protocol::uri_of(&path) },
+        "position": { "line": 5, "character": utf16_col + 1 }
+    });
+    let reply = server
+        .request("textDocument/hover", &hover)
+        .expect("hover reply");
+    let out = reply.to_string();
+    assert!(
+        out.contains("result { … } : Result Boom String")
+            && out.contains("Remaining services: `none`"),
+        "{out}"
+    );
+
+    // Code action on `result` offers expansion to `try … with`
+    let code_action = json!({
+        "textDocument": { "uri": protocol::uri_of(&path) },
+        "range": {
+            "start": { "line": 5, "character": utf16_col },
+            "end": { "line": 5, "character": utf16_col + 6 }
+        },
+        "context": { "diagnostics": [] }
+    });
+    let reply = server
+        .request("textDocument/codeAction", &code_action)
+        .expect("codeAction reply");
+    let out = reply.to_string();
+    assert!(out.contains("expand `result"), "{out}");
+
+    // Edit `result { ... }` into an ordinary variable `result` and verify no stale keyword hover
+    let edited = "module A exposing (run)\n\ntype error Boom = Boom\n\nrun : Bool ->{} (String, String)\nlet run _ =\n  let result = \"ok\"\n  (\"é𝄞\", result)\n";
+    let full_change = json!({
+        "textDocument": { "uri": protocol::uri_of(&path), "version": 2 },
+        "contentChanges": [{ "text": edited }]
+    });
+    server.notify("textDocument/didChange", &full_change);
+    settle(&mut server);
+
+    let edited_line7 = edited.lines().nth(7).expect("edited line 7");
+    let edited_col: usize = edited_line7[..edited_line7.rfind("result").expect("result var")]
+        .chars()
+        .map(char::len_utf16)
+        .sum();
+    let hover_after = json!({
+        "textDocument": { "uri": protocol::uri_of(&path) },
+        "position": { "line": 7, "character": edited_col + 1 }
+    });
+    let reply = server
+        .request("textDocument/hover", &hover_after)
+        .expect("hover reply after edit");
+    let out = reply.to_string();
+    assert!(
+        out.contains("result : String") && !out.contains("result { … }"),
+        "{out}"
+    );
+}
+
+#[test]
+fn postfix_catch_utf16_hover_and_edit_refresh() {
+    let written = Written::default();
+    let mut server = server(Box::new(written.clone()));
+    let dir = env::temp_dir().join(format!("flick-lsp-catch-utf16-{}", process::id()));
+    let path = dir.join("CatchUtf16.fl");
+    // Line 7 has Cyrillic + astral emoji before `catch` so UTF-8 byte offset != UTF-16 column.
+    let source = "\
+module CatchUtf16 exposing (greet)
+
+type error Missing = Missing String
+
+load : String ->{; Missing} String
+let load tag = Fail.fail (Missing tag)
+
+greet : Unit ->{} String
+let greet () = load \"Гость 🎉\" catch | Missing _ -> \"ok\"
+";
+    server.notify("textDocument/didOpen", &opened(&path, source));
+    settle(&mut server);
+
+    // Line 8: `let greet () = load "Гость 🎉" catch | Missing _ -> "ok"`
+    // Count UTF-16 units up to `catch`:
+    let line8 = source.lines().nth(8).expect("line 8");
+    let catch_byte = line8.find("catch").expect("catch");
+    let catch_utf16: u32 = line8[..catch_byte]
+        .encode_utf16()
+        .count()
+        .try_into()
+        .expect("u32");
     let hover = server
         .request(
             "textDocument/hover",
-            &json!({ "textDocument": { "uri": uri }, "position": { "line": 5, "character": 17 } }),
-        )
-        .expect("hover");
-    let hover_val = hover["contents"]["value"].as_str().unwrap_or_default();
-    assert!(
-        hover_val.contains("String") && hover_val.contains("does not match"),
-        "{hover}"
-    );
-
-    let highlights = server
-        .request(
-            "textDocument/documentHighlight",
-            &json!({ "textDocument": { "uri": uri }, "position": { "line": 5, "character": 17 } }),
-        )
-        .expect("documentHighlight");
-    let arr = highlights.as_array().expect("highlight array");
-    assert_eq!(arr.len(), 4, "let, else, fallback, remainder: {highlights}");
-    // Fallback `"é𝄞"` is on line 5 from col 22 to col 27 in UTF-16 (`"` + `é`(1) + `𝄞`(2) + `"` = 5 units).
-    assert_eq!(
-        arr[2]["range"]["start"],
-        json!({ "line": 5, "character": 22 })
-    );
-    assert_eq!(
-        arr[2]["range"]["end"],
-        json!({ "line": 5, "character": 27 })
-    );
-    // Skipped remainder `prefix ++ s` is on line 6.
-    assert_eq!(
-        arr[3]["range"]["start"],
-        json!({ "line": 6, "character": 2 })
-    );
-    assert_eq!(
-        arr[3]["range"]["end"],
-        json!({ "line": 6, "character": 13 })
-    );
-
-    let actions = server
-        .request(
-            "textDocument/codeAction",
             &json!({
-                "textDocument": { "uri": uri },
-                "range": {
-                    "start": { "line": 5, "character": 2 },
-                    "end": { "line": 5, "character": 5 }
-                },
-                "context": { "diagnostics": [] }
+                "textDocument": { "uri": protocol::uri_of(&path) },
+                "position": { "line": 8, "character": catch_utf16 + 1 }
             }),
         )
-        .expect("codeAction");
+        .expect("hover response");
+    let contents = hover["contents"]["value"].as_str().unwrap_or("");
     assert!(
-        actions
-            .as_array()
-            .expect("actions")
-            .iter()
-            .any(|a| a["title"] == "expand `let ... else` to `match`"),
-        "{actions}"
+        contents.contains("catch") && contents.contains("String"),
+        "expected UTF-16 hover on `catch`: {hover:?}"
     );
 
-    // Edit the remainder line and re-query immediately after settling: no stale highlight end column!
+    // Edit after analysis: introduce a type mismatch in the recovery arm and verify fresh
+    // diagnostics without stale results.
+    let ok_byte = line8.find("\"ok\"").expect("\"ok\"");
+    let ok_utf16: u32 = line8[..ok_byte]
+        .encode_utf16()
+        .count()
+        .try_into()
+        .expect("u32");
+    written.0.lock().expect("not poisoned").clear();
     server.notify(
         "textDocument/didChange",
-        &change(&path, (6, 2), (6, 13), "s"),
+        &change(&path, (8, ok_utf16), (8, ok_utf16 + 4), "42"),
     );
     settle(&mut server);
-    let updated = server
-        .request(
-            "textDocument/documentHighlight",
-            &json!({ "textDocument": { "uri": uri }, "position": { "line": 5, "character": 17 } }),
-        )
-        .expect("updated documentHighlight");
-    let updated_arr = updated.as_array().expect("updated array");
-    assert_eq!(
-        updated_arr[3]["range"]["end"],
-        json!({ "line": 6, "character": 3 }),
-        "stale highlight range after edit: {updated}"
+    let out = written_text(&written);
+    assert!(
+        out.contains("FLICK-T003"),
+        "expected fresh FLICK-T003 after editing recovery arm: {out}"
+    );
+
+    // Fix it back and ensure the stale diagnostic clears.
+    written.0.lock().expect("not poisoned").clear();
+    server.notify(
+        "textDocument/didChange",
+        &change(&path, (8, ok_utf16), (8, ok_utf16 + 2), "\"ok\""),
+    );
+    settle(&mut server);
+    let out = written_text(&written);
+    assert!(
+        out.contains("\"diagnostics\":[]"),
+        "expected diagnostics to clear after fixing recovery arm: {out}"
     );
 }

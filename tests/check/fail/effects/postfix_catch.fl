@@ -1,0 +1,156 @@
+module App.PostfixCatchFail exposing (..)
+
+type error NotFound = NotFound String
+
+type error Timeout = Timeout
+
+type error BadCode = BadCode Int
+
+type error Flag = Flag Bool
+
+effect Ask =
+  ask : Unit ->{} Int
+
+effect Emit =
+  control emit : Int ->{} Unit
+
+fail_nf : String ->{; NotFound} Int
+let fail_nf s = Fail.fail (NotFound s)
+
+fail_code : Int ->{; BadCode} Int
+let fail_code n = Fail.fail (BadCode n)
+
+fail_flag : Bool ->{; Flag} Int
+let fail_flag b = Fail.fail (Flag b)
+
+fail_both : Bool ->{; NotFound, Timeout} Int
+let fail_both b = if b then Fail.fail (NotFound "x") else Fail.fail Timeout
+
+// 1. Operation arm rejected in `catch`.
+op_arm : Unit ->{Ask} Int
+let op_arm () =
+  Ask.ask () catch
+  | Ask.ask () -> 1
+//~ FLICK-E007 @33:5-33:15 `catch` handles typed errors only; for `Ask.ask`, use `try … with`
+
+// 2. `return` arm rejected in `catch`.
+return_arm : String ->{} Int
+let return_arm s =
+  fail_nf s catch
+  | NotFound _ -> 0
+  | return n -> n
+//~ FLICK-E007 @41:5-41:13 `catch` handles typed errors only; use `try … with` for a `return` arm
+
+// 3. `Fail.fail p` arm rejected in `catch`.
+fail_arm : String ->{} Int
+let fail_arm s =
+  fail_nf s catch
+  | Fail.fail (NotFound _) -> 0
+//~ FLICK-E007 @48:5-48:27 `catch` takes a direct error pattern, not `Fail.fail …`
+
+// 4. `resume` inside `catch` arm gets targeted error.
+resume_in_catch : String ->{} Int
+let resume_in_catch s =
+  fail_nf s catch
+  | NotFound _ -> resume ()
+//~ FLICK-T001 @55:19-55:25 cannot find value `resume`: `catch` handles typed errors only; `resume` is only available in `control` operation arms of `try … with`
+
+// 5. Ordinary ADT pattern rejected.
+adt_arm : String ->{; NotFound} Option Int
+let adt_arm s =
+  Some (fail_nf s) catch
+  | None -> None
+//~ FLICK-E007 @62:5-62:9 a handler matches errors declared with `type error`
+
+// 6. Non-Bool guard rejected.
+non_bool_guard : String ->{; NotFound} Int
+let non_bool_guard s =
+  fail_nf s catch
+  | NotFound _ when 1 -> 0
+//~ FLICK-T003 @69:21-69:22 expected `Bool`, found `Int`
+
+// 7. Mismatched recovery RHS type reported at RHS.
+bad_rhs : String ->{} Int
+let bad_rhs s =
+  fail_nf s catch
+  | NotFound _ -> "oops"
+//~ FLICK-T003 @76:19-76:25 expected `Int`, found `String`
+
+// 8. Partial payload arm does NOT remove nominal error.
+partial_unhandled : Int ->{} Int
+let partial_unhandled n =
+  fail_code n catch
+  //~ FLICK-E002 @82:15-82:20 the signature of `partial_unhandled` does not allow
+  | BadCode 0 -> 0
+
+// 9. Separate partial arms covering all payload values still do NOT remove nominal error.
+separate_partials_unhandled : Bool ->{} Int
+let separate_partials_unhandled b =
+  fail_flag b catch
+  //~ FLICK-E002 @89:15-89:20 the signature of `separate_partials_unhandled` does not allow
+  | Flag true -> 1
+  | Flag false -> 2
+
+// 10. Guarded arm (`when true`) does NOT remove nominal error.
+guarded_unhandled : String ->{} Int
+let guarded_unhandled s =
+  fail_nf s catch
+  //~ FLICK-E002 @97:13-97:18 the signature of `guarded_unhandled` does not allow
+  | NotFound _ when true -> 0
+
+// 11. Guarded catch-all does NOT remove errors.
+guarded_all_unhandled : String ->{} Int
+let guarded_all_unhandled s =
+  fail_nf s catch
+  //~ FLICK-E002 @104:13-104:18 the signature of `guarded_all_unhandled` does not allow
+  | _ when true -> 0
+
+// 12. Recovery re-raising the same nominal error leaks it to the outer row.
+re_raised_unhandled : String ->{} Int
+let re_raised_unhandled s =
+  fail_nf s catch
+  | NotFound x -> Fail.fail (NotFound x)
+//~ FLICK-E002 @112:19-112:41 the signature of `re_raised_unhandled` does not allow
+
+// 13. Catch-all variable gets full body row even after an earlier arm.
+only_timeout : Timeout -> Int
+let only_timeout _ = 1
+
+narrowed_var : Bool ->{} Int
+let narrowed_var b =
+  fail_both b catch
+  | NotFound _ -> 0
+  | e -> only_timeout e
+//~ FLICK-E002 @123:5-123:6
+
+// 14. Option `?` cannot cross the `catch` return boundary (body and recovery).
+opt_body : Option Int ->{} Option Int
+let opt_body x =
+  Some (x?) catch
+  //~ FLICK-T003 @129:9-129:11 `?` on an `Option` returns `None` from the function around it, but this code runs on its own (in a `task`, `scope`, `provide`, `try`, `catch` or a `for`)
+  | _ -> None
+
+opt_recovery : String -> Option Int ->{} Option Int
+let opt_recovery s x =
+  Some (fail_nf s) catch
+  | NotFound _ -> Some (x?)
+//~ FLICK-T003 @136:25-136:27 `?` on an `Option` returns `None` from the function around it, but this code runs on its own (in a `task`, `scope`, `provide`, `try`, `catch` or a `for`)
+
+// 15. Region escape via `catch` recovery is rejected.
+region_escape : Unit ->{} (Unit ->{} Unit)
+let region_escape () =
+  scope s {
+    keep : (Unit ->{} Unit)^{s}
+    let keep = fun () -> ()
+    (fail_nf "a" |> fun _ -> keep) catch
+    //~ FLICK-G002 @145:6-145:34 this uses region `s`, which the expected type `Unit ->{} Unit` does not keep live
+    | NotFound _ -> keep
+    //~ FLICK-G002 @147:21-147:25 this uses region `s`, which the expected type `Unit ->{} Unit` does not keep live
+  }
+
+// 16. Effectful `catch` in a pure function is rejected.
+pure_catch : String -> Int
+let pure_catch s =
+  fail_nf s catch
+  //~ FLICK-E001 @154:3-154:12
+  | NotFound _ -> 0

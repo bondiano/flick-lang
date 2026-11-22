@@ -8,7 +8,7 @@ use crate::iface::Namespace;
 use crate::resolve::declarations;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
-use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::kind::{SyntaxKind as K, keyword};
 
 mod contracts;
 mod methods;
@@ -141,6 +141,9 @@ impl Ide<'_> {
                 "`{new_name}` is not a {} name",
                 if capital { "capitalized" } else { "lowercase" }
             ));
+        }
+        if !capital && (keyword(new_name).is_some() || new_name == "_") {
+            return Err(format!("`{new_name}` is a reserved keyword"));
         }
         self.rename_references(&symbol, new_name)
     }

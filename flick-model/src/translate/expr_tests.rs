@@ -1,6 +1,7 @@
 use super::Tr;
+use crate::run::compile_source;
 use crate::syntax::Term;
-use flick_core::ir::{Expr, ExprKind, Lit, Stage};
+use flick_core::ir::{Expr, ExprKind, ItemKind, Lit, Stage};
 use flick_core::source::{FileId, Span};
 
 fn expression(kind: ExprKind) -> Expr {
@@ -52,5 +53,33 @@ fn let_else_lowers_and_translates_identically_to_canonical_match() {
     assert_eq!(
         format!("{:?}", translate_f(let_else_src)),
         format!("{:?}", translate_f(match_src))
+    );
+}
+
+#[test]
+fn orelse_lowers_to_canonical_option_match() {
+    let source = "module App.Main exposing (pick)\n\npick : Option Int -> Int -> Int\nlet pick opt fallback = opt orelse fallback\n";
+    let modules = compile_source(source).expect("source checks");
+    let main = modules
+        .iter()
+        .find(|module| module.ir.name == "App.Main")
+        .expect("App.Main module");
+    let body = main
+        .ir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            ItemKind::Value { name, body, .. } if name == "pick" => Some(body),
+            _ => None,
+        })
+        .expect("pick item");
+    let translated = Tr::new("App.Main").expr(body);
+    let mut inner = &translated;
+    while let Term::Lam(_, body) = inner {
+        inner = body;
+    }
+    assert!(
+        matches!(inner, Term::Match(_, arms) if arms.len() == 2),
+        "expected canonical two-arm match, got {inner:?}"
     );
 }

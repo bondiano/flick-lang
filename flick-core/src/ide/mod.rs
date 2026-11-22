@@ -462,6 +462,8 @@ mod rename_safety_tests;
 #[cfg(test)]
 mod rename_tests;
 #[cfg(test)]
+mod result_tests;
+#[cfg(test)]
 mod set_tests;
 #[cfg(test)]
 mod tests;

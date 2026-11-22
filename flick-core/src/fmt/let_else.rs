@@ -7,11 +7,11 @@ use super::printer::{Doc, INDENT, Printer, nodes, position};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
 
-/// Whether `n` contains an unparenthesized `if`, `match`, `try` or `fun`
-/// whose own branches/arms could break to the enclosing line's column.
+/// Whether `n` contains an unparenthesized `if`, `match`, `try`, `catch` or
+/// `fun` whose own branches/arms could break to the enclosing line's column.
 fn has_layout_branch(n: &Node) -> bool {
     match n.kind {
-        K::IfExpr | K::MatchExpr | K::TryExpr | K::FunExpr => true,
+        K::IfExpr | K::MatchExpr | K::TryExpr | K::CatchExpr | K::FunExpr => true,
         K::ParenExpr
         | K::TupleExpr
         | K::ListExpr
@@ -21,6 +21,7 @@ fn has_layout_branch(n: &Node) -> bool {
         | K::LazyExpr
         | K::ScopeExpr
         | K::ProvideExpr
+        | K::ResultExpr
         | K::DoExpr
         | K::LoopExpr
         | K::PluginExpr => false,

@@ -264,3 +264,73 @@ fn let_else_hover_actions_and_emission_work_in_wasm_session() {
         );
     }
 }
+
+#[test]
+fn result_block_wasm_hover_tokens_and_code_actions_respect_utf16_and_edits() {
+    let source = "module Main exposing (main)\n\ntype error Boom = Boom\n\nmain : Bool ->{} Result Boom String\nlet main flag =\n  let _ = \"é𝄞\"\n  result { if flag then Fail.fail Boom else \"ok\" }\n";
+    let mut session = Session::new();
+    assert_eq!(json(&session.update(source)), Value::Array(Vec::new()));
+
+    let byte_at = source.find("result {").expect("result");
+    let utf16_at: u32 = source[..byte_at]
+        .chars()
+        .map(char::len_utf16)
+        .sum::<usize>()
+        .try_into()
+        .expect("utf16 offset");
+
+    let tokens = json(&session.semantic_tokens());
+    let has_kw = tokens["tokens"]
+        .as_array()
+        .expect("tokens")
+        .iter()
+        .any(|t| {
+            t["from"] == u64::from(utf16_at)
+                && t["to"] == u64::from(utf16_at + 6)
+                && t["type"] == "keyword"
+        });
+    assert!(
+        has_kw,
+        "expected keyword semantic token at {utf16_at}: {tokens}"
+    );
+
+    let hover = json(&session.hover(utf16_at + 1));
+    assert!(
+        hover["text"]
+            .as_str()
+            .is_some_and(|s| s.contains("result { … } : Result Boom String")),
+        "{hover}"
+    );
+
+    let actions = json(&session.code_actions(utf16_at, utf16_at + 6));
+    assert!(
+        actions.as_array().is_some_and(|arr| arr.iter().any(|a| {
+            a["title"]
+                .as_str()
+                .is_some_and(|t| t.contains("expand `result"))
+        })),
+        "{actions}"
+    );
+
+    // Edit into canonical `try` and ensure cache updates cleanly and offers forward rewrite
+    let edited = "module Main exposing (main)\n\ntype error Boom = Boom\n\nmain : Bool ->{} Result Boom String\nlet main flag =\n  let _ = \"é𝄞\"\n  try if flag then Fail.fail Boom else \"ok\" with\n  | return x -> Ok x\n  | e -> Err e\n";
+    assert_eq!(json(&session.update(edited)), Value::Array(Vec::new()));
+    let try_byte = edited.find("try if").expect("try");
+    let try_utf16: u32 = edited[..try_byte]
+        .chars()
+        .map(char::len_utf16)
+        .sum::<usize>()
+        .try_into()
+        .expect("utf16");
+    let edited_actions = json(&session.code_actions(try_utf16, try_utf16 + 3));
+    assert!(
+        edited_actions
+            .as_array()
+            .is_some_and(|arr| arr.iter().any(|a| {
+                a["title"]
+                    .as_str()
+                    .is_some_and(|t| t.contains("rewrite as `result"))
+            })),
+        "{edited_actions}"
+    );
+}

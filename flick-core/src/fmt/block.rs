@@ -29,6 +29,7 @@ pub(super) fn hugs(n: &Node) -> bool {
             | K::TaskExpr
             | K::ScopeExpr
             | K::ProvideExpr
+            | K::ResultExpr
             | K::DoExpr
             | K::FunExpr
     ) || matches!(n.kind, K::ForExpr | K::PluginExpr | K::LazyExpr) && n.has_token(K::LBrace)

@@ -82,6 +82,7 @@ codegen/local_functions
 codegen/match_graph
 codegen/numbers
 codegen/numeric_classes
+codegen/orelse
 codegen/patterns
 codegen/pure_main
 codegen/question
@@ -368,10 +369,15 @@ codegen/loops_guards
 codegen/loops_owners
 codegen/labeled_loops_finalizers
 codegen/record_constructor
+codegen/record_order
+codegen/record_order_std
+codegen/record_identity_std
+codegen/record_ffi
 codegen/class_variance
 codegen/contract_runs_nowhere
 
 effect/row_without
+effect/postfix_catch
 ../rt/owner_foreign_policy
 
 runtime/counted_layer_merge
@@ -386,3 +392,6 @@ runtime/suspended_std
 runtime/lazy_let
 runtime/lazy_let_state
 runtime/lazy_opt
+effect/result_blocks
+runtime/result_block_causes
+../rt/result_control_unwind

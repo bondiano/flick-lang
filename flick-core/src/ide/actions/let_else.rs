@@ -89,7 +89,7 @@ impl Ide<'_> {
         }
         let scrutinee = if matches!(
             init_expr.kind,
-            K::MatchExpr | K::TryExpr | K::IfExpr | K::FunExpr
+            K::MatchExpr | K::TryExpr | K::CatchExpr | K::IfExpr | K::FunExpr
         ) || init_src.contains('\n')
         {
             format!("({init_src})")

@@ -1,5 +1,7 @@
 // `hash` of the built-in instances, computed as Go's `flickrt` computes it: a
 // seed draws the same `Gen.function` on every runtime.
+import { gadtMarker } from "../core/values.ts";
+
 const optimize = (n: number): number => (n & 0xbfffffff) | ((n >>> 1) & 0x40000000);
 
 /** The 32-bit MurmurHash3 finalizer. */
@@ -42,7 +44,11 @@ export const hash = (a: unknown): number => {
       if (a === null) break;
       if (Array.isArray(a)) return optimize(a.reduce((h: number, x: unknown) => combine(h, hash(x)), 6151));
       let h = 12289;
-      for (const key of Object.keys(a)) h ^= combine(hashString(key), hash(Reflect.get(a, key)));
+      const skipDicts = gadtMarker in a;
+      for (const key of Object.keys(a)) {
+        if (skipDicts && key.charCodeAt(0) === 36) continue;
+        h ^= combine(hashString(key), hash(Reflect.get(a, key)));
+      }
       return optimize(h);
     }
     default:

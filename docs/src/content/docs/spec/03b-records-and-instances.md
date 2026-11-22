@@ -1,6 +1,6 @@
 ---
 title: "Records and instances"
-source_hash: fe30a22ecb0983e0
+source_hash: 7a43bc952a5d1f09
 ---
 
 ## Record structurality
@@ -21,7 +21,13 @@ let project_name value =
   { name = value.name }
 ```
 
-`name` allows extra fields through `fields`. `project_name` creates an object with only the field `name`; this is not a cast that hides keys. The update `{ record with field = value }` replaces an existing field with a value of the same type. `Record.extend` requires `Lacks`; `Record.merge_disjoint` requires disjoint rows. Changing a field's type is done by explicit remove/extend or by a new record. There is no hidden overwrite on spread. The values of the fields are evaluated in source order.
+`name` allows extra fields through `fields`. `project_name` creates an object with only the field `name`; this is not a cast that hides keys. The update `{ record with field = value }` replaces an existing field with a value of the same type. `Record.extend` requires `Lacks`; `Record.merge_disjoint` requires disjoint rows. Changing a field's type is done by explicit remove/extend or by a new record. There is no hidden overwrite on spread. Field expressions in record literals and updates `{ record with ... }` evaluate in source order.
+
+### Value identity and label order
+
+Values of algebraic data types (including `unboxed` and `untagged` types), structural records, and tuples have **no observable storage identity**, and the written order of a structural record's labels is **not observable** from Flick code. Every language and standard-library operation that enumerates, formats, hashes, compares, generates, or encodes a structural record uses the canonical sorted order of `Record.labels`, never the source written order. A cache keyed by identity (such as a `WeakMap` or reference comparison inside a runtime) may affect cost only, never an observable result.
+
+A backend may copy, inline, or share the storage of such a value whenever every observable part is preserved — including hidden GADT evidence and the identity of any referenced mutable cells (`Ref`, `RcRef`, `ScopedRef`, `Atom`) and foreign values. Source equality `==` alone is not a license to substitute one value for another: for example, `0.0 == -0.0`, while `Float.same_value` and `show` distinguish them. Explicit mutable cells and foreign values have identity by design.
 
 ### Records, instances and FFI
 
@@ -29,7 +35,7 @@ Two transparent aliases of one shape are one type and do not get different globa
 
 For different domain semantics, a nominal wrapper is introduced. An alternative comparison without a new type is an explicit `EqHash` witness, which a `HashSet` or `HashMap` keeps as part of its type ([hash collections](../../reference/stdlib/#hash-collections)).
 
-A record is a plain JS object with exactly its fields (on the Go target, a `*flickrt.Record`). Flick data crosses a foreign binding as a copy, so JS cannot change a Flick value it was given ([FFI](../../reference/ffi/#js-values)). Untrusted input becomes a record only by decoding through a schema or codec, which refuses keys it does not name unless the codec goes through `ignore_extra_fields` ([schemas](../../reference/schema/)).
+At the FFI boundary, a structural record is a plain JS object with exactly its fields (on the Go target, a `*flickrt.Record`) in canonical sorted label order: JS array-index keys first in ascending numeric order, then all remaining labels in UTF-16 code-unit order (pure `Record.labels` order for Flick identifier labels). Flick data crosses a foreign binding as a copy, so JS cannot change a Flick value it was given ([FFI](../../reference/ffi/#js-values)). Untrusted input becomes a record only by decoding through a schema or codec, which refuses keys it does not name unless the codec goes through `ignore_extra_fields` ([schemas](../../reference/schema/)). `Json` values and `Record.ReadonlyRecord` dictionaries are separate key-value maps with their own insertion/wire ordering rules: `Codec.json` encodes structural records in canonical order and decodes any JSON key order into a canonical record, while a `codec` block preserves its declared wire key order on encoding and canonicalizes the decoded record.
 
 ## Classes and dependencies between types
 

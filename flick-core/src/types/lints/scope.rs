@@ -82,6 +82,21 @@ impl Checker<'_> {
                     self.wildcard_arm(s, &arms);
                 }
             }
+            K::TryExpr | K::CatchExpr => {
+                let mut parts = node.nodes();
+                if let Some(body) = parts.next() {
+                    self.scope_walk(body, scope);
+                }
+                for arm in parts.filter(|n| n.kind == K::MatchArm) {
+                    let mut inner = arm.nodes();
+                    if let Some(pattern) = inner.next() {
+                        let names = self.pattern_variables(pattern).into_iter();
+                        scope.extend(names.map(|(n, _)| n));
+                    }
+                    inner.for_each(|n| self.scope_walk(n, scope));
+                    scope.truncate(mark);
+                }
+            }
             K::BinExpr => {
                 // a chain of operators binds nothing: its operands, in a loop
                 let (spine, left) = node.left_spine();
