@@ -10,7 +10,9 @@ use crate::project::environment::ResolvedEnvironment;
 use crate::project::target_preflight::{self, CheckOptions, RunnerRef};
 use crate::source::SourceMap;
 
-pub use target_preflight::{gated_service, handled_services, handles, std_root_handlers};
+pub use target_preflight::{
+    gated_service, handled_services, handles, std_root_handlers, std_root_handlers_for,
+};
 
 /// Run unified environment preflight from native JS build `Settings` (used by
 /// direct `build::emit` callers and the JS backend preflight step).
@@ -43,6 +45,7 @@ pub fn check_settings(
             by_class: settings.backend == Backend::Rt,
             for_tests: false,
             test_paths: &[],
+            handles: None,
         },
         sources,
         &env,
@@ -86,6 +89,7 @@ pub fn check(
             by_class: settings.backend == Backend::Rt,
             for_tests: false,
             test_paths: &[],
+            handles: None,
         },
         sources,
         &env,

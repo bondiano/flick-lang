@@ -3,9 +3,10 @@ use super::*;
 use crate::backends::Selected;
 use crate::backends::options::ResolvedOptions;
 use flick_backend::{
-    BackendId, DeclaredInputs, JavascriptEntry, JavascriptProjection, Limits,
+    Backend, BackendId, DeclaredInputs, JavascriptEntry, JavascriptProjection, Limits,
     TypescriptModuleProjection, validate_request,
 };
+use flick_backend_js::Javascript;
 use flick_core::diagnostics::Severity;
 use std::io;
 use std::path::Path;
@@ -29,11 +30,12 @@ fn prepared_fixture(path: &str) -> Prepared {
         out_dir: "unused-projection-output".into(),
         entries: vec![],
         typescript: true,
-        go: false,
+        stages_by_class: false,
         suites: vec![],
         extras: build::Extras::default(),
         release: false,
     };
+    let descriptor = Javascript.describe();
     Prepared::new(
         &host,
         &mut sources,
@@ -47,6 +49,7 @@ fn prepared_fixture(path: &str) -> Prepared {
             },
             sha256: flick_backend::sha256(b"test component"),
         },
+        &descriptor,
     )
 }
 
@@ -101,11 +104,12 @@ pub(super) fn prepared_prefix() -> Prepared {
         out_dir: "unused-projection-output".into(),
         entries: vec![("main".into(), "App.Main".into())],
         typescript: true,
-        go: false,
+        stages_by_class: false,
         suites: vec![],
         extras: build::Extras::default(),
         release: false,
     };
+    let descriptor = Javascript.describe();
     Prepared::new(
         &FsHost::new(),
         &mut sources,
@@ -119,6 +123,7 @@ pub(super) fn prepared_prefix() -> Prepared {
             },
             sha256: flick_backend::sha256(b"test component"),
         },
+        &descriptor,
     )
 }
 
@@ -146,14 +151,6 @@ fn typescript_and_foreign_inputs_are_explicit_frontend_projections() {
     assert!(
         !request.foreign.is_empty(),
         "builtin foreign specifiers are resolved by the host"
-    );
-    assert!(
-        request
-            .target
-            .options
-            .iter()
-            .any(|o| o.key == "js.effect-bridge"),
-        "runtime ownership is explicit as well as Effect/RT mode"
     );
     let mut inputs = DeclaredInputs::new(&request.inputs, |id| prepared.bytes.get(id).cloned())
         .expect("declared side inputs");

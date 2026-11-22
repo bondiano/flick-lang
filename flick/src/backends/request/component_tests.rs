@@ -8,6 +8,7 @@ use crate::commands::build::settings::with_settings;
 use crate::component;
 use flick_backend::{Backend, BackendId, DeclaredInputs, Limits, Policy, generate};
 use flick_backend_js::Javascript;
+use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::Severity;
 #[cfg(feature = "wasm-backends")]
 use std::fs;
@@ -63,7 +64,7 @@ fn prepare_fixture(
                 .clone(),
         )],
         typescript,
-        go: false,
+        stages_by_class: rt,
         suites: vec![],
         extras: build::Extras {
             rt,
@@ -71,13 +72,19 @@ fn prepare_fixture(
         },
         release,
     };
-    let (native, diagnostics) = with_settings(host, None, compilation, &output, |settings| {
-        build::emit(compilation, sources, settings)
-    });
+    let (native, diagnostics) = with_settings(
+        host,
+        None,
+        compilation,
+        &output,
+        EffectBridge::Available,
+        |settings| build::emit(compilation, sources, settings),
+    );
     assert!(
         !diagnostics.iter().any(|d| d.severity == Severity::Error),
         "{diagnostics:?}"
     );
+    let descriptor = Javascript.describe();
     let prepared = Prepared::new(
         host,
         sources,
@@ -91,6 +98,7 @@ fn prepare_fixture(
             },
             sha256: flick_backend::sha256(b"native parity"),
         },
+        &descriptor,
     );
     assert!(
         prepared.diagnostics.is_empty(),
@@ -402,6 +410,7 @@ fn official_js_per_module_output_keeps_the_complete_reference_graph() {
         reserved_paths: &reserved,
         limits: Limits::default(),
         authorize_step: &|_| Err("no tools".into()),
+        authorize_launch: &|_| Ok(()),
     };
     let generated = generate(
         &Javascript,

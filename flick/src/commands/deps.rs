@@ -242,7 +242,7 @@ fn delegated(
             .diagnostics
             .iter()
             .any(|d| d.severity == Severity::Error)
-        && let Some(problem) = backends::check_runtime_project(project, false)
+        && let Some(problem) = backends::check_runtime_project(project)
     {
         ran.diagnostics.push(problem);
     }

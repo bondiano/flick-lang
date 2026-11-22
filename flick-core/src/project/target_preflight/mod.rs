@@ -19,7 +19,9 @@ use std::path::PathBuf;
 use facades::{FacadeUse, eager_facade_uses, item_facade_uses, module_facade_uses};
 pub(crate) use gated::needs_adapter;
 use gated::scan_item_gated_services;
-pub use gated::{gated_service, handled_services, handles, std_root_handlers};
+pub use gated::{
+    gated_service, handled_services, handles, std_root_handlers, std_root_handlers_for,
+};
 pub(crate) use prune::{prune_compilation, prune_compilation_for_env};
 use refs::{Reference, collect_item_references, initialization_refs, module_reexports};
 
@@ -40,6 +42,9 @@ pub(crate) struct RunnerRef {
     pub span: Option<Span>,
 }
 
+/// Host lookup returning whether the selected backend handles a gated service.
+pub(crate) type HandlesService<'a> = &'a dyn Fn(&str) -> Option<bool>;
+
 /// Options controlling which roots environment preflight starts from.
 pub(crate) struct CheckOptions<'a> {
     pub entries: &'a [(String, String, Option<Span>)],
@@ -47,6 +52,7 @@ pub(crate) struct CheckOptions<'a> {
     pub by_class: bool,
     pub for_tests: bool,
     pub test_paths: &'a [PathBuf],
+    pub handles: Option<HandlesService<'a>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -75,6 +81,7 @@ struct Preflight<'a> {
     compilation: &'a Compilation,
     sources: &'a SourceMap,
     env: &'a ResolvedEnvironment,
+    handles: Option<HandlesService<'a>>,
     modules: Vec<&'a Module>,
     index: HashMap<reach::Key, (usize, usize)>,
     module_conditions: HashMap<String, Option<String>>,
@@ -142,6 +149,7 @@ pub(crate) fn check(
         compilation,
         sources,
         env,
+        handles: options.handles,
         modules,
         index,
         module_conditions,
@@ -435,6 +443,7 @@ impl Preflight<'_> {
                 scan_item_gated_services(
                     item,
                     self.env,
+                    self.handles,
                     work.covered,
                     &mut self.reported_e020,
                     self.diagnostics,

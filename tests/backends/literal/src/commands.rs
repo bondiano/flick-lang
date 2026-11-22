@@ -81,6 +81,38 @@ pub(super) fn commands() -> Vec<Descriptor> {
             writes: vec!["staged.txt".into(), "after.txt".into()],
             style: Style::Plan,
         },
+        Descriptor {
+            name: "doctor".into(),
+            summary: "reports literal backend readiness for `flick doctor`".into(),
+            positionals: vec![],
+            options: vec![
+                Parameter {
+                    name: "in-project".into(),
+                    kind: ValueKind::Text,
+                    multiple: false,
+                    required: false,
+                    help: "whether inside a project".into(),
+                },
+                Parameter {
+                    name: "compiler".into(),
+                    kind: ValueKind::Text,
+                    multiple: false,
+                    required: false,
+                    help: "compiler version".into(),
+                },
+                Parameter {
+                    name: "granted-tools".into(),
+                    kind: ValueKind::Text,
+                    multiple: true,
+                    required: false,
+                    help: "granted tools".into(),
+                },
+            ],
+            inputs: vec!["doctor-write.txt".into()],
+            reads: vec![],
+            writes: vec![],
+            style: Style::Plan,
+        },
     ];
     all.extend(deps::commands());
     all
@@ -181,43 +213,74 @@ pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
             outputs: vec!["made.txt".into()],
             in_place: false,
         })),
-        "literal-in-place" => {
-            let mode = value(invocation, "mode").unwrap_or("ok");
-            let node = invocation
-                .tools
-                .iter()
-                .find(|t| t.id == "node")
-                .cloned()
-                .unwrap_or(Tool {
-                    id: "node".into(),
-                    version: String::new(),
-                    sha256: String::new(),
-                });
-            plan.files.push(file("staged.txt", "staged-content\n"));
-            let (inputs, reads, outputs) = match mode {
-                "bad-inputs" => (vec!["staged.txt".into()], vec![], vec!["after.txt".into()]),
-                "bad-reads" => (vec![], vec!["staged.txt".into()], vec!["after.txt".into()]),
-                "bad-outputs" => (vec![], vec![], vec!["undeclared.txt".into()]),
-                _ => (vec![], vec![], vec!["after.txt".into()]),
-            };
-            plan.steps.push(Step::Tool(ToolStep {
-                id: "in-place".into(),
-                tool: node,
-                arguments: vec![
-                    "-e".into(),
-                    "const fs = require('fs'); fs.writeFileSync('after.txt', 'saw:' + fs.readFileSync('staged.txt', 'utf8'));"
-                        .into(),
-                ],
-                environment: vec![],
-                inputs,
-                reads,
-                outputs,
-                in_place: true,
-            }));
-        }
+        "literal-in-place" => run_in_place(invocation, &mut plan),
+        "doctor" => run_doctor(invocation, &mut plan),
         _ => {}
     }
     Ok(plan)
+}
+
+fn run_in_place(invocation: &Invocation, plan: &mut Plan) {
+    let mode = value(invocation, "mode").unwrap_or("ok");
+    let node = invocation
+        .tools
+        .iter()
+        .find(|t| t.id == "node")
+        .cloned()
+        .unwrap_or(Tool {
+            id: "node".into(),
+            version: String::new(),
+            sha256: String::new(),
+        });
+    plan.files.push(file("staged.txt", "staged-content\n"));
+    let (inputs, reads, outputs) = match mode {
+        "bad-inputs" => (vec!["staged.txt".into()], vec![], vec!["after.txt".into()]),
+        "bad-reads" => (vec![], vec!["staged.txt".into()], vec!["after.txt".into()]),
+        "bad-outputs" => (vec![], vec![], vec!["undeclared.txt".into()]),
+        _ => (vec![], vec![], vec!["after.txt".into()]),
+    };
+    plan.steps.push(Step::Tool(ToolStep {
+        id: "in-place".into(),
+        tool: node,
+        arguments: vec![
+            "-e".into(),
+            "const fs = require('fs'); fs.writeFileSync('after.txt', 'saw:' + fs.readFileSync('staged.txt', 'utf8'));"
+                .into(),
+        ],
+        environment: vec![],
+        inputs,
+        reads,
+        outputs,
+        in_place: true,
+    }));
+}
+
+fn run_doctor(invocation: &Invocation, plan: &mut Plan) {
+    if invocation
+        .inputs
+        .iter()
+        .any(|f| f.path == "doctor-write.txt")
+    {
+        plan.files
+            .push(file("doctor-side-effect.txt", "forbidden\n"));
+        return;
+    }
+    let detail = match invocation
+        .tools
+        .iter()
+        .find(|t| t.id == "node" && !t.sha256.is_empty() && !t.version.is_empty())
+    {
+        Some(t) => format!("ready (runtime {})", t.version),
+        None => "ready (no runtime on PATH)".into(),
+    };
+    plan.diagnostics.push(Diagnostic {
+        code: "doctor-ok".into(),
+        severity: Severity::Note,
+        message: format!("literal-backend\n{detail}"),
+        notes: vec![],
+        span: None,
+        help: None,
+    });
 }
 
 fn file(path: &str, text: &str) -> File {

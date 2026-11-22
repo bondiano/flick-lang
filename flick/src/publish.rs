@@ -233,8 +233,10 @@ fn relative(path: &str) -> bool {
 /// A directory of its own beside an output directory, so that paths
 /// relative to it resolve as they do from the output, for the tools that
 /// make files the output then gets. It is removed on drop.
+#[cfg_attr(not(feature = "wasm-backends"), allow(dead_code))]
 pub(crate) struct Beside(PathBuf);
 
+#[cfg_attr(not(feature = "wasm-backends"), allow(dead_code))]
 impl Beside {
     pub(crate) fn new(out: &Path) -> io::Result<Self> {
         static NEXT: AtomicUsize = AtomicUsize::new(0);

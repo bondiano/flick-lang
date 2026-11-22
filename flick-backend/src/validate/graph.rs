@@ -83,6 +83,21 @@ pub(super) fn validate(
         }
     }
     let order = schedule(result, &artifacts, &steps, &sources)?;
+    validate_launches(request, result, policy, &artifacts)?;
+    runtime_dependencies(request, result, limits)?;
+    for step in &result.steps {
+        (policy.authorize_step)(step)?;
+    }
+    Ok(order)
+}
+
+fn validate_launches(
+    request: &BuildRequest,
+    result: &BuildResult,
+    policy: &Policy,
+    artifacts: &BTreeMap<&str, (Option<usize>, ArtifactKind)>,
+) -> Result<(), String> {
+    let limits = policy.limits;
     let mut launches = BTreeSet::new();
     for launch in &result.launches {
         string(&launch.name, limits)?;
@@ -98,18 +113,36 @@ pub(super) fn validate(
             .ok_or("backend launch names an unknown artifact")?;
         if let Some(runtime) = &launch.runtime {
             tool(runtime, request, policy)?;
-        } else if kind != ArtifactKind::Executable {
-            return Err("backend launch without a runtime needs an executable artifact".into());
+        } else {
+            if kind != ArtifactKind::Executable {
+                return Err("backend launch without a runtime needs an executable artifact".into());
+            }
+            if !launch.runtime_arguments.is_empty() {
+                return Err(
+                    "backend launch without a runtime cannot pass runtime arguments".into(),
+                );
+            }
+        }
+        for argument in &launch.runtime_arguments {
+            string(argument, limits)?;
         }
         for argument in &launch.arguments {
             string(argument, limits)?;
         }
+        let mut launch_env = BTreeSet::new();
+        for env in &launch.environment {
+            if env.key.is_empty() || !launch_env.insert(&env.key) {
+                return Err(format!(
+                    "empty or duplicate launch environment `{}`",
+                    env.key
+                ));
+            }
+            string(&env.key, limits)?;
+            string(&env.value, limits)?;
+        }
+        (policy.authorize_launch)(launch)?;
     }
-    runtime_dependencies(request, result, limits)?;
-    for step in &result.steps {
-        (policy.authorize_step)(step)?;
-    }
-    Ok(order)
+    Ok(())
 }
 
 fn runtime_dependencies(

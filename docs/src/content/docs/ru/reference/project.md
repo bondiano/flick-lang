@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: 3559057fab2dafe5
+source_hash: 0866382db4a33e96
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -88,7 +88,7 @@ max-params = 5
 | `target.js.typescript` | логическое значение; генерировать `.ts` вместо `.js` | `false` |
 | `target.js.declarations` | логическое значение; генерировать публичные объявления TypeScript `.d.ts` | `false` |
 | `target.js.promise-facade` | логическое значение; генерировать Promise-фасады `A/B.promise.js` | `false` |
-| `target.js.schema-aot` | логическое значение; компилировать чистые кодеки заранее в раннерах входов | `false` |
+| `target.js.schema-aot` | логическое значение; компилировать чистые кодеки заранее в раннерах входов (требует `"node"` в `[tools]` или `--allow-tool node` вне проекта) | `false` |
 | `target.js.runtime` | `"rt"` на собственной среде Flick или `"effect"` через адаптер Effect; библиотека, от которой зависит проект, компилируется с `runtime` проекта | `"rt"` |
 | `target.js.devtools` | логическое значение (`true` = `"ws://localhost:34437"`) или строка WebSocket URL для `run` / `dev` | выкл. |
 | `target.js.ui` | спецификатор модуля, который рисует и монтирует представления вместо React (экспортирует все имена, которые `Ui` и `Action` берут из `@flick-lang/effect-ts/ui` и `@flick-lang/effect-ts/ui/react`; относительный путь — от корня проекта) | React |

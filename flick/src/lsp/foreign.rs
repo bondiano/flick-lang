@@ -1,4 +1,4 @@
-//! Definitions of local foreign modules and their named JS/Go bindings.
+//! Definitions of local foreign modules and their named bindings.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -46,13 +46,14 @@ pub(super) fn definition(snapshot: &Snapshot, file: FileId, offset: u32) -> Opti
     }
     let path = normalize(&module.path.parent()?.join(spec));
     let extension = path.extension()?.to_str()?;
-    if !matches!(extension, "js" | "mjs" | "ts" | "mts") {
+    if extension == "fl" {
         return None;
     }
-    let path = if snapshot.go {
-        path.with_extension("go")
-    } else {
-        path
+    let path = match &snapshot.foreign_extension {
+        Some(ext) if !ext.is_empty() && !ext.contains(['/', '\\', '\0']) && !ext.contains("..") => {
+            path.with_extension(ext)
+        }
+        _ => path,
     };
     if which == 0 {
         path.is_file().then_some(Location {
@@ -62,11 +63,7 @@ pub(super) fn definition(snapshot: &Snapshot, file: FileId, offset: u32) -> Opti
         })
     } else {
         let text = fs::read_to_string(&path).ok()?;
-        let (start, end) = if snapshot.go {
-            go_name(&text, &export)?
-        } else {
-            js_name(&text, &export)?
-        };
+        let (start, end) = find_name(&text, &export)?;
         Some(Location {
             target: Target::Path(path),
             start,
@@ -154,8 +151,12 @@ fn tokens(text: &str) -> Vec<Token<'_>> {
     out
 }
 
-fn js_name(text: &str, export: &str) -> Option<(u32, u32)> {
+fn find_name(text: &str, name: &str) -> Option<(u32, u32)> {
     let t = tokens(text);
+    exported_name(&t, name).or_else(|| top_level_decl(&t, name))
+}
+
+fn exported_name(t: &[Token<'_>], export: &str) -> Option<(u32, u32)> {
     let mut declarations = HashMap::new();
     for (i, token) in t.iter().enumerate() {
         if token.depth != 0 {
@@ -223,13 +224,12 @@ fn js_name(text: &str, export: &str) -> Option<(u32, u32)> {
     }
 }
 
-fn go_name(text: &str, name: &str) -> Option<(u32, u32)> {
-    let t = tokens(text);
+fn top_level_decl(t: &[Token<'_>], name: &str) -> Option<(u32, u32)> {
     t.windows(2).find_map(|pair| {
         let [head, ident] = pair else { return None };
         (head.depth == 0
             && ident.depth == 0
-            && matches!(head.text, "func" | "var")
+            && matches!(head.text, "func" | "var" | "fn" | "def")
             && ident.text == name)
             .then_some((ident.start, ident.end))
     })
@@ -237,16 +237,16 @@ fn go_name(text: &str, name: &str) -> Option<(u32, u32)> {
 
 #[cfg(test)]
 mod tests {
-    use super::{go_name, js_name};
+    use super::find_name;
 
     #[test]
     fn finds_declarations_without_matching_comments_or_strings() {
-        let js = "// export function count() {}\nconst note = 'export const count = 0';\nexport function count() {}\n";
-        let at = u32::try_from(js.rfind("count").expect("count")).expect("small");
-        assert_eq!(js_name(js, "count"), Some((at, at + 5)));
-        assert_eq!(js_name(js, "missing"), None);
-        let go = "// var count = 0\nvar count = 1\n";
-        let start = u32::try_from(go.rfind("count").expect("count")).expect("small");
-        assert_eq!(go_name(go, "count"), Some((start, start + 5)));
+        let exported = "// export function count() {}\nconst note = 'export const count = 0';\nexport function count() {}\n";
+        let at = u32::try_from(exported.rfind("count").expect("count")).expect("small");
+        assert_eq!(find_name(exported, "count"), Some((at, at + 5)));
+        assert_eq!(find_name(exported, "missing"), None);
+        let decl = "// var count = 0\nvar count = 1\n";
+        let start = u32::try_from(decl.rfind("count").expect("count")).expect("small");
+        assert_eq!(find_name(decl, "count"), Some((start, start + 5)));
     }
 }

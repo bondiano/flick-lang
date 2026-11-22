@@ -1,6 +1,7 @@
 //! The official Go backend over the versioned component records.
 
 mod data;
+mod doctor;
 mod emit;
 #[cfg(feature = "guest")]
 mod guest;
@@ -8,9 +9,9 @@ mod optimize;
 mod templates;
 
 use flick_backend::{
-    Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment, Inputs,
-    Mode, NamedRange, OptionDescriptor, Parameter, Profile, Severity, TagAxis, TargetSupport,
-    ValueKind, Verb, VersionRange, command,
+    Abi, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment,
+    EnvironmentServices, Inputs, Mode, NamedRange, OptionDescriptor, Parameter, Profile, Severity,
+    TagAxis, TargetSupport, ValueKind, Verb, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -28,6 +29,21 @@ pub(super) fn failure(code: &str, message: impl Into<String>) -> Vec<Diagnostic>
 }
 
 impl Backend for Go {
+    fn commands(&self) -> Vec<command::Descriptor> {
+        vec![doctor::descriptor()]
+    }
+
+    fn run(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        if invocation.name == "doctor" {
+            doctor::run(invocation)
+        } else {
+            Err(command::unknown(&invocation.name))
+        }
+    }
+
     fn templates(&self) -> Vec<command::TemplateDescriptor> {
         templates::descriptors()
     }
@@ -82,6 +98,22 @@ impl Backend for Go {
                 implicit_value: None,
                 choices: vec![],
                 verbs: vec![Verb::Build, Verb::Run, Verb::Dev, Verb::Test],
+            }],
+            launch_runtimes: vec![],
+            host_tools: vec!["go".into()],
+            projections: vec![Abi {
+                name: "flick.go".into(),
+                version: "0.1.0".into(),
+            }],
+            stages_by_class_option: None,
+            foreign_extension: Some("go".into()),
+            foreign_suffixes: vec![".go".into()],
+            handled_services: vec![EnvironmentServices {
+                environment: Environment {
+                    backend: "go".into(),
+                    platform: "native".into(),
+                },
+                services: vec!["Database".into(), "Db".into(), "Server".into()],
             }],
         }
     }

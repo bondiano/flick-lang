@@ -19,10 +19,8 @@ use crate::sources::FsHost;
 #[cfg(any(test, feature = "native-backends-development"))]
 use flick_core::build;
 use flick_core::build::Settings;
-#[cfg(all(
-    any(test, feature = "native-backends-development"),
-    not(feature = "wasm-backends")
-))]
+use flick_core::codegen::EffectBridge;
+#[cfg(any(test, feature = "native-backends-development"))]
 use flick_core::project::Host;
 #[cfg(any(test, feature = "native-backends-development"))]
 use flick_core::project::target;
@@ -38,7 +36,26 @@ pub fn artifacts(
     compilation: &Compilation,
     output: &BuildPlan,
 ) -> Emission {
-    super::settings::with_settings(host, project, compilation, output, |settings| {
+    #[cfg(any(test, feature = "native-backends-development"))]
+    let bridge = {
+        let available = project.is_none_or(|p| {
+            compilation.target_dependencies.iter().any(|dependency| {
+                dependency.target == "js" && dependency.name == "@flick-lang/effect-ts"
+            }) || host
+                .foreign(p)
+                .declared
+                .iter()
+                .any(|dependency| dependency == "@flick-lang/effect-ts")
+        });
+        if available {
+            EffectBridge::Available
+        } else {
+            EffectBridge::Absent
+        }
+    };
+    #[cfg(not(any(test, feature = "native-backends-development")))]
+    let bridge = EffectBridge::Absent;
+    super::settings::with_settings(host, project, compilation, output, bridge, |settings| {
         artifacts_with(host, sources, project, compilation, output, settings)
     })
 }
@@ -52,7 +69,7 @@ fn artifacts_with(
     settings: &Settings<'_>,
 ) -> Emission {
     #[cfg(any(test, feature = "native-backends-development"))]
-    if output.go {
+    if output.target == "go" {
         let (artifacts, diagnostics) = build::go::emit(
             compilation,
             sources,

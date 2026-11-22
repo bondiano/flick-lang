@@ -43,6 +43,16 @@ fn js_descriptor() -> Descriptor {
         profiles: vec![Profile::Debug, Profile::Release],
         modes: vec![Mode::WholeProgram, Mode::PerModule],
         capabilities: vec![],
+        launch_runtimes: vec!["node".into()],
+        host_tools: vec!["node".into(), "pnpm".into()],
+        projections: vec![],
+        stages_by_class_option: Some(flick_backend::OptionValue {
+            key: "runtime".into(),
+            value: "rt".into(),
+        }),
+        foreign_extension: None,
+        foreign_suffixes: vec![],
+        handled_services: vec![],
         options: vec![
             OptionDescriptor {
                 parameter: Parameter {
@@ -241,7 +251,7 @@ fn unknown_target_fails_with_p059_and_suggests_closest() {
     let project =
         project_from("schema-version = 1\n[project]\nkind = \"lib\"\n[build]\ntarget = \"go\"\n");
     let (choice, overridden) = resolve_target(None, Some(&project)).expect("go from config");
-    assert!(choice.is_go());
+    assert_eq!(choice.short(), "go");
     assert!(!overridden);
 
     let (choice, overridden) =
@@ -276,6 +286,7 @@ fn target_override_preserves_non_rt_stage_mode_for_go() {
     use super::{OFFICIAL_GO, ResolvedOptions, TargetChoice};
     use crate::backends::Selected;
     use crate::commands::build::target_override;
+    use crate::sources::FsHost;
 
     let default_js_project =
         project_from("schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App\"\n");
@@ -293,5 +304,9 @@ fn target_override_preserves_non_rt_stage_mode_for_go() {
         Vec::new(),
     );
     assert_eq!(ov.rt, Some(false));
-    assert!(!stages_by_class(Some(&default_js_project), ov.rt));
+    assert!(!stages_by_class(
+        &FsHost::without_backends(),
+        Some(&default_js_project),
+        ov.rt
+    ));
 }

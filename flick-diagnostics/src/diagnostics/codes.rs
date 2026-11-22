@@ -316,6 +316,7 @@ codes! {
     P064 = Project 64, "module or binding is not available in this environment";
     P065 = Project 65, "unknown or incompatible environment host";
     P066 = Project 66, "unknown environment tag in condition";
+    P067 = Project 67, "the backend has no client entry runner for this";
 }
 
 #[cfg(test)]

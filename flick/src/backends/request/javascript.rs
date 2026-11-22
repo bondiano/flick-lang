@@ -37,80 +37,85 @@ impl Prepared {
         {
             return;
         }
-        with_settings(host, project, compilation, output, |settings| {
-            let entries =
-                build::javascript_entries(settings, &compilation.modules, &mut self.diagnostics);
-            if self
-                .diagnostics
-                .iter()
-                .any(|d| d.severity == Severity::Error)
-            {
-                return;
-            }
-            self.javascript_facts(compilation, settings, interfaces, &entries);
-            let bridge = build::javascript_effect_bridge(
-                compilation,
-                settings.effect_bridge,
-                settings.runners,
-            );
-            self.request.target.options.push(OptionValue {
-                key: "js.effect-bridge".into(),
-                value: match bridge {
-                    EffectBridge::Absent => "absent",
-                    EffectBridge::Available => "available",
-                    EffectBridge::AvailableWithUi => "available-with-ui",
-                    EffectBridge::AvailableWithWeb => "available-with-web",
-                    EffectBridge::AvailableWithUiAndWeb => "available-with-ui-and-web",
-                }
-                .into(),
-            });
-            let resolved = RefCell::new(build::javascript_foreign_inputs(compilation, settings));
-            let projected =
-                if output.typescript || output.extras.dts || output.extras.promise_facade {
-                    self.frontend_files(compilation, settings, interfaces, &resolved)
-                } else {
-                    Frontend::default()
-                };
-            self.shared
-                .extend(projected.shared.into_iter().map(Artifact::from));
-            self.diagnostics.extend(projected.diagnostics);
-            for (module, projection) in projected.typescript {
-                let mut bytes = Vec::new();
-                ciborium::into_writer(&projection, &mut bytes).expect("plain TS projection");
-                let input = self.input(
-                    format!("typescript/{module}"),
-                    InputKind::TargetFacts,
-                    bytes,
+        let effect_bridge = if self
+            .request
+            .declared_dependencies
+            .as_ref()
+            .is_none_or(|deps| deps.iter().any(|d| d == "@flick-lang/effect-ts"))
+        {
+            EffectBridge::Available
+        } else {
+            EffectBridge::Absent
+        };
+        with_settings(
+            host,
+            project,
+            compilation,
+            output,
+            effect_bridge,
+            |settings| {
+                let entries = build::javascript_entries(
+                    settings,
+                    &compilation.modules,
+                    &mut self.diagnostics,
                 );
-                self.request.projections.push(Projection {
-                    module,
-                    schema: Abi {
-                        name: "flick.typescript".into(),
-                        version: "0.2.0".into(),
-                    },
-                    input,
-                });
-            }
-            self.request
-                .foreign
-                .extend(resolved.into_inner().into_iter().map(|r| {
-                    let inputs = if compilation.library_of(&r.module).is_some() {
-                        assets.clone()
+                if self
+                    .diagnostics
+                    .iter()
+                    .any(|d| d.severity == Severity::Error)
+                {
+                    return;
+                }
+                self.javascript_facts(compilation, settings, interfaces, &entries);
+                let resolved =
+                    RefCell::new(build::javascript_foreign_inputs(compilation, settings));
+                let projected =
+                    if output.typescript || output.extras.dts || output.extras.promise_facade {
+                        self.frontend_files(compilation, settings, interfaces, &resolved)
                     } else {
-                        vec![]
+                        Frontend::default()
                     };
-                    ForeignBinding {
-                        module: r.module,
-                        specifier: r.spec,
-                        resolved: r.specifier,
-                        abi: Abi {
-                            name: "flick.javascript-ffi".into(),
-                            version: "0.1.0".into(),
+                self.shared
+                    .extend(projected.shared.into_iter().map(Artifact::from));
+                self.diagnostics.extend(projected.diagnostics);
+                for (module, projection) in projected.typescript {
+                    let mut bytes = Vec::new();
+                    ciborium::into_writer(&projection, &mut bytes).expect("plain TS projection");
+                    let input = self.input(
+                        format!("typescript/{module}"),
+                        InputKind::TargetFacts,
+                        bytes,
+                    );
+                    self.request.projections.push(Projection {
+                        module,
+                        schema: Abi {
+                            name: "flick.typescript".into(),
+                            version: "0.2.0".into(),
                         },
-                        inputs,
-                    }
-                }));
-        });
+                        input,
+                    });
+                }
+                self.request
+                    .foreign
+                    .extend(resolved.into_inner().into_iter().map(|r| {
+                        let inputs = if compilation.library_of(&r.module).is_some() {
+                            assets.clone()
+                        } else {
+                            vec![]
+                        };
+                        ForeignBinding {
+                            module: r.module,
+                            specifier: r.spec,
+                            resolved: r.specifier,
+                            abi: Abi {
+                                name: "flick.javascript-ffi".into(),
+                                version: "0.1.0".into(),
+                            },
+                            inputs,
+                        }
+                    }));
+            },
+        );
     }
     fn frontend_files(
         &self,

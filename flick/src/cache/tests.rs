@@ -108,14 +108,14 @@ fn a_source_saved_after_it_was_read_keeps_the_build_out_of_the_cache() {
     let (diagnostics, _) = project::compile(&host, &mut sources, Some(&project), &roots);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     assert!(sources.files().any(|f| f.path.ends_with("Helper.fl")));
-    assert!(read_unchanged(&project, &roots, &host.cwd, &sources));
+    assert!(read_unchanged(&project, &roots, &host.cwd, &sources, None));
     // the editor saves the helper after the compiler read it
     fs::write(
         &helper,
         "module App.Helper exposing (n)\n\nn : Float\nlet n = 2\n",
     )
     .expect("write");
-    assert!(!read_unchanged(&project, &roots, &host.cwd, &sources));
+    assert!(!read_unchanged(&project, &roots, &host.cwd, &sources, None));
     let _ = fs::remove_dir_all(&root);
 }
 

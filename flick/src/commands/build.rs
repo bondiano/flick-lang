@@ -4,7 +4,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use flick_backend::Verb;
-use flick_core::build::{self, Extras};
+use flick_core::build::Extras;
 use flick_core::codegen::Labels;
 use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::project::config::{Build, Kind, MAIN_ENTRY, Profile};
@@ -25,7 +25,6 @@ use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
 
-mod backend;
 mod cached;
 pub(super) mod hooks;
 #[cfg(any(test, feature = "native-backends-development"))]
@@ -37,7 +36,6 @@ pub use publication::write;
 pub(super) use publication::{paths as publication_paths, publish_artifacts, write_artifacts};
 #[cfg(test)]
 mod publication_tests;
-mod schemas;
 pub(crate) mod settings;
 #[cfg(any(
     test,
@@ -101,28 +99,15 @@ impl BuildCommand {
         let runners = modules_of
             .iter()
             .filter_map(|(name, module)| {
-                if output.backend.is_component() {
-                    return paths
-                        .iter()
-                        .find(|(n, _)| n == name)
-                        .map(|(_, path)| (module.clone(), output.out_dir.join(path)));
-                }
-                let file = if output.go {
-                    build::go::executable(name)
-                } else {
-                    build::runner_file(name, output.typescript)
-                };
-                Some((module.clone(), output.out_dir.join(file)))
+                paths
+                    .iter()
+                    .find(|(n, _)| n == name)
+                    .map(|(_, path)| (module.clone(), output.out_dir.join(path)))
             })
             .collect();
         *self.built.borrow_mut() = Some(Built {
             #[cfg(feature = "wasm-backends")]
             backend: output.backend.pin(),
-            #[cfg(feature = "wasm-backends")]
-            devtools: output.backend.supports_host("host-node-devtools"),
-            devtools_url: output.options.get("devtools").map(str::to_owned),
-            go: output.go,
-            rt: output.extras.rt,
             modules,
             out_dir: output.out_dir.clone(),
             runners,
@@ -166,6 +151,7 @@ impl Command for BuildCommand {
                 sources,
                 project.as_ref(),
                 &roots,
+                self.options.target.as_deref(),
             );
         }
         let (backend, choice, target_overridden) =
@@ -178,9 +164,10 @@ impl Command for BuildCommand {
                     };
                 }
             };
-        let resolved = match backend.descriptor() {
+        let descriptor = backend.descriptor();
+        let resolved = match &descriptor {
             Some(descriptor) => match options::resolve(
-                &descriptor,
+                descriptor,
                 self.verb(),
                 project.as_ref(),
                 &self.options.backend_options,
@@ -195,11 +182,10 @@ impl Command for BuildCommand {
             },
             None => ResolvedOptions::default(),
         };
-        let go = choice.is_go();
-        let rt = !go && resolved.is_rt();
+        let stages_by_class = options::stages_by_class(descriptor.as_ref(), &resolved);
         if let Some(problem) = project
             .as_ref()
-            .and_then(|p| backends::check_runtime(p, &backend, rt))
+            .and_then(|p| backends::check_runtime(p, &backend, &resolved))
         {
             return Outcome {
                 sources,
@@ -214,13 +200,8 @@ impl Command for BuildCommand {
             &choice,
             target_overridden,
             &resolved,
+            stages_by_class,
         );
-        if let Err(diagnostic) = backend.validate_environment(project.as_ref(), go) {
-            return Outcome {
-                sources,
-                diagnostics: vec![diagnostic],
-            };
-        }
         *self.built.borrow_mut() = None;
         if let Some(p) = &project
             && let Some(problem) = overlap(p, &plan.out_dir)
@@ -239,6 +220,7 @@ impl Command for BuildCommand {
                 &choice,
                 target_overridden,
                 &resolved,
+                stages_by_class,
             )
         });
         let initial_key = project
@@ -260,8 +242,7 @@ impl Command for BuildCommand {
         }
         // only a build that compiles reads the built-in modules: a cache hit
         // restored its artifacts above
-        let stages_by_class = project::stages_by_class(project.as_ref(), Some(plan.extras.rt));
-        if let Err(outcome) = self.prepare(&progress, stages_by_class) {
+        if let Err(outcome) = self.prepare(&progress, plan.stages_by_class) {
             return outcome;
         }
         progress.stage("Compiling Flick modules");
@@ -271,7 +252,7 @@ impl Command for BuildCommand {
             &choice,
             target_overridden,
             &resolved,
-            plan.extras.rt,
+            plan.stages_by_class,
             false,
             Vec::new(),
         );
@@ -315,12 +296,9 @@ impl Command for BuildCommand {
             &choice,
             target_overridden,
             &resolved,
+            stages_by_class,
         );
-        progress.stage(match (output.go, output.typescript) {
-            (true, _) => "Emitting Go",
-            (false, true) => "Emitting TypeScript",
-            (false, false) => "Emitting JavaScript",
-        });
+        progress.stage("Emitting backend output");
         let mut emitted = artifacts(&host, &mut sources, project.as_ref(), &compilation, &output);
         self.record(
             &output,
@@ -328,28 +306,29 @@ impl Command for BuildCommand {
             &output.entries,
             &emitted.artifacts,
         );
-        let extra = self.options.emit_ir.map(|format| {
-            emit_ir::artifact(
-                &compilation,
-                &mut sources,
-                project.as_ref(),
-                &output,
-                format,
-            )
-        });
+        let extra = self
+            .options
+            .emit_ir
+            .map(|format| emit_ir::artifact(&compilation, &mut sources, &output, format));
         self.publish(project.as_ref(), &output, &mut emitted, extra, &progress);
         let clean = diagnostics.is_empty() && emitted.diagnostics.is_empty();
         diagnostics.extend(emitted.diagnostics);
         if let Some(p) = &project
             && clean
-            && !output.extras.schema_aot
             && self.options.emit_ir.is_none()
         {
             progress.stage("Saving build cache");
             let key = self.key(p, &roots, &output);
             let read = (&roots[..], &*host.cwd, &sources);
             if let Some(before) = &initial_key {
-                cache::store_built(p, read, before, &key, &emitted.artifacts);
+                cache::store_built(
+                    p,
+                    read,
+                    self.options.target.as_deref(),
+                    before,
+                    &key,
+                    &emitted.artifacts,
+                );
             }
         }
         Outcome {
@@ -397,6 +376,7 @@ impl BuildCommand {
         choice: &TargetChoice,
         target_overridden: bool,
         resolved: &ResolvedOptions,
+        stages_by_class: bool,
     ) -> BuildPlan {
         let out_dir = match (&self.options.out_dir, project) {
             (Some(dir), _) => host.cwd.join(dir),
@@ -404,8 +384,6 @@ impl BuildCommand {
             (None, None) => host.cwd.join("dist"),
         };
         let config = project.map(|p| &p.config.build);
-        let go = choice.is_go();
-        let rt = !go && resolved.is_rt();
         BuildPlan {
             purpose: if self.dev {
                 Purpose::Dev
@@ -425,12 +403,12 @@ impl BuildCommand {
             ),
             entries,
             typescript: resolved.flag("typescript"),
-            go,
+            stages_by_class,
             suites: Vec::new(),
             extras: Extras {
                 dts: resolved.flag("declarations"),
                 promise_facade: resolved.flag("promise-facade"),
-                rt,
+                rt: stages_by_class,
                 schema_aot: resolved.flag("schema-aot"),
                 labels: match self.options.labels {
                     Some(LabelsArgument::All) => Labels::All,
@@ -451,10 +429,9 @@ impl BuildCommand {
             output.out_dir.clone()
         };
         let package = project::project_name(&FsHost::new(), project).unwrap_or_default();
-        let effect = !output.go && !output.extras.rt;
         let backend = format!(
             "{} {:?} {} {}",
-            output.backend.cache_identity(effect),
+            output.backend.cache_identity(&output.options),
             output.purpose,
             output.target,
             output.options.cache_key(),
@@ -464,11 +441,17 @@ impl BuildCommand {
             out_dir.display(),
             output.entries,
             output.typescript,
-            output.go,
+            output.stages_by_class,
             output.extras,
             output.release
         );
-        cache::key(project, roots, &settings, effect)
+        cache::key(
+            project,
+            roots,
+            &settings,
+            self.options.target.as_deref(),
+            &output.options,
+        )
     }
 }
 
@@ -521,17 +504,19 @@ pub struct BuildPlan {
     pub purpose: Purpose,
     pub backend: Selected,
     pub target: String,
+    #[cfg_attr(not(feature = "wasm-backends"), allow(dead_code))]
     pub target_overridden: bool,
     pub options: ResolvedOptions,
+    #[cfg_attr(not(feature = "wasm-backends"), allow(dead_code))]
     pub inspect_module: Option<String>,
     pub out_dir: PathBuf,
     /// The entries a runner is written for, by name and module.
     pub entries: Vec<(String, String)>,
     pub typescript: bool,
-    /// The go target: a Go module per entry, built into an executable.
-    pub go: bool,
-    /// For the go target: the test modules whose tests the one executable
-    /// `flick-test` runs, instead of the entries.
+    /// Whether this build uses class-derived built-in stages.
+    pub stages_by_class: bool,
+    /// Test module names whose `tests` a test runner runs instead of entries.
+    #[cfg_attr(not(feature = "wasm-backends"), allow(dead_code))]
     pub suites: Vec<String>,
     pub extras: Extras,
     pub release: bool,

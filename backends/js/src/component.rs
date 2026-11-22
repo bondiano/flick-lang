@@ -1,5 +1,6 @@
 //! Official backend implementation over the versioned component records.
 
+mod client;
 mod data;
 mod dependencies;
 mod emit;
@@ -14,9 +15,10 @@ mod packages;
 mod templates;
 
 use flick_backend::{
-    Backend, BackendId, BuildRequest, BuildResult, Capability, Descriptor, Diagnostic, Environment,
-    Inputs, Mode, NamedRange, OptionDescriptor, OptionValue, Packages, Parameter, Profile,
-    ProjectFile, Severity, TagAxis, TargetSupport, ValueKind, Verb, VersionRange, command,
+    Abi, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment,
+    EnvironmentServices, Inputs, Mode, NamedRange, OptionDescriptor, OptionValue, Packages,
+    Parameter, Profile, ProjectFile, Severity, TagAxis, TargetSupport, ValueKind, Verb,
+    VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -35,16 +37,6 @@ pub(super) fn failure(message: impl Into<String>) -> Vec<Diagnostic> {
 
 fn selected(request: &BuildRequest, module: &str) -> bool {
     request.target.mode != Mode::PerModule || request.module_root.as_deref() == Some(module)
-}
-
-fn capabilities() -> Vec<Capability> {
-    ["host-node-devtools", "host-schema-aot", "host-source-build"]
-        .into_iter()
-        .map(|name| Capability {
-            name: name.into(),
-            version: "1.0.0".into(),
-        })
-        .collect()
 }
 
 fn options() -> Vec<OptionDescriptor> {
@@ -142,6 +134,8 @@ impl Backend for Javascript {
         let mut commands = ffi::descriptors();
         commands.push(mapper::descriptor());
         commands.extend(dependencies::descriptors());
+        commands.extend(client::descriptors());
+        commands.push(packages::doctor_descriptor());
         commands
     }
 
@@ -153,6 +147,10 @@ impl Backend for Javascript {
             ffi::run(invocation)
         } else if dependencies::NAMES.contains(&invocation.name.as_str()) {
             dependencies::run(invocation)
+        } else if client::NAMES.contains(&invocation.name.as_str()) {
+            client::run(invocation)
+        } else if invocation.name == "doctor" {
+            Ok(packages::run_doctor(invocation))
         } else {
             Err(command::unknown(&invocation.name))
         }
@@ -243,8 +241,36 @@ impl Backend for Javascript {
             ],
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::PerModule, Mode::WholeProgram],
-            capabilities: capabilities(),
+            capabilities: vec![],
             options: options(),
+            launch_runtimes: vec!["node".into()],
+            host_tools: vec!["node".into(), "pnpm".into()],
+            projections: vec![
+                Abi {
+                    name: "flick.javascript".into(),
+                    version: "0.1.0".into(),
+                },
+                Abi {
+                    name: "flick.typescript".into(),
+                    version: "0.2.0".into(),
+                },
+            ],
+            stages_by_class_option: Some(OptionValue {
+                key: "runtime".into(),
+                value: "rt".into(),
+            }),
+            foreign_extension: None,
+            foreign_suffixes: [".mjs", ".cjs", ".d.mts", ".d.cts", ".d.ts"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
+            handled_services: vec![EnvironmentServices {
+                environment: Environment {
+                    backend: "js".into(),
+                    platform: "node".into(),
+                },
+                services: vec!["Database".into(), "Db".into(), "Server".into()],
+            }],
         }
     }
 
@@ -256,7 +282,7 @@ impl Backend for Javascript {
         let data = data::Data::read(request, inputs)?;
         data.check(request)?;
         Ok(TargetSupport {
-            capabilities: capabilities(),
+            capabilities: vec![],
         })
     }
 

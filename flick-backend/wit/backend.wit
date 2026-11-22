@@ -32,6 +32,12 @@ interface types {
         choices: list<string>,
         verbs: list<verb>,
     }
+    record option-value { key: string, value: string }
+    /// Gated services handled at the root of an environment.
+    record environment-services {
+        environment: environment,
+        services: list<string>,
+    }
     record descriptor {
         identity: backend-id,
         backend-api: version-range,
@@ -45,8 +51,22 @@ interface types {
         modes: list<mode>,
         capabilities: list<capability>,
         options: list<option-descriptor>,
+        /// Host tool ids executed by `Launch.runtime` without `[tools]`.
+        launch-runtimes: list<string>,
+        /// Host tool ids used in steps or `doctor` inspection.
+        host-tools: list<string>,
+        /// Compiler frontend projection schemas this backend consumes.
+        projections: list<abi>,
+        /// Option key/value that selects class-derived effect stages, if any.
+        stages-by-class-option: option<option-value>,
+        /// Companion file extension for local foreign bindings when rewritten
+        /// from the source specifier.
+        foreign-extension: option<string>,
+        /// Foreign source file suffixes tracked as build cache inputs.
+        foreign-suffixes: list<string>,
+        /// Gated services handled at the root of each environment.
+        handled-services: list<environment-services>,
     }
-    record option-value { key: string, value: string }
     /// Available before IR generation; the host checks descriptor ranges
     /// first, then asks the backend for target-specific refusals.
     record target-request {
@@ -163,6 +183,10 @@ interface types {
         inputs: list<input>,
         toolchains: list<toolchain>,
         runtime-dependencies: list<runtime-dependency>,
+        /// Direct ecosystem package names declared for this target by the
+        /// project manifest and `[target.<name>.dependencies]` closure;
+        /// `none` outside a project.
+        declared-dependencies: option<list<string>>,
     }
     enum artifact-kind { source, source-map, declaration, object, executable, %resource, metadata }
     record artifact {
@@ -233,7 +257,11 @@ interface types {
         artifact: string,
         /// None executes a generated executable; Some uses a pinned VM.
         runtime: option<toolchain>,
+        /// Arguments passed to `runtime` before the launch artifact; must be empty when `runtime` is none.
+        runtime-arguments: list<string>,
         arguments: list<string>,
+        /// Environment variables set on the launched process (validated by host launch policy).
+        environment: list<option-value>,
     }
     record build-result {
         artifacts: list<artifact>,

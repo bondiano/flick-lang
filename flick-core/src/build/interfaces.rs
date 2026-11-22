@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 use std::path::Path;
 
 #[cfg(not(target_arch = "wasm32"))]
-use super::interface;
+use super::abi::interface_without_dependencies;
 #[cfg(feature = "native-project")]
 use crate::iface;
 use crate::iface::{Interface, Target};
@@ -31,11 +31,10 @@ pub fn published_interfaces<'a>(
     let mut published_interfaces: BTreeMap<&str, Interface> = BTreeMap::new();
     published_interfaces.extend(modules.iter().map(|module| {
         #[cfg(not(target_arch = "wasm32"))]
-        let mut published = interface(
+        let mut published = interface_without_dependencies(
             &module.ir,
             &module.interface,
             module.package.as_deref().or(package),
-            &[],
             &checked_interfaces,
         );
         #[cfg(target_arch = "wasm32")]

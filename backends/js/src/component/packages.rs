@@ -20,7 +20,10 @@ use flick_backend::{
 };
 use serde_json::Value;
 
-use doctor::{ADAPTER, adapter_requirements, check_runtime_diagnostics, doctor_diagnostics};
+use doctor::{
+    ADAPTER, adapter_requirements, check_runtime_diagnostics, doctor_package_diagnostics,
+};
+pub(super) use doctor::{doctor_descriptor, run_doctor};
 
 /// How many packages one runtime graph may hold.
 const LIMIT: usize = 10_000;
@@ -132,8 +135,8 @@ pub(super) fn packages(
     let root = option("root").unwrap_or_default().to_owned();
     let boundary = option("boundary").filter(|b| !b.is_empty());
 
-    if option("inspect") == Some("doctor") {
-        let doctor = doctor_diagnostics(&mut known, &project, options, boundary);
+    if matches!(option("inspect"), Some("doctor-packages" | "doctor")) {
+        let doctor = doctor_package_diagnostics(&mut known, options, boundary);
         return Packages {
             name: project["name"].as_str().map(str::to_owned),
             version: project["version"].as_str().map(str::to_owned),
@@ -148,7 +151,15 @@ pub(super) fn packages(
 
     if let Some(mode) = option("check-runtime") {
         let compiler = option("compiler").unwrap_or("0.1.0");
-        let check = check_runtime_diagnostics(&mut known, mode == "rt", compiler, boundary);
+        let rt = match mode {
+            "rt" => true,
+            "effect" => false,
+            _ => {
+                option("option.runtime") != Some("effect")
+                    && option("option.schema-aot") != Some("true")
+            }
+        };
+        let check = check_runtime_diagnostics(&mut known, rt, compiler, boundary);
         return Packages {
             name: project["name"].as_str().map(str::to_owned),
             version: project["version"].as_str().map(str::to_owned),
@@ -163,7 +174,11 @@ pub(super) fn packages(
 
     let declared: Vec<String> = names(&project, &["dependencies"]).into_iter().collect();
     let sources = source_roots(&known, &project, &mut diagnostics);
-    let effect = option("runtime") == Some("effect");
+    let effect = option("option.runtime") == Some("effect")
+        || option("option.schema-aot") == Some("true")
+        || option("runtime") == Some("effect")
+        || option("all-runtimes") == Some("true")
+        || names(&project, &["dependencies", "optionalDependencies"]).contains(ADAPTER);
     let inputs = build_inputs(&known, &project, effect, boundary);
     let runtime = runtime_graphs(
         &mut known,

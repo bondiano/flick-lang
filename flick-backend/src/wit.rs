@@ -80,8 +80,9 @@ macro_rules! wit_conversions {
             TagAxis { name, tags, default, exclusive }
             Parameter { name, kind, multiple, required, help }
             OptionDescriptor { parameter, default, implicit_value, choices, verbs }
-            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, tags, axes, profiles, modes, capabilities, options }
             OptionValue { key, value }
+            EnvironmentServices { environment, services }
+            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, tags, axes, profiles, modes, capabilities, options, launch_runtimes, host_tools, projections, stages_by_class_option, foreign_extension, foreign_suffixes, handled_services }
             TargetRequest { backend_api, ir_version, language_version, runtime_abis, environment, tags, host_package, profile, mode, required_capabilities, options }
             TargetSupport { capabilities }
             Span { file, start, end }
@@ -95,7 +96,7 @@ macro_rules! wit_conversions {
             Projection { module, schema, input }
             PackageTarget { package, environments }
             RootHandler { environment, service, handler }
-            BuildRequest { target, backend, program, module_root, modules, sources, entries, test_roots, foreign, projections, package_targets, root_handlers, inputs, toolchains, runtime_dependencies }
+            BuildRequest { target, backend, program, module_root, modules, sources, entries, test_roots, foreign, projections, package_targets, root_handlers, inputs, toolchains, runtime_dependencies, declared_dependencies }
             Artifact { id, path, kind, bytes }
             Toolchain { id, version, sha256 }
             StepOutput { id, path, kind }
@@ -106,7 +107,7 @@ macro_rules! wit_conversions {
             RuntimeNode { name, version, dir, dependencies }
             RuntimeGraph { package, nodes, skip }
             Packages { name, version, declared, sources, runtime, inputs, diagnostics, needs }
-            Launch { name, kind, artifact, runtime, arguments }
+            Launch { name, kind, artifact, runtime, runtime_arguments, arguments, environment }
             BuildResult { artifacts, steps, runtime_dependencies, launches, diagnostics }
             }
             enums! {

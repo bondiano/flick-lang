@@ -3,6 +3,7 @@
 
 use std::collections::HashSet;
 
+use super::HandlesService;
 use super::locals::reachable_block_stmts;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::effects::{self, bindings};
@@ -32,10 +33,22 @@ pub(super) fn handler_mask(handler: &Handler) -> u8 {
         .fold(0, |mask, handled| mask | gated_bit(&handled.effect))
 }
 
-/// Bitmask of gated services natively handled by `env`.
-pub(super) fn env_handled_mask(env: &ResolvedEnvironment) -> u8 {
+/// Bitmask of gated services natively handled by `env` (or declared by the
+/// selected backend's descriptor via `handles_service`).
+pub(super) fn env_handled_mask(
+    env: &ResolvedEnvironment,
+    handles_service: Option<HandlesService<'_>>,
+) -> u8 {
     GATED.iter().fold(0, |mask, name| {
-        if handles_resolved(env, name) {
+        let handled = match handles_service.and_then(|f| f(name)) {
+            Some(true) => true,
+            Some(false) => {
+                env.host_package.is_some()
+                    && (env.tags.contains("node") || env.tags.contains("native"))
+            }
+            None => handles_resolved(env, name),
+        };
+        if handled {
             mask | gated_bit(name)
         } else {
             mask
@@ -66,21 +79,32 @@ fn handles_resolved(env: &ResolvedEnvironment, name: &str) -> bool {
     handles(&env.pair(), name) || env.tags.contains("node") || env.tags.contains("native")
 }
 
+/// Std root-handler symbols corresponding to the handled service names.
+/// `Db` is gated in source checks but has no fixed std handler symbol.
+pub fn std_root_handlers_for<'a>(
+    services: impl IntoIterator<Item = &'a str>,
+) -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
+    let mut out: Vec<(&'static str, &'static str, &'static str, &'static str)> = Vec::new();
+    for service in services {
+        match service {
+            "Database" if !out.iter().any(|(s, ..)| *s == "Database") => {
+                out.push(("Database", "Database", "Database", "pg"));
+            }
+            "Server" if !out.iter().any(|(s, ..)| *s == "Server") => {
+                out.push(("Server", "Server", "Server", "handler"));
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
 /// Std root-handler symbols declared for an environment that hosts them.
 /// `Db` is gated in source checks but has no fixed std handler symbol.
 pub fn std_root_handlers(
     environment: &BackendEnvironment,
 ) -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
-    if !matches!(
-        (environment.backend.as_str(), environment.platform.as_str()),
-        ("js", "node") | ("go", "native")
-    ) {
-        return Vec::new();
-    }
-    vec![
-        ("Database", "Database", "Database", "pg"),
-        ("Server", "Server", "Server", "handler"),
-    ]
+    std_root_handlers_for(handled_services(environment).iter().copied())
 }
 
 /// Whether only the Effect adapter implements `foreign`, with the UI renderer `ui`.
@@ -102,11 +126,12 @@ pub(crate) fn needs_adapter(foreign: &Foreign, ui: Option<&str>) -> bool {
 pub(super) fn scan_item_gated_services(
     item: &Item,
     env: &ResolvedEnvironment,
+    handles_service: Option<HandlesService<'_>>,
     covered: u8,
     reported: &mut HashSet<(String, Span)>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let initial = covered | env_handled_mask(env);
+    let initial = covered | env_handled_mask(env, handles_service);
     item.each_body(&mut |expr| {
         scan_expr_gated_services(expr, env, initial, reported, diagnostics);
     });

@@ -6,8 +6,9 @@ use std::collections::BTreeMap;
 use std::env;
 
 use flick_backend::{
-    Abi, BackendPin, BuildRequest, Entry, Environment, Input, InputKind, Mode, ModuleInput,
-    ModuleRole, OptionValue, PackageTarget, Profile, RootHandler, Source, Symbol, TargetRequest,
+    Abi, BackendPin, BuildRequest, Descriptor, Entry, Environment, Input, InputKind, Mode,
+    ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile, RootHandler, Source, Symbol,
+    TargetRequest,
 };
 use std::collections::HashSet;
 
@@ -15,8 +16,7 @@ use flick_core::build;
 use flick_core::codegen;
 use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::iface::{self, Target};
-use flick_core::project::config::BackendEnvironment;
-use flick_core::project::{self, Compilation, Project};
+use flick_core::project::{self, Compilation, Host, Project};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{ir, types};
 use flick_ir::Program;
@@ -99,21 +99,20 @@ impl Prepared {
         compilation: &Compilation,
         output: &BuildPlan,
         pin: BackendPin,
+        descriptor: &Descriptor,
     ) -> Self {
         let package = project.and_then(|p| project::project_name(host, p));
-        let (target_request, module_root) = target(project, compilation, output);
-        let mut preflight_diagnostics = Vec::new();
-        if target_request.environment.backend != "go" {
-            with_settings(host, project, compilation, output, |settings| {
-                build::javascript_preflight(
-                    compilation,
-                    sources,
-                    settings,
-                    &mut preflight_diagnostics,
-                );
-            });
-        }
-        let stages_by_class = by_class(project, output);
+        let (target_request, module_root) = target(project, compilation, output, descriptor);
+        let declared_dependencies = declared_dependencies(host, project, compilation, output);
+        let preflight_diagnostics = javascript_preflight(
+            host,
+            sources,
+            project,
+            compilation,
+            output,
+            descriptor,
+            declared_dependencies.as_deref(),
+        );
         let pruned;
         let compilation = if preflight_diagnostics
             .iter()
@@ -121,10 +120,10 @@ impl Prepared {
         {
             compilation
         } else {
-            pruned = compilation.prune_for_environment(sources, stages_by_class);
+            pruned = compilation.prune_for_environment(sources, output.stages_by_class);
             &pruned
         };
-        let (program, files) = program(sources, compilation, stages_by_class);
+        let (program, files) = program(sources, compilation, output.stages_by_class);
         let mut data = Self {
             request: BuildRequest {
                 target: target_request,
@@ -162,6 +161,7 @@ impl Prepared {
                 inputs: vec![],
                 toolchains: vec![],
                 runtime_dependencies: vec![],
+                declared_dependencies,
             },
             bytes: BTreeMap::new(),
             files,
@@ -181,12 +181,20 @@ impl Prepared {
                 line_starts: file.line_starts().to_vec(),
             });
         }
-        data.modules(host, compilation, project, package.as_deref(), output);
-        data.fill_environment_facts(package.as_deref());
+        data.modules(
+            host,
+            compilation,
+            project,
+            package.as_deref(),
+            output,
+            descriptor,
+        );
+        data.fill_environment_facts(descriptor, package.as_deref());
 
         data
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn modules(
         &mut self,
         host: &FsHost,
@@ -194,6 +202,7 @@ impl Prepared {
         project: Option<&Project>,
         package: Option<&str>,
         output: &BuildPlan,
+        descriptor: &Descriptor,
     ) {
         let interfaces = build::published_interfaces(
             compilation,
@@ -236,7 +245,7 @@ impl Prepared {
         }
         // Built-ins have explicit lowered bodies and the actual texts used
         // during lowering. They never alias the project's source identities.
-        for interface in types::builtins_of(by_class(project, output)) {
+        for interface in types::builtins_of(output.stages_by_class) {
             if self
                 .request
                 .modules
@@ -258,9 +267,11 @@ impl Prepared {
                 interface: Some(input),
             });
         }
-        if self.request.target.environment.backend == "go" {
+        let wants = |name: &str| descriptor.projections.iter().any(|p| p.name == name);
+        if wants("flick.go") {
             self.go(host, project, compilation, output);
-        } else {
+        }
+        if wants("flick.javascript") || wants("flick.typescript") {
             self.javascript(host, project, compilation, output, &interfaces);
         }
     }
@@ -277,12 +288,8 @@ impl Prepared {
     }
 
     /// Record package targets and std root handlers for the selected environment.
-    fn fill_environment_facts(&mut self, package: Option<&str>) {
+    fn fill_environment_facts(&mut self, descriptor: &Descriptor, package: Option<&str>) {
         let environment = &self.request.target.environment;
-        let selected = BackendEnvironment {
-            backend: environment.backend.clone(),
-            platform: environment.platform.clone(),
-        };
         let mut packages: Vec<String> = self
             .request
             .modules
@@ -308,7 +315,16 @@ impl Prepared {
                 environments: environments.clone(),
             })
             .collect();
-        self.request.root_handlers = build::target_preflight::std_root_handlers(&selected)
+        let services: Vec<&str> = descriptor
+            .handled_services
+            .iter()
+            .filter(|entry| {
+                entry.environment.backend == environment.backend
+                    && entry.environment.platform == environment.platform
+            })
+            .flat_map(|entry| entry.services.iter().map(String::as_str))
+            .collect();
+        self.request.root_handlers = build::target_preflight::std_root_handlers_for(services)
             .into_iter()
             .filter(|(service_module, _, handler_module, _)| {
                 present.contains(service_module) && present.contains(handler_module)
@@ -330,25 +346,74 @@ impl Prepared {
     }
 }
 
-/// The built-in modules a build compiles: the go target's are always those
-/// of the non-class stages, as its runtime implements them.
-fn by_class(project: Option<&Project>, output: &BuildPlan) -> bool {
-    !output.go && project::stages_by_class(project, Some(output.extras.rt))
+fn declared_dependencies(
+    host: &FsHost,
+    project: Option<&Project>,
+    compilation: &Compilation,
+    output: &BuildPlan,
+) -> Option<Vec<String>> {
+    project.map(|p| {
+        let mut deps = host.foreign(p).declared;
+        deps.extend(
+            compilation
+                .target_dependencies
+                .iter()
+                .filter(|d| d.target == output.target)
+                .map(|d| d.name.clone()),
+        );
+        deps.sort();
+        deps.dedup();
+        deps
+    })
+}
+
+fn javascript_preflight(
+    host: &FsHost,
+    sources: &SourceMap,
+    project: Option<&Project>,
+    compilation: &Compilation,
+    output: &BuildPlan,
+    descriptor: &Descriptor,
+    declared_dependencies: Option<&[String]>,
+) -> Vec<Diagnostic> {
+    let wants = |name: &str| descriptor.projections.iter().any(|p| p.name == name);
+    let mut diagnostics = Vec::new();
+    if wants("flick.javascript") || wants("flick.typescript") {
+        let effect_bridge = if declared_dependencies
+            .is_none_or(|deps| deps.iter().any(|d| d == "@flick-lang/effect-ts"))
+        {
+            codegen::EffectBridge::Available
+        } else {
+            codegen::EffectBridge::Absent
+        };
+        with_settings(
+            host,
+            project,
+            compilation,
+            output,
+            effect_bridge,
+            |settings| {
+                build::javascript_preflight(compilation, sources, settings, &mut diagnostics);
+            },
+        );
+    }
+    diagnostics
 }
 
 fn target(
     project: Option<&Project>,
     compilation: &Compilation,
     output: &BuildPlan,
+    descriptor: &Descriptor,
 ) -> (TargetRequest, Option<String>) {
     let default_env = || {
-        output
-            .backend
-            .descriptor()
-            .and_then(|d| d.environments.into_iter().next())
+        descriptor
+            .environments
+            .first()
+            .cloned()
             .unwrap_or_else(|| Environment {
-                backend: if output.go { "go" } else { "js" }.into(),
-                platform: if output.go { "native" } else { "node" }.into(),
+                backend: output.target.clone(),
+                platform: "default".into(),
             })
     };
     let (environment, tags, host_package) = if let Some(resolved) = &compilation.environment {
@@ -385,22 +450,15 @@ fn target(
             Purpose::Inspect => "inspect",
         },
     );
-    let mut options = vec![command];
-    if environment.backend == "go" {
-        options.push(option("host.os", env::consts::OS));
-    } else {
-        options.push(option(
-            "labels",
-            &format!("{:?}", extras.labels).to_lowercase(),
-        ));
-    }
+    let mut options = vec![
+        command,
+        option("host.os", env::consts::OS),
+        option("labels", &format!("{:?}", extras.labels).to_lowercase()),
+    ];
     options.extend(output.options.to_wire());
 
     let (mode, module_root) = if output.purpose == Purpose::Inspect {
-        let supports_per_module = output
-            .backend
-            .descriptor()
-            .is_some_and(|d| d.modes.contains(&Mode::PerModule));
+        let supports_per_module = descriptor.modes.contains(&Mode::PerModule);
         if supports_per_module {
             (Mode::PerModule, output.inspect_module.clone())
         } else {

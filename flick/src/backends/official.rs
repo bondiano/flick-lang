@@ -9,7 +9,6 @@ use std::{env, fs, process};
 
 use flick_backend::{BackendId, BackendPin, VersionRange};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::config::BackendPackage;
 use flick_core::project::lock::{LOCK_FILE, Lock, LockedBackend};
 use flick_core::project::{Project, store};
 use semver::Version;
@@ -47,22 +46,30 @@ fn failure(message: String) -> Diagnostic {
     Diagnostic::new(codes::P056, Severity::Error, message)
 }
 
-pub(super) fn javascript(
+pub(super) fn by_id(
+    id: &str,
     root: &Path,
     project: Option<&Project>,
     tools: Option<&BTreeMap<String, Vec<String>>>,
 ) -> Result<Package, Diagnostic> {
-    let (pin, bytes) = resolve(JS, project)?;
-    Package::from_bytes(root, pin, &bytes, tools, true)
+    let (pin, bytes) = resolve(id, project)?;
+    Package::from_bytes(root, pin, &bytes, tools)
 }
 
-pub(super) fn go(
+/// Loads an official backend from a local checkout or local store without ever
+/// reaching the network.
+pub(super) fn load_local(
+    id: &str,
     root: &Path,
     project: Option<&Project>,
     tools: Option<&BTreeMap<String, Vec<String>>>,
 ) -> Result<Package, Diagnostic> {
-    let (pin, bytes) = resolve(GO, project)?;
-    Package::from_bytes(root, pin, &bytes, tools, true)
+    let (pin, bytes) = local_bytes(id, project).ok_or_else(|| {
+        failure(format!(
+            "`{id}` is not available locally: build once online or run `flick install`"
+        ))
+    })?;
+    Package::from_bytes(root, pin, &bytes, tools)
 }
 
 /// Whether `version` falls inside `[minimum, maximum_exclusive)`.
@@ -151,12 +158,6 @@ pub(super) fn known(id: &str, project: Option<&Project>) -> Option<BackendPin> {
     project
         .and_then(|p| lock_entry(p, id))
         .map(|entry| pin_of(&entry))
-}
-
-/// Whether `package`, a project's own pin, names an official component.
-pub(super) fn matches(package: &BackendPackage, project: &Project) -> bool {
-    known(&package.id, Some(project))
-        .is_some_and(|pin| pin.identity.version == package.version && pin.sha256 == package.sha256)
 }
 
 /// The component of the official backend `id` and its pin, from a checkout,

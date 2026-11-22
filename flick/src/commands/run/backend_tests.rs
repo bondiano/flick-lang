@@ -42,7 +42,6 @@ fn a_generation_uses_the_successful_build_selection_after_config_changes() {
             Some(digest.as_str()),
             "generation records the actual successful backend"
         );
-        assert!(!generation.go);
         drop(generation);
     }
     options
@@ -78,7 +77,6 @@ fn a_generation_uses_the_successful_build_selection_after_config_changes() {
     assert_eq!(pin.identity.id, "flick/js");
     assert_eq!(pin.identity.version, "0.1.0");
     assert_eq!(pin.sha256, flick_backend::sha256(&bundled));
-    assert!(generation.rt, "runtime mode comes from the completed build");
     drop(generation);
     fs::remove_dir_all(root).expect("cleanup");
 }

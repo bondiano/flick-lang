@@ -171,7 +171,7 @@ pub struct Config {
     /// The directory of proof modules, which only `flick prove` reads.
     pub proof_dir: String,
     /// The entry points of an app, by name: `entries`, or `entry` as the
-    /// one named `main`. Each builds a runner `flick-<name>.js`.
+    /// one named `main`. Each produces a target launcher.
     pub entries: Vec<Entry>,
     /// `[dependencies]`, by name.
     pub dependencies: Vec<Dependency>,
@@ -197,8 +197,8 @@ pub struct Config {
     /// `[plugins.<package>]`: what the plugin of each package may reach.
     #[cfg(feature = "native-project")]
     pub plugins: BTreeMap<String, Grants>,
-    /// `[tools]`: the host tools, as `node` or `go`, that the steps of a
-    /// backend or a plugin may run, by its id or package.
+    /// `[tools]`: the host tools that the steps of a backend or a plugin may
+    /// run, by its id or package.
     #[cfg(feature = "native-project")]
     pub tools: BTreeMap<String, Vec<String>>,
 }
@@ -213,9 +213,9 @@ pub struct Entry {
     /// The module whose `run` starts the entry and whose `Main` is the type
     /// of its `main`, with the span of its name: the entry's `runner`, else
     /// the project's; without one, a pure `main` is called and an effect is
-    /// run as on Node.
+    /// run by the target's default runtime.
     pub runner: Option<(String, Span)>,
-    /// `target = "client"`: the entry runs in a browser, so nothing it
+    /// `target = "client"`: the entry runs on a client target, so nothing it
     /// reaches needs `Server`.
     pub client: bool,
 }
@@ -235,7 +235,7 @@ pub enum Kind {
 pub struct Build {
     pub out_dir: String,
     pub profile: Profile,
-    /// Default target backend name (e.g. `"js"`, `"go"`).
+    /// Default target backend name.
     #[cfg(feature = "native-project")]
     pub target: Option<String>,
     /// Source span of `[build] target`.
@@ -327,25 +327,6 @@ impl Config {
         "js"
     }
 
-    /// Whether the project's default target is Go.
-    #[cfg(feature = "native-project")]
-    pub fn is_go(&self) -> bool {
-        self.default_target() == "go"
-    }
-
-    /// Whether `[target.js]` selects Flick's own runtime (`"rt"`, the default)
-    /// rather than the Effect adapter (`"effect"`).
-    #[cfg(feature = "native-project")]
-    pub fn js_is_rt(&self) -> bool {
-        !matches!(
-            self.targets
-                .get("js")
-                .and_then(|t| t.get("runtime"))
-                .map(|o| &o.value),
-            Some(TargetValue::String(s)) if s == "effect"
-        )
-    }
-
     /// Whether `flick.toml` explicitly selects a target, backend, environment,
     /// or target option table (so `flick check` and IDE runs perform
     /// reachable-use environment preflight).
@@ -358,18 +339,6 @@ impl Config {
             return true;
         }
         false
-    }
-
-    /// The boolean value of `[target.js] <key>`, or `false` when unset.
-    #[cfg(feature = "native-project")]
-    pub fn js_flag(&self, key: &str) -> bool {
-        matches!(
-            self.targets
-                .get("js")
-                .and_then(|t| t.get(key))
-                .map(|o| &o.value),
-            Some(TargetValue::Bool(true))
-        )
     }
 }
 

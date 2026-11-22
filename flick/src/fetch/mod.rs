@@ -4,7 +4,9 @@
 
 mod download;
 
-pub use download::{bytes, hex};
+#[cfg(feature = "wasm-backends")]
+pub use download::bytes;
+pub use download::hex;
 
 use std::collections::BTreeSet;
 use std::fs;

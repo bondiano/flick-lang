@@ -17,6 +17,7 @@ use flick_core::source::SourceMap;
 use crate::artifact::{self, Artifact};
 #[cfg(feature = "wasm-backends")]
 use crate::backends;
+use crate::backends::options::ResolvedOptions;
 use crate::builtins;
 use crate::commands::inputs::{declared_name, sibling_root};
 use crate::publish;
@@ -48,7 +49,13 @@ pub fn files_under(dir: &Path, out: &mut Vec<PathBuf>) {
 
 /// The key of a build of `project` with `settings`, a description of the
 /// command-line settings that change its output.
-pub fn key(project: &Project, roots: &[PathBuf], settings: &str, needs_effect: bool) -> Signed {
+pub fn key(
+    project: &Project,
+    roots: &[PathBuf],
+    settings: &str,
+    target_override: Option<&str>,
+    backend_options: &ResolvedOptions,
+) -> Signed {
     let mut key = Key::default();
     key.add("settings", settings);
     let mut selected: Vec<PathBuf> = roots.iter().map(|p| project::normalize(p)).collect();
@@ -70,7 +77,7 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str, needs_effect: b
         let value = env::var(name).unwrap_or_default();
         key.add(format!("env {name}"), hash([value.as_bytes()]));
     }
-    for path in input_files_for(project, &selected, Some(needs_effect)) {
+    for path in input_files_for(project, &selected, target_override, Some(backend_options)) {
         key.add(
             format!("input {}", path.display()),
             fs::read(path).unwrap_or_default(),
@@ -88,8 +95,11 @@ pub fn read_unchanged(
     roots: &[PathBuf],
     cwd: &Path,
     sources: &SourceMap,
+    target_override: Option<&str>,
 ) -> bool {
-    let inputs: HashSet<PathBuf> = input_files(project, roots).into_iter().collect();
+    let inputs: HashSet<PathBuf> = input_files_for_target(project, roots, target_override)
+        .into_iter()
+        .collect();
     sources.files().all(|file| {
         let path = project::normalize(&cwd.join(&file.path));
         !inputs.contains(&path) || fs::read(&path).is_ok_and(|bytes| bytes == file.text.as_bytes())
@@ -97,15 +107,30 @@ pub fn read_unchanged(
 }
 
 /// Files that affect a build, including absent manifests whose creation matters.
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
-    input_files_for(project, roots, None)
+    input_files_for(project, roots, None, None)
+}
+
+/// Like [`input_files`], honoring an explicit `--target` override when present.
+pub fn input_files_for_target(
+    project: &Project,
+    roots: &[PathBuf],
+    target_override: Option<&str>,
+) -> Vec<PathBuf> {
+    input_files_for(project, roots, target_override, None)
 }
 
 fn input_files_for(
     project: &Project,
     roots: &[PathBuf],
-    effect_override: Option<bool>,
+    target_override: Option<&str>,
+    backend_options: Option<&ResolvedOptions>,
 ) -> Vec<PathBuf> {
+    #[cfg(feature = "wasm-backends")]
+    let foreign_suffixes = backends::foreign_suffixes_for(project, target_override);
+    #[cfg(not(feature = "wasm-backends"))]
+    let foreign_suffixes: Vec<String> = Vec::new();
     let mut files = Vec::new();
     for root in [project.source_root(), project.test_root()] {
         files_under(&root, &mut files);
@@ -132,14 +157,16 @@ fn input_files_for(
     library_files(
         &project.root,
         &project.config.dependencies,
+        &foreign_suffixes,
         &mut libraries,
         &mut loaded,
     );
     files.retain(|p| {
-        project::ships(&p.to_string_lossy())
+        let name = p.to_string_lossy();
+        foreign_suffixes.iter().any(|s| name.ends_with(s))
             || p.extension()
                 .and_then(|e| e.to_str())
-                .is_some_and(|e| matches!(e, "fl" | "go") || loaded.iter().any(|l| l == e))
+                .is_some_and(|e| e == "fl" || loaded.iter().any(|l| l == e))
     });
     files.extend([project::CONFIG_FILE, project::lock::LOCK_FILE].map(|f| project.root.join(f)));
     if let Some(backend) = &project.config.build.backend {
@@ -147,9 +174,15 @@ fn input_files_for(
     }
     files.extend(project.workspace.clone());
     #[cfg(feature = "wasm-backends")]
-    files.extend(backends::package_inputs(project, effect_override));
+    {
+        let wire = backend_options.map_or_else(
+            || backends::options::project_wire_options(project, target_override),
+            ResolvedOptions::to_wire,
+        );
+        files.extend(backends::package_inputs(project, target_override, &wire));
+    }
     #[cfg(not(feature = "wasm-backends"))]
-    let _ = effect_override;
+    let _ = (target_override, backend_options);
     files.extend(libraries);
     // what plugins read: the files the project grants them, and snapshots
     files_under(&project.root.join(SNAPSHOTS), &mut files);
@@ -178,6 +211,7 @@ fn input_files_for(
 fn library_files(
     dir: &Path,
     dependencies: &[config::Dependency],
+    foreign_suffixes: &[String],
     out: &mut Vec<PathBuf>,
     loaded: &mut Vec<String>,
 ) {
@@ -207,10 +241,11 @@ fn library_files(
         let mut modules = Vec::new();
         files_under(&at.join(&library.source_dir), &mut modules);
         out.extend(modules.into_iter().filter(|p| {
-            project::ships(&p.to_string_lossy())
-                || p.extension().is_some_and(|e| e == "fl" || e == "go")
+            let name = p.to_string_lossy();
+            foreign_suffixes.iter().any(|s| name.ends_with(s))
+                || p.extension().is_some_and(|e| e == "fl")
         }));
-        library_files(&at, &library.dependencies, out, loaded);
+        library_files(&at, &library.dependencies, foreign_suffixes, out, loaded);
     }
 }
 
@@ -233,7 +268,7 @@ pub fn load(root: &Path, key: &str) -> Option<Vec<Artifact>> {
 }
 
 /// How many files of builds a project keeps: each state of its inputs
-/// leaves a whole copy of what it built, and a Go build its stamp beside it.
+/// leaves a whole copy of what it built.
 const KEPT: usize = 16;
 
 /// Caches `artifacts` under `key` when the build read the inputs the key is
@@ -242,12 +277,13 @@ const KEPT: usize = 16;
 pub fn store_built(
     project: &Project,
     read: (&[PathBuf], &Path, &SourceMap),
+    target_override: Option<&str>,
     before: &Signed,
     key: &Signed,
     artifacts: &[Artifact],
 ) -> bool {
     let (roots, cwd, sources) = read;
-    let current = before == key && read_unchanged(project, roots, cwd, sources);
+    let current = before == key && read_unchanged(project, roots, cwd, sources, target_override);
     if current {
         store(&project.root, key, artifacts);
     }

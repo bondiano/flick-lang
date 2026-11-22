@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs, io};
 
-use flick_backend::{Toolchain, ToolchainStep};
+use flick_backend::{Launch, OptionValue, Toolchain, ToolchainStep};
 use sha2::{Digest, Sha256};
 
 /// What the host knows of one tool.
@@ -20,8 +20,72 @@ struct Adapter {
     inherit: &'static [&'static str],
     /// Variables a step may set.
     settable: &'static [&'static str],
+    /// Variables a launch may set on this runtime.
+    launch_settable: &'static [&'static str],
+    /// Runtime flags a launch may pass before its artifact.
+    validate_launch_args: fn(&[String]) -> Result<(), String>,
     /// Variables the host pins for this tool on every run, version query included.
     fixed: &'static [(&'static str, &'static str)],
+}
+
+fn no_launch_args(args: &[String]) -> Result<(), String> {
+    match args.first() {
+        Some(arg) => Err(format!("launch refuses runtime argument `{arg}`")),
+        None => Ok(()),
+    }
+}
+
+fn valid_node_import_specifier(spec: &str) -> bool {
+    if spec.is_empty()
+        || spec.starts_with(['/', '\\', '.', '-'])
+        || spec.contains([':', '\\', '\0', '?', '#', '%'])
+        || spec.contains("..")
+        || spec.chars().any(|c| c.is_whitespace() || c.is_control())
+    {
+        return false;
+    }
+    let mut segments = spec.split('/');
+    let Some(first) = segments.next() else {
+        return false;
+    };
+    if let Some(scope) = first.strip_prefix('@') {
+        if scope.is_empty() || scope.starts_with(['.', '-', '@']) {
+            return false;
+        }
+        let Some(pkg) = segments.next() else {
+            return false;
+        };
+        if pkg.is_empty() || pkg.starts_with(['.', '-']) {
+            return false;
+        }
+    } else if first.is_empty() {
+        return false;
+    }
+    segments.all(|seg| !seg.is_empty() && seg != ".")
+}
+
+fn validate_node_launch_args(args: &[String]) -> Result<(), String> {
+    let mut i = 0;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--enable-source-maps" => i += 1,
+            "--import" => {
+                let Some(spec) = args.get(i + 1) else {
+                    return Err("`node` launch argument `--import` requires a specifier".into());
+                };
+                if !valid_node_import_specifier(spec) {
+                    return Err(format!(
+                        "`node` launch refuses `--import` specifier `{spec}`"
+                    ));
+                }
+                i += 2;
+            }
+            other => {
+                return Err(format!("`node` launch refuses runtime argument `{other}`"));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Variables every tool needs to find its home, caches and network proxy.
@@ -50,6 +114,8 @@ const ADAPTERS: &[Adapter] = &[
         parse: |out| Some(out.trim().strip_prefix('v')?.to_owned()),
         inherit: &[],
         settable: &[],
+        launch_settable: &["FLICK_DEVTOOLS"],
+        validate_launch_args: validate_node_launch_args,
         fixed: &[],
     },
     Adapter {
@@ -76,6 +142,8 @@ const ADAPTERS: &[Adapter] = &[
             "GOINSECURE",
         ],
         settable: &["GOFLAGS", "GOTOOLCHAIN", "CGO_ENABLED"],
+        launch_settable: &[],
+        validate_launch_args: no_launch_args,
         fixed: &[],
     },
     Adapter {
@@ -96,6 +164,8 @@ const ADAPTERS: &[Adapter] = &[
             "FORCE_COLOR",
         ],
         settable: &[],
+        launch_settable: &[],
+        validate_launch_args: no_launch_args,
         // Flick owns the version gate; even `pnpm --version` must not bootstrap or pin pnpm.
         fixed: &[
             ("npm_config_manage_package_manager_versions", "false"),
@@ -216,6 +286,17 @@ impl Tool {
         }
         command
     }
+
+    /// The tool as a client entry runner runs it: in `dir`, inheriting the
+    /// caller's environment while keeping the adapter's fixed variables.
+    pub(crate) fn client_command(&self, dir: &Path) -> Command {
+        let mut command = self.command();
+        command.current_dir(dir);
+        for &(name, value) in self.adapter.fixed {
+            command.env(name, value);
+        }
+        command
+    }
 }
 
 /// The variables the steps of any tool may set.
@@ -240,6 +321,46 @@ pub(crate) fn authorize(step: &ToolchainStep) -> Result<(), String> {
         Some(v) => Err(format!(
             "step `{}` sets `{}`, which `{}` does not take",
             step.id, v.key, adapter.id
+        )),
+        None => Ok(()),
+    }
+}
+
+/// A launch passes only runtime arguments and environment variables approved
+/// by its runtime's host adapter.
+pub(crate) fn authorize_launch(launch: &Launch) -> Result<(), String> {
+    authorize_launch_parts(
+        launch.runtime.as_ref(),
+        &launch.runtime_arguments,
+        &launch.environment,
+    )
+}
+
+pub(crate) fn authorize_launch_parts(
+    runtime: Option<&Toolchain>,
+    runtime_arguments: &[String],
+    environment: &[OptionValue],
+) -> Result<(), String> {
+    let Some(runtime) = runtime else {
+        if !runtime_arguments.is_empty() {
+            return Err("launch without a runtime cannot pass runtime arguments".into());
+        }
+        if let Some(var) = environment.first() {
+            return Err(format!(
+                "launch without a runtime cannot set environment variable `{}`",
+                var.key
+            ));
+        }
+        return Ok(());
+    };
+    let adapter = (ADAPTERS.iter())
+        .find(|a| a.id == runtime.id)
+        .ok_or_else(|| format!("the host has no adapter for the tool `{}`", runtime.id))?;
+    (adapter.validate_launch_args)(runtime_arguments)?;
+    match (environment.iter()).find(|v| !adapter.launch_settable.contains(&v.key.as_str())) {
+        Some(v) => Err(format!(
+            "launch sets `{}`, which `{}` does not take",
+            v.key, adapter.id
         )),
         None => Ok(()),
     }

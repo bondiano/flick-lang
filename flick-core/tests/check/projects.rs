@@ -3,7 +3,9 @@
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
+use flick_core::build::target_preflight;
 use flick_core::diagnostics::Diagnostic;
+use flick_core::project::config::BackendEnvironment;
 use flick_core::project::{self, Foreign, ForeignPackage, Host, Project};
 use flick_core::source::SourceMap;
 use flick_core::types;
@@ -88,6 +90,15 @@ impl Host for FixtureHost {
             packages,
             diagnostics: Vec::new(),
         }
+    }
+
+    fn handles_service(
+        &self,
+        _project: &Project,
+        environment: &BackendEnvironment,
+        service: &str,
+    ) -> Option<bool> {
+        Some(target_preflight::handles(environment, service))
     }
 }
 

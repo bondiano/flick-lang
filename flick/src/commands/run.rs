@@ -1,23 +1,18 @@
 //! `flick run` and `flick dev`. Each build of the app goes into its own
 //! generation `.flick/run/<pid>-<n>/`, never written again once it runs, so
-//! a late `import()` never sees the next build. Its CLI owns the directory
+//! a running process never sees the next build. Its CLI owns the directory
 //! from reservation through cleanup; `clean` also keeps an orphaned live
-//! child. `run` and `dev` build JavaScript, or the Go executable of each
-//! entry when the project emits go.
+//! child.
 
 use std::cell::RefCell;
 use std::fs::OpenOptions;
 use std::io::{ErrorKind, Write as _};
 use std::path::{Path, PathBuf};
-use std::process::{Command as Process, ExitCode};
+use std::process::ExitCode;
 use std::rc::Rc;
-#[cfg(feature = "wasm-backends")]
-use std::slice;
 use std::sync::atomic::AtomicUsize;
 use std::{fs, io, process};
 
-use flick_backend::Verb;
-use flick_core::build::{go, runner_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::MAIN_ENTRY;
 use flick_core::project::{self, ModuleCache, Project, cache};
@@ -28,14 +23,15 @@ use rustix::io::Errno;
 use rustix::process::{Pid, test_kill_process};
 
 use super::build::BuildCommand;
+#[cfg(feature = "wasm-backends")]
+use super::contributed;
 use crate::args::{BuildArguments, GlobalArguments, RunArguments};
 use crate::artifact::resolve_root;
 use crate::backends;
-use crate::backends::options;
 use crate::child::{self, Running};
 use crate::command::Command;
+use crate::report;
 use crate::sources::FsHost;
-use crate::{report, toolchain};
 
 /// The generations of a project.
 pub fn generations(root: &Path) -> PathBuf {
@@ -47,12 +43,6 @@ pub struct Generation {
     #[cfg(feature = "wasm-backends")]
     backend: Option<flick_backend::BackendPin>,
     path: PathBuf,
-    /// Built for Flick's own runtime, whose `DevTools` client is its own.
-    rt: bool,
-    /// Built for go: each entry is an executable, not a module for node.
-    go: bool,
-    /// Resolved `DevTools` URL from CLI or `[target.js]`.
-    devtools: Option<String>,
 }
 
 impl Generation {
@@ -69,9 +59,6 @@ impl Generation {
                         path,
                         #[cfg(feature = "wasm-backends")]
                         backend: None,
-                        rt: false,
-                        go: false,
-                        devtools: None,
                     });
                 }
                 Err(err) if err.kind() == ErrorKind::AlreadyExists => {}
@@ -244,43 +231,7 @@ pub fn build_into_generation_for(
         code
     })?;
     let project = &current;
-    #[cfg(feature = "wasm-backends")]
-    {
-        let (backend, _, _) = backends::Selected::load_target(
-            &FsHost::new(),
-            Some(project),
-            options.target.as_deref(),
-        )
-        .map_err(|diagnostic| {
-            let code = report::code(slice::from_ref(&diagnostic)).max(1);
-            report::render(global, &SourceMap::default(), &[diagnostic]);
-            code
-        })?;
-        let verb = if dev { Verb::Dev } else { Verb::Run };
-        if let Some(descriptor) = backend.descriptor() {
-            let resolved =
-                options::resolve(&descriptor, verb, Some(project), &options.backend_options)
-                    .map_err(|diagnostics| {
-                        let code = report::code(&diagnostics).max(1);
-                        let mut sources = SourceMap::default();
-                        let _ = project::discover(
-                            &FsHost::new(),
-                            &mut sources,
-                            &project.root,
-                            Some(&project.root),
-                        );
-                        report::render(global, &sources, &diagnostics);
-                        code
-                    })?;
-            check_devtools(
-                !backend.supports_host("host-node-devtools"),
-                resolved.get("devtools").is_some(),
-                global,
-            )?;
-        }
-    }
-    #[cfg(not(feature = "wasm-backends"))]
-    let _ = (Verb::Run, options::short_name);
+    #[allow(unused_mut, reason = "mutated only with wasm-backends")]
     let mut generation = match Generation::reserve(&project.root) {
         Ok(generation) => generation,
         Err(err) => {
@@ -328,29 +279,13 @@ pub fn build_into_generation_for(
     let Some(completed) = build.built.borrow_mut().take() else {
         return Err(1);
     };
-    generation.go = completed.go;
-    generation.rt = completed.rt;
-    generation.devtools = completed.devtools_url;
     #[cfg(feature = "wasm-backends")]
     {
-        check_devtools(!completed.devtools, generation.devtools.is_some(), global)?;
         generation.backend = completed.backend;
     }
+    #[cfg(not(feature = "wasm-backends"))]
+    let _ = completed;
     Ok(generation)
-}
-
-#[cfg(feature = "wasm-backends")]
-fn check_devtools(unsupported: bool, requested: bool, global: &GlobalArguments) -> Result<(), u8> {
-    if unsupported && requested {
-        let diagnostic = Diagnostic::new(
-            codes::P012,
-            Severity::Error,
-            "the selected backend component does not support the host --devtools launch option",
-        );
-        report::render(global, &SourceMap::default(), &[diagnostic]);
-        return Err(1);
-    }
-    Ok(())
 }
 
 /// Starts the runner and records its child PID for cleanup after an orphaned CLI.
@@ -360,58 +295,29 @@ pub fn launch(
     options: &RunArguments,
     global: &GlobalArguments,
 ) -> Option<Running> {
-    // a generation built for go holds the entry's executable
-    let executable = generation.path().join(go::executable(name));
-    let go = generation.go;
     #[cfg(feature = "wasm-backends")]
-    let component = generation.backend.as_ref().map(|pin| {
-        let import = generation.devtools.as_ref().filter(|_| !go).map(|_| {
-            if generation.rt {
-                "@flick-lang/runtime/rt/runner/devtools"
-            } else {
-                "@flick-lang/effect-ts/runner/devtools"
-            }
-        });
-        backends::launch::command_with_import(
-            generation.path(),
-            pin,
-            flick_backend::LaunchKind::Run,
-            name,
-            import,
-        )
+    let command = generation.backend.as_ref().map(|pin| {
+        backends::launch::command(generation.path(), pin, flick_backend::LaunchKind::Run, name)
     });
     #[cfg(not(feature = "wasm-backends"))]
-    let component: Option<Result<Process, String>> = None;
-    let mut command = if let Some(command) = component {
-        match command {
-            Ok(command) => command,
-            Err(why) => {
-                report::render(global, &SourceMap::default(), &[backends::failure(why)]);
-                return None;
-            }
+    let command: Option<Result<std::process::Command, String>> = None;
+    let mut command = match command {
+        Some(Ok(command)) => command,
+        Some(Err(why)) => {
+            report::render(global, &SourceMap::default(), &[backends::failure(why)]);
+            return None;
         }
-    } else if go {
-        Process::new(&executable)
-    } else {
-        let mut command = Process::new("node");
-        command.arg("--enable-source-maps");
-        if let Some(url) = &generation.devtools {
-            // the module that sends the program's spans to the DevTools
-            let client = if generation.rt {
-                "@flick-lang/runtime/rt/runner/devtools"
-            } else {
-                "@flick-lang/effect-ts/runner/devtools"
-            };
-            command
-                .args(["--import", client])
-                .env("FLICK_DEVTOOLS", url);
+        None => {
+            report::render(
+                global,
+                &SourceMap::default(),
+                &[backends::failure(
+                    "running requires WebAssembly backend support",
+                )],
+            );
+            return None;
         }
-        command.arg(generation.path().join(runner_file(name, false)));
-        command
     };
-    if let Some(url) = &generation.devtools {
-        command.env("FLICK_DEVTOOLS", url);
-    }
     command.args(&options.args);
     match child::spawn(&mut command, global, "application-stderr") {
         Ok(running) => {
@@ -419,11 +325,7 @@ pub fn launch(
             Some(running)
         }
         Err(err) => {
-            let message = if go {
-                format!("cannot run `{}`: {err}", executable.display())
-            } else {
-                format!("cannot run `node` (Node.js >= {}): {err}", toolchain::NODE)
-            };
+            let message = format!("cannot run entry `{name}`: {err}");
             let d = Diagnostic::new(codes::P015, Severity::Error, message);
             report::render(global, &SourceMap::default(), &[d]);
             None
@@ -431,56 +333,36 @@ pub fn launch(
     }
 }
 
-/// The client package's local Vite executable, found under the backend's
-/// installed package directories.
-fn vite_binary(project: &Project, global: &GlobalArguments) -> Option<PathBuf> {
+/// Delegates a client entry to the selected backend's `run-client` verb.
+fn run_client(
+    project: &Project,
+    name: &str,
+    options: &RunArguments,
+    signals: &AtomicUsize,
+    global: &GlobalArguments,
+) -> ExitCode {
     #[cfg(feature = "wasm-backends")]
-    let found = backends::package_dirs(project)
-        .into_iter()
-        .map(|dir| project.root.join(dir).join(".bin/vite"))
-        .find(|bin| bin.exists());
-    #[cfg(not(feature = "wasm-backends"))]
-    let found: Option<PathBuf> = {
-        let _ = project;
-        None
-    };
-    if found.is_none() {
-        report::log(
+    {
+        contributed::run_client(
+            project,
+            options.target.as_deref(),
+            Some(name),
+            &options.args,
+            signals,
             global,
-            "the client entry needs Vite: install it with `flick install`",
+        )
+    }
+    #[cfg(not(feature = "wasm-backends"))]
+    {
+        let _ = (project, name, options, signals);
+        let d = Diagnostic::new(
+            codes::P067,
+            Severity::Error,
+            "client entries require WebAssembly backend support",
         );
+        report::render(global, &SourceMap::default(), &[d]);
+        ExitCode::from(2)
     }
-    found
-}
-
-/// Vite serves a client entry and rebuilds its modules during development.
-pub fn vite(project: &Project, global: &GlobalArguments) -> Option<Running> {
-    let bin = vite_binary(project, global)?;
-    let mut command = Process::new(bin);
-    command.current_dir(&project.root);
-    child::spawn(&mut command, global, "vite-stderr").ok()
-}
-
-/// Build a client page and serve the result without Vite's dev optimizer.
-fn run_client(project: &Project, global: &GlobalArguments, signals: &AtomicUsize) -> u8 {
-    let Some(bin) = vite_binary(project, global) else {
-        return 2;
-    };
-    let mut build = Process::new(&bin);
-    build.arg("build").current_dir(&project.root);
-    let Ok(running) = child::spawn(&mut build, global, "vite-stderr") else {
-        return 2;
-    };
-    let code = finish(running, signals);
-    if code != 0 {
-        return code;
-    }
-    let mut preview = Process::new(bin);
-    preview.arg("preview").current_dir(&project.root);
-    let Ok(running) = child::spawn(&mut preview, global, "vite-stderr") else {
-        return 2;
-    };
-    finish(running, signals)
 }
 
 pub fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
@@ -503,16 +385,16 @@ pub fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
             return report::exit_code(&diagnostics);
         }
     };
-    // A client entry needs a page and browser APIs; Node cannot run its
-    // generated runner. Vite builds and previews that entry instead.
-    if let Ok(name) = chosen_entry(&project, options)
+    // A client entry runs through the selected backend's `run-client` verb.
+    if options.entry.is_none()
+        && let Ok(name) = chosen_entry(&project, options)
         && project
             .config
             .entries
             .iter()
             .any(|entry| entry.name == name && entry.client)
     {
-        return ExitCode::from(run_client(&project, global, &signals));
+        return run_client(&project, &name, options, &signals, global);
     }
     let (generation, name) = match build_generation(&project, options, global) {
         Ok(g) => g,

@@ -6,6 +6,7 @@ use flick_backend::{
     BuildRequest, Diagnostic, Inputs, JavascriptProjection, ModuleRole, TypescriptModuleProjection,
     validate_source_spans,
 };
+use flick_backend_support::bridge_select;
 use flick_ir::{Expr, ExprKind, OpClass, Program};
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
@@ -28,6 +29,7 @@ pub(super) struct Data {
     pub declarations: bool,
     pub schema_aot: bool,
     pub inspect: bool,
+    pub devtools: Option<String>,
     pub labels: Labels,
     pub bridge: EffectBridge,
 }
@@ -99,6 +101,7 @@ impl Data {
             })
             .collect::<Result<_, _>>()?;
         let parsed = runtime_options(request)?;
+        let bridge = select_bridge(request, &program, parsed.rt);
         let packages = request
             .modules
             .iter()
@@ -119,8 +122,9 @@ impl Data {
             declarations: parsed.declarations,
             schema_aot: parsed.schema_aot,
             inspect: parsed.inspect,
+            devtools: parsed.devtools,
             labels: parsed.labels,
-            bridge: parsed.bridge,
+            bridge,
         })
     }
 
@@ -232,8 +236,39 @@ struct ParsedOptions {
     declarations: bool,
     schema_aot: bool,
     inspect: bool,
-    bridge: EffectBridge,
+    devtools: Option<String>,
     labels: Labels,
+}
+
+fn select_bridge(request: &BuildRequest, program: &Program, rt: bool) -> EffectBridge {
+    if !rt {
+        return EffectBridge::Absent;
+    }
+    let available = match request.declared_dependencies.as_deref() {
+        None => EffectBridge::Available,
+        Some(deps) if deps.iter().any(|d| d == "@flick-lang/effect-ts") => EffectBridge::Available,
+        Some(_) => EffectBridge::Absent,
+    };
+    let own_names: BTreeSet<&str> = request
+        .modules
+        .iter()
+        .filter(|m| m.role == ModuleRole::Own)
+        .map(|m| m.name.as_str())
+        .collect();
+    let own = program
+        .modules
+        .iter()
+        .filter(|m| own_names.contains(m.name.as_str()));
+    let builtins = program
+        .modules
+        .iter()
+        .filter(|m| !own_names.contains(m.name.as_str()));
+    let roots = request
+        .entries
+        .iter()
+        .filter_map(|e| Some((e.runner.clone()?, "run".to_owned())))
+        .collect();
+    bridge_select::select(own, builtins, available, roots)
 }
 
 fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnostic>> {
@@ -259,14 +294,7 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
     let declarations = flag("option.declarations")?;
     let _promise_facade = flag("option.promise-facade")?;
     let schema_aot = flag("option.schema-aot")?;
-    let bridge = match option("js.effect-bridge") {
-        Some("absent") => EffectBridge::Absent,
-        Some("available") => EffectBridge::Available,
-        Some("available-with-ui") => EffectBridge::AvailableWithUi,
-        Some("available-with-web") => EffectBridge::AvailableWithWeb,
-        Some("available-with-ui-and-web") => EffectBridge::AvailableWithUiAndWeb,
-        _ => return Err(failure("missing or unknown js.effect-bridge")),
-    };
+    let devtools = option("option.devtools").map(str::to_owned);
     let labels = match option("labels") {
         Some("all") => Labels::All,
         Some("components") => Labels::Components,
@@ -279,7 +307,7 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
             || !matches!(
                 option.key.as_str(),
                 "command"
-                    | "js.effect-bridge"
+                    | "host.os"
                     | "labels"
                     | "option.typescript"
                     | "option.declarations"
@@ -307,7 +335,7 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
         declarations,
         schema_aot,
         inspect,
-        bridge,
+        devtools,
         labels,
     })
 }

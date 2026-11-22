@@ -1,6 +1,6 @@
-//! The files an earlier build wrote that this build does not write: in a Go
-//! module, `go build` would compile them with the rest of their package; in
-//! the output of files built alone, which has no manifest, they would stay.
+//! The files an earlier build wrote that this build does not write: in a
+//! backend's output directory, stale generated files from previous builds
+//! would otherwise stay behind.
 
 use std::collections::HashSet;
 use std::fs;

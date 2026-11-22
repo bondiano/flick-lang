@@ -148,7 +148,7 @@ fn check_block(
     let (mut compile_sources, diagnostics, compilation, overlay_paths) = run_flick::compile_overlay(
         &checked.host,
         checked.project.as_ref(),
-        prepared.rt,
+        prepared.stages_by_class,
         name,
         &[(name.to_owned(), overlay_source.clone())],
     );

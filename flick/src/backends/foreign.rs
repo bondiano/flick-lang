@@ -3,7 +3,6 @@
 //! backend is taken without the network: a project's own pin, or an
 //! official one a checkout or the store holds; without one there is none.
 
-use std::env;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -13,6 +12,7 @@ use flick_backend::command::Dependency;
 use flick_backend::host::{Budget, WasmBackend};
 use flick_backend::{Backend, BackendId, BackendPin, Limits, OptionValue};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::project::config::BackendEnvironment;
 use flick_core::project::target::Wanted;
 use flick_core::project::{Foreign, ForeignPackage, Project, store};
 use flick_core::source::{FileId, Span};
@@ -79,11 +79,60 @@ pub(crate) fn foreign(project: &Project) -> Foreign {
     }
 }
 
+/// Whether `project`'s selected target backend uses class-derived built-in stages.
+pub(crate) fn stages_by_class(project: &Project) -> bool {
+    options::descriptor_for_project(project).map_or_else(
+        || options::project_stages_by_class_cached(project),
+        |d| options::project_stages_by_class(&d, project),
+    )
+}
+
+/// Like [`stages_by_class`], without ever loading or instantiating a backend component.
+pub(crate) fn stages_by_class_cached(project: &Project) -> bool {
+    options::project_stages_by_class_cached(project)
+}
+
+/// Whether `project`'s selected target backend declares a root handler for `service`
+/// in `environment`; `None` when no backend descriptor is available offline.
+pub(crate) fn handles_service(
+    project: &Project,
+    environment: &BackendEnvironment,
+    service: &str,
+) -> Option<bool> {
+    let descriptor = options::descriptor_for_project(project)?;
+    Some(descriptor.handled_services.iter().any(|entry| {
+        entry.environment.backend == environment.backend
+            && entry.environment.platform == environment.platform
+            && entry.services.iter().any(|s| s == service)
+    }))
+}
+
+/// Alternate file extension the project's selected target backend uses for local
+/// foreign bindings, if any.
+pub(crate) fn foreign_extension(project: &Project) -> Option<String> {
+    options::descriptor_for_project(project).and_then(|d| d.foreign_extension)
+}
+
+/// Foreign file suffixes tracked as build cache inputs for `project`'s selected
+/// backend (honoring an explicit `--target` override when present).
+pub(crate) fn foreign_suffixes_for(
+    project: &Project,
+    target_override: Option<&str>,
+) -> Vec<String> {
+    options::descriptor_for_target(project, target_override)
+        .map(|d| d.foreign_suffixes)
+        .unwrap_or_default()
+}
+
 /// The files a build of `project` depends on through its backend's
 /// packages: those the backend reports in `inputs` (or matches via its
 /// patterns), and the modules of the packages that ship Flick sources.
-pub(crate) fn package_inputs(project: &Project, effect_override: Option<bool>) -> Vec<PathBuf> {
-    let Some((pin, bytes)) = selected_bytes(project, None) else {
+pub(crate) fn package_inputs(
+    project: &Project,
+    target_override: Option<&str>,
+    backend_options: &[OptionValue],
+) -> Vec<PathBuf> {
+    let Some((pin, bytes)) = selected_bytes(project, target_override) else {
         return Vec::new();
     };
     if let Some(patterns) = cached(&pin.sha256)
@@ -99,21 +148,16 @@ pub(crate) fn package_inputs(project: &Project, effect_override: Option<bool>) -
     if patterns.is_empty() {
         return Vec::new();
     }
-    let effect = effect_override.unwrap_or_else(|| !project.config.js_is_rt());
-    let options = [
-        OptionValue {
-            key: "root".into(),
-            value: real_path(&project.root),
-        },
-        OptionValue {
-            key: "skip-runtime".into(),
-            value: "true".into(),
-        },
-        OptionValue {
-            key: "runtime".into(),
-            value: if effect { "effect" } else { "rt" }.into(),
-        },
-    ];
+    let mut options = Vec::with_capacity(backend_options.len() + 2);
+    options.push(OptionValue {
+        key: "root".into(),
+        value: real_path(&project.root),
+    });
+    options.push(OptionValue {
+        key: "skip-runtime".into(),
+        value: "true".into(),
+    });
+    options.extend(backend_options.iter().cloned());
     let Ok(report) = packages::report(&*backend, &project.root, &[], &options) else {
         return Vec::new();
     };
@@ -131,18 +175,21 @@ pub(crate) fn package_inputs(project: &Project, effect_override: Option<bool>) -
     };
     for package in report.sources {
         if packages::is_safe_relative(&package.root) {
+            let dir = project.root.join(&package.root);
             let mut sources = Vec::new();
-            cache::files_under(&project.root.join(&package.root), &mut sources);
-            files.extend(
-                (sources.into_iter())
-                    .filter(|p| p.extension().is_some_and(|e| e == "fl" || e == "go")),
-            );
+            cache::files_under(&dir, &mut sources);
+            files.extend(sources.into_iter().filter(|p| {
+                p.strip_prefix(&dir).ok().is_some_and(|rel| {
+                    rel.components()
+                        .all(|c| !c.as_os_str().to_str().is_some_and(|s| s.starts_with('.')))
+                })
+            }));
         }
     }
     files
 }
 
-/// Top-level package directories the backend of `project` reads (e.g. `node_modules`).
+/// Top-level package directories the backend of `project` reads.
 pub(crate) fn package_dirs(project: &Project) -> Vec<String> {
     let Some((pin, bytes)) = selected_bytes(project, None) else {
         return Vec::new();
@@ -258,22 +305,22 @@ pub(crate) fn verify_for_target(
 pub(crate) fn check_runtime_with(
     backend: &WasmBackend,
     root: &Path,
-    rt: bool,
+    backend_options: &[OptionValue],
 ) -> Option<Diagnostic> {
-    let options = [
-        OptionValue {
-            key: "check-runtime".into(),
-            value: if rt { "rt" } else { "effect" }.into(),
-        },
-        OptionValue {
-            key: "compiler".into(),
-            value: toolchain::COMPILER.into(),
-        },
-        OptionValue {
-            key: "root".into(),
-            value: real_path(root),
-        },
-    ];
+    let mut options = Vec::with_capacity(backend_options.len() + 3);
+    options.push(OptionValue {
+        key: "check-runtime".into(),
+        value: "true".into(),
+    });
+    options.push(OptionValue {
+        key: "compiler".into(),
+        value: toolchain::COMPILER.into(),
+    });
+    options.push(OptionValue {
+        key: "root".into(),
+        value: real_path(root),
+    });
+    options.extend(backend_options.iter().cloned());
     let report = packages::report(backend, root, &[], &options).ok()?;
     report
         .diagnostics
@@ -286,58 +333,39 @@ pub(crate) fn check_runtime_with(
 }
 
 /// Checks the runtime contract of `project` using its selected backend.
-pub(crate) fn check_runtime_project(project: &Project, rt: bool) -> Option<Diagnostic> {
+pub(crate) fn check_runtime_project(project: &Project) -> Option<Diagnostic> {
     let (pin, bytes) = selected_bytes(project, None)?;
     let backend = load(&pin, &bytes)?;
-    check_runtime_with(&backend, &project.root, rt)
+    let wire = options::project_wire_options(project, None);
+    check_runtime_with(&backend, &project.root, &wire)
 }
 
-/// Backend-owned lines for `flick doctor`: `(ok, what, detail)`.
-pub(crate) fn doctor(
-    project: Option<&Project>,
-    node: Option<&str>,
-    pnpm: Option<&str>,
-) -> Option<Vec<(Option<bool>, String, String)>> {
-    let cwd = env::current_dir().unwrap_or_default();
-    let (root, loaded) = match project {
-        Some(project) => (
-            project.root.as_path(),
-            selected_bytes(project, None).and_then(|(pin, bytes)| load(&pin, &bytes)),
-        ),
-        None => (
-            cwd.as_path(),
-            official::local_bytes(official::JS, None).and_then(|(pin, bytes)| load(&pin, &bytes)),
-        ),
-    };
-    let backend = loaded?;
+/// Backend-owned installed package checks for `flick doctor`: `(ok, what, detail)`.
+pub(crate) fn doctor_packages(
+    backend: &WasmBackend,
+    root: &Path,
+) -> Vec<(Option<bool>, String, String)> {
+    if backend.package_files().is_empty() {
+        return Vec::new();
+    }
     let options = [
         OptionValue {
             key: "inspect".into(),
-            value: "doctor".into(),
+            value: "doctor-packages".into(),
         },
         OptionValue {
             key: "compiler".into(),
             value: toolchain::COMPILER.into(),
         },
         OptionValue {
-            key: "has-project".into(),
-            value: if project.is_some() { "true" } else { "false" }.into(),
-        },
-        OptionValue {
-            key: "node-version".into(),
-            value: node.unwrap_or_default().into(),
-        },
-        OptionValue {
-            key: "pnpm-version".into(),
-            value: pnpm.unwrap_or_default().into(),
-        },
-        OptionValue {
             key: "root".into(),
             value: real_path(root),
         },
     ];
-    let report = packages::report(&*backend, root, &[], &options).ok()?;
-    let lines = report
+    let Ok(report) = packages::report(backend, root, &[], &options) else {
+        return Vec::new();
+    };
+    report
         .diagnostics
         .into_iter()
         .filter_map(|d| {
@@ -350,8 +378,7 @@ pub(crate) fn doctor(
             let (what, detail) = d.message.split_once('\n')?;
             Some((ok, what.to_owned(), detail.to_owned()))
         })
-        .collect();
-    Some(lines)
+        .collect()
 }
 
 fn real_path(path: &Path) -> String {

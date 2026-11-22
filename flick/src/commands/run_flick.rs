@@ -17,18 +17,19 @@ use std::collections::BTreeMap;
 #[cfg(feature = "wasm-backends")]
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
+#[cfg(feature = "wasm-backends")]
 use std::process::Stdio;
 use std::slice;
 #[cfg(feature = "wasm-backends")]
 use std::str;
 
-#[cfg(feature = "wasm-backends")]
-use flick_backend::LaunchKind;
+use flick_backend::Verb;
 #[cfg(feature = "wasm-backends")]
 use flick_backend::command::{Invocation, RunFlickStep, Span as CommandSpan};
 #[cfg(feature = "wasm-backends")]
 use flick_backend::host::runtime::Cancellation;
-use flick_backend::{Limits, Verb};
+#[cfg(feature = "wasm-backends")]
+use flick_backend::{LaunchKind, Limits};
 use flick_core::build::Extras;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "wasm-backends")]
@@ -38,7 +39,9 @@ use flick_core::project::{self, Compilation, Project};
 use flick_core::source::Span;
 use flick_core::source::{FileId, SourceMap};
 
-use process::{TempGeneration, fresh_entry_name, native_launch_command, supervise};
+#[cfg(feature = "wasm-backends")]
+use process::supervise;
+use process::{TempGeneration, fresh_entry_name};
 
 use super::build::{BuildPlan, Purpose, emit, hooks};
 use crate::backends::options::{self, ResolvedOptions, TargetChoice};
@@ -53,12 +56,11 @@ pub(crate) struct PreparedTarget {
     pub(crate) choice: TargetChoice,
     pub(crate) target_overridden: bool,
     pub(crate) options: ResolvedOptions,
-    pub(crate) go: bool,
-    pub(crate) rt: bool,
+    pub(crate) stages_by_class: bool,
 }
 
-/// Resolves the target backend, validates `Verb::Run` options and environment,
-/// and lazily prepares `std` and built-in module interfaces.
+/// Resolves the target backend, validates `Verb::Run` options, and lazily
+/// prepares `std` and built-in module interfaces.
 pub(crate) fn prepare_target(
     host: &FsHost,
     project: Option<&Project>,
@@ -74,8 +76,9 @@ pub(crate) fn prepare_target(
     let (backend, choice, target_overridden) =
         Selected::load_target(host, project, target_override)
             .map_err(|d| (SourceMap::default(), vec![d]))?;
-    let mut resolved = match backend.descriptor() {
-        Some(descriptor) => options::resolve(&descriptor, Verb::Run, project, &BTreeMap::new())
+    let descriptor = backend.descriptor();
+    let mut resolved = match &descriptor {
+        Some(descriptor) => options::resolve(descriptor, Verb::Run, project, &BTreeMap::new())
             .map_err(|diagnostics| {
                 let mut sources = SourceMap::default();
                 if let Some(p) = project {
@@ -87,15 +90,11 @@ pub(crate) fn prepare_target(
     };
     // Internal generated programs never connect to a DevTools server.
     resolved.values.remove("devtools");
-    let go = choice.is_go();
-    let rt = !go && resolved.is_rt();
-    if let Some(problem) = project.and_then(|p| backends::check_runtime(p, &backend, rt)) {
+    let stages_by_class = options::stages_by_class(descriptor.as_ref(), &resolved);
+    if let Some(problem) = project.and_then(|p| backends::check_runtime(p, &backend, &resolved)) {
         return Err((SourceMap::default(), vec![problem]));
     }
-    if let Err(problem) = backend.validate_environment(project, go) {
-        return Err((SourceMap::default(), vec![problem]));
-    }
-    if let Err(problem) = builtins::prepare_in(project::stages_by_class(project, Some(rt))) {
+    if let Err(problem) = builtins::prepare_in(stages_by_class) {
         return Err((SourceMap::default(), vec![problem]));
     }
     Ok(PreparedTarget {
@@ -103,8 +102,7 @@ pub(crate) fn prepare_target(
         choice,
         target_overridden,
         options: resolved,
-        go,
-        rt,
+        stages_by_class,
     })
 }
 
@@ -187,10 +185,10 @@ pub(crate) fn run_compiled(
         out_dir: gen_dir.path().to_path_buf(),
         entries: vec![(entry_name.clone(), entry.to_owned())],
         typescript: false,
-        go: prepared.go,
+        stages_by_class: prepared.stages_by_class,
         suites: Vec::new(),
         extras: Extras {
-            rt: prepared.rt,
+            rt: prepared.stages_by_class,
             ..Extras::default()
         },
         release: false,
@@ -209,43 +207,48 @@ pub(crate) fn run_compiled(
         backends::launch::command(gen_dir.path(), &pin, LaunchKind::Run, &entry_name)
             .map_err(|why| vec![backends::failure(why)])?
     } else {
-        native_launch_command(gen_dir.path(), &entry_name, prepared.go)
+        return Err(vec![backends::failure(
+            "running requires WebAssembly backend support",
+        )]);
     };
     #[cfg(not(feature = "wasm-backends"))]
-    let mut command = native_launch_command(gen_dir.path(), &entry_name, prepared.go);
-
-    let work_dir = project.map_or(host.cwd.as_path(), |p| p.root.as_path());
-    command
-        .args(arguments)
-        .current_dir(work_dir)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    #[cfg(unix)]
     {
-        use std::os::unix::process::CommandExt;
-        command.process_group(0);
+        let _ = (arguments, gen_dir, entry_name);
+        return Err(vec![backends::failure(
+            "running requires WebAssembly backend support",
+        )]);
     }
 
-    let child = match command.spawn() {
-        Ok(child) => child,
-        Err(err) => {
-            return Ok(RunOutput {
-                stdout: Vec::new(),
-                stderr: String::new(),
-                status: RunStatus::LaunchError(err.to_string()),
-            });
-        }
-    };
+    #[cfg(feature = "wasm-backends")]
+    {
+        let work_dir = project.map_or(host.cwd.as_path(), |p| p.root.as_path());
+        command
+            .args(arguments)
+            .current_dir(work_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
 
-    let output = supervise(
-        child,
-        Limits::default().artifact_bytes,
-        #[cfg(feature = "wasm-backends")]
-        cancel,
-    );
-    Ok(output)
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+
+        let child = match command.spawn() {
+            Ok(child) => child,
+            Err(err) => {
+                return Ok(RunOutput {
+                    stdout: Vec::new(),
+                    stderr: String::new(),
+                    status: RunStatus::LaunchError(err.to_string()),
+                });
+            }
+        };
+
+        let output = supervise(child, Limits::default().artifact_bytes, cancel);
+        Ok(output)
+    }
 }
 
 /// Executes a `flick:command@0.1.0` `run-flick` step on the project's selected
@@ -265,8 +268,13 @@ pub(crate) fn execute_step(
         .iter()
         .map(|m| (m.name.clone(), m.source.clone()))
         .collect();
-    let (mut sources, diagnostics, compilation, overlay_paths) =
-        compile_overlay(&host, Some(project), prepared.rt, &step.entry, &overlays);
+    let (mut sources, diagnostics, compilation, overlay_paths) = compile_overlay(
+        &host,
+        Some(project),
+        prepared.stages_by_class,
+        &step.entry,
+        &overlays,
+    );
     let overlay_files: Vec<FileId> = overlay_file_ids(&host, &sources, &overlay_paths);
 
     if diagnostics.iter().any(|d| d.severity == Severity::Error) {

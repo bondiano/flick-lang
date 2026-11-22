@@ -36,7 +36,9 @@ pub use dev::dev;
 pub use diff::diff;
 pub use expand::expand;
 pub use fmt::FmtCommand;
-pub use inspect::{doc, inspect, interface_of, projection_of};
+pub use inspect::{doc, inspect};
+#[cfg(feature = "wasm-backends")]
+pub use inspect::{interface_of, projection_of};
 pub use libraries::add_library;
 pub use pack::pack;
 pub use plugins::plugins;

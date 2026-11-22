@@ -1,8 +1,8 @@
 //! Target runtime mode and reachable-use environment preflight.
 
-use super::Project;
 #[cfg(not(target_arch = "wasm32"))]
 use super::{Compilation, SourceMap};
+use super::{Host, Project};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::diagnostics::{Diagnostic, Severity};
 #[cfg(not(target_arch = "wasm32"))]
@@ -16,6 +16,7 @@ use crate::source::Span;
 #[cfg(not(target_arch = "wasm32"))]
 #[allow(clippy::too_many_arguments)]
 pub(super) fn check_environment(
+    host: &dyn Host,
     compilation: &Compilation,
     project: Option<&Project>,
     target_override: Option<&TargetOverride>,
@@ -59,6 +60,15 @@ pub(super) fn check_environment(
         .collect();
     let for_tests = target_override.is_some_and(|o| o.for_tests);
     let test_paths = target_override.map_or(&[][..], |o| o.test_paths.as_slice());
+    let overridden = target_override.is_some_and(|o| o.target_overridden);
+    let pair = environment.pair();
+    let handles = |service: &str| {
+        if overridden {
+            None
+        } else {
+            project.and_then(|p| host.handles_service(p, &pair, service))
+        }
+    };
     target_preflight::check(
         compilation,
         &CheckOptions {
@@ -67,6 +77,7 @@ pub(super) fn check_environment(
             by_class,
             for_tests,
             test_paths,
+            handles: Some(&handles),
         },
         sources,
         environment,
@@ -75,16 +86,17 @@ pub(super) fn check_environment(
 }
 
 /// Whether a run over `project` checks with the stages of a class derived
-/// from it, as Flick's own runtime has them: explicit `Some(true)`/`Some(false)`
-/// overrides the project, while `None` follows the project's `[target.js]`
-/// runtime (`"rt"` by default). A host prepares the built-in modules checked
-/// this way before it runs.
-pub fn stages_by_class(project: Option<&Project>, rt: Option<bool>) -> bool {
+/// from it: explicit `Some(true)`/`Some(false)` overrides the project, while
+/// `None` queries the host's backend descriptor for `project`.
+pub fn stages_by_class(host: &dyn Host, project: Option<&Project>, rt: Option<bool>) -> bool {
     match rt {
         Some(explicit) => explicit,
         #[cfg(feature = "native-project")]
-        None => project.is_some_and(|p| !p.config.is_go() && p.config.js_is_rt()),
+        None => project.is_some_and(|p| host.stages_by_class(p)),
         #[cfg(not(feature = "native-project"))]
-        None => project.is_some(),
+        None => {
+            let _ = host;
+            project.is_some()
+        }
     }
 }

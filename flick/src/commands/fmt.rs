@@ -44,7 +44,12 @@ impl FmtCommand {
                     paths.extend(roots.iter().map(|r| r.to_string_lossy().into_owned()));
                     // the test companions beside the sources are formatted too
                     if let Some(p) = &project {
-                        sources::companions(&p.source_root().to_string_lossy(), &mut paths);
+                        let skip = sources::skip_dirs(Some(p));
+                        sources::companions_skipping(
+                            &p.source_root().to_string_lossy(),
+                            &skip,
+                            &mut paths,
+                        );
                     }
                     project
                 }
@@ -57,8 +62,9 @@ impl FmtCommand {
             self.project_at(&host, &mut outcome.sources, &host.cwd)
         };
         let mut plugins = FormatPlugins::new(&host, &mut outcome.sources, project.as_ref());
+        let skip = sources::skip_dirs(project.as_ref());
         for path in &self.options.paths {
-            sources::all_files(path, &mut paths);
+            sources::all_files_skipping(path, &skip, &mut paths);
         }
         for path in paths {
             let file = match sources::load(&mut outcome.sources, &path) {

@@ -228,7 +228,9 @@ fn add(
         },
         artifact: format!("exe:{name}"),
         runtime: None,
+        runtime_arguments: vec![],
         arguments: vec![],
+        environment: vec![],
     });
 }
 

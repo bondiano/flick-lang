@@ -1,10 +1,7 @@
-//! Package selection at the common build boundary. JS uses the distributed
-//! component by default; Go retains its temporary native baseline.
+//! Backend package selection at the common build boundary.
 
 #[cfg(feature = "wasm-backends")]
 mod component;
-#[cfg(all(test, feature = "wasm-backends"))]
-mod dependencies;
 #[cfg(feature = "wasm-backends")]
 mod execute;
 #[cfg(feature = "wasm-backends")]
@@ -25,18 +22,21 @@ mod scaffold;
 #[cfg(feature = "wasm-backends")]
 mod tools;
 #[cfg(feature = "wasm-backends")]
+pub(crate) use component::Package;
+#[cfg(feature = "wasm-backends")]
 pub(crate) use execute::Reads;
 #[cfg(feature = "wasm-backends")]
 pub(crate) use foreign::{
-    asked, check_runtime_project, doctor, foreign, package_dirs, package_inputs, verify,
+    asked, check_runtime_project, foreign, foreign_extension, foreign_suffixes_for,
+    handles_service, package_dirs, package_inputs, stages_by_class, stages_by_class_cached, verify,
     verify_for_target,
 };
 #[cfg(feature = "wasm-backends")]
 pub(crate) use tools::Tool;
 
 use crate::artifact::Artifact;
+#[cfg(feature = "wasm-backends")]
 use std::path::Path;
-use std::process::Command;
 #[cfg(feature = "wasm-backends")]
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -50,8 +50,6 @@ use flick_backend::BackendPin;
 #[cfg(feature = "wasm-backends")]
 use flick_backend::host::runtime::Cancellation;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-#[cfg(feature = "wasm-backends")]
-use flick_core::project;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::config;
 #[cfg(feature = "wasm-backends")]
@@ -75,27 +73,23 @@ pub(crate) enum Selected {
 }
 
 /// Verify the runtime contract reported by the selected backend component.
-pub(crate) fn check_runtime(project: &Project, backend: &Selected, rt: bool) -> Option<Diagnostic> {
+pub(crate) fn check_runtime(
+    project: &Project,
+    backend: &Selected,
+    resolved: &options::ResolvedOptions,
+) -> Option<Diagnostic> {
     let _ = project;
     match backend {
         Selected::Native => {
-            let _ = rt;
+            let _ = resolved;
             None
         }
         #[cfg(feature = "wasm-backends")]
-        Selected::Component(package) => package.check_runtime(rt),
+        Selected::Component(package) => package.check_runtime(&resolved.to_wire()),
     }
 }
 
 impl Selected {
-    #[cfg(feature = "wasm-backends")]
-    pub(crate) fn supports_host(&self, capability: &str) -> bool {
-        match self {
-            Self::Native => true,
-            Self::Component(package) => package.supports_host(capability),
-        }
-    }
-
     pub(crate) fn descriptor(&self) -> Option<flick_backend::Descriptor> {
         match self {
             Self::Native => None,
@@ -104,44 +98,19 @@ impl Selected {
         }
     }
 
-    #[cfg_attr(
-        not(feature = "wasm-backends"),
-        expect(
-            clippy::unnecessary_wraps,
-            reason = "component tool authorization can fail"
-        )
-    )]
-    pub(crate) fn schema_aot_command(&self, root: &Path) -> Result<Command, String> {
-        match self {
-            Self::Native => {
-                let _ = root;
-                Ok(Command::new("node"))
-            }
-            #[cfg(feature = "wasm-backends")]
-            Self::Component(package) => package.schema_aot_command(root),
-        }
-    }
     pub(crate) fn reference_ir(
         &self,
         sources: &mut SourceMap,
-        project: Option<&Project>,
         compilation: &Compilation,
-        rt: bool,
+        stages_by_class: bool,
     ) -> Option<Program> {
         match self {
             Self::Native => {
-                let _ = (sources, project, compilation, rt);
+                let _ = (sources, compilation, stages_by_class);
                 None
             }
             #[cfg(feature = "wasm-backends")]
-            Self::Component(_) => Some(
-                request::program(
-                    sources,
-                    compilation,
-                    project::stages_by_class(project, Some(rt)),
-                )
-                .0,
-            ),
+            Self::Component(_) => Some(request::program(sources, compilation, stages_by_class).0),
         }
     }
 
@@ -183,20 +152,38 @@ impl Selected {
                 {
                     let root = project.map_or(host.cwd.as_path(), |p| p.root.as_path());
                     let tools = project.map(|p| &p.config.tools);
-                    let package = if *id == official::GO {
-                        official::go(root, project, tools)
-                    } else {
-                        official::javascript(root, project, tools)
-                    };
-                    package.map(|p| (Self::Component(Arc::new(p)), choice, overridden))
+                    official::by_id(id, root, project, tools)
+                        .map(|p| (Self::Component(Arc::new(p)), choice, overridden))
                 }
                 #[cfg(not(feature = "wasm-backends"))]
                 {
-                    let _ = (host, id);
+                    let _ = (host, id, overridden);
                     Err(failure("builds require WebAssembly backend support"))
                 }
             }
         }
+    }
+
+    /// Loads the selected backend locally without reaching the network (for `flick doctor`).
+    #[cfg(feature = "wasm-backends")]
+    pub(crate) fn load_target_local(
+        host: &FsHost,
+        project: Option<&Project>,
+        cli_target: Option<&str>,
+    ) -> Result<(Arc<component::Package>, options::TargetChoice), Diagnostic> {
+        let (choice, _) = options::resolve_target(cli_target, project)?;
+        let package = match &choice {
+            options::TargetChoice::Pinned { package, .. } => {
+                let project = project.expect("pinned target comes from a project");
+                component::Package::load(project, package)?
+            }
+            options::TargetChoice::Official { id, .. } => {
+                let root = project.map_or(host.cwd.as_path(), |p| p.root.as_path());
+                let tools = project.map(|p| &p.config.tools);
+                official::load_local(id, root, project, tools)?
+            }
+        };
+        Ok((Arc::new(package), choice))
     }
 
     #[cfg(feature = "wasm-backends")]
@@ -206,27 +193,6 @@ impl Selected {
             #[cfg(feature = "wasm-backends")]
             Self::Component(package) => Some(package.pin()),
         }
-    }
-
-    pub(crate) fn validate_environment(
-        &self,
-        project: Option<&Project>,
-        go: bool,
-    ) -> Result<(), Diagnostic> {
-        let Some(environment) = project.and_then(|p| p.config.build.environment.as_ref()) else {
-            return Ok(());
-        };
-        if self.is_component() {
-            return Ok(());
-        }
-        let expected = if go { ("go", "native") } else { ("js", "node") };
-        if (environment.backend.as_str(), environment.platform.as_str()) == expected {
-            return Ok(());
-        }
-        Err(failure(format!(
-            "the temporary native baseline does not support environment `{}/{}` for this output; select a backend component",
-            environment.backend, environment.platform
-        )))
     }
 
     pub(crate) fn run_paths(&self, files: &[Artifact]) -> Vec<(String, String)> {
@@ -240,14 +206,14 @@ impl Selected {
         }
     }
 
-    pub(crate) fn cache_identity(&self, effect: bool) -> String {
+    pub(crate) fn cache_identity(&self, resolved: &options::ResolvedOptions) -> String {
         match self {
             Self::Native => {
-                let _ = effect;
+                let _ = resolved;
                 "native-baseline".into()
             }
             #[cfg(feature = "wasm-backends")]
-            Self::Component(package) => package.cache_identity(effect),
+            Self::Component(package) => package.cache_identity(&resolved.to_wire()),
         }
     }
 
@@ -257,10 +223,6 @@ impl Selected {
             #[cfg(feature = "wasm-backends")]
             Self::Component(package) => package.accepts_cached(files),
         }
-    }
-
-    pub(crate) fn is_component(&self) -> bool {
-        !matches!(self, Self::Native)
     }
 }
 
@@ -345,12 +307,7 @@ pub(crate) fn official_contributor(
     id: &str,
 ) -> Result<Arc<dyn Contributor>, String> {
     let tools = Some(&project.config.tools);
-    let package = if id == official::GO {
-        official::go(&project.root, Some(project), tools)
-    } else {
-        official::javascript(&project.root, Some(project), tools)
-    };
-    match package {
+    match official::by_id(id, &project.root, Some(project), tools) {
         Ok(package) => Ok(Arc::new(package)),
         Err(diagnostic) => Err(diagnostic.message),
     }
@@ -396,6 +353,7 @@ pub(crate) fn set_offline(offline: bool) {
     OFFLINE.store(offline, Ordering::Relaxed);
 }
 
+#[cfg(feature = "wasm-backends")]
 fn offline() -> bool {
     OFFLINE.load(Ordering::Relaxed)
 }

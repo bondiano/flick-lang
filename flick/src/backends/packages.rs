@@ -9,6 +9,7 @@ mod scope;
 pub(super) mod tests;
 
 use std::collections::BTreeSet;
+use std::io::Read as _;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 
@@ -226,7 +227,7 @@ pub(crate) fn named(root: &Path, patterns: &[String]) -> Vec<PathBuf> {
     files
 }
 
-/// Unique top-level directory names referenced by `patterns` (e.g. `node_modules`).
+/// Unique top-level directory names referenced by `patterns`.
 pub(crate) fn top_dirs(patterns: &[String]) -> Vec<String> {
     let mut dirs = BTreeSet::new();
     for pattern in patterns.iter().filter(|p| is_safe_pattern(p)) {
@@ -358,18 +359,22 @@ pub(crate) fn content(dir: &Path, skip: &[String]) -> Result<String, String> {
         .map_err(|e| format!("cannot pin the installed runtime: {e}"))?;
     files.sort();
     let mut hash = Sha256::new();
+    let mut buf = vec![0_u8; 64 * 1024];
     for relative in files {
         let name = relative.to_string_lossy().replace('\\', "/");
         let path = dir.join(&relative);
-        let size = fs::metadata(&path).map_err(|e| e.to_string())?.len();
+        let mut file = fs::File::open(&path).map_err(|e| e.to_string())?;
+        let size = file.metadata().map_err(|e| e.to_string())?.len();
         hash.update(u64::try_from(name.len()).unwrap_or(u64::MAX).to_le_bytes());
         hash.update(name.as_bytes());
         hash.update(size.to_le_bytes());
-        io::copy(
-            &mut fs::File::open(path).map_err(|e| e.to_string())?,
-            &mut hash,
-        )
-        .map_err(|e| e.to_string())?;
+        loop {
+            let read = file.read(&mut buf).map_err(|e| e.to_string())?;
+            if read == 0 {
+                break;
+            }
+            hash.update(&buf[..read]);
+        }
     }
     Ok(format!("{:x}", hash.finalize()))
 }

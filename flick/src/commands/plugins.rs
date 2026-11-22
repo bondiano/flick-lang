@@ -19,6 +19,8 @@ use super::run::find_project;
 use crate::args::GlobalArguments;
 use crate::command::Outcome;
 use crate::fetch;
+#[cfg(feature = "wasm-plugins")]
+use crate::plugins as plugin_host;
 
 /// Lists the plugins of the project, one a line, the compiler's own first.
 pub fn plugins(global: &GlobalArguments) -> Outcome {
@@ -94,6 +96,71 @@ pub(crate) fn components(project: &Project) -> Vec<(String, PathBuf)> {
             ))
         })
         .collect()
+}
+
+/// Offline plugin health checks for `flick doctor`.
+pub(crate) fn doctor_lines(project: &Project) -> Vec<(Option<bool>, String, String)> {
+    let lock = match fetch::lock_of(&project.root) {
+        Ok(lock) => lock,
+        Err(why) => {
+            return vec![(
+                Some(false),
+                "plugins".to_owned(),
+                format!("cannot read lockfile: {why}"),
+            )];
+        }
+    };
+    let store = store::store_dir();
+    let mut lines = Vec::new();
+    for dependency in &project.config.dependencies {
+        let Ok(library) = project::library_dir(&project.root, dependency, &lock, store.as_deref())
+        else {
+            continue;
+        };
+        let Some(component) = plugin_of(&library) else {
+            continue;
+        };
+        let path = project::normalize(&library.join(&component));
+        let what = format!("plugin {}", dependency.name);
+        let Ok(bytes) = fs::read(&path) else {
+            lines.push((
+                Some(false),
+                what,
+                format!(
+                    "missing component `{}`",
+                    fetch::relative(&project.root, &path)
+                ),
+            ));
+            continue;
+        };
+        let checksum = format!("sha256:{}", fetch::hex(&Sha256::digest(&bytes)));
+        if matches!(dependency.source, Source::Path(_)) {
+            let shown = fetch::relative(&project.root, &path);
+            if let Some(pinned) = lock
+                .plugins
+                .iter()
+                .find(|p| p.name == dependency.name && p.component == shown)
+                && pinned.checksum != checksum
+            {
+                lines.push((
+                    Some(false),
+                    what,
+                    format!("component `{shown}` differs from `flick.lock` (run `flick install`)"),
+                ));
+                continue;
+            }
+        }
+        #[cfg(feature = "wasm-plugins")]
+        if let Err(why) = plugin_host::plugin(&dependency.name, Some(&path)) {
+            lines.push((Some(false), what, format!("failed to load: {why}")));
+            continue;
+        }
+        lines.push((Some(true), what, format!("loaded ({checksum})")));
+    }
+    if lines.is_empty() {
+        lines.push((None, "plugins".to_owned(), "none declared".to_owned()));
+    }
+    lines
 }
 
 /// The listing line of the plugin `dependency` provides, if it provides one.

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use flick_ir::{FileId, Program};
 
-use crate::validate::{Budget, Limits, id, runtime_dependency};
+use crate::validate::{Budget, Limits, id, runtime_dependency, string};
 use crate::{BuildRequest, InputKind, Inputs, Mode, ModuleInput, ModuleRole, VERSION};
 
 mod graph;
@@ -114,6 +114,17 @@ fn side_data(
         runtime_dependency(dependency, limits)?;
         if !runtimes.insert(&dependency.package) {
             return Err("duplicate backend runtime dependency".into());
+        }
+    }
+    if let Some(declared) = &request.declared_dependencies {
+        if declared.len() > limits.files {
+            return Err("declared dependency count exceeds its limit".into());
+        }
+        for name in declared {
+            string(name, limits)?;
+            if name.is_empty() {
+                return Err("empty declared dependency name".into());
+            }
         }
     }
     Ok(())

@@ -17,11 +17,6 @@ use crate::command::Outcome;
 pub struct Built {
     #[cfg(feature = "wasm-backends")]
     pub backend: Option<flick_backend::BackendPin>,
-    #[cfg(feature = "wasm-backends")]
-    pub devtools: bool,
-    pub devtools_url: Option<String>,
-    pub go: bool,
-    pub rt: bool,
     /// How many modules it compiled; `None` when it reused a cached build.
     pub modules: Option<usize>,
     pub out_dir: PathBuf,
@@ -163,11 +158,6 @@ mod tests {
         let built = Built {
             #[cfg(feature = "wasm-backends")]
             backend: None,
-            #[cfg(feature = "wasm-backends")]
-            devtools: true,
-            devtools_url: None,
-            go: false,
-            rt: false,
             modules: Some(3),
             out_dir: PathBuf::from("/x/dist"),
             runners: vec![
@@ -204,11 +194,6 @@ mod tests {
         let built = Built {
             #[cfg(feature = "wasm-backends")]
             backend: None,
-            #[cfg(feature = "wasm-backends")]
-            devtools: true,
-            devtools_url: None,
-            go: false,
-            rt: false,
             modules: Some(1),
             out_dir: PathBuf::new(),
             runners: Vec::new(),

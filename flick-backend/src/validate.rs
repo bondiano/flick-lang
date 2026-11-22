@@ -7,7 +7,9 @@ use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::{self, Write};
 
-use crate::{BuildRequest, BuildResult, Diagnostic, Inputs, Severity, Toolchain, ToolchainStep};
+use crate::{
+    BuildRequest, BuildResult, Diagnostic, Inputs, Launch, Severity, Toolchain, ToolchainStep,
+};
 use ciborium::ser::Error as SerializeError;
 use serde::Serialize;
 
@@ -48,6 +50,9 @@ pub struct Policy<'a> {
     /// adapter lets it set. Whether a tool may run at all is the project's
     /// grant, which the host checks before running any step.
     pub authorize_step: &'a dyn Fn(&ToolchainStep) -> Result<(), String>,
+    /// The host's own check of a launch's runtime arguments and environment
+    /// variables against the runtime adapter's launch policy.
+    pub authorize_launch: &'a dyn Fn(&Launch) -> Result<(), String>,
     pub limits: Limits,
 }
 

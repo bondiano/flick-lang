@@ -56,6 +56,7 @@ fn compile(backend: &dyn Backend, request: &BuildRequest) -> Result<Generated, F
         environment: &[],
         reserved_paths: &[],
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         limits: Limits::default(),
     };
     generate(
@@ -77,6 +78,7 @@ fn mismatched_request_pin_is_rejected_by_the_driver() {
         environment: &[],
         reserved_paths: &[],
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         limits: Limits::default(),
     };
     for available in [true, false] {

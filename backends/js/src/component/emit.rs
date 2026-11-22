@@ -3,7 +3,8 @@
 use super::{data::Data, failure, launch, optimize, selected};
 use crate::codegen::{self, Known, Options, RuntimeLayout};
 use flick_backend::{
-    Artifact, ArtifactKind, BuildRequest, BuildResult, Diagnostic, ModuleRole, Profile,
+    Artifact, ArtifactKind, BuildRequest, BuildResult, Diagnostic, InputRef, ModuleRole, Profile,
+    StepOutput, ToolchainStep,
 };
 use flick_ir::Module;
 use std::collections::HashSet;
@@ -102,15 +103,80 @@ pub(super) fn generate(
             output.code,
         ));
     }
-    let launches = launch::generate(request, data, &options, &mut artifacts)?;
     artifacts.push(package_json(request, data.typescript));
+    let steps = schema_aot_steps(request, data, &options, &artifacts)?;
+    let launches = launch::generate(request, data, &options, &mut artifacts)?;
     Ok(BuildResult {
         artifacts,
-        steps: vec![],
+        steps,
         runtime_dependencies: request.runtime_dependencies.clone(),
         launches,
         diagnostics: vec![],
     })
+}
+
+fn schema_aot_steps(
+    request: &BuildRequest,
+    data: &Data,
+    options: &Options<'_>,
+    artifacts: &[Artifact],
+) -> Result<Vec<ToolchainStep>, Vec<Diagnostic>> {
+    if !data.schema_aot {
+        return Ok(vec![]);
+    }
+    let selected_entries: Vec<_> = request
+        .entries
+        .iter()
+        .filter(|e| selected(request, &e.symbol.module))
+        .collect();
+    if selected_entries.is_empty() {
+        return Ok(vec![]);
+    }
+    let Some(node) = request.toolchains.iter().find(|t| t.id == "node") else {
+        return Err(failure(
+            "`--schema-aot` requires the host tool `node` on PATH",
+        ));
+    };
+    let inputs: Vec<InputRef> = artifacts
+        .iter()
+        .filter(|a| matches!(a.kind, ArtifactKind::Source | ArtifactKind::Metadata))
+        .map(|a| InputRef::Artifact(a.id.clone()))
+        .collect();
+    let script = "import { writeSchemaAot } from \"@flick-lang/effect-ts\";\nawait writeSchemaAot(process.argv[1], process.argv[2]);\n";
+    let mut steps = Vec::new();
+    for entry in selected_entries {
+        let facts = data
+            .facts
+            .get(&entry.symbol.module)
+            .and_then(|f| f.entries.iter().find(|e| e.name == entry.name))
+            .ok_or_else(|| failure("missing entry classification"))?;
+        let module_path = options.path(&facts.module);
+        let aot_file = if entry.name == "main" {
+            "schemas.aot.js".to_owned()
+        } else {
+            format!("schemas.{}.aot.js", entry.name)
+        };
+        steps.push(ToolchainStep {
+            id: format!("schema-aot:{}", entry.name),
+            dependencies: vec![],
+            toolchain: node.clone(),
+            arguments: vec![
+                "--input-type=module".into(),
+                "-e".into(),
+                script.into(),
+                module_path,
+                aot_file.clone(),
+            ],
+            environment: vec![],
+            inputs: inputs.clone(),
+            outputs: vec![StepOutput {
+                id: format!("schema-aot-out:{}", entry.name),
+                path: aot_file,
+                kind: ArtifactKind::Source,
+            }],
+        });
+    }
+    Ok(steps)
 }
 
 pub(super) fn artifact(path: String, kind: ArtifactKind, text: String) -> Artifact {

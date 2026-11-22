@@ -5,6 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::{BackendTags, ResolvedEnvironment, TargetOverride};
 use crate::diagnostics::{Diagnostic, Severity, codes, suggest};
+#[cfg(feature = "native-project")]
+use crate::effects::bindings;
 use crate::project::config::{BackendEnvironment, HostConfig};
 #[cfg(feature = "native-project")]
 use crate::project::config::{TargetOption, TargetValue};
@@ -503,7 +505,7 @@ fn active_backend_tags(
     tags
 }
 
-/// Whether compiled JS RT code may use `@flick-lang/effect-ts`: via
+/// Whether compiled JS RT code may use the Effect adapter package: via
 /// `[target.js.dependencies]` or the backend's declared foreign packages.
 #[cfg(feature = "native-project")]
 fn has_effect_adapter(
@@ -513,11 +515,11 @@ fn has_effect_adapter(
 ) -> bool {
     project.is_none_or(|p| {
         target_dependencies.iter().any(|dependency| {
-            dependency.target == "js" && dependency.name == "@flick-lang/effect-ts"
+            dependency.target == "js" && dependency.name == bindings::ADAPTER_PREFIX
         }) || host
             .foreign(p)
             .declared
             .iter()
-            .any(|dependency| dependency == "@flick-lang/effect-ts")
+            .any(|dependency| dependency == bindings::ADAPTER_PREFIX)
     })
 }

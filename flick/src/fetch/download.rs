@@ -99,6 +99,7 @@ fn clone(url: &str, tag: &str, dir: &Path) -> Result<String, String> {
 }
 
 /// The bytes at `url`: downloaded over HTTP(S), or read when it names a file.
+#[cfg(feature = "wasm-backends")]
 pub fn bytes(url: &str) -> Result<Vec<u8>, String> {
     if !(url.starts_with("http://") || url.starts_with("https://")) {
         return fs::read(url).map_err(|e| format!("cannot read `{url}`: {e}"));

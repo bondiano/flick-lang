@@ -86,7 +86,7 @@ pub fn add_library(options: &AddArguments, global: &GlobalArguments) -> Outcome 
 }
 
 /// Removes the libraries among `names` from `[dependencies]` and the lock;
-/// the names that are not libraries, for pnpm.
+/// the names that are not libraries, for the backend.
 pub fn remove(project: &Project, names: &[String]) -> Result<Vec<String>, Outcome> {
     let path = project.root.join(CONFIG_FILE);
     let Ok(mut text) = fs::read_to_string(&path) else {

@@ -24,7 +24,6 @@ pub(super) fn cached_prepare(
     if !backend.accepts_cached(&artifacts) {
         return None;
     }
-    let runner = out.join("test.js");
     let current = cache::artifacts_current(out, &artifacts);
     let output = BuildPlan {
         purpose: Purpose::Test,
@@ -36,19 +35,15 @@ pub(super) fn cached_prepare(
         out_dir: out.to_path_buf(),
         entries: Vec::new(),
         typescript: false,
-        go: false,
+        stages_by_class: false,
         suites: Vec::new(),
         extras: Extras::default(),
         release: false,
     };
     if current {
-        cache::record(&project.root, out, publication_paths(&output, &artifacts)).ok()?;
+        cache::record(&project.root, out, publication_paths(&artifacts)).ok()?;
         progress.stage("Reusing test build");
-        return Some(if backend.is_component() {
-            Runner::component(out.to_path_buf(), backend)
-        } else {
-            Runner::native(runner)
-        });
+        return Some(Runner::component(out.to_path_buf(), backend));
     }
     progress.stage("Restoring cached test artifacts");
     let mut emitted = Emission {
@@ -57,11 +52,7 @@ pub(super) fn cached_prepare(
     };
     publish_artifacts(&output, &mut emitted, progress, Some(&project.root));
     if emitted.diagnostics.is_empty() {
-        Some(if backend.is_component() {
-            Runner::component(out.to_path_buf(), backend)
-        } else {
-            Runner::native(runner)
-        })
+        Some(Runner::component(out.to_path_buf(), backend))
     } else {
         None
     }

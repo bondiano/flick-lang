@@ -93,6 +93,7 @@ fn diagnostics(text: &str, pair: &str, app: bool) -> Vec<Diagnostic> {
             by_class: true,
             for_tests: false,
             test_paths: &[],
+            handles: None,
         },
         &sources,
         &env,

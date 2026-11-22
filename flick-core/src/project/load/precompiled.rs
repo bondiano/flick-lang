@@ -3,6 +3,7 @@
 //! hands them back; a run takes their interfaces and IR instead of parsing
 //! and checking their sources again.
 
+#[cfg(feature = "native-project")]
 use std::collections::BTreeMap;
 #[cfg(feature = "native-project")]
 use std::collections::HashMap;
@@ -87,6 +88,7 @@ pub(super) struct Precompiled {
     #[cfg(feature = "native-project")]
     packages: BTreeMap<String, (String, PathBuf)>,
     /// The saved modules by name, with their package.
+    #[cfg(feature = "native-project")]
     saved: BTreeMap<String, (String, CachedModule)>,
     /// The saved modules the run used, in the order it took them.
     #[cfg(feature = "native-project")]
@@ -129,8 +131,15 @@ impl Precompiled {
     }
 
     /// The package of the saved module `name`.
+    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
     pub(super) fn package_of(&self, name: &str) -> Option<&str> {
-        self.saved.get(name).map(|(package, _)| package.as_str())
+        #[cfg(feature = "native-project")]
+        return self.saved.get(name).map(|(package, _)| package.as_str());
+        #[cfg(not(feature = "native-project"))]
+        {
+            let _ = name;
+            None
+        }
     }
 
     /// The key of the package of the saved module `name`, which covers

@@ -9,10 +9,10 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use flick_core::build::Artifact;
+use flick_core::build::{Artifact, js_ships as ships};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::ItemKind;
-use flick_core::project::{Compilation, ships};
+use flick_core::project::Compilation;
 use flick_core::syntax::ts_mark::{self, Origin};
 
 use crate::cache::files_under;

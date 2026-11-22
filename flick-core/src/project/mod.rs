@@ -41,7 +41,7 @@ pub use load::{
     stages_by_class,
 };
 #[cfg(feature = "native-project")]
-pub use load::{ModuleStore, SavedModule, ships};
+pub use load::{ModuleStore, SavedModule};
 #[cfg(feature = "native-project")]
 pub use packages::{library_dir, project_name};
 
@@ -112,6 +112,26 @@ pub trait Host {
     fn verify(&self, project: &Project, wanted: &[target::Wanted]) -> Vec<Diagnostic> {
         let _ = (project, wanted);
         Vec::new()
+    }
+    /// Whether `project` checks with effect stages derived by class; defaults
+    /// to `true` when no backend descriptor is loaded.
+    #[cfg(feature = "native-project")]
+    fn stages_by_class(&self, project: &Project) -> bool {
+        let _ = project;
+        true
+    }
+    /// Whether `project`'s selected backend handles the gated service
+    /// `service` at the root of `environment`; `None` when no backend
+    /// descriptor is loaded.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn handles_service(
+        &self,
+        project: &Project,
+        environment: &config::BackendEnvironment,
+        service: &str,
+    ) -> Option<bool> {
+        let _ = (project, environment, service);
+        None
     }
     /// Extra backend descriptors known to the host for `project` (such as a
     /// pinned `[build.backend]` component or cached descriptors), without

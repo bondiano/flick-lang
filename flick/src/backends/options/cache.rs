@@ -167,6 +167,38 @@ pub(super) fn all_known_descriptors(project: Option<&Project>) -> Vec<Descriptor
     by_id.into_values().collect()
 }
 
+/// Offline-only descriptor lookup for `project`'s selected target backend,
+/// honoring an explicit `--target` override when present.
+pub(crate) fn descriptor_for_target(
+    project: &Project,
+    target_override: Option<&str>,
+) -> Option<Descriptor> {
+    let (choice, _) = super::resolve_target(target_override, Some(project)).ok()?;
+    descriptor_for(&choice, Some(project), false, true).0
+}
+
+/// Offline-only descriptor lookup for `project`'s default target backend.
+pub(crate) fn descriptor_for_project(project: &Project) -> Option<Descriptor> {
+    descriptor_for_target(project, None)
+}
+
+/// Reads a cached backend descriptor from `<store>/descriptors/` without
+/// ever loading or instantiating a WebAssembly backend component.
+pub(crate) fn cached_descriptor_for_project(project: &Project) -> Option<Descriptor> {
+    let (choice, _) = super::resolve_target(None, Some(project)).ok()?;
+    match choice {
+        TargetChoice::Pinned { package, .. } => read_descriptor(&package.sha256),
+        TargetChoice::Official { id, .. } => {
+            if let Some(pin) = official::known(id, Some(project))
+                && let Some(cached) = read_descriptor(&pin.sha256)
+            {
+                return Some(cached);
+            }
+            read_cached_descriptor_by_id(id)
+        }
+    }
+}
+
 /// Environment tag metadata for the project's pinned third-party
 /// `[build.backend]`, without scanning the global descriptor store, hitting the
 /// network, or compiling official components (whose tags come strictly from

@@ -42,7 +42,7 @@ impl Loader<'_> {
         let error = |message: String, at: Span| Diagnostic::error(codes::P026, message, at);
         let Some(interface) = self.runner_interface(runner, interfaces) else {
             let message = format!(
-                "runner `{runner}` not found: a built-in one such as `Runner.Node`, or a module of the program or of an installed package"
+                "runner `{runner}` not found: a built-in runner module, or a module of the program or of an installed package"
             );
             self.diagnostics.push(error(message, runner_at));
             return;

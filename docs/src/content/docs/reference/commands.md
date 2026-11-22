@@ -25,10 +25,11 @@ flick literal:literal-hello you --out greetings
   `FLICK-P053`, which lists the qualified names.
 - A contributor cannot take a name of `flick` itself, as `build`. Such a
   declaration is ignored, with the warning `FLICK-P054`. Backends (and not
-  plugins) may implement the core dependency and app-packaging verbs
-  (`install`, `add`, `remove`, `update`, `deps`, `pack`) as `plan` commands;
-  `flick` delegates the target-ecosystem portion of those verbs to the selected
-  backend instead of ignoring them.
+  plugins) may implement the delegated core verbs (`install`, `add`, `remove`,
+  `update`, `deps`, `pack`, `doctor`, `run-client`, `dev-client`) as `plan`
+  commands; `flick` delegates the target-ecosystem portion of those verbs to
+  the selected backend instead of ignoring them and omits them from the
+  contributed command list in `--help`.
 - A name nobody adds is `FLICK-P052`. When an official backend or a
   contributor the store has seen adds it, the message names that one.
 
@@ -92,8 +93,8 @@ A descriptor declares:
   project is refused before the command runs.
 - `inputs`: the files the host reads for the command, relative to the
   project's root, and passes in `invocation.inputs`. A directory stands for
-  the regular files under it, outside `node_modules` and hidden
-  directories. A path that does not exist gives nothing.
+  the regular files under it, outside the backend's package directories and
+  hidden directories. A path that does not exist gives nothing.
 - `reads`: what the plan's tool steps may read in place.
 - `writes`: the paths the command may write.
 - `style`: `plan` or `session`.

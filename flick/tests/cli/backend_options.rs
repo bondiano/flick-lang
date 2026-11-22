@@ -2,6 +2,9 @@
 //! `FLICK-P057` / `FLICK-P058` / `FLICK-P059`, option cache invalidation, and
 //! `inspect --emit output` / `inspect --emit iface`.
 
+#[path = "backend_options/inspect_and_cache.rs"]
+mod inspect_and_cache;
+
 use std::fs;
 use std::process::Output;
 
@@ -473,64 +476,4 @@ fn cli_flag_overrides_toml_and_option_changes_invalidate_cache() {
     assert!(dts_build.status.success(), "{dts_build:?}");
     assert!(dir.join("dist/App/Main.d.ts").is_file());
     assert_eq!(count_cache(), 3);
-}
-
-#[test]
-fn inspect_output_supports_js_typescript_and_go_and_iface_loads_no_backend() {
-    let dir = project(
-        "backend_opts_inspect",
-        &[
-            (
-                "flick.toml",
-                "schema-version = 1\n[project]\nkind = \"lib\"\n",
-            ),
-            ("src/Lib/Math.fl", LIB),
-        ],
-    );
-
-    let js = flick_in(&dir, &["inspect", "Lib.Math", "--emit", "output"]);
-    assert!(js.status.success(), "{js:?}");
-    let js_out = stdout(&js);
-    assert!(js_out.contains("export const inc"), "{js_out}");
-
-    let ts = flick_in(
-        &dir,
-        &["inspect", "Lib.Math", "--emit", "output", "--typescript"],
-    );
-    assert!(ts.status.success(), "{ts:?}");
-    let ts_out = stdout(&ts);
-    assert!(
-        ts_out.contains("export const inc") && ts_out.contains("number"),
-        "{ts_out}"
-    );
-
-    // Go `inspect --emit output` works even on a library without `[tools]` or `go`!
-    let go = flick_in(
-        &dir,
-        &["inspect", "Lib.Math", "--emit", "output", "--target", "go"],
-    );
-    assert!(go.status.success(), "{go:?}");
-    let go_out = stdout(&go);
-    assert!(
-        go_out.contains("package main") && go_out.contains("func "),
-        "{go_out}"
-    );
-
-    // `inspect --emit iface` never loads any backend — even if `[build.backend]` points to a missing file.
-    let broken_backend = project(
-        "backend_opts_inspect_iface_no_backend",
-        &[
-            (
-                "flick.toml",
-                &format!(
-                    "schema-version = 1\n[project]\nkind = \"lib\"\n\n[build.backend]\nid = \"example/missing\"\nversion = \"1.0.0\"\nsha256 = \"{}\"\ncomponent = \"missing.wasm\"\n",
-                    "a".repeat(64)
-                ),
-            ),
-            ("src/Lib/Math.fl", LIB),
-        ],
-    );
-    let iface = flick_in(&broken_backend, &["inspect", "Lib.Math", "--emit", "iface"]);
-    assert!(iface.status.success(), "{iface:?}");
-    assert!(stdout(&iface).contains("Lib.Math"));
 }

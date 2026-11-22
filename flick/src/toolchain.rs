@@ -6,9 +6,6 @@ use std::{env, fs};
 pub const COMPILER: &str = env!("CARGO_PKG_VERSION");
 #[cfg(feature = "wasm-backends")]
 pub const RUNTIME: &str = "0.1.0";
-#[cfg(all(test, feature = "wasm-backends"))]
-pub const ADAPTER: &str = "@flick-lang/effect-ts";
-pub const NODE: &str = "24.18.0";
 
 /// This compiler as caches tell binaries apart: its version, and the size
 /// and modification time of its executable, which a rebuild without a new

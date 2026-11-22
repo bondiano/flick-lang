@@ -8,11 +8,12 @@ use std::path::Path;
 use std::process::Command;
 
 use flick_backend::{
-    ArtifactKind, BackendPin, BuildResult, LaunchKind, Limits, RuntimeDependency, Toolchain,
+    ArtifactKind, BackendPin, BuildResult, LaunchKind, Limits, OptionValue, RuntimeDependency,
+    Toolchain,
 };
 use serde::{Deserialize, Serialize};
 
-use super::tools::Tool;
+use super::tools::{self, Tool};
 use crate::artifact::Artifact;
 
 pub(super) const FILE: &str = ".flick-backend.cbor";
@@ -31,7 +32,11 @@ struct Launch {
     kind: LaunchKind,
     path: String,
     runtime: Option<Toolchain>,
+    #[serde(default)]
+    runtime_arguments: Vec<String>,
     arguments: Vec<String>,
+    #[serde(default)]
+    environment: Vec<OptionValue>,
 }
 
 pub(super) fn artifact(pin: &BackendPin, result: &BuildResult) -> Result<Artifact, String> {
@@ -51,7 +56,9 @@ pub(super) fn artifact(pin: &BackendPin, result: &BuildResult) -> Result<Artifac
                 kind: launch.kind,
                 path,
                 runtime: launch.runtime.clone(),
+                runtime_arguments: launch.runtime_arguments.clone(),
                 arguments: launch.arguments.clone(),
+                environment: launch.environment.clone(),
             })
         })
         .collect::<Result<Vec<_>, String>>()?;
@@ -93,6 +100,11 @@ pub(super) fn validate(
             .iter()
             .find(|a| a.path == launch.path)
             .ok_or("launch artifact is missing")?;
+        tools::authorize_launch_parts(
+            launch.runtime.as_ref(),
+            &launch.runtime_arguments,
+            &launch.environment,
+        )?;
         if let Some(runtime) = launch.runtime {
             if !tools.contains(&runtime) {
                 return Err("cached launch toolchain differs from the selected toolchain".into());
@@ -155,10 +167,6 @@ fn load_manifest(root: &Path, pin: &BackendPin) -> Result<Manifest, String> {
     Ok(manifest)
 }
 
-pub(super) fn verify_runtime(root: &Path, pin: &BackendPin) -> Result<(), String> {
-    verify_runtime_manifest(root, &load_manifest(root, pin)?)
-}
-
 fn verify_runtime_manifest(root: &Path, manifest: &Manifest) -> Result<(), String> {
     if !manifest.runtime_dependencies.is_empty() {
         let directories: BTreeSet<_> = manifest
@@ -198,16 +206,6 @@ pub(crate) fn command(
     kind: LaunchKind,
     name: &str,
 ) -> Result<Command, String> {
-    command_with_import(root, pin, kind, name, None)
-}
-
-pub(crate) fn command_with_import(
-    root: &Path,
-    pin: &BackendPin,
-    kind: LaunchKind,
-    name: &str,
-    import: Option<&str>,
-) -> Result<Command, String> {
     let manifest = load_manifest(root, pin)?;
     verify_runtime_manifest(root, &manifest)?;
     let launch = manifest
@@ -215,31 +213,51 @@ pub(crate) fn command_with_import(
         .iter()
         .find(|l| l.kind == kind && l.name == name)
         .ok_or_else(|| format!("backend supplied no {kind:?} launch named `{name}`"))?;
+    tools::authorize_launch_parts(
+        launch.runtime.as_ref(),
+        &launch.runtime_arguments,
+        &launch.environment,
+    )?;
     let artifact = root.join(&launch.path);
     let mut command = if let Some(runtime) = &launch.runtime {
-        if runtime.id != "node" {
-            return Err(format!("no host runtime adapter for `{}`", runtime.id));
-        }
-        let mut command = Tool::find("node", Some(runtime))?.command();
-        command.arg("--enable-source-maps");
-        if let Some(import) = import {
-            command.args(["--import", import]);
-        }
+        let mut command = Tool::find(&runtime.id, Some(runtime))?.command();
+        command.args(&launch.runtime_arguments);
         command.arg(artifact);
         command
     } else {
         Command::new(artifact)
     };
     command.args(&launch.arguments);
+    command.envs(launch.environment.iter().map(|v| (&v.key, &v.value)));
     Ok(command)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{FILE, artifact, command};
-    use crate::backends::{dependencies, packages, runtimes};
-    use flick_backend::{BackendId, BackendPin, BuildResult, Launch, LaunchKind, sha256};
+    use crate::backends::{packages, runtimes};
+    use flick_backend::{
+        BackendId, BackendPin, BuildResult, Launch, LaunchKind, OptionValue, sha256,
+    };
+    use std::path::Path;
     use std::{env, fs, process};
+
+    fn installed_rt(root: &Path) -> Vec<flick_backend::RuntimeDependency> {
+        let backend = packages::tests::js();
+        let options = [
+            OptionValue {
+                key: "option.runtime".into(),
+                value: "rt".into(),
+            },
+            OptionValue {
+                key: "root".into(),
+                value: packages::canonical_slashed(root),
+            },
+        ];
+        packages::report(&*backend, root, &[], &options)
+            .expect("runtime pin")
+            .runtime
+    }
 
     #[test]
     fn a_launch_rechecks_the_content_pin_of_its_runtime_dependencies() {
@@ -253,7 +271,7 @@ mod tests {
         )
         .expect("manifest");
         fs::write(kernel.join("dist/index.js"), "first").expect("original runtime");
-        let runtimes = dependencies::installed(&root).expect("runtime pin");
+        let runtimes = installed_rt(&root);
         let pin = BackendPin {
             identity: BackendId {
                 id: "test/executable".into(),
@@ -276,7 +294,9 @@ mod tests {
                 kind: LaunchKind::Run,
                 artifact: "main".into(),
                 runtime: None,
+                runtime_arguments: vec![],
                 arguments: vec![],
+                environment: vec![],
             }],
             diagnostics: vec![],
         };
@@ -324,7 +344,9 @@ mod tests {
                 kind: LaunchKind::Run,
                 artifact: "exe:main".into(),
                 runtime: None,
+                runtime_arguments: vec![],
                 arguments: vec![],
+                environment: vec![],
             }],
             diagnostics: vec![],
         };
@@ -364,13 +386,15 @@ mod tests {
                 bytes: vec![],
             }],
             steps: vec![],
-            runtime_dependencies: dependencies::installed(&root).expect("runtime pin"),
+            runtime_dependencies: installed_rt(&root),
             launches: vec![Launch {
                 name: "main".into(),
                 kind: LaunchKind::Run,
                 artifact: "entry".into(),
                 runtime: None,
+                runtime_arguments: vec![],
                 arguments: vec![],
+                environment: vec![],
             }],
             diagnostics: vec![],
         };

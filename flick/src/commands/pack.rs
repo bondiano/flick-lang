@@ -34,8 +34,20 @@ use crate::cache::files_under;
 use crate::command::{Command, Outcome};
 use crate::report;
 use flick_core::project::Project;
-use flick_core::project::config::Kind;
+use flick_core::project::config::{Kind, TargetValue};
 use flick_core::types;
+
+fn target_flag(project: &Project, target: &str, name: &str) -> bool {
+    matches!(
+        project
+            .config
+            .targets
+            .get(target)
+            .and_then(|t| t.get(name))
+            .map(|o| &o.value),
+        Some(TargetValue::Bool(true))
+    )
+}
 
 fn failure(code: Code, message: String) -> Outcome {
     Outcome {
@@ -68,13 +80,13 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
     }
     let stage = root.join(cache::DIR).join("pack");
     let _ = fs::remove_dir_all(&stage);
-    let dts = project.config.js_flag("declarations");
+    let dts = target_flag(&project, "js", "declarations");
     let mut backend_options = BTreeMap::new();
     backend_options.insert("typescript".into(), vec!["false".into()]);
     if dts {
         backend_options.insert("declarations".into(), vec!["true".into()]);
     }
-    if project.config.js_flag("promise-facade") {
+    if target_flag(&project, "js", "promise-facade") {
         backend_options.insert("promise-facade".into(), vec!["true".into()]);
     }
     let build = BuildCommand {

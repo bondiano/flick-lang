@@ -39,8 +39,6 @@ pub use entry::{MainKind, host_services, main_kind};
 pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};
-#[cfg(feature = "native-project")]
-pub use output::ships;
 pub use output::{Compilation, Compiled};
 pub use precompiled::{CachedModule, Fresh, PackageCache};
 pub use target::stages_by_class;
@@ -286,7 +284,7 @@ fn run_in(
     target_override: Option<&TargetOverride>,
 ) -> Output {
     let rt = target_override.and_then(|o| o.rt);
-    let stages_by_class = stages_by_class(project, rt);
+    let stages_by_class = stages_by_class(host, project, rt);
     let mut diagnostics = Vec::new();
     #[cfg(feature = "native-project")]
     let packages = project.map_or_else(Packages::default, |p| {
@@ -485,6 +483,7 @@ fn run_in(
     #[cfg(not(target_arch = "wasm32"))]
     if let Some(resolved) = compilation.environment.as_ref() {
         target::check_environment(
+            host,
             &compilation,
             project,
             target_override,

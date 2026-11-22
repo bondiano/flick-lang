@@ -13,10 +13,22 @@ fn target_tables_and_build_target_parse_open_names() {
     .expect("valid");
     assert_eq!(config.build.target.as_deref(), Some("js"));
     assert_eq!(config.default_target(), "js");
-    assert!(!config.js_is_rt());
-    assert!(config.js_flag("typescript"));
-    assert!(config.js_flag("declarations"));
-    assert!(config.js_flag("promise-facade"));
+    assert_eq!(
+        config.targets["js"]["runtime"].value,
+        TargetValue::String("effect".into())
+    );
+    assert_eq!(
+        config.targets["js"]["typescript"].value,
+        TargetValue::Bool(true)
+    );
+    assert_eq!(
+        config.targets["js"]["declarations"].value,
+        TargetValue::Bool(true)
+    );
+    assert_eq!(
+        config.targets["js"]["promise-facade"].value,
+        TargetValue::Bool(true)
+    );
     assert_eq!(config.targets["go"]["cgo"].value, TargetValue::Bool(true));
     assert!(matches!(
         &config.targets["custom_1"]["tags"].value,

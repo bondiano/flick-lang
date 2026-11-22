@@ -42,6 +42,7 @@ pub fn describe(
     mut sources: SourceMap,
     project: Option<&Project>,
     selected: &[PathBuf],
+    target_override: Option<&str>,
 ) -> Outcome {
     let mut diagnostics = Vec::new();
     let mut roots = project.map_or_else(Vec::new, |p| vec![p.source_root(), p.test_root()]);
@@ -79,7 +80,10 @@ pub fn describe(
             diagnostics,
         };
     }
-    let mut files = project.map_or_else(|| selected.to_vec(), |p| cache::input_files(p, selected));
+    let mut files = project.map_or_else(
+        || selected.to_vec(),
+        |p| cache::input_files_for_target(p, selected, target_override),
+    );
     for root in roots.iter().skip(project_root_count) {
         let mut found = Vec::new();
         sources::source_files(&root.to_string_lossy(), &mut found);

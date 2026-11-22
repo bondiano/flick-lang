@@ -1,18 +1,15 @@
-//! File validation, publication and host tool steps of the shared driver.
+//! File validation and publication of the shared build driver.
 
 use std::path::Path;
 use std::{fs, io};
 
-use flick_backend::ArtifactKind;
-use flick_core::build;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 
-use super::schemas::compile_schemas;
 use super::{BuildPlan, Emission, unwritten};
 use crate::artifact::{self, Artifact};
 use crate::cache;
 use crate::progress::Progress;
-use crate::publish::{self, Beside};
+use crate::publish;
 
 /// Fresh and restored build/test outputs share stale ownership preflight and
 /// reconciliation. Run generations pass no root because their lease owns them.
@@ -49,7 +46,7 @@ fn publish(
 ) -> Result<(), Box<Diagnostic>> {
     let failed = |why: String| Box::new(Diagnostic::new(codes::P013, Severity::Error, why));
     let out_dir = output.out_dir.as_path();
-    let paths = paths(output, artifacts);
+    let paths = paths(artifacts);
     artifact::validate(artifacts)
         .and_then(|()| {
             artifact::validate_destination_paths(out_dir, paths.iter().map(String::as_str))
@@ -65,60 +62,9 @@ fn publish(
         }
         None => None,
     };
-    let made = host_outputs(output, artifacts, progress)?;
     progress.stage("Writing artifacts");
-    publish::commit(out_dir, artifacts.iter().chain(&made), &removes, manifest)
+    publish::commit(out_dir, artifacts, &removes, manifest)
         .map_err(|e| failed(format!("cannot publish to `{}`: {e}", out_dir.display())))
-}
-
-/// The files host tools make from a build's own: the compiled schema
-/// decoders. The tools run on a copy of the build beside the output, so
-/// their results are published with it or not at all.
-fn host_outputs(
-    output: &BuildPlan,
-    artifacts: &[Artifact],
-    progress: &Progress,
-) -> Result<Vec<Artifact>, Box<Diagnostic>> {
-    let failed = |why: String| Box::new(Diagnostic::new(codes::P013, Severity::Error, why));
-    if !output.extras.schema_aot {
-        return Ok(Vec::new());
-    }
-    let copy = Beside::new(&output.out_dir).map_err(|e| failed(e.to_string()))?;
-    let dir = copy.path();
-    for artifact in artifacts {
-        let path = dir.join(&artifact.path);
-        write(&path, &artifact.contents)
-            .and_then(|()| artifact.restore_permissions(&path))
-            .map_err(|e| failed(format!("cannot write `{}`: {e}", path.display())))?;
-    }
-    let mut made = Vec::new();
-    let read = |path: String, kind| {
-        fs::read(dir.join(&path))
-            .map(|contents| Artifact {
-                path,
-                contents,
-                kind,
-            })
-            .map_err(|e| failed(e.to_string()))
-    };
-    let aot = if output.extras.schema_aot {
-        output.entries.as_slice()
-    } else {
-        &[]
-    };
-    for (name, entry) in aot {
-        let ext = if output.typescript { "ts" } else { "js" };
-        let module = dir.join(format!("{}.{ext}", entry.replace('.', "/")));
-        let file = build::schema_aot_file(name);
-        progress.stage("Compiling schema decoders");
-        compile_schemas(dir, &module, &file, &output.backend).map_err(|why| {
-            failed(format!(
-                "cannot write the compiled decoders `{file}`: {why}"
-            ))
-        })?;
-        made.push(read(file, ArtifactKind::Source)?);
-    }
-    Ok(made)
 }
 
 pub fn write(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {
@@ -128,16 +74,7 @@ pub fn write(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {
     fs::write(path, contents)
 }
 
-/// The complete owned output set, including host tool results.
-pub(in crate::commands) fn paths(output: &BuildPlan, files: &[Artifact]) -> Vec<String> {
-    let mut paths: Vec<_> = files.iter().map(|file| file.path.clone()).collect();
-    if output.extras.schema_aot {
-        paths.extend(
-            output
-                .entries
-                .iter()
-                .map(|(name, _)| build::schema_aot_file(name)),
-        );
-    }
-    paths
+/// The complete owned output set.
+pub(in crate::commands) fn paths(files: &[Artifact]) -> Vec<String> {
+    files.iter().map(|file| file.path.clone()).collect()
 }

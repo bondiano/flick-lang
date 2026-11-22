@@ -66,7 +66,7 @@ fn prepare_project_doc(
         &prepared.choice,
         prepared.target_overridden,
         &prepared.options,
-        prepared.rt,
+        prepared.stages_by_class,
         false,
         Vec::new(),
     );

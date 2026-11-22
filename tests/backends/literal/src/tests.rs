@@ -176,7 +176,9 @@ pub(super) fn runner(
         kind: LaunchKind::Test,
         artifact: "test-launch".into(),
         runtime: Some(node.clone()),
+        runtime_arguments: vec!["--enable-source-maps".into()],
         arguments: vec![],
+        environment: vec![],
     });
     vec![runtime.clone()]
 }
