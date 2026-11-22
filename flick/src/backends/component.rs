@@ -488,6 +488,17 @@ impl Contributor for Package {
     fn close(&self, state: Vec<u8>) -> command::Plan {
         Backend::close(&self.backend, state)
     }
+
+    fn templates(&self) -> Result<Vec<command::TemplateDescriptor>, String> {
+        self.backend.try_templates()
+    }
+
+    fn scaffold(
+        &self,
+        request: &command::TemplateRequest,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        Backend::scaffold(&self.backend, request)
+    }
 }
 
 fn reserved_outputs(

@@ -16,16 +16,20 @@ impl BuildCommand {
         })
     }
 
-    /// The built-in modules checked, or the outcome of why they cannot be;
-    /// the phase shows once a process, as they are read once. `--inputs`
-    /// only names files and needs none.
-    pub(super) fn prepare(&self, progress: &Progress) -> Result<(), Outcome> {
+    /// The built-in modules checked for `stages_by_class`, or the outcome of
+    /// why they cannot be; the phase shows once a process, as they are read
+    /// once. `--inputs` only names files and needs none.
+    pub(super) fn prepare(
+        &self,
+        progress: &Progress,
+        stages_by_class: bool,
+    ) -> Result<(), Outcome> {
         static SHOWN: Once = Once::new();
         if self.options.inputs {
             return Ok(());
         }
         SHOWN.call_once(|| progress.stage("Preparing compiler"));
-        builtins::prepare().map_err(|diagnostic| Outcome {
+        builtins::prepare_in(stages_by_class).map_err(|diagnostic| Outcome {
             sources: SourceMap::default(),
             diagnostics: vec![diagnostic],
         })

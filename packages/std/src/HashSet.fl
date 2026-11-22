@@ -18,13 +18,15 @@ foreign pure empty from "flick:rt" "hashSetEmpty"
 from_list : EqHash.EqHash w a -> List a -> HashSet w a
 foreign pure from_list from "flick:rt" "hashSetFromList"
 
-/// The set of the elements of a sequence, such as a `for`.
+/// The set of the elements of a sequence, such as a `for`, consumed once in
+/// order without a temporary list.
 from_seq : EqHash.EqHash w a -> (Seq a)^d -> HashSet w a
-let from_seq witness elements = from_list witness (Seq.to_list elements)
+foreign pure from_seq from "flick:rt" "hashSetFromSeq"
+  retention call
 
-/// The elements as a sequence, in no particular order.
+/// The elements as a lazy, restartable sequence in traversal order: a source of `for`.
 to_seq : HashSet w a -> Seq a
-let to_seq set = Seq.of_list (to_list set)
+foreign pure to_seq from "flick:rt" "hashSetToSeq"
 
 /// The set with the element.
 insert : a -> HashSet w a -> HashSet w a

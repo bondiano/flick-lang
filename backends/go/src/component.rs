@@ -5,11 +5,12 @@ mod emit;
 #[cfg(feature = "guest")]
 mod guest;
 mod optimize;
+mod templates;
 
 use flick_backend::{
     Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment, Inputs,
     Mode, NamedRange, OptionDescriptor, Parameter, Profile, Severity, TargetSupport, ValueKind,
-    Verb, VersionRange,
+    Verb, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -27,6 +28,17 @@ pub(super) fn failure(code: &str, message: impl Into<String>) -> Vec<Diagnostic>
 }
 
 impl Backend for Go {
+    fn templates(&self) -> Vec<command::TemplateDescriptor> {
+        templates::descriptors()
+    }
+
+    fn scaffold(
+        &self,
+        request: &command::TemplateRequest,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        templates::scaffold(request)
+    }
+
     fn describe(&self) -> Descriptor {
         let range = |minimum: &str, maximum: &str| VersionRange {
             minimum: minimum.into(),

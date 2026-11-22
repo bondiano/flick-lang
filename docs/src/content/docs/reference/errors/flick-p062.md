@@ -1,0 +1,15 @@
+---
+title: "FLICK-P062"
+---
+
+A fenced Flick example checked by `flick doc --check-examples` did not satisfy
+its documentation contract: either it imported a package root that is not declared
+in `flick.toml`, or a `fail` block compiled without reporting its expected error
+or diagnostic code.
+
+Add the missing dependency to `[dependencies]` in `flick.toml`, update the example
+imports, or adjust the `fail` fence so it matches the error the example produces.
+
+```sh
+flick doc --out-dir api --check-examples
+```

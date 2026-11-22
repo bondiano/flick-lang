@@ -9,12 +9,15 @@ impl Checker<'_> {
         &self,
         interface: &Interface,
     ) -> Result<Vec<SupportType>, String> {
-        let public: BTreeSet<_> = interface
-            .exports
-            .iter()
-            .filter(|e| e.definition.is_some())
-            .map(|e| e.entity.clone())
-            .collect();
+        // `extend`, not `collect`: collecting compiles a sort of `Entity` into the wasm compiler.
+        let mut public = BTreeSet::new();
+        public.extend(
+            interface
+                .exports
+                .iter()
+                .filter(|e| e.definition.is_some())
+                .map(|e| e.entity.clone()),
+        );
         let mut roots = interface.clone();
         roots.support_types.clear();
         let mut queue = support::dependencies(&roots);

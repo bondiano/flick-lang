@@ -63,9 +63,6 @@ pub enum Commands {
     Plugins,
     /// Compare the public API with a git revision and name the version bump.
     Diff(DiffArguments),
-    /// Static schemas of codecs.
-    #[command(subcommand)]
-    Schema(SchemaCommands),
     /// Write documentation of the public API.
     Doc(DocArguments),
     /// Explain a diagnostic code.

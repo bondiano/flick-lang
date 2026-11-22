@@ -1,32 +1,71 @@
 //! Public API Markdown and package-context documentation examples.
-use flick_core::diagnostics::{Severity, codes};
-use flick_core::project::{self, Compilation, Project};
-use flick_core::source::{SourceMap, Span};
-use flick_core::types::{builtin_sources, builtins, implicit_package_of};
-use flick_core::{doc, syntax};
+use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::Path;
+use std::sync::Arc;
 
-use super::example_host::ExampleHost;
-use super::{Checked, compile, failure, write};
+use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::doc::{self, DocComment};
+use flick_core::iface::Interface;
+use flick_core::plugin::expansion::Expansion;
+use flick_core::project::{self, Compilation, Project};
+use flick_core::source::{FileId, SourceMap, Span};
+use flick_core::types::{builtin_sources, builtins, implicit_package_of};
+
+use super::doc_run::{DocOrigin, check_doc_examples};
+use super::{Checked, compile, compile_with_extra, failure, write};
 use crate::args::DocArguments;
 use crate::builtins as builtin_cache;
 use crate::command::Outcome;
+use crate::commands::check::select;
+use crate::commands::run_flick::{self, PreparedTarget};
 use crate::sources::FsHost;
 
 pub fn doc(options: &DocArguments, explicit: Option<&str>) -> Outcome {
     if options.std {
         return doc_std(options);
     }
-    let checked = match compile(explicit) {
-        Ok(c) => c,
+    let (mut checked, prepared) = match prepare_project_doc(options, explicit) {
+        Ok(pair) => pair,
         Err(outcome) => return outcome,
     };
-    if options.check_examples
-        && let Some(message) = check_project_examples(&checked)
-    {
-        return failure(checked.sources, codes::P013, message);
+
+    if let Some(prepared) = prepared.as_ref() {
+        let diagnostics = check_project_examples(&mut checked, prepared);
+        if diagnostics.iter().any(|d| d.severity == Severity::Error) {
+            return Outcome {
+                sources: checked.sources,
+                diagnostics,
+            };
+        }
     }
+
+    write_project_docs(checked, options)
+}
+
+fn prepare_project_doc(
+    options: &DocArguments,
+    explicit: Option<&str>,
+) -> Result<(Checked, Option<PreparedTarget>), Outcome> {
+    if !options.check_examples {
+        return Ok((compile(explicit)?, None));
+    }
+    let host = FsHost::new();
+    let mut sources = SourceMap::default();
+    let (project, _) = select(&host, &mut sources, explicit, &[]).map_err(|d| Outcome {
+        sources,
+        diagnostics: vec![d],
+    })?;
+    let prepared = run_flick::prepare_target(&host, project.as_ref(), options.target.as_deref())
+        .map_err(|(err_sources, diagnostics)| Outcome {
+            sources: err_sources,
+            diagnostics,
+        })?;
+    let checked = compile_with_extra(explicit, &[], Some(prepared.rt))?;
+    Ok((checked, Some(prepared)))
+}
+
+fn write_project_docs(checked: Checked, options: &DocArguments) -> Outcome {
     let out = checked.host.cwd.join(&options.output.out_dir);
     let mut index = String::from("# API\n\n");
     for module in checked
@@ -103,82 +142,223 @@ pub fn doc(options: &DocArguments, explicit: Option<&str>) -> Outcome {
     Outcome::default()
 }
 
-fn check_project_examples(checked: &Checked) -> Option<String> {
+fn builtin_source_file(
+    sources: &mut SourceMap,
+    cache: &mut BTreeMap<String, FileId>,
+    module_name: &str,
+    text: &str,
+) -> FileId {
+    if let Some(&id) = cache.get(module_name) {
+        return id;
+    }
+    let rel = project::module_path(module_name)
+        .to_string_lossy()
+        .replace('\\', "/");
+    let package = implicit_package_of(module_name).unwrap_or("core");
+    let display = format!("packages/{package}/src/{rel}");
+    let id = sources.add(display, text);
+    cache.insert(module_name.to_owned(), id);
+    id
+}
+
+fn collect_project_origins(checked: &mut Checked) -> Vec<DocOrigin> {
+    let mut origins: Vec<DocOrigin> = Vec::new();
+    let mut builtin_files: BTreeMap<String, FileId> = BTreeMap::new();
+    let builtins = builtin_sources();
+    let mut module_comments_cache: BTreeMap<usize, BTreeMap<String, DocComment>> = BTreeMap::new();
+
     for module in &checked.compilation.modules {
         if module.test || module.interface.private {
             continue;
         }
-        let source = checked.sources.get(module.file);
-        let text = module
-            .expansion
-            .as_ref()
-            .map_or(source.text.as_str(), |e| e.text.as_str());
-        if let Some(comment) = doc::module_comment(text)
-            && let Some(message) = check_doc_examples(checked, &comment)
-        {
-            return Some(format!(
-                "documentation example of `{}`: {message}",
-                module.name
-            ));
+        let text = module.expansion.as_ref().map_or_else(
+            || checked.sources.get(module.file).text.as_str(),
+            |e| e.text.as_str(),
+        );
+        if let Some(comment) = doc::located_module_comment(text) {
+            origins.push(DocOrigin {
+                owner: module.name.clone(),
+                file: module.file,
+                expansion: module.expansion.as_ref().map(Arc::clone),
+                comment,
+            });
         }
-        for export in module
+        let exports: Vec<(String, String)> = module
             .interface
             .exports
             .iter()
             .filter(|e| e.parent.is_none())
-        {
-            let Some(origin) = checked
+            .map(|e| (e.entity.module.clone(), e.entity.name.clone()))
+            .collect();
+        let owner_module = module.name.clone();
+        for (entity_module, entity_name) in exports {
+            if let Some(origin_idx) = checked
                 .compilation
                 .modules
                 .iter()
-                .find(|m| m.name == export.entity.module)
-            else {
-                if let Some((_, text)) = builtin_sources()
-                    .iter()
-                    .find(|(name, _)| *name == export.entity.module)
-                    && let Some(comment) = doc::comments(text).get(&export.entity.name)
-                    && let Some(message) = check_doc_examples(checked, comment)
-                {
-                    return Some(format!(
-                        "documentation example of `{}.{}`: {message}",
-                        module.name, export.entity.name
-                    ));
-                }
-                continue;
-            };
-            let source = checked.sources.get(origin.file);
-            let text = origin
-                .expansion
-                .as_ref()
-                .map_or(source.text.as_str(), |e| e.text.as_str());
-            if let Some(comment) = doc::comments(text).get(&export.entity.name)
-                && let Some(message) = check_doc_examples(checked, comment)
+                .position(|m| m.name == entity_module)
             {
-                return Some(format!(
-                    "documentation example of `{}.{}`: {message}",
-                    module.name, export.entity.name
-                ));
+                let origin_file = checked.compilation.modules[origin_idx].file;
+                let origin_expansion = checked.compilation.modules[origin_idx]
+                    .expansion
+                    .as_ref()
+                    .map(Arc::clone);
+                let comments = module_comments_cache.entry(origin_idx).or_insert_with(|| {
+                    let origin_mod = &checked.compilation.modules[origin_idx];
+                    let text = origin_mod.expansion.as_ref().map_or_else(
+                        || checked.sources.get(origin_mod.file).text.as_str(),
+                        |e| e.text.as_str(),
+                    );
+                    doc::located_comments(text).into_iter().collect()
+                });
+                if let Some(comment) = comments.get(&entity_name).cloned() {
+                    origins.push(DocOrigin {
+                        owner: format!("{owner_module}.{entity_name}"),
+                        file: origin_file,
+                        expansion: origin_expansion,
+                        comment,
+                    });
+                }
+            } else if let Some((_, text)) = builtins.iter().find(|(name, _)| *name == entity_module)
+                && let Some(comment) = doc::located_comments(text).remove(&entity_name)
+            {
+                let file = builtin_source_file(
+                    &mut checked.sources,
+                    &mut builtin_files,
+                    &entity_module,
+                    text,
+                );
+                origins.push(DocOrigin {
+                    owner: format!("{owner_module}.{entity_name}"),
+                    file,
+                    expansion: None::<Arc<Expansion>>,
+                    comment,
+                });
+            }
+        }
+    }
+    origins
+}
+
+fn check_project_examples(checked: &mut Checked, prepared: &PreparedTarget) -> Vec<Diagnostic> {
+    let origins = collect_project_origins(checked);
+    for origin in &origins {
+        let diagnostics = check_doc_examples(checked, prepared, origin);
+        if diagnostics.iter().any(|d| d.severity == Severity::Error) {
+            return diagnostics;
+        }
+    }
+    Vec::new()
+}
+
+fn doc_std(options: &DocArguments) -> Outcome {
+    let host = FsHost::new();
+    let prepared = if options.check_examples {
+        match run_flick::prepare_target(&host, None, options.target.as_deref()) {
+            Ok(prepared) => Some(prepared),
+            Err((sources, diagnostics)) => {
+                return Outcome {
+                    sources,
+                    diagnostics,
+                };
+            }
+        }
+    } else {
+        if let Err(diagnostic) = builtin_cache::prepare() {
+            return Outcome {
+                diagnostics: vec![diagnostic],
+                ..Outcome::default()
+            };
+        }
+        None
+    };
+
+    let sources = builtin_sources();
+    let interfaces = builtins();
+    if let Some(prepared) = prepared.as_ref()
+        && let Some(outcome) = check_std_examples(host, prepared, interfaces, sources)
+    {
+        return outcome;
+    }
+
+    write_std_docs(options, interfaces, sources)
+}
+
+fn check_std_examples(
+    host: FsHost,
+    prepared: &PreparedTarget,
+    interfaces: &[Interface],
+    sources: &[(&str, &str)],
+) -> Option<Outcome> {
+    let mut example_context = Checked {
+        host,
+        sources: SourceMap::default(),
+        project: None::<Project>,
+        compilation: Compilation::default(),
+    };
+    let mut builtin_files: BTreeMap<String, FileId> = BTreeMap::new();
+    for interface in interfaces.iter().filter(|i| !i.private) {
+        let text = sources
+            .iter()
+            .find(|(name, _)| *name == interface.module)
+            .map_or("", |(_, text)| *text);
+        if let Some(comment) = doc::located_module_comment(text) {
+            let file = builtin_source_file(
+                &mut example_context.sources,
+                &mut builtin_files,
+                &interface.module,
+                text,
+            );
+            let origin = DocOrigin {
+                owner: interface.module.clone(),
+                file,
+                expansion: None,
+                comment,
+            };
+            let diagnostics = check_doc_examples(&mut example_context, prepared, &origin);
+            if diagnostics.iter().any(|d| d.severity == Severity::Error) {
+                return Some(Outcome {
+                    sources: example_context.sources,
+                    diagnostics,
+                });
+            }
+        }
+        for export in interface.exports.iter().filter(|e| e.parent.is_none()) {
+            if let Some((_, source)) = sources
+                .iter()
+                .find(|(name, _)| *name == export.entity.module)
+                && let Some(comment) = doc::located_comments(source).remove(&export.entity.name)
+            {
+                let file = builtin_source_file(
+                    &mut example_context.sources,
+                    &mut builtin_files,
+                    &export.entity.module,
+                    source,
+                );
+                let origin = DocOrigin {
+                    owner: format!("{}.{}", interface.module, export.entity.name),
+                    file,
+                    expansion: None,
+                    comment,
+                };
+                let diagnostics = check_doc_examples(&mut example_context, prepared, &origin);
+                if diagnostics.iter().any(|d| d.severity == Severity::Error) {
+                    return Some(Outcome {
+                        sources: example_context.sources,
+                        diagnostics,
+                    });
+                }
             }
         }
     }
     None
 }
 
-fn doc_std(options: &DocArguments) -> Outcome {
-    if let Err(diagnostic) = builtin_cache::prepare() {
-        return Outcome {
-            diagnostics: vec![diagnostic],
-            ..Outcome::default()
-        };
-    }
-    let example_context = Checked {
-        host: FsHost::new(),
-        sources: SourceMap::default(),
-        project: None,
-        compilation: Compilation::default(),
-    };
-    let sources = builtin_sources();
-    let interfaces = builtins();
+fn write_std_docs(
+    options: &DocArguments,
+    interfaces: &[Interface],
+    sources: &[(&str, &str)],
+) -> Outcome {
     let out = Path::new(&options.output.out_dir);
     let mut index = String::from("# API\n\n");
     for interface in interfaces.iter().filter(|i| !i.private) {
@@ -186,34 +366,6 @@ fn doc_std(options: &DocArguments) -> Outcome {
             .iter()
             .find(|(name, _)| *name == interface.module)
             .map_or("", |(_, text)| *text);
-        if options.check_examples {
-            if let Some(comment) = doc::module_comment(text)
-                && let Some(message) = check_doc_examples(&example_context, &comment)
-            {
-                return failure(
-                    SourceMap::default(),
-                    codes::P013,
-                    format!("documentation example of `{}`: {message}", interface.module),
-                );
-            }
-            for export in interface.exports.iter().filter(|e| e.parent.is_none()) {
-                if let Some((_, source)) = sources
-                    .iter()
-                    .find(|(name, _)| *name == export.entity.module)
-                    && let Some(comment) = doc::comments(source).get(&export.entity.name)
-                    && let Some(message) = check_doc_examples(&example_context, comment)
-                {
-                    return failure(
-                        SourceMap::default(),
-                        codes::P013,
-                        format!(
-                            "documentation example of `{}.{}`: {message}",
-                            interface.module, export.entity.name
-                        ),
-                    );
-                }
-            }
-        }
         let page = doc::page_with_metadata(interface, text, &|export| {
             let Some((_, source)) = sources
                 .iter()
@@ -265,80 +417,4 @@ fn doc_std(options: &DocArguments) -> Outcome {
         );
     }
     Outcome::default()
-}
-
-/// An in-memory example is a source root in the real package, not a single-file
-/// check that trusts its imports. No example files are written to the project.
-fn check_doc_examples(checked: &Checked, comment: &str) -> Option<String> {
-    use flick_core::markdown::{self, Mode};
-    for block in markdown::blocks(comment) {
-        if block.mode == Mode::Ignore {
-            let mut sources = SourceMap::default();
-            let file = sources.add("documentation example", block.text.as_str());
-            let parsed = syntax::parse(&block.text, file);
-            if !parsed.diagnostics.is_empty() {
-                return Some(format!(
-                    "line {} does not parse: {:?}",
-                    block.line, parsed.diagnostics
-                ));
-            }
-            continue;
-        }
-        let root = checked
-            .project
-            .as_ref()
-            .map_or_else(|| checked.host.cwd.clone(), Project::source_root);
-        let declared = block.text.lines().find_map(|line| {
-            line.strip_prefix("module ")
-                .and_then(|s| s.split_whitespace().next())
-        });
-        let name = declared.unwrap_or("DocExample");
-        let text = if declared.is_some() {
-            block.text.clone()
-        } else {
-            format!("module {name} exposing (..)\n{}", block.text)
-        };
-        let path = root.join(project::module_path(name));
-        let host = ExampleHost {
-            host: &checked.host,
-            path: path.clone(),
-            text,
-        };
-        let mut sources = SourceMap::default();
-        let diagnostics = project::check(&host, &mut sources, checked.project.as_ref(), &[path]);
-        let errors: Vec<_> = diagnostics
-            .iter()
-            .filter(|d| d.severity == Severity::Error)
-            .collect();
-        let valid = if block.mode == Mode::Fail {
-            !errors.is_empty()
-                && block.codes.iter().all(|code| {
-                    errors.iter().any(|d| {
-                        d.code.to_string().trim_start_matches("FLICK-")
-                            == code.trim_start_matches("FLICK-")
-                    })
-                })
-        } else {
-            errors.is_empty()
-        };
-        if !valid {
-            // a missing dependency is what the reader must add, not the
-            // resolution error that follows from it
-            if let Some(package) = super::doc_run::undeclared_import(checked, &block.text) {
-                return Some(format!(
-                    "line {} imports `{package}`, which is not a declared dependency",
-                    block.line
-                ));
-            }
-            return Some(format!(
-                "line {} did not satisfy {:?}: {errors:?}",
-                block.line, block.mode
-            ));
-        }
-        // A runnable example must also run: its expected behavior is its exit.
-        if let Some(message) = super::doc_run::check_example(checked, &block) {
-            return Some(message);
-        }
-    }
-    None
 }

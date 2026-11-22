@@ -8,9 +8,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::pnpm;
 use flick_core::source::SourceMap;
 
-use crate::args::{
-    CheckArguments, CommandArguments, Commands, GlobalArguments, ProveArguments, SchemaCommands,
-};
+use crate::args::{CheckArguments, CommandArguments, Commands, GlobalArguments, ProveArguments};
 use crate::command::{Command, Outcome, finish as report, run_command};
 use crate::commands::{BuildCommand, CheckCommand, FmtCommand, ScaffoldCommand};
 
@@ -241,16 +239,18 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::New(options) => run_command(
             &ScaffoldCommand {
                 dir: options.directory.into(),
-                template: options.template,
+                options: options.scaffold,
                 fresh: true,
+                offline: global.offline,
             },
             global,
         ),
         Commands::Init(options) => run_command(
             &ScaffoldCommand {
                 dir: ".".into(),
-                template: options.template,
+                options: options.scaffold,
                 fresh: false,
+                offline: global.offline,
             },
             global,
         ),
@@ -271,9 +271,6 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::Pack(o) => report(commands::pack(&o, global), global),
         Commands::Plugins => report(commands::plugins(global), global),
         Commands::Diff(o) => report(commands::diff(&o, global), global),
-        Commands::Schema(SchemaCommands::Export(o)) => {
-            report(commands::schema_export(&o, project), global)
-        }
         Commands::Doc(o) => report(commands::doc(&o, project), global),
         Commands::Explain(o) => report(commands::explain(&o), global),
         Commands::Expand(o) => report(commands::expand(&o, project), global),

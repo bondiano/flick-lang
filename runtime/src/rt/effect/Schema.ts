@@ -8,8 +8,8 @@ import {
   hashMapToList,
   hashSetFromList,
   hashSetToList,
-  type FlickHashMap,
-  type FlickHashSet,
+  isFlickHashMap,
+  isFlickHashSet,
 } from "../collections.ts";
 import { decimalFromString, decimalToString, type Decimal } from "../decimal.ts";
 import { Duration, exactNanos } from "../duration.ts";
@@ -110,10 +110,8 @@ export const flickChunk = (item: Witness): Witness => {
 export const flickChunkJson = flickChunk;
 
 /** JSON collection codecs retain the native collection representation. */
-const isHashMap = (value: unknown): value is FlickHashMap<unknown, unknown> =>
-  typeof value === "object" && value !== null && "entries" in value && Array.isArray(value.entries);
-const isHashSet = (value: unknown): value is FlickHashSet<unknown> =>
-  typeof value === "object" && value !== null && "map" in value && isHashMap(value.map);
+const isHashMap = isFlickHashMap;
+const isHashSet = isFlickHashSet;
 const isPairs = (value: unknown): value is ReadonlyArray<readonly [unknown, unknown]> =>
   Array.isArray(value) && value.every((entry: unknown) => Array.isArray(entry) && entry.length === 2);
 

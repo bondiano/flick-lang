@@ -9,26 +9,11 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 pub const COMPILER: &str = env!("CARGO_PKG_VERSION");
 pub const RUNTIME: &str = "0.1.0";
 pub const ADAPTER: &str = "@flick-lang/effect-ts";
-const ADAPTER_MANIFEST: &str = include_str!("../../packages/effect-ts/package.json");
-
-/// Default for newly scaffolded projects, supplied by the adapter package.
-pub fn adapter_version() -> String {
-    let manifest: serde_json::Value =
-        serde_json::from_str(ADAPTER_MANIFEST).expect("adapter manifest");
-    manifest["version"]
-        .as_str()
-        .expect("adapter version")
-        .to_owned()
-}
 pub const PNPM: &str = "12.16.1";
 pub const NODE: &str = "24.18.0";
 /// The TypeScript release `flick content-mapper` is verified against: the
 /// first with Content Mappers.
 pub const TYPESCRIPT_GO: &str = "7.1.0-beta";
-/// React of the `fullstack` template, the version the runtime is tested with.
-pub const REACT: &str = "19.3.1";
-/// Vite of the `fullstack` template.
-pub const VITE: &str = "8.3.5";
 
 /// This compiler as caches tell binaries apart: its version, and the size
 /// and modification time of its executable, which a rebuild without a new
