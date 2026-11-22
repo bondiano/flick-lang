@@ -571,6 +571,9 @@ struct ItemCx {
     /// The argument being checked meets this parameter: where it is bound
     /// and its type.
     parameter: Option<(u32, Type)>,
+    /// The variables an operator kept from being generalized, each with
+    /// that operation and its operator.
+    kept_operands: Vec<(u32, Span, &'static str)>,
     /// The operand of an `await` being typed is a name: a `let lazy` may be
     /// read there.
     awaiting: bool,

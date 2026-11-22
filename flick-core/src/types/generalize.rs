@@ -8,6 +8,7 @@ use super::classes::Outcome;
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
 use super::typing::passes_dictionary;
+use super::unify::Store;
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -79,12 +80,18 @@ impl Checker<'_> {
         // so does an operand type a pending operator has yet to settle: it
         // takes one of the operator's types, as an integer literal's does
         for op in &self.cx.operators {
-            self.store.lower(&op.ty);
+            keep_operand(
+                &mut self.store,
+                &mut self.cx.kept_operands,
+                &op.ty,
+                op.span,
+                op.op,
+            );
         }
         // and an operand type of `==` or `!=`: the type a use settles decides
         // whether it compares by identity
-        for (ty, _, _) in &self.equalities {
-            self.store.lower(ty);
+        for (ty, span, op, _) in &self.equalities {
+            keep_operand(&mut self.store, &mut self.cx.kept_operands, ty, *span, op);
         }
         // a value a pending hold still checks stays monomorphic: its unknown
         // rows, once quantified, would count as variables it captures
@@ -269,8 +276,21 @@ fn without_value_row(row: &Type, types: &[&str]) -> Type {
     }
 }
 
+/// Keeps `ty`, an operand type of the operator `op` at `span`, from being
+/// generalized, noting each variable it keeps there.
+fn keep_operand(
+    store: &mut Store,
+    kept: &mut Vec<(u32, Span, &'static str)>,
+    ty: &Type,
+    span: Span,
+    op: &'static str,
+) {
+    kept.extend((store.deep_metas(&store.zonk(ty)).into_iter()).map(|m| (m, span, op)));
+    store.lower(ty);
+}
+
 /// The unknowns of `t`, in order of appearance.
-fn metas_of(t: &Type) -> Vec<u32> {
+pub(super) fn metas_of(t: &Type) -> Vec<u32> {
     let mut metas = Vec::new();
     t.visit(&mut |t| {
         if let Some(m) = t.inference_meta_root()

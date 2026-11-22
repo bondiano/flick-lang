@@ -46,7 +46,7 @@ impl Checker<'_> {
     /// determined becomes the first allowed type (`Int`, or `String` for
     /// `++`), a literal's becomes `Int`.
     pub fn settle_operators(&mut self) {
-        for (ty, span, givens) in mem::take(&mut self.equalities) {
+        for (ty, span, _, givens) in mem::take(&mut self.equalities) {
             if let Some(identity) = self.under(&givens, |this| this.identity(&ty)) {
                 let key = super::typing::range(span);
                 self.typing.identity_eq.insert(key, identity);
