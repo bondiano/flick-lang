@@ -9,6 +9,7 @@ module App.LocalCallback exposing (
   mixed,
   parameterized,
   pending_instance,
+  use_outer,
 )
 
 service Log =
@@ -108,3 +109,22 @@ let pending_instance () =
     save_with save_int 1
     save_scoped_with save_int 2
   }
+
+// A resource used inside nested scopes can require its enclosing owner live.
+type Handle (s : Region)
+service Files =
+  open_scoped : forall s. String ->{Scope s} Handle s
+  use : forall s. Handle s ->{} Unit
+
+use_outer : String ->{Files} Unit
+let use_outer path = scope {
+  let file = Files.open_scoped path
+  let save_with_file value = scope {
+    scope {
+      Files.use file
+      Store.save value
+    }
+  }
+  provide int_store { save_with_file 1 }
+  provide string_store { save_with_file "two" }
+}

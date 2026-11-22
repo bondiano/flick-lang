@@ -56,18 +56,6 @@ pub(super) fn unknown_tail(tail: &Type) -> Option<u32> {
     unknown(tail)
 }
 
-/// A closed service inclusion that can only constrain live regions.
-fn live_only(constraint: &SubRow, actual: &Norm) -> bool {
-    !constraint.errors
-        && constraint.provides.is_none()
-        && actual.tails.is_empty()
-        && !actual.entries.is_empty()
-        && actual
-            .entries
-            .iter()
-            .all(|(label, _)| matches!(label, Elem::Live))
-}
-
 impl Checker<'_> {
     /// Grows unknown declared rows until nothing changes.
     pub fn grow(&mut self) {
@@ -222,24 +210,24 @@ impl Checker<'_> {
             {
                 continue;
             }
-            // A closed call needing only Live can still constrain the
-            // bound's qualifier or tail. It cannot unify a service payload.
-            // A region the call needs live is lowered through its qualifier.
-            if live_only(c, &actual) {
-                pending.extend(actual.entries.into_iter().map(|(_, payload)| payload));
-                pending.extend(
-                    declared
-                        .entries
-                        .iter()
-                        .filter(|(label, _)| matches!(label, Elem::Live))
-                        .map(|(_, payload)| payload.clone()),
-                );
-                pending.extend(declared_deep().cloned());
-                continue;
-            }
-            // Matching entries do not need to be lowered once the actual
-            // row cannot gain another label from a pending call.
-            if self.call_row_settled(&actual, &declared, c.provides.is_some(), &mut scoped_tails) {
+            if self.named_payloads_settled(
+                &actual,
+                &declared,
+                c.provides.is_some(),
+                &mut scoped_tails,
+            ) {
+                // Live requirements can still constrain their qualifiers.
+                // They do not unify the payload of a named service.
+                if actual.get(&Elem::Live).is_some() {
+                    pending.extend(
+                        actual
+                            .entries
+                            .iter()
+                            .chain(&declared.entries)
+                            .filter(|(label, _)| matches!(label, Elem::Live))
+                            .map(|(_, payload)| payload.clone()),
+                    );
+                }
                 pending.extend(
                     actual
                         .tails
@@ -266,8 +254,8 @@ impl Checker<'_> {
         self.close_holds(Some(level));
     }
 
-    /// The inclusion can no longer constrain its matched label payloads.
-    fn call_row_settled(
+    /// The inclusion can no longer constrain its matched named payloads.
+    fn named_payloads_settled(
         &self,
         actual: &Norm,
         declared: &Norm,
@@ -281,11 +269,12 @@ impl Checker<'_> {
         } else if !actual.tails.is_empty() {
             return false;
         }
-        let matched = actual.entries.iter().all(|(label, ty)| {
-            matches!(label, Elem::Named(_))
-                && declared
-                    .get(label)
-                    .is_some_and(|bound| self.store.zonk(ty) == self.store.zonk(bound))
+        let matched = actual.entries.iter().all(|(label, ty)| match label {
+            Elem::Live => true,
+            Elem::Named(_) => declared
+                .get(label)
+                .is_some_and(|bound| self.store.zonk(ty) == self.store.zonk(bound)),
+            _ => false,
         });
         matched && (actual.tails.is_empty() || self.scope_tail_settled(&actual.tails, scoped_tails))
     }
@@ -316,10 +305,7 @@ impl Checker<'_> {
                 continue;
             }
             let actual = self.store.normalize(&c.actual);
-            // Live-only producers can grow qualifiers, which settle_rows
-            // keeps pending separately. They cannot change named payloads.
-            if !live_only(c, &actual)
-                && !self.call_row_settled(&actual, &declared, c.provides.is_some(), scoped_tails)
+            if !self.named_payloads_settled(&actual, &declared, c.provides.is_some(), scoped_tails)
             {
                 return false;
             }
