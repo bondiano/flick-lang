@@ -1,0 +1,14 @@
+module App.OrElseSyntax exposing (..)
+
+let missing_rhs = Some 1 orelse
+
+let mixed_pipes = 1 |> f <| 2
+
+let orelse = 1
+
+let bad_pun = fun { orelse } -> 1
+
+//~ FLICK-S007 @3:32-3:32 expected an expression
+//~ FLICK-S007 @5:21-5:23 `<|` and `|>` do not mix: add parentheses
+//~ FLICK-S007 @7:5-7:11 expected a pattern
+//~ FLICK-S007 @9:21-9:27 `orelse` is a reserved keyword and cannot be bound by record punning

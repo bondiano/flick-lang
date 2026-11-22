@@ -117,6 +117,7 @@ syntax_kinds! {
         ForKw = "for",
         YieldKw = "yield",
         DoKw = "do",
+        OrElse = "orelse",
     }
     after {
         /// `and` between the bindings of a `do` group, a keyword only there.
@@ -434,6 +435,13 @@ impl SyntaxKind {
         matches!(self, K::RParen | K::RBracket | K::RBrace)
     }
 
+    /// Keyword tokens that remain valid as explicit record field labels
+    /// (`{ orelse = … }`, `{ orelse : … }`, `{ orelse = p }`, `r.orelse`,
+    /// and the same for `catch`).
+    pub fn is_record_label(self) -> bool {
+        matches!(self, Self::OrElse | Self::CatchKw)
+    }
+
     /// Binary operator tokens of the fixed operator table.
     pub fn is_binary_op(self) -> bool {
         self.binding_power().is_some()
@@ -445,9 +453,9 @@ impl SyntaxKind {
         use SyntaxKind as K;
         Some(match self {
             // `<|` and `|>` do not mix, nor `>>` and `<<` (validate.rs).
-            // Postfix `catch` sits below `<|`, outside `expr_bp(p, 2)`; `(4, 4)`
-            // is reserved for `orelse`.
+            // Postfix `catch` sits below `<|`, outside `expr_bp(p, 2)`.
             K::LtPipe => (2, 2),
+            K::OrElse => (4, 4),
             K::PipeGt => (6, 7),
             K::OrOr => (8, 8),
             K::AndAnd => (10, 10),

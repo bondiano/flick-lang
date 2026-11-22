@@ -4,6 +4,7 @@
 
 use super::ty::Type;
 use super::{Checker, Domain, Operator};
+use crate::diagnostics::codes;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
@@ -15,7 +16,10 @@ fn left_first(node: &Node) -> Option<(Token, &Node, &Node)> {
         return None;
     }
     let op = node.child_tokens().find(|t| t.kind.is_binary_op())?;
-    if matches!(op.kind, K::LtPipe | K::GtGt | K::LtLt | K::OrOr | K::AndAnd) {
+    if matches!(
+        op.kind,
+        K::LtPipe | K::OrElse | K::GtGt | K::LtLt | K::OrOr | K::AndAnd
+    ) {
         return None;
     }
     let mut operands = node.nodes();
@@ -37,6 +41,7 @@ impl Checker<'_> {
                 self.note_type(self.token_span(op), &ty);
                 ty
             }
+            K::OrElse => self.orelse(node, children, None),
             K::GtGt | K::LtLt => self.compose(node, None),
             K::OrOr | K::AndAnd => {
                 self.check(lhs, &bool_);
@@ -51,6 +56,81 @@ impl Checker<'_> {
                 self.binary_after_left(node, op, lhs, rhs, ty)
             }
         }
+    }
+
+    /// `left orelse right`: canonical typing of
+    /// `match left with | Some value -> value | None -> right`.
+    pub fn orelse(&mut self, node: &Node, children: &[&Node], expected: Option<&Type>) -> Type {
+        let Some(op) = node.child_tokens().find(|t| t.kind == K::OrElse) else {
+            return Type::Error;
+        };
+        let (Some(lhs), Some(rhs)) = (children.first(), children.get(1)) else {
+            return Type::Error;
+        };
+        let op_span = self.token_span(op);
+        let lhs_span = self.span(lhs);
+        let open = expected.is_none();
+        let result = expected.cloned().unwrap_or_else(|| self.fresh());
+        let lhs_ty = self.infer(lhs);
+        let (bare, captures) = self.whnf_captured(&lhs_ty);
+        let (head, args) = bare.spine();
+        let head = self.whnf(head);
+        let numeric_meta = bare
+            .inference_meta_root()
+            .is_some_and(|m| self.store.is_numeric(m));
+        let unwrapped = match args[..] {
+            [item] if head.is_lang(Lang::Option) => Some(match &captures {
+                Some(c) => self.data_field(item, c),
+                None => item.clone(),
+            }),
+            _ if matches!(bare, Type::Meta(_)) && !numeric_meta => {
+                let item = self.fresh();
+                let opt = Type::app(Type::lang(Lang::Option), item.clone());
+                if self.unify(&bare, &opt).is_ok() {
+                    Some(match &captures {
+                        Some(c) => self.data_field(&item, c),
+                        None => item,
+                    })
+                } else {
+                    None
+                }
+            }
+            _ if bare == Type::Error => None,
+            _ => {
+                let shown = self.show(&lhs_ty);
+                self.error(
+                    codes::T003,
+                    lhs_span,
+                    format!("the left side of `orelse` must be an `Option`, found `{shown}`"),
+                );
+                if rhs.kind != K::Error {
+                    if expected.is_some() {
+                        self.check(rhs, &result);
+                    } else {
+                        self.infer(rhs);
+                    }
+                }
+                let ty = expected.cloned().unwrap_or(Type::Error);
+                self.note_type(op_span, &ty);
+                return ty;
+            }
+        };
+        if let Some(item) = unwrapped {
+            // Any lift or implicit conversion applies to the unwrapped `Some`
+            // payload in lowering, never to the `Option` scrutinee itself.
+            self.expect_for(&item, &result, op_span, lhs_span);
+        }
+        self.note_type(op_span, &result);
+        if rhs.kind != K::Error {
+            let since = self.diagnostics.len();
+            self.check(rhs, &result);
+            if open && bare != Type::Error {
+                self.explain_since(since, &result, lhs_span, &|t| {
+                    format!("the left side of `orelse` unwraps to `{t}`")
+                });
+            }
+        }
+        result
     }
 
     /// `infer` of the left operand of a binary operator: the operators of a

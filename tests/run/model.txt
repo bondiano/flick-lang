@@ -14,6 +14,7 @@ codegen/enums
 codegen/bigints
 codegen/literals
 codegen/numeric_classes
+codegen/orelse
 codegen/call_site
 codegen/eval_order
 codegen/local_functions

@@ -320,6 +320,8 @@ fn a_dotted_completion_waits_for_the_background_analysis_and_reads_its_snapshot(
     );
 }
 
+mod orelse;
+
 #[test]
 fn result_block_lsp_hover_actions_and_edits_handle_utf16_without_stale_results() {
     let written = Written::default();

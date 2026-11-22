@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: 0044c3b77877b1fe
+source_hash: d8782ea9defb05ef
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -112,7 +112,7 @@ let examples =
 
 ```text
 ( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ? @
-|> <| >> << || && == != < <= > >= ++ + - * / % ** not
+|> <| orelse >> << || && == != < <= > >= ++ + - * / % ** not
 ```
 
 ## Ключевые слова
@@ -123,8 +123,8 @@ let examples =
 ```text
 module exposing import as let mut rec assert fun match with try catch if then
 else task await lazy scope provide ignore todo echo type opaque where kind
-error service class instance deriving foreign from forall not none true false
-in when for yield do break continue
+error service class instance deriving foreign from forall not orelse none true
+false in when for yield do break continue
 ```
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
@@ -217,6 +217,7 @@ in when for yield do break continue
 | `catch` | Постфиксный обработчик только типизированных ошибок (зарезервировано в выражениях и связываниях; допускается как метка поля записи, `.catch`, переименованный образец записи `{ catch = f }` и метаданные `foreign`) | `find id catch \| NotFound _ -> None` |
 | `result` | Контекстное слово: перед `{` сразу выполняет блок и собирает его ожидаемые ошибки в `Result (Errors e) a`; в других местах остаётся именем | `result { find id }` |
 | `not` | Отрицает логическое значение; в `sql table` входит в ограничение `not null` | `not done` |
+| `orelse` | Ленивый fallback для `Option`: вычисляет правую часть только при `None`; допустимо как метка поля записи (`{ orelse = … }`, `r.orelse`, `{ orelse = x }`), но не как имя переменной и не как сокращённый образец `{ orelse }` | `host orelse "localhost"` |
 | `true` `false` | Два значения типа `Bool` | `if ok then true else false` |
 | `none` | Обозначает пустую строку в типе | `a ->{none; NotFound} b` |
 | `in` | Связывает имя со строкой таблицы в конструкции SQL `from` или `join`; начинает тело `unpack … as K in` | `join account in Accounts` |
@@ -297,6 +298,7 @@ in when for yield do break continue
 | `sql`, `ui` | Значение, создаваемое блоком, например `sql { … } : Template Pg {} { label : String }` |
 | `await` | `await … : Float` — результат и запускаемое вычисление `Eff` |
 | `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit` — тип отбрасываемого значения и предупреждение, если это `Eff`, который не будет выполнен |
+| `orelse` | `option orelse fallback : String` — тип развёрнутого результата, пояснение ленивого вычисления и явная группировка при цепочках или сочетании с `\|>` и `<\|` |
 
 Для остальных ключевых слов подсказок нет. Типы связанных с ними имён
 можно посмотреть, наведя указатель на сами имена.
@@ -309,6 +311,7 @@ in when for yield do break continue
 | - | - | - |
 | −1 | постфиксный `catch \| …` | отсутствует: цепочка внешних `catch` требует скобок `(a catch \| E -> b) catch \| F -> c` |
 | 0 | `<\|` | правая; не смешивается с `\|>`: `x \|> f <\| y` — ошибка |
+| 0½ | `orelse` | правая: `a orelse b orelse c` означает `a orelse (b orelse c)` |
 | 1 | `\|>` | левая |
 | 2 | `\|\|` | правая |
 | 3 | `&&` | правая |
@@ -326,6 +329,9 @@ in when for yield do break continue
 `-x ** 2` означает `-(x ** 2)`; `-a * b` означает `(-a) * b`; `await f x`
 означает `await (f x)`; `0..n - 1` — это `0..(n - 1)`, а `i < 0..n` сравнивает с диапазоном.
 `f <| g <| x + 1` означает `f (g (x + 1))`, а `f a <| x` — вызов `f a x`;
+`x |> find orelse default` означает `(x |> find) orelse default`, а
+`f <| opt orelse default` — `f <| (opt orelse default)` (`flick fmt`
+явно расставляет скобки для наглядности);
 `List.map f >> List.filter p` — композиция двух применений, а `await f >> g`
 означает `await (f >> g)`. Что делают операторы, описано в разделе [Числа и
 операторы](../numbers/#операторы).
