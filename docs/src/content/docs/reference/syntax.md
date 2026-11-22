@@ -116,7 +116,7 @@ in when for yield do break continue
 
 Contextual words are ordinary names everywhere except in one position:
 
-- `loop` before `{` and `while` before a condition followed by `do`;
+- `loop` before `{`, `result` before `{`, and `while` before a condition followed by `do`;
 - `private` before `module` in a file's header (see [modules](../modules/)),
   and `plugin` before a head in an `exposing` list (see
   [plugins](../plugins/#using-a-plugin));
@@ -203,6 +203,7 @@ and [ffi.md](../ffi/).
 | `with` | also the handlers of `try` and a record update | `{ user with name = "Ada" }` |
 | `try` | handles the expected errors and effect operations of its body | `try find id with \| NotFound _ -> None` |
 | `catch` | postfix handler for typed errors only (reserved in expressions and binders; still allowed as record field label, `.catch`, renamed record pattern `{ catch = f }` and foreign metadata) | `find id catch \| NotFound _ -> None` |
+| `result` | contextual: before `{`, runs its block eagerly and catches its typed errors as `Result (Errors e) a`; a name elsewhere | `result { find id }` |
 | `not` | boolean negation; `not null` on a `sql table` column | `not done` |
 | `true` `false` | the two `Bool` values | `if ok then true else false` |
 | `none` | the empty row in a type | `a ->{none; NotFound} b` |

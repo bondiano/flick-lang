@@ -413,6 +413,24 @@ fn keeps_a_loop_label_against_its_colon() {
 }
 
 #[test]
+fn formats_result_blocks_and_parenthesized_record_calls_idempotently() {
+    let src = "let a () = result{1}\nlet b () =\n  result {\n    // keep comment\n    let x = work ()\n    x + 1\n  }\nlet c () = f result { work () }?\nlet d () = result { result { () } }\nlet e result = (result) { field = 1 }\n";
+    let once = fmt(src);
+    assert_eq!(fmt(&once), once, "formatter must reach a fixed point");
+    insta::assert_snapshot!(once, @r#"
+    let a () = result { 1 }
+    let b () = result {
+      // keep comment
+      let x = work ()
+      x + 1
+    }
+    let c () = f result { work () }?
+    let d () = result { result { () } }
+    let e result = (result) { field = 1 }
+    "#);
+}
+
+#[test]
 fn formats_postfix_catch_canonically_and_explicitly_groups_pipes() {
     let src = "\
 let load_user id = fetch id catch | NotFound _ -> guest | Timeout -> retry id

@@ -89,6 +89,9 @@ impl<'c> Checker<'c> {
             (K::TryExpr, _) => {
                 self.try_expr(node, Some(expected));
             }
+            (K::ResultExpr, _) => {
+                actual_type = Some(self.result_expr(node, Some(expected)));
+            }
             (K::CatchExpr, _) => {
                 self.catch_expr(node, Some(expected));
             }
@@ -390,6 +393,7 @@ impl<'c> Checker<'c> {
             K::Block => self.block(node, None),
             K::MatchExpr => self.match_expr(node, None),
             K::TryExpr => self.try_expr(node, None),
+            K::ResultExpr => self.result_expr(node, None),
             K::CatchExpr => self.catch_expr(node, None),
             K::IfExpr => {
                 let ty = self.fresh();

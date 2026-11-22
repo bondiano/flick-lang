@@ -500,3 +500,60 @@ import App.Public as P exposing (MonadError(..), Box(..), Token(..))
 }
 
 include!("hover_tests_navigation.rs");
+
+#[test]
+fn hover_on_result_block_shows_type_stage_and_remaining_services() {
+    let source = "module App.Main exposing (load, pure_val, poly, plain_ident)\n\n\
+type error NotFound = NotFound Int\n\n\
+service Users =\n  get : Int ->{; NotFound} String\n\n\
+load : Int ->{Users} Result NotFound String\n\
+let load id = result { Users.get id }\n\n\
+pure_val : Unit ->{} Result Never Int\n\
+let pure_val () = result { 42 }\n\n\
+poly : forall r e a. (Unit ->{r; e} a) ->{r} Result (Errors e) a\n\
+let poly f = result { f () }\n\n\
+plain_ident : Int -> Int\n\
+let plain_ident result = result + 1\n";
+    let f = fixture_of(&[("src/App/Main.fl", source)]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    let file = f.file("App.Main");
+
+    let at_load = f.at("App.Main", "result { Users.get", 0);
+    let (h_load, r_load) = ide.hover(file, at_load + 1).expect("hover load result");
+    assert_eq!(r_load, (at_load, at_load + 6));
+    assert!(
+        h_load.contains("result { … } : Result NotFound String")
+            && h_load.contains("runtime")
+            && h_load.contains("Remaining services:")
+            && h_load.contains("Users"),
+        "{h_load}"
+    );
+
+    let at_pure = f.at("App.Main", "result { 42", 0);
+    let (h_pure, _) = ide.hover(file, at_pure + 1).expect("hover pure_val result");
+    assert!(
+        h_pure.contains("result { … } : Result Never Int")
+            && h_pure.contains("Remaining services: `none`"),
+        "{h_pure}"
+    );
+
+    let at_poly = f.at("App.Main", "result { f ()", 0);
+    let (h_poly, _) = ide.hover(file, at_poly + 1).expect("hover poly result");
+    assert!(
+        h_poly.contains("Result (Errors e) a") && h_poly.contains("Remaining services: `r`"),
+        "{h_poly}"
+    );
+
+    // Ordinary identifier `result` hovers as a local `Int`, never as `result { … }`.
+    let at_ident = f.at("App.Main", "result + 1", 0);
+    let (h_ident, _) = ide.hover(file, at_ident + 1).expect("hover ident result");
+    assert!(
+        h_ident.contains("result : Int") && !h_ident.contains("result { … }"),
+        "{h_ident}"
+    );
+}

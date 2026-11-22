@@ -569,4 +569,6 @@ mod plugin_tests;
 #[cfg(test)]
 mod proof_tests;
 #[cfg(test)]
+mod result_tests;
+#[cfg(test)]
 mod tests;

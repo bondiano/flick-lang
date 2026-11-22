@@ -386,3 +386,6 @@ runtime/suspended_std
 runtime/lazy_let
 runtime/lazy_let_state
 runtime/lazy_opt
+effect/result_blocks
+runtime/result_block_causes
+../rt/result_control_unwind

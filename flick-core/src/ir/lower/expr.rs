@@ -285,6 +285,7 @@ impl Lower<'_> {
                     errors: self.arms(node),
                 }))
             }
+            K::ResultExpr => self.result_expr(children[0], span),
             K::TaskExpr => {
                 let key = StageKey::Task { node: node.range() };
                 self.register_owner_entry(key);

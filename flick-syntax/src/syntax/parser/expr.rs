@@ -381,6 +381,11 @@ fn todo(p: &mut Parser) -> K {
 pub(super) fn atom(p: &mut Parser) -> Option<Done> {
     let m = p.start();
     let kind = match p.current() {
+        K::Ident if !p.no_brace && p.at_word("result") && p.nth(1) == K::LBrace => {
+            p.bump_as(K::ResultKw);
+            p.braces(K::Block, stmt, |_| false);
+            K::ResultExpr
+        }
         K::Ident if plugin::at_block(p) => plugin::block(p),
         K::Ident if p.at_word(OPEN) => plugin::opened(p),
         K::Ident => {

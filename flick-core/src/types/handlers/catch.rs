@@ -8,8 +8,12 @@ impl Checker<'_> {
         let span = self.keyword_span(node, K::CatchKw);
         let raised = self.store.fresh_error_row();
         let mut stage = self.cx.stage.clone();
-        stage.errors = raised.clone();
-        stage.returns = None;
+        (
+            stage.errors,
+            stage.error_site,
+            stage.in_result,
+            stage.returns,
+        ) = (raised.clone(), None, false, None);
         let outer = mem::replace(&mut self.cx.stage, stage);
         if let Some(body) = node.nodes().next() {
             self.check(body, &ty);
@@ -28,15 +32,7 @@ impl Checker<'_> {
         self.cx.catch_arm -= 1;
         self.cx.stage.returns = returns;
         if !errors.all && self.cx.stage.pure.is_none() {
-            let mut handled = errors.handled;
-            Row::sort_entries(&mut handled);
-            let rest = Type::Row(Row {
-                entries: handled,
-                tail: Some(Box::new(self.cx.stage.errors.clone())),
-                ..Row::default()
-            });
-            let site = self.cx.stage.site;
-            self.sub_row(&raised, &rest, site, span, true);
+            self.unhandled_errors(&raised, errors.handled, span);
         }
         ty
     }
