@@ -97,6 +97,7 @@ impl Checker<'_> {
         mut tail: Option<Tail<'_, Self>>,
     ) -> Type {
         let mark = self.cx.locals.len();
+        let since = self.diagnostics.len();
         let statements: Vec<&Node> = node.nodes().collect();
         let mut result = None;
         let mut i = 0;
@@ -122,6 +123,7 @@ impl Checker<'_> {
             }
             i += 1;
         }
+        self.detached_statements(&statements, since);
         self.cx.locals.truncate(mark);
         result.unwrap_or_else(|| {
             let end = node.range().1;

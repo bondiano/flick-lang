@@ -170,18 +170,30 @@ impl Checker<'_> {
         ty
     }
 
-    /// `FLICK-T003` on a callee of type `ty` given `args`, which are still
-    /// checked.
-    fn not_a_function(&mut self, ty: &Type, span: Span, args: &[&Node]) -> Type {
+    /// `FLICK-T003` on a callee of type `ty` given `args[i..]`, which are
+    /// still checked; `head` takes the arguments before them.
+    fn not_a_function(
+        &mut self,
+        ty: &Type,
+        span: Span,
+        (head, args, i): (&Node, &[&Node], usize),
+    ) -> Type {
         let shown = self.show(ty);
-        self.error(
+        let mut diagnostic = Diagnostic::error(
             codes::T003,
-            span,
             format!(
                 "this is not a function: it has type `{shown}`, so it cannot take another argument"
             ),
+            span,
         );
-        for arg in args {
+        // `user .name`: the accessor was meant as a field of the value before it
+        let accessors = super::detached::leading_accessors(&args[i..]);
+        if !accessors.is_empty() {
+            let value = (i == 0).then_some(head);
+            diagnostic.fixes.push(self.detached_fix(value, &accessors));
+        }
+        self.diagnostic(diagnostic);
+        for arg in &args[i..] {
             self.infer(arg);
         }
         Type::Error
@@ -281,13 +293,13 @@ impl Checker<'_> {
                     let arrow = Type::pure_fun(param.clone(), result.clone());
                     // a number literal's variable stands for a number only
                     if self.unify(&meta, &arrow).is_err() {
-                        return self.not_a_function(&meta, span, &args[i..]);
+                        return self.not_a_function(&meta, span, (head, args, i));
                     }
                     self.assume_pure(head, &arrow);
                     self.check(arg, &param);
                     ty = result;
                 }
-                other => return self.not_a_function(&other, span, &args[i..]),
+                other => return self.not_a_function(&other, span, (head, args, i)),
             }
         }
         // a call that gave all but its children has none

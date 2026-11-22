@@ -62,4 +62,56 @@ let spaced user =
   .name
 //~ FLICK-T011 @61:3-61:7 has type `User` and would be discarded
 //~ FLICK-T003 @62:3-62:8 expected `String`, found a function
+
+// after a `let`, the accessor is meant as a field of its value
+spaced_let : User -> String
+let spaced_let user =
+  let n = user
+  .name
+  n
+//~ FLICK-T011 @70:3-70:8 has type `{ name : _ | _ } -> _` and would be discarded
+//~ FLICK-T003 @71:3-71:4 expected `String`, found `User`
+
+spaced_last : User -> String
+let spaced_last user =
+  let n = user
+  .name
+//~ FLICK-T003 @78:3-78:8 expected `String`, found a function
+
+// with more indent, the value is applied to the accessor
+indented : User -> String
+let indented user =
+  user
+    .name
+//~ FLICK-T003 @84:3-85:10 this is not a function: it has type `{ address : Address; age : Int; name : String }`
+
+one_line : User -> String
+let one_line user = user .name
+//                  ^^^^^^^^^^ FLICK-T003 this is not a function
+
+two_steps : User -> String
+let two_steps user = user .address .city
+//                   ^^^^^^^^^^^^^ FLICK-T003 this is not a function
+
+// glued after an application, the accessor would read its last argument
+first : List User -> String
+let first users = List.head users .name
+//                ^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 this is not a function: it has type `Option { address : Address; age : Int; name : String }`, so it cannot take another argument: `.name` here starts a separate accessor, a function; to read the field, write it right after the value, with no space or line break
+
+// a comment between them is kept
+commented : User -> String
+let commented user =
+  user
+  // the name
+  .name
+//~ FLICK-T011 @104:3-104:7 only `Unit` may be dropped: `.name` here starts a separate accessor, a function; to read the field, write it right after the value: `user.name`
+//~ FLICK-T003 @106:3-106:8 expected `String`, found a function
+
+in_ui : User -> Ui
+let in_ui user = ui {
+  text user
+    .name
+}
+//~ FLICK-T003 @112:3-113:10 this is not a function: it has type `Ui`, so it cannot take another argument: `.name` here starts a separate accessor, a function; to read the field, write it right after the value, with no space or line break
+//~ FLICK-T003 @112:8-112:12 expected `String`, found `User`
 //~ FLICK-T004 @29:1-29:21 function `get_name` needs a signature right above its `let`

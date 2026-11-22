@@ -32,6 +32,7 @@ mod comprehension;
 mod convert;
 mod debug;
 mod decls;
+mod detached;
 mod display;
 mod do_notation;
 mod effects;
