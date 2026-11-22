@@ -34,15 +34,32 @@ let older user = .age + 1
 //               ^^^^^^^^ FLICK-T003 expected `Int`, found `{ age : _ | _ } -> _`
 //                      ^ FLICK-T003 expected `{ age : _ | _ } -> _`, found `Int`
 
+// `?` applies to the accessor, a function, not to the field it reads
 tried : User -> String
 let tried = .name?
-//          ^^^^^^ FLICK-T003 `?` takes an `Option` or a `Result`, but this has type `{ name : _ | _ } -> _`
+//          ^^^^^^ FLICK-T003 `?` applies to the accessor `.name`, a function, not to the field it reads: an accessor only reads fields; to apply `?` to the field, read it explicitly: `x.name?` or `fun x -> x.name?`
+
+type alias Contact = { email : Option String; home : { email : Option String } }
+
+questioned : Contact -> Option String
+let questioned contact =
+  let mapped = List.map .email? [contact]
+//                      ^^^^^^^ FLICK-T003 `?` applies to the accessor `.email`, a function, not to the field it reads
+  let piped = contact |> .email?
+//                       ^^^^^^^ FLICK-T003 `?` applies to the accessor `.email`
+  let applied = .email? contact
+//              ^^^^^^^ FLICK-T003 `?` applies to the accessor `.email`
+  let wrapped = (.email)?
+//              ^^^^^^^^^ FLICK-T003 `?` applies to the accessor `.email`
+  let nested = .home.email?
+//             ^^^^^^^^^^^^ FLICK-T003 `?` applies to the accessor `.home.email`, a function, not to the field it reads: an accessor only reads fields; to apply `?` to the field, read it explicitly: `x.home.email?` or `fun x -> x.home.email?`
+  contact.email
 
 // a field is read with no space after its record: `user.name`
 spaced : User -> String
 let spaced user =
   user
   .name
-//~ FLICK-T011 @44:3-44:7 has type `User` and would be discarded
-//~ FLICK-T003 @45:3-45:8 expected `String`, found a function
+//~ FLICK-T011 @61:3-61:7 has type `User` and would be discarded
+//~ FLICK-T003 @62:3-62:8 expected `String`, found a function
 //~ FLICK-T004 @29:1-29:21 function `get_name` needs a signature right above its `let`
