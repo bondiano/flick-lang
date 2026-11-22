@@ -44,18 +44,17 @@ pub enum Commands {
     Dev(RunArguments),
     /// Remove the build artifacts of the project.
     Clean(CleanArguments),
-    /// Install the dependencies with the pinned pnpm; at a workspace root,
-    /// of every member.
+    /// Install the project's dependencies; at a workspace root, of every member.
     Install(InstallArguments),
-    /// Add npm packages to the dependencies.
+    /// Add dependencies (Flick libraries with a source option, or target packages).
     Add(AddArguments),
     /// Remove direct dependencies.
     Remove(RemoveArguments),
-    /// Update dependencies within the ranges of `package.json`.
+    /// Update dependencies within their declared ranges.
     Update(PackagesArguments),
-    /// Show the installed dependencies and their Flick interfaces.
+    /// Show the installed dependencies and their Flick libraries.
     Deps(DepsArguments),
-    /// Build a release package and an npm tarball of it.
+    /// Build a release package (or an app archive through the selected backend).
     Pack(OutDirArguments),
     /// Show the plugins of the project's path, git and url dependencies, where
     /// each comes from, and whether `flick.lock` pins the build of its
@@ -63,9 +62,6 @@ pub enum Commands {
     Plugins,
     /// Compare the public API with a git revision and name the version bump.
     Diff(DiffArguments),
-    /// Static schemas of codecs.
-    #[command(subcommand)]
-    Schema(SchemaCommands),
     /// Write documentation of the public API.
     Doc(DocArguments),
     /// Explain a diagnostic code.
@@ -73,7 +69,7 @@ pub enum Commands {
     /// Print the code each plugin block of the files stands for, as its
     /// plugin gives it.
     Expand(ExpandArguments),
-    /// Check the compiler, Node.js, pnpm and the runtime.
+    /// Check the compiler and the selected backend's toolchain.
     Doctor,
     /// Print a representation of a module: AST, typed IR, backend output,
     /// interface, variance or source mapping.

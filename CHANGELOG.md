@@ -17,11 +17,28 @@ break programs.
   and `let get = fun r -> r.value` inside a function are generalized as
   `let f = (fun …)` already was, so each use may give them other types. A
   top-level or recursive function still needs a signature (`FLICK-T004`).
+  When a runtime function is given to a callback of such a function that
+  was taken for a pure one, `FLICK-T003` points to the callback parameter
+  and offers an annotation where the parameter can be annotated.
 
-- **An operator's operand keeps one type in a generalized binding.** The
-  operand of an operator such as `+` or `++` stays of one type, which the
-  uses settle, as a number literal's does: `let add = (fun x y -> x + y)`
-  inside a function is no longer `FLICK-T003` on a type variable.
+- **A generalized local binding keeps the rows of its calls open.** Inside
+  a function, a row of calls still unknown when a binding is generalized
+  stays of one type, which the uses of the binding fill, instead of
+  becoming `none`. A local helper may pass its callback to a function that
+  runs it: `let each_line = (fun f -> List.each_effect f lines)` used as
+  `each_line shout`, with `shout` calling a service, is no longer
+  `FLICK-E002`. A named task awaited in a `Layer.from_build` body may
+  register a finalizer that uses the layer's inputs, as a direct call may,
+  without `FLICK-G003`. Local helpers can still be polymorphic over type
+  arguments of known services.
+
+- **An unresolved operand type stays monomorphic in a generalized binding.**
+  Uses of the binding settle the type when they determine which implementation
+  an operator uses. For example, `let add = (fun x y -> x + y)` inside a
+  function can be used at `Int`. When both operands are already known to be
+  lists, `++` and `==` can still be used at different element types. A
+  `FLICK-T003` on an argument can point to the operator that kept the type
+  monomorphic.
 
 - **A fixture that fails to be made is a `setup` failure.** A case that
   awaits a fixture whose expression fails, and does not handle the error,

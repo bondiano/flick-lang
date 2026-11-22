@@ -1,0 +1,71 @@
+use super::Session;
+use serde_json::Value;
+
+#[test]
+fn playground_compiles_and_queries_an_inline_module() {
+    let source = "module Main exposing (main)\nmodule Child exposing (answer) =\n  let answer = 42\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (show Child.answer)\n";
+    let mut session = Session::new();
+    let diagnostics: Value = serde_json::from_str(&session.update(source)).expect("JSON");
+    assert_eq!(diagnostics, serde_json::json!([]));
+    let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
+    assert!(
+        built["js"]
+            .as_str()
+            .is_some_and(|js| js.contains("Child$answer")),
+        "{built}"
+    );
+    let at = u32::try_from(source.find("Child.answer").expect("use") + 6).expect("offset");
+    let hover: Value = serde_json::from_str(&session.hover(at)).expect("JSON");
+    assert!(
+        hover["text"]
+            .as_str()
+            .is_some_and(|text| text.contains("Int")),
+        "{hover}"
+    );
+}
+
+#[test]
+fn a_playground_program_runs_on_flicks_own_runtime() {
+    let mut session = Session::new();
+    session.update("module Main exposing (main)\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line \"hi\"\n");
+    let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
+    let runner = built["files"]["flick-main.js"].as_str().expect("a runner");
+    assert!(
+        runner.contains("from \"@flick-lang/runtime/rt\""),
+        "{runner}"
+    );
+    assert!(!runner.contains("@flick-lang/effect-ts"), "{runner}");
+}
+
+#[test]
+fn playground_handles_orelse_hover_completion_and_emit_with_utf16() {
+    let source = "module Main exposing (main)\n\npick : Option String -> String\nlet pick x =\n  let _ = \"Привет 🚀\"\n  x orelse \"мир\"\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (pick None)\n";
+    let mut session = Session::new();
+    let diagnostics: Value = serde_json::from_str(&session.update(source)).expect("JSON");
+    assert_eq!(diagnostics, serde_json::json!([]));
+    let orelse_byte = source.find("orelse").expect("orelse");
+    let orelse_utf16 = u32::try_from(source[..orelse_byte].encode_utf16().count()).expect("utf16");
+    let hover: Value = serde_json::from_str(&session.hover(orelse_utf16 + 1)).expect("JSON");
+    assert_eq!(hover["from"], serde_json::json!(orelse_utf16));
+    assert_eq!(hover["to"], serde_json::json!(orelse_utf16 + 6));
+    assert!(
+        hover["text"]
+            .as_str()
+            .is_some_and(|text| text.contains("option orelse fallback : String")),
+        "{hover}"
+    );
+    let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
+    assert!(built["js"].as_str().is_some(), "{built}");
+
+    let partial = "module Main exposing (pick)\n\nfallback_name : String\nlet fallback_name = \"ok\"\n\npick : Option String -> String\nlet pick x = x orelse \n";
+    let _ = session.update(partial);
+    let cursor =
+        u32::try_from(partial.trim_end_matches('\n').encode_utf16().count()).expect("cursor");
+    let items: Value = serde_json::from_str(&session.complete(cursor, false)).expect("JSON");
+    assert!(
+        items
+            .as_array()
+            .is_some_and(|arr| arr.iter().any(|it| it["label"] == "fallback_name")),
+        "{items}"
+    );
+}

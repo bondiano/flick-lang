@@ -7,7 +7,13 @@ use std::collections::BTreeSet;
 use std::fs;
 #[cfg(feature = "ide")]
 use std::io;
+#[cfg(feature = "ide")]
+use std::num::NonZero;
 use std::path::{Path, PathBuf};
+#[cfg(feature = "ide")]
+use std::sync::atomic::{AtomicUsize, Ordering};
+#[cfg(feature = "ide")]
+use std::thread;
 
 #[cfg(feature = "ide")]
 use flick_core::iface::Decl;
@@ -73,55 +79,91 @@ fn fl_files(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 #[cfg(feature = "ide")]
+fn used_names_in(path: &Path, used: &mut BTreeSet<String>) {
+    let mut sources = SourceMap::default();
+    let analysis = project::analyze(&Fs, &mut sources, None, &[path.to_path_buf()]);
+    for module in &analysis.modules {
+        for r in module.typing.names.values() {
+            match r {
+                Ref::Value { module, name } | Ref::Method { module, name } => {
+                    used.insert(format!("{module}.{name}"));
+                }
+                Ref::Constructor(c) => {
+                    used.insert(format!("{}.{}", c.module, c.name));
+                }
+                Ref::Operation { service, name, .. } => {
+                    used.insert(format!("{service}.{name}"));
+                }
+                Ref::ServiceTag(service) => {
+                    used.insert(service.clone());
+                }
+                Ref::Local | Ref::PackedField { .. } => {}
+            }
+        }
+        for (module, name) in module.typing.type_names.values() {
+            used.insert(format!("{module}.{name}"));
+        }
+        // a type is used by a value of it too, written or inferred
+        for ty in module.typing.types.values() {
+            ty.visit(&mut |t| {
+                if let Type::Con { module, name } = t {
+                    used.insert(format!("{module}.{name}"));
+                }
+            });
+        }
+    }
+    // and by the code plugins gave, which only the IR holds
+    for module in &analysis.compilation.modules {
+        for item in &module.ir.items {
+            if let ItemKind::Value { body, .. } = &item.kind {
+                globals(body, used);
+            }
+        }
+    }
+}
+
+#[cfg(feature = "ide")]
 /// Every `Module.name` the stdlib tests refer to, as resolved by the checker,
 /// and every type their values have.
 fn used_names() -> BTreeSet<String> {
     let mut paths = Vec::new();
     fl_files(&repo().join("tests/run/stdlib"), &mut paths);
-    let mut used = BTreeSet::new();
-    for path in paths {
-        let mut sources = SourceMap::default();
-        let analysis = project::analyze(&Fs, &mut sources, None, &[path]);
-        for module in &analysis.modules {
-            for r in module.typing.names.values() {
-                match r {
-                    Ref::Value { module, name } | Ref::Method { module, name } => {
-                        used.insert(format!("{module}.{name}"));
-                    }
-                    Ref::Constructor(c) => {
-                        used.insert(format!("{}.{}", c.module, c.name));
-                    }
-                    Ref::Operation { service, name, .. } => {
-                        used.insert(format!("{service}.{name}"));
-                    }
-                    Ref::ServiceTag(service) => {
-                        used.insert(service.clone());
-                    }
-                    Ref::Local | Ref::PackedField { .. } => {}
-                }
-            }
-            for (module, name) in module.typing.type_names.values() {
-                used.insert(format!("{module}.{name}"));
-            }
-            // a type is used by a value of it too, written or inferred
-            for ty in module.typing.types.values() {
-                ty.visit(&mut |t| {
-                    if let Type::Con { module, name } = t {
-                        used.insert(format!("{module}.{name}"));
-                    }
-                });
-            }
+    let _ = types::builtins();
+    let workers = thread::available_parallelism()
+        .map_or(1, NonZero::get)
+        .min(paths.len());
+    if workers <= 1 {
+        let mut used = BTreeSet::new();
+        for path in &paths {
+            used_names_in(path, &mut used);
         }
-        // and by the code plugins gave, which only the IR holds
-        for module in &analysis.compilation.modules {
-            for item in &module.ir.items {
-                if let ItemKind::Value { body, .. } = &item.kind {
-                    globals(body, &mut used);
-                }
-            }
-        }
+        return used;
     }
-    used
+    let next = AtomicUsize::new(0);
+    thread::scope(|scope| {
+        let paths = &paths;
+        let next = &next;
+        let handles: Vec<_> = (0..workers)
+            .map(|_| {
+                scope.spawn(move || {
+                    let mut local = BTreeSet::new();
+                    loop {
+                        let idx = next.fetch_add(1, Ordering::Relaxed);
+                        let Some(path) = paths.get(idx) else {
+                            break;
+                        };
+                        used_names_in(path, &mut local);
+                    }
+                    local
+                })
+            })
+            .collect();
+        let mut used = BTreeSet::new();
+        for handle in handles {
+            used.extend(handle.join().expect("coverage worker passed"));
+        }
+        used
+    })
 }
 
 #[cfg(feature = "ide")]

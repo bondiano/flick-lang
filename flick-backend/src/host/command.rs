@@ -16,6 +16,15 @@ pub fn invocation(i: &n::Invocation) -> w::Invocation {
         sources: i.sources.clone(),
         inputs: i.inputs.iter().map(file_wire).collect(),
         tools: i.tools.iter().map(|t| tool_wire(t.clone())).collect(),
+        dependencies: i.dependencies.iter().map(dependency_wire).collect(),
+    }
+}
+
+pub fn dependency_wire(d: &n::Dependency) -> w::Dependency {
+    w::Dependency {
+        name: d.name.clone(),
+        version: d.version.clone(),
+        by: d.by.clone(),
     }
 }
 
@@ -75,6 +84,14 @@ pub fn descriptors(ds: Vec<w::Descriptor>) -> Vec<n::Descriptor> {
         .collect()
 }
 
+fn span(s: w::Span) -> n::Span {
+    n::Span {
+        path: s.path,
+        start: s.start,
+        end: s.end,
+    }
+}
+
 pub fn diagnostics(ds: Vec<w::Diagnostic>) -> Vec<n::Diagnostic> {
     (ds.into_iter())
         .map(|d| n::Diagnostic {
@@ -86,11 +103,7 @@ pub fn diagnostics(ds: Vec<w::Diagnostic>) -> Vec<n::Diagnostic> {
             },
             message: d.message,
             notes: d.notes,
-            span: d.span.map(|s| n::Span {
-                path: s.path,
-                start: s.start,
-                end: s.end,
-            }),
+            span: d.span.map(span),
             help: d.help,
         })
         .collect()
@@ -120,6 +133,20 @@ pub fn plan(p: w::Plan) -> n::Plan {
                     inputs: t.inputs,
                     reads: t.reads,
                     outputs: t.outputs,
+                    in_place: t.in_place,
+                }),
+                w::Step::RunFlick(r) => n::Step::RunFlick(n::RunFlickStep {
+                    id: r.id,
+                    entry: r.entry,
+                    modules: (r.modules.into_iter())
+                        .map(|m| n::FlickModule {
+                            name: m.name,
+                            source: m.source,
+                        })
+                        .collect(),
+                    arguments: r.arguments,
+                    output: r.output,
+                    origin: r.origin.map(span),
                 }),
             })
             .collect(),
@@ -172,5 +199,23 @@ pub fn handled(h: w::Handled) -> n::Handled {
         state: h.state,
         response: h.response,
         needs: h.needs.into_iter().map(need).collect(),
+    }
+}
+
+pub fn template_descriptors(ds: Vec<w::TemplateDescriptor>) -> Vec<n::TemplateDescriptor> {
+    ds.into_iter()
+        .map(|d| n::TemplateDescriptor {
+            name: d.name,
+            summary: d.summary,
+        })
+        .collect()
+}
+
+pub fn template_request(r: &n::TemplateRequest) -> w::TemplateRequest {
+    w::TemplateRequest {
+        template: r.template.clone(),
+        name: r.name.clone(),
+        compiler: r.compiler.clone(),
+        init: r.init,
     }
 }

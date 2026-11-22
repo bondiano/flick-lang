@@ -15,8 +15,9 @@
 //!   throw to its one use;
 //! - [`fuse`]: `Seq` and `List` combinators of a `for` run in its loop;
 //! - [`lazy`]: lazy cells a program need not make: one nothing reads, one of
-//!   a value, made done, and one forced where it is made; and a force of a
-//!   cell an earlier force left done;
+//!   a value, made done, and one forced where it is made; a force of a cell an
+//!   earlier force left done; and a pure, loop-invariant lazy hoisted out of a
+//!   loop;
 //! - [`sroa`]: temporary records and tuples split into their parts;
 //! - dead code: unused pure bindings and private top-level values.
 //!
@@ -28,6 +29,7 @@
 //! each a contextual equivalence of the core.
 
 pub mod devirt;
+pub mod eval;
 mod fold;
 mod fuse;
 mod inline;
@@ -75,6 +77,35 @@ pub fn optimize(
     lang: &crate::Known<'_>,
     builtin: &dyn Fn(&str) -> bool,
 ) {
+    let config = eval::EvalConfig::default();
+    let _ = optimize_with_eval(
+        module,
+        exported,
+        generics,
+        arity,
+        lang,
+        builtin,
+        &config,
+        &eval::NoPrimitives,
+    );
+}
+
+/// [`optimize`], with explicit evaluator budgets and a target [`eval::PrimitiveEval`]
+/// hook, returning stable internal outcome counters.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "explicit optimizer configuration boundary"
+)]
+pub fn optimize_with_eval(
+    module: &mut Module,
+    exported: &dyn Fn(&str) -> bool,
+    generics: Generics,
+    arity: Arity,
+    lang: &crate::Known<'_>,
+    builtin: &dyn Fn(&str) -> bool,
+    eval_config: &eval::EvalConfig,
+    primitives: &dyn eval::PrimitiveEval,
+) -> eval::EvalCounters {
     let mut fresh = 0;
     let foreign = inline::Foreign::new(generics, builtin);
     // what other modules' functions take, by `module.name`: one map type
@@ -96,6 +127,9 @@ pub fn optimize(
         &mut fresh,
     );
     specialize::specialize(module, generics, lang);
+    let mut module_steps = eval_config.max_module_steps;
+    let mut retries = eval::RetryTracker::default();
+    let mut counters = eval::EvalCounters::default();
     for _ in 0..ROUNDS {
         constants(module, lang);
         let lookup = devirt::Lookup::new(module, generics, lang);
@@ -117,6 +151,7 @@ pub fn optimize(
                 devirt::methods(body, &lookup, &mut fresh, 0);
                 inline::inline(body, &module.name, &candidates, &foreign, &mut fresh);
                 fuse::fuse(body, &mut fresh, lang);
+                lazy::hoist(body, &mut fresh, lang);
                 simplify_with(body, &arities, lang);
                 // a value built only to be taken apart: each step may
                 // show the next one
@@ -127,10 +162,33 @@ pub fn optimize(
                     }
                     simplify_with(body, &arities, lang);
                 }
+                if lazy::hoist(body, &mut fresh, lang) {
+                    simplify_with(body, &arities, lang);
+                }
+            }
+        }
+        let eval_lookup = devirt::Lookup::new(module, generics, lang);
+        if eval::run_module_pass(
+            module,
+            exported,
+            &eval_lookup,
+            generics,
+            lang,
+            primitives,
+            eval_config,
+            &mut module_steps,
+            &mut retries,
+            &mut counters,
+        ) {
+            for item in &mut module.items {
+                for body in bodies(item) {
+                    simplify_with(body, &arities, lang);
+                }
             }
         }
     }
     unused_items(module, exported);
+    counters
 }
 
 fn bodies(item: &mut Item) -> Vec<&mut Expr> {

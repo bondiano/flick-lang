@@ -407,3 +407,35 @@ fn stage4_intrinsics_round_trip() {
     );
     round_trip_operations(&operations);
 }
+
+#[test]
+#[cfg(feature = "json")]
+fn foreign_call_operation_round_trips() {
+    let spec = Box::new(ForeignCallSpec {
+        module: "App.Main".into(),
+        source_dir: Some("/repo/tests/run/ffi".into()),
+        from: Some("./bindings.mjs".into()),
+        name: "readText".into(),
+        mode: crate::ForeignMode::Async,
+        dicts: 0,
+        arity: 1,
+        taken: 1,
+        runtime: true,
+        has_catch: true,
+        adapter: crate::Adapter {
+            cancel: true,
+            ..crate::Adapter::default()
+        },
+        arg_hints: vec![WireHint::Any, WireHint::Unit],
+        result_hint: WireHint::Record(vec![
+            ("id".into(), WireHint::Float),
+            ("raw".into(), WireHint::Opaque),
+        ]),
+        remaining_stages: vec![true],
+    });
+    let operations = vec![Operation::ForeignCall {
+        spec,
+        args: vec![0, 1],
+    }];
+    round_trip_operations(&operations);
+}

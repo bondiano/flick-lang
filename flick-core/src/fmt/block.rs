@@ -29,19 +29,20 @@ pub(super) fn hugs(n: &Node) -> bool {
             | K::TaskExpr
             | K::ScopeExpr
             | K::ProvideExpr
+            | K::ResultExpr
             | K::DoExpr
             | K::FunExpr
     ) || matches!(n.kind, K::ForExpr | K::PluginExpr | K::LazyExpr) && n.has_token(K::LBrace)
 }
 
-fn is_expression(n: &Node) -> bool {
+pub(super) fn is_expression(n: &Node) -> bool {
     !matches!(n.kind, K::LetDecl | K::Signature)
 }
 
 impl<'a> Printer<'a> {
     /// Leaves the brackets around for a block of lines, where a line under
     /// a call is its child again; what [`Printer::calls`] was, to put back.
-    fn lines_again(&mut self) -> Calls {
+    pub(super) fn lines_again(&mut self) -> Calls {
         let outer = self.calls;
         if outer == Calls::Bracketed {
             self.calls = Calls::Lines;
@@ -63,7 +64,13 @@ impl<'a> Printer<'a> {
         doc
     }
 
-    fn body_of(&mut self, head: Doc<'a>, value: Value<'a>, end: u32, closing: &[Part]) -> Doc<'a> {
+    pub(super) fn body_of(
+        &mut self,
+        head: Doc<'a>,
+        value: Value<'a>,
+        end: u32,
+        closing: &[Part],
+    ) -> Doc<'a> {
         let a = self.a;
         let inline = mem::take(&mut self.inline_body);
         let statements = match value {
@@ -152,6 +159,9 @@ impl<'a> Printer<'a> {
             && node_position(n, K::Contract).is_some()
         {
             return self.contract_let(n, at);
+        }
+        if position(n, K::ElseKw).is_some() {
+            return self.let_else(n);
         }
         let a = self.a;
         let (Some(eq), Some(block)) = (position(n, K::Eq), node_position(n, K::Block)) else {

@@ -74,6 +74,121 @@ with_region : (forall s. Fiber.Owner s ->{Scope s; none} String) ->{} String
 let with_region body = Scope.run body
 ```
 
+## Scoped arenas
+
+`Arena s` (`import Arena`) allocates values into storage owned by the region
+`s` rather than relying on individual resource finalizers:
+
+- `Arena.make : Unit ->{Scope s} Arena s` creates an arena owned by the
+  compiler-selected owner for `Scope s` (not necessarily the innermost scope or
+  provider).
+- `Arena.alloc : Arena s -> a^c ->{} Arena.Value s (a^c)` moves a value into a
+  strong slot of the arena and returns a nonowning view `Arena.Value s (a^c)`.
+- `Arena.get : Arena.Value s (a^c) ->{} a^c` reads an ordinary immutable value
+  from the slot. The returned value has its own lifetime and may survive after
+  the scope closes.
+
+```flick
+# import Arena
+#
+read_scoped : Unit ->{} String
+let read_scoped () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "owned"
+  Scope.add_finalizer (task { ignore (Arena.get view) })
+  Arena.get view
+}
+```
+
+### Owner lifetime and close order
+
+An arena belongs to its lexical owner and closes as part of that owner's
+phased close (see [Resources](../resources/#order-and-outcome) and
+[Runtime](../runtime/)), whether the scope exits normally, fails with a typed
+error or defect, is interrupted/cancelled, or unwinds through an effect-handler
+signal (`abort`, `control` discontinuation, or a failing `tail` arm):
+
+1. Admission of new child fibers ends (`C0`) and closing hooks run (`C1`).
+2. Owned children are interrupted and awaited with their supervisors (`C2`–`C3`),
+   and tracked pending foreign work settles (`C4`). Arena storage stays live
+   throughout so children and settling callbacks can still read it.
+3. Registered finalizers (`Scope.add_finalizer`, `Scope.defer`, `Resource.own`,
+   `Resource.acquire_release`) run in reverse registration order (LIFO, `C5`),
+   even when an earlier finalizer reads an arena allocated later, or when a
+   finalizer creates an additional arena in the finalizing owner.
+4. Only after every child, pending foreign call, and finalizer has finished are
+   all arena slots detached and retired exactly once (`C6`). Re-closing an
+   already-closed owner is idempotent and releases nothing further; late arena
+   operations against closed storage or a closed owner fail cleanly instead of
+   reading freed memory.
+
+Because owner selection is lexical, a helper requiring `Scope s` allocates into
+the enclosing `scope` even when invoked inside a `provide` layer or persistent
+`Context`, and an arena created in an outer `scope` stays live across nested
+inner scopes:
+
+```flick
+# import Arena
+#
+# service Label =
+#   label : Unit ->{} String
+#
+alloc_in_caller : forall s. String ->{Scope s} Arena.Value s String
+let alloc_in_caller text =
+  let arena = Arena.make ()
+  Arena.alloc arena text
+
+provided_arenas : Layer none none {Label} ->{} String
+let provided_arenas layer = scope {
+  let outer_view = provide layer {
+    alloc_in_caller (Label.label ())
+  }
+  let combined = scope {
+    let inner = Arena.alloc (Arena.make ()) "inner"
+    Arena.get inner ++ "+" ++ Arena.get outer_view
+  }
+  combined
+}
+```
+
+### Retention versus use (`T4'` / `SafeUse`)
+
+`Arena s` follows Flick's **typing by use** contract (`T4'` / `SafeUse`), not
+an escape-only prohibition on holding handles:
+
+- **Retaining a view without dereferencing it is allowed.** Returning or
+  storing a closure, `task`, record, or `Context` that merely retains an
+  `Arena.Value s a` (or drops/ignores it after the scope closes) does not use
+  region `s` and is accepted. Dropping a retired view never touches freed arena
+  storage.
+- **Using an arena or view after its region closes is rejected (`FLICK-G002`).**
+  Calling `Arena.get` or `Arena.alloc` needs region `s` live at the call site;
+  capturing such a use in a closure or `task` that outlives the scope is a
+  compile-time error (`FLICK-G002`), and keeping such work on an outer owner
+  that outlives `s` is rejected with `FLICK-G003`.
+
+```flick
+# import Arena
+#
+retain_without_use : Unit ->{} (String, Unit ->{} Unit)
+let retain_without_use () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "kept"
+  (Arena.get view, fun () -> ignore view)
+}
+```
+
+```flick fail G002
+# import Arena
+#
+read_after_close : Unit ->{} (Unit ->{} String)
+let read_after_close () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "closed"
+  fun () -> Arena.get view
+}
+```
+
 ## Holding is not using
 
 A closure, a `task` or a constructor may hold a handle past the end of its

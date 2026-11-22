@@ -2,13 +2,15 @@
 //! commands that read inputs, link a step's reads and resume after it, and
 //! a session that echoes, traps or spins on request.
 
+mod deps;
+
 use std::fmt::Write as _;
 use std::hint;
 use std::path::Path;
 
 use flick_backend::command::{
     self, Descriptor, Diagnostic, File, Handled, Invocation, Parameter, Plan, Severity, Span, Step,
-    Style, Tool, ToolStep, ValueKind,
+    Style, TemplateDescriptor, TemplateRequest, Tool, ToolStep, ValueKind,
 };
 
 fn descriptor(
@@ -43,7 +45,7 @@ pub(super) fn commands() -> Vec<Descriptor> {
         required: true,
         help: "whom to greet".into(),
     };
-    vec![
+    let mut all = vec![
         descriptor("literal-hello", vec![who.clone()], &["$out"], Style::Plan),
         descriptor("greet", vec![who], &["greeted.txt"], Style::Plan),
         // a core command: refused with a warning, never run
@@ -63,7 +65,25 @@ pub(super) fn commands() -> Vec<Descriptor> {
             reads: vec!["data".into()],
             ..descriptor("literal-sneak", vec![], &[], Style::Plan)
         },
-    ]
+        Descriptor {
+            name: "literal-in-place".into(),
+            summary: "tests in-place tool step execution and validation".into(),
+            positionals: vec![],
+            options: vec![Parameter {
+                name: "mode".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "test mode".into(),
+            }],
+            inputs: vec![],
+            reads: vec![],
+            writes: vec!["staged.txt".into(), "after.txt".into()],
+            style: Style::Plan,
+        },
+    ];
+    all.extend(deps::commands());
+    all
 }
 
 /// A step of the granted `node` that copies `data/in.txt` to `copy.txt`,
@@ -82,6 +102,7 @@ fn copy_step(invocation: &Invocation, read: &str) -> Option<Step> {
         inputs: vec![],
         reads: vec![read.into()],
         outputs: vec!["copy.txt".into()],
+        in_place: false,
     }))
 }
 
@@ -92,7 +113,19 @@ fn value<'a>(invocation: &'a Invocation, name: &str) -> Option<&'a str> {
         .map(String::as_str)
 }
 
-pub(super) fn run(invocation: &Invocation) -> Plan {
+fn values<'a>(invocation: &'a Invocation, name: &str) -> &'a [String] {
+    (invocation.arguments.iter())
+        .find(|a| a.name == name)
+        .map_or(&[], |a| a.values.as_slice())
+}
+
+pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
+    if matches!(
+        invocation.name.as_str(),
+        "install" | "add" | "remove" | "update" | "deps"
+    ) {
+        return deps::run(invocation);
+    }
     let mut plan = Plan::empty();
     let who = value(invocation, "who").unwrap_or("nobody");
     match invocation.name.as_str() {
@@ -146,10 +179,45 @@ pub(super) fn run(invocation: &Invocation) -> Plan {
             inputs: vec![],
             reads: vec![],
             outputs: vec!["made.txt".into()],
+            in_place: false,
         })),
+        "literal-in-place" => {
+            let mode = value(invocation, "mode").unwrap_or("ok");
+            let node = invocation
+                .tools
+                .iter()
+                .find(|t| t.id == "node")
+                .cloned()
+                .unwrap_or(Tool {
+                    id: "node".into(),
+                    version: String::new(),
+                    sha256: String::new(),
+                });
+            plan.files.push(file("staged.txt", "staged-content\n"));
+            let (inputs, reads, outputs) = match mode {
+                "bad-inputs" => (vec!["staged.txt".into()], vec![], vec!["after.txt".into()]),
+                "bad-reads" => (vec![], vec!["staged.txt".into()], vec!["after.txt".into()]),
+                "bad-outputs" => (vec![], vec![], vec!["undeclared.txt".into()]),
+                _ => (vec![], vec![], vec!["after.txt".into()]),
+            };
+            plan.steps.push(Step::Tool(ToolStep {
+                id: "in-place".into(),
+                tool: node,
+                arguments: vec![
+                    "-e".into(),
+                    "const fs = require('fs'); fs.writeFileSync('after.txt', 'saw:' + fs.readFileSync('staged.txt', 'utf8'));"
+                        .into(),
+                ],
+                environment: vec![],
+                inputs,
+                reads,
+                outputs,
+                in_place: true,
+            }));
+        }
         _ => {}
     }
-    plan
+    Ok(plan)
 }
 
 fn file(path: &str, text: &str) -> File {
@@ -205,4 +273,88 @@ pub(super) fn resume(state: &[u8], outputs: &[File]) -> Plan {
 
 pub(super) fn unknown(name: &str) -> Vec<Diagnostic> {
     command::unknown(name)
+}
+
+pub(super) fn templates() -> Vec<TemplateDescriptor> {
+    vec![
+        TemplateDescriptor {
+            name: "starter".into(),
+            summary: "Minimal literal starter project".into(),
+        },
+        TemplateDescriptor {
+            name: "escape".into(),
+            summary: "Fixture template that escapes the target directory".into(),
+        },
+        TemplateDescriptor {
+            name: "stepped".into(),
+            summary: "Fixture template that returns a disallowed tool step".into(),
+        },
+        TemplateDescriptor {
+            name: "bad-lock".into(),
+            summary: "Fixture template that writes a malformed flick.lock".into(),
+        },
+    ]
+}
+
+pub(super) fn scaffold(request: &TemplateRequest) -> Result<Plan, Vec<Diagnostic>> {
+    let mut plan = Plan::empty();
+    match request.template.as_str() {
+        "starter" => {
+            let name = &request.name;
+            let compiler = &request.compiler;
+            let init = request.init;
+            plan.files = vec![
+                file(
+                    "flick.toml",
+                    "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+                ),
+                file(
+                    "src/App/Main.fl",
+                    &format!(
+                        "module App.Main exposing (main)\n\nmain : Unit ->{{Host.Console; AppError}} Unit\nlet main () = Platform.stdout_line \"hello from {name}\"\n"
+                    ),
+                ),
+                file(
+                    "README.md",
+                    &format!("# {name}\ncompiler: {compiler}\ninit: {init}\n"),
+                ),
+                file("AGENTS.md", "# Literal template agents\n"),
+            ];
+            plan.stdout = format!("Next: literal starter `{name}` ready\n").into_bytes();
+            Ok(plan)
+        }
+        "escape" => {
+            plan.files.push(file("../outside.txt", "escaped\n"));
+            Ok(plan)
+        }
+        "stepped" => {
+            plan.files.push(file("flick.toml", "schema-version = 1\n"));
+            plan.steps.push(Step::Tool(ToolStep {
+                id: "forbidden".into(),
+                tool: Tool {
+                    id: "node".into(),
+                    version: "0.0.0".into(),
+                    sha256: "0".repeat(64),
+                },
+                arguments: vec![],
+                environment: vec![],
+                inputs: vec![],
+                reads: vec![],
+                outputs: vec!["made.txt".into()],
+                in_place: false,
+            }));
+            Ok(plan)
+        }
+        "bad-lock" => {
+            plan.files = vec![
+                file(
+                    "flick.toml",
+                    "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+                ),
+                file("flick.lock", "version = \"broken\"\n"),
+            ];
+            Ok(plan)
+        }
+        other => Err(command::unknown_template(other, &templates())),
+    }
 }

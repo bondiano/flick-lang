@@ -205,18 +205,22 @@ func (it *chunkLeaves) next() []Value {
 }
 
 func (c *Chunk) equals(other *Chunk) bool {
+	return c.equalsWith(other, false)
+}
+
+func (c *Chunk) equalsWith(other *Chunk, strictZero bool) bool {
 	if c.length() != other.length() {
 		return false
 	}
 	if c.left == nil && other.left == nil {
-		return Equals(c.leaf, other.leaf)
+		return equalValues(c.leaf, other.leaf, strictZero)
 	}
 	left, right := chunkLeaves{current: c}, chunkLeaves{current: other}
 	xs, ys := left.next(), right.next()
 	for len(xs) != 0 {
 		n := min(len(xs), len(ys))
 		for i := range n {
-			if !Equals(xs[i], ys[i]) {
+			if !equalValues(xs[i], ys[i], strictZero) {
 				return false
 			}
 		}

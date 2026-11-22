@@ -1,0 +1,29 @@
+// Syntax errors for postfix `catch` and reserved-word positions.
+module App.PostfixCatchSyntaxFail exposing (..)
+
+let catch = 1
+//~ FLICK-S007 @4:5-4:10
+
+let binder = fun catch -> 1
+//~ FLICK-S007 @7:18-7:23
+
+let pun r =
+  let { catch } = r
+  //~ FLICK-S007 @11:9-11:14 `catch` is a reserved keyword and cannot be bound by `{ catch }`
+  1
+
+let missing_bar x = x catch E -> 0
+//~ FLICK-S007 @15:29-15:30
+
+let shorthand x = x catch 0
+//~ FLICK-S007 @18:27-18:28
+
+let mixed_pipes x = x |> f <| y catch | E -> 0
+//~ FLICK-S007 @21:23-21:25 `<|` and `|>` do not mix
+
+let chained x =
+  x catch
+  | E -> 1
+  catch
+  //~ FLICK-S007 @27:3-27:8 cannot chain `catch` without parentheses
+  | F -> 2

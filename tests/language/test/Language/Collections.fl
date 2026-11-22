@@ -113,4 +113,164 @@ let tests = [
       Test.equal [5381, 0, -182423092, 177629] [hash "", hash 0, hash 1.5, hash (Some "x")]
     ),
   ],
+  Test.group "hash seq" [
+    Test.test "empty map and set sequences" (fun () ->
+      let empty_map : HashMap.HashMap EqHash.Canonical Int String = HashMap.empty
+      let empty_set : HashSet.HashSet EqHash.Canonical Int = HashSet.empty
+      let built_map : HashMap.HashMap EqHash.Canonical Int String =
+        HashMap.from_seq EqHash.canonical Seq.empty
+      let built_set : HashSet.HashSet EqHash.Canonical Int =
+        HashSet.from_seq EqHash.canonical Seq.empty
+      Test.equal ([], None, [], None, true, 0, true, 0) (
+        Seq.to_list (HashMap.to_seq empty_map),
+        Seq.first (HashMap.to_seq empty_map),
+        Seq.to_list (HashSet.to_seq empty_set),
+        Seq.first (HashSet.to_seq empty_set),
+        HashMap.is_empty built_map,
+        HashMap.size built_map,
+        HashSet.is_empty built_set,
+        HashSet.size built_set,
+      )
+    ),
+    Test.test "repeat and partial traversal preserve walk order" (fun () ->
+      let m = HashMap.from_seq EqHash.canonical (for { n <- Seq.range 0 40 } yield (n, n * 10))
+      let s = HashSet.from_seq EqHash.canonical (Seq.range 0 40)
+      let ms = HashMap.to_seq m
+      let ss = HashSet.to_seq s
+      let first_five = [(0, 0), (32, 320), (1, 10), (33, 330), (2, 20)]
+      let mut broken : List Int = []
+      for x <- ss do {
+        if List.length broken == 4 then break
+        broken = broken ++ [x]
+      }
+      Test.equal
+        (
+          [],
+          Some (0, 0),
+          first_five,
+          first_five,
+          [((0, 0), (0, 0)), ((32, 320), (32, 320)), ((1, 10), (1, 10))],
+          HashMap.to_list m,
+          [0, 32, 1, 33],
+          [0, 32, 1, 33, 2, 34],
+          HashSet.to_list s,
+        )
+        (
+          Seq.to_list (Seq.take 0 ms),
+          Seq.first ms,
+          Seq.to_list (Seq.take 5 ms),
+          Seq.to_list (Seq.take 5 ms),
+          Seq.to_list (Seq.take 3 (Seq.zip ms ms)),
+          Seq.to_list ms,
+          broken,
+          Seq.to_list (Seq.take 6 ss),
+          Seq.to_list ss,
+        )
+    ),
+    Test.test "collisions keep bucket and insertion order in to_seq" (fun () ->
+      let constant_hash =
+        EqHash.with (fun a b -> a == b) (fun _ -> 7) (fun w ->
+          let m =
+            HashMap.from_seq
+              w
+              (Seq.of_list [("first", 1), ("second", 2), ("third", 3), ("fourth", 4)])
+          let replaced = HashMap.insert "second" 20 m
+          (
+            Seq.to_list (Seq.take 2 (HashMap.to_seq m)),
+            Seq.to_list (HashMap.to_seq replaced),
+          )
+        )
+      let thirds =
+        EqHash.with (fun a b -> a == b) (fun n -> n % 3) (fun w ->
+          let s = HashSet.from_seq w (Seq.of_list [7, 4, 1, 9, 6, 2, 5, 8, 3])
+          (Seq.to_list (Seq.take 4 (HashSet.to_seq s)), Seq.to_list (HashSet.to_seq s))
+        )
+      Test.equal
+        (
+          (
+            [("first", 1), ("second", 2)],
+            [("first", 1), ("second", 20), ("third", 3), ("fourth", 4)],
+          ),
+          ([9, 6, 3, 7], [9, 6, 3, 7, 4, 1, 2, 5, 8]),
+        )
+        (constant_hash, thirds)
+    ),
+    Test.test "custom witnesses, duplicates, and from_seq on lazy sequences" (fun () ->
+      let result =
+        EqHash.with
+          (fun a b -> String.to_lower a == String.to_lower b)
+          (fun s -> hash (String.to_lower s))
+          (fun w ->
+            let map_input = for {
+              pair <- Seq.of_list [("A", 1), ("b", 2), ("a", 10), ("B", 20), ("c", 3)]
+            } yield pair
+            let m = HashMap.from_seq w map_input
+            let merged = HashMap.union m (HashMap.insert "C" 30 (HashMap.with w))
+            let set_input =
+              Seq.unfold
+                (fun xs ->
+                  match xs with
+                  | [] -> None
+                  | [head, ...tail] -> Some (head, tail)
+                )
+                ["Ada", "ada", "Bob", "BOB", "Cid"]
+            let s = HashSet.from_seq w set_input
+            let merged_set = HashSet.union s (HashSet.insert "CID" (HashSet.with w))
+            (
+              HashMap.size m,
+              HashMap.get "A" m,
+              HashMap.get "b" m,
+              HashMap.get "c" merged,
+              List.sort (Seq.to_list (HashMap.to_seq m)),
+              HashSet.size s,
+              HashSet.size merged_set,
+              HashSet.member "ADA" s,
+              List.sort (Seq.to_list (HashSet.to_seq s)),
+            )
+          )
+      Test.equal
+        (
+          3,
+          Some 10,
+          Some 20,
+          Some 30,
+          [("B", 20), ("a", 10), ("c", 3)],
+          3,
+          3,
+          true,
+          ["Ada", "Bob", "Cid"],
+        )
+        result
+    ),
+    Test.test "persistent snapshots stay isolated across inserts and removals" (fun () ->
+      let m0 =
+        HashMap.from_seq
+          EqHash.canonical
+          (Seq.of_list [(0, "zero"), (32, "thirty-two"), (1, "one"), (2, "two")])
+      let seq0 = HashMap.to_seq m0
+      let prefix_before = Seq.to_list (Seq.take 2 seq0)
+      let m1 = HashMap.insert 33 "thirty-three" (HashMap.insert 0 "ZERO" (HashMap.remove 32 m0))
+      let s0 = HashSet.from_seq EqHash.canonical (Seq.of_list [0, 32, 1, 2])
+      let sseq0 = HashSet.to_seq s0
+      let set_before = Seq.to_list (Seq.take 2 sseq0)
+      let s1 = HashSet.insert 33 (HashSet.remove 32 s0)
+      Test.equal
+        (
+          [(0, "zero"), (32, "thirty-two")],
+          [(0, "zero"), (32, "thirty-two"), (1, "one"), (2, "two")],
+          [(0, "ZERO"), (1, "one"), (33, "thirty-three"), (2, "two")],
+          [0, 32],
+          [0, 32, 1, 2],
+          [0, 1, 33, 2],
+        )
+        (
+          prefix_before,
+          Seq.to_list seq0,
+          Seq.to_list (HashMap.to_seq m1),
+          set_before,
+          Seq.to_list sseq0,
+          Seq.to_list (HashSet.to_seq s1),
+        )
+    ),
+  ],
 ]

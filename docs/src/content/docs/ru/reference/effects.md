@@ -1,6 +1,6 @@
 ---
 title: "Эффекты и ошибки"
-source_hash: 8e4712e74b9dd7c1
+source_hash: 82e9cea36f54307a
 ---
 
 Компилятор проверяет, где допустимы эффектные вызовы, какие сервисы и ошибки
@@ -323,6 +323,82 @@ let find_optional id =
 ```
 
 Ветвь с образцом, который соответствует не ошибке, вызывает `FLICK-E007`.
+
+Постфиксный `catch` — синтаксический сахар над `try … with` только для
+типизированных ошибок с тем же порядком вычисления, вычитанием строк,
+захватами и правилами изменяемости:
+
+```flick
+# type error FileNotFound = FileNotFound String
+# type error InvalidConfig = InvalidConfig String
+# type alias Config = { host : String }
+# default_config : Config
+# let default_config = { host = "localhost" }
+# load_config : String ->{; FileNotFound, InvalidConfig} Config
+# let load_config path = Fail.fail (FileNotFound path)
+# load_backup : String ->{} Config
+# let load_backup _ = default_config
+#
+read_config : String ->{} Config
+let read_config path =
+  load_config path catch
+  | FileNotFound _ -> default_config
+  | InvalidConfig details -> load_backup details
+```
+
+Приоритет `catch` слабее всех инфиксных операторов, а ведущий `|` обязателен
+даже для одной ветви. Конвейер внутри ветви восстановления принадлежит этой
+ветви; чтобы передать в конвейер результат всего `catch`, поставьте скобки
+(`(load id catch | NotFound _ -> guest) |> format`), а для перехвата ошибок
+из ветви восстановления заключите внутренний `catch` в скобки
+(`(a catch | E -> b) catch | F -> c`). Ветви операций (`| S.op x -> …`),
+ветви `return`, ветви `Fail.fail p` и `resume` в `catch` отклоняются
+(`FLICK-E007` / `FLICK-T001`); для обработки операций эффектов используйте
+`try … with`. Обработчик устанавливается до вычисления левого выражения,
+условия `when` и тела восстановления выполняются вне этого обработчика
+(поэтому ошибка того же номинального типа уходит во внешний обработчик, а не
+в следующие ветви), чистые значения `Err` и холодные `task { … }` не
+затрагиваются, а оператор `?` для `Option` не может пересекать границу
+возврата `catch`.
+
+### `result { … }`
+
+`result { body }` — энергичная граница типизированных ошибок: блок выполняется
+один раз в текущем файбере, обычное значение оборачивается в `Ok`, а любая
+типизированная ошибка — в `Err`, давая `Result (Errors e) a`. Это сокращение
+для канонического обработчика `try`:
+
+```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error NotFound = NotFound UserId
+# type error DbUnavailable = DbUnavailable
+# service Users =
+#   get : UserId ->{; NotFound, DbUnavailable} User
+#
+load_result : UserId ->{Users} Result (Errors {NotFound, DbUnavailable}) User
+let load_result id =
+  result {
+    Users.get id
+  }
+```
+
+- `result { … }` снимает типизированные ошибки тела с внешней строки ошибок,
+  сохраняя требования к сервисам `r` и открытую строку ошибок `e`. Если тело не
+  бросает типизированных ошибок, `Errors none` упрощается до `Never`
+  (`Result Never a`); для одной ошибки `E` тип `Errors {E}` совпадает с `E`.
+- Это runtime-конструкция даже при пустых строках: она допускается под `->{}` и
+  отклоняется с `FLICK-E001` под чистой стрелкой `->` и в значении верхнего
+  уровня.
+- Блок не разворачивает вложенный `Result` (`result { Err e }` даёт
+  `Ok (Err e)`) и не запускает холодные значения `Eff` или `Lazy`, возвращённые
+  из тела (для их запуска нужен `await` внутри блока).
+- В `Err` попадают только типизированные ошибки: дефекты (`Effect.die`),
+  прерывание файбера и раскрутка эффектов `abort`/`control` проходят насквозь,
+  как в `try`.
+- Слово `result` контекстно только непосредственно перед `{`; в остальных
+  местах это обычное имя. Чтобы вызвать функцию с именем `result` с литералом
+  записи, заключите функцию в скобки: `(result) { field = 1 }`.
 
 `Errors e` преобразует строку ошибок в тип: `Errors none` — это `Never`,
 `Errors {NotFound}` — это `NotFound`. `from_result` завершает вычисление

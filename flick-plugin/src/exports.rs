@@ -184,4 +184,20 @@ pub trait Plugin {
         let _ = state;
         command::Plan::empty()
     }
+    /// Project templates the plugin provides for `flick new` and `flick init`.
+    #[cfg(feature = "commands")]
+    fn templates(&self) -> Vec<command::TemplateDescriptor> {
+        Vec::new()
+    }
+    /// The plan of files (and optional stdout guidance) for a project from `request`.
+    #[cfg(feature = "commands")]
+    fn scaffold(
+        &self,
+        request: &command::TemplateRequest,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        Err(command::unknown_template(
+            &request.template,
+            &self.templates(),
+        ))
+    }
 }

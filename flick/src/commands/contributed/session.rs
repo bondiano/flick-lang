@@ -9,13 +9,14 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
-use flick_backend::command::{Descriptor, Handled, Invocation, Opened};
+use flick_backend::command::{Descriptor, Handled, Invocation, Opened, Plan};
 use flick_backend::host::runtime::Cancellation;
 use flick_core::project::Project;
+use flick_core::source::SourceMap;
 use serde_json::{Value, json};
 
 use super::Contributor;
-use super::plan::{carry_out, finish};
+use super::plan::{InPlaceMode, carry_out, finish};
 use super::projection::Projections;
 use crate::args::GlobalArguments;
 use crate::backends::Tool;
@@ -41,11 +42,20 @@ pub(super) fn serve(
         Ok(Opened::Session(state)) => state,
         // it runs once instead, as a plan command does
         Ok(Opened::Plan(plan)) => {
-            let done = carry_out(project, contributor, descriptor, invocation, plan, tools);
-            let _ = io::stdout().write_all(&done.stdout);
-            return finish(global, invocation, &done.diagnostics, &done.refused);
+            return finish_plan(
+                project,
+                contributor,
+                descriptor,
+                invocation,
+                plan,
+                tools,
+                global,
+                false,
+            );
         }
-        Err(diagnostics) => return finish(global, invocation, &diagnostics, &[]),
+        Err(diagnostics) => {
+            return finish(global, invocation, SourceMap::default(), &diagnostics, &[]);
+        }
     };
     let mut projections = Projections::default();
     let Ok(engine) = component::engine() else {
@@ -122,12 +132,57 @@ pub(super) fn serve(
         }
     }
     let plan = contributor.close(state);
-    let done = carry_out(project, contributor, descriptor, invocation, plan, tools);
     // stdout is the protocol's: what the session prints goes to stderr
+    finish_plan(
+        project,
+        contributor,
+        descriptor,
+        invocation,
+        plan,
+        tools,
+        global,
+        true,
+    )
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "shared plan completion for session open/close"
+)]
+fn finish_plan(
+    project: &Project,
+    contributor: &dyn Contributor,
+    descriptor: &Descriptor,
+    invocation: &Invocation,
+    plan: Plan,
+    tools: &[Tool],
+    global: &GlobalArguments,
+    to_stderr: bool,
+) -> ExitCode {
+    let done = carry_out(
+        project,
+        contributor,
+        descriptor,
+        invocation,
+        plan,
+        tools,
+        InPlaceMode::Tool,
+        Some(global),
+    );
     if !done.stdout.is_empty() {
-        eprint!("{}", String::from_utf8_lossy(&done.stdout));
+        if to_stderr {
+            eprint!("{}", String::from_utf8_lossy(&done.stdout));
+        } else {
+            let _ = io::stdout().write_all(&done.stdout);
+        }
     }
-    finish(global, invocation, &done.diagnostics, &done.refused)
+    finish(
+        global,
+        invocation,
+        done.sources,
+        &done.diagnostics,
+        &done.refused,
+    )
 }
 
 /// The result of `call`, on a thread of its own: what arrives meanwhile

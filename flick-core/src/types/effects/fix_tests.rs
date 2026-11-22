@@ -442,7 +442,9 @@ fn the_fix_of_g003_adds_the_constraint_to_the_context() {
 #[test]
 fn the_fix_of_g003_names_only_a_region_of_the_signature() {
     // the region of `Scope.run` is not the signature's `s`, though shown as
-    // `s`, and that of a `from_build` body or of a named task is not there
+    // `s`. A named task awaited in a `from_build` body registers its
+    // finalizer in the region of the body, which assumes `Provided`, as a
+    // direct call does
     let text = "module Probe exposing (..)\n\
         service Log =\n  line : String ->{} Unit\n\
         service Box =\n  value : Unit ->{} String\n\
@@ -456,11 +458,17 @@ fn the_fix_of_g003_names_only_a_region_of_the_signature() {
     let mut sources = SourceMap::default();
     let file = sources.add("Probe.fl", text.to_owned());
     let diagnostics = crate::check(&sources, file);
-    let unnamed: Vec<_> = (diagnostics.iter())
-        .filter(|d| d.code == codes::G003)
-        .collect();
-    assert_eq!(unnamed.len(), 2, "{diagnostics:?}");
-    assert!(unnamed.iter().all(|d| d.fixes.is_empty()), "{unnamed:?}");
+    let [unnamed] = &diagnostics[..] else {
+        panic!("{diagnostics:?}")
+    };
+    assert_eq!(unnamed.code, codes::G003, "{unnamed:?}");
+    assert!(unnamed.fixes.is_empty(), "{unnamed:?}");
+    let ran = text.find("Scope.add_finalizer").expect("in `ran`");
+    assert_eq!(
+        unnamed.span.map(|s| s.start as usize),
+        Some(ran),
+        "{unnamed:?}"
+    );
 }
 
 #[test]

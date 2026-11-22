@@ -8,6 +8,76 @@ Every statement before the last must have type `Unit`; another value is
 dropped only with `ignore` (`FLICK-T011`, with that fix). The last statement
 is the value of the block and must be an expression (`FLICK-T019`).
 
+## Pattern matching with `let ... else`
+
+Inside an ordinary statement block, `let pattern = initializer else fallback`
+matches `initializer` against `pattern` and, when it does not match, returns
+`fallback` as the result of the remainder of the current block. It is exact
+sugar for:
+
+```text
+match initializer with
+| pattern -> <rest of current block>
+| _ -> fallback
+```
+
+Statements before `let ... else` stay outside the `match`, `initializer` is
+evaluated once, and `fallback` is a regular expression of the current block's
+result type (it does not require `Never` and is not a nonlocal `return`).
+
+```flick
+type InputError = MissingName | MissingEmail
+type alias RawInput = { name : Option String; email : Option String }
+type alias User = { name : String; email : String }
+
+build_user : RawInput -> Result InputError User
+let build_user input =
+  let Some name = input.name else
+    Err MissingName
+
+  let Some email = input.email else
+    Err MissingEmail
+
+  Ok { name = name; email = email }
+```
+
+When `let ... else` sits inside a nested block such as an outer `let`
+initializer, mismatch only finishes that inner block and the surrounding block
+continues with the fallback value:
+
+```flick
+# type alias User = { name : String }
+# render : String -> String
+# let render s = "Hello, " ++ s
+#
+greet : Option User -> String
+let greet maybe_user =
+  let name =
+    let Some user = maybe_user else "guest"
+    user.name
+  render name
+```
+
+- **Scope and shadowing.** Pattern bindings are in scope only in the success
+  remainder after `else`, never in `initializer` or `fallback`. If `pattern`
+  shadows an outer local, `fallback` still sees the outer binding.
+- **Monomorphic bindings.** Every name bound by `let ... else` is monomorphic,
+  just like in `match` — even an irrefutable single-variable pattern
+  `let x = v else fallback`. It never generalizes like ordinary `let x = v`.
+  An irrefutable pattern emits `FLICK-T010` warning that `else` is unreachable,
+  while retaining `match` typing.
+- **GADT, row, class, mutation and resource rules.** GADT refinements,
+  existentials, row equalities and held class dictionaries apply only in the
+  success remainder. Earlier `let mut` assignments persist on both paths; no
+  function, loop or handler boundary is added, so `break`, `continue`, `?`,
+  `try` and `scope` behave identically to the equivalent `match`.
+- **v1 boundaries.** `let ... else` requires a non-empty success remainder
+  (`FLICK-T019` otherwise). It is not allowed at the module level, directly as
+  a `do` or `for` clause (though ordinary `for ... do` loop bodies are
+  allowed), with `rec`/`mut`/`lazy`/`assert`, with function parameters, with a
+  paired or inline type signature, or with `when` guards (`FLICK-S007` /
+  `FLICK-T006`).
+
 ## Variables
 
 `let mut name = value` declares a variable of the function whose block holds
@@ -120,8 +190,11 @@ higher-rank argument over a runtime result is `FLICK-T013`, and so is a
 top-level value whose type stays unknown. Type variables of an enclosing
 signature, or of a value already in scope, are never generalized, and mutable
 containers are invariant. A row of calls still unknown when a binding is
-generalized becomes `none`, as at the end of a declaration
-([empty rows](../effects/#empty-rows-none)); it is not quantified.
+generalized is not quantified. At the top level it becomes `none`, as at the
+end of a declaration ([empty rows](../effects/#empty-rows-none)). Inside a
+function it stays of one type, which the uses of the binding fill: a local
+helper may pass its callback to a function that runs it. The type arguments
+of a known service can still be generalized.
 
 ```flick
 make_empty : forall a. Unit ->{} Ref (Option a)

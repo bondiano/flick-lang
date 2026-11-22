@@ -1,0 +1,50 @@
+// RG4 / T4': holding a retired Arena or Value without dereferencing it is
+// accepted across closures, tasks, records, nested scopes, and persistent Contexts.
+module App.ArenaHoldingContexts exposing (..)
+
+import Arena
+
+service Holder =
+  touch : Unit ->{} Unit
+
+type Wrapped = Wrapped (Unit ->{} Unit)
+
+held_in_record : Unit ->{} { keep : Unit ->{} Unit; label : String }
+let held_in_record () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "record-kept"
+  { keep = fun () -> ignore view; label = Arena.get view }
+}
+
+held_in_adt : Unit ->{} Wrapped
+let held_in_adt () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "adt-kept"
+  Wrapped (fun () -> ignore view)
+}
+
+held_in_context : Unit ->{} Context.Context {Holder}
+let held_in_context () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "ctx-kept"
+  Context.make Holder { touch = fun () -> ignore view }
+}
+
+held_across_nested_and_reference : Unit ->{} (String, Eff {} none Unit)
+let held_across_nested_and_reference () =
+  let pref = Context.reference "arena-holding/pref" (fun () -> "default")
+  scope {
+    let arena = Arena.make ()
+    let view = Arena.alloc arena "nested-kept"
+    let label =
+      Context.with_reference
+        pref
+        "pfx"
+        (task {
+          scope {
+            let inner = Arena.alloc (Arena.make ()) "inner"
+            Context.read pref ++ ":" ++ Arena.get inner ++ "+" ++ Arena.get view
+          }
+        })
+    (label, task { ignore view })
+  }

@@ -176,7 +176,7 @@ impl Checker<'_> {
                 result,
             } => {
                 if !early {
-                    self.expect(&arg, &param, self.span(lhs));
+                    self.meeting_parameter(rhs, 0, &param, |c| c.expect(&arg, &param, c.span(lhs)));
                 }
                 if let Some(e) = effects {
                     let (start, _) = lhs.range();

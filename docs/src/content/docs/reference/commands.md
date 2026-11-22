@@ -2,9 +2,11 @@
 title: "Contributed commands"
 ---
 
-A project's backend and the plugins of its dependencies may add commands
-to `flick`, beside its own. `flick --help` lists them, grouped by the
-backend or plugin that adds them.
+Built-in `std`, a project's backend and the plugins of its dependencies may add
+commands to `flick`, beside its own. `flick --help` lists them, grouped by the
+contributor that adds them. Built-in `std` provides `schema export`
+(`std:schema export`) in memory without loading a WebAssembly component or
+touching the descriptor cache.
 
 ## Running one
 
@@ -22,7 +24,11 @@ flick literal:literal-hello you --out greetings
 - When two contributors add the same name, the flat name is
   `FLICK-P053`, which lists the qualified names.
 - A contributor cannot take a name of `flick` itself, as `build`. Such a
-  declaration is ignored, with the warning `FLICK-P054`.
+  declaration is ignored, with the warning `FLICK-P054`. Backends (and not
+  plugins) may implement the core dependency and app-packaging verbs
+  (`install`, `add`, `remove`, `update`, `deps`, `pack`) as `plan` commands;
+  `flick` delegates the target-ecosystem portion of those verbs to the selected
+  backend instead of ignoring them.
 - A name nobody adds is `FLICK-P052`. When an official backend or a
   contributor the store has seen adds it, the message names that one.
 
@@ -104,9 +110,28 @@ itself: it returns a plan, which the host checks and carries out.
 - **Files** are written under the declared paths.
 - **Tool steps** run a host tool from `invocation.tools`. These are the
   tools the project allows the contributor in `[tools]`, by plugin package
-  or backend id, and the host pins each one by digest and version. A
-  step's `reads`, within the descriptor's, appear in its directory at the
-  same relative path, linked to the project's files rather than copied.
+  or backend id, and the host pins each one by digest and version (a granted
+  tool missing from `PATH` appears with empty `version` and `sha256` so the
+  command can report a clear error; trying to execute it is refused). A
+  staged step's `reads`, within the descriptor's, appear in its directory at the
+  same relative path, linked to the project's files rather than copied. A step
+  with `in_place: true` runs directly in the project's root after the plan's
+  files are published (used by backend package managers): it takes no `inputs`
+  or `reads`, cannot be used with `resume` or editor previews, and every path
+  in `outputs` must be declared under `descriptor.writes`.
+- **Dependencies**: delegated backend verbs also receive
+  `invocation.dependencies`, the transitive closure of
+  `[target.<name>.dependencies]` for that backend.
+- **`run-flick` steps** compile and run a Flick program through the project's
+  selected backend in an isolated temporary generation, without writing to the
+  project tree or the disk module cache. A step may overlay in-memory
+  `FlickModule` sources on `$sources`, pass `arguments` to the program, capture
+  stdout into `output` (handed to `resume` when set, otherwise published under
+  `descriptor.writes`), and attach an `origin` span in `invocation.inputs` so
+  diagnostics originating in synthetic overlay modules point back to user
+  source. Only the selected backend's own `[tools]` grant applies (for example
+  `"flick/go" = ["go"]` on Go, and none on `flick/js`); runtime failures,
+  timeouts, or output-limit violations report `FLICK-P061`.
 - **Diagnostics** are reported as the compiler's own. A `span` points into
   a file of `invocation.inputs`, and `help` tells the user what to do.
 - **`stdout`** is what the command prints.
@@ -117,7 +142,10 @@ itself: it returns a plan, which the host checks and carries out.
 
 The host refuses a plan with `FLICK-P055` before anything happens when it
 writes outside its declared paths or the project, runs a tool the host did
-not pin, or reads a file the plan does not have. A step runs in a directory
+not pin, reads a file the plan does not have, or includes an invalid
+`run-flick` step (invalid or duplicate module names, duplicate step ids,
+oversized overlays, escaping or undeclared output paths, or an out-of-bounds
+`origin` span). Steps run in declared order, each tool step in a directory
 of its own with only its inputs, as a build step does (see
 [project.md](../project/)). The files of every plan and the outputs of the
 last plan's steps are then published together in one transaction: a
@@ -145,3 +173,24 @@ keeps it open, as an editor integration does. The host owns stdio:
 - `exit`, or the end of stdin, calls `close`, whose plan the host carries
   out. What that plan prints goes to stderr, since stdout belongs to the
   protocol.
+
+## Templates
+
+Backends and library plugins also contribute project templates for `flick new`
+and `flick init` on the same `flick:command/command` interface:
+
+- `templates()` returns a list of `TemplateDescriptor { name, summary }`.
+- `scaffold(request)` receives a `TemplateRequest { template, name, compiler, init }`
+  (with the normalized package name and the running compiler's version) and
+  returns a `Plan` of all template files — including `flick.toml` — plus
+  optional next-step guidance in `stdout`.
+
+Template plans are pure file plans: the host refuses any template plan that
+includes host `steps` (`tool` or `run-flick`), `resume`, `needs`, or escaping
+paths with `FLICK-P055` before creating directories or writing files. Unknown
+templates return `FLICK-P060` listing the contributor's available templates.
+
+Users select an official backend's templates with `--target <name>` (`js` by
+default, or `go`), or load a third-party plugin or backend template package
+with `--from <path|url|git>` (verified like `flick add` and pinned under
+`[[template]]` in `flick.lock`).

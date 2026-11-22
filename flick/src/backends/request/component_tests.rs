@@ -23,12 +23,7 @@ fn fixture(typescript: bool, release: bool, rt: bool) -> (Prepared, Vec<build::A
     )
 }
 
-fn fixture_at(
-    path: &str,
-    typescript: bool,
-    release: bool,
-    rt: bool,
-) -> (Prepared, Vec<build::Artifact>) {
+fn compile_fixture(path: &str, rt: bool) -> (FsHost, SourceMap, project::Compilation) {
     let host = FsHost::new();
     let mut sources = SourceMap::default();
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join(path);
@@ -38,6 +33,17 @@ fn fixture_at(
         !diagnostics.iter().any(|d| d.severity == Severity::Error),
         "{diagnostics:?}"
     );
+    (host, sources, compilation)
+}
+
+fn prepare_fixture(
+    host: &FsHost,
+    sources: &mut SourceMap,
+    compilation: &project::Compilation,
+    typescript: bool,
+    release: bool,
+    rt: bool,
+) -> (Prepared, Vec<build::Artifact>) {
     let output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
@@ -65,18 +71,18 @@ fn fixture_at(
         },
         release,
     };
-    let (native, diagnostics) = with_settings(&host, None, &compilation, &output, |settings| {
-        build::emit(&compilation, &sources, settings)
+    let (native, diagnostics) = with_settings(host, None, compilation, &output, |settings| {
+        build::emit(compilation, sources, settings)
     });
     assert!(
         !diagnostics.iter().any(|d| d.severity == Severity::Error),
         "{diagnostics:?}"
     );
     let prepared = Prepared::new(
-        &host,
-        &mut sources,
+        host,
+        sources,
         None,
-        &compilation,
+        compilation,
         &output,
         BackendPin {
             identity: BackendId {
@@ -94,22 +100,42 @@ fn fixture_at(
     (prepared, native)
 }
 
+fn fixture_at(
+    path: &str,
+    typescript: bool,
+    release: bool,
+    rt: bool,
+) -> (Prepared, Vec<build::Artifact>) {
+    let (host, mut sources, compilation) = compile_fixture(path, rt);
+    prepare_fixture(&host, &mut sources, &compilation, typescript, release, rt)
+}
+
 #[cfg(feature = "wasm-backends")]
 #[test]
 fn official_js_component_emits_deep_owner_policies_with_its_default_budget() {
     use flick_backend::host::{Budget, WasmBackend};
     let bytes = include_bytes!("../../../../backends/js/package/component.wasm");
+    let sha256 = flick_backend::sha256(bytes);
+    let pin = BackendPin {
+        identity: BackendId {
+            id: "flick/js".into(),
+            version: "0.1.0".into(),
+        },
+        sha256: sha256.clone(),
+    };
+    let backend = WasmBackend::load(
+        component::engine().expect("engine"),
+        pin,
+        bytes,
+        Budget::default(),
+    )
+    .expect("distributed JS component");
+    let (host, mut sources, compilation) =
+        compile_fixture("tests/rt/owner_foreign_policy.fl", true);
     for release in [false, true] {
         let (mut prepared, native) =
-            fixture_at("tests/rt/owner_foreign_policy.fl", false, release, true);
-        prepared.request.backend.sha256 = flick_backend::sha256(bytes);
-        let backend = WasmBackend::load(
-            component::engine().expect("engine"),
-            prepared.request.backend.clone(),
-            bytes,
-            Budget::default(),
-        )
-        .expect("distributed JS component");
+            prepare_fixture(&host, &mut sources, &compilation, false, release, true);
+        prepared.request.backend.sha256.clone_from(&sha256);
         parity(&Javascript, &prepared, &native);
         parity(&backend, &prepared, &native);
     }
@@ -150,9 +176,12 @@ fn parity(backend: &dyn Backend, prepared: &Prepared, native: &[build::Artifact]
 #[test]
 fn official_js_native_uses_only_the_public_request_in_both_profiles() {
     for rt in [false, true] {
+        let (host, mut sources, compilation) =
+            compile_fixture("tests/run/bootstrap/inline_nested.fl", rt);
         for typescript in [false, true] {
             for release in [false, true] {
-                let (prepared, native) = fixture(typescript, release, rt);
+                let (prepared, native) =
+                    prepare_fixture(&host, &mut sources, &compilation, typescript, release, rt);
                 parity(&Javascript, &prepared, &native);
             }
         }

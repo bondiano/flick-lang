@@ -32,11 +32,25 @@ impl Checker<'_> {
             [item] if head.is_lang(Lang::Option) => {
                 let item = item.clone();
                 let Some(returns) = self.cx.stage.returns.clone() else {
-                    self.error(
-                        codes::T003,
-                        span,
-                        "`?` on an `Option` returns `None` from the function around it, but this code runs on its own (in a `task`, `scope`, `provide`, `try` or a `for`): match the `Option` here",
-                    );
+                    if self.cx.stage.in_result {
+                        self.diagnostics.push(
+                            Diagnostic::error(
+                                codes::T003,
+                                "`?` on an `Option` cannot short-circuit a `result { … }` block because `Option` carries no typed error: convert it to a `Result` or match the `Option` here",
+                                span,
+                            )
+                            .with_fix(|| (
+                                "convert the `Option` to a `Result` with an explicit error: `(Option.to_result error option)?`",
+                                Vec::new(),
+                            )),
+                        );
+                    } else {
+                        self.error(
+                            codes::T003,
+                            span,
+                            "`?` on an `Option` returns `None` from the function around it, but this code runs on its own (in a `task`, `scope`, `provide`, `try`, `catch` or a `for`): match the `Option` here",
+                        );
+                    }
                     return item;
                 };
                 let some = Type::app(Type::lang(Lang::Option), self.fresh());

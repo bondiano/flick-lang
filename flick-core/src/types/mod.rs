@@ -121,7 +121,7 @@ pub(crate) use builtins::check_sources;
 pub use builtins::read_package;
 pub use builtins::{
     ImplicitPackage, builtin_sources, builtins, builtins_of, check_each, has_implicit_packages,
-    implicit_go_bindings, implicit_js_dependencies, implicit_package_of, install_builtins,
+    implicit_go_bindings, implicit_package_of, implicit_target_dependencies, install_builtins,
     set_implicit_packages, try_builtins,
 };
 pub use class_members::class_defaults;
@@ -139,6 +139,8 @@ pub use ffi::{PURE_OVER_CAPABILITY, keeps_for_owner};
 pub use gadt::branch::dict_local;
 pub use gadt::scheme::{built, is_indexed, written_dicts};
 pub use generalize::without_value_captures;
+#[cfg(feature = "ide")]
+pub(crate) use handlers::catch_to_try_text;
 pub use interpolation::{hole_key, holes};
 pub use kinds::Kind;
 pub use options::{Limits, Options};
@@ -564,9 +566,17 @@ struct ItemCx {
     /// The parameters of the class whose law is being checked: applied,
     /// each is a type the instance of a bundle fills in.
     law: Vec<u32>,
-    /// Locals applied before their type was known, each with the pure arrow
-    /// taken for it, its name and where it is bound.
-    assumed_pure: Vec<(Type, String, u32)>,
+    /// Locals applied before their type was known.
+    assumed_pure: Vec<assumed_pure::Assumption>,
+    /// Where the parameters of each local function without a signature are
+    /// bound, by where the function is bound; `None` for a pattern.
+    local_params: HashMap<u32, Vec<Option<u32>>>,
+    /// The argument being checked meets this parameter: where it is bound
+    /// and its type.
+    parameter: Option<(u32, Type)>,
+    /// The variables an operator kept from being generalized, each with
+    /// that operation and its operator.
+    kept_operands: Vec<(u32, Span, &'static str)>,
     /// The operand of an `await` being typed is a name: a `let lazy` may be
     /// read there.
     awaiting: bool,
@@ -574,6 +584,8 @@ struct ItemCx {
     facts: Vec<proofs::Fact>,
     /// The facts around each body that runs apart, set aside.
     held_facts: Vec<Vec<proofs::Fact>>,
+    /// Nesting depth inside postfix `catch` arms, where `resume` is never bound.
+    catch_arm: u32,
 }
 
 include!("checker_state.rs");

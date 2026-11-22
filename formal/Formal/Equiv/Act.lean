@@ -92,10 +92,11 @@ theorem plug_noframe {E : List Frame} {r x : Tm} (hx : ∀ (F : Frame) (a : Tm),
 theorem plug_value {E : List Frame} {r v : Tm} (hr : ¬ Value r) (hv : Value v) (h : plug E r = v) :
     False := not_value_plugs hr E (h ▸ hv)
 
-/-- The focus of a step in the left side of a special pair is a form of a lazy cell: one a step of
-a context does not take. -/
+/-- The focus of a step in the left side of a special pair is a form of a lazy cell, or sits
+inside the `settle` of a pure hoisted cell (`o4Settle`). -/
 theorem Act.simple {μ μ₂ : List Tm} (hst : StR W μ μ₂) {a b : Tm} (h : Act W a b)
-    {E : List Frame} {r : Tm} (hr : ¬ Value r) (ha : a = plug E r) : r.Simple := by
+    {E : List Frame} {r : Tm} (hr : ¬ Value r) (ha : a = plug E r) :
+    r.Simple ∨ ∃ l l' e t, a = .settle l t ∧ W.H l l' ∧ W.HL l e ∧ PSteps W.R e t ∧ t.Closed := by
   have nl : ∀ {e : Tm} (F : Frame) (x : Tm), F.plug x ≠ .lazy e := fun F _ h => by
     cases F <;> simp [Frame.plug] at h
   have nt : ∀ (F : Frame) (x : Tm), F.plug x ≠ .todo := fun F _ h => by
@@ -108,40 +109,41 @@ theorem Act.simple {μ μ₂ : List Tm} (hst : StR W μ μ₂) {a b : Tm} (h : A
   · simp only [plug] at ha
     subst ha
     cases h with
-    | bornS _ _ _ hs => rcases hs with rfl | rfl | rfl | rfl | rfl <;> trivial
-    | _ => trivial
+    | bornS _ _ _ hs => rcases hs with rfl | rfl | rfl | rfl | rfl <;> exact .inl trivial
+    | _ => exact .inl trivial
   rw [plug_snoc] at ha
   cases h with
-  | dropA | bornB =>
+  | dropA | bornB | o4B | o4Alloc1 =>
     cases F <;> simp only [Frame.plug, reduceCtorEq, Tm.let_.injEq] at ha
-    rw [plug_noframe nl ha.1]; trivial
-  | dropB =>
+    rw [plug_noframe nl ha.1]; exact .inl trivial
+  | dropB | o4Bind =>
     cases F <;> simp only [Frame.plug, reduceCtorEq, Tm.let_.injEq] at ha
     exact (plug_value hr .loc ha.1).elim
   | forceA =>
     cases F <;> simp only [Frame.plug, reduceCtorEq, Tm.force.injEq] at ha
-    rw [plug_noframe nl ha]; trivial
+    rw [plug_noframe nl ha]; exact .inl trivial
   | bornA => exact (nl _ _ ha).elim
   | dead => exact (nt _ _ ha).elim
   | bornV _ hl =>
     cases F <;> simp only [Frame.plug, reduceCtorEq, Tm.settle.injEq] at ha
     exact (plug_value hr (val hl) ha.2).elim
+  | o4Settle _ hH hhl _ hct hpt => exact .inr ⟨_, _, _, _, rfl, hH, hhl, hpt, hct⟩
   | bornS _ hl _ hs =>
     rcases hs with rfl | rfl | rfl | rfl | rfl <;>
       cases F <;> simp only [Frame.plug, reduceCtorEq, Tm.let_.injEq] at ha
     · exact (plug_value hr .loc ha.1).elim
     · rcases snoc_or E₀ with rfl | ⟨E₁, G, rfl⟩
-      · simp only [plug] at ha; rw [ha.1]; trivial
+      · simp only [plug] at ha; rw [ha.1]; exact .inl trivial
       · rw [plug_snoc] at ha
         cases G <;> simp only [Frame.plug, reduceCtorEq, Tm.force.injEq, false_and] at ha
         exact (plug_value hr .loc ha.1).elim
     · rcases snoc_or E₀ with rfl | ⟨E₁, G, rfl⟩
-      · simp only [plug] at ha; rw [ha.1]; trivial
+      · simp only [plug] at ha; rw [ha.1]; exact .inl trivial
       · rw [plug_snoc] at ha
         cases G <;> simp only [Frame.plug, reduceCtorEq, Tm.settle.injEq, false_and] at ha
         exact (plug_value hr (val hl) ha.1.2).elim
     · exact (plug_value hr (val hl) ha.1).elim
-    · rw [plug_noframe nt ha.1]; trivial
+    · rw [plug_noframe nt ha.1]; exact .inl trivial
 
 /-- The left side of a special pair steps at its redex `r` in `F`. -/
 theorem step_in {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' : List Tm} {E₁ : List Frame}

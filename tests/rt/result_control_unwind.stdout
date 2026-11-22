@@ -1,0 +1,3 @@
+abandon: abandoned:7
+resume ok: [1, 2] Ok 99
+resume err: [3] Err (Boom 4)

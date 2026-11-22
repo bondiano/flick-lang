@@ -77,6 +77,17 @@ pub(super) fn codec_option_null(b: &ExprBuilder, nullish: bool) -> Expr {
 }
 
 pub(super) fn codec_transform_pure(b: &ExprBuilder) -> Expr {
+    codec_transform_pure_with_extra(b, extra_con(b, "$None", vec![]))
+}
+
+pub(super) fn codec_transform_as(b: &ExprBuilder) -> Expr {
+    b.lam(
+        &["s"],
+        codec_transform_pure_with_extra(b, extra_con(b, "$TransformAs", vec![b.loc("s")])),
+    )
+}
+
+fn codec_transform_pure_with_extra(b: &ExprBuilder, extra: Expr) -> Expr {
     b.lam(
         &["dec", "enc", "from"],
         make_codec(
@@ -104,7 +115,7 @@ pub(super) fn codec_transform_pure(b: &ExprBuilder) -> Expr {
                 "$Stage",
                 vec![b.app(rt(b, "Helper.codec_meta"), b.loc("from"))],
             ),
-            extra_con(b, "$None", vec![]),
+            extra,
         ),
     )
 }

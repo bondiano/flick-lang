@@ -1,0 +1,19 @@
+---
+title: "FLICK-P063"
+---
+
+The core manages the Flick libraries of `[dependencies]`: `flick add` with
+`--path`, `--git` or `--url` adds one. Every other package belongs to the
+ecosystem of the project's backend, which implements `install`, `add`,
+`remove`, `update` and `deps` for it as commands of its own. This project's
+backend has no such command, or not one that takes this option, so `flick`
+has nowhere to send the package.
+
+Name a Flick library with a source option, or build with a backend whose
+ecosystem has the package.
+
+```sh
+flick add geometry --git https://example.com/geometry.git --tag v1.2.0
+flick add geometry --path ../geometry
+flick add geometry --url https://example.com/geometry-1.2.0.tgz --sha256 <hash>
+```

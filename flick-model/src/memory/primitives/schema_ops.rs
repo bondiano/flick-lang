@@ -102,6 +102,9 @@ pub(super) fn run(
         SchemaIntrinsic::MakeCheck => check_ops::make_check(heap, &args[0], &args[1], fuel),
         SchemaIntrinsic::RunCheck => check_eval::run_check(heap, &args[0], &args[1], fuel),
         SchemaIntrinsic::SameValue => Ok(Value::Bool(same_value(heap, &args[0], &args[1])?)),
+        SchemaIntrinsic::StrictSameValue => Ok(Value::Bool(super::strict_same_value(
+            heap, &args[0], &args[1],
+        )?)),
         SchemaIntrinsic::EncodeXml => schema_data::encode_xml(heap, &args[0], &args[1], fuel),
         SchemaIntrinsic::ExportJsonSchema => {
             json_schema_export::export_json_schema(heap, &args[0], &args[1], fuel)
@@ -226,6 +229,10 @@ fn check_inert(heap: &mut Heap, root: &Value, fuel: &mut u64) -> Result<Value, E
         };
         let id = tok.id;
         match &heap.object(id)?.data {
+            Data::ForeignCycle { .. } => {
+                let err = make_schema_error(heap, &path, "a cycle in the input")?;
+                return heap.construct("Prelude.Option.Some", vec![err]);
+            }
             Data::Record(fields) => {
                 if !active.insert(id) {
                     let err = make_schema_error(heap, &path, "a cycle in the input")?;

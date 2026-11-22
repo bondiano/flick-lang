@@ -222,6 +222,44 @@ fn keyword_context_requires_whole_words_and_adjacent_qualifiers() {
         ("echo == value", "echo", K::EchoKw),
         ("todo => value", "todo", K::TodoKw),
         ("todo :: value", "todo", K::TodoKw),
+        ("a orelse b", "orelse", K::OrElse),
+        ("let orelse = 1", "orelse", K::OrElse),
+        ("orelse : Int", "orelse", K::OrElse),
+        ("foreign pure orelse from", "orelse", K::OrElse),
+        ("{ orelse = 1 }", "orelse", K::OrElse),
+        ("orelse_val", "orelse_val", K::Ident),
+    ] {
+        let (tokens, errors) = kinds(src);
+        assert!(errors.is_empty(), "{src}: {errors:?}");
+        let token = tokens
+            .iter()
+            .find(|(_, text)| *text == word)
+            .expect("word token");
+        assert_eq!(*token, (expected, word), "{src}");
+    }
+}
+
+#[test]
+fn catch_keyword_and_member_context() {
+    for (src, word, expected) in [
+        ("load id catch | E -> 0", "catch", K::CatchKw),
+        ("let catch = 1", "catch", K::CatchKw),
+        ("let mut catch = 1", "catch", K::CatchKw),
+        ("fun catch -> 1", "catch", K::CatchKw),
+        ("{ catch }", "catch", K::CatchKw),
+        ("{ catch = f }", "catch", K::CatchKw),
+        ("{ catch : Int }", "catch", K::CatchKw),
+        ("{ r with catch = f }", "catch", K::CatchKw),
+        ("r.catch", "catch", K::Ident),
+        ("Layer.catch", "catch", K::Ident),
+        ("catch : Int -> Int", "catch", K::Ident),
+        (
+            "foreign pure catch from \"./x.js\" \"catch\"",
+            "catch",
+            K::Ident,
+        ),
+        ("catch_all", "catch_all", K::Ident),
+        ("my_catch", "my_catch", K::Ident),
     ] {
         let (tokens, errors) = kinds(src);
         assert!(errors.is_empty(), "{src}: {errors:?}");

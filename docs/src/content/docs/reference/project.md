@@ -92,11 +92,11 @@ virtual workspace root (`FLICK-P005`).
 | `target.js.ui` | module specifier rendering and mounting views in place of React (exports every name `Ui` and `Action` bind from `@flick-lang/effect-ts/ui` and `@flick-lang/effect-ts/ui/react`; relative paths are from the project root) | React |
 | `target.go.cgo` | boolean; enable cgo (`CGO_ENABLED=1`) when building Go executables | `false` |
 
-`flick new` creates an RT project with `@flick-lang/runtime` and no Effect dependency. Pass `--runtime rt` to `build`, `run`, `dev`, `test` or `inspect` to select RT for one invocation of an Effect project. Set `[target.js] runtime = "effect"` explicitly when a project needs the Effect adapter and add `@flick-lang/effect-ts` to its dependencies.
+`flick new` takes its template files from the selected target backend (`--target js` by default creates an RT project with `[tools] "flick/js" = ["pnpm"]`, `@flick-lang/runtime` and no Effect dependency; `--target go` creates a Go project with `[build] target = "go"`, `[tools] "flick/go" = ["go"]`, and no `package.json`), or from a third-party package via `--from`. Pass `--runtime rt` to `build`, `run`, `dev`, `test` or `inspect` to select RT for one invocation of an Effect project. Set `[target.js] runtime = "effect"` explicitly when a project needs the Effect adapter and add `@flick-lang/effect-ts` to its dependencies.
 
-Legacy `[build]` keys (`emit`, `emit-dts`, `promise-facade`, `schema-aot`, `effect`, `ui`) are removed with no compatibility aliases and fail with `FLICK-P057`, naming the replacement under `[build] target` or `[target.js]`:
+Legacy `[build]` keys (`emit`, `emit-dts`, `promise-facade`, `schema-aot`, `effect`, `ui`) and `[js]` / `[js.dependencies]` tables are removed with no compatibility aliases and fail with `FLICK-P057`, naming the replacement under `[build] target` or `[target.js]`:
 
-| Removed `[build]` key | Replacement |
+| Removed key or table | Replacement |
 | - | - |
 | `[build] emit = "js"` | `[build] target = "js"` (or omit; `"js"` is default) |
 | `[build] emit = "ts"` | `[build] target = "js"` and `[target.js] typescript = true` |
@@ -107,15 +107,17 @@ Legacy `[build]` keys (`emit`, `emit-dts`, `promise-facade`, `schema-aot`, `effe
 | `[build] effect = "rt"` | `[target.js] runtime = "rt"` (or omit; `"rt"` is default) |
 | `[build] effect = "effect"` | `[target.js] runtime = "effect"` |
 | `[build] ui = "./renderer.mjs"` | `[target.js] ui = "./renderer.mjs"` |
+| `[js.dependencies]` | `[target.js.dependencies]` |
 
 Errors in the configuration exit with code `2`:
 
 | Problem | Diagnostic |
 | - | - |
 | TOML syntax, an unknown key, a value of the wrong type or outside its set | `FLICK-P005` |
-| a removed `[build]` key (`emit`, `emit-dts`, `promise-facade`, `schema-aot`, `effect`, `ui`) | `FLICK-P057` |
+| a removed `[build]` key or `[js]` / `[js.dependencies]` table | `FLICK-P057` |
 | an unknown or invalid key or value in `[target.<name>]` | `FLICK-P058` |
 | an unknown `[build] target` or `--target` name | `FLICK-P059` |
+| an unknown or unsupported `--template` for `new` or `init` | `FLICK-P060` |
 | a `schema-version` other than `1`, or none | `FLICK-P006` |
 | `kind = "app"` without `entry` or `entries`, or with an empty `entries` | `FLICK-P007` |
 | both `entry` and `entries`, or an entry name that is not one | `FLICK-P005` |
@@ -300,12 +302,18 @@ or `--path DIR`) adds one and `flick remove <name>` drops it.
 
 The official backend a project builds with when it pins none (`flick/js`,
 or `flick/go` with `[build] target = "go"` or `--target go`) is not part of the compiler either: it is a
-release asset. The first build, or `flick install`, takes the newest release
+release asset. `flick new`, the first build, or `flick install` takes the newest release
 the compiler accepts from the backends index, keeps it in the package store
 and pins it in `flick.lock` under `[[backend]]`; later builds work offline.
 `flick update` moves the pin to a newer release. With `--offline` and no pin
 in the store, or a component whose digest is not the pinned one, the build
 fails with `FLICK-P056` and no other backend is used.
+
+Projects created or initialized from a third-party template package with
+`flick new --from` or `flick init --from` also record the verified template
+source, tree checksum, component digest, and (for tarball URLs) archive digest
+under `[[template]]` in `flick.lock`. `flick install` preserves `[[template]]`
+entries without coupling `[dependencies]` to the template package.
 
 A path library's plugin is built in place, so `flick.lock` also records the
 hash of its component under `[[plugin]]`. A build is not held to it;
@@ -349,29 +357,36 @@ and the output refers to it there, as for the project's own modules, so it
 ships with no tarball. On the go target the build copies `pad.go` beside the
 same module into the Go module, and a helper it needs goes in that file.
 
-### npm packages of a library
+### Target packages of a library
 
-A project's own npm dependencies stay in `package.json`. A library that needs
-npm packages at run time on the js target names them under
-`[js.dependencies]`, each a version or range of the registry, not a path, a
-URL or a `workspace:` protocol:
+A project's own target-ecosystem dependencies stay in the backend's manifest
+(for JavaScript, `package.json`). A library that needs target packages at run
+time names them under `[target.<name>.dependencies]`; each backend defines and
+validates its own syntax. For `flick/js`, entries under
+`[target.js.dependencies]` are npm package versions or ranges from the
+registry, not a path, a URL or a `workspace:` protocol:
 
 ```toml
-[js.dependencies]
+[target.js.dependencies]
 left-pad = "^1.3.0"
 ```
 
-`flick install` and `flick update` gather these tables from the project's
-manifest and from each library it depends on, directly or through another,
-and add what `package.json` lacks to its `dependencies`, creating the file if
-the project has none; pnpm then installs and pins them as the project's own,
-and `flick pack` ships them in the manifest of an app. `--locked` fails rather
+`flick install` and `flick update` gather `[target.<name>.dependencies]` from
+the project's manifest and from each library it depends on, directly or through
+another, check that declarations for the same `(target, package)` agree
+(`FLICK-P040`), and pass the selected backend's slice to that backend. For
+`flick/js` (with `[tools] "flick/js" = ["pnpm"]`), the backend adds what
+`package.json` lacks to its `dependencies`, creating the file if the project
+has none; `pnpm` then installs and pins them as the project's own, and
+`flick pack` ships them in the manifest of an app. `--locked` fails rather
 than change `package.json`.
 
 A js build without them fails with `FLICK-P034`, which says to run
-`flick install`; a build for go needs none of them. Two packages must name one
-npm package with the same text, and `package.json` with it, or the build and
-`flick install` report `FLICK-P040`.
+`flick install`; a build for go ignores `[target.js.dependencies]` and needs
+neither Node nor pnpm. Two packages must name one target dependency with the
+same text, and the backend's manifest (such as `package.json`) with it, or the
+build and `flick install` report `FLICK-P040`. The old `[js.dependencies]`
+table is removed and fails with `FLICK-P057`.
 
 ## Scripts
 
@@ -402,20 +417,21 @@ companions, only one that a path names. Outside a project paths are required.
 
 ## Packages
 
-npm packages live in `package.json`; pnpm installs them. Flick reads the
-installed tree: for each dependency of `package.json` it reads
-`node_modules/<name>/package.json`. An npm package with Flick modules is a
-source package, which names the directory of its sources:
+Target-ecosystem packages are discovered by the selected backend component,
+not hardcoded in the compiler. For `flick/js`, npm packages live in
+`package.json` and `pnpm` installs them; the JS backend inspects
+`package.json` and `node_modules/<name>/package.json` and reports any package
+whose manifest names Flick sources:
 
 ```json
 { "name": "@acme/contract", "flick": { "source-dir": "src" } }
 ```
 
 Each dependent compiles its modules for the target it emits, js or go, as
-modules of that package. So a JS client and a Go server that both depend on it
-share its types, and its constructors have the same tags on both sides. A
-source package needs no build of its own; within a repository, a
-[path dependency](#flick-dependencies) names it without `node_modules`. Its modules are checked
+modules of that package. Within a repository or across targets (such as a Go
+server and a JS client), a [Flick dependency](#flick-dependencies) in
+`[dependencies]` shares the library without needing `node_modules` or
+`package.json` on the Go side. Its modules are checked
 for the target of the dependent, so on go an import of a js-only module is
 `FLICK-P030`. The dependent does not report the package's warnings. Its own
 modules come first: a module the project declares is not looked up in the

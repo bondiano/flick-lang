@@ -76,7 +76,7 @@ fn arrow(p: &mut Parser) -> Option<Done> {
 /// starts `name :`.
 fn record_ahead(p: &Parser) -> bool {
     let at = |i: usize| p.toks[(p.pos + i).min(p.toks.len() - 1)].kind;
-    at(1) == K::Ident && at(2) == K::Colon
+    (at(1) == K::Ident || at(1).is_record_label()) && at(2) == K::Colon
 }
 
 /// `a ->{ f : T }`, meant as an arrow to a record: reported with the space
@@ -283,10 +283,12 @@ fn brace_type(p: &mut Parser) -> K {
         p.bump();
         return K::RowType;
     }
-    let record = first.kind == K::Ident && next.kind == K::Colon;
+    let record = (first.kind == K::Ident || first.kind.is_record_label()) && next.kind == K::Colon;
     if record {
         p.push(Ctx::Aligned { col: p.col() });
-        p.items(record_type_field, true, |p| p.at(K::Pipe));
+        p.items(record_type_field, true, |p| {
+            p.at(K::Pipe) || p.at_aligned_catch()
+        });
     } else {
         p.push(Ctx::Bracket);
         if first.kind != K::Semi {
@@ -306,7 +308,13 @@ fn record_type_field(p: &mut Parser) {
         return tail(p);
     }
     let m = p.start();
-    if p.expect(K::Ident) && p.expect(K::Colon) {
+    let ok = if p.at_record_label() {
+        p.bump_as(K::Ident);
+        true
+    } else {
+        p.expect(K::Ident)
+    };
+    if ok && p.expect(K::Colon) {
         type_(p);
     }
     p.complete(m, K::RecordTypeField);

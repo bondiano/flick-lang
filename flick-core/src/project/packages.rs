@@ -1,17 +1,13 @@
-//! The libraries a project compiles from their sources. An npm package of
-//! `node_modules`, which pnpm installs, is one when its `package.json` names
-//! its source directory, `"flick": { "source-dir": "src" }`: each dependent
-//! compiles its modules,
-//! for whichever target it emits, as modules of that package. A library of
-//! `[dependencies]` is a source package too, with the `source-dir` of its own
+//! The libraries a project compiles from their sources. A library of
+//! `[dependencies]` is a source package with the `source-dir` of its own
 //! `flick.toml`, and so are its dependencies: a path names its directory, and
 //! a git or url source is found through `flick.lock` in the package store.
+//! Packages of a target backend's ecosystem that ship Flick sources are
+//! reported through [`Host::foreign`].
 
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
-use serde::Deserialize;
-
-use super::config::{self, Dependency, JsDependency, Kind, Source};
+use super::config::{self, Dependency, Kind, Source, TargetDependency};
 use super::lock::{LOCK_FILE, Lock};
 use super::store;
 use super::{Host, Project};
@@ -21,7 +17,7 @@ use crate::source::SourceMap;
 
 #[derive(Debug, Default)]
 pub(super) struct Packages {
-    /// Direct dependencies in `package.json` order.
+    /// Direct dependencies in declaration order.
     packages: Vec<Package>,
 }
 
@@ -50,39 +46,18 @@ struct Package {
 pub struct Library {
     pub checksum: Option<String>,
     pub dependencies: Vec<String>,
-    /// The npm packages it needs on the js target.
-    pub js_dependencies: Vec<JsDependency>,
+    /// The target ecosystem packages it needs under `[target.<name>.dependencies]`.
+    pub target_dependencies: Vec<TargetDependency>,
 }
 
-#[derive(Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct Manifest {
-    name: Option<String>,
-    #[serde(default)]
-    pub(super) dependencies: serde_json::Map<String, serde_json::Value>,
-    #[serde(default)]
-    dev_dependencies: serde_json::Map<String, serde_json::Value>,
-    flick: Option<FlickField>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "kebab-case")]
-struct FlickField {
-    /// Where a source package keeps the modules its dependents compile.
-    source_dir: Option<String>,
-    /// The compiler a project pins; `flick` itself reads it.
-    #[serde(rename = "compiler")]
-    _compiler: Option<String>,
-}
-
-/// The `name` in the project's `package.json`, which owns its modules.
-pub fn project_name(host: &dyn Host, root: &Path) -> Option<String> {
-    manifest(host, &root.join("package.json"), &mut Vec::new())?.name
+/// The project's own name in its backend's ecosystem, which owns its modules.
+pub fn project_name(host: &dyn Host, project: &Project) -> Option<String> {
+    host.foreign(project).name
 }
 
 impl Packages {
-    /// Reads the path dependencies of the project, then `package.json` of the
-    /// project and of its installed direct dependencies.
+    /// Reads the path/fetched dependencies of the project, then the packages
+    /// reported by its backend through [`Host::foreign`].
     pub fn load(
         host: &dyn Host,
         sources: &mut SourceMap,
@@ -102,34 +77,42 @@ impl Packages {
             diagnostics: &mut *diagnostics,
         }
         .add(root, dependencies);
-        let Some(project) = manifest(host, &root.join("package.json"), diagnostics) else {
-            return Packages { packages };
-        };
-        let names = project
-            .dependencies
-            .keys()
-            .chain(project.dev_dependencies.keys());
-        let installed = names
-            .filter(|name| !packages.iter().any(|p| p.name == **name))
-            .map(|name| {
-                let dir = root.join("node_modules").join(name);
-                let installed = manifest(host, &dir.join("package.json"), diagnostics);
-                let flick = installed.as_ref().and_then(|m| m.flick.as_ref());
-                let source_dir = flick
-                    .and_then(|f| f.source_dir.as_ref())
-                    .map(|s| super::normalize(&dir.join(s)));
-                Package {
-                    name: name.clone(),
-                    installed: installed.is_some(),
-                    source_dir,
-                    library: None,
-                    plugin: None,
-                    load: Vec::new(),
-                    hooks: Vec::new(),
-                    watch: Vec::new(),
+        // the packages of the backend's ecosystem, as it reports them
+        let foreign = host.foreign(project);
+        diagnostics.extend(foreign.diagnostics);
+        let mut installed = Vec::new();
+        for f in foreign.packages {
+            if packages.iter().any(|p| p.name == f.name) {
+                continue;
+            }
+            let source_dir = match f.source_dir {
+                Some(dir) if is_relative_normal(&dir) => Some(super::normalize(&root.join(dir))),
+                Some(dir) => {
+                    diagnostics.push(Diagnostic::new(
+                        codes::P013,
+                        Severity::Error,
+                        format!(
+                            "the backend reported a package root outside the project for `{}`: `{}`",
+                            f.name,
+                            dir.display()
+                        ),
+                    ));
+                    None
                 }
+                None => None,
+            };
+            installed.push(Package {
+                name: f.name,
+                installed: f.version.is_some() || source_dir.is_some(),
+                source_dir,
+                library: None,
+                plugin: None,
+                load: Vec::new(),
+                hooks: Vec::new(),
+                watch: Vec::new(),
             });
-        packages.extend(installed.collect::<Vec<_>>());
+        }
+        packages.extend(installed);
         Packages { packages }
     }
 
@@ -184,7 +167,7 @@ impl Packages {
             .and_then(|p| p.plugin.as_deref())
     }
 
-    /// Declared dependencies missing from `node_modules`.
+    /// Declared dependencies missing from the backend's installed packages.
     pub fn missing(&self) -> Vec<&str> {
         self.packages
             .iter()
@@ -388,7 +371,7 @@ impl Libraries<'_> {
             library: Some(Library {
                 checksum,
                 dependencies,
-                js_dependencies: library.js_dependencies,
+                target_dependencies: library.target_dependencies,
             }),
             plugin: (library.package.as_ref())
                 .and_then(|p| p.plugin.as_ref())
@@ -401,6 +384,21 @@ impl Libraries<'_> {
     }
 }
 
+/// Whether `path` is a non-empty relative path made solely of normal segments.
+fn is_relative_normal(path: &Path) -> bool {
+    let mut has_normal = false;
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => has_normal = true,
+            Component::CurDir
+            | Component::ParentDir
+            | Component::RootDir
+            | Component::Prefix(_) => return false,
+        }
+    }
+    has_normal
+}
+
 /// Whether the semver requirement `requirement` includes `version`.
 fn compiles_with(requirement: &str, version: &str) -> bool {
     match (
@@ -409,25 +407,5 @@ fn compiles_with(requirement: &str, version: &str) -> bool {
     ) {
         (Ok(requirement), Ok(version)) => requirement.matches(&version),
         _ => false,
-    }
-}
-
-/// `None` when the file is absent; an unreadable manifest is reported.
-pub(super) fn manifest(
-    host: &dyn Host,
-    path: &Path,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> Option<Manifest> {
-    let bytes = host.read(path).ok()?;
-    match serde_json::from_slice(&bytes) {
-        Ok(manifest) => Some(manifest),
-        Err(err) => {
-            diagnostics.push(Diagnostic::new(
-                codes::P005,
-                Severity::Error,
-                format!("invalid `{}`: {err}", host.display(path)),
-            ));
-            Some(Manifest::default())
-        }
     }
 }

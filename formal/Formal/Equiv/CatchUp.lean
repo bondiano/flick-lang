@@ -1,4 +1,4 @@
-import Formal.Equiv.Store
+import Formal.Equiv.StoreHoist
 import Formal.Equiv.PotTm
 
 /-!
@@ -65,9 +65,11 @@ structure RJ (W : World) (μ : List Tm) (b : Tm) (W' : World) (μ' : List Tm) (b
   o : ∀ n τ, W'.O n τ → W.O n τ
   /-- They consume forms only one side has: none, or the potential drops. -/
   pot : (μ' = μ ∧ b' = b) ∨ b'.pot < b.pot
+  /-- Closedness is preserved. -/
+  cl : b.Closed → b'.Closed
 
 theorem RJ.refl (μ : List Tm) (b : Tm) : RJ W μ b W μ b :=
-  ⟨.refl, World.le.refl _, fun _ h => h, fun _ h => h, fun _ _ h => h, .inl ⟨rfl, rfl⟩⟩
+  ⟨.refl, World.le.refl _, fun _ h => h, fun _ h => h, fun _ _ h => h, .inl ⟨rfl, rfl⟩, id⟩
 
 theorem RJ.trans {W₁ W₂ : World} {μ μ₁ μ₂ : List Tm} {b b₁ b₂ : Tm} (h₁ : RJ W μ b W₁ μ₁ b₁)
     (h₂ : RJ W₁ μ₁ b₁ W₂ μ₂ b₂) : RJ W μ b W₂ μ₂ b₂ :=
@@ -77,45 +79,50 @@ theorem RJ.trans {W₁ W₂ : World} {μ μ₁ μ₂ : List Tm} {b b₁ b₂ : T
       · exact .inl ⟨rfl, rfl⟩
       · exact .inr p₂
       · exact .inr p₁
-      · exact .inr (Nat.lt_trans p₂ p₁)⟩
+      · exact .inr (Nat.lt_trans p₂ p₁),
+    fun hc => h₂.cl (h₁.cl hc)⟩
 
 theorem RJ.plug {W' : World} {μ μ' : List Tm} {b b' : Tm} (h : RJ W μ b W' μ' b')
     {E : List Frame} (hE : OkE E) : RJ W μ (Flick.plug E b) W' μ' (Flick.plug E b') :=
   ⟨h.steps.plug hE, h.le, h.st, h.j₁, h.o, by
     rcases h.pot with ⟨rfl, rfl⟩ | h
     · exact .inl ⟨rfl, rfl⟩
-    · exact .inr (pot_plug_lt E h)⟩
+    · exact .inr (pot_plug_lt E h),
+    fun hc => closed_plug_of hc (h.cl (closed_plug_of.closed_plug_inner_aux hc))⟩
 
 theorem RJ.frame {W' : World} {μ μ' : List Tm} {b b' : Tm} (h : RJ W μ b W' μ' b')
     {F : Frame} (hF : F.ok) : RJ W μ (F.plug b) W' μ' (F.plug b') :=
   h.plug (E := [F]) (OkE.cons' OkE.nil hF)
 
 theorem RJ.head {μ μ' : List Tm} {b b' : Tm} (h : ∀ Λ, RHead Λ μ b Λ μ' b')
-    (hs : ∀ μ₁, StR W μ₁ μ → StR W μ₁ μ') (hp : b'.pot < b.pot) : RJ W μ b W μ' b' :=
+    (hs : ∀ μ₁, StR W μ₁ μ → StR W μ₁ μ') (hp : b'.pot < b.pot) (hcl : b.Closed → b'.Closed) :
+    RJ W μ b W μ' b' :=
   ⟨.step ⟨[], b, b', OkE.nil, rfl, rfl, .inr h⟩ .refl, World.le.refl _, hs, fun _ h => h,
-    fun _ _ h => h, .inr hp⟩
+    fun _ _ h => h, .inr hp, hcl⟩
 
-theorem RJ.pure {μ : List Tm} {b b' : Tm} (h : PHead b b') (hp : b'.pot < b.pot) : RJ W μ b W μ b' :=
+theorem RJ.pure {μ : List Tm} {b b' : Tm} (h : PHead b b') (hp : b'.pot < b.pot)
+    (hcl : b.Closed → b'.Closed) : RJ W μ b W μ b' :=
   ⟨.step ⟨[], b, b', OkE.nil, rfl, rfl, .inl ⟨h, rfl⟩⟩ .refl, World.le.refl _,
-    fun _ h => h, fun _ h => h, fun _ _ h => h, .inr hp⟩
+    fun _ h => h, fun _ h => h, fun _ _ h => h, .inr hp, hcl⟩
 
 /-- A new right cell only the right side has. -/
 theorem RJ.alloc (μ : List Tm) (e : Tm) :
     RJ W μ (.lazy e) (W.addJ₂ μ.length) (μ ++ [.lazy e]) (.loc μ.length) :=
   ⟨.step ⟨[], _, _, OkE.nil, rfl, rfl, .inr fun _ => RHead.lazy⟩ .refl, World.le_addJ₂ _ _,
-    fun _ h => h.allocJ₂ _, fun _ h => h, fun _ _ h => h, .inr (by simp [Tm.pot])⟩
+    fun _ h => h.allocJ₂ _, fun _ h => h, fun _ _ h => h, .inr (by simp [Tm.pot]),
+    fun _ _ hi => hi⟩
 
 theorem RJ.settleV {μ : List Tm} {n : Nat} {v : Tm} (hn : W.J₂ n) (hv : Value v) :
     RJ W μ (.settle n v) W (settleCell μ n v) v :=
-  RJ.head (fun _ => .settleVal hv) (fun _ h => h.settleJ₂ hn _) (by simp [Tm.pot])
+  RJ.head (fun _ => .settleVal hv) (fun _ h => h.settleJ₂ hn _) (by simp [Tm.pot]) id
 
 theorem RJ.settleR {μ : List Tm} {n : Nat} {v : Tm} (hn : W.J₂ n) (hv : Value v) :
     RJ W μ (.settle n (.raise v)) W (settleCell μ n (.raise v)) (.raise v) :=
-  RJ.head (fun _ => .settleRaise hv) (fun _ h => h.settleJ₂ hn _) (by simp [Tm.pot])
+  RJ.head (fun _ => .settleRaise hv) (fun _ h => h.settleJ₂ hn _) (by simp [Tm.pot]) id
 
 theorem RJ.settleU {μ : List Tm} {n p ℓ : Nat} {a : Tm} (hn : W.J₂ n) :
     RJ W μ (.settle n (.unw p ℓ a)) W (resetCell μ n) (.unw p ℓ a) :=
-  RJ.head (fun _ => .settleUnw) (fun _ h => h.resetJ₂ hn) (by simp [Tm.pot])
+  RJ.head (fun _ => .settleUnw) (fun _ h => h.resetJ₂ hn) (by simp [Tm.pot]) id
 
 theorem subst_shift (c v : Tm) : (c.rename (· + 1)).subst (inst [v]) = c := by
   rw [Tm.subst_rename]
@@ -130,6 +137,7 @@ theorem RJ.drop (μ : List Tm) (e c' : Tm) :
   have h₂ := RJ.pure (W := W.addJ₂ μ.length) (μ := μ ++ [.lazy e])
     (PHead.let_ (v := .loc μ.length) (b := c'.rename (· + 1)) .loc)
     (by rw [subst_shift]; simp [Tm.pot, Tm.pot_rename])
+    (fun hc => closed_let_subst_loc hc μ.length)
   rw [subst_shift] at h₂
   exact h₂
 
@@ -141,6 +149,45 @@ theorem RJ.start (μ : List Tm) (e' : Tm) :
   exact ⟨.step ⟨[.force], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => RHead.lazy⟩
       (.step ⟨[], _, _, OkE.nil, rfl, rfl, .inr fun _ => .forcePending hc⟩ .refl),
     World.le_addJ₂ _ _, fun _ h => (h.allocJ₂ _).setJ₂ (Or.inr rfl) _, fun _ h => h,
-    fun _ _ h => h, .inr (by simp [Tm.pot])⟩
+    fun _ _ h => h, .inr (by simp [Tm.pot]), id⟩
+
+/-- The right side of O4 forward allocates its hoisted pure cell `l'` and binds it into `fix`. -/
+theorem RJ.o4A (μ : List Tm) {e' b' : Tm} (hB : W.B) (hcl : e'.Closed) (hpe : PureEval W.R e') :
+    RJ W μ (.let_ (.lazy e') (.fix (b'.rename rot))) (W.addHR μ.length e') (μ ++ [.lazy e'])
+      (.fix (b'.subst (inst [.loc μ.length]))) := by
+  have h₁ : RJ W μ (.let_ (.lazy e') (.fix (b'.rename rot))) (W.addHR μ.length e') (μ ++ [.lazy e'])
+      (.let_ (.loc μ.length) (.fix (b'.rename rot))) :=
+    ⟨.step ⟨[.let_ (.fix (b'.rename rot))], _, _, OkE.nil.cons' trivial, rfl, rfl,
+        .inr fun _ => RHead.lazy⟩ .refl,
+      World.le_addHR _ _ _, fun _ h => h.allocHR hB hcl hpe, fun _ h => h, fun _ _ h => h,
+      .inr (by simp [Tm.pot]), fun hc => closed_frame_of (F := .let_ (.fix (b'.rename rot))) hc (fun _ hi => hi)⟩
+  refine h₁.trans ?_
+  have h₂ := RJ.pure (W := W.addHR μ.length e') (μ := μ ++ [.lazy e'])
+    (PHead.let_ (v := .loc μ.length) (b := .fix (b'.rename rot)) .loc)
+    (by
+      simp only [Tm.subst, subst_rot_loc, Tm.pot, Tm.pot_subst_loc, Tm.pot_rename]
+      omega)
+    (fun hc => closed_let_subst_loc hc μ.length)
+  simp only [Tm.subst, subst_rot_loc] at h₂
+  exact h₂
+
+/-- The right side of O4 reverse allocates a per-iteration cell `l'` linked to the hoisted left
+cell `l` and binds it into the loop body. -/
+theorem RJ.o4AllocR (μ : List Tm) {l : Nat} {e e' c' : Tm}
+    (hB : W.B) (hl : W.HL l e) (hcl : e'.Closed) (hpe : PureEval W.R e') (he : Sim W .any e e') :
+    RJ W μ (.let_ (.lazy e') c') ((W.addHR μ.length e').addH l μ.length) (μ ++ [.lazy e'])
+      (c'.subst (inst [.loc μ.length])) := by
+  have hW : W.le ((W.addHR μ.length e').addH l μ.length) :=
+    (World.le_addHR _ _ _).trans (World.le_addH _ _ _)
+  have h₁ : RJ W μ (.let_ (.lazy e') c') ((W.addHR μ.length e').addH l μ.length) (μ ++ [.lazy e'])
+      (.let_ (.loc μ.length) c') :=
+    ⟨.step ⟨[.let_ c'], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => RHead.lazy⟩ .refl,
+      hW, fun _ h => (h.allocHR hB hcl hpe).linkH hB hl (.inr ⟨rfl, rfl⟩) (he.mono (World.le_addHR _ _ _)),
+      fun _ h => h, fun _ _ h => h, .inr (by simp [Tm.pot]),
+      fun hc => closed_frame_of (F := .let_ c') hc (fun _ hi => hi)⟩
+  refine h₁.trans ?_
+  exact RJ.pure (PHead.let_ (v := .loc μ.length) (b := c') .loc)
+    (by simp only [Tm.pot, Tm.pot_subst_loc]; omega)
+    (fun hc => closed_let_subst_loc hc μ.length)
 
 end Flick.Equiv

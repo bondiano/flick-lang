@@ -2,7 +2,7 @@
 //! and run from its `main`, as a runner does (§2.6): `main ()`, and the
 //! task it gives awaited.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::rc::Rc;
 use std::{fs, io, path, slice};
 
@@ -17,8 +17,9 @@ use crate::check::check_program;
 use crate::decls::Decls;
 use crate::eval::{Machine, Outcome, Program};
 use crate::memory::{
-    Error as MemoryError, ExecutionReport, Heap, ProgramOutcome, Stats, Value,
-    execute_main_program_outcome, execute_rooted_main_program_outcome,
+    Error as MemoryError, ExecutionReport, Heap, HostBridge, HostMode, ProgramOutcome, Stats,
+    Value, execute_main_program_outcome_with_host, execute_main_with_bridge_and_inits,
+    execute_rooted_main_program_outcome_with_host,
 };
 use crate::syntax::{Name, Path, Term};
 use crate::translate;
@@ -236,18 +237,76 @@ pub struct CountedMain {
     pub program: ir::memory::Program,
     pub entry: MemoryName,
     pub root: Option<MemoryName>,
+    pub eager_inits: Vec<MemoryName>,
 }
 
 impl CountedMain {
-    /// Runs `main` with its root services, `Σ₀`, when the program has them.
+    /// Runs `main` with its root services, `Σ₀`, when the program has them,
+    /// using the deterministic reference-model host.
     pub fn execute(&self, heap: &mut Heap, fuel: u64) -> ExecutionReport {
+        self.execute_with_host(heap, fuel, HostMode::Deterministic)
+    }
+
+    /// Runs `main` with its root services under the chosen [`HostMode`].
+    pub fn execute_with_host(
+        &self,
+        heap: &mut Heap,
+        fuel: u64,
+        host_mode: HostMode,
+    ) -> ExecutionReport {
         match &self.root {
-            Some(root) => {
-                execute_rooted_main_program_outcome(heap, &self.program, &self.entry, root, fuel)
-            }
-            None => execute_main_program_outcome(heap, &self.program, &self.entry, fuel),
+            Some(root) => execute_rooted_main_program_outcome_with_host(
+                heap,
+                &self.program,
+                &self.entry,
+                root,
+                fuel,
+                host_mode,
+            ),
+            None => execute_main_program_outcome_with_host(
+                heap,
+                &self.program,
+                &self.entry,
+                fuel,
+                host_mode,
+            ),
         }
     }
+
+    /// Runs `main` with its root services under an explicit [`HostBridge`].
+    pub fn execute_with_bridge(
+        &self,
+        heap: &mut Heap,
+        fuel: u64,
+        host_mode: HostMode,
+        bridge: &mut HostBridge,
+    ) -> ExecutionReport {
+        execute_main_with_bridge_and_inits(
+            heap,
+            &self.program,
+            &self.entry,
+            self.root.as_ref(),
+            &self.eager_inits,
+            fuel,
+            host_mode,
+            bridge,
+        )
+    }
+}
+
+fn entry_module_eager_inits(modules: &[Compiled], main: &Path) -> Vec<MemoryName> {
+    let Some(entry_mod) = modules.iter().find(|m| m.name.as_str() == &*main.module) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for item in &entry_mod.ir.items {
+        if let ir::ItemKind::Value { name, .. } = &item.kind
+            && name.as_str() != &*main.name
+        {
+            out.push(MemoryName::new(&main.module, name));
+        }
+    }
+    out
 }
 
 /// Lowers `main` of `modules` and its root layer for the counted executor.
@@ -261,6 +320,23 @@ pub fn counted_main(
         program,
         entry: MemoryName::new(&main.module, &main.name),
         root,
+        eager_inits: Vec::new(),
+    })
+}
+
+/// Lowers `main` of `modules` with explicit opt-in foreign-bridge support.
+pub fn counted_main_with_bridge(
+    modules: &[Compiled],
+    main: &Path,
+    release: bool,
+) -> Result<CountedMain, String> {
+    let (program, root) = counted_program_with_bridge(modules, slice::from_ref(main), release)?;
+    let eager_inits = entry_module_eager_inits(modules, main);
+    Ok(CountedMain {
+        program,
+        entry: MemoryName::new(&main.module, &main.name),
+        root,
+        eager_inits,
     })
 }
 
@@ -269,6 +345,24 @@ pub fn counted_program(
     modules: &[Compiled],
     entries: &[Path],
     release: bool,
+) -> Result<(ir::memory::Program, Option<MemoryName>), String> {
+    counted_program_inner(modules, entries, release, false)
+}
+
+/// Lowers multiple entry roots with explicit opt-in foreign-bridge support.
+pub fn counted_program_with_bridge(
+    modules: &[Compiled],
+    entries: &[Path],
+    release: bool,
+) -> Result<(ir::memory::Program, Option<MemoryName>), String> {
+    counted_program_inner(modules, entries, release, true)
+}
+
+fn counted_program_inner(
+    modules: &[Compiled],
+    entries: &[Path],
+    release: bool,
+    allow_foreign_bridge: bool,
 ) -> Result<(ir::memory::Program, Option<MemoryName>), String> {
     let ir: Vec<_> = modules
         .iter()
@@ -296,11 +390,26 @@ pub fn counted_program(
         .any(|m| *m.name == *layer.module && defines(m))
         .then(|| MemoryName::new(&layer.module, &layer.name));
     let roots: Vec<&MemoryName> = entry_names.iter().chain(&root).collect();
-    let program = perceus::lower_roots_with_declarations(
-        ir.iter().map(AsRef::as_ref),
-        declarations.iter().map(AsRef::as_ref),
-        &roots,
-    )
+    let program = if allow_foreign_bridge {
+        let mut module_dirs = BTreeMap::new();
+        for module in modules {
+            if let Some(dir) = module.path.parent() {
+                module_dirs.insert(module.name.clone(), dir.to_string_lossy().into_owned());
+            }
+        }
+        perceus::lower_roots_with_foreign_bridge(
+            ir.iter().map(AsRef::as_ref),
+            declarations.iter().map(AsRef::as_ref),
+            &roots,
+            module_dirs,
+        )
+    } else {
+        perceus::lower_roots_with_declarations(
+            ir.iter().map(AsRef::as_ref),
+            declarations.iter().map(AsRef::as_ref),
+            &roots,
+        )
+    }
     .map_err(|error| error.to_string())?;
     Ok((program, root))
 }

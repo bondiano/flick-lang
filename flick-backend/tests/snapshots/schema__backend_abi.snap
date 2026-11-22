@@ -304,6 +304,42 @@ interface types {
     runtime-dependencies: list<runtime-dependency>,
   }
 
+  record project-file {
+    path: string,
+    real: string,
+    bytes: list<u8>,
+  }
+
+  record package-root {
+    %package: string,
+    version: string,
+    root: string,
+  }
+
+  record runtime-node {
+    name: string,
+    version: string,
+    dir: string,
+    dependencies: list<tuple<string, u32>>,
+  }
+
+  record runtime-graph {
+    %package: string,
+    nodes: list<runtime-node>,
+    skip: list<string>,
+  }
+
+  record packages {
+    name: option<string>,
+    version: option<string>,
+    declared: list<string>,
+    sources: list<package-root>,
+    runtime: list<runtime-graph>,
+    inputs: list<string>,
+    diagnostics: list<diagnostic>,
+    needs: list<string>,
+  }
+
   enum launch-kind {
     run,
     test,
@@ -342,10 +378,13 @@ world backend {
   import flick:command/types@0.1.0;
   import types;
   import inputs;
-  use types.{descriptor, target-request, target-support, build-request, build-result, diagnostic};
+  use types.{descriptor, target-request, target-support, build-request, build-result, diagnostic, project-file, packages, option-value};
+  use flick:command/types@0.1.0.{dependency};
 
   export describe: func() -> descriptor;
   export check-target: func(request: build-request) -> result<target-support, list<diagnostic>>;
   export generate: func(request: build-request) -> result<build-result, list<diagnostic>>;
+  export package-files: func() -> list<string>;
+  export packages: func(files: list<project-file>, dependencies: list<dependency>, options: list<option-value>) -> packages;
   export flick:command/command@0.1.0;
 }

@@ -146,8 +146,11 @@ fn a_new_project_builds_runs_and_tests_on_rt_without_effect() {
 
     // the Go backend runs `go build` only with the project's grant
     let config = fs::read_to_string(app.join("flick.toml")).expect("config");
-    let grant = "schema-version = 1\n\n[tools]\n\"flick/go\" = [\"go\"]\n";
-    let granted = config.replacen("schema-version = 1\n", grant, 1);
+    let granted = if config.contains("\n[tools]\n") {
+        config.replacen("\n[tools]\n", "\n[tools]\n\"flick/go\" = [\"go\"]\n", 1)
+    } else {
+        format!("{config}\n[tools]\n\"flick/go\" = [\"go\"]\n")
+    };
     fs::write(app.join("flick.toml"), granted).expect("grant go");
     let go = flick_in(&app, &["test", "--target", "go", "--reporter", "json"]);
     assert!(

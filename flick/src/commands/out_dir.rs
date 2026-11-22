@@ -29,7 +29,7 @@ pub fn overlap(project: &Project, out_dir: &Path) -> Option<Diagnostic> {
         codes::P028,
         Severity::Error,
         format!(
-            "the output directory `{}` is {reason}: a build writes its own `package.json` there and `flick clean` removes it; set `build.out-dir` or `--out-dir` to a directory of its own, such as `dist`",
+            "the output directory `{}` is {reason}: a build writes its own files there and `flick clean` removes it; set `build.out-dir` or `--out-dir` to a directory of its own, such as `dist`",
             out_dir.display()
         ),
     ))

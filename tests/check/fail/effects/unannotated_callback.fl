@@ -29,3 +29,14 @@ let apply_host () =
   run say_host
 
 //~ FLICK-T003 @29:7-29:15 expected `Unit -> _`, found `Unit ->{Host.Console} Unit`
+
+// Of two local functions with callbacks of one shape, the error explains the
+// one applied: its note points to `h`, the parameter of `apply_it`.
+apply_local : Unit ->{Log} Unit
+let apply_local () =
+  let call f x = f x
+  let apply_it h = h ()
+  call (fun x -> x) ()
+  apply_it say
+
+//~ FLICK-T003 @40:12-40:15 expected `Unit -> _`, found `Unit ->{Log} Unit`

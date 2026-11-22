@@ -14,6 +14,7 @@ codegen/enums
 codegen/bigints
 codegen/literals
 codegen/numeric_classes
+codegen/orelse
 codegen/call_site
 codegen/eval_order
 codegen/local_functions
@@ -61,6 +62,7 @@ codegen/do_notation
 codegen/applicative_do
 codegen/classes
 codegen/repeated_superclass
+codegen/let_else
 codegen/let_mut
 runtime/abort_closes_scopes
 runtime/discontinued_body
@@ -90,6 +92,7 @@ codegen/unpack_dictionary
 codegen/record_constructor
 codegen/mutual_rec_arity
 effect/row_without
+effect/postfix_catch
 stdlib/effect/mutable_ref
 stdlib/effect/optic_parts
 stdlib/seqs
@@ -106,5 +109,7 @@ runtime/suspended
 runtime/lazy_let
 runtime/lazy_let_state
 runtime/lazy_opt
+effect/result_blocks
 schema/prove
 schema/prove_imported
+codegen/bounded_eval

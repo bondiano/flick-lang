@@ -3,26 +3,38 @@
 
 #[cfg(feature = "wasm-backends")]
 mod component;
-#[cfg(feature = "wasm-backends")]
+#[cfg(all(test, feature = "wasm-backends"))]
 mod dependencies;
 #[cfg(feature = "wasm-backends")]
 mod execute;
+#[cfg(feature = "wasm-backends")]
+mod foreign;
 #[cfg(feature = "wasm-backends")]
 pub(crate) mod launch;
 #[cfg(feature = "wasm-backends")]
 mod official;
 pub(crate) mod options;
 #[cfg(feature = "wasm-backends")]
+pub(crate) mod packages;
+#[cfg(feature = "wasm-backends")]
 mod request;
+#[cfg(feature = "wasm-backends")]
+mod runtimes;
+#[cfg(feature = "wasm-backends")]
+mod scaffold;
 #[cfg(feature = "wasm-backends")]
 mod tools;
 #[cfg(feature = "wasm-backends")]
 pub(crate) use execute::Reads;
 #[cfg(feature = "wasm-backends")]
+pub(crate) use foreign::{
+    asked, check_runtime_project, doctor, foreign, package_dirs, package_inputs, verify,
+    verify_for_target,
+};
+#[cfg(feature = "wasm-backends")]
 pub(crate) use tools::Tool;
 
 use crate::artifact::Artifact;
-use crate::toolchain;
 use std::path::Path;
 use std::process::Command;
 #[cfg(feature = "wasm-backends")]
@@ -34,12 +46,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::commands::contributed::Contributor;
 use crate::sources::FsHost;
 #[cfg(feature = "wasm-backends")]
+use flick_backend::BackendPin;
+#[cfg(feature = "wasm-backends")]
 use flick_backend::host::runtime::Cancellation;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "wasm-backends")]
 use flick_core::project;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::config;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::lock::{Lock, LockedBackend};
 use flick_core::project::{Compilation, Project};
 use flick_core::source::SourceMap;
 #[cfg(feature = "wasm-backends")]
@@ -58,13 +74,17 @@ pub(crate) enum Selected {
     Component(Arc<component::Package>),
 }
 
-/// Preserve the compiler-owned JS runtime diagnostic before loading packages.
-/// Other components negotiate their runtime requirements through the backend ABI.
+/// Verify the runtime contract reported by the selected backend component.
 pub(crate) fn check_runtime(project: &Project, backend: &Selected, rt: bool) -> Option<Diagnostic> {
-    if !backend.is_official_js() {
-        return None;
+    let _ = project;
+    match backend {
+        Selected::Native => {
+            let _ = rt;
+            None
+        }
+        #[cfg(feature = "wasm-backends")]
+        Selected::Component(package) => package.check_runtime(rt),
     }
-    toolchain::check_runtime(&project.root, rt)
 }
 
 impl Selected {
@@ -81,14 +101,6 @@ impl Selected {
             Self::Native => None,
             #[cfg(feature = "wasm-backends")]
             Self::Component(package) => Some(package.descriptor()),
-        }
-    }
-
-    pub(crate) fn is_official_js(&self) -> bool {
-        match self {
-            Self::Native => true,
-            #[cfg(feature = "wasm-backends")]
-            Self::Component(package) => package.is_official_js(),
         }
     }
 
@@ -261,30 +273,26 @@ pub(crate) fn pin_official(
     locked: bool,
     offline: bool,
 ) -> Result<(), Diagnostic> {
-    if project.config.build.backend.is_some() {
-        return Ok(());
+    let (choice, _) = options::resolve_target(None, Some(project))?;
+    match choice {
+        options::TargetChoice::Pinned { .. } => Ok(()),
+        options::TargetChoice::Official { id, .. } => {
+            official::pin(project, id, update, locked, offline)
+        }
     }
-    let id = if project.config.is_go() {
-        official::GO
-    } else {
-        official::JS
-    };
-    official::pin(project, id, update, locked, offline)
 }
 
 /// The id and digest of the backend `project` selects, read from its pin
 /// or the distributed one, without loading it.
 #[cfg(feature = "wasm-backends")]
 pub(crate) fn selected_pin(project: &Project) -> Option<(String, String)> {
-    if let Some(package) = &project.config.build.backend {
-        return Some((package.id.clone(), package.sha256.clone()));
+    let (choice, _) = options::resolve_target(None, Some(project)).ok()?;
+    match choice {
+        options::TargetChoice::Pinned { package, .. } => Some((package.id, package.sha256)),
+        options::TargetChoice::Official { id, .. } => {
+            official::known(id, Some(project)).map(|pin| (pin.identity.id, pin.sha256))
+        }
     }
-    let id = if project.config.is_go() {
-        official::GO
-    } else {
-        official::JS
-    };
-    official::known(id, Some(project)).map(|pin| (pin.identity.id, pin.sha256))
 }
 
 /// The backend `project` selects, as a contributor of commands.
@@ -306,6 +314,28 @@ pub(crate) fn officials() -> Vec<(String, String)> {
         .filter_map(|id| official::known(id, None))
         .map(|pin| (pin.identity.id, pin.sha256))
         .collect()
+}
+
+/// The official backend `id`, loaded lightweight for scaffolding (`flick new` / `flick init`).
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn scaffold_target(
+    id: &str,
+    existing_lock: Option<&Lock>,
+    offline: bool,
+) -> Result<(Arc<dyn Contributor>, Option<LockedBackend>), Diagnostic> {
+    let (pin, bytes, entry) = official::resolve_target(id, existing_lock, offline)?;
+    let contributor = scaffold::ScaffoldBackend::from_bytes(&pin, &bytes, true)?;
+    Ok((Arc::new(contributor), entry))
+}
+
+/// A verified backend component package loaded lightweight for scaffolding (`--from`).
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn scaffold_package(
+    pin: &BackendPin,
+    bytes: &[u8],
+) -> Result<Arc<dyn Contributor>, Diagnostic> {
+    let contributor = scaffold::ScaffoldBackend::from_bytes(pin, bytes, false)?;
+    Ok(Arc::new(contributor))
 }
 
 /// The official backend `id`, loaded for `project` whatever it selects.

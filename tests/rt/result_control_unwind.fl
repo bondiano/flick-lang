@@ -1,0 +1,62 @@
+// R10: `control` effect operations inside `result { ... }` unwind to their
+// enclosing `control` handler without being swallowed as `Err`, and resuming
+// returns into the `result { ... }` boundary.
+module App.Main exposing (main)
+
+type error Boom = Boom Int
+  deriving Eq, Show
+
+effect Emit a =
+  control emit : a ->{} Unit
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+abandon_first : (Unit ->{Emit Int} String) ->{} String
+let abandon_first body =
+  try body () with
+  | Emit.emit x -> "abandoned:" ++ show x
+  | return s -> "returned:" ++ s
+
+collect_and_resume : (Unit ->{Emit Int} String) ->{} (List Int, String)
+let collect_and_resume body =
+  try body () with
+  | Emit.emit x ->
+    let (xs, out) = resume ()
+    ([x] ++ xs, out)
+  | return s -> ([], s)
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  // Abandoning control handler unwinds past `result { ... }`
+  let a =
+    abandon_first (fun () ->
+      let r : Result Boom Int = result {
+        Emit.emit 7
+        42
+      }
+      show r
+    )
+  say ("abandon: " ++ a)
+
+  // Resuming control handler returns into `result { ... }` for Ok and Err
+  let (xs_ok, out_ok) =
+    collect_and_resume (fun () ->
+      let r : Result Boom Int = result {
+        Emit.emit 1
+        Emit.emit 2
+        99
+      }
+      show r
+    )
+  say ("resume ok: " ++ show xs_ok ++ " " ++ out_ok)
+
+  let (xs_err, out_err) =
+    collect_and_resume (fun () ->
+      let r : Result Boom Int = result {
+        Emit.emit 3
+        Fail.fail (Boom 4)
+      }
+      show r
+    )
+  say ("resume err: " ++ show xs_err ++ " " ++ out_err)

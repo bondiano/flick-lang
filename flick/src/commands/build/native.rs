@@ -8,14 +8,24 @@ use super::js_artifacts::js_artifacts;
 use super::{BuildPlan, Emission};
 #[cfg(any(test, feature = "native-backends-development"))]
 use crate::artifact::Artifact;
+#[cfg(all(
+    any(test, feature = "native-backends-development"),
+    feature = "wasm-backends"
+))]
+use crate::backends;
 #[cfg(not(any(test, feature = "native-backends-development")))]
 use crate::backends::failure;
 use crate::sources::FsHost;
 #[cfg(any(test, feature = "native-backends-development"))]
 use flick_core::build;
 use flick_core::build::Settings;
+#[cfg(all(
+    any(test, feature = "native-backends-development"),
+    not(feature = "wasm-backends")
+))]
+use flick_core::project::Host;
 #[cfg(any(test, feature = "native-backends-development"))]
-use flick_core::project::js;
+use flick_core::project::target;
 use flick_core::project::{Compilation, Project};
 use flick_core::source::SourceMap;
 #[cfg(any(test, feature = "native-backends-development"))]
@@ -70,10 +80,21 @@ fn artifacts_with(
     {
         let mut emission = js_artifacts(sources, compilation, settings);
         if let Some(project) = project {
-            let wanted = &compilation.js_dependencies;
+            let wanted = &compilation.target_dependencies;
             let needs = &mut emission.diagnostics;
-            needs.extend(js::conflicts(host, &project.root, wanted));
-            needs.extend(js::unmet(host, &project.root, wanted));
+            needs.extend(target::conflicts(wanted));
+            #[cfg(feature = "wasm-backends")]
+            {
+                let _ = host;
+                needs.extend(backends::verify_for_target(
+                    project,
+                    Some(&output.target),
+                    wanted,
+                    true,
+                ));
+            }
+            #[cfg(not(feature = "wasm-backends"))]
+            needs.extend(host.verify(project, wanted));
         } else {
             // files built alone have no manifest of the outputs: the list names
             // them, so the next build removes those it does not write

@@ -24,6 +24,58 @@ pub fn execute_tests_program(
     fuel_per_test: u64,
     skip_groups: &[&str],
 ) -> Result<Vec<TestCaseResult>, Error> {
+    execute_tests_program_inner(
+        heap,
+        program,
+        entry,
+        root,
+        seed,
+        fuel_per_test,
+        skip_groups,
+        HostMode::Deterministic,
+        None,
+    )
+}
+
+/// Evaluates and runs a `List Test.Test` suite with an explicit [`HostMode`]
+/// and [`HostBridge`], releasing all Rust heap slots and host handles on return.
+#[expect(clippy::too_many_arguments, reason = "explicit host-bridged test runner")]
+pub fn execute_tests_program_with_bridge(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    root: Option<&Name>,
+    seed: i32,
+    fuel_per_test: u64,
+    skip_groups: &[&str],
+    host_mode: HostMode,
+    bridge: &mut HostBridge,
+) -> Result<Vec<TestCaseResult>, Error> {
+    execute_tests_program_inner(
+        heap,
+        program,
+        entry,
+        root,
+        seed,
+        fuel_per_test,
+        skip_groups,
+        host_mode,
+        Some(bridge),
+    )
+}
+
+#[expect(clippy::too_many_arguments, reason = "shared test-suite executor")]
+fn execute_tests_program_inner(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    root: Option<&Name>,
+    seed: i32,
+    fuel_per_test: u64,
+    skip_groups: &[&str],
+    host_mode: HostMode,
+    bridge: Option<&mut HostBridge>,
+) -> Result<Vec<TestCaseResult>, Error> {
     if let Err(err) = memory::validate_program(program) {
         return Err(Error::InvalidProgram(err));
     }
@@ -32,13 +84,18 @@ pub fn execute_tests_program(
     }
     let start_global = root.unwrap_or(entry);
     let main_stage = match root {
-        Some(_) => MainStage::Root(entry.clone()),
+        Some(_) => MainStage::Root {
+            main: entry.clone(),
+            eager_inits: VecDeque::new(),
+        },
         None => MainStage::Done,
     };
     let execution = NEXT_EXECUTION
         .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
         .expect("fewer than usize::MAX model executions");
     let mut machine = Machine::new(heap, program, execution, vec![], fuel_per_test, main_stage);
+    machine.host_mode = host_mode;
+    machine.bridge = bridge;
     let tests_val = match machine.global(start_global, None).and_then(|()| machine.run()) {
         Ok(LanguageExit::Success(val)) => val,
         Ok(LanguageExit::Failure(cause)) => {
@@ -52,8 +109,13 @@ pub fn execute_tests_program(
         }
         Err(err) => {
             let outcome = machine.finish(Err(err));
-            let _ = outcome.release(heap);
-            return Err(Error::UnsupportedOperation("test suite initialization fault"));
+            match outcome {
+                ProgramOutcome::Fault(fault) => return Err(fault),
+                other => {
+                    let _ = other.release(heap);
+                    return Err(Error::UnsupportedOperation("test suite initialization fault"));
+                }
+            }
         }
     };
 

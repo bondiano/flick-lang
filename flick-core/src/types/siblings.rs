@@ -48,6 +48,32 @@ impl Checker<'_> {
         };
         let mark = self.cx.locals.len();
         let statements: Vec<&Node> = block.nodes().collect();
+        let ty = self.siblings_statements(
+            &statements,
+            block.range().1,
+            first,
+            &function,
+            &parts,
+            span,
+            None,
+        );
+        self.cx.locals.truncate(mark);
+        self.typing.siblings.insert(block.range(), reference);
+        ty
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn siblings_statements(
+        &mut self,
+        statements: &[&Node],
+        block_end: u32,
+        first: &Node,
+        function: &Type,
+        parts: &super::children::Children,
+        span: Span,
+        expected: Option<&Type>,
+    ) -> Type {
+        let mut lines = Vec::new();
         let mut i = 0;
         while i < statements.len() {
             let statement = statements[i];
@@ -55,16 +81,26 @@ impl Checker<'_> {
                 self.late_statement(statement, &statements[..i], first);
             }
             match statement.kind {
-                K::Signature | K::LetDecl => i += self.local_declaration(&statements, i),
+                K::LetDecl if statement.has_token(K::ElseKw) => {
+                    let rest = &statements[i + 1..];
+                    let has_rest_lines = rest.iter().any(|n| !is_statement(n.kind));
+                    if has_rest_lines && lines.is_empty() {
+                        let mut tail = |c: &mut Self, exp: Option<&Type>| {
+                            c.siblings_statements(
+                                rest, block_end, first, function, parts, span, exp,
+                            )
+                        };
+                        return self.let_else(statement, &[], block_end, expected, Some(&mut tail));
+                    }
+                    return self.let_else(statement, rest, block_end, expected, None);
+                }
+                K::Signature | K::LetDecl => i += self.local_declaration(statements, i),
                 K::AssignStmt => self.statement(statement),
-                _ => {}
+                _ => lines.push(statement),
             }
             i += 1;
         }
-        let ty = self.applied_to_children(&function, &parts, &lines, None, span);
-        self.cx.locals.truncate(mark);
-        self.typing.siblings.insert(block.range(), reference);
-        ty
+        self.applied_to_children(function, parts, &lines, expected, span)
     }
 
     /// `T085` on `statement`, which follows `first`, the first child of its

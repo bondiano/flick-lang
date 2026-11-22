@@ -3,6 +3,8 @@
 
 use crate::common;
 
+#[path = "builtins_cache/backend.rs"]
+mod backend;
 #[path = "builtins_cache/go.rs"]
 mod go;
 
@@ -43,43 +45,6 @@ fn check(dir: &Path, std: &Path, cache: &Path) -> Output {
         .env("XDG_CACHE_HOME", cache)
         .output()
         .expect("flick runs")
-}
-
-#[test]
-fn project_checks_save_the_interfaces_of_the_selected_backend() {
-    for backend in ["rt", "effect"] {
-        let app = project(
-            &format!("builtins_cache_backend/{backend}"),
-            &[
-                (
-                    "flick.toml",
-                    &format!(
-                        "schema-version = 1\n[project]\nkind = \"lib\"\n[target.js]\nruntime = \"{backend}\"\n"
-                    ),
-                ),
-                (
-                    "src/App/Main.fl",
-                    "module App.Main exposing (x)\nx : Int\nlet x = 1\n",
-                ),
-            ],
-        );
-        let cache = app.join("cache");
-        let std = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages/std");
-        let out = check(&app, &std, &cache);
-        assert!(out.status.success(), "{out:?}");
-        let files: Vec<_> = fs::read_dir(cache.join("flick"))
-            .expect("cache")
-            .map(|e| e.expect("entry").file_name().to_string_lossy().into_owned())
-            .filter(|name| {
-                name.starts_with("builtins-")
-                    && Path::new(name)
-                        .extension()
-                        .is_some_and(|ext| ext == "jsonl")
-            })
-            .collect();
-        assert_eq!(files.len(), 1, "{files:?}");
-        assert_eq!(files[0].contains("-by-class"), backend == "rt", "{files:?}");
-    }
 }
 
 #[test]
@@ -182,7 +147,8 @@ fn moved_sources_and_go_tables_invalidate_cached_interfaces_and_build_inputs() {
     let text = fs::read_to_string(&manifest).expect("the moved package manifest");
     fs::write(&manifest, format!("{text}\n# presentation only\n")).expect("comment");
     assert_eq!(key(&app, &std, &cache), changed_table);
-    let dependency = format!("{text}\n[js.dependencies]\n\"@acme/cache-probe\" = \"1.0.0\"\n");
+    let dependency =
+        format!("{text}\n[target.js.dependencies]\n\"@acme/cache-probe\" = \"1.0.0\"\n");
     fs::write(&manifest, &dependency).expect("declare a new dependency");
     let changed_manifest = key(&app, &std, &cache);
     assert_ne!(changed_manifest, changed_table);

@@ -1,0 +1,284 @@
+// Postfix `catch` runtime semantics verified against canonical `try ... with`
+// and independent expected outputs across JS (Effect + RT), Go, and λFlick.
+module App.Main exposing (main)
+
+type error Code = Code Int
+
+type error Tag = Tag String
+
+note : Ref (List String) -> String ->{} Unit
+let note log text = Ref.set log (Ref.get log ++ [text])
+
+join : List String -> String
+let rec join items =
+  match items with
+  | [] -> ""
+  | [x] -> x
+  | [x, ...rest] -> x ++ "," ++ join rest
+
+shout : String -> String
+let shout s = s ++ "!"
+
+identity : a -> a
+let identity x = x
+
+succeed_logged : Ref (List String) ->{; Code} String
+let succeed_logged log =
+  note log "body"
+  "ok"
+
+fail_code_logged : Ref (List String) -> Int ->{; Code} String
+let fail_code_logged log n =
+  note log "body"
+  Fail.fail (Code n)
+
+guard_check : Ref (List String) -> String -> Bool ->{} Bool
+let guard_check log label ok =
+  note log label
+  ok
+
+guard_fail : Ref (List String) -> String -> Int ->{; Code} Bool
+let guard_fail log label n =
+  note log label
+  Fail.fail (Code n)
+
+recovery_fail : Ref (List String) -> String -> Int ->{; Code} String
+let recovery_fail log label n =
+  note log label
+  Fail.fail (Code n)
+
+case_success_catch : Unit ->{} String
+let case_success_catch () =
+  let log = Ref.make []
+  let out =
+    succeed_logged log catch
+    | Code _ when guard_check log "guard" true ->
+      note log "rec"
+      "bad"
+    | _ ->
+      note log "rec"
+      "bad"
+  out ++ " | " ++ join (Ref.get log)
+
+case_success_try : Unit ->{} String
+let case_success_try () =
+  let log = Ref.make []
+  let out =
+    try succeed_logged log with
+    | Code _ when guard_check log "guard" true ->
+      note log "rec"
+      "bad"
+    | _ ->
+      note log "rec"
+      "bad"
+  out ++ " | " ++ join (Ref.get log)
+
+case_guard_order_catch : Unit ->{} String
+let case_guard_order_catch () =
+  let log = Ref.make []
+  let out =
+    fail_code_logged log 2 catch
+    | Code n when guard_check log "g1" (n == 1) -> "r1"
+    | Code n when guard_check log "g2" (n == 2) -> "r2"
+    | Code _ -> "r3"
+  out ++ " | " ++ join (Ref.get log)
+
+case_guard_order_try : Unit ->{} String
+let case_guard_order_try () =
+  let log = Ref.make []
+  let out =
+    try fail_code_logged log 2 with
+    | Code n when guard_check log "g1" (n == 1) -> "r1"
+    | Code n when guard_check log "g2" (n == 2) -> "r2"
+    | Code _ -> "r3"
+  out ++ " | " ++ join (Ref.get log)
+
+case_partial_catch : Unit ->{} String
+let case_partial_catch () =
+  Fail.fail (Code 3) catch
+  | Code 1 -> "one"
+  | Code 3 -> "three"
+  | Code _ -> "other"
+
+case_partial_try : Unit ->{} String
+let case_partial_try () =
+  try Fail.fail (Code 3) with
+  | Code 1 -> "one"
+  | Code 3 -> "three"
+  | Code _ -> "other"
+
+case_guard_fail_catch : Unit ->{} String
+let case_guard_fail_catch () =
+  let log = Ref.make []
+  let out =
+    (
+      fail_code_logged log 1 catch
+      | Code _ when guard_fail log "g1" 99 -> "wrong"
+      | Code n -> "inner-" ++ show n
+    )
+    catch
+    | Code n -> "outer-" ++ show n
+  out ++ " | " ++ join (Ref.get log)
+
+case_guard_fail_try : Unit ->{} String
+let case_guard_fail_try () =
+  let log = Ref.make []
+  let out =
+    try
+      try fail_code_logged log 1 with
+      | Code _ when guard_fail log "g1" 99 -> "wrong"
+      | Code n -> "inner-" ++ show n
+    with
+    | Code n -> "outer-" ++ show n
+  out ++ " | " ++ join (Ref.get log)
+
+case_recovery_fail_catch : Unit ->{} String
+let case_recovery_fail_catch () =
+  let log = Ref.make []
+  let out =
+    (
+      fail_code_logged log 1 catch
+      | Code 1 -> recovery_fail log "r1" 77
+      | Code n -> "inner-" ++ show n
+    )
+    catch
+    | Code n -> "outer-" ++ show n
+  out ++ " | " ++ join (Ref.get log)
+
+case_recovery_fail_try : Unit ->{} String
+let case_recovery_fail_try () =
+  let log = Ref.make []
+  let out =
+    try
+      try fail_code_logged log 1 with
+      | Code 1 -> recovery_fail log "r1" 77
+      | Code n -> "inner-" ++ show n
+    with
+    | Code n -> "outer-" ++ show n
+  out ++ " | " ++ join (Ref.get log)
+
+fail_tag : String ->{; Tag, Code} String
+let fail_tag s = Fail.fail (Tag s)
+
+case_unmatched : Unit ->{} String
+let case_unmatched () =
+  (
+    fail_tag "miss" catch
+    | Code _ -> "wrong"
+  )
+  catch
+  | Tag s -> "outer-tag:" ++ s
+
+case_let_mut : Bool ->{} (Int, Int)
+let case_let_mut run_body =
+  let mut x = 1
+  let out =
+    if run_body then {
+      x = 10
+      Fail.fail (Code 5)
+    } else
+      0
+    catch
+    | Code n ->
+      x = x + n
+      x
+  (out, x)
+
+case_result : Unit ->{} String
+let case_result () =
+  let untouched =
+    Err (Tag "raw") catch
+    | _ -> Ok "nope"
+  let first =
+    match untouched with
+    | Ok s -> "ok:" ++ s
+    | Err (Tag s) -> "pure-err:" ++ s
+  let res : Result Tag String = Err (Tag "boom")
+  let second =
+    res? catch
+    | Tag s -> "q:" ++ s
+  first ++ " / " ++ second
+
+case_cold_task : Unit ->{} String
+let case_cold_task () =
+  let log = Ref.make []
+  let job : Eff none {Tag} String =
+    task {
+      note log "ran"
+      Fail.fail (Tag "cold")
+    }
+    catch
+    | _ -> task { "fallback" }
+  let before = join (Ref.get log)
+  let after =
+    await job catch
+    | Tag s -> "outer:" ++ s
+  "before=" ++ before ++ " after=" ++ after ++ "|" ++ join (Ref.get log)
+
+case_nesting : Unit ->{} String
+let case_nesting () =
+  let nested =
+    Fail.fail (Code 1) catch
+    | Code _ ->
+      Fail.fail (Tag "in") catch
+      | Tag s -> "rhs:" ++ s
+  let outer =
+    (
+      Fail.fail (Code 1) catch
+      | Code _ -> Fail.fail (Tag "in")
+    )
+    catch
+    | Tag s -> "outer:" ++ s
+  nested ++ " / " ++ outer
+
+succeed_or_fail : Bool ->{; Code} String
+let succeed_or_fail ok = if ok then "ok" else Fail.fail (Code 1)
+
+case_pipes : Unit ->{} String
+let case_pipes () =
+  let in_ok =
+    succeed_or_fail true catch
+    | Code _ -> "hi" |> shout
+  let in_err =
+    succeed_or_fail false catch
+    | Code _ -> "hi" |> shout
+  let out_ok =
+    (
+      succeed_or_fail true catch
+      | Code _ -> "hi"
+    )
+    |> shout
+  let out_err =
+    (
+      succeed_or_fail false catch
+      | Code _ -> "hi"
+    )
+    |> shout
+  in_ok ++ "," ++ in_err ++ " / " ++ out_ok ++ "," ++ out_err
+
+case_labels : Unit -> (Int, Int, Int, Int)
+let case_labels () =
+  let r1 = { catch = fun n -> n + 1 }
+  let r2 = { r1 with catch = fun n -> n * 10 }
+  let { catch = f } = r2
+  (r1.catch 3, (identity r2).catch 4, { catch = 50 }.catch, f 6)
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line ("success-catch: " ++ case_success_catch ())
+  Platform.stdout_line ("success-try:   " ++ case_success_try ())
+  Platform.stdout_line ("guard-catch:   " ++ case_guard_order_catch ())
+  Platform.stdout_line ("guard-try:     " ++ case_guard_order_try ())
+  Platform.stdout_line ("partial-catch: " ++ case_partial_catch ())
+  Platform.stdout_line ("partial-try:   " ++ case_partial_try ())
+  Platform.stdout_line ("gfail-catch:   " ++ case_guard_fail_catch ())
+  Platform.stdout_line ("gfail-try:     " ++ case_guard_fail_try ())
+  Platform.stdout_line ("rfail-catch:   " ++ case_recovery_fail_catch ())
+  Platform.stdout_line ("rfail-try:     " ++ case_recovery_fail_try ())
+  Platform.stdout_line ("unmatched:     " ++ case_unmatched ())
+  Platform.stdout_line ("let_mut:       " ++ show (case_let_mut true))
+  Platform.stdout_line ("result:        " ++ case_result ())
+  Platform.stdout_line ("cold_task:     " ++ case_cold_task ())
+  Platform.stdout_line ("nesting:       " ++ case_nesting ())
+  Platform.stdout_line ("pipes:         " ++ case_pipes ())
+  Platform.stdout_line ("labels:        " ++ show (case_labels ()))

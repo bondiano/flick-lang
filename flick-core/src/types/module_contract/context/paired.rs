@@ -261,21 +261,23 @@ impl Identities for Dependencies<'_> {
                 // A generated atomic name may itself contain dots. Preserve the
                 // existing qualified-label interpretation, but only against
                 // exact module identities supplied by issued/retained views.
-                let modules: BTreeSet<_> = self
-                    .scoped
-                    .iter()
-                    .chain(
-                        self.context
-                            .0
-                            .iter()
-                            .flat_map(|coordinate| &coordinate.modules),
-                    )
-                    .filter(|module| {
-                        name.strip_prefix(module.as_str())
-                            .is_some_and(|suffix| suffix.starts_with('.'))
-                    })
-                    .cloned()
-                    .collect();
+                // `extend`, not `collect`: collecting compiles a sort of `String` into the wasm compiler.
+                let mut modules = BTreeSet::new();
+                modules.extend(
+                    self.scoped
+                        .iter()
+                        .chain(
+                            self.context
+                                .0
+                                .iter()
+                                .flat_map(|coordinate| &coordinate.modules),
+                        )
+                        .filter(|module| {
+                            name.strip_prefix(module.as_str())
+                                .is_some_and(|suffix| suffix.starts_with('.'))
+                        })
+                        .cloned(),
+                );
                 for module in modules {
                     self.module(&module, bound);
                 }

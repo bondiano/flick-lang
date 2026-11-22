@@ -31,6 +31,14 @@ let summed a b =
   try show (sum a b) with
   | Invalid s -> "invalid " ++ s
 
+// `let ... else` keeps `?` targeting the enclosing function in initializer,
+// fallback, and remainder.
+let_else_question : Option (Option Int) -> Option Int -> Option Int
+let let_else_question m backup =
+  let Some inner = m else Some (backup? + 100)
+  let Some n = Some inner? else None
+  Some (n + 5)
+
 main : Unit ->{Host.Console; AppError} Unit
 let main () =
   Platform.stdout_line (show (quarter 8))
@@ -39,3 +47,7 @@ let main () =
   Platform.stdout_line (show (labelled 6))
   Platform.stdout_line (summed "1" "2")
   Platform.stdout_line (summed "1" "x")
+  Platform.stdout_line (show (let_else_question (Some (Some 10)) None))
+  Platform.stdout_line (show (let_else_question (Some None) (Some 1)))
+  Platform.stdout_line (show (let_else_question None (Some 2)))
+  Platform.stdout_line (show (let_else_question None None))

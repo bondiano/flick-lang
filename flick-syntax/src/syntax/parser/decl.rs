@@ -144,6 +144,19 @@ fn let_rest(p: &mut Parser, m: super::Marker, assert: bool) {
     } else {
         pattern::pattern(p);
     }
+    if p.at(K::WhenKw) {
+        let when = p.raw();
+        p.error_at(
+            codes::S007,
+            p.span(when.start, when.end),
+            "`when` guards are not supported in `let` or `let ... else`: use `match` instead"
+                .into(),
+        );
+        let guard = p.start();
+        p.bump();
+        expr::expr(p);
+        p.complete(guard, K::Error);
+    }
     if p.eat(K::Colon) {
         types::type_(p);
     }
@@ -159,6 +172,14 @@ fn let_rest(p: &mut Parser, m: super::Marker, assert: bool) {
         }
         p.bump();
         p.expect(K::String);
+    }
+    if p.eat(K::ElseKw) {
+        p.body(K::Block, expr::stmt);
+        if p.at(K::AsKw) {
+            p.error_expected("the end of `let ... else`: only `let assert` takes `as \"message\"`");
+            p.bump();
+            p.expect(K::String);
+        }
     }
     p.complete(m, K::LetDecl);
 }
@@ -622,14 +643,14 @@ fn foreign_decl(p: &mut Parser) {
     }
     p.complete(source, K::ForeignSource);
     if p.sep().is_none() && p.raw().line_start {
-        p.body(K::ForeignMeta, meta_item);
+        p.body_glued(K::ForeignMeta, meta_item, Parser::at_aligned_catch);
     }
     p.complete(m, K::ForeignDecl);
 }
 
 fn meta_item(p: &mut Parser) {
     let m = p.start();
-    if p.at(K::Ident) {
+    if p.at(K::Ident) || p.at(K::CatchKw) {
         let name = p.raw();
         if !FOREIGN_META.contains(&p.text_of(name)) {
             p.error_at(
@@ -642,7 +663,11 @@ fn meta_item(p: &mut Parser) {
                 ),
             );
         }
-        p.bump();
+        if p.at(K::CatchKw) {
+            p.bump_as(K::Ident);
+        } else {
+            p.bump();
+        }
         while expr::at_arg_start(p) {
             expr::postfix(p);
         }

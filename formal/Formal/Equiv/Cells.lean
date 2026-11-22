@@ -14,13 +14,21 @@ open Flick.Elab (All2 ORel)
 
 variable {W : World}
 
-/-- Head steps of a term that read no region. -/
-inductive HSeq : List Tm → Tm → List Tm → Tm → Prop
-  | refl {μ t} : HSeq μ t μ t
-  | rt {μ t μ₁ t₁ μ' t'} : (∀ Λ, RHead Λ μ t Λ μ₁ t₁) → HSeq μ₁ t₁ μ' t' → HSeq μ t μ' t'
-  | pure {μ t t₁ μ' t'} : PHead t t₁ → HSeq μ t₁ μ' t' → HSeq μ t μ' t'
+/-- Head steps (and pure multi-frame steps) of a term that read no region. -/
+inductive HSeq (root : Roots) : List Tm → Tm → List Tm → Tm → Prop
+  | refl {μ t} : HSeq root μ t μ t
+  | rt {μ t μ₁ t₁ μ' t'} : (∀ Λ, RHead Λ μ t Λ μ₁ t₁) → HSeq root μ₁ t₁ μ' t' → HSeq root μ t μ' t'
+  | pure {μ t t₁ μ' t'} : PHead t t₁ → HSeq root μ t₁ μ' t' → HSeq root μ t μ' t'
+  | pstep {μ t t₁ μ' t'} : PStep root t t₁ → HSeq root μ t₁ μ' t' → HSeq root μ t μ' t'
 
-theorem HSeq.one {μ t μ' t'} (h : ∀ Λ, RHead Λ μ t Λ μ' t') : HSeq μ t μ' t' := .rt h .refl
+theorem HSeq.one {root : Roots} {μ t μ' t'} (h : ∀ Λ, RHead Λ μ t Λ μ' t') : HSeq root μ t μ' t' :=
+  .rt h .refl
+
+theorem HSeq.of_psteps {root : Roots} {μ μ' : List Tm} {t t₁ t' : Tm}
+    (hp : PSteps root t t₁) (h : HSeq root μ t₁ μ' t') : HSeq root μ t μ' t' := by
+  induction hp with
+  | refl => exact h
+  | step s _ ih => exact .pstep s (ih h)
 
 theorem Steps.trans' {root : Roots} {Q : Lbl → Prop} {Λ μ t Λ₁ μ₁ t₁ Λ' μ' t'}
     (h₁ : Steps root Q Λ μ t Λ₁ μ₁ t₁) (h₂ : Steps root Q Λ₁ μ₁ t₁ Λ' μ' t') :
@@ -35,7 +43,8 @@ theorem Sim.top_cell {x : Pos} {c c' : Tm} (h : Sim W x c c') (hx : x = .top) :
       ((∃ o, c = .done o) ↔ ∃ o', c' = .done o') := by
   cases h with
   | jL hx' | jR hx' => exact (hx' hx).elim
-  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead => cases hx
+  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | _ => simp
 

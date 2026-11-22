@@ -287,7 +287,7 @@ codes! {
     P037 = Project 37, "plugin block without its import";
     P038 = Project 38, "plugin reaches what the project does not grant";
     P039 = Project 39, "plugin's answer is in no snapshot of an offline run";
-    P040 = Project 40, "packages need different versions of an npm package";
+    P040 = Project 40, "packages need different versions of a target dependency";
     P041 = Project 41, "foreign module of a library cannot ship";
     P042 = Project 42, "the manifest disables this part of a plugin";
     P043 = Project 43, "the `std` does not fit this compiler";
@@ -307,6 +307,10 @@ codes! {
     P057 = Project 57, "removed build flag or configuration key";
     P058 = Project 58, "unknown or invalid backend option";
     P059 = Project 59, "unknown target backend";
+    P060 = Project 60, "unknown or unsupported project template";
+    P061 = Project 61, "Flick program step or documentation example failed at runtime";
+    P062 = Project 62, "documentation example failed its check contract";
+    P063 = Project 63, "the backend has no dependency command for this";
 }
 
 #[cfg(test)]

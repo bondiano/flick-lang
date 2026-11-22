@@ -12,6 +12,7 @@ use std::time::Duration;
 use std::{env, fs};
 use wasmtime::Engine;
 
+use flick_backend::command::TemplateRequest;
 use flick_backend::host::{Budget, WasmBackend, runtime};
 use flick_backend::{
     Backend, BackendPin, BuildRequest, Failure, Generated, InputError, Inputs, Limits, Mode,
@@ -393,5 +394,97 @@ fn an_ungranted_wasi_clock_traps_instead_of_becoming_an_implicit_input() {
     assert!(
         diagnostics[0].message.contains("trapped"),
         "{diagnostics:?}"
+    );
+}
+
+#[test]
+#[ignore = "build the real component fixture with `just wasm-backends`"]
+fn component_templates_and_scaffold_match_native_and_reject_unknown() {
+    let (backend, _) = fixture(Budget::default());
+    let listed = backend.try_templates().expect("templates list");
+    assert_eq!(listed, Literal.templates());
+    assert!(listed.iter().any(|t| t.name == "starter"), "{listed:?}");
+
+    let request = TemplateRequest {
+        template: "starter".into(),
+        name: "demo".into(),
+        compiler: "0.1.0".into(),
+        init: false,
+    };
+    let wasm_plan = backend.scaffold(&request).expect("scaffold starter");
+    let native_plan = Literal.scaffold(&request).expect("native starter");
+    assert_eq!(wasm_plan, native_plan);
+    assert!(
+        wasm_plan.files.iter().any(|f| f.path == "flick.toml"),
+        "{wasm_plan:?}"
+    );
+
+    let bad = TemplateRequest {
+        template: "missing".into(),
+        ..request
+    };
+    let diagnostics = backend.scaffold(&bad).expect_err("unknown template");
+    assert_eq!(diagnostics[0].code, "P060");
+    assert!(
+        diagnostics[0].message.contains("starter"),
+        "{diagnostics:?}"
+    );
+}
+
+#[test]
+#[ignore = "build the real component fixture with `just wasm-backends`"]
+fn component_packages_and_package_files_match_native() {
+    use flick_backend::ProjectFile;
+    use flick_backend::command::Dependency;
+
+    let (backend, _) = fixture(Budget::default());
+    assert_eq!(backend.package_files(), Literal.package_files());
+
+    let files = vec![
+        ProjectFile {
+            path: "literal-deps.json".into(),
+            real: "/proj/literal-deps.json".into(),
+            bytes: br#"{"name":"demo","version":"1.0.0","dependencies":{"widget":"1.0.0"},"installed":["widget"]}"#.to_vec(),
+        },
+        ProjectFile {
+            path: "literal_packages/helper/manifest.json".into(),
+            real: "/proj/literal_packages/helper/manifest.json".into(),
+            bytes: br#"{"name":"helper","version":"0.2.0","source-dir":"src"}"#.to_vec(),
+        },
+    ];
+    let deps = vec![
+        Dependency {
+            name: "widget".into(),
+            version: "1.0.0".into(),
+            by: None,
+        },
+        Dependency {
+            name: "missing".into(),
+            version: "2.0.0".into(),
+            by: Some("lib".into()),
+        },
+    ];
+    let options = vec![
+        OptionValue {
+            key: "skip-runtime".into(),
+            value: "true".into(),
+        },
+        OptionValue {
+            key: "verify".into(),
+            value: "installed".into(),
+        },
+    ];
+    let wasm = backend.packages(&files, &deps, &options);
+    let native = Literal.packages(&files, &deps, &options);
+    assert_eq!(wasm, native);
+    assert_eq!(wasm.name.as_deref(), Some("demo"));
+    assert_eq!(wasm.version.as_deref(), Some("1.0.0"));
+    assert_eq!(wasm.declared, vec!["widget".to_owned()]);
+    assert_eq!(wasm.sources.len(), 1);
+    assert_eq!(wasm.sources[0].root, "literal_packages/helper/src");
+    assert!(
+        wasm.diagnostics.iter().any(|d| d.code == "P034"),
+        "{:?}",
+        wasm.diagnostics
     );
 }

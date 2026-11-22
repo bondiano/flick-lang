@@ -267,8 +267,8 @@ pub fn implicit_hash() -> &'static str {
             hasher.update(text.as_bytes());
             hasher.update([0]);
         }
-        for (package, name, version) in types::implicit_js_dependencies() {
-            for part in [package, name, version] {
+        for (package, target, name, version) in types::implicit_target_dependencies() {
+            for part in [package, target, name, version] {
                 hasher.update(part.as_bytes());
                 hasher.update([0]);
             }

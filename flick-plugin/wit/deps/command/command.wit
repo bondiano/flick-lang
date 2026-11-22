@@ -37,7 +37,13 @@ interface types {
     }
     record argument { name: string, values: list<string> }
     /// A host tool the project allows the contributor, pinned by the host.
+    /// One it allows that the host did not find has an empty version and
+    /// digest, and no step may run it.
     record tool { id: string, version: string, sha256: string }
+    /// A package of the contributor's ecosystem that the project or a
+    /// library of its closure asks for in `[target.<name>.dependencies]`;
+    /// `by` names the library, none the project.
+    record dependency { name: string, version: string, by: option<string> }
     record file { path: string, bytes: list<u8>, executable: bool }
     record invocation {
         name: string,
@@ -48,11 +54,20 @@ interface types {
         /// The files the descriptor's `inputs` name, as they are now.
         inputs: list<file>,
         tools: list<tool>,
+        /// What the closure asks of a backend's ecosystem, for the
+        /// dependency commands it implements; empty for any other command.
+        dependencies: list<dependency>,
     }
     record variable { name: string, value: string }
     /// A run of a host tool in a directory of its own, holding the plan's
     /// files `inputs` names; it gives back the files `outputs` names, which
     /// the host writes with the plan's, or hands to `resume`.
+    ///
+    /// An `in-place` step runs in the project's root instead, once the
+    /// other steps have run and the files so far are published. It reads
+    /// and inputs nothing of the plan; `outputs` names what it changes,
+    /// each within the descriptor's `writes`, and nothing is read back. The
+    /// host cannot undo what it changes: a failure leaves that as it is.
     record tool-step {
         id: string,
         tool: tool,
@@ -64,8 +79,39 @@ interface types {
         /// the step's directory, linked rather than copied.
         reads: list<string>,
         outputs: list<string>,
+        in-place: bool,
     }
-    variant step { tool(tool-step) }
+    /// An in-memory Flick source module overlaid on the project's source root
+    /// for a `run-flick` step; never written to the project tree.
+    record flick-module {
+        /// Valid Flick module name, as `FlickSchemaExport` or `DocExample`.
+        name: string,
+        /// UTF-8 Flick source text.
+        source: string,
+    }
+    /// A Flick program compiled and run on the project's selected backend in
+    /// an isolated temporary generation, without writing to the project tree.
+    record run-flick-step {
+        /// Unique identifier within the plan's steps.
+        id: string,
+        /// Module whose `main` runs: an overlay in `modules` or an existing
+        /// module of the project.
+        entry: string,
+        /// In-memory `.fl` modules overlaid on `$sources` during compilation.
+        modules: list<flick-module>,
+        /// Arguments passed to the program (`Platform.args`).
+        arguments: list<string>,
+        /// Optional output path receiving captured stdout: handed to `resume`
+        /// when `resume` is set, otherwise published under `descriptor.writes`.
+        output: option<string>,
+        /// Optional span in `invocation.inputs` used to anchor compiler or
+        /// runtime diagnostics originating inside synthetic overlay `modules`.
+        origin: option<span>,
+    }
+    variant step {
+        tool(tool-step),
+        run-flick(run-flick-step),
+    }
     enum severity { error, warning, note }
     /// Bytes `start` to `end` of the file `path` of `invocation.inputs`.
     record span { path: string, start: u32, end: u32 }
@@ -126,10 +172,26 @@ interface types {
     /// How a session command starts: as a session, or as a plan it runs
     /// once instead.
     variant opened { session(list<u8>), plan(plan) }
+    /// A project template a backend or plugin contributes for `flick new` and `flick init`.
+    record template-descriptor {
+        name: string,
+        summary: string,
+    }
+    /// Input for scaffolding a project from a template.
+    record template-request {
+        /// Template name from `templates`.
+        template: string,
+        /// Normalized project/package name derived from the target directory.
+        name: string,
+        /// Version of the `flick` compiler running `new`/`init`.
+        compiler: string,
+        /// True for `flick init`, false for `flick new`.
+        init: bool,
+    }
 }
 
 interface command {
-    use types.{descriptor, invocation, plan, handled, diagnostic, file, answer, opened};
+    use types.{descriptor, invocation, plan, handled, diagnostic, file, answer, opened, template-descriptor, template-request};
     describe: func() -> list<descriptor>;
     run: func(invocation: invocation) -> result<plan, list<diagnostic>>;
     /// The rest of a plan whose steps have run, with their outputs.
@@ -140,4 +202,8 @@ interface command {
     handle: func(state: list<u8>, request: list<u8>, answers: list<answer>) -> result<handled, string>;
     /// The plan of a session that ends.
     close: func(state: list<u8>) -> plan;
+    /// Project templates the contributor provides for `flick new` and `flick init`.
+    templates: func() -> list<template-descriptor>;
+    /// The plan of files (and optional stdout guidance) for a project from `request`.
+    scaffold: func(request: template-request) -> result<plan, list<diagnostic>>;
 }

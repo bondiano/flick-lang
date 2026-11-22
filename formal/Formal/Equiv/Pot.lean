@@ -95,7 +95,8 @@ theorem Act.not_force {a b : Tm} (h : Act W a b) (hB : ¬ W.B) {E : List Frame} 
     obtain ⟨-, h⟩ := decomp_eq (E := [.force]) (lazy_redex _) (force_redex n)
       (OkE.nil.cons' trivial) hE ha
     cases h
-  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB' => exact hB hB'
+  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB'
+  | o4B hB' | o4Alloc1 hB' | o4Bind hB' | o4Settle hB' => exact hB hB'
 
 /-- **A thread related by `Sim` forces no left cell at its next step**: the focus of a force of a
 related cell is related by a congruence, and a related location is no left cell. -/
@@ -105,13 +106,15 @@ theorem Sim.no_force {μ μ₂ : List Tm} {t t₂ : Tm} (h : Sim W .any t t₂) 
   intro hn
   subst ht
   rcases h.dec (force_redex n).1 (fun _ _ h => by cases h) (fun _ _ _ h => by cases h)
-      (fun h => h) _ _ rfl hE μ₂ with
+      (fun h => h) _ _ rfl hE μ₂ (fun h => (hB h).elim) with
     ⟨W', μ', E₀, E₁, a, b, E₂, hj, rfl, rfl, -, -, hact⟩ |
     ⟨W', μ', E₂, r₂, hj, -, -, hs⟩ | ⟨_, _, _, _, _, _, _, _, _, h', _, _⟩
   · exact hact.not_force (fun h => hB (hj.le.B.2 h)) (fun F hF => hE F (List.mem_append_left _ hF)) rfl
   · obtain ⟨e₂, rfl, he⟩ := hs.inv_force
-    obtain ⟨W'', μ'', l', k, r, hl⟩ := force_loc he μ'
-    exact (r.st _ (hj.st _ hst)).not_j₁ hl (r.le.J₁ _ (hj.le.J₁ _ hn))
+    obtain ⟨W'', μ'', l', r, hl⟩ := force_loc he μ' (fun h => (hB (hj.le.B.2 h)).elim)
+    rcases hl with ⟨k, hl⟩ | ⟨hB', -⟩
+    · exact (r.st _ (hj.st _ hst)).not_j₁ hl (r.le.J₁ _ (hj.le.J₁ _ hn))
+    · exact hB (hj.le.B.2 (r.le.B.2 hB'))
   · cases h'
 
 theorem Sim.xpot {μ μ₂ : List Tm} {t t₂ : Tm} (h : Sim W .any t t₂) (hst : StR W μ μ₂)

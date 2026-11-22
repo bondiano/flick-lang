@@ -291,6 +291,16 @@ enum Data {
         services: Vec<Value>,
         refs: BTreeMap<String, Value>,
     },
+    /// Counted handle to a host object/function/Effect owned by the Node `HostBridge`.
+    ForeignHandle {
+        execution: usize,
+        host_id: u64,
+    },
+    /// Counted handle marking a cycle back-edge in an untrusted host value.
+    ForeignCycle {
+        execution: usize,
+        host_id: u64,
+    },
 }
 
 #[derive(Debug)]
@@ -315,6 +325,8 @@ pub struct Heap {
     service_tags: BTreeMap<String, ObjectId>,
     // Freed unresumed continuations queued for deterministic VM unwind/finalization.
     dropped_continuations: Vec<(usize, usize)>,
+    // Freed foreign handles queued for deterministic release on the Node HostBridge.
+    released_foreign_handles: Vec<(usize, u64)>,
 }
 
 static NEXT_HEAP: AtomicUsize = AtomicUsize::new(0);

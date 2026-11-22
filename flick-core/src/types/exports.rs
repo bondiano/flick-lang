@@ -249,7 +249,12 @@ impl Checker<'_> {
         };
         let mut exports: Vec<Export> = self.env.own_values().map(value).collect();
         exports.extend(self.env.own_types().map(ty));
-        exports.sort_by(|a, b| a.entity.cmp(&b.entity));
+        if exports.len() > 1 {
+            let order = flick_ir::sort_indices(exports.len(), &|i, j| {
+                exports[i].entity.cmp(&exports[j].entity)
+            });
+            flick_ir::apply_order(&mut exports, order);
+        }
         Interface {
             module: self.env.module.clone(),
             exports,

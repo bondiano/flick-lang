@@ -19,11 +19,11 @@ use crate::args::{BuildArguments, LabelsArgument, ProfileArgument};
 use crate::artifact::{Artifact, resolve_root};
 use crate::backends::options::{self, ResolvedOptions, TargetChoice};
 use crate::backends::{self, Selected};
+use crate::cache;
 use crate::command::{Command, Outcome};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{builtins, cache};
 
 mod backend;
 mod cached;
@@ -255,16 +255,9 @@ impl Command for BuildCommand {
         }
         // only a build that compiles reads the built-in modules: a cache hit
         // restored its artifacts above
-        if let Err(outcome) = self.prepare(&progress) {
+        let stages_by_class = project::stages_by_class(project.as_ref(), Some(plan.extras.rt));
+        if let Err(outcome) = self.prepare(&progress, stages_by_class) {
             return outcome;
-        }
-        if project::stages_by_class(project.as_ref(), Some(plan.extras.rt))
-            && let Err(diagnostic) = builtins::prepare_in(true)
-        {
-            return Outcome {
-                sources,
-                diagnostics: vec![diagnostic],
-            };
         }
         progress.stage("Compiling Flick modules");
         let mut kept = self.modules.as_ref().map(|modules| modules.borrow_mut());
@@ -443,7 +436,7 @@ impl BuildCommand {
         } else {
             output.out_dir.clone()
         };
-        let package = project::project_name(&FsHost::new(), &project.root).unwrap_or_default();
+        let package = project::project_name(&FsHost::new(), project).unwrap_or_default();
         let effect = !output.go && !output.extras.rt;
         let backend = format!(
             "{} {:?} {} {}",

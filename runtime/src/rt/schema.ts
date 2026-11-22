@@ -176,29 +176,32 @@ export const schemaTupleOf = (items: ReadonlyArray<Witness>): Witness => witness
   }
   return ok(out);
 }, undefined, { kind: "tuple", items });
-export const schemaRecordOf = (fields: ReadonlyArray<readonly [string, Witness]>): Witness => witness("record", (v, path) => {
-  if (!isRecord(v)) return mismatch(path, "an object", v);
-  const out: Record<string, unknown> = {};
-  for (const [name, item] of fields) {
-    if (!Object.hasOwn(v, name)) return err(schemaError(at(path, name), "a missing key"));
-    const r = item.decodeAt(v[name], at(path, name));
-    if (r._tag === "Failure") return r;
-    out[name] = r.success;
-  }
-  for (const name of Object.keys(v)) if (!fields.some(([label]) => label === name))
-    return err(schemaError(at(path, name), "an unknown key"));
-  return ok(out);
-}, (v, path) => {
-  if (!isRecord(v)) return mismatch(path, "an object", v);
-  const out: Record<string, unknown> = {};
-  for (const [name, item] of fields) {
-    if (!Object.hasOwn(v, name)) return err(schemaError(at(path, name), "a missing key"));
-    const r = item.encodeAt(v[name], at(path, name));
-    if (r._tag === "Failure") return r;
-    out[name] = r.success;
-  }
-  return ok(out);
-}, undefined, { kind: "record", fields });
+export const schemaRecordOf = (fields: ReadonlyArray<readonly [string, Witness]>): Witness => {
+  const sorted = fields.toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return witness("record", (v, path) => {
+    if (!isRecord(v)) return mismatch(path, "an object", v);
+    const out: Record<string, unknown> = {};
+    for (const [name, item] of sorted) {
+      if (!Object.hasOwn(v, name)) return err(schemaError(at(path, name), "a missing key"));
+      const r = item.decodeAt(v[name], at(path, name));
+      if (r._tag === "Failure") return r;
+      Object.defineProperty(out, name, { value: r.success, enumerable: true, writable: true, configurable: true });
+    }
+    for (const name of Object.keys(v)) if (!sorted.some(([label]) => label === name))
+      return err(schemaError(at(path, name), "an unknown key"));
+    return ok(out);
+  }, (v, path) => {
+    if (!isRecord(v)) return mismatch(path, "an object", v);
+    const out: Record<string, unknown> = {};
+    for (const [name, item] of sorted) {
+      if (!Object.hasOwn(v, name)) return err(schemaError(at(path, name), "a missing key"));
+      const r = item.encodeAt(v[name], at(path, name));
+      if (r._tag === "Failure") return r;
+      Object.defineProperty(out, name, { value: r.success, enumerable: true, writable: true, configurable: true });
+    }
+    return ok(out);
+  }, undefined, { kind: "record", fields: sorted });
+};
 
 export const schemaCase = (constructor: unknown, fields: ReadonlyArray<Witness>): Case => {
   let current = constructor;

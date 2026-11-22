@@ -15,17 +15,17 @@ its tools in [`[tools]`](../project/#flicktoml), and the flag there is
 `FLICK-P051`) and `--help`; `flick help <command>` prints a command's help and
 `flick --version` the compiler's version (`flick doctor` shows the rest).
 
-The project's backend and the plugins of its dependencies may add commands
-of their own. `flick --help` lists them by contributor, and they run as
-`flick <command>` or `flick <contributor>:<command>` (see
+Built-in `std`, the project's backend and the plugins of its dependencies may
+add commands of their own. `flick --help` lists them by contributor, and they
+run as `flick <command>` or `flick <contributor>:<command>` (see
 [Contributed commands](../commands/)).
 
 ## Commands
 
 | Command | What it does |
 | - | - |
-| `new <dir> [--template app\|cli\|fullstack\|lib\|plugin]` | creates a project: `flick.toml`, `package.json`, an example module and its test, and an `AGENTS.md` that tells coding agents where to look Flick up and which checks to pass; `cli` makes `main` a [`cli` block](../cli-dsl/); `plugin` is a library with a [plugin](../plugins/), its crate in `plugin/` and `flick run plugin` to build it; `fullstack` is a server entry and a browser page (`target = "client"`) sharing the calls of a [`server fn`](../server-fn/) module, writes guarded by `Server.authenticated`, with Vite for the page |
-| `init [--template app\|cli\|fullstack\|lib]` | the same files in the working directory; every file that exists is reported before anything is written (`FLICK-P019`), except an existing `AGENTS.md`, which is kept |
+| `new <dir> [--target <name>] [--template <name>] [--from <source> [--tag <tag> [--subdir <dir>] \| --sha256 <hex>]]` | creates a project from a template contributed by the selected target backend (`js` by default: `app`, `cli`, `fullstack`, `lib`, `plugin`; `go`: `app`, `cli`, `lib`, `plugin`) or a third-party `--from` package (local path, tarball URL with `--sha256`, or git repository with `--tag` and optional `--subdir`); every template file, including `flick.toml`, comes from the contributor, `--from` pins the template under `[[template]]` in `flick.lock`, an unsupported template is `FLICK-P060` listing the available ones, and an unknown `--target` is `FLICK-P059` |
+| `init [--target <name>] [--template <name>] [--from <source> [--tag <tag> [--subdir <dir>] \| --sha256 <hex>]]` | adds the template files to the working directory while keeping existing unrelated files; every colliding template file is reported before anything is written (`FLICK-P019`), except an existing `AGENTS.md`, which is kept, and `flick.lock`, into which new pins are merged |
 | `check [paths] [--watch] [--fix [--only codes]]` | checks; without paths the source and test roots; `--fix` applies the fixes that keep the program's meaning (such as removing a type annotation the value already has, `FLICK-T021`) to those files and reports what is left; `--only E002,F001` applies only the fixes of those codes, for a migration that changes nothing else |
 | `prove [paths] [--watch]` | checks the proofs of the proof root (`project.proof-dir`), or of the files given, with the code they name; `check`, `build` and `test` never read the proof root (see [the proof contract](https://github.com/bondiano/flick-lang/blob/main/docs/formal/proofs.md)) |
 | `build [paths] [--target <name>] [--profile] [--labels all\|components\|none] [--emit-ir[=json\|cbor]] [--out-dir] [--watch] [<backend options>]` | compiles the project with the selected target backend (`js` by default: ESM, source maps and `.iface` files; `--target go`: a Go executable per entry, see [Go target](../codegen/#go-target)); target-specific flags such as `--typescript`, `--declarations`, `--promise-facade`, `--schema-aot`, `--runtime`, `--ui` (`flick/js`) or `--cgo` (`flick/go`) are declared by the selected backend (see [Target and backend options](#target-and-backend-options)); `--emit-ir` adds `program.ir.json` (or `program.ir.cbor`): the IR the backend gets, optimized in a release build, with the version of the IR it is written in; shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
@@ -43,9 +43,9 @@ of their own. `flick --help` lists them by contributor, and they run as
 | `diff [ref]` | the public API changes since a git revision (the latest tag by default), each `MAJOR` (removed or changed) or `MINOR` (added), and the version they call for from `package.json` |
 | `ffi import <pkg> --out <dir> [--select a,b]` | a command of the JavaScript backend (`js:ffi import`): reads the `.d.ts` of an installed package and writes `<dir>/<Pkg>/Generated.fl` with a coverage report; `--select` imports only the named exports (see [Importing a package's `.d.ts`](../ffi/#importing-a-packages-dts)) |
 | `ffi check [paths]` | a command of the JavaScript backend: checks generated and reviewed bindings and their policies against the installed packages; without paths the source root |
-| `schema export <M.codec> --target json-schema-2020-12 --out <file>` | the strict JSON Schema of a `PureCodec Json a` |
-| `schema export <M.api> --target openapi-3.1 --out <file>` | an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes (see [Clients and documents](../http-api/#clients-and-documents)) |
-| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | Markdown pages of the public API: types, kinds, variances, constraints, effects, captures |
+| `schema export <M.codec> --target json-schema-2020-12 --out <file>` | a command of `std` (`std:schema export`): exports the strict JSON Schema of a `PureCodec Json a` by running through the project's selected backend |
+| `schema export <M.api> --target openapi-3.1 --out <file>` | a command of `std` (`std:schema export`): exports an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes, running through the project's selected backend (see [Clients and documents](../http-api/#clients-and-documents)) |
+| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--target <name>] [--std]` | Markdown pages of the public API: types, kinds, variances, constraints, effects, captures; with `--check-examples`, compiles and executes examples on the selected backend (or `--target <name>`) |
 | `explain <code>` | the explanation of a diagnostic code, a plugin's too, as `std/L001` |
 | `expand [paths]` | the code each [plugin](../plugins/) block of the project or of the files stands for |
 | `doctor` | the compiler, Node.js, pnpm, git, the TypeScript Content Mapper, the installed runtime and Effect, the optional adapters, and Go when it is installed; everything but the compiler, Node.js and pnpm is a note, not a failure |
@@ -60,17 +60,19 @@ dependencies first.
 `check`, `build` and the build steps of `run`, `dev` and `test` install
 nothing, run no `main` and load no foreign module. An installed
 `@flick-lang/runtime`, `@flick-lang/effect-ts` or `effect` of another version than the compiler
-pins stops them with `FLICK-P015` (exit code 2). `schema export` loads the
-module that makes the codec, whose top level is pure, and nothing else.
-JSON Schema export uses the project's selected runtime. OpenAPI export uses the
-Effect adapter; set `[target.js] runtime = "effect"` and install `@flick-lang/effect-ts` for
-an `HttpApi.Api` export.
+pins stops them with `FLICK-P015` (exit code 2). `schema export` (contributed by
+`std`, also invocable as `flick std:schema export`) compiles an in-memory
+exporter module against the project and runs it through the project's selected
+backend (`flick/js` on `rt` or `effect`, `flick/go` as a native Go executable
+without Node, or another pinned backend) in an isolated temporary generation,
+writing no generated modules to the project tree. A schema that cannot be
+exported strictly fails with `FLICK-D008` pointing at the exported declaration.
 
 `test` streams human results after each test's cleanup, with success/failure markers, completion counts and timings, then prints a summary. Node and Go share the format and honor `--color`; auto color checks stdout, `NO_COLOR` and `TERM=dumb`. `--reporter json` writes one final object in declaration order, without color or timings.
 
 ## Target and backend options
 
-`build`, `run`, `dev`, `test` and `inspect` take `--target <name>` to select
+`build`, `run`, `dev`, `test`, `inspect` and `doc` (when checking examples) take `--target <name>` to select
 which backend component runs (`js` for `flick/js`, `go` for `flick/go`, or the
 short name of a pinned `[build.backend]`). Without `--target`, the target comes
 from `[build.backend]`, then `[build] target`, then the backend prefix of
@@ -111,6 +113,40 @@ flags are removed with no compatibility aliases and fail with `FLICK-P057`
 Arguments after `--` (such as `flick run app -- --rt`) are passed straight to
 the program or script and are never parsed by `flick`.
 
+### Project templates (`new` and `init`)
+
+`flick new <dir>` and `flick init` take their project templates from the
+selected target backend (`--target js` by default, or `--target go`) or from a
+third-party package named by `--from` (which conflicts with `--target`).
+When `--template <name>` is omitted, `flick` picks `app` if the contributor
+declares one, or the sole template if it declares only one. Requesting an
+unsupported template fails with `FLICK-P060` (exit code `2`) and lists every
+available template with its summary.
+
+- **`flick/js` (`--target js`)**: `app`, `cli` (a [`cli` block](../cli-dsl/)
+  entry), `fullstack` (server and client entries sharing a [`server fn`](../server-fn/)
+  module with Vite), `lib`, and `plugin` (a library with a [plugin](../plugins/)
+  crate in `plugin/`).
+- **`flick/go` (`--target go`)**: `app`, `cli`, `lib`, and `plugin` (with
+  `[build] target = "go"` and `[tools] "flick/go" = ["go"]`, and no
+  `package.json`).
+- **Third-party packages (`--from <source>`)**: accepts a local directory
+  (`--from ./my-templates`), a gzipped tarball URL with its digest
+  (`--from https://example.com/tpl.tgz --sha256 <64-hex>`), or a git tag
+  (`--from https://example.com/repo --tag v1.0.0 [--subdir pkg]`), using the
+  same verification and package store as `flick add`. Remote `--from` URLs
+  without `--sha256` or `--tag` are refused (`FLICK-P032`). The generated
+  project records the verified source and component digest under `[[template]]`
+  in `flick.lock` (preserved by `flick install`). Official release-asset
+  backends are pinned under `[[backend]]` in `flick.lock` so later builds work
+  offline.
+
+Template plans are pure file plans: any template returning host tool steps,
+`resume`, `needs`, or escaping paths is refused with `FLICK-P055` before
+anything is created. `flick init` keeps unrelated files and any existing
+`AGENTS.md`, merges new lockfile pins into an existing `flick.lock`, and
+refuses any other colliding file with `FLICK-P019` before writing.
+
 ## Outputs and the cache
 
 A build writes into `build.out-dir` (or `--out-dir`) and records the files
@@ -123,10 +159,11 @@ and the next build into it removes the listed files it no longer writes.
 
 The cache in `.flick/cache/` keeps the artifacts of each build by a key over
 the normalized selected roots separately from the available sources of the
-project, its effective configuration, the profile, emit
-and output settings, the compiler (version and binary), the installed
-runtime and Effect, `package.json`, `pnpm-lock.yaml` and the manifests and
-interfaces of the installed dependencies. Any change of these is a miss; a
+project, its effective configuration, the profile, target options
+and output settings, the compiler (version and binary), the backend component
+and its pinned runtime graphs, and the package inputs reported by the selected
+backend (for `flick/js`, `package.json`, `pnpm-lock.yaml`, and the manifests
+and Flick sources of installed packages). Any change of these is a miss; a
 hit writes exactly the files the build would.
 
 Watch commands compare individual paths and their state, including file
@@ -156,12 +193,22 @@ exit code.
 
 `install` and `update` first fetch the Flick libraries `flick.lock` pins,
 and `add` with `--git`, `--url` or `--path` and `remove` change
-`[dependencies]` (see [project.md](../project/#flick-dependencies)). For npm
-packages the dependency commands delegate to pnpm. Every command that changes
-`package.json`, its lockfile or the tree first checks that `pnpm --version`
-is the version `packageManager` pins (`FLICK-P016`, exit code 2, nothing
-changed); the message names the pinned version and how to activate it, and
-`flick doctor` prints both versions. `install --locked` without
+`[dependencies]` (see [project.md](../project/#flick-dependencies)). The
+target-ecosystem portion of `install`, `add`, `remove`, `update` and `deps` is
+delegated to the project's selected backend, along with the closure's
+`[target.<name>.dependencies]` for that backend. When the selected backend
+manages no packages of its own (for example `flick/go`), `flick install`
+handles Flick `[dependencies]` without needing Node or pnpm, while target
+package operations such as `flick add <pkg>` (without `--path`, `--git` or
+`--url`) fail with `FLICK-P063` (exit code 2) naming the backend and suggesting
+those source options.
+
+For `flick/js`, dependency commands run `pnpm` (requiring
+`[tools] "flick/js" = ["pnpm"]` in `flick.toml`, else `FLICK-P051`). Every
+command that changes `package.json`, its lockfile or the tree first checks that
+`pnpm --version` is the version `packageManager` pins (`FLICK-P016`, exit code
+2, nothing changed); the message names the pinned version and how to activate
+it, and `flick doctor` prints both versions. `install --locked` without
 `pnpm-lock.yaml`, or with one out of date, is `FLICK-P017` with exit code 2.
 
 `pack` builds the project in the release profile and refuses a `todo` or
@@ -169,18 +216,24 @@ changed); the message names the pinned version and how to activate it, and
 `<name>-<version>.tgz` holds its `flick.toml`, its source directory and its
 readme and license under `package/`, without times or owners, so the same
 sources give the same bytes; stdout shows the sha256 a `url` dependency
-names. An app packs a staging package, with the runner of each entry, which the staged
-`package.json` names in `bin` (see [project.md](../project/#entry-points)), checks that every module has its `.iface` (and
-`.d.ts` with `[target.js] declarations = true`), that interfaces in the package agree on each
-other's fingerprints and that the paths `exports` names exist
-(`FLICK-P020`), and writes the tarball with `pnpm pack`.
+names. An app checks that every module has its `.iface` (and
+`.d.ts` with `[target.js] declarations = true`) and that interfaces in the
+package agree on each other's fingerprints (`FLICK-P020`), then delegates
+staging and archiving to the selected backend's `pack` command (for `flick/js`,
+staging `package.json` with entry `bin` fields, checking `exports`, and running
+`pnpm pack`).
 
 ## Checked package documentation
 
 `flick doc --out-dir api --check-examples` writes Markdown from the checked
 public interface and its `///` comments, and checks their fenced Flick examples
-with the package imports available. Private declarations are not separate API
-entries. A public re-export uses the original declaration's documentation.
+with the package imports available. Runnable examples compile in memory and
+execute through the project's selected backend (or `--target <name>`), so Go
+projects execute their examples as native Go binaries without Node. Parse,
+type, undeclared-import (`FLICK-P062`), unsatisfied `fail` (`FLICK-P062`), and
+runtime (`FLICK-P061`) failures report diagnostics with source spans inside the
+original `///` comment and write no files. Private declarations are not separate
+API entries. A public re-export uses the original declaration's documentation.
 
 `--source-base-url https://host/repo/blob/REV/package` links declarations to
 paths relative to the project root and their original source lines. Choose a

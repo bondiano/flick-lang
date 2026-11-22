@@ -103,6 +103,16 @@ fn same_primitive(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Erro
         (Value::Object(a), Value::Object(b)) => {
             match (&heap.object(a.id)?.data, &heap.object(b.id)?.data) {
                 (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => Ok(a.id == b.id),
+                (
+                    Data::ForeignHandle {
+                        execution: ae,
+                        host_id: ah,
+                    },
+                    Data::ForeignHandle {
+                        execution: be,
+                        host_id: bh,
+                    },
+                ) => Ok(ae == be && ah == bh),
                 (Data::String(a), Data::String(b)) => Ok(a == b),
                 (Data::Utf16(a), Data::Utf16(b)) => Ok(a == b),
                 (Data::Bytes(a), Data::Bytes(b)) => Ok(a == b),
@@ -252,6 +262,16 @@ fn equal_objects<'a>(
     let (a_data, b_data) = (&heap.object(a_id)?.data, &heap.object(b_id)?.data);
     match (a_data, b_data) {
         (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => Ok(a_id == b_id),
+        (
+            Data::ForeignHandle {
+                execution: ae,
+                host_id: ah,
+            },
+            Data::ForeignHandle {
+                execution: be,
+                host_id: bh,
+            },
+        ) => Ok(ae == be && ah == bh),
         (Data::Label(a), Data::Label(b)) | (Data::String(a), Data::String(b)) => Ok(a == b),
         (Data::Utf16(a), Data::Utf16(b)) => Ok(a == b),
         (Data::Bytes(a), Data::Bytes(b)) => Ok(a == b),
@@ -333,9 +353,9 @@ fn equal_objects<'a>(
 
 #[expect(
     clippy::float_cmp,
-    reason = "structural Float equality is SameValueZero"
+    reason = "structural Float equality is SameValueZero when strict_zero is false"
 )]
-fn equal(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Error> {
+fn equal_with(heap: &Heap, left: &Value, right: &Value, strict_zero: bool) -> Result<bool, Error> {
     let mut pending = vec![(left, right)];
     let mut seen = BTreeSet::new();
     while let Some((left, right)) = pending.pop() {
@@ -343,24 +363,42 @@ fn equal(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Error> {
             (Value::Unit, Value::Unit) => true,
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Int(a), Value::Int(b)) => a == b,
-            (Value::Float(a), Value::Float(b)) => a == b || a.is_nan() && b.is_nan(),
+            (Value::Float(a), Value::Float(b)) => {
+                if strict_zero {
+                    a.to_bits() == b.to_bits() || a.is_nan() && b.is_nan()
+                } else {
+                    a == b || a.is_nan() && b.is_nan()
+                }
+            }
             (Value::Object(a), Value::Object(b)) => {
-                if is_opaque_data(&heap.object(a.id)?.data)
-                    || is_opaque_data(&heap.object(b.id)?.data)
-                {
-                    return Err(unsupported("closure equality"));
-                }
-                if !seen.insert((a.id, b.id)) {
+                let (a_data, b_data) = (&heap.object(a.id)?.data, &heap.object(b.id)?.data);
+                if is_opaque_data(a_data) || is_opaque_data(b_data) {
+                    if strict_zero {
+                        a.id == b.id
+                    } else {
+                        return Err(unsupported("closure equality"));
+                    }
+                } else if !seen.insert((a.id, b.id)) {
                     continue;
+                } else {
+                    equal_objects(heap, left, right, a.id, b.id, &mut pending)?
                 }
-                equal_objects(heap, left, right, a.id, b.id, &mut pending)?
             }
             (Value::Owner(_) | Value::Arena(_) | Value::ArenaView(_), _)
             | (_, Value::Owner(_) | Value::Arena(_) | Value::ArenaView(_)) => {
-                return Err(unsupported("opaque arena capability equality"));
+                if strict_zero {
+                    false
+                } else {
+                    return Err(unsupported("opaque arena capability equality"));
+                }
             }
+            (Value::Cell(a), Value::Cell(b)) if strict_zero => a == b,
             (Value::Cell(_), _) | (_, Value::Cell(_)) => {
-                return Err(unsupported("cell equality requires Ref.same"));
+                if strict_zero {
+                    false
+                } else {
+                    return Err(unsupported("cell equality requires Ref.same"));
+                }
             }
             _ => false,
         };
@@ -369,4 +407,16 @@ fn equal(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Error> {
         }
     }
     Ok(true)
+}
+
+fn equal(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Error> {
+    equal_with(heap, left, right, false)
+}
+
+/// Structural `SameValue` equivalence for `Filter.equals_strict`: distinguishes
+/// `0.0` from `-0.0`, compares mutable cells and foreign handles by identity,
+/// ignores GADT held dictionaries and written record field order, and compares
+/// records, tuples, lists, and ADTs structurally.
+pub(super) fn strict_same_value(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Error> {
+    equal_with(heap, left, right, true)
 }

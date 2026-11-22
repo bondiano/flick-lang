@@ -26,7 +26,7 @@ theorem kept_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ :
     (hEi : OkE Ei) (hh : ∀ G ∈ Ei, G.handles Ef o = none) (ha : al.armOf o = some b) (hv : Value v)
     (hq : Live Λ q)
     (ht : Sim W .any (plug E (.hkeep q ℓℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v))))
-      t₂) (hst : StR W μ μ₂)
+      t₂) (hst : StR W μ μ₂) (hR : W.R = root)
     (hcl₁ : (plug E (.hkeep q ℓℓ Ef al (plug Ei (.app (.const (.perform Ef o .tail)) v)))).Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂)
     (hzl : ¬ (plug E (.hkarm q ℓℓ Ef al (b.subst (inst [v])) (plug Ei (.hole q)))).LzTop .any)
@@ -39,7 +39,7 @@ theorem kept_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ :
       rw [plug_append]; rfl] at ht hcl₁ hs₀
   refine focus_cases (hEi.append' (hE.cons' (F := .hkeep q ℓℓ Ef al) trivial)) (perform_redex hv).1
     (perform_shape hv)
-    (fun _ _ _ h => by cases h) id (fun _ _ h => by cases h) ht hst hcl₁ hcl₂ hrg hs₀ ?_
+    (fun _ _ _ h => by cases h) id (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg hs₀ ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨v₂, rfl, hv₂, h₂⟩ := perform_right hv hs
   obtain ⟨A₂, G₂, B₂, rfl, hA, hG, hB, hA₂, hB₂, -⟩ := split_at (fun _ h => by cases h) hfr hE₂
@@ -64,7 +64,7 @@ theorem resume_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ
     {E A Ei : List Frame} {Ef : Name} {u r al t₂ : Tm} {p ℓ ℓh : Nat} (hE : OkE E) (hA : OkE A)
     (hEi : OkE Ei) (hn : ∀ G ∈ A, ¬ G.resumes p) (hu : Value u)
     (ht : Sim W .any (plug E (.hctl p ℓh ℓ false Ef al r (plug A (.app (.kont p ℓ) u))
-      (plug Ei (.hole p)))) t₂) (hst : StR W μ μ₂)
+      (plug Ei (.hole p)))) t₂) (hst : StR W μ μ₂) (hR : W.R = root)
     (hcl₁ : (plug E (.hctl p ℓh ℓ false Ef al r (plug A (.app (.kont p ℓ) u))
       (plug Ei (.hole p)))).Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂) :
@@ -77,7 +77,7 @@ theorem resume_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ
       rw [plug_append]; rfl] at ht hcl₁ hs₀
   refine focus_cases (hA.append' (hE.cons' (F := .hctlA p ℓh ℓ false Ef al r _) trivial))
     (kont_redex hu).1 (fun _ _ h => Redex.app (kont_redex hu) h) (fun _ _ _ h => by cases h) id
-    (fun _ _ h => by cases h) ht hst hcl₁ hcl₂ hrg hs₀ ?_
+    (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg hs₀ ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨k₂, u₂, rfl, h₁, h₂⟩ := hs.inv_app
   obtain ⟨ℓ₂, kd, rfl, hl₂⟩ := h₁.inv_kont

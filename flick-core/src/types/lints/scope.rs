@@ -82,6 +82,21 @@ impl Checker<'_> {
                     self.wildcard_arm(s, &arms);
                 }
             }
+            K::TryExpr | K::CatchExpr => {
+                let mut parts = node.nodes();
+                if let Some(body) = parts.next() {
+                    self.scope_walk(body, scope);
+                }
+                for arm in parts.filter(|n| n.kind == K::MatchArm) {
+                    let mut inner = arm.nodes();
+                    if let Some(pattern) = inner.next() {
+                        let names = self.pattern_variables(pattern).into_iter();
+                        scope.extend(names.map(|(n, _)| n));
+                    }
+                    inner.for_each(|n| self.scope_walk(n, scope));
+                    scope.truncate(mark);
+                }
+            }
             K::BinExpr => {
                 // a chain of operators binds nothing: its operands, in a loop
                 let (spine, left) = node.left_spine();
@@ -100,6 +115,19 @@ impl Checker<'_> {
         match node.kind {
             K::LetDecl => {
                 let parts = let_parts(node, self.text);
+                if let Some(fallback) = parts.fallback {
+                    if let Some(body) = parts.body {
+                        self.scope_walk(body, scope);
+                    }
+                    self.scope_walk(fallback, scope);
+                    // like a `match` arm, a `let ... else` pattern names what it
+                    // matches without shadowing warnings
+                    if let Some(pattern) = parts.pattern {
+                        let names = self.pattern_variables(pattern).into_iter();
+                        scope.extend(names.map(|(n, _)| n));
+                    }
+                    return;
+                }
                 if parts.params.is_empty() {
                     if let Some(body) = parts.body {
                         self.scope_walk(body, scope);

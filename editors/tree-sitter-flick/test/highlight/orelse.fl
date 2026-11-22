@@ -1,0 +1,7 @@
+let fallback opt =
+  opt orelse "default"
+//    ^ keyword.operator
+let rec_val = { orelse = 1 }
+//              ^ property
+let x = rec_val.orelse
+//              ^ property

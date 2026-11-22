@@ -5,14 +5,11 @@ use std::thread;
 use std::time::Duration;
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::pnpm;
 use flick_core::source::SourceMap;
 
-use crate::args::{
-    CheckArguments, CommandArguments, Commands, GlobalArguments, ProveArguments, SchemaCommands,
-};
+use crate::args::{CheckArguments, CommandArguments, Commands, GlobalArguments, ProveArguments};
 use crate::command::{Command, Outcome, finish as report, run_command};
-use crate::commands::{BuildCommand, CheckCommand, FmtCommand, ScaffoldCommand};
+use crate::commands::{BuildCommand, CheckCommand, FmtCommand, ScaffoldCommand, Verb};
 
 mod args;
 mod artifact;
@@ -56,27 +53,24 @@ fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
     }
 }
 
-/// The pnpm command of a dependency command.
-fn dependency_command(cmd: Commands, offline: bool) -> pnpm::Command {
+/// The dependency verb of a CLI command.
+fn dependency_command(cmd: Commands, offline: bool) -> Verb {
     match cmd {
-        Commands::Install(o) => pnpm::Command::Install {
+        Commands::Install(o) => Verb::Install {
             locked: o.locked,
             offline,
         },
-        Commands::Add(o) => pnpm::Command::Add {
+        Commands::Add(o) => Verb::Add {
             packages: o.packages,
             dev: o.dev,
         },
-        Commands::Remove(o) => pnpm::Command::Remove {
+        Commands::Remove(o) => Verb::Remove {
             packages: o.packages,
         },
-        Commands::Update(o) => pnpm::Command::Update {
+        Commands::Update(o) => Verb::Update {
             packages: o.packages,
         },
-        Commands::Deps(o) => match o.why {
-            Some(package) => pnpm::Command::Why { package },
-            None => pnpm::Command::List,
-        },
+        Commands::Deps(o) => Verb::Deps { why: o.why },
         _ => unreachable!("only dependency commands"),
     }
 }
@@ -241,16 +235,18 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::New(options) => run_command(
             &ScaffoldCommand {
                 dir: options.directory.into(),
-                template: options.template,
+                options: options.scaffold,
                 fresh: true,
+                offline: global.offline,
             },
             global,
         ),
         Commands::Init(options) => run_command(
             &ScaffoldCommand {
                 dir: ".".into(),
-                template: options.template,
+                options: options.scaffold,
                 fresh: false,
+                offline: global.offline,
             },
             global,
         ),
@@ -271,9 +267,6 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::Pack(o) => report(commands::pack(&o, global), global),
         Commands::Plugins => report(commands::plugins(global), global),
         Commands::Diff(o) => report(commands::diff(&o, global), global),
-        Commands::Schema(SchemaCommands::Export(o)) => {
-            report(commands::schema_export(&o, project), global)
-        }
         Commands::Doc(o) => report(commands::doc(&o, project), global),
         Commands::Explain(o) => report(commands::explain(&o), global),
         Commands::Expand(o) => report(commands::expand(&o, project), global),

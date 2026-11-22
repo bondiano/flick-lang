@@ -8,8 +8,8 @@
 (boolean) @boolean
 
 (keyword) @keyword
-((keyword) @_not
-  (#eq? @_not "not")) @keyword.operator
+((keyword) @_op
+  (#any-of? @_op "not" "orelse")) @keyword.operator
 (operator) @operator
 
 (attribute) @attribute
@@ -41,6 +41,11 @@
 ; the head of a plugin's blocks, as an import exposes it
 (_ (keyword) @_plugin . (identifier) @function.macro
   (#eq? @_plugin "plugin"))
+
+; `orelse` is allowed as a record label in `{ orelse = … }` and `{ orelse : … }`
+(braces (keyword) @property . (operator) @_assign
+  (#eq? @property "orelse")
+  (#any-of? @_assign "=" ":"))
 
 ["(" ")" "[" "]" "{" "}"] @punctuation.bracket
 (operator ["," ";"]) @punctuation.delimiter

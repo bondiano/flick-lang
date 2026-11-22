@@ -1,0 +1,294 @@
+---
+source: flick/tests/cli/cli_template.rs
+expression: tree
+---
+=== .gitignore ===
+node_modules/
+dist/
+.flick/*
+!.flick/plugin-snapshots/
+=== AGENTS.md ===
+# Notes for coding agents
+
+This project is written in Flick, a statically typed functional language
+with effects that compiles to JavaScript or Go. It is young and changes
+between releases, so your training data likely gets its syntax and APIs
+wrong. Look them up for the compiler this project pins instead of
+borrowing them from Elm, OCaml or F#.
+
+## Look things up
+
+- `flick doc --std --out-dir .flick/std-docs` writes the standard library
+  of this compiler as one Markdown file per module, such as `List.md`;
+  search it before using a function.
+- `flick explain <CODE>` explains a diagnostic, such as `FLICK-E001`.
+- The [documentation](https://bondiano.github.io/flick-lang/) has the
+  language tour, the handbook, the CLI reference and the standard library
+  API. It follows the latest release.
+
+## Before you finish
+
+Run these and fix everything they report; a warning counts as a failure:
+
+```sh
+flick fmt
+flick check --warnings-as-errors
+flick test
+```
+
+`flick check --fix` applies the fixes that keep the program's meaning.
+
+## Conventions
+
+- `src/A/B.fl` holds `module A.B`; tests live under `test/`.
+- A function's type lists the effects it performs, `->{Host.Console} Unit`.
+  When the checker reports a missing effect, add it to the signature and
+  provide it where the program starts, such as `main`.
+- Add npm packages with `flick add` and install them with `flick install`,
+  which uses the pnpm version `package.json` pins.
+- `dist/` is build output; change the sources and rebuild.
+=== flick.toml ===
+schema-version = 1
+
+[project]
+kind = "app"
+runner = "Runner.Node"
+entries = { server = "App.Server", web = { module = "App.Web", runner = "Runner.Browser", target = "client" } }
+source-dir = "src"
+test-dir = "test"
+
+[build]
+out-dir = "dist"
+profile = "debug"
+target = "js"
+
+[target.js]
+runtime = "effect"
+
+[tools]
+"flick/js" = ["pnpm"]
+=== index.html ===
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>demo</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
+=== package.json ===
+{
+  "dependencies": {
+    "@flick-lang/effect-ts": "0.1.0",
+    "@flick-lang/runtime": "0.1.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@flick-lang/astro": "0.1.0",
+    "vite": "8.3.5"
+  },
+  "flick": {
+    "compiler": "0.1.0"
+  },
+  "name": "demo",
+  "packageManager": "pnpm@12.16.1",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0"
+}
+=== src/App/Api.fl ===
+// The contract the server and the browser share. A `server fn` runs on the
+// server; in the browser its name is a call over HTTP, with the same types.
+module App.Api exposing (Session, list, add)
+
+import App.Store exposing (Store)
+import App.Todo exposing (Todo)
+import Server
+
+/// Who calls: what `Server.authenticated` makes of a call's cookie.
+service Session =
+  user : Unit ->{} String
+
+/// Every todo: anyone may read them.
+list : Unit ->{Server.Server, Store} List Todo
+server fn list () = Store.all ()
+
+/// Adds a todo, for a signed-in caller only: a call without a session gets
+/// `Server.Unauthorized`, and this does not run.
+add : String ->{Server.Server, Store, Session; Server.Unauthorized} Todo
+server fn add title = Store.add (Session.user () ++ ": " ++ title)
+=== src/App/Server.fl ===
+// The server entry: it serves the calls of `App.Api` on `PORT` (3000 by
+// default) until it is stopped.
+module App.Server exposing (main)
+
+import App.Api exposing (Session)
+import App.Store
+import Http.ServerRequest exposing (ServerRequest)
+import Http.ServerResponse exposing (ServerResponse)
+import Server
+
+/// The session of a `session=<name>` cookie; without one, a guarded call is
+/// turned away. Replace it with your own sign-in.
+check : Http.Headers.Headers ->{; Server.Unauthorized} Session.Impl
+let check headers =
+  let prefix = "session="
+  match Http.Headers.get "cookie" headers with
+  | Some cookie ->
+    if String.starts_with prefix cookie then
+      let name = String.slice (String.length prefix) (String.length cookie) cookie
+      { user = fun () -> name }
+    else
+      Fail.fail Server.Unauthorized
+  | None -> Fail.fail Server.Unauthorized
+
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
+let main () =
+  let port = Option.with_default 3000 (Option.bind String.to_number (Platform.env "PORT"))
+  let store = Layer.succeed App.Store.Store (App.Store.memory ())
+  provide (Layer.merge Server.node (Layer.merge store Http.Server.layer_services)) {
+    try
+      scope s {
+        functions : (ServerRequest ->{Async} ServerResponse)^{s}
+        let functions =
+          Server.handler
+            (Server.authenticated Session check [server App.Api.add] ++ [server App.Api.list])
+        app :
+          (ServerRequest ->{Async, Server.Server; Http.ServerError.HttpServerError} ServerResponse)^{s}
+        let app =
+          Http.Router.router Http.Router.config [
+            Http.Router.route (Some Http.Method.POST) Server.path functions,
+          ]
+        let listening =
+          Http.Server.serve { host = "127.0.0.1"; port = port; gracefulShutdownTimeout = None } app
+        Platform.stdout_line
+          ("listening on " ++ Http.Server.format_address (Http.Server.address listening))
+        Deferred.await_ (Deferred.make ())
+      }
+    with
+    | Http.ServerError.ServeError _ -> App.fail ("cannot listen on port " ++ show port)
+  }
+=== src/App/Store.fl ===
+// What only the server keeps: the todos, in memory while it runs. Its
+// module is out of the browser's bundle: a client entry that reached it
+// would be `FLICK-E009`.
+module App.Store exposing (Store, memory)
+
+import App.Todo exposing (Todo)
+
+service Store =
+  all : Unit ->{} List Todo
+  add : String ->{} Todo
+
+/// A store that forgets everything when the server stops.
+memory : Unit ->{} Store.Impl
+let memory () =
+  let todos = Ref.make []
+  {
+    all = fun () -> Ref.get todos
+    add = fun title ->
+      Ref.modify todos (fun items ->
+        let item = { id = List.length items + 1; title = title }
+        (item, items ++ [item])
+      )
+  }
+=== src/App/Todo.fl ===
+// What the server and the browser both know: a todo.
+module App.Todo exposing (Todo)
+
+type alias Todo = { id : Int; title : String }
+  deriving Schema
+=== src/App/Web.fl ===
+// The browser entry: the todos the server lists, and a form that adds one.
+// It reaches the server only through the calls of `App.Api`.
+module App.Web exposing (main)
+
+import App.Api
+import App.Todo exposing (Todo)
+
+refined type Title = String where Checks.non_empty
+  deriving Eq, Show, Schema
+
+type alias NewTodo = { title : Title }
+  deriving Schema, Form
+
+todos : Atom.Atom (Atom.Async (List Todo) {Rpc.ClientError})
+let todos = Atom.query ["todos"] (task { App.Api.list () })
+
+add : String ->{Async, Atom.Write; Server.Unauthorized, Rpc.ClientError} Todo
+let add title = Atom.mutation ["todos"] App.Api.add title
+
+new_todo : Form.Draft NewTodo
+let new_todo = Form.draft NewTodo.form
+
+send : Action.Action Ui.ClickSnapshot
+let send =
+  Action.exhaust (fun _ -> task {
+    match Form.validate new_todo with
+    | None -> ()
+    | Some entered ->
+      let problem =
+        try
+          let _ = add (Title.value entered.title)
+          None
+        with
+        | Server.Unauthorized -> Some "sign in to add a todo"
+        | Rpc.ClientError message -> Some message
+      Form.report new_todo NewTodo.fields.title problem
+  })
+
+list_view : Ui.View (Atom.Atom (Atom.Async (List Todo) {Rpc.ClientError}))
+let list_view =
+  Ui.awaiting (fun _ -> Ui.text "cannot reach the server") (Ui.text "loading") (fun items ->
+    Ui.fragment (List.map (fun item -> Ui.paragraph [Ui.text item.title]) items)
+  )
+
+page : Ui
+let page =
+  Ui.fragment [
+    Form.input new_todo NewTodo.fields.title "New todo" None,
+    Ui.button { disabled = false; on_click = send } [Ui.text "Add"],
+    Ui.render list_view todos,
+  ]
+
+main : Unit ->{Async, ...Host.BrowserLive; AppError} Unit
+let main () =
+  match Ui.Dom.container "app" with
+  | None -> App.fail "the page has no #app"
+  | Some root ->
+    let _ = provide Atom.layer { Ui.Dom.mount root (fun _ -> ()) page }
+    ()
+=== src/main.js ===
+// The page's script. Vite builds `App/Web.fl` with `flick build`; when a
+// module changes it runs the new program in place of the old one, and the
+// labelled atoms (each top-level `let` of a state) keep their values.
+import { hotCarry, hotDispose, run } from "@flick-lang/effect-ts/runner/browser";
+
+import { main } from "./App/Web.fl";
+
+if (import.meta.hot) {
+  hotCarry(import.meta.hot.data.states);
+  import.meta.hot.dispose((data) => {
+    data.states = hotDispose();
+  });
+  import.meta.hot.accept();
+}
+
+run(main);
+=== vite.config.mjs ===
+// `flick dev` starts Vite for the page and the server entry beside it; the
+// page's calls of `server fn` go to that server.
+import { flickVite } from "@flick-lang/astro/vite";
+import { defineConfig } from "vite";
+
+const server = `http://127.0.0.1:${process.env.PORT ?? "3000"}`;
+
+export default defineConfig({
+  plugins: [flickVite()],
+  server: { proxy: { "/_flick": server } },
+});

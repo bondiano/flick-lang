@@ -92,6 +92,25 @@ let safe id =
   try Some (Users.get id) with
   | NotFound _ -> None
 
+safe_catch : UserId ->{Users} Option User
+let safe_catch id =
+  Some (Users.get id) catch
+  | NotFound _ -> None
+
+safe_piped : UserId ->{Users} String
+let safe_piped id =
+  (
+    Users.get id catch
+    | NotFound _ when true -> guest
+    | NotFound _ -> guest
+  )
+  |> format_user
+
+record_catch : { catch : Int -> Int } -> Int
+let record_catch r =
+  let { catch = f } = { r with catch = r.catch }
+  f 1
+
 read : Path ->{FileSystem; OpenError, ReadError} String
 let read path = scope s {
   let file = File.open_scoped path

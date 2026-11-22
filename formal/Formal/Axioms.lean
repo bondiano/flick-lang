@@ -21,6 +21,9 @@ import Formal.Proofs.CheckSound
 import Formal.RT.LazyCell
 import Formal.Equiv.Context
 import Formal.Equiv.All
+import Formal.RecordOrder
+import Formal.MemoryArena
+import Formal.MemoryScopes
 
 /-!
 # The axioms of the main theorems
@@ -241,3 +244,51 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Equiv.EverySim.has' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Equiv.EverySim.has
+
+/-- info: 'Flick.Equiv.o4' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o4
+
+/-- info: 'Flick.Equiv.o4_open' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o4_open
+
+/-- info: 'Flick.Equiv.PSteps.det' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.PSteps.det
+
+/-- info: 'Flick.Typ.pure_eval' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Typ.pure_eval
+
+/-- info: 'Flick.RecEquiv.setField' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.RecEquiv.setField
+
+/-- info: 'Flick.RecEquiv.matchP' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.RecEquiv.matchP
+
+/-- info: 'Flick.elabSwap_canonical' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.elabSwap_canonical
+
+/-- info: 'Flick.MemoryArena.close_balance' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.MemoryArena.close_balance
+
+/-- info: 'Flick.MemoryScopes.close_selected' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.MemoryScopes.close_selected
+
+/-- info: 'Flick.MemoryScopes.closeLifecycle_lifo_order' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.MemoryScopes.closeLifecycle_lifo_order
+
+/-- info: 'Flick.MemoryScopes.closeLifecycle_selected' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.MemoryScopes.closeLifecycle_selected
+
+/-- info: 'Flick.MemoryScopes.closeLifecycle_idempotent' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.MemoryScopes.closeLifecycle_idempotent

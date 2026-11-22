@@ -86,6 +86,29 @@ impl<'a> Lookup<'a> {
         (self.generics)(module, name)
     }
 
+    /// The context dictionary parameters and raw body of `method` on `module.instance`.
+    pub(super) fn raw_method(
+        &self,
+        module: &str,
+        instance: &str,
+        method: &str,
+    ) -> Option<(Vec<String>, Expr)> {
+        if module != self.module {
+            return (self.generics)(module, &format!("{instance}#{method}"));
+        }
+        let key = (instance.to_owned(), method.to_owned());
+        if let Some(own) = self.own.get(&key) {
+            return Some(own.clone());
+        }
+        let taken = self.taken.get(&key)?;
+        let dict = Dict::Instance {
+            module: module.to_owned(),
+            name: instance.to_owned(),
+            args: Vec::new(),
+        };
+        Some((taken.context.clone(), self.default(&dict, method, taken)?))
+    }
+
     /// The code of `method` of the instance `dict`, its context given: its
     /// own, or the default it takes; code of another module, the instance's
     /// or the class's of the default, at `at`, as its spans are of its file.

@@ -10,6 +10,7 @@ impl Lower<'_> {
             Some(K::LtPipe) => {
                 return self.app_expr(&right_application(children[0], children[1]), span);
             }
+            Some(K::OrElse) => return self.orelse(node, children[0], children[1], span),
             Some(K::GtGt | K::LtLt) => return self.composition(node),
             _ => {}
         }
@@ -65,6 +66,46 @@ impl Lower<'_> {
             k => BinOp::Arith(k.and_then(arith_of).unwrap_or(Arith::Pow), self.num(key)),
         };
         Expr::new(ExprKind::Binary(op, lhs, rhs), span)
+    }
+
+    /// `left orelse right` as `match left with | Some $orelse -> $orelse | None -> right`.
+    fn orelse(&mut self, node: &Node, lhs: &Node, rhs: &Node, span: Span) -> Expr {
+        let scrutinee = self.boxed(lhs);
+        let fallback = self.expr(rhs);
+        let value_name = self.hidden("$orelse");
+        let op_key = node
+            .child_tokens()
+            .find(|t| t.kind == K::OrElse)
+            .map(|t| (t.start, t.end));
+        let value = Expr::new(ExprKind::Local(value_name.clone()), span);
+        let value = match op_key {
+            Some(key) => self.adapted(key, value),
+            None => value,
+        };
+        let some_pat = Pat::Con(
+            super::enums::native(Lang::Some, Lang::Option),
+            vec![Pat::Bind(value_name)],
+        );
+        let none_pat = Pat::Con(
+            Constructor {
+                arity: 0,
+                ..super::enums::native(Lang::None, Lang::Option)
+            },
+            Vec::new(),
+        );
+        let arms = vec![
+            Arm {
+                pat: some_pat,
+                guard: None,
+                body: value,
+            },
+            Arm {
+                pat: none_pat,
+                guard: None,
+                body: fallback,
+            },
+        ];
+        Expr::new(ExprKind::Match(scrutinee, arms), span)
     }
 
     /// `f >> g` as `{ let f' = f; let g' = g; fun x -> g' (f' x) }`, and
@@ -202,6 +243,12 @@ impl Lower<'_> {
                     result = Some(self.let_assert(statement, span, then));
                     break;
                 }
+                K::LetDecl if statement.has_token(K::ElseKw) => {
+                    let rest = &statements[i + 1..];
+                    let then = |l: &mut Self| l.statements(rest, span, siblings);
+                    result = Some(self.let_else(statement, span, then));
+                    break;
+                }
                 K::LetDecl => self.local_let(statement, &mut stmts),
                 K::AssignStmt => stmts.push(self.assign(statement)),
                 _ if siblings.is_some() => lines.push(self.expr(statement)),
@@ -228,6 +275,47 @@ impl Lower<'_> {
             return result;
         }
         Expr::new(ExprKind::Block(stmts, Box::new(result)), span)
+    }
+
+    /// `let pattern = initializer else fallback` and the statements after it:
+    /// `match initializer with | pattern -> rest | _ -> fallback`.
+    fn let_else(
+        &mut self,
+        decl: &Node,
+        span: Span,
+        rest: impl FnOnce(&mut Self) -> Expr,
+    ) -> Expr {
+        let parts = let_parts(decl, self.text);
+        let value = parts.body.map_or_else(
+            || Expr::new(ExprKind::Lit(Lit::Unit), span),
+            |b| self.expr(b),
+        );
+        let fallback = parts.fallback.map_or_else(
+            || Expr::new(ExprKind::Lit(Lit::Unit), span),
+            |b| self.expr(b),
+        );
+        let mut arms = Vec::new();
+        if !self.typing.dead_arms.contains(&decl.range()) {
+            let mark = self.scope.len();
+            let pat = parts.pattern.map_or(Pat::Wild, |p| self.pattern(p));
+            let body = rest(self);
+            self.scope.truncate(mark);
+            arms.push(Arm {
+                pat,
+                guard: None,
+                body,
+            });
+        }
+        arms.push(Arm {
+            pat: Pat::Wild,
+            guard: None,
+            body: fallback,
+        });
+        let mut expr = Expr::new(ExprKind::Match(Box::new(value), arms), span);
+        if let Some(ty) = self.typing.values.get(&decl.range()) {
+            expr.ty = type_name(ty);
+        }
+        expr
     }
 
     /// The statements of a local `let`: those of a `let lazy`, or one.

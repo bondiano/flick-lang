@@ -10,7 +10,7 @@ use crate::command;
 use crate::request::validate_size;
 use crate::{
     Backend, BackendPin, BuildRequest, BuildResult, DeclaredInputs, Descriptor, Diagnostic, Inputs,
-    Limits, Severity, TargetSupport, sha256,
+    Limits, OptionValue, Packages, ProjectFile, Severity, TargetSupport, sha256,
 };
 
 #[allow(clippy::all, clippy::pedantic)]
@@ -264,6 +264,14 @@ impl WasmBackend {
         self.cancellation.clone()
     }
 
+    /// Project templates the component provides, surfacing component errors.
+    pub fn try_templates(&self) -> Result<Vec<command::TemplateDescriptor>, String> {
+        self.command_call(&self.cancellation, |i, store| {
+            i.flick_command_command().call_templates(store)
+        })
+        .map(commands::template_descriptors)
+    }
+
     /// One request of a session, which `cancel` alone can stop.
     pub fn handle_cancellable(
         &self,
@@ -327,6 +335,36 @@ impl Backend for WasmBackend {
 
     fn describe(&self) -> Descriptor {
         self.descriptor.clone()
+    }
+
+    fn package_files(&self) -> Vec<String> {
+        self.command_call(&self.cancellation, |i, store| i.call_package_files(store))
+            .unwrap_or_default()
+    }
+
+    fn packages(
+        &self,
+        files: &[ProjectFile],
+        dependencies: &[command::Dependency],
+        options: &[OptionValue],
+    ) -> Packages {
+        let (wire, options) = (convert::files(files), convert::options(options));
+        let dependencies: Vec<_> = dependencies.iter().map(commands::dependency_wire).collect();
+        match self.command_call(&self.cancellation, |i, store| {
+            i.call_packages(store, &wire, &dependencies, &options)
+        }) {
+            Ok(packages) => convert::packages(packages),
+            Err(error) => Packages {
+                name: None,
+                version: None,
+                declared: Vec::new(),
+                sources: Vec::new(),
+                runtime: Vec::new(),
+                inputs: Vec::new(),
+                diagnostics: self.failure("packages", &error),
+                needs: Vec::new(),
+            },
+        }
     }
 
     fn commands(&self) -> Vec<command::Descriptor> {
@@ -401,6 +439,26 @@ impl Backend for WasmBackend {
                 let mut plan = command::Plan::empty();
                 plan.diagnostics = self.command_failure("close", &error);
                 plan
+            }
+        }
+    }
+
+    fn templates(&self) -> Vec<command::TemplateDescriptor> {
+        self.try_templates().unwrap_or_default()
+    }
+
+    fn scaffold(
+        &self,
+        request: &command::TemplateRequest,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        let wire = commands::template_request(request);
+        match self.command_call(&self.cancellation, |i, store| {
+            i.flick_command_command().call_scaffold(store, &wire)
+        }) {
+            Ok(Ok(plan)) => Ok(commands::plan(plan)),
+            Ok(Err(diagnostics)) => Err(commands::diagnostics(diagnostics)),
+            Err(error) => {
+                Err(self.command_failure(&format!("scaffold {}", request.template), &error))
             }
         }
     }

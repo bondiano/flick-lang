@@ -239,6 +239,13 @@ module is written with its JSON Schema keywords when they are exact
 its pattern is looser than the check). A recursive type becomes a `$ref`
 into `$defs`; `Codec.annotate` adds a `title` and `description`.
 
+From the command line, `flick schema export <Module.value> --target json-schema-2020-12|openapi-3.1 --out <file>`
+(a contributed command of `std`, also invocable as `flick std:schema export`)
+runs `Codec.json_schema` or `HttpApi.openapi` through the project's selected
+backend (`flick/js` on `rt` or `effect`, or `flick/go` with
+`[tools] "flick/go" = ["go"]` and no Node). An `ExportError` writes nothing and
+reports `FLICK-D008` anchored to the exported declaration.
+
 `Codec.standard codec` is a Standard Schema V1 object that validates
 synchronously. `Codec.standard_async codec` is made at run time: its
 `validate` returns a promise run with the services and under the scope of

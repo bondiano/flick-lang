@@ -56,7 +56,7 @@ func (n *hnode) with(fb *Fiber, w *Witness, e entry, shift uint, keep bool) (*hn
 			if w == nil || !w.equal(fb, e.key, old.key) {
 				continue
 			}
-			if keep || Equals(old.value, e.value) {
+			if keep {
 				return n, false
 			}
 			leaf := append([]entry(nil), n.leaf...)
@@ -83,6 +83,43 @@ func (n *hnode) with(fb *Fiber, w *Witness, e entry, shift uint, keep bool) (*hn
 	kids := append([]*hnode(nil), n.kids...)
 	kids[i] = kid
 	return &hnode{bitmap: n.bitmap, kids: kids}, added
+}
+
+// withMut inserts `e` into a freshly-owned trie built by `fromSeq` / `fromList`.
+// Callers must never pass a node shared with any other table.
+func (n *hnode) withMut(fb *Fiber, w *Witness, e entry, shift uint, keep bool) (*hnode, bool) {
+	switch {
+	case n == nil:
+		return &hnode{leaf: []entry{e}, hash: e.hash}, true
+	case n.isLeaf() && n.hash == e.hash:
+		for i, old := range n.leaf {
+			if w == nil || !w.equal(fb, e.key, old.key) {
+				continue
+			}
+			if keep {
+				return n, false
+			}
+			n.leaf[i] = e
+			return n, false
+		}
+		n.leaf = append(n.leaf, e)
+		return n, true
+	case n.isLeaf():
+		branch := &hnode{bitmap: 1 << frag(n.hash, shift), kids: []*hnode{n}}
+		return branch.withMut(fb, w, e, shift, keep)
+	}
+	f := frag(e.hash, shift)
+	i := n.slot(f)
+	if n.bitmap&(1<<f) == 0 {
+		n.kids = append(n.kids, nil)
+		copy(n.kids[i+1:], n.kids[i:])
+		n.kids[i] = &hnode{leaf: []entry{e}, hash: e.hash}
+		n.bitmap |= 1 << f
+		return n, true
+	}
+	kid, added := n.kids[i].withMut(fb, w, e, shift+5, keep)
+	n.kids[i] = kid
+	return n, added
 }
 
 // without is the node without the key, the same one when it lacks it,
