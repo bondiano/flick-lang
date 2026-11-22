@@ -200,8 +200,11 @@ export function invokeAsyncCallback(exec, cbId, rawArgs, cbMeta, mode, effCtx, r
     const hint = cbMeta?.argHints?.[idx] ?? "Any";
     return encodeWire(val, hint, copy, exec, wireCtx);
   });
-  const snap = snapshotCtxEntries(rtCtx ?? fiberMod.currentCtx(), effCtx);
+  const effectiveCtx = rtCtx ?? fiberMod.currentCtx();
+  const snap = snapshotCtxEntries(effectiveCtx, effCtx);
   const hostCtxHandle = snap.length > 0 ? exec.retainHandle(snap) : undefined;
+  const ownerId = effectiveCtx?.owner ? exec.ownerIdOf(effectiveCtx.owner) : undefined;
+  const evOwnerId = effectiveCtx?.evidence ? exec.ownerIdOf(effectiveCtx.evidence) : undefined;
   return new Promise((resolve, reject) => {
     exec.pendingCbs.set(reqId, { resolve, reject, retCopy: cbMeta?.retCopy === true });
     send({
@@ -211,6 +214,8 @@ export function invokeAsyncCallback(exec, cbId, rawArgs, cbMeta, mode, effCtx, r
       cb_id: cbId,
       mode,
       args: argsWire,
+      ...(ownerId !== undefined ? { owner: ownerId } : {}),
+      ...(evOwnerId !== undefined ? { evidence_owner: evOwnerId } : {}),
       ...(hostCtxHandle !== undefined ? { host_ctx_handle: hostCtxHandle } : {}),
     });
   });

@@ -45,3 +45,24 @@ empty_pair : (List Float, List String)
 let empty_pair =
   let empty = []
   (empty, empty)
+
+// the operand of an operator stays of one type, which the uses settle
+operators : Unit ->{} (Int, List String)
+let operators () =
+  let add = (fun x y -> x + y)
+  let prefixed = (fun mark lines -> List.map (fun line -> mark ++ line) lines)
+  (add 1 2, prefixed "> " ["c"])
+
+// a local function takes records with other fields at each use
+fields : Unit ->{} (Int, String)
+let fields () =
+  let get r = r.value
+  (get { value = 1 }, get { value = "a"; other = 2 })
+
+// an operator of a local function in another keeps the outer one of one type
+nested : Int ->{} (Int, Int)
+let nested n =
+  let outer x =
+    let inner y = y + x
+    (inner x, n)
+  outer 2

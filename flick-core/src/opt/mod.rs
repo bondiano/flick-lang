@@ -37,6 +37,8 @@ pub fn simplify(expr: &mut Expr) {
 #[cfg(test)]
 mod compose_tests;
 #[cfg(test)]
+mod eval_tests;
+#[cfg(test)]
 mod gadt_tests;
 #[cfg(test)]
 mod inline_tests;

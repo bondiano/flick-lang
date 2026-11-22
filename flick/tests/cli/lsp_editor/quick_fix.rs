@@ -343,3 +343,76 @@ fn a_captured_variable_offers_a_ref_and_an_unsafe_fix_is_not_preferred() {
     assert_eq!(annotate["isPreferred"], false, "{annotate:?}");
     lsp.close();
 }
+
+/// Every mismatch points to the applied callback, and applying its edit
+/// repairs the document through the same server session.
+#[test]
+fn a_callback_fix_annotates_the_function_applied() {
+    let text = "module App.Main exposing (apply)
+
+service Log =
+  info : String ->{} Bool
+
+say : Unit ->{Log} Bool
+let say () = Log.info \"hi\"
+
+apply : Unit ->{Log} Unit
+let apply () =
+  let call = fun f -> if f () then ()
+  let apply_it () = (fun h -> if h () then ())
+  call (fun () -> true)
+  apply_it () say
+  apply_it () say
+";
+    let dir = project(
+        "lsp_callback_applied",
+        &[("flick.toml", LIB), ("src/App/Main.fl", text)],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let uri = uri(&file);
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri, "languageId": "flick", "version": 1, "text": text } }));
+    let diagnostics = lsp.diagnostics(&uri);
+    assert_eq!(diagnostics.len(), 2, "{diagnostics:?}");
+    let mut fixed = text.to_owned();
+    for diagnostic in diagnostics {
+        assert_eq!(diagnostic["code"], "FLICK-T003", "{diagnostic}");
+        let actions = lsp.request(
+            "textDocument/codeAction",
+            &json!({ "textDocument": { "uri": uri }, "range": diagnostic["range"], "context": { "diagnostics": [diagnostic] } }),
+        );
+        let annotations: Vec<_> = actions["result"]
+            .as_array()
+            .expect("actions")
+            .iter()
+            .filter(|a| {
+                a["title"]
+                    .as_str()
+                    .is_some_and(|t| t.starts_with("annotate "))
+            })
+            .collect();
+        let [fix] = &annotations[..] else {
+            panic!("{actions}");
+        };
+        assert_eq!(
+            fix["title"], "annotate `h` with the runtime function it is given",
+            "{actions}"
+        );
+        let edits = fix["edit"]["changes"][&uri].as_array().expect("edits");
+        let [edit] = &edits[..] else {
+            panic!("{edits:?}");
+        };
+        let start = offset(text, &edit["range"]["start"]);
+        let end = offset(text, &edit["range"]["end"]);
+        fixed = text.to_owned();
+        fixed.replace_range(start..end, edit["newText"].as_str().expect("text"));
+        assert_eq!(
+            fixed,
+            text.replace("fun h ->", "fun (h : Unit ->{Log} Bool) ->")
+        );
+    }
+    lsp.notify("textDocument/didChange", &json!({ "textDocument": { "uri": uri, "version": 2 }, "contentChanges": [{ "text": fixed }] }));
+    let diagnostics = lsp.diagnostics(&uri);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
+    lsp.close();
+}

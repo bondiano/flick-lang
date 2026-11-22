@@ -199,7 +199,7 @@ fn calls(
 }
 
 /// `d` as a numeric instance without context, a superclass of one included.
-fn known(d: &Dict, lang: &Known<'_>) -> Option<Dict> {
+pub(super) fn known(d: &Dict, lang: &Known<'_>) -> Option<Dict> {
     match d {
         Dict::Instance { module, args, .. }
             if lang.get(Lang::Numeric).is_some_and(|(m, _)| m == module) && args.is_empty() =>
@@ -297,20 +297,14 @@ pub fn operator(e: &mut Expr, lang: &Known<'_>) -> bool {
 }
 
 /// The numeric type and method name of a method of a numeric instance.
-fn method_of(e: &Expr, lang: &Known<'_>) -> Option<(Num, Lang)> {
-    let ExprKind::Method {
-        dict:
-            Dict::Instance {
-                module,
-                name: instance,
-                args,
-            },
-        name,
-    } = &e.kind
-    else {
-        return None;
-    };
-    if lang.get(Lang::Numeric).is_none_or(|(m, _)| m != module) || !args.is_empty() {
+pub(super) fn numeric_method(
+    module: &str,
+    instance: &str,
+    args_empty: bool,
+    name: &str,
+    lang: &Known<'_>,
+) -> Option<(Num, Lang)> {
+    if lang.get(Lang::Numeric).is_none_or(|(m, _)| m != module) || !args_empty {
         return None;
     }
     let method = METHODS
@@ -328,8 +322,25 @@ fn method_of(e: &Expr, lang: &Known<'_>) -> Option<(Num, Lang)> {
     Some((number, method))
 }
 
+/// The numeric type and method name of a method of a numeric instance.
+fn method_of(e: &Expr, lang: &Known<'_>) -> Option<(Num, Lang)> {
+    let ExprKind::Method {
+        dict:
+            Dict::Instance {
+                module,
+                name: instance,
+                args,
+            },
+        name,
+    } = &e.kind
+    else {
+        return None;
+    };
+    numeric_method(module, instance, args.is_empty(), name, lang)
+}
+
 /// The operator a binary method of `Numeric` is on `num`.
-fn binary(method: Lang, num: Num) -> Option<BinOp> {
+pub(super) fn binary(method: Lang, num: Num) -> Option<BinOp> {
     let arith = |a| BinOp::Arith(a, num);
     Some(match method {
         Lang::Add => arith(Arith::Add),

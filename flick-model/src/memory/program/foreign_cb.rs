@@ -96,6 +96,23 @@ impl Machine<'_, '_> {
         Ok((callee, services, refs))
     }
 
+    fn cb_owner_context(&self, msg: &Json) -> (usize, Option<OwnerEvidence>) {
+        let owner = msg
+            .get("owner")
+            .and_then(Json::as_u64)
+            .and_then(|o| usize::try_from(o).ok())
+            .filter(|&o| o < self.owners.len())
+            .unwrap_or(self.current_owner);
+        let evidence = msg
+            .get("evidence_owner")
+            .and_then(Json::as_u64)
+            .and_then(|o| usize::try_from(o).ok())
+            .filter(|&o| o < self.owners.len())
+            .map(|o| OwnerEvidence::from_owner(&self.owner_handle(o)))
+            .or(self.current_evidence);
+        (owner, evidence)
+    }
+
     fn spawn_cb_child(
         &mut self,
         msg: &Json,
@@ -105,15 +122,9 @@ impl Machine<'_, '_> {
         services: Vec<Value>,
         refs: BTreeMap<String, Value>,
     ) -> Result<usize, Error> {
+        let (owner, evidence) = self.cb_owner_context(msg);
         if is_task {
-            return self.spawn_raw_fiber(
-                self.current_owner,
-                self.current_evidence,
-                callee,
-                services,
-                refs,
-                0,
-            );
+            return self.spawn_raw_fiber(owner, evidence, callee, services, refs, 0);
         }
         let mut args = match self.decode_cb_args(msg) {
             Ok(a) => a,
@@ -126,7 +137,7 @@ impl Machine<'_, '_> {
             }
         };
         let first_arg = args.pop_front().unwrap_or(Value::Unit);
-        self.spawn_host_cb_fiber(callee, first_arg, args, services, refs)
+        self.spawn_host_cb_fiber(owner, evidence, callee, first_arg, args, services, refs)
     }
 
     fn handle_sync_child_invoke(&mut self, msg: &Json, is_task: bool) -> Result<(), Error> {
@@ -425,8 +436,11 @@ impl Machine<'_, '_> {
         Ok(())
     }
 
+    #[expect(clippy::too_many_arguments, reason = "host callback fiber spawn context")]
     fn spawn_host_cb_fiber(
         &mut self,
+        owner: usize,
+        evidence: Option<OwnerEvidence>,
         func: Value,
         first_arg: Value,
         remaining_args: VecDeque<Value>,
@@ -444,7 +458,7 @@ impl Machine<'_, '_> {
             }
         };
         let child_id = self.alloc_fiber_id();
-        let mut ctx = FiberContext::empty(self.current_owner, self.current_evidence);
+        let mut ctx = FiberContext::empty(owner, evidence);
         ctx.inherited_services = services;
         ctx.inherited_tail_ops = tail_ops;
         ctx.fiber_refs = fiber_refs;

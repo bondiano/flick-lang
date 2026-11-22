@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Cause, Effect, Exit } from "effect";
+import { Cause, type Context, Effect, Exit } from "effect";
 
 import { type Arena, arenaAlloc, arenaGet } from "@flick-lang/runtime/core/Arena";
 import { type Owner, arenaMake, closeOwn, fiberSpawn, scopeRun, within } from "../src/owner.ts";
+import { handle } from "../src/handlers.ts";
+import { layerRun, layerSucceed } from "../src/layer.ts";
+import { promiseCallback, RuntimeFailure } from "../src/stdlib/callbacks.ts";
+import { operation, service } from "../src/effects.ts";
 
 const emptyRead = (): unknown => undefined;
 
@@ -138,4 +142,91 @@ test("owned child cleanup and pending foreign work retain arena access until the
   })));
   assert.deepEqual(seen, ["live", "live"]);
   assert.equal(kept?.liveSlots, 0);
+});
+
+test("abort and failing tail handlers close inner arena scopes after LIFO finalizers", async () => {
+  // 1. abort arm
+  let abortArena: Arena | undefined;
+  const abortOrder: Array<string> = [];
+  const escapeTag = service("Test.ArenaEscape");
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased handler ABI tag
+  const escapeInstall = escapeTag as unknown as Context.Service<object, object>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased handler op ABI
+  const escapeOp = operation(escapeTag, "escape", 1) as (m: string) => Effect.Effect<string, unknown, unknown>;
+  const escapeImpl = {
+    escape: (msg: string) => Effect.sync(() => { abortOrder.push(`arm:${msg}`); return `escaped:${msg}`; }),
+  };
+  const abortProg = handle(
+    [[escapeInstall, escapeImpl, ["escape"]]],
+    scopeRun(() => Effect.gen(function* () {
+      abortArena = yield* arenaMake();
+      const view = arenaAlloc(abortArena, "abort-live");
+      yield* Effect.addFinalizer(() => Effect.sync(() => abortOrder.push(`fin1:${String(arenaGet(view))}`)));
+      yield* Effect.addFinalizer(() => Effect.sync(() => abortOrder.push(`fin2:${String(arenaGet(view))}`)));
+      return yield* escapeOp("now");
+    })),
+    undefined,
+    undefined,
+  );
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- handler discharges escapeTag
+  const abortRes = await Effect.runPromise(abortProg as Effect.Effect<unknown, unknown>);
+  assert.equal(abortRes, "escaped:now");
+  assert.deepEqual(abortOrder, ["fin2:abort-live", "fin1:abort-live", "arm:now"]);
+  assert.equal(abortArena?.liveSlots, 0);
+
+  // 2. failing tail arm
+  let tailArena: Arena | undefined;
+  const tailOrder: Array<string> = [];
+  const askTag = service("Test.ArenaAsk");
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased handler ABI tag
+  const askInstall = askTag as unknown as Context.Service<object, object>;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- erased handler op ABI
+  const askOp = operation(askTag, "ask", 1) as (u: undefined) => Effect.Effect<string, unknown, unknown>;
+  const askImpl = {
+    ask: (_u: undefined) => Effect.fail("tail-boom"),
+  };
+  const tailProg = handle(
+    [[askInstall, askImpl, []]],
+    scopeRun(() => Effect.gen(function* () {
+      tailArena = yield* arenaMake();
+      const view = arenaAlloc(tailArena, "tail-live");
+      yield* Effect.addFinalizer(() => Effect.sync(() => tailOrder.push(`fin1:${String(arenaGet(view))}`)));
+      yield* Effect.addFinalizer(() => Effect.sync(() => tailOrder.push(`fin2:${String(arenaGet(view))}`)));
+      return yield* askOp(undefined);
+    })),
+    undefined,
+    undefined,
+  );
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- handler discharges askTag
+  const tailExit = await Effect.runPromiseExit(tailProg as Effect.Effect<unknown, unknown>);
+  assert.ok(Exit.isFailure(tailExit));
+  assert.deepEqual(tailOrder, ["fin2:tail-live", "fin1:tail-live"]);
+  assert.equal(tailArena?.liveSlots, 0);
+});
+
+test("layerRun preserves selected outer arena and promiseCallback rejects late calls after close", async () => {
+  let outerArena: Arena | undefined;
+  let pcb: ((arg: string) => Promise<string>) | undefined;
+  let readAfter: (() => unknown) | undefined;
+  const svcTag = service("Test.ArenaSvc");
+  const openResult = await Effect.runPromise(
+    scopeRun((outer) => Effect.gen(function* () {
+      const layer = layerSucceed(svcTag, { label: "ctx" });
+      const view = yield* layerRun(layer, () => Effect.gen(function* () {
+        outerArena = yield* within(outer, arenaMake());
+        return arenaAlloc(outerArena, "outer-live");
+      }));
+      assert.equal(outerArena?.liveSlots, 1);
+      readAfter = () => arenaGet(view);
+      const cb = yield* promiseCallback((tag: string) => Effect.sync(() => `${tag}:${String(arenaGet(view))}`));
+      pcb = cb;
+      return yield* Effect.promise(() => cb("open"));
+    })),
+  );
+  assert.equal(openResult, "open:outer-live");
+  assert.equal(outerArena?.liveSlots, 0);
+  assert.ok(pcb);
+  const lateCb = pcb;
+  await assert.rejects(() => lateCb("late"), RuntimeFailure);
+  assert.throws(() => readAfter?.(), /closed/);
 });

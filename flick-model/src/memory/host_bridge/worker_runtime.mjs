@@ -274,6 +274,7 @@ export class ExecState {
     this.nextHandle = 1;
     this.callbacks = new Map();
     this.owners = new Map();
+    this.closingOwners = new Map();
     this.ownerToId = new WeakMap();
     this.pendingCalls = new Map();
     this.pendingCbs = new Map();

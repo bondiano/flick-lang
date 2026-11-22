@@ -1,0 +1,33 @@
+// A local function without a signature that uses a resource is generic inside
+// the resource's scope, as a parenthesized `fun` is.
+module App.LocalFunction exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+reading : Path ->{FileSystem; OpenError, ReadError} (Int, String)
+let reading path = scope {
+  let file = FileSystem.open_scoped path
+  let with_text x = (x, FileSystem.read_all file)
+  let (n, _) = with_text 1
+  let (s, text) = with_text "a"
+  (n, s ++ text)
+}
+
+keeping : Path ->{FileSystem; OpenError, ReadError} (Int, String)
+let keeping path = scope {
+  let file = FileSystem.open_scoped path
+  let keep x = (x, file)
+  let (n, kept) = keep 1
+  let (s, _) = keep "a"
+  (n, s ++ FileSystem.read_all kept)
+}

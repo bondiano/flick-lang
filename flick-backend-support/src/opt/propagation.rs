@@ -228,31 +228,42 @@ fn dead(stmts: &mut Vec<Stmt>, result: &Expr, arity: Arity) -> bool {
             read.insert(l);
         });
         let mut keep = vec![true; stmts.len()];
-        for (i, stmt) in stmts.iter().enumerate().rev() {
-            let drop = match stmt {
-                Stmt::Expr(v) => inert(v, arity),
-                Stmt::Let(p, v) => {
-                    let mut bound = Vec::new();
-                    p.binders(&mut bound);
-                    p.irrefutable() && bound.iter().all(|n| !read.contains(n)) && inert(v, arity)
+        let has_rec = stmts
+            .iter()
+            .any(|s| matches!(s, Stmt::Fun { rec: true, .. }));
+        loop {
+            let before_read = read.len();
+            for (i, stmt) in stmts.iter().enumerate().rev() {
+                let drop = match stmt {
+                    Stmt::Expr(v) => inert(v, arity),
+                    Stmt::Let(p, v) => {
+                        let mut bound = Vec::new();
+                        p.binders(&mut bound);
+                        p.irrefutable()
+                            && bound.iter().all(|n| !read.contains(n))
+                            && inert(v, arity)
+                    }
+                    Stmt::Fun { name, .. } => !read.contains(name.as_str()),
+                    Stmt::Var(..) | Stmt::Assign(..) => false,
+                };
+                keep[i] = !drop;
+                if drop {
+                    continue;
                 }
-                Stmt::Fun { name, .. } => !read.contains(name.as_str()),
-                Stmt::Var(..) | Stmt::Assign(..) => false,
-            };
-            if drop {
-                keep[i] = false;
-                continue;
+                match stmt {
+                    Stmt::Let(_, v)
+                    | Stmt::Var(_, v)
+                    | Stmt::Assign(_, v)
+                    | Stmt::Expr(v)
+                    | Stmt::Fun { value: v, .. } => {
+                        each_use(v, &mut |l| {
+                            read.insert(l);
+                        });
+                    }
+                }
             }
-            match stmt {
-                Stmt::Let(_, v)
-                | Stmt::Var(_, v)
-                | Stmt::Assign(_, v)
-                | Stmt::Expr(v)
-                | Stmt::Fun { value: v, .. } => {
-                    each_use(v, &mut |l| {
-                        read.insert(l);
-                    });
-                }
+            if !has_rec || read.len() == before_read {
+                break;
             }
         }
         keep

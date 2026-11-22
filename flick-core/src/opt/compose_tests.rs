@@ -57,18 +57,41 @@ fn an_applied_composition_is_the_nested_call() {
 
 #[test]
 fn a_named_composition_is_inlined_as_a_written_function() {
-    let uses = "  say (show (h 4))\n  say (show (4 |> h))";
+    let closed_uses = "  say (show (h 4))\n  say (show (4 |> h))";
     same(
-        ("h : Int -> Int\nlet h = step >> shrink\n\n", uses),
-        ("h : Int -> Int\nlet h = fun x -> shrink (step x)\n\n", uses),
+        ("h : Int -> Int\nlet h = step >> shrink\n\n", closed_uses),
+        (
+            "h : Int -> Int\nlet h = fun x -> shrink (step x)\n\n",
+            closed_uses,
+        ),
     );
-    assert!(js("h : Int -> Int\nlet h = step >> shrink\n\n", uses).contains("shrink(step(4))"));
+    assert!(js("h : Int -> Int\nlet h = step >> shrink\n\n", closed_uses).contains("say(\"11\")"));
+    let dyn_uses = "  let n = seen 4\n  say (show (h n))\n  say (show (n |> h))";
+    same(
+        ("h : Int -> Int\nlet h = step >> shrink\n\n", dyn_uses),
+        (
+            "h : Int -> Int\nlet h = fun x -> shrink (step x)\n\n",
+            dyn_uses,
+        ),
+    );
+    assert!(js("h : Int -> Int\nlet h = step >> shrink\n\n", dyn_uses).contains("shrink(step(n))"));
     // a method of a known instance is read where the composition calls it,
-    // as in the function written out
-    let uses = "  say (back 4)\n  say (back 5)";
-    let back = js("back : Int -> String\nlet back = show << shrink\n\n", uses);
+    // as in the function written out (with closed calls folding to literals)
+    let closed_back = js(
+        "back : Int -> String\nlet back = show << shrink\n\n",
+        "  say (back 4)\n  say (back 5)",
+    );
     assert!(
-        back.contains("export const back = ($x) => $m_Instances.$i_Show_Int.show(shrink($x));"),
+        closed_back.contains("say(\"3\")") && closed_back.contains("say(\"4\")"),
+        "{closed_back}"
+    );
+    let dyn_back = "  let n = seen 4\n  say (back n)\n  say (back (n + 1))";
+    let back = js(
+        "back : Int -> String\nlet back = show << shrink\n\n",
+        dyn_back,
+    );
+    assert!(
+        back.contains("const back = ($x) => $m_Instances.$i_Show_Int.show(shrink($x));"),
         "{back}"
     );
 }
