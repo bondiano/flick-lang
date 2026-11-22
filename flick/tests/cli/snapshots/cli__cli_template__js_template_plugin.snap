@@ -1,0 +1,206 @@
+---
+source: flick/tests/cli/cli_template.rs
+expression: tree
+---
+=== .gitignore ===
+node_modules/
+dist/
+.flick/*
+!.flick/plugin-snapshots/
+plugin/target/
+=== AGENTS.md ===
+# Notes for coding agents
+
+This project is written in Flick, a statically typed functional language
+with effects that compiles to JavaScript or Go. It is young and changes
+between releases, so your training data likely gets its syntax and APIs
+wrong. Look them up for the compiler this project pins instead of
+borrowing them from Elm, OCaml or F#.
+
+## Look things up
+
+- `flick doc --std --out-dir .flick/std-docs` writes the standard library
+  of this compiler as one Markdown file per module, such as `List.md`;
+  search it before using a function.
+- `flick explain <CODE>` explains a diagnostic, such as `FLICK-E001`.
+- The [documentation](https://bondiano.github.io/flick-lang/) has the
+  language tour, the handbook, the CLI reference and the standard library
+  API. It follows the latest release.
+
+## Before you finish
+
+Run these and fix everything they report; a warning counts as a failure:
+
+```sh
+flick fmt
+flick check --warnings-as-errors
+flick test
+```
+
+`flick check --fix` applies the fixes that keep the program's meaning.
+
+## Conventions
+
+- `src/A/B.fl` holds `module A.B`; tests live under `test/`.
+- A function's type lists the effects it performs, `->{Host.Console} Unit`.
+  When the checker reports a missing effect, add it to the signature and
+  provide it where the program starts, such as `main`.
+- Add npm packages with `flick add` and install them with `flick install`,
+  which uses the pnpm version `package.json` pins.
+- `dist/` is build output; change the sources and rebuild.
+- `flick run plugin` rebuilds `plugin.wasm` after a change in `plugin/`;
+  the compiler runs the component, not the Rust sources.
+=== explain/T001.md ===
+A `tagged` block names its tag, a string, before its body:
+
+```flick
+import Tagged exposing (plugin tagged)
+
+let answer = tagged "answer" { 42.0 }
+```
+=== explain/T002.md ===
+A `tagged` block holds one expression, the value it tags. Put several
+values in a record or a list:
+
+```flick
+import Tagged exposing (plugin tagged)
+
+let point = tagged "point" { { x = 1.0; y = 2.0 } }
+```
+=== flick.toml ===
+schema-version = 1
+
+[package]
+name = "demo"
+version = "0.1.0"
+plugin = "plugin.wasm"
+
+[scripts]
+plugin = [
+  "cargo build --manifest-path plugin/Cargo.toml --features guest --target wasm32-wasip2 --release",
+  "cp plugin/target/wasm32-wasip2/release/demo_plugin.wasm plugin.wasm",
+]
+
+[project]
+kind = "lib"
+source-dir = "src"
+test-dir = "test"
+
+[build]
+out-dir = "dist"
+profile = "debug"
+target = "js"
+=== package.json ===
+{
+  "dependencies": {
+    "@flick-lang/runtime": "0.1.0"
+  },
+  "flick": {
+    "compiler": "0.1.0"
+  },
+  "name": "demo",
+  "packageManager": "pnpm@12.16.1",
+  "private": false,
+  "type": "module",
+  "version": "0.1.0"
+}
+=== plugin/Cargo.toml ===
+[package]
+name = "demo-plugin"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# its own workspace, whatever holds the package
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# the plugin as a WebAssembly component, which `flick run plugin` builds
+guest = ["flick-plugin/guest"]
+
+[dependencies]
+flick-plugin = { git = "https://github.com/bondiano/flick-lang", tag = "v0.1.0" }
+
+[dev-dependencies]
+flick-core = { git = "https://github.com/bondiano/flick-lang", tag = "v0.1.0" }
+=== plugin/src/lib.rs ===
+//! The plugin of demo: `tagged "name" { value }` stands for the record
+//! `{ tag = "name"; value = value }`, a `Tagged.Tagged`.
+
+use flick_plugin::{Arena, Block, Builder, Compiler, Diagnostic, Plugin, TokenKind, flick};
+
+pub struct Tagged;
+
+#[cfg(feature = "guest")]
+flick_plugin::export!(Tagged);
+
+impl Plugin for Tagged {
+    fn collect(&self, _: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
+        Vec::new()
+    }
+
+    fn expand(
+        &self,
+        block: &Block,
+        _: &[u8],
+        compiler: &mut dyn Compiler,
+    ) -> Result<Arena, Vec<Diagnostic>> {
+        let tag = match block.arguments() {
+            [t] if t.kind == TokenKind::String => t.span,
+            _ => {
+                let message = "`tagged` takes its tag: `tagged \"name\" { value }`";
+                return Err(vec![Diagnostic::error(message, block.whole()).with_code("T001")]);
+            }
+        };
+        let mut body = block.body();
+        let value = body.expr(compiler).map_err(|d| vec![d])?;
+        if let Some(more) = body.next() {
+            let message = "a `tagged` block holds one expression";
+            return Err(vec![Diagnostic::error(message, more.span).with_code("T002")]);
+        }
+        let mut b = Builder::new(block.whole());
+        let record = flick!(b, { tag = #tag; value = #value });
+        Ok(b.finish(record))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use flick_core::plugin::testing::expand;
+
+    use super::Tagged;
+
+    /// What the plugin makes of the block `block`.
+    fn one(block: &str) -> Result<String, Vec<String>> {
+        let source = format!("module Main exposing (x)\n\nimport Tagged exposing (plugin tagged)\n\nlet x = {block}\n");
+        expand(&Tagged, &source).remove(0)
+    }
+
+    #[test]
+    fn a_block_is_its_record() {
+        assert_eq!(
+            one("tagged \"a\" { 1.0 + 2.0 }"),
+            Ok("{ tag = \"a\"; value = (1.0 + 2.0) }".to_owned())
+        );
+    }
+
+    #[test]
+    fn a_block_without_its_tag_is_an_error() {
+        let errors = one("tagged { 1.0 }").expect_err("an error");
+        assert!(errors[0].starts_with("T001 on the block"), "{errors:?}");
+    }
+}
+=== rust-toolchain.toml ===
+[toolchain]
+channel = "1.95.0"
+components = ["rustfmt", "clippy"]
+targets = ["wasm32-unknown-unknown", "wasm32-wasip2"]
+=== src/Tagged.fl ===
+/// The values `tagged "name" { value }` makes: `value` with the tag `name`.
+/// A module imports the plugin with `import Tagged exposing (plugin tagged)`.
+module Tagged exposing (Tagged)
+
+type alias Tagged a = { tag : String; value : a }

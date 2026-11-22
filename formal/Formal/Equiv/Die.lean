@@ -31,7 +31,8 @@ theorem Act.not_todo {a b : Tm} (h : Act W a b) (hB : ¬ W.B) {E : List Frame}
     obtain ⟨-, h⟩ := decomp_eq (E := [.force]) (lazy_redex _) todo_redex
       (OkE.nil.cons' trivial) hE ha
     cases h
-  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB' => exact hB hB'
+  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB'
+  | o4B hB' | o4Alloc1 hB' | o4Bind hB' | o4Settle hB' => exact hB hB'
 
 theorem FrL.resumesE' {E E₂ : List Frame} (h : FrL W E E₂) {p : Nat}
     (hn : ∀ G ∈ E₂, ¬ G.resumes p) : ∀ G ∈ E, ¬ G.resumes p := by
@@ -71,7 +72,7 @@ theorem die_sim {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} {μ μ₂ : List 
   · cases hs with
     | todo hE =>
       rcases ht.dec todo_redex.1 (fun _ _ h => by cases h) (fun _ _ _ h => by cases h)
-          (fun h => h) _ _ rfl hE μ₂ with
+          (fun h => h) _ _ rfl hE μ₂ (fun h => (hB h).elim) with
         ⟨W', μ', E₀, E₁, a, b, E₂, hj, rfl, rfl, -, -, hact⟩ | ⟨W', μ', E₂, r₂, hj, hfr, hE₂, hs⟩ |
         ⟨_, _, _, _, _, _, _, _, _, h', _, _⟩
       · exact (hact.not_todo (fun h => hB (hj.le.B.2 h))
@@ -83,11 +84,12 @@ theorem die_sim {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} {μ μ₂ : List 
     | resumeDie hE hu hnr =>
       rcases ht.dec (Flick.Elab.kont_redex hu).1
           (fun _ _ h => Redex.app (Flick.Elab.kont_redex hu) h) (fun _ _ _ h => by cases h)
-          (fun h => h) _ _ rfl hE μ₂ with
+          (fun h => h) _ _ rfl hE μ₂ (fun h => (hB h).elim) with
         ⟨W', μ', E₀, E₁, a, b, E₂, hj, rfl, rfl, -, -, hact⟩ | ⟨W', μ', E₂, r₂, hj, hfr, hE₂, hs⟩ |
         ⟨_, _, _, _, _, _, _, _, _, h', _, _⟩
-      · have := hact.simple (hj.st _ hst) kont_not_value rfl
-        simp [Tm.Simple] at this
+      · rcases hact.simple (hj.st _ hst) kont_not_value rfl with hsm | ⟨l₀, l', e, t, _, hH, -⟩
+        · simp [Tm.Simple] at hsm
+        · exact (hB (hj.le.B.2 ((hj.st _ hst).hrel l₀ l' hH).1)).elim
       · have hrel := hfr.plugs hs.lower
         obtain ⟨f₂, u₂, rfl, h₁, h₂⟩ := hs.inv_app
         obtain ⟨ℓ', k, rfl, hl⟩ := h₁.inv_kont

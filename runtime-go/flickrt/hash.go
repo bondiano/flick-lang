@@ -55,6 +55,14 @@ func (t *table) set(fb *Fiber, k, v Value, h int32, keep bool) *table {
 	return &table{t.w, root, size}
 }
 
+func (t *table) putMut(fb *Fiber, k, v Value, h int32, keep bool) {
+	root, added := t.root.withMut(fb, t.w, entry{k, v, h}, 0, keep)
+	t.root = root
+	if added {
+		t.size++
+	}
+}
+
 func (t *table) remove(fb *Fiber, k Value) *table {
 	root, removed := t.root.without(fb, t.w, k, t.w.of(fb, k), 0)
 	if !removed {
@@ -121,7 +129,16 @@ func HashSetInsert(fb *Fiber, x, s Value) Value {
 func HashSetFromList(fb *Fiber, w, xs Value) Value {
 	t := empty(w)
 	for _, x := range List(xs) {
-		t = t.set(fb, x, Unit, t.w.of(fb, x), true)
+		t.putMut(fb, x, Unit, t.w.of(fb, x), true)
+	}
+	return setOf(t)
+}
+
+// HashSetFromSeq consumes a finite sequence once in order without a temporary list.
+func HashSetFromSeq(fb *Fiber, w, xs Value) Value {
+	t := empty(w)
+	for x := range Iter(fb, xs) {
+		t.putMut(fb, x, Unit, t.w.of(fb, x), true)
 	}
 	return setOf(t)
 }
@@ -138,6 +155,16 @@ func HashSetToList(s Value) Value {
 	return out
 }
 
+// HashSetToSeq returns a lazy, restartable sequence of elements in HAMT walk order.
+func HashSetToSeq(s Value) Value {
+	root := set(s).root
+	return seq(func(_ *Fiber, yield func(Value) bool) {
+		root.each(func(e entry) bool {
+			return yield(e.key)
+		})
+	})
+}
+
 // HashSetUnion is the elements of `a`, then those of `b` it lacks.
 func HashSetUnion(fb *Fiber, a, b Value) Value {
 	t := set(a)
@@ -147,7 +174,14 @@ func HashSetUnion(fb *Fiber, a, b Value) Value {
 	return setOf(t)
 }
 
-func HashSetRehash(fb *Fiber, w, s Value) Value { return HashSetFromList(fb, w, HashSetToList(s)) }
+func HashSetRehash(fb *Fiber, w, s Value) Value {
+	t := empty(w)
+	set(s).root.each(func(e entry) bool {
+		t.putMut(fb, e.key, Unit, t.w.of(fb, e.key), true)
+		return true
+	})
+	return setOf(t)
+}
 
 func filterSet(s Value, keep func(Value) bool) Value {
 	return setOf(set(s).kept(func(e entry) (entry, bool) { return e, keep(e.key) }))

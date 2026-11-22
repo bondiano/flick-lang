@@ -33,22 +33,36 @@ theorem _root_.Flick.Tm.Src.field : ∀ {r : Tm}, r.Src → ∀ {l : Label} {w :
   | drec c r ih => intro h l w hw; exact ih h hw
   | _ => intro _ _ _ hw; simp [Tm.field] at hw
 
-/-- The focus of a step, after the right side catches up. -/
+/-- The focus of a non-pure step, after the right side catches up. -/
 theorem focus_cases {root : Roots} {l : Lbl} {Λ Λ' Λ₂ : List Rgn} {μ μ' μ₂ : List Tm}
     {τ : Option (Nat × Nat)} {E : List Frame} {r t₂ t' : Tm} (hE : OkE E) (hrv : ¬ Value r)
     (hr : ∀ f a, r = .app f a → Value f ∧ Value a) (hrc : ∀ l e a, r ≠ .rcons l e a)
     (hal : ¬ IsAlts r) (hns : ∀ n a, r ≠ .settle n a)
-    (ht : Sim W .any (plug E r) t₂) (hst : StR W μ μ₂) (hcl₁ : (plug E r).Closed)
-    (_hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (_hrg : RgsR W μ τ Λ Λ₂)
+    (ht : Sim W .any (plug E r) t₂) (hst : StR W μ μ₂) (hR : W.R = root) (hcl₁ : (plug E r).Closed)
+    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (_hrg : RgsR W μ τ Λ Λ₂)
     (hs : Step root l Λ μ (plug E r) (.cfg Λ' μ' t'))
     (hcong : ∀ W' μ₂' E₂ r₂, RJ W μ₂ t₂ W' μ₂' (plug E₂ r₂) → FrL W' E E₂ → OkE E₂ →
       Sim W' .top r r₂ → TRes root W τ Λ₂ μ₂ t₂ μ Λ' μ' t')
-    (hsr : ¬ r.Simple := by simp [Tm.Simple]) :
+    (hsr : ¬ r.Simple := by simp [Tm.Simple]) (hnp : l ≠ .pure := by intro h; cases h) :
     TRes root W τ Λ₂ μ₂ t₂ μ Λ' μ' t' := by
-  rcases ht.dec hrv hr hrc hal _ _ rfl hE μ₂ with hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs'⟩ |
+  rcases ht.dec hrv hr hrc hal _ _ rfl hE μ₂ (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
+    hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs'⟩ |
     ⟨W', μ₂', E₂, n, a, b, hj, hfr, hE₂, rfl, hn, hs'⟩
-  · obtain ⟨W', μ₂', E₀, E₁, a, b, E₂, hj, rfl, rfl, -, -, hact⟩ := hd
-    exact (hsr (hact.simple (hj.st _ hst) hrv rfl)).elim
+  · obtain ⟨W', μ₂', E₀, E₁, a, b, E₂, hj, rfl, ha, -, -, hact⟩ := hd
+    rcases hact.simple (hj.st _ hst) hrv ha with hsm | ⟨l₀, l', e, t, rfl, hH, hhl, hpt, hct⟩
+    · exact (hsr hsm).elim
+    · obtain ⟨-, -, -, -, -, hpe, -⟩ := (hj.st _ hst).hl l₀ e hhl
+      have hR' : W'.R = root := hj.le.R.symm.trans hR
+      have hnv : ¬ Value t := by
+        rcases snoc_or E₀ with rfl | ⟨E₀', F, rfl⟩
+        · simp only [plug] at ha; exact (hns l₀ t ha.symm).elim
+        · rw [plug_snoc] at ha
+          cases F <;> simp only [Frame.plug, reduceCtorEq, Tm.settle.injEq] at ha
+          exact ha.2 ▸ not_value_plugs hrv E₀'
+      rw [plug_append, ← ha] at hs
+      have hEq := (PureEval.step_settle (fun G hG => hE G (List.mem_append_right _ hG))
+        (hR' ▸ hpe) (hR' ▸ hpt) hnv hs).1
+      exact (hnp hEq).elim
   · exact hcong W' μ₂' E₂ r₂ hj hfr hE₂ hs'
   · exact (hns _ _ rfl).elim
 

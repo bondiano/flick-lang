@@ -45,41 +45,42 @@ pub(super) fn plain_template(
     }
 }
 
+fn fold_set_from(b: &ExprBuilder, module: &str, fold: &str) -> Expr {
+    b.lam(
+        &["w", "xs"],
+        b.app3(
+            b.global(module, fold),
+            b.lam(
+                &["acc", "x"],
+                b.app2(b.global("HashSet", "insert"), b.loc("x"), b.loc("acc")),
+            ),
+            b.app(b.global("HashSet", "with"), b.loc("w")),
+            b.loc("xs"),
+        ),
+    )
+}
+
 fn hash_set_rt(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr> {
     match (bind, stages) {
         ("hashSetWith", 1) => Some(b.lam(
             &["w"],
             wrap(b, b.app(b.global("HashMap", "with"), b.loc("w"))),
         )),
-        ("hashSetFromList", 2) => Some(b.lam(
-            &["w", "xs"],
-            wrap(
-                b,
-                b.app3(
-                    b.global("List.Core", "fold_left"),
-                    b.lam(
-                        &["acc", "x"],
-                        b.app3(
-                            b.global("HashMap", "insert"),
-                            b.loc("x"),
-                            b.unit(),
-                            b.loc("acc"),
-                        ),
-                    ),
-                    b.app(b.global("HashMap", "with"), b.loc("w")),
-                    b.loc("xs"),
-                ),
-            ),
-        )),
+        ("hashSetFromList", 2) => Some(fold_set_from(b, "List.Core", "fold_left")),
+        ("hashSetFromSeq", 2) => Some(fold_set_from(b, "Seq", "fold")),
         ("hashSetInsert", 2) => Some(b.lam(
             &["x", "s"],
-            wrap(
-                b,
-                b.app3(
-                    b.global("HashMap", "insert"),
-                    b.loc("x"),
-                    b.unit(),
-                    unwrap(b, b.loc("s")),
+            b.if_(
+                b.app2(b.global("HashSet", "member"), b.loc("x"), b.loc("s")),
+                b.loc("s"),
+                wrap(
+                    b,
+                    b.app3(
+                        b.global("HashMap", "insert"),
+                        b.loc("x"),
+                        b.unit(),
+                        unwrap(b, b.loc("s")),
+                    ),
                 ),
             ),
         )),
@@ -110,15 +111,33 @@ fn hash_set_rt(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr> {
             &["s"],
             b.app(b.global("HashMap", "keys"), unwrap(b, b.loc("s"))),
         )),
+        ("hashSetToSeq", 1) => Some(b.lam(
+            &["s"],
+            b.app2(
+                b.global("Seq", "map"),
+                b.lam(
+                    &["pair"],
+                    b.match_(
+                        b.loc("pair"),
+                        vec![arm(
+                            Pat::Tuple(vec![Pat::Bind(b.name("k")), Pat::Wild]),
+                            b.loc("k"),
+                        )],
+                    ),
+                ),
+                b.app(b.global("HashMap", "to_seq"), unwrap(b, b.loc("s"))),
+            ),
+        )),
         ("hashSetUnion", 2) => Some(b.lam(
             &["a", "b"],
-            wrap(
-                b,
-                b.app2(
-                    b.global("HashMap", "union"),
-                    unwrap(b, b.loc("a")),
-                    unwrap(b, b.loc("b")),
+            b.app3(
+                b.global("List.Core", "fold_left"),
+                b.lam(
+                    &["acc", "x"],
+                    b.app2(b.global("HashSet", "insert"), b.loc("x"), b.loc("acc")),
                 ),
+                b.loc("a"),
+                b.app(b.global("HashSet", "to_list"), b.loc("b")),
             ),
         )),
         ("hashSetRehash", 2) => Some(b.lam(

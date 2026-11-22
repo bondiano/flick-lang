@@ -38,6 +38,44 @@ fn help_describes_global_and_build_options() {
 }
 
 #[test]
+fn help_lists_std_schema_export_as_contributed_and_not_core() {
+    let help = stdout(&["--help"]);
+    let core_section = help
+        .split("Commands of `std`:")
+        .next()
+        .expect("core help before contributed commands");
+    assert!(
+        !core_section
+            .lines()
+            .any(|line| line.trim_start().starts_with("schema")),
+        "schema must not remain a core command:\n{core_section}"
+    );
+    assert!(
+        help.contains("Commands of `std`:") && help.contains("schema export"),
+        "expected contributed std commands in --help:\n{help}"
+    );
+
+    for args in [
+        &["schema", "export", "--help"][..],
+        &["std:schema", "export", "--help"][..],
+    ] {
+        let out = flick(args);
+        assert_eq!(out.status.code(), Some(0), "{args:?}: {out:?}");
+        let text = String::from_utf8_lossy(&out.stdout);
+        assert!(
+            text.contains("--target") && text.contains("--out"),
+            "{args:?}: {text}"
+        );
+    }
+
+    let doc_help = stdout(&["doc", "--help"]);
+    assert!(
+        doc_help.contains("--check-examples") && doc_help.contains("--target"),
+        "{doc_help}"
+    );
+}
+
+#[test]
 fn bad_invocation_exits_2() {
     assert_eq!(flick(&["frobnicate"]).status.code(), Some(2));
     assert_eq!(flick(&["check"]).status.code(), Some(2));

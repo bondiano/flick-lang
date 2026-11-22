@@ -1,6 +1,6 @@
 ---
 title: "Схемы и кодеки"
-source_hash: bae524eff2195197
+source_hash: 77525c544f0d482e
 ---
 
 Схема описывает структуру значений типа и доступна во время выполнения.
@@ -263,6 +263,13 @@ codec`.
 менее строг, чем сама проверка.
 Для рекурсивного типа создаётся `$ref` на определение в `$defs`;
 `Codec.annotate` добавляет `title` и `description`.
+
+Из командной строки `flick schema export <Module.value> --target json-schema-2020-12|openapi-3.1 --out <file>`
+(добавленная команда `std`, также вызывается как `flick std:schema export`)
+запускает `Codec.json_schema` или `HttpApi.openapi` через выбранный бэкенд
+проекта (`flick/js` в режиме `rt` или `effect` либо `flick/go` с
+`[tools] "flick/go" = ["go"]` и без Node). При `ExportError` файл не
+записывается и выводится `FLICK-D008` с указанием на экспортируемое объявление.
 
 `Codec.standard codec` создаёт объект Standard Schema V1 с синхронной
 валидацией. `Codec.standard_async codec` — эффектный вызов.

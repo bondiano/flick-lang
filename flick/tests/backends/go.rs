@@ -110,3 +110,47 @@ fn official_go_cgo_option_builds_and_invalidates_cache() {
         .count();
     assert_eq!(after_cgo, 2);
 }
+
+#[test]
+#[ignore = "requires Go"]
+fn go_scaffolded_templates_test_and_run() {
+    let root = project("go_scaffold_e2e", &[]);
+    fs::create_dir_all(&root).expect("dir");
+
+    let app_created = flick_in(&root, &["new", "go-app", "--target", "go"]);
+    assert!(app_created.status.success(), "{app_created:?}");
+    let app = root.join("go-app");
+    let tested = flick_in(&app, &["test", "--offline"]);
+    assert!(tested.status.success(), "{tested:?}");
+    let ran = flick_in(&app, &["run", "--offline", "--", "Ada"]);
+    assert!(ran.status.success(), "{ran:?}");
+    assert_eq!(String::from_utf8_lossy(&ran.stdout), "Hello, Ada!\n");
+
+    let cli_created = flick_in(
+        &root,
+        &["new", "go-cli", "--target", "go", "--template", "cli"],
+    );
+    assert!(cli_created.status.success(), "{cli_created:?}");
+    let cli = root.join("go-cli");
+    let tested = flick_in(&cli, &["test", "--offline"]);
+    assert!(tested.status.success(), "{tested:?}");
+    let help = flick_in(&cli, &["run", "--offline", "--", "--help"]);
+    assert!(help.status.success(), "{help:?}");
+    let help_text = String::from_utf8_lossy(&help.stdout);
+    assert!(
+        help_text.contains("go-cli") && help_text.contains("--loud"),
+        "{help_text}"
+    );
+    let ran = flick_in(&cli, &["run", "--offline", "--", "--loud", "Ada"]);
+    assert!(ran.status.success(), "{ran:?}");
+    assert_eq!(String::from_utf8_lossy(&ran.stdout), "HELLO, ADA!\n");
+
+    let lib_created = flick_in(
+        &root,
+        &["new", "go-lib", "--target", "go", "--template", "lib"],
+    );
+    assert!(lib_created.status.success(), "{lib_created:?}");
+    let lib = root.join("go-lib");
+    let tested = flick_in(&lib, &["test", "--offline"]);
+    assert!(tested.status.success(), "{tested:?}");
+}

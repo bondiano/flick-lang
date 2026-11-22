@@ -61,6 +61,29 @@ impl Plugin for Pairs {
         commands::run(invocation)
     }
 
+    #[cfg(feature = "guest")]
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+        _answers: Vec<command::Answer>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        Ok(commands::resume(&state, &outputs))
+    }
+
+    #[cfg(feature = "guest")]
+    fn templates(&self) -> Vec<command::TemplateDescriptor> {
+        commands::templates()
+    }
+
+    #[cfg(feature = "guest")]
+    fn scaffold(
+        &self,
+        request: &command::TemplateRequest,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        commands::scaffold(request)
+    }
+
     /// The IR with each string `"hello"` as `"HELLO"`; a string `"break the
     /// IR"` becomes a local nothing binds, a module with a string `"move
     /// the package"` goes to another package, and one with `"hide the

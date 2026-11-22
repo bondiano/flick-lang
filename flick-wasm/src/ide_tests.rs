@@ -2,13 +2,18 @@
 //! diagnostics and the build a reused cache must not change.
 
 use std::fs::{read_dir, read_to_string};
+use std::num::NonZero;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::thread;
 
 use serde_json::Value;
 
+use flick_core::build;
 use flick_core::diagnostics::render::json_events;
 use flick_core::project::{self, Analysis};
 use flick_core::source::SourceMap;
+use flick_core::types;
 
 use crate::{Demo, Session, path, positions};
 
@@ -117,12 +122,47 @@ fn source_after(source: &str, at: usize) -> String {
     String::new()
 }
 
+fn for_each_example(examples: &[(String, String)], check: impl Fn(&str, &str) + Sync) {
+    let workers = thread::available_parallelism()
+        .map_or(1, NonZero::get)
+        .min(examples.len());
+    if workers <= 1 {
+        for (name, source) in examples {
+            check(name, source);
+        }
+        return;
+    }
+    let next = AtomicUsize::new(0);
+    thread::scope(|scope| {
+        let handles: Vec<_> = (0..workers)
+            .map(|_| {
+                let check = &check;
+                let next = &next;
+                scope.spawn(move || {
+                    loop {
+                        let idx = next.fetch_add(1, Ordering::Relaxed);
+                        let Some((name, source)) = examples.get(idx) else {
+                            break;
+                        };
+                        check(name, source);
+                    }
+                })
+            })
+            .collect();
+        for handle in handles {
+            handle.join().expect("example worker passed");
+        }
+    });
+}
+
 #[test]
 fn a_reused_cache_reports_what_a_cold_run_reports() {
-    for (name, source) in examples() {
+    let examples = examples();
+    let _ = types::builtins_of(true);
+    for_each_example(&examples, |name, source| {
         let mut session = Session::new();
-        let first = json(&session.update(&source));
-        assert_eq!(first, cold(&source), "{name}: first analysis");
+        let first = json(&session.update(source));
+        assert_eq!(first, cold(source), "{name}: first analysis");
 
         // an edit and its undo: the cache of the first analysis is reused
         let edited = source.replace(
@@ -131,28 +171,31 @@ fn a_reused_cache_reports_what_a_cold_run_reports() {
         );
         let analysed = json(&session.update(&edited));
         assert_eq!(analysed, cold(&edited), "{name}: after an edit");
-        let again = json(&session.update(&source));
-        assert_eq!(again, cold(&source), "{name}: after the undo");
+        let again = json(&session.update(source));
+        assert_eq!(again, cold(source), "{name}: after the undo");
         // the revision count is not in the report, but the cache is: every
         // update goes through the same `ModuleCache` the session owns, which
         // `checking.rs` retains by path, so the second analysis of the same
         // text cannot parse it again
         assert_eq!(again, first, "{name}: the same text analyses the same");
-    }
+    });
 }
 
 #[test]
 fn emission_is_the_same_after_the_cache_was_reused() {
-    for (name, source) in examples() {
+    let examples = examples();
+    let _ = types::builtins_of(true);
+    let _ = build::builtin_modules_of(true);
+    for_each_example(&examples, |name, source| {
         let mut session = Session::new();
-        session.update(&source);
+        session.update(source);
         session.update(&source.replace(
             "module Main exposing (main)",
             "module Main exposing (main)\n",
         ));
-        session.update(&source);
+        session.update(source);
         let mut fresh = Session::new();
-        fresh.update(&source);
+        fresh.update(source);
         for profile in ["debug", "release"] {
             let reused: Value = json(&session.emit(profile));
             let cold: Value = json(&fresh.emit(profile));
@@ -161,7 +204,7 @@ fn emission_is_the_same_after_the_cache_was_reused() {
             let cold: Value = json(&fresh.emit_declarations(profile));
             assert_eq!(reused, cold, "{name}: `emit_declarations {profile}`");
         }
-    }
+    });
 }
 
 #[test]

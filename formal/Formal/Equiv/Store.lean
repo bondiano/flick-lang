@@ -46,6 +46,15 @@ structure StR (W : World) (μ₁ μ₂ : List Tm) : Prop where
   j₂ : ∀ n, W.J₂ n → n < μ₂.length ∧ ∀ l k, ¬ W.L l n k
   own : ∀ n τ, W.O n τ → W.J₁ n
   ownU : ∀ n τ τ', W.O n τ → W.O n τ' → τ = τ'
+  hl : ∀ l e, W.HL l e →
+    W.B ∧ (∀ e₀, W.HL l e₀ → e₀ = e) ∧ (∀ l' k, ¬ W.L l l' k) ∧ ¬ W.J₁ l ∧
+    e.Closed ∧ PureEval W.R e ∧
+    ∃ c, μ₁[l]? = some c ∧ (c = .lazy e ∨ c = .running e ∨ ∃ v, c = .done v ∧ Value v ∧ PSteps W.R e v)
+  hr : ∀ l' e', W.HR l' e' →
+    W.B ∧ (∀ e₀', W.HR l' e₀' → e₀' = e') ∧ (∀ l k, ¬ W.L l l' k) ∧ ¬ W.J₂ l' ∧
+    e'.Closed ∧ PureEval W.R e' ∧
+    ∃ c', μ₂[l']? = some c' ∧ (c' = .lazy e' ∨ ∃ v', c' = .done v' ∧ Value v' ∧ PSteps W.R e' v')
+  hrel : ∀ l l', W.H l l' → W.B ∧ ∃ e e', W.HL l e ∧ W.HR l' e' ∧ Sim W .any e e'
 
 theorem BornInv.mono {W' : World} (hW : W.le W') {v v' c c' : Tm} (h : BornInv W v v' c c') :
     BornInv W' v v' c c' := by
@@ -86,16 +95,30 @@ def World.addO (W : World) (n : Nat) (τ : Option (Nat × Nat)) : World :=
   { W with J₁ := fun a => W.J₁ a ∨ a = n, O := fun a τ' => W.O a τ' ∨ (a = n ∧ τ' = τ) }
 
 theorem World.le_addL (W : World) (l l' : Nat) (k : Kd) : W.le (W.addL l l' k) :=
-  ⟨fun _ _ _ h => .inl h, fun _ h => h, fun _ h => h, fun _ _ h => h, Iff.rfl⟩
+  ⟨rfl, fun _ _ _ h => .inl h, fun _ h => h, fun _ h => h, fun _ _ h => h,
+    fun _ _ h => h, fun _ _ h => h, fun _ _ h => h, Iff.rfl⟩
 
 theorem World.le_addJ₁ (W : World) (n : Nat) : W.le (W.addJ₁ n) :=
-  ⟨fun _ _ _ h => h, fun _ h => .inl h, fun _ h => h, fun _ _ h => h, Iff.rfl⟩
+  ⟨rfl, fun _ _ _ h => h, fun _ h => .inl h, fun _ h => h, fun _ _ h => h,
+    fun _ _ h => h, fun _ _ h => h, fun _ _ h => h, Iff.rfl⟩
 
 theorem World.le_addJ₂ (W : World) (n : Nat) : W.le (W.addJ₂ n) :=
-  ⟨fun _ _ _ h => h, fun _ h => h, fun _ h => .inl h, fun _ _ h => h, Iff.rfl⟩
+  ⟨rfl, fun _ _ _ h => h, fun _ h => h, fun _ h => .inl h, fun _ _ h => h,
+    fun _ _ h => h, fun _ _ h => h, fun _ _ h => h, Iff.rfl⟩
 
 theorem World.le_addO (W : World) (n : Nat) (τ : Option (Nat × Nat)) : W.le (W.addO n τ) :=
-  ⟨fun _ _ _ h => h, fun _ h => .inl h, fun _ h => h, fun _ _ h => .inl h, Iff.rfl⟩
+  ⟨rfl, fun _ _ _ h => h, fun _ h => .inl h, fun _ h => h, fun _ _ h => .inl h,
+    fun _ _ h => h, fun _ _ h => h, fun _ _ h => h, Iff.rfl⟩
+
+theorem StR.ltHL {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {l : Nat} {e : Tm} (hl : W.HL l e) :
+    l < μ₁.length := by
+  obtain ⟨-, -, -, -, -, -, c, hc, -⟩ := h.hl l e hl
+  exact (List.getElem?_eq_some_iff.mp hc).1
+
+theorem StR.ltHR {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {l' : Nat} {e' : Tm} (hr : W.HR l' e') :
+    l' < μ₂.length := by
+  obtain ⟨-, -, -, -, -, -, c', hc', -⟩ := h.hr l' e' hr
+  exact (List.getElem?_eq_some_iff.mp hc').1
 
 theorem getElem?_append_old {μ : List Tm} {c : Tm} {l : Nat} (h : l < μ.length) :
     (μ ++ [c])[l]? = μ[l]? := List.getElem?_append_left h
@@ -139,6 +162,26 @@ theorem StR.alloc {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {k : Kd} {c c'
     · omega
   own := h.own
   ownU := h.ownU
+  hl := by
+    intro l e hl
+    obtain ⟨hB, hu, hnl, hnj, hcl, hpe, d, hd, hst⟩ := h.hl l e hl
+    have hlt := h.ltHL hl
+    refine ⟨hB, hu, ?_, hnj, hcl, hpe, d, by rw [getElem?_append_old hlt]; exact hd, hst⟩
+    rintro l' k' (h' | ⟨rfl, -, -⟩)
+    · exact hnl _ _ h'
+    · omega
+  hr := by
+    intro l' e' hr
+    obtain ⟨hB, hu, hnl, hnj, hcl, hpe, d', hd', hst⟩ := h.hr l' e' hr
+    have hlt := h.ltHR hr
+    refine ⟨hB, hu, ?_, hnj, hcl, hpe, d', by rw [getElem?_append_old hlt]; exact hd', hst⟩
+    rintro l k' (h' | ⟨-, rfl, -⟩)
+    · exact hnl _ _ h'
+    · omega
+  hrel := by
+    intro l l' hH
+    obtain ⟨hB, e, e', hl, hr, hs⟩ := h.hrel l l' hH
+    exact ⟨hB, e, e', hl, hr, hs.mono (World.le_addL _ _ _ _)⟩
 
 /-- **Allocation of a left cell** only the left side has. -/
 theorem StR.allocJ₁ {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) (c : Tm) :
@@ -156,6 +199,19 @@ theorem StR.allocJ₁ {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) (c : Tm) :
   j₂ := h.j₂
   own := fun n τ ho => .inl (h.own n τ ho)
   ownU := h.ownU
+  hl := by
+    intro l e hl
+    obtain ⟨hB, hu, hnl, hnj, hcl, hpe, d, hd, hst⟩ := h.hl l e hl
+    have hlt := h.ltHL hl
+    refine ⟨hB, hu, hnl, ?_, hcl, hpe, d, by rw [getElem?_append_old hlt]; exact hd, hst⟩
+    rintro (h' | rfl)
+    · exact hnj h'
+    · omega
+  hr := h.hr
+  hrel := by
+    intro l l' hH
+    obtain ⟨hB, e, e', hl, hr, hs⟩ := h.hrel l l' hH
+    exact ⟨hB, e, e', hl, hr, hs.mono (World.le_addJ₁ _ _)⟩
 
 /-- **Allocation of a left cell** a thread forces at its next step. -/
 theorem StR.allocO {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) (c : Tm) (τ : Option (Nat × Nat)) :
@@ -181,6 +237,19 @@ theorem StR.allocO {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) (c : Tm) (τ 
     · exact absurd (h₃ ▸ (h.j₁ _ (h.own _ _ h₁)).1) (Nat.lt_irrefl _)
     · exact absurd (h.j₁ _ (h.own _ _ h₂)).1 (Nat.lt_irrefl _)
     · rfl
+  hl := by
+    intro l e hl
+    obtain ⟨hB, hu, hnl, hnj, hcl, hpe, d, hd, hst⟩ := h.hl l e hl
+    have hlt := h.ltHL hl
+    refine ⟨hB, hu, hnl, ?_, hcl, hpe, d, by rw [getElem?_append_old hlt]; exact hd, hst⟩
+    rintro (h' | rfl)
+    · exact hnj h'
+    · omega
+  hr := h.hr
+  hrel := by
+    intro l l' hH
+    obtain ⟨hB, e, e', hl, hr, hs⟩ := h.hrel l l' hH
+    exact ⟨hB, e, e', hl, hr, hs.mono (World.le_addO _ _ _)⟩
 
 /-- **Allocation of a right cell** only the right side has. -/
 theorem StR.allocJ₂ {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) (c : Tm) :
@@ -198,6 +267,19 @@ theorem StR.allocJ₂ {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) (c : Tm) :
     · exact ⟨by simp, fun l k hl => absurd (h.lt₂ hl) (Nat.lt_irrefl _)⟩
   own := h.own
   ownU := h.ownU
+  hl := h.hl
+  hr := by
+    intro l' e' hr
+    obtain ⟨hB, hu, hnl, hnj, hcl, hpe, d', hd', hst⟩ := h.hr l' e' hr
+    have hlt := h.ltHR hr
+    refine ⟨hB, hu, hnl, ?_, hcl, hpe, d', by rw [getElem?_append_old hlt]; exact hd', hst⟩
+    rintro (h' | rfl)
+    · exact hnj h'
+    · omega
+  hrel := by
+    intro l l' hH
+    obtain ⟨hB, e, e', hl, hr, hs⟩ := h.hrel l l' hH
+    exact ⟨hB, e, e', hl, hr, hs.mono (World.le_addJ₂ _ _)⟩
 
 /-- A new content of a related pair of cells. -/
 theorem StR.set {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {l l' : Nat} {k : Kd} (hl : W.L l l' k)
@@ -220,6 +302,17 @@ theorem StR.set {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {l l' : Nat} {k 
   j₂ := fun n hn => by simpa using h.j₂ n hn
   own := h.own
   ownU := h.ownU
+  hl := by
+    intro a e ha
+    obtain ⟨hB, hu, hnl, hnj, hcl, hpe, d, hd, hst⟩ := h.hl a e ha
+    have hne : a ≠ l := fun he => hnl l' k (he ▸ hl)
+    exact ⟨hB, hu, hnl, hnj, hcl, hpe, d, by rw [List.getElem?_set_ne (Ne.symm hne)]; exact hd, hst⟩
+  hr := by
+    intro a' e' ha'
+    obtain ⟨hB, hu, hnl, hnj, hcl, hpe, d', hd', hst⟩ := h.hr a' e' ha'
+    have hne : a' ≠ l' := fun he => hnl l k (he ▸ hl)
+    exact ⟨hB, hu, hnl, hnj, hcl, hpe, d', by rw [List.getElem?_set_ne (Ne.symm hne)]; exact hd', hst⟩
+  hrel := h.hrel
 
 /-- A new content of a left cell only the left side has. -/
 theorem StR.setJ₁ {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {n : Nat} (hn : W.J₁ n) (c : Tm) :
@@ -235,6 +328,13 @@ theorem StR.setJ₁ {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {n : Nat} (h
   j₂ := h.j₂
   own := h.own
   ownU := h.ownU
+  hl := by
+    intro a e ha
+    obtain ⟨hB, hu, hnl, hnj, hcl, hpe, d, hd, hst⟩ := h.hl a e ha
+    have hne : a ≠ n := fun he => hnj (he ▸ hn)
+    exact ⟨hB, hu, hnl, hnj, hcl, hpe, d, by rw [List.getElem?_set_ne (Ne.symm hne)]; exact hd, hst⟩
+  hr := h.hr
+  hrel := h.hrel
 
 /-- A new content of a right cell only the right side has. -/
 theorem StR.setJ₂ {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {n : Nat} (hn : W.J₂ n) (c : Tm) :
@@ -250,6 +350,13 @@ theorem StR.setJ₂ {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {n : Nat} (h
   j₂ := fun n hn => by simpa using h.j₂ n hn
   own := h.own
   ownU := h.ownU
+  hl := h.hl
+  hr := by
+    intro a' e' ha'
+    obtain ⟨hB, hu, hnl, hnj, hcl, hpe, d', hd', hst⟩ := h.hr a' e' ha'
+    have hne : a' ≠ n := fun he => hnj (he ▸ hn)
+    exact ⟨hB, hu, hnl, hnj, hcl, hpe, d', by rw [List.getElem?_set_ne (Ne.symm hne)]; exact hd', hst⟩
+  hrel := h.hrel
 
 theorem settleCell_cases (μ : List Tm) (l : Nat) (o : Tm) :
     (∃ e, μ[l]? = some (.running e) ∧ settleCell μ l o = μ.set l (.done o)) ∨

@@ -2,6 +2,7 @@
 //! what it would write as an edit.
 
 use flick_backend::command::{Diagnostic, Severity, Style};
+use flick_core::diagnostics::Severity as HostSeverity;
 use flick_core::project::Project;
 
 use super::plan::{Done, chain};
@@ -37,11 +38,7 @@ pub(crate) fn preview(project: &Project, words: &[String]) -> Result<Preview, St
     let plan = contributor
         .run(&invocation)
         .map_err(|ds| first(&ds).unwrap_or_default())?;
-    let mut done = Done {
-        stdout: Vec::new(),
-        diagnostics: Vec::new(),
-        refused: Vec::new(),
-    };
+    let mut done = Done::default();
     let call = (
         project,
         &*contributor,
@@ -51,6 +48,14 @@ pub(crate) fn preview(project: &Project, words: &[String]) -> Result<Preview, St
     );
     let files = chain(call, plan, &mut done).map_err(|d| d.message)?;
     if let Some(why) = first(&done.diagnostics) {
+        return Err(why);
+    }
+    if let Some(why) = done
+        .refused
+        .iter()
+        .find(|d| d.severity == HostSeverity::Error)
+        .map(|d| d.message.clone())
+    {
         return Err(why);
     }
     Ok(Preview {

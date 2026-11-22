@@ -15,7 +15,8 @@ use flick_core::fmt;
 use flick_core::markdown::{Block, Mode, blocks};
 use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
-use flick_test_support::files as fixture_files;
+use flick_core::types;
+use flick_test_support::{files as fixture_files, par_map};
 
 const SPEC: &str = "docs/src/content/docs/ru/spec";
 
@@ -230,14 +231,15 @@ fn docs_examples_check() {
     pages.push(root().join("examples/typed-interpreter/README.md"));
     pages.sort();
     let exemptions = exemptions();
-    let mut seen = BTreeSet::new();
-    let mut failures = Vec::new();
-    let mut counts = Counts::default();
-    for path in pages {
-        let markdown = fs::read_to_string(&path).expect("readable markdown");
+    let _ = types::builtins();
+    let results = par_map(&pages, |path| {
+        let mut seen = BTreeSet::new();
+        let mut failures = Vec::new();
+        let mut counts = Counts::default();
+        let markdown = fs::read_to_string(path).expect("readable markdown");
         let page = path
             .strip_prefix(root())
-            .unwrap_or(&path)
+            .unwrap_or(path)
             .display()
             .to_string();
         for block in blocks(&markdown) {
@@ -254,6 +256,18 @@ fn docs_examples_check() {
                 checked(&page, &block, &mut counts, &mut failures);
             }
         }
+        (seen, counts, failures)
+    });
+    let mut seen = BTreeSet::new();
+    let mut failures = Vec::new();
+    let mut counts = Counts::default();
+    for (page_seen, page_counts, page_failures) in results {
+        seen.extend(page_seen);
+        counts.checked += page_counts.checked;
+        counts.failed += page_counts.failed;
+        counts.valid += page_counts.valid;
+        counts.exempt += page_counts.exempt;
+        failures.extend(page_failures);
     }
     // every exemption covers an ignored example of the English page and of
     // its translation, and no example is left unexplained
@@ -582,39 +596,48 @@ fn syntax_fixtures_parse() {
 /// also on examples whose names are defined elsewhere.
 #[test]
 fn checker_survives_the_corpus() {
-    for (name, text) in corpus() {
+    let entries = corpus();
+    let _ = types::builtins();
+    par_map(&entries, |(name, text)| {
         let mut sources = SourceMap::default();
         let file = sources.add(name.as_str(), text.as_str());
         let result = panic::catch_unwind(|| flick_core::check(&sources, file));
         assert!(result.is_ok(), "{name}: the checker panicked");
-    }
+    });
 }
 
 #[test]
 fn corpus_is_lossless_and_formats_stably() {
-    let mut problems = Vec::new();
-    let mut formatted = 0;
-    for (name, text) in corpus() {
+    let entries = corpus();
+    let results = par_map(&entries, |(name, text)| {
         let mut sources = SourceMap::default();
         let file = sources.add(name.as_str(), text.as_str());
-        let parsed = parse(&text, file);
-        if parsed.tree.text(&text) != text {
+        let parsed = parse(text, file);
+        let mut problems = Vec::new();
+        let mut formatted = 0;
+        if parsed.tree.text(text) != *text {
             problems.push(format!("{name}: tree is not lossless"));
         }
-        if !parsed.diagnostics.is_empty() {
-            continue;
+        if parsed.diagnostics.is_empty() {
+            // `format` itself rejects output whose AST differs from the input's
+            match fmt::format(text, file) {
+                Ok(once) => match fmt::format(&once, file) {
+                    Ok(twice) if twice == once => formatted = 1,
+                    Ok(twice) => problems.push(format!(
+                        "{name}: not idempotent\n--- once\n{once}--- twice\n{twice}"
+                    )),
+                    Err(e) => problems.push(format!("{name}: formatted output fails: {e:?}")),
+                },
+                Err(e) => problems.push(format!("{name}: cannot format: {e:?}")),
+            }
         }
-        // `format` itself rejects output whose AST differs from the input's
-        match fmt::format(&text, file) {
-            Ok(once) => match fmt::format(&once, file) {
-                Ok(twice) if twice == once => formatted += 1,
-                Ok(twice) => problems.push(format!(
-                    "{name}: not idempotent\n--- once\n{once}--- twice\n{twice}"
-                )),
-                Err(e) => problems.push(format!("{name}: formatted output fails: {e:?}")),
-            },
-            Err(e) => problems.push(format!("{name}: cannot format: {e:?}")),
-        }
+        (problems, formatted)
+    });
+    let mut problems = Vec::new();
+    let mut formatted = 0;
+    for (entry_problems, entry_formatted) in results {
+        problems.extend(entry_problems);
+        formatted += entry_formatted;
     }
     assert!(problems.is_empty(), "{}", problems.join("\n"));
     assert!(
@@ -651,17 +674,18 @@ fn fl_sources_are_formatted() {
     files.retain(|f| !excluded.iter().any(|d| f.starts_with(d)));
     files.sort();
     assert!(files.len() > 100, "only {} .fl sources found", files.len());
-    let unformatted: Vec<String> = files
-        .iter()
-        .filter(|path| {
-            let text = fs::read_to_string(path).expect("UTF-8 source");
-            let mut sources = SourceMap::default();
-            let file = sources.add(path.display().to_string(), text.as_str());
-            // files with syntax errors are fixtures of those errors
-            fmt::format(&text, file).is_ok_and(|out| out != text)
-        })
-        .map(|path| path.display().to_string())
-        .collect();
+    let unformatted: Vec<String> = par_map(&files, |path| {
+        let text = fs::read_to_string(path).expect("UTF-8 source");
+        let mut sources = SourceMap::default();
+        let file = sources.add(path.display().to_string(), text.as_str());
+        // files with syntax errors are fixtures of those errors
+        fmt::format(&text, file)
+            .is_ok_and(|out| out != text)
+            .then(|| path.display().to_string())
+    })
+    .into_iter()
+    .flatten()
+    .collect();
     assert!(
         unformatted.is_empty(),
         "not formatted (run `flick fmt` on them):\n{}",

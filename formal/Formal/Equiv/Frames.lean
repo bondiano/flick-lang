@@ -40,7 +40,8 @@ theorem Sim.top_head {x : Pos} {f f' : Tm} (h : Sim W x f f') (hx : x = .top) (h
     | ctorApp hf' _ _ => exact ih₁ hx hf' hK
     | constApp _ _ => simp [Tm.head] at hK
   | jL hx' | jR hx' => exact (hx' hx).elim
-  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead => cases hx
+  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | ctor => exact hK
   | _ => first | (cases hf; done) | simp [Tm.head] at hK
@@ -60,8 +61,11 @@ theorem Sim.top_value {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .top) (ha
   | rcons _ _ _ ih₁ ih₂ => cases ha with
     | rcons h₁ h₂ => subst hx; exact .rcons (ih₁ rfl h₁) (ih₂ rfl h₂)
   | jL hx' | jR hx' => exact (hx' hx).elim
-  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead => cases hx
+  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
+  | hloc => exact .loc
+  | o4Fix1 | o4Fix2 => exact .fix
   | _ => first | (cases ha; done) | constructor
 
 theorem FrS.plugP {F F' : Frame} (h : FrS W F F') (hF : F.ok) (hF' : F'.ok) {a a' : Tm}
@@ -137,7 +141,8 @@ theorem armOf_eq {o : Name} {x : Pos} {al al' : Tm} (h : Sim W x al al') (hx : x
     · simp only [hc, if_true]; exact .inr ⟨hd, hn⟩
     · simp only [hc, if_false]; exact ihr hx
   | jL hx' | jR hx' => exact (hx' hx).elim
-  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead => cases hx
+  | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
   | _ => simp [Tm.armOf, ORel]
 
 theorem FrS.handles {F F' : Frame} (h : FrS W F F') (E o : Name) :

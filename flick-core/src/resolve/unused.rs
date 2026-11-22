@@ -80,16 +80,34 @@ fn module_expression_paths(node: &Node, text: &str, out: &mut Vec<String>) {
     }
 }
 
+fn used_qualifiers<'a>(references: &'a [Reference], packed: &'a [String]) -> BTreeSet<&'a str> {
+    let mut qualifiers = BTreeSet::new();
+    for q in references
+        .iter()
+        .filter_map(|r| r.qualifier.as_deref())
+        .chain(packed.iter().map(String::as_str))
+    {
+        for (i, _) in q.match_indices('.') {
+            qualifiers.insert(&q[..i]);
+        }
+        qualifiers.insert(q);
+    }
+    qualifiers
+}
+
 impl Scope<'_> {
     /// Warnings for imports, and names they expose, that no reference and no
     /// export of the module uses.
     pub fn unused_imports(&self, references: &[Reference], diagnostics: &mut Vec<Diagnostic>) {
         let module = self.module();
-        let mut names: BTreeSet<&str> = references
-            .iter()
-            .filter(|r| r.qualifier.is_none())
-            .map(|r| r.name.as_str())
-            .collect();
+        // `extend`, not `collect`: collecting compiles a sort of `&str` into the wasm compiler.
+        let mut names: BTreeSet<&str> = BTreeSet::new();
+        names.extend(
+            references
+                .iter()
+                .filter(|r| r.qualifier.is_none())
+                .map(|r| r.name.as_str()),
+        );
         // a re-export uses the name too
         let header = module.syntax.header.as_ref();
         names.extend(
@@ -118,16 +136,7 @@ impl Scope<'_> {
                 packed.push(application.name.clone());
             }
         }
-        let qualifiers: BTreeSet<&str> = references
-            .iter()
-            .filter_map(|r| r.qualifier.as_deref())
-            .flat_map(|q| q.match_indices('.').map(|(i, _)| &q[..i]).chain([q]))
-            .chain(packed.iter().flat_map(|q| {
-                q.match_indices('.')
-                    .map(|(i, _)| &q[..i])
-                    .chain([q.as_str()])
-            }))
-            .collect();
+        let qualifiers = used_qualifiers(references, &packed);
         // `T.member`, a companion, uses the type `T`
         names.extend(qualifiers.iter().filter(|q| !q.contains('.')));
         for (import, interface) in self.imports() {

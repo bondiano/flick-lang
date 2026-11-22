@@ -112,8 +112,30 @@ let main () = provide (Layer.merge Host.arguments Host.console) { run () }
 layers, so a test can call `run` with its own. `flick run -- Ada` prints
 `Hello, Ada!`.
 
-The first build downloads the JavaScript backend, a release asset the compiler
-does not hold, and pins it in `flick.lock`; later builds work offline.
+The first `flick new` or build downloads the selected official backend, a
+release asset the compiler does not hold, and pins it in `flick.lock`; later
+builds work offline.
+
+Templates come from the selected target backend or a third-party package:
+
+```sh
+# Pick a template from the default JavaScript backend (app, cli, fullstack, lib, plugin)
+flick new my-cli --template cli
+
+# Create a Go project (app, cli, lib, plugin; no package.json, requires Go on PATH)
+flick new my-go-app --target go --template app
+
+# Scaffold from a third-party template package (path, tarball URL + --sha256, or git + --tag)
+flick new my-starter --from ./my-template-pkg --template starter
+flick new my-starter --from https://example.com/starter.tgz --sha256 <64-hex> --template starter
+
+# Add a project to an existing non-empty directory while keeping existing files
+flick init --target go --template lib
+```
+
+Passing an unsupported `--template` reports `FLICK-P060` with the list of
+templates that contributor provides. `--from` uses the same source verification
+as `flick add` and records the pin in `flick.lock`.
 
 `flick check` type-checks without running anything, `flick build` writes the
 JavaScript to `dist/`, `flick test` runs the tests of the test root and

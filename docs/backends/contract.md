@@ -256,15 +256,43 @@ artifacts retain their bytes.
 
 Both the backend world and the plugin world export `flick:command/command`
 (`flick-backend/wit/deps/command`, copied to `flick-plugin/wit/deps`; a test
-keeps the two identical). A command declares its parameters, the files the
-host reads for it, the paths its steps read in place, the paths it writes
-and its style; it returns a plan of files and tool steps or answers session
-requests. The host checks a plan against the declaration, runs its steps
-with the executor above under the contributor's `[tools]` grant, linking
-each step's reads into its directory, and hands their outputs to `resume`
-when the plan asks for it. It then publishes the files of every plan in one
-transaction under the project's root. Help
-reads the descriptors cached by component digest, never a component. See
+keeps the two identical). First-party `std` also contributes commands natively
+on the same contract (including `schema export`), always available in memory
+without component loading or descriptor cache files. A command declares its
+parameters, the files the host reads for it, the paths its steps read in place,
+the paths it writes and its style; it returns a plan of files and steps
+(`tool` or `run-flick`) or answers session requests.
+
+The host validates the entire plan against the descriptor before any step
+executes (`FLICK-P055`):
+
+- `tool` steps run with the executor above under the contributor's `[tools]`
+  grant, linking each step's `reads` into its directory.
+- `run-flick` steps (`run-flick-step`) overlay zero or more in-memory
+  `flick-module` sources on `$sources` without writing to the project tree or
+  the disk module cache, compile `entry`, emit into an isolated temporary
+  generation, and execute through the project's selected backend
+  (`LaunchKind::Run`). No contributor `[tools]` grant is needed for
+  `run-flick`; only the selected backend's own grants apply (for example,
+  `"flick/go" = ["go"]` on Go, and none on `flick/js`). Captured stdout goes to
+  `output` (handed to `resume` when set, otherwise published under
+  `descriptor.writes`). Upfront validation enforces valid Flick module names,
+  unique step ids and overlay module names, file/byte/string limits, valid
+  output paths, and `origin` spans within `invocation.inputs`. Compiler
+  diagnostics inside synthetic overlay modules anchor to `origin`, and runtime
+  failures, timeouts, or oversized stdout report `FLICK-P061`.
+
+Steps execute sequentially in declared order, with step outputs handed to
+`resume` when the plan asks for it, and the files of every plan published in
+one transaction under the project's root. Help reads in-memory `std` and
+descriptors cached by component digest, never a component.
+
+The same interface also exports `templates` (`list<template-descriptor>`) and
+`scaffold` (`template-request -> result<plan, list<diagnostic>>`) for
+`flick new` and `flick init`. Template plans must be pure file plans (no
+`tool` or `run-flick` `steps`, `resume`, or `needs`, and valid output paths
+within the target directory; violations are refused with `FLICK-P055` before
+creating files), and are published atomically. See
 [Contributed commands](../src/content/docs/reference/commands.md).
 
 ### Atomic publication
