@@ -77,17 +77,29 @@ impl<'p> Machine<'p, '_> {
         if state.phase == ClosePhase::Hooks {
             state.phase = ClosePhase::Children;
         } else {
+            let owner = state.owner;
+            if let Err(err) = self.close_mirrored_owner(owner) {
+                self.closing_scopes.insert(owner, state);
+                return Err(err);
+            }
+            if !self.owners[owner].hooks.is_empty() {
+                return Ok(Some(state));
+            }
+            if !self.owners[owner].children.is_empty() || self.owners[owner].watchers > 0 {
+                state.phase = ClosePhase::Children;
+                return Ok(Some(state));
+            }
             let exit_dup = match Self::state_exit_cause(&state) {
                 Some(c) => match self.heap.dup_cause(c) {
                     Ok(d) => Some(d),
                     Err(err) => {
-                        self.closing_scopes.insert(state.owner, state);
+                        self.closing_scopes.insert(owner, state);
                         return Err(err);
                     }
                 },
                 None => None,
             };
-            let o = &mut self.owners[state.owner];
+            let o = &mut self.owners[owner];
             o.phase = OwnerPhase::Finalizing;
             o.exit_cause = exit_dup;
             state.remaining = mem::take(&mut o.finalizers);
@@ -95,11 +107,6 @@ impl<'p> Machine<'p, '_> {
             self.mask_depth += 1;
             state.masked = true;
             state.phase = ClosePhase::Finalizers;
-            let owner = state.owner;
-            if let Err(err) = self.close_mirrored_owner(owner) {
-                self.closing_scopes.insert(owner, state);
-                return Err(err);
-            }
         }
         Ok(Some(state))
     }

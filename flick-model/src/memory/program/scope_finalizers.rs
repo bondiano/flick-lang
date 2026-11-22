@@ -207,7 +207,8 @@ impl<'p> Machine<'p, '_> {
             && (!o.hooks.is_empty()
                 || !o.children.is_empty()
                 || o.watchers > 0
-                || !o.finalizers.is_empty())
+                || !o.finalizers.is_empty()
+                || self.foreign.mirrored_owners.contains(&owner))
     }
 
     pub(super) fn begin_close_scope(

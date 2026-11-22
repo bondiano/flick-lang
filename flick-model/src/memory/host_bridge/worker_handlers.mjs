@@ -22,7 +22,6 @@ import {
   fnResultHint,
   fnStages,
   layerMod,
-  ownerMod,
   runtime,
   send,
   syncMod,
@@ -53,7 +52,32 @@ export async function handleCall(msg, alreadyPending = false, prePinned = null) 
     ) {
       const cbWire = msg.args[0];
       const cbId = cbWire.nodes[cbWire.root][1];
-      const promiseFn = (arg) => invokeAsyncCallback(exec, cbId, [arg], undefined, "promise");
+      const callCtx = buildCallCtx(exec, msg);
+      const owner = callCtx.owner;
+      const promiseFn = (arg) => {
+        if (owner && !owner.open) {
+          return Promise.reject(new runtime.RuntimeFailure(causeMod.interrupt(undefined)));
+        }
+        const p = invokeAsyncCallback(
+          exec,
+          cbId,
+          [arg],
+          undefined,
+          "promise",
+          undefined,
+          callCtx,
+        ).catch((err) => {
+          if (err instanceof causeMod.Raise) {
+            throw new runtime.RuntimeFailure(err.cause);
+          }
+          if (err instanceof runtime.RuntimeFailure) {
+            throw err;
+          }
+          throw new runtime.RuntimeFailure(causeMod.die(err));
+        });
+        owner?.track(p);
+        return p;
+      };
       releasePinned();
       if (checkAlive()) finishCallOk(exec, callId, spec, false, promiseFn);
       return;
@@ -496,26 +520,4 @@ export function handleGetField(msg) {
   } catch (err) {
     finishCallErr(exec, callId, err, false);
   }
-}
-
-export function handleCloseOwner(msg) {
-  const exec = executions.get(msg.exec);
-  const owner = exec?.owners.get(msg.owner);
-  if (!owner || !owner.open) {
-    send({ type: "owner_closed", owner: msg.owner });
-    return;
-  }
-  const fiber = fiberMod.forkNow(
-    () => ownerMod.close(owner, causeMod.succeeded(undefined)),
-    fiberMod.currentCtx(),
-  );
-  if (fiber.exit !== undefined) {
-    exec.owners.delete(msg.owner);
-    send({ type: "owner_closed", owner: msg.owner });
-    return;
-  }
-  fiber.observe(() => {
-    exec.owners.delete(msg.owner);
-    send({ type: "owner_closed", owner: msg.owner });
-  });
 }

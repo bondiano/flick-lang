@@ -222,11 +222,14 @@ impl<'p> Machine<'p, '_> {
         if frames.is_empty() {
             return;
         }
-        let next = match self.discard.take() {
-            Some(prev) => TransferNext::Chain(Box::new(prev)),
-            None => TransferNext::ResumeRunning {
-                saved_failure: self.failure.take(),
-            },
+        let next = if let Some(prev) = self.discard.take() {
+            TransferNext::Chain(Box::new(prev))
+        } else {
+            let saved_failure = self.failure.take();
+            if saved_failure.is_some() {
+                self.failure_elected = false;
+            }
+            TransferNext::ResumeRunning { saved_failure }
         };
         self.discard = Some(Discard {
             frames,

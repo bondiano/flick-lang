@@ -1,0 +1,311 @@
+// Scoped arenas (`Arena s`) and owner cleanup across nested scopes, finalizers,
+// failure recovery, cancellation, persistent contexts/layers, and Signals.
+module Language.Arenas exposing (tests)
+
+import Arena
+
+type error FailE = FailE String
+  deriving Show
+
+service TagA =
+  tag_a : Unit ->{} String
+
+service TagB =
+  tag_b : Unit ->{} String
+
+effect Ask =
+  ask : Unit ->{} Int
+
+effect Escape =
+  abort escape : forall a. String ->{} a
+
+/// Lines in the order they were noted.
+type alias Log = Ref (List String)
+
+note : Log -> String ->{} Unit
+let note log text = Ref.set log (Ref.get log ++ [text])
+
+nap : Float ->{Async} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+alloc_into_outer : Log -> String -> Unit ->{Scope s} Arena.Value s String
+let alloc_into_outer log label () =
+  let a = Arena.make ()
+  let v = Arena.alloc a label
+  Scope.add_finalizer (task { note log ("outer-fin:" ++ Arena.get v) })
+  v
+
+tests : List Test.Test
+let tests = [
+  Test.group "scoped allocation and retention" [
+    Test.effect_test
+      "copied-out value survives scope exit while retained unused views remain inert"
+      (task {
+        let (copied, held) = scope {
+          let a = Arena.make ()
+          let v = Arena.alloc a "copied-out"
+          let inner_read = scope {
+            let inner_a = Arena.make ()
+            let inner_v = Arena.alloc inner_a "inner"
+            Arena.get inner_v ++ "+" ++ Arena.get v
+          }
+          (inner_read, fun () -> ignore v)
+        }
+        // Calling a closure that merely retains a retired view without reading it is safe (RG4 / T4').
+        held ()
+        Test.check (Test.equal "inner+copied-out" copied)
+      }),
+    Test.effect_test
+      "selected outer owner retains arena across nested inner scope"
+      (task {
+        let log = Ref.make []
+        let out = scope {
+          let outer_a = Arena.make ()
+          let v = scope {
+            let inner_a = Arena.make ()
+            let inner_v = Arena.alloc inner_a "inner"
+            Scope.add_finalizer (task { note log ("inner-fin:" ++ Arena.get inner_v) })
+            Arena.alloc outer_a "outer"
+          }
+          Scope.add_finalizer (task { note log ("outer-fin:" ++ Arena.get v) })
+          note log ("after-inner:" ++ Arena.get v)
+          Arena.get v
+        }
+        Test.check (Test.equal "outer" out)
+        Test.check
+          (Test.equal ["inner-fin:inner", "after-inner:outer", "outer-fin:outer"] (Ref.get log))
+      }),
+  ],
+  Test.group "finalizers and ordering" [
+    Test.effect_test
+      "arenas outlive earlier, later, and nested LIFO finalizers including late arena creation"
+      (task {
+        let log = Ref.make []
+        scope {
+          let read = Ref.make (fun () -> note log "unset")
+          Scope.add_finalizer (task { (Ref.get read) () })
+          let a = Arena.make ()
+          let v = Arena.alloc a "live"
+          Ref.set read (fun () -> note log ("first:" ++ Arena.get v))
+          Scope.add_finalizer
+            (task {
+              note log ("last:" ++ Arena.get v)
+              scope {
+                let late = Arena.make ()
+                let lv = Arena.alloc late "late"
+                Scope.add_finalizer
+                  (task { note log ("nested:" ++ Arena.get v ++ "/" ++ Arena.get lv) })
+                note log ("late:" ++ Arena.get lv)
+              }
+            })
+          note log "body"
+        }
+        Test.check
+          (Test.equal
+            ["body", "last:live", "late:late", "nested:live/late", "first:live"]
+            (Ref.get log))
+      }),
+  ],
+  Test.group "failure recovery and cancellation" [
+    Test.effect_test
+      "typed failure runs LIFO arena finalizers before try recovery"
+      (task {
+        let log = Ref.make []
+        let outcome =
+          try
+            scope {
+              let a = Arena.make ()
+              let v = Arena.alloc a "fail-data"
+              Scope.add_finalizer (task { note log ("fin1:" ++ Arena.get v) })
+              Scope.add_finalizer (task { note log ("fin2:" ++ Arena.get v) })
+              Fail.fail (FailE "boom")
+            }
+          with
+          | FailE m ->
+            note log ("recovered:" ++ m)
+            m
+        Test.check (Test.equal "boom" outcome)
+        Test.check (Test.equal ["fin2:fail-data", "fin1:fail-data", "recovered:boom"] (Ref.get log))
+      }),
+    Test.effect_test
+      "defect inside scope still runs arena finalizers before exiting"
+      (task {
+        let log = Ref.make []
+        let ex : Exit none String =
+          Effect.exit
+            (task {
+              scope {
+                let a = Arena.make ()
+                let v = Arena.alloc a "die-data"
+                Scope.add_finalizer (task { note log ("die-fin:" ++ Arena.get v) })
+                show (Int.unsafe_div 1 (List.length []))
+              }
+            })
+        Test.check (Test.equal (true, ["die-fin:die-data"]) (Exit.has_dies ex, Ref.get log))
+      }),
+    Test.effect_test
+      "child fiber cleanup reads parent arena and finishes before parent LIFO finalizer"
+      (task {
+        let log = Ref.make []
+        scope owner {
+          let a = Arena.make ()
+          let v = Arena.alloc a "parent-data"
+          Scope.add_finalizer (task { note log ("parent-fin:" ++ Arena.get v) })
+          let started : Deferred.Deferred none Unit = Deferred.make ()
+          let _child =
+            Fiber.spawn
+              owner
+              (fun f -> note log ("sup-int:" ++ show (Cause.has_interrupts f)))
+              (task {
+                Effect.ensuring
+                  (task { note log ("child-clean:" ++ Arena.get v) })
+                  (task {
+                    ignore (Deferred.succeed () started)
+                    Effect.never ()
+                  })
+              })
+          Deferred.await_ started
+          note log "body"
+        }
+        Test.check
+          (Test.equal
+            ["body", "child-clean:parent-data", "sup-int:true", "parent-fin:parent-data"]
+            (Ref.get log))
+      }),
+    Test.effect_test
+      "parallel sibling failure and timeout cancel inner arena scopes cleanly"
+      (task {
+        let log = Ref.make []
+        let par_out =
+          try
+            let _ =
+              parallel
+                (task {
+                  scope {
+                    let a = Arena.make ()
+                    let v = Arena.alloc a "par-arena"
+                    Scope.add_finalizer (task { note log ("par-fin:" ++ Arena.get v) })
+                    nap 5000
+                    0
+                  }
+                })
+                (task {
+                  nap 5
+                  Fail.fail (FailE "sib")
+                })
+            "ok"
+          with
+          | FailE m -> "caught:" ++ m
+        let time_out =
+          try
+            timeout
+              5
+              (task {
+                scope {
+                  let a = Arena.make ()
+                  let v = Arena.alloc a "to-arena"
+                  Scope.add_finalizer (task { note log ("to-fin:" ++ Arena.get v) })
+                  nap 5000
+                  "never"
+                }
+              })
+          with
+          | TimeoutError -> "timed"
+        Test.check (Test.equal ("caught:sib", "timed") (par_out, time_out))
+        Test.check (Test.equal ["par-fin:par-arena", "to-fin:to-arena"] (Ref.get log))
+      }),
+  ],
+  Test.group "persistent contexts and layers" [
+    Test.effect_test
+      "built Context and memoized Layer preserve lexical owner and close cleanly"
+      (task {
+        let log = Ref.make []
+        let builds = Ref.make 0
+        scope {
+          let built_ctx =
+            Layer.build
+              (Layer.merge
+                (Layer.succeed TagB { tag_b = fun () -> "B" })
+                (Layer.succeed TagA { tag_a = fun () -> "A" }))
+          let ctx_layer = Layer.succeed_context built_ctx
+          let outer_v = provide ctx_layer {
+            let label = TagA.tag_a () ++ "+" ++ TagB.tag_b ()
+            alloc_into_outer log label ()
+          }
+          note log ("survived:" ++ Arena.get outer_v)
+          let shared =
+            Layer.from_build_memo (fun _memo ->
+              Ref.set builds (Ref.get builds + 1)
+              let la = Arena.make ()
+              let lv = Arena.alloc la ("memo-" ++ show (Ref.get builds))
+              let copied = Arena.get lv
+              Scope.add_finalizer (task { note log ("memo-fin:" ++ Arena.get lv) })
+              Layer.build (Layer.succeed TagA { tag_a = fun () -> copied })
+            )
+          provide (Layer.override shared shared) { note log ("memo-use:" ++ TagA.tag_a ()) }
+        }
+        Test.check (Test.equal 1 (Ref.get builds))
+        Test.check
+          (Test.equal
+            ["survived:A+B", "memo-use:memo-1", "memo-fin:memo-1", "outer-fin:A+B"]
+            (Ref.get log))
+      }),
+  ],
+  Test.group "effect handler signals" [
+    Test.effect_test
+      "abort unwinds inner arena scope and runs LIFO finalizers before arm"
+      (task {
+        let log = Ref.make []
+        let out = scope {
+          let outer_a = Arena.make ()
+          let outer_v = Arena.alloc outer_a "outer"
+          let escaped =
+            try
+              scope {
+                let inner_a = Arena.make ()
+                let inner_v = Arena.alloc inner_a "inner"
+                Scope.add_finalizer (task { note log ("abort-fin1:" ++ Arena.get inner_v) })
+                Scope.add_finalizer (task { note log ("abort-fin2:" ++ Arena.get inner_v) })
+                Escape.escape (Arena.get outer_v)
+              }
+            with
+            | Escape.escape s ->
+              note log ("arm:" ++ s)
+              "escaped:" ++ s
+          escaped ++ "/" ++ Arena.get outer_v
+        }
+        Test.check (Test.equal "escaped:outer/outer" out)
+        Test.check (Test.equal ["abort-fin2:inner", "abort-fin1:inner", "arm:outer"] (Ref.get log))
+      }),
+    Test.effect_test
+      "failing tail arm bypasses inner try and runs inner arena finalizers before outer recovery"
+      (task {
+        let log = Ref.make []
+        let out =
+          try
+            try
+              scope {
+                let a = Arena.make ()
+                let v = Arena.alloc a "tail-data"
+                Scope.add_finalizer (task { note log ("tail-fin1:" ++ Arena.get v) })
+                Scope.add_finalizer (task { note log ("tail-fin2:" ++ Arena.get v) })
+                try show (Ask.ask ()) with
+                | FailE _ -> "wrong-inner"
+              }
+            with
+            | Ask.ask () -> Fail.fail (FailE "tail-err")
+          with
+          | FailE m ->
+            note log ("outer-catch:" ++ m)
+            m
+        Test.check (Test.equal "tail-err" out)
+        Test.check
+          (Test.equal
+            ["tail-fin2:tail-data", "tail-fin1:tail-data", "outer-catch:tail-err"]
+            (Ref.get log))
+      }),
+  ],
+]

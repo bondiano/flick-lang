@@ -417,16 +417,21 @@ impl Machine<'_, '_> {
         match invocation.end {
             InvocationEnd::Tail(id) => {
                 let segment = self.segments.remove(&id).expect("failed tail segment");
+                let cause = self.failure.take();
+                self.failure_elected = false;
                 self.discard = Some(Discard {
                     frames: segment.frames,
                     owner: Some(self.current_owner),
-                    next: TransferNext::Raise,
+                    next: TransferNext::ResumeRunning {
+                        saved_failure: cause,
+                    },
                 });
             }
             InvocationEnd::Control { cont_id, .. } => {
                 if let Some(Some(captured)) = self.continuations.get_mut(&cont_id).map(Option::take)
                 {
                     let cause = self.failure.take();
+                    self.failure_elected = false;
                     self.discard = Some(Discard {
                         frames: captured.frames,
                         owner: Some(self.current_owner),

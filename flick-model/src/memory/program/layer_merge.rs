@@ -186,6 +186,121 @@ impl<'p> Machine<'p, '_> {
         self.begin_close_scope_elect(inner_owner, prev_owner, ScopeOutcome::Failure(cause), true)
     }
 
+    #[expect(clippy::too_many_arguments, reason = "layer build discard context")]
+    pub(super) fn discard_layer_build_finish(
+        &mut self,
+        inner_owner: usize,
+        prev_owner: usize,
+        prev_ev: Option<OwnerEvidence>,
+        prev_memo: Option<Value>,
+        memo_entry: Option<(usize, ObjectId)>,
+        target: LayerBuildTarget,
+        roots: Vec<Value>,
+    ) -> Result<(), Error> {
+        self.current_owner = prev_owner;
+        self.current_evidence = prev_ev;
+        self.restore_fiber_memo(prev_memo)?;
+        self.heap.drop_values(roots)?;
+        if let Some((mid, lid)) = memo_entry
+            && let Some(entry) = self
+                .memo_maps
+                .get_mut(&mid)
+                .and_then(|m| m.entries.remove(&lid))
+        {
+            match entry.state {
+                MemoEntryState::Building { waiters } => {
+                    if !waiters.is_empty() {
+                        let base = self.interrupt_cause(self.active_fiber as u64)?;
+                        for (wf, w_or_die, wt) in waiters {
+                            let mut dup = self.heap.dup_cause(&base)?;
+                            if w_or_die {
+                                let conv = primitives::fails_to_dies_cause(
+                                    self.heap,
+                                    &dup,
+                                    &mut self.fuel,
+                                );
+                                self.heap.drop_cause(dup)?;
+                                dup = match conv {
+                                    Ok(c) => c,
+                                    Err(err) => {
+                                        self.heap.drop_cause(base)?;
+                                        return Err(err);
+                                    }
+                                };
+                            }
+                            self.wake_fiber_build_failure(wf, wt, dup)?;
+                        }
+                        self.heap.drop_cause(base)?;
+                    }
+                }
+                MemoEntryState::Ready(v) => self.heap.drop_value(v)?,
+                MemoEntryState::Failed(c) => self.heap.drop_cause(c)?,
+            }
+        }
+        if let LayerBuildTarget::Provide(pid) = target
+            && let Some(pp) = self.pending_provides.remove(&pid)
+        {
+            self.heap.drop_value(pp.body_thunk)?;
+            self.restore_fiber_memo(pp.prev_memo)?;
+            self.current_evidence = pp.saved_evidence;
+            if !self.owners[inner_owner].is_closed() {
+                self.owners[pp.owner]
+                    .finalizers
+                    .push(Finalizer::CloseChildOwner(inner_owner));
+            }
+            if self.owner_needs_async_close(pp.owner) {
+                let paused = self.discard.take().expect("active transfer");
+                return self.begin_close_scope(
+                    pp.owner,
+                    pp.previous,
+                    ScopeOutcome::Discard(Box::new(paused)),
+                );
+            }
+            self.close_mirrored_owner(pp.owner)?;
+            self.close_owner(pp.owner)?;
+            self.current_owner = pp.previous;
+            return Ok(());
+        }
+        if self.owner_needs_async_close(inner_owner) {
+            let paused = self.discard.take().expect("active transfer");
+            return self.begin_close_scope(
+                inner_owner,
+                prev_owner,
+                ScopeOutcome::Discard(Box::new(paused)),
+            );
+        }
+        self.close_mirrored_owner(inner_owner)?;
+        self.close_owner(inner_owner)?;
+        Ok(())
+    }
+
+    pub(super) fn discard_foreign_layer_build_finish(
+        &mut self,
+        target: LayerBuildTarget,
+        roots: Vec<Value>,
+    ) -> Result<(), Error> {
+        self.heap.drop_values(roots)?;
+        if let LayerBuildTarget::Provide(pid) = target
+            && let Some(pp) = self.pending_provides.remove(&pid)
+        {
+            self.heap.drop_value(pp.body_thunk)?;
+            self.restore_fiber_memo(pp.prev_memo)?;
+            self.current_evidence = pp.saved_evidence;
+            if self.owner_needs_async_close(pp.owner) {
+                let paused = self.discard.take().expect("active transfer");
+                return self.begin_close_scope(
+                    pp.owner,
+                    pp.previous,
+                    ScopeOutcome::Discard(Box::new(paused)),
+                );
+            }
+            self.close_mirrored_owner(pp.owner)?;
+            self.close_owner(pp.owner)?;
+            self.current_owner = pp.previous;
+        }
+        Ok(())
+    }
+
     fn release_memo_observer(&mut self, memo_id: usize, layer_id: ObjectId) -> Option<usize> {
         let memo = self.memo_maps.get_mut(&memo_id)?;
         let entry = memo.entries.get_mut(&layer_id)?;

@@ -338,12 +338,22 @@ impl<'p> Machine<'p, '_> {
                 prev_owner,
                 prev_ev,
                 prev_memo,
+                memo_entry,
+                target,
                 ..
             } => {
-                self.current_owner = prev_owner;
-                self.current_evidence = prev_ev;
-                self.restore_fiber_memo(prev_memo)?;
-                self.close_owner(inner_owner)?;
+                return self.discard_layer_build_finish(
+                    inner_owner,
+                    prev_owner,
+                    prev_ev,
+                    prev_memo,
+                    memo_entry,
+                    target,
+                    roots,
+                );
+            }
+            Destination::ForeignLayerBuildFinish { target, .. } => {
+                return self.discard_foreign_layer_build_finish(target, roots);
             }
             Destination::OrDie { .. }
             | Destination::TimedFinish { .. }
