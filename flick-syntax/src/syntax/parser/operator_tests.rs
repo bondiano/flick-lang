@@ -85,6 +85,91 @@ fn a_right_chain_past_the_depth_limit_nests_no_deeper() {
 }
 
 #[test]
+fn orelse_sits_between_pipes_associates_right_and_continues_lines() {
+    assert_eq!(
+        sexp("let x = a orelse b orelse c"),
+        "(LetDecl let (VarPat x) = (Block (BinExpr (NameExpr a) orelse (BinExpr (NameExpr b) orelse (NameExpr c)))))"
+    );
+    assert_eq!(
+        sexp("let x = a |> f orelse b"),
+        "(LetDecl let (VarPat x) = (Block (BinExpr (BinExpr (NameExpr a) |> (NameExpr f)) orelse (NameExpr b))))"
+    );
+    assert_eq!(
+        sexp("let x = f <| a orelse b"),
+        "(LetDecl let (VarPat x) = (Block (BinExpr (NameExpr f) <| (BinExpr (NameExpr a) orelse (NameExpr b)))))"
+    );
+    assert_eq!(
+        sexp("let x = a orelse b || c"),
+        "(LetDecl let (VarPat x) = (Block (BinExpr (NameExpr a) orelse (BinExpr (NameExpr b) || (NameExpr c)))))"
+    );
+    assert_eq!(
+        sexp("let x = a orelse b catch | E -> c"),
+        "(LetDecl let (VarPat x) = (Block (CatchExpr (BinExpr (NameExpr a) orelse (NameExpr b)) catch \
+         (MatchArm | (ConPat E) -> (Block (NameExpr c))))))"
+    );
+    assert!(
+        sexp("let x = result { a } orelse b")
+            .contains("(BinExpr (ResultExpr result { (Block (NameExpr a)) }) orelse (NameExpr b))")
+    );
+    assert!(
+        sexp("let x =\n  a\n  orelse b\n  orelse c")
+            .contains("(BinExpr (NameExpr a) orelse (BinExpr (NameExpr b) orelse (NameExpr c)))")
+    );
+    assert!(
+        sexp("let x = a orelse if ok then 1 else 2")
+            .contains("(BinExpr (NameExpr a) orelse (IfExpr if")
+    );
+    assert!(
+        sexp("let x = a orelse fun y -> y").contains("(BinExpr (NameExpr a) orelse (FunExpr fun")
+    );
+    assert_eq!(errors("let x = a orelse"), ["FLICK-S007 "]);
+    assert_eq!(errors("let x = a |> f <| b orelse c"), ["FLICK-S007 |>"]);
+}
+
+#[test]
+fn orelse_is_reserved_as_a_binder_but_allowed_as_a_record_label() {
+    assert!(!errors("let orelse = 1").is_empty());
+    assert!(!errors("let f orelse = 1").is_empty());
+    assert!(!errors("orelse : Int").is_empty());
+    assert_eq!(errors("let f { orelse } = 1"), ["FLICK-S007 orelse"]);
+
+    for valid in [
+        "type alias R = { orelse : Option Int }",
+        "type alias R = {\n  host : String\n  orelse : Option Int\n}",
+        "let r = { orelse = Some 1 }",
+        "let r = {\n  host = \"a\"\n  orelse = Some 1\n}",
+        "let r2 = { r with orelse = None }",
+        "let x = r.orelse",
+        "let x = (f ()).orelse",
+        "let x = { orelse = 1 }.orelse",
+        "let x = r.orelse orelse 0",
+        "let f { orelse = x } = x",
+        "let f {\n  host\n  orelse = x\n} = x",
+    ] {
+        assert!(errors(valid).is_empty(), "{valid}: {:?}", errors(valid));
+    }
+    assert!(
+        sexp("let x = r.orelse orelse 0")
+            .contains("(BinExpr (FieldExpr (NameExpr r) . orelse) orelse (Literal 0))")
+    );
+}
+
+#[test]
+fn a_deep_orelse_right_chain_hits_depth_limit_cleanly() {
+    fn depth(node: &Node) -> u32 {
+        1 + node.nodes().map(depth).max().unwrap_or(0)
+    }
+    let src = format!("let x = {}0\nlet y = 1", "a orelse ".repeat(1000));
+    let mut map = SourceMap::default();
+    let parsed = super::parse(&src, map.add("t.fl", src.as_str()));
+    assert!(depth(&parsed.tree) <= super::MAX_DEPTH + 8);
+    assert_eq!(parsed.tree.text(&src), src);
+    let found = errors(&src);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].starts_with("FLICK-S007"), "{found:?}");
+}
+
+#[test]
 fn postfix_catch_precedence_nesting_and_layout() {
     // Weaker than all infix operators, including `<|` and `|>`.
     assert_eq!(

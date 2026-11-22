@@ -210,6 +210,8 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor("for x <- xs yield x", "yield").includes("keyword.control.flick"));
   assert.ok(scopesFor("'outer: loop { continue 'outer }", "continue").includes("keyword.control.flick"));
   assert.ok(scopesFor("let shared = lazy { load id }", "lazy").includes("keyword.control.flick"));
+  assert.ok(scopesFor("let host = a orelse b", "orelse").includes("keyword.operator.word.flick"));
+  assert.ok(scopesFor("let x = a orelse b == c", "orelse").includes("keyword.operator.word.flick"));
   assert.ok(scopesFor("let r = result { work () }", "result").includes("keyword.control.flick"));
   assert.ok(scopesFor("load id catch | NotFound _ -> guest", "catch").includes("keyword.control.flick"));
   assert.ok(scopesFor("  catch", "catch").includes("keyword.control.flick"));
@@ -261,6 +263,11 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["let law = 1", "law"],
     ["let require = 1", "require"],
     ["let x = ensure y", "ensure"],
+    ["let x = r.orelse", "orelse"],
+    ["let f = .orelse", "orelse"],
+    ["let rec_val = { orelse = 1 }", "orelse"],
+    ["type T = { orelse : Int }", "orelse"],
+    ["let orelse_val = 1", "orelse_val"],
     ["let result = 1", "result"],
     ["let x = (result) { field = 1 }", "result"],
     ["let x = obj.result", "result"],

@@ -1,0 +1,45 @@
+module App.OrElseRegions exposing (..)
+
+type File (s : Region) = File String
+
+service Files =
+  open : forall s. String ->{Scope s; none} File s
+
+escape_lhs : String ->{Files} Unit
+let escape_lhs path =
+  let leaked = scope {
+    let f = Files.open path
+    Some f orelse f
+  }
+  ignore leaked
+
+escape_rhs : String ->{Files} Unit
+let escape_rhs path =
+  let leaked = scope {
+    None orelse Files.open path
+  }
+  ignore leaked
+
+poly_runtime : Unit ->{} Unit
+let poly_runtime () =
+  let cell : forall a. Ref (Option a) = None orelse Ref.make None
+  Ref.set cell (Some 42)
+
+unsigned_runtime : Unit ->{} Unit
+let unsigned_runtime () =
+  let cell = None orelse Ref.make None
+  Ref.set cell (Some 1)
+  Ref.set cell (Some "x")
+
+mut_capture : Option (Unit -> Int) -> Int
+let mut_capture opt =
+  let mut count = 0
+  let f = opt orelse fun () -> count
+  count = 1
+  f ()
+
+//~ FLICK-G002 @11:5-12:20
+//~ FLICK-G002 @19:5-19:32
+//~ FLICK-T013 @25:41-25:66 this is computed by a runtime call, so it cannot have the polymorphic type
+//~ FLICK-T003 @32:17-32:25 expected `Option Int`, found `Option String`
+//~ FLICK-G005 @37:32-37:37

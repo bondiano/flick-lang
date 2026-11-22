@@ -14,6 +14,7 @@ Elaborated here:
 - `do` with `<-`, `and`, an `if` guard and `let`;
 - `for … yield`, `[for …]`, `for … do`;
 - postfix `?`;
+- lazy `Option` fallback `orelse`;
 - postfix `catch`;
 - eager `result { … }` blocks;
 - direct calls;
@@ -87,12 +88,12 @@ constitute a proof of the Rust checker's rewrite.
 
 ```text
 e ::= … | do { s̄ } | for { c̄ } yield e | [for { c̄ } yield e] | for { c̄ } do e | e?
-      | e catch (| p (when g)? -> h)+ | result { s̄ }
+      | e₁ orelse e₂ | e catch (| p (when g)? -> h)+ | result { s̄ }
 s ::= p <- e | p₁ <- e₁ and … and pₙ <- eₙ | let p = e | if e | e
 c ::= p <- e | if e | let p = e
 ```
 
-The last statement of a `do` or `result` block is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`, `handlers.rs`. Syntax: `reference/syntax.md` "`do`", "`for`", `?`, `catch`, `result`.
+The last statement of a `do` or `result` block is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`, `binary.rs` (`orelse`), `handlers.rs`. Syntax: `reference/syntax.md` "`do`", "`for`", `?`, `orelse`, `catch`, `result`.
 
 ## 2. Dictionaries
 
@@ -523,6 +524,35 @@ and built-in `Result` constructors:
   term, so the core soundness and region proofs in `formal/` remain valid
   unchanged (as noted in `AGENTS.md`, the model proof does not prove the Rust
   compiler or either runtime).
+
+### 3.9 `orelse`
+
+`e₁ orelse e₂` is surface sugar for matching one layer of Prelude `Option` with
+a fresh hygienic binder `v` (`v ∉ fv(e₂)`):
+
+```text
+⟦e₁ orelse e₂⟧  =  match ⟦e₁⟧ with | Some v -> v | None -> ⟦e₂⟧
+```
+
+- `e₁` is inferred to `Option τ` (retaining any capture qualifier on the
+  `Option` value via `data_field` when projecting `τ`), and `e₂` is checked
+  against the result type `τ'`, with `τ ≤ τ'` (any `≤-Fun` lift or `@implicit`
+  conversion applies to `v` in the `Some` arm, never to `e₁` itself).
+- `e₁` is evaluated once; `e₂` is evaluated at most once and only when `e₁`
+  evaluates to `None`. If `e₁` fails with a typed error or defect, `e₂` is
+  never evaluated.
+- Exactly one `Option` layer is unwrapped (`Option (Option a)` unwraps to
+  `Option a`), and cold values (`Eff`, `Lazy`) remain unstarted values.
+- Effects, error rows, regions, captures, `let mut` updates, loop exits and
+  the value restriction (`φ = φ₁ ⊔ φ₂`) follow directly from the two-arm core
+  `match` rule without introducing any new core term, typing rule, evaluation
+  rule or Lean proof obligation.
+
+Checker: `binary.rs` `orelse` (checked bidirectionally from `infer.rs`
+`check_value`). IR: `ir/lower/expr_tail.rs` `orelse`, lowering directly to
+`ExprKind::Match` on `Lang::Some` / `Lang::None`. The reference model
+(`flick-model`) translates that IR `Match` without special cases; model and
+Lean theorems do not constitute a proof of the Rust compiler or either runtime.
 
 ## 4. Coherence and T6
 

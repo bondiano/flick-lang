@@ -4,8 +4,9 @@ use std::{mem, ptr};
 
 use flick_pretty::docvec;
 
+use super::binary::operator;
 use super::block::Value;
-use super::expr::{Part, operator};
+use super::expr::Part;
 use super::printer::{Doc, INDENT, Printer, position, token};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;

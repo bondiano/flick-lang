@@ -316,7 +316,7 @@ fn accesses(p: &mut Parser, mut lhs: Done) -> Option<Done> {
         if p.at(K::Dot) && p.adjacent() {
             let m = p.precede(lhs);
             p.bump();
-            if p.at(K::CatchKw) && p.adjacent() {
+            if p.at_record_label() && p.adjacent() {
                 p.bump_as(K::Ident);
             } else {
                 p.expect(K::Ident);
@@ -520,7 +520,7 @@ fn record(p: &mut Parser) -> K {
     }
     p.push_aligned_here();
     let kind =
-        if (matches!(p.current(), K::Ident | K::Con) || p.at(K::CatchKw)) && p.nth(1) == K::Eq {
+        if (matches!(p.current(), K::Ident | K::Con) || p.at_record_label()) && p.nth(1) == K::Eq {
             p.items(record_field, true, Parser::at_aligned_catch);
             K::RecordExpr
         } else {
@@ -541,7 +541,7 @@ fn record_field(p: &mut Parser) {
     let m = p.start();
     if matches!(p.current(), K::Ident | K::Con) {
         p.bump();
-    } else if p.at(K::CatchKw) {
+    } else if p.at_record_label() {
         p.bump_as(K::Ident);
     } else {
         p.error_expected("a record field name");

@@ -99,7 +99,7 @@ let examples =
 
 ```text
 ( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ? @
-|> <| >> << || && == != < <= > >= ++ + - * / % ** not
+|> <| orelse >> << || && == != < <= > >= ++ + - * / % ** not
 ```
 
 ## Keywords
@@ -110,8 +110,8 @@ where it is described in full. A keyword cannot be used as a name.
 ```text
 module exposing import as let mut rec assert fun match with try catch if then
 else task await lazy scope provide ignore todo echo type opaque where kind
-error service class instance deriving foreign from forall not none true false
-in when for yield do break continue
+error service class instance deriving foreign from forall not orelse none true
+false in when for yield do break continue
 ```
 
 Contextual words are ordinary names everywhere except in one position:
@@ -205,6 +205,7 @@ and [ffi.md](../ffi/).
 | `catch` | postfix handler for typed errors only (reserved in expressions and binders; still allowed as record field label, `.catch`, renamed record pattern `{ catch = f }` and foreign metadata) | `find id catch \| NotFound _ -> None` |
 | `result` | contextual: before `{`, runs its block eagerly and catches its typed errors as `Result (Errors e) a`; a name elsewhere | `result { find id }` |
 | `not` | boolean negation; `not null` on a `sql table` column | `not done` |
+| `orelse` | lazy `Option` fallback: evaluates the right side only on `None`; usable as a record field label (`{ orelse = … }`, `r.orelse`, `{ orelse = x }`) but not as a variable name or record pun `{ orelse }` | `host orelse "localhost"` |
 | `true` `false` | the two `Bool` values | `if ok then true else false` |
 | `none` | the empty row in a type | `a ->{none; NotFound} b` |
 | `in` | binds a row in a SQL `from` or `join` clause; starts the body of `unpack … as K in` | `join account in Accounts` |
@@ -284,6 +285,7 @@ with what the keyword does:
 | `sql`, `ui` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
 | `await` | `await … : Float`: the result, with the `Eff` it runs |
 | `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit`: the type of what is discarded, with a warning when it is an `Eff` that is not run |
+| `orelse` | `option orelse fallback : String`: the unwrapped result type, lazy evaluation note, and explicit grouping when chained or mixed with `\|>` or `<\|` |
 
 Other keywords show nothing on hover; the names around them show their types.
 
@@ -295,6 +297,7 @@ There are no user-defined operators. From weakest to strongest:
 | - | - | - |
 | −1 | postfix `catch \| …` | none: chaining outer `catch` needs parentheses `(a catch \| E -> b) catch \| F -> c` |
 | 0 | `<\|` | right; does not mix with `\|>`: `x \|> f <\| y` is an error |
+| 0½ | `orelse` | right: `a orelse b orelse c` is `a orelse (b orelse c)` |
 | 1 | `\|>` | left |
 | 2 | `\|\|` | right |
 | 3 | `&&` | right |
@@ -312,6 +315,9 @@ There are no user-defined operators. From weakest to strongest:
 `-x ** 2` is `-(x ** 2)`; `-a * b` is `(-a) * b`; `await f x` is
 `await (f x)`; `0..n - 1` is `0..(n - 1)`, and `i < 0..n` compares with the range.
 `f <| g <| x + 1` is `f (g (x + 1))`, and `f a <| x` is the call `f a x`;
+`x |> find orelse default` is `(x |> find) orelse default`, and
+`f <| opt orelse default` is `f <| (opt orelse default)` (which `flick fmt`
+parenthesizes explicitly for readability);
 `List.map f >> List.filter p` composes two applications, and `await f >> g`
 is `await (f >> g)`. What the operators mean is in [Numbers and
 operators](../numbers/#operators).

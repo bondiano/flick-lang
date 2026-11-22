@@ -1,0 +1,25 @@
+module App.OrElseFail exposing (..)
+
+service Log =
+  read : Unit ->{} Int
+
+number_lhs : Int
+let number_lhs = 7 orelse 0
+
+result_lhs : Int
+let result_lhs = Ok 7 orelse 0
+
+rhs_mismatch : Int
+let rhs_mismatch = Some 7 orelse "x"
+
+no_flatten : String
+let no_flatten = Some (Some "a") orelse "b"
+
+pure_rhs_effect : Option Int -> Int
+let pure_rhs_effect opt = opt orelse Log.read ()
+
+//~ FLICK-T003 @7:18-7:19 the left side of `orelse` must be an `Option`
+//~ FLICK-T003 @10:18-10:22 the left side of `orelse` must be an `Option`
+//~ FLICK-T003 @13:34-13:37 expected `Int`, found `String`
+//~ FLICK-T003 @16:18-16:33 expected `String`, found `Option String`
+//~ FLICK-E001 @19:38-19:49 this is a runtime call
