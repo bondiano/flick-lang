@@ -390,3 +390,70 @@ fn stage2_control_var_loop_and_generator_operations_validate_arity_and_tokens() 
         })
     );
 }
+
+#[test]
+fn validates_foreign_call_arity_and_ownership() {
+    let spec = Box::new(ForeignCallSpec {
+        module: "App.Main".into(),
+        source_dir: Some("/tmp".into()),
+        from: Some("./bindings.mjs".into()),
+        name: "combine".into(),
+        mode: crate::ForeignMode::Pure,
+        dicts: 0,
+        arity: 2,
+        taken: 2,
+        runtime: false,
+        has_catch: false,
+        adapter: crate::Adapter::default(),
+        arg_hints: vec![WireHint::Float, WireHint::Float],
+        result_hint: WireHint::Float,
+        remaining_stages: vec![],
+    });
+    let valid = Function {
+        params: vec![0, 1],
+        body: Block {
+            instructions: vec![Instruction::Let {
+                binding: 2,
+                value: Operation::ForeignCall {
+                    spec: spec.clone(),
+                    args: vec![0, 1],
+                },
+            }],
+            exit: Exit::Return(2),
+        },
+    };
+    let program = Program {
+        functions: BTreeMap::from([(0, valid)]),
+        globals: vec![],
+    };
+    assert_eq!(validate_program(&program), Ok(()));
+
+    let bad_arity = Function {
+        params: vec![0],
+        body: Block {
+            instructions: vec![Instruction::Let {
+                binding: 1,
+                value: Operation::ForeignCall {
+                    spec,
+                    args: vec![0],
+                },
+            }],
+            exit: Exit::Return(1),
+        },
+    };
+    let bad_program = Program {
+        functions: BTreeMap::from([(0, bad_arity)]),
+        globals: vec![],
+    };
+    assert_eq!(
+        validate_program(&bad_program),
+        Err(Error::InCode {
+            code: 0,
+            error: Box::new(Error::ForeignArity {
+                name: "combine".into(),
+                expected: 2,
+                actual: 1,
+            }),
+        })
+    );
+}

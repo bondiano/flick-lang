@@ -91,10 +91,7 @@ fn format_logfmt_expr(b: &ExprBuilder) -> Expr {
 
 fn format_json_expr(b: &ExprBuilder) -> Expr {
     let msg_txt = b.app2(b.global("String", "join"), b.str_(" "), b.loc("emsg"));
-    let msg_json = b.app(
-        b.global("Json", "stringify"),
-        b.app(b.global("Json", "string"), msg_txt),
-    );
+    let msg_json = b.app(b.global("Json", "stringify"), msg_txt);
     let suffix = b.bin(
         BinOp::Concat,
         b.str_(

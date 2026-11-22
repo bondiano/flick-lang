@@ -31,11 +31,6 @@ impl Lower<'_> {
     }
 }
 
-// Listener: `(q : Queue, closed : Ref Bool, cap : Int, sup, env)`
-fn listener_pat(b: &ExprBuilder) -> Pat {
-    b.tup_pat(&["lq", "lcl", "lcap", "lsup", "lenv"])
-}
-
 fn events_worker_step(b: &ExprBuilder) -> Expr {
     b.match_(
         b.app(b.global("Queue", "take"), b.loc("q")),
@@ -47,7 +42,11 @@ fn events_worker_step(b: &ExprBuilder) -> Expr {
                         b.global("Exit", "failure"),
                         b.app(
                             b.global("Effect.Core", "exit"),
-                            b.app(b.loc("h"), b.loc("ev")),
+                            b.task(b.app2(
+                                b.loc("env_run"),
+                                b.loc("env"),
+                                b.app(b.loc("h"), b.loc("ev")),
+                            )),
                         ),
                     ),
                     vec![
@@ -87,6 +86,41 @@ fn events_worker_step(b: &ExprBuilder) -> Expr {
 
 fn events_listen_template(b: &ExprBuilder) -> Expr {
     let worker_step = events_worker_step(b);
+    let overflow_msg = b.bin(
+        BinOp::Concat,
+        b.bin(
+            BinOp::Concat,
+            b.str_("error event queue full: "),
+            b.app(b.loc("show_val"), b.loc("cap")),
+        ),
+        b.str_(" events are waiting"),
+    );
+    let on_overflow = b.block(
+        vec![b.let_(
+            "_sf",
+            b.app(
+                b.global("Effect.Core", "exit"),
+                b.task(b.app2(
+                    b.loc("env_run"),
+                    b.loc("env"),
+                    b.task(b.app(b.loc("sup"), b.app(b.global("Cause", "die"), overflow_msg))),
+                )),
+            ),
+        )],
+        b.unit(),
+    );
+    let listener_fn = b.lam(
+        &["ev"],
+        b.if_(
+            b.rget(b.loc("cl")),
+            b.unit(),
+            b.if_(
+                b.app2(b.global("Queue", "offer"), b.loc("ev"), b.loc("q")),
+                b.unit(),
+                on_overflow,
+            ),
+        ),
+    );
     b.lam(
         &["owner", "cap", "sup", "h"],
         b.block(
@@ -94,6 +128,14 @@ fn events_listen_template(b: &ExprBuilder) -> Expr {
                 b.let_("q", b.app(b.global("Queue", "dropping"), b.loc("cap"))),
                 b.let_("cl", b.rmake(b.bool_(false))),
                 b.let_("env", b.app(b.loc("env_capture"), b.unit())),
+                Stmt::Expr(b.app2(
+                    b.loc("owner_run"),
+                    b.loc("owner"),
+                    b.task(b.app(
+                        b.global("Scope", "add_finalizer"),
+                        b.task(b.block(vec![b.rset(b.loc("cl"), b.bool_(true))], b.unit())),
+                    )),
+                )),
                 b.let_(
                     "_wf",
                     b.app3(
@@ -104,13 +146,7 @@ fn events_listen_template(b: &ExprBuilder) -> Expr {
                     ),
                 ),
             ],
-            b.tuple(vec![
-                b.loc("q"),
-                b.loc("cl"),
-                b.loc("cap"),
-                b.loc("sup"),
-                b.loc("env"),
-            ]),
+            listener_fn,
         ),
     )
 }
@@ -118,24 +154,15 @@ fn events_listen_template(b: &ExprBuilder) -> Expr {
 fn events_attach_template(b: &ExprBuilder) -> Expr {
     b.lam(
         &["l", "add", "rem"],
-        b.match_(
-            b.loc("l"),
-            vec![arm(
-                listener_pat(b),
-                b.block(
-                    vec![
-                        Stmt::Expr(b.app(b.loc("add"), b.loc("l"))),
-                        Stmt::Expr(b.app(
-                            b.global("Scope", "add_finalizer"),
-                            b.task(b.block(
-                                vec![b.rset(b.loc("lcl"), b.bool_(true))],
-                                b.app(b.loc("rem"), b.loc("l")),
-                            )),
-                        )),
-                    ],
-                    b.unit(),
-                ),
-            )],
+        b.block(
+            vec![
+                Stmt::Expr(b.app(b.loc("add"), b.loc("l"))),
+                Stmt::Expr(b.app(
+                    b.global("Scope", "add_finalizer"),
+                    b.task(b.app(b.loc("rem"), b.loc("l"))),
+                )),
+            ],
+            b.unit(),
         ),
     )
 }
@@ -212,34 +239,7 @@ fn report_reason_expr(b: &ExprBuilder) -> Expr {
                     ])),
                 ),
             ],
-            b.if_(
-                b.rget(b.loc("lcl")),
-                b.unit(),
-                b.if_(
-                    b.app2(b.global("Queue", "offer"), b.loc("rep"), b.loc("lq")),
-                    b.unit(),
-                    b.block(
-                        vec![b.let_(
-                            "_sf",
-                            b.app(
-                                b.global("Effect.Core", "exit"),
-                                b.task(b.app2(
-                                    b.loc("env_run"),
-                                    b.loc("lenv"),
-                                    b.task(b.app(
-                                        b.loc("lsup"),
-                                        b.app(
-                                            b.global("Cause", "die"),
-                                            b.str_("Error: event queue full"),
-                                        ),
-                                    )),
-                                )),
-                            ),
-                        )],
-                        b.unit(),
-                    ),
-                ),
-            ),
+            b.app(b.loc("l"), b.loc("rep")),
         ),
     )
 }
@@ -255,7 +255,7 @@ fn error_reporter_report_template(b: &ExprBuilder) -> Expr {
         "er_l",
         "l",
         b.app(b.global("Context", "read"), reporters_ref(b)),
-        b.match_(b.loc("l"), vec![arm(listener_pat(b), for_reasons)]),
+        for_reasons,
     );
     b.lam(&["failure"], for_reps)
 }

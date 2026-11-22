@@ -244,6 +244,7 @@ impl<'p> Machine<'p, '_> {
             if let Some(c) = exit_override {
                 self.heap.drop_cause(c)?;
             }
+            self.close_mirrored_owner(owner)?;
             self.close_owner(owner)?;
             self.current_owner = previous;
             return self.complete_scope_outcome(outcome, None, elect_on_fail);

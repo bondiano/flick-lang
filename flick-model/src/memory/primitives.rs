@@ -230,6 +230,8 @@ use bigint_norm::{bigint_order, bigint_text, normalize_bigint};
 pub(super) use cause_ops::{
     concat_causes, first_defect_message, join_causes, strip_fail_and_add_interrupt,
 };
+pub(super) use decimal_ops::format_decimal;
+pub use host::HostMode;
 pub(super) use isaac_ops::{
     IsaacRng, describe_cause_report, duration_sleep_nanos, fails_to_dies_cause,
     without_interrupts_cause,
@@ -475,7 +477,9 @@ pub(super) fn show_value(heap: &Heap, value: &Value) -> Result<String, Error> {
             | Data::CachedRunTask { .. }
             | Data::CachedInvalidateTask { .. }
             | Data::ExitTask(_)
-            | Data::CapturedEnv { .. } => Err(unsupported(
+            | Data::CapturedEnv { .. }
+            | Data::ForeignHandle { .. }
+            | Data::ForeignCycle { .. } => Err(unsupported(
                 "primitive show of record or executable/opaque storage",
             )),
         },
@@ -526,6 +530,16 @@ pub(super) fn intrinsic(
     value: &Value,
     stdout: &mut String,
 ) -> Result<Value, Error> {
+    intrinsic_with_host(heap, HostMode::Deterministic, kind, value, stdout)
+}
+
+pub(super) fn intrinsic_with_host(
+    heap: &mut Heap,
+    host_mode: HostMode,
+    kind: Intrinsic,
+    value: &Value,
+    stdout: &mut String,
+) -> Result<Value, Error> {
     heap.admit_ordinary(value)?;
     match kind {
         Intrinsic::PrintLine => {
@@ -537,7 +551,9 @@ pub(super) fn intrinsic(
             let text = show_value(heap, value)?;
             heap.literal(&Lit::String(text))
         }
-        Intrinsic::Host(primitive) => host::run(heap, primitive, value, stdout),
+        Intrinsic::Host(primitive) => {
+            host::run_with_mode(heap, host_mode, primitive, value, stdout)
+        }
         _ => Err(Error::NeedsProgram),
     }
 }

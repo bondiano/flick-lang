@@ -94,6 +94,7 @@ impl Lower<'_> {
                 .or_else(|| super::std_stream_combine::stream_combine_helper(helper, span))
                 .or_else(|| super::std_stream_split::stream_split_helper(helper, span))
                 .or_else(|| super::std_stream_pipe::stream_pipe_helper(helper, span))
+                .or_else(|| super::std_sql::sql_helper_expr(helper, span))
                 .ok_or_else(|| LowerError::UnknownGlobal {
                     name: name.clone(),
                     span: Some(span),
