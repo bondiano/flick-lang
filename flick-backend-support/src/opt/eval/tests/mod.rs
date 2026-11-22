@@ -1,6 +1,7 @@
 //! Unit tests for the bounded concrete evaluator over portable Flick IR (#803).
 
 mod budgets;
+mod limits;
 
 use std::collections::{BTreeMap, HashSet};
 

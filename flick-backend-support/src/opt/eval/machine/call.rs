@@ -8,7 +8,6 @@ use super::apply::is_builtin_method;
 use super::{Control, Frame, Machine, StepResult};
 use crate::opt::eval::StopReason;
 use crate::opt::eval::value::{CLOSURE_BYTES, Closure, DictEnv, DictValue, Env, SLOT_BYTES, Value};
-use crate::opt::specialize;
 
 impl<'a> Machine<'a, '_> {
     pub(super) fn step_global(
@@ -54,7 +53,10 @@ impl<'a> Machine<'a, '_> {
             }));
         }
         if let Some(arity) = self.primitives.arity(module, name, self.lang) {
-            self.budget.charge_bytes(CLOSURE_BYTES)?;
+            let bytes = CLOSURE_BYTES
+                .saturating_add(u32::try_from(module.len()).unwrap_or(u32::MAX))
+                .saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
+            self.budget.charge_bytes(bytes)?;
             return Ok(StepResult::Continue(Control::Return(Value::Primitive {
                 module: Rc::from(module),
                 name: Rc::from(name),
@@ -63,6 +65,10 @@ impl<'a> Machine<'a, '_> {
                 args: Rc::from([]),
             })));
         }
+        let bytes = u32::try_from(module.len())
+            .unwrap_or(u32::MAX)
+            .saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
+        self.budget.charge_bytes(bytes)?;
         Ok(StepResult::Continue(Control::Return(Value::OpaqueGlobal {
             module: Rc::from(module),
             name: Rc::from(name),
@@ -76,16 +82,17 @@ impl<'a> Machine<'a, '_> {
         env: Env<'a>,
         dict_env: DictEnv<'a>,
     ) -> Result<StepResult<'a>, StopReason> {
+        let vec_bytes = u32::try_from(dicts.len())
+            .unwrap_or(u32::MAX)
+            .saturating_mul(SLOT_BYTES);
+        self.budget.charge_bytes(vec_bytes)?;
         let mut resolved = Vec::with_capacity(dicts.len());
         for d in dicts {
             resolved.push(self.resolve_dict(d, &env, &dict_env, 0)?);
         }
         match &inner.kind {
             ExprKind::Con(ctor) if ctor.dicts == resolved.len() => {
-                let bytes = u32::try_from(resolved.len())
-                    .unwrap_or(u32::MAX)
-                    .saturating_mul(SLOT_BYTES);
-                self.budget.charge_bytes(bytes)?;
+                self.budget.charge_bytes(SLOT_BYTES)?;
                 Ok(StepResult::Continue(Control::Return(Value::Con {
                     ctor: Rc::new(ctor.clone()),
                     args: Rc::from([]),
@@ -96,6 +103,12 @@ impl<'a> Machine<'a, '_> {
                 if let Some((dict_params, body)) = self.defs.value(module, name)
                     && dict_params.len() == resolved.len()
                 {
+                    let mut param_bytes: u32 = 0;
+                    for param in dict_params {
+                        param_bytes = param_bytes
+                            .saturating_add(u32::try_from(param.len()).unwrap_or(u32::MAX));
+                    }
+                    self.budget.charge_bytes(param_bytes)?;
                     let mut next_dicts = DictEnv::default();
                     for (param, dict) in dict_params.iter().zip(resolved) {
                         next_dicts = next_dicts.with(Rc::from(param.as_str()), dict);
@@ -128,7 +141,10 @@ impl<'a> Machine<'a, '_> {
                     }));
                 }
                 if let Some(arity) = self.primitives.arity(module, name, self.lang) {
-                    self.budget.charge_bytes(CLOSURE_BYTES)?;
+                    let bytes = CLOSURE_BYTES
+                        .saturating_add(u32::try_from(module.len()).unwrap_or(u32::MAX))
+                        .saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
+                    self.budget.charge_bytes(bytes)?;
                     return Ok(StepResult::Continue(Control::Return(Value::Primitive {
                         module: Rc::from(module.as_str()),
                         name: Rc::from(name.as_str()),
@@ -182,12 +198,11 @@ impl<'a> Machine<'a, '_> {
             }
             DictValue::Super { dict: inner, class } => match *inner {
                 DictValue::Record(fields) => {
-                    let super_key = format!("${class}");
                     let scan_steps = u32::try_from(fields.len()).unwrap_or(u32::MAX);
                     self.budget.charge_steps(scan_steps)?;
                     let (_, val) = fields
                         .iter()
-                        .find(|(k, _)| &**k == super_key.as_str())
+                        .find(|(k, _)| k.strip_prefix('$') == Some(&*class))
                         .ok_or(StopReason::UnknownOp)?;
                     match val {
                         Value::Dict(super_dict) => {
@@ -204,7 +219,9 @@ impl<'a> Machine<'a, '_> {
                 args,
             } => {
                 if is_builtin_method(&module, &instance, args.is_empty(), method, self.lang) {
-                    self.budget.charge_bytes(CLOSURE_BYTES)?;
+                    let bytes = CLOSURE_BYTES
+                        .saturating_add(u32::try_from(method.len()).unwrap_or(u32::MAX));
+                    self.budget.charge_bytes(bytes)?;
                     return Ok(StepResult::Continue(Control::Return(Value::Method {
                         dict: DictValue::Instance {
                             module,
@@ -221,6 +238,14 @@ impl<'a> Machine<'a, '_> {
                 if matches!(body.kind, ExprKind::Abstract(..)) || context.len() != args.len() {
                     return Err(StopReason::UnknownOp);
                 }
+                let mut ctx_bytes = u32::try_from(context.len())
+                    .unwrap_or(u32::MAX)
+                    .saturating_mul(SLOT_BYTES);
+                for param in context {
+                    ctx_bytes =
+                        ctx_bytes.saturating_add(u32::try_from(param.len()).unwrap_or(u32::MAX));
+                }
+                self.budget.charge_bytes(ctx_bytes)?;
                 let mut next_dicts = DictEnv::default();
                 for (param, arg) in context.iter().zip(args.iter()) {
                     next_dicts = next_dicts.with(Rc::from(param.as_str()), arg.clone());
@@ -261,6 +286,15 @@ impl<'a> Machine<'a, '_> {
         self.budget.charge_steps(1)?;
         match dict {
             Dict::Instance { module, name, args } => {
+                let bytes = SLOT_BYTES
+                    .saturating_add(
+                        u32::try_from(args.len())
+                            .unwrap_or(u32::MAX)
+                            .saturating_mul(SLOT_BYTES),
+                    )
+                    .saturating_add(u32::try_from(module.len()).unwrap_or(u32::MAX))
+                    .saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
+                self.budget.charge_bytes(bytes)?;
                 let mut resolved_args = Vec::with_capacity(args.len());
                 for arg in args {
                     resolved_args.push(self.resolve_dict(arg, env, dict_env, depth + 1)?);
@@ -282,22 +316,37 @@ impl<'a> Machine<'a, '_> {
             },
             Dict::Super { dict: inner, class } => {
                 let resolved = self.resolve_dict(inner, env, dict_env, depth + 1)?;
-                if let Some(ir_inner) = resolved.to_ir_dict() {
-                    let super_ir = Dict::Super {
-                        dict: Box::new(ir_inner),
-                        class: class.clone(),
-                    };
-                    if let Some(Dict::Instance { module, name, args }) =
-                        specialize::known(&super_ir, self.lang)
-                        && args.is_empty()
-                    {
-                        return Ok(DictValue::Instance {
-                            module: Rc::from(module.as_str()),
-                            name: Rc::from(name.as_str()),
-                            args: Rc::from([]),
-                        });
-                    }
+                // Collapse superclass chains over known numeric instances without
+                // allocating intermediate IR dictionaries.
+                let mut cur = &resolved;
+                while let DictValue::Super { dict: nested, .. } = cur {
+                    self.budget.charge_steps(1)?;
+                    cur = nested;
                 }
+                if let DictValue::Instance { module, name, args } = cur
+                    && args.is_empty()
+                    && let Some((num_mod, _)) = self.lang.get(Lang::Numeric)
+                    && num_mod == &**module
+                    && let Some(num_suffix) = name.rsplit(' ').next()
+                {
+                    let class_short = class.rsplit('.').next().unwrap_or(class);
+                    let inst_len = u32::try_from(class_short.len())
+                        .unwrap_or(u32::MAX)
+                        .saturating_add(1)
+                        .saturating_add(u32::try_from(num_suffix.len()).unwrap_or(u32::MAX));
+                    let bytes = SLOT_BYTES
+                        .saturating_add(u32::try_from(num_mod.len()).unwrap_or(u32::MAX))
+                        .saturating_add(inst_len);
+                    self.budget.charge_bytes(bytes)?;
+                    return Ok(DictValue::Instance {
+                        module: Rc::from(num_mod),
+                        name: Rc::from(format!("{class_short} {num_suffix}")),
+                        args: Rc::from([]),
+                    });
+                }
+                let super_bytes =
+                    SLOT_BYTES.saturating_add(u32::try_from(class.len()).unwrap_or(u32::MAX));
+                self.budget.charge_bytes(super_bytes)?;
                 Ok(DictValue::Super {
                     dict: Box::new(resolved),
                     class: Rc::from(class.as_str()),

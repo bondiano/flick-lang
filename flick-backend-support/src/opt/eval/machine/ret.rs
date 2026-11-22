@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use flick_ir::{BinOp, Lang};
 
+use super::ops::fields_bytes;
 use super::{Control, Frame, Machine, StepResult};
 use crate::opt::eval::StopReason;
 use crate::opt::eval::pattern::{PatMatch, match_pat};
@@ -48,6 +49,12 @@ impl<'a> Machine<'a, '_> {
             Frame::AppReadyArg { arg_val } => self.apply(value, arg_val),
             Frame::ApplyDicts { dicts } => match value {
                 Value::Closure(closure) if closure.dict_params.len() == dicts.len() => {
+                    let mut param_bytes: u32 = 0;
+                    for param in closure.dict_params {
+                        param_bytes = param_bytes
+                            .saturating_add(u32::try_from(param.len()).unwrap_or(u32::MAX));
+                    }
+                    self.budget.charge_bytes(param_bytes)?;
                     let mut next_dicts = closure.dict_env.clone();
                     for (param, dict) in closure.dict_params.iter().zip(dicts.iter()) {
                         next_dicts = next_dicts.with(Rc::from(param.as_str()), dict.clone());
@@ -260,6 +267,7 @@ impl<'a> Machine<'a, '_> {
                 if fields.is_empty() {
                     return Ok(StepResult::Continue(Control::Return(Value::Record(base))));
                 }
+                self.budget.charge_bytes(fields_bytes(fields))?;
                 self.push_frame(Frame::UpdateFields {
                     base,
                     done: Vec::with_capacity(fields.len()),
@@ -298,11 +306,10 @@ impl<'a> Machine<'a, '_> {
                         dict_env,
                     }))
                 } else {
-                    let est_fields = base.len().saturating_add(done.len());
-                    let bytes = u32::try_from(est_fields)
+                    let base_bytes = u32::try_from(base.len())
                         .unwrap_or(u32::MAX)
                         .saturating_mul(FIELD_BYTES);
-                    self.budget.charge_bytes(bytes)?;
+                    self.budget.charge_bytes(base_bytes)?;
                     let scan_steps = u32::try_from(base.len().saturating_mul(done.len()))
                         .unwrap_or(u32::MAX)
                         / 4;

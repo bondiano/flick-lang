@@ -4,13 +4,17 @@ use std::rc::Rc;
 
 use flick_ir::{Lang, Num, Stage};
 
-use super::ops::value_to_const;
 use super::{Control, Frame, Machine, StepResult};
 use crate::Known;
 use crate::opt::eval::pattern::{PatMatch, match_pat};
-use crate::opt::eval::value::{CLOSURE_BYTES, Closure, DictValue, SLOT_BYTES, Value};
+use crate::opt::eval::value::{
+    CLOSURE_BYTES, Closure, DictValue, SLOT_BYTES, Value, bigint_byte_len,
+};
 use crate::opt::eval::{PrimitiveOutcome, StopReason};
 use crate::opt::{fold, specialize};
+
+/// Maximum UTF-8 byte length of any finite `f64` formatted by [`fold::js_number`].
+const MAX_JS_NUMBER_BYTES: u32 = 25;
 
 impl<'a> Machine<'a, '_> {
     #[allow(
@@ -168,28 +172,8 @@ impl<'a> Machine<'a, '_> {
                     .get(Lang::DisplayMethod)
                     .is_some_and(|(_, n)| n == &*name);
             if is_show || is_display {
-                let base_bytes = match &arg {
-                    Value::String(s) => {
-                        let n = u32::try_from(s.len()).unwrap_or(u32::MAX);
-                        self.budget.charge_steps(n / 16)?;
-                        n
-                    }
-                    _ => 0,
-                };
-                self.budget.charge_bytes(base_bytes)?;
-                let c = value_to_const(&arg)?;
-                let text = if is_show {
-                    fold::show(instance, c)
-                } else {
-                    fold::display(instance, c)
-                }
-                .ok_or(StopReason::UnknownOp)?;
-                let total_len = u32::try_from(text.len()).unwrap_or(u32::MAX);
-                self.budget
-                    .charge_bytes(total_len.saturating_sub(base_bytes))?;
-                return Ok(StepResult::Continue(Control::Return(Value::String(
-                    Rc::from(text),
-                ))));
+                let res = self.eval_show_display(instance, is_show, arg)?;
+                return Ok(StepResult::Continue(Control::Return(res)));
             }
         }
         // Built-in `Numeric` / `Integer` / `Floating` methods.
@@ -232,6 +216,95 @@ impl<'a> Machine<'a, '_> {
             }
         }
     }
+    #[allow(
+        clippy::float_cmp,
+        reason = "exact zero check for signed-zero JS formatting"
+    )]
+    fn eval_show_display(
+        &mut self,
+        instance: &str,
+        is_show: bool,
+        arg: Value<'a>,
+    ) -> Result<Value<'a>, StopReason> {
+        match (is_show, instance, arg) {
+            (false, "Display String", Value::String(s)) => Ok(Value::String(s)),
+            (true, "Show String", Value::String(s)) => {
+                let min_len = u32::try_from(s.len()).unwrap_or(u32::MAX).saturating_add(2);
+                if min_len > self.budget.bytes_remaining {
+                    return Err(StopReason::ConstructedBytes);
+                }
+                let scan_steps = u32::try_from(s.len()).unwrap_or(u32::MAX) / 16;
+                self.budget.charge_steps(scan_steps)?;
+                let escaped_len = json_string_len(&s);
+                self.budget.charge_bytes(escaped_len)?;
+                Ok(Value::String(Rc::from(fold::json_string(&s))))
+            }
+            (true, "Show Bool", Value::Bool(b)) | (false, "Display Bool", Value::Bool(b)) => {
+                let text = if b { "true" } else { "false" };
+                let len = u32::try_from(text.len()).unwrap_or(u32::MAX);
+                self.budget.charge_bytes(len)?;
+                Ok(Value::String(Rc::from(text)))
+            }
+            (true, "Show Int", Value::Int(n)) | (false, "Display Int", Value::Int(n)) => {
+                let len = bigint_byte_len(i128::from(n));
+                self.budget.charge_bytes(len)?;
+                Ok(Value::String(Rc::from(n.to_string())))
+            }
+            (true, "Show BigInt", Value::BigInt(n)) => {
+                let len = bigint_byte_len(n).saturating_add(1);
+                self.budget.charge_bytes(len)?;
+                Ok(Value::String(Rc::from(format!("{n}n"))))
+            }
+            (true, "Show Float", Value::Float(x)) | (false, "Display Float", Value::Float(x)) => {
+                let special = if x.is_nan() {
+                    Some("NaN")
+                } else if x.is_infinite() {
+                    Some(if x.is_sign_negative() {
+                        "-Infinity"
+                    } else {
+                        "Infinity"
+                    })
+                } else if x == 0.0 {
+                    Some(if x.is_sign_negative() { "-0" } else { "0" })
+                } else {
+                    None
+                };
+                if let Some(text) = special {
+                    let len = u32::try_from(text.len()).unwrap_or(u32::MAX);
+                    self.budget.charge_bytes(len)?;
+                    return Ok(Value::String(Rc::from(text)));
+                }
+                // Charge worst-case formatted byte length before calling `js_number`.
+                self.budget.charge_bytes(MAX_JS_NUMBER_BYTES)?;
+                let text = fold::js_number(x);
+                let actual = u32::try_from(text.len()).unwrap_or(u32::MAX);
+                if actual < MAX_JS_NUMBER_BYTES {
+                    self.budget.bytes_remaining = self
+                        .budget
+                        .bytes_remaining
+                        .saturating_add(MAX_JS_NUMBER_BYTES - actual);
+                } else if actual > MAX_JS_NUMBER_BYTES {
+                    self.budget.charge_bytes(actual - MAX_JS_NUMBER_BYTES)?;
+                }
+                Ok(Value::String(Rc::from(text)))
+            }
+            _ => Err(StopReason::UnknownOp),
+        }
+    }
+}
+
+/// Computes the exact UTF-8 byte length of [`fold::json_string`] without allocating.
+fn json_string_len(s: &str) -> u32 {
+    let mut len: u32 = 2;
+    for c in s.chars() {
+        let add = match c {
+            '"' | '\\' | '\u{8}' | '\u{c}' | '\n' | '\r' | '\t' => 2,
+            c if c < ' ' => 6,
+            c => u32::try_from(c.len_utf8()).unwrap_or(4),
+        };
+        len = len.saturating_add(add);
+    }
+    len
 }
 
 pub(super) fn is_builtin_method(

@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use flick_ir::{Arm, Expr, ExprKind, Param, Stmt};
+use flick_ir::{Arm, Expr, ExprKind, Stmt};
 
 use super::{Control, Frame, Machine, StepResult};
 use crate::opt::eval::StopReason;
@@ -77,7 +77,9 @@ impl<'a> Machine<'a, '_> {
                         dict_env,
                     }))
                 } else {
-                    self.budget.charge_bytes(CLOSURE_BYTES)?;
+                    let bytes =
+                        CLOSURE_BYTES.saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
+                    self.budget.charge_bytes(bytes)?;
                     let closure = Value::Closure(Rc::new(Closure {
                         env: env.clone(),
                         dict_env: dict_env.clone(),
@@ -97,31 +99,46 @@ impl<'a> Machine<'a, '_> {
                 }
             }
             Stmt::Fun { rec: true, .. } => {
+                // First pass (zero allocation): charge per-member step + bytes
+                // and validate every sibling before allocating `defs` / `RecGroup`.
                 let mut end = index;
-                let mut defs = Vec::new();
                 while let Some(Stmt::Fun {
                     name,
                     rec: true,
-                    dicts,
                     value,
+                    ..
                 }) = stmts.get(end)
                 {
-                    let (params, body): (&'a [Param], &'a Expr) = match &value.kind {
-                        ExprKind::Lambda { params, body } => (params.as_slice(), body.as_ref()),
-                        _ => return Err(StopReason::UnsafeContext),
+                    self.budget.charge_steps(1)?;
+                    if !matches!(value.kind, ExprKind::Lambda { .. }) {
+                        return Err(StopReason::UnsafeContext);
+                    }
+                    let bytes =
+                        CLOSURE_BYTES.saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
+                    self.budget.charge_bytes(bytes)?;
+                    end += 1;
+                }
+                let mut defs = Vec::with_capacity(end - index);
+                for stmt in &stmts[index..end] {
+                    let Stmt::Fun {
+                        name,
+                        rec: true,
+                        dicts,
+                        value,
+                    } = stmt
+                    else {
+                        return Err(StopReason::UnsafeContext);
+                    };
+                    let ExprKind::Lambda { params, body } = &value.kind else {
+                        return Err(StopReason::UnsafeContext);
                     };
                     defs.push(RecFun {
                         name: Rc::from(name.as_str()),
                         dict_params: dicts.as_slice(),
-                        params,
-                        body,
+                        params: params.as_slice(),
+                        body: body.as_ref(),
                     });
-                    end += 1;
                 }
-                let bytes = u32::try_from(defs.len())
-                    .unwrap_or(u32::MAX)
-                    .saturating_mul(CLOSURE_BYTES);
-                self.budget.charge_bytes(bytes)?;
                 let group = Rc::new(RecGroup {
                     env: env.clone(),
                     dict_env: dict_env.clone(),

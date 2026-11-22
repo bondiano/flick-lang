@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 use flick_ir::{Constructor, Expr, ExprKind, Lang, Lit, Pat, Span, Stage, Stmt};
 
-use super::value::{FIELD_BYTES, SLOT_BYTES, Value};
+use super::value::{FIELD_BYTES, SLOT_BYTES, Value, bigint_byte_len};
 use super::{EvalConfig, StopReason};
 use crate::Known;
 
@@ -155,12 +155,18 @@ pub fn materialize(
                     ready = Some(Expr::new(ExprKind::Lit(Lit::String(s.to_string())), span));
                 }
                 Value::Utf16(units) => {
-                    // Validate UTF-16 -> UTF-8 before charging residual growth so
-                    // lone surrogates always report `Unmaterializable`.
+                    // Validate UTF-16 and sum exact UTF-8 byte length without
+                    // allocating, preserving `Unmaterializable` for lone surrogates
+                    // while enforcing `max_nodes`/`max_bytes` before allocation.
+                    let mut utf8_len: u32 = 0;
+                    for decoded_char in char::decode_utf16(units.iter().copied()) {
+                        let ch = decoded_char.map_err(|_| StopReason::Unmaterializable)?;
+                        utf8_len =
+                            utf8_len.saturating_add(u32::try_from(ch.len_utf8()).unwrap_or(4));
+                    }
+                    charge(&mut nodes, &mut bytes, 1, utf8_len)?;
                     let decoded =
                         String::from_utf16(units).map_err(|_| StopReason::Unmaterializable)?;
-                    let len = u32::try_from(decoded.len()).unwrap_or(u32::MAX);
-                    charge(&mut nodes, &mut bytes, 1, len)?;
                     ready = Some(Expr::new(ExprKind::Lit(Lit::String(decoded)), span));
                 }
                 Value::Tuple(items) => {
@@ -353,21 +359,6 @@ pub fn materialize(
             }
         }
     }
-}
-
-/// Estimates decimal string length of an `i128` without allocating.
-fn bigint_byte_len(n: i128) -> u32 {
-    if n == 0 {
-        return 1;
-    }
-    let sign = u32::from(n < 0);
-    let mut mag = n.unsigned_abs();
-    let mut digits = 0_u32;
-    while mag > 0 {
-        mag /= 10;
-        digits += 1;
-    }
-    sign + digits
 }
 
 /// Cost summary of an existing IR expression, computed iteratively (no host recursion).

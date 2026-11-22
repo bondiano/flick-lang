@@ -3,7 +3,7 @@
 
 use std::rc::Rc;
 
-use flick_ir::{Constructor, Dict, Expr, Param};
+use flick_ir::{Constructor, Expr, Param};
 
 use super::{EvalBudget, StopReason};
 use crate::numeric;
@@ -114,31 +114,6 @@ pub enum DictValue<'a> {
     },
     /// Explicitly constructed dictionary record (`ExprKind::Dictionary`).
     Record(Rc<[(Rc<str>, Value<'a>)]>),
-}
-
-impl DictValue<'_> {
-    /// Converts a resolved instance/super dictionary back to a portable IR [`Dict`],
-    /// when representable as one (not an explicit runtime record).
-    pub(super) fn to_ir_dict(&self) -> Option<Dict> {
-        match self {
-            DictValue::Instance { module, name, args } => {
-                let mut out = Vec::with_capacity(args.len());
-                for arg in args.iter() {
-                    out.push(arg.to_ir_dict()?);
-                }
-                Some(Dict::Instance {
-                    module: module.to_string(),
-                    name: name.to_string(),
-                    args: out,
-                })
-            }
-            DictValue::Super { dict, class } => Some(Dict::Super {
-                dict: Box::new(dict.to_ir_dict()?),
-                class: class.to_string(),
-            }),
-            DictValue::Record(_) => None,
-        }
-    }
 }
 
 /// Immutable persistent lexical environment mapping local names to values
@@ -277,4 +252,19 @@ pub(super) fn bigint_value(digits: &str) -> Option<i128> {
     } else {
         numeric::bigint_digits_value(digits)
     }
+}
+
+/// Computes exact decimal string byte length of an `i128` without allocating.
+pub(super) fn bigint_byte_len(n: i128) -> u32 {
+    if n == 0 {
+        return 1;
+    }
+    let sign = u32::from(n < 0);
+    let mut mag = n.unsigned_abs();
+    let mut digits = 0_u32;
+    while mag > 0 {
+        mag /= 10;
+        digits += 1;
+    }
+    sign + digits
 }

@@ -82,8 +82,9 @@ pub(super) fn value_eq<'a>(
                 if xs.len() != ys.len() {
                     return Ok(false);
                 }
-                let scan_steps = u32::try_from(xs.len()).unwrap_or(u32::MAX);
-                budget.charge_steps(scan_steps)?;
+                let linear = u32::try_from(xs.len()).unwrap_or(u32::MAX);
+                let quad = u32::try_from(xs.len().saturating_mul(ys.len())).unwrap_or(u32::MAX) / 4;
+                budget.charge_steps(linear.max(quad))?;
                 for (kx, vx) in xs.iter().rev() {
                     let Some((_, vy)) = ys.iter().find(|(ky, _)| ky == kx) else {
                         return Ok(false);
@@ -355,6 +356,8 @@ pub(super) fn match_pat<'a>(
                 if choice.next_alt < choice.alts.len() {
                     let alt = &choice.alts[choice.next_alt];
                     let val = choice.value.clone();
+                    let restore_steps = u32::try_from(choice.saved_work.len()).unwrap_or(u32::MAX);
+                    budget.charge_steps(restore_steps)?;
                     work.clone_from(&choice.saved_work);
                     budget.check_depth(work.len() + choices.len())?;
                     work.push((alt, val));

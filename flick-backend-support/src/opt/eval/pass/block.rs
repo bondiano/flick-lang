@@ -5,7 +5,7 @@ use std::rc::Rc;
 use flick_ir::{Expr, ExprKind, Pat, Stmt};
 
 use super::{EvalAttempt, Hint, PassCtx};
-use crate::opt::eval::value::{Closure, DictEnv, Env, RecFun, RecGroup, Value};
+use crate::opt::eval::value::{CLOSURE_BYTES, Closure, DictEnv, Env, RecFun, RecGroup, Value};
 
 impl<'a> PassCtx<'a, '_> {
     /// Walks a `Block(stmts, result)`, propagating known pure `let` and `Fun`
@@ -50,7 +50,7 @@ impl<'a> PassCtx<'a, '_> {
                         }
                     }
                     let group_ref: &[Stmt] = &*group;
-                    if let Some(next_env) = bind_rec_group(group_ref, &env) {
+                    if let Some(next_env) = self.bind_rec_group_in_env(group_ref, &env) {
                         env = next_env;
                     } else {
                         for stmt in group_ref {
@@ -110,15 +110,14 @@ impl<'a> PassCtx<'a, '_> {
                         value,
                     } => {
                         if !dicts.is_empty() {
-                            let closure = Value::Closure(Rc::new(Closure {
-                                env: env.clone(),
-                                dict_env: DictEnv::default(),
-                                dict_params: dicts.as_slice(),
-                                params: &[],
-                                body: value,
-                                rec_group: None,
-                            }));
-                            env = env.with(Rc::from(name.as_str()), closure);
+                            if let Some(next_env) =
+                                self.bind_poly_fun_in_env(name, dicts, value, &env)
+                            {
+                                env = next_env;
+                            } else {
+                                env = env.shadow(Rc::from(name.as_str()));
+                                all_concrete = false;
+                            }
                         } else if stmt_hint == Hint::Concrete
                             && let Some(val) = self.eval_for_env(value, &env)
                         {
@@ -147,6 +146,97 @@ impl<'a> PassCtx<'a, '_> {
             };
         }
         Hint::NonConcrete
+    }
+    fn bind_poly_fun_in_env<'e>(
+        &mut self,
+        name: &str,
+        dicts: &'e [String],
+        value: &'e Expr,
+        env: &Env<'e>,
+    ) -> Option<Env<'e>>
+    where
+        'a: 'e,
+    {
+        let mut budget = self.new_trial_budget()?;
+        let bytes = CLOSURE_BYTES.saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
+        let ok = budget
+            .charge_steps(1)
+            .and_then(|()| budget.charge_bytes(bytes))
+            .is_ok();
+        *self.module_steps_remaining = budget.module_steps_remaining;
+        if !ok {
+            return None;
+        }
+        let closure = Value::Closure(Rc::new(Closure {
+            env: env.clone(),
+            dict_env: DictEnv::default(),
+            dict_params: dicts,
+            params: &[],
+            body: value,
+            rec_group: None,
+        }));
+        Some(env.with(Rc::from(name), closure))
+    }
+
+    fn bind_rec_group_in_env<'e>(&mut self, group: &'e [Stmt], env: &Env<'e>) -> Option<Env<'e>>
+    where
+        'a: 'e,
+    {
+        let mut budget = self.new_trial_budget()?;
+        // First pass (zero allocation): charge per-member step + bytes and validate.
+        let mut ok = true;
+        for stmt in group {
+            let Stmt::Fun {
+                name,
+                rec: true,
+                value,
+                ..
+            } = stmt
+            else {
+                ok = false;
+                break;
+            };
+            if !matches!(value.kind, ExprKind::Lambda { .. }) {
+                ok = false;
+                break;
+            }
+            let bytes = CLOSURE_BYTES.saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
+            if budget.charge_steps(1).is_err() || budget.charge_bytes(bytes).is_err() {
+                ok = false;
+                break;
+            }
+        }
+        *self.module_steps_remaining = budget.module_steps_remaining;
+        if !ok {
+            return None;
+        }
+        let mut defs = Vec::with_capacity(group.len());
+        for stmt in group {
+            let Stmt::Fun {
+                name,
+                rec: true,
+                dicts,
+                value,
+            } = stmt
+            else {
+                return None;
+            };
+            let ExprKind::Lambda { params, body } = &value.kind else {
+                return None;
+            };
+            defs.push(RecFun {
+                name: Rc::from(name.as_str()),
+                dict_params: dicts.as_slice(),
+                params: params.as_slice(),
+                body: body.as_ref(),
+            });
+        }
+        let rec_group = Rc::new(RecGroup {
+            env: env.clone(),
+            dict_env: DictEnv::default(),
+            defs: Rc::from(defs),
+        });
+        Some(env.with_rec_group(&rec_group))
     }
 }
 
@@ -194,34 +284,4 @@ pub(super) fn shadow_pat(pat: &Pat, env: &mut Env<'_>) {
     for name in binders {
         *env = env.shadow(Rc::from(name));
     }
-}
-
-fn bind_rec_group<'e>(group: &'e [Stmt], env: &Env<'e>) -> Option<Env<'e>> {
-    let mut defs = Vec::with_capacity(group.len());
-    for stmt in group {
-        let Stmt::Fun {
-            name,
-            rec: true,
-            dicts,
-            value,
-        } = stmt
-        else {
-            return None;
-        };
-        let ExprKind::Lambda { params, body } = &value.kind else {
-            return None;
-        };
-        defs.push(RecFun {
-            name: Rc::from(name.as_str()),
-            dict_params: dicts.as_slice(),
-            params: params.as_slice(),
-            body: body.as_ref(),
-        });
-    }
-    let rec_group = Rc::new(RecGroup {
-        env: env.clone(),
-        dict_env: DictEnv::default(),
-        defs: Rc::from(defs),
-    });
-    Some(env.with_rec_group(&rec_group))
 }

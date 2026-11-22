@@ -18,7 +18,7 @@ use super::materialize::{
     MaterializeContext, MaterializeLimits, check_profitability, expr_cost, materialize,
 };
 use super::pattern::{PatMatch, match_pat};
-use super::value::{Closure, DictEnv, Env, Value, bigint_value};
+use super::value::{CLOSURE_BYTES, Closure, DictEnv, Env, SLOT_BYTES, Value, bigint_value};
 use super::{
     DefTable, EvalBudget, EvalConfig, EvalCounters, EvalOutcome, PrimitiveEval, StopReason,
     evaluate,
@@ -270,9 +270,9 @@ impl<'a> PassCtx<'a, '_> {
     {
         let val = self.eval_for_env(rhs, env)?;
         let mut budget = self.new_trial_budget()?;
-        let matched = match_pat(pat, val, &mut budget).ok()?;
+        let matched = match_pat(pat, val, &mut budget);
         *self.module_steps_remaining = budget.module_steps_remaining;
-        let PatMatch::Matched(binds) = matched else {
+        let PatMatch::Matched(binds) = matched.ok()? else {
             return None;
         };
         let mut next = env.clone();
@@ -286,35 +286,67 @@ impl<'a> PassCtx<'a, '_> {
     where
         'a: 'e,
     {
-        // Fast path for already-evaluated literals, locals, constructors, and lambdas.
-        match &expr.kind {
-            ExprKind::Lit(Lit::Unit) => return Some(Value::Unit),
-            ExprKind::Lit(Lit::Bool(b)) => return Some(Value::Bool(*b)),
-            ExprKind::Lit(Lit::Int(n)) => return Some(Value::Int(*n)),
-            ExprKind::Lit(Lit::Float(x)) => return Some(Value::Float(*x)),
-            ExprKind::Lit(Lit::BigInt(d)) => return bigint_value(d).map(Value::BigInt),
-            ExprKind::Lit(Lit::String(s)) => return Some(Value::String(Rc::from(s.as_str()))),
-            ExprKind::Local(name) => return env.peek(name).cloned(),
-            ExprKind::Con(ctor) => {
-                return Some(Value::Con {
-                    ctor: Rc::new(ctor.clone()),
-                    args: Rc::from([]),
-                    dicts: Rc::from([]),
-                });
-            }
-            ExprKind::Lambda { params, body } => {
-                return Some(Value::Closure(Rc::new(Closure {
-                    env: env.clone(),
-                    dict_env: DictEnv::default(),
-                    dict_params: &[],
-                    params: params.as_slice(),
-                    body: body.as_ref(),
-                    rec_group: None,
-                })));
-            }
-            _ => {}
-        }
         let mut budget = self.new_trial_budget()?;
+        // Fast path for already-evaluated literals, locals, constructors, and lambdas.
+        // Charge steps and constructed bytes before allocating any value into `Env`.
+        let fast = match &expr.kind {
+            ExprKind::Lit(Lit::Unit) => Some(budget.charge_steps(1).map(|()| Value::Unit)),
+            ExprKind::Lit(Lit::Bool(b)) => Some(budget.charge_steps(1).map(|()| Value::Bool(*b))),
+            ExprKind::Lit(Lit::Int(n)) => Some(budget.charge_steps(1).map(|()| Value::Int(*n))),
+            ExprKind::Lit(Lit::Float(x)) => Some(budget.charge_steps(1).map(|()| Value::Float(*x))),
+            ExprKind::Lit(Lit::BigInt(d)) => Some(
+                budget
+                    .charge_steps(1)
+                    .and_then(|()| budget.charge_bytes(16))
+                    .and_then(|()| bigint_value(d).ok_or(StopReason::UnknownOp))
+                    .map(Value::BigInt),
+            ),
+            ExprKind::Lit(Lit::String(s)) => {
+                let len = u32::try_from(s.len()).unwrap_or(u32::MAX);
+                Some(
+                    budget
+                        .charge_steps(1)
+                        .and_then(|()| budget.charge_bytes(len))
+                        .map(|()| Value::String(Rc::from(s.as_str()))),
+                )
+            }
+            ExprKind::Local(name) => Some(
+                budget
+                    .charge_steps(1)
+                    .and_then(|()| env.get(name, &mut budget))
+                    .and_then(|v| v.cloned().ok_or(StopReason::DynamicRead)),
+            ),
+            ExprKind::Con(ctor) => Some(
+                budget
+                    .charge_steps(1)
+                    .and_then(|()| budget.charge_bytes(SLOT_BYTES))
+                    .map(|()| Value::Con {
+                        ctor: Rc::new(ctor.clone()),
+                        args: Rc::from([]),
+                        dicts: Rc::from([]),
+                    }),
+            ),
+            ExprKind::Lambda { params, body } => Some(
+                budget
+                    .charge_steps(1)
+                    .and_then(|()| budget.charge_bytes(CLOSURE_BYTES))
+                    .map(|()| {
+                        Value::Closure(Rc::new(Closure {
+                            env: env.clone(),
+                            dict_env: DictEnv::default(),
+                            dict_params: &[],
+                            params: params.as_slice(),
+                            body: body.as_ref(),
+                            rec_group: None,
+                        }))
+                    }),
+            ),
+            _ => None,
+        };
+        if let Some(res) = fast {
+            *self.module_steps_remaining = budget.module_steps_remaining;
+            return res.ok();
+        }
         let outcome = evaluate(
             expr,
             self.defs,
@@ -331,7 +363,7 @@ impl<'a> PassCtx<'a, '_> {
         }
     }
 
-    fn new_trial_budget(&self) -> Option<EvalBudget> {
+    pub(super) fn new_trial_budget(&self) -> Option<EvalBudget> {
         if *self.module_steps_remaining == 0 {
             return None;
         }

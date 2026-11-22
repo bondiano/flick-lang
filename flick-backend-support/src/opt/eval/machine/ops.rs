@@ -99,6 +99,8 @@ impl<'a> Machine<'a, '_> {
             (Value::String(a), Value::String(b)) => {
                 let scan = u32::try_from(a.len().min(b.len()) / 16).unwrap_or(u32::MAX);
                 self.budget.charge_steps(scan)?;
+                let ord = a.encode_utf16().cmp(b.encode_utf16());
+                return Ok(Value::Bool(order_matches(token, ord)?));
             }
             (Value::Utf16(a), Value::Utf16(b)) => {
                 let scan = u32::try_from(a.len().min(b.len()) / 8).unwrap_or(u32::MAX);
@@ -237,12 +239,11 @@ impl<'a> Machine<'a, '_> {
     }
 }
 
-pub(super) fn value_to_const(value: &Value<'_>) -> Result<Const, StopReason> {
+fn value_to_const(value: &Value<'_>) -> Result<Const, StopReason> {
     match value {
         Value::Int(n) => Ok(Const::Number(f64::from(*n))),
         Value::Float(x) => Ok(Const::Number(*x)),
         Value::BigInt(n) => Ok(Const::BigInt(*n)),
-        Value::String(s) => Ok(Const::String(s.to_string())),
         Value::Bool(b) => Ok(Const::Bool(*b)),
         _ => Err(StopReason::UnknownOp),
     }
