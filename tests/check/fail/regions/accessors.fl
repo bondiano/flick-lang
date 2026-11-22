@@ -1,0 +1,83 @@
+// An accessor reads a field as `value.field` does: a field that holds a
+// region carries it out of the accessor, in every form of the call.
+module App.Accessors exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+free : a^{} -> Unit
+let free _ = ()
+
+field : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
+let field path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { read = fun () -> FileSystem.read_all file }
+  h.read
+//^^^^^^ FLICK-G002 this uses region `s`
+}
+
+applied : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
+let applied path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { read = fun () -> FileSystem.read_all file }
+  .read h
+//^^^^^^^ FLICK-G002 this uses region `s`
+}
+
+piped : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
+let piped path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { read = fun () -> FileSystem.read_all file }
+  h |> .read
+//^^^^^^^^^^ FLICK-G002 this uses region `s`
+}
+
+named : Path ->{FileSystem; OpenError} (Unit ->{FileSystem; ReadError} String)
+let named path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { read = fun () -> FileSystem.read_all file }
+  let get = .read
+  get h
+//^^^^^ FLICK-G002 this uses region `s`
+}
+
+mapped : Path ->{FileSystem; OpenError} List (Unit ->{FileSystem; ReadError} String)
+let mapped path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { read = fun () -> FileSystem.read_all file }
+  List.map .read [h]
+//^^^^^^^^^^^^^^^^^^ FLICK-G002 this uses region `s`
+}
+
+held_field : Path ->{FileSystem; OpenError} Unit
+let held_field path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { file = file }
+  free h.file
+//     ^^^^^^ FLICK-G001 this value holds region `s`
+}
+
+held_applied : Path ->{FileSystem; OpenError} Unit
+let held_applied path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { file = file }
+  free (.file h)
+//      ^^^^^^^ FLICK-G001 this value holds region `s`
+}
+
+held_piped : Path ->{FileSystem; OpenError} Unit
+let held_piped path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { file = file }
+  free (h |> .file)
+//      ^^^^^^^^^^ FLICK-G001 this value holds region `s`
+}
