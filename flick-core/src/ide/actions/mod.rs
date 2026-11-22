@@ -5,6 +5,7 @@
 mod catch_try;
 mod extract;
 mod import_class;
+mod let_else;
 mod match_on;
 mod orelse;
 mod qualify;
@@ -31,6 +32,7 @@ impl Ide<'_> {
         out.extend(self.add_signature(file, start));
         out.extend(self.infer_todo_signature(file, start));
         out.extend(self.import_class(file, start));
+        out.extend(self.let_else_actions(file, start));
         out.extend(self.match_on(file, start));
         out.extend(self.expand_orelse(file, start));
         out.extend(self.fold_match_to_orelse(file, start));

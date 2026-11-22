@@ -7,6 +7,7 @@ use flick_test_support::files as fixture_files;
 
 mod decl;
 mod layout;
+mod let_else;
 mod orelse;
 mod plugins;
 

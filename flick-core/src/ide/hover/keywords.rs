@@ -67,6 +67,19 @@ impl Ide<'_> {
             K::MatchKw => ("match … with", "The value of the arm that matches."),
             K::IfKw => ("if … then … else …", "The value of the branch taken."),
             K::FunKw => ("fun … -> …", "An anonymous function."),
+            K::LetKw if parent.kind == K::LetDecl && parent.has_token(K::ElseKw) => (
+                "let … = … else …",
+                "Binds the pattern for the remainder of the current block; if the pattern \
+                 does not match, the `else` fallback becomes the result of the current \
+                 block and skips the remaining statements. Pattern bindings are monomorphic \
+                 (as in `match`) and only in scope after `else`.",
+            ),
+            K::ElseKw if parent.kind == K::LetDecl => (
+                "let … = … else …",
+                "If the pattern does not match, this fallback value becomes the result of \
+                 the current block, skipping the remaining statements. Pattern bindings are \
+                 monomorphic (as in `match`) and only in scope after `else`.",
+            ),
             K::AwaitKw => {
                 let ran = match ty.spine() {
                     (h, args) if h.is_lang(Lang::Eff) && args.len() == 3 => show_type(args[2]),

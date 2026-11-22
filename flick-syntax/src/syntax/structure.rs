@@ -105,6 +105,7 @@ pub fn branches(node: &Node) -> u32 {
         for child in node.nodes().filter(|c| !is_function(c)) {
             total += match child.kind {
                 K::IfExpr | K::Guard | K::GuardStmt => 1,
+                K::LetDecl if child.has_token(K::ElseKw) => 1,
                 K::MatchExpr if is_lookup(child) => 0,
                 K::MatchExpr => {
                     u32::try_from(child.nodes().filter(|a| a.kind == K::MatchArm).count())

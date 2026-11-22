@@ -60,6 +60,7 @@ codegen/do_notation
 codegen/applicative_do
 codegen/classes
 codegen/repeated_superclass
+codegen/let_else
 codegen/let_mut
 runtime/abort_closes_scopes
 runtime/discontinued_body

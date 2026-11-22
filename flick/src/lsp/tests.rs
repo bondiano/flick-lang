@@ -320,6 +320,7 @@ fn a_dotted_completion_waits_for_the_background_analysis_and_reads_its_snapshot(
     );
 }
 
+mod let_else;
 mod orelse;
 
 #[test]

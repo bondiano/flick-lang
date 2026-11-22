@@ -1,0 +1,164 @@
+// `let pattern = initializer else fallback`: single initializer evaluation,
+// nearest-block completion, shadowing, `let mut` persistence, loops,
+// `try`/`Fail.fail`, `scope` cleanup, GADTs with held dictionaries, and
+// equivalence with canonical `match`.
+module App.Main exposing (main)
+
+import Numeric exposing (Numeric)
+
+type error Boom = Boom String
+
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+  | Numeric a => Add a a : Expr a
+
+type Showable =
+  | Show b => Showable b : Showable
+
+/// Pure chained validation.
+build_user : Option String -> Option Int -> Result String String
+let build_user raw_name raw_age =
+  let Some name = raw_name else Err "missing name"
+  let Some age = raw_age else Err "missing age"
+  Ok "\{name}:\{age}"
+
+/// Canonical `match` form for differential checking.
+build_user_match : Option String -> Option Int -> Result String String
+let build_user_match raw_name raw_age =
+  match raw_name with
+  | Some name ->
+    match raw_age with
+    | Some age -> Ok "\{name}:\{age}"
+    | _ -> Err "missing age"
+  | _ -> Err "missing name"
+
+/// Single initializer evaluation and short-circuiting.
+counted : Option Int -> (Int, Int)
+let counted opt =
+  let mut calls = 0
+  let mut rem_runs = 0
+  let mut fb_runs = 0
+  let value =
+    let Some n =
+      calls = calls + 1
+      opt
+    else
+      fb_runs = fb_runs + 1
+      -1
+    rem_runs = rem_runs + 1
+    n * 10
+  (value, calls * 100 + rem_runs * 10 + fb_runs)
+
+/// Nested initializer: inner `let-else` only completes the inner block.
+greet : Option String -> String
+let greet raw_name =
+  let name =
+    let Some s = raw_name else "guest"
+    s ++ "!"
+  "hi " ++ name
+
+/// Shadowing: outer name in initializer and fallback; inner name in remainder.
+shadow : String -> Option String -> String
+let shadow x opt =
+  let Some x = (if x == "use_opt" then opt else Some (x ++ "_init")) else
+    let local_note = "fb:" ++ x
+    local_note
+  "ok:" ++ x
+
+/// `let mut` mutations before and inside initializer persist without rollback.
+mut_no_rollback : Option Int -> (Int, Int)
+let mut_no_rollback opt =
+  let mut counter = 1
+  let res =
+    counter = counter + 1
+    let Some n =
+      counter = counter + 10
+      opt
+    else
+      counter = counter + 100
+      0
+    counter = counter + 1000
+    n
+  (res, counter)
+
+/// Loops: `continue` and `break` inside `let-else` fallback.
+sum_until_neg : List (Option Int) -> Int
+let sum_until_neg xs =
+  let mut total = 0
+  for item <- xs do {
+    let Some n = item else continue
+    if n < 0 then break
+    total = total + n
+  }
+  total
+
+/// `try` / `Fail.fail`: initializer failure propagates and does NOT run fallback.
+init_fails : Bool ->{} String
+let init_fails should_fail =
+  let mut fb_ran = false
+  let res =
+    try
+      let Some n =
+        if should_fail then Fail.fail (Boom "init") else (None : Option Int)
+      else
+        fb_ran = true
+        "fallback"
+      "ok:\{n}"
+    with
+    | Boom msg -> "caught:\{msg}"
+  "\{res}:fb=\{fb_ran}"
+
+/// `scope` finalizer runs on early `let-else` fallback.
+log : String -> Eff none none Unit
+let log line = task { Host.raw_stdout_line line }
+
+scoped_fallback : Option String ->{} String
+let scoped_fallback opt = scope {
+  Scope.add_finalizer (log "scope:closed")
+  let Some label = opt else "scope:fb"
+  "scope:ok:" ++ label
+}
+
+/// GADT refinement and held class dictionaries.
+eval_add : Expr a -> a -> a
+let eval_add e fallback =
+  let Add x y = e else fallback
+  x + y
+
+show_head : List Showable -> String
+let show_head xs =
+  let [Showable x, ..._] = xs else "empty"
+  show x
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let pairs = [
+    (Some "ada", Some 36),
+    (None, Some 36),
+    (Some "ada", None),
+    (None, None),
+  ]
+  for (n, a) <- pairs do {
+    let r1 = build_user n a
+    let r2 = build_user_match n a
+    Platform.stdout_line "\{show r1} eq=\{r1 == r2}"
+  }
+  Platform.stdout_line (show (counted (Some 4)))
+  Platform.stdout_line (show (counted None))
+  Platform.stdout_line (greet (Some "world"))
+  Platform.stdout_line (greet None)
+  Platform.stdout_line (shadow "use_opt" (Some "new"))
+  Platform.stdout_line (shadow "use_opt" None)
+  Platform.stdout_line (shadow "outer" None)
+  Platform.stdout_line (show (mut_no_rollback (Some 7)))
+  Platform.stdout_line (show (mut_no_rollback None))
+  Platform.stdout_line (show (sum_until_neg [Some 2, None, Some 5, Some (-1), Some 99]))
+  Platform.stdout_line (init_fails true)
+  Platform.stdout_line (init_fails false)
+  Platform.stdout_line (scoped_fallback None)
+  Platform.stdout_line (scoped_fallback (Some "yes"))
+  Platform.stdout_line (show (eval_add (Add 3 4) 0))
+  Platform.stdout_line (show (eval_add (IntLit 9) (-1)))
+  Platform.stdout_line (show_head [Showable 42])
+  Platform.stdout_line (show_head [])

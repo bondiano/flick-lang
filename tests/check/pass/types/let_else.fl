@@ -1,0 +1,143 @@
+// `let pattern = initializer else fallback` over the remainder of the nearest
+// ordinary statement block: pure validation, nested initializers, shadowing,
+// GADTs and held dictionaries, open error rows, `let mut`, loops, `try`,
+// and `scope`.
+module App.LetElse exposing (..)
+
+import Numeric exposing (Numeric)
+
+type Choice = Left Int | Right Int | Neither
+
+type error BadInput = BadInput String
+
+type error NotFound = NotFound String
+
+type File (s : Region)
+
+service Files =
+  open : forall s. String ->{Scope s} File s
+  read : forall s. File s ->{} String
+
+/// Pure chained validation with statements before remaining outside.
+build_user : Option String -> Option Int -> Result String { name : String; age : Int }
+let build_user raw_name raw_age =
+  let prefix = "user:"
+  let Some name = raw_name else Err "missing name"
+  let Some age = raw_age else Err "missing age"
+  Ok { name = prefix ++ name; age = age }
+
+/// Inner `let-else` only completes its initializer block; the outer block continues.
+greet : Option String -> String
+let greet raw_name =
+  let name =
+    let Some s = raw_name else "guest"
+    String.trim s
+  "hello " ++ name
+
+/// Outer binding stays visible in initializer and fallback; inner binding is only
+/// in scope in the success remainder; fallback locals do not escape.
+shadowing : String -> Option String -> String
+let shadowing x opt =
+  let Some x = (if x == "" then opt else Some x) else
+    let note = "outer:" ++ x
+    note
+  "inner:" ++ x
+
+/// Pattern forms: list with rest, or-pattern, record pattern, tuple pattern,
+/// and record literal directly after `else`.
+patterns : List Int -> Choice -> { tag : String; n : Int } -> { value : Int }
+let patterns xs e entry =
+  let [head, ...tail] = xs else { value = 0 }
+  let (Left k | Right k) = e else { value = head }
+  let { tag = "ok"; n } = entry else { value = head + k }
+  let (a, b) = (n, List.length tail)
+  { value = head + k + a + b }
+
+/// GADT refinement and held class dictionary available only in the success remainder.
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+  | Numeric a => Add a a : Expr a
+
+eval_int : Expr Int -> Int
+let eval_int e =
+  let IntLit n = e else 0
+  n + 1
+
+eval_add : Expr a -> a -> a
+let eval_add e fallback =
+  let Add x y = e else fallback
+  x + y
+
+type Showable =
+  | Show b => Showable b : Showable
+
+show_first : List Showable -> String
+let show_first xs =
+  let [Showable x, ..._] = xs else "none"
+  show x
+
+type Ty a =
+  | TInt : Ty Int
+  | TStr : Ty String
+
+refine_tag : Ty a -> a -> Int
+let refine_tag ty x =
+  let TInt = ty else 0
+  x + 1
+
+/// Open error rows (`Errors e`) can be matched with `let-else`.
+recover_not_found : Errors {NotFound | e} -> Option String
+let recover_not_found err =
+  let NotFound key = err else None
+  Some key
+
+/// `let mut` mutations before and inside the initializer persist into the fallback.
+with_mut : List (Option Int) -> (Int, Int)
+let with_mut items =
+  let mut steps = 0
+  let first =
+    let Some x =
+      steps = steps + 1
+      match items with
+      | [Some n, ..._] -> Some n
+      | _ -> None
+    else
+      steps = steps + 10
+      -1
+    steps = steps + 100
+    x
+  (first, steps)
+
+/// `break`/`continue` target the enclosing loop.
+with_loops : List (Option Int) -> Int
+let with_loops xs =
+  let mut sum = 0
+  for item <- xs do {
+    let Some n = item else continue
+    if n < 0 then break
+    sum = sum + n
+  }
+  loop {
+    let Some (Some n) = List.head xs else break sum
+    break (sum + n)
+  }
+
+/// `try` / `Fail.fail` and `scope` pass cleanly through `let-else`.
+with_try : Option Int ->{; BadInput} Int
+let with_try opt =
+  try
+    let Some n =
+      if opt == None then Fail.fail (BadInput "empty") else opt
+    else
+      -1
+    n * 2
+  with
+  | BadInput _ -> 99
+
+with_scope : Option String ->{Files} String
+let with_scope maybe_path = scope {
+  let Some path = maybe_path else "no file"
+  let file = Files.open path
+  Files.read file
+}

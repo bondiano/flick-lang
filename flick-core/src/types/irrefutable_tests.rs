@@ -122,3 +122,50 @@ fn no_match_fix_without_a_rest_of_the_block() {
         "{fixes:?}"
     );
 }
+
+#[test]
+fn irrefutable_let_else_warns_without_safe_fix_and_stays_monomorphic() {
+    let text =
+        format!("{HEAD}f : (Int, Int) -> Int\nlet f pair =\n  let (a, b) = pair else 0\n  a + b\n");
+    let diagnostics = check(&text);
+    let warning = diagnostics
+        .iter()
+        .find(|d| d.code == codes::T010 && d.severity == Severity::Warning)
+        .unwrap_or_else(|| panic!("expected T010 warning, got {diagnostics:?}"));
+    assert!(
+        warning.fixes.iter().all(|fix| !fix.safe),
+        "irrefutable let-else must never attach a safe auto-fix: {:?}",
+        warning.fixes
+    );
+    // Even an irrefutable single-variable `let-else` remains monomorphic (like `match`).
+    let poly = format!(
+        "{HEAD}f : Unit -> (Int, String)\nlet f () =\n  let id = fun x -> x else (0, \"\")\n  (id 1, id \"a\")\n"
+    );
+    let poly_diags = check(&poly);
+    assert!(
+        poly_diags
+            .iter()
+            .any(|d| d.code == codes::T003 && d.severity == Severity::Error),
+        "expected monomorphic T003 on irrefutable single-var let-else, got {poly_diags:?}"
+    );
+    // Refutable ordinary `let` also must not claim a safe auto-fix to `let-else`.
+    let refutable = format!("{HEAD}f : Option Int -> Int\nlet f m =\n  let Some n = m\n  n\n");
+    let ref_diags = check(&refutable);
+    assert!(
+        ref_diags
+            .iter()
+            .filter(|d| d.code == codes::T009)
+            .flat_map(|d| &d.fixes)
+            .all(|fix| !fix.safe),
+        "refutable let must not have a safe fix-all: {ref_diags:?}"
+    );
+    // `?` inside `let-else` initializer, fallback, and remainder targets the enclosing Option function.
+    let question = format!(
+        "{HEAD}f : Option (Option Int) -> Option Int -> Option Int\nlet f m backup =\n  let Some inner = m else Some (backup? + 1)\n  let Some n = Some inner? else None\n  Some (n + 1)\n"
+    );
+    let q_diags = check(&question);
+    assert!(
+        q_diags.is_empty(),
+        "expected `?` in let-else to typecheck cleanly, got {q_diags:?}"
+    );
+}

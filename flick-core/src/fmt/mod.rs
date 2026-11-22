@@ -82,6 +82,7 @@ mod decl;
 mod expr;
 pub(crate) mod foralls;
 mod handlers;
+mod let_else;
 mod lines;
 mod plugins;
 mod printer;

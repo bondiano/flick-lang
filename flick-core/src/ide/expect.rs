@@ -342,7 +342,7 @@ fn around(m: &Analyzed, path: &[&Node], text: &str) -> (Vec<Type>, bool) {
             .is_some_and(|n| n.range() == child.range());
         match node.kind {
             K::ParenExpr => {}
-            K::Block if last => {}
+            K::Block if last || child.kind == K::LetDecl && child.has_token(K::ElseKw) => {}
             // a statement before the last one is dropped: only `Unit` may be,
             // but in `do` it runs through its monad
             K::Block if i < 2 || path[i - 2].kind != K::DoExpr => {
@@ -354,6 +354,11 @@ fn around(m: &Analyzed, path: &[&Node], text: &str) -> (Vec<Type>, bool) {
                     .count();
                 let head = node.nodes().next().unwrap_or(node);
                 return (argument(m, head, index), false);
+            }
+            K::LetDecl if node.has_token(K::ElseKw) => {
+                if !(last && child.kind == K::Block) {
+                    break;
+                }
             }
             K::BinExpr if !first && node.has_token(K::OrElse) => {
                 if let Some(inner) = orelse_expected(m, node) {
@@ -394,6 +399,17 @@ fn after(m: &Analyzed, path: &[&Node], before: u32, text: &str) -> (Vec<Type>, b
         return (Vec::new(), false);
     }
     match node.kind {
+        K::LetDecl if node.has_token(K::ElseKw) => {
+            let after_else = node
+                .child_tokens()
+                .find(|t| t.kind == K::ElseKw)
+                .is_some_and(|kw| before >= kw.end);
+            if after_else {
+                around(m, &path[..=j], text)
+            } else {
+                (Vec::new(), false)
+            }
+        }
         K::LetDecl => (body(m, path[j - 1], node, text), false),
         K::MatchArm => pattern(m, path[j - 1]),
         K::BinExpr if node.has_token(K::OrElse) => match orelse_expected(m, node) {

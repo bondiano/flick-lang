@@ -35,6 +35,28 @@ fn argument_first_staging_keeps_task_expectations_but_not_computations() {
 }
 
 #[test]
+fn let_else_lowers_and_translates_identically_to_canonical_match() {
+    use crate::run;
+    use crate::syntax::Path as ModelPath;
+
+    let let_else_src = "module App.Main exposing (f)\n\nf : Option Int -> Int\nlet f m =\n  let Some n = m else 0\n  n + 1\n";
+    let match_src = "module App.Main exposing (f)\n\nf : Option Int -> Int\nlet f m =\n  match m with\n  | Some n -> n + 1\n  | _ -> 0\n";
+
+    let translate_f = |src: &str| {
+        let modules = run::compile_source(src).expect("compiles");
+        let program = run::program(&modules);
+        let errors = run::check(&modules, &program);
+        assert!(errors.is_empty(), "model check errors: {errors:?}");
+        program.globals[&ModelPath::new("App.Main", "f")].clone()
+    };
+
+    assert_eq!(
+        format!("{:?}", translate_f(let_else_src)),
+        format!("{:?}", translate_f(match_src))
+    );
+}
+
+#[test]
 fn orelse_lowers_to_canonical_option_match() {
     let source = "module App.Main exposing (pick)\n\npick : Option Int -> Int -> Int\nlet pick opt fallback = opt orelse fallback\n";
     let modules = compile_source(source).expect("source checks");

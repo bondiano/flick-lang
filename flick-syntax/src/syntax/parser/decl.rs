@@ -144,6 +144,19 @@ fn let_rest(p: &mut Parser, m: super::Marker, assert: bool) {
     } else {
         pattern::pattern(p);
     }
+    if p.at(K::WhenKw) {
+        let when = p.raw();
+        p.error_at(
+            codes::S007,
+            p.span(when.start, when.end),
+            "`when` guards are not supported in `let` or `let ... else`: use `match` instead"
+                .into(),
+        );
+        let guard = p.start();
+        p.bump();
+        expr::expr(p);
+        p.complete(guard, K::Error);
+    }
     if p.eat(K::Colon) {
         types::type_(p);
     }
@@ -159,6 +172,14 @@ fn let_rest(p: &mut Parser, m: super::Marker, assert: bool) {
         }
         p.bump();
         p.expect(K::String);
+    }
+    if p.eat(K::ElseKw) {
+        p.body(K::Block, expr::stmt);
+        if p.at(K::AsKw) {
+            p.error_expected("the end of `let ... else`: only `let assert` takes `as \"message\"`");
+            p.bump();
+            p.expect(K::String);
+        }
     }
     p.complete(m, K::LetDecl);
 }
