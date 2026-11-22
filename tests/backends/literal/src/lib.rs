@@ -3,6 +3,7 @@
 
 mod commands;
 mod launches;
+mod packages;
 mod steps;
 mod tests;
 
@@ -13,8 +14,8 @@ use std::time::SystemTime;
 use flick_backend::command;
 use flick_backend::{
     Artifact, ArtifactKind, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic,
-    Environment, Inputs, Mode, ModuleRole, NamedRange, OptionDescriptor, Parameter, Profile,
-    Severity, Span, TargetSupport, ValueKind, Verb, VersionRange,
+    Environment, Inputs, Mode, ModuleRole, NamedRange, OptionDescriptor, OptionValue, Packages,
+    Parameter, Profile, ProjectFile, Severity, Span, TargetSupport, ValueKind, Verb, VersionRange,
 };
 use flick_ir::{ExprKind, ItemKind, Lit, Program, Stage};
 
@@ -90,6 +91,19 @@ fn selected(request: &BuildRequest, module: &str) -> bool {
 }
 
 impl Backend for Literal {
+    fn package_files(&self) -> Vec<String> {
+        packages::package_files()
+    }
+
+    fn packages(
+        &self,
+        files: &[ProjectFile],
+        dependencies: &[command::Dependency],
+        options: &[OptionValue],
+    ) -> Packages {
+        packages::packages(files, dependencies, options)
+    }
+
     fn commands(&self) -> Vec<command::Descriptor> {
         commands::commands()
     }
@@ -102,7 +116,7 @@ impl Backend for Literal {
             .iter()
             .any(|d| d.name == invocation.name)
         {
-            Ok(commands::run(invocation))
+            commands::run(invocation)
         } else {
             Err(commands::unknown(&invocation.name))
         }
@@ -403,9 +417,10 @@ fn module_artifacts(request: &BuildRequest) -> Vec<Artifact> {
 mod guest {
     use flick_backend::bindings::flick::backend::inputs;
     use flick_backend::bindings::{Guest, export_component};
+    use flick_backend::command::Dependency;
     use flick_backend::{
         Backend, BuildRequest, BuildResult, Descriptor, Diagnostic, InputError, Inputs,
-        TargetSupport,
+        OptionValue, Packages, ProjectFile, TargetSupport,
     };
 
     use super::Literal;
@@ -427,6 +442,16 @@ mod guest {
         }
         fn generate(request: BuildRequest) -> Result<BuildResult, Vec<Diagnostic>> {
             Literal.generate(&request, &mut Imports)
+        }
+        fn package_files() -> Vec<String> {
+            Literal.package_files()
+        }
+        fn packages(
+            files: Vec<ProjectFile>,
+            dependencies: Vec<Dependency>,
+            options: Vec<OptionValue>,
+        ) -> Packages {
+            Literal.packages(&files, &dependencies, &options)
         }
     }
     export_component!(Component);

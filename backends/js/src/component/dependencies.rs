@@ -1,0 +1,365 @@
+//! The dependency and packaging commands of a JavaScript project: `install`,
+//! `add`, `remove`, `update`, `deps` and `pack`, which `flick` runs after its
+//! own part on the Flick libraries. Each runs pnpm in the project's root,
+//! checking the version `packageManager` in `package.json` pins (or this
+//! backend's own) before modifying anything. `install` and `update` first add
+//! to `package.json` what the closure's `[target.js.dependencies]` asks for.
+
+use flick_backend::command::{
+    Descriptor, Diagnostic, File, Invocation, Parameter, Plan, Step, Style, Tool, ToolStep,
+    ValueKind,
+};
+use serde_json::Value;
+
+use super::manifest;
+
+/// The pnpm a project takes without `packageManager`.
+pub(super) const PNPM: &str = "12.16.1";
+
+/// What pnpm may change in the project's root.
+const WRITES: [&str; 4] = [
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "node_modules",
+];
+
+pub(super) const NAMES: [&str; 6] = ["install", "add", "remove", "update", "deps", "pack"];
+
+fn parameter(name: &str, kind: ValueKind, multiple: bool, required: bool, help: &str) -> Parameter {
+    Parameter {
+        name: name.into(),
+        kind,
+        multiple,
+        required,
+        help: help.into(),
+    }
+}
+
+pub(super) fn descriptors() -> Vec<Descriptor> {
+    let packages = |required| {
+        parameter(
+            "packages",
+            ValueKind::Text,
+            true,
+            required,
+            "npm package specs, such as `date-fns` or `date-fns@4`",
+        )
+    };
+    let flag = |name: &str, help: &str| parameter(name, ValueKind::Flag, false, false, help);
+    let command = |name: &str, summary: &str, positionals, options| Descriptor {
+        name: name.into(),
+        summary: summary.into(),
+        positionals,
+        options,
+        inputs: vec!["package.json".into(), "pnpm-lock.yaml".into()],
+        reads: vec![],
+        writes: if name == "deps" {
+            vec![]
+        } else {
+            WRITES.map(str::to_owned).to_vec()
+        },
+        style: Style::Plan,
+    };
+    vec![
+        command(
+            "install",
+            "Installs the npm packages of `package.json` with the pinned pnpm",
+            vec![],
+            vec![
+                flag("locked", "Install exactly `pnpm-lock.yaml`"),
+                flag("offline", "Use only the packages pnpm has stored"),
+            ],
+        ),
+        command(
+            "add",
+            "Adds npm packages to `package.json`",
+            vec![packages(true)],
+            vec![flag("dev", "Add them to `devDependencies`")],
+        ),
+        command(
+            "remove",
+            "Removes npm packages from `package.json`",
+            vec![packages(true)],
+            vec![],
+        ),
+        command(
+            "update",
+            "Updates npm packages within the ranges of `package.json`",
+            vec![packages(false)],
+            vec![],
+        ),
+        command(
+            "deps",
+            "Lists the installed npm packages, or why one is installed",
+            vec![],
+            vec![parameter(
+                "why",
+                ValueKind::Text,
+                false,
+                false,
+                "Show why this package is installed",
+            )],
+        ),
+        Descriptor {
+            name: "pack".into(),
+            summary: "Stages `package.json` for a built app and packs it with pnpm".into(),
+            positionals: vec![],
+            options: vec![
+                parameter(
+                    "runner",
+                    ValueKind::Text,
+                    true,
+                    false,
+                    "Entry runner mapping `<entry>=<runner-file>`",
+                ),
+                parameter(
+                    "file",
+                    ValueKind::Text,
+                    true,
+                    false,
+                    "Relative file path present in the staged pack directory",
+                ),
+            ],
+            inputs: vec!["package.json".into()],
+            reads: vec![],
+            writes: vec![".flick/pack".into()],
+            style: Style::Plan,
+        },
+    ]
+}
+
+fn values<'a>(invocation: &'a Invocation, name: &str) -> &'a [String] {
+    (invocation.arguments.iter())
+        .find(|a| a.name == name)
+        .map_or(&[], |a| a.values.as_slice())
+}
+
+fn flag(invocation: &Invocation, name: &str) -> bool {
+    !values(invocation, name).is_empty()
+}
+
+fn input<'a>(invocation: &'a Invocation, path: &str) -> Option<&'a File> {
+    invocation.inputs.iter().find(|f| f.path == path)
+}
+
+pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
+    if invocation.name == "pack" {
+        return run_pack(invocation);
+    }
+    let text = input(invocation, "package.json").map(|f| String::from_utf8_lossy(&f.bytes));
+    let parsed: Option<Value> = text.as_deref().and_then(|t| serde_json::from_str(t).ok());
+    let name = invocation.name.as_str();
+    let merged = if matches!(name, "install" | "update") {
+        manifest::merged(text.as_deref(), &invocation.dependencies)
+            .map_err(|message| vec![Diagnostic::error("P005", message)])?
+    } else {
+        None
+    };
+    // a project without npm packages has nothing to install, update or list
+    if text.is_none() && merged.is_none() && matches!(name, "install" | "update" | "deps") {
+        return Ok(Plan::empty());
+    }
+    let pnpm = pnpm(invocation, parsed.as_ref(), name != "deps")?;
+    let locked = flag(invocation, "locked");
+    let mut plan = Plan::empty();
+    if let Some(merged) = merged {
+        if locked {
+            return Err(vec![Diagnostic::error(
+                "P034",
+                "`package.json` lacks npm packages that `[target.js.dependencies]` name: run `flick install` without `--locked`".into(),
+            )]);
+        }
+        plan.files.push(File {
+            path: "package.json".into(),
+            bytes: merged.into_bytes(),
+            executable: false,
+        });
+    }
+    if locked && input(invocation, "pnpm-lock.yaml").is_none() {
+        return Err(vec![Diagnostic::error(
+            "P017",
+            "`install --locked` needs `pnpm-lock.yaml`; run `flick install` to create it".into(),
+        )]);
+    }
+    let packages = values(invocation, "packages").iter().cloned();
+    let arguments: Vec<String> = match name {
+        "install" => ["install".to_owned()]
+            .into_iter()
+            .chain(locked.then(|| "--frozen-lockfile".to_owned()))
+            .chain(flag(invocation, "offline").then(|| "--offline".to_owned()))
+            .collect(),
+        "add" => ["add".to_owned()]
+            .into_iter()
+            .chain(flag(invocation, "dev").then(|| "--save-dev".to_owned()))
+            .chain(packages)
+            .collect(),
+        "remove" | "update" => [name.to_owned()].into_iter().chain(packages).collect(),
+        _ => match values(invocation, "why").first() {
+            Some(package) => vec!["why".into(), package.clone()],
+            None => vec!["list".into(), "--depth".into(), "Infinity".into()],
+        },
+    };
+    plan.steps.push(Step::Tool(ToolStep {
+        id: name.into(),
+        tool: pnpm,
+        arguments,
+        environment: vec![],
+        inputs: vec![],
+        reads: vec![],
+        outputs: if name == "deps" {
+            vec![]
+        } else {
+            WRITES.map(str::to_owned).to_vec()
+        },
+        in_place: true,
+    }));
+    Ok(plan)
+}
+
+/// Stages `.flick/pack/package.json` for a built JS app and runs `pnpm pack`.
+fn run_pack(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
+    let Some(raw) = input(invocation, "package.json") else {
+        return Err(vec![Diagnostic::error(
+            "P020",
+            "cannot read `package.json`: file not found".into(),
+        )]);
+    };
+    let text = String::from_utf8_lossy(&raw.bytes);
+    let mut manifest: Value = serde_json::from_str(&text).map_err(|err| {
+        vec![Diagnostic::error(
+            "P020",
+            format!("`package.json` is not JSON: {err}"),
+        )]
+    })?;
+    let Some(object) = manifest.as_object_mut() else {
+        return Err(vec![Diagnostic::error(
+            "P020",
+            "`package.json` is not an object".into(),
+        )]);
+    };
+    object.insert("type".into(), "module".into());
+    object.insert("files".into(), serde_json::json!(["dist"]));
+    object
+        .entry("exports")
+        .or_insert(serde_json::json!({ "./*": "./dist/*" }));
+    let runners: Vec<(&str, &str)> = values(invocation, "runner")
+        .iter()
+        .filter_map(|entry| entry.split_once('='))
+        .collect();
+    if !runners.is_empty() {
+        let package = object
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let unscoped = package.rsplit('/').next().unwrap_or(package).to_owned();
+        let bin: serde_json::Map<String, Value> = runners
+            .iter()
+            .map(|&(name, file)| {
+                let command = if runners.len() == 1 && name == "main" && !unscoped.is_empty() {
+                    unscoped.clone()
+                } else {
+                    name.to_owned()
+                };
+                (command, format!("./dist/{file}").into())
+            })
+            .collect();
+        object.entry("bin").or_insert(Value::Object(bin));
+    }
+    object.remove("devDependencies");
+    object.remove("scripts");
+    if let Some(missing) = missing_exports(&manifest, values(invocation, "file")) {
+        return Err(vec![Diagnostic::error("P020", missing)]);
+    }
+    let pnpm = pnpm(invocation, Some(&manifest), false)?;
+    let mut plan = Plan::empty();
+    plan.files.push(File {
+        path: ".flick/pack/package.json".into(),
+        bytes: format!("{manifest:#}\n").into_bytes(),
+        executable: false,
+    });
+    plan.steps.push(Step::Tool(ToolStep {
+        id: "pack".into(),
+        tool: pnpm,
+        arguments: vec![
+            "--dir".into(),
+            ".flick/pack".into(),
+            "pack".into(),
+            "--pack-destination".into(),
+            ".".into(),
+        ],
+        environment: vec![],
+        inputs: vec![],
+        reads: vec![],
+        outputs: vec![".flick/pack".into()],
+        in_place: true,
+    }));
+    Ok(plan)
+}
+
+/// The first path `exports` names that the staged package lacks.
+fn missing_exports(manifest: &Value, staged: &[String]) -> Option<String> {
+    fn targets(value: &Value, out: &mut Vec<String>) {
+        match value {
+            Value::String(s) => out.push(s.clone()),
+            Value::Object(map) => map.values().for_each(|v| targets(v, out)),
+            Value::Array(items) => items.iter().for_each(|v| targets(v, out)),
+            _ => {}
+        }
+    }
+    let mut paths = Vec::new();
+    targets(manifest.get("exports")?, &mut paths);
+    paths
+        .into_iter()
+        .find(|p| {
+            if p.contains('*') {
+                return false;
+            }
+            let norm = p.strip_prefix("./").unwrap_or(p);
+            !staged.iter().any(|f| f == norm)
+        })
+        .map(|p| format!("`exports` names `{p}`, which the package does not have"))
+}
+
+/// The pnpm the host found and the project allows; with `exact`, only the
+/// version the project pins, else nothing is changed.
+fn pnpm(
+    invocation: &Invocation,
+    manifest: Option<&Value>,
+    exact: bool,
+) -> Result<Tool, Vec<Diagnostic>> {
+    let pinned = (manifest.and_then(|m| m["packageManager"].as_str()))
+        .and_then(|spec| spec.strip_prefix("pnpm@"))
+        .map_or(PNPM, |v| v.split('+').next().unwrap_or(v));
+    let instruction = format!(
+        "run `corepack prepare pnpm@{pinned} --activate`, or `npm install --global pnpm@{pinned}`"
+    );
+    let next = "nothing was changed (`flick doctor` lists the toolchain versions)";
+    match invocation.tools.iter().find(|t| t.id == "pnpm") {
+        None => {
+            let mut d = Diagnostic::error(
+                "P051",
+                format!(
+                    "`{}` runs `pnpm`, which `[tools]` does not allow `flick/js`",
+                    invocation.name
+                ),
+            );
+            d.help = Some("allow it in `flick.toml`: `[tools]` `\"flick/js\" = [\"pnpm\"]`".into());
+            Err(vec![d])
+        }
+        Some(t) if t.sha256.is_empty() => Err(vec![Diagnostic::error(
+            "P016",
+            format!(
+                "`pnpm` is not on PATH and the project pins pnpm {pinned} in `packageManager`: {instruction}; {next}"
+            ),
+        )]),
+        Some(t) if exact && t.version != pinned => Err(vec![Diagnostic::error(
+            "P016",
+            format!(
+                "the project pins pnpm {pinned} in `packageManager`, but `pnpm` is {}: {instruction}; {next}",
+                t.version
+            ),
+        )]),
+        Some(t) => Ok(t.clone()),
+    }
+}

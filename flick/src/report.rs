@@ -106,7 +106,7 @@ pub fn strip_ansi(text: &str) -> String {
 
 /// Errors that mean a wrong invocation, configuration or missing dependency
 /// rather than a problem in the code: exit code `2`.
-const USAGE: [codes::Code; 18] = [
+const USAGE: [codes::Code; 19] = [
     codes::P005,
     codes::P006,
     codes::P007,
@@ -125,6 +125,7 @@ const USAGE: [codes::Code; 18] = [
     codes::P058,
     codes::P059,
     codes::P060,
+    codes::P063,
 ];
 
 /// `3` for an internal tooling error, `2` for a usage error, `1` for any

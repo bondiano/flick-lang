@@ -94,9 +94,6 @@ pub fn describe(
             break;
         }
     }
-    if let Some(project) = project {
-        files.extend(toolchain::contract_inputs(&project.root));
-    }
     files.sort();
     files.dedup();
     let mut key = Key::default();
@@ -106,14 +103,6 @@ pub fn describe(
         "compiler-binary",
         toolchain::fingerprint().unwrap_or_default(),
     );
-    if let Some(project) = project {
-        for package in ["@flick-lang/runtime", "@flick-lang/effect-ts", "effect"] {
-            key.add(
-                format!("version {package}"),
-                toolchain::resolved(&project.root, package).unwrap_or_default(),
-            );
-        }
-    }
     for file in &files {
         key.add(file.to_string_lossy(), fs::read(file).unwrap_or_default());
     }

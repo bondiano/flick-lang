@@ -20,6 +20,8 @@ struct Adapter {
     inherit: &'static [&'static str],
     /// Variables a step may set.
     settable: &'static [&'static str],
+    /// Variables the host pins for this tool on every run, version query included.
+    fixed: &'static [(&'static str, &'static str)],
 }
 
 /// Variables every tool needs to find its home, caches and network proxy.
@@ -48,6 +50,7 @@ const ADAPTERS: &[Adapter] = &[
         parse: |out| Some(out.trim().strip_prefix('v')?.to_owned()),
         inherit: &[],
         settable: &[],
+        fixed: &[],
     },
     Adapter {
         id: "go",
@@ -73,6 +76,35 @@ const ADAPTERS: &[Adapter] = &[
             "GOINSECURE",
         ],
         settable: &["GOFLAGS", "GOTOOLCHAIN", "CGO_ENABLED"],
+        fixed: &[],
+    },
+    Adapter {
+        id: "pnpm",
+        version: &["--version"],
+        parse: |out| {
+            let version = out.trim();
+            (!version.is_empty()).then(|| version.to_owned())
+        },
+        inherit: &[
+            "PNPM_HOME",
+            "NPM_CONFIG_REGISTRY",
+            "NPM_CONFIG_STORE_DIR",
+            "npm_config_registry",
+            "npm_config_store_dir",
+            "COREPACK_HOME",
+            "NO_COLOR",
+            "FORCE_COLOR",
+        ],
+        settable: &[],
+        // Flick owns the version gate; even `pnpm --version` must not bootstrap or pin pnpm.
+        fixed: &[
+            ("npm_config_manage_package_manager_versions", "false"),
+            ("PNPM_CONFIG_PM_ON_FAIL", "ignore"),
+            ("COREPACK_ENABLE_PROJECT_SPEC", "0"),
+            ("COREPACK_ENABLE_AUTO_PIN", "0"),
+            ("COREPACK_ENABLE_NETWORK", "0"),
+            ("COREPACK_DEFAULT_TO_LATEST", "0"),
+        ],
     },
 ];
 
@@ -93,13 +125,13 @@ impl Tool {
         let adapter = (ADAPTERS.iter())
             .find(|a| a.id == id)
             .ok_or_else(|| format!("the host has no adapter for the tool `{id}`"))?;
-        let name = if cfg!(windows) {
-            format!("{id}.exe")
+        let names: Vec<String> = if cfg!(windows) {
+            vec![format!("{id}.exe"), format!("{id}.cmd")]
         } else {
-            id.to_owned()
+            vec![id.to_owned()]
         };
         let path = env::split_paths(paths)
-            .map(|dir| dir.join(&name))
+            .flat_map(|dir| names.iter().map(move |name| dir.join(name)))
             .find(|path| executable(path))
             .ok_or_else(|| format!("cannot find `{id}` on PATH"))?;
         Self::at(&path, adapter, expected)
@@ -128,10 +160,12 @@ impl Tool {
         if expected.is_some_and(|pin| pin.id != adapter.id || pin.sha256 != digest) {
             return Err(differs());
         }
-        let output = Command::new(&path)
-            .args(adapter.version)
-            .output()
-            .map_err(|e| e.to_string())?;
+        let mut query = Command::new(&path);
+        query.args(adapter.version);
+        for &(name, value) in adapter.fixed {
+            query.env(name, value);
+        }
+        let output = query.output().map_err(|e| e.to_string())?;
         let version = (output.status.success())
             .then(|| String::from_utf8(output.stdout).ok())
             .flatten()
@@ -176,6 +210,9 @@ impl Tool {
             if let Some(value) = env::var_os(name) {
                 command.env(name, value);
             }
+        }
+        for &(name, value) in self.adapter.fixed {
+            command.env(name, value);
         }
         command
     }

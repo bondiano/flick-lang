@@ -64,6 +64,9 @@ target = "js"
 
 [target.js]
 runtime = "effect"
+
+[tools]
+"flick/js" = ["pnpm"]
 === index.html ===
 <!doctype html>
 <html lang="en">

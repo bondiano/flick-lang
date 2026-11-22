@@ -186,15 +186,21 @@ whose tool is not granted is `FLICK-P051` before any step runs. A launch
 runtime, Node for `flick run`, needs no grant; its pin is still checked.
 
 The host knows each tool through an adapter (`flick/src/backends/tools.rs`):
-`node` and `go`. It finds the first executable on `PATH`, hashes it and
+`node`, `go` and `pnpm`. It finds the first executable on `PATH`, hashes it and
 refuses a digest that differs from the pin before the candidate ever runs,
 then queries the version with the adapter's own command. Only granted tools
-and Node appear in `BuildRequest.toolchains`. Before each step the host
+and Node appear in `BuildRequest.toolchains`. For contributed commands, tools
+granted in `[tools]` that are absent on `PATH` appear in `invocation.tools`
+with empty `version` and `sha256` so a backend can distinguish a missing tool
+(`FLICK-P016`) from an ungranted one (`FLICK-P051`), and the host refuses any
+step that tries to execute an unpinned entry. Before each step the host
 hashes the executable again, so a binary replaced during the build fails
 its step. The grant is the authorization of arguments: the host does not
 parse a tool's command line. An adapter decides which variables a step
-inherits (the home, cache, temporary and proxy variables, and for `go` its
-module settings) and which it may set (`GOFLAGS`, `GOTOOLCHAIN`,
+inherits (the home, cache, temporary and proxy variables, for `go` its
+module settings, and for `pnpm` its registry/store settings), which variables
+are pinned on every run (for `pnpm`, disabling Corepack/package-manager
+self-downloads), and which it may set (`GOFLAGS`, `GOTOOLCHAIN`,
 `CGO_ENABLED`); every other variable is cleared.
 
 Each step runs in a fresh directory beside the output directory, at the
@@ -267,7 +273,12 @@ The host validates the entire plan against the descriptor before any step
 executes (`FLICK-P055`):
 
 - `tool` steps run with the executor above under the contributor's `[tools]`
-  grant, linking each step's `reads` into its directory.
+  grant, linking each step's `reads` into its directory. A step with
+  `in-place = true` instead runs directly in the project root after the plan's
+  files are published (used by backend package managers such as `pnpm`); it
+  forbids `inputs`, `reads`, `resume`, and editor previews, requires every
+  output prefix to be declared in `descriptor.writes`, and still enforces tool
+  digest rechecks and environment-variable authorization.
 - `run-flick` steps (`run-flick-step`) overlay zero or more in-memory
   `flick-module` sources on `$sources` without writing to the project tree or
   the disk module cache, compile `entry`, emit into an isolated temporary
@@ -294,6 +305,41 @@ The same interface also exports `templates` (`list<template-descriptor>`) and
 within the target directory; violations are refused with `FLICK-P055` before
 creating files), and are published atomically. See
 [Contributed commands](../src/content/docs/reference/commands.md).
+
+### Package discovery and dependency verbs
+
+The backend world exports `package-files: func() -> list<string>` and
+`packages: func(files: list<project-file>, dependencies: list<dependency>, options: list<option-value>) -> packages`.
+The host knows nothing of any target ecosystem's package manager or manifest
+layout:
+
+- `package-files` returns glob patterns relative to the project root (for
+  example `["package.json", "node_modules/*/package.json", "node_modules/@*/*/package.json"]`
+  for `flick/js`, or `[]` for `flick/go`). The host caches the pattern list by
+  component digest so projects matching none of them do not even instantiate
+  the backend component.
+- `packages` receives matched files (with canonical paths so the backend can
+  follow symlinks and ancestor resolution), the transitive closure of
+  `[target.<name>.dependencies]` for this backend, and host options (such as
+  `root`, `runtime`, `verify`, `check-runtime`, `packages`, or `inspect=doctor`).
+  If the backend needs additional files (for example ancestor manifests in a
+  hoisted package graph), it returns their paths in `needs`; the host verifies
+  each basename matches a declared pattern, rejects duplicates and `..`,
+  reads them, and calls `packages` again (up to 128 rounds and 16,384 files).
+- The final `packages` record returns the project `name` and `version`,
+  `declared` dependency names, Flick `sources` (`package-root`), `runtime`
+  dependency graphs (which the host content-hashes while skipping `graph.skip`
+  directories and `.git`), build-cache `inputs`, and `diagnostics` (for
+  example `P032`/`P040`/`P034` on `[target.<name>.dependencies]`, `P015` on
+  runtime contracts, or structured `flick doctor` lines).
+- Backends (and not plugins) may also implement the core dependency and app
+  packaging verbs (`install`, `add`, `remove`, `update`, `deps`, `pack`) as
+  `plan` commands without triggering `FLICK-P054`. `flick` handles Flick
+  `[dependencies]` and `flick.lock` first, then delegates the target part with
+  `invocation.dependencies`. If the selected backend does not declare the
+  requested verb (for example `flick add pkg` under `flick/go`), `flick`
+  reports `FLICK-P063` (exit code `2`) naming the backend and suggesting
+  `--path`, `--git`, or `--url`.
 
 ### Atomic publication
 

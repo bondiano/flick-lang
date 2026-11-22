@@ -16,6 +16,15 @@ pub fn invocation(i: &n::Invocation) -> w::Invocation {
         sources: i.sources.clone(),
         inputs: i.inputs.iter().map(file_wire).collect(),
         tools: i.tools.iter().map(|t| tool_wire(t.clone())).collect(),
+        dependencies: i.dependencies.iter().map(dependency_wire).collect(),
+    }
+}
+
+pub fn dependency_wire(d: &n::Dependency) -> w::Dependency {
+    w::Dependency {
+        name: d.name.clone(),
+        version: d.version.clone(),
+        by: d.by.clone(),
     }
 }
 
@@ -124,6 +133,7 @@ pub fn plan(p: w::Plan) -> n::Plan {
                     inputs: t.inputs,
                     reads: t.reads,
                     outputs: t.outputs,
+                    in_place: t.in_place,
                 }),
                 w::Step::RunFlick(r) => n::Step::RunFlick(n::RunFlickStep {
                     id: r.id,

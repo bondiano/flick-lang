@@ -5,7 +5,7 @@ pub use doc::doc;
 mod doc_run;
 
 use std::mem;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use flick_backend::{ArtifactKind, Verb};
 use flick_core::build::{self, Extras};
@@ -45,15 +45,20 @@ pub struct Checked {
 }
 
 pub fn compile(explicit: Option<&str>) -> Result<Checked, Outcome> {
-    compile_with_extra(explicit, &[], None)
+    compile_with_extra(explicit, &[], None, true)
 }
 
 fn compile_with_extra(
     explicit: Option<&str>,
     extra: &[PathBuf],
     rt_override: Option<bool>,
+    allow_backends: bool,
 ) -> Result<Checked, Outcome> {
-    let host = FsHost::new();
+    let host = if allow_backends {
+        FsHost::new()
+    } else {
+        FsHost::without_backends()
+    };
     let mut sources = SourceMap::default();
     let (project, mut roots) = match select(&host, &mut sources, explicit, &[]) {
         Ok(selected) => selected,
@@ -156,8 +161,9 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
     } else {
         None
     };
+    let allow_backends = options.emit == Representation::Output;
     let rt_override = target.as_ref().map(|t| t.rt);
-    let mut checked = match compile_with_extra(explicit, &[], rt_override) {
+    let mut checked = match compile_with_extra(explicit, &[], rt_override, allow_backends) {
         Ok(c) => c,
         Err(outcome) => return outcome,
     };
@@ -175,7 +181,7 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
             .map(|(_, dir)| dir.join(&rel))
             .find(|path| path.is_file())
         {
-            checked = match compile_with_extra(explicit, &[path], rt_override) {
+            checked = match compile_with_extra(explicit, &[path], rt_override, allow_backends) {
                 Ok(c) => c,
                 Err(outcome) => return outcome,
             };
@@ -262,7 +268,7 @@ fn inspect_module(
             let package = checked
                 .project
                 .as_ref()
-                .and_then(|p| project::project_name(&checked.host, &p.root));
+                .and_then(|p| project::project_name(&checked.host, p));
             let target_name = options
                 .target
                 .as_deref()
@@ -404,25 +410,31 @@ fn builtin_param_names(export: &Export) -> Option<Vec<String>> {
 
 /// The editor projection of `module` and its span maps, as JSON.
 fn projected(explicit: Option<&str>, module: &str) -> Option<String> {
-    let host = FsHost::new();
+    let host = FsHost::without_backends();
     let mut sources = SourceMap::default();
     let (project, roots) = select(&host, &mut sources, explicit, &[]).ok()?;
     let analysis = project::analyze(&host, &mut sources, project.as_ref(), &roots);
     let analyzed = analysis.module(module)?;
-    let root = project.as_ref().map(|p| p.root.as_path());
     let text = &sources.get(analyzed.file).text;
     let specifier = |m: &str| projection::relative(module, m);
-    let projected = projection_of(&host, &analysis, root, analyzed, text, &specifier);
+    let projected = projection_of(
+        &host,
+        &analysis,
+        project.as_ref(),
+        analyzed,
+        text,
+        &specifier,
+    );
     serde_json::to_string_pretty(&projected).ok()
 }
 
-/// The projection of `module` of `analysis`, whose project is at `root`:
+/// The projection of `module` of `analysis`, in `project`:
 /// the modules it refers to by their interfaces, its imports at
 /// `specifier`'s paths.
 pub fn projection_of(
     host: &impl Host,
     analysis: &Analysis,
-    root: Option<&Path>,
+    project: Option<&Project>,
     module: &Analyzed,
     text: &str,
     specifier: &dyn Fn(&str) -> String,
@@ -431,7 +443,7 @@ pub fn projection_of(
     let lookup = |m: &str| interface_of(analysis, m);
     let package = |m: &str| {
         let own = analysis.module(m).is_some();
-        let name = root.and_then(|r| project::project_name(host, r));
+        let name = project.and_then(|p| project::project_name(host, p));
         own.then_some(name).flatten()
     };
     projection::project(module, text, &fingerprint, &lookup, &package, specifier)

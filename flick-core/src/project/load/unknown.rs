@@ -21,7 +21,7 @@ impl Loader<'_> {
                     .join(", ");
                 return Diagnostic::error(
                     codes::P009,
-                    format!("cannot find module `{name}`; dependencies in package.json are not installed: {list}"),
+                    format!("cannot find module `{name}`; declared dependencies are not installed: {list}"),
                     span,
                 )
                 .with_fix(|| ("install them with `flick install`", Vec::new()));

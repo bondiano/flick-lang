@@ -1,39 +1,39 @@
 //! A verified package invocation. No component failure calls native codegen.
 
+mod support;
+
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Read;
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 
-use flick_backend::command;
-use flick_backend::host::runtime::Cancellation;
 use flick_backend::host::{Budget, WasmBackend};
 use flick_backend::{
     Backend, BackendId, BackendPin, BuildRequest, Failure, Generated, Limits, Policy,
     RuntimeDependency,
 };
-use flick_core::build::{go::FILES, schema_aot_file};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::BackendPackage;
-use flick_core::project::{Compilation, Project, js};
+use flick_core::project::{Compilation, Project};
 use flick_core::source::{FileId, SourceMap, Span};
 
 use super::request::Prepared;
 use super::tools::{self, Tool};
-use super::{execute, failure, launch};
+use super::{execute, failure, launch, runtimes};
 use crate::artifact::Artifact;
 use crate::commands::build::Purpose;
 use crate::commands::build::{BuildPlan, Emission};
-use crate::commands::contributed::Contributor;
 use crate::component;
 use crate::sources::FsHost;
+use support::{host_preflight, required_launches, reserved_outputs, standalone_files};
 
 pub(crate) struct Package {
     pin: BackendPin,
     root: PathBuf,
-    backend: WasmBackend,
+    backend: Arc<WasmBackend>,
     tools: Vec<Tool>,
     /// The tools `[tools]` lets the steps of this backend run.
     allowed: Vec<String>,
@@ -79,19 +79,22 @@ impl Package {
         allowed: Option<&BTreeMap<String, Vec<String>>>,
         official: bool,
     ) -> Result<Self, Diagnostic> {
-        let backend = WasmBackend::load_with_cancellation(
-            component::engine().map_err(failure)?,
-            pin.clone(),
-            bytes,
-            Budget::default(),
-            component::cancellation().map_err(failure)?.clone(),
-        )
-        .map_err(|why| {
-            failure(format!(
-                "backend {}@{}#{}: {why}",
-                pin.identity.id, pin.identity.version, pin.sha256
-            ))
-        })?;
+        let backend = Arc::new(
+            WasmBackend::load_with_cancellation(
+                component::engine().map_err(failure)?,
+                pin.clone(),
+                bytes,
+                Budget::default(),
+                component::cancellation().map_err(failure)?.clone(),
+            )
+            .map_err(|why| {
+                failure(format!(
+                    "backend {}@{}#{}: {why}",
+                    pin.identity.id, pin.identity.version, pin.sha256
+                ))
+            })?,
+        );
+        runtimes::loaded(&pin, &backend);
         super::options::save_descriptor(&pin.sha256, &backend.describe());
         // outside a project only `--allow-tool` grants a tool
         let allowed = allowed.map_or_else(
@@ -121,8 +124,8 @@ impl Package {
         self.backend.describe()
     }
 
-    pub(super) fn is_official_js(&self) -> bool {
-        self.official && self.pin.identity.id == super::options::OFFICIAL_JS
+    pub(super) fn check_runtime(&self, rt: bool) -> Option<Diagnostic> {
+        super::foreign::check_runtime_with(&self.backend, &self.root, rt)
     }
 
     /// These compiler-owned host integrations are approved for the exact shipped
@@ -154,12 +157,11 @@ impl Package {
 
     fn preflight(
         &self,
-        host: &FsHost,
         project: Option<&Project>,
         compilation: &Compilation,
         output: &BuildPlan,
     ) -> Vec<Diagnostic> {
-        let mut diagnostics = host_preflight(host, project, compilation, output);
+        let mut diagnostics = host_preflight(project, compilation, output);
         if self.supports_host("host-source-build")
             && self.tools.is_empty()
             && (!matches!(output.purpose, Purpose::Build | Purpose::Inspect)
@@ -180,7 +182,7 @@ impl Package {
         compilation: &Compilation,
         output: &BuildPlan,
     ) -> Emission {
-        let diagnostics = self.preflight(host, project, compilation, output);
+        let diagnostics = self.preflight(project, compilation, output);
         if !diagnostics.is_empty() {
             return Emission {
                 artifacts: vec![],
@@ -235,7 +237,7 @@ impl Package {
         component::cancel_on_signals();
         let mut emission = self.finish_generation(
             flick_backend::generate(
-                &self.backend,
+                &*self.backend,
                 &prepared.request,
                 &policy,
                 |id| prepared.bytes.get(id).cloned(),
@@ -379,7 +381,7 @@ impl Package {
                 || (o.key == "js.effect-bridge" && o.value != "absent")
                 || (o.key == "option.schema-aot" && o.value == "true")
         });
-        super::dependencies::installed_for(&self.root, effect).map_err(failure)
+        runtimes::runtime(&self.backend, &self.root, effect).map_err(failure)
     }
 
     fn rejected(&self, diagnostics: &[flick_backend::Diagnostic], files: &[FileId]) -> Emission {
@@ -401,7 +403,7 @@ impl Package {
     }
 
     pub(super) fn cache_identity(&self, effect: bool) -> String {
-        let runtimes = super::dependencies::installed_for(&self.root, effect).unwrap_or_default();
+        let runtimes = runtimes::runtime(&self.backend, &self.root, effect).unwrap_or_default();
         format!(
             "{:?} {:?} {:?}",
             self.pin,
@@ -411,11 +413,14 @@ impl Package {
     }
 
     pub(super) fn accepts_cached(&self, files: &[Artifact]) -> bool {
+        let Ok(installed) = runtimes::runtime(&self.backend, &self.root, true) else {
+            return false;
+        };
         launch::validate(
             files,
             &self.pin,
             &self.tools.iter().map(|t| t.pin.clone()).collect::<Vec<_>>(),
-            &self.root,
+            &installed,
         )
         .is_ok()
     }
@@ -444,140 +449,4 @@ impl Package {
         }
         mapped
     }
-}
-
-impl Contributor for Package {
-    fn describe(&self) -> Result<Vec<command::Descriptor>, String> {
-        Ok(self.backend.commands())
-    }
-
-    fn run(
-        &self,
-        invocation: &command::Invocation,
-    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
-        Backend::run(&self.backend, invocation)
-    }
-
-    fn resume(
-        &self,
-        state: Vec<u8>,
-        outputs: Vec<command::File>,
-        answers: Vec<command::Answer>,
-    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
-        Backend::resume(&self.backend, state, outputs, answers)
-    }
-
-    fn open(
-        &self,
-        invocation: &command::Invocation,
-    ) -> Result<command::Opened, Vec<command::Diagnostic>> {
-        Backend::open(&self.backend, invocation)
-    }
-
-    fn handle(
-        &self,
-        state: Vec<u8>,
-        request: Vec<u8>,
-        answers: &[command::Answer],
-        cancel: &Cancellation,
-    ) -> Result<command::Handled, String> {
-        self.backend
-            .handle_cancellable(&state, &request, answers, cancel)
-    }
-
-    fn close(&self, state: Vec<u8>) -> command::Plan {
-        Backend::close(&self.backend, state)
-    }
-
-    fn templates(&self) -> Result<Vec<command::TemplateDescriptor>, String> {
-        self.backend.try_templates()
-    }
-
-    fn scaffold(
-        &self,
-        request: &command::TemplateRequest,
-    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
-        Backend::scaffold(&self.backend, request)
-    }
-}
-
-fn reserved_outputs(
-    prepared: &Prepared,
-    output: &BuildPlan,
-    project: Option<&Project>,
-) -> Vec<String> {
-    let mut reserved: Vec<_> = prepared.shared.iter().map(|a| a.path.clone()).collect();
-    reserved.push(launch::FILE.into());
-    if output.extras.schema_aot {
-        reserved.extend(output.entries.iter().map(|(name, _)| schema_aot_file(name)));
-    }
-    if project.is_none() {
-        reserved.push(FILES.into());
-    }
-    reserved
-}
-
-fn required_launches(
-    result: &flick_backend::BuildResult,
-    output: &BuildPlan,
-    require_runs: bool,
-) -> Result<(), String> {
-    for (name, kind) in output
-        .entries
-        .iter()
-        .filter(|_| require_runs)
-        .map(|(name, _)| (name.as_str(), flick_backend::LaunchKind::Run))
-        .chain(
-            (output.purpose == Purpose::Test).then_some(("test", flick_backend::LaunchKind::Test)),
-        )
-    {
-        if !result
-            .launches
-            .iter()
-            .any(|l| l.name == name && l.kind == kind)
-        {
-            return Err(format!(
-                "backend supplied no {kind:?} launch named `{name}`"
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn host_preflight(
-    host: &FsHost,
-    project: Option<&Project>,
-    compilation: &Compilation,
-    output: &BuildPlan,
-) -> Vec<Diagnostic> {
-    if output.extras.schema_aot && !output.backend.supports_host("host-schema-aot") {
-        return vec![Diagnostic::new(
-            codes::P012,
-            Severity::Error,
-            "component schema AOT requires an approved pinned host tool adapter",
-        )];
-    }
-    let Some(project) = project.filter(|_| !output.go) else {
-        return vec![];
-    };
-    let mut diagnostics = js::conflicts(host, &project.root, &compilation.js_dependencies);
-    diagnostics.extend(js::unmet(host, &project.root, &compilation.js_dependencies));
-    diagnostics
-}
-
-fn standalone_files(emission: &mut Emission) {
-    if !emission.diagnostics.is_empty() {
-        return;
-    }
-    let files = emission
-        .artifacts
-        .iter()
-        .fold(String::new(), |mut files, artifact| {
-            files.push_str(&artifact.path);
-            files.push('\n');
-            files
-        });
-    emission
-        .artifacts
-        .push(Artifact::source(FILES.into(), files));
 }

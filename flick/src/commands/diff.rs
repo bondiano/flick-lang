@@ -3,19 +3,22 @@
 //! The revision is checked out into a temporary worktree and checked like
 //! the working tree; both must check without errors.
 
+use std::env;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command as Process};
-use std::{env, fs};
 
 use flick_core::api_diff::{self, Bump, Change, ModuleChanges};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface::Interface;
+use flick_core::project::Project;
 use flick_core::source::SourceMap;
 
 use super::inspect::compile;
 use super::run::find_project;
 use crate::args::{DiffArguments, GlobalArguments};
+#[cfg(feature = "wasm-backends")]
+use crate::backends;
 use crate::command::Outcome;
 
 fn failure(message: String) -> Outcome {
@@ -46,13 +49,13 @@ pub fn diff(options: &DiffArguments, global: &GlobalArguments) -> Outcome {
             }
         },
     };
-    let changes = match changes_since(&project.root, &revision) {
+    let changes = match changes_since(&project, &revision) {
         Ok(c) => c,
         Err(outcome) => return outcome,
     };
     print!(
         "{}",
-        report(&revision, &changes, version(&project.root).as_deref())
+        report(&revision, &changes, version(&project).as_deref())
     );
     Outcome::default()
 }
@@ -62,8 +65,9 @@ pub fn latest_tag(root: &Path) -> Option<String> {
     git(root, &["describe", "--tags", "--abbrev=0"]).ok()
 }
 
-/// The API changes of the project at `root` since `revision`.
-pub fn changes_since(root: &Path, revision: &str) -> Result<Vec<ModuleChanges>, Outcome> {
+/// The API changes of `project` since `revision`.
+pub fn changes_since(project: &Project, revision: &str) -> Result<Vec<ModuleChanges>, Outcome> {
+    let root = &project.root;
     let top = PathBuf::from(git(root, &["rev-parse", "--show-toplevel"]).map_err(failure)?);
     let relative = root
         .canonicalize()
@@ -72,10 +76,13 @@ pub fn changes_since(root: &Path, revision: &str) -> Result<Vec<ModuleChanges>, 
         .unwrap_or_default();
     let tree = Worktree::add(&top, revision).map_err(failure)?;
     let old_root = tree.path.join(&relative);
-    // the old tree resolves packages as the working tree has them installed
-    let modules = root.join("node_modules");
-    if modules.is_dir() {
-        link(&modules, &old_root.join("node_modules"));
+    // the old tree resolves backend packages as the working tree has them installed
+    #[cfg(feature = "wasm-backends")]
+    for dir in backends::package_dirs(project) {
+        let installed = root.join(&dir);
+        if installed.is_dir() {
+            link(&installed, &old_root.join(&dir));
+        }
     }
     let old = interfaces(&old_root)?;
     let new = interfaces(root)?;
@@ -124,11 +131,19 @@ pub fn breaking(changes: &[ModuleChanges]) -> bool {
     api_diff::bump(changes) == Bump::Major
 }
 
-/// The `version` of the project's `package.json`.
-fn version(root: &Path) -> Option<String> {
-    let manifest: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(root.join("package.json")).ok()?).ok()?;
-    manifest.get("version")?.as_str().map(str::to_owned)
+/// The version of `project`: `[package].version`, else what the backend reports.
+fn version(project: &Project) -> Option<String> {
+    if let Some(package) = &project.config.package {
+        return Some(package.version.clone());
+    }
+    #[cfg(feature = "wasm-backends")]
+    {
+        backends::foreign(project).version
+    }
+    #[cfg(not(feature = "wasm-backends"))]
+    {
+        None
+    }
 }
 
 fn git(dir: &Path, args: &[&str]) -> Result<String, String> {
@@ -177,11 +192,11 @@ impl Drop for Worktree {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, feature = "wasm-backends"))]
 fn link(from: &Path, to: &Path) {
     use std::os::unix::fs::symlink;
     let _ = symlink(from, to);
 }
 
-#[cfg(not(unix))]
+#[cfg(all(not(unix), feature = "wasm-backends"))]
 fn link(_: &Path, _: &Path) {}
