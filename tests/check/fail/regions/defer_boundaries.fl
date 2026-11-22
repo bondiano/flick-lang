@@ -1,0 +1,84 @@
+// Lexical owner boundary rules for `defer` / `errdefer` (D13, D14, D23):
+// ambient owners, generic `Scope s` helpers, nested functions/lambdas,
+// `task`, `lazy`, `let lazy`, `for … yield`, effect handler arms, and nested
+// cleanup blocks without an inner explicit `scope` are all rejected.
+module App.DeferBoundariesFail exposing (..)
+
+effect Ask =
+  tail ask : Unit ->{} Int
+
+// D13: ambient runtime owner (no explicit `scope`)
+ambient : Unit ->{} Unit
+let ambient () =
+  defer { () }
+
+// D14: generic `Scope s` service parameter is not a lexical `scope`
+generic_scope : Unit ->{Scope s} Unit
+let generic_scope () =
+  errdefer { () }
+
+// D13: lambda / nested function inside a `scope`
+in_lambda : Unit ->{} (Unit ->{} Unit)
+let in_lambda () = scope {
+  fun () -> defer { () }
+}
+
+// D13: `task` inside a `scope`
+in_task : Unit ->{} Eff {} none Unit
+let in_task () = scope {
+  task { defer { () } }
+}
+
+// D13: `lazy` inside a `scope`
+in_lazy : Unit ->{} Lazy {} none Unit
+let in_lazy () = scope {
+  lazy { errdefer { () } }
+}
+
+// D13: `let lazy` inside a `scope`
+in_let_lazy : Unit ->{} Int
+let in_let_lazy () = scope {
+  let lazy x =
+    defer { () }
+    1
+  await x
+}
+
+// D13: `for … yield` inside a `scope`
+in_for_yield : Bool -> List Int ->{} Seq Int
+let in_for_yield cond xs = scope {
+  for x <- xs yield
+    if cond then {
+      defer { () }
+      x
+    } else x
+}
+
+// D13: effect handler operation arm inside a `scope`
+in_handler_arm : Unit ->{} Int
+let in_handler_arm () = scope {
+  try
+    Ask.ask ()
+  with
+  | Ask.ask () ->
+    defer { () }
+    1
+}
+
+// D23: nested `defer`/`errdefer` inside cleanup without an inner explicit `scope`
+nested_in_cleanup : Unit ->{} Unit
+let nested_in_cleanup () = scope {
+  defer {
+    errdefer { () }
+  }
+}
+
+//~ FLICK-G004 @13:3-13:8 requires a lexically enclosing explicit `scope { … }`
+//~ FLICK-G004 @18:3-18:11 not a generic `Scope` service requirement
+//~ FLICK-G004 @23:13-23:18 cannot bind across a function or lambda boundary
+//~ FLICK-G004 @29:10-29:15 cannot bind across a `task { … }` boundary
+//~ FLICK-G004 @35:10-35:18 cannot bind across a `lazy` boundary
+//~ FLICK-G004 @42:5-42:10 cannot bind across a `lazy` boundary
+//~ FLICK-G004 @52:7-52:12 cannot appear in a `for … yield` comprehension
+//~ FLICK-G004 @64:5-64:10 cannot bind across an effect handler arm boundary
+//~ FLICK-G004 @72:5-72:13 cannot appear directly inside another `defer` or `errdefer` cleanup block

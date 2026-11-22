@@ -286,7 +286,7 @@
     "keywords": {
       "patterns": [
         { "name": "constant.language.boolean.flick", "match": "(?<![.\\w])(?:true|false)\\b" },
-        { "name": "keyword.control.flick", "match": "(?<![.\\w])(?:loop\\b(?=[ \\t]*\\{)|while\\b(?=[^,;\\r\\n]*\\bdo\\b))" },
+        { "name": "keyword.control.flick", "match": "(?<![.\\w])(?:(?:loop|defer|errdefer)\\b(?=[ \\t]*\\{)|while\\b(?=[^,;\\r\\n]*\\bdo\\b))" },
         {
           "match": "(?<!\\|)(\\|)[ \\t]*(return)\\b(?=[ \\t]+(?!->|when\\b|\\|)[^\\r\\n]*->)",
           "captures": {

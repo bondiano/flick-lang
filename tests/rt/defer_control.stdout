@@ -1,0 +1,12 @@
+handler:abandon
+abandoned:inner-errdefer
+abandoned:inner-defer
+abandoned:outer-errdefer
+abandoned:outer-defer
+res1=7
+--
+rta:resumed
+handler:stop
+rta:errdefer
+rta:defer
+res2=9

@@ -1,0 +1,175 @@
+// Deterministic core runtime coverage for scope-owned `defer` and `errdefer`:
+// D01 (success), D02 (Result Err / Option None data skip errdefer),
+// D03 (escaping typed failure), D04 (caught failure inside scope skips errdefer),
+// D05 (shared LIFO with Scope.defer and Resource.acquire_release),
+// D10 (untaken branch, loops, per-iteration scope), D11 (nested explicit scopes),
+// D12 (`provide` inside `scope` keeps outer owner), D15/D19 (`try` vs `scope` ordering),
+// D16 (local error handling inside cleanup), D18 (unreached cleanup on acquire failure),
+// D20 (contextual identifiers & grouped record calls), D22 (abort unwind),
+// D23 (nested explicit `scope` inside cleanup).
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+service Outer =
+  log : String ->{} Unit
+
+service Inner =
+  tag : Unit ->{} String
+
+effect Abort =
+  abort bail : forall a. String ->{} a
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+outer_layer : Layer none none {Outer}
+let outer_layer = Layer.succeed Outer { log = fun msg -> say ("outer:" ++ msg) }
+
+inner_layer : Layer none none {Inner}
+let inner_layer = Layer.succeed Inner { tag = fun () -> "inner-svc" }
+
+fail_boom : String ->{; Boom} String
+let fail_boom msg = Fail.fail (Boom msg)
+
+maybe_defer : Bool -> Bool ->{} Unit
+let maybe_defer take_a take_b = scope {
+  if take_a then defer { say "d10:untaken-SKIP" }
+  if take_b then defer { say "d10:taken" }
+  for item <- ["a", "b", "c"] do { defer { say ("d10:same-scope:" ++ item) } }
+  say "d10:after-same-scope-loop"
+}
+
+main : Unit ->{; AppError} Unit
+let main () =
+  // D01 + D02: success, returning Err data, returning None data
+  say "-- D01/D02 --"
+  let ok_val = scope {
+    defer { say "d01:defer" }
+    errdefer { say "d01:errdefer-SKIP" }
+    say "d01:body"
+    "ok"
+  }
+  say ("d01:" ++ ok_val)
+  let err_data : Result String Int = scope {
+    defer { say "d02-err:defer" }
+    errdefer { say "d02-err:errdefer-SKIP" }
+    Err "just-data"
+  }
+  say ("d02-err:" ++ show err_data)
+  let none_data : Option Int = scope {
+    defer { say "d02-none:defer" }
+    errdefer { say "d02-none:errdefer-SKIP" }
+    None
+  }
+  say ("d02-none:" ++ show none_data)
+
+  // D03 + D04 + D19: escaping failure vs caught inside scope
+  say "-- D03/D04/D19 --"
+  let caught_outside =
+    try
+      scope {
+        defer { say "d03:defer-1" }
+        errdefer { say "d03:errdefer-1" }
+        defer { say "d03:defer-2" }
+        fail_boom "escaped"
+      }
+    with
+    | Boom msg -> "caught:" ++ msg
+  say caught_outside
+
+  let caught_inside = scope {
+    defer { say "d04:defer" }
+    errdefer { say "d04:errdefer-SKIP" }
+    try fail_boom "handled-inside" with
+    | Boom msg ->
+      defer { say ("d04:arm-defer:" ++ msg) }
+      "recovered:" ++ msg
+  }
+  say caught_inside
+
+  // D05: shared LIFO across acquire_release, Scope.defer, defer, errdefer
+  say "-- D05 --"
+  let _ =
+    try
+      scope {
+        let _r1 = Resource.acquire_release (task { "r1" }) (fun n -> say ("d05:ar:" ++ n))
+        Scope.defer (fun e -> say ("d05:scope_defer:fail=" ++ show (Exit.is_failure e)))
+        defer { say "d05:defer-1" }
+        errdefer { say "d05:errdefer-1" }
+        let _r2 = Resource.acquire_release (task { "r2" }) (fun n -> say ("d05:ar:" ++ n))
+        defer { say "d05:defer-2" }
+        fail_boom "d05-fail"
+      }
+    with
+    | Boom msg -> msg
+  ()
+
+  // D10: untaken branch, loop N registrations, per-iteration scope
+  say "-- D10 --"
+  maybe_defer false true
+  for item <- ["x", "y"] do {
+    scope {
+      defer { say ("d10:per-iter:" ++ item) }
+      say ("d10:body:" ++ item)
+    }
+  }
+
+  // D11 + D12: nested explicit scopes & `provide` between `scope` and `defer`
+  say "-- D11/D12 --"
+  provide outer_layer {
+    scope {
+      defer { Outer.log "s1-end" }
+      provide inner_layer {
+        say ("d12:in-provide:" ++ Inner.tag ())
+        defer { Outer.log "registered-inside-provide" }
+      }
+      say "d12:after-provide"
+      scope {
+        defer { Outer.log "s2-inner" }
+        say "d11:inner-body"
+      }
+      say "d11:outer-body-end"
+    }
+  }
+
+  // D16 + D18 + D23: local error handling in cleanup, unreached defer, nested scope in cleanup
+  say "-- D16/D18/D23 --"
+  let _ =
+    try
+      scope {
+        defer {
+          try ignore (fail_boom "cleanup-local") with
+          | Boom msg -> say ("d16:handled:" ++ msg)
+          scope {
+            defer { say "d23:inner-defer" }
+            say "d23:inner-body"
+          }
+        }
+        ignore (fail_boom "acquire-failed")
+        defer { say "d18:unreached-SKIP" }
+        errdefer { say "d18:unreached-err-SKIP" }
+      }
+    with
+    | Boom msg -> say ("d18:caught:" ++ msg)
+  ()
+
+  // D20: contextual identifiers & grouped record calls
+  say "-- D20 --"
+  let defer = fun (r : { v : String }) -> "fn-defer:" ++ r.v
+  let errdefer = fun (r : { v : String }) -> "fn-errdefer:" ++ r.v
+  say ((defer) { v = "1" })
+  say ((errdefer) { v = "2" })
+
+  // D22 (abort unwind): abort unwinds scope, runs defer & errdefer
+  say "-- D22-abort --"
+  let aborted =
+    try
+      scope {
+        defer { say "d22:defer" }
+        errdefer { say "d22:errdefer" }
+        Abort.bail "aborted-body"
+      }
+    with
+    | Abort.bail why -> "bail:" ++ why
+  say aborted

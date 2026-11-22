@@ -172,7 +172,10 @@ impl Ide<'_> {
 impl Ide<'_> {
     /// Moving a variable access or lexical exit can change its meaning.
     fn unsafe_to_move(&self, file: FileId, node: &Node) -> bool {
-        if matches!(node.kind, K::AssignStmt | K::BreakExpr | K::ContinueExpr) {
+        if matches!(
+            node.kind,
+            K::AssignStmt | K::BreakExpr | K::ContinueExpr | K::DeferStmt
+        ) {
             return true;
         }
         if node.kind == K::NameExpr

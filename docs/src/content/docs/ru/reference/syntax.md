@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: 61fccd2cba83efe4
+source_hash: 4c990ab23da7d34a
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -130,6 +130,8 @@ in when for yield do break continue
 Контекстные слова считаются обычными именами, кроме следующих позиций:
 
 - `loop` перед `{` и `while` перед условием, за которым идёт `do`;
+- `defer` и `errdefer` перед `{` в позиции инструкции (см.
+  [ресурсы](../resources/#инструкции-defer-и-errdefer));
 - `private` перед `module` в заголовке файла (см. [модули](../modules/)) и
   `plugin` перед головой в списке `exposing` (см.
   [плагины](../plugins/#как-подключить-плагин));
@@ -237,6 +239,8 @@ in when for yield do break continue
 | `await` | Один раз выполняет `Eff` в текущем файбере и возвращает результат или вычисляет `Lazy` | `await request` |
 | `lazy` | Создаёт `Lazy r e a`: блок выполнится не больше одного раза, при первом `await`; `let lazy x = e` связывает такое значение своей функции | `lazy { Config.load () }` |
 | `scope` | Выполняет блок в новом регионе и при завершении освобождает полученные в нём ресурсы | `scope { File.read_all (File.open_scoped path) }` |
+| `defer` | Контекстное слово: регистрирует очистку в ближайшем явном `scope` на любое закрытие | `defer { close handle }` |
+| `errdefer` | Контекстное слово: регистрирует очистку в ближайшем явном `scope`, выполняемую только при сбое тела | `errdefer { rollback tx }` |
 | `provide` | Выполняет блок с сервисами, созданными слоем | `provide live { run user }` |
 | `ignore` | Отбрасывает результат промежуточного выражения | `ignore (Store.save user)` |
 
@@ -289,6 +293,7 @@ in when for yield do break continue
 | `task` | `task { … } : Eff {Store} {StoreError} Float` — вычисление, создаваемое блоком |
 | `lazy` | `lazy { … } : Lazy {Store} {StoreError} Float` — ленивое вычисление, создаваемое блоком |
 | `scope` | `scope { … } : Float` — результат блока, возвращаемый после освобождения ресурсов |
+| `defer`, `errdefer` | `defer { … } : Unit` — режим очистки и позиция владеющего явного `scope` |
 | `provide`, `try` | Результат блока и сервисы или ошибки, которые он устраняет |
 | `match`, `if` | `match … with : String` — результат выбранной ветки |
 | `fun` | `fun … -> … : Float -> Float` — тип функции |
@@ -682,7 +687,8 @@ save_with :
 
 ```text
 block       = statement { line break statement }
-statement   = "let" ["lazy"] ["mut"] … | signature | name "=" block | expr
+statement   = "let" ["lazy"] ["mut"] … | signature | name "=" block
+            | "defer" "{" block "}" | "errdefer" "{" block "}" | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | [label [":"]] "loop" "{" block "}"
             | [label [":"]] "while" expr "do" block

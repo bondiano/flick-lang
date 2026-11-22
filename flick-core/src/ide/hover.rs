@@ -19,6 +19,7 @@ mod attributes;
 #[cfg(test)]
 mod attributes_tests;
 pub(super) mod companions;
+mod defer;
 mod kinds;
 mod operators;
 mod types;
@@ -129,6 +130,9 @@ impl Ide<'_> {
             .child_tokens()
             .find(|t| t.start <= offset && offset <= t.end && t.kind != K::Ident)?;
         let at = (kw.start, kw.end);
+        if matches!(kw.kind, K::DeferKw | K::ErrdeferKw) {
+            return self.defer_hover(file, kw.kind == K::ErrdeferKw, at);
+        }
         let ty = m.typing.types.get(&at)?;
         let shown = show_signature(ty);
         let (head, note) = match kw.kind {

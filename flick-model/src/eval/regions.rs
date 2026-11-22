@@ -56,6 +56,8 @@ pub enum Finalizer {
     Release(usize),
     /// A task, awaited with what it kept.
     Run(Term, Kept),
+    /// A `Scope.defer` callback `Exit e b ->{r} Unit`, run with the body's exit snapshot.
+    Close(Term, Kept),
 }
 
 /// `Λ`, the objects released so far, and the environments of the
@@ -186,6 +188,10 @@ impl Machine<'_> {
     /// One step of closing `π` (§3.3): the next child, else the last
     /// finalizer, else `π` is closed and its body's end goes on.
     pub(super) fn close(&mut self, pi: usize, s: Name, ended: Ended) -> Control {
+        enum NextWork {
+            Await(Term, Kept),
+            Close(Term, Kept),
+        }
         let r = &mut self.lambda.regions[pi];
         let work = if r.children.is_empty() {
             loop {
@@ -193,15 +199,28 @@ impl Machine<'_> {
                     Some(Finalizer::Release(n)) => {
                         self.lambda.released.insert(n);
                     }
-                    Some(Finalizer::Run(t, kept)) => break Some((t, kept)),
+                    Some(Finalizer::Run(t, kept)) => break Some(NextWork::Await(t, kept)),
+                    Some(Finalizer::Close(func, kept)) => break Some(NextWork::Close(func, kept)),
                     None => break None,
                 }
             }
         } else {
             let (_, t, kept) = r.children.remove(0);
-            Some((t, kept))
+            Some(NextWork::Await(t, kept))
         };
-        if let Some((t, kept)) = work {
+        if let Some(work) = work {
+            let (step, kept) = match work {
+                NextWork::Await(t, kept) => (Term::Await(Rc::new(t)), kept),
+                NextWork::Close(func, kept) => {
+                    let exit_path = if ended.is_err() {
+                        Path::new("Exit", "fail")
+                    } else {
+                        Path::new("Exit", "succeed")
+                    };
+                    let exit = self.object(&exit_path, None);
+                    (Term::app(func, exit), kept)
+                }
+            };
             self.push(Frame::Close(pi, s, ended));
             for keep in kept.iter() {
                 self.push(match keep {
@@ -210,7 +229,7 @@ impl Machine<'_> {
                     Keep::Handler(id, h) => Frame::KeptHandler(*id, h.clone()),
                 });
             }
-            return Control::Eval(Term::Await(Rc::new(t)));
+            return Control::Eval(step);
         }
         // Detach every payload before dropping any of them. Storage is not
         // an ordinary LIFO finalizer: an earlier finalizer may read a view
@@ -303,6 +322,14 @@ impl Machine<'_> {
                 self.lambda.regions[pi]
                     .finalizers
                     .push(Finalizer::Run(t.clone(), kept));
+                Control::Ret(Term::unit())
+            }
+            (RegionOp::AddClose, [func]) => {
+                let pi = self.live(owner()?)?;
+                let kept = self.kept();
+                self.lambda.regions[pi]
+                    .finalizers
+                    .push(Finalizer::Close(func.clone(), kept));
                 Control::Ret(Term::unit())
             }
             // `let x = await t in Scope.add_finalizer (task (release x)); x`

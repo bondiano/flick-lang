@@ -151,6 +151,7 @@ impl<'a> Printer<'a> {
             | K::LazyExpr
             | K::ScopeExpr
             | K::ProvideExpr
+            | K::DeferStmt
             | K::DoExpr
             | K::RecGroup => self.braced(n, &[]),
             K::ForExpr | K::WhileExpr => self.for_(n),

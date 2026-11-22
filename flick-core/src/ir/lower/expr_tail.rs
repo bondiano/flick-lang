@@ -204,6 +204,7 @@ impl Lower<'_> {
                 }
                 K::LetDecl => self.local_let(statement, &mut stmts),
                 K::AssignStmt => stmts.push(self.assign(statement)),
+                K::DeferStmt if siblings.is_some() => stmts.push(Stmt::Expr(self.expr(statement))),
                 _ if siblings.is_some() => lines.push(self.expr(statement)),
                 _ if last => result = Some(self.expr(statement)),
                 _ => stmts.push(Stmt::Expr(self.expr(statement))),

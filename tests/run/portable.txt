@@ -287,6 +287,8 @@ runtime/abort_stops_children
 runtime/discontinued_body
 runtime/discontinued_fiber
 runtime/defer_make
+runtime/defer_core
+runtime/defer_lifecycle
 runtime/cleanup_control
 
 effect/host_services

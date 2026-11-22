@@ -2,6 +2,25 @@
 use super::expr::{at_operand_start, expr, for_expr, head_without_braces, stmt};
 use super::{Done, K, Parser};
 
+pub(super) fn is_defer_head(p: &Parser) -> bool {
+    !p.no_brace
+        && p.at(K::Ident)
+        && (p.at_word("defer") || p.at_word("errdefer"))
+        && p.nth(1) == K::LBrace
+}
+
+pub(super) fn defer_stmt(p: &mut Parser) -> Done {
+    let m = p.start();
+    let keyword = if p.at_word("errdefer") {
+        K::ErrdeferKw
+    } else {
+        K::DeferKw
+    };
+    p.bump_as(keyword);
+    p.braces(K::Block, stmt, |_| false);
+    p.complete(m, K::DeferStmt)
+}
+
 pub(super) fn while_ahead(p: &Parser) -> bool {
     let mut depth = 0;
     let mut conditional = 0;

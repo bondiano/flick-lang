@@ -150,6 +150,7 @@ impl Checker<'_> {
                 owner: owner.clone(),
                 givens: self.classes.givens.clone(),
                 span,
+                owner_related: None,
             };
             self.cx.regions.outlives.push(outlives);
             return;

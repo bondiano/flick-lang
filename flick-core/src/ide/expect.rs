@@ -385,6 +385,7 @@ fn calls<'m>(m: &'m Analyzed, path: &[&Node], text: &str) -> Calls<'m> {
             | K::LazyExpr
             | K::ProvideExpr
             | K::ScopeExpr
+            | K::DeferStmt
             | K::DoExpr
             | K::ForExpr
             | K::LoopExpr

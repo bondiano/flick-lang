@@ -62,6 +62,9 @@ pub enum Site {
     Expected(Type, Written),
     /// The rows inferred for a function without an expected type.
     Inferred,
+    /// The cleanup block of a `defer { … }` or `errdefer { … }` statement,
+    /// which must leave no unhandled typed errors.
+    DeferCleanup { is_errdefer: bool, span: Span },
 }
 
 impl Stage {

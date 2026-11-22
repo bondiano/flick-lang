@@ -5,6 +5,7 @@
 # runs every case on Effect too.
 
 ../rt/control_handlers
+../rt/defer_control
 ../rt/deep_async
 ../rt/deep_control
 ../rt/late_effect
@@ -121,6 +122,8 @@ runtime/concurrency
 runtime/discontinued_body
 runtime/discontinued_fiber
 runtime/defer_make
+runtime/defer_core
+runtime/defer_lifecycle
 runtime/cleanup_control
 runtime/error_map
 runtime/exits

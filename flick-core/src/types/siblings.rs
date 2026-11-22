@@ -56,7 +56,7 @@ impl Checker<'_> {
             }
             match statement.kind {
                 K::Signature | K::LetDecl => i += self.local_declaration(&statements, i),
-                K::AssignStmt => self.statement(statement),
+                K::AssignStmt | K::DeferStmt => self.statement(statement),
                 _ => {}
             }
             i += 1;
@@ -229,5 +229,8 @@ impl Checker<'_> {
 /// Whether a line of a block of this kind is a statement rather than an
 /// expression.
 fn is_statement(kind: K) -> bool {
-    matches!(kind, K::Signature | K::LetDecl | K::AssignStmt)
+    matches!(
+        kind,
+        K::Signature | K::LetDecl | K::AssignStmt | K::DeferStmt
+    )
 }

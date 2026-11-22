@@ -148,6 +148,8 @@ pub enum RegionOp {
     Spawn,
     /// `Scope.add_finalizer`.
     AddFinalizer,
+    /// `Scope.defer` / `Resource.add_close`.
+    AddClose,
     /// `Resource.acquire_release`: the value, its release a finalizer.
     AcquireRelease,
     /// Allocates region-owned storage, separately from the finalizer stack.

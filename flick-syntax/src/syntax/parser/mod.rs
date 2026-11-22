@@ -614,6 +614,8 @@ mod branch_tests;
 #[cfg(test)]
 mod contract_tests;
 #[cfg(test)]
+mod defer_tests;
+#[cfg(test)]
 mod exposing_tests;
 #[cfg(test)]
 mod operator_tests;

@@ -13,6 +13,8 @@ pub struct Outlives {
     pub owner: Type,
     pub givens: Vec<Type>,
     pub span: Span,
+    /// Selected explicit `scope` span when originating from `defer`/`errdefer`.
+    pub owner_related: Option<Span>,
 }
 
 impl Checker<'_> {
@@ -64,15 +66,22 @@ impl Checker<'_> {
             if !fits {
                 let (region, scope) = self.describe(&atom);
                 let (owner_name, _) = self.describe(&owner);
-                let mut diagnostic = Diagnostic::error(
-                    codes::G003,
+                let message = if o.owner_related.is_some() {
+                    format!(
+                        "this cleanup holds {region}, which may end before its owner {owner_name}: cleanup runs when its owner's scope closes"
+                    )
+                } else {
                     format!(
                         "the child holds {region}, which may end before its owner {owner_name}: a child runs until its owner's scope closes"
-                    ),
-                    o.span,
-                );
+                    )
+                };
+                let mut diagnostic = Diagnostic::error(codes::G003, message, o.span);
                 if let Some(span) = scope {
                     diagnostic = diagnostic.with_related(span, "the region's scope ends here");
+                }
+                if let Some(owner_span) = o.owner_related {
+                    diagnostic = diagnostic
+                        .with_related(owner_span, "cleanup is registered on this `scope`");
                 }
                 self.diagnostics.push(diagnostic);
                 return;

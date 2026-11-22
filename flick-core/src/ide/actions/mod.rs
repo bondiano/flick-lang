@@ -2,6 +2,7 @@
 //! adding a signature, matching on a variable, qualifying a name,
 //! extracting or inlining a variable, and keeping one in a `Ref`.
 
+mod defer;
 mod extract;
 mod import_class;
 mod match_on;
@@ -33,6 +34,7 @@ impl Ide<'_> {
         out.extend(self.extract(file, start, end));
         out.extend(self.inline(file, start));
         out.extend(self.to_ref(file, start));
+        out.extend(self.defer_actions(file, start));
         out
     }
 }

@@ -110,6 +110,8 @@ syntax_kinds! {
         WhenKw = "when",
         LoopKw,
         WhileKw,
+        DeferKw,
+        ErrdeferKw,
         BreakKw = "break",
         ContinueKw = "continue",
         ForKw = "for",
@@ -339,6 +341,8 @@ syntax_kinds! {
         ForExpr,
         ScopeExpr,
         ProvideExpr,
+        /// `defer { … }` or `errdefer { … }`: scope-owned cleanup statement.
+        DeferStmt,
         /// The lines under a call that are its arguments, one each, where a
         /// plugin's block asks for them: the children of an element of `ui`.
         Children,

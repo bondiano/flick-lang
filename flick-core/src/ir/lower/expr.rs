@@ -294,6 +294,7 @@ impl Lower<'_> {
             K::LazyExpr => self.lazy_expr(node, children[0], span),
             K::DoExpr => return self.do_expr(node),
             K::ScopeExpr => return self.scope_expr(node, children[0], span),
+            K::DeferStmt => return self.defer_stmt(node),
             K::ProvideExpr => self.layer_run(children[0], children[1], span),
             _ => {
                 self.unsupported(node);
@@ -460,7 +461,7 @@ impl Lower<'_> {
         }
     }
 
-    fn within(&mut self, key: Range, call: Expr) -> Expr {
+    pub(super) fn within(&mut self, key: Range, call: Expr) -> Expr {
         let Some(owner) = self.typing.owners.get(&key) else {
             return call;
         };

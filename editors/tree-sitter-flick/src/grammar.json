@@ -23,6 +23,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "_defer"
+        },
+        {
+          "type": "SYMBOL",
           "name": "_while"
         },
         {
@@ -215,6 +219,37 @@
             "content": {
               "type": "STRING",
               "value": "loop"
+            },
+            "named": true,
+            "value": "keyword"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "braces"
+          }
+        ]
+      }
+    },
+    "_defer": {
+      "type": "PREC_DYNAMIC",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "STRING",
+                  "value": "defer"
+                },
+                {
+                  "type": "STRING",
+                  "value": "errdefer"
+                }
+              ]
             },
             "named": true,
             "value": "keyword"
@@ -1419,6 +1454,14 @@
         },
         {
           "type": "STRING",
+          "value": "defer"
+        },
+        {
+          "type": "STRING",
+          "value": "errdefer"
+        },
+        {
+          "type": "STRING",
           "value": "while"
         },
         {
@@ -1643,6 +1686,10 @@
   "conflicts": [
     [
       "_loop",
+      "identifier"
+    ],
+    [
+      "_defer",
       "identifier"
     ],
     [

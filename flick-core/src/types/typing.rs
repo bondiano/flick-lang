@@ -204,6 +204,10 @@ pub struct Typing {
     pub aliases: HashMap<String, (Vec<String>, Type)>,
     /// Calls whose solved Scope requirement identifies a lexical owner.
     pub owners: HashMap<Range, Owner>,
+    #[cfg(feature = "ide")]
+    /// Lexical owner and mode resolved for each `defer` / `errdefer` statement,
+    /// keyed by its keyword range.
+    pub defers: HashMap<Range, DeferInfo>,
     /// Pending: uses whose types are known once the module is solved.
     pending_labels: Vec<(Range, Type)>,
     /// The services of a call that needs, or whose row may still grow to
@@ -236,6 +240,20 @@ impl Typing {
     pub fn uses_owner(&self, owner: Owner) -> bool {
         self.owners.values().any(|o| *o == owner)
     }
+}
+
+#[cfg(feature = "ide")]
+/// Lexical owner metadata for hover and refactoring on `defer` / `errdefer`.
+#[derive(Debug, Clone)]
+pub struct DeferInfo {
+    /// Span of the selected explicit `scope` keyword.
+    pub owner_span: Span,
+    /// Full byte range of the selected explicit `scope` expression.
+    pub owner_node: Range,
+    /// Optional explicit owner name (`scope name { … }`).
+    pub owner_name: Option<String>,
+    /// Whether the statement is `errdefer` (`true`) or `defer` (`false`).
+    pub is_errdefer: bool,
 }
 
 /// A class method selected without inference or dictionary search.

@@ -56,6 +56,16 @@ impl Checker<'_> {
         );
         let outer = mem::replace(&mut self.cx.stage, stage);
         self.enter_apart(super::mutation::Apart::Task);
+        let barrier =
+            if node.kind == K::LazyExpr || (node.kind == K::LetDecl && node.has_token(K::LazyKw)) {
+                super::regions::DeferBarrier::Lazy
+            } else {
+                super::regions::DeferBarrier::Task
+            };
+        self.cx
+            .regions
+            .defer_owners
+            .push(super::regions::DeferOwner::Barrier(barrier));
         let result = match result {
             Some(result) => {
                 self.check(body, &result);
@@ -63,6 +73,7 @@ impl Checker<'_> {
             }
             None => self.infer(body),
         };
+        self.cx.regions.defer_owners.pop();
         self.leave_apart();
         self.typing.owner_stack.truncate(owner_mark);
         let inner = mem::replace(&mut self.cx.stage, outer);
@@ -140,7 +151,14 @@ impl Checker<'_> {
         for (arm, operation) in arms.iter().zip(&operations) {
             if let Some((index, op)) = operation {
                 self.enter_apart(super::mutation::Apart::HandlerArm);
+                self.cx
+                    .regions
+                    .defer_owners
+                    .push(super::regions::DeferOwner::Barrier(
+                        super::regions::DeferBarrier::HandlerArm,
+                    ));
                 let covers = self.operation_arm(arm, &handled[*index], op, &ty, region.as_ref());
+                self.cx.regions.defer_owners.pop();
                 self.leave_apart();
                 if covers {
                     handled[*index].covered.push(op.name.clone());

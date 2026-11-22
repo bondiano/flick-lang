@@ -64,6 +64,61 @@ pub(super) fn item(label: &str, kind: CompletionKind, detail: Option<String>) ->
     }
 }
 
+/// Whether `offset` is at a block statement position lexically inside an
+/// explicit `scope { … }` without an intervening deferred or cleanup boundary.
+fn in_defer_scope(tree: &Node, offset: u32) -> bool {
+    let path = tree::path_to(tree, offset);
+    let statement_block = match path.as_slice() {
+        [.., parent, last]
+            if parent.kind == K::Block && matches!(last.kind, K::NameExpr | K::Error) =>
+        {
+            path.len() - 2
+        }
+        [.., last] if last.kind == K::Block => path.len() - 1,
+        _ => return false,
+    };
+    if let Some(&owner) = statement_block.checked_sub(1).and_then(|i| path.get(i)) {
+        match owner.kind {
+            K::DoExpr => return false,
+            K::ForExpr
+                if owner
+                    .nodes()
+                    .next()
+                    .is_some_and(|c| c.range() == path[statement_block].range()) =>
+            {
+                return false;
+            }
+            K::AssignStmt | K::RecordField | K::ProofDecl => return false,
+            K::LetDecl if !owner.nodes().any(|c| c.kind == K::Params) => return false,
+            _ => {}
+        }
+    }
+    for (i, &node) in path[..statement_block].iter().enumerate().rev() {
+        match node.kind {
+            K::ScopeExpr => return true,
+            K::FunExpr | K::TaskExpr | K::LazyExpr | K::DeferStmt => return false,
+            K::LetDecl
+                if node.nodes().any(|c| c.kind == K::Params) || node.has_token(K::LazyKw) =>
+            {
+                return false;
+            }
+            K::ForExpr if !node.has_token(K::DoKw) => return false,
+            K::MatchArm
+                if i > 0
+                    && path[i - 1].kind == K::TryExpr
+                    && node
+                        .nodes()
+                        .next()
+                        .is_some_and(|p| p.kind == K::ConPat && p.has_token(K::Dot)) =>
+            {
+                return false;
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
 /// The sort groups of names in scope.
 const LOCAL: u8 = 0;
 const OWN: u8 = 1;
@@ -182,6 +237,26 @@ impl Ide<'_> {
         if let Some(prelude) = self.interface(lang::prelude()) {
             for e in visible(prelude) {
                 add(PRELUDE_NAMES, completion(e), e.scheme.as_ref());
+            }
+        }
+        if in_defer_scope(&m.tree, scope) {
+            for (label, detail, snippet) in [
+                (
+                    "defer",
+                    "scope-owned cleanup (runs on every scope close)",
+                    "defer {\n  $0\n}",
+                ),
+                (
+                    "errdefer",
+                    "scope-owned cleanup (runs when scope body fails)",
+                    "errdefer {\n  $0\n}",
+                ),
+            ] {
+                out.entry(label.to_owned()).or_insert_with(|| Completion {
+                    snippet: Some(snippet.to_owned()),
+                    sort: PRELUDE_NAMES,
+                    ..item(label, CompletionKind::Keyword, Some(detail.to_owned()))
+                });
             }
         }
         out.into_values().collect()

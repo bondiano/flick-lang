@@ -104,5 +104,6 @@ runtime/suspended
 runtime/lazy_let
 runtime/lazy_let_state
 runtime/lazy_opt
+runtime/defer_core
 schema/prove
 schema/prove_imported
