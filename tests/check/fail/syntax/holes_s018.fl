@@ -1,0 +1,49 @@
+// `_` is only allowed as a direct argument of an application (`FLICK-S018`).
+module App.HolesS018 exposing (..)
+
+f : a -> a
+let f x = x
+
+pipe_right : String -> String
+let pipe_right name = name |> _
+//                            ^ FLICK-S018
+
+pipe_left : Int -> Int
+let pipe_left x = _ |> f x
+//                ^ FLICK-S018
+
+in_list : Int -> List Int
+let in_list x = f [_, x]
+//                 ^ FLICK-S018
+
+in_record : { field : Int }
+let in_record = f { field = _ }
+//                          ^ FLICK-S018
+
+as_callee : Int -> Int
+let as_callee x = _ x
+//                ^ FLICK-S018
+
+standalone : Int
+let standalone = _
+//               ^ FLICK-S018
+
+parenthesized : Int -> Int
+let parenthesized = f (_)
+//                     ^ FLICK-S018
+
+op_section : Int -> Int
+let op_section = (_ + 1)
+//                ^ FLICK-S018
+
+field_section : { name : String } -> String
+let field_section = _.name
+//                  ^ FLICK-S018
+
+arg_field_section : { name : String } -> String
+let arg_field_section = f _.name
+//                        ^ FLICK-S018
+
+arg_question : Option Int -> Option Int
+let arg_question = f _?
+//                   ^ FLICK-S018

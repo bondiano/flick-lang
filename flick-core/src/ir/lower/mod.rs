@@ -13,6 +13,7 @@ mod enums;
 mod expr;
 mod generic;
 mod handle;
+mod holes;
 mod interpolation;
 mod lambda;
 mod lazy;
@@ -137,6 +138,7 @@ impl<'a> Lower<'a> {
             reuse: None,
             owners: HashMap::new(),
             entry_owners: HashMap::new(),
+            hole_params: HashMap::new(),
             records: BTreeMap::new(),
             #[cfg(not(target_arch = "wasm32"))]
             current_item: String::new(),
@@ -187,6 +189,8 @@ struct Lower<'a> {
     /// The owner local of each source `scope` used by a call or value plan.
     owners: HashMap<Range, String>,
     entry_owners: HashMap<StageKey, String>,
+    /// Active expression-hole parameters keyed by `K::HoleExpr` range.
+    hole_params: HashMap<Range, String>,
     /// The constructors over a record written in their declaration, with
     /// its labels (`Module::records`).
     records: BTreeMap<String, Vec<String>>,
@@ -285,6 +289,7 @@ impl Lower<'_> {
         self.scope.clear();
         self.used.clear();
         self.vars.clear();
+        self.hole_params.clear();
         #[cfg(not(target_arch = "wasm32"))]
         self.current_item.clear();
     }

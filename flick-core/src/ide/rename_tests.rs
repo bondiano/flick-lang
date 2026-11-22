@@ -387,6 +387,25 @@ fn class_method_rename_checks_inherited_imports_even_without_method_calls() {
 }
 
 #[test]
+fn rename_and_prepare_rename_refuse_expression_holes() {
+    let source = "module App.Holes exposing (wrapped)
+
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+wrapped : String -> String
+let wrapped name = name |> label \"[\" _ \"]\"
+";
+    let f = fixture_of(&[("src/App/Holes.fl", source)]);
+    assert_clean(&f);
+    let ide = f.ide();
+    let file = f.file("App.Holes");
+    let hole = f.at("App.Holes", "_ \"]\"", 0);
+    assert!(ide.renamable(file, hole).is_err());
+    assert!(ide.rename(file, hole, "value").is_err());
+}
+
+#[test]
 fn rename_refuses_orelse_keyword_and_leaves_orelse_record_labels_alone() {
     let source = "module App.Main exposing (run)\n\ntype alias Box = { orelse : Option Int }\n\nrun : Box -> Int\nlet run box =\n  let value = box.orelse orelse 0\n  let { orelse = raw } = box\n  value + (raw orelse 0)\n";
     let f = fixture_of(&[("src/App/Main.fl", source)]);

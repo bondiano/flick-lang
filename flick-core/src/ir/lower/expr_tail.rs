@@ -8,7 +8,7 @@ impl Lower<'_> {
             .map(|t| t.kind);
         match op {
             Some(K::LtPipe) => {
-                return self.app_expr(&right_application(children[0], children[1]), span);
+                return self.app_expr(node, &right_application(children[0], children[1]), span);
             }
             Some(K::OrElse) => return self.orelse(node, children[0], children[1], span),
             Some(K::GtGt | K::LtLt) => return self.composition(node),

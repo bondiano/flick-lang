@@ -1,0 +1,65 @@
+// Expression holes desugar to `fun h -> f a1 ... h ... an`.
+// In `x |> f y _`, `x` is evaluated before the closure runs `f`, `y`, `h`,
+// whereas `f y x` evaluates `f`, `y`, then `x`.
+module App.Main exposing (main)
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+join_with : String -> List String -> String
+let rec join_with sep items =
+  match items with
+  | [] -> ""
+  | [x] -> x
+  | [x, ...xs] -> x ++ sep ++ join_with sep xs
+
+seen : String ->{Host.Console} String
+let seen s =
+  say s
+  s
+
+report : String ->{Host.Console} String
+let report name = name |> label (seen "before") _ "]"
+
+apply_twice : (String -> String) -> String -> String
+let apply_twice f s = f (f s)
+
+apply_runtime : (String ->{} String) -> String ->{} String
+let apply_runtime f s = f s
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  // Pipe, `<|`, last-position hole and direct call produce equal results.
+  let name = "ada"
+  say (name |> label "[" _ "]")
+  say (label "[" _ "]" <| name)
+  say (name |> label "[" "]" _)
+  say (label "[" name "]")
+  say ("-" |> (join_with _ ["ada", "lovelace"]))
+  // Partial application, polymorphic capture, nested holes and lifted pure capture.
+  let open = label "[" _
+  say (open "part" "]")
+  say (show (List.map (label "<" _ ">") ["a", "b"]))
+  say (show (Some _ <| 42))
+  let nested = apply_twice (label "(" _ ")") _
+  say (nested "hi")
+  say (apply_runtime (label "{" _ "}") "lift")
+  // Evaluation order: pipe evaluates its left operand before the capture body.
+  say "--- pipe ---"
+  say (report (seen "name"))
+  say "--- right-apply ---"
+  say (label (seen "before") _ "]" <| seen "name")
+  say "--- direct ---"
+  say (label (seen "before") (seen "name") "]")
+  say "--- after-hole ---"
+  say (seen "name" |> label (seen "before") _ (seen "after"))
+  say "--- direct-three ---"
+  say (label (seen "before") (seen "name") (seen "after"))
+  // Building a capture does not evaluate its arguments until called.
+  say "--- deferred ---"
+  let deferred = label (seen "inside") _ "]"
+  say "built"
+  say (deferred "ok")

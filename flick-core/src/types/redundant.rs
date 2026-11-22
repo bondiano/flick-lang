@@ -42,6 +42,10 @@ impl Checker<'_> {
                     .iter()
                     .fold(true, |all, child| self.check_exact(child, &item) & all)
             }
+            (K::AppExpr, _) if super::holes::has_hole(node) => {
+                self.check(node, expected);
+                return false;
+            }
             (
                 K::Block
                 | K::FunExpr

@@ -1,6 +1,6 @@
 ---
 title: "Direct effectful calls"
-source_hash: a3ca57e8b45c2128
+source_hash: c325e5223a2d733b
 ---
 
 An effectful function is called in an ordinary expression, and `let` binds its result. A sequence of operations is written with ordinary expressions and bindings.
@@ -92,6 +92,8 @@ let hello =
 ```
 
 For an anonymous lambda, the kind of each arrow and both rows are inferred, or it is checked against the expected type. `fun x -> normalize_name x` is a pure function, `fun x -> task { Users.get x }` is a pure `Eff` builder, and `fun x -> Users.get x` is a runtime function. With nested lambdas, the effect belongs to the stage that performs it. Bindings that are not functions do not have to have a separate signature; local type hints remain available.
+
+A single `_` hole in direct argument position of a call is shorthand for a one-parameter anonymous function: `f a _ c` means `fun h -> f a h c`, so `x |> f a _ c` and `f a _ c <| x` pass `x` into the hole position, evaluating `x` before the capture body; a nested call `f (g _) _` desugars independently (`fun h -> f (fun k -> g k) h`). Typing, effects, regions and captures match the equivalent `fun`: the closure follows the same generalization rules as an anonymous function, and the passed value remains a parameter. A second `_` in one call is `FLICK-S017`, and `_` outside a direct call argument is `FLICK-S018`.
 
 A pure body or callback is allowed in an expected runtime position through a checked lift node in the IR: the backend defers the body and wraps its result in Effect. This is an adaptation of the representation, not an equality of arrows. Lift does not run a returned `Eff` value and does not remove an additional layer. The reverse conversion of a runtime call into a pure one by empty rows is forbidden; captures are preserved by lift.
 

@@ -1,0 +1,30 @@
+// Typing errors on expression holes: mismatched hole argument, mismatched pipe,
+// monomorphic parameter passed a hole closure, and unsigned top-level hole.
+module App.HolesTypes exposing (..)
+
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+add_one : Int -> Int
+let add_one n = n + 1
+
+bad_expected : String -> Int
+let bad_expected = add_one _
+//                         ^ FLICK-T003
+
+bad_pipe : String
+let bad_pipe = 1 |> label "[" _ "]"
+//             ^ FLICK-T003
+
+param_no_gen : (Int, Int)
+let param_no_gen =
+  (fun g -> (g 1, g "a")) (identity _)
+//                  ^^^ FLICK-T003
+
+let top_hole = add_one _
+//~ FLICK-T004 @24:1-24:25 function `top_hole` needs a signature right above its `let`
+
+// Type wildcards in annotations remain `FLICK-T024`.
+type_hole : Int
+let type_hole = (1 : _)
+//                   ^ FLICK-T024

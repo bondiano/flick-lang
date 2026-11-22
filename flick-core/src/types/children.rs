@@ -195,7 +195,7 @@ impl Checker<'_> {
         let by_expected = matches!(
             inner.kind,
             K::FunExpr | K::LoopExpr | K::WhileExpr | K::RecordExpr | K::DoExpr | K::TaskExpr
-        );
+        ) || super::holes::has_hole(inner);
         if by_expected {
             return None;
         }

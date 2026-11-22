@@ -235,8 +235,9 @@ fn app(p: &mut Parser) -> Option<Done> {
         return Some(head);
     }
     let m = p.precede(head);
+    let mut has_hole = false;
     while at_arg_start(p) && !at_children(p) {
-        argument(p);
+        argument(p, &mut has_hole);
     }
     if at_children(p) {
         children(p);
@@ -286,15 +287,20 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::TaskKw
         | K::TodoKw
         | K::ScopeKw
-        | K::ProvideKw => true,
+        | K::ProvideKw
+        | K::Underscore => true,
         K::LazyKw => p.nth(1) == K::LBrace,
         K::LBrace => !p.no_brace,
         _ => false,
     }
 }
 
-/// An argument of an application, where `server` is a name: `f server x`.
-fn argument(p: &mut Parser) -> Option<Done> {
+/// An argument of an application, where `server` is a name (`f server x`) and
+/// `_` captures one argument (`f a _ c` means `fun h -> f a h c`).
+fn argument(p: &mut Parser, has_hole: &mut bool) -> Option<Done> {
+    if p.at(K::Underscore) {
+        return super::holes::argument(p, has_hole);
+    }
     if !p.at_word("server") {
         return postfix(p);
     }
@@ -402,6 +408,7 @@ pub(super) fn atom(p: &mut Parser) -> Option<Done> {
         }
         K::StringStart => interpolation(p),
         K::TodoKw => todo(p),
+        K::Underscore => super::holes::unexpected(p),
         K::LParen => paren(p),
         K::LBracket => {
             p.delimited(K::RBracket, |p| {

@@ -1,0 +1,120 @@
+// Expression holes capture one argument of an application as `fun h -> ...`.
+module App.Holes exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_with : forall s. String -> File s ->{; ReadError} String
+
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+full_name : String -> String -> String
+let full_name last_name first_name = last_name |> (String.join _ [first_name])
+
+wrapped : String -> String
+let wrapped name = name |> label "[" _ "]"
+
+wrapped_right : String -> String
+let wrapped_right name = label "[" _ "]" <| name
+
+plain : String -> String
+let plain name = name |> label "[" "]" _
+
+direct : String -> String
+let direct name = label "[" name "]"
+
+partial : String -> String -> String
+let partial = label "[" _
+
+single : a -> a
+let single = identity _
+
+wrap_some : a -> Option a
+let wrap_some = Some _
+
+mapped : List String -> List String
+let mapped names = List.map (label "[" _ "]") names
+
+apply_twice : (Int -> Int) -> Int -> Int
+let apply_twice f x = f (f x)
+
+add : Int -> Int -> Int
+let add a b = a + b
+
+nested : Int -> Int
+let nested = apply_twice (add 1 _) _
+
+composed : String -> String
+let composed = label "[" _ "]" >> label "(" _ ")"
+
+apply_runtime : (String ->{} String) -> String ->{} String
+let apply_runtime f s = f s
+
+lifted_outer : String ->{} String
+let lifted_outer s = apply_runtime (label "[" _ "]") s
+
+make_adder : Int -> Int -> Int
+let make_adder a b = a + b
+
+lifted_inner : Int -> Int ->{} Int
+let lifted_inner = make_adder _
+
+scoped_pipe : Path ->{FileSystem; OpenError, ReadError} String
+let scoped_pipe path = scope {
+  let file = FileSystem.open_scoped path
+  file |> FileSystem.read_with "hdr" _
+}
+
+keep_wildcards : Option Int -> Int
+let keep_wildcards item =
+  let _ = 1
+  ignore_arg : Int -> Int
+  let ignore_arg = fun _ -> 2
+  let value = ignore_arg 0
+  match item with
+  | Some n -> n + value
+  | _ -> value
+
+// Cross-feature interactions: `orelse`, `catch`, `result { ... }`, `let ... else`,
+// and bidirectional checking through annotated lists.
+with_orelse : Option String -> String
+let with_orelse item = (item |> Option.map (label "[" _ "]")) orelse "none"
+
+fail_read : String -> String ->{; ReadError} String
+let fail_read tag path =
+  let _ = tag
+  Fail.fail (ReadError path)
+
+with_catch : Path ->{} String
+let with_catch path =
+  (path |> fail_read "hdr" _) catch
+  | ReadError p -> p
+
+with_result : Path ->{} Result ReadError String
+let with_result path = result { path |> fail_read "hdr" _ }
+
+with_let_else : Option String -> String
+let with_let_else item =
+  let Some wrapped_item = item |> Option.map (label "[" _ "]") else "none"
+  wrapped_item
+
+use_poly : (forall a. a -> Int) -> Int -> Int
+let use_poly f n = f n
+
+annotated_list_hole : List ((forall a. a -> Int) -> Int)
+let annotated_list_hole =
+  let fns : List ((forall a. a -> Int) -> Int) = [use_poly _ 1]
+  fns
+
+local_generalized : (Int, String)
+let local_generalized =
+  let g = identity _
+  (g 1, g "a")

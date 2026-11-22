@@ -1,0 +1,20 @@
+// At most one `_` hole is allowed per application (`FLICK-S017`).
+module App.HolesS017 exposing (..)
+
+f : Int -> Int -> Int -> Int
+let f a b c = a + b + c
+
+g : Int -> Int
+let g x = x
+
+h : (Int -> Int) -> Int -> Int -> Int
+let h fn a b = fn a + b
+
+let two = f _ _ 1
+//            ^ FLICK-S017
+
+let spaced = f 1 _ _
+//                 ^ FLICK-S017
+
+let with_nested = h (g _) _ _
+//                          ^ FLICK-S017

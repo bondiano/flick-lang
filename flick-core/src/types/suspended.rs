@@ -83,6 +83,9 @@ impl Checker<'_> {
                 let Some((head, args)) = parts.split_first() else {
                     return false;
                 };
+                if args.iter().any(|a| a.kind == K::HoleExpr) {
+                    return false;
+                }
                 self.is_operation(head)
                     || (self.peek_type(head)).is_some_and(|ty| crosses_runtime(&ty, args.len()))
             }

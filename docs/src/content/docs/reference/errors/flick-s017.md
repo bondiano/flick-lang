@@ -1,0 +1,30 @@
+---
+title: "FLICK-S017"
+---
+
+An application can have at most one `_` hole. A single hole captures one
+argument as an anonymous function (`f a _ c` means `fun h -> f a h c`);
+for two or more missing arguments, write a `fun` explicitly, or put a
+separate hole inside a nested call in parentheses (`f (g _) _`).
+
+```flick fail S017
+module App.Example exposing (wrap)
+
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+wrap : String -> String -> String
+let wrap = label _ _ "]"
+```
+
+Write `fun` when more than one argument is left open:
+
+```flick
+module App.Example exposing (wrap)
+
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+wrap : String -> String -> String
+let wrap = fun open mid -> label open mid "]"
+```

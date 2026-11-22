@@ -84,11 +84,21 @@ impl Checker<'_> {
             }
             let mut parts = head.nodes();
             head = parts.next()?;
+            let mut arg_count = 0;
+            let mut hole_pos = None;
             for argument in parts {
                 if argument.kind == K::Children {
                     return None;
                 }
-                i += 1;
+                if argument.kind == K::HoleExpr {
+                    hole_pos = Some(arg_count);
+                }
+                arg_count += 1;
+            }
+            if let Some(pos) = hole_pos {
+                i = if i == 0 { pos } else { arg_count + i - 1 };
+            } else {
+                i += arg_count;
             }
         }
         match head.kind {

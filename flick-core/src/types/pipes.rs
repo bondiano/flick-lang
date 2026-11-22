@@ -18,7 +18,10 @@ use crate::syntax::kind::SyntaxKind as K;
 
 /// The callee and the arguments of `f a <| x`, which are those of `f a x`.
 pub fn right_application<'n>(lhs: &'n Node, rhs: &'n Node) -> Vec<&'n Node> {
-    let call = lhs.kind == K::AppExpr && !lhs.nodes().any(|n| n.kind == K::Children);
+    let call = lhs.kind == K::AppExpr
+        && !lhs
+            .nodes()
+            .any(|n| matches!(n.kind, K::Children | K::HoleExpr));
     let mut parts: Vec<&Node> = if call {
         lhs.nodes().collect()
     } else {

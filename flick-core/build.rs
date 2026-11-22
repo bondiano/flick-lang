@@ -35,23 +35,27 @@ use implicit_packages::IMPLICIT_PACKAGES;
 fn main() -> io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo supplies OUT_DIR"));
-    let docs = cfg!(feature = "native-project");
-    if !docs {
+    let native = cfg!(feature = "native-project");
+    if !native {
         for package in ["core"].iter().chain(IMPLICIT_PACKAGES) {
             let sources = Path::new("../packages").join(package).join("src");
             strip_tree(&sources, &output.join(package))?;
         }
     }
-    implicit_sources(&output, docs)
+    implicit_sources(&output, native)
 }
 
 /// `implicit_sources.rs`: `IMPLICIT`, each implicit package with its modules
-/// and the tables of its `src/go`.
-fn implicit_sources(output: &Path, docs: bool) -> io::Result<()> {
+/// and, with `native-project`, the tables of its `src/go`.
+fn implicit_sources(output: &Path, native: bool) -> io::Result<()> {
     let mut out = String::from("pub(super) const IMPLICIT: &[Embedded] = &[\n");
     for package in IMPLICIT_PACKAGES {
-        let modules = package_modules(package, output, docs)?;
-        let go = package_go_tables(package)?;
+        let modules = package_modules(package, output, native)?;
+        let go = if native {
+            package_go_tables(package)?
+        } else {
+            String::new()
+        };
         let _ = writeln!(out, "    ({package:?}, &[\n{modules}    ], &[\n{go}    ]),");
     }
     out.push_str("];\n");
