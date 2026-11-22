@@ -2,7 +2,7 @@
 //! `(fun h -> h ()) f`. When a runtime function then meets that arrow, the
 //! mismatch points at the local and offers the annotation it needs.
 
-use std::mem;
+use std::{iter, mem};
 
 use super::Checker;
 use super::bindings::LetParts;
@@ -12,6 +12,15 @@ use crate::diagnostics::{Edit, codes};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+
+pub(super) struct Assumption {
+    arrow: Type,
+    name: String,
+    at: u32,
+    /// A diagnostic already explained this assumption. Later diagnostics
+    /// can reuse it when they know the binder they are checking.
+    reported: bool,
+}
 
 impl Checker<'_> {
     /// Notes that `head`, applied with no type known, was taken for `arrow`.
@@ -23,29 +32,28 @@ impl Checker<'_> {
         let name = &self.text[start as usize..end as usize];
         let found = self.cx.locals.iter().rposition(|l| l.name == name);
         if let Some(at) = found.and_then(|i| self.cx.locals[i].at) {
-            self.cx
-                .assumed_pure
-                .push((arrow.clone(), name.to_owned(), at));
+            self.cx.assumed_pure.push(Assumption {
+                arrow: arrow.clone(),
+                name: name.to_owned(),
+                at,
+                reported: false,
+            });
         }
     }
 
-    /// Notes where the parameters of the local function bound at `at` are
-    /// bound, a `fun` right after its `=` continuing them.
+    /// Notes where the stages of a local function bind their parameters.
     pub(super) fn note_local_params(&mut self, at: u32, parts: &LetParts) {
-        let mut params = parts.params.clone();
-        if let Some(body) = parts.body {
-            let mut statements = body.nodes();
-            if let (Some(lambda), None) = (statements.next(), statements.next())
-                && lambda.kind == K::FunExpr
-            {
-                params.extend(
-                    lambda
-                        .nodes()
-                        .filter(|n| super::patterns::is_pattern(n.kind)),
-                );
-            }
+        let lambda = parts.body.and_then(only_lambda);
+        if parts.params.is_empty() && lambda.is_none() {
+            return;
         }
-        let binders = params.into_iter().map(binder).collect();
+        let binders = parts
+            .params
+            .iter()
+            .copied()
+            .chain(lambda.into_iter().flat_map(lambda_params))
+            .map(binder)
+            .collect();
         self.cx.local_params.insert(at, binders);
     }
 
@@ -68,13 +76,23 @@ impl Checker<'_> {
 
     /// Where the `i`th parameter of `head` is bound, when `head` is a local
     /// function without a signature or a `fun`.
-    fn parameter_binder(&self, head: &Node, i: usize) -> Option<u32> {
-        let head = unparen(head);
+    fn parameter_binder(&self, mut head: &Node, mut i: usize) -> Option<u32> {
+        loop {
+            head = unparen(head);
+            if head.kind != K::AppExpr {
+                break;
+            }
+            let mut parts = head.nodes();
+            head = parts.next()?;
+            for argument in parts {
+                if argument.kind == K::Children {
+                    return None;
+                }
+                i += 1;
+            }
+        }
         match head.kind {
-            K::FunExpr => (head.nodes())
-                .filter(|n| super::patterns::is_pattern(n.kind))
-                .nth(i)
-                .and_then(binder),
+            K::FunExpr => lambda_params(head).nth(i).and_then(binder),
             K::NameExpr => {
                 let mut tokens = head.child_tokens().filter(|t| t.kind != K::Dot);
                 let (Some(token), None) = (tokens.next(), tokens.next()) else {
@@ -109,23 +127,30 @@ impl Checker<'_> {
         if !runtime || !matches!(expected, Type::Fun { effects: None, .. }) {
             return;
         }
-        let reported = (self.diagnostics.last())
-            .is_some_and(|d| d.code == codes::T003 && d.span == Some(span));
-        // the parameter the argument meets, else the arrow expected itself
+        if !self
+            .diagnostics
+            .last()
+            .is_some_and(|d| d.code == codes::T003 && d.span == Some(span))
+        {
+            return;
+        }
         let parameter = (self.cx.parameter.as_ref())
-            .filter(|(_, ty)| super::report::uncaptured(&self.zonk(ty)) == *expected)
-            .and_then(|(binder, _)| {
-                (self.cx.assumed_pure.iter()).position(|(_, _, at)| at == binder)
-            });
-        let found = parameter.or_else(|| {
-            (self.cx.assumed_pure.iter())
-                .position(|(arrow, _, _)| super::report::uncaptured(&self.zonk(arrow)) == *expected)
-        });
-        let (true, Some(index)) = (reported, found) else {
+            .filter(|(_, ty)| super::report::uncaptured(&self.zonk(ty)) == *expected);
+        let found = if let Some((binder, _)) = parameter {
+            // Every use of this parameter can point to the same binding.
+            self.cx
+                .assumed_pure
+                .iter()
+                .position(|assumption| assumption.at == *binder)
+        } else {
+            self.arrow_without_parameter(expected)
+        };
+        let Some(index) = found else {
             return;
         };
-        // one explanation per arrow taken
-        let (_, name, at) = self.cx.assumed_pure.remove(index);
+        let assumption = &mut self.cx.assumed_pure[index];
+        assumption.reported = true;
+        let (name, at) = (assumption.name.clone(), assumption.at);
         let mut last = self.diagnostics.pop().expect("the T003 just reported");
         let end = at + u32::try_from(name.len()).expect("source fits in u32");
         let binder = Span::new(self.file, at, end);
@@ -139,21 +164,72 @@ impl Checker<'_> {
         };
         let (found_msg, expected_msg) = (show_side(source_types.0), show_side(source_types.1));
         last.message = format!("expected `{expected_msg}`, found `{found_msg}`");
-        let shown = self.show_written(actual);
-        let annotate = Edit {
-            span: binder,
-            replacement: format!("({name} : {shown})"),
-        };
         let note =
             format!("`{name}` has no type written, so applying it took it for a pure function");
-        let last = last.with_related(binder, note).with_fix(|| {
-            (
-                format!("annotate `{name}` with the runtime function it is given"),
-                vec![annotate],
-            )
-        });
+        let mut last = last.with_related(binder, note);
+        // A let header takes its parameter's type in the signature (T005).
+        if !self.root.is_some_and(|root| let_parameter(root, at)) {
+            last = last.with_fix(|| {
+                let shown = self.show_written(actual);
+                (
+                    format!("annotate `{name}` with the runtime function it is given"),
+                    vec![Edit {
+                        span: binder,
+                        replacement: format!("({name} : {shown})"),
+                    }],
+                )
+            });
+        }
         self.diagnostics.push(last);
     }
+
+    /// Uses arrow shape when the callee has no source parameter and one
+    /// assumption matches. A previously explained assumption can only
+    /// be reused through its source binder.
+    fn arrow_without_parameter(&self, expected: &Type) -> Option<usize> {
+        let mut matches = self
+            .cx
+            .assumed_pure
+            .iter()
+            .enumerate()
+            .filter(|(_, assumption)| {
+                !assumption.reported
+                    && super::report::uncaptured(&self.zonk(&assumption.arrow)) == *expected
+            });
+        let (index, _) = matches.next()?;
+        matches.next().is_none().then_some(index)
+    }
+}
+
+/// A function body consisting of a lambda, with optional parentheses.
+fn only_lambda(body: &Node) -> Option<&Node> {
+    let mut statements = body.nodes();
+    let node = unparen(statements.next()?);
+    (node.kind == K::FunExpr && statements.next().is_none()).then_some(node)
+}
+
+/// The parameters of a lambda and of each lambda it immediately returns.
+fn lambda_params(lambda: &Node) -> impl Iterator<Item = &Node> {
+    iter::successors(Some(lambda), |node| {
+        node.nodes()
+            .find(|child| child.kind == K::Block)
+            .and_then(only_lambda)
+    })
+    .flat_map(|node| node.nodes().filter(|n| super::patterns::is_pattern(n.kind)))
+}
+
+/// Whether the binder at `at` belongs to a named function's let header.
+fn let_parameter(mut node: &Node, at: u32) -> bool {
+    while let Some(child) = node.nodes().find(|child| {
+        let (start, end) = child.range();
+        start <= at && at < end
+    }) {
+        if node.kind == K::LetDecl && child.kind == K::Params {
+            return true;
+        }
+        node = child;
+    }
+    false
 }
 
 /// Where the parameter `pattern` binds its name, when it is one.

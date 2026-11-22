@@ -92,82 +92,79 @@ fn a_callback_taken_for_pure_is_annotated() {
     );
 }
 
-/// A local function is generalized, so its use instantiates the arrow
-/// taken for its parameter afresh: the note and the fix still find it.
-#[test]
-fn a_callback_of_a_local_function_is_annotated() {
-    let head = "service Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\n";
-    let text = format!("{HEAD}{head}let apply () =\n  let apply_it h = h ()\n  apply_it say\n");
-    let diagnostics = check(&text);
-    let error = (diagnostics.iter())
-        .find(|d| d.code.to_string() == "FLICK-T003")
-        .unwrap_or_else(|| panic!("{diagnostics:?}"));
-    assert!(
-        (error.related.iter()).any(|r| r.message.starts_with("`h` has no type written")),
-        "{error:?}"
-    );
-    let fixed = fixed(&text, "FLICK-T003").expect("the fix");
-    assert!(
-        fixed.contains("let apply_it (h : Unit ->{Log} Unit) = h ()"),
-        "{fixed}"
-    );
-}
-
 const SAY: &str = "service Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\nlet apply () =\n";
 
-/// The `FLICK-T003` fix of `before` annotates `from` as `to` only. A `fun`
-/// annotated so leaves no errors; a parameter of a `let` header takes its
-/// type in a signature instead (`FLICK-T005`), so there the text is checked.
-fn assert_annotated_in(before: &str, from: &str, to: &str) {
-    let before = format!("{HEAD}{before}");
-    assert_eq!(before.matches(from).count(), 1, "{from}");
-    let after = before.replacen(from, to, 1);
-    assert_eq!(fixed(&before, "FLICK-T003").as_deref(), Some(&*after));
-    if to.starts_with("fun ") {
-        let errors: Vec<_> = (check(&after).into_iter())
-            .filter(|d| d.severity == Severity::Error)
-            .collect();
-        assert!(errors.is_empty(), "{errors:?}");
-    }
+/// The `FLICK-T003` edit annotates the specified lambda parameter only and
+/// the annotated program checks again.
+fn assert_annotated(body: &str, name: &str) {
+    let before = format!("{SAY}{body}");
+    let from = format!("fun {name} ->");
+    assert_eq!(before.matches(&from).count(), 1, "{before}");
+    let after = before.replace(&from, &format!("fun ({name} : Unit ->{{Log}} Unit) ->"));
+    assert_fix(&before, "FLICK-T003", &after);
 }
 
-/// As `assert_annotated_in`, for the body of `apply`.
-fn assert_annotated(body: &str, from: &str, to: &str) {
-    assert_annotated_in(&format!("{SAY}{body}"), from, to);
-}
-
-/// The note and the fix are at the parameter of the function applied, not
-/// at a local before it whose arrow has the same shape.
-#[test]
-fn a_callback_is_annotated_at_the_function_applied() {
-    // a local function with a callback of its own
-    assert_annotated(
-        "  let call f x = f x\n  let apply_it h = h ()\n  call (fun x -> x) ()\n  apply_it say\n",
-        "apply_it h =",
-        "apply_it (h : Unit ->{Log} Unit) =",
+/// The note identifies the binder of the applied callback. A named
+/// function's header cannot carry a parameter annotation (FLICK-T005).
+fn assert_header_callback(body: &str, name: &str) {
+    let text = format!("{HEAD}{body}");
+    let diagnostics = check(&text);
+    let errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == codes::T003)
+        .collect();
+    let [error] = &errors[..] else {
+        panic!("{diagnostics:?}")
+    };
+    let note = error
+        .related
+        .iter()
+        .find(|r| r.message.contains("took it for a pure function"))
+        .unwrap_or_else(|| panic!("{error:?}"));
+    assert_eq!(
+        &text[note.span.start as usize..note.span.end as usize],
+        name
     );
-    // two of the same shape, the second applied, also through a pipe
+    assert!(
+        error
+            .fixes
+            .iter()
+            .all(|fix| !fix.message.starts_with("annotate")),
+        "{error:?}"
+    );
+}
+
+#[test]
+fn a_callback_of_a_named_local_function_is_explained_at_its_header() {
+    assert_header_callback(
+        &format!(
+            "{SAY}  let call f x = f x\n  let apply_it h = h ()\n  call (fun x -> x) ()\n  apply_it say\n"
+        ),
+        "h",
+    );
     for applied in ["run_it say", "say |> run_it"] {
-        assert_annotated(
+        assert_header_callback(
             &format!(
-                "  let apply_it h = h ()\n  let run_it g = g ()\n  apply_it (fun () -> ())\n  {applied}\n"
+                "{SAY}  let apply_it h = h ()\n  let run_it g = g ()\n  apply_it (fun () -> ())\n  {applied}\n"
             ),
-            "run_it g =",
-            "run_it (g : Unit ->{Log} Unit) =",
+            "g",
         );
     }
-    let first = "  let first k = k ()\n  first (fun () -> ())\n";
-    assert_annotated(
-        &format!("{first}  let run = fun h -> h ()\n  run say\n"),
-        "fun h ->",
-        "fun (h : Unit ->{Log} Unit) ->",
-    );
-    // the callback as the second parameter
-    assert_annotated(
-        &format!("{first}  let both x h = h x\n  both () say\n"),
-        "both x h =",
-        "both x (h : Unit ->{Log} Unit) =",
-    );
+}
+
+/// Both a returned lambda and a local lambda literal may be parenthesized.
+#[test]
+fn a_parenthesized_callback_is_annotated_at_the_function_applied() {
+    for body in [
+        "  let run () = (fun h -> h ())\n  run () say\n",
+        "  let run () = (fun h -> h ())\n  (run ()) say\n",
+        "  let run () = (fun h -> h ())\n  say |> run ()\n",
+        "  let run = (fun h -> h ())\n  run say\n",
+        "  let run = fun () -> (fun h -> h ())\n  run () say\n",
+        "  (fun () -> (fun h -> h ())) () say\n",
+    ] {
+        assert_annotated(body, "h");
+    }
 }
 
 /// An arrow taking a record is matched as a whole, not by its fields.
@@ -177,12 +174,10 @@ fn a_callback_taking_a_record_is_annotated_at_the_function_applied() {
         "apply : ",
         "log_record : { a : Int } ->{Log} Unit\nlet log_record r = Log.info (show r.a)\n\napply : ",
     );
-    let body = "  let first k = k { a = 2 }\n  first (fun _ -> ())\n  let with_record h = h { a = 1 }\n  with_record log_record\n";
-    assert_annotated_in(
-        &format!("{text}{body}"),
-        "with_record h =",
-        "with_record (h : { a : Int } ->{Log} Unit) =",
-    );
+    let body = "  let first k = k { a = 2 }\n  first (fun _ -> ())\n  let with_record = (fun h -> h { a = 1 })\n  with_record log_record\n";
+    let before = format!("{text}{body}");
+    let after = before.replace("fun h ->", "fun (h : { a : Int } ->{Log} Unit) ->");
+    assert_fix(&before, "FLICK-T003", &after);
 }
 
 /// Applied through a function that is not a local, the arrow taken for a
@@ -193,8 +188,7 @@ fn a_callback_applied_through_another_function_is_annotated() {
     let unrelated = "  let unrelated h = h ()\n  unrelated (fun () -> ())\n";
     assert_annotated(
         &format!("{unrelated}  List.each_effect (fun k -> k ()) [say]\n"),
-        "fun k ->",
-        "fun (k : Unit ->{Log} Unit) ->",
+        "k",
     );
     // `List.map` takes a pure function, so only the text of its fix is checked
     let mapped = format!("{HEAD}{SAY}{unrelated}  ignore (List.map (fun k -> k ()) [say])\n");
@@ -202,10 +196,80 @@ fn a_callback_applied_through_another_function_is_annotated() {
         fixed(&mapped, "FLICK-T003"),
         Some(mapped.replace("fun k ->", "fun (k : Unit ->{Log} Unit) ->"))
     );
-    assert_annotated(
-        &format!("{unrelated}  (fun k -> k ()) say\n"),
-        "fun k ->",
-        "fun (k : Unit ->{Log} Unit) ->",
+    assert_annotated(&format!("{unrelated}  (fun k -> k ()) say\n"), "k");
+}
+
+/// A diagnostic inferred through an external callee leaves the assumption
+/// available for a later direct call of the local.
+#[test]
+fn a_callback_note_can_be_reused_after_matching_its_arrow() {
+    let text = format!(
+        "{HEAD}{}  let run = fun h -> if h () then ()\n  List.each_effect run [say]\n  run say\n",
+        SAY.replace("->{Log} Unit\nlet say", "->{Log} Bool\nlet say")
+            .replace("info : String ->{} Unit", "info : String ->{} Bool")
+    );
+    let diagnostics = check(&text);
+    assert_eq!(diagnostics.len(), 2, "{diagnostics:?}");
+    for diagnostic in &diagnostics {
+        assert_eq!(diagnostic.code, codes::T003, "{diagnostic:?}");
+        let fixing = diagnostic
+            .fixes
+            .iter()
+            .find(|fix| fix.message.starts_with("annotate `h`"))
+            .unwrap_or_else(|| panic!("{diagnostic:?}"));
+        let [edit] = &fixing.edits[..] else {
+            panic!("{fixing:?}");
+        };
+        let mut fixed = text.clone();
+        fixed.replace_range(
+            edit.span.start as usize..edit.span.end as usize,
+            &edit.replacement,
+        );
+        assert_eq!(
+            fixed,
+            text.replace("fun h ->", "fun (h : Unit ->{Log} Bool) ->")
+        );
+        assert!(check(&fixed).is_empty(), "{fixed}");
+    }
+}
+
+/// A later argument to a signed function has no inferred binder to annotate.
+#[test]
+fn a_callback_fix_does_not_reuse_an_unrelated_inferred_parameter() {
+    let text = "service Log =
+  info : String ->{} Bool
+
+say : Unit ->{Log} Bool
+let say () = Log.info \"hi\"
+
+explicit : (Unit -> Bool) -> Unit
+let explicit h = if h () then ()
+
+apply : Unit ->{Log} Unit
+let apply () =
+  let inferred = (fun f -> if f () then ())
+  inferred say
+  explicit say
+";
+    let diagnostics = check(&format!("{HEAD}{text}"));
+    let [inferred, explicit] = &diagnostics[..] else {
+        panic!("{diagnostics:?}");
+    };
+    assert_eq!(inferred.code, codes::T003, "{inferred:?}");
+    assert_eq!(explicit.code, codes::T003, "{explicit:?}");
+    assert!(
+        inferred
+            .fixes
+            .iter()
+            .any(|fix| fix.message.starts_with("annotate `f`")),
+        "{inferred:?}"
+    );
+    assert!(
+        explicit
+            .fixes
+            .iter()
+            .all(|fix| !fix.message.starts_with("annotate")),
+        "{explicit:?}"
     );
 }
 

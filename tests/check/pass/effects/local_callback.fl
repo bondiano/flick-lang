@@ -1,7 +1,15 @@
 // A local function without a signature may take a callback that calls a
 // service: the unknown row of that callback is not generalized, so its uses
 // grow it, and the enclosing declaration closes it at its end.
-module App.LocalCallback exposing (lines, paren, piped, both, mixed)
+module App.LocalCallback exposing (
+  lines,
+  paren,
+  piped,
+  both,
+  mixed,
+  parameterized,
+  pending_instance,
+)
 
 service Log =
   info : String ->{} Unit
@@ -43,3 +51,48 @@ let mixed () =
   let each f items = List.each_effect f items
   each shout ["a", "b"]
   each (fun n -> shout (show n)) [1, 2]
+
+service Store a =
+  save : a ->{} Unit
+
+int_store : Layer none none {Store Int}
+let int_store = Layer.succeed Store { save = fun _ -> () }
+
+string_store : Layer none none {Store String}
+let string_store = Layer.succeed Store { save = fun _ -> () }
+
+// A known service's type arguments can be generalized with the wrapper.
+parameterized : Unit ->{} Unit
+let parameterized () =
+  let save = (fun value -> Store.save value)
+  let save_direct value = Store.save value
+  let save_scoped = (fun value -> scope { Store.save value })
+  provide int_store {
+    save 1
+    save_direct 2
+    save_scoped 3
+  }
+  provide string_store {
+    save "two"
+    save_direct "three"
+    save_scoped "four"
+  }
+
+save_int : Unit ->{Store Int} Unit
+let save_int () = Store.save 0
+
+// An unresolved callback can still constrain a service the wrapper already uses.
+pending_instance : Unit ->{} Unit
+let pending_instance () =
+  let values = [()]
+  let save_with f value =
+    Store.save value
+    List.each_effect f values
+  let save_scoped_with f value = scope {
+    Store.save value
+    List.each_effect f values
+  }
+  provide int_store {
+    save_with save_int 1
+    save_scoped_with save_int 2
+  }

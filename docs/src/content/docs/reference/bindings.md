@@ -193,7 +193,8 @@ containers are invariant. A row of calls still unknown when a binding is
 generalized is not quantified. At the top level it becomes `none`, as at the
 end of a declaration ([empty rows](../effects/#empty-rows-none)). Inside a
 function it stays of one type, which the uses of the binding fill: a local
-helper may pass its callback to a function that runs it.
+helper may pass its callback to a function that runs it. The type arguments
+of a known service can still be generalized.
 
 ```flick
 make_empty : forall a. Unit ->{} Ref (Option a)

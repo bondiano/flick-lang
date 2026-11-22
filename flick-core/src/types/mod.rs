@@ -562,9 +562,8 @@ struct ItemCx {
     /// The parameters of the class whose law is being checked: applied,
     /// each is a type the instance of a bundle fills in.
     law: Vec<u32>,
-    /// Locals applied before their type was known, each with the pure arrow
-    /// taken for it, its name and where it is bound.
-    assumed_pure: Vec<(Type, String, u32)>,
+    /// Locals applied before their type was known.
+    assumed_pure: Vec<assumed_pure::Assumption>,
     /// Where the parameters of each local function without a signature are
     /// bound, by where the function is bound; `None` for a pattern.
     local_params: HashMap<u32, Vec<Option<u32>>>,

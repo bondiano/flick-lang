@@ -27,7 +27,7 @@ let apply_host () =
 //~ FLICK-T003 @25:7-25:15 expected `Unit -> _`, found `Unit ->{Host.Console} Unit`
 
 // Of two local functions with callbacks of one shape, the error explains the
-// one applied: its note and fix are at `h` of `apply_it`, not at `f`.
+// one applied: its note points to `h`, the parameter of `apply_it`.
 apply_local : Unit ->{Log} Unit
 let apply_local () =
   let call f x = f x

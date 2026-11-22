@@ -2,13 +2,13 @@
 //! purely becomes polymorphic over the variables that are not free in its
 //! environment; the result of a runtime call stays monomorphic, even of `->{}`.
 
-use super::Checker;
 use super::bindings::LetParts;
 use super::classes::Outcome;
 use super::kinds::Kind;
 use super::ty::{Binder, Type};
 use super::typing::passes_dictionary;
 use super::unify::Store;
+use super::{Checker, Domain};
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -80,9 +80,15 @@ impl Checker<'_> {
         for w in self.classes.wanted.clone() {
             self.store.lower(&w.constraint);
         }
-        // so does an operand type a pending operator has yet to settle: it
-        // takes one of the operator's types, as an integer literal's does
+        // A pending operator keeps its operand monomorphic while settling
+        // an overload or an Ord constraint. List concatenation depends only
+        // on the List constructor, so its element type can be generalized.
         for op in self.cx.operators.iter().skip(operands.0) {
+            if op.domain == Domain::Concat
+                && self.borrowed_whnf(&op.ty).spine().0.is_lang(Lang::List)
+            {
+                continue;
+            }
             keep_operand(
                 &mut self.store,
                 &mut self.cx.kept_operands,
@@ -91,10 +97,25 @@ impl Checker<'_> {
                 op.op,
             );
         }
-        // and an operand type of `==` or `!=`: the type a use settles decides
-        // whether it compares by identity
+        // Equality uses only the operand's head to choose identity or
+        // structural comparison. A pending row projection can still change it.
         for (ty, span, op, _) in self.equalities.iter().skip(operands.1) {
-            keep_operand(&mut self.store, &mut self.cx.kept_operands, ty, *span, op);
+            let operand = self.borrowed_whnf(ty);
+            let (head, _) = operand.spine();
+            let kept = match head {
+                Type::Meta(_) => head.clone(),
+                _ if head.is_lang(Lang::Errors) || head.is_lang(Lang::ServiceImpl) => {
+                    operand.into_owned()
+                }
+                _ => continue,
+            };
+            keep_operand(
+                &mut self.store,
+                &mut self.cx.kept_operands,
+                &kept,
+                *span,
+                op,
+            );
         }
         // a value a pending hold still checks stays monomorphic: its unknown
         // rows, once quantified, would count as variables it captures

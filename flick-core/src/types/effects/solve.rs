@@ -186,26 +186,51 @@ impl Checker<'_> {
     /// of a call is closed at the top level; inside a function its constraint
     /// stays pending and of one type, so the uses of the binding grow it and
     /// the end of the declaration closes it, as for a binding not generalized.
+    /// Type arguments of labels whose inclusion already holds can generalize.
     pub fn settle_rows(&mut self) {
         self.grow();
         let level = self.store.level;
-        let deep = |row: &Type| -> Vec<u32> {
-            (self.store.normalize(row).tails.iter())
-                .filter_map(unknown)
-                .filter(|m| self.store.meta_level(*m).is_some_and(|l| l > level))
-                .collect()
+        let deep = |tail: &Type| {
+            unknown(tail).filter(|m| self.store.meta_level(*m).is_some_and(|l| l > level))
         };
         let mut close = Vec::new();
         let mut pending = Vec::new();
         for c in &self.cx.subrows {
+            let actual = self.store.normalize(&c.actual);
             if level == 0 {
-                close.extend(deep(&c.actual));
-            } else if !deep(&c.actual).is_empty() || !deep(&c.declared).is_empty() {
+                close.extend(actual.tails.iter().filter_map(deep));
+                continue;
+            }
+            let declared = self.store.normalize(&c.declared);
+            let declared_deep = || declared.tails.iter().filter(|tail| deep(tail).is_some());
+            if !actual.tails.iter().any(|tail| deep(tail).is_some())
+                && declared_deep().next().is_none()
+            {
+                continue;
+            }
+            // Matching entries do not need to be lowered once the actual
+            // row cannot gain another label from a pending call.
+            let closed = actual.tails.is_empty();
+            let scoped = c.provides.is_some();
+            if (closed || scoped)
+                && (!scoped || actual.get(regions::scope()).is_none())
+                && self.matched_call_labels(&actual, &declared)
+                && (closed || self.scope_tail_settled(&actual.tails))
+            {
+                pending.extend(
+                    actual
+                        .tails
+                        .iter()
+                        .filter(|tail| deep(tail).is_some())
+                        .cloned(),
+                );
+                pending.extend(declared_deep().cloned());
+            } else {
                 pending.extend([c.actual.clone(), c.declared.clone()]);
             }
         }
         for row in &self.cx.widened_rows {
-            close.extend(deep(row));
+            close.extend(self.store.normalize(row).tails.iter().filter_map(deep));
         }
         for m in close {
             if self.store.meta_level(m).is_some() {
@@ -216,6 +241,45 @@ impl Checker<'_> {
             self.store.lower(&side);
         }
         self.close_holds(Some(level));
+    }
+
+    /// The actual labels are fixed and their payloads already agree with the bound.
+    fn matched_call_labels(&self, actual: &Norm, declared: &Norm) -> bool {
+        actual.entries.iter().all(|(label, ty)| {
+            matches!(label, Elem::Named(_))
+                && declared
+                    .get(label)
+                    .is_some_and(|bound| self.store.zonk(ty) == self.store.zonk(bound))
+        })
+    }
+
+    /// A scope's inferred body row can stay open after all its calls have
+    /// settled. A call with an open or unmatched actual row can still grow
+    /// that tail, including when it forwards another scope's open row.
+    fn scope_tail_settled(&self, tails: &[Type]) -> bool {
+        let [tail] = tails else {
+            return false;
+        };
+        let Some(root) = unknown(tail) else {
+            return false;
+        };
+        let mut settled = false;
+        for c in self.cx.subrows.iter().filter(|c| !c.errors) {
+            let declared = self.store.normalize(&c.declared);
+            if !declared
+                .tails
+                .iter()
+                .any(|tail| unknown(tail) == Some(root))
+            {
+                continue;
+            }
+            let actual = self.store.normalize(&c.actual);
+            if !actual.tails.is_empty() || !self.matched_call_labels(&actual, &declared) {
+                return false;
+            }
+            settled = true;
+        }
+        settled
     }
 
     /// At the end of a declaration: solves its constraints, makes what is

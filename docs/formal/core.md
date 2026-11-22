@@ -509,10 +509,10 @@ For runtime forms `Γ` includes `Ψ` (§3.6): `ᾱ ∉ ftv(Ψ)` (see [store typi
 The checker generalizes no more than `Gen`. Fewer generalized variables give the same T3 guarantees and only accept fewer programs. The differences:
 
 1. "Not free in Γ" is decided by levels. `Store::level`: a meta deeper than the current level is not in Γ. The result of a runtime binding is lowered to the level of the environment (`Store::lower`).
-2. Variables of numeric literals and of the operands of the operators `+ - * / % ** < <= > >= ++` not yet settled are not generalized: the literal's type, and the operator's, are chosen later (`settle.rs` `settle_operators`). Nor are those of the operands of `==` and `!=`: the type a use settles decides whether they compare by identity (`===`, `typing.identity_eq`). `|>` and `>>` are applications and keep none.
+2. Variables of numeric literals stay monomorphic. An operator can also keep variables monomorphic when its implementation or class constraint depends on them (`settle.rs` `settle_operators`). For instance, an unknown operand type can decide whether `==` compares by identity (`===`, `typing.identity_eq`). Once the operands are known to be lists, both concatenation and structural equality permit generalization of the element type. `|>` and `>>` are applications and impose no additional restriction.
 3. Variables of unsolved class constraints are not generalized. A scheme without a signature gets no constraints (see [class constraints and generalization](#class-constraints-and-generalization)).
 4. Variables of a value with an open region obligation are not generalized. This belongs to regions.
-5. Unknown call rows inside a binding are not quantified (`effects/solve.rs` `settle_rows`). At the top level they are closed with `none` before generalization: the checker picks the least solution (see [unknown call rows](#unknown-call-rows-in-a-generalized-binding-close-to-none)). Inside a function they stay monomorphic with their constraints: the uses of the binding grow them, and the end of the declaration closes them (`close_rows`), as for a binding that is not generalized.
+5. Unknown call rows inside a binding are not quantified (`effects/solve.rs` `settle_rows`). At the top level they are closed with `none` before generalization: the checker picks the least solution (see [unknown call rows](#unknown-call-rows-in-a-generalized-binding-close-to-none)). Inside a function they stay monomorphic with their constraints: the uses of the binding grow them, and the end of the declaration closes them (`close_rows`), as for a binding that is not generalized. When a call's known service entries already match their requirements, their type arguments can still be generalized.
 6. `let (a, b) = …` and `let assert` are always monomorphic. A top-level or recursive function without a signature is `FLICK-T004` and stays monomorphic; another local one is generalized as a `λ` is, by (Let-Gen).
 
 Checker:
@@ -999,8 +999,8 @@ let run job =
 ### Class constraints and generalization
 
 - Spec: spec/03 excluded from generalization only the variables of "ambiguous constraints".
-- Checker: the variables of any unsolved constraint, of numeric literals and of the operands of operators not yet settled, `==` and `!=` among them, stay monomorphic; a scheme without a signature never gets constraints.
-- Resolution (spec, spec/03 "Generalization in the presence of Ref"): "a binding without a signature has no class constraints: variables of unsolved constraints, of numeric literals and of operators' operands stay monomorphic; constrained polymorphism requires a signature".
+- Checker: variables of unsolved constraints, numeric literals and unresolved operator types can remain monomorphic. A scheme without a signature never gets class constraints.
+- Resolution: spec/03 "Generalization in the presence of Ref" specifies which variables stay monomorphic and when a signature is required.
 
 ### Unknown call rows in a generalized binding close to none
 

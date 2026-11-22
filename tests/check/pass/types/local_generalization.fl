@@ -1,6 +1,6 @@
 // A local function without a signature is generalized, as a parenthesized
 // `fun` is: each use instantiates it afresh.
-module App.LocalGeneralization exposing (pairs, values, both, operators)
+module App.LocalGeneralization exposing (pairs, values, both, operators, list_operators)
 
 pairs : Unit ->{} (Int, String)
 let pairs () =
@@ -24,3 +24,16 @@ let operators () =
   let join a b = a ++ b
   let prefixed = fun mark lines -> List.map (fun line -> mark ++ line) lines
   (add 1 2, join "a" "b", prefixed "> " ["c"])
+
+// A known list operand selects the operation independently of its elements.
+list_operators : Unit ->{} (List Int, List String, Bool, Bool)
+let list_operators () =
+  let append_empty = (fun xs -> xs ++ [])
+  let is_empty = (fun xs -> xs == [])
+  let nonempty xs = xs != []
+  (
+    append_empty [1],
+    append_empty ["a"],
+    is_empty [1] || is_empty ["a"],
+    nonempty [1] && nonempty ["a"],
+  )

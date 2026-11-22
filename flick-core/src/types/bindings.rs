@@ -285,9 +285,7 @@ impl Checker<'_> {
             let alias = self.let_alias(&parts);
             self.push_local(&name, at, ty);
             self.proof_alias(at, alias);
-            if parts.is_function() {
-                self.note_local_params(at, &parts);
-            }
+            self.note_local_params(at, &parts);
             if let Some(local) = self.cx.locals.last_mut()
                 && !parts.is_function()
                 && !parts.rec
