@@ -1,0 +1,15 @@
+show: { a = 2, z = 1 } | { a = 2, z = 1 }
+eq: (true, EQ)
+nested: { flag = true, outer = { a = 20, z = 10 } } | (true, EQ)
+lit:z
+lit:m
+lit:a
+lit: { a = 3, m = 2, z = 1 }
+mut: { a = 111, m = 11, z = 1 } counter=111
+base
+upd:z
+upd:a
+upd: { a = 20, z = 10 }
+boxes: BoxZ { a = 2, z = 1 } | BoxA { a = 2, z = 1 }
+zeros: (true, false, "0", "-0")
+ref: (true, 42)

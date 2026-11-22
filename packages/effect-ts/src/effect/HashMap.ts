@@ -4,7 +4,14 @@
 import { HashMap, Option } from "effect";
 import type { Result } from "effect";
 
-import { type FlickHashMap, HashKey, hashMapFromSeq, hashMapOf, type Witness } from "../stdlib/hash.ts";
+import {
+  type FlickHashMap,
+  HashKey,
+  hashMapFromSeq,
+  hashMapOf,
+  hashMapSetReplace,
+  type Witness,
+} from "../stdlib/hash.ts";
 
 export * from "effect/HashMap";
 
@@ -24,16 +31,40 @@ export const flickHasBy = <K, V>(f: (v: V, k: K) => boolean, m: Hm<K, V>): boole
   HashMap.hasBy(m.native, (v, k) => f(v, k.value));
 export const flickKeys = <K, V>(m: Hm<K, V>): Array<K> => Array.from(HashMap.keys(m.native), (k) => k.value);
 export const flickValues = <K, V>(m: Hm<K, V>): Array<V> => HashMap.toValues(m.native);
-export const flickModifyAt = <K, V>(k: K, f: (v: Option.Option<V>) => Option.Option<V>, m: Hm<K, V>): Hm<K, V> =>
-  keep(m, HashMap.modifyAt(m.native, box(m, k), f));
+const REPLACE_HASH_SENTINEL = /*#__PURE__*/ Symbol("flick/hashmap-modify-hash-replace");
+
+export const flickModifyAt = <K, V>(k: K, f: (v: Option.Option<V>) => Option.Option<V>, m: Hm<K, V>): Hm<K, V> => {
+  const key = box(m, k);
+  const next = f(HashMap.get(m.native, key));
+  return keep(m, Option.isSome(next) ? hashMapSetReplace(m.native, key, next.value) : HashMap.remove(m.native, key));
+};
 export const flickModifyHash = <K, V>(
   k: K,
   hash: number,
   f: (v: Option.Option<V>) => Option.Option<V>,
   m: Hm<K, V>,
-): Hm<K, V> => keep(m, HashMap.modifyHash(m.native, box(m, k), hash, f));
-export const flickModify = <K, V>(k: K, f: (v: V) => V, m: Hm<K, V>): Hm<K, V> =>
-  keep(m, HashMap.modify(m.native, box(m, k), f));
+): Hm<K, V> => {
+  const key = box(m, k);
+  const existing = HashMap.getHash(m.native, key, hash);
+  const next = f(existing);
+  if (Option.isNone(next)) return keep(m, HashMap.modifyHash(m.native, key, hash, () => Option.none()));
+  if (Option.isSome(existing) && Object.is(existing.value, next.value)) {
+    const cleared = HashMap.modifyHash(
+      m.native,
+      key,
+      hash,
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- transient sentinel overwritten immediately on the next line
+      () => Option.some(REPLACE_HASH_SENTINEL as unknown as V),
+    );
+    return keep(m, HashMap.modifyHash(cleared, key, hash, () => next));
+  }
+  return keep(m, HashMap.modifyHash(m.native, key, hash, () => next));
+};
+export const flickModify = <K, V>(k: K, f: (v: V) => V, m: Hm<K, V>): Hm<K, V> => {
+  const key = box(m, k);
+  const existing = HashMap.get(m.native, key);
+  return Option.isSome(existing) ? keep(m, hashMapSetReplace(m.native, key, f(existing.value))) : m;
+};
 export const flickRemoveMany = <K, V>(ks: ReadonlyArray<K>, m: Hm<K, V>): Hm<K, V> =>
   keep(
     m,
@@ -42,14 +73,11 @@ export const flickRemoveMany = <K, V>(ks: ReadonlyArray<K>, m: Hm<K, V>): Hm<K, 
       ks.map((k) => box(m, k)),
     ),
   );
-export const flickSetMany = <K, V>(entries: ReadonlyArray<readonly [K, V]>, m: Hm<K, V>): Hm<K, V> =>
-  keep(
-    m,
-    HashMap.setMany(
-      m.native,
-      entries.map(([k, v]) => [box(m, k), v] as const),
-    ),
-  );
+export const flickSetMany = <K, V>(entries: ReadonlyArray<readonly [K, V]>, m: Hm<K, V>): Hm<K, V> => {
+  let out = m.native;
+  for (const [k, v] of entries) out = hashMapSetReplace(out, box(m, k), v);
+  return keep(m, out);
+};
 export const flickMap = <K, V, B>(f: (v: V, k: K) => B, m: Hm<K, V>): Hm<K, B> =>
   keep(
     m,

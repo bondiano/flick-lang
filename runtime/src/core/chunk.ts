@@ -1,4 +1,4 @@
-import { equals, hash, iterableHash, runtimeEquals, runtimeHash, runtimeSequence } from "./data.ts";
+import { equals, hash, iterableHash, runtimeEquals, runtimeHash, runtimeSequence, sameValue } from "./data.ts";
 
 // Small chunks and bulk constructions use flat leaves. Concatenations share
 // their operands in an AVL tree, weighted by element count for indexing.
@@ -29,10 +29,11 @@ export class ChunkBranch<A> implements Iterable<A> {
     return true;
   }
 
-  [runtimeEquals](other: unknown): boolean {
+  [runtimeEquals](other: unknown, strictZero = false): boolean {
     if (!(other instanceof ChunkBranch || Array.isArray(other)) || this.length !== other.length) return false;
     const right = other[Symbol.iterator]();
-    for (const value of this) if (!equals(value, right.next().value)) return false;
+    const eq = strictZero ? sameValue : equals;
+    for (const value of this) if (!eq(value, right.next().value)) return false;
     return true;
   }
 

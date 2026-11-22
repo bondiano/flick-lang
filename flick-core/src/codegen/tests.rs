@@ -38,6 +38,37 @@ pub(super) fn compile_with(text: &str, release: bool, labels: Labels) -> super::
 }
 
 #[test]
+fn record_literals_emit_canonical_key_order_while_preserving_source_evaluation_order() {
+    let pure_code = compile(
+        "module App exposing (make)\n\
+         make : Int -> { a : Int; z : Int }\n\
+         let make n = { z = n; a = 2 }\n",
+    );
+    assert!(pure_code.contains("{ a: 2, z: n }"), "{pure_code}");
+
+    let ordered_code = compile(
+        "module App exposing (make)\n\
+         step : Int -> Int\n\
+         let step n = n + 1\n\
+         make : Int -> Int -> { a : Int; z : Int }\n\
+         let make n m = { z = step n; a = step m }\n",
+    );
+    let first_call = ordered_code
+        .find("step(n)")
+        .expect("first field call in source order");
+    let second_call = ordered_code
+        .find("step(m)")
+        .expect("second field call in source order");
+    assert!(first_call < second_call, "{ordered_code}");
+    assert!(
+        ordered_code.contains("const $t1 = step(n);")
+            && ordered_code.contains("const $t2 = step(m);")
+            && ordered_code.contains("{ a: $t2, z: $t1 }"),
+        "{ordered_code}"
+    );
+}
+
+#[test]
 fn a_while_nothing_leaves_is_a_plain_loop_in_javascript() {
     let text = "module App exposing (sum)\n\nsum : Int -> Int\nlet sum n =\n  let mut acc = 0\n  \
                 let mut i = n\n  while i > 0 do\n    acc = acc + i\n    i = i - 1\n  acc\n";

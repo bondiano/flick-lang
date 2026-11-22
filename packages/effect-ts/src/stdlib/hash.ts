@@ -89,6 +89,27 @@ export interface FlickHashMap<K, V> {
 export const hashMapOf = <K, V>(w: Witness<K>, native: HashMap.HashMap<HashKey<K>, V>): FlickHashMap<K, V> =>
   Object.freeze({ witness: w, native });
 
+const REPLACE_SENTINEL = /*#__PURE__*/ Symbol("flick/hashmap-replace");
+
+/**
+ * Sets `(key, value)` in an Effect `HashMap`, unconditionally replacing an
+ * equal key even when `Object.is(existing, value)` is true so data-value
+ * storage sharing cannot suppress replacing a custom-`EqHash` key.
+ */
+export const hashMapSetReplace = <K, V>(
+  native: HashMap.HashMap<HashKey<K>, V>,
+  key: HashKey<K>,
+  value: V,
+): HashMap.HashMap<HashKey<K>, V> => {
+  const existing = HashMap.get(native, key);
+  if (Option.isSome(existing) && Object.is(existing.value, value)) {
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- transient sentinel overwritten immediately on the next line
+    const cleared = HashMap.set(native, key, REPLACE_SENTINEL as unknown as V);
+    return HashMap.set(cleared, key, value);
+  }
+  return HashMap.set(native, key, value);
+};
+
 export const hashMapWith = <K, V>(w: Witness<K>): FlickHashMap<K, V> => hashMapOf(w, HashMap.empty());
 export const hashMapEmpty = <K, V>(dHash: HashDict<K>): FlickHashMap<K, V> => hashMapWith(eqHashCanonical(dHash));
 export const hashMapFromSeq = <K, V>(w: Witness<K>, entries: Seq<readonly [K, V]>): FlickHashMap<K, V> => {
@@ -97,10 +118,9 @@ export const hashMapFromSeq = <K, V>(w: Witness<K>, entries: Seq<readonly [K, V]
     const key = new HashKey(k, w);
     const existing = HashMap.get(map, key);
     if (Option.isSome(existing)) {
-      if (Object.is(existing.value, v)) continue;
-      // Effect's mutable LeafNode.set retains the previous key; an immutable set
-      // updates both key and value while preserving collision order.
-      map = HashMap.beginMutation(HashMap.set(HashMap.endMutation(map), key, v));
+      // Effect's mutable LeafNode.set retains the previous key and short-circuits
+      // on Object.is; an immutable replace updates both key and value in place.
+      map = HashMap.beginMutation(hashMapSetReplace(HashMap.endMutation(map), key, v));
     } else {
       HashMap.set(map, key, v);
     }
@@ -108,7 +128,7 @@ export const hashMapFromSeq = <K, V>(w: Witness<K>, entries: Seq<readonly [K, V]
   return hashMapOf(w, HashMap.endMutation(map));
 };
 export const hashMapInsert = <K, V>(k: K, v: V, m: FlickHashMap<K, V>): FlickHashMap<K, V> =>
-  hashMapOf(m.witness, HashMap.set(m.native, new HashKey(k, m.witness), v));
+  hashMapOf(m.witness, hashMapSetReplace(m.native, new HashKey(k, m.witness), v));
 export const hashMapRemove = <K, V>(k: K, m: FlickHashMap<K, V>): FlickHashMap<K, V> =>
   hashMapOf(m.witness, HashMap.remove(m.native, new HashKey(k, m.witness)));
 export const hashMapGet = <K, V>(k: K, m: FlickHashMap<K, V>): Option.Option<V> => {
@@ -121,7 +141,10 @@ export const hashMapToSeq = <K, V>(m: FlickHashMap<K, V>): Seq<[K, V]> =>
   seq(function* () {
     for (const [k, v] of m.native) yield [k.value, v];
   });
-export const hashMapUnion = <K, V>(a: FlickHashMap<K, V>, b: FlickHashMap<K, V>): FlickHashMap<K, V> =>
-  hashMapOf(a.witness, HashMap.union(a.native, b.native));
+export const hashMapUnion = <K, V>(a: FlickHashMap<K, V>, b: FlickHashMap<K, V>): FlickHashMap<K, V> => {
+  let out = a.native;
+  for (const [k, v] of b.native) out = hashMapSetReplace(out, k, v);
+  return hashMapOf(a.witness, out);
+};
 export const hashMapRehash = <K, V>(w: Witness<K>, m: FlickHashMap<K, V>): FlickHashMap<K, V> =>
   hashMapFromSeq(w, hashMapToSeq(m));

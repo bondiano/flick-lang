@@ -1,6 +1,6 @@
 // A filter is a function from an input to a Result. Combinators preserve the
 // first failure, except `or`, which tries the fallback on failure.
-import { equals as sameValue, type Option, type Result, err, ok, none, some } from "../../core/data.ts";
+import { equals as eq, sameValue, type Option, type Result, err, ok, none, some } from "../../core/data.ts";
 
 type Filter<I, A, E> = (input: I) => Result<A, E>;
 export const make = <I, A, E>(f: Filter<I, A, E>): Filter<I, A, E> => f;
@@ -23,8 +23,8 @@ export const toOption = <I, A, E>(self: Filter<I, A, E>) => (input: I): Option<A
   return result._tag === "Success" ? some(result.success) : none;
 };
 export const toResult = <I, A, E>(self: Filter<I, A, E>): Filter<I, A, E> => self;
-export const equalsStrict = <A>(value: A): Filter<A, A, A> => (input) => input === value ? ok(input) : err(input);
-export const equals = <A>(value: A): Filter<A, A, A> => (input) => sameValue(input, value) ? ok(input) : err(input);
+export const equalsStrict = <A>(value: A): Filter<A, A, A> => (input) => sameValue(input, value) ? ok(input) : err(input);
+export const equals = <A>(value: A): Filter<A, A, A> => (input) => eq(input, value) ? ok(input) : err(input);
 export const or = <I, A, B, E, F>(that: Filter<I, B, F>) => (self: Filter<I, A, E>): Filter<I, A | B, F> =>
   (input) => {
     const first = self(input);

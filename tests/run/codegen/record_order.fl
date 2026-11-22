@@ -1,0 +1,75 @@
+// Structural records have no observable storage identity or written field order,
+// while field expressions in literals and updates evaluate strictly in source order.
+// Source equality `==` does not license substituting distinct values (e.g. 0.0 vs -0.0),
+// and copying a record preserves the identity of any referenced mutable cells.
+module App.Main exposing (main)
+
+type BoxZ = BoxZ { z : Int; a : Int }
+  deriving Eq, Ord, Show
+
+type BoxA = BoxA { a : Int; z : Int }
+  deriving Eq, Ord, Show
+
+trace : String -> Int ->{Host.Console} Int
+let trace tag n =
+  Platform.stdout_line tag
+  n
+
+trace_base : Unit ->{Host.Console} { z : Int; a : Int }
+let trace_base () =
+  Platform.stdout_line "base"
+  { z = 1; a = 2 }
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let r1 = { z = 1; a = 2 }
+  let r2 = { a = 2; z = 1 }
+  Platform.stdout_line ("show: " ++ show r1 ++ " | " ++ show r2)
+  Platform.stdout_line ("eq: " ++ show (r1 == r2, compare r1 r2))
+  let n1 = { outer = { z = 10; a = 20 }; flag = true }
+  let n2 = { flag = true; outer = { a = 20; z = 10 } }
+  Platform.stdout_line ("nested: " ++ show n1 ++ " | " ++ show (n1 == n2, compare n1 n2))
+  // Effectful field expressions in a literal run in source order.
+  let lit = { z = trace "lit:z" 1; m = trace "lit:m" 2; a = trace "lit:a" 3 }
+  Platform.stdout_line ("lit: " ++ show lit)
+  // Mutable-variable updates across out-of-order fields run in source order.
+  let mut counter = 0
+  let from_mut = {
+    z = scope {
+      counter = counter + 1
+      counter
+    }
+    m = scope {
+      counter = counter + 10
+      counter
+    }
+    a = scope {
+      counter = counter + 100
+      counter
+    }
+  }
+  Platform.stdout_line ("mut: " ++ show from_mut ++ " counter=" ++ show counter)
+  // Base and replacement expressions in a record update run in source order.
+  let upd = { trace_base () with z = trace "upd:z" 10; a = trace "upd:a" 20 }
+  Platform.stdout_line ("upd: " ++ show upd)
+  // Constructors declared over closed records with reversed field orders.
+  let bz = BoxZ { a = 2; z = 1 }
+  let ba = BoxA { z = 1; a = 2 }
+  Platform.stdout_line ("boxes: " ++ show bz ++ " | " ++ show ba)
+  // Value equality `==` does not conflate +0.0 and -0.0.
+  let pos_zero : Float = 0.0
+  let neg_zero : Float = -0.0
+  Platform.stdout_line
+    ("zeros: "
+      ++ show (
+        pos_zero == neg_zero,
+        Float.same_value pos_zero neg_zero,
+        show pos_zero,
+        show neg_zero,
+      ))
+  // Mutable cell identity is preserved across records built in different field orders.
+  let cell = Ref.make 41
+  let c1 = { z = cell; a = 1 }
+  let c2 = { a = 1; z = cell }
+  Ref.set c1.z 42
+  Platform.stdout_line ("ref: " ++ show (Ref.same c1.z c2.z, Ref.get c2.z))

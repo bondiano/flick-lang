@@ -56,7 +56,7 @@ func (n *hnode) with(fb *Fiber, w *Witness, e entry, shift uint, keep bool) (*hn
 			if w == nil || !w.equal(fb, e.key, old.key) {
 				continue
 			}
-			if keep || Equals(old.value, e.value) {
+			if keep {
 				return n, false
 			}
 			leaf := append([]entry(nil), n.leaf...)
@@ -96,7 +96,7 @@ func (n *hnode) withMut(fb *Fiber, w *Witness, e entry, shift uint, keep bool) (
 			if w == nil || !w.equal(fb, e.key, old.key) {
 				continue
 			}
-			if keep || Equals(old.value, e.value) {
+			if keep {
 				return n, false
 			}
 			n.leaf[i] = e

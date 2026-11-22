@@ -14,6 +14,7 @@ mod lang;
 pub mod memory;
 mod num;
 mod op;
+mod order;
 mod program;
 mod span;
 mod stage;
@@ -32,6 +33,10 @@ pub use instance::{GenericInfo, InstanceInfo, default_method};
 pub use lang::{Lang, LangItem, Namespace, STRUCTURAL};
 pub use num::{Arith, Num, NumKind};
 pub use op::OpClass;
+pub use order::{
+    apply_order, cmp_utf16, sort_by_str, sort_by_utf16, sort_indices, sort_strings_utf16,
+    utf16_sorted_indices,
+};
 pub use program::{Error, Program, VERSION};
 pub use span::{FileId, Span};
 pub use stage::{Lift, Stage};

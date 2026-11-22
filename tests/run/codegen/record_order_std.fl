@@ -1,0 +1,116 @@
+// Standard-library operations over structural records are independent of written
+// field order: Record row primitives, Hash, Schema/Codec JSON encoding & JSON Schema,
+// Arbitrary seeded sampling, Combiner/Reducer.struct, and Differ.json_patch.
+module App.Main exposing (main)
+
+import Codec
+
+type alias RecZA = { z : Int; a : String }
+  deriving Schema
+
+type alias RecAZ = { a : String; z : Int }
+  deriving Schema
+
+type alias ArbZA = { z : Float; a : String }
+  deriving Schema
+
+type alias ArbAZ = { a : String; z : Float }
+  deriving Schema
+
+json_of : PureCodec Json a -> a -> String
+let json_of c v =
+  match Codec.encode_result c v with
+  | Ok wire -> Json.stringify wire
+  | Err _ -> "encode-err"
+
+schema_of : PureCodec Json a -> String
+let schema_of c =
+  match Codec.json_schema "R" c with
+  | Ok text -> text
+  | Err _ -> "export-err"
+
+block_codec : PureCodec Json RecZA
+let block_codec = codec RecZA.schema {
+  z = field "wire_z" Int.json
+  a = field "wire_a" String.json
+}
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let r1 : RecZA = { z = 1; a = "hi" }
+  let r2 : RecAZ = { a = "hi"; z = 1 }
+  // Structural Hash, Show, Record.labels
+  Platform.stdout_line ("labels: " ++ show (Record.labels r1) ++ " | " ++ show (Record.labels r2))
+  Platform.stdout_line ("hash_eq: " ++ show (hash r1 == hash r2))
+  // Row primitives: extend, merge_disjoint, project, remove
+  let ext1 = Record.extend (Record.label : Record.Label "a") "hi" { z = 1 }
+  let ext2 = Record.extend (Record.label : Record.Label "z") 1 { a = "hi" }
+  let merged1 = Record.merge_disjoint { z = 1 } { a = "hi" }
+  let merged2 = Record.merge_disjoint { a = "hi" } { z = 1 }
+  let proj : RecAZ = Record.project { z = 1; m = 9; a = "hi" }
+  let rem = Record.remove (Record.label : Record.Label "m") { z = 1; m = 9; a = "hi" }
+  Platform.stdout_line
+    ("rows: " ++ show (ext1 == r1, ext2 == r1, merged1 == r1, merged2 == r1, proj == r1, rem == r1))
+  Platform.stdout_line
+    ("rows_hash: " ++ show (hash ext1 == hash ext2, hash merged1 == hash merged2))
+  // Derived Schema + Codec.json: canonical JSON field order independent of alias declaration order
+  let cza = Codec.json RecZA.schema
+  let caz = Codec.json RecAZ.schema
+  Platform.stdout_line ("json: " ++ json_of cza r1 ++ " | " ++ json_of caz r2)
+  Platform.stdout_line ("json_schema_eq: " ++ show (schema_of cza == schema_of caz))
+  // Decode from reversed JSON object key order
+  let decoded =
+    match Json.parse "{\"z\": 7, \"a\": \"ok\"}" with
+    | Ok j ->
+      (
+        match Codec.decode_result cza j with
+        | Ok v -> show v ++ " | " ++ json_of caz v
+        | Err _ -> "decode-err"
+      )
+    | Err _ -> "parse-err"
+  Platform.stdout_line ("decoded: " ++ decoded)
+  // Codec block: explicit wire order for encoding, independent of record construction order
+  Platform.stdout_line
+    ("block_encode: " ++ json_of block_codec r1 ++ " | " ++ json_of block_codec r2)
+  // Arbitrary seeded sampling: identical samples for ArbZA and ArbAZ
+  let opts : Arbitrary.SampleOptions = {
+    count = Some 4
+    size = None
+    maxDiscards = None
+    seed = Some 17
+  }
+  let s1 =
+    try Arbitrary.sample opts (Arbitrary.from_schema ArbZA.schema) with
+    | Arbitrary.SampleError _ -> []
+  let s2 =
+    try Arbitrary.sample opts (Arbitrary.from_schema ArbAZ.schema) with
+    | Arbitrary.SampleError _ -> []
+  Platform.stdout_line ("arbitrary_eq: " ++ show (List.length s1 == 4 && s1 == s2))
+  // Combiner.struct and Reducer.struct
+  let comb1 =
+    Combiner.struct {
+      z = Reducer.to_combiner Reducer.number_sum
+      a = Reducer.to_combiner Reducer.string_concat
+    }
+  let comb2 =
+    Combiner.struct {
+      a = Reducer.to_combiner Reducer.string_concat
+      z = Reducer.to_combiner Reducer.number_sum
+    }
+  let out1 = Combiner.combine comb1 { z = 1.0; a = "x" } { a = "y"; z = 2.0 }
+  let out2 = Combiner.combine comb2 { a = "x"; z = 1.0 } { z = 2.0; a = "y" }
+  Platform.stdout_line ("combiner: " ++ show out1 ++ " | " ++ show (out1 == out2))
+  let red1 = Reducer.struct { z = Reducer.number_sum; a = Reducer.string_concat }
+  let red2 = Reducer.struct { a = Reducer.string_concat; z = Reducer.number_sum }
+  let rout1 = Reducer.combine_all red1 [{ z = 3.0; a = "p" }, { a = "q"; z = 4.0 }]
+  let rout2 = Reducer.combine_all red2 [{ a = "p"; z = 3.0 }, { z = 4.0; a = "q" }]
+  Platform.stdout_line ("reducer: " ++ show rout1 ++ " | " ++ show (rout1 == rout2))
+  // Differ.json_patch: canonical patch operation order
+  let differ = Differ.json_patch cza
+  let patch1 = Differ.diff { z = 1; a = "old" } { z = 2; a = "new" } differ
+  let patch2 = Differ.diff { a = "old"; z = 1 } { a = "new"; z = 2 } (Differ.json_patch caz)
+  Platform.stdout_line
+    ("diff: "
+      ++ Json.stringify patch1
+      ++ " | "
+      ++ show (Json.stringify patch1 == Json.stringify patch2))

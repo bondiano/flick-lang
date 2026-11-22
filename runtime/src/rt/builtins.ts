@@ -66,16 +66,22 @@ export const refModify = (cell: Cell, f: (a: unknown) => readonly [unknown, unkn
 
 type Fields = Readonly<Record<string, unknown>>;
 type Erased = unknown;
+const canonicalRecord = (entries: ReadonlyArray<readonly [string, unknown]>): Fields => {
+  const sorted = entries.toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const out: Record<string, unknown> = {};
+  for (const [label, value] of sorted) {
+    Object.defineProperty(out, label, { value, enumerable: true, writable: true, configurable: true });
+  }
+  return out;
+};
 export const recordLabel: undefined = undefined;
 export const recordGet = (_has: Erased, label: string, record: Fields): unknown => record[label];
-export const recordExtend = (_lacks: Erased, _union: Erased, label: string, value: unknown, record: Fields): Fields => ({
-  ...record, [label]: value,
-});
-export const recordRemove = (_remove: Erased, label: string, record: Fields): Fields => {
-  const { [label]: _, ...rest } = record;
-  return rest;
-};
+export const recordExtend = (_lacks: Erased, _union: Erased, label: string, value: unknown, record: Fields): Fields =>
+  canonicalRecord([...Object.entries(record), [label, value]]);
+export const recordRemove = (_remove: Erased, label: string, record: Fields): Fields =>
+  canonicalRecord(Object.entries(record).filter(([k]) => k !== label));
 export const recordProject = (labels: ReadonlyArray<string>, record: Fields): Fields =>
-  Object.fromEntries(labels.map((label) => [label, record[label]]));
-export const recordMergeDisjoint = (_union: Erased, a: Fields, b: Fields): Fields => ({ ...a, ...b });
+  canonicalRecord(labels.map((label) => [label, record[label]] as const));
+export const recordMergeDisjoint = (_union: Erased, a: Fields, b: Fields): Fields =>
+  canonicalRecord([...Object.entries(a), ...Object.entries(b)]);
 export const recordLabels = (_labels: Erased, record: Fields): Array<string> => Object.keys(record).toSorted();

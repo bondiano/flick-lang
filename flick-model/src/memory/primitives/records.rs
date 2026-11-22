@@ -35,6 +35,23 @@ fn record_get(
     heap.project_named(record, &name)
 }
 
+fn canonical_record_key_cmp(a: &str, b: &str) -> Ordering {
+    fn array_index(key: &str) -> Option<u32> {
+        let first = *key.as_bytes().first()?;
+        if !first.is_ascii_digit() {
+            return None;
+        }
+        let n: u32 = key.parse().ok()?;
+        (n != u32::MAX && n.to_string() == key).then_some(n)
+    }
+    match (array_index(a), array_index(b)) {
+        (Some(na), Some(nb)) => na.cmp(&nb),
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => a.encode_utf16().cmp(b.encode_utf16()),
+    }
+}
+
 fn record_extend(
     heap: &mut Heap,
     label: &Value,
@@ -76,6 +93,7 @@ fn record_extend(
             return Err(err);
         }
     }
+    out.sort_by(|a, b| canonical_record_key_cmp(&a.0, &b.0));
     heap.record(out)
 }
 
@@ -110,6 +128,7 @@ fn record_remove(
             }
         }
     }
+    out.sort_by(|a, b| canonical_record_key_cmp(&a.0, &b.0));
     heap.record(out)
 }
 
@@ -138,6 +157,7 @@ fn record_project(
             }
         }
     }
+    out.sort_by(|a, b| canonical_record_key_cmp(&a.0, &b.0));
     heap.record(out)
 }
 
@@ -177,6 +197,7 @@ fn record_merge_disjoint(
             }
         }
     }
+    out.sort_by(|a, b| canonical_record_key_cmp(&a.0, &b.0));
     heap.record(out)
 }
 

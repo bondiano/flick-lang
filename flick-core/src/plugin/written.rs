@@ -55,7 +55,7 @@ pub fn written(node: &Node, text: &str, origin: u32) -> Written {
                     Some((label.to_owned(), written(ty, text, origin)))
                 })
                 .collect();
-            fields.sort_by(|a, b| a.0.cmp(&b.0));
+            flick_ir::sort_by_utf16(&mut fields, |f| &f.0);
             WrittenKind::Record {
                 fields,
                 open: children.iter().any(|n| n.kind == K::RowTail),

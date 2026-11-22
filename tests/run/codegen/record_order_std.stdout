@@ -1,0 +1,12 @@
+labels: ["a", "z"] | ["a", "z"]
+hash_eq: true
+rows: (true, true, true, true, true, true)
+rows_hash: (true, true)
+json: {"a":"hi","z":1} | {"a":"hi","z":1}
+json_schema_eq: true
+decoded: { a = "ok", z = 7 } | {"a":"ok","z":7}
+block_encode: {"wire_z":1,"wire_a":"hi"} | {"wire_z":1,"wire_a":"hi"}
+arbitrary_eq: true
+combiner: { a = "xy", z = 3 } | true
+reducer: { a = "pq", z = 7 } | true
+diff: [{"op":"replace","path":"/a","value":"new"},{"op":"replace","path":"/z","value":2}] | true
