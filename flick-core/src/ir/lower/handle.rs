@@ -25,6 +25,24 @@ struct Group<'n> {
     arms: Vec<&'n Node>,
 }
 
+fn param(pat: Pat, stage: Stage) -> Param {
+    Param {
+        pat,
+        stage,
+        ty: None,
+        binder_types: Vec::new(),
+    }
+}
+
+fn bare_arm(pat: Pat, guard: Option<Expr>, body: Expr) -> Arm {
+    Arm {
+        pat,
+        binder_types: Vec::new(),
+        guard,
+        body,
+    }
+}
+
 impl Lower<'_> {
     /// `scope s { body }`: `Scope.run (fun s -> body)`, after the owner around
     /// it when a call in `body` acquires into that one.
@@ -36,11 +54,7 @@ impl Lower<'_> {
     ) -> Expr {
         let lang = |item| Box::new(Expr::new(ExprKind::lang(item), span));
         let thunk = ExprKind::Lambda {
-            params: vec![Param {
-                pat: owner.map_or(Pat::Wild, Pat::Bind),
-                stage: Stage::Runtime,
-                ty: None,
-            }],
+            params: vec![param(owner.map_or(Pat::Wild, Pat::Bind), Stage::Runtime)],
             body: Box::new(body),
         };
         let run = Expr::new(
@@ -61,7 +75,7 @@ impl Lower<'_> {
             stage: Stage::Runtime,
             arg_first: false,
         };
-        let bind = Stmt::Let(Pat::Bind(outer), Expr::new(current, span));
+        let bind = Stmt::let_bind(Pat::Bind(outer), Expr::new(current, span));
         Expr::new(ExprKind::Block(vec![bind], Box::new(run)), span)
     }
 
@@ -70,11 +84,7 @@ impl Lower<'_> {
         let layer = self.expr(layer);
         let body = self.expr(body);
         let thunk = ExprKind::Lambda {
-            params: vec![Param {
-                pat: Pat::Wild,
-                stage: Stage::Runtime,
-                ty: None,
-            }],
+            params: vec![param(Pat::Wild, Stage::Runtime)],
             body: Box::new(body),
         };
         let applied = ExprKind::App {
@@ -113,22 +123,14 @@ impl Lower<'_> {
             arg_first: false,
         });
         let ret = at(ExprKind::Lambda {
-            params: vec![Param {
-                pat: Pat::Bind(val),
-                stage: Stage::Runtime,
-                ty: None,
-            }],
+            params: vec![param(Pat::Bind(val), Stage::Runtime)],
             body: Box::new(ok_body),
         });
         ExprKind::Handle(Box::new(Handler {
             effects: Vec::new(),
             body,
             ret: Some(ret),
-            errors: vec![Arm {
-                pat: Pat::Bind(err),
-                guard: None,
-                body: err_body,
-            }],
+            errors: vec![bare_arm(Pat::Bind(err), None, err_body)],
         }))
     }
 
@@ -264,11 +266,7 @@ impl Lower<'_> {
             let params = args
                 .iter()
                 .zip(&stages)
-                .map(|(x, stage)| Param {
-                    pat: Pat::Bind(x.clone()),
-                    stage: *stage,
-                    ty: None,
-                })
+                .map(|(x, stage)| param(Pat::Bind(x.clone()), *stage))
                 .collect();
             let function = at(ExprKind::Lambda {
                 params,
@@ -295,7 +293,7 @@ impl Lower<'_> {
             errors: Vec::new(),
         }));
         ExprKind::Block(
-            vec![Stmt::Let(Pat::Bind(local), record)],
+            vec![Stmt::let_bind(Pat::Bind(local), record)],
             Box::new(at(handle)),
         )
     }
@@ -330,7 +328,9 @@ impl Lower<'_> {
     fn value_function(&mut self, arm: &Node) -> Expr {
         let span = self.span(arm);
         let mark = self.scope.len();
-        let pat = arm_pattern(arm).map_or(Pat::Wild, |p| self.pattern(p));
+        let (pat, binder_types) =
+            arm_pattern(arm).map_or((Pat::Wild, Vec::new()), |p| self.pattern_typed(p));
+        let param_ty = arm_pattern(arm).and_then(|p| self.ir_type(p.range()));
         let body = arm.nodes().find(|n| n.kind == K::Block).map_or_else(
             || Expr::new(ExprKind::Lit(Lit::Unit), span),
             |b| self.expr(b),
@@ -341,7 +341,8 @@ impl Lower<'_> {
                 params: vec![Param {
                     pat,
                     stage: Stage::Runtime,
-                    ty: None,
+                    ty: param_ty,
+                    binder_types,
                 }],
                 body: Box::new(body),
             },
@@ -389,11 +390,7 @@ impl Lower<'_> {
         // arms that take every argument leave the operation nothing to go on with
         if !group.covers {
             let forwarded = forward(group, &dicts, &args, resume.as_deref(), span);
-            arms.push(Arm {
-                pat: Pat::Wild,
-                guard: None,
-                body: forwarded,
-            });
+            arms.push(bare_arm(Pat::Wild, None, forwarded));
         }
         self.scope.truncate(mark);
         let scrutinee = match &args[..] {
@@ -406,22 +403,19 @@ impl Lower<'_> {
         let mut params: Vec<Param> = args
             .iter()
             .zip(&group.stages)
-            .map(|(x, stage)| Param {
-                pat: Pat::Bind(x.clone()),
-                stage: if resume.is_some() {
-                    Stage::Pure
-                } else {
-                    *stage
-                },
-                ty: None,
+            .map(|(x, stage)| {
+                param(
+                    Pat::Bind(x.clone()),
+                    if resume.is_some() {
+                        Stage::Pure
+                    } else {
+                        *stage
+                    },
+                )
             })
             .collect();
         if let Some(resume) = resume {
-            params.push(Param {
-                pat: Pat::Bind(resume),
-                stage: Stage::Runtime,
-                ty: None,
-            });
+            params.push(param(Pat::Bind(resume), Stage::Runtime));
         }
         let function = at(ExprKind::Lambda {
             params,
@@ -439,10 +433,15 @@ impl Lower<'_> {
     fn operation_arm(&mut self, arm: &Node, arity: usize) -> Arm {
         let span = self.span(arm);
         let mark = self.scope.len();
+        let mut binder_types = Vec::new();
         let args: Vec<Pat> = arm_pattern(arm).map_or_else(Vec::new, |p| {
             p.nodes()
                 .filter(|n| is_pattern(n.kind))
-                .map(|n| self.pattern(n))
+                .map(|n| {
+                    let (pat, bs) = self.pattern_typed(n);
+                    binder_types.extend(bs);
+                    pat
+                })
                 .collect()
         });
         let pat = match args.len() {
@@ -461,6 +460,7 @@ impl Lower<'_> {
         self.scope.truncate(mark);
         Arm {
             pat,
+            binder_types,
             guard,
             body: body.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span)),
         }

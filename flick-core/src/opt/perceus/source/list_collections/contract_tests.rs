@@ -262,7 +262,7 @@ mod sequencing_tests {
             panic!("explicit recursion-before-callback sequencing")
         };
         assert_eq!(statements.len(), 1);
-        let Stmt::Let(_, recur) = &statements[0] else {
+        let Stmt::Let { value: recur, .. } = &statements[0] else {
             panic!("tail result bound first")
         };
         assert_eq!(callee(recur), "$collection.loop");
@@ -296,14 +296,17 @@ mod sequencing_tests {
             let ExprKind::Block(statements, result) = &arms[1].body.kind else {
                 panic!("sequenced evaluation")
             };
-            let Stmt::Let(_, callback) = &statements[0] else {
+            let Stmt::Let {
+                value: callback, ..
+            } = &statements[0]
+            else {
                 panic!("callback result bound once")
             };
             assert_eq!(callee(callback), "$collection.callback");
             match kind {
                 Collection::Map => {
                     assert_eq!(statements.len(), 2);
-                    let Stmt::Let(_, recur) = &statements[1] else {
+                    let Stmt::Let { value: recur, .. } = &statements[1] else {
                         panic!("tail bound after callback")
                     };
                     assert_eq!(callee(recur), "$collection.loop");

@@ -91,8 +91,8 @@ impl<'d> Gen<'_, 'd> {
             }
             ExprKind::Lit(lit) => self.literal(lit),
             ExprKind::Local(name) | ExprKind::Var(name) => self.leaf(&names::ident(name)),
-            ExprKind::Global { module, name } => self.global(module, &names::ident(name)),
-            ExprKind::Method { dict, name } => {
+            ExprKind::Global { module, name, .. } => self.global(module, &names::ident(name)),
+            ExprKind::Method { dict, name, .. } => {
                 if let Some(direct) = self.direct_method(dict, name) {
                     direct
                 } else {
@@ -386,8 +386,8 @@ impl<'d> Gen<'_, 'd> {
     pub(super) fn stmt(&mut self, stmt: &IrStmt) {
         #[cfg(feature = "source-maps")]
         let span = match stmt {
-            IrStmt::Let(_, e)
-            | IrStmt::Var(_, e)
+            IrStmt::Let { value: e, .. }
+            | IrStmt::Var { value: e, .. }
             | IrStmt::Assign(_, e)
             | IrStmt::Expr(e)
             | IrStmt::Fun { value: e, .. } => e.span,
@@ -410,16 +410,20 @@ impl<'d> Gen<'_, 'd> {
 
     fn stmt_kind(&mut self, stmt: &IrStmt) {
         match stmt {
-            IrStmt::Let(Pat::Bind(name), value) => {
+            IrStmt::Let {
+                pat: Pat::Bind(name),
+                value,
+                ..
+            } => {
                 let v = self.expr(value);
                 self.buf.push(self.constant(&names::ident(name), v));
             }
-            IrStmt::Let(pat, value) => {
+            IrStmt::Let { pat, value, .. } => {
                 let v = self.expr(value);
                 let v = self.subject(v);
                 self.destructure(pat, &v);
             }
-            IrStmt::Var(name, value) => {
+            IrStmt::Var { name, value, .. } => {
                 let v = self.expr(value);
                 let name = names::ident(name);
                 self.buf.push(self.variable(&name, v));
@@ -434,6 +438,7 @@ impl<'d> Gen<'_, 'd> {
                 rec,
                 dicts,
                 value,
+                ..
             } => {
                 let target = rec.then(|| Target {
                     callee: Callee::Local(name.clone()),

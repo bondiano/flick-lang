@@ -80,4 +80,7 @@ struct Checker<'a> {
     /// The effects of this module with a `control` operation, known before any
     /// type is converted: a row may name one declared further down.
     control_effects: HashSet<String>,
+    /// Skip building interned IR types when lowering will not run.
+    #[cfg_attr(target_arch = "wasm32", expect(dead_code))]
+    skip_ir_types: bool,
 }

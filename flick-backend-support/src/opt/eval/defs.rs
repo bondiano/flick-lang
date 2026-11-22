@@ -182,7 +182,9 @@ impl DefTable {
         // forward references within `module` never consume external probe slots.
         for item in &module.items {
             match &item.kind {
-                ItemKind::Value { name, dicts, body } => {
+                ItemKind::Value {
+                    name, dicts, body, ..
+                } => {
                     let key = value_key(&module.name, name);
                     table.record_own(&mut queues.seen, key, (dicts.clone(), body.clone()));
                 }
@@ -234,7 +236,7 @@ impl DefTable {
             let (key, found) = if let Some(key) = queues.values.pop() {
                 let found = split_value_key(&key).and_then(|(owner, name)| {
                     external_probes += 1;
-                    generics(owner, name)
+                    generics(owner, name).map(|g| (g.dicts, g.body))
                 });
                 (key, found)
             } else {
@@ -306,12 +308,12 @@ fn enqueue_refs(root: &Expr, current_module: &str, queues: &mut RefQueues) {
     let mut stack = vec![root];
     while let Some(e) = stack.pop() {
         match &e.kind {
-            ExprKind::Global { module, name } if module != current_module => {
+            ExprKind::Global { module, name, .. } if module != current_module => {
                 queues
                     .values
                     .push(&mut queues.seen, value_key(module, name));
             }
-            ExprKind::Method { dict, name } => {
+            ExprKind::Method { dict, name, .. } => {
                 walk_dict(dict, Some(name), current_module, queues);
             }
             ExprKind::Dicts(_, dicts) => {

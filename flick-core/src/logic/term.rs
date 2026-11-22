@@ -122,11 +122,11 @@ pub fn term(e: &Expr) -> Result<Term, Refused> {
         ExprKind::Global { module, .. } if module == RULES => {
             return refuse(e.span, "a rule of a proof is no value of the statement");
         }
-        ExprKind::Global { module, name } => Term::Def(Rc::new(Def::Value {
+        ExprKind::Global { module, name, .. } => Term::Def(Rc::new(Def::Value {
             module: module.clone(),
             name: name.clone(),
         })),
-        ExprKind::Method { dict, name } => Term::Def(Rc::new(Def::Method {
+        ExprKind::Method { dict, name, .. } => Term::Def(Rc::new(Def::Method {
             dict: dict.clone(),
             name: name.clone(),
         })),
@@ -161,7 +161,12 @@ pub fn term(e: &Expr) -> Result<Term, Refused> {
         ExprKind::Block(stmts, result) => {
             let mut out = term(result)?;
             for stmt in stmts.iter().rev() {
-                let Stmt::Let(IrPat::Bind(name), value) = stmt else {
+                let Stmt::Let {
+                    pat: IrPat::Bind(name),
+                    value,
+                    ..
+                } = stmt
+                else {
                     return refuse(e.span, "only `let name = value` is supported in a proof");
                 };
                 out = Term::Let(name.as_str().into(), Rc::new(term(value)?), Rc::new(out));

@@ -169,7 +169,7 @@ impl<'d> Gen<'_, 'd> {
             args.push(&**arg);
             head = func;
         }
-        let ExprKind::Global { module, name } = &head.kind else {
+        let ExprKind::Global { module, name, .. } = &head.kind else {
             return None;
         };
         args.reverse();

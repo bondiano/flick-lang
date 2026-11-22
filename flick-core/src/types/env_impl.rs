@@ -263,6 +263,16 @@ impl<'b> Env<'b> {
             .or_else(|| self.builtins.values.get(entity))
     }
 
+    /// Top-level values and foreigns declared by the current module.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn local_values(&self) -> impl Iterator<Item = (&str, &Type)> {
+        let module = self.module.as_str();
+        self.values.iter().filter_map(move |(entity, ty)| {
+            (entity.module == module && entity.namespace == Namespace::Value)
+                .then_some((entity.name.as_str(), ty))
+        })
+    }
+
     /// The type a constructor builds, by its entity.
     pub fn parent(&self, entity: &Entity) -> Option<(String, String)> {
         let parent = self

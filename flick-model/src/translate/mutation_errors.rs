@@ -128,14 +128,21 @@ impl Tr<'_> {
                 let rest = tr.protected_block(rest, tail, xs);
                 tr.write_cell(x, v, rest)
             }),
-            Stmt::Var(x, e) | Stmt::Assign(x, e) => self.protected_with(e, xs, |tr, v| {
+            Stmt::Var {
+                name: x, value: e, ..
+            }
+            | Stmt::Assign(x, e) => self.protected_with(e, xs, |tr, v| {
                 let name = tr.fresh(x);
                 tr.versions.push((x.clone(), name.clone()));
                 let body = tr.protected_block(rest, tail, xs);
                 tr.versions.pop();
                 Term::Let(name, None, Rc::new(v), Rc::new(body))
             }),
-            Stmt::Let(ir::Pat::Bind(x), e) => self.protected_with(e, xs, |tr, v| {
+            Stmt::Let {
+                pat: ir::Pat::Bind(x),
+                value: e,
+                ..
+            } => self.protected_with(e, xs, |tr, v| {
                 let body = tr.protected_block(rest, tail, xs);
                 if let Some(sig) = tr.local_scheme(x) {
                     Term::Let(x.as_str().into(), Some(sig), Rc::new(v), Rc::new(body))
@@ -150,7 +157,9 @@ impl Tr<'_> {
                     )
                 }
             }),
-            Stmt::Let(p, e) => self.protected_with(e, xs, |tr, v| {
+            Stmt::Let {
+                pat: p, value: e, ..
+            } => self.protected_with(e, xs, |tr, v| {
                 let body = tr.protected_block(rest, tail, xs);
                 Term::Match(
                     Rc::new(v),
@@ -206,6 +215,7 @@ impl Tr<'_> {
                 pat: p,
                 source,
                 body,
+                ..
             } => self.protected_with(source, xs, |tr, v| tr.protected_each(p, v, body, xs)),
             ExprKind::ControlLoop {
                 id,

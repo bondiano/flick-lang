@@ -159,7 +159,7 @@ fn hash_expr(root: &Expr, seed: u64, limit: usize) -> u64 {
             }
             ExprKind::Lit(Lit::BigInt(s) | Lit::String(s)) => (20, s, ""),
             ExprKind::Local(s) => (21, s, ""),
-            ExprKind::Global { module, name } => (22, module, name),
+            ExprKind::Global { module, name, .. } => (22, module, name),
             ExprKind::Con(c) => (23, &c.module, &c.name),
             ExprKind::Method { name, .. } => (24, name, ""),
             ExprKind::Field(_, s) => (25, s, ""),
@@ -229,6 +229,35 @@ pub fn run_module_pass(
     retries: &mut RetryTracker,
     counters: &mut EvalCounters,
 ) -> bool {
+    run_module_pass_with_types(
+        module,
+        exported,
+        lookup,
+        generics,
+        lang,
+        primitives,
+        config,
+        module_steps_remaining,
+        retries,
+        counters,
+        true,
+    )
+}
+
+#[allow(clippy::too_many_arguments, reason = "pass state across rounds")]
+pub(crate) fn run_module_pass_with_types(
+    module: &mut Module,
+    exported: &dyn Fn(&str) -> bool,
+    lookup: &devirt::Lookup<'_>,
+    generics: Generics<'_>,
+    lang: &Known<'_>,
+    primitives: &dyn PrimitiveEval,
+    config: &EvalConfig,
+    module_steps_remaining: &mut u32,
+    retries: &mut RetryTracker,
+    counters: &mut EvalCounters,
+    preserve_types: bool,
+) -> bool {
     if *module_steps_remaining == 0 {
         return false;
     }
@@ -251,6 +280,7 @@ pub fn run_module_pass(
         module_steps_remaining,
         retries,
         counters,
+        preserve_types,
         changed: false,
     };
 
@@ -272,6 +302,7 @@ pub(super) struct PassCtx<'a, 'b> {
     pub(super) module_steps_remaining: &'b mut u32,
     pub(super) retries: &'b mut RetryTracker,
     pub(super) counters: &'b mut EvalCounters,
+    pub(super) preserve_types: bool,
     pub(super) changed: bool,
 }
 
@@ -404,7 +435,10 @@ impl<'a> PassCtx<'a, '_> {
         };
         *self.module_steps_remaining = budget.module_steps_remaining;
         match replacement {
-            Ok(new_expr) => {
+            Ok(mut new_expr) => {
+                if self.preserve_types && new_expr.ty.is_none() {
+                    new_expr.ty.clone_from(&e.ty);
+                }
                 *e = new_expr;
                 self.changed = true;
                 self.counters.record_success();
@@ -432,7 +466,7 @@ impl<'a> PassCtx<'a, '_> {
         if let ExprKind::Dicts(inner, _) = &head.kind {
             head = inner;
         }
-        if let ExprKind::Global { module, name } = &head.kind
+        if let ExprKind::Global { module, name, .. } = &head.kind
             && module == self.mat_ctx.current_module
         {
             return self

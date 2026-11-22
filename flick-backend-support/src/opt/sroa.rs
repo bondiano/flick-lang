@@ -3,7 +3,11 @@
 //! destructures it, becomes one local per part. Its identity is never
 //! observed, so no object needs to exist.
 
+use std::collections::HashMap;
+
+use super::types::filter_binder_types;
 use crate::ir::{Expr, ExprKind, Pat, Stmt};
+use flick_ir::{IrType, TypeRef};
 
 /// Splits the records and tuples bound in `stmts` that only feed reads of
 /// their parts; whether anything changed.
@@ -12,7 +16,11 @@ pub fn split(stmts: &mut Vec<Stmt>, result: &mut Expr) -> bool {
     let mut i = 0;
     while i < stmts.len() {
         let parts = match &stmts[i] {
-            Stmt::Let(Pat::Bind(name), value) => match &value.kind {
+            Stmt::Let {
+                pat: Pat::Bind(name),
+                value,
+                ..
+            } => match &value.kind {
                 ExprKind::Record(fields)
                     if only(stmts, i, result, name, &|e| field_of(e, name)) =>
                 {
@@ -35,14 +43,26 @@ pub fn split(stmts: &mut Vec<Stmt>, result: &mut Expr) -> bool {
             continue;
         };
         let local = |part: &str| format!("{name}${part}");
+        let part_types: HashMap<String, Option<TypeRef>> = parts
+            .iter()
+            .map(|(part, value)| (part.clone(), value.ty.clone()))
+            .collect();
         let lets: Vec<Stmt> = parts
             .iter()
-            .map(|(part, value)| Stmt::Let(Pat::Bind(local(part)), value.clone()))
+            .map(|(part, value)| {
+                let n = local(part);
+                let bt = value
+                    .ty
+                    .clone()
+                    .map(|t| vec![(n.clone(), t)])
+                    .unwrap_or_default();
+                Stmt::let_typed(Pat::Bind(n), bt, value.clone())
+            })
             .collect();
         let count = lets.len();
         let rest: Vec<Stmt> = stmts
             .drain(i + 1..)
-            .flat_map(|stmt| replace_stmt(stmt, &name, &local))
+            .flat_map(|stmt| replace_stmt(stmt, &name, &local, &part_types))
             .collect();
         stmts.splice(i..=i, lets);
         stmts.extend(rest);
@@ -66,18 +86,20 @@ fn only(
     let mut parts = parts(result, is_part);
     for stmt in &stmts[i + 1..] {
         match stmt {
-            Stmt::Let(
-                Pat::Tuple(_),
-                Expr {
-                    kind: ExprKind::Local(l),
-                    ..
-                },
-            ) if l == name => {
+            Stmt::Let {
+                pat: Pat::Tuple(_),
+                value:
+                    Expr {
+                        kind: ExprKind::Local(l),
+                        ..
+                    },
+                ..
+            } if l == name => {
                 total += 1;
                 parts += 1;
             }
-            Stmt::Let(_, v)
-            | Stmt::Var(_, v)
+            Stmt::Let { value: v, .. }
+            | Stmt::Var { value: v, .. }
             | Stmt::Assign(_, v)
             | Stmt::Expr(v)
             | Stmt::Fun { value: v, .. } => {
@@ -104,31 +126,66 @@ fn field_of(e: &Expr, name: &str) -> bool {
 
 /// `stmt` with the parts of `name` read from their locals; `let (a, b) = t`
 /// of a split tuple becomes one `let` per part.
-fn replace_stmt(stmt: Stmt, name: &str, local: &dyn Fn(&str) -> String) -> Vec<Stmt> {
+fn replace_stmt(
+    stmt: Stmt,
+    name: &str,
+    local: &dyn Fn(&str) -> String,
+    part_types: &HashMap<String, Option<TypeRef>>,
+) -> Vec<Stmt> {
     match stmt {
-        Stmt::Let(
-            Pat::Tuple(pats),
-            Expr {
-                kind: ExprKind::Local(l),
-                span,
-                ..
-            },
-        ) if l == name => pats
-            .into_iter()
-            .enumerate()
-            .map(|(k, p)| Stmt::Let(p, Expr::new(ExprKind::Local(local(&k.to_string())), span)))
-            .collect(),
-        Stmt::Let(p, mut v) => {
+        Stmt::Let {
+            pat: Pat::Tuple(pats),
+            binder_types,
+            value:
+                Expr {
+                    kind: ExprKind::Local(l),
+                    span,
+                    ty: tup_ty,
+                },
+        } if l == name => {
+            let elem_tys = match tup_ty.as_deref() {
+                Some(IrType::Tuple(ts)) if ts.len() == pats.len() => Some(ts),
+                _ => None,
+            };
+            pats.into_iter()
+                .enumerate()
+                .map(|(k, p)| {
+                    let key = k.to_string();
+                    let bt = filter_binder_types(&p, &binder_types);
+                    let ty = elem_tys
+                        .and_then(|ts| ts.get(k).cloned())
+                        .or_else(|| part_types.get(&key).cloned().flatten());
+                    Stmt::let_typed(p, bt, Expr::with_ty(ExprKind::Local(local(&key)), span, ty))
+                })
+                .collect()
+        }
+        Stmt::Let {
+            pat: p,
+            binder_types,
+            value: mut v,
+        } => {
             replace(&mut v, name, local);
-            vec![Stmt::Let(p, v)]
+            vec![Stmt::Let {
+                pat: p,
+                binder_types,
+                value: v,
+            }]
         }
         Stmt::Expr(mut v) => {
             replace(&mut v, name, local);
             vec![Stmt::Expr(v)]
         }
-        Stmt::Var(x, mut v) => {
+        Stmt::Var {
+            name: x,
+            ty,
+            value: mut v,
+        } => {
             replace(&mut v, name, local);
-            vec![Stmt::Var(x, v)]
+            vec![Stmt::Var {
+                name: x,
+                ty,
+                value: v,
+            }]
         }
         Stmt::Assign(x, mut v) => {
             replace(&mut v, name, local);
@@ -137,14 +194,20 @@ fn replace_stmt(stmt: Stmt, name: &str, local: &dyn Fn(&str) -> String) -> Vec<S
         Stmt::Fun {
             name: f,
             rec,
+            type_params,
             dicts,
+            dict_constraints,
+            ty,
             mut value,
         } => {
             replace(&mut value, name, local);
             vec![Stmt::Fun {
                 name: f,
                 rec,
+                type_params,
                 dicts,
+                dict_constraints,
+                ty,
                 value,
             }]
         }

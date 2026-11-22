@@ -222,7 +222,7 @@ mod tests {
                     1,
                     Operation::Match {
                         object: 0,
-                        pattern: pattern.clone(),
+                        pattern: Box::new(pattern.clone()),
                     },
                 ),
                 let_(2, construct(&[1])),
@@ -233,7 +233,13 @@ mod tests {
         assert_eq!(
             output.body.instructions,
             [
-                let_(1, Operation::Match { object: 0, pattern }),
+                let_(
+                    1,
+                    Operation::Match {
+                        object: 0,
+                        pattern: Box::new(pattern),
+                    }
+                ),
                 let_(
                     2,
                     Operation::Reuse {
@@ -257,7 +263,7 @@ mod tests {
                     1,
                     Operation::Match {
                         object: 0,
-                        pattern: pattern.clone(),
+                        pattern: Box::new(pattern.clone()),
                     },
                 ),
                 let_(2, construct(&[])),
@@ -268,7 +274,13 @@ mod tests {
         assert_eq!(
             output.body.instructions,
             [
-                let_(1, Operation::Match { object: 0, pattern }),
+                let_(
+                    1,
+                    Operation::Match {
+                        object: 0,
+                        pattern: Box::new(pattern),
+                    }
+                ),
                 Instruction::Drop(1),
                 let_(
                     2,

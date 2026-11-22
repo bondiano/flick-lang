@@ -6,7 +6,7 @@ use crate::resolve;
 
 #[test]
 fn built_in_signatures_write_nothing_they_get_anyway() {
-    super::check_allowing(super::builtin_sources(), &[], false, |_, _| {});
+    super::check_allowing(super::builtin_sources(), &[], false, true, |_, _| {});
 }
 
 mod fixes {
@@ -52,7 +52,7 @@ mod fixes {
                     fixes.push((name.to_owned(), edits));
                 }
             };
-            check_reporting(&sources, &mut report, false, &mut |_, _| {});
+            check_reporting(&sources, &mut report, false, true, &mut |_, _| {});
             if fixes.is_empty() {
                 return;
             }
@@ -170,7 +170,7 @@ fn a_built_in_module_imports_only_the_ones_before_it() {
             said = diagnostics;
         }
     };
-    super::check_reporting(&modules, &mut report, false, &mut |_, _| {});
+    super::check_reporting(&modules, &mut report, false, true, &mut |_, _| {});
     let found: Vec<_> = (said.iter())
         .map(|d| (d.code, &early[d.span.expect("a span").range()]))
         .collect();
@@ -193,7 +193,7 @@ fn a_built_in_module_names_only_the_ones_before_it() {
             said = diagnostics;
         }
     };
-    super::check_reporting(&modules, &mut report, false, &mut |_, _| {});
+    super::check_reporting(&modules, &mut report, false, true, &mut |_, _| {});
     let found: Vec<_> = (said.iter())
         .map(|d| {
             (

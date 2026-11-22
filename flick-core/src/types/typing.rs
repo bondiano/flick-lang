@@ -9,18 +9,19 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
-use super::Checker;
 use super::classes::Dict;
 use super::env::Abi;
 use super::gadt::branch::as_field_given;
+#[cfg(not(target_arch = "wasm32"))]
+use super::kinds::Kind;
 use super::services::OpClass;
 use super::ty::{Stage, Type};
 use crate::diagnostics::Diagnostic;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::iface::Entity;
 use crate::iface::Interface;
 use crate::numeric::Num;
 use crate::source::Span;
-use crate::syntax::cst::Node;
-use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
 use flick_ir::{Adapter, ForeignMode, Label};
 
@@ -30,9 +31,14 @@ mod owner_templates;
 pub use owner_productivity::{OwnerAbstract, OwnerProductivity, OwnerRawHead};
 mod owners;
 pub use owner_templates::{OwnerTypeExpr, OwnerTypeKind, OwnerTypeTemplates};
+mod record;
 mod stages;
 pub use owners::{ForeignOwnerNode, ForeignOwnerPolicy, Owner, StageKey};
 use owners::{OwnerContext, OwnerStage};
+
+/// A pending constructor use before the module is solved: `(range, ctor_entity, kinded_type_args)`.
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) type PendingConUse = (Range, Entity, Vec<(Kind, Type)>);
 
 /// A source range of the module being checked.
 pub type Range = (u32, u32);
@@ -195,6 +201,45 @@ pub struct Typing {
     /// stays linear in the size of the module.
     pub values: HashMap<Range, Type>,
     pending_values: Vec<(Range, Type)>,
+    /// Full interned IR types for expressions, names and binders (populated
+    /// when IR lowering is requested).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ir_values: HashMap<Range, flick_ir::TypeRef>,
+    /// Post-coercion target types at ranges with implicit coercions.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ir_coercion_targets: HashMap<Range, flick_ir::TypeRef>,
+    /// Layout-relevant type arguments instantiating polymorphic globals,
+    /// constructors, and methods, keyed by use range.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ir_type_args: HashMap<Range, Vec<flick_ir::TypeRef>>,
+    /// Instantiated field types at constructor uses (`ExprKind::Con`, `Pat::Con`).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ir_con_fields: HashMap<Range, Vec<flick_ir::TypeRef>>,
+    /// Module type declarations (data, error, nominal) with constructor fields.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ir_type_decls: Vec<flick_ir::TypeDecl>,
+    /// Lowered schemes of top-level values and foreigns:
+    /// `name -> (type_params, dict_constraints, ty)`.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ir_top_schemes:
+        HashMap<String, (Vec<String>, Vec<flick_ir::Constraint>, flick_ir::TypeRef)>,
+    /// Lowered schemes of local `let` / `let rec` functions keyed by `K::LetDecl` range.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ir_local_schemes:
+        HashMap<Range, (Vec<String>, Vec<flick_ir::Constraint>, flick_ir::TypeRef)>,
+    /// Declared constructor field types for constructors of this module, by name.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ir_ctor_fields: HashMap<String, Vec<flick_ir::TypeRef>>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) pending_ir_values: Vec<(Range, Type)>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) pending_coercion_targets: Vec<(Range, Type)>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) pending_type_args: Vec<(Range, Vec<(Kind, Type)>)>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) pending_con_uses: Vec<PendingConUse>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) pending_ir_local_schemes: Vec<(Range, Type)>,
     #[cfg(feature = "ide")]
     /// The record each field label belongs to, at the label: in a field
     /// access, a literal, an update and a record pattern.
@@ -350,88 +395,6 @@ pub fn passes_dictionary(constraint: &Type) -> bool {
         && !class(Lang::TypeEq)
         && super::gadt::row_facts::Equation::from_given(constraint).is_none()
         && as_field_given(constraint).is_none()
-}
-
-impl Checker<'_> {
-    pub fn record_name(&mut self, span: Span, r: Ref) {
-        self.typing.names.insert(range(span), r);
-    }
-
-    /// Records the dictionaries of the constraints of a definition or
-    /// argument checked at `span`.
-    pub fn record_givens(&mut self, span: Span, givens: &[Type]) {
-        let shown: Vec<String> = givens
-            .iter()
-            .filter(|g| passes_dictionary(g))
-            .map(|g| self.show_exact(&self.canon(g)))
-            .collect();
-        if !shown.is_empty() {
-            self.typing.givens.insert(range(span), shown);
-        }
-    }
-
-    /// Records the type of a name or binder at `span`, settled once the
-    /// module is solved.
-    pub fn note_type(&mut self, span: Span, ty: &Type) {
-        if !self.store.equalities.is_empty() || !self.store.row_equalities.is_empty() {
-            return self.note_refined(range(span), ty, ty);
-        }
-        self.typing.pending_types.push((range(span), ty.clone()));
-    }
-
-    #[cfg(feature = "ide")]
-    /// `record` is the record the field label at `span` belongs to.
-    pub fn note_field(&mut self, span: Span, record: &Type) {
-        self.typing
-            .pending_fields
-            .push((range(span), record.clone()));
-    }
-
-    /// The type of a value code generation makes at `at` without a node of
-    /// its own, when it is a type constructor on its own.
-    pub fn note_value(&mut self, at: Range, ty: &Type) {
-        let observed = self.store.head(ty);
-        if let t @ (Type::Con { .. } | Type::Meta(_)) = observed.as_ref() {
-            self.typing.pending_values.push((at, t.clone()));
-        }
-    }
-
-    /// The type of an expression a keyword opens (`task`, `match`, `fun` …),
-    /// recorded at the keyword so an editor can show it there.
-    pub fn note_head(&mut self, node: &Node, ty: &Type) {
-        self.note_value(node.range(), ty);
-        // a body with a module open has no keyword of the user's: its type is
-        // at the whole of it, where the head of its block finds it
-        if node.kind == K::OpenExpr {
-            return self.note_type(self.span(node), ty);
-        }
-        let head = match node.kind {
-            K::TaskExpr => K::TaskKw,
-            K::LazyExpr => K::LazyKw,
-            K::DoExpr => K::DoKw,
-            K::ForExpr => K::ForKw,
-            K::ScopeExpr => K::ScopeKw,
-            K::ProvideExpr => K::ProvideKw,
-            K::TryExpr => K::TryKw,
-            K::ResultExpr => K::ResultKw,
-            K::CatchExpr => K::CatchKw,
-            K::MatchExpr => K::MatchKw,
-            K::IfExpr => K::IfKw,
-            K::FunExpr => K::FunKw,
-            _ => return,
-        };
-        if let Some(kw) = node.child_tokens().find(|t| t.kind == head) {
-            self.note_type(self.token_span(kw), ty);
-        }
-    }
-
-    pub fn record_dict(&mut self, span: Span, order: u32, dict: Dict) {
-        self.typing.pending_dicts.push((range(span), order, dict));
-    }
-
-    pub fn record_label(&mut self, span: Span, ty: Type) {
-        self.typing.pending_labels.push((range(span), ty));
-    }
 }
 
 impl Typing {

@@ -20,7 +20,7 @@ function fixture(t) {
   copyFileSync(new URL("./index.mjs", import.meta.url), script);
   writeFileSync(
     join(root, "backends/js/Cargo.toml"),
-    'version = "0.1.0"\n\n[package.metadata.flick]\nbackend-api = { minimum = "0.1.0", maximum-exclusive = "0.2.0" }\nir = { minimum = "0.13.0", maximum-exclusive = "0.14.0" }\n',
+    'version = "0.1.0"\n\n[package.metadata.flick]\nbackend-api = { minimum = "0.1.0", maximum-exclusive = "0.2.0" }\nir = { minimum = "0.14.0", maximum-exclusive = "0.15.0" }\n',
   );
   const built = join(root, "target/backends/js.wasm");
   const distributed = join(root, "backends/js/package/component.wasm");
@@ -29,7 +29,7 @@ function fixture(t) {
     identity: { id: "flick/js", version: "0.1.0" },
     sha256: createHash("sha256").update(component).digest("hex"),
     backend_api: { minimum: "0.1.0", maximum_exclusive: "0.2.0" },
-    ir: { minimum: "0.13.0", maximum_exclusive: "0.14.0" },
+    ir: { minimum: "0.14.0", maximum_exclusive: "0.15.0" },
   };
   writeFileSync(built, component);
   writeFileSync(distributed, component);

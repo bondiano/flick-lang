@@ -57,7 +57,7 @@ pub fn dict_uses(d: &Dict, out: &mut Vec<Key>) {
 
 fn expr_uses(e: &Expr, out: &mut Vec<Key>) {
     match &e.kind {
-        ExprKind::Global { module, name } => out.push((module.clone(), name.clone())),
+        ExprKind::Global { module, name, .. } => out.push((module.clone(), name.clone())),
         ExprKind::Method { dict, .. } => dict_uses(dict, out),
         ExprKind::Dicts(_, dicts) => {
             for d in dicts {

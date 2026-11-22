@@ -58,6 +58,7 @@ impl Tr<'_> {
             pat: p,
             source,
             body,
+            ..
         } = &e.kind
         else {
             return self.expr(&collected(e));
@@ -156,6 +157,7 @@ impl Tr<'_> {
                 pat: p,
                 source,
                 body,
+                ..
             } => {
                 let source = seq_iter(self.expr(source));
                 let item = self.fresh("item");
@@ -215,6 +217,7 @@ mod tests {
                         ExprKind::Each {
                             stop: Some(Box::new(Expr::new(ExprKind::Lit(Lit::Bool(true)), span))),
                             pat: Pat::Bind("x".into()),
+                            binder_types: Vec::new(),
                             source: Box::new(Expr::new(ExprKind::List(Vec::new()), span)),
                             body: Box::new(Expr::new(
                                 ExprKind::Yield(Box::new(Expr::new(

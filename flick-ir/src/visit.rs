@@ -116,8 +116,8 @@ impl Expr {
             ExprKind::Block(stmts, result) => {
                 for stmt in stmts {
                     match stmt {
-                        Stmt::Let(_, v)
-                        | Stmt::Var(_, v)
+                        Stmt::Let { value: v, .. }
+                        | Stmt::Var { value: v, .. }
                         | Stmt::Assign(_, v)
                         | Stmt::Expr(v)
                         | Stmt::Fun { value: v, .. } => f(v),
@@ -253,8 +253,8 @@ impl Expr {
             ExprKind::Block(stmts, result) => {
                 for stmt in stmts {
                     match stmt {
-                        Stmt::Let(_, v)
-                        | Stmt::Var(_, v)
+                        Stmt::Let { value: v, .. }
+                        | Stmt::Var { value: v, .. }
                         | Stmt::Assign(_, v)
                         | Stmt::Expr(v)
                         | Stmt::Fun { value: v, .. } => f(v),
@@ -465,6 +465,7 @@ mod tests {
             ExprKind::Method {
                 dict,
                 name: "shared".into(),
+                type_args: Vec::new(),
             },
             at(),
         );
@@ -481,6 +482,7 @@ mod tests {
                     ExprKind::Method {
                         dict: Dict::Field("shared".into()),
                         name: "read".into(),
+                        type_args: Vec::new(),
                     },
                     at(),
                 )),

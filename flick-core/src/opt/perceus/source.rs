@@ -456,6 +456,7 @@ fn abstract_params(names: &[String]) -> Vec<Param> {
             pat: Pat::Bind(given(name)),
             stage: Stage::Pure,
             ty: None,
+            binder_types: Vec::new(),
         })
         .collect()
 }
@@ -471,12 +472,14 @@ fn dictionary(value: &Dict, span: Span) -> Result<Expr, LowerError> {
         Dict::Value { module, name } => ExprKind::Global {
             module: module.clone(),
             name: name.clone(),
+            type_args: Vec::new(),
         },
         Dict::Instance { module, name, args } => {
             let instance = Expr::new(
                 ExprKind::Global {
                     module: module.clone(),
                     name: format!("instance {name}"),
+                    type_args: Vec::new(),
                 },
                 span,
             );
@@ -485,6 +488,7 @@ fn dictionary(value: &Dict, span: Span) -> Result<Expr, LowerError> {
         Dict::Super { dict, class } => ExprKind::Method {
             dict: (**dict).clone(),
             name: format!("${class}"),
+            type_args: Vec::new(),
         },
         Dict::Site { place, definition } => ExprKind::Dictionary(vec![
             (
@@ -513,6 +517,7 @@ fn dictionary(value: &Dict, span: Span) -> Result<Expr, LowerError> {
                         pat: Pat::Bind(name.into()),
                         stage: Stage::Pure,
                         ty: None,
+                        binder_types: Vec::new(),
                     }],
                     body: Box::new(Expr::new(ExprKind::Local(name.into()), span)),
                 },

@@ -7,7 +7,11 @@ use crate::ir::{self, Expr, Module};
 use crate::types;
 use flick_backend_support::opt as portable;
 pub use flick_backend_support::opt::tuple_match;
-pub use flick_backend_support::opt::{Arity, arity, js_number, json_string, names_only, rename};
+pub use flick_backend_support::opt::{
+    Arity, Generic, arity, js_number, json_string, names_only, rename,
+};
+#[cfg(feature = "native-project")]
+pub use flick_backend_support::opt::{strip_legacy_bare_generic, strip_legacy_bare_types};
 
 pub use portable::Generics;
 
@@ -43,6 +47,28 @@ pub fn optimize_with_primitives(
     let config = portable::eval::EvalConfig::default();
     tuple_match::fold_tuple_matches(module);
     let _ = portable::optimize_with_eval(
+        module, exported, generics, arity, &known, &builtin, &config, primitives,
+    );
+}
+
+#[cfg(feature = "native-project")]
+pub fn optimize_legacy_bare(
+    module: &mut Module,
+    exported: &dyn Fn(&str) -> bool,
+    generics: Generics,
+    arity: Arity,
+    primitives: &dyn portable::eval::PrimitiveEval,
+) {
+    let table = ir::lang_items();
+    let known = Known::of(&table);
+    let builtin = |module: &str| {
+        types::builtin_sources()
+            .iter()
+            .any(|(name, _)| *name == module)
+    };
+    let config = portable::eval::EvalConfig::default();
+    tuple_match::fold_tuple_matches(module);
+    let _ = portable::optimize_legacy_bare(
         module, exported, generics, arity, &known, &builtin, &config, primitives,
     );
 }

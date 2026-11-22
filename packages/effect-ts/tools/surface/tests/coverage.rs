@@ -168,7 +168,7 @@ fn used_names() -> BTreeSet<String> {
 
 #[cfg(feature = "ide")]
 fn globals(e: &Expr, used: &mut BTreeSet<String>) {
-    if let ExprKind::Global { module, name } = &e.kind {
+    if let ExprKind::Global { module, name, .. } = &e.kind {
         used.insert(format!("{module}.{name}"));
     }
     e.each_child(&mut |child| globals(child, used));

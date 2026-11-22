@@ -650,3 +650,33 @@ project must also let the backend run it: `[tools]` `"flick/go" = ["go"]`
 in `flick.toml`, or `--allow-tool go` for a file built outside a project
 (`FLICK-P029` otherwise). It is built without cgo by default, so no C compiler is
 needed either; pass `--cgo` (or `[target.go] cgo = true`) to build with `CGO_ENABLED=1`.
+
+## Portable IR (0.14.0)
+
+Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.14.0"`),
+checked against the `ir` version range (`[0.14.0, 0.15.0)`) in its descriptor.
+Alongside values, stages, dictionaries and lang items, IR `0.14.0` carries the
+layout-relevant types the checker inferred so layout-aware and monomorphizing
+backends can lay out values by value without calling back into the checker:
+
+| IR structure | Type information carried |
+| - | - |
+| `IrType` (`TypeRef`) | named type applied to arguments (`Named`), type variable (`Var`), higher-kinded application (`App`), staged function (`Fun`), tuple (`Tuple`), closed or open record row (`Record`), higher-rank scheme (`Forall`), and packed-module existential (`Exists`); effect, service and region rows are omitted |
+| `Module.types` (`TypeDecl`) | each data type, `type error` and `opaque type alias` declared in the module, its layout type parameters, and each `ConstructorDecl`'s `type_params`, `existentials`, dictionary `constraints`, `fields`, `record` labels (for record-over-constructor declarations) and GADT `result_args` |
+| `Constructor` | constructor `fields` (declared on `ItemKind::Constructor`, instantiated at `ExprKind::Con`) and instantiation `type_args`, alongside `dicts` and `rep` |
+| Binders and expressions | `Expr.ty`, `Param.{ty, binder_types}`, `ItemKind::Value.{type_params, dict_constraints, ty}`, `ItemKind::Destructure.binder_types`, `Stmt::Let.binder_types`, `Stmt::Var.ty`, `Stmt::Fun.{type_params, dict_constraints, ty}`, `Arm.binder_types`, `Each.binder_types` and `Foreign.{type_params, ty}` |
+| Polymorphic uses | `type_args` on `ExprKind::Global`, `ExprKind::Method` and `ExprKind::Con`, next to `ExprKind::Dicts` |
+
+In memory, types are shared behind `Arc<IrType>` (`TypeRef`). On the CBOR and
+JSON wire (`flick build --emit-ir`), `Program` deduplicates distinct `IrType`
+nodes into a top-level `types` pool referenced by integer index so repeated
+types do not duplicate the IR.
+
+After any IR transform — including portable optimization passes and `ir` plugin
+hooks — `flick_ir::validate` checks that every `IrType` is well formed, that
+type arguments match the parameters of their declaration, and that type
+annotations used for layout agree with the terms they describe (constructor
+operands, binders, calls and results). Backends and transforms may still use an
+erased representation where optional annotations are omitted (`None` or empty
+lists) and the erased path stays valid. The official `flick/js` and `flick/go`
+backends ignore the new compound type fields beyond bare type-constructor names.

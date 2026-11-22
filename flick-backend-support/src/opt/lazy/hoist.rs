@@ -90,6 +90,7 @@ fn hoist_loop(e: &mut Expr, in_runtime: bool, fresh: &mut usize, lang: &Known<'_
             pat,
             source,
             body,
+            ..
         } => {
             changed |= hoist_in(source, in_runtime, fresh, lang);
             if let Some(stop) = stop {
@@ -129,6 +130,7 @@ fn hoist_block(
                 rec: true,
                 dicts,
                 value,
+                ..
             } if in_runtime && dicts.is_empty() => {
                 if let ExprKind::Lambda { params, body } = &mut value.kind
                     && params.last().is_some_and(|p| p.stage == Stage::Runtime)
@@ -149,8 +151,8 @@ fn hoist_block(
                     changed |= hoist_in(value, in_runtime, fresh, lang);
                 }
             }
-            Stmt::Let(_, v)
-            | Stmt::Var(_, v)
+            Stmt::Let { value: v, .. }
+            | Stmt::Var { value: v, .. }
             | Stmt::Assign(_, v)
             | Stmt::Expr(v)
             | Stmt::Fun { value: v, .. } => {
@@ -165,9 +167,10 @@ fn hoist_block(
 
 fn wrap_hoisted(e: &mut Expr, hoisted: Vec<Stmt>) {
     let span = e.span;
+    let ty = e.ty.clone();
     let unit = Expr::new(ExprKind::Lit(Lit::Unit), span);
     let inner = mem::replace(e, unit);
-    *e = Expr::new(ExprKind::Block(hoisted, Box::new(inner)), span);
+    *e = Expr::with_ty(ExprKind::Block(hoisted, Box::new(inner)), span, ty);
 }
 
 fn add_pat_binders(pat: &Pat, bound: &mut HashSet<String>) -> Vec<String> {
@@ -219,6 +222,7 @@ fn direct_value_cell(arg: &Expr, lang: &Known<'_>) -> bool {
     is(func, Lang::LazyMake, lang) && matches!(&arg.kind, ExprKind::Task(body) if value(body))
 }
 
+#[allow(clippy::too_many_lines)]
 fn collect_expr(
     e: &mut Expr,
     bound: &mut HashSet<String>,
@@ -237,9 +241,11 @@ fn collect_expr(
     if hoistable(e, bound, lang) {
         let name = fresh_name(fresh);
         let span = e.span;
-        let replacement = Expr::new(ExprKind::Local(name.clone()), span);
+        let ty = e.ty.clone();
+        let replacement = Expr::with_ty(ExprKind::Local(name.clone()), span, ty.clone());
         let cell = mem::replace(e, replacement);
-        hoisted.push(Stmt::Let(Pat::Bind(name), cell));
+        let bt = ty.map(|t| vec![(name.clone(), t)]).unwrap_or_default();
+        hoisted.push(Stmt::let_typed(Pat::Bind(name), bt, cell));
         return;
     }
     match &mut e.kind {
@@ -265,7 +271,11 @@ fn collect_expr(
             for mut stmt in mem::take(stmts) {
                 match &mut stmt {
                     // Let O1a drop dead/ignored lazy cells rather than hoisting them.
-                    Stmt::Let(Pat::Wild, v) if hoistable(v, bound, lang) => {
+                    Stmt::Let {
+                        pat: Pat::Wild,
+                        value: v,
+                        ..
+                    } if hoistable(v, bound, lang) => {
                         kept.push(stmt);
                     }
                     Stmt::Expr(v)
@@ -276,15 +286,19 @@ fn collect_expr(
                     }
                     // Moving `let l = lazy_make ...` directly keeps `l` unique
                     // and avoids wrapper aliases; `l` is now bound before the loop.
-                    Stmt::Let(Pat::Bind(_), v) if hoistable(v, bound, lang) => {
+                    Stmt::Let {
+                        pat: Pat::Bind(_),
+                        value: v,
+                        ..
+                    } if hoistable(v, bound, lang) => {
                         hoisted.push(stmt);
                     }
-                    Stmt::Let(pat, v) => {
+                    Stmt::Let { pat, value: v, .. } => {
                         collect_expr(v, bound, hoisted, fresh, lang);
                         added.extend(add_pat_binders(pat, bound));
                         kept.push(stmt);
                     }
-                    Stmt::Var(name, v) => {
+                    Stmt::Var { name, value: v, .. } => {
                         collect_expr(v, bound, hoisted, fresh, lang);
                         if bound.insert(name.clone()) {
                             added.push(name.clone());

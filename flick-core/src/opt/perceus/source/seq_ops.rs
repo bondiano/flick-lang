@@ -42,11 +42,13 @@ impl SeqBuilder {
                 vec![
                     Arm {
                         pat: Self::some_pat(Pat::Bind(Self::vname("y"))),
+                        binder_types: Vec::new(),
                         guard: None,
                         body: self.yield_(self.loc("y")),
                     },
                     Arm {
                         pat: Pat::Wild,
+                        binder_types: Vec::new(),
                         guard: None,
                         body: self.unit(),
                     },
@@ -82,7 +84,7 @@ impl SeqBuilder {
             ),
         );
         let body = self.block(
-            vec![Stmt::Var(Self::vname("rem"), self.loc("n"))],
+            vec![Stmt::var(Self::vname("rem"), None, self.loc("n"))],
             self.if_(
                 self.bin(BinOp::Le, self.var("rem"), self.int(0)),
                 self.unit(),
@@ -108,7 +110,7 @@ impl SeqBuilder {
 
     fn seq_drop(&self) -> Expr {
         let body = self.block(
-            vec![Stmt::Var(Self::vname("rem"), self.loc("n"))],
+            vec![Stmt::var(Self::vname("rem"), None, self.loc("n"))],
             self.each(
                 "x",
                 self.loc("s"),
@@ -130,7 +132,7 @@ impl SeqBuilder {
 
     fn seq_drop_while(&self) -> Expr {
         let body = self.block(
-            vec![Stmt::Var(Self::vname("dropping"), self.bool(true))],
+            vec![Stmt::var(Self::vname("dropping"), None, self.bool(true))],
             self.each(
                 "x",
                 self.loc("s"),
@@ -153,13 +155,13 @@ impl SeqBuilder {
 
     fn seq_enumerate(&self) -> Expr {
         let body = self.block(
-            vec![Stmt::Var(Self::vname("idx"), self.int(0))],
+            vec![Stmt::var(Self::vname("idx"), None, self.int(0))],
             self.each(
                 "x",
                 self.loc("s"),
                 self.block(
                     vec![
-                        Stmt::Let(Pat::Bind(Self::vname("i")), self.var("idx")),
+                        Stmt::let_bind(Pat::Bind(Self::vname("i")), self.var("idx")),
                         Stmt::Assign(Self::vname("idx"), self.add(self.var("idx"), self.int(1))),
                     ],
                     self.yield_(self.at(ExprKind::Tuple(vec![self.loc("i"), self.loc("x")]))),
@@ -172,7 +174,7 @@ impl SeqBuilder {
     fn seq_scan(&self) -> Expr {
         let body = self.block(
             vec![
-                Stmt::Var(Self::vname("acc"), self.loc("init")),
+                Stmt::var(Self::vname("acc"), None, self.loc("init")),
                 Stmt::Expr(self.yield_(self.var("acc"))),
             ],
             self.each(
@@ -224,8 +226,8 @@ impl SeqBuilder {
             self.unit(),
             self.block(
                 vec![
-                    Stmt::Var(Self::vname("buf"), self.at(ExprKind::List(vec![]))),
-                    Stmt::Var(Self::vname("count"), self.int(0)),
+                    Stmt::var(Self::vname("buf"), None, self.at(ExprKind::List(vec![]))),
+                    Stmt::var(Self::vname("count"), None, self.int(0)),
                     Stmt::Expr(self.each("x", self.loc("s"), iter_body)),
                 ],
                 self.if_(
@@ -247,11 +249,13 @@ impl SeqBuilder {
                         vec![Pat::Wild],
                         Some(Box::new(Pat::Bind(Self::vname("rest")))),
                     ),
+                    binder_types: Vec::new(),
                     guard: None,
                     body: self.loc("rest"),
                 },
                 Arm {
                     pat: Pat::Wild,
+                    binder_types: Vec::new(),
                     guard: None,
                     body: self.at(ExprKind::List(vec![])),
                 },
@@ -293,8 +297,8 @@ impl SeqBuilder {
             self.unit(),
             self.block(
                 vec![
-                    Stmt::Var(Self::vname("buf"), self.at(ExprKind::List(vec![]))),
-                    Stmt::Var(Self::vname("count"), self.int(0)),
+                    Stmt::var(Self::vname("buf"), None, self.at(ExprKind::List(vec![]))),
+                    Stmt::var(Self::vname("count"), None, self.int(0)),
                 ],
                 self.each("x", self.loc("s"), iter_body),
             ),
@@ -305,7 +309,7 @@ impl SeqBuilder {
     fn seq_fold(&self, _effectful: bool) -> Expr {
         let body = self.block(
             vec![
-                Stmt::Var(Self::vname("acc"), self.loc("init")),
+                Stmt::var(Self::vname("acc"), None, self.loc("init")),
                 Stmt::Expr(self.each(
                     "x",
                     self.loc("s"),
@@ -334,7 +338,7 @@ impl SeqBuilder {
         };
         let body = self.block(
             vec![
-                Stmt::Var(Self::vname("found"), self.bool(init_val)),
+                Stmt::var(Self::vname("found"), None, self.bool(init_val)),
                 Stmt::Expr(self.for_ctrl(
                     "$seq_quant",
                     "x",
@@ -357,7 +361,7 @@ impl SeqBuilder {
     fn seq_find(&self) -> Expr {
         let body = self.block(
             vec![
-                Stmt::Var(Self::vname("found"), self.none()),
+                Stmt::var(Self::vname("found"), None, self.none()),
                 Stmt::Expr(self.for_ctrl(
                     "$seq_find",
                     "x",
@@ -380,7 +384,7 @@ impl SeqBuilder {
     fn seq_first(&self) -> Expr {
         let body = self.block(
             vec![
-                Stmt::Var(Self::vname("found"), self.none()),
+                Stmt::var(Self::vname("found"), None, self.none()),
                 Stmt::Expr(self.for_ctrl(
                     "$seq_first",
                     "x",

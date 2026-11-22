@@ -10,10 +10,12 @@ pub fn print(module: &Module) -> String {
     let mut out = format!("module {}\n", module.name);
     for item in &module.items {
         let line = match &item.kind {
-            ItemKind::Value { name, dicts, body } => {
+            ItemKind::Value {
+                name, dicts, body, ..
+            } => {
                 format!("let {name}{} = {}", given(dicts), expr(body))
             }
-            ItemKind::Destructure { pattern, body } => {
+            ItemKind::Destructure { pattern, body, .. } => {
                 format!("let {} = {}", pat(pattern), expr(body))
             }
             ItemKind::Foreign(f) => {
@@ -133,8 +135,8 @@ pub fn expr(e: &Expr) -> String {
         ExprKind::Lit(l) => lit(l),
         ExprKind::Local(n) => n.clone(),
         ExprKind::Var(n) => format!("!{n}"),
-        ExprKind::Global { module, name } => format!("{module}.{name}"),
-        ExprKind::Method { dict: d, name } => format!("{}.{name}", dict(d)),
+        ExprKind::Global { module, name, .. } => format!("{module}.{name}"),
+        ExprKind::Method { dict: d, name, .. } => format!("{}.{name}", dict(d)),
         ExprKind::Con(c) => c.name.clone(),
         ExprKind::Perform {
             effect: service,
@@ -209,6 +211,7 @@ pub fn expr(e: &Expr) -> String {
             source,
             body,
             stop,
+            ..
         } => {
             let _ = stop;
             format!("(each {} <- {} {})", pat(p), expr(source), expr(body))
@@ -230,14 +233,19 @@ pub fn expr(e: &Expr) -> String {
 
 fn stmt(s: &Stmt) -> String {
     match s {
-        Stmt::Let(p, e) => format!("let {} = {}", pat(p), expr(e)),
-        Stmt::Var(n, e) => format!("let mut {n} = {}", expr(e)),
+        Stmt::Let {
+            pat: p, value: e, ..
+        } => format!("let {} = {}", pat(p), expr(e)),
+        Stmt::Var {
+            name: n, value: e, ..
+        } => format!("let mut {n} = {}", expr(e)),
         Stmt::Assign(n, e) => format!("{n} := {}", expr(e)),
         Stmt::Fun {
             name,
             rec,
             dicts,
             value,
+            ..
         } => format!(
             "let {}{name}{} = {}",
             if *rec { "rec " } else { "" },

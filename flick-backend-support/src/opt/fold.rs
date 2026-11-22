@@ -15,7 +15,7 @@ use flick_ir::Dict;
 use flick_ir::Lang;
 
 /// Folds `e` itself, its operands already folded; whether it changed.
-pub fn fold(e: &mut Expr, lang: &Known<'_>) -> bool {
+pub fn fold(e: &mut Expr, lang: &Known<'_>, preserve_types: bool) -> bool {
     let folded = match &e.kind {
         ExprKind::Binary(BinOp::Arith(op, Num::Int), l, r) => int(l, lang)
             .zip(int(r, lang))
@@ -31,6 +31,7 @@ pub fn fold(e: &mut Expr, lang: &Known<'_>) -> bool {
             ExprKind::Method {
                 dict: Dict::Instance { module, name, args },
                 name: method,
+                ..
             } if lang.get(Lang::Instances).is_some_and(|(m, _)| m == module)
                 && args.is_empty()
                 && lang.get(Lang::ShowMethod).is_some_and(|(_, n)| n == method) =>
@@ -42,6 +43,7 @@ pub fn fold(e: &mut Expr, lang: &Known<'_>) -> bool {
             ExprKind::Method {
                 dict: Dict::Instance { module, name, args },
                 name: method,
+                ..
             } if lang.get(Lang::Instances).is_some_and(|(m, _)| m == module)
                 && args.is_empty()
                 && lang
@@ -56,11 +58,19 @@ pub fn fold(e: &mut Expr, lang: &Known<'_>) -> bool {
         },
         ExprKind::If(c, t, f) => match constant(c, lang) {
             Some(Const::Bool(true)) => {
-                *e = (**t).clone();
+                let mut branch = (**t).clone();
+                if preserve_types && branch.ty.is_none() {
+                    branch.ty.clone_from(&e.ty);
+                }
+                *e = branch;
                 return true;
             }
             Some(Const::Bool(false)) => {
-                *e = (**f).clone();
+                let mut branch = (**f).clone();
+                if preserve_types && branch.ty.is_none() {
+                    branch.ty.clone_from(&e.ty);
+                }
+                *e = branch;
                 return true;
             }
             _ => None,
@@ -71,7 +81,7 @@ pub fn fold(e: &mut Expr, lang: &Known<'_>) -> bool {
         ExprKind::Binary(BinOp::Arith(_, num), ..) | ExprKind::Neg(num, _) => *num,
         _ => Num::Float,
     };
-    match folded.map(|c| expr(&c, num, e)) {
+    match folded.map(|c| expr(&c, num, e, preserve_types)) {
         Some(value) => {
             *e = value;
             true
@@ -232,10 +242,10 @@ pub fn constant(e: &Expr, lang: &Known<'_>) -> Option<Const> {
         ExprKind::Lit(Lit::String(s)) => Some(Const::String(s.clone())),
         ExprKind::Lit(Lit::Bool(b)) => Some(Const::Bool(*b)),
         ExprKind::Neg(_, inner) => consteval::prefix(K::Minus, constant(inner, lang)?),
-        ExprKind::Global { module, name } if lang.is(Lang::FloatInfinity, module, name) => {
+        ExprKind::Global { module, name, .. } if lang.is(Lang::FloatInfinity, module, name) => {
             Some(Const::Number(f64::INFINITY))
         }
-        ExprKind::Global { module, name } if lang.is(Lang::FloatNan, module, name) => {
+        ExprKind::Global { module, name, .. } if lang.is(Lang::FloatNan, module, name) => {
             Some(Const::Number(f64::NAN))
         }
         _ => None,
@@ -243,7 +253,7 @@ pub fn constant(e: &Expr, lang: &Known<'_>) -> Option<Const> {
 }
 
 /// `c` as a literal at the place of `at`; a number is of type `num`.
-fn expr(c: &Const, num: Num, at: &Expr) -> Expr {
+fn expr(c: &Const, num: Num, at: &Expr, preserve_types: bool) -> Expr {
     let lit = match c {
         #[allow(
             clippy::cast_possible_truncation,
@@ -255,5 +265,6 @@ fn expr(c: &Const, num: Num, at: &Expr) -> Expr {
         Const::String(s) => Lit::String(s.clone()),
         Const::Bool(b) => Lit::Bool(*b),
     };
-    Expr::new(ExprKind::Lit(lit), at.span)
+    let ty = preserve_types.then(|| at.ty.clone()).flatten();
+    Expr::with_ty(ExprKind::Lit(lit), at.span, ty)
 }

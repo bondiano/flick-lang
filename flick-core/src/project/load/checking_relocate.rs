@@ -5,18 +5,41 @@ fn relocate_ir(module: &mut ir::Module, child: &str, parent: &str, local: &str) 
     #[cfg(test)]
     let expected = relocated_as_json(module, child, parent, local);
     let to = Relocation { child, parent, local };
+    for decl in &mut module.types {
+        to.opt_ir_type(&mut decl.alias);
+        for ctor in &mut decl.constructors {
+            to.constraints(&mut ctor.constraints);
+            to.ir_types(&mut ctor.fields);
+            if let Some(res) = &mut ctor.result_args {
+                to.ir_types(res);
+            }
+        }
+    }
     for item in &mut module.items {
         match &mut item.kind {
-            ir::ItemKind::Value { body, .. } => {
+            ir::ItemKind::Value {
+                dict_constraints,
+                ty,
+                body,
+                ..
+            } => {
+                to.constraints(dict_constraints);
+                to.opt_ir_type(ty);
                 to.expr(body);
             }
-            ir::ItemKind::Destructure { pattern, body } => {
+            ir::ItemKind::Destructure {
+                pattern,
+                binder_types,
+                body,
+            } => {
                 if !omits("destructure") {
                     to.pattern(pattern);
                 }
+                to.binder_types(binder_types);
                 to.expr(body);
             }
             ir::ItemKind::Foreign(foreign) => {
+                to.opt_ir_type(&mut foreign.ty);
                 if let Some(catch) = &mut foreign.catch
                     && !omits("catch")
                 {
@@ -100,6 +123,8 @@ impl Relocation<'_> {
         if self.name(&mut constructor.module, &mut constructor.name) {
             constructor.ty = format!("{}${}", self.local, constructor.ty);
         }
+        self.ir_types(&mut constructor.fields);
+        self.ir_types(&mut constructor.type_args);
     }
 
     fn dicts(&self, dicts: &mut [types::Dict]) {
@@ -186,30 +211,66 @@ impl Relocation<'_> {
     fn arms(&self, arms: &mut [ir::Arm]) {
         for arm in arms {
             self.pattern(&mut arm.pat);
+            self.binder_types(&mut arm.binder_types);
         }
     }
 
     fn expr(&self, expr: &mut ir::Expr) {
+        self.opt_ir_type(&mut expr.ty);
         match &mut expr.kind {
-            ir::ExprKind::Global { module, name } => {
+            ir::ExprKind::Global {
+                module,
+                name,
+                type_args,
+            } => {
                 self.name(module, name);
+                self.ir_types(type_args);
             }
-            ir::ExprKind::Method { dict, .. } => self.dicts(slice::from_mut(dict)),
+            ir::ExprKind::Method {
+                dict, type_args, ..
+            } => {
+                self.dicts(slice::from_mut(dict));
+                self.ir_types(type_args);
+            }
             ir::ExprKind::Con(constructor) => self.constructor(constructor),
             ir::ExprKind::Perform { effect: key, .. } | ir::ExprKind::ServiceTag(key) => {
                 self.key(key);
             }
             ir::ExprKind::Dicts(_, dicts) => self.dicts(dicts),
-            ir::ExprKind::Each { pat, .. } if !omits("for") => self.pattern(pat),
+            ir::ExprKind::Each {
+                pat, binder_types, ..
+            } => {
+                if !omits("for") {
+                    self.pattern(pat);
+                }
+                self.binder_types(binder_types);
+            }
             ir::ExprKind::Lambda { params, .. } => {
                 for param in params {
                     self.pattern(&mut param.pat);
+                    self.opt_ir_type(&mut param.ty);
+                    self.binder_types(&mut param.binder_types);
                 }
             }
             ir::ExprKind::Block(statements, _) => {
                 for statement in statements {
-                    if let ir::Stmt::Let(pattern, _) = statement {
-                        self.pattern(pattern);
+                    match statement {
+                        ir::Stmt::Let {
+                            pat, binder_types, ..
+                        } => {
+                            self.pattern(pat);
+                            self.binder_types(binder_types);
+                        }
+                        ir::Stmt::Var { ty, .. } => self.opt_ir_type(ty),
+                        ir::Stmt::Fun {
+                            dict_constraints,
+                            ty,
+                            ..
+                        } => {
+                            self.constraints(dict_constraints);
+                            self.opt_ir_type(ty);
+                        }
+                        ir::Stmt::Assign(..) | ir::Stmt::Expr(_) => {}
                     }
                 }
             }
@@ -249,6 +310,16 @@ fn relocate_value(value: &mut serde_json::Value, child: &str, parent: &str, loca
             let instance = fields.contains_key("context")
                 && fields.contains_key("supers")
                 && fields.contains_key("module");
+            let constraint = fields.contains_key("module")
+                && fields.get("class").is_some_and(serde_json::Value::is_string);
+            if constraint
+                && fields.get("module").and_then(serde_json::Value::as_str) == Some(child)
+            {
+                fields.insert("module".into(), parent.into());
+                if let Some(class) = fields.get("class").and_then(serde_json::Value::as_str) {
+                    fields.insert("class".into(), format!("{local}${class}").into());
+                }
+            }
             if constructor || dictionary || instance {
                 relocate_name(fields, child, parent, local, constructor);
                 if instance
@@ -269,7 +340,7 @@ fn relocate_value(value: &mut serde_json::Value, child: &str, parent: &str, loca
                 {
                     *field = format!("{parent}.{local}${member}").into();
                 }
-                if matches!(key.as_str(), "Global" | "Value" | "Instance")
+                if matches!(key.as_str(), "Global" | "Value" | "Instance" | "Named")
                     && let serde_json::Value::Object(reference) = field
                 {
                     relocate_name(reference, child, parent, local, false);
@@ -320,7 +391,16 @@ fn rename_item(item: &mut ir::Item, local: &str) {
         ir::ItemKind::Service { name, .. } => {
             *name = format!("{local}${name}");
         }
-        ir::ItemKind::Destructure { pattern, .. } => rename_pattern(pattern, local),
+        ir::ItemKind::Destructure {
+            pattern,
+            binder_types,
+            ..
+        } => {
+            rename_pattern(pattern, local);
+            for (name, _) in binder_types {
+                *name = format!("{local}${name}");
+            }
+        }
         ir::ItemKind::Constructor(_) | ir::ItemKind::Instance { .. } => {}
     }
 }

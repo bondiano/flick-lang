@@ -58,6 +58,7 @@ change needs.
 | [`Detached` forbids `abort`; `lazy` uses `NoControl`](#detached-forbids-abort-lazy-uses-nocontrol) | no | `FLICK-E017`, `FLICK-F002` |
 | [Backend options move to `--target` and `[target.<name>]`](#backend-options-move-to---target-and-targetname) | no | `FLICK-P057`, `FLICK-P058`, `FLICK-P059` |
 | [Target dependencies move to `[target.<name>.dependencies]` and backends own package managers](#target-dependencies-move-to-targetnamedependencies-and-backends-own-package-managers) | no | `FLICK-P051`, `FLICK-P057`, `FLICK-P063` |
+| [The IR carries full layout types (`0.14.0`)](#the-ir-carries-full-layout-types-0140) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -729,3 +730,20 @@ package-manager commands (`install`, `add`, `remove`, `update`, `deps`, app
   `[dependencies]`. Running `flick add <pkg>` without `--path`, `--git`, or
   `--url` under a backend without its own package manager reports `FLICK-P063`
   (exit code `2`).
+
+## The IR carries full layout types (`0.14.0`)
+
+The portable IR moves from `0.13.0` to `0.14.0` to carry the full layout-relevant
+types inferred by the checker (`IrType`, `Module.types` with constructor field
+types and GADT existentials/constraints, binder types, and `type_args` on
+polymorphic globals, constructors and methods), deduplicated into a wire `types`
+pool and shared behind `Arc` in memory. Effect, service and region rows remain
+omitted.
+
+Backend components and `ir`-hook plugins must rebuild against `flick-ir` `0.14.0`
+and update their descriptor `ir` range to `[0.14.0, 0.15.0)`. IR validation
+(`flick_ir::validate`, also enforced for `ir` plugins under `FLICK-P047`) now
+checks type well-formedness, type argument counts and annotation agreement with
+the terms they describe, while keeping erased nodes valid. Ordinary Flick
+programs require no source changes; `flick/js` and `flick/go` ignore the new
+compound type fields beyond bare type-constructor names.

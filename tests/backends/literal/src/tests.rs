@@ -15,7 +15,7 @@ fn quote(text: &str) -> String {
 fn expression(expr: &Expr) -> Option<String> {
     Some(match &expr.kind {
         ExprKind::Lit(Lit::String(text)) => quote(text),
-        ExprKind::Global { module, name } if module == "Test" && name == "test" => {
+        ExprKind::Global { module, name, .. } if module == "Test" && name == "test" => {
             "((name) => (body) => testPure(name, body))".into()
         }
         ExprKind::Con(c)
@@ -68,7 +68,7 @@ pub(super) fn supported(item: &Item, request: &BuildRequest) -> bool {
             .runtime_dependencies
             .iter()
             .any(|r| r.package == "@flick-lang/runtime" && r.version == "0.1.0")
-        && matches!(&item.kind, ItemKind::Value { name, dicts, body } if name == "tests" && dicts.is_empty() && expression(body).is_some())
+        && matches!(&item.kind, ItemKind::Value { name, dicts, body, .. } if name == "tests" && dicts.is_empty() && expression(body).is_some())
 }
 
 pub(super) fn source(request: &BuildRequest, module: &str) -> Option<Vec<u8>> {

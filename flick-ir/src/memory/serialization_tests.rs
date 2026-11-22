@@ -65,7 +65,7 @@ fn malformed_patterns_in_unselected_code_are_validated() {
                         binding: 1,
                         value: Operation::Match {
                             object: 0,
-                            pattern: Pat::Or(vec![]),
+                            pattern: Box::new(Pat::Or(vec![])),
                         },
                     },
                     Instruction::Drop(0),
@@ -89,10 +89,10 @@ fn pattern_and_update_operations_round_trip() {
     let operations = vec![
         Operation::Match {
             object: 0,
-            pattern: Pat::Or(vec![
+            pattern: Box::new(Pat::Or(vec![
                 Pat::Tuple(vec![Pat::Bind("x".into()), Pat::Lit(Lit::Float(-0.0))]),
                 Pat::Tuple(vec![Pat::Lit(Lit::Float(f64::NAN)), Pat::Bind("x".into())]),
-            ]),
+            ])),
         },
         Operation::Update {
             object: 1,

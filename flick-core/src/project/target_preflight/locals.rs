@@ -17,9 +17,11 @@ pub(super) fn deferred_local(stmt: &Stmt) -> Option<(&str, bool, &Expr)> {
         Stmt::Fun {
             name, rec, value, ..
         } => Some((name.as_str(), *rec, value)),
-        Stmt::Let(Pat::Bind(name), value)
-            if matches!(value.kind, ExprKind::Lambda { .. } | ExprKind::Abstract(..)) =>
-        {
+        Stmt::Let {
+            pat: Pat::Bind(name),
+            value,
+            ..
+        } if matches!(value.kind, ExprKind::Lambda { .. } | ExprKind::Abstract(..)) => {
             Some((name.as_str(), false, value))
         }
         _ => None,
@@ -29,8 +31,8 @@ pub(super) fn deferred_local(stmt: &Stmt) -> Option<(&str, bool, &Expr)> {
 /// Returns the subexpression of `stmt`.
 pub(super) fn stmt_expr(stmt: &Stmt) -> &Expr {
     match stmt {
-        Stmt::Let(_, v)
-        | Stmt::Var(_, v)
+        Stmt::Let { value: v, .. }
+        | Stmt::Var { value: v, .. }
         | Stmt::Assign(_, v)
         | Stmt::Expr(v)
         | Stmt::Fun { value: v, .. } => v,
@@ -125,8 +127,8 @@ pub(super) fn dead_local_fun_spans(item: &Item) -> Vec<Span> {
 
 fn stmt_binds_name(stmt: &Stmt, name: &str) -> bool {
     match stmt {
-        Stmt::Let(pat, _) => pat_binds_name(pat, name),
-        Stmt::Var(bound, _) | Stmt::Fun { name: bound, .. } => bound == name,
+        Stmt::Let { pat, .. } => pat_binds_name(pat, name),
+        Stmt::Var { name: bound, .. } | Stmt::Fun { name: bound, .. } => bound == name,
         Stmt::Assign(..) | Stmt::Expr(_) => false,
     }
 }
@@ -231,6 +233,7 @@ fn collect_free_locals(expr: &Expr, bound: &mut HashSet<String>, used: &mut Hash
             pat,
             source,
             body,
+            ..
         } => {
             if let Some(stop) = stop {
                 collect_free_locals(stop, bound, used);
@@ -289,7 +292,7 @@ fn collect_block_free_locals(
                     newly.push(name.clone());
                 }
             }
-            Stmt::Let(pat, value) => {
+            Stmt::Let { pat, value, .. } => {
                 if is_active {
                     collect_free_locals(value, bound, used);
                 }
@@ -301,7 +304,7 @@ fn collect_block_free_locals(
                     }
                 }
             }
-            Stmt::Var(name, value) => {
+            Stmt::Var { name, value, .. } => {
                 if is_active {
                     collect_free_locals(value, bound, used);
                 }

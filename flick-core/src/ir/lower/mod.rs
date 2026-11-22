@@ -30,28 +30,24 @@ pub mod proofs;
 mod question;
 mod ranges;
 mod type_items;
+mod types;
 mod wire;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::iter;
 use std::mem;
-use std::sync::Arc;
 
-use super::{
-    Binding, Expr, ExprKind, Foreign, Item, ItemKind, Lit, Module, Param, Stage, TypeName,
-};
+#[cfg(not(target_arch = "wasm32"))]
+use super::TypeRef;
+use super::{Expr, ExprKind, Item, ItemKind, Lit, Module, Param, Stage};
 use crate::diagnostics::{Diagnostic, codes};
-use crate::effects::key;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::iface::LocalScheme;
 use crate::resolve;
 use crate::source::{FileId, Span};
-use crate::syntax::cst::{Node, foreign_words};
+use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::literal;
-use crate::types::{
-    Dict, Range, StageKey, Type, Typing, class_defaults, default_method, let_parts,
-};
+use crate::types::{Dict, Range, StageKey, Typing, class_defaults, default_method, let_parts};
 
 /// Lowers `module`, which checked without errors, with what its check recorded.
 pub fn lower(module: &resolve::Module, typing: &Typing) -> Result<Module, Vec<Diagnostic>> {
@@ -110,6 +106,7 @@ fn lower_inner<'a>(
             Module {
                 name: module.name.to_owned(),
                 items,
+                types: lower.ir_type_decls(),
                 labels: typing.labelled.clone(),
                 initialization: flick_ir::Initialization::default(),
                 records,
@@ -142,22 +139,13 @@ impl<'a> Lower<'a> {
             hole_params: HashMap::new(),
             records: BTreeMap::new(),
             #[cfg(not(target_arch = "wasm32"))]
+            collecting_binders: None,
+            #[cfg(not(target_arch = "wasm32"))]
             current_item: String::new(),
             #[cfg(not(target_arch = "wasm32"))]
             local_schemes: Vec::new(),
             diagnostics: Vec::new(),
         }
-    }
-}
-
-/// The name of `ty` when it is a type constructor on its own.
-pub(super) fn type_name(ty: &Type) -> Option<Arc<TypeName>> {
-    match ty {
-        Type::Con { module, name } => Some(Arc::new(TypeName {
-            module: module.clone(),
-            name: name.clone(),
-        })),
-        _ => None,
     }
 }
 
@@ -195,6 +183,9 @@ struct Lower<'a> {
     /// The constructors over a record written in their declaration, with
     /// its labels (`Module::records`).
     records: BTreeMap<String, Vec<String>>,
+    /// Active pattern binder-type collector for [`Self::pattern_typed`].
+    #[cfg(not(target_arch = "wasm32"))]
+    collecting_binders: Option<Vec<(String, TypeRef)>>,
     /// Key of the top-level definition currently being lowered.
     #[cfg(not(target_arch = "wasm32"))]
     current_item: String,
@@ -295,35 +286,53 @@ impl Lower<'_> {
         self.current_item.clear();
     }
 
+    fn let_item(&mut self, decl: &Node, span: Span, items: &mut Vec<Item>) {
+        self.fresh_definition();
+        let parts = let_parts(decl, self.text);
+        let kind = match (&parts.name, parts.pattern) {
+            (Some(name), _) => {
+                #[cfg(not(target_arch = "wasm32"))]
+                self.current_item.clone_from(name);
+                let (type_params, dict_constraints, ty) = self.ir_top_scheme(name);
+                let dicts = self.givens(decl);
+                let dict_constraints = if dict_constraints.len() == dicts.len() {
+                    dict_constraints
+                } else {
+                    Vec::new()
+                };
+                let body = self.definition(decl);
+                let ty = ty.or_else(|| body.ty.clone());
+                ItemKind::Value {
+                    name: name.clone(),
+                    type_params,
+                    dicts,
+                    dict_constraints,
+                    ty,
+                    body,
+                }
+            }
+            (None, Some(pattern)) => {
+                #[cfg(not(target_arch = "wasm32"))]
+                {
+                    self.current_item = format!("destructure {}..{}", span.start, span.end);
+                }
+                let body = self.definition(decl);
+                let (pattern, binder_types) = self.pattern_typed(pattern);
+                ItemKind::Destructure {
+                    pattern,
+                    binder_types,
+                    body,
+                }
+            }
+            (None, None) => return,
+        };
+        items.push(Item { kind, span });
+    }
+
     fn item(&mut self, decl: &Node, items: &mut Vec<Item>) {
         let span = self.span(decl);
         match decl.kind {
-            K::LetDecl => {
-                self.fresh_definition();
-                let parts = let_parts(decl, self.text);
-                let kind = match (&parts.name, parts.pattern) {
-                    (Some(name), _) => {
-                        #[cfg(not(target_arch = "wasm32"))]
-                        self.current_item.clone_from(name);
-                        ItemKind::Value {
-                            name: name.clone(),
-                            dicts: self.givens(decl),
-                            body: self.definition(decl),
-                        }
-                    }
-                    (None, Some(pattern)) => {
-                        #[cfg(not(target_arch = "wasm32"))]
-                        {
-                            self.current_item = format!("destructure {}..{}", span.start, span.end);
-                        }
-                        let body = self.definition(decl);
-                        let pattern = self.pattern(pattern);
-                        ItemKind::Destructure { pattern, body }
-                    }
-                    (None, None) => return,
-                };
-                items.push(Item { kind, span });
-            }
+            K::LetDecl => self.let_item(decl, span, items),
             K::RecGroup => {
                 for member in decl
                     .nodes()
@@ -373,10 +382,15 @@ impl Lower<'_> {
                     let name = default_method(&class, &method);
                     #[cfg(not(target_arch = "wasm32"))]
                     self.current_item.clone_from(&name);
+                    let body = self.definition(member);
+                    let ty = body.ty.clone();
                     let kind = ItemKind::Value {
                         name,
+                        type_params: Vec::new(),
                         dicts: self.givens(member),
-                        body: self.definition(member),
+                        dict_constraints: Vec::new(),
+                        ty,
+                        body,
                     };
                     items.push(Item {
                         kind,
@@ -439,10 +453,14 @@ impl Lower<'_> {
         let params: Vec<_> = params
             .iter()
             .zip(stages.iter().copied().chain(iter::repeat(Stage::Pure)))
-            .map(|(p, stage)| Param {
-                pat: self.pattern(p),
-                stage,
-                ty: self.typing.values.get(&p.range()).and_then(type_name),
+            .map(|(p, stage)| {
+                let (pat, binder_types) = self.pattern_typed(p);
+                Param {
+                    pat,
+                    stage,
+                    ty: self.ir_type(p.range()),
+                    binder_types,
+                }
             })
             .collect();
         let mut body = body(self);
@@ -454,22 +472,27 @@ impl Lower<'_> {
         if entries {
             for (index, param) in params.into_iter().enumerate().rev() {
                 body = self.owner_entry(StageKey::Arrow { node: key, index }, body);
-                body = Expr::new(
+                let single = vec![param];
+                let ty = types::lambda_type(&single, &body);
+                body = Expr::with_ty(
                     ExprKind::Lambda {
-                        params: vec![param],
+                        params: single,
                         body: Box::new(body),
                     },
                     span,
+                    ty,
                 );
             }
             body
         } else {
-            Expr::new(
+            let ty = types::lambda_type(&params, &body);
+            Expr::with_ty(
                 ExprKind::Lambda {
                     params,
                     body: Box::new(body),
                 },
                 span,
+                ty,
             )
         }
     }
@@ -499,51 +522,6 @@ impl Lower<'_> {
                 Some((name, value))
             })
             .collect()
-    }
-
-    fn foreign(&mut self, decl: &Node) -> Option<Foreign> {
-        let name = foreign_words(decl).1?.text(self.text).to_owned();
-        let source = decl.nodes().find(|n| n.kind == K::ForeignSource)?;
-        let strings: Vec<String> = source
-            .child_tokens()
-            .filter(|t| t.kind == K::String)
-            .map(|t| literal::string_value(t.text(self.text)))
-            .collect();
-        let (module, export) = match &strings[..] {
-            [export] => (None, export.clone()),
-            [module, export] => (Some(module.clone()), export.clone()),
-            _ => return None,
-        };
-        let info = self
-            .typing
-            .foreigns
-            .get(&decl.range())
-            .cloned()
-            .unwrap_or_default();
-        let catch = info.catch.and_then(|at| {
-            let node = decl
-                .nodes()
-                .filter(|n| n.kind == K::ForeignMeta)
-                .flat_map(Node::nodes)
-                .flat_map(Node::nodes)
-                .find(|n| n.range() == at)?;
-            Some(self.expr(node))
-        });
-        Some(Foreign {
-            source_name: None,
-            name,
-            mode: info.mode,
-            binding: Binding {
-                // the built-in packages are bound by key, however a source spells it
-                from: module.map(|spec| key(&spec).into_owned()),
-                name: export,
-            },
-            stages: info.stages.clone(),
-            dicts: info.dicts,
-            arity: info.js_arity(),
-            adapter: info.adapter,
-            catch,
-        })
     }
 
     fn unsupported(&mut self, node: &Node) {

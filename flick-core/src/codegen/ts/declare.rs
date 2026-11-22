@@ -198,6 +198,8 @@ impl Projection<'_> {
                 arity: fields.len(),
                 rep: Rep::Tagged,
                 dicts: 0,
+                fields: Vec::new(),
+                type_args: Vec::new(),
             };
             let tag = names::string(&names::tag(
                 &constructor,

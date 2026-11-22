@@ -1,6 +1,7 @@
 //! Instantiating and skolemizing checked schemes.
 
 use crate::source::Span;
+use crate::types::kinds::Kind;
 use crate::types::{Checker, Elem, ty::Type, typing::passes_dictionary};
 use std::collections::HashSet;
 
@@ -22,39 +23,64 @@ impl Checker<'_> {
     }
 
     pub fn instantiate(&mut self, t: &Type, span: Span) -> Type {
+        self.instantiate_args(t, span).0
+    }
+
+    /// Instantiates outer `Forall` binders of `t`, returning both the
+    /// instantiated type and `(kind, arg_type)` for each instantiated binder.
+    pub fn instantiate_args(&mut self, t: &Type, span: Span) -> (Type, Vec<(Kind, Type)>) {
         match self.store.resolve(t) {
             Type::Captured {
                 ty,
                 captures,
                 value,
                 elided,
-            } => Type::Captured {
-                ty: Box::new(self.instantiate(&ty, span)),
-                captures,
-                value,
-                elided,
-            },
-            Type::Bounded { ty, captures } => Type::Bounded {
-                ty: Box::new(self.instantiate(&ty, span)),
-                captures,
-            },
+            } => {
+                let (inner, args) = self.instantiate_args(&ty, span);
+                (
+                    Type::Captured {
+                        ty: Box::new(inner),
+                        captures,
+                        value,
+                        elided,
+                    },
+                    args,
+                )
+            }
+            Type::Bounded { ty, captures } => {
+                let (inner, args) = self.instantiate_args(&ty, span);
+                (
+                    Type::Bounded {
+                        ty: Box::new(inner),
+                        captures,
+                    },
+                    args,
+                )
+            }
             Type::Forall {
                 vars,
                 constraints,
                 body,
             } => {
+                let mut recorded = Vec::with_capacity(vars.len());
                 let subst: Vec<(String, Type)> = vars
                     .iter()
-                    .map(|v| (v.name.clone(), self.store.fresh_of(&v.kind)))
+                    .map(|v| {
+                        let fresh = self.store.fresh_of(&v.kind);
+                        recorded.push((v.kind.clone(), fresh.clone()));
+                        (v.name.clone(), fresh)
+                    })
                     .collect();
                 for c in &constraints {
                     self.want(c.substitute(&subst), span);
                 }
                 let body = body.substitute(&subst);
                 self.error_elements(&body, span);
-                self.instantiate(&body, span)
+                let (rest, more) = self.instantiate_args(&body, span);
+                recorded.extend(more);
+                (rest, recorded)
             }
-            other => other,
+            other => (other, Vec::new()),
         }
     }
 

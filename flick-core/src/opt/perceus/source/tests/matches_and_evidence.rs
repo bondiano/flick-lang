@@ -160,7 +160,7 @@ let answer outer =
         .values()
         .find(|function| function.body.instructions.iter().any(|instruction| matches!(
             instruction,
-            memory::Instruction::Let { value: memory::Operation::Match { pattern: Pat::Bind(name), .. }, .. } if name == &outer
+            memory::Instruction::Let { value: memory::Operation::Match { pattern, .. }, .. } if matches!(&**pattern, Pat::Bind(name) if name == &outer)
         )))
         .expect("binding arm helper");
     let memory::Exit::Branch { then_, .. } = &helper.body.exit else {

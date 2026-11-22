@@ -99,15 +99,17 @@ impl Checker<'_> {
         }
         match self.env.find(namespace, name) {
             super::env::Found::Entity(entity) => {
-                let ty = if entity.module == self.env.module && namespace == Namespace::Value {
-                    self.top_value(name, span)
-                } else {
-                    let scheme = self.env.value(&entity).cloned();
-                    scheme.map_or(Type::Error, |s| {
-                        self.instantiate(&self.live_scheme(&s), span)
-                    })
-                };
-                self.record_entity(&entity, &ty, span);
+                let (ty, type_args) =
+                    if entity.module == self.env.module && namespace == Namespace::Value {
+                        self.top_value_args(name, span)
+                    } else {
+                        let scheme = self.env.value(&entity).cloned();
+                        scheme.map_or((Type::Error, Vec::new()), |s| {
+                            let live = self.live_scheme(&s);
+                            self.instantiate_args(&live, span)
+                        })
+                    };
+                self.record_entity_args(&entity, &ty, type_args, span);
                 ty
             }
             super::env::Found::Unknown => {

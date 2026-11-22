@@ -130,7 +130,7 @@ pub enum Operation {
     /// order. Selection itself creates no owned aliases or list tails.
     Match {
         object: Local,
-        pattern: Pat,
+        pattern: Box<Pat>,
     },
     /// Consumes the base and every replacement in written order, including
     /// duplicate labels. Produces a fresh record; the last duplicate wins.

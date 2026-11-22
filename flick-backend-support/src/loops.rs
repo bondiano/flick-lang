@@ -62,7 +62,7 @@ impl Control<'_> {
                             Expr::new(ExprKind::Block(finish_stmts, Box::new(unit(span))), span);
                         *e = Expr::new(
                             ExprKind::Block(
-                                vec![Stmt::Let(Pat::Bind(name), value)],
+                                vec![Stmt::let_bind(Pat::Bind(name), value)],
                                 Box::new(Self::guard(finish, flag)),
                             ),
                             span,
@@ -129,7 +129,10 @@ impl Control<'_> {
         let mut rest = self.guarded_parts(tail.clone(), flag);
         for mut stmt in stmts.iter().cloned().rev() {
             let v = match &mut stmt {
-                Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => Some(v),
+                Stmt::Let { value: v, .. }
+                | Stmt::Var { value: v, .. }
+                | Stmt::Assign(_, v)
+                | Stmt::Expr(v) => Some(v),
                 Stmt::Fun { .. } => None,
             };
             if let Some(v) = v {
@@ -139,7 +142,7 @@ impl Control<'_> {
                 let suffix = Expr::new(ExprKind::Block(vec![stmt], Box::new(rest)), span);
                 rest = Expr::new(
                     ExprKind::Block(
-                        vec![Stmt::Let(Pat::Bind(name), value)],
+                        vec![Stmt::let_bind(Pat::Bind(name), value)],
                         Box::new(Self::guard(suffix, flag)),
                     ),
                     span,
@@ -161,7 +164,7 @@ impl Control<'_> {
         self.guarded_arms(arms, flag, span);
         Expr::new(
             ExprKind::Block(
-                vec![Stmt::Let(Pat::Bind(name), value)],
+                vec![Stmt::let_bind(Pat::Bind(name), value)],
                 Box::new(Self::guard(e, flag)),
             ),
             span,
@@ -179,7 +182,10 @@ impl Control<'_> {
                 };
                 let selected = Expr::new(ExprKind::If(c, yes, Box::new(boolean(true, span))), span);
                 *g = Expr::new(
-                    ExprKind::Block(vec![Stmt::Let(Pat::Bind(name), value)], Box::new(selected)),
+                    ExprKind::Block(
+                        vec![Stmt::let_bind(Pat::Bind(name), value)],
+                        Box::new(selected),
+                    ),
                     span,
                 );
             }
@@ -199,7 +205,10 @@ impl Control<'_> {
                     let pattern = mem::replace(&mut param.pat, Pat::Bind(name.clone()));
                     guarded = Expr::new(
                         ExprKind::Block(
-                            vec![Stmt::Let(pattern, Expr::new(ExprKind::Local(name), span))],
+                            vec![Stmt::let_bind(
+                                pattern,
+                                Expr::new(ExprKind::Local(name), span),
+                            )],
                             Box::new(guarded),
                         ),
                         span,
@@ -223,6 +232,7 @@ impl Control<'_> {
                             pat: Pat::Bind(name),
                             stage: Stage::Runtime,
                             ty: None,
+                            binder_types: Vec::new(),
                         }],
                         body: Box::new(Self::guard(call, flag)),
                     },
@@ -256,7 +266,7 @@ impl Control<'_> {
                 e
             }
             ExprKind::App { func, arg, .. }
-                if matches!(&func.kind, ExprKind::Global { module, name } if self.lang.is(Lang::ScopeRun, module, name))
+                if matches!(&func.kind, ExprKind::Global { module, name, .. } if self.lang.is(Lang::ScopeRun, module, name))
                     && matches!(arg.kind, ExprKind::Lambda { .. }) =>
             {
                 **arg = self.guarded_parts((**arg).clone(), flag);
@@ -281,7 +291,7 @@ impl Control<'_> {
                 );
                 Expr::new(
                     ExprKind::Block(
-                        vec![Stmt::Let(Pat::Bind(name), c)],
+                        vec![Stmt::let_bind(Pat::Bind(name), c)],
                         Box::new(Self::guard(branch, flag)),
                     ),
                     span,
@@ -321,7 +331,7 @@ impl Control<'_> {
                 for (name, value) in values.into_iter().rev() {
                     rest = Expr::new(
                         ExprKind::Block(
-                            vec![Stmt::Let(Pat::Bind(name), value)],
+                            vec![Stmt::let_bind(Pat::Bind(name), value)],
                             Box::new(Self::guard(rest, flag)),
                         ),
                         span,
@@ -354,7 +364,10 @@ impl Control<'_> {
             // absent value; an outer clause may still advance after continue.
             let guarded = Self::guard(e.clone(), flag);
             *e = Expr::new(
-                ExprKind::Block(vec![Stmt::Let(Pat::Bind(name), value)], Box::new(guarded)),
+                ExprKind::Block(
+                    vec![Stmt::let_bind(Pat::Bind(name), value)],
+                    Box::new(guarded),
+                ),
                 span,
             );
         } else {
@@ -467,7 +480,7 @@ pub fn lower(
             ExprKind::Block(
                 vec![
                     Stmt::Assign(format!("{flag}$step"), boolean(true, span)),
-                    Stmt::Let(Pat::Bind(name), condition),
+                    Stmt::let_bind(Pat::Bind(name), condition),
                 ],
                 Box::new(branch),
             ),
@@ -484,9 +497,9 @@ pub fn lower(
     Expr::new(
         ExprKind::Block(
             vec![
-                Stmt::Var(flag.into(), boolean(true, span)),
-                Stmt::Var(result.clone(), unit(span)),
-                Stmt::Var(format!("{flag}$step"), boolean(true, span)),
+                Stmt::var(flag.into(), None, boolean(true, span)),
+                Stmt::var(result.clone(), None, unit(span)),
+                Stmt::var(format!("{flag}$step"), None, boolean(true, span)),
                 Stmt::Expr(body),
             ],
             Box::new(read(&result, span)),

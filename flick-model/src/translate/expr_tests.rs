@@ -13,6 +13,7 @@ fn call(argument: Expr) -> Expr {
         func: Box::new(expression(ExprKind::Global {
             module: "Test".to_owned(),
             name: "consume".to_owned(),
+            type_args: Vec::new(),
         })),
         arg: Box::new(argument),
         stage: Stage::Runtime,

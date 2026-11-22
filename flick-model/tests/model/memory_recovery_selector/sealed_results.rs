@@ -227,11 +227,11 @@ fn forbidden_marker_operations() -> Vec<Operation> {
         },
         Operation::Match {
             object: 2,
-            pattern: Pat::Wild,
+            pattern: Box::new(Pat::Wild),
         },
         Operation::Match {
             object: 2,
-            pattern: Pat::Bind("bound".into()),
+            pattern: Box::new(Pat::Bind("bound".into())),
         },
         Operation::Call {
             code: 4,

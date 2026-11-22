@@ -76,6 +76,7 @@ fn self_param() -> Param {
         pat: Pat::Bind(SELF.into()),
         stage: Stage::Pure,
         ty: None,
+        binder_types: Vec::new(),
     }
 }
 
@@ -84,6 +85,7 @@ fn default_body(info: &InstanceInfo, name: &str, own: usize, extra: &[Dict], spa
         ExprKind::Global {
             module: info.class.0.clone(),
             name: default_method(&info.class.1, name),
+            type_args: Vec::new(),
         },
         span,
     );

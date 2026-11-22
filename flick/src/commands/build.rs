@@ -280,6 +280,12 @@ impl Command for BuildCommand {
         }
         compilation.modules.retain(|c| !c.test);
         hooks::ir(project.as_ref(), &mut compilation, &mut diagnostics);
+        if diagnostics.iter().any(|d| d.severity == Severity::Error) {
+            return Outcome {
+                sources,
+                diagnostics,
+            };
+        }
         let modules = &compilation.modules;
         let entries = match &project {
             Some(p) => self.entries(p),

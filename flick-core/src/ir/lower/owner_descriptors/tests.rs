@@ -85,9 +85,21 @@ fn count(expression: &Expr, predicate: fn(&Expr) -> bool) -> usize {
 
 fn descriptor_parts(expression: &Expr) -> (&str, &[Pat], &Expr) {
     if let ExprKind::Block(statements, body) = &expression.kind {
-        if let [Stmt::Let(Pat::Bind(current), source)] = &statements[..]
+        if let [
+            Stmt::Let {
+                pat: Pat::Bind(current),
+                value: source,
+                ..
+            },
+        ] = &statements[..]
             && let ExprKind::Block(unpack, _) = &body.kind
-            && let [Stmt::Let(Pat::Tuple(fields), value)] = &unpack[..]
+            && let [
+                Stmt::Let {
+                    pat: Pat::Tuple(fields),
+                    value,
+                    ..
+                },
+            ] = &unpack[..]
             && matches!(&value.kind, ExprKind::Local(name) if name == current)
         {
             return (current, fields, source);
@@ -347,7 +359,11 @@ fn head_alias_groups_keep_exact_parameter_names_and_original_body_ids() {
     let ExprKind::Block(unpack, _) = &dispatch.kind else {
         panic!("head group data");
     };
-    let Stmt::Let(Pat::Tuple(data), _) = &unpack[0] else {
+    let Stmt::Let {
+        pat: Pat::Tuple(data),
+        ..
+    } = &unpack[0]
+    else {
         panic!("group and body");
     };
     let Pat::Bind(body) = &data[1] else {

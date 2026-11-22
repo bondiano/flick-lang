@@ -14,16 +14,21 @@ pub fn request() -> BuildRequest {
     let span = flick_ir::Span::new(FileId::new(0), 0, 16);
     let module = Module {
         name: "App".into(),
+        types: vec![],
         items: vec![Item {
             kind: ItemKind::Value {
                 name: "main".into(),
+                type_params: vec![],
                 dicts: vec![],
+                dict_constraints: vec![],
+                ty: None,
                 body: Expr::new(
                     ExprKind::Lambda {
                         params: vec![Param {
                             pat: Pat::Wild,
                             stage: Stage::Pure,
                             ty: None,
+                            binder_types: vec![],
                         }],
                         body: Box::new(Expr::new(ExprKind::Lit(Lit::Unit), span)),
                     },
@@ -115,7 +120,7 @@ pub fn descriptor() -> Descriptor {
     Descriptor {
         identity: request().backend.identity,
         backend_api: range("0.1.0", "0.2.0"),
-        ir: range("0.13.0", "0.14.0"),
+        ir: range("0.14.0", "0.15.0"),
         language: range("0.1.0", "0.2.0"),
         runtime_abis: vec![NamedRange {
             name: "flickrt".into(),

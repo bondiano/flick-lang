@@ -83,10 +83,12 @@ pub(super) fn witness_from_dict(b: &ExprBuilder, dict_local: &str) -> Expr {
             class: "Eq".into(),
         },
         name: "eq".into(),
+        type_args: Vec::new(),
     });
     let hash_fn = b.at(ExprKind::Method {
         dict: Dict::Field(b.name(dict_local)),
         name: "hash".into(),
+        type_args: Vec::new(),
     });
     b.app2(b.at(ExprKind::Con(witness_con())), eq_fn, hash_fn)
 }

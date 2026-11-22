@@ -8,12 +8,19 @@ fn later_uses(stmts: &[Stmt], result: &Expr) -> Vec<Option<(usize, usize)>> {
     each_strict_use(result, &mut |l| *strict.entry(l).or_default() += 1);
     let mut later = vec![None; stmts.len()];
     for (i, stmt) in stmts.iter().enumerate().rev() {
-        if let Stmt::Let(Pat::Bind(name), _) = stmt {
+        if let Stmt::Let {
+            pat: Pat::Bind(name),
+            ..
+        } = stmt
+        {
             let of = |counts: &HashMap<&str, usize>| counts.get(name.as_str()).copied();
             later[i] = Some((of(&all).unwrap_or(0), of(&strict).unwrap_or(0)));
         }
         match stmt {
-            Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
+            Stmt::Let { value: v, .. }
+            | Stmt::Var { value: v, .. }
+            | Stmt::Assign(_, v)
+            | Stmt::Expr(v) => {
                 each_use(v, &mut |l| *all.entry(l).or_default() += 1);
                 each_strict_use(v, &mut |l| *strict.entry(l).or_default() += 1);
             }
@@ -60,9 +67,12 @@ fn dictionary_operands(e: &Expr, output: &mut HashSet<String>) {
 
 fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr, arity: Arity) -> bool {
     // Without an atom or inert value, no binding can enter `moving`.
-    if !stmts.iter().any(
-        |stmt| matches!(stmt, Stmt::Let(Pat::Bind(_), value) if atom(value) || inert(value, arity)),
-    ) {
+    if !stmts.iter().any(|stmt| {
+        matches!(
+            stmt,
+            Stmt::Let { pat: Pat::Bind(_), value, .. } if atom(value) || inert(value, arity)
+        )
+    }) {
         return false;
     }
     let mut evaluated = HashSet::new();
@@ -71,8 +81,8 @@ fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr, arity: Arity) -> bool {
     dictionary_operands(result, &mut metadata);
     for stmt in stmts.iter() {
         match stmt {
-            Stmt::Let(_, value)
-            | Stmt::Var(_, value)
+            Stmt::Let { value, .. }
+            | Stmt::Var { value, .. }
             | Stmt::Assign(_, value)
             | Stmt::Expr(value)
             | Stmt::Fun { value, .. } => {
@@ -84,8 +94,22 @@ fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr, arity: Arity) -> bool {
     let later = later_uses(stmts, result);
     let completed: Vec<bool> = (stmts.iter().enumerate())
         .map(|(i, stmt)| match (stmt, later[i]) {
-            (Stmt::Let(Pat::Bind(_), v), Some((1, _))) if walk::known_method(v) => true,
-            (Stmt::Let(Pat::Bind(name), v), Some((1, _))) if applied_to_atoms(v) => {
+            (
+                Stmt::Let {
+                    pat: Pat::Bind(_),
+                    value: v,
+                    ..
+                },
+                Some((1, _)),
+            ) if walk::known_method(v) => true,
+            (
+                Stmt::Let {
+                    pat: Pat::Bind(name),
+                    value: v,
+                    ..
+                },
+                Some((1, _)),
+            ) if applied_to_atoms(v) => {
                 partial(v, arity).is_some_and(|rest| completes(&stmts[i + 1..], result, name, rest))
             }
             _ => false,
@@ -101,21 +125,28 @@ fn propagate(stmts: &mut Vec<Stmt>, result: &mut Expr, arity: Arity) -> bool {
         // before it still may after: asking first keeps the answer from
         // walking the values that moved into this one
         let once = matches!(uses, Some((1, 1)));
-        let pure = completed || once && matches!(&stmt, Stmt::Let(_, v) if inert(v, arity));
+        let pure = completed
+            || once && matches!(&stmt, Stmt::Let { value: v, .. } if inert(v, arity));
         match &mut stmt {
-            Stmt::Let(_, v)
-            | Stmt::Var(_, v)
+            Stmt::Let { value: v, .. }
+            | Stmt::Var { value: v, .. }
             | Stmt::Assign(_, v)
             | Stmt::Expr(v)
             | Stmt::Fun { value: v, .. } => place(v, &mut moving),
         }
         match (stmt, uses) {
-            (Stmt::Let(Pat::Bind(name), value), Some((all, _)))
-                if all != 0
-                    && (!evaluated.contains(&name)
-                        || matches!(value.kind, ExprKind::Local(_) | ExprKind::Lit(_)))
-                    && (!metadata.contains(&name) || matches!(value.kind, ExprKind::Local(_)))
-                    && (atom(&value) || pure || (once && inert(&value, arity))) =>
+            (
+                Stmt::Let {
+                    pat: Pat::Bind(name),
+                    value,
+                    ..
+                },
+                Some((all, _)),
+            ) if all != 0
+                && (!evaluated.contains(&name)
+                    || matches!(value.kind, ExprKind::Local(_) | ExprKind::Lit(_)))
+                && (!metadata.contains(&name) || matches!(value.kind, ExprKind::Local(_)))
+                && (atom(&value) || pure || (once && inert(&value, arity))) =>
             {
                 moving.insert(name, value);
             }
@@ -170,11 +201,15 @@ fn place_reads(
         {
             return;
         }
+        let old_ty = e.ty.clone();
         *e = if atom(value) {
             value.clone()
         } else {
             moving.remove(l).expect("found above")
         };
+        if e.ty.is_none() {
+            e.ty = old_ty;
+        }
         return;
     }
     walk::rename_dictionaries(e, aliases);
@@ -209,8 +244,8 @@ fn completes(stmts: &[Stmt], result: &Expr, name: &str, rest: usize) -> bool {
         found
     }
     let in_stmt = |s: &Stmt| match s {
-        Stmt::Let(_, v)
-        | Stmt::Var(_, v)
+        Stmt::Let { value: v, .. }
+        | Stmt::Var { value: v, .. }
         | Stmt::Assign(_, v)
         | Stmt::Expr(v)
         | Stmt::Fun { value: v, .. } => applies(v, name, rest),
@@ -236,7 +271,9 @@ fn dead(stmts: &mut Vec<Stmt>, result: &Expr, arity: Arity) -> bool {
             for (i, stmt) in stmts.iter().enumerate().rev() {
                 let drop = match stmt {
                     Stmt::Expr(v) => inert(v, arity),
-                    Stmt::Let(p, v) => {
+                    Stmt::Let {
+                        pat: p, value: v, ..
+                    } => {
                         let mut bound = Vec::new();
                         p.binders(&mut bound);
                         p.irrefutable()
@@ -244,15 +281,15 @@ fn dead(stmts: &mut Vec<Stmt>, result: &Expr, arity: Arity) -> bool {
                             && inert(v, arity)
                     }
                     Stmt::Fun { name, .. } => !read.contains(name.as_str()),
-                    Stmt::Var(..) | Stmt::Assign(..) => false,
+                    Stmt::Var { .. } | Stmt::Assign(..) => false,
                 };
                 keep[i] = !drop;
                 if drop {
                     continue;
                 }
                 match stmt {
-                    Stmt::Let(_, v)
-                    | Stmt::Var(_, v)
+                    Stmt::Let { value: v, .. }
+                    | Stmt::Var { value: v, .. }
                     | Stmt::Assign(_, v)
                     | Stmt::Expr(v)
                     | Stmt::Fun { value: v, .. } => {

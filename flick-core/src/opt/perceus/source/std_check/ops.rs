@@ -127,6 +127,7 @@ fn ord_cmp_fn(b: &ExprBuilder) -> Expr {
     b.at(ExprKind::Method {
         dict: Dict::Field(b.name("ord")),
         name: "compare".into(),
+        type_args: Vec::new(),
     })
 }
 

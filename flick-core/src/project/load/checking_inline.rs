@@ -50,13 +50,28 @@ fn merge_inline_lowering(
     {
         return;
     }
-    if let (Some(parent_ir), Some(mut child_ir)) = (&mut output.ir, child_output.ir.take()) {
+    if let (Some(parent_ir), Some(mut child_ir)) = (
+        output.ir.as_mut().map(Arc::make_mut),
+        child_output.ir.take().map(Arc::unwrap_or_clone),
+    ) {
         relocate_ir(parent_ir, &units.name, &loaded.name, &units.local);
         relocate_ir(&mut child_ir, &units.name, &loaded.name, &units.local);
         for (label, value) in child_ir.labels {
             parent_ir
                 .labels
                 .insert(format!("{}${label}", units.local), value);
+        }
+        for (name, fields) in child_ir.records {
+            parent_ir
+                .records
+                .insert(format!("{}${name}", units.local), fields);
+        }
+        for mut decl in child_ir.types {
+            decl.name = format!("{}${}", units.local, decl.name);
+            for ctor in &mut decl.constructors {
+                ctor.name = format!("{}${}", units.local, ctor.name);
+            }
+            parent_ir.types.push(decl);
         }
         parent_ir
             .items

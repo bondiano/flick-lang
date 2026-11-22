@@ -6,7 +6,7 @@ fn whole_value_binding_retains_before_last_receiver_drop() {
             2,
             Operation::Match {
                 object: 1,
-                pattern: Pat::Bind("whole".into()),
+                pattern: Box::new(Pat::Bind("whole".into())),
             },
         )],
         2,
@@ -83,7 +83,13 @@ fn updates_are_fresh_and_last_written_duplicate_wins() {
 fn matcher(pattern: Pat) -> Program {
     program(function(
         &[0, 1],
-        vec![bind(2, Operation::Match { object: 1, pattern })],
+        vec![bind(
+            2,
+            Operation::Match {
+                object: 1,
+                pattern: Box::new(pattern),
+            },
+        )],
         2,
     ))
 }
@@ -101,6 +107,8 @@ fn constructor(arity: usize, dicts: usize) -> Constructor {
         arity,
         dicts,
         rep: Rep::Tagged,
+        fields: Vec::new(),
+        type_args: Vec::new(),
     }
 }
 fn bound(name: &str) -> Pat {

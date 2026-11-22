@@ -51,6 +51,7 @@ fn join(span: Span) -> Expr {
                 pat: bind(name),
                 stage: Stage::Pure,
                 ty: None,
+                binder_types: Vec::new(),
             }],
             body: Box::new(body),
         })
@@ -73,16 +74,19 @@ fn join(span: Span) -> Expr {
         vec![
             Arm {
                 pat: Pat::List(vec![], None),
+                binder_types: Vec::new(),
                 guard: None,
                 body: at(ExprKind::Lit(Lit::String(String::new()))),
             },
             Arm {
                 pat: Pat::List(vec![bind("head")], None),
+                binder_types: Vec::new(),
                 guard: None,
                 body: local("head"),
             },
             Arm {
                 pat: Pat::List(vec![bind("head")], Some(Box::new(bind("tail")))),
+                binder_types: Vec::new(),
                 guard: None,
                 body: concat(local("head"), concat(local("separator"), recurse)),
             },
@@ -94,7 +98,10 @@ fn join(span: Span) -> Expr {
             vec![Stmt::Fun {
                 name: "$stringJoin.loop".into(),
                 rec: true,
+                type_params: Vec::new(),
                 dicts: vec![],
+                dict_constraints: Vec::new(),
+                ty: None,
                 value: lambda("items", body),
             }],
             Box::new(local("loop")),

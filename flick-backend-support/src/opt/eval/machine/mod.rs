@@ -178,8 +178,8 @@ impl<'a, 'b> Machine<'a, 'b> {
                 };
             }
             ExprKind::Var(_) => return Err(StopReason::DynamicRead),
-            ExprKind::Global { module, name } => return self.step_global(module, name),
-            ExprKind::Method { dict, name } => return self.step_method(dict, name, &env),
+            ExprKind::Global { module, name, .. } => return self.step_global(module, name),
+            ExprKind::Method { dict, name, .. } => return self.step_method(dict, name, &env),
             ExprKind::Con(ctor) => {
                 self.budget.charge_bytes(SLOT_BYTES)?;
                 return Ok(Control::Return(Value::Con {

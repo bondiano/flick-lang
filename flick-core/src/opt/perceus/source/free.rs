@@ -52,6 +52,7 @@ fn arm(value: &Arm, bound: &BTreeSet<String>, output: &mut BTreeSet<String>) {
     collect(&value.body, &inside, output);
 }
 
+#[allow(clippy::too_many_lines)]
 fn collect(expr: &Expr, bound: &BTreeSet<String>, output: &mut BTreeSet<String>) {
     match &expr.kind {
         ExprKind::Local(name) | ExprKind::Var(name) => local(name, bound, output),
@@ -82,7 +83,11 @@ fn collect(expr: &Expr, bound: &BTreeSet<String>, output: &mut BTreeSet<String>)
             let mut bound = bound.clone();
             for statement in statements {
                 match statement {
-                    Stmt::Let(pattern, value) => {
+                    Stmt::Let {
+                        pat: pattern,
+                        value,
+                        ..
+                    } => {
                         collect(value, &bound, output);
                         bind(pattern, &mut bound);
                     }
@@ -91,6 +96,7 @@ fn collect(expr: &Expr, bound: &BTreeSet<String>, output: &mut BTreeSet<String>)
                         rec,
                         dicts,
                         value,
+                        ..
                     } => {
                         let mut inside = bound.clone();
                         if *rec {
@@ -100,7 +106,7 @@ fn collect(expr: &Expr, bound: &BTreeSet<String>, output: &mut BTreeSet<String>)
                         collect(value, &inside, output);
                         bound.insert(name.clone());
                     }
-                    Stmt::Var(name, value) => {
+                    Stmt::Var { name, value, .. } => {
                         collect(value, &bound, output);
                         bound.insert(name.clone());
                     }
@@ -138,6 +144,7 @@ fn collect(expr: &Expr, bound: &BTreeSet<String>, output: &mut BTreeSet<String>)
             pat,
             source,
             body,
+            ..
         } => {
             if let Some(stop) = stop {
                 collect(stop, bound, output);
@@ -176,11 +183,13 @@ mod tests {
             errors: vec![
                 Arm {
                     pat: Pat::Bind("error".into()),
+                    binder_types: Vec::new(),
                     guard: Some(local("error")),
                     body: expr(ExprKind::Tuple(vec![local("error"), local("captured")])),
                 },
                 Arm {
                     pat: Pat::Wild,
+                    binder_types: Vec::new(),
                     guard: Some(local("error")),
                     body: expr(ExprKind::Lit(Lit::Unit)),
                 },
@@ -207,6 +216,7 @@ mod tests {
         let value = expr(ExprKind::Each {
             stop: Some(Box::new(local("element"))),
             pat: Pat::Bind("element".into()),
+            binder_types: Vec::new(),
             source: Box::new(local("source")),
             body: Box::new(local("element")),
         });

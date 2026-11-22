@@ -24,7 +24,9 @@ pub(super) fn analyze_module(module: &Module, exported: &dyn Fn(&str) -> bool) -
             let mut stack = vec![expr];
             while let Some(e) = stack.pop() {
                 match &e.kind {
-                    ExprKind::Global { module: m, name } if m == &module.name => {
+                    ExprKind::Global {
+                        module: m, name, ..
+                    } if m == &module.name => {
                         if let Some(count) = refs.get_mut(name.as_str()) {
                             *count += 1;
                         } else {
@@ -45,7 +47,9 @@ pub(super) fn analyze_module(module: &Module, exported: &dyn Fn(&str) -> bool) -
     }
     let mut sizes: HashMap<String, usize> = HashMap::new();
     for item in &module.items {
-        if let ItemKind::Value { name, dicts, body } = &item.kind
+        if let ItemKind::Value {
+            name, dicts, body, ..
+        } = &item.kind
             && dicts.is_empty()
             && !exported(name)
             && !name.contains('$')

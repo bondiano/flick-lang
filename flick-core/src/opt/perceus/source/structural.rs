@@ -93,6 +93,7 @@ fn parameter(name: &str) -> Param {
         pat: Pat::Bind(name.into()),
         stage: Stage::Pure,
         ty: None,
+        binder_types: Vec::new(),
     }
 }
 
@@ -112,6 +113,8 @@ fn ordering(name: &str) -> Constructor {
         arity: 0,
         dicts: 0,
         rep: Rep::Tagged,
+        fields: Vec::new(),
+        type_args: Vec::new(),
     }
 }
 
@@ -145,6 +148,7 @@ impl Builder {
         let method = self.at(ExprKind::Method {
             dict: Dict::Field(field_name(index)),
             name: name.into(),
+            type_args: Vec::new(),
         });
         let method = self.apply(method, self.local(&element(LEFT, index)));
         if binary {
@@ -168,7 +172,7 @@ impl Builder {
         } else {
             Pat::Wild
         };
-        Stmt::Let(
+        Stmt::let_bind(
             Pat::Tuple(vec![
                 if show {
                     Pat::Bind(IS_RECORD.into())
@@ -207,11 +211,13 @@ impl Builder {
                 vec![
                     Arm {
                         pat: Pat::Con(ordering("EQ"), vec![]),
+                        binder_types: Vec::new(),
                         guard: None,
                         body: result,
                     },
                     Arm {
                         pat: Pat::Bind("$structure$order".into()),
+                        binder_types: Vec::new(),
                         guard: None,
                         body: self.local("$structure$order"),
                     },
@@ -235,7 +241,7 @@ impl Builder {
                 self.method(index, "hash", false),
             );
             let name = element("$structure$hash", index);
-            statements.push(Stmt::Let(Pat::Bind(name.clone()), value));
+            statements.push(Stmt::let_bind(Pat::Bind(name.clone()), value));
             result = self.local(&name);
         }
         self.at(ExprKind::Block(statements, Box::new(result)))
@@ -243,7 +249,7 @@ impl Builder {
     fn show(&self) -> Expr {
         let mut statements = vec![self.view(LEFT, true)];
         for index in 0..self.count {
-            statements.push(Stmt::Let(
+            statements.push(Stmt::let_bind(
                 Pat::Bind(element("$structure$shown", index)),
                 self.method(index, "show", false),
             ));

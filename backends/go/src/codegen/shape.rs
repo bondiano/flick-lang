@@ -197,7 +197,7 @@ pub(super) fn settled<'m>(
         let (module, class) = &info.class;
         methods.iter().all(|(_, method)| match &method.kind {
             ExprKind::Lambda { .. } => true,
-            ExprKind::Global { module, name } => named_quietly(shapes, module, name),
+            ExprKind::Global { module, name, .. } => named_quietly(shapes, module, name),
             _ => false,
         }) && info.defaults.iter().all(|(name, own, _)| {
             *own > 0 || named_quietly(shapes, module, &default_method(class, name))

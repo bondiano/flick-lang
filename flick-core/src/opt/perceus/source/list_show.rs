@@ -74,6 +74,7 @@ pub(super) fn expression(span: Span) -> Expr {
                 pat: Pat::Bind(name.into()),
                 stage: Stage::Pure,
                 ty: None,
+                binder_types: Vec::new(),
             }],
             body: Box::new(body),
         })
@@ -82,8 +83,8 @@ pub(super) fn expression(span: Span) -> Expr {
     // Returned strings are concatenated verbatim, never shown/quoted again.
     let more = at(ExprKind::Block(
         vec![
-            Stmt::Let(Pat::Bind(SHOWN.into()), apply(RENDER, local(HEAD))),
-            Stmt::Let(Pat::Bind(SUFFIX.into()), apply(LOOP, local(TAIL))),
+            Stmt::let_bind(Pat::Bind(SHOWN.into()), apply(RENDER, local(HEAD))),
+            Stmt::let_bind(Pat::Bind(SUFFIX.into()), apply(LOOP, local(TAIL))),
         ],
         Box::new(concat(concat(local(SHOWN), text(", ")), local(SUFFIX))),
     ));
@@ -92,11 +93,13 @@ pub(super) fn expression(span: Span) -> Expr {
         vec![
             Arm {
                 pat: Pat::List(vec![], None),
+                binder_types: Vec::new(),
                 guard: None,
                 body: text(""),
             },
             Arm {
                 pat: Pat::List(vec![Pat::Bind(LAST.into())], None),
+                binder_types: Vec::new(),
                 guard: None,
                 body: apply(RENDER, local(LAST)),
             },
@@ -105,6 +108,7 @@ pub(super) fn expression(span: Span) -> Expr {
                     vec![Pat::Bind(HEAD.into())],
                     Some(Box::new(Pat::Bind(TAIL.into()))),
                 ),
+                binder_types: Vec::new(),
                 guard: None,
                 body: more,
             },
@@ -117,7 +121,10 @@ pub(super) fn expression(span: Span) -> Expr {
             vec![Stmt::Fun {
                 name: LOOP.into(),
                 rec: true,
+                type_params: vec![],
                 dicts: vec![],
+                dict_constraints: vec![],
+                ty: None,
                 value: lambda(ITEMS, body),
             }],
             Box::new(lambda(INPUT, rendered)),
@@ -337,7 +344,7 @@ mod tests {
         };
         assert_eq!(statements.len(), 2);
         for (statement, function) in statements.iter().zip([renderer, name]) {
-            let Stmt::Let(_, value) = statement else {
+            let Stmt::Let { value, .. } = statement else {
                 panic!("explicit let before string assembly")
             };
             let ExprKind::App { func, .. } = &value.kind else {

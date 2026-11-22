@@ -28,6 +28,8 @@ fn con(name: &str, arity: usize) -> Constructor {
             Rep::Tagged
         },
         dicts: 0,
+        fields: Vec::new(),
+        type_args: Vec::new(),
     }
 }
 
@@ -56,6 +58,7 @@ fn arm(pat: Pat, guarded: bool) -> Arm {
     let unit = || Expr::new(ExprKind::Lit(Lit::Unit), Span::new(FileId::new(0), 0, 0));
     Arm {
         pat,
+        binder_types: Vec::new(),
         guard: guarded.then(unit),
         body: unit(),
     }
@@ -482,6 +485,8 @@ fn constructors_of_one_name_in_two_modules_are_two_tests() {
         arity: 1,
         rep: Rep::Tagged,
         dicts: 0,
+        fields: Vec::new(),
+        type_args: Vec::new(),
     };
     let arms = [
         arm(Pat::Con(not_found("Http"), vec![bind("path")]), false),

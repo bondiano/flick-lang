@@ -9,7 +9,9 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use flick_ir::{Constructor, Expr, ExprKind, Lang, Lit, Pat, Span, Stage};
+#[cfg(feature = "typed-ir")]
+use flick_ir::IrType;
+use flick_ir::{Constructor, Expr, ExprKind, Lang, Lit, Pat, Span, Stage, TypeRef};
 
 use super::defs::join_nul;
 use super::value::{FIELD_BYTES, SLOT_BYTES, Value, bigint_byte_len, each_expr_pat, walk_pat};
@@ -126,12 +128,34 @@ impl MatAcc {
     }
 }
 
+#[cfg(not(feature = "typed-ir"))]
+fn has_type_var(_ty: &TypeRef) -> bool {
+    false
+}
+
+#[cfg(feature = "typed-ir")]
+fn has_type_var(ty: &TypeRef) -> bool {
+    let mut stack = vec![ty];
+    while let Some(t) = stack.pop() {
+        if matches!(&**t, IrType::Var(_)) {
+            return true;
+        }
+        t.each_child(&mut |child| stack.push(child));
+    }
+    false
+}
+
 fn finish_seq(kind: MatSeqKind, done: Vec<Expr>, span: Span) -> Expr {
     match kind {
         MatSeqKind::Tuple => Expr::new(ExprKind::Tuple(done), span),
         MatSeqKind::List => Expr::new(ExprKind::List(done), span),
         MatSeqKind::Con(ctor) => {
-            let mut built = Expr::new(ExprKind::Con((*ctor).clone()), span);
+            let mut con = (*ctor).clone();
+            if con.fields.iter().any(has_type_var) || con.type_args.iter().any(has_type_var) {
+                con.fields.clear();
+                con.type_args.clear();
+            }
+            let mut built = Expr::new(ExprKind::Con(con), span);
             for arg in done {
                 built = Expr::new(
                     ExprKind::App {

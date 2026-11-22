@@ -57,6 +57,7 @@ impl At {
         let method = ExprKind::Method {
             dict: dict.clone(),
             name: name.to_owned(),
+            type_args: Vec::new(),
         };
         self.call(self.of(method), args)
     }
@@ -74,6 +75,7 @@ impl At {
             pat: Pat::Bind((*p).to_owned()),
             stage: Stage::Pure,
             ty: None,
+            binder_types: Vec::new(),
         });
         self.of(ExprKind::Lambda {
             params: params.collect(),
@@ -85,6 +87,7 @@ impl At {
 fn arm(pat: Pat, body: Expr) -> Arm {
     Arm {
         pat,
+        binder_types: Vec::new(),
         guard: None,
         body,
     }
@@ -188,6 +191,8 @@ fn compare(at: &At, variants: &[Variant]) -> Expr {
         arity: 0,
         rep: Rep::Tagged,
         dicts: 0,
+        fields: Vec::new(),
+        type_args: Vec::new(),
     };
     let ord_int = Dict::Instance {
         module: INSTANCES.to_owned(),
@@ -218,7 +223,7 @@ fn compare(at: &At, variants: &[Variant]) -> Expr {
         let fields = vec![Pat::Wild; c.arity];
         arm(Pat::Con((*c).clone(), fields), at.int(i))
     });
-    let place = Stmt::Let(Pat::Bind("j".to_owned()), at.matched("b", index.collect()));
+    let place = Stmt::let_bind(Pat::Bind("j".to_owned()), at.matched("b", index.collect()));
     at.lambda(
         &["a", "b"],
         at.of(ExprKind::Block(vec![place], Box::new(body))),
@@ -244,6 +249,7 @@ fn show(at: &At, variants: &[Variant]) -> Expr {
         at.of(ExprKind::Global {
             module: INSTANCES.to_owned(),
             name: "show_arg".to_owned(),
+            type_args: Vec::new(),
         })
     };
     let arms = variants.iter().enumerate().map(|(i, (c, dicts))| {

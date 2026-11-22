@@ -24,6 +24,7 @@ impl Lower<'_> {
                         ExprKind::Global {
                             module: "Exit".to_owned(),
                             name: "is_failure".to_owned(),
+                            type_args: Vec::new(),
                         },
                         span,
                     )),
@@ -47,6 +48,7 @@ impl Lower<'_> {
                         pat: Pat::Bind(exit),
                         stage: Stage::Runtime,
                         ty: None,
+                        binder_types: Vec::new(),
                     }],
                     body: Box::new(guarded),
                 },
@@ -59,6 +61,7 @@ impl Lower<'_> {
                         pat: Pat::Wild,
                         stage: Stage::Runtime,
                         ty: None,
+                        binder_types: Vec::new(),
                     }],
                     body: Box::new(body),
                 },
@@ -71,6 +74,7 @@ impl Lower<'_> {
                     ExprKind::Global {
                         module: "Scope".to_owned(),
                         name: "defer".to_owned(),
+                        type_args: Vec::new(),
                     },
                     span,
                 )),

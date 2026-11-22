@@ -75,7 +75,10 @@ pub fn each_strict_use<'e>(e: &'e Expr, read: &mut dyn FnMut(&'e str)) {
         ExprKind::Block(stmts, result) => {
             for s in stmts {
                 match s {
-                    Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
+                    Stmt::Let { value: v, .. }
+                    | Stmt::Var { value: v, .. }
+                    | Stmt::Assign(_, v)
+                    | Stmt::Expr(v) => {
                         each_strict_use(v, read);
                     }
                     Stmt::Fun { .. } => {}
@@ -108,7 +111,7 @@ pub fn size(e: &Expr) -> usize {
             n += stmts
                 .iter()
                 .map(|s| match s {
-                    Stmt::Let(p, _) => pat_size(p),
+                    Stmt::Let { pat: p, .. } => pat_size(p),
                     _ => 0,
                 })
                 .sum::<usize>();
@@ -185,7 +188,9 @@ pub type Arity<'a> = &'a dyn Fn(&str, &str) -> Option<usize>;
 /// foreign function takes at once.
 pub fn arity(item: &Item) -> Option<(&str, usize)> {
     match &item.kind {
-        ItemKind::Value { name, dicts, body } if dicts.is_empty() => match &body.kind {
+        ItemKind::Value {
+            name, dicts, body, ..
+        } if dicts.is_empty() => match &body.kind {
             ExprKind::Lambda { params, .. } => Some((name, params.len())),
             _ => None,
         },
@@ -202,8 +207,12 @@ pub fn inert(e: &Expr, arity: Arity) -> bool {
         _ if droppable(e) || known_method(e) => true,
         ExprKind::App { .. } => partial(e, arity).is_some(),
         ExprKind::Block(stmts, value) => {
-            let bound =
-                |s: &Stmt| matches!(s, Stmt::Let(p, v) if p.irrefutable() && inert(v, arity));
+            let bound = |s: &Stmt| {
+                matches!(
+                    s,
+                    Stmt::Let { pat: p, value: v, .. } if p.irrefutable() && inert(v, arity)
+                )
+            };
             stmts.iter().all(bound) && inert(value, arity)
         }
         _ => false,
@@ -230,7 +239,7 @@ pub fn known_method(e: &Expr) -> bool {
 /// arguments that are themselves [`inert`].
 pub fn partial(e: &Expr, arity: Arity) -> Option<usize> {
     let (head, args) = e.pure_spine();
-    let ExprKind::Global { module, name } = &head.kind else {
+    let ExprKind::Global { module, name, .. } = &head.kind else {
         return None;
     };
     let taken = arity(module, name)?;
@@ -294,8 +303,8 @@ fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
         ExprKind::Block(stmts, _) => {
             for s in stmts {
                 match s {
-                    Stmt::Let(p, _) => pat_binders(p, names, suffix),
-                    Stmt::Var(name, _) | Stmt::Fun { name, .. } => fresh(names, name, suffix),
+                    Stmt::Let { pat: p, .. } => pat_binders(p, names, suffix),
+                    Stmt::Var { name, .. } | Stmt::Fun { name, .. } => fresh(names, name, suffix),
                     Stmt::Assign(..) | Stmt::Expr(_) => {}
                 }
             }
@@ -316,6 +325,17 @@ fn binders(e: &Expr, names: &mut HashMap<String, String>, suffix: &str) {
     e.each_child(&mut |c| binders(c, names, suffix));
 }
 
+fn rename_binder_types(
+    binder_types: &mut [(String, flick_ir::TypeRef)],
+    names: &HashMap<String, String>,
+) {
+    for (n, _) in binder_types {
+        if let Some(to) = names.get(n.as_str()) {
+            n.clone_from(to);
+        }
+    }
+}
+
 fn apply(e: &mut Expr, names: &HashMap<String, String>) {
     let new = |n: &mut String| {
         if let Some(to) = names.get(n.as_str()) {
@@ -328,13 +348,21 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
         ExprKind::Lambda { params, .. } => {
             for p in params {
                 apply_pat(&mut p.pat, names);
+                rename_binder_types(&mut p.binder_types, names);
             }
         }
         ExprKind::Block(stmts, _) => {
             for s in stmts {
                 match s {
-                    Stmt::Let(p, _) => apply_pat(p, names),
-                    Stmt::Var(name, _) | Stmt::Assign(name, _) | Stmt::Fun { name, .. } => {
+                    Stmt::Let {
+                        pat: p,
+                        binder_types,
+                        ..
+                    } => {
+                        apply_pat(p, names);
+                        rename_binder_types(binder_types, names);
+                    }
+                    Stmt::Var { name, .. } | Stmt::Assign(name, _) | Stmt::Fun { name, .. } => {
                         new(name);
                     }
                     Stmt::Expr(_) => {}
@@ -344,14 +372,21 @@ fn apply(e: &mut Expr, names: &HashMap<String, String>) {
         ExprKind::Match(_, arms) => {
             for arm in arms {
                 apply_pat(&mut arm.pat, names);
+                rename_binder_types(&mut arm.binder_types, names);
             }
         }
         ExprKind::Handle(h) => {
             for arm in &mut h.errors {
                 apply_pat(&mut arm.pat, names);
+                rename_binder_types(&mut arm.binder_types, names);
             }
         }
-        ExprKind::Each { pat, .. } => apply_pat(pat, names),
+        ExprKind::Each {
+            pat, binder_types, ..
+        } => {
+            apply_pat(pat, names);
+            rename_binder_types(binder_types, names);
+        }
         _ => {}
     }
     rename_dictionaries(e, names);

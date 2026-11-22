@@ -118,6 +118,8 @@ mod tests {
             arity,
             dicts,
             rep: Rep::Tagged,
+            fields: Vec::new(),
+            type_args: Vec::new(),
         }
     }
 

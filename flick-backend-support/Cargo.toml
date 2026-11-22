@@ -12,7 +12,12 @@ publish.workspace = true
 workspace = true
 
 [features]
+default = ["typed-ir"]
 native-project = []
+# Preserve and transform full IR 0.14.0 types during portable optimization.
+# Enabled by default (including for WASM backend components); browser-only
+# `flick-wasm` disables it to stay within its bundle budget.
+typed-ir = []
 
 [build-dependencies]
 serde_json = { workspace = true }

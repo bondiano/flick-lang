@@ -110,6 +110,13 @@ impl Plugin for Pairs {
             if said.hidden {
                 module.exports = flick_ir::Exports::default();
             }
+            if let Some(corrupt) = said.corrupt {
+                for item in &mut module.items {
+                    if let flick_ir::ItemKind::Value { body, .. } = &mut item.kind {
+                        corrupt_types(body, corrupt);
+                    }
+                }
+            }
         }
         Ok(program.to_cbor())
     }
@@ -417,12 +424,19 @@ fn refuse(token: Token, message: &str) -> Diagnostic {
     Diagnostic::error(message, token.span)
 }
 
+#[derive(Clone, Copy)]
+enum Corrupt {
+    IntOperand,
+    WrongTypeArgs,
+}
+
 /// What the strings of a module ask of its metadata: `"move the package"`
-/// and `"hide the exports"`.
+/// and `"hide the exports"`, or type-validation corruption cases.
 #[derive(Default)]
 struct Said {
     moved: bool,
     hidden: bool,
+    corrupt: Option<Corrupt>,
 }
 
 /// `e` with each string `"hello"` in it as `"HELLO"`, and `"break the IR"`
@@ -431,11 +445,42 @@ fn shout(e: &mut flick_ir::Expr, said: &mut Said) {
     if let flick_ir::ExprKind::Lit(flick_ir::Lit::String(s)) = &mut e.kind {
         said.moved |= s == "move the package";
         said.hidden |= s == "hide the exports";
-        if s == "hello" {
+        if s == "corrupt int operand" {
+            said.corrupt = Some(Corrupt::IntOperand);
+        } else if s == "wrong type args" {
+            said.corrupt = Some(Corrupt::WrongTypeArgs);
+        } else if s == "hello" {
             *s = "HELLO".into();
         } else if s == "break the IR" {
             e.kind = flick_ir::ExprKind::Local("dangling".into());
         }
     }
     e.each_child_mut(&mut |child| shout(child, said));
+}
+
+fn corrupt_types(e: &mut flick_ir::Expr, corrupt: Corrupt) {
+    match corrupt {
+        Corrupt::IntOperand => {
+            if let flick_ir::ExprKind::App { func, arg, .. } = &mut e.kind
+                && matches!(&func.kind, flick_ir::ExprKind::Con(_))
+                && matches!(&arg.kind, flick_ir::ExprKind::Lit(flick_ir::Lit::Int(_)))
+            {
+                // Replace an Int constructor operand with a string while retaining its Int annotation.
+                arg.kind = flick_ir::ExprKind::Lit(flick_ir::Lit::String("oops".into()));
+            }
+        }
+        Corrupt::WrongTypeArgs => {
+            if let flick_ir::ExprKind::Con(c) = &mut e.kind
+                && !c.type_args.is_empty()
+            {
+                c.type_args
+                    .push(flick_ir::TypeRef::new(flick_ir::IrType::Named {
+                        module: "Prelude".into(),
+                        name: "String".into(),
+                        args: Vec::new(),
+                    }));
+            }
+        }
+    }
+    e.each_child_mut(&mut |child| corrupt_types(child, corrupt));
 }

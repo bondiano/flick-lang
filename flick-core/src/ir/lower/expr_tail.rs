@@ -4,7 +4,11 @@ impl Lower<'_> {
             return func;
         };
         let span = func.span;
-        let component = ExprKind::Global { module, name };
+        let component = ExprKind::Global {
+            module,
+            name,
+            type_args: Vec::new(),
+        };
         Expr::new(
             ExprKind::App {
                 func: Box::new(Expr::new(component, span)),
@@ -34,7 +38,139 @@ impl Lower<'_> {
         };
         let name = self.owner_name(*owner);
         let span = call.span;
-        self.evidence_call(Expr::new(ExprKind::Local(name), span), call)
+        let ty = call.ty.clone();
+        let mut wrapped = self.evidence_call(Expr::new(ExprKind::Local(name), span), call);
+        if wrapped.ty.is_none() {
+            wrapped.ty = ty;
+        }
+        wrapped
+    }
+
+    fn pack_module_expr(&mut self, node: &Node, span: Span) -> Expr {
+        let fields = self
+            .typing
+            .packs
+            .get(&node.range())
+            .expect("the checker validated `pack`")
+            .iter()
+            .map(|(field, module, name)| {
+                (
+                    field.clone(),
+                    Expr::new(
+                        ExprKind::Global {
+                            module: module.clone(),
+                            name: name.clone(),
+                            type_args: Vec::new(),
+                        },
+                        span,
+                    ),
+                )
+            })
+            .collect();
+        Expr::new(ExprKind::Record(fields), span)
+    }
+
+    fn app_expr(&mut self, node: &Node, children: &[&Node], span: Span) -> Expr {
+        if let Some(hole) = app_hole(node) {
+            return self.app_hole(node, children, hole, span);
+        }
+        if let [callee, argument] = children
+            && let Some(slots) = self.typing.dictionary_constructors.get(&callee.range())
+        {
+            let mut fields = self.fields(argument);
+            for (written, runtime) in slots {
+                if let Some((label, _)) = fields.iter_mut().find(|(label, _)| label == written) {
+                    runtime.clone_into(label);
+                }
+            }
+            Expr::new(ExprKind::Dictionary(fields), span)
+        } else {
+            self.apply(children[0], &children[1..])
+        }
+    }
+
+    fn scope_expr(&mut self, node: &Node, body: &Node, span: Span) -> Expr {
+        let mark = self.scope.len();
+        let key = node.range();
+        let inner = self.typing.uses_owner(Owner::Scope(key));
+        let owner = match node.child_tokens().find(|t| t.kind == K::Ident) {
+            Some(name) => Some(self.bind(name.text(self.text), name.start)),
+            None => inner.then(|| self.hidden("$owner")),
+        };
+        if let Some(owner) = &owner {
+            self.owners.insert(key, owner.clone());
+        }
+        let body = self.expr(body);
+        self.scope.truncate(mark);
+        Self::scope_run(owner, None, body, span)
+    }
+
+    fn unpack_module_expr(&mut self, node: &Node, children: &[&Node], span: Span) -> Expr {
+        let Some(source) = children.first() else {
+            self.unsupported(node);
+            return Expr::new(ExprKind::Lit(Lit::Unit), span);
+        };
+        let Some(body) = children.iter().find(|n| n.kind == K::Block) else {
+            self.unsupported(node);
+            return Expr::new(ExprKind::Lit(Lit::Unit), span);
+        };
+        let Some(alias) = node.child_tokens().find(|t| t.kind == K::Con) else {
+            self.unsupported(node);
+            return Expr::new(ExprKind::Lit(Lit::Unit), span);
+        };
+        let source = self.expr(source);
+        let mark = self.scope.len();
+        let mut statements = Vec::new();
+        let opened = self.typing.existential_opens.contains(&node.range());
+        let pair = if opened {
+            let pair = self.bind("$existential", node.range().0);
+            statements.push(Stmt::let_bind(Pat::Bind(pair.clone()), source.clone()));
+            Some(pair)
+        } else {
+            None
+        };
+        let unique = self.bind(alias.text(self.text), alias.start);
+        if let Some(pair) = &pair {
+            let pair_value = Expr::new(ExprKind::Local(pair.clone()), span);
+            let module = Expr::new(
+                ExprKind::Field(Box::new(pair_value), "$module".to_owned()),
+                span,
+            );
+            statements.push(Stmt::let_bind(Pat::Bind(unique.clone()), module));
+            let mut tokens = node.child_tokens();
+            let payload = tokens
+                .find(|t| t.kind == K::Comma)
+                .and_then(|_| tokens.find(|t| t.kind == K::Ident));
+            if let Some(payload) = payload {
+                let value = self.bind(payload.text(self.text), payload.start);
+                let pair_value = Expr::new(ExprKind::Local(pair.clone()), span);
+                let field = Expr::new(
+                    ExprKind::Field(Box::new(pair_value), "$value".to_owned()),
+                    span,
+                );
+                statements.push(Stmt::let_bind(Pat::Bind(value), field));
+            }
+        } else {
+            statements.push(Stmt::let_bind(Pat::Bind(unique.clone()), source));
+        }
+        let body = self.expr(body);
+        self.scope.truncate(mark);
+        let result = if self.typing.existential_unpacks.contains(&node.range()) {
+            Expr::new(
+                ExprKind::Record(vec![
+                    (
+                        "$module".to_owned(),
+                        Expr::new(ExprKind::Local(unique.clone()), span),
+                    ),
+                    ("$value".to_owned(), body),
+                ]),
+                span,
+            )
+        } else {
+            body
+        };
+        let ty = result.ty.clone();
+        Expr::with_ty(ExprKind::Block(statements, Box::new(result)), span, ty)
     }
 
     fn binary(&mut self, node: &Node, children: &[&Node]) -> Expr {
@@ -82,6 +218,7 @@ impl Lower<'_> {
         }
         let op = match op {
             Some(K::PipeGt) => {
+                let res_ty = self.ir_type(key).or_else(|| app_result_type(&rhs));
                 let app = ExprKind::App {
                     func: rhs,
                     arg: lhs,
@@ -89,7 +226,7 @@ impl Lower<'_> {
                     arg_first: true,
                 };
                 let dicts = self.dictionaries(key);
-                return with_dicts(self.within(key, Expr::new(app, span)), dicts);
+                return with_dicts(self.within(key, Expr::with_ty(app, span, res_ty)), dicts);
             }
             Some(K::OrOr) => BinOp::Or,
             Some(K::AndAnd) => BinOp::And,
@@ -109,24 +246,34 @@ impl Lower<'_> {
     /// `left orelse right` as `match left with | Some $orelse -> $orelse | None -> right`.
     fn orelse(&mut self, node: &Node, lhs: &Node, rhs: &Node, span: Span) -> Expr {
         let scrutinee = self.boxed(lhs);
+        let inner_ty = scrutinee.ty.as_deref().and_then(|ty| match ty {
+            flick_ir::IrType::Named { args, .. } if args.len() == 1 => Some(args[0].clone()),
+            _ => None,
+        });
         let fallback = self.expr(rhs);
         let value_name = self.hidden("$orelse");
         let op_key = node
             .child_tokens()
             .find(|t| t.kind == K::OrElse)
             .map(|t| (t.start, t.end));
-        let value = Expr::new(ExprKind::Local(value_name.clone()), span);
+        let value = Expr::with_ty(ExprKind::Local(value_name.clone()), span, inner_ty.clone());
         let value = match op_key {
             Some(key) => self.adapted(key, value),
             None => value,
         };
+        let type_args: Vec<_> = inner_ty.iter().cloned().collect();
         let some_pat = Pat::Con(
-            super::enums::native(Lang::Some, Lang::Option),
-            vec![Pat::Bind(value_name)],
+            Constructor {
+                fields: type_args.clone(),
+                type_args: type_args.clone(),
+                ..super::enums::native(Lang::Some, Lang::Option)
+            },
+            vec![Pat::Bind(value_name.clone())],
         );
         let none_pat = Pat::Con(
             Constructor {
                 arity: 0,
+                type_args,
                 ..super::enums::native(Lang::None, Lang::Option)
             },
             Vec::new(),
@@ -134,16 +281,22 @@ impl Lower<'_> {
         let arms = vec![
             Arm {
                 pat: some_pat,
+                binder_types: inner_ty.map(|t| vec![(value_name, t)]).unwrap_or_default(),
                 guard: None,
                 body: value,
             },
             Arm {
                 pat: none_pat,
+                binder_types: Vec::new(),
                 guard: None,
                 body: fallback,
             },
         ];
-        Expr::new(ExprKind::Match(scrutinee, arms), span)
+        Expr::with_ty(
+            ExprKind::Match(scrutinee, arms),
+            span,
+            self.ir_type(node.range()),
+        )
     }
 
     /// `f >> g` as `{ let f' = f; let g' = g; fun x -> g' (f' x) }`, and
@@ -176,24 +329,27 @@ impl Lower<'_> {
             } else {
                 let name = self.hidden("$f");
                 let at = value.span;
-                stmts.push(Stmt::Let(Pat::Bind(name.clone()), value));
-                functions.push(Expr::new(ExprKind::Local(name), at));
+                let ty = value.ty.clone();
+                let binders = ty.clone().map(|t| vec![(name.clone(), t)]).unwrap_or_default();
+                stmts.push(Stmt::let_typed(Pat::Bind(name.clone()), binders, value));
+                functions.push(Expr::with_ty(ExprKind::Local(name), at, ty));
             }
         }
         let x = self.hidden("$x");
-        let mut value = Expr::new(ExprKind::Local(x.clone()), span);
+        let x_ty = self.ir_type(param_key(&operators));
+        let mut value = Expr::with_ty(ExprKind::Local(x.clone()), span, x_ty.clone());
         for i in applied_order(&operators) {
             let key = composed_key(&operands, &operators, i);
             let at = Span::new(self.file, key.0, key.1);
             let func = self.ui_callable(functions[i].clone(), key);
+            let res_ty = self.ir_type(key).or_else(|| app_result_type(&func));
             let app = ExprKind::App {
                 func: Box::new(func),
                 arg: Box::new(self.adapted(key, value)),
                 stage: self.call_stage(key),
                 arg_first: false,
             };
-            let mut app = Expr::new(app, at);
-            app.ty = self.typing.values.get(&key).and_then(type_name);
+            let app = Expr::with_ty(app, at, res_ty);
             let dicts = self.dictionaries(key);
             value = with_dicts(self.within(key, app), dicts);
         }
@@ -202,22 +358,30 @@ impl Lower<'_> {
             .stages
             .get(&node.range())
             .and_then(|s| s.first());
-        let lambda = ExprKind::Lambda {
-            params: vec![Param {
-                pat: Pat::Bind(x),
-                stage: stage.copied().unwrap_or(Stage::Pure),
-                ty: (self.typing.values.get(&param_key(&operators))).and_then(type_name),
-            }],
-            body: Box::new({
-                let value = self.adapted(result_key(&operators), value);
-                self.owner_entry(entry, value)
-            }),
+        let x_binders = x_ty.clone().map(|t| vec![(x.clone(), t)]).unwrap_or_default();
+        let params = vec![Param {
+            pat: Pat::Bind(x),
+            stage: stage.copied().unwrap_or(Stage::Pure),
+            ty: x_ty,
+            binder_types: x_binders,
+        }];
+        let body = {
+            let value = self.adapted(result_key(&operators), value);
+            self.owner_entry(entry, value)
         };
-        let lambda = Expr::new(lambda, span);
+        let lam_ty = super::types::lambda_type(&params, &body);
+        let lambda = Expr::with_ty(
+            ExprKind::Lambda {
+                params,
+                body: Box::new(body),
+            },
+            span,
+            lam_ty.clone(),
+        );
         if stmts.is_empty() {
             lambda
         } else {
-            Expr::new(ExprKind::Block(stmts, Box::new(lambda)), span)
+            Expr::with_ty(ExprKind::Block(stmts, Box::new(lambda)), span, lam_ty)
         }
     }
 
@@ -226,7 +390,8 @@ impl Lower<'_> {
         let value = match self.typing.lifts.get(&key).cloned() {
             Some(lift) => {
                 let span = value.span;
-                Expr::new(ExprKind::Lift(Box::new(value), lift), span)
+                let lifted = value.ty.as_ref().map(|t| apply_lift_type(t, &lift));
+                Expr::with_ty(ExprKind::Lift(Box::new(value), lift), span, lifted)
             }
             None => value,
         };
@@ -247,188 +412,6 @@ impl Lower<'_> {
                 Some((label, self.expr(value)))
             })
             .collect()
-    }
-
-    pub(super) fn block(&mut self, node: &Node) -> Expr {
-        let span = self.span(node);
-        let mark = self.scope.len();
-        let statements: Vec<&Node> = node.nodes().collect();
-        let siblings = (self.typing.siblings.get(&node.range()).cloned()).map(|f| (f, node.range()));
-        let block = self.statements(&statements, span, siblings.as_ref());
-        self.scope.truncate(mark);
-        block
-    }
-
-    /// The statements of a block; a `let assert` takes the ones after it.
-    /// With `siblings`, a function and the range of its block, the
-    /// expression lines are the list it is applied to.
-    fn statements(
-        &mut self,
-        statements: &[&Node],
-        span: Span,
-        siblings: Option<&(Ref, Range)>,
-    ) -> Expr {
-        let mut stmts = Vec::new();
-        let mut result = None;
-        let mut lines = Vec::new();
-        for (i, statement) in statements.iter().enumerate() {
-            let last = i + 1 == statements.len();
-            match statement.kind {
-                K::Signature => {}
-                K::LetDecl if statement.has_token(K::AssertKw) => {
-                    let rest = &statements[i + 1..];
-                    let then = |l: &mut Self| l.statements(rest, span, siblings);
-                    result = Some(self.let_assert(statement, span, then));
-                    break;
-                }
-                K::LetDecl if statement.has_token(K::ElseKw) => {
-                    let rest = &statements[i + 1..];
-                    let then = |l: &mut Self| l.statements(rest, span, siblings);
-                    result = Some(self.let_else(statement, span, then));
-                    break;
-                }
-                K::LetDecl => self.local_let(statement, &mut stmts),
-                K::AssignStmt => stmts.push(self.assign(statement)),
-                K::DeferStmt if siblings.is_some() => stmts.push(Stmt::Expr(self.expr(statement))),
-                _ if siblings.is_some() => lines.push(self.expr(statement)),
-                _ if last => result = Some(self.expr(statement)),
-                _ => stmts.push(Stmt::Expr(self.expr(statement))),
-            }
-        }
-        if let Some((Ref::Value { module, name }, key)) = siblings
-            && result.is_none()
-        {
-            let (module, name) = (module.clone(), name.clone());
-            let function = Expr::new(ExprKind::Global { module, name }, span);
-            let app = ExprKind::App {
-                func: Box::new(function),
-                arg: Box::new(Expr::new(ExprKind::List(lines), span)),
-                stage: self.call_stage(*key),
-                arg_first: false,
-            };
-            let dicts = self.dictionaries(*key);
-            result = Some(with_dicts(self.within(*key, Expr::new(app, span)), dicts));
-        }
-        let result = result.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span));
-        if stmts.is_empty() {
-            return result;
-        }
-        Expr::new(ExprKind::Block(stmts, Box::new(result)), span)
-    }
-
-    /// `let pattern = initializer else fallback` and the statements after it:
-    /// `match initializer with | pattern -> rest | _ -> fallback`.
-    fn let_else(
-        &mut self,
-        decl: &Node,
-        span: Span,
-        rest: impl FnOnce(&mut Self) -> Expr,
-    ) -> Expr {
-        let parts = let_parts(decl, self.text);
-        let value = parts.body.map_or_else(
-            || Expr::new(ExprKind::Lit(Lit::Unit), span),
-            |b| self.expr(b),
-        );
-        let fallback = parts.fallback.map_or_else(
-            || Expr::new(ExprKind::Lit(Lit::Unit), span),
-            |b| self.expr(b),
-        );
-        let mut arms = Vec::new();
-        if !self.typing.dead_arms.contains(&decl.range()) {
-            let mark = self.scope.len();
-            let pat = parts.pattern.map_or(Pat::Wild, |p| self.pattern(p));
-            let body = rest(self);
-            self.scope.truncate(mark);
-            arms.push(Arm {
-                pat,
-                guard: None,
-                body,
-            });
-        }
-        arms.push(Arm {
-            pat: Pat::Wild,
-            guard: None,
-            body: fallback,
-        });
-        let mut expr = Expr::new(ExprKind::Match(Box::new(value), arms), span);
-        if let Some(ty) = self.typing.values.get(&decl.range()) {
-            expr.ty = type_name(ty);
-        }
-        expr
-    }
-
-    /// The statements of a local `let`: those of a `let lazy`, or one.
-    pub(super) fn local_let(&mut self, decl: &Node, stmts: &mut Vec<Stmt>) {
-        if self.typing.lazy_lets.contains(&decl.range()) {
-            self.lazy_state(decl, stmts);
-        } else {
-            stmts.push(self.local_let_stmt(decl));
-        }
-    }
-
-    fn local_let_stmt(&mut self, decl: &Node) -> Stmt {
-        let parts = let_parts(decl, self.text);
-        let Some(name) = parts.name.clone() else {
-            let value = self.definition(decl);
-            let pat = parts.pattern.map_or(Pat::Wild, |p| self.pattern(p));
-            return Stmt::Let(pat, value);
-        };
-        let dicts = self.givens(decl);
-        let at =
-            (decl.nodes().find(|n| n.kind == K::VarPat)).map_or(decl.range().0, |n| n.range().0);
-        if parts.rec {
-            let unique = self.bind(&name, at);
-            #[cfg(not(target_arch = "wasm32"))]
-            self.record_local_scheme(decl, &unique);
-            let value = self.definition(decl);
-            return Stmt::Fun {
-                name: unique,
-                rec: true,
-                dicts,
-                value,
-            };
-        }
-        let value = self.definition(decl);
-        let unique = self.bind(&name, at);
-        if decl.has_token(K::MutKw) {
-            self.vars.insert(unique.clone());
-            return Stmt::Var(unique, value);
-        }
-        #[cfg(not(target_arch = "wasm32"))]
-        self.record_local_scheme(decl, &unique);
-        if parts.params.is_empty() && dicts.is_empty() {
-            Stmt::Let(Pat::Bind(unique), value)
-        } else {
-            Stmt::Fun {
-                name: unique,
-                rec: false,
-                dicts,
-                value,
-            }
-        }
-    }
-
-    /// `name = value` of the `let mut` variable `name` in scope.
-    fn assign(&mut self, node: &Node) -> Stmt {
-        let mut children = node.nodes();
-        let target = children.next();
-        let token = target.and_then(|t| t.child_tokens().find(|t| t.kind == K::Ident));
-        let unique = token
-            .and_then(|t| self.local(t.text(self.text), t.start))
-            .map_or_else(
-                || panic!("the checker resolved the target of an assignment"),
-                str::to_owned,
-            );
-        let value = match children.next() {
-            Some(value) => self.expr(value),
-            None => Expr::new(ExprKind::Lit(Lit::Unit), self.span(node)),
-        };
-        let value = if self.typing.lazy_sets.contains(&node.range()) {
-            super::lazy::written(value)
-        } else {
-            value
-        };
-        Stmt::Assign(unique, value)
     }
 
     /// Whether a `try` has arms for operations or for the value of its
@@ -468,6 +451,7 @@ impl Lower<'_> {
     pub(super) fn arm(&mut self, arm: &Node) -> Arm {
         let mark = self.scope.len();
         let mut pat = Pat::Wild;
+        let mut binder_types = Vec::new();
         let mut guard = None;
         let mut body = None;
         for child in arm.nodes() {
@@ -476,7 +460,7 @@ impl Lower<'_> {
                 K::Block => body = Some(self.expr(child)),
                 kind if is_pattern(kind) => {
                     let child = failed_pattern(child, self.text).unwrap_or(child);
-                    pat = self.pattern(child);
+                    (pat, binder_types) = self.pattern_typed(child);
                 }
                 _ => {}
             }
@@ -485,6 +469,7 @@ impl Lower<'_> {
         let span = self.span(arm);
         Arm {
             pat,
+            binder_types,
             guard,
             body: body.unwrap_or_else(|| Expr::new(ExprKind::Lit(Lit::Unit), span)),
         }

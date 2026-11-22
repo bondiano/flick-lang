@@ -131,7 +131,9 @@ fn summaries(
     let mut all: Vec<(Summary, Option<&Expr>)> = Vec::new();
     for item in &module.items {
         match &item.kind {
-            ItemKind::Value { name, dicts, body } => {
+            ItemKind::Value {
+                name, dicts, body, ..
+            } => {
                 let (stages, body) = match &body.kind {
                     ExprKind::Lambda { params, body } => (
                         params
@@ -293,8 +295,8 @@ impl Totality<'_> {
             ExprKind::Block(stmts, result) => {
                 partial(result)
                     || stmts.iter().any(|s| match s {
-                        Stmt::Let(_, v)
-                        | Stmt::Var(_, v)
+                        Stmt::Let { value: v, .. }
+                        | Stmt::Var { value: v, .. }
                         | Stmt::Assign(_, v)
                         | Stmt::Expr(v)
                         | Stmt::Fun { value: v, .. } => partial(v),
@@ -329,7 +331,7 @@ impl Totality<'_> {
         }
         match &head.kind {
             ExprKind::Con(_) => true,
-            ExprKind::Global { module, name } => match (self.known)(module, name) {
+            ExprKind::Global { module, name, .. } => match (self.known)(module, name) {
                 Some((params, partial)) => args < params || (args == params && !partial),
                 None => false,
             },

@@ -5,7 +5,7 @@ use std::cell::Cell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use flick_ir::{BinOp, Dict, Expr, ExprKind, Item, ItemKind, LangItem, Lit, Namespace, Pat, Stmt};
+use flick_ir::{BinOp, Dict, ExprKind, Item, ItemKind, LangItem, Lit, Namespace, Pat, Stmt};
 
 use super::super::defs::MAX_EXTERNAL_PROBES;
 use super::super::materialize::{MaterializeContext, MaterializeLimits, materialize};
@@ -15,7 +15,7 @@ use super::super::{
 };
 use super::{app, bin, empty_module, ex, global, int, lam, local, sp, val_item};
 use crate::Known;
-use crate::opt::devirt;
+use crate::opt::{Generic, devirt};
 
 #[test]
 fn failing_let_pattern_match_commits_module_step_budget() {
@@ -26,7 +26,10 @@ fn failing_let_pattern_match_commits_module_step_budget() {
         pat = Pat::Tuple(vec![pat, Pat::Wild]);
         rhs = ex(ExprKind::Tuple(vec![rhs, int(0)]));
     }
-    let stmts = vec![Stmt::Let(pat.clone(), rhs.clone()), Stmt::Let(pat, rhs)];
+    let stmts = vec![
+        Stmt::let_bind(pat.clone(), rhs.clone()),
+        Stmt::let_bind(pat, rhs),
+    ];
     let block = ex(ExprKind::Block(
         stmts,
         Box::new(app(global("App", "id"), int(7))),
@@ -77,13 +80,17 @@ fn def_table_caps_unavailable_polymorphic_cartesian_probes() {
         items.push(Item {
             kind: ItemKind::Value {
                 name: format!("poly_{m_idx:03}"),
+                type_params: Vec::new(),
                 dicts: vec!["d".into()],
+                dict_constraints: Vec::new(),
+                ty: None,
                 body: lam(
                     &["x"],
                     app(
                         ex(ExprKind::Method {
                             dict: Dict::Given("d".into()),
                             name: method_name,
+                            type_args: Vec::new(),
                         }),
                         local("x"),
                     ),
@@ -110,7 +117,7 @@ fn def_table_caps_unavailable_polymorphic_cartesian_probes() {
     let module = empty_module("App", items);
     let known = Known::of(&[]);
     let probes = Cell::new(0_usize);
-    let generics = |owner: &str, _key: &str| -> Option<(Vec<String>, Expr)> {
+    let generics = |owner: &str, _key: &str| -> Option<Generic> {
         if owner == "Ext" {
             probes.set(probes.get() + 1);
         }
@@ -131,7 +138,7 @@ fn def_table_caps_unavailable_polymorphic_cartesian_probes() {
 fn eval_for_env_charges_constructed_bytes_on_literal_fast_path() {
     let make_module = || {
         let block = ex(ExprKind::Block(
-            vec![Stmt::Let(
+            vec![Stmt::let_bind(
                 Pat::Bind("s".into()),
                 ex(ExprKind::Lit(Lit::String("0123456789".into()))),
             )],
@@ -232,6 +239,7 @@ fn show_string_charges_escaped_bytes_before_allocating() {
                 args: vec![],
             },
             name: "show".into(),
+            type_args: Vec::new(),
         }),
         local("s"),
     );
@@ -290,6 +298,7 @@ fn show_string_charges_escaped_bytes_before_allocating() {
                 args: vec![],
             },
             name: "display".into(),
+            type_args: Vec::new(),
         }),
         local("s"),
     );
@@ -320,7 +329,10 @@ fn rec_fun_group_charges_steps_and_bytes_before_allocating() {
         .map(|i| Stmt::Fun {
             name: format!("f{i:02}"),
             rec: true,
+            type_params: Vec::new(),
             dicts: vec![],
+            dict_constraints: Vec::new(),
+            ty: None,
             value: lam(&["x"], local("x")),
         })
         .collect();
@@ -393,6 +405,7 @@ fn step_dicts_and_resolve_dict_charge_constructed_bytes() {
                     class: "Numeric.Numeric".into(),
                 },
                 name: "add".into(),
+                type_args: Vec::new(),
             }),
             int(2),
         ),

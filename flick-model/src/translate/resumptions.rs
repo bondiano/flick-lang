@@ -69,7 +69,7 @@ impl Normalize<'_, '_> {
                 }
                 let function = match &head.kind {
                     ExprKind::Lambda { .. } => head,
-                    ExprKind::Global { module, name } => {
+                    ExprKind::Global { module, name, .. } => {
                         let Some(f) = self.tr.functions.get(&Path::new(module, name)) else {
                             return false;
                         };
@@ -116,6 +116,7 @@ impl Normalize<'_, '_> {
                 rec: false,
                 dicts,
                 value,
+                ..
             } = stmt
                 && dicts.is_empty()
                 && matches!(value.kind, ExprKind::Lambda { .. })
@@ -124,7 +125,12 @@ impl Normalize<'_, '_> {
                 self.aliases.insert(name.clone(), value);
                 continue;
             }
-            if let Stmt::Let(p, e) = stmt {
+            if let Stmt::Let {
+                pat: p,
+                binder_types,
+                value: e,
+            } = stmt
+            {
                 let mut e = self.expr(e);
                 if let Pat::Bind(name) = p
                     && self.value_tail(&e)
@@ -140,13 +146,17 @@ impl Normalize<'_, '_> {
                     for name in bound {
                         self.aliases.remove(name);
                     }
-                    out.push(Stmt::Let(p.clone(), e));
+                    out.push(Stmt::Let {
+                        pat: p.clone(),
+                        binder_types: binder_types.clone(),
+                        value: e,
+                    });
                 }
             } else {
                 let mut stmt = stmt.clone();
                 let e = match &mut stmt {
-                    Stmt::Let(_, e)
-                    | Stmt::Var(_, e)
+                    Stmt::Let { value: e, .. }
+                    | Stmt::Var { value: e, .. }
                     | Stmt::Assign(_, e)
                     | Stmt::Expr(e)
                     | Stmt::Fun { value: e, .. } => e,
@@ -179,7 +189,7 @@ impl Normalize<'_, '_> {
         args.reverse();
         let (key, mut function) = match &head.kind {
             ExprKind::Lambda { .. } => (None, head.clone()),
-            ExprKind::Global { module, name } => {
+            ExprKind::Global { module, name, .. } => {
                 let key = Path::new(module, name);
                 if self.active.contains(&key) {
                     return None;
@@ -213,10 +223,10 @@ impl Normalize<'_, '_> {
         }
         let mut captured: Vec<_> = order
             .into_iter()
-            .map(|i| Stmt::Let(Pat::Bind(names[i].clone()), args[i].0.clone()))
+            .map(|i| Stmt::let_bind(Pat::Bind(names[i].clone()), args[i].0.clone()))
             .collect();
         captured.extend(params.into_iter().zip(names).map(|(param, name)| {
-            Stmt::Let(param.pat, ir::Expr::new(ExprKind::Local(name), e.span))
+            Stmt::let_bind(param.pat, ir::Expr::new(ExprKind::Local(name), e.span))
         }));
         let expanded = ir::Expr::new(ExprKind::Block(captured, body), e.span);
         if let Some(key) = &key {

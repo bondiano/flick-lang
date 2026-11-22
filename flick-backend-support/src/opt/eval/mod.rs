@@ -22,6 +22,7 @@ use flick_ir::Expr;
 use crate::Known;
 pub use defs::DefTable;
 use machine::Machine;
+pub(crate) use pass::run_module_pass_with_types;
 pub use pass::{RetryTracker, run_module_pass};
 pub use primitives::{NativePrimitive, ReviewedPrimitives, js_target_allows};
 pub use value::{DictEnv, DictValue, Env, Value};
