@@ -43,3 +43,11 @@ let counted () =
 //~ FLICK-T003 @35:16-35:19 expected `String`, found `List Int`
 //~ FLICK-T003 @35:20-35:23 expected `String`, found `List Int`
 //~ FLICK-T004 @41:3-41:56 function `count` needs a signature right above its `let`
+
+// as does an operand of `==`: a use compares it by identity
+compared : Unit ->{} Bool
+let compared () =
+  let same a b = a == b
+  same 1 2 && same "a" "b"
+//~ FLICK-T003 @51:20-51:23 expected `Int`, found `String`
+//~ FLICK-T003 @51:24-51:27 expected `Int`, found `String`

@@ -81,6 +81,11 @@ impl Checker<'_> {
         for op in &self.cx.operators {
             self.store.lower(&op.ty);
         }
+        // and an operand type of `==` or `!=`: the type a use settles decides
+        // whether it compares by identity
+        for (ty, _, _) in &self.equalities {
+            self.store.lower(ty);
+        }
         // a value a pending hold still checks stays monomorphic: its unknown
         // rows, once quantified, would count as variables it captures
         for hold in &self.cx.regions.holds {
