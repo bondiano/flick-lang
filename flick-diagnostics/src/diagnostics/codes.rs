@@ -308,6 +308,8 @@ codes! {
     P058 = Project 58, "unknown or invalid backend option";
     P059 = Project 59, "unknown target backend";
     P060 = Project 60, "unknown or unsupported project template";
+    P061 = Project 61, "Flick program step or documentation example failed at runtime";
+    P062 = Project 62, "documentation example failed its check contract";
 }
 
 #[cfg(test)]

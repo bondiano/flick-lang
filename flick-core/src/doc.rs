@@ -3,138 +3,25 @@
 //! values their full source types: `forall`, class constraints, service and
 //! error rows, captures.
 
+mod comments;
+
 use std::collections::HashMap;
 use std::fmt::Write;
-use std::ptr;
+
+pub use comments::{
+    DocComment, DocLine, comments, leading_doc, located_comments, located_module_comment,
+    module_comment,
+};
 
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::source::FileId;
 use crate::syntax;
-use crate::syntax::cst::{Element, Node};
+use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{
     Form, ModuleNominalKind, ModuleRequirement, ModuleSignature, TypeDef, decl_param_names,
     format_markdown, show_signature, show_type,
 };
-
-/// The `///` comment right above each top-level declaration, and above
-/// each constructor on a line of its own (`| Circle Float`), by name. A
-/// `let` takes the lines only right above it, as generated code writes it.
-pub fn comments(text: &str) -> HashMap<String, String> {
-    let mut out = HashMap::new();
-    let mut pending: Vec<&str> = Vec::new();
-    let mut adjacent = false;
-    for line in text.lines() {
-        if let Some(doc) = line.trim_start().strip_prefix("///") {
-            pending.push(doc.strip_prefix(' ').unwrap_or(doc));
-            adjacent = true;
-            continue;
-        }
-        let name = declared(line).or_else(|| variant(line));
-        if !pending.is_empty()
-            && let Some(name) = name.or_else(|| adjacent.then(|| defined(line)).flatten())
-        {
-            out.entry(name).or_insert_with(|| pending.join("\n"));
-        }
-        adjacent = false;
-        if !line.trim().is_empty() {
-            pending.clear();
-        }
-    }
-    out
-}
-
-/// The value a top-level `let [rec] name …` defines.
-fn defined(line: &str) -> Option<String> {
-    let mut words = line.strip_prefix("let ")?.split_whitespace();
-    let name = words
-        .next()
-        .filter(|w| *w != "rec")
-        .or_else(|| words.next())?;
-    Some(name.to_owned())
-}
-
-/// The `///` documentation immediately before the module header.
-pub fn module_comment(text: &str) -> Option<String> {
-    let mut pending = Vec::new();
-    for line in text.lines() {
-        if line.starts_with("module ") {
-            return (!pending.is_empty()).then(|| pending.join("\n"));
-        }
-        if let Some(doc) = line.strip_prefix("///") {
-            pending.push(doc.strip_prefix(' ').unwrap_or(doc));
-        } else if !line.trim().is_empty() {
-            pending.clear();
-        }
-    }
-    None
-}
-
-/// The constructor a line `| Name …` of a type declaration starts.
-fn variant(line: &str) -> Option<String> {
-    let rest = line.trim_start().strip_prefix('|')?.trim_start();
-    let name: String = rest
-        .chars()
-        .take_while(|c| c.is_alphanumeric() || *c == '_')
-        .collect();
-    name.starts_with(|c: char| c.is_ascii_uppercase())
-        .then_some(name)
-}
-
-/// The `///` comment right above `child` among the children of `parent`,
-/// where the parser keeps the comments before a node.
-pub fn leading_doc(parent: &Node, child: &Node, text: &str) -> Option<String> {
-    let at = parent
-        .children
-        .iter()
-        .position(|c| matches!(c, Element::Node(n) if ptr::eq(n, child)))?;
-    let mut lines = Vec::new();
-    for element in parent.children[..at].iter().rev() {
-        match element {
-            Element::Token(t) if t.kind == K::DocComment => {
-                let doc = t
-                    .text(text)
-                    .trim_end()
-                    .strip_prefix("///")
-                    .unwrap_or_default();
-                lines.push(doc.strip_prefix(' ').unwrap_or(doc));
-            }
-            Element::Token(t) if t.kind.is_trivia() && !t.kind.is_comment() => {}
-            _ => break,
-        }
-    }
-    lines.reverse();
-    (!lines.is_empty()).then(|| lines.join("\n"))
-}
-
-/// The name a top-level line declares: `name :`, `type [alias|error] N`,
-/// `service N`, `class … N`, `sql table N`, `kind N`.
-fn declared(line: &str) -> Option<String> {
-    if line.starts_with(' ') {
-        return None;
-    }
-    let words: Vec<&str> = line.split_whitespace().collect();
-    if words.starts_with(&["type", "module"]) {
-        return words
-            .get(2)
-            .map(|name| name.trim_end_matches('=').to_owned());
-    }
-    let skip = [
-        "type", "alias", "error", "opaque", "refined", "unboxed", "untagged", "service", "class",
-        "kind", "sql", "table",
-    ];
-    if words.get(1) == Some(&":") {
-        return Some(words[0].to_owned());
-    }
-    if !words.first().is_some_and(|f| skip.contains(f)) {
-        return None;
-    }
-    let name = words.iter().find(|w| !skip.contains(w))?;
-    Some(
-        name.trim_end_matches(|c: char| !c.is_alphanumeric() && c != '_')
-            .to_owned(),
-    )
-}
 
 /// The page of `interface`, its comments from `text`.
 pub fn page(interface: &Interface, text: &str) -> String {
@@ -461,25 +348,6 @@ fn definition(interface: &Interface, e: &Export, form: &Form, out: &mut String) 
                 out.push_str("\nOpaque.\n");
             }
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn comments_belong_to_the_declaration_below() {
-        let docs = comments(
-            "/// Adds.\n/// Twice.\nadd : Float -> Float\n\n/// A user.\ntype alias User = {}\n/// lost\n\nlet x = 1\n",
-        );
-        assert_eq!(docs.get("add").map(String::as_str), Some("Adds.\nTwice."));
-        assert_eq!(docs.get("User").map(String::as_str), Some("A user."));
-        assert!(!docs.contains_key("x"));
-        let docs = comments("/// Made.\nlet rec made = 1\n");
-        assert_eq!(docs.get("made").map(String::as_str), Some("Made."));
-        let docs = comments("/// Contract.\ntype module HashKey =\n  type Key\n");
-        assert_eq!(docs.get("HashKey").map(String::as_str), Some("Contract."));
     }
 }
 

@@ -370,7 +370,7 @@ fn validate_template_plan(
             codes::P055,
             Severity::Error,
             format!(
-                "template `{template}` plan is refused: templates may only return files and diagnostics, not host tool steps or continuations"
+                "template `{template}` plan is refused: templates may only return files and diagnostics, not host steps or continuations"
             ),
         )]);
     }
@@ -538,5 +538,33 @@ fn package_name(dir: &Path) -> String {
         "app".to_owned()
     } else {
         trimmed.to_owned()
+    }
+}
+
+#[cfg(all(test, feature = "wasm-backends"))]
+mod tests {
+    use flick_backend::command::{FlickModule, Plan, RunFlickStep, Step};
+    use flick_core::diagnostics::codes;
+
+    use super::validate_template_plan;
+
+    #[test]
+    fn template_plan_refuses_run_flick_steps_with_p055() {
+        let mut plan = Plan::empty();
+        plan.steps.push(Step::RunFlick(RunFlickStep {
+            id: "export".into(),
+            entry: "Gen".into(),
+            modules: vec![FlickModule {
+                name: "Gen".into(),
+                source: "module Gen exposing (main)\nmain : Unit -> Unit\nlet main () = ()\n"
+                    .into(),
+            }],
+            arguments: vec![],
+            output: None,
+            origin: None,
+        }));
+        let errs = validate_template_plan("app", &plan).expect_err("templates forbid run-flick");
+        assert_eq!(errs.len(), 1);
+        assert_eq!(errs[0].code, codes::P055);
     }
 }

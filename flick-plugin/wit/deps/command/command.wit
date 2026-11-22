@@ -65,7 +65,37 @@ interface types {
         reads: list<string>,
         outputs: list<string>,
     }
-    variant step { tool(tool-step) }
+    /// An in-memory Flick source module overlaid on the project's source root
+    /// for a `run-flick` step; never written to the project tree.
+    record flick-module {
+        /// Valid Flick module name, as `FlickSchemaExport` or `DocExample`.
+        name: string,
+        /// UTF-8 Flick source text.
+        source: string,
+    }
+    /// A Flick program compiled and run on the project's selected backend in
+    /// an isolated temporary generation, without writing to the project tree.
+    record run-flick-step {
+        /// Unique identifier within the plan's steps.
+        id: string,
+        /// Module whose `main` runs: an overlay in `modules` or an existing
+        /// module of the project.
+        entry: string,
+        /// In-memory `.fl` modules overlaid on `$sources` during compilation.
+        modules: list<flick-module>,
+        /// Arguments passed to the program (`Platform.args`).
+        arguments: list<string>,
+        /// Optional output path receiving captured stdout: handed to `resume`
+        /// when `resume` is set, otherwise published under `descriptor.writes`.
+        output: option<string>,
+        /// Optional span in `invocation.inputs` used to anchor compiler or
+        /// runtime diagnostics originating inside synthetic overlay `modules`.
+        origin: option<span>,
+    }
+    variant step {
+        tool(tool-step),
+        run-flick(run-flick-step),
+    }
     enum severity { error, warning, note }
     /// Bytes `start` to `end` of the file `path` of `invocation.inputs`.
     record span { path: string, start: u32, end: u32 }
