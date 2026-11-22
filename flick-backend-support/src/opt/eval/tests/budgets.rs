@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use flick_ir::{Arith, BinOp, Dict, ExprKind, ItemKind, Lit, Num, Stage, Stmt};
+use flick_ir::{Arith, BinOp, Dict, Expr, ExprKind, Item, ItemKind, Lit, Num, Stage, Stmt};
 
 use super::super::materialize::{
     MaterializeContext, MaterializeLimits, check_profitability, expr_cost, materialize,
@@ -499,4 +499,62 @@ fn repeated_failing_trials_hit_retry_cap_and_zero_budget_preserves_ir() {
     );
     assert_eq!(c2.success, 0);
     assert_eq!(m2.items[1].kind, original_module.items[1].kind);
+}
+
+#[test]
+fn external_polymorphic_preload_is_deterministic_at_cap() {
+    use crate::opt::devirt;
+
+    // Reference 300 external instances in reversed insertion order alongside a
+    // polymorphic `Dict::Given` method call: `DefTable::build` must always load
+    // the exact same lexicographically first `MAX_EXTERNAL_DEFS` (256) entries.
+    let poly_fn = Item {
+        kind: ItemKind::Value {
+            name: "poly".into(),
+            dicts: vec!["d".into()],
+            body: lam(
+                &["x"],
+                app(
+                    ex(ExprKind::Method {
+                        dict: Dict::Given("d".into()),
+                        name: "m".into(),
+                    }),
+                    local("x"),
+                ),
+            ),
+        },
+        span: sp(0, 1),
+    };
+    let mut items = vec![poly_fn];
+    for idx in (0..300_usize).rev() {
+        let inst = format!("Inst{idx:03}");
+        let call = app(
+            ex(ExprKind::Dicts(
+                Box::new(global("App", "poly")),
+                vec![Dict::Instance {
+                    module: "Ext".into(),
+                    name: inst,
+                    args: vec![],
+                }],
+            )),
+            int(0),
+        );
+        items.push(val_item(&format!("use_{idx:03}"), call));
+    }
+    let module = empty_module("App", items);
+    let known = Known::of(&[]);
+    let generics = |owner: &str, key: &str| -> Option<(Vec<String>, Expr)> {
+        (owner == "Ext" && key.ends_with("#m")).then(|| (vec![], lam(&["n"], local("n"))))
+    };
+    let lookup = devirt::Lookup::new(&module, &generics, &known);
+
+    let first = DefTable::build(&module, &lookup, &generics, &known);
+    let second = DefTable::build(&module, &lookup, &generics, &known);
+    for idx in 0..300_usize {
+        let inst = format!("Inst{idx:03}");
+        let loaded_1 = first.method("Ext", &inst, "m").is_some();
+        let loaded_2 = second.method("Ext", &inst, "m").is_some();
+        assert_eq!(loaded_1, loaded_2, "determinism mismatch at {inst}");
+        assert_eq!(loaded_1, idx < 256, "unexpected preload boundary at {inst}");
+    }
 }

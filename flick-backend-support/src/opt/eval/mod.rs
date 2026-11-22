@@ -15,7 +15,7 @@ pub mod value;
 #[cfg(test)]
 mod tests;
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 use flick_ir::{Dict, Expr, ExprKind, ItemKind, Module};
 
@@ -263,8 +263,8 @@ pub struct DefTable {
 struct RefQueues {
     values: VecDeque<(String, String)>,
     methods: VecDeque<(String, String, String)>,
-    ext_instances: HashSet<(String, String)>,
-    polymorphic_methods: HashSet<String>,
+    ext_instances: BTreeSet<(String, String)>,
+    polymorphic_methods: BTreeSet<String>,
 }
 
 impl DefTable {
@@ -281,8 +281,8 @@ impl DefTable {
         let mut queues = RefQueues {
             values: VecDeque::new(),
             methods: VecDeque::new(),
-            ext_instances: HashSet::new(),
-            polymorphic_methods: HashSet::new(),
+            ext_instances: BTreeSet::new(),
+            polymorphic_methods: BTreeSet::new(),
         };
         let mut seen_values: HashSet<(String, String)> = HashSet::new();
         let mut seen_methods: HashSet<(String, String, String)> = HashSet::new();
@@ -472,7 +472,7 @@ fn enqueue_dict_methods(dict: &Dict, method: &str, current_module: &str, queues:
 fn collect_external_instances(
     dict: &Dict,
     current_module: &str,
-    out: &mut HashSet<(String, String)>,
+    out: &mut BTreeSet<(String, String)>,
 ) {
     let mut stack = vec![dict];
     while let Some(d) = stack.pop() {
