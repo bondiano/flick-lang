@@ -22,7 +22,8 @@ use flick_core::source;
 use flick_core::source::{FileId, SourceFile, SourceMap};
 #[cfg(feature = "native-project")]
 use flick_core::syntax::{self, cst::Node, kind::SyntaxKind};
-use flick_test_support::files as fixture_files;
+use flick_core::types;
+use flick_test_support::{files as fixture_files, par_map};
 
 /// 1-based `line:col-line:col`, columns in characters, end exclusive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -239,26 +240,33 @@ fn lone(sources: &mut SourceMap, _: &Path, file: FileId) -> Vec<Diagnostic> {
 #[test]
 fn check_fixtures() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/check");
-    let mut report = Vec::new();
-    let mut count = 0;
+    let mut cases = Vec::new();
     for (kind, should_fail) in [("pass", false), ("fail", true)] {
-        let mut paths = Vec::new();
-        paths.extend(fixture_files(&root.join(kind), "fl"));
+        let mut paths = fixture_files(&root.join(kind), "fl");
         paths.sort();
-        count += paths.len();
-        for path in paths {
-            let problems = check_fixture(&path, should_fail);
-            if !problems.is_empty() {
-                let name = path
-                    .strip_prefix(&root)
-                    .unwrap_or(&path)
-                    .display()
-                    .to_string();
-                report.push(format!("{name}:\n{}", problems.join("\n")));
-            }
-        }
+        cases.extend(paths.into_iter().map(|path| (path, should_fail)));
     }
-    assert!(count > 0, "no fixtures found under {}", root.display());
+    assert!(
+        !cases.is_empty(),
+        "no fixtures found under {}",
+        root.display()
+    );
+    let _ = types::builtins();
+    let report: Vec<String> = par_map(&cases, |(path, should_fail)| {
+        let problems = check_fixture(path, *should_fail);
+        if problems.is_empty() {
+            return None;
+        }
+        let name = path
+            .strip_prefix(&root)
+            .unwrap_or(path)
+            .display()
+            .to_string();
+        Some(format!("{name}:\n{}", problems.join("\n")))
+    })
+    .into_iter()
+    .flatten()
+    .collect();
     assert!(
         report.is_empty(),
         "fixture mismatches:\n{}",
@@ -507,14 +515,15 @@ fn project_fixtures() {
         .collect();
     cases.sort();
     assert!(!cases.is_empty());
-    let report: Vec<String> = cases
-        .iter()
-        .filter_map(|case| {
-            let problems = check_project(&project::normalize(case));
-            let name = case.file_name().expect("named").to_string_lossy();
-            (!problems.is_empty()).then(|| format!("{name}:\n{}", problems.join("\n")))
-        })
-        .collect();
+    let _ = types::builtins();
+    let report: Vec<String> = par_map(&cases, |case| {
+        let problems = check_project(&project::normalize(case));
+        let name = case.file_name().expect("named").to_string_lossy();
+        (!problems.is_empty()).then(|| format!("{name}:\n{}", problems.join("\n")))
+    })
+    .into_iter()
+    .flatten()
+    .collect();
     assert!(
         report.is_empty(),
         "project fixture mismatches:\n{}",

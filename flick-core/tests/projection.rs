@@ -14,7 +14,7 @@ use flick_core::project::{self, Host, analysis_fingerprint};
 use flick_core::projection;
 use flick_core::source::SourceMap;
 use flick_core::types::builtins;
-use flick_test_support::files as fixture_files;
+use flick_test_support::{files as fixture_files, par_map};
 
 struct Files;
 
@@ -36,7 +36,8 @@ fn projection_and_executable_share_the_analysis() {
         "fl",
     ));
     assert!(paths.len() > 10);
-    for path in paths {
+    let _ = builtins();
+    par_map(&paths, |path| {
         let roots = [path.clone()];
         let mut sources = SourceMap::default();
         let analysis = project::analyze(&Files, &mut sources, None, &roots);
@@ -76,5 +77,5 @@ fn projection_and_executable_share_the_analysis() {
                     .starts_with(&format!("// flick-analysis {fingerprint}\n"))
             );
         }
-    }
+    });
 }

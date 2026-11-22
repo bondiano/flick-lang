@@ -2,6 +2,10 @@
 # compiler fetches by its tag.
 export FLICK_STD_PATH := justfile_directory() + "/packages/std"
 
+# Share compiled Wasmtime components across tests that isolate XDG_CACHE_HOME,
+# so each fresh cache directory does not recompile component.wasm from scratch.
+export FLICK_WASMTIME_CACHE_DIR := justfile_directory() + "/target/tmp/wasmtime-cache"
+
 # The compiler the e2e suites run, built in the `e2e` profile
 flick := justfile_directory() + "/target/e2e/flick"
 
@@ -39,9 +43,25 @@ test: unit feature-test
 unit *packages="--workspace --exclude flick-model":
     cargo test {{packages}}
 
-# `flick`'s tests under nextest: all, or the part `k/n`
+# The non-`flick`, non-model workspace crates as CI runs them
+unit-crates:
+    rm -f target/tmp/effect-coverage.md
+    just unit --workspace --exclude flick-model --exclude flick
+
+# `flick`'s tests in the `e2e` profile (optimized, with debug assertions and
+# overflow checks): all, or the part `k/n` under nextest (`--bin flick` runs
+# once in part 1 so its unit tests share the built-ins `OnceLock`)
 unit-flick part="":
-    cargo nextest run -p flick --profile ci {{ if part == "" { "" } else { "--partition count:" + part } }}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -z "{{part}}" ]; then
+        cargo test --profile e2e -p flick
+    else
+        if [[ "{{part}}" == 1/* ]]; then
+            cargo test --profile e2e -p flick --bin flick
+        fi
+        cargo nextest run --cargo-profile e2e --profile ci -p flick -E 'not binary_id(flick::bin/flick)' --partition "count:{{part}}"
+    fi
 
 # The reference model of λFlick: its unit tests, the cases of
 # tests/run/model.txt checked and run against their `.stdout`, the other
@@ -351,7 +371,8 @@ effect-bump version:
     pnpm -C tools/dts-importer build
     node tools/dts-importer/index.mjs bump {{version}}
 
-# Print the Effect coverage counters by status and module
-effect-coverage:
-    @cargo test -q -p flick-effect-surface --test coverage the_manifest_classifies > /dev/null
+# Print the Effect coverage counters by status and module (`from-run` prints
+# the report written by `unit-crates` without recompiling)
+effect-coverage mode="":
+    @if [ "{{mode}}" != "from-run" ]; then cargo test -q -p flick-effect-surface --test coverage the_manifest_classifies > /dev/null; elif [ ! -s target/tmp/effect-coverage.md ]; then echo "target/tmp/effect-coverage.md missing or empty" >&2; exit 1; fi
     @cat target/tmp/effect-coverage.md
