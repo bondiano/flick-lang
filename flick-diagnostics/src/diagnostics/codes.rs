@@ -54,6 +54,8 @@ codes! {
     S014 = Syntax 14, "unknown attribute";
     S015 = Syntax 15, "a constructor result where none can be written";
     S016 = Syntax 16, "`mut` where only a local variable of one name can be";
+    S017 = Syntax 17, "more than one `_` hole in an application";
+    S018 = Syntax 18, "`_` outside an application argument";
     R001 = Resolve 1, "module name does not match the file path";
     R002 = Resolve 2, "two files declare the same module";
     R003 = Resolve 3, "unknown module";

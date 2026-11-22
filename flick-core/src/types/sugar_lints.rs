@@ -57,7 +57,7 @@ impl Checker<'_> {
                 self.returned_binding(node);
                 self.bind_before(node);
             }
-            K::AppExpr => {
+            K::AppExpr if !super::holes::has_hole(node) => {
                 let children: Vec<&Node> = node.nodes().collect();
                 if let [head, .., last] = children[..] {
                     self.forced(node, head, last);
@@ -238,11 +238,13 @@ impl Checker<'_> {
         let node = unparen(node);
         let children: Vec<&Node> = node.nodes().collect();
         match (node.kind, &children[..]) {
-            (K::AppExpr, [head, .., last]) => match self.seq_function(head) {
-                Some(f) if INFINITE.contains(&f.as_str()) => true,
-                Some(f) if FOLLOWS.contains(&f.as_str()) => self.infinite(last),
-                _ => false,
-            },
+            (K::AppExpr, [head, .., last]) if !super::holes::has_hole(node) => {
+                match self.seq_function(head) {
+                    Some(f) if INFINITE.contains(&f.as_str()) => true,
+                    Some(f) if FOLLOWS.contains(&f.as_str()) => self.infinite(last),
+                    _ => false,
+                }
+            }
             (K::BinExpr, _) if let Some((function, argument)) = piped(node) => {
                 let head = match function.kind {
                     K::AppExpr => function.nodes().next(),
@@ -376,7 +378,7 @@ impl Checker<'_> {
     pub(super) fn list_call<'n>(&self, node: &'n Node, name: &str) -> Option<&'n Node> {
         let parts: Vec<&Node> = node.nodes().collect();
         match (node.kind, &parts[..]) {
-            (K::AppExpr, [head, f]) => {
+            (K::AppExpr, [head, f]) if f.kind != K::HoleExpr => {
                 let found = match self.typing.names.get(&head.range()) {
                     Some(Ref::Value { module, name: n }) => is_list_module(module) && n == name,
                     _ => false,
@@ -414,6 +416,9 @@ impl Checker<'_> {
         let (K::AppExpr, [head, value]) = (node.kind, &parts[..]) else {
             return None;
         };
+        if value.kind == K::HoleExpr {
+            return None;
+        }
         match self.typing.names.get(&head.range())? {
             Ref::Method { module, name } if lang::is(Lang::Pure, module, name) => Some(value),
             _ => None,

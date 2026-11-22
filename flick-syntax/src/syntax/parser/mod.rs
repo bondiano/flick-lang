@@ -17,6 +17,7 @@ mod decl;
 mod expr;
 mod fragment;
 mod handlers;
+mod holes;
 mod layout;
 mod pattern;
 mod plugin;
@@ -579,6 +580,8 @@ mod branch_tests;
 mod contract_tests;
 #[cfg(test)]
 mod exposing_tests;
+#[cfg(test)]
+mod hole_tests;
 #[cfg(test)]
 mod let_else_tests;
 #[cfg(test)]

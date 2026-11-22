@@ -37,7 +37,9 @@ fn pure_parts(statement: &Node) -> Option<(&Node, &Node)> {
     let statement = super::sugar_lints::unparen(statement);
     let parts: Vec<&Node> = statement.nodes().collect();
     match (statement.kind, &parts[..]) {
-        (K::AppExpr, [head, value]) if head.kind == K::NameExpr => Some((head, value)),
+        (K::AppExpr, [head, value]) if head.kind == K::NameExpr && value.kind != K::HoleExpr => {
+            Some((head, value))
+        }
         _ => None,
     }
 }

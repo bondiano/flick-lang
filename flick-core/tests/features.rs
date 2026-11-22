@@ -8,7 +8,7 @@ use flick_core::iface;
 use flick_core::ir::ItemKind;
 use flick_core::project::{self, Compilation, Host};
 use flick_core::source::{FileId, SourceMap};
-use flick_core::types::{Kind, Type};
+use flick_core::types::{Kind, Type, implicit_go_bindings};
 
 struct Module<'a>(&'a str);
 
@@ -98,6 +98,9 @@ fn optional_outputs_have_real_artifacts_only_when_enabled() {
             file("Main.js.map").is_some(),
             cfg!(feature = "native-project")
         );
+        if !cfg!(feature = "native-project") {
+            assert!(implicit_go_bindings().next().is_none());
+        }
         if let Some(artifact) = file("Main.iface") {
             let interface =
                 iface::read(artifact.contents.as_bytes(), "Main").expect("published interface");

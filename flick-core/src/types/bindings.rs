@@ -40,14 +40,14 @@ pub struct LetParts<'n> {
 }
 
 impl LetParts<'_> {
-    /// A syntactic function: parameters, or a `fun` right after `=`.
+    /// A syntactic function: parameters, a `fun`, or an application hole capture right after `=`.
     pub fn is_function(&self) -> bool {
         !self.params.is_empty()
             || self.body.is_some_and(|b| {
                 let mut statements = b.nodes();
                 matches!(
                     (statements.next(), statements.next()),
-                    (Some(s), None) if s.kind == K::FunExpr
+                    (Some(s), None) if s.kind == K::FunExpr || super::holes::has_hole(s)
                 )
             })
     }

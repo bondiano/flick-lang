@@ -50,6 +50,9 @@ impl Checker<'_> {
         let (K::AppExpr, [con, error]) = (built.kind, &inner[..]) else {
             return None;
         };
+        if error.kind == K::HoleExpr {
+            return None;
+        }
         let err = matches!(self.typing.names.get(&con.range()),
             Some(Ref::Constructor(c)) if lang::is(Lang::Err, &c.module, &c.name));
         (from_result && err).then_some(*error)

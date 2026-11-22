@@ -307,6 +307,8 @@ syntax_kinds! {
         UnpackExpr,
         /// `todo` or `todo "what is missing"`.
         TodoExpr,
+        /// `_`: an expression hole capturing one argument of an application.
+        HoleExpr,
         ParenExpr,
         TupleExpr,
         UnitExpr,

@@ -378,6 +378,7 @@ codegen/class_variance
 codegen/contract_runs_nowhere
 
 effect/row_without
+effect/holes_order
 effect/postfix_catch
 ../rt/owner_foreign_policy
 

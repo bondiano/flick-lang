@@ -6,6 +6,7 @@ use crate::source::SourceMap;
 use flick_test_support::files as fixture_files;
 
 mod decl;
+mod holes;
 mod layout;
 mod let_else;
 mod orelse;
