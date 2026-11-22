@@ -249,8 +249,8 @@ fn formula_price_10_evaluates_to_37() {
 fn two_closures_of_same_lambda_keep_distinct_captures() {
     let mut defs = DefTable::default();
     defs.insert_value(
-        "App".into(),
-        "make_adder".into(),
+        "App",
+        "make_adder",
         vec![],
         lam(
             &["n"],
@@ -298,8 +298,8 @@ fn two_closures_of_same_lambda_keep_distinct_captures() {
 fn staged_trap_stops_at_stage_one_before_next_arg_and_respects_arg_first() {
     let mut defs = DefTable::default();
     defs.insert_value(
-        "App".into(),
-        "staged".into(),
+        "App",
+        "staged",
         vec![],
         lam(
             &["x"],
@@ -387,12 +387,7 @@ fn staged_trap_stops_at_stage_one_before_next_arg_and_respects_arg_first() {
 #[test]
 fn discarded_throwing_arg_is_preserved_and_dead_branch_unsupported_is_skipped() {
     let mut defs = DefTable::default();
-    defs.insert_value(
-        "App".into(),
-        "const_42".into(),
-        vec![],
-        lam(&["_"], int(42)),
-    );
+    defs.insert_value("App", "const_42", vec![], lam(&["_"], int(42)));
     let known = Known::of(&[]);
 
     let throwing = app(
@@ -487,8 +482,8 @@ fn known_none_and_err_are_valid_results_distinct_from_stopped() {
     assert!(matches!(mat_err.expr.kind, ExprKind::App { .. }));
 
     defs.insert_value(
-        "App".into(),
-        "early".into(),
+        "App",
+        "early",
         vec![],
         lam(
             &["_"],

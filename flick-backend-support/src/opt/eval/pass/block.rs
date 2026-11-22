@@ -1,15 +1,15 @@
-//! Block traversal, local environment propagation, and literal-data detection.
-
-use std::rc::Rc;
+//! Block traversal and local environment propagation for the bounded evaluator pass.
 
 use flick_ir::{Expr, ExprKind, Pat, Stmt};
 
 use super::{EvalAttempt, Hint, PassCtx};
-use crate::opt::eval::value::{CLOSURE_BYTES, Closure, DictEnv, Env, RecFun, RecGroup, Value};
+use crate::opt::eval::machine::{bind_poly_fun, bind_rec_group};
+use crate::opt::eval::value::{Env, rc_str, walk_pat};
 
 impl<'a> PassCtx<'a, '_> {
     /// Walks a `Block(stmts, result)`, propagating known pure `let` and `Fun`
     /// bindings into subsequent statements via disjoint `split_first_mut` borrows.
+    #[inline(never)]
     #[allow(
         clippy::too_many_lines,
         reason = "block statement traversal with lexical env propagation"
@@ -39,11 +39,7 @@ impl<'a> PassCtx<'a, '_> {
                     let (group, tail) = rest.split_at_mut(group_len);
                     // Shadow every mutually recursive sibling before visiting any body.
                     let mut fn_env = env.clone();
-                    for stmt in group.iter() {
-                        if let Stmt::Fun { name, .. } = stmt {
-                            fn_env = fn_env.shadow(Rc::from(name.as_str()));
-                        }
-                    }
+                    shadow_group(group, &mut fn_env);
                     for stmt in group.iter_mut() {
                         if let Stmt::Fun { value, .. } = stmt {
                             self.visit_expr(value, &fn_env, false, depth + 1);
@@ -53,11 +49,7 @@ impl<'a> PassCtx<'a, '_> {
                     if let Some(next_env) = self.bind_rec_group_in_env(group_ref, &env) {
                         env = next_env;
                     } else {
-                        for stmt in group_ref {
-                            if let Stmt::Fun { name, .. } = stmt {
-                                env = env.shadow(Rc::from(name.as_str()));
-                            }
-                        }
+                        shadow_group(group_ref, &mut env);
                         all_concrete = false;
                     }
                     rest = tail;
@@ -84,7 +76,7 @@ impl<'a> PassCtx<'a, '_> {
                         self.visit_expr(rhs, &env, false, depth + 1);
                         Hint::NonConcrete
                     }
-                    Stmt::Fun { rec: true, .. } => unreachable!("handled above"),
+                    Stmt::Fun { rec: true, .. } => Hint::NonConcrete,
                 };
                 if stmt_hint != Hint::Concrete {
                     all_concrete = false;
@@ -109,29 +101,25 @@ impl<'a> PassCtx<'a, '_> {
                         dicts,
                         value,
                     } => {
-                        if !dicts.is_empty() {
-                            if let Some(next_env) =
-                                self.bind_poly_fun_in_env(name, dicts, value, &env)
-                            {
-                                env = next_env;
-                            } else {
-                                env = env.shadow(Rc::from(name.as_str()));
-                                all_concrete = false;
-                            }
-                        } else if stmt_hint == Hint::Concrete
-                            && let Some(val) = self.eval_for_env(value, &env)
-                        {
-                            env = env.with(Rc::from(name.as_str()), val);
+                        let next = if !dicts.is_empty() {
+                            self.bind_poly_fun_in_env(name, dicts, value, &env)
+                        } else if stmt_hint == Hint::Concrete {
+                            self.eval_for_env(value, &env)
+                                .map(|val| env.with(rc_str(name), val))
                         } else {
-                            env = env.shadow(Rc::from(name.as_str()));
+                            None
+                        };
+                        if let Some(next_env) = next {
+                            env = next_env;
+                        } else {
+                            env = env.shadow(rc_str(name));
                             all_concrete = false;
                         }
                     }
                     Stmt::Var(name, _) => {
-                        env = env.shadow(Rc::from(name.as_str()));
+                        env = env.shadow(rc_str(name));
                     }
-                    Stmt::Assign(..) | Stmt::Expr(_) => {}
-                    Stmt::Fun { rec: true, .. } => unreachable!("handled above"),
+                    Stmt::Assign(..) | Stmt::Expr(_) | Stmt::Fun { rec: true, .. } => {}
                 }
                 rest = tail;
             }
@@ -147,6 +135,7 @@ impl<'a> PassCtx<'a, '_> {
         }
         Hint::NonConcrete
     }
+
     fn bind_poly_fun_in_env<'e>(
         &mut self,
         name: &str,
@@ -158,24 +147,9 @@ impl<'a> PassCtx<'a, '_> {
         'a: 'e,
     {
         let mut budget = self.new_trial_budget()?;
-        let bytes = CLOSURE_BYTES.saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
-        let ok = budget
-            .charge_steps(1)
-            .and_then(|()| budget.charge_bytes(bytes))
-            .is_ok();
+        let res = bind_poly_fun(name, dicts, value, env, &mut budget);
         *self.module_steps_remaining = budget.module_steps_remaining;
-        if !ok {
-            return None;
-        }
-        let closure = Value::Closure(Rc::new(Closure {
-            env: env.clone(),
-            dict_env: DictEnv::default(),
-            dict_params: dicts,
-            params: &[],
-            body: value,
-            rec_group: None,
-        }));
-        Some(env.with(Rc::from(name), closure))
+        res.ok()
     }
 
     fn bind_rec_group_in_env<'e>(&mut self, group: &'e [Stmt], env: &Env<'e>) -> Option<Env<'e>>
@@ -183,105 +157,24 @@ impl<'a> PassCtx<'a, '_> {
         'a: 'e,
     {
         let mut budget = self.new_trial_budget()?;
-        // First pass (zero allocation): charge per-member step + bytes and validate.
-        let mut ok = true;
-        for stmt in group {
-            let Stmt::Fun {
-                name,
-                rec: true,
-                value,
-                ..
-            } = stmt
-            else {
-                ok = false;
-                break;
-            };
-            if !matches!(value.kind, ExprKind::Lambda { .. }) {
-                ok = false;
-                break;
-            }
-            let bytes = CLOSURE_BYTES.saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
-            if budget.charge_steps(1).is_err() || budget.charge_bytes(bytes).is_err() {
-                ok = false;
-                break;
-            }
-        }
+        let res = bind_rec_group(group, env, &mut budget);
         *self.module_steps_remaining = budget.module_steps_remaining;
-        if !ok {
-            return None;
-        }
-        let mut defs = Vec::with_capacity(group.len());
-        for stmt in group {
-            let Stmt::Fun {
-                name,
-                rec: true,
-                dicts,
-                value,
-            } = stmt
-            else {
-                return None;
-            };
-            let ExprKind::Lambda { params, body } = &value.kind else {
-                return None;
-            };
-            defs.push(RecFun {
-                name: Rc::from(name.as_str()),
-                dict_params: dicts.as_slice(),
-                params: params.as_slice(),
-                body: body.as_ref(),
-            });
-        }
-        let rec_group = Rc::new(RecGroup {
-            env: env.clone(),
-            dict_env: DictEnv::default(),
-            defs: Rc::from(defs),
-        });
-        Some(env.with_rec_group(&rec_group))
+        res.ok()
     }
 }
 
-/// Iteratively checks whether `expr` is already a pure materialized data tree
-/// (literals, constructors, tuples, lists, records, and constructor applications
-/// with `arg_first: false`), so we never waste work re-evaluating already-folded data.
-pub(super) fn is_literal_data(expr: &Expr) -> bool {
-    let mut stack = vec![expr];
-    let mut visited = 0_usize;
-    while let Some(e) = stack.pop() {
-        visited += 1;
-        if visited > 128 {
-            return false;
-        }
-        match &e.kind {
-            ExprKind::Lit(_) | ExprKind::Con(_) => {}
-            ExprKind::Tuple(items) | ExprKind::List(items) => {
-                for item in items {
-                    stack.push(item);
-                }
-            }
-            ExprKind::Record(fields) => {
-                for (_, val) in fields {
-                    stack.push(val);
-                }
-            }
-            ExprKind::App { .. } => {
-                let (head, args) = e.pure_spine();
-                if !matches!(head.kind, ExprKind::Con(_)) || args.is_empty() {
-                    return false;
-                }
-                for arg in args {
-                    stack.push(arg);
-                }
-            }
-            _ => return false,
+fn shadow_group(group: &[Stmt], env: &mut Env<'_>) {
+    for stmt in group {
+        if let Stmt::Fun { name, .. } = stmt {
+            *env = env.shadow(rc_str(name));
         }
     }
-    true
 }
 
 pub(super) fn shadow_pat(pat: &Pat, env: &mut Env<'_>) {
-    let mut binders = Vec::new();
-    pat.binders(&mut binders);
-    for name in binders {
-        *env = env.shadow(Rc::from(name));
-    }
+    walk_pat(pat, &mut |p| {
+        if let Pat::Bind(name) = p {
+            *env = env.shadow(rc_str(name));
+        }
+    });
 }

@@ -7,20 +7,55 @@ use std::rc::Rc;
 
 use flick_ir::{Lit, Pat};
 
-use super::value::{SLOT_BYTES, Value, bigint_value};
+use super::value::{
+    SLOT_BYTES, Utf16Source, Value, bigint_value, empty_values, eq_utf16, find_field, rc_str,
+};
 use super::{EvalBudget, StopReason};
 
 /// Iterative structural equality (`==`), matching Flick's JS and Go runtimes:
 /// `SameValueZero` on `Float` (`NaN == NaN`, `-0 == +0`), structural on tuples,
 /// lists, records, and saturated constructors (ignoring GADT dictionary fields).
-#[allow(
-    clippy::float_cmp,
-    clippy::too_many_lines,
-    reason = "SameValueZero compares floats directly after NaN check; exhaustive value equality"
-)]
 pub(super) fn value_eq<'a>(
     lhs: &'a Value<'a>,
     rhs: &'a Value<'a>,
+    budget: &mut EvalBudget,
+) -> Result<bool, StopReason> {
+    compare_values(lhs, rhs, false, budget)
+}
+
+/// Strict identity/value equality (`===`) for types whose identity is their equality.
+pub(super) fn value_same<'a>(
+    lhs: &'a Value<'a>,
+    rhs: &'a Value<'a>,
+    budget: &mut EvalBudget,
+) -> Result<bool, StopReason> {
+    compare_values(lhs, rhs, true, budget)
+}
+
+fn push_val_pairs<'a>(
+    work: &mut Vec<(&'a Value<'a>, &'a Value<'a>)>,
+    xs: &'a [Value<'a>],
+    ys: &'a [Value<'a>],
+    budget: &EvalBudget,
+) -> Result<(), StopReason> {
+    let mut i = xs.len().min(ys.len());
+    while i > 0 {
+        i -= 1;
+        budget.check_depth(work.len())?;
+        work.push((&xs[i], &ys[i]));
+    }
+    Ok(())
+}
+
+#[allow(
+    clippy::float_cmp,
+    clippy::too_many_lines,
+    reason = "SameValueZero vs strict float comparison; unified structural/identity equality"
+)]
+fn compare_values<'a>(
+    lhs: &'a Value<'a>,
+    rhs: &'a Value<'a>,
+    strict: bool,
     budget: &mut EvalBudget,
 ) -> Result<bool, StopReason> {
     let mut work: Vec<(&'a Value<'a>, &'a Value<'a>)> = vec![(lhs, rhs)];
@@ -39,7 +74,7 @@ pub(super) fn value_eq<'a>(
                 }
             }
             (Value::Float(x), Value::Float(y)) => {
-                if !(x == y || (x.is_nan() && y.is_nan())) {
+                if x != y && (strict || !(x.is_nan() && y.is_nan())) {
                     return Ok(false);
                 }
             }
@@ -65,20 +100,19 @@ pub(super) fn value_eq<'a>(
             (Value::String(x), Value::Utf16(y)) | (Value::Utf16(y), Value::String(x)) => {
                 let scan_steps = u32::try_from(y.len() / 8).unwrap_or(u32::MAX);
                 budget.charge_steps(scan_steps)?;
-                if !x.encode_utf16().eq(y.iter().copied()) {
+                if !eq_utf16(Utf16Source::from_str(x), Utf16Source::from_units(y)) {
                     return Ok(false);
                 }
             }
-            (Value::Tuple(xs), Value::Tuple(ys)) | (Value::List(xs), Value::List(ys)) => {
+            (Value::Tuple(xs), Value::Tuple(ys)) | (Value::List(xs), Value::List(ys))
+                if !strict =>
+            {
                 if xs.len() != ys.len() {
                     return Ok(false);
                 }
-                for (x, y) in xs.iter().zip(ys.iter()).rev() {
-                    budget.check_depth(work.len())?;
-                    work.push((x, y));
-                }
+                push_val_pairs(&mut work, xs, ys, budget)?;
             }
-            (Value::Record(xs), Value::Record(ys)) => {
+            (Value::Record(xs), Value::Record(ys)) if !strict => {
                 if xs.len() != ys.len() {
                     return Ok(false);
                 }
@@ -86,7 +120,7 @@ pub(super) fn value_eq<'a>(
                 let quad = u32::try_from(xs.len().saturating_mul(ys.len())).unwrap_or(u32::MAX) / 4;
                 budget.charge_steps(linear.max(quad))?;
                 for (kx, vx) in xs.iter().rev() {
-                    let Some((_, vy)) = ys.iter().find(|(ky, _)| ky == kx) else {
+                    let Some(vy) = find_field(ys, kx) else {
                         return Ok(false);
                     };
                     budget.check_depth(work.len())?;
@@ -105,6 +139,16 @@ pub(super) fn value_eq<'a>(
                     dicts: dy,
                 },
             ) => {
+                if strict
+                    && !(cx.arity == 0
+                        && cy.arity == 0
+                        && ax.is_empty()
+                        && ay.is_empty()
+                        && dx.is_empty()
+                        && dy.is_empty())
+                {
+                    return Err(StopReason::UnknownOp);
+                }
                 if ax.len() != cx.arity
                     || ay.len() != cy.arity
                     || dx.len() != cx.dicts
@@ -119,10 +163,7 @@ pub(super) fn value_eq<'a>(
                     return Ok(false);
                 }
                 // GADT dictionaries are ignored by `==` on both JS and Go.
-                for (x, y) in ax.iter().zip(ay.iter()).rev() {
-                    budget.check_depth(work.len())?;
-                    work.push((x, y));
-                }
+                push_val_pairs(&mut work, ax, ay, budget)?;
             }
             _ => return Err(StopReason::UnknownOp),
         }
@@ -130,69 +171,46 @@ pub(super) fn value_eq<'a>(
     Ok(true)
 }
 
-/// Strict identity/value equality (`===`) for types whose identity is their equality.
-#[allow(
-    clippy::float_cmp,
-    reason = "strict `===` compares floats directly (`NaN !== NaN`, `-0 === +0`)"
-)]
-pub(super) fn value_same(
-    lhs: &Value<'_>,
-    rhs: &Value<'_>,
-    budget: &mut EvalBudget,
-) -> Result<bool, StopReason> {
-    budget.charge_steps(1)?;
-    match (lhs, rhs) {
-        (Value::Unit, Value::Unit) => Ok(true),
-        (Value::Bool(a), Value::Bool(b)) => Ok(a == b),
-        (Value::Int(a), Value::Int(b)) => Ok(a == b),
-        (Value::Float(a), Value::Float(b)) => Ok(a == b),
-        (Value::BigInt(a), Value::BigInt(b)) => Ok(a == b),
-        (Value::String(a), Value::String(b)) => {
-            let scan_steps = u32::try_from(a.len().min(b.len()) / 16).unwrap_or(u32::MAX);
-            budget.charge_steps(scan_steps)?;
-            Ok(a == b)
-        }
-        (Value::Utf16(a), Value::Utf16(b)) => {
-            let scan_steps = u32::try_from(a.len().min(b.len()) / 8).unwrap_or(u32::MAX);
-            budget.charge_steps(scan_steps)?;
-            Ok(a == b)
-        }
-        (Value::String(a), Value::Utf16(b)) | (Value::Utf16(b), Value::String(a)) => {
-            let scan_steps = u32::try_from(b.len() / 8).unwrap_or(u32::MAX);
-            budget.charge_steps(scan_steps)?;
-            Ok(a.encode_utf16().eq(b.iter().copied()))
-        }
-        (
-            Value::Con {
-                ctor: cx,
-                args: ax,
-                dicts: dx,
-            },
-            Value::Con {
-                ctor: cy,
-                args: ay,
-                dicts: dy,
-            },
-        ) if cx.arity == 0
-            && cy.arity == 0
-            && ax.is_empty()
-            && ay.is_empty()
-            && dx.is_empty()
-            && dy.is_empty() =>
-        {
-            if cx.module != cy.module || cx.ty != cy.ty {
-                return Err(StopReason::UnsafeContext);
-            }
-            Ok(cx.name == cy.name)
-        }
-        _ => Err(StopReason::UnknownOp),
-    }
-}
-
 /// Outcome of matching a pattern against a concrete value.
 pub(super) enum PatMatch<'a> {
     Matched(Vec<(Rc<str>, Value<'a>)>),
     NoMatch,
+}
+
+#[inline(never)]
+fn push_pat_work<'a>(
+    work: &mut Vec<(&'a Pat, Value<'a>)>,
+    choices_len: usize,
+    pat: &'a Pat,
+    val: Value<'a>,
+    budget: &EvalBudget,
+) -> Result<(), StopReason> {
+    budget.check_depth(work.len() + choices_len)?;
+    work.push((pat, val));
+    Ok(())
+}
+
+fn push_pat_pairs<'a>(
+    work: &mut Vec<(&'a Pat, Value<'a>)>,
+    choices_len: usize,
+    pats: &'a [Pat],
+    vals: &[Value<'a>],
+    budget: &EvalBudget,
+) -> Result<(), StopReason> {
+    let mut i = pats.len().min(vals.len());
+    while i > 0 {
+        i -= 1;
+        push_pat_work(work, choices_len, &pats[i], vals[i].clone(), budget)?;
+    }
+    Ok(())
+}
+
+fn clone_work<'a>(src: &[(&'a Pat, Value<'a>)]) -> Vec<(&'a Pat, Value<'a>)> {
+    let mut out = Vec::new();
+    for (p, v) in src {
+        out.push((*p, v.clone()));
+    }
+    out
 }
 
 /// Iterative pattern matching against a concrete [`Value`], supporting all IR
@@ -210,7 +228,6 @@ pub(super) fn match_pat<'a>(
     struct Choice<'a> {
         value: Value<'a>,
         alts: &'a [Pat],
-        next_alt: usize,
         binds_mark: usize,
         saved_work: Vec<(&'a Pat, Value<'a>)>,
     }
@@ -227,16 +244,13 @@ pub(super) fn match_pat<'a>(
         let matched = match p {
             Pat::Wild => true,
             Pat::Bind(name) => {
-                binds.push((Rc::from(name.as_str()), v));
+                binds.push((rc_str(name), v));
                 true
             }
             Pat::Lit(lit) => match_lit(lit, &v, budget)?,
             Pat::Tuple(pats) => match v {
                 Value::Tuple(items) if items.len() == pats.len() => {
-                    for (sub_p, sub_v) in pats.iter().zip(items.iter()).rev() {
-                        budget.check_depth(work.len() + choices.len())?;
-                        work.push((sub_p, sub_v.clone()));
-                    }
+                    push_pat_pairs(&mut work, choices.len(), pats, &items, budget)?;
                     true
                 }
                 _ => return Err(StopReason::UnsafeContext),
@@ -251,7 +265,7 @@ pub(super) fn match_pat<'a>(
                     if ok_len {
                         if let Some(rest_pat) = rest {
                             let rest_val = if matches!(**rest_pat, Pat::Wild) {
-                                Value::List(Rc::from([]))
+                                Value::List(empty_values())
                             } else {
                                 let slice_len = items.len() - pats.len();
                                 let bytes = u32::try_from(slice_len)
@@ -260,15 +274,15 @@ pub(super) fn match_pat<'a>(
                                 budget.charge_bytes(bytes)?;
                                 let steps = u32::try_from(slice_len / 8).unwrap_or(u32::MAX);
                                 budget.charge_steps(steps)?;
-                                Value::List(Rc::from(&items[pats.len()..]))
+                                let mut tail = Vec::new();
+                                for item in &items[pats.len()..] {
+                                    tail.push(item.clone());
+                                }
+                                Value::List(Rc::new(tail))
                             };
-                            budget.check_depth(work.len() + choices.len())?;
-                            work.push((rest_pat, rest_val));
+                            push_pat_work(&mut work, choices.len(), rest_pat, rest_val, budget)?;
                         }
-                        for (sub_p, sub_v) in pats.iter().zip(items.iter()).rev() {
-                            budget.check_depth(work.len() + choices.len())?;
-                            work.push((sub_p, sub_v.clone()));
-                        }
+                        push_pat_pairs(&mut work, choices.len(), pats, &items, budget)?;
                         true
                     } else {
                         false
@@ -283,12 +297,10 @@ pub(super) fn match_pat<'a>(
                         / 4;
                     budget.charge_steps(scan_steps)?;
                     for (label, sub_p) in fields.iter().rev() {
-                        let Some((_, sub_v)) = rec_fields.iter().find(|(k, _)| &**k == label)
-                        else {
+                        let Some(sub_v) = find_field(&rec_fields, label) else {
                             return Err(StopReason::UnsafeContext);
                         };
-                        budget.check_depth(work.len() + choices.len())?;
-                        work.push((sub_p, sub_v.clone()));
+                        push_pat_work(&mut work, choices.len(), sub_p, sub_v.clone(), budget)?;
                     }
                     true
                 }
@@ -303,24 +315,34 @@ pub(super) fn match_pat<'a>(
                         false
                     } else if args.len() != ctor.arity {
                         return Err(StopReason::UnsafeContext);
-                    } else if pats.len() == ctor.arity {
-                        for (sub_p, sub_v) in pats.iter().zip(args.iter()).rev() {
-                            budget.check_depth(work.len() + choices.len())?;
-                            work.push((sub_p, sub_v.clone()));
-                        }
-                        true
-                    } else if pats.len() == ctor.arity + ctor.dicts && dicts.len() == ctor.dicts {
-                        for (sub_p, sub_d) in pats[ctor.arity..].iter().zip(dicts.iter()).rev() {
-                            budget.check_depth(work.len() + choices.len())?;
-                            work.push((sub_p, Value::Dict(sub_d.clone())));
-                        }
-                        for (sub_p, sub_v) in pats[..ctor.arity].iter().zip(args.iter()).rev() {
-                            budget.check_depth(work.len() + choices.len())?;
-                            work.push((sub_p, sub_v.clone()));
-                        }
-                        true
                     } else {
-                        return Err(StopReason::UnsafeContext);
+                        let has_dicts =
+                            pats.len() == ctor.arity + ctor.dicts && dicts.len() == ctor.dicts;
+                        if pats.len() != ctor.arity && !has_dicts {
+                            return Err(StopReason::UnsafeContext);
+                        }
+                        if has_dicts {
+                            let dict_pats = &pats[ctor.arity..];
+                            let mut i = dict_pats.len().min(dicts.len());
+                            while i > 0 {
+                                i -= 1;
+                                push_pat_work(
+                                    &mut work,
+                                    choices.len(),
+                                    &dict_pats[i],
+                                    Value::Dict(Rc::new(dicts[i].clone())),
+                                    budget,
+                                )?;
+                            }
+                        }
+                        push_pat_pairs(
+                            &mut work,
+                            choices.len(),
+                            &pats[..ctor.arity],
+                            &args,
+                            budget,
+                        )?;
+                        true
                     }
                 }
                 _ => return Err(StopReason::UnsafeContext),
@@ -335,13 +357,11 @@ pub(super) fn match_pat<'a>(
                         choices.push(Choice {
                             value: v.clone(),
                             alts: rest,
-                            next_alt: 0,
                             binds_mark: binds.len(),
-                            saved_work: work.clone(),
+                            saved_work: clone_work(&work),
                         });
                     }
-                    budget.check_depth(work.len() + choices.len())?;
-                    work.push((first, v));
+                    push_pat_work(&mut work, choices.len(), first, v, budget)?;
                     true
                 } else {
                     false
@@ -353,18 +373,20 @@ pub(super) fn match_pat<'a>(
             let mut resumed = false;
             while let Some(mut choice) = choices.pop() {
                 binds.truncate(choice.binds_mark);
-                if choice.next_alt < choice.alts.len() {
-                    let alt = &choice.alts[choice.next_alt];
-                    let val = choice.value.clone();
+                if let Some((alt, rest)) = choice.alts.split_first() {
                     let restore_steps = u32::try_from(choice.saved_work.len()).unwrap_or(u32::MAX);
                     budget.charge_steps(restore_steps)?;
-                    work.clone_from(&choice.saved_work);
-                    budget.check_depth(work.len() + choices.len())?;
-                    work.push((alt, val));
-                    choice.next_alt += 1;
-                    if choice.next_alt < choice.alts.len() {
+                    let val = if rest.is_empty() {
+                        work = choice.saved_work;
+                        choice.value
+                    } else {
+                        let val = choice.value.clone();
+                        work = clone_work(&choice.saved_work);
+                        choice.alts = rest;
                         choices.push(choice);
-                    }
+                        val
+                    };
+                    push_pat_work(&mut work, choices.len(), alt, val, budget)?;
                     resumed = true;
                     break;
                 }
@@ -399,7 +421,10 @@ fn match_lit(lit: &Lit, value: &Value<'_>, budget: &mut EvalBudget) -> Result<bo
         (Lit::String(a), Value::Utf16(b)) => {
             let scan_steps = u32::try_from(b.len() / 8).unwrap_or(u32::MAX);
             budget.charge_steps(scan_steps)?;
-            Ok(a.encode_utf16().eq(b.iter().copied()))
+            Ok(eq_utf16(
+                Utf16Source::from_str(a),
+                Utf16Source::from_units(b),
+            ))
         }
         _ => Err(StopReason::UnsafeContext),
     }

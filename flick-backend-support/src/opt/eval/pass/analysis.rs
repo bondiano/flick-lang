@@ -1,119 +1,49 @@
-//! Module-wide iterative analyses supporting materialization visibility and
-//! single-use private definition credit.
+//! Single-pass iterative module analysis supporting materialization visibility
+//! and single-use private definition credit.
 
 use std::collections::{HashMap, HashSet};
 
-use flick_ir::{ExprKind, ItemKind, Module, Pat, Stmt};
+use flick_ir::{ExprKind, ItemKind, Module, Pat};
 
-use crate::opt::eval::materialize::expr_cost;
+use crate::opt::eval::materialize::{ctor_key, expr_cost};
+use crate::opt::eval::value::{each_expr_pat, walk_pat};
 
-/// Collects all external constructors already referenced in `module` (either in
-/// expressions or patterns) so materialization never introduces an unexported import.
-pub(super) fn collect_visible_external_ctors(module: &Module) -> HashSet<(String, String, String)> {
-    let mut out = HashSet::new();
+/// Combined module analysis result computed in one iterative AST walk.
+pub(super) struct ModuleAnalysis {
+    pub(super) visible_external_ctors: HashSet<String>,
+    pub(super) single_use_private: HashMap<String, usize>,
+}
+
+/// Collects visible external constructors and single-use private top-level
+/// definition node sizes in a single iterative walk over `module`.
+pub(super) fn analyze_module(module: &Module, exported: &dyn Fn(&str) -> bool) -> ModuleAnalysis {
+    let mut visible = HashSet::new();
+    let mut refs: HashMap<String, usize> = HashMap::new();
     for item in &module.items {
         item.each_body(&mut |expr| {
             let mut stack = vec![expr];
             while let Some(e) = stack.pop() {
                 match &e.kind {
+                    ExprKind::Global { module: m, name } if m == &module.name => {
+                        if let Some(count) = refs.get_mut(name.as_str()) {
+                            *count += 1;
+                        } else {
+                            refs.insert(name.clone(), 1);
+                        }
+                    }
                     ExprKind::Con(c) if c.module != module.name => {
-                        out.insert((c.module.clone(), c.ty.clone(), c.name.clone()));
-                    }
-                    ExprKind::Match(_, arms) => {
-                        for arm in arms {
-                            collect_pat_ctors(&arm.pat, &module.name, &mut out);
-                        }
-                    }
-                    ExprKind::Block(stmts, _) => {
-                        for stmt in stmts {
-                            if let Stmt::Let(pat, _) = stmt {
-                                collect_pat_ctors(pat, &module.name, &mut out);
-                            }
-                        }
-                    }
-                    ExprKind::Lambda { params, .. } => {
-                        for p in params {
-                            collect_pat_ctors(&p.pat, &module.name, &mut out);
-                        }
-                    }
-                    ExprKind::Each { pat, .. } => {
-                        collect_pat_ctors(pat, &module.name, &mut out);
-                    }
-                    ExprKind::Handle(h) => {
-                        for arm in &h.errors {
-                            collect_pat_ctors(&arm.pat, &module.name, &mut out);
-                        }
+                        visible.insert(ctor_key(&c.module, &c.ty, &c.name));
                     }
                     _ => {}
                 }
+                each_expr_pat(e, true, &mut |pat| {
+                    collect_pat_ctors(pat, &module.name, &mut visible);
+                });
                 e.each_child(&mut |child| stack.push(child));
             }
         });
     }
-    out
-}
-
-fn collect_pat_ctors(
-    root: &Pat,
-    current_module: &str,
-    out: &mut HashSet<(String, String, String)>,
-) {
-    let mut stack = vec![root];
-    while let Some(pat) = stack.pop() {
-        match pat {
-            Pat::Con(c, args) => {
-                if c.module != current_module {
-                    out.insert((c.module.clone(), c.ty.clone(), c.name.clone()));
-                }
-                for arg in args {
-                    stack.push(arg);
-                }
-            }
-            Pat::Tuple(items) | Pat::Or(items) => {
-                for item in items {
-                    stack.push(item);
-                }
-            }
-            Pat::List(items, rest) => {
-                for item in items {
-                    stack.push(item);
-                }
-                if let Some(rest) = rest {
-                    stack.push(rest);
-                }
-            }
-            Pat::Record(fields) => {
-                for (_, p) in fields {
-                    stack.push(p);
-                }
-            }
-            Pat::Wild | Pat::Bind(_) | Pat::Lit(_) => {}
-        }
-    }
-}
-
-/// Counts references to each private top-level `ItemKind::Value` in `module` and
-/// records the node size of those referenced exactly once (which eliminating the
-/// call allows `unused_items` to remove).
-pub(super) fn collect_single_use_private_sizes(
-    module: &Module,
-    exported: &dyn Fn(&str) -> bool,
-) -> HashMap<String, u32> {
-    let mut refs: HashMap<&str, usize> = HashMap::new();
-    for item in &module.items {
-        item.each_body(&mut |expr| {
-            let mut stack = vec![expr];
-            while let Some(e) = stack.pop() {
-                if let ExprKind::Global { module: m, name } = &e.kind
-                    && m == &module.name
-                {
-                    *refs.entry(name.as_str()).or_default() += 1;
-                }
-                e.each_child(&mut |child| stack.push(child));
-            }
-        });
-    }
-    let mut sizes = HashMap::new();
+    let mut sizes: HashMap<String, usize> = HashMap::new();
     for item in &module.items {
         if let ItemKind::Value { name, dicts, body } = &item.kind
             && dicts.is_empty()
@@ -121,8 +51,21 @@ pub(super) fn collect_single_use_private_sizes(
             && !name.contains('$')
             && refs.get(name.as_str()) == Some(&1)
         {
-            sizes.insert(name.clone(), expr_cost(body).nodes);
+            sizes.insert(name.clone(), expr_cost(body).nodes as usize);
         }
     }
-    sizes
+    ModuleAnalysis {
+        visible_external_ctors: visible,
+        single_use_private: sizes,
+    }
+}
+
+fn collect_pat_ctors(root: &Pat, current_module: &str, out: &mut HashSet<String>) {
+    walk_pat(root, &mut |pat| {
+        if let Pat::Con(c, _) = pat
+            && c.module != current_module
+        {
+            out.insert(ctor_key(&c.module, &c.ty, &c.name));
+        }
+    });
 }

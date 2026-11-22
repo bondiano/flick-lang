@@ -1,16 +1,17 @@
 //! Scalar, string, list, and equality operations for the bounded evaluator.
 
-use std::cmp::Ordering;
 use std::rc::Rc;
 
 use flick_ir::{Arith, BinOp, Expr, Lit, Num};
 
 use super::Machine;
-use crate::consteval::{self, Const, Op as ConstOp};
+use crate::consteval::{self, Const};
 use crate::numeric;
 use crate::opt::eval::StopReason;
 use crate::opt::eval::pattern::{value_eq, value_same};
-use crate::opt::eval::value::{FIELD_BYTES, SLOT_BYTES, Value, bigint_value};
+use crate::opt::eval::value::{
+    FIELD_BYTES, SLOT_BYTES, Utf16Source, Value, bigint_value, cmp_utf16, rc_str,
+};
 use crate::opt::fold;
 
 impl<'a> Machine<'a, '_> {
@@ -28,7 +29,7 @@ impl<'a> Machine<'a, '_> {
             Lit::String(s) => {
                 let len = u32::try_from(s.len()).unwrap_or(u32::MAX);
                 self.budget.charge_bytes(len)?;
-                Ok(Value::String(Rc::from(s.as_str())))
+                Ok(Value::String(rc_str(s)))
             }
         }
     }
@@ -49,89 +50,68 @@ impl<'a> Machine<'a, '_> {
     pub(super) fn eval_binary(
         &mut self,
         op: BinOp,
-        lhs: Value<'a>,
-        rhs: Value<'a>,
+        lhs: &Value<'a>,
+        rhs: &Value<'a>,
     ) -> Result<Value<'a>, StopReason> {
         match op {
-            BinOp::Eq => Ok(Value::Bool(value_eq(&lhs, &rhs, self.budget)?)),
-            BinOp::NotEq => Ok(Value::Bool(!value_eq(&lhs, &rhs, self.budget)?)),
-            BinOp::Same => Ok(Value::Bool(value_same(&lhs, &rhs, self.budget)?)),
-            BinOp::NotSame => Ok(Value::Bool(!value_same(&lhs, &rhs, self.budget)?)),
+            BinOp::Eq | BinOp::NotEq => {
+                let eq = value_eq(lhs, rhs, self.budget)?;
+                Ok(Value::Bool(eq ^ matches!(op, BinOp::NotEq)))
+            }
+            BinOp::Same | BinOp::NotSame => {
+                let same = value_same(lhs, rhs, self.budget)?;
+                Ok(Value::Bool(same ^ matches!(op, BinOp::NotSame)))
+            }
             BinOp::Arith(arith, Num::Int) => match (lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => Ok(Value::Int(numeric::int_arith(arith, a, b))),
-                _ => Err(StopReason::UnsafeContext),
-            },
-            BinOp::Arith(Arith::Pow, Num::BigInt) => match (lhs, rhs) {
-                (Value::BigInt(a), Value::BigInt(b)) => {
-                    if b < 0 {
-                        // JS throws RangeError and Go panics on negative BigInt exponents.
-                        return Err(StopReason::PossibleTrap);
-                    }
-                    let exp = u32::try_from(b).map_err(|_| StopReason::UnknownOp)?;
-                    self.budget.charge_bytes(16)?;
-                    let res = a.checked_pow(exp).ok_or(StopReason::UnknownOp)?;
-                    Ok(Value::BigInt(res))
-                }
+                (Value::Int(a), Value::Int(b)) => Ok(Value::Int(numeric::int_arith(arith, *a, *b))),
                 _ => Err(StopReason::UnsafeContext),
             },
             BinOp::Concat => self.eval_string_concat(lhs, rhs),
             BinOp::ListConcat => self.eval_list_concat(lhs, rhs),
-            BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => self.eval_order(op, &lhs, &rhs),
-            BinOp::Arith(_, Num::Float | Num::BigInt) => {
+            BinOp::Lt
+            | BinOp::Le
+            | BinOp::Gt
+            | BinOp::Ge
+            | BinOp::Arith(_, Num::Float | Num::BigInt) => {
+                if matches!(op, BinOp::Arith(Arith::Pow, Num::BigInt)) {
+                    match (lhs, rhs) {
+                        (Value::BigInt(_), Value::BigInt(b)) if *b < 0 => {
+                            // JS throws RangeError and Go panics on negative BigInt exponents.
+                            return Err(StopReason::PossibleTrap);
+                        }
+                        (Value::BigInt(_), Value::BigInt(_)) => {}
+                        _ => return Err(StopReason::UnsafeContext),
+                    }
+                }
+                if matches!(op, BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge)
+                    && let (Some((sa, a)), Some((sb, b))) = (as_utf16(lhs), as_utf16(rhs))
+                {
+                    let scan_steps = u32::try_from(sa.min(sb)).unwrap_or(u32::MAX);
+                    self.budget.charge_steps(scan_steps)?;
+                    let ord = cmp_utf16(a, b);
+                    let matched = match op {
+                        BinOp::Lt => ord.is_lt(),
+                        BinOp::Le => ord.is_le(),
+                        BinOp::Gt => ord.is_gt(),
+                        BinOp::Ge => ord.is_ge(),
+                        _ => return Err(StopReason::UnknownOp),
+                    };
+                    return Ok(Value::Bool(matched));
+                }
                 let token = fold::token(op).ok_or(StopReason::UnknownOp)?;
-                let lc = value_to_const(&lhs)?;
-                let rc = value_to_const(&rhs)?;
+                let lc = value_to_const(lhs)?;
+                let rc = value_to_const(rhs)?;
                 let out = consteval::binary(token, lc, rc).ok_or(StopReason::UnknownOp)?;
-                self.const_to_value(out, op)
+                self.const_to_value(out)
             }
             BinOp::And | BinOp::Or => Err(StopReason::UnsafeContext),
         }
     }
 
-    fn eval_order(
-        &mut self,
-        op: BinOp,
-        lhs: &Value<'a>,
-        rhs: &Value<'a>,
-    ) -> Result<Value<'a>, StopReason> {
-        let token = fold::token(op).ok_or(StopReason::UnknownOp)?;
-        match (lhs, rhs) {
-            (Value::String(a), Value::String(b)) => {
-                let scan = u32::try_from(a.len().min(b.len()) / 16).unwrap_or(u32::MAX);
-                self.budget.charge_steps(scan)?;
-                let ord = a.encode_utf16().cmp(b.encode_utf16());
-                return Ok(Value::Bool(order_matches(token, ord)?));
-            }
-            (Value::Utf16(a), Value::Utf16(b)) => {
-                let scan = u32::try_from(a.len().min(b.len()) / 8).unwrap_or(u32::MAX);
-                self.budget.charge_steps(scan)?;
-                let ord = a.iter().cmp(b.iter());
-                return Ok(Value::Bool(order_matches(token, ord)?));
-            }
-            (Value::String(a), Value::Utf16(b)) => {
-                let scan = u32::try_from(b.len() / 8).unwrap_or(u32::MAX);
-                self.budget.charge_steps(scan)?;
-                let ord = a.encode_utf16().cmp(b.iter().copied());
-                return Ok(Value::Bool(order_matches(token, ord)?));
-            }
-            (Value::Utf16(a), Value::String(b)) => {
-                let scan = u32::try_from(a.len() / 8).unwrap_or(u32::MAX);
-                self.budget.charge_steps(scan)?;
-                let ord = a.iter().copied().cmp(b.encode_utf16());
-                return Ok(Value::Bool(order_matches(token, ord)?));
-            }
-            _ => {}
-        }
-        let lc = value_to_const(lhs)?;
-        let rc = value_to_const(rhs)?;
-        let out = consteval::binary(token, lc, rc).ok_or(StopReason::UnknownOp)?;
-        self.const_to_value(out, op)
-    }
-
     fn eval_string_concat(
         &mut self,
-        lhs: Value<'a>,
-        rhs: Value<'a>,
+        lhs: &Value<'a>,
+        rhs: &Value<'a>,
     ) -> Result<Value<'a>, StopReason> {
         match (lhs, rhs) {
             (Value::String(a), Value::String(b)) => {
@@ -140,9 +120,9 @@ impl<'a> Machine<'a, '_> {
                 self.budget.charge_bytes(bytes)?;
                 self.budget.charge_steps(bytes / 16)?;
                 let mut out = String::with_capacity(total);
-                out.push_str(&a);
-                out.push_str(&b);
-                Ok(Value::String(Rc::from(out)))
+                out.push_str(a);
+                out.push_str(b);
+                Ok(Value::String(rc_str(&out)))
             }
             (Value::Utf16(a), Value::Utf16(b)) => {
                 let total_units = a.len().saturating_add(b.len());
@@ -151,50 +131,53 @@ impl<'a> Machine<'a, '_> {
                     .saturating_mul(2);
                 self.budget.charge_bytes(bytes)?;
                 self.budget.charge_steps(bytes / 16)?;
-                let mut out = Vec::with_capacity(total_units);
-                out.extend_from_slice(&a);
-                out.extend_from_slice(&b);
-                Ok(Value::Utf16(Rc::from(out)))
+                let mut out = Vec::new();
+                out.extend_from_slice(a);
+                out.extend_from_slice(b);
+                Ok(Value::Utf16(Rc::new(out)))
             }
-            (Value::String(a), Value::Utf16(b)) => {
-                // UTF-16 unit count is always <= UTF-8 byte length; charge scan before counting.
-                let scan = u32::try_from(a.len() / 16).unwrap_or(u32::MAX);
-                self.budget.charge_steps(scan)?;
-                let a_units = a.encode_utf16().count();
-                let total_units = a_units.saturating_add(b.len());
-                let bytes = u32::try_from(total_units)
-                    .unwrap_or(u32::MAX)
-                    .saturating_mul(2);
-                self.budget.charge_bytes(bytes)?;
-                self.budget.charge_steps(bytes / 16)?;
-                let mut out = Vec::with_capacity(total_units);
-                out.extend(a.encode_utf16());
-                out.extend_from_slice(&b);
-                Ok(Value::Utf16(Rc::from(out)))
-            }
-            (Value::Utf16(a), Value::String(b)) => {
-                let scan = u32::try_from(b.len() / 16).unwrap_or(u32::MAX);
-                self.budget.charge_steps(scan)?;
-                let b_units = b.encode_utf16().count();
-                let total_units = a.len().saturating_add(b_units);
-                let bytes = u32::try_from(total_units)
-                    .unwrap_or(u32::MAX)
-                    .saturating_mul(2);
-                self.budget.charge_bytes(bytes)?;
-                self.budget.charge_steps(bytes / 16)?;
-                let mut out = Vec::with_capacity(total_units);
-                out.extend_from_slice(&a);
-                out.extend(b.encode_utf16());
-                Ok(Value::Utf16(Rc::from(out)))
-            }
+            (Value::String(a), Value::Utf16(b)) => self.concat_str_utf16(a, b, true),
+            (Value::Utf16(a), Value::String(b)) => self.concat_str_utf16(b, a, false),
             _ => Err(StopReason::UnsafeContext),
         }
     }
 
+    fn concat_str_utf16(
+        &mut self,
+        s: &str,
+        units: &[u16],
+        str_first: bool,
+    ) -> Result<Value<'a>, StopReason> {
+        let scan = u32::try_from(s.len() / 16).unwrap_or(u32::MAX);
+        self.budget.charge_steps(scan)?;
+        let mut s_units = 0_usize;
+        for ch in s.chars() {
+            s_units += ch.len_utf16();
+        }
+        let total_units = s_units.saturating_add(units.len());
+        let bytes = u32::try_from(total_units)
+            .unwrap_or(u32::MAX)
+            .saturating_mul(2);
+        self.budget.charge_bytes(bytes)?;
+        self.budget.charge_steps(bytes / 16)?;
+        let mut out = Vec::new();
+        if !str_first {
+            out.extend_from_slice(units);
+        }
+        let mut buf = [0_u16; 2];
+        for ch in s.chars() {
+            out.extend_from_slice(ch.encode_utf16(&mut buf));
+        }
+        if str_first {
+            out.extend_from_slice(units);
+        }
+        Ok(Value::Utf16(Rc::new(out)))
+    }
+
     fn eval_list_concat(
         &mut self,
-        lhs: Value<'a>,
-        rhs: Value<'a>,
+        lhs: &Value<'a>,
+        rhs: &Value<'a>,
     ) -> Result<Value<'a>, StopReason> {
         let (Value::List(a), Value::List(b)) = (lhs, rhs) else {
             return Err(StopReason::UnsafeContext);
@@ -206,25 +189,19 @@ impl<'a> Machine<'a, '_> {
         self.budget.charge_bytes(bytes)?;
         let steps = u32::try_from(total / 8).unwrap_or(u32::MAX);
         self.budget.charge_steps(steps)?;
-        let mut out = Vec::with_capacity(total);
-        out.extend(a.iter().cloned());
-        out.extend(b.iter().cloned());
-        Ok(Value::List(Rc::from(out)))
+        let mut out = Vec::new();
+        for x in a.iter() {
+            out.push(x.clone());
+        }
+        for x in b.iter() {
+            out.push(x.clone());
+        }
+        Ok(Value::List(Rc::new(out)))
     }
 
-    fn const_to_value(&mut self, c: Const, op: BinOp) -> Result<Value<'a>, StopReason> {
+    fn const_to_value(&mut self, c: Const) -> Result<Value<'a>, StopReason> {
         match c {
-            Const::Number(x) => match op {
-                BinOp::Arith(_, Num::Int) =>
-                {
-                    #[allow(
-                        clippy::cast_possible_truncation,
-                        reason = "Int arithmetic already wrapped in 32 bits"
-                    )]
-                    Ok(Value::Int(x as i32))
-                }
-                _ => Ok(Value::Float(x)),
-            },
+            Const::Number(x) => Ok(Value::Float(x)),
             Const::BigInt(n) => {
                 self.budget.charge_bytes(16)?;
                 Ok(Value::BigInt(n))
@@ -232,29 +209,27 @@ impl<'a> Machine<'a, '_> {
             Const::String(s) => {
                 let len = u32::try_from(s.len()).unwrap_or(u32::MAX);
                 self.budget.charge_bytes(len)?;
-                Ok(Value::String(Rc::from(s)))
+                Ok(Value::String(rc_str(&s)))
             }
             Const::Bool(b) => Ok(Value::Bool(b)),
         }
     }
 }
 
-fn value_to_const(value: &Value<'_>) -> Result<Const, StopReason> {
+fn as_utf16<'a>(v: &'a Value<'a>) -> Option<(usize, Utf16Source<'a>)> {
+    match v {
+        Value::String(s) => Some((s.len() / 16, Utf16Source::from_str(s))),
+        Value::Utf16(u) => Some((u.len() / 8, Utf16Source::from_units(u))),
+        _ => None,
+    }
+}
+
+pub(super) fn value_to_const(value: &Value<'_>) -> Result<Const, StopReason> {
     match value {
         Value::Int(n) => Ok(Const::Number(f64::from(*n))),
         Value::Float(x) => Ok(Const::Number(*x)),
         Value::BigInt(n) => Ok(Const::BigInt(*n)),
         Value::Bool(b) => Ok(Const::Bool(*b)),
-        _ => Err(StopReason::UnknownOp),
-    }
-}
-
-fn order_matches(op: ConstOp, ord: Ordering) -> Result<bool, StopReason> {
-    match op {
-        ConstOp::Lt => Ok(ord.is_lt()),
-        ConstOp::Le => Ok(ord.is_le()),
-        ConstOp::Gt => Ok(ord.is_gt()),
-        ConstOp::Ge => Ok(ord.is_ge()),
         _ => Err(StopReason::UnknownOp),
     }
 }

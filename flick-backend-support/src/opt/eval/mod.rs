@@ -162,6 +162,7 @@ impl EvalBudget {
     }
 
     /// Charges `steps` before performing work or scanning.
+    #[inline(never)]
     pub fn charge_steps(&mut self, steps: u32) -> Result<(), StopReason> {
         if steps == 0 {
             return Ok(());
@@ -180,6 +181,7 @@ impl EvalBudget {
     }
 
     /// Enforces frame depth *before* pushing a new continuation frame.
+    #[inline(never)]
     pub fn check_depth(&self, current_depth: usize) -> Result<(), StopReason> {
         let depth = u32::try_from(current_depth).unwrap_or(u32::MAX);
         if depth >= self.max_frame_depth {
@@ -189,6 +191,7 @@ impl EvalBudget {
     }
 
     /// Charges constructed payload bytes *before* allocating a value.
+    #[inline(never)]
     pub fn charge_bytes(&mut self, bytes: u32) -> Result<(), StopReason> {
         if bytes > self.bytes_remaining {
             return Err(StopReason::ConstructedBytes);

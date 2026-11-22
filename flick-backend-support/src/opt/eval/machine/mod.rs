@@ -11,14 +11,19 @@ mod frame;
 mod ops;
 mod ret;
 
+pub(super) use block::{bind_poly_fun, bind_rec_group};
+
 use std::rc::Rc;
 
-use flick_ir::{BinOp, Expr, ExprKind, Stage};
+use flick_ir::{Expr, ExprKind, Param, Stage, Stmt};
 
-use super::value::{CLOSURE_BYTES, Closure, DictEnv, DictValue, Env, SLOT_BYTES, Value};
+use super::value::{
+    CLOSURE_BYTES, Callable, DictEnv, DictValue, Env, SLOT_BYTES, Value, empty_dicts, empty_fields,
+    empty_values, rc_str,
+};
 use super::{DefTable, EvalBudget, EvalOutcome, PrimitiveEval, StopReason};
 use crate::Known;
-use frame::{Control, Frame, StepResult};
+use frame::{BlockKind, Control, Frame, FrameKind, RecordTarget, UnaryOp};
 use ops::fields_bytes;
 
 pub(super) struct Machine<'a, 'b> {
@@ -27,7 +32,7 @@ pub(super) struct Machine<'a, 'b> {
     primitives: &'b dyn PrimitiveEval,
     budget: &'b mut EvalBudget,
     frames: Vec<Frame<'a>>,
-    active_globals: Vec<(&'a str, &'a str)>,
+    active_globals: Vec<&'a Expr>,
 }
 
 impl<'a, 'b> Machine<'a, 'b> {
@@ -47,10 +52,89 @@ impl<'a, 'b> Machine<'a, 'b> {
         }
     }
 
-    fn push_frame(&mut self, frame: Frame<'a>) -> Result<(), StopReason> {
+    #[inline(never)]
+    fn push_frame(&mut self, kind: FrameKind<'a>, env: Env<'a>) -> Result<(), StopReason> {
         self.budget.check_depth(self.frames.len())?;
-        self.frames.push(frame);
+        self.frames.push(Frame { kind, env });
         Ok(())
+    }
+
+    #[inline(never)]
+    fn make_closure(
+        &mut self,
+        env: Env<'a>,
+        dict_params: &'a [String],
+        params: &'a [Param],
+        body: &'a Expr,
+    ) -> Result<Control<'a>, StopReason> {
+        self.budget.charge_bytes(CLOSURE_BYTES)?;
+        Ok(Control::Return(Value::Callable(Rc::new(
+            Callable::Closure {
+                env,
+                dict_params,
+                params,
+                body,
+                rec_group: &[],
+            },
+        ))))
+    }
+
+    #[inline(never)]
+    fn make_primitive(
+        &mut self,
+        module: &str,
+        name: &str,
+        arity: usize,
+        dicts: Rc<Vec<DictValue<'a>>>,
+    ) -> Result<Control<'a>, StopReason> {
+        let bytes = CLOSURE_BYTES
+            .saturating_add(u32::try_from(module.len()).unwrap_or(u32::MAX))
+            .saturating_add(u32::try_from(name.len()).unwrap_or(u32::MAX));
+        self.budget.charge_bytes(bytes)?;
+        Ok(Control::Return(Value::Callable(Rc::new(
+            Callable::Primitive {
+                module: rc_str(module),
+                name: rc_str(name),
+                arity,
+                dicts,
+                args: empty_values(),
+            },
+        ))))
+    }
+
+    fn closure_env(&mut self, env: &Env<'a>, rec_group: &'a [Stmt]) -> Result<Env<'a>, StopReason> {
+        if rec_group.is_empty() {
+            return Ok(env.clone());
+        }
+        if rec_group.len() > 1 {
+            let extra = u32::try_from(rec_group.len()).unwrap_or(u32::MAX);
+            self.budget.charge_steps(extra)?;
+        }
+        Ok(env.with_rec_group(rec_group))
+    }
+
+    #[inline(never)]
+    fn bind_dict_params(
+        &mut self,
+        env: &Env<'a>,
+        rec_group: &'a [Stmt],
+        params: &[String],
+        dicts: &[DictValue<'a>],
+        base_bytes: u32,
+    ) -> Result<Env<'a>, StopReason> {
+        let mut bytes = base_bytes;
+        for param in params {
+            bytes = bytes.saturating_add(u32::try_from(param.len()).unwrap_or(u32::MAX));
+        }
+        self.budget.charge_bytes(bytes)?;
+        let mut next = self.closure_env(env, rec_group)?;
+        let n = params.len().min(dicts.len());
+        let mut i = 0;
+        while i < n {
+            next = next.with_dict(rc_str(&params[i]), dicts[i].clone());
+            i += 1;
+        }
+        Ok(next)
     }
 
     pub(super) fn run(
@@ -59,95 +143,55 @@ impl<'a, 'b> Machine<'a, 'b> {
         env: Env<'a>,
         dict_env: DictEnv<'a>,
     ) -> EvalOutcome<'a> {
-        let mut control = Control::Eval {
-            expr,
-            env,
-            dict_env,
+        let env = if dict_env.is_empty() {
+            env
+        } else {
+            env.merge_dicts(dict_env)
         };
+        let mut control = Control::Eval { expr, env };
         loop {
-            match self.step(control) {
-                Ok(StepResult::Continue(next)) => control = next,
-                Ok(StepResult::Done(val)) => return EvalOutcome::Known(val),
+            if let Err(reason) = self.budget.charge_steps(1) {
+                return EvalOutcome::Stopped(reason);
+            }
+            let next = match control {
+                Control::Eval { expr, env } => self.step_eval(expr, env),
+                Control::Return(val) => match self.frames.pop() {
+                    Some(frame) => self.step_return(frame, val),
+                    None => return EvalOutcome::Known(val),
+                },
+            };
+            match next {
+                Ok(c) => control = c,
                 Err(reason) => return EvalOutcome::Stopped(reason),
             }
         }
     }
 
-    fn step(&mut self, control: Control<'a>) -> Result<StepResult<'a>, StopReason> {
-        self.budget.charge_steps(1)?;
-        match control {
-            Control::Eval {
-                expr,
-                env,
-                dict_env,
-            } => self.step_eval(expr, env, dict_env),
-            Control::Return(val) => self.step_return(val),
-            Control::BlockStep {
-                stmts,
-                index,
-                result,
-                env,
-                dict_env,
-            } => self.step_block(stmts, index, result, env, dict_env),
-            Control::MatchArm {
-                scrutinee,
-                arms,
-                arm_idx,
-                outer_env,
-                dict_env,
-            } => self.step_match_arm(scrutinee, arms, arm_idx, outer_env, dict_env),
-        }
-    }
-
     #[allow(clippy::too_many_lines, reason = "exhaustive IR expression dispatch")]
-    fn step_eval(
-        &mut self,
-        expr: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    ) -> Result<StepResult<'a>, StopReason> {
-        match &expr.kind {
-            ExprKind::Lit(lit) => Ok(StepResult::Continue(Control::Return(self.eval_lit(lit)?))),
-            ExprKind::Local(name) => match env.get(name, self.budget)? {
-                Some(val) => Ok(StepResult::Continue(Control::Return(val.clone()))),
-                None => Err(StopReason::DynamicRead),
-            },
-            ExprKind::Var(_) => Err(StopReason::DynamicRead),
-            ExprKind::Global { module, name } => self.step_global(module, name),
-            ExprKind::Method { dict, name } => self.step_method(dict, name, &env, &dict_env),
+    fn step_eval(&mut self, expr: &'a Expr, env: Env<'a>) -> Result<Control<'a>, StopReason> {
+        let (frame, next, keep_env) = match &expr.kind {
+            ExprKind::Lit(lit) => return Ok(Control::Return(self.eval_lit(lit)?)),
+            ExprKind::Local(name) => {
+                return match env.get(name, self.budget)? {
+                    Some(val) => Ok(Control::Return(val.clone())),
+                    None => Err(StopReason::DynamicRead),
+                };
+            }
+            ExprKind::Var(_) => return Err(StopReason::DynamicRead),
+            ExprKind::Global { module, name } => return self.step_global(module, name),
+            ExprKind::Method { dict, name } => return self.step_method(dict, name, &env),
             ExprKind::Con(ctor) => {
                 self.budget.charge_bytes(SLOT_BYTES)?;
-                Ok(StepResult::Continue(Control::Return(Value::Con {
+                return Ok(Control::Return(Value::Con {
                     ctor: Rc::new(ctor.clone()),
-                    args: Rc::from([]),
-                    dicts: Rc::from([]),
-                })))
-            }
-            ExprKind::Dicts(inner, dicts) => self.step_dicts(inner, dicts, env, dict_env),
-            ExprKind::Abstract(names, inner) => {
-                self.budget.charge_bytes(CLOSURE_BYTES)?;
-                let closure = Value::Closure(Rc::new(Closure {
-                    env,
-                    dict_env,
-                    dict_params: names,
-                    params: &[],
-                    body: inner,
-                    rec_group: None,
+                    args: empty_values(),
+                    dicts: empty_dicts(),
                 }));
-                Ok(StepResult::Continue(Control::Return(closure)))
             }
-            ExprKind::Lambda { params, body } => {
-                self.budget.charge_bytes(CLOSURE_BYTES)?;
-                let closure = Value::Closure(Rc::new(Closure {
-                    env,
-                    dict_env,
-                    dict_params: &[],
-                    params,
-                    body,
-                    rec_group: None,
-                }));
-                Ok(StepResult::Continue(Control::Return(closure)))
-            }
+            ExprKind::Dicts(inner, dicts) => return self.step_dicts(inner, dicts, env),
+            ExprKind::Abstract(names, inner) => return self.make_closure(env, names, &[], inner),
+            ExprKind::Lambda { params, body } => return self.make_closure(env, &[], params, body),
+            ExprKind::Block(stmts, result) => return self.step_block(stmts, result, env),
             ExprKind::App {
                 func,
                 arg,
@@ -157,241 +201,100 @@ impl<'a, 'b> Machine<'a, 'b> {
                 if *stage != Stage::Pure {
                     return Err(StopReason::UnsafeContext);
                 }
-                if *arg_first {
-                    self.push_frame(Frame::AppArgFirst {
-                        func,
-                        env: env.clone(),
-                        dict_env: dict_env.clone(),
-                    })?;
-                    Ok(StepResult::Continue(Control::Eval {
-                        expr: arg,
-                        env,
-                        dict_env,
-                    }))
-                } else {
-                    self.push_frame(Frame::AppFunc {
-                        arg,
-                        env: env.clone(),
-                        dict_env: dict_env.clone(),
-                    })?;
-                    Ok(StepResult::Continue(Control::Eval {
-                        expr: func,
-                        env,
-                        dict_env,
-                    }))
-                }
+                let (first, second) = if *arg_first { (arg, func) } else { (func, arg) };
+                (
+                    FrameKind::AppSecond {
+                        second,
+                        arg_first: *arg_first,
+                    },
+                    first.as_ref(),
+                    true,
+                )
             }
-            ExprKind::Block(stmts, result) => {
-                if stmts.is_empty() {
-                    Ok(StepResult::Continue(Control::Eval {
-                        expr: result,
-                        env,
-                        dict_env,
-                    }))
-                } else {
-                    Ok(StepResult::Continue(Control::BlockStep {
-                        stmts,
-                        index: 0,
-                        result,
-                        env,
-                        dict_env,
-                    }))
-                }
-            }
-            ExprKind::If(cond, then_expr, else_expr) => {
-                self.push_frame(Frame::If {
+            ExprKind::If(cond, then_expr, else_expr) => (
+                FrameKind::If {
                     then_expr,
                     else_expr,
-                    env: env.clone(),
-                    dict_env: dict_env.clone(),
-                })?;
-                Ok(StepResult::Continue(Control::Eval {
-                    expr: cond,
-                    env,
-                    dict_env,
-                }))
-            }
+                },
+                cond.as_ref(),
+                true,
+            ),
             ExprKind::Match(scrutinee, arms) => {
-                self.push_frame(Frame::MatchScrutinee {
-                    arms,
-                    env: env.clone(),
-                    dict_env: dict_env.clone(),
-                })?;
-                Ok(StepResult::Continue(Control::Eval {
-                    expr: scrutinee,
-                    env,
-                    dict_env,
-                }))
+                (FrameKind::MatchScrutinee { arms }, scrutinee.as_ref(), true)
             }
-            ExprKind::Tuple(items) => {
+            ExprKind::Tuple(items) | ExprKind::List(items) => {
+                let is_list = matches!(expr.kind, ExprKind::List(_));
                 let bytes = u32::try_from(items.len())
                     .unwrap_or(u32::MAX)
                     .saturating_mul(SLOT_BYTES);
                 self.budget.charge_bytes(bytes)?;
-                if items.is_empty() {
-                    Ok(StepResult::Continue(Control::Return(Value::Tuple(
-                        Rc::from([]),
-                    ))))
-                } else {
-                    self.push_frame(Frame::Tuple {
-                        done: Vec::with_capacity(items.len()),
-                        rest: items,
-                        index: 1,
-                        env: env.clone(),
-                        dict_env: dict_env.clone(),
-                    })?;
-                    Ok(StepResult::Continue(Control::Eval {
-                        expr: &items[0],
-                        env,
-                        dict_env,
-                    }))
-                }
-            }
-            ExprKind::List(items) => {
-                let bytes = u32::try_from(items.len())
-                    .unwrap_or(u32::MAX)
-                    .saturating_mul(SLOT_BYTES);
-                self.budget.charge_bytes(bytes)?;
-                if items.is_empty() {
-                    Ok(StepResult::Continue(Control::Return(Value::List(
-                        Rc::from([]),
-                    ))))
-                } else {
-                    self.push_frame(Frame::List {
-                        done: Vec::with_capacity(items.len()),
-                        rest: items,
-                        index: 1,
-                        env: env.clone(),
-                        dict_env: dict_env.clone(),
-                    })?;
-                    Ok(StepResult::Continue(Control::Eval {
-                        expr: &items[0],
-                        env,
-                        dict_env,
-                    }))
-                }
+                let Some((first, rest)) = items.split_first() else {
+                    let empty = if is_list {
+                        Value::List(empty_values())
+                    } else {
+                        Value::Tuple(empty_values())
+                    };
+                    return Ok(Control::Return(empty));
+                };
+                (
+                    FrameKind::Seq {
+                        is_list,
+                        done: Vec::new(),
+                        rest,
+                    },
+                    first,
+                    true,
+                )
             }
             ExprKind::Record(fields) | ExprKind::Dictionary(fields) => {
                 let as_dict = matches!(expr.kind, ExprKind::Dictionary(_));
-                let bytes = fields_bytes(fields);
-                self.budget.charge_bytes(bytes)?;
-                if fields.is_empty() {
+                self.budget.charge_bytes(fields_bytes(fields))?;
+                let Some(((label, first), rest)) = fields.split_first() else {
                     let value = if as_dict {
-                        Value::Dict(DictValue::Record(Rc::from([])))
+                        Value::Dict(Rc::new(DictValue::Record(empty_fields())))
                     } else {
-                        Value::Record(Rc::from([]))
+                        Value::Record(empty_fields())
                     };
-                    Ok(StepResult::Continue(Control::Return(value)))
+                    return Ok(Control::Return(value));
+                };
+                let target = if as_dict {
+                    RecordTarget::Dict
                 } else {
-                    self.push_frame(Frame::Record {
-                        done: Vec::with_capacity(fields.len()),
-                        rest: fields,
-                        index: 1,
-                        as_dict,
-                        env: env.clone(),
-                        dict_env: dict_env.clone(),
-                    })?;
-                    Ok(StepResult::Continue(Control::Eval {
-                        expr: &fields[0].1,
-                        env,
-                        dict_env,
-                    }))
-                }
+                    RecordTarget::Record
+                };
+                (
+                    FrameKind::Record {
+                        label,
+                        done: Vec::new(),
+                        rest,
+                        target,
+                    },
+                    first,
+                    true,
+                )
             }
             ExprKind::Update(base, fields) => {
-                self.push_frame(Frame::UpdateBase {
-                    fields,
-                    env: env.clone(),
-                    dict_env: dict_env.clone(),
-                })?;
-                Ok(StepResult::Continue(Control::Eval {
-                    expr: base,
-                    env,
-                    dict_env,
-                }))
-            }
-            ExprKind::Field(record, label) => {
-                self.push_frame(Frame::Field { label })?;
-                Ok(StepResult::Continue(Control::Eval {
-                    expr: record,
-                    env,
-                    dict_env,
-                }))
-            }
-            ExprKind::Binary(op @ (BinOp::And | BinOp::Or), lhs, rhs) => {
-                self.push_frame(Frame::ShortCircuit {
-                    op: *op,
-                    rhs,
-                    env: env.clone(),
-                    dict_env: dict_env.clone(),
-                })?;
-                Ok(StepResult::Continue(Control::Eval {
-                    expr: lhs,
-                    env,
-                    dict_env,
-                }))
+                (FrameKind::UpdateBase { fields }, base.as_ref(), true)
             }
             ExprKind::Binary(op, lhs, rhs) => {
-                self.push_frame(Frame::BinaryLhs {
-                    op: *op,
-                    rhs,
-                    env: env.clone(),
-                    dict_env: dict_env.clone(),
-                })?;
-                Ok(StepResult::Continue(Control::Eval {
-                    expr: lhs,
-                    env,
-                    dict_env,
-                }))
+                (FrameKind::BinaryLhs { op: *op, rhs }, lhs.as_ref(), true)
             }
+            ExprKind::Field(record, label) => (FrameKind::Field { label }, record.as_ref(), false),
             ExprKind::Neg(num, inner) => {
-                self.push_frame(Frame::Neg(*num))?;
-                Ok(StepResult::Continue(Control::Eval {
-                    expr: inner,
-                    env,
-                    dict_env,
-                }))
+                (FrameKind::Unary(UnaryOp::Neg(*num)), inner.as_ref(), false)
             }
-            ExprKind::Not(inner) => {
-                self.push_frame(Frame::Not)?;
-                Ok(StepResult::Continue(Control::Eval {
-                    expr: inner,
-                    env,
-                    dict_env,
-                }))
-            }
-            ExprKind::Ignore(inner) => {
-                self.push_frame(Frame::Ignore)?;
-                Ok(StepResult::Continue(Control::Eval {
-                    expr: inner,
-                    env,
-                    dict_env,
-                }))
-            }
-            ExprKind::Unwrap(inner) => {
-                self.push_frame(Frame::Unwrap)?;
-                Ok(StepResult::Continue(Control::Eval {
-                    expr: inner,
-                    env,
-                    dict_env,
-                }))
-            }
-            ExprKind::Label(_) => Err(StopReason::UnknownOp),
-            ExprKind::Perform { .. }
-            | ExprKind::ServiceTag(_)
-            | ExprKind::Generate { .. }
-            | ExprKind::Each { .. }
-            | ExprKind::Yield(_)
-            | ExprKind::Loop { .. }
-            | ExprKind::ControlLoop { .. }
-            | ExprKind::LoopExit { .. }
-            | ExprKind::Await(_)
-            | ExprKind::Task(_)
-            | ExprKind::Within(..)
-            | ExprKind::ReadOwnerEvidence
-            | ExprKind::WithOwnerEvidence(..)
-            | ExprKind::Handle(_)
-            | ExprKind::Lift(..) => Err(StopReason::UnsafeContext),
-        }
+            ExprKind::Not(inner) => (FrameKind::Unary(UnaryOp::Not), inner.as_ref(), false),
+            ExprKind::Ignore(inner) => (FrameKind::Unary(UnaryOp::Ignore), inner.as_ref(), false),
+            ExprKind::Unwrap(inner) => (FrameKind::Unary(UnaryOp::Unwrap), inner.as_ref(), false),
+            ExprKind::Label(_) => return Err(StopReason::UnknownOp),
+            _ => return Err(StopReason::UnsafeContext),
+        };
+        let frame_env = if keep_env {
+            env.clone()
+        } else {
+            Env::default()
+        };
+        self.push_frame(frame, frame_env)?;
+        Ok(Control::Eval { expr: next, env })
     }
 }

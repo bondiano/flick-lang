@@ -1,6 +1,8 @@
 //! Expression walker for the bounded concrete evaluation pass.
 
-use flick_ir::{BinOp, Expr, ExprKind, Lit, Stage};
+use std::mem;
+
+use flick_ir::{Arm, BinOp, Expr, ExprKind, Lit, Stage};
 
 use super::block::shadow_pat;
 use super::{EvalAttempt, Hint, PassCtx};
@@ -36,7 +38,10 @@ impl<'a> PassCtx<'a, '_> {
                 });
                 Hint::NonConcrete
             }
-            ExprKind::Lit(_) | ExprKind::Con(_) => Hint::Concrete,
+            ExprKind::Lit(_)
+            | ExprKind::Con(_)
+            | ExprKind::Global { .. }
+            | ExprKind::Method { .. } => Hint::Concrete,
             ExprKind::Local(name) => {
                 if env.peek(name).is_some() {
                     Hint::Concrete
@@ -44,24 +49,12 @@ impl<'a> PassCtx<'a, '_> {
                     Hint::NonConcrete
                 }
             }
-            ExprKind::Var(_)
-            | ExprKind::ReadOwnerEvidence
-            | ExprKind::Perform { .. }
-            | ExprKind::ServiceTag(_)
-            | ExprKind::Label(_) => Hint::NonConcrete,
-            ExprKind::Global { .. } | ExprKind::Method { .. } => {
-                // Bare globals and methods are not replaced directly (avoid duplicating
-                // shared top-level values/defaults); they remain concrete operands for
-                // enclosing calls/matches/projections.
-                Hint::Concrete
-            }
             ExprKind::Lambda { params, body } => {
                 let mut inner_env = env.clone();
                 for param in params.iter() {
                     shadow_pat(&param.pat, &mut inner_env);
                 }
                 self.visit_expr(body, &inner_env, false, depth + 1);
-                // Creating a closure is inert even if its body reads dynamic locals.
                 Hint::Concrete
             }
             ExprKind::Abstract(_, inner) => {
@@ -69,8 +62,7 @@ impl<'a> PassCtx<'a, '_> {
                 Hint::Concrete
             }
             ExprKind::Dicts(inner, _) => {
-                let ih = self.visit_expr(inner, env, true, depth + 1);
-                if ih != Hint::Concrete {
+                if self.visit_expr(inner, env, true, depth + 1) != Hint::Concrete {
                     return Hint::NonConcrete;
                 }
                 if is_pure_app_callee {
@@ -81,20 +73,15 @@ impl<'a> PassCtx<'a, '_> {
             ExprKind::If(cond, then_expr, else_expr) => {
                 let cond_hint = self.visit_expr(cond, env, false, depth + 1);
                 if let ExprKind::Lit(Lit::Bool(flag)) = cond.kind {
-                    let chosen = if flag {
-                        then_expr.as_ref().clone()
-                    } else {
-                        else_expr.as_ref().clone()
-                    };
-                    *e = chosen;
+                    let chosen = if flag { then_expr } else { else_expr };
+                    *e = mem::replace(chosen, Expr::new(ExprKind::Lit(Lit::Unit), e.span));
                     self.changed = true;
                     return self.visit_expr(e, env, is_pure_app_callee, depth + 1);
                 }
-                if cond_hint == Hint::Concrete {
-                    match self.try_eval_and_replace(e, env) {
-                        EvalAttempt::Replaced | EvalAttempt::KnownKept => return Hint::Concrete,
-                        EvalAttempt::Stopped => {}
-                    }
+                if cond_hint == Hint::Concrete
+                    && self.try_eval_and_replace(e, env) != EvalAttempt::Stopped
+                {
+                    return Hint::Concrete;
                 }
                 if let ExprKind::If(_, then_expr, else_expr) = &mut e.kind {
                     self.visit_expr(then_expr, env, false, depth + 1);
@@ -111,16 +98,13 @@ impl<'a> PassCtx<'a, '_> {
                         | (BinOp::Or, ExprKind::Lit(Lit::Bool(true)))
                 );
                 if short {
-                    *e = lhs.as_ref().clone();
+                    *e = mem::replace(lhs, Expr::new(ExprKind::Lit(Lit::Unit), e.span));
                     self.changed = true;
                     return Hint::Concrete;
                 }
                 let rhs_hint = self.visit_expr(rhs, env, false, depth + 1);
                 if lhs_hint == Hint::Concrete && rhs_hint == Hint::Concrete {
-                    return match self.try_eval_and_replace(e, env) {
-                        EvalAttempt::Replaced | EvalAttempt::KnownKept => Hint::Concrete,
-                        EvalAttempt::Stopped => Hint::NonConcrete,
-                    };
+                    return self.eval_attempt_hint(e, env);
                 }
                 Hint::NonConcrete
             }
@@ -130,28 +114,19 @@ impl<'a> PassCtx<'a, '_> {
                 stage,
                 arg_first,
             } => {
-                let stage = *stage;
+                let is_pure = *stage == Stage::Pure;
                 let arg_first = *arg_first;
-                if stage != Stage::Pure {
-                    if arg_first {
-                        self.visit_expr(arg, env, false, depth + 1);
-                        self.visit_expr(func, env, false, depth + 1);
-                    } else {
-                        self.visit_expr(func, env, false, depth + 1);
-                        self.visit_expr(arg, env, false, depth + 1);
-                    }
-                    return Hint::NonConcrete;
-                }
+                let callee_flag = is_pure && is_curried_prefix(func);
                 let (func_hint, arg_hint) = if arg_first {
                     let ah = self.visit_expr(arg, env, false, depth + 1);
-                    let fh = self.visit_expr(func, env, is_curried_prefix(func), depth + 1);
+                    let fh = self.visit_expr(func, env, callee_flag, depth + 1);
                     (fh, ah)
                 } else {
-                    let fh = self.visit_expr(func, env, is_curried_prefix(func), depth + 1);
+                    let fh = self.visit_expr(func, env, callee_flag, depth + 1);
                     let ah = self.visit_expr(arg, env, false, depth + 1);
                     (fh, ah)
                 };
-                if func_hint != Hint::Concrete || arg_hint != Hint::Concrete {
+                if !is_pure || func_hint != Hint::Concrete || arg_hint != Hint::Concrete {
                     return Hint::NonConcrete;
                 }
                 if is_pure_app_callee {
@@ -161,97 +136,37 @@ impl<'a> PassCtx<'a, '_> {
             }
             ExprKind::Block(..) => self.visit_block(e, env, depth),
             ExprKind::Match(scrutinee, _) => {
-                let s_hint = self.visit_expr(scrutinee, env, false, depth + 1);
-                if s_hint == Hint::Concrete {
-                    match self.try_eval_and_replace(e, env) {
-                        EvalAttempt::Replaced | EvalAttempt::KnownKept => return Hint::Concrete,
-                        EvalAttempt::Stopped => {}
-                    }
+                if self.visit_expr(scrutinee, env, false, depth + 1) == Hint::Concrete
+                    && self.try_eval_and_replace(e, env) != EvalAttempt::Stopped
+                {
+                    return Hint::Concrete;
                 }
                 if let ExprKind::Match(_, arms) = &mut e.kind {
-                    for arm in arms {
-                        let mut arm_env = env.clone();
-                        shadow_pat(&arm.pat, &mut arm_env);
-                        if let Some(guard) = &mut arm.guard {
-                            self.visit_expr(guard, &arm_env, false, depth + 1);
-                        }
-                        self.visit_expr(&mut arm.body, &arm_env, false, depth + 1);
-                    }
+                    self.visit_arms(arms, env, depth);
                 }
                 Hint::NonConcrete
             }
-            ExprKind::Tuple(items) | ExprKind::List(items) => {
-                let mut all_concrete = true;
-                for item in items.iter_mut() {
-                    if self.visit_expr(item, env, false, depth + 1) != Hint::Concrete {
-                        all_concrete = false;
-                    }
-                }
-                if all_concrete {
+            ExprKind::Tuple(_)
+            | ExprKind::List(_)
+            | ExprKind::Record(_)
+            | ExprKind::Dictionary(_) => {
+                if self.visit_children_concrete(e, env, depth) {
                     Hint::Concrete
                 } else {
                     Hint::NonConcrete
                 }
             }
-            ExprKind::Record(fields) | ExprKind::Dictionary(fields) => {
-                let mut all_concrete = true;
-                for (_, val) in fields.iter_mut() {
-                    if self.visit_expr(val, env, false, depth + 1) != Hint::Concrete {
-                        all_concrete = false;
-                    }
-                }
-                if all_concrete {
-                    Hint::Concrete
+            ExprKind::Update(..)
+            | ExprKind::Field(..)
+            | ExprKind::Binary(..)
+            | ExprKind::Neg(..)
+            | ExprKind::Not(_)
+            | ExprKind::Ignore(_) => {
+                if self.visit_children_concrete(e, env, depth) {
+                    self.eval_attempt_hint(e, env)
                 } else {
                     Hint::NonConcrete
                 }
-            }
-            ExprKind::Update(base, fields) => {
-                let mut all_concrete =
-                    self.visit_expr(base, env, false, depth + 1) == Hint::Concrete;
-                for (_, val) in fields.iter_mut() {
-                    if self.visit_expr(val, env, false, depth + 1) != Hint::Concrete {
-                        all_concrete = false;
-                    }
-                }
-                if all_concrete {
-                    return match self.try_eval_and_replace(e, env) {
-                        EvalAttempt::Replaced | EvalAttempt::KnownKept => Hint::Concrete,
-                        EvalAttempt::Stopped => Hint::NonConcrete,
-                    };
-                }
-                Hint::NonConcrete
-            }
-            ExprKind::Field(record, _) => {
-                let r_hint = self.visit_expr(record, env, false, depth + 1);
-                if r_hint == Hint::Concrete {
-                    return match self.try_eval_and_replace(e, env) {
-                        EvalAttempt::Replaced | EvalAttempt::KnownKept => Hint::Concrete,
-                        EvalAttempt::Stopped => Hint::NonConcrete,
-                    };
-                }
-                Hint::NonConcrete
-            }
-            ExprKind::Binary(_, lhs, rhs) => {
-                let lh = self.visit_expr(lhs, env, false, depth + 1);
-                let rh = self.visit_expr(rhs, env, false, depth + 1);
-                if lh == Hint::Concrete && rh == Hint::Concrete {
-                    return match self.try_eval_and_replace(e, env) {
-                        EvalAttempt::Replaced | EvalAttempt::KnownKept => Hint::Concrete,
-                        EvalAttempt::Stopped => Hint::NonConcrete,
-                    };
-                }
-                Hint::NonConcrete
-            }
-            ExprKind::Neg(_, inner) | ExprKind::Not(inner) | ExprKind::Ignore(inner) => {
-                let ih = self.visit_expr(inner, env, false, depth + 1);
-                if ih == Hint::Concrete {
-                    return match self.try_eval_and_replace(e, env) {
-                        EvalAttempt::Replaced | EvalAttempt::KnownKept => Hint::Concrete,
-                        EvalAttempt::Stopped => Hint::NonConcrete,
-                    };
-                }
-                Hint::NonConcrete
             }
             ExprKind::Each {
                 stop,
@@ -278,47 +193,52 @@ impl<'a> PassCtx<'a, '_> {
                 if let Some(ret) = &mut h.ret {
                     self.visit_expr(ret, env, false, depth + 1);
                 }
-                for arm in &mut h.errors {
-                    let mut arm_env = env.clone();
-                    shadow_pat(&arm.pat, &mut arm_env);
-                    if let Some(guard) = &mut arm.guard {
-                        self.visit_expr(guard, &arm_env, false, depth + 1);
-                    }
-                    self.visit_expr(&mut arm.body, &arm_env, false, depth + 1);
-                }
+                self.visit_arms(&mut h.errors, env, depth);
                 Hint::NonConcrete
             }
-            ExprKind::Generate { body, limit, .. }
-            | ExprKind::ControlLoop {
-                body,
-                condition: limit,
-                ..
-            } => {
-                if let Some(limit) = limit {
-                    self.visit_expr(limit, env, false, depth + 1);
-                }
-                self.visit_expr(body, env, false, depth + 1);
+            _ => {
+                e.each_child_mut(&mut |child| {
+                    self.visit_expr(child, env, false, depth + 1);
+                });
                 Hint::NonConcrete
             }
-            ExprKind::Loop { condition, body } => {
-                self.visit_expr(condition, env, false, depth + 1);
-                self.visit_expr(body, env, false, depth + 1);
-                Hint::NonConcrete
+        }
+    }
+
+    fn visit_arms<'e>(&mut self, arms: &'e mut [Arm], env: &Env<'e>, depth: u32)
+    where
+        'a: 'e,
+    {
+        for arm in arms {
+            let mut arm_env = env.clone();
+            shadow_pat(&arm.pat, &mut arm_env);
+            if let Some(guard) = &mut arm.guard {
+                self.visit_expr(guard, &arm_env, false, depth + 1);
             }
-            ExprKind::LoopExit { value, .. } => {
-                if let Some(value) = value {
-                    self.visit_expr(value, env, false, depth + 1);
-                }
-                Hint::NonConcrete
+            self.visit_expr(&mut arm.body, &arm_env, false, depth + 1);
+        }
+    }
+
+    fn visit_children_concrete<'e>(&mut self, e: &'e mut Expr, env: &Env<'e>, depth: u32) -> bool
+    where
+        'a: 'e,
+    {
+        let mut all_concrete = true;
+        e.each_child_mut(&mut |child| {
+            if self.visit_expr(child, env, false, depth + 1) != Hint::Concrete {
+                all_concrete = false;
             }
-            ExprKind::Unwrap(inner)
-            | ExprKind::Yield(inner)
-            | ExprKind::Await(inner)
-            | ExprKind::Task(inner)
-            | ExprKind::Lift(inner, _) => {
-                self.visit_expr(inner, env, false, depth + 1);
-                Hint::NonConcrete
-            }
+        });
+        all_concrete
+    }
+
+    fn eval_attempt_hint<'e>(&mut self, e: &'e mut Expr, env: &Env<'e>) -> Hint
+    where
+        'a: 'e,
+    {
+        match self.try_eval_and_replace(e, env) {
+            EvalAttempt::Replaced | EvalAttempt::KnownKept => Hint::Concrete,
+            EvalAttempt::Stopped => Hint::NonConcrete,
         }
     }
 }

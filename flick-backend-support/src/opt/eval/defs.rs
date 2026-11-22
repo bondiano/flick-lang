@@ -1,12 +1,12 @@
 //! Bounded, deterministic definition table for the portable-IR evaluator.
 //!
 //! Snapshots own-module pure definitions and transitively preloads reachable
-//! external pure definitions and instance methods with deterministic `BTreeSet`
-//! ordering, lazy polymorphic candidate generation, and hard caps on both
-//! loaded definitions ([`MAX_EXTERNAL_DEFS`]) and attempted lookup probes
-//! ([`MAX_EXTERNAL_PROBES`]).
+//! external pure definitions and instance methods with deterministic
+//! lexicographical ordering, lazy polymorphic candidate generation, and hard
+//! caps on both loaded definitions ([`MAX_EXTERNAL_DEFS`]) and attempted lookup
+//! probes ([`MAX_EXTERNAL_PROBES`]).
 
-use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::mem;
 
 use flick_ir::{Dict, Expr, ExprKind, ItemKind, Module};
@@ -22,82 +22,92 @@ pub(super) const MAX_EXTERNAL_PROBES: usize = 1_024;
 
 /// Immutable snapshot of pure definitions and instance methods available to
 /// the evaluator during an optimization round.
+///
+/// Shares a single `HashMap<String, (Vec<String>, Expr)>` (already
+/// monomorphized by [`crate::opt::specialize`]) with disjoint NUL-delimited
+/// keys for values (`"v\0<module>\0<name>"`) and methods
+/// (`"m\0<module>\0<instance>\0<method>"`).
 #[derive(Debug, Default)]
 pub struct DefTable {
-    values: HashMap<(String, String), (Vec<String>, Expr)>,
-    methods: HashMap<(String, String, String), (Vec<String>, Expr)>,
+    defs: HashMap<String, (Vec<String>, Expr)>,
 }
 
+/// Joins `parts` with `'\0'` into a compact composite key.
+pub(super) fn join_nul(parts: &[&str]) -> String {
+    let mut cap = parts.len().saturating_sub(1);
+    for part in parts {
+        cap += part.len();
+    }
+    let mut k = String::with_capacity(cap);
+    for (i, part) in parts.iter().enumerate() {
+        if i > 0 {
+            k.push('\0');
+        }
+        k.push_str(part);
+    }
+    k
+}
+
+fn value_key(module: &str, name: &str) -> String {
+    join_nul(&["v", module, name])
+}
+
+fn method_key(module: &str, instance: &str, method: &str) -> String {
+    join_nul(&["m", module, instance, method])
+}
+
+#[inline(never)]
+fn compact_sorted(vec: &mut Vec<String>, cap: usize) {
+    vec.sort();
+    vec.dedup();
+    vec.truncate(cap);
+}
+
+fn push_bounded_sorted(vec: &mut Vec<String>, item: String, cap: usize) {
+    vec.push(item);
+    if vec.len() >= cap * 2 {
+        compact_sorted(vec, cap);
+    }
+}
+
+#[derive(Default)]
+struct StrQueue {
+    items: Vec<String>,
+    head: usize,
+}
+
+impl StrQueue {
+    fn push(&mut self, seen: &mut HashSet<String>, key: String) {
+        if self.items.len() >= MAX_EXTERNAL_PROBES {
+            return;
+        }
+        if seen.insert(key.clone()) {
+            self.items.push(key);
+        }
+    }
+
+    fn pop(&mut self) -> Option<String> {
+        let slot = self.items.get_mut(self.head)?;
+        self.head += 1;
+        Some(mem::take(slot))
+    }
+}
+
+#[derive(Default)]
 struct RefQueues {
-    values: VecDeque<(String, String)>,
-    methods: VecDeque<(String, String, String)>,
-    seen_values: HashSet<(String, String)>,
-    seen_methods: HashSet<(String, String, String)>,
-    queued_values: usize,
-    queued_methods: usize,
-    ext_instances: BTreeSet<(String, String)>,
-    polymorphic_methods: BTreeSet<String>,
-}
-
-impl RefQueues {
-    fn new() -> Self {
-        RefQueues {
-            values: VecDeque::new(),
-            methods: VecDeque::new(),
-            seen_values: HashSet::new(),
-            seen_methods: HashSet::new(),
-            queued_values: 0,
-            queued_methods: 0,
-            ext_instances: BTreeSet::new(),
-            polymorphic_methods: BTreeSet::new(),
-        }
-    }
-
-    fn push_value(&mut self, owner: &str, name: &str) {
-        if self.queued_values >= MAX_EXTERNAL_PROBES {
-            return;
-        }
-        let key = (owner.to_owned(), name.to_owned());
-        if self.seen_values.insert(key.clone()) {
-            self.queued_values += 1;
-            self.values.push_back(key);
-        }
-    }
-
-    fn push_method(&mut self, owner: &str, instance: &str, method: &str) {
-        if self.queued_methods >= MAX_EXTERNAL_PROBES {
-            return;
-        }
-        let key = (owner.to_owned(), instance.to_owned(), method.to_owned());
-        if self.seen_methods.insert(key.clone()) {
-            self.queued_methods += 1;
-            self.methods.push_back(key);
-        }
-    }
-
-    fn insert_ext_instance(&mut self, owner: &str, instance: &str) {
-        insert_bounded_set(
-            &mut self.ext_instances,
-            (owner.to_owned(), instance.to_owned()),
-            MAX_EXTERNAL_PROBES,
-        );
-    }
-
-    fn insert_poly_method(&mut self, method: &str) {
-        insert_bounded_set(
-            &mut self.polymorphic_methods,
-            method.to_owned(),
-            MAX_EXTERNAL_PROBES,
-        );
-    }
+    values: StrQueue,
+    methods: StrQueue,
+    seen: HashSet<String>,
+    ext_instances: Vec<String>,
+    polymorphic_methods: Vec<String>,
 }
 
 /// Lazy lexicographical iterator over `ext_instances × polymorphic_methods`.
 ///
-/// Materializes only the two bounded factor vectors (`O(|I| + |M|)`) instead of
-/// the full Cartesian product (`O(|I| × |M|)`), yielding candidates on demand.
+/// Materializes only the two bounded sorted factor vectors (`O(|I| + |M|)`)
+/// instead of the full Cartesian product (`O(|I| × |M|)`).
 struct PolyCursor {
-    instances: Vec<(String, String)>,
+    instances: Vec<String>,
     methods: Vec<String>,
     inst_idx: usize,
     method_idx: usize,
@@ -105,26 +115,31 @@ struct PolyCursor {
 
 impl PolyCursor {
     fn from_queues(queues: &mut RefQueues) -> Self {
+        let mut instances = mem::take(&mut queues.ext_instances);
+        compact_sorted(&mut instances, MAX_EXTERNAL_PROBES);
+        let mut methods = mem::take(&mut queues.polymorphic_methods);
+        compact_sorted(&mut methods, MAX_EXTERNAL_PROBES);
         PolyCursor {
-            instances: mem::take(&mut queues.ext_instances).into_iter().collect(),
-            methods: mem::take(&mut queues.polymorphic_methods)
-                .into_iter()
-                .collect(),
+            instances,
+            methods,
             inst_idx: 0,
             method_idx: 0,
         }
     }
 
-    fn next(&mut self) -> Option<(String, String, String)> {
+    fn next(&mut self) -> Option<(&str, &str, &str)> {
         if self.methods.is_empty() {
             return None;
         }
-        while self.inst_idx < self.instances.len() {
-            if self.method_idx < self.methods.len() {
-                let (owner, instance) = &self.instances[self.inst_idx];
-                let method = &self.methods[self.method_idx];
+        while let Some(inst) = self.instances.get(self.inst_idx) {
+            if let Some(method) = self.methods.get(self.method_idx) {
+                let Some((owner, instance)) = inst.split_once('\0') else {
+                    self.inst_idx += 1;
+                    self.method_idx = 0;
+                    continue;
+                };
                 self.method_idx += 1;
-                return Some((owner.clone(), instance.clone(), method.clone()));
+                return Some((owner, instance, method.as_str()));
             }
             self.inst_idx += 1;
             self.method_idx = 0;
@@ -133,7 +148,24 @@ impl PolyCursor {
     }
 }
 
+fn split_value_key(key: &str) -> Option<(&str, &str)> {
+    key.strip_prefix("v\0")?.split_once('\0')
+}
+
+fn split_method_key(key: &str) -> Option<(&str, &str, &str)> {
+    let rest = key.strip_prefix("m\0")?;
+    let (owner, rest) = rest.split_once('\0')?;
+    let (instance, method) = rest.split_once('\0')?;
+    Some((owner, instance, method))
+}
+
 impl DefTable {
+    #[inline(never)]
+    fn record_own(&mut self, seen: &mut HashSet<String>, key: String, val: (Vec<String>, Expr)) {
+        seen.insert(key.clone());
+        self.defs.insert(key, val);
+    }
+
     /// Builds a [`DefTable`] for `module` by snapshotting own items and
     /// transitively pre-loading reachable external pure definitions via `generics`
     /// and `lookup` (bounded by [`MAX_EXTERNAL_DEFS`] and [`MAX_EXTERNAL_PROBES`]).
@@ -144,32 +176,32 @@ impl DefTable {
         _lang: &Known<'_>,
     ) -> Self {
         let mut table = DefTable::default();
-        let mut queues = RefQueues::new();
+        let mut queues = RefQueues::default();
 
         // Pass 1: register all own-module definitions before scanning bodies so
         // forward references within `module` never consume external probe slots.
         for item in &module.items {
             match &item.kind {
                 ItemKind::Value { name, dicts, body } => {
-                    let key = (module.name.clone(), name.clone());
-                    queues.seen_values.insert(key.clone());
-                    table.values.insert(key, (dicts.clone(), body.clone()));
+                    let key = value_key(&module.name, name);
+                    table.record_own(&mut queues.seen, key, (dicts.clone(), body.clone()));
                 }
                 ItemKind::Instance { info, methods } => {
                     for (m, code) in methods {
-                        let key = (module.name.clone(), info.name.clone(), m.clone());
-                        queues.seen_methods.insert(key.clone());
-                        table
-                            .methods
-                            .insert(key, (info.context.clone(), code.clone()));
+                        let key = method_key(&module.name, &info.name, m);
+                        table.record_own(
+                            &mut queues.seen,
+                            key,
+                            (info.context.clone(), code.clone()),
+                        );
                     }
                     for (m, n, _) in &info.defaults {
                         if *n == 0 {
-                            let key = (module.name.clone(), info.name.clone(), m.clone());
-                            if queues.seen_methods.insert(key.clone())
+                            let key = method_key(&module.name, &info.name, m);
+                            if queues.seen.insert(key.clone())
                                 && let Some(found) = lookup.raw_method(&module.name, &info.name, m)
                             {
-                                table.methods.insert(key, found);
+                                table.defs.insert(key, found);
                             }
                         }
                     }
@@ -183,23 +215,15 @@ impl DefTable {
 
         // Pass 2: collect external references from own items and own default methods.
         for item in &module.items {
-            match &item.kind {
-                ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => {
-                    enqueue_refs(body, &module.name, &mut queues);
-                }
-                ItemKind::Instance { info, methods } => {
-                    for (_, code) in methods {
-                        enqueue_refs(code, &module.name, &mut queues);
-                    }
-                    for (m, n, _) in &info.defaults {
-                        if *n == 0
-                            && let Some((_, body)) = table.method(&module.name, &info.name, m)
-                        {
-                            enqueue_refs(body, &module.name, &mut queues);
-                        }
+            item.each_body(&mut |body| enqueue_refs(body, &module.name, &mut queues));
+            if let ItemKind::Instance { info, .. } = &item.kind {
+                for (m, n, _) in &info.defaults {
+                    if *n == 0
+                        && let Some((_, body)) = table.method(&module.name, &info.name, m)
+                    {
+                        enqueue_refs(body, &module.name, &mut queues);
                     }
                 }
-                ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
             }
         }
 
@@ -207,35 +231,35 @@ impl DefTable {
         let mut external_probes = 0_usize;
         let mut poly: Option<PolyCursor> = None;
         while external_loaded < MAX_EXTERNAL_DEFS && external_probes < MAX_EXTERNAL_PROBES {
-            if let Some(key) = queues.values.pop_front() {
-                external_probes += 1;
-                if let Some((dicts, body)) = generics(&key.0, &key.1) {
-                    enqueue_refs(&body, &module.name, &mut queues);
-                    table.values.insert(key, (dicts, body));
-                    external_loaded += 1;
-                }
-                continue;
-            }
-            if let Some(key) = queues.methods.pop_front() {
-                external_probes += 1;
-                if let Some((context, body)) = lookup.raw_method(&key.0, &key.1, &key.2) {
-                    enqueue_refs(&body, &module.name, &mut queues);
-                    table.methods.insert(key, (context, body));
-                    external_loaded += 1;
-                }
-                continue;
-            }
-            let cursor = poly.get_or_insert_with(|| PolyCursor::from_queues(&mut queues));
-            let Some(key) = cursor.next() else {
-                break;
+            let (key, found) = if let Some(key) = queues.values.pop() {
+                let found = split_value_key(&key).and_then(|(owner, name)| {
+                    external_probes += 1;
+                    generics(owner, name)
+                });
+                (key, found)
+            } else {
+                let key = if let Some(key) = queues.methods.pop() {
+                    key
+                } else {
+                    let cursor = poly.get_or_insert_with(|| PolyCursor::from_queues(&mut queues));
+                    let Some((owner, instance, method)) = cursor.next() else {
+                        break;
+                    };
+                    let key = method_key(owner, instance, method);
+                    if !queues.seen.insert(key.clone()) {
+                        continue;
+                    }
+                    key
+                };
+                let found = split_method_key(&key).and_then(|(owner, instance, method)| {
+                    external_probes += 1;
+                    lookup.raw_method(owner, instance, method)
+                });
+                (key, found)
             };
-            if !queues.seen_methods.insert(key.clone()) {
-                continue;
-            }
-            external_probes += 1;
-            if let Some((context, body)) = lookup.raw_method(&key.0, &key.1, &key.2) {
+            if let Some((ctx, body)) = found {
                 enqueue_refs(&body, &module.name, &mut queues);
-                table.methods.insert(key, (context, body));
+                table.defs.insert(key, (ctx, body));
                 external_loaded += 1;
             }
         }
@@ -243,26 +267,26 @@ impl DefTable {
     }
 
     /// Inserts a single value definition (useful for unit tests).
-    pub fn insert_value(&mut self, module: String, name: String, dicts: Vec<String>, body: Expr) {
-        self.values.insert((module, name), (dicts, body));
+    pub fn insert_value(&mut self, module: &str, name: &str, dicts: Vec<String>, body: Expr) {
+        self.defs.insert(value_key(module, name), (dicts, body));
     }
 
     /// Inserts a single instance method definition (useful for unit tests).
     pub fn insert_method(
         &mut self,
-        module: String,
-        instance: String,
-        method: String,
+        module: &str,
+        instance: &str,
+        method: &str,
         context: Vec<String>,
         body: Expr,
     ) {
-        self.methods
-            .insert((module, instance, method), (context, body));
+        self.defs
+            .insert(method_key(module, instance, method), (context, body));
     }
 
     pub(super) fn value(&self, module: &str, name: &str) -> Option<(&[String], &Expr)> {
-        self.values
-            .get(&(module.to_owned(), name.to_owned()))
+        self.defs
+            .get(value_key(module, name).as_str())
             .map(|(d, b)| (d.as_slice(), b))
     }
 
@@ -272,25 +296,9 @@ impl DefTable {
         instance: &str,
         method: &str,
     ) -> Option<(&[String], &Expr)> {
-        self.methods
-            .get(&(module.to_owned(), instance.to_owned(), method.to_owned()))
+        self.defs
+            .get(method_key(module, instance, method).as_str())
             .map(|(c, b)| (c.as_slice(), b))
-    }
-}
-
-/// Keeps the lexicographically smallest `cap` distinct values in `set`,
-/// producing identical results regardless of insertion order.
-fn insert_bounded_set<T: Ord>(set: &mut BTreeSet<T>, value: T, cap: usize) {
-    if set.contains(&value) {
-        return;
-    }
-    if set.len() < cap {
-        set.insert(value);
-    } else if let Some(last) = set.last()
-        && &value < last
-    {
-        set.pop_last();
-        set.insert(value);
     }
 }
 
@@ -299,14 +307,16 @@ fn enqueue_refs(root: &Expr, current_module: &str, queues: &mut RefQueues) {
     while let Some(e) = stack.pop() {
         match &e.kind {
             ExprKind::Global { module, name } if module != current_module => {
-                queues.push_value(module, name);
+                queues
+                    .values
+                    .push(&mut queues.seen, value_key(module, name));
             }
             ExprKind::Method { dict, name } => {
-                enqueue_dict_methods(dict, name, current_module, queues);
+                walk_dict(dict, Some(name), current_module, queues);
             }
             ExprKind::Dicts(_, dicts) => {
                 for dict in dicts {
-                    collect_external_instances(dict, current_module, queues);
+                    walk_dict(dict, None, current_module, queues);
                 }
             }
             _ => {}
@@ -315,60 +325,62 @@ fn enqueue_refs(root: &Expr, current_module: &str, queues: &mut RefQueues) {
     }
 }
 
-fn enqueue_dict_methods(dict: &Dict, method: &str, current_module: &str, queues: &mut RefQueues) {
-    let mut stack = vec![dict];
-    while let Some(d) = stack.pop() {
-        match d {
-            Dict::Instance { module, name, args } => {
-                queues.push_method(module, name, method);
-                for arg in args {
-                    collect_external_instances(arg, current_module, queues);
-                    stack.push(arg);
+fn walk_dict(root: &Dict, method: Option<&str>, current_module: &str, queues: &mut RefQueues) {
+    let mut inst_stack: Vec<&Dict> = Vec::new();
+    if let Some(method_name) = method {
+        let mut stack = vec![root];
+        while let Some(d) = stack.pop() {
+            match d {
+                Dict::Instance { module, name, args } => {
+                    queues
+                        .methods
+                        .push(&mut queues.seen, method_key(module, name, method_name));
+                    for arg in args {
+                        stack.push(arg);
+                        inst_stack.push(arg);
+                    }
                 }
-            }
-            Dict::Super { dict, .. } => stack.push(dict),
-            Dict::Structural { fields, .. } => {
-                for field in fields {
-                    stack.push(field);
+                Dict::Super { dict, .. } => stack.push(dict),
+                Dict::Structural { fields, .. } => {
+                    for field in fields {
+                        stack.push(field);
+                    }
                 }
+                Dict::Given(_) | Dict::Field(_) => {
+                    push_bounded_sorted(
+                        &mut queues.polymorphic_methods,
+                        method_name.to_owned(),
+                        MAX_EXTERNAL_PROBES,
+                    );
+                }
+                _ => {}
             }
-            Dict::Given(_) | Dict::Field(_) => {
-                queues.insert_poly_method(method);
-            }
-            Dict::Value { .. }
-            | Dict::Opened { .. }
-            | Dict::Primitive { .. }
-            | Dict::Site { .. }
-            | Dict::Error => {}
         }
+    } else {
+        inst_stack.push(root);
     }
-}
 
-fn collect_external_instances(dict: &Dict, current_module: &str, queues: &mut RefQueues) {
-    let mut stack = vec![dict];
-    while let Some(d) = stack.pop() {
+    while let Some(d) = inst_stack.pop() {
         match d {
             Dict::Instance { module, name, args } => {
                 if module != current_module {
-                    queues.insert_ext_instance(module, name);
+                    push_bounded_sorted(
+                        &mut queues.ext_instances,
+                        join_nul(&[module, name]),
+                        MAX_EXTERNAL_PROBES,
+                    );
                 }
                 for arg in args {
-                    stack.push(arg);
+                    inst_stack.push(arg);
                 }
             }
-            Dict::Super { dict, .. } => stack.push(dict),
+            Dict::Super { dict, .. } => inst_stack.push(dict),
             Dict::Structural { fields, .. } => {
                 for field in fields {
-                    stack.push(field);
+                    inst_stack.push(field);
                 }
             }
-            Dict::Given(_)
-            | Dict::Value { .. }
-            | Dict::Opened { .. }
-            | Dict::Field(_)
-            | Dict::Primitive { .. }
-            | Dict::Site { .. }
-            | Dict::Error => {}
+            _ => {}
         }
     }
 }

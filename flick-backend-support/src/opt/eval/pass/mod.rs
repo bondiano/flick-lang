@@ -9,62 +9,94 @@ mod analysis;
 mod block;
 mod walk;
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::rc::Rc;
 
-use flick_ir::{Expr, ExprKind, FileId, Lit, Module, Pat, Stage};
+use flick_ir::{Expr, ExprKind, Lit, Module, Pat, Span, Stage};
 
 use super::materialize::{
     MaterializeContext, MaterializeLimits, check_profitability, expr_cost, materialize,
 };
 use super::pattern::{PatMatch, match_pat};
-use super::value::{CLOSURE_BYTES, Closure, DictEnv, Env, SLOT_BYTES, Value, bigint_value};
+use super::value::{DictEnv, Env, Value};
 use super::{
     DefTable, EvalBudget, EvalConfig, EvalCounters, EvalOutcome, PrimitiveEval, StopReason,
     evaluate,
 };
 use crate::Known;
 use crate::opt::{Generics, bodies, devirt};
-use analysis::{collect_single_use_private_sizes, collect_visible_external_ctors};
-use block::is_literal_data;
+use analysis::analyze_module;
 
 /// Maximum AST nodes hashed into a structural retry fingerprint.
 const FINGERPRINT_NODE_LIMIT: usize = 32;
 
-/// Tracks failed trial counts across simplification rounds without collecting input strings.
+/// Tracks failed trial counts across simplification rounds without collecting
+/// input strings, storing both site and unchanged-expression counts in a single
+/// sorted `(hash, count)` table (distinguished by a 1-bit domain tag).
 #[derive(Debug, Default)]
-pub struct RetryTracker {
-    /// Failed count per `(span, full_structural_fingerprint)`.
-    unchanged_failures: HashMap<(FileId, u32, u32, u64), u32>,
-    /// Total failed count per `(span, head_fingerprint)` across rounds.
-    site_failures: HashMap<(FileId, u32, u32, u64), u32>,
-}
+pub struct RetryTracker(Vec<(u64, u32)>);
 
 impl RetryTracker {
+    fn find(&self, key: u64) -> Result<usize, usize> {
+        let (mut lo, mut hi) = (0, self.0.len());
+        while lo < hi {
+            let mid = lo + (hi - lo) / 2;
+            match self.0[mid].0.cmp(&key) {
+                Ordering::Less => lo = mid + 1,
+                Ordering::Greater => hi = mid,
+                Ordering::Equal => return Ok(mid),
+            }
+        }
+        Err(lo)
+    }
+
+    fn get(&self, key: u64) -> u32 {
+        self.find(key).map_or(0, |idx| self.0[idx].1)
+    }
+
+    fn inc(&mut self, key: u64) {
+        match self.find(key) {
+            Ok(idx) => self.0[idx].1 = self.0[idx].1.saturating_add(1),
+            Err(idx) => {
+                self.0.push((key, 1));
+                let mut i = self.0.len() - 1;
+                while i > idx {
+                    self.0.swap(i - 1, i);
+                    i -= 1;
+                }
+            }
+        }
+    }
+
     fn should_skip(&self, expr: &Expr, nodes: u32, config: &EvalConfig) -> bool {
         let span = expr.span;
-        let site_key = (span.file, span.start, span.end, head_fingerprint(expr));
-        if self.site_failures.get(&site_key).copied().unwrap_or(0) >= config.max_failed_retries {
+        if self.get(retry_key(span, head_fingerprint(expr), 1)) >= config.max_failed_retries {
             return true;
         }
-        let fp_key = (span.file, span.start, span.end, fingerprint(expr, nodes));
-        self.unchanged_failures.get(&fp_key).copied().unwrap_or(0) >= 1
+        self.get(retry_key(span, fingerprint(expr, nodes), 0)) >= 1
     }
 
     fn record_failure(&mut self, expr: &Expr, nodes: u32) {
         let span = expr.span;
-        let site_key = (span.file, span.start, span.end, head_fingerprint(expr));
-        *self.site_failures.entry(site_key).or_default() += 1;
-        let fp_key = (span.file, span.start, span.end, fingerprint(expr, nodes));
-        *self.unchanged_failures.entry(fp_key).or_default() += 1;
+        self.inc(retry_key(span, head_fingerprint(expr), 1));
+        self.inc(retry_key(span, fingerprint(expr, nodes), 0));
     }
 }
 
+fn retry_key(span: Span, mut fp: u64, domain: u64) -> u64 {
+    fnv_mix(&mut fp, domain);
+    fnv_mix(&mut fp, u64::from(span.file.index()));
+    fnv_mix(&mut fp, (u64::from(span.start) << 32) | u64::from(span.end));
+    fp
+}
+
+#[inline(never)]
 fn fnv_mix(h: &mut u64, v: u64) {
     *h ^= v;
     *h = h.wrapping_mul(0x0100_0000_01b3);
 }
 
+#[inline(never)]
 fn fnv_str(h: &mut u64, s: &str) {
     fnv_mix(h, u64::try_from(s.len()).unwrap_or(u64::MAX));
     for &b in s.as_bytes() {
@@ -72,104 +104,90 @@ fn fnv_str(h: &mut u64, s: &str) {
     }
 }
 
-fn expr_tag(e: &Expr) -> u64 {
-    match &e.kind {
-        ExprKind::App {
-            arg_first, stage, ..
-        } => {
-            1 + u64::from(*arg_first) * 2
-                + match stage {
-                    Stage::Pure => 0,
-                    Stage::Sync => 4,
-                    Stage::Runtime => 8,
-                }
-        }
-        ExprKind::Lit(_) => 15,
-        ExprKind::Local(_) => 16,
-        ExprKind::Global { .. } => 17,
-        ExprKind::Con(_) => 18,
-        ExprKind::Method { .. } => 19,
-        ExprKind::Match(_, arms) => 20 + u64::try_from(arms.len()).unwrap_or(0),
-        ExprKind::Field(..) => 40,
-        ExprKind::Update(_, fields) => 50 + u64::try_from(fields.len()).unwrap_or(0),
-        ExprKind::Block(stmts, _) => 60 + u64::try_from(stmts.len()).unwrap_or(0),
-        ExprKind::If(..) => 80,
-        ExprKind::Binary(..) => 90,
-        ExprKind::Neg(..) => 100,
-        ExprKind::Not(_) => 101,
-        ExprKind::Ignore(_) => 102,
-        ExprKind::Dicts(_, dicts) => 110 + u64::try_from(dicts.len()).unwrap_or(0),
-        _ => 200,
-    }
-}
-
 /// Identifies a call site's callee head without storing any strings.
 fn head_fingerprint(expr: &Expr) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
     let mut head = expr;
     let mut depth = 0_u64;
     while let ExprKind::App { func, .. } = &head.kind {
         head = func;
         depth += 1;
-        if depth >= 32 {
+        if depth >= FINGERPRINT_NODE_LIMIT as u64 {
             break;
         }
     }
-    fnv_mix(&mut h, depth);
-    fnv_mix(&mut h, expr_tag(head));
-    match &head.kind {
-        ExprKind::Global { module, name } => {
-            fnv_str(&mut h, module);
-            fnv_str(&mut h, name);
-        }
-        ExprKind::Local(name) | ExprKind::Method { name, .. } => fnv_str(&mut h, name),
-        ExprKind::Con(c) => {
-            fnv_str(&mut h, &c.module);
-            fnv_str(&mut h, &c.name);
-        }
-        _ => {}
-    }
-    h
+    hash_expr(head, depth, 1)
 }
 
 /// Bounded iterative structural fingerprint of `expr` (zero strings stored).
 fn fingerprint(expr: &Expr, nodes: u32) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ u64::from(nodes);
-    let mut stack = vec![expr];
+    hash_expr(expr, u64::from(nodes), FINGERPRINT_NODE_LIMIT)
+}
+
+fn hash_expr(root: &Expr, seed: u64, limit: usize) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325 ^ seed;
+    let mut stack = vec![root];
     let mut visited = 0_usize;
     while let Some(e) = stack.pop() {
         visited += 1;
-        if visited > FINGERPRINT_NODE_LIMIT {
+        if visited > limit {
             break;
         }
-        fnv_mix(&mut h, expr_tag(e));
-        fnv_mix(&mut h, u64::from(e.span.start));
-        fnv_mix(&mut h, u64::from(e.span.end));
-        match &e.kind {
-            ExprKind::Lit(Lit::Unit) => fnv_mix(&mut h, 1),
-            ExprKind::Lit(Lit::Bool(b)) => fnv_mix(&mut h, 2 + u64::from(*b)),
-            ExprKind::Lit(Lit::Int(n)) => fnv_mix(&mut h, u64::from(n.cast_unsigned())),
-            ExprKind::Lit(Lit::Float(x)) => fnv_mix(&mut h, x.to_bits()),
-            ExprKind::Lit(Lit::BigInt(s) | Lit::String(s)) => fnv_str(&mut h, s),
-            ExprKind::Local(name) => fnv_str(&mut h, name),
-            ExprKind::Global { module, name } => {
-                fnv_str(&mut h, module);
-                fnv_str(&mut h, name);
+        fnv_mix(
+            &mut h,
+            (u64::from(e.span.start) << 32) | u64::from(e.span.end),
+        );
+        let (tag, s1, s2): (u64, &str, &str) = match &e.kind {
+            ExprKind::App {
+                arg_first, stage, ..
+            } => {
+                let st = match stage {
+                    Stage::Pure => 0,
+                    Stage::Sync => 4,
+                    Stage::Runtime => 8,
+                };
+                (1 + u64::from(*arg_first) * 2 + st, "", "")
             }
-            ExprKind::Con(c) => {
-                fnv_str(&mut h, &c.module);
-                fnv_str(&mut h, &c.name);
+            ExprKind::Lit(Lit::Unit) => (15, "", ""),
+            ExprKind::Lit(Lit::Bool(b)) => (16 + u64::from(*b), "", ""),
+            ExprKind::Lit(Lit::Int(n)) => {
+                fnv_mix(&mut h, u64::from(n.cast_unsigned()));
+                (18, "", "")
             }
-            ExprKind::Field(_, label) | ExprKind::Method { name: label, .. } => {
-                fnv_str(&mut h, label);
+            ExprKind::Lit(Lit::Float(x)) => {
+                fnv_mix(&mut h, x.to_bits());
+                (19, "", "")
             }
-            _ => {}
+            ExprKind::Lit(Lit::BigInt(s) | Lit::String(s)) => (20, s, ""),
+            ExprKind::Local(s) => (21, s, ""),
+            ExprKind::Global { module, name } => (22, module, name),
+            ExprKind::Con(c) => (23, &c.module, &c.name),
+            ExprKind::Method { name, .. } => (24, name, ""),
+            ExprKind::Field(_, s) => (25, s, ""),
+            ExprKind::Match(_, arms) => (30 + u64::try_from(arms.len()).unwrap_or(0), "", ""),
+            ExprKind::Update(_, fields) => (50 + u64::try_from(fields.len()).unwrap_or(0), "", ""),
+            ExprKind::Block(stmts, _) => (70 + u64::try_from(stmts.len()).unwrap_or(0), "", ""),
+            ExprKind::Dicts(_, dicts) => (90 + u64::try_from(dicts.len()).unwrap_or(0), "", ""),
+            ExprKind::If(..) => (110, "", ""),
+            ExprKind::Binary(..) => (111, "", ""),
+            ExprKind::Neg(..) => (112, "", ""),
+            ExprKind::Not(_) => (113, "", ""),
+            ExprKind::Ignore(_) => (114, "", ""),
+            _ => (200, "", ""),
+        };
+        fnv_mix(&mut h, tag);
+        if !s1.is_empty() {
+            fnv_str(&mut h, s1);
         }
-        e.each_child(&mut |child| {
-            if stack.len() < FINGERPRINT_NODE_LIMIT {
-                stack.push(child);
-            }
-        });
+        if !s2.is_empty() {
+            fnv_str(&mut h, s2);
+        }
+        if limit > 1 {
+            e.each_child(&mut |child| {
+                if stack.len() < limit {
+                    stack.push(child);
+                }
+            });
+        }
     }
     h
 }
@@ -215,13 +233,12 @@ pub fn run_module_pass(
         return false;
     }
     let defs = DefTable::build(module, lookup, generics, lang);
-    let visible_external_ctors = collect_visible_external_ctors(module);
-    let single_use_private = collect_single_use_private_sizes(module, exported);
+    let analysis = analyze_module(module, exported);
     let current_module = module.name.clone();
     let mat_ctx = MaterializeContext {
         current_module: &current_module,
         lang,
-        visible_external_ctors: &visible_external_ctors,
+        visible_external_ctors: &analysis.visible_external_ctors,
     };
 
     let mut ctx = PassCtx {
@@ -230,7 +247,7 @@ pub fn run_module_pass(
         primitives,
         config,
         mat_ctx: &mat_ctx,
-        single_use_private: &single_use_private,
+        single_use_private: &analysis.single_use_private,
         module_steps_remaining,
         retries,
         counters,
@@ -251,7 +268,7 @@ pub(super) struct PassCtx<'a, 'b> {
     pub(super) primitives: &'b dyn PrimitiveEval,
     pub(super) config: &'b EvalConfig,
     pub(super) mat_ctx: &'a MaterializeContext<'a>,
-    pub(super) single_use_private: &'a HashMap<String, u32>,
+    pub(super) single_use_private: &'a HashMap<String, usize>,
     pub(super) module_steps_remaining: &'b mut u32,
     pub(super) retries: &'b mut RetryTracker,
     pub(super) counters: &'b mut EvalCounters,
@@ -272,11 +289,11 @@ impl<'a> PassCtx<'a, '_> {
         let mut budget = self.new_trial_budget()?;
         let matched = match_pat(pat, val, &mut budget);
         *self.module_steps_remaining = budget.module_steps_remaining;
-        let PatMatch::Matched(binds) = matched.ok()? else {
+        let PatMatch::Matched(mut binds) = matched.ok()? else {
             return None;
         };
         let mut next = env.clone();
-        for (name, v) in binds {
+        while let Some((name, v)) = binds.pop() {
             next = next.with(name, v);
         }
         Some(next)
@@ -287,66 +304,6 @@ impl<'a> PassCtx<'a, '_> {
         'a: 'e,
     {
         let mut budget = self.new_trial_budget()?;
-        // Fast path for already-evaluated literals, locals, constructors, and lambdas.
-        // Charge steps and constructed bytes before allocating any value into `Env`.
-        let fast = match &expr.kind {
-            ExprKind::Lit(Lit::Unit) => Some(budget.charge_steps(1).map(|()| Value::Unit)),
-            ExprKind::Lit(Lit::Bool(b)) => Some(budget.charge_steps(1).map(|()| Value::Bool(*b))),
-            ExprKind::Lit(Lit::Int(n)) => Some(budget.charge_steps(1).map(|()| Value::Int(*n))),
-            ExprKind::Lit(Lit::Float(x)) => Some(budget.charge_steps(1).map(|()| Value::Float(*x))),
-            ExprKind::Lit(Lit::BigInt(d)) => Some(
-                budget
-                    .charge_steps(1)
-                    .and_then(|()| budget.charge_bytes(16))
-                    .and_then(|()| bigint_value(d).ok_or(StopReason::UnknownOp))
-                    .map(Value::BigInt),
-            ),
-            ExprKind::Lit(Lit::String(s)) => {
-                let len = u32::try_from(s.len()).unwrap_or(u32::MAX);
-                Some(
-                    budget
-                        .charge_steps(1)
-                        .and_then(|()| budget.charge_bytes(len))
-                        .map(|()| Value::String(Rc::from(s.as_str()))),
-                )
-            }
-            ExprKind::Local(name) => Some(
-                budget
-                    .charge_steps(1)
-                    .and_then(|()| env.get(name, &mut budget))
-                    .and_then(|v| v.cloned().ok_or(StopReason::DynamicRead)),
-            ),
-            ExprKind::Con(ctor) => Some(
-                budget
-                    .charge_steps(1)
-                    .and_then(|()| budget.charge_bytes(SLOT_BYTES))
-                    .map(|()| Value::Con {
-                        ctor: Rc::new(ctor.clone()),
-                        args: Rc::from([]),
-                        dicts: Rc::from([]),
-                    }),
-            ),
-            ExprKind::Lambda { params, body } => Some(
-                budget
-                    .charge_steps(1)
-                    .and_then(|()| budget.charge_bytes(CLOSURE_BYTES))
-                    .map(|()| {
-                        Value::Closure(Rc::new(Closure {
-                            env: env.clone(),
-                            dict_env: DictEnv::default(),
-                            dict_params: &[],
-                            params: params.as_slice(),
-                            body: body.as_ref(),
-                            rec_group: None,
-                        }))
-                    }),
-            ),
-            _ => None,
-        };
-        if let Some(res) = fast {
-            *self.module_steps_remaining = budget.module_steps_remaining;
-            return res.ok();
-        }
         let outcome = evaluate(
             expr,
             self.defs,
@@ -377,7 +334,7 @@ impl<'a> PassCtx<'a, '_> {
     where
         'a: 'e,
     {
-        if is_literal_data(e) {
+        if matches!(e.pure_spine().0.kind, ExprKind::Con(_)) {
             return Hint::Concrete;
         }
         match self.try_eval_expr(e, env, true) {
@@ -392,9 +349,6 @@ impl<'a> PassCtx<'a, '_> {
     where
         'a: 'e,
     {
-        if is_literal_data(e) {
-            return EvalAttempt::KnownKept;
-        }
         self.try_eval_expr(e, env, false)
     }
 
@@ -451,9 +405,6 @@ impl<'a> PassCtx<'a, '_> {
         *self.module_steps_remaining = budget.module_steps_remaining;
         match replacement {
             Ok(new_expr) => {
-                if new_expr == *e {
-                    return EvalAttempt::KnownKept;
-                }
                 *e = new_expr;
                 self.changed = true;
                 self.counters.record_success();
@@ -484,7 +435,11 @@ impl<'a> PassCtx<'a, '_> {
         if let ExprKind::Global { module, name } = &head.kind
             && module == self.mat_ctx.current_module
         {
-            return self.single_use_private.get(name).copied().unwrap_or(0);
+            return self
+                .single_use_private
+                .get(name.as_str())
+                .copied()
+                .map_or(0, |n| u32::try_from(n).unwrap_or(u32::MAX));
         }
         0
     }

@@ -4,172 +4,95 @@ use std::rc::Rc;
 
 use flick_ir::{Arm, BinOp, Expr, Num, Pat, Stmt};
 
-use crate::opt::eval::value::{DictEnv, DictValue, Env, Value};
+use crate::opt::eval::value::{DictValue, Env, Value};
 
-/// Explicit continuation frame for the CEK machine.
-pub(super) enum Frame<'a> {
+/// How a [`FrameKind::Block`] binds or discards the finished statement value.
+pub(super) enum BlockKind<'a> {
+    Let(&'a Pat),
+    Fun(&'a str),
+    Discard,
+}
+
+/// Target built when a [`FrameKind::Record`] finishes evaluating its field expressions.
+pub(super) enum RecordTarget<'a> {
+    Record,
+    Dict,
+    Update(Rc<Vec<(Rc<str>, Value<'a>)>>),
+}
+
+/// Unary continuation operation on an evaluated scalar/option operand.
+pub(super) enum UnaryOp {
+    Neg(Num),
+    Not,
+    Ignore,
+    Unwrap,
+}
+
+/// Explicit continuation frame carrying a single shared `env` slot (empty for
+/// env-less frames) to keep `Frame` drop glue compact.
+pub(super) struct Frame<'a> {
+    pub(super) kind: FrameKind<'a>,
+    pub(super) env: Env<'a>,
+}
+
+/// Continuation frame payloads for the CEK machine.
+pub(super) enum FrameKind<'a> {
     /// Function/call return boundary for `ExprKind::Unwrap` (`o?`).
     CallBoundary,
     /// Unwinds an active top-level value evaluation on return (cycle guard).
     LeaveGlobal,
-    /// Evaluating `func` of `func arg` (`arg_first: false`).
-    AppFunc {
-        arg: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-    /// Evaluating `arg` of `func arg` with `func_val` already evaluated.
-    AppReadyFunc { func_val: Value<'a> },
-    /// Evaluating `arg` of `arg |> func` (`arg_first: true`).
-    AppArgFirst {
-        func: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-    /// Evaluating `func` of `arg |> func` with `arg_val` already evaluated.
-    AppReadyArg { arg_val: Value<'a> },
+    /// Waiting for first operand of `App`; next evaluates `second` in `frame.env`.
+    AppSecond { second: &'a Expr, arg_first: bool },
+    /// Waiting for second operand of `App` with first operand already evaluated.
+    AppReady { first: Value<'a>, arg_first: bool },
     /// Applying resolved dictionaries to an evaluated dictionary abstraction.
-    ApplyDicts { dicts: Rc<[DictValue<'a>]> },
+    ApplyDicts { dicts: Rc<Vec<DictValue<'a>>> },
     /// Conditional branch selection after evaluating condition.
     If {
         then_expr: &'a Expr,
         else_expr: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
     },
-    /// Short-circuiting `&&` / `||` after evaluating left operand.
-    ShortCircuit {
-        op: BinOp,
-        rhs: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-    /// Evaluating left operand of a strict binary operator.
-    BinaryLhs {
-        op: BinOp,
-        rhs: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
+    /// Evaluating left operand of a strict or short-circuiting (`&&` / `||`) binary operator.
+    BinaryLhs { op: BinOp, rhs: &'a Expr },
     /// Evaluating right operand of a strict binary operator.
     BinaryRhs { op: BinOp, lhs_val: Value<'a> },
-    /// Unary numeric negation.
-    Neg(Num),
-    /// Logical negation.
-    Not,
-    /// Strict `ignore e` -> evaluates `e`, returns `Unit`.
-    Ignore,
-    /// Early-return `o?` (`ExprKind::Unwrap`).
-    Unwrap,
+    /// Unary operation (`Neg`, `Not`, `Ignore`, `Unwrap`).
+    Unary(UnaryOp),
     /// Record field projection after evaluating record.
     Field { label: &'a str },
-    /// Evaluating elements of a `Tuple`.
-    Tuple {
+    /// Evaluating elements of a `Tuple` (`is_list: false`) or `List` (`is_list: true`).
+    Seq {
+        is_list: bool,
         done: Vec<Value<'a>>,
         rest: &'a [Expr],
-        index: usize,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
     },
-    /// Evaluating elements of a `List`.
-    List {
-        done: Vec<Value<'a>>,
-        rest: &'a [Expr],
-        index: usize,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-    /// Evaluating fields of a `Record` or `Dictionary`.
+    /// Evaluating fields of a `Record`, `Dictionary`, or `Update`.
     Record {
+        label: &'a str,
         done: Vec<(Rc<str>, Value<'a>)>,
         rest: &'a [(String, Expr)],
-        index: usize,
-        as_dict: bool,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
+        target: RecordTarget<'a>,
     },
     /// Evaluating base of `ExprKind::Update`.
-    UpdateBase {
-        fields: &'a [(String, Expr)],
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-    /// Evaluating updated fields of `ExprKind::Update`.
-    UpdateFields {
-        base: Rc<[(Rc<str>, Value<'a>)]>,
-        done: Vec<(Rc<str>, Value<'a>)>,
-        rest: &'a [(String, Expr)],
-        index: usize,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-    /// Binding the result of `Stmt::Let(pat, rhs)` inside a `Block`.
-    BlockLet {
-        pat: &'a Pat,
+    UpdateBase { fields: &'a [(String, Expr)] },
+    /// Resuming a `Block` after evaluating a `Let`, non-recursive `Fun`, or `Expr` statement.
+    Block {
+        kind: BlockKind<'a>,
         stmts: &'a [Stmt],
-        next_index: usize,
         result: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-    /// Binding a non-recursive `Stmt::Fun` inside a `Block`.
-    BlockFun {
-        name: &'a str,
-        stmts: &'a [Stmt],
-        next_index: usize,
-        result: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-    /// Discarding the value of `Stmt::Expr(e)` inside a `Block`.
-    BlockDiscard {
-        stmts: &'a [Stmt],
-        next_index: usize,
-        result: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
     },
     /// Evaluating scrutinee of `ExprKind::Match`.
-    MatchScrutinee {
-        arms: &'a [Arm],
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-    /// Evaluating an arm guard of `ExprKind::Match`.
+    MatchScrutinee { arms: &'a [Arm] },
+    /// Evaluating an arm guard of `ExprKind::Match` (`frame.env` holds `outer_env`).
     MatchGuard {
         scrutinee: Value<'a>,
-        arms: &'a [Arm],
-        arm_idx: usize,
+        body: &'a Expr,
+        rest: &'a [Arm],
         arm_env: Env<'a>,
-        outer_env: Env<'a>,
-        dict_env: DictEnv<'a>,
     },
 }
 
 pub(super) enum Control<'a> {
-    Eval {
-        expr: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
+    Eval { expr: &'a Expr, env: Env<'a> },
     Return(Value<'a>),
-    BlockStep {
-        stmts: &'a [Stmt],
-        index: usize,
-        result: &'a Expr,
-        env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-    MatchArm {
-        scrutinee: Value<'a>,
-        arms: &'a [Arm],
-        arm_idx: usize,
-        outer_env: Env<'a>,
-        dict_env: DictEnv<'a>,
-    },
-}
-
-pub(super) enum StepResult<'a> {
-    Continue(Control<'a>),
-    Done(Value<'a>),
 }

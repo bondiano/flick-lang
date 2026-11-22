@@ -481,7 +481,7 @@ fn materialize_utf16_checks_limits_before_allocating_and_preserves_surrogate_err
     };
 
     // Lone surrogate always reports `Unmaterializable` even under zero limits.
-    let lone = Value::Utf16(Rc::from([0xD800_u16]));
+    let lone = Value::Utf16(Rc::new(vec![0xD800_u16]));
     assert_eq!(
         materialize(
             &lone,
@@ -498,7 +498,7 @@ fn materialize_utf16_checks_limits_before_allocating_and_preserves_surrogate_err
     );
 
     // Surrogate pair U+1F600 ("😀") decodes to 4 UTF-8 bytes.
-    let emoji = Value::Utf16(Rc::from([0xD83D_u16, 0xDE00_u16]));
+    let emoji = Value::Utf16(Rc::new(vec![0xD83D_u16, 0xDE00_u16]));
     assert_eq!(
         materialize(
             &emoji,

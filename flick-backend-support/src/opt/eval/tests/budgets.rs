@@ -51,8 +51,8 @@ impl PrimitiveEval for StubPrim {
 fn deep_recursion_and_deep_terms_hit_deterministic_frame_depth_without_stack_overflow() {
     let mut defs = DefTable::default();
     defs.insert_value(
-        "App".into(),
-        "deep".into(),
+        "App",
+        "deep",
         vec![],
         lam(
             &["n"],
@@ -112,8 +112,8 @@ fn deep_recursion_and_deep_terms_hit_deterministic_frame_depth_without_stack_ove
 fn tiny_call_producing_large_data_declines_on_bytes_and_growth() {
     let mut defs = DefTable::default();
     defs.insert_value(
-        "App".into(),
-        "grow".into(),
+        "App",
+        "grow",
         vec![],
         lam(
             &["n", "s"],
@@ -196,7 +196,7 @@ fn primitive_hook_consumes_unmaterializable_utf16_internally() {
         lang: &known,
         visible_external_ctors: &visible,
     };
-    let lone = Value::Utf16(Rc::from([0xD800_u16]));
+    let lone = Value::Utf16(Rc::new(vec![0xD800_u16]));
     assert!(matches!(
         materialize(
             &lone,
@@ -301,8 +301,8 @@ fn resolved_dictionary_consumed_internally_without_materializing() {
     let known = Known::of(&[]);
     let mut defs = DefTable::default();
     defs.insert_value(
-        "App".into(),
-        "use_dict".into(),
+        "App",
+        "use_dict",
         vec!["d".into()],
         lam(
             &["x"],
@@ -316,9 +316,9 @@ fn resolved_dictionary_consumed_internally_without_materializing() {
         ),
     );
     defs.insert_method(
-        "App".into(),
-        "Inc Int".into(),
-        "inc".into(),
+        "App",
+        "Inc Int",
+        "inc",
         vec![],
         lam(
             &["n"],
