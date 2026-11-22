@@ -372,5 +372,24 @@ fn a_derived_instance_has_its_methods_written_out() {
     );
 }
 
+/// The operands of `==` in a local function keep one type, which its uses
+/// settle, so it compares `String` and `Int` by identity as at the top level.
+#[test]
+fn equality_in_a_local_function_compares_by_identity() {
+    let ir = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         compared : Int -> Int ->{} Bool\n\
+         let compared x y =\n  let same a b = a == b\n  let other a b = a != b\n  \
+         same \"a\" \"b\" && other x y\n",
+    )
+    .expect("lowers");
+    let printed = super::print(&ir);
+    assert!(printed.contains(" === "), "{printed}");
+    assert!(printed.contains(" !== "), "{printed}");
+    assert!(!printed.contains(" == "), "{printed}");
+    assert!(!printed.contains(" != "), "{printed}");
+}
+
 #[path = "owner_tests.rs"]
 mod owner_tests;

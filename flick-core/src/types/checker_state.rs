@@ -30,9 +30,9 @@ struct Checker<'a> {
     sites: Vec<effects::Site>,
     literals: Vec<NumLiteral>,
     signatures: Vec<bindings::PendingSignature>,
-    /// `==` and `!=` with the type of their operands and the equalities of
-    /// the GADT branches they are in.
-    equalities: Vec<(Type, Span, Vec<Type>)>,
+    /// `==` and `!=` with the type of their operands, the operator and the
+    /// equalities of the GADT branches they are in.
+    equalities: Vec<(Type, Span, &'static str, Vec<Type>)>,
     gadt: gadt::branch::State,
     /// While a pattern of a `match` is checked, the rows it added an error
     /// to, each by the variable that stands for the rest of it.

@@ -1,0 +1,130 @@
+// A local function without a signature may take a callback that calls a
+// service: the unknown row of that callback is not generalized, so its uses
+// grow it, and the enclosing declaration closes it at its end.
+module App.LocalCallback exposing (
+  lines,
+  paren,
+  piped,
+  both,
+  mixed,
+  parameterized,
+  pending_instance,
+  use_outer,
+)
+
+service Log =
+  info : String ->{} Unit
+
+service Db =
+  save : String ->{} Unit
+
+shout : String ->{Log} Unit
+let shout s = Log.info s
+
+store : String ->{Db} Unit
+let store s = Db.save s
+
+lines : Unit ->{Log} Unit
+let lines () =
+  let each_line f = List.each_effect f ["a", "b"]
+  each_line shout
+
+paren : Unit ->{Log} Unit
+let paren () =
+  let each_line = (fun f -> List.each_effect f ["a", "b"])
+  each_line shout
+
+piped : Unit ->{Log} Unit
+let piped () =
+  let each_line f = List.each_effect f ["a", "b"]
+  shout |> each_line
+
+// one row for both uses, so it holds both services
+both : Unit ->{Log, Db} Unit
+let both () =
+  let each_line f = List.each_effect f ["a", "b"]
+  each_line shout
+  each_line store
+
+// the types of the function are still generalized
+mixed : Unit ->{Log} Unit
+let mixed () =
+  let each f items = List.each_effect f items
+  each shout ["a", "b"]
+  each (fun n -> shout (show n)) [1, 2]
+
+service Store a =
+  save : a ->{} Unit
+
+int_store : Layer none none {Store Int}
+let int_store = Layer.succeed Store { save = fun _ -> () }
+
+string_store : Layer none none {Store String}
+let string_store = Layer.succeed Store { save = fun _ -> () }
+
+// A known service's type arguments can be generalized with the wrapper.
+parameterized : Unit ->{} Unit
+let parameterized () =
+  let save = (fun value -> Store.save value)
+  let save_direct value = Store.save value
+  let save_scoped = (fun value -> scope { Store.save value })
+  let save_nested = (fun value -> scope { scope { Store.save value } })
+  let calls = Ref.make 0
+  let save_nested_with_live value = scope {
+    scope {
+      Ref.update calls (fun n -> n + 1)
+      Store.save value
+    }
+  }
+  provide int_store {
+    save 1
+    save_direct 2
+    save_scoped 3
+    save_nested 4
+    save_nested_with_live 5
+  }
+  provide string_store {
+    save "two"
+    save_direct "three"
+    save_scoped "four"
+    save_nested "five"
+    save_nested_with_live "six"
+  }
+
+save_int : Unit ->{Store Int} Unit
+let save_int () = Store.save 0
+
+// An unresolved callback can still constrain a service the wrapper already uses.
+pending_instance : Unit ->{} Unit
+let pending_instance () =
+  let values = [()]
+  let save_with f value =
+    Store.save value
+    List.each_effect f values
+  let save_scoped_with f value = scope {
+    Store.save value
+    List.each_effect f values
+  }
+  provide int_store {
+    save_with save_int 1
+    save_scoped_with save_int 2
+  }
+
+// A resource used inside nested scopes can require its enclosing owner live.
+type Handle (s : Region)
+service Files =
+  open_scoped : forall s. String ->{Scope s} Handle s
+  use : forall s. Handle s ->{} Unit
+
+use_outer : String ->{Files} Unit
+let use_outer path = scope {
+  let file = Files.open_scoped path
+  let save_with_file value = scope {
+    scope {
+      Files.use file
+      Store.save value
+    }
+  }
+  provide int_store { save_with_file 1 }
+  provide string_store { save_with_file "two" }
+}

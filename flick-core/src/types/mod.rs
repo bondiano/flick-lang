@@ -463,9 +463,6 @@ struct Local {
     /// A function of a recursive group used before its type is proved, by
     /// index into [`Checker::recs`].
     rec: Option<usize>,
-    /// A local function without a signature: it has one type, from its body
-    /// and its first uses.
-    unsigned: bool,
     binding: mutation::Binding,
 }
 
@@ -569,9 +566,17 @@ struct ItemCx {
     /// The parameters of the class whose law is being checked: applied,
     /// each is a type the instance of a bundle fills in.
     law: Vec<u32>,
-    /// Locals applied before their type was known, each with the pure arrow
-    /// taken for it, its name and where it is bound.
-    assumed_pure: Vec<(Type, String, u32)>,
+    /// Locals applied before their type was known.
+    assumed_pure: Vec<assumed_pure::Assumption>,
+    /// Where the parameters of each local function without a signature are
+    /// bound, by where the function is bound; `None` for a pattern.
+    local_params: HashMap<u32, Vec<Option<u32>>>,
+    /// The argument being checked meets this parameter: where it is bound
+    /// and its type.
+    parameter: Option<(u32, Type)>,
+    /// The variables an operator kept from being generalized, each with
+    /// that operation and its operator.
+    kept_operands: Vec<(u32, Span, &'static str)>,
     /// The operand of an `await` being typed is a name: a `let lazy` may be
     /// read there.
     awaiting: bool,

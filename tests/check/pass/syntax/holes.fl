@@ -113,3 +113,8 @@ annotated_list_hole : List ((forall a. a -> Int) -> Int)
 let annotated_list_hole =
   let fns : List ((forall a. a -> Int) -> Int) = [use_poly _ 1]
   fns
+
+local_generalized : (Int, String)
+let local_generalized =
+  let g = identity _
+  (g 1, g "a")

@@ -173,7 +173,8 @@ impl Checker<'_> {
             K::EqEq | K::NotEq => {
                 self.check(rhs, &ty);
                 let givens = self.equalities_in_scope();
-                self.equalities.push((ty, span, givens));
+                let name = if op.kind == K::EqEq { "==" } else { "!=" };
+                self.equalities.push((ty, span, name, givens));
                 bool_
             }
             kind => {

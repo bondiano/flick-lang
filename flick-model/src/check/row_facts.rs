@@ -21,7 +21,7 @@ pub(super) struct Givens {
 }
 
 impl Givens {
-    fn is_empty(&self) -> bool {
+    pub(super) fn is_empty(&self) -> bool {
         self.types.is_empty() && self.rows.is_empty() && self.caps.is_empty()
     }
 }

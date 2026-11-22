@@ -79,3 +79,27 @@ impl Checker<'_> {
         self.value_bound(ty)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::diagnostics::codes;
+    use crate::types::lint_tests::{HEAD, check};
+
+    #[test]
+    fn piped_hole_explains_assumed_pure_callback_at_callee_parameter() {
+        let text = format!(
+            "{HEAD}service Log =\n  info : String ->{{}} Unit\n\nsay : Unit ->{{Log}} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{{Log}} Unit\nlet apply () =\n  let call f x = f x\n  let apply_it h = h ()\n  apply_it (fun () -> ())\n  say |> call _ ()\n"
+        );
+        let diagnostics = check(&text);
+        let error = diagnostics
+            .iter()
+            .find(|d| d.code == codes::T003)
+            .unwrap_or_else(|| panic!("{diagnostics:?}"));
+        let note = error
+            .related
+            .iter()
+            .find(|r| r.message.contains("took it for a pure function"))
+            .unwrap_or_else(|| panic!("{error:?}"));
+        assert_eq!(&text[note.span.start as usize..note.span.end as usize], "f");
+    }
+}

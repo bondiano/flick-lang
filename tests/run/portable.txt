@@ -69,6 +69,7 @@ codegen/loops
 codegen/lift
 codegen/literals
 codegen/local_functions
+codegen/local_generic
 codegen/match_graph
 codegen/numbers
 codegen/numeric_classes
@@ -333,3 +334,4 @@ runtime/lazy_let_state
 runtime/lazy_opt
 effect/result_blocks
 runtime/result_block_causes
+codegen/bounded_eval
