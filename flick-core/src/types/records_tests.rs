@@ -1,5 +1,5 @@
 //! Accessors on records of different fields, which the model does not
-//! check: its records are exact.
+//! check: its records are exact; and on polymorphic fields.
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::SourceMap;
@@ -28,6 +28,46 @@ fn a_local_accessor_takes_records_of_different_fields() {
         assert!(
             (diagnostics.iter()).any(|d| d.code == codes::T003 && d.severity == Severity::Error),
             "{get}: {diagnostics:?}"
+        );
+    }
+}
+
+const POLY: &str = "module Probe exposing (..)\n\ntype alias Poly = { id : forall a. a -> a }\n\n";
+
+/// A function applied where it is written takes the type of its argument,
+/// so a polymorphic field it reads is used at an instance, as `p.id` is.
+/// (No list holds such a record: a type variable cannot stand for it.)
+#[test]
+fn a_polymorphic_field_is_read_by_a_function_applied_to_its_record() {
+    for (signature, body) in [
+        ("Poly -> (Int, String)", "(.id p 1, .id p \"a\")"),
+        ("Poly -> (Int, String)", "((p |> .id) 1, (p |> .id) \"a\")"),
+        (
+            "Poly -> (Int, String)",
+            "((fun r -> r.id) p 1, (fun r -> r.id) p \"a\")",
+        ),
+        ("Poly -> Int", "(p |> fun r -> r.id) 1"),
+    ] {
+        let text = format!("{POLY}read : {signature}\nlet read p = {body}\n");
+        let diagnostics = check(&text);
+        assert!(diagnostics.is_empty(), "{body}: {diagnostics:?}");
+    }
+}
+
+/// A function whose type is fixed before its argument, as a named one,
+/// still takes a monomorphic record.
+#[test]
+fn a_polymorphic_field_needs_its_record_before_a_named_function() {
+    for (signature, body) in [
+        ("Poly -> Int", "\n  let get = .id\n  get p 1"),
+        ("Poly -> Int", "\n  let get = fun r -> r.id\n  get p 1"),
+    ] {
+        let text = format!("{POLY}read : {signature}\nlet read p = {body}\n");
+        let diagnostics = check(&text);
+        assert!(
+            (diagnostics.iter()).any(|d| d.code == codes::T003
+                && d.message.contains("cannot stand for the polymorphic type")),
+            "{body}: {diagnostics:?}"
         );
     }
 }

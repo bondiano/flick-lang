@@ -1,6 +1,7 @@
 //! A local applied before its type is known is taken for a pure function,
-//! `(fun h -> h ()) f`. When a runtime function then meets that arrow, the
-//! mismatch points at the local and offers the annotation it needs.
+//! `let run = fun h -> h ()` / `run f`. When a runtime function then meets
+//! that arrow, the mismatch points at the local and offers the annotation it
+//! needs.
 
 use std::collections::HashMap;
 

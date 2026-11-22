@@ -219,9 +219,60 @@ impl Checker<'_> {
         args: &[&Node],
         defaults: &mut Vec<(Type, usize)>,
     ) -> Type {
+        // a pipeline around this application checks the accessors it leaves
+        // once it has applied it: `users |> List.map .address.town`
+        let piped = self.piped_late.take();
+        let mut late = Vec::new();
+        let ty = self.apply_each(head, args, defaults, &mut late);
+        match piped {
+            Some(_) => self.piped_late = Some(late),
+            None => self.check_late(head, args, late),
+        }
+        ty
+    }
+
+    /// The accessors `late` among `args`, left until the other arguments
+    /// of `head` gave the domain of their parameter: in
+    /// `List.map .address.town users` a missing field is at its step.
+    pub(super) fn check_late(&mut self, head: &Node, args: &[&Node], late: Vec<(usize, Type)>) {
+        for (i, param) in late {
+            let since = self.diagnostics.len();
+            self.check_value(args[i], &param);
+            self.explain_argument(since, head, i, &param);
+        }
+    }
+
+    /// Whether an accessor given for `param` waits for the other arguments:
+    /// `param` is a pure arrow whose domain nothing has fixed yet. An
+    /// accessor holds nothing and runs nothing, so checking it later changes
+    /// no effect and no region.
+    fn late_accessor(&self, arg: &Node, param: &Type) -> bool {
+        unparen(arg).kind == K::AccessorExpr
+            && matches!(
+                self.whnf(param),
+                Type::Fun { param: domain, effects: None, .. }
+                    if matches!(self.whnf(&domain), Type::Meta(_))
+            )
+    }
+
+    fn apply_each(
+        &mut self,
+        head: &Node,
+        args: &[&Node],
+        defaults: &mut Vec<(Type, usize)>,
+        late: &mut Vec<(usize, Type)>,
+    ) -> Type {
         let since = self.diagnostics.len();
         // a local `forall v. τ^v -> σ` keeps its argument out of its result
         let parametric = self.local_parametric(head);
+        // `.email user`, `(fun r -> r.id) p`: a function applied where it is
+        // written takes the type of its parameter from the argument, inferred
+        // first, as `let r = user` would give it
+        let mut first = (!args.is_empty() && applied_where_written(head)).then(|| {
+            let argument = self.infer(args[0]);
+            self.given_param = Some(argument.clone());
+            argument
+        });
         let mut ty = self.infer(head);
         let mut unknown = Vec::new();
         let mut params = Vec::new();
@@ -233,7 +284,10 @@ impl Checker<'_> {
         let end = args.last().map_or(head.range().1, |last| last.range().1);
         for (i, arg) in args.iter().enumerate() {
             let span = Span::new(self.file, head.range().0, arg.range().1);
-            if let Some(gathered) = self.gather(head, &ty, &args[i..], (i, end)) {
+            let checked = first.take();
+            if checked.is_none()
+                && let Some(gathered) = self.gather(head, &ty, &args[i..], (i, end))
+            {
                 ty = gathered;
                 break;
             }
@@ -243,40 +297,21 @@ impl Checker<'_> {
                     effects,
                     result,
                 } => {
-                    let calls = self.cx.stage.calls;
-                    let since = self.diagnostics.len();
-                    // a task acquiring into a region a later argument names
-                    // waits for it (`docs/formal/regions.md#scope-region-of-a-task-argument-is-resolved-after-the-call`)
-                    let eff = self.eff_parts(&param).is_some();
-                    let defer = eff
-                        || self
-                            .arrow_stages(&param)
-                            .contains(&super::ty::Stage::Runtime);
-                    let outer = defer.then(|| self.cx.regions.defaults.replace(Vec::new()));
-                    // a runtime call for a parameter marked `~` is passed unstarted
-                    let argument = if eff && marked.contains(&i) && self.runs_now(arg) {
-                        self.suspended_arg(arg, &param)
-                    } else {
-                        self.check_value(arg, &param)
-                    };
-                    if let Some(outer) = outer {
-                        let mine = mem::replace(&mut self.cx.regions.defaults, outer);
-                        defaults.extend(mine.unwrap_or_default());
-                    }
-                    self.explain_argument(since, head, i, &param);
-                    if watched.is_some() {
-                        let folded = consteval::eval(arg, self.text);
-                        let lambda = unparen(arg).kind == K::FunExpr;
-                        given.push((self.span(arg), argument.clone(), folded, lambda));
-                    }
-                    if eff {
-                        if self.cx.stage.calls > calls {
-                            self.early_argument(head, arg);
+                    let argument = match checked {
+                        Some(argument) => argument,
+                        None if watched.is_none() && self.late_accessor(arg, &param) => {
+                            late.push((i, (*param).clone()));
+                            (*param).clone()
                         }
-                        // the rows the `Eff` needs are lower bounds of the parameter's: grown
-                        // now, before the result's rows unify as if they could be smaller
-                        self.grow();
-                    }
+                        None => self.argument(
+                            head,
+                            (arg, i),
+                            &param,
+                            defaults,
+                            &mut given,
+                            (watched.is_some(), &marked),
+                        ),
+                    };
                     if let Some(e) = effects {
                         self.call_effects(&self.live_call(&ty, &e), span);
                     }
@@ -285,7 +320,7 @@ impl Checker<'_> {
                     ty = self.application_result(result, &ty, &argument, parametric && i == 0);
                 }
                 Type::Error => {
-                    let inferred = self.infer(arg);
+                    let inferred = checked.unwrap_or_else(|| self.infer(arg));
                     unknown.push(inferred);
                 }
                 meta @ Type::Meta(_) => {
@@ -296,7 +331,12 @@ impl Checker<'_> {
                         return self.not_a_function(&meta, span, (head, args, i));
                     }
                     self.assume_pure(head, &arrow);
-                    self.check(arg, &param);
+                    match checked {
+                        Some(argument) => {
+                            self.expect(&argument, &param, self.span(arg));
+                        }
+                        None => self.check(arg, &param),
+                    }
                     ty = result;
                 }
                 other => return self.not_a_function(&other, span, (head, args, i)),
@@ -323,6 +363,54 @@ impl Checker<'_> {
             self.merge_conflicts(first, second, span);
         }
         ty
+    }
+
+    /// The argument `arg`, the `i`-th of `head`, checked against `param`;
+    /// `given` collects it for a watched name.
+    fn argument(
+        &mut self,
+        head: &Node,
+        (arg, i): (&Node, usize),
+        param: &Type,
+        defaults: &mut Vec<(Type, usize)>,
+        given: &mut Vec<super::facts::Given>,
+        (watched, marked): (bool, &[usize]),
+    ) -> Type {
+        let calls = self.cx.stage.calls;
+        let since = self.diagnostics.len();
+        // a task acquiring into a region a later argument names
+        // waits for it (`docs/formal/regions.md#scope-region-of-a-task-argument-is-resolved-after-the-call`)
+        let eff = self.eff_parts(param).is_some();
+        let defer = eff
+            || self
+                .arrow_stages(param)
+                .contains(&super::ty::Stage::Runtime);
+        let outer = defer.then(|| self.cx.regions.defaults.replace(Vec::new()));
+        // a runtime call for a parameter marked `~` is passed unstarted
+        let argument = if eff && marked.contains(&i) && self.runs_now(arg) {
+            self.suspended_arg(arg, param)
+        } else {
+            self.check_value(arg, param)
+        };
+        if let Some(outer) = outer {
+            let mine = mem::replace(&mut self.cx.regions.defaults, outer);
+            defaults.extend(mine.unwrap_or_default());
+        }
+        self.explain_argument(since, head, i, param);
+        if watched {
+            let folded = consteval::eval(arg, self.text);
+            let lambda = unparen(arg).kind == K::FunExpr;
+            given.push((self.span(arg), argument.clone(), folded, lambda));
+        }
+        if eff {
+            if self.cx.stage.calls > calls {
+                self.early_argument(head, arg);
+            }
+            // the rows the `Eff` needs are lower bounds of the parameter's: grown
+            // now, before the result's rows unify as if they could be smaller
+            self.grow();
+        }
+        argument
     }
 
     /// A runtime call in an argument runs before the function it is passed
@@ -446,5 +534,20 @@ impl Checker<'_> {
                 ty
             }
         }
+    }
+}
+
+/// A function written where it is applied, whose argument gives the type
+/// of its first parameter: an accessor, or a `fun` whose first parameter is
+/// a bare name or `_` (a pattern or an annotation keeps its own type).
+pub(super) fn applied_where_written(head: &Node) -> bool {
+    let head = unparen(head);
+    match head.kind {
+        K::AccessorExpr => true,
+        K::FunExpr => head
+            .nodes()
+            .find(|n| super::patterns::is_pattern(n.kind))
+            .is_some_and(|p| matches!(p.kind, K::VarPat | K::WildcardPat)),
+        _ => false,
     }
 }

@@ -618,6 +618,7 @@ impl<'c> Checker<'c> {
         // the arrow the expected type gives the last stage
         let mut last = None;
         let level = self.store.level;
+        let mut given = self.given_param.take();
         for param in params {
             let target = rest.as_ref().map(|t| self.whnf(t));
             let known = rest.clone().filter(|t| {
@@ -658,8 +659,10 @@ impl<'c> Checker<'c> {
                     rest = Some(Type::Error);
                     (Type::Error, None)
                 }
-                None => (self.fresh(), None),
+                None => (given.take().unwrap_or_else(|| self.fresh()), None),
             };
+            // only the first parameter is given
+            given = None;
             if let Some(param) = param {
                 let pat = self.bind_pattern(param, &ty);
                 self.irrefutable(&pat, &ty, param, None);

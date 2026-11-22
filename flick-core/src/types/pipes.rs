@@ -155,7 +155,19 @@ impl Checker<'_> {
     pub(super) fn pipe_from(&mut self, arg: Type, lhs: &Node, rhs: &Node) -> Type {
         let provided = self.cx.regions.provided.len();
         let provided_late = self.cx.regions.provided_late.len();
+        // `user |> .email`: the function takes the type of its parameter from `x`
+        let early = super::calls::applied_where_written(rhs);
+        if early {
+            self.given_param = Some(arg.clone());
+        }
+        // `users |> List.map .town`: the accessors the application leaves
+        // wait until it is applied to `x`
+        let application = unparen(rhs);
+        if application.kind == K::AppExpr {
+            self.piped_late = Some(Vec::new());
+        }
         let function = self.infer(rhs);
+        let late = self.piped_late.take().unwrap_or_default();
         let call = (lhs.range().0, rhs.range().1);
         let ty = match self.ui_callable(&function, call, self.span(rhs)) {
             Type::Fun {
@@ -163,7 +175,9 @@ impl Checker<'_> {
                 effects,
                 result,
             } => {
-                self.expect(&arg, &param, self.span(lhs));
+                if !early {
+                    self.expect(&arg, &param, self.span(lhs));
+                }
                 if let Some(e) = effects {
                     let (start, _) = lhs.range();
                     let (_, end) = rhs.range();
@@ -193,6 +207,11 @@ impl Checker<'_> {
                 Type::Error
             }
         };
+        if !late.is_empty() {
+            let children: Vec<&Node> = application.nodes().collect();
+            let args = super::children::arguments(&children[1..]);
+            self.check_late(children[0], &args, late);
+        }
         self.settle_provided_since(provided, provided_late);
         ty
     }

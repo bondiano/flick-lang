@@ -80,7 +80,7 @@ fn check_modules(modules: &[(&str, &str, &str)]) -> Vec<Diagnostic> {
 #[test]
 fn a_callback_taken_for_pure_is_annotated() {
     let head = "service Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\n";
-    let before = format!("{head}let apply () = (fun h -> h ()) say\n");
+    let before = format!("{head}let apply () =\n  let run = fun h -> h ()\n  run say\n");
     assert_eq!(
         t003_message(&format!("{HEAD}{before}")),
         "expected `Unit -> _`, found `Unit ->{Log} Unit`"
@@ -88,7 +88,33 @@ fn a_callback_taken_for_pure_is_annotated() {
     assert_fix(
         &before,
         "FLICK-T003",
-        &format!("{head}let apply () = (fun (h : Unit ->{{Log}} Unit) -> h ()) say\n"),
+        &format!(
+            "{head}let apply () =\n  let run = fun (h : Unit ->{{Log}} Unit) -> h ()\n  run say\n"
+        ),
+    );
+}
+
+/// Applied where it is written, the function takes the type of its
+/// parameter from its argument: the callback is the runtime function given.
+#[test]
+fn a_callback_applied_where_it_is_written_takes_the_argument_type() {
+    let head = "service Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\n";
+    for body in [
+        "apply : Unit ->{Log} Unit\nlet apply () = (fun h -> h ()) say\n",
+        "piped : Unit ->{Log} Unit\nlet piped () = say |> fun h -> h ()\n",
+        "both : Unit ->{Log} Unit\nlet both () = (fun h _ -> h ()) say 1\n",
+    ] {
+        let diagnostics = check(&format!("{HEAD}{head}{body}"));
+        assert!(diagnostics.is_empty(), "{body}: {diagnostics:?}");
+    }
+    // the effects of the callback are the call's: a signature must allow them
+    let pure = format!("{HEAD}{head}pure : Unit -> Unit\nlet pure () = (fun h -> h ()) say\n");
+    let diagnostics = check(&pure);
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.code == codes::E001 || d.code == codes::E002),
+        "{diagnostics:?}"
     );
 }
 

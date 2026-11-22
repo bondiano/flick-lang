@@ -1,0 +1,14 @@
+// A function applied where it is written takes the type of its first
+// parameter from its argument, as `let r = argument` would give it. (An
+// effectful callback taken so, `(fun h -> h ()) say`, is a case of
+// `assumed_pure_tests.rs` of the checker: the model takes `h` for pure.)
+module App.AppliedWhereWritten exposing (..)
+
+type alias Poly = { id : forall a. a -> a }
+
+// a polymorphic field is read at an instance, as `p.id` is
+fields : Poly -> (Int, String)
+let fields p = (.id p 1, (p |> .id) "a")
+
+lambdas : Poly -> (Int, String)
+let lambdas p = ((fun r -> r.id) p 1, (p |> fun r -> r.id) "a")

@@ -42,4 +42,4 @@ let token = .token
 
 piped_token : Session -> String
 let piped_token session = session |> .token
-//                        ^^^^^^^ FLICK-T003
+//                                   ^^^^^^ FLICK-T003 `Session` has no field `token`

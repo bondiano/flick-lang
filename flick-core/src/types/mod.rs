@@ -368,6 +368,8 @@ fn checker_in<'a>(
         root: None,
         calls: Vec::new(),
         field_path: Vec::new(),
+        given_param: None,
+        piped_late: None,
         holes: Vec::new(),
         hole_ok: false,
         control_effects: HashSet::new(),

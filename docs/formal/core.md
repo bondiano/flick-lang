@@ -964,9 +964,9 @@ let poke () =
 
 ### A callee of unknown type is a pure arrow
 
-- Divergence: `(fun h -> h ()) f` with `f : Unit ->{Log} Unit` is `FLICK-T003` "expected `Unit -> _`".
+- Divergence: `let run = fun h -> h ()` followed by `run f` with `f : Unit ->{Log} Unit` is `FLICK-T003` "expected `Unit -> _`".
 - In the model (App) admits any `φ`, but `λh. h ()` has no principal type: `(Unit →P τ) →P τ` and `(Unit →R⟨r;ε⟩ τ) →R⟨r;ε⟩ τ` are incomparable, and the core has no stage variables.
-- Resolution (spec): `reference/effects.md` states that a parameter of unknown type applied to an argument is treated as a pure function; an effectful callback gets its type from the expected type or from a signature.
+- Resolution (spec): `reference/effects.md` states that a parameter of unknown type applied to an argument is treated as a pure function; an effectful callback gets its type from the expected type, from a signature, or from the argument when the function is applied where it is written. The checker infers that argument first, so `(fun h -> h ()) f` and `f |> fun h -> h ()` type `h` as `f` and check, as `let h = f in h ()` does; so does the parameter of an accessor `.a.b` applied where it is written (`calls.rs` `applied_where_written`). The order of checking changes, not the typing rules: the program is typed as a derivation of (App) with `φ` the stage of `f`. The reference model's checker still infers `λh. h ()` before its argument and rejects such a program, so it is a case of the checker's unit tests (`assumed_pure_tests.rs` `a_callback_applied_where_it_is_written_takes_the_argument_type`), not of `tests/check/pass`.
 
 ### Only arrows and `Eff` have subtyping
 

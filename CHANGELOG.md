@@ -6,6 +6,13 @@ break programs.
 
 ## Unreleased
 
+- **A function applied where it is written takes its argument's type.**
+  In `(fun h -> h ()) say` and `say |> fun h -> h ()` the parameter `h`
+  has the type of `say`, as in `let h = say`: an effectful callback fits,
+  a polymorphic field of a record argument is read at an instance, and a
+  field the argument lacks is reported where the body reads it. A function
+  bound to a name first still takes its parameter's type from its body.
+
 - **A local function without a signature is generic.** `let same x = x`
   and `let get = fun r -> r.value` inside a function are generalized as
   `let f = (fun …)` already was, so each use may give them other types. A
