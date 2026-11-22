@@ -52,3 +52,9 @@ let operators () =
   let add = (fun x y -> x + y)
   let prefixed = (fun mark lines -> List.map (fun line -> mark ++ line) lines)
   (add 1 2, prefixed "> " ["c"])
+
+// a local function takes records with other fields at each use
+fields : Unit ->{} (Int, String)
+let fields () =
+  let get r = r.value
+  (get { value = 1 }, get { value = "a"; other = 2 })

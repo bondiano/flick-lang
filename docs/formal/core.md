@@ -521,7 +521,7 @@ Checker:
 - `bindings.rs` `unsigned` → `generalize.rs` `Checker::generalize`; this is the only call of `generalize`.
 - `bindings.rs` `check_signed` and `polymorphic_runtime` (`FLICK-T013`), `pattern_let`.
 - `generalize.rs` `kind_of`: a quantified variable takes the kind of where it occurs, an argument of a type the kind of the type's parameter (`Server.Function (r : ServiceRow)` makes `r` a service row). Before, a row argument of a type other than `Eff` and `Layer` was quantified at kind `Type` (`flick-core/tests/features.rs`).
-- The model (`flick-model/src/check/generalize.rs`) quantifies type metas and the row metas a type takes, as in `Errors e`; a row only of a stage is not quantified, as in item 5.
+- The model (`flick-model/src/check/generalize.rs`) quantifies type metas, the row metas a type takes, as in `Errors e`, and the tails of records, as in `{value : a | r}`; a row only of a stage is not quantified, as in item 5.
 
 `foreign pure` atoms are created as state, so they have two separate rules (see [stateful atoms](#atommake-and-atomfresh-create-state-but-are-foreign-pure)). A local binding without a type does not generalize variables inside an atom type (`ui.rs` `lower_atoms` before `generalize`): its uses fix the type. An atom type with a quantified variable on a value is `FLICK-U005` (`ui.rs` `polymorphic_atom`): at the top level without a signature (`unsigned`), with a signature (`polymorphic_signature`), and when checked against `∀` (`check_value`).
 
