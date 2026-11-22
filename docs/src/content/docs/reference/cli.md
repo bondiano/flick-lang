@@ -15,9 +15,9 @@ its tools in [`[tools]`](../project/#flicktoml), and the flag there is
 `FLICK-P051`) and `--help`; `flick help <command>` prints a command's help and
 `flick --version` the compiler's version (`flick doctor` shows the rest).
 
-The project's backend and the plugins of its dependencies may add commands
-of their own. `flick --help` lists them by contributor, and they run as
-`flick <command>` or `flick <contributor>:<command>` (see
+Built-in `std`, the project's backend and the plugins of its dependencies may
+add commands of their own. `flick --help` lists them by contributor, and they
+run as `flick <command>` or `flick <contributor>:<command>` (see
 [Contributed commands](../commands/)).
 
 ## Commands
@@ -43,9 +43,9 @@ of their own. `flick --help` lists them by contributor, and they run as
 | `diff [ref]` | the public API changes since a git revision (the latest tag by default), each `MAJOR` (removed or changed) or `MINOR` (added), and the version they call for from `package.json` |
 | `ffi import <pkg> --out <dir> [--select a,b]` | a command of the JavaScript backend (`js:ffi import`): reads the `.d.ts` of an installed package and writes `<dir>/<Pkg>/Generated.fl` with a coverage report; `--select` imports only the named exports (see [Importing a package's `.d.ts`](../ffi/#importing-a-packages-dts)) |
 | `ffi check [paths]` | a command of the JavaScript backend: checks generated and reviewed bindings and their policies against the installed packages; without paths the source root |
-| `schema export <M.codec> --target json-schema-2020-12 --out <file>` | the strict JSON Schema of a `PureCodec Json a` |
-| `schema export <M.api> --target openapi-3.1 --out <file>` | an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes (see [Clients and documents](../http-api/#clients-and-documents)) |
-| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--std]` | Markdown pages of the public API: types, kinds, variances, constraints, effects, captures |
+| `schema export <M.codec> --target json-schema-2020-12 --out <file>` | a command of `std` (`std:schema export`): exports the strict JSON Schema of a `PureCodec Json a` by running through the project's selected backend |
+| `schema export <M.api> --target openapi-3.1 --out <file>` | a command of `std` (`std:schema export`): exports an `HttpApi.Api` value as an OpenAPI 3.1 document, the same document `HttpApi.openapi` makes, running through the project's selected backend (see [Clients and documents](../http-api/#clients-and-documents)) |
+| `doc --out-dir <dir> [--source-base-url <url>] [--check-examples] [--target <name>] [--std]` | Markdown pages of the public API: types, kinds, variances, constraints, effects, captures; with `--check-examples`, compiles and executes examples on the selected backend (or `--target <name>`) |
 | `explain <code>` | the explanation of a diagnostic code, a plugin's too, as `std/L001` |
 | `expand [paths]` | the code each [plugin](../plugins/) block of the project or of the files stands for |
 | `doctor` | the compiler, Node.js, pnpm, git, the TypeScript Content Mapper, the installed runtime and Effect, the optional adapters, and Go when it is installed; everything but the compiler, Node.js and pnpm is a note, not a failure |
@@ -60,17 +60,19 @@ dependencies first.
 `check`, `build` and the build steps of `run`, `dev` and `test` install
 nothing, run no `main` and load no foreign module. An installed
 `@flick-lang/runtime`, `@flick-lang/effect-ts` or `effect` of another version than the compiler
-pins stops them with `FLICK-P015` (exit code 2). `schema export` loads the
-module that makes the codec, whose top level is pure, and nothing else.
-JSON Schema export uses the project's selected runtime. OpenAPI export uses the
-Effect adapter; set `[target.js] runtime = "effect"` and install `@flick-lang/effect-ts` for
-an `HttpApi.Api` export.
+pins stops them with `FLICK-P015` (exit code 2). `schema export` (contributed by
+`std`, also invocable as `flick std:schema export`) compiles an in-memory
+exporter module against the project and runs it through the project's selected
+backend (`flick/js` on `rt` or `effect`, `flick/go` as a native Go executable
+without Node, or another pinned backend) in an isolated temporary generation,
+writing no generated modules to the project tree. A schema that cannot be
+exported strictly fails with `FLICK-D008` pointing at the exported declaration.
 
 `test` streams human results after each test's cleanup, with success/failure markers, completion counts and timings, then prints a summary. Node and Go share the format and honor `--color`; auto color checks stdout, `NO_COLOR` and `TERM=dumb`. `--reporter json` writes one final object in declaration order, without color or timings.
 
 ## Target and backend options
 
-`build`, `run`, `dev`, `test` and `inspect` take `--target <name>` to select
+`build`, `run`, `dev`, `test`, `inspect` and `doc` (when checking examples) take `--target <name>` to select
 which backend component runs (`js` for `flick/js`, `go` for `flick/go`, or the
 short name of a pinned `[build.backend]`). Without `--target`, the target comes
 from `[build.backend]`, then `[build] target`, then the backend prefix of
@@ -213,8 +215,13 @@ other's fingerprints and that the paths `exports` names exist
 
 `flick doc --out-dir api --check-examples` writes Markdown from the checked
 public interface and its `///` comments, and checks their fenced Flick examples
-with the package imports available. Private declarations are not separate API
-entries. A public re-export uses the original declaration's documentation.
+with the package imports available. Runnable examples compile in memory and
+execute through the project's selected backend (or `--target <name>`), so Go
+projects execute their examples as native Go binaries without Node. Parse,
+type, undeclared-import (`FLICK-P062`), unsatisfied `fail` (`FLICK-P062`), and
+runtime (`FLICK-P061`) failures report diagnostics with source spans inside the
+original `///` comment and write no files. Private declarations are not separate
+API entries. A public re-export uses the original declaration's documentation.
 
 `--source-base-url https://host/repo/blob/REV/package` links declarations to
 paths relative to the project root and their original source lines. Choose a

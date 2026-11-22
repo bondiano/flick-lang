@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use clap::{Args, Subcommand, ValueEnum};
+use clap::{Args, ValueEnum};
 
 use super::ProfileArgument;
 use flick_core::project::config::Source;
@@ -186,38 +186,13 @@ pub struct DocArguments {
     /// Check fenced Flick examples in public documentation in this package context.
     #[arg(long)]
     pub check_examples: bool,
+    /// Target backend for `--check-examples`, such as `js` or `go`; by default
+    /// `build.target` of the project.
+    #[arg(long, value_name = "NAME")]
+    pub target: Option<String>,
     /// Document the loaded standard library rather than a user project.
     #[arg(long)]
     pub std: bool,
-}
-
-#[derive(Subcommand)]
-pub enum SchemaCommands {
-    /// Export the static wire form of a JSON codec.
-    Export(SchemaExportArguments),
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub enum SchemaTarget {
-    #[value(name = "json-schema-2020-12")]
-    JsonSchema,
-    /// An `HttpApi.Api` as an `OpenAPI` 3.1 document.
-    #[value(name = "openapi-3.1")]
-    OpenApi,
-}
-
-#[derive(Args)]
-pub struct SchemaExportArguments {
-    /// `Module.value`: a `PureCodec Json a` for JSON Schema, an
-    /// `HttpApi.Api gs` for `OpenAPI`.
-    pub codec: String,
-
-    #[arg(long, value_enum)]
-    pub target: SchemaTarget,
-
-    /// The file to write.
-    #[arg(long, value_name = "FILE")]
-    pub out: String,
 }
 
 #[derive(Args)]

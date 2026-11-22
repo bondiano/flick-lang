@@ -3,9 +3,12 @@
 //! the host refuses before any write, help read from the cache alone, and a
 //! session on stdio.
 
+use std::env;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::thread;
@@ -398,4 +401,130 @@ fn a_plugin_package_scaffolds_via_from_path_and_url_and_pins_in_lock() {
     assert!(!bad.status.success());
     assert!(text(&bad).1.contains("FLICK-P033"), "{:?}", text(&bad));
     assert!(!root.join("too-new").exists());
+}
+
+fn find_on_path(name: &str) -> Option<PathBuf> {
+    let path_var = env::var_os("PATH")?;
+    for dir in env::split_paths(&path_var) {
+        let candidate = dir.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+        #[cfg(windows)]
+        {
+            let exe = dir.join(format!("{name}.exe"));
+            if exe.is_file() {
+                return Some(exe);
+            }
+        }
+    }
+    None
+}
+
+#[test]
+fn a_wasm_plugin_runs_in_memory_flick_programs_on_js_backend() {
+    let root = app("commands_run_flick_js", MAIN);
+    let app_dir = root.join("app");
+    let ok = flick(
+        &root,
+        &[
+            "pairs-eval",
+            "Platform.stdout_write \"hello-from-js\"",
+            "--out",
+            "result.txt",
+        ],
+    );
+    let (stdout, stderr) = text(&ok);
+    assert!(ok.status.success(), "{stderr}");
+    assert_eq!(stdout, "pairs-eval ok\n");
+    assert_eq!(
+        fs::read_to_string(app_dir.join("result.txt")).expect("result"),
+        "pairs-eval: hello-from-js"
+    );
+    assert!(!app_dir.join("eval.raw").exists());
+    assert!(!app_dir.join("src/PairsEvalGen.fl").exists());
+
+    // Compile error inside synthetic overlay anchors to `origin` (`src/App/Main.fl:1:1`).
+    let bad_type = flick(
+        &root,
+        &[
+            "pairs-eval",
+            "let bad : String = 1\n  ()",
+            "--out",
+            "bad.txt",
+        ],
+    );
+    let (_, stderr) = text(&bad_type);
+    assert_eq!(bad_type.status.code(), Some(1), "{stderr}");
+    assert!(stderr.contains("FLICK-T003"), "{stderr}");
+    assert!(stderr.contains("src/App/Main.fl:1:1"), "{stderr}");
+    assert!(!app_dir.join("bad.txt").exists());
+
+    // Runtime failure reports FLICK-P061 anchored to `origin`.
+    let fail = flick(
+        &root,
+        &[
+            "pairs-eval",
+            "App.fail \"plugin boom\"",
+            "--out",
+            "fail.txt",
+        ],
+    );
+    let (_, stderr) = text(&fail);
+    assert_eq!(fail.status.code(), Some(1), "{stderr}");
+    assert!(stderr.contains("FLICK-P061"), "{stderr}");
+    assert!(stderr.contains("plugin boom"), "{stderr}");
+    assert!(stderr.contains("src/App/Main.fl:1:1"), "{stderr}");
+    assert!(!app_dir.join("fail.txt").exists());
+}
+
+#[test]
+fn a_wasm_plugin_runs_in_memory_flick_programs_on_go_without_node() {
+    let go_root = app("commands_run_flick_go", MAIN);
+    let go_app = go_root.join("app");
+    let config = fs::read_to_string(go_app.join("flick.toml")).expect("config");
+    fs::write(
+        go_app.join("flick.toml"),
+        format!("{config}\n[tools]\n\"flick/go\" = [\"go\"]\n\n[build]\ntarget = \"go\"\n"),
+    )
+    .expect("go config");
+
+    let go = find_on_path("go").expect("`go` must be on PATH");
+    let no_node_bin = go_root.join("no-node-bin");
+    fs::create_dir_all(&no_node_bin).expect("bin");
+    let link = no_node_bin.join(go.file_name().expect("go"));
+    #[cfg(unix)]
+    symlink(&go, &link).expect("symlink go");
+    #[cfg(windows)]
+    fs::copy(&go, &link).expect("copy go");
+    assert!(
+        Command::new("node")
+            .arg("--version")
+            .env("PATH", &no_node_bin)
+            .output()
+            .is_err()
+    );
+
+    let go_ok = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args([
+            "pairs-eval",
+            "Platform.stdout_write \"hello-from-go\"",
+            "--out",
+            "go-result.txt",
+        ])
+        .current_dir(&go_app)
+        .env("PATH", &no_node_bin)
+        .env("XDG_CACHE_HOME", go_root.join("cache"))
+        .env("NO_COLOR", "1")
+        .env_remove("CI")
+        .output()
+        .expect("flick runs on go");
+    let (stdout, stderr) = text(&go_ok);
+    assert!(go_ok.status.success(), "{stderr}");
+    assert_eq!(stdout, "pairs-eval ok\n");
+    assert_eq!(
+        fs::read_to_string(go_app.join("go-result.txt")).expect("go result"),
+        "pairs-eval: hello-from-go"
+    );
+    assert!(!go_app.join("src/PairsEvalGen.fl").exists());
 }

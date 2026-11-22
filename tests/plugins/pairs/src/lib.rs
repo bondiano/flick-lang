@@ -62,6 +62,16 @@ impl Plugin for Pairs {
     }
 
     #[cfg(feature = "guest")]
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+        _answers: Vec<command::Answer>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        Ok(commands::resume(&state, &outputs))
+    }
+
+    #[cfg(feature = "guest")]
     fn templates(&self) -> Vec<command::TemplateDescriptor> {
         commands::templates()
     }

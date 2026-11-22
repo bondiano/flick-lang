@@ -75,6 +75,14 @@ pub fn descriptors(ds: Vec<w::Descriptor>) -> Vec<n::Descriptor> {
         .collect()
 }
 
+fn span(s: w::Span) -> n::Span {
+    n::Span {
+        path: s.path,
+        start: s.start,
+        end: s.end,
+    }
+}
+
 pub fn diagnostics(ds: Vec<w::Diagnostic>) -> Vec<n::Diagnostic> {
     (ds.into_iter())
         .map(|d| n::Diagnostic {
@@ -86,11 +94,7 @@ pub fn diagnostics(ds: Vec<w::Diagnostic>) -> Vec<n::Diagnostic> {
             },
             message: d.message,
             notes: d.notes,
-            span: d.span.map(|s| n::Span {
-                path: s.path,
-                start: s.start,
-                end: s.end,
-            }),
+            span: d.span.map(span),
             help: d.help,
         })
         .collect()
@@ -120,6 +124,19 @@ pub fn plan(p: w::Plan) -> n::Plan {
                     inputs: t.inputs,
                     reads: t.reads,
                     outputs: t.outputs,
+                }),
+                w::Step::RunFlick(r) => n::Step::RunFlick(n::RunFlickStep {
+                    id: r.id,
+                    entry: r.entry,
+                    modules: (r.modules.into_iter())
+                        .map(|m| n::FlickModule {
+                            name: m.name,
+                            source: m.source,
+                        })
+                        .collect(),
+                    arguments: r.arguments,
+                    output: r.output,
+                    origin: r.origin.map(span),
                 }),
             })
             .collect(),

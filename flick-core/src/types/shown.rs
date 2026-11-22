@@ -60,7 +60,8 @@ fn implicit(vars: &[Binder], constraints: &[Type], body: &Type, store: &Store) -
         .iter()
         .chain([body])
         .for_each(|t| names(t, store, &mut used, &mut rigid));
-    let distinct: BTreeSet<&str> = vars.iter().map(|v| v.name.as_str()).collect();
+    let mut distinct: BTreeSet<&str> = BTreeSet::new();
+    distinct.extend(vars.iter().map(|v| v.name.as_str()));
     distinct.len() == vars.len()
         && vars
             .iter()

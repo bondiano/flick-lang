@@ -342,12 +342,15 @@ impl Embedding {
             if prefix.transport_checked(&from.contract)? != to.contract {
                 return Err(Invalid::Contract);
             }
-            let mapped: BTreeSet<_> = view.source.0[..index]
-                .iter()
-                .enumerate()
-                .filter(|(_, c)| from.dependencies.contains(&c.id))
-                .map(|(i, _)| view.target.0[view.image[i]].id)
-                .collect();
+            // `extend`, not `collect`: collecting compiles a sort of `ScopeId` into the wasm compiler.
+            let mut mapped = BTreeSet::new();
+            mapped.extend(
+                view.source.0[..index]
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| from.dependencies.contains(&c.id))
+                    .map(|(i, _)| view.target.0[view.image[i]].id),
+            );
             if mapped != to.dependencies {
                 return Err(Invalid::Dependency);
             }
@@ -477,7 +480,9 @@ impl Embedding {
 
     pub fn restrict(&self, keep: &BTreeSet<ScopeId>) -> Self {
         let source = self.source.restrict(keep);
-        let ids: BTreeSet<_> = source.ids().collect();
+        // `extend`, not `collect`: collecting compiles a sort of `ScopeId` into the wasm compiler.
+        let mut ids = BTreeSet::new();
+        ids.extend(source.ids());
         let image = self
             .source
             .0

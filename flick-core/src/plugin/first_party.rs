@@ -1,8 +1,13 @@
 //! The plugins linked into the compiler: those of the packages that come
 //! with it, which every build has, the browser's among them.
 
+#[cfg(feature = "commands")]
+mod schema;
+
 use std::sync::Arc;
 
+#[cfg(feature = "commands")]
+use flick_plugin::command;
 use flick_plugin::{
     Arena, Block, CallSite, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover,
     Piece, Plugin, Published,
@@ -72,6 +77,13 @@ pub fn plugin_owner(package: &str) -> &str {
 /// The plugin linked into the compiler for `package`.
 pub fn plugin(package: &str) -> Option<Arc<dyn Expander>> {
     has_plugin(package).then(|| Arc::new(Native::new(PACKAGE, Std)) as Arc<dyn Expander>)
+}
+
+/// `std`'s first-party plugin as a contributor of CLI commands (`schema export`).
+#[cfg(feature = "commands")]
+pub fn std_commands() -> &'static (dyn Plugin + Send + Sync) {
+    static STD: Std = Std;
+    &STD
 }
 
 /// The plugin of std: `cli` blocks and `deriving Cli.Value`, `server fn`,
@@ -229,5 +241,28 @@ impl Plugin for Std {
             return flick_plugin_derive::derive(target, class, args, module);
         }
         Cli.derive(target, class, args, module, state, compiler)
+    }
+
+    #[cfg(feature = "commands")]
+    fn commands(&self) -> Vec<command::Descriptor> {
+        schema::descriptors()
+    }
+
+    #[cfg(feature = "commands")]
+    fn run(
+        &self,
+        invocation: &command::Invocation,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        schema::run(invocation)
+    }
+
+    #[cfg(feature = "commands")]
+    fn resume(
+        &self,
+        state: Vec<u8>,
+        outputs: Vec<command::File>,
+        _answers: Vec<command::Answer>,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        schema::resume(&state, &outputs)
     }
 }
