@@ -29,6 +29,7 @@ import {
   bridge,
   builtinModuleCache,
   causeMod,
+  collectCallHandleIds,
   executions,
   fiberMod,
   initialArgv1,
@@ -63,11 +64,23 @@ function dispatchSyncNested(msg) {
     try {
       const resolved = resolveTargetSync(exec, spec);
       if (resolved.needsAsyncLoad || spec.mode === "Async") {
-        exec.pendingCalls.set(callId, { abort: () => {} });
+        let pinned = exec ? exec.retainHandleIds(collectCallHandleIds(msg)) : [];
+        const releasePins = () => {
+          if (pinned.length > 0) {
+            exec.releaseHandles(pinned);
+            pinned = [];
+          }
+        };
+        exec.pendingCalls.set(callId, { abort: releasePins });
         send({ type: "pending", call_id: callId });
         queueMicrotask(() => {
-          if (!exec.pendingCalls.has(callId) || exec.closing) return;
-          handleCall(msg, true).catch((err) => {
+          if (!exec.pendingCalls.has(callId) || exec.closing) {
+            releasePins();
+            return;
+          }
+          const passed = pinned;
+          pinned = [];
+          handleCall(msg, true, passed).catch((err) => {
             if (!exec.pendingCalls.delete(callId) || exec.closing) return;
             finishCallErr(exec, callId, err, spec.has_catch);
           });

@@ -7,7 +7,8 @@
 //! - Fuel-prefix zero-leak sweeps on bridged HTTP and UI fixtures (zero Rust & zero host leaks).
 
 use std::path::{Path, PathBuf};
-use std::{fs, io};
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::{env, fs, io, process};
 
 use flick_core::diagnostics::Severity;
 use flick_core::project::{self, Compiled};
@@ -297,5 +298,118 @@ fn stage5_host_fuel_prefix_sweeps_have_zero_leaks_on_both_heaps() {
             heap.finish()
                 .unwrap_or_else(|e| panic!("Rust heap leak at fuel={fuel} for {rel}: {e}"));
         }
+    }
+}
+
+struct TempDirGuard(PathBuf);
+
+impl Drop for TempDirGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+#[test]
+fn stage5_cell_proxy_and_async_target_handle_pinning_zero_leaks() {
+    let unique = format!(
+        "flick-model-host-bridge-reg-{}-{}",
+        process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock")
+            .as_nanos()
+    );
+    let dir = env::temp_dir().join(unique);
+    fs::create_dir_all(&dir).expect("create temp test dir");
+    let _guard = TempDirGuard(dir.clone());
+
+    fs::write(
+        dir.join("maker.mjs"),
+        "export function makeHandle() { return new Map([[\"k\", 42]]); }\n",
+    )
+    .expect("write maker.mjs");
+    fs::write(
+        dir.join("consumer.mjs"),
+        "export function readHandle(m) { return m.get(\"k\"); }\n",
+    )
+    .expect("write consumer.mjs");
+    let main_fl = dir.join("Main.fl");
+    fs::write(
+        &main_fl,
+        r#"module App.Main exposing (main)
+
+import Http.ClientError exposing (HttpClientError)
+import Http.ClientRequest exposing (ClientRequest)
+import Http.ClientResponse exposing (ClientResponse)
+
+make_handle : Unit ->{} JsValue
+foreign make_handle from "./maker.mjs" "makeHandle"
+  arity 0
+
+read_handle : JsValue -> Float
+foreign pure read_handle from "./consumer.mjs" "readHandle"
+  arity 1
+
+answer : ClientRequest -> Http.Url.Url ->{; HttpClientError} ClientResponse
+let answer request url =
+  let ok = Http.ServerResponse.defaults
+  let response =
+    if String.contains "/login" (Http.Url.href url) then
+      Http.ServerResponse.merge_cookies
+        (Http.Cookies.from_set_cookie ["session=abc; Path=/"])
+        (Http.ServerResponse.text "in" ok)
+    else
+      let cookie =
+        match Http.Headers.get "cookie" (Http.ClientRequest.headers request) with
+        | Some v -> v
+        | None -> "none"
+      Http.ServerResponse.text cookie ok
+  Http.ServerResponse.to_client_response request response
+
+main : Unit ->{Host.Console, Async; HttpClientError} Unit
+let main () =
+  let n = read_handle (make_handle ())
+  Platform.stdout_line (show n)
+  let jar = Ref.make Http.Cookies.empty
+  let client = Http.Client.with_cookies_ref jar (Http.Client.make answer)
+  let _ = Http.Client.execute_with client (Http.ClientRequest.get "http://fake/login")
+  let who = Http.Client.execute_with client (Http.ClientRequest.get "http://fake/whoami")
+  Platform.stdout_line (Http.ClientResponse.text who)
+"#,
+    )
+    .expect("write Main.fl");
+
+    let modules = compile(&main_fl).expect("compile regression Main.fl");
+    let main = main_of(&modules).expect("main of regression Main.fl");
+
+    // Use a fresh HostBridge per profile so `./consumer.mjs` genuinely hits the async import path
+    // (`needsAsyncLoad`) while the one-shot handle from `make_handle ()` is released immediately
+    // after the call message is sent, and `with_cookies_ref` passes a `Ref` alongside a one-shot
+    // `Client` handle across `bridge.dataToEffect`.
+    for release in [false, true] {
+        let profile = if release { "release" } else { "debug" };
+        let mut bridge = HostBridge::new().expect("spawn fresh HostBridge");
+        let counted = counted_main_with_bridge(&modules, &main, release)
+            .unwrap_or_else(|e| panic!("lower regression ({profile}): {e}"));
+        let mut heap = Heap::new();
+        let report = counted.execute_with_bridge(&mut heap, FUEL, HostMode::LiveOs, &mut bridge);
+        let outcome_dbg = format!("{:?}", report.outcome);
+        let is_unit = matches!(report.outcome, ProgramOutcome::Returned(Value::Unit));
+        report
+            .outcome
+            .release(&mut heap)
+            .unwrap_or_else(|e| panic!("release regression ({profile}): {e}"));
+        let stats = heap
+            .finish()
+            .unwrap_or_else(|e| panic!("Rust heap leak in regression ({profile}): {e}"));
+        assert_eq!(stats.live_objects, 0, "regression ({profile}) live objects");
+        assert!(
+            is_unit,
+            "expected Returned(()) for regression ({profile}), got {outcome_dbg}"
+        );
+        assert_eq!(
+            report.stdout, "42\nsession=abc\n",
+            "unexpected stdout for regression ({profile})"
+        );
     }
 }

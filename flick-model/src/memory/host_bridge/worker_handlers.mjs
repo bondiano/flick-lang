@@ -8,6 +8,7 @@ import {
   invokeTarget,
   prepareArgs,
   resolveTarget,
+  resolveTargetSync,
 } from "./worker_adapt.mjs";
 import { invokeAsyncCallback, makeCallback } from "./worker_callbacks.mjs";
 import {
@@ -15,6 +16,7 @@ import {
   Effect,
   bridge,
   causeMod,
+  collectCallHandleIds,
   executions,
   fiberMod,
   fnResultHint,
@@ -27,11 +29,18 @@ import {
   wireCtx,
 } from "./worker_runtime.mjs";
 
-export async function handleCall(msg, alreadyPending = false) {
+export async function handleCall(msg, alreadyPending = false, prePinned = null) {
   const exec = executions.get(msg.exec);
   const spec = msg.spec;
   const callId = msg.call_id;
   const checkAlive = () => !alreadyPending || (exec.pendingCalls.delete(callId) && !exec.closing);
+  let pinned = prePinned;
+  const releasePins = () => {
+    if (pinned !== null && pinned.length > 0) {
+      exec?.releaseHandles(pinned);
+    }
+    pinned = null;
+  };
   try {
     // Special-case `Js.promise_callback` regardless of mode so the returned JS function
     // invokes the Rust async callback on a child fiber and resolves its Promise.
@@ -44,14 +53,34 @@ export async function handleCall(msg, alreadyPending = false) {
       const cbWire = msg.args[0];
       const cbId = cbWire.nodes[cbWire.root][1];
       const promiseFn = (arg) => invokeAsyncCallback(exec, cbId, [arg], undefined, "promise");
+      releasePins();
       if (checkAlive()) finishCallOk(exec, callId, spec, false, promiseFn);
       return;
     }
-    const { target, bridged } = await resolveTarget(exec, spec);
-    if (alreadyPending && (!exec.pendingCalls.has(callId) || exec.closing)) return;
+    let resolved = resolveTargetSync(exec, spec);
+    if (resolved.needsAsyncLoad) {
+      if (pinned === null && exec) {
+        pinned = exec.retainHandleIds(collectCallHandleIds(msg));
+      }
+      if (alreadyPending && pinned && pinned.length > 0) {
+        exec.pendingCalls.set(callId, { abort: releasePins });
+      }
+      resolved = await resolveTarget(exec, spec);
+    }
+    if (alreadyPending && (!exec.pendingCalls.has(callId) || exec.closing)) {
+      releasePins();
+      return;
+    }
+    const { target, bridged } = resolved;
     const controller = spec.mode === "Async" || spec.adapter.cancel ? new AbortController() : null;
-    const finalArgs = prepareArgs(exec, spec, msg.args, bridged, controller);
-    const callCtx = buildCallCtx(exec, msg);
+    let finalArgs;
+    let callCtx;
+    try {
+      finalArgs = prepareArgs(exec, spec, msg.args, bridged, controller);
+      callCtx = buildCallCtx(exec, msg);
+    } finally {
+      releasePins();
+    }
 
     if (spec.mode === "Pure" || !spec.runtime) {
       const raw = fiberMod.inCtx(callCtx, () =>
@@ -137,6 +166,7 @@ export async function handleCall(msg, alreadyPending = false) {
       if (checkAlive()) finishCallOk(exec, callId, spec, bridged, runOrVal);
     }
   } catch (err) {
+    releasePins();
     if (checkAlive()) finishCallErr(exec, callId, err, spec.has_catch);
   }
 }
