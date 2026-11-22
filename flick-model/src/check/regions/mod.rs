@@ -352,8 +352,20 @@ impl Checker<'_> {
     /// core.md §2.5 item 4). A later argument/call can still fix their owner.
     pub(super) fn open_region_metas(&self) -> BTreeSet<u32> {
         let mut metas = BTreeSet::new();
+        let unconditional = self.equalities.is_empty()
+            && self.row_equalities.is_empty()
+            && self.cap_equalities.is_empty();
         for hold in &self.regions.holds {
+            let unrefined = unconditional && hold.givens.is_empty() && !hold.within.is_empty();
             for held in &hold.held {
+                // When the bound already admits the same type, the hold
+                // imposes no constraint on its variables.
+                if unrefined {
+                    let ty = self.zonk(held);
+                    if hold.within.iter().any(|within| self.zonk(within) == ty) {
+                        continue;
+                    }
+                }
                 self.metas(held, &mut metas);
             }
         }
