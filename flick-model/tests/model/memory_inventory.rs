@@ -7,27 +7,22 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::{env, fs, io};
+use std::time::Instant;
+use std::{env, fs};
 
 use flick_core::diagnostics::Severity;
 use flick_core::project;
 use flick_core::source::SourceMap;
-use flick_model::memory::{Error as MemoryError, Heap, ProgramOutcome, Value};
+use flick_model::memory::{
+    Error as MemoryError, ExecutionReport, Heap, HostBridge, HostMode, ProgramOutcome, Value,
+};
 use flick_model::run;
 use flick_model::syntax::Path as ModelPath;
 use flick_test_support::files as fixture_files;
 
-struct FsHost;
-
-impl project::Host for FsHost {
-    fn read(&self, p: &Path) -> io::Result<Vec<u8>> {
-        fs::read(p)
-    }
-
-    fn display(&self, p: &Path) -> String {
-        p.display().to_string()
-    }
-}
+mod examples;
+mod helpers;
+use helpers::{FsHost, compile_self_spawn_entry, describe_outcome_detail, load_doc_expectations};
 
 /// Fuel cap for debug `just model` runs so the inventory finishes quickly while
 /// still executing every corpus program and verifying zero leaks on `OutOfFuel`.
@@ -98,11 +93,35 @@ impl CorpusSummary {
             println!("  [out_of_fuel]: {}", self.out_of_fuel.join(", "));
         }
         if !self.failed_outcome.is_empty() {
-            for item in self.failed_outcome.iter().take(20) {
-                println!("  [failed_outcome]: {item}");
+            if env::var("FLICK_INVENTORY_DIFF").is_ok() {
+                for item in &self.failed_outcome {
+                    println!("  [FAIL]: {item}");
+                }
             }
-            if self.failed_outcome.len() > 20 {
-                println!("  ... and {} more", self.failed_outcome.len() - 20);
+            let mut by_reason: BTreeMap<String, Vec<String>> = BTreeMap::new();
+            for item in &self.failed_outcome {
+                let (name, rest) = item.split_once(": ").unwrap_or((item, ""));
+                let key = rest.split(" expected=").next().unwrap_or(rest).to_owned();
+                by_reason.entry(key).or_default().push(name.to_owned());
+            }
+            let mut ranked_fail: Vec<_> = by_reason.into_iter().collect();
+            ranked_fail.sort_by(|a, b| b.1.len().cmp(&a.1.len()).then_with(|| a.0.cmp(&b.0)));
+            println!(
+                "  [failed_outcome grouped ({} total)]:",
+                self.failed_outcome.len()
+            );
+            for (reason, names) in ranked_fail {
+                let sample: Vec<_> = names.iter().take(6).cloned().collect();
+                let more = if names.len() > 6 {
+                    format!(" ... +{}", names.len() - 6)
+                } else {
+                    String::new()
+                };
+                println!(
+                    "    {:4}  {reason}  [{}]{more}",
+                    names.len(),
+                    sample.join(", ")
+                );
             }
         }
         if !self.leaked.is_empty() {
@@ -126,16 +145,61 @@ fn check_file_fixture(
     label: &str,
     check_stdout: bool,
     fuel: u64,
+    bridge: &mut HostBridge,
     summary: &mut CorpusSummary,
 ) {
+    check_file_fixture_with_expect(path, label, check_stdout, None, fuel, bridge, summary);
+}
+
+fn check_doc_compile_fail(path: &Path, label: &str, fail_code: &str, summary: &mut CorpusSummary) {
+    summary.total_profiles += 2;
+    match run::compile(path) {
+        Err(err) if err.contains(fail_code) => summary.expected_failure += 2,
+        Err(err) => {
+            summary.failed_outcome.push(format!(
+                "{label}: expected compile error {fail_code}, got {err}"
+            ));
+            summary.failed_outcome.push(format!(
+                "{label} (release): expected compile error {fail_code}, got {err}"
+            ));
+        }
+        Ok(_) => {
+            summary.failed_outcome.push(format!(
+                "{label}: expected compile error {fail_code}, but compiled cleanly"
+            ));
+            summary.failed_outcome.push(format!(
+                "{label} (release): expected compile error {fail_code}, but compiled cleanly"
+            ));
+        }
+    }
+}
+
+fn check_file_fixture_with_expect(
+    path: &Path,
+    label: &str,
+    check_stdout: bool,
+    doc_expect: Option<&str>,
+    fuel: u64,
+    bridge: &mut HostBridge,
+    summary: &mut CorpusSummary,
+) {
+    if let Some(fail_code) = doc_expect.and_then(|e| e.strip_prefix("fail ")) {
+        check_doc_compile_fail(path, label, fail_code, summary);
+        return;
+    }
     let expected_stdout = if check_stdout {
         fs::read_to_string(path.with_extension("stdout")).ok()
     } else {
         None
     };
-    let expects_nonzero_exit = fs::read_to_string(path.with_extension("exit"))
-        .ok()
-        .is_some_and(|code| code.trim() != "0");
+    let fetch_mock: Option<serde_json::Value> =
+        fs::read_to_string(path.with_extension("fetch.json"))
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok());
+    let expects_nonzero_exit = doc_expect == Some("ui")
+        || fs::read_to_string(path.with_extension("exit"))
+            .ok()
+            .is_some_and(|code| code.trim() != "0");
 
     let Ok(modules) = run::compile(path) else {
         summary.total_profiles += 2;
@@ -151,76 +215,117 @@ fn check_file_fixture(
     for release in [false, true] {
         summary.total_profiles += 1;
         let profile = if release { "release" } else { "debug" };
-        let counted = match run::counted_main(&modules, &main, release) {
+        let counted = match run::counted_main_with_bridge(&modules, &main, release) {
             Ok(counted) => counted,
             Err(error) => {
                 summary.record_unsupported(&error);
                 continue;
             }
         };
+        if let Some(replies) = &fetch_mock {
+            bridge
+                .set_fetch_mock(Some(replies))
+                .expect("install fetch mock");
+        }
+        let self_spawn = compile_self_spawn_entry(&repo(), path, label, &main.module, release);
+        if let Some(script) = &self_spawn {
+            bridge
+                .set_entry_script(Some(script))
+                .expect("install self-spawn entry script");
+        }
+        let started = Instant::now();
         let mut heap = Heap::new();
-        let report = counted.execute(&mut heap, fuel);
-        let outcome_tag = match &report.outcome {
-            ProgramOutcome::Returned(Value::Unit) => "returned_unit",
-            ProgramOutcome::Returned(_) => "returned_non_unit",
-            ProgramOutcome::Raised(_) => "raised",
-            ProgramOutcome::Failed(_) => "failed",
-            ProgramOutcome::Fault(MemoryError::OutOfFuel) => "out_of_fuel",
-            ProgramOutcome::Fault(_) => "fault",
-        };
-        let fault_detail = match &report.outcome {
-            ProgramOutcome::Fault(err) => Some(err.to_string()),
-            _ => None,
-        };
-        let release_err = report.outcome.release(&mut heap).err();
-        let finish_res = heap.finish();
-        if let Some(err) = release_err {
-            summary
-                .leaked
-                .push(format!("{label} ({profile}): release error: {err}"));
-            continue;
+        let report = counted.execute_with_bridge(&mut heap, fuel, HostMode::LiveOs, bridge);
+        let elapsed = started.elapsed();
+        if elapsed.as_secs() >= 4 {
+            eprintln!(
+                "[slow] {label} ({profile}) took {:.1}s",
+                elapsed.as_secs_f64()
+            );
         }
-        match finish_res {
-            Ok(stats) if stats.live_objects == 0 && stats.allocations == stats.frees => {}
-            Ok(stats) => {
-                summary.leaked.push(format!(
-                    "{label} ({profile}): live={} alloc={} free={}",
-                    stats.live_objects, stats.allocations, stats.frees
-                ));
-                continue;
-            }
-            Err(err) => {
-                summary.leaked.push(format!("{label} ({profile}): {err}"));
-                continue;
-            }
+        if matches!(
+            &report.outcome,
+            ProgramOutcome::Fault(MemoryError::HostBridge(_))
+        ) {
+            *bridge = HostBridge::new().expect("respawn HostBridge after bridge fault");
         }
-
-        if outcome_tag == "out_of_fuel" {
-            summary.out_of_fuel.push(format!("{label} ({profile})"));
-            continue;
-        }
-        if let Some(expected) = &expected_stdout
-            && report.stdout != *expected
-        {
-            summary.failed_outcome.push(format!(
-                "{label} ({profile}): stdout mismatch ({outcome_tag}{}) expected={expected:?} actual={:?}",
-                fault_detail.map_or(String::new(), |d| format!(": {d}")),
-                report.stdout,
-            ));
-            continue;
-        }
-        match outcome_tag {
-            "returned_unit" if !expects_nonzero_exit => summary.passed += 1,
-            "raised" | "failed" if expects_nonzero_exit => summary.expected_failure += 1,
-            _ => summary.failed_outcome.push(format!(
-                "{label} ({profile}): unexpected outcome {outcome_tag}{}",
-                fault_detail.map_or(String::new(), |d| format!(": {d}"))
-            )),
-        }
+        record_fixture_report(
+            &mut heap,
+            report,
+            label,
+            profile,
+            expected_stdout.as_deref(),
+            expects_nonzero_exit,
+            summary,
+        );
     }
 }
 
-fn check_language_exports(fuel: u64, summary: &mut CorpusSummary) {
+fn record_fixture_report(
+    heap: &mut Heap,
+    report: ExecutionReport,
+    label: &str,
+    profile: &str,
+    expected_stdout: Option<&str>,
+    expects_nonzero_exit: bool,
+    summary: &mut CorpusSummary,
+) {
+    let outcome_tag = match &report.outcome {
+        ProgramOutcome::Returned(Value::Unit) => "returned_unit",
+        ProgramOutcome::Returned(_) => "returned_non_unit",
+        ProgramOutcome::Raised(_) => "raised",
+        ProgramOutcome::Failed(_) => "failed",
+        ProgramOutcome::Fault(MemoryError::OutOfFuel) => "out_of_fuel",
+        ProgramOutcome::Fault(_) => "fault",
+    };
+    let fault_detail = describe_outcome_detail(heap, &report.outcome);
+    let release_err = report.outcome.release(heap).err();
+    let finish_res = heap.finish();
+    if let Some(err) = release_err {
+        summary
+            .leaked
+            .push(format!("{label} ({profile}): release error: {err}"));
+        return;
+    }
+    match finish_res {
+        Ok(stats) if stats.live_objects == 0 && stats.allocations == stats.frees => {}
+        Ok(stats) => {
+            summary.leaked.push(format!(
+                "{label} ({profile}): live={} alloc={} free={}",
+                stats.live_objects, stats.allocations, stats.frees
+            ));
+            return;
+        }
+        Err(err) => {
+            summary.leaked.push(format!("{label} ({profile}): {err}"));
+            return;
+        }
+    }
+    if outcome_tag == "out_of_fuel" {
+        summary.out_of_fuel.push(format!("{label} ({profile})"));
+        return;
+    }
+    if let Some(expected) = expected_stdout
+        && report.stdout != expected
+    {
+        summary.failed_outcome.push(format!(
+            "{label} ({profile}): stdout mismatch ({outcome_tag}{}) expected={expected:?} actual={:?}",
+            fault_detail.map_or(String::new(), |d| format!(": {d}")),
+            report.stdout,
+        ));
+        return;
+    }
+    match outcome_tag {
+        "returned_unit" if !expects_nonzero_exit => summary.passed += 1,
+        "raised" | "failed" if expects_nonzero_exit => summary.expected_failure += 1,
+        _ => summary.failed_outcome.push(format!(
+            "{label} ({profile}): unexpected outcome {outcome_tag}{}",
+            fault_detail.map_or(String::new(), |d| format!(": {d}"))
+        )),
+    }
+}
+
+fn check_language_exports(fuel: u64, bridge: &mut HostBridge, summary: &mut CorpusSummary) {
     let dir = repo().join("tests/language");
     let mut test_files = fixture_files(&dir.join("test"), "fl");
     test_files.sort();
@@ -260,7 +365,8 @@ fn check_language_exports(fuel: u64, summary: &mut CorpusSummary) {
         for release in [false, true] {
             summary.total_profiles += 1;
             let profile = if release { "release" } else { "debug" };
-            let counted = match run::counted_main(&compilation.modules, &entry, release) {
+            let counted = match run::counted_main_with_bridge(&compilation.modules, &entry, release)
+            {
                 Ok(counted) => counted,
                 Err(error) => {
                     summary.record_unsupported(&error);
@@ -268,7 +374,7 @@ fn check_language_exports(fuel: u64, summary: &mut CorpusSummary) {
                 }
             };
             let mut heap = Heap::new();
-            let report = counted.execute(&mut heap, fuel);
+            let report = counted.execute_with_bridge(&mut heap, fuel, HostMode::LiveOs, bridge);
             let is_ok = matches!(report.outcome, ProgramOutcome::Returned(_));
             let is_oof = matches!(
                 report.outcome,
@@ -307,6 +413,15 @@ fn check_language_exports(fuel: u64, summary: &mut CorpusSummary) {
 fn counted_corpus_inventory() {
     let fuel = inventory_fuel();
     let root = repo();
+    let filter = env::var("FLICK_INVENTORY_FILTER").ok();
+    let matches_filter = |name: &str| {
+        filter.as_deref().is_none_or(|f| {
+            f.split(',')
+                .any(|pat| !pat.is_empty() && name.contains(pat))
+        })
+    };
+    let doc_expects = load_doc_expectations(&root);
+    let mut bridge = HostBridge::new().expect("spawn HostBridge");
     let mut run_summary = CorpusSummary::default();
     let mut run_files = fixture_files(&root.join("tests/run"), "fl");
     run_files.sort();
@@ -317,7 +432,10 @@ fn counted_corpus_inventory() {
             .with_extension("")
             .display()
             .to_string();
-        check_file_fixture(path, &rel, true, fuel, &mut run_summary);
+        if !matches_filter(&rel) {
+            continue;
+        }
+        check_file_fixture(path, &rel, true, fuel, &mut bridge, &mut run_summary);
     }
     run_summary.print("tests/run");
 
@@ -331,7 +449,10 @@ fn counted_corpus_inventory() {
             .with_extension("")
             .display()
             .to_string();
-        check_file_fixture(path, &rel, true, fuel, &mut rt_summary);
+        if !matches_filter(&rel) {
+            continue;
+        }
+        check_file_fixture(path, &rel, true, fuel, &mut bridge, &mut rt_summary);
     }
     rt_summary.print("tests/rt");
 
@@ -354,20 +475,63 @@ fn counted_corpus_inventory() {
             .unwrap_or(path)
             .display()
             .to_string();
-        check_file_fixture(path, &rel, false, fuel, &mut docs_summary);
+        if !matches_filter(&rel) {
+            continue;
+        }
+        let exp = doc_expects.get(&rel).map(String::as_str);
+        check_file_fixture_with_expect(path, &rel, true, exp, fuel, &mut bridge, &mut docs_summary);
     }
     docs_summary.print("docs (tour + exercise solutions + playground examples)");
 
     let mut lang_summary = CorpusSummary::default();
-    check_language_exports(fuel, &mut lang_summary);
+    if filter.is_none() {
+        check_language_exports(fuel, &mut bridge, &mut lang_summary);
+    }
     lang_summary.print("tests/language exports");
 
-    let total_leaks = run_summary.leaked.len()
-        + rt_summary.leaked.len()
-        + docs_summary.leaked.len()
-        + lang_summary.leaked.len();
+    let mut examples_summary = CorpusSummary::default();
+    examples::check_examples_corpus(
+        &root,
+        fuel,
+        &mut bridge,
+        &mut examples_summary,
+        &matches_filter,
+    );
+    examples_summary.print("examples (runnable mains + test suites)");
+
+    assert_inventory_gate(
+        filter.is_some(),
+        &[
+            ("tests/run", &run_summary),
+            ("tests/rt", &rt_summary),
+            ("docs", &docs_summary),
+            ("tests/language", &lang_summary),
+            ("examples", &examples_summary),
+        ],
+    );
+}
+
+fn assert_inventory_gate(filtered: bool, corpora: &[(&str, &CorpusSummary)]) {
+    let total_leaks: usize = corpora.iter().map(|(_, s)| s.leaked.len()).sum();
     assert_eq!(
         total_leaks, 0,
         "counted execution must never leak heap slots"
     );
+    if !cfg!(debug_assertions) && !filtered {
+        for (name, s) in corpora {
+            assert!(
+                s.failed_outcome.is_empty()
+                    && s.out_of_fuel.is_empty()
+                    && s.unsupported.is_empty()
+                    && s.compile_error == 0
+                    && s.no_main == 0,
+                "{name} release corpus gate failed: failed={:?} oof={:?} unsup={:?} err={} nomain={}",
+                s.failed_outcome,
+                s.out_of_fuel,
+                s.unsupported,
+                s.compile_error,
+                s.no_main
+            );
+        }
+    }
 }

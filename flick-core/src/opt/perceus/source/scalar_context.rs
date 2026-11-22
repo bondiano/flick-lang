@@ -312,3 +312,4 @@ impl<'a> ScalarContext<'a> {
 }
 
 include!("scalar_context/observation.rs");
+include!("scalar_context/wire_hint.rs");

@@ -2,6 +2,9 @@
 
 impl<'p> Machine<'p, '_> {
     fn schedule_next(&mut self, active_finished: bool) -> Result<(), Error> {
+        if self.foreign.sync_task_fiber.is_some() {
+            return Ok(());
+        }
         loop {
             if let Some(next_id) = self.run_queue.pop_front() {
                 if !self.parked_fibers.contains_key(&next_id) {
@@ -27,11 +30,22 @@ impl<'p> Machine<'p, '_> {
                 }
                 return Ok(());
             }
+            if self.try_poll_bridge_nonblocking()? {
+                continue;
+            }
             if self.test_clock_mode {
                 if self.advance_test_clock_step()? {
                     continue;
                 }
+            } else if self.has_pending_foreign_work() && !self.timers.is_empty() {
+                if self.poll_bridge_with_timer_budget()? {
+                    continue;
+                }
             } else if self.fire_next_timer()? {
+                continue;
+            }
+            if self.has_pending_foreign_work() {
+                self.poll_bridge_once()?;
                 continue;
             }
             if active_finished
@@ -63,16 +77,31 @@ impl<'p> Machine<'p, '_> {
     }
 
     fn maybe_quantum_preempt(&mut self) -> Result<(), Error> {
+        if self.foreign.sync_task_fiber.is_some() {
+            return Ok(());
+        }
+        if self.interrupt_requested.is_some()
+            && !self.frames.iter().any(|frame| {
+                matches!(
+                    frame.destination,
+                    Destination::Modify { .. } | Destination::Initialize { .. }
+                )
+            })
+            && self.check_active_interrupt()?
+        {
+            return Ok(());
+        }
         if self.quantum > 0 {
             self.quantum -= 1;
             return Ok(());
         }
         self.quantum = self.active_max_ops_before_yield();
-        if self
-            .frames
-            .iter()
-            .any(|frame| matches!(frame.destination, Destination::Modify { .. }))
-        {
+        if self.frames.iter().any(|frame| {
+            matches!(
+                frame.destination,
+                Destination::Modify { .. } | Destination::Initialize { .. }
+            )
+        }) {
             return Ok(());
         }
         if self.check_active_interrupt()? {
@@ -186,11 +215,13 @@ impl<'p> Machine<'p, '_> {
         Ok(!self.run_queue.is_empty())
     }
 
-    fn complete_child_fiber(&mut self, outcome: FiberOutcome) -> Result<(), Error> {
-        let fid = self.active_fiber;
+    fn record_child_fiber_completion(
+        &mut self,
+        fid: usize,
+        outcome: FiberOutcome,
+    ) -> Result<(), Error> {
         let Some(rec) = self.fiber_table.get_mut(&fid) else {
-            self.drop_fiber_outcome(outcome)?;
-            return self.schedule_next(true);
+            return self.drop_fiber_outcome(outcome);
         };
         let waiters = mem::take(&mut rec.waiters);
         let supervisor = rec.supervisor.take();
@@ -255,6 +286,15 @@ impl<'p> Machine<'p, '_> {
         for waiter in waiters {
             self.notify_fiber_waiter(fid, waiter)?;
         }
+        if let Some(req_id) = self.foreign.pending_host_cbs.remove(&fid) {
+            self.send_async_cb_return(req_id, fid)?;
+        }
+        Ok(())
+    }
+
+    fn complete_child_fiber(&mut self, outcome: FiberOutcome) -> Result<(), Error> {
+        let fid = self.active_fiber;
+        self.record_child_fiber_completion(fid, outcome)?;
         self.schedule_next(true)
     }
 

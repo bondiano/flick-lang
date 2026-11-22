@@ -86,6 +86,11 @@ impl Machine<'_, '_> {
                 let cause = self.interrupt_cause(by)?;
                 self.wake_fiber_with_failure(target, cause)?;
             }
+            Some(ParkReason::ForeignAsync { call_id }) => {
+                self.cancel_foreign_call(call_id)?;
+                let cause = self.interrupt_cause(by)?;
+                self.wake_fiber_with_failure(target, cause)?;
+            }
             Some(
                 ParkReason::Deferred { .. }
                 | ParkReason::Fiber { .. }

@@ -84,7 +84,7 @@ pub(super) fn atom_pattern(p: &mut Parser) -> Option<Done> {
             p.bump();
             if p.raw().kind != K::RBrace {
                 p.push(Ctx::Aligned { col: p.col() });
-                p.items(record_pattern_field, true, |_| false);
+                p.items(record_pattern_field, true, Parser::at_aligned_catch);
                 p.pop();
             }
             p.expect_closer(K::RBrace, opener);
@@ -151,8 +151,26 @@ fn paren_pattern(p: &mut Parser) -> K {
 /// `field = pattern`, or `field` alone to bind a variable of the same name.
 fn record_pattern_field(p: &mut Parser) {
     let m = p.start();
-    if p.expect(K::Ident) && p.eat(K::Eq) {
-        or_pattern(p);
+    if p.eat(K::Ident) {
+        if p.eat(K::Eq) {
+            or_pattern(p);
+        }
+    } else if p.at(K::CatchKw) {
+        if p.nth(1) == K::Eq {
+            p.bump_as(K::Ident);
+            p.bump();
+            or_pattern(p);
+        } else {
+            let span = p.here_span();
+            p.error_at(
+                codes::S007,
+                span,
+                "`catch` is a reserved keyword and cannot be bound by `{ catch }`: write `{ catch = handler }`".into(),
+            );
+            p.bump();
+        }
+    } else {
+        p.error_expected("a name");
     }
     p.complete(m, K::RecordPatField);
 }

@@ -95,6 +95,7 @@ enum ParkReason {
     FiberGroupEmpty,
     TestClock,
     Lazy { lazy_id: ObjectId },
+    ForeignAsync { call_id: u64 },
 }
 
 struct FiberRecord {

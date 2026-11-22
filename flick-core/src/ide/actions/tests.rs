@@ -377,3 +377,198 @@ fn removing_mut_cannot_invalidate_an_inline_function_annotation() {
         "an inline annotation can require a preceding signature after removing mut"
     );
 }
+
+#[test]
+fn catch_and_try_rewrites_round_trip() {
+    let base = "\
+module App.Main exposing (..)
+
+type error NotFound = NotFound String
+type error Timeout = Timeout
+
+load : String ->{; NotFound, Timeout} Int
+let load key = Fail.fail (NotFound key)
+
+with_catch : String ->{} Int
+let with_catch key =
+  load key catch
+  | NotFound k when String.length k > 0 -> 1
+  | NotFound _ -> 2
+  | Timeout -> 3
+
+with_try : String ->{} Int
+let with_try key =
+  try
+    load key
+  with
+  | NotFound _ -> 1
+  | Timeout -> 2
+";
+    let (f, text) = main(base);
+    assert!(
+        f.ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .all(Diagnostic::unnecessary),
+        "{:?}",
+        f.ide().analysis.diagnostics
+    );
+
+    let at_catch = f.at("App.Main", "load key catch", 0) + 9;
+    let expand = action(&f, at_catch, at_catch, "rewrite `catch` as `try").expect("catch->try");
+    assert_eq!(expand.kind, "refactor.rewrite");
+    let expanded = applied(&text, &expand);
+    assert!(expanded.contains("try load key with\n"), "{expanded}");
+    let checked_expanded = main(&expanded).0;
+    assert!(
+        checked_expanded
+            .ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .all(Diagnostic::unnecessary),
+        "{:?}",
+        checked_expanded.ide().analysis.diagnostics
+    );
+    let at_roundtrip = checked_expanded.at("App.Main", "try load key with", 0);
+    let fold_back = action(
+        &checked_expanded,
+        at_roundtrip,
+        at_roundtrip,
+        "rewrite `try",
+    )
+    .expect("round-trip try->catch");
+    assert_eq!(applied(&expanded, &fold_back), text);
+
+    let at_try = f.at("App.Main", "try\n    load key", 0);
+    let fold = action(&f, at_try, at_try, "rewrite `try").expect("try->catch");
+    let folded = applied(&text, &fold);
+    assert!(folded.contains("  load key\n  catch\n"), "{folded}");
+    let checked_folded = main(&folded).0;
+    assert!(
+        checked_folded
+            .ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .all(Diagnostic::unnecessary),
+        "{:?}",
+        checked_folded.ide().analysis.diagnostics
+    );
+}
+
+#[test]
+fn try_to_catch_skips_non_error_and_multi_stmt_blocks() {
+    let base = "\
+module App.Main exposing (..)
+
+type error NotFound = NotFound String
+type error Timeout = Timeout
+
+effect Ask =
+  ask : Unit ->{} Int
+
+load : String ->{; NotFound, Timeout} Int
+let load key = Fail.fail (NotFound key)
+
+multi_stmt : String ->{} Int
+let multi_stmt key =
+  try
+    let n = load key
+    n + 1
+  with
+  | NotFound _ -> 0
+  | Timeout -> 0
+
+effect_try : Unit ->{} Int
+let effect_try () =
+  try Ask.ask () with
+  | Ask.ask () -> 1
+
+return_try : String ->{} Int
+let return_try key =
+  try load key with
+  | NotFound _ -> 1
+  | Timeout -> 2
+  | return n -> n + 1
+
+fail_try : String ->{} Int
+let fail_try key =
+  try load key with
+  | Fail.fail (NotFound _) -> 1
+  | Timeout -> 2
+";
+    let (f, _) = main(base);
+    assert!(
+        f.ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .all(Diagnostic::unnecessary),
+        "{:?}",
+        f.ide().analysis.diagnostics
+    );
+    for needle in [
+        "try\n    let n = load key",
+        "try Ask.ask () with",
+        "try load key with\n  | NotFound _ -> 1\n  | Timeout -> 2\n  | return",
+        "try load key with\n  | Fail.fail",
+    ] {
+        let at = f.at("App.Main", needle, 0);
+        assert!(
+            action(&f, at, at, "rewrite `try").is_none(),
+            "must not offer try->catch for `{needle}`"
+        );
+    }
+}
+
+#[test]
+fn catch_invalid_arm_diagnostic_fixes_are_not_safe() {
+    let src = "\
+module App.Main exposing (..)
+
+type error NotFound = NotFound String
+
+effect Ask =
+  ask : Unit ->{} Int
+
+load : String ->{; NotFound} Int
+let load key = Fail.fail (NotFound key)
+
+bad_op : Unit ->{Ask} Int
+let bad_op () =
+  Ask.ask () catch
+  | Ask.ask () -> 1
+
+bad_return : String ->{} Int
+let bad_return key =
+  load key catch
+  | NotFound _ -> 0
+  | return n -> n
+
+bad_fail : String ->{} Int
+let bad_fail key =
+  load key catch
+  | Fail.fail (NotFound _) -> 0
+";
+    let (f, _) = main(src);
+    let e007: Vec<_> = f
+        .ide()
+        .analysis
+        .diagnostics
+        .iter()
+        .filter(|d| d.code.to_string() == "FLICK-E007")
+        .collect();
+    assert_eq!(e007.len(), 3, "{e007:?}");
+    for diag in &e007 {
+        assert!(
+            !diag.fixes.is_empty(),
+            "expected manual quickfix on {diag:?}"
+        );
+        assert!(
+            diag.fixes.iter().all(|fix| !fix.safe),
+            "invalid catch arm fix must NOT be marked safe: {diag:?}"
+        );
+    }
+}

@@ -108,15 +108,15 @@ Every reserved word of Flick is listed below with what it introduces and
 where it is described in full. A keyword cannot be used as a name.
 
 ```text
-module exposing import as let mut rec assert fun match with try if then else
-task await lazy scope provide ignore todo echo type opaque where kind error
-service class instance deriving foreign from forall not none true false
+module exposing import as let mut rec assert fun match with try catch if then
+else task await lazy scope provide ignore todo echo type opaque where kind
+error service class instance deriving foreign from forall not none true false
 in when for yield do break continue
 ```
 
 Contextual words are ordinary names everywhere except in one position:
 
-- `loop` before `{` and `while` before a condition followed by `do`;
+- `loop` before `{`, `result` before `{`, and `while` before a condition followed by `do`;
 - `private` before `module` in a file's header (see [modules](../modules/)),
   and `plugin` before a head in an `exposing` list (see
   [plugins](../plugins/#using-a-plugin));
@@ -201,7 +201,9 @@ and [ffi.md](../ffi/).
 | `match` `with` | pattern matching | `match shape with \| Circle r -> r` |
 | `when` | a guard on a match arm | `\| Rect w h when w == h -> "square"` |
 | `with` | also the handlers of `try` and a record update | `{ user with name = "Ada" }` |
-| `try` | handles the expected errors of its body | `try find id with \| NotFound _ -> None` |
+| `try` | handles the expected errors and effect operations of its body | `try find id with \| NotFound _ -> None` |
+| `catch` | postfix handler for typed errors only (reserved in expressions and binders; still allowed as record field label, `.catch`, renamed record pattern `{ catch = f }` and foreign metadata) | `find id catch \| NotFound _ -> None` |
+| `result` | contextual: before `{`, runs its block eagerly and catches its typed errors as `Result (Errors e) a`; a name elsewhere | `result { find id }` |
 | `not` | boolean negation; `not null` on a `sql table` column | `not done` |
 | `true` `false` | the two `Bool` values | `if ok then true else false` |
 | `none` | the empty row in a type | `a ->{none; NotFound} b` |
@@ -276,7 +278,7 @@ with what the keyword does:
 | `task` | `task { … } : Eff {Store} {StoreError} Float`: the computation the block builds |
 | `lazy` | `lazy { … } : Lazy {Store} {StoreError} Float`: the lazy the block builds |
 | `scope` | `scope { … } : Float`: the value the block returns once its resources are released |
-| `provide`, `try` | the value of the block, with the services or errors it removes |
+| `provide`, `try`, `catch` | the value of the block or expression, with the services or errors it removes |
 | `match`, `if` | `match … with : String`: the value of the arm or branch taken |
 | `fun` | `fun … -> … : Float -> Float`: the function |
 | `sql`, `ui` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
@@ -291,6 +293,7 @@ There are no user-defined operators. From weakest to strongest:
 
 | Level | Operators | Associativity |
 | - | - | - |
+| −1 | postfix `catch \| …` | none: chaining outer `catch` needs parentheses `(a catch \| E -> b) catch \| F -> c` |
 | 0 | `<\|` | right; does not mix with `\|>`: `x \|> f <\| y` is an error |
 | 1 | `\|>` | left |
 | 2 | `\|\|` | right |
@@ -338,9 +341,9 @@ blocks of `task`, `scope`, `provide`, `sql`, `ui`, `rec` and plugins.
    - after `then` and `else`, `{` opens a brace block of statements, as after
      `do` and `loop`; a record there goes in parentheses (`FLICK-T074`).
 3. A line that starts at the block column with an infix operator other than
-   `-`, with `|`, `then`, `else`, `with`, `where`, or with a closing delimiter
+   `-`, with `|`, `then`, `else`, `with`, `catch`, `where`, or with a closing delimiter
    continues the statement instead of starting a new one. This is what lets
-   `|>` and `<|` pipelines, `match` arms, `else` branches and the goal of a
+   `|>` and `<|` pipelines, `match` and `catch` arms, `else` branches and the goal of a
    `proof` line up with their expression or declaration.
 4. Inside `{ … }` of a record, record type or brace block the items align on
    the first item, which may follow `{` on the same line; items are separated
@@ -662,7 +665,7 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "if" expr "then" block [ "else" (if_expr | block) ]
             | "pack" ModulePath "as" contract | "unpack" expr "as" Con ["," name] "in" block
             | "lazy" expr                    // binds as `await`: `lazy f x` is `lazy (f x)`
-            | operator expression over application (see the operator table)
+            | operator expression over application [ "catch" arm { arm } ] (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
 handler_arm = arm | "|" "return" or_pattern "->" block
             // an operation's arm is `| E.op p… -> …`, a pattern whose path ends in a name
@@ -879,8 +882,9 @@ fits; otherwise it breaks, outermost construct first:
   line, its operators under the first operand when the pipeline starts its
   line;
 - `if c then a else b` stays on one line or puts every branch on lines of its
-  own; `match` and `try` put each arm on its own line, at the column of
-  `match`. Before a `,`, where the parser takes no block on lines of its own,
+  own; `match`, `try` and postfix `catch` put each arm on its own line (and
+  `catch` parenthesizes a mixed pipeline on its left so the grouping is
+  explicit). Before a `,`, where the parser takes no block on lines of its own,
   the last branch or arm stays on its line;
 - lists, tuples and `exposing (…)` put one item per line followed by `,`;
   records, record types, patterns and updates (`base with` on its own line)

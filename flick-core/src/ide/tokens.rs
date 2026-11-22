@@ -37,7 +37,7 @@ const KEYWORD: u32 = 7;
 const MACRO: u32 = 8;
 
 /// Nodes worth folding when they span several lines.
-const FOLDED: [K; 16] = [
+const FOLDED: [K; 18] = [
     K::LetDecl,
     K::ProofDecl,
     K::LawDecl,
@@ -46,10 +46,12 @@ const FOLDED: [K; 16] = [
     K::ClassDecl,
     K::InstanceDecl,
     K::MatchExpr,
+    K::CatchExpr,
     K::RecordExpr,
     K::RecordType,
     K::ListExpr,
     K::TaskExpr,
+    K::ResultExpr,
     K::DoExpr,
     K::PluginExpr,
     K::PluginDecl,
@@ -201,7 +203,8 @@ fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
     for t in node.child_tokens() {
         if matches!(
             t.kind,
-            K::AndKw
+            K::CatchKw
+                | K::AndKw
                 | K::PluginKw
                 | K::EffectKw
                 | K::TailKw
@@ -212,6 +215,7 @@ fn contextual_keywords(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
                 | K::LawKw
                 | K::RequireKw
                 | K::EnsureKw
+                | K::ResultKw
         ) {
             out.push((t.start, t.end, KEYWORD));
         }

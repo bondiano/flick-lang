@@ -19,7 +19,11 @@ pub fn optimize(
 ) {
     let table = ir::lang_items();
     let known = Known::of(&table);
-    let builtin = |module: &str| types::builtins().iter().any(|i| i.module == module);
+    let builtin = |module: &str| {
+        types::builtin_sources()
+            .iter()
+            .any(|(name, _)| *name == module)
+    };
     tuple_match::fold_tuple_matches(module);
     portable::optimize(module, exported, generics, arity, &known, &builtin);
 }

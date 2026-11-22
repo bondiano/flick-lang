@@ -2,10 +2,12 @@
 //! adding a signature, matching on a variable, qualifying a name,
 //! extracting or inlining a variable, and keeping one in a `Ref`.
 
+mod catch_try;
 mod extract;
 mod import_class;
 mod match_on;
 mod qualify;
+mod result_block;
 mod signature;
 mod to_ref;
 
@@ -33,6 +35,9 @@ impl Ide<'_> {
         out.extend(self.extract(file, start, end));
         out.extend(self.inline(file, start));
         out.extend(self.to_ref(file, start));
+        out.extend(self.result_block(file, start));
+        out.extend(self.catch_to_try(file, start));
+        out.extend(self.try_to_catch(file, start));
         out
     }
 }
@@ -68,6 +73,8 @@ fn to_u32(n: usize) -> u32 {
     u32::try_from(n).expect("source offsets fit in u32")
 }
 
+#[cfg(test)]
+mod result_block_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

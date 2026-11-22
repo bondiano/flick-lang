@@ -1,0 +1,36 @@
+module App.ResultBlocksRegionsFail exposing (..)
+
+type File (s : Region)
+
+type error ReadError = ReadError String
+
+type error Wrapped a = Wrapped a
+
+service FileSystem =
+  open_scoped : forall s. String ->{Scope s} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+// R13: `Ok` carrying a scoped handle cannot escape its `scope`
+escape_handle : String ->{FileSystem} Unit
+let escape_handle path =
+  let leaked = scope { result { FileSystem.open_scoped path } }
+  ignore leaked
+
+// R13: `Ok` carrying a closure that captures a scoped handle cannot escape its `scope`
+escape_closure : String ->{FileSystem} Result Never (Unit ->{FileSystem; ReadError} String)
+let escape_closure path = scope {
+  let file = FileSystem.open_scoped path
+  result { fun () -> FileSystem.read_all file }
+}
+
+// R14: raised error carrying a scoped handle is still rejected even when caught by `result { ... }`
+raised_scoped_error : String ->{FileSystem} Unit
+let raised_scoped_error path = scope {
+  let file = FileSystem.open_scoped path
+  let _ = result { Fail.fail (Wrapped file) }
+  ()
+}
+
+//~ FLICK-G002 @16:24-16:62
+//~ FLICK-G002 @23:22-23:46 this uses region `s`
+//~ FLICK-E005 @30:20-30:44

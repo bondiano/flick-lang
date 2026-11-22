@@ -6,7 +6,8 @@ use std::{fs, io};
 use flick_core::diagnostics::Diagnostic;
 use flick_core::project::{self, Foreign, ForeignPackage, Host, Project};
 use flick_core::source::SourceMap;
-use flick_test_support::files as fixture_files;
+use flick_core::types;
+use flick_test_support::{files as fixture_files, par_map};
 
 use super::{annotations, diff, opted_out};
 
@@ -168,14 +169,15 @@ fn project_fixtures() {
         .collect();
     cases.sort();
     assert!(!cases.is_empty());
-    let report: Vec<String> = cases
-        .iter()
-        .filter_map(|case| {
-            let problems = check_project(&project::normalize(case));
-            let name = case.file_name().expect("named").to_string_lossy();
-            (!problems.is_empty()).then(|| format!("{name}:\n{}", problems.join("\n")))
-        })
-        .collect();
+    let _ = types::builtins();
+    let report: Vec<String> = par_map(&cases, |case| {
+        let problems = check_project(&project::normalize(case));
+        let name = case.file_name().expect("named").to_string_lossy();
+        (!problems.is_empty()).then(|| format!("{name}:\n{}", problems.join("\n")))
+    })
+    .into_iter()
+    .flatten()
+    .collect();
     assert!(
         report.is_empty(),
         "project fixture mismatches:\n{}",

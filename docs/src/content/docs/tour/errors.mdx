@@ -13,9 +13,10 @@ A failure the caller should handle is a typed error.
 `find : String ->{; NotFound} Float` says, after the `;`, that `find` may fail
 with it.
 
-`Fail.fail (NotFound name)` fails with that error. `try … with` handles the failure, with an arm for
-each error. Once handled, the error leaves the signature: `main` has no
-`NotFound` in its own.
+`Fail.fail (NotFound name)` fails with that error. `try … with` (or postfix
+`expr catch | NotFound _ -> …` when handling typed errors alone) handles the
+failure, with an arm for each error. Once handled, the error leaves the
+signature: `main` has no `NotFound` in its own.
 
 **Try:** remove `; NotFound` from the signature of `find`. The compiler
 reports `FLICK-E002`: the body needs an error the signature does not allow.

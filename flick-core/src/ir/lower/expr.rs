@@ -276,7 +276,7 @@ impl Lower<'_> {
                 ExprKind::Match(scrutinee, self.arms(node))
             }
             K::TryExpr | K::ProvideExpr if self.handles_effects(node) => self.handler(node),
-            K::TryExpr => {
+            K::TryExpr | K::CatchExpr => {
                 let body = *self.boxed(children[0]);
                 ExprKind::Handle(Box::new(Handler {
                     effects: Vec::new(),
@@ -285,6 +285,7 @@ impl Lower<'_> {
                     errors: self.arms(node),
                 }))
             }
+            K::ResultExpr => self.result_expr(children[0], span),
             K::TaskExpr => {
                 let key = StageKey::Task { node: node.range() };
                 self.register_owner_entry(key);

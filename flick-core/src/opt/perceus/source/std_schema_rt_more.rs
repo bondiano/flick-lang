@@ -5,7 +5,7 @@ mod entries;
 use flick_ir::BinOp;
 
 use super::expr_builder::{ExprBuilder, arm};
-use super::std_schema_rt::{meta_con, pair_pat, rt};
+use super::std_schema_rt::{meta_con, pair_pat, rt, triple_pat};
 use super::std_schema_rt_block::make_block_codec_helper;
 use super::std_schema_rt_tree::{check_tree_helper, decode_tree_helper, encode_tree_helper};
 use super::{Expr, Pat, Span, Stmt};
@@ -87,8 +87,8 @@ fn resolve_meta_helper(b: &ExprBuilder) -> Expr {
     let adt_step = b.match_(
         b.loc("c"),
         [arm(
-            pair_pat(b, "sn", "fms"),
-            b.yield_(b.tuple([b.loc("sn"), map_items(b.loc("fms"))])),
+            triple_pat(b, "ft", "sn", "fms"),
+            b.yield_(b.tuple([b.loc("ft"), b.loc("sn"), map_items(b.loc("fms"))])),
         )],
     );
     let adt_body = meta_con(

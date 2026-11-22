@@ -95,6 +95,11 @@ impl<'p> Machine<'p, '_> {
             self.mask_depth += 1;
             state.masked = true;
             state.phase = ClosePhase::Finalizers;
+            let owner = state.owner;
+            if let Err(err) = self.close_mirrored_owner(owner) {
+                self.closing_scopes.insert(owner, state);
+                return Err(err);
+            }
         }
         Ok(Some(state))
     }
@@ -105,6 +110,10 @@ impl<'p> Machine<'p, '_> {
     ) -> Result<Option<Box<ClosingScopeState<'p>>>, Error> {
         let Some(finalizer) = state.remaining.pop() else {
             let owner = state.owner;
+            if let Err(err) = self.close_mirrored_owner(owner) {
+                self.closing_scopes.insert(owner, state);
+                return Err(err);
+            }
             let previous = state.previous;
             let outcome = state.outcome;
             let finalizer_failure = state.finalizer_failure;
