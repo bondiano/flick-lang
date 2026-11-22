@@ -11,7 +11,6 @@ use super::parse_targets::{RawBuild, RawTargets, parse_build, parse_targets};
 use super::workspace::RawWorkspace;
 use super::{Build, Config, Entry, Kind, MAIN_ENTRY, Manifest, Script};
 use crate::diagnostics::{Code, Diagnostic, Severity, codes};
-use crate::manifest::{RawJs, js_dependencies};
 use crate::source::{FileId, Span};
 use crate::types::Thresholds;
 
@@ -34,7 +33,9 @@ struct Raw {
     sql: Option<Spanned<RawSql>>,
     lint: Option<Spanned<RawLint>>,
     dependencies: Option<Spanned<BTreeMap<String, Spanned<RawDependency>>>>,
-    js: Option<Spanned<RawJs>>,
+    /// Removed table: accepted here only to emit FLICK-P057 with exact span
+    /// and a migration fix hint to `[target.js.dependencies]`.
+    js: Option<Spanned<toml::Value>>,
     package: Option<Spanned<RawPackage>>,
     plugins: Option<Spanned<BTreeMap<String, Spanned<RawGrants>>>>,
     tools: Option<Spanned<BTreeMap<String, Vec<String>>>>,
@@ -145,6 +146,25 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
         }
     }
     let mut raw: Raw = toml::from_str(text).map_err(invalid)?;
+    if let Some(js) = &raw.js {
+        let what = if js
+            .get_ref()
+            .as_table()
+            .is_some_and(|t| t.contains_key("dependencies"))
+        {
+            "`[js.dependencies]` was removed"
+        } else {
+            "`[js]` was removed"
+        };
+        return Err(
+            Diagnostic::error(codes::P057, what, span(js.span())).with_fix(|| {
+                (
+                    "rename `[js.dependencies]` to `[target.js.dependencies]`",
+                    Vec::new(),
+                )
+            }),
+        );
+    }
     let scripts = scripts(mem::take(&mut raw.scripts), &span)?;
     let (members, plugins) = match raw.workspace.take() {
         Some(workspace) => {
@@ -169,7 +189,6 @@ pub fn parse_manifest(text: &str, file: FileId) -> Result<Manifest, Diagnostic> 
             ("sql", raw.sql.map(|s| s.span())),
             ("lint", raw.lint.map(|l| l.span())),
             ("dependencies", raw.dependencies.map(|d| d.span())),
-            ("js.dependencies", raw.js.map(|j| j.span())),
             ("package", raw.package.map(|p| p.span())),
             ("plugins", raw.plugins.map(|p| p.span())),
             ("tools", raw.tools.map(|t| t.span())),
@@ -297,7 +316,6 @@ fn config(
             .unwrap_or_default(),
         span,
     )?;
-    let js_dependencies = js_dependencies(raw.js.map(Spanned::into_inner), span)?;
     let package = match raw.package {
         Some(raw) => {
             let at = span(raw.span());
@@ -313,9 +331,9 @@ fn config(
         Some(raw_build) => parse_build(raw_build, span)?,
         None => Build::default(),
     };
-    let targets = match raw.target {
+    let (targets, target_dependencies) = match raw.target {
         Some(raw_targets) => parse_targets(raw_targets.into_inner(), span)?,
-        None => BTreeMap::new(),
+        None => (BTreeMap::new(), Vec::new()),
     };
     Ok(Config {
         kind: project.kind,
@@ -324,7 +342,7 @@ fn config(
         proof_dir: project.proof_dir,
         entries,
         dependencies,
-        js_dependencies,
+        target_dependencies,
         package,
         build,
         targets,

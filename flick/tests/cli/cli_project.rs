@@ -349,7 +349,7 @@ fn fake_pnpm(dir: &Path, version: &str) -> (PathBuf, PathBuf) {
 fn local_std() -> String {
     let packages = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages");
     let mut manifest =
-        "schema-version = 1\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[dependencies]\n"
+        "schema-version = 1\n\n[tools]\n\"flick/js\" = [\"pnpm\"]\n\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n\n[dependencies]\n"
             .to_owned();
     for name in IMPLICIT_PACKAGES {
         writeln!(

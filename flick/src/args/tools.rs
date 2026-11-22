@@ -88,20 +88,19 @@ pub struct CleanArguments {
 
 #[derive(Args)]
 pub struct InstallArguments {
-    /// Install exactly the lockfile: no lockfile, or one out of date with
-    /// `package.json`, is an error.
+    /// Install exactly the lockfile: a missing or out-of-date lockfile is an error.
     #[arg(long)]
     pub locked: bool,
 }
 
 #[derive(Args)]
 pub struct AddArguments {
-    /// npm package specs, such as `date-fns` or `date-fns@4`; with a source
-    /// option, the name of one Flick library.
+    /// Package specs for the selected backend, or with a source option, the
+    /// name of one Flick library.
     #[arg(required = true)]
     pub packages: Vec<String>,
 
-    /// Add to `devDependencies`.
+    /// Add as a development dependency when the backend supports it.
     #[arg(long, conflicts_with_all = ["git", "url", "path"])]
     pub dev: bool,
 

@@ -57,6 +57,7 @@ change needs.
 | [Backends find the built-in types by lang item](#backends-find-the-built-in-types-by-lang-item) | no | `FLICK-S014` |
 | [`Detached` forbids `abort`; `lazy` uses `NoControl`](#detached-forbids-abort-lazy-uses-nocontrol) | no | `FLICK-E017`, `FLICK-F002` |
 | [Backend options move to `--target` and `[target.<name>]`](#backend-options-move-to---target-and-targetname) | no | `FLICK-P057`, `FLICK-P058`, `FLICK-P059` |
+| [Target dependencies move to `[target.<name>.dependencies]` and backends own package managers](#target-dependencies-move-to-targetnamedependencies-and-backends-own-package-managers) | no | `FLICK-P051`, `FLICK-P057`, `FLICK-P063` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -703,3 +704,28 @@ Run `flick <cmd> --help` (or `flick <cmd> --target <name> --help`) to inspect
 the options declared by the selected backend for that command. Unknown or invalid
 options report `FLICK-P058`, and unknown target names report `FLICK-P059`.
 `flick inspect <M> --emit iface` no longer loads any backend.
+
+## Target dependencies move to `[target.<name>.dependencies]` and backends own package managers
+
+Target-ecosystem package discovery (`package.json`, `node_modules`) and
+package-manager commands (`install`, `add`, `remove`, `update`, `deps`, app
+`pack`) now live in each backend component rather than in the core compiler:
+
+- Rename `[js.dependencies]` in `flick.toml` to `[target.js.dependencies]`.
+  The old `[js]` and `[js.dependencies]` tables are removed with no
+  compatibility alias and fail with `FLICK-P057` (exit code `2`).
+- Existing JavaScript projects that run `flick install`, `add`, `remove`,
+  `update`, `deps`, or app `pack` with `flick/js` must grant `pnpm` in
+  `flick.toml` (`FLICK-P051` without it; projects created with `flick new`
+  include this automatically):
+
+```toml
+[tools]
+"flick/js" = ["pnpm"]
+```
+
+- Go projects (`[build] target = "go"`) no longer read `package.json` or
+  `node_modules` and need neither Node nor pnpm to build or test with Flick
+  `[dependencies]`. Running `flick add <pkg>` without `--path`, `--git`, or
+  `--url` under a backend without its own package manager reports `FLICK-P063`
+  (exit code `2`).

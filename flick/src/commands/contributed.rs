@@ -2,6 +2,7 @@
 //! project, described from a cache in the store, and run by the host from
 //! the plan or the session they declare.
 
+mod delegate;
 mod inputs;
 pub(crate) mod plan;
 mod preview;
@@ -10,6 +11,7 @@ mod registry;
 mod session;
 mod validate;
 
+pub(crate) use delegate::delegate;
 pub(crate) use preview::preview;
 pub(crate) use registry::Contributor;
 
@@ -76,7 +78,11 @@ fn contributed(project: &Project) -> (Vec<(Source, Contributed)>, Vec<Diagnostic
         };
         let (taken, commands): (Vec<_>, Vec<_>) =
             (all.into_iter()).partition(|d| reserved.iter().any(|r| r == first_word(&d.name)));
+        let backend = matches!(source.kind, SourceKind::Backend { .. });
         for d in taken {
+            if backend && delegate::VERBS.contains(&d.name.as_str()) {
+                continue;
+            }
             warnings.push(Diagnostic::new(
                 codes::P054,
                 Severity::Warning,
@@ -189,7 +195,7 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
     }
     let tools = backends::granted_tools(&project, &source.id);
     let cwd = env::current_dir().unwrap_or_else(|_| project.root.clone());
-    let invocation = match invocation(&project, descriptor, arguments, &tools, &cwd) {
+    let invocation = match invocation(&project, &source.id, descriptor, arguments, &tools, &cwd) {
         Ok(invocation) => invocation,
         Err(why) => {
             return fail(Diagnostic::new(
@@ -220,9 +226,12 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
 }
 
 /// The call of `descriptor` with `arguments`: their paths relative to the
-/// project's root, and the files the command reads.
+/// project's root, and the files the command reads. Tools allowed in `[tools]`
+/// for `id` that are missing on `PATH` appear with empty `version` and `sha256`
+/// so the contributor can distinguish a missing tool from a disallowed one.
 fn invocation(
     project: &Project,
+    id: &str,
     descriptor: &Descriptor,
     arguments: Vec<Argument>,
     tools: &[Tool],
@@ -231,12 +240,23 @@ fn invocation(
     let root = &project.root;
     let sources =
         (project.source_root().strip_prefix(root)).map_or_else(|_| String::new(), inputs::slashed);
+    let mut pinned: Vec<command::Tool> = tools.iter().map(|t| plan::tool(&t.pin)).collect();
+    for name in project.config.tools.get(id).into_iter().flatten() {
+        if !pinned.iter().any(|t| &t.id == name) {
+            pinned.push(command::Tool {
+                id: name.clone(),
+                version: String::new(),
+                sha256: String::new(),
+            });
+        }
+    }
     let mut invocation = Invocation {
         name: descriptor.name.clone(),
         arguments: inputs::relative(descriptor, arguments, root, cwd)?,
         sources,
         inputs: Vec::new(),
-        tools: tools.iter().map(|t| plan::tool(&t.pin)).collect(),
+        tools: pinned,
+        dependencies: Vec::new(),
     };
     let paths = inputs::expand(&descriptor.inputs, &invocation)?;
     invocation.inputs = inputs::read(root, &paths)?;

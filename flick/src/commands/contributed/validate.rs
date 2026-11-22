@@ -16,7 +16,7 @@ use flick_core::project;
 use super::inputs::{normal, under};
 use crate::backends::authorize;
 
-/// Validated metadata for one step in a plan, ready for sequential execution.
+/// Validated metadata for one staged step in a plan, ready for sequential execution.
 pub(super) enum PreparedStep<'a> {
     Tool {
         step: &'a ToolStep,
@@ -24,6 +24,13 @@ pub(super) enum PreparedStep<'a> {
         reads: Vec<(String, PathBuf)>,
     },
     RunFlick(&'a RunFlickStep),
+}
+
+/// Validated steps of a plan: staged steps run before publishing; in-place
+/// tool steps run directly in the project root after publishing.
+pub(super) struct ValidatedPlan<'a> {
+    pub(super) regular: Vec<PreparedStep<'a>>,
+    pub(super) in_place: Vec<&'a ToolStep>,
 }
 
 fn check_bounded_string(label: &str, value: &str, limits: Limits) -> Result<(), String> {
@@ -41,7 +48,8 @@ pub(super) fn validate_plan<'a>(
     writes: &[String],
     reads: &[String],
     root: &Path,
-) -> Result<Vec<PreparedStep<'a>>, String> {
+    allow_in_place: bool,
+) -> Result<ValidatedPlan<'a>, String> {
     let limits = Limits::default();
     if plan.steps.len() > limits.steps {
         return Err(format!("it declares more than {} steps", limits.steps));
@@ -50,10 +58,24 @@ pub(super) fn validate_plan<'a>(
     let mut seen_ids: BTreeSet<&str> = BTreeSet::new();
     let mut available: BTreeSet<&str> = plan.files.iter().map(|f| f.path.as_str()).collect();
     let mut all_paths: Vec<&str> = plan.files.iter().map(|f| f.path.as_str()).collect();
-    let mut prepared: Vec<PreparedStep<'a>> = Vec::with_capacity(plan.steps.len());
+    let mut regular: Vec<PreparedStep<'a>> = Vec::with_capacity(plan.steps.len());
+    let mut in_place: Vec<&'a ToolStep> = Vec::new();
 
     for (i, step) in plan.steps.iter().enumerate() {
         match step {
+            Step::Tool(t) if t.in_place => {
+                validate_in_place_step(
+                    i,
+                    t,
+                    plan,
+                    invocation,
+                    writes,
+                    limits,
+                    allow_in_place,
+                    &mut seen_ids,
+                )?;
+                in_place.push(t);
+            }
             Step::Tool(t) => {
                 let entry = validate_tool_step(
                     i,
@@ -66,7 +88,7 @@ pub(super) fn validate_plan<'a>(
                     &mut available,
                     &mut all_paths,
                 )?;
-                prepared.push(entry);
+                regular.push(entry);
             }
             Step::RunFlick(r) => {
                 validate_run_flick_step(
@@ -77,7 +99,7 @@ pub(super) fn validate_plan<'a>(
                     &mut available,
                     &mut all_paths,
                 )?;
-                prepared.push(PreparedStep::RunFlick(r));
+                regular.push(PreparedStep::RunFlick(r));
             }
         }
     }
@@ -95,7 +117,81 @@ pub(super) fn validate_plan<'a>(
         ));
     }
 
-    Ok(prepared)
+    Ok(ValidatedPlan { regular, in_place })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_in_place_step<'a>(
+    index: usize,
+    t: &'a ToolStep,
+    plan: &Plan,
+    invocation: &Invocation,
+    writes: &[String],
+    limits: Limits,
+    allow_in_place: bool,
+    seen_ids: &mut BTreeSet<&'a str>,
+) -> Result<(), String> {
+    if !allow_in_place {
+        return Err(format!(
+            "step `{}` runs in place, which cannot be previewed",
+            t.id
+        ));
+    }
+    if plan.resume.is_some() {
+        return Err(format!("step `{}` runs in place and cannot resume", t.id));
+    }
+    if t.id.is_empty() {
+        return Err("step has an empty id".into());
+    }
+    check_bounded_string("step id", &t.id, limits)?;
+    if !seen_ids.insert(t.id.as_str()) {
+        return Err(format!("duplicate step id `{}`", t.id));
+    }
+    if t.tool.sha256.is_empty() {
+        return Err(format!(
+            "step `{}` runs `{}`, which is not on PATH",
+            t.id, t.tool.id
+        ));
+    }
+    if !invocation.tools.contains(&t.tool) {
+        return Err(format!(
+            "step `{}` runs `{}` {} #{}, which the host did not pin for it",
+            t.id, t.tool.id, t.tool.version, t.tool.sha256
+        ));
+    }
+    if !t.inputs.is_empty() || !t.reads.is_empty() {
+        return Err(format!(
+            "step `{}` runs in place and takes no `inputs` or `reads`",
+            t.id
+        ));
+    }
+    for output in &t.outputs {
+        if !normal(output) || !under(output, writes) {
+            return Err(format!(
+                "step `{}` writes `{output}` in place, which the command does not declare",
+                t.id
+            ));
+        }
+    }
+    let toolchain = ToolchainStep {
+        id: format!("step:{index}"),
+        dependencies: vec![],
+        toolchain: Toolchain {
+            id: t.tool.id.clone(),
+            version: t.tool.version.clone(),
+            sha256: t.tool.sha256.clone(),
+        },
+        arguments: t.arguments.clone(),
+        environment: (t.environment.iter())
+            .map(|v| OptionValue {
+                key: v.name.clone(),
+                value: v.value.clone(),
+            })
+            .collect(),
+        inputs: vec![],
+        outputs: vec![],
+    };
+    authorize(&toolchain)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -116,6 +212,12 @@ fn validate_tool_step<'a>(
     check_bounded_string("step id", &t.id, limits)?;
     if !seen_ids.insert(t.id.as_str()) {
         return Err(format!("duplicate step id `{}`", t.id));
+    }
+    if t.tool.sha256.is_empty() {
+        return Err(format!(
+            "step `{}` runs `{}`, which is not on PATH",
+            t.id, t.tool.id
+        ));
     }
     if !invocation.tools.contains(&t.tool) {
         return Err(format!(

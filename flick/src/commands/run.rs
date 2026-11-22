@@ -431,34 +431,43 @@ pub fn launch(
     }
 }
 
-/// The client package's local Vite executable.
-fn vite_binary(root: &Path, global: &GlobalArguments) -> Option<PathBuf> {
-    let bin = root.join("node_modules/.bin/vite");
-    if !bin.exists() {
+/// The client package's local Vite executable, found under the backend's
+/// installed package directories.
+fn vite_binary(project: &Project, global: &GlobalArguments) -> Option<PathBuf> {
+    #[cfg(feature = "wasm-backends")]
+    let found = backends::package_dirs(project)
+        .into_iter()
+        .map(|dir| project.root.join(dir).join(".bin/vite"))
+        .find(|bin| bin.exists());
+    #[cfg(not(feature = "wasm-backends"))]
+    let found: Option<PathBuf> = {
+        let _ = project;
+        None
+    };
+    if found.is_none() {
         report::log(
             global,
-            "the client entry needs Vite: install it with `pnpm install`",
+            "the client entry needs Vite: install it with `flick install`",
         );
-        return None;
     }
-    Some(bin)
+    found
 }
 
 /// Vite serves a client entry and rebuilds its modules during development.
-pub fn vite(root: &Path, global: &GlobalArguments) -> Option<Running> {
-    let bin = vite_binary(root, global)?;
+pub fn vite(project: &Project, global: &GlobalArguments) -> Option<Running> {
+    let bin = vite_binary(project, global)?;
     let mut command = Process::new(bin);
-    command.current_dir(root);
+    command.current_dir(&project.root);
     child::spawn(&mut command, global, "vite-stderr").ok()
 }
 
 /// Build a client page and serve the result without Vite's dev optimizer.
-fn run_client(root: &Path, global: &GlobalArguments, signals: &AtomicUsize) -> u8 {
-    let Some(bin) = vite_binary(root, global) else {
+fn run_client(project: &Project, global: &GlobalArguments, signals: &AtomicUsize) -> u8 {
+    let Some(bin) = vite_binary(project, global) else {
         return 2;
     };
     let mut build = Process::new(&bin);
-    build.arg("build").current_dir(root);
+    build.arg("build").current_dir(&project.root);
     let Ok(running) = child::spawn(&mut build, global, "vite-stderr") else {
         return 2;
     };
@@ -467,7 +476,7 @@ fn run_client(root: &Path, global: &GlobalArguments, signals: &AtomicUsize) -> u
         return code;
     }
     let mut preview = Process::new(bin);
-    preview.arg("preview").current_dir(root);
+    preview.arg("preview").current_dir(&project.root);
     let Ok(running) = child::spawn(&mut preview, global, "vite-stderr") else {
         return 2;
     };
@@ -503,7 +512,7 @@ pub fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
             .iter()
             .any(|entry| entry.name == name && entry.client)
     {
-        return ExitCode::from(run_client(&project.root, global, &signals));
+        return ExitCode::from(run_client(&project, global, &signals));
     }
     let (generation, name) = match build_generation(&project, options, global) {
         Ok(g) => g,

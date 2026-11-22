@@ -159,10 +159,11 @@ and the next build into it removes the listed files it no longer writes.
 
 The cache in `.flick/cache/` keeps the artifacts of each build by a key over
 the normalized selected roots separately from the available sources of the
-project, its effective configuration, the profile, emit
-and output settings, the compiler (version and binary), the installed
-runtime and Effect, `package.json`, `pnpm-lock.yaml` and the manifests and
-interfaces of the installed dependencies. Any change of these is a miss; a
+project, its effective configuration, the profile, target options
+and output settings, the compiler (version and binary), the backend component
+and its pinned runtime graphs, and the package inputs reported by the selected
+backend (for `flick/js`, `package.json`, `pnpm-lock.yaml`, and the manifests
+and Flick sources of installed packages). Any change of these is a miss; a
 hit writes exactly the files the build would.
 
 Watch commands compare individual paths and their state, including file
@@ -192,12 +193,22 @@ exit code.
 
 `install` and `update` first fetch the Flick libraries `flick.lock` pins,
 and `add` with `--git`, `--url` or `--path` and `remove` change
-`[dependencies]` (see [project.md](../project/#flick-dependencies)). For npm
-packages the dependency commands delegate to pnpm. Every command that changes
-`package.json`, its lockfile or the tree first checks that `pnpm --version`
-is the version `packageManager` pins (`FLICK-P016`, exit code 2, nothing
-changed); the message names the pinned version and how to activate it, and
-`flick doctor` prints both versions. `install --locked` without
+`[dependencies]` (see [project.md](../project/#flick-dependencies)). The
+target-ecosystem portion of `install`, `add`, `remove`, `update` and `deps` is
+delegated to the project's selected backend, along with the closure's
+`[target.<name>.dependencies]` for that backend. When the selected backend
+manages no packages of its own (for example `flick/go`), `flick install`
+handles Flick `[dependencies]` without needing Node or pnpm, while target
+package operations such as `flick add <pkg>` (without `--path`, `--git` or
+`--url`) fail with `FLICK-P063` (exit code 2) naming the backend and suggesting
+those source options.
+
+For `flick/js`, dependency commands run `pnpm` (requiring
+`[tools] "flick/js" = ["pnpm"]` in `flick.toml`, else `FLICK-P051`). Every
+command that changes `package.json`, its lockfile or the tree first checks that
+`pnpm --version` is the version `packageManager` pins (`FLICK-P016`, exit code
+2, nothing changed); the message names the pinned version and how to activate
+it, and `flick doctor` prints both versions. `install --locked` without
 `pnpm-lock.yaml`, or with one out of date, is `FLICK-P017` with exit code 2.
 
 `pack` builds the project in the release profile and refuses a `todo` or
@@ -205,11 +216,12 @@ changed); the message names the pinned version and how to activate it, and
 `<name>-<version>.tgz` holds its `flick.toml`, its source directory and its
 readme and license under `package/`, without times or owners, so the same
 sources give the same bytes; stdout shows the sha256 a `url` dependency
-names. An app packs a staging package, with the runner of each entry, which the staged
-`package.json` names in `bin` (see [project.md](../project/#entry-points)), checks that every module has its `.iface` (and
-`.d.ts` with `[target.js] declarations = true`), that interfaces in the package agree on each
-other's fingerprints and that the paths `exports` names exist
-(`FLICK-P020`), and writes the tarball with `pnpm pack`.
+names. An app checks that every module has its `.iface` (and
+`.d.ts` with `[target.js] declarations = true`) and that interfaces in the
+package agree on each other's fingerprints (`FLICK-P020`), then delegates
+staging and archiving to the selected backend's `pack` command (for `flick/js`,
+staging `package.json` with entry `bin` fields, checking `exports`, and running
+`pnpm pack`).
 
 ## Checked package documentation
 

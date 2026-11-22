@@ -25,7 +25,7 @@ use crate::iface::Interface;
 #[cfg(feature = "native-project")]
 use crate::implicit_packages::IMPLICIT_PACKAGES;
 #[cfg(feature = "native-project")]
-use crate::manifest::js_dependencies_in;
+use crate::manifest::target_dependencies_in;
 use crate::plugin::derive::builtin_expansion;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
@@ -36,14 +36,14 @@ type Files = &'static [(&'static str, &'static str)];
 
 /// What the compiler reads of an implicit package: its modules, in the order
 /// of its `src/modules.txt`, the tables of `src/go/` that bind its foreign
-/// declarations on the go target, and the `[js.dependencies]` of its manifest
-/// as `(name, version)`.
+/// declarations on the go target, and the `[target.<name>.dependencies]` of
+/// its manifest as `(target, name, version)`.
 #[derive(Debug, Default)]
 pub struct ImplicitPackage {
     pub name: String,
     pub modules: Vec<(String, String)>,
     pub go_bindings: Vec<(String, String)>,
-    pub js_dependencies: Vec<(String, String)>,
+    pub target_dependencies: Vec<(String, String, String)>,
 }
 
 /// An implicit package this run uses.
@@ -51,7 +51,7 @@ struct Implicit {
     name: &'static str,
     modules: Files,
     go_bindings: Files,
-    js_dependencies: Files,
+    target_dependencies: &'static [(&'static str, &'static str, &'static str)],
 }
 
 static IMPLICIT: OnceLock<Vec<Implicit>> = OnceLock::new();
@@ -71,7 +71,10 @@ fn leak_all(packages: Vec<ImplicitPackage>) -> Vec<Implicit> {
             name: package.name.leak(),
             modules: leak(package.modules),
             go_bindings: leak(package.go_bindings),
-            js_dependencies: leak(package.js_dependencies),
+            target_dependencies: (package.target_dependencies.into_iter())
+                .map(|(t, n, v)| (&*t.leak(), &*n.leak(), &*v.leak()))
+                .collect::<Vec<_>>()
+                .leak(),
         })
         .collect()
 }
@@ -101,11 +104,12 @@ pub fn implicit_go_bindings() -> impl Iterator<Item = &'static (&'static str, &'
     implicit().iter().flat_map(|package| package.go_bindings)
 }
 
-/// The npm packages each implicit package names, with its name.
-pub fn implicit_js_dependencies() -> impl Iterator<Item = (&'static str, &'static str, &'static str)>
-{
+/// The packages of backends' ecosystems each implicit package names, as
+/// `(package, target, name, version)`.
+pub fn implicit_target_dependencies()
+-> impl Iterator<Item = (&'static str, &'static str, &'static str, &'static str)> {
     implicit().iter().flat_map(|package| {
-        (package.js_dependencies.iter()).map(|(name, version)| (package.name, *name, *version))
+        (package.target_dependencies.iter()).map(|(t, n, v)| (package.name, *t, *n, *v))
     })
 }
 
@@ -127,7 +131,7 @@ fn implicit() -> &'static [Implicit] {
                 name,
                 modules,
                 go_bindings,
-                js_dependencies: &[],
+                target_dependencies: &[],
             })
             .collect();
         #[allow(unreachable_code, reason = "a host without a project hands them over")]
@@ -179,7 +183,7 @@ pub fn read_package(name: &str, dir: &Path) -> io::Result<ImplicitPackage> {
         name: name.to_owned(),
         modules,
         go_bindings,
-        js_dependencies: js_dependencies_in(dir),
+        target_dependencies: target_dependencies_in(dir),
     })
 }
 

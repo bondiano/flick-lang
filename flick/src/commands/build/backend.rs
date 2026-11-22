@@ -3,27 +3,21 @@ use flick_core::project::{Compilation, Host, Project};
 
 use crate::sources::FsHost;
 
-/// whether compiled RT code may reach the separately installed Effect
-/// adapter: a JS dependency or a package.json entry on the adapter.
+/// Whether compiled RT code may reach the separately installed Effect adapter:
+/// declared in `[target.js.dependencies]` or in the backend's declared dependencies.
 pub(super) fn effect_bridge(
     host: &FsHost,
     project: Option<&Project>,
     compilation: &Compilation,
 ) -> EffectBridge {
     let available = project.is_none_or(|p| {
-        compilation
-            .js_dependencies
+        compilation.target_dependencies.iter().any(|dependency| {
+            dependency.target == "js" && dependency.name == "@flick-lang/effect-ts"
+        }) || host
+            .foreign(p)
+            .declared
             .iter()
-            .any(|dependency| dependency.name == "@flick-lang/effect-ts")
-            || host
-                .read(&p.root.join("package.json"))
-                .ok()
-                .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
-                .is_some_and(|package| {
-                    package["dependencies"]
-                        .get("@flick-lang/effect-ts")
-                        .is_some()
-                })
+            .any(|dependency| dependency == "@flick-lang/effect-ts")
     });
     if available {
         EffectBridge::Available

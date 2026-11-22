@@ -2,6 +2,8 @@
 //! commands that read inputs, link a step's reads and resume after it, and
 //! a session that echoes, traps or spins on request.
 
+mod deps;
+
 use std::fmt::Write as _;
 use std::hint;
 use std::path::Path;
@@ -43,7 +45,7 @@ pub(super) fn commands() -> Vec<Descriptor> {
         required: true,
         help: "whom to greet".into(),
     };
-    vec![
+    let mut all = vec![
         descriptor("literal-hello", vec![who.clone()], &["$out"], Style::Plan),
         descriptor("greet", vec![who], &["greeted.txt"], Style::Plan),
         // a core command: refused with a warning, never run
@@ -63,7 +65,25 @@ pub(super) fn commands() -> Vec<Descriptor> {
             reads: vec!["data".into()],
             ..descriptor("literal-sneak", vec![], &[], Style::Plan)
         },
-    ]
+        Descriptor {
+            name: "literal-in-place".into(),
+            summary: "tests in-place tool step execution and validation".into(),
+            positionals: vec![],
+            options: vec![Parameter {
+                name: "mode".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "test mode".into(),
+            }],
+            inputs: vec![],
+            reads: vec![],
+            writes: vec!["staged.txt".into(), "after.txt".into()],
+            style: Style::Plan,
+        },
+    ];
+    all.extend(deps::commands());
+    all
 }
 
 /// A step of the granted `node` that copies `data/in.txt` to `copy.txt`,
@@ -82,6 +102,7 @@ fn copy_step(invocation: &Invocation, read: &str) -> Option<Step> {
         inputs: vec![],
         reads: vec![read.into()],
         outputs: vec!["copy.txt".into()],
+        in_place: false,
     }))
 }
 
@@ -92,7 +113,19 @@ fn value<'a>(invocation: &'a Invocation, name: &str) -> Option<&'a str> {
         .map(String::as_str)
 }
 
-pub(super) fn run(invocation: &Invocation) -> Plan {
+fn values<'a>(invocation: &'a Invocation, name: &str) -> &'a [String] {
+    (invocation.arguments.iter())
+        .find(|a| a.name == name)
+        .map_or(&[], |a| a.values.as_slice())
+}
+
+pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
+    if matches!(
+        invocation.name.as_str(),
+        "install" | "add" | "remove" | "update" | "deps"
+    ) {
+        return deps::run(invocation);
+    }
     let mut plan = Plan::empty();
     let who = value(invocation, "who").unwrap_or("nobody");
     match invocation.name.as_str() {
@@ -146,10 +179,45 @@ pub(super) fn run(invocation: &Invocation) -> Plan {
             inputs: vec![],
             reads: vec![],
             outputs: vec!["made.txt".into()],
+            in_place: false,
         })),
+        "literal-in-place" => {
+            let mode = value(invocation, "mode").unwrap_or("ok");
+            let node = invocation
+                .tools
+                .iter()
+                .find(|t| t.id == "node")
+                .cloned()
+                .unwrap_or(Tool {
+                    id: "node".into(),
+                    version: String::new(),
+                    sha256: String::new(),
+                });
+            plan.files.push(file("staged.txt", "staged-content\n"));
+            let (inputs, reads, outputs) = match mode {
+                "bad-inputs" => (vec!["staged.txt".into()], vec![], vec!["after.txt".into()]),
+                "bad-reads" => (vec![], vec!["staged.txt".into()], vec!["after.txt".into()]),
+                "bad-outputs" => (vec![], vec![], vec!["undeclared.txt".into()]),
+                _ => (vec![], vec![], vec!["after.txt".into()]),
+            };
+            plan.steps.push(Step::Tool(ToolStep {
+                id: "in-place".into(),
+                tool: node,
+                arguments: vec![
+                    "-e".into(),
+                    "const fs = require('fs'); fs.writeFileSync('after.txt', 'saw:' + fs.readFileSync('staged.txt', 'utf8'));"
+                        .into(),
+                ],
+                environment: vec![],
+                inputs,
+                reads,
+                outputs,
+                in_place: true,
+            }));
+        }
         _ => {}
     }
-    plan
+    Ok(plan)
 }
 
 fn file(path: &str, text: &str) -> File {
@@ -273,6 +341,7 @@ pub(super) fn scaffold(request: &TemplateRequest) -> Result<Plan, Vec<Diagnostic
                 inputs: vec![],
                 reads: vec![],
                 outputs: vec!["made.txt".into()],
+                in_place: false,
             }));
             Ok(plan)
         }

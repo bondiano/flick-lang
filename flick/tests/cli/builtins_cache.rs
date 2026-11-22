@@ -182,7 +182,8 @@ fn moved_sources_and_go_tables_invalidate_cached_interfaces_and_build_inputs() {
     let text = fs::read_to_string(&manifest).expect("the moved package manifest");
     fs::write(&manifest, format!("{text}\n# presentation only\n")).expect("comment");
     assert_eq!(key(&app, &std, &cache), changed_table);
-    let dependency = format!("{text}\n[js.dependencies]\n\"@acme/cache-probe\" = \"1.0.0\"\n");
+    let dependency =
+        format!("{text}\n[target.js.dependencies]\n\"@acme/cache-probe\" = \"1.0.0\"\n");
     fs::write(&manifest, &dependency).expect("declare a new dependency");
     let changed_manifest = key(&app, &std, &cache);
     assert_ne!(changed_manifest, changed_table);

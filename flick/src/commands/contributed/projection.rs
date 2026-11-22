@@ -10,8 +10,9 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 
 use flick_backend::command::{Answer, Need, Source, TsSpan, TypescriptModule};
-use flick_core::project::Analyzed;
+use flick_core::project::{self, Analyzed};
 use flick_core::projection::{self, Projected};
+use flick_core::source::SourceMap;
 use flick_core::types::builtins;
 
 use crate::commands::{interface_of, projection_of};
@@ -101,10 +102,18 @@ fn project_module(
         None => relative(dir, &elsewhere.join(projection::file_of(m))),
     };
     let host = FsHost::new();
+    let project = project::discover(
+        &host,
+        &mut SourceMap::default(),
+        &snapshot.root,
+        Some(&snapshot.root),
+    )
+    .ok()
+    .flatten();
     projection_of(
         &host,
         &snapshot.analysis,
-        Some(&snapshot.root),
+        project.as_ref(),
         module,
         text,
         &specifier,

@@ -10,7 +10,8 @@ use common::{APP, flick_in, project};
 
 const MAIN: &str = "module App.Main exposing (main)\n\nmain : Unit ->{Host.Console; AppError} Unit\nlet main () = Platform.stdout_line \"hi\"\n";
 const EFFECT_APP: &str = concat!(
-    "schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
+    "schema-version = 1\n[tools]\n\"flick/js\" = [\"pnpm\"]\n",
+    "[project]\nkind = \"app\"\nentry = \"App.Main\"\n",
     "[target.js]\nruntime = \"effect\"\n"
 );
 

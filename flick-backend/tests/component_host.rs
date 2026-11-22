@@ -430,3 +430,61 @@ fn component_templates_and_scaffold_match_native_and_reject_unknown() {
         "{diagnostics:?}"
     );
 }
+
+#[test]
+#[ignore = "build the real component fixture with `just wasm-backends`"]
+fn component_packages_and_package_files_match_native() {
+    use flick_backend::ProjectFile;
+    use flick_backend::command::Dependency;
+
+    let (backend, _) = fixture(Budget::default());
+    assert_eq!(backend.package_files(), Literal.package_files());
+
+    let files = vec![
+        ProjectFile {
+            path: "literal-deps.json".into(),
+            real: "/proj/literal-deps.json".into(),
+            bytes: br#"{"name":"demo","version":"1.0.0","dependencies":{"widget":"1.0.0"},"installed":["widget"]}"#.to_vec(),
+        },
+        ProjectFile {
+            path: "literal_packages/helper/manifest.json".into(),
+            real: "/proj/literal_packages/helper/manifest.json".into(),
+            bytes: br#"{"name":"helper","version":"0.2.0","source-dir":"src"}"#.to_vec(),
+        },
+    ];
+    let deps = vec![
+        Dependency {
+            name: "widget".into(),
+            version: "1.0.0".into(),
+            by: None,
+        },
+        Dependency {
+            name: "missing".into(),
+            version: "2.0.0".into(),
+            by: Some("lib".into()),
+        },
+    ];
+    let options = vec![
+        OptionValue {
+            key: "skip-runtime".into(),
+            value: "true".into(),
+        },
+        OptionValue {
+            key: "verify".into(),
+            value: "installed".into(),
+        },
+    ];
+    let wasm = backend.packages(&files, &deps, &options);
+    let native = Literal.packages(&files, &deps, &options);
+    assert_eq!(wasm, native);
+    assert_eq!(wasm.name.as_deref(), Some("demo"));
+    assert_eq!(wasm.version.as_deref(), Some("1.0.0"));
+    assert_eq!(wasm.declared, vec!["widget".to_owned()]);
+    assert_eq!(wasm.sources.len(), 1);
+    assert_eq!(wasm.sources[0].root, "literal_packages/helper/src");
+    assert!(
+        wasm.diagnostics.iter().any(|d| d.code == "P034"),
+        "{:?}",
+        wasm.diagnostics
+    );
+}

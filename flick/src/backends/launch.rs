@@ -74,14 +74,18 @@ pub(super) fn validate(
     files: &[Artifact],
     pin: &BackendPin,
     tools: &[Toolchain],
-    root: &Path,
+    installed: &[RuntimeDependency],
 ) -> Result<(), String> {
     let file = files
         .iter()
         .find(|f| f.path == FILE)
         .ok_or("component build has no launch manifest")?;
     let manifest = read(&file.contents, pin)?;
-    if !super::dependencies::verify(root, &manifest.runtime_dependencies)? {
+    if !manifest
+        .runtime_dependencies
+        .iter()
+        .all(|pin| installed.contains(pin))
+    {
         return Err("cached runtime dependency differs from its host pin".into());
     }
     for launch in manifest.launches {
@@ -168,9 +172,17 @@ fn verify_runtime_manifest(root: &Path, manifest: &Manifest) -> Result<(), Strin
             })
             .chain(iter::once(root.to_path_buf()))
             .collect();
-        let mut pins = super::dependencies::Pins::default();
+        let names: Vec<String> = (manifest.runtime_dependencies.iter())
+            .map(|d| d.package.clone())
+            .collect();
         for directory in directories {
-            if !pins.verify(&directory, &manifest.runtime_dependencies)? {
+            let installed =
+                super::runtimes::runtime_from(&manifest.backend, &directory, root, &names)?;
+            if !manifest
+                .runtime_dependencies
+                .iter()
+                .all(|pin| installed.contains(pin))
+            {
                 return Err(
                     "launch runtime dependency differs from its pinned version and digest".into(),
                 );
@@ -225,7 +237,7 @@ pub(crate) fn command_with_import(
 #[cfg(test)]
 mod tests {
     use super::{FILE, artifact, command};
-    use crate::backends::dependencies;
+    use crate::backends::{dependencies, packages, runtimes};
     use flick_backend::{BackendId, BackendPin, BuildResult, Launch, LaunchKind, sha256};
     use std::{env, fs, process};
 
@@ -249,6 +261,7 @@ mod tests {
             },
             sha256: sha256(b"component"),
         };
+        runtimes::loaded(&pin, &packages::tests::js());
         let result = BuildResult {
             artifacts: vec![flick_backend::Artifact {
                 id: "main".into(),
@@ -342,6 +355,7 @@ mod tests {
             },
             sha256: sha256(b"component"),
         };
+        runtimes::loaded(&pin, &packages::tests::js());
         let result = BuildResult {
             artifacts: vec![flick_backend::Artifact {
                 id: "entry".into(),
