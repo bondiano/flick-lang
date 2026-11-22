@@ -6,6 +6,13 @@ use super::validate::Place;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
 
+/// Whether `block` is the `else` fallback branch of `let p = init else fallback`.
+pub(super) fn is_fallback(decl: &Node, block: &Node) -> bool {
+    decl.child_tokens()
+        .find(|t| t.kind == K::ElseKw)
+        .is_some_and(|kw| block.range().0 >= kw.end)
+}
+
 /// `let pattern = initializer else fallback`: a statement of an ordinary
 /// block, without modifiers, parameters, whole-binding annotations or
 /// contracts.

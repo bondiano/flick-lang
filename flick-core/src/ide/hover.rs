@@ -17,6 +17,7 @@ mod attributes;
 #[cfg(test)]
 mod attributes_tests;
 pub(super) mod companions;
+mod defer;
 mod exposing;
 mod keywords;
 mod kinds;

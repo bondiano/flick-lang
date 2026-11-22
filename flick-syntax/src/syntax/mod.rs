@@ -15,6 +15,8 @@ pub mod patterns;
 pub mod structure;
 pub mod ts_mark;
 mod validate;
+mod validate_attrs;
+mod validate_defer;
 mod validate_let_else;
 pub mod when;
 

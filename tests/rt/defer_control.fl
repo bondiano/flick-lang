@@ -1,0 +1,55 @@
+// D22: outer `control` handler suspends and abandons a scope with `defer` and
+// `errdefer`: scopes unwind cleanly, each finalizer runs once in LIFO order,
+// and resuming once before abandoning does not double-run cleanup.
+module App.Main exposing (main)
+
+effect Yield =
+  control emit : Int ->{} Unit
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+abandoned : Unit ->{Host.Console} Int
+let abandoned () =
+  try
+    scope {
+      defer { say "abandoned:outer-defer" }
+      errdefer { say "abandoned:outer-errdefer" }
+      scope {
+        defer { say "abandoned:inner-defer" }
+        errdefer { say "abandoned:inner-errdefer" }
+        Yield.emit 7
+        say "not-reached"
+      }
+      0
+    }
+  with
+  | Yield.emit x ->
+    say "handler:abandon"
+    x
+
+resumed_then_abandoned : Unit ->{Host.Console} Int
+let resumed_then_abandoned () =
+  try
+    scope {
+      defer { say "rta:defer" }
+      errdefer { say "rta:errdefer" }
+      Yield.emit 0
+      say "rta:resumed"
+      Yield.emit 9
+      say "rta:not-reached"
+      0
+    }
+  with
+  | Yield.emit x ->
+    if x == 0 then
+      resume ()
+    else
+      say "handler:stop"
+      x
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  say ("res1=" ++ show (abandoned ()))
+  say "--"
+  say ("res2=" ++ show (resumed_then_abandoned ()))

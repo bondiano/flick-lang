@@ -1,0 +1,53 @@
+-- D01/D02 --
+d01:body
+d01:defer
+d01:ok
+d02-err:defer
+d02-err:Err "just-data"
+d02-none:defer
+d02-none:None
+-- D03/D04/D19 --
+d03:defer-2
+d03:errdefer-1
+d03:defer-1
+caught:escaped
+d04:arm-defer:handled-inside
+d04:defer
+recovered:handled-inside
+-- D05 --
+d05:defer-2
+d05:ar:r2
+d05:errdefer-1
+d05:defer-1
+d05:scope_defer:fail=true
+d05:ar:r1
+-- D10 --
+d10:after-same-scope-loop
+d10:same-scope:c
+d10:same-scope:b
+d10:same-scope:a
+d10:taken
+d10:body:x
+d10:per-iter:x
+d10:body:y
+d10:per-iter:y
+-- D11/D12 --
+d12:in-provide:inner-svc
+d12:after-provide
+d11:inner-body
+outer:s2-inner
+d11:outer-body-end
+outer:registered-inside-provide
+outer:s1-end
+-- D16/D18/D23 --
+d16:handled:cleanup-local
+d23:inner-body
+d23:inner-defer
+d18:caught:acquire-failed
+-- D20 --
+fn-defer:1
+fn-errdefer:2
+-- D22-abort --
+d22:errdefer
+d22:defer
+bail:aborted-body

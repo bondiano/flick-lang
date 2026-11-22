@@ -1,7 +1,7 @@
 //! Explicit owned handler activations, parked frames and metered transfers.
 use super::{
     Activation, BracketOutcome, CapturedContinuation, Data, Destination, Discard, Error,
-    GeneratorRun, InstalledOperation, Invocation, InvocationEnd, Local, Machine, Operation,
+    GeneratorRun, InstalledOperation, Invocation, InvocationEnd, Local, Machine, Operation, Reason,
     ScopeOutcome, Segment, TransferNext, Value, charge, iter, mem,
 };
 use flick_core::ir::memory::HandlerEffect;
@@ -237,6 +237,7 @@ impl Machine<'_, '_> {
             frames: cleanup_frames,
             owner: Some(self.current_owner),
             next: TransferNext::FinishCutoff,
+            aborted: true,
         });
         Ok(true)
     }
@@ -271,6 +272,7 @@ impl Machine<'_, '_> {
                     frames,
                     owner: Some(outer_owner),
                     next: TransferNext::Raise,
+                    aborted: true,
                 });
                 InvocationEnd::Abort(result_binding)
             }
@@ -363,6 +365,7 @@ impl Machine<'_, '_> {
                             frames: captured.frames,
                             owner: Some(self.current_owner),
                             next: TransferNext::DeliverValue { binding, value },
+                            aborted: true,
                         });
                     } else {
                         self.store(binding, value)?;
@@ -426,6 +429,7 @@ impl Machine<'_, '_> {
                         saved_failure: cause,
                         propagate_exit: true,
                     },
+                    aborted: true,
                 });
             }
             InvocationEnd::Control { cont_id, .. } => {
@@ -440,6 +444,7 @@ impl Machine<'_, '_> {
                             saved_failure: cause,
                             propagate_exit: true,
                         },
+                        aborted: true,
                     });
                 }
             }

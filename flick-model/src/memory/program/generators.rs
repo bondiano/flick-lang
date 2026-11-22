@@ -30,6 +30,7 @@ impl Machine<'_, '_> {
                                 binding: strict_binding,
                                 items: collected,
                             },
+                            aborted: false,
                         });
                         return Ok(());
                     }
@@ -82,6 +83,7 @@ impl Machine<'_, '_> {
                         next: TransferNext::DeliverNone {
                             binding: caller_binding,
                         },
+                        aborted: false,
                     });
                     return Ok(());
                 }
@@ -247,6 +249,7 @@ impl Machine<'_, '_> {
                         frames,
                         owner: Some(self.current_owner),
                         next: TransferNext::DeliverNone { binding },
+                        aborted: false,
                     });
                 }
                 GeneratorRun::Running | GeneratorRun::Done => {

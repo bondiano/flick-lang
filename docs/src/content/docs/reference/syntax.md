@@ -117,6 +117,8 @@ false in when for yield do break continue
 Contextual words are ordinary names everywhere except in one position:
 
 - `loop` before `{`, `result` before `{`, and `while` before a condition followed by `do`;
+- `defer` and `errdefer` before `{` in statement position (see
+  [resources](../resources/#scope-owned-defer-and-errdefer));
 - `private` before `module` in a file's header (see [modules](../modules/)),
   and `plugin` before a head in an `exposing` list (see
   [plugins](../plugins/#using-a-plugin));
@@ -228,6 +230,8 @@ A loop may carry a label, `'outer: for x <- xs do …`, which `break` and
 | `await` | runs an `Eff` once in the current fiber and gives its result, or forces a `Lazy` | `await request` |
 | `lazy` | builds a `Lazy r e a`, which runs its block at most once, at its first `await`; `let lazy x = e` binds one of its function | `lazy { Config.load () }` |
 | `scope` | runs its block in a fresh region and releases what the block acquired when it ends | `scope { File.read_all (File.open_scoped path) }` |
+| `defer` | contextual: registers cleanup on the nearest explicit enclosing `scope` to run on every close | `defer { close handle }` |
+| `errdefer` | contextual: registers cleanup on the nearest explicit enclosing `scope` to run only if the scope body fails | `errdefer { rollback tx }` |
 | `provide` | runs its block with the services a layer builds | `provide live { run user }` |
 | `ignore` | discards the value of an intermediate statement | `ignore (Store.save user)` |
 
@@ -279,6 +283,7 @@ with what the keyword does:
 | `task` | `task { … } : Eff {Store} {StoreError} Float`: the computation the block builds |
 | `lazy` | `lazy { … } : Lazy {Store} {StoreError} Float`: the lazy the block builds |
 | `scope` | `scope { … } : Float`: the value the block returns once its resources are released |
+| `defer`, `errdefer` | `defer { … } : Unit`: cleanup mode and the location of the owning explicit `scope` |
 | `provide`, `try`, `catch` | the value of the block or expression, with the services or errors it removes |
 | `match`, `if` | `match … with : String`: the value of the arm or branch taken |
 | `let`, `else` | `let … = … else … : Result InputError User`: in `let ... else`, the result of the current block, explaining that mismatch finishes the current block and bindings are monomorphic |
@@ -663,7 +668,8 @@ save_with :
 ```text
 block       = statement { line break statement }
 statement   = "let" pattern "=" block "else" block
-            | "let" ["lazy"] ["mut"] … | signature | name "=" block | expr
+            | "let" ["lazy"] ["mut"] … | signature | name "=" block
+            | "defer" "{" block "}" | "errdefer" "{" block "}" | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | [label [":"]] "loop" "{" block "}"
             | [label [":"]] "while" expr "do" block

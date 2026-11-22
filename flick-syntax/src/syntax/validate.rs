@@ -5,14 +5,11 @@
 //! one function.
 
 use super::cst::{Node, Token};
-use super::heads::{CHECKED_BY, INVARIANT_OF};
 use super::kind::SyntaxKind as K;
 use super::patterns::{is_part, is_pattern};
-use super::ts_mark;
 use super::when;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
-use crate::syntax::lang::Lang;
 
 pub fn check(
     tree: &Node,
@@ -45,6 +42,8 @@ pub(super) enum Place {
     Do,
     /// The clauses of a `for`.
     For,
+    /// The value block of a binding, assignment, record field or proof.
+    ValueBlock,
 }
 
 impl Validator<'_> {
@@ -92,6 +91,13 @@ impl Validator<'_> {
             let inner = match (node.kind, child.kind) {
                 (K::DoExpr, K::Block) => Place::Do,
                 (K::ForExpr, K::Block) if index == 0 => Place::For,
+                (K::LetDecl, K::Block)
+                    if !node.nodes().any(|n| n.kind == K::Params)
+                        && !super::validate_let_else::is_fallback(node, child) =>
+                {
+                    Place::ValueBlock
+                }
+                (K::AssignStmt | K::RecordField | K::ProofDecl, K::Block) => Place::ValueBlock,
                 _ => Place::Plain,
             };
             self.walk(child, inner);
@@ -119,7 +125,16 @@ impl Validator<'_> {
                 .nodes()
                 .take(index)
                 .any(|n| n.kind == K::Attribute && when::is_when(n, self.src));
-            self.attribute(child, next, before_module_header, duplicate_when);
+            super::validate_attrs::check(
+                self.src,
+                self.file,
+                self.allow_trailing_attribute,
+                child,
+                next,
+                before_module_header,
+                duplicate_when,
+                &mut self.errors,
+            );
         }
         if child.kind == K::LetDecl {
             if child.has_token(K::ElseKw) {
@@ -134,6 +149,17 @@ impl Validator<'_> {
                 self.mutable(child, node.kind == K::Block, place);
                 self.lazy(child, node.kind == K::Block, place);
             }
+        }
+        if child.kind == K::DeferStmt {
+            super::validate_defer::check(
+                self.src,
+                self.file,
+                node,
+                index,
+                child,
+                place,
+                &mut self.errors,
+            );
         }
     }
 
@@ -221,165 +247,6 @@ impl Validator<'_> {
             codes::S016,
             message.to_owned(),
             Span::new(self.file, kw.start, kw.end),
-        ));
-    }
-
-    /// `@lang item`, with an item the compiler knows, `@derive` before a
-    /// class, maybe naming the package whose plugin derives it, or `@maker`
-    /// before a value that makes an atom, an action or a view; `@cell`
-    /// marks a type whose values hold one value each, `@label kind` one
-    /// whose top-level values carry their names where the program runs,
-    /// `@owner` a service whose handler owns what is made under it, `@sync`
-    /// one whose operations run at once, `@ts` gives a type its TypeScript
-    /// form, `@stores` marks a foreign type whose values store functions
-    /// (data with hidden storage), and `@implicit` a conversion instance.
-    #[allow(clippy::too_many_lines)]
-    fn attribute(
-        &mut self,
-        node: &Node,
-        before: Option<&Node>,
-        before_module_header: bool,
-        duplicate_when: bool,
-    ) {
-        let next = before.map(|n| n.kind);
-        let words: Vec<Token> = idents(node).collect();
-        let message = match &words[..] {
-            [name, ..] if name.text(self.src) == "when" => {
-                if duplicate_when && before_module_header {
-                    "a module may have at most one `@when` attribute: combine conditions with `&&`"
-                        .to_owned()
-                } else {
-                    match when::read(node, self.src) {
-                        Some(Err(why)) => why,
-                        _ if before_module_header
-                            || (next.is_none() && self.allow_trailing_attribute) =>
-                        {
-                            return;
-                        }
-                        _ => "`@when` belongs before the module header".to_owned(),
-                    }
-                }
-            }
-            [name, ..] if name.text(self.src) == "ts" => match ts_mark::read(node, self.src) {
-                Some(Err(why)) => why,
-                _ if matches!(next, Some(K::TypeDecl | K::ServiceDecl | K::Attribute))
-                    || (next.is_none() && self.allow_trailing_attribute) =>
-                {
-                    return;
-                }
-                _ => "`@ts` belongs before the declaration of a type or a service".to_owned(),
-            },
-            [name] | [name, _] if name.text(self.src) == "derive" => return,
-            [name] if name.text(self.src) == "maker" => return,
-            [name, ..] if name.text(self.src) == "maker" => "`@maker` takes no argument".to_owned(),
-            [name] if name.text(self.src) == "cell" => {
-                if matches!(next, Some(K::TypeDecl | K::Attribute))
-                    || (next.is_none() && self.allow_trailing_attribute)
-                {
-                    return;
-                }
-                "`@cell` belongs before a type declaration".to_owned()
-            }
-            [name, ..] if name.text(self.src) == "cell" => "`@cell` takes no argument".to_owned(),
-            [name, _] if name.text(self.src) == "label" => {
-                if matches!(next, Some(K::TypeDecl | K::Attribute))
-                    || (next.is_none() && self.allow_trailing_attribute)
-                {
-                    return;
-                }
-                "`@label` belongs before a type declaration".to_owned()
-            }
-            [name, ..] if name.text(self.src) == "label" => {
-                "`@label` names one kind, as `@label atom`".to_owned()
-            }
-            [name] | [name, _] if name.text(self.src) == "sync" => {
-                let reader = words.get(1).is_none_or(|w| w.text(self.src) == "reader");
-                if !reader {
-                    "`@sync` takes `reader` or nothing".to_owned()
-                } else if matches!(next, Some(K::ServiceDecl | K::Attribute))
-                    || (next.is_none() && self.allow_trailing_attribute)
-                {
-                    return;
-                } else {
-                    "`@sync` belongs before a service declaration".to_owned()
-                }
-            }
-            [name, ..] if name.text(self.src) == "sync" => {
-                "`@sync` takes `reader` or nothing".to_owned()
-            }
-            // generated code alone writes it: a source cannot spell `$`
-            [name, _]
-                if CHECKED_BY.ends_with(name.text(self.src))
-                    && name.text(self.src).contains('$') =>
-            {
-                if matches!(next, Some(K::LetDecl)) {
-                    return;
-                }
-                "a check is named before the function it reads a constant for".to_owned()
-            }
-            // generated code alone writes it, before the type it is the
-            // invariant of
-            [name, _, _, _]
-                if INVARIANT_OF.ends_with(name.text(self.src))
-                    && name.text(self.src).contains('$') =>
-            {
-                if matches!(next, Some(K::TypeDecl)) {
-                    return;
-                }
-                "an invariant is named before the type whose values it holds for".to_owned()
-            }
-            [name] if name.text(self.src) == "owner" => {
-                if matches!(next, Some(K::ServiceDecl | K::Attribute))
-                    || (next.is_none() && self.allow_trailing_attribute)
-                {
-                    return;
-                }
-                "`@owner` belongs before a service declaration".to_owned()
-            }
-            [name, ..] if name.text(self.src) == "owner" => "`@owner` takes no argument".to_owned(),
-            [name] if name.text(self.src) == "stores" => {
-                // constructors or a body show what a type stores itself
-                if before.is_some_and(|d| d.kind == K::TypeDecl && d.has_token(K::Eq)) {
-                    "`@stores` belongs before a type without constructors or a body".to_owned()
-                } else if matches!(next, Some(K::TypeDecl | K::Attribute))
-                    || (next.is_none() && self.allow_trailing_attribute)
-                {
-                    return;
-                } else {
-                    "`@stores` belongs before a type declaration".to_owned()
-                }
-            }
-            [name, ..] if name.text(self.src) == "stores" => {
-                "`@stores` takes no argument".to_owned()
-            }
-            [name] if name.text(self.src) == "implicit" => {
-                // a lone attribute is a fragment the formatter checks on its own
-                if matches!(next, Some(K::InstanceDecl))
-                    || (next.is_none() && self.allow_trailing_attribute)
-                {
-                    return;
-                }
-                "`@implicit` belongs before an instance declaration".to_owned()
-            }
-            [name, ..] if name.text(self.src) == "implicit" => {
-                "`@implicit` takes no argument".to_owned()
-            }
-            [name, ..] if name.text(self.src) == "derive" => {
-                "`@derive` names at most the package of its plugin: `@derive std`".to_owned()
-            }
-            [name, ..] if name.text(self.src) != "lang" => format!(
-                "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync`, `@ts`, `@stores`, `@implicit` and `@when`",
-                name.text(self.src)
-            ),
-            [_, item] if Lang::from_name(item.text(self.src)).is_some() => return,
-            [_, item] => format!("unknown lang item `{}`", item.text(self.src)),
-            _ => "`@lang` names one lang item".to_owned(),
-        };
-        let (start, end) = node.range();
-        self.errors.push(Diagnostic::error(
-            codes::S014,
-            message,
-            Span::new(self.file, start, end),
         ));
     }
 

@@ -10,6 +10,7 @@
     reason = "every native has the signature of `Native::run`, which may fail"
 )]
 
+mod exit;
 pub mod host;
 mod lazy;
 mod numbers;
@@ -124,6 +125,8 @@ natives! {
     RT, "layerMerge", 2 => layer_merge;
     RT, "layerOverride", 2 => layer_merge;
     "flick:Layer", "effect", 2 => layer_effect;
+    "flick:Exit", "flickIsFailure", 1 => exit::is_failure;
+    "flick:Exit", "flickIsSuccess", 1 => exit::is_success;
     RT, "flickTodo", 1 => todo;
     STRING, "includes", 2 => includes;
     STRING, "startsWith", 2 => starts_with;

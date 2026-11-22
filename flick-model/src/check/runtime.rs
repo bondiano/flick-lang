@@ -162,7 +162,7 @@ impl Checker<'_> {
     fn lambda(&mut self, lambda: &Lambda, mem: &[Term]) -> Check<()> {
         for (pi, r) in lambda.regions.iter().enumerate().filter(|(_, r)| r.live) {
             let fins = r.finalizers.iter().filter_map(|f| match f {
-                Finalizer::Run(t, _) => Some(t),
+                Finalizer::Run(t, _) | Finalizer::Close(t, _) => Some(t),
                 Finalizer::Release(_) => None,
             });
             let kids = r.children.iter().flat_map(|(f, t, _)| [f, t]);

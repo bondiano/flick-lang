@@ -3,6 +3,7 @@
 //! extracting or inlining a variable, and keeping one in a `Ref`.
 
 mod catch_try;
+mod defer;
 mod extract;
 mod import_class;
 mod let_else;
@@ -40,6 +41,7 @@ impl Ide<'_> {
         out.extend(self.extract(file, start, end));
         out.extend(self.inline(file, start));
         out.extend(self.to_ref(file, start));
+        out.extend(self.defer_actions(file, start));
         out.extend(self.result_block(file, start));
         out.extend(self.catch_to_try(file, start));
         out.extend(self.try_to_catch(file, start));

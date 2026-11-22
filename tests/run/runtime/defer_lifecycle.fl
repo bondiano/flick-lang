@@ -1,0 +1,189 @@
+// Deterministic lifecycle, defect, cancellation, and shared-LIFO tests for
+// `defer` and `errdefer` using `Deferred` barriers (zero sleeps/timers):
+// D03 (defect + external cancel), D05 (Resource.own + Resource.make + Scope.defer
+// + defer + errdefer), D06 (finalizer defect on success keeps snapshot=success),
+// D07 (body fail + multiple finalizer defects), D08 (cancel during async cleanup),
+// D09 (cancel arriving during close of successful body keeps snapshot=success),
+// D18 (Resource.make atomicity alongside defer).
+module App.Main exposing (main)
+
+import Resource exposing (Close(..), own)
+
+type error Boom = Boom String
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+ping : Deferred.Deferred none Unit ->{} Unit
+let ping d = ignore (Deferred.succeed () d)
+
+type Owned = Owned String
+
+instance Close Owned =
+  let close _ (Owned name) = say ("own-close:" ++ name)
+  let close_exit _ exit (Owned name) =
+    say ("own-close:" ++ name ++ ":fail=" ++ show (Exit.is_failure exit))
+
+type Made = Made String
+
+make_res : String ->{Async, Scope s} Made^{s}
+let make_res name =
+  Resource.make
+    (task {
+      say ("make-acq:" ++ name)
+      Made name
+    })
+    (fun (Made n) exit -> say ("make-rel:" ++ n ++ ":fail=" ++ show (Exit.is_failure exit)))
+
+/// Waits to be interrupted, then completes `stopped` so the target's finalizer
+/// continues only after the interrupt request has reached the target.
+signal_when_stopped :
+  Deferred.Deferred none Unit -> Deferred.Deferred none Unit -> Eff {Async} none Unit
+let signal_when_stopped started stopped = task {
+  Effect.ensuring
+    (task { ping stopped })
+    (task {
+      ping started
+      Effect.never ()
+    })
+}
+
+test_d05_d18 : Unit ->{Async} Unit
+let test_d05_d18 () =
+  say "-- D05/D18 --"
+  scope {
+    let _o = own (Owned "o1")
+    defer { say "defer-1" }
+    let _m = make_res "m1"
+    Scope.defer (fun e -> say ("scope-defer:fail=" ++ show (Exit.is_failure e)))
+    errdefer { say "errdefer-SKIP" }
+    defer { say "defer-2" }
+    say "d05:body"
+  }
+
+test_d03 : Unit ->{Async} Unit
+let test_d03 () =
+  // D03 (defect): body dies -> errdefer and defer both run, outcome stays defect
+  say "-- D03-defect --"
+  let defect_exit =
+    Effect.exit
+      (task {
+        scope {
+          defer { say "d03-die:defer" }
+          errdefer { say "d03-die:errdefer" }
+          Effect.die "body-boom"
+        }
+      })
+  say ("d03-die:has_dies=" ++ show (Exit.has_dies defect_exit))
+
+  // D03 (cancel): body interrupted -> errdefer and defer both run, outcome stays interrupted
+  say "-- D03-cancel --"
+  scope owner {
+    let ready : Deferred.Deferred none Unit = Deferred.make ()
+    let child =
+      Fiber.spawn
+        owner
+        quiet
+        (task {
+          scope {
+            defer { say "d03-cancel:defer" }
+            errdefer { say "d03-cancel:errdefer" }
+            ping ready
+            Effect.never ()
+          }
+        })
+    Deferred.await_ ready
+    Fiber.interrupt child
+    let exit = Fiber.await_ child
+    say ("d03-cancel:interrupted=" ++ show (Exit.has_interrupts exit))
+  }
+
+test_d06_d07 : Unit ->{Async} Unit
+let test_d06_d07 () =
+  // D06: finalizer defect when body succeeded -> remaining defer runs, errdefer stays skipped
+  say "-- D06 --"
+  let d06_exit =
+    Effect.exit
+      (task {
+        scope {
+          defer { say "d06:outer-defer" }
+          errdefer { say "d06:errdefer-SKIP" }
+          defer {
+            say "d06:dying-defer"
+            Effect.die "finalizer-boom"
+          }
+          say "d06:body-ok"
+          42
+        }
+      })
+  say ("d06:has_dies=" ++ show (Exit.has_dies d06_exit))
+
+  // D07: body typed failure + multiple finalizer defects -> all run, fail+die both preserved
+  say "-- D07 --"
+  let d07_exit =
+    Effect.exit
+      (task {
+        scope {
+          defer { say "d07:defer-1" }
+          errdefer {
+            say "d07:errdefer-dies"
+            Effect.die "errdefer-boom"
+          }
+          defer {
+            say "d07:defer-2-dies"
+            Effect.die "defer-boom"
+          }
+          Fail.fail (Boom "body-fail")
+        }
+      })
+  say
+    ("d07:has_fails="
+      ++ show (Exit.has_fails d07_exit)
+      ++ ",has_dies="
+      ++ show (Exit.has_dies d07_exit))
+
+test_d08_d09 : Unit ->{Async} Unit
+let test_d08_d09 () =
+  // D08 + D09: cancel arrives during closing of a successful body (masked await
+  // in `defer`): cleanup finishes, remaining `defer` runs, earlier `errdefer`
+  // STILL sees immutable body=success snapshot (skipped!), and then fiber stops.
+  say "-- D08/D09 --"
+  scope owner {
+    let in_cleanup : Deferred.Deferred none Unit = Deferred.make ()
+    let go : Deferred.Deferred none Unit = Deferred.make ()
+    let started : Deferred.Deferred none Unit = Deferred.make ()
+    let target =
+      Fiber.spawn
+        owner
+        quiet
+        (task {
+          scope {
+            defer { say "d08:remaining-defer" }
+            errdefer { say "d09:errdefer-SKIP" }
+            defer {
+              say "d08:cleanup-start"
+              ping in_cleanup
+              Deferred.await_ go
+              say "d08:cleanup-end"
+            }
+            say "d09:body-succeeded"
+          }
+          Effect.yield_now ()
+          say "d08:not-reached-after-cancel"
+        })
+    let stopper = Fiber.spawn owner quiet (signal_when_stopped started go)
+    Deferred.await_ started
+    Deferred.await_ in_cleanup
+    Fiber.interrupt_all [target, stopper]
+  }
+  say "d08/d09:done"
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  test_d05_d18 ()
+  test_d03 ()
+  test_d06_d07 ()
+  test_d08_d09 ()

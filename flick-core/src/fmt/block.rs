@@ -29,6 +29,7 @@ pub(super) fn hugs(n: &Node) -> bool {
             | K::TaskExpr
             | K::ScopeExpr
             | K::ProvideExpr
+            | K::DeferStmt
             | K::ResultExpr
             | K::DoExpr
             | K::FunExpr

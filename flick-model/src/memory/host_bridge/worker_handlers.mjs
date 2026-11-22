@@ -83,6 +83,9 @@ export async function handleCall(msg, alreadyPending = false, prePinned = null) 
       return;
     }
     const syncResolved = resolveTargetSync(exec, spec);
+    if (syncResolved.needsAsyncLoad && alreadyPending && pinned.length > 0) {
+      exec.pendingCalls.set(callId, { abort: releasePinned });
+    }
     const { target, bridged } = syncResolved.needsAsyncLoad
       ? await resolveTarget(exec, spec)
       : syncResolved;

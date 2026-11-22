@@ -1,0 +1,79 @@
+// Scope-owned `defer` and `errdefer` statements across explicit scopes,
+// control-flow blocks, `provide`, local error handling, nested explicit scopes,
+// generic `Scope.defer` helpers, and contextual identifiers.
+module App.DeferPass exposing (..)
+
+type error Boom = Boom String
+
+service Outer =
+  log : String ->{} Unit
+
+service Inner =
+  ping : Unit ->{} Unit
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+outer_layer : Layer none none {Outer}
+let outer_layer = Layer.succeed Outer { log = say }
+
+inner_layer : Layer none none {Inner}
+let inner_layer = Layer.succeed Inner { ping = fun () -> () }
+
+may_fail : Bool ->{; Boom} Unit
+let may_fail flag = if flag then Fail.fail (Boom "oops")
+
+// D10, D11, D12, D15, D16, D19, D23 (valid forms)
+full_surface : Bool -> List Int ->{; Boom} Int
+let full_surface cond items = provide outer_layer {
+  scope outer {
+    defer { Outer.log "outer-defer" }
+    errdefer { Outer.log "outer-errdefer" }
+    if cond then defer { Outer.log "branch" }
+    match items with
+    | [] -> errdefer { Outer.log "empty-err" }
+    | _ -> ()
+    for _item <- items do { defer { Outer.log "loop-item" } }
+    let mut n = 0
+    while n < 1 do {
+      n = n + 1
+      defer { Outer.log "while-item" }
+    }
+    provide inner_layer {
+      Inner.ping ()
+      defer { Outer.log "registered-inside-provide-for-outer-scope" }
+    }
+    scope {
+      defer {
+        try may_fail true with
+        | Boom msg -> Outer.log ("handled:" ++ msg)
+      }
+      defer {
+        scope {
+          defer { Outer.log "nested-scope-inside-cleanup" }
+          Outer.log "cleanup-inner-body"
+        }
+      }
+      Outer.log "inner-body"
+    }
+    try may_fail cond with
+    | Boom msg -> defer { Outer.log ("in-try-arm:" ++ msg) }
+    42
+  }
+}
+
+// D14 (explicit Scope.defer still works on generic Scope s helpers)
+generic_helper : Unit ->{Scope s} Unit
+let generic_helper () = Scope.defer (fun _ -> say "generic")
+
+// D20 (contextual identifiers & grouped record calls)
+contextual : Unit ->{} Int
+let contextual () =
+  let defer = fun (r : { n : Int }) -> r.n
+  let errdefer = fun (r : { n : Int }) -> r.n + 1
+  let a = (defer) { n = 10 }
+  let b = (errdefer) { n = 20 }
+  let layer_fn = fun (x : Layer none none {Outer}) -> x
+  let defer_layer = layer_fn outer_layer
+  provide defer_layer { Outer.log "ok" }
+  a + b

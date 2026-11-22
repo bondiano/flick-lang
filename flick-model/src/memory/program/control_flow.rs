@@ -152,6 +152,7 @@ impl Machine<'_, '_> {
                     binding,
                     value: break_value,
                 },
+                aborted: false,
             });
         } else {
             let mut frames = self.frames.split_off(target);
@@ -173,6 +174,7 @@ impl Machine<'_, '_> {
                     args,
                     binding,
                 },
+                aborted: false,
             });
         }
         Ok(())
@@ -213,6 +215,7 @@ impl Machine<'_, '_> {
                     frames,
                     owner: None,
                     next: TransferNext::ReturnNone { binding },
+                    aborted: false,
                 });
                 Ok(())
             }

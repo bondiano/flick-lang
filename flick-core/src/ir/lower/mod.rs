@@ -7,6 +7,7 @@ mod abstraction;
 mod applicative_do;
 mod comprehension;
 mod debug;
+mod defer;
 mod derived;
 mod do_notation;
 mod enums;

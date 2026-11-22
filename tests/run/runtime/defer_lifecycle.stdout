@@ -1,0 +1,32 @@
+-- D05/D18 --
+make-acq:m1
+d05:body
+defer-2
+scope-defer:fail=false
+make-rel:m1:fail=false
+defer-1
+own-close:o1:fail=false
+-- D03-defect --
+d03-die:errdefer
+d03-die:defer
+d03-die:has_dies=true
+-- D03-cancel --
+d03-cancel:errdefer
+d03-cancel:defer
+d03-cancel:interrupted=true
+-- D06 --
+d06:body-ok
+d06:dying-defer
+d06:outer-defer
+d06:has_dies=true
+-- D07 --
+d07:defer-2-dies
+d07:errdefer-dies
+d07:defer-1
+d07:has_fails=true,has_dies=true
+-- D08/D09 --
+d09:body-succeeded
+d08:cleanup-start
+d08:cleanup-end
+d08:remaining-defer
+d08/d09:done

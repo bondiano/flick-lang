@@ -6,8 +6,9 @@ A `scope` owns what is acquired into it and releases it when its body ends
 ([regions](../regions/)). A value of a class `Close` is released through
 `Resource.own`: the scope closes it once, with how its body ended, and no
 other code can close it. `Resource.make` acquires a value and registers a
-release that sees the outcome, and `Scope.defer` registers cleanup that
-sees it. `Resource.acquire_release` and `Scope.add_finalizer` stay as the
+release that sees the outcome, `Scope.defer` registers cleanup that
+sees it, and `defer { … }` / `errdefer { … }` write scope-owned cleanup
+directly as statements. `Resource.acquire_release` and `Scope.add_finalizer` stay as the
 low-level way to register a release.
 
 ## Owning a value
@@ -188,6 +189,77 @@ it does not use it there; a call that uses it past the scope, such as an
 operation of a service on it, is `FLICK-G002`
 ([regions](../regions/)). Fixtures: `tests/check/pass/regions/made.fl`,
 `tests/check/fail/regions/made.fl`.
+
+### Scope-owned `defer` and `errdefer`
+
+Inside an explicit `scope { … }` or `scope owner { … }`, `defer { cleanup }`
+and `errdefer { cleanup }` register cleanup statements on that scope's shared
+LIFO finalizer stack without writing a `Scope.defer` callback:
+
+- `defer { cleanup }` runs on every close of the owning `scope` (success,
+  escaping typed failure, defect, or cancellation);
+- `errdefer { cleanup }` runs only when the owning `scope` body ends in failure
+  (escaping typed failure, defect, or cancellation), decided once from the
+  immutable body-exit snapshot taken before closing begins.
+
+| Body outcome of owning `scope` | `defer { … }` | `errdefer { … }` |
+| - | - | - |
+| Succeeds (including returning `Err _` or `None` as data) | runs | skipped |
+| Typed failure caught inside the `scope` (`try … with`) | runs | skipped |
+| Escaping typed failure, defect, or cancellation | runs | runs |
+| Finalizer defect or cancellation arriving during close of a successful body | remaining run | skipped (snapshot stays success) |
+
+`defer` and `errdefer` are contextual statement heads only before `{`, never
+first-class value expressions (`let x = defer { … }` is rejected; to call a
+function named `defer` with a record, write `(defer) { … }`). Owner selection
+binds lexically to the nearest explicit enclosing `scope`, passing through
+blocks, `if`, `match`, `loop`/`while`/`for … do`, `try` branches, and `provide`,
+and stopping at functions, lambdas, `task`, `lazy`, comprehensions, effect
+handler arms, and cleanup bodies themselves. Ambient runtime owners and generic
+`Scope s` helpers are not owners for this syntax; use `Scope.defer` there.
+
+The cleanup block must have type `Unit` (returning a cold `Eff` is rejected)
+and an empty unhandled error row (`FLICK-E002`; handle typed errors locally
+with `try … with`). Like `Scope.defer`, it enforces `Detached` (`FLICK-E017`),
+`Fiber.Outlives`, and `Fiber.Provided` (`FLICK-G003`), and does not mask
+acquisition: if acquiring a resource and registering its release must be
+atomic against cancellation, use `Resource.make`.
+
+```flick
+type error Failed = Failed String
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+step : Bool ->{; Failed} String
+let step should_fail = scope {
+  defer { say "close" }
+  errdefer { say "rollback" }
+  if should_fail then Fail.fail (Failed "boom") else "ok"
+}
+
+main : Unit ->{} Unit
+let main () =
+  say (try step false with | Failed msg -> msg)
+  say (try step true with | Failed msg -> msg)
+```
+
+```text
+close
+ok
+rollback
+close
+boom
+```
+
+```flick fail G004
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+outside : Unit ->{} Unit
+let outside () =
+  defer { say "no explicit scope" }
+```
 
 ## Only the owner closes
 

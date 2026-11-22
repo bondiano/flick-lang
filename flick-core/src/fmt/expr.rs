@@ -25,7 +25,9 @@ fn hugs(n: &Node) -> bool {
     match n.kind {
         K::ParenExpr => n.nodes().next().is_some_and(|c| c.kind == K::FunExpr),
         K::ListExpr | K::RecordExpr | K::RecordUpdate | K::TupleExpr => n.nodes().next().is_some(),
-        K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::ResultExpr | K::DoExpr => true,
+        K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::DeferStmt | K::ResultExpr | K::DoExpr => {
+            true
+        }
         K::PluginExpr | K::LazyExpr => n.has_token(K::LBrace),
         _ => false,
     }
@@ -269,6 +271,7 @@ impl<'a> Printer<'a> {
             | K::LazyExpr
             | K::ScopeExpr
             | K::ProvideExpr
+            | K::DeferStmt
             | K::ResultExpr
             | K::DoExpr => self.braced(n, suffix),
             _ => {

@@ -45,6 +45,7 @@ pub enum Apart {
     Task,
     Sequence,
     HandlerArm,
+    Defer,
 }
 
 #[derive(Debug, Clone)]
@@ -234,6 +235,7 @@ impl Checker<'_> {
             Apart::Task => ("A `task`", "the `task`"),
             Apart::Sequence => ("A lazy `for`", "the `for`"),
             Apart::HandlerArm => ("An arm of a handler of operations", "the handler"),
+            Apart::Defer => ("A `defer` cleanup block", "the cleanup block"),
         };
         let what = if binding == Binding::Mut {
             "a `let mut` variable"

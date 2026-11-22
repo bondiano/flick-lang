@@ -335,3 +335,41 @@ let answer () =
         |heap, val| assert_eq!(heap.string(val), Ok("two|[\"b\", \"d\"]|9")),
     );
 }
+
+#[test]
+fn defer_and_errdefer_statements_preserve_lifo_and_snapshot_at_every_fuel_prefix() {
+    let text = r#"module App.DeferStmtTest exposing (answer)
+
+type error Boom = Boom String
+
+failing : Unit ->{; Boom} String
+let failing () = scope {
+  defer { Host.raw_stdout_line "f-defer-1" }
+  errdefer { Host.raw_stdout_line "f-errdefer-1" }
+  defer { Host.raw_stdout_line "f-defer-2" }
+  from_result (Err (Boom "kaboom"))
+}
+
+answer : Unit ->{} String
+let answer () = scope {
+  defer { Host.raw_stdout_line "outer-defer" }
+  errdefer { Host.raw_stdout_line "outer-errdefer-skipped" }
+  let res =
+    try failing () with
+    | Boom msg -> msg
+  let _inner = scope {
+    defer { Host.raw_stdout_line "inner-defer" }
+    errdefer { Host.raw_stdout_line "inner-errdefer-skipped" }
+    Err "data-only"
+  }
+  res
+}
+"#;
+    assert_all_fuel_prefixes(
+        text,
+        &Name::new("App.DeferStmtTest", "answer"),
+        8_192,
+        "f-defer-2\nf-errdefer-1\nf-defer-1\ninner-defer\nouter-defer\n",
+        |heap, val| assert_eq!(heap.string(val), Ok("kaboom")),
+    );
+}

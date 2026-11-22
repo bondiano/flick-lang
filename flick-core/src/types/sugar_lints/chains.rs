@@ -271,7 +271,7 @@ mod tests;
 
 /// An existing nested function or loop keeps its own exits when moved.
 fn lexical_exit(node: &Node) -> bool {
-    if matches!(node.kind, K::BreakExpr | K::ContinueExpr) {
+    if matches!(node.kind, K::BreakExpr | K::ContinueExpr | K::DeferStmt) {
         return true;
     }
     if matches!(

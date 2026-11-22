@@ -1,0 +1,48 @@
+// Cleanup bodies must have type `Unit` (cold `Eff` rejected, D21) and an empty
+// unhandled error row (D16), and cannot capture enclosing `let mut` variables.
+module App.DeferCleanupFail exposing (..)
+
+type error CleanupErr = CleanupErr String
+
+fail_cleanup : Unit ->{; CleanupErr} Unit
+let fail_cleanup () = Fail.fail (CleanupErr "bad")
+
+cold_eff : Unit -> Eff {} none Unit
+let cold_eff () = task { () }
+
+// D16: unhandled typed error inside `defer`
+unhandled_defer : Unit ->{; CleanupErr} Unit
+let unhandled_defer () = scope {
+  defer { fail_cleanup () }
+}
+
+// D16: unhandled typed error inside `errdefer`
+unhandled_errdefer : Unit ->{; CleanupErr} Unit
+let unhandled_errdefer () = scope {
+  errdefer { fail_cleanup () }
+}
+
+// D21: returning a cold `Eff ... Unit` instead of `Unit`
+returns_cold_eff : Unit ->{} Unit
+let returns_cold_eff () = scope {
+  defer { cold_eff () }
+}
+
+// Non-Unit value returned from cleanup
+returns_int : Unit ->{} Unit
+let returns_int () = scope {
+  errdefer { 42 }
+}
+
+// `let mut` from enclosing function cannot be mutated from cleanup
+captures_mut : Unit ->{} Unit
+let captures_mut () = scope {
+  let mut x = 0
+  defer { x = 1 }
+}
+
+//~ FLICK-E002 @16:11-16:26 `defer` cleanup block cannot leave error `CleanupErr` unhandled
+//~ FLICK-E002 @22:14-22:29 `errdefer` cleanup block cannot leave error `CleanupErr` unhandled
+//~ FLICK-T003 @28:11-28:22 expected `Unit`
+//~ FLICK-T003 @34:14-34:16 expected `Unit`
+//~ FLICK-G005 @41:11-41:12 A `defer` cleanup block cannot use `x`

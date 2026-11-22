@@ -21,6 +21,7 @@ fn has_layout_branch(n: &Node) -> bool {
         | K::LazyExpr
         | K::ScopeExpr
         | K::ProvideExpr
+        | K::DeferStmt
         | K::ResultExpr
         | K::DoExpr
         | K::LoopExpr

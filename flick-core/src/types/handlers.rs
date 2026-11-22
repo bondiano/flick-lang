@@ -56,6 +56,16 @@ impl Checker<'_> {
         );
         let outer = mem::replace(&mut self.cx.stage, stage);
         self.enter_apart(super::mutation::Apart::Task);
+        let barrier =
+            if node.kind == K::LazyExpr || (node.kind == K::LetDecl && node.has_token(K::LazyKw)) {
+                super::regions::DeferBarrier::Lazy
+            } else {
+                super::regions::DeferBarrier::Task
+            };
+        self.cx
+            .regions
+            .defer_owners
+            .push(super::regions::DeferOwner::Barrier(barrier));
         let result = match result {
             Some(result) => {
                 self.check(body, &result);
@@ -63,6 +73,7 @@ impl Checker<'_> {
             }
             None => self.infer(body),
         };
+        self.cx.regions.defer_owners.pop();
         self.leave_apart();
         self.typing.owner_stack.truncate(owner_mark);
         let inner = mem::replace(&mut self.cx.stage, outer);
@@ -143,9 +154,8 @@ impl Checker<'_> {
         let mut returned = false;
         for (arm, operation) in arms.iter().zip(&operations) {
             if let Some((index, op)) = operation {
-                self.enter_apart(super::mutation::Apart::HandlerArm);
-                let covers = self.operation_arm(arm, &handled[*index], op, &ty, region.as_ref());
-                self.leave_apart();
+                let covers =
+                    self.check_operation_arm(arm, &handled[*index], op, &ty, region.as_ref());
                 if covers {
                     handled[*index].covered.push(op.name.clone());
                 }
@@ -179,6 +189,27 @@ impl Checker<'_> {
             self.handled_row(&needed, &handled, span);
         }
         ty
+    }
+
+    fn check_operation_arm(
+        &mut self,
+        arm: &Node,
+        handled: &Handled,
+        op: &Operation,
+        ty: &Type,
+        region: Option<&Type>,
+    ) -> bool {
+        self.enter_apart(super::mutation::Apart::HandlerArm);
+        self.cx
+            .regions
+            .defer_owners
+            .push(super::regions::DeferOwner::Barrier(
+                super::regions::DeferBarrier::HandlerArm,
+            ));
+        let covers = self.operation_arm(arm, handled, op, ty, region);
+        self.cx.regions.defer_owners.pop();
+        self.leave_apart();
+        covers
     }
 
     fn unhandled_errors(&mut self, raised: &Type, mut handled: Vec<(Elem, Type)>, span: Span) {
