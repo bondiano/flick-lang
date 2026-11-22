@@ -25,6 +25,71 @@ fn is_option_name(name: &str) -> bool {
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
+fn is_tag_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    let Some(first) = bytes.next() else {
+        return false;
+    };
+    first.is_ascii_lowercase()
+        && bytes.all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'-' | b'_'))
+}
+
+/// Validate the environment tags and axes a backend publishes in `describe`.
+pub fn validate_tags(descriptor: &Descriptor) -> Result<(), String> {
+    let mut seen_tags = BTreeSet::new();
+    for tag in &descriptor.tags {
+        if !is_tag_name(tag) {
+            return Err(format!(
+                "invalid environment tag `{tag}`: tags start with a lowercase letter and use lowercase letters, digits, `-`, or `_`"
+            ));
+        }
+        if !seen_tags.insert(tag.as_str()) {
+            return Err(format!("duplicate environment tag `{tag}`"));
+        }
+    }
+    let mut seen_axes = BTreeSet::new();
+    for axis in &descriptor.axes {
+        if !is_tag_name(&axis.name) {
+            return Err(format!(
+                "invalid tag axis name `{}`: use lowercase ASCII letters, digits, `-`, or `_`",
+                axis.name
+            ));
+        }
+        if !seen_axes.insert(axis.name.as_str()) {
+            return Err(format!("duplicate tag axis `{}`", axis.name));
+        }
+        if axis.tags.is_empty() {
+            return Err(format!(
+                "tag axis `{}` must declare at least one tag",
+                axis.name
+            ));
+        }
+        for tag in &axis.tags {
+            if !is_tag_name(tag) {
+                return Err(format!(
+                    "invalid tag `{tag}` on axis `{}`: tags start with a lowercase letter and use lowercase letters, digits, `-`, or `_`",
+                    axis.name
+                ));
+            }
+            if !seen_tags.insert(tag.as_str()) {
+                return Err(format!(
+                    "duplicate environment tag `{tag}` on axis `{}`",
+                    axis.name
+                ));
+            }
+        }
+        if let Some(default) = &axis.default
+            && !axis.tags.contains(default)
+        {
+            return Err(format!(
+                "default tag `{default}` on axis `{}` is not in its tag list",
+                axis.name
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Validate the option descriptors a backend publishes in `describe`.
 pub fn validate_options(descriptor: &Descriptor) -> Result<(), String> {
     let mut names = BTreeSet::new();
@@ -112,6 +177,40 @@ fn verb_of(command: &str) -> Option<Verb> {
     }
 }
 
+fn validate_request_environment(
+    descriptor: &Descriptor,
+    request: &TargetRequest,
+) -> Result<(), String> {
+    let env_supported = if request.host_package.is_some() {
+        let short = descriptor
+            .identity
+            .id
+            .rsplit('/')
+            .next()
+            .unwrap_or(&descriptor.identity.id);
+        request.environment.backend == short
+            || descriptor
+                .environments
+                .iter()
+                .any(|e| e.backend == request.environment.backend)
+            || descriptor.tags.contains(&request.environment.backend)
+    } else {
+        descriptor.environments.contains(&request.environment)
+    };
+    if !env_supported
+        || !descriptor.profiles.contains(&request.profile)
+        || !descriptor.modes.contains(&request.mode)
+    {
+        return Err("unsupported environment, profile or compilation mode".into());
+    }
+    for tag in &request.tags {
+        if !is_tag_name(tag) {
+            return Err(format!("invalid environment tag `{tag}` in target request"));
+        }
+    }
+    Ok(())
+}
+
 /// Check identity, protocol ranges and static capabilities before invoking
 /// target-specific preflight or generation. No fallback backend is chosen.
 pub fn handshake(
@@ -122,6 +221,7 @@ pub fn handshake(
     if pin.identity != descriptor.identity {
         return Err("backend identity does not match the project pin".into());
     }
+    validate_tags(descriptor)?;
     validate_options(descriptor)?;
     for (name, range, version) in [
         ("backend API", &descriptor.backend_api, &request.backend_api),
@@ -141,12 +241,7 @@ pub fn handshake(
             return Err(format!("incompatible runtime ABI `{}`", required.name));
         }
     }
-    if !descriptor.environments.contains(&request.environment)
-        || !descriptor.profiles.contains(&request.profile)
-        || !descriptor.modes.contains(&request.mode)
-    {
-        return Err("unsupported environment, profile or compilation mode".into());
-    }
+    validate_request_environment(descriptor, request)?;
     for capability in &request.required_capabilities {
         if !descriptor.capabilities.contains(capability) {
             return Err(format!("unsupported capability `{}`", capability.name));

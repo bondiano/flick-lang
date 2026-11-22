@@ -3,6 +3,7 @@
 /// computes a derived atom again when an atom it read changes, and drops a
 /// value nobody reads, after its idle time. The same atom read through two
 /// registries has two values.
+@when "js"
 module Reactivity.Atom exposing (..)
 
 import Duration

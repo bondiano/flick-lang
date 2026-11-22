@@ -52,6 +52,7 @@ fn export(
         definition,
         blocked: None,
         at: None,
+        via: Vec::new(),
     }
 }
 
@@ -152,6 +153,7 @@ fn manifest_class_requires_nominal_identity() {
             definition: None,
             blocked: None,
             at: None,
+            via: Vec::new(),
         }],
         ..Interface::default()
     };

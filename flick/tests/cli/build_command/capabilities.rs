@@ -23,7 +23,7 @@ fn rt_checks_initializers_captured_by_a_static_module_closure() {
         assert_eq!(out.status.code(), Some(1), "{profile}: {out:?}");
         let stderr = String::from_utf8(out.stderr).expect("UTF-8 diagnostics");
         assert!(
-            stderr.contains("FLICK-P012") && stderr.contains("DateTime.zone_make_offset"),
+            stderr.contains("FLICK-P064") && stderr.contains("DateTime.zone_make_offset"),
             "{stderr}"
         );
         assert!(!app.join("dist/flick-main.js").exists());
@@ -59,7 +59,7 @@ let run main =
     let out = flick_in(&app, &["build", "--offline"]);
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     let stderr = String::from_utf8(out.stderr).expect("UTF-8 diagnostics");
-    assert!(stderr.contains("FLICK-P012"), "{stderr}");
+    assert!(stderr.contains("FLICK-P064"), "{stderr}");
     assert!(stderr.contains("Schedule.cron"), "{stderr}");
 }
 
@@ -89,7 +89,7 @@ fn rt_reports_missing_runtime_capabilities_before_writing_artifacts() {
             .collect();
         assert_eq!(events.len(), 3, "{stderr}");
         for diagnostic in events {
-            assert_eq!(diagnostic["code"], "FLICK-P012");
+            assert_eq!(diagnostic["code"], "FLICK-P064");
             assert_eq!(diagnostic["severity"], "error");
             assert!(
                 diagnostic["message"]
@@ -161,7 +161,7 @@ fn rt_checks_a_reexported_entry_against_its_runtime_capabilities() {
     let out = flick_in(&app, &["build", "--offline"]);
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     let stderr = String::from_utf8(out.stderr).expect("UTF-8 diagnostics");
-    assert!(stderr.contains("FLICK-P012"), "{stderr}");
+    assert!(stderr.contains("FLICK-P064"), "{stderr}");
     assert!(stderr.contains("Schedule.cron"), "{stderr}");
 }
 
@@ -227,7 +227,7 @@ fn changing_the_adapter_dependency_invalidates_the_cached_build() {
     fs::write(app.join("package.json"), r#"{"type":"module"}"#).expect("remove adapter dependency");
     let removed = flick_in(&app, &["build", "--offline"]);
     assert_eq!(removed.status.code(), Some(1), "{removed:?}");
-    assert!(String::from_utf8_lossy(&removed.stderr).contains("FLICK-P012"));
+    assert!(String::from_utf8_lossy(&removed.stderr).contains("FLICK-P064"));
     fs::write(app.join("package.json"), with_adapter).expect("restore adapter dependency");
     let restored = flick_in(&app, &["build", "--offline"]);
     assert_eq!(restored.status.code(), Some(0), "{restored:?}");
@@ -254,7 +254,7 @@ fn reexported_modules_contribute_their_eager_initializers() {
         assert_eq!(out.status.code(), Some(1), "{out:?}");
         let stderr = String::from_utf8_lossy(&out.stderr);
         assert!(
-            stderr.contains("FLICK-P012") && stderr.contains("DateTime.zone_make_offset"),
+            stderr.contains("FLICK-P064") && stderr.contains("DateTime.zone_make_offset"),
             "{stderr}"
         );
         assert!(!app.join("dist/flick-main.js").exists());
@@ -319,6 +319,6 @@ fn a_reexported_main_still_initializes_its_declaring_entry_module() {
     );
     let out = flick_in(&app, &["build", "--offline"]);
     assert_eq!(out.status.code(), Some(1), "{out:?}");
-    assert!(String::from_utf8_lossy(&out.stderr).contains("FLICK-P012"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("FLICK-P064"));
     assert!(!app.join("dist/flick-main.js").exists());
 }

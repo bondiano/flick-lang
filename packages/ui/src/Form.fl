@@ -19,6 +19,7 @@
 /// such as a taken name, runs on input with `Ui.Event.latest`, which
 /// interrupts it when the user types again, and gives its verdict with
 /// `report`.
+@when "js"
 module Form exposing (
   Field,
   Draft,

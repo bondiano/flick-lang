@@ -67,6 +67,7 @@ fn alias_only_discovery_learns_external_types_and_real_service_companions_only()
         definition,
         blocked: None,
         at: None,
+        via: Vec::new(),
     };
     let published = Interface {
         module: "Published".into(),
@@ -170,6 +171,7 @@ fn same_tree_support_cannot_override_a_child_public_definition() {
                 definition: Some(alias("Int")),
                 blocked: None,
                 at: None,
+                via: Vec::new(),
             }],
             ..Interface::default()
         },
@@ -247,6 +249,7 @@ fn support_cannot_override_a_child_services_generated_implementation() {
                 }),
                 blocked: None,
                 at: None,
+                via: Vec::new(),
             }],
             ..Interface::default()
         },
@@ -329,6 +332,7 @@ fn support_service_cannot_override_a_child_public_implementation() {
                 }),
                 blocked: None,
                 at: None,
+                via: Vec::new(),
             }],
             ..Interface::default()
         },

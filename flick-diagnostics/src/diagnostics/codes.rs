@@ -313,6 +313,9 @@ codes! {
     P061 = Project 61, "Flick program step or documentation example failed at runtime";
     P062 = Project 62, "documentation example failed its check contract";
     P063 = Project 63, "the backend has no dependency command for this";
+    P064 = Project 64, "module or binding is not available in this environment";
+    P065 = Project 65, "unknown or incompatible environment host";
+    P066 = Project 66, "unknown environment tag in condition";
 }
 
 #[cfg(test)]

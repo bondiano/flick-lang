@@ -1,0 +1,8 @@
+@when "js && !browzer"
+module App.WhenSyntax exposing (..)
+
+@when "js"
+let misplaced = 1
+
+//~ FLICK-P066 @1:15-1:22 unknown environment tag `browzer` in condition `js && !browzer`; known tags: `browser`, `bun`, `cgo`, `cloudflare`, `effect`, `effect-adapter`, `go`, `js`, `native`, `node`, `rt`
+//~ FLICK-S014 @4:1-4:11 `@when` belongs before the module header

@@ -4,6 +4,7 @@
 /// any of its buttons while the task of an earlier one runs. Its tasks
 /// belong to the root, which interrupts and joins them when it unmounts.
 /// `capacity` and `limit` are positive integers.
+@when "js"
 module Action exposing (..)
 
 import Atom

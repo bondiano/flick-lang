@@ -160,6 +160,7 @@ fn inline_units(
         parameter_groups: Vec::new(),
         name: name.clone(),
         private: true,
+        when: None,
         span: at,
         exposing: inline.nodes().find(|n| n.kind == K::Exposing).map(|_| {
             let header = Node {

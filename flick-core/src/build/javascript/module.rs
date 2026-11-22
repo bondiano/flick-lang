@@ -7,12 +7,16 @@ use super::super::Backend;
 use crate::codegen;
 #[cfg(feature = "native-project")]
 use crate::codegen::sourcemap;
-use crate::codegen::ts::{Facade, Projection, Typing, declaration_file, facade_files};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::codegen::ts::{Facade, facade_files};
+use crate::codegen::ts::{Projection, Typing, declaration_file};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::effects;
 #[cfg(feature = "native-project")]
 use crate::iface;
-use crate::iface::{Interface, Namespace};
+use crate::iface::Interface;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::iface::Namespace;
 use crate::project::Compiled;
 #[cfg(feature = "native-project")]
 use crate::project::normalize;
@@ -138,6 +142,7 @@ pub(super) fn dts_path(file: &str) -> String {
 
 /// The Promise façade of `module`: each exported runtime function that
 /// needs no service and whose earlier stages only make closures.
+#[cfg(not(target_arch = "wasm32"))]
 fn facade(
     module: &str,
     built: &Interface,
@@ -232,6 +237,7 @@ pub fn shared_files(
             ));
         }
     }
+    #[cfg(not(target_arch = "wasm32"))]
     if promise_facade {
         out.extend(facade(
             module,
@@ -243,6 +249,8 @@ pub fn shared_files(
             typing.rt,
         ));
     }
+    #[cfg(target_arch = "wasm32")]
+    let _ = (built, promise_facade);
     (out, diagnostics)
 }
 

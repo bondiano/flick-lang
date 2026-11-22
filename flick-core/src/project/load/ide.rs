@@ -105,6 +105,10 @@ pub fn analyze_rt(
     project: Option<&Project>,
     roots: &[PathBuf],
 ) -> Analysis {
+    let target = super::TargetOverride {
+        rt: Some(true),
+        ..super::TargetOverride::default()
+    };
     let output = run_in(
         host,
         sources,
@@ -113,7 +117,7 @@ pub fn analyze_rt(
         Mode::Analyze,
         None,
         None,
-        Some(true),
+        Some(&target),
     );
     Analysis {
         modules: output.analyzed,

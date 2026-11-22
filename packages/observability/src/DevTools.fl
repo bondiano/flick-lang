@@ -1,6 +1,7 @@
 /// The Effect DevTools: a program that provides `layer` sends its spans, as
 /// they start and end, over a WebSocket to the DevTools at `url`, which
 /// must already listen. The module is experimental.
+@when "js && (effect || effect-adapter)"
 module DevTools exposing (..)
 
 /// Spans sent to the DevTools at `url`; they listen on

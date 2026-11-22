@@ -254,6 +254,7 @@ fn support_projection_closure_handles_cycles_and_drops_unused_records() {
             definition: None,
             blocked: None,
             at: None,
+            via: Vec::new(),
         }],
         support_types: vec![
             record("A", "B"),

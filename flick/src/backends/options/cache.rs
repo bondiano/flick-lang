@@ -9,10 +9,10 @@ use std::path::PathBuf;
 use flick_backend::host::{Budget, WasmBackend};
 use flick_backend::{Backend as _, BackendId, BackendPin, Descriptor, Limits};
 use flick_core::diagnostics::Diagnostic;
-use flick_core::project::{Project, store};
+use flick_core::project::{BackendTags, Project, store};
 use semver::Version;
 
-use super::{OFFICIAL_GO, OFFICIAL_JS, TargetChoice};
+use super::{OFFICIAL_GO, OFFICIAL_JS, TargetChoice, descriptor_tags, short_name};
 use crate::backends::official;
 use crate::component;
 use crate::saved;
@@ -165,4 +165,31 @@ pub(super) fn all_known_descriptors(project: Option<&Project>) -> Vec<Descriptor
         }
     }
     by_id.into_values().collect()
+}
+
+/// Environment tag metadata for the project's pinned third-party
+/// `[build.backend]`, without scanning the global descriptor store, hitting the
+/// network, or compiling official components (whose tags come strictly from
+/// `flick_core::project::official_backends()`).
+pub(crate) fn project_backend_tags(project: &Project, allow_load: bool) -> Vec<BackendTags> {
+    let Some(package) = &project.config.build.backend else {
+        return Vec::new();
+    };
+    if matches!(package.id.as_str(), OFFICIAL_JS | OFFICIAL_GO) {
+        return Vec::new();
+    }
+    let descriptor = read_descriptor(&package.sha256).or_else(|| {
+        if !allow_load {
+            return None;
+        }
+        let choice = TargetChoice::Pinned {
+            short: short_name(&package.id).to_owned(),
+            package: package.clone(),
+        };
+        descriptor_for(&choice, Some(project), false, true).0
+    });
+    descriptor
+        .as_ref()
+        .map(|desc| vec![descriptor_tags(desc)])
+        .unwrap_or_default()
 }

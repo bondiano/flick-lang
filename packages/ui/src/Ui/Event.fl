@@ -1,6 +1,7 @@
 /// The policies of event handlers: what happens to an event that comes
 /// while the handler's earlier tasks still run. `capacity` and `limit` are
 /// positive integers; a constant that is not one is `FLICK-U001`.
+@when "js"
 module Ui.Event exposing (..)
 
 import Atom

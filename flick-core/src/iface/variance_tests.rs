@@ -362,6 +362,7 @@ fn forged_contract(req: types::ModuleRequirement) -> Interface {
             }),
             blocked: None,
             at: None,
+            via: Vec::new(),
         }],
         ..Interface::default()
     }

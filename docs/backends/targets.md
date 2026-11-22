@@ -53,26 +53,33 @@ it does not prove that every host API has been migrated.
 This table names evidence; it is not a claim that every suite was rerun for a
 documentation change. Check outcomes belong in the PR that changes behavior.
 
-## Environment effect preflight
+## Environment selection, tags, and preflight
 
-The registry parses an environment independently of JS runtime mode. The
-temporary native path accepts `js/node` and `go/native`; it refuses an
-explicit incompatible environment before cache lookup. The component path
-performs descriptor/ABI/capability validation and calls `check-target` before
-`generate`.
+Each backend descriptor publishes its base `tags` (for example `["js"]` or
+`["go"]`), selectable `axes` (`runtime` with `rt`/`effect`, `adapter` with
+`effect-adapter`, `cgo` with `cgo`), and built-in `environments` (`js/node`,
+`js/browser`, `js/bun`, `js/cloudflare`, `go/native`). Library packages may
+declare `[host]` (`name`, `backend`, optional `requires`, and `tags`) to
+provide additional `<backend>/<host>` environments whose `requires` condition
+is validated against the backend's active tags (`FLICK-P065`).
 
-When `build.environment` is set, shared target preflight runs in `flick check`,
-IDE analysis and build: reachable gated effects (`Db`, `Database`, `Server`)
-need a root handler for that full backend/platform pair. A required `Db`
-without a browser root handler is `FLICK-E020` (`unhandled effect Db on
-js/browser`) at the requiring expression; the same export builds on
-`js/node`. Local `provide` handlers discharge the requirement; unused
-unsupported code does not fail; public library exports are checked under the
-export policy. CLI and IDE share the code and span. Host tool availability
-remains `FLICK-P015` / `FLICK-P029`, separate from source-effect refusal.
-Without a selected environment, check stays portable typing only.
+When a project selects a target or `[build] environment = "<backend>/<host>"`
+(and always during builds), shared environment preflight runs in `flick check`,
+IDE analysis and `flick build`:
 
-`BuildRequest` carries `package_targets` and std `root_handlers` for the
-selected environment. This slice does not claim full official-backend
-conformance, arbitrary IR/emit-plugin correctness, generic tool graphs or
-atomic publication. W and N remain unsupported until they have fixtures.
+- Condition tags in `@when "<cond>"`, `[package] when = "<cond>"`, and
+  `[host] requires = "<cond>"` are checked against the combined backend and
+  loaded host vocabulary (`FLICK-P066` at the unknown tag span).
+- Reachable uses from entries, runners, eager initializers, or active public
+  library exports that depend on a module or package whose `when` condition is
+  false — or on an Effect-adapter-only JS foreign without `effect` or
+  `effect-adapter` — report `FLICK-P064` at the use site with the path from
+  entry. Unused imports and unreachable functions do not fail.
+- When `[build] environment` is set, reachable gated effects (`Db`, `Database`,
+  `Server`) without a root handler for that environment still report
+  `FLICK-E020` at the requiring expression; local `provide` handlers discharge
+  the requirement.
+
+`TargetRequest` carries the resolved active `tags` and optional `host-package`,
+and `BuildRequest` carries `package_targets` and std `root_handlers` for the
+selected environment. Host tool availability remains `FLICK-P015` / `FLICK-P029`.

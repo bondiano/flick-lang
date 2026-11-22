@@ -5,6 +5,8 @@ use crate::types::Thresholds;
 
 #[path = "config_backend_tests.rs"]
 mod backend;
+#[path = "config_host_tests.rs"]
+mod host;
 #[path = "config_target_tests.rs"]
 mod targets;
 

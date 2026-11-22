@@ -227,6 +227,8 @@ impl Checker<'_> {
             definition: None,
             blocked: None,
             at: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            via: Vec::new(),
         };
         let ty = |(name, d): (&str, &TypeDef)| Export {
             entity: self.env.entity(Namespace::Type, name),
@@ -246,6 +248,8 @@ impl Checker<'_> {
             definition: Some(self.exported_def((&self.env.module, name), d, None)),
             blocked: None,
             at: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            via: Vec::new(),
         };
         let mut exports: Vec<Export> = self.env.own_values().map(value).collect();
         exports.extend(self.env.own_types().map(ty));
@@ -298,6 +302,8 @@ impl Checker<'_> {
                 definition: None,
                 blocked: None,
                 at: None,
+                #[cfg(not(target_arch = "wasm32"))]
+                via: Vec::new(),
             });
         }
         for ty in types {
@@ -316,6 +322,8 @@ impl Checker<'_> {
                         definition: None,
                         blocked: None,
                         at: None,
+                        #[cfg(not(target_arch = "wasm32"))]
+                        via: Vec::new(),
                     });
                 }
             }

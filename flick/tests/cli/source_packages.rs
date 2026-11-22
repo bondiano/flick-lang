@@ -197,7 +197,7 @@ fn a_source_package_module_is_checked_for_the_target_of_its_dependent() {
     let out = flick_in(dir.join("app"), &["check"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(
-        stderr.contains("FLICK-P030") && stderr.contains("`Ui`"),
+        stderr.contains("FLICK-P064") && stderr.contains("`Ui`"),
         "{stderr}"
     );
 }

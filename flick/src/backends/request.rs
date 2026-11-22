@@ -13,7 +13,7 @@ use std::collections::HashSet;
 
 use flick_core::build;
 use flick_core::codegen;
-use flick_core::diagnostics::Diagnostic;
+use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::iface::{self, Target};
 use flick_core::project::config::BackendEnvironment;
 use flick_core::project::{self, Compilation, Project};
@@ -22,6 +22,7 @@ use flick_core::{ir, types};
 use flick_ir::Program;
 
 use crate::artifact::Artifact;
+use crate::commands::build::settings::with_settings;
 use crate::commands::build::{BuildPlan, Purpose};
 use crate::sources::FsHost;
 use crate::toolchain;
@@ -99,9 +100,31 @@ impl Prepared {
         output: &BuildPlan,
         pin: BackendPin,
     ) -> Self {
-        let (program, files) = program(sources, compilation, by_class(project, output));
         let package = project.and_then(|p| project::project_name(host, p));
-        let (target_request, module_root) = target(project, output);
+        let (target_request, module_root) = target(project, compilation, output);
+        let mut preflight_diagnostics = Vec::new();
+        if target_request.environment.backend != "go" {
+            with_settings(host, project, compilation, output, |settings| {
+                build::javascript_preflight(
+                    compilation,
+                    sources,
+                    settings,
+                    &mut preflight_diagnostics,
+                );
+            });
+        }
+        let stages_by_class = by_class(project, output);
+        let pruned;
+        let compilation = if preflight_diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error)
+        {
+            compilation
+        } else {
+            pruned = compilation.prune_for_environment(sources, stages_by_class);
+            &pruned
+        };
+        let (program, files) = program(sources, compilation, stages_by_class);
         let mut data = Self {
             request: BuildRequest {
                 target: target_request,
@@ -143,7 +166,7 @@ impl Prepared {
             bytes: BTreeMap::new(),
             files,
             shared: vec![],
-            diagnostics: vec![],
+            diagnostics: preflight_diagnostics,
         };
         for (i, name) in program.files.into_iter().enumerate() {
             let file = sources.get(data.files[i]);
@@ -158,14 +181,7 @@ impl Prepared {
                 line_starts: file.line_starts().to_vec(),
             });
         }
-        data.modules(
-            host,
-            sources,
-            compilation,
-            project,
-            package.as_deref(),
-            output,
-        );
+        data.modules(host, compilation, project, package.as_deref(), output);
         data.fill_environment_facts(package.as_deref());
 
         data
@@ -174,7 +190,6 @@ impl Prepared {
     fn modules(
         &mut self,
         host: &FsHost,
-        sources: &SourceMap,
         compilation: &Compilation,
         project: Option<&Project>,
         package: Option<&str>,
@@ -246,7 +261,7 @@ impl Prepared {
         if self.request.target.environment.backend == "go" {
             self.go(host, project, compilation, output);
         } else {
-            self.javascript(host, sources, project, compilation, output, &interfaces);
+            self.javascript(host, project, compilation, output, &interfaces);
         }
     }
 
@@ -321,7 +336,11 @@ fn by_class(project: Option<&Project>, output: &BuildPlan) -> bool {
     !output.go && project::stages_by_class(project, Some(output.extras.rt))
 }
 
-fn target(project: Option<&Project>, output: &BuildPlan) -> (TargetRequest, Option<String>) {
+fn target(
+    project: Option<&Project>,
+    compilation: &Compilation,
+    output: &BuildPlan,
+) -> (TargetRequest, Option<String>) {
     let default_env = || {
         output
             .backend
@@ -332,13 +351,25 @@ fn target(project: Option<&Project>, output: &BuildPlan) -> (TargetRequest, Opti
                 platform: if output.go { "native" } else { "node" }.into(),
             })
     };
-    let environment = project
-        .and_then(|p| p.config.build.environment.as_ref())
-        .filter(|e| !output.target_overridden || e.backend == output.target)
-        .map_or_else(default_env, |e| Environment {
-            backend: e.backend.clone(),
-            platform: e.platform.clone(),
-        });
+    let (environment, tags, host_package) = if let Some(resolved) = &compilation.environment {
+        (
+            Environment {
+                backend: resolved.backend.clone(),
+                platform: resolved.platform.clone(),
+            },
+            resolved.tags.iter().cloned().collect(),
+            resolved.host_package.clone(),
+        )
+    } else {
+        let env = project
+            .and_then(|p| p.config.build.environment.as_ref())
+            .filter(|e| !output.target_overridden || e.backend == output.target)
+            .map_or_else(default_env, |e| Environment {
+                backend: e.backend.clone(),
+                platform: e.platform.clone(),
+            });
+        (env, vec![], None)
+    };
     let extras = output.extras;
     let option = |key: &str, value: &str| OptionValue {
         key: key.into(),
@@ -392,6 +423,8 @@ fn target(project: Option<&Project>, output: &BuildPlan) -> (TargetRequest, Opti
                 version: toolchain::RUNTIME.into(),
             }],
             environment,
+            tags,
+            host_package,
             profile: if output.release {
                 Profile::Release
             } else {

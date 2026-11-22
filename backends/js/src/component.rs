@@ -16,7 +16,7 @@ mod templates;
 use flick_backend::{
     Backend, BackendId, BuildRequest, BuildResult, Capability, Descriptor, Diagnostic, Environment,
     Inputs, Mode, NamedRange, OptionDescriptor, OptionValue, Packages, Parameter, Profile,
-    ProjectFile, Severity, TargetSupport, ValueKind, Verb, VersionRange, command,
+    ProjectFile, Severity, TagAxis, TargetSupport, ValueKind, Verb, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -219,13 +219,28 @@ impl Backend for Javascript {
                 name: "flickrt".into(),
                 versions: range("0.1.0", "0.2.0"),
             }],
-            environments: ["node", "browser"]
+            environments: ["node", "browser", "bun", "cloudflare"]
                 .into_iter()
                 .map(|platform| Environment {
                     backend: "js".into(),
                     platform: platform.into(),
                 })
                 .collect(),
+            tags: vec!["js".into()],
+            axes: vec![
+                TagAxis {
+                    name: "runtime".into(),
+                    tags: vec!["rt".into(), "effect".into()],
+                    default: Some("rt".into()),
+                    exclusive: true,
+                },
+                TagAxis {
+                    name: "adapter".into(),
+                    tags: vec!["effect-adapter".into()],
+                    default: None,
+                    exclusive: false,
+                },
+            ],
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::PerModule, Mode::WholeProgram],
             capabilities: capabilities(),

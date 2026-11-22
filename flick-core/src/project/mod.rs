@@ -6,6 +6,7 @@ pub(crate) mod builtins;
 #[cfg(feature = "native-project")]
 pub mod cache;
 pub mod config;
+pub mod environment;
 #[cfg(feature = "native-project")]
 mod inherit;
 mod load;
@@ -28,14 +29,16 @@ use std::path::{Component, Path, PathBuf, is_separator};
 use std::sync::Arc;
 
 pub use config::Config;
+#[cfg(not(target_arch = "wasm32"))]
+pub use environment::official_backends;
+pub use environment::{BackendAxis, BackendTags, ResolvedEnvironment, TargetOverride};
 pub(crate) use load::check_file;
-#[cfg(all(test, feature = "native-project"))]
-pub(crate) use load::js_only;
 #[cfg(feature = "ide")]
 pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};
 pub use load::{
     CachedModule, Compilation, Compiled, FormatPlugins, Fresh, MainKind, ModuleCache, PackageCache,
-    check, check_with, compile, compile_with, host_services, main_kind, stages_by_class,
+    check, check_with, compile, compile_for, compile_with, host_services, main_kind,
+    stages_by_class,
 };
 #[cfg(feature = "native-project")]
 pub use load::{ModuleStore, SavedModule, ships};
@@ -109,6 +112,19 @@ pub trait Host {
     fn verify(&self, project: &Project, wanted: &[target::Wanted]) -> Vec<Diagnostic> {
         let _ = (project, wanted);
         Vec::new()
+    }
+    /// Extra backend descriptors known to the host for `project` (such as a
+    /// pinned `[build.backend]` component or cached descriptors), without
+    /// hitting the network.
+    fn backend_tags(&self, project: &Project) -> Vec<BackendTags> {
+        let _ = project;
+        Vec::new()
+    }
+    /// Whether this host is permitted to load backend components to inspect
+    /// custom `[build.backend]` descriptors. False for frontend-only commands
+    /// such as `flick inspect --emit iface`.
+    fn loads_backends(&self) -> bool {
+        true
     }
 }
 

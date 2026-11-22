@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
+#[cfg(not(target_arch = "wasm32"))]
 use super::interface;
 #[cfg(feature = "native-project")]
 use crate::iface;
@@ -16,16 +17,20 @@ pub fn published_interfaces<'a>(
     targets: Option<&[Target]>,
 ) -> BTreeMap<&'a str, Interface> {
     let modules = &compilation.modules;
+    #[cfg(not(target_arch = "wasm32"))]
     let checked_interfaces = |name: &str| {
         modules
             .iter()
             .find(|module| module.name == name)
             .map(|module| module.interface.clone())
     };
+    #[cfg(target_arch = "wasm32")]
+    let _ = package;
     // `extend`, not `collect`: collecting compiles a sort of these large
     // entries into the wasm compiler
     let mut published_interfaces: BTreeMap<&str, Interface> = BTreeMap::new();
     published_interfaces.extend(modules.iter().map(|module| {
+        #[cfg(not(target_arch = "wasm32"))]
         let mut published = interface(
             &module.ir,
             &module.interface,
@@ -33,6 +38,8 @@ pub fn published_interfaces<'a>(
             &[],
             &checked_interfaces,
         );
+        #[cfg(target_arch = "wasm32")]
+        let mut published = module.interface.clone();
         if let Some(targets) = targets {
             published.targets = targets.to_vec();
         }

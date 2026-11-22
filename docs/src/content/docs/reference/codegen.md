@@ -427,8 +427,10 @@ schemas deriving `Form`, and a `foreign` binding without a
 Go implementation: in the runtime for the standard library, part of which
 has none yet beyond the core (most of `Stream`, queues, schedules beyond
 `recurs`, parts of `Codec`), or beside the program for its own bindings
-(see [FFI](../ffi/#the-go-target)). Modules of the js target only are
-`FLICK-P030` already in `flick check`. `Rpc` and `server fn` speak the
+(see [FFI](../ffi/#the-go-target)). Reachable uses of modules gated to other
+environments (such as JS-only modules with `@when "js"`) report `FLICK-P064`
+already in `flick check`, the editor and `flick build`; unused imports do not
+fail. `Rpc` and `server fn` speak the
 wire of the js target, so a Go backend serves a JS frontend (see
 [Typed RPC](../rpc/#on-the-go-target)).
 

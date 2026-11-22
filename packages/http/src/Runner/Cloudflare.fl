@@ -2,6 +2,7 @@
 /// The runner of the entry exports `{ fetch }`, which answers each request
 /// with `main` run under its own root owner, with the bindings and the live
 /// browser host services; a failure is a 500 response, reported on the console.
+@when "js"
 module Runner.Cloudflare exposing (Main, Fetch, Env, Context, run, var, binding, wait_until)
 
 import Host
