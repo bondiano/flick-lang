@@ -458,9 +458,6 @@ fn the_fix_of_g003_names_only_a_region_of_the_signature() {
     let mut sources = SourceMap::default();
     let file = sources.add("Probe.fl", text.to_owned());
     let diagnostics = crate::check(&sources, file);
-    let unnamed: Vec<_> = (diagnostics.iter())
-        .filter(|d| d.code == codes::G003)
-        .collect();
     let [unnamed] = &diagnostics[..] else {
         panic!("{diagnostics:?}")
     };
