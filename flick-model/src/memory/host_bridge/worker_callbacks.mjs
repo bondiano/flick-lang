@@ -267,19 +267,30 @@ export function invokeSyncOp(exec, payload) {
   }
 }
 
+class CellProxy {
+  #exec;
+  #cellId;
+
+  constructor(exec, cellId) {
+    this.#exec = exec;
+    this.#cellId = cellId;
+  }
+
+  get value() {
+    const msg = invokeSyncOp(this.#exec, { type: "cell_get", cell_id: this.#cellId });
+    if (!msg.ok) throw decodeFailure(msg, this.#exec);
+    return decodeWire(msg.value, this.#exec, wireCtx);
+  }
+
+  set value(v) {
+    const wire = encodeWire(v, "Any", false, this.#exec, wireCtx);
+    const msg = invokeSyncOp(this.#exec, { type: "cell_set", cell_id: this.#cellId, value: wire });
+    if (!msg.ok) throw decodeFailure(msg, this.#exec);
+  }
+}
+
 export function makeCellProxy(exec, cellId) {
-  return {
-    get value() {
-      const msg = invokeSyncOp(exec, { type: "cell_get", cell_id: cellId });
-      if (!msg.ok) throw decodeFailure(msg, exec);
-      return decodeWire(msg.value, exec, wireCtx);
-    },
-    set value(v) {
-      const wire = encodeWire(v, "Any", false, exec, wireCtx);
-      const msg = invokeSyncOp(exec, { type: "cell_set", cell_id: cellId, value: wire });
-      if (!msg.ok) throw decodeFailure(msg, exec);
-    },
-  };
+  return new CellProxy(exec, cellId);
 }
 
 export function makeTask(exec, cbId, innerShape, bridged) {

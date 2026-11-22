@@ -300,6 +300,40 @@ let find_optional id =
 
 An arm that matches something other than an error is `FLICK-E007`.
 
+Postfix `catch` is typed-error-only sugar over `try … with` with the same
+evaluation order, row subtraction, capture and mutation rules:
+
+```flick
+# type error FileNotFound = FileNotFound String
+# type error InvalidConfig = InvalidConfig String
+# type alias Config = { host : String }
+# default_config : Config
+# let default_config = { host = "localhost" }
+# load_config : String ->{; FileNotFound, InvalidConfig} Config
+# let load_config path = Fail.fail (FileNotFound path)
+# load_backup : String ->{} Config
+# let load_backup _ = default_config
+#
+read_config : String ->{} Config
+let read_config path =
+  load_config path catch
+  | FileNotFound _ -> default_config
+  | InvalidConfig details -> load_backup details
+```
+
+`catch` binds weaker than all infix operators, and the leading `|` is required
+even for a single arm. A pipeline inside a recovery arm belongs to that arm;
+parenthesize the whole `catch` to pipe its result (`(load id catch | NotFound _ -> guest) |> format`),
+and parenthesize an inner `catch` to catch failures from its recovery
+(`(a catch | E -> b) catch | F -> c`). Operation arms (`| S.op x -> …`),
+`return` arms, `Fail.fail p` arms and `resume` are rejected in `catch`
+(`FLICK-E007` / `FLICK-T001`); use `try … with` when handling effect operations.
+The handler is established before evaluating the left-hand expression, guards
+and recovery bodies execute outside that handler (so a same-type failure escapes
+to an outer handler rather than re-entering later arms), pure `Err` values and
+cold `task { … }` values are untouched, and Option `?` cannot cross the `catch`
+return boundary.
+
 `Errors e` turns an error row into a type: `Errors none` is `Never`,
 `Errors {NotFound}` is `NotFound`. `from_result` fails with the error of an
 `Err`; the error row of a `Result NotFound a` is `{NotFound}`, and a

@@ -151,6 +151,11 @@ impl Ide<'_> {
                 "Handles the errors of its body: an error leaves the row when an \
                  arm without a guard matches every value of it.",
             ),
+            K::CatchKw => (
+                "… catch | …",
+                "Handles typed errors of the expression on its left: an error leaves \
+                 the row when an arm without a guard matches every value of it.",
+            ),
             K::MatchKw => ("match … with", "The value of the arm that matches."),
             K::IfKw => ("if … then … else …", "The value of the branch taken."),
             K::FunKw => ("fun … -> …", "An anonymous function."),

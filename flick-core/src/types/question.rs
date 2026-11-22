@@ -33,7 +33,7 @@ impl Checker<'_> {
                     self.error(
                         codes::T003,
                         span,
-                        "`?` on an `Option` returns `None` from the function around it, but this code runs on its own (in a `task`, `scope`, `provide`, `try` or a `for`): match the `Option` here",
+                        "`?` on an `Option` returns `None` from the function around it, but this code runs on its own (in a `task`, `scope`, `provide`, `try`, `catch` or a `for`): match the `Option` here",
                     );
                     return item;
                 };

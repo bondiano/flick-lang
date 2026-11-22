@@ -138,6 +138,8 @@ pub use ffi::{PURE_OVER_CAPABILITY, keeps_for_owner};
 pub use gadt::branch::dict_local;
 pub use gadt::scheme::{built, is_indexed, written_dicts};
 pub use generalize::without_value_captures;
+#[cfg(feature = "ide")]
+pub(crate) use handlers::catch_to_try_text;
 pub use interpolation::{hole_key, holes};
 pub use kinds::Kind;
 pub use options::{Limits, Options};
@@ -573,6 +575,8 @@ struct ItemCx {
     facts: Vec<proofs::Fact>,
     /// The facts around each body that runs apart, set aside.
     held_facts: Vec<Vec<proofs::Fact>>,
+    /// Nesting depth inside postfix `catch` arms, where `resume` is never bound.
+    catch_arm: u32,
 }
 
 include!("checker_state.rs");

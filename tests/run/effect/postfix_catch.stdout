@@ -1,0 +1,17 @@
+success-catch: ok | body
+success-try:   ok | body
+guard-catch:   r2 | body,g1,g2
+guard-try:     r2 | body,g1,g2
+partial-catch: three
+partial-try:   three
+gfail-catch:   outer-99 | body,g1
+gfail-try:     outer-99 | body,g1
+rfail-catch:   outer-77 | body,r1
+rfail-try:     outer-77 | body,r1
+unmatched:     outer-tag:miss
+let_mut:       (15, 15)
+result:        pure-err:raw / q:boom
+cold_task:     before= after=outer:cold|ran
+nesting:       rhs:in / outer:in
+pipes:         ok,hi! / ok!,hi!
+labels:        (4, 40, 50, 60)
