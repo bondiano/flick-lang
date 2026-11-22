@@ -80,6 +80,7 @@ impl Checker<'_> {
             region,
             span,
             node: node.range(),
+            #[cfg(feature = "ide")]
             name: None,
             outer: self.cx.stage.services.clone(),
             parent: self.cx.regions.nest.last().copied(),

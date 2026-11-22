@@ -226,6 +226,7 @@ impl<'p> Machine<'p, '_> {
             frames,
             owner: Some(self.current_owner),
             next,
+            aborted: false,
         });
     }
 

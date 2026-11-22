@@ -51,9 +51,8 @@ let signal_when_stopped started stopped = task {
     })
 }
 
-main : Unit ->{Async; AppError} Unit
-let main () =
-  // D05 + D18: full shared LIFO across Resource.own, Resource.make, Scope.defer, defer, errdefer
+test_d05_d18 : Unit ->{Async} Unit
+let test_d05_d18 () =
   say "-- D05/D18 --"
   scope {
     let _o = own (Owned "o1")
@@ -65,6 +64,8 @@ let main () =
     say "d05:body"
   }
 
+test_d03 : Unit ->{Async} Unit
+let test_d03 () =
   // D03 (defect): body dies -> errdefer and defer both run, outcome stays defect
   say "-- D03-defect --"
   let defect_exit =
@@ -95,10 +96,13 @@ let main () =
           }
         })
     Deferred.await_ ready
-    let exit = Fiber.interrupt child
+    Fiber.interrupt child
+    let exit = Fiber.await_ child
     say ("d03-cancel:interrupted=" ++ show (Exit.has_interrupts exit))
   }
 
+test_d06_d07 : Unit ->{Async} Unit
+let test_d06_d07 () =
   // D06: finalizer defect when body succeeded -> remaining defer runs, errdefer stays skipped
   say "-- D06 --"
   let d06_exit =
@@ -141,6 +145,8 @@ let main () =
       ++ ",has_dies="
       ++ show (Exit.has_dies d07_exit))
 
+test_d08_d09 : Unit ->{Async} Unit
+let test_d08_d09 () =
   // D08 + D09: cancel arrives during closing of a successful body (masked await
   // in `defer`): cleanup finishes, remaining `defer` runs, earlier `errdefer`
   // STILL sees immutable body=success snapshot (skipped!), and then fiber stops.
@@ -174,3 +180,10 @@ let main () =
     Fiber.interrupt_all [target, stopper]
   }
   say "d08/d09:done"
+
+main : Unit ->{Async; AppError} Unit
+let main () =
+  test_d05_d18 ()
+  test_d03 ()
+  test_d06_d07 ()
+  test_d08_d09 ()

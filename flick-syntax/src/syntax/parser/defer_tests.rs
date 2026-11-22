@@ -1,10 +1,11 @@
 use crate::diagnostics::codes;
 use crate::source::SourceMap;
+use crate::syntax::Parse;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::parser::parse;
 
-fn parse_src(src: &str) -> crate::syntax::Parse {
+fn parse_src(src: &str) -> Parse {
     let mut map = SourceMap::default();
     let file = map.add("defer.fl", src);
     parse(src, file)
@@ -44,7 +45,7 @@ fn parses_defer_and_errdefer_statements() {
 #[test]
 fn preserves_contextual_identifiers_and_record_calls() {
     let parsed = parse_src(
-        r#"let defer = 1
+        r"let defer = 1
 let errdefer = 2
 let use_vals x =
   let a = defer x
@@ -59,7 +60,7 @@ let use_vals x =
       (a, b, c, d, e, h)
     }
   }
-"#,
+",
     );
     assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
     assert!(!has_kind(&parsed.tree, K::DeferStmt));

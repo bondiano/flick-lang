@@ -40,8 +40,8 @@ let maybe_defer take_a take_b = scope {
   say "d10:after-same-scope-loop"
 }
 
-main : Unit ->{; AppError} Unit
-let main () =
+test_d01_to_d04 : Unit ->{} Unit
+let test_d01_to_d04 () =
   // D01 + D02: success, returning Err data, returning None data
   say "-- D01/D02 --"
   let ok_val = scope {
@@ -88,6 +88,8 @@ let main () =
   }
   say caught_inside
 
+test_d05_to_d12 : Unit ->{} Unit
+let test_d05_to_d12 () =
   // D05: shared LIFO across acquire_release, Scope.defer, defer, errdefer
   say "-- D05 --"
   let _ =
@@ -133,6 +135,8 @@ let main () =
     }
   }
 
+test_d16_to_d23 : Unit ->{} Unit
+let test_d16_to_d23 () =
   // D16 + D18 + D23: local error handling in cleanup, unreached defer, nested scope in cleanup
   say "-- D16/D18/D23 --"
   let _ =
@@ -173,3 +177,9 @@ let main () =
     with
     | Abort.bail why -> "bail:" ++ why
   say aborted
+
+main : Unit ->{; AppError} Unit
+let main () =
+  test_d01_to_d04 ()
+  test_d05_to_d12 ()
+  test_d16_to_d23 ()

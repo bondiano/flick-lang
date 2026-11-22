@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use flick_core::fmt;
 use flick_core::ir::{Expr, ExprKind, ItemKind, Stmt};
 use flick_core::project::{self, Host};
-use flick_core::source::{FileId, SourceMap};
+use flick_core::source::SourceMap;
 use flick_core::syntax::parse;
 
 struct SingleFile<'a>(&'a str);
@@ -26,14 +26,6 @@ impl Host for SingleFile<'_> {
     }
 }
 
-fn analyze_single(src: &str) -> (SourceMap, FileId, project::Analysis) {
-    let mut sources = SourceMap::default();
-    let path = PathBuf::from("/Main.fl");
-    let analysis = project::analyze(&SingleFile(src), &mut sources, None, &[path]);
-    let file = analysis.modules.first().expect("analyzed module").file;
-    (sources, file, analysis)
-}
-
 fn format_once(src: &str) -> String {
     let mut sources = SourceMap::default();
     let file = sources.add("DeferFmt.fl", src);
@@ -44,30 +36,37 @@ fn format_once(src: &str) -> String {
 fn formatter_preserves_defer_errdefer_and_reaches_fixed_point() {
     let inputs = [
         // Single-line and multi-line defer/errdefer with comments
-        "module App.Main exposing (main)\n\n\
-         say : String ->{} Unit\n\
-         let say s = Host.raw_stdout_line s\n\n\
-         main : Unit ->{} Unit\n\
-         let main () = scope {\n\
-           // leading comment\n\
-           defer { say \"one\" }\n\
-           errdefer {\n\
-             // inside comment\n\
-             say \"a\"\n\
-             say \"b\"\n\
-           }\n\
-           say \"body\"\n\
-         }\n",
+        r#"module App.Main exposing (main)
+
+say : String ->{} Unit
+let say s = Host.raw_stdout_line s
+
+main : Unit ->{} Unit
+let main () = scope {
+  // leading comment
+  defer { say "one" }
+  errdefer {
+    // inside comment
+    say "a"
+    say "b"
+  }
+  say "body"
+}
+"#,
         // Contextual identifiers and grouped record calls must NOT lose parens!
-        "module App.Compat exposing (run)\n\n\
-         run : ({ n : Int } -> Int) -> Int\n\
-         let run defer =\n\
-           let errdefer = defer\n\
-           (defer) { n = 1 } + (errdefer) { n = 2 }\n",
+        r"module App.Compat exposing (run)
+
+run : ({ n : Int } -> Int) -> Int
+let run defer =
+  let errdefer = defer
+  (defer) { n = 1 } + (errdefer) { n = 2 }
+",
         // Compact/messy spacing normalized cleanly
-        "module App.Messy exposing (f)\n\n\
-         f : Unit ->{} Unit\n\
-         let f () = scope { defer { () }; errdefer { () }; () }\n",
+        r"module App.Messy exposing (f)
+
+f : Unit ->{} Unit
+let f () = scope { defer { () }; errdefer { () }; () }
+",
     ];
 
     for input in inputs {
@@ -190,13 +189,18 @@ let run () = scope outer {
 mod ide_tests {
     use super::*;
     use flick_core::ide::{CompletionKind, Ide, TOKEN_TYPES};
+    use flick_core::source::FileId;
 
     fn analyze(src: &str) -> (SourceMap, FileId, project::Analysis) {
-        analyze_single(src)
+        let mut sources = SourceMap::default();
+        let path = PathBuf::from("/Main.fl");
+        let analysis = project::analyze(&SingleFile(src), &mut sources, None, &[path]);
+        let file = analysis.modules.first().expect("analyzed module").file;
+        (sources, file, analysis)
     }
 
     fn offset_of(src: &str, needle: &str) -> u32 {
-        u32::try_from(src.find(needle).expect("needle present")).unwrap()
+        u32::try_from(src.find(needle).expect("needle present")).expect("offset fits u32")
     }
 
     #[test]
@@ -313,10 +317,13 @@ let run defer = scope {
             sources: &sources,
         };
         let tokens = ide.semantic_tokens(file);
-        let kw_idx = TOKEN_TYPES
-            .iter()
-            .position(|&t| t == "keyword")
-            .expect("keyword") as u32;
+        let kw_idx = u32::try_from(
+            TOKEN_TYPES
+                .iter()
+                .position(|&t| t == "keyword")
+                .expect("keyword"),
+        )
+        .expect("token index fits u32");
 
         let defer_stmt = offset_of(src, "defer { () }");
         let errdefer_stmt = offset_of(src, "errdefer { () }");

@@ -150,16 +150,8 @@ impl Checker<'_> {
         let mut returned = false;
         for (arm, operation) in arms.iter().zip(&operations) {
             if let Some((index, op)) = operation {
-                self.enter_apart(super::mutation::Apart::HandlerArm);
-                self.cx
-                    .regions
-                    .defer_owners
-                    .push(super::regions::DeferOwner::Barrier(
-                        super::regions::DeferBarrier::HandlerArm,
-                    ));
-                let covers = self.operation_arm(arm, &handled[*index], op, &ty, region.as_ref());
-                self.cx.regions.defer_owners.pop();
-                self.leave_apart();
+                let covers =
+                    self.check_operation_arm(arm, &handled[*index], op, &ty, region.as_ref());
                 if covers {
                     handled[*index].covered.push(op.name.clone());
                 }
@@ -201,6 +193,27 @@ impl Checker<'_> {
             self.handled_row(&needed, &handled, span);
         }
         ty
+    }
+
+    fn check_operation_arm(
+        &mut self,
+        arm: &Node,
+        handled: &Handled,
+        op: &Operation,
+        ty: &Type,
+        region: Option<&Type>,
+    ) -> bool {
+        self.enter_apart(super::mutation::Apart::HandlerArm);
+        self.cx
+            .regions
+            .defer_owners
+            .push(super::regions::DeferOwner::Barrier(
+                super::regions::DeferBarrier::HandlerArm,
+            ));
+        let covers = self.operation_arm(arm, handled, op, ty, region);
+        self.cx.regions.defer_owners.pop();
+        self.leave_apart();
+        covers
     }
 
     /// The services `needed` by the body of a handler of `handled`: those

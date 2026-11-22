@@ -79,7 +79,6 @@ fn in_defer_scope(tree: &Node, offset: u32) -> bool {
     };
     if let Some(&owner) = statement_block.checked_sub(1).and_then(|i| path.get(i)) {
         match owner.kind {
-            K::DoExpr => return false,
             K::ForExpr
                 if owner
                     .nodes()
@@ -88,7 +87,7 @@ fn in_defer_scope(tree: &Node, offset: u32) -> bool {
             {
                 return false;
             }
-            K::AssignStmt | K::RecordField | K::ProofDecl => return false,
+            K::DoExpr | K::AssignStmt | K::RecordField | K::ProofDecl => return false,
             K::LetDecl if !owner.nodes().any(|c| c.kind == K::Params) => return false,
             _ => {}
         }

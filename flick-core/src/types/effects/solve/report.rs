@@ -110,28 +110,9 @@ impl Checker<'_> {
         if let Site::DeferCleanup {
             is_errdefer,
             span: cleanup_span,
-        } = &self.sites[e.site]
+        } = self.sites[e.site]
         {
-            let kw = if *is_errdefer { "errdefer" } else { "defer" };
-            let diagnostic = Diagnostic::error(
-                codes::E002,
-                format!(
-                    "a `{kw}` cleanup block cannot leave {list} unhandled: handle typed errors locally inside the cleanup block"
-                ),
-                e.span,
-            )
-            .with_related(
-                *cleanup_span,
-                format!("this `{kw}` cleanup block requires an empty error row"),
-            )
-            .with_fix(|| {
-                (
-                    "handle the error locally with `try … with` inside the cleanup block"
-                        .to_owned(),
-                    Vec::new(),
-                )
-            });
-            self.diagnostics.push(diagnostic);
+            self.report_defer_cleanup_excess(is_errdefer, cleanup_span, e.span, &list);
             return;
         }
         let (bound, needer, written) = match &self.sites[e.site] {
@@ -205,6 +186,34 @@ impl Checker<'_> {
                 diagnostic.with_fix(fix)
             };
         }
+        self.diagnostics.push(diagnostic);
+    }
+
+    fn report_defer_cleanup_excess(
+        &mut self,
+        is_errdefer: bool,
+        cleanup_span: Span,
+        span: Span,
+        list: &str,
+    ) {
+        let kw = if is_errdefer { "errdefer" } else { "defer" };
+        let diagnostic = Diagnostic::error(
+            codes::E002,
+            format!(
+                "a `{kw}` cleanup block cannot leave {list} unhandled: handle typed errors locally inside the cleanup block"
+            ),
+            span,
+        )
+        .with_related(
+            cleanup_span,
+            format!("this `{kw}` cleanup block requires an empty error row"),
+        )
+        .with_fix(|| {
+            (
+                "handle the error locally with `try … with` inside the cleanup block".to_owned(),
+                Vec::new(),
+            )
+        });
         self.diagnostics.push(diagnostic);
     }
 }

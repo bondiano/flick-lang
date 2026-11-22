@@ -118,7 +118,32 @@ impl Checker<'_> {
         let Some(owner) = owner_info else {
             return Type::lang(Lang::Unit);
         };
+        self.register_defer_obligations(
+            &owner,
+            is_errdefer,
+            kw_span,
+            stmt_span,
+            uses,
+            locals,
+            cleanup_services,
+        );
+        Type::lang(Lang::Unit)
+    }
 
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "collects the checked cleanup state from `defer_stmt` in one place"
+    )]
+    fn register_defer_obligations(
+        &mut self,
+        owner: &super::Scope,
+        is_errdefer: bool,
+        kw_span: Span,
+        stmt_span: Span,
+        uses: usize,
+        locals: usize,
+        cleanup_services: Type,
+    ) {
         let owner_region = Type::Skolem(owner.region);
         let held = self.held_since(uses, locals);
         let captures = self.store.fresh_capture_row();
@@ -180,8 +205,6 @@ impl Checker<'_> {
             self.perform(&registration_services, &Type::empty_row(), stmt_span);
         }
         self.settle_provided_since(provided_mark, provided_late_mark);
-
-        Type::lang(Lang::Unit)
     }
 
     fn missing_defer_owner(&mut self, is_errdefer: bool, kw_span: Span, top: Option<DeferOwner>) {

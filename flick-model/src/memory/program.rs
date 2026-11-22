@@ -555,6 +555,7 @@ struct Discard<'p> {
     frames: Vec<Frame<'p>>,
     owner: Option<usize>,
     next: TransferNext<'p>,
+    aborted: bool,
 }
 
 struct Machine<'p, 'h> {

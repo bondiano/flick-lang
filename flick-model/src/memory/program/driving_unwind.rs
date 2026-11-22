@@ -179,6 +179,7 @@ impl<'p> Machine<'p, '_> {
                 next: TransferNext::ResumeRunning {
                     saved_failure: cause,
                 },
+                aborted: true,
             });
         }
     }
