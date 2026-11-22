@@ -132,22 +132,16 @@ impl<'d> Gen<'_, 'd> {
                 self.expr(result)
             }
             ExprKind::If(c, t, f) => self.if_expr(c, t, f),
-            ExprKind::Match(scrutinee, arms) => {
-                let s = self.expr(scrutinee);
-                let s = self.subject(s);
-                let r = self.temp();
-                self.buf.push(self.declare(&r));
-                self.arms(&s, arms, Some(&r));
-                self.leaf(&r)
-            }
+            ExprKind::Match(scrutinee, arms) => self.match_expr(scrutinee, arms),
             ExprKind::Handle(h) if h.is_try() => self.try_expr(&h.body, &h.errors),
             ExprKind::Tuple(items) | ExprKind::List(items) => {
                 let items: Vec<&Expr> = items.iter().collect();
                 let items = self.ordered(&items);
                 array(self.a, &items)
             }
-            ExprKind::Record(fields) | ExprKind::Dictionary(fields) => self.record(None, fields),
-            ExprKind::Update(record, fields) => self.record(Some(record), fields),
+            ExprKind::Record(_) | ExprKind::Dictionary(_) | ExprKind::Update(..) => {
+                self.record_expr(e)
+            }
             ExprKind::Field(record, label) => {
                 let r = self.expr(record);
                 self.field(r, label)
@@ -319,12 +313,55 @@ impl<'d> Gen<'_, 'd> {
         self.leaf(&format!("{v}.value"))
     }
 
-    /// A record literal, or `{ base with … }`.
-    fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> Js<'d> {
+    fn match_expr(&mut self, scrutinee: &Expr, arms: &[Arm]) -> Js<'d> {
+        let s = self.expr(scrutinee);
+        let s = self.subject(s);
+        let r = self.temp();
+        self.buf.push(self.declare(&r));
+        self.arms(&s, arms, Some(&r));
+        self.leaf(&r)
+    }
+
+    fn record_expr(&mut self, e: &Expr) -> Js<'d> {
+        match &e.kind {
+            ExprKind::Record(fields) => self.record(None, fields, true),
+            ExprKind::Dictionary(fields) => self.record(None, fields, false),
+            ExprKind::Update(record, fields) => self.record(Some(record), fields, false),
+            _ => unreachable!("record expression"),
+        }
+    }
+
+    /// A record literal, a dictionary literal, or `{ base with … }`.
+    /// Structural record literals (`canonical == true`) evaluate field
+    /// expressions in source order and emit properties in canonical sorted
+    /// UTF-16 label order so written field order is not observable.
+    fn record(
+        &mut self,
+        base: Option<&Expr>,
+        fields: &[(String, Expr)],
+        canonical: bool,
+    ) -> Js<'d> {
         let a = self.a;
         let mut all: Vec<&Expr> = base.into_iter().collect();
         all.extend(fields.iter().map(|(_, v)| v));
-        let js = self.ordered(&all);
+        let mut js = self.ordered(&all);
+        let mut order: Option<Vec<usize>> = None;
+        if canonical && base.is_none() && fields.len() > 1 {
+            let ord = flick_ir::utf16_sorted_indices(fields.len(), &|i| &fields[i].0);
+            let needs_spill = (0..ord.len()).any(|pos| {
+                let later = ord[pos];
+                !self.stable(js[later])
+                    && ord[pos + 1..]
+                        .iter()
+                        .any(|&earlier| earlier < later && !self.stable(js[earlier]))
+            });
+            if needs_spill {
+                for v in &mut js {
+                    *v = self.spill(*v);
+                }
+            }
+            order = Some(ord);
+        }
         let values = &js[usize::from(base.is_some())..];
         let mut entries = Vec::with_capacity(js.len());
         if base.is_some() {
@@ -334,14 +371,15 @@ impl<'d> Gen<'_, 'd> {
                 js[0].at(a, Before::Other, After::Delimiter)
             ]);
         }
-        entries.extend(fields.iter().zip(values).map(|((label, _), v)| {
-            docvec![
+        for pos in 0..fields.len() {
+            let i = order.as_ref().map_or(pos, |ord| ord[pos]);
+            entries.push(docvec![
                 a,
-                key(label),
+                key(&fields[i].0),
                 ": ",
-                v.at(a, Before::Delimiter, After::Delimiter)
-            ]
-        }));
+                values[i].at(a, Before::Delimiter, After::Delimiter)
+            ]);
+        }
         object(a, &entries, &js)
     }
 

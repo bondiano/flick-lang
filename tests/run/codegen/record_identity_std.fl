@@ -1,0 +1,202 @@
+// Issue #740: Filter.equals_strict, TxHashMap overwrites, Differ/JsonPatch
+// signed zeros, and GADT held-dictionary equality/hashing across runtimes.
+module App.Main exposing (main)
+
+import Codec
+
+type ShowBox =
+  | Show b => ShowBox b : ShowBox
+
+pack : Show a => a -> ShowBox
+let pack x = ShowBox x
+
+type alias CustomKey = { id : Int; tag : String }
+
+key_tag : List (CustomKey, { a : Int }) -> String
+let key_tag xs =
+  match xs with
+  | [(k, _)] -> k.tag
+  | _ -> "bad"
+
+check_filter : Unit ->{Host.Console} Unit
+let check_filter () =
+  let r1 = { z = 1; a = "hi" }
+  let r2 = { a = "hi"; z = 1 }
+  let rec_ok = Filter.to_predicate (Filter.equals_strict r1) r2
+  let tup_ok = Filter.to_predicate (Filter.equals_strict (1, r1)) (1, r2)
+  let tup_no = Filter.to_predicate (Filter.equals_strict (1, r1)) (2, r2)
+  let zero_eq = Filter.to_predicate (Filter.equals 0.0) (-0.0)
+  let zero_strict = Filter.to_predicate (Filter.equals_strict 0.0) (-0.0)
+  let neg_zero_strict = Filter.to_predicate (Filter.equals_strict (-0.0)) (-0.0)
+  let nan_strict = Filter.to_predicate (Filter.equals_strict (0.0 / 0.0)) (0.0 / 0.0)
+  let c1 = Ref.make 1
+  let c2 = Ref.make 1
+  let cell_same = Filter.to_predicate (Filter.equals_strict c1) c1
+  let cell_diff = Filter.to_predicate (Filter.equals_strict c1) c2
+  let ch_pos = Chunk.from_list [0.0]
+  let ch_neg = Chunk.from_list [-0.0]
+  let ch_rec_pos = Chunk.from_list [{ x = 0.0 }]
+  let ch_rec_neg = Chunk.from_list [{ x = -0.0 }]
+  let ch_eq = Filter.to_predicate (Filter.equals ch_pos) ch_neg
+  let ch_strict = Filter.to_predicate (Filter.equals_strict ch_pos) ch_neg
+  let ch_rec_strict = Filter.to_predicate (Filter.equals_strict ch_rec_pos) ch_rec_neg
+  Platform.stdout_line
+    ("filter: "
+      ++ show (
+        rec_ok,
+        tup_ok,
+        tup_no,
+        zero_eq,
+        zero_strict,
+        neg_zero_strict,
+        nan_strict,
+        cell_same,
+        cell_diff,
+        ch_eq,
+        ch_strict,
+        ch_rec_strict,
+      ))
+
+check_tx_hashmap : Unit ->{Host.Console} Unit
+let check_tx_hashmap () =
+  let shared = { a = 1 }
+  let k1 : CustomKey = { id = 1; tag = "old" }
+  let k2 : CustomKey = { id = 1; tag = "new" }
+  let tags =
+    Tx.atomically
+      (EqHash.with
+        (fun (a : CustomKey) (b : CustomKey) -> a.id == b.id)
+        (fun (_ : CustomKey) -> 7)
+        (fun w -> task {
+          let m_make = TxHashMap.make w [(k1, shared), (k2, shared)]
+          let m_iter = TxHashMap.from_iterable w [(k1, shared), (k2, shared)]
+          let m_set = TxHashMap.make w [(k1, shared)]
+          TxHashMap.set k2 shared m_set
+          let m_mod = TxHashMap.make w [(k1, shared)]
+          let _ = TxHashMap.modify k2 (fun _ -> shared) m_mod
+          let m_mod_at = TxHashMap.make w [(k1, shared)]
+          TxHashMap.modify_at k2 (fun _ -> Some shared) m_mod_at
+          let m_union = TxHashMap.make w [(k1, shared)]
+          TxHashMap.union (HashMap.from_list w [(k2, shared)]) m_union
+          let m_many = TxHashMap.make w [(k1, shared)]
+          TxHashMap.set_many [(k2, shared)] m_many
+          [
+            key_tag (TxHashMap.entries m_make),
+            key_tag (TxHashMap.entries m_iter),
+            key_tag (TxHashMap.entries m_set),
+            key_tag (TxHashMap.entries m_mod),
+            key_tag (TxHashMap.entries m_mod_at),
+            key_tag (TxHashMap.entries m_union),
+            key_tag (TxHashMap.entries m_many),
+          ]
+        }))
+  let neg_zero_ok =
+    Tx.atomically
+      (task {
+        let zm = TxHashMap.make EqHash.canonical [("z", 0.0)]
+        TxHashMap.set "z" (-0.0) zm
+        match TxHashMap.get "z" zm with
+        | Some v -> 1.0 / v < 0.0
+        | None -> false
+      })
+  Platform.stdout_line ("tx_hashmap: " ++ show tags ++ " | " ++ show neg_zero_ok)
+
+check_zero_diff : Unit ->{Host.Console; AppError} Unit
+let check_zero_diff () =
+  let c = Codec.json Schema.number
+  let diff = Differ.diff 0.0 (-0.0) (Differ.json_patch c)
+  let jp_result =
+    match (Codec.encode_result c 0.0, Codec.encode_result c (-0.0)) with
+    | (Ok z0, Ok zn) ->
+      let jp = JsonPatch.get z0 zn
+      let applied_neg =
+        match JsonPatch.apply jp z0 with
+        | Ok j ->
+          (
+            match Codec.decode_result c (Json.to_unknown j) with
+            | Ok n -> 1.0 / n < 0.0
+            | Err _ -> false
+          )
+        | Err _ -> false
+      (List.length jp, applied_neg)
+    | _ -> (-1, false)
+  Platform.stdout_line ("zero_diff: " ++ Json.stringify diff ++ " | " ++ show jp_result)
+
+check_dollar_keys : Unit ->{Host.Console} Unit
+let check_dollar_keys () =
+  let d_ref_a = Record.from_entries [("$ref", "A")]
+  let d_ref_b = Record.from_entries [("$ref", "B")]
+  let d_schema = Record.from_entries [("$schema", "v1")]
+  let d_empty : Record.ReadonlyRecord String = Record.from_entries []
+  let rec_distinct = (
+    d_ref_a == d_ref_b,
+    d_schema == d_empty,
+    Filter.to_predicate (Filter.equals d_ref_a) d_ref_b,
+    Filter.to_predicate (Filter.equals_strict d_ref_a) d_ref_b,
+    Filter.to_predicate (Filter.equals_strict d_schema) d_empty,
+  )
+  let json_distinct =
+    match
+      (
+        Json.parse "{\"$ref\":\"A\"}",
+        Json.parse "{\"$ref\":\"B\"}",
+        Json.parse "{\"$schema\":\"v1\"}",
+        Json.parse "{}",
+      )
+    with
+    | (Ok ua, Ok ub, Ok us, Ok ue) ->
+      (
+        match
+          (
+            Codec.decode_result Json.json ua,
+            Codec.decode_result Json.json ub,
+            Codec.decode_result Json.json us,
+            Codec.decode_result Json.json ue,
+          )
+        with
+        | (Ok ja, Ok jb, Ok js, Ok je) -> (
+          ja == jb,
+          js == je,
+          Filter.to_predicate (Filter.equals_strict ja) jb,
+          List.length (JsonPatch.get ja jb),
+          List.length (JsonPatch.get js je),
+        )
+        | _ -> (true, true, true, -1, -1)
+      )
+    | _ -> (true, true, true, -2, -2)
+  Platform.stdout_line ("dollar_keys: " ++ show rec_distinct ++ " | " ++ show json_distinct)
+
+check_gadt : Unit ->{Host.Console, Async} Unit
+let check_gadt () =
+  // Two ShowBox values carrying parameterized Show (List Int) dictionaries
+  let b1 = pack [1, 2]
+  let b2 = pack [1, 2]
+  let eq_ok = b1 == b2
+  let f_eq = Filter.to_predicate (Filter.equals b1) b2
+  let f_strict = Filter.to_predicate (Filter.equals_strict b1) b2
+  let deduped = Chunk.size (Chunk.dedupe (Chunk.from_list [b1, b2]))
+  let adj = Chunk.size (Chunk.dedupe_adjacent (Chunk.from_list [b1, b2]))
+  let inter = Chunk.size (Chunk.intersection (Chunk.from_list [b2]) (Chunk.from_list [b1]))
+  let uni = Chunk.size (Chunk.union (Chunk.from_list [b2]) (Chunk.from_list [b1]))
+  let lookups = Ref.make 0
+  let cache : Cache.Cache ShowBox none String =
+    Cache.make {
+      lookup = fun (k : ShowBox) ->
+        Ref.update lookups (fun n -> n + 1)
+        match k with
+        | ShowBox x -> show x
+      capacity = 10
+      timeToLive = None
+    }
+  let v1 = Cache.get b1 cache
+  let v2 = Cache.get b2 cache
+  Platform.stdout_line
+    ("gadt: " ++ show (eq_ok, f_eq, f_strict, deduped, adj, inter, uni, v1 == v2, Ref.get lookups))
+
+main : Unit ->{Host.Console, Async; AppError} Unit
+let main () =
+  check_filter ()
+  check_tx_hashmap ()
+  check_zero_diff ()
+  check_dollar_keys ()
+  check_gadt ()

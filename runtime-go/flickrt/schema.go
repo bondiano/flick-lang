@@ -3,6 +3,7 @@ package flickrt
 import (
 	"math"
 	"math/big"
+	"sort"
 	"strconv"
 	"sync"
 )
@@ -95,13 +96,22 @@ func SchemaTuple(items ...Value) Value {
 	return &Schema{kind: kindTuple, items: out}
 }
 
-// SchemaRecord is a record of labels and schemas, alternating, in label
-// order.
+// SchemaRecord is a record of labels and schemas, alternating, canonicalized
+// to UTF-16 label order.
 func SchemaRecord(fields ...Value) Value {
-	s := &Schema{kind: kindRecord}
+	type entry struct {
+		label  string
+		schema *Schema
+	}
+	entries := make([]entry, 0, len(fields)/2)
 	for i := 0; i < len(fields); i += 2 {
-		s.labels = append(s.labels, fields[i].(string))
-		s.items = append(s.items, sch(fields[i+1]))
+		entries = append(entries, entry{fields[i].(string), sch(fields[i+1])})
+	}
+	sort.Slice(entries, func(i, j int) bool { return CompareStrings(entries[i].label, entries[j].label) < 0 })
+	s := &Schema{kind: kindRecord, labels: make([]string, len(entries)), items: make([]*Schema, len(entries))}
+	for i, e := range entries {
+		s.labels[i] = e.label
+		s.items[i] = e.schema
 	}
 	s.keys, s.pos = shapeOf(s.labels)
 	return s

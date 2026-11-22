@@ -92,7 +92,13 @@ impl<'a> Scope<'a> {
                 .push(import);
         }
         for (qualifier, mut imports) in by_qualifier {
-            imports.sort_by(|a, b| (&a.module, a.span.start).cmp(&(&b.module, b.span.start)));
+            if imports.len() > 1 {
+                let order = flick_ir::sort_indices(imports.len(), &|i, j| {
+                    (&imports[i].module, imports[i].span.start)
+                        .cmp(&(&imports[j].module, imports[j].span.start))
+                });
+                flick_ir::apply_order(&mut imports, order);
+            }
             imports.dedup_by(|a, b| a.module == b.module);
             if let [first, .., last] = imports[..] {
                 diagnostics.push(
@@ -121,7 +127,13 @@ impl<'a> Scope<'a> {
             if known.len() < bindings.len() {
                 continue;
             }
-            known.sort_by(|a, b| (&a.1.module, a.2.start).cmp(&(&b.1.module, b.2.start)));
+            if known.len() > 1 {
+                let order = flick_ir::sort_indices(known.len(), &|i, j| {
+                    (&known[i].1.module, known[i].2.start)
+                        .cmp(&(&known[j].1.module, known[j].2.start))
+                });
+                flick_ir::apply_order(&mut known, order);
+            }
             known.dedup_by(|a, b| a.0.entity == b.0.entity);
             if let [(_, first, first_span), .., (_, last, last_span)] = known[..] {
                 diagnostics.push(

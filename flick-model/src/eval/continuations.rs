@@ -48,11 +48,14 @@ impl Machine<'_> {
                 Control::Eval((*e).clone())
             }
             Frame::UpdateValue(record, l) => match record {
-                Term::Record(fs) => Control::Ret(Term::Record(
-                    fs.iter()
+                Term::Record(fs) => {
+                    let mut out: Vec<_> = fs
+                        .iter()
                         .map(|(m, x)| (m.clone(), if *m == l { v.clone() } else { x.clone() }))
-                        .collect(),
-                )),
+                        .collect();
+                    out.sort_by(|a, b| a.0.encode_utf16().cmp(b.0.encode_utf16()));
+                    Control::Ret(Term::Record(out.into()))
+                }
                 other => return Err(stuck(format!("`with` on {other:?}"))),
             },
             // `await` runs the body again each time: a task is not a cache

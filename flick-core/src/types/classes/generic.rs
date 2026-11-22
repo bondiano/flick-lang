@@ -126,7 +126,7 @@ impl<'n> Checker<'_> {
                 let mut entries: Vec<(String, Type)> = (row.entries.iter())
                     .map(|(l, t)| (l.to_string(), t.clone()))
                     .collect();
-                entries.sort_by(|a, b| a.0.cmp(&b.0));
+                flick_ir::sort_by_utf16(&mut entries, |e| &e.0);
                 (
                     Some(entries.iter().map(|(l, _)| l.clone()).collect()),
                     entries,

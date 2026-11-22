@@ -162,7 +162,7 @@ pub(super) fn record_from_entries(
         }
     }
     if sorted {
-        fields.sort_by(|a, b| a.0.cmp(&b.0));
+        fields.sort_by(|a, b| a.0.encode_utf16().cmp(b.0.encode_utf16()));
     }
     heap.record(fields)
 }
@@ -371,7 +371,7 @@ fn xml_node(
                     .iter()
                     .map(|(k, v)| (k.clone(), v.representation()))
                     .collect();
-                sorted.sort_by(|a, b| a.0.cmp(&b.0));
+                sorted.sort_by(|a, b| a.0.encode_utf16().cmp(b.0.encode_utf16()));
                 for (k, v) in &sorted {
                     xml_node(heap, lines, &xml_name(k), v, depth + 1, k, fuel)?;
                 }

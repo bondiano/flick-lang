@@ -1,9 +1,11 @@
 //! Audited compound `Schema` pure IR adapters (`result`, `record`, `tuple`, `adt`).
 
+use flick_ir::BinOp;
+
 use super::expr_builder::{ExprBuilder, arm};
 use super::std_schema_rt::{
-    expected_err, extra_con, kind_con, make_codec, make_schema, meta_con, pair_pat, rt, str_lit,
-    triple_pat,
+    con_app, expected_err, extra_con, kind_con, make_codec, make_schema, meta_con, pair_pat, rt,
+    str_lit, triple_pat,
 };
 use super::{Expr, Pat};
 
@@ -187,11 +189,39 @@ pub(super) fn schema_result(b: &ExprBuilder) -> Expr {
     )
 }
 
+fn sort_record_fields(b: &ExprBuilder, fields: Expr) -> Expr {
+    let cmp_label = b.lam(
+        &["a", "b"],
+        b.match_(
+            b.loc("a"),
+            vec![arm(
+                pair_pat(b, "ka", "_sa"),
+                b.match_(
+                    b.loc("b"),
+                    vec![arm(
+                        pair_pat(b, "kb", "_sb"),
+                        b.if_(
+                            b.bin(BinOp::Lt, b.loc("ka"), b.loc("kb")),
+                            con_app(b, "Prelude", "Ordering", "LT", vec![]),
+                            b.if_(
+                                b.bin(BinOp::Gt, b.loc("ka"), b.loc("kb")),
+                                con_app(b, "Prelude", "Ordering", "GT", vec![]),
+                                con_app(b, "Prelude", "Ordering", "EQ", vec![]),
+                            ),
+                        ),
+                    )],
+                ),
+            )],
+        ),
+    );
+    b.app2(b.global("List.Core", "sort_by"), cmp_label, fields)
+}
+
 pub(super) fn schema_record(b: &ExprBuilder) -> Expr {
     let map_f = |f_body: Expr| {
         b.gen_strict(b.each(
             "fld",
-            b.loc("fields"),
+            b.loc("sorted"),
             b.match_(
                 b.loc("fld"),
                 vec![arm(
@@ -205,13 +235,14 @@ pub(super) fn schema_record(b: &ExprBuilder) -> Expr {
         &["fields"],
         b.block(
             vec![
+                b.let_("sorted", sort_record_fields(b, b.loc("fields"))),
                 b.let_("decs", map_f(codec_part(b, "Helper.codec_dec", "s"))),
                 b.let_("encs", map_f(codec_part(b, "Helper.codec_enc", "s"))),
                 b.let_("metas", map_f(codec_part(b, "Helper.codec_meta", "s"))),
             ],
             make_schema(
                 b,
-                b.app(rt(b, "Helper.validate_record"), b.loc("fields")),
+                b.app(rt(b, "Helper.validate_record"), b.loc("sorted")),
                 make_codec(
                     b,
                     b.lam(
@@ -252,7 +283,7 @@ pub(super) fn schema_record(b: &ExprBuilder) -> Expr {
                     meta_con(b, "$Record", vec![b.loc("metas")]),
                     extra_con(b, "$None", vec![]),
                 ),
-                kind_con(b, "$Record", vec![b.loc("fields")]),
+                kind_con(b, "$Record", vec![b.loc("sorted")]),
                 b.none(),
             ),
         ),

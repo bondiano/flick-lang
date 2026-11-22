@@ -107,6 +107,28 @@ earlier; the Flick value stays as it was. Primitives, `JsValue`, opaque types
 and functions pass as they are, and a callback without data keeps its
 identity.
 
+Structural records always cross the JS and Go foreign boundaries in canonical
+sorted label order (JS array-index keys first in ascending numeric order, then
+UTF-16 code-unit order — pure `Record.labels` order for Flick identifier
+labels), regardless of how they were constructed (`{ ... }`, `{ r with ... }`,
+`Record.extend`, `Record.merge_disjoint`, `Record.project`, `Record.remove`,
+closed-record constructors, `Codec.json` / `codec` block decoding, or
+`Combiner.struct` / `Reducer.struct`). Foreign code inspecting `Object.keys` on
+JS or `flickrt.RecordToEntries` on Go sees `["a", "z"]` for both
+`{ z = 1; a = 2 }` and `{ a = 2; z = 1 }` (this changes previous behavior where
+written literal order could leak to host code). Data values, records, and
+tuples have no storage identity across the boundary: callers must not rely on
+reference equality (`===`) between two copies of a Flick data value, while
+explicit mutable cells and foreign values retain their identity.
+
+`Json` values and `Record.ReadonlyRecord` dictionaries follow separate ordering
+rules: they preserve ECMAScript insertion/wire key order (array indices
+ascending, then insertion order) through `Json.parse`, `Record.from_entries`,
+and `Record.set`. Converting a structural record to `Json` with `Codec.json`
+emits keys in canonical order, and decoding any JSON object key order produces
+a canonical structural record; `codec` blocks keep their declared wire key
+order on encoding and canonicalize the decoded structural record.
+
 ## The go target
 
 On the go target a binding to a module of the program — a relative path,
