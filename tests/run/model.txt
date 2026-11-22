@@ -110,3 +110,4 @@ runtime/lazy_opt
 effect/result_blocks
 schema/prove
 schema/prove_imported
+codegen/bounded_eval

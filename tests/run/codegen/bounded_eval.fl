@@ -1,0 +1,63 @@
+// Bounded concrete evaluation (#803) preserves debug/release parity on JS, Go,
+// and the reference model across recursive ADTs (#815), distinct closure
+// captures, capture avoidance, pipe evaluation order, staged calls, dead
+// unsupported branches, and known Option/Result values.
+module App.Main exposing (main)
+
+type Formula = Input | Number Int | Add Formula Formula | Times Formula Formula
+
+eval : Formula -> Int -> Int
+let rec eval formula x =
+  match formula with
+  | Input -> x
+  | Number n -> n
+  | Add a b -> eval a x + eval b x
+  | Times a b -> eval a x * eval b x
+
+price : Int -> Int
+let price x = eval (Add (Times Input (Number 3)) (Add (Number 2) (Number 5))) x
+
+make_adder : Int -> Int -> Int
+let make_adder n =
+  let bias = n * 2
+  fun x -> bias + x
+
+staged : BigInt -> BigInt -> BigInt
+let staged x =
+  let checked = 2n ** x
+  fun y -> checked + y
+
+classify : Int -> Result String Int
+let classify n =
+  match n with
+  | k when k < 0 -> Err "negative"
+  | 0 -> Err "zero"
+  | k -> Ok (k * 2)
+
+maybe_head : List Int -> Option Int
+let maybe_head xs =
+  match xs with
+  | [x, ..._] -> Some x
+  | [] -> None
+
+dead_branch : Bool -> Int
+let dead_branch ok = if ok then 42 else Int.unsafe_div 1 0
+
+note : String -> Int ->{Host.Console} Int
+let note label value =
+  Platform.stdout_line (label ++ ":" ++ show value)
+  value
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  Platform.stdout_line (show (price 10))
+  let dyn = note "dyn" 10
+  Platform.stdout_line (show (price dyn))
+  let f = make_adder 5
+  let g = make_adder 20
+  Platform.stdout_line (show (f 1, g 1))
+  Platform.stdout_line (show (5n |> staged 3n))
+  Platform.stdout_line (show (classify (-3), classify 4, maybe_head [], maybe_head [9, 8]))
+  Platform.stdout_line (show (dead_branch true))
+  let piped = note "first" 3 |> (fun a -> note "second" (a + 4))
+  Platform.stdout_line (show piped)
