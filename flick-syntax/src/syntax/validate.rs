@@ -38,7 +38,7 @@ struct Validator<'a> {
 
 /// What the statements of a block are.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Place {
+pub(super) enum Place {
     Plain,
     /// The statements of `do { … }`.
     Do,
@@ -108,8 +108,18 @@ impl Validator<'_> {
             self.attribute(child, next);
         }
         if child.kind == K::LetDecl {
-            self.mutable(child, node.kind == K::Block, place);
-            self.lazy(child, node.kind == K::Block, place);
+            if child.has_token(K::ElseKw) {
+                super::validate_let_else::check(
+                    self.file,
+                    child,
+                    node.kind == K::Block,
+                    place,
+                    &mut self.errors,
+                );
+            } else {
+                self.mutable(child, node.kind == K::Block, place);
+                self.lazy(child, node.kind == K::Block, place);
+            }
         }
     }
 

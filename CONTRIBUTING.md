@@ -115,6 +115,18 @@ test fixture. A release installs and locks each package from its compiler's
 not make the optional Effect adapter a requirement of an RT-only program;
 conditional foreign-binding metadata decides which runtime families it uses.
 
+## Primitives and runtime contracts
+
+No new primitive, runtime helper, or standard-library binding may observe the
+storage identity of a Flick data value (ADT, unboxed/untagged type, structural
+record, or tuple) or the written field order of a structural record. Any
+operation that constructs, decodes, transforms, or iterates structural records
+must produce or traverse labels in canonical order (`Record.labels`, with JS
+array-index keys ascending first, then UTF-16 code units). Internal caches
+keyed by identity (such as `WeakMap`, pointer equality, or `Object.is`) may
+change cost only, never an observable result. Explicit mutable cells (`Ref`,
+`RcRef`, `ScopedRef`, `Atom`) and foreign values have identity by design.
+
 ## Documentation site
 
 The Astro/Starlight site in `docs/` serves English at `/` and Russian at

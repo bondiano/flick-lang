@@ -116,23 +116,68 @@ func newRecord(n int) *Record {
 	return &Record{make([]string, 0, n), make([]Value, 0, n)}
 }
 
-// shapeOf is the key order of a record of `labels`, and where each label's
-// value goes in it; nil when that is the labels' own order.
-func shapeOf(labels []string) ([]string, []int) {
-	r := newRecord(len(labels))
-	for i, l := range labels {
-		r.put(l, i)
+// canonicalKeyLess orders structural record labels canonically: JS array-index
+// keys first in ascending numeric order, then all other keys in UTF-16
+// code-unit order (matching `Record.labels` and JS `Object.keys` on canonical
+// records).
+func canonicalKeyLess(a, b string) bool {
+	na, oka := arrayIndex(a)
+	nb, okb := arrayIndex(b)
+	if oka && okb {
+		return na < nb
 	}
+	if oka != okb {
+		return oka
+	}
+	return CompareStrings(a, b) < 0
+}
+
+// putCanonical sets `k` to `v` in place in canonical key order: only for a
+// structural record still being built.
+func (r *Record) putCanonical(k string, v Value) {
+	if i := r.index(k); i >= 0 {
+		r.vals[i] = v
+		return
+	}
+	at := sort.Search(len(r.keys), func(i int) bool {
+		return !canonicalKeyLess(r.keys[i], k)
+	})
+	r.keys = slices.Insert(r.keys, at, k)
+	r.vals = slices.Insert(r.vals, at, v)
+}
+
+// setCanonical is `r` with its fields plus `k` as `v` in canonical key order.
+func (r *Record) setCanonical(k string, v Value) *Record {
+	out := newRecord(len(r.keys) + 1)
+	for i, key := range r.keys {
+		out.putCanonical(key, r.vals[i])
+	}
+	out.putCanonical(k, v)
+	return out
+}
+
+// shapeOf is the canonical key order of a structural record of `labels`, and
+// where each label's value goes in it; nil when `labels` is already canonical.
+func shapeOf(labels []string) ([]string, []int) {
+	order := make([]int, len(labels))
+	for i := range order {
+		order[i] = i
+	}
+	sort.Slice(order, func(i, j int) bool {
+		return canonicalKeyLess(labels[order[i]], labels[order[j]])
+	})
+	keys := make([]string, len(labels))
 	pos := make([]int, len(labels))
 	same := true
-	for at, i := range r.vals {
-		pos[i.(int)] = at
-		same = same && at == i.(int)
+	for at, orig := range order {
+		keys[at] = labels[orig]
+		pos[orig] = at
+		same = same && at == orig
 	}
 	if same {
-		return r.keys, nil
+		return keys, nil
 	}
-	return r.keys, pos
+	return keys, pos
 }
 
 // shaped is the record of `keys` from shapeOf with the labels' values;
@@ -249,9 +294,9 @@ type Shape struct {
 	pos  []int
 }
 
-// ShapeOf is the shape of the records of `labels`, as a literal writes
-// them. Its labels are shared by those records, so they have no room where
-// a record that grows could write.
+// ShapeOf is the canonical shape of a structural record of `labels`. Its
+// labels are shared by those records, so they have no room where a record
+// that grows could write.
 func ShapeOf(labels ...string) *Shape {
 	keys, pos := shapeOf(labels)
 	return &Shape{slices.Clip(keys), pos}

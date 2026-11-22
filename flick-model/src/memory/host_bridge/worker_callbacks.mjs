@@ -267,8 +267,6 @@ export function invokeSyncOp(exec, payload) {
   }
 }
 
-// Distinct prototype matches runtime/effect-ts `class Cell` so `bridge.dataToEffect`
-// and `encodeWire` never walk `.value` as a plain record or fire spurious `cell_get`s.
 class CellProxy {
   #exec;
   #cellId;
@@ -286,11 +284,7 @@ class CellProxy {
 
   set value(v) {
     const wire = encodeWire(v, "Any", false, this.#exec, wireCtx);
-    const msg = invokeSyncOp(this.#exec, {
-      type: "cell_set",
-      cell_id: this.#cellId,
-      value: wire,
-    });
+    const msg = invokeSyncOp(this.#exec, { type: "cell_set", cell_id: this.#cellId, value: wire });
     if (!msg.ok) throw decodeFailure(msg, this.#exec);
   }
 }

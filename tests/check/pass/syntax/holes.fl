@@ -82,3 +82,34 @@ let keep_wildcards item =
   match item with
   | Some n -> n + value
   | _ -> value
+
+// Cross-feature interactions: `orelse`, `catch`, `result { ... }`, `let ... else`,
+// and bidirectional checking through annotated lists.
+with_orelse : Option String -> String
+let with_orelse item = (item |> Option.map (label "[" _ "]")) orelse "none"
+
+fail_read : String -> String ->{; ReadError} String
+let fail_read tag path =
+  let _ = tag
+  Fail.fail (ReadError path)
+
+with_catch : Path ->{} String
+let with_catch path =
+  (path |> fail_read "hdr" _) catch
+  | ReadError p -> p
+
+with_result : Path ->{} Result ReadError String
+let with_result path = result { path |> fail_read "hdr" _ }
+
+with_let_else : Option String -> String
+let with_let_else item =
+  let Some wrapped_item = item |> Option.map (label "[" _ "]") else "none"
+  wrapped_item
+
+use_poly : (forall a. a -> Int) -> Int -> Int
+let use_poly f n = f n
+
+annotated_list_hole : List ((forall a. a -> Int) -> Int)
+let annotated_list_hole =
+  let fns : List ((forall a. a -> Int) -> Int) = [use_poly _ 1]
+  fns

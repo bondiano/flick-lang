@@ -38,6 +38,7 @@ pub enum SchemaIntrinsic {
     MakeCheck,
     RunCheck,
     SameValue,
+    StrictSameValue,
     EncodeXml,
     ExportJsonSchema,
     RouteFormatUrl,

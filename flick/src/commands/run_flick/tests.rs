@@ -41,6 +41,7 @@ fn load_origin_span_rejects_non_utf8_and_mid_character_spans() {
             },
         ],
         tools: vec![],
+        dependencies: vec![],
     };
     let mut sources = SourceMap::default();
     // `é` occupies bytes 6..8 in "// café\n"

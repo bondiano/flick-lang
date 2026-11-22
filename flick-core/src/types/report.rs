@@ -36,21 +36,27 @@ impl Checker<'_> {
     /// Unifies the type an expression has with the one its position expects;
     /// reports a mismatch at `span`. `false` after a diagnostic.
     pub fn expect(&mut self, actual: &Type, expected: &Type, span: Span) -> bool {
-        if let Some(fits) = self.errors_in(actual, expected, span) {
+        self.expect_for(actual, expected, span, span)
+    }
+
+    /// Like [`Self::expect`], recording any lift or implicit conversion at
+    /// `site` while reporting diagnostics at `diag`.
+    pub fn expect_for(&mut self, actual: &Type, expected: &Type, site: Span, diag: Span) -> bool {
+        if let Some(fits) = self.errors_in(actual, expected, diag) {
             return fits;
         }
         let ground = self.coercion_types(actual, expected);
         let marks = (self.cx.regions.holds.len(), self.cx.subrows.len());
-        match self.subsume(actual, expected, span) {
+        match self.subsume(actual, expected, diag) {
             Ok(()) => {
                 if let Some(lift) = self.lift(actual, expected) {
-                    self.typing.lifts.insert(super::typing::range(span), lift);
+                    self.typing.lifts.insert(super::typing::range(site), lift);
                 }
                 true
             }
             Err(mismatch) => {
                 if let Some((actual, expected)) = ground
-                    && self.insert_coercion(&actual, &expected, span)
+                    && self.insert_coercion(&actual, &expected, site)
                 {
                     // ground nominal types bind no metas; what the failed
                     // comparison queued is about a value no longer placed here
@@ -58,7 +64,7 @@ impl Checker<'_> {
                     self.cx.subrows.truncate(marks.1);
                     return true;
                 }
-                self.mismatch(&mismatch, actual, expected, span);
+                self.mismatch(&mismatch, actual, expected, diag);
                 false
             }
         }

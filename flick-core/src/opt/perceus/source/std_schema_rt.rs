@@ -154,6 +154,7 @@ fn schema_intrinsic_by_name(name: &str) -> Option<SchemaIntrinsic> {
         "MakeCheck" => S::MakeCheck,
         "RunCheck" => S::RunCheck,
         "SameValue" => S::SameValue,
+        "StrictSameValue" => S::StrictSameValue,
         "EncodeXml" => S::EncodeXml,
         "ExportJsonSchema" => S::ExportJsonSchema,
         "DifferJsonPatchOps" => S::DifferJsonPatchOps,

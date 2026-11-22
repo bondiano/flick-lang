@@ -31,7 +31,7 @@ mod tools;
 pub use build::BuildCommand;
 pub use check::CheckCommand;
 pub use clean::clean;
-pub use deps::deps;
+pub use deps::{Verb, deps};
 pub use dev::dev;
 pub use diff::diff;
 pub use expand::expand;

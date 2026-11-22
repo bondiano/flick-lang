@@ -5,22 +5,22 @@
 //! only in memory (`OverlayHost`) and compile into an isolated temporary
 //! generation emitted and launched through the project's selected backend.
 
+mod overlay;
 mod process;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use overlay::OverlayHost;
 pub(crate) use process::{RunOutput, RunStatus};
 
 use std::collections::BTreeMap;
 #[cfg(feature = "wasm-backends")]
 use std::fmt::Write as _;
-use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::slice;
 #[cfg(feature = "wasm-backends")]
 use std::str;
-use std::sync::Arc;
 
 #[cfg(feature = "wasm-backends")]
 use flick_backend::LaunchKind;
@@ -31,8 +31,9 @@ use flick_backend::host::runtime::Cancellation;
 use flick_backend::{Limits, Verb};
 use flick_core::build::Extras;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::plugin::{Expander, reach::Outside};
-use flick_core::project::{self, Compilation, Host, Project};
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::Host;
+use flick_core::project::{self, Compilation, Project};
 #[cfg(feature = "wasm-backends")]
 use flick_core::source::Span;
 use flick_core::source::{FileId, SourceMap};
@@ -44,67 +45,6 @@ use crate::backends::options::{self, ResolvedOptions, TargetChoice};
 use crate::backends::{self, Selected};
 use crate::sources::FsHost;
 use crate::{builtins, package_cache, stdlib};
-
-/// Serves overlaid in-memory `.fl` modules under a source root and delegates
-/// all other reads to the underlying [`FsHost`].
-pub(crate) struct OverlayHost<'a> {
-    base: &'a FsHost,
-    overlays: BTreeMap<PathBuf, Vec<u8>>,
-}
-
-impl<'a> OverlayHost<'a> {
-    pub(crate) fn new(
-        base: &'a FsHost,
-        root: &Path,
-        modules: impl IntoIterator<Item = (String, String)>,
-    ) -> Self {
-        let overlays = modules
-            .into_iter()
-            .map(|(name, source)| {
-                let path = project::normalize(&root.join(project::module_path(&name)));
-                (path, source.into_bytes())
-            })
-            .collect();
-        Self { base, overlays }
-    }
-
-    pub(crate) fn paths(&self) -> impl Iterator<Item = &PathBuf> {
-        self.overlays.keys()
-    }
-}
-
-impl Host for OverlayHost<'_> {
-    fn read(&self, path: &Path) -> io::Result<Vec<u8>> {
-        if let Some(bytes) = self.overlays.get(path) {
-            return Ok(bytes.clone());
-        }
-        let normalized = project::normalize(path);
-        if let Some(bytes) = self.overlays.get(&normalized) {
-            return Ok(bytes.clone());
-        }
-        self.base.read(path)
-    }
-
-    fn display(&self, path: &Path) -> String {
-        self.base.display(path)
-    }
-
-    fn plugin(&self, package: &str, component: Option<&Path>) -> Result<Arc<dyn Expander>, String> {
-        self.base.plugin(package, component)
-    }
-
-    fn cached(&self, key: &[u8]) -> Option<Vec<u8>> {
-        self.base.cached(key)
-    }
-
-    fn save(&self, key: &[u8], value: &[u8]) {
-        self.base.save(key, value);
-    }
-
-    fn outside(&self) -> Option<Arc<dyn Outside>> {
-        self.base.outside()
-    }
-}
 
 /// Backend and resolved `Verb::Run` options prepared once for one or more
 /// `run-flick` executions.
@@ -182,11 +122,26 @@ pub(crate) fn compile_overlay(
     let overlay_paths: Vec<PathBuf> = overlay_host.paths().cloned().collect();
     let entry_path = project::normalize(&root.join(project::module_path(entry)));
     let mut sources = SourceMap::default();
+    let discovered = match project {
+        Some(p) => match project::discover(host, &mut sources, &p.root, Some(&p.root)) {
+            Ok(found) => found,
+            Err(diagnostic) => {
+                return (
+                    sources,
+                    vec![diagnostic],
+                    Compilation::default(),
+                    overlay_paths,
+                );
+            }
+        },
+        None => None,
+    };
+    let effective = discovered.as_ref().or(project);
     let (mut diagnostics, mut compilation) = package_cache::with_saved(|saved| {
         let (diagnostics, compilation, fresh) = project::compile_with(
             &overlay_host,
             &mut sources,
-            project,
+            effective,
             slice::from_ref(&entry_path),
             saved,
             Some(rt),
@@ -196,7 +151,7 @@ pub(crate) fn compile_overlay(
     });
     if !diagnostics.iter().any(|d| d.severity == Severity::Error) {
         compilation.modules.retain(|c| !c.test);
-        hooks::ir(project, &mut compilation, &mut diagnostics);
+        hooks::ir(effective, &mut compilation, &mut diagnostics);
     }
     (sources, diagnostics, compilation, overlay_paths)
 }

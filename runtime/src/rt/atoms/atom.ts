@@ -10,7 +10,8 @@ import { withOwner } from "../owner.ts";
 import type { Codec } from "../schema.ts";
 import { type UrlCodec, routeParse, routePrint } from "../route.ts";
 import { streamHooks } from "../ui/stream_hook.ts";
-import { type Atom, type AsyncResult, type Reading, type Registry, isAtom, lastSuccess, mapped, patched, readable, state, waitingFrom } from "./registry.ts";
+import { type Atom, type Reading, type Registry, isAtom, mapped, patched, readable, state } from "./registry.ts";
+import { type AsyncResult, lastSuccess, waitingFrom } from "./task.ts";
 import { seededTask, serializableTask, withSeed } from "./serial.ts";
 import { WRITE, reading, registryHere, registryOf, toAsync } from "./services.ts";
 
@@ -31,12 +32,15 @@ export const atomTask = (task: () => unknown): Atom => seededTask(() => task);
 
 /** `atom`, which a mutation of one of `keys` refreshes in the registry that reads it. */
 const withReactivity = (keys: ReadonlyArray<string>, atom: Atom): Atom =>
-  readable(
-    (r: Reading) => {
-      r.addFinalizer(r.registry.register(keys, () => r.registry.refresh(atom)));
-      return r.get(atom);
-    },
-    (registry) => registry.refresh(atom),
+  patched(
+    readable(
+      (r: Reading) => {
+        r.addFinalizer(r.registry.register(keys, () => r.registry.refresh(atom)));
+        return r.get(atom);
+      },
+      (registry) => registry.refresh(atom),
+    ),
+    atom.equals === undefined ? {} : { equals: atom.equals },
   );
 
 /** `Atom.query keys task`: a task atom that a mutation of one of `keys` runs anew. */
@@ -319,27 +323,30 @@ export const atomRoute = <A>(codec: UrlCodec, fallback: A): Atom<A> => {
  * when there is none. Its failure fails it. As the adapter's atom of a stream.
  */
 const streamAtom = (run: (element: (value: unknown) => void) => unknown, empty: () => Cause): Atom<AsyncResult> =>
-  readable((r) => {
-    const previous = r.self();
-    let latest: { readonly value: unknown } | undefined;
-    let started = false;
-    const element = (value: unknown): void => {
-      latest = { value };
-      // during the read, the value it returns is the latest; `setSelf` there would replace it
-      if (started) r.setSelf({ _tag: "Success", value, waiting: true });
-    };
-    const ended = (exit: Exit): AsyncResult => {
-      const last = latest ?? lastSuccess(previous);
-      if (exit.cause !== undefined) return { _tag: "Failure", cause: exit.cause, previous: last, waiting: false };
-      return last === undefined ? { _tag: "Failure", cause: empty(), previous: undefined, waiting: false } : { _tag: "Success", value: last.value, waiting: false };
-    };
-    const fiber = forkNow(() => withOwner(() => run(element)), r.registry.ctx);
-    if (fiber.exit !== undefined) return ended(fiber.exit);
-    started = true;
-    fiber.observe((exit) => r.setSelf(ended(exit)));
-    r.addFinalizer(() => fiber.interrupt(-1));
-    return latest === undefined ? waitingFrom(previous) : { _tag: "Success", value: latest.value, waiting: true };
-  });
+  patched(
+    readable((r) => {
+      const previous = r.self();
+      let latest: { readonly value: unknown } | undefined;
+      let started = false;
+      const element = (value: unknown): void => {
+        latest = { value };
+        // during the read, the value it returns is the latest; `setSelf` there would replace it
+        if (started) r.setSelf({ _tag: "Success", value, waiting: true });
+      };
+      const ended = (exit: Exit): AsyncResult => {
+        const last = latest ?? lastSuccess(previous);
+        if (exit.cause !== undefined) return { _tag: "Failure", cause: exit.cause, previous: last, waiting: false };
+        return last === undefined ? { _tag: "Failure", cause: empty(), previous: undefined, waiting: false } : { _tag: "Success", value: last.value, waiting: false };
+      };
+      const fiber = forkNow(() => withOwner(() => run(element)), r.registry.ctx);
+      if (fiber.exit !== undefined) return ended(fiber.exit);
+      started = true;
+      fiber.observe((exit) => r.setSelf(ended(exit)));
+      r.addFinalizer(() => fiber.interrupt(-1));
+      return latest === undefined ? waitingFrom(previous) : { _tag: "Success", value: latest.value, waiting: true };
+    }),
+    { equals: Object.is },
+  );
 
 const NO_SUCH_ELEMENT = /*#__PURE__*/ tag("Cause.NoSuchElementError.NoSuchElementError");
 
@@ -356,5 +363,5 @@ export const atomQueryStream = (keys: ReadonlyArray<string>, stream: unknown): A
     if (streamHooks.each === undefined) throw new Error("`Atom.query_stream` reads a `Stream`, which needs the optional `@flick-lang/effect-ts` adapter");
     return streamHooks.each(stream, element);
   };
-  return withReactivity(keys, mapped(streamAtom(run, noElement), toAsync));
+  return withReactivity(keys, patched(mapped(streamAtom(run, noElement), toAsync), { equals: Object.is }));
 };

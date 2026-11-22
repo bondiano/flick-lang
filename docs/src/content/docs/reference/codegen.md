@@ -54,7 +54,7 @@ is `Math.imul(a, b)`, and `/`, `%` and `**` are runtime calls that truncate
 and divide by zero to `0`. `/` and `%` on `BigInt` are runtime calls too,
 for the zero divisor.
 | tuple, `List` | dense array |
-| record | plain object with exactly its fields, in the order written |
+| record | plain object with exactly its fields in canonical sorted UTF-16 label order (field expressions evaluate in source order; array-index keys, if any, come first numerically per ECMAScript) |
 | ADT value | `{ _tag, _0, _1, … }`, fields in declaration order |
 | `unboxed type T = C f` | the field itself |
 | `untagged type T = A f \| B g …` | the field of its constructor, told apart by its JS type |
@@ -442,10 +442,10 @@ Values have the representation of the JS target, in Go terms:
 | `String` | `string` holding WTF-8 |
 | `Bool`, `Unit` | `bool`, `flickrt.Unit` |
 | a tuple, a `List` | `[]flickrt.Value`; `[x, ...rest]` shares the storage of the list |
-| a record | `*flickrt.Record`, its labels in JS key order, copied by `{ r with … }` |
+| a record | `*flickrt.Record`, its labels in canonical sorted order (JS array-index keys ascending, then UTF-16 code-unit order — matching `Record.labels` and the JS target), copied by `{ r with … }` |
 | a constructor | `*flickrt.Data` with the tag of the JS target; `Fields()` is its fields, up to two of them held in the value itself |
 | a constructor that has fields, of a type the program declares | a Go type of its own, `*T_Module__Name`, holding the fields: a `match` asks Go for the type and compares no tag. The runtime reads any constructor value as `flickrt.Constructed` (`TagName()`, `Fields()`) and builds one with `flickrt.Construct(tag, fields...)`; a constructor without fields, one of a built-in module and one holding a dictionary stay `*flickrt.Data` |
-| a constructor declared over a record, `Node { left : Tree; key : Int }` | the record lies in the value of the constructor: one object, and the record a `match` binds is a `*flickrt.Record` pointing into it. Its labels are in the order of the declaration, whatever order a literal writes them in; a record given whole (`Node r`) is copied in |
+| a constructor declared over a record, `Node { left : Tree; key : Int }` | the record lies in the value of the constructor: one object, and the record a `match` binds is a `*flickrt.Record` pointing into it. Its labels are in canonical sorted order, whatever order the declaration or literal writes them in (field expressions still evaluate in source order); a record given whole (`Node r`) is copied in |
 | a function | `func(*flickrt.Fiber, flickrt.Value) flickrt.Value` per stage; one of two or three arguments whose stages before the last are pure is `flickrt.Fn2` or `flickrt.Fn3`, which takes them at once |
 | a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
 

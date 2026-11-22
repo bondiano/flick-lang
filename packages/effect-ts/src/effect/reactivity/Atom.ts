@@ -6,6 +6,7 @@
 import { Context, type Duration, Effect, Layer, LogLevel, Option, type Schema, Scope, type Tracer } from "effect";
 import type * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
+import { equals as flickEquals, hash as flickHash, sameValue } from "../../data.ts";
 import * as AtomRegistry from "./AtomRegistry.ts";
 
 import { service } from "../../effects.ts";
@@ -40,10 +41,17 @@ const callerRegistry: Effect.Effect<AtomRegistry.AtomRegistry, never, AtomRegist
 
 /** `Reactivity.Atom.state`: a writable atom holding `value`. */
 export const flickState = <A>(value: A): Atom.Writable<A> =>
-  Atom.writable(
-    () => value,
-    (ctx, next: A) => ctx.setSelf(next),
+  Atom.withEquality(
+    Atom.writable(
+      () => value,
+      (ctx, next: A) => ctx.setSelf(next),
+    ),
+    sameValue,
   );
+
+/** `Reactivity.Atom.readable`: a derived atom whose values compare without observing data identity. */
+export const readable = <A>(read: (get: Atom.AtomContext) => A): Atom.Atom<A> =>
+  Atom.withEquality(Atom.readable(read), sameValue);
 
 /** `Reactivity.Atom.read`: the value of `atom` inside a read function, which then depends on it. */
 export const flickRead = <A>(ctx: Atom.AtomContext, atom: Atom.Atom<A>): A => ctx(atom);
@@ -52,7 +60,53 @@ export const flickRead = <A>(ctx: Atom.AtomContext, atom: Atom.Atom<A>): A => ct
 export const flickFromTask = <A, E>(task: Effect.Effect<A, E>) => taskAtom(task);
 
 /** `Reactivity.Atom.map`. */
-export const flickMap = <A, B>(f: (a: A) => B, atom: Atom.Atom<A>): Atom.Atom<B> => Atom.map(atom, f);
+export const flickMap = <A, B>(f: (a: A) => B, atom: Atom.Atom<A>): Atom.Atom<B> =>
+  Atom.withEquality(Atom.map(atom, f), sameValue);
+
+interface FamilyEntry<K, A> {
+  readonly code: number;
+  readonly key: K;
+  readonly ref: { deref(): A | undefined };
+}
+
+/**
+ * `Reactivity.Atom.family`: one atom per structural key, made by `f` the first
+ * time. Keys are compared by Flick's structural `hash` and `equals` so records,
+ * tuples, and data values (including GADTs with held dictionaries) never observe
+ * storage identity or written field order, while mutable cells (`Ref`) and
+ * foreign handles retain reference identity.
+ */
+export const family = <K, A>(f: (key: K) => A): ((key: K) => A) => {
+  const entries = new Map<number, Array<FamilyEntry<K, A>>>();
+  const forget = (entry: FamilyEntry<K, A>): void => {
+    const rest = (entries.get(entry.code) ?? []).filter((e) => e !== entry);
+    if (rest.length > 0) entries.set(entry.code, rest);
+    else entries.delete(entry.code);
+  };
+  const gone = typeof FinalizationRegistry === "function"
+    ? new FinalizationRegistry<FamilyEntry<K, A>>((entry) => { forget(entry); })
+    : undefined;
+  return (key) => {
+    const code = flickHash(key);
+    const bucket = entries.get(code) ?? [];
+    for (const entry of bucket) {
+      const known = entry.ref.deref();
+      if (known === undefined) continue;
+      if (flickEquals(entry.key, key)) return known;
+    }
+    const atom = f(key);
+    const entry: FamilyEntry<K, A> = {
+      code,
+      key,
+      ref: typeof atom === "object" && atom !== null ? new WeakRef(atom) : { deref: () => atom },
+    };
+    const live = bucket.filter((e) => e.ref.deref() !== undefined);
+    live.push(entry);
+    entries.set(code, live);
+    if (typeof atom === "object" && atom !== null) gone?.register(atom, entry);
+    return atom;
+  };
+};
 
 /** `Reactivity.Atom.with_label`: names the atom in debugging tools. */
 export const flickWithLabel = <T extends Atom.Atom<unknown>>(name: string, atom: T): T => Atom.withLabel(atom, name);
@@ -67,7 +121,7 @@ export const flickSerializableFamily = <A>(
   codec: Schema.Codec<A, unknown>,
   make: (key: string) => Atom.Writable<A>,
 ): ((key: string) => Atom.Writable<A>) =>
-  Atom.family((key: string) => flickSerializable(`${prefix}/${key}`, codec, make(key)));
+  family((key: string) => flickSerializable(`${prefix}/${key}`, codec, make(key)));
 
 /** `Reactivity.Atom.idle_ttl`: how long the value stays after nobody reads it. */
 export const flickIdleTtl = <T extends Atom.Atom<unknown>>(ttl: Duration.Duration, atom: T): T =>

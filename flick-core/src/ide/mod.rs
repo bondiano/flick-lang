@@ -7,6 +7,7 @@ mod complete;
 mod enrich;
 mod expect;
 mod fields;
+mod highlights;
 mod hints;
 mod hover;
 mod locals;
@@ -20,6 +21,7 @@ mod tree;
 
 pub use actions::Action;
 pub use complete::{Completion, CompletionKind};
+pub use highlights::{Highlight, HighlightKind};
 pub use hints::Help;
 pub use symbols::Outline;
 pub use tokens::TOKEN_TYPES;
@@ -444,6 +446,8 @@ mod hover_tests;
 #[cfg(test)]
 mod kind_hover_tests;
 #[cfg(test)]
+mod let_else_tests;
+#[cfg(test)]
 mod migration_tests;
 #[cfg(test)]
 mod operator_hover_tests;
@@ -457,6 +461,8 @@ mod rank_tests;
 mod rename_safety_tests;
 #[cfg(test)]
 mod rename_tests;
+#[cfg(test)]
+mod result_tests;
 #[cfg(test)]
 mod set_tests;
 #[cfg(test)]

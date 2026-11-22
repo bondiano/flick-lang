@@ -121,7 +121,7 @@ fn a_record_under_a_constructor_lies_in_its_value() {
         found.map(|(_, go)| go.as_str()).expect(name)
     };
     let (go, types) = (file("m_App.go"), file("own_types.go"));
-    // one object: the header of a record over the values, in the order declared
+    // one object: the header of a record over the values, in canonical label order
     assert!(
         types.contains(
             "type T_App__Box struct {\n\trec  flickrt.Record\n\tf    [3]flickrt.Value\n\tself [1]flickrt.Value\n}"
@@ -129,7 +129,7 @@ fn a_record_under_a_constructor_lies_in_its_value() {
         "{types}"
     );
     assert!(
-        types.contains("var S_T_App__Box = flickrt.ShapeOf(\"w\", \"h\", \"name\")"),
+        types.contains("var S_T_App__Box = flickrt.ShapeOf(\"h\", \"name\", \"w\")"),
         "{types}"
     );
     // the list of its one field is kept in the value: none is made where the runtime asks
@@ -137,19 +137,19 @@ fn a_record_under_a_constructor_lies_in_its_value() {
         types.contains("func (p *T_App__Box) Fields() []flickrt.Value { return p.self[:] }"),
         "{types}"
     );
-    // a literal gives its values to their places, whatever order it writes them in
-    assert!(go.contains("New_T_App__Box(int32(3), int32(2), t"), "{go}");
+    // a literal gives its values to their canonical places ("h", "name", "w"), whatever order it writes them in
+    assert!(go.contains("New_T_App__Box(int32(2), t"), "{go}");
     // `{ box with … }` is a copy in a new value with a place set: no record apart
-    assert!(go.contains("With_T_App__Box(l_box).Set(1, "), "{go}");
+    assert!(go.contains("With_T_App__Box(l_box).Set(0, "), "{go}");
     assert!(!go.contains("flickrt.With("), "{go}");
     // a label of the pattern is a place; the record taken whole is a pointer into the value
-    assert!(go.contains("l_shape.(*T_App__Box).f[1]"), "{go}");
+    assert!(go.contains("l_shape.(*T_App__Box).f[0]"), "{go}");
     assert!(
         go.contains("var l_box flickrt.Value = flickrt.Value(&l_shape.(*T_App__Box).rec)"),
         "{go}"
     );
     // read through the name, a label is a place too
-    assert!(go.contains("flickrt.FieldAt(l_box, 1)"), "{go}");
+    assert!(go.contains("flickrt.FieldAt(l_box, 0)"), "{go}");
     // any other record is copied in
     assert!(go.contains("Of_T_App__Box(l_r)"), "{go}");
 }

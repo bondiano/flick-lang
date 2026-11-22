@@ -463,6 +463,7 @@ mod tests {
             sources: "src".into(),
             inputs,
             tools: vec![],
+            dependencies: vec![],
         }
     }
 

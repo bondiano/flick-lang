@@ -107,15 +107,15 @@ func failFast(fb *Fiber, f func(*Fiber, Value, Value) Value, a, b Value) Value {
 	return Some(f(fb, x.Fields()[0], y.Fields()[0]))
 }
 
-// StructCombiner combines records field by field, as `combiners` lists
-// the fields.
+// StructCombiner combines records field by field in canonical UTF-16 label order.
 func StructCombiner(_, combiners Value) Value {
 	cs := record(combiners)
+	keys := sortedKeys(cs)
 	return combiner(func(fb *Fiber, a, b Value) Value {
 		x, y := record(a), record(b)
-		out := &Record{}
-		for i, k := range cs.keys {
-			out = out.set(k, comb(cs.vals[i]).combine(fb, x.Get(k), y.Get(k)))
+		out := newRecord(len(keys))
+		for _, k := range keys {
+			out.putCanonical(k, comb(cs.Get(k)).combine(fb, x.Get(k), y.Get(k)))
 		}
 		return out
 	})
@@ -123,9 +123,10 @@ func StructCombiner(_, combiners Value) Value {
 
 func StructReducer(d, reducers Value) Value {
 	rs := record(reducers)
-	initial := &Record{}
-	for i, k := range rs.keys {
-		initial = initial.set(k, comb(rs.vals[i]).initial)
+	keys := sortedKeys(rs)
+	initial := newRecord(len(keys))
+	for _, k := range keys {
+		initial.putCanonical(k, comb(rs.Get(k)).initial)
 	}
 	return reducer(comb(StructCombiner(d, reducers)).combine, initial)
 }

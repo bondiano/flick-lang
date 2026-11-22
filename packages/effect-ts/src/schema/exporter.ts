@@ -150,7 +150,7 @@ const body = (ast: SchemaAST.AST, path: string, defs: Defs): JsonSchema => {
   const transform = noteOf(ast, "flick/transform");
   const unwritable = transform && TRANSFORMS[transform];
   if (unwritable) throw new Unsupported(path, unwritable);
-  if (notes["flick/block"] && ast._tag === "Objects") {
+  if (notes["flick/block"] && notes["flick/wires"] && ast._tag === "Objects") {
     const closed = !notesOf(wireEnd(ast))["flick/ignoreExtra"];
     return objectOf(ast, path, defs, notes["flick/wires"], closed);
   }

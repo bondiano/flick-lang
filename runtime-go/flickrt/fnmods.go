@@ -132,8 +132,8 @@ func FilterEquals(v, u Value) Value {
 }
 
 func FilterEqualsStrict(v, u Value) Value {
-	if Same(u, v) {
-		return Ok(v)
+	if SameValue(u, v) {
+		return Ok(u)
 	}
 	return Err(u)
 }

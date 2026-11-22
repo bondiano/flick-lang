@@ -8,6 +8,7 @@ import {
   invokeTarget,
   prepareArgs,
   resolveTarget,
+  resolveTargetSync,
 } from "./worker_adapt.mjs";
 import { invokeAsyncCallback, makeCallback } from "./worker_callbacks.mjs";
 import {
@@ -15,6 +16,7 @@ import {
   Effect,
   bridge,
   causeMod,
+  collectMsgHandleIds,
   executions,
   fiberMod,
   fnResultHint,
@@ -27,19 +29,19 @@ import {
   wireCtx,
 } from "./worker_runtime.mjs";
 
-export async function handleCall(msg, alreadyPending = false, pinnedHandles = null) {
+export async function handleCall(msg, alreadyPending = false, prePinned = null) {
   const exec = executions.get(msg.exec);
   const spec = msg.spec;
   const callId = msg.call_id;
-  const checkAlive = () => !alreadyPending || (exec.pendingCalls.delete(callId) && !exec.closing);
-  let pendingPinned = pinnedHandles;
+  let pinned = prePinned ?? (exec ? exec.pinExistingHandles(collectMsgHandleIds(msg)) : []);
   const releasePinned = () => {
-    if (pendingPinned !== null && pendingPinned.length > 0) {
-      const ids = pendingPinned;
-      pendingPinned = null;
+    if (pinned.length > 0) {
+      const ids = pinned;
+      pinned = [];
       exec?.releaseHandles(ids);
     }
   };
+  const checkAlive = () => !alreadyPending || (exec.pendingCalls.delete(callId) && !exec.closing);
   try {
     // Special-case `Js.promise_callback` regardless of mode so the returned JS function
     // invokes the Rust async callback on a child fiber and resolves its Promise.
@@ -49,18 +51,18 @@ export async function handleCall(msg, alreadyPending = false, pinnedHandles = nu
         spec.from === "@flick-lang/effect-ts") &&
       spec.name === "promiseCallback"
     ) {
-      releasePinned();
       const cbWire = msg.args[0];
       const cbId = cbWire.nodes[cbWire.root][1];
       const promiseFn = (arg) => invokeAsyncCallback(exec, cbId, [arg], undefined, "promise");
+      releasePinned();
       if (checkAlive()) finishCallOk(exec, callId, spec, false, promiseFn);
       return;
     }
-    const { target, bridged } = await resolveTarget(exec, spec);
-    if (alreadyPending && (!exec.pendingCalls.has(callId) || exec.closing)) {
-      releasePinned();
-      return;
-    }
+    const syncResolved = resolveTargetSync(exec, spec);
+    const { target, bridged } = syncResolved.needsAsyncLoad
+      ? await resolveTarget(exec, spec)
+      : syncResolved;
+    if (alreadyPending && (!exec.pendingCalls.has(callId) || exec.closing)) return;
     const controller = spec.mode === "Async" || spec.adapter.cancel ? new AbortController() : null;
     const finalArgs = prepareArgs(exec, spec, msg.args, bridged, controller);
     const callCtx = buildCallCtx(exec, msg);
@@ -150,8 +152,9 @@ export async function handleCall(msg, alreadyPending = false, pinnedHandles = nu
       if (checkAlive()) finishCallOk(exec, callId, spec, bridged, runOrVal);
     }
   } catch (err) {
-    releasePinned();
     if (checkAlive()) finishCallErr(exec, callId, err, spec.has_catch);
+  } finally {
+    releasePinned();
   }
 }
 
@@ -342,6 +345,14 @@ export function handleLookupService(msg) {
 export function handlePerformService(msg) {
   const exec = executions.get(msg.exec);
   const callId = msg.call_id;
+  let pinned = exec ? exec.pinExistingHandles(collectMsgHandleIds(msg)) : [];
+  const releasePinned = () => {
+    if (pinned.length > 0) {
+      const ids = pinned;
+      pinned = [];
+      exec?.releaseHandles(ids);
+    }
+  };
   try {
     const callCtx = buildCallCtx(exec, msg);
     let impl;
@@ -353,6 +364,7 @@ export function handlePerformService(msg) {
     } else {
       const found = lookupInCallCtx(callCtx, msg.effect);
       if (!found) {
+        releasePinned();
         send({
           type: "call_done",
           call_id: callId,
@@ -368,6 +380,7 @@ export function handlePerformService(msg) {
     }
     const fn = impl?.[msg.op_name];
     if (typeof fn !== "function") {
+      releasePinned();
       send({
         type: "call_done",
         call_id: callId,
@@ -382,6 +395,7 @@ export function handlePerformService(msg) {
       const v = decodeWire(w, exec, wireCtx);
       return isEffect ? bridge.dataToEffect(v) : v;
     });
+    releasePinned();
     if (msg.op_name === "update" || msg.op_name === "modify") {
       const pair =
         decodedArgs.length >= 2 &&
@@ -465,6 +479,8 @@ export function handlePerformService(msg) {
     send({ type: "call_done", call_id: callId, ok: true, value: wire });
   } catch (err) {
     finishCallErr(exec, callId, err, false);
+  } finally {
+    releasePinned();
   }
 }
 

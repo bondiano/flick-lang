@@ -10,8 +10,8 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::handle::{arm_pattern, failed_pattern, operation_path};
 use crate::types::lang::{self, Lang};
 use crate::types::{
-    Dict, Identity, Owner, Range, Ref, StageKey, app_hole, applied_order, children, composed_key,
-    composition, is_pattern, let_parts, param_key, result_key, right_application,
+    Constructor, Dict, Identity, Owner, Range, Ref, StageKey, app_hole, applied_order, children,
+    composed_key, composition, is_pattern, let_parts, param_key, result_key, right_application,
 };
 
 impl Lower<'_> {
@@ -280,7 +280,7 @@ impl Lower<'_> {
                 ExprKind::Match(scrutinee, self.arms(node))
             }
             K::TryExpr | K::ProvideExpr if self.handles_effects(node) => self.handler(node),
-            K::TryExpr => {
+            K::TryExpr | K::CatchExpr => {
                 let body = *self.boxed(children[0]);
                 ExprKind::Handle(Box::new(Handler {
                     effects: Vec::new(),
@@ -289,6 +289,7 @@ impl Lower<'_> {
                     errors: self.arms(node),
                 }))
             }
+            K::ResultExpr => self.result_expr(children[0], span),
             K::TaskExpr => {
                 let key = StageKey::Task { node: node.range() };
                 self.register_owner_entry(key);

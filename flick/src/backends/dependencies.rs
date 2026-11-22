@@ -37,23 +37,6 @@ impl Pins {
         }
         Ok(vec![self.graph.pin("@flick-lang/runtime", &manifest)?])
     }
-
-    pub(super) fn verify(
-        &mut self,
-        root: &Path,
-        pins: &[RuntimeDependency],
-    ) -> Result<bool, String> {
-        for pin in pins {
-            let found = resolve(root, &pin.package)?;
-            let Some(manifest) = found else {
-                return Ok(false);
-            };
-            if self.graph.pin(&pin.package, &manifest)? != *pin {
-                return Ok(false);
-            }
-        }
-        Ok(true)
-    }
 }
 
 pub(super) fn installed_for(root: &Path, effect: bool) -> Result<Vec<RuntimeDependency>, String> {
@@ -74,12 +57,6 @@ pub(super) fn installed_for(root: &Path, effect: bool) -> Result<Vec<RuntimeDepe
         }
     }
     Ok(pins)
-}
-
-/// Launch roots already identify every package selected at build time.
-/// The generated package.json need not repeat the source project's dependencies.
-pub(super) fn verify(root: &Path, pins: &[RuntimeDependency]) -> Result<bool, String> {
-    Pins::default().verify(root, pins)
 }
 
 fn names(manifest: &Value, peers: bool) -> BTreeSet<String> {

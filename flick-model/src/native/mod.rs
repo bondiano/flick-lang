@@ -523,7 +523,7 @@ fn fields(v: &Term) -> Result<Fields, String> {
         Term::Tuple(xs) => Ok((xs.to_vec(), None)),
         Term::Record(fs) => {
             let mut fs = fs.to_vec();
-            fs.sort_by(|a, b| a.0.cmp(&b.0));
+            fs.sort_by(|a, b| a.0.encode_utf16().cmp(b.0.encode_utf16()));
             let labels = fs.iter().map(|(l, _)| l.clone()).collect();
             Ok((fs.into_iter().map(|(_, x)| x).collect(), Some(labels)))
         }

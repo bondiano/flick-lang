@@ -323,7 +323,11 @@ fn filter_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr> {
         ("equalsStrict", 2) => Some(b.lam(
             &["v", "x"],
             b.if_(
-                b.bin(BinOp::Same, b.loc("x"), b.loc("v")),
+                b.app2(
+                    super::std_schema_rt::rt(b, "Schema.StrictSameValue"),
+                    b.loc("x"),
+                    b.loc("v"),
+                ),
                 b.ok(b.loc("x")),
                 b.err(b.loc("x")),
             ),

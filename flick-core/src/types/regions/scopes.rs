@@ -71,6 +71,7 @@ impl Checker<'_> {
         let needed = self.fresh();
         let mut stage = self.cx.stage.clone();
         stage.services = needed.clone();
+        stage.in_result = false;
         stage.returns = None;
         let outer = mem::replace(&mut self.cx.stage, stage);
         let body = node.nodes().next();

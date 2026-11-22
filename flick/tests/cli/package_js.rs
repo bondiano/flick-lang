@@ -1,6 +1,8 @@
 //! What a library brings on the js target: the npm packages of its
-//! `[js.dependencies]`, which `flick install` adds to the project's
+//! `[target.js.dependencies]`, which `flick install` adds to the project's
 //! `package.json`, and the foreign modules beside its Flick modules.
+
+mod backends;
 
 use crate::common;
 
@@ -15,6 +17,7 @@ const APP: &str = "schema-version = 1
 
 [tools]
 \"flick/go\" = [\"go\"]
+\"flick/js\" = [\"pnpm\"]
 
 [project]
 kind = \"app\"
@@ -38,7 +41,7 @@ fn library(version: &str) -> String {
 [project]
 kind = \"lib\"
 
-[js.dependencies]
+[target.js.dependencies]
 left-pad = \"{version}\"
 "
     )
@@ -235,6 +238,7 @@ const LIB_APP: &str = "schema-version = 1
 
 [tools]
 \"flick/go\" = [\"go\"]
+\"flick/js\" = [\"pnpm\"]
 
 [project]
 kind = \"app\"
@@ -401,7 +405,7 @@ fn a_shipped_foreign_module_runs_and_finds_npm_packages_from_the_project() {
     .expect("write");
     fs::write(
         dir.join("lib/flick.toml"),
-        format!("{LIB}\n[js.dependencies]\nleft-pad = \"^1.3.0\"\n"),
+        format!("{LIB}\n[target.js.dependencies]\nleft-pad = \"^1.3.0\"\n"),
     )
     .expect("write");
     fs::write(
@@ -422,7 +426,7 @@ fn a_foreign_go_file_of_a_library_is_compiled_under_the_name_of_its_package() {
     // the go target needs none of the npm packages of a library
     fs::write(
         dir.join("lib/flick.toml"),
-        format!("{LIB}\n[js.dependencies]\nleft-pad = \"^1.3.0\"\n"),
+        format!("{LIB}\n[target.js.dependencies]\nleft-pad = \"^1.3.0\"\n"),
     )
     .expect("write");
     let build = flick_in(&app, &["build"]);

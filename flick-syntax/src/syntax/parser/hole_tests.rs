@@ -37,9 +37,22 @@ fn expression_holes_parse_in_application_arguments_only() {
         "let a = _.name",
         "let a = f _.name",
         "let a = f _?",
+        "let a = _ orelse 0",
+        "let a = x orelse _",
+        "let a = _ catch\n  | E -> 0",
+        "let a = result { _ }",
     ] {
         assert_eq!(errors(bad), ["FLICK-S018 _"], "{bad}");
     }
+    // Cross-feature precedence: `|>` binds tighter than `orelse` and `catch`.
+    assert_eq!(
+        sexp("let g = x |> f a _ orelse 0"),
+        "(LetDecl let (VarPat g) = (Block (BinExpr (BinExpr (NameExpr x) |> (AppExpr (NameExpr f) (NameExpr a) (HoleExpr _))) orelse (Literal 0))))"
+    );
+    assert_eq!(
+        sexp("let g = x |> f a _ catch\n  | E -> 0"),
+        "(LetDecl let (VarPat g) = (Block (CatchExpr (BinExpr (NameExpr x) |> (AppExpr (NameExpr f) (NameExpr a) (HoleExpr _))) catch (MatchArm | (ConPat E) -> (Block (Literal 0))))))"
+    );
     // Wildcard patterns and type holes remain unchanged.
     assert_eq!(errors("let _ = 1"), Vec::<String>::new());
     assert_eq!(errors("let f = fun _ -> 1"), Vec::<String>::new());

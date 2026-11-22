@@ -17,6 +17,7 @@ use crate::syntax::patterns;
 use crate::types::lang::Lang;
 
 mod header;
+mod let_else;
 mod signatures;
 mod unsigned;
 
@@ -31,6 +32,8 @@ pub struct LetParts<'n> {
     /// The `: T` after the parameters.
     pub header: Option<&'n Node>,
     pub body: Option<&'n Node>,
+    /// The fallback block after `else` in `let pattern = initializer else fallback`.
+    pub fallback: Option<&'n Node>,
     pub rec: bool,
     /// `let assert`: the pattern may miss, and the program fails when it does.
     pub assert: bool,
@@ -53,11 +56,21 @@ impl LetParts<'_> {
 pub fn let_parts<'n>(decl: &'n Node, text: &str) -> LetParts<'n> {
     let pattern = decl.nodes().find(|n| is_pattern(n.kind));
     let assert = decl.has_token(K::AssertKw);
-    // `let assert x = …` binds like a pattern, to be checked as one
+    let else_kw = decl.child_tokens().find(|t| t.kind == K::ElseKw);
+    // `let assert x = …` and `let x = … else …` bind like a pattern, to be checked as one
     let name = pattern
-        .filter(|p| p.kind == K::VarPat && !assert)
+        .filter(|p| p.kind == K::VarPat && !assert && else_kw.is_none())
         .and_then(|p| p.child_tokens().find(|t| t.kind == K::Ident))
         .map(|t| t.text(text).to_owned());
+    let (body, fallback) = match else_kw {
+        Some(kw) => (
+            decl.nodes()
+                .find(|n| n.kind == K::Block && n.range().1 <= kw.start),
+            decl.nodes()
+                .find(|n| n.kind == K::Block && n.range().0 >= kw.end),
+        ),
+        None => (decl.nodes().find(|n| n.kind == K::Block), None),
+    };
     LetParts {
         name,
         pattern,
@@ -67,7 +80,8 @@ pub fn let_parts<'n>(decl: &'n Node, text: &str) -> LetParts<'n> {
             .flat_map(Node::nodes)
             .collect(),
         header: decl.nodes().find(|n| is_type(n.kind)),
-        body: decl.nodes().find(|n| n.kind == K::Block),
+        body,
+        fallback,
         rec: decl.has_token(K::RecKw),
         assert,
     }
@@ -94,17 +108,37 @@ impl Checker<'_> {
         &mut self,
         node: &Node,
         expected: Option<&Type>,
+        tail: Option<Tail<'_, Self>>,
+    ) -> Type {
+        let statements: Vec<&Node> = node.nodes().collect();
+        self.check_statements(&statements, node.range().1, expected, tail)
+    }
+
+    fn check_statements(
+        &mut self,
+        statements: &[&Node],
+        block_end: u32,
+        expected: Option<&Type>,
         mut tail: Option<Tail<'_, Self>>,
     ) -> Type {
         let mark = self.cx.locals.len();
-        let statements: Vec<&Node> = node.nodes().collect();
         let mut result = None;
         let mut i = 0;
         while i < statements.len() {
             let statement = statements[i];
             let last = i + 1 == statements.len();
             match statement.kind {
-                K::Signature | K::LetDecl => i += self.local_declaration(&statements, i),
+                K::LetDecl if statement.has_token(K::ElseKw) => {
+                    result = Some(self.let_else(
+                        statement,
+                        &statements[i + 1..],
+                        block_end,
+                        expected,
+                        tail.take(),
+                    ));
+                    break;
+                }
+                K::Signature | K::LetDecl => i += self.local_declaration(statements, i),
                 _ if last && tail.is_some() => {
                     let tail = tail.as_mut().expect("a tail");
                     result = Some(tail(self, expected));
@@ -124,10 +158,9 @@ impl Checker<'_> {
         }
         self.cx.locals.truncate(mark);
         result.unwrap_or_else(|| {
-            let end = node.range().1;
             self.error(
                 codes::T019,
-                Span::new(self.file, end, end),
+                Span::new(self.file, block_end, block_end),
                 "a block must end with an expression: its value is the value of the block",
             );
             Type::Error
@@ -144,13 +177,31 @@ impl Checker<'_> {
             return 0;
         }
         let name = signature_name(statement, self.text);
-        let next = statements
+        if let Some(next) = statements
             .get(i + 1)
             .copied()
-            .filter(|n| n.kind == K::LetDecl && let_parts(n, self.text).name.as_deref() == name);
-        if let Some(decl) = next {
-            self.local_let(decl, Some(statement), &statements[i + 2..]);
-            return 1;
+            .filter(|n| n.kind == K::LetDecl)
+        {
+            if next.has_token(K::ElseKw) {
+                let mut binders = Vec::new();
+                if let Some(pat) = let_parts(next, self.text).pattern {
+                    patterns::binders(pat, &mut binders);
+                }
+                if name.is_some_and(|n| binders.iter().any(|t| t.text(self.text) == n)) {
+                    let name = name.unwrap_or_default();
+                    self.error(
+                        codes::T006,
+                        self.span(statement),
+                        format!(
+                            "signature `{name}` cannot pair with `let ... else`: annotate the initializer or pattern instead"
+                        ),
+                    );
+                    return 0;
+                }
+            } else if let_parts(next, self.text).name.as_deref() == name {
+                self.local_let(next, Some(statement), &statements[i + 2..]);
+                return 1;
+            }
         }
         self.lone_signature(statement, false);
         0
@@ -329,7 +380,7 @@ impl Checker<'_> {
             let pat = self.bind_pattern(pattern, &ty);
             if parts.assert {
                 self.let_assert((&pat, &ty), pattern, decl, rest);
-            } else {
+            } else if !decl.has_token(K::ElseKw) {
                 self.irrefutable(&pat, &ty, pattern, rest.map(|rest| (decl, rest)));
             }
         }

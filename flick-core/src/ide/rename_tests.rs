@@ -404,3 +404,29 @@ let wrapped name = name |> label \"[\" _ \"]\"
     assert!(ide.renamable(file, hole).is_err());
     assert!(ide.rename(file, hole, "value").is_err());
 }
+
+#[test]
+fn rename_refuses_orelse_keyword_and_leaves_orelse_record_labels_alone() {
+    let source = "module App.Main exposing (run)\n\ntype alias Box = { orelse : Option Int }\n\nrun : Box -> Int\nlet run box =\n  let value = box.orelse orelse 0\n  let { orelse = raw } = box\n  value + (raw orelse 0)\n";
+    let f = fixture_of(&[("src/App/Main.fl", source)]);
+    assert_clean(&f);
+    let file = f.file("App.Main");
+    let ide = f.ide();
+    assert!(
+        ide.rename(file, f.at("App.Main", "value =", 0) + 1, "orelse")
+            .is_err(),
+        "cannot rename a local to reserved keyword `orelse`"
+    );
+    assert!(
+        ide.rename(file, f.at("App.Main", "run box", 0) + 1, "orelse")
+            .is_err(),
+        "cannot rename a top-level value to reserved keyword `orelse`"
+    );
+    let edits = ide
+        .rename(file, f.at("App.Main", "raw }", 0) + 1, "inner")
+        .expect("renaming pattern binder succeeds");
+    assert_eq!(edits.len(), 2);
+    for (_, (s, e)) in edits {
+        assert_eq!(&source[s as usize..e as usize], "raw");
+    }
+}

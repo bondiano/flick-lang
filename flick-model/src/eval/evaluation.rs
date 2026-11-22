@@ -195,6 +195,8 @@ impl<'p> Machine<'p> {
     }
 
     /// The next field of a record, `{ℓ₁ = v₁, …, ℓᵢ = E, …}`.
+    /// Field expressions evaluate in source order; once all fields are values,
+    /// the resulting record is canonicalized to UTF-16 label order.
     fn fields(&mut self, done: Vec<(Rc<str>, Term)>, rest: &[(Rc<str>, Term)]) -> Control {
         let mut done = done;
         let mut i = 0;
@@ -203,7 +205,10 @@ impl<'p> Machine<'p> {
             i += 1;
         }
         match rest.get(i) {
-            None => Control::Ret(Term::Record(done.into())),
+            None => {
+                done.sort_by(|a, b| a.0.encode_utf16().cmp(b.0.encode_utf16()));
+                Control::Ret(Term::Record(done.into()))
+            }
             Some((label, next)) => {
                 let next = next.clone();
                 self.push(Frame::Record(done, label.clone(), rest[i + 1..].into()));

@@ -9,10 +9,11 @@ use std::rc::Rc;
 use crate::check::trace::{Node, Trace, key};
 use crate::syntax::{Const, Head, Lit, Name, Term};
 use crate::translate::lean::elide::{Env, caps, hidden_at, hidden_by, row, stage, ty};
-use crate::types::{Caps, Fields, Row, Scheme, Stage, Type, Var};
+use crate::types::{Caps, Row, Scheme, Stage, Type};
 
 use super::Unsupported;
 use super::cell::cell;
+use super::field::record_tm;
 use super::list::list_tm;
 use super::pat::{arms_tm, match_tm};
 use super::provide::{operation, provide_tm};
@@ -72,13 +73,7 @@ pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupporte
         // a record of the core is a spine in the order of its labels, as
         // its type is written
         Term::List(xs) => list_tm(xs, ctx, sig)?,
-        Term::Record(fs) => {
-            let mut out = ".rnil".to_owned();
-            for (l, x) in sorted(fs).into_iter().rev() {
-                out = format!("(.rcons \"{l}\" {} {out})", tm(x, ctx)?);
-            }
-            out
-        }
+        Term::Record(fs) => record_tm(fs, ctx, sig)?,
         Term::Field(..) if operation(e).is_some() => {
             let (svc, o) = operation(e).ok_or("no operation")?;
             format!("(.const (.perform {svc:?} {:?} .tail))", o.to_string())
@@ -90,31 +85,6 @@ pub(super) fn tm(e: &Term, ctx: &[Name], sig: &Sig) -> Result<String, Unsupporte
         Term::Match(s, arms) => match_tm(s, arms, ctx, sig)?,
         other => return Err(form(other)),
     })
-}
-
-/// The fields of a record term by label.
-pub(super) fn sorted(fs: &[(Name, Term)]) -> Vec<(&Name, &Term)> {
-    let mut fs: Vec<_> = fs.iter().map(|(l, x)| (l, x)).collect();
-    fs.sort_by(|a, b| a.0.cmp(b.0));
-    fs
-}
-
-/// The type of field `l` of a record type.
-pub(super) fn field<'a>(t: &'a Type, l: &str) -> Result<&'a Type, Unsupported> {
-    let f = fields(t).ok_or("a field of no record")?;
-    f.fields
-        .get(l)
-        .ok_or_else(|| format!("a field `{l}` the type does not have"))
-}
-
-/// The fields of a record type.
-pub(super) fn fields(t: &Type) -> Option<&Fields> {
-    match t {
-        // a rest the check left open is empty (`Env::ground`)
-        Type::Record(f) if matches!(f.tail, None | Some(Var::Meta(_))) => Some(f),
-        Type::Captured(x, _) | Type::Bounded(x, _) => fields(x),
-        _ => None,
-    }
 }
 
 /// The computation `t` is: its rows, result and qualifier.
@@ -130,7 +100,7 @@ fn eff(t: &Type) -> Option<(&Row, &Row, &Type, Caps)> {
     }
 }
 
-fn push(ctx: &[Name], x: &Name) -> Vec<Name> {
+pub(super) fn push(ctx: &[Name], x: &Name) -> Vec<Name> {
     iter::once(x.clone()).chain(ctx.iter().cloned()).collect()
 }
 

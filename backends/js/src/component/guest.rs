@@ -2,8 +2,10 @@
 
 use super::Javascript;
 use flick_backend::bindings::{Guest, export_component, flick::backend::inputs};
+use flick_backend::command::Dependency;
 use flick_backend::{
-    Backend, BuildRequest, BuildResult, Descriptor, Diagnostic, InputError, Inputs, TargetSupport,
+    Backend, BuildRequest, BuildResult, Descriptor, Diagnostic, InputError, Inputs, OptionValue,
+    Packages, ProjectFile, TargetSupport,
 };
 
 struct Imports;
@@ -22,6 +24,16 @@ impl Guest for Component {
     }
     fn generate(request: BuildRequest) -> Result<BuildResult, Vec<Diagnostic>> {
         Javascript.generate(&request, &mut Imports)
+    }
+    fn package_files() -> Vec<String> {
+        Javascript.package_files()
+    }
+    fn packages(
+        files: Vec<ProjectFile>,
+        dependencies: Vec<Dependency>,
+        options: Vec<OptionValue>,
+    ) -> Packages {
+        Javascript.packages(&files, &dependencies, &options)
     }
 }
 export_component!(Component);

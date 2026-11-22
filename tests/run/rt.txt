@@ -73,6 +73,7 @@ codegen/known_failure
 codegen/known_instances
 codegen/unpack_dictionary
 codegen/let_assert
+codegen/let_else
 codegen/let_mut
 codegen/loops
 codegen/lift
@@ -81,6 +82,7 @@ codegen/local_functions
 codegen/match_graph
 codegen/numbers
 codegen/numeric_classes
+codegen/orelse
 codegen/patterns
 codegen/pure_main
 codegen/question
@@ -367,11 +369,16 @@ codegen/loops_guards
 codegen/loops_owners
 codegen/labeled_loops_finalizers
 codegen/record_constructor
+codegen/record_order
+codegen/record_order_std
+codegen/record_identity_std
+codegen/record_ffi
 codegen/class_variance
 codegen/contract_runs_nowhere
 
 effect/row_without
 effect/holes_order
+effect/postfix_catch
 ../rt/owner_foreign_policy
 
 runtime/counted_layer_merge
@@ -386,3 +393,6 @@ runtime/suspended_std
 runtime/lazy_let
 runtime/lazy_let_state
 runtime/lazy_opt
+effect/result_blocks
+runtime/result_block_causes
+../rt/result_control_unwind

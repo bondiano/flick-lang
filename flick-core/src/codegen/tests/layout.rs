@@ -106,7 +106,7 @@ fn a_nullary_constructor_returns_the_object_holding_its_dictionaries() {
     for release in [false, true] {
         let js = compile_with(source, release, Labels::default()).code;
         assert!(
-            js.contains("export const Witness = ($d0) => ({ _tag: "),
+            js.contains("export const Witness = ($d0) => $rt.gadt({ _tag: "),
             "{js}"
         );
         assert!(js.contains("$0: $d0"), "{js}");

@@ -24,7 +24,11 @@ flick literal:literal-hello you --out greetings
 - When two contributors add the same name, the flat name is
   `FLICK-P053`, which lists the qualified names.
 - A contributor cannot take a name of `flick` itself, as `build`. Such a
-  declaration is ignored, with the warning `FLICK-P054`.
+  declaration is ignored, with the warning `FLICK-P054`. Backends (and not
+  plugins) may implement the core dependency and app-packaging verbs
+  (`install`, `add`, `remove`, `update`, `deps`, `pack`) as `plan` commands;
+  `flick` delegates the target-ecosystem portion of those verbs to the selected
+  backend instead of ignoring them.
 - A name nobody adds is `FLICK-P052`. When an official backend or a
   contributor the store has seen adds it, the message names that one.
 
@@ -106,9 +110,18 @@ itself: it returns a plan, which the host checks and carries out.
 - **Files** are written under the declared paths.
 - **Tool steps** run a host tool from `invocation.tools`. These are the
   tools the project allows the contributor in `[tools]`, by plugin package
-  or backend id, and the host pins each one by digest and version. A
-  step's `reads`, within the descriptor's, appear in its directory at the
-  same relative path, linked to the project's files rather than copied.
+  or backend id, and the host pins each one by digest and version (a granted
+  tool missing from `PATH` appears with empty `version` and `sha256` so the
+  command can report a clear error; trying to execute it is refused). A
+  staged step's `reads`, within the descriptor's, appear in its directory at the
+  same relative path, linked to the project's files rather than copied. A step
+  with `in_place: true` runs directly in the project's root after the plan's
+  files are published (used by backend package managers): it takes no `inputs`
+  or `reads`, cannot be used with `resume` or editor previews, and every path
+  in `outputs` must be declared under `descriptor.writes`.
+- **Dependencies**: delegated backend verbs also receive
+  `invocation.dependencies`, the transitive closure of
+  `[target.<name>.dependencies]` for that backend.
 - **`run-flick` steps** compile and run a Flick program through the project's
   selected backend in an isolated temporary generation, without writing to the
   project tree or the disk module cache. A step may overlay in-memory
