@@ -1115,3 +1115,20 @@ let v1 g x = (g x)
 
 - Divergence: `render_impl.render 7` with `render_impl : Render.Impl` was `FLICK-T003` "this is not a function: it has type `forall a. Show a => a ->{} String`". `records.rs` `field` returned the field type without instantiating `∀`. This was incompleteness, not a soundness hole: the program was rejected.
 - Resolution (checker): `records.rs` `field` instantiates the field's scheme, as `instantiate` does for a name, and requests the dictionaries of its constraints; the IR wraps the field in `Dicts`, and the code generator passes them as for any value with dictionaries. Fixture: e2e `tests/run/codegen/service_dictionary.fl` (`render_impl.render 7`, `render_impl.pair`), on JS and Go.
+
+### Structural records and data values: no identity or observable field order
+
+Audit scope (issue #740): `flick-model` substitution evaluator and certificate emitter, and the Lean core `formal/Formal/`.
+
+- **Core calculus & Lean (`formal/Formal/`)**:
+  - Store locations `loc ℓ` exist only for `Ref` and `Lazy` cells (plus handler/continuation markers in `RHead`/`Step`); constructing records or ADT values never allocates a store cell (`RHead.store_grows_only_for_cells_or_hdl`).
+  - `Const` (`SyntaxTm.lean`) contains no polymorphic identity comparison or record key-iteration primitive (`refMake`, `refGet`, `refSet`, `open_`, `op`, `addFin`, `spawn`, `intEq`, `scopeRun`, `perform`).
+  - `formal/Formal/RecordOrder.lean` proves (with no `sorry` and only standard Lean axioms, pinned in `formal/Formal/Axioms.lean`):
+    1. `RecEquiv.field`, `RecEquiv.setField_isSome`, `RecEquiv.setField`, and `RecEquiv.matchP`: two finite record spines with the same field map yield identical results under projection (`Tm.field`), equivalent records under update (`Tm.setField`), and identical bindings under record-spine patterns (`RecSpinePat`).
+    2. `elabSwap_step_after_first` and `elabSwap_canonical`: elaborating an out-of-order record literal via nested `.let_` bindings evaluates fields in source order and reduces purely to the exact same canonical `.rcons` value for any permutation of evaluated fields.
+- **Reference substitution model (`flick-model/src/`)**:
+  - `eval/prim.rs` `equal` compares records order-independently, skips GADT held dictionary arguments, and compares `Term::Loc` only for explicit `Ref` cells; no primitive observes data storage identity or written label order.
+  - `syntax.rs` (`Term::is_value`), `eval/evaluation.rs` (`Machine::fields`), and `eval/continuations.rs` (`Frame::UpdateValue`) evaluate field expressions strictly in source order and canonicalize resulting `Term::Record` values to UTF-16 label order, so permutations of the same evaluated fields produce the exact same canonical value.
+  - `native/mod.rs` (`fields`) uses UTF-16 order to match `Record.labels`.
+  - `cert/term.rs` & `cert/field.rs` (`needs_source_lets`, `record_let`) preserve source evaluation order via nested `.let_` bindings when elaborating out-of-order record literals containing non-value expressions into canonical `.rcons` spines.
+- **Scope boundary**: this audit establishes the property for the core calculus, Lean proofs, and `flick-model`; it is not a machine-checked proof of the Rust compiler or JS/Go runtimes, which are pinned separately by unit tests and e2e fixtures (`tests/run/codegen/record_{order,order_std,ffi}.fl`).

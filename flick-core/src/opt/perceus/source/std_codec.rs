@@ -9,7 +9,7 @@ use super::std_codec_meta::{
     codec_transform_pure, codec_transform_result, dsl_on_missing,
 };
 use super::std_schema_rt::{con_app, extra_con, make_codec, meta_con, rt, str_lit};
-use super::{Code, Env, Expr, ExprKind, Local, Lower, LowerError, Pat, Span};
+use super::{Code, Env, Expr, Local, Lower, LowerError, Pat, Span};
 
 pub(super) const REFUSE_FALLIBLE: &str = "a fallible transformation has no JSON Schema form";
 pub(super) const REFUSE_FALLBACK: &str =
@@ -121,9 +121,12 @@ pub(super) fn leaf_codec(b: &ExprBuilder, kind: &str, meta: Expr) -> Expr {
 }
 
 pub(super) fn check_meta_exact(b: &ExprBuilder, desc: &str, fields: Vec<(&str, Expr)>) -> Expr {
-    let rec = b.at(ExprKind::Record(
-        fields.into_iter().map(|(k, v)| (k.into(), v)).collect(),
-    ));
+    // JSON Schema keywords are ordered JSON object entries, not structural Flick records.
+    let pairs: Vec<Expr> = fields
+        .into_iter()
+        .map(|(k, v)| b.tuple([str_lit(b, k), v]))
+        .collect();
+    let rec = b.app(rt(b, "Schema.RecordFromEntries"), b.list(pairs));
     con_app(b, "Check", "$Meta", "$Exact", vec![str_lit(b, desc), rec])
 }
 

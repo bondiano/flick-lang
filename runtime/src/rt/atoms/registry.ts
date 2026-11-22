@@ -5,9 +5,8 @@
 // them does not overflow it. A node is observed while it has a subscriber or
 // an observed dependent: an observed node computes again at once when an atom
 // it read changes, another only when it is read.
-import type { Cause, Exit } from "../cause.ts";
-import { type Ctx, forkNow } from "../fiber.ts";
-import { withOwner } from "../owner.ts";
+import { sameValue } from "../../core/data.ts";
+import type { Ctx } from "../fiber.ts";
 
 const ATOM = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/rt/Atom");
 
@@ -22,6 +21,8 @@ export interface Atom<A = unknown> {
   server?(get: (atom: Atom) => unknown): A;
   /** Whether its value stays while the registry lives, read or not. */
   keepAlive: boolean;
+  /** Value equivalence for suppressing redundant notifications; defaults to structural `sameValue`. */
+  readonly equals?: (a: unknown, b: unknown) => boolean;
   readonly label?: string;
   /** How long its value stays after nothing holds it, in milliseconds. */
   readonly idleTtl?: number;
@@ -68,7 +69,7 @@ export class Reading {
   readonly node: Node;
   disposed = false;
   /** A value set while the read function runs, which replaces what it returns. */
-  early: { readonly value: unknown } | undefined = undefined;
+  early: { readonly value: unknown } | undefined;
   /** The parents it read: a read function drops the others. */
   readonly reads = new Set<Node>();
   private finalizers: Array<() => void> = [];
@@ -101,12 +102,9 @@ export class Reading {
   }
   dispose(): void {
     this.disposed = true;
-    let failed: { readonly error: unknown } | undefined;
-    for (const f of this.finalizers.splice(0).toReversed()) {
-      try { f(); }
-      catch (error) { failed ??= { error }; }
-    }
-    if (failed !== undefined) throw failed.error;
+    collect((attempt) => {
+      for (const f of this.finalizers.splice(0).toReversed()) attempt(f);
+    });
   }
 }
 
@@ -118,9 +116,9 @@ const REMOVED = 3;
 export class Node {
   readonly atom: Atom;
   state: 0 | 1 | 2 | 3 = UNINITIALIZED;
-  value: unknown = undefined;
+  value: unknown;
   computing = false;
-  reading: Reading | undefined = undefined;
+  reading: Reading | undefined;
   readonly parents = new Set<Node>();
   readonly children = new Set<Node>();
   readonly listeners = new Set<() => void>();
@@ -148,24 +146,23 @@ const observedBy = (from: Node, delta: 1 | -1): void => {
   }
 };
 
+const bumpParent = (parent: Node, delta: 1 | -1): void => {
+  const was = parent.observed;
+  parent.observedChildren += delta;
+  if (was !== parent.observed) observedBy(parent, delta);
+};
+
 const link = (child: Node, parent: Node): void => {
   if (child.parents.has(parent)) return;
   child.parents.add(parent);
   parent.children.add(child);
-  if (child.observed) {
-    const was = parent.observed;
-    parent.observedChildren++;
-    if (!was) observedBy(parent, 1);
-  }
+  if (child.observed) bumpParent(parent, 1);
 };
 
 const unlink = (child: Node, parent: Node): void => {
   if (!child.parents.delete(parent)) return;
   parent.children.delete(child);
-  if (child.observed) {
-    parent.observedChildren--;
-    if (!parent.observed) observedBy(parent, -1);
-  }
+  if (child.observed) bumpParent(parent, -1);
 };
 
 /** Listeners wait while a change is under way, so each hears the end of it once. */
@@ -182,24 +179,34 @@ export const batch = <A>(f: () => A): A => {
   }
 };
 
-const flush = (): void => {
-  depth++;
+/** Runs `run`, catching errors from each `attempt` and rethrowing the first after the rest finish. */
+const collect = (run: (attempt: (f: () => void) => void) => void): void => {
   let failed: { readonly error: unknown } | undefined;
-  try {
-    for (let node = first(announced); node !== undefined; node = first(announced)) {
-      announced.delete(node);
-      for (const listener of Array.from(node.listeners)) {
-        try { listener(); }
-        catch (error) { failed ??= { error }; }
-      }
-    }
-  } finally {
-    depth--;
-  }
+  const attempt = (f: () => void): void => {
+    try { f(); }
+    catch (error) { failed ??= { error }; }
+  };
+  attempt(() => run(attempt));
   if (failed !== undefined) throw failed.error;
 };
 
-const first = <A>(set: ReadonlySet<A>): A | undefined => set.values().next().value;
+const snap = <A>(set: ReadonlySet<A>): Array<A> => Array.from(set);
+
+const flush = (): void => {
+  depth++;
+  try {
+    collect((attempt) => {
+      for (const node of announced) {
+        announced.delete(node);
+        for (const listener of snap(node.listeners)) attempt(listener);
+      }
+    });
+  } finally {
+    depth--;
+  }
+};
+
+const sameAtomValue = (node: Node, a: unknown, b: unknown): boolean => (node.atom.equals ?? sameValue)(a, b);
 
 export class Registry {
   /** The evidence the tasks of its atoms run with: where it was built. */
@@ -286,12 +293,10 @@ export class Registry {
     if (atom.refresh !== undefined) return atom.refresh(this);
     const node = this.node(atom);
     if (node.state !== VALID) return;
-    let failed: { readonly error: unknown } | undefined;
-    try { this.stale(node); }
-    catch (error) { failed = { error }; }
-    try { batch(() => this.propagate([node])); }
-    catch (error) { failed ??= { error }; }
-    if (failed !== undefined) throw failed.error;
+    collect((attempt) => {
+      attempt(() => this.stale(node));
+      attempt(() => batch(() => this.propagate([node])));
+    });
   }
 
   /** Calls `f` with the value of `atom` whenever it changes, at once too with `immediate`. */
@@ -303,22 +308,20 @@ export class Registry {
     const was = node.observed;
     node.listeners.add(listener);
     if (!was) observedBy(node, 1);
+    const unsub = (): void => {
+      if (node.listeners.delete(listener) && !node.observed) observedBy(node, -1);
+      this.dropLater(node);
+    };
     if (immediate) {
       try {
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the node of `atom` holds a value of its type
         f(value as A);
-      }
-      catch (error) {
-        node.listeners.delete(listener);
-        if (!node.observed) observedBy(node, -1);
-        this.dropLater(node);
+      } catch (error) {
+        unsub();
         throw error;
       }
     }
-    return () => {
-      if (node.listeners.delete(listener) && !node.observed) observedBy(node, -1);
-      this.dropLater(node);
-    };
+    return unsub;
   }
 
   /** Holds `atom`'s value until the function returned is called. */
@@ -346,49 +349,36 @@ export class Registry {
   /** Runs anew, once each, the queries of `keys`. */
   invalidate(keys: ReadonlyArray<string>): void {
     const runs = new Set(keys.flatMap((key) => [...(this.queries.get(key) ?? [])]));
-    let failed: { readonly error: unknown } | undefined;
-    try {
-      batch(() => {
-        for (const run of runs) {
-          try { run(); }
-          catch (error) { failed ??= { error }; }
-        }
-      });
-    } catch (error) { failed ??= { error }; }
-    if (failed !== undefined) throw failed.error;
+    collect((attempt) => batch(() => {
+      for (const run of runs) attempt(run);
+    }));
   }
 
   dispose(): void {
     this.disposed = true;
-    let failed: { readonly error: unknown } | undefined;
-    for (const node of this.nodes.values()) {
-      node.state = REMOVED;
-      try { node.reading?.dispose(); }
-      catch (error) { failed ??= { error }; }
-    }
-    this.nodes.clear();
-    this.queries.clear();
-    if (failed !== undefined) throw failed.error;
+    collect((attempt) => {
+      for (const node of this.nodes.values()) {
+        node.state = REMOVED;
+        attempt(() => node.reading?.dispose());
+      }
+      this.nodes.clear();
+      this.queries.clear();
+    });
   }
 
   setValue(node: Node, value: unknown): void {
-    if (node.state === REMOVED || (node.state === VALID && Object.is(node.value, value))) return;
+    if (node.state === REMOVED || (node.state === VALID && sameAtomValue(node, node.value, value))) return;
     // a first value replaces none a dependent holds
     const initialized = node.state !== UNINITIALIZED;
     node.value = value;
     node.state = VALID;
-    let failed: { readonly error: unknown } | undefined;
-    try {
-      batch(() => {
-        if (node.listeners.size > 0) announced.add(node);
-        if (initialized) {
-          const stale = this.staleChildren(node, (error) => { failed ??= { error }; });
-          try { this.propagate(stale); }
-          catch (error) { failed ??= { error }; }
-        }
-      });
-    } catch (error) { failed ??= { error }; }
-    if (failed !== undefined) throw failed.error;
+    collect((attempt) => batch(() => {
+      if (node.listeners.size > 0) announced.add(node);
+      if (initialized) {
+        const stale = this.staleChildren(node, attempt);
+        attempt(() => this.propagate(stale));
+      }
+    }));
   }
 
   /** Computes `node`, whose dependents, if any, are stale already; its subscribers hear of a new value. */
@@ -402,7 +392,7 @@ export class Registry {
       value = node.atom.read(reading);
     } finally {
       node.computing = false;
-      for (const parent of Array.from(node.parents)) {
+      for (const parent of snap(node.parents)) {
         if (reading.reads.has(parent)) continue;
         unlink(node, parent);
         this.dropLater(parent);
@@ -410,7 +400,7 @@ export class Registry {
     }
     if (node.reading !== reading) return;
     if (reading.early !== undefined) value = reading.early.value;
-    const fresh = node.state === UNINITIALIZED || !Object.is(node.value, value);
+    const fresh = node.state === UNINITIALIZED || !sameAtomValue(node, node.value, value);
     node.value = value;
     node.state = VALID;
     if (fresh && node.listeners.size > 0) batch(() => announced.add(node));
@@ -426,12 +416,11 @@ export class Registry {
   }
 
   /** The dependents of `node` that held its value, now stale. */
-  private staleChildren(node: Node, onError: (error: unknown) => void): Array<Node> {
+  private staleChildren(node: Node, attempt: (f: () => void) => void): Array<Node> {
     const stale: Array<Node> = [];
-    for (const child of Array.from(node.children)) {
+    for (const child of snap(node.children)) {
       if (child.state !== VALID) continue;
-      try { this.stale(child); }
-      catch (error) { onError(error); }
+      attempt(() => this.stale(child));
       stale.push(child);
     }
     return stale;
@@ -443,23 +432,22 @@ export class Registry {
    * stale until read, its dependents with it.
    */
   private propagate(queue: Array<Node>): void {
-    let failure: { readonly error: unknown } | undefined;
-    for (let i = 0; i < queue.length; i++) {
-      const node = queue[i];
-      if (node === undefined || node.state !== STALE) continue;
-      if (node.observed) {
-        const before = node.value;
-        try {
-          this.compute(node);
-        } catch (error) {
-          failure ??= { error };
-          continue;
+    collect((attempt) => {
+      for (let i = 0; i < queue.length; i++) {
+        const node = queue[i];
+        if (node === undefined || node.state !== STALE) continue;
+        if (node.observed) {
+          const before = node.value;
+          let ok = false;
+          attempt(() => {
+            this.compute(node);
+            ok = true;
+          });
+          if (!ok || sameAtomValue(node, before, node.value)) continue;
         }
-        if (Object.is(before, node.value)) continue;
+        for (const child of this.staleChildren(node, attempt)) queue.push(child);
       }
-      for (const child of this.staleChildren(node, (error) => { failure ??= { error }; })) queue.push(child);
-    }
-    if (failure !== undefined) throw failure.error;
+    });
   }
 
   /** Drops `node` once nothing holds it, on a later turn, or after its idle time. */
@@ -475,60 +463,14 @@ export class Registry {
   private remove(node: Node): void {
     this.nodes.delete(node.atom);
     node.state = REMOVED;
-    let failed: { readonly error: unknown } | undefined;
-    try { node.reading?.dispose(); }
-    catch (error) { failed = { error }; }
-    node.reading = undefined;
-    for (const parent of Array.from(node.parents)) {
-      unlink(node, parent);
-      this.dropLater(parent);
-    }
-    if (failed !== undefined) throw failed.error;
+    collect((attempt) => {
+      attempt(() => node.reading?.dispose());
+      node.reading = undefined;
+      for (const parent of snap(node.parents)) {
+        unlink(node, parent);
+        this.dropLater(parent);
+      }
+    });
   }
 }
-
-/** `Reactivity.AsyncResult`: a task's result as an atom holds it. */
-export type AsyncResult =
-  | { readonly _tag: "Initial"; readonly waiting: boolean }
-  | { readonly _tag: "Success"; readonly value: unknown; readonly waiting: boolean }
-  | {
-      readonly _tag: "Failure";
-      readonly cause: Cause;
-      readonly previous: { readonly value: unknown } | undefined;
-      readonly waiting: boolean;
-    };
-
-const isResult = (value: unknown): value is AsyncResult =>
-  typeof value === "object" && value !== null && ["Initial", "Success", "Failure"].includes(String(Reflect.get(value, "_tag")));
-
-/** The result of a run that has started again after `previous`. */
-export const waitingFrom = (previous: { readonly value: unknown } | undefined): AsyncResult =>
-  previous !== undefined && isResult(previous.value) ? { ...previous.value, waiting: true } : { _tag: "Initial", waiting: true };
-
-export const lastSuccess = (previous: { readonly value: unknown } | undefined): { readonly value: unknown } | undefined => {
-  const result = previous?.value;
-  if (!isResult(result) || result._tag === "Initial") return undefined;
-  return result._tag === "Success" ? { value: result.value } : result.previous;
-};
-
-const resultOf = (exit: Exit, previous: { readonly value: unknown } | undefined): AsyncResult =>
-  exit.cause === undefined
-    ? { _tag: "Success", value: exit.value, waiting: false }
-    : { _tag: "Failure", cause: exit.cause, previous: lastSuccess(previous), waiting: false };
-
-/**
- * The atom of the task `make` gives: run in a scope of its own, with the
- * evidence of the registry, by the registry that reads it; interrupted when
- * the atom computes again or is dropped.
- */
-export const taskAtom = (make: (reading: Reading) => () => unknown): Atom<AsyncResult> =>
-  readable((reading) => {
-    const task = make(reading);
-    const previous = reading.self();
-    const fiber = forkNow(() => withOwner(() => task()), reading.registry.ctx);
-    if (fiber.exit !== undefined) return resultOf(fiber.exit, previous);
-    fiber.observe((exit) => reading.setSelf(resultOf(exit, previous)));
-    reading.addFinalizer(() => fiber.interrupt(-1));
-    return waitingFrom(previous);
-  });
 

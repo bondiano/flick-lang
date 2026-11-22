@@ -21,6 +21,7 @@ import Formal.Proofs.CheckSound
 import Formal.RT.LazyCell
 import Formal.Equiv.Context
 import Formal.Equiv.All
+import Formal.RecordOrder
 
 /-!
 # The axioms of the main theorems
@@ -257,3 +258,15 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Typ.pure_eval' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Typ.pure_eval
+
+/-- info: 'Flick.RecEquiv.setField' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.RecEquiv.setField
+
+/-- info: 'Flick.RecEquiv.matchP' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.RecEquiv.matchP
+
+/-- info: 'Flick.elabSwap_canonical' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.elabSwap_canonical

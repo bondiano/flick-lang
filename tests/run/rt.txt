@@ -367,6 +367,10 @@ codegen/loops_guards
 codegen/loops_owners
 codegen/labeled_loops_finalizers
 codegen/record_constructor
+codegen/record_order
+codegen/record_order_std
+codegen/record_identity_std
+codegen/record_ffi
 codegen/class_variance
 codegen/contract_runs_nowhere
 

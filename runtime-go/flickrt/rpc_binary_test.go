@@ -144,6 +144,27 @@ func binSorted(v Value) Value {
 	return out
 }
 
+// binCanonical recursively canonicalizes structural record objects in an
+// expected JSON tree (array indices ascending, then UTF-16 order).
+func binCanonical(v Value) Value {
+	switch x := v.(type) {
+	case *Record:
+		out := newRecord(len(x.keys))
+		for i, k := range x.keys {
+			out.putCanonical(k, binCanonical(x.vals[i]))
+		}
+		return out
+	case []Value:
+		out := make([]Value, len(x))
+		for i, elem := range x {
+			out[i] = binCanonical(elem)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
 func TestBinVectors(t *testing.T) {
 	layouts := binTestLayouts()
 	for _, v := range binVectors {
@@ -173,12 +194,19 @@ func TestBinVectors(t *testing.T) {
 			t.Errorf("%s: encode %v\n got %x\nwant %s", v.name, err, got, v.hex)
 		}
 		back, err := binDecode(n, want)
+		wantTree := tree
 		// An ignore-extra block's keys come back in wire order, sorted.
 		if strings.HasSuffix(prefix, "ignore") {
-			back, tree = binSorted(back), binSorted(tree)
+			back, wantTree = binSorted(back), binSorted(tree)
 		}
-		if err != nil || JsonStringify(back) != JsonStringify(tree) {
-			t.Errorf("%s: decode %v\n got %v\nwant %s", v.name, err, JsonStringify(back), v.tree)
+		// Structural SchemaRecord layouts decode into canonical key order,
+		// regardless of the unsorted key order in the source JSON test vector.
+		switch prefix {
+		case "rows", "widerows", "floats", "rowsexit", "rowchunk":
+			wantTree = binCanonical(tree)
+		}
+		if err != nil || JsonStringify(back) != JsonStringify(wantTree) {
+			t.Errorf("%s: decode %v\n got %v\nwant %s", v.name, err, JsonStringify(back), JsonStringify(wantTree))
 		}
 	}
 }

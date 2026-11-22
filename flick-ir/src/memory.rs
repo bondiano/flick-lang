@@ -116,7 +116,7 @@ pub enum Operation {
         object: Local,
         field: usize,
     },
-    /// Label order is evaluation order, not an inferred positional layout.
+    /// Canonical UTF-16 label order after source-order field evaluation.
     Record {
         fields: Vec<(String, Local)>,
     },

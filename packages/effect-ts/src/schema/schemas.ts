@@ -136,11 +136,13 @@ export const schemaResult = (error: AnySchema, value: AnySchema): AnySchema =>
 export const schemaRedacted = (item: AnySchema): AnySchema =>
   withJson(Schema.Redacted(item), () => refuse("a Redacted value has no JSON form without an explicit policy"));
 
-/** A record: `fields` lists `[label, schema]` in label order. */
-export const schemaRecord = (fields: ReadonlyArray<readonly [string, AnySchema]>): AnySchema =>
-  withJson(annotate(Schema.Struct(Object.fromEntries(fields)), { expected: "a record" }), () =>
-    Schema.Struct(Object.fromEntries(fields.map(([label, s]) => [label, jsonOf(s)]))),
+/** A record: `fields` lists `[label, schema]`, canonicalized to UTF-16 label order. */
+export const schemaRecord = (fields: ReadonlyArray<readonly [string, AnySchema]>): AnySchema => {
+  const sorted = fields.toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return withJson(annotate(Schema.Struct(Object.fromEntries(sorted)), { expected: "a record" }), () =>
+    Schema.Struct(Object.fromEntries(sorted.map(([label, s]) => [label, jsonOf(s)]))),
   );
+};
 
 const positional = (fields: ReadonlyArray<AnySchema>, each: (s: AnySchema) => AnySchema): Record<string, AnySchema> =>
   Object.fromEntries(fields.map((f, i) => [`_${i}`, each(f)]));
