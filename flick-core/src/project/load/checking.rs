@@ -23,7 +23,7 @@ use super::{
 };
 use crate::clock::{micros, timed};
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::iface::{Decl, Namespace};
+use crate::iface::{Decl, Namespace, closed};
 #[cfg(feature = "native-project")]
 use crate::iface::{IFACE_VERSION, ModuleTemplate};
 use crate::ir;
@@ -479,19 +479,16 @@ struct Output {
 fn exported(interface: &Interface, clean: bool) -> Interface {
     // a type left open holds variables of the module's own store, which no
     // interface writes and no importer may read with its own
-    fn written(part: &impl serde::Serialize) -> bool {
-        serde_json::to_value(part).is_ok()
-    }
     let mut out = interface.clone();
     if clean {
         return out;
     }
     for export in &mut out.exports {
-        if !written(export) {
+        if !closed::export_is_closed(export) {
             (export.scheme, export.definition) = (None, None);
         }
     }
-    out.instances.retain(written);
+    out.instances.retain(closed::instance_is_closed);
     out
 }
 

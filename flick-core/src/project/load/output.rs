@@ -1,6 +1,7 @@
 //! Compiled output structures (`Compilation`, `Compiled`) produced by project
 //! loading.
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -8,6 +9,7 @@ use std::sync::Arc;
 use super::{Loaded, Lowered, Root};
 use crate::ir;
 use crate::plugin::expansion::Expansion;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::project::environment::ResolvedEnvironment;
 #[cfg(feature = "native-project")]
 use crate::project::target;
@@ -65,11 +67,14 @@ pub struct Compilation {
     #[cfg(feature = "native-project")]
     pub target_dependencies: Vec<target::Wanted>,
     /// Dependency packages that declare `[package] when = "<cond>"`, by package name.
+    #[cfg(not(target_arch = "wasm32"))]
     pub package_when: BTreeMap<String, String>,
     /// Own project's `(package name, when condition)` when `[package] when` is set.
+    #[cfg(not(target_arch = "wasm32"))]
     pub own_package_when: Option<(String, String)>,
     /// The environment resolved for this compilation, when a target/environment
     /// was selected and resolved cleanly.
+    #[cfg(not(target_arch = "wasm32"))]
     pub environment: Option<ResolvedEnvironment>,
 }
 

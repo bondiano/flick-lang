@@ -80,6 +80,7 @@ impl Scope<'_> {
             definition: None,
             blocked: def.blocked.clone(),
             at: Some([def.span.start, def.span.end]),
+            #[cfg(not(target_arch = "wasm32"))]
             via: Vec::new(),
         }
     }
@@ -171,12 +172,20 @@ impl Scope<'_> {
 /// when it differs from `export.entity.module` (so multi-hop re-export facades
 /// stay visible to environment preflight).
 fn reexported(export: &Export, via: Option<&str>) -> Export {
-    let mut out = export.clone();
-    if let Some(module) = via
-        && module != out.entity.module
-        && !out.via.iter().any(|existing| existing == module)
+    #[cfg(not(target_arch = "wasm32"))]
     {
-        out.via.push(module.to_owned());
+        let mut out = export.clone();
+        if let Some(module) = via
+            && module != out.entity.module
+            && !out.via.iter().any(|existing| existing == module)
+        {
+            out.via.push(module.to_owned());
+        }
+        out
     }
-    out
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = via;
+        export.clone()
+    }
 }

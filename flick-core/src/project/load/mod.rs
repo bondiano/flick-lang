@@ -305,8 +305,9 @@ fn run_in(
         .package_when()
         .map(|(name, cond, _)| (name.to_owned(), cond.to_owned()))
         .collect();
-    #[cfg(not(feature = "native-project"))]
+    #[cfg(all(not(feature = "native-project"), not(target_arch = "wasm32")))]
     let package_when = BTreeMap::new();
+    #[cfg(not(target_arch = "wasm32"))]
     let own_package_when = project
         .and_then(|p| p.config.package.as_ref())
         .and_then(|p| Some((p.name.clone(), p.when.as_ref()?.0.clone())));
@@ -402,6 +403,7 @@ fn run_in(
             );
         }
     }
+    #[cfg(not(target_arch = "wasm32"))]
     for iface in loader.from_packages.values() {
         if let Some(cond) = &iface.when {
             environment::validate_module_when(cond, None, None, &env_ctx, &mut loader.diagnostics);
@@ -473,8 +475,11 @@ fn run_in(
         libraries,
         #[cfg(feature = "native-project")]
         target_dependencies,
+        #[cfg(not(target_arch = "wasm32"))]
         package_when,
+        #[cfg(not(target_arch = "wasm32"))]
         own_package_when,
+        #[cfg(not(target_arch = "wasm32"))]
         environment: env_ctx.resolved,
     };
     #[cfg(not(target_arch = "wasm32"))]

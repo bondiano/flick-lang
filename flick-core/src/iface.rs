@@ -99,6 +99,7 @@ pub struct Export {
     /// Intermediate re-exporting modules through which this entity reached the
     /// exporting module (excluding `entity.module` and the exporting module
     /// itself), so environment preflight checks gated facades in re-export chains.
+    #[cfg(not(target_arch = "wasm32"))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub via: Vec<String>,
 }
@@ -183,6 +184,7 @@ pub struct LocalScheme {
     pub scheme: Type,
 }
 
+pub(crate) mod closed;
 pub(crate) mod support;
 
 /// What a module exposes to its importers.
@@ -206,6 +208,7 @@ pub struct Interface {
     #[serde(default, skip_serializing_if = "is_false")]
     pub private: bool,
     /// Environment condition declared by `@when "..."` before the module header.
+    #[cfg(not(target_arch = "wasm32"))]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub when: Option<String>,
     /// The module's source did not parse in full, so a declaration may have

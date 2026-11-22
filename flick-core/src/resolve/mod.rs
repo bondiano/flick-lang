@@ -136,11 +136,14 @@ pub fn resolve(
     let scope = scope::Scope::new(module, &defs, imported, &mut diagnostics);
     let mut interface = scope.exports(&mut diagnostics);
     interface.private = module.syntax.header.as_ref().is_some_and(|h| h.private);
-    interface.when = module
-        .syntax
-        .header
-        .as_ref()
-        .and_then(|h| h.when.as_ref().map(|(cond, _)| cond.clone()));
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        interface.when = module
+            .syntax
+            .header
+            .as_ref()
+            .and_then(|h| h.when.as_ref().map(|(cond, _)| cond.clone()));
+    }
     let mut docs = doc::comments(module.text);
     // `extend` inserts one by one, as other maps of names do, where `collect`
     // would compile a sort and a bulk build of its own

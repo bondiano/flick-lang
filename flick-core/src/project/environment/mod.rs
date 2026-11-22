@@ -305,9 +305,7 @@ const OFFICIAL_TAGS: &[&str] = &[
 ];
 
 #[cfg(target_arch = "wasm32")]
-pub(super) struct EnvironmentContext {
-    pub resolved: Option<ResolvedEnvironment>,
-}
+pub(super) struct EnvironmentContext;
 
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn validate_standalone_when(
@@ -348,7 +346,7 @@ pub(super) fn resolve(
     _sources: &SourceMap,
     _diagnostics: &mut Vec<Diagnostic>,
 ) -> EnvironmentContext {
-    EnvironmentContext { resolved: None }
+    EnvironmentContext
 }
 
 /// Resolves the project's active environment (when `require_resolved` is true)

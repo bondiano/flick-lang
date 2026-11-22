@@ -105,6 +105,7 @@ impl ModuleSignature {
                         scheme: None,
                         blocked: None,
                         at: None,
+                        #[cfg(not(target_arch = "wasm32"))]
                         via: Vec::new(),
                     });
                     continue;
@@ -160,6 +161,7 @@ impl ModuleSignature {
                             parent: Some(entity.name.clone()),
                             blocked: None,
                             at: None,
+                            #[cfg(not(target_arch = "wasm32"))]
                             via: Vec::new(),
                         });
                     }
@@ -178,6 +180,7 @@ impl ModuleSignature {
                         parent: None,
                         blocked: None,
                         at: None,
+                        #[cfg(not(target_arch = "wasm32"))]
                         via: Vec::new(),
                     });
                     continue;
@@ -206,6 +209,7 @@ impl ModuleSignature {
                 parent: None,
                 blocked: None,
                 at: None,
+                #[cfg(not(target_arch = "wasm32"))]
                 via: Vec::new(),
             });
         }

@@ -325,6 +325,7 @@ fn canonical(e: &Export) -> Export {
     });
     Export {
         at: None,
+        #[cfg(not(target_arch = "wasm32"))]
         via: Vec::new(),
         scheme,
         definition,

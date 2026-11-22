@@ -41,7 +41,7 @@ mod fixes {
             let sources: Vec<(&str, &str)> = (modules.iter())
                 .map(|(name, text)| (name.as_str(), text.as_str()))
                 .collect();
-            let report = |name: &str, diagnostics: Vec<Diagnostic>| {
+            let mut report = |name: &str, diagnostics: Vec<Diagnostic>| {
                 let (ours, other): (Vec<_>, Vec<_>) = (diagnostics.into_iter())
                     .partition(|d| [codes::T059, codes::R012].contains(&d.code));
                 assert!(other.is_empty(), "{name}: {other:?}");
@@ -52,7 +52,7 @@ mod fixes {
                     fixes.push((name.to_owned(), edits));
                 }
             };
-            check_reporting(&sources, report, false, |_, _| {});
+            check_reporting(&sources, &mut report, false, &mut |_, _| {});
             if fixes.is_empty() {
                 return;
             }
@@ -165,12 +165,12 @@ fn a_built_in_module_imports_only_the_ones_before_it() {
     let at = (modules.iter().position(|(n, _)| *n == "List.Core")).expect("a core module");
     modules.insert(at, ("Early", early));
     let mut said = Vec::new();
-    let report = |name: &str, diagnostics: Vec<_>| {
+    let mut report = |name: &str, diagnostics: Vec<_>| {
         if name == "Early" {
             said = diagnostics;
         }
     };
-    super::check_reporting(&modules, report, false, |_, _| {});
+    super::check_reporting(&modules, &mut report, false, &mut |_, _| {});
     let found: Vec<_> = (said.iter())
         .map(|d| (d.code, &early[d.span.expect("a span").range()]))
         .collect();
@@ -188,12 +188,12 @@ fn a_built_in_module_names_only_the_ones_before_it() {
     let at = (modules.iter().position(|(n, _)| *n == "Option")).expect("a core module");
     modules.insert(at, ("Early", early));
     let mut said = Vec::new();
-    let report = |name: &str, diagnostics: Vec<_>| {
+    let mut report = |name: &str, diagnostics: Vec<_>| {
         if name == "Early" {
             said = diagnostics;
         }
     };
-    super::check_reporting(&modules, report, false, |_, _| {});
+    super::check_reporting(&modules, &mut report, false, &mut |_, _| {});
     let found: Vec<_> = (said.iter())
         .map(|d| {
             (
