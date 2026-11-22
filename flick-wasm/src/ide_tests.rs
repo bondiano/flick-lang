@@ -334,3 +334,48 @@ fn result_block_wasm_hover_tokens_and_code_actions_respect_utf16_and_edits() {
         "{edited_actions}"
     );
 }
+
+#[test]
+fn release_evaluator_folds_formula_and_bounds_deep_recursion_in_browser_build() {
+    let source = "\
+module Main exposing (price, total, deep)
+
+type Formula = Input | Number Int | Add Formula Formula | Times Formula Formula
+
+eval : Formula -> Int -> Int
+let rec eval formula x =
+  match formula with
+  | Input -> x
+  | Number n -> n
+  | Add a b -> eval a x + eval b x
+  | Times a b -> eval a x * eval b x
+
+price : Int -> Int
+let price x =
+  eval (Add (Times Input (Number 3)) (Add (Number 2) (Number 5))) x
+
+total : Int
+let total = price 10
+
+depth : Int -> Int
+let rec depth n =
+  if n <= 0 then 0 else 1 + depth (n - 1)
+
+deep : Int
+let deep = depth 500
+";
+    let mut session = Session::new();
+    let diagnostics = json(&session.update(source));
+    assert_eq!(diagnostics, Value::Array(Vec::new()));
+
+    let rel1 = json(&session.emit("release"));
+    let rel2 = json(&session.emit("release"));
+    assert_eq!(rel1, rel2, "browser release emission must be deterministic");
+    let js = rel1["js"].as_str().expect("release js");
+    assert!(js.contains("export const total = 37;"), "{js}");
+    assert!(js.contains("depth(500)"), "{js}");
+
+    let dbg = json(&session.emit("debug"));
+    let dbg_js = dbg["js"].as_str().expect("debug js");
+    assert!(dbg_js.contains("price(10)"), "{dbg_js}");
+}

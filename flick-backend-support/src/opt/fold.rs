@@ -81,7 +81,7 @@ pub fn fold(e: &mut Expr, lang: &Known<'_>) -> bool {
 }
 
 /// `show` of a built-in instance as the runtime `show` spells it.
-fn show(instance: &str, c: Const) -> Option<String> {
+pub(super) fn show(instance: &str, c: Const) -> Option<String> {
     Some(match (instance, c) {
         ("Show Float", Const::Number(x)) => js_number(x),
         ("Show Int", Const::Number(x)) => format!("{x}"),
@@ -93,7 +93,7 @@ fn show(instance: &str, c: Const) -> Option<String> {
 }
 
 /// `display` of a built-in instance as its runtime method spells it.
-fn display(instance: &str, c: Const) -> Option<String> {
+pub(super) fn display(instance: &str, c: Const) -> Option<String> {
     match (instance, c) {
         ("Display String", Const::String(s)) => Some(s),
         ("Display Float", c) => show("Show Float", c),
@@ -188,7 +188,7 @@ pub fn json_string(s: &str) -> String {
     out
 }
 
-fn token(op: BinOp) -> Option<K> {
+pub(super) fn token(op: BinOp) -> Option<K> {
     Some(match op {
         BinOp::Or => K::OrOr,
         BinOp::And => K::AndAnd,
