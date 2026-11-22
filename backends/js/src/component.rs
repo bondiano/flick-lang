@@ -260,12 +260,10 @@ impl Backend for Javascript {
                 value: "rt".into(),
             }),
             foreign_extension: None,
-            foreign_suffixes: [
-                ".mjs", ".cjs", ".js", ".ts", ".mts", ".d.ts", ".d.mts", ".d.cts",
-            ]
-            .into_iter()
-            .map(String::from)
-            .collect(),
+            foreign_suffixes: [".mjs", ".cjs", ".d.mts", ".d.cts", ".d.ts"]
+                .into_iter()
+                .map(String::from)
+                .collect(),
             handled_services: vec![EnvironmentServices {
                 environment: Environment {
                     backend: "js".into(),

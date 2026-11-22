@@ -59,3 +59,85 @@ fn a_library_declaration_edit_invalidates_the_published_foreign_bytes() {
         }
     }
 }
+
+#[test]
+fn generated_content_mapper_declarations_and_host_ts_are_not_js_build_inputs() {
+    let dir = project(
+        "cli_js_foreign_suffixes",
+        &[
+            (
+                "flick.toml",
+                "schema-version = 1\n[project]\nkind = \"lib\"\n",
+            ),
+            (
+                "src/App/Main.fl",
+                "module App.Main exposing (answer)\n\nanswer : Int\nlet answer = 42\n",
+            ),
+        ],
+    );
+    let inputs_of = |dir: &Path| -> serde_json::Value {
+        let out = flick_in(dir, &["build", "--inputs", "--color", "never"]);
+        assert!(out.status.success(), "{out:?}");
+        serde_json::from_slice(&out.stdout).expect("inputs json")
+    };
+
+    let before = inputs_of(&dir);
+
+    // Generating `Main.d.fl.ts` alongside `.fl` files and adding host `.ts`/`.js`/`.mts`
+    // files that Flick never ships must not change the compiler's input inventory or key.
+    let declared = flick_in(&dir, &["content-mapper", "--declarations", "src"]);
+    assert!(declared.status.success(), "{declared:?}");
+    assert!(dir.join("src/App/Main.d.fl.ts").is_file());
+    fs::write(dir.join("src/App/page.ts"), "export const x = 1;\n").expect("write page.ts");
+    fs::write(dir.join("src/App/wrapper.js"), "export const y = 2;\n").expect("write wrapper.js");
+    fs::write(dir.join("src/App/helper.mts"), "export const z = 3;\n").expect("write helper.mts");
+
+    let after_non_shipped = inputs_of(&dir);
+    assert_eq!(
+        after_non_shipped["key"], before["key"],
+        "generated `.d.fl.ts` and unshipped `.ts`/`.js`/`.mts` files must not change `--inputs` key"
+    );
+    let listed: Vec<&str> = after_non_shipped["files"]
+        .as_array()
+        .expect("files array")
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .collect();
+    for excluded in ["Main.d.fl.ts", "page.ts", "wrapper.js", "helper.mts"] {
+        assert!(
+            !listed.iter().any(|p| p.ends_with(excluded)),
+            "{excluded} must not be tracked as a JS build input: {listed:?}"
+        );
+    }
+
+    // Shipped JS foreign suffixes remain tracked.
+    for shipped in [
+        "helper.mjs",
+        "helper.cjs",
+        "helper.d.ts",
+        "helper.d.mts",
+        "helper.d.cts",
+    ] {
+        fs::write(dir.join("src/App").join(shipped), "export {};\n").expect("write shipped");
+    }
+    let after_shipped = inputs_of(&dir);
+    assert_ne!(after_shipped["key"], before["key"]);
+    let shipped_listed: Vec<&str> = after_shipped["files"]
+        .as_array()
+        .expect("files array")
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .collect();
+    for shipped in [
+        "helper.mjs",
+        "helper.cjs",
+        "helper.d.ts",
+        "helper.d.mts",
+        "helper.d.cts",
+    ] {
+        assert!(
+            shipped_listed.iter().any(|p| p.ends_with(shipped)),
+            "{shipped} must be tracked as a JS build input: {shipped_listed:?}"
+        );
+    }
+}
