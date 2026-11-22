@@ -1,6 +1,6 @@
 ---
 title: "Generalization and monads"
-source_hash: 1861aa7cbf5024fc
+source_hash: 0bc1fa22564031ce
 ---
 
 ## Generalization in the presence of Ref
@@ -19,7 +19,7 @@ let invalid () =
 
 The program is rejected: the write `Some 42` fixes the cell's content as `Option Int`, while `String.trim` requires `String`. If `cell` were given `forall a. Ref (Option a)`, the write and the read could choose different types for one object.
 
-**Provably pure constructions of values** are generalized, only over variables that are not free in the environment and not tied to local skolems, region/capture obligations or ambiguous constraints. A binding without a signature gets no class constraints: the variables of its unsolved constraints, of its number literals and of its operators' operands stay monomorphic, and constrained polymorphism needs a signature. The result of a runtime binding is not generalized even with `->{}` (`FLICK-T013`), including in a covariant immutable type such as `Option a`. A full signature does not cancel these checks. Mutable containers are invariant. A trusted pure FFI must observe the same purity contract.
+**Provably pure constructions of values** are generalized, only over variables that are not free in the environment and not tied to local skolems, region/capture obligations or ambiguous constraints. A binding without a signature gets no class constraints: the variables of its unsolved constraints, of its number literals and of the operands of its operators `+ - * / % ** < <= > >= ++ == !=` stay monomorphic (`|>` and `>>` are applications: they do not keep their operands monomorphic), and constrained polymorphism needs a signature. The result of a runtime binding is not generalized even with `->{}` (`FLICK-T013`), including in a covariant immutable type such as `Option a`. A full signature does not cancel these checks. Mutable containers are invariant. A trusted pure FFI must observe the same purity contract.
 
 ```flick
 make_empty : forall a. Unit ->{} Ref (Option a)

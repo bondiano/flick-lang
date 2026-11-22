@@ -10,6 +10,9 @@ break programs.
   and `let get = fun r -> r.value` inside a function are generalized as
   `let f = (fun …)` already was, so each use may give them other types. A
   top-level or recursive function still needs a signature (`FLICK-T004`).
+  When a runtime function is given to a callback of such a function that
+  was taken for a pure one, the `FLICK-T003` notes and annotates the
+  parameter of the function applied.
 
 - **A generalized local binding keeps the rows of its calls open.** Inside
   a function, a row of calls still unknown when a binding is generalized
@@ -22,9 +25,12 @@ break programs.
   without `FLICK-G003`.
 
 - **An operator's operand keeps one type in a generalized binding.** The
-  operand of an operator such as `+` or `++` stays of one type, which the
-  uses settle, as a number literal's does: `let add = (fun x y -> x + y)`
-  inside a function is no longer `FLICK-T003` on a type variable.
+  operand of an operator such as `+`, `++` or `==` stays of one type, which
+  the uses settle, as a number literal's does: `let add = (fun x y -> x + y)`
+  inside a function is no longer `FLICK-T003` on a type variable, and `==`
+  in a local function still compares `Int` and `String` by identity. A
+  `FLICK-T003` on an argument of such a function also points at the
+  operator that keeps it of one type.
 
 - **A fixture that fails to be made is a `setup` failure.** A case that
   awaits a fixture whose expression fails, and does not handle the error,
