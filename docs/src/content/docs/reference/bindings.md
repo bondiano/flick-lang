@@ -190,8 +190,10 @@ higher-rank argument over a runtime result is `FLICK-T013`, and so is a
 top-level value whose type stays unknown. Type variables of an enclosing
 signature, or of a value already in scope, are never generalized, and mutable
 containers are invariant. A row of calls still unknown when a binding is
-generalized becomes `none`, as at the end of a declaration
-([empty rows](../effects/#empty-rows-none)); it is not quantified.
+generalized is not quantified. At the top level it becomes `none`, as at the
+end of a declaration ([empty rows](../effects/#empty-rows-none)). Inside a
+function it stays of one type, which the uses of the binding fill: a local
+helper may pass its callback to a function that runs it.
 
 ```flick
 make_empty : forall a. Unit ->{} Ref (Option a)

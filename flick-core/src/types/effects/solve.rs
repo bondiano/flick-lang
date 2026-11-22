@@ -181,34 +181,39 @@ impl Checker<'_> {
     }
 
     /// Before a binding is generalized: solves the constraints so far and
-    /// closes the unknown rows of its calls and widened rows, so they become no
-    /// row variables of its type.
+    /// settles the unknown rows of its calls and its widened rows, so they
+    /// become no row variables of its type. A widened row is closed. The row
+    /// of a call is closed at the top level; inside a function its constraint
+    /// stays pending and of one type, so the uses of the binding grow it and
+    /// the end of the declaration closes it, as for a binding not generalized.
     pub fn settle_rows(&mut self) {
         self.grow();
         let level = self.store.level;
+        let deep = |row: &Type| -> Vec<u32> {
+            (self.store.normalize(row).tails.iter())
+                .filter_map(unknown)
+                .filter(|m| self.store.meta_level(*m).is_some_and(|l| l > level))
+                .collect()
+        };
         let mut close = Vec::new();
+        let mut pending = Vec::new();
         for c in &self.cx.subrows {
-            for t in self.store.normalize(&c.actual).tails {
-                if let Some(m) = unknown(&t)
-                    && self.store.meta_level(m).is_some_and(|l| l > level)
-                {
-                    close.push(m);
-                }
+            if level == 0 {
+                close.extend(deep(&c.actual));
+            } else if !deep(&c.actual).is_empty() || !deep(&c.declared).is_empty() {
+                pending.extend([c.actual.clone(), c.declared.clone()]);
             }
         }
         for row in &self.cx.widened_rows {
-            for t in self.store.normalize(row).tails {
-                if let Some(m) = unknown(&t)
-                    && self.store.meta_level(m).is_some_and(|l| l > level)
-                {
-                    close.push(m);
-                }
-            }
+            close.extend(deep(row));
         }
         for m in close {
             if self.store.meta_level(m).is_some() {
                 self.store.set(m, Type::empty_row());
             }
+        }
+        for side in pending {
+            self.store.lower(&side);
         }
         self.close_holds(Some(level));
     }

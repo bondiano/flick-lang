@@ -512,7 +512,7 @@ The checker generalizes no more than `Gen`. Fewer generalized variables give the
 2. Variables of numeric literals and of the operands of operators not yet settled are not generalized: the literal's type, and the operator's, are chosen later (`settle.rs` `settle_operators`).
 3. Variables of unsolved class constraints are not generalized. A scheme without a signature gets no constraints (see [class constraints and generalization](#class-constraints-and-generalization)).
 4. Variables of a value with an open region obligation are not generalized. This belongs to regions.
-5. Unknown call rows inside a binding are closed with `none` before generalization rather than quantified (`effects/solve.rs` `settle_rows`): the checker picks the least solution (see [unknown call rows](#unknown-call-rows-in-a-generalized-binding-close-to-none)).
+5. Unknown call rows inside a binding are not quantified (`effects/solve.rs` `settle_rows`). At the top level they are closed with `none` before generalization: the checker picks the least solution (see [unknown call rows](#unknown-call-rows-in-a-generalized-binding-close-to-none)). Inside a function they stay monomorphic with their constraints: the uses of the binding grow them, and the end of the declaration closes them (`close_rows`), as for a binding that is not generalized.
 6. `let (a, b) = …` and `let assert` are always monomorphic. A top-level or recursive function without a signature is `FLICK-T004` and stays monomorphic; another local one is generalized as a `λ` is, by (Let-Gen).
 
 Checker:
@@ -521,7 +521,7 @@ Checker:
 - `bindings.rs` `unsigned` → `generalize.rs` `Checker::generalize`; this is the only call of `generalize`.
 - `bindings.rs` `check_signed` and `polymorphic_runtime` (`FLICK-T013`), `pattern_let`.
 - `generalize.rs` `kind_of`: a quantified variable takes the kind of where it occurs, an argument of a type the kind of the type's parameter (`Server.Function (r : ServiceRow)` makes `r` a service row). Before, a row argument of a type other than `Eff` and `Layer` was quantified at kind `Type` (`flick-core/tests/features.rs`).
-- The model (`flick-model/src/check/generalize.rs`) quantifies type metas and the row metas a type takes, as in `Errors e`; a row only of a stage is closed, as in item 5.
+- The model (`flick-model/src/check/generalize.rs`) quantifies type metas and the row metas a type takes, as in `Errors e`; a row only of a stage is not quantified, as in item 5.
 
 `foreign pure` atoms are created as state, so they have two separate rules (see [stateful atoms](#atommake-and-atomfresh-create-state-but-are-foreign-pure)). A local binding without a type does not generalize variables inside an atom type (`ui.rs` `lower_atoms` before `generalize`): its uses fix the type. An atom type with a quantified variable on a value is `FLICK-U005` (`ui.rs` `polymorphic_atom`): at the top level without a signature (`unsigned`), with a signature (`polymorphic_signature`), and when checked against `∀` (`check_value`).
 
@@ -1004,9 +1004,10 @@ let run job =
 
 ### Unknown call rows in a generalized binding close to none
 
-Unknown call rows inside a generalized binding are closed with `none`, whereas `Gen` would quantify them.
+Unknown call rows inside a generalized top-level binding are closed with `none`, and inside a function they stay monomorphic until the end of the declaration, whereas `Gen` would quantify them.
 
 - This is the choice of the least solution and incompleteness relative to the model. The model accepts it as a narrowing of `Gen` (§2.5, item 5).
+- Inside a function, closing them would reject a local helper that passes its callback to a runtime function, such as `let each_line f = List.each_effect f lines` used as `each_line shout` (`tests/check/pass/effects/local_callback.fl`).
 - Resolution (spec): a sentence in `reference/bindings.md` "Generalization", analogous to what `reference/effects.md` already says about the end of a declaration.
 
 ### The type of `Some 42` in spec/03

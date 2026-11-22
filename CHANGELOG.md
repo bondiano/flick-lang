@@ -11,6 +11,16 @@ break programs.
   `let f = (fun …)` already was, so each use may give them other types. A
   top-level or recursive function still needs a signature (`FLICK-T004`).
 
+- **A generalized local binding keeps the rows of its calls open.** Inside
+  a function, a row of calls still unknown when a binding is generalized
+  stays of one type, which the uses of the binding fill, instead of
+  becoming `none`. A local helper may pass its callback to a function that
+  runs it: `let each_line = (fun f -> List.each_effect f lines)` used as
+  `each_line shout`, with `shout` calling a service, is no longer
+  `FLICK-E002`. A named task awaited in a `Layer.from_build` body may
+  register a finalizer that uses the layer's inputs, as a direct call may,
+  without `FLICK-G003`.
+
 - **An operator's operand keeps one type in a generalized binding.** The
   operand of an operator such as `+` or `++` stays of one type, which the
   uses settle, as a number literal's does: `let add = (fun x y -> x + y)`
