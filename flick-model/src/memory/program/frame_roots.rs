@@ -107,6 +107,10 @@ impl<'p> Machine<'p, '_> {
             Destination::RestoreFiberRef { previous, .. } => roots.extend(previous),
             Destination::RestoreEnvRefs { previous, .. } => roots.extend(previous.into_values()),
             Destination::LayerBuildFinish { prev_memo, .. } => roots.extend(prev_memo),
+            Destination::HostSyncCallback { remaining_args, .. }
+            | Destination::HostApplyChain { remaining_args } => {
+                roots.extend(remaining_args);
+            }
             Destination::OrDie { .. }
             | Destination::RestoreOwnerEvidence { .. }
             | Destination::TimedFinish { .. }
@@ -128,6 +132,8 @@ impl<'p> Machine<'p, '_> {
             | Destination::GeneratorStep { .. }
             | Destination::LazyComplete { .. }
             | Destination::CaptureExit { .. }
+            | Destination::RaiseFromCatch
+            | Destination::ForeignLayerBuildFinish { .. }
             | Destination::DiscardFinalizer => {}
         }
     }

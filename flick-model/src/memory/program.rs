@@ -1,9 +1,10 @@
 //! One counted execution: explicit frames, global roots and error unwinding.
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::{Duration, Instant};
 use std::{iter, mem};
 
-use flick_core::ir::{Lit, Pat};
+use flick_core::ir::{BinOp, Lit, Pat};
 use flick_core::types::OpClass;
 
 use flick_core::ir::memory::{
@@ -12,9 +13,9 @@ use flick_core::ir::memory::{
 };
 
 use super::{
-    ArenaHandle, ArenaView, CellHandle, Data, Error, ExitData, Heap, IteratorHandle, IteratorState,
-    LayerData, LazyHandle, LazyState, Locals, ObjectId, ObjectToken, OwnerHandle, SeqData, Value,
-    VarHandle, patterns, peek, primitives, tagged_boundary, take,
+    ArenaHandle, ArenaView, CellHandle, Data, Error, ExitData, Heap, HostBridge, HostMode,
+    IteratorHandle, IteratorState, LayerData, LazyHandle, LazyState, Locals, ObjectId, ObjectToken,
+    OwnerHandle, SeqData, Value, VarHandle, patterns, peek, primitives, tagged_boundary, take,
 };
 
 #[path = "dictionaries.rs"]
@@ -109,7 +110,10 @@ pub fn execute_rooted_main_program_outcome(
             stdout: String::new(),
         };
     }
-    let stage = MainStage::Root(entry.clone());
+    let stage = MainStage::Root {
+        main: entry.clone(),
+        eager_inits: VecDeque::new(),
+    };
     execute(heap, program, root, vec![], fuel, stage)
 }
 
@@ -193,25 +197,15 @@ fn execute(
     fuel: u64,
     main_stage: MainStage,
 ) -> ExecutionReport {
-    let arguments = match prepare_arguments(heap, program, entry, arguments) {
-        Ok(arguments) => arguments,
-        Err(error) => {
-            return ExecutionReport {
-                outcome: ProgramOutcome::Fault(error),
-                stdout: String::new(),
-            };
-        }
-    };
-    let execution = NEXT_EXECUTION
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
-        .expect("fewer than usize::MAX model executions");
-    let mut machine = Machine::new(heap, program, execution, arguments, fuel, main_stage);
-    let result = machine.global(entry, None).and_then(|()| machine.run());
-    let outcome = machine.finish(result);
-    ExecutionReport {
-        outcome,
-        stdout: machine.stdout,
-    }
+    execute_with_host(
+        heap,
+        program,
+        entry,
+        arguments,
+        fuel,
+        main_stage,
+        HostMode::Deterministic,
+    )
 }
 
 enum Destination<'p> {
@@ -406,6 +400,18 @@ enum Destination<'p> {
         or_die: bool,
         target: LayerBuildTarget,
     },
+    RaiseFromCatch,
+    HostSyncCallback {
+        req_id: u64,
+        remaining_args: VecDeque<Value>,
+    },
+    HostApplyChain {
+        remaining_args: VecDeque<Value>,
+    },
+    ForeignLayerBuildFinish {
+        or_die: bool,
+        target: LayerBuildTarget,
+    },
     DiscardFinalizer,
 }
 
@@ -416,8 +422,16 @@ enum BracketOutcome {
 
 #[derive(Clone, PartialEq, Eq)]
 enum MainStage {
-    /// The root layer is evaluated; `main`, named here, comes next.
-    Root(Name),
+    /// The root layer is evaluated; `eager_inits` and `main`, named here, come next.
+    Root {
+        main: Name,
+        eager_inits: VecDeque<Name>,
+    },
+    /// Entry-module top-level value bindings evaluated before `main`.
+    EagerInit {
+        pending: VecDeque<Name>,
+        main: Name,
+    },
     Function,
     Task,
     Done,
@@ -636,9 +650,17 @@ struct Machine<'p, 'h> {
     seeded_random: Option<usize>,
     root_defects: Vec<CauseToken>,
     runtime_fibers_started: u64,
+    host_mode: HostMode,
+    bridge: Option<&'h mut HostBridge>,
+    foreign: ForeignState<'p>,
 }
 
 include!("program/async_state.rs");
+include!("program/foreign.rs");
+include!("program/foreign_calls.rs");
+include!("program/foreign_cb.rs");
+include!("program/foreign_poll.rs");
+include!("program/foreign_layers.rs");
 include!("program/driving.rs");
 include!("program/driving_unwind.rs");
 include!("program/returns.rs");

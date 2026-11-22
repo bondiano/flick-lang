@@ -143,6 +143,213 @@ impl Default for OwnerState {
     }
 }
 
+/// Runs the main apply/await protocol using the chosen [`HostMode`].
+pub fn execute_main_program_outcome_with_host(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    fuel: u64,
+    host_mode: HostMode,
+) -> ExecutionReport {
+    execute_with_host_and_bridge(
+        heap,
+        program,
+        entry,
+        vec![],
+        fuel,
+        MainStage::Function,
+        host_mode,
+        None,
+    )
+}
+
+/// [`execute_rooted_main_program_outcome`] with the chosen [`HostMode`].
+pub fn execute_rooted_main_program_outcome_with_host(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    root: &Name,
+    fuel: u64,
+    host_mode: HostMode,
+) -> ExecutionReport {
+    if !program.globals.iter().any(|global| &global.name == entry) {
+        return ExecutionReport {
+            outcome: ProgramOutcome::Fault(Error::UnknownGlobal(entry.clone())),
+            stdout: String::new(),
+        };
+    }
+    execute_with_host_and_bridge(
+        heap,
+        program,
+        root,
+        vec![],
+        fuel,
+        MainStage::Root {
+            main: entry.clone(),
+            eager_inits: VecDeque::new(),
+        },
+        host_mode,
+        None,
+    )
+}
+
+/// Runs the main apply/await protocol with an explicit [`HostBridge`].
+pub fn execute_main_program_outcome_with_bridge(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    fuel: u64,
+    host_mode: HostMode,
+    bridge: &mut HostBridge,
+) -> ExecutionReport {
+    execute_with_host_and_bridge(
+        heap,
+        program,
+        entry,
+        vec![],
+        fuel,
+        MainStage::Function,
+        host_mode,
+        Some(bridge),
+    )
+}
+
+/// [`execute_rooted_main_program_outcome`] with an explicit [`HostBridge`].
+pub fn execute_rooted_main_program_outcome_with_bridge(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    root: &Name,
+    fuel: u64,
+    host_mode: HostMode,
+    bridge: &mut HostBridge,
+) -> ExecutionReport {
+    execute_main_with_bridge_and_inits(
+        heap,
+        program,
+        entry,
+        Some(root),
+        &[],
+        fuel,
+        host_mode,
+        bridge,
+    )
+}
+
+/// Executes `entry` with optional root layer, optional entry-module eager
+/// top-level initializers, and an explicit [`HostBridge`].
+#[expect(clippy::too_many_arguments, reason = "explicit bridge main runner")]
+pub fn execute_main_with_bridge_and_inits(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    root: Option<&Name>,
+    eager_inits: &[Name],
+    fuel: u64,
+    host_mode: HostMode,
+    bridge: &mut HostBridge,
+) -> ExecutionReport {
+    if !program.globals.iter().any(|global| &global.name == entry) {
+        return ExecutionReport {
+            outcome: ProgramOutcome::Fault(Error::UnknownGlobal(entry.clone())),
+            stdout: String::new(),
+        };
+    }
+    let mut pending: VecDeque<Name> = eager_inits
+        .iter()
+        .filter(|name| program.globals.iter().any(|g| &g.name == *name))
+        .cloned()
+        .collect();
+    if let Some(root) = root {
+        execute_with_host_and_bridge(
+            heap,
+            program,
+            root,
+            vec![],
+            fuel,
+            MainStage::Root {
+                main: entry.clone(),
+                eager_inits: pending,
+            },
+            host_mode,
+            Some(bridge),
+        )
+    } else if let Some(first) = pending.pop_front() {
+        execute_with_host_and_bridge(
+            heap,
+            program,
+            &first,
+            vec![],
+            fuel,
+            MainStage::EagerInit {
+                pending,
+                main: entry.clone(),
+            },
+            host_mode,
+            Some(bridge),
+        )
+    } else {
+        execute_with_host_and_bridge(
+            heap,
+            program,
+            entry,
+            vec![],
+            fuel,
+            MainStage::Function,
+            host_mode,
+            Some(bridge),
+        )
+    }
+}
+
+fn execute_with_host(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    arguments: Vec<Value>,
+    fuel: u64,
+    main_stage: MainStage,
+    host_mode: HostMode,
+) -> ExecutionReport {
+    execute_with_host_and_bridge(
+        heap, program, entry, arguments, fuel, main_stage, host_mode, None,
+    )
+}
+
+#[expect(clippy::too_many_arguments, reason = "internal execution entrypoint")]
+fn execute_with_host_and_bridge(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    arguments: Vec<Value>,
+    fuel: u64,
+    main_stage: MainStage,
+    host_mode: HostMode,
+    bridge: Option<&mut HostBridge>,
+) -> ExecutionReport {
+    let arguments = match prepare_arguments(heap, program, entry, arguments) {
+        Ok(arguments) => arguments,
+        Err(error) => {
+            return ExecutionReport {
+                outcome: ProgramOutcome::Fault(error),
+                stdout: String::new(),
+            };
+        }
+    };
+    let execution = NEXT_EXECUTION
+        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .expect("fewer than usize::MAX model executions");
+    let mut machine = Machine::new(heap, program, execution, arguments, fuel, main_stage);
+    machine.host_mode = host_mode;
+    machine.bridge = bridge;
+    let result = machine.global(entry, None).and_then(|()| machine.run());
+    let outcome = machine.finish(result);
+    ExecutionReport {
+        outcome,
+        stdout: machine.stdout,
+    }
+}
+
 impl<'p, 'h> Machine<'p, 'h> {
     fn new(
         heap: &'h mut Heap,
@@ -225,6 +432,9 @@ impl<'p, 'h> Machine<'p, 'h> {
             seeded_random: None,
             root_defects: Vec::new(),
             runtime_fibers_started: 0,
+            host_mode: HostMode::Deterministic,
+            bridge: None,
+            foreign: ForeignState::default(),
         }
     }
 }

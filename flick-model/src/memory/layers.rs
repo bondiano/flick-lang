@@ -34,8 +34,8 @@ impl<'p> Machine<'p, '_> {
                 self.store(binding, value)?;
             }
             Intrinsic::LayerMerge => {
-                layer_data(self.heap, &self.scratch[0])?;
-                layer_data(self.heap, &self.scratch[1])?;
+                ensure_layer(self.heap, &self.scratch[0])?;
+                ensure_layer(self.heap, &self.scratch[1])?;
                 let mut inputs = mem::take(&mut self.scratch).into_iter();
                 let value = self.heap.allocate(Data::Layer(LayerData::Merge {
                     left: inputs.next().expect("left layer"),
@@ -44,7 +44,7 @@ impl<'p> Machine<'p, '_> {
                 self.store(binding, value)?;
             }
             Intrinsic::LayerRun => {
-                layer_data(self.heap, &self.scratch[0])?;
+                ensure_layer(self.heap, &self.scratch[0])?;
                 if self.layer_is_static(&self.scratch[0])? {
                     let id = self.handler_identity()?;
                     let previous = self.current_owner;
@@ -112,6 +112,11 @@ impl<'p> Machine<'p, '_> {
         binding: Local,
         op: &str,
     ) -> Result<(), Error> {
+        if let Value::Object(tok) = impl_rep
+            && let Data::ForeignHandle { execution, host_id } = self.heap.object(tok.id)?.data
+        {
+            return self.foreign_invoke_service_op(binding, execution, host_id, op);
+        }
         let function = self.heap.named_field(impl_rep, op)?.representation();
         let function = self.heap.dup(&function)?;
         self.scratch.insert(0, function);
@@ -138,7 +143,7 @@ impl<'p> Machine<'p, '_> {
     /// `Σ₀`: the layer the root global gave becomes a provider that no
     /// frame holds. It answers what no frame does until cleanup releases it.
     pub(super) fn install_root(&mut self) -> Result<(), Error> {
-        layer_data(self.heap, self.top.as_ref().expect("root layer"))?;
+        ensure_layer(self.heap, self.top.as_ref().expect("root layer"))?;
         let id = self.handler_identity()?;
         let layer = self.top.take().expect("root layer");
         let owner = self.current_owner;
@@ -180,6 +185,7 @@ impl<'p> Machine<'p, '_> {
             return self.begin_close_scope(owner, previous, outcome);
         }
         self.scratch.push(provider.layer);
+        self.close_mirrored_owner(owner)?;
         self.close_owner(owner)?;
         self.current_owner = previous;
         self.heap
@@ -188,14 +194,14 @@ impl<'p> Machine<'p, '_> {
     }
 }
 
-fn layer_data<'a>(heap: &'a Heap, value: &Value) -> Result<&'a LayerData, Error> {
+fn ensure_layer(heap: &Heap, value: &Value) -> Result<(), Error> {
     let Value::Object(value) = value else {
         return Err(Error::ExpectedLayer);
     };
-    let Data::Layer(layer) = &heap.object(value.id)?.data else {
-        return Err(Error::ExpectedLayer);
-    };
-    Ok(layer)
+    match &heap.object(value.id)?.data {
+        Data::Layer(_) | Data::ForeignHandle { .. } => Ok(()),
+        _ => Err(Error::ExpectedLayer),
+    }
 }
 
 pub(super) fn lookup_layer_service<'a>(
@@ -216,7 +222,7 @@ pub(super) fn lookup_layer_service<'a>(
                     return Ok(Some(imp));
                 }
             }
-            Data::Layer(LayerData::Empty) => {}
+            Data::ForeignHandle { .. } | Data::Layer(LayerData::Empty) => {}
             Data::Layer(LayerData::Context(ctx)) => pending.push(ctx),
             Data::Layer(LayerData::Merge { left, right }) => {
                 // Native servicesOf processes left-to-right with replacement;

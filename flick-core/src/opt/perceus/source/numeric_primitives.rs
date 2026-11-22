@@ -148,7 +148,9 @@ impl Lower<'_> {
         if let Some(result) = self.std_effect_coll_foreign(value, span, block) {
             return Some(result);
         }
-        if let Some(result) = self.std_schedule_foreign(value, span, block) {
+        if !self.bridge_families.schedule
+            && let Some(result) = self.std_schedule_foreign(value, span, block)
+        {
             return Some(result);
         }
         if let Some(result) = self.std_sync_foreign(value, span, block) {
@@ -157,11 +159,13 @@ impl Lower<'_> {
         if let Some(result) = self.std_part_sem_foreign(value, span, block) {
             return Some(result);
         }
-        if let Some(result) = self.std_queue_foreign(value, span, block) {
-            return Some(result);
-        }
-        if let Some(result) = self.std_pubsub_foreign(value, span, block) {
-            return Some(result);
+        if !self.bridge_families.queue {
+            if let Some(result) = self.std_queue_foreign(value, span, block) {
+                return Some(result);
+            }
+            if let Some(result) = self.std_pubsub_foreign(value, span, block) {
+                return Some(result);
+            }
         }
         if let Some(result) = self.std_scoped_res_foreign(value, span, block) {
             return Some(result);
@@ -208,43 +212,54 @@ impl Lower<'_> {
         if let Some(result) = self.std_events_rep_foreign(value, span, block) {
             return Some(result);
         }
-        if let Some(result) = self.std_observe_refs_foreign(value, span, block) {
-            return Some(result);
-        }
-        if let Some(result) = self.std_observe_trace_foreign(value, span, block) {
-            return Some(result);
-        }
-        if let Some(result) = self.std_observe_span_foreign(value, span, block) {
-            return Some(result);
-        }
-        if let Some(result) = self.std_observe_log_foreign(value, span, block) {
-            return Some(result);
+        if !self.bridge_families.observe {
+            if let Some(result) = self.std_observe_refs_foreign(value, span, block) {
+                return Some(result);
+            }
+            if let Some(result) = self.std_observe_trace_foreign(value, span, block) {
+                return Some(result);
+            }
+            if let Some(result) = self.std_observe_span_foreign(value, span, block) {
+                return Some(result);
+            }
+            if let Some(result) = self.std_observe_log_foreign(value, span, block) {
+                return Some(result);
+            }
         }
         if let Some(result) = self.std_crypto_foreign(value, span, block) {
             return Some(result);
         }
-        if let Some(result) = self.std_metric_foreign(value, span, block) {
+        if !self.bridge_families.observe
+            && let Some(result) = self.std_metric_foreign(value, span, block)
+        {
             return Some(result);
         }
         if let Some(result) = self.std_request_foreign(value, span, block) {
             return Some(result);
         }
-        if let Some(result) = self.std_config_prov_foreign(value, span, block) {
-            return Some(result);
-        }
-        if let Some(result) = self.std_config_foreign(value, span, block) {
-            return Some(result);
+        if !self.bridge_families.config {
+            if let Some(result) = self.std_config_prov_foreign(value, span, block) {
+                return Some(result);
+            }
+            if let Some(result) = self.std_config_foreign(value, span, block) {
+                return Some(result);
+            }
         }
         if let Some(result) = self.std_arbitrary_foreign(value, span, block) {
             return Some(result);
         }
-        if let Some(result) = self.std_channel_foreign(value, span, block) {
-            return Some(result);
+        if !self.bridge_families.stream {
+            if let Some(result) = self.std_channel_foreign(value, span, block) {
+                return Some(result);
+            }
+            if let Some(result) = self.std_sink_foreign(value, span, block) {
+                return Some(result);
+            }
+            if let Some(result) = self.std_stream_foreign(value, span, block) {
+                return Some(result);
+            }
         }
-        if let Some(result) = self.std_sink_foreign(value, span, block) {
-            return Some(result);
-        }
-        if let Some(result) = self.std_stream_foreign(value, span, block) {
+        if let Some(result) = self.std_sql_foreign(value, span, block) {
             return Some(result);
         }
         self.std_layer_foreign(value, span, block)
@@ -273,9 +288,15 @@ impl Lower<'_> {
             &name.module,
             value.source_name.as_deref().unwrap_or(&value.name),
         );
-        let domain = declarations
-            .adapter(&source, kind)
-            .map_err(|message| super::unsupported(format!("{label}: {message}"), span))?;
+        let domain = match declarations.adapter(&source, kind) {
+            Ok(domain) => domain,
+            Err(_) if self.allow_foreign_bridge => {
+                return self.foreign_bridge(value, name, span, block);
+            }
+            Err(message) => {
+                return Err(super::unsupported(format!("{label}: {message}"), span));
+            }
+        };
         if domain == ScalarDomain::IntSelection {
             self.expr(
                 &scalar::int_selection(kind == Intrinsic::FloatMin, span),

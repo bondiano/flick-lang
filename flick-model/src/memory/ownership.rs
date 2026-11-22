@@ -334,6 +334,10 @@ impl Heap {
             Data::Continuation { execution, id } => {
                 self.dropped_continuations.push((execution, id));
             }
+            Data::ForeignHandle { execution, host_id }
+            | Data::ForeignCycle { execution, host_id } => {
+                self.released_foreign_handles.push((execution, host_id));
+            }
             Data::Cell { contents, .. } => {
                 self.stats.cells_freed += 1;
                 pending.extend(contents);
@@ -462,6 +466,8 @@ fn release_data_children(data: Data, pending: &mut Vec<Value>) {
         | Data::CachedRunTask { .. }
         | Data::CachedInvalidateTask { .. } => {}
         Data::Continuation { .. }
+        | Data::ForeignHandle { .. }
+        | Data::ForeignCycle { .. }
         | Data::Cell { .. }
         | Data::Arena { .. }
         | Data::ServiceTag { .. } => unreachable!("stateful heap data handled in release_data"),

@@ -10,7 +10,23 @@ impl Heap {
             stats: Stats::default(),
             service_tags: BTreeMap::new(),
             dropped_continuations: Vec::new(),
+            released_foreign_handles: Vec::new(),
         }
+    }
+
+    /// Drains foreign host handle IDs whose last counted reference hit zero in `execution`.
+    pub(super) fn take_released_foreign_handles(&mut self, execution: usize) -> Vec<u64> {
+        let mut taken = Vec::new();
+        let mut kept = Vec::new();
+        for (owner, id) in mem::take(&mut self.released_foreign_handles) {
+            if owner == execution {
+                taken.push(id);
+            } else {
+                kept.push((owner, id));
+            }
+        }
+        self.released_foreign_handles = kept;
+        taken
     }
 
     /// Drains continuation IDs whose last counted reference hit zero in `execution`.
