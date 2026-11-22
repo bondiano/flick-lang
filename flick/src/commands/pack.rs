@@ -1,33 +1,36 @@
 //! `flick pack`: a release build of the project, which must have no `todo`
 //! or `echo` left. A library with `[package]` packs its sources, which
-//! dependents fetch and compile (see `tarball`); an app packs a staging npm
-//! package, checked for completeness, made into a tarball by pnpm. Each public module has its ESM and `.iface`, with `.d.ts` when the
+//! dependents fetch and compile (see `tarball`); an app checks completeness
+//! and delegates packaging to the selected backend's `pack` command. Each
+//! public module has its emitted module and `.iface`, with `.d.ts` when the
 //! project emits them; its interface owns any alternate backend implementation.
 //! Dependencies have the recorded fingerprints and manifest exports exist.
-//! Importing a module runs nothing, as its top level is pure; an app also
-//! packs the runner of each entry, which the manifest's `bin` names.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::process::Command as Process;
 use std::{env, fs};
 
-use flick_core::build::{BUILTIN_DIR, runner_file};
+use flick_core::build::BUILTIN_DIR;
+#[cfg(feature = "wasm-backends")]
+use flick_core::build::runner_file;
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::iface;
 use flick_core::implicit_packages::is_implicit_package;
 use flick_core::project::cache;
-use flick_core::project::config::MAIN_ENTRY;
 use flick_core::source::SourceMap;
 
-use super::build::{BuildCommand, write};
+use super::build::BuildCommand;
+#[cfg(test)]
+use super::build::write;
+#[cfg(feature = "wasm-backends")]
+use super::contributed;
 use super::diff;
 use super::run::find_project;
 use super::tarball;
 use crate::args::{BuildArguments, GlobalArguments, OutDirArguments, ProfileArgument};
+use crate::backends::options;
 use crate::cache::files_under;
-use crate::child;
 use crate::command::{Command, Outcome};
 use crate::report;
 use flick_core::project::Project;
@@ -107,9 +110,9 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
         };
     }
     report::render(global, &outcome.sources, &outcome.diagnostics);
-    // a warning, not a refusal: the version in `package.json` is the author's call
+    // a warning, not a refusal: the version bump is the author's call
     if let Some(tag) = diff::latest_tag(root)
-        && let Ok(changes) = diff::changes_since(root, &tag)
+        && let Ok(changes) = diff::changes_since(&project, &tag)
         && diff::breaking(&changes)
     {
         eprintln!(
@@ -122,8 +125,8 @@ pub fn pack(options: &OutDirArguments, global: &GlobalArguments) -> Outcome {
     app(&project, &stage, dts, &runners, &options.out_dir, global)
 }
 
-/// The staged npm package of the app `project`, built into `stage`, as a
-/// tarball by pnpm.
+/// Packs the built app staged in `stage` through the project's backend, then
+/// moves the produced tarball(s) into `out_dir`.
 fn app(
     project: &Project,
     stage: &Path,
@@ -132,7 +135,6 @@ fn app(
     out_dir: &str,
     global: &GlobalArguments,
 ) -> Outcome {
-    let root = &project.root;
     let problems = incomplete(&stage.join("dist"), dts);
     if !problems.is_empty() {
         return Outcome {
@@ -140,41 +142,125 @@ fn app(
             diagnostics: problems,
         };
     }
-    let manifest = match staged_manifest(root, runners) {
-        Ok(m) => m,
-        Err(outcome) => return outcome,
-    };
-    if let Some(missing) = missing_exports(&manifest, stage) {
-        return failure(codes::P020, missing);
+    #[cfg(feature = "wasm-backends")]
+    {
+        use flick_backend::command::Argument;
+
+        let mut staged_files = Vec::new();
+        files_under(stage, &mut staged_files);
+        let file_paths: Vec<String> = staged_files
+            .into_iter()
+            .filter_map(|p| {
+                Some(
+                    p.strip_prefix(stage)
+                        .ok()?
+                        .to_string_lossy()
+                        .replace('\\', "/"),
+                )
+            })
+            .collect();
+        let mut arguments = Vec::new();
+        if !runners.is_empty() {
+            arguments.push(Argument {
+                name: "runner".into(),
+                values: runners
+                    .iter()
+                    .map(|(name, _)| format!("{name}={}", runner_file(name, false)))
+                    .collect(),
+            });
+        }
+        if !file_paths.is_empty() {
+            arguments.push(Argument {
+                name: "file".into(),
+                values: file_paths,
+            });
+        }
+        let Some(ran) = contributed::delegate(project, "pack", arguments, Vec::new(), global)
+        else {
+            let backend = options::resolve_target(None, Some(project)).map_or_else(
+                |_| project.config.default_target().to_owned(),
+                |(choice, _)| choice.id().to_owned(),
+            );
+            return failure(
+                codes::P063,
+                format!("the backend `{backend}` has no `pack` command for apps"),
+            );
+        };
+        if ran
+            .diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error)
+        {
+            return Outcome {
+                sources: ran.sources,
+                diagnostics: ran.diagnostics,
+            };
+        }
+        if let Some(failed) = move_tarballs(stage, out_dir) {
+            return failed;
+        }
+        Outcome {
+            sources: ran.sources,
+            diagnostics: ran.diagnostics,
+        }
     }
-    if let Err(err) = write(&stage.join("package.json"), format!("{manifest:#}\n")) {
-        return failure(
-            codes::P013,
-            format!("cannot write the staged `package.json`: {err}"),
+    #[cfg(not(feature = "wasm-backends"))]
+    {
+        let _ = (
+            project,
+            stage,
+            runners,
+            out_dir,
+            global,
+            options::short_name,
         );
+        failure(
+            codes::P063,
+            "this build has no backend component to pack apps".into(),
+        )
     }
+}
+
+#[cfg(feature = "wasm-backends")]
+fn move_tarballs(stage: &Path, out_dir: &str) -> Option<Outcome> {
     let out = global_path(out_dir);
     if let Err(err) = fs::create_dir_all(&out) {
-        return failure(
+        return Some(failure(
             codes::P013,
             format!("cannot create `{}`: {err}", out.display()),
-        );
+        ));
     }
-    let mut process = Process::new("pnpm");
-    process
-        .args(["pack", "--pack-destination"])
-        .arg(&out)
-        .current_dir(stage);
-    match child::spawn_tool(&mut process, global, "package-manager-output")
-        .and_then(|r| r.wait(&child::signals()))
-    {
-        Ok(s) if s.success() => Outcome::default(),
-        Ok(s) => failure(
-            codes::P017,
-            format!("pnpm pack failed with exit code {}", child::code(s)),
-        ),
-        Err(err) => failure(codes::P016, format!("cannot run pnpm: {err}")),
+    let mut moved = false;
+    if let Ok(entries) = fs::read_dir(stage) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().is_some_and(|e| e == "tgz")
+                && let Some(name) = path.file_name()
+            {
+                let dest = out.join(name);
+                if let Err(err) = fs::rename(&path, &dest)
+                    .or_else(|_| fs::copy(&path, &dest).and_then(|_| fs::remove_file(&path)))
+                {
+                    return Some(failure(
+                        codes::P013,
+                        format!(
+                            "cannot move `{}` to `{}`: {err}",
+                            path.display(),
+                            dest.display()
+                        ),
+                    ));
+                }
+                moved = true;
+            }
+        }
     }
+    if !moved {
+        return Some(failure(
+            codes::P020,
+            "the backend's `pack` command produced no `.tgz` archive".into(),
+        ));
+    }
+    None
 }
 
 /// The source tarball of the library `project`, with its sha256 on stdout.
@@ -307,75 +393,6 @@ fn relative(path: &Path, base: &Path) -> String {
         .unwrap_or(path)
         .to_string_lossy()
         .into_owned()
-}
-
-/// The project's `package.json` with the fields of a Flick package; the
-/// `bin` of an app names the runner of each entry, the only entry `main`
-/// under the package's name without its scope.
-fn staged_manifest(
-    root: &Path,
-    runners: &[(String, String)],
-) -> Result<serde_json::Value, Outcome> {
-    let text = fs::read_to_string(root.join("package.json"))
-        .map_err(|err| failure(codes::P020, format!("cannot read `package.json`: {err}")))?;
-    let mut manifest: serde_json::Value = serde_json::from_str(&text)
-        .map_err(|err| failure(codes::P020, format!("`package.json` is not JSON: {err}")))?;
-    let Some(object) = manifest.as_object_mut() else {
-        return Err(failure(
-            codes::P020,
-            "`package.json` is not an object".to_owned(),
-        ));
-    };
-    object.insert("type".into(), "module".into());
-    object.insert("files".into(), serde_json::json!(["dist"]));
-    object
-        .entry("exports")
-        .or_insert(serde_json::json!({ "./*": "./dist/*" }));
-    if !runners.is_empty() {
-        let package = object
-            .get("name")
-            .and_then(|n| n.as_str())
-            .unwrap_or_default();
-        let unscoped = package.rsplit('/').next().unwrap_or(package).to_owned();
-        let bin: serde_json::Map<String, serde_json::Value> = runners
-            .iter()
-            .map(|(name, _)| {
-                let command = if runners.len() == 1 && name == MAIN_ENTRY && !unscoped.is_empty() {
-                    unscoped.clone()
-                } else {
-                    name.clone()
-                };
-                (
-                    command,
-                    format!("./dist/{}", runner_file(name, false)).into(),
-                )
-            })
-            .collect();
-        object
-            .entry("bin")
-            .or_insert(serde_json::Value::Object(bin));
-    }
-    object.remove("devDependencies");
-    object.remove("scripts");
-    Ok(manifest)
-}
-
-/// The first path `exports` names that the package lacks.
-fn missing_exports(manifest: &serde_json::Value, stage: &Path) -> Option<String> {
-    fn targets(value: &serde_json::Value, out: &mut Vec<String>) {
-        match value {
-            serde_json::Value::String(s) => out.push(s.clone()),
-            serde_json::Value::Object(map) => map.values().for_each(|v| targets(v, out)),
-            serde_json::Value::Array(items) => items.iter().for_each(|v| targets(v, out)),
-            _ => {}
-        }
-    }
-    let mut paths = Vec::new();
-    targets(manifest.get("exports")?, &mut paths);
-    paths
-        .into_iter()
-        .find(|p| !p.contains('*') && !stage.join(p).exists())
-        .map(|p| format!("`exports` names `{p}`, which the package does not have"))
 }
 
 #[cfg(test)]

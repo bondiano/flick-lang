@@ -9,20 +9,40 @@ use std::{env, fs, io};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::target::Wanted;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::{Foreign, Project};
 use flick_core::project::{Host, is_companion};
 use flick_core::source::{FileId, SourceMap};
 
+#[cfg(feature = "wasm-backends")]
+use crate::backends;
 use crate::plugins;
 
 /// The file system, with paths shown relative to the working directory.
 pub struct FsHost {
     pub cwd: PathBuf,
+    #[cfg(feature = "wasm-backends")]
+    load_backends: bool,
 }
 
 impl FsHost {
     pub fn new() -> Self {
         FsHost {
             cwd: env::current_dir().unwrap_or_default(),
+            #[cfg(feature = "wasm-backends")]
+            load_backends: true,
+        }
+    }
+
+    /// A host that never loads backend components (for frontend-only commands
+    /// such as `inspect --emit iface`).
+    pub fn without_backends() -> Self {
+        FsHost {
+            cwd: env::current_dir().unwrap_or_default(),
+            #[cfg(feature = "wasm-backends")]
+            load_backends: false,
         }
     }
 }
@@ -53,6 +73,24 @@ impl Host for FsHost {
 
     fn outside(&self) -> Option<Arc<dyn Outside>> {
         Some(plugins::outside(false))
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn foreign(&self, project: &Project) -> Foreign {
+        if self.load_backends {
+            backends::foreign(project)
+        } else {
+            Foreign::default()
+        }
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn verify(&self, project: &Project, wanted: &[Wanted]) -> Vec<Diagnostic> {
+        if self.load_backends {
+            backends::verify(project, wanted, false)
+        } else {
+            Vec::new()
+        }
     }
 }
 

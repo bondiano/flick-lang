@@ -8,17 +8,15 @@ pub mod cache;
 pub mod config;
 #[cfg(feature = "native-project")]
 mod inherit;
-#[cfg(feature = "native-project")]
-pub mod js;
 mod load;
 #[cfg(feature = "native-project")]
 pub mod lock;
 #[cfg(feature = "native-project")]
 mod packages;
 #[cfg(feature = "native-project")]
-pub mod pnpm;
-#[cfg(feature = "native-project")]
 pub mod store;
+#[cfg(feature = "native-project")]
+pub mod target;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod target_preflight;
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -98,6 +96,45 @@ pub trait Host {
     fn outside(&self) -> Option<Arc<dyn Outside>> {
         None
     }
+    /// What the backend of `project` reports of its ecosystem's packages;
+    /// a host without backends reports none.
+    #[cfg(feature = "native-project")]
+    fn foreign(&self, project: &Project) -> Foreign {
+        let _ = project;
+        Foreign::default()
+    }
+    /// What the backend of `project` finds wrong with what the closure asks
+    /// of its ecosystem; a host without backends finds nothing.
+    #[cfg(feature = "native-project")]
+    fn verify(&self, project: &Project, wanted: &[target::Wanted]) -> Vec<Diagnostic> {
+        let _ = (project, wanted);
+        Vec::new()
+    }
+}
+
+/// What a backend reports of its ecosystem's packages: the project's own
+/// name and version there, declared dependency names, and the packages it
+/// declares, with the directories of the Flick modules those that ship them
+/// hold.
+#[cfg(feature = "native-project")]
+#[derive(Debug, Clone, Default)]
+pub struct Foreign {
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub declared: Vec<String>,
+    pub packages: Vec<ForeignPackage>,
+    /// What is wrong with them, as the backend reports it.
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// A package a project's ecosystem declares: not installed without a
+/// version, and shipping Flick modules from `source_dir`.
+#[cfg(feature = "native-project")]
+#[derive(Debug, Clone)]
+pub struct ForeignPackage {
+    pub name: String,
+    pub version: Option<String>,
+    pub source_dir: Option<PathBuf>,
 }
 
 #[derive(Debug)]

@@ -97,7 +97,12 @@ let main () =
 /// `emit`, the package linked into its `node_modules` as pnpm links one.
 fn workspace(name: &str, app_main: &str, emit: &str, effect: bool) -> PathBuf {
     let config = format!(
-        "{APP}\n[build]\ntarget = \"{emit}\"\n{}",
+        "{APP}\n[build]\ntarget = \"{emit}\"\n{}{}",
+        if emit == "go" {
+            "\n[dependencies]\ncontract = { path = \"../contract\" }\n"
+        } else {
+            ""
+        },
         if effect {
             "\n[target.js]\nruntime = \"effect\"\n"
         } else {

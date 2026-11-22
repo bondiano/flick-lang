@@ -15,6 +15,8 @@ use flick_core::project::{self, Project, config};
 use flick_core::source::SourceMap;
 
 use crate::artifact::{self, Artifact};
+#[cfg(feature = "wasm-backends")]
+use crate::backends;
 use crate::builtins;
 use crate::commands::inputs::{declared_name, sibling_root};
 use crate::publish;
@@ -63,32 +65,12 @@ pub fn key(project: &Project, roots: &[PathBuf], settings: &str, needs_effect: b
         "compiler-binary",
         toolchain::fingerprint().unwrap_or_default(),
     );
-    let packages = ["@flick-lang/runtime"]
-        .into_iter()
-        .chain(needs_effect.then_some("@flick-lang/effect-ts"))
-        .chain(needs_effect.then_some("effect"));
-    for package in packages {
-        let version = toolchain::resolved(&project.root, package).unwrap_or_default();
-        key.add(format!("version {package}"), version);
-    }
-    if needs_effect {
-        // An absent contract is valid; unreadable or empty manifests are not.
-        if let Err(error) = toolchain::adapter_requirements(&project.root) {
-            key.add("invalid adapter contract", error);
-        }
-        for path in toolchain::contract_inputs(&project.root) {
-            key.add(
-                format!("contract {}", path.display()),
-                fs::read(path).unwrap_or_default(),
-            );
-        }
-    }
     // a variable a plugin may read, by its SHA-256: the key's hash is weak
     for name in project.config.plugins.values().flat_map(|g| &g.env) {
         let value = env::var(name).unwrap_or_default();
         key.add(format!("env {name}"), hash([value.as_bytes()]));
     }
-    for path in input_files(project, &selected) {
+    for path in input_files_for(project, &selected, Some(needs_effect)) {
         key.add(
             format!("input {}", path.display()),
             fs::read(path).unwrap_or_default(),
@@ -116,6 +98,14 @@ pub fn read_unchanged(
 
 /// Files that affect a build, including absent manifests whose creation matters.
 pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
+    input_files_for(project, roots, None)
+}
+
+fn input_files_for(
+    project: &Project,
+    roots: &[PathBuf],
+    effect_override: Option<bool>,
+) -> Vec<PathBuf> {
     let mut files = Vec::new();
     for root in [project.source_root(), project.test_root()] {
         files_under(&root, &mut files);
@@ -151,20 +141,15 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
                 .and_then(|e| e.to_str())
                 .is_some_and(|e| matches!(e, "fl" | "go") || loaded.iter().any(|l| l == e))
     });
-    files.extend(
-        [
-            project::CONFIG_FILE,
-            project::lock::LOCK_FILE,
-            "package.json",
-            "pnpm-lock.yaml",
-        ]
-        .map(|file| project.root.join(file)),
-    );
+    files.extend([project::CONFIG_FILE, project::lock::LOCK_FILE].map(|f| project.root.join(f)));
     if let Some(backend) = &project.config.build.backend {
         files.push(project.root.join(&backend.component));
     }
     files.extend(project.workspace.clone());
-    files.extend(dependency_files(&project.root));
+    #[cfg(feature = "wasm-backends")]
+    files.extend(backends::package_inputs(project, effect_override));
+    #[cfg(not(feature = "wasm-backends"))]
+    let _ = effect_override;
     files.extend(libraries);
     // what plugins read: the files the project grants them, and snapshots
     files_under(&project.root.join(SNAPSHOTS), &mut files);
@@ -182,44 +167,6 @@ pub fn input_files(project: &Project, roots: &[PathBuf]) -> Vec<PathBuf> {
     files.sort();
     files.dedup();
     files
-}
-
-/// Manifests of direct dependencies and their installed Flick interfaces.
-fn dependency_files(root: &Path) -> Vec<PathBuf> {
-    let Ok(text) = fs::read_to_string(root.join("package.json")) else {
-        return Vec::new();
-    };
-    let Ok(manifest) = serde_json::from_str::<serde_json::Value>(&text) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    for field in ["dependencies", "devDependencies"] {
-        let Some(deps) = manifest.get(field).and_then(|d| d.as_object()) else {
-            continue;
-        };
-        for name in deps.keys() {
-            let dir = root.join("node_modules").join(name);
-            out.push(dir.join("package.json"));
-            let Ok(package) = fs::read(dir.join("package.json")) else {
-                continue;
-            };
-            let flick = serde_json::from_slice::<serde_json::Value>(&package)
-                .ok()
-                .and_then(|p| p.get("flick").cloned());
-            let dir_of = |key: &str| Some(flick.as_ref()?.get(key)?.as_str()?.to_owned());
-            // a source package is compiled with the project: its modules are inputs
-            if let Some(source_dir) = dir_of("source-dir") {
-                let mut sources = Vec::new();
-                files_under(&dir.join(source_dir), &mut sources);
-                out.extend(
-                    sources
-                        .into_iter()
-                        .filter(|p| p.extension().is_some_and(|e| e == "fl" || e == "go")),
-                );
-            }
-        }
-    }
-    out
 }
 
 /// The configuration and modules of the libraries `dependencies` of the

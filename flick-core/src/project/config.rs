@@ -1,14 +1,14 @@
 //! `flick.toml`: the schema version, `[project]`, `[package]`, `[build]`,
-//! `[target.<name>]`, `[sql]`, `[lint]`, `[dependencies]`, `[js.dependencies]`,
-//! `[workspace]` and `[scripts]`. Unknown keys are errors so that a typo never
-//! silently means a default.
+//! `[target.<name>]`, `[target.<name>.dependencies]`, `[sql]`, `[lint]`,
+//! `[dependencies]`, `[workspace]` and `[scripts]`. Unknown keys are errors so
+//! that a typo never silently means a default.
 
 #[cfg(feature = "native-project")]
 use std::collections::BTreeMap;
 
 use crate::codegen::Labels;
 use crate::diagnostics::Code;
-pub use crate::manifest::JsDependency;
+pub use crate::manifest::TargetDependency;
 pub use crate::plugin::reach::Grants;
 use crate::source::Span;
 use crate::types::{self, Thresholds};
@@ -159,8 +159,8 @@ pub struct Config {
     pub entries: Vec<Entry>,
     /// `[dependencies]`, by name.
     pub dependencies: Vec<Dependency>,
-    /// `[js.dependencies]`, by name.
-    pub js_dependencies: Vec<JsDependency>,
+    /// `[target.<name>.dependencies]`, by target and name.
+    pub target_dependencies: Vec<TargetDependency>,
     /// `[package]`, which a library others fetch has.
     pub package: Option<Package>,
     pub build: Build,
@@ -345,7 +345,7 @@ impl Default for Config {
             proof_dir: "proofs".into(),
             entries: Vec::new(),
             dependencies: Vec::new(),
-            js_dependencies: Vec::new(),
+            target_dependencies: Vec::new(),
             package: None,
             build: Build::default(),
             #[cfg(feature = "native-project")]

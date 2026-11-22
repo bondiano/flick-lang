@@ -426,7 +426,9 @@ fn files(dir: &Path) -> Vec<(PathBuf, Vec<u8>)> {
         for entry in fs::read_dir(&at).expect("readable").flatten() {
             let path = entry.path();
             if path.is_dir() {
-                pending.push(path);
+                if entry.file_name() != "wasmtime" {
+                    pending.push(path);
+                }
             } else {
                 let rel = path.strip_prefix(dir).expect("under dir").to_path_buf();
                 out.push((rel, fs::read(&path).expect("readable")));

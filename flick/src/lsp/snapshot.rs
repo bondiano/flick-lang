@@ -9,13 +9,21 @@ use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 
+#[cfg(feature = "wasm-backends")]
+use flick_core::diagnostics::Diagnostic;
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::target::Wanted;
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, ModuleCache};
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::{Foreign, Project};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{resolve, syntax, types};
 use tracing::{debug, debug_span};
 
+#[cfg(feature = "wasm-backends")]
+use crate::backends;
 use crate::{plugins, sources};
 
 pub(super) static BUILTIN_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -82,6 +90,16 @@ impl Host for Overlay<'_> {
     fn outside(&self) -> Option<Arc<dyn Outside>> {
         Some(plugins::outside(true))
     }
+
+    #[cfg(feature = "wasm-backends")]
+    fn foreign(&self, project: &Project) -> Foreign {
+        backends::foreign(project)
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn verify(&self, project: &Project, wanted: &[Wanted]) -> Vec<Diagnostic> {
+        backends::verify(project, wanted, false)
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -110,7 +128,8 @@ impl Context {
 pub struct Snapshot {
     pub analysis: Analysis,
     pub sources: SourceMap,
-    /// The project's root, where `node_modules` is.
+    /// The project's root directory.
+    #[cfg_attr(not(feature = "wasm-backends"), allow(dead_code))]
     pub root: PathBuf,
     /// Whether the project targets Go.
     pub go: bool,

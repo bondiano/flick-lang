@@ -16,7 +16,7 @@ pub(crate) fn with_settings<R>(
 ) -> R {
     let out_dir = output.out_dir.as_path();
     let modules = &compilation.modules;
-    let package = project.and_then(|p| project::project_name(host, &p.root));
+    let package = project.and_then(|p| project::project_name(host, p));
     let paths: Vec<(FileId, PathBuf)> = modules.iter().map(|m| (m.file, m.path.clone())).collect();
     let source_path = |file: FileId| {
         paths

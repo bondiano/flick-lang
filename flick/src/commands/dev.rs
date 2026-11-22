@@ -80,7 +80,7 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
     };
     let several = options.name.is_none() && options.entry.is_none();
     let mut pages = if several && project.config.entries.iter().any(|e| e.client) {
-        vite(&project.root, global)
+        vite(&project, global)
     } else {
         None
     };

@@ -144,21 +144,24 @@ pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
 
 /// The pinned `node` the project allows this backend.
 fn node(invocation: &Invocation) -> Result<&Tool, Vec<Diagnostic>> {
-    invocation
-        .tools
-        .iter()
-        .find(|t| t.id == "node")
-        .ok_or_else(|| {
-            let mut d = Diagnostic::error(
-                "P051",
-                format!(
-                    "`{}` runs `node`, which `[tools]` does not allow `flick/js`",
-                    invocation.name
-                ),
-            );
-            d.help = Some("allow it in `flick.toml`: `[tools]` `\"flick/js\" = [\"node\"]`".into());
-            vec![d]
-        })
+    let found = invocation.tools.iter().find(|t| t.id == "node");
+    if found.is_some_and(|t| t.sha256.is_empty()) {
+        return Err(vec![Diagnostic::error(
+            "P015",
+            format!("`{}` runs `node`, which is not on PATH", invocation.name),
+        )]);
+    }
+    found.ok_or_else(|| {
+        let mut d = Diagnostic::error(
+            "P051",
+            format!(
+                "`{}` runs `node`, which `[tools]` does not allow `flick/js`",
+                invocation.name
+            ),
+        );
+        d.help = Some("allow it in `flick.toml`: `[tools]` `\"flick/js\" = [\"node\"]`".into());
+        vec![d]
+    })
 }
 
 /// A step that writes the surface of each of `packages` to `surface-<i>.json`.
@@ -175,6 +178,7 @@ fn steps(node: &Tool, packages: &[String]) -> Vec<Step> {
                 inputs: vec![],
                 reads: vec!["node_modules".into()],
                 outputs: vec![surface(i)],
+                in_place: false,
             })
         })
         .collect()

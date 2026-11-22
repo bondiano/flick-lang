@@ -9,10 +9,12 @@ use flick_core::project;
 use flick_core::source::SourceMap;
 
 use crate::args::{ExplainArguments, GlobalArguments};
+#[cfg(feature = "wasm-backends")]
+use crate::backends;
 use crate::command::Outcome;
 use crate::sources::FsHost;
 use crate::stdlib;
-use crate::toolchain::{self, COMPILER, NODE, PNPM, RUNTIME};
+use crate::toolchain::COMPILER;
 
 pub fn explain(options: &ExplainArguments) -> Outcome {
     if let Some((package, code)) = options.code.trim().split_once('/') {
@@ -100,13 +102,8 @@ fn go_version() -> Option<String> {
     )
 }
 
-fn at_least(found: &str, wanted: &str) -> bool {
-    let parse = |v: &str| -> Vec<u64> { v.split('.').map(|p| p.parse().unwrap_or(0)).collect() };
-    parse(found) >= parse(wanted)
-}
-
-/// Checks the toolchain and the project's installed tree; optional
-/// adapters that are missing are notes, not failures.
+/// Checks the toolchain and the project's installed tree via its backend;
+/// optional tools and adapters that are missing are notes, not failures.
 pub fn doctor(global: &GlobalArguments) -> Outcome {
     let mut failed = Vec::new();
     let mut line = |ok: Option<bool>, what: &str, detail: String| {
@@ -121,39 +118,11 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
         }
     };
     line(Some(true), "compiler", format!("flick {COMPILER}"));
-    match version_of("node") {
-        Some(v) => line(
-            Some(at_least(&v, NODE)),
-            "Node.js",
-            format!("{v} (needs >= {NODE})"),
-        ),
-        None => line(
-            Some(false),
-            "Node.js",
-            format!("not found (needs >= {NODE})"),
-        ),
-    }
     let host = FsHost::new();
     let explicit = global.project.as_deref().map(Path::new);
-    let found = project::discover(&host, &mut SourceMap::default(), &host.cwd, explicit);
-    let root = found.ok().flatten().map(|p| p.root);
-    let pinned = root
-        .as_ref()
-        .and_then(|r| fs::read_to_string(r.join("package.json")).ok())
-        .and_then(|t| project::pnpm::pinned(&t))
-        .unwrap_or_else(|| PNPM.to_owned());
-    match version_of("pnpm") {
-        Some(v) => line(
-            Some(v == pinned),
-            "pnpm",
-            format!("{v} (the project pins {pinned})"),
-        ),
-        None => line(
-            Some(false),
-            "pnpm",
-            format!("not found (the project pins {pinned})"),
-        ),
-    }
+    let project = project::discover(&host, &mut SourceMap::default(), &host.cwd, explicit)
+        .ok()
+        .flatten();
     // a note, not a failure: a checkout with `FLICK_STD_PATH`, path
     // dependencies and a warm package store fetches nothing
     match git_version() {
@@ -180,90 +149,25 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
             "not found (the `go` target only: `--target go`)".to_owned(),
         ),
     }
-    installed(root.as_deref(), &mut line);
-    // the mapper is verified against one TypeScript release
-    let mapper = root
-        .as_deref()
-        .and_then(|r| toolchain::installed(r, "typescript"));
-    let detail = match mapper {
-        Some(v) if v == toolchain::TYPESCRIPT_GO => {
-            format!("typescript {v}, the mapper's release")
+    #[cfg(feature = "wasm-backends")]
+    {
+        let node = version_of("node");
+        let pnpm = version_of("pnpm");
+        if let Some(lines) = backends::doctor(project.as_ref(), node.as_deref(), pnpm.as_deref()) {
+            for (ok, what, detail) in lines {
+                line(ok, &what, detail);
+            }
         }
-        Some(v) => format!(
-            "typescript {v}: the mapper is verified against {}",
-            toolchain::TYPESCRIPT_GO
-        ),
-        None => "typescript not installed: editors use `flick lsp` only".to_owned(),
-    };
-    line(None, "Content Mapper", detail);
+    }
+    #[cfg(not(feature = "wasm-backends"))]
+    {
+        let _ = (project, version_of);
+    }
     Outcome {
         sources: SourceMap::default(),
         diagnostics: failed
             .into_iter()
             .map(|f| Diagnostic::new(codes::P015, Severity::Error, f))
             .collect(),
-    }
-}
-
-/// The runtime, Effect and the optional adapters installed in `root`.
-fn installed(root: Option<&Path>, line: &mut impl FnMut(Option<bool>, &str, String)) {
-    match root {
-        Some(root) => {
-            if let Some(problem) = toolchain::check_runtime(root, false) {
-                line(Some(false), "package contract", problem.message);
-            }
-            let mut requirements = vec![("@flick-lang/runtime".to_owned(), RUNTIME.to_owned())];
-            match toolchain::adapter_requirements(root) {
-                Ok(deps) => requirements.extend(deps),
-                Err(message) => line(Some(false), toolchain::ADAPTER, message),
-            }
-            if toolchain::installed(root, toolchain::ADAPTER).is_none() {
-                line(
-                    None,
-                    "effect",
-                    toolchain::installed(root, "effect").unwrap_or_else(|| {
-                        "not installed; requirements come from the adapter package".to_owned()
-                    }),
-                );
-            }
-            line(
-                None,
-                toolchain::ADAPTER,
-                toolchain::installed(root, toolchain::ADAPTER)
-                    .unwrap_or_else(|| "not installed".to_owned()),
-            );
-            for (package, wanted) in requirements {
-                let found = toolchain::resolved(root, &package);
-                match found {
-                    Some(v) => line(Some(v == wanted), &package, format!("{v} (needs {wanted})")),
-                    None => line(
-                        None,
-                        &package,
-                        format!("not installed; `flick install` (needs {wanted})"),
-                    ),
-                }
-            }
-            for (package, what) in [
-                ("pg", "PostgreSQL driver of `Database.pg`"),
-                ("react", "React adapter of `Ui.Dom.mount`"),
-            ] {
-                let found = toolchain::installed(root, package).or_else(|| {
-                    toolchain::installed(&root.join("node_modules/@flick-lang/effect-ts"), package)
-                });
-                line(
-                    None,
-                    package,
-                    found.map_or_else(
-                        || format!("not installed: the {what} is unavailable"),
-                        |v| format!("{v}, the {what}"),
-                    ),
-                );
-            }
-        }
-        None => line(
-            None,
-            "project",
-            "none here: runtime and adapters not checked".to_owned(),
-        ),
     }
 }

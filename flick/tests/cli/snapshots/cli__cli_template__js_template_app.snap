@@ -60,6 +60,9 @@ test-dir = "test"
 out-dir = "dist"
 profile = "debug"
 target = "js"
+
+[tools]
+"flick/js" = ["pnpm"]
 === package.json ===
 {
   "dependencies": {
