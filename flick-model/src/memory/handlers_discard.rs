@@ -158,6 +158,7 @@ impl<'p> Machine<'p, '_> {
                         false,
                     );
                 }
+                self.close_mirrored_owner(owner)?;
                 self.close_owner(owner)?;
                 self.current_owner = previous;
             }
@@ -168,6 +169,7 @@ impl<'p> Machine<'p, '_> {
                     self.mask_depth = state.saved_mask;
                 }
                 self.drain_closing_scope_roots(*state, &mut roots);
+                self.close_mirrored_owner(owner)?;
                 self.close_owner(owner)?;
                 self.current_owner = previous;
             }

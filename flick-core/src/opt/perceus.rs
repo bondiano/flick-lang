@@ -10,7 +10,10 @@ use std::{error, fmt};
 use crate::ir::memory::{self, Block, Exit, Function, Instruction, Local, Operation};
 
 mod source;
-pub use source::{LowerError, lower, lower_roots_with_declarations, lower_with_declarations};
+pub use source::{
+    LowerError, lower, lower_roots_with_declarations, lower_roots_with_foreign_bridge,
+    lower_with_declarations,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {

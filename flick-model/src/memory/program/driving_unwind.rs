@@ -156,16 +156,50 @@ impl<'p> Machine<'p, '_> {
             | Destination::LayerBuildFinish { .. } => {
                 self.unwind_async_destination(destination)?;
             }
+            Destination::HostSyncCallback { .. }
+            | Destination::HostApplyChain { .. }
+            | Destination::ForeignLayerBuildFinish { .. } => {
+                self.unwind_foreign_destination(destination)?;
+            }
             Destination::RecoveryHelper { .. }
             | Destination::Top
             | Destination::Bind(_)
             | Destination::Modify { .. }
             | Destination::FunctionBoundary { .. }
+            | Destination::RaiseFromCatch
             | Destination::DiscardFinalizer => {}
             Destination::Catch { .. }
             | Destination::CaptureExit { .. }
             | Destination::CatchDefect { .. }
             | Destination::Handle { .. } => unreachable!("handled in fail_destination"),
+        }
+        Ok(())
+    }
+
+    fn unwind_foreign_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+        match destination {
+            Destination::HostSyncCallback {
+                req_id,
+                remaining_args,
+            } => {
+                self.heap.drop_values(remaining_args.into_iter().collect())?;
+                let cause = self.failure.take().expect("sync callback failure");
+                self.failure_elected = false;
+                self.foreign.sync_cb_result = Some((req_id, Err(cause)));
+            }
+            Destination::HostApplyChain { remaining_args } => {
+                self.heap.drop_values(remaining_args.into_iter().collect())?;
+            }
+            Destination::ForeignLayerBuildFinish { or_die, target } => {
+                let mut cause = self.failure.take().expect("host layer build failure");
+                if or_die {
+                    let conv = primitives::fails_to_dies_cause(self.heap, &cause, &mut self.fuel);
+                    self.heap.drop_cause(cause)?;
+                    cause = conv?;
+                }
+                self.deliver_layer_build_err(target, cause)?;
+            }
+            _ => unreachable!("non-foreign destination in unwind_foreign_destination"),
         }
         Ok(())
     }

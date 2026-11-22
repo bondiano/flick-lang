@@ -26,6 +26,7 @@ enum LayerBuildKind {
     Fresh(Value),
     OrDie(Value),
     MergeAll(Vec<Value>),
+    ForeignHandle { execution: usize, host_id: u64 },
 }
 
 impl Machine<'_, '_> {
@@ -88,16 +89,17 @@ impl Machine<'_, '_> {
             let Value::Object(tok) = v else {
                 return Err(Error::ExpectedLayer);
             };
-            let Data::Layer(data) = &self.heap.object(tok.id)?.data else {
-                return Err(Error::ExpectedLayer);
-            };
-            match data {
-                LayerData::Succeed { .. } | LayerData::Empty | LayerData::Context(_) => {}
-                LayerData::Merge { left, right } => pending.extend([left, right]),
-                LayerData::Dynamic { .. }
-                | LayerData::Fresh(_)
-                | LayerData::MergeAll(_)
-                | LayerData::OrDie(_) => return Ok(false),
+            match &self.heap.object(tok.id)?.data {
+                Data::ForeignHandle { .. } => return Ok(false),
+                Data::Layer(data) => match data {
+                    LayerData::Succeed { .. } | LayerData::Empty | LayerData::Context(_) => {}
+                    LayerData::Merge { left, right } => pending.extend([left, right]),
+                    LayerData::Dynamic { .. }
+                    | LayerData::Fresh(_)
+                    | LayerData::MergeAll(_)
+                    | LayerData::OrDie(_) => return Ok(false),
+                },
+                _ => return Err(Error::ExpectedLayer),
             }
         }
         Ok(true)
@@ -158,7 +160,12 @@ impl Machine<'_, '_> {
                     let ctx_map = self.clone_context_map(&ctx_rep)?;
                     self.heap.drop_value(v)?;
                     for (k, imp) in ctx_map {
-                        if let Some(old) = map.insert(k, imp) {
+                        if k == HOST_CTX_KEY
+                            && let Some(prev) = map.remove(HOST_CTX_KEY)
+                        {
+                            let combined = self.concat_host_context_lists(prev, imp)?;
+                            map.insert(k, combined);
+                        } else if let Some(old) = map.insert(k, imp) {
                             self.heap.drop_value(old)?;
                         }
                     }
@@ -312,9 +319,16 @@ impl Machine<'_, '_> {
             Data::Layer(LayerData::MergeAll(ls)) => {
                 LayerBuildKind::MergeAll(ls.iter().map(Value::representation).collect())
             }
+            Data::ForeignHandle { execution, host_id } => LayerBuildKind::ForeignHandle {
+                execution: *execution,
+                host_id: *host_id,
+            },
             _ => unreachable!("static layers handled above"),
         };
         match kind {
+            LayerBuildKind::ForeignHandle { execution, host_id } => {
+                self.foreign_build_layer(layer, execution, host_id, scope_owner, or_die, target)
+            }
             LayerBuildKind::Fresh(inner_rep) => {
                 let inner = self.heap.dup(&inner_rep)?;
                 self.heap.drop_value(layer)?;

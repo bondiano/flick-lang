@@ -18,6 +18,8 @@ use crate::{BinOp, Lit, Num, Pat};
 
 mod pattern;
 pub use pattern::pattern_bindings;
+mod foreign;
+pub use foreign::{ForeignCallSpec, WireHint};
 mod handlers;
 pub use handlers::{HandlerEffect, HandlerOperation};
 mod intrinsics;
@@ -305,6 +307,13 @@ pub enum Operation {
     SeqNext(Local),
     /// First-class nominal record label value (`Record.label`).
     Label(String),
+    /// Explicitly bridged foreign host call consuming `[dicts..., args..., optional_catch]`.
+    /// Emitted only when the caller opts into foreign bridging; closed-world
+    /// lowering never emits this operation.
+    ForeignCall {
+        spec: Box<ForeignCallSpec>,
+        args: Vec<Local>,
+    },
 }
 
 include!("memory/std_intrinsics.rs");
