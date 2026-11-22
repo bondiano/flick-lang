@@ -12,7 +12,7 @@ fn precedence(kind: K) -> u8 {
     kind.binding_power().map_or(0, |(left, _)| left)
 }
 
-fn operator(n: &Node) -> Option<Token> {
+pub(super) fn operator(n: &Node) -> Option<Token> {
     n.child_tokens().find(|t| t.kind.is_binary_op())
 }
 

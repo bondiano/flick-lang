@@ -16,6 +16,8 @@ mod control;
 mod decl;
 mod expr;
 mod fragment;
+mod handlers;
+mod layout;
 mod pattern;
 mod plugin;
 mod proofs;
@@ -142,7 +144,14 @@ fn continues(kind: SyntaxKind) -> bool {
         || kind.is_closer()
         || matches!(
             kind,
-            K::Pipe | K::ThenKw | K::ElseKw | K::WithKw | K::YieldKw | K::WhereKw | K::Eq
+            K::Pipe
+                | K::ThenKw
+                | K::ElseKw
+                | K::WithKw
+                | K::CatchKw
+                | K::YieldKw
+                | K::WhereKw
+                | K::Eq
         )
 }
 
@@ -560,68 +569,6 @@ impl<'t> Parser<'t> {
             }
         }
     }
-
-    /// A block after `=`, `->`, `then`, `else` or `try`: aligned on its first
-    /// token when that starts a line, otherwise one inline statement.
-    fn body(&mut self, kind: SyntaxKind, item: fn(&mut Self)) {
-        let m = self.start();
-        if self.sep().is_some() {
-            let span = self.here_span();
-            self.error_at(
-                codes::S009,
-                span,
-                "expected an indented block on the next line".into(),
-            );
-        } else if self.raw().line_start {
-            self.push(Ctx::Aligned { col: self.col() });
-            self.items(item, false, |_| false);
-            self.pop();
-        } else {
-            // a line at the column of an enclosing mid-line block is its next item
-            self.push(Ctx::Inline {
-                threshold: self.raw().line_indent.max(self.aligned_col()),
-            });
-            item(self);
-            self.pop();
-        }
-        self.complete(m, kind);
-    }
-
-    /// `{ items }`, aligned on the first item; returns false without `{`.
-    fn braces(&mut self, kind: SyntaxKind, item: fn(&mut Self), glue: fn(&Self) -> bool) -> bool {
-        let opener = self.raw();
-        if !self.expect(K::LBrace) {
-            return false;
-        }
-        let m = self.start();
-        if self.raw().kind != K::RBrace {
-            self.push(Ctx::Aligned { col: self.col() });
-            self.items(item, true, glue);
-            self.pop();
-        }
-        self.complete(m, kind);
-        self.expect_closer(K::RBrace, opener);
-        true
-    }
-
-    /// `open items close` separated by `,`, with line breaks insignificant.
-    fn delimited(&mut self, close: SyntaxKind, item: fn(&mut Self)) {
-        let opener = self.raw();
-        self.bump();
-        self.push(Ctx::Bracket);
-        while !self.at(close) && self.sep().is_none() && self.raw().kind != close {
-            let before = self.pos;
-            item(self);
-            if !self.eat(K::Comma) {
-                break;
-            }
-            if self.pos == before {
-                break;
-            }
-        }
-        self.pop();
-        self.expect_closer(close, opener);
-    }
 }
 
 #[cfg(test)]
@@ -638,5 +585,7 @@ mod operator_tests;
 mod plugin_tests;
 #[cfg(test)]
 mod proof_tests;
+#[cfg(test)]
+mod result_tests;
 #[cfg(test)]
 mod tests;

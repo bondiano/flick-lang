@@ -68,6 +68,29 @@ fn orelse_expands_hygienically_and_folds_back_from_exact_option_match() {
         "{:?}",
         checked.ide().analysis.diagnostics
     );
+
+    // Folding a `match` whose `None` branch is a postfix `catch` must parenthesize the RHS
+    // because `catch` binds weaker than `orelse`.
+    let with_catch = "module App.Main exposing (pick)\n\ntype error E = E\n\nload : Unit ->{; E} Int\nlet load () = Fail.fail E\n\npick : Option Int ->{} Int\nlet pick opt =\n  match opt with\n  | Some x -> x\n  | None -> load () catch | E -> 0\n";
+    let (f, text) = main(with_catch);
+    let at = f.at("App.Main", "match opt", 0) + 1;
+    let fold = action(&f, at, at, "fold `match`").expect("fold with catch rhs");
+    let folded = applied(&text, &fold);
+    assert!(
+        folded.contains("opt orelse (load () catch | E -> 0)"),
+        "{folded}"
+    );
+    let checked = fixture_of(&[("src/App/Main.fl", &folded)]);
+    assert!(
+        checked
+            .ide()
+            .analysis
+            .diagnostics
+            .iter()
+            .all(|d| d.severity != Severity::Error),
+        "{:?}",
+        checked.ide().analysis.diagnostics
+    );
 }
 
 #[test]

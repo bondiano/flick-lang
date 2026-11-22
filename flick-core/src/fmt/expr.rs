@@ -1,13 +1,13 @@
-//! Applications, operators, parentheses, functions, `if`, `match` and `try`.
+//! Applications, operators, parentheses, and functions.
 
-use std::{mem, ptr};
+use std::mem;
 
 use flick_pretty::{NextBreakFitsMode, docvec};
 
 use super::block::Value;
 use super::lines::{child, children, commented};
 use super::printer::{Calls, Doc, INDENT, Printer, nodes, position, token};
-use crate::syntax::cst::{Element, Node, Token};
+use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
 /// A piece of what follows an expression on its line: closing
@@ -25,7 +25,7 @@ fn hugs(n: &Node) -> bool {
     match n.kind {
         K::ParenExpr => n.nodes().next().is_some_and(|c| c.kind == K::FunExpr),
         K::ListExpr | K::RecordExpr | K::RecordUpdate | K::TupleExpr => n.nodes().next().is_some(),
-        K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr => true,
+        K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::ResultExpr | K::DoExpr => true,
         K::PluginExpr | K::LazyExpr => n.has_token(K::LBrace),
         _ => false,
     }
@@ -236,7 +236,7 @@ impl<'a> Printer<'a> {
                 let fun = self.fun(inner, &closing);
                 docvec![a, open, fun]
             }
-            K::MatchExpr | K::TryExpr | K::IfExpr => {
+            K::MatchExpr | K::TryExpr | K::CatchExpr | K::IfExpr => {
                 let inner = self.statement(inner);
                 let inner = docvec![a, a.break_("", ""), inner].nest(a, INDENT);
                 let close = self.suffix(&closing);
@@ -265,9 +265,12 @@ impl<'a> Printer<'a> {
             K::RecordExpr | K::RecordUpdate | K::RecordType | K::RecordPat => {
                 self.record(n, suffix)
             }
-            K::TaskExpr | K::LazyExpr | K::ScopeExpr | K::ProvideExpr | K::DoExpr => {
-                self.braced(n, suffix)
-            }
+            K::TaskExpr
+            | K::LazyExpr
+            | K::ScopeExpr
+            | K::ProvideExpr
+            | K::ResultExpr
+            | K::DoExpr => self.braced(n, suffix),
             _ => {
                 let doc = self.node(n);
                 let suffix = self.suffix(suffix);
@@ -308,69 +311,5 @@ impl<'a> Printer<'a> {
             .elements(n, &n.children[..=arrow])
             .next_break_fits(self.a, NextBreakFitsMode::Disabled);
         self.body(head, Value::Block(body), n.range().1, closing)
-    }
-
-    /// `match e with` or `try e with`, then one arm per line.
-    pub fn match_(&mut self, n: &'a Node) -> Doc<'a> {
-        let a = self.a;
-        let inline = mem::take(&mut self.tail_inline);
-        let Some(with) = position(n, K::WithKw) else {
-            return self.generic(n);
-        };
-        let head = if n.kind == K::TryExpr {
-            self.try_head(n, with)
-        } else {
-            let (Some(keyword), Some(subject)) = (token(n, K::MatchKw), n.nodes().next()) else {
-                return self.generic(n);
-            };
-            let keyword = self.tok(keyword);
-            let subject = self.node(subject);
-            let subject = docvec![a, a.break_("", " "), subject].nest(a, INDENT);
-            let Element::Token(with) = n.children[with] else {
-                unreachable!("a token position")
-            };
-            let with = self.tok(with);
-            docvec![a, keyword, subject, a.break_("", " "), with].group(a)
-        };
-        let arms: Vec<&Node> = n.nodes().filter(|c| c.kind == K::MatchArm).collect();
-        let last = arms.last().copied();
-        let items = self.items(&arms, n.range().1, None, &mut |p, arm| {
-            p.inline_body = inline && last.is_some_and(|l| ptr::eq(l, arm));
-            p.arm(arm)
-        });
-        docvec![a, head, a.line(), self.join_lines(&items)].force_break(a)
-    }
-
-    /// `try body with`: one line when the body is one expression that fits.
-    fn try_head(&mut self, n: &'a Node, with: usize) -> Doc<'a> {
-        let a = self.a;
-        let (Some(keyword), Some(block)) = (token(n, K::TryKw), n.nodes().next()) else {
-            return self.generic(n);
-        };
-        let keyword = self.tok(keyword);
-        let Element::Token(with) = n.children[with] else {
-            unreachable!("a token position")
-        };
-        let (branch, broken) = self.branch(block, with.start, false);
-        let with = self.tok(with);
-        let separator = if broken { a.line() } else { a.break_("", " ") };
-        let doc = docvec![a, keyword, branch, separator, with];
-        if broken {
-            doc.force_break(a)
-        } else {
-            doc.group(a)
-        }
-    }
-
-    /// `| pattern when guard -> body`.
-    fn arm(&mut self, n: &'a Node) -> Doc<'a> {
-        let (Some(arrow), Some(block)) = (position(n, K::Arrow), n.nodes().last()) else {
-            return self.generic(n);
-        };
-        if block.kind != K::Block {
-            return self.generic(n);
-        }
-        let head = self.elements(n, &n.children[..=arrow]);
-        self.body(head, Value::Block(block), n.range().1, &[])
     }
 }

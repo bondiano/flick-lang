@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: a5cf8c149fa04e2c
+source_hash: d8782ea9defb05ef
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -121,15 +121,15 @@ let examples =
 и где прочитать подробности. Такие слова нельзя использовать как имена.
 
 ```text
-module exposing import as let mut rec assert fun match with try if then else
-task await lazy scope provide ignore todo echo type opaque where kind error
-service class instance deriving foreign from forall not orelse none true false
-in when for yield do break continue
+module exposing import as let mut rec assert fun match with try catch if then
+else task await lazy scope provide ignore todo echo type opaque where kind
+error service class instance deriving foreign from forall not orelse none true
+false in when for yield do break continue
 ```
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
 
-- `loop` перед `{` и `while` перед условием, за которым идёт `do`;
+- `loop` перед `{`, `result` перед `{` и `while` перед условием, за которым идёт `do`;
 - `private` перед `module` в заголовке файла (см. [модули](../modules/)) и
   `plugin` перед головой в списке `exposing` (см.
   [плагины](../plugins/#как-подключить-плагин));
@@ -213,7 +213,9 @@ in when for yield do break continue
 | `match` `with` | Задают сопоставление с образцом | `match shape with \| Circle r -> r` |
 | `when` | Задаёт дополнительное условие ветки сопоставления | `\| Rect w h when w == h -> "square"` |
 | `with` | Также вводит обработчики `try` и обновление записи | `{ user with name = "Ada" }` |
-| `try` | Обрабатывает ожидаемые ошибки своего тела | `try find id with \| NotFound _ -> None` |
+| `try` | Обрабатывает ожидаемые ошибки и операции эффектов своего тела | `try find id with \| NotFound _ -> None` |
+| `catch` | Постфиксный обработчик только типизированных ошибок (зарезервировано в выражениях и связываниях; допускается как метка поля записи, `.catch`, переименованный образец записи `{ catch = f }` и метаданные `foreign`) | `find id catch \| NotFound _ -> None` |
+| `result` | Контекстное слово: перед `{` сразу выполняет блок и собирает его ожидаемые ошибки в `Result (Errors e) a`; в других местах остаётся именем | `result { find id }` |
 | `not` | Отрицает логическое значение; в `sql table` входит в ограничение `not null` | `not done` |
 | `orelse` | Ленивый fallback для `Option`: вычисляет правую часть только при `None`; допустимо как метка поля записи (`{ orelse = … }`, `r.orelse`, `{ orelse = x }`), но не как имя переменной и не как сокращённый образец `{ orelse }` | `host orelse "localhost"` |
 | `true` `false` | Два значения типа `Bool` | `if ok then true else false` |
@@ -290,7 +292,7 @@ in when for yield do break continue
 | `task` | `task { … } : Eff {Store} {StoreError} Float` — вычисление, создаваемое блоком |
 | `lazy` | `lazy { … } : Lazy {Store} {StoreError} Float` — ленивое вычисление, создаваемое блоком |
 | `scope` | `scope { … } : Float` — результат блока, возвращаемый после освобождения ресурсов |
-| `provide`, `try` | Результат блока и сервисы или ошибки, которые он устраняет |
+| `provide`, `try`, `catch` | Результат блока или выражения и сервисы или ошибки, которые он устраняет |
 | `match`, `if` | `match … with : String` — результат выбранной ветки |
 | `fun` | `fun … -> … : Float -> Float` — тип функции |
 | `sql`, `ui` | Значение, создаваемое блоком, например `sql { … } : Template Pg {} { label : String }` |
@@ -307,6 +309,7 @@ in when for yield do break continue
 
 | Уровень | Операторы | Ассоциативность |
 | - | - | - |
+| −1 | постфиксный `catch \| …` | отсутствует: цепочка внешних `catch` требует скобок `(a catch \| E -> b) catch \| F -> c` |
 | 0 | `<\|` | правая; не смешивается с `\|>`: `x \|> f <\| y` — ошибка |
 | 0½ | `orelse` | правая: `a orelse b orelse c` означает `a orelse (b orelse c)` |
 | 1 | `\|>` | левая |
@@ -364,9 +367,9 @@ in when for yield do break continue
      скобках, как после `do` и `loop`; запись на этом месте пишется в
      круглых скобках (`FLICK-T074`).
 3. Строка в столбце блока продолжает инструкцию, если начинается
-   с инфиксного оператора, кроме `-`, с `|`, `then`, `else`, `with`, `where`
+   с инфиксного оператора, кроме `-`, с `|`, `then`, `else`, `with`, `catch`, `where`
    или с закрывающего разделителя. Поэтому конвейеры `|>` и `<|`, ветви
-   `match`, ветви `else` и цель `proof` могут начинаться в том же столбце,
+   `match` и `catch`, ветви `else` и цель `proof` могут начинаться в том же столбце,
    что и их выражение или объявление.
 4. В записях, типах записей и блоках `{ … }` элементы выравниваются
    по первому элементу, даже если он идёт сразу после `{` на той же строке.
@@ -698,7 +701,7 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "if" expr "then" block [ "else" (if_expr | block) ]
             | "pack" ModulePath "as" contract | "unpack" expr "as" Con ["," name] "in" block
             | "lazy" expr                    // binds as `await`: `lazy f x` is `lazy (f x)`
-            | operator expression over application (see the operator table)
+            | operator expression over application [ "catch" arm { arm } ] (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
 handler_arm = arm | "|" "return" or_pattern "->" block
             // ветка операции — `| E.op p… -> …`, образец, чей путь кончается именем
@@ -933,8 +936,9 @@ let describe shape =
   разбивается по одному шагу на строку, и его операторы стоят под первым
   операндом, если конвейер начинает строку;
 - `if c then a else b` остаётся на одной строке или помещает каждую ветвь
-  на свои строки; `match` и `try` ставят каждую ветвь на отдельную строку
-  в столбце `match`. Перед `,`, где парсер не принимает блок на отдельных
+  на свои строки; `match`, `try` и постфиксный `catch` ставят каждую ветвь
+  на отдельную строку (а `catch` заключает в скобки смешанный конвейер слева,
+  чтобы группировка была явной). Перед `,`, где парсер не принимает блок на отдельных
   строках, последняя ветвь остаётся на своей строке;
 - списки, кортежи и `exposing (…)` ставят по одному элементу на строку
   с `,` после каждого; записи, типы записей, образцы и обновления

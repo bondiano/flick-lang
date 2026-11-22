@@ -79,6 +79,7 @@ syntax_kinds! {
         MatchKw = "match",
         WithKw = "with",
         TryKw = "try",
+        CatchKw = "catch",
         IfKw = "if",
         ThenKw = "then",
         ElseKw = "else",
@@ -110,6 +111,7 @@ syntax_kinds! {
         WhenKw = "when",
         LoopKw,
         WhileKw,
+        ResultKw,
         BreakKw = "break",
         ContinueKw = "continue",
         ForKw = "for",
@@ -318,6 +320,9 @@ syntax_kinds! {
         MatchArm,
         Guard,
         TryExpr,
+        /// `result { … }`: eager typed-error boundary returning `Result (Errors e) a`.
+        ResultExpr,
+        CatchExpr,
         IfExpr,
         TaskExpr,
         /// `lazy { … }`: a computation run at most once, at its first `await`.
@@ -431,9 +436,10 @@ impl SyntaxKind {
     }
 
     /// Keyword tokens that remain valid as explicit record field labels
-    /// (`{ orelse = … }`, `{ orelse : … }`, `{ orelse = p }`, `r.orelse`).
+    /// (`{ orelse = … }`, `{ orelse : … }`, `{ orelse = p }`, `r.orelse`,
+    /// and the same for `catch`).
     pub fn is_record_label(self) -> bool {
-        matches!(self, Self::OrElse)
+        matches!(self, Self::OrElse | Self::CatchKw)
     }
 
     /// Binary operator tokens of the fixed operator table.
@@ -446,7 +452,8 @@ impl SyntaxKind {
     pub fn binding_power(self) -> Option<(u8, u8)> {
         use SyntaxKind as K;
         Some(match self {
-            // `<|` and `|>` do not mix, nor `>>` and `<<` (validate.rs)
+            // `<|` and `|>` do not mix, nor `>>` and `<<` (validate.rs).
+            // Postfix `catch` sits below `<|`, outside `expr_bp(p, 2)`.
             K::LtPipe => (2, 2),
             K::OrElse => (4, 4),
             K::PipeGt => (6, 7),

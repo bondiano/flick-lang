@@ -84,7 +84,7 @@ pub(super) fn atom_pattern(p: &mut Parser) -> Option<Done> {
             p.bump();
             if p.raw().kind != K::RBrace {
                 p.push(Ctx::Aligned { col: p.col() });
-                p.items(record_pattern_field, true, |_| false);
+                p.items(record_pattern_field, true, Parser::at_aligned_catch);
                 p.pop();
             }
             p.expect_closer(K::RBrace, opener);
@@ -158,14 +158,16 @@ fn record_pattern_field(p: &mut Parser) {
             or_pattern(p);
         } else {
             let tok = p.raw();
-            let word = p.text_of(tok);
-            p.error_at(
-                codes::S007,
-                p.span(tok.start, tok.end),
+            let message = if tok.kind == K::CatchKw {
+                "`catch` is a reserved keyword and cannot be bound by `{ catch }`: write `{ catch = handler }`"
+                    .to_owned()
+            } else {
+                let word = p.text_of(tok);
                 format!(
                     "`{word}` is a reserved keyword and cannot be bound by record punning; write `{word} = name`"
-                ),
-            );
+                )
+            };
+            p.error_at(codes::S007, p.span(tok.start, tok.end), message);
             p.bump();
         }
     } else if p.expect(K::Ident) && p.eat(K::Eq) {

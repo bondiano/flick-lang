@@ -3,8 +3,8 @@ import test from "node:test";
 import { validateReport } from "./report.mjs";
 
 const complete = () => ({
-  seed: 42, passed: 428, failed: 0,
-  tests: Array.from({ length: 428 }, (_, i) => ({ name: `assertion-${i}`, status: "passed" })),
+  seed: 42, passed: 435, failed: 0,
+  tests: Array.from({ length: 435 }, (_, i) => ({ name: `assertion-${i}`, status: "passed" })),
 });
 
 test("the complete independent corpus is accepted", () => {
@@ -20,8 +20,8 @@ test("a uniformly truncated corpus is refused", () => {
 
 test("the corpus without the four matcher cases is refused", () => {
   const report = complete();
-  report.tests = report.tests.slice(0, 424);
-  report.passed = 424;
+  report.tests = report.tests.slice(0, 431);
+  report.passed = 431;
   assert.throws(() => validateReport(report, "effect-debug"));
 });
 
@@ -34,7 +34,7 @@ test("repeating one passing assertion cannot replace the corpus", () => {
 test("a failed assertion is refused", () => {
   const report = complete();
   report.tests[0].status = "failed";
-  report.passed = 427;
+  report.passed = 434;
   report.failed = 1;
   assert.throws(() => validateReport(report, "rt-debug"));
 });

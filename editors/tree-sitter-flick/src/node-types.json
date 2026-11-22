@@ -580,6 +580,10 @@
     "named": false
   },
   {
+    "type": "catch",
+    "named": false
+  },
+  {
     "type": "class",
     "named": false
   },
@@ -747,6 +751,10 @@
   },
   {
     "type": "refined",
+    "named": false
+  },
+  {
+    "type": "result",
     "named": false
   },
   {

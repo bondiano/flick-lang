@@ -2,6 +2,7 @@
 
 use super::conditional::if_expr;
 use super::control::{control_expr, while_ahead};
+use super::handlers::{catch_expr, match_expr, try_expr};
 use super::{Ctx, Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
 use crate::syntax::heads::OPEN;
@@ -31,7 +32,12 @@ fn assign_stmt(p: &mut Parser) {
 }
 
 pub(super) fn expr(p: &mut Parser) -> Option<Done> {
-    expr_bp(p, 0)
+    let lhs = expr_bp(p, 2)?;
+    if p.at(K::CatchKw) {
+        Some(catch_expr(p, lhs))
+    } else {
+        Some(lhs)
+    }
 }
 
 /// Operand of a prefix operator: binds tighter than `*`, looser than `**`.
@@ -61,7 +67,7 @@ fn expr_bp(p: &mut Parser, min_bp: u8) -> Option<Done> {
                     .into(),
             );
             p.bump();
-            expr_bp(p, 0);
+            expr_bp(p, 2);
             lhs = Some(p.complete(m, K::Error));
             break;
         }
@@ -375,6 +381,11 @@ fn todo(p: &mut Parser) -> K {
 pub(super) fn atom(p: &mut Parser) -> Option<Done> {
     let m = p.start();
     let kind = match p.current() {
+        K::Ident if !p.no_brace && p.at_word("result") && p.nth(1) == K::LBrace => {
+            p.bump_as(K::ResultKw);
+            p.braces(K::Block, stmt, |_| false);
+            K::ResultExpr
+        }
         K::Ident if plugin::at_block(p) => plugin::block(p),
         K::Ident if p.at_word(OPEN) => plugin::opened(p),
         K::Ident => {
@@ -510,13 +521,13 @@ fn record(p: &mut Parser) -> K {
     p.push_aligned_here();
     let kind =
         if (matches!(p.current(), K::Ident | K::Con) || p.at_record_label()) && p.nth(1) == K::Eq {
-            p.items(record_field, true, |_| false);
+            p.items(record_field, true, Parser::at_aligned_catch);
             K::RecordExpr
         } else {
             expr(p);
             if p.expect(K::WithKw) {
                 p.push_aligned_here();
-                p.items(record_field, true, |_| false);
+                p.items(record_field, true, Parser::at_aligned_catch);
                 p.pop();
             }
             K::RecordUpdate
@@ -673,50 +684,4 @@ fn fun_expr(p: &mut Parser) -> Done {
         p.body(K::Block, stmt);
     }
     p.complete(m, K::FunExpr)
-}
-
-/// The arms of a `match`, or of a `try` (`handler`): there `| return p ->`
-/// is the arm for the value of the body, and `return` alone a name.
-fn arms(p: &mut Parser, handler: bool) {
-    if !p.at(K::Pipe) {
-        p.error_expected("a match arm `| pattern -> …`");
-    }
-    while p.at(K::Pipe) {
-        let m = p.start();
-        p.bump();
-        if handler && p.at_word("return") && !matches!(p.nth(1), K::Arrow | K::WhenKw | K::Pipe) {
-            p.bump_as(K::ReturnKw);
-        }
-        pattern::or_pattern(p);
-        if p.at(K::WhenKw) {
-            let guard = p.start();
-            p.bump();
-            expr(p);
-            p.complete(guard, K::Guard);
-        }
-        if p.expect(K::Arrow) {
-            p.body(K::Block, stmt);
-        }
-        p.complete(m, K::MatchArm);
-    }
-}
-
-fn match_expr(p: &mut Parser) -> Done {
-    let m = p.start();
-    p.bump();
-    expr(p);
-    if p.expect(K::WithKw) {
-        arms(p, false);
-    }
-    p.complete(m, K::MatchExpr)
-}
-
-fn try_expr(p: &mut Parser) -> Done {
-    let m = p.start();
-    p.bump();
-    p.body(K::Block, stmt);
-    if p.expect(K::WithKw) {
-        arms(p, true);
-    }
-    p.complete(m, K::TryExpr)
 }

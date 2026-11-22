@@ -25,7 +25,7 @@ pub(super) fn while_ahead(p: &Parser) -> bool {
                 K::IfKw => conditional += 1,
                 K::ThenKw | K::ElseKw if conditional == 0 => return false,
                 K::ElseKw => conditional -= 1,
-                K::MatchKw | K::TryKw => match_or_try = true,
+                K::MatchKw | K::TryKw | K::CatchKw => match_or_try = true,
                 K::WithKw | K::Pipe if !match_or_try => return false,
                 K::FunKw => lambda = true,
                 K::Arrow if !match_or_try && !lambda => return false,

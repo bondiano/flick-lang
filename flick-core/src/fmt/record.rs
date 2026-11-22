@@ -113,7 +113,7 @@ impl<'a> Printer<'a> {
             // a `,` may follow the item when the bracket breaks
             p.tail_inline = matches!(
                 item.kind,
-                K::IfExpr | K::MatchExpr | K::TryExpr | K::FunExpr
+                K::IfExpr | K::MatchExpr | K::TryExpr | K::CatchExpr | K::FunExpr
             );
             if index == count && !last_comma {
                 return (p.node(item), (",", ", "));

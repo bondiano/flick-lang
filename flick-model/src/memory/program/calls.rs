@@ -5,6 +5,7 @@ enum AwaitTaskKind {
     CachedInvalidate(usize),
     ExitOk(Value),
     ExitErr(Value),
+    ForeignHandle(u64),
 }
 
 impl<'p> Machine<'p, '_> {
@@ -224,6 +225,11 @@ impl<'p> Machine<'p, '_> {
                 self.store(captured.binding, arg)?;
                 Ok(())
             }
+            Data::ForeignHandle { execution, host_id } => {
+                let execution = *execution;
+                let host_id = *host_id;
+                self.foreign_call_handle(destination, execution, host_id)
+            }
             _ => Err(Error::ExpectedClosure),
         }
     }
@@ -264,6 +270,12 @@ impl<'p> Machine<'p, '_> {
             }
             Data::ExitTask(ExitData::Success(v)) => Ok(AwaitTaskKind::ExitOk(v.representation())),
             Data::ExitTask(ExitData::Failure(c)) => Ok(AwaitTaskKind::ExitErr(c.representation())),
+            Data::ForeignHandle { execution, host_id } => {
+                if *execution != self.execution {
+                    return Err(Error::ForeignTask);
+                }
+                Ok(AwaitTaskKind::ForeignHandle(*host_id))
+            }
             _ => Err(Error::ExpectedTask),
         }
     }
@@ -352,13 +364,33 @@ impl<'p> Machine<'p, '_> {
                 self.failure_elected = true;
                 self.fail_destination(destination)
             }
+            AwaitTaskKind::ForeignHandle(host_id) => {
+                self.foreign_await_handle(destination, host_id)
+            }
         }
     }
 
     fn advance_main(&mut self) -> Result<(), Error> {
-        if let MainStage::Root(main) = &self.main_stage {
-            let main = main.clone();
+        if let MainStage::Root { main, mut eager_inits } = self.main_stage.clone() {
             self.install_root()?;
+            if let Some(first) = eager_inits.pop_front() {
+                self.main_stage = MainStage::EagerInit {
+                    pending: eager_inits,
+                    main,
+                };
+                return self.global(&first, None);
+            }
+            self.main_stage = MainStage::Function;
+            return self.global(&main, None);
+        }
+        if let MainStage::EagerInit { mut pending, main } = self.main_stage.clone() {
+            if let Some(val) = self.top.take() {
+                self.heap.drop_value(val)?;
+            }
+            if let Some(next) = pending.pop_front() {
+                self.main_stage = MainStage::EagerInit { pending, main };
+                return self.global(&next, None);
+            }
             self.main_stage = MainStage::Function;
             return self.global(&main, None);
         }
@@ -371,13 +403,14 @@ impl<'p> Machine<'p, '_> {
         let callable = if let Some(Value::Object(token)) = &self.top {
             matches!(
                 (&self.heap.object(token.id)?.data, &stage),
-                (Data::Closure { .. }, MainStage::Function)
+                (Data::Closure { .. } | Data::ForeignHandle { .. }, MainStage::Function)
                     | (
                         Data::Task { .. }
                             | Data::MaskedTask { .. }
                             | Data::CachedRunTask { .. }
                             | Data::CachedInvalidateTask { .. }
-                            | Data::ExitTask(_),
+                            | Data::ExitTask(_)
+                            | Data::ForeignHandle { .. },
                         MainStage::Task,
                     )
             )

@@ -604,3 +604,33 @@ let y = r.orelse
   (operator)
   (identifier)
   (member))
+
+==================
+Postfix catch
+==================
+
+let name = load id catch
+  | NotFound _ -> "guest"
+let f = Layer.catch r.catch
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (identifier)
+  (keyword)
+  (operator)
+  (constructor)
+  (identifier)
+  (operator)
+  (string)
+  (keyword)
+  (identifier)
+  (operator)
+  (constructor)
+  (member)
+  (identifier)
+  (member))

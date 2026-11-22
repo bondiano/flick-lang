@@ -81,6 +81,7 @@ mod contract;
 mod decl;
 mod expr;
 pub(crate) mod foralls;
+mod handlers;
 mod lines;
 mod plugins;
 mod printer;

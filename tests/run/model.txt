@@ -89,6 +89,7 @@ codegen/unpack_dictionary
 codegen/record_constructor
 codegen/mutual_rec_arity
 effect/row_without
+effect/postfix_catch
 stdlib/effect/mutable_ref
 stdlib/effect/optic_parts
 stdlib/seqs
@@ -105,5 +106,6 @@ runtime/suspended
 runtime/lazy_let
 runtime/lazy_let_state
 runtime/lazy_opt
+effect/result_blocks
 schema/prove
 schema/prove_imported

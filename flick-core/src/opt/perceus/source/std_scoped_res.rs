@@ -39,6 +39,11 @@ impl Lower<'_> {
                 env.insert(full, local);
             }
         }
+        let show_key = format!("{prefix}.show_val");
+        if used.contains(&show_key) {
+            let local = self.intrinsic(Intrinsic::Show, false, vec![], block, span)?;
+            env.insert(show_key, local);
+        }
         self.expr(expr, &env, block)
     }
 

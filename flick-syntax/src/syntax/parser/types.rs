@@ -286,7 +286,9 @@ fn brace_type(p: &mut Parser) -> K {
     let record = (first.kind == K::Ident || first.kind.is_record_label()) && next.kind == K::Colon;
     if record {
         p.push(Ctx::Aligned { col: p.col() });
-        p.items(record_type_field, true, |p| p.at(K::Pipe));
+        p.items(record_type_field, true, |p| {
+            p.at(K::Pipe) || p.at_aligned_catch()
+        });
     } else {
         p.push(Ctx::Bracket);
         if first.kind != K::Semi {

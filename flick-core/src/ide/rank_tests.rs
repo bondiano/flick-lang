@@ -277,3 +277,37 @@ fn the_checker_accepts_what_fits_and_rejects_what_does_not() {
         );
     }
 }
+
+#[test]
+fn postfix_catch_completion_ranks_body_errors_first() {
+    let partial_empty = "\
+module App.Main exposing (..)
+
+import App.Domain exposing (Shape(..), NotFound(..), Busy(..), Users, describe)
+
+fetch : String ->{Users; NotFound} Shape
+let fetch id = Users.load id
+
+caught : Unit ->{Users} String
+let caught () =
+  describe (fetch \"x\") catch
+  | \n";
+    let f = fixture_of(&[
+        ("src/App/Domain.fl", DOMAIN),
+        ("src/App/Main.fl", partial_empty),
+    ]);
+    let ide = f.ide();
+    let file = f.file("App.Main");
+    let at = f.at("App.Main", "  | \n", 0) + 4;
+    assert_eq!(fitting(&ide, file, at), ["NotFound"]);
+
+    let partial_prefix = partial_empty.replace("  | \n", "  | Not\n");
+    let f = fixture_of(&[
+        ("src/App/Domain.fl", DOMAIN),
+        ("src/App/Main.fl", &partial_prefix),
+    ]);
+    let ide = f.ide();
+    let file = f.file("App.Main");
+    let at = f.at("App.Main", "Not\n", 0);
+    assert_eq!(fitting(&ide, file, at), ["NotFound"]);
+}

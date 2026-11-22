@@ -94,8 +94,11 @@ impl<'a> Printer<'a> {
             && !self.comments.any_before(first)
         {
             // what ends the line of an inline branch ends the branch's value too
-            self.tail_inline =
-                inline && matches!(one.kind, K::IfExpr | K::MatchExpr | K::TryExpr | K::FunExpr);
+            self.tail_inline = inline
+                && matches!(
+                    one.kind,
+                    K::IfExpr | K::MatchExpr | K::TryExpr | K::CatchExpr | K::FunExpr
+                );
             let mut doc = self.statement(one);
             self.tail_inline = false;
             let trailing = self.comments.trailing(end, None);

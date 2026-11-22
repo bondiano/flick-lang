@@ -206,6 +206,9 @@ impl Machine<'_, '_> {
         if let Some(root) = self.root_with(effect)? {
             return self.invoke_provider(root, binding, effect, op);
         }
+        if self.foreign.bridge_opened {
+            return self.foreign_perform_service(binding, effect, op);
+        }
         charge(
             &mut self.fuel,
             effect.len().saturating_add(op.len()).saturating_add(1),

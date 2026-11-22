@@ -10,7 +10,7 @@ are not evidence for this contract.
 
 | Obligation | Current implementation | Still required for the phase gate |
 | - | - | - |
-| M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), Stage 3 pure/pure-effect stdlib counted lowering/primitives, Stage 4 cooperative single-threaded async/fiber/layer/STM/observability/config/arbitrary/streaming runtime (`Fiber`, `Deferred`, `FiberGroup`, `Layer` dynamic/memo/merge, `Context.Reference`, `Clock`/`TestClock`, `Schedule`/`ExecutionPlan`, `Latch`/`Semaphore`/`PartitionedSemaphore`, `Queue`/`PubSub`/`SynchronizedRef`/`SubscriptionRef`, `Cache`/`ScopedCache`/`Pool`/`RcRef`/`RcMap`/`LayerMap`/`LayerRef`, `Tx` STM, `Events`/`ErrorReporter`/`Tracer`/`Logger`/`Metric`/`Request`/`Crypto`, `Config`/`ConfigProvider`, `Arbitrary`, `Channel`/`Sink`/`Stream`), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs`: 762 clean profiles across `tests/run`, `tests/rt`, `docs`, and 26/26 `tests/language` suites in both profiles with zero live objects) | Explicit counted host/FFI bridge for `.mjs`/DOM/UI/HTTP/RPC/FileSystem/CLI/Reactivity.Atom fixtures and OS-environment host services so 100% of the corpus passes on this path in both profiles with zero live objects |
+| M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), Stage 3 pure/pure-effect stdlib counted lowering/primitives, Stage 4 cooperative single-threaded async/fiber/layer/STM/observability/config/arbitrary/streaming runtime (`Fiber`, `Deferred`, `FiberGroup`, `Layer` dynamic/memo/merge, `Context.Reference`, `Clock`/`TestClock`, `Schedule`/`ExecutionPlan`, `Latch`/`Semaphore`/`PartitionedSemaphore`, `Queue`/`PubSub`/`SynchronizedRef`/`SubscriptionRef`, `Cache`/`ScopedCache`/`Pool`/`RcRef`/`RcMap`/`LayerMap`/`LayerRef`, `Tx` STM, `Events`/`ErrorReporter`/`Tracer`/`Logger`/`Metric`/`Request`/`Crypto`, `Config`/`ConfigProvider`, `Arbitrary`, `Channel`/`Sink`/`Stream`), Stage 5 `HostMode::LiveOs`, pure `flick:sql`, and explicit opt-in counted Host/FFI bridge (`lower_roots_with_foreign_bridge`, `Operation::ForeignCall`, persistent Node `HostBridge` with 1-to-1 handle refcount symmetry and zero-live-handle teardown), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs` `--release` gate: **1,064/1,064** clean profiles across `tests/run`, `tests/rt`, `docs`, `tests/language`, and runnable `examples/`, plus generated `flick_model::generate` programs, with zero live Rust heap slots and zero live host handles) | M1 reference-model corpus gate complete; production backend RC codegen and physical reclamation remain in M2–M5 / Phase N |
 | M2: `Arena s` | Public `Arena.make/alloc/get`, existing by-use checker rules, counted scope/selected-owner execution with LIFO finalizers and child-fiber cancellation running before arena retirement, JS/Go storage retirement after finalizers, scope-release/use/retention and concurrent cancellation regressions | Whole heap/region proof and counted host/FFI boundary |
 | M3: FBIP and cycles | Dynamic uniqueness/layout-checked reuse for a last borrowed receiver followed by construction; root-owned counted cells, strong reads/replacement and detach-all teardown, with closure/cell-cycle tests | Full constructor/destructor lowering and backend implementation |
 | M4: Lean | `Formal/MemoryInsert.lean`: whole-function token balance for the executable cached insertion projection, before output validation, with distinct parameters and every selected-path prefix; `Formal/MemoryPass.lean`: independent token checking and computed live-in availability; `Formal/Memory.lean`: local arithmetic; `Formal/MemoryArena.lean` and `MemoryScopes.lean`: root inventories and selected-owner storage retirement | Verified Rust correspondence, machine bounds, operation/heap and exception-unwind semantics, dynamic reuse and physical reclamation remain outside these proofs |
@@ -157,9 +157,49 @@ interruption and pure-abort reset. Like Stage 3, Stage 4 adds only consuming
 Flick templates without changing `Operation` or `Exit`, so
 `Formal/MemoryPass.lean` and `Formal/MemoryInsert.lean` remain unaffected;
 cooperative scheduling, concurrency, and primitive semantics remain tested
-rather than Lean-proved. The remaining unsupported corpus cases are exclusively
-explicit host/FFI/UI/HTTP/RPC/FileSystem/CLI/`Reactivity.Atom`/`.mjs` surfaces
-plus `effect/host_services` (which asserts host OS `PATH` in `Platform.vars ()`).
+rather than Lean-proved.
+
+Stage 5 closes M1 across the remaining host, FFI, OS-environment, SQL, UI, and
+example corpora without relaxing the closed-world contract. The closed-world
+entry points (`perceus::lower`, `perceus::lower_with_declarations`, and
+`perceus::lower_roots_with_declarations`) keep `allow_foreign_bridge == false`
+and continue to reject arbitrary foreign bindings at lowering time. Callers
+that opt into host execution use `perceus::lower_roots_with_foreign_bridge`,
+which lowers host/FFI bindings to `Operation::ForeignCall { spec, args }` with
+type-derived `WireHint` metadata and single-owner Effect-TS family overrides
+(`BridgeFamilies` for `observe`, `config`, `stream`, `queue`, and `schedule`)
+so one execution never splits a family across disconnected Rust and Effect-TS
+runtimes. `HostMode::LiveOs` supplies live OS `Platform.env`/`Platform.vars`
+for `effect/host_services`, pure `flick:sql` lowers to closed IR templates, and
+`MainStage::EagerInit` evaluates entry-module top-level value bindings in
+declaration order before `main ()`.
+
+Bridged calls execute across a persistent Node worker (`HostBridge`) over
+localhost TCP with a dedicated I/O worker thread (`io.mjs`) for re-entrant
+synchronous callbacks and an iterative flat-node wire codec (`wire.rs` /
+`wire.mjs`) so arbitrarily deep ADTs and lists never overflow the Rust or JS
+call stack. Every Rust `Data::ForeignHandle` (or `Data::ForeignCycle`) slot
+corresponds 1-to-1 with a refcounted host handle entry in `worker.mjs`;
+dropping a Rust slot flushes `release_handles` in FIFO order, teardown closes
+mirrored owners and unblocks late synchronous callbacks cleanly under
+`OutOfFuel`, and `HostBridge::close_exec` asserts zero live host handles
+(`Error::LeakedForeignHandles` otherwise) while resetting shared React context
+renderer slots between executions. `memory_stage5.rs`, `memory_stage5_ffi.rs`,
+and `memory_stage5_host.rs` pin closed-world rejection, live OS services, SQL,
+all `.mjs`/owner FFI fixtures, HTTP, RPC, CLI, FileSystem/`Stream.watch`,
+ChildProcess, `Reactivity.Atom`, UI/hydration/SSR, bridged `examples/` suites
+(`execute_tests_program_with_bridge`), generated `flick_model::generate`
+programs, and fuel-prefix zero-leak sweeps on both heaps. The full `--release`
+`memory_inventory::counted_corpus_inventory` gate passes **1,064/1,064**
+profiles with zero failures, zero `OutOfFuel`, zero unsupported entries, and
+zero Rust or host handle leaks (`734/734` `tests/run`, `20/20` `tests/rt`,
+`220/220` `docs`, `52/52` `tests/language`, and `38/38` runnable `examples/`).
+Because `Operation::ForeignCall` consumes all operand tokens and introduces one
+fresh binding with no new `Exit` variant, the local-token and whole-pass
+theorems in `Formal/MemoryPass.lean` and `Formal/MemoryInsert.lean` (`just
+lean`, 363 jobs) remain valid for their token projection; the Rust VM, Node
+worker, wire marshalling, host libraries, and cross-heap refcount symmetry are
+validated by tests rather than proved in Lean.
 
 ## 2. Owned tokens and objects
 

@@ -1,0 +1,212 @@
+// Postfix `catch` is typed-error-only sugar over `try ... with`.
+module App.PostfixCatch exposing (..)
+
+type alias UserId = String
+
+type alias User = { name : String }
+
+type alias Config = { host : String }
+
+type error NotFound = NotFound UserId
+
+type error Timeout = Timeout
+
+type error BadCode = BadCode Int
+
+type error Flag = Flag Bool
+
+type error FileNotFound = FileNotFound String
+
+type error InvalidConfig = InvalidConfig String
+
+service Users =
+  get : UserId ->{; NotFound} User
+
+guest_user : User
+let guest_user = { name = "guest" }
+
+default_config : Config
+let default_config = { host = "localhost" }
+
+fetch_user : UserId ->{Users; NotFound} User
+let fetch_user id = Users.get id
+
+load_config_raw : String ->{; FileNotFound, InvalidConfig} Config
+let load_config_raw path = Fail.fail (FileNotFound path)
+
+load_backup : String ->{} Config
+let load_backup _ = default_config
+
+// Required canonical examples from the specification.
+load_user : UserId ->{Users} User
+let load_user id =
+  fetch_user id catch
+  | NotFound _ -> guest_user
+
+load_config : String ->{} Config
+let load_config path =
+  load_config_raw path catch
+  | FileNotFound _ -> default_config
+  | InvalidConfig details -> load_backup details
+
+// Full unguarded nominal arm removes the nominal error; open tail stays open.
+handle_open : (Unit ->{r; NotFound, Timeout | e} User) ->{r; Timeout | e} User
+let handle_open run =
+  run () catch
+  | NotFound _ -> guest_user
+
+// Partial payload, separate partial arms, guarded arm, and guarded catch-all
+// conservatively keep the nominal error in the row.
+fail_code : Int ->{; BadCode} Int
+let fail_code n = Fail.fail (BadCode n)
+
+fail_flag : Bool ->{; Flag} Int
+let fail_flag b = Fail.fail (Flag b)
+
+partial_keeps : Int ->{; BadCode} Int
+let partial_keeps n =
+  fail_code n catch
+  | BadCode 0 -> 0
+
+separate_partials_keep : Bool ->{; Flag} Int
+let separate_partials_keep b =
+  fail_flag b catch
+  | Flag true -> 1
+  | Flag false -> 2
+
+guarded_keeps : UserId ->{Users; NotFound} User
+let guarded_keeps id =
+  fetch_user id catch
+  | NotFound _ when true -> guest_user
+
+guarded_catch_all_keeps : UserId ->{Users; NotFound} User
+let guarded_catch_all_keeps id =
+  fetch_user id catch
+  | _ when true -> guest_user
+
+// Unguarded catch-all removes all errors including an open row tail.
+catch_all_open : (Unit ->{r; NotFound | e} User) ->{r} User
+let catch_all_open run =
+  run () catch
+  | _ -> guest_user
+
+// Catch-all variable carries the full body error row, even after an earlier arm.
+describe_both : Errors {NotFound, Timeout} -> String
+let describe_both e =
+  match e with
+  | NotFound id -> id
+  | Timeout -> "timeout"
+
+fail_both : Bool ->{; NotFound, Timeout} String
+let fail_both first = if first then Fail.fail (NotFound "a") else Fail.fail Timeout
+
+catch_all_var_full_row : Bool ->{} String
+let catch_all_var_full_row first =
+  fail_both first catch
+  | NotFound _ -> "missing"
+  | e -> describe_both e
+
+// Recovery re-raising the same nominal error puts it back in the outer row.
+re_raise_same : UserId ->{Users; NotFound} User
+let re_raise_same id =
+  fetch_user id catch
+  | NotFound missing -> Fail.fail (NotFound missing)
+
+// Result `?` raises a typed error that `catch` handles; pure `Err` is untouched.
+catch_question : Result NotFound Int ->{} Int
+let catch_question res =
+  res? catch
+  | NotFound _ -> 0
+
+pure_err_untouched : Unit ->{} Result NotFound Int
+let pure_err_untouched () =
+  Err (NotFound "x") catch
+  | _ -> Ok 0
+
+// Cold `task { ... }` stays cold and keeps its error row on `Eff`.
+cold_task_untouched : UserId ->{} Eff {Users} {NotFound} User
+let cold_task_untouched id =
+  task { fetch_user id } catch
+  | _ -> task { guest_user }
+
+// `let mut` mutation in body and recovery is allowed.
+mutate_across : Bool -> UserId ->{Users} (User, Int)
+let mutate_across run_body id =
+  let mut count = 0
+  let user =
+    if run_body then {
+      count = count + 1
+      fetch_user id
+    } else
+      guest_user
+    catch
+    | NotFound _ ->
+      count = count + 10
+      guest_user
+  (user, count)
+
+// Captures and regions are preserved.
+in_scope : UserId ->{Users} String
+let in_scope id = scope {
+  let u =
+    fetch_user id catch
+    | NotFound _ -> guest_user
+  u.name
+}
+
+// Pipelines and nesting.
+format_name : User -> String
+let format_name u = u.name
+
+pipe_in_recovery : UserId ->{Users} String
+let pipe_in_recovery id =
+  (fetch_user id).name catch
+  | NotFound _ -> guest_user |> format_name
+
+pipe_outside : UserId ->{Users} String
+let pipe_outside id =
+  (
+    fetch_user id catch
+    | NotFound _ -> guest_user
+  )
+  |> format_name
+
+nested_rhs : Bool ->{} String
+let nested_rhs first =
+  fail_both first catch
+  | NotFound _ ->
+    fail_both false catch
+    | Timeout -> "inner"
+    | NotFound _ -> "inner2"
+  | Timeout -> "outer"
+
+parenthesized_outer : Bool ->{} String
+let parenthesized_outer first =
+  (
+    fail_both first catch
+    | NotFound _ -> Fail.fail Timeout
+  )
+  catch
+  | Timeout -> "caught-outer"
+
+// `catch` stays valid as record label, field access, accessor, renamed pattern,
+// and `foreign` metadata.
+type alias Handler = { catch : Int -> Int }
+
+identity : a -> a
+let identity x = x
+
+record_positions : Handler -> Int
+let record_positions h =
+  let created = { catch = h.catch }
+  let updated = { created with catch = fun n -> n + 1 }
+  let { catch = run } = updated
+  run ((identity updated).catch 1)
+
+map_fs_error : JsValue -> FileNotFound
+let map_fs_error _ = FileNotFound "io"
+
+read_text : String ->{Async; FileNotFound} String
+foreign read_text from "./fs.js" "readText"
+  arity 1
+  catch map_fs_error

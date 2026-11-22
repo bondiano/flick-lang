@@ -255,6 +255,7 @@ fn needs_lhs_parens(node: &Node) -> bool {
         | K::IfExpr
         | K::MatchExpr
         | K::TryExpr
+        | K::CatchExpr
         | K::ProvideExpr
         | K::ScopeExpr
         | K::WhileExpr
@@ -265,10 +266,11 @@ fn needs_lhs_parens(node: &Node) -> bool {
 }
 
 fn needs_rhs_parens(node: &Node) -> bool {
-    node.kind == K::BinExpr
-        && node
-            .child_tokens()
-            .any(|t| matches!(t.kind, K::LtPipe | K::PipeGt))
+    node.kind == K::CatchExpr
+        || (node.kind == K::BinExpr
+            && node
+                .child_tokens()
+                .any(|t| matches!(t.kind, K::LtPipe | K::PipeGt)))
 }
 
 fn fresh_binder(m: &Analyzed, text: &str, file: FileId, at: u32, lhs: &Node, rhs: &Node) -> String {

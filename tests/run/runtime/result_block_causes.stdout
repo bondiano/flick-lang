@@ -1,0 +1,9 @@
+R10 die: fail:["D"]
+R10 abort: stopped:halt
+R10 interrupt: ["I"]
+R11 die+fail: fail:["D", "D"]
+R11 fail+fin_die: fail:["D", "D"]
+R12 skipHandler: ["I"]
+R15a: ["defer_fail=true", "res=Err (A 5)"]
+R15b: Err (A 6), ["caught=Err (A 6)", "defer_ok=true"]
+R15c close defect: fail:["D"]
