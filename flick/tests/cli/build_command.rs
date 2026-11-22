@@ -7,6 +7,8 @@ use crate::common;
 mod ir;
 #[path = "build_command/modules.rs"]
 mod modules;
+#[path = "build_command/schema_aot.rs"]
+mod schema_aot;
 #[path = "build_command/target_preflight.rs"]
 mod target_preflight;
 
@@ -101,7 +103,7 @@ fn build_progress_preserves_stream_contracts() {
             "Checking build cache",
             "Preparing compiler",
             "Compiling Flick modules",
-            "Emitting JavaScript",
+            "Emitting backend output",
             // the manifest of outputs is part of the one publication
             "Writing artifacts",
             "Saving build cache",
@@ -325,74 +327,6 @@ fn dotted_and_underscored_modules_run_in_all_emit_profiles() {
         assert_eq!(String::from_utf8_lossy(&node.stdout), "3\n");
         assert!(node.stderr.is_empty(), "{emit}/{profile}: {node:?}");
     }
-}
-
-const AOT_APP: &str = r#"module Main exposing (main)
-
-type alias Point = { x : Float; y : Float }
-  deriving Schema
-
-point_json : PureCodec Json Point
-let point_json = Codec.json Point.schema
-
-main : Unit ->{Host.Console; AppError} Unit
-let main () =
-  match Json.parse "{\"x\": 1, \"y\": 2}" with
-  | Err _ -> Platform.stdout_line "not JSON"
-  | Ok input ->
-    match Codec.decode_result point_json input with
-    | Ok p -> Platform.stdout_line (show (p.x + p.y))
-    | Err _ -> Platform.stdout_line "not a point"
-"#;
-
-#[test]
-#[ignore = "needs Node and pnpm install"]
-fn schema_aot_writes_compiled_decoders_the_runner_installs() {
-    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("build_schema_aot");
-    let _ = fs::remove_dir_all(&dir);
-    fs::create_dir_all(&dir).expect("dir");
-    fs::write(dir.join("Main.fl"), AOT_APP).expect("write");
-    let out = flick_in(
-        &dir,
-        &[
-            "build",
-            "Main.fl",
-            "--out-dir",
-            "out",
-            "--runtime",
-            "effect",
-            "--schema-aot",
-        ],
-    );
-    assert!(out.status.success(), "{out:?}");
-    let aot = fs::read_to_string(dir.join("out/schemas.aot.js")).expect("compiled decoders");
-    assert!(aot.contains("from \"@flick-lang/effect-ts\""), "{aot}");
-    let run = Command::new("node")
-        .arg(Path::new("out").join(runner_path(false)))
-        .current_dir(&dir)
-        .output()
-        .expect("node");
-    assert!(run.status.success(), "{run:?}");
-    assert_eq!(String::from_utf8_lossy(&run.stdout), "3\n");
-    // a stale module is refused, and decoding still works
-    fs::write(
-        dir.join("out/schemas.aot.js"),
-        "export const fingerprint = \"\";\nexport const install = () => {};\n",
-    )
-    .expect("write");
-    let stale = Command::new("node")
-        .arg(Path::new("out").join(runner_path(false)))
-        .current_dir(&dir)
-        .output()
-        .expect("node");
-    assert_eq!(String::from_utf8_lossy(&stale.stdout), "3\n");
-    assert!(
-        String::from_utf8_lossy(&stale.stderr).contains("stale"),
-        "{stale:?}"
-    );
-    let plain = flick_in(&dir, &["build", "Main.fl", "--out-dir", "plain"]);
-    assert!(plain.status.success(), "{plain:?}");
-    assert!(!dir.join("plain/schemas.aot.js").exists());
 }
 
 #[test]

@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use flick_core::diagnostics::Diagnostic;
 use flick_core::plugin::{Expander, reach::Outside};
+use flick_core::project::config::BackendEnvironment;
 use flick_core::project::target::Wanted;
 use flick_core::project::{self, Foreign, Host, Project};
 
@@ -79,5 +80,22 @@ impl Host for OverlayHost<'_> {
 
     fn verify(&self, project: &Project, wanted: &[Wanted]) -> Vec<Diagnostic> {
         self.base.verify(project, wanted)
+    }
+
+    fn unsupported_modules(&self, project: &Project) -> Vec<String> {
+        self.base.unsupported_modules(project)
+    }
+
+    fn stages_by_class(&self, project: &Project) -> bool {
+        self.base.stages_by_class(project)
+    }
+
+    fn handles_service(
+        &self,
+        project: &Project,
+        environment: &BackendEnvironment,
+        service: &str,
+    ) -> Option<bool> {
+        self.base.handles_service(project, environment, service)
     }
 }

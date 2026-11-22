@@ -14,8 +14,9 @@ use std::time::SystemTime;
 use flick_backend::command;
 use flick_backend::{
     Artifact, ArtifactKind, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic,
-    Environment, Inputs, Mode, ModuleRole, NamedRange, OptionDescriptor, OptionValue, Packages,
-    Parameter, Profile, ProjectFile, Severity, Span, TargetSupport, ValueKind, Verb, VersionRange,
+    Environment, EnvironmentServices, Inputs, Mode, ModuleRole, NamedRange, OptionDescriptor,
+    OptionValue, Packages, Parameter, Profile, ProjectFile, Severity, Span, TargetSupport,
+    ValueKind, Verb, VersionRange,
 };
 use flick_ir::{ExprKind, ItemKind, Lit, Program, Stage};
 
@@ -220,6 +221,20 @@ impl Backend for Literal {
                     verbs: vec![Verb::Build, Verb::Inspect],
                 },
             ],
+            launch_runtimes: vec!["node".into()],
+            host_tools: vec!["node".into()],
+            projections: vec![],
+            unsupported_modules: vec![],
+            stages_by_class_option: None,
+            foreign_extension: None,
+            foreign_suffixes: vec![],
+            handled_services: vec![EnvironmentServices {
+                environment: Environment {
+                    backend: "js".into(),
+                    platform: "node".into(),
+                },
+                services: vec!["Database".into(), "Db".into(), "Server".into()],
+            }],
         }
     }
 

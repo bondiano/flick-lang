@@ -14,6 +14,8 @@ use flick_core::diagnostics::Diagnostic;
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
 #[cfg(feature = "wasm-backends")]
+use flick_core::project::config::BackendEnvironment;
+#[cfg(feature = "wasm-backends")]
 use flick_core::project::target::Wanted;
 use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, ModuleCache};
 #[cfg(feature = "wasm-backends")]
@@ -100,6 +102,26 @@ impl Host for Overlay<'_> {
     fn verify(&self, project: &Project, wanted: &[Wanted]) -> Vec<Diagnostic> {
         backends::verify(project, wanted, false)
     }
+
+    #[cfg(feature = "wasm-backends")]
+    fn unsupported_modules(&self, project: &Project) -> Vec<String> {
+        backends::unsupported_modules(project)
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn stages_by_class(&self, project: &Project) -> bool {
+        backends::stages_by_class(project)
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn handles_service(
+        &self,
+        project: &Project,
+        environment: &BackendEnvironment,
+        service: &str,
+    ) -> Option<bool> {
+        backends::handles_service(project, environment, service)
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -131,8 +153,8 @@ pub struct Snapshot {
     /// The project's root directory.
     #[cfg_attr(not(feature = "wasm-backends"), allow(dead_code))]
     pub root: PathBuf,
-    /// Whether the project targets Go.
-    pub go: bool,
+    /// Alternate companion file extension for local foreign bindings, if any.
+    pub foreign_extension: Option<String>,
     pub(super) context: Context,
 }
 
@@ -187,11 +209,12 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
     let directories = found
         .as_ref()
         .map(|p| [p.source_root(), p.test_root(), p.proof_root()]);
+    let skip = sources::skip_dirs(found.as_ref());
     if let Some(directories) = &directories {
         for root in directories {
             let mut files = Vec::new();
             if root.is_dir() {
-                sources::source_files(&root.to_string_lossy(), &mut files);
+                sources::source_files_skipping(&root.to_string_lossy(), &skip, &mut files);
             }
             roots.extend(files.into_iter().map(PathBuf::from));
         }
@@ -224,7 +247,10 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
     let cache = caches.entry(context.clone()).or_default();
     let mut analysis = project::analyze_with(&host, &mut sources, found.as_ref(), &roots, cache);
     analysis.diagnostics.extend(unread);
-    let go = found.as_ref().is_some_and(|p| p.config.is_go());
+    #[cfg(feature = "wasm-backends")]
+    let foreign_extension = found.as_ref().and_then(backends::foreign_extension);
+    #[cfg(not(feature = "wasm-backends"))]
+    let foreign_extension = None;
     let root = found.map_or(dir, |p| p.root);
     debug!(
         root = %root.display(),
@@ -237,7 +263,7 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
         analysis,
         sources,
         root,
-        go,
+        foreign_extension,
         context,
     }
 }
@@ -309,7 +335,7 @@ pub(super) fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         },
         sources,
         root: path.parent().expect("source directory").to_path_buf(),
-        go: false,
+        foreign_extension: None,
         context: Context::Builtin(path.to_path_buf()),
     }
 }

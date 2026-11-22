@@ -68,8 +68,7 @@ pub(crate) fn is_safe_pattern(pattern: &str) -> bool {
 }
 
 /// Whether `pattern` is a structured package-directory wildcard pattern
-/// (`<dir>/<wildcard...>/<manifest>`, such as `node_modules/*/package.json` or
-/// `node_modules/@*/*/package.json`) permitted for bounded ancestor lookups.
+/// (`<dir>/<wildcard...>/<manifest>`) permitted for bounded ancestor lookups.
 fn is_ancestor_pattern(pattern: &str) -> bool {
     let parts: Vec<&str> = pattern.split('/').collect();
     if parts.len() < 3 {

@@ -2,7 +2,7 @@
 
 use flick_core::build;
 use flick_core::ir::lang_items;
-use flick_core::project::{Compilation, Project};
+use flick_core::project::Compilation;
 use flick_core::source::SourceMap;
 use flick_ir::Program;
 
@@ -17,13 +17,12 @@ use flick_backend::ArtifactKind;
 pub(super) fn artifact(
     compilation: &Compilation,
     sources: &mut SourceMap,
-    project: Option<&Project>,
     output: &BuildPlan,
     format: IrFormat,
 ) -> Artifact {
     let program = output
         .backend
-        .reference_ir(sources, project, compilation, output.extras.rt)
+        .reference_ir(sources, compilation, output.stages_by_class)
         .unwrap_or_else(|| native_program(compilation, sources, output));
     let (name, bytes) = match format {
         IrFormat::Json => ("program.ir.json", program.to_json().into_bytes()),
@@ -42,7 +41,7 @@ fn native_program(compilation: &Compilation, sources: &SourceMap, output: &Build
         .iter()
         .map(|m| {
             if output.release {
-                build::optimized(modules, m, output.extras.rt)
+                build::optimized(modules, m, output.stages_by_class)
             } else {
                 m.ir.clone()
             }

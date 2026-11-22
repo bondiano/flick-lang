@@ -1,6 +1,7 @@
 //! Runtime ABI and adapter contract verification plus `flick doctor` inspection
 //! for the JavaScript backend.
 
+use flick_backend::command::{self, Descriptor, Invocation, Parameter, Plan, Style, ValueKind};
 use flick_backend::{Diagnostic, OptionValue, Severity};
 use serde_json::Value;
 
@@ -142,33 +143,90 @@ fn push_doctor(lines: &mut Vec<Diagnostic>, ok: Option<bool>, what: &str, detail
     });
 }
 
-/// Structured lines for `flick doctor`, encoded as diagnostics with codes
-/// `doctor-ok`, `doctor-fail` and `doctor-note` and message `<what>\n<detail>`.
-pub(super) fn doctor_diagnostics(
-    known: &mut Known<'_>,
-    project: &Value,
-    options: &[OptionValue],
-    boundary: Option<&str>,
-) -> Vec<Diagnostic> {
-    let option = |key: &str| {
-        (options.iter())
-            .find(|o| o.key == key)
-            .map(|o| o.value.as_str())
+/// Delegated `doctor` command descriptor for the JavaScript backend.
+pub(in super::super) fn doctor_descriptor() -> Descriptor {
+    let param = |name: &str, multiple: bool, help: &str| Parameter {
+        name: name.into(),
+        kind: ValueKind::Text,
+        multiple,
+        required: false,
+        help: help.into(),
     };
-    let compiler = option("compiler").unwrap_or("0.1.0");
-    let has_project = option("has-project") == Some("true");
-    let node_ver = option("node-version").filter(|s| !s.is_empty());
-    let pnpm_ver = option("pnpm-version").filter(|s| !s.is_empty());
+    Descriptor {
+        name: "doctor".into(),
+        summary: "Checks the JavaScript toolchain (Node.js and pnpm) for `flick doctor`".into(),
+        positionals: vec![],
+        options: vec![
+            param(
+                "in-project",
+                false,
+                "Whether `flick doctor` is running inside a project",
+            ),
+            param("compiler", false, "Flick compiler version"),
+            param("granted-tools", true, "Tools granted to `flick/js`"),
+        ],
+        inputs: vec!["package.json".into()],
+        reads: vec![],
+        writes: vec![],
+        style: Style::Plan,
+    }
+}
+
+fn push_cmd_doctor(
+    lines: &mut Vec<command::Diagnostic>,
+    ok: Option<bool>,
+    what: &str,
+    detail: &str,
+) {
+    let (code, severity) = match ok {
+        Some(true) => ("doctor-ok", command::Severity::Note),
+        Some(false) => ("doctor-fail", command::Severity::Error),
+        None => ("doctor-note", command::Severity::Note),
+    };
+    lines.push(command::Diagnostic {
+        code: code.into(),
+        severity,
+        message: format!("{what}\n{detail}"),
+        notes: vec![],
+        span: None,
+        help: None,
+    });
+}
+
+/// Pure read-only `doctor` plan checking Node.js and pnpm from host-probed tools.
+pub(in super::super) fn run_doctor(invocation: &Invocation) -> Plan {
+    let arg = |name: &str| {
+        invocation
+            .arguments
+            .iter()
+            .find(|a| a.name == name)
+            .and_then(|a| a.values.first())
+            .map(String::as_str)
+    };
+    let in_project = arg("in-project") == Some("true");
+    let tool_version = |id: &str| {
+        invocation
+            .tools
+            .iter()
+            .find(|t| t.id == id && !t.sha256.is_empty() && !t.version.is_empty())
+            .map(|t| t.version.as_str())
+    };
+    let project: Value = invocation
+        .inputs
+        .iter()
+        .find(|f| f.path == "package.json")
+        .and_then(|f| serde_json::from_slice(&f.bytes).ok())
+        .unwrap_or(Value::Null);
 
     let mut lines = Vec::new();
-    match node_ver {
-        Some(v) => push_doctor(
+    match tool_version("node") {
+        Some(v) => push_cmd_doctor(
             &mut lines,
             Some(at_least(v, NODE)),
             "Node.js",
             &format!("{v} (needs >= {NODE})"),
         ),
-        None => push_doctor(
+        None => push_cmd_doctor(
             &mut lines,
             Some(false),
             "Node.js",
@@ -180,14 +238,14 @@ pub(super) fn doctor_diagnostics(
         .as_str()
         .and_then(|spec| spec.strip_prefix("pnpm@"))
         .map_or(PNPM, |v| v.split('+').next().unwrap_or(v));
-    match pnpm_ver {
-        Some(v) => push_doctor(
+    match tool_version("pnpm") {
+        Some(v) => push_cmd_doctor(
             &mut lines,
             Some(v == pinned),
             "pnpm",
             &format!("{v} (the project pins {pinned})"),
         ),
-        None => push_doctor(
+        None => push_cmd_doctor(
             &mut lines,
             Some(false),
             "pnpm",
@@ -195,16 +253,14 @@ pub(super) fn doctor_diagnostics(
         ),
     }
 
-    if has_project {
-        doctor_project_lines(known, compiler, boundary, &mut lines);
-    } else {
-        push_doctor(
+    if !in_project {
+        push_cmd_doctor(
             &mut lines,
             None,
             "project",
             "none here: runtime and adapters not checked",
         );
-        push_doctor(
+        push_cmd_doctor(
             &mut lines,
             None,
             "Content Mapper",
@@ -212,6 +268,25 @@ pub(super) fn doctor_diagnostics(
         );
     }
 
+    let mut plan = Plan::empty();
+    plan.diagnostics = lines;
+    plan
+}
+
+/// Structured package-tree lines for `flick doctor` inside a JS project,
+/// encoded as diagnostics with codes `doctor-ok`, `doctor-fail` and `doctor-note`
+/// and message `<what>\n<detail>`.
+pub(super) fn doctor_package_diagnostics(
+    known: &mut Known<'_>,
+    options: &[OptionValue],
+    boundary: Option<&str>,
+) -> Vec<Diagnostic> {
+    let compiler = options
+        .iter()
+        .find(|o| o.key == "compiler")
+        .map_or("0.1.0", |o| o.value.as_str());
+    let mut lines = Vec::new();
+    doctor_project_lines(known, compiler, boundary, &mut lines);
     lines
 }
 

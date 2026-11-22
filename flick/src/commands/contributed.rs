@@ -11,7 +11,7 @@ mod registry;
 mod session;
 mod validate;
 
-pub(crate) use delegate::delegate;
+pub(crate) use delegate::{delegate, doctor, run_client, spawn_dev_client};
 pub(crate) use preview::preview;
 pub(crate) use registry::Contributor;
 
@@ -76,8 +76,10 @@ fn contributed(project: &Project) -> (Vec<(Source, Contributed)>, Vec<Diagnostic
                 continue;
             }
         };
-        let (taken, commands): (Vec<_>, Vec<_>) =
-            (all.into_iter()).partition(|d| reserved.iter().any(|r| r == first_word(&d.name)));
+        let (taken, commands): (Vec<_>, Vec<_>) = (all.into_iter()).partition(|d| {
+            reserved.iter().any(|r| r == first_word(&d.name))
+                || delegate::VERBS.contains(&d.name.as_str())
+        });
         let backend = matches!(source.kind, SourceKind::Backend { .. });
         for d in taken {
             if backend && delegate::VERBS.contains(&d.name.as_str()) {
@@ -123,7 +125,10 @@ pub(crate) fn help() -> String {
     let mut text = String::new();
     for (id, commands) in groups {
         let commands: Vec<_> = (commands.iter())
-            .filter(|d| !reserved.iter().any(|r| r == first_word(&d.name)))
+            .filter(|d| {
+                !reserved.iter().any(|r| r == first_word(&d.name))
+                    && !delegate::VERBS.contains(&d.name.as_str())
+            })
             .collect();
         if commands.is_empty() {
             continue;
@@ -259,7 +264,8 @@ fn invocation(
         dependencies: Vec::new(),
     };
     let paths = inputs::expand(&descriptor.inputs, &invocation)?;
-    invocation.inputs = inputs::read(root, &paths)?;
+    let skip = backends::package_dirs(project);
+    invocation.inputs = inputs::read(root, &paths, &skip)?;
     Ok(invocation)
 }
 

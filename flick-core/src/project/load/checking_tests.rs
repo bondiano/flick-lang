@@ -10,8 +10,12 @@ use std::sync::Arc;
 use super::checking::levels;
 #[cfg(feature = "ide")]
 use super::{Mode, ModuleCache, analyze, analyze_with, run};
+#[cfg(all(feature = "ide", not(target_arch = "wasm32")))]
+use crate::build::target_preflight;
 #[cfg(feature = "ide")]
 use crate::iface::{Interface, Namespace};
+#[cfg(all(feature = "ide", not(target_arch = "wasm32")))]
+use crate::project::config::BackendEnvironment;
 #[cfg(feature = "ide")]
 use crate::project::config::{Build, Config, Kind};
 #[cfg(feature = "ide")]
@@ -41,6 +45,29 @@ impl Host for Memory {
 
     fn display(&self, path: &Path) -> String {
         path.display().to_string()
+    }
+
+    #[cfg(feature = "native-project")]
+    fn stages_by_class(&self, project: &Project) -> bool {
+        !matches!(
+            project
+                .config
+                .targets
+                .get("js")
+                .and_then(|t| t.get("runtime"))
+                .map(|o| &o.value),
+            Some(TargetValue::String(v)) if v == "effect"
+        )
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn handles_service(
+        &self,
+        _project: &Project,
+        environment: &BackendEnvironment,
+        service: &str,
+    ) -> Option<bool> {
+        Some(target_preflight::handles(environment, service))
     }
 }
 

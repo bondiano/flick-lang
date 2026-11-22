@@ -371,25 +371,29 @@ fn doctor_reports_without_failing_on_a_missing_content_mapper() {
     let text = String::from_utf8_lossy(&out.stdout);
     for check in [
         "compiler: flick",
+        "store:",
+        "git:",
+        "plugins:",
+        "backend: flick/js@",
         "Node.js:",
         "pnpm:",
-        "git:",
-        "Go:",
         "@flick-lang/runtime:",
         "effect:",
         "Content Mapper:",
     ] {
         assert!(text.contains(check), "`{check}` in\n{text}");
     }
+    assert!(
+        !text.contains("Go:"),
+        "JS project doctor must not mention Go:\n{text}"
+    );
     let mapper = text
         .lines()
         .find(|l| l.contains("Content Mapper"))
         .expect("a line");
     assert!(!mapper.starts_with("FAIL"), "{mapper}");
-    for optional in ["git:", "Go:"] {
-        let line = text.lines().find(|l| l.contains(optional)).expect("a line");
-        assert!(!line.starts_with("FAIL"), "{line}");
-    }
+    let git = text.lines().find(|l| l.contains("git:")).expect("a line");
+    assert!(!git.starts_with("FAIL"), "{git}");
 }
 
 #[test]
@@ -408,9 +412,11 @@ fn doctor_notes_a_missing_git_rather_than_failing_on_it() {
         git.contains("FLICK_STD_PATH"),
         "how to work without git:\n{git}"
     );
-    let go = text.lines().find(|l| l.contains("Go:")).expect("a Go line");
-    assert!(go.starts_with("note"), "{go}");
-    // only the toolchain the build cannot do without fails, and git is not one
+    assert!(
+        !text.contains("Go:"),
+        "JS project doctor must not mention Go:\n{text}"
+    );
+    // only the toolchain the selected backend cannot do without fails, and git is not one
     let failed: Vec<&str> = text.lines().filter(|l| l.starts_with("FAIL")).collect();
     assert_eq!(failed.len(), 2, "{failed:?}");
     assert!(failed.iter().any(|l| l.contains("Node.js")), "{failed:?}");

@@ -181,6 +181,15 @@ fn arity_of(modules: &[Compiled], module: &str, name: &str, by_class: bool) -> O
 /// The module of compiled decoders an app's runner installs.
 pub const SCHEMA_AOT: &str = "schemas.aot.js";
 
+/// Whether a JS build ships the file `path` of a library into its output: a
+/// foreign JS module or its TypeScript declarations.
+#[cfg(feature = "native-project")]
+pub fn js_ships(path: &str) -> bool {
+    [".mjs", ".cjs", ".d.mts", ".d.cts", ".d.ts"]
+        .iter()
+        .any(|end| path.ends_with(end))
+}
+
 /// The IR of `module` of the build `modules` as a release build optimizes
 /// it, for every target alike; `by_class` is the mode the build is checked in.
 pub fn optimized(modules: &[Compiled], module: &Compiled, by_class: bool) -> ir::Module {

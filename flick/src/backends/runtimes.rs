@@ -55,21 +55,16 @@ pub(super) fn runtime_from(
 }
 
 /// The pins of the runtime packages `backend` reports for the project at
-/// `root`, of the effect runtime or of Flick's own.
+/// `root` with the backend's resolved options.
 pub(super) fn runtime(
     backend: &WasmBackend,
     root: &Path,
-    effect: bool,
+    options: &[OptionValue],
 ) -> Result<Vec<RuntimeDependency>, String> {
-    let options = [
-        OptionValue {
-            key: "runtime".into(),
-            value: if effect { "effect" } else { "rt" }.into(),
-        },
-        OptionValue {
-            key: "root".into(),
-            value: packages::canonical_slashed(root),
-        },
-    ];
-    packages::report(backend, root, &[], &options).map(|report| report.runtime)
+    let mut all = options.to_vec();
+    all.push(OptionValue {
+        key: "root".into(),
+        value: packages::canonical_slashed(root),
+    });
+    packages::report(backend, root, &[], &all).map(|report| report.runtime)
 }

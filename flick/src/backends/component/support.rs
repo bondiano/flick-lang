@@ -3,8 +3,8 @@
 
 use flick_backend::host::runtime::Cancellation;
 use flick_backend::{Backend, command};
-use flick_core::build::{go::FILES, schema_aot_file};
-use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::build::go::FILES;
+use flick_core::diagnostics::Diagnostic;
 use flick_core::project::{Compilation, Project, target};
 
 use super::super::launch;
@@ -69,16 +69,9 @@ impl Contributor for Package {
     }
 }
 
-pub(super) fn reserved_outputs(
-    prepared: &Prepared,
-    output: &BuildPlan,
-    project: Option<&Project>,
-) -> Vec<String> {
+pub(super) fn reserved_outputs(prepared: &Prepared, project: Option<&Project>) -> Vec<String> {
     let mut reserved: Vec<_> = prepared.shared.iter().map(|a| a.path.clone()).collect();
     reserved.push(launch::FILE.into());
-    if output.extras.schema_aot {
-        reserved.extend(output.entries.iter().map(|(name, _)| schema_aot_file(name)));
-    }
     if project.is_none() {
         reserved.push(FILES.into());
     }
@@ -117,13 +110,6 @@ pub(super) fn host_preflight(
     compilation: &Compilation,
     output: &BuildPlan,
 ) -> Vec<Diagnostic> {
-    if output.extras.schema_aot && !output.backend.supports_host("host-schema-aot") {
-        return vec![Diagnostic::new(
-            codes::P012,
-            Severity::Error,
-            "component schema AOT requires an approved pinned host tool adapter",
-        )];
-    }
     let Some(project) = project else {
         return vec![];
     };

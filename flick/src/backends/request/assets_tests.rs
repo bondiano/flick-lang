@@ -72,11 +72,12 @@ fn library_outputs(missing: bool, typescript: bool, extras: build::Extras) -> Pr
         out_dir: "unused-assets-output".into(),
         entries: vec![],
         typescript,
-        go: false,
+        stages_by_class: extras.rt,
         suites: vec![],
         extras,
         release: false,
     };
+    let descriptor = Javascript.describe();
     Prepared::new(
         &FsHost::new(),
         &mut sources,
@@ -90,6 +91,7 @@ fn library_outputs(missing: bool, typescript: bool, extras: build::Extras) -> Pr
             },
             sha256: flick_backend::sha256(b"test component"),
         },
+        &descriptor,
     )
 }
 
@@ -255,27 +257,24 @@ fn a_project_runtime_setting_reaches_the_component_without_a_cli_override() {
         !diagnostics.iter().any(|d| d.severity == Severity::Error),
         "{diagnostics:?}"
     );
-    let resolved = options::resolve(
-        &Javascript.describe(),
-        Verb::Build,
-        Some(&project),
-        &BTreeMap::new(),
-    )
-    .expect("resolve JS options from project");
+    let descriptor = Javascript.describe();
+    let resolved = options::resolve(&descriptor, Verb::Build, Some(&project), &BTreeMap::new())
+        .expect("resolve JS options from project");
+    let stages_by_class = options::stages_by_class(Some(&descriptor), &resolved);
     let output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
         target: "js".into(),
         target_overridden: false,
-        options: resolved.clone(),
+        options: resolved,
         inspect_module: None,
         out_dir: "unused-runtime-output".into(),
         entries: vec![],
         typescript: true,
-        go: false,
+        stages_by_class,
         suites: vec![],
         extras: build::Extras {
-            rt: resolved.is_rt(),
+            rt: stages_by_class,
             ..build::Extras::default()
         },
         release: false,
@@ -293,6 +292,7 @@ fn a_project_runtime_setting_reaches_the_component_without_a_cli_override() {
             },
             sha256: flick_backend::sha256(b"test component"),
         },
+        &descriptor,
     );
     assert!(
         prepared

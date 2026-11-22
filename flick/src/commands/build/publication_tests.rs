@@ -26,7 +26,7 @@ fn plan(name: &str) -> BuildPlan {
         out_dir: root.join("output"),
         entries: vec![],
         typescript: false,
-        go: false,
+        stages_by_class: false,
         suites: vec![],
         extras: Extras::default(),
         release: false,
@@ -184,27 +184,24 @@ fn cached_executable_artifacts_can_be_launched_after_restoration() {
     fs::remove_dir_all(root).expect("cleanup");
 }
 
-/// A Go executable is now a step output, validated with every artifact; the
-/// schema decoders are the host tool output left to check here.
+/// Step-produced outputs are validated with every artifact before any file is published.
 #[cfg(unix)]
 #[test]
-fn host_tool_outputs_are_checked_before_publishing_source_files() {
+fn step_outputs_are_checked_before_publishing_source_files() {
     use flick_core::build;
     use std::os::unix::fs::symlink;
 
-    let mut output = plan("schema-tool-output");
-    output.extras.schema_aot = true;
-    output.entries.push(("main".into(), "Main".into()));
+    let output = plan("step-output");
+    let aot_file = build::schema_aot_file("main");
     let outside = output.out_dir.parent().expect("root").join("kept.bin");
     fs::write(&outside, "owned elsewhere").expect("outside file");
-    symlink(
-        &outside,
-        output.out_dir.join(build::schema_aot_file("main")),
-    )
-    .expect("output symlink");
+    symlink(&outside, output.out_dir.join(&aot_file)).expect("output symlink");
     fs::write(output.out_dir.join("safe.js"), "previous build").expect("old output");
     let mut emitted = Emission {
-        artifacts: vec![Artifact::source("safe.js".into(), "new build".into())],
+        artifacts: vec![
+            Artifact::source("safe.js".into(), "new build".into()),
+            Artifact::source(aot_file, "compiled decoders".into()),
+        ],
         diagnostics: vec![],
     };
     write_artifacts(&output, &mut emitted, &Progress::new(Mode::Hidden));

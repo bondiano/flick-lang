@@ -121,3 +121,95 @@ fn a_step_sets_only_the_variables_of_its_tool() {
     assert!(authorize(&step("node", "CGO_ENABLED")).is_err());
     assert!(authorize(&step("go", "LD_PRELOAD")).is_err());
 }
+
+#[test]
+fn launch_authorization_checks_runtime_arguments_and_environment() {
+    use super::authorize_launch_parts;
+
+    let node = Toolchain {
+        id: "node".into(),
+        version: "24.0.0".into(),
+        sha256: "0".repeat(64),
+    };
+    let env = |k: &str, v: &str| OptionValue {
+        key: k.into(),
+        value: v.into(),
+    };
+    assert!(authorize_launch_parts(None, &[], &[]).is_ok());
+    assert!(authorize_launch_parts(None, &["--enable-source-maps".into()], &[]).is_err());
+    assert!(authorize_launch_parts(None, &[], &[env("FLICK_DEVTOOLS", "ws://1")]).is_err());
+
+    assert!(
+        authorize_launch_parts(
+            Some(&node),
+            &[
+                "--enable-source-maps".into(),
+                "--import".into(),
+                "@flick-lang/runtime/rt/runner/devtools".into(),
+            ],
+            &[env("FLICK_DEVTOOLS", "ws://127.0.0.1:34437")],
+        )
+        .is_ok()
+    );
+    assert!(
+        authorize_launch_parts(
+            Some(&node),
+            &["--import".into(), "some-pkg/loader".into()],
+            &[],
+        )
+        .is_ok()
+    );
+    assert!(authorize_launch_parts(Some(&node), &["--eval".into(), "1".into()], &[]).is_err());
+    for bad in [
+        "",
+        "data:text/javascript,0",
+        "DATA:text/javascript,console.log(\"BYPASS_OK\")",
+        "Data:text/javascript,0",
+        "file:///tmp/evil.mjs",
+        "https://evil.example/hook.mjs",
+        "node:fs",
+        "/tmp/evil.mjs",
+        "C:\\evil.mjs",
+        "./evil.mjs",
+        "../evil.mjs",
+        "pkg/../evil.mjs",
+        "pkg/./evil.mjs",
+        "pkg//evil.mjs",
+        "pkg/",
+        "pkg/a?x=1",
+        "pkg/a#frag",
+        "jsdom/%2e%2e/%2e%2e/evil.mjs",
+        "pkg/%2E%2E/evil.mjs",
+        "pkg/%2f/evil.mjs",
+        "pkg/%5c/evil.mjs",
+        "pkg/a%20b",
+        "pkg with space",
+        "pkg\0evil",
+        "pkg/\x1bevil",
+        "pkg/\x7fevil",
+        "pkg/\nevil",
+        "-flag",
+        "@",
+        "@scope",
+        "@/pkg",
+        "@scope/",
+        "@scope/.hidden",
+        "@scope/-bad",
+    ] {
+        assert!(
+            authorize_launch_parts(Some(&node), &["--import".into(), bad.into()], &[]).is_err(),
+            "expected `--import {bad:?}` to be refused"
+        );
+    }
+    assert!(
+        authorize_launch_parts(
+            Some(&node),
+            &["--import".into(), "../escape.js".into()],
+            &[]
+        )
+        .is_err()
+    );
+    assert!(authorize_launch_parts(Some(&node), &["--import".into()], &[]).is_err());
+    assert!(authorize_launch_parts(Some(&node), &[], &[env("NODE_OPTIONS", "--inspect")]).is_err());
+    assert!(authorize_launch_parts(Some(&node), &[], &[env("LD_PRELOAD", "/x")]).is_err());
+}

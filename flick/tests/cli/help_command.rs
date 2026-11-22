@@ -86,3 +86,147 @@ fn bad_invocation_exits_2() {
         Some(2)
     );
 }
+
+#[test]
+fn core_help_mentions_no_target_ecosystem() {
+    let verbs = [
+        None,
+        Some("check"),
+        Some("prove"),
+        Some("build"),
+        Some("fmt"),
+        Some("test"),
+        Some("new"),
+        Some("init"),
+        Some("run"),
+        Some("dev"),
+        Some("clean"),
+        Some("install"),
+        Some("add"),
+        Some("remove"),
+        Some("update"),
+        Some("deps"),
+        Some("plugins"),
+        Some("pack"),
+        Some("diff"),
+        Some("doc"),
+        Some("explain"),
+        Some("expand"),
+        Some("doctor"),
+        Some("inspect"),
+        Some("lsp"),
+    ];
+    let forbidden_substrings = [
+        "npm",
+        "pnpm",
+        "node_modules",
+        "package.json",
+        "TypeScript",
+        "Vite",
+        "JavaScript",
+        "`go`",
+        "`js`",
+    ];
+    for verb in verbs {
+        let full = match verb {
+            Some(v) => stdout(&[v, "--help"]),
+            None => stdout(&["--help"]),
+        };
+        let core = full
+            .split("\nOptions of ")
+            .next()
+            .unwrap_or(&full)
+            .split("\nCommands of ")
+            .next()
+            .unwrap_or(&full);
+        for term in forbidden_substrings {
+            assert!(
+                !core.contains(term),
+                "core help for `{verb:?}` must not mention `{term}`:\n{core}"
+            );
+        }
+        for word in ["Node", "Go"] {
+            let found = core
+                .split(|c: char| !c.is_ascii_alphanumeric())
+                .any(|tok| tok == word);
+            assert!(
+                !found,
+                "core help for `{verb:?}` must not mention `{word}`:\n{core}"
+            );
+        }
+    }
+}
+
+#[test]
+fn core_cli_source_stays_backend_neutral() {
+    use std::fs;
+    use std::path::Path;
+
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let allowed_boundary = [
+        "flick/src/backends/tools.rs",
+        "flick/src/backends/official.rs",
+        "flick/src/backends/options/mod.rs",
+        "flick/src/backends/options/cache.rs",
+        "flick/src/backends/options/scan.rs",
+        "flick/src/backends/request.rs",
+        "flick/src/backends/request/javascript.rs",
+        "flick/src/backends/request/javascript_facts.rs",
+        "flick/src/backends/request/go.rs",
+        "flick/src/backends/request/assets.rs",
+        "flick/src/commands/build/native.rs",
+        "flick/src/commands/build/js_artifacts.rs",
+        "flick/src/commands/build/shipped.rs",
+        "flick/src/commands/pack.rs",
+        "flick/src/commands/inspect.rs",
+        "flick/src/commands/scaffold/source.rs",
+        "flick-core/src/project/config.rs",
+    ];
+    let forbidden = [
+        "node_modules",
+        "package.json",
+        "pnpm",
+        "vite",
+        "@flick-lang/",
+        "host-node-devtools",
+        "host-schema-aot",
+        "host-source-build",
+        "js.effect-bridge",
+    ];
+    let mut stack = vec![root.join("src"), root.join("../flick-core/src/project")];
+    while let Some(dir) = stack.pop() {
+        for entry in fs::read_dir(&dir).expect("read dir").flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                if path.file_name().is_some_and(|n| n == "tests") {
+                    continue;
+                }
+                stack.push(path);
+                continue;
+            }
+            if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                continue;
+            }
+            let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+            if file_name == "tests.rs" || file_name.ends_with("_tests.rs") {
+                continue;
+            }
+            let rel = path
+                .strip_prefix(root.parent().expect("workspace root"))
+                .expect("relative")
+                .to_string_lossy()
+                .replace('\\', "/");
+            if allowed_boundary.contains(&rel.as_str()) {
+                continue;
+            }
+            let text = fs::read_to_string(&path).expect("read rs");
+            let prod = text.split("#[cfg(test)]").next().unwrap_or(&text);
+            for token in forbidden {
+                assert!(
+                    !prod.contains(token),
+                    "core file `{rel}` must not contain `{token}`"
+                );
+            }
+        }
+    }
+}

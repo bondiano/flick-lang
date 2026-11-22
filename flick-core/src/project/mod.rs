@@ -19,8 +19,6 @@ pub mod store;
 pub mod target;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod target_preflight;
-#[cfg(all(test, not(target_arch = "wasm32")))]
-mod target_preflight_tests;
 #[cfg(feature = "native-project")]
 pub mod workspace;
 
@@ -29,8 +27,6 @@ use std::sync::Arc;
 
 pub use config::Config;
 pub(crate) use load::check_file;
-#[cfg(all(test, feature = "native-project"))]
-pub(crate) use load::js_only;
 #[cfg(feature = "ide")]
 pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};
 pub use load::{
@@ -38,7 +34,7 @@ pub use load::{
     check, check_with, compile, compile_with, host_services, main_kind, stages_by_class,
 };
 #[cfg(feature = "native-project")]
-pub use load::{ModuleStore, SavedModule, ships};
+pub use load::{ModuleStore, SavedModule};
 #[cfg(feature = "native-project")]
 pub use packages::{library_dir, project_name};
 
@@ -109,6 +105,34 @@ pub trait Host {
     fn verify(&self, project: &Project, wanted: &[target::Wanted]) -> Vec<Diagnostic> {
         let _ = (project, wanted);
         Vec::new()
+    }
+    /// Built-in module names (and derived class names) that the selected
+    /// backend of `project` does not support, reported as `FLICK-P030`.
+    #[cfg(feature = "native-project")]
+    fn unsupported_modules(&self, project: &Project) -> Vec<String> {
+        let _ = project;
+        Vec::new()
+    }
+    /// Whether `project` checks with effect stages derived by class; defaults
+    /// to `true` when no backend descriptor is loaded.
+    #[cfg(feature = "native-project")]
+    fn stages_by_class(&self, project: &Project) -> bool {
+        let _ = project;
+        true
+    }
+    /// Whether `project`'s selected backend handles the gated service
+    /// `service` at the root of `environment`; `None` when no backend
+    /// descriptor is loaded so environment preflight does not emit false
+    /// `FLICK-E020` errors.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn handles_service(
+        &self,
+        project: &Project,
+        environment: &config::BackendEnvironment,
+        service: &str,
+    ) -> Option<bool> {
+        let _ = (project, environment, service);
+        None
     }
 }
 

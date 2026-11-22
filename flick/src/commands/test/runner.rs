@@ -1,37 +1,22 @@
 //! A test launch and the shared reporting and cancellation arguments.
 
-use crate::args::{Color, GlobalArguments, Reporter, TestArguments};
+#[cfg(feature = "wasm-backends")]
+use crate::args::{Color, Reporter};
+use crate::args::{GlobalArguments, TestArguments};
 #[cfg(feature = "wasm-backends")]
 use crate::backends;
 use crate::backends::Selected;
+#[cfg(feature = "wasm-backends")]
 use crate::progress::Mode;
-use flick_core::project::suite_name;
+#[cfg(feature = "wasm-backends")]
 use std::env;
-use std::fmt::Write;
-use std::io::{self, IsTerminal};
+use std::io;
+#[cfg(feature = "wasm-backends")]
+use std::io::IsTerminal;
 use std::path::{Display, PathBuf};
-use std::process::{Child, Command, Stdio};
-
-/// The runner: imports each suite's `tests` and runs them all, on Flick's own
-/// runtime with `rt`.
-pub(super) fn runner_source(suites: &[(String, String)], rt: bool) -> String {
-    let runtime = if rt {
-        "@flick-lang/runtime/rt"
-    } else {
-        "@flick-lang/effect-ts"
-    };
-    let mut out = format!("import {{ runTests }} from \"{runtime}\";\n");
-    for (i, (_, path)) in suites.iter().enumerate() {
-        let _ = writeln!(out, "import * as $s{i} from {path:?};");
-    }
-    let list: Vec<String> = suites
-        .iter()
-        .enumerate()
-        .map(|(i, (name, _))| format!("[{:?}, $s{i}.tests]", suite_name(name)))
-        .collect();
-    let _ = write!(out, "\nawait runTests([{}]);\n", list.join(", "));
-    out
-}
+#[cfg(feature = "wasm-backends")]
+use std::process::Stdio;
+use std::process::{Child, Command};
 
 pub(super) fn start(
     runner: &Runner,
@@ -44,27 +29,18 @@ pub(super) fn start(
         .spawn()
 }
 
+#[cfg(feature = "wasm-backends")]
 pub(super) fn runner_command(
     runner: &Runner,
     options: &TestArguments,
     global: &GlobalArguments,
     watched: bool,
 ) -> Result<Command, String> {
-    // the runner is the test executable of the go target, or a script for node
-    #[cfg(feature = "wasm-backends")]
-    let selected = runner.backend.as_ref().map(|pin| {
-        backends::launch::command(&runner.path, pin, flick_backend::LaunchKind::Test, "test")
-    });
-    #[cfg(not(feature = "wasm-backends"))]
-    let selected: Option<Result<Command, String>> = None;
-    let mut command = if let Some(command) = selected {
-        command?
-    } else if runner.path.extension().is_some_and(|e| e == "js") {
-        let mut command = Command::new("node");
-        command.arg("--enable-source-maps").arg(&runner.path);
-        command
-    } else {
-        Command::new(&runner.path)
+    let mut command = match runner.backend.as_ref() {
+        Some(pin) => {
+            backends::launch::command(&runner.path, pin, flick_backend::LaunchKind::Test, "test")?
+        }
+        None => return Err("running tests requires WebAssembly backend support".into()),
     };
     if watched {
         command.arg("--watched").stdin(Stdio::piped());
@@ -110,6 +86,16 @@ pub(super) fn runner_command(
     Ok(command)
 }
 
+#[cfg(not(feature = "wasm-backends"))]
+pub(super) fn runner_command(
+    _runner: &Runner,
+    _options: &TestArguments,
+    _global: &GlobalArguments,
+    _watched: bool,
+) -> Result<Command, String> {
+    Err("running tests requires WebAssembly backend support".into())
+}
+
 pub(super) struct Runner {
     path: PathBuf,
     #[cfg(feature = "wasm-backends")]
@@ -117,13 +103,6 @@ pub(super) struct Runner {
 }
 
 impl Runner {
-    pub(super) fn native(path: PathBuf) -> Self {
-        Self {
-            path,
-            #[cfg(feature = "wasm-backends")]
-            backend: None,
-        }
-    }
     pub(super) fn component(out: PathBuf, selected: &Selected) -> Self {
         #[cfg(not(feature = "wasm-backends"))]
         let _ = selected;

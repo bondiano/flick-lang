@@ -111,7 +111,7 @@ fn run(args: CommandArguments, raw_argv: &[OsString]) -> ExitCode {
             | Commands::Deps(_)
             | Commands::Plugins
             | Commands::Explain(_)
-            | Commands::Doctor
+            | Commands::Doctor(_)
             | Commands::External(_)
     );
     if needs_std && let Err(message) = stdlib::prepare(args.global.project.as_deref()) {
@@ -139,7 +139,7 @@ fn run(args: CommandArguments, raw_argv: &[OsString]) -> ExitCode {
             | Commands::Deps(_)
             | Commands::Plugins
             | Commands::Explain(_)
-            | Commands::Doctor
+            | Commands::Doctor(_)
             | Commands::External(_)
             // after its logging starts
             | Commands::Lsp(_)
@@ -270,7 +270,7 @@ fn dispatch(args: CommandArguments) -> ExitCode {
         Commands::Doc(o) => report(commands::doc(&o, project), global),
         Commands::Explain(o) => report(commands::explain(&o), global),
         Commands::Expand(o) => report(commands::expand(&o, project), global),
-        Commands::Doctor => report(commands::doctor(global), global),
+        Commands::Doctor(o) => report(commands::doctor(&o, global), global),
         Commands::Inspect(o) => report(commands::inspect(&o, project), global),
         Commands::Lsp(_) => lsp::serve(),
         Commands::External(words) => external(&words, global),

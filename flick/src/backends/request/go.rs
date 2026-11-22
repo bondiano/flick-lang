@@ -7,6 +7,7 @@ use std::path::Path;
 
 use flick_backend::{Abi, ForeignBinding, GoProjection, InputKind, Projection};
 use flick_core::build::go::{foreign_files, line_path};
+use flick_core::codegen::EffectBridge;
 use flick_core::iface::{Interface, Namespace};
 use flick_core::project::{Compilation, Project};
 use flick_core::types;
@@ -49,49 +50,56 @@ impl Prepared {
         compilation: &Compilation,
         output: &BuildPlan,
     ) {
-        with_settings(host, project, compilation, output, |settings| {
-            for module in &compilation.modules {
-                let facts = GoProjection {
-                    exports: exports(&module.interface),
-                    line_path: line_path(settings, &module.path),
-                };
-                self.go_facts(&module.name, &facts);
-            }
-            // a release build specializes and inlines from them as from the build's
-            for interface in types::builtins_of(false) {
-                if !compilation
-                    .modules
-                    .iter()
-                    .any(|m| m.name == interface.module)
-                {
+        with_settings(
+            host,
+            project,
+            compilation,
+            output,
+            EffectBridge::Absent,
+            |settings| {
+                for module in &compilation.modules {
                     let facts = GoProjection {
-                        exports: exports(interface),
-                        line_path: String::new(),
+                        exports: exports(&module.interface),
+                        line_path: line_path(settings, &module.path),
                     };
-                    self.go_facts(&interface.module, &facts);
+                    self.go_facts(&module.name, &facts);
                 }
-            }
-            let read = |path: &Path| fs::read_to_string(path).ok();
-            for ((module, specifier), (resolved, text)) in
-                foreign_files(compilation, settings, &read)
-            {
-                let input = self.input(
-                    format!("foreign/go/{module}/{specifier}"),
-                    InputKind::Foreign,
-                    text.into_bytes(),
-                );
-                self.request.foreign.push(ForeignBinding {
-                    module,
-                    specifier,
-                    resolved,
-                    abi: Abi {
-                        name: "flick.go-ffi".into(),
-                        version: "0.1.0".into(),
-                    },
-                    inputs: vec![input],
-                });
-            }
-        });
+                // a release build specializes and inlines from them as from the build's
+                for interface in types::builtins_of(false) {
+                    if !compilation
+                        .modules
+                        .iter()
+                        .any(|m| m.name == interface.module)
+                    {
+                        let facts = GoProjection {
+                            exports: exports(interface),
+                            line_path: String::new(),
+                        };
+                        self.go_facts(&interface.module, &facts);
+                    }
+                }
+                let read = |path: &Path| fs::read_to_string(path).ok();
+                for ((module, specifier), (resolved, text)) in
+                    foreign_files(compilation, settings, &read)
+                {
+                    let input = self.input(
+                        format!("foreign/go/{module}/{specifier}"),
+                        InputKind::Foreign,
+                        text.into_bytes(),
+                    );
+                    self.request.foreign.push(ForeignBinding {
+                        module,
+                        specifier,
+                        resolved,
+                        abi: Abi {
+                            name: "flick.go-ffi".into(),
+                            version: "0.1.0".into(),
+                        },
+                        inputs: vec![input],
+                    });
+                }
+            },
+        );
         // two packages may name a table alike
         for (i, (file, text)) in types::implicit_go_bindings().enumerate() {
             let id = format!("{BINDINGS}{i}/{file}");

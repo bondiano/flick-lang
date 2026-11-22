@@ -70,7 +70,7 @@ fn compile_with_extra(
         }
     };
     roots.extend(extra.iter().cloned());
-    let rt = project::stages_by_class(project.as_ref(), rt_override);
+    let rt = project::stages_by_class(&host, project.as_ref(), rt_override);
     if let Err(diagnostic) = builtin_cache::prepare_in(rt) {
         return Err(Outcome {
             sources,
@@ -104,7 +104,7 @@ struct InspectTarget {
     choice: TargetChoice,
     target_overridden: bool,
     resolved: ResolvedOptions,
-    rt: bool,
+    stages_by_class: bool,
 }
 
 fn prepare_inspect_target(
@@ -129,9 +129,10 @@ fn prepare_inspect_target(
                 diagnostics: vec![d],
             }
         })?;
-    let resolved = match backend.descriptor() {
+    let descriptor = backend.descriptor();
+    let resolved = match &descriptor {
         Some(descriptor) => options::resolve(
-            &descriptor,
+            descriptor,
             Verb::Inspect,
             project.as_ref(),
             &options.backend_options,
@@ -142,13 +143,13 @@ fn prepare_inspect_target(
         })?,
         None => ResolvedOptions::default(),
     };
-    let rt = !choice.is_go() && resolved.is_rt();
+    let stages_by_class = options::stages_by_class(descriptor.as_ref(), &resolved);
     Ok(InspectTarget {
         backend,
         choice,
         target_overridden,
         resolved,
-        rt,
+        stages_by_class,
     })
 }
 
@@ -162,7 +163,7 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
         None
     };
     let allow_backends = options.emit == Representation::Output;
-    let rt_override = target.as_ref().map(|t| t.rt);
+    let rt_override = target.as_ref().map(|t| t.stages_by_class);
     let mut checked = match compile_with_extra(explicit, &[], rt_override, allow_backends) {
         Ok(c) => c,
         Err(outcome) => return outcome,
@@ -225,7 +226,7 @@ fn inspect_builtin(checked: &Checked, options: &InspectArguments) -> Option<Stri
     ) {
         return None;
     }
-    let rt = project::stages_by_class(checked.project.as_ref(), None);
+    let rt = project::stages_by_class(&checked.host, checked.project.as_ref(), None);
     let builtin = builtins_of(rt)
         .iter()
         .find(|i| i.module == options.module && !i.private)?;
@@ -305,7 +306,6 @@ fn inspect_output(
     target: InspectTarget,
 ) -> Result<String, Outcome> {
     let typescript = target.resolved.flag("typescript");
-    let go = target.choice.is_go();
     let labels = checked
         .project
         .as_ref()
@@ -320,10 +320,10 @@ fn inspect_output(
         out_dir: checked.host.cwd.join("dist"),
         entries: Vec::new(),
         typescript,
-        go,
+        stages_by_class: target.stages_by_class,
         suites: Vec::new(),
         extras: Extras {
-            rt: target.rt,
+            rt: target.stages_by_class,
             labels,
             ..Extras::default()
         },
@@ -346,17 +346,15 @@ fn inspect_output(
             diagnostics: emission.diagnostics,
         });
     }
-    let preferred = if go {
-        format!("{path}.go")
-    } else if typescript {
-        format!("{path}.ts")
-    } else {
-        format!("{path}.js")
-    };
+    let stem = format!("{path}.");
     let primary = emission
         .artifacts
         .iter()
-        .find(|a| a.kind == ArtifactKind::Source && a.path == preferred)
+        .find(|a| {
+            a.kind == ArtifactKind::Source
+                && a.path.starts_with(&stem)
+                && !a.path[stem.len()..].contains('.')
+        })
         .or_else(|| {
             emission
                 .artifacts

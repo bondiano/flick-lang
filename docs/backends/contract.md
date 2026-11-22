@@ -38,11 +38,16 @@ Projects without a pin select the shipped `flick/js` component by default or
 `flick/go` when `[build] target = "go"` / `--target go` is selected.
 Each backend declares its own CLI and `[target.<name>]` options in
 `descriptor.options` (`option-descriptor`: `parameter`, `default`,
-`implicit-value`, `choices`, `verbs`), cached by component digest in
+`implicit-value`, `choices`, `verbs`), along with target metadata
+(`launch-runtimes`, `host-tools`, `projections`, `unsupported-modules`,
+`stages-by-class-option`, `foreign-extension`, `foreign-suffixes`, and
+`handled-services`), cached by component digest in
 `<store>/descriptors/<sha256>.cbor` so `--help` never reaches the network.
 Resolved active options arrive in `TargetRequest.options` as `option.<name>`
 entries alongside `command` (`build`, `run`, `dev`, `test` or `inspect`) and,
-for `inspect`, `inspect.module`. The browser
+for `inspect`, `inspect.module`. `BuildRequest.declared-dependencies` carries
+the target package dependencies declared by the project so each backend derives
+internal runtime/bridge settings itself. The browser
 loader, atomic publication and generic tool execution adapters remain integration work.
 Accepting a graph here does not execute it or establish that a tool's arguments
 access only declared files.
@@ -125,9 +130,13 @@ The host prepares `.d.ts` and Promise facades with the same projection
 implementation as the native baseline and reserves their output paths.
 JavaScript output alone requires no TypeScript source projection. Its foreign
 metadata still includes type-only imports needed by shared declarations.
-`js.runtime` selects `effect` or `rt` from the effective project/CLI settings;
-`js.effect-bridge` records `absent`, `available`, `available-with-ui`,
-`available-with-web` or `available-with-ui-and-web`.
+`option.runtime` selects `effect` or `rt` from the effective project/CLI settings;
+`backends/js` computes its internal `EffectBridge` from `BuildRequest.declared-dependencies`
+rather than receiving a JS-specific option from the host.
+`Launch` carries `runtime-arguments` (passed to the launch runtime before the
+artifact, such as `--enable-source-maps` or `--import` for DevTools) and
+`environment` variables, both authorized by host policy (`Policy::authorize_launch`)
+before acceptance and again before process launch.
 
 `flick.javascript-ffi@0.1.0` foreign bindings carry original and host-resolved
 specifiers. Library files use the existing shipping checks, are retained as
@@ -189,7 +198,7 @@ The host knows each tool through an adapter (`flick/src/backends/tools.rs`):
 `node`, `go` and `pnpm`. It finds the first executable on `PATH`, hashes it and
 refuses a digest that differs from the pin before the candidate ever runs,
 then queries the version with the adapter's own command. Only granted tools
-and Node appear in `BuildRequest.toolchains`. For contributed commands, tools
+and `descriptor.launch-runtimes` appear in `BuildRequest.toolchains`. For contributed commands, tools
 granted in `[tools]` that are absent on `PATH` appear in `invocation.tools`
 with empty `version` and `sha256` so a backend can distinguish a missing tool
 (`FLICK-P016`) from an ungranted one (`FLICK-P051`), and the host refuses any
@@ -332,14 +341,22 @@ layout:
   directories and `.git`), build-cache `inputs`, and `diagnostics` (for
   example `P032`/`P040`/`P034` on `[target.<name>.dependencies]`, `P015` on
   runtime contracts, or structured `flick doctor` lines).
-- Backends (and not plugins) may also implement the core dependency and app
-  packaging verbs (`install`, `add`, `remove`, `update`, `deps`, `pack`) as
-  `plan` commands without triggering `FLICK-P054`. `flick` handles Flick
+- Backends (and not plugins) may also implement the delegated core verbs
+  (`install`, `add`, `remove`, `update`, `deps`, `pack`, `doctor`, `run-client`,
+  `dev-client`) as `plan` commands without triggering `FLICK-P054` (and omitted
+  from the contributed commands section of `--help`). `flick` handles Flick
   `[dependencies]` and `flick.lock` first, then delegates the target part with
   `invocation.dependencies`. If the selected backend does not declare the
-  requested verb (for example `flick add pkg` under `flick/go`), `flick`
-  reports `FLICK-P063` (exit code `2`) naming the backend and suggesting
-  `--path`, `--git`, or `--url`.
+  requested dependency verb (for example `flick add pkg` under `flick/go`),
+  `flick` reports `FLICK-P063` (exit code `2`) naming the backend and suggesting
+  `--path`, `--git`, or `--url`. `doctor` plans must be strictly read-only
+  (no `files`, `steps`, `resume`, or `needs`; violations are refused with
+  `FLICK-P055`), reporting check lines via `plan.diagnostics` using codes
+  `"doctor-ok"`, `"doctor-fail"`, and `"doctor-note"` with message format
+  `"<what>\n<detail>"` (`plan.stdout` is ignored; any `"doctor-fail"` line fails
+  `flick doctor` with `FLICK-P015`, exit code `2`). `run-client` and `dev-client` handle client
+  entries (`target = "client"`) via `in-place` tool steps; if a backend does not
+  declare them, `flick` reports `FLICK-P064` (exit code `2`).
 
 ### Atomic publication
 

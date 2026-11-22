@@ -1,12 +1,12 @@
-//! What a program built for go cannot use: built-in modules that exist on
-//! the js target only, `deriving Form`, and package modules no build
-//! compiled for go. Selected environments also check reachable effects.
+//! Backend-declared target restrictions: built-in modules and derived classes
+//! that the selected backend does not support (`FLICK-P030`), and reachable
+//! gated effects on a selected environment.
 
 #[cfg(feature = "native-project")]
 use super::Loader;
-use super::Project;
 #[cfg(not(target_arch = "wasm32"))]
 use super::{Compilation, SourceMap};
+use super::{Host, Project};
 #[cfg(any(feature = "native-project", not(target_arch = "wasm32")))]
 use crate::diagnostics::Diagnostic;
 #[cfg(not(target_arch = "wasm32"))]
@@ -23,58 +23,49 @@ use crate::syntax::cst::{Element, Node};
 #[cfg(feature = "native-project")]
 use crate::syntax::kind::SyntaxKind as K;
 
-/// The built-in modules of the js target only: the browser UI, its forms
-/// and its reactivity, the telemetry client, JS interop and the
-/// JS hosts.
+/// Whether `name`, or a module under it, matches an entry in `unsupported`.
 #[cfg(feature = "native-project")]
-const JS_ONLY: &[&str] = &[
-    "Action",
-    "Atom",
-    "DevTools",
-    "Form",
-    "Js",
-    "Otlp",
-    "Reactivity.AsyncResult",
-    "Reactivity.Atom",
-    "Runner.Browser",
-    "Runner.Cloudflare",
-    "Runner.Node",
-    "Ui",
-];
-
-/// Whether the built-in module `name`, or a module under it, is js only.
-#[cfg(feature = "native-project")]
-pub(crate) fn js_only(name: &str) -> bool {
-    JS_ONLY.iter().any(|m| {
-        name.strip_prefix(m)
+pub(super) fn unsupported_match(unsupported: &[String], name: &str) -> bool {
+    unsupported.iter().any(|m| {
+        name.strip_prefix(m.as_str())
             .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
     })
 }
 
-/// P030 for a module of the js target only, named at `at`.
+/// P030 for a built-in module or derived class unsupported by `target`.
 #[cfg(feature = "native-project")]
-pub(super) fn js_only_error(module: &str, at: Span) -> Diagnostic {
-    let message =
-        format!("`{module}` is available on the js target only, and this project targets go");
+pub(super) fn unsupported_error(module: &str, target: &str, at: Span) -> Diagnostic {
+    let message = format!("`{module}` is not supported by the `{target}` target");
     Diagnostic::error(codes::P030, message, at).with_fix(|| {
         (
-            "remove the import, or build the project with `[build] target = \"js\"`".to_owned(),
+            "remove the import, or build the project for a target that supports it".to_owned(),
             Vec::new(),
         )
     })
 }
 
-/// P030 for each `Form` of a `deriving` clause under `node`: a form is
-/// built on `Form`, though the module need not import it.
+/// P030 for each derived class under `node` that appears in `unsupported`.
 #[cfg(feature = "native-project")]
-fn derived_forms(node: &Node, text: &str, file: FileId, found: &mut Vec<Diagnostic>) {
+fn derived_unsupported(
+    node: &Node,
+    text: &str,
+    file: FileId,
+    unsupported: &[String],
+    target: &str,
+    found: &mut Vec<Diagnostic>,
+) {
     for child in &node.children {
         match child {
-            Element::Node(n) => derived_forms(n, text, file, found),
-            Element::Token(t)
-                if node.kind == K::DerivingClause && t.kind == K::Con && t.text(text) == "Form" =>
-            {
-                found.push(js_only_error("Form", Span::new(file, t.start, t.end)));
+            Element::Node(n) => derived_unsupported(n, text, file, unsupported, target, found),
+            Element::Token(t) if node.kind == K::DerivingClause && t.kind == K::Con => {
+                let class = t.text(text);
+                if unsupported.iter().any(|u| u == class) {
+                    found.push(unsupported_error(
+                        class,
+                        target,
+                        Span::new(file, t.start, t.end),
+                    ));
+                }
             }
             Element::Token(_) => {}
         }
@@ -83,18 +74,25 @@ fn derived_forms(node: &Node, text: &str, file: FileId, found: &mut Vec<Diagnost
 
 #[cfg(feature = "native-project")]
 impl Loader<'_> {
-    /// P030 for each import of a program built for go that the go target
-    /// does not have, and each `deriving Form`.
+    /// P030 for each built-in import and derived class unsupported by the
+    /// project's selected backend.
     pub(super) fn check_targets(&mut self) {
-        if self.project.is_none_or(|p| !p.config.is_go()) {
+        let Some(project) = self.project else {
+            return;
+        };
+        let unsupported = self.host.unsupported_modules(project);
+        if unsupported.is_empty() {
             return;
         }
+        let target = project.config.default_target();
         let mut found = Vec::new();
         for m in &self.modules {
-            derived_forms(
+            derived_unsupported(
                 &m.parse.tree,
                 &self.sources.get(m.file).text,
                 m.file,
+                &unsupported,
+                target,
                 &mut found,
             );
             for import in &m.syntax.imports {
@@ -103,8 +101,8 @@ impl Loader<'_> {
                     continue;
                 }
                 let builtin = self.builtins().iter().any(|i| i.module == name);
-                if builtin && js_only(name) {
-                    found.push(js_only_error(name, import.span));
+                if builtin && unsupported_match(&unsupported, name) {
+                    found.push(unsupported_error(name, target, import.span));
                 }
             }
         }
@@ -115,6 +113,7 @@ impl Loader<'_> {
 /// Check the selected environment against the complete compiled program.
 #[cfg(not(target_arch = "wasm32"))]
 pub(super) fn check_environment(
+    host: &dyn Host,
     compilation: &Compilation,
     project: Option<&Project>,
     sources: &SourceMap,
@@ -144,22 +143,26 @@ pub(super) fn check_environment(
             &runners,
             sources,
             environment,
+            &|service| {
+                project.is_none_or(|p| host.handles_service(p, environment, service) != Some(false))
+            },
             diagnostics,
         );
     }
 }
 
 /// Whether a run over `project` checks with the stages of a class derived
-/// from it, as Flick's own runtime has them: explicit `Some(true)`/`Some(false)`
-/// overrides the project, while `None` follows the project's `[target.js]`
-/// runtime (`"rt"` by default). A host prepares the built-in modules checked
-/// this way before it runs.
-pub fn stages_by_class(project: Option<&Project>, rt: Option<bool>) -> bool {
+/// from it: explicit `Some(true)`/`Some(false)` overrides the project, while
+/// `None` queries the host's backend descriptor for `project`.
+pub fn stages_by_class(host: &dyn Host, project: Option<&Project>, rt: Option<bool>) -> bool {
     match rt {
         Some(explicit) => explicit,
         #[cfg(feature = "native-project")]
-        None => project.is_some_and(|p| !p.config.is_go() && p.config.js_is_rt()),
+        None => project.is_some_and(|p| host.stages_by_class(p)),
         #[cfg(not(feature = "native-project"))]
-        None => project.is_some(),
+        None => {
+            let _ = host;
+            project.is_some()
+        }
     }
 }

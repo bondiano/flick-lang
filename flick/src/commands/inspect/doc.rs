@@ -61,7 +61,7 @@ fn prepare_project_doc(
             sources: err_sources,
             diagnostics,
         })?;
-    let checked = compile_with_extra(explicit, &[], Some(prepared.rt), true)?;
+    let checked = compile_with_extra(explicit, &[], Some(prepared.stages_by_class), true)?;
     Ok((checked, Some(prepared)))
 }
 

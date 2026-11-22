@@ -8,6 +8,9 @@ mod deep;
 #[path = "backends/dependencies.rs"]
 mod dependencies;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/doctor.rs"]
+mod doctor;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/go.rs"]
 mod go;
 #[cfg(feature = "wasm-backends")]
@@ -351,6 +354,40 @@ fn component_devtools_is_refused_before_building_a_generation() {
         !root.join(".flick/run").exists(),
         "refuse before reserving a generation"
     );
+}
+
+#[cfg(feature = "wasm-backends")]
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn component_launch_policy_rejects_unapproved_args_and_env() {
+    let component = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../target/wasm32-wasip2/release/flick_test_backend.wasm");
+    let bytes = fs::read(component).expect("component fixture");
+    let digest = flick_backend::sha256(&bytes);
+    for case in ["bad-launch-arg", "bad-launch-env"] {
+        let root = project(
+            &format!("backend_launch_policy_{case}"),
+            &[
+                (
+                    "flick.toml",
+                    &format!(
+                        "{}\n[target.literal]\ncase = \"{case}\"\n",
+                        pinned().replace(&"a".repeat(64), &digest)
+                    ),
+                ),
+                (
+                    "src/App.fl",
+                    "module App exposing (main)\nmain : Unit -> Unit\nlet main () = ()\n",
+                ),
+            ],
+        );
+        fs::write(root.join("backend.wasm"), &bytes).expect("component");
+        let built = flick_in(&root, &["build", "--offline", "--diagnostics", "json"]);
+        assert_eq!(built.status.code(), Some(1), "{case}: {built:?}");
+        let errors = String::from_utf8_lossy(&built.stderr);
+        assert!(errors.contains("FLICK-P013"), "{case}: {errors}");
+        assert!(!root.join("dist").exists(), "{case}: published nothing");
+    }
 }
 
 #[cfg(feature = "wasm-backends")]

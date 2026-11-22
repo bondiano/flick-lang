@@ -117,13 +117,13 @@ pub(super) fn under(path: &str, within: &[String]) -> bool {
 }
 
 /// The regular files at `paths` under `root`, a directory standing for
-/// those under it outside `node_modules` and hidden directories. A path
+/// those under it outside `skip` and hidden directories. A path
 /// that does not exist gives nothing.
-pub(super) fn read(root: &Path, paths: &[String]) -> Result<Vec<File>, String> {
+pub(super) fn read(root: &Path, paths: &[String], skip: &[String]) -> Result<Vec<File>, String> {
     let mut files = BTreeMap::new();
     let mut size = 0;
     for path in paths {
-        collect(root, path, &mut files, &mut size)?;
+        collect(root, path, skip, &mut files, &mut size)?;
     }
     Ok(files.into_values().collect())
 }
@@ -131,6 +131,7 @@ pub(super) fn read(root: &Path, paths: &[String]) -> Result<Vec<File>, String> {
 fn collect(
     root: &Path,
     path: &str,
+    skip: &[String],
     files: &mut BTreeMap<String, File>,
     size: &mut u64,
 ) -> Result<(), String> {
@@ -156,7 +157,7 @@ fn collect(
         let entries = fs::read_dir(&full).map_err(|e| format!("cannot read `{path}`: {e}"))?;
         let mut names: Vec<String> = (entries.flatten())
             .map(|e| e.file_name().to_string_lossy().into_owned())
-            .filter(|n| n != "node_modules" && !n.starts_with('.'))
+            .filter(|n| !skip.iter().any(|s| s == n) && !n.starts_with('.'))
             .collect();
         names.sort();
         for name in names {
@@ -165,7 +166,7 @@ fn collect(
             } else {
                 format!("{path}/{name}")
             };
-            collect(root, &child, files, size)?;
+            collect(root, &child, skip, files, size)?;
         }
     }
     Ok(())

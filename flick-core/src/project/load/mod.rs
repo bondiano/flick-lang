@@ -39,8 +39,6 @@ pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};
 pub use precompiled::{CachedModule, Fresh, PackageCache};
-#[cfg(all(test, feature = "native-project"))]
-pub(crate) use target::js_only;
 pub use target::stages_by_class;
 
 #[cfg(feature = "native-project")]
@@ -245,27 +243,22 @@ impl Compilation {
     }
 
     /// The file of the foreign module `spec` when the build ships it beside
-    /// `module`: an `.mjs` or `.cjs` of a library or the declarations of
-    /// one, inside its source directory, which a tarball or a fetched copy
-    /// of the library has. Any other relative file stays where it is, and
-    /// the output refers to it.
+    /// `module`: a relative non-`.fl` file of a library inside its source
+    /// directory. Any other relative file stays where it is, and the output
+    /// refers to it.
     pub fn shipped_foreign(&self, module: &str, spec: &str) -> Option<PathBuf> {
-        if !spec.starts_with("./") && !spec.starts_with("../") {
+        if (!spec.starts_with("./") && !spec.starts_with("../"))
+            || Path::new(spec)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("fl"))
+        {
             return None;
         }
-        let (_, dir) = self.library_of(module).filter(|_| ships(spec))?;
+        let (_, dir) = self.library_of(module)?;
         let source = self.modules.iter().find(|m| m.name == module)?;
         let path = normalize(&source.path.parent()?.join(spec));
         path.starts_with(dir).then_some(path)
     }
-}
-
-/// Whether a build ships the file `path` of a library into its output: a
-/// foreign module, or the TypeScript declarations of one.
-pub fn ships(path: &str) -> bool {
-    [".mjs", ".cjs", ".d.mts", ".d.cts", ".d.ts"]
-        .iter()
-        .any(|end| path.ends_with(end))
 }
 
 /// Checks `roots` (absolute `.fl` paths) and their transitive imports.
@@ -350,7 +343,7 @@ fn run_in(
     saved: Option<&PackageCache>,
     rt: Option<bool>,
 ) -> Output {
-    let stages_by_class = stages_by_class(project, rt);
+    let stages_by_class = stages_by_class(host, project, rt);
     #[cfg(feature = "native-project")]
     let mut diagnostics = Vec::new();
     #[cfg(feature = "native-project")]
@@ -494,7 +487,7 @@ fn run_in(
         target_dependencies,
     };
     #[cfg(not(target_arch = "wasm32"))]
-    target::check_environment(&compilation, project, sources, &mut diagnostics);
+    target::check_environment(host, &compilation, project, sources, &mut diagnostics);
     // by path, not by load order, which follows the order of imports
     diagnostics.sort_by_cached_key(|d| {
         (

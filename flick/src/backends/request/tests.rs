@@ -1,8 +1,11 @@
 use std::{env, fs, process};
 
 use flick_backend::{
-    BackendId, BackendPin, DeclaredInputs, Limits, ModuleRole, sha256, validate_request,
+    Abi, Backend, BackendId, BackendPin, DeclaredInputs, Descriptor, Environment,
+    EnvironmentServices, Limits, Mode, ModuleRole, NamedRange, Profile, VersionRange, sha256,
+    validate_request,
 };
+use flick_backend_js::Javascript;
 use flick_core::build::{self, Extras};
 use flick_core::diagnostics::Severity;
 use flick_core::iface::{self, Target};
@@ -15,6 +18,51 @@ use crate::backends::Selected;
 use crate::backends::options::ResolvedOptions;
 use crate::commands::build::{BuildPlan, Purpose};
 use crate::sources::FsHost;
+
+fn go_test_descriptor() -> Descriptor {
+    let range = || VersionRange {
+        minimum: "0.1.0".into(),
+        maximum_exclusive: "0.2.0".into(),
+    };
+    Descriptor {
+        identity: BackendId {
+            id: "test/go".into(),
+            version: "1.0.0".into(),
+        },
+        backend_api: range(),
+        ir: range(),
+        language: range(),
+        runtime_abis: vec![NamedRange {
+            name: "flickrt".into(),
+            versions: range(),
+        }],
+        environments: vec![Environment {
+            backend: "go".into(),
+            platform: "native".into(),
+        }],
+        profiles: vec![Profile::Debug, Profile::Release],
+        modes: vec![Mode::WholeProgram],
+        capabilities: vec![],
+        options: vec![],
+        launch_runtimes: vec![],
+        host_tools: vec!["go".into()],
+        projections: vec![Abi {
+            name: "flick.go".into(),
+            version: "0.1.0".into(),
+        }],
+        unsupported_modules: vec![],
+        stages_by_class_option: None,
+        foreign_extension: Some("go".into()),
+        foreign_suffixes: vec![".go".into()],
+        handled_services: vec![EnvironmentServices {
+            environment: Environment {
+                backend: "go".into(),
+                platform: "native".into(),
+            },
+            services: vec!["Database".into(), "Db".into(), "Server".into()],
+        }],
+    }
+}
 
 #[test]
 fn go_dependency_fingerprints_describe_the_published_go_interfaces() {
@@ -43,7 +91,7 @@ fn go_dependency_fingerprints_describe_the_published_go_interfaces() {
         },
         sha256: sha256(b"component"),
     };
-    let mut output = BuildPlan {
+    let output = BuildPlan {
         purpose: Purpose::Build,
         backend: Selected::Native,
         target: "go".into(),
@@ -53,16 +101,26 @@ fn go_dependency_fingerprints_describe_the_published_go_interfaces() {
         out_dir: root.join("output"),
         entries: vec![],
         typescript: false,
-        go: true,
+        stages_by_class: false,
         suites: vec![],
         extras: Extras::default(),
         release: false,
     };
-    let prepared = Prepared::new(&host, &mut sources, None, &compilation, &output, pin);
+    let go_desc = go_test_descriptor();
+    let js_desc = Javascript.describe();
+    let prepared = Prepared::new(
+        &host,
+        &mut sources,
+        None,
+        &compilation,
+        &output,
+        pin,
+        &go_desc,
+    );
     assert_interfaces(&prepared, Target::Go);
-    for (environment, go, expected) in [
-        ("js/node", true, Target::Js),
-        ("go/native", false, Target::Go),
+    for (environment, desc, expected) in [
+        ("js/node", &js_desc, Target::Js),
+        ("go/native", &go_desc, Target::Go),
     ] {
         let config_file = sources.add("config", "");
         let mut config = project::config::parse(
@@ -77,7 +135,6 @@ fn go_dependency_fingerprints_describe_the_published_go_interfaces() {
             config_file,
             workspace: None,
         };
-        output.go = go;
         let prepared = Prepared::new(
             &host,
             &mut sources,
@@ -85,32 +142,37 @@ fn go_dependency_fingerprints_describe_the_published_go_interfaces() {
             &compilation,
             &output,
             prepared.request.backend.clone(),
+            desc,
         );
         assert_interfaces(&prepared, expected);
-        if environment == "js/node" {
-            assert!(
-                prepared
-                    .request
-                    .root_handlers
-                    .iter()
-                    .any(|h| h.service.module == "Database" && h.handler.name == "pg"),
-                "{:?}",
-                prepared.request.root_handlers
-            );
-        }
-        if environment == "go/native" {
-            assert!(
-                prepared
-                    .request
-                    .root_handlers
-                    .iter()
-                    .any(|h| h.service.name == "Server"),
-                "{:?}",
-                prepared.request.root_handlers
-            );
-        }
+        assert_root_handlers(environment, &prepared);
     }
     fs::remove_dir_all(root).expect("cleanup");
+}
+
+fn assert_root_handlers(environment: &str, prepared: &Prepared) {
+    if environment == "js/node" {
+        assert!(
+            prepared
+                .request
+                .root_handlers
+                .iter()
+                .any(|h| h.service.module == "Database" && h.handler.name == "pg"),
+            "{:?}",
+            prepared.request.root_handlers
+        );
+    }
+    if environment == "go/native" {
+        assert!(
+            prepared
+                .request
+                .root_handlers
+                .iter()
+                .any(|h| h.service.name == "Server"),
+            "{:?}",
+            prepared.request.root_handlers
+        );
+    }
 }
 
 fn assert_interfaces(prepared: &Prepared, expected: Target) {
@@ -152,11 +214,12 @@ fn a_backend_receives_a_closed_graph_with_real_source_provenance() {
         out_dir: "unused-provenance-output".into(),
         entries: vec![("main".into(), "Main".into())],
         typescript: false,
-        go: false,
+        stages_by_class: false,
         suites: vec![],
         extras: build::Extras::default(),
         release: false,
     };
+    let js_desc = Javascript.describe();
     let prepared = Prepared::new(
         &host,
         &mut sources,
@@ -170,6 +233,7 @@ fn a_backend_receives_a_closed_graph_with_real_source_provenance() {
             },
             sha256: flick_backend::sha256(b"test component"),
         },
+        &js_desc,
     );
     let mut inputs = DeclaredInputs::new(&prepared.request.inputs, |id| {
         prepared.bytes.get(id).cloned()
@@ -186,6 +250,7 @@ fn a_backend_receives_a_closed_graph_with_real_source_provenance() {
         &compilation,
         &output,
         prepared.request.backend.clone(),
+        &js_desc,
     );
     assert_eq!(
         sources.files().count(),

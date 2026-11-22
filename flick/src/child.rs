@@ -1,4 +1,4 @@
-//! Child processes: Node running a program, pnpm. Their stdout passes
+//! Child processes: applications and host tools. Their stdout passes
 //! through; their stderr passes through in human mode and becomes events of
 //! one kind in JSON mode. SIGINT and SIGTERM sent to `flick` reach the
 //! child, and `flick` ends only after the child has, with its exit code.
@@ -62,6 +62,7 @@ pub fn spawn(
 
 /// Starts a tool whose stdout is service output too: both its streams go
 /// to stderr, as `kind` events in JSON mode.
+#[cfg(feature = "wasm-backends")]
 pub fn spawn_tool(
     command: &mut Command,
     global: &GlobalArguments,

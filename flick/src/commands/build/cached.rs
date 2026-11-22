@@ -16,9 +16,6 @@ impl BuildCommand {
         progress: &Progress,
         key: &cache::Signed,
     ) -> Option<Vec<Diagnostic>> {
-        if output.extras.schema_aot {
-            return None;
-        }
         progress.stage("Checking build cache");
         let Some(artifacts) = cache::load(&project.root, key) else {
             debug!(miss = %cache::missed(&project.root, key));
@@ -27,7 +24,7 @@ impl BuildCommand {
         if !output.backend.accepts_cached(&artifacts) {
             return None;
         }
-        let paths = super::publication::paths(output, &artifacts);
+        let paths = super::publication::paths(&artifacts);
         let current = validate_destination_paths(&output.out_dir, paths.iter().map(String::as_str))
             .is_ok()
             && cache::artifacts_current(&output.out_dir, &artifacts);

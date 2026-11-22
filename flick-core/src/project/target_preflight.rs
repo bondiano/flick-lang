@@ -15,7 +15,7 @@ use crate::syntax;
 use crate::types::builtins_of;
 
 /// Services that need an explicit environment root handler.
-const GATED: &[&str] = &["Database", "Db", "Server"];
+pub(crate) const GATED: &[&str] = &["Database", "Db", "Server"];
 
 /// Whether `effect` (`Module.Service`) is gated and, if so, its short name.
 pub fn gated_service(effect: &str) -> Option<&str> {
@@ -23,34 +23,24 @@ pub fn gated_service(effect: &str) -> Option<&str> {
     GATED.iter().copied().find(|&gated| gated == name)
 }
 
-/// Short names of gated services that have a root handler on `environment`.
-pub fn handled_services(environment: &BackendEnvironment) -> &'static [&'static str] {
-    match (environment.backend.as_str(), environment.platform.as_str()) {
-        ("js", "node") | ("go", "native") => GATED,
-        _ => &[],
-    }
-}
-
-/// Whether `environment` has a root handler for the gated service `name`.
-pub fn handles(environment: &BackendEnvironment, name: &str) -> bool {
-    handled_services(environment).contains(&name)
-}
-
-/// Std root-handler symbols declared for an environment that hosts them.
+/// Std root-handler symbols corresponding to the handled service names.
 /// `Db` is gated in source checks but has no fixed std handler symbol.
-pub fn std_root_handlers(
-    environment: &BackendEnvironment,
+pub fn std_root_handlers_for<'a>(
+    services: impl IntoIterator<Item = &'a str>,
 ) -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
-    if !matches!(
-        (environment.backend.as_str(), environment.platform.as_str()),
-        ("js", "node") | ("go", "native")
-    ) {
-        return Vec::new();
+    let mut out: Vec<(&'static str, &'static str, &'static str, &'static str)> = Vec::new();
+    for service in services {
+        match service {
+            "Database" if !out.iter().any(|(s, ..)| *s == "Database") => {
+                out.push(("Database", "Database", "Database", "pg"));
+            }
+            "Server" if !out.iter().any(|(s, ..)| *s == "Server") => {
+                out.push(("Server", "Server", "Server", "handler"));
+            }
+            _ => {}
+        }
     }
-    vec![
-        ("Database", "Database", "Database", "pg"),
-        ("Server", "Server", "Server", "handler"),
-    ]
+    out
 }
 
 /// Reject reachable gated effects that the selected environment cannot host.
@@ -60,6 +50,7 @@ pub(crate) fn check(
     runner_modules: &[(String, String)],
     sources: &SourceMap,
     environment: &BackendEnvironment,
+    handles: &dyn Fn(&str) -> bool,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     let modules: Vec<_> = compilation
@@ -87,7 +78,7 @@ pub(crate) fn check(
         }
         let item = &modules[at.0].items[at.1];
         if at.0 < compilation.modules.len() {
-            scan_item(item, environment, &mut reported, diagnostics);
+            scan_item(item, environment, handles, &mut reported, diagnostics);
         }
         let mut used = Vec::new();
         reach::uses(item, &mut used);
@@ -105,17 +96,26 @@ pub(crate) fn check(
 fn scan_item(
     item: &Item,
     environment: &BackendEnvironment,
+    handles: &dyn Fn(&str) -> bool,
     reported: &mut HashSet<(String, Span)>,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     item.each_body(&mut |expr| {
-        scan_expr(expr, environment, &HashSet::new(), reported, diagnostics);
+        scan_expr(
+            expr,
+            environment,
+            handles,
+            &HashSet::new(),
+            reported,
+            diagnostics,
+        );
     });
 }
 
 fn scan_expr(
     expr: &Expr,
     environment: &BackendEnvironment,
+    handles: &dyn Fn(&str) -> bool,
     covered: &HashSet<String>,
     reported: &mut HashSet<(String, Span)>,
     diagnostics: &mut Vec<Diagnostic>,
@@ -125,7 +125,7 @@ fn scan_expr(
             if let Some(name) = gated_service(effect)
                 && !covered.contains(effect)
                 && !covered.contains(name)
-                && !handles(environment, name)
+                && !handles(name)
             {
                 let key = (name.to_owned(), expr.span);
                 if reported.insert(key) {
@@ -140,12 +140,12 @@ fn scan_expr(
                 }
             }
             expr.each_child(&mut |child| {
-                scan_expr(child, environment, covered, reported, diagnostics);
+                scan_expr(child, environment, handles, covered, reported, diagnostics);
             });
         }
-        ExprKind::Handle(handler) => {
+        ExprKind::Handle(block) => {
             let mut nested = covered.clone();
-            for handled in &handler.effects {
+            for handled in &block.effects {
                 nested.insert(handled.effect.clone());
                 if let Some(name) = gated_service(&handled.effect) {
                     nested.insert(name.to_owned());
@@ -153,25 +153,46 @@ fn scan_expr(
             }
             // Operation implementations are checked in the outer coverage;
             // only the body gains the handler's effects.
-            for handled in &handler.effects {
+            for handled in &block.effects {
                 for arm in &handled.operations {
-                    scan_expr(&arm.function, environment, covered, reported, diagnostics);
+                    scan_expr(
+                        &arm.function,
+                        environment,
+                        handles,
+                        covered,
+                        reported,
+                        diagnostics,
+                    );
                 }
             }
-            scan_expr(&handler.body, environment, &nested, reported, diagnostics);
-            if let Some(ret) = &handler.ret {
-                scan_expr(ret, environment, covered, reported, diagnostics);
+            scan_expr(
+                &block.body,
+                environment,
+                handles,
+                &nested,
+                reported,
+                diagnostics,
+            );
+            if let Some(ret) = &block.ret {
+                scan_expr(ret, environment, handles, covered, reported, diagnostics);
             }
-            for arm in &handler.errors {
+            for arm in &block.errors {
                 if let Some(guard) = &arm.guard {
-                    scan_expr(guard, environment, covered, reported, diagnostics);
+                    scan_expr(guard, environment, handles, covered, reported, diagnostics);
                 }
-                scan_expr(&arm.body, environment, covered, reported, diagnostics);
+                scan_expr(
+                    &arm.body,
+                    environment,
+                    handles,
+                    covered,
+                    reported,
+                    diagnostics,
+                );
             }
         }
         _ => {
             expr.each_child(&mut |child| {
-                scan_expr(child, environment, covered, reported, diagnostics);
+                scan_expr(child, environment, handles, covered, reported, diagnostics);
             });
         }
     }

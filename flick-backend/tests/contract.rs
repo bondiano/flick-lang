@@ -1,4 +1,6 @@
 mod common;
+#[path = "contract/launch.rs"]
+mod launch;
 
 use std::cell::Cell;
 
@@ -31,7 +33,9 @@ fn binary_executables_need_no_external_linker_when_the_backend_emits_them() {
         kind: LaunchKind::Run,
         artifact: "object".into(),
         runtime: None,
+        runtime_arguments: vec![],
         arguments: vec![],
+        environment: vec![],
     });
     assert_eq!(validate(&request(), &result), Ok(vec![]));
     assert_eq!(result.artifacts[0].bytes, [0, 255, 128, 10]);
@@ -128,7 +132,9 @@ fn valid_dag_is_sorted_even_when_steps_arrive_in_reverse_order() {
         kind: LaunchKind::Run,
         artifact: "link-output".into(),
         runtime: None,
+        runtime_arguments: vec![],
         arguments: vec![],
+        environment: vec![],
     });
     assert_eq!(validate(&request(), &result), Ok(vec![1, 0]));
 }
@@ -195,6 +201,7 @@ fn duplicate_ids_and_host_owned_outputs_are_rejected() {
     let reserved = vec!["obj/app.o".into()];
     let policy = Policy {
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         toolchains: &[],
         environment: &[],
         reserved_paths: &reserved,
@@ -232,7 +239,9 @@ fn undeclared_toolchain_input_and_environment_are_rejected() {
                 kind: LaunchKind::Run,
                 artifact: "object".into(),
                 runtime: None,
+                runtime_arguments: vec![],
                 arguments: vec![],
+                environment: vec![],
             }),
             "runtime" => result.runtime_dependencies.push(RuntimeDependency {
                 package: "unlocked".into(),
@@ -280,6 +289,7 @@ fn output_limits_cover_payloads_diagnostics_and_metadata() {
         }
         let policy = Policy {
             authorize_step: &common::authorize,
+            authorize_launch: &common::authorize_launch,
             toolchains: &request.toolchains,
             environment: &[],
             reserved_paths: &[],
@@ -333,6 +343,7 @@ fn diagnostic_spans_are_checked_against_utf8_source_bytes() {
     result.diagnostics.push(d);
     let policy = Policy {
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         toolchains: &[],
         environment: &[],
         reserved_paths: &[],
@@ -389,6 +400,7 @@ fn preflight_refusal_happens_before_generation() {
     let request = request();
     let policy = Policy {
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         toolchains: &[],
         environment: &[],
         reserved_paths: &[],
@@ -419,6 +431,7 @@ fn unstable_generation_is_rejected_and_unchecked_generation_is_uncacheable() {
     let request = request();
     let policy = Policy {
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         toolchains: &[],
         environment: &[],
         reserved_paths: &[],
@@ -455,6 +468,7 @@ fn stable_validated_results_become_cacheable_after_two_generations() {
     let request = request();
     let policy = Policy {
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         toolchains: &[],
         environment: &[],
         reserved_paths: &[],
@@ -485,6 +499,7 @@ fn incompatible_handshake_reads_no_inputs_and_never_generates() {
     request.target.ir_version = "0.14.0".into();
     let policy = Policy {
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         toolchains: &[],
         environment: &[],
         reserved_paths: &[],
@@ -522,6 +537,7 @@ fn cache_key_tracks_backend_runtime_toolchain_environment_and_side_inputs() {
         "runtime",
         "option",
         "ir",
+        "declared_dependencies",
     ] {
         let mut changed = request.clone();
         match case {
@@ -537,6 +553,9 @@ fn cache_key_tracks_backend_runtime_toolchain_environment_and_side_inputs() {
                 value: "rt".into(),
             }),
             "ir" => changed.program.push(0),
+            "declared_dependencies" => {
+                changed.declared_dependencies = Some(vec!["@flick-lang/effect-ts".into()]);
+            }
             _ => unreachable!(),
         }
         assert_ne!(cache_key(&changed), key, "{case}");

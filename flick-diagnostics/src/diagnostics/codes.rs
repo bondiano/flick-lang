@@ -311,6 +311,7 @@ codes! {
     P061 = Project 61, "Flick program step or documentation example failed at runtime";
     P062 = Project 62, "documentation example failed its check contract";
     P063 = Project 63, "the backend has no dependency command for this";
+    P064 = Project 64, "the backend has no client entry runner for this";
 }
 
 #[cfg(test)]

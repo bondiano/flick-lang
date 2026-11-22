@@ -1,8 +1,9 @@
 //! Shared host preparation of native and component frontend projections.
 
-use super::{BuildPlan, backend};
+use super::BuildPlan;
 use crate::sources::FsHost;
 use flick_core::build::{Backend, Settings};
+use flick_core::codegen::EffectBridge;
 use flick_core::project::{self, Compilation, Project};
 use flick_core::source::FileId;
 use std::path::{Path, PathBuf};
@@ -12,6 +13,7 @@ pub(crate) fn with_settings<R>(
     project: Option<&Project>,
     compilation: &Compilation,
     output: &BuildPlan,
+    effect_bridge: EffectBridge,
     prepare: impl FnOnce(&Settings<'_>) -> R,
 ) -> R {
     let out_dir = output.out_dir.as_path();
@@ -43,7 +45,7 @@ pub(crate) fn with_settings<R>(
         .flat_map(|p| &p.config.entries)
         .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
         .collect();
-    let backend = if output.extras.rt {
+    let backend = if output.stages_by_class {
         Backend::Rt
     } else {
         Backend::Effect
@@ -60,7 +62,7 @@ pub(crate) fn with_settings<R>(
         release: output.release,
         root: project.map(|p| p.root.as_path()),
         backend,
-        effect_bridge: backend::effect_bridge(host, project, compilation),
+        effect_bridge,
         ui: output.options.get("ui"),
         runners: &runners,
         environment: project.and_then(|p| p.config.build.environment.as_ref()),

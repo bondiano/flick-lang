@@ -42,7 +42,7 @@ impl Loader<'_> {
                 let local = module_path(name);
                 (
                     format!(
-                        "a local module goes in `{}`; if it comes from an npm package, add it with `flick add <package>`",
+                        "a local module goes in `{}`; if it comes from a dependency package, add it with `flick add <package>`",
                         self.project.map_or(local.clone(), |p| Path::new(&p.config.source_dir).join(&local)).display()
                     ),
                     Vec::new(),

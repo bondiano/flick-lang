@@ -2,6 +2,7 @@
 //! These Rust modules are build dependencies, not a public plugin ABI.
 
 mod bridge;
+pub mod bridge_select;
 pub mod effects;
 pub mod exports;
 mod lang;

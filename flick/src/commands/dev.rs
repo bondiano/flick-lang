@@ -6,22 +6,25 @@
 //! shutdown that fails stops the restarts, and its cause stays on stderr.
 //!
 //! A project with several entries, none named, runs each that is not a
-//! client's, and Vite for its pages: the bundler builds the client's
-//! modules itself and replaces them in the page as they change.
+//! client's, and delegates its client entries to the selected backend's
+//! `dev-client` runner.
 
 use std::cell::RefCell;
 use std::process::ExitCode;
 use std::rc::Rc;
-use std::sync::atomic::Ordering;
+use std::slice;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::Duration;
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::ModuleCache;
+use flick_core::project::{ModuleCache, Project};
 use flick_core::source::SourceMap;
 use signal_hook::consts::SIGTERM;
 
-use super::run::{Generation, build_into_generation_for, dev_entries, find_project, launch, vite};
+#[cfg(feature = "wasm-backends")]
+use super::contributed;
+use super::run::{Generation, build_into_generation_for, dev_entries, find_project, launch};
 use super::test::{settled_snapshot, watch_snapshot, watched_roots};
 use crate::args::{GlobalArguments, RunArguments};
 use crate::child::{self, Running};
@@ -78,11 +81,20 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    if options.entry.is_none()
+        && let [only] = names.as_slice()
+        && project
+            .config
+            .entries
+            .iter()
+            .any(|e| e.name == *only && e.client)
+    {
+        return dev_client_only(&project, options, only, &signals, global);
+    }
     let several = options.name.is_none() && options.entry.is_none();
-    let mut pages = if several && project.config.entries.iter().any(|e| e.client) {
-        vite(&project, global)
-    } else {
-        None
+    let mut pages = match start_dev_pages(&project, options, several, global) {
+        Ok(running) => running,
+        Err(code) => return code,
     };
     let paths = watched_roots(&project);
     let mut live: Option<Live> = None;
@@ -102,21 +114,10 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
             // each build reports itself, before the version it built starts
             timings::report(global);
             if let Ok(generation) = built {
-                if let Some(old) = live.take() {
-                    report::log(global, "dev: stopping the running version");
-                    let code = old.stop(SIGTERM as usize);
-                    // 143: interrupted and cleaned up; 0: it had ended
-                    if code != 143 && code != 0 {
-                        let d = Diagnostic::new(
-                            codes::P021,
-                            Severity::Error,
-                            format!(
-                                "the running version did not shut down cleanly (exit code {code}): restarts stop"
-                            ),
-                        );
-                        report::render(global, &SourceMap::default(), &[d]);
-                        return ExitCode::from(1);
-                    }
+                if let Some(old) = live.take()
+                    && let Err(exit) = stop_previous(old, global)
+                {
+                    return exit;
                 }
                 report::log(global, "dev: starting the new version");
                 let running: Vec<Running> = names
@@ -159,5 +160,82 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
             }
         }
         thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn stop_previous(old: Live, global: &GlobalArguments) -> Result<(), ExitCode> {
+    report::log(global, "dev: stopping the running version");
+    let code = old.stop(SIGTERM as usize);
+    // 143: interrupted and cleaned up; 0: it had ended
+    if code != 143 && code != 0 {
+        let d = Diagnostic::new(
+            codes::P021,
+            Severity::Error,
+            format!(
+                "the running version did not shut down cleanly (exit code {code}): restarts stop"
+            ),
+        );
+        report::render(global, &SourceMap::default(), &[d]);
+        return Err(ExitCode::from(1));
+    }
+    Ok(())
+}
+
+fn dev_client_only(
+    project: &Project,
+    options: &RunArguments,
+    only: &str,
+    signals: &AtomicUsize,
+    global: &GlobalArguments,
+) -> ExitCode {
+    match spawn_client(project, options, Some(only), &options.args, global) {
+        Ok(Some(running)) => match running.wait(signals) {
+            Ok(status) => ExitCode::from(child::code(status)),
+            Err(_) => ExitCode::from(1),
+        },
+        Ok(None) => ExitCode::from(2),
+        Err(diag) => {
+            let code = report::exit_code(slice::from_ref(&diag));
+            report::render(global, &SourceMap::default(), &[diag]);
+            code
+        }
+    }
+}
+
+fn start_dev_pages(
+    project: &Project,
+    options: &RunArguments,
+    several: bool,
+    global: &GlobalArguments,
+) -> Result<Option<Running>, ExitCode> {
+    if !(several && project.config.entries.iter().any(|e| e.client)) {
+        return Ok(None);
+    }
+    spawn_client(project, options, None, &[], global).map_err(|diag| {
+        let code = report::exit_code(slice::from_ref(&diag));
+        report::render(global, &SourceMap::default(), &[diag]);
+        code
+    })
+}
+
+fn spawn_client(
+    project: &Project,
+    options: &RunArguments,
+    entry: Option<&str>,
+    args: &[String],
+    global: &GlobalArguments,
+) -> Result<Option<Running>, Diagnostic> {
+    #[cfg(feature = "wasm-backends")]
+    {
+        contributed::spawn_dev_client(project, options.target.as_deref(), entry, args, global)
+    }
+    #[cfg(not(feature = "wasm-backends"))]
+    {
+        let _ = (project, options, entry, args, global);
+        Err(Diagnostic::new(
+            codes::P064,
+            Severity::Error,
+            "client entries require WebAssembly backend support",
+        ))
     }
 }

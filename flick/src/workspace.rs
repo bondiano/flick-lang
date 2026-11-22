@@ -24,7 +24,7 @@ pub fn members(args: &CommandArguments) -> Result<Option<Vec<String>>, Outcome> 
             | Commands::New(_)
             | Commands::Init(_)
             | Commands::Explain(_)
-            | Commands::Doctor
+            | Commands::Doctor(_)
     );
     if args.global.project.is_some() || (projectless && args.global.package.is_none()) {
         return Ok(None);

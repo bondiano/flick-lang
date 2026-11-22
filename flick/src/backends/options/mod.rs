@@ -15,13 +15,17 @@ use std::fmt::Write as _;
 
 #[cfg(feature = "wasm-backends")]
 use flick_backend::OptionValue;
-use flick_backend::{OptionDescriptor, Verb};
+use flick_backend::{Descriptor, OptionDescriptor, Verb};
 use flick_core::diagnostics::{Diagnostic, Severity, codes, suggest};
 use flick_core::project::Project;
 use flick_core::project::config::BackendPackage;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::config::TargetValue;
 
 #[cfg(feature = "wasm-backends")]
-pub(crate) use cache::save_descriptor;
+pub(crate) use cache::{
+    cached_descriptor_for_project, descriptor_for_project, descriptor_for_target, save_descriptor,
+};
 pub(crate) use cli::{ParseOutcome, parse_cli};
 pub(crate) use resolve::resolve;
 
@@ -59,10 +63,6 @@ impl TargetChoice {
             Self::Official { short, .. } => short,
             Self::Pinned { short, .. } => short,
         }
-    }
-
-    pub(crate) fn is_go(&self) -> bool {
-        self.id() == OFFICIAL_GO
     }
 
     #[cfg(test)]
@@ -104,12 +104,9 @@ fn project_default_target(project: Option<&Project>) -> Result<TargetChoice, Dia
         return resolve_named_target(target, Some(project));
     }
     if let Some(env) = &project.config.build.environment
-        && env.backend == "go"
+        && let Ok(choice) = resolve_named_target(&env.backend, Some(project))
     {
-        return Ok(TargetChoice::Official {
-            id: OFFICIAL_GO,
-            short: "go",
-        });
+        return Ok(choice);
     }
     Ok(TargetChoice::Official {
         id: OFFICIAL_JS,
@@ -185,10 +182,6 @@ impl ResolvedOptions {
             .map(String::as_str)
     }
 
-    pub(crate) fn is_rt(&self) -> bool {
-        self.get("runtime") == Some("rt")
-    }
-
     #[cfg(feature = "wasm-backends")]
     pub(crate) fn to_wire(&self) -> Vec<OptionValue> {
         let mut out = Vec::new();
@@ -240,6 +233,108 @@ impl ResolvedOptions {
 
 pub(super) fn active_for_verb(option: &OptionDescriptor, verb: Verb) -> bool {
     option.verbs.is_empty() || option.verbs.contains(&verb)
+}
+
+/// Whether the selected backend descriptor and resolved options use
+/// class-derived built-in stages.
+pub(crate) fn stages_by_class(descriptor: Option<&Descriptor>, resolved: &ResolvedOptions) -> bool {
+    let Some(required) = descriptor.and_then(|d| d.stages_by_class_option.as_ref()) else {
+        return false;
+    };
+    resolved.get(&required.key) == Some(required.value.as_str())
+}
+
+/// Whether `project`'s configured target options select class-derived built-in
+/// stages for `descriptor`.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn project_stages_by_class(descriptor: &Descriptor, project: &Project) -> bool {
+    let Some(required) = descriptor.stages_by_class_option.as_ref() else {
+        return false;
+    };
+    let short = short_name(&descriptor.identity.id);
+    if let Some(table) = project.config.targets.get(short)
+        && let Some(option) = table.get(&required.key)
+    {
+        return match &option.value {
+            TargetValue::String(s) => s == &required.value,
+            TargetValue::Bool(b) => (if *b { "true" } else { "false" }) == required.value,
+            TargetValue::List(_) | TargetValue::Unsupported(_) => false,
+        };
+    }
+    descriptor
+        .options
+        .iter()
+        .find(|o| o.parameter.name == required.key)
+        .and_then(|o| o.default.as_deref())
+        == Some(required.value.as_str())
+}
+
+/// Stage-mode fallback when no backend component is loaded: reads the disk
+/// descriptor cache first (without instantiating WASM), then falls back to
+/// known official target defaults from `project.config`.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn project_stages_by_class_cached(project: &Project) -> bool {
+    if let Some(descriptor) = cached_descriptor_for_project(project) {
+        return project_stages_by_class(&descriptor, project);
+    }
+    let Ok((choice, _)) = resolve_target(None, Some(project)) else {
+        return true;
+    };
+    match choice {
+        TargetChoice::Official {
+            id: OFFICIAL_JS, ..
+        } => !matches!(
+            project
+                .config
+                .targets
+                .get("js")
+                .and_then(|t| t.get("runtime"))
+                .map(|o| &o.value),
+            Some(TargetValue::String(v)) if v == "effect"
+        ),
+        TargetChoice::Official {
+            id: OFFICIAL_GO, ..
+        } => false,
+        TargetChoice::Official { .. } | TargetChoice::Pinned { .. } => true,
+    }
+}
+
+/// Configured `[target.<name>]` values of `project`'s selected target encoded
+/// as `option.<key>` wire entries for callers without resolved CLI flags.
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn project_wire_options(
+    project: &Project,
+    target_override: Option<&str>,
+) -> Vec<OptionValue> {
+    let Ok((choice, _)) = resolve_target(target_override, Some(project)) else {
+        return Vec::new();
+    };
+    let Some(table) = project.config.targets.get(choice.short()) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for (key, opt) in table {
+        match &opt.value {
+            TargetValue::String(s) => out.push(OptionValue {
+                key: format!("option.{key}"),
+                value: s.clone(),
+            }),
+            TargetValue::Bool(b) => out.push(OptionValue {
+                key: format!("option.{key}"),
+                value: if *b { "true" } else { "false" }.to_owned(),
+            }),
+            TargetValue::List(items) => {
+                for (s, _) in items {
+                    out.push(OptionValue {
+                        key: format!("option.{key}"),
+                        value: s.clone(),
+                    });
+                }
+            }
+            TargetValue::Unsupported(_) => {}
+        }
+    }
+    out
 }
 
 pub(super) fn verb_name(verb: Verb) -> &'static str {

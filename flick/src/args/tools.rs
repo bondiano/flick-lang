@@ -9,7 +9,7 @@ use flick_core::project::config::Source;
 
 #[derive(Args, Clone)]
 pub struct ScaffoldArguments {
-    /// Target backend whose templates to use, such as `js` or `go` (default: `js`).
+    /// Target backend whose templates to use.
     #[arg(long, value_name = "NAME", conflicts_with = "from")]
     pub target: Option<String>,
 
@@ -61,8 +61,7 @@ pub struct RunArguments {
     #[arg(long, value_name = "MODULE")]
     pub entry: Option<String>,
 
-    /// Target backend, such as `js` or `go`; by default `build.target` of the
-    /// project.
+    /// Target backend; by default `build.target` of the project.
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
 
@@ -185,8 +184,8 @@ pub struct DocArguments {
     /// Check fenced Flick examples in public documentation in this package context.
     #[arg(long)]
     pub check_examples: bool,
-    /// Target backend for `--check-examples`, such as `js` or `go`; by default
-    /// `build.target` of the project.
+    /// Target backend for `--check-examples`; by default `build.target` of the
+    /// project.
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
     /// Document the loaded standard library rather than a user project.
@@ -234,14 +233,21 @@ pub struct InspectArguments {
     #[arg(long, value_enum)]
     pub emit: Representation,
 
-    /// Target backend for `--emit output`, such as `js` or `go`; by default
-    /// `build.target` of the project.
+    /// Target backend for `--emit output`; by default `build.target` of the
+    /// project.
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
 
     /// Backend-declared options parsed from the command line.
     #[arg(skip)]
     pub backend_options: BTreeMap<String, Vec<String>>,
+}
+
+#[derive(Args)]
+pub struct DoctorArguments {
+    /// Target backend to inspect; by default the project's configured target.
+    #[arg(long, value_name = "NAME")]
+    pub target: Option<String>,
 }
 
 #[derive(Args)]

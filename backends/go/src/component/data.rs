@@ -130,6 +130,7 @@ fn options(
                 })
                 .is_some(),
             "host.os" => windows.replace(option.value == "windows").is_some(),
+            "labels" => false,
             "inspect.module" => inspect_module.replace(option.value.clone()).is_some(),
             "option.cgo" => {
                 let value = match option.value.as_str() {

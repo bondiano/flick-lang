@@ -41,6 +41,17 @@ fn js_descriptor() -> Descriptor {
         profiles: vec![Profile::Debug, Profile::Release],
         modes: vec![Mode::WholeProgram, Mode::PerModule],
         capabilities: vec![],
+        launch_runtimes: vec!["node".into()],
+        host_tools: vec!["node".into(), "pnpm".into()],
+        projections: vec![],
+        unsupported_modules: vec![],
+        stages_by_class_option: Some(flick_backend::OptionValue {
+            key: "runtime".into(),
+            value: "rt".into(),
+        }),
+        foreign_extension: None,
+        foreign_suffixes: vec![],
+        handled_services: vec![],
         options: vec![
             OptionDescriptor {
                 parameter: Parameter {
@@ -239,7 +250,7 @@ fn unknown_target_fails_with_p059_and_suggests_closest() {
     let project =
         project_from("schema-version = 1\n[project]\nkind = \"lib\"\n[build]\ntarget = \"go\"\n");
     let (choice, overridden) = resolve_target(None, Some(&project)).expect("go from config");
-    assert!(choice.is_go());
+    assert_eq!(choice.short(), "go");
     assert!(!overridden);
 
     let (choice, overridden) =

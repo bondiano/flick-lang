@@ -10,7 +10,6 @@ use flick_backend::{
 };
 
 use super::report;
-use crate::backends::dependencies::installed_for;
 use crate::component;
 
 /// The JavaScript component of this checkout.
@@ -36,10 +35,10 @@ fn write(path: &Path, text: &str) {
     fs::write(path, text).expect("write");
 }
 
-/// The JS backend resolves the runtime graphs the host pinned before,
-/// so every pin, and the build cache it keys, stays the same.
+/// The JS backend resolves and pins the runtime graphs and their transitive
+/// dependencies, and changes to transitive files change the content digest.
 #[test]
-fn the_backend_pins_the_runtime_as_the_host_did() {
+fn the_backend_pins_the_runtime_and_transitive_dependencies() {
     let root = env::temp_dir().join(format!("flick-packages-pins-{}", process::id()));
     let _ = fs::remove_dir_all(&root);
     let modules = root.join("node_modules");
@@ -77,31 +76,67 @@ fn the_backend_pins_the_runtime_as_the_host_did() {
     );
     let real = super::canonical_slashed(&root);
     let backend = js();
-    for effect in [false, true] {
+    let pin = |runtime: &str| {
         let options = [
             OptionValue {
-                key: "runtime".into(),
-                value: if effect { "effect" } else { "rt" }.into(),
+                key: "option.runtime".into(),
+                value: runtime.into(),
             },
             OptionValue {
                 key: "root".into(),
                 value: real.clone(),
             },
         ];
-        let reported = report(&*backend, &root, &[], &options).expect("a report");
-        let mut pinned = reported.runtime;
-        pinned.sort_by(|a, b| a.package.cmp(&b.package));
-        let mut before = installed_for(&root, effect).expect("the host's pins");
-        before.sort_by(|a, b| a.package.cmp(&b.package));
-        assert_eq!(pinned, before, "effect {effect}");
-        let lib = (reported.sources.iter())
-            .find(|s| s.package == "lib")
-            .expect("the Flick library");
-        assert_eq!(
-            (lib.version.as_str(), lib.root.as_str()),
-            ("1.2.0", "node_modules/lib/src")
-        );
-    }
+        report(&*backend, &root, &[], &options).expect("a report")
+    };
+    let rt = pin("rt");
+    let rt_names: Vec<&str> = rt.runtime.iter().map(|r| r.package.as_str()).collect();
+    assert_eq!(rt_names, ["@flick-lang/runtime", "left"], "{rt_names:?}");
+    let runtime_pin = rt
+        .runtime
+        .iter()
+        .find(|r| r.package == "@flick-lang/runtime")
+        .expect("runtime pin");
+    assert_eq!(runtime_pin.version, "0.1.0");
+    assert_eq!(runtime_pin.sha256.len(), 64);
+
+    let effect = pin("effect");
+    let names: Vec<&str> = effect.runtime.iter().map(|r| r.package.as_str()).collect();
+    assert_eq!(
+        names,
+        ["@flick-lang/effect-ts", "@flick-lang/runtime", "left"],
+        "{names:?}"
+    );
+    let adapter_before = effect
+        .runtime
+        .iter()
+        .find(|r| r.package == "@flick-lang/effect-ts")
+        .expect("effect adapter")
+        .sha256
+        .clone();
+    write(
+        &modules.join("@flick-lang/effect-ts/node_modules/effect/dist/a.js"),
+        "effect-changed",
+    );
+    let effect_after = pin("effect");
+    let adapter_after = effect_after
+        .runtime
+        .iter()
+        .find(|r| r.package == "@flick-lang/effect-ts")
+        .expect("effect adapter")
+        .sha256
+        .clone();
+    assert_ne!(
+        adapter_before, adapter_after,
+        "transitive dependency change invalidates pin"
+    );
+    let lib = (effect.sources.iter())
+        .find(|s| s.package == "lib")
+        .expect("the Flick library");
+    assert_eq!(
+        (lib.version.as_str(), lib.root.as_str()),
+        ("1.2.0", "node_modules/lib/src")
+    );
     fs::remove_dir_all(root).expect("cleanup");
 }
 

@@ -86,7 +86,7 @@ virtual workspace root (`FLICK-P005`).
 | `target.js.typescript` | boolean; emit `.ts` instead of `.js` | `false` |
 | `target.js.declarations` | boolean; emit `.d.ts` public TypeScript declarations | `false` |
 | `target.js.promise-facade` | boolean; emit `A/B.promise.js` Promise façades | `false` |
-| `target.js.schema-aot` | boolean; compile pure codecs ahead of use in entry runners | `false` |
+| `target.js.schema-aot` | boolean; compile pure codecs ahead of use in entry runners (requires `"node"` in `[tools]`, or `--allow-tool node` outside a project) | `false` |
 | `target.js.runtime` | `"rt"` on Flick's own runtime, or `"effect"` through the Effect adapter; a library a project depends on is compiled with the project's `runtime` | `"rt"` |
 | `target.js.devtools` | boolean (`true` = `"ws://localhost:34437"`) or WebSocket URL string for `run` / `dev` | off |
 | `target.js.ui` | module specifier rendering and mounting views in place of React (exports every name `Ui` and `Action` bind from `@flick-lang/effect-ts/ui` and `@flick-lang/effect-ts/ui/react`; relative paths are from the project root) | React |

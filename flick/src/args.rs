@@ -69,8 +69,8 @@ pub enum Commands {
     /// Print the code each plugin block of the files stands for, as its
     /// plugin gives it.
     Expand(ExpandArguments),
-    /// Check the compiler and the selected backend's toolchain.
-    Doctor,
+    /// Check the compiler, plugins, and the selected backend's toolchain.
+    Doctor(DoctorArguments),
     /// Print a representation of a module: AST, typed IR, backend output,
     /// interface, variance or source mapping.
     Inspect(InspectArguments),
@@ -141,7 +141,7 @@ pub struct GlobalArguments {
     #[arg(long, global = true)]
     pub offline: bool,
 
-    /// Let the selected backend run this host tool, as `go`, in a build
+    /// Let the selected backend run this host tool in a build
     /// outside a project; a project allows its tools in `[tools]`.
     #[arg(long = "allow-tool", global = true, value_name = "TOOL")]
     pub allow_tool: Vec<String>,
@@ -185,8 +185,7 @@ pub struct BuildArguments {
     /// default the project's source root.
     pub paths: Vec<String>,
 
-    /// Target backend, such as `js` or `go`; by default `build.target` of the
-    /// project.
+    /// Target backend; by default `build.target` of the project.
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
 
@@ -309,8 +308,7 @@ pub struct TestArguments {
     #[arg(long, value_enum)]
     pub profile: Option<ProfileArgument>,
 
-    /// Target backend, such as `js` or `go`; by default `build.target` of the
-    /// project.
+    /// Target backend; by default `build.target` of the project.
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
 

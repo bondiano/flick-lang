@@ -1,14 +1,13 @@
 use std::collections::{BTreeMap, HashSet};
 use std::fmt::Write as _;
 
-use super::{Input, Output, RUNTIME, go};
+use super::{Input, Output, RUNTIME, go, unsupported_module as js_only};
 use crate::build::builtin_modules;
 use crate::build::go::{bindings, unsupported};
 use crate::codegen::Known;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::tests::lower_text;
 use crate::ir::{ItemKind, Module, lang_items};
-use crate::project::js_only;
 
 /// The Go program of `text` with the built-in modules.
 pub(super) fn build(text: &str) -> Output {

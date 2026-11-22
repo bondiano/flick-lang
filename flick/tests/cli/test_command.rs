@@ -241,12 +241,7 @@ fn test_preparation_reports_phases_without_changing_json() {
             assert!(stderr.contains(phase), "{emit}: {stderr}");
         }
         assert!(
-            // the backend's `go build` step runs while Go is emitted
-            stderr.contains(if emit == "go" {
-                "Emitting Go"
-            } else {
-                "Writing test runner"
-            }),
+            stderr.contains("Emitting backend output"),
             "{emit}: {stderr}"
         );
         assert!(
@@ -507,4 +502,21 @@ fn schema_arbitrary_draws_alike_on_go() {
         assert_eq!(j, g);
     }
     assert_eq!((&go[4].1, &go[4].2), (&js[4].1, &js[4].2));
+}
+
+#[test]
+#[ignore = "needs Node and Go"]
+fn empty_test_run_passes_on_js_and_go() {
+    let dir = project("empty_test_run");
+    fs::remove_file(dir.join("test/Test/Sample.fl")).expect("remove sample suite");
+    for target in ["js", "go"] {
+        let out = flick_in(&dir, &["test", "--target", target, "--reporter", "json"]);
+        assert!(out.status.success(), "{target}: {out:?}");
+        let json = results(&out);
+        assert_eq!(
+            json["tests"].as_array().map(Vec::len),
+            Some(0),
+            "{target}: {json}"
+        );
+    }
 }

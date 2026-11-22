@@ -191,6 +191,7 @@ fn driver_cancellation_stops_input_snapshots_and_preserves_the_diagnostic() {
                 environment: &[],
                 reserved_paths: &[],
                 authorize_step: &common::authorize,
+                authorize_launch: &common::authorize_launch,
                 limits: Limits::default(),
             };
             let mut reads = 0;

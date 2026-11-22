@@ -102,7 +102,7 @@ impl CheckCommand {
         };
         // Projects select class-derived stages on RT. Persist that set of
         // builtin interfaces, rather than checking std anew in every process.
-        let rt = project::stages_by_class(project.as_ref(), None);
+        let rt = project::stages_by_class(host, project.as_ref(), None);
         timings::stage("Preparing compiler");
         if let Err(diagnostic) = builtins::prepare_in(rt) {
             return (
@@ -214,6 +214,7 @@ pub fn select(
 ) -> Result<(Option<Project>, Vec<PathBuf>), Diagnostic> {
     let project = project::discover(host, sources, &host.cwd, explicit.map(Path::new))?;
     let mut files = Vec::new();
+    let skip = host.skip_dirs(project.as_ref());
     if paths.is_empty() {
         let Some(project) = &project else {
             let message = format!(
@@ -224,12 +225,12 @@ pub fn select(
         };
         for root in [project.source_root(), project.test_root()] {
             if root.is_dir() {
-                sources::source_files(&root.to_string_lossy(), &mut files);
+                sources::source_files_skipping(&root.to_string_lossy(), &skip, &mut files);
             }
         }
     } else {
         for path in paths {
-            sources::source_files(path, &mut files);
+            sources::source_files_skipping(path, &skip, &mut files);
         }
     }
     let roots = files

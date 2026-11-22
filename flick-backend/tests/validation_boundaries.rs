@@ -53,6 +53,7 @@ fn unavailable_declared_inputs_cannot_make_a_cacheable_fallback() {
         environment: &[],
         reserved_paths: &[],
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         limits: Limits::default(),
     };
     let generated = generate(
@@ -141,6 +142,7 @@ fn unicode_case_aliases_collide_with_each_other_and_host_owned_paths() {
             environment: &[],
             reserved_paths: &[left.into()],
             authorize_step: &common::authorize,
+            authorize_launch: &common::authorize_launch,
             limits: Limits::default(),
         };
         assert!(validate_result(&request, &result, &policy, &mut inputs(&request)).is_err());
@@ -183,6 +185,7 @@ fn repeated_diagnostics_load_each_source_once_per_validation() {
         environment: &[],
         reserved_paths: &[],
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         limits: Limits::default(),
     };
     let mut inputs = CountingInputs(0);
@@ -240,7 +243,9 @@ fn launch_identity_includes_the_kind_and_name() {
         kind: LaunchKind::Run,
         artifact: "object".into(),
         runtime: None,
+        runtime_arguments: vec![],
         arguments: vec![],
+        environment: vec![],
     };
     let mut test = run.clone();
     test.kind = LaunchKind::Test;
@@ -281,6 +286,7 @@ fn hfs_ignorable_characters_cannot_bypass_output_ownership() {
             environment: &[],
             reserved_paths: &["App.iface".into()],
             authorize_step: &common::authorize,
+            authorize_launch: &common::authorize_launch,
             limits: Limits::default(),
         };
         assert!(validate_result(&request, &result, &policy, &mut inputs(&request)).is_err());
@@ -321,6 +327,7 @@ fn the_complete_request_budget_is_checked_before_loading_inputs() {
         environment: &[],
         reserved_paths: &[],
         authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
         limits: Limits {
             request_bytes: encoded.len() + 128,
             ..Limits::default()
@@ -390,6 +397,7 @@ fn dos_short_name_shapes_cannot_alias_artifacts_or_reserved_paths() {
             environment: &[],
             reserved_paths: &["LongModule.iface".into(), "LongDirectory".into()],
             authorize_step: &common::authorize,
+            authorize_launch: &common::authorize_launch,
             limits: Limits::default(),
         };
         assert!(validate_result(&request(), &result, &policy, &mut inputs(&request())).is_err());

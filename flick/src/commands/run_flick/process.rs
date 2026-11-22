@@ -1,30 +1,42 @@
 //! Child-process supervision, bounded pipe draining, and temporary generation
 //! management for `run-flick` executions.
 
-use std::io::{self, ErrorKind, Read};
+#[cfg(feature = "wasm-backends")]
+use std::io::Read;
+use std::io::{self, ErrorKind};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStderr, ChildStdout, Command};
+#[cfg(feature = "wasm-backends")]
+use std::process::{Child, ChildStderr, ChildStdout};
+#[cfg(feature = "wasm-backends")]
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+#[cfg(feature = "wasm-backends")]
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicU64, Ordering};
+#[cfg(feature = "wasm-backends")]
+use std::thread;
+#[cfg(feature = "wasm-backends")]
 use std::time::{Duration, Instant};
-use std::{env, fs, process, thread};
+use std::{env, fs, process};
 
 #[cfg(feature = "wasm-backends")]
 use flick_backend::host::runtime::Cancellation;
-use flick_core::build::{go, runner_file};
 use flick_core::project::{Project, cache};
 
 use crate::artifact::resolve_root;
+#[cfg(feature = "wasm-backends")]
 use crate::child;
 use crate::sources::FsHost;
 
 /// How long a `run-flick` program or documentation example may run before the
 /// host terminates it.
+#[cfg(feature = "wasm-backends")]
 const TIMEOUT: Duration = Duration::from_mins(1);
 
 /// Maximum stderr bytes retained for failure diagnostics.
+#[cfg(feature = "wasm-backends")]
 const STDERR_TAIL: usize = 64 << 10;
 
+#[cfg_attr(not(feature = "wasm-backends"), allow(dead_code))]
 pub(crate) enum RunStatus {
     Success,
     Failed(String),
@@ -70,18 +82,7 @@ pub(super) fn fresh_entry_name(project: Option<&Project>) -> String {
     unreachable!("unbounded suffix range")
 }
 
-pub(super) fn native_launch_command(gen_dir: &Path, entry_name: &str, is_go: bool) -> Command {
-    if is_go {
-        Command::new(gen_dir.join(go::executable(entry_name)))
-    } else {
-        let mut command = Command::new("node");
-        command
-            .arg("--enable-source-maps")
-            .arg(gen_dir.join(runner_file(entry_name, false)));
-        command
-    }
-}
-
+#[cfg(feature = "wasm-backends")]
 pub(super) fn supervise(
     mut child: Child,
     stdout_limit: usize,
@@ -185,6 +186,7 @@ pub(super) fn supervise(
     }
 }
 
+#[cfg(feature = "wasm-backends")]
 fn read_bounded(stream: Option<ChildStdout>, limit: usize, overflowed: &AtomicBool) -> Vec<u8> {
     let Some(mut stream) = stream else {
         return Vec::new();
@@ -201,6 +203,7 @@ fn read_bounded(stream: Option<ChildStdout>, limit: usize, overflowed: &AtomicBo
     out
 }
 
+#[cfg(feature = "wasm-backends")]
 fn read_tail(stream: Option<ChildStderr>, max_bytes: usize) -> Vec<u8> {
     let Some(mut stream) = stream else {
         return Vec::new();
@@ -217,11 +220,13 @@ fn read_tail(stream: Option<ChildStderr>, max_bytes: usize) -> Vec<u8> {
     kept.split_off(start)
 }
 
+#[cfg(feature = "wasm-backends")]
 fn join_tail(handle: thread::JoinHandle<Vec<u8>>) -> String {
     let bytes = handle.join().unwrap_or_default();
     String::from_utf8_lossy(&bytes).into_owned()
 }
 
+#[cfg(feature = "wasm-backends")]
 fn end_group(child: &Child) {
     #[cfg(unix)]
     {
@@ -232,6 +237,7 @@ fn end_group(child: &Child) {
     let _ = child;
 }
 
+#[cfg(feature = "wasm-backends")]
 fn stop_child(child: &mut Child) {
     #[cfg(unix)]
     {

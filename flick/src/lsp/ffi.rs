@@ -5,20 +5,23 @@
 use std::path::Path;
 
 use flick_core::ffi::check::{self, Header};
+#[cfg(feature = "wasm-backends")]
 use flick_core::project;
+#[cfg(feature = "wasm-backends")]
 use flick_core::source::SourceMap;
 use serde_json::{Map, Value, json};
 
 use super::super::protocol;
 #[cfg(feature = "wasm-backends")]
 use crate::commands::contributed;
+#[cfg(feature = "wasm-backends")]
 use crate::sources::FsHost;
 
 /// "Regenerate from <pkg>@<version>" when the range touches the header
 /// and the module differs from a fresh import; disabled, with the reason,
 /// when the import cannot run.
 pub(super) fn regenerate(path: &Path, text: &str, params: &Value) -> Option<Value> {
-    // the import runs Node: not for the requests of cursor moves
+    // the import runs a host tool: not for the requests of cursor moves
     let automatic = params["context"]["triggerKind"]
         .as_u64()
         .is_some_and(|k| k != 1);

@@ -63,7 +63,15 @@ fn the_conduit_client_starts_with_the_runner_of_its_runtime() {
     let client = Path::new(env!("CARGO_MANIFEST_DIR")).join("../examples/conduit/client");
     let text = fs::read_to_string(client.join("flick.toml")).expect("the client's flick.toml");
     let config = config::parse(&text, FileId::default()).expect("a valid flick.toml");
-    let runner = if config.js_is_rt() {
+    let is_rt = !matches!(
+        config
+            .targets
+            .get("js")
+            .and_then(|t| t.get("runtime"))
+            .map(|o| &o.value),
+        Some(config::TargetValue::String(v)) if v == "effect"
+    );
+    let runner = if is_rt {
         "@flick-lang/runtime/rt/runner/browser"
     } else {
         "@flick-lang/effect-ts/runner/browser"
@@ -71,8 +79,7 @@ fn the_conduit_client_starts_with_the_runner_of_its_runtime() {
     let script = fs::read_to_string(client.join("src/main.js")).expect("the page's script");
     assert!(
         script.contains(&format!("from \"{runner}\"")),
-        "the client builds for js_is_rt={}, so its script imports `run` from {runner}:\n{script}",
-        config.js_is_rt()
+        "the client builds for is_rt={is_rt}, so its script imports `run` from {runner}:\n{script}",
     );
 }
 

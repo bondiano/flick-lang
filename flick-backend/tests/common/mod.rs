@@ -101,6 +101,7 @@ pub fn request() -> BuildRequest {
         }],
         toolchains: vec![toolchain()],
         runtime_dependencies: vec![],
+        declared_dependencies: None,
     }
 }
 
@@ -123,6 +124,14 @@ pub fn descriptor() -> Descriptor {
         modes: vec![Mode::PerModule, Mode::WholeProgram],
         capabilities: vec![],
         options: vec![],
+        launch_runtimes: vec![],
+        host_tools: vec![],
+        projections: vec![],
+        unsupported_modules: vec![],
+        stages_by_class_option: None,
+        foreign_extension: None,
+        foreign_suffixes: vec![],
+        handled_services: vec![],
     }
 }
 
@@ -177,6 +186,7 @@ pub fn validate(request: &BuildRequest, result: &BuildResult) -> Result<Vec<usiz
         reserved_paths: &[],
         limits: Limits::default(),
         authorize_step: &authorize,
+        authorize_launch: &authorize_launch,
     };
     validate_result(request, result, &policy, &mut inputs(request))
 }
@@ -198,6 +208,23 @@ pub fn diagnostic() -> Diagnostic {
 pub fn authorize(step: &ToolchainStep) -> Result<(), String> {
     if step.arguments != ["build"] {
         return Err("host tool adapter rejected the command arguments".into());
+    }
+    Ok(())
+}
+
+pub fn authorize_launch(launch: &Launch) -> Result<(), String> {
+    for env in &launch.environment {
+        if env.key != "FLICK_DEVTOOLS" {
+            return Err(format!(
+                "host launch policy rejected environment `{}`",
+                env.key
+            ));
+        }
+    }
+    for arg in &launch.runtime_arguments {
+        if arg == "-e" || arg == "--eval" {
+            return Err(format!("host launch policy rejected runtime arg `{arg}`"));
+        }
     }
     Ok(())
 }

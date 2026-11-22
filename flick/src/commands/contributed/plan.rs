@@ -5,13 +5,13 @@
 use std::collections::BTreeMap;
 use std::io::{self, Write};
 use std::path::Path;
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 use std::str;
 
 use flick_backend::command::{self, Descriptor, Invocation, Plan, ToolStep};
 use flick_backend::host::runtime::Cancellation;
 use flick_backend::{ArtifactKind, BuildResult, Toolchain};
-use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::project::Project;
 use flick_core::source::{FileId, SourceMap, Span};
 
@@ -36,6 +36,8 @@ pub(super) enum InPlaceMode {
     Tool,
     /// Delegated dependency verb: stream stderr under `"package-manager-output"`, fail with `P017`/`P016`.
     PackageManager,
+    /// Delegated client entry runner: inherit caller env, stream stderr under `"client-output"`.
+    Client,
 }
 
 pub(crate) fn tool(pin: &Toolchain) -> command::Tool {
@@ -246,17 +248,13 @@ pub(super) fn chain(
     Err(refused(format!("it resumes more than {ROUNDS} times")))
 }
 
-fn run_in_place(
+fn prepare_in_place(
     root: &Path,
     step: &ToolStep,
     tools: &[Tool],
     mode: InPlaceMode,
-    global: Option<&GlobalArguments>,
-) -> Result<(), Diagnostic> {
-    let (event_kind, fail_code, spawn_code) = match mode {
-        InPlaceMode::PackageManager => ("package-manager-output", codes::P017, codes::P016),
-        InPlaceMode::Tool | InPlaceMode::Forbidden => ("tool-output", codes::P050, codes::P050),
-    };
+    spawn_code: Code,
+) -> Result<Command, Diagnostic> {
     let tool = (tools.iter())
         .find(|t| {
             t.pin.id == step.tool.id
@@ -280,13 +278,52 @@ fn run_in_place(
             format!("step `{}`: {why}", step.id),
         )
     })?;
-    let mut process = verified.step(root);
+    let mut process = if mode == InPlaceMode::Client {
+        verified.client_command(root)
+    } else {
+        verified.step(root)
+    };
     process.args(&step.arguments);
     for var in &step.environment {
         process.env(&var.name, &var.value);
     }
+    Ok(process)
+}
+
+/// Spawns a single validated in-place client step in the background and
+/// returns its live child handle (for `flick dev`).
+pub(super) fn spawn_in_place(
+    root: &Path,
+    step: &ToolStep,
+    tools: &[Tool],
+    event_kind: &'static str,
+    global: &GlobalArguments,
+) -> Result<child::Running, Diagnostic> {
+    let mut process = prepare_in_place(root, step, tools, InPlaceMode::Client, codes::P015)?;
+    child::spawn(&mut process, global, event_kind).map_err(|err| {
+        Diagnostic::new(
+            codes::P015,
+            Severity::Error,
+            format!("cannot run `{}`: {err}", step.tool.id),
+        )
+    })
+}
+
+fn run_in_place(
+    root: &Path,
+    step: &ToolStep,
+    tools: &[Tool],
+    mode: InPlaceMode,
+    global: Option<&GlobalArguments>,
+) -> Result<(), Diagnostic> {
+    let (event_kind, fail_code, spawn_code) = match mode {
+        InPlaceMode::PackageManager => ("package-manager-output", codes::P017, codes::P016),
+        InPlaceMode::Client => ("client-output", codes::P017, codes::P015),
+        InPlaceMode::Tool | InPlaceMode::Forbidden => ("tool-output", codes::P050, codes::P050),
+    };
+    let mut process = prepare_in_place(root, step, tools, mode, spawn_code)?;
     let status = if let Some(global) = global {
-        let running = if step.outputs.is_empty() {
+        let running = if mode == InPlaceMode::Client || step.outputs.is_empty() {
             child::spawn(&mut process, global, event_kind)
         } else {
             child::spawn_tool(&mut process, global, event_kind)

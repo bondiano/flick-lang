@@ -1,8 +1,5 @@
-//! `flick test`: builds the project with its test root into `.flick/test/`,
-//! writes a runner that imports the `tests` of each test module, and runs it
-//! on Node; a project targeting Go (`--target go`) gets one executable,
-//! `flick-test`, that runs them, and `--runtime rt` / `--runtime effect` picks
-//! the JavaScript effect runtime.
+//! `flick test`: builds the project with its test root into `.flick/test/`
+//! through the selected target backend and runs its test launch.
 //! With `--watch`, a change of a source file stops the run (closing the
 //! runner's stdin: every running test closes its scope) and starts the next
 //! one after it.
@@ -32,7 +29,7 @@ use flick_core::build::Extras;
 mod cached;
 mod runner;
 use cached::cached_prepare;
-use runner::{Runner, runner_command, runner_source, start};
+use runner::{Runner, runner_command, start};
 
 /// Where the test build goes, inside the project.
 const OUT_DIR: &str = ".flick/test";
@@ -95,8 +92,13 @@ fn prepare(
     // the test companions beside the sources, which only this command runs
     let mut roots = roots;
     let mut companions = Vec::new();
+    let skip = sources::skip_dirs(Some(&project));
     if project.source_root().is_dir() {
-        sources::companions(&project.source_root().to_string_lossy(), &mut companions);
+        sources::companions_skipping(
+            &project.source_root().to_string_lossy(),
+            &skip,
+            &mut companions,
+        );
     }
     roots.extend(companions.into_iter().map(PathBuf::from));
     let wanted: Vec<PathBuf> = options
@@ -115,9 +117,10 @@ fn prepare(
                 return fail(&sources, vec![diagnostic]);
             }
         };
-    let resolved = match backend.descriptor() {
+    let descriptor = backend.descriptor();
+    let resolved = match &descriptor {
         Some(descriptor) => match options::resolve(
-            &descriptor,
+            descriptor,
             Verb::Test,
             Some(&project),
             &options.backend_options,
@@ -130,18 +133,12 @@ fn prepare(
         },
         None => ResolvedOptions::default(),
     };
-    let go = choice.is_go();
-    let rt = !go && resolved.is_rt();
-    if let Some(problem) = backends::check_runtime(&project, &backend, rt) {
+    let stages_by_class = options::stages_by_class(descriptor.as_ref(), &resolved);
+    if let Some(problem) = backends::check_runtime(&project, &backend, &resolved) {
         drop(progress);
         return fail(&sources, vec![problem]);
     }
-    if let Err(diagnostic) = backend.validate_environment(Some(&project), go) {
-        drop(progress);
-        return fail(&sources, vec![diagnostic]);
-    }
-    let effect = !go && !rt;
-    let identity = backend.cache_identity(effect);
+    let identity = backend.cache_identity(&resolved);
     let settings = format!(
         "test {:?} {} {:?} {} {identity}",
         selected,
@@ -149,7 +146,13 @@ fn prepare(
         release(options.profile, Some(&project.config.build)),
         resolved.cache_key(),
     );
-    let key = cache::key(&project, &roots, &settings, effect);
+    let key = cache::key(
+        &project,
+        &roots,
+        &settings,
+        options.target.as_deref(),
+        &resolved,
+    );
     let out = resolve_root(&project.root, &project.root.join(OUT_DIR));
     if let Err(why) = validate_root(&out) {
         drop(progress);
@@ -163,9 +166,7 @@ fn prepare(
         return Ok(runner);
     }
     progress.stage("Preparing compiler");
-    if let Err(diagnostic) =
-        builtins::prepare_in(project::stages_by_class(Some(&project), Some(rt)))
-    {
+    if let Err(diagnostic) = builtins::prepare_in(stages_by_class) {
         drop(progress);
         return fail(&sources, vec![diagnostic]);
     }
@@ -175,7 +176,7 @@ fn prepare(
         &mut sources,
         Some(&project),
         &roots,
-        Some(rt),
+        Some(stages_by_class),
         modules,
     );
     super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);
@@ -197,46 +198,33 @@ fn prepare(
             Mode::for_cli(global)
         })
     };
-    let suites: Vec<(String, String)> = compilation
+    let suites: Vec<String> = compilation
         .modules
         .iter()
         .filter(|m| m.test && m.interface.exports_value("tests"))
         .filter(|m| wanted.is_empty() || wanted.contains(&m.path))
-        .map(|m| (m.name.clone(), format!("./{}.js", m.name.replace('.', "/"))))
+        .map(|m| m.name.clone())
         .collect();
     let output = BuildPlan {
         purpose: Purpose::Test,
         backend: backend.clone(),
         target: choice.short().to_owned(),
         target_overridden,
-        options: resolved,
+        options: resolved.clone(),
         inspect_module: None,
         out_dir: out.clone(),
         entries: Vec::new(),
         typescript: false,
-        go,
-        suites: suites.iter().map(|(name, _)| name.clone()).collect(),
+        stages_by_class,
+        suites,
         extras: Extras {
-            rt,
+            rt: stages_by_class,
             ..Extras::default()
         },
         release: release(options.profile, Some(&project.config.build)),
     };
-    progress.stage(if go {
-        "Emitting Go"
-    } else {
-        "Emitting JavaScript"
-    });
+    progress.stage("Emitting backend output");
     let mut emitted = artifacts(&host, &mut sources, Some(&project), &compilation, &output);
-    if !go {
-        progress.stage("Writing test runner");
-    }
-    if !go && !backend.is_component() {
-        emitted.artifacts.push(Artifact::source(
-            "test.js".to_owned(),
-            runner_source(&suites, rt),
-        ));
-    }
     if global.warnings_as_errors {
         emitted.diagnostics = report::promote(&emitted.diagnostics);
     }
@@ -260,20 +248,27 @@ fn prepare(
     };
     let read = (&roots[..], &*host.cwd, &sources);
     let store = |artifacts: &[Artifact]| {
-        let now = cache::key(&project, &roots, &settings, effect);
+        let now = cache::key(
+            &project,
+            &roots,
+            &settings,
+            options.target.as_deref(),
+            &resolved,
+        );
         diagnostics.is_empty()
             && emitted.diagnostics.is_empty()
-            && cache::store_built(&project, read, &key, &now, artifacts)
+            && cache::store_built(
+                &project,
+                read,
+                options.target.as_deref(),
+                &key,
+                &now,
+                artifacts,
+            )
     };
-    if backend.is_component() {
-        store(&emitted.artifacts);
-        drop(progress);
-        return Ok(Runner::component(out, &backend));
-    }
-    let runner = out.join("test.js");
     store(&emitted.artifacts);
     drop(progress);
-    Ok(Runner::native(runner))
+    Ok(Runner::component(out, &backend))
 }
 
 /// The source and test roots and the configuration of the project.

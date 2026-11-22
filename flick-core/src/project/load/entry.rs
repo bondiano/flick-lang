@@ -180,13 +180,16 @@ impl Loader<'_> {
                 let runner = runner.or_else(|| client.then_some(&default_client_runner));
                 // no type when the module failed to check: that is reported already
                 #[cfg(feature = "native-project")]
-                if let Some((runner, runner_at)) = runner
-                    && project.config.is_go()
-                    && target::js_only(runner)
-                {
-                    self.diagnostics
-                        .push(target::js_only_error(runner, *runner_at));
-                    return;
+                if let Some((runner, runner_at)) = runner {
+                    let unsupported = self.host.unsupported_modules(project);
+                    if target::unsupported_match(&unsupported, runner) {
+                        self.diagnostics.push(target::unsupported_error(
+                            runner,
+                            project.config.default_target(),
+                            *runner_at,
+                        ));
+                        return;
+                    }
                 }
                 if let Some((runner, runner_at)) = runner
                     && main.scheme.is_some()

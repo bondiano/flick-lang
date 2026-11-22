@@ -5,12 +5,15 @@ use std::path::Path;
 use std::process::Command as Process;
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project;
+use flick_core::project::{self, store};
 use flick_core::source::SourceMap;
 
-use crate::args::{ExplainArguments, GlobalArguments};
 #[cfg(feature = "wasm-backends")]
-use crate::backends;
+use super::contributed;
+use super::plugins;
+use crate::args::{DoctorArguments, ExplainArguments, GlobalArguments};
+#[cfg(feature = "wasm-backends")]
+use crate::backends::Selected;
 use crate::command::Outcome;
 use crate::sources::FsHost;
 use crate::stdlib;
@@ -79,34 +82,18 @@ fn output_of(program: &str, args: &[&str]) -> Option<String> {
         .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
 }
 
-/// The output of `program --version`, if it runs.
-fn version_of(program: &str) -> Option<String> {
-    output_of(program, &["--version"]).map(|v| v.trim_start_matches('v').to_owned())
-}
-
 /// The version `git --version` prints, such as `2.43.0`.
 fn git_version() -> Option<String> {
     output_of("git", &["--version"]).map(|v| v.trim_start_matches("git version ").to_owned())
 }
 
-/// The version `go version` prints, such as `1.23.12`.
-fn go_version() -> Option<String> {
-    let printed = output_of("go", &["version"])?;
-    Some(
-        printed
-            .split_whitespace()
-            .find(|word| word.starts_with("go1"))
-            .map_or(printed.clone(), |word| {
-                word.trim_start_matches("go").to_owned()
-            }),
-    )
+#[derive(Default)]
+struct DoctorReport {
+    diagnostics: Vec<Diagnostic>,
 }
 
-/// Checks the toolchain and the project's installed tree via its backend;
-/// optional tools and adapters that are missing are notes, not failures.
-pub fn doctor(global: &GlobalArguments) -> Outcome {
-    let mut failed = Vec::new();
-    let mut line = |ok: Option<bool>, what: &str, detail: String| {
+impl DoctorReport {
+    fn line(&mut self, ok: Option<bool>, what: &str, detail: &str) {
         let mark = match ok {
             Some(true) => "ok  ",
             Some(false) => "FAIL",
@@ -114,10 +101,34 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
         };
         println!("{mark} {what}: {detail}");
         if ok == Some(false) {
-            failed.push(format!("{what}: {detail}"));
+            self.diagnostics.push(Diagnostic::new(
+                codes::P015,
+                Severity::Error,
+                format!("{what}: {detail}"),
+            ));
         }
-    };
-    line(Some(true), "compiler", format!("flick {COMPILER}"));
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn fail_with(&mut self, what: &str, diagnostic: Diagnostic) {
+        println!("FAIL {what}: {}", diagnostic.message);
+        self.diagnostics.push(diagnostic);
+    }
+}
+
+/// Checks core compiler prerequisites (compiler, store, git, plugins) and then
+/// delegates target-specific toolchain and package checks to the selected backend.
+pub fn doctor(options: &DoctorArguments, global: &GlobalArguments) -> Outcome {
+    let mut report = DoctorReport::default();
+    report.line(Some(true), "compiler", &format!("flick {COMPILER}"));
+    match store::store_dir() {
+        Some(dir) => report.line(Some(true), "store", &dir.display().to_string()),
+        None => report.line(
+            None,
+            "store",
+            "unavailable (set `FLICK_STORE_DIR` or `HOME`)",
+        ),
+    }
     let host = FsHost::new();
     let explicit = global.project.as_deref().map(Path::new);
     let project = project::discover(&host, &mut SourceMap::default(), &host.cwd, explicit)
@@ -126,48 +137,86 @@ pub fn doctor(global: &GlobalArguments) -> Outcome {
     // a note, not a failure: a checkout with `FLICK_STD_PATH`, path
     // dependencies and a warm package store fetches nothing
     match git_version() {
-        Some(v) => line(
+        Some(v) => report.line(
             Some(true),
             "git",
-            format!("{v} (fetches the implicit `std` and `git` dependencies)"),
+            &format!("{v} (fetches the implicit `std` and `git` dependencies)"),
         ),
-        None => line(
+        None => report.line(
             None,
             "git",
             "not found: `flick install` fetches the implicit `std` from its release tag, and `check`, \
              `build`, `run` and `test` do too when it is not in the package store; set \
-             `FLICK_STD_PATH` to a local `packages/std` to work without it"
-                .to_owned(),
+             `FLICK_STD_PATH` to a local `packages/std` to work without it",
         ),
     }
-    // the go target is optional: a missing toolchain is a note, as for adapters
-    match go_version() {
-        Some(v) => line(None, "Go", format!("{v} (the `go` target only)")),
-        None => line(
-            None,
-            "Go",
-            "not found (the `go` target only: `--target go`)".to_owned(),
-        ),
+    if let Some(p) = &project {
+        for (ok, what, detail) in plugins::doctor_lines(p) {
+            report.line(ok, &what, &detail);
+        }
+    } else {
+        report.line(None, "plugins", "no project here");
     }
+    doctor_backend(options, &host, project.as_ref(), &mut report);
+    Outcome {
+        sources: SourceMap::default(),
+        diagnostics: report.diagnostics,
+    }
+}
+
+fn doctor_backend(
+    options: &DoctorArguments,
+    host: &FsHost,
+    project: Option<&project::Project>,
+    report: &mut DoctorReport,
+) {
     #[cfg(feature = "wasm-backends")]
     {
-        let node = version_of("node");
-        let pnpm = version_of("pnpm");
-        if let Some(lines) = backends::doctor(project.as_ref(), node.as_deref(), pnpm.as_deref()) {
-            for (ok, what, detail) in lines {
-                line(ok, &what, detail);
+        if project.is_some() || options.target.is_some() {
+            match Selected::load_target_local(host, project, options.target.as_deref()) {
+                Ok((package, _)) => {
+                    let pin = package.pin();
+                    report.line(
+                        Some(true),
+                        "backend",
+                        &format!("{}@{}", pin.identity.id, pin.identity.version),
+                    );
+                    match contributed::doctor(&package, project, &host.cwd) {
+                        Ok(Some(lines)) => {
+                            for (ok, what, detail) in lines {
+                                report.line(ok, &what, &detail);
+                            }
+                        }
+                        Ok(None) => report.line(
+                            None,
+                            "backend checks",
+                            &format!("`{}` declares no doctor checks", pin.identity.id),
+                        ),
+                        Err(diag) => report.fail_with("backend checks", diag),
+                    }
+                    if project.is_some() {
+                        for (ok, what, detail) in package.doctor_packages() {
+                            report.line(ok, &what, &detail);
+                        }
+                    }
+                }
+                Err(diag) => report.fail_with("backend", diag),
             }
+        } else {
+            report.line(
+                None,
+                "backend",
+                "no project here; pass `--target <name>` to inspect a backend",
+            );
         }
     }
     #[cfg(not(feature = "wasm-backends"))]
     {
-        let _ = (project, version_of);
-    }
-    Outcome {
-        sources: SourceMap::default(),
-        diagnostics: failed
-            .into_iter()
-            .map(|f| Diagnostic::new(codes::P015, Severity::Error, f))
-            .collect(),
+        let _ = (options, host, project);
+        report.line(
+            None,
+            "backend",
+            "this build has no WebAssembly backend support",
+        );
     }
 }

@@ -68,6 +68,16 @@ interface types {
     verbs: list<verb>,
   }
 
+  record option-value {
+    key: string,
+    value: string,
+  }
+
+  record environment-services {
+    environment: environment,
+    services: list<string>,
+  }
+
   record descriptor {
     identity: backend-id,
     backend-api: version-range,
@@ -79,11 +89,14 @@ interface types {
     modes: list<mode>,
     capabilities: list<capability>,
     options: list<option-descriptor>,
-  }
-
-  record option-value {
-    key: string,
-    value: string,
+    launch-runtimes: list<string>,
+    host-tools: list<string>,
+    projections: list<abi>,
+    unsupported-modules: list<string>,
+    stages-by-class-option: option<option-value>,
+    foreign-extension: option<string>,
+    foreign-suffixes: list<string>,
+    handled-services: list<environment-services>,
   }
 
   record target-request {
@@ -302,6 +315,7 @@ interface types {
     inputs: list<input>,
     toolchains: list<toolchain>,
     runtime-dependencies: list<runtime-dependency>,
+    declared-dependencies: option<list<string>>,
   }
 
   record project-file {
@@ -350,7 +364,9 @@ interface types {
     kind: launch-kind,
     artifact: string,
     runtime: option<toolchain>,
+    runtime-arguments: list<string>,
     arguments: list<string>,
+    environment: list<option-value>,
   }
 
   record build-result {

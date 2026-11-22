@@ -1,9 +1,10 @@
 //! Entry launchers of the deliberately small fixture backend.
 
-use flick_backend::{Artifact, ArtifactKind, BuildRequest, Launch, LaunchKind};
+use flick_backend::{Artifact, ArtifactKind, BuildRequest, Launch, LaunchKind, OptionValue};
 
 pub(super) fn run(request: &BuildRequest, artifacts: &mut Vec<Artifact>) -> Vec<Launch> {
     let mut launches = vec![];
+    let case = super::case(request);
     if let Some(node) = request.toolchains.iter().find(|t| t.id == "node") {
         for entry in &request.entries {
             let module = request
@@ -22,12 +23,27 @@ pub(super) fn run(request: &BuildRequest, artifacts: &mut Vec<Artifact>) -> Vec<
                 )
                 .into_bytes(),
             });
+            let runtime_arguments = if case == "bad-launch-arg" {
+                vec!["-e".into(), "process.exit(1)".into()]
+            } else {
+                vec!["--enable-source-maps".into()]
+            };
+            let environment = if case == "bad-launch-env" {
+                vec![OptionValue {
+                    key: "LD_PRELOAD".into(),
+                    value: "/evil.so".into(),
+                }]
+            } else {
+                vec![]
+            };
             launches.push(Launch {
                 name: entry.name.clone(),
                 kind: LaunchKind::Run,
                 artifact: id,
                 runtime: Some(node.clone()),
+                runtime_arguments,
                 arguments: vec![],
+                environment,
             });
         }
     }

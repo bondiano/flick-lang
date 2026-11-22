@@ -1,13 +1,13 @@
 module App.Main exposing (main)
 
 import Ui
-//     ^^ FLICK-P030 `Ui` is available on the js target only, and this project targets go: remove the import, or build the project with `[build] target = "js"`
+//     ^^ FLICK-P030 `Ui` is not supported by the `go` target: remove the import, or build the project for a target that supports it
 import Js.Array
-//     ^^^^^^^^ FLICK-P030 `Js.Array` is available on the js target only, and this project targets go: remove the import, or build the project with `[build] target = "js"`
+//     ^^^^^^^^ FLICK-P030 `Js.Array` is not supported by the `go` target: remove the import, or build the project for a target that supports it
 import Form
-//     ^^^^ FLICK-P030 `Form` is available on the js target only, and this project targets go: remove the import, or build the project with `[build] target = "js"`
+//     ^^^^ FLICK-P030 `Form` is not supported by the `go` target: remove the import, or build the project for a target that supports it
 import Reactivity.AsyncResult
-//     ^^^^^^^^^^^^^^^^^^^^^^ FLICK-P030 `Reactivity.AsyncResult` is available on the js target only, and this project targets go: remove the import, or build the project with `[build] target = "js"`
+//     ^^^^^^^^^^^^^^^^^^^^^^ FLICK-P030 `Reactivity.AsyncResult` is not supported by the `go` target: remove the import, or build the project for a target that supports it
 
 main : Unit -> Unit
 let main () = ()
