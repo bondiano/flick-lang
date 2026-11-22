@@ -4,7 +4,7 @@
 import { HashMap, Option } from "effect";
 import type { Result } from "effect";
 
-import { type FlickHashMap, HashKey, hashMapOf, type Witness } from "../stdlib/hash.ts";
+import { type FlickHashMap, HashKey, hashMapFromSeq, hashMapOf, type Witness } from "../stdlib/hash.ts";
 
 export * from "effect/HashMap";
 
@@ -14,7 +14,7 @@ const box = <K, V>(m: Hm<K, V>, k: K): HashKey<K> => new HashKey(k, m.witness);
 const keep = <K, V, B>(m: Hm<K, V>, native: HashMap.HashMap<HashKey<K>, B>): Hm<K, B> => hashMapOf(m.witness, native);
 
 export const flickFromList = <K, V>(w: Witness<K>, entries: ReadonlyArray<readonly [K, V]>): Hm<K, V> =>
-  hashMapOf(w, HashMap.fromIterable(entries.map(([k, v]) => [new HashKey(k, w), v] as const)));
+  hashMapFromSeq(w, entries);
 export const flickIsEmpty = <K, V>(m: Hm<K, V>): boolean => HashMap.isEmpty(m.native);
 export const flickHas = <K, V>(k: K, m: Hm<K, V>): boolean => HashMap.has(m.native, box(m, k));
 export const flickGetHash = <K, V>(k: K, hash: number, m: Hm<K, V>): Option.Option<V> =>

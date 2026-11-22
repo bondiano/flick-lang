@@ -13,6 +13,9 @@ mod review;
 #[cfg(all(feature = "wasm-backends", unix))]
 #[path = "backends/steps.rs"]
 mod steps;
+#[cfg(feature = "wasm-backends")]
+#[path = "backends/templates.rs"]
+mod templates;
 
 use std::fs;
 #[cfg(feature = "wasm-backends")]

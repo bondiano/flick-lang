@@ -8,6 +8,7 @@ mod guest;
 mod launch;
 mod mapper;
 mod optimize;
+mod templates;
 
 use flick_backend::{
     Backend, BackendId, BuildRequest, BuildResult, Capability, Descriptor, Diagnostic, Environment,
@@ -169,6 +170,17 @@ impl Backend for Javascript {
     ) -> Result<command::Handled, String> {
         let _ = state;
         mapper::handle(&request, &answers)
+    }
+
+    fn templates(&self) -> Vec<command::TemplateDescriptor> {
+        templates::descriptors()
+    }
+
+    fn scaffold(
+        &self,
+        request: &command::TemplateRequest,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        templates::scaffold(request)
     }
 
     fn describe(&self) -> Descriptor {

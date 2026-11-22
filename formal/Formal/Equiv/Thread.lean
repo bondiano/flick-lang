@@ -61,13 +61,24 @@ theorem AStar.ksteps {root : Roots} {μ μ' : List Tm} {t t' : Tm}
 theorem RJ.ksteps {root : Roots} {W' : World} {μ μ' : List Tm} {t t' : Tm}
     (h : RJ W μ t W' μ' t') : KSteps root μ t μ' t' := h.steps.ksteps
 
+theorem PStep.plug {root : Roots} {a b : Tm} (h : PStep root a b) {E : List Frame} (hE : OkE E) :
+    PStep root (Flick.plug E a) (Flick.plug E b) := by
+  cases h with
+  | head hE' hh =>
+    have := PStep.head (root := root) (hE'.append' hE) hh
+    rwa [plug_append, plug_append] at this
+  | glob hE' hg =>
+    have := PStep.glob (root := root) (hE'.append' hE) hg
+    rwa [plug_append, plug_append] at this
+
 theorem HSeq.ksteps {root : Roots} {μ μ' : List Tm} {t t' : Tm}
-    (h : HSeq μ t μ' t') {E : List Frame} (hE : OkE E) :
+    (h : HSeq root μ t μ' t') {E : List Frame} (hE : OkE E) :
     KSteps root μ (plug E t) μ' (plug E t') := by
   induction h with
   | refl => exact .refl
   | rt hh _ ih => exact .step (fun Λ => ⟨_, .rt hE (hh Λ)⟩) ih
   | pure hh _ ih => exact .step (fun _ => ⟨_, .pure hE hh⟩) ih
+  | pstep hp _ ih => exact .step (fun Λ => ⟨_, (PStep.plug hp hE).step Λ _⟩) ih
 
 /-- At least one step of a thread that keeps the regions. -/
 def KPos (root : Roots) (μ : List Tm) (t : Tm) (μ' : List Tm) (t' : Tm) : Prop :=
@@ -94,12 +105,12 @@ theorem KSteps.split {root : Roots} {μ μ' : List Tm} {t t' : Tm} (h : KSteps r
   | refl => exact .inl ⟨rfl, rfl⟩
   | step s k => exact .inr ⟨_, _, s, k⟩
 
-theorem HSeqP.kpos {root : Roots} {μ μ' : List Tm} {t t' : Tm} (h : HSeqP W μ t μ' t')
-    {E : List Frame} (hE : OkE E) :
+theorem HSeqP.kpos {root : Roots} {μ μ' : List Tm} {t t' : Tm} (hR : W.R = root)
+    (h : HSeqP W μ t μ' t') {E : List Frame} (hE : OkE E) :
     KPos root μ (plug E t) μ' (plug E t') ∨ (W.B ∧ μ' = μ ∧ t' = t) := by
   rcases h with ⟨_, _, hh, k⟩ | ⟨_, hh, k⟩ | h
-  · exact .inl ⟨_, _, fun Λ => ⟨_, .rt hE (hh Λ)⟩, k.ksteps hE⟩
-  · exact .inl ⟨_, _, fun _ => ⟨_, .pure hE hh⟩, k.ksteps hE⟩
+  · exact .inl ⟨_, _, fun Λ => ⟨_, .rt hE (hh Λ)⟩, (hR ▸ k).ksteps hE⟩
+  · exact .inl ⟨_, _, fun _ => ⟨_, .pure hE hh⟩, (hR ▸ k).ksteps hE⟩
   · exact .inr h
 
 /-- The answer of the right side to a step of a thread: steps that keep the regions, then at most

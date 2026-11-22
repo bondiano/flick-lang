@@ -38,6 +38,9 @@ theorem HAns.pure {μ μ₂ : List Tm} {r₂ r' W₁ μ₂a r₂a r₂'}
 step gives has no lazy cell where a pattern reads (`hzl`, `hzr`). -/
 theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     (hh : RHead Λ μ r Λ' μ' r') (hreg : ¬ r.Reg) (h : Sim W .top r r₂) (hst : StR W μ μ₂)
+    (hglob : ∀ g v, W.R.glob g = some v → v.Src) (hcl : W.B → r.Closed ∧ r₂.Closed)
+    (hmvl : r.MatchVals) (hmvr : r₂.MatchVals)
+    (hcell : ∀ (l : Nat) (c : Tm), μ[l]? = some c → c.IsCell → ∃ c', μ'[l]? = some c' ∧ c'.IsCell)
     (hzl : ¬ r'.LzTop .any) (hzr : ∀ r₂', (∀ Λ, RHead Λ μ₂ r₂ Λ μ₂ r₂') → ¬ r₂'.LzTop .any) :
     HAns W μ₂ r₂ μ μ' r' := by
   cases hh with
@@ -51,51 +54,70 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
   | refGet hc hnc =>
     obtain ⟨f', a', rfl, h₁, h₂⟩ := h.inv_app
     rw [h₁.inv_const]
-    obtain ⟨l', k, rfl, hl⟩ := h₂.inv_loc
-    obtain ⟨c, c', hc₁, hc', hcr⟩ := hst.cell _ _ _ hl
-    rw [hc] at hc₁; cases hc₁
-    cases k with
-    | sym =>
-      have hcr : Sim W .top _ c' := hcr
-      exact HAns.one (.refl _ _) (fun _ => .refGet hc' (fun h => hnc (hcr.top_isCell.2 h))) hcr.lower hst
-    | born v v' =>
-      rcases hcr.state with ⟨hl₁ | hl₁ | hl₁, -⟩ | ⟨-, hnc', hs⟩
-      all_goals first
-        | (subst hl₁; exact (hnc trivial).elim)
-        | exact HAns.one (.refl _ _) (fun _ => .refGet hc' hnc') hs.lower hst
+    obtain ⟨l', rfl, hloc⟩ := h₂.inv_loc
+    rcases hloc with ⟨k, hl⟩ | ⟨hB, hH⟩
+    · obtain ⟨c, c', hc₁, hc', hcr⟩ := hst.cell _ _ _ hl
+      rw [hc] at hc₁; cases hc₁
+      cases k with
+      | sym =>
+        have hcr : Sim W .top _ c' := hcr
+        exact HAns.one (.refl _ _) (fun _ => .refGet hc' (fun h => hnc (hcr.top_isCell.2 h))) hcr.lower hst
+      | born v v' =>
+        rcases hcr.state with ⟨hl₁ | hl₁ | hl₁, -⟩ | ⟨-, hnc', hs⟩
+        all_goals first
+          | (subst hl₁; exact (hnc trivial).elim)
+          | exact HAns.one (.refl _ _) (fun _ => .refGet hc' hnc') hs.lower hst
+    · obtain ⟨-, e, e', hhl, -, -⟩ := hst.hrel _ _ hH
+      obtain ⟨-, -, -, -, -, -, c, hc₁, hstL⟩ := hst.hl _ _ hhl
+      rw [hc] at hc₁; cases hc₁
+      rcases hstL with rfl | rfl | ⟨_, rfl, -⟩ <;> exact (hnc trivial).elim
   | refGetCell hc hic =>
     obtain ⟨f', a', rfl, h₁, h₂⟩ := h.inv_app
     rw [h₁.inv_const]
-    obtain ⟨l', k, rfl, hl⟩ := h₂.inv_loc
-    obtain ⟨c, c', hc₁, hc', hcr⟩ := hst.cell _ _ _ hl
-    rw [hc] at hc₁; cases hc₁
-    cases k with
-    | sym =>
-      have hcr : Sim W .top _ c' := hcr
-      exact HAns.one (.refl _ _) (fun _ => .refGetCell hc' (hcr.top_isCell.1 hic)) .todo hst
-    | born v v' =>
-      rcases hcr.state with ⟨-, hr₁ | hr₁⟩ | ⟨hnc, -, -⟩
-      · subst hr₁; exact HAns.one (.refl _ _) (fun _ => .refGetCell hc' trivial) .todo hst
-      · subst hr₁; exact HAns.one (.refl _ _) (fun _ => .refGetCell hc' trivial) .todo hst
-      · exact (hnc hic).elim
+    obtain ⟨l', rfl, hloc⟩ := h₂.inv_loc
+    rcases hloc with ⟨k, hl⟩ | ⟨hB, hH⟩
+    · obtain ⟨c, c', hc₁, hc', hcr⟩ := hst.cell _ _ _ hl
+      rw [hc] at hc₁; cases hc₁
+      cases k with
+      | sym =>
+        have hcr : Sim W .top _ c' := hcr
+        exact HAns.one (.refl _ _) (fun _ => .refGetCell hc' (hcr.top_isCell.1 hic)) .todo hst
+      | born v v' =>
+        rcases hcr.state with ⟨-, hr₁ | hr₁⟩ | ⟨hnc, -, -⟩
+        · subst hr₁; exact HAns.one (.refl _ _) (fun _ => .refGetCell hc' trivial) .todo hst
+        · subst hr₁; exact HAns.one (.refl _ _) (fun _ => .refGetCell hc' trivial) .todo hst
+        · exact (hnc hic).elim
+    · obtain ⟨-, e, e', -, hhr, -⟩ := hst.hrel _ _ hH
+      obtain ⟨-, -, -, -, -, -, c', hc', hstR⟩ := hst.hr _ _ hhr
+      rcases hstR with rfl | ⟨_, rfl, -⟩
+      · exact HAns.one (.refl _ _) (fun _ => .refGetCell hc' trivial) .todo hst
+      · exact HAns.one (.refl _ _) (fun _ => .refGetCell hc' trivial) .todo hst
   | @refSet v l _ _ hv hl₀ =>
     obtain ⟨f', v', rfl, h₁, h₂⟩ := h.inv_app
     obtain ⟨c', a', rfl, h₃, h₄⟩ := h₁.inv_app
     rw [h₃.inv_const]
-    obtain ⟨l', k, rfl, hl⟩ := h₄.inv_loc
-    have hv' := h₂.top_value rfl hv
-    have hnj : ∀ n, W.J₁ n → n ≠ l := fun n hn e => hst.not_j₁ hl (e ▸ hn)
-    refine ⟨W, μ₂, _, W, _, _, RJ.refl _ _, HSeqP.one (fun _ => .refSet hv' (hst.lt₂ hl)), World.le.refl _,
-      .lit, hst.set hl ?_, fun n hn => getElem?_set_of_ne (hnj n hn)⟩
-    cases k with
-    | sym => exact h₂
-    | born v₀ v₀' =>
-      obtain ⟨c, c', -, -, hcr⟩ := hst.cell _ _ _ hl
-      exact ⟨hcr.val, hcr.val', hcr.cl, hcr.cl', hcr.noIns, hcr.rel,
-        .inr ⟨hv.not_cell, hv'.not_cell, h₂⟩, hcr.flag⟩
+    obtain ⟨l', rfl, hloc⟩ := h₄.inv_loc
+    rcases hloc with ⟨k, hl⟩ | ⟨hB, hH⟩
+    · have hv' := h₂.top_value rfl hv
+      have hnj : ∀ n, W.J₁ n → n ≠ l := fun n hn e => hst.not_j₁ hl (e ▸ hn)
+      refine ⟨W, μ₂, _, W, _, _, RJ.refl _ _, HSeqP.one (fun _ => .refSet hv' (hst.lt₂ hl)), World.le.refl _,
+        .lit, hst.set hl ?_, fun n hn => getElem?_set_of_ne (hnj n hn)⟩
+      cases k with
+      | sym => exact h₂
+      | born v₀ v₀' =>
+        obtain ⟨c, c', -, -, hcr⟩ := hst.cell _ _ _ hl
+        exact ⟨hcr.val, hcr.val', hcr.cl, hcr.cl', hcr.noIns, hcr.rel,
+          .inr ⟨hv.not_cell, hv'.not_cell, h₂⟩, hcr.flag⟩
+    · obtain ⟨-, e, e', hhl, -, -⟩ := hst.hrel _ _ hH
+      obtain ⟨-, -, -, -, -, -, c, hc, hstL⟩ := hst.hl _ _ hhl
+      have hic : c.IsCell := by rcases hstL with rfl | rfl | ⟨_, rfl, -⟩ <;> trivial
+      obtain ⟨c', hc', hic'⟩ := hcell l c hc hic
+      rw [List.getElem?_set_self hl₀] at hc'; cases hc'
+      exact (hv.not_cell hic').elim
   | await =>
     obtain ⟨e', rfl, h₁⟩ := h.inv_await
     obtain ⟨W₁, μ₁, v', r₁, hv', s₁⟩ := vcu_frame h₁ rfl .task μ₂ (F := .await) trivial
+      (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .await) a, closed_frame_inner (F := .await) b⟩)
     obtain ⟨e₂, rfl, he, -⟩ := (s₁.value_any .task hv' .top).inv_task
     exact HAns.one r₁ (fun _ => .await) he hst
   | lazy =>
@@ -105,16 +127,17 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
       fun n hn => getElem?_append_old (hst.j₁ n hn).1⟩
   | forcePending hc =>
     obtain ⟨e', rfl, h₁⟩ := h.inv_force
-    exact force_sim (Λ := Λ) (.forcePending hc) h₁ hst
+    exact force_sim (Λ := Λ) (.forcePending hc) h₁ hst hglob (fun hB => closed_frame_inner (F := .force) (hcl hB).2)
   | forceDone hc =>
     obtain ⟨e', rfl, h₁⟩ := h.inv_force
-    exact force_sim (Λ := Λ) (.forceDone hc) h₁ hst
+    exact force_sim (Λ := Λ) (.forceDone hc) h₁ hst hglob (fun hB => closed_frame_inner (F := .force) (hcl hB).2)
   | forceRunning hc hnl hnd =>
     obtain ⟨e', rfl, h₁⟩ := h.inv_force
-    exact force_sim (Λ := Λ) (.forceRunning hc hnl hnd) h₁ hst
+    exact force_sim (Λ := Λ) (.forceRunning hc hnl hnd) h₁ hst hglob (fun hB => closed_frame_inner (F := .force) (hcl hB).2)
   | @settleVal v _ _ l hv =>
     obtain ⟨l', e', rfl, hl, h₁⟩ := h.inv_settle
     obtain ⟨W₁, μ₁, v', r₁, hv', s₁⟩ := vcu_frame h₁ rfl hv μ₂ (F := .settle l') trivial
+      (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .settle _) a, closed_frame_inner (F := .settle _) b⟩)
     have hst₁ := r₁.st _ hst
     have hl₁ := r₁.le.L _ _ _ hl
     exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .settleVal hv'), World.le.refl _, s₁,
@@ -123,6 +146,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
   | @settleRaise v _ _ l hv =>
     obtain ⟨l', e', rfl, hl, h₁⟩ := h.inv_settle
     obtain ⟨W₁, μ₁, v', r₁, hv', s₁⟩ := rcu_frame h₁ rfl rfl hv μ₂ (F := .settle l') trivial
+      (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .settle _) a, closed_frame_inner (F := .settle _) b⟩)
     have hst₁ := r₁.st _ hst
     have hl₁ := r₁.le.L _ _ _ hl
     exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .settleRaise hv'), World.le.refl _, .raise s₁,
@@ -131,6 +155,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
   | @settleUnw _ _ l p ℓ a =>
     obtain ⟨l', e', rfl, hl, h₁⟩ := h.inv_settle
     obtain ⟨W₁, μ₁, ℓ', k, a', r₁, hlk, s₁⟩ := ucu_frame h₁ rfl rfl μ₂ (F := .settle l') trivial
+      (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .settle _) a, closed_frame_inner (F := .settle _) b⟩)
     have hst₁ := r₁.st _ hst
     have hl₁ := r₁.le.L _ _ _ hl
     exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .settleUnw), World.le.refl _, .unw hlk s₁,
@@ -138,12 +163,15 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
   | @tryRaise v _ _ A hv =>
     obtain ⟨e', al', rfl, h₁, h₂⟩ := h.inv_try
     obtain ⟨W₁, μ₁, v', r₁, hv', s₁⟩ := rcu_frame h₁ rfl rfl hv μ₂ (F := .try_ al') trivial
+      (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .try_ _) a, closed_frame_inner (F := .try_ _) b⟩)
     exact HAns.one r₁ (fun _ => .tryRaise hv') (.handle (s₁.value_any hv hv' .top) (h₂.mono r₁.le)) hst
   | handleYes hv hm =>
     obtain ⟨v', al', rfl, h₁, h₂⟩ := h.inv_handle
     obtain ⟨b', r', rfl, hb, hr⟩ := h₂.inv_acons
     have hv' := h₁.top_value rfl hv
     obtain ⟨δ₂, hm', hδ⟩ := h₁.matchP_sub hv' hm
+      (hmvl [] _ _ _ _ _ OkE.nil hv hm (.inr (.inr (.inl rfl))))
+      (fun δ₂ hm₂ => hmvr [] v' _ b' r' δ₂ OkE.nil hv' hm₂ (.inr (.inr (.inl rfl))))
     rcases hb with hb | ⟨hd | hd, -⟩
     · exact HAns.one (.refl _ _) (fun _ => .handleYes hv' hm') (hb.subst _ _ hδ) hst
     · exact (hzl (hd.subst _)).elim
@@ -158,6 +186,8 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨g', b', r', rfl, hg, hb, hr⟩ := h₂.inv_aguard
     have hv' := h₁.top_value rfl hv
     obtain ⟨δ₂, hm', hδ⟩ := h₁.matchP_sub hv' hm
+      (hmvl [] _ _ _ _ _ OkE.nil hv hm (.inr (.inr (.inr ⟨_, rfl⟩))))
+      (fun δ₂ hm₂ => hmvr [] v' _ b' r' δ₂ OkE.nil hv' hm₂ (.inr (.inr (.inr ⟨g', rfl⟩))))
     exact HAns.one (.refl _ _) (fun _ => .hguardYes hv' hm') (.match_ (hg.subst _ _ hδ)
       (.acons (hb.subst _ _ hδ) (.acons (.handle h₁ hr) .anil))) hst
   | hguardNo hv hm =>
@@ -181,6 +211,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨Ei₂, rfl, hfr, hEi₂⟩ := hc.plug_hole hEi
     obtain ⟨W₁, μ₁, w', r₁, hw', s₁⟩ :=
       rcu_frame h₁ rfl rfl hw μ₂ (F := .hctlA _ ℓ' κ' _ _ al' r' (plug Ei₂ (.hole _))) trivial
+        (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .hctlA _ _ _ _ _ _ _ _) a, closed_frame_inner (F := .hctlA _ _ _ _ _ _ _ _) b⟩)
     exact HAns.one r₁ (fun _ => .hctlRaise hEi₂ rfl hw') (.hwith (r₁.le.L _ _ _ hl) (hal.mono r₁.le)
       (hr.mono r₁.le) ((hfr.mono r₁.le).plugs (.unw (r₁.le.L _ _ _ hl) (.raise s₁)))) hst
   | hctlUnw hEi hk =>
@@ -189,6 +220,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨Ei₂, rfl, hfr, hEi₂⟩ := hc.plug_hole hEi
     obtain ⟨W₁, μ₁, ℓ₂, kd₂, a₂, r₁, hl₂, s₁⟩ :=
       ucu_frame h₁ rfl rfl μ₂ (F := .hctlA _ ℓ' κ' _ _ al' r' (plug Ei₂ (.hole _))) trivial
+        (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .hctlA _ _ _ _ _ _ _ _) a, closed_frame_inner (F := .hctlA _ _ _ _ _ _ _ _) b⟩)
     exact HAns.one r₁ (fun _ => .hctlUnw hEi₂ rfl) (.hwith (r₁.le.L _ _ _ hl) (hal.mono r₁.le)
       (hr.mono r₁.le) ((hfr.mono r₁.le).plugs (.unw (r₁.le.L _ _ _ hl) (.unw hl₂ s₁)))) hst
   | hresRaise hA ha hw =>
@@ -197,6 +229,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨A₂, rfl, hfr, hA₂⟩ := hc.plug_hole hA
     obtain ⟨W₁, μ₁, w', r₁, hw', s₁⟩ :=
       rcu_frame h₁ rfl rfl hw μ₂ (F := .hresB _ ℓ' (plug A₂ (.hole _))) trivial
+        (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .hresB _ _ _) a, closed_frame_inner (F := .hresB _ _ _) b⟩)
     exact HAns.one r₁ (fun _ => .hresRaise hA₂ rfl hw') (.hdone ((hfr.mono r₁.le).plugs (.raise s₁))) hst
   | hresUnw hA ha =>
     obtain ⟨ℓ', kd, a', b', rfl, hl, hc, h₁⟩ := h.inv_hres
@@ -204,6 +237,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨A₂, rfl, hfr, hA₂⟩ := hc.plug_hole hA
     obtain ⟨W₁, μ₁, ℓ₂, kd₂, b₂, r₁, hl₂, s₁⟩ :=
       ucu_frame h₁ rfl rfl μ₂ (F := .hresB _ ℓ' (plug A₂ (.hole _))) trivial
+        (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .hresB _ _ _) a, closed_frame_inner (F := .hresB _ _ _) b⟩)
     exact HAns.one r₁ (fun _ => .hresUnw hA₂ rfl) (.hdone ((hfr.mono r₁.le).plugs (.unw hl₂ s₁))) hst
   | hkarmRaise hEi hk hw =>
     obtain ⟨ℓ', kd, al', a', k', rfl, hl, hal, h₁, hc⟩ := h.inv_hkarm
@@ -211,6 +245,7 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨Ei₂, rfl, hfr, hEi₂⟩ := hc.plug_hole hEi
     obtain ⟨W₁, μ₁, w', r₁, hw', s₁⟩ :=
       rcu_frame h₁ rfl rfl hw μ₂ (F := .hkarmA _ ℓ' _ al' (plug Ei₂ (.hole _))) trivial
+        (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .hkarmA _ _ _ _ _) a, closed_frame_inner (F := .hkarmA _ _ _ _ _) b⟩)
     exact HAns.one r₁ (fun _ => .hkarmRaise hEi₂ rfl hw') (.hkeep (r₁.le.L _ _ _ hl) (hal.mono r₁.le)
       ((hfr.mono r₁.le).plugs (.unw (r₁.le.L _ _ _ hl) (.raise s₁)))) hst
   | hkarmUnw hEi hk =>
@@ -219,12 +254,14 @@ theorem rhead_sim {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {r r' r₂ : Tm}
     obtain ⟨Ei₂, rfl, hfr, hEi₂⟩ := hc.plug_hole hEi
     obtain ⟨W₁, μ₁, ℓ₂, kd₂, a₂, r₁, hl₂, s₁⟩ :=
       ucu_frame h₁ rfl rfl μ₂ (F := .hkarmA _ ℓ' _ al' (plug Ei₂ (.hole _))) trivial
+        (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .hkarmA _ _ _ _ _) a, closed_frame_inner (F := .hkarmA _ _ _ _ _) b⟩)
     exact HAns.one r₁ (fun _ => .hkarmUnw hEi₂ rfl) (.hkeep (r₁.le.L _ _ _ hl) (hal.mono r₁.le)
       ((hfr.mono r₁.le).plugs (.unw hl₂ s₁))) hst
   | hwithCatch =>
     obtain ⟨ℓ', kd, al', r', e', rfl, hl, hal, hr, h₁⟩ := h.inv_hwith
     obtain ⟨W₁, μ₁, ℓ₂, kd₂, a₂, r₁, hl₂, s₁⟩ :=
       ucu_frame h₁ rfl rfl μ₂ (F := .hwith _ ℓ' _ al' r') trivial
+        (fun hB => let ⟨a, b⟩ := hcl hB; ⟨closed_frame_inner (F := .hwith _ _ _ _ _) a, closed_frame_inner (F := .hwith _ _ _ _ _) b⟩)
     have he : ℓ₂ = ℓ' := ((r₁.st _ hst).bij _ _ _ _ _ _ hl₂ (r₁.le.L _ _ _ hl)).1 rfl
     subst he
     exact HAns.one r₁ (fun _ => .hwithCatch) s₁ hst

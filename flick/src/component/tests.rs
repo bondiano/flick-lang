@@ -1,7 +1,10 @@
+use std::ffi::OsString;
+use std::path::PathBuf;
+
 use wasmtime::Store;
 use wasmtime::component::{Component, Linker};
 
-use super::{MemoryLimits, engine, memory_limits, prepare, why};
+use super::{MemoryLimits, cache_dir_from, engine, memory_limits, prepare, why};
 
 struct State {
     limits: MemoryLimits,
@@ -143,4 +146,25 @@ fn multiple_tables_share_the_store_memory_budget() {
             .is_err(),
         "two full-budget tables cannot pass one store budget"
     );
+}
+
+#[test]
+fn wasmtime_cache_dir_prefers_explicit_override() {
+    let default = Some(PathBuf::from("/tmp/flick-cache"));
+    assert_eq!(
+        cache_dir_from(
+            Some(OsString::from("/tmp/shared-wasmtime")),
+            default.clone()
+        ),
+        Some(PathBuf::from("/tmp/shared-wasmtime"))
+    );
+    assert_eq!(
+        cache_dir_from(Some(OsString::new()), default.clone()),
+        Some(PathBuf::from("/tmp/flick-cache/wasmtime"))
+    );
+    assert_eq!(
+        cache_dir_from(None, default),
+        Some(PathBuf::from("/tmp/flick-cache/wasmtime"))
+    );
+    assert_eq!(cache_dir_from(None, None), None);
 }

@@ -387,3 +387,47 @@ fn non_backend_commands_never_fetch_or_load_backends() {
         "inspect --emit iface must not touch store/backends"
     );
 }
+
+#[test]
+fn new_from_backends_index_pins_backend_in_lock_and_builds_offline() {
+    let s = Scratch::new("new_pins_backend");
+    s.index(|_| {});
+    let out = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args(["new", "fresh-lib", "--template", "lib"])
+        .current_dir(&s.dir)
+        .env("FLICK_BACKENDS_INDEX", s.dir.join("index/backends.json"))
+        .env("FLICK_STORE", s.dir.join("store"))
+        .env("NO_COLOR", "1")
+        .output()
+        .expect("flick new runs");
+    assert!(out.status.success(), "{}", stderr(&out));
+
+    let lib = s.dir.join("fresh-lib");
+    let sha = hex(&component());
+    let lock = fs::read_to_string(lib.join("flick.lock")).expect("flick.lock written");
+    assert!(
+        lock.contains(&format!(
+            "[[backend]]\nid = \"flick/js\"\nversion = \"0.1.0\"\nsha256 = \"{sha}\""
+        )),
+        "{lock}"
+    );
+    assert!(s.dir.join(format!("store/backends/{sha}.wasm")).is_file());
+
+    // Remove the index and point the lock URL to an invalid host: offline build uses the pin and store.
+    fs::remove_file(s.dir.join("index/backends.json")).expect("remove index");
+    let url = s.dir.join("index/component.wasm");
+    let offline_lock = lock.replace(
+        &format!("{:?}", url.display().to_string()),
+        "\"https://example.invalid/component.wasm\"",
+    );
+    fs::write(lib.join("flick.lock"), offline_lock).expect("lock");
+    let built = Command::new(env!("CARGO_BIN_EXE_flick"))
+        .args(["build", "--offline"])
+        .current_dir(&lib)
+        .env("FLICK_BACKENDS_INDEX", s.dir.join("index/backends.json"))
+        .env("FLICK_STORE", s.dir.join("store"))
+        .env("NO_COLOR", "1")
+        .output()
+        .expect("flick build runs");
+    assert!(built.status.success(), "{}", stderr(&built));
+}

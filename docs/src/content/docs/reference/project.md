@@ -92,7 +92,7 @@ virtual workspace root (`FLICK-P005`).
 | `target.js.ui` | module specifier rendering and mounting views in place of React (exports every name `Ui` and `Action` bind from `@flick-lang/effect-ts/ui` and `@flick-lang/effect-ts/ui/react`; relative paths are from the project root) | React |
 | `target.go.cgo` | boolean; enable cgo (`CGO_ENABLED=1`) when building Go executables | `false` |
 
-`flick new` creates an RT project with `@flick-lang/runtime` and no Effect dependency. Pass `--runtime rt` to `build`, `run`, `dev`, `test` or `inspect` to select RT for one invocation of an Effect project. Set `[target.js] runtime = "effect"` explicitly when a project needs the Effect adapter and add `@flick-lang/effect-ts` to its dependencies.
+`flick new` takes its template files from the selected target backend (`--target js` by default creates an RT project with `@flick-lang/runtime` and no Effect dependency; `--target go` creates a Go project with `[build] target = "go"`, `[tools] "flick/go" = ["go"]`, and no `package.json`), or from a third-party package via `--from`. Pass `--runtime rt` to `build`, `run`, `dev`, `test` or `inspect` to select RT for one invocation of an Effect project. Set `[target.js] runtime = "effect"` explicitly when a project needs the Effect adapter and add `@flick-lang/effect-ts` to its dependencies.
 
 Legacy `[build]` keys (`emit`, `emit-dts`, `promise-facade`, `schema-aot`, `effect`, `ui`) are removed with no compatibility aliases and fail with `FLICK-P057`, naming the replacement under `[build] target` or `[target.js]`:
 
@@ -116,6 +116,7 @@ Errors in the configuration exit with code `2`:
 | a removed `[build]` key (`emit`, `emit-dts`, `promise-facade`, `schema-aot`, `effect`, `ui`) | `FLICK-P057` |
 | an unknown or invalid key or value in `[target.<name>]` | `FLICK-P058` |
 | an unknown `[build] target` or `--target` name | `FLICK-P059` |
+| an unknown or unsupported `--template` for `new` or `init` | `FLICK-P060` |
 | a `schema-version` other than `1`, or none | `FLICK-P006` |
 | `kind = "app"` without `entry` or `entries`, or with an empty `entries` | `FLICK-P007` |
 | both `entry` and `entries`, or an entry name that is not one | `FLICK-P005` |
@@ -300,12 +301,18 @@ or `--path DIR`) adds one and `flick remove <name>` drops it.
 
 The official backend a project builds with when it pins none (`flick/js`,
 or `flick/go` with `[build] target = "go"` or `--target go`) is not part of the compiler either: it is a
-release asset. The first build, or `flick install`, takes the newest release
+release asset. `flick new`, the first build, or `flick install` takes the newest release
 the compiler accepts from the backends index, keeps it in the package store
 and pins it in `flick.lock` under `[[backend]]`; later builds work offline.
 `flick update` moves the pin to a newer release. With `--offline` and no pin
 in the store, or a component whose digest is not the pinned one, the build
 fails with `FLICK-P056` and no other backend is used.
+
+Projects created or initialized from a third-party template package with
+`flick new --from` or `flick init --from` also record the verified template
+source, tree checksum, component digest, and (for tarball URLs) archive digest
+under `[[template]]` in `flick.lock`. `flick install` preserves `[[template]]`
+entries without coupling `[dependencies]` to the template package.
 
 A path library's plugin is built in place, so `flick.lock` also records the
 hash of its component under `[[plugin]]`. A build is not held to it;

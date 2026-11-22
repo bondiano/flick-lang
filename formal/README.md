@@ -220,6 +220,15 @@ signature and golden certificates.
   `Equiv/Stuck.lean`, `Equiv/Refl.lean`). `Equiv.o1a_all` and `Equiv.o1c_all`. O1b holds of
   the literals only: the core of `lazy.md` §3 has no waiters, so two threads that force one
   `lazy v` at once may die where `born v` does not.
+- **O4, hoisting a pure lazy out of a loop** (`Formal/Equiv/Pure.lean`, `Formal/Equiv/PureSim.lean`,
+  `Formal/Equiv/Context.lean`, `lazy.md` §6): `Equiv.o4` (closed pure initializer) and
+  `Equiv.o4_open` (open loop-invariant initializer under `PureOpen`) prove contextual equivalence
+  of the literals (`CtxEquiv`) between `fix (let l = lazy e in b)` and
+  `let l = lazy e in fix (b.rename rot)`. Pure evaluation is deterministic (`Equiv.PSteps.det`),
+  typing at the pure stage guarantees operational purity (`Typ.pure_eval`, `Equiv/TopTyped.lean`),
+  and the simulation uses a many-to-one hoisted cell relation (`World.H`) across the loop's
+  binders. Like O1b, O4 holds of the literals only: concurrent forces of the hoisted cell may die
+  without waiters, and re-evaluating `e` per iteration has no syntactic potential bound.
 - **T6, the elaboration** (`Formal/Elab/`), with runtime stages `R r e` whose rows take
   variables, constructors whose values carry the dictionaries of their constraints with
   arms on them refined by the most general unifier, and **variance-directed class
@@ -268,8 +277,9 @@ only `propext` and `Quot.sound` (no `Classical.choice`). `Formal/Axioms.lean` pi
 `Prog.ClsVarOk.super_serves`, `dict_transport`, `closed_unique_common`, `Cn.Serves.tr`,
 `has_dictLe`, `T6a_safeUse`, `Lazy.L1`, `Lazy.L1_once`, `Lazy.L2`, `R9`, `R9_again`, `T7`,
 `MutOk.lzDecl`, `LzSig.typ_run`, `MutOk.lzAwait`, `MutOk.lzWrite`,
-`Elab.Witness.lzSig`, `Equiv.o1a`, `Equiv.o1b`, `Equiv.o1c`, `Equiv.o1a_all`, `Equiv.o1c_all`
-and `Equiv.EverySim.has` with `#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
+`Elab.Witness.lzSig`, `Equiv.o1a`, `Equiv.o1b`, `Equiv.o1c`, `Equiv.o1a_all`, `Equiv.o1c_all`,
+`Equiv.EverySim.has`, `Equiv.o4`, `Equiv.o4_open`, `Equiv.PSteps.det` and `Typ.pure_eval` with
+`#guard_msgs`, so `lake build` fails on a `sorry` or a new axiom.
 
 T4.3 is the premise G11 of T5 in the form [the answering provide must be live](../docs/formal/runtime.md#the-provide-liveness-premise-is-stronger-than-typing-gives) gives it: an operation answered by a handler of the region `q` happens only while `q` is live.
 It is the third conjunct of `SafeUse` (`Live.lean`), the counterpart of `G11` in

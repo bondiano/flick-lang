@@ -40,7 +40,7 @@ pub(crate) fn ir(
             files.insert(s.file);
         });
     }
-    let builtin = |m: &str| types::builtins().iter().any(|b| b.module == m);
+    let builtin = |m: &str| types::builtin_sources().iter().any(|(name, _)| *name == m);
     let error = |code, message: String| Diagnostic::new(code, Severity::Error, message);
     for (package, component) in hooked {
         let plugin = match plugins::plugin(&package, component.as_deref()) {

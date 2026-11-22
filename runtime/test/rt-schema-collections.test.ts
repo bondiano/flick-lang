@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { hashMapToList, hashSetToList, type FlickHashMap, type FlickHashSet } from "../src/rt/collections.ts";
+import {
+  hashMapToList,
+  hashSetToList,
+  isFlickHashMap,
+  isFlickHashSet,
+} from "../src/rt/collections.ts";
 import {
   flickEntries,
   flickHashMapJson,
@@ -15,10 +20,8 @@ const strings = {
   hash: (value: unknown) => typeof value === "string" ? value.charCodeAt(0) : 0,
   $Eq: { eq: (a: unknown) => (b: unknown) => a === b },
 };
-const isMap = (value: unknown): value is FlickHashMap<unknown, unknown> =>
-  typeof value === "object" && value !== null && "entries" in value && Array.isArray(value.entries);
-const isSet = (value: unknown): value is FlickHashSet<unknown> =>
-  typeof value === "object" && value !== null && "map" in value && isMap(value.map);
+const isMap = isFlickHashMap;
+const isSet = isFlickHashSet;
 
 test("collection JSON codecs round trip native collections", () => {
   const set = flickHashSetJson(strings, schemaString);

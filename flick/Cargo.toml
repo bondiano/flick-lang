@@ -24,7 +24,7 @@ anstyle = "1.0.14"
 clap = { version = "4.6.7", features = ["derive", "string"] }
 ciborium = "0.2.2"
 flate2 = "1.1.1"
-flick-core = { path = "../flick-core", features = ["ide"] }
+flick-core = { path = "../flick-core", features = ["ide", "commands"] }
 flick-backend = { path = "../flick-backend" }
 flick-ir = { path = "../flick-ir", features = ["json", "cbor"] }
 flick-plugin = { path = "../flick-plugin" }

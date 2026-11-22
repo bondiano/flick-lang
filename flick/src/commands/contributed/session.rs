@@ -12,6 +12,7 @@ use std::time::Duration;
 use flick_backend::command::{Descriptor, Handled, Invocation, Opened};
 use flick_backend::host::runtime::Cancellation;
 use flick_core::project::Project;
+use flick_core::source::SourceMap;
 use serde_json::{Value, json};
 
 use super::Contributor;
@@ -43,9 +44,17 @@ pub(super) fn serve(
         Ok(Opened::Plan(plan)) => {
             let done = carry_out(project, contributor, descriptor, invocation, plan, tools);
             let _ = io::stdout().write_all(&done.stdout);
-            return finish(global, invocation, &done.diagnostics, &done.refused);
+            return finish(
+                global,
+                invocation,
+                done.sources,
+                &done.diagnostics,
+                &done.refused,
+            );
         }
-        Err(diagnostics) => return finish(global, invocation, &diagnostics, &[]),
+        Err(diagnostics) => {
+            return finish(global, invocation, SourceMap::default(), &diagnostics, &[]);
+        }
     };
     let mut projections = Projections::default();
     let Ok(engine) = component::engine() else {
@@ -127,7 +136,13 @@ pub(super) fn serve(
     if !done.stdout.is_empty() {
         eprint!("{}", String::from_utf8_lossy(&done.stdout));
     }
-    finish(global, invocation, &done.diagnostics, &done.refused)
+    finish(
+        global,
+        invocation,
+        done.sources,
+        &done.diagnostics,
+        &done.refused,
+    )
 }
 
 /// The result of `call`, on a thread of its own: what arrives meanwhile

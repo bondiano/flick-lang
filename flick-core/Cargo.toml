@@ -20,6 +20,8 @@ ide = []
 native-project = ["dep:flick-backend-go", "dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-support/native-project", "flick-ffi/native-project"]
 # std in the binary, for a host with no packages: the playground
 embedded-std = []
+# first-party contributed commands (`std`'s `schema export`); off in browser builds
+commands = ["flick-plugin/commands"]
 
 # the build script compiles the source.rs of flick-diagnostics, whose spans
 # the IR serializes

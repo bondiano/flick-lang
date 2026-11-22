@@ -2,7 +2,9 @@
 // as made: a lazy nothing reads never runs its task, nor one a function takes
 // and drops; a lazy of a value gives it to every `await`; a lazy forced
 // where it is made runs its task once, there; an `await` after the first one
-// gives what the first gave.
+// gives what the first gave; a pure loop-invariant lazy hoisted out of a loop
+// gives the same value each iteration, while an impure or loop-variant lazy
+// still runs per iteration.
 module App.Main exposing (main)
 
 counted : Ref Int -> Int ->{} Int
@@ -10,8 +12,25 @@ let counted runs n =
   Ref.set runs (Ref.get runs + 1)
   n * 2
 
+work : Int -> Int
+let rec work n = if n <= 0 then 1 else n + work (n - 1)
+
 dropped : Lazy r e Int -> Int -> Int
 let dropped _ n = n
+
+branch_loop : Int -> Bool ->{Async} Int
+let branch_loop x flag =
+  let mut i = 0
+  let mut acc = 0
+  while i < 3 do {
+    if flag then {
+      let l = lazy { work x }
+      acc = acc + await l
+    } else
+      ()
+    i = i + 1
+  }
+  acc
 
 main : Unit ->{Host.Console, Async} Unit
 let main () =
@@ -26,3 +45,59 @@ let main () =
   Platform.stdout_line "\{kept} \{await five + await five} \{direct}"
   Platform.stdout_line "\{first + await again + twice ()}"
   Platform.stdout_line "runs: \{Ref.get runs}"
+
+  // O4: pure loop-invariant lazies hoisted out of while, for, let rec, nested, branch, direct
+  let mut wi = 0
+  let mut wsum = 0
+  while wi < 3 do {
+    let l = lazy { work 4 }
+    wsum = wsum + await l
+    wi = wi + 1
+  }
+  let mut fsum = 0
+  for item <- [1, 2, 3] do {
+    let l = lazy { work 3 }
+    fsum = fsum + item + await l
+  }
+  go : Int -> Int ->{Async} Int
+  let rec go n acc =
+    if n <= 0 then
+      acc
+    else
+      let l = lazy { work 5 }
+      go (n - 1) (acc + await l)
+  let rsum = go 3 0
+  let mut nsum = 0
+  for x <- [1, 2] do {
+    let mut j = 0
+    while j < 2 do {
+      let outer = lazy { work 3 }
+      let mid = lazy { work x }
+      nsum = nsum + await outer + await mid
+      j = j + 1
+    }
+  }
+  let b_off = branch_loop 2 false
+  let b_on = branch_loop 2 true
+  let mut di = 0
+  let mut dsum = 0
+  while di < 3 do {
+    dsum = dsum + await (lazy { work 3 }) + await (lazy { 5 })
+    di = di + 1
+  }
+  Platform.stdout_line "hoist: \{wsum} \{fsum} \{rsum} \{nsum} \{b_off} \{b_on} \{dsum}"
+
+  // Negative O4: impure `Lazy none none` (mutating Ref) and loop-variant lazy stay per iteration
+  let mut ii = 0
+  let mut isum = 0
+  while ii < 3 do {
+    let l = lazy { counted runs 3 }
+    isum = isum + await l
+    ii = ii + 1
+  }
+  let mut vsum = 0
+  for item <- [1, 2, 3] do {
+    let l = lazy { work item }
+    vsum = vsum + await l
+  }
+  Platform.stdout_line "stay: \{isum} \{vsum} runs: \{Ref.get runs}"

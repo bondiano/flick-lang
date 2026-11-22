@@ -44,11 +44,18 @@ theorem Sim.inv_letrec {f : Tm} {b : Tm} {r₂ : Tm} (h : Sim W .top (.letrec f 
   | _ => first | (cases hx; done) | (subst hx; contradiction)
 
 theorem Sim.inv_fix {f : Tm} {r₂ : Tm} (h : Sim W .top (.fix f) r₂) :
-    ∃ f', r₂ = (.fix f') ∧ Sim W .any f f' ∧ f'.NoIns := by
+    (∃ f', r₂ = (.fix f') ∧ Sim W .any f f' ∧ f'.NoIns) ∨
+    (∃ l' e e' b b', W.B ∧ f = .let_ (.lazy (e.rename (· + 2))) b ∧
+      r₂ = .fix (b'.subst (inst [.loc l'])) ∧ W.HR l' e' ∧ e.Closed ∧ PureEval W.R e ∧
+      Sim W .any e e' ∧ Sim W .any b b' ∧ b'.NoIns) ∨
+    (∃ l e e' b b', W.B ∧ f = b.subst (inst [.loc l]) ∧
+      r₂ = .fix (.let_ (.lazy (e'.rename (· + 2))) b') ∧ W.HL l e ∧ e'.Closed ∧ PureEval W.R e' ∧
+      Sim W .any e e' ∧ Sim W .any b b' ∧ e'.NoIns ∧ b'.NoIns) := by
   generalize hx : Pos.top = x at h
   cases h with
-  | fix =>
-    subst hx; exact ⟨_, rfl, ‹_›, ‹_›⟩
+  | fix => subst hx; exact .inl ⟨_, rfl, ‹_›, ‹_›⟩
+  | o4Fix1 _ _ hf hf' _ _ _ _ _ => subst hx hf hf'; exact .inr (.inl ⟨_, _, _, _, _, ‹_›, rfl, rfl, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩)
+  | o4Fix2 _ _ hf hf' _ _ _ _ _ _ => subst hx hf hf'; exact .inr (.inr ⟨_, _, _, _, _, ‹_›, rfl, rfl, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›, ‹_›⟩)
   | _ => first | (cases hx; done) | (subst hx; contradiction)
 
 theorem Sim.inv_rcons {l : Label} {e : Tm} {r : Tm} {r₂ : Tm} (h : Sim W .top (.rcons l e r) r₂) :
@@ -254,11 +261,11 @@ theorem Sim.inv_kont {p : Nat} {ℓ : Nat} {r₂ : Tm} (h : Sim W .top (.kont p 
   | _ => first | (cases hx; done) | (subst hx; contradiction)
 
 theorem Sim.inv_loc {l : Nat} {r₂ : Tm} (h : Sim W .top (.loc l) r₂) :
-    ∃ l' k, r₂ = (.loc l') ∧ W.L l l' k := by
+    ∃ l', r₂ = (.loc l') ∧ ((∃ k, W.L l l' k) ∨ (W.B ∧ W.H l l')) := by
   generalize hx : Pos.top = x at h
   cases h with
-  | loc =>
-    subst hx; exact ⟨_, _, rfl, ‹_›⟩
+  | loc => subst hx; exact ⟨_, rfl, .inl ⟨_, ‹_›⟩⟩
+  | hloc => subst hx; exact ⟨_, rfl, .inr ⟨‹_›, ‹_›⟩⟩
   | _ => first | (cases hx; done) | (subst hx; contradiction)
 
 theorem Sim.inv_settle {ℓ : Nat} {e : Tm} {r₂ : Tm} (h : Sim W .top (.settle ℓ e) r₂) :

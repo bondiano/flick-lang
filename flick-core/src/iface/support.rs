@@ -182,12 +182,15 @@ pub(crate) fn validate(interface: &Interface) -> Result<(), String> {
 }
 
 fn validate_owners(interface: &Interface) -> Result<(), String> {
-    let public: BTreeSet<_> = interface
-        .exports
-        .iter()
-        .filter(|e| e.definition.is_some())
-        .map(|e| &e.entity)
-        .collect();
+    // `extend`, not `collect`: collecting compiles a sort of `&Entity` into the wasm compiler.
+    let mut public = BTreeSet::new();
+    public.extend(
+        interface
+            .exports
+            .iter()
+            .filter(|e| e.definition.is_some())
+            .map(|e| &e.entity),
+    );
     let mut previous = None;
     for (index, support) in interface.support_types.iter().enumerate() {
         let entity = &support.entity;
@@ -445,7 +448,9 @@ pub(crate) fn prune(interface: &mut Interface) {
             pending.extend(definition_dependencies(&record.definition));
         }
     }
-    let public: BTreeSet<_> = interface.exports.iter().map(|e| &e.entity).collect();
+    // `extend`, not `collect`: collecting compiles a sort of `&Entity` into the wasm compiler.
+    let mut public = BTreeSet::new();
+    public.extend(interface.exports.iter().map(|e| &e.entity));
     interface.support_types = records
         .into_iter()
         .filter(|r| seen.contains(&r.entity) && !public.contains(&r.entity))

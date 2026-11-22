@@ -409,6 +409,26 @@ fn hash_map_plain(b: &ExprBuilder, from: &str, bind: &str, stages: usize) -> Opt
         ("flick:rt", "hashMapToList", 1) => {
             Some(project_entries(b.tuple(vec![b.loc("ek"), b.loc("ev")])))
         }
+        ("flick:rt", "hashMapToSeq", 1) => Some(b.lam(
+            &["m"],
+            unwrap_map(
+                b,
+                b.loc("m"),
+                "_w",
+                "es",
+                b.gen_lazy(b.each(
+                    "ent",
+                    b.loc("es"),
+                    b.match_(
+                        b.loc("ent"),
+                        vec![arm(
+                            e_pat(),
+                            b.yield_(b.tuple(vec![b.loc("ek"), b.loc("ev")])),
+                        )],
+                    ),
+                )),
+            ),
+        )),
         ("flick:HashMap", "flickKeys", 1) => Some(project_entries(b.loc("ek"))),
         ("flick:HashMap", "flickValues", 1) => Some(project_entries(b.loc("ev"))),
         _ => hash_map_lookup(b, from, bind, stages),

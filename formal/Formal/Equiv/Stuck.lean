@@ -77,7 +77,8 @@ theorem Act.lstep {μ : List Tm} {a b : Tm} (h : Act W a b) (hB : ¬ W.B) : LSte
   | dropA => exact ⟨_, _, [.let_ _], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
   | dropB => exact .pure (.let_ .loc)
   | forceA => exact ⟨_, _, [.force], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
-  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB' => exact (hB hB').elim
+  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB'
+  | o4B hB' | o4Alloc1 hB' | o4Bind hB' | o4Settle hB' => exact (hB hB').elim
 
 theorem LStep.moves {root : Roots} {Λ : List Rgn} {μ : List Tm} {t : Tm} (h : LStep μ t) :
     Moves root Λ μ t :=
@@ -91,7 +92,7 @@ theorem thread_reflect {S : Sig} {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} 
   rcases ht with ht | ⟨E, E', n, e, e', rfl, rfl, hE, -, -, -, hc, -⟩
   case inr => exact .inl (.inl ⟨_, _, .rt hE (.forcePending hc)⟩)
   by_cases hf : Final t
-  · obtain ⟨W', μ₂', b', rj, hb', s⟩ := ht.fcu rfl hf μ₂
+  · obtain ⟨W', μ₂', b', rj, hb', s⟩ := ht.fcu rfl hf μ₂ (fun h => (hB h).elim)
     rcases rj.pot with ⟨-, rfl⟩ | hlt
     · exact (hs₂.not_final hb').elim
     · exact .inr ⟨W', μ₂', b', rj, hlt, .inl s⟩
@@ -102,7 +103,7 @@ theorem thread_reflect {S : Sig} {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} 
     have he := hr.2 (.rconsL l a) e trivial rfl
     exact hr.1 (.rcons he (hr.2 (.rconsR l e) a he rfl))
   rcases ht.dec hr.1 (fun _ _ h => Redex.app hr h) hrc ((hty.inner hE hr.1 rfl).not_alts) _ _ rfl
-      hE μ₂ with
+      hE μ₂ (fun h => (hB h).elim) with
     ⟨W', μ', E₀, E₁, a, b, E₂, hj, rfl, rfl, -, -, hact⟩ | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
     ⟨W', μ', E₂, n, a, b, hj, -, -, rfl, -, -⟩
   · rw [plug_append]
@@ -114,7 +115,7 @@ theorem thread_reflect {S : Sig} {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} 
       have hst' := hj.st _ hst
       have hrg' := hrg.keep hj.le keepO_refl
       have hB' : ¬ W'.B := fun h => hB (hj.le.B.2 h)
-      rcases hs.redex_cu hr μ₂ with hr₂ | ⟨W'', μ₂'', r₂', rj, hlt, hs'⟩
+      rcases hs.redex_cu hr hB' μ₂ with hr₂ | ⟨W'', μ₂'', r₂', rj, hlt, hs'⟩
       · rcases reflect_focus hE hE₂ hr hr₂ hs hfr hst' hrg' hB' hty hs₂ with h | h
         · exact .inl h
         · obtain ⟨W'', μ₂'', t₂', rj, hlt, s⟩ := h
