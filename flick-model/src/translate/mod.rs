@@ -393,6 +393,7 @@ fn region_op(module: &str, export: &str) -> Option<RegionOp> {
         ("flick:rt", "arenaAlloc") => RegionOp::ArenaAlloc,
         ("flick:rt", "arenaGet") => RegionOp::ArenaGet,
         ("flick:Scope", "flickAddFinalizer") => RegionOp::AddFinalizer,
+        ("flick:Scope", "flickAddClose") => RegionOp::AddClose,
         _ => return None,
     })
 }

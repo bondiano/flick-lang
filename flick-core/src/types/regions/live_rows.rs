@@ -230,6 +230,13 @@ impl Checker<'_> {
             Site::Signature(name, _) => format!("the signature of `{name}`"),
             Site::Expected(ty, _) => format!("the expected type `{}`", self.show(ty)),
             Site::Inferred => "the type of this function".to_owned(),
+            Site::DeferCleanup { is_errdefer, .. } => {
+                if *is_errdefer {
+                    "this `errdefer` cleanup block".to_owned()
+                } else {
+                    "this `defer` cleanup block".to_owned()
+                }
+            }
         };
         let mut diagnostic = Diagnostic::error(
             codes::G002,
@@ -257,6 +264,7 @@ impl Checker<'_> {
         owner: &Type,
         givens: &[Type],
         span: Span,
+        owner_related: Option<Span>,
         last: bool,
     ) {
         let o = Outlives {
@@ -264,6 +272,7 @@ impl Checker<'_> {
             owner: owner.clone(),
             givens: givens.to_vec(),
             span,
+            owner_related,
         };
         if !last {
             self.cx.regions.outlives.push(o);

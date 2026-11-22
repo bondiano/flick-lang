@@ -215,6 +215,7 @@ impl<'p> Machine<'p, '_> {
                     saved_failure: cause,
                     propagate_exit: true,
                 },
+                aborted: true,
             });
         }
     }

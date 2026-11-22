@@ -56,7 +56,7 @@ impl Ide<'_> {
         let apart = |at: u32| {
             let p = tree::path_to(&m.tree, at);
             (p.iter().skip(d)).any(|n| {
-                matches!(n.kind, K::FunExpr | K::TaskExpr)
+                matches!(n.kind, K::FunExpr | K::TaskExpr | K::DeferStmt)
                     || (n.kind == K::LetDecl && n.nodes().any(|c| c.kind == K::Params))
             })
         };

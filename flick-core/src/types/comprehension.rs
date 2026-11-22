@@ -87,6 +87,12 @@ impl Checker<'_> {
         } else {
             self.enter_apart(Apart::Sequence);
         }
+        self.cx
+            .regions
+            .defer_owners
+            .push(super::regions::DeferOwner::Barrier(
+                super::regions::DeferBarrier::Sequence,
+            ));
         let (clauses, element) = for_parts(node);
         for clause in clauses {
             self.for_clause(clause);
@@ -106,6 +112,7 @@ impl Checker<'_> {
             (Some(body), None) => self.infer(body),
             (None, _) => Type::Error,
         };
+        self.cx.regions.defer_owners.pop();
         if strict {
             self.leave_settled();
         } else {

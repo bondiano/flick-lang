@@ -26,7 +26,7 @@ module.exports = grammar({
   word: $ => $._identifier,
 
   conflicts: $ => [
-    [$._loop, $.identifier], [$._result, $.identifier], [$._while, $.identifier], [$._case, $.identifier], [$._hook, $.identifier],
+    [$._loop, $.identifier], [$._defer, $.identifier], [$._result, $.identifier], [$._while, $.identifier], [$._case, $.identifier], [$._hook, $.identifier],
     [$._fixture, $.identifier], [$._case], [$._fixture],
   ],
 
@@ -36,6 +36,7 @@ module.exports = grammar({
     _token: $ => choice(
       $._newline,
       $._loop,
+      $._defer,
       $._result,
       $._while,
       $._case,
@@ -73,6 +74,7 @@ module.exports = grammar({
 
     _newline: _ => '\n',
     _loop: $ => prec.dynamic(1, seq(alias('loop', $.keyword), $.braces)),
+    _defer: $ => prec.dynamic(1, seq(alias(choice('defer', 'errdefer'), $.keyword), $.braces)),
     _result: $ => prec.dynamic(1, seq(alias('result', $.keyword), $.braces)),
     _while: $ => prec.dynamic(1, seq(alias('while', $.keyword), repeat1($._condition_token), alias('do', $.keyword))),
     // `suite "name"` and `test "name"`, maybe `.skip` or `.only`, `parallel`
@@ -134,7 +136,7 @@ module.exports = grammar({
 
     _identifier: _ => /[a-z_][A-Za-z0-9_]*/,
     identifier: $ => choice(
-      $._identifier, 'loop', 'result', 'while', 'suite', 'test', 'timeout', 'before_all', 'before_each', 'after_each', 'after_all',
+      $._identifier, 'loop', 'defer', 'errdefer', 'result', 'while', 'suite', 'test', 'timeout', 'before_all', 'before_each', 'after_each', 'after_all',
       'fixture', 'shared', 'concurrent', 'parallel',
     ),
     constructor: _ => /[A-Z][A-Za-z0-9_]*/,

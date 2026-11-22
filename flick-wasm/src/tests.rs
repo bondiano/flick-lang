@@ -38,6 +38,41 @@ fn a_playground_program_runs_on_flicks_own_runtime() {
 }
 
 #[test]
+fn playground_handles_defer_and_errdefer_hover_emit_and_utf16_updates() {
+    let mut session = Session::new();
+    let src1 = "module Main exposing (main)\nmain : Unit ->{Host.Console} Unit\nlet main () =\n  let _ = \"😀\"\n  scope outer {\n    defer { Platform.stdout_line \"d\" }\n    errdefer { Platform.stdout_line \"e\" }\n  }\n";
+    let diags: Value = serde_json::from_str(&session.update(src1)).expect("JSON");
+    assert_eq!(diags, serde_json::json!([]));
+    let built: Value = serde_json::from_str(&session.emit("debug")).expect("JSON");
+    assert!(built["js"].is_string(), "{built}");
+
+    // UTF-16 offset of `defer` after surrogate pair `😀` on earlier line
+    let defer_byte = src1.find("defer {").expect("defer");
+    let defer_u16 = u32::try_from(src1[..defer_byte].encode_utf16().count()).expect("u16");
+    let hover1: Value = serde_json::from_str(&session.hover(defer_u16 + 1)).expect("JSON");
+    assert!(
+        hover1["text"]
+            .as_str()
+            .is_some_and(|t| t.contains("`scope outer`") && t.contains("line 5, column 3")),
+        "{hover1}"
+    );
+
+    // Stale-edit check: wrapping in an inner scope immediately refreshes owner hover
+    let src2 = "module Main exposing (main)\nmain : Unit ->{Host.Console} Unit\nlet main () =\n  scope outer {\n    scope inner {\n      errdefer { Platform.stdout_line \"e\" }\n    }\n  }\n";
+    let diags2: Value = serde_json::from_str(&session.update(src2)).expect("JSON");
+    assert_eq!(diags2, serde_json::json!([]));
+    let err_byte = src2.find("errdefer {").expect("errdefer");
+    let err_u16 = u32::try_from(src2[..err_byte].encode_utf16().count()).expect("u16");
+    let hover2: Value = serde_json::from_str(&session.hover(err_u16 + 2)).expect("JSON");
+    assert!(
+        hover2["text"]
+            .as_str()
+            .is_some_and(|t| t.contains("`scope inner`") && t.contains("body fails")),
+        "{hover2}"
+    );
+}
+
+#[test]
 fn playground_handles_orelse_hover_completion_and_emit_with_utf16() {
     let source = "module Main exposing (main)\n\npick : Option String -> String\nlet pick x =\n  let _ = \"Привет 🚀\"\n  x orelse \"мир\"\n\nmain : Unit ->{Host.Console} Unit\nlet main () = Platform.stdout_line (pick None)\n";
     let mut session = Session::new();

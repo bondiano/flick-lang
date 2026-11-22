@@ -38,6 +38,7 @@ impl<'p> Machine<'p, '_> {
                         frames: captured.frames,
                         owner: Some(self.current_owner),
                         next: TransferNext::DeliverValue { binding, value },
+                        aborted: true,
                     });
                 } else {
                     self.store(binding, value)?;

@@ -209,6 +209,8 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor("for x <- xs do { break }", "for").includes("keyword.control.flick"));
   assert.ok(scopesFor("for x <- xs yield x", "yield").includes("keyword.control.flick"));
   assert.ok(scopesFor("'outer: loop { continue 'outer }", "continue").includes("keyword.control.flick"));
+  assert.ok(scopesFor("  defer { close () }", "defer").includes("keyword.control.flick"));
+  assert.ok(scopesFor("  errdefer { rollback () }", "errdefer").includes("keyword.control.flick"));
   assert.ok(scopesFor("let shared = lazy { load id }", "lazy").includes("keyword.control.flick"));
   assert.ok(scopesFor("let host = a orelse b", "orelse").includes("keyword.operator.word.flick"));
   assert.ok(scopesFor("let x = a orelse b == c", "orelse").includes("keyword.operator.word.flick"));
@@ -266,6 +268,13 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["let law = 1", "law"],
     ["let require = 1", "require"],
     ["let x = ensure y", "ensure"],
+    ["let defer = 1", "defer"],
+    ["let errdefer = 2", "errdefer"],
+    ["let x = (defer) { a = 1 }", "defer"],
+    ["let x = (errdefer) { a = 1 }", "errdefer"],
+    ["let x = obj.defer", "defer"],
+    ["let x = obj.errdefer", "errdefer"],
+    ["let x = defer_cleanup ()", "defer_cleanup"],
     ["let x = r.orelse", "orelse"],
     ["let f = .orelse", "orelse"],
     ["let rec_val = { orelse = 1 }", "orelse"],

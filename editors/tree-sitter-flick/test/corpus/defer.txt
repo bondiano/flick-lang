@@ -1,0 +1,20 @@
+==================
+Contextual defer and errdefer statements and ordinary names
+==================
+
+let defer = 1
+let errdefer = 2
+let call = (defer) { a = 1 }
+defer { close () }
+errdefer { rollback () }
+let r = obj.defer
+
+---
+
+(source_file
+  (keyword) (identifier) (operator) (number)
+  (keyword) (identifier) (operator) (number)
+  (keyword) (identifier) (operator) (parens (identifier)) (braces (identifier) (operator) (number))
+  (keyword) (braces (identifier) (parens))
+  (keyword) (braces (identifier) (parens))
+  (keyword) (identifier) (operator) (identifier) (member))

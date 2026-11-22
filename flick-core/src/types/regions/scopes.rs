@@ -3,7 +3,7 @@
 use crate::types::Elem;
 use std::{iter, mem};
 
-use super::{Need, Scope, scope};
+use super::{DeferOwner, Need, Scope, scope};
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -40,12 +40,15 @@ impl Checker<'_> {
             region: id,
             span,
             node: node.range(),
+            #[cfg(feature = "ide")]
+            name: name.map(|n| n.text(self.text).to_owned()),
             outer: self.cx.stage.services.clone(),
             parent: self.cx.regions.nest.last().copied(),
             handler: false,
         });
         let index = self.cx.regions.scopes.len() - 1;
         self.cx.regions.open.push(index);
+        self.cx.regions.defer_owners.push(DeferOwner::Scope(index));
         self.cx.regions.nest.push(index);
         let (locals, tyvars) = (self.cx.locals.len(), self.cx.tyvars.len());
         if let Some(token) = name {
@@ -93,6 +96,7 @@ impl Checker<'_> {
         self.cx.locals.truncate(locals);
         self.cx.tyvars.truncate(tyvars);
         self.cx.regions.open.pop();
+        self.cx.regions.defer_owners.pop();
         self.cx.regions.nest.pop();
         self.store.level -= 1;
         // what the value needs live is in rows still growing (`live.rs`)

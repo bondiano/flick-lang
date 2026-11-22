@@ -61,7 +61,10 @@ impl Ide<'_> {
         let [expr] = stmts.as_slice() else {
             return None;
         };
-        if matches!(expr.kind, K::LetDecl | K::Signature | K::AssignStmt) {
+        if matches!(
+            expr.kind,
+            K::LetDecl | K::Signature | K::AssignStmt | K::DeferStmt
+        ) {
             return None;
         }
         let arms: Vec<&Node> = node.nodes().filter(|n| n.kind == K::MatchArm).collect();

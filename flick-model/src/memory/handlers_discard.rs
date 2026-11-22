@@ -139,12 +139,23 @@ impl<'p> Machine<'p, '_> {
                 owner, previous, ..
             } => {
                 if self.owner_needs_async_close(owner) {
-                    let paused = self.discard.take().expect("active transfer");
                     self.heap.drop_values(roots)?;
-                    return self.begin_close_scope(
+                    let aborted = self.discard.as_ref().expect("active transfer").aborted;
+                    let exit_override = if aborted {
+                        Some(
+                            self.heap
+                                .cause(&[Reason::Fail(&Value::Unit)], &mut self.fuel)?,
+                        )
+                    } else {
+                        None
+                    };
+                    let paused = self.discard.take().expect("active transfer");
+                    return self.begin_close_scope_with_override(
                         owner,
                         previous,
                         ScopeOutcome::Discard(Box::new(paused)),
+                        exit_override,
+                        false,
                     );
                 }
                 self.close_mirrored_owner(owner)?;

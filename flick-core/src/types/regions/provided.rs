@@ -55,6 +55,7 @@ pub struct Want {
     span: Span,
     at: Lexical,
     settled: Vec<String>,
+    owner_related: Option<Span>,
 }
 
 impl Want {
@@ -79,6 +80,8 @@ impl Checker<'_> {
             region,
             span,
             node: node.range(),
+            #[cfg(feature = "ide")]
+            name: None,
             outer: self.cx.stage.services.clone(),
             parent: self.cx.regions.nest.last().copied(),
             handler: false,
@@ -111,6 +114,16 @@ impl Checker<'_> {
     /// `Provided row owner` wanted at `span`: settled at the end of the
     /// call, once its arguments say what the task needs.
     pub fn want_provided(&mut self, row: Type, owner: Type, span: Span) {
+        self.want_provided_owned(row, owner, span, None);
+    }
+
+    pub fn want_provided_owned(
+        &mut self,
+        row: Type,
+        owner: Type,
+        span: Span,
+        owner_related: Option<Span>,
+    ) {
         let at = self.lexical();
         self.cx.regions.provided.push(Want {
             row,
@@ -118,6 +131,7 @@ impl Checker<'_> {
             span,
             at,
             settled: Vec::new(),
+            owner_related,
         });
     }
 
@@ -150,11 +164,13 @@ impl Checker<'_> {
         let mut wanted = mem::take(&mut self.cx.regions.provided);
         wanted.append(&mut self.cx.regions.provided_late);
         self.settle_wants(wanted, true);
-        for (provide, owner, service, span) in mem::take(&mut self.cx.regions.late_owners) {
+        for (provide, owner, service, span, owner_related) in
+            mem::take(&mut self.cx.regions.late_owners)
+        {
             let owner = self.store.resolve(&owner);
             match self.scope_index(&owner) {
                 Some(scope) if self.encloses(provide, scope) => {}
-                Some(_) => self.outlived_provide(&service, provide, &owner, span),
+                Some(_) => self.outlived_provide(&service, provide, &owner, span, owner_related),
                 // never solved: an error was reported already
                 None => {}
             }
@@ -183,7 +199,14 @@ impl Checker<'_> {
             if matches!(label, Elem::Live) {
                 if want.claim(format!("live{ty:?}")) {
                     let span = want.span;
-                    self.keep_live(&ty, &want.owner, &want.at.givens, span, last);
+                    self.keep_live(
+                        &ty,
+                        &want.owner,
+                        &want.at.givens,
+                        span,
+                        want.owner_related,
+                        last,
+                    );
                 }
                 continue;
             }
@@ -196,7 +219,7 @@ impl Checker<'_> {
             {
                 continue;
             }
-            if !self.discharge(&label, &want.owner, &want.at, want.span) {
+            if !self.discharge(&label, &want.owner, &want.at, want.span, want.owner_related) {
                 keep.push(obligation(&label, ty, &want.owner));
             }
         }
@@ -249,7 +272,7 @@ impl Checker<'_> {
             };
             let settled = match (&label, owner) {
                 (Elem::Provided(service), Some(owner)) => {
-                    self.discharge(service, &owner, &at, span)
+                    self.discharge(service, &owner, &at, span, None)
                 }
                 _ => false,
             };
@@ -261,7 +284,14 @@ impl Checker<'_> {
     }
 
     /// Whether the place `at` settles that `service` outlives `owner`.
-    fn discharge(&mut self, service: &Elem, owner: &Type, at: &Lexical, span: Span) -> bool {
+    fn discharge(
+        &mut self,
+        service: &Elem,
+        owner: &Type,
+        at: &Lexical,
+        span: Span,
+        owner_related: Option<Span>,
+    ) -> bool {
         let provider = at
             .provides
             .iter()
@@ -273,10 +303,16 @@ impl Checker<'_> {
             match (self.scope_index(&owner), &owner) {
                 (Some(scope), _) if self.encloses(provide, scope) => {}
                 (_, Type::Meta(_)) => {
-                    let late = (provide, owner.clone(), service.to_owned(), span);
+                    let late = (
+                        provide,
+                        owner.clone(),
+                        service.to_owned(),
+                        span,
+                        owner_related,
+                    );
                     self.cx.regions.late_owners.push(late);
                 }
-                _ => self.outlived_provide(service, provide, &owner, span),
+                _ => self.outlived_provide(service, provide, &owner, span, owner_related),
             }
             return true;
         }
@@ -345,27 +381,36 @@ impl Checker<'_> {
         }
     }
 
-    fn outlived_provide(&mut self, service: &Elem, provide: usize, owner: &Type, span: Span) {
+    fn outlived_provide(
+        &mut self,
+        service: &Elem,
+        provide: usize,
+        owner: &Type,
+        span: Span,
+        owner_related: Option<Span>,
+    ) {
         let Scope { span: at, .. } = self.cx.regions.scopes[provide];
         let (region, _) = self.describe(owner);
         let service = service.to_string();
         let name = service.rsplit('.').next().unwrap_or(&service);
-        self.diagnostics.push(
-            Diagnostic::error(
-                codes::G003,
-                format!(
-                    "this keeps work that uses `{name}` until {region} closes, but the `provide` that builds `{name}` releases it earlier"
-                ),
-                span,
+        let mut diagnostic = Diagnostic::error(
+            codes::G003,
+            format!(
+                "this keeps work that uses `{name}` until {region} closes, but the `provide` that builds `{name}` releases it earlier"
+            ),
+            span,
+        )
+        .with_related(at, "the service is released when this `provide` ends");
+        if let Some(owner_span) = owner_related {
+            diagnostic =
+                diagnostic.with_related(owner_span, "cleanup is registered on this `scope`");
+        }
+        self.diagnostics.push(diagnostic.with_fix(|| {
+            (
+                "give the work an owner inside the `provide`, or provide the service outside the owner's `scope`",
+                Vec::new(),
             )
-            .with_related(at, "the service is released when this `provide` ends")
-            .with_fix(|| {
-                (
-                    "give the work an owner inside the `provide`, or provide the service outside the owner's `scope`",
-                    Vec::new(),
-                )
-            }),
-        );
+        }));
     }
 
     /// Whether `ty` is a variable of a top-level signature being checked,

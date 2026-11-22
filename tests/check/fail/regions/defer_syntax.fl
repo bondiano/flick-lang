@@ -1,0 +1,49 @@
+// `defer { … }` and `errdefer { … }` are statements, never first-class
+// expressions, and cannot appear inside `do` blocks or `for` clauses.
+module App.DeferSyntaxFail exposing (..)
+
+bad_let : Unit ->{} Unit
+let bad_let () = scope {
+  let _x = defer { () }
+  ()
+}
+
+bad_errdefer_let : Unit ->{} Unit
+let bad_errdefer_let () = scope {
+  let _x = errdefer { () }
+  ()
+}
+
+bad_arg : Unit ->{} Unit
+let bad_arg () = scope {
+  ignore (defer { () })
+}
+
+bad_bin : Unit ->{} Bool
+let bad_bin () = scope {
+  () == errdefer { () }
+}
+
+bad_list : Unit ->{} List Unit
+let bad_list () = scope {
+  [defer { () }]
+}
+
+bad_assign : Unit ->{} Unit
+let bad_assign () = scope {
+  let mut x = ()
+  x = defer { () }
+}
+
+bad_record : Unit ->{} { a : Unit }
+let bad_record () = scope {
+  { a = errdefer { () } }
+}
+
+//~ FLICK-S007 @7:12-7:17 statement, not a value expression
+//~ FLICK-S007 @13:12-13:20 statement, not a value expression
+//~ FLICK-S007 @19:11-19:16 statement, not an expression
+//~ FLICK-S007 @24:9-24:17 statement, not an expression
+//~ FLICK-S007 @29:4-29:9 statement, not an expression
+//~ FLICK-S007 @35:7-35:12 statement, not a value expression
+//~ FLICK-S007 @40:9-40:17 statement, not a value expression

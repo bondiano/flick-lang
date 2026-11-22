@@ -343,6 +343,7 @@ impl<'c> Checker<'c> {
             },
             K::NameExpr => self.name(node),
             K::AssignStmt => self.assign(node),
+            K::DeferStmt => self.defer_stmt(node),
             K::LoopExpr | K::WhileExpr => self.control_loop(node, None),
             K::BreakExpr | K::ContinueExpr => self.loop_exit(node),
             K::InterpExpr => self.interpolation(node),
@@ -619,6 +620,12 @@ impl<'c> Checker<'c> {
         let givens = self.classes.givens.len();
         let uses = self.uses_mark();
         self.enter_apart(super::mutation::Apart::Function);
+        self.cx
+            .regions
+            .defer_owners
+            .push(super::regions::DeferOwner::Barrier(
+                super::regions::DeferBarrier::Function,
+            ));
         self.begin_reader();
         let mut rest = expected.cloned();
         let mut stages = Vec::new();
@@ -741,6 +748,7 @@ impl<'c> Checker<'c> {
         if inferred && let Some(stage) = stages.last_mut() {
             stage.1 = Self::stage_effects(&inner);
         }
+        self.cx.regions.defer_owners.pop();
         self.leave_apart();
         let closures: Vec<_> = closures
             .into_iter()

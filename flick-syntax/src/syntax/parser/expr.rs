@@ -1,7 +1,7 @@
 //! Expressions and block statements.
 
 use super::conditional::if_expr;
-use super::control::{control_expr, while_ahead};
+use super::control::{control_expr, defer_stmt, is_defer_head, while_ahead};
 use super::handlers::{catch_expr, match_expr, try_expr};
 use super::{Ctx, Done, K, Parser, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
@@ -139,6 +139,7 @@ fn prefix(p: &mut Parser) -> Option<Done> {
     match p.current() {
         K::Ident if p.at_word("pack") && keyword_ahead(p, K::AsKw) => Some(pack_expr(p)),
         K::Ident if p.at_word("unpack") && keyword_ahead(p, K::AsKw) => Some(unpack_expr(p)),
+        K::Ident if is_defer_head(p) => Some(defer_stmt(p)),
         K::Ident if p.at_word("loop") && p.nth(1) == K::LBrace => Some(control_expr(p)),
         K::Ident if p.at_word("while") && while_ahead(p) => Some(control_expr(p)),
         K::Label | K::BreakKw | K::ContinueKw => Some(control_expr(p)),

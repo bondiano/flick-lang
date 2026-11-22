@@ -600,6 +600,10 @@
     "named": false
   },
   {
+    "type": "defer",
+    "named": false
+  },
+  {
     "type": "deriving",
     "named": false
   },
@@ -618,6 +622,10 @@
   },
   {
     "type": "else",
+    "named": false
+  },
+  {
+    "type": "errdefer",
     "named": false
   },
   {

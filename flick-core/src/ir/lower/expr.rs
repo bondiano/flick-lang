@@ -299,6 +299,7 @@ impl Lower<'_> {
             K::LazyExpr => self.lazy_expr(node, children[0], span),
             K::DoExpr => return self.do_expr(node),
             K::ScopeExpr => return self.scope_expr(node, children[0], span),
+            K::DeferStmt => return self.defer_stmt(node),
             K::ProvideExpr => self.layer_run(children[0], children[1], span),
             _ => {
                 self.unsupported(node);
@@ -434,44 +435,6 @@ impl Lower<'_> {
             func = with_dicts(self.within(key, Expr::new(app, span)), dicts);
         }
         func
-    }
-
-    fn ui_callable(&self, func: Expr, key: Range) -> Expr {
-        let Some(Ref::Value { module, name }) = self.typing.through.get(&key).cloned() else {
-            return func;
-        };
-        let span = func.span;
-        let component = ExprKind::Global { module, name };
-        Expr::new(
-            ExprKind::App {
-                func: Box::new(Expr::new(component, span)),
-                arg: Box::new(func),
-                stage: Stage::Pure,
-                arg_first: false,
-            },
-            span,
-        )
-    }
-
-    /// `call`, acquiring into the owner the checker chose for it.
-    /// The stage of the call the application or pipe at `key` makes.
-    pub(super) fn call_stage(&self, key: Range) -> Stage {
-        if self.typing.runtime.contains(&key) {
-            Stage::Runtime
-        } else if self.typing.sync.contains(&key) {
-            Stage::Sync
-        } else {
-            Stage::Pure
-        }
-    }
-
-    fn within(&mut self, key: Range, call: Expr) -> Expr {
-        let Some(owner) = self.typing.owners.get(&key) else {
-            return call;
-        };
-        let name = self.owner_name(*owner);
-        let span = call.span;
-        self.evidence_call(Expr::new(ExprKind::Local(name), span), call)
     }
 }
 

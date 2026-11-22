@@ -20,6 +20,7 @@ Elaborated here:
 - direct calls;
 - `let mut` variables and assignment;
 - `let ... else` block-remainder pattern bindings;
+- scope-owned `defer { … }` and `errdefer { … }` cleanup statements;
 - `CallSite`, the place of a use, which the checker gives.
 
 | Not covered | Where | How the model accounts for it |
@@ -591,6 +592,44 @@ typed error or defect, control propagates out without running `e₂`.
   `formal/README.md`, model and Lean theorems do not prove the Rust compiler or
   the JS/Go runtimes; differential fixtures verify implementation equivalence
   across the model and both backends.
+
+### 3.11 `defer` and `errdefer`
+
+`defer { cleanup }` and `errdefer { cleanup }` are contextual statements
+(parsed only before `{`, outside expression and value-binding positions) that
+register scope-owned cleanup on the nearest lexically enclosing explicit
+`scope [owner] { … }`:
+
+```text
+⟦defer { c }⟧_s    = with_owner_evidence(owner_s, Scope.defer (fun _ -> ⟦c⟧))
+⟦errdefer { c }⟧_s = with_owner_evidence(owner_s,
+                       Scope.defer (fun $scope_exit ->
+                         if Exit.is_failure $scope_exit then ⟦c⟧ else ()))
+```
+
+where `owner_s` is the lexical owner evidence of the selected explicit `scope`
+of region `s` and `$scope_exit` is a fresh hygienic binder unreachable from
+source code.
+
+Lexical owner selection traverses immediate blocks, `if`, `match`, `loop`,
+`while`, `for … do`, `try` bodies and error/`return` arms, postfix `catch`,
+`result { … }`, `provide`, `let ... else`, and `unpack`, and stops at
+function/lambda, `task`, `lazy`/`let lazy`, `for … yield` comprehension,
+effect-operation handler arm, and cleanup-block boundaries. Ambient runtime
+owners and generic `Scope s` service parameters do not serve as owners for this
+syntax; `Scope.defer` remains the explicit API for them.
+
+The checker (`flick-core/src/types/regions/defer.rs`) checks `c` against `Unit`
+in a fresh detached cleanup stage with an empty error row (`none`), isolated
+from enclosing `let mut`/`let lazy` locals and loop exits (`Apart::Defer`), and
+imposes the exact obligations of `Scope.defer` against the selected owner `s`:
+`Detached r` (`FLICK-E017`), `Fiber.Outlives c s` (`FLICK-G003`),
+`Fiber.Provided r s` (`FLICK-G003`), and `{Scope s | r}` on the enclosing stage.
+Lowering (`flick-core/src/ir/lower/defer.rs`) emits ordinary core IR targeting
+`Scope.defer`, `Exit.is_failure`, and `WithOwnerEvidence`, so `flick-ir`, the
+backends, and the core Lean theorems (`formal/`) require no new core forms or
+proof obligations; T6(a) and T4′ carry over by the typing of `Scope.defer` and
+`Exit.is_failure`.
 
 ## 4. Coherence and T6
 

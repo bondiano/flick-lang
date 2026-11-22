@@ -63,7 +63,10 @@ impl Ide<'_> {
         let [init_expr] = init_stmts[..] else {
             return None;
         };
-        if matches!(init_expr.kind, K::LetDecl | K::Signature | K::AssignStmt) {
+        if matches!(
+            init_expr.kind,
+            K::LetDecl | K::Signature | K::AssignStmt | K::DeferStmt
+        ) {
             return None;
         }
         // Do not silently drop comments sitting outside `init_expr` between `=` and `else`.

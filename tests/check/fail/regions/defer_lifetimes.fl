@@ -1,0 +1,51 @@
+// Lifetime and effect constraints of `defer` / `errdefer` (D12, D17):
+// services provided inside the owning `scope` cannot be used in cleanup
+// (`FLICK-G003`), shorter inner regions cannot be used live (`FLICK-G003`),
+// and `control`/`abort` effects are rejected (`FLICK-E017`).
+module App.DeferLifetimesFail exposing (..)
+
+service LocalSvc =
+  ping : Unit ->{} Unit
+
+effect Emit =
+  control emit : String ->{} Unit
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+local_layer : Layer none none {LocalSvc}
+let local_layer = Layer.succeed LocalSvc { ping = fun () -> () }
+
+// D12: `provide` inside `scope` releases `LocalSvc` before `scope` closes
+inner_provide : Unit ->{} Unit
+let inner_provide () = scope {
+  provide local_layer {
+    defer { LocalSvc.ping () }
+  }
+}
+
+// D17: `control` effect inside `defer` cleanup
+control_in_defer : Unit ->{Emit} Unit
+let control_in_defer () = scope {
+  defer { Emit.emit "late" }
+}
+
+// D17: `abort` effect inside `errdefer` cleanup
+abort_in_errdefer : Unit ->{Stop} Unit
+let abort_in_errdefer () = scope {
+  errdefer { Stop.stop "late" }
+}
+
+// D17: effect handled by inner `try` inside `scope` ends before `scope` closes
+inner_handler_service : Unit ->{} Unit
+let inner_handler_service () = scope {
+  try
+    defer { LocalSvc.ping () }
+  with
+  | LocalSvc.ping () -> ()
+}
+
+//~ FLICK-G003 @23:5-23:31 the `provide` that builds `LocalSvc` releases it earlier
+//~ FLICK-E017 @30:3-30:29 `Detached {Emit}` does not hold
+//~ FLICK-E017 @36:3-36:32 `Detached {Stop}` does not hold
+//~ FLICK-G003 @43:5-43:31 the `provide` that builds `LocalSvc` releases it earlier
