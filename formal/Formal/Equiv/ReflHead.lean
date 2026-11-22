@@ -156,7 +156,7 @@ theorem rhead_rev {Λ Λ₂ Λ₂' : List Rgn} {μ μ₂ μ₂' : List Tm} {r r�
   | refGet | refGetCell =>
     obtain ⟨f, a, rfl, hf, ha⟩ := hs.rinv_app
     rw [hf.top_const_rev rfl]
-    obtain ⟨l, k, rfl, hl⟩ := ha.rinv_loc
+    obtain ⟨l, k, rfl, hl⟩ := ha.rinv_loc hB
     obtain ⟨c, hc⟩ := cell hl
     by_cases hic : c.IsCell
     · exact Or.inl ⟨_, _, _, .refGetCell hc hic⟩
@@ -165,7 +165,7 @@ theorem rhead_rev {Λ Λ₂ Λ₂' : List Rgn} {μ μ₂ μ₂' : List Tm} {r r�
     obtain ⟨f, a, rfl, hf, -⟩ := hs.rinv_app
     obtain ⟨f₁, y, rfl, hf₁, hy⟩ := hf.rinv_app
     rw [hf₁.top_const_rev rfl]
-    obtain ⟨l, k, rfl, hl⟩ := hy.rinv_loc
+    obtain ⟨l, k, rfl, hl⟩ := hy.rinv_loc hB
     exact Or.inl ⟨_, _, _, .refSet (Redex.app hr rfl).2 (hst.lt₁ hl)⟩
   | await =>
     obtain ⟨e, rfl, he⟩ := hs.rinv_await
@@ -176,7 +176,7 @@ theorem rhead_rev {Λ Λ₂ Λ₂' : List Rgn} {μ μ₂ μ₂' : List Tm} {r r�
   | forcePending | forceDone | forceRunning =>
     obtain ⟨e, rfl, he⟩ := hs.rinv_force
     have hev := hr.2 .force e trivial rfl
-    obtain ⟨l, k, rfl, hl⟩ := (he.value_any hev .loc .top).rinv_loc
+    obtain ⟨l, k, rfl, hl⟩ := (he.value_any hev .loc .top).rinv_loc hB
     obtain ⟨c, hc⟩ := cell hl
     by_cases h₁ : ∃ e', c = .lazy e'
     · obtain ⟨e', rfl⟩ := h₁; exact Or.inl ⟨_, _, _, .forcePending hc⟩

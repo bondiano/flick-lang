@@ -14,8 +14,9 @@ use flick_core::diagnostics::Severity;
 use flick_core::ir;
 use flick_core::project::{self, Host};
 use flick_core::source::{FileId, SourceMap};
+use flick_core::types;
 use flick_ir::Program;
-use flick_test_support::files as fixture_files;
+use flick_test_support::{files as fixture_files, par_map};
 
 struct Files;
 
@@ -90,23 +91,29 @@ fn every_program_and_fixture_round_trips() {
     paths.extend(fixture_files(&repo("tests/run"), "fl"));
     paths.extend(fixture_files(&repo("tests/check/pass"), "fl"));
     assert!(paths.len() > 100);
-    let mut modules = 0;
-    for path in &paths {
-        modules += compiled(None, slice::from_ref(path), &path.display().to_string());
-    }
+    let _ = types::builtins();
+    let _ = build::builtin_modules();
+    let modules: usize = par_map(&paths, |path| {
+        compiled(None, slice::from_ref(path), &path.display().to_string())
+    })
+    .into_iter()
+    .sum();
     assert!(modules > paths.len() / 2, "only {modules} modules compiled");
 }
 
 #[test]
 fn every_example_project_round_trips() {
-    for name in [
+    let examples = [
         "cli-tool",
         "first-slice",
         "hom-repository",
         "mtl",
         "observability",
         "typed-interpreter",
-    ] {
+    ];
+    let _ = types::builtins();
+    let _ = build::builtin_modules();
+    par_map(&examples, |&name| {
         let dir = repo(&format!("examples/{name}"));
         let mut sources_map = SourceMap::default();
         let project = project::discover(&Files, &mut sources_map, &dir, None)
@@ -122,5 +129,5 @@ fn every_example_project_round_trips() {
             compiled(Some(&project), &roots, name) > 0,
             "{name} does not compile"
         );
-    }
+    });
 }

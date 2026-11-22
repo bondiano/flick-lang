@@ -1,13 +1,8 @@
-//! `flick inspect`, `flick doc` and `flick schema export`: tools over the
-//! checked project that run none of its code, except that a schema export
-//! loads the module that makes the codec, whose top level is pure.
+//! `flick inspect` and `flick doc`: tools over the checked project.
 
 mod doc;
 pub use doc::doc;
 mod doc_run;
-mod example_host;
-mod schema;
-pub use schema::schema_export;
 
 use std::mem;
 use std::path::{Path, PathBuf};

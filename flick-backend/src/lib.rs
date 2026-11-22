@@ -79,6 +79,21 @@ pub mod command {
             format!("this contributor has no command `{name}`"),
         )]
     }
+
+    /// The answer of a contributor that has no template `name`.
+    pub fn unknown_template(name: &str, available: &[TemplateDescriptor]) -> Vec<Diagnostic> {
+        let message = if available.is_empty() {
+            format!("unsupported template `{name}`: this contributor provides no project templates")
+        } else {
+            let list = available
+                .iter()
+                .map(|t| format!("  {} — {}", t.name, t.summary))
+                .collect::<Vec<_>>()
+                .join("\n");
+            format!("unsupported template `{name}`; available templates:\n{list}")
+        };
+        vec![Diagnostic::error("P060", message)]
+    }
 }
 
 /// Exports the command interface of a component through the [`Backend`]
@@ -125,6 +140,17 @@ macro_rules! export_commands {
             }
             fn close(state: ::std::vec::Vec<u8>) -> $crate::command::Plan {
                 $crate::Backend::close(&$backend, state)
+            }
+            fn templates() -> ::std::vec::Vec<$crate::command::TemplateDescriptor> {
+                $crate::Backend::templates(&$backend)
+            }
+            fn scaffold(
+                request: $crate::command::TemplateRequest,
+            ) -> ::std::result::Result<
+                $crate::command::Plan,
+                ::std::vec::Vec<$crate::command::Diagnostic>,
+            > {
+                $crate::Backend::scaffold(&$backend, &request)
             }
         }
     };
@@ -201,6 +227,20 @@ pub trait Backend {
     fn close(&self, state: Vec<u8>) -> command::Plan {
         let _ = state;
         command::Plan::empty()
+    }
+    /// Project templates the backend provides for `flick new` and `flick init`.
+    fn templates(&self) -> Vec<command::TemplateDescriptor> {
+        Vec::new()
+    }
+    /// The plan of files (and optional stdout guidance) for a project from `request`.
+    fn scaffold(
+        &self,
+        request: &command::TemplateRequest,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        Err(command::unknown_template(
+            &request.template,
+            &self.templates(),
+        ))
     }
 }
 

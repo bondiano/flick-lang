@@ -1,7 +1,7 @@
 ---
 title: Начало работы
 description: Установите инструменты, создайте приложение и запустите его.
-source_hash: 012bc1594f6e8ecb
+source_hash: ea6a186929231122
 ---
 
 ## Установка
@@ -115,9 +115,30 @@ let main () = provide (Layer.merge Host.arguments Host.console) { run () }
 живые слои, поэтому тест может вызвать `run` со своими. `flick run -- Ada`
 выводит `Hello, Ada!`.
 
-Первая сборка скачивает JavaScript-бэкенд: это ассет релиза, которого нет
-в самом компиляторе. Бэкенд закрепляется в `flick.lock`, и дальше сборки
-работают без сети.
+Первый вызов `flick new` или первая сборка скачивает выбранный официальный
+бэкенд — ассет релиза, которого нет в самом компиляторе, — и закрепляет его в
+`flick.lock`; дальнейшие сборки работают без сети.
+
+Шаблоны приходят от выбранного целевого бэкенда или стороннего пакета:
+
+```sh
+# Выбрать шаблон JavaScript-бэкенда по умолчанию (app, cli, fullstack, lib, plugin)
+flick new my-cli --template cli
+
+# Создать проект под Go (app, cli, lib, plugin; без package.json, нужен Go в PATH)
+flick new my-go-app --target go --template app
+
+# Создать проект из стороннего пакета шаблонов (путь, URL tar.gz + --sha256 или git + --tag)
+flick new my-starter --from ./my-template-pkg --template starter
+flick new my-starter --from https://example.com/starter.tgz --sha256 <64-hex> --template starter
+
+# Добавить проект в существующий непустой каталог, сохранив уже имеющиеся файлы
+flick init --target go --template lib
+```
+
+Неподдерживаемый `--template` сообщает `FLICK-P060` со списком шаблонов этого
+контрибьютора. `--from` использует ту же проверку источников, что и `flick add`,
+и записывает закрепление в `flick.lock`.
 
 Для проверки типов без запуска выполните `flick check`. Команда
 `flick build` сохраняет JavaScript в `dist/`, а `flick test` запускает

@@ -28,7 +28,9 @@ theorem StR.setBorn {μ μ₂ : List Tm} (h : StR W μ μ₂) {l l' : Nat} {v v'
 /-- **A step of a special pair**: the left side steps by its redex. -/
 theorem act_sim {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm}
     {τ : Option (Nat × Nat)} {E₁ E₂ : List Frame} {a b t' : Tm} (hE₁ : OkE E₁) (hE₂ : OkE E₂)
-    (hfr : FrL W E₁ E₂) (hact : Act W a b) (hst : StR W μ μ₂) (hcl₁ : (plug E₁ a).Closed)
+    (hfr : FrL W E₁ E₂) (hact : Act W a b) (hst : StR W μ μ₂)
+    (hR : W.R = root) (hglob : ∀ g v, root.glob g = some v → v.Src)
+    (hcl₁ : (plug E₁ a).Closed) (hcl₁' : t'.Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ (plug E₂ b) μ'' t'' → t''.Closed)
     (hs : Step root l Λ μ (plug E₁ a) (.cfg Λ' μ' t')) :
     Λ' = Λ ∧ KAns root W τ μ₂ (plug E₂ b) μ μ' (plug E₁ a) t' := by
@@ -193,5 +195,86 @@ theorem act_sim {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ : Lis
       | settleUnw => exact absurd hi.val (by intro h; cases h)
   | dead =>
     rcases Step.simple hE₁ todo_redex trivial hs with ⟨_, hh, -⟩ | ⟨_, hh, -⟩ <;> cases hh
+  | @o4B e e' b₀ b₀' br f' hB hbr hf' hpe hpe' he hb hne hnb =>
+    subst hbr hf'
+    rcases step_in (F := .let_ (.fix (b₀.rename rot))) hE₁ trivial (lazy_redex e) trivial hs with
+      ⟨_, hh, -⟩ | ⟨_, hh, rfl⟩
+    · cases hh
+    · cases hh
+      have hce : e.Closed := closed_let_lazy (plug_closed hcl₁)
+      have hce' : e'.Closed := closed_fix_let_lazy_up2 (plug_closed (hcl₂ _ _ .refl))
+      have hpe₁ : PureEval W.R e := hpe.eval hce
+      have hpe₁' : PureEval W.R e' := hpe'.eval hce'
+      have hW := World.le_addHL W μ.length e
+      refine ⟨rfl, _, μ₂, _, hW, .inr ⟨rfl, rfl, Zero.of_B hB⟩,
+        .inl ((hfr.mono hW).plugs (.o4Bind hB ?_)), hst.allocHL hB hce hpe₁, KeepO.append hst _⟩
+      simp only [Tm.subst]
+      exact .o4Fix2 hB (.inr ⟨rfl, rfl⟩) (subst_rot_loc _ _) rfl hce' hpe₁'
+        (he.mono hW) (hb.mono hW) hne hnb
+  | @o4Alloc1 l' e e' c c' s' hB hhr hs' hce hpe he hc hnc =>
+    subst hs'
+    rcases step_in (F := .let_ c) hE₁ trivial (lazy_redex e) trivial hs with
+      ⟨_, hh, -⟩ | ⟨_, hh, rfl⟩
+    · cases hh
+    · cases hh
+      have hW₁ := World.le_addHL W μ.length e
+      have hW := hW₁.trans (World.le_addH (W.addHL μ.length e) μ.length l')
+      have hsub : SubR ((W.addHL μ.length e).addH μ.length l') (inst [.loc μ.length]) (inst [.loc l']) := by
+        intro i; cases i with
+        | zero =>
+          exact ⟨fun y _ => .hloc hB (.inr ⟨rfl, rfl⟩), by simp [inst, Tm.NoIns, Tm.Has],
+            .inr .loc, .inr .loc⟩
+        | succ k =>
+          exact ⟨fun _ hy => .var hy, by simp [inst, Tm.NoIns, Tm.Has],
+            .inl ⟨k, rfl⟩, .inl ⟨k, rfl⟩⟩
+      exact ⟨rfl, _, μ₂, _, hW, .inr ⟨rfl, rfl, Zero.of_B hB⟩,
+        .inl ((hfr.mono hW).plugs (.o4Bind hB ((hc.mono hW).subst _ _ hsub))),
+        (hst.allocHL hB hce hpe).linkH hB (.inr ⟨rfl, rfl⟩) hhr (he.mono hW₁), KeepO.append hst _⟩
+  | @o4Bind l₀ c c' hB hc =>
+    rcases Step.simple hE₁ (let_redex .loc) trivial hs with ⟨_, hh, rfl, rfl, rfl⟩ | ⟨_, hh, -⟩
+    · cases hh
+      exact ⟨rfl, W, μ₂, _, World.le.refl _, .inr ⟨rfl, rfl, Zero.of_B hB⟩, .inl (hfr.plugs hc), hst, keep⟩
+    · cases hh
+  | @o4Settle l₀ l' e t hB hH hhl hce hct hpt =>
+    obtain ⟨-, e₀, e', hhl₀, hhr, hee⟩ := hst.hrel l₀ l' hH
+    obtain ⟨-, hu, -, hnj₁, -, hpe, c, hc, hstL⟩ := hst.hl l₀ e hhl
+    obtain rfl := hu e₀ hhl₀
+    obtain ⟨-, -, -, -, hce', hpe', c', hc', hstR⟩ := hst.hr l' e' hhr
+    by_cases hvt : Value t
+    · rcases Step.simple hE₁ (settle_redex hvt) trivial hs with ⟨_, hh, -⟩ | ⟨_, hh, rfl⟩
+      · cases hh
+      · cases hh with
+        | settleVal =>
+          obtain ⟨v', hpev', hv', hvv⟩ := pure_sim_val hst (hR ▸ hglob) hpe hpe' hee hpt hvt
+          have hstL' : StR W (settleCell μ l₀ t) μ₂ := by
+            rcases settleCell_cases μ l₀ t with ⟨_, _, e₁⟩ | ⟨_, e₁⟩ <;> rw [e₁]
+            · exact hst.setHL hhl (.inr (.inr ⟨t, rfl, hvt, hpt⟩))
+            · exact hst
+          have hko : KeepO W τ μ (settleCell μ l₀ t) := fun n _ e' _ ho h' => by
+            have hne : n ≠ l₀ := fun he => hnj₁ (he ▸ hst.own _ _ ho)
+            rw [settleCell_other hne]
+            exact h'
+          rcases hstR with rfl | ⟨v₀', rfl, hv₀', hpev₀'⟩
+          · have hstR' : StR W (settleCell μ l₀ t) (μ₂.set l' (.done v')) :=
+              hstL'.setHR hhr (.inr ⟨v', rfl, hv', hpev'⟩)
+            have hseq : HSeq root (μ₂.set l' (.running e')) (.settle l' e') (μ₂.set l' (.done v')) v' := by
+              rw [← settleCell_running (e := e') (o := v') (hst.ltHR hhr)]
+              exact HSeq.of_psteps ((hR ▸ hpev').frame (F := .settle l') trivial)
+                (.rt (fun _ => .settleVal hv') .refl)
+            exact ⟨rfl, W, μ₂.set l' (.done v'), plug E₂ v', World.le.refl _,
+              .inl ⟨_, _, fun _ => ⟨_, .rt hE₂ (.forcePending hc')⟩, hseq.ksteps hE₂⟩,
+              .inl (hfr.plugs hvv), hstR', hko⟩
+          · obtain rfl := PSteps.det hpev₀' hpev' hv₀' hv'
+            exact ⟨rfl, W, μ₂, plug E₂ v₀', World.le.refl _,
+              .inl ⟨_, _, fun _ => ⟨_, .rt hE₂ (.forceDone hc')⟩, .refl⟩,
+              .inl (hfr.plugs hvv), hstL', hko⟩
+        | settleRaise => exact absurd hvt (by intro h; cases h)
+        | settleUnw => exact absurd hvt (by intro h; cases h)
+    · obtain ⟨rfl, rfl, rfl, t₁, hp₁, rfl⟩ :=
+        PureEval.step_settle hE₁ (hR ▸ hpe) (hR ▸ hpt) hvt hs
+      have hct₁ : t₁.Closed := closed_frame_inner (F := .settle l₀) (plug_closed hcl₁')
+      exact ⟨rfl, W, μ₂, _, World.le.refl _, .inr ⟨rfl, rfl, Zero.of_B hB⟩,
+        .inl (hfr.plugs (.o4Settle hB hH hhl hce hct₁ (hpt.trans (.single (hR.symm ▸ hp₁))))),
+        hst, keep⟩
 
 end Flick.Equiv

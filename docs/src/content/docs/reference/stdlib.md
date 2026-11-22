@@ -175,8 +175,9 @@ it was made with, and its identity `w` is part of the type. `HashSet.empty`
 uses the canonical instances (`w` is `EqHash.Canonical`); `EqHash.with eq
 hash body` makes a witness of a fresh identity and passes it to `body`,
 which cannot return anything mentioning it. `HashMap.from_seq` and
-`HashSet.from_seq` build one from a sequence, such as a `for`, and
-`to_seq` gives the elements back as a source of `for`. Insertion and lookup use the
+`HashSet.from_seq` consume a finite sequence once without building a
+temporary list, and `to_seq` returns a lazy, restartable traversal as a
+source of `for`. Insertion and lookup use the
 set's own witness, and `HashSet.union` of sets of two witnesses is a type
 error: `HashSet.rehash witness set` moves a set to another witness first.
 

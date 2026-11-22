@@ -143,6 +143,17 @@ impl Backend for Literal {
         commands::close(&state)
     }
 
+    fn templates(&self) -> Vec<command::TemplateDescriptor> {
+        commands::templates()
+    }
+
+    fn scaffold(
+        &self,
+        request: &command::TemplateRequest,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        commands::scaffold(request)
+    }
+
     fn describe(&self) -> Descriptor {
         let range = |a: &str, b: &str| VersionRange {
             minimum: a.into(),

@@ -27,12 +27,12 @@ theorem inside_not_final {p : Nat} {E : List Frame} {w : Tm} : ¬ Final (plug E 
 /-- **A scope** opens a new region on both sides. -/
 theorem scope_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ : Option (Nat × Nat)}
     {E : List Frame} {e t₂ : Tm} (hE : OkE E) (ht : Sim W .any (plug E (.scope e)) t₂)
-    (hst : StR W μ μ₂) (hcl₁ : (plug E (.scope e)).Closed)
+    (hst : StR W μ μ₂) (hR : W.R = root) (hcl₁ : (plug E (.scope e)).Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂) :
     TRes root W τ Λ₂ μ₂ t₂ μ (Λ ++ [Rgn.new]) μ
       (plug E (.inside Λ.length (e.subst (inst [.own Λ.length])))) := by
   refine focus_cases hE (fun h => by cases h) (fun _ _ h => by cases h) (fun _ _ _ h => by cases h) id
-    (fun _ _ h => by cases h) ht hst hcl₁ hcl₂ hrg (.rt hE .scope) ?_
+    (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg (.rt hE .scope) ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨e₂, rfl, h₁⟩ := hs.inv_scope
   have hl := hrg.1
@@ -44,13 +44,13 @@ theorem scope_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ 
 /-- **A handler** opens a new region and a new cell on both sides. -/
 theorem hdl_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ : Option (Nat × Nat)}
     {E : List Frame} {Ef : Name} {al r e t₂ : Tm} (hE : OkE E)
-    (ht : Sim W .any (plug E (.hdl Ef al r e)) t₂) (hst : StR W μ μ₂)
+    (ht : Sim W .any (plug E (.hdl Ef al r e)) t₂) (hst : StR W μ μ₂) (hR : W.R = root)
     (hcl₁ : (plug E (.hdl Ef al r e)).Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) (hrg : RgsR W μ τ Λ Λ₂) :
     TRes root W τ Λ₂ μ₂ t₂ μ (Λ ++ [Rgn.new]) (μ ++ [.lam .todo])
       (plug E (.inside Λ.length (.hwith Λ.length μ.length Ef al r e))) := by
   refine focus_cases hE (fun h => by cases h) (fun _ _ h => by cases h) (fun _ _ _ h => by cases h) id
-    (fun _ _ h => by cases h) ht hst hcl₁ hcl₂ hrg (.rt hE .hdl) ?_
+    (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg (.rt hE .hdl) ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨al₂, r₂', e₂, rfl, hal, hr, he⟩ := hs.inv_hdl
   have hl := hrg.1

@@ -15,18 +15,22 @@ open Flick.Elab (All2 ORel)
 variable {W : World}
 
 theorem SubR.inst {vs ws : List Tm}
-    (h : All2 (fun a b => (∀ y, y ≠ .park → Sim W y a b) ∧ b.NoIns) vs ws) :
+    (h : All2 (fun a b => (∀ y, y ≠ .park → Sim W y a b) ∧ b.NoIns ∧ Value a ∧ Value b) vs ws) :
     SubR W (Flick.inst vs) (Flick.inst ws) := by
   intro i
   unfold Flick.inst
   have hl := h.length
   by_cases hi : i < vs.length
-  · rw [dif_pos hi, dif_pos (hl ▸ hi)]; exact h.get i hi (hl ▸ hi)
-  · rw [dif_neg hi, dif_neg (hl ▸ hi), hl]; exact ⟨fun _ hy => .var hy, by simp [Tm.NoIns, Tm.Has]⟩
+  · rw [dif_pos hi, dif_pos (hl ▸ hi)]
+    obtain ⟨hs, hn, hva, hvb⟩ := h.get i hi (hl ▸ hi)
+    exact ⟨hs, hn, .inr hva, .inr hvb⟩
+  · rw [dif_neg hi, dif_neg (hl ▸ hi), hl]
+    exact ⟨fun _ hy => .var hy, by simp [Tm.NoIns, Tm.Has], .inl ⟨_, rfl⟩, .inl ⟨_, rfl⟩⟩
 
 /-- A value as a substituted term. -/
 theorem Sim.sub {x : Pos} {a b : Tm} (h : Sim W x a b) (ha : Value a) (hb : Value b) :
-    (∀ y, y ≠ .park → Sim W y a b) ∧ b.NoIns := ⟨fun y _ => h.value_any ha hb y, h.value_noIns hb⟩
+    (∀ y, y ≠ .park → Sim W y a b) ∧ b.NoIns ∧ Value a ∧ Value b :=
+  ⟨fun y _ => h.value_any ha hb y, h.value_noIns hb, ha, hb⟩
 
 theorem All2.mem_right {α β : Type} {R : α → β → Prop} {P : β → Prop} :
     ∀ {l : List α} {l' : List β}, All2 R l l' → (∀ b ∈ l', P b) → All2 (fun a b => R a b ∧ P b) l l'
@@ -118,18 +122,27 @@ theorem Sim.matchP {p : Pat} : ∀ {v v₂ : Tm}, Sim W .top v v₂ →
         Flick.Elab.ORel.bind (ihr h) fun e f hef => Flick.Elab.All2.app hcd hef
   | or p q ihp ihq => intro v v₂ h; exact Flick.Elab.ORel.or (ihp h) (ihq h)
 
+theorem All2.mem_left {α β : Type} {R : α → β → Prop} {P : α → Prop} :
+    ∀ {l : List α} {l' : List β}, All2 R l l' → (∀ a ∈ l, P a) → All2 (fun a b => R a b ∧ P a) l l'
+  | _, _, .nil, _ => .nil
+  | _, _, .cons r h, hp => .cons ⟨r, hp _ (List.mem_cons_self ..)⟩
+      (All2.mem_left h fun a ha => hp a (List.mem_cons_of_mem _ ha))
+
 /-- Matched values as related substitutions. -/
 theorem Sim.matchP_sub {p : Pat} {v v₂ : Tm} (h : Sim W .top v v₂) (hv₂ : Value v₂)
-    {δ : List Tm} (hm : Flick.matchP p v = some δ) :
+    {δ : List Tm} (hm : Flick.matchP p v = some δ)
+    (hδv : ∀ w ∈ δ, Value w) (hδ₂v : ∀ δ₂, Flick.matchP p v₂ = some δ₂ → ∀ w ∈ δ₂, Value w) :
     ∃ δ₂, Flick.matchP p v₂ = some δ₂ ∧ SubR W (inst δ) (inst δ₂) := by
   obtain ⟨δ₂, h₂, hδ⟩ := (Sim.matchP (p := p) h).some_left hm
   have hn := h.value_noIns hv₂
-  refine ⟨δ₂, h₂, SubR.inst (Flick.Elab.All2.mono (All2.mem_right hδ
-    (P := fun b => b.NoIns) fun b hb hi => hn (matchP_has p h₂ b hb hi)) fun a b r => ?_)⟩
-  refine ⟨fun y hy => ?_, r.2⟩
+  have h₁ := All2.mem_right hδ (P := fun b => b.NoIns ∧ Value b) fun b hb =>
+    ⟨fun hi => hn (matchP_has p h₂ b hb hi), hδ₂v δ₂ h₂ b hb⟩
+  have h₃ := All2.mem_left h₁ (P := Value) hδv
+  refine ⟨δ₂, h₂, SubR.inst (Flick.Elab.All2.mono h₃ fun a b ⟨⟨hs, hnb, hvb⟩, hva⟩ => ?_)⟩
+  refine ⟨fun y hy => ?_, hnb, hva, hvb⟩
   cases y
-  · exact r.1.lower
-  · exact r.1
+  · exact hs.lower
+  · exact hs
   · exact (hy rfl).elim
 
 end Flick.Equiv
