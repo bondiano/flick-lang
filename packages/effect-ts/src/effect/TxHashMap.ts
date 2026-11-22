@@ -2,10 +2,16 @@
 // `TxHashMap w k v` keeps the witness of its keys beside Effect's map, whose
 // keys are wrapped with it as in `HashMap w k v`, so each operation is an
 // adapter that wraps keys going in and unwraps them coming out.
-import { Effect, Option, type Result, TxHashMap } from "effect";
+import { Effect, HashMap, Option, type Result, TxHashMap, TxRef } from "effect";
 
 import { none, some } from "../data.ts";
-import { type FlickHashMap, HashKey as Key, type Witness } from "../stdlib/hash.ts";
+import {
+  type FlickHashMap,
+  HashKey as Key,
+  hashMapFromSeq,
+  hashMapSetReplace,
+  type Witness,
+} from "../stdlib/hash.ts";
 
 export * from "effect/TxHashMap";
 
@@ -22,9 +28,6 @@ const wrap = <K, V>(witness: Witness<K>, native: TxHashMap.TxHashMap<Key<K>, V>)
 
 const key = <K, V>(self: FlickTxHashMap<K, V>, k: K): Key<K> => new Key(k, self.witness);
 
-const keyed = <K, V>(witness: Witness<K>, entries: ReadonlyArray<Entry<K, V>>): Array<Entry<Key<K>, V>> =>
-  entries.map(([k, v]) => [new Key(k, witness), v] as const);
-
 const same =
   <K, V>(self: FlickTxHashMap<K, V>) =>
   <B>(effect: Effect.Effect<TxHashMap.TxHashMap<Key<K>, B>>): Effect.Effect<FlickTxHashMap<K, B>> =>
@@ -33,23 +36,29 @@ const same =
 export const flickEmpty = <K, V>(witness: Witness<K>): Effect.Effect<FlickTxHashMap<K, V>> =>
   Effect.map(TxHashMap.empty<Key<K>, V>(), (native) => wrap(witness, native));
 
+const makeFrom = <K, V>(
+  witness: Witness<K>,
+  entries: ReadonlyArray<Entry<K, V>>,
+): Effect.Effect<FlickTxHashMap<K, V>> =>
+  Effect.flatMap(TxHashMap.empty<Key<K>, V>(), (native) =>
+    Effect.as(TxRef.set(native.ref, hashMapFromSeq(witness, entries).native), wrap(witness, native)),
+  );
+
 /** `TxHashMap.make`: the entries as Effect's rest arguments. */
 export const flickMake = <K, V>(
   witness: Witness<K>,
   entries: ReadonlyArray<Entry<K, V>>,
-): Effect.Effect<FlickTxHashMap<K, V>> =>
-  Effect.map(TxHashMap.make(...keyed(witness, entries)), (native) => wrap(witness, native));
+): Effect.Effect<FlickTxHashMap<K, V>> => makeFrom(witness, entries);
 
 export const flickFromIterable = <K, V>(
   witness: Witness<K>,
   entries: ReadonlyArray<Entry<K, V>>,
-): Effect.Effect<FlickTxHashMap<K, V>> =>
-  Effect.map(TxHashMap.fromIterable(keyed(witness, entries)), (native) => wrap(witness, native));
+): Effect.Effect<FlickTxHashMap<K, V>> => makeFrom(witness, entries);
 
 export const flickGet = <K, V>(k: K, self: FlickTxHashMap<K, V>): Effect.Effect<Option.Option<V>> =>
   TxHashMap.get(self.native, key(self, k));
 export const flickSet = <K, V>(k: K, v: V, self: FlickTxHashMap<K, V>): Effect.Effect<void> =>
-  TxHashMap.set(self.native, key(self, k), v);
+  TxRef.update(self.native.ref, (map) => hashMapSetReplace(map, key(self, k), v));
 export const flickHas = <K, V>(k: K, self: FlickTxHashMap<K, V>): Effect.Effect<boolean> =>
   TxHashMap.has(self.native, key(self, k));
 export const flickRemove = <K, V>(k: K, self: FlickTxHashMap<K, V>): Effect.Effect<boolean> =>
@@ -61,12 +70,23 @@ export const flickIsEmpty = <K, V>(self: FlickTxHashMap<K, V>): Effect.Effect<bo
 export const flickIsNonEmpty = <K, V>(self: FlickTxHashMap<K, V>): Effect.Effect<boolean> =>
   TxHashMap.isNonEmpty(self.native);
 export const flickModify = <K, V>(k: K, f: (v: V) => V, self: FlickTxHashMap<K, V>): Effect.Effect<Option.Option<V>> =>
-  TxHashMap.modify(self.native, key(self, k), f);
+  TxRef.modify(self.native.ref, (map) => {
+    const wrapped = key(self, k);
+    const existing = HashMap.get(map, wrapped);
+    return Option.isSome(existing)
+      ? ([existing, hashMapSetReplace(map, wrapped, f(existing.value))] as const)
+      : ([Option.none(), map] as const);
+  });
 export const flickModifyAt = <K, V>(
   k: K,
   f: (v: Option.Option<V>) => Option.Option<V>,
   self: FlickTxHashMap<K, V>,
-): Effect.Effect<void> => TxHashMap.modifyAt(self.native, key(self, k), f);
+): Effect.Effect<void> =>
+  TxRef.update(self.native.ref, (map) => {
+    const wrapped = key(self, k);
+    const next = f(HashMap.get(map, wrapped));
+    return Option.isSome(next) ? hashMapSetReplace(map, wrapped, next.value) : HashMap.remove(map, wrapped);
+  });
 
 export const flickKeys = <K, V>(self: FlickTxHashMap<K, V>): Effect.Effect<Array<K>> =>
   Effect.map(TxHashMap.keys(self.native), (keys) => keys.map((k) => k.value));
@@ -83,14 +103,22 @@ export const flickToValues = <K, V>(self: FlickTxHashMap<K, V>): Effect.Effect<A
 export const flickSnapshot = <K, V>(self: FlickTxHashMap<K, V>): Effect.Effect<FlickHashMap<K, V>> =>
   Effect.map(TxHashMap.snapshot(self.native), (native) => Object.freeze({ witness: self.witness, native }));
 export const flickUnion = <K, V>(other: FlickHashMap<K, V>, self: FlickTxHashMap<K, V>): Effect.Effect<void> =>
-  TxHashMap.union(self.native, other.native);
+  TxRef.update(self.native.ref, (map) => {
+    let out = map;
+    for (const [k, v] of other.native) out = hashMapSetReplace(out, k, v);
+    return out;
+  });
 export const flickRemoveMany = <K, V>(keys: ReadonlyArray<K>, self: FlickTxHashMap<K, V>): Effect.Effect<void> =>
   TxHashMap.removeMany(
     self.native,
     keys.map((k) => key(self, k)),
   );
 export const flickSetMany = <K, V>(entries: ReadonlyArray<Entry<K, V>>, self: FlickTxHashMap<K, V>): Effect.Effect<void> =>
-  TxHashMap.setMany(self.native, keyed(self.witness, entries));
+  TxRef.update(self.native.ref, (map) => {
+    let out = map;
+    for (const [k, v] of entries) out = hashMapSetReplace(out, key(self, k), v);
+    return out;
+  });
 export const flickGetHash = <K, V>(k: K, hash: number, self: FlickTxHashMap<K, V>): Effect.Effect<Option.Option<V>> =>
   TxHashMap.getHash(self.native, key(self, k), hash);
 export const flickHasHash = <K, V>(k: K, hash: number, self: FlickTxHashMap<K, V>): Effect.Effect<boolean> =>
@@ -112,10 +140,19 @@ export const flickFlatMap = <K, V, B>(
   f: (v: V, k: K) => Effect.Effect<FlickTxHashMap<K, B>>,
   self: FlickTxHashMap<K, V>,
 ): Effect.Effect<FlickTxHashMap<K, B>> =>
-  same(self)(
-    TxHashMap.flatMap(self.native, (v, k) =>
-      Effect.map(f(v, k.value), (m) => m.native),
-    ),
+  Effect.tx(
+    Effect.gen(function* () {
+      const current = yield* TxRef.get(self.native.ref);
+      const result = yield* TxHashMap.empty<Key<K>, B>();
+      let acc = HashMap.empty<Key<K>, B>();
+      for (const [k, v] of current) {
+        const inner = yield* f(v, k.value);
+        const innerMap = yield* TxRef.get(inner.native.ref);
+        for (const [ik, iv] of innerMap) acc = hashMapSetReplace(acc, ik, iv);
+      }
+      yield* TxRef.set(result.ref, acc);
+      return wrap(self.witness, result);
+    }),
   );
 
 export const flickReduce = <K, V, A>(

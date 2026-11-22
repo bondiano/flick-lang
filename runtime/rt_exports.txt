@@ -178,6 +178,8 @@
 @flick-lang/runtime/core/data equals
 @flick-lang/runtime/core/data err
 @flick-lang/runtime/core/data fromNullable
+@flick-lang/runtime/core/data gadt
+@flick-lang/runtime/core/data gadtMarker
 @flick-lang/runtime/core/data hash
 @flick-lang/runtime/core/data isRuntimeSequence
 @flick-lang/runtime/core/data iterableHash
@@ -253,6 +255,8 @@
 @flick-lang/runtime/core/index formSpec
 @flick-lang/runtime/core/index fromNullable
 @flick-lang/runtime/core/index fromResult
+@flick-lang/runtime/core/index gadt
+@flick-lang/runtime/core/index gadtMarker
 @flick-lang/runtime/core/index handle
 @flick-lang/runtime/core/index hash
 @flick-lang/runtime/core/index identity
@@ -653,6 +657,7 @@
 @flick-lang/runtime/core/values copyThrough
 @flick-lang/runtime/core/values err
 @flick-lang/runtime/core/values fromNullable
+@flick-lang/runtime/core/values gadtMarker
 @flick-lang/runtime/core/values isRuntimeSequence
 @flick-lang/runtime/core/values none
 @flick-lang/runtime/core/values ok
@@ -819,6 +824,8 @@
 @flick-lang/runtime/rt formSpec
 @flick-lang/runtime/rt fromNullable
 @flick-lang/runtime/rt fromResult
+@flick-lang/runtime/rt gadt
+@flick-lang/runtime/rt gadtMarker
 @flick-lang/runtime/rt genBool
 @flick-lang/runtime/rt genConstant
 @flick-lang/runtime/rt genFunction

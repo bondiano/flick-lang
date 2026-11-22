@@ -13,6 +13,7 @@ import {
   GT,
   LT,
   type Ordering,
+  gadtMarker,
   none,
   runtimeEquals,
   runtimeHash,
@@ -42,12 +43,21 @@ const builtinField = (value: Readonly<Record<string, unknown>>): string | undefi
   return k ? (n === 1 && has(value, k) ? k : undefined) : n === 0 ? "" : undefined;
 };
 
+const eqFields = (
+  a: Readonly<Record<PropertyKey, unknown>>,
+  b: Readonly<Record<PropertyKey, unknown>>,
+  strictZero: boolean,
+): boolean => {
+  const ak = ownKeys(a);
+  return ak.length === ownKeys(b).length && ak.every((k) => has(b, k) && eqValues(a[k], b[k], strictZero));
+};
+
 const eqValues = (a: unknown, b: unknown, strictZero: boolean): boolean => {
   // oxlint-disable-next-line no-self-compare -- SameValueZero: NaN equals NaN
   if (strictZero ? Object.is(a, b) : a === b || (a !== a && b !== b)) return true;
   if (!isObject(a) || !isObject(b)) return false;
   const custom = a[runtimeEquals];
-  if (typeof custom === "function") return custom.call(a, b) === true;
+  if (typeof custom === "function") return custom.call(a, b, strictZero) === true;
   const aKey = builtinField(a);
   const bKey = builtinField(b);
   if (aKey !== undefined && bKey !== undefined) {
@@ -67,8 +77,7 @@ const eqValues = (a: unknown, b: unknown, strictZero: boolean): boolean => {
   // Class instances without a Flick equality hook compare by identity.
   const proto: unknown = Object.getPrototypeOf(a);
   if (proto !== Object.getPrototypeOf(b) || (proto !== Object.prototype && proto !== null)) return false;
-  const ak = ownKeys(a);
-  return ak.length === ownKeys(b).length && ak.every((k) => has(b, k) && eqValues(a[k], b[k], strictZero));
+  return eqFields(a, b, strictZero);
 };
 
 /** `==`: structural equality with SameValueZero on numbers. */
@@ -116,6 +125,11 @@ const identityHash = (value: object): number => {
   return code;
 };
 
+const hashFields = (a: Readonly<Record<PropertyKey, unknown>>): number =>
+  ownKeys(a)
+    .toSorted()
+    .reduce((h, k) => combine(combine(h, hashString(k)), hash(a[k])), 13);
+
 /** A hash consistent with `equals`. */
 export const hash = (a: unknown): number => {
   if (typeof a === "number") return hashString(Object.is(a, -0) ? "0" : String(a));
@@ -144,31 +158,43 @@ export const hash = (a: unknown): number => {
   if (Array.isArray(a)) return listHash(hash, a);
   const proto: unknown = Object.getPrototypeOf(a);
   if (proto !== Object.prototype && proto !== null) return identityHash(a);
-  return ownKeys(a)
-    .toSorted()
-    .reduce((h, k) => combine(combine(h, hashString(k)), hash(a[k])), 13);
+  return hashFields(a);
 };
 
-const tagOf = (a: object): string | undefined => {
-  const t: unknown = Reflect.get(a, "_tag");
-  return typeof t === "string" ? t : undefined;
+const isGadtLike = (value: unknown): value is Readonly<Record<PropertyKey, unknown>> =>
+  isObject(value) && (Object.getPrototypeOf(value) === GADT_PROTO || gadtMarker in value);
+
+const GADT_PROTO: Record<PropertyKey, unknown> = /*#__PURE__*/ Object.freeze({
+  [gadtMarker]: true,
+  [runtimeEquals](this: Readonly<Record<PropertyKey, unknown>>, that: unknown, strictZero = false): boolean {
+    return isGadtLike(that) && eqFields(this, that, strictZero);
+  },
+  [runtimeHash](this: Readonly<Record<PropertyKey, unknown>>): number {
+    return hashFields(this);
+  },
+  ["~effect/Equal"](this: Readonly<Record<PropertyKey, unknown>>, that: unknown): boolean {
+    return isGadtLike(that) && eqFields(this, that, false);
+  },
+  ["~effect/Hash"](this: Readonly<Record<PropertyKey, unknown>>): number {
+    return hashFields(this);
+  },
+});
+
+/** Marks a GADT value holding `$0`, `$1`, … dictionaries so host/Effect `Equal`/`Hash` skip them. */
+export const gadt = <A extends object>(value: A): A => {
+  Object.setPrototypeOf(value, GADT_PROTO);
+  return value;
 };
 
 /** `Show` of a primitive. */
 export const show = (a: unknown): string => {
-  switch (typeof a) {
-    case "string":
-      return JSON.stringify(a);
-    case "bigint":
-      return `${a}n`;
-    case "object": {
-      if (a === null) return "null";
-      const t = tagOf(a);
-      return t === undefined ? Object.prototype.toString.call(a) : constructorName(t);
-    }
-    default:
-      return Object.is(a, -0) ? "-0" : String(a);
+  if (typeof a === "string") return JSON.stringify(a);
+  if (typeof a === "bigint") return `${a}n`;
+  if (isObject(a)) {
+    const t = a["_tag"];
+    return typeof t === "string" ? constructorName(t) : Object.prototype.toString.call(a);
   }
+  return Object.is(a, -0) ? "-0" : String(a);
 };
 
 export const listEquals = <A>(eq: (a: A, b: A) => boolean, xs: ReadonlyArray<A>, ys: ReadonlyArray<A>): boolean =>
@@ -222,11 +248,11 @@ export type Dict = Partial<Record<"eq" | "compare" | "hash" | "show" | "parse" |
 
 const isTuple = (value: Structure): value is ReadonlyArray<unknown> => Array.isArray(value);
 
-const fieldsOf = (value: Structure): ReadonlyArray<unknown> =>
-  isTuple(value) ? value : Object.keys(value).toSorted().map((k) => value[k]);
-
 const labelsOf = (value: Structure): ReadonlyArray<string> | null =>
-  isTuple(value) ? null : Object.keys(value).toSorted();
+  isTuple(value) ? null : keys(value).toSorted();
+
+const fieldsOf = (value: Structure): ReadonlyArray<unknown> =>
+  isTuple(value) ? value : keys(value).toSorted().map((k) => value[k]);
 
 const at = item;
 
@@ -235,35 +261,34 @@ const at = item;
  * `dicts` are those of its fields, by label order or by position.
  */
 export const structural = (name: string, dicts: ReadonlyArray<FieldDict>): Dict => {
-  const eq = (a: Structure) => (b: Structure) =>
-    fieldsOf(a).every((x, i) => at(dicts, i).eq(x)(at(fieldsOf(b), i)));
-  const cmp = (a: Structure) => (b: Structure) => {
-    const xs = fieldsOf(a);
-    const ys = fieldsOf(b);
-    for (let i = 0; i < xs.length; i++) {
-      const o = at(dicts, i).compare(xs[i])(ys[i]);
-      if (o._tag !== EQ._tag) return o;
-    }
-    return EQ;
-  };
-  const supers = (): Dict => structural("Eq", dicts.map((d) => d.$Eq));
+  const withEq = (body: Dict): Dict => ({
+    ...body,
+    get $Eq() {
+      return structural("Eq", dicts.map((d) => d.$Eq));
+    },
+  });
   switch (name) {
     case "Eq":
-      return { eq };
+      return {
+        eq: (a: Structure) => (b: Structure) =>
+          fieldsOf(a).every((x, i) => at(dicts, i).eq(x)(at(fieldsOf(b), i))),
+      };
     case "Ord":
-      return {
-        compare: cmp,
-        get $Eq() {
-          return supers();
+      return withEq({
+        compare: (a: Structure) => (b: Structure) => {
+          const xs = fieldsOf(a);
+          const ys = fieldsOf(b);
+          for (let i = 0; i < xs.length; i++) {
+            const o = at(dicts, i).compare(xs[i])(ys[i]);
+            if (o._tag !== EQ._tag) return o;
+          }
+          return EQ;
         },
-      };
+      });
     case "Hash":
-      return {
+      return withEq({
         hash: (a: Structure) => fieldsOf(a).reduce<number>((h, x, i) => combine(h, at(dicts, i).hash(x)), 11),
-        get $Eq() {
-          return supers();
-        },
-      };
+      });
     default:
       return {
         show: (a: Structure) => {

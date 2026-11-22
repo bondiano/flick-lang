@@ -49,6 +49,8 @@ export const GT = /*#__PURE__*/ ordering("GT");
 /** A native runtime value whose equality is defined by its semantic value. */
 export const runtimeEquals = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/equals");
 export const runtimeHash = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/hash");
+/** Prototype marker for GADT values holding `$0`, `$1`, … dictionaries. */
+export const gadtMarker = /*#__PURE__*/ Symbol.for("@flick-lang/runtime/gadt");
 /** A native sequence exposed through iteration instead of array indices. */
 export const runtimeSequence = /*#__PURE__*/ Symbol();
 export const isRuntimeSequence = (value: object, carrier = value): value is Iterable<unknown> =>
@@ -60,6 +62,10 @@ export const fromNullable = <A>(value: A | null | undefined): Option<A> =>
 
 /** `optional i`: `None` is passed as `undefined`. */
 export const optionalArg = <A>(option: Option<A>): A | undefined => (option._tag === "Some" ? option.value : undefined);
+
+const putOwn = (target: object, key: PropertyKey, value: unknown): void => {
+  Object.defineProperty(target, key, { value, writable: true, enumerable: true, configurable: true });
+};
 
 /**
  * `value` as Flick data JS can no longer change: arrays and plain objects
@@ -79,11 +85,16 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
   const visit = (input: unknown, put: (copy: unknown) => void): void => {
     if (typeof input !== "object" || input === null) { put(input); return; }
     let array: unknown = input;
+    let preserveProto: object | null = null;
     if (!Array.isArray(input)) {
       const proto = Reflect.getPrototypeOf(input);
       if (proto !== Object.prototype && proto !== null) {
-        if (!isRuntimeSequence(input, proto)) { put(other(input)); return; }
-        array = Array.from(input);
+        if (gadtMarker in input) {
+          preserveProto = proto;
+        } else {
+          if (!isRuntimeSequence(input, proto)) { put(other(input)); return; }
+          array = Array.from(input);
+        }
       } else if (Object.isFrozen(input)) { put(other(input)); return; }
     }
     // Only active ancestors are rejected. Completed aliases must be copied again,
@@ -103,7 +114,7 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
           if (!(key in array)) continue;
           const child: unknown = array[key];
           work.push(next);
-          visit(child, (copied) => { Object.defineProperty(copy, key, { value: copied, writable: true, enumerable: true, configurable: true }); });
+          visit(child, (copied) => putOwn(copy, key, copied));
           return;
         }
         finish(copy);
@@ -113,13 +124,14 @@ export const copyThrough = (value: unknown, other: (value: object) => unknown): 
       // Object.entries eagerly reads all enumerable fields before descending.
       const entries: Array<[string, unknown]> = Object.entries(input);
       const copy: Record<string, unknown> = {};
+      if (preserveProto !== null) Object.setPrototypeOf(copy, preserveProto);
       let index = 0;
       const next = (): void => {
         const entry = entries[index++];
         if (entry === undefined) { finish(copy); return; }
         const [key, child] = entry;
         work.push(next);
-        visit(child, (copied) => { Object.defineProperty(copy, key, { value: copied, writable: true, enumerable: true, configurable: true }); });
+        visit(child, (copied) => putOwn(copy, key, copied));
       };
       work.push(next);
     }

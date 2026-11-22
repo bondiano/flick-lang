@@ -1,6 +1,6 @@
 // JSON patch differ for Flick's pure codecs. Patches use RFC 6902 paths and
 // apply in order, so a patch and its inverse can be combined.
-import { equals } from "../../core/data.ts";
+import { sameValue } from "../../core/data.ts";
 import { type Codec } from "../schema.ts";
 export interface Patch { readonly op: "add" | "remove" | "replace"; readonly path: string; readonly value?: unknown }
 export interface Differ<A> { readonly codec: Codec<A> }
@@ -9,7 +9,7 @@ const record = (value: unknown): value is Readonly<Record<string, unknown>> =>
 const escape = (name: string): string => name.replaceAll("~", "~0").replaceAll("/", "~1");
 const unescape = (name: string): string => name.replaceAll("~1", "/").replaceAll("~0", "~");
 const diff = (oldValue: unknown, newValue: unknown, path: string): Array<Patch> => {
-  if (equals(oldValue, newValue)) return [];
+  if (sameValue(oldValue, newValue)) return [];
   if (Array.isArray(oldValue) && Array.isArray(newValue)) {
     const result: Array<Patch> = [];
     const common = Math.min(oldValue.length, newValue.length);

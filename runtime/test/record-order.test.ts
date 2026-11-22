@@ -3,7 +3,8 @@
 // struct combiners/reducers, JSON diffs, hashes, and reactive atom families.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { equals, hash as coreHash, sameValue } from "../src/core/data.ts";
+import { copyData, equals, gadt, gadtMarker, hash as coreHash, sameValue } from "../src/core/data.ts";
+import { tag } from "../src/tags.ts";
 import { Registry, readable, state } from "../src/rt/atoms/registry.ts";
 import {
   recordExtend,
@@ -25,8 +26,9 @@ import {
 } from "../src/rt/collections.ts";
 import { currentCtx } from "../src/rt/fiber.ts";
 import { hash as rtHash } from "../src/rt/hash.ts";
-import { schemaInt, schemaJsonCodec, schemaRecordOf, schemaString } from "../src/rt/schema.ts";
+import { schemaInt, schemaJsonCodec, schemaNumber, schemaRecordOf, schemaString } from "../src/rt/schema.ts";
 import { flickDiff } from "../src/rt/effect/Differ.ts";
+import { equals as filterEquals, equalsStrict as filterEqualsStrict } from "../src/rt/effect/Filter.ts";
 import { flickGet } from "../src/rt/effect/JsonPatch.ts";
 import { flickMakeCombiner, flickMakeReducer } from "../src/rt/effect/Struct.ts";
 import { family } from "../src/rt/effect/reactivity/Atom.ts";
@@ -229,4 +231,69 @@ test("RT reactive atoms compare values structurally with SameValue without obser
   registry.subscribe(refAtom, () => refCalls++, true);
   registry.set(refAtom, c2);
   assert.equal(refCalls, 2);
+});
+
+test("RT Filter.equalsStrict uses structural SameValue without observing data identity", () => {
+  const r1 = { z: 1, a: "hi" };
+  const r2 = { a: "hi", z: 1 };
+  assert.equal(filterEqualsStrict(r1)(r2)._tag, "Success");
+  assert.equal(filterEqualsStrict([1, r1])([1, r2])._tag, "Success");
+  assert.equal(filterEqualsStrict([1, r1])([2, r2])._tag, "Failure");
+  assert.equal(filterEqualsStrict(0)(-0)._tag, "Failure");
+  assert.equal(filterEqualsStrict(-0)(-0)._tag, "Success");
+  assert.equal(filterEqualsStrict(NaN)(NaN)._tag, "Success");
+  assert.equal(filterEquals(0)(-0)._tag, "Success");
+
+  // Mutable cells and foreign instances retain identity
+  const c1 = refMake(1);
+  const c2 = refMake(1);
+  assert.equal(filterEqualsStrict(c1)(c1)._tag, "Success");
+  assert.equal(filterEqualsStrict(c1)(c2)._tag, "Failure");
+  const f1 = new Map<string, number>();
+  const f2 = new Map<string, number>();
+  assert.equal(filterEqualsStrict(f1)(f1)._tag, "Success");
+  assert.equal(filterEqualsStrict(f1)(f2)._tag, "Failure");
+
+  // GADT values ignore held dictionaries while still distinguishing 0.0 vs -0.0
+  const g1 = gadt({ _tag: "Box", _0: 0, $0: { tag: "first" } });
+  const g2 = gadt({ _tag: "Box", _0: 0, $0: { tag: "second" } });
+  const gNeg = gadt({ _tag: "Box", _0: -0, $0: { tag: "third" } });
+  assert.equal(filterEqualsStrict(g1)(g2)._tag, "Success");
+  assert.equal(filterEqualsStrict(g1)(gNeg)._tag, "Failure");
+  assert.equal(filterEquals(g1)(gNeg)._tag, "Success");
+});
+
+test("RT Differ and JsonPatch distinguish 0.0 from -0.0", () => {
+  const patch = flickGet(0, -0);
+  assert.equal(patch.length, 1);
+  const op = patch[0];
+  assert.ok(op !== undefined && op._tag === tag("JsonPatch.Operation.Replace"));
+  assert.equal(op._0, "");
+  assert.equal(Object.is(op._1, -0), true);
+
+  const codec = schemaJsonCodec(schemaNumber);
+  const diff = flickDiff(0, -0, { codec });
+  assert.equal(diff.length, 1);
+  assert.deepEqual(diff[0], { op: "replace", path: "", value: -0 });
+  assert.equal(Object.is(diff[0]?.value, -0), true);
+});
+
+test("RT gadt values preserve held dictionaries through copyData while skipping them in equals/hash", () => {
+  const d1 = { show: () => "first" };
+  const d2 = { show: () => "second" };
+  const g1 = gadt({ _tag: "Box", _0: { z: 1, a: "x" }, $0: d1 });
+  const g2 = gadt({ _tag: "Box", _0: { a: "x", z: 1 }, $0: d2 });
+  assert.equal(gadtMarker in g1, true);
+  assert.equal(equals(g1, g2), true);
+  assert.equal(sameValue(g1, g2), true);
+  assert.equal(coreHash(g1), coreHash(g2));
+  assert.equal(rtHash(g1), rtHash(g2));
+
+  const copied = copyData(g1);
+  assert.notEqual(copied, g1);
+  assert.equal(gadtMarker in copied, true);
+  assert.equal(copied.$0.show(), "first");
+  assert.equal(equals(copied, g2), true);
+  assert.equal(coreHash(copied), coreHash(g2));
+  assert.equal(rtHash(copied), rtHash(g2));
 });

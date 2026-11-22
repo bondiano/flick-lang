@@ -252,3 +252,48 @@ let main () =
     assert_eq!(ran.memory.live_objects, 0);
     assert_eq!(ran.memory.allocations, ran.memory.frees);
 }
+
+#[test]
+fn counted_filter_equals_strict_uses_structural_same_value_with_zero_leaks() {
+    let source = r#"
+module App.Main exposing (main)
+
+import Codec
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let r1 = { z = 1; a = "hi" }
+  let r2 = { a = "hi"; z = 1 }
+  let rec_ok = Filter.to_predicate (Filter.equals_strict r1) r2
+  let tup_ok = Filter.to_predicate (Filter.equals_strict (1, r1)) (1, r2)
+  let tup_no = Filter.to_predicate (Filter.equals_strict (1, r1)) (2, r2)
+  let zero_diff = Filter.to_predicate (Filter.equals_strict 0.0) (-0.0)
+  let neg_zero_same = Filter.to_predicate (Filter.equals_strict (-0.0)) (-0.0)
+  let nan_same = Filter.to_predicate (Filter.equals_strict (0.0 / 0.0)) (0.0 / 0.0)
+  let c1 = Ref.make 1
+  let c2 = Ref.make 1
+  let cell_same = Filter.to_predicate (Filter.equals_strict c1) c1
+  let cell_diff = Filter.to_predicate (Filter.equals_strict c1) c2
+  let num_codec = Codec.json Schema.number
+  let patch_len =
+    match (Codec.encode_result num_codec 0.0, Codec.encode_result num_codec (-0.0)) with
+    | (Ok z0, Ok zn) -> List.length (JsonPatch.get z0 zn)
+    | _ -> -1
+  Platform.stdout_line (show (rec_ok, tup_ok, tup_no, zero_diff, neg_zero_same, nan_same, cell_same, cell_diff, patch_len))
+"#;
+    let compiled = run::compile_source(source).expect("Filter.equals_strict source compiles");
+    let main = run::main_of(&compiled).expect("main export");
+    for release in [false, true] {
+        let ran = run::run_main_counted(&compiled, &main, 2_000_000, release)
+            .unwrap_or_else(|err| panic!("release={release}: {err}"));
+        assert_eq!(
+            ran.stdout, "(true, true, false, false, true, true, true, false, 1)\n",
+            "release={release}"
+        );
+        assert_eq!(ran.memory.live_objects, 0, "release={release}");
+        assert_eq!(
+            ran.memory.allocations, ran.memory.frees,
+            "release={release}"
+        );
+    }
+}

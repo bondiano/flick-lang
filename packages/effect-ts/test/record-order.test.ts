@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { Equal, Hash, Option, Result, Schema } from "effect";
+import { Cache, Chunk, Effect, Equal, Hash, Option, Result, Schema } from "effect";
 import * as AtomRegistry from "effect/reactivity/AtomRegistry";
 
 import {
@@ -14,8 +14,12 @@ import {
   codecInt,
   codecJsonSchema,
   codecString,
+  copyData,
   dslField,
   dslOptionalField,
+  equals as flickEquals,
+  gadt,
+  hash as flickHash,
   recordExtend,
   recordLabels,
   recordMergeDisjoint,
@@ -28,9 +32,11 @@ import {
   schemaRecord,
   schemaString,
 } from "../src/index.ts";
+import { equals as filterEquals, equalsStrict as filterEqualsStrict } from "../src/effect/Filter.ts";
 import { flickModify, flickModifyAt, flickModifyHash, flickSetMany } from "../src/effect/HashMap.ts";
 import { flickToType } from "../src/effect/Schema.ts";
 import { flickMakeCombiner, flickMakeReducer } from "../src/effect/Struct.ts";
+import * as TxHashMap from "../src/effect/TxHashMap.ts";
 import { family, flickState, readable } from "../src/effect/reactivity/Atom.ts";
 import {
   hashMapFromSeq,
@@ -255,4 +261,153 @@ test("Effect reactive atoms compare values structurally with SameValue without o
   registry.subscribe(refAtom, () => { refCalls++; }, { immediate: true });
   registry.set(refAtom, c2);
   assert.equal(refCalls, 2);
+});
+
+test("Effect Filter.equalsStrict uses structural SameValue without observing data identity", () => {
+  const r1 = { z: 1, a: "hi" };
+  const r2 = { a: "hi", z: 1 };
+  assert.equal(Result.isSuccess(filterEqualsStrict(r1)(r2)), true);
+  assert.equal(Result.isSuccess(filterEqualsStrict([1, r1])([1, r2])), true);
+  assert.equal(Result.isFailure(filterEqualsStrict([1, r1])([2, r2])), true);
+  assert.equal(Result.isFailure(filterEqualsStrict(0)(-0)), true);
+  assert.equal(Result.isSuccess(filterEqualsStrict(-0)(-0)), true);
+  assert.equal(Result.isSuccess(filterEqualsStrict(NaN)(NaN)), true);
+  assert.equal(Result.isSuccess(filterEquals(0)(-0)), true);
+
+  const c1 = refMake(1);
+  const c2 = refMake(1);
+  assert.equal(Result.isSuccess(filterEqualsStrict(c1)(c1)), true);
+  assert.equal(Result.isFailure(filterEqualsStrict(c1)(c2)), true);
+  const f1 = new Map<string, number>();
+  const f2 = new Map<string, number>();
+  assert.equal(Result.isSuccess(filterEqualsStrict(f1)(f1)), true);
+  assert.equal(Result.isFailure(filterEqualsStrict(f1)(f2)), true);
+
+  const g1 = gadt({ _tag: "Box", _0: 0, $0: { show: (): string => "a" } });
+  const g2 = gadt({ _tag: "Box", _0: 0, $0: { show: (): string => "b" } });
+  const gNeg = gadt({ _tag: "Box", _0: -0, $0: { show: (): string => "c" } });
+  assert.equal(Result.isSuccess(filterEqualsStrict(g1)(g2)), true);
+  assert.equal(Result.isFailure(filterEqualsStrict(g1)(gNeg)), true);
+  assert.equal(Result.isSuccess(filterEquals(g1)(gNeg)), true);
+});
+
+test("Effect TxHashMap overwrites replace keys unconditionally without observing value identity or conflating -0.0", () => {
+  interface Key {
+    readonly id: number;
+    readonly tag: string;
+  }
+  const byId = { eq: (a: Key, b: Key) => a.id === b.id, hash: () => 7 };
+  const shared = { a: 1 };
+  const k1: Key = { id: 1, tag: "old" };
+  const k2: Key = { id: 1, tag: "new" };
+
+  const keyTag = (m: TxHashMap.FlickTxHashMap<Key, { readonly a: number }>): string => {
+    const entries = Effect.runSync(TxHashMap.flickEntries(m));
+    assert.equal(entries.length, 1);
+    const first = entries[0];
+    assert.ok(first !== undefined);
+    return first[0].tag;
+  };
+
+  assert.equal(keyTag(Effect.runSync(TxHashMap.flickMake(byId, [[k1, shared], [k2, shared]]))), "new");
+  assert.equal(keyTag(Effect.runSync(TxHashMap.flickFromIterable(byId, [[k1, shared], [k2, shared]]))), "new");
+
+  const mSet = Effect.runSync(TxHashMap.flickMake(byId, [[k1, shared]]));
+  Effect.runSync(TxHashMap.flickSet(k2, shared, mSet));
+  assert.equal(keyTag(mSet), "new");
+
+  const mMod = Effect.runSync(TxHashMap.flickMake(byId, [[k1, shared]]));
+  const prev = Effect.runSync(TxHashMap.flickModify(k2, () => shared, mMod));
+  assert.ok(Option.isSome(prev));
+  assert.deepEqual(prev.value, shared);
+  assert.equal(keyTag(mMod), "new");
+
+  const mModAt = Effect.runSync(TxHashMap.flickMake(byId, [[k1, shared]]));
+  Effect.runSync(TxHashMap.flickModifyAt(k2, () => Option.some(shared), mModAt));
+  assert.equal(keyTag(mModAt), "new");
+
+  const mUnion = Effect.runSync(TxHashMap.flickMake(byId, [[k1, shared]]));
+  Effect.runSync(TxHashMap.flickUnion(hashMapFromSeq(byId, [[k2, shared]]), mUnion));
+  assert.equal(keyTag(mUnion), "new");
+
+  const mMany = Effect.runSync(TxHashMap.flickMake(byId, [[k1, shared]]));
+  Effect.runSync(TxHashMap.flickSetMany([[k2, shared]], mMany));
+  assert.equal(keyTag(mMany), "new");
+
+  const mFlatSrc = Effect.runSync(
+    TxHashMap.flickMake(
+      { eq: (a: number, b: number) => a === b, hash: (n: number) => n },
+      [[1, k1], [2, k2]],
+    ),
+  );
+  const mFlat = Effect.runSync(
+    TxHashMap.flickFlatMap(
+      (k) => TxHashMap.flickMake(byId, [[k, shared]]),
+      // Different key type: build over Key directly with two distinct keys mapping to k1 then k2
+      Effect.runSync(TxHashMap.flickMake(byId, [[{ id: 10, tag: "a" }, k1], [{ id: 20, tag: "b" }, k2]])),
+    ),
+  );
+  assert.equal(Effect.runSync(TxHashMap.flickSize(mFlatSrc)), 2);
+  assert.equal(keyTag(mFlat), "new");
+
+  // Overwriting 0.0 with -0.0 preserves -0.0
+  const strWitness = { eq: (a: string, b: string) => a === b, hash: (s: string) => Hash.string(s) };
+  const zm = Effect.runSync(TxHashMap.flickMake(strWitness, [["z", 0]]));
+  Effect.runSync(TxHashMap.flickSet("z", -0, zm));
+  const zgot = Effect.runSync(TxHashMap.flickGet("z", zm));
+  assert.ok(Option.isSome(zgot));
+  assert.equal(Object.is(zgot.value, -0), true);
+});
+
+test("Effect GADT values skip held dictionaries in equals, hash, Cache, Chunk.dedupe, Filter, and copyData", () => {
+  const g1 = gadt({ _tag: "Box", _0: { z: 1, a: "x" }, $0: { show: (): string => "first" } });
+  const g2 = gadt({ _tag: "Box", _0: { a: "x", z: 1 }, $0: { show: (): string => "second" } });
+  const raw1 = { _tag: "Box", _0: { z: 1, a: "x" }, $0: { show: (): string => "first" } };
+  const raw2 = { _tag: "Box", _0: { a: "x", z: 1 }, $0: { show: (): string => "second" } };
+
+  // Direct Flick equals/hash handle both gadt-tagged and raw $-holding objects
+  assert.equal(flickEquals(g1, g2), true);
+  assert.equal(flickHash(g1), flickHash(g2));
+  assert.equal(flickEquals(raw1, raw2), true);
+  assert.equal(flickHash(raw1), flickHash(raw2));
+  assert.equal(flickHash(g1), flickHash(raw1));
+
+  // Effect's native Equal/Hash and polymorphic stdlib structures ignore $0 via GADT_PROTO
+  assert.equal(Equal.equals(g1, g2), true);
+  assert.equal(Hash.hash(g1), Hash.hash(g2));
+  assert.equal(Equal.equals(Option.some(g1), Option.some(g2)), true);
+  assert.equal(Hash.hash(Option.some(g1)), Hash.hash(Option.some(g2)));
+  assert.equal(Hash.hash(Option.some(g1)), flickHash(Option.some(g1)));
+  assert.equal(Hash.hash(Result.succeed(g1)), flickHash(Result.succeed(g1)));
+
+  const deduped = Chunk.dedupe(Chunk.fromIterable([g1, g2]));
+  assert.equal(deduped.length, 1);
+  assert.equal(Result.isSuccess(filterEquals(g1)(g2)), true);
+
+  // Polymorphic Effect Cache deduplicates lookups on GADT keys carrying distinct dictionaries
+  let lookups = 0;
+  const cached = Effect.runSync(
+    Effect.gen(function* () {
+      const cache = yield* Cache.make({
+        capacity: 10,
+        lookup: (k: typeof g1) =>
+          Effect.sync(() => {
+            lookups += 1;
+            return k._0.z + 10;
+          }),
+      });
+      const first = yield* Cache.get(cache, g1);
+      const second = yield* Cache.get(cache, g2);
+      return [first, second] as const;
+    }),
+  );
+  assert.deepEqual(cached, [11, 11]);
+  assert.equal(lookups, 1);
+
+  // copyData preserves GADT prototype and held dictionaries
+  const copied = copyData(g1);
+  assert.notEqual(copied, g1);
+  assert.equal(copied.$0.show(), "first");
+  assert.equal(Equal.equals(copied, g2), true);
+  assert.equal(Hash.hash(copied), Hash.hash(g2));
 });

@@ -6,7 +6,7 @@
 import { Context, type Duration, Effect, Layer, LogLevel, Option, type Schema, Scope, type Tracer } from "effect";
 import type * as AsyncResult from "effect/reactivity/AsyncResult";
 import * as Atom from "effect/reactivity/Atom";
-import { equals as flickEquals, hash as flickHash, sameValue } from "@flick-lang/runtime/core/data";
+import { equals as flickEquals, hash as flickHash, sameValue } from "../../data.ts";
 import * as AtomRegistry from "./AtomRegistry.ts";
 
 import { service } from "../../effects.ts";

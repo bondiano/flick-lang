@@ -14,7 +14,7 @@ import { WriteService, flickState, keepState, nativeRegistry, taskAtom, taskAtom
 import { service } from "./effects.ts";
 import { type UrlCodec, routeParse, routePrint } from "./route.ts";
 import { syncAbi, syncIn } from "./sync.ts";
-import { sameValue } from "@flick-lang/runtime/core/data";
+import { sameValue } from "./data.ts";
 import { tag } from "@flick-lang/runtime/tags";
 
 interface ReadImpl {

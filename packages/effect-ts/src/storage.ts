@@ -1,6 +1,6 @@
 // The browser's local storage as a state: `Atom.stored`.
 import { Option } from "effect";
-import { sameValue } from "@flick-lang/runtime/core/data";
+import { sameValue } from "./data.ts";
 import * as Atom from "./effect/reactivity/Atom.ts";
 
 /** `Atom.stored key`: the text the browser's local storage keeps under `key`. */

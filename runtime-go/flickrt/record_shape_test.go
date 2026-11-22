@@ -248,3 +248,155 @@ func TestHashMapOverwritesKeyUnconditionallyAndPreservesNegZero(t *testing.T) {
 		t.Errorf("HashMapInsert conflated -0.0 with 0.0: got %#v (signbit=%v)", opt.in[0], ok && math.Signbit(f))
 	}
 }
+
+func TestFilterEqualsStrictUsesStructuralSameValue(t *testing.T) {
+	isOk := func(v Value) bool {
+		d, ok := v.(*Data)
+		return ok && d.Tag == "Success"
+	}
+	// Records in different orders and tuples compare structurally without panicking on []Value
+	r1 := Rec("z", int32(1), "a", "hi")
+	r2 := Rec("a", "hi", "z", int32(1))
+	if !isOk(FilterEqualsStrict(r1, r2)) {
+		t.Errorf("FilterEqualsStrict failed on equal records in different orders")
+	}
+	t1 := []Value{int32(1), r1}
+	t2 := []Value{int32(1), r2}
+	if !isOk(FilterEqualsStrict(t1, t2)) {
+		t.Errorf("FilterEqualsStrict failed on equal tuples")
+	}
+	if isOk(FilterEqualsStrict([]Value{int32(1)}, []Value{int32(2)})) {
+		t.Errorf("FilterEqualsStrict accepted distinct tuples")
+	}
+	// Distinguishes +0.0 from -0.0, equates NaN with NaN
+	negZero := math.Copysign(0, -1)
+	if isOk(FilterEqualsStrict(float64(0), negZero)) {
+		t.Errorf("FilterEqualsStrict conflated 0.0 and -0.0")
+	}
+	if !isOk(FilterEqualsStrict(negZero, negZero)) {
+		t.Errorf("FilterEqualsStrict rejected -0.0 == -0.0")
+	}
+	if !isOk(FilterEqualsStrict(math.NaN(), math.NaN())) {
+		t.Errorf("FilterEqualsStrict rejected NaN == NaN")
+	}
+	if !isOk(FilterEquals(float64(0), negZero)) {
+		t.Errorf("FilterEquals should still equate 0.0 and -0.0")
+	}
+	// Mutable cells keep reference identity
+	c1 := RefMake(int32(1))
+	c2 := RefMake(int32(1))
+	if isOk(FilterEqualsStrict(c1, c2)) {
+		t.Errorf("FilterEqualsStrict conflated distinct Ref cells")
+	}
+	if !isOk(FilterEqualsStrict(c1, c1)) {
+		t.Errorf("FilterEqualsStrict rejected identical Ref cell")
+	}
+	// Chunks use strictZero comparison
+	ch0 := ChunkFromList([]Value{float64(0)})
+	chNeg0 := ChunkFromList([]Value{negZero})
+	if isOk(FilterEqualsStrict(ch0, chNeg0)) {
+		t.Errorf("FilterEqualsStrict conflated Chunk(0.0) and Chunk(-0.0)")
+	}
+	if !isOk(FilterEqualsStrict(ch0, ChunkFromList([]Value{float64(0)}))) {
+		t.Errorf("FilterEqualsStrict rejected equal Chunks")
+	}
+}
+
+func TestGADTDictFieldsSkippedInHashAndEquality(t *testing.T) {
+	d1 := NewDict()
+	d1.Set("show", Fn(func(_ *Fiber, _ Value) Value { return "a" }))
+	d2 := NewDict()
+	d2.Set("show", Fn(func(_ *Fiber, _ Value) Value { return "b" }))
+
+	g1 := &Data{Tag: "App.Box", n: 2, in: [2]Value{int32(1), d1}}
+	g2 := &Data{Tag: "App.Box", n: 2, in: [2]Value{int32(1), d2}}
+	plain := &Data{Tag: "App.Box", n: 1, in: [2]Value{int32(1)}}
+
+	if !Equals(g1, g2) || !SameValue(g1, g2) {
+		t.Errorf("GADT values with distinct *Dict fields should be equal")
+	}
+	if Hash(g1) != Hash(g2) {
+		t.Errorf("Hash(g1)=%v != Hash(g2)=%v", Hash(g1), Hash(g2))
+	}
+	if Hash(g1) != Hash(plain) {
+		t.Errorf("Hash(g1)=%v != Hash(plain)=%v", Hash(g1), Hash(plain))
+	}
+	negZero := math.Copysign(0, -1)
+	gz1 := &Data{Tag: "App.Box", n: 2, in: [2]Value{float64(0), d1}}
+	gz2 := &Data{Tag: "App.Box", n: 2, in: [2]Value{negZero, d2}}
+	if !Equals(gz1, gz2) {
+		t.Errorf("Equals should equate GADT(0.0) and GADT(-0.0)")
+	}
+	if SameValue(gz1, gz2) {
+		t.Errorf("SameValue should distinguish GADT(0.0) and GADT(-0.0)")
+	}
+}
+
+func TestTxHashMapOverwritesKeyUnconditionallyAndPreservesNegZero(t *testing.T) {
+	fb := &Fiber{}
+	byID := &Witness{
+		eq: Curry2(func(_ *Fiber, a, b Value) Value {
+			return Field(a, "id") == Field(b, "id")
+		}),
+		hash: Fn(func(_ *Fiber, _ Value) Value { return int32(7) }),
+	}
+	k1 := Shaped(ShapeOf("id", "tag"), int32(1), "old")
+	k2 := Shaped(ShapeOf("id", "tag"), int32(1), "new")
+	shared := Shaped(ShapeOf("a"), int32(1))
+
+	keyTag := func(m Value) Value {
+		entries := TxHashMapEntries(fb, m).([]Value)
+		if len(entries) != 1 {
+			t.Fatalf("expected 1 entry, got %d", len(entries))
+		}
+		return Field(entries[0].([]Value)[0], "tag")
+	}
+
+	built := TxHashMapMake(fb, byID, []Value{[]Value{k1, shared}, []Value{k2, shared}})
+	if keyTag(built) != "new" {
+		t.Errorf("TxHashMapMake did not replace equal custom key")
+	}
+
+	m := TxHashMapMake(fb, byID, []Value{[]Value{k1, shared}})
+	TxHashMapSet(fb, k2, shared, m)
+	if keyTag(m) != "new" {
+		t.Errorf("TxHashMapSet did not replace equal custom key")
+	}
+
+	m2 := TxHashMapMake(fb, byID, []Value{[]Value{k1, shared}})
+	TxHashMapModify(fb, k2, Fn(func(_ *Fiber, _ Value) Value { return shared }), m2)
+	if keyTag(m2) != "new" {
+		t.Errorf("TxHashMapModify did not replace equal custom key")
+	}
+
+	m3 := TxHashMapMake(fb, byID, []Value{[]Value{k1, shared}})
+	TxHashMapModifyAt(fb, k2, Fn(func(_ *Fiber, _ Value) Value { return Some(shared) }), m3)
+	if keyTag(m3) != "new" {
+		t.Errorf("TxHashMapModifyAt did not replace equal custom key")
+	}
+
+	m4 := TxHashMapMake(fb, byID, []Value{[]Value{k1, shared}})
+	TxHashMapUnion(fb, HashMapFromList(fb, byID, []Value{[]Value{k2, shared}}), m4)
+	if keyTag(m4) != "new" {
+		t.Errorf("TxHashMapUnion did not replace equal custom key")
+	}
+
+	m5 := TxHashMapMake(fb, byID, []Value{[]Value{k1, shared}})
+	TxHashMapSetMany(fb, []Value{[]Value{k2, shared}}, m5)
+	if keyTag(m5) != "new" {
+		t.Errorf("TxHashMapSetMany did not replace equal custom key")
+	}
+
+	// Overwriting 0.0 with -0.0 preserves -0.0
+	strW := stringWitness()
+	negZero := math.Copysign(0, -1)
+	zm := TxHashMapMake(fb, strW, []Value{[]Value{"z", float64(0)}})
+	TxHashMapSet(fb, "z", negZero, zm)
+	opt, ok := TxHashMapGet(fb, "z", zm).(*Data)
+	if !ok || opt.Tag != "Some" {
+		t.Fatalf("expected Some(-0.0), got %#v", opt)
+	}
+	if f, ok := opt.in[0].(float64); !ok || f != 0 || !math.Signbit(f) {
+		t.Errorf("TxHashMapSet conflated -0.0 with 0.0: got %#v", opt.in[0])
+	}
+}
