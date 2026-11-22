@@ -1,0 +1,41 @@
+// Using an arena or view after its region closes is rejected across closures,
+// tasks, persistent Contexts (`FLICK-G002`), and outer-owner children (`FLICK-G003`).
+module App.ArenaAfterCloseCaptures exposing (..)
+
+import Arena
+
+service Reader =
+  read : Unit ->{} String
+
+closure_read_after_close : Unit ->{} (Unit ->{} String)
+let closure_read_after_close () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "closed"
+  fun () -> Arena.get view
+}
+
+task_alloc_after_close : Unit ->{} Eff {} none Unit
+let task_alloc_after_close () = scope {
+  let arena = Arena.make ()
+  task { ignore (Arena.alloc arena "late") }
+}
+
+context_read_after_close : Unit ->{} Context.Context {Reader}
+let context_read_after_close () = scope {
+  let arena = Arena.make ()
+  let view = Arena.alloc arena "ctx-closed"
+  Context.make Reader { read = fun () -> Arena.get view }
+}
+
+outer_owner_reads_inner_arena : Unit ->{} Unit
+let outer_owner_reads_inner_arena () = scope outer {
+  scope inner {
+    let arena = Arena.make ()
+    let view = Arena.alloc arena "inner"
+    ignore (Fiber.spawn outer (fun _ -> ()) (task { ignore (Arena.get view) }))
+  }
+}
+//~ FLICK-G002 @14:13-14:27
+//~ FLICK-G002 @20:18-20:42
+//~ FLICK-G002 @27:42-27:56
+//~ FLICK-G003 @35:13-35:24

@@ -17,7 +17,6 @@ import {
   handleBuildLayer,
   handleCall,
   handleCallHandle,
-  handleCloseOwner,
   handleGetField,
   handleLookupService,
   handlePerformService,
@@ -50,6 +49,53 @@ import {
 wireCtx.makeCallback = makeCallback;
 wireCtx.makeTask = makeTask;
 wireCtx.makeCellProxy = makeCellProxy;
+
+function handleCloseOwner(msg) {
+  const exec = executions.get(msg.exec);
+  const owner = exec?.owners.get(msg.owner);
+  if (!owner) {
+    send({ type: "owner_closed", owner: msg.owner });
+    return;
+  }
+  const inflight = exec.closingOwners.get(msg.owner);
+  if (inflight) {
+    inflight.push(() => send({ type: "owner_closed", owner: msg.owner }));
+    return;
+  }
+  if (!owner.open) {
+    if (owner.pending.size === 0) {
+      send({ type: "owner_closed", owner: msg.owner });
+      return;
+    }
+    const waiters = [() => send({ type: "owner_closed", owner: msg.owner })];
+    exec.closingOwners.set(msg.owner, waiters);
+    const drain = async () => {
+      while (owner.pending.size > 0) {
+        await Promise.allSettled(owner.pending);
+      }
+    };
+    drain().finally(() => {
+      exec.closingOwners.delete(msg.owner);
+      for (const done of waiters) done();
+    });
+    return;
+  }
+  const waiters = [() => send({ type: "owner_closed", owner: msg.owner })];
+  exec.closingOwners.set(msg.owner, waiters);
+  const finish = () => {
+    exec.closingOwners.delete(msg.owner);
+    for (const done of waiters) done();
+  };
+  const fiber = fiberMod.forkNow(
+    () => ownerMod.close(owner, causeMod.succeeded(undefined)),
+    fiberMod.currentCtx(),
+  );
+  if (fiber.exit !== undefined) {
+    finish();
+    return;
+  }
+  fiber.observe(finish);
+}
 
 function dispatchSyncNested(msg) {
   if (msg.op === "release_handles") {
@@ -281,6 +327,7 @@ async function handleMessage(line) {
           ]);
         }
         exec.owners.clear();
+        exec.closingOwners.clear();
         const liveHandles = exec.handles.size;
         exec.handles.clear();
         exec.objToId.clear();
