@@ -60,6 +60,13 @@ interface types {
     version: string,
   }
 
+  record tag-axis {
+    name: string,
+    tags: list<string>,
+    default: option<string>,
+    exclusive: bool,
+  }
+
   record option-descriptor {
     parameter: parameter,
     default: option<string>,
@@ -85,6 +92,8 @@ interface types {
     language: version-range,
     runtime-abis: list<named-range>,
     environments: list<environment>,
+    tags: list<string>,
+    axes: list<tag-axis>,
     profiles: list<profile>,
     modes: list<mode>,
     capabilities: list<capability>,
@@ -92,7 +101,6 @@ interface types {
     launch-runtimes: list<string>,
     host-tools: list<string>,
     projections: list<abi>,
-    unsupported-modules: list<string>,
     stages-by-class-option: option<option-value>,
     foreign-extension: option<string>,
     foreign-suffixes: list<string>,
@@ -105,6 +113,8 @@ interface types {
     language-version: string,
     runtime-abis: list<abi>,
     environment: environment,
+    tags: list<string>,
+    host-package: option<string>,
     profile: profile,
     mode: mode,
     required-capabilities: list<capability>,

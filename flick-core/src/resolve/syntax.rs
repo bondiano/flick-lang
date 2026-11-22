@@ -7,6 +7,7 @@ use crate::plugin::{blocks_under, head_token};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::when;
 
 #[derive(Debug, Clone)]
 pub struct ModuleSyntax {
@@ -31,6 +32,9 @@ pub struct Header {
     pub private: bool,
     /// Span of the module path.
     pub span: Span,
+    /// `@when "<cond>"` condition before the module header, with the span of
+    /// its string literal.
+    pub when: Option<(String, Span)>,
     /// `None` without `exposing`: the module exports nothing.
     pub exposing: Option<Vec<Item>>,
     /// Static module parameters of a parameterized source file.
@@ -136,9 +140,22 @@ pub enum ItemKind {
 #[allow(clippy::too_many_lines)]
 pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
     let mut header = None;
+    let mut header_when: Option<(String, Span)> = None;
     let mut imports = Vec::new();
     let mut applications = Vec::new();
     for node in tree.nodes() {
+        if node.kind == K::Attribute {
+            if header.is_none()
+                && header_when.is_none()
+                && let Some(Ok(attr)) = when::read(node, text)
+            {
+                header_when = Some((
+                    attr.condition,
+                    Span::new(file, attr.literal_range.0, attr.literal_range.1),
+                ));
+            }
+            continue;
+        }
         let file_expression = node.kind == K::ModuleApplyDecl
             && header.is_none()
             && node.nodes().any(|n| {
@@ -261,6 +278,7 @@ pub fn module_syntax(tree: &Node, text: &str, file: FileId) -> ModuleSyntax {
                         .child_tokens()
                         .any(|t| t.kind == K::Ident && t.text(text) == "private"),
                     span,
+                    when: header_when.take(),
                     exposing: exposing.map(|e| items(e, text, file)),
                     parameters: node
                         .nodes()

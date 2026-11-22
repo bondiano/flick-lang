@@ -150,6 +150,7 @@ impl Loader<'_> {
             parameter_groups: Vec::new(),
             name: name.to_owned(),
             private: false,
+            when: None,
             span: at,
             exposing: Some(vec![all]),
             parameters: Vec::new(),

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { Cause, Context, Effect, Exit, Fiber } from "effect";
+import { Cause, Context, Deferred, Effect, Exit, Fiber } from "effect";
 
 import { lazyForce, lazyMake } from "../src/index.ts";
 import type { LazyCell } from "../src/effect/Lazy.ts";
@@ -54,31 +54,56 @@ test("concurrent forces run the initializer once and all get its value", async (
 });
 
 test("an interrupted owner resets the cell: a waiter runs it again and gets the value", async () => {
-  const { state, cell } = counted(20, (run) => Effect.succeed(run));
+  const started = Deferred.makeUnsafe<void>();
+  let runs = 0;
+  const cell = Effect.runSync(
+    lazyMake(
+      Effect.suspend(() => {
+        const run = ++runs;
+        if (run === 1) {
+          Deferred.doneUnsafe(started, Exit.void);
+          return Effect.never;
+        }
+        return Effect.succeed(run);
+      }),
+    ),
+  );
   const owner = Effect.runFork(lazyForce(cell));
-  await later(5);
+  await Effect.runPromise(Deferred.await(started));
   const waiter = Effect.runFork(lazyForce(cell));
   await later(5);
   const ownerExit = await Effect.runPromise(Effect.andThen(Fiber.interrupt(owner), Fiber.await(owner)));
   const waiterExit = await Effect.runPromise(Fiber.await(waiter));
   assert.ok(Exit.isFailure(ownerExit) && Cause.hasInterruptsOnly(ownerExit.cause));
   assert.deepEqual(waiterExit, Exit.succeed(2));
-  assert.equal(state.runs, 2);
+  assert.equal(runs, 2);
   assert.equal(await Effect.runPromise(lazyForce(cell)), 2);
-  assert.equal(state.runs, 2);
+  assert.equal(runs, 2);
 });
 
 test("an interrupted waiter leaves the attempt running for the others", async () => {
-  const { state, cell } = counted(20, () => Effect.succeed(42));
+  const started = Deferred.makeUnsafe<void>();
+  const release = Deferred.makeUnsafe<void>();
+  let runs = 0;
+  const cell = Effect.runSync(
+    lazyMake(
+      Effect.suspend(() => {
+        runs++;
+        Deferred.doneUnsafe(started, Exit.void);
+        return Effect.andThen(Deferred.await(release), Effect.succeed(42));
+      }),
+    ),
+  );
   const owner = Effect.runFork(lazyForce(cell));
-  await later(5);
+  await Effect.runPromise(Deferred.await(started));
   const waiter = Effect.runFork(lazyForce(cell));
   await later(5);
   const waiterExit = await Effect.runPromise(Effect.andThen(Fiber.interrupt(waiter), Fiber.await(waiter)));
   assert.ok(Exit.isFailure(waiterExit) && Cause.hasInterruptsOnly(waiterExit.cause));
+  Deferred.doneUnsafe(release, Exit.void);
   assert.deepEqual(await Effect.runPromise(Fiber.await(owner)), Exit.succeed(42));
   assert.equal(await Effect.runPromise(lazyForce(cell)), 42);
-  assert.equal(state.runs, 1);
+  assert.equal(runs, 1);
 });
 
 test("forcing a lazy from its own initializer is a defect, and it is cached", async () => {

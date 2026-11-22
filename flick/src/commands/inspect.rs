@@ -11,7 +11,7 @@ use flick_backend::{ArtifactKind, Verb};
 use flick_core::build::{self, Extras};
 use flick_core::diagnostics::{Code, Diagnostic, Severity, codes};
 use flick_core::iface::{self, Export, Interface, Target};
-use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, Project};
+use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, Project, TargetOverride};
 use flick_core::projection::Projected;
 use flick_core::source::{FileId, SourceMap};
 use flick_core::types::{
@@ -19,7 +19,7 @@ use flick_core::types::{
 };
 use flick_core::{ir, projection, syntax};
 
-use super::build::{BuildPlan, Purpose, artifacts, write};
+use super::build::{BuildPlan, Purpose, artifacts, target_override, write};
 use super::check::select;
 use crate::args::{InspectArguments, Representation};
 use crate::backends::Selected;
@@ -51,7 +51,7 @@ pub fn compile(explicit: Option<&str>) -> Result<Checked, Outcome> {
 fn compile_with_extra(
     explicit: Option<&str>,
     extra: &[PathBuf],
-    rt_override: Option<bool>,
+    target: Option<&TargetOverride>,
     allow_backends: bool,
 ) -> Result<Checked, Outcome> {
     let host = if allow_backends {
@@ -70,21 +70,15 @@ fn compile_with_extra(
         }
     };
     roots.extend(extra.iter().cloned());
-    let rt = project::stages_by_class(&host, project.as_ref(), rt_override);
+    let rt = project::stages_by_class(&host, project.as_ref(), target.and_then(|t| t.rt));
     if let Err(diagnostic) = builtin_cache::prepare_in(rt) {
         return Err(Outcome {
             sources,
             diagnostics: vec![diagnostic],
         });
     }
-    let (diagnostics, compilation) = package_cache::compile(
-        &host,
-        &mut sources,
-        project.as_ref(),
-        &roots,
-        rt_override,
-        None,
-    );
+    let (diagnostics, compilation) =
+        package_cache::compile_for(&host, &mut sources, project.as_ref(), &roots, target, None);
     if diagnostics.iter().any(|d| d.severity == Severity::Error) {
         return Err(Outcome {
             sources,
@@ -163,8 +157,19 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
         None
     };
     let allow_backends = options.emit == Representation::Output;
-    let rt_override = target.as_ref().map(|t| t.stages_by_class);
-    let mut checked = match compile_with_extra(explicit, &[], rt_override, allow_backends) {
+    let override_cfg = target.as_ref().map(|t| {
+        target_override(
+            &t.backend,
+            &t.choice,
+            t.target_overridden,
+            &t.resolved,
+            t.stages_by_class,
+            false,
+            Vec::new(),
+        )
+    });
+    let mut checked = match compile_with_extra(explicit, &[], override_cfg.as_ref(), allow_backends)
+    {
         Ok(c) => c,
         Err(outcome) => return outcome,
     };
@@ -182,7 +187,12 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
             .map(|(_, dir)| dir.join(&rel))
             .find(|path| path.is_file())
         {
-            checked = match compile_with_extra(explicit, &[path], rt_override, allow_backends) {
+            checked = match compile_with_extra(
+                explicit,
+                &[path],
+                override_cfg.as_ref(),
+                allow_backends,
+            ) {
                 Ok(c) => c,
                 Err(outcome) => return outcome,
             };

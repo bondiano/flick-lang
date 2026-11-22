@@ -15,7 +15,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::{self, ModuleCache, Project};
 use flick_core::source::SourceMap;
 
-use super::build::{BuildPlan, Purpose, artifacts, publish_artifacts, release};
+use super::build::{BuildPlan, Purpose, artifacts, publish_artifacts, release, target_override};
 use super::check::select;
 use crate::args::{GlobalArguments, Reporter, TestArguments};
 use crate::backends::options::{self, ResolvedOptions};
@@ -171,12 +171,21 @@ fn prepare(
         return fail(&sources, vec![diagnostic]);
     }
     progress.stage("Compiling Flick modules");
-    let (mut diagnostics, mut compilation) = package_cache::compile(
+    let override_cfg = target_override(
+        &backend,
+        &choice,
+        target_overridden,
+        &resolved,
+        stages_by_class,
+        true,
+        wanted.clone(),
+    );
+    let (mut diagnostics, mut compilation) = package_cache::compile_for(
         &host,
         &mut sources,
         Some(&project),
         &roots,
-        Some(stages_by_class),
+        Some(&override_cfg),
         modules,
     );
     super::build::hooks::ir(Some(&project), &mut compilation, &mut diagnostics);
@@ -203,6 +212,7 @@ fn prepare(
         .iter()
         .filter(|m| m.test && m.interface.exports_value("tests"))
         .filter(|m| wanted.is_empty() || wanted.contains(&m.path))
+        .filter(|m| compilation.module_available(&m.name))
         .map(|m| m.name.clone())
         .collect();
     let output = BuildPlan {

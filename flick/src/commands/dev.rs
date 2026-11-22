@@ -233,7 +233,7 @@ fn spawn_client(
     {
         let _ = (project, options, entry, args, global);
         Err(Diagnostic::new(
-            codes::P064,
+            codes::P067,
             Severity::Error,
             "client entries require WebAssembly backend support",
         ))

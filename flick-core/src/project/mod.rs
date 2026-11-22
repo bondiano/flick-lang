@@ -6,6 +6,7 @@ pub(crate) mod builtins;
 #[cfg(feature = "native-project")]
 pub mod cache;
 pub mod config;
+pub mod environment;
 #[cfg(feature = "native-project")]
 mod inherit;
 mod load;
@@ -19,6 +20,8 @@ pub mod store;
 pub mod target;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) mod target_preflight;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod target_preflight_tests;
 #[cfg(feature = "native-project")]
 pub mod workspace;
 
@@ -26,12 +29,16 @@ use std::path::{Component, Path, PathBuf, is_separator};
 use std::sync::Arc;
 
 pub use config::Config;
+#[cfg(not(target_arch = "wasm32"))]
+pub use environment::official_backends;
+pub use environment::{BackendAxis, BackendTags, ResolvedEnvironment, TargetOverride};
 pub(crate) use load::check_file;
 #[cfg(feature = "ide")]
 pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};
 pub use load::{
     CachedModule, Compilation, Compiled, FormatPlugins, Fresh, MainKind, ModuleCache, PackageCache,
-    check, check_with, compile, compile_with, host_services, main_kind, stages_by_class,
+    check, check_with, compile, compile_for, compile_with, host_services, main_kind,
+    stages_by_class,
 };
 #[cfg(feature = "native-project")]
 pub use load::{ModuleStore, SavedModule};
@@ -106,13 +113,6 @@ pub trait Host {
         let _ = (project, wanted);
         Vec::new()
     }
-    /// Built-in module names (and derived class names) that the selected
-    /// backend of `project` does not support, reported as `FLICK-P030`.
-    #[cfg(feature = "native-project")]
-    fn unsupported_modules(&self, project: &Project) -> Vec<String> {
-        let _ = project;
-        Vec::new()
-    }
     /// Whether `project` checks with effect stages derived by class; defaults
     /// to `true` when no backend descriptor is loaded.
     #[cfg(feature = "native-project")]
@@ -122,8 +122,7 @@ pub trait Host {
     }
     /// Whether `project`'s selected backend handles the gated service
     /// `service` at the root of `environment`; `None` when no backend
-    /// descriptor is loaded so environment preflight does not emit false
-    /// `FLICK-E020` errors.
+    /// descriptor is loaded.
     #[cfg(not(target_arch = "wasm32"))]
     fn handles_service(
         &self,
@@ -133,6 +132,19 @@ pub trait Host {
     ) -> Option<bool> {
         let _ = (project, environment, service);
         None
+    }
+    /// Extra backend descriptors known to the host for `project` (such as a
+    /// pinned `[build.backend]` component or cached descriptors), without
+    /// hitting the network.
+    fn backend_tags(&self, project: &Project) -> Vec<BackendTags> {
+        let _ = project;
+        Vec::new()
+    }
+    /// Whether this host is permitted to load backend components to inspect
+    /// custom `[build.backend]` descriptors. False for frontend-only commands
+    /// such as `flick inspect --emit iface`.
+    fn loads_backends(&self) -> bool {
+        true
     }
 }
 

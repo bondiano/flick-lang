@@ -15,17 +15,17 @@ use flick_core::project::Foreign;
 use flick_core::project::config::BackendEnvironment;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::target::Wanted;
-use flick_core::project::{Host, Project, is_companion};
+use flick_core::project::{BackendTags, Host, Project, is_companion};
 use flick_core::source::{FileId, SourceMap};
 
 #[cfg(feature = "wasm-backends")]
 use crate::backends;
+use crate::backends::options;
 use crate::plugins;
 
 /// The file system, with paths shown relative to the working directory.
 pub struct FsHost {
     pub cwd: PathBuf,
-    #[cfg(feature = "wasm-backends")]
     load_backends: bool,
 }
 
@@ -33,17 +33,15 @@ impl FsHost {
     pub fn new() -> Self {
         FsHost {
             cwd: env::current_dir().unwrap_or_default(),
-            #[cfg(feature = "wasm-backends")]
             load_backends: true,
         }
     }
 
-    /// A host that never loads backend components (for frontend-only commands
-    /// such as `inspect --emit iface`).
+    /// A host for frontend-only commands (`inspect --emit iface`, `build --inputs`)
+    /// that must never load or cache `[build.backend]` WebAssembly components.
     pub fn without_backends() -> Self {
         FsHost {
             cwd: env::current_dir().unwrap_or_default(),
-            #[cfg(feature = "wasm-backends")]
             load_backends: false,
         }
     }
@@ -106,15 +104,6 @@ impl Host for FsHost {
     }
 
     #[cfg(feature = "wasm-backends")]
-    fn unsupported_modules(&self, project: &Project) -> Vec<String> {
-        if self.load_backends {
-            backends::unsupported_modules(project)
-        } else {
-            Vec::new()
-        }
-    }
-
-    #[cfg(feature = "wasm-backends")]
     fn stages_by_class(&self, project: &Project) -> bool {
         if self.load_backends {
             backends::stages_by_class(project)
@@ -135,6 +124,14 @@ impl Host for FsHost {
         } else {
             None
         }
+    }
+
+    fn backend_tags(&self, project: &Project) -> Vec<BackendTags> {
+        options::project_backend_tags(project, self.load_backends)
+    }
+
+    fn loads_backends(&self) -> bool {
+        self.load_backends
     }
 }
 

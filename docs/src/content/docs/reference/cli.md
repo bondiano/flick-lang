@@ -30,7 +30,7 @@ run as `flick <command>` or `flick <contributor>:<command>` (see
 | `prove [paths] [--watch]` | checks the proofs of the proof root (`project.proof-dir`), or of the files given, with the code they name; `check`, `build` and `test` never read the proof root (see [the proof contract](https://github.com/bondiano/flick-lang/blob/main/docs/formal/proofs.md)) |
 | `build [paths] [--target <name>] [--profile] [--labels all\|components\|none] [--emit-ir[=json\|cbor]] [--out-dir] [--watch] [<backend options>]` | compiles the project with the selected target backend; target-specific flags are declared by the selected backend (see [Target and backend options](#target-and-backend-options)); `--emit-ir` adds `program.ir.json` (or `program.ir.cbor`): the IR the backend gets, optimized in a release build, with the version of the IR it is written in; shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
 | `build [paths] --inputs` | prints a conservative JSON input inventory (`key`, `files`, `roots`, `modules`) without writing build artifacts or cache entries |
-| `run [name] [--target <name>] [--entry M] [--profile] [<backend options>] -- args` | builds with the selected target backend and runs the `main` of the entry `name` (the only one when left out); a `name` that is not an entry runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails, with `args` as their `"$@"`; a client entry (`target = "client"`) delegates to the selected backend's client runner (`FLICK-P064` if the backend has none) |
+| `run [name] [--target <name>] [--entry M] [--profile] [<backend options>] -- args` | builds with the selected target backend and runs the `main` of the entry `name` (the only one when left out); a `name` that is not an entry runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails, with `args` as their `"$@"`; a client entry (`target = "client"`) delegates to the selected backend's client runner (`FLICK-P067` if the backend has none) |
 | `dev [name] [--target <name>] [--entry M] [--profile] [<backend options>] -- args` | rebuilds on changes and replaces the running app; in a project with several entries and none named, it runs every non-client entry and, if any entry has `target = "client"`, delegates the client runner to the selected backend |
 | `test [paths] [--target <name>] [--filter] [--list] [--forbid-only] [--jobs] [--seed] [--timeout] [--reporter human\|json] [--watch] [--profile] [<backend options>]` | runs the tests of the test root with the selected target backend (see [testing](../testing/)) |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | writes the canonical layout ([formatting](../syntax/#formatting)); without paths the source and test roots |
@@ -102,7 +102,7 @@ in `flick.toml`).
 - **`flick/go` options**: `--cgo` (`build`, `run`, `dev`, `test`; enables
   `CGO_ENABLED=1`, default `false`). `flick doctor` checks `go` and `[tools]`
   without checking Node.js or pnpm; client entries are unsupported
-  (`FLICK-P064`).
+  (`FLICK-P067`).
 
 Passing an unknown option, a wrong-verb option, a cross-backend option or an
 invalid value fails with `FLICK-P058` (exit code `2`). The legacy hardcoded

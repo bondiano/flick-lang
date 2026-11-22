@@ -54,8 +54,8 @@ max-params = 5
 | `project.runner` | the module that starts each entry without a runner of its own: it exports `type alias Main`, the type `main` must have (`FLICK-P026` otherwise), and `run`, which takes `main` and whose result the runner exports as `default`; built in are `"Runner.Node"`, `"Runner.Browser"` and `"Runner.Cloudflare"`, a Worker whose `fetch` gives `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` the request and the context (`wait_until`), and provides the bindings as the service `Env` (`Runner.Cloudflare.var`, `binding`) and the live browser services `Host.BrowserLive`; a runner may provide services this way, and `main` may need any of those its `Main` names; a package may provide another; without one, a pure `main` is called and an effect runs as on Node | — |
 | `build.out-dir` | base directory of artifacts; not the project's root, the directory of its sources or tests, or one above them (`FLICK-P028`, before anything is written) | `"dist"` |
 | `build.profile` | `"debug"` or `"release"` (see [codegen.md](../codegen/)); `--profile` of `build` and `test` overrides it | `"debug"` |
-| `build.target` | default target backend short name (`"js"`, `"go"`, or the short name of a pinned `[build.backend]`); overridden by `--target <name>` on `build`, `run`, `dev`, `test` and `inspect`. On `"go"`, Go must be on `PATH` and allowed in `[tools]` as `"flick/go" = ["go"]` (`FLICK-P029`), an import of a module of the js target only (`Ui`, `Atom`, `Action`, `Otlp`, `DevTools`, `Js`, the `Node`/`Browser`/`Cloudflare` runners) or of a package not built for go is `FLICK-P030` already in `flick check`, and what the go target does not compile yet is `FLICK-P012` (see [Go target](../codegen/#go-target)) | `"js"` (or the backend prefix of `build.environment`) |
-| `build.environment` | backend/platform pair such as `"js/node"`, `"js/browser"` or `"go/native"`; when set, `flick check`, the editor and build share environment preflight: a reachable gated effect without a root handler for that pair is `FLICK-E020` (`unhandled effect Db on js/browser` at the use). Unused unsupported code does not fail; public library exports are checked. Without it, check stays portable typing only. Toolchain gaps stay `FLICK-P015` / `FLICK-P029`. This does not promise arbitrary IR or emit-plugin correctness | the default environment of the selected backend |
+| `build.target` | default target backend short name (`"js"`, `"go"`, or the short name of a pinned `[build.backend]`); overridden by `--target <name>` on `build`, `run`, `dev`, `test` and `inspect`. On `"go"`, Go must be on `PATH` and allowed in `[tools]` as `"flick/go" = ["go"]` (`FLICK-P029`), reachable uses of JS-only modules (`Ui`, `Atom`, `Action`, `Form`, `Otlp`, `DevTools`, `Js`, `Reactivity.*`, the `Node`/`Browser`/`Cloudflare` runners) or other gated modules report `FLICK-P064` in `flick check`, the editor and `flick build` (unused imports do not fail), and constructs the go target does not compile yet are `FLICK-P012` (see [Go target](../codegen/#go-target)) | `"js"` (or the backend prefix of `build.environment`) |
+| `build.environment` | `<backend>/<host>` pair such as `"js/node"`, `"js/browser"`, `"js/bun"`, `"js/cloudflare"`, `"go/native"`, or a host provided by a `[host]` dependency package; resolves to the backend's active tags plus the host's tags. Unknown backends report `FLICK-P059`; unknown or incompatible hosts report `FLICK-P065`; unknown condition tags report `FLICK-P066`. `flick check`, the editor and `flick build` share reachable-use preflight: unavailable modules, packages or Effect-adapter bindings report `FLICK-P064` at the use site with the path from entry, and reachable gated effects without a root handler report `FLICK-E020`. Unused imports and unreachable functions do not fail; public library exports follow the export policy | the default environment of the selected backend |
 | `build.solver-steps` | instance resolution steps per definition | `100000` |
 | `build.solver-depth` | depth of nested class constraints | `256` |
 | `build.labels` | what a release build labels `Module.name` for debugging tools: `"all"` (the values of every type marked `@label`: atoms, views, actions), `"components"` (those of the kind `component`: views and actions) or `"none"`; debug labels all; `flick build --labels` overrides it | `"all"` |
@@ -116,8 +116,9 @@ Errors in the configuration exit with code `2`:
 | TOML syntax, an unknown key, a value of the wrong type or outside its set | `FLICK-P005` |
 | a removed `[build]` key or `[js]` / `[js.dependencies]` table | `FLICK-P057` |
 | an unknown or invalid key or value in `[target.<name>]` | `FLICK-P058` |
-| an unknown `[build] target` or `--target` name | `FLICK-P059` |
+| an unknown `[build] target`, `[build] environment` backend, or `--target` name | `FLICK-P059` |
 | an unknown or unsupported `--template` for `new` or `init` | `FLICK-P060` |
+| an unknown host in `[build] environment`, a duplicate `[host]` declaration, or an unmet `[host] requires` condition | `FLICK-P065` |
 | a `schema-version` other than `1`, or none | `FLICK-P006` |
 | `kind = "app"` without `entry` or `entries`, or with an empty `entries` | `FLICK-P007` |
 | both `entry` and `entries`, or an entry name that is not one | `FLICK-P005` |
@@ -128,6 +129,47 @@ Errors in the configuration exit with code `2`:
 | `sql.dialect` names a dialect that is not supported yet | `FLICK-P022` |
 | `sql.dialect` names no dialect; the message lists the known ones | `FLICK-P023` |
 | `lint.allow` names an unknown code | `FLICK-P005` |
+
+### Environments, host packages, and `when` conditions
+
+Each backend component declares its base environment tags, selectable tag axes, and built-in hosts in its descriptor:
+
+- `flick/js` publishes tag `js`, exclusive axis `runtime` (`rt` default, `effect`), additive axis `adapter` (`effect-adapter`, active when `@flick-lang/effect-ts` is in project dependencies), and built-in hosts `node`, `browser`, `bun`, and `cloudflare`.
+- `flick/go` publishes tag `go`, additive axis `cgo` (`cgo`, active with `[target.go] cgo = true`), and built-in host `native`.
+- Third-party backends can publish their own tags, axes, and hosts through the same descriptor schema.
+
+A library (`kind = "lib"`) may also declare `[host]` to define a named host environment `<backend>/<name>` and contribute extra tags when selected:
+
+```toml
+[project]
+kind = "lib"
+
+[host]
+name = "worker"
+backend = "js"
+requires = "rt || effect"
+tags = ["edge"]
+```
+
+- `host.name`: host name used in `[build] environment = "<backend>/<name>"` (automatically added as an active tag).
+- `host.backend`: target backend short name or id (such as `"js"` or `"flick/js"`).
+- `host.requires`: optional boolean condition evaluated against the backend's active tags; unmet requirements report `FLICK-P065` (exit code `2`).
+- `host.tags`: additional environment tags contributed when this host is active.
+
+Packages and modules restrict themselves to environments with boolean expressions over tags using `&&`, `||`, `!`, and parentheses:
+
+- `[package] when = "<cond>"` in `flick.toml` gates every module of that package.
+- `@when "<cond>"` immediately before `module` (or `private module`) gates a single module:
+
+```flick
+@when "js && !browser"
+module App.ServerOnly exposing (ready)
+
+ready : Bool
+let ready = true
+```
+
+Every tag referenced in `@when`, `[package] when`, and `[host] requires` is checked against the combined vocabulary of known backends and loaded `[host]` packages; typos fail at the tag span with `FLICK-P066` (exit code `1`). Reachable uses from an app's entries and runners (or a library's active public exports) that enter a gated module, package, or Effect-adapter binding report `FLICK-P064` (exit code `1`) at the use site with the path from entry, identically across `flick check`, the editor, and `flick build`. Unused imports and unreachable functions never fail, and libraries skip public modules whose own condition is false in the selected environment.
 
 ## Entry points
 
@@ -431,9 +473,10 @@ Each dependent compiles its modules for the target it emits, js or go, as
 modules of that package. Within a repository or across targets (such as a Go
 server and a JS client), a [Flick dependency](#flick-dependencies) in
 `[dependencies]` shares the library without needing `node_modules` or
-`package.json` on the Go side. Its modules are checked
-for the target of the dependent, so on go an import of a js-only module is
-`FLICK-P030`. The dependent does not report the package's warnings. Its own
+`package.json` on the Go side. Its modules are checked for the target and
+environment of the dependent, so on go a reachable use of a js-only module is
+`FLICK-P064` (unused imports do not fail). The dependent does not report the
+package's warnings. Its own
 modules come first: a module the project declares is not looked up in the
 package.
 

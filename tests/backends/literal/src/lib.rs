@@ -15,7 +15,7 @@ use flick_backend::command;
 use flick_backend::{
     Artifact, ArtifactKind, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic,
     Environment, EnvironmentServices, Inputs, Mode, ModuleRole, NamedRange, OptionDescriptor,
-    OptionValue, Packages, Parameter, Profile, ProjectFile, Severity, Span, TargetSupport,
+    OptionValue, Packages, Parameter, Profile, ProjectFile, Severity, Span, TagAxis, TargetSupport,
     ValueKind, Verb, VersionRange,
 };
 use flick_ir::{ExprKind, ItemKind, Lit, Program, Stage};
@@ -190,41 +190,28 @@ impl Backend for Literal {
                 backend: "js".into(),
                 platform: "node".into(),
             }],
+            tags: vec!["literal".into()],
+            axes: vec![
+                TagAxis {
+                    name: "dialect".into(),
+                    tags: vec!["alpha".into(), "beta".into()],
+                    default: Some("alpha".into()),
+                    exclusive: true,
+                },
+                TagAxis {
+                    name: "capabilities".into(),
+                    tags: vec!["jit".into(), "ffi".into()],
+                    default: None,
+                    exclusive: false,
+                },
+            ],
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::PerModule, Mode::WholeProgram],
             capabilities: vec![],
-            options: vec![
-                OptionDescriptor {
-                    parameter: Parameter {
-                        name: "case".into(),
-                        kind: ValueKind::Text,
-                        multiple: false,
-                        required: false,
-                        help: "Select a test fixture behavior.".into(),
-                    },
-                    default: None,
-                    implicit_value: None,
-                    choices: vec![],
-                    verbs: vec![Verb::Build, Verb::Run, Verb::Test],
-                },
-                OptionDescriptor {
-                    parameter: Parameter {
-                        name: "banner".into(),
-                        kind: ValueKind::Text,
-                        multiple: false,
-                        required: false,
-                        help: "Prepend a comment banner to generated JavaScript output.".into(),
-                    },
-                    default: None,
-                    implicit_value: None,
-                    choices: vec![],
-                    verbs: vec![Verb::Build, Verb::Inspect],
-                },
-            ],
+            options: literal_options(),
             launch_runtimes: vec!["node".into()],
             host_tools: vec!["node".into()],
             projections: vec![],
-            unsupported_modules: vec![],
             stages_by_class_option: None,
             foreign_extension: None,
             foreign_suffixes: vec![],
@@ -253,39 +240,41 @@ impl Backend for Literal {
         }
         let program =
             Program::from_cbor(&request.program).map_err(|e| diagnostic(&e.to_string(), None))?;
-        for module in &program.modules {
-            if !request
-                .modules
-                .iter()
-                .any(|m| m.name == module.name && m.role == ModuleRole::Own)
-            {
-                continue;
-            }
-            if module.items.len() != 1 {
-                return Err(diagnostic(
-                    "literal backend needs exactly one Unit main",
-                    None,
-                ));
-            }
-            for item in &module.items {
-                if tests::supported(item, request) {
+        if request.target.host_package.is_none() && case(request) != "env" {
+            for module in &program.modules {
+                if !request
+                    .modules
+                    .iter()
+                    .any(|m| m.name == module.name && m.role == ModuleRole::Own)
+                {
                     continue;
                 }
-                let supported = matches!(&item.kind, ItemKind::Value { name, dicts, body }
-                    if name == "main" && dicts.is_empty()
-                    && matches!(&body.kind, ExprKind::Lambda { params, body }
-                        if params.len() == 1 && params[0].stage == Stage::Pure
-                            && matches!(body.kind, ExprKind::Lit(Lit::Unit))));
-                if !supported && case(request) != "ir" {
-                    let span = item.span;
+                if module.items.len() != 1 {
                     return Err(diagnostic(
-                        "literal backend supports only a pure Unit main",
-                        Some(Span {
-                            file: span.file.index(),
-                            start: span.start,
-                            end: span.end,
-                        }),
+                        "literal backend needs exactly one Unit main",
+                        None,
                     ));
+                }
+                for item in &module.items {
+                    if tests::supported(item, request) {
+                        continue;
+                    }
+                    let supported = matches!(&item.kind, ItemKind::Value { name, dicts, body }
+                        if name == "main" && dicts.is_empty()
+                        && matches!(&body.kind, ExprKind::Lambda { params, body }
+                            if params.len() == 1 && params[0].stage == Stage::Pure
+                                && matches!(body.kind, ExprKind::Lit(Lit::Unit))));
+                    if !supported && case(request) != "ir" {
+                        let span = item.span;
+                        return Err(diagnostic(
+                            "literal backend supports only a pure Unit main",
+                            Some(Span {
+                                file: span.file.index(),
+                                start: span.start,
+                                end: span.end,
+                            }),
+                        ));
+                    }
                 }
             }
         }
@@ -408,12 +397,25 @@ impl Backend for Literal {
 
 fn module_artifacts(request: &BuildRequest) -> Vec<Artifact> {
     let prefix = banner(request).map(|b| format!("// {b}\n").into_bytes());
+    let env_header = (request.target.host_package.is_some() || case(request) == "env").then(|| {
+        format!(
+            "// env: {}/{} tags: {} host: {}\n",
+            request.target.environment.backend,
+            request.target.environment.platform,
+            request.target.tags.join(","),
+            request.target.host_package.as_deref().unwrap_or("none"),
+        )
+        .into_bytes()
+    });
     request
         .modules
         .iter()
         .filter(|m| m.role == ModuleRole::Own && selected(request, &m.name))
         .map(|m| {
             let mut bytes = prefix.clone().unwrap_or_default();
+            if let Some(header) = &env_header {
+                bytes.extend(header);
+            }
             bytes.extend(
                 tests::source(request, &m.name)
                     .unwrap_or_else(|| b"export const main = (_) => undefined;\n".to_vec()),
@@ -426,6 +428,76 @@ fn module_artifacts(request: &BuildRequest) -> Vec<Artifact> {
             }
         })
         .collect()
+}
+
+fn literal_options() -> Vec<OptionDescriptor> {
+    vec![
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "case".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "Select a test fixture behavior.".into(),
+            },
+            default: None,
+            implicit_value: None,
+            choices: vec![],
+            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "banner".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "Prepend a comment banner to generated JavaScript output.".into(),
+            },
+            default: None,
+            implicit_value: None,
+            choices: vec![],
+            verbs: vec![Verb::Build, Verb::Inspect],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "dialect".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "Select literal fixture dialect tag.".into(),
+            },
+            default: Some("alpha".into()),
+            implicit_value: None,
+            choices: vec!["alpha".into(), "beta".into()],
+            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "jit".into(),
+                kind: ValueKind::Flag,
+                multiple: false,
+                required: false,
+                help: "Enable fixture JIT capability tag.".into(),
+            },
+            default: Some("false".into()),
+            implicit_value: None,
+            choices: vec![],
+            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "ffi".into(),
+                kind: ValueKind::Flag,
+                multiple: false,
+                required: false,
+                help: "Enable fixture FFI capability tag.".into(),
+            },
+            default: Some("false".into()),
+            implicit_value: None,
+            choices: vec![],
+            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
+        },
+    ]
 }
 
 #[cfg(feature = "guest")]

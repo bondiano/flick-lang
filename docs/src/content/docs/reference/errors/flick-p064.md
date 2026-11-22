@@ -2,14 +2,22 @@
 title: "FLICK-P064"
 ---
 
-`flick run` and `flick dev` delegate entries with `target = "client"` to the
-selected backend's `run-client` and `dev-client` commands. This project's
-backend declares no client entry runner for the requested command, so `flick`
-cannot launch the client entry on this target.
+A reachable use from the program's entry or a library's public exports depends
+on a module, package, or foreign binding whose environment condition is not
+satisfied by the selected environment.
 
-Run or develop the entry with a target whose backend supports client entries,
-or select a non-client entry of the project:
+Unused imports and unreachable functions are allowed so cross-environment
+modules can share types and signatures. The diagnostic points to the use site
+and shows the path from the entry or public export that reached it.
 
-```sh
-flick run --target js <entry>
+Either switch `[build] environment` (or `[target.<backend>]` options) to an
+environment whose tags satisfy the condition, add the required dependency (such
+as `@flick-lang/effect-ts` for Effect-adapter bindings on JS `rt`), or move
+environment-specific code behind a module gated for that environment:
+
+```flick
+@when "js && browser"
+module App.Browser exposing (mount)
+
+let mount = ()
 ```

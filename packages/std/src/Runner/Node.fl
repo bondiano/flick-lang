@@ -1,6 +1,7 @@
 /// The runner of a program on Node.js: `[project] runner = "Runner.Node"`.
 /// It runs `main` with `()` under the root owner; SIGINT and SIGTERM
 /// interrupt it, and the exit code tells how it ended.
+@when "js"
 module Runner.Node exposing (Main, run)
 
 import Host

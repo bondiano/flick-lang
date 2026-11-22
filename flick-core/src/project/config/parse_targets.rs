@@ -106,7 +106,7 @@ pub(super) struct RawBuild {
     profile: Option<Profile>,
     target: Option<Spanned<String>>,
     backend: Option<Spanned<BackendPackage>>,
-    environment: Option<BackendEnvironment>,
+    environment: Option<Spanned<BackendEnvironment>>,
     solver_steps: Option<u32>,
     solver_depth: Option<u32>,
     labels: Option<Labels>,
@@ -209,12 +209,16 @@ pub(super) fn parse_build(
             .map_err(|why| Diagnostic::error(codes::P005, why, span(backend.span())))?;
     }
     let defaults = Build::default();
+    let target_span = raw.target.as_ref().map(|t| span(t.span()));
+    let environment_span = raw.environment.as_ref().map(|e| span(e.span()));
     Ok(Build {
         out_dir: raw.out_dir.unwrap_or(defaults.out_dir),
         profile: raw.profile.unwrap_or(defaults.profile),
         target: raw.target.map(Spanned::into_inner),
+        target_span,
         backend: raw.backend.map(Spanned::into_inner),
-        environment: raw.environment,
+        environment: raw.environment.map(Spanned::into_inner),
+        environment_span,
         solver_steps: raw.solver_steps.unwrap_or(types::Limits::default().steps),
         solver_depth: raw.solver_depth.unwrap_or(types::Limits::default().depth),
         labels: raw.labels.unwrap_or(defaults.labels),

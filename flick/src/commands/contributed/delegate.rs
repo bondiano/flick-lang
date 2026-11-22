@@ -157,7 +157,7 @@ fn client_arguments(entry: Option<&str>, extra_args: &[String]) -> Vec<Argument>
 fn no_client_runner(id: &str, verb: &str) -> Diagnostic {
     let action = verb.strip_suffix("-client").unwrap_or(verb);
     Diagnostic::new(
-        codes::P064,
+        codes::P067,
         Severity::Error,
         format!("the backend `{id}` has no client entry runner for `flick {action}`"),
     )

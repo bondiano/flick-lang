@@ -8,11 +8,10 @@ mod guest;
 mod optimize;
 mod templates;
 
-use crate::codegen::UNSUPPORTED_MODULES;
 use flick_backend::{
     Abi, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment,
     EnvironmentServices, Inputs, Mode, NamedRange, OptionDescriptor, Parameter, Profile, Severity,
-    TargetSupport, ValueKind, Verb, VersionRange, command,
+    TagAxis, TargetSupport, ValueKind, Verb, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -77,6 +76,13 @@ impl Backend for Go {
                 backend: "go".into(),
                 platform: "native".into(),
             }],
+            tags: vec!["go".into()],
+            axes: vec![TagAxis {
+                name: "cgo".into(),
+                tags: vec!["cgo".into()],
+                default: None,
+                exclusive: false,
+            }],
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::WholeProgram],
             capabilities: vec![],
@@ -99,10 +105,6 @@ impl Backend for Go {
                 name: "flick.go".into(),
                 version: "0.1.0".into(),
             }],
-            unsupported_modules: UNSUPPORTED_MODULES
-                .iter()
-                .map(|m| (*m).to_owned())
-                .collect(),
             stages_by_class_option: None,
             foreign_extension: Some("go".into()),
             foreign_suffixes: vec![".go".into()],

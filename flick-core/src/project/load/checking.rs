@@ -23,7 +23,7 @@ use super::{
 };
 use crate::clock::{micros, timed};
 use crate::diagnostics::{Diagnostic, Severity, codes};
-use crate::iface::{Decl, Namespace};
+use crate::iface::{Decl, Namespace, closed};
 #[cfg(feature = "native-project")]
 use crate::iface::{IFACE_VERSION, ModuleTemplate};
 use crate::ir;
@@ -109,6 +109,11 @@ pub(crate) fn check_file(
     };
     let mut diagnostics = checking.check(&modules[0], &builtin, &builtin).diagnostics;
     diagnostics.append(&mut derived);
+    super::environment::validate_standalone_when(
+        &modules[0].syntax,
+        sources.get(file),
+        &mut diagnostics,
+    );
     // a lone file has no package, so no private module of one is its own
     for import in &modules[0].syntax.imports {
         let private = |i: &Interface| i.module == import.module && i.private;
@@ -295,13 +300,11 @@ impl Loader<'_> {
                     .diagnostics
                     .iter()
                     .any(|d| d.severity == Severity::Error),
-            // an editor's run drops IR unless a selected environment needs it
-            // for target preflight; a check and a build keep it
+            // an editor's run drops IR unless a selected target/environment needs
+            // it for reachable-use preflight; a check and a build keep it
             #[cfg(feature = "ide")]
             cached_ir: if self.ide.is_some()
-                && self
-                    .project
-                    .is_none_or(|p| p.config.build.environment.is_none())
+                && self.project.is_none_or(|p| !p.config.has_selected_target())
             {
                 CachedIr::Dropped
             } else {
@@ -477,19 +480,16 @@ struct Output {
 fn exported(interface: &Interface, clean: bool) -> Interface {
     // a type left open holds variables of the module's own store, which no
     // interface writes and no importer may read with its own
-    fn written(part: &impl serde::Serialize) -> bool {
-        serde_json::to_value(part).is_ok()
-    }
     let mut out = interface.clone();
     if clean {
         return out;
     }
     for export in &mut out.exports {
-        if !written(export) {
+        if !closed::export_is_closed(export) {
             (export.scheme, export.definition) = (None, None);
         }
     }
-    out.instances.retain(written);
+    out.instances.retain(closed::instance_is_closed);
     out
 }
 

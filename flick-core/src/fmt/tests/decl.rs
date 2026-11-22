@@ -401,3 +401,15 @@ fn lays_out_a_contract_under_where() {
       x - 1
     ");
 }
+
+#[test]
+fn formats_when_attribute_before_module_header() {
+    let src = "/// Node runner.\n@when   \"js && !browser\"\nmodule   App.Node   exposing ( main )\n\nlet main () = ()\n";
+    insta::assert_snapshot!(fmt(src), @r#"
+    /// Node runner.
+    @when "js && !browser"
+    module App.Node exposing (main)
+
+    let main () = ()
+    "#);
+}

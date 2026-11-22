@@ -1,36 +1,59 @@
-//! Build-facing environment preflight and standard environment root-handler
-//! mappings.
+//! Build-facing compatibility API for unified project environment preflight.
 
-use super::Settings;
+use std::collections::BTreeSet;
+
+use super::{Backend, Settings};
 use crate::diagnostics::Diagnostic;
+use crate::project::Compilation;
 use crate::project::config::BackendEnvironment;
-use crate::project::{Compilation, target_preflight};
+use crate::project::environment::ResolvedEnvironment;
+use crate::project::target_preflight::{self, CheckOptions, RunnerRef};
 use crate::source::SourceMap;
 
-pub use target_preflight::{gated_service, std_root_handlers_for};
+pub use target_preflight::{
+    gated_service, handled_services, handles, std_root_handlers, std_root_handlers_for,
+};
 
-/// Short names of gated services that have a root handler on the built-in
-/// official environments (used by native emitter tests).
-pub fn handled_services(environment: &BackendEnvironment) -> &'static [&'static str] {
-    match (environment.backend.as_str(), environment.platform.as_str()) {
-        ("js", "node") | ("go", "native") => target_preflight::GATED,
-        _ => &[],
-    }
+/// Run unified environment preflight from native JS build `Settings` (used by
+/// direct `build::emit` callers and the JS backend preflight step).
+pub fn check_settings(
+    compilation: &Compilation,
+    settings: &Settings<'_>,
+    sources: &SourceMap,
+    diagnostics: &mut Vec<Diagnostic>,
+) {
+    let env = resolved_from_settings(compilation, settings);
+    let entries: Vec<_> = settings
+        .entries
+        .iter()
+        .map(|(name, module)| (name.clone(), module.clone(), None))
+        .collect();
+    let runners: Vec<_> = settings
+        .runners
+        .iter()
+        .map(|(entry, module)| RunnerRef {
+            entry: entry.clone(),
+            module: module.clone(),
+            span: None,
+        })
+        .collect();
+    target_preflight::check(
+        compilation,
+        &CheckOptions {
+            entries: &entries,
+            runners: &runners,
+            by_class: settings.backend == Backend::Rt,
+            for_tests: false,
+            test_paths: &[],
+            handles: None,
+        },
+        sources,
+        &env,
+        diagnostics,
+    );
 }
 
-/// Whether `environment` has a root handler for the gated service `name`.
-pub fn handles(environment: &BackendEnvironment, name: &str) -> bool {
-    handled_services(environment).contains(&name)
-}
-
-/// Std root-handler symbols declared for an environment that hosts them.
-pub fn std_root_handlers(
-    environment: &BackendEnvironment,
-) -> Vec<(&'static str, &'static str, &'static str, &'static str)> {
-    std_root_handlers_for(handled_services(environment).iter().copied())
-}
-
-/// Reject reachable gated effects that the selected environment cannot host.
+/// Reject reachable unavailable uses and gated effects for an explicit environment.
 pub fn check(
     compilation: &Compilation,
     settings: &Settings<'_>,
@@ -38,141 +61,88 @@ pub fn check(
     environment: &BackendEnvironment,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
+    let mut env = resolved_from_settings(compilation, settings);
+    env.backend.clone_from(&environment.backend);
+    env.platform.clone_from(&environment.platform);
+    env.tags.insert(environment.backend.clone());
+    env.tags.insert(environment.platform.clone());
+    env.explicit_environment = true;
+    let entries: Vec<_> = settings
+        .entries
+        .iter()
+        .map(|(name, module)| (name.clone(), module.clone(), None))
+        .collect();
+    let runners: Vec<_> = settings
+        .runners
+        .iter()
+        .map(|(entry, module)| RunnerRef {
+            entry: entry.clone(),
+            module: module.clone(),
+            span: None,
+        })
+        .collect();
     target_preflight::check(
         compilation,
-        settings.entries,
-        settings.runners,
+        &CheckOptions {
+            entries: &entries,
+            runners: &runners,
+            by_class: settings.backend == Backend::Rt,
+            for_tests: false,
+            test_paths: &[],
+            handles: None,
+        },
         sources,
-        environment,
-        &|name| handles(environment, name),
+        &env,
         diagnostics,
     );
 }
 
-#[cfg(test)]
-mod tests {
-    use std::path::PathBuf;
-    use std::sync::Arc;
-
-    use super::{gated_service, handles};
-    use crate::diagnostics::{Diagnostic, codes};
-    use crate::ir::tests::check_text;
-    use crate::project::config::BackendEnvironment;
-    use crate::project::{Compilation, Compiled, target_preflight};
-    use crate::source::SourceMap;
-
-    const DB_PROVIDED: &str = r#"module App.Main exposing (main)
-
-service Db =
-  query : String ->{} String
-
-main : Unit ->{} Unit
-let main () =
-  provide Db ({ query = fun key -> key }) {
-    ignore (Db.query "x")
-  }
-"#;
-
-    const DB_UNUSED: &str = r"module App.Main exposing (main)
-
-service Db =
-  query : String ->{} String
-
-unused : String ->{Db} String
-let unused key = Db.query key
-
-main : Unit ->{} Unit
-let main () = ()
-";
-
-    const DB_EXPORT: &str = r"module App.Main exposing (run)
-
-service Db =
-  query : String ->{} String
-
-run : String ->{Db} String
-let run key = Db.query key
-";
-
-    fn environment(pair: &str) -> BackendEnvironment {
-        pair.parse().expect("environment")
+pub(crate) fn resolved_from_settings(
+    compilation: &Compilation,
+    settings: &Settings<'_>,
+) -> ResolvedEnvironment {
+    if let Some(mut resolved) = compilation.environment.clone() {
+        if settings.ui.is_some() {
+            resolved.ui = settings.ui.map(str::to_owned);
+        }
+        if settings.backend == Backend::Rt {
+            resolved.tags.insert("rt".into());
+            resolved.tags.remove("effect");
+        } else {
+            resolved.tags.insert("effect".into());
+            resolved.tags.remove("rt");
+        }
+        if settings.effect_bridge.available() {
+            resolved.tags.insert("effect-adapter".into());
+        } else {
+            resolved.tags.remove("effect-adapter");
+        }
+        return resolved;
     }
-
-    fn diagnostics(text: &str, pair: &str, app: bool) -> Vec<Diagnostic> {
-        let (ir, interface) = check_text("App.Main", text).expect("the source checks");
-        let mut sources = SourceMap::default();
-        let file = sources.add("App/Main.fl", text);
-        let compilation = Compilation {
-            modules: vec![Compiled {
-                name: ir.name.clone(),
-                path: PathBuf::from("/app/src/App/Main.fl"),
-                file,
-                test: false,
-                package: None,
-                imports: vec![],
-                ir,
-                declarations: Arc::new(interface.clone()),
-                interface,
-                expansion: None,
-            }],
-            ..Compilation::default()
-        };
-        let entries = [("main".into(), "App.Main".into())];
-        let env = environment(pair);
-        let mut found = Vec::new();
-        target_preflight::check(
-            &compilation,
-            if app { &entries } else { &[] },
-            &[],
-            &sources,
-            &env,
-            &|name| handles(&env, name),
-            &mut found,
-        );
-        found
+    let (backend, platform, explicit_environment) = match settings.environment {
+        Some(env) => (env.backend.clone(), env.platform.clone(), true),
+        None => ("js".to_owned(), "node".to_owned(), false),
+    };
+    let mut tags = BTreeSet::new();
+    tags.insert(backend.clone());
+    tags.insert(platform.clone());
+    if backend == "js" {
+        tags.insert(if settings.backend == Backend::Rt {
+            "rt".to_owned()
+        } else {
+            "effect".to_owned()
+        });
+        if settings.effect_bridge.available() {
+            tags.insert("effect-adapter".to_owned());
+        }
     }
-
-    #[test]
-    fn inventory_handles_database_on_node_not_browser() {
-        assert!(handles(&environment("js/node"), "Db"));
-        assert!(handles(&environment("js/node"), "Database"));
-        assert!(!handles(&environment("js/browser"), "Db"));
-        assert_eq!(gated_service("App.Main.Db"), Some("Db"));
-        assert_eq!(gated_service("Database.Database"), Some("Database"));
-    }
-
-    #[test]
-    fn browser_rejects_a_reachable_unhandled_db_at_its_use() {
-        let source = DB_EXPORT;
-        let found = diagnostics(source, "js/browser", false);
-        assert_eq!(found.len(), 1, "{found:?}");
-        assert_eq!(found[0].code, codes::E020);
-        assert_eq!(found[0].message, "unhandled effect Db on js/browser");
-        let span = found[0].span.expect("requirement span");
-        assert_eq!(&source[span.start as usize..span.end as usize], "Db.query");
-    }
-
-    #[test]
-    fn node_accepts_the_same_reachable_db_export() {
-        let found = diagnostics(DB_EXPORT, "js/node", false);
-        assert!(found.is_empty(), "{found:?}");
-    }
-
-    #[test]
-    fn browser_accepts_a_locally_provided_db() {
-        let found = diagnostics(DB_PROVIDED, "js/browser", true);
-        assert!(found.is_empty(), "{found:?}");
-    }
-
-    #[test]
-    fn unused_db_does_not_fail_a_reachable_only_executable() {
-        let found = diagnostics(DB_UNUSED, "js/browser", true);
-        assert!(found.is_empty(), "{found:?}");
-    }
-
-    #[test]
-    fn a_library_export_policy_checks_public_db_use() {
-        let found = diagnostics(DB_EXPORT, "js/browser", false);
-        assert_eq!(found[0].code, codes::E020);
+    ResolvedEnvironment {
+        backend_id: format!("flick/{backend}"),
+        backend,
+        platform,
+        host_package: None,
+        tags,
+        explicit_environment,
+        ui: settings.ui.map(str::to_owned),
     }
 }

@@ -79,13 +79,6 @@ pub(crate) fn foreign(project: &Project) -> Foreign {
     }
 }
 
-/// Modules unsupported by the project's selected target backend (cached descriptor).
-pub(crate) fn unsupported_modules(project: &Project) -> Vec<String> {
-    options::descriptor_for_project(project)
-        .map(|d| d.unsupported_modules)
-        .unwrap_or_default()
-}
-
 /// Whether `project`'s selected target backend uses class-derived built-in stages.
 pub(crate) fn stages_by_class(project: &Project) -> bool {
     options::descriptor_for_project(project).map_or_else(

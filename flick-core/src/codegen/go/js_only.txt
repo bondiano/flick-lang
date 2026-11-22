@@ -1,7 +1,7 @@
 # Exports the go target never binds, as they are JS values by nature (Web
 # Streams, JS arrays, promises): under each `[module]`, an export, each with
-# a comment saying why. Modules of `project/load/target.rs::JS_ONLY` are
-# left out whole and need no entry here.
+# a comment saying why. Built-in modules whose `@when` condition excludes
+# `go`/`native` are left out whole and need no entry here.
 
 [flick:Channel]
 # a web ReadableStream, a JS value Go has no form of

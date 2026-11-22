@@ -144,6 +144,22 @@ pub struct Package {
     /// of any module; a service, `Module.Service`, whose signatures it is
     /// told of; or a tag: `@maker`, for the values it reaches, or `@cell`.
     pub watch: Vec<String>,
+    /// `when = "<cond>"`: environment tag condition required to use any module
+    /// of this package.
+    pub when: Option<(String, Span)>,
+    pub span: Span,
+}
+
+/// `[host]`: a host package that provides an environment `<backend>/<name>`
+/// and publishes environment tags for `when` conditions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HostConfig {
+    pub name: String,
+    pub backend: String,
+    /// Optional `requires = "<cond>"` evaluated against the backend's active tags.
+    pub requires: Option<(String, Span)>,
+    /// Additional environment tags contributed when this host is selected.
+    pub tags: Vec<(String, Span)>,
     pub span: Span,
 }
 
@@ -163,6 +179,8 @@ pub struct Config {
     pub target_dependencies: Vec<TargetDependency>,
     /// `[package]`, which a library others fetch has.
     pub package: Option<Package>,
+    /// `[host]`, when this library provides a host environment for a backend.
+    pub host: Option<HostConfig>,
     pub build: Build,
     /// `[target.<name>]`: backend-declared options by target short name.
     #[cfg(feature = "native-project")]
@@ -220,11 +238,16 @@ pub struct Build {
     /// Default target backend name.
     #[cfg(feature = "native-project")]
     pub target: Option<String>,
+    /// Source span of `[build] target`.
+    #[cfg(feature = "native-project")]
+    pub target_span: Option<Span>,
     /// An exact backend package pin.
     #[cfg(feature = "native-project")]
     pub backend: Option<BackendPackage>,
-    /// Backend plus platform; absent means the selected backend's default.
+    /// Backend plus host/platform; absent means the selected backend's default.
     pub environment: Option<BackendEnvironment>,
+    /// Source span of `[build] environment`.
+    pub environment_span: Option<Span>,
     /// Instance resolution budget per definition.
     pub solver_steps: u32,
     pub solver_depth: u32,
@@ -303,6 +326,20 @@ impl Config {
         }
         "js"
     }
+
+    /// Whether `flick.toml` explicitly selects a target, backend, environment,
+    /// or target option table (so `flick check` and IDE runs perform
+    /// reachable-use environment preflight).
+    pub fn has_selected_target(&self) -> bool {
+        if self.build.environment.is_some() {
+            return true;
+        }
+        #[cfg(feature = "native-project")]
+        if self.build.target.is_some() || self.build.backend.is_some() || !self.targets.is_empty() {
+            return true;
+        }
+        false
+    }
 }
 
 impl Default for Config {
@@ -316,6 +353,7 @@ impl Default for Config {
             dependencies: Vec::new(),
             target_dependencies: Vec::new(),
             package: None,
+            host: None,
             build: Build::default(),
             #[cfg(feature = "native-project")]
             targets: BTreeMap::new(),
@@ -339,8 +377,11 @@ impl Default for Build {
             #[cfg(feature = "native-project")]
             target: None,
             #[cfg(feature = "native-project")]
+            target_span: None,
+            #[cfg(feature = "native-project")]
             backend: None,
             environment: None,
+            environment_span: None,
             solver_steps: types::Limits::default().steps,
             solver_depth: types::Limits::default().depth,
             labels: Labels::default(),

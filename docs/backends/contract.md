@@ -39,7 +39,7 @@ Projects without a pin select the shipped `flick/js` component by default or
 Each backend declares its own CLI and `[target.<name>]` options in
 `descriptor.options` (`option-descriptor`: `parameter`, `default`,
 `implicit-value`, `choices`, `verbs`), along with target metadata
-(`launch-runtimes`, `host-tools`, `projections`, `unsupported-modules`,
+(`launch-runtimes`, `host-tools`, `projections`,
 `stages-by-class-option`, `foreign-extension`, `foreign-suffixes`, and
 `handled-services`), cached by component digest in
 `<store>/descriptors/<sha256>.cbor` so `--help` never reaches the network.
@@ -60,7 +60,7 @@ A `BuildRequest` carries these independent facts:
 | --- | --- |
 | API, IR and language versions | Host; explicit handshake ranges in the descriptor |
 | Backend selection | Project pin: id, version and SHA-256 of component bytes |
-| Environment | Backend plus platform, such as `js/browser`, `js/node` or `go/native` |
+| Environment | Backend plus host/platform (`js/browser`, `js/node`, `go/native`, or a `[host]` package), resolved active `tags`, and optional `host-package` |
 | Runtime ABI and toolchain pins | Host/project; independent of backend API and IR |
 | Portable program | Versioned CBOR `flick_ir::Program`, including declared lang items |
 | Compilation mode | Whole program, or explicit module root with the surrounding graph and external interfaces |
@@ -356,7 +356,7 @@ layout:
   `"<what>\n<detail>"` (`plan.stdout` is ignored; any `"doctor-fail"` line fails
   `flick doctor` with `FLICK-P015`, exit code `2`). `run-client` and `dev-client` handle client
   entries (`target = "client"`) via `in-place` tool steps; if a backend does not
-  declare them, `flick` reports `FLICK-P064` (exit code `2`).
+  declare them, `flick` reports `FLICK-P067` (exit code `2`).
 
 ### Atomic publication
 

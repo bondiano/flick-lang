@@ -14,7 +14,7 @@ use std::collections::HashSet;
 
 use flick_core::build;
 use flick_core::codegen;
-use flick_core::diagnostics::Diagnostic;
+use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::iface::{self, Target};
 use flick_core::project::{self, Compilation, Host, Project};
 use flick_core::source::{FileId, SourceMap};
@@ -22,6 +22,7 @@ use flick_core::{ir, types};
 use flick_ir::Program;
 
 use crate::artifact::Artifact;
+use crate::commands::build::settings::with_settings;
 use crate::commands::build::{BuildPlan, Purpose};
 use crate::sources::FsHost;
 use crate::toolchain;
@@ -100,22 +101,29 @@ impl Prepared {
         pin: BackendPin,
         descriptor: &Descriptor,
     ) -> Self {
-        let (program, files) = program(sources, compilation, output.stages_by_class);
         let package = project.and_then(|p| project::project_name(host, p));
-        let (target_request, module_root) = target(project, output, descriptor);
-        let declared_dependencies = project.map(|p| {
-            let mut deps = host.foreign(p).declared;
-            deps.extend(
-                compilation
-                    .target_dependencies
-                    .iter()
-                    .filter(|d| d.target == output.target)
-                    .map(|d| d.name.clone()),
-            );
-            deps.sort();
-            deps.dedup();
-            deps
-        });
+        let (target_request, module_root) = target(project, compilation, output, descriptor);
+        let declared_dependencies = declared_dependencies(host, project, compilation, output);
+        let preflight_diagnostics = javascript_preflight(
+            host,
+            sources,
+            project,
+            compilation,
+            output,
+            descriptor,
+            declared_dependencies.as_deref(),
+        );
+        let pruned;
+        let compilation = if preflight_diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error)
+        {
+            compilation
+        } else {
+            pruned = compilation.prune_for_environment(sources, output.stages_by_class);
+            &pruned
+        };
+        let (program, files) = program(sources, compilation, output.stages_by_class);
         let mut data = Self {
             request: BuildRequest {
                 target: target_request,
@@ -158,7 +166,7 @@ impl Prepared {
             bytes: BTreeMap::new(),
             files,
             shared: vec![],
-            diagnostics: vec![],
+            diagnostics: preflight_diagnostics,
         };
         for (i, name) in program.files.into_iter().enumerate() {
             let file = sources.get(data.files[i]);
@@ -175,7 +183,6 @@ impl Prepared {
         }
         data.modules(
             host,
-            sources,
             compilation,
             project,
             package.as_deref(),
@@ -191,7 +198,6 @@ impl Prepared {
     fn modules(
         &mut self,
         host: &FsHost,
-        sources: &SourceMap,
         compilation: &Compilation,
         project: Option<&Project>,
         package: Option<&str>,
@@ -266,7 +272,7 @@ impl Prepared {
             self.go(host, project, compilation, output);
         }
         if wants("flick.javascript") || wants("flick.typescript") {
-            self.javascript(host, sources, project, compilation, output, &interfaces);
+            self.javascript(host, project, compilation, output, &interfaces);
         }
     }
 
@@ -340,8 +346,63 @@ impl Prepared {
     }
 }
 
+fn declared_dependencies(
+    host: &FsHost,
+    project: Option<&Project>,
+    compilation: &Compilation,
+    output: &BuildPlan,
+) -> Option<Vec<String>> {
+    project.map(|p| {
+        let mut deps = host.foreign(p).declared;
+        deps.extend(
+            compilation
+                .target_dependencies
+                .iter()
+                .filter(|d| d.target == output.target)
+                .map(|d| d.name.clone()),
+        );
+        deps.sort();
+        deps.dedup();
+        deps
+    })
+}
+
+fn javascript_preflight(
+    host: &FsHost,
+    sources: &SourceMap,
+    project: Option<&Project>,
+    compilation: &Compilation,
+    output: &BuildPlan,
+    descriptor: &Descriptor,
+    declared_dependencies: Option<&[String]>,
+) -> Vec<Diagnostic> {
+    let wants = |name: &str| descriptor.projections.iter().any(|p| p.name == name);
+    let mut diagnostics = Vec::new();
+    if wants("flick.javascript") || wants("flick.typescript") {
+        let effect_bridge = if declared_dependencies
+            .is_none_or(|deps| deps.iter().any(|d| d == "@flick-lang/effect-ts"))
+        {
+            codegen::EffectBridge::Available
+        } else {
+            codegen::EffectBridge::Absent
+        };
+        with_settings(
+            host,
+            project,
+            compilation,
+            output,
+            effect_bridge,
+            |settings| {
+                build::javascript_preflight(compilation, sources, settings, &mut diagnostics);
+            },
+        );
+    }
+    diagnostics
+}
+
 fn target(
     project: Option<&Project>,
+    compilation: &Compilation,
     output: &BuildPlan,
     descriptor: &Descriptor,
 ) -> (TargetRequest, Option<String>) {
@@ -355,13 +416,25 @@ fn target(
                 platform: "default".into(),
             })
     };
-    let environment = project
-        .and_then(|p| p.config.build.environment.as_ref())
-        .filter(|e| !output.target_overridden || e.backend == output.target)
-        .map_or_else(default_env, |e| Environment {
-            backend: e.backend.clone(),
-            platform: e.platform.clone(),
-        });
+    let (environment, tags, host_package) = if let Some(resolved) = &compilation.environment {
+        (
+            Environment {
+                backend: resolved.backend.clone(),
+                platform: resolved.platform.clone(),
+            },
+            resolved.tags.iter().cloned().collect(),
+            resolved.host_package.clone(),
+        )
+    } else {
+        let env = project
+            .and_then(|p| p.config.build.environment.as_ref())
+            .filter(|e| !output.target_overridden || e.backend == output.target)
+            .map_or_else(default_env, |e| Environment {
+                backend: e.backend.clone(),
+                platform: e.platform.clone(),
+            });
+        (env, vec![], None)
+    };
     let extras = output.extras;
     let option = |key: &str, value: &str| OptionValue {
         key: key.into(),
@@ -408,6 +481,8 @@ fn target(
                 version: toolchain::RUNTIME.into(),
             }],
             environment,
+            tags,
+            host_package,
             profile: if output.release {
                 Profile::Release
             } else {

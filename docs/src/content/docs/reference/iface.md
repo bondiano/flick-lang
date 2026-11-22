@@ -57,6 +57,7 @@ later arguments do not enter that lexical environment.
 | `member_of` | owner namespace and member name for a generated static member; external access uses the checked parent view |
 | `template` | checked static body (`source`) and its lexical `capture`: module bindings, signature origins, partial arguments with the caller's namespace access, lexical namespaces, inherited-import count and definition package; omitted for ordinary structures |
 | `private` | `true` for a module importable only within its package; omitted otherwise |
+| `when` | optional environment condition string from `@when "<cond>"` on the module header; omitted when unconstrained |
 | `incomplete` | `true` when the module's source did not parse in full; importers take on trust names they do not find, while finished exports stay typed and checked; omitted when false |
 | `exports` | the module's interface, in the order of its `exposing` list |
 | `hidden` | constructors of exported types that are not exported, so an import of one gets a precise `FLICK-R005`; omitted when empty |
@@ -67,7 +68,7 @@ later arguments do not enter that lexical environment.
 | `abi` | how the compiled code represents what the module defines, see [ABI](#abi); written by `flick build`, absent from `flick check` |
 | `dependencies` | the fingerprint of each imported module's interface the module was built against; omitted when empty |
 | `source` | the module's source, relative to the root of its package, so editors find declarations in a published package; written by `flick build` |
-| `targets` | the targets `flick build` compiled the module for, `["js"]` today; a project with `[build] target = "go"` that imports a module without `"go"` gets `FLICK-P030`; omitted when no build wrote the file |
+| `targets` | the targets `flick build` compiled the module for, `["js"]` today; environment compatibility is checked via module `@when` and package `when` conditions (`FLICK-P064`); omitted when no build wrote the file |
 
 A native saved package keeps both these templates and the portable IR of their
 ordinary dependencies. It can instantiate a factory for a new argument and build

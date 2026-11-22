@@ -2,8 +2,6 @@
 
 use std::path::Path;
 
-#[cfg(feature = "native-project")]
-use super::target;
 use super::{Loader, Root};
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::codes;
@@ -179,18 +177,6 @@ impl Loader<'_> {
                 let default_client_runner = ("Runner.Browser".to_string(), span);
                 let runner = runner.or_else(|| client.then_some(&default_client_runner));
                 // no type when the module failed to check: that is reported already
-                #[cfg(feature = "native-project")]
-                if let Some((runner, runner_at)) = runner {
-                    let unsupported = self.host.unsupported_modules(project);
-                    if target::unsupported_match(&unsupported, runner) {
-                        self.diagnostics.push(target::unsupported_error(
-                            runner,
-                            project.config.default_target(),
-                            *runner_at,
-                        ));
-                        return;
-                    }
-                }
                 if let Some((runner, runner_at)) = runner
                     && main.scheme.is_some()
                 {

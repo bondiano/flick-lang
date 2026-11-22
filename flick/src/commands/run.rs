@@ -356,7 +356,7 @@ fn run_client(
     {
         let _ = (project, name, options, signals);
         let d = Diagnostic::new(
-            codes::P064,
+            codes::P067,
             Severity::Error,
             "client entries require WebAssembly backend support",
         );

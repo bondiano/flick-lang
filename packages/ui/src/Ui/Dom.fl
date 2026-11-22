@@ -1,5 +1,6 @@
 /// React DOM roots. Keep DOM imports out of `Ui`, so `Ui.mount_with` also
 /// works with renderers that do not install `react-dom` or provide a document.
+@when "js"
 module Ui.Dom exposing (..)
 
 import Atom

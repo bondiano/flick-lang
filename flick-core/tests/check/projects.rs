@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use std::{fs, io};
 
 use flick_core::build::target_preflight;
-use flick_core::codegen::go;
 use flick_core::diagnostics::Diagnostic;
 use flick_core::project::config::BackendEnvironment;
 use flick_core::project::{self, Foreign, ForeignPackage, Host, Project};
@@ -90,17 +89,6 @@ impl Host for FixtureHost {
             declared,
             packages,
             diagnostics: Vec::new(),
-        }
-    }
-
-    fn unsupported_modules(&self, project: &Project) -> Vec<String> {
-        if project.config.default_target() == "go" {
-            go::UNSUPPORTED_MODULES
-                .iter()
-                .map(|m| (*m).to_owned())
-                .collect()
-        } else {
-            Vec::new()
         }
     }
 

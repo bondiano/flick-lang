@@ -58,31 +58,6 @@ use shape::{Shape, shape};
 /// The Go import path of the runtime package.
 pub const RUNTIME_PACKAGE: &str = "flick.app/flickrt";
 
-/// Built-in modules (and derived class names such as `Form`) that the Go
-/// target does not provide; published in `Descriptor.unsupported_modules`.
-pub const UNSUPPORTED_MODULES: &[&str] = &[
-    "Action",
-    "Atom",
-    "DevTools",
-    "Form",
-    "Js",
-    "Otlp",
-    "Reactivity.AsyncResult",
-    "Reactivity.Atom",
-    "Runner.Browser",
-    "Runner.Cloudflare",
-    "Runner.Node",
-    "Ui",
-];
-
-/// Whether `name`, or a module under it, is unsupported on Go.
-pub fn unsupported_module(name: &str) -> bool {
-    UNSUPPORTED_MODULES.iter().any(|m| {
-        name.strip_prefix(m)
-            .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
-    })
-}
-
 /// What the go target cannot compile yet, at its span in an own module.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Unsupported {

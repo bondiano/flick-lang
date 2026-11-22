@@ -161,6 +161,34 @@ A panic is a defect unless handled by `catch`. Foreign metadata annotations
 The Go representation of values is not a stable interface yet: a Go file follows
 the compiler it is built with.
 
+## Environment conditions and host packages
+
+Foreign modules that bind APIs specific to one backend, runtime, or host
+annotate their module header with `@when "<cond>"` (or gate the whole library
+with `[package] when = "<cond>"` in `flick.toml`):
+
+```flick
+@when "js && node"
+module App.NodeFs exposing (exists)
+
+exists : String ->{} Bool
+foreign exists from "node:fs" "existsSync"
+  arity 1
+```
+
+A condition may combine backend tags, axis tags, and host tags with `&&`, `||`,
+`!`, and parentheses (see [Environments, host packages, and `when` conditions](../project/#environments-host-packages-and-when-conditions)).
+Unknown tags fail at the condition with `FLICK-P066`, while reachable uses from
+an entry or public library export in an environment that does not satisfy the
+condition report `FLICK-P064` at the use site with the path from entry. Unused
+imports and unreachable functions never fail, so shared modules can reference
+types or organize host-specific bindings without breaking portable builds.
+
+Host-specific FFI packages can also publish a `[host]` table (`name`, `backend`,
+optional `requires`, and `tags`) so projects select them via
+`[build] environment = "<backend>/<host>"` and gate their modules on those host
+tags.
+
 ## Importing a package's `.d.ts`
 
 `flick ffi import <package> --out <dir>` reads the declarations of an

@@ -11,16 +11,17 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
 use super::Backend;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::codegen::ts::Typing;
 use crate::codegen::{self, Known, Options, Resolved};
 use crate::diagnostics::Diagnostic;
 use crate::iface::Interface;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::project::target_preflight::prune_compilation_for_env;
 use crate::project::{Compilation, Compiled, normalize};
 use crate::source::SourceMap;
 use crate::{ir, types};
 
-#[cfg(not(target_arch = "wasm32"))]
-use super::capabilities;
 #[cfg(feature = "native-project")]
 use super::runner_file;
 use super::{
@@ -44,6 +45,10 @@ pub fn emit(
     if !diagnostics.is_empty() {
         return (Vec::new(), diagnostics);
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    let pruned = prune_for_settings(compilation, sources, settings);
+    #[cfg(not(target_arch = "wasm32"))]
+    let compilation = &pruned;
     let modules = &compilation.modules;
     let builtin_names: Vec<&str> = types::builtin_sources().iter().map(|(n, _)| *n).collect();
     let path = |m: &str| codegen::module_path(&builtin_names, settings.typescript, m);
@@ -83,6 +88,7 @@ pub fn emit(
     let resolved = resolved(compilation, settings, by_class, &foreign);
     let lang = ir::lang_items();
     let known = Known::of(&lang);
+    #[cfg(not(target_arch = "wasm32"))]
     let typing = Typing {
         interface: &any_interface,
         package: &package,
@@ -91,13 +97,17 @@ pub fn emit(
         rt: by_class,
     };
     // each module gets its own as the build writes it (see `typed_options`)
+    #[cfg(not(target_arch = "wasm32"))]
     let untyped = BTreeMap::new();
     let options = Options {
         builtins: &builtin_names,
         paths: None,
         packages: &packages,
         resolved: &resolved,
+        #[cfg(not(target_arch = "wasm32"))]
         typescript: settings.typescript.then_some(&untyped),
+        #[cfg(target_arch = "wasm32")]
+        typescript: None,
         release: settings.release,
         workers: &workers,
         direct: &direct,
@@ -117,6 +127,7 @@ pub fn emit(
         #[cfg(feature = "native-project")]
         sources,
         options: &options,
+        #[cfg(not(target_arch = "wasm32"))]
         typing: settings.typescript.then_some(&typing),
         path: &path,
         package: &package,
@@ -140,22 +151,19 @@ pub fn preflight(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     #[cfg(not(target_arch = "wasm32"))]
-    {
-        if settings.backend == Backend::Rt && !settings.effect_bridge.available() {
-            capabilities::check(compilation, settings, sources, diagnostics);
-        }
-        if let Some(environment) = settings.environment {
-            super::target_preflight::check(
-                compilation,
-                settings,
-                sources,
-                environment,
-                diagnostics,
-            );
-        }
-    }
+    super::target_preflight::check_settings(compilation, settings, sources, diagnostics);
     #[cfg(target_arch = "wasm32")]
     let _ = (compilation, sources, settings, diagnostics);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn prune_for_settings(
+    compilation: &Compilation,
+    sources: &SourceMap,
+    settings: &Settings,
+) -> Compilation {
+    let env = super::target_preflight::resolved_from_settings(compilation, settings);
+    prune_compilation_for_env(compilation, sources, settings.backend == Backend::Rt, &env)
 }
 
 /// The specifiers of the foreign modules of `compilation` and the built-in
@@ -391,6 +399,7 @@ struct Context<'a> {
     sources: &'a SourceMap,
     options: &'a Options<'a>,
     /// In TypeScript, what projects the types of a module's exports.
+    #[cfg(not(target_arch = "wasm32"))]
     typing: Option<&'a Typing<'a>>,
     path: &'a dyn Fn(&str) -> String,
     package: &'a dyn Fn(&str) -> Option<String>,
@@ -402,10 +411,16 @@ struct Context<'a> {
 /// `js` with the options of `module`'s code: in TypeScript they hold the
 /// types of its exports, projected here, for the modules the build writes
 /// and no others.
+#[cfg(not(target_arch = "wasm32"))]
 fn typed_options<R>(ctx: &Context, module: &ir::Module, js: impl FnOnce(&Options) -> R) -> R {
     let typed = ctx.typing.map(|typing| typing.prepare(module));
     js(&Options {
         typescript: typed.as_ref().or(ctx.options.typescript),
         ..*ctx.options
     })
+}
+
+#[cfg(target_arch = "wasm32")]
+fn typed_options<R>(ctx: &Context, _module: &ir::Module, js: impl FnOnce(&Options) -> R) -> R {
+    js(ctx.options)
 }

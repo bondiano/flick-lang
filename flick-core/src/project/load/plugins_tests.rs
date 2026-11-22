@@ -196,6 +196,7 @@ fn library(sources: &mut SourceMap) -> Project {
                 .collect(),
             target_dependencies: Vec::new(),
             package: None,
+            host: None,
             build: Build::default(),
             targets: BTreeMap::new(),
             sql_dialect: Default::default(),

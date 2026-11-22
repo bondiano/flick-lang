@@ -14,18 +14,21 @@ use flick_core::diagnostics::Diagnostic;
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
 #[cfg(feature = "wasm-backends")]
+use flick_core::project::Foreign;
+#[cfg(feature = "wasm-backends")]
 use flick_core::project::config::BackendEnvironment;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::target::Wanted;
-use flick_core::project::{self, Analysis, Analyzed, Compilation, Host, ModuleCache};
-#[cfg(feature = "wasm-backends")]
-use flick_core::project::{Foreign, Project};
+use flick_core::project::{
+    self, Analysis, Analyzed, BackendTags, Compilation, Host, ModuleCache, Project,
+};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{resolve, syntax, types};
 use tracing::{debug, debug_span};
 
 #[cfg(feature = "wasm-backends")]
 use crate::backends;
+use crate::backends::options;
 use crate::{plugins, sources};
 
 pub(super) static BUILTIN_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
@@ -104,11 +107,6 @@ impl Host for Overlay<'_> {
     }
 
     #[cfg(feature = "wasm-backends")]
-    fn unsupported_modules(&self, project: &Project) -> Vec<String> {
-        backends::unsupported_modules(project)
-    }
-
-    #[cfg(feature = "wasm-backends")]
     fn stages_by_class(&self, project: &Project) -> bool {
         backends::stages_by_class(project)
     }
@@ -121,6 +119,10 @@ impl Host for Overlay<'_> {
         service: &str,
     ) -> Option<bool> {
         backends::handles_service(project, environment, service)
+    }
+
+    fn backend_tags(&self, project: &Project) -> Vec<BackendTags> {
+        options::project_backend_tags(project, true)
     }
 }
 

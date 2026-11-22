@@ -155,6 +155,7 @@ fn library(sources: &mut SourceMap) -> Project {
             dependencies: Vec::new(),
             target_dependencies: Vec::new(),
             package: None,
+            host: None,
             build: Build::default(),
             #[cfg(feature = "native-project")]
             targets: BTreeMap::new(),

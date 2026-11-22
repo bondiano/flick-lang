@@ -173,7 +173,7 @@ pub fn located_module_comment(text: &str) -> Option<DocComment> {
         let line = raw
             .strip_suffix('\n')
             .map_or(raw, |l| l.strip_suffix('\r').unwrap_or(l));
-        if line.starts_with("module ") {
+        if line.starts_with("module ") || line.starts_with("private module ") {
             return (!pending.is_empty()).then(|| build_doc_comment(&pending));
         }
         if let Some(doc) = line.strip_prefix("///") {
@@ -182,7 +182,7 @@ pub fn located_module_comment(text: &str) -> Option<DocComment> {
             let start = u32::try_from(offset + 3 + space).unwrap_or(u32::MAX);
             let end = start.saturating_add(u32::try_from(content.len()).unwrap_or(u32::MAX));
             pending.push((start, end, content));
-        } else if !line.trim().is_empty() {
+        } else if !line.trim().is_empty() && !line.trim_start().starts_with('@') {
             pending.clear();
         }
         offset += raw.len();
@@ -194,12 +194,12 @@ pub fn located_module_comment(text: &str) -> Option<DocComment> {
 pub fn module_comment(text: &str) -> Option<String> {
     let mut pending = Vec::new();
     for line in text.lines() {
-        if line.starts_with("module ") {
+        if line.starts_with("module ") || line.starts_with("private module ") {
             return (!pending.is_empty()).then(|| pending.join("\n"));
         }
         if let Some(doc) = line.strip_prefix("///") {
             pending.push(doc.strip_prefix(' ').unwrap_or(doc));
-        } else if !line.trim().is_empty() {
+        } else if !line.trim().is_empty() && !line.trim_start().starts_with('@') {
             pending.clear();
         }
     }

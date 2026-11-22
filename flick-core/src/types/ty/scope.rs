@@ -188,6 +188,7 @@ mod tests {
                 definition: None,
                 blocked: None,
                 at: None,
+                via: Vec::new(),
             }],
             ..Interface::default()
         };

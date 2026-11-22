@@ -11,6 +11,12 @@ mod dependencies;
 #[path = "backends/doctor.rs"]
 mod doctor;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/env_gating.rs"]
+mod env_gating;
+#[cfg(feature = "wasm-backends")]
+#[path = "backends/environments.rs"]
+mod environments;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/go.rs"]
 mod go;
 #[cfg(feature = "wasm-backends")]
@@ -262,17 +268,25 @@ fn component_preflight_refusals_preserve_spans_and_existing_output() {
         "module App exposing (main)\nmain : Unit -> Unit\nlet main () = ()\n",
     )
     .expect("supported main");
-    for invalid in [
-        config.replace("1.0.0", "1.0.1"),
-        config.replace(
-            "[build.backend]",
-            "[build]\nenvironment = \"js/browser\"\n[build.backend]",
+    for (invalid, expected_code, expected_exit) in [
+        (config.replace("1.0.0", "1.0.1"), "FLICK-P013", 1),
+        (
+            config.replace(
+                "[build.backend]",
+                "[build]\nenvironment = \"js/browser\"\n[build.backend]",
+            ),
+            "FLICK-P065",
+            2,
         ),
     ] {
         fs::write(root.join("flick.toml"), invalid).expect("incompatible target");
         let rejected = flick_in(&root, &["build", "--diagnostics", "json"]);
-        assert_eq!(rejected.status.code(), Some(1), "{rejected:?}");
-        assert!(String::from_utf8_lossy(&rejected.stderr).contains("FLICK-P013"));
+        assert_eq!(rejected.status.code(), Some(expected_exit), "{rejected:?}");
+        assert!(
+            String::from_utf8_lossy(&rejected.stderr).contains(expected_code),
+            "expected {expected_code}: {}",
+            String::from_utf8_lossy(&rejected.stderr)
+        );
         assert_eq!(
             fs::read(root.join("dist/_flick/App.js")).expect("previous output"),
             old
@@ -306,10 +320,10 @@ fn the_selected_backend_rejects_an_unsupported_environment() {
     )
     .expect("unsupported platform");
     let unsupported = flick_in(&root, &["build", "--diagnostics", "json"]);
-    assert_eq!(unsupported.status.code(), Some(1), "{unsupported:?}");
+    assert_eq!(unsupported.status.code(), Some(2), "{unsupported:?}");
     let errors = String::from_utf8_lossy(&unsupported.stderr);
     assert!(
-        errors.contains("FLICK-P013")
+        errors.contains("FLICK-P065")
             && errors.contains("unsupported environment")
             && errors.contains("js/unsupported"),
         "{errors}"

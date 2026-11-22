@@ -430,6 +430,7 @@ mod declaration_reference_tests {
             definition: None,
             blocked: None,
             at: None,
+            via: Vec::new(),
         }
     }
 

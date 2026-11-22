@@ -12,7 +12,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use flick_core::diagnostics::Diagnostic;
 use flick_core::project::{
     self, CachedModule, Compilation, Fresh, Host, ModuleCache, ModuleStore, PackageCache, Project,
-    SavedModule, store,
+    SavedModule, TargetOverride, store,
 };
 use flick_core::source::SourceMap;
 use sha2::{Digest, Sha256};
@@ -40,20 +40,21 @@ pub fn with_saved<R>(run: impl FnOnce(Option<&PackageCache>) -> (R, Vec<Fresh>))
     result
 }
 
-/// Compiles what `roots` reach, with the saved modules of packages, and
-/// saves those of the packages it checked.
-pub fn compile(
+/// Compiles what `roots` reach, with an optional target/option override
+/// (from CLI `--target`, resolved backend options, loaded backend descriptor,
+/// or `flick test`), reusing and updating saved package modules.
+pub fn compile_for(
     host: &dyn Host,
     sources: &mut SourceMap,
     project: Option<&Project>,
     roots: &[PathBuf],
-    rt: Option<bool>,
+    target: Option<&TargetOverride>,
     kept: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Compilation) {
     with_modules(kept, |kept| {
         with_saved(|saved| {
             let (diagnostics, compilation, fresh) =
-                project::compile_with(host, sources, project, roots, saved, rt, kept);
+                project::compile_for(host, sources, project, roots, saved, target, kept);
             ((diagnostics, compilation), fresh)
         })
     })

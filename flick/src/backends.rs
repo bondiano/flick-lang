@@ -28,8 +28,8 @@ pub(crate) use execute::Reads;
 #[cfg(feature = "wasm-backends")]
 pub(crate) use foreign::{
     asked, check_runtime_project, foreign, foreign_extension, foreign_suffixes_for,
-    handles_service, package_dirs, package_inputs, stages_by_class, stages_by_class_cached,
-    unsupported_modules, verify, verify_for_target,
+    handles_service, package_dirs, package_inputs, stages_by_class, stages_by_class_cached, verify,
+    verify_for_target,
 };
 #[cfg(feature = "wasm-backends")]
 pub(crate) use tools::Tool;

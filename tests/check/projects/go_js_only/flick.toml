@@ -5,7 +5,7 @@ kind = "app"
 source-dir = "src"
 entry = "App.Main"
 runner = "Runner.Node"
-#        ^^^^^^^^^^^^^ FLICK-P030 `Runner.Node` is not supported by the `go` target: remove the import, or build the project for a target that supports it
+#        ^^^^^^^^^^^^^ FLICK-P064 `Runner.Node` is not available in environment `go/native` (requires `js`; active tags: `go`, `native`; path: `Runner.Node (runner for main)`)
 
 [build]
 target = "go"

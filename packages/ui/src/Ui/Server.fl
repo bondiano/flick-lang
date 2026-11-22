@@ -1,5 +1,6 @@
 /// Server markup. Keep `react-dom/server` out of `Ui`, so client programs
 /// do not load it.
+@when "js"
 module Ui.Server exposing (..)
 
 import Atom

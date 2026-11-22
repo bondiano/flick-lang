@@ -1,6 +1,6 @@
 //! Client entries delegate to the selected backend's `run-client` / `dev-client`
 //! command (for `flick/js`, Vite via granted `node`; for backends without a
-//! client runner such as `flick/go`, `FLICK-P064`).
+//! client runner such as `flick/go`, `FLICK-P067`).
 
 use crate::common;
 
@@ -85,7 +85,7 @@ fn client_entry_requires_node_tool_grant() {
 }
 
 #[test]
-fn client_entry_on_go_target_reports_p064() {
+fn client_entry_on_go_target_reports_p067() {
     let config = concat!(
         "schema-version = 1\n",
         "[project]\nkind = \"app\"\n",
@@ -97,14 +97,14 @@ fn client_entry_on_go_target_reports_p064() {
         let out = common::flick_in(&dir, &[verb]);
         assert_eq!(out.status.code(), Some(2), "{verb}: {out:?}");
         assert!(
-            String::from_utf8_lossy(&out.stderr).contains("FLICK-P064"),
+            String::from_utf8_lossy(&out.stderr).contains("FLICK-P067"),
             "{verb}: {out:?}"
         );
     }
     // Explicit `--entry` overrides the project's client entry instead of misrouting to `run-client`.
     let explicit = common::flick_in(&dir, &["run", "--entry", "App.Other"]);
     assert!(
-        !String::from_utf8_lossy(&explicit.stderr).contains("FLICK-P064"),
+        !String::from_utf8_lossy(&explicit.stderr).contains("FLICK-P067"),
         "explicit --entry must not dispatch to run-client: {explicit:?}"
     );
 }

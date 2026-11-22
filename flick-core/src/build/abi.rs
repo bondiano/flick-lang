@@ -5,9 +5,9 @@
 use std::collections::BTreeMap;
 
 use crate::codegen::{instance_export, qualified_id, tag};
-use crate::iface::{
-    Abi, ConstructorAbi, Data, Dictionary, Interface, Namespace, Summary, Target, fingerprint,
-};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::iface::fingerprint;
+use crate::iface::{Abi, ConstructorAbi, Data, Dictionary, Interface, Namespace, Summary, Target};
 use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Module, Stage, Stmt};
 use crate::numeric::{Arith, Num};
 use crate::types::Rep;
@@ -21,11 +21,15 @@ pub fn interface(
     imports: &[String],
     interface_of: &dyn Fn(&str) -> Option<Interface>,
 ) -> Interface {
+    #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
     let mut out = interface_without_dependencies(module, interface, package, interface_of);
     // `extend`, not `collect`: collecting compiles a sort of its own into the
     // wasm compiler, where `insert` of this map type is already there
+    #[cfg(not(target_arch = "wasm32"))]
     out.dependencies
         .extend((imports.iter()).filter_map(|m| Some((m.clone(), fingerprint(&interface_of(m)?)))));
+    #[cfg(target_arch = "wasm32")]
+    let _ = imports;
     out
 }
 

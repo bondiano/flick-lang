@@ -16,6 +16,14 @@ interface types {
     /// SHA-256 of the exact component bytes, supplied by the host.
     record backend-pin { identity: backend-id, sha256: string }
     record capability { name: string, version: string }
+    /// A configurable axis of environment tags declared by a backend
+    /// (for example `runtime`: `rt` / `effect`, or `dialect`: `luau` / `luajit`).
+    record tag-axis {
+        name: string,
+        tags: list<string>,
+        default: option<string>,
+        exclusive: bool,
+    }
     /// An option a backend declares for core verbs and `[target.<name>]`.
     record option-descriptor {
         parameter: parameter,
@@ -37,6 +45,8 @@ interface types {
         language: version-range,
         runtime-abis: list<named-range>,
         environments: list<environment>,
+        tags: list<string>,
+        axes: list<tag-axis>,
         profiles: list<profile>,
         modes: list<mode>,
         capabilities: list<capability>,
@@ -47,9 +57,6 @@ interface types {
         host-tools: list<string>,
         /// Compiler frontend projection schemas this backend consumes.
         projections: list<abi>,
-        /// Built-in module names (and derived class names like `Form`)
-        /// unsupported by this backend, reported as `FLICK-P030`.
-        unsupported-modules: list<string>,
         /// Option key/value that selects class-derived effect stages, if any.
         stages-by-class-option: option<option-value>,
         /// Companion file extension for local foreign bindings when rewritten
@@ -68,6 +75,8 @@ interface types {
         language-version: string,
         runtime-abis: list<abi>,
         environment: environment,
+        tags: list<string>,
+        host-package: option<string>,
         profile: profile,
         mode: mode,
         required-capabilities: list<capability>,

@@ -1,13 +1,29 @@
 module App.Main exposing (main)
 
-import Ui
-//     ^^ FLICK-P030 `Ui` is not supported by the `go` target: remove the import, or build the project for a target that supports it
+import App.Signup exposing (Signup)
+import Atom
 import Js.Array
-//     ^^^^^^^^ FLICK-P030 `Js.Array` is not supported by the `go` target: remove the import, or build the project for a target that supports it
-import Form
-//     ^^^^ FLICK-P030 `Form` is not supported by the `go` target: remove the import, or build the project for a target that supports it
+import Otlp
 import Reactivity.AsyncResult
-//     ^^^^^^^^^^^^^^^^^^^^^^ FLICK-P030 `Reactivity.AsyncResult` is not supported by the `go` target: remove the import, or build the project for a target that supports it
+import Ui
 
-main : Unit -> Unit
-let main () = ()
+// Unused imports (`Atom`, `Otlp`) and unreachable functions do not fail.
+unused : Unit -> Ui
+let unused () = Ui.text "never called"
+
+render : Unit -> Ui
+let render () = Ui.text "hello"
+//              ^^^^^^^ FLICK-P064 `Ui` is not available in environment `go/native` (requires `js`; active tags: `go`, `native`; path: `App.Main.main` → `App.Main.render` → `Ui.text`)
+
+check_async : Reactivity.AsyncResult.AsyncResult Int none -> Bool
+let check_async res = Reactivity.AsyncResult.is_waiting res
+//                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-P064 `Reactivity.AsyncResult` is not available in environment `go/native` (requires `js`; active tags: `go`, `native`; path: `App.Main.main` → `App.Main.check_async` → `Reactivity.AsyncResult.is_waiting`)
+
+main : Unit ->{} Unit
+let main () =
+  let _ = render ()
+  let _ = Js.Array.make ()
+//        ^^^^^^^^^^^^^ FLICK-P064 `Js.Array` is not available in environment `go/native` (requires `js`; active tags: `go`, `native`; path: `App.Main.main` → `Js.Array.make`)
+  let _ = Signup.form
+  let _ = check_async
+  ()
