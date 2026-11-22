@@ -103,6 +103,16 @@ fn same_primitive(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Erro
         (Value::Object(a), Value::Object(b)) => {
             match (&heap.object(a.id)?.data, &heap.object(b.id)?.data) {
                 (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => Ok(a.id == b.id),
+                (
+                    Data::ForeignHandle {
+                        execution: ae,
+                        host_id: ah,
+                    },
+                    Data::ForeignHandle {
+                        execution: be,
+                        host_id: bh,
+                    },
+                ) => Ok(ae == be && ah == bh),
                 (Data::String(a), Data::String(b)) => Ok(a == b),
                 (Data::Utf16(a), Data::Utf16(b)) => Ok(a == b),
                 (Data::Bytes(a), Data::Bytes(b)) => Ok(a == b),
@@ -252,6 +262,16 @@ fn equal_objects<'a>(
     let (a_data, b_data) = (&heap.object(a_id)?.data, &heap.object(b_id)?.data);
     match (a_data, b_data) {
         (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => Ok(a_id == b_id),
+        (
+            Data::ForeignHandle {
+                execution: ae,
+                host_id: ah,
+            },
+            Data::ForeignHandle {
+                execution: be,
+                host_id: bh,
+            },
+        ) => Ok(ae == be && ah == bh),
         (Data::Label(a), Data::Label(b)) | (Data::String(a), Data::String(b)) => Ok(a == b),
         (Data::Utf16(a), Data::Utf16(b)) => Ok(a == b),
         (Data::Bytes(a), Data::Bytes(b)) => Ok(a == b),

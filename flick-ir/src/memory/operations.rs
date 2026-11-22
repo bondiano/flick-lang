@@ -114,7 +114,8 @@ impl Operation {
             | Self::FunctionBoundary { args, .. }
             | Self::GenerateStrict { args, .. }
             | Self::Call { args, .. }
-            | Self::Intrinsic { args, .. } => args.clone(),
+            | Self::Intrinsic { args, .. }
+            | Self::ForeignCall { args, .. } => args.clone(),
             Self::LoopExit { value, .. } => value.iter().copied().collect(),
             Self::GenerateLazy {
                 captures, limit, ..

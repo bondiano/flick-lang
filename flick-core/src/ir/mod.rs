@@ -18,7 +18,7 @@ pub use exports::exports;
 pub use flick_ir::{
     Adapter, Arm, BinOp, Binding, Copies, EnumLit, Expr, ExprKind, Foreign, ForeignMode, Handled,
     Handler, Item, ItemKind, JsClass, Label, LangItem, Lit, Module, OpArm, Param, Pat, Rep,
-    ResultAdapter, Stage, Stmt, TypeName, memory, operation_arity,
+    ResultAdapter, Shape, Stage, Stmt, TypeName, memory, operation_arity,
 };
 pub use lower::lower;
 #[cfg(not(target_arch = "wasm32"))]

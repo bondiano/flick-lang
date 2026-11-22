@@ -142,6 +142,8 @@ pub enum Error {
         tracked: usize,
         actual: usize,
     },
+    HostBridge(String),
+    LeakedForeignHandles(usize),
 }
 
 impl Error {
@@ -329,6 +331,10 @@ impl Error {
             Self::NoToken(local) => write!(f, "memory local {local} has no owned token"),
             Self::Leftover(tokens) => write!(f, "unreleased memory tokens: {tokens:?}"),
             Self::LiveObjects(count) => write!(f, "{count} memory objects are still live"),
+            Self::HostBridge(msg) => write!(f, "host bridge error: {msg}"),
+            Self::LeakedForeignHandles(count) => {
+                write!(f, "{count} host foreign handles are still live")
+            }
             _ => unreachable!("static error formatted earlier"),
         }
     }

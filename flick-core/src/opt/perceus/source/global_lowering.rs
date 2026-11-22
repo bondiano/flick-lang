@@ -139,97 +139,30 @@ impl Lower<'_> {
             }
             return self.intrinsic(Intrinsic::FromResult, false, vec![], block, span);
         }
-        let kind = foreign_intrinsic(value).ok_or_else(|| {
-            unsupported(
-                format!(
-                    "foreign binding {:?}:{}",
-                    value.binding.from, value.binding.name
-                ),
-                span,
-            )
-        })?;
-        let adapter = &value.adapter;
-        let internal_owned = matches!(
-            kind,
-            Intrinsic::RefMake
-                | Intrinsic::RefGet
-                | Intrinsic::RefSet
-                | Intrinsic::RefModify
-                | Intrinsic::ArenaAlloc
-                | Intrinsic::ArenaGet
-                | Intrinsic::ScopeRun
-        );
-        let callback = match kind {
-            Intrinsic::RefModify => Some(1),
-            Intrinsic::ScopeRun => Some(0),
-            _ => None,
+        let kind = match foreign_intrinsic(value) {
+            Some(Intrinsic::Host(HostPrimitive::ProcessSpawn)) | None
+                if self.allow_foreign_bridge =>
+            {
+                return self.foreign_bridge(value, name, span, block);
+            }
+            Some(kind) => kind,
+            None => {
+                return Err(unsupported(
+                    format!(
+                        "foreign binding {:?}:{}",
+                        value.binding.from, value.binding.name
+                    ),
+                    span,
+                ));
+            }
         };
-        let callbacks_valid = adapter.callbacks.iter().enumerate().all(|(index, arity)| {
-            *arity
-                == if callback == Some(index) {
-                    Some(1)
-                } else {
-                    None
-                }
-        }) && (callback
-            .is_none_or(|index| adapter.callbacks.get(index) == Some(&Some(1))));
-        // These are internal language operations, not a host export of
-        // mutable data. Ref contents stay immutable owned values; writes
-        // replace slots, and reads retain before returning. Defensive host
-        // copies are therefore discharged by the intrinsic's ownership
-        // contract, not erased for arbitrary foreign functions.
-        let copies_valid = if internal_owned {
-            adapter
-                .copies
-                .callbacks
-                .iter()
-                .enumerate()
-                .all(|(index, copy)| {
-                    copy.as_ref()
-                        .is_none_or(|(arguments, result)| match (kind, index) {
-                            // The quantified Scope callback's copy metadata has
-                            // no data parameters: its sole argument is an opaque
-                            // owner, supplied directly by this intrinsic. Unary
-                            // calling convention is checked independently above.
-                            (Intrinsic::ScopeRun, 0) => arguments.is_empty() && !result,
-                            (Intrinsic::RefModify, 1) => arguments.len() == 1,
-                            _ => false,
-                        })
-                })
-        } else {
-            (!adapter.copies.result || fresh_result(kind))
-                && (kind == Intrinsic::Show || !adapter.copies.args.contains(&true))
-                && !adapter
-                    .copies
-                    .callbacks
-                    .iter()
-                    .flatten()
-                    .any(|(args, result)| *result || args.contains(&true))
-        };
-        if value.dicts != 0
-            || value.stages.len() != kind.arity()
-            || value.taken() != kind.arity()
-            || value.catch.is_some()
-            || adapter.receiver
-            || adapter.cancel
-            || !adapter.optional.is_empty()
-            || adapter.variadic
-            || adapter.result.nullable
-            || !callbacks_valid
-            || !copies_valid
-            || !(fresh_result(kind) || matches!(adapter.result_shape, Shape::Data))
-            || adapter.shapes.iter().enumerate().any(|(index, shape)| {
-                if kind == Intrinsic::ScopeRun && index == 0 {
-                    !matches!(shape, Shape::Fun { args, result, runtime: true, .. }
-                        if args == &[Shape::Data] && matches!(result.as_ref(), Shape::Data))
-                } else {
-                    !matches!(shape, Shape::Data)
-                }
-            })
-        {
+        if !foreign_intrinsic_adapter_valid(value, kind) {
+            if self.allow_foreign_bridge {
+                return self.foreign_bridge(value, name, span, block);
+            }
             return Err(unsupported("foreign ownership adapter", span));
         }
-        let unit = adapter.result.unit && !writes(kind);
+        let unit = value.adapter.result.unit && !writes(kind);
         self.intrinsic(kind, unit, vec![], block, span)
     }
 
@@ -292,4 +225,84 @@ fn writes(kind: Intrinsic) -> bool {
             | Intrinsic::RefSet
             | Intrinsic::Host(HostPrimitive::StderrLine | HostPrimitive::StdoutWrite)
     )
+}
+
+fn foreign_intrinsic_adapter_valid(value: &Foreign, kind: Intrinsic) -> bool {
+    let adapter = &value.adapter;
+    let internal_owned = matches!(
+        kind,
+        Intrinsic::RefMake
+            | Intrinsic::RefGet
+            | Intrinsic::RefSet
+            | Intrinsic::RefModify
+            | Intrinsic::ArenaAlloc
+            | Intrinsic::ArenaGet
+            | Intrinsic::ScopeRun
+    );
+    let callback = match kind {
+        Intrinsic::RefModify => Some(1),
+        Intrinsic::ScopeRun => Some(0),
+        _ => None,
+    };
+    let callbacks_valid = adapter.callbacks.iter().enumerate().all(|(index, arity)| {
+        *arity
+            == if callback == Some(index) {
+                Some(1)
+            } else {
+                None
+            }
+    }) && (callback.is_none_or(|index| adapter.callbacks.get(index) == Some(&Some(1))));
+    // These are internal language operations, not a host export of
+    // mutable data. Ref contents stay immutable owned values; writes
+    // replace slots, and reads retain before returning. Defensive host
+    // copies are therefore discharged by the intrinsic's ownership
+    // contract, not erased for arbitrary foreign functions.
+    let copies_valid = if internal_owned {
+        adapter
+            .copies
+            .callbacks
+            .iter()
+            .enumerate()
+            .all(|(index, copy)| {
+                copy.as_ref()
+                    .is_none_or(|(arguments, result)| match (kind, index) {
+                        // The quantified Scope callback's copy metadata has
+                        // no data parameters: its sole argument is an opaque
+                        // owner, supplied directly by this intrinsic. Unary
+                        // calling convention is checked independently above.
+                        (Intrinsic::ScopeRun, 0) => arguments.is_empty() && !result,
+                        (Intrinsic::RefModify, 1) => arguments.len() == 1,
+                        _ => false,
+                    })
+            })
+    } else {
+        (!adapter.copies.result || fresh_result(kind))
+            && (kind == Intrinsic::Show || !adapter.copies.args.contains(&true))
+            && !adapter
+                .copies
+                .callbacks
+                .iter()
+                .flatten()
+                .any(|(args, result)| *result || args.contains(&true))
+    };
+    value.dicts == 0
+        && value.stages.len() == kind.arity()
+        && value.taken() == kind.arity()
+        && value.catch.is_none()
+        && !adapter.receiver
+        && !adapter.cancel
+        && adapter.optional.is_empty()
+        && !adapter.variadic
+        && !adapter.result.nullable
+        && callbacks_valid
+        && copies_valid
+        && (fresh_result(kind) || matches!(adapter.result_shape, Shape::Data))
+        && !adapter.shapes.iter().enumerate().any(|(index, shape)| {
+            if kind == Intrinsic::ScopeRun && index == 0 {
+                !matches!(shape, Shape::Fun { args, result, runtime: true, .. }
+                    if args == &[Shape::Data] && matches!(result.as_ref(), Shape::Data))
+            } else {
+                !matches!(shape, Shape::Data)
+            }
+        })
 }

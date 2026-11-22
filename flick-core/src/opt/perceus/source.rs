@@ -19,6 +19,7 @@ mod dictionaries;
 mod eff_combinators;
 mod expr_builder;
 mod failures;
+mod foreign_bridge;
 mod free;
 mod handlers;
 mod layers;
@@ -113,6 +114,7 @@ mod std_scoped_cache;
 mod std_scoped_res;
 mod std_sink_core;
 mod std_sink_folds;
+mod std_sql;
 mod std_stream_combine;
 mod std_stream_core;
 mod std_stream_errors;
@@ -216,7 +218,7 @@ pub fn lower<'a>(
     modules: impl IntoIterator<Item = &'a Module>,
     entry: &Name,
 ) -> Result<Program, LowerError> {
-    lower_in(modules, &[entry], None)
+    lower_in(modules, &[entry], None, false, BTreeMap::new())
 }
 
 /// Adds matching checked compiler declaration facts, including private/open
@@ -240,13 +242,30 @@ pub fn lower_roots_with_declarations<'a>(
 ) -> Result<Program, LowerError> {
     let declarations =
         scalar_context::ScalarContext::new(declarations).map_err(LowerError::Declarations)?;
-    lower_in(modules, roots, Some(declarations))
+    lower_in(modules, roots, Some(declarations), false, BTreeMap::new())
+}
+
+/// Explicitly opts into lowering unadapted `foreign` declarations to
+/// [`Operation::ForeignCall`] for callers that supply a counted host bridge.
+/// `module_dirs` maps module names to their source directory for resolving
+/// relative `./*.mjs` foreign modules.
+pub fn lower_roots_with_foreign_bridge<'a>(
+    modules: impl IntoIterator<Item = &'a Module>,
+    declarations: impl IntoIterator<Item = &'a Interface>,
+    roots: &[&Name],
+    module_dirs: BTreeMap<String, String>,
+) -> Result<Program, LowerError> {
+    let declarations =
+        scalar_context::ScalarContext::new(declarations).map_err(LowerError::Declarations)?;
+    lower_in(modules, roots, Some(declarations), true, module_dirs)
 }
 
 fn lower_in<'a>(
     modules: impl IntoIterator<Item = &'a Module>,
     roots: &[&Name],
     declarations: Option<scalar_context::ScalarContext<'a>>,
+    allow_foreign_bridge: bool,
+    module_dirs: BTreeMap<String, String>,
 ) -> Result<Program, LowerError> {
     let mut sources = BTreeMap::new();
     for module in modules {
@@ -276,8 +295,16 @@ fn lower_in<'a>(
             }
         }
     }
+    let bridge_families = if allow_foreign_bridge {
+        foreign_bridge::detect_families(&sources, roots)
+    } else {
+        foreign_bridge::BridgeFamilies::default()
+    };
     let mut lower = Lower {
         declarations,
+        allow_foreign_bridge,
+        bridge_families,
+        module_dirs,
         sources,
         initializers: BTreeMap::new(),
         program: Program::default(),
@@ -290,12 +317,18 @@ fn lower_in<'a>(
     for root in roots {
         lower.global(root, None)?;
     }
+    if allow_foreign_bridge {
+        foreign_bridge::resolve_routes(&mut lower.program, lower.bridge_families);
+    }
     memory::validate_program(&lower.program).map_err(LowerError::Program)?;
     Ok(lower.program)
 }
 
 struct Lower<'a> {
     declarations: Option<scalar_context::ScalarContext<'a>>,
+    allow_foreign_bridge: bool,
+    bridge_families: foreign_bridge::BridgeFamilies,
+    module_dirs: BTreeMap<String, String>,
     sources: BTreeMap<Name, &'a Item>,
     initializers: BTreeMap<Name, CodeId>,
     program: Program,
