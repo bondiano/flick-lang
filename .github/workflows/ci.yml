@@ -348,8 +348,8 @@ jobs:
           '
 
   # the reference model of λFlick (flick-model) against tests/run/model.txt,
-  # every pass fixture and docs example, and the model properties on
-  # generated programs; it needs neither Node nor Go
+  # every pass fixture and docs example, the counted Host/FFI bridge suites,
+  # and the model properties on generated programs
   model:
     runs-on: ubuntu-26.04
     timeout-minutes: 60
@@ -360,6 +360,15 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: just@1.59.0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+      - run: |
+          pnpm install --frozen-lockfile
+          pnpm -C runtime build
+          pnpm -C packages/effect-ts build
       - run: just model
 
   # the Lean 4 mechanization of λFlick in formal/; elan installs the toolchain

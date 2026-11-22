@@ -274,8 +274,9 @@ impl Machine<'_, '_> {
             }
             _ => {}
         }
-        primitives::intrinsic(
+        primitives::intrinsic_with_host(
             self.heap,
+            self.host_mode,
             Intrinsic::Host(primitive),
             &self.scratch[0],
             &mut self.stdout,

@@ -610,6 +610,10 @@
               },
               {
                 "type": "STRING",
+                "value": "catch"
+              },
+              {
+                "type": "STRING",
                 "value": "if"
               },
               {
@@ -907,6 +911,10 @@
         {
           "type": "STRING",
           "value": "try"
+        },
+        {
+          "type": "STRING",
+          "value": "catch"
         },
         {
           "type": "STRING",

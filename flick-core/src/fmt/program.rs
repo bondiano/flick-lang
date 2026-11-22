@@ -134,6 +134,7 @@ fn normalize(ast: Ast) -> Ast {
         }
         K::EffectAnnot => drop_empty_rows(&mut children),
         K::AppExpr => arguments(&mut children),
+        K::CatchExpr => catch_subject(&mut children),
         _ => {}
     }
     Ast::Node(kind, children)
@@ -153,6 +154,22 @@ fn arguments(children: &mut Vec<Ast>) {
         {
             *argument = inner.swap_remove(1);
         }
+    }
+}
+
+/// Explicit grouping parentheses around a pipe expression on the left of
+/// `catch` do not change the AST: `catch` binds weaker than `|>` and `<|`.
+fn catch_subject(children: &mut [Ast]) {
+    let Some(first) = children.first_mut() else {
+        return;
+    };
+    if let Ast::Node(K::ParenExpr, inner) = first
+        && let [_, Ast::Node(K::BinExpr, bin), _] = inner.as_slice()
+        && bin
+            .iter()
+            .any(|c| is_token(c, K::PipeGt) || is_token(c, K::LtPipe))
+    {
+        *first = inner.swap_remove(1);
     }
 }
 

@@ -280,6 +280,13 @@
             "1": { "name": "keyword.other.flick" },
             "2": { "name": "keyword.other.flick" }
           }
+        },
+        {
+          "comment": "foreign metadata `catch mapping` on an indented line",
+          "match": "^[ \\t]+(catch)(?=[ \\t]+[A-Za-z_])",
+          "captures": {
+            "1": { "name": "variable.other.flick" }
+          }
         }
       ]
     },
@@ -294,6 +301,7 @@
             "2": { "name": "keyword.control.flick" }
           }
         },
+        { "name": "keyword.control.flick", "match": "(?<![.\\w])catch\\b(?![ \\t]*(?:=(?!=|>)|:(?!:)))" },
         { "name": "keyword.control.flick", "match": "(?<![.\\w])(?:match|with|try|if|then|else|when|await|lazy|in|for|yield|do|break|continue)\\b" },
         { "name": "keyword.operator.word.flick", "match": "(?<![.\\w])not\\b" },
         { "name": "keyword.other.flick", "match": "(?<![.\\w])private\\b(?=[ \\t]+module\\b)" },

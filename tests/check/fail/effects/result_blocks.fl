@@ -53,6 +53,20 @@ let record_call_migration result = result { field = 1 }
 missing_service : Int ->{} Result NotFound String
 let missing_service id = result { Users.get id }
 
+// Cross-feature: unhandled error from `catch` inside `result` blames expected `Result` type
+nested_catch_wrong_error : Unit ->{} Result NotFound Int
+let nested_catch_wrong_error () = result {
+  Fail.fail Timeout catch
+  | NotFound _ -> 0
+}
+
+// Cross-feature: Option `?` inside `catch` inside `result` hits the `catch` boundary
+option_question_in_nested_catch : Option Int ->{} Result NotFound Int
+let option_question_in_nested_catch o = result {
+  o? catch
+  | NotFound _ -> 0
+}
+
 //~ FLICK-E002 @12:31-12:48 the expected type `Result NotFound Int` does not allow error `Timeout`
 //~ FLICK-E002 @16:28-16:32 the expected type `Result Never a` does not allow error `e`
 //~ FLICK-T003 @20:23-20:36
@@ -64,3 +78,5 @@ let missing_service id = result { Users.get id }
 //~ FLICK-T019 @45:12-45:12
 //~ FLICK-T074 @50:36-50:42 `result { … }` starts a result block
 //~ FLICK-E002 @54:35-54:47 the signature of `missing_service` does not allow service `Users`
+//~ FLICK-E002 @59:21-59:26 the expected type `Result NotFound Int` does not allow error `Timeout`
+//~ FLICK-T003 @66:3-66:5 in a `task`, `scope`, `provide`, `try`, `catch` or a `for`

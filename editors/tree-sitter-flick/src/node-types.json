@@ -580,6 +580,10 @@
     "named": false
   },
   {
+    "type": "catch",
+    "named": false
+  },
+  {
     "type": "class",
     "named": false
   },

@@ -93,3 +93,21 @@ let parenthesized_record_call result = (result) { field = 1 }
 
 provide_named_result : Layer none none {Clock} ->{} Int
 let provide_named_result result = provide result { Clock.now () }
+
+// Cross-feature: postfix `catch` inside and around `result { ... }`
+nested_catch : Bool ->{} Result Timeout Int
+let nested_catch flag = result {
+  (if flag then Fail.fail (NotFound 1) else Fail.fail Timeout) catch
+  | NotFound _ -> 0
+}
+
+catch_arm_to_result : Unit ->{} Result Timeout Int
+let catch_arm_to_result () = result {
+  Fail.fail (NotFound 1) catch
+  | NotFound _ -> Fail.fail Timeout
+}
+
+result_before_catch : Int ->{Users} Result NotFound String
+let result_before_catch id =
+  result { Users.get id } catch
+  | Timeout -> Ok "unused"

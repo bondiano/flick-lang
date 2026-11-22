@@ -146,6 +146,7 @@ fn depths(node: &Node, depth: u32, limit: u32, out: &mut Vec<Nesting>) {
                     | K::ForExpr
                     | K::TryExpr
                     | K::ResultExpr
+                    | K::CatchExpr
             );
             let else_if = node.kind == K::IfExpr && child.kind == K::IfExpr;
             pending.push((child, depth + u32::from(nests && !else_if)));

@@ -73,6 +73,13 @@ fn symbols(block: &Block, program: &Program, globals: &BTreeSet<&Name>) -> Resul
                         actual: args.len(),
                     });
                 }
+                Operation::ForeignCall { spec, args } if args.len() != spec.expected_args() => {
+                    return Err(Error::ForeignArity {
+                        name: spec.name.clone(),
+                        expected: spec.expected_args(),
+                        actual: args.len(),
+                    });
+                }
                 _ => {}
             }
         }

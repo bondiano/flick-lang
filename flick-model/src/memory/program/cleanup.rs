@@ -93,6 +93,7 @@ impl Machine<'_, '_> {
         }
         self.cleanup_recoveries(&mut roots);
         self.cleanup_async_roots(&mut roots);
+        self.cleanup_foreign_roots(&mut roots);
         for provider in mem::take(&mut self.providers).into_values() {
             roots.push(provider.layer);
             if let MemoRestore::Restore(Some(prev_memo)) = provider.restore_memo {
@@ -162,6 +163,7 @@ impl Machine<'_, '_> {
         roots.extend(detached);
         let released = self.heap.drop_values(roots);
         let _ = self.heap.take_dropped_continuations(self.execution);
-        failure.map_or(released, Err)
+        let bridge_res = self.finish_foreign_bridge();
+        failure.map_or(released.and(bridge_res), Err)
     }
 }

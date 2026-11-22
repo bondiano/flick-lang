@@ -429,3 +429,113 @@ fn formats_result_blocks_and_parenthesized_record_calls_idempotently() {
     let e result = (result) { field = 1 }
     "#);
 }
+
+#[test]
+fn formats_postfix_catch_canonically_and_explicitly_groups_pipes() {
+    let src = "\
+let load_user id = fetch id catch | NotFound _ -> guest | Timeout -> retry id
+
+let piped id = id |> fetch |> parse catch | NotFound _ -> guest
+
+let left_piped id = parse <| fetch id catch | NotFound _ -> guest
+
+let recovery_pipe id = fetch id catch | NotFound _ -> guest |> normalize
+
+let outer_pipe id = (fetch id catch | NotFound _ -> guest) |> normalize
+
+let nested id = fetch id catch | NotFound _ -> fallback id catch | Timeout -> guest
+
+let outer_catch id = (fetch id catch | NotFound _ -> fallback id) catch | Timeout -> guest
+
+let after_if ok =
+  if ok then load 1 else load 2
+  catch | NotFound _ -> 0
+
+let in_else ok = if ok then load 1 else load 2 catch | NotFound _ -> 0
+
+let in_list id = [fetch id catch | NotFound _ -> 0, 1]
+
+let with_comments id =
+  fetch id // may fail
+  // recover here
+  catch
+  // missing user
+  | NotFound _ -> guest
+
+let labels r =
+  let a = { catch = fun x -> x }
+  let b = { a with catch = fun x -> x + 1 }
+  let { catch = h } = b
+  (r.catch, (id r).catch, { catch = 1 }.catch, h)
+";
+    insta::assert_snapshot!(fmt(src), @r#"
+    let load_user id =
+      fetch id catch
+      | NotFound _ -> guest
+      | Timeout -> retry id
+
+    let piped id =
+      (id |> fetch |> parse) catch
+      | NotFound _ -> guest
+
+    let left_piped id =
+      (parse <| fetch id) catch
+      | NotFound _ -> guest
+
+    let recovery_pipe id =
+      fetch id catch
+      | NotFound _ -> guest |> normalize
+
+    let outer_pipe id =
+      (
+        fetch id catch
+        | NotFound _ -> guest
+      )
+      |> normalize
+
+    let nested id =
+      fetch id catch
+      | NotFound _ ->
+        fallback id catch
+        | Timeout -> guest
+
+    let outer_catch id =
+      (
+        fetch id catch
+        | NotFound _ -> fallback id
+      )
+      catch
+      | Timeout -> guest
+
+    let after_if ok =
+      if ok then load 1 else load 2
+      catch
+      | NotFound _ -> 0
+
+    let in_else ok =
+      if ok then
+        load 1
+      else
+        load 2 catch
+        | NotFound _ -> 0
+
+    let in_list id = [
+      fetch id catch
+      | NotFound _ -> 0,
+      1,
+    ]
+
+    let with_comments id =
+      fetch id // may fail
+      // recover here
+      catch
+      // missing user
+      | NotFound _ -> guest
+
+    let labels r =
+      let a = { catch = fun x -> x }
+      let b = { a with catch = fun x -> x + 1 }
+      let { catch = h } = b
+      (r.catch, (id r).catch, { catch = 1 }.catch, h)
+    "#);
+}

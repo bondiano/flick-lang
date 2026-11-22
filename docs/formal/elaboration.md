@@ -14,6 +14,7 @@ Elaborated here:
 - `do` with `<-`, `and`, an `if` guard and `let`;
 - `for … yield`, `[for …]`, `for … do`;
 - postfix `?`;
+- postfix `catch`;
 - eager `result { … }` blocks;
 - direct calls;
 - `let mut` variables and assignment;
@@ -85,12 +86,13 @@ constitute a proof of the Rust checker's rewrite.
 ### 1.3 Sugar
 
 ```text
-e ::= … | do { s̄ } | for { c̄ } yield e | [for { c̄ } yield e] | for { c̄ } do e | e? | result { s̄ }
+e ::= … | do { s̄ } | for { c̄ } yield e | [for { c̄ } yield e] | for { c̄ } do e | e?
+      | e catch (| p (when g)? -> h)+ | result { s̄ }
 s ::= p <- e | p₁ <- e₁ and … and pₙ <- eₙ | let p = e | if e | e
 c ::= p <- e | if e | let p = e
 ```
 
-The last statement of a `do` or `result` block is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`, `handlers.rs`. Syntax: `reference/syntax.md` "`do`", "`for`", `?`, `result`.
+The last statement of a `do` or `result` block is an expression. Checker: `do_notation.rs`, `applicative_do.rs`, `comprehension.rs`, `question.rs`, `handlers.rs`. Syntax: `reference/syntax.md` "`do`", "`for`", `?`, `catch`, `result`.
 
 ## 2. Dictionaries
 
@@ -471,7 +473,23 @@ the typing of blocks, so T7 covers them (`formal/Formal/LetMut/Lazy.lean`),
 given the Prelude's `Option` and `Result` in the signature (`LzSig`, which
 the witness signature has: `Elab.Witness.lzSig`).
 
-### 3.7 `result { … }`
+### 3.7 Postfix `catch`
+
+Postfix `catch` is typed-error-only source sugar over the existing error-only `try … with` handler (`core.md` §1.4, §2.3, §3.5):
+
+```text
+⟦e catch | p₁ [when g₁] -> h₁ … | pₙ [when gₙ] -> hₙ⟧
+  = try e with | p₁ [when g₁] -> h₁ … | pₙ [when gₙ] -> hₙ
+```
+
+where every arm `pᵢ` is an error pattern (nominal `type error` pattern, wildcard `_`, or catch-all variable). Operation arms (`S.op …`), `return` arms, `Fail.fail …` arms and `resume` are rejected during typechecking (`handlers.rs` `catch_expr`, `FLICK-E007` / `FLICK-T001`).
+
+- **Hygiene and preservation.** No fresh binders are introduced; every pattern binding, guard, recovery body, capture qualifier, `let mut` allowance and Option `?` return boundary (`stage.returns = None`) inherits the exact rules of `try … with`.
+- **Evaluation order.** The handler is established before evaluating `e`. On success `e`'s value is returned unchanged without running any guard or recovery. On a typed error, arms are tried in source order; guards and recovery bodies execute outside this handler so their failures (including a failure of the same nominal type) propagate to the enclosing handler rather than re-entering subsequent arms. Defects, interruption and cold `task` values are not caught.
+- **Row subtraction.** Service rows are never removed. A nominal error label is removed from `e`'s error row only when a single unguarded arm covers every payload value; partial arms, guarded arms and separate partial arms do not remove the label, open tails are preserved open, and a catch-all variable receives `Errors e_body` for the full error row of `e`.
+- **IR, model and Lean impact.** `ir/lower/expr.rs` lowers `CatchExpr` directly to the unchanged `ExprKind::Handle` with `effects = []` and `ret = None`. The reference model (`flick-model`) translates and evaluates that unchanged core `Handle` form, and the Lean 4 core calculus and theorems (`formal/`, T1–T7 and `Formal/LocalControl.lean`) require no new term, typing rule, evaluation rule, Prelude scheme or axiom. As stated in `formal/README.md`, those theorems cover the formal calculus and do not constitute a proof of the Rust compiler or either runtime.
+
+### 3.8 `result { … }`
 
 `result { body }` is an eager runtime typed-error boundary whose canonical
 elaboration into the core is an error-catching `Handle` with hygienic binders

@@ -396,8 +396,8 @@ fn calls<'m>(m: &'m Analyzed, path: &[&Node], text: &str) -> Calls<'m> {
             | K::PluginDecl
             | K::PluginRest
             | K::PluginArgs => return Calls::Any,
-            // the body of a `try` may raise what its arms catch
-            K::TryExpr
+            // the body of a `try` or `catch` may raise what its arms catch
+            K::TryExpr | K::CatchExpr
                 if path.get(i + 1).map(|c| c.range()) == node.nodes().next().map(Node::range) =>
             {
                 return Calls::Any;

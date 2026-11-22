@@ -276,7 +276,7 @@ impl Lower<'_> {
                 ExprKind::Match(scrutinee, self.arms(node))
             }
             K::TryExpr | K::ProvideExpr if self.handles_effects(node) => self.handler(node),
-            K::TryExpr => {
+            K::TryExpr | K::CatchExpr => {
                 let body = *self.boxed(children[0]);
                 ExprKind::Handle(Box::new(Handler {
                     effects: Vec::new(),

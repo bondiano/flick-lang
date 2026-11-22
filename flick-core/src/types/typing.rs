@@ -392,6 +392,7 @@ impl Checker<'_> {
             K::ProvideExpr => K::ProvideKw,
             K::TryExpr => K::TryKw,
             K::ResultExpr => K::ResultKw,
+            K::CatchExpr => K::CatchKw,
             K::MatchExpr => K::MatchKw,
             K::IfExpr => K::IfKw,
             K::FunExpr => K::FunKw,

@@ -18,7 +18,7 @@ use super::ty::{Row, Type, Written, without};
 use super::typing::Ref;
 use crate::diagnostics::{Diagnostic, Edit, codes};
 use crate::iface::{Entity, Namespace};
-use crate::source::Span;
+use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
@@ -276,6 +276,7 @@ impl Checker<'_> {
     }
 }
 
+include!("handlers/catch.rs");
 include!("handlers/providing.rs");
 include!("handlers/result.rs");
 

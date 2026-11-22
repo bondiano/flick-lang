@@ -79,6 +79,7 @@ syntax_kinds! {
         MatchKw = "match",
         WithKw = "with",
         TryKw = "try",
+        CatchKw = "catch",
         IfKw = "if",
         ThenKw = "then",
         ElseKw = "else",
@@ -320,6 +321,7 @@ syntax_kinds! {
         TryExpr,
         /// `result { … }`: eager typed-error boundary returning `Result (Errors e) a`.
         ResultExpr,
+        CatchExpr,
         IfExpr,
         TaskExpr,
         /// `lazy { … }`: a computation run at most once, at its first `await`.
@@ -442,18 +444,20 @@ impl SyntaxKind {
     pub fn binding_power(self) -> Option<(u8, u8)> {
         use SyntaxKind as K;
         Some(match self {
-            // `<|` and `|>` do not mix, nor `>>` and `<<` (validate.rs)
-            K::LtPipe => (1, 1),
-            K::PipeGt => (2, 3),
-            K::OrOr => (4, 4),
-            K::AndAnd => (6, 6),
-            K::EqEq | K::NotEq | K::Lt | K::Le | K::Gt | K::Ge => (8, 9),
-            K::PlusPlus => (10, 10),
-            K::Plus | K::Minus => (12, 13),
-            K::Star | K::Slash | K::Percent => (14, 15),
-            K::StarStar => (18, 18),
-            K::GtGt => (20, 21),
-            K::LtLt => (20, 20),
+            // `<|` and `|>` do not mix, nor `>>` and `<<` (validate.rs).
+            // Postfix `catch` sits below `<|`, outside `expr_bp(p, 2)`; `(4, 4)`
+            // is reserved for `orelse`.
+            K::LtPipe => (2, 2),
+            K::PipeGt => (6, 7),
+            K::OrOr => (8, 8),
+            K::AndAnd => (10, 10),
+            K::EqEq | K::NotEq | K::Lt | K::Le | K::Gt | K::Ge => (12, 13),
+            K::PlusPlus => (14, 14),
+            K::Plus | K::Minus => (16, 17),
+            K::Star | K::Slash | K::Percent => (18, 19),
+            K::StarStar => (22, 22),
+            K::GtGt => (24, 25),
+            K::LtLt => (24, 24),
             _ => return None,
         })
     }
