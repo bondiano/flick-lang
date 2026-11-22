@@ -54,6 +54,8 @@ codes! {
     S014 = Syntax 14, "unknown attribute";
     S015 = Syntax 15, "a constructor result where none can be written";
     S016 = Syntax 16, "`mut` where only a local variable of one name can be";
+    S017 = Syntax 17, "more than one `_` hole in an application";
+    S018 = Syntax 18, "`_` outside an application argument";
     R001 = Resolve 1, "module name does not match the file path";
     R002 = Resolve 2, "two files declare the same module";
     R003 = Resolve 3, "unknown module";
@@ -287,7 +289,7 @@ codes! {
     P037 = Project 37, "plugin block without its import";
     P038 = Project 38, "plugin reaches what the project does not grant";
     P039 = Project 39, "plugin's answer is in no snapshot of an offline run";
-    P040 = Project 40, "packages need different versions of an npm package";
+    P040 = Project 40, "packages need different versions of a target dependency";
     P041 = Project 41, "foreign module of a library cannot ship";
     P042 = Project 42, "the manifest disables this part of a plugin";
     P043 = Project 43, "the `std` does not fit this compiler";
@@ -310,6 +312,7 @@ codes! {
     P060 = Project 60, "unknown or unsupported project template";
     P061 = Project 61, "Flick program step or documentation example failed at runtime";
     P062 = Project 62, "documentation example failed its check contract";
+    P063 = Project 63, "the backend has no dependency command for this";
 }
 
 #[cfg(test)]

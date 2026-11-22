@@ -41,7 +41,10 @@ impl Checker<'_> {
         if param.kind != K::VarPat {
             return;
         }
-        let Some(call) = single(body).map(unparen).filter(|c| c.kind == K::AppExpr) else {
+        let Some(call) = single(body)
+            .map(unparen)
+            .filter(|c| c.kind == K::AppExpr && !super::super::holes::has_hole(c))
+        else {
             return;
         };
         let args: Vec<&Node> = call.nodes().collect();

@@ -63,7 +63,7 @@ impl<'p> Machine<'p, '_> {
                 let none = self.heap.construct("Prelude.Option.None", vec![])?;
                 self.store(binding, none)?;
             }
-            TransferNext::ResumeRunning { saved_failure } => {
+            TransferNext::ResumeRunning { saved_failure, .. } => {
                 self.restore_evidence();
                 if let Some(cause) = saved_failure {
                     if let Some(existing) = self.failure.take() {
@@ -290,13 +290,25 @@ impl<'p> Machine<'p, '_> {
     ) -> Result<(), Error> {
         let paused = self.discard.take().expect("active transfer");
         self.heap.drop_values(roots)?;
+        let exit_val = if let Some(cause) = Self::peek_discard_exit_cause(&paused.next) {
+            let dup = match self.heap.dup_cause(cause) {
+                Ok(dup) => dup,
+                Err(err) => {
+                    self.discard = Some(paused);
+                    self.scratch.push(decide);
+                    return Err(err);
+                }
+            };
+            self.heap
+                .allocate(Data::Exit(super::ExitData::Failure(dup.into_value())))
+        } else {
+            self.heap
+                .allocate(Data::Exit(super::ExitData::Success(Value::Unit)))
+        };
         let saved_mask = self.mask_depth;
         if !interruptible {
             self.mask_depth += 1;
         }
-        let exit_val = self
-            .heap
-            .allocate(Data::Exit(super::ExitData::Success(Value::Unit)));
         self.scratch.extend([decide, exit_val]);
         self.apply_fresh(Destination::OnExitDiscardRunFin {
             saved_mask,
@@ -349,12 +361,22 @@ impl<'p> Machine<'p, '_> {
                 prev_owner,
                 prev_ev,
                 prev_memo,
+                memo_entry,
+                target,
                 ..
             } => {
-                self.current_owner = prev_owner;
-                self.current_evidence = prev_ev;
-                self.restore_fiber_memo(prev_memo)?;
-                self.close_owner(inner_owner)?;
+                return self.discard_layer_build_finish(
+                    inner_owner,
+                    prev_owner,
+                    prev_ev,
+                    prev_memo,
+                    memo_entry,
+                    target,
+                    roots,
+                );
+            }
+            Destination::ForeignLayerBuildFinish { target, .. } => {
+                return self.discard_foreign_layer_build_finish(target, roots);
             }
             Destination::OrDie { .. }
             | Destination::TimedFinish { .. }

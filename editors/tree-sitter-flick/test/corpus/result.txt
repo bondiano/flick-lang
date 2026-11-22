@@ -1,0 +1,18 @@
+==================
+Contextual result block head and ordinary names
+==================
+
+let result = 42
+let f result = result + 1
+let r = result { work () }
+let call = (result) { field = 1 }
+let field = obj.result
+
+---
+
+(source_file
+  (keyword) (identifier) (operator) (number)
+  (keyword) (identifier) (identifier) (operator) (identifier) (operator) (number)
+  (keyword) (identifier) (operator) (keyword) (braces (identifier) (parens))
+  (keyword) (identifier) (operator) (parens (identifier)) (braces (identifier) (operator) (number))
+  (keyword) (identifier) (operator) (identifier) (member))

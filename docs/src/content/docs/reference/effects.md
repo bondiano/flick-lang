@@ -300,6 +300,78 @@ let find_optional id =
 
 An arm that matches something other than an error is `FLICK-E007`.
 
+Postfix `catch` is typed-error-only sugar over `try … with` with the same
+evaluation order, row subtraction, capture and mutation rules:
+
+```flick
+# type error FileNotFound = FileNotFound String
+# type error InvalidConfig = InvalidConfig String
+# type alias Config = { host : String }
+# default_config : Config
+# let default_config = { host = "localhost" }
+# load_config : String ->{; FileNotFound, InvalidConfig} Config
+# let load_config path = Fail.fail (FileNotFound path)
+# load_backup : String ->{} Config
+# let load_backup _ = default_config
+#
+read_config : String ->{} Config
+let read_config path =
+  load_config path catch
+  | FileNotFound _ -> default_config
+  | InvalidConfig details -> load_backup details
+```
+
+`catch` binds weaker than all infix operators, and the leading `|` is required
+even for a single arm. A pipeline inside a recovery arm belongs to that arm;
+parenthesize the whole `catch` to pipe its result (`(load id catch | NotFound _ -> guest) |> format`),
+and parenthesize an inner `catch` to catch failures from its recovery
+(`(a catch | E -> b) catch | F -> c`). Operation arms (`| S.op x -> …`),
+`return` arms, `Fail.fail p` arms and `resume` are rejected in `catch`
+(`FLICK-E007` / `FLICK-T001`); use `try … with` when handling effect operations.
+The handler is established before evaluating the left-hand expression, guards
+and recovery bodies execute outside that handler (so a same-type failure escapes
+to an outer handler rather than re-entering later arms), pure `Err` values and
+cold `task { … }` values are untouched, and Option `?` cannot cross the `catch`
+return boundary.
+
+### `result { … }`
+
+`result { body }` is an eager typed-error boundary: it runs `body` once in the
+current fiber, wraps a normal result in `Ok`, and catches every typed failure
+in `Err`, returning `Result (Errors e) a`. It is shorthand for the canonical
+`try` handler:
+
+```flick
+# type UserId = UserId String
+# type alias User = { name : String }
+# type error NotFound = NotFound UserId
+# type error DbUnavailable = DbUnavailable
+# service Users =
+#   get : UserId ->{; NotFound, DbUnavailable} User
+#
+load_result : UserId ->{Users} Result (Errors {NotFound, DbUnavailable}) User
+let load_result id =
+  result {
+    Users.get id
+  }
+```
+
+- `result { … }` removes the body's typed failures from the surrounding error
+  row while preserving its service requirements `r` and open error row `e`.
+  When the body raises no typed errors, `Errors none` simplifies to `Never`
+  (`Result Never a`); for a single error type `E`, `Errors {E}` is `E`.
+- It is a runtime-stage construct even when both rows are empty: it is accepted
+  under `->{}` and rejected with `FLICK-E001` under a pure arrow `->` or as a
+  top-level value.
+- It does not flatten nested `Result` values (`result { Err e }` produces
+  `Ok (Err e)`) and does not run cold `Eff` or `Lazy` values returned by the
+  body (use `await` inside the block to run them).
+- Only typed failures become `Err`: defects (`Effect.die`), fiber interruption,
+  and `abort`/`control` effect unwinds propagate unchanged, matching `try`.
+- `result` is contextual only immediately before `{`; elsewhere it remains an
+  ordinary identifier. To call a function named `result` with a record literal,
+  parenthesize the callee: `(result) { field = 1 }`.
+
 `Errors e` turns an error row into a type: `Errors none` is `Never`,
 `Errors {NotFound}` is `NotFound`. `from_result` fails with the error of an
 `Err`; the error row of a `Result NotFound a` is `{NotFound}`, and a

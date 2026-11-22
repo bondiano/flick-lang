@@ -188,6 +188,7 @@ let run () = scope outer {
 #[cfg(feature = "ide")]
 mod ide_tests {
     use super::*;
+    use flick_core::diagnostics::codes;
     use flick_core::ide::{CompletionKind, Ide, TOKEN_TYPES};
     use flick_core::source::FileId;
 
@@ -547,5 +548,83 @@ let run () = scope outer {
             .hover(f2, offset_of(after, "defer") + 1)
             .expect("after hover");
         assert!(h2.contains("`scope inner`"), "{h2}");
+    }
+
+    #[test]
+    fn cross_feature_defer_with_result_catch_let_else_orelse_and_holes() {
+        let ok_src = "\
+module App.Cross exposing (run)
+
+type error Boom = Boom
+
+work : Unit ->{; Boom} Int
+let work () = 1
+
+run : Option Int ->{} Int
+let run opt = scope outer {
+  let Some n = opt else
+    defer { Host.raw_stdout_line \"else\" }
+    0
+  let r = result {
+    defer { Host.raw_stdout_line \"res\" }
+    errdefer { Host.raw_stdout_line \"res-err\" }
+    work ()
+  }
+  let v =
+    work () catch
+    | Boom ->
+      defer { Host.raw_stdout_line \"caught\" }
+      0
+  let _ = try defer { () } with | Boom -> ()
+  let fallback = opt orelse (n + v)
+  match r with
+  | Ok x -> x + fallback
+  | Err _ -> fallback
+}
+";
+        let (sources, file, analysis) = analyze(ok_src);
+        assert!(
+            analysis.diagnostics.is_empty(),
+            "cross-feature defer should check cleanly: {:?}",
+            analysis.diagnostics
+        );
+        let ide = Ide {
+            analysis: &analysis,
+            sources: &sources,
+        };
+        // `try defer { () } with | Boom -> ()` must not offer invalid `try_to_catch`
+        let try_at = offset_of(ok_src, "try defer");
+        assert!(
+            !ide.actions(file, try_at, try_at)
+                .iter()
+                .any(|a| a.title.contains("as `catch`")),
+            "must not rewrite `try defer` as postfix catch"
+        );
+        // `defer` inside `result { … }` and `let ... else` binds to `scope outer`
+        let res_defer = offset_of(ok_src, "defer { Host.raw_stdout_line \"res\" }");
+        let (hover, _) = ide.hover(file, res_defer + 1).expect("hover in result");
+        assert!(hover.contains("`scope outer`"), "{hover}");
+
+        // Expression hole creates a lambda boundary blocking outer `scope` for `defer`
+        let bad_hole = "\
+module App.HoleDefer exposing (run)
+
+keep : Unit -> Int ->{} Int
+let keep _ n = n
+
+run : Unit ->{} (Int ->{} Int)
+let run () = scope {
+  keep (if true then defer { () }) _
+}
+";
+        let (_, _, hole_analysis) = analyze(bad_hole);
+        assert!(
+            hole_analysis
+                .diagnostics
+                .iter()
+                .any(|d| d.code == codes::G004),
+            "expected FLICK-G004 across expression hole lambda: {:?}",
+            hole_analysis.diagnostics
+        );
     }
 }

@@ -126,6 +126,7 @@ impl Ide<'_> {
         if pattern.range() != binder
             || decl.nodes().any(|n| n.kind == K::Params)
             || decl.has_token(K::MutKw)
+            || decl.has_token(K::ElseKw)
         {
             return None;
         }

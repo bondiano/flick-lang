@@ -17,7 +17,6 @@ import {
   handleBuildLayer,
   handleCall,
   handleCallHandle,
-  handleCloseOwner,
   handleGetField,
   handleLookupService,
   handlePerformService,
@@ -29,7 +28,8 @@ import {
   bridge,
   builtinModuleCache,
   causeMod,
-  collectCallHandleIds,
+  collectMsgHandleIds,
+  effectSpecifier,
   executions,
   fiberMod,
   initialArgv1,
@@ -38,6 +38,7 @@ import {
   ioWorker,
   ownerMod,
   resetReactContexts,
+  routeMap,
   runtime,
   send,
   tagsMod,
@@ -48,6 +49,53 @@ import {
 wireCtx.makeCallback = makeCallback;
 wireCtx.makeTask = makeTask;
 wireCtx.makeCellProxy = makeCellProxy;
+
+function handleCloseOwner(msg) {
+  const exec = executions.get(msg.exec);
+  const owner = exec?.owners.get(msg.owner);
+  if (!owner) {
+    send({ type: "owner_closed", owner: msg.owner });
+    return;
+  }
+  const inflight = exec.closingOwners.get(msg.owner);
+  if (inflight) {
+    inflight.push(() => send({ type: "owner_closed", owner: msg.owner }));
+    return;
+  }
+  if (!owner.open) {
+    if (owner.pending.size === 0) {
+      send({ type: "owner_closed", owner: msg.owner });
+      return;
+    }
+    const waiters = [() => send({ type: "owner_closed", owner: msg.owner })];
+    exec.closingOwners.set(msg.owner, waiters);
+    const drain = async () => {
+      while (owner.pending.size > 0) {
+        await Promise.allSettled(owner.pending);
+      }
+    };
+    drain().finally(() => {
+      exec.closingOwners.delete(msg.owner);
+      for (const done of waiters) done();
+    });
+    return;
+  }
+  const waiters = [() => send({ type: "owner_closed", owner: msg.owner })];
+  exec.closingOwners.set(msg.owner, waiters);
+  const finish = () => {
+    exec.closingOwners.delete(msg.owner);
+    for (const done of waiters) done();
+  };
+  const fiber = fiberMod.forkNow(
+    () => ownerMod.close(owner, causeMod.succeeded(undefined)),
+    fiberMod.currentCtx(),
+  );
+  if (fiber.exit !== undefined) {
+    finish();
+    return;
+  }
+  fiber.observe(finish);
+}
 
 function dispatchSyncNested(msg) {
   if (msg.op === "release_handles") {
@@ -64,23 +112,24 @@ function dispatchSyncNested(msg) {
     try {
       const resolved = resolveTargetSync(exec, spec);
       if (resolved.needsAsyncLoad || spec.mode === "Async") {
-        let pinned = exec ? exec.retainHandleIds(collectCallHandleIds(msg)) : [];
-        const releasePins = () => {
+        let pinned = exec ? exec.pinExistingHandles(collectMsgHandleIds(msg)) : [];
+        const releasePinned = () => {
           if (pinned.length > 0) {
-            exec.releaseHandles(pinned);
+            const ids = pinned;
             pinned = [];
+            exec?.releaseHandles(ids);
           }
         };
-        exec.pendingCalls.set(callId, { abort: releasePins });
+        exec.pendingCalls.set(callId, { abort: releasePinned });
         send({ type: "pending", call_id: callId });
         queueMicrotask(() => {
           if (!exec.pendingCalls.has(callId) || exec.closing) {
-            releasePins();
+            releasePinned();
             return;
           }
-          const passed = pinned;
+          const handoff = pinned;
           pinned = [];
-          handleCall(msg, true, passed).catch((err) => {
+          handleCall(msg, true, handoff).catch((err) => {
             if (!exec.pendingCalls.delete(callId) || exec.closing) return;
             finishCallErr(exec, callId, err, spec.has_catch);
           });
@@ -88,8 +137,15 @@ function dispatchSyncNested(msg) {
         return;
       }
       const { target, bridged } = resolved;
-      const finalArgs = prepareArgs(exec, spec, msg.args, bridged, null);
-      const callCtx = buildCallCtx(exec, msg);
+      const pinned = exec ? exec.pinExistingHandles(collectMsgHandleIds(msg)) : [];
+      let finalArgs;
+      let callCtx;
+      try {
+        finalArgs = prepareArgs(exec, spec, msg.args, bridged, null);
+        callCtx = buildCallCtx(exec, msg);
+      } finally {
+        if (pinned.length > 0) exec?.releaseHandles(pinned);
+      }
       if (spec.mode === "Effect") {
         const made = fiberMod.inCtx(callCtx, () => invokeTarget(spec, target, finalArgs));
         const runOrVal = Effect.isEffect(made)
@@ -223,11 +279,16 @@ async function handleMessage(line) {
       }
       if (Array.isArray(msg.imports)) {
         for (const spec of msg.imports) {
-          if (!builtinModuleCache.has(spec)) {
-            try {
-              builtinModuleCache.set(spec, await import(spec));
-            } catch {
-              // Fall back to lazy resolution if specifier is non-standard.
+          const targets = spec.startsWith("flick:")
+            ? [routeMap.get(spec), effectSpecifier(spec)].filter(Boolean)
+            : [spec];
+          for (const targetSpec of targets) {
+            if (!builtinModuleCache.has(targetSpec)) {
+              try {
+                builtinModuleCache.set(targetSpec, await import(targetSpec));
+              } catch {
+                // Fall back to lazy resolution if specifier is non-standard.
+              }
             }
           }
         }
@@ -266,6 +327,7 @@ async function handleMessage(line) {
           ]);
         }
         exec.owners.clear();
+        exec.closingOwners.clear();
         const liveHandles = exec.handles.size;
         exec.handles.clear();
         exec.objToId.clear();

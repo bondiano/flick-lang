@@ -60,8 +60,8 @@ used without its argument and `Float String` are `FLICK-T002`.
 
 Every named function has its full signature right above its `let` (see [Direct effectful calls](../../spec/01-direct-calls/)): at
 the top level, and for a function made by partial application. A local function
-may omit it: its type is inferred, and without a signature it has one type, so
-using it at a second type is `FLICK-T003`. A recursive local function needs one.
+may omit it: its type is inferred and generalized as a lambda's is, so each use
+may give it other types. A recursive local function needs one.
 An instance method takes its signature from the class; repeating it is `FLICK-T059`.
 A top-level function without one is `FLICK-T004`, with the inferred type
 as a suggestion; types written in the `let` header are `FLICK-T005`; a
@@ -120,10 +120,10 @@ being stored in a cell created outside the callback (`FLICK-T007`).
 
 ## Records
 
-Records are exact and structural (see [The HKT type core and type classes](../../spec/03-types-and-classes/)). `type alias User = { … }` is a transparent
-alias, and the order of fields does not matter. A record with extra fields
-does not pass for a closed record type; a signature accepts more fields with
-an open row:
+Records are exact and structural (see [Records and instances](../../spec/03b-records-and-instances/)). `type alias User = { … }` is a transparent
+alias, and the order of fields does not matter either in types or in runtime
+values. A record with extra fields does not pass for a closed record type; a
+signature accepts more fields with an open row:
 
 ```flick
 name : forall fields. { name : String | fields } -> String
@@ -132,7 +132,19 @@ let name value = value.name
 
 `{ r with f = v }` replaces existing fields by values of the same type. A
 label given twice in a record type, literal, update or pattern is
-`FLICK-T014`.
+`FLICK-T014`. Field expressions in record literals and updates evaluate in
+source order.
+
+Values of data types, structural records and tuples have no observable storage
+identity, and the written order of a record's labels is not observable: every
+operation that inspects labels or encodes structural records uses the canonical
+sorted order of `Record.labels`. A backend may copy, inline or share storage
+when every observable part is preserved — including GADT evidence and the
+identity of any referenced mutable cells (`Ref`, `RcRef`, `ScopedRef`, `Atom`)
+and foreign values. Source equality (`==`) does not license substituting one
+value for another (`0.0 == -0.0`, while `Float.same_value` and `show`
+distinguish them). Explicit mutable cells and foreign values retain identity
+by design.
 
 ## Patterns
 

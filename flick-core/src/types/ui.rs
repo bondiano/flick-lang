@@ -206,6 +206,7 @@ impl Keyed {
         self.visit(node, &parts, in_function, names, watched);
         let inner = in_function
             || node.kind == K::FunExpr
+            || super::holes::has_hole(node)
             || (node.kind == K::LetDecl && parts.iter().any(|n| n.kind == K::Params));
         for child in parts {
             self.walk(child, inner, names, watched);
@@ -229,7 +230,9 @@ impl Keyed {
             }
             // `state |> Atom.serializable codec`: the piped state is the last argument
             K::BinExpr if node.has_token(K::PipeGt) => {
-                if let Some(app) = parts.get(1).filter(|n| n.kind == K::AppExpr)
+                if let Some(app) = parts
+                    .get(1)
+                    .filter(|n| n.kind == K::AppExpr && !super::holes::has_hole(n))
                     && let Some(head) = app.nodes().next()
                 {
                     self.applied.insert(head.range(), app.nodes().count());
@@ -238,7 +241,7 @@ impl Keyed {
             // `Atom.serializable codec <| state` is the application itself
             K::BinExpr if node.has_token(K::LtPipe) => {
                 let (head, given) = match parts.first() {
-                    Some(app) if app.kind == K::AppExpr => {
+                    Some(app) if app.kind == K::AppExpr && !super::holes::has_hole(app) => {
                         (app.nodes().next(), app.nodes().count())
                     }
                     other => (other.copied(), 1),

@@ -1,0 +1,125 @@
+// Type, scope, monomorphism, GADT, existential, region, reachability, and
+// block-tail errors for `let ... else`.
+module App.LetElseFail exposing (..)
+
+type Box =
+  | Hide a : Box
+
+type Expr a =
+  | IntLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+
+type File (s : Region)
+
+service Files =
+  open : forall s. String ->{Scope s} File s
+
+/// Fallback type must match the enclosing block remainder (checked).
+branch_mismatch : Option Int -> Int
+let branch_mismatch m =
+  let Some n = m else "wrong"
+  n + 1
+
+/// Fallback type must match the inferred success remainder in an unannotated block.
+inferred_branch_mismatch : Option Int -> String
+let inferred_branch_mismatch m =
+  let v =
+    let Some n = m else "wrong"
+    n + 1
+  show v
+
+/// Pattern bindings are not in scope in the fallback.
+pattern_in_fallback : Option Int -> Int
+let pattern_in_fallback m =
+  let Some n = m else n
+  n + 1
+
+/// Pattern bindings are not in scope in the initializer.
+pattern_in_init : Bool -> Option Int -> Int
+let pattern_in_init flag m =
+  let Some n = (if flag then Some n else m) else 0
+  n + 1
+
+/// Fallback locals do not escape to the success remainder.
+fallback_local_escapes : Option Int -> Int
+let fallback_local_escapes m =
+  let Some n = m else
+    let fb = 0
+    fb
+  n + fb
+
+/// Pattern bindings are monomorphic (like `match`).
+mono_refutable : Unit -> (Int, String)
+let mono_refutable () =
+  let Some id = Some (fun x -> x) else (0, "")
+  (id 1, id "a")
+
+/// Even an irrefutable single-variable `let-else` is monomorphic (like `match`).
+mono_irrefutable : Unit -> (Int, String)
+let mono_irrefutable () =
+  let id = fun x -> x else (0, "")
+  (id 1, id "a")
+
+/// GADT refinement does not leak into the fallback.
+gadt_leak : forall a. Expr a -> a -> Int
+let gadt_leak e x =
+  let IntLit n = e else x + 1
+  n + x
+
+/// Existentials bound by `let-else` cannot escape the block.
+existential_escape : Option Box -> Int
+let existential_escape m =
+  let _result =
+    let Some (Hide x) = m else 0
+    x
+  0
+
+/// Scoped region handles cannot escape via `let-else`.
+region_escape : Option String ->{Files} Unit
+let region_escape m =
+  let leaked = scope {
+    let Some path = m else Files.open "fallback"
+    Files.open path
+  }
+  ignore leaked
+
+/// Impossible GADT pattern warns that `let-else` never matches.
+impossible_gadt : Expr Int -> Int
+let impossible_gadt e =
+  let BoolLit b = e else 0
+  if b then 1 else 2
+
+/// Irrefutable tuple pattern warns that `else` is unreachable.
+irrefutable_tuple : (Int, Int) -> Int
+let irrefutable_tuple pair =
+  let (a, b) = pair else 0
+  a + b
+
+/// Empty success remainder is a block-tail error (`FLICK-T019`).
+empty_remainder : Option Int -> Int
+let empty_remainder m =
+  let Some _ = m else 0
+
+/// A signature cannot be paired with `let ... else`.
+paired_sig : Option Int -> Int
+let paired_sig m =
+  n : Int
+  let Some n = m else 0
+  n
+
+//~ FLICK-T003 @20:23-20:30 expected `Int`, found `String`
+//~ FLICK-T003 @27:25-27:32 expected `Int`, found `String`
+//~ FLICK-T001 @34:23-34:24 `n` is bound by the `let ... else` pattern and is only in scope after `else`
+//~ FLICK-T001 @40:35-40:36 `n` is bound by this `let ... else` pattern and is not in scope in its initializer
+//~ FLICK-T001 @49:7-49:9 cannot find value `fb`
+//~ FLICK-T003 @55:10-55:16 expected `String`, found `Int`
+//~ FLICK-T003 @55:13-55:16 expected `Int`, found `String`
+//~ FLICK-T003 @61:10-61:16 expected `String`, found `Int`
+//~ FLICK-T003 @61:13-61:16 expected `Int`, found `String`
+//~ FLICK-T008 @66:25-66:30 expected `Int`, found `a`
+//~ FLICK-T007 @74:5-74:6 the type variable `a` would escape
+//~ FLICK-G002 @81:5-82:20 region `s` ends with its `scope`
+//~ FLICK-T010 @89:7-89:16 this pattern is never matched
+//~ FLICK-T010 @95:21-95:27 this `else` branch is never reached
+//~ FLICK-T019 @101:24-101:24 a block must end with an expression
+//~ FLICK-T006 @106:3-106:10 signature `n` cannot pair with `let ... else`

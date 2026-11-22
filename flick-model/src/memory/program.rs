@@ -553,6 +553,7 @@ enum TransferNext<'p> {
     },
     ResumeRunning {
         saved_failure: Option<CauseToken>,
+        propagate_exit: bool,
     },
     FinishGenerateStrict {
         binding: Local,

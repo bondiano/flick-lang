@@ -8,11 +8,25 @@ import (
 )
 
 // Equals is `==`: structural equality, SameValueZero on numbers.
-func Equals(a, b Value) bool {
+func Equals(a, b Value) bool { return equalValues(a, b, false) }
+
+// SameValue is structural SameValue equivalence: distinguishes +0.0 and -0.0,
+// treats all NaNs as equal, compares mutable cells and foreign values by
+// identity, and compares data values, records, tuples, lists, and Chunks
+// structurally without observing storage identity or written field order.
+func SameValue(a, b Value) bool { return equalValues(a, b, true) }
+
+func equalValues(a, b Value, strictZero bool) bool {
 	switch x := a.(type) {
 	case float64:
 		y, ok := b.(float64)
-		return ok && (x == y || (x != x && y != y))
+		if !ok {
+			return false
+		}
+		if strictZero {
+			return NumberSameValue(x, y)
+		}
+		return x == y || (x != x && y != y)
 	case *big.Int:
 		y, ok := b.(*big.Int)
 		return ok && x.Cmp(y) == 0
@@ -22,7 +36,7 @@ func Equals(a, b Value) bool {
 			return false
 		}
 		for i := range x {
-			if !Equals(x[i], y[i]) {
+			if !equalValues(x[i], y[i], strictZero) {
 				return false
 			}
 		}
@@ -30,13 +44,13 @@ func Equals(a, b Value) bool {
 	case *Data:
 		y, ok := b.(*Data)
 		if !ok {
-			return sameConstructed(x, b)
+			return sameConstructedValues(x, b, strictZero)
 		}
 		if x.Tag != y.Tag || len(x.Fields()) != len(y.Fields()) {
 			return false
 		}
 		for i := range x.Fields() {
-			if !Equals(x.Fields()[i], y.Fields()[i]) {
+			if !equalValues(x.Fields()[i], y.Fields()[i], strictZero) {
 				return false
 			}
 		}
@@ -48,7 +62,7 @@ func Equals(a, b Value) bool {
 		}
 		for i, k := range x.keys {
 			j := y.index(k)
-			if j < 0 || !Equals(x.vals[i], y.vals[j]) {
+			if j < 0 || !equalValues(x.vals[i], y.vals[j], strictZero) {
 				return false
 			}
 		}
@@ -62,7 +76,7 @@ func Equals(a, b Value) bool {
 	case *Chunk:
 		// a Chunk equals one with the same elements, by structural equality
 		y, ok := b.(*Chunk)
-		return ok && x.equals(y)
+		return ok && x.equalsWith(y, strictZero)
 	case *Dict:
 		// a dictionary a value of a GADT holds: the fields beside it decide
 		_, ok := b.(*Dict)
@@ -76,15 +90,15 @@ func Equals(a, b Value) bool {
 		// a constructor value of a Go type of its own, asked last: a number
 		// or a string never gets here
 		if x, ok := a.(Constructed); ok {
-			return sameConstructed(x, b)
+			return sameConstructedValues(x, b, strictZero)
 		}
 		return a == b
 	}
 }
 
-// sameConstructed is `Equals` of a constructor value and any value,
+// sameConstructedValues is `equalValues` of a constructor value and any value,
 // whatever Go types the two have.
-func sameConstructed(x Constructed, b Value) bool {
+func sameConstructedValues(x Constructed, b Value, strictZero bool) bool {
 	y, ok := b.(Constructed)
 	if !ok || x.TagName() != y.TagName() {
 		return false
@@ -94,7 +108,7 @@ func sameConstructed(x Constructed, b Value) bool {
 		return false
 	}
 	for i := range xs {
-		if !Equals(xs[i], ys[i]) {
+		if !equalValues(xs[i], ys[i], strictZero) {
 			return false
 		}
 	}
@@ -278,10 +292,13 @@ func hash(a Value) int32 {
 }
 
 // hashConstructed is the hash of the object `{ _tag, _0, … }`: its keys in
-// any order.
+// any order, skipping held GADT dictionaries (`*Dict`).
 func hashConstructed(tag string, fields []Value) int32 {
 	h := int32(12289) ^ effectCombine(hashOfTag, hashString(tag))
 	for i, v := range fields {
+		if _, ok := v.(*Dict); ok {
+			continue
+		}
 		h ^= effectCombine(hashString(nativeField(tag, i)), hash(v))
 	}
 	return optimize(h)

@@ -16,9 +16,9 @@ use super::patterns::is_pattern;
 use super::services::Operation;
 use super::ty::{Row, Type, Written, without};
 use super::typing::Ref;
-use crate::diagnostics::codes;
-use crate::iface::Entity;
-use crate::source::Span;
+use crate::diagnostics::{Diagnostic, Edit, codes};
+use crate::iface::{Entity, Namespace};
+use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang::Lang;
@@ -120,8 +120,12 @@ impl Checker<'_> {
         let raised = self.store.fresh_error_row();
         let needed = effects.then(|| self.fresh());
         let mut stage = self.cx.stage.clone();
-        stage.errors = raised.clone();
-        stage.returns = None;
+        (
+            stage.errors,
+            stage.error_site,
+            stage.in_result,
+            stage.returns,
+        ) = (raised.clone(), None, false, None);
         if let Some(needed) = &needed {
             stage.services = needed.clone();
         }
@@ -176,15 +180,7 @@ impl Checker<'_> {
         }
         self.cx.stage.returns = returns;
         if !errors.all && self.cx.stage.pure.is_none() {
-            let mut handled = errors.handled;
-            Row::sort_entries(&mut handled);
-            let rest = Type::Row(Row {
-                entries: handled,
-                tail: Some(Box::new(self.cx.stage.errors.clone())),
-                ..Row::default()
-            });
-            let site = self.cx.stage.site;
-            self.sub_row(&raised, &rest, site, span, true);
+            self.unhandled_errors(&raised, errors.handled, span);
         }
         if let Some(needed) = needed
             && self.cx.stage.pure.is_none()
@@ -214,6 +210,17 @@ impl Checker<'_> {
         self.cx.regions.defer_owners.pop();
         self.leave_apart();
         covers
+    }
+
+    fn unhandled_errors(&mut self, raised: &Type, mut handled: Vec<(Elem, Type)>, span: Span) {
+        Row::sort_entries(&mut handled);
+        let rest = Type::Row(Row {
+            entries: handled,
+            tail: Some(Box::new(self.cx.stage.errors.clone())),
+            ..Row::default()
+        });
+        let site = self.cx.stage.error_site.unwrap_or(self.cx.stage.site);
+        self.sub_row(raised, &rest, site, span, true);
     }
 
     /// The services `needed` by the body of a handler of `handled`: those
@@ -300,7 +307,9 @@ impl Checker<'_> {
     }
 }
 
+include!("handlers/catch.rs");
 include!("handlers/providing.rs");
+include!("handlers/result.rs");
 
 impl Checker<'_> {
     /// The row label of a type declared with `type error`.

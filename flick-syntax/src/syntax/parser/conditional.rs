@@ -48,7 +48,7 @@ fn record_update_ahead(p: &Parser) -> bool {
             K::RParen | K::RBracket | K::RBrace if depth > 0 => depth -= 1,
             K::RBrace => return false,
             K::WithKw if depth == 0 => return true,
-            K::Eq | K::Semi | K::MatchKw | K::TryKw if depth == 0 => return false,
+            K::Eq | K::Semi | K::MatchKw | K::TryKw | K::CatchKw if depth == 0 => return false,
             _ if depth == 0 && p.sep_at(i).is_some() => return false,
             _ => {}
         }

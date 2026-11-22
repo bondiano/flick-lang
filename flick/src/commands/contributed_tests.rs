@@ -74,6 +74,7 @@ fn sample_invocation() -> Invocation {
             executable: false,
         }],
         tools: vec![],
+        dependencies: vec![],
     }
 }
 
@@ -227,10 +228,10 @@ fn validate_plan_accepts_valid_run_flick_step() {
     let mut plan = Plan::empty();
     plan.steps.push(Step::RunFlick(sample_run_flick_step()));
     // Declared write succeeds when resume is None
-    assert!(validate_plan(&plan, &inv, &["out.json".into()], &[], Path::new(".")).is_ok());
+    assert!(validate_plan(&plan, &inv, &["out.json".into()], &[], Path::new("."), true).is_ok());
     // Undeclared output succeeds when resume is Some (consumed by resume, not published)
     plan.resume = Some(b"state".to_vec());
-    assert!(validate_plan(&plan, &inv, &[], &[], Path::new(".")).is_ok());
+    assert!(validate_plan(&plan, &inv, &[], &[], Path::new("."), true).is_ok());
 }
 
 fn assert_step_rejected(
@@ -243,7 +244,7 @@ fn assert_step_rejected(
     let mut plan = Plan::empty();
     plan.resume = resume;
     plan.steps.push(Step::RunFlick(step));
-    let err = validate_plan(&plan, inv, writes, &[], Path::new("."))
+    let err = validate_plan(&plan, inv, writes, &[], Path::new("."), true)
         .err()
         .expect("rejected");
     assert!(err.contains(needle), "expected `{needle}` in `{err}`");
@@ -282,7 +283,7 @@ fn validate_plan_refuses_invalid_run_flick_module_and_step_names() {
     s2.output = None;
     plan.steps.push(Step::RunFlick(s1));
     plan.steps.push(Step::RunFlick(s2));
-    let err = validate_plan(&plan, &inv, &writes, &[], Path::new("."))
+    let err = validate_plan(&plan, &inv, &writes, &[], Path::new("."), true)
         .err()
         .expect("dup id");
     assert!(err.contains("duplicate step id"), "{err}");
@@ -392,5 +393,114 @@ fn validate_plan_refuses_non_utf8_and_mid_char_run_flick_origins() {
     });
     let mut plan = Plan::empty();
     plan.steps.push(Step::RunFlick(valid_step));
-    assert!(validate_plan(&plan, &inv, &writes, &[], Path::new(".")).is_ok());
+    assert!(validate_plan(&plan, &inv, &writes, &[], Path::new("."), true).is_ok());
+}
+
+#[test]
+fn validate_plan_enforces_in_place_step_contract() {
+    use flick_backend::command::{Tool, ToolStep};
+
+    let pinned = Tool {
+        id: "node".into(),
+        version: "24.0.0".into(),
+        sha256: "a".repeat(64),
+    };
+    let mut inv = sample_invocation();
+    inv.tools.push(pinned.clone());
+
+    let step = |inputs: Vec<String>, reads: Vec<String>, outputs: Vec<String>| ToolStep {
+        id: "ip".into(),
+        tool: pinned.clone(),
+        arguments: vec![],
+        environment: vec![],
+        inputs,
+        reads,
+        outputs,
+        in_place: true,
+    };
+
+    // Valid in-place step with declared write passes when allowed.
+    let mut plan = Plan::empty();
+    plan.steps
+        .push(Step::Tool(step(vec![], vec![], vec!["out.json".into()])));
+    assert!(validate_plan(&plan, &inv, &["out.json".into()], &[], Path::new("."), true).is_ok());
+
+    // Refused during preview (allow_in_place = false).
+    let err = validate_plan(
+        &plan,
+        &inv,
+        &["out.json".into()],
+        &[],
+        Path::new("."),
+        false,
+    )
+    .err()
+    .expect("preview refuses in-place");
+    assert!(err.contains("cannot be previewed"), "{err}");
+
+    // Refused when resume is set.
+    let mut resuming = Plan::empty();
+    resuming.resume = Some(b"state".to_vec());
+    resuming
+        .steps
+        .push(Step::Tool(step(vec![], vec![], vec!["out.json".into()])));
+    let err = validate_plan(
+        &resuming,
+        &inv,
+        &["out.json".into()],
+        &[],
+        Path::new("."),
+        true,
+    )
+    .err()
+    .expect("resume refuses in-place");
+    assert!(err.contains("cannot resume"), "{err}");
+
+    // Refused when inputs or reads are non-empty.
+    for bad in [
+        step(vec!["a.txt".into()], vec![], vec!["out.json".into()]),
+        step(vec![], vec!["a.txt".into()], vec!["out.json".into()]),
+    ] {
+        let mut plan = Plan::empty();
+        plan.steps.push(Step::Tool(bad));
+        let err = validate_plan(&plan, &inv, &["out.json".into()], &[], Path::new("."), true)
+            .err()
+            .expect("non-empty inputs/reads rejected");
+        assert!(err.contains("takes no `inputs` or `reads`"), "{err}");
+    }
+
+    // Refused when output is undeclared or escapes.
+    for bad_out in ["undeclared.json", "../escape.json"] {
+        let mut plan = Plan::empty();
+        plan.steps
+            .push(Step::Tool(step(vec![], vec![], vec![bad_out.into()])));
+        let err = validate_plan(&plan, &inv, &["out.json".into()], &[], Path::new("."), true)
+            .err()
+            .expect("undeclared output rejected");
+        assert!(err.contains("does not declare"), "{err}");
+    }
+
+    // Refused when tool is missing on PATH (empty sha256).
+    let missing = Tool {
+        id: "node".into(),
+        version: String::new(),
+        sha256: String::new(),
+    };
+    let mut inv_missing = sample_invocation();
+    inv_missing.tools.push(missing.clone());
+    let mut plan = Plan::empty();
+    let mut s = step(vec![], vec![], vec!["out.json".into()]);
+    s.tool = missing;
+    plan.steps.push(Step::Tool(s));
+    let err = validate_plan(
+        &plan,
+        &inv_missing,
+        &["out.json".into()],
+        &[],
+        Path::new("."),
+        true,
+    )
+    .err()
+    .expect("missing tool rejected");
+    assert!(err.contains("not on PATH"), "{err}");
 }

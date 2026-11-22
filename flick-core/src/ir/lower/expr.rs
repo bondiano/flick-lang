@@ -10,8 +10,8 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::handle::{arm_pattern, failed_pattern, operation_path};
 use crate::types::lang::{self, Lang};
 use crate::types::{
-    Dict, Identity, Owner, Range, Ref, StageKey, applied_order, children, composed_key,
-    composition, is_pattern, let_parts, param_key, result_key, right_application,
+    Constructor, Dict, Identity, Owner, Range, Ref, StageKey, app_hole, applied_order, children,
+    composed_key, composition, is_pattern, let_parts, param_key, result_key, right_application,
 };
 
 impl Lower<'_> {
@@ -60,7 +60,7 @@ impl Lower<'_> {
         Self::coercion_expr(expr, coercion.dict, coercion.method, span)
     }
 
-    fn coercion_expr(expr: Expr, dict: Dict, name: String, span: Span) -> Expr {
+    pub(super) fn coercion_expr(expr: Expr, dict: Dict, name: String, span: Span) -> Expr {
         let method = Expr::new(ExprKind::Method { dict, name }, span);
         apply(method, [Box::new(expr)], span)
     }
@@ -169,7 +169,10 @@ impl Lower<'_> {
         Expr::new(ExprKind::Block(statements, Box::new(result)), span)
     }
 
-    fn app_expr(&mut self, children: &[&Node], span: Span) -> Expr {
+    fn app_expr(&mut self, node: &Node, children: &[&Node], span: Span) -> Expr {
+        if let Some(hole) = app_hole(node) {
+            return self.app_hole(node, children, hole, span);
+        }
         if let [callee, argument] = children
             && let Some(slots) = self.typing.dictionary_constructors.get(&callee.range())
         {
@@ -229,7 +232,8 @@ impl Lower<'_> {
                 let record = self.boxed(children[0]);
                 ExprKind::Update(record, self.fields(node))
             }
-            K::AppExpr => return self.app_expr(children.as_slice(), span),
+            K::AppExpr => return self.app_expr(node, children.as_slice(), span),
+            K::HoleExpr => return self.hole_expr(node, span),
             K::BinExpr => return self.binary(node, &children),
             K::TodoExpr => return self.todo(node),
             K::PrefixExpr if node.has_token(K::EchoKw) => {
@@ -276,7 +280,7 @@ impl Lower<'_> {
                 ExprKind::Match(scrutinee, self.arms(node))
             }
             K::TryExpr | K::ProvideExpr if self.handles_effects(node) => self.handler(node),
-            K::TryExpr => {
+            K::TryExpr | K::CatchExpr => {
                 let body = *self.boxed(children[0]);
                 ExprKind::Handle(Box::new(Handler {
                     effects: Vec::new(),
@@ -285,6 +289,7 @@ impl Lower<'_> {
                     errors: self.arms(node),
                 }))
             }
+            K::ResultExpr => self.result_expr(children[0], span),
             K::TaskExpr => {
                 let key = StageKey::Task { node: node.range() };
                 self.register_owner_entry(key);
@@ -387,7 +392,7 @@ impl Lower<'_> {
     }
 
     /// `f a b` as `(f a) b`, each stage with its mode and dictionaries.
-    fn apply(&mut self, head: &Node, written: &[&Node]) -> Expr {
+    pub(super) fn apply(&mut self, head: &Node, written: &[&Node]) -> Expr {
         let start = head.range().0;
         let mut func = self.expr(head);
         // each line under the call is an argument too
@@ -430,44 +435,6 @@ impl Lower<'_> {
             func = with_dicts(self.within(key, Expr::new(app, span)), dicts);
         }
         func
-    }
-
-    fn ui_callable(&self, func: Expr, key: Range) -> Expr {
-        let Some(Ref::Value { module, name }) = self.typing.through.get(&key).cloned() else {
-            return func;
-        };
-        let span = func.span;
-        let component = ExprKind::Global { module, name };
-        Expr::new(
-            ExprKind::App {
-                func: Box::new(Expr::new(component, span)),
-                arg: Box::new(func),
-                stage: Stage::Pure,
-                arg_first: false,
-            },
-            span,
-        )
-    }
-
-    /// `call`, acquiring into the owner the checker chose for it.
-    /// The stage of the call the application or pipe at `key` makes.
-    pub(super) fn call_stage(&self, key: Range) -> Stage {
-        if self.typing.runtime.contains(&key) {
-            Stage::Runtime
-        } else if self.typing.sync.contains(&key) {
-            Stage::Sync
-        } else {
-            Stage::Pure
-        }
-    }
-
-    pub(super) fn within(&mut self, key: Range, call: Expr) -> Expr {
-        let Some(owner) = self.typing.owners.get(&key) else {
-            return call;
-        };
-        let name = self.owner_name(*owner);
-        let span = call.span;
-        self.evidence_call(Expr::new(ExprKind::Local(name), span), call)
     }
 }
 

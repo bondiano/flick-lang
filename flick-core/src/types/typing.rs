@@ -37,6 +37,11 @@ use owners::{OwnerContext, OwnerStage};
 /// A source range of the module being checked.
 pub type Range = (u32, u32);
 
+#[cfg(feature = "ide")]
+/// One service obligation escaping a `result { … }` block before rows settle:
+/// `(actual_row, excluded_labels, scope_region)`.
+pub(crate) type PendingResultService = (Type, Vec<super::Elem>, Option<Type>);
+
 pub fn range(span: Span) -> Range {
     (span.start, span.end)
 }
@@ -105,6 +110,10 @@ pub struct Typing {
     pub lifts: HashMap<Range, Lift>,
     /// Unique ground conversions at value boundaries.
     pub coercions: HashMap<Range, Coercion>,
+    /// Lifts applied to the inner application body of an expression-hole capture.
+    pub hole_body_lifts: HashMap<Range, Lift>,
+    /// Implicit conversions applied to the inner application body of an expression-hole capture.
+    pub hole_body_coercions: HashMap<Range, Coercion>,
     /// The numeric type of arithmetic and integer literals.
     pub numeric: HashMap<Range, Num>,
     /// Operators on a type variable, by `Numeric` or by `Ord`.
@@ -198,6 +207,12 @@ pub struct Typing {
     pub refined: HashMap<Range, Type>,
     #[cfg(feature = "ide")]
     pub(crate) pending_refined: Vec<(Range, Type)>,
+    #[cfg(feature = "ide")]
+    /// Remaining service requirements of a `result { … }` block, keyed by its
+    /// `result` keyword range, for hover.
+    pub result_services: HashMap<Range, Type>,
+    #[cfg(feature = "ide")]
+    pub(crate) pending_result_services: Vec<(Range, Vec<PendingResultService>)>,
     #[cfg(feature = "ide")]
     /// The transparent aliases the module declares, exported or not: their
     /// parameters and bodies.
@@ -398,6 +413,8 @@ impl Checker<'_> {
             K::ScopeExpr => K::ScopeKw,
             K::ProvideExpr => K::ProvideKw,
             K::TryExpr => K::TryKw,
+            K::ResultExpr => K::ResultKw,
+            K::CatchExpr => K::CatchKw,
             K::MatchExpr => K::MatchKw,
             K::IfExpr => K::IfKw,
             K::FunExpr => K::FunKw,

@@ -140,6 +140,7 @@ impl<'a> Printer<'a> {
             K::FunExpr => self.fun(n, &[]),
             K::IfExpr => self.if_(n),
             K::MatchExpr | K::TryExpr => self.match_(n),
+            K::CatchExpr => self.catch_(n),
             K::LetDecl | K::AssignStmt => self.let_(n),
             K::ProofDecl => self.proof(n),
             K::LawDecl => self.law(n),
@@ -152,6 +153,7 @@ impl<'a> Printer<'a> {
             | K::ScopeExpr
             | K::ProvideExpr
             | K::DeferStmt
+            | K::ResultExpr
             | K::DoExpr
             | K::RecGroup => self.braced(n, &[]),
             K::ForExpr | K::WhileExpr => self.for_(n),

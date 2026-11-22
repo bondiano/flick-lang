@@ -16,13 +16,12 @@ import {
   Effect,
   bridge,
   causeMod,
-  collectCallHandleIds,
+  collectMsgHandleIds,
   executions,
   fiberMod,
   fnResultHint,
   fnStages,
   layerMod,
-  ownerMod,
   runtime,
   send,
   syncMod,
@@ -33,14 +32,15 @@ export async function handleCall(msg, alreadyPending = false, prePinned = null) 
   const exec = executions.get(msg.exec);
   const spec = msg.spec;
   const callId = msg.call_id;
-  const checkAlive = () => !alreadyPending || (exec.pendingCalls.delete(callId) && !exec.closing);
-  let pinned = prePinned;
-  const releasePins = () => {
-    if (pinned !== null && pinned.length > 0) {
-      exec?.releaseHandles(pinned);
+  let pinned = prePinned ?? (exec ? exec.pinExistingHandles(collectMsgHandleIds(msg)) : []);
+  const releasePinned = () => {
+    if (pinned.length > 0) {
+      const ids = pinned;
+      pinned = [];
+      exec?.releaseHandles(ids);
     }
-    pinned = null;
   };
+  const checkAlive = () => !alreadyPending || (exec.pendingCalls.delete(callId) && !exec.closing);
   try {
     // Special-case `Js.promise_callback` regardless of mode so the returned JS function
     // invokes the Rust async callback on a child fiber and resolves its Promise.
@@ -52,35 +52,48 @@ export async function handleCall(msg, alreadyPending = false, prePinned = null) 
     ) {
       const cbWire = msg.args[0];
       const cbId = cbWire.nodes[cbWire.root][1];
-      const promiseFn = (arg) => invokeAsyncCallback(exec, cbId, [arg], undefined, "promise");
-      releasePins();
+      const callCtx = buildCallCtx(exec, msg);
+      const owner = callCtx.owner;
+      const promiseFn = (arg) => {
+        if (owner && !owner.open) {
+          return Promise.reject(new runtime.RuntimeFailure(causeMod.interrupt(undefined)));
+        }
+        const p = invokeAsyncCallback(
+          exec,
+          cbId,
+          [arg],
+          undefined,
+          "promise",
+          undefined,
+          callCtx,
+        ).catch((err) => {
+          if (err instanceof causeMod.Raise) {
+            throw new runtime.RuntimeFailure(err.cause);
+          }
+          if (err instanceof runtime.RuntimeFailure) {
+            throw err;
+          }
+          throw new runtime.RuntimeFailure(causeMod.die(err));
+        });
+        owner?.track(p);
+        return p;
+      };
+      releasePinned();
       if (checkAlive()) finishCallOk(exec, callId, spec, false, promiseFn);
       return;
     }
-    let resolved = resolveTargetSync(exec, spec);
-    if (resolved.needsAsyncLoad) {
-      if (pinned === null && exec) {
-        pinned = exec.retainHandleIds(collectCallHandleIds(msg));
-      }
-      if (alreadyPending && pinned && pinned.length > 0) {
-        exec.pendingCalls.set(callId, { abort: releasePins });
-      }
-      resolved = await resolveTarget(exec, spec);
+    const syncResolved = resolveTargetSync(exec, spec);
+    if (syncResolved.needsAsyncLoad && alreadyPending && pinned.length > 0) {
+      exec.pendingCalls.set(callId, { abort: releasePinned });
     }
-    if (alreadyPending && (!exec.pendingCalls.has(callId) || exec.closing)) {
-      releasePins();
-      return;
-    }
-    const { target, bridged } = resolved;
+    const { target, bridged } = syncResolved.needsAsyncLoad
+      ? await resolveTarget(exec, spec)
+      : syncResolved;
+    if (alreadyPending && (!exec.pendingCalls.has(callId) || exec.closing)) return;
     const controller = spec.mode === "Async" || spec.adapter.cancel ? new AbortController() : null;
-    let finalArgs;
-    let callCtx;
-    try {
-      finalArgs = prepareArgs(exec, spec, msg.args, bridged, controller);
-      callCtx = buildCallCtx(exec, msg);
-    } finally {
-      releasePins();
-    }
+    const finalArgs = prepareArgs(exec, spec, msg.args, bridged, controller);
+    const callCtx = buildCallCtx(exec, msg);
+    releasePinned();
 
     if (spec.mode === "Pure" || !spec.runtime) {
       const raw = fiberMod.inCtx(callCtx, () =>
@@ -166,8 +179,9 @@ export async function handleCall(msg, alreadyPending = false, prePinned = null) 
       if (checkAlive()) finishCallOk(exec, callId, spec, bridged, runOrVal);
     }
   } catch (err) {
-    releasePins();
     if (checkAlive()) finishCallErr(exec, callId, err, spec.has_catch);
+  } finally {
+    releasePinned();
   }
 }
 
@@ -358,6 +372,14 @@ export function handleLookupService(msg) {
 export function handlePerformService(msg) {
   const exec = executions.get(msg.exec);
   const callId = msg.call_id;
+  let pinned = exec ? exec.pinExistingHandles(collectMsgHandleIds(msg)) : [];
+  const releasePinned = () => {
+    if (pinned.length > 0) {
+      const ids = pinned;
+      pinned = [];
+      exec?.releaseHandles(ids);
+    }
+  };
   try {
     const callCtx = buildCallCtx(exec, msg);
     let impl;
@@ -369,6 +391,7 @@ export function handlePerformService(msg) {
     } else {
       const found = lookupInCallCtx(callCtx, msg.effect);
       if (!found) {
+        releasePinned();
         send({
           type: "call_done",
           call_id: callId,
@@ -384,6 +407,7 @@ export function handlePerformService(msg) {
     }
     const fn = impl?.[msg.op_name];
     if (typeof fn !== "function") {
+      releasePinned();
       send({
         type: "call_done",
         call_id: callId,
@@ -398,6 +422,7 @@ export function handlePerformService(msg) {
       const v = decodeWire(w, exec, wireCtx);
       return isEffect ? bridge.dataToEffect(v) : v;
     });
+    releasePinned();
     if (msg.op_name === "update" || msg.op_name === "modify") {
       const pair =
         decodedArgs.length >= 2 &&
@@ -481,6 +506,8 @@ export function handlePerformService(msg) {
     send({ type: "call_done", call_id: callId, ok: true, value: wire });
   } catch (err) {
     finishCallErr(exec, callId, err, false);
+  } finally {
+    releasePinned();
   }
 }
 
@@ -496,26 +523,4 @@ export function handleGetField(msg) {
   } catch (err) {
     finishCallErr(exec, callId, err, false);
   }
-}
-
-export function handleCloseOwner(msg) {
-  const exec = executions.get(msg.exec);
-  const owner = exec?.owners.get(msg.owner);
-  if (!owner || !owner.open) {
-    send({ type: "owner_closed", owner: msg.owner });
-    return;
-  }
-  const fiber = fiberMod.forkNow(
-    () => ownerMod.close(owner, causeMod.succeeded(undefined)),
-    fiberMod.currentCtx(),
-  );
-  if (fiber.exit !== undefined) {
-    exec.owners.delete(msg.owner);
-    send({ type: "owner_closed", owner: msg.owner });
-    return;
-  }
-  fiber.observe(() => {
-    exec.owners.delete(msg.owner);
-    send({ type: "owner_closed", owner: msg.owner });
-  });
 }

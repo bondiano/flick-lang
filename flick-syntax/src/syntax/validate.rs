@@ -38,7 +38,7 @@ struct Validator<'a> {
 
 /// What the statements of a block are.
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Place {
+pub(super) enum Place {
     Plain,
     /// The statements of `do { … }`.
     Do,
@@ -93,7 +93,10 @@ impl Validator<'_> {
             let inner = match (node.kind, child.kind) {
                 (K::DoExpr, K::Block) => Place::Do,
                 (K::ForExpr, K::Block) if index == 0 => Place::For,
-                (K::LetDecl, K::Block) if !node.nodes().any(|n| n.kind == K::Params) => {
+                (K::LetDecl, K::Block)
+                    if !node.nodes().any(|n| n.kind == K::Params)
+                        && !super::validate_let_else::is_fallback(node, child) =>
+                {
                     Place::ValueBlock
                 }
                 (K::AssignStmt | K::RecordField | K::ProofDecl, K::Block) => Place::ValueBlock,
@@ -114,49 +117,30 @@ impl Validator<'_> {
             self.attribute(child, next);
         }
         if child.kind == K::LetDecl {
-            self.mutable(child, node.kind == K::Block, place);
-            self.lazy(child, node.kind == K::Block, place);
+            if child.has_token(K::ElseKw) {
+                super::validate_let_else::check(
+                    self.file,
+                    child,
+                    node.kind == K::Block,
+                    place,
+                    &mut self.errors,
+                );
+            } else {
+                self.mutable(child, node.kind == K::Block, place);
+                self.lazy(child, node.kind == K::Block, place);
+            }
         }
         if child.kind == K::DeferStmt {
-            self.defer_stmt(node, index, child, place);
+            super::validate_defer::check(
+                self.src,
+                self.file,
+                node,
+                index,
+                child,
+                place,
+                &mut self.errors,
+            );
         }
-    }
-
-    /// `defer { … }` / `errdefer { … }` is a statement of an ordinary block,
-    /// never a first-class value expression.
-    fn defer_stmt(&mut self, parent: &Node, index: usize, child: &Node, place: Place) {
-        let kw = child
-            .child_tokens()
-            .find(|t| matches!(t.kind, K::DeferKw | K::ErrdeferKw));
-        let word = kw.map_or("defer", |t| t.text(self.src));
-        let span = kw.map_or_else(
-            || {
-                let (start, end) = child.range();
-                Span::new(self.file, start, end)
-            },
-            |t| Span::new(self.file, t.start, t.end),
-        );
-        let message = if parent.kind != K::Block {
-            format!(
-                "`{word} {{ … }}` is a statement, not an expression; if calling a function named `{word}` with a record, write `({word}) {{ … }}`"
-            )
-        } else if place == Place::Do {
-            format!(
-                "`{word} {{ … }}` cannot appear in a `do` block: its statements run in the functions `flat_map` takes"
-            )
-        } else if place == Place::For {
-            format!(
-                "`{word} {{ … }}` cannot appear in `for` clauses: write it in a `for … do` body inside a `scope`"
-            )
-        } else if place == Place::ValueBlock && index + 1 == parent.nodes().count() {
-            format!(
-                "`{word} {{ … }}` is a statement, not a value expression; if calling a function named `{word}` with a record, write `({word}) {{ … }}`"
-            )
-        } else {
-            return;
-        };
-        self.errors
-            .push(Diagnostic::error(codes::S007, message, span));
     }
 
     /// `x |> f <| y` and `f >> g << h`: operators of opposite directions read

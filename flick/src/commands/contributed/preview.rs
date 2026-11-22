@@ -5,7 +5,7 @@ use flick_backend::command::{Diagnostic, Severity, Style};
 use flick_core::diagnostics::Severity as HostSeverity;
 use flick_core::project::Project;
 
-use super::plan::{Done, chain};
+use super::plan::{Done, InPlaceMode, chain};
 use super::{arguments, contributed, invocation, known, load, resolve};
 use crate::backends;
 
@@ -29,7 +29,14 @@ pub(crate) fn preview(project: &Project, words: &[String]) -> Result<Preview, St
     let contributor = load(project, source)?;
     let arguments = arguments(descriptor, &source.short, &rest).map_err(|e| e.to_string())?;
     let tools = backends::granted_tools(project, &source.id);
-    let invocation = invocation(project, descriptor, arguments, &tools, &project.root)?;
+    let invocation = invocation(
+        project,
+        &source.id,
+        descriptor,
+        arguments,
+        &tools,
+        &project.root,
+    )?;
     let first = |ds: &[Diagnostic]| {
         ds.iter()
             .find(|d| d.severity == Severity::Error)
@@ -46,7 +53,8 @@ pub(crate) fn preview(project: &Project, words: &[String]) -> Result<Preview, St
         &invocation,
         tools.as_slice(),
     );
-    let files = chain(call, plan, &mut done).map_err(|d| d.message)?;
+    let files =
+        chain(call, plan, InPlaceMode::Forbidden, None, &mut done).map_err(|d| d.message)?;
     if let Some(why) = first(&done.diagnostics) {
         return Err(why);
     }

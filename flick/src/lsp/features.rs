@@ -69,6 +69,21 @@ pub(super) fn inlay_hints(ide: &Ide, file: FileId) -> Value {
     Value::Array(hints)
 }
 
+pub(super) fn document_highlights(ide: &Ide, file: FileId, offset: u32) -> Value {
+    let source = ide.sources.get(file);
+    let highlights: Vec<Value> = ide
+        .document_highlights(file, offset)
+        .into_iter()
+        .map(|h| {
+            json!({
+                "range": protocol::range_in(source, h.start, h.end),
+                "kind": h.kind as u32,
+            })
+        })
+        .collect();
+    Value::Array(highlights)
+}
+
 pub(super) fn signature_help(ide: &Ide, file: FileId, offset: u32) -> Value {
     let Some(help) = ide.signature_help(file, offset) else {
         return Value::Null;

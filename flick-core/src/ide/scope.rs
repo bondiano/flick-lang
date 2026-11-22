@@ -75,7 +75,7 @@ impl Ide<'_> {
             }
         }
         // a name written twice is the first: the stable sort keeps it ahead
-        scope.values.sort_by(|a, b| a.0.cmp(&b.0));
+        flick_ir::sort_by_str(&mut scope.values, |v| &v.0);
         scope.values.dedup_by(|later, first| later.0 == first.0);
         Arc::new(scope)
     }

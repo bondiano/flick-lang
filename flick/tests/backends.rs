@@ -5,6 +5,9 @@ mod common;
 #[path = "backends/deep.rs"]
 mod deep;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/dependencies.rs"]
+mod dependencies;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/go.rs"]
 mod go;
 #[cfg(feature = "wasm-backends")]

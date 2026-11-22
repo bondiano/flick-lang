@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: 4c990ab23da7d34a
+source_hash: 9517fbaba1a5ab1e
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -31,7 +31,7 @@ source_hash: 4c990ab23da7d34a
 | имя | `[a-z_][A-Za-z0-9_]*` | значения, функции, поля, переменные типов |
 | имя с заглавной буквы | `[A-Z][A-Za-z0-9_]*` | типы, конструкторы, модули, классы, сервисы, ошибки |
 | метка | `'[a-z_][A-Za-z0-9_]*` | метки циклов (`'outer: loop { … }`, `break 'outer`) |
-| `_` | отдельно | образец, который не связывает имя |
+| `_` | отдельно | образец без связывания имени, дырка типа или дырка аргумента вызова |
 
 В квалифицированных именах вокруг `.` нет пробелов: `Users.get`,
 `Ui.Event.exhaust`, `Sql.Template`. Запись `user.name` обращается к полю.
@@ -112,7 +112,7 @@ let examples =
 
 ```text
 ( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ? @
-|> <| >> << || && == != < <= > >= ++ + - * / % ** not
+|> <| orelse >> << || && == != < <= > >= ++ + - * / % ** not
 ```
 
 ## Ключевые слова
@@ -121,15 +121,15 @@ let examples =
 и где прочитать подробности. Такие слова нельзя использовать как имена.
 
 ```text
-module exposing import as let mut rec assert fun match with try if then else
-task await lazy scope provide ignore todo echo type opaque where kind error
-service class instance deriving foreign from forall not none true false
-in when for yield do break continue
+module exposing import as let mut rec assert fun match with try catch if then
+else task await lazy scope provide ignore todo echo type opaque where kind
+error service class instance deriving foreign from forall not orelse none true
+false in when for yield do break continue
 ```
 
 Контекстные слова считаются обычными именами, кроме следующих позиций:
 
-- `loop` перед `{` и `while` перед условием, за которым идёт `do`;
+- `loop` перед `{`, `result` перед `{` и `while` перед условием, за которым идёт `do`;
 - `defer` и `errdefer` перед `{` в позиции инструкции (см.
   [ресурсы](../resources/#инструкции-defer-и-errdefer));
 - `private` перед `module` в заголовке файла (см. [модули](../modules/)) и
@@ -215,8 +215,11 @@ in when for yield do break continue
 | `match` `with` | Задают сопоставление с образцом | `match shape with \| Circle r -> r` |
 | `when` | Задаёт дополнительное условие ветки сопоставления | `\| Rect w h when w == h -> "square"` |
 | `with` | Также вводит обработчики `try` и обновление записи | `{ user with name = "Ada" }` |
-| `try` | Обрабатывает ожидаемые ошибки своего тела | `try find id with \| NotFound _ -> None` |
+| `try` | Обрабатывает ожидаемые ошибки и операции эффектов своего тела | `try find id with \| NotFound _ -> None` |
+| `catch` | Постфиксный обработчик только типизированных ошибок (зарезервировано в выражениях и связываниях; допускается как метка поля записи, `.catch`, переименованный образец записи `{ catch = f }` и метаданные `foreign`) | `find id catch \| NotFound _ -> None` |
+| `result` | Контекстное слово: перед `{` сразу выполняет блок и собирает его ожидаемые ошибки в `Result (Errors e) a`; в других местах остаётся именем | `result { find id }` |
 | `not` | Отрицает логическое значение; в `sql table` входит в ограничение `not null` | `not done` |
+| `orelse` | Ленивый fallback для `Option`: вычисляет правую часть только при `None`; допустимо как метка поля записи (`{ orelse = … }`, `r.orelse`, `{ orelse = x }`), но не как имя переменной и не как сокращённый образец `{ orelse }` | `host orelse "localhost"` |
 | `true` `false` | Два значения типа `Bool` | `if ok then true else false` |
 | `none` | Обозначает пустую строку в типе | `a ->{none; NotFound} b` |
 | `in` | Связывает имя со строкой таблицы в конструкции SQL `from` или `join`; начинает тело `unpack … as K in` | `join account in Accounts` |
@@ -294,12 +297,14 @@ in when for yield do break continue
 | `lazy` | `lazy { … } : Lazy {Store} {StoreError} Float` — ленивое вычисление, создаваемое блоком |
 | `scope` | `scope { … } : Float` — результат блока, возвращаемый после освобождения ресурсов |
 | `defer`, `errdefer` | `defer { … } : Unit` — режим очистки и позиция владеющего явного `scope` |
-| `provide`, `try` | Результат блока и сервисы или ошибки, которые он устраняет |
+| `provide`, `try`, `catch` | Результат блока или выражения и сервисы или ошибки, которые он устраняет |
 | `match`, `if` | `match … with : String` — результат выбранной ветки |
+| `let`, `else` | `let … = … else … : Result InputError User` — в `let ... else`, результат текущего блока с пояснением, что несовпадение завершает текущий блок и привязки мономорфны |
 | `fun` | `fun … -> … : Float -> Float` — тип функции |
 | `sql`, `ui` | Значение, создаваемое блоком, например `sql { … } : Template Pg {} { label : String }` |
 | `await` | `await … : Float` — результат и запускаемое вычисление `Eff` |
 | `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit` — тип отбрасываемого значения и предупреждение, если это `Eff`, который не будет выполнен |
+| `orelse` | `option orelse fallback : String` — тип развёрнутого результата, пояснение ленивого вычисления и явная группировка при цепочках или сочетании с `\|>` и `<\|` |
 
 Для остальных ключевых слов подсказок нет. Типы связанных с ними имён
 можно посмотреть, наведя указатель на сами имена.
@@ -310,7 +315,9 @@ in when for yield do break continue
 
 | Уровень | Операторы | Ассоциативность |
 | - | - | - |
+| −1 | постфиксный `catch \| …` | отсутствует: цепочка внешних `catch` требует скобок `(a catch \| E -> b) catch \| F -> c` |
 | 0 | `<\|` | правая; не смешивается с `\|>`: `x \|> f <\| y` — ошибка |
+| 0½ | `orelse` | правая: `a orelse b orelse c` означает `a orelse (b orelse c)` |
 | 1 | `\|>` | левая |
 | 2 | `\|\|` | правая |
 | 3 | `&&` | правая |
@@ -328,6 +335,9 @@ in when for yield do break continue
 `-x ** 2` означает `-(x ** 2)`; `-a * b` означает `(-a) * b`; `await f x`
 означает `await (f x)`; `0..n - 1` — это `0..(n - 1)`, а `i < 0..n` сравнивает с диапазоном.
 `f <| g <| x + 1` означает `f (g (x + 1))`, а `f a <| x` — вызов `f a x`;
+`x |> find orelse default` означает `(x |> find) orelse default`, а
+`f <| opt orelse default` — `f <| (opt orelse default)` (`flick fmt`
+явно расставляет скобки для наглядности);
 `List.map f >> List.filter p` — композиция двух применений, а `await f >> g`
 означает `await (f >> g)`. Что делают операторы, описано в разделе [Числа и
 операторы](../numbers/#операторы).
@@ -363,9 +373,9 @@ in when for yield do break continue
      скобках, как после `do` и `loop`; запись на этом месте пишется в
      круглых скобках (`FLICK-T074`).
 3. Строка в столбце блока продолжает инструкцию, если начинается
-   с инфиксного оператора, кроме `-`, с `|`, `then`, `else`, `with`, `where`
+   с инфиксного оператора, кроме `-`, с `|`, `then`, `else`, `with`, `catch`, `where`
    или с закрывающего разделителя. Поэтому конвейеры `|>` и `<|`, ветви
-   `match`, ветви `else` и цель `proof` могут начинаться в том же столбце,
+   `match` и `catch`, ветви `else` и цель `proof` могут начинаться в том же столбце,
    что и их выражение или объявление.
 4. В записях, типах записей и блоках `{ … }` элементы выравниваются
    по первому элементу, даже если он идёт сразу после `{` на той же строке.
@@ -687,7 +697,8 @@ save_with :
 
 ```text
 block       = statement { line break statement }
-statement   = "let" ["lazy"] ["mut"] … | signature | name "=" block
+statement   = "let" pattern "=" block "else" block
+            | "let" ["lazy"] ["mut"] … | signature | name "=" block
             | "defer" "{" block "}" | "errdefer" "{" block "}" | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | [label [":"]] "loop" "{" block "}"
@@ -698,11 +709,12 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "if" expr "then" block [ "else" (if_expr | block) ]
             | "pack" ModulePath "as" contract | "unpack" expr "as" Con ["," name] "in" block
             | "lazy" expr                    // binds as `await`: `lazy f x` is `lazy (f x)`
-            | operator expression over application (see the operator table)
+            | operator expression over application [ "catch" arm { arm } ] (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
 handler_arm = arm | "|" "return" or_pattern "->" block
             // ветка операции — `| E.op p… -> …`, образец, чей путь кончается именем
-application = postfix { postfix }
+application = postfix { argument }
+argument    = "_" | postfix                     // не больше одной `_` на вызов
 postfix     = atom { "." name | "?" }           // без пробела перед ними
 atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
@@ -759,7 +771,30 @@ clause      = ("from" | "join" | "left_join") name "in" expr
 
 `todo` (с необязательной строкой после него) — выражение любого типа, а
 `echo` без операнда — функция, как в `x |> echo`. `_` — тип только в
-сигнатуре или аннотации.
+сигнатуре или аннотации. Как прямой аргумент применения функции `_` служит
+дыркой выражения, захватывающей один аргумент: `f a _ c` означает
+`fun h -> f a h c`. Поскольку применение связывается сильнее, чем `|>` и `<|`,
+выражения `x |> f a _ c` и `f a _ c <| x` подставляют `x` в нужную позицию
+аргумента. Порядок вычислений следует за `fun`: в `x |> f y _` сначала
+вычисляется `x`, затем замыкание вычисляет `f`, `y` и параметр; правила областей
+и захватов те же, что у `fun`. Вложенное применение — отдельный вызов
+(`f (g _) _` — это `fun h -> f (fun k -> g k) h`). В одном применении допустима
+не больше одна `_` (`FLICK-S017`), а `_` в любой другой позиции выражения — сам
+по себе, на месте вызываемой функции, в `x |> _`, в литерале списка или записи,
+в скобках `(_)` или в секциях поля и оператора `_.name`, `(_ + 1)` — вызывает
+`FLICK-S018`. Наведение на `_` показывает выведенный тип параметра, а
+переименование отказывается от `_`.
+
+```flick
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+wrapped : String -> String
+let wrapped name = name |> label "[" _ "]"
+
+wrapped_right : String -> String
+let wrapped_right name = label "[" _ "]" <| name
+```
 
 `if` — выражение; без `else` оно имеет тип `Unit`, как и его ветвь `then` (на `else ()` выдаётся предупреждение `FLICK-T028`). Ветвь в фигурных скобках содержит инструкции: `if a > b then { low = b; high = a }`. `ignore e` отбрасывает
 результат промежуточной инструкции, отличный от `Unit`
@@ -933,8 +968,9 @@ let describe shape =
   разбивается по одному шагу на строку, и его операторы стоят под первым
   операндом, если конвейер начинает строку;
 - `if c then a else b` остаётся на одной строке или помещает каждую ветвь
-  на свои строки; `match` и `try` ставят каждую ветвь на отдельную строку
-  в столбце `match`. Перед `,`, где парсер не принимает блок на отдельных
+  на свои строки; `match`, `try` и постфиксный `catch` ставят каждую ветвь
+  на отдельную строку (а `catch` заключает в скобки смешанный конвейер слева,
+  чтобы группировка была явной). Перед `,`, где парсер не принимает блок на отдельных
   строках, последняя ветвь остаётся на своей строке;
 - списки, кортежи и `exposing (…)` ставят по одному элементу на строку
   с `,` после каждого; записи, типы записей, образцы и обновления

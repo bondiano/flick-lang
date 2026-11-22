@@ -2,13 +2,13 @@
 title: "FLICK-P040"
 ---
 
-Two packages of the project's dependencies name one npm package at different
-versions in `[js.dependencies]`, or one of them differs from the project's
-`package.json`. A project installs one copy of an npm package, so the
-requirements must be the same text: change the project's `package.json`, or
-use versions of the packages that agree.
+Two packages of the project's dependencies name one target package at different
+versions in `[target.<name>.dependencies]`, or one of them differs from the
+project's target manifest (such as `package.json`). A project installs one copy
+of a target package, so the requirements must be the same text: change the
+project's manifest, or use versions of the packages that agree.
 
 ```toml
-[js.dependencies]
+[target.js.dependencies]
 left-pad = "^1.3.0"
 ```

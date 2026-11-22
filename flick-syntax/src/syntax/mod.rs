@@ -15,6 +15,8 @@ pub mod patterns;
 pub mod structure;
 pub mod ts_mark;
 mod validate;
+mod validate_defer;
+mod validate_let_else;
 
 pub use parser::{
     Fragment, Heads, Parse, parse, parse_body_at, parse_decl_at, parse_decls_at, parse_expr_at,

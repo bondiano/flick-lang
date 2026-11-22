@@ -7,7 +7,7 @@ use super::{Action, edit, indent_at};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Owner, Ref};
+use crate::types::{Owner, Ref, has_hole};
 
 impl Ide<'_> {
     pub(super) fn defer_actions(&self, file: FileId, offset: u32) -> Vec<Action> {
@@ -148,6 +148,7 @@ fn nearest_explicit_scope(path: &[&Node], target: &Node) -> Option<(u32, u32)> {
         }
         match node.kind {
             K::ScopeExpr => return Some(node.range()),
+            K::AppExpr if has_hole(node) => return None,
             K::FunExpr | K::TaskExpr | K::LazyExpr | K::DeferStmt => return None,
             K::LetDecl
                 if node.nodes().any(|c| c.kind == K::Params) || node.has_token(K::LazyKw) =>
@@ -190,10 +191,18 @@ fn valid_defer_statement_position(path: &[&Node]) -> bool {
             .nodes()
             .next()
             .is_none_or(|clauses| clauses.range() != parent.range()),
-        K::LetDecl if !grand.nodes().any(|c| c.kind == K::Params) => parent
-            .nodes()
-            .last()
-            .is_some_and(|last| last.range() != node.range()),
+        K::LetDecl
+            if !grand.nodes().any(|c| c.kind == K::Params)
+                && grand
+                    .child_tokens()
+                    .find(|t| t.kind == K::ElseKw)
+                    .is_none_or(|kw| parent.range().0 < kw.end) =>
+        {
+            parent
+                .nodes()
+                .last()
+                .is_some_and(|last| last.range() != node.range())
+        }
         K::AssignStmt | K::RecordField | K::ProofDecl => parent
             .nodes()
             .last()

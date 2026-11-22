@@ -27,6 +27,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "_result"
+        },
+        {
+          "type": "SYMBOL",
           "name": "_while"
         },
         {
@@ -250,6 +254,28 @@
                   "value": "errdefer"
                 }
               ]
+            },
+            "named": true,
+            "value": "keyword"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "braces"
+          }
+        ]
+      }
+    },
+    "_result": {
+      "type": "PREC_DYNAMIC",
+      "value": 1,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "ALIAS",
+            "content": {
+              "type": "STRING",
+              "value": "result"
             },
             "named": true,
             "value": "keyword"
@@ -619,6 +645,10 @@
               },
               {
                 "type": "STRING",
+                "value": "catch"
+              },
+              {
+                "type": "STRING",
                 "value": "if"
               },
               {
@@ -692,6 +722,10 @@
               {
                 "type": "STRING",
                 "value": "not"
+              },
+              {
+                "type": "STRING",
+                "value": "orelse"
               },
               {
                 "type": "STRING",
@@ -919,6 +953,10 @@
         },
         {
           "type": "STRING",
+          "value": "catch"
+        },
+        {
+          "type": "STRING",
           "value": "if"
         },
         {
@@ -1008,6 +1046,10 @@
         {
           "type": "STRING",
           "value": "not"
+        },
+        {
+          "type": "STRING",
+          "value": "orelse"
         },
         {
           "type": "STRING",
@@ -1462,6 +1504,10 @@
         },
         {
           "type": "STRING",
+          "value": "result"
+        },
+        {
+          "type": "STRING",
           "value": "while"
         },
         {
@@ -1690,6 +1736,10 @@
     ],
     [
       "_defer",
+      "identifier"
+    ],
+    [
+      "_result",
       "identifier"
     ],
     [

@@ -10,11 +10,12 @@ use super::kind::{FOREIGN_MODES, KEYWORDS, SyntaxKind, describe};
 
 /// Words a grammar or the reference may show as keywords besides the
 /// reserved ones: the parser's contextual words and plugin heads.
-const CONTEXTUAL: [&str; 38] = [
+const CONTEXTUAL: [&str; 39] = [
     "loop",
     "while",
     "defer",
     "errdefer",
+    "result",
     "and",
     "private",
     "plugin",

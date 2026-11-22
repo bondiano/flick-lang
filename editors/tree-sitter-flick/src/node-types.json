@@ -580,6 +580,10 @@
     "named": false
   },
   {
+    "type": "catch",
+    "named": false
+  },
+  {
     "type": "class",
     "named": false
   },
@@ -734,6 +738,10 @@
     "named": false
   },
   {
+    "type": "orelse",
+    "named": false
+  },
+  {
     "type": "parallel",
     "named": false
   },
@@ -751,6 +759,10 @@
   },
   {
     "type": "refined",
+    "named": false
+  },
+  {
+    "type": "result",
     "named": false
   },
   {

@@ -63,14 +63,17 @@ codegen/unpack_dictionary
 codegen/implicit
 codegen/ints
 codegen/let_assert
+codegen/let_else
 codegen/let_mut
 codegen/loops
 codegen/lift
 codegen/literals
 codegen/local_functions
+codegen/local_generic
 codegen/match_graph
 codegen/numbers
 codegen/numeric_classes
+codegen/orelse
 codegen/patterns
 codegen/question
 codegen/ranges
@@ -298,7 +301,13 @@ codegen/loops_guards
 codegen/loops_owners
 codegen/labeled_loops_finalizers
 codegen/record_constructor
+codegen/record_order
+codegen/record_order_std
+codegen/record_identity_std
+codegen/record_ffi
 effect/row_without
+effect/holes_order
+effect/postfix_catch
 
 stdlib/lists
 stdlib/rpc/rpc
@@ -325,3 +334,6 @@ runtime/suspended_std
 runtime/lazy_let
 runtime/lazy_let_state
 runtime/lazy_opt
+effect/result_blocks
+runtime/result_block_causes
+codegen/bounded_eval

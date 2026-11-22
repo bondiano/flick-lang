@@ -191,6 +191,7 @@ pub(super) fn scaffold(request: &TemplateRequest) -> Result<Plan, Vec<command::D
     if matches!(template, "cli" | "fullstack") {
         config.push_str("\n[target.js]\nruntime = \"effect\"\n");
     }
+    config.push_str("\n[tools]\n\"flick/js\" = [\"pnpm\"]\n");
     let mut files = vec![
         ("flick.toml", config),
         ("package.json", package_json(name, compiler, template)),

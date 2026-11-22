@@ -17,7 +17,7 @@ use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::lang;
-use crate::types::{Form, Type, show_signature, show_type};
+use crate::types::{Form, Type, has_hole, show_signature, show_type};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CompletionKind {
@@ -88,13 +88,22 @@ fn in_defer_scope(tree: &Node, offset: u32) -> bool {
                 return false;
             }
             K::DoExpr | K::AssignStmt | K::RecordField | K::ProofDecl => return false,
-            K::LetDecl if !owner.nodes().any(|c| c.kind == K::Params) => return false,
+            K::LetDecl
+                if !owner.nodes().any(|c| c.kind == K::Params)
+                    && owner
+                        .child_tokens()
+                        .find(|t| t.kind == K::ElseKw)
+                        .is_none_or(|kw| path[statement_block].range().0 < kw.end) =>
+            {
+                return false;
+            }
             _ => {}
         }
     }
     for (i, &node) in path[..statement_block].iter().enumerate().rev() {
         match node.kind {
             K::ScopeExpr => return true,
+            K::AppExpr if has_hole(node) => return false,
             K::FunExpr | K::TaskExpr | K::LazyExpr | K::DeferStmt => return false,
             K::LetDecl
                 if node.nodes().any(|c| c.kind == K::Params) || node.has_token(K::LazyKw) =>

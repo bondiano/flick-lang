@@ -32,6 +32,11 @@ pub struct Stage {
     pub errors: Type,
     /// Index into [`Checker::sites`]: what the bounds come from.
     pub site: usize,
+    /// Separate site for error-row bounds (e.g. `result { … }`), when
+    /// errors are checked against a different bound than services.
+    pub error_site: Option<usize>,
+    /// True directly inside a `result { … }` block.
+    pub in_result: bool,
     /// A runtime call ran at this stage.
     pub runtime: bool,
     /// Why runtime calls are not allowed in this Sync stage, if they are not.
@@ -74,6 +79,8 @@ impl Stage {
             services: Type::empty_row(),
             errors: Type::empty_row(),
             site: 0,
+            error_site: None,
+            in_result: false,
             runtime: false,
             only_sync: None,
             returns: None,
@@ -100,6 +107,8 @@ impl Checker<'_> {
             services,
             errors,
             site: self.sites.len() - 1,
+            error_site: None,
+            in_result: false,
             runtime: false,
             only_sync: None,
             returns: None,
@@ -188,8 +197,9 @@ impl Checker<'_> {
         let (bound_services, bound_errors) =
             (self.cx.stage.services.clone(), self.cx.stage.errors.clone());
         let site = self.cx.stage.site;
+        let error_site = self.cx.stage.error_site.unwrap_or(site);
         self.sub_row(services, &bound_services, site, span, false);
-        self.sub_row(errors, &bound_errors, site, span, true);
+        self.sub_row(errors, &bound_errors, error_site, span, true);
     }
 
     /// A call of `effects` at `span`: performed and recorded for code
@@ -337,7 +347,7 @@ impl Checker<'_> {
         }))
     }
 
-    fn expected_site(&mut self, expected: &Type, written: Written) -> usize {
+    pub(super) fn expected_site(&mut self, expected: &Type, written: Written) -> usize {
         self.sites.push(Site::Expected(expected.clone(), written));
         self.sites.len() - 1
     }

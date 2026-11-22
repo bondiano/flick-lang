@@ -76,8 +76,14 @@ impl<'c> Checker<'c> {
             (K::FunExpr, _) => {
                 self.lambda(node, Some(expected));
             }
+            (K::AppExpr, _) if super::holes::has_hole(node) => {
+                self.apply_hole(node, Some(expected));
+            }
             (K::BinExpr, _) if super::pipes::composes(node) => {
                 self.compose(node, Some(expected));
+            }
+            (K::BinExpr, _) if node.has_token(K::OrElse) => {
+                self.orelse(node, &children, Some(expected));
             }
             (K::LoopExpr | K::WhileExpr, _) => {
                 self.control_loop(node, Some(expected));
@@ -88,6 +94,12 @@ impl<'c> Checker<'c> {
             }
             (K::TryExpr, _) => {
                 self.try_expr(node, Some(expected));
+            }
+            (K::ResultExpr, _) => {
+                actual_type = Some(self.result_expr(node, Some(expected)));
+            }
+            (K::CatchExpr, _) => {
+                self.catch_expr(node, Some(expected));
             }
             (K::ProvideExpr, _) => {
                 self.provide(node, Some(expected));
@@ -375,10 +387,12 @@ impl<'c> Checker<'c> {
             }
             K::FieldExpr => self.field(node, children[0]),
             K::QuestionExpr => self.question(node, children[0]),
+            K::AppExpr if super::holes::has_hole(node) => self.apply_hole(node, None),
             K::AppExpr => {
                 let arguments = super::children::arguments(&children[1..]);
                 self.apply(children[0], &arguments)
             }
+            K::HoleExpr => self.hole_expr(node),
             K::BinExpr => self.binary(node, &children),
             K::PrefixExpr => self.prefix(node, &children),
             K::TodoExpr => self.todo(node),
@@ -388,6 +402,8 @@ impl<'c> Checker<'c> {
             K::Block => self.block(node, None),
             K::MatchExpr => self.match_expr(node, None),
             K::TryExpr => self.try_expr(node, None),
+            K::ResultExpr => self.result_expr(node, None),
+            K::CatchExpr => self.catch_expr(node, None),
             K::IfExpr => {
                 let ty = self.fresh();
                 self.if_expr(node, &ty);

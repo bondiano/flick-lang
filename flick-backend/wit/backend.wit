@@ -174,6 +174,46 @@ interface types {
         outputs: list<step-output>,
     }
     record runtime-dependency { %package: string, version: string, sha256: string }
+    /// A file a backend asked for, by the path it asked with, and the
+    /// canonical absolute path it is at, which tells shared instances apart.
+    record project-file { path: string, real: string, bytes: list<u8> }
+    /// The directory of a package that ships Flick modules, relative to the
+    /// project's root.
+    record package-root { %package: string, version: string, root: string }
+    /// One package of a runtime graph: the directory whose files the host
+    /// hashes, and its dependencies, by name and index in the graph.
+    record runtime-node {
+        name: string,
+        version: string,
+        dir: string,
+        dependencies: list<tuple<string, u32>>,
+    }
+    /// A runtime package the backend's output loads and the packages it
+    /// loads in turn, the first node its root; the host pins its contents.
+    /// `skip` names the directories within a package that are not its
+    /// contents, as those that hold other packages.
+    record runtime-graph { %package: string, nodes: list<runtime-node>, skip: list<string> }
+    /// What a backend's packages give the project: the source directories of
+    /// those that ship Flick modules, the runtime graphs of its output, the
+    /// files that invalidate its build cache, and what is wrong with them.
+    /// With `needs`, the host reads those paths too, absolute or relative to
+    /// the root, and asks again. A diagnostic about one of the `dependencies`
+    /// asked of the call has that one's index as its span's file, which the
+    /// host points at where it is declared.
+    record packages {
+        /// The project's own name in the backend's ecosystem.
+        name: option<string>,
+        /// The project's own version in the backend's ecosystem.
+        version: option<string>,
+        /// Direct package names declared by the project's ecosystem manifest.
+        declared: list<string>,
+        sources: list<package-root>,
+        runtime: list<runtime-graph>,
+        /// Files that affect build caches and `--inputs`, relative or absolute.
+        inputs: list<string>,
+        diagnostics: list<diagnostic>,
+        needs: list<string>,
+    }
     enum launch-kind { run, test }
     record launch {
         name: string,
@@ -201,9 +241,17 @@ interface inputs {
 
 world backend {
     import inputs;
-    use types.{descriptor, target-request, target-support, build-request, build-result, diagnostic};
+    use types.{descriptor, target-request, target-support, build-request, build-result, diagnostic, project-file, packages, option-value};
+    use flick:command/types@0.1.0.{dependency};
     export describe: func() -> descriptor;
     export check-target: func(request: build-request) -> result<target-support, list<diagnostic>>;
     export generate: func(request: build-request) -> result<build-result, list<diagnostic>>;
+    /// The files of a project the backend reads to report its packages, as
+    /// paths relative to the root; `*` stands for any one name in a path.
+    export package-files: func() -> list<string>;
+    /// The backend's packages, read from the files `package-files` names
+    /// that the project has and those its last answer needed; `options` are
+    /// those of the build, as its runtime.
+    export packages: func(files: list<project-file>, dependencies: list<dependency>, options: list<option-value>) -> packages;
     export flick:command/command@0.1.0;
 }

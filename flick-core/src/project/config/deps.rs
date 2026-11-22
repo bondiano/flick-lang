@@ -1,4 +1,4 @@
-//! `[dependencies]`, `[js.dependencies]`, `[package]` and `[plugins]` of
+//! `[dependencies]`, `[package]` and `[plugins]` of `flick.toml`.
 //! `flick.toml`.
 
 use std::collections::BTreeMap;

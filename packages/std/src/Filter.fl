@@ -53,7 +53,10 @@ equals : a -> Filter a a a
 foreign pure equals from "flick:Filter" "equals"
   arity 1
 
-/// Passes values `===` to `value`: the same primitive, or the very same object.
+/// Passes values strictly equivalent to `value`: structural equality that
+/// distinguishes `0.0` from `-0.0` and compares mutable cells and foreign
+/// values by identity, without observing the storage identity or written
+/// field order of data values, records, or tuples.
 equals_strict : a -> Filter a a a
 foreign pure equals_strict from "flick:Filter" "equalsStrict"
   arity 1

@@ -24,6 +24,10 @@ codegen/ints # no native for `checked_add` (flick:rt intCheckedAdd)
 codegen/let_assert # no native for `get` (flick:rt listGet)
 codegen/pure_main # no native for `say` (global console.log)
 codegen/question # `?` on an `Option`, a return from the function, has no λFlick form
+codegen/record_ffi # no native for `dict_keys` (./record_ffi.mjs keysOf)
+codegen/record_identity_std # the model's (≤-Cap) rejects `App.Main.pack`
+codegen/record_order # the instance `Ord` of a record or tuple
+codegen/record_order_std # the row primitive `Labels { a : String; z : Int }`
 codegen/recursion # runs out of the model's steps
 codegen/release # no native for `timeout_option` (flick:rt timeoutOption)
 codegen/service_child # no native for `parallel` (flick:rt parallel)
@@ -112,4 +116,5 @@ ui/sync_data # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/sync_for # no native for `layer` (flick:reactivity/Atom atomLayer)
 ui/wake_chain # no native for `click` (./dom.mjs click)
 runtime/lazy_shared # no native for `parallel` (flick:rt parallel)
+runtime/result_block_causes # no native for `exit` (flick:Effect flickExit)
 runtime/suspended_std # no native for `or_die` (flick:Effect orDie)

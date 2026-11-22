@@ -1,0 +1,178 @@
+// Runtime cause, cancellation, and scope semantics of `result { ... }`:
+// - R10: defects (`Effect.die`), interruption (`Fiber.interrupt`), and `abort`
+//   unwind propagate out of `result { ... }` without becoming `Err`.
+// - R11: mixed causes (`Die + Fail`, typed failure + defect finalizer) do not
+//   collapse into `Err`.
+// - R12: pending interruption skips `result { ... }` (`skipHandler`).
+// - R15: `result { scope { ... } }` runs `Scope.defer` with `Exit.is_failure`
+//   before `result` yields `Err`; `scope { result { ... } }` sees `Exit.is_success`;
+//   a defect while closing an inner scope propagates out of `result`.
+module App.Main exposing (main)
+
+type error A = A Int
+  deriving Eq, Show
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+nap : Float ->{Async} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+view : Failure e -> List String
+let view f =
+  label : Cause.Reason e -> String
+  let label r = if Cause.is_fail_reason r then "F" else if Cause.is_die_reason r then "D" else "I"
+  List.map label (Cause.reasons f)
+
+outcome : Exit e String -> String
+let outcome ex = Exit.match_ (fun v -> "ok:" ++ v) (fun f -> "fail:" ++ show (view f)) ex
+
+stopping : (Unit ->{Stop | r; e} String) ->{r; e} String
+let stopping body =
+  try body () with
+  | Stop.stop s -> "stopped:" ++ s
+
+late : Deferred.Deferred none Unit ->{Async; A} Int
+let late entered =
+  Effect.uninterruptible
+    (task {
+      let _ = Deferred.succeed () entered
+      nap 250
+      Fail.fail (A 1)
+    })
+
+main : Unit ->{Host.Console, Async; AppError} Unit
+let main () =
+  // R10a: defect propagates out of result { ... }
+  let die_exit =
+    Effect.exit
+      (task {
+        let r : Result A Int = result { Effect.die "boom" }
+        show r
+      })
+  say ("R10 die: " ++ outcome die_exit)
+
+  // R10b: abort unwinds through result { ... } to outer handler
+  let abort_res =
+    stopping (fun () ->
+      let r : Result A Int = result { Stop.stop "halt" }
+      show r
+    )
+  say ("R10 abort: " ++ abort_res)
+
+  // R10c: Fiber.interrupt propagates out of result { ... }
+  let started : Deferred.Deferred none Unit = Deferred.make ()
+  let int_exits = scope owner {
+    let fiber =
+      Fiber.spawn
+        owner
+        (fun _ -> ())
+        (task {
+          let r : Result A Int = result {
+            let _ = Deferred.succeed () started
+            nap 10000
+            1
+          }
+          say ("unexpected: " ++ show r)
+        })
+    Deferred.await_ started
+    Fiber.interrupt fiber
+    Fiber.await_all [fiber]
+  }
+  List.each_effect
+    (fun ex ->
+      match Exit.failure ex with
+      | Some f -> say ("R10 interrupt: " ++ show (view f))
+      | None -> say "R10 interrupt: succeeded"
+    )
+    int_exits
+
+  // R11a: mixed Die + Fail cause does not become Err
+  let mixed_direct =
+    Effect.exit
+      (task {
+        let r : Result A Int = result {
+          Effect.fail_cause_sync (fun () -> Cause.combine (Cause.die "boom") (Cause.fail (A 1)))
+        }
+        show r
+      })
+  say ("R11 die+fail: " ++ outcome mixed_direct)
+
+  // R11b: typed failure + finalizer defect does not become Err
+  let mixed_fin =
+    Effect.exit
+      (task {
+        let r : Result A Int = result {
+          Effect.ensuring (task { Effect.die "fin-boom" }) (task { Fail.fail (A 2) })
+        }
+        show r
+      })
+  say ("R11 fail+fin_die: " ++ outcome mixed_fin)
+
+  // R12: pending cancellation skips result { ... }
+  let entered : Deferred.Deferred none Unit = Deferred.make ()
+  let r12_exits = scope owner {
+    let fiber =
+      Fiber.spawn
+        owner
+        (fun _ -> ())
+        (task {
+          let r = result { late entered }
+          say ("R12 unexpected: " ++ show r)
+        })
+    Deferred.await_ entered
+    Fiber.interrupt fiber
+    Fiber.await_all [fiber]
+  }
+  List.each_effect
+    (fun ex ->
+      match Exit.failure ex with
+      | Some f -> say ("R12 skipHandler: " ++ show (view f))
+      | None -> say "R12 skipHandler: succeeded"
+    )
+    r12_exits
+
+  // R15a: result { scope { ... } } runs defer with is_failure before result yields Err
+  let log_a = Ref.make []
+  let r15a : Result A Int = result {
+    scope {
+      Scope.defer (fun ex ->
+        Ref.set log_a (Ref.get log_a ++ ["defer_fail=" ++ show (Exit.is_failure ex)])
+      )
+      Fail.fail (A 5)
+    }
+  }
+  Ref.set log_a (Ref.get log_a ++ ["res=" ++ show r15a])
+  say ("R15a: " ++ show (Ref.get log_a))
+
+  // R15b: scope { result { ... } } sees is_success because result caught the failure
+  let log_b = Ref.make []
+  let r15b = scope {
+    Scope.defer (fun ex ->
+      Ref.set log_b (Ref.get log_b ++ ["defer_ok=" ++ show (Exit.is_success ex)])
+    )
+    let inner : Result A Int = result { Fail.fail (A 6) }
+    Ref.set log_b (Ref.get log_b ++ ["caught=" ++ show inner])
+    inner
+  }
+  say ("R15b: " ++ show r15b ++ ", " ++ show (Ref.get log_b))
+
+  // R15c: defect during inner scope close propagates out of result { ... }
+  let r15c =
+    Effect.exit
+      (task {
+        let r : Result A Int = result {
+          scope {
+            Scope.add_finalizer (task { Effect.die "close-boom" })
+            1
+          }
+        }
+        show r
+      })
+  say ("R15c close defect: " ++ outcome r15c)

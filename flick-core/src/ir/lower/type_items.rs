@@ -7,7 +7,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{Abi, Constructor, Rep, is_type, written_dicts};
 
 impl Lower<'_> {
-    /// The labels of the one field of `variant`, in the order written,
+    /// The labels of the one field of `variant`, in canonical UTF-16 order,
     /// when that field is written as a closed record.
     fn record_field(&self, variant: &Node) -> Option<Vec<String>> {
         let mut fields = variant.nodes().filter(|n| is_type(n.kind));
@@ -21,7 +21,9 @@ impl Lower<'_> {
             (field.kind == K::RecordTypeField).then(|| self.token_text(field, K::Ident))?
         };
         // a tail, or a field without a name, and the labels are not all known
-        record.nodes().map(label).collect()
+        let mut labels: Vec<String> = record.nodes().map(label).collect::<Option<_>>()?;
+        flick_ir::sort_strings_utf16(&mut labels);
+        Some(labels)
     }
 
     /// The constructors of a type or error; its

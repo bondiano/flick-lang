@@ -181,3 +181,79 @@ let profile =
     assert!(markdown.contains("id : Float"), "{markdown}");
     assert_eq!(range, (start, start + 2));
 }
+
+#[test]
+fn postfix_catch_hover_semantic_tokens_and_folding() {
+    let source = "\
+module App.CatchIde exposing (..)
+
+type error NotFound = NotFound String
+
+load : String ->{; NotFound} String
+let load key = Fail.fail (NotFound key)
+
+recover : String ->{} String
+let recover key =
+  load key catch
+  | NotFound missing -> missing
+
+labels : { catch : Int } -> Int
+let labels r =
+  let box = { catch = r.catch }
+  let { catch = count } = box
+  count
+";
+    let f = fixture_of(&[("src/App/CatchIde.fl", source)]);
+    let ide = f.ide();
+    assert!(
+        ide.analysis.diagnostics.iter().all(Diagnostic::unnecessary),
+        "{:?}",
+        ide.analysis.diagnostics
+    );
+    let file = f.file("App.CatchIde");
+
+    // Hover on `catch` keyword, error constructor, and payload binder.
+    let catch_kw = f.at("App.CatchIde", "catch\n", 0);
+    let (kw_hover, _) = ide.hover(file, catch_kw + 1).expect("catch keyword hover");
+    assert!(
+        kw_hover.contains("catch") && kw_hover.contains("String"),
+        "{kw_hover}"
+    );
+
+    let ctor = f.at("App.CatchIde", "NotFound missing", 0);
+    let (ctor_hover, _) = ide.hover(file, ctor + 1).expect("ctor hover");
+    assert!(
+        ctor_hover.contains("NotFound : String -> NotFound"),
+        "{ctor_hover}"
+    );
+
+    let binder = f.at("App.CatchIde", "missing ->", 0);
+    let (binder_hover, _) = ide.hover(file, binder + 1).expect("binder hover");
+    assert!(binder_hover.contains("missing : String"), "{binder_hover}");
+
+    // Semantic tokens: `catch` keyword is `keyword`, `NotFound` is `enumMember`,
+    // while record field label `catch` is NOT `keyword`.
+    let tokens = ide.semantic_tokens(file);
+    let token_at = |at: u32| {
+        tokens
+            .iter()
+            .find(|(s, e, _)| *s <= at && at < *e)
+            .map(|(_, _, k)| super::tokens::TOKEN_TYPES[*k as usize])
+    };
+    assert_eq!(token_at(catch_kw), Some("keyword"));
+    assert_eq!(token_at(ctor), Some("enumMember"));
+    let field_label = f.at("App.CatchIde", "catch = r.catch", 0);
+    assert_ne!(token_at(field_label), Some("keyword"));
+
+    // Folding range includes the multiline `CatchExpr`.
+    let folds = ide.folding_ranges(file);
+    let catch_start = f.at("App.CatchIde", "load key catch", 0);
+    let catch_end =
+        f.at("App.CatchIde", "-> missing", 0) + u32::try_from("-> missing".len()).expect("small");
+    assert!(
+        folds
+            .iter()
+            .any(|&(s, e)| s == catch_start && e == catch_end),
+        "expected fold ({catch_start}, {catch_end}) in {folds:?}"
+    );
+}

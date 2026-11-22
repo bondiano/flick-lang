@@ -1,0 +1,43 @@
+module Syntax.LetElse exposing (..)
+
+type Choice = Left Int | Right Int | Neither
+
+inline_let_else : Option Int -> Int
+let inline_let_else m =
+  let Some x = m else 0
+  x + 1
+
+layout_both : Option (Option Int) -> Bool -> Int
+let layout_both m flag =
+  let Some x =
+    let Some inner = m else None
+    if flag then inner else None
+  else
+    let fallback = -1
+    fallback
+  x * 2
+
+record_fallback : Option { name : String } -> { name : String }
+let record_fallback m =
+  let Some r = m else { name = "guest" }
+  r
+
+chained_and_patterns : List Int -> Choice -> { tag : String; value : Int } -> Int
+let chained_and_patterns xs e entry =
+  let [first, ...rest] = xs else 0
+  let (Left n | Right n) = e else first
+  let { tag = "ok"; value } = entry else n
+  first + List.length rest + n + value
+
+in_control : List (Option Int) ->{} Int
+let in_control xs =
+  let mut total = 0
+  for item <- xs do {
+    let Some n = item else continue
+    if n < 0 then break
+    total = total + n
+  }
+  scope {
+    let Some (Some last) = List.head xs else total
+    total + last
+  }

@@ -207,11 +207,13 @@ impl<'p> Machine<'p, '_> {
     fn unwind_discontinue(&mut self, cont_id: usize) {
         if let Some(Some(captured)) = self.continuations.get_mut(&cont_id).map(Option::take) {
             let cause = self.failure.take();
+            self.failure_elected = false;
             self.discard = Some(Discard {
                 frames: captured.frames,
                 owner: Some(self.current_owner),
                 next: TransferNext::ResumeRunning {
                     saved_failure: cause,
+                    propagate_exit: true,
                 },
                 aborted: true,
             });

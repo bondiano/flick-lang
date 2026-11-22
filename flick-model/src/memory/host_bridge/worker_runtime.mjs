@@ -274,6 +274,7 @@ export class ExecState {
     this.nextHandle = 1;
     this.callbacks = new Map();
     this.owners = new Map();
+    this.closingOwners = new Map();
     this.ownerToId = new WeakMap();
     this.pendingCalls = new Map();
     this.pendingCbs = new Map();
@@ -301,7 +302,7 @@ export class ExecState {
     return id;
   }
 
-  retainHandleIds(ids) {
+  pinExistingHandles(ids) {
     const pinned = [];
     for (const id of ids) {
       const entry = this.handles.get(id);
@@ -416,21 +417,25 @@ export function readSyncLine() {
   }
 }
 
-export function collectCallHandleIds(msg) {
+export function collectMsgHandleIds(msg) {
   const ids = [];
-  const pushWire = (wire) => {
+  const scanWire = (wire) => {
     for (const node of wire?.nodes ?? []) {
       if (Array.isArray(node) && node[0] === "handle" && typeof node[1] === "number") {
         ids.push(node[1]);
       }
     }
   };
-  for (const w of msg.args ?? []) pushWire(w);
+  if (typeof msg.handle === "number") ids.push(msg.handle);
+  if (msg.arg) scanWire(msg.arg);
+  for (const w of msg.args ?? []) scanWire(w);
   for (const entry of msg.services ?? []) {
-    if (entry[0] === "host_ctx" && typeof entry[1] === "number") {
-      ids.push(entry[1]);
-    } else if (entry[0] === "service") {
-      pushWire(entry[2]);
+    if (Array.isArray(entry)) {
+      if (entry[0] === "host_ctx" && typeof entry[1] === "number") {
+        ids.push(entry[1]);
+      } else if (entry[0] === "service" && entry[2]) {
+        scanWire(entry[2]);
+      }
     }
   }
   return ids;

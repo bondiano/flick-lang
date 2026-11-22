@@ -212,6 +212,15 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor("  defer { close () }", "defer").includes("keyword.control.flick"));
   assert.ok(scopesFor("  errdefer { rollback () }", "errdefer").includes("keyword.control.flick"));
   assert.ok(scopesFor("let shared = lazy { load id }", "lazy").includes("keyword.control.flick"));
+  assert.ok(scopesFor("let host = a orelse b", "orelse").includes("keyword.operator.word.flick"));
+  assert.ok(scopesFor("let x = a orelse b == c", "orelse").includes("keyword.operator.word.flick"));
+  assert.ok(scopesFor("let r = result { work () }", "result").includes("keyword.control.flick"));
+  assert.ok(scopesFor("load id catch | NotFound _ -> guest", "catch").includes("keyword.control.flick"));
+  assert.ok(scopesFor("  catch", "catch").includes("keyword.control.flick"));
+  assert.ok(scopesFor("  catch | NotFound _ -> 0", "catch").includes("keyword.control.flick"));
+  assert.ok(scopesFor("  let Some x = m else 0", "let").includes("keyword.other.flick"));
+  assert.ok(scopesFor("  let Some x = m else 0", "else").includes("keyword.control.flick"));
+  assert.ok(scopesFor("  let [first, ...rest] = xs else []", "else").includes("keyword.control.flick"));
 });
 
 test("word boundaries prevent spurious keyword matches on partial identifiers and member accesses", () => {
@@ -266,6 +275,24 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["let x = obj.defer", "defer"],
     ["let x = obj.errdefer", "errdefer"],
     ["let x = defer_cleanup ()", "defer_cleanup"],
+    ["let x = r.orelse", "orelse"],
+    ["let f = .orelse", "orelse"],
+    ["let rec_val = { orelse = 1 }", "orelse"],
+    ["type T = { orelse : Int }", "orelse"],
+    ["let orelse_val = 1", "orelse_val"],
+    ["let result = 1", "result"],
+    ["let x = (result) { field = 1 }", "result"],
+    ["let x = obj.result", "result"],
+    ["let result_value = 1", "result_value"],
+    ["let r = { catch = f }", "catch"],
+    ["type T = { catch : Int }", "catch"],
+    ["let { catch = h } = r", "catch"],
+    ["let x = r.catch", "catch"],
+    ["let x = Layer.catch f", "catch"],
+    ["  catch FsError.from_js", "catch"],
+    ["catch : Int -> Int", "catch"],
+    ['foreign pure catch from "./x.js" "catch"', "catch"],
+    ["let catch_all = 1", "catch_all"],
   ];
 
   for (const [line, word] of nonKeywordCases) {

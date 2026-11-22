@@ -7,14 +7,13 @@
 //! - Fuel-prefix zero-leak sweeps on bridged HTTP and UI fixtures (zero Rust & zero host leaks).
 
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{env, fs, io, process};
+use std::{fs, io, process};
 
 use flick_core::diagnostics::Severity;
 use flick_core::project::{self, Compiled};
 use flick_core::source::SourceMap;
 use flick_model::memory::{
-    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Value,
+    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Reason, Value,
     execute_tests_program_with_bridge,
 };
 use flick_model::run::{compile, counted_main, counted_main_with_bridge, main_of};
@@ -42,6 +41,26 @@ fn repo_path(rel: &str) -> PathBuf {
         .join(rel)
 }
 
+fn describe_outcome(heap: &Heap, outcome: &ProgramOutcome) -> String {
+    match outcome {
+        ProgramOutcome::Failed(cause) => {
+            let parts: Vec<String> = heap
+                .cause_reasons(cause)
+                .expect("cause reasons")
+                .map(|r| match r {
+                    Reason::Die(v) => {
+                        format!("Die({:?})", heap.defect(v).map(|d| d.code().clone()))
+                    }
+                    Reason::Fail(v) => format!("Fail({v:?})"),
+                    Reason::Interrupt { fiber_id } => format!("Interrupt({fiber_id:?})"),
+                })
+                .collect();
+            format!("Failed([{}])", parts.join(", "))
+        }
+        other => format!("{other:?}"),
+    }
+}
+
 fn run_bridged_fixture(bridge: &mut HostBridge, rel: &str) {
     let path = repo_path(rel);
     let expected_stdout = fs::read_to_string(path.with_extension("stdout"))
@@ -66,7 +85,7 @@ fn run_bridged_fixture(bridge: &mut HostBridge, rel: &str) {
             ProgramOutcome::Failed(_) => "failed",
             ProgramOutcome::Fault(_) => "fault",
         };
-        let outcome_dbg = format!("{:?}", report.outcome);
+        let outcome_dbg = describe_outcome(&heap, &report.outcome);
         report
             .outcome
             .release(&mut heap)
@@ -301,115 +320,118 @@ fn stage5_host_fuel_prefix_sweeps_have_zero_leaks_on_both_heaps() {
     }
 }
 
-struct TempDirGuard(PathBuf);
-
-impl Drop for TempDirGuard {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-
 #[test]
-fn stage5_cell_proxy_and_async_target_handle_pinning_zero_leaks() {
-    let unique = format!(
-        "flick-model-host-bridge-reg-{}-{}",
-        process::id(),
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system clock")
-            .as_nanos()
-    );
-    let dir = env::temp_dir().join(unique);
-    fs::create_dir_all(&dir).expect("create temp test dir");
-    let _guard = TempDirGuard(dir.clone());
+fn stage5_cell_proxy_and_deferred_call_handle_pinning() {
+    let base = repo_path("target/tmp").join(format!("stage5-bridge-pin-{}", process::id()));
+    let _ = fs::remove_dir_all(&base);
+    fs::create_dir_all(&base).expect("create temp dir");
+    let _guard = TempDirCleanup(base.clone());
 
     fs::write(
-        dir.join("maker.mjs"),
-        "export function makeHandle() { return new Map([[\"k\", 42]]); }\n",
+        base.join("box.mjs"),
+        r"
+class Box {
+  constructor(n) { this.n = n; }
+}
+export function makeBox(n) { return new Box(n); }
+export function runCb(cb) { return cb(10); }
+",
     )
-    .expect("write maker.mjs");
+    .expect("write box.mjs");
+
     fs::write(
-        dir.join("consumer.mjs"),
-        "export function readHandle(m) { return m.get(\"k\"); }\n",
+        base.join("cell_helper.mjs"),
+        r#"
+export function touchCellAndBox(cell, box) {
+  const prev = cell.value;
+  if (prev === undefined || prev._tag !== "Some" || typeof prev.value !== "number") {
+    throw new Error(`unexpected cell value: ${JSON.stringify(prev)}`);
+  }
+  cell.value = { _tag: "Some", value: prev.value + box.n };
+  return box.n;
+}
+"#,
     )
-    .expect("write consumer.mjs");
-    let main_fl = dir.join("Main.fl");
+    .expect("write cell_helper.mjs");
+
+    fs::write(
+        base.join("async_helper.mjs"),
+        r"
+export async function readBoxAsync(box) {
+  await Promise.resolve();
+  return box.n * 2;
+}
+",
+    )
+    .expect("write async_helper.mjs");
+
+    let main_fl = base.join("Main.fl");
     fs::write(
         &main_fl,
-        r#"module App.Main exposing (main)
+        r#"
+module App.Main exposing (main)
 
-import Http.ClientError exposing (HttpClientError)
-import Http.ClientRequest exposing (ClientRequest)
-import Http.ClientResponse exposing (ClientResponse)
+type Box
 
-make_handle : Unit ->{} JsValue
-foreign make_handle from "./maker.mjs" "makeHandle"
-  arity 0
+make_box : Int -> Box
+foreign pure make_box from "./box.mjs" "makeBox"
 
-read_handle : JsValue -> Float
-foreign pure read_handle from "./consumer.mjs" "readHandle"
-  arity 1
+run_cb : (Int ->{Async} Int)^c ->{Async} Int
+foreign effect run_cb from "./box.mjs" "runCb"
+  retention call
 
-answer : ClientRequest -> Http.Url.Url ->{; HttpClientError} ClientResponse
-let answer request url =
-  let ok = Http.ServerResponse.defaults
-  let response =
-    if String.contains "/login" (Http.Url.href url) then
-      Http.ServerResponse.merge_cookies
-        (Http.Cookies.from_set_cookie ["session=abc; Path=/"])
-        (Http.ServerResponse.text "in" ok)
-    else
-      let cookie =
-        match Http.Headers.get "cookie" (Http.ClientRequest.headers request) with
-        | Some v -> v
-        | None -> "none"
-      Http.ServerResponse.text cookie ok
-  Http.ServerResponse.to_client_response request response
+touch_cell_and_box : Ref (Option Int) -> Box ->{} Int
+foreign effect touch_cell_and_box from "./cell_helper.mjs" "touchCellAndBox"
+  arity 2
 
-main : Unit ->{Host.Console, Async; HttpClientError} Unit
+read_box_async : Box ->{Async} Int
+foreign read_box_async from "./async_helper.mjs" "readBoxAsync"
+
+main : Unit ->{Host.Console, Async} Unit
 let main () =
-  let n = read_handle (make_handle ())
-  Platform.stdout_line (show n)
-  let jar = Ref.make Http.Cookies.empty
-  let client = Http.Client.with_cookies_ref jar (Http.Client.make answer)
-  let _ = Http.Client.execute_with client (Http.ClientRequest.get "http://fake/login")
-  let who = Http.Client.execute_with client (Http.ClientRequest.get "http://fake/whoami")
-  Platform.stdout_line (Http.ClientResponse.text who)
+  let cell = Ref.make (Some 41)
+  let first = touch_cell_and_box cell (make_box 1)
+  let second_call = touch_cell_and_box cell (make_box 3)
+  let updated = Ref.get cell
+  let deferred = run_cb (fun x -> read_box_async (make_box (x + 5)))
+  Platform.stdout_line
+    (show first ++ " " ++ show second_call ++ " " ++ show updated ++ " " ++ show deferred)
 "#,
     )
     .expect("write Main.fl");
 
-    let modules = compile(&main_fl).expect("compile regression Main.fl");
-    let main = main_of(&modules).expect("main of regression Main.fl");
-
-    // Use a fresh HostBridge per profile so `./consumer.mjs` genuinely hits the async import path
-    // (`needsAsyncLoad`) while the one-shot handle from `make_handle ()` is released immediately
-    // after the call message is sent, and `with_cookies_ref` passes a `Ref` alongside a one-shot
-    // `Client` handle across `bridge.dataToEffect`.
+    let modules = compile(&main_fl).expect("compile Main.fl");
+    let main = main_of(&modules).expect("main");
+    let mut bridge = HostBridge::new().expect("spawn HostBridge");
     for release in [false, true] {
         let profile = if release { "release" } else { "debug" };
-        let mut bridge = HostBridge::new().expect("spawn fresh HostBridge");
         let counted = counted_main_with_bridge(&modules, &main, release)
-            .unwrap_or_else(|e| panic!("lower regression ({profile}): {e}"));
+            .unwrap_or_else(|e| panic!("lower ({profile}): {e}"));
         let mut heap = Heap::new();
         let report = counted.execute_with_bridge(&mut heap, FUEL, HostMode::LiveOs, &mut bridge);
-        let outcome_dbg = format!("{:?}", report.outcome);
-        let is_unit = matches!(report.outcome, ProgramOutcome::Returned(Value::Unit));
+        let outcome_dbg = describe_outcome(&heap, &report.outcome);
+        let returned_unit = matches!(report.outcome, ProgramOutcome::Returned(Value::Unit));
         report
             .outcome
             .release(&mut heap)
-            .unwrap_or_else(|e| panic!("release regression ({profile}): {e}"));
+            .unwrap_or_else(|e| panic!("release ({profile}): {e}"));
         let stats = heap
             .finish()
-            .unwrap_or_else(|e| panic!("Rust heap leak in regression ({profile}): {e}"));
-        assert_eq!(stats.live_objects, 0, "regression ({profile}) live objects");
+            .unwrap_or_else(|e| panic!("Rust heap leak ({profile}): {e}"));
+        assert_eq!(stats.live_objects, 0, "{profile} live objects");
         assert!(
-            is_unit,
-            "expected Returned(()) for regression ({profile}), got {outcome_dbg}"
+            returned_unit,
+            "expected Returned(()) ({profile}), got {outcome_dbg}; stdout={:?}",
+            report.stdout
         );
-        assert_eq!(
-            report.stdout, "42\nsession=abc\n",
-            "unexpected stdout for regression ({profile})"
-        );
+        assert_eq!(report.stdout, "1 3 Some 45 30\n", "stdout ({profile})");
+    }
+}
+
+struct TempDirCleanup(PathBuf);
+
+impl Drop for TempDirCleanup {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
     }
 }

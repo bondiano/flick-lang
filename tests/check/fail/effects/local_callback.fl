@@ -1,0 +1,21 @@
+// An unresolved callback row still contributes its service to the caller.
+module App.LocalCallback exposing (missing_store, missing_nested_store)
+
+service Store a =
+  save : a ->{} Unit
+
+save_int : Int ->{Store Int} Unit
+let save_int value = Store.save value
+
+missing_store : Unit ->{} Unit
+let missing_store () =
+  let write_all xs f = List.each_effect f xs
+  write_all [1] save_int
+
+missing_nested_store : Unit ->{} Unit
+let missing_nested_store () =
+  let write_all xs f = scope { scope { List.each_effect f xs } }
+  write_all [1] save_int
+
+//~ FLICK-E002 @13:3-13:25 the signature of `missing_store` does not allow service `Store Int`
+//~ FLICK-E002 @18:3-18:25 the signature of `missing_nested_store` does not allow service `Store Int`

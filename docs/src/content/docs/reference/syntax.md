@@ -27,7 +27,7 @@ UTF-8 byte ranges; layout columns count characters.
 | name | `[a-z_][A-Za-z0-9_]*` | values, functions, fields, type variables |
 | capitalized name | `[A-Z][A-Za-z0-9_]*` | types, constructors, modules, classes, services, errors |
 | label | `'[a-z_][A-Za-z0-9_]*` | loop labels (`'outer: loop { … }`, `break 'outer`) |
-| `_` | alone | wildcard pattern |
+| `_` | alone | wildcard pattern, type hole, or application argument hole |
 
 Qualified names are written without spaces around `.`: `Users.get`,
 `Ui.Event.exhaust`, `Sql.Template`. `user.name` is field access.
@@ -99,7 +99,7 @@ let examples =
 
 ```text
 ( ) [ ] { } , ; : . .. ..< = -> <- => | ^ _ ? @
-|> <| >> << || && == != < <= > >= ++ + - * / % ** not
+|> <| orelse >> << || && == != < <= > >= ++ + - * / % ** not
 ```
 
 ## Keywords
@@ -108,15 +108,15 @@ Every reserved word of Flick is listed below with what it introduces and
 where it is described in full. A keyword cannot be used as a name.
 
 ```text
-module exposing import as let mut rec assert fun match with try if then else
-task await lazy scope provide ignore todo echo type opaque where kind error
-service class instance deriving foreign from forall not none true false
-in when for yield do break continue
+module exposing import as let mut rec assert fun match with try catch if then
+else task await lazy scope provide ignore todo echo type opaque where kind
+error service class instance deriving foreign from forall not orelse none true
+false in when for yield do break continue
 ```
 
 Contextual words are ordinary names everywhere except in one position:
 
-- `loop` before `{` and `while` before a condition followed by `do`;
+- `loop` before `{`, `result` before `{`, and `while` before a condition followed by `do`;
 - `defer` and `errdefer` before `{` in statement position (see
   [resources](../resources/#scope-owned-defer-and-errdefer));
 - `private` before `module` in a file's header (see [modules](../modules/)),
@@ -203,8 +203,11 @@ and [ffi.md](../ffi/).
 | `match` `with` | pattern matching | `match shape with \| Circle r -> r` |
 | `when` | a guard on a match arm | `\| Rect w h when w == h -> "square"` |
 | `with` | also the handlers of `try` and a record update | `{ user with name = "Ada" }` |
-| `try` | handles the expected errors of its body | `try find id with \| NotFound _ -> None` |
+| `try` | handles the expected errors and effect operations of its body | `try find id with \| NotFound _ -> None` |
+| `catch` | postfix handler for typed errors only (reserved in expressions and binders; still allowed as record field label, `.catch`, renamed record pattern `{ catch = f }` and foreign metadata) | `find id catch \| NotFound _ -> None` |
+| `result` | contextual: before `{`, runs its block eagerly and catches its typed errors as `Result (Errors e) a`; a name elsewhere | `result { find id }` |
 | `not` | boolean negation; `not null` on a `sql table` column | `not done` |
+| `orelse` | lazy `Option` fallback: evaluates the right side only on `None`; usable as a record field label (`{ orelse = … }`, `r.orelse`, `{ orelse = x }`) but not as a variable name or record pun `{ orelse }` | `host orelse "localhost"` |
 | `true` `false` | the two `Bool` values | `if ok then true else false` |
 | `none` | the empty row in a type | `a ->{none; NotFound} b` |
 | `in` | binds a row in a SQL `from` or `join` clause; starts the body of `unpack … as K in` | `join account in Accounts` |
@@ -281,12 +284,14 @@ with what the keyword does:
 | `lazy` | `lazy { … } : Lazy {Store} {StoreError} Float`: the lazy the block builds |
 | `scope` | `scope { … } : Float`: the value the block returns once its resources are released |
 | `defer`, `errdefer` | `defer { … } : Unit`: cleanup mode and the location of the owning explicit `scope` |
-| `provide`, `try` | the value of the block, with the services or errors it removes |
+| `provide`, `try`, `catch` | the value of the block or expression, with the services or errors it removes |
 | `match`, `if` | `match … with : String`: the value of the arm or branch taken |
+| `let`, `else` | `let … = … else … : Result InputError User`: in `let ... else`, the result of the current block, explaining that mismatch finishes the current block and bindings are monomorphic |
 | `fun` | `fun … -> … : Float -> Float`: the function |
 | `sql`, `ui` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
 | `await` | `await … : Float`: the result, with the `Eff` it runs |
 | `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit`: the type of what is discarded, with a warning when it is an `Eff` that is not run |
+| `orelse` | `option orelse fallback : String`: the unwrapped result type, lazy evaluation note, and explicit grouping when chained or mixed with `\|>` or `<\|` |
 
 Other keywords show nothing on hover; the names around them show their types.
 
@@ -296,7 +301,9 @@ There are no user-defined operators. From weakest to strongest:
 
 | Level | Operators | Associativity |
 | - | - | - |
+| −1 | postfix `catch \| …` | none: chaining outer `catch` needs parentheses `(a catch \| E -> b) catch \| F -> c` |
 | 0 | `<\|` | right; does not mix with `\|>`: `x \|> f <\| y` is an error |
+| 0½ | `orelse` | right: `a orelse b orelse c` is `a orelse (b orelse c)` |
 | 1 | `\|>` | left |
 | 2 | `\|\|` | right |
 | 3 | `&&` | right |
@@ -314,6 +321,9 @@ There are no user-defined operators. From weakest to strongest:
 `-x ** 2` is `-(x ** 2)`; `-a * b` is `(-a) * b`; `await f x` is
 `await (f x)`; `0..n - 1` is `0..(n - 1)`, and `i < 0..n` compares with the range.
 `f <| g <| x + 1` is `f (g (x + 1))`, and `f a <| x` is the call `f a x`;
+`x |> find orelse default` is `(x |> find) orelse default`, and
+`f <| opt orelse default` is `f <| (opt orelse default)` (which `flick fmt`
+parenthesizes explicitly for readability);
 `List.map f >> List.filter p` composes two applications, and `await f >> g`
 is `await (f >> g)`. What the operators mean is in [Numbers and
 operators](../numbers/#operators).
@@ -343,9 +353,9 @@ blocks of `task`, `scope`, `provide`, `sql`, `ui`, `rec` and plugins.
    - after `then` and `else`, `{` opens a brace block of statements, as after
      `do` and `loop`; a record there goes in parentheses (`FLICK-T074`).
 3. A line that starts at the block column with an infix operator other than
-   `-`, with `|`, `then`, `else`, `with`, `where`, or with a closing delimiter
+   `-`, with `|`, `then`, `else`, `with`, `catch`, `where`, or with a closing delimiter
    continues the statement instead of starting a new one. This is what lets
-   `|>` and `<|` pipelines, `match` arms, `else` branches and the goal of a
+   `|>` and `<|` pipelines, `match` and `catch` arms, `else` branches and the goal of a
    `proof` line up with their expression or declaration.
 4. Inside `{ … }` of a record, record type or brace block the items align on
    the first item, which may follow `{` on the same line; items are separated
@@ -657,7 +667,8 @@ save_with :
 
 ```text
 block       = statement { line break statement }
-statement   = "let" ["lazy"] ["mut"] … | signature | name "=" block
+statement   = "let" pattern "=" block "else" block
+            | "let" ["lazy"] ["mut"] … | signature | name "=" block
             | "defer" "{" block "}" | "errdefer" "{" block "}" | expr
 expr        = "fun" atom_pattern { atom_pattern } "->" block
             | [label [":"]] "loop" "{" block "}"
@@ -668,11 +679,12 @@ expr        = "fun" atom_pattern { atom_pattern } "->" block
             | "if" expr "then" block [ "else" (if_expr | block) ]
             | "pack" ModulePath "as" contract | "unpack" expr "as" Con ["," name] "in" block
             | "lazy" expr                    // binds as `await`: `lazy f x` is `lazy (f x)`
-            | operator expression over application (see the operator table)
+            | operator expression over application [ "catch" arm { arm } ] (see the operator table)
 arm         = "|" or_pattern ["when" expr] "->" block
 handler_arm = arm | "|" "return" or_pattern "->" block
             // an operation's arm is `| E.op p… -> …`, a pattern whose path ends in a name
-application = postfix { postfix }
+application = postfix { argument }
+argument    = "_" | postfix                     // at most one `_` per application
 postfix     = atom { "." name | "?" }           // no space before either
 atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
@@ -729,7 +741,31 @@ too). `f x?` is `f (x?)`; write `(f x)?`.
 
 `todo` (optionally followed by a string) is an expression of any type, and
 `echo` without an operand is a function, as in `x |> echo`. `_` is a type
-only in a signature or annotation. `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). A branch in braces holds statements: `if a > b then { low = b; high = a }`. `ignore e` discards a non-`Unit`
+only in a signature or annotation. As a direct argument of an application, `_`
+is an expression hole capturing one argument: `f a _ c` means `fun h -> f a h c`.
+Because application binds tighter than `|>` and `<|`, `x |> f a _ c` and
+`f a _ c <| x` pass `x` into that argument position. Evaluation follows the
+desugared `fun`: `x |> f y _` evaluates `x` before the closure runs `f`, `y` and
+the parameter, and regions and captures follow ordinary `fun` rules. A nested
+application is separate (`f (g _) _` is `fun h -> f (fun k -> g k) h`). At most
+one `_` is allowed per application (`FLICK-S017`), and `_` in any other
+expression position—standalone, as a callee, `x |> _`, in a list or record
+literal, in parentheses `(_)`, or as a field or operator section `_.name`,
+`(_ + 1)`—is `FLICK-S018`. Hover on `_` shows its inferred parameter type, and
+rename refuses `_`.
+
+```flick
+label : String -> String -> String -> String
+let label open mid close = open ++ mid ++ close
+
+wrapped : String -> String
+let wrapped name = name |> label "[" _ "]"
+
+wrapped_right : String -> String
+let wrapped_right name = label "[" _ "]" <| name
+```
+
+`if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). A branch in braces holds statements: `if a > b then { low = b; high = a }`. `ignore e` discards a non-`Unit`
 result of an intermediate statement (see [Direct effectful calls](../../spec/01-direct-calls/)). `await e` runs a stored `Eff` once in
 the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/02-computations/)). In
 `provide e { … }` the `{` ends the head expression.
@@ -885,8 +921,9 @@ fits; otherwise it breaks, outermost construct first:
   line, its operators under the first operand when the pipeline starts its
   line;
 - `if c then a else b` stays on one line or puts every branch on lines of its
-  own; `match` and `try` put each arm on its own line, at the column of
-  `match`. Before a `,`, where the parser takes no block on lines of its own,
+  own; `match`, `try` and postfix `catch` put each arm on its own line (and
+  `catch` parenthesizes a mixed pipeline on its left so the grouping is
+  explicit). Before a `,`, where the parser takes no block on lines of its own,
   the last branch or arm stays on its line;
 - lists, tuples and `exposing (…)` put one item per line followed by `,`;
   records, record types, patterns and updates (`base with` on its own line)

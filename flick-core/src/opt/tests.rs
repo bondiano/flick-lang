@@ -358,12 +358,13 @@ fn a_native_binding_with_a_schema_is_called_directly_on_flicks_runtime() {
 #[test]
 fn matches_test_each_tag_once_and_skip_the_last_test() {
     let js = release(
-        "module App exposing (area, name, unit)\n\n\
+        "module App exposing (area, name, make, unit)\n\n\
          type Shape = Circle Float | Rect Float Float | Dot\n\n\
          area : Shape -> Float\n\
          let area s =\n  match s with\n  | Circle r -> r * r\n  | Rect w h -> w * h\n  | Dot -> 0\n\n\
          name : Shape -> String\n\
          let name s =\n  match s with\n  | Circle _ -> \"circle\"\n  | _ -> \"other\"\n\n\
+         make : Unit -> Shape\nlet make () = Rect 2 3\n\n\
          unit : Unit -> Float\nlet unit () = area (Rect 2 3)\n",
     );
     // the last arm runs whatever reaches it: three arms, two tests; two, one
@@ -372,6 +373,7 @@ fn matches_test_each_tag_once_and_skip_the_last_test() {
     assert!(!js.contains("s._tag === \"Dot#"), "{js}");
     assert!(js.contains("{ _tag: \"Rect#"), "{js}");
     assert!(js.contains("_0: 2, _1: 3 }"), "{js}");
+    assert!(js.contains("export const unit = ($_) => 6;"), "{js}");
 }
 
 #[test]

@@ -1,13 +1,13 @@
-//! Applications, operators, parentheses, functions, `if`, `match` and `try`.
+//! Applications, operators, parentheses, and functions.
 
-use std::{mem, ptr};
+use std::mem;
 
 use flick_pretty::{NextBreakFitsMode, docvec};
 
 use super::block::Value;
 use super::lines::{child, children, commented};
 use super::printer::{Calls, Doc, INDENT, Printer, nodes, position, token};
-use crate::syntax::cst::{Element, Node, Token};
+use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 
 /// A piece of what follows an expression on its line: closing
@@ -19,60 +19,18 @@ pub(super) enum Part {
     Text(&'static str),
 }
 
-/// Binding strength of a binary operator: the parser's left power.
-fn precedence(kind: K) -> u8 {
-    kind.binding_power().map_or(0, |(left, _)| left)
-}
-
-fn operator(n: &Node) -> Option<Token> {
-    n.child_tokens().find(|t| t.kind.is_binary_op())
-}
-
-/// The operands and operators of a chain of one precedence, in order.
-fn chain<'n>(n: &'n Node, level: u8, operands: &mut Vec<&'n Node>, operators: &mut Vec<Token>) {
-    for child in &n.children {
-        match child {
-            Element::Node(c)
-                if c.kind == K::BinExpr
-                    && operator(c).is_some_and(|o| precedence(o.kind) == level) =>
-            {
-                chain(c, level, operands, operators);
-            }
-            Element::Node(c) => operands.push(c),
-            Element::Token(t) if t.kind.is_binary_op() => operators.push(*t),
-            Element::Token(_) => {}
-        }
-    }
-}
-
 /// A last argument that may stay on the line of the call and break inside:
 /// `f a (fun x ->`, `f a [`, `f a {`, `f task {`.
 fn hugs(n: &Node) -> bool {
     match n.kind {
         K::ParenExpr => n.nodes().next().is_some_and(|c| c.kind == K::FunExpr),
         K::ListExpr | K::RecordExpr | K::RecordUpdate | K::TupleExpr => n.nodes().next().is_some(),
-        K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::DeferStmt | K::DoExpr => true,
+        K::TaskExpr | K::ScopeExpr | K::ProvideExpr | K::DeferStmt | K::ResultExpr | K::DoExpr => {
+            true
+        }
         K::PluginExpr | K::LazyExpr => n.has_token(K::LBrace),
         _ => false,
     }
-}
-
-/// Whether the token starts its line.
-fn starts_line(text: &str, t: Token) -> bool {
-    let before = &text[..t.start as usize];
-    before
-        .rsplit('\n')
-        .next()
-        .is_some_and(|l| l.trim().is_empty())
-}
-
-/// Whether the token ends its line.
-fn ends_line(text: &str, t: Token) -> bool {
-    let after = &text[t.end as usize..];
-    after
-        .split('\n')
-        .next()
-        .is_some_and(|l| l.trim().is_empty())
 }
 
 impl<'a> Printer<'a> {
@@ -247,70 +205,6 @@ impl<'a> Printer<'a> {
         self.call(call, &parts, suffix, Some(paren))
     }
 
-    /// A chain of operators of one precedence: on one line, or broken before
-    /// each operator. A pipeline breaks one step per line, stays broken when
-    /// written so, and lines its steps up under the first operand when it
-    /// starts its line (`aligned`); other chains go one level in.
-    pub fn binary(&mut self, n: &'a Node, aligned: bool, suffix: &[Part]) -> Doc<'a> {
-        let a = self.a;
-        let Some(op) = operator(n) else {
-            return self.generic(n);
-        };
-        let mut operands = Vec::new();
-        let mut operators = Vec::new();
-        chain(n, precedence(op.kind), &mut operands, &mut operators);
-        if operands.len() != operators.len() + 1 {
-            return self.generic(n);
-        }
-        let pipe = matches!(op.kind, K::PipeGt | K::LtPipe);
-        // a step on a line of its own, whichever end of a line its operator is on
-        let on_lines = |&o: &Token| starts_line(self.text, o) || ends_line(self.text, o);
-        let broken = pipe && operators.iter().any(on_lines);
-        let mut forced = broken;
-        let mut first = self.node(operands[0]);
-        if let Some(c) = self.comments.trailing(operators[0].start, None) {
-            first = docvec![a, first, " ", c];
-            forced = true;
-        }
-        let mut steps = Vec::with_capacity(operators.len());
-        for (i, (&op, &operand)) in operators.iter().zip(&operands[1..]).enumerate() {
-            let comments = self.comments.leading(op.start);
-            let comments = if comments.is_empty() {
-                a.empty()
-            } else {
-                forced = true;
-                self.comment_lines(&comments)
-            };
-            let op = self.tok(op);
-            let last = i + 1 == operators.len();
-            let mut operand = if last {
-                self.with_suffix(operand, suffix)
-            } else {
-                self.node(operand)
-            };
-            if let Some(next) = operators.get(i + 1)
-                && let Some(c) = self.comments.trailing(next.start, None)
-            {
-                operand = docvec![a, operand, " ", c];
-                forced = true;
-            }
-            let separator = if broken { a.line() } else { a.break_("", " ") };
-            steps.push(docvec![a, separator, comments, op, " ", operand]);
-        }
-        let steps = a.concat(steps);
-        let steps = if pipe && aligned {
-            steps
-        } else {
-            steps.nest(a, INDENT)
-        };
-        let doc = docvec![a, first, steps];
-        if forced {
-            doc.force_break(a).group(a)
-        } else {
-            doc.group(a)
-        }
-    }
-
     /// `(e)`: hugged by its parentheses. A function in parentheses closes
     /// on its own line when its body breaks; a `match`, `try` or broken `if`
     /// goes on lines of its own between them.
@@ -344,7 +238,7 @@ impl<'a> Printer<'a> {
                 let fun = self.fun(inner, &closing);
                 docvec![a, open, fun]
             }
-            K::MatchExpr | K::TryExpr | K::IfExpr => {
+            K::MatchExpr | K::TryExpr | K::CatchExpr | K::IfExpr => {
                 let inner = self.statement(inner);
                 let inner = docvec![a, a.break_("", ""), inner].nest(a, INDENT);
                 let close = self.suffix(&closing);
@@ -378,6 +272,7 @@ impl<'a> Printer<'a> {
             | K::ScopeExpr
             | K::ProvideExpr
             | K::DeferStmt
+            | K::ResultExpr
             | K::DoExpr => self.braced(n, suffix),
             _ => {
                 let doc = self.node(n);
@@ -419,69 +314,5 @@ impl<'a> Printer<'a> {
             .elements(n, &n.children[..=arrow])
             .next_break_fits(self.a, NextBreakFitsMode::Disabled);
         self.body(head, Value::Block(body), n.range().1, closing)
-    }
-
-    /// `match e with` or `try e with`, then one arm per line.
-    pub fn match_(&mut self, n: &'a Node) -> Doc<'a> {
-        let a = self.a;
-        let inline = mem::take(&mut self.tail_inline);
-        let Some(with) = position(n, K::WithKw) else {
-            return self.generic(n);
-        };
-        let head = if n.kind == K::TryExpr {
-            self.try_head(n, with)
-        } else {
-            let (Some(keyword), Some(subject)) = (token(n, K::MatchKw), n.nodes().next()) else {
-                return self.generic(n);
-            };
-            let keyword = self.tok(keyword);
-            let subject = self.node(subject);
-            let subject = docvec![a, a.break_("", " "), subject].nest(a, INDENT);
-            let Element::Token(with) = n.children[with] else {
-                unreachable!("a token position")
-            };
-            let with = self.tok(with);
-            docvec![a, keyword, subject, a.break_("", " "), with].group(a)
-        };
-        let arms: Vec<&Node> = n.nodes().filter(|c| c.kind == K::MatchArm).collect();
-        let last = arms.last().copied();
-        let items = self.items(&arms, n.range().1, None, &mut |p, arm| {
-            p.inline_body = inline && last.is_some_and(|l| ptr::eq(l, arm));
-            p.arm(arm)
-        });
-        docvec![a, head, a.line(), self.join_lines(&items)].force_break(a)
-    }
-
-    /// `try body with`: one line when the body is one expression that fits.
-    fn try_head(&mut self, n: &'a Node, with: usize) -> Doc<'a> {
-        let a = self.a;
-        let (Some(keyword), Some(block)) = (token(n, K::TryKw), n.nodes().next()) else {
-            return self.generic(n);
-        };
-        let keyword = self.tok(keyword);
-        let Element::Token(with) = n.children[with] else {
-            unreachable!("a token position")
-        };
-        let (branch, broken) = self.branch(block, with.start, false);
-        let with = self.tok(with);
-        let separator = if broken { a.line() } else { a.break_("", " ") };
-        let doc = docvec![a, keyword, branch, separator, with];
-        if broken {
-            doc.force_break(a)
-        } else {
-            doc.group(a)
-        }
-    }
-
-    /// `| pattern when guard -> body`.
-    fn arm(&mut self, n: &'a Node) -> Doc<'a> {
-        let (Some(arrow), Some(block)) = (position(n, K::Arrow), n.nodes().last()) else {
-            return self.generic(n);
-        };
-        if block.kind != K::Block {
-            return self.generic(n);
-        }
-        let head = self.elements(n, &n.children[..=arrow]);
-        self.body(head, Value::Block(block), n.range().1, &[])
     }
 }

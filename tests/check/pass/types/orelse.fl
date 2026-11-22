@@ -1,0 +1,90 @@
+module App.OrElsePass exposing (..)
+
+type error Missing = Missing String
+
+service Log =
+  write : String ->{} Unit
+
+unwrap_or : Option a -> a -> a
+let unwrap_or opt fallback = opt orelse fallback
+
+from_chain : Option Int -> Option Int -> Int
+let from_chain a b = a orelse b orelse 8080
+
+nested_layer : Option (Option Int) -> Option Int
+let nested_layer opt = opt orelse Some 1
+
+nested_double : Option (Option Int) -> Option Int -> Int
+let nested_double a b = (a orelse b) orelse 9
+
+bidirectional_float : Float
+let bidirectional_float = None orelse 3
+
+bidirectional_lambda : Int -> Int
+let bidirectional_lambda = None orelse fun x -> x + 1
+
+precedence_pipe : Option Int -> String
+let precedence_pipe opt = show <| (opt orelse 0)
+
+precedence_forward : Int -> (Int -> Option Int) -> Int
+let precedence_forward x find = (x |> find) orelse 99
+
+precedence_bool : Option Bool -> Bool
+let precedence_bool opt = opt orelse false || true
+
+rhs_fails : Option String ->{; Missing} String
+let rhs_fails opt = opt orelse Fail.fail (Missing "host")
+
+cold_eff : Option (Eff {Log} {} Int) -> Eff {Log} {} Int
+let cold_eff opt =
+  opt
+    orelse task {
+      Log.write "fallback"
+      0
+    }
+
+cold_lazy : Option (Lazy {Log} {} Int) ->{} Lazy {Log} {} Int
+let cold_lazy opt =
+  opt
+    orelse lazy {
+      Log.write "lazy"
+      0
+    }
+
+apply_log : (Int ->{Log} Int)^c -> Int ->{Log} Int
+let apply_log f n = f n
+
+lifted_function : Option (Int -> Int) -> (Int ->{Log} Int) -> Int ->{Log} Int
+let lifted_function opt fallback n = apply_log (opt orelse fallback) n
+
+with_mut_and_loop : List (Option Int) -> Int
+let with_mut_and_loop items =
+  let mut total = 0
+  let mut rest = items
+  loop {
+    match rest with
+    | [] -> break total
+    | [head, ...tail] ->
+      rest = tail
+      let n = head orelse continue
+      total = total + n
+  }
+
+type alias Config = {
+  host : String
+  orelse : Option Int
+}
+
+make_config : Option Int -> Config
+let make_config port = {
+  host = "localhost"
+  orelse = port
+}
+
+read_config : Config -> Int
+let read_config cfg =
+  let { orelse = port } = cfg
+  let updated = { cfg with orelse = port }
+  let from_call = (make_config updated.orelse).orelse
+  let from_lit = { orelse = from_call }.orelse
+  from_lit orelse 8080

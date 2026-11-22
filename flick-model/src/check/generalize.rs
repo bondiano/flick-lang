@@ -3,7 +3,7 @@
 //! signature, and `Gen` (§2.5) by levels: a meta made inside the right
 //! side of a `let` and not reachable from `Γ` is quantified.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
 use super::regions::regions_of;
@@ -220,6 +220,14 @@ impl Checker<'_> {
                 // is closed instead (`core.md` §2.5, item 5)
                 self.slots[m as usize].solved = Some(Solved::Row(Row::var(named)));
                 vars.push((name, Kind::Errors));
+            } else if in_tail(&Var::Meta(m), &zonked) {
+                // the other fields of a record, as `{value : a | r}`
+                let tail = Fields {
+                    fields: BTreeMap::new(),
+                    tail: Some(named),
+                };
+                self.slots[m as usize].solved = Some(Solved::Fields(tail));
+                vars.push((name, Kind::Fields));
             }
         }
         Scheme {
@@ -265,6 +273,26 @@ fn in_errors(v: &Var, t: &Type) -> bool {
         Type::Tuple(ts) | Type::Dict(_, ts) => any(ts),
         Type::Forall(s) => in_errors(v, &s.body),
         Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => in_errors(v, b),
+        _ => false,
+    }
+}
+
+/// Whether the variable `v` is the tail of a record in `t`.
+fn in_tail(v: &Var, t: &Type) -> bool {
+    let any = |ts: &[Type]| ts.iter().any(|t| in_tail(v, t));
+    let row = |r: &Row| r.elems.values().any(|a| any(a));
+    match t {
+        Type::Record(f) => f.tail.as_ref() == Some(v) || f.fields.values().any(|t| in_tail(v, t)),
+        Type::App(h, a) => in_tail(v, h) || in_tail(v, a),
+        Type::Fun(p, s, r) => {
+            in_tail(v, p) || in_tail(v, r) || matches!(s, Stage::Runtime(a, b) if row(a) || row(b))
+        }
+        Type::Eff(r, e, t) => row(r) || row(e) || in_tail(v, t),
+        Type::Ref(t) | Type::Captured(t, _) | Type::Bounded(t, _) => in_tail(v, t),
+        Type::Errors(r) => row(r),
+        Type::Tuple(ts) | Type::Dict(_, ts) => any(ts),
+        Type::Forall(s) => in_tail(v, &s.body),
+        Type::Exists(_, _, b) | Type::OpenedExists(_, _, b) => in_tail(v, b),
         _ => false,
     }
 }

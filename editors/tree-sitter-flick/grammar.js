@@ -3,10 +3,10 @@
 
 const KEYWORDS = [
   'module', 'exposing', 'import', 'as', 'let', 'mut', 'rec', 'assert', 'fun', 'match', 'with',
-  'try', 'if', 'then', 'else', 'task', 'await', 'lazy', 'scope', 'provide', 'ignore',
+  'try', 'catch', 'if', 'then', 'else', 'task', 'await', 'lazy', 'scope', 'provide', 'ignore',
   'todo', 'echo',
   'type', 'opaque', 'refined', 'where', 'kind', 'error', 'service', 'class',
-  'instance', 'deriving', 'forall', 'not', 'none',
+  'instance', 'deriving', 'forall', 'not', 'orelse', 'none',
   'ui', 'in', 'when', 'for', 'yield', 'do', 'break', 'continue',
 ];
 
@@ -26,7 +26,7 @@ module.exports = grammar({
   word: $ => $._identifier,
 
   conflicts: $ => [
-    [$._loop, $.identifier], [$._defer, $.identifier], [$._while, $.identifier], [$._case, $.identifier], [$._hook, $.identifier],
+    [$._loop, $.identifier], [$._defer, $.identifier], [$._result, $.identifier], [$._while, $.identifier], [$._case, $.identifier], [$._hook, $.identifier],
     [$._fixture, $.identifier], [$._case], [$._fixture],
   ],
 
@@ -37,6 +37,7 @@ module.exports = grammar({
       $._newline,
       $._loop,
       $._defer,
+      $._result,
       $._while,
       $._case,
       $._hook,
@@ -74,6 +75,7 @@ module.exports = grammar({
     _newline: _ => '\n',
     _loop: $ => prec.dynamic(1, seq(alias('loop', $.keyword), $.braces)),
     _defer: $ => prec.dynamic(1, seq(alias(choice('defer', 'errdefer'), $.keyword), $.braces)),
+    _result: $ => prec.dynamic(1, seq(alias('result', $.keyword), $.braces)),
     _while: $ => prec.dynamic(1, seq(alias('while', $.keyword), repeat1($._condition_token), alias('do', $.keyword))),
     // `suite "name"` and `test "name"`, maybe `.skip` or `.only`, `parallel`
     // before the name and `timeout` after it, start a case of the test DSL, a
@@ -134,7 +136,7 @@ module.exports = grammar({
 
     _identifier: _ => /[a-z_][A-Za-z0-9_]*/,
     identifier: $ => choice(
-      $._identifier, 'loop', 'defer', 'errdefer', 'while', 'suite', 'test', 'timeout', 'before_all', 'before_each', 'after_each', 'after_all',
+      $._identifier, 'loop', 'defer', 'errdefer', 'result', 'while', 'suite', 'test', 'timeout', 'before_all', 'before_each', 'after_each', 'after_all',
       'fixture', 'shared', 'concurrent', 'parallel',
     ),
     constructor: _ => /[A-Z][A-Za-z0-9_]*/,

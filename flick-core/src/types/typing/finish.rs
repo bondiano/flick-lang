@@ -4,6 +4,8 @@ use std::mem;
 
 use super::Typing;
 use crate::types::{Checker, Type};
+#[cfg(feature = "ide")]
+use crate::types::{Elem, regions, ty::Norm};
 
 impl Checker<'_> {
     #[cfg(feature = "ide")]
@@ -44,6 +46,41 @@ impl Checker<'_> {
             for (at, ty) in mem::take(&mut typing.pending_refined) {
                 let ty = self.named_skolems(&self.zonk(&ty));
                 typing.refined.insert(at, ty);
+            }
+            for (at, parts) in mem::take(&mut typing.pending_result_services) {
+                let mut combined = Norm::default();
+                for (actual, excluded, provides) in parts {
+                    let norm = self.store.normalize(&actual);
+                    for (label, ty) in norm.entries {
+                        if matches!(label, Elem::Live) || excluded.contains(&label) {
+                            continue;
+                        }
+                        if let Some(region) = &provides
+                            && label == *regions::scope()
+                            && ty.spine().1.first().is_some_and(|owner| {
+                                self.store.resolve(owner) == self.store.resolve(region)
+                            })
+                        {
+                            continue;
+                        }
+                        if combined.get(&label).is_none() {
+                            combined
+                                .entries
+                                .push((label, self.named_skolems(&self.zonk(&ty))));
+                        }
+                    }
+                    for tail in norm.tails {
+                        let tail = self.named_skolems(&self.zonk(&tail));
+                        if !matches!(tail, Type::Meta(_) | Type::Error)
+                            && !combined.tails.contains(&tail)
+                        {
+                            combined.tails.push(tail);
+                        }
+                    }
+                }
+                if !combined.entries.is_empty() || !combined.tails.is_empty() {
+                    typing.result_services.insert(at, combined.into_type());
+                }
             }
         }
         #[cfg(not(feature = "ide"))]

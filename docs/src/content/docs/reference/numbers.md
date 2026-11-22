@@ -101,11 +101,15 @@ results, defects and cleanup.
 | `< <= > >=` | both `Int`, `Float`, `BigInt` or `String`, or both of another type with `Ord` | `Bool` |
 | `== !=` | the same type | `Bool` |
 | `&& \|\|`, `not` | `Bool` | `Bool` |
+| `option orelse fallback` | `Option a` and `a` | `a` (evaluates `fallback` only on `None`) |
 | `x \|> f`, `f <\| x` | `f x` | the result of `f` |
 | `f >> g`, `g << f` | functions | the function that applies `f`, then `g` |
 
 `x |> f` evaluates `x` first, `f <| x` evaluates `f` first, as `f x` does;
-`f a <| x` is the call `f a x`. A composition is the closure `let f' = f;
+`f a <| x` is the call `f a x`. To pipe into another argument position, write
+an expression hole `_`: `x |> f a _ c` is `(fun h -> f a h c) x`, evaluating
+`x` first and then the capture body; `f a _ c <| x` applies the same capture to
+`x`. A composition is the closure `let f' = f;
 let g' = g; fun x -> g' (f' x)`: it evaluates its operands once, left to
 right, where it is written, and is typed as that closure. Its arrow has the
 rows of the calls it makes: two pure functions compose into a pure one, and
@@ -116,6 +120,27 @@ it is applied: `(f >> g) x` is `g (f x)`.
 `1.5 + 1n` and `"a" ++ 1` are `FLICK-T003`. An operand nothing else
 determines is `Int` (`String` for `++`). Ranges `a..b`, `a..<b` and `a..`
 count in `Int`.
+
+`left orelse right` is lazy `Option` fallback, equivalent to
+`match left with | Some value -> value | None -> right`. It evaluates `left`
+once and evaluates `right` at most once, only when `left` is `None`. If `left`
+fails with a typed error or defect, `right` does not run. It unwraps exactly
+one `Option` layer (`Some None orelse Some 1` is `None : Option Int`), never
+starts a cold `Eff` or `Lazy` value, and lets `right` fail into the enclosing
+error row (for example `opt orelse Fail.fail Missing`). Unlike
+`Option.with_default`, which evaluates its default argument eagerly before the
+call, `orelse` skips expensive or effectful fallbacks on `Some`.
+
+```flick
+fallback : Option String -> String
+let fallback host = host orelse "localhost"
+
+first_valid : Option Int -> Option Int -> Int
+let first_valid a b = a orelse b orelse 8080
+
+nested_layer : Option (Option Int) -> Option Int
+let nested_layer value = value orelse Some 1
+```
 
 ## Numeric classes
 

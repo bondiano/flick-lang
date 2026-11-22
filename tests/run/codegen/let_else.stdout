@@ -1,0 +1,24 @@
+Ok "ada:36" eq=true
+Err "missing name" eq=true
+Err "missing age" eq=true
+Err "missing name" eq=true
+(40, 110)
+(-1, 101)
+hi world!
+hi guest
+ok:new
+fb:use_opt
+ok:outer_init
+(7, 1012)
+(0, 112)
+7
+caught:init:fb=false
+fallback:fb=true
+scope:closed
+scope:fb
+scope:closed
+scope:ok:yes
+7
+-1
+42
+empty
