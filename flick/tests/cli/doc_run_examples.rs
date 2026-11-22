@@ -272,6 +272,7 @@ let answer = 42
 }
 
 #[test]
+#[ignore = "needs Node and pnpm install"]
 fn doc_runs_large_stdout_example_without_deadlocking() {
     let dir = project(
         "doc_run_large_stdout",

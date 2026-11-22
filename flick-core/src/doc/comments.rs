@@ -10,6 +10,7 @@ use crate::syntax::kind::SyntaxKind as K;
 /// One `///` line of a doc comment, with its byte range in the original source
 /// text (after `///` and optional single space, excluding line ending) and its
 /// starting byte offset inside [`DocComment::text`].
+#[cfg(feature = "native-project")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DocLine {
     pub source_start: u32,
@@ -19,12 +20,14 @@ pub struct DocLine {
 
 /// A `///` documentation comment with its cleaned Markdown text and a line
 /// table mapping byte offsets in `text` back to the original `.fl` source.
+#[cfg(feature = "native-project")]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DocComment {
     pub text: String,
     pub lines: Vec<DocLine>,
 }
 
+#[cfg(feature = "native-project")]
 impl DocComment {
     /// Maps a byte range `start..end` inside [`Self::text`] back to a byte
     /// range in the original source text.
@@ -62,6 +65,7 @@ impl DocComment {
     }
 }
 
+#[cfg(feature = "native-project")]
 fn build_doc_comment(pending: &[(u32, u32, &str)]) -> DocComment {
     let mut text = String::new();
     let mut lines = Vec::with_capacity(pending.len());
@@ -84,6 +88,7 @@ fn build_doc_comment(pending: &[(u32, u32, &str)]) -> DocComment {
 /// each constructor on a line of its own (`| Circle Float`), by name,
 /// with source line offsets for span remapping. A `let` takes the lines
 /// only right above it, as generated code writes it.
+#[cfg(feature = "native-project")]
 pub fn located_comments(text: &str) -> HashMap<String, DocComment> {
     let mut out = HashMap::new();
     let mut pending: Vec<(u32, u32, &str)> = Vec::new();
@@ -125,10 +130,27 @@ pub fn located_comments(text: &str) -> HashMap<String, DocComment> {
 /// each constructor on a line of its own (`| Circle Float`), by name. A
 /// `let` takes the lines only right above it, as generated code writes it.
 pub fn comments(text: &str) -> HashMap<String, String> {
-    located_comments(text)
-        .into_iter()
-        .map(|(name, comment)| (name, comment.text))
-        .collect()
+    let mut out = HashMap::new();
+    let mut pending: Vec<&str> = Vec::new();
+    let mut adjacent = false;
+    for line in text.lines() {
+        if let Some(doc) = line.trim_start().strip_prefix("///") {
+            pending.push(doc.strip_prefix(' ').unwrap_or(doc));
+            adjacent = true;
+            continue;
+        }
+        let name = declared(line).or_else(|| variant(line));
+        if !pending.is_empty()
+            && let Some(name) = name.or_else(|| adjacent.then(|| defined(line)).flatten())
+        {
+            out.entry(name).or_insert_with(|| pending.join("\n"));
+        }
+        adjacent = false;
+        if !line.trim().is_empty() {
+            pending.clear();
+        }
+    }
+    out
 }
 
 /// The value a top-level `let [rec] name …` defines.
@@ -143,6 +165,7 @@ fn defined(line: &str) -> Option<String> {
 
 /// The `///` documentation immediately before the module header, with source
 /// line offsets for span remapping.
+#[cfg(feature = "native-project")]
 pub fn located_module_comment(text: &str) -> Option<DocComment> {
     let mut pending: Vec<(u32, u32, &str)> = Vec::new();
     let mut offset = 0usize;
@@ -169,7 +192,18 @@ pub fn located_module_comment(text: &str) -> Option<DocComment> {
 
 /// The `///` documentation immediately before the module header.
 pub fn module_comment(text: &str) -> Option<String> {
-    located_module_comment(text).map(|comment| comment.text)
+    let mut pending = Vec::new();
+    for line in text.lines() {
+        if line.starts_with("module ") {
+            return (!pending.is_empty()).then(|| pending.join("\n"));
+        }
+        if let Some(doc) = line.strip_prefix("///") {
+            pending.push(doc.strip_prefix(' ').unwrap_or(doc));
+        } else if !line.trim().is_empty() {
+            pending.clear();
+        }
+    }
+    None
 }
 
 /// The constructor a line `| Name …` of a type declaration starts.
@@ -241,6 +275,7 @@ fn declared(line: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "native-project")]
     use crate::markdown;
 
     #[test]
@@ -257,6 +292,7 @@ mod tests {
         assert_eq!(docs.get("HashKey").map(String::as_str), Some("Contract."));
     }
 
+    #[cfg(feature = "native-project")]
     #[test]
     fn located_comments_map_markdown_and_hidden_lines_back_to_source() {
         let source = "\
@@ -313,5 +349,14 @@ module Lib.Api exposing (answer)
             &source[b_start as usize..b_end as usize],
             "let x : String = 1"
         );
+        assert_eq!(
+            module_comment(source).as_deref(),
+            Some(mod_doc.text.as_str())
+        );
+        let plain = comments(source);
+        assert_eq!(plain.len(), decl_docs.len());
+        for (name, doc) in &decl_docs {
+            assert_eq!(plain.get(name), Some(&doc.text), "{name}");
+        }
     }
 }

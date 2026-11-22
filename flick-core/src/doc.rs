@@ -8,10 +8,9 @@ mod comments;
 use std::collections::HashMap;
 use std::fmt::Write;
 
-pub use comments::{
-    DocComment, DocLine, comments, leading_doc, located_comments, located_module_comment,
-    module_comment,
-};
+#[cfg(feature = "native-project")]
+pub use comments::{DocComment, DocLine, located_comments, located_module_comment};
+pub use comments::{comments, leading_doc, module_comment};
 
 use crate::iface::{Decl, Export, Interface, Namespace};
 use crate::source::FileId;
