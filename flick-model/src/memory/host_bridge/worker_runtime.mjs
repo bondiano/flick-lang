@@ -301,6 +301,18 @@ export class ExecState {
     return id;
   }
 
+  retainExistingHandles(ids) {
+    const retained = [];
+    for (const id of ids) {
+      const entry = this.handles.get(id);
+      if (entry !== undefined) {
+        entry.refCount += 1;
+        retained.push(id);
+      }
+    }
+    return retained;
+  }
+
   releaseHandles(ids) {
     for (const id of ids) {
       const entry = this.handles.get(id);

@@ -48,6 +48,29 @@ wireCtx.makeCallback = makeCallback;
 wireCtx.makeTask = makeTask;
 wireCtx.makeCellProxy = makeCellProxy;
 
+function collectWireHandleIds(msg) {
+  const ids = [];
+  for (const w of msg.args ?? []) {
+    for (const node of w?.nodes ?? []) {
+      if (Array.isArray(node) && node[0] === "handle" && typeof node[1] === "number") {
+        ids.push(node[1]);
+      }
+    }
+  }
+  for (const entry of msg.services ?? []) {
+    if (entry[0] === "host_ctx" && typeof entry[1] === "number") {
+      ids.push(entry[1]);
+    } else if (entry[0] === "service") {
+      for (const node of entry[2]?.nodes ?? []) {
+        if (Array.isArray(node) && node[0] === "handle" && typeof node[1] === "number") {
+          ids.push(node[1]);
+        }
+      }
+    }
+  }
+  return ids;
+}
+
 function dispatchSyncNested(msg) {
   if (msg.op === "release_handles") {
     executions.get(msg.exec)?.releaseHandles(msg.ids);
@@ -63,11 +86,15 @@ function dispatchSyncNested(msg) {
     try {
       const resolved = resolveTargetSync(exec, spec);
       if (resolved.needsAsyncLoad || spec.mode === "Async") {
+        const pinned = exec.retainExistingHandles(collectWireHandleIds(msg));
         exec.pendingCalls.set(callId, { abort: () => {} });
         send({ type: "pending", call_id: callId });
         queueMicrotask(() => {
-          if (!exec.pendingCalls.has(callId) || exec.closing) return;
-          handleCall(msg, true).catch((err) => {
+          if (!exec.pendingCalls.has(callId) || exec.closing) {
+            exec.releaseHandles(pinned);
+            return;
+          }
+          handleCall(msg, true, pinned).catch((err) => {
             if (!exec.pendingCalls.delete(callId) || exec.closing) return;
             finishCallErr(exec, callId, err, spec.has_catch);
           });
@@ -366,16 +393,28 @@ async function handleMessage(line) {
   }
 }
 
+// Serialize async message dispatch in TCP arrival order so a subsequent
+// `release_handles` cannot outrun `await resolveTarget(...)` in `handleCall`.
+let messageQueue = Promise.resolve();
+
+function enqueueMessage(line) {
+  const next = messageQueue.then(() =>
+    handleMessage(line).catch((err) => {
+      send({
+        type: "fatal",
+        message: err instanceof Error ? err.stack ?? err.message : String(err),
+      });
+    }),
+  );
+  messageQueue = next;
+  return next;
+}
+
 workerState.dispatchSyncNested = dispatchSyncNested;
-workerState.handleMessage = handleMessage;
+workerState.handleMessage = enqueueMessage;
 
 ioWorker.on("message", (line) => {
-  handleMessage(line).catch((err) => {
-    send({
-      type: "fatal",
-      message: err instanceof Error ? err.stack ?? err.message : String(err),
-    });
-  });
+  enqueueMessage(line);
 });
 
 send({ type: "ready" });

@@ -13,7 +13,7 @@ use flick_core::diagnostics::Severity;
 use flick_core::project::{self, Compiled};
 use flick_core::source::SourceMap;
 use flick_model::memory::{
-    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Value,
+    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Reason, Value,
     execute_tests_program_with_bridge,
 };
 use flick_model::run::{compile, counted_main, counted_main_with_bridge, main_of};
@@ -65,7 +65,23 @@ fn run_bridged_fixture(bridge: &mut HostBridge, rel: &str) {
             ProgramOutcome::Failed(_) => "failed",
             ProgramOutcome::Fault(_) => "fault",
         };
-        let outcome_dbg = format!("{:?}", report.outcome);
+        let outcome_dbg = match &report.outcome {
+            ProgramOutcome::Failed(cause) => {
+                let parts: Vec<String> = heap
+                    .cause_reasons(cause)
+                    .expect("cause reasons")
+                    .map(|r| match r {
+                        Reason::Die(v) => {
+                            format!("Die({:?})", heap.defect(v).map(|d| d.code().clone()))
+                        }
+                        Reason::Fail(v) => format!("Fail({v:?})"),
+                        Reason::Interrupt { fiber_id } => format!("Interrupt({fiber_id:?})"),
+                    })
+                    .collect();
+                format!("Failed([{}])", parts.join(", "))
+            }
+            other => format!("{other:?}"),
+        };
         report
             .outcome
             .release(&mut heap)
@@ -269,6 +285,91 @@ fn stage5_examples_bridged_tests_and_conduit_zero_leaks() {
     client_roots.extend(fixture_files(&conduit.join("client/test"), "fl"));
     let client_mods = compile_project_roots(&conduit.join("client"), client_roots);
     assert_bridged_suite(&mut bridge, &client_mods, "Conduit.Client.PagesTest");
+}
+
+#[test]
+fn stage5_cell_proxy_survives_bridged_crossing_without_handle_race() {
+    let tmp = repo_path("target/tmp/stage5_cell_proxy_regression");
+    let _ = fs::remove_dir_all(&tmp);
+    fs::create_dir_all(&tmp).expect("create temp fixture dir");
+    let helper_js = tmp.join("helper.mjs");
+    let main_fl = tmp.join("Main.fl");
+    fs::write(
+        &helper_js,
+        r#"
+export function makeHandle(tag) {
+  return { tag };
+}
+
+export function updateCellWithHandle(cell, handle, next) {
+  if (typeof handle?.tag !== "string") {
+    throw new Error("missing sibling foreign handle");
+  }
+  cell.value = next;
+  return handle.tag;
+}
+"#,
+    )
+    .expect("write helper.mjs");
+    fs::write(
+        &main_fl,
+        r#"module App.Main exposing (main)
+
+type Token
+
+make_handle : String -> Token
+foreign pure make_handle from "./helper.mjs" "makeHandle"
+
+update_cell_with_handle : Ref (Option Int) -> Token -> Option Int ->{Async} String
+foreign effect update_cell_with_handle from "./helper.mjs" "updateCellWithHandle"
+  arity 3
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  let cell = Ref.make (Some 1)
+  let tag = update_cell_with_handle cell (make_handle "ok") (Some 2)
+  Platform.stdout_line (tag ++ ":" ++ show (Ref.get cell))
+"#,
+    )
+    .expect("write Main.fl");
+
+    let modules = compile(&main_fl).expect("compile regression fixture");
+    let main = main_of(&modules).expect("main");
+    let mut bridge = HostBridge::new().expect("spawn HostBridge");
+
+    for release in [false, true] {
+        let profile = if release { "release" } else { "debug" };
+        let counted = counted_main_with_bridge(&modules, &main, release)
+            .unwrap_or_else(|e| panic!("lower ({profile}): {e}"));
+        let mut heap = Heap::new();
+        let report = counted.execute_with_bridge(&mut heap, FUEL, HostMode::LiveOs, &mut bridge);
+        let outcome_dbg = match &report.outcome {
+            ProgramOutcome::Failed(cause) => {
+                let parts: Vec<String> = heap
+                    .cause_reasons(cause)
+                    .expect("cause reasons")
+                    .map(|r| match r {
+                        Reason::Die(v) => {
+                            format!("Die({:?})", heap.defect(v).map(|d| d.code().clone()))
+                        }
+                        Reason::Fail(v) => format!("Fail({v:?})"),
+                        Reason::Interrupt { fiber_id } => format!("Interrupt({fiber_id:?})"),
+                    })
+                    .collect();
+                format!("Failed([{}])", parts.join(", "))
+            }
+            other => format!("{other:?}"),
+        };
+        report.outcome.release(&mut heap).expect("release outcome");
+        let stats = heap.finish().expect("zero Rust heap leaks");
+        assert_eq!(stats.live_objects, 0, "live objects ({profile})");
+        assert_eq!(
+            report.stdout, "ok:Some 2\n",
+            "bridged CellProxy crossing failed ({profile}); outcome={outcome_dbg}"
+        );
+    }
+
+    let _ = fs::remove_dir_all(&tmp);
 }
 
 #[test]

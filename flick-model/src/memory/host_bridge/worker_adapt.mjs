@@ -354,15 +354,16 @@ export function prepareArgs(exec, spec, rawWireArgs, bridged, controller) {
   const trusted = isTrustedPackage(spec.from);
   const copies = !trusted && spec.adapter.copies ? spec.adapter.copies : null;
   const decodeCtx = bridged ? { ...wireCtx, bridged: true } : wireCtx;
+  // Decode every raw wire argument (and look up all foreign handles) before
+  // running any copy or Effect-TS crossing that could re-enter the bridge.
   const decoded = [];
   for (let i = 0; i < spec.dicts; i++) {
     decoded.push(decodeWire(rawWireArgs[i], exec, decodeCtx));
   }
-  const valueArgs = [];
+  const decodedValueArgs = [];
   for (let i = 0; i < spec.arity; i++) {
     const wire = rawWireArgs[spec.dicts + i];
     const cbArity = spec.adapter.callbacks[i];
-    const copyArg = copies?.args?.[i] === true;
     const cbCopies = copies?.callbacks?.[i];
     const argHint = spec.arg_hints?.[i] ?? "Any";
     const argShape = spec.adapter.shapes?.[i] ?? "Data";
@@ -405,7 +406,12 @@ export function prepareArgs(exec, spec, rawWireArgs, bridged, controller) {
     } else {
       val = decodeWire(wire, exec, decodeCtx);
     }
-
+    decodedValueArgs.push({ val, alreadyCrossed, argShape });
+  }
+  const valueArgs = [];
+  for (let i = 0; i < spec.arity; i++) {
+    const copyArg = copies?.args?.[i] === true;
+    let { val, alreadyCrossed, argShape } = decodedValueArgs[i];
     if (spec.adapter.optional.includes(i)) {
       if (bridged) {
         if (copyArg) val = runtime.copyData(val);
