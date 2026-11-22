@@ -301,6 +301,18 @@ export class ExecState {
     return id;
   }
 
+  pinExistingHandles(ids) {
+    const pinned = [];
+    for (const id of ids) {
+      const entry = this.handles.get(id);
+      if (entry !== undefined) {
+        entry.refCount += 1;
+        pinned.push(id);
+      }
+    }
+    return pinned;
+  }
+
   releaseHandles(ids) {
     for (const id of ids) {
       const entry = this.handles.get(id);
@@ -402,6 +414,30 @@ export function readSyncLine() {
       return Buffer.concat(chunks).toString("utf8");
     }
   }
+}
+
+export function collectMsgHandleIds(msg) {
+  const ids = [];
+  const scanWire = (wire) => {
+    for (const node of wire?.nodes ?? []) {
+      if (Array.isArray(node) && node[0] === "handle" && typeof node[1] === "number") {
+        ids.push(node[1]);
+      }
+    }
+  };
+  if (typeof msg.handle === "number") ids.push(msg.handle);
+  if (msg.arg) scanWire(msg.arg);
+  for (const w of msg.args ?? []) scanWire(w);
+  for (const entry of msg.services ?? []) {
+    if (Array.isArray(entry)) {
+      if (entry[0] === "host_ctx" && typeof entry[1] === "number") {
+        ids.push(entry[1]);
+      } else if (entry[0] === "service" && entry[2]) {
+        scanWire(entry[2]);
+      }
+    }
+  }
+  return ids;
 }
 
 export function isTrustedPackage(from) {

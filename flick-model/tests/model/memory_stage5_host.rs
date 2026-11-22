@@ -7,13 +7,13 @@
 //! - Fuel-prefix zero-leak sweeps on bridged HTTP and UI fixtures (zero Rust & zero host leaks).
 
 use std::path::{Path, PathBuf};
-use std::{fs, io};
+use std::{fs, io, process};
 
 use flick_core::diagnostics::Severity;
 use flick_core::project::{self, Compiled};
 use flick_core::source::SourceMap;
 use flick_model::memory::{
-    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Value,
+    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Reason, Value,
     execute_tests_program_with_bridge,
 };
 use flick_model::run::{compile, counted_main, counted_main_with_bridge, main_of};
@@ -41,6 +41,26 @@ fn repo_path(rel: &str) -> PathBuf {
         .join(rel)
 }
 
+fn describe_outcome(heap: &Heap, outcome: &ProgramOutcome) -> String {
+    match outcome {
+        ProgramOutcome::Failed(cause) => {
+            let parts: Vec<String> = heap
+                .cause_reasons(cause)
+                .expect("cause reasons")
+                .map(|r| match r {
+                    Reason::Die(v) => {
+                        format!("Die({:?})", heap.defect(v).map(|d| d.code().clone()))
+                    }
+                    Reason::Fail(v) => format!("Fail({v:?})"),
+                    Reason::Interrupt { fiber_id } => format!("Interrupt({fiber_id:?})"),
+                })
+                .collect();
+            format!("Failed([{}])", parts.join(", "))
+        }
+        other => format!("{other:?}"),
+    }
+}
+
 fn run_bridged_fixture(bridge: &mut HostBridge, rel: &str) {
     let path = repo_path(rel);
     let expected_stdout = fs::read_to_string(path.with_extension("stdout"))
@@ -65,7 +85,7 @@ fn run_bridged_fixture(bridge: &mut HostBridge, rel: &str) {
             ProgramOutcome::Failed(_) => "failed",
             ProgramOutcome::Fault(_) => "fault",
         };
-        let outcome_dbg = format!("{:?}", report.outcome);
+        let outcome_dbg = describe_outcome(&heap, &report.outcome);
         report
             .outcome
             .release(&mut heap)
@@ -297,5 +317,121 @@ fn stage5_host_fuel_prefix_sweeps_have_zero_leaks_on_both_heaps() {
             heap.finish()
                 .unwrap_or_else(|e| panic!("Rust heap leak at fuel={fuel} for {rel}: {e}"));
         }
+    }
+}
+
+#[test]
+fn stage5_cell_proxy_and_deferred_call_handle_pinning() {
+    let base = repo_path("target/tmp").join(format!("stage5-bridge-pin-{}", process::id()));
+    let _ = fs::remove_dir_all(&base);
+    fs::create_dir_all(&base).expect("create temp dir");
+    let _guard = TempDirCleanup(base.clone());
+
+    fs::write(
+        base.join("box.mjs"),
+        r"
+class Box {
+  constructor(n) { this.n = n; }
+}
+export function makeBox(n) { return new Box(n); }
+export function runCb(cb) { return cb(10); }
+",
+    )
+    .expect("write box.mjs");
+
+    fs::write(
+        base.join("cell_helper.mjs"),
+        r#"
+export function touchCellAndBox(cell, box) {
+  const prev = cell.value;
+  if (prev === undefined || prev._tag !== "Some" || typeof prev.value !== "number") {
+    throw new Error(`unexpected cell value: ${JSON.stringify(prev)}`);
+  }
+  cell.value = { _tag: "Some", value: prev.value + box.n };
+  return box.n;
+}
+"#,
+    )
+    .expect("write cell_helper.mjs");
+
+    fs::write(
+        base.join("async_helper.mjs"),
+        r"
+export async function readBoxAsync(box) {
+  await Promise.resolve();
+  return box.n * 2;
+}
+",
+    )
+    .expect("write async_helper.mjs");
+
+    let main_fl = base.join("Main.fl");
+    fs::write(
+        &main_fl,
+        r#"
+module App.Main exposing (main)
+
+type Box
+
+make_box : Int -> Box
+foreign pure make_box from "./box.mjs" "makeBox"
+
+run_cb : (Int ->{Async} Int)^c ->{Async} Int
+foreign effect run_cb from "./box.mjs" "runCb"
+  retention call
+
+touch_cell_and_box : Ref (Option Int) -> Box ->{} Int
+foreign effect touch_cell_and_box from "./cell_helper.mjs" "touchCellAndBox"
+  arity 2
+
+read_box_async : Box ->{Async} Int
+foreign read_box_async from "./async_helper.mjs" "readBoxAsync"
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  let cell = Ref.make (Some 41)
+  let first = touch_cell_and_box cell (make_box 1)
+  let second_call = touch_cell_and_box cell (make_box 3)
+  let updated = Ref.get cell
+  let deferred = run_cb (fun x -> read_box_async (make_box (x + 5)))
+  Platform.stdout_line
+    (show first ++ " " ++ show second_call ++ " " ++ show updated ++ " " ++ show deferred)
+"#,
+    )
+    .expect("write Main.fl");
+
+    let modules = compile(&main_fl).expect("compile Main.fl");
+    let main = main_of(&modules).expect("main");
+    let mut bridge = HostBridge::new().expect("spawn HostBridge");
+    for release in [false, true] {
+        let profile = if release { "release" } else { "debug" };
+        let counted = counted_main_with_bridge(&modules, &main, release)
+            .unwrap_or_else(|e| panic!("lower ({profile}): {e}"));
+        let mut heap = Heap::new();
+        let report = counted.execute_with_bridge(&mut heap, FUEL, HostMode::LiveOs, &mut bridge);
+        let outcome_dbg = describe_outcome(&heap, &report.outcome);
+        let returned_unit = matches!(report.outcome, ProgramOutcome::Returned(Value::Unit));
+        report
+            .outcome
+            .release(&mut heap)
+            .unwrap_or_else(|e| panic!("release ({profile}): {e}"));
+        let stats = heap
+            .finish()
+            .unwrap_or_else(|e| panic!("Rust heap leak ({profile}): {e}"));
+        assert_eq!(stats.live_objects, 0, "{profile} live objects");
+        assert!(
+            returned_unit,
+            "expected Returned(()) ({profile}), got {outcome_dbg}; stdout={:?}",
+            report.stdout
+        );
+        assert_eq!(report.stdout, "1 3 Some 45 30\n", "stdout ({profile})");
+    }
+}
+
+struct TempDirCleanup(PathBuf);
+
+impl Drop for TempDirCleanup {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
     }
 }

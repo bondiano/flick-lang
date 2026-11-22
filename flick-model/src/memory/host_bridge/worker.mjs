@@ -29,6 +29,8 @@ import {
   bridge,
   builtinModuleCache,
   causeMod,
+  collectMsgHandleIds,
+  effectSpecifier,
   executions,
   fiberMod,
   initialArgv1,
@@ -37,6 +39,7 @@ import {
   ioWorker,
   ownerMod,
   resetReactContexts,
+  routeMap,
   runtime,
   send,
   tagsMod,
@@ -63,11 +66,24 @@ function dispatchSyncNested(msg) {
     try {
       const resolved = resolveTargetSync(exec, spec);
       if (resolved.needsAsyncLoad || spec.mode === "Async") {
-        exec.pendingCalls.set(callId, { abort: () => {} });
+        let pinned = exec ? exec.pinExistingHandles(collectMsgHandleIds(msg)) : [];
+        const releasePinned = () => {
+          if (pinned.length > 0) {
+            const ids = pinned;
+            pinned = [];
+            exec?.releaseHandles(ids);
+          }
+        };
+        exec.pendingCalls.set(callId, { abort: releasePinned });
         send({ type: "pending", call_id: callId });
         queueMicrotask(() => {
-          if (!exec.pendingCalls.has(callId) || exec.closing) return;
-          handleCall(msg, true).catch((err) => {
+          if (!exec.pendingCalls.has(callId) || exec.closing) {
+            releasePinned();
+            return;
+          }
+          const handoff = pinned;
+          pinned = [];
+          handleCall(msg, true, handoff).catch((err) => {
             if (!exec.pendingCalls.delete(callId) || exec.closing) return;
             finishCallErr(exec, callId, err, spec.has_catch);
           });
@@ -75,8 +91,15 @@ function dispatchSyncNested(msg) {
         return;
       }
       const { target, bridged } = resolved;
-      const finalArgs = prepareArgs(exec, spec, msg.args, bridged, null);
-      const callCtx = buildCallCtx(exec, msg);
+      const pinned = exec ? exec.pinExistingHandles(collectMsgHandleIds(msg)) : [];
+      let finalArgs;
+      let callCtx;
+      try {
+        finalArgs = prepareArgs(exec, spec, msg.args, bridged, null);
+        callCtx = buildCallCtx(exec, msg);
+      } finally {
+        if (pinned.length > 0) exec?.releaseHandles(pinned);
+      }
       if (spec.mode === "Effect") {
         const made = fiberMod.inCtx(callCtx, () => invokeTarget(spec, target, finalArgs));
         const runOrVal = Effect.isEffect(made)
@@ -210,11 +233,16 @@ async function handleMessage(line) {
       }
       if (Array.isArray(msg.imports)) {
         for (const spec of msg.imports) {
-          if (!builtinModuleCache.has(spec)) {
-            try {
-              builtinModuleCache.set(spec, await import(spec));
-            } catch {
-              // Fall back to lazy resolution if specifier is non-standard.
+          const targets = spec.startsWith("flick:")
+            ? [routeMap.get(spec), effectSpecifier(spec)].filter(Boolean)
+            : [spec];
+          for (const targetSpec of targets) {
+            if (!builtinModuleCache.has(targetSpec)) {
+              try {
+                builtinModuleCache.set(targetSpec, await import(targetSpec));
+              } catch {
+                // Fall back to lazy resolution if specifier is non-standard.
+              }
             }
           }
         }
