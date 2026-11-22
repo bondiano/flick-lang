@@ -343,3 +343,53 @@ fn a_captured_variable_offers_a_ref_and_an_unsafe_fix_is_not_preferred() {
     assert_eq!(annotate["isPreferred"], false, "{annotate:?}");
     lsp.close();
 }
+
+/// Of two local functions with callbacks of one shape, the fix for the
+/// runtime function given to the one applied annotates that one's parameter.
+#[test]
+fn a_callback_fix_annotates_the_function_applied() {
+    let text = "module App.Main exposing (apply)\n\nservice Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\nlet apply () =\n  let call f x = f x\n  let apply_it h = h ()\n  call (fun x -> x) ()\n  apply_it say\n";
+    let dir = project(
+        "lsp_callback_applied",
+        &[("flick.toml", LIB), ("src/App/Main.fl", text)],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify("textDocument/didOpen", &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": text } }));
+    let reported = lsp.diagnostics(&uri(&file));
+    let t003 = reported
+        .iter()
+        .find(|d| d["code"] == "FLICK-T003")
+        .unwrap_or_else(|| panic!("{reported:?}"));
+    let actions = lsp.request(
+        "textDocument/codeAction",
+        &json!({ "textDocument": { "uri": uri(&file) }, "range": t003["range"], "context": { "diagnostics": [t003] } }),
+    );
+    let fix = (actions["result"].as_array().expect("actions").iter())
+        .find(|a| {
+            a["title"]
+                .as_str()
+                .is_some_and(|t| t.starts_with("annotate"))
+        })
+        .unwrap_or_else(|| panic!("{actions}"));
+    assert_eq!(
+        fix["title"], "annotate `h` with the runtime function it is given",
+        "{actions}"
+    );
+    let edit = &fix["edit"]["changes"][uri(&file)][0];
+    let (start, end) = (
+        offset(text, &edit["range"]["start"]),
+        offset(text, &edit["range"]["end"]),
+    );
+    let fixed = format!(
+        "{}{}{}",
+        &text[..start],
+        edit["newText"].as_str().expect("text"),
+        &text[end..]
+    );
+    assert!(
+        fixed.contains("\n  let call f x = f x\n  let apply_it (h : Unit ->{Log} Unit) = h ()\n"),
+        "{fixed}"
+    );
+    lsp.close();
+}

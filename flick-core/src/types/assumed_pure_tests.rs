@@ -113,6 +113,102 @@ fn a_callback_of_a_local_function_is_annotated() {
     );
 }
 
+const SAY: &str = "service Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\nlet apply () =\n";
+
+/// The `FLICK-T003` fix of `before` annotates `from` as `to` only. A `fun`
+/// annotated so leaves no errors; a parameter of a `let` header takes its
+/// type in a signature instead (`FLICK-T005`), so there the text is checked.
+fn assert_annotated_in(before: &str, from: &str, to: &str) {
+    let before = format!("{HEAD}{before}");
+    assert_eq!(before.matches(from).count(), 1, "{from}");
+    let after = before.replacen(from, to, 1);
+    assert_eq!(fixed(&before, "FLICK-T003").as_deref(), Some(&*after));
+    if to.starts_with("fun ") {
+        let errors: Vec<_> = (check(&after).into_iter())
+            .filter(|d| d.severity == Severity::Error)
+            .collect();
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+}
+
+/// As `assert_annotated_in`, for the body of `apply`.
+fn assert_annotated(body: &str, from: &str, to: &str) {
+    assert_annotated_in(&format!("{SAY}{body}"), from, to);
+}
+
+/// The note and the fix are at the parameter of the function applied, not
+/// at a local before it whose arrow has the same shape.
+#[test]
+fn a_callback_is_annotated_at_the_function_applied() {
+    // a local function with a callback of its own
+    assert_annotated(
+        "  let call f x = f x\n  let apply_it h = h ()\n  call (fun x -> x) ()\n  apply_it say\n",
+        "apply_it h =",
+        "apply_it (h : Unit ->{Log} Unit) =",
+    );
+    // two of the same shape, the second applied, also through a pipe
+    for applied in ["run_it say", "say |> run_it"] {
+        assert_annotated(
+            &format!(
+                "  let apply_it h = h ()\n  let run_it g = g ()\n  apply_it (fun () -> ())\n  {applied}\n"
+            ),
+            "run_it g =",
+            "run_it (g : Unit ->{Log} Unit) =",
+        );
+    }
+    let first = "  let first k = k ()\n  first (fun () -> ())\n";
+    assert_annotated(
+        &format!("{first}  let run = fun h -> h ()\n  run say\n"),
+        "fun h ->",
+        "fun (h : Unit ->{Log} Unit) ->",
+    );
+    // the callback as the second parameter
+    assert_annotated(
+        &format!("{first}  let both x h = h x\n  both () say\n"),
+        "both x h =",
+        "both x (h : Unit ->{Log} Unit) =",
+    );
+}
+
+/// An arrow taking a record is matched as a whole, not by its fields.
+#[test]
+fn a_callback_taking_a_record_is_annotated_at_the_function_applied() {
+    let text = SAY.replace(
+        "apply : ",
+        "log_record : { a : Int } ->{Log} Unit\nlet log_record r = Log.info (show r.a)\n\napply : ",
+    );
+    let body = "  let first k = k { a = 2 }\n  first (fun _ -> ())\n  let with_record h = h { a = 1 }\n  with_record log_record\n";
+    assert_annotated_in(
+        &format!("{text}{body}"),
+        "with_record h =",
+        "with_record (h : { a : Int } ->{Log} Unit) =",
+    );
+}
+
+/// Applied through a function that is not a local, the arrow taken for a
+/// callback is still found when it is the one expected; a local whose
+/// arrow is generic since is not.
+#[test]
+fn a_callback_applied_through_another_function_is_annotated() {
+    let unrelated = "  let unrelated h = h ()\n  unrelated (fun () -> ())\n";
+    assert_annotated(
+        &format!("{unrelated}  List.each_effect (fun k -> k ()) [say]\n"),
+        "fun k ->",
+        "fun (k : Unit ->{Log} Unit) ->",
+    );
+    // `List.map` takes a pure function, so only the text of its fix is checked
+    let mapped = format!("{HEAD}{SAY}{unrelated}  ignore (List.map (fun k -> k ()) [say])\n");
+    assert_eq!(
+        fixed(&mapped, "FLICK-T003"),
+        Some(mapped.replace("fun k ->", "fun (k : Unit ->{Log} Unit) ->"))
+    );
+    assert_annotated(
+        &format!("{unrelated}  (fun k -> k ()) say\n"),
+        "fun k ->",
+        "fun (k : Unit ->{Log} Unit) ->",
+    );
+}
+
 /// Repro for #707: a callback needing a service from another module such as
 /// `Host.Console` spells it the way this module can name it in both the
 /// T003 message and the inserted annotation, so applying the fix leaves no

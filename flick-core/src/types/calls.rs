@@ -252,11 +252,13 @@ impl Checker<'_> {
                             .contains(&super::ty::Stage::Runtime);
                     let outer = defer.then(|| self.cx.regions.defaults.replace(Vec::new()));
                     // a runtime call for a parameter marked `~` is passed unstarted
-                    let argument = if eff && marked.contains(&i) && self.runs_now(arg) {
-                        self.suspended_arg(arg, &param)
-                    } else {
-                        self.check_value(arg, &param)
-                    };
+                    let argument = self.meeting_parameter(head, i, &param, |c| {
+                        if eff && marked.contains(&i) && c.runs_now(arg) {
+                            c.suspended_arg(arg, &param)
+                        } else {
+                            c.check_value(arg, &param)
+                        }
+                    });
                     if let Some(outer) = outer {
                         let mine = mem::replace(&mut self.cx.regions.defaults, outer);
                         defaults.extend(mine.unwrap_or_default());

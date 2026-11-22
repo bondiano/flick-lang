@@ -565,6 +565,12 @@ struct ItemCx {
     /// Locals applied before their type was known, each with the pure arrow
     /// taken for it, its name and where it is bound.
     assumed_pure: Vec<(Type, String, u32)>,
+    /// Where the parameters of each local function without a signature are
+    /// bound, by where the function is bound; `None` for a pattern.
+    local_params: HashMap<u32, Vec<Option<u32>>>,
+    /// The argument being checked meets this parameter: where it is bound
+    /// and its type.
+    parameter: Option<(u32, Type)>,
     /// The operand of an `await` being typed is a name: a `let lazy` may be
     /// read there.
     awaiting: bool,
