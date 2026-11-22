@@ -78,11 +78,12 @@ pub(super) fn generate(
             .map(|i| i.role)
     };
     let release = request.target.profile == Profile::Release;
+    let primitives = release.then(|| optimize::primitives(request, data, &lang));
     let own: Vec<Module> = (data.program.modules.iter())
         .filter(|m| role(m) == Some(ModuleRole::Own))
         .map(|m| {
-            if release {
-                optimize::module(request, data, m, &lang)
+            if let Some(prims) = primitives.as_ref() {
+                optimize::module(request, data, m, &lang, prims)
             } else {
                 m.clone()
             }

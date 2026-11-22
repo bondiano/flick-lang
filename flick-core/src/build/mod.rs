@@ -15,6 +15,8 @@ pub mod go;
 mod interfaces;
 mod javascript;
 mod paths;
+#[cfg(test)]
+mod shadowed_tests;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod target_preflight;
 
@@ -37,11 +39,12 @@ use std::path::{Path, PathBuf};
 
 use paths::specifier;
 
-use crate::codegen::{EffectBridge, Labels};
+use crate::codegen::{EffectBridge, Known, Labels};
 use crate::project::Compiled;
 use crate::project::config::{BackendEnvironment, MAIN_ENTRY};
 use crate::source::FileId;
 use crate::{ir, opt, types};
+use flick_backend_support::opt::eval::{PrimitiveEval, ReviewedPrimitives};
 
 pub use crate::codegen::BUILTIN_DIR;
 
@@ -191,6 +194,26 @@ pub fn js_ships(path: &str) -> bool {
 /// The IR of `module` of the build `modules` as a release build optimizes
 /// it, for every target alike; `by_class` is the mode the build is checked in.
 pub fn optimized(modules: &[Compiled], module: &Compiled, by_class: bool) -> ir::Module {
+    let table = ir::lang_items();
+    let known = Known::of(&table);
+    let is_builtin = |owner: &str| !modules.iter().any(|m| m.name == owner);
+    let primitives = ReviewedPrimitives::for_js(
+        builtin_modules_of(by_class),
+        &is_builtin,
+        &known,
+        by_class,
+        EffectBridge::Absent,
+        &|_, _| None,
+    );
+    optimized_with_primitives(modules, module, by_class, &primitives)
+}
+
+pub(super) fn optimized_with_primitives(
+    modules: &[Compiled],
+    module: &Compiled,
+    by_class: bool,
+    primitives: &dyn PrimitiveEval,
+) -> ir::Module {
     let mut ir = module.ir.clone();
     let exported = |name: &str| {
         module.interface.exports_value(name)
@@ -203,7 +226,7 @@ pub fn optimized(modules: &[Compiled], module: &Compiled, by_class: bool) -> ir:
     };
     let generics = |m: &str, name: &str| generic_of(modules, m, name, by_class);
     let arity = |m: &str, name: &str| arity_of(modules, m, name, by_class);
-    opt::optimize(&mut ir, &exported, &generics, &arity);
+    opt::optimize_with_primitives(&mut ir, &exported, &generics, &arity, primitives);
     ir
 }
 

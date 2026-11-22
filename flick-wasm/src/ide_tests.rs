@@ -379,3 +379,94 @@ let deep = depth 500
     let dbg_js = dbg["js"].as_str().expect("debug js");
     assert!(dbg_js.contains("price(10)"), "{dbg_js}");
 }
+
+#[test]
+fn release_evaluator_folds_reviewed_native_primitives_in_browser_build() {
+    let source = "\
+module Main exposing (len_earth, len_lone, lone_slice, parsed, dyn_len)
+
+len_earth : Int
+let len_earth = String.length \"a\\u{1F30D}b\"
+
+len_lone : Int
+let len_lone = String.length (String.slice 1 2 \"a\\u{1F30D}b\")
+
+lone_slice : String
+let lone_slice = String.slice 1 2 \"a\\u{1F30D}b\"
+
+parsed : Option Int
+let parsed = Int.parse \"\\u{FEFF}36\\u{00A0}\"
+
+dyn_len : String -> Int
+let dyn_len s = String.length s
+";
+    let mut session = Session::new();
+    let diagnostics = json(&session.update(source));
+    assert_eq!(diagnostics, Value::Array(Vec::new()));
+
+    let rel = json(&session.emit("release"));
+    let js = rel["js"].as_str().expect("release js");
+    assert!(js.contains("export const len_earth = 4;"), "{js}");
+    assert!(js.contains("export const len_lone = 1;"), "{js}");
+    assert!(
+        js.contains("export const parsed = /*#__PURE__*/ $rt.some(36);")
+            || js.contains("export const parsed = /*#__PURE__*/ Option.some(36);"),
+        "{js}"
+    );
+    let lone_line = js
+        .lines()
+        .find(|l| l.starts_with("export const lone_slice ="))
+        .expect("lone_slice");
+    assert!(
+        lone_line.contains("slice") && !lone_line.contains('\u{FFFD}'),
+        "{lone_line}"
+    );
+    assert!(
+        js.contains("export const dyn_len = (s) => $m_String.length(s);"),
+        "{js}"
+    );
+
+    let dbg = json(&session.emit("debug"));
+    let dbg_js = dbg["js"].as_str().expect("debug js");
+    assert!(dbg_js.contains("String.length(\"a🌍b\")"), "{dbg_js}");
+    assert!(dbg_js.contains("Int.parse("), "{dbg_js}");
+}
+
+#[test]
+fn release_evaluator_declines_user_foreign_homonym_in_browser_build() {
+    let source = "\
+module Main exposing (parse, own_parsed, builtin_parsed)
+
+parse : String -> Option Int
+foreign pure parse from \"flick:rt\" \"intParse\"
+
+own_parsed : Option Int
+let own_parsed = parse \"36\"
+
+builtin_parsed : Option Int
+let builtin_parsed = Int.parse \"36\"
+";
+    let mut session = Session::new();
+    let diagnostics = json(&session.update(source));
+    assert_eq!(diagnostics, Value::Array(Vec::new()));
+
+    let rel = json(&session.emit("release"));
+    let js = rel["js"].as_str().expect("release js");
+    let own_line = js
+        .lines()
+        .find(|l| l.starts_with("export const own_parsed ="))
+        .expect("own_parsed export");
+    assert!(
+        own_line.contains("$f_parse(\"36\")") || own_line.contains("parse(\"36\")"),
+        "user foreign pure homonym must stay a call: {own_line}\n{js}"
+    );
+    assert!(
+        !own_line.contains("some(36)"),
+        "user foreign pure homonym must never fold to Some(36): {own_line}"
+    );
+    assert!(
+        js.contains("export const builtin_parsed = /*#__PURE__*/ $rt.some(36);")
+            || js.contains("export const builtin_parsed = /*#__PURE__*/ Option.some(36);"),
+        "{js}"
+    );
+}

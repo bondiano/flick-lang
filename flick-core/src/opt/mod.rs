@@ -17,6 +17,22 @@ pub fn optimize(
     generics: Generics,
     arity: Arity,
 ) {
+    optimize_with_primitives(
+        module,
+        exported,
+        generics,
+        arity,
+        &portable::eval::NoPrimitives,
+    );
+}
+
+pub fn optimize_with_primitives(
+    module: &mut Module,
+    exported: &dyn Fn(&str) -> bool,
+    generics: Generics,
+    arity: Arity,
+    primitives: &dyn portable::eval::PrimitiveEval,
+) {
     let table = ir::lang_items();
     let known = Known::of(&table);
     let builtin = |module: &str| {
@@ -24,8 +40,11 @@ pub fn optimize(
             .iter()
             .any(|(name, _)| *name == module)
     };
+    let config = portable::eval::EvalConfig::default();
     tuple_match::fold_tuple_matches(module);
-    portable::optimize(module, exported, generics, arity, &known, &builtin);
+    let _ = portable::optimize_with_eval(
+        module, exported, generics, arity, &known, &builtin, &config, primitives,
+    );
 }
 
 pub fn simplify(expr: &mut Expr) {
@@ -36,6 +55,8 @@ pub fn simplify(expr: &mut Expr) {
 
 #[cfg(test)]
 mod compose_tests;
+#[cfg(test)]
+mod eval_primitives_tests;
 #[cfg(test)]
 mod eval_tests;
 #[cfg(test)]

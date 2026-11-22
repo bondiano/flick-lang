@@ -55,12 +55,15 @@ pub(super) fn generate(
         .filter(|e| selected(request, &e.symbol.module))
         .filter_map(|e| e.runner.clone())
         .collect();
+    let primitives = (request.target.profile == Profile::Release)
+        .then(|| optimize::primitives(request, data, &lang));
     for module in &data.program.modules {
         if !own(&module.name) || !selected(request, &module.name) {
             continue;
         }
-        let optimized = (request.target.profile == Profile::Release)
-            .then(|| optimize::module(request, data, module, &lang));
+        let optimized = primitives
+            .as_ref()
+            .map(|prims| optimize::module(request, data, module, &lang, prims));
         let module = optimized.as_ref().unwrap_or(module);
         for (physical, output) in codegen::js_parts(module, &options, &layout) {
             pending.extend(output.imports.iter().cloned());
@@ -84,6 +87,26 @@ pub(super) fn generate(
     if data.declarations {
         pending = builtins.iter().map(|m| (*m).to_owned()).collect();
     }
+    emit_builtins(data, &builtins, &options, &mut pending, &mut artifacts)?;
+    artifacts.push(package_json(request, data.typescript));
+    let steps = schema_aot_steps(request, data, &options, &artifacts)?;
+    let launches = launch::generate(request, data, &options, &mut artifacts)?;
+    Ok(BuildResult {
+        artifacts,
+        steps,
+        runtime_dependencies: request.runtime_dependencies.clone(),
+        launches,
+        diagnostics: vec![],
+    })
+}
+
+fn emit_builtins(
+    data: &Data,
+    builtins: &[&str],
+    options: &Options<'_>,
+    pending: &mut Vec<String>,
+    artifacts: &mut Vec<Artifact>,
+) -> Result<(), Vec<Diagnostic>> {
     let mut written = HashSet::new();
     while let Some(name) = pending.pop() {
         if !builtins.contains(&name.as_str()) || !written.insert(name.clone()) {
@@ -95,7 +118,7 @@ pub(super) fn generate(
             .iter()
             .find(|m| m.name == name)
             .ok_or_else(|| failure("missing builtin IR"))?;
-        let output = codegen::js(module, &options);
+        let output = codegen::js(module, options);
         pending.extend(output.imports);
         artifacts.push(artifact(
             options.path(&name),
@@ -103,16 +126,7 @@ pub(super) fn generate(
             output.code,
         ));
     }
-    artifacts.push(package_json(request, data.typescript));
-    let steps = schema_aot_steps(request, data, &options, &artifacts)?;
-    let launches = launch::generate(request, data, &options, &mut artifacts)?;
-    Ok(BuildResult {
-        artifacts,
-        steps,
-        runtime_dependencies: request.runtime_dependencies.clone(),
-        launches,
-        diagnostics: vec![],
-    })
+    Ok(())
 }
 
 fn schema_aot_steps(

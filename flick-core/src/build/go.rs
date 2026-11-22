@@ -7,7 +7,7 @@ use std::env;
 use std::path::Path;
 use std::sync::OnceLock;
 
-use super::{Artifact, Settings, builtin_modules, optimized, specifier};
+use super::{Artifact, Settings, builtin_modules, optimized_with_primitives, specifier};
 use crate::codegen::Known;
 pub use crate::codegen::go::go_mod;
 use crate::codegen::go::{self, Bindings, GO_SUM, Input, PACKAGES, Package, RUNTIME, Unsupported};
@@ -16,6 +16,7 @@ use crate::ir::{self, ItemKind};
 use crate::project::{Compilation, normalize};
 use crate::source::{SourceFile, SourceMap};
 use crate::types;
+use flick_backend_support::opt::eval::ReviewedPrimitives;
 
 /// The name of the Go module and executable that runs a project's tests.
 pub const TEST: &str = "test";
@@ -66,23 +67,36 @@ pub fn emit(
         return (Vec::new(), diagnostics);
     }
     let modules = &compilation.modules;
+    let lang = ir::lang_items();
+    let known = Known::of(&lang);
+    let go_bindings = bindings();
+    let is_builtin = |owner: &str| !modules.iter().any(|m| m.name == owner);
+    let primitives = settings.release.then(|| {
+        ReviewedPrimitives::build(
+            builtin_modules(),
+            &is_builtin,
+            &known,
+            &|module, foreign, prim| go_bindings.allows_primitive(module, foreign, prim),
+        )
+    });
     // the same optimization as the JS target's, so constant folding agrees
     let optimized: Vec<ir::Module> = modules
         .iter()
         .map(|module| {
-            if settings.release {
-                optimized(modules, module, false)
+            if let Some(prims) = primitives.as_ref() {
+                optimized_with_primitives(modules, module, false, prims)
             } else {
                 module.ir.clone()
             }
         })
         .collect();
     let own: Vec<&ir::Module> = optimized.iter().collect();
-    let builtins: Vec<&ir::Module> = builtin_modules().iter().collect();
+    let builtins: Vec<&ir::Module> = builtin_modules()
+        .iter()
+        .filter(|m| is_builtin(&m.name))
+        .collect();
     let foreign = foreign_files(compilation, settings, read);
     let lines: Vec<&[u32]> = sources.files().map(SourceFile::line_starts).collect();
-    let lang = ir::lang_items();
-    let known = Known::of(&lang);
     let mut out = Vec::new();
     for (name, entry) in programs {
         let dir = module_dir(name);
