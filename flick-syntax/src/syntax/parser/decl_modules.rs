@@ -232,3 +232,69 @@ fn expose_item(p: &mut Parser) {
     }
     p.complete(m, K::ExposeItem);
 }
+
+/// `type module Name =` followed by required declarations. `type T = U`
+/// in this body is a manifest type equality, unlike an ordinary ADT.
+fn module_type_decl(p: &mut Parser) {
+    let m = p.start();
+    p.bump();
+    p.bump();
+    if p.expect(K::Con) && p.expect(K::Eq) {
+        if matches!(p.current(), K::Con | K::LParen) {
+            module_signature(p);
+        } else {
+            p.body(K::Members, module_type_member);
+        }
+    }
+    p.complete(m, K::ModuleTypeDecl);
+}
+
+fn module_type_member(p: &mut Parser) {
+    match p.current() {
+        K::ModuleKw => {
+            let m = p.start();
+            p.bump();
+            if p.expect(K::Con) && p.expect(K::Colon) {
+                module_signature(p);
+            }
+            p.complete(m, K::ModuleMember);
+        }
+        K::TypeKw => {
+            let m = p.start();
+            p.bump();
+            if p.expect(K::Con) {
+                type_params(p);
+                if p.eat(K::Eq) {
+                    types::type_(p);
+                }
+            }
+            p.complete(m, K::ModuleTypeMember);
+        }
+        K::InstanceKw => {
+            let m = p.start();
+            p.bump();
+            types::union(p);
+            if p.expect(K::FromKw) {
+                p.expect(K::Ident);
+            }
+            p.complete(m, K::ModuleInstanceReq);
+        }
+        K::Ident if p.nth(1) == K::Colon => signature(p),
+        K::ClassKw | K::ServiceKw
+            if p.nth(1) == K::Con && p.nth(2) == K::Eq && p.nth(3) == K::Con =>
+        {
+            let m = p.start();
+            p.bump();
+            p.bump();
+            p.bump();
+            module_path(p);
+            p.complete(m, K::ModuleNominalMember);
+        }
+        K::ClassKw => class_decl(p),
+        K::ServiceKw => service_decl(p),
+        _ => {
+            p.error_expected("a module requirement: `type`, a value signature, `class`, `service`, or `instance ... from name`");
+            p.recover();
+        }
+    }
+}

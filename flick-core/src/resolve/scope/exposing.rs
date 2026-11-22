@@ -80,6 +80,7 @@ impl Scope<'_> {
             definition: None,
             blocked: def.blocked.clone(),
             at: Some([def.span.start, def.span.end]),
+            via: Vec::new(),
         }
     }
 
@@ -125,7 +126,8 @@ impl Scope<'_> {
                 }
             }
             Found::Imported(export, interface) => {
-                exports.push(export.clone());
+                let via = interface.map(|i| i.module.as_str());
+                exports.push(reexported(export, via));
                 // a re-exported type keeps its companions, `T$parse`, `T$check`
                 // and the rest, so `M.T.parse` works through the re-exporter
                 if namespace == Namespace::Type {
@@ -137,7 +139,7 @@ impl Scope<'_> {
                                     && e.entity.namespace == Namespace::Value
                                     && e.entity.name.starts_with(&prefix)
                             })
-                            .cloned(),
+                            .map(|e| reexported(e, via)),
                     );
                 }
                 if members {
@@ -145,7 +147,7 @@ impl Scope<'_> {
                         interface
                             .into_iter()
                             .flat_map(|i| i.members(&item.name))
-                            .cloned(),
+                            .map(|e| reexported(e, via)),
                     );
                 }
             }
@@ -163,4 +165,18 @@ impl Scope<'_> {
             ))),
         }
     }
+}
+
+/// Clones `export` for re-export, recording the immediate source module `via`
+/// when it differs from `export.entity.module` (so multi-hop re-export facades
+/// stay visible to environment preflight).
+fn reexported(export: &Export, via: Option<&str>) -> Export {
+    let mut out = export.clone();
+    if let Some(module) = via
+        && module != out.entity.module
+        && !out.via.iter().any(|existing| existing == module)
+    {
+        out.via.push(module.to_owned());
+    }
+    out
 }

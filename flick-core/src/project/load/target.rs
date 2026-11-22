@@ -1,152 +1,77 @@
-//! What a program built for go cannot use: built-in modules that exist on
-//! the js target only, `deriving Form`, and package modules no build
-//! compiled for go. Selected environments also check reachable effects.
+//! Target runtime mode and reachable-use environment preflight.
 
-#[cfg(feature = "native-project")]
-use super::Loader;
 use super::Project;
 #[cfg(not(target_arch = "wasm32"))]
 use super::{Compilation, SourceMap};
-#[cfg(any(feature = "native-project", not(target_arch = "wasm32")))]
-use crate::diagnostics::Diagnostic;
 #[cfg(not(target_arch = "wasm32"))]
-use crate::diagnostics::Severity;
-#[cfg(feature = "native-project")]
-use crate::diagnostics::codes;
+use crate::diagnostics::{Diagnostic, Severity};
 #[cfg(not(target_arch = "wasm32"))]
-use crate::project::target_preflight;
-
-#[cfg(feature = "native-project")]
-use crate::source::{FileId, Span};
-#[cfg(feature = "native-project")]
-use crate::syntax::cst::{Element, Node};
-#[cfg(feature = "native-project")]
-use crate::syntax::kind::SyntaxKind as K;
-
-/// The built-in modules of the js target only: the browser UI, its forms
-/// and its reactivity, the telemetry client, JS interop and the
-/// JS hosts.
-#[cfg(feature = "native-project")]
-const JS_ONLY: &[&str] = &[
-    "Action",
-    "Atom",
-    "DevTools",
-    "Form",
-    "Js",
-    "Otlp",
-    "Reactivity.AsyncResult",
-    "Reactivity.Atom",
-    "Runner.Browser",
-    "Runner.Cloudflare",
-    "Runner.Node",
-    "Ui",
-];
-
-/// Whether the built-in module `name`, or a module under it, is js only.
-#[cfg(feature = "native-project")]
-pub(crate) fn js_only(name: &str) -> bool {
-    JS_ONLY.iter().any(|m| {
-        name.strip_prefix(m)
-            .is_some_and(|rest| rest.is_empty() || rest.starts_with('.'))
-    })
-}
-
-/// P030 for a module of the js target only, named at `at`.
-#[cfg(feature = "native-project")]
-pub(super) fn js_only_error(module: &str, at: Span) -> Diagnostic {
-    let message =
-        format!("`{module}` is available on the js target only, and this project targets go");
-    Diagnostic::error(codes::P030, message, at).with_fix(|| {
-        (
-            "remove the import, or build the project with `[build] target = \"js\"`".to_owned(),
-            Vec::new(),
-        )
-    })
-}
-
-/// P030 for each `Form` of a `deriving` clause under `node`: a form is
-/// built on `Form`, though the module need not import it.
-#[cfg(feature = "native-project")]
-fn derived_forms(node: &Node, text: &str, file: FileId, found: &mut Vec<Diagnostic>) {
-    for child in &node.children {
-        match child {
-            Element::Node(n) => derived_forms(n, text, file, found),
-            Element::Token(t)
-                if node.kind == K::DerivingClause && t.kind == K::Con && t.text(text) == "Form" =>
-            {
-                found.push(js_only_error("Form", Span::new(file, t.start, t.end)));
-            }
-            Element::Token(_) => {}
-        }
-    }
-}
-
-#[cfg(feature = "native-project")]
-impl Loader<'_> {
-    /// P030 for each import of a program built for go that the go target
-    /// does not have, and each `deriving Form`.
-    pub(super) fn check_targets(&mut self) {
-        if self.project.is_none_or(|p| !p.config.is_go()) {
-            return;
-        }
-        let mut found = Vec::new();
-        for m in &self.modules {
-            derived_forms(
-                &m.parse.tree,
-                &self.sources.get(m.file).text,
-                m.file,
-                &mut found,
-            );
-            for import in &m.syntax.imports {
-                let name = import.module.as_str();
-                if self.by_name.contains_key(name) {
-                    continue;
-                }
-                let builtin = self.builtins().iter().any(|i| i.module == name);
-                if builtin && js_only(name) {
-                    found.push(js_only_error(name, import.span));
-                }
-            }
-        }
-        self.diagnostics.extend(found);
-    }
-}
-
-/// Check the selected environment against the complete compiled program.
+use crate::project::environment::{ResolvedEnvironment, TargetOverride};
 #[cfg(not(target_arch = "wasm32"))]
+use crate::project::target_preflight::{self, CheckOptions, RunnerRef};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::source::Span;
+
+/// Check the resolved environment against the complete compiled program.
+#[cfg(not(target_arch = "wasm32"))]
+#[allow(clippy::too_many_arguments)]
 pub(super) fn check_environment(
     compilation: &Compilation,
     project: Option<&Project>,
+    target_override: Option<&TargetOverride>,
+    by_class: bool,
+    environment: &ResolvedEnvironment,
     sources: &SourceMap,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    if let Some(environment) = project.and_then(|p| p.config.build.environment.as_ref())
-        && !compilation.modules.is_empty()
-        && !diagnostics.iter().any(|d| d.severity == Severity::Error)
-    {
-        let entries: Vec<(String, String)> = project
-            .map(|p| {
-                p.config
-                    .entries
-                    .iter()
-                    .map(|e| (e.name.clone(), e.module.clone()))
-                    .collect()
-            })
-            .unwrap_or_default();
-        let runners: Vec<(String, String)> = project
-            .iter()
-            .flat_map(|p| &p.config.entries)
-            .filter_map(|e| Some((e.name.clone(), e.runner.as_ref()?.0.clone())))
-            .collect();
-        target_preflight::check(
-            compilation,
-            &entries,
-            &runners,
-            sources,
-            environment,
-            diagnostics,
-        );
+    if compilation.modules.is_empty() || diagnostics.iter().any(|d| d.severity == Severity::Error) {
+        return;
     }
+    let entries: Vec<(String, String, Option<Span>)> = project
+        .map(|p| {
+            p.config
+                .entries
+                .iter()
+                .map(|e| (e.name.clone(), e.module.clone(), Some(e.span)))
+                .collect()
+        })
+        .unwrap_or_default();
+    let runners: Vec<RunnerRef> = project
+        .iter()
+        .flat_map(|p| &p.config.entries)
+        .filter_map(|e| {
+            if let Some((runner, span)) = &e.runner {
+                Some(RunnerRef {
+                    entry: e.name.clone(),
+                    module: runner.clone(),
+                    span: Some(*span),
+                })
+            } else if e.client {
+                Some(RunnerRef {
+                    entry: e.name.clone(),
+                    module: "Runner.Browser".to_owned(),
+                    span: Some(e.span),
+                })
+            } else {
+                None
+            }
+        })
+        .collect();
+    let for_tests = target_override.is_some_and(|o| o.for_tests);
+    let test_paths = target_override.map_or(&[][..], |o| o.test_paths.as_slice());
+    target_preflight::check(
+        compilation,
+        &CheckOptions {
+            entries: &entries,
+            runners: &runners,
+            by_class,
+            for_tests,
+            test_paths,
+        },
+        sources,
+        environment,
+        diagnostics,
+    );
 }
 
 /// Whether a run over `project` checks with the stages of a class derived

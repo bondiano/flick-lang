@@ -17,6 +17,13 @@ pub use syntax::{
 };
 #[cfg(feature = "ide")]
 pub(crate) use unused::item_removal;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use uses::Reference as SyntaxReference;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn syntax_references(module: &Module) -> Vec<SyntaxReference> {
+    uses::references(module).0
+}
 
 /// A top-level name a module declares, signatures included.
 #[derive(Debug, Clone)]
@@ -129,6 +136,11 @@ pub fn resolve(
     let scope = scope::Scope::new(module, &defs, imported, &mut diagnostics);
     let mut interface = scope.exports(&mut diagnostics);
     interface.private = module.syntax.header.as_ref().is_some_and(|h| h.private);
+    interface.when = module
+        .syntax
+        .header
+        .as_ref()
+        .and_then(|h| h.when.as_ref().map(|(cond, _)| cond.clone()));
     let mut docs = doc::comments(module.text);
     // `extend` inserts one by one, as other maps of names do, where `collect`
     // would compile a sort and a bulk build of its own

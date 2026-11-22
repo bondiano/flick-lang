@@ -21,6 +21,7 @@ mod ide;
 mod imports;
 mod lexical;
 mod loader;
+mod output;
 mod plugins;
 // the plugin of a module is its package's, which needs packages
 #[cfg(all(test, feature = "native-project"))]
@@ -38,14 +39,16 @@ pub use entry::{MainKind, host_services, main_kind};
 pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]
 pub use ide::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};
+#[cfg(feature = "native-project")]
+pub use output::ships;
+pub use output::{Compilation, Compiled};
 pub use precompiled::{CachedModule, Fresh, PackageCache};
-#[cfg(all(test, feature = "native-project"))]
-pub(crate) use target::js_only;
 pub use target::stages_by_class;
 
+use super::environment::{self, TargetOverride};
 #[cfg(feature = "native-project")]
 use super::packages::{Packages, project_name};
-use super::{Host, Project, companion_of, module_path, normalize};
+use super::{Host, Project, module_path, normalize};
 use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
 use crate::iface::{
     BindingOrigin, CalleeOrigin, ExpansionFrame, LexicalScope, StaticArgument, StaticBinding,
@@ -172,101 +175,7 @@ struct Loader<'a> {
 /// A module's IR and what the reference model reads of it.
 type Lowered = (ir::Module, Arc<Interface>, Vec<ir::Proven>);
 
-/// The module `m` of the build, lowered.
-fn compiled(m: &Loaded, (ir, declarations, _): Lowered, interface: Interface) -> Compiled {
-    Compiled {
-        name: m.name.clone(),
-        path: m.path.clone(),
-        file: m.file,
-        test: m.root == Root::Test || companion_of(&m.name).is_some(),
-        package: match &m.root {
-            Root::Package(name) => Some(name.clone()),
-            _ => None,
-        },
-        imports: m
-            .syntax
-            .imports
-            .iter()
-            .chain(&m.syntax.inline_imports)
-            .filter(|i| !i.module.starts_with("$scope:"))
-            .map(|i| i.module.clone())
-            .chain(
-                m.virtual_of
-                    .iter()
-                    .flat_map(|v| v.capture.scopes.iter().map(|s| s.module.clone())),
-            )
-            .collect(),
-        ir,
-        declarations,
-        interface,
-        expansion: m.expansion.clone(),
-    }
-}
-
-/// The modules of a build: the project's and those of its libraries.
-#[derive(Default)]
-pub struct Compilation {
-    pub modules: Vec<Compiled>,
-    /// The libraries of `[dependencies]`, each with its source directory.
-    pub libraries: Vec<(String, PathBuf)>,
-    /// What the closure asks of backends' ecosystems.
-    #[cfg(feature = "native-project")]
-    pub target_dependencies: Vec<super::target::Wanted>,
-}
-
-/// A module that checked cleanly, lowered to the IR.
-pub struct Compiled {
-    pub name: String,
-    pub path: PathBuf,
-    pub file: FileId,
-    /// Whether it is in the test root.
-    pub test: bool,
-    /// The source package it belongs to; `None` for the project's own.
-    pub package: Option<String>,
-    /// The modules it imports.
-    pub imports: Vec<String>,
-    pub ir: ir::Module,
-    /// Every top-level entity with its type, for the reference model.
-    pub declarations: Arc<Interface>,
-    pub interface: Interface,
-    /// The module with its plugin blocks expanded, when it has any.
-    pub expansion: Option<Arc<Expansion>>,
-}
-
-impl Compilation {
-    /// The library of `[dependencies]` that `module` belongs to, with its
-    /// source directory.
-    pub fn library_of(&self, module: &str) -> Option<(&str, &Path)> {
-        let module = self.modules.iter().find(|m| m.name == module)?;
-        let package = module.package.as_deref()?;
-        (self.libraries.iter())
-            .find(|(name, _)| name == package)
-            .map(|(name, dir)| (name.as_str(), dir.as_path()))
-    }
-
-    /// The file of the foreign module `spec` when the build ships it beside
-    /// `module`: an `.mjs` or `.cjs` of a library or the declarations of
-    /// one, inside its source directory, which a tarball or a fetched copy
-    /// of the library has. Any other relative file stays where it is, and
-    /// the output refers to it.
-    pub fn shipped_foreign(&self, module: &str, spec: &str) -> Option<PathBuf> {
-        if !spec.starts_with("./") && !spec.starts_with("../") {
-            return None;
-        }
-        let (_, dir) = self.library_of(module).filter(|_| ships(spec))?;
-        let source = self.modules.iter().find(|m| m.name == module)?;
-        let path = normalize(&source.path.parent()?.join(spec));
-        path.starts_with(dir).then_some(path)
-    }
-}
-
-/// Whether a build ships the file `path` of a library into its output: a
-/// foreign module, or the TypeScript declarations of one.
-pub fn ships(path: &str) -> bool {
-    [".mjs", ".cjs", ".d.mts", ".d.cts", ".d.ts"]
-        .iter()
-        .any(|end| path.ends_with(end))
-}
+use output::compiled;
 
 /// Checks `roots` (absolute `.fl` paths) and their transitive imports.
 pub fn check(
@@ -322,8 +231,34 @@ pub fn compile_with(
     rt: Option<bool>,
     cache: Option<&mut ModuleCache>,
 ) -> (Vec<Diagnostic>, Compilation, Vec<Fresh>) {
+    let target = rt.map(|rt| TargetOverride {
+        rt: Some(rt),
+        ..TargetOverride::default()
+    });
+    compile_for(
+        host,
+        sources,
+        project,
+        roots,
+        packages,
+        target.as_ref(),
+        cache,
+    )
+}
+
+/// [`compile_with`], parameterized by a target/option override (from CLI
+/// `--target`, resolved backend options, loaded descriptor tags, or test mode).
+pub fn compile_for(
+    host: &dyn Host,
+    sources: &mut SourceMap,
+    project: Option<&Project>,
+    roots: &[PathBuf],
+    packages: Option<&PackageCache>,
+    target: Option<&TargetOverride>,
+    cache: Option<&mut ModuleCache>,
+) -> (Vec<Diagnostic>, Compilation, Vec<Fresh>) {
     let mode = Mode::Compile;
-    let output = run_in(host, sources, project, roots, mode, cache, packages, rt);
+    let output = run_in(host, sources, project, roots, mode, cache, packages, target);
     (output.diagnostics, output.compilation, output.fresh)
 }
 
@@ -348,10 +283,10 @@ fn run_in(
     mode: Mode,
     cache: Option<&mut ModuleCache>,
     saved: Option<&PackageCache>,
-    rt: Option<bool>,
+    target_override: Option<&TargetOverride>,
 ) -> Output {
+    let rt = target_override.and_then(|o| o.rt);
     let stages_by_class = stages_by_class(project, rt);
-    #[cfg(feature = "native-project")]
     let mut diagnostics = Vec::new();
     #[cfg(feature = "native-project")]
     let packages = project.map_or_else(Packages::default, |p| {
@@ -366,6 +301,16 @@ fn run_in(
         diagnostics.extend(host.verify(project, &target_dependencies));
     }
     #[cfg(feature = "native-project")]
+    let package_when: BTreeMap<String, String> = packages
+        .package_when()
+        .map(|(name, cond, _)| (name.to_owned(), cond.to_owned()))
+        .collect();
+    #[cfg(not(feature = "native-project"))]
+    let package_when = BTreeMap::new();
+    let own_package_when = project
+        .and_then(|p| p.config.package.as_ref())
+        .and_then(|p| Some((p.name.clone(), p.when.as_ref()?.0.clone())));
+    #[cfg(feature = "native-project")]
     let libraries: Vec<(String, PathBuf)> = packages
         .libraries()
         .map(|(name, dir, _)| (name.to_owned(), dir.to_path_buf()))
@@ -378,11 +323,27 @@ fn run_in(
         .map(|(p, saved)| Precompiled::new(&packages, p, saved, stages_by_class))
         .unwrap_or_default();
     #[cfg(not(feature = "native-project"))]
-    let (diagnostics, precompiled) = (Vec::new(), Precompiled::default());
+    let precompiled = Precompiled::default();
+    #[cfg(not(target_arch = "wasm32"))]
+    let environment_preflight = project.is_some_and(|p| p.config.has_selected_target())
+        || target_override.is_some_and(|o| o.target.is_some() || !o.options.is_empty());
+    #[cfg(target_arch = "wasm32")]
+    let environment_preflight = false;
+    let env_ctx = environment::resolve(
+        host,
+        project,
+        #[cfg(feature = "native-project")]
+        &packages,
+        #[cfg(feature = "native-project")]
+        &target_dependencies,
+        target_override,
+        environment_preflight,
+        sources,
+        &mut diagnostics,
+    );
     // a check lowers the modules of source packages only to save them;
-    // a selected environment also needs IR for target preflight
-    let lower_packages_only = mode == Mode::Check && saved.is_some();
-    let environment_preflight = project.is_some_and(|p| p.config.build.environment.is_some());
+    // a selected target or environment also needs IR for reachable-use preflight
+    let lower_packages_only = mode == Mode::Check && saved.is_some() && !environment_preflight;
     let mut loader = Loader {
         expression_serial: 0,
         expressions_active: BTreeSet::new(),
@@ -398,7 +359,7 @@ fn run_in(
         diagnostics,
         lowered: (mode != Mode::Check || lower_packages_only || environment_preflight)
             .then(Vec::new),
-        lower_packages_only: lower_packages_only && !environment_preflight,
+        lower_packages_only,
         precompiled,
         #[cfg(feature = "ide")]
         ide: (mode == Mode::Analyze).then(Vec::new),
@@ -428,9 +389,25 @@ fn run_in(
         // modules no longer loaded are dropped
         cache.retain_loaded(&loader.modules);
     }
+    // Validate `@when` tag names on every loaded and cached module against the vocabulary.
+    for m in &loader.modules {
+        if let Some((cond, span)) = m.syntax.header.as_ref().and_then(|h| h.when.as_ref()) {
+            let text = &loader.sources.get(span.file).text;
+            environment::validate_module_when(
+                cond,
+                Some(*span),
+                Some(text),
+                &env_ctx,
+                &mut loader.diagnostics,
+            );
+        }
+    }
+    for iface in loader.from_packages.values() {
+        if let Some(cond) = &iface.when {
+            environment::validate_module_when(cond, None, None, &env_ctx, &mut loader.diagnostics);
+        }
+    }
     loader.check_entry(&interfaces);
-    #[cfg(feature = "native-project")]
-    loader.check_targets();
     let failed = loader
         .diagnostics
         .iter()
@@ -466,7 +443,11 @@ fn run_in(
             .collect(),
         _ => Vec::new(),
     };
-    let fresh = loader.finish_packages(&mut compiled, mode, saved.is_some() && !failed);
+    let fresh = loader.finish_packages(
+        &mut compiled,
+        mode != Mode::Check || environment_preflight,
+        saved.is_some() && !failed,
+    );
     for c in &mut compiled {
         // the code of a module with a loaded test companion exports to it all
         // it declares; a build never loads a companion, nor makes this code
@@ -492,9 +473,22 @@ fn run_in(
         libraries,
         #[cfg(feature = "native-project")]
         target_dependencies,
+        package_when,
+        own_package_when,
+        environment: env_ctx.resolved,
     };
     #[cfg(not(target_arch = "wasm32"))]
-    target::check_environment(&compilation, project, sources, &mut diagnostics);
+    if let Some(resolved) = compilation.environment.as_ref() {
+        target::check_environment(
+            &compilation,
+            project,
+            target_override,
+            stages_by_class,
+            resolved,
+            sources,
+            &mut diagnostics,
+        );
+    }
     // by path, not by load order, which follows the order of imports
     diagnostics.sort_by_cached_key(|d| {
         (

@@ -1,5 +1,6 @@
 /// The boundary with JS values: copying foreign data into checked values,
 /// and functions handed to JS that run Flick tasks.
+@when "js"
 module Js exposing (..)
 
 type error SnapshotError = SnapshotError String

@@ -9,7 +9,7 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::patterns::{binders, is_part, is_pattern};
 
 #[derive(Debug)]
-pub(super) struct Reference {
+pub(crate) struct Reference {
     pub namespace: Namespace,
     /// `M` of `M.name`, `M.N` of `M.N.name`.
     pub qualifier: Option<String>,

@@ -9,6 +9,7 @@ use super::heads::{CHECKED_BY, INVARIANT_OF};
 use super::kind::SyntaxKind as K;
 use super::patterns::{is_part, is_pattern};
 use super::ts_mark;
+use super::when;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
 use crate::syntax::lang::Lang;
@@ -105,7 +106,20 @@ impl Validator<'_> {
                 .nodes()
                 .skip(index + 1)
                 .find(|n| n.kind != K::Attribute);
-            self.attribute(child, next);
+            let before_module_header = node.kind == K::SourceFile
+                && matches!(
+                    next.map(|n| n.kind),
+                    Some(K::ModuleHeader | K::ModuleApplyDecl)
+                )
+                && !node
+                    .nodes()
+                    .take(index)
+                    .any(|n| matches!(n.kind, K::ModuleHeader | K::ModuleApplyDecl));
+            let duplicate_when = node
+                .nodes()
+                .take(index)
+                .any(|n| n.kind == K::Attribute && when::is_when(n, self.src));
+            self.attribute(child, next, before_module_header, duplicate_when);
         }
         if child.kind == K::LetDecl {
             if child.has_token(K::ElseKw) {
@@ -220,10 +234,32 @@ impl Validator<'_> {
     /// form, `@stores` marks a foreign type whose values store functions
     /// (data with hidden storage), and `@implicit` a conversion instance.
     #[allow(clippy::too_many_lines)]
-    fn attribute(&mut self, node: &Node, before: Option<&Node>) {
+    fn attribute(
+        &mut self,
+        node: &Node,
+        before: Option<&Node>,
+        before_module_header: bool,
+        duplicate_when: bool,
+    ) {
         let next = before.map(|n| n.kind);
         let words: Vec<Token> = idents(node).collect();
         let message = match &words[..] {
+            [name, ..] if name.text(self.src) == "when" => {
+                if duplicate_when && before_module_header {
+                    "a module may have at most one `@when` attribute: combine conditions with `&&`"
+                        .to_owned()
+                } else {
+                    match when::read(node, self.src) {
+                        Some(Err(why)) => why,
+                        _ if before_module_header
+                            || (next.is_none() && self.allow_trailing_attribute) =>
+                        {
+                            return;
+                        }
+                        _ => "`@when` belongs before the module header".to_owned(),
+                    }
+                }
+            }
             [name, ..] if name.text(self.src) == "ts" => match ts_mark::read(node, self.src) {
                 Some(Err(why)) => why,
                 _ if matches!(next, Some(K::TypeDecl | K::ServiceDecl | K::Attribute))
@@ -332,7 +368,7 @@ impl Validator<'_> {
                 "`@derive` names at most the package of its plugin: `@derive std`".to_owned()
             }
             [name, ..] if name.text(self.src) != "lang" => format!(
-                "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync`, `@ts`, `@stores` and `@implicit`",
+                "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync`, `@ts`, `@stores`, `@implicit` and `@when`",
                 name.text(self.src)
             ),
             [_, item] if Lang::from_name(item.text(self.src)).is_some() => return,

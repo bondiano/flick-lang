@@ -109,6 +109,11 @@ pub(crate) fn check_file(
     };
     let mut diagnostics = checking.check(&modules[0], &builtin, &builtin).diagnostics;
     diagnostics.append(&mut derived);
+    super::environment::validate_standalone_when(
+        &modules[0].syntax,
+        sources.get(file),
+        &mut diagnostics,
+    );
     // a lone file has no package, so no private module of one is its own
     for import in &modules[0].syntax.imports {
         let private = |i: &Interface| i.module == import.module && i.private;
@@ -294,13 +299,11 @@ impl Loader<'_> {
                     .diagnostics
                     .iter()
                     .any(|d| d.severity == Severity::Error),
-            // an editor's run drops IR unless a selected environment needs it
-            // for target preflight; a check and a build keep it
+            // an editor's run drops IR unless a selected target/environment needs
+            // it for reachable-use preflight; a check and a build keep it
             #[cfg(feature = "ide")]
             cached_ir: if self.ide.is_some()
-                && self
-                    .project
-                    .is_none_or(|p| p.config.build.environment.is_none())
+                && self.project.is_none_or(|p| !p.config.has_selected_target())
             {
                 CachedIr::Dropped
             } else {

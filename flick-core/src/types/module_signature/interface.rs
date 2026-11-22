@@ -105,6 +105,7 @@ impl ModuleSignature {
                         scheme: None,
                         blocked: None,
                         at: None,
+                        via: Vec::new(),
                     });
                     continue;
                 }
@@ -159,6 +160,7 @@ impl ModuleSignature {
                             parent: Some(entity.name.clone()),
                             blocked: None,
                             at: None,
+                            via: Vec::new(),
                         });
                     }
                     interface.exports.push(Export {
@@ -176,6 +178,7 @@ impl ModuleSignature {
                         parent: None,
                         blocked: None,
                         at: None,
+                        via: Vec::new(),
                     });
                     continue;
                 }
@@ -203,6 +206,7 @@ impl ModuleSignature {
                 parent: None,
                 blocked: None,
                 at: None,
+                via: Vec::new(),
             });
         }
         rebase_kind_members(&mut interface, &requirements, path);

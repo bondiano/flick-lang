@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Compiled, Loader, Mode};
+use super::{Compiled, Loader};
 #[cfg(feature = "native-project")]
 use super::{Loaded, Root, Virtual, module_path};
 #[cfg(feature = "native-project")]
@@ -319,18 +319,18 @@ impl Loader<'_> {
     }
 
     /// What to save of the modules of source packages in `compiled`, when
-    /// `save`; a build also compiles the saved modules it used.
+    /// `save`; a build or environment preflight also compiles the saved modules it used.
     #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
     pub(super) fn finish_packages(
         &mut self,
         compiled: &mut Vec<Compiled>,
-        mode: Mode,
+        keep_saved_ir: bool,
         save: bool,
     ) -> Vec<Fresh> {
         // without a project of packages nothing is saved: the browser build
         // carries none of the serialization of the IR
         #[cfg(not(feature = "native-project"))]
-        let _ = (compiled, mode, save);
+        let _ = (compiled, keep_saved_ir, save);
         #[cfg(not(feature = "native-project"))]
         return Vec::new();
         #[cfg(feature = "native-project")]
@@ -347,13 +347,9 @@ impl Loader<'_> {
             } else {
                 Vec::new()
             };
-            // A selected environment checks reachable effects in package bodies,
-            // including bodies reused from an earlier source-package check.
-            if mode != Mode::Check
-                || self
-                    .project
-                    .is_some_and(|p| p.config.build.environment.is_some())
-            {
+            // A build or selected target/environment checks reachable uses in
+            // package bodies, including bodies reused from an earlier check.
+            if keep_saved_ir {
                 let saved = self.saved_compiled();
                 compiled.extend(saved);
             }

@@ -4,6 +4,7 @@
 /// the policy of its handler (`Action`, `Ui.Event`). Inside `ui { … }` the
 /// names of this module need no `Ui.`, and a `Component p` takes its props
 /// directly: `badge props` means `Ui.component badge props`.
+@when "js"
 module Ui exposing (.., SafeUrl, SanitizedHtml, safe_url, trusted_html)
 
 import Atom

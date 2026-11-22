@@ -15,15 +15,44 @@ use std::fmt::Write as _;
 
 #[cfg(feature = "wasm-backends")]
 use flick_backend::OptionValue;
-use flick_backend::{OptionDescriptor, Verb};
+use flick_backend::{Descriptor, OptionDescriptor, Verb};
 use flick_core::diagnostics::{Diagnostic, Severity, codes, suggest};
-use flick_core::project::Project;
 use flick_core::project::config::BackendPackage;
+use flick_core::project::{BackendAxis, BackendTags, Project};
 
 #[cfg(feature = "wasm-backends")]
-pub(crate) use cache::save_descriptor;
+pub(crate) use cache::{project_backend_tags, save_descriptor};
 pub(crate) use cli::{ParseOutcome, parse_cli};
 pub(crate) use resolve::resolve;
+
+#[cfg(not(feature = "wasm-backends"))]
+pub(crate) fn project_backend_tags(_project: &Project, _allow_load: bool) -> Vec<BackendTags> {
+    Vec::new()
+}
+
+/// Converts a backend component descriptor into the core environment metadata.
+pub(crate) fn descriptor_tags(descriptor: &Descriptor) -> BackendTags {
+    BackendTags {
+        id: descriptor.identity.id.clone(),
+        short: short_name(&descriptor.identity.id).to_owned(),
+        tags: descriptor.tags.clone(),
+        axes: descriptor
+            .axes
+            .iter()
+            .map(|a| BackendAxis {
+                name: a.name.clone(),
+                tags: a.tags.clone(),
+                default: a.default.clone(),
+                exclusive: a.exclusive,
+            })
+            .collect(),
+        environments: descriptor
+            .environments
+            .iter()
+            .map(|e| (e.backend.clone(), e.platform.clone()))
+            .collect(),
+    }
+}
 
 pub(crate) const OFFICIAL_JS: &str = "flick/js";
 pub(crate) const OFFICIAL_GO: &str = "flick/go";
@@ -103,13 +132,8 @@ fn project_default_target(project: Option<&Project>) -> Result<TargetChoice, Dia
     if let Some(target) = &project.config.build.target {
         return resolve_named_target(target, Some(project));
     }
-    if let Some(env) = &project.config.build.environment
-        && env.backend == "go"
-    {
-        return Ok(TargetChoice::Official {
-            id: OFFICIAL_GO,
-            short: "go",
-        });
+    if let Some(env) = &project.config.build.environment {
+        return resolve_named_target(&env.backend, Some(project));
     }
     Ok(TargetChoice::Official {
         id: OFFICIAL_JS,

@@ -9,8 +9,8 @@ mod templates;
 
 use flick_backend::{
     Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment, Inputs,
-    Mode, NamedRange, OptionDescriptor, Parameter, Profile, Severity, TargetSupport, ValueKind,
-    Verb, VersionRange, command,
+    Mode, NamedRange, OptionDescriptor, Parameter, Profile, Severity, TagAxis, TargetSupport,
+    ValueKind, Verb, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -59,6 +59,13 @@ impl Backend for Go {
             environments: vec![Environment {
                 backend: "go".into(),
                 platform: "native".into(),
+            }],
+            tags: vec!["go".into()],
+            axes: vec![TagAxis {
+                name: "cgo".into(),
+                tags: vec!["cgo".into()],
+                default: None,
+                exclusive: false,
             }],
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::WholeProgram],

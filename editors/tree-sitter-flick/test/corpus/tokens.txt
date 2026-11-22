@@ -372,6 +372,26 @@ type Fields (rd : ServiceRow)
     (constructor)))
 
 ==================
+Module environment condition
+==================
+
+@when "js && !browser"
+module App.Server exposing (start)
+
+---
+
+(source_file
+  (attribute)
+  (string)
+  (keyword)
+  (constructor)
+  (operator)
+  (constructor)
+  (keyword)
+  (parens
+    (identifier)))
+
+==================
 Plugins
 ==================
 

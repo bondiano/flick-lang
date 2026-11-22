@@ -325,6 +325,7 @@ fn canonical(e: &Export) -> Export {
     });
     Export {
         at: None,
+        via: Vec::new(),
         scheme,
         definition,
         ..e.clone()

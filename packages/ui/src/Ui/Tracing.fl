@@ -1,5 +1,6 @@
 /// Optional action spans on the Effect adapter. Disabled by default; a root
 /// captures this setting when mounted. Requires the optional Effect adapter.
+@when "js && (effect || effect-adapter)"
 module Ui.Tracing exposing (with_action_spans)
 
 with_action_spans : Bool -> (Eff r e a)^c ->{r; e} a

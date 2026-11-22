@@ -189,3 +189,22 @@ fn attribute_hover_explains_the_typescript_form_of_a_type() {
     assert!(markdown.contains("is in TypeScript"), "{markdown}");
     assert_eq!(range, (module, module + 7));
 }
+
+#[test]
+fn attribute_hover_explains_when_condition_on_module() {
+    let source = "@when \"js && !browser\"\nmodule App.Main exposing (..)\n\nlet x = 1\n";
+    let f = fixture_of(&[("src/App/Main.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.Main");
+    let (markdown, range) = ide.hover(file, 1).expect("@when");
+    assert!(
+        markdown.contains("```flick\n@when \"js && !browser\"\n```"),
+        "{markdown}"
+    );
+    assert!(markdown.contains("FLICK-P064"), "{markdown}");
+    assert_eq!(range, (0, 5));
+    let cond = u32::try_from(source.find("\"js").expect("cond")).expect("small");
+    let (markdown, range) = ide.hover(file, cond + 2).expect("cond");
+    assert!(markdown.contains("FLICK-P064"), "{markdown}");
+    assert_eq!(range, (cond, cond + 16));
+}

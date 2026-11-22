@@ -1,5 +1,6 @@
 /// Mutable JS arrays, behind runtime operations; a `List` is copied in and
 /// out.
+@when "js"
 module Js.Array exposing (Array, make, from_list, to_list, push, get, set, length)
 
 type Array a

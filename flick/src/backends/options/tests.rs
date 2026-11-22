@@ -8,7 +8,7 @@ use flick_backend::{
     VersionRange,
 };
 use flick_core::diagnostics::codes;
-use flick_core::project::{Project, config};
+use flick_core::project::{Project, config, official_backends};
 use flick_core::source::SourceMap;
 
 use super::scan::scan_argv;
@@ -38,6 +38,8 @@ fn js_descriptor() -> Descriptor {
             backend: "js".into(),
             platform: "node".into(),
         }],
+        tags: vec!["js".into()],
+        axes: vec![],
         profiles: vec![Profile::Debug, Profile::Release],
         modes: vec![Mode::WholeProgram, Mode::PerModule],
         capabilities: vec![],
@@ -246,4 +248,50 @@ fn unknown_target_fails_with_p059_and_suggests_closest() {
         resolve_target(Some("js"), Some(&project)).expect("cli overrides config");
     assert!(choice.is_official_js());
     assert!(overridden);
+
+    let bad_env = project_from(
+        "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\nenvironment = \"ruby/mri\"\n",
+    );
+    let err = resolve_target(None, Some(&bad_env)).expect_err("unknown env backend");
+    assert_eq!(err.code, codes::P059);
+}
+
+#[test]
+fn official_js_backend_descriptor_matches_core_official_backends() {
+    use flick_backend::Backend as _;
+    let desc = flick_backend_js::Javascript.describe();
+    assert!(flick_backend::validate_tags(&desc).is_ok());
+    let from_component = super::descriptor_tags(&desc);
+    let from_core = official_backends()
+        .into_iter()
+        .find(|b| b.id == "flick/js")
+        .expect("official js backend");
+    assert_eq!(from_component, from_core);
+}
+
+#[test]
+fn target_override_preserves_non_rt_stage_mode_for_go() {
+    use flick_core::project::stages_by_class;
+
+    use super::{OFFICIAL_GO, ResolvedOptions, TargetChoice};
+    use crate::backends::Selected;
+    use crate::commands::build::target_override;
+
+    let default_js_project =
+        project_from("schema-version = 1\n[project]\nkind = \"app\"\nentry = \"App\"\n");
+    let choice = TargetChoice::Official {
+        id: OFFICIAL_GO,
+        short: "go",
+    };
+    let ov = target_override(
+        &Selected::Native,
+        &choice,
+        true,
+        &ResolvedOptions::default(),
+        false,
+        false,
+        Vec::new(),
+    );
+    assert_eq!(ov.rt, Some(false));
+    assert!(!stages_by_class(Some(&default_js_project), ov.rt));
 }

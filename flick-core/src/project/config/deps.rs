@@ -1,17 +1,18 @@
 //! `[dependencies]`, `[package]` and `[plugins]` of `flick.toml`.
 //! `flick.toml`.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops;
 
 use serde::Deserialize;
 use toml::Spanned;
 
-use super::{Dependency, Grants, Package, Source};
+use super::{Dependency, Grants, HostConfig, Package, Source};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::iface;
 use crate::plugin::reach::{inside, net_endpoint};
 use crate::source::Span;
+use crate::syntax::when;
 
 /// A dependency as written: the keys of one of its sources.
 #[derive(Deserialize)]
@@ -38,6 +39,17 @@ pub(super) struct RawPackage {
     hooks: Vec<String>,
     #[serde(default)]
     watch: Vec<String>,
+    when: Option<Spanned<String>>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct RawHost {
+    name: Spanned<String>,
+    backend: Spanned<String>,
+    requires: Option<Spanned<String>>,
+    #[serde(default)]
+    tags: Vec<Spanned<String>>,
 }
 
 /// The dependencies of `[dependencies]`, each with one source.
@@ -95,7 +107,12 @@ fn is_sha256(text: &str) -> bool {
 }
 
 /// `[package]`, with a `flick` requirement that parses as one.
-pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Diagnostic> {
+pub(super) fn package(
+    raw: Spanned<RawPackage>,
+    at: Span,
+    text: &str,
+    span: &dyn Fn(ops::Range<usize>) -> Span,
+) -> Result<Package, Diagnostic> {
     let RawPackage {
         name,
         version,
@@ -104,6 +121,7 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
         load,
         hooks,
         watch,
+        when: raw_when,
     } = raw.into_inner();
     let error = |message: String| Diagnostic::error(codes::P032, message, at);
     semver::Version::parse(&version).map_err(|e| {
@@ -163,6 +181,22 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
             "`load = [\"{bad}\"]`: an extension is lowercase letters and digits, without the dot, and not `fl`"
         )));
     }
+    let when_cond = match raw_when {
+        Some(raw_when) => {
+            let literal = span(raw_when.span());
+            let cond = raw_when.into_inner();
+            if let Err(err) = when::parse(&cond) {
+                let place = when::subspan(text, literal, err.range);
+                return Err(Diagnostic::error(
+                    codes::P032,
+                    format!("invalid `[package] when` condition: {err}"),
+                    place,
+                ));
+            }
+            Some((cond, literal))
+        }
+        None => None,
+    };
     Ok(Package {
         name,
         version,
@@ -171,8 +205,99 @@ pub(super) fn package(raw: Spanned<RawPackage>, at: Span) -> Result<Package, Dia
         load,
         hooks,
         watch,
+        when: when_cond,
         span: at,
     })
+}
+
+/// `[host]`: a host environment package for a backend.
+pub(super) fn host(
+    raw: Spanned<RawHost>,
+    at: Span,
+    text: &str,
+    span: &dyn Fn(ops::Range<usize>) -> Span,
+) -> Result<HostConfig, Diagnostic> {
+    let RawHost {
+        name,
+        backend,
+        requires,
+        tags,
+    } = raw.into_inner();
+    let name_span = span(name.span());
+    let name = name.into_inner();
+    if !when::is_valid_tag(&name) {
+        return Err(Diagnostic::error(
+            codes::P032,
+            format!(
+                "`[host] name = \"{name}\"` is not a valid host name: names start with a lowercase letter and use lowercase letters, digits, `-`, or `_`"
+            ),
+            name_span,
+        ));
+    }
+    let backend_span = span(backend.span());
+    let backend = backend.into_inner();
+    if !is_backend_name(&backend) {
+        return Err(Diagnostic::error(
+            codes::P032,
+            format!(
+                "`[host] backend = \"{backend}\"` is not a valid backend name: use a short name like `js` or a backend id like `flick/js`"
+            ),
+            backend_span,
+        ));
+    }
+    let requires = match requires {
+        Some(raw_req) => {
+            let literal = span(raw_req.span());
+            let cond = raw_req.into_inner();
+            if let Err(err) = when::parse(&cond) {
+                let place = when::subspan(text, literal, err.range);
+                return Err(Diagnostic::error(
+                    codes::P032,
+                    format!("invalid `[host] requires` condition: {err}"),
+                    place,
+                ));
+            }
+            Some((cond, literal))
+        }
+        None => None,
+    };
+    let mut seen = BTreeSet::new();
+    let mut parsed_tags = Vec::with_capacity(tags.len());
+    for raw_tag in tags {
+        let tag_span = span(raw_tag.span());
+        let tag = raw_tag.into_inner();
+        if !when::is_valid_tag(&tag) {
+            return Err(Diagnostic::error(
+                codes::P032,
+                format!(
+                    "`[host] tags` contains invalid tag `{tag}`: tags start with a lowercase letter and use lowercase letters, digits, `-`, or `_`"
+                ),
+                tag_span,
+            ));
+        }
+        if !seen.insert(tag.clone()) {
+            return Err(Diagnostic::error(
+                codes::P032,
+                format!("`[host] tags` lists `{tag}` more than once"),
+                tag_span,
+            ));
+        }
+        parsed_tags.push((tag, tag_span));
+    }
+    Ok(HostConfig {
+        name,
+        backend,
+        requires,
+        tags: parsed_tags,
+        span: at,
+    })
+}
+
+fn is_backend_name(name: &str) -> bool {
+    match name.split_once('/') {
+        Some((scope, short)) => when::is_valid_tag(scope) && when::is_valid_tag(short),
+        None => when::is_valid_tag(name),
+    }
 }
 
 /// Whether `watched` names what a plugin is told of: a value of a module

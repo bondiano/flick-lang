@@ -8,7 +8,7 @@ use flick_core::build::{self, Extras};
 use flick_core::codegen::Labels;
 use flick_core::diagnostics::{Diagnostic, Severity};
 use flick_core::project::config::{Build, Kind, MAIN_ENTRY, Profile};
-use flick_core::project::{self, Compilation, Compiled, ModuleCache, Project};
+use flick_core::project::{self, Compilation, Compiled, ModuleCache, Project, TargetOverride};
 use flick_core::source::SourceMap;
 
 use super::check::select;
@@ -161,7 +161,12 @@ impl Command for BuildCommand {
             }
         };
         if self.options.inputs {
-            return super::inputs::describe(&host, sources, project.as_ref(), &roots);
+            return super::inputs::describe(
+                &FsHost::without_backends(),
+                sources,
+                project.as_ref(),
+                &roots,
+            );
         }
         let (backend, choice, target_overridden) =
             match Selected::load_target(&host, project.as_ref(), self.options.target.as_deref()) {
@@ -261,12 +266,21 @@ impl Command for BuildCommand {
         }
         progress.stage("Compiling Flick modules");
         let mut kept = self.modules.as_ref().map(|modules| modules.borrow_mut());
-        let (mut diagnostics, mut compilation) = package_cache::compile(
+        let target_override = target_override(
+            &backend,
+            &choice,
+            target_overridden,
+            &resolved,
+            plan.extras.rt,
+            false,
+            Vec::new(),
+        );
+        let (mut diagnostics, mut compilation) = package_cache::compile_for(
             &host,
             &mut sources,
             project.as_ref(),
             &roots,
-            Some(plan.extras.rt),
+            Some(&target_override),
             kept.as_deref_mut(),
         );
         if diagnostics.iter().any(|d| d.severity == Severity::Error) {
@@ -463,6 +477,29 @@ pub fn release(profile: Option<ProfileArgument>, config: Option<&Build>) -> bool
     match profile {
         Some(p) => p == ProfileArgument::Release,
         None => config.is_some_and(|b| b.profile == Profile::Release),
+    }
+}
+
+/// Builds a core `TargetOverride` from the selected backend and resolved options.
+pub(crate) fn target_override(
+    backend: &Selected,
+    choice: &TargetChoice,
+    target_overridden: bool,
+    resolved: &ResolvedOptions,
+    rt: bool,
+    for_tests: bool,
+    test_paths: Vec<PathBuf>,
+) -> TargetOverride {
+    TargetOverride {
+        target: Some(choice.short().to_owned()),
+        target_overridden,
+        backend: backend.descriptor().map(|d| options::descriptor_tags(&d)),
+        options: resolved.values.clone(),
+        rt: Some(rt),
+        ui: resolved.get("ui").map(str::to_owned),
+        effect_adapter: None,
+        for_tests,
+        test_paths,
     }
 }
 

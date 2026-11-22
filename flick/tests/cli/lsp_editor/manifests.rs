@@ -167,3 +167,110 @@ fn a_workspace_git_plugin_is_the_same_chain_for_the_editor_and_the_command_line(
         "{stderr}"
     );
 }
+
+#[test]
+fn when_conditions_report_the_same_p064_in_lsp_check_and_build() {
+    let config = "\
+schema-version = 1
+
+[project]
+kind = \"app\"
+entry = \"App.Main\"
+
+[build]
+environment = \"js/browser\"
+";
+    let server_only = "\
+@when \"js && !browser\"
+module App.ServerOnly exposing (secret)
+
+secret : String
+let secret = \"token\"
+";
+    let unused_mod = "\
+@when \"go\"
+module App.GoOnly exposing (native_val)
+
+native_val : Int
+let native_val = 1
+";
+    let main = "\
+module App.Main exposing (main)
+
+import App.GoOnly
+import App.ServerOnly
+
+helper : Unit -> String
+let helper () = App.ServerOnly.secret
+
+main : Unit -> Unit
+let main () =
+  let _ = helper ()
+  ()
+";
+    let dir = project(
+        "lsp_when_preflight",
+        &[
+            ("flick.toml", config),
+            ("src/App/ServerOnly.fl", server_only),
+            ("src/App/GoOnly.fl", unused_mod),
+            ("src/App/Main.fl", main),
+        ],
+    );
+    let file = dir.join("src/App/Main.fl");
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": { "uri": uri(&file), "languageId": "flick", "version": 1, "text": main } }),
+    );
+    let published = lsp.diagnostics(&uri(&file));
+    let lsp_hit = published
+        .iter()
+        .find(|d| d["code"] == "FLICK-P064")
+        .unwrap_or_else(|| panic!("expected FLICK-P064 in {published:?}"));
+    // Unused import App.GoOnly must not produce a diagnostic.
+    assert_eq!(
+        published
+            .iter()
+            .filter(|d| d["code"] == "FLICK-P064")
+            .count(),
+        1,
+        "{published:?}"
+    );
+    lsp.close();
+
+    let parse_p063 = |args: &[&str]| -> Value {
+        let out = flick_in(&dir, args);
+        assert_eq!(out.status.code(), Some(1), "{args:?}: {out:?}");
+        String::from_utf8_lossy(&out.stderr)
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .find(|d| d["code"] == "FLICK-P064")
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected FLICK-P064 in {}",
+                    String::from_utf8_lossy(&out.stderr)
+                )
+            })
+    };
+    let check_hit = parse_p063(&["check", "--diagnostics", "json"]);
+    let build_hit = parse_p063(&["build", "--offline", "--diagnostics", "json"]);
+    assert_eq!(check_hit["message"], lsp_hit["message"]);
+    assert_eq!(build_hit["message"], lsp_hit["message"]);
+    assert_eq!(check_hit["range"], build_hit["range"]);
+    let msg = check_hit["message"].as_str().expect("message");
+    assert!(
+        msg.contains("App.Main.main")
+            && msg.contains("App.Main.helper")
+            && msg.contains("App.ServerOnly.secret"),
+        "{msg}"
+    );
+    let start =
+        usize::try_from(check_hit["range"]["start"].as_u64().expect("start")).expect("start fits");
+    let end = usize::try_from(check_hit["range"]["end"].as_u64().expect("end")).expect("end fits");
+    assert_eq!(&main[start..end], "App.ServerOnly.secret");
+    assert_eq!(
+        lsp_hit["range"],
+        json!({ "start": position(main, start), "end": position(main, end) })
+    );
+}
