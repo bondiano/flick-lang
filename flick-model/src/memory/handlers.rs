@@ -424,6 +424,7 @@ impl Machine<'_, '_> {
                     owner: Some(self.current_owner),
                     next: TransferNext::ResumeRunning {
                         saved_failure: cause,
+                        propagate_exit: true,
                     },
                 });
             }
@@ -437,6 +438,7 @@ impl Machine<'_, '_> {
                         owner: Some(self.current_owner),
                         next: TransferNext::ResumeRunning {
                             saved_failure: cause,
+                            propagate_exit: true,
                         },
                     });
                 }

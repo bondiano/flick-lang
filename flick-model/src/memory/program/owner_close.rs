@@ -11,7 +11,8 @@ impl<'p> Machine<'p, '_> {
         state.exit_override.as_ref().or(match &state.outcome {
             ScopeOutcome::Failure(c) => Some(c),
             ScopeOutcome::ChildClose { inherited_exit, .. } => inherited_exit.as_ref(),
-            ScopeOutcome::Normal { .. } | ScopeOutcome::Discard(_) => None,
+            ScopeOutcome::Discard(discard) => Self::peek_discard_exit_cause(&discard.next),
+            ScopeOutcome::Normal { .. } => None,
         })
     }
 
@@ -144,8 +145,13 @@ impl<'p> Machine<'p, '_> {
                 self.close_child_owner_for_finalizer(child_owner, state)?;
                 Ok(None)
             }
-            Finalizer::ReleaseMemo { memo_id, layer_id } => {
-                if let Some(scope_owner) = self.release_memo_observer(memo_id, layer_id)
+            Finalizer::ReleaseMemo {
+                memo_id,
+                layer_id,
+                entry_owner,
+            } => {
+                if let Some(scope_owner) =
+                    self.release_memo_observer(memo_id, layer_id, entry_owner)
                     && !self.owners[scope_owner].is_closed()
                 {
                     self.close_child_owner_for_finalizer(scope_owner, state)?;
@@ -428,8 +434,18 @@ impl<'p> Machine<'p, '_> {
 
     fn take_saved_failure(next: &mut TransferNext<'p>) -> Option<CauseToken> {
         match next {
-            TransferNext::ResumeRunning { saved_failure } => saved_failure.take(),
+            TransferNext::ResumeRunning { saved_failure, .. } => saved_failure.take(),
             TransferNext::Chain(chained) => Self::take_saved_failure(&mut chained.next),
+            _ => None,
+        }
+    }
+
+    pub(super) fn peek_discard_exit_cause<'a>(next: &'a TransferNext<'p>) -> Option<&'a CauseToken> {
+        match next {
+            TransferNext::ResumeRunning {
+                saved_failure,
+                propagate_exit: true,
+            } => saved_failure.as_ref(),
             _ => None,
         }
     }

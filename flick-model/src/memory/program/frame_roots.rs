@@ -6,7 +6,7 @@ impl<'p> Machine<'p, '_> {
             TransferNext::DeliverValue { value, .. } => roots.push(value),
             TransferNext::LoopContinue { args, .. } => roots.extend(args),
             TransferNext::FinishGenerateStrict { items, .. } => roots.extend(items),
-            TransferNext::ResumeRunning { saved_failure } => {
+            TransferNext::ResumeRunning { saved_failure, .. } => {
                 if let Some(cause) = saved_failure {
                     roots.push(cause.into_value());
                 }
@@ -229,7 +229,10 @@ impl<'p> Machine<'p, '_> {
             if saved_failure.is_some() {
                 self.failure_elected = false;
             }
-            TransferNext::ResumeRunning { saved_failure }
+            TransferNext::ResumeRunning {
+                saved_failure,
+                propagate_exit: false,
+            }
         };
         self.discard = Some(Discard {
             frames,

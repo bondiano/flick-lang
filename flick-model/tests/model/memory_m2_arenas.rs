@@ -105,7 +105,7 @@ fn sweep_fuel_prefixes(tag: &str, counted: &CountedMain, expected_stdout: &str, 
 /// Then sweeps every fuel prefix `0..=dense_limit` (and exponentially to completion)
 /// while keeping an independent external caller root alive, asserting zero live
 /// arena-owned objects and zero leaks on every single prefix.
-fn assert_source_and_fuel_sweep(
+pub(crate) fn assert_source_and_fuel_sweep(
     tag: &str,
     source: &str,
     expected_stdout: &str,

@@ -49,6 +49,7 @@ enum Finalizer {
     ReleaseMemo {
         memo_id: usize,
         layer_id: ObjectId,
+        entry_owner: usize,
     },
 }
 

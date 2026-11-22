@@ -88,6 +88,7 @@ impl<'p> Machine<'p, '_> {
                 .memo_maps
                 .get_mut(&mid)
                 .and_then(|m| m.entries.get_mut(&lid))
+                .filter(|e| e.scope_owner == inner_owner)
             {
                 let old = mem::replace(&mut entry.state, MemoEntryState::Ready(cached));
                 if let MemoEntryState::Building { waiters } = old {
@@ -132,6 +133,7 @@ impl<'p> Machine<'p, '_> {
                 .memo_maps
                 .get_mut(&mid)
                 .and_then(|m| m.entries.get_mut(&lid))
+                .filter(|e| e.scope_owner == inner_owner)
             {
                 let old = mem::replace(&mut entry.state, MemoEntryState::Failed(cached));
                 if let MemoEntryState::Building { waiters } = old {
@@ -202,10 +204,12 @@ impl<'p> Machine<'p, '_> {
         self.restore_fiber_memo(prev_memo)?;
         self.heap.drop_values(roots)?;
         if let Some((mid, lid)) = memo_entry
-            && let Some(entry) = self
-                .memo_maps
-                .get_mut(&mid)
-                .and_then(|m| m.entries.remove(&lid))
+            && let Some(memo) = self.memo_maps.get_mut(&mid)
+            && memo
+                .entries
+                .get(&lid)
+                .is_some_and(|e| e.scope_owner == inner_owner)
+            && let Some(entry) = memo.entries.remove(&lid)
         {
             match entry.state {
                 MemoEntryState::Building { waiters } => {
@@ -301,9 +305,17 @@ impl<'p> Machine<'p, '_> {
         Ok(())
     }
 
-    fn release_memo_observer(&mut self, memo_id: usize, layer_id: ObjectId) -> Option<usize> {
+    fn release_memo_observer(
+        &mut self,
+        memo_id: usize,
+        layer_id: ObjectId,
+        entry_owner: usize,
+    ) -> Option<usize> {
         let memo = self.memo_maps.get_mut(&memo_id)?;
         let entry = memo.entries.get_mut(&layer_id)?;
+        if entry.scope_owner != entry_owner {
+            return None;
+        }
         entry.observers = entry.observers.saturating_sub(1);
         if entry.observers == 0 {
             let scope_owner = entry.scope_owner;
