@@ -241,3 +241,19 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Equiv.EverySim.has' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Equiv.EverySim.has
+
+/-- info: 'Flick.Equiv.o4' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o4
+
+/-- info: 'Flick.Equiv.o4_open' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.o4_open
+
+/-- info: 'Flick.Equiv.PSteps.det' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Equiv.PSteps.det
+
+/-- info: 'Flick.Typ.pure_eval' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Typ.pure_eval

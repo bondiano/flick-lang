@@ -111,4 +111,29 @@ impl Contributor for Wasm {
             commands::plan,
         )
     }
+
+    fn templates(&self) -> Result<Vec<command::TemplateDescriptor>, String> {
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.flick_command_command().call_templates(store)
+        });
+        result.map(commands::template_descriptors)
+    }
+
+    fn scaffold(
+        &self,
+        request: &command::TemplateRequest,
+    ) -> Result<command::Plan, Vec<command::Diagnostic>> {
+        let wire = commands::template_request(request);
+        let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+            plugin.flick_command_command().call_scaffold(store, &wire)
+        });
+        match result {
+            Ok(Ok(plan)) => Ok(commands::plan(plan)),
+            Ok(Err(diagnostics)) => Err(commands::diagnostics(diagnostics)),
+            Err(why) => Err(vec![command::Diagnostic::error(
+                "P013",
+                format!("scaffold {}: {why}", request.template),
+            )]),
+        }
+    }
 }

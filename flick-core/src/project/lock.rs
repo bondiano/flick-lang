@@ -22,6 +22,26 @@ pub struct Lock {
     pub plugins: Vec<LockedPlugin>,
     /// The official backend the project builds with when it pins none.
     pub backends: Vec<LockedBackend>,
+    /// Third-party templates used by `flick new --from` or `flick init --from`.
+    pub templates: Vec<LockedTemplate>,
+}
+
+/// A third-party template package pinned by `flick new --from` or `flick init --from`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LockedTemplate {
+    pub template: String,
+    pub package: String,
+    pub version: String,
+    /// `path+<rel>`, `url+<url>`, or `git+<url>?tag=<tag>[&subdir=<dir>]#<commit>`.
+    pub source: String,
+    /// `sha256:` and the tree hash (git/url) or component hash (path).
+    pub checksum: String,
+    /// `sha256:` and the digest of the loaded WebAssembly component.
+    pub component: String,
+    /// For `url` sources, `sha256:` and the verified tarball digest.
+    #[serde(default)]
+    pub archive: Option<String>,
 }
 
 /// An official backend component, a release asset kept in the package store
@@ -72,6 +92,8 @@ struct Raw {
     plugin: Vec<LockedPlugin>,
     #[serde(default)]
     backend: Vec<LockedBackend>,
+    #[serde(default)]
+    template: Vec<LockedTemplate>,
 }
 
 impl Locked {
@@ -122,6 +144,7 @@ impl Lock {
             packages: raw.package,
             plugins: raw.plugin,
             backends: raw.backend,
+            templates: raw.template,
         })
     }
 
@@ -166,6 +189,25 @@ impl Lock {
                 quote(&b.url)
             );
         }
+        let mut templates: Vec<&LockedTemplate> = self.templates.iter().collect();
+        templates.sort_by(|a, b| {
+            (&a.template, &a.package, &a.source).cmp(&(&b.template, &b.package, &b.source))
+        });
+        for t in templates {
+            let _ = write!(
+                out,
+                "\n[[template]]\ntemplate = {}\npackage = {}\nversion = {}\nsource = {}\nchecksum = {}\ncomponent = {}\n",
+                quote(&t.template),
+                quote(&t.package),
+                quote(&t.version),
+                quote(&t.source),
+                quote(&t.checksum),
+                quote(&t.component)
+            );
+            if let Some(archive) = &t.archive {
+                let _ = writeln!(out, "archive = {}", quote(archive));
+            }
+        }
         out
     }
 }
@@ -190,7 +232,7 @@ fn quote(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{Lock, Locked, LockedBackend, LockedPlugin};
+    use super::{Lock, Locked, LockedBackend, LockedPlugin, LockedTemplate};
     use crate::project::config::Source;
     use crate::source::SourceMap;
 
@@ -214,11 +256,35 @@ mod tests {
                 sha256: "2d".repeat(32),
                 url: "https://x/y/component.wasm".into(),
             }],
+            templates: vec![
+                LockedTemplate {
+                    template: "starter".into(),
+                    package: "acme/starter".into(),
+                    version: "1.0.0".into(),
+                    source: "url+https://x/y/starter.tgz".into(),
+                    checksum: format!("sha256:{}", "3c".repeat(32)),
+                    component: format!("sha256:{}", "4b".repeat(32)),
+                    archive: Some(format!("sha256:{}", "5a".repeat(32))),
+                },
+                LockedTemplate {
+                    template: "local".into(),
+                    package: "local-tpl".into(),
+                    version: "0.1.0".into(),
+                    source: "path+../tpl".into(),
+                    checksum: format!("sha256:{}", "69".repeat(32)),
+                    component: format!("sha256:{}", "69".repeat(32)),
+                    archive: None,
+                },
+            ],
         };
         let text = lock.render();
         let mut map = SourceMap::default();
         let file = map.add("flick.lock", &text);
-        assert_eq!(Lock::parse(&text, file), Ok(lock.clone()));
+        let mut expected = lock.clone();
+        expected.templates.sort_by(|a, b| {
+            (&a.template, &a.package, &a.source).cmp(&(&b.template, &b.package, &b.source))
+        });
+        assert_eq!(Lock::parse(&text, file), Ok(expected));
         let source = Source::Git {
             url: "https://x/y".into(),
             tag: "std-v0.1.0".into(),

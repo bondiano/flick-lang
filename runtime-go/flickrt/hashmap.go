@@ -33,6 +33,16 @@ func HashMapToList(m Value) Value {
 	return out
 }
 
+// HashMapToSeq returns a lazy, restartable sequence of `[key, value]` pairs in HAMT walk order.
+func HashMapToSeq(m Value) Value {
+	root := hmap(m).root
+	return seq(func(_ *Fiber, yield func(Value) bool) {
+		root.each(func(e entry) bool {
+			return yield([]Value{e.key, e.value})
+		})
+	})
+}
+
 func fromEntries(fb *Fiber, t *table, entries Value) *table {
 	for _, kv := range List(entries) {
 		pair := kv.([]Value)
@@ -43,14 +53,40 @@ func fromEntries(fb *Fiber, t *table, entries Value) *table {
 
 // HashMapUnion is `a` with the entries of `b`, which win.
 func HashMapUnion(fb *Fiber, a, b Value) Value {
-	return mapOf(fromEntries(fb, hmap(a), HashMapToList(b)))
+	t := hmap(a)
+	hmap(b).root.each(func(e entry) bool {
+		t = t.set(fb, e.key, e.value, t.w.of(fb, e.key), false)
+		return true
+	})
+	return mapOf(t)
 }
 
 func HashMapRehash(fb *Fiber, w, m Value) Value {
-	return mapOf(fromEntries(fb, empty(w), HashMapToList(m)))
+	out := empty(w)
+	hmap(m).root.each(func(e entry) bool {
+		out.putMut(fb, e.key, e.value, out.w.of(fb, e.key), false)
+		return true
+	})
+	return mapOf(out)
 }
+
 func HashMapFromList(fb *Fiber, w, entries Value) Value {
-	return mapOf(fromEntries(fb, empty(w), entries))
+	out := empty(w)
+	for _, kv := range List(entries) {
+		pair := kv.([]Value)
+		out.putMut(fb, pair[0], pair[1], out.w.of(fb, pair[0]), false)
+	}
+	return mapOf(out)
+}
+
+// HashMapFromSeq consumes a finite sequence of `[key, value]` pairs once in order without a temporary list.
+func HashMapFromSeq(fb *Fiber, w, entries Value) Value {
+	out := empty(w)
+	for kv := range Iter(fb, entries) {
+		pair := kv.([]Value)
+		out.putMut(fb, pair[0], pair[1], out.w.of(fb, pair[0]), false)
+	}
+	return mapOf(out)
 }
 
 func HashMapHas(fb *Fiber, k, m Value) Value {

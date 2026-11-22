@@ -24,8 +24,8 @@ WASM components build it with the `guest` feature.
 - Keep `VERSION` in `src/lib.rs` equal to the `package flick:plugin@…`
   line of every `.wit` file (a unit test checks); expansion caches key
   on it.
-- Update `flick/src/commands/templates/plugin/lib.rs` with an API change:
-  `flick new --template plugin` copies it and no test compiles it.
+- Update `backends/js/src/component/templates/plugin/lib.rs` with an API change:
+  `flick new --template plugin` (both JS and Go) copies it and no test compiles it.
 - Document a breaking change in the
   [plugins reference](../docs/src/content/docs/reference/plugins.md), the
   [upgrade guide](../docs/src/content/docs/handbook/upgrading.md) (en and

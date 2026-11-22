@@ -76,6 +76,29 @@ fn bulk_template(b: &ExprBuilder, from: &str, bind: &str, stages: usize) -> Opti
             &["w", "pairs"],
             fold_pairs(make_map(b, b.loc("w"), b.list(vec![])), b.loc("pairs")),
         )),
+        ("flick:rt", "hashMapFromSeq", 2) => Some(b.lam(
+            &["w", "pairs"],
+            b.app3(
+                b.global("Seq", "fold"),
+                b.lam(
+                    &["acc", "pair"],
+                    b.match_(
+                        b.loc("pair"),
+                        vec![arm(
+                            Pat::Tuple(vec![Pat::Bind(b.name("pk")), Pat::Bind(b.name("pv"))]),
+                            b.app3(
+                                b.global("HashMap", "insert"),
+                                b.loc("pk"),
+                                b.loc("pv"),
+                                b.loc("acc"),
+                            ),
+                        )],
+                    ),
+                ),
+                make_map(b, b.loc("w"), b.list(vec![])),
+                b.loc("pairs"),
+            ),
+        )),
         ("flick:HashMap", "flickSetMany", 2) => {
             Some(b.lam(&["pairs", "m"], fold_pairs(b.loc("m"), b.loc("pairs"))))
         }

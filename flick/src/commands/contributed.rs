@@ -3,162 +3,41 @@
 //! the plan or the session they declare.
 
 mod inputs;
-mod plan;
+pub(crate) mod plan;
 mod preview;
 mod projection;
+mod registry;
 mod session;
+mod validate;
 
 pub(crate) use preview::preview;
+pub(crate) use registry::Contributor;
 
+use std::env;
 use std::ffi::OsString;
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitCode;
-use std::sync::Arc;
-use std::{env, fs};
 
+use clap::error::ErrorKind;
 use clap::{Arg, ArgAction, CommandFactory};
 use flick_backend::command::{self, Argument, Descriptor, Invocation, Style, ValueKind};
-use flick_backend::host::runtime::Cancellation;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
-use flick_core::project::{Project, store};
+use flick_core::plugin::first_party;
+use flick_core::project::Project;
 use flick_core::source::SourceMap;
-use sha2::{Digest, Sha256};
+
+#[cfg(test)]
+use registry::builtin_std_source;
+use registry::{
+    NativeContributor, Source, SourceKind, cached_everywhere, descriptors, known, load, read_cache,
+    sources,
+};
 
 use super::run::{find_project, find_project_at};
 use crate::args::{CommandArguments, GlobalArguments};
 use crate::backends::Tool;
-use crate::{backends, fetch, plugins, report, saved};
-
-/// What runs the commands of one backend or plugin.
-pub(crate) trait Contributor: Send + Sync {
-    fn describe(&self) -> Result<Vec<Descriptor>, String>;
-    fn run(&self, invocation: &Invocation) -> Result<command::Plan, Vec<command::Diagnostic>>;
-    fn resume(
-        &self,
-        state: Vec<u8>,
-        outputs: Vec<command::File>,
-        answers: Vec<command::Answer>,
-    ) -> Result<command::Plan, Vec<command::Diagnostic>>;
-    fn open(&self, invocation: &Invocation) -> Result<command::Opened, Vec<command::Diagnostic>>;
-    fn handle(
-        &self,
-        state: Vec<u8>,
-        request: Vec<u8>,
-        answers: &[command::Answer],
-        cancel: &Cancellation,
-    ) -> Result<command::Handled, String>;
-    fn close(&self, state: Vec<u8>) -> command::Plan;
-}
-
-/// A backend or a plugin of the project that may add commands.
-#[derive(Debug)]
-struct Source {
-    /// The prefix of its qualified names: a plugin's package, or the last
-    /// part of a backend's id.
-    short: String,
-    /// What `[tools]` grants it by.
-    id: String,
-    /// The digest of its component, which keys its cached descriptors.
-    digest: String,
-    plugin: Option<PathBuf>,
-    /// An official backend other than the project's, described to name
-    /// who adds a command the project has not.
-    official: bool,
-}
-
-/// Cached descriptors, by the digest of their component.
-#[derive(serde::Serialize, serde::Deserialize)]
-struct Cached {
-    short: String,
-    id: String,
-    descriptors: Vec<Descriptor>,
-}
-
-fn cache_path(digest: &str) -> Option<PathBuf> {
-    Some(
-        store::store_dir()?
-            .join("commands")
-            .join(format!("{digest}.cbor")),
-    )
-}
-
-fn read_cache(digest: &str) -> Option<Cached> {
-    let bytes = fs::read(cache_path(digest)?).ok()?;
-    ciborium::from_reader(bytes.as_slice()).ok()
-}
-
-/// The backend and the plugins of `project`, without loading a component.
-fn sources(project: &Project) -> Vec<Source> {
-    let mut sources = Vec::new();
-    if let Some((id, digest)) = backends::selected_pin(project) {
-        let short = id.rsplit('/').next().unwrap_or(&id).to_owned();
-        sources.push(Source {
-            short,
-            id,
-            digest,
-            plugin: None,
-            official: false,
-        });
-    }
-    for (package, path) in super::plugins::components(project) {
-        let Ok(bytes) = fs::read(&path) else { continue };
-        sources.push(Source {
-            short: package.clone(),
-            id: package,
-            digest: fetch::hex(&Sha256::digest(&bytes)),
-            plugin: Some(path),
-            official: false,
-        });
-    }
-    sources
-}
-
-fn load(project: &Project, source: &Source) -> Result<Arc<dyn Contributor>, String> {
-    match &source.plugin {
-        Some(path) => plugins::contributor(&source.id, path),
-        None if source.official => backends::official_contributor(project, &source.id),
-        None => backends::contributor(project),
-    }
-}
-
-/// Every contributor the store has seen, the official backends described
-/// first if it has not seen them yet.
-fn known(project: &Project) -> Vec<(String, Vec<Descriptor>)> {
-    for (id, digest) in backends::officials() {
-        let short = id.rsplit('/').next().unwrap_or(&id).to_owned();
-        let source = Source {
-            short,
-            id,
-            digest,
-            plugin: None,
-            official: true,
-        };
-        let _ = descriptors(project, &source);
-    }
-    cached_everywhere()
-}
-
-/// The descriptors of `source`, from the cache, else from its component,
-/// which the cache then keeps.
-fn descriptors(project: &Project, source: &Source) -> Result<Vec<Descriptor>, String> {
-    if let Some(cached) = read_cache(&source.digest) {
-        return Ok(cached.descriptors);
-    }
-    let descriptors = load(project, source)?.describe()?;
-    let cached = Cached {
-        short: source.short.clone(),
-        id: source.id.clone(),
-        descriptors: descriptors.clone(),
-    };
-    if let Some(path) = cache_path(&source.digest) {
-        let mut bytes = Vec::new();
-        if ciborium::into_writer(&cached, &mut bytes).is_ok() {
-            let _ = saved::write(&path, &bytes);
-        }
-    }
-    Ok(descriptors)
-}
+use crate::{backends, report};
 
 /// The names of the core's commands, which no contributor may take.
 fn reserved() -> Vec<String> {
@@ -216,17 +95,24 @@ fn contributed(project: &Project) -> (Vec<(Source, Contributed)>, Vec<Diagnostic
     (found, warnings)
 }
 
-/// The help text of contributed commands, by contributor: those of the
-/// project's backend and plugins, or outside a project every cached one.
-/// Reads only the cache: no component is loaded and nothing is fetched.
+/// The help text of contributed commands, by contributor: built-in `std` and
+/// those of the project's backend and plugins, or outside a project every
+/// cached one. Reads only in-memory `std` and the cache: no component is
+/// loaded and nothing is fetched.
 pub(crate) fn help() -> String {
-    let groups: Vec<(String, Vec<Descriptor>)> = match find_project_at(None) {
-        Ok(project) => sources(&project)
-            .into_iter()
-            .filter_map(|s| Some((s.id, read_cache(&s.digest)?.descriptors)))
-            .collect(),
-        Err(_) => cached_everywhere(),
-    };
+    let mut groups: Vec<(String, Vec<Descriptor>)> = Vec::new();
+    if let Ok(std_ds) = NativeContributor::std().describe() {
+        groups.push((first_party::PACKAGE.into(), std_ds));
+    }
+    match find_project_at(None) {
+        Ok(project) => groups.extend(
+            sources(&project)
+                .into_iter()
+                .filter(|s| !matches!(s.kind, SourceKind::BuiltinStd))
+                .filter_map(|s| Some((s.id, read_cache(&s.digest)?.descriptors))),
+        ),
+        Err(_) => groups.extend(cached_everywhere()),
+    }
     let reserved = reserved();
     let mut text = String::new();
     for (id, commands) in groups {
@@ -243,22 +129,6 @@ pub(crate) fn help() -> String {
         text.push('\n');
     }
     text
-}
-
-fn cached_everywhere() -> Vec<(String, Vec<Descriptor>)> {
-    let Some(dir) = store::store_dir().map(|d| d.join("commands")) else {
-        return Vec::new();
-    };
-    let mut found: Vec<(String, Vec<Descriptor>)> = fs::read_dir(dir)
-        .into_iter()
-        .flatten()
-        .flatten()
-        .filter_map(|e| fs::read(e.path()).ok())
-        .filter_map(|bytes| ciborium::from_reader::<Cached, _>(bytes.as_slice()).ok())
-        .map(|c| (c.id, c.descriptors))
-        .collect();
-    found.sort_by(|a, b| a.0.cmp(&b.0));
-    found
 }
 
 /// Runs the contributed command `words` names, flat or as `short:name`.
@@ -279,7 +149,7 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
         backends::outside_project(&cwd).ok()
     });
     let Some(mut project) = found else {
-        return fail(unknown(&words, &cached_everywhere()));
+        return fail(unknown(&words, &[], &cached_everywhere()));
     };
     let (found, warnings) = contributed(&project);
     report::render(global, &SourceMap::default(), &warnings);
@@ -301,8 +171,16 @@ pub(crate) fn run(words: &[OsString], global: &GlobalArguments) -> ExitCode {
     let arguments = match arguments(descriptor, &source.short, &rest) {
         Ok(arguments) => arguments,
         Err(error) => {
+            let code = if matches!(
+                error.kind(),
+                ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
+            ) {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::from(2)
+            };
             let _ = error.print();
-            return ExitCode::from(2);
+            return code;
         }
     };
     // outside a project, the root holds the working directory and every path named
@@ -405,7 +283,7 @@ fn resolve<'a>(
         }
     }
     match matches.as_slice() {
-        [] => Err(Box::new(unknown(&words, &known()))),
+        [] => Err(Box::new(unknown(&words, found, &known()))),
         [(source, descriptor, n)] => Ok((source, descriptor, words[*n..].to_vec())),
         many => {
             let names: Vec<String> = (many.iter())
@@ -424,19 +302,38 @@ fn resolve<'a>(
 }
 
 /// No command of flick or of the project has the name `words` starts with;
-/// a cached contributor that adds it is named.
-fn unknown(words: &[String], cached: &[(String, Vec<Descriptor>)]) -> Diagnostic {
+/// matching multi-word commands of active contributors or a cached contributor
+/// that adds it are named.
+fn unknown(
+    words: &[String],
+    found: &[(Source, Contributed)],
+    cached: &[(String, Vec<Descriptor>)],
+) -> Diagnostic {
     let name = words.first().map_or("", String::as_str);
     let head = name.rsplit(':').next().unwrap_or(name);
-    let by: Vec<&str> = (cached.iter())
-        .filter(|(_, ds)| ds.iter().any(|d| first_word(&d.name) == head))
-        .map(|(id, _)| id.as_str())
+    let active_prefix: Vec<String> = found
+        .iter()
+        .flat_map(|(_, c)| c.commands.iter())
+        .filter(|d| first_word(&d.name) == head)
+        .map(|d| format!("`flick {}`", d.name))
         .collect();
     let diagnostic = Diagnostic::new(
         codes::P052,
         Severity::Error,
         format!("flick has no command `{name}`"),
     );
+    if !active_prefix.is_empty() {
+        return diagnostic.with_fix(|| {
+            (
+                format!("did you mean {}?", active_prefix.join(", ")),
+                Vec::new(),
+            )
+        });
+    }
+    let by: Vec<&str> = (cached.iter())
+        .filter(|(_, ds)| ds.iter().any(|d| first_word(&d.name) == head))
+        .map(|(id, _)| id.as_str())
+        .collect();
     if by.is_empty() {
         diagnostic
     } else {

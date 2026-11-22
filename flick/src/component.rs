@@ -1,5 +1,9 @@
 //! Shared engine of the compiler's component hosts.
 
+use std::env;
+use std::ffi::OsString;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 use std::sync::{Once, OnceLock};
 use std::thread;
@@ -14,11 +18,21 @@ use wasmtime::Engine;
 #[cfg(any(feature = "wasm-plugins", test))]
 pub(crate) use runtime::{MemoryLimits, memory_limits, prepare, why};
 
+fn cache_dir_from(override_dir: Option<OsString>, default_dir: Option<PathBuf>) -> Option<PathBuf> {
+    override_dir
+        .filter(|dir| !dir.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| default_dir.map(|dir| dir.join("wasmtime")))
+}
+
 pub(crate) fn engine() -> Result<&'static Engine, String> {
     static ENGINE: OnceLock<Result<Engine, String>> = OnceLock::new();
     ENGINE
         .get_or_init(|| {
-            let cache = store::cache_dir().map(|dir| dir.join("wasmtime"));
+            let cache = cache_dir_from(env::var_os("FLICK_WASMTIME_CACHE_DIR"), store::cache_dir());
+            if let Some(dir) = &cache {
+                let _ = fs::create_dir_all(dir);
+            }
             runtime::engine(cache.as_deref())
         })
         .as_ref()

@@ -15,6 +15,8 @@ pub(crate) mod options;
 #[cfg(feature = "wasm-backends")]
 mod request;
 #[cfg(feature = "wasm-backends")]
+mod scaffold;
+#[cfg(feature = "wasm-backends")]
 mod tools;
 #[cfg(feature = "wasm-backends")]
 pub(crate) use execute::Reads;
@@ -34,12 +36,16 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use crate::commands::contributed::Contributor;
 use crate::sources::FsHost;
 #[cfg(feature = "wasm-backends")]
+use flick_backend::BackendPin;
+#[cfg(feature = "wasm-backends")]
 use flick_backend::host::runtime::Cancellation;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 #[cfg(feature = "wasm-backends")]
 use flick_core::project;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::config;
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::lock::{Lock, LockedBackend};
 use flick_core::project::{Compilation, Project};
 use flick_core::source::SourceMap;
 #[cfg(feature = "wasm-backends")]
@@ -306,6 +312,28 @@ pub(crate) fn officials() -> Vec<(String, String)> {
         .filter_map(|id| official::known(id, None))
         .map(|pin| (pin.identity.id, pin.sha256))
         .collect()
+}
+
+/// The official backend `id`, loaded lightweight for scaffolding (`flick new` / `flick init`).
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn scaffold_target(
+    id: &str,
+    existing_lock: Option<&Lock>,
+    offline: bool,
+) -> Result<(Arc<dyn Contributor>, Option<LockedBackend>), Diagnostic> {
+    let (pin, bytes, entry) = official::resolve_target(id, existing_lock, offline)?;
+    let contributor = scaffold::ScaffoldBackend::from_bytes(&pin, &bytes, true)?;
+    Ok((Arc::new(contributor), entry))
+}
+
+/// A verified backend component package loaded lightweight for scaffolding (`--from`).
+#[cfg(feature = "wasm-backends")]
+pub(crate) fn scaffold_package(
+    pin: &BackendPin,
+    bytes: &[u8],
+) -> Result<Arc<dyn Contributor>, Diagnostic> {
+    let contributor = scaffold::ScaffoldBackend::from_bytes(pin, bytes, false)?;
+    Ok(Arc::new(contributor))
 }
 
 /// The official backend `id`, loaded for `project` whatever it selects.

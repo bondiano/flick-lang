@@ -259,6 +259,15 @@ impl ExprBuilder {
         })
     }
 
+    pub(super) fn gen_lazy(&self, body: Expr) -> Expr {
+        self.at(ExprKind::Generate {
+            body: Box::new(body),
+            strict: false,
+            sync: true,
+            limit: None,
+        })
+    }
+
     pub(super) fn each(&self, item: &str, src: Expr, body: Expr) -> Expr {
         self.at(ExprKind::Each {
             stop: None,

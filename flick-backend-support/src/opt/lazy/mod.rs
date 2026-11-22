@@ -9,7 +9,9 @@
 //!   `lazy_force (lazy_done v)`, both at once, is `v`;
 //! - O2a: after `let y = lazy_force l`, a force of the same `l` is `y`: the
 //!   first force returned only once the cell was done, and a done cell
-//!   stays done (L2).
+//!   stays done (L2);
+//! - O4: a pure, loop-invariant `lazy_make (task e)` (or `lazy_done v`)
+//!   inside a loop hoists before the loop, so iterations share one cell.
 
 use std::collections::HashSet;
 use std::mem;
@@ -19,8 +21,13 @@ use crate::Known;
 use crate::ir::{Expr, ExprKind, Lit, Pat, Stmt};
 use flick_ir::Lang;
 
+mod hoist;
+mod purity;
+
+pub use hoist::hoist;
+
 /// Whether `e` names the lang item `item`.
-fn is(e: &Expr, item: Lang, lang: &Known<'_>) -> bool {
+pub(super) fn is(e: &Expr, item: Lang, lang: &Known<'_>) -> bool {
     matches!(&e.kind, ExprKind::Global { module, name } if lang.is(item, module, name))
 }
 
@@ -34,7 +41,7 @@ fn made<'e>(e: &'e Expr, lang: &Known<'_>) -> Option<&'e Expr> {
 
 /// A value of the core: evaluating it takes no step. A local is one, as the
 /// core substitutes values for variables; a mutable variable is not.
-fn value(e: &Expr) -> bool {
+pub(super) fn value(e: &Expr) -> bool {
     match &e.kind {
         ExprKind::Lit(_) | ExprKind::Local(_) | ExprKind::Con(_) | ExprKind::Lambda { .. } => true,
         ExprKind::Tuple(items) | ExprKind::List(items) => items.iter().all(value),
