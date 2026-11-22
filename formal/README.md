@@ -66,15 +66,24 @@ signature and golden certificates.
   per-object owner/slot inventories for root-cell allocation, strong reads,
   replacement and detach-all close, including aliases and independent
   machine roots. `Formal/MemoryScopes.lean` covers multi-slot storage with
-  one private owner per arena, allocation/read and selected-owner close
-  preserving arbitrary other owners and external roots. Closed-owner
-  retirement is idempotent. These results do not yet prove source-to-memory
-  lowering, verified correspondence with the Rust pass or machine-counter
-  bounds, counted heap or exceptional-unwind semantics,
-  FBIP, matcher/update or evidence-erasure correctness, fresh/valid handles
-  or physical arena reclamation. See the
+  one private owner per arena, allocation/read, selected-owner close
+  preserving arbitrary other owners and external roots, and the M2 multi-phase
+  owner close lifecycle (`open_` -> `closing` -> `finalizing` -> `closed`):
+  children finish before LIFO finalizers run, late arena allocations during
+  finalization are accounted for and retired together with initial arenas
+  exactly once after all finalizers (`closeLifecycle_lifo_order`,
+  `closeLifecycle_selected`), re-closing a closed owner is idempotent
+  (`closeLifecycle_idempotent`), and closed owners/arenas reject admission
+  (`closed_rejects_make/alloc/get`) across success, failure, and cancellation
+  outcomes. `Formal/Axioms.lean` pins these theorems together with
+  `MemoryArena.close_balance` using `#guard_msgs` (standard Lean axioms
+  `propext`, `Quot.sound` only; zero `sorry`). These results do NOT prove
+  source-to-memory lowering equivalence, verified correspondence with the Rust
+  pass or compiler checker, handle freshness/provenance checks, counted
+  heap-graph acyclicity, host-bridge wire marshalling, dynamic reuse/FBIP, or
+  physical memory reclamation. See the
   [memory contract](../docs/formal/memory.md) for
-  the still-open M1–M4 gates.
+  the M1–M5 boundaries.
 - **The module boundary** (`Formal/Modules.lean`): separate named application
   sites have separate nominal result types, repeated imports preserve identity,
   manifest class/service requirements match exactly, abstract identities cannot

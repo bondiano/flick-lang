@@ -5,6 +5,9 @@ import { test } from "node:test";
 import { type Arena, arenaAlloc, arenaGet } from "../src/core/Arena.ts";
 import { arenaMake, closeOwn, addFinalizer, scopeRun, within } from "../src/rt/owner.ts";
 import { type Owner } from "../src/rt/owner.ts";
+import { handle, operation, service } from "../src/rt/handle.ts";
+import { layerRun, layerSucceed } from "../src/rt/layer.ts";
+import { eventsListen, eventsQueue } from "../src/rt/events.ts";
 import { type Run, asExit, die, exitOf, fail, fiberSpawn, interrupt, raise, succeeded, yieldNow } from "../src/rt/kernel.ts";
 import { root, sleep } from "./rt-support.ts";
 
@@ -165,4 +168,115 @@ test("owned child cleanup and pending foreign work see storage until they settle
   assert.equal(exit.cause, undefined);
   assert.deepEqual(seen, ["live", "live"]);
   assert.equal(kept?.liveSlots, 0);
+});
+
+test("abort, control discontinue, and failing tail arms close inner arenas after LIFO finalizers", async () => {
+  // 1. abort unwinds inner scope, runs LIFO finalizers while arena is live, then retires arena
+  let abortArena: Arena | undefined;
+  const abortOrder: Array<unknown> = [];
+  const escapeTag = service("Test.Escape");
+  const abortExit = await root(() =>
+    handle(
+      [[escapeTag, [["escape", (msg: unknown) => { abortOrder.push(`arm:${String(msg)}`); return `escaped:${String(msg)}`; }, "abort", 0, 1]]]],
+      () =>
+        scopeRun(function* (): Run {
+          abortArena = (yield arenaMake()) as Arena;
+          const view = arenaAlloc(abortArena, "abort-live");
+          yield addFinalizer(() => abortOrder.push(`fin1:${String(arenaGet(view))}`));
+          yield addFinalizer(() => abortOrder.push(`fin2:${String(arenaGet(view))}`));
+          const perform = operation(escapeTag, "escape", 1) as (m: string) => unknown;
+          return yield perform("now");
+        }),
+      undefined,
+      undefined,
+    ),
+  );
+  assert.equal(abortExit.cause, undefined);
+  assert.equal(abortExit.value, "escaped:now");
+  assert.deepEqual(abortOrder, ["fin2:abort-live", "fin1:abort-live", "arm:now"]);
+  assert.equal(abortArena?.liveSlots, 0);
+
+  // 2. control discontinue closes inner arena scope in LIFO order
+  let ctrlArena: Arena | undefined;
+  const ctrlOrder: Array<unknown> = [];
+  const yieldTag = service("Test.Yield");
+  const ctrlExit = await root(() =>
+    handle(
+      [[yieldTag, [["yield_", (x: unknown) => () => { ctrlOrder.push("ctrl-arm"); return x; }, "control", 0, 1]]]],
+      () =>
+        scopeRun(function* (): Run {
+          ctrlArena = (yield arenaMake()) as Arena;
+          const view = arenaAlloc(ctrlArena, "ctrl-live");
+          yield addFinalizer(() => ctrlOrder.push(`fin1:${String(arenaGet(view))}`));
+          yield addFinalizer(() => ctrlOrder.push(`fin2:${String(arenaGet(view))}`));
+          const perform = operation(yieldTag, "yield_", 1) as (m: string) => unknown;
+          return yield perform("dropped");
+        }),
+      undefined,
+      undefined,
+    ),
+  );
+  assert.equal(ctrlExit.cause, undefined);
+  assert.equal(ctrlExit.value, "dropped");
+  assert.deepEqual(ctrlOrder, ["ctrl-arm", "fin2:ctrl-live", "fin1:ctrl-live"]);
+  assert.equal(ctrlArena?.liveSlots, 0);
+
+  // 3. failing tail arm unwinds inner arena scope and runs LIFO finalizers before failure propagates
+  let tailArena: Arena | undefined;
+  const tailOrder: Array<unknown> = [];
+  const askTag = service("Test.Ask");
+  const tailExit = await root(() =>
+    handle(
+      [[askTag, [["ask", () => raise(fail("tail-boom")), "tail", 0, 1]]]],
+      () =>
+        scopeRun(function* (): Run {
+          tailArena = (yield arenaMake()) as Arena;
+          const view = arenaAlloc(tailArena, "tail-live");
+          yield addFinalizer(() => tailOrder.push(`fin1:${String(arenaGet(view))}`));
+          yield addFinalizer(() => tailOrder.push(`fin2:${String(arenaGet(view))}`));
+          const perform = operation(askTag, "ask", 1) as (u: undefined) => unknown;
+          return yield perform(undefined);
+        }),
+      undefined,
+      undefined,
+    ),
+  );
+  assert.ok(tailExit.cause);
+  assert.deepEqual(tailOrder, ["fin2:tail-live", "fin1:tail-live"]);
+  assert.equal(tailArena?.liveSlots, 0);
+});
+
+test("provider layers preserve selected outer arena and late async callbacks see closed storage", async () => {
+  let outerArena: Arena | undefined;
+  let listener: ((ev: string) => void) | undefined;
+  let lateRead: (() => unknown) | undefined;
+  const seen: Array<unknown> = [];
+  const svcTag = service("Test.Svc");
+  const exit = await root(() =>
+    scopeRun(function* (outer: Owner): Run {
+      const layer = layerSucceed(svcTag, { get: () => "svc" });
+      const view = yield layerRun(layer, function* (): Run {
+        outerArena = (yield within(outer, () => arenaMake())) as Arena;
+        return arenaAlloc(outerArena, "outer-via-layer");
+      });
+      assert.equal(outerArena?.liveSlots, 1);
+      lateRead = () => arenaGet(view as never);
+      listener = eventsListen<string>(
+        outer,
+        eventsQueue(4),
+        () => undefined,
+        (ev) => () => seen.push(`${ev}:${String(arenaGet(view as never))}`),
+      );
+      listener("open");
+      yield sleep(5);
+      return undefined;
+    }),
+  );
+  assert.equal(exit.cause, undefined);
+  assert.equal(outerArena?.liveSlots, 0);
+  // Late event after owner close is dropped cleanly; direct late read throws closed
+  listener?.("after-close");
+  await new Promise((r) => setTimeout(r, 10));
+  assert.deepEqual(seen, ["open:outer-via-layer"]);
+  assert.throws(() => lateRead?.(), /closed/);
 });

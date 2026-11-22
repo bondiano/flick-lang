@@ -172,3 +172,162 @@ func TestArenaConcurrentAccessAndClose(t *testing.T) {
 		t.Fatal("closed storage stays empty")
 	}
 }
+
+func TestArenaSignalsUnwindFinalizersAndRetireStorage(t *testing.T) {
+	// 1. abort unwinds inner scope, runs LIFO finalizers while arena is live, then retires arena
+	var abortArena *arena
+	var abortOrder []Value
+	res := Run(rootFiber(), Eff(func(fb *Fiber) Value {
+		escapeTag := "Test.Escape"
+		arms := newRecord(1)
+		arms.put("escape", Fn(func(_ *Fiber, msg Value) Value {
+			return Eff(func(*Fiber) Value {
+				abortOrder = append(abortOrder, "arm:"+msg.(string))
+				return "escaped:" + msg.(string)
+			})
+		}))
+		return Handle(fb, []Install{{Key: escapeTag, Arms: arms, Aborts: []string{"escape"}}}, Eff(func(fb *Fiber) Value {
+			return Scope(fb, func(fb *Fiber, owner, _ Value) Value {
+				o := owner.(*Owner)
+				abortArena = ArenaMake(fb, Unit).(*arena)
+				v := ArenaAlloc(abortArena, "abort-live")
+				o.add(fb, func(*Fiber, *Cause) Value { abortOrder = append(abortOrder, "fin1:"+ArenaGet(v).(string)); return Unit })
+				o.add(fb, func(*Fiber, *Cause) Value { abortOrder = append(abortOrder, "fin2:"+ArenaGet(v).(string)); return Unit })
+				return Run(fb, Apply(fb, Operation(escapeTag, "escape", 1), "now"))
+			})
+		}), nil, nil)
+	}))
+	if res != "escaped:now" || abortArena.liveSlots() != 0 {
+		t.Fatalf("unexpected abort result=%v liveSlots=%d", res, abortArena.liveSlots())
+	}
+	if !reflect.DeepEqual(abortOrder, []Value{"fin2:abort-live", "fin1:abort-live", "arm:now"}) {
+		t.Fatalf("unexpected abort order: %v", abortOrder)
+	}
+
+	// 2. control arm returning without resuming discontinues inner arena scope in LIFO order
+	var ctrlArena *arena
+	var ctrlOrder []Value
+	ctrlRes := Run(rootFiber(), Eff(func(fb *Fiber) Value {
+		yieldTag := "Test.Yield"
+		arms := newRecord(1)
+		arms.put("yield_", Fn(func(_ *Fiber, x Value) Value {
+			return Fn(func(_ *Fiber, _ Value) Value {
+				return Eff(func(*Fiber) Value {
+					ctrlOrder = append(ctrlOrder, "ctrl-arm")
+					return x
+				})
+			})
+		}))
+		return Handle(fb, []Install{{Key: yieldTag, Arms: arms, Controls: []Control{{Name: "yield_", Arity: 1}}}}, Eff(func(fb *Fiber) Value {
+			return Scope(fb, func(fb *Fiber, owner, _ Value) Value {
+				o := owner.(*Owner)
+				ctrlArena = ArenaMake(fb, Unit).(*arena)
+				v := ArenaAlloc(ctrlArena, "ctrl-live")
+				o.add(fb, func(*Fiber, *Cause) Value { ctrlOrder = append(ctrlOrder, "fin1:"+ArenaGet(v).(string)); return Unit })
+				o.add(fb, func(*Fiber, *Cause) Value { ctrlOrder = append(ctrlOrder, "fin2:"+ArenaGet(v).(string)); return Unit })
+				return Run(fb, Apply(fb, Operation(yieldTag, "yield_", 1), "dropped"))
+			})
+		}), nil, nil)
+	}))
+	if ctrlRes != "dropped" || ctrlArena.liveSlots() != 0 {
+		t.Fatalf("unexpected control result=%v liveSlots=%d", ctrlRes, ctrlArena.liveSlots())
+	}
+	if !reflect.DeepEqual(ctrlOrder, []Value{"ctrl-arm", "fin2:ctrl-live", "fin1:ctrl-live"}) {
+		t.Fatalf("unexpected control order: %v", ctrlOrder)
+	}
+
+	// 3. failing tail arm unwinds inner arena scope and runs finalizers before outer recovery
+	var tailArena *arena
+	var tailOrder []Value
+	tailOut := Run(rootFiber(), Eff(func(fb *Fiber) Value {
+		return Try(fb, func(fb *Fiber) Value {
+			askTag := "Test.Ask"
+			arms := newRecord(1)
+			arms.put("ask", Fn(func(_ *Fiber, _ Value) Value {
+				return Eff(func(*Fiber) Value { panic(&Failure{&Cause{kind: causeFail, err: "tail-boom"}}) })
+			}))
+			return Handle(fb, []Install{{Key: askTag, Arms: arms}}, Eff(func(fb *Fiber) Value {
+				return Scope(fb, func(fb *Fiber, owner, _ Value) Value {
+					o := owner.(*Owner)
+					tailArena = ArenaMake(fb, Unit).(*arena)
+					v := ArenaAlloc(tailArena, "tail-live")
+					o.add(fb, func(*Fiber, *Cause) Value { tailOrder = append(tailOrder, "fin1:"+ArenaGet(v).(string)); return Unit })
+					o.add(fb, func(*Fiber, *Cause) Value { tailOrder = append(tailOrder, "fin2:"+ArenaGet(v).(string)); return Unit })
+					return Run(fb, Apply(fb, Operation(askTag, "ask", 1), Unit))
+				})
+			}), nil, nil)
+		}, func(_ *Fiber, err Value) Value {
+			tailOrder = append(tailOrder, "caught:"+err.(string))
+			return err
+		})
+	}))
+	if tailOut != "tail-boom" || tailArena.liveSlots() != 0 {
+		t.Fatalf("unexpected tail failure result=%v liveSlots=%d", tailOut, tailArena.liveSlots())
+	}
+	if !reflect.DeepEqual(tailOrder, []Value{"fin2:tail-live", "fin1:tail-live", "caught:tail-boom"}) {
+		t.Fatalf("unexpected tail order: %v", tailOrder)
+	}
+}
+
+func TestArenaTrackedAsyncWorkAndLateCallbackAfterClose(t *testing.T) {
+	var kept *arena
+	var view Value
+	var seen []Value
+	lateDone := make(chan bool, 1)
+	Run(rootFiber(), Eff(func(fb *Fiber) Value {
+		return Scope(fb, func(fb *Fiber, owner, _ Value) Value {
+			o := owner.(*Owner)
+			kept = ArenaMake(fb, Unit).(*arena)
+			view = ArenaAlloc(kept, "tracked-live")
+			o.add(fb, func(*Fiber, *Cause) Value {
+				seen = append(seen, "c5:"+ArenaGet(view).(string))
+				return Unit
+			})
+			done := make(chan struct{})
+			o.track(done)
+			go func() {
+				defer close(done)
+				seen = append(seen, "c4:"+ArenaGet(view).(string))
+			}()
+			return Unit
+		})
+	}))
+	if kept.liveSlots() != 0 {
+		t.Fatal("arena must be retired after tracked C4 and C5 finalizers finish")
+	}
+	if !reflect.DeepEqual(seen, []Value{"c4:tracked-live", "c5:tracked-live"}) {
+		t.Fatalf("C4 must settle before C5 finalizers: %v", seen)
+	}
+	// Late untracked async callback after scope close cleanly raises closed-arena defect
+	go func() {
+		_, cause := catch(func() Value { return ArenaGet(view) })
+		lateDone <- (cause != nil && cause.kind == causeDie && strings.Contains(cause.defect, "arena is closed"))
+	}()
+	if !<-lateDone {
+		t.Fatal("late callback reading closed arena must fail cleanly with closed-arena defect")
+	}
+}
+
+func TestArenaPersistentContextLayerPreservesSelectedOuterOwner(t *testing.T) {
+	var outerArena *arena
+	var got Value
+	Run(rootFiber(), Eff(func(fb *Fiber) Value {
+		return Scope(fb, func(fb *Fiber, outer, _ Value) Value {
+			fb = WithOwnerEvidence(fb, outer)
+			ctx := ContextMake("Test.Svc", "val")
+			layer := LayerSucceedContext(ctx)
+			v := Provide(fb, layer, Eff(func(inner *Fiber) Value {
+				outerArena = ArenaMake(Within(inner, ReadOwnerEvidence(inner)), Unit).(*arena)
+				return ArenaAlloc(outerArena, ContextGet("Test.Svc", ctx))
+			}))
+			if outerArena.liveSlots() != 1 {
+				t.Fatal("outer arena must outlive persistent context layer provide")
+			}
+			got = ArenaGet(v)
+			return Unit
+		})
+	}))
+	if got != "val" || outerArena.liveSlots() != 0 {
+		t.Fatalf("unexpected persistent context result=%v liveSlots=%d", got, outerArena.liveSlots())
+	}
+}

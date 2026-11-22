@@ -423,18 +423,21 @@ impl Machine<'_, '_> {
         if let Some(holder_id) = self.lookup_memo_entry(memo_id, layer_id) {
             self.heap.drop_value(build_fn)?;
             if !self.owners[parent_scope].is_finalizing_or_closed() {
-                self.memo_maps
+                let entry = self
+                    .memo_maps
                     .get_mut(&holder_id)
                     .expect("memo")
                     .entries
                     .get_mut(&layer_id)
-                    .expect("entry")
-                    .observers += 1;
+                    .expect("entry");
+                entry.observers += 1;
+                let entry_owner = entry.scope_owner;
                 self.owners[parent_scope]
                     .finalizers
                     .push(Finalizer::ReleaseMemo {
                         memo_id: holder_id,
                         layer_id,
+                        entry_owner,
                     });
             }
             match &self.memo_maps[&holder_id].entries[&layer_id].state {
@@ -491,7 +494,11 @@ impl Machine<'_, '_> {
             );
         self.owners[parent_scope]
             .finalizers
-            .push(Finalizer::ReleaseMemo { memo_id, layer_id });
+            .push(Finalizer::ReleaseMemo {
+                memo_id,
+                layer_id,
+                entry_owner,
+            });
         let prev_owner = self.current_owner;
         let prev_ev = self.current_evidence;
         let prev_memo = self.set_fiber_memo(memo_id);
