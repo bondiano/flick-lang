@@ -232,3 +232,31 @@ fn keyword_context_requires_whole_words_and_adjacent_qualifiers() {
         assert_eq!(*token, (expected, word), "{src}");
     }
 }
+
+#[test]
+fn the_debugging_keywords_label_the_steps_of_an_accessor() {
+    for (src, word, expected) in [
+        (".echo", "echo", K::Ident),
+        ("List.map .echo logs", "echo", K::Ident),
+        ("(.todo)", "todo", K::Ident),
+        ("[.todo, .echo]", "todo", K::Ident),
+        ("(make ()).echo", "echo", K::Ident),
+        ("logs |> List.map .todo", "todo", K::Ident),
+        ("0..echo x", "echo", K::EchoKw),
+        ("0..<todo x", "todo", K::TodoKw),
+        ("...echo", "echo", K::EchoKw),
+        ("echo x", "echo", K::EchoKw),
+        ("f todo", "todo", K::TodoKw),
+        // the other keywords are never labels in source
+        (".with", "with", K::WithKw),
+        (".type", "type", K::TypeKw),
+    ] {
+        let (tokens, errors) = kinds(src);
+        assert!(errors.is_empty(), "{src}: {errors:?}");
+        let token = tokens
+            .iter()
+            .find(|(_, text)| *text == word)
+            .expect("word token");
+        assert_eq!(*token, (expected, word), "{src}");
+    }
+}

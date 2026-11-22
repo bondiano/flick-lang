@@ -171,4 +171,5 @@ let accessors users =
   let spaced = .address .city
   let tried = .name?
   let ranged = (List.range 1 3, [0..5], 1.5)
+  let labels = (List.map .echo logs, .log.todo, (make ()).echo, [0..echo 5])
   cities

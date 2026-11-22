@@ -54,3 +54,12 @@ let called handler = (.run handler) 1
 
 held : { get : User -> String }
 let held = { get = .address.city }
+
+type alias Log = { echo : String; todo : Bool }
+
+// the debugging keywords label fields, as in `log.echo`
+echoes : List Log -> (List String, Bool)
+let echoes logs = (List.map .echo logs, .log.todo { log = { echo = "a"; todo = true } })
+
+made : (Unit -> Log) -> String
+let made make = (make ()).echo
