@@ -5,8 +5,8 @@ use flick_ir::{Foreign, ForeignMode};
 use super::expr_builder::{ExprBuilder, arm};
 use super::lazy_scope::has_standard_shape;
 use super::std_codec_meta::{
-    codec_check_whole, codec_option_null, codec_transform_effect, codec_transform_pure,
-    codec_transform_result, dsl_on_missing,
+    codec_check_whole, codec_option_null, codec_transform_as, codec_transform_effect,
+    codec_transform_pure, codec_transform_result, dsl_on_missing,
 };
 use super::std_schema_rt::{con_app, extra_con, make_codec, meta_con, rt, str_lit};
 use super::{Code, Env, Expr, ExprKind, Local, Lower, LowerError, Pat, Span};
@@ -32,6 +32,9 @@ impl Lower<'_> {
         let b = ExprBuilder::new(span, "$cdc");
 
         if value.mode == ForeignMode::Effect && value.dicts == 0 {
+            if self.allow_foreign_bridge && from == "flick:rt" && bind == "codecStandardAsync" {
+                return None;
+            }
             let expr = codec_effect_template(&b, from, bind, stages)?;
             return Some(self.expr(&expr, &Env::new(), block));
         }
@@ -239,15 +242,7 @@ fn codec_rt_template(b: &ExprBuilder, bind: &str, stages: usize) -> Option<Expr>
         ("codecOptionNullish", 1) => Some(codec_option_null(b, true)),
         ("codecTaggedOption", 1) => Some(super::std_codec_ops::codec_tagged_option(b)),
         ("codecTransformPure", 3) => Some(codec_transform_pure(b)),
-        ("codecTransformAs", 4) => Some(b.lam(
-            &["_s", "dec", "enc", "from"],
-            b.app3(
-                codec_transform_pure(b),
-                b.loc("dec"),
-                b.loc("enc"),
-                b.loc("from"),
-            ),
-        )),
+        ("codecTransformAs", 4) => Some(codec_transform_as(b)),
         ("codecTransformResult", 3) => Some(codec_transform_result(b)),
         ("codecTransformEffect", 3) => Some(codec_transform_effect(b)),
         ("codecCheckWhole", 3) => Some(codec_check_whole(b)),

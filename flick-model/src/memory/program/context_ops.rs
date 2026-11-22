@@ -47,11 +47,13 @@ impl Machine<'_, '_> {
                 let tag_val = self.scratch.pop().expect("service tag");
                 let key = self.service_tag_key(&tag_val)?.to_owned();
                 self.heap.drop_value(tag_val)?;
-                let Some(impl_val) = self.lookup_service_impl(&key)? else {
-                    return self
-                        .raise_defect(DefectSpec::custom(format!("Service not found: {key}")));
-                };
-                self.store(binding, impl_val)
+                if let Some(impl_val) = self.lookup_service_impl(&key)? {
+                    return self.store(binding, impl_val);
+                }
+                if self.foreign.bridge_opened {
+                    return self.foreign_lookup_service(binding, &key);
+                }
+                self.raise_defect(DefectSpec::custom(format!("Service not found: {key}")))
             }
             LayerIntrinsic::OwnerNew
             | LayerIntrinsic::OwnerRun
@@ -314,7 +316,12 @@ impl Machine<'_, '_> {
             };
             self.heap.drop_value(ctx)?;
             for (k, v) in map {
-                if let Some(old) = merged.insert(k, v) {
+                if k == HOST_CTX_KEY
+                    && let Some(prev) = merged.remove(HOST_CTX_KEY)
+                {
+                    let combined = self.concat_host_context_lists(prev, v)?;
+                    merged.insert(k, combined);
+                } else if let Some(old) = merged.insert(k, v) {
                     self.heap.drop_value(old)?;
                 }
             }

@@ -3,10 +3,31 @@
 use flick_ir::memory::{
     ArbitraryIntrinsic, AsyncIntrinsic, BigDecimalIntrinsic, BigIntIntrinsic, BytesIntrinsic,
     ConfigIntrinsic, DateTimeIntrinsic, DurationIntrinsic, GraphIntrinsic, HostPrimitive,
-    Intrinsic, LayerIntrinsic, PathIntrinsic,
+    Intrinsic, LayerIntrinsic, PathIntrinsic, StringIntrinsic,
 };
 
 pub(super) fn ext_rt_intrinsic(name: &str) -> Option<Intrinsic> {
+    if name == "Show" {
+        return Some(Intrinsic::Show);
+    }
+    if name == "String.Length" {
+        return Some(Intrinsic::StringLength);
+    }
+    if name == "String.CharCodeAt" {
+        return Some(Intrinsic::String(StringIntrinsic::CharCodeAt));
+    }
+    if name == "String.Slice" {
+        return Some(Intrinsic::String(StringIntrinsic::Slice));
+    }
+    if name == "String.ReplaceAll" {
+        return Some(Intrinsic::String(StringIntrinsic::ReplaceAll));
+    }
+    if name == "Bytes.EncodeUtf8" {
+        return Some(Intrinsic::Bytes(BytesIntrinsic::EncodeUtf8));
+    }
+    if name == "Bytes.ToList" {
+        return Some(Intrinsic::Bytes(BytesIntrinsic::ToList));
+    }
     if name == "Layer.Succeed" {
         return Some(Intrinsic::LayerSucceed);
     }

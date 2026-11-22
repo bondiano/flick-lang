@@ -326,7 +326,8 @@ fn operation(heap: &mut Heap, locals: &mut Locals, value: &Operation) -> Result<
         | Operation::GenerateLazy { .. }
         | Operation::Yield(_)
         | Operation::SeqOpen(_)
-        | Operation::SeqNext(_) => Err(Error::NeedsProgram),
+        | Operation::SeqNext(_)
+        | Operation::ForeignCall { .. } => Err(Error::NeedsProgram),
         Operation::Reuse {
             object,
             tag,

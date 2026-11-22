@@ -226,6 +226,10 @@ fn check_inert(heap: &mut Heap, root: &Value, fuel: &mut u64) -> Result<Value, E
         };
         let id = tok.id;
         match &heap.object(id)?.data {
+            Data::ForeignCycle { .. } => {
+                let err = make_schema_error(heap, &path, "a cycle in the input")?;
+                return heap.construct("Prelude.Option.Some", vec![err]);
+            }
             Data::Record(fields) => {
                 if !active.insert(id) {
                     let err = make_schema_error(heap, &path, "a cycle in the input")?;

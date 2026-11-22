@@ -26,6 +26,11 @@ pub enum Error {
         kind: Intrinsic,
         actual: usize,
     },
+    ForeignArity {
+        name: String,
+        expected: usize,
+        actual: usize,
+    },
     DuplicateHandledEffect(String),
     DuplicateHandledOperation {
         effect: String,
@@ -84,6 +89,14 @@ impl fmt::Display for Error {
                 f,
                 "memory intrinsic {kind:?} expects {} arguments, got {actual}",
                 kind.arity()
+            ),
+            Self::ForeignArity {
+                name,
+                expected,
+                actual,
+            } => write!(
+                f,
+                "memory foreign call {name} expects {expected} arguments, got {actual}"
             ),
             Self::DuplicateHandledEffect(effect) => write!(f, "handler repeats effect {effect}"),
             Self::DuplicateHandledOperation { effect, op } => {

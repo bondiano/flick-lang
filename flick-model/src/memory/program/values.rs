@@ -57,9 +57,10 @@ impl Machine<'_, '_> {
                 self.primitive_result(binding, value)?;
             }
             Operation::Field { object, field } => {
-                let receiver = peek(&self.frames.last().expect("caller").locals, *object)?;
-                let value = self.heap.project_named(receiver, field)?;
-                self.store(binding, value)?;
+                self.field_operation(binding, *object, field)?;
+            }
+            Operation::ForeignCall { spec, args } => {
+                self.foreign_call(binding, spec, args)?;
             }
             Operation::Literal(literal) => {
                 let value = self.heap.literal(literal)?;
@@ -97,12 +98,32 @@ impl Machine<'_, '_> {
         Ok(())
     }
 
+    fn field_operation(&mut self, binding: Local, object: Local, field: &str) -> Result<(), Error> {
+        let receiver = peek(&self.frames.last().expect("caller").locals, object)?;
+        if let Value::Object(tok) = receiver
+            && let Data::ForeignHandle { execution, host_id } = self.heap.object(tok.id)?.data
+        {
+            return self.foreign_get_field(binding, execution, host_id, field);
+        }
+        let value = self.heap.project_named(receiver, field)?;
+        self.store(binding, value)
+    }
+
     fn primitive_operation(&mut self, binding: Local, operation: &Operation) -> Result<(), Error> {
         match operation {
             Operation::Binary { op, left, right } => {
                 self.stage([*left, *right])?;
-                let result =
-                    primitives::binary_metered(self.heap, *op, &self.scratch, &mut self.fuel)?;
+                let result = if self.foreign.bridge_opened
+                    && matches!(
+                        op,
+                        BinOp::Eq | BinOp::NotEq | BinOp::Same | BinOp::NotSame
+                    )
+                    && let Some(eq) = self.try_foreign_handles_equal()?
+                {
+                    Value::Bool(eq == matches!(op, BinOp::Eq | BinOp::Same))
+                } else {
+                    primitives::binary_metered(self.heap, *op, &self.scratch, &mut self.fuel)?
+                };
                 self.primitive_result(binding, result)?;
             }
             Operation::Not(local) => {

@@ -17,13 +17,20 @@ use regex_automata::meta::Regex;
 mod causes;
 pub use causes::{CauseToken, DefectClass, DefectCode, DefectSpec, LanguageExit, Reason};
 
+mod host_bridge;
+pub use host_bridge::HostBridge;
+
 mod patterns;
 mod primitives;
+pub use primitives::HostMode;
 mod program;
 pub use program::{
     Executed, ExecutionReport, ProgramOutcome, TestCaseResult, execute_main_program,
-    execute_main_program_outcome, execute_program, execute_program_outcome,
-    execute_rooted_main_program_outcome, execute_tests_program,
+    execute_main_program_outcome, execute_main_program_outcome_with_bridge,
+    execute_main_program_outcome_with_host, execute_main_with_bridge_and_inits, execute_program,
+    execute_program_outcome, execute_rooted_main_program_outcome,
+    execute_rooted_main_program_outcome_with_bridge, execute_rooted_main_program_outcome_with_host,
+    execute_tests_program, execute_tests_program_with_bridge,
 };
 
 /// An allocation's identity includes its heap and generation. Recycled backing

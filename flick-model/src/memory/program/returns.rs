@@ -155,6 +155,12 @@ impl<'p> Machine<'p, '_> {
                 let ignored = self.pending.take().expect("discarded result");
                 self.heap.drop_value(ignored)?;
             }
+            Destination::RaiseFromCatch
+            | Destination::HostSyncCallback { .. }
+            | Destination::HostApplyChain { .. }
+            | Destination::ForeignLayerBuildFinish { .. } => {
+                self.returned_foreign_destination(destination)?;
+            }
             Destination::RestoreMask { .. }
             | Destination::DiscardCleanupDone { .. }
             | Destination::OnExitDiscardRunFin { .. }
@@ -180,6 +186,52 @@ impl<'p> Machine<'p, '_> {
                 let value = self.pending.take().expect("returned token");
                 self.deliver(&destination, value)?;
             }
+        }
+        Ok(())
+    }
+
+    fn returned_foreign_destination(&mut self, destination: Destination<'p>) -> Result<(), Error> {
+        match destination {
+            Destination::RaiseFromCatch => {
+                let err_val = self.pending.take().expect("catch mapped error");
+                self.scratch.push(err_val);
+                self.raise_ordinary()?;
+            }
+            Destination::HostSyncCallback {
+                req_id,
+                mut remaining_args,
+            } => {
+                let val = self.pending.take().expect("sync callback return");
+                if let Some(next_arg) = remaining_args.pop_front() {
+                    self.scratch.extend([val, next_arg]);
+                    self.apply_fresh(Destination::HostSyncCallback {
+                        req_id,
+                        remaining_args,
+                    })?;
+                } else {
+                    self.foreign.sync_cb_result = Some((req_id, Ok(val)));
+                }
+            }
+            Destination::HostApplyChain { mut remaining_args } => {
+                let val = self.pending.take().expect("async callback intermediate");
+                if let Some(next_arg) = remaining_args.pop_front() {
+                    self.scratch.extend([val, next_arg]);
+                    let next_dest = if remaining_args.is_empty() {
+                        Destination::Top
+                    } else {
+                        Destination::HostApplyChain { remaining_args }
+                    };
+                    self.apply_fresh(next_dest)?;
+                } else {
+                    self.top = Some(val);
+                }
+            }
+            Destination::ForeignLayerBuildFinish { target, .. } => {
+                let handle = self.pending.take().expect("built host layer handle");
+                let ctx = self.wrap_host_context_handle(handle)?;
+                self.deliver_layer_build_ok(target, ctx)?;
+            }
+            _ => unreachable!("non-foreign destination in returned_foreign_destination"),
         }
         Ok(())
     }

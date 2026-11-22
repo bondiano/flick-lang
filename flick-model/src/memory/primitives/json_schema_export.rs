@@ -9,6 +9,7 @@ use super::json_schema_jval::{
 };
 use super::list_ops::slice_reps;
 use super::{Error, Heap, Value, charge};
+use crate::memory::Data;
 
 const INT32_MIN: f64 = -2_147_483_648.0;
 const INT32_MAX: f64 = 2_147_483_647.0;
@@ -239,7 +240,15 @@ impl Exporter {
                 }
                 let mut members = Vec::with_capacity(reps.len());
                 for r in &reps {
-                    let (nv, fv) = pair_of(heap, r)?;
+                    let (nv, fv) = if let Value::Object(tok) = r
+                        && let Data::Tagged { tag, fields, .. } = &heap.object(tok.id)?.data
+                        && tag == "$tuple"
+                        && fields.len() == 3
+                    {
+                        (fields[1].representation(), fields[2].representation())
+                    } else {
+                        pair_of(heap, r)?
+                    };
                     let vname = heap.string_lossy(&nv)?;
                     let mut entries = vec![(
                         "_tag".to_owned(),
