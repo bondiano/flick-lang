@@ -4,7 +4,9 @@ stamp : Unit ->{Host.Clock, Host.Random} String
 let stamp () =
   let running = Host.Clock.current_time_millis () > 0
   let draw = Host.Random.next ()
-  "clock running: \{show running}, draw in range: \{show (draw >= 0 && draw < 1)}, draw is 0.25: \{show (draw == 0.25)}"
+  let in_range = draw >= 0 && draw < 1
+  "clock running: \{show running}, draw in range: \{show in_range}, "
+    ++ "draw is 0.25: \{show (draw == 0.25)}"
 
 fixed_clock : Layer none none {Host.Clock}
 let fixed_clock =

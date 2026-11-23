@@ -8,7 +8,8 @@ let open_store () =
   Ref.make ["Ada"]
 
 suite "store" {
-  fixture shared names = open_store () |> Fixture.cleanup (fun _ -> Platform.stdout_line "close store")
+  fixture shared names = open_store ()
+    |> Fixture.cleanup (fun _ -> Platform.stdout_line "close store")
   fixture count = List.length (Ref.get (await names))
   test "count" { expect (await count) |> to.equal 1 }
   test "read" { expect (Ref.get (await names)) |> to.contain "Ada" }

@@ -20,9 +20,14 @@ let main () =
     try
       scope {
         let _tx = own (Tx "books")
-        let file = Resource.make (task { "file" }) (fun _ exit ->
-          Platform.stdout_line (if Exit.is_success exit then "close: success" else "close: failure"))
-        Scope.defer (fun exit -> Platform.stdout_line (if Exit.is_success exit then "flush: success" else "flush: failure"))
+        let file =
+          Resource.make (task { "file" }) (fun _ exit ->
+            Platform.stdout_line
+              (if Exit.is_success exit then "close: success" else "close: failure")
+          )
+        Scope.defer (fun exit ->
+          Platform.stdout_line (if Exit.is_success exit then "flush: success" else "flush: failure")
+        )
         Platform.stdout_line "reading \{file}"
         check (-3)
       }

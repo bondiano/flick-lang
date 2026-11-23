@@ -6,7 +6,8 @@ server : Config.Config Server
 let server =
   Config.with_default "localhost" (Config.string "SHOP_HOST")
   |> Config.flat_map (fun host ->
-    Config.with_default 8080 (Config.port "SHOP_PORT") |> Config.map (fun port -> { host = host; port = port })
+    Config.with_default 8080 (Config.port "SHOP_PORT")
+    |> Config.map (fun port -> { host = host; port = port })
   )
 
 describe : Unit ->{Host.Environment} String
@@ -20,7 +21,8 @@ let describe () =
 fake_env : List (String, String) -> Layer none none {Host.Environment}
 let fake_env vars =
   Layer.succeed Host.Environment {
-    env = fun name -> List.find (fun (key, _) -> key == name) vars |> Option.map (fun (_, value) -> value)
+    env = fun name ->
+      List.find (fun (key, _) -> key == name) vars |> Option.map (fun (_, value) -> value)
     vars = fun () -> vars
   }
 

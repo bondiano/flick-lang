@@ -17,13 +17,14 @@ order_button : Ui
 let order_button = ui {
   button {
     disabled = false
-    on_click = Ui.Event.exhaust (fun _ -> task {
-      let message =
-        try place { item = "tea"; count = 1 } with
-        | OutOfStock item -> "out of stock: " ++ item
-        | Rpc.ClientError reason -> reason
-      Platform.stdout_line message
-    })
+    on_click =
+      Ui.Event.exhaust (fun _ -> task {
+        let message =
+          try place { item = "tea"; count = 1 } with
+          | OutOfStock item -> "out of stock: " ++ item
+          | Rpc.ClientError reason -> reason
+        Platform.stdout_line message
+      })
   }
     text "Place order"
 }

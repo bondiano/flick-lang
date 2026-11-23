@@ -1,7 +1,10 @@
 module Main exposing (main)
 
 is_some : Option a -> Bool
-let is_some value = match value with | Some _ -> true | None -> false
+let is_some value =
+  match value with
+  | Some _ -> true
+  | None -> false
 
 proof some_is_some (x : a) where holds (is_some (Some x)) = refl
 

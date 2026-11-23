@@ -18,8 +18,7 @@ let box =
   )
 
 main : Unit ->{Host.Console} Unit
-let main () =
-  provide log {
-    provide box { Log.line ("use " ++ Box.value ()) }
-    Log.line "after the provide"
-  }
+let main () = provide log {
+  provide box { Log.line ("use " ++ Box.value ()) }
+  Log.line "after the provide"
+}
