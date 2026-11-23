@@ -1,14 +1,57 @@
+use std::mem;
 use std::sync::Arc;
 
 use super::{
-    Diagnostic, Edit, Loaded, Loader, ModuleSyntax, Path, PathBuf, Root, Span, codes,
+    Diagnostic, Edit, Loaded, Loader, ModuleSyntax, Path, PathBuf, Root, Severity, Span, codes,
     expected_name, io, module_path,
 };
 use crate::project::{COMPANION, COMPANIONS, companion_module, companion_of};
-use crate::resolve::{Header, Import, Item, ItemKind, TESTS};
+use crate::resolve::{self, Header, Import, Interface, Item, ItemKind, TESTS};
 use crate::source::FileId;
+use crate::syntax::{self, Parse};
+use crate::types;
 
 impl Loader<'_> {
+    /// The interfaces of the built-in modules, in the mode of this run.
+    pub(super) fn builtins(&self) -> &'static [Interface] {
+        types::builtins_of(self.stages_by_class)
+    }
+
+    /// The diagnostics of the run without the warnings it does not report:
+    /// those the project allows, and those of source packages, whose
+    /// dependent does not answer for them.
+    pub(super) fn reported(&mut self) -> Vec<Diagnostic> {
+        let package_files: Vec<FileId> = self
+            .modules
+            .iter()
+            .filter(|m| matches!(m.root, Root::Package(_)))
+            .map(|m| m.file)
+            .collect();
+        let allowed = self.project.map(|p| &p.config.allow);
+        let mut diagnostics = mem::take(&mut self.diagnostics);
+        diagnostics.retain(|d| {
+            d.severity != Severity::Warning
+                || (d.span.is_none_or(|s| !package_files.contains(&s.file))
+                    && allowed.is_none_or(|a| !a.contains(&d.code)))
+        });
+        diagnostics
+    }
+
+    /// The parse of a module, from an earlier run while its text stays the same.
+    pub(super) fn parsed(&mut self, path: &Path, file: FileId) -> (Arc<Parse>, Arc<ModuleSyntax>) {
+        let text = &self.sources.get(file).text;
+        if let Some(found) = self.cache.as_ref().and_then(|c| c.parsed(path, file, text)) {
+            return found;
+        }
+        let parse = Arc::new(syntax::parse(text, file).into_module());
+        let module = Arc::new(resolve::module_syntax(&parse.tree, text, file));
+        if let Some(cache) = &mut self.cache {
+            let parsed = (parse.clone(), module.clone());
+            cache.keep_parsed(path, file, text, parsed);
+        }
+        (parse, module)
+    }
+
     /// The directory a module of `root` names itself from.
     fn root_dir(&self, root: &Root) -> Option<PathBuf> {
         match (root, self.project) {

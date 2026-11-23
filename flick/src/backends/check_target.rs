@@ -30,7 +30,7 @@ pub(crate) fn check_target_for_project(
     compilation: &Compilation,
     sources: &SourceMap,
     environment: &ResolvedEnvironment,
-    _stages_by_class: bool,
+    stages_by_class: bool,
 ) -> Vec<Diagnostic> {
     if matches!(
         environment.backend_id.as_str(),
@@ -40,6 +40,7 @@ pub(crate) fn check_target_for_project(
     }
     let has_foreign = compilation.modules.iter().any(|m| {
         m.package.is_none()
+            && compilation.module_available(&m.name)
             && m.ir
                 .items
                 .iter()
@@ -54,8 +55,14 @@ pub(crate) fn check_target_for_project(
     let Some(backend) = load(&pin, &bytes) else {
         return Vec::new();
     };
-    let (request, files, input_bytes) =
-        build_check_request(project, compilation, sources, environment, &pin);
+    let (request, files, input_bytes) = build_check_request(
+        project,
+        compilation,
+        sources,
+        environment,
+        stages_by_class,
+        &pin,
+    );
     let Ok(mut declared) = DeclaredInputs::new(&request.inputs, |id| input_bytes.get(id).cloned())
     else {
         return Vec::new();
@@ -74,10 +81,12 @@ fn build_check_request(
     compilation: &Compilation,
     sources: &SourceMap,
     environment: &ResolvedEnvironment,
+    stages_by_class: bool,
     pin: &BackendPin,
 ) -> (BuildRequest, Vec<FileId>, BTreeMap<String, Vec<u8>>) {
+    let pruned = compilation.prune_for_environment(sources, stages_by_class);
     let files = RefCell::new(Vec::new());
-    let ir_modules: Vec<_> = compilation.modules.iter().map(|m| m.ir.clone()).collect();
+    let ir_modules: Vec<_> = pruned.modules.iter().map(|m| m.ir.clone()).collect();
     let program = Program::new(
         &format!("flick {}", toolchain::COMPILER),
         ir_modules,
@@ -108,7 +117,7 @@ fn build_check_request(
             line_starts: file.line_starts().to_vec(),
         });
     }
-    let modules = compilation
+    let modules = pruned
         .modules
         .iter()
         .map(|m| ModuleInput {

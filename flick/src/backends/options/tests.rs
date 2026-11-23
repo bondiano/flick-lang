@@ -307,6 +307,10 @@ fn target_override_preserves_non_rt_stage_mode_for_go() {
         Vec::new(),
     );
     assert_eq!(ov.rt, Some(false));
+    assert!(
+        !ov.skip_backend_check_target,
+        "target_override must not skip backend check-target by default (pack/doc rely on it)"
+    );
     assert!(!stages_by_class(
         &FsHost::without_backends(),
         Some(&default_js_project),

@@ -2,6 +2,7 @@
 //! of one level of the import graph in parallel, reusing what a
 //! [`ModuleCache`] kept of earlier runs.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 #[cfg(feature = "native-project")]
 use std::fmt::Write as _;
@@ -86,6 +87,9 @@ pub(crate) fn check_file(
         watched: types::Watched::new(first_party::WATCH),
     });
     let watching: Vec<_> = watching.into_iter().collect();
+    let env_ctx = super::environment::EnvironmentContext::standalone();
+    #[cfg(not(target_arch = "wasm32"))]
+    let package_when = BTreeMap::new();
     let checking = Checking {
         modules: &modules,
         sources,
@@ -93,8 +97,11 @@ pub(crate) fn check_file(
         from_packages: &from_packages,
         project: None,
         stages_by_class: false,
-        foreign_backend: types::ForeignBackendSpec::default_js(),
-        validate_foreign_metadata: true,
+        env_ctx: &env_ctx,
+        #[cfg(not(target_arch = "wasm32"))]
+        package_when: &package_when,
+        #[cfg(not(target_arch = "wasm32"))]
+        own_package_when: None,
         lower: false,
         lowered: &[],
         proving: false,
@@ -310,8 +317,11 @@ impl Loader<'_> {
             watching: &self.watchers.plugins,
             watched: &self.watchers.watched,
             stages_by_class: self.stages_by_class,
-            foreign_backend: &self.foreign_backend,
-            validate_foreign_metadata: self.validate_foreign_metadata,
+            env_ctx: self.env_ctx,
+            #[cfg(not(target_arch = "wasm32"))]
+            package_when: self.package_when,
+            #[cfg(not(target_arch = "wasm32"))]
+            own_package_when: self.own_package_when,
             lowered: self.lowered.as_deref().unwrap_or(&[]),
             proving: self.modules.iter().any(Loaded::has_proofs),
             // a failed import leaves names unresolved, and the build fails anyway
@@ -410,8 +420,11 @@ struct Checking<'a> {
     from_packages: &'a BTreeMap<String, Interface>,
     project: Option<&'a Project>,
     stages_by_class: bool,
-    foreign_backend: &'a types::ForeignBackendSpec,
-    validate_foreign_metadata: bool,
+    env_ctx: &'a super::environment::EnvironmentContext,
+    #[cfg(not(target_arch = "wasm32"))]
+    package_when: &'a BTreeMap<String, String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    own_package_when: Option<&'a str>,
     lower: bool,
     /// The IR of the modules checked before this level, which proofs read.
     lowered: &'a [Option<Lowered>],

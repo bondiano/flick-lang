@@ -202,12 +202,11 @@ impl Checker<'_> {
                     AdapterArg::Int(n)
                 }
                 AdapterArgKind::Text => {
-                    if raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2 {
-                        AdapterArg::String(literal::string_value(raw))
-                    } else {
+                    let Some(raw) = plain_string_literal(self.text, node) else {
                         self.bad_meta(item, &usage());
                         return None;
-                    }
+                    };
+                    AdapterArg::String(literal::string_value(raw))
                 }
                 AdapterArgKind::Word => {
                     if raw

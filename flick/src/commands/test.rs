@@ -171,7 +171,7 @@ fn prepare(
         return fail(&sources, vec![diagnostic]);
     }
     progress.stage("Compiling Flick modules");
-    let override_cfg = target_override(
+    let mut override_cfg = target_override(
         &backend,
         &choice,
         target_overridden,
@@ -180,6 +180,7 @@ fn prepare(
         true,
         wanted.clone(),
     );
+    override_cfg.skip_backend_check_target = true;
     let (mut diagnostics, mut compilation) = package_cache::compile_for(
         &host,
         &mut sources,

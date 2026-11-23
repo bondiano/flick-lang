@@ -119,8 +119,8 @@ pub struct TargetOverride {
     /// Specific test file paths selected for `flick test`, if any.
     pub test_paths: Vec<PathBuf>,
     /// Skip invoking `Host::check_target` during `check_environment` when the
-    /// caller (`flick build` / `run` / `test` / `inspect`) runs backend
-    /// `check-target` itself during artifact generation.
+    /// caller (`flick build`, `flick test`, `flick inspect --emit output`) runs
+    /// backend `check-target` itself during artifact generation.
     pub skip_backend_check_target: bool,
 }
 
@@ -182,6 +182,9 @@ pub(super) struct EnvironmentContext {
     /// Whether foreign metadata words and attributes should be validated against
     /// `foreign_backend` (false when an uncached custom backend could not be loaded).
     pub validate_foreign_metadata: bool,
+    /// Official and project-loaded backend descriptors, used to pick the right
+    /// foreign metadata vocabulary for inactive `@when` modules.
+    pub backends: Vec<BackendTags>,
 }
 
 /// Validates `@when "<cond>"` on a standalone file checked outside any project.
@@ -300,6 +303,20 @@ pub(super) struct EnvironmentContext {
 }
 
 #[cfg(target_arch = "wasm32")]
+impl EnvironmentContext {
+    pub(super) fn standalone() -> Self {
+        Self {
+            foreign_backend: ForeignBackendSpec::js(),
+            validate_foreign_metadata: true,
+        }
+    }
+
+    pub(super) fn foreign_backend_for(&self, _module_when: Option<&str>) -> ForeignBackendSpec {
+        self.foreign_backend.clone()
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
 pub(crate) fn validate_standalone_when(
     syntax: &ModuleSyntax,
     file: &SourceFile,
@@ -389,6 +406,7 @@ pub(super) fn resolve(
             resolved: None,
             foreign_backend: ForeignBackendSpec::js(),
             validate_foreign_metadata: false,
+            backends,
         };
     }
 
@@ -480,6 +498,7 @@ pub(super) fn resolve(
             resolved: None,
             foreign_backend,
             validate_foreign_metadata,
+            backends,
         };
     }
 
@@ -500,5 +519,6 @@ pub(super) fn resolve(
         resolved,
         foreign_backend,
         validate_foreign_metadata,
+        backends,
     }
 }

@@ -1,8 +1,11 @@
 //! Built-in official backend metadata (`flick/js`, `flick/go`) and active
 //! foreign backend selection for checking and IDE analysis.
 
-use super::{BackendAxis, BackendTags, TargetOverride};
+use std::collections::BTreeSet;
+
+use super::{BackendAxis, BackendTags, EnvironmentContext, TargetOverride};
 use crate::project::Project;
+use crate::syntax::when;
 use crate::types::ForeignBackendSpec;
 
 /// Built-in metadata for the official `flick/js` and `flick/go` backends.
@@ -112,5 +115,53 @@ pub(super) fn upsert_backend(backends: &mut Vec<BackendTags>, extra: BackendTags
         *existing = extra;
     } else {
         backends.push(extra);
+    }
+}
+
+impl EnvironmentContext {
+    /// Context for checking a standalone file outside a project.
+    pub(in crate::project) fn standalone() -> Self {
+        Self {
+            vocabulary: BTreeSet::new(),
+            validate_tags: true,
+            resolved: None,
+            foreign_backend: ForeignBackendSpec::js(),
+            validate_foreign_metadata: true,
+            backends: official_backends(),
+        }
+    }
+
+    /// Selects the foreign metadata specification for one module: a uniquely
+    /// matching backend for an inactive `@when` condition, else the project's
+    /// active backend.
+    pub(in crate::project) fn foreign_backend_for(
+        &self,
+        module_when: Option<&str>,
+    ) -> ForeignBackendSpec {
+        if let Some(cond) = module_when
+            && let Ok(expr) = when::parse(cond)
+        {
+            let active_matches = match &self.resolved {
+                Some(env) => expr.eval(&|tag| env.tags.contains(tag)),
+                None => self
+                    .backends
+                    .iter()
+                    .find(|b| b.id == self.foreign_backend.backend_id)
+                    .is_some_and(|b| {
+                        let vocab = b.full_vocabulary();
+                        expr.eval(&|tag| vocab.contains(tag))
+                    }),
+            };
+            if !active_matches {
+                let mut matching = self.backends.iter().filter(|b| {
+                    let vocab = b.full_vocabulary();
+                    expr.eval(&|tag| vocab.contains(tag))
+                });
+                if let (Some(only), None) = (matching.next(), matching.next()) {
+                    return only.foreign_spec();
+                }
+            }
+        }
+        self.foreign_backend.clone()
     }
 }

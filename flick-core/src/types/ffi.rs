@@ -398,6 +398,26 @@ impl ForeignInfo {
     }
 }
 
+/// Returns the raw token slice when `node` is a single plain string literal
+/// (`K::Literal` with one non-trivia `K::String` token and no child nodes),
+/// accepting plain, raw (`r"..."`, `r#"..."#`), and multiline (`"""..."""`)
+/// string literals while rejecting postfix expressions (`"a".b`, `"a"()`) and
+/// string interpolation.
+fn plain_string_literal<'a>(text: &'a str, node: &Node) -> Option<&'a str> {
+    if node.kind != K::Literal || node.nodes().next().is_some() {
+        return None;
+    }
+    let mut tokens = node.child_tokens();
+    let token = tokens.next()?;
+    if token.kind != K::String || tokens.next().is_some() {
+        return None;
+    }
+    Some(token.text(text))
+}
+
+#[cfg(test)]
+#[path = "ffi/metadata_tests.rs"]
+mod metadata_tests;
 #[cfg(test)]
 #[path = "ffi/pending_tests.rs"]
 mod pending_tests;

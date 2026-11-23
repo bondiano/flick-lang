@@ -135,8 +135,8 @@ impl Checking<'_> {
             // the code of its blocks too, which other modules' blocks change
             text: self.text_of(loaded).to_owned(),
             config: self.project.map(|p| p.config.clone()),
-            foreign_backend: self.foreign_backend.clone(),
-            validate_foreign_metadata: self.validate_foreign_metadata,
+            foreign_backend: self.foreign_backend_for(loaded),
+            validate_foreign_metadata: self.env_ctx.validate_foreign_metadata,
             lower: self.lower,
             cached_ir: self.cached_ir,
             imports: loaded
