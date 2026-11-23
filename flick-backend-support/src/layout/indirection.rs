@@ -1,5 +1,6 @@
 //! Static declaration-level indirection analysis (transparent DAG check,
-//! Phase 1 growing recursive instantiation detection, and Tarjan's SCC).
+//! Phase 1 growing recursive instantiation detection across ADTs, `unboxed`
+//! wrappers, and `opaque type alias`es, and Tarjan's SCC).
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -16,28 +17,49 @@ pub(crate) type FieldSite = (DeclKey, usize, usize);
 pub(crate) struct StaticIndirection {
     /// `opaque type alias` declarations that cycle without an intervening ADT.
     pub cyclic_aliases: BTreeSet<DeclKey>,
-    /// `unboxed` declarations that stay transparent (not in a transparent-only cycle).
+    /// `unboxed` declarations that stay transparent (neither in a
+    /// transparent-only cycle nor in a growing recursive SCC).
     pub transparent_unboxed: BTreeSet<DeclKey>,
     /// Constructor field sites statically forced behind pointers due to
     /// growing recursive instantiations.
     pub growing_fields: BTreeSet<FieldSite>,
+    /// `opaque type alias` declarations in a growing recursive SCC, mapped to
+    /// the set of declarations reachable from them in the declaration graph
+    /// (`None` when a reachable declaration uses an HKT variable application,
+    /// meaning any ADT may be reached through the type parameter).
+    pub growing_aliases: BTreeMap<DeclKey, Option<BTreeSet<DeclKey>>>,
 }
 
 impl StaticIndirection {
     pub(crate) fn analyze(catalog: &TypeCatalog<'_>) -> StaticIndirection {
-        let (cyclic_aliases, transparent_unboxed) = analyze_transparent_dag(catalog);
-        let growing_fields =
-            analyze_growing_recursion(catalog, &cyclic_aliases, &transparent_unboxed);
+        let (cyclic_aliases, mut transparent_unboxed) = analyze_transparent_dag(catalog);
+        let (growing_fields, growing_aliases) =
+            analyze_growing_recursion(catalog, &cyclic_aliases, &mut transparent_unboxed);
         StaticIndirection {
             cyclic_aliases,
             transparent_unboxed,
             growing_fields,
+            growing_aliases,
         }
     }
 
-    /// Expands one layer of transparent `opaque type alias` / `unboxed`
-    /// declarations at the top level of `ty` until reaching a primitive,
-    /// structural type, or non-transparent ADT.
+    /// Whether `alias_key` is a growing recursive `opaque type alias` that can
+    /// reach `owner_decl` (directly, transitively, or via an HKT parameter).
+    pub(crate) fn is_growing_alias_reaching(
+        &self,
+        alias_key: &DeclKey,
+        owner_decl: &DeclKey,
+    ) -> bool {
+        match self.growing_aliases.get(alias_key) {
+            Some(None) => true,
+            Some(Some(reachable)) => reachable.contains(owner_decl),
+            None => false,
+        }
+    }
+
+    /// Expands transparent `opaque type alias`, `transparent_unboxed`, and
+    /// empty `Forall` layers at the top level of `ty` until reaching a
+    /// primitive, structural type, or non-transparent ADT.
     pub(crate) fn unwrap_transparent(
         &self,
         catalog: &TypeCatalog<'_>,
@@ -46,6 +68,17 @@ impl StaticIndirection {
     ) -> Result<TypeRef, LayoutError> {
         let mut cur = ty.clone();
         loop {
+            if let IrType::Forall {
+                vars,
+                constraints,
+                body,
+            } = &*cur
+                && vars.is_empty()
+                && constraints.is_empty()
+            {
+                cur = body.clone();
+                continue;
+            }
             let IrType::Named { module, name, args } = &*cur else {
                 return Ok(cur);
             };
@@ -183,166 +216,221 @@ fn collect_transparent_targets(
                 collect_transparent_targets(arg, idx_of, out);
             }
         }
+        IrType::Forall {
+            vars,
+            constraints,
+            body,
+        } if vars.is_empty() && constraints.is_empty() => {
+            collect_transparent_targets(body, idx_of, out);
+        }
         IrType::Var(_) | IrType::Fun { .. } | IrType::Forall { .. } | IrType::Exists { .. } => {}
     }
 }
 
-/// One declaration-level occurrence of a non-transparent ADT inside a field.
+/// One declaration-level occurrence inside a field or alias body.
 struct DeclOcc {
     target: usize,
     growing: bool,
 }
 
-struct OccCollector<'a, 'p> {
-    catalog: &'a TypeCatalog<'p>,
-    cyclic_aliases: &'a BTreeSet<DeclKey>,
-    transparent_unboxed: &'a BTreeSet<DeclKey>,
-    idx_of: &'a BTreeMap<DeclKey, usize>,
-    interner: TypeInterner,
-}
-
-impl OccCollector<'_, '_> {
-    fn collect(&mut self, ty: &TypeRef, out: &mut Vec<DeclOcc>) {
-        match &**ty {
-            IrType::Named { module, name, args } => self.collect_named(module, name, args, out),
-            IrType::Tuple(items) => {
-                for item in items {
-                    self.collect(item, out);
-                }
-            }
-            IrType::Record { fields, .. } => {
-                for (_, field_ty) in fields {
-                    self.collect(field_ty, out);
-                }
-            }
-            IrType::App { head, args } => {
-                self.collect(head, out);
-                for arg in args {
-                    self.collect(arg, out);
-                }
-            }
-            IrType::Var(_) | IrType::Fun { .. } | IrType::Forall { .. } | IrType::Exists { .. } => {
-            }
-        }
-    }
-
-    fn collect_named(
-        &mut self,
-        module: &str,
-        name: &str,
-        args: &[TypeRef],
-        out: &mut Vec<DeclOcc>,
-    ) {
-        let key = (module.to_owned(), name.to_owned());
-        if self.cyclic_aliases.contains(&key) {
-            return;
-        }
-        let Some(decl) = self.catalog.decl_of(module, name) else {
-            return;
-        };
-        if let Some(body) = &decl.alias {
-            if args.len() == decl.params.len() {
-                let subst: Vec<(&str, &TypeRef)> = decl
-                    .params
+/// Walks a declaration AST once without expanding aliases or `unboxed` types,
+/// collecting direct references to declarations in `idx_of` and noting any
+/// higher-kinded variable applications (`IrType::App`).
+fn collect_decl_occs(
+    catalog: &TypeCatalog<'_>,
+    ty: &IrType,
+    idx_of: &BTreeMap<DeclKey, usize>,
+    out: &mut Vec<DeclOcc>,
+    has_hkt_app: &mut bool,
+) {
+    match ty {
+        IrType::Named { module, name, args } => {
+            let Some(decl) = catalog.decl_of(module, name) else {
+                // Primitive, pointer handle (`List`, `String`, `Bytes`, ...),
+                // or opaque 0-constructor handle: stops by-value traversal.
+                return;
+            };
+            let key = (module.clone(), name.clone());
+            if let Some(&target) = idx_of.get(&key) {
+                let partial = args.len() < decl.params.len();
+                let growing_arg = args
                     .iter()
-                    .map(String::as_str)
-                    .zip(args.iter())
-                    .collect();
-                let expanded = body.substitute(&subst, &mut self.interner);
-                self.collect(&expanded, out);
+                    .any(|a| !matches!(&**a, IrType::Var(_)) && has_free_var(a));
+                out.push(DeclOcc {
+                    target,
+                    growing: partial || growing_arg,
+                });
             }
-            return;
-        }
-        if self.transparent_unboxed.contains(&key) {
-            if args.len() == decl.params.len() {
-                let subst: Vec<(&str, &TypeRef)> = decl
-                    .params
-                    .iter()
-                    .map(String::as_str)
-                    .zip(args.iter())
-                    .collect();
-                let expanded =
-                    decl.constructors[0].fields[0].substitute(&subst, &mut self.interner);
-                self.collect(&expanded, out);
+            for arg in args {
+                collect_decl_occs(catalog, arg, idx_of, out, has_hkt_app);
             }
-            return;
         }
-        if let Some(&target) = self.idx_of.get(&key) {
-            let partial = args.len() < decl.params.len();
-            let growing_arg = args
-                .iter()
-                .any(|a| !matches!(&**a, IrType::Var(_)) && has_free_var(a));
-            out.push(DeclOcc {
-                target,
-                growing: partial || growing_arg,
-            });
+        IrType::Tuple(items) => {
+            for item in items {
+                collect_decl_occs(catalog, item, idx_of, out, has_hkt_app);
+            }
         }
-        for arg in args {
-            self.collect(arg, out);
+        IrType::Record { fields, .. } => {
+            for (_, field_ty) in fields {
+                collect_decl_occs(catalog, field_ty, idx_of, out, has_hkt_app);
+            }
         }
+        IrType::App { head, args } => {
+            if !matches!(&**head, IrType::Named { .. }) {
+                *has_hkt_app = true;
+            }
+            collect_decl_occs(catalog, head, idx_of, out, has_hkt_app);
+            for arg in args {
+                collect_decl_occs(catalog, arg, idx_of, out, has_hkt_app);
+            }
+        }
+        IrType::Forall {
+            vars,
+            constraints,
+            body,
+        } if vars.is_empty() && constraints.is_empty() => {
+            collect_decl_occs(catalog, body, idx_of, out, has_hkt_app);
+        }
+        IrType::Var(_) | IrType::Fun { .. } | IrType::Forall { .. } | IrType::Exists { .. } => {}
     }
 }
 
-/// Step 1: identifies constructor fields that contain growing recursive
-/// declaration occurrences (such as `Nested (List a)` or partial applications
-/// of an SCC member) so they are put behind pointers before any instantiation.
+/// Step 1: analyzes ALL non-cyclic declarations (regular ADTs, `unboxed` ADTs,
+/// and `opaque type alias`es) as vertices in a single finite declaration graph
+/// without eager expansion. Identifies growing recursive fields, demotes
+/// growing-recursive `unboxed` wrappers so their growing field is boxed, and
+/// records growing-recursive `opaque type alias`es with their reachable ADTs.
 fn analyze_growing_recursion(
     catalog: &TypeCatalog<'_>,
     cyclic_aliases: &BTreeSet<DeclKey>,
-    transparent_unboxed: &BTreeSet<DeclKey>,
-) -> BTreeSet<FieldSite> {
-    let mut adts: Vec<DeclKey> = Vec::new();
-    for (key, decl) in &catalog.decls {
-        if decl.alias.is_none()
-            && !decl.constructors.is_empty()
-            && !transparent_unboxed.contains(key)
-        {
-            adts.push(key.clone());
-        }
-    }
-    let idx_of: BTreeMap<DeclKey, usize> = adts
+    transparent_unboxed: &mut BTreeSet<DeclKey>,
+) -> (
+    BTreeSet<FieldSite>,
+    BTreeMap<DeclKey, Option<BTreeSet<DeclKey>>>,
+) {
+    let decls: Vec<DeclKey> = catalog
+        .decls
+        .iter()
+        .filter(|(key, decl)| {
+            !cyclic_aliases.contains(*key)
+                && (decl.alias.is_some() || !decl.constructors.is_empty())
+        })
+        .map(|(key, _)| key.clone())
+        .collect();
+    let idx_of: BTreeMap<DeclKey, usize> = decls
         .iter()
         .enumerate()
         .map(|(i, k)| (k.clone(), i))
         .collect();
 
-    let mut edges: Vec<Vec<usize>> = vec![Vec::new(); adts.len()];
+    let mut edges: Vec<Vec<usize>> = vec![Vec::new(); decls.len()];
+    let mut has_hkt_app = vec![false; decls.len()];
     let mut site_occs: Vec<(usize, FieldSite, Vec<DeclOcc>)> = Vec::new();
-    let mut collector = OccCollector {
-        catalog,
-        cyclic_aliases,
-        transparent_unboxed,
-        idx_of: &idx_of,
-        interner: TypeInterner::new(),
-    };
+    let mut alias_occs: Vec<(usize, Vec<DeclOcc>)> = Vec::new();
 
-    for (src_idx, key) in adts.iter().enumerate() {
+    for (src_idx, key) in decls.iter().enumerate() {
         let decl = catalog.decls[key];
         let mut target_set = BTreeSet::new();
-        for (ctor_idx, ctor) in decl.constructors.iter().enumerate() {
-            for (field_idx, field_ty) in ctor.fields.iter().enumerate() {
-                let mut occs = Vec::new();
-                collector.collect(field_ty, &mut occs);
-                for occ in &occs {
-                    target_set.insert(occ.target);
+        if let Some(body) = &decl.alias {
+            let mut occs = Vec::new();
+            collect_decl_occs(catalog, body, &idx_of, &mut occs, &mut has_hkt_app[src_idx]);
+            for occ in &occs {
+                target_set.insert(occ.target);
+            }
+            alias_occs.push((src_idx, occs));
+        } else {
+            for (ctor_idx, ctor) in decl.constructors.iter().enumerate() {
+                for (field_idx, field_ty) in ctor.fields.iter().enumerate() {
+                    let mut occs = Vec::new();
+                    collect_decl_occs(
+                        catalog,
+                        field_ty,
+                        &idx_of,
+                        &mut occs,
+                        &mut has_hkt_app[src_idx],
+                    );
+                    for occ in &occs {
+                        target_set.insert(occ.target);
+                    }
+                    site_occs.push((src_idx, (key.clone(), ctor_idx, field_idx), occs));
                 }
-                site_occs.push((src_idx, (key.clone(), ctor_idx, field_idx), occs));
             }
         }
         edges[src_idx] = target_set.into_iter().collect();
     }
 
-    let sccs = tarjan_scc(adts.len(), &edges);
-    let mut growing = BTreeSet::new();
-    for (src_idx, site, occs) in site_occs {
+    let sccs = tarjan_scc(decls.len(), &edges);
+    let mut growing_sccs = BTreeSet::new();
+    let mut growing_fields = BTreeSet::new();
+
+    for &(src_idx, ref site, ref occs) in &site_occs {
         if occs
             .iter()
             .any(|occ| occ.growing && sccs[src_idx] == sccs[occ.target])
         {
-            growing.insert(site);
+            growing_sccs.insert(sccs[src_idx]);
+            growing_fields.insert(site.clone());
         }
     }
-    growing
+    for (src_idx, occs) in &alias_occs {
+        if occs
+            .iter()
+            .any(|occ| occ.growing && sccs[*src_idx] == sccs[occ.target])
+        {
+            growing_sccs.insert(sccs[*src_idx]);
+        }
+    }
+
+    // Demote any `unboxed` declaration participating in a growing SCC so
+    // Phase 1 / Phase 2 can box its field instead of expanding it forever.
+    for (idx, key) in decls.iter().enumerate() {
+        if growing_sccs.contains(&sccs[idx]) {
+            transparent_unboxed.remove(key);
+        }
+    }
+
+    // Record every growing `opaque type alias` together with all declarations
+    // reachable from it in the declaration graph (or `None` if an HKT `App`
+    // can reach arbitrary ADTs).
+    let mut growing_aliases = BTreeMap::new();
+    for (idx, key) in decls.iter().enumerate() {
+        let decl = catalog.decls[key];
+        if decl.alias.is_some() && growing_sccs.contains(&sccs[idx]) {
+            let reach = reachable_from(idx, &edges, &has_hkt_app, &decls);
+            growing_aliases.insert(key.clone(), reach);
+        }
+    }
+
+    (growing_fields, growing_aliases)
+}
+
+/// Computes all declarations reachable from `start` in `edges`, returning
+/// `None` if any reachable vertex contains a higher-kinded variable `App`.
+fn reachable_from(
+    start: usize,
+    edges: &[Vec<usize>],
+    has_hkt_app: &[bool],
+    decls: &[DeclKey],
+) -> Option<BTreeSet<DeclKey>> {
+    let mut seen = vec![false; decls.len()];
+    let mut stack = vec![start];
+    let mut out = BTreeSet::new();
+    while let Some(v) = stack.pop() {
+        if seen[v] {
+            continue;
+        }
+        seen[v] = true;
+        if has_hkt_app[v] {
+            return None;
+        }
+        out.insert(decls[v].clone());
+        for &next in &edges[v] {
+            if !seen[next] {
+                stack.push(next);
+            }
+        }
+    }
+    Some(out)
 }
 
 /// Deterministic Tarjan strongly connected components algorithm over `0..n`.

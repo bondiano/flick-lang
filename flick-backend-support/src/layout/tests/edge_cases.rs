@@ -369,3 +369,87 @@ fn custom_primitive_table_and_error_cases() {
         Err(LayoutError::ArityMismatch { .. })
     ));
 }
+
+#[test]
+fn u64_max_sentinel_niches_do_not_overflow_when_fully_consumed() {
+    let app = make_module(
+        "App",
+        vec![data_decl(
+            "TriHandle",
+            &[],
+            vec![
+                ctor("EmptyA", &[], Vec::new(), Rep::Tagged),
+                ctor("EmptyB", &[], Vec::new(), Rep::Tagged),
+                ctor("Full", &[], vec![bare("Bytes", "Bytes")], Rep::Tagged),
+            ],
+        )],
+    );
+    let program = make_program(vec![app]);
+
+    // Single-value sentinel niche at u64::MAX (`-1` handle) consumed by Option Bytes.
+    let mut table1 = PrimitiveTable::target_64();
+    table1.bytes = PrimitiveLayout::new(
+        8,
+        8,
+        Some(Niche {
+            offset: 0,
+            width: 8,
+            start: u64::MAX,
+            end: u64::MAX,
+        }),
+    );
+    let opt_bytes = compute_layout(
+        &program,
+        &table1,
+        &named("Prelude", "Option", vec![bare("Bytes", "Bytes")]),
+    )
+    .expect("Option Bytes with u64::MAX niche");
+    assert_eq!(opt_bytes.size, 8);
+    assert_eq!(opt_bytes.align, 8);
+    assert_eq!(opt_bytes.niche, None);
+    let ob_data = as_data(&opt_bytes);
+    assert_eq!(
+        ob_data.discriminant,
+        Discriminant::Niche {
+            offset: 0,
+            width: 8,
+            data_variant: 1,
+            niche_start: u64::MAX,
+            niche_end: u64::MAX,
+        }
+    );
+    assert_eq!(ob_data.variants[0].tag, Some(u64::MAX));
+    assert_eq!(ob_data.variants[1].tag, None);
+
+    // Two-value niche ending at u64::MAX (`u64::MAX - 1..=u64::MAX`) fully consumed.
+    let mut table2 = PrimitiveTable::target_64();
+    table2.bytes = PrimitiveLayout::new(
+        8,
+        8,
+        Some(Niche {
+            offset: 0,
+            width: 8,
+            start: u64::MAX - 1,
+            end: u64::MAX,
+        }),
+    );
+    let tri = compute_layout(&program, &table2, &bare("App", "TriHandle"))
+        .expect("TriHandle with u64::MAX - 1..=u64::MAX niche");
+    assert_eq!(tri.size, 8);
+    assert_eq!(tri.align, 8);
+    assert_eq!(tri.niche, None);
+    let tri_data = as_data(&tri);
+    assert_eq!(
+        tri_data.discriminant,
+        Discriminant::Niche {
+            offset: 0,
+            width: 8,
+            data_variant: 2,
+            niche_start: u64::MAX - 1,
+            niche_end: u64::MAX,
+        }
+    );
+    assert_eq!(tri_data.variants[0].tag, Some(u64::MAX - 1));
+    assert_eq!(tri_data.variants[1].tag, Some(u64::MAX));
+    assert_eq!(tri_data.variants[2].tag, None);
+}

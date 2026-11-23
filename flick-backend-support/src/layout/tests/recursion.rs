@@ -332,3 +332,178 @@ fn higher_kinded_non_recursive_and_growing_recursive_types() {
     assert_eq!(hkt.align, 8);
     assert_eq!(as_data(&hkt).pointer_fields, BTreeSet::from([(1, 0)]));
 }
+
+#[test]
+fn recursive_opaque_aliases_and_unboxed_stream_terminate() {
+    let app = make_module(
+        "App",
+        vec![
+            TypeDecl {
+                name: "Stream".into(),
+                params: Vec::new(),
+                error: false,
+                constructors: Vec::new(),
+                alias: Some(named(
+                    "Prelude",
+                    "Option",
+                    vec![TypeRef::new(IrType::Tuple(vec![
+                        bare("Prelude", "Float"),
+                        bare("App", "Stream"),
+                    ]))],
+                )),
+            },
+            data_decl(
+                "Box",
+                &[],
+                vec![ctor("Box", &[], vec![bare("App", "Stream")], Rep::Tagged)],
+            ),
+            data_decl(
+                "UnboxedStream",
+                &[],
+                vec![ctor(
+                    "UnboxedStream",
+                    &[],
+                    vec![named(
+                        "Prelude",
+                        "Option",
+                        vec![TypeRef::new(IrType::Tuple(vec![
+                            bare("Prelude", "Float"),
+                            bare("App", "UnboxedStream"),
+                        ]))],
+                    )],
+                    Rep::Unboxed,
+                )],
+            ),
+        ],
+    );
+    let program = make_program(vec![app]);
+
+    for (table, ptr_size) in [
+        (PrimitiveTable::target_32(), 4u64),
+        (PrimitiveTable::target_64(), 8u64),
+    ] {
+        let mut engine = LayoutEngine::new(&program, table).expect("engine");
+
+        let stream = engine.layout(&bare("App", "Stream")).expect("Stream");
+        assert_eq!(stream.size, ptr_size);
+        assert_eq!(stream.align, ptr_size);
+        assert_eq!(as_data(&stream).pointer_fields, BTreeSet::from([(1, 0)]));
+
+        let boxed = engine.layout(&bare("App", "Box")).expect("Box");
+        assert_eq!(boxed.size, ptr_size);
+        assert!(as_data(&boxed).pointer_fields.is_empty());
+
+        let u_stream = engine
+            .layout(&bare("App", "UnboxedStream"))
+            .expect("UnboxedStream");
+        assert_eq!(u_stream.size, ptr_size);
+        assert_eq!(u_stream.align, ptr_size);
+        assert!(as_data(&u_stream).unboxed);
+        assert!(as_data(&u_stream).pointer_fields.is_empty());
+    }
+}
+
+#[test]
+fn growing_recursive_unboxed_opaque_alias_and_empty_forall_terminate() {
+    let a = var("a");
+    let app = make_module(
+        "App",
+        vec![
+            data_decl(
+                "GrowUnbox",
+                &["a"],
+                vec![ctor(
+                    "GrowUnbox",
+                    &["a"],
+                    vec![named(
+                        "Prelude",
+                        "Option",
+                        vec![named(
+                            "App",
+                            "GrowUnbox",
+                            vec![named("Prelude", "List", vec![a.clone()])],
+                        )],
+                    )],
+                    Rep::Unboxed,
+                )],
+            ),
+            TypeDecl {
+                name: "Nonreg".into(),
+                params: vec!["a".into()],
+                error: false,
+                constructors: Vec::new(),
+                alias: Some(named(
+                    "Prelude",
+                    "Option",
+                    vec![TypeRef::new(IrType::Tuple(vec![
+                        a.clone(),
+                        named(
+                            "App",
+                            "Nonreg",
+                            vec![named("Prelude", "List", vec![a.clone()])],
+                        ),
+                    ]))],
+                )),
+            },
+            data_decl(
+                "NonregHolder",
+                &["a"],
+                vec![ctor(
+                    "NonregHolder",
+                    &["a"],
+                    vec![named("App", "Nonreg", vec![a])],
+                    Rep::Tagged,
+                )],
+            ),
+            TypeDecl {
+                name: "ForallCycle".into(),
+                params: Vec::new(),
+                error: false,
+                constructors: Vec::new(),
+                alias: Some(TypeRef::new(IrType::Forall {
+                    vars: Vec::new(),
+                    constraints: Vec::new(),
+                    body: bare("App", "ForallCycle"),
+                })),
+            },
+        ],
+    );
+    let program = make_program(vec![app]);
+
+    for (table, ptr_size) in [
+        (PrimitiveTable::target_32(), 4u64),
+        (PrimitiveTable::target_64(), 8u64),
+    ] {
+        let mut engine = LayoutEngine::new(&program, table).expect("engine");
+
+        let grow_u = engine
+            .layout(&named("App", "GrowUnbox", vec![bare("Prelude", "Float")]))
+            .expect("GrowUnbox Float");
+        assert_eq!(grow_u.size, ptr_size);
+        assert_eq!(grow_u.align, ptr_size);
+        assert!(!as_data(&grow_u).unboxed);
+        assert_eq!(as_data(&grow_u).pointer_fields, BTreeSet::from([(0, 0)]));
+
+        let nonreg = engine
+            .layout(&named("App", "Nonreg", vec![bare("Prelude", "Float")]))
+            .expect("Nonreg Float");
+        assert_eq!(nonreg.size, ptr_size);
+        assert_eq!(nonreg.align, ptr_size);
+        assert_eq!(as_data(&nonreg).pointer_fields, BTreeSet::from([(1, 0)]));
+
+        let holder = engine
+            .layout(&named(
+                "App",
+                "NonregHolder",
+                vec![bare("Prelude", "Float")],
+            ))
+            .expect("NonregHolder Float");
+        assert_eq!(holder.size, ptr_size);
+        assert!(as_data(&holder).pointer_fields.is_empty());
+
+        assert!(matches!(
+            engine.layout(&bare("App", "ForallCycle")),
+            Err(LayoutError::CyclicAlias { .. })
+        ));
+    }
+}

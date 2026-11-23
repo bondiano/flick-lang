@@ -24,7 +24,7 @@ fn arb_primitive_table() -> impl Strategy<Value = PrimitiveTable> {
         prop_oneof![Just(4u64), Just(8u64)], // Float alignment
         any::<bool>(),                       // String is fat (2*ptr) vs thin (ptr)
         any::<bool>(),                       // Closure is fat (2*ptr) vs thin (ptr)
-        any::<bool>(),                       // Bytes has niche?
+        0u8..3u8,                            // Bytes niche: 0=none, 1=null, 2=u64::MAX sentinel
     )
         .prop_map(
             |(ptr_sz, ptr_niche, bool_niche, float_align, fat_str, fat_closure, bytes_niche)| {
@@ -40,11 +40,23 @@ fn arb_primitive_table() -> impl Strategy<Value = PrimitiveTable> {
                 } else {
                     ptr
                 };
-                let bytes = PrimitiveLayout::new(
-                    ptr_sz,
-                    ptr_sz,
-                    bytes_niche.then(|| Niche::null_pointer(ptr_sz)),
-                );
+                let bytes_n = match bytes_niche {
+                    1 => Some(Niche::null_pointer(ptr_sz)),
+                    2 if ptr_sz == 8 => Some(Niche {
+                        offset: 0,
+                        width: 8,
+                        start: u64::MAX,
+                        end: u64::MAX,
+                    }),
+                    2 => Some(Niche {
+                        offset: 0,
+                        width: 4,
+                        start: u64::from(u32::MAX),
+                        end: u64::from(u32::MAX),
+                    }),
+                    _ => None,
+                };
+                let bytes = PrimitiveLayout::new(ptr_sz, ptr_sz, bytes_n);
                 let mut table = if ptr_sz == 4 {
                     PrimitiveTable::target_32()
                 } else {

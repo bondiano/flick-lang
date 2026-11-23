@@ -9,7 +9,7 @@ use std::mem;
 use flick_ir::{IrType, TypeInterner, TypeRef};
 
 use super::LayoutError;
-use super::catalog::{NamedKind, TypeCatalog, instantiate_constructors, mentions_any_var};
+use super::catalog::{DeclKey, NamedKind, TypeCatalog, instantiate_constructors, mentions_any_var};
 use super::indirection::{StaticIndirection, tarjan_scc};
 
 /// For every reachable instantiated nominal ADT, the set of
@@ -79,6 +79,10 @@ pub(crate) fn compute_instantiated_indirection(
                     forced.insert((inst.decl_index, field_idx));
                     continue;
                 }
+                if field_reaches_growing_alias(catalog, static_ind, field_ty, &key, interner)? {
+                    forced.insert((inst.decl_index, field_idx));
+                    continue;
+                }
                 let mut targets = BTreeSet::new();
                 collect_inst_targets(catalog, static_ind, field_ty, interner, &mut targets)?;
                 let mut target_ids = Vec::with_capacity(targets.len());
@@ -133,6 +137,95 @@ fn intern_node(
     nodes.push(ty.clone());
     id_of.insert(ty.clone(), id);
     id
+}
+
+/// Whether expanding `ty` by value encounters a growing recursive `opaque type
+/// alias` that can reach `owner_decl` (without crossing a nominal ADT or
+/// pointer/closure boundary).
+fn field_reaches_growing_alias(
+    catalog: &TypeCatalog<'_>,
+    static_ind: &StaticIndirection,
+    ty: &TypeRef,
+    owner_decl: &DeclKey,
+    interner: &mut TypeInterner,
+) -> Result<bool, LayoutError> {
+    if static_ind.growing_aliases.is_empty() {
+        return Ok(false);
+    }
+    match &**ty {
+        IrType::Named { module, name, args } => {
+            let key = (module.clone(), name.clone());
+            if static_ind.is_growing_alias_reaching(&key, owner_decl) {
+                return Ok(true);
+            }
+            if static_ind.cyclic_aliases.contains(&key) {
+                return Err(LayoutError::CyclicAlias {
+                    module: module.clone(),
+                    name: name.clone(),
+                });
+            }
+            let NamedKind::Decl(decl) = catalog.classify(module, name, args.len())? else {
+                return Ok(false);
+            };
+            if let Some(body) = &decl.alias {
+                let subst: Vec<(&str, &TypeRef)> = decl
+                    .params
+                    .iter()
+                    .map(String::as_str)
+                    .zip(args.iter())
+                    .collect();
+                let expanded = body.substitute(&subst, interner);
+                return field_reaches_growing_alias(
+                    catalog, static_ind, &expanded, owner_decl, interner,
+                );
+            }
+            if static_ind.transparent_unboxed.contains(&key) {
+                let subst: Vec<(&str, &TypeRef)> = decl
+                    .params
+                    .iter()
+                    .map(String::as_str)
+                    .zip(args.iter())
+                    .collect();
+                let expanded = decl.constructors[0].fields[0].substitute(&subst, interner);
+                return field_reaches_growing_alias(
+                    catalog, static_ind, &expanded, owner_decl, interner,
+                );
+            }
+            Ok(false)
+        }
+        IrType::Tuple(items) => {
+            for item in items {
+                if field_reaches_growing_alias(catalog, static_ind, item, owner_decl, interner)? {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+        IrType::Record { fields, tail } => {
+            if let Some(row) = tail {
+                return Err(LayoutError::OpenRecord(row.clone()));
+            }
+            for (_, field_ty) in fields {
+                if field_reaches_growing_alias(catalog, static_ind, field_ty, owner_decl, interner)?
+                {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+        IrType::Forall {
+            vars,
+            constraints,
+            body,
+        } if vars.is_empty() && constraints.is_empty() => {
+            field_reaches_growing_alias(catalog, static_ind, body, owner_decl, interner)
+        }
+        IrType::Fun { .. }
+        | IrType::Exists { .. }
+        | IrType::Forall { .. }
+        | IrType::Var(_)
+        | IrType::App { .. } => Ok(false),
+    }
 }
 
 /// Whether `ty` evaluates directly to a primitive/handle/closure boundary

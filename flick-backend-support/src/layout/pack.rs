@@ -253,9 +253,9 @@ fn try_niche_layout(
         .max(data_packed.align);
     let overall_size = align_up(data_packed.size, overall_align)?;
     let niche_start = niche.start;
-    let niche_end = niche_start + tag_count - 1;
+    let niche_end = niche_start + (tag_count - 1);
     let remaining = niche.consume(tag_count);
-    let mut next_tag = niche_start;
+    let mut assigned = 0u64;
     let mut out_variants = Vec::with_capacity(variants.len());
     for (i, v) in variants.iter().enumerate() {
         if i == *data_idx {
@@ -266,8 +266,8 @@ fn try_niche_layout(
                 pointer_layout,
             ));
         } else {
-            let tag = next_tag;
-            next_tag += 1;
+            let tag = niche_start + assigned;
+            assigned += 1;
             out_variants.push(build_variant_layout(
                 v,
                 Some(tag),
