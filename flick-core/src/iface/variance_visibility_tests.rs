@@ -48,7 +48,13 @@ fn imported_visible_constructor_data_and_error_preserve_exported_variance_withou
         (m == "App.Secret").then(|| secret_iface.clone())
     });
     assert!(d1.is_empty(), "{d1:?}");
-    let restored = read(write(&provider_iface).as_bytes(), "App.Provider").expect("valid iface");
+    let restored = read(
+        write(&provider_iface)
+            .expect("publishable interface")
+            .as_bytes(),
+        "App.Provider",
+    )
+    .expect("valid iface");
     for (name, expected) in [
         ("Wrapper", vec![Variance::Covariant]),
         ("Tag", vec![Variance::Covariant]),

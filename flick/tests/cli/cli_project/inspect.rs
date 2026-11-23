@@ -1,4 +1,5 @@
 use super::*;
+use flick_core::iface;
 
 #[test]
 fn inspect_prints_each_representation() {
@@ -38,4 +39,36 @@ fn inspect_prints_each_representation() {
         )),
         Some(2)
     );
+}
+
+#[test]
+fn inspect_and_build_do_not_publish_a_broken_interface() {
+    let broken = "module Lib.Api exposing (value)\nvalue : Int\nlet value = missingValue\n";
+    let dir = project(
+        "cli_inspect_broken_interface",
+        &[("flick.toml", LIB), ("src/Lib/Api.fl", broken)],
+    );
+    for args in [&["inspect", "Lib.Api", "--emit", "iface"][..], &["build"]] {
+        let out = flick_in(&dir, args);
+        assert_ne!(code(&out), Some(0), "{args:?}: {out:?}");
+        assert!(out.stdout.is_empty(), "{args:?}: {out:?}");
+        let errors = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            errors.contains("FLICK-T001") && errors.contains("missingValue"),
+            "{errors}"
+        );
+        assert!(!dir.join("dist/Lib/Api.iface").exists());
+    }
+}
+
+#[test]
+fn inspect_writes_a_readable_builtin_interface() {
+    let dir = project(
+        "cli_inspect_builtin_interface",
+        &[("flick.toml", LIB), ("src/Lib/Api.fl", API)],
+    );
+    let output = flick_in(&dir, &["inspect", "Prelude", "--emit", "iface"]);
+    assert_eq!(code(&output), Some(0), "{output:?}");
+    let interface = iface::read(&output.stdout, "Prelude").expect("valid builtin");
+    assert!(!interface.exports.is_empty());
 }

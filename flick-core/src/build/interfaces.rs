@@ -15,7 +15,7 @@ pub fn published_interfaces<'a>(
     package: Option<&str>,
     root: Option<&Path>,
     targets: Option<&[Target]>,
-) -> BTreeMap<&'a str, Interface> {
+) -> Result<BTreeMap<&'a str, Interface>, String> {
     let modules = &compilation.modules;
     #[cfg(not(target_arch = "wasm32"))]
     let checked_interfaces = |name: &str| {
@@ -52,8 +52,8 @@ pub fn published_interfaces<'a>(
         // Hash only finalized ABI, including backend availability, exactly as published.
         let fingerprints: BTreeMap<&str, String> = published_interfaces
             .iter()
-            .map(|(name, interface)| (*name, iface::fingerprint(interface)))
-            .collect();
+            .map(|(name, interface)| Ok((*name, iface::fingerprint(interface)?)))
+            .collect::<Result<_, String>>()?;
         for module in modules {
             let published = published_interfaces
                 .get_mut(module.name.as_str())
@@ -65,5 +65,5 @@ pub fn published_interfaces<'a>(
                 .collect();
         }
     }
-    published_interfaces
+    Ok(published_interfaces)
 }

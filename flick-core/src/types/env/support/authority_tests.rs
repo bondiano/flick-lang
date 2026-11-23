@@ -79,7 +79,7 @@ fn real_class_dictionary_authority_rejects_explicit_support_and_reverse_public_a
     for (class_support, dictionary_support) in [(false, true), (true, false), (true, true)] {
         let mut env = Env::new("Consumer", &syntax, &|_| None, &builtins);
         let interface = class_support_interface(class_support, dictionary_support);
-        let reader_rejects = read(write(&interface).as_bytes(), "Provider").is_err();
+        let reader_rejects = read(write(&interface).expect("publishable interface").as_bytes(), "Provider").is_err();
         let learning_rejects = env.learn_type_support(&interface).is_err();
         assert!(
             reader_rejects && learning_rejects,
@@ -103,11 +103,11 @@ fn existing_class_authority_is_nominal_but_unknown_suffix_names_remain_ordinary(
     class.exports.clear();
     let mut dictionary = class_support_interface(false, true);
     dictionary.exports.clear();
-    assert!(read(write(&class).as_bytes(), "Provider").is_ok());
-    assert!(read(write(&dictionary).as_bytes(), "Provider").is_ok());
+    assert!(read(write(&class).expect("publishable interface").as_bytes(), "Provider").is_ok());
+    assert!(read(write(&dictionary).expect("publishable interface").as_bytes(), "Provider").is_ok());
     let mut ordinary = dictionary.clone();
     ordinary.support_types[0].entity.name = "Unknown.Impl".into();
-    assert!(read(write(&ordinary).as_bytes(), "Provider").is_ok());
+    assert!(read(write(&ordinary).expect("publishable interface").as_bytes(), "Provider").is_ok());
     let mut env = Env::new("Consumer", &syntax, &|_| None, &builtins);
     env.learn_type_support(&ordinary)
         .expect("unknown implementation suffix remains ordinary");
@@ -152,7 +152,7 @@ fn identified_nested_real_class_retains_nominal_dictionary_authority() {
         },
         variance: Vec::new(),
     });
-    assert!(read(write(&interface).as_bytes(), "Provider").is_err());
+    assert!(read(write(&interface).expect("publishable interface").as_bytes(), "Provider").is_err());
     let mut abstract_view = interface.clone();
     let Form::ModuleContract { requirements } = &mut abstract_view.exports[0]
         .definition
@@ -167,7 +167,7 @@ fn identified_nested_real_class_retains_nominal_dictionary_authority() {
     };
     *identity = None;
     assert!(
-        read(write(&abstract_view).as_bytes(), "Provider").is_ok(),
+        read(write(&abstract_view).expect("publishable interface").as_bytes(), "Provider").is_ok(),
         "abstract class metadata invents no canonical identity"
     );
     let dictionary = Interface {
@@ -287,7 +287,7 @@ fn nested_nominal_views_establish_companions_not_global_definition_equality() {
         ..Interface::default()
     };
     assert!(
-        read(write(&interface).as_bytes(), "Provider").is_ok(),
+        read(write(&interface).expect("publishable interface").as_bytes(), "Provider").is_ok(),
         "a nested projected class view is not a competing global TypeDef"
     );
 }

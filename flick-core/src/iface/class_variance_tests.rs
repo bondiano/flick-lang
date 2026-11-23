@@ -45,7 +45,7 @@ fn exported_class_variance_round_trips_and_applies() {
     let (interface, diagnostics) = check_module_with("App.Classes", CLASS_PROVIDER, &|_| None);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
 
-    let json = write(&interface);
+    let json = write(&interface).expect("publishable interface");
     let encoded: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
     let class_variance = |name: &str| {
         encoded["exports"]
@@ -122,7 +122,11 @@ fn class_variance_fallback_stays_invariant_and_tracks_api_diff() {
             .variance
             .clear();
     }
-    let unknown = read(write(&unknown).as_bytes(), "App.Classes").expect("unknown is valid");
+    let unknown = read(
+        write(&unknown).expect("publishable interface").as_bytes(),
+        "App.Classes",
+    )
+    .expect("unknown is valid");
     let consumer = "\
 module App.Consumer exposing (..)
 import App.Classes exposing (..)
@@ -152,7 +156,10 @@ let desc_pure = describe (fun () -> ())
         );
     let (updated, d2) = check_module_with("App.Classes", &invariant_provider, &|_| None);
     assert!(d2.is_empty(), "{d2:?}");
-    assert_ne!(fingerprint(&interface), fingerprint(&updated));
+    assert_ne!(
+        fingerprint(&interface).expect("publishable interface"),
+        fingerprint(&updated).expect("publishable interface")
+    );
     let changes = diff(slice::from_ref(&interface), slice::from_ref(&updated));
     assert_eq!(
         bump(&changes),

@@ -40,10 +40,17 @@ fn library() -> &'static [Interface] {
         ] {
             let (interface, diagnostics) = check(source, &interfaces);
             assert!(diagnostics.is_empty(), "{name}: {diagnostics:?}");
-            let encoded = iface::write(&interface);
+            let encoded = iface::write(&interface).expect("publishable interface");
             let decoded = iface::read(encoded.as_bytes(), name).expect("MTL interface round trip");
-            assert_eq!(iface::write(&decoded), encoded, "{name}");
-            assert_eq!(iface::fingerprint(&decoded), iface::fingerprint(&interface));
+            assert_eq!(
+                iface::write(&decoded).expect("publishable interface"),
+                encoded,
+                "{name}"
+            );
+            assert_eq!(
+                iface::fingerprint(&decoded).expect("publishable fingerprint"),
+                iface::fingerprint(&interface).expect("publishable fingerprint")
+            );
             interfaces.push(decoded);
         }
         interfaces

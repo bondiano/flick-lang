@@ -192,15 +192,31 @@ mod tests {
             }],
             ..Interface::default()
         };
-        let json = iface::write(&interface);
+        let json = iface::write(&interface).expect("publishable interface");
         let left = iface::read(json.as_bytes(), "Consumer").expect("closed interface");
         let right = iface::read(json.as_bytes(), "Consumer").expect("closed interface");
         assert_eq!(left, right);
-        assert_eq!(iface::fingerprint(&interface), iface::fingerprint(&left));
-        assert_eq!(iface::fingerprint(&left), iface::fingerprint(&right));
+        assert_eq!(
+            iface::fingerprint(&interface).expect("publishable fingerprint"),
+            iface::fingerprint(&left).expect("publishable fingerprint")
+        );
+        assert_eq!(
+            iface::fingerprint(&left).expect("publishable fingerprint"),
+            iface::fingerprint(&right).expect("publishable fingerprint")
+        );
         let left = left.exports[0].scheme.as_ref().expect("packed scheme");
         let right = right.exports[0].scheme.as_ref().expect("packed scheme");
         assert_ne!(identity(left), identity(right));
+
+        // A fresh existential handle is skipped metadata; a checker error in
+        // the same export is an explicit publication failure, never a panic.
+        let mut broken = interface;
+        broken.exports[0].scheme = Some(Type::Tuple(vec![Type::Error]));
+        for result in [iface::write(&broken), iface::fingerprint(&broken)] {
+            let error = result.expect_err("a checker error cannot be published");
+            assert!(error.contains("Consumer"), "{error}");
+            assert!(error.contains("export `packed`"), "{error}");
+        }
     }
 
     #[test]

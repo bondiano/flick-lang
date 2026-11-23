@@ -205,8 +205,13 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
         .position(|m| m.name == options.module)
     else {
         if let Some(text) = inspect_builtin(&checked, options) {
-            print_representation(&text);
-            return Outcome::default();
+            return match text {
+                Ok(text) => {
+                    print_representation(&text);
+                    Outcome::default()
+                }
+                Err(error) => failure(checked.sources, codes::P010, error),
+            };
         }
         return failure(
             checked.sources,
@@ -229,7 +234,10 @@ fn print_representation(text: &str) {
     }
 }
 
-fn inspect_builtin(checked: &Checked, options: &InspectArguments) -> Option<String> {
+fn inspect_builtin(
+    checked: &Checked,
+    options: &InspectArguments,
+) -> Option<Result<String, String>> {
     if !matches!(
         options.emit,
         Representation::Iface | Representation::Variance
@@ -242,9 +250,9 @@ fn inspect_builtin(checked: &Checked, options: &InspectArguments) -> Option<Stri
         .find(|i| i.module == options.module && !i.private)?;
     Some(match options.emit {
         Representation::Iface => iface::write(builtin),
-        Representation::Variance => {
-            format_interface_summary(builtin, &|export| builtin_param_names(export))
-        }
+        Representation::Variance => Ok(format_interface_summary(builtin, &|export| {
+            builtin_param_names(export)
+        })),
         _ => unreachable!(),
     })
 }
@@ -268,13 +276,15 @@ fn inspect_module(
         Representation::Variance => Ok(format_interface_summary(&module.interface, &|export| {
             compiled_param_names(checked, export).or_else(|| builtin_param_names(export))
         })),
-        Representation::Mapping => projected(explicit, &options.module).ok_or_else(|| {
-            failure(
-                mem::take(&mut checked.sources),
-                codes::P018,
-                format!("no projection of `{}`", options.module),
-            )
-        }),
+        Representation::Mapping => projected(explicit, &options.module)
+            .map_err(|error| failure(mem::take(&mut checked.sources), codes::P010, error))?
+            .ok_or_else(|| {
+                failure(
+                    mem::take(&mut checked.sources),
+                    codes::P018,
+                    format!("no projection of `{}`", options.module),
+                )
+            }),
         Representation::Iface => {
             let package = checked
                 .project
@@ -295,8 +305,10 @@ fn inspect_module(
                 package.as_deref(),
                 checked.project.as_ref().map(|p| p.root.as_path()),
                 filter,
-            );
-            Ok(iface::write(&interfaces[module_name.as_str()]))
+            )
+            .map_err(|error| failure(mem::take(&mut checked.sources), codes::P010, error))?;
+            iface::write(&interfaces[module_name.as_str()])
+                .map_err(|error| failure(mem::take(&mut checked.sources), codes::P010, error))
         }
         Representation::Output => inspect_output(
             checked,
@@ -417,12 +429,16 @@ fn builtin_param_names(export: &Export) -> Option<Vec<String>> {
 }
 
 /// The editor projection of `module` and its span maps, as JSON.
-fn projected(explicit: Option<&str>, module: &str) -> Option<String> {
+fn projected(explicit: Option<&str>, module: &str) -> Result<Option<String>, String> {
     let host = FsHost::without_backends();
     let mut sources = SourceMap::default();
-    let (project, roots) = select(&host, &mut sources, explicit, &[]).ok()?;
+    let Ok((project, roots)) = select(&host, &mut sources, explicit, &[]) else {
+        return Ok(None);
+    };
     let analysis = project::analyze(&host, &mut sources, project.as_ref(), &roots);
-    let analyzed = analysis.module(module)?;
+    let Some(analyzed) = analysis.module(module) else {
+        return Ok(None);
+    };
     let text = &sources.get(analyzed.file).text;
     let specifier = |m: &str| projection::relative(module, m);
     let projected = projection_of(
@@ -432,8 +448,8 @@ fn projected(explicit: Option<&str>, module: &str) -> Option<String> {
         analyzed,
         text,
         &specifier,
-    );
-    serde_json::to_string_pretty(&projected).ok()
+    )?;
+    Ok(serde_json::to_string_pretty(&projected).ok())
 }
 
 /// The projection of `module` of `analysis`, in `project`:
@@ -446,15 +462,22 @@ pub fn projection_of(
     module: &Analyzed,
     text: &str,
     specifier: &dyn Fn(&str) -> String,
-) -> Projected {
-    let fingerprint = project::analysis_fingerprint(&analysis.compilation);
+) -> Result<Projected, String> {
+    let fingerprint = project::analysis_fingerprint(&analysis.compilation)?;
     let lookup = |m: &str| interface_of(analysis, m);
     let package = |m: &str| {
         let own = analysis.module(m).is_some();
         let name = project.and_then(|p| project::project_name(host, p));
         own.then_some(name).flatten()
     };
-    projection::project(module, text, &fingerprint, &lookup, &package, specifier)
+    Ok(projection::project(
+        module,
+        text,
+        &fingerprint,
+        &lookup,
+        &package,
+        specifier,
+    ))
 }
 
 /// The interface of `module`: the analysis's own or a built-in.

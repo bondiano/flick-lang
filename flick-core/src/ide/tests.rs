@@ -466,7 +466,8 @@ fn the_projection_maps_names_exactly_and_comes_from_the_analysis() {
     let ide = f.ide();
     let module = f.analysis.module("App.Main").expect("module");
     let text = &f.sources.get(module.file).text;
-    let fingerprint = analysis_fingerprint(&f.analysis.compilation);
+    let fingerprint =
+        analysis_fingerprint(&f.analysis.compilation).expect("publishable fingerprint");
     let lookup = |m: &str| ide.interface(m).cloned();
     let projected = projection::project(module, text, &fingerprint, &lookup, &|_| None, &|m| {
         projection::relative(&module.name, m)

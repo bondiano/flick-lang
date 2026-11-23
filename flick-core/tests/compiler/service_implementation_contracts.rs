@@ -61,7 +61,7 @@ fn private_service_implementation_contract_round_trips_without_an_error_marker()
             .interface;
         // Error markers cannot be serialized. A successful check must not leave
         // one hidden inside the public alias's private dependency closure.
-        let encoded = iface::write(interface);
+        let encoded = iface::write(interface).expect("publishable interface");
         assert_eq!(
             iface::read(encoded.as_bytes(), "Probe"),
             Ok(interface.clone())
@@ -113,7 +113,7 @@ fn implementation_headers_preserve_service_parameter_kinds_and_alias_saturation(
         "{diagnostics:?}"
     );
     for module in compilation.modules {
-        let encoded = iface::write(&module.interface);
+        let encoded = iface::write(&module.interface).expect("publishable interface");
         assert_eq!(
             iface::read(encoded.as_bytes(), &module.name),
             Ok(module.interface)

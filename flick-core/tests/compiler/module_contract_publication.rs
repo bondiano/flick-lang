@@ -165,12 +165,22 @@ fn late_solutions_reach_public_private_nested_and_parameterized_contracts() {
                 assert_signature(signature);
             }
             assert_eq!(
-                iface::read(iface::write(interface).as_bytes(), "Probe"),
+                iface::read(
+                    iface::write(interface)
+                        .expect("publishable interface")
+                        .as_bytes(),
+                    "Probe"
+                ),
                 Ok(interface.clone())
             );
         }
-        let restored = iface::read(iface::write(&module.interface).as_bytes(), "Probe")
-            .expect("published interface has no live inference variables");
+        let restored = iface::read(
+            iface::write(&module.interface)
+                .expect("publishable interface")
+                .as_bytes(),
+            "Probe",
+        )
+        .expect("published interface has no live inference variables");
         assert_eq!(definition(&restored, "Secret").form, Form::NOMINAL);
         assert!(restored.find(Namespace::Constructor, "Secret").is_none());
         let diagnostics = consumer(

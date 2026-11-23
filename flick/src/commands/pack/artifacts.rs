@@ -230,7 +230,14 @@ pub(super) fn verify_interfaces(dist: &Path) -> Vec<Diagnostic> {
             else {
                 continue;
             };
-            if &iface::fingerprint(&dep) != fingerprint {
+            let actual = match iface::fingerprint(&dep) {
+                Ok(actual) => actual,
+                Err(error) => {
+                    out.push(Diagnostic::new(codes::P020, Severity::Error, error));
+                    continue;
+                }
+            };
+            if &actual != fingerprint {
                 out.push(Diagnostic::new(
                     codes::P020,
                     Severity::Error,

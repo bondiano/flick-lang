@@ -3,7 +3,49 @@
 //! row atoms). Mirrors what [`serde_json::to_value`] accepts without pulling
 //! JSON serialization for types and interfaces into the browser wasm build.
 
-use super::Export;
+use super::{Export, Interface};
+
+pub(super) fn open_field(interface: &Interface) -> Option<String> {
+    if let Some(export) = interface
+        .exports
+        .iter()
+        .find(|export| !export_is_closed(export))
+    {
+        return Some(format!("export `{}`", export.entity.name));
+    }
+    if let Some(instance) = interface
+        .instances
+        .iter()
+        .find(|instance| !instance_is_closed(instance))
+    {
+        return Some(format!("instance `{}`", instance.name));
+    }
+    if interface
+        .parameterized
+        .as_ref()
+        .is_some_and(|signature| !signature_is_closed(signature))
+    {
+        return Some("parameterized signature".into());
+    }
+    if let Some(support) = interface
+        .support_types
+        .iter()
+        .find(|support| !def_is_closed(&support.definition))
+    {
+        return Some(format!("support type `{}`", support.entity.name));
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(local) = interface
+        .local_schemes
+        .iter()
+        .find(|entry| !type_is_closed(&entry.scheme))
+    {
+        return Some(format!("local scheme `{}`", local.local));
+    }
+    interface.modules.iter().find_map(|(name, nested)| {
+        open_field(nested).map(|field| format!("module `{name}`, {field}"))
+    })
+}
 use crate::types::{Form, Instance, Kind, ModuleRequirement, ModuleSignature, Row, Type, TypeDef};
 
 pub(crate) fn export_is_closed(export: &Export) -> bool {
@@ -155,7 +197,9 @@ fn requirement_is_closed(req: &ModuleRequirement) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::iface::{Decl, Entity, Namespace};
+    #[cfg(not(target_arch = "wasm32"))]
+    use crate::iface::LocalScheme;
+    use crate::iface::{self, Decl, Entity, Namespace, SupportType};
     use crate::types::{Atom, Binder, Effects, Elem, Operation, Scope};
 
     fn base_export() -> Export {
@@ -173,6 +217,114 @@ mod tests {
             at: None,
             via: Vec::new(),
         }
+    }
+
+    #[test]
+    fn publication_rejects_an_open_export_without_panicking() {
+        let mut export = base_export();
+        export.scheme = Some(Type::Tuple(vec![Type::Error]));
+        let interface = Interface {
+            module: "M".into(),
+            exports: vec![export],
+            ..Interface::default()
+        };
+        rejects(&interface, "export `x`");
+    }
+
+    fn rejects(interface: &Interface, field: &str) {
+        for result in [iface::write(interface), iface::fingerprint(interface)] {
+            let error = result.expect_err("the interface contains a checker-local type");
+            assert!(error.contains(field), "{error}");
+        }
+    }
+
+    #[test]
+    fn publication_rejects_open_nested_kinds_signatures_support_types_and_instance_contexts() {
+        let mut interface = Interface {
+            module: "M".into(),
+            ..Interface::default()
+        };
+        let mut export = base_export();
+        export.scheme = Some(Type::Forall {
+            vars: vec![Binder {
+                name: "a".into(),
+                kind: Kind::meta(3),
+            }],
+            constraints: Vec::new(),
+            body: Box::new(Type::Var("a".into())),
+        });
+        interface.modules.insert(
+            "Nested".into(),
+            Interface {
+                module: "M.Nested".into(),
+                exports: vec![export],
+                ..Interface::default()
+            },
+        );
+        rejects(&interface, "module `Nested`, export `x`");
+        interface.modules.clear();
+
+        let empty = || {
+            Box::new(ModuleSignature::Structure {
+                requirements: Vec::new(),
+            })
+        };
+        interface.parameterized = Some(ModuleSignature::Parameterized {
+            group_size: 1,
+            binder: "P".into(),
+            parameter: empty(),
+            result: Box::new(ModuleSignature::Structure {
+                requirements: vec![ModuleRequirement::Value {
+                    name: "x".into(),
+                    ty: Type::Error,
+                }],
+            }),
+        });
+        rejects(&interface, "parameterized signature");
+        interface.parameterized = None;
+
+        interface.support_types.push(SupportType {
+            entity: base_export().entity,
+            definition: TypeDef {
+                kind: Kind::meta(3),
+                form: Form::NOMINAL,
+                variance: Vec::new(),
+            },
+            owner_path: vec!["Nested".into()],
+        });
+        rejects(&interface, "support type `x`");
+        interface.support_types.clear();
+
+        interface.instances.push(Instance {
+            implicit: false,
+            module: "M".into(),
+            name: "X".into(),
+            vars: Vec::new(),
+            context: vec![Type::Skolem(1)],
+            head: Type::con("M", "X"),
+        });
+        rejects(&interface, "instance `X`");
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn fingerprint_still_omits_root_local_schemes() {
+        let mut interface = Interface {
+            module: "M".into(),
+            ..Interface::default()
+        };
+        let fingerprint = iface::fingerprint(&interface).expect("closed");
+        interface.local_schemes.push(LocalScheme {
+            item: "f".into(),
+            local: "x".into(),
+            scheme: Type::Error,
+        });
+        assert_eq!(iface::fingerprint(&interface), Ok(fingerprint));
+        assert!(
+            iface::write(&interface)
+                .expect_err("open local")
+                .contains("local scheme `x`")
+        );
     }
 
     #[test]

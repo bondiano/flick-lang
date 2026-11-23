@@ -355,7 +355,8 @@ pub struct Summary {
 
 /// A fingerprint of the interface: equal fingerprints mean importers
 /// compiled against one are valid against the other.
-pub fn fingerprint(interface: &Interface) -> String {
+/// Returns an error when the projected interface contains a checker-local type.
+pub fn fingerprint(interface: &Interface) -> Result<String, String> {
     let mut bare = interface.clone();
     bare.dependencies.clear();
     // where declarations are written, and their comments, change nothing for importers
@@ -366,11 +367,11 @@ pub fn fingerprint(interface: &Interface) -> String {
     for export in &mut bare.exports {
         export.at = None;
     }
-    let json = serde_json::to_string(&bare).expect("an interface serializes");
+    let json = serde_json::to_string(&bare).map_err(|error| publication_error(&bare, &error))?;
     let hash = json.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
     });
-    format!("{hash:016x}")
+    Ok(format!("{hash:016x}"))
 }
 
 /// The tag of the makers of an interface.
@@ -416,27 +417,41 @@ impl Interface {
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-struct File {
+struct File<I> {
     iface_version: u32,
     /// Version of the compiler that wrote the file.
     compiler: String,
     #[serde(flatten)]
-    interface: Interface,
+    interface: I,
 }
 
 /// The file contents: pretty JSON with a trailing newline.
-pub fn write(interface: &Interface) -> String {
+pub fn write(interface: &Interface) -> Result<String, String> {
     let file = File {
         iface_version: IFACE_VERSION,
         compiler: crate::VERSION.to_owned(),
-        interface: interface.clone(),
+        interface,
     };
-    serde_json::to_string_pretty(&file).expect("an interface serializes") + "\n"
+    let mut json = serde_json::to_string_pretty(&file)
+        .map_err(|error| publication_error(interface, &error))?;
+    json.push('\n');
+    Ok(json)
+}
+
+/// The serializers enforce the wire projection as they write it. Walk the
+/// types with the recovery predicates only on failure, to name the bad entry.
+fn publication_error(interface: &Interface, error: &serde_json::Error) -> String {
+    let field =
+        closed::open_field(interface).map_or_else(String::new, |field| format!(" ({field})"));
+    format!(
+        "cannot publish interface for `{}`{field}: {error}",
+        interface.module
+    )
 }
 
 /// Reads the interface of `module`; `Err` explains why the file is unusable.
 pub fn read(bytes: &[u8], module: &str) -> Result<Interface, String> {
-    let file: File = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+    let file: File<Interface> = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
     if file.iface_version != IFACE_VERSION {
         return Err(format!(
             "`iface-version` {} is not supported; this compiler reads {IFACE_VERSION}",
