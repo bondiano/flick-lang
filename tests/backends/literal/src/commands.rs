@@ -154,7 +154,7 @@ fn values<'a>(invocation: &'a Invocation, name: &str) -> &'a [String] {
 pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
     if matches!(
         invocation.name.as_str(),
-        "install" | "add" | "remove" | "update" | "deps"
+        "install" | "add" | "remove" | "update" | "deps" | "pack"
     ) {
         return deps::run(invocation);
     }

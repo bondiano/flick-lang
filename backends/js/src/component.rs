@@ -11,6 +11,7 @@ mod launch;
 mod manifest;
 mod mapper;
 mod optimize;
+mod pack;
 mod packages;
 mod templates;
 

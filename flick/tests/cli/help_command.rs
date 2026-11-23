@@ -73,6 +73,12 @@ fn help_lists_std_schema_export_as_contributed_and_not_core() {
         doc_help.contains("--check-examples") && doc_help.contains("--target"),
         "{doc_help}"
     );
+
+    let pack_help = stdout(&["pack", "--help"]);
+    assert!(
+        pack_help.contains("--out-dir") && pack_help.contains("--target"),
+        "{pack_help}"
+    );
 }
 
 #[test]
@@ -177,7 +183,6 @@ fn core_cli_source_stays_backend_neutral() {
         "flick/src/commands/build/native.rs",
         "flick/src/commands/build/js_artifacts.rs",
         "flick/src/commands/build/shipped.rs",
-        "flick/src/commands/pack.rs",
         "flick/src/commands/inspect.rs",
         "flick/src/commands/scaffold/source.rs",
         "flick-core/src/project/config.rs",
