@@ -401,5 +401,8 @@ impl ForeignInfo {
 }
 
 #[cfg(test)]
+#[path = "ffi/metadata_tests.rs"]
+mod metadata_tests;
+#[cfg(test)]
 #[path = "ffi/pending_tests.rs"]
 mod pending_tests;

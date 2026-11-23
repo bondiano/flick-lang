@@ -92,6 +92,10 @@ pub struct TargetOverride {
     pub for_tests: bool,
     /// Specific test file paths selected for `flick test`, if any.
     pub test_paths: Vec<PathBuf>,
+    /// True when the caller (`flick build`, `flick test`, `flick inspect --emit output`)
+    /// immediately runs the backend component's `check-target` and `generate`
+    /// pipeline on the returned compilation, avoiding a duplicate check here.
+    pub defer_backend_check: bool,
 }
 
 /// Concrete environment resolved for checking, IDE analysis, or building.

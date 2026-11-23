@@ -100,7 +100,7 @@ pub(super) fn finalize_diagnostics(
     adapter_diagnostics: Vec<Diagnostic>,
 ) {
     #[cfg(target_arch = "wasm32")]
-    let _ = (compilation, project, target_override, stages_by_class);
+    let _ = (compilation, project, stages_by_class);
     #[cfg(not(target_arch = "wasm32"))]
     if let Some(resolved) = compilation.environment.as_ref() {
         check_environment(
@@ -115,18 +115,21 @@ pub(super) fn finalize_diagnostics(
         );
     }
     let has_error = diagnostics.iter().any(|d| d.severity == Severity::Error);
-    if mode == Mode::Compile {
+    let defer_backend_check =
+        mode == Mode::Compile && target_override.is_some_and(|o| o.defer_backend_check);
+    if defer_backend_check {
         if has_error || !host.has_backend_runner() {
             diagnostics.extend(adapter_diagnostics);
         }
     } else {
-        #[cfg(feature = "native-project")]
+        #[cfg(all(feature = "native-project", not(target_arch = "wasm32")))]
         let backend_checked = if !has_error
             && host.has_backend_runner()
             && let Some(project) = project
             && let Some(resolved) = compilation.environment.as_ref()
             && compilation.modules.iter().any(|m| {
                 m.package.is_none()
+                    && compilation.module_available(&m.name)
                     && m.ir
                         .items
                         .iter()
@@ -136,7 +139,7 @@ pub(super) fn finalize_diagnostics(
         } else {
             None
         };
-        #[cfg(not(feature = "native-project"))]
+        #[cfg(not(all(feature = "native-project", not(target_arch = "wasm32"))))]
         let backend_checked: Option<Vec<Diagnostic>> = None;
         match backend_checked {
             Some(backend_diags) => diagnostics.extend(backend_diags),

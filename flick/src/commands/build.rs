@@ -255,7 +255,7 @@ impl Command for BuildCommand {
         }
         progress.stage("Compiling Flick modules");
         let mut kept = self.modules.as_ref().map(|modules| modules.borrow_mut());
-        let target_override = target_override(
+        let mut target_override = target_override(
             &backend,
             &choice,
             target_overridden,
@@ -264,6 +264,7 @@ impl Command for BuildCommand {
             false,
             Vec::new(),
         );
+        target_override.defer_backend_check = true;
         let (mut diagnostics, mut compilation) = package_cache::compile_for(
             &host,
             &mut sources,
@@ -497,6 +498,7 @@ pub(crate) fn target_override(
         effect_adapter: None,
         for_tests,
         test_paths,
+        defer_backend_check: false,
     }
 }
 

@@ -29,7 +29,8 @@ impl Prepared {
         descriptor: &Descriptor,
         extra_options: Vec<OptionValue>,
     ) -> Self {
-        let (program, files) = program(sources, compilation, stages_by_class);
+        let pruned = compilation.prune_for_environment(sources, stages_by_class);
+        let (program, files) = program(sources, &pruned, stages_by_class);
         let option = |key: &str, value: &str| OptionValue {
             key: key.into(),
             value: value.into(),
@@ -63,11 +64,7 @@ impl Prepared {
             required_capabilities: vec![],
             options,
         };
-        let own: HashSet<&str> = compilation
-            .modules
-            .iter()
-            .map(|m| m.name.as_str())
-            .collect();
+        let own: HashSet<&str> = pruned.modules.iter().map(|m| m.name.as_str()).collect();
         let builtins: Vec<&str> = types::builtin_sources()
             .iter()
             .map(|(name, _)| *name)

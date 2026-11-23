@@ -190,9 +190,9 @@ fn parse_adapter_word_args(
                 parsed.push(flick_ir::AdapterArg::Ident(raw.to_owned()));
             }
             AdapterArgKind::Text => {
-                if !(raw.starts_with('"') || raw.starts_with("r\"") || raw.starts_with("r#")) {
+                let Some(raw) = plain_string_literal(text, node) else {
                     return Err(err());
-                }
+                };
                 let decoded = literal::string_value(raw);
                 if !arg_spec.choices.is_empty() && !arg_spec.choices.iter().any(|c| c == &decoded) {
                     return Err(err());
@@ -202,6 +202,21 @@ fn parse_adapter_word_args(
         }
     }
     Ok(parsed)
+}
+
+/// Returns the raw token slice when `node` is a single plain string literal
+/// (`K::Literal` with one non-trivia `K::String` token and no child nodes),
+/// rejecting postfix expressions (`"a".b`, `"a"()`) and string interpolation.
+fn plain_string_literal<'a>(text: &'a str, node: &Node) -> Option<&'a str> {
+    if node.kind != K::Literal || node.nodes().next().is_some() {
+        return None;
+    }
+    let mut tokens = node.child_tokens();
+    let token = tokens.next()?;
+    if token.kind != K::String || tokens.next().is_some() {
+        return None;
+    }
+    Some(token.text(text))
 }
 
 fn is_ident(raw: &str) -> bool {

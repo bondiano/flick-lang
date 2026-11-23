@@ -20,6 +20,9 @@ mod environments;
 #[path = "backends/foreign_meta.rs"]
 mod foreign_meta;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/foreign_meta_regression.rs"]
+mod foreign_meta_regression;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/go.rs"]
 mod go;
 #[cfg(feature = "wasm-backends")]
