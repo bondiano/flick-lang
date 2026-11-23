@@ -235,3 +235,72 @@ fn core_cli_source_stays_backend_neutral() {
         }
     }
 }
+
+#[test]
+fn cli_reference_core_sections_mention_no_target_ecosystem() {
+    use std::fs;
+    use std::path::Path;
+
+    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("workspace root");
+    let pages = [
+        (
+            "docs/src/content/docs/reference/cli.md",
+            "\n## Plugin-contributed commands and backends\n",
+        ),
+        (
+            "docs/src/content/docs/ru/reference/cli.md",
+            "\n## Команды плагинов и официальные бэкенды\n",
+        ),
+    ];
+    let forbidden_ci = [
+        "npm",
+        "pnpm",
+        "pnpm-lock.yaml",
+        "node_modules",
+        "package.json",
+        "typescript",
+        "javascript",
+        "vite",
+        "flick/js",
+        "flick/go",
+        "--target js",
+        "--target go",
+        "--emit js",
+        "--emit ts",
+        "--emit go",
+        "`js`",
+        "`go`",
+        "`node`",
+        "ffi import",
+        "ffi check",
+        "content-mapper",
+        "schema export",
+    ];
+    for (rel, heading) in pages {
+        let text = fs::read_to_string(workspace.join(rel)).expect("read cli reference");
+        let (core, contributed) = text
+            .split_once(heading)
+            .unwrap_or_else(|| panic!("{rel} must contain plugin-contributed section `{heading}`"));
+        let core_lower = core.to_ascii_lowercase();
+        for term in forbidden_ci {
+            assert!(
+                !core_lower.contains(term),
+                "core sections of `{rel}` must not mention `{term}`"
+            );
+        }
+        for word in ["Node", "Go"] {
+            let found = core
+                .split(|c: char| !c.is_ascii_alphanumeric())
+                .any(|tok| tok == word);
+            assert!(!found, "core sections of `{rel}` must not mention `{word}`");
+        }
+        for contributor in ["`std`", "`flick/js`", "`flick/go`"] {
+            assert!(
+                contributed.contains(contributor),
+                "plugin-contributed section of `{rel}` must document {contributor}"
+            );
+        }
+    }
+}

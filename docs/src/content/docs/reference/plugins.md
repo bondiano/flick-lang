@@ -514,14 +514,14 @@ the IR is stable.
 
 A plugin whose package says `hooks = ["emit"]` beside `plugin` gets the files
 `flick build` writes before it writes them: each path in the output
-directory and its text, the `.js` of each module with its `.map` when the
-build writes maps, and the `.iface` that sums up its types. Its `emit` gives
-the files the build writes instead; the plugins of several packages run one
-after another in the order of `[dependencies]`. A plugin that changes a `.js`
-it got with a `.map` gives that `.map` changed too, or the build keeps the
-files as they were and reports `FLICK-P046`; a `.js` without a map may
-change alone. Only `flick build` asks: `flick run` and `flick test` build
-without it, so a plugin that changes behavior tests it itself.
+directory and its text, the emitted files of each module with their `.map`
+companions when the build writes maps, and the `.iface` that sums up its types.
+Its `emit` gives the files the build writes instead; the plugins of several
+packages run one after another in the order of `[dependencies]`. A plugin that
+changes an emitted file it got with a `.map` gives that `.map` changed too, or
+the build keeps the files as they were and reports `FLICK-P046`; a file without
+a map may change alone. Only `flick build` asks: `flick run` and `flick test`
+build without it, so a plugin that changes behavior tests it itself.
 
 ## Disabling a plugin
 
