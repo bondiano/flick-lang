@@ -21,8 +21,6 @@ jobs:
     env:
       FLICK_876_BASELINE_SHA: 1918f8919368817bac94f8c84244607d68f28557
       FLICK_876_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
-      FLICK_876_BASELINE_DIR: ${{ runner.temp }}/flick-876-before
-      FLICK_876_ARTIFACT_DIR: ${{ runner.temp }}/flick-876-browser
       CARGO_TARGET_DIR: ${{ github.workspace }}/target/issue-876
       CARGO_BUILD_JOBS: "2"
       CARGO_INCREMENTAL: "0"
@@ -36,6 +34,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
           fetch-depth: 1
+      - name: Initialize benchmark paths on the runner
+        run: |
+          echo "FLICK_876_BASELINE_DIR=$RUNNER_TEMP/flick-876-before" >> "$GITHUB_ENV"
+          echo "FLICK_876_ARTIFACT_DIR=$RUNNER_TEMP/flick-876-browser" >> "$GITHUB_ENV"
       - run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
         with:
