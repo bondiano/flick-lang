@@ -48,6 +48,25 @@ fn evidence_keeps_first_root_order_and_last_kind_in_preorder() {
 }
 
 #[test]
+fn a_root_in_both_effect_rows_keeps_the_service_kind() {
+    let [service, shared, error] = [5, 9, 2].map(Type::meta);
+    let ty = Type::Fun {
+        param: Box::new(Type::Var("a".into())),
+        effects: Some(Box::new(Effects::new(
+            Type::Union(Box::new(service), Box::new(shared.clone())),
+            Type::Union(Box::new(shared), Box::new(error)),
+        ))),
+        result: Box::new(Type::Var("b".into())),
+    };
+    // Nothing after this arrow may overwrite its evidence: reversing the
+    // two row updates must change the middle root and fail this assertion.
+    assert_eq!(
+        kinds(&ty, &|_| vec![]),
+        [Kind::ServiceRow, Kind::ServiceRow, Kind::ErrorRow]
+    );
+}
+
+#[test]
 fn evidence_from_application_prefixes_and_shared_effect_rows_is_stable() {
     let [shared, nested, unresolved, plain] = [5, 9, 2, 8].map(Type::meta);
     let row = Type::Without {
