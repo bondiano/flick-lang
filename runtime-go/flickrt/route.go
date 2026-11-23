@@ -79,7 +79,7 @@ func routeSegmentField(fb *Fiber, segment Value, text string) (Value, bool) {
 	}
 	for i, word := range w.words {
 		if word == text {
-			return NewData(w.tags[i]), true
+			return Construct(w.tags[i]), true
 		}
 	}
 	return nil, false

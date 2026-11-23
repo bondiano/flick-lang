@@ -84,12 +84,14 @@ fn a_constructor_with_fields_of_the_program_has_a_go_type_of_its_own() {
         go.contains("New_T_App__Rect(float64(2e0), float64(3e0))"),
         "{go}"
     );
-    // one without fields is the one value of its tag, among values of other Go types
-    assert!(go.contains("if flickrt.IsData(l_shape, \"Dot#"), "{go}");
+    // one without fields has a zero-size Go type of its own: no string comparison
+    assert!(go.contains("if Is_T_App__Dot(l_shape) {"), "{go}");
+    assert!(!go.contains("flickrt.IsData("), "{go}");
     // a constructor of a built-in type is made by the runtime too: it stays as it was
     assert!(go.contains("flickrt.NewData(\"Some\", "), "{go}");
     assert!(!go.contains("flickrt.NewData(\"Rect#"), "{go}");
     // declared once for the program, with what the runtime reads and builds it by
+    assert!(types.contains("type T_App__Dot struct{}"), "{types}");
     assert!(
         types.contains("type T_App__Rect struct{ f [2]flickrt.Value }"),
         "{types}"
@@ -98,8 +100,7 @@ fn a_constructor_with_fields_of_the_program_has_a_go_type_of_its_own() {
         types.contains("func (p *T_App__Rect) Fields() []flickrt.Value { return p.f[:] }"),
         "{types}"
     );
-    assert_eq!(types.matches("flickrt.Owned(\"").count(), 2, "{types}");
-    assert!(!types.contains("Dot"), "{types}");
+    assert_eq!(types.matches("flickrt.Owned(\"").count(), 3, "{types}");
 }
 
 #[test]
@@ -186,4 +187,93 @@ fn wildcard_tailrec_carry_is_a_valid_go_local() {
         go.contains(&format!("_ = {variable}")),
         "an ignored loop parameter still declares a Go local: {go}"
     );
+}
+
+#[test]
+fn a_payload_free_constructor_has_a_zero_size_go_type_and_no_string_comparison() {
+    let out = build(
+        "module App exposing (main)\n\n\
+         type Tree = Leaf | Node Tree Int Tree\n\n\
+         depth : Tree -> Int\n\
+         let rec depth tree =\n  match tree with\n  | Leaf -> 0\n  | Node l _ r -> 1 + depth l + depth r\n\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (depth (Node Leaf 1 Leaf), (None : Option Int), LT))\n",
+    );
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+    let file = |name: &str| {
+        let found = out.files.iter().find(|(file, _)| file.ends_with(name));
+        found.map(|(_, go)| go.as_str()).expect(name)
+    };
+    let (go, types) = (file("m_App.go"), file("own_types.go"));
+    // Zero-size type declared once with TagName, empty Fields, Is_T, and Owned registration.
+    assert!(types.contains("type T_App__Leaf struct{}"), "{types}");
+    assert!(
+        types.contains("func (T_App__Leaf) TagName() string { return \"Leaf#"),
+        "{types}"
+    );
+    assert!(
+        types.contains("func (T_App__Leaf) Fields() []flickrt.Value { return nil }"),
+        "{types}"
+    );
+    assert!(
+        types.contains("func Is_T_App__Leaf(v flickrt.Value) bool {\n\t_, ok := v.(T_App__Leaf)\n\treturn ok\n}"),
+        "{types}"
+    );
+    assert!(types.contains("var _ = flickrt.Owned(\"Leaf#"), "{types}");
+    // Construction uses T{} as flickrt.Value, not flickrt.Nullary.
+    assert!(go.contains("flickrt.Value(T_App__Leaf{})"), "{go}");
+    assert!(!go.contains("flickrt.Nullary(\"Leaf#"), "{go}");
+    // Match tests Go types with no string comparison.
+    assert!(go.contains("Is_T_App__Leaf(l_tree)"), "{go}");
+    assert!(go.contains("Is_T_App__Node(l_tree)"), "{go}");
+    assert!(!go.contains("flickrt.IsData("), "{go}");
+    assert!(!go.contains("flickrt.IsTag("), "{go}");
+    assert!(!go.contains("\"Leaf#"), "{go}");
+    assert!(!go.contains("\"Node#"), "{go}");
+    // Built-in nullary constructors (`None`, `LT`) keep their runtime values.
+    assert!(go.contains("flickrt.Nullary(\"None\")"), "{go}");
+    assert!(go.contains("flickrt.Nullary(\"LT#"), "{go}");
+    assert!(!types.contains("None"), "{types}");
+    assert!(!types.contains("LT"), "{types}");
+}
+
+#[test]
+fn a_nullary_gadt_witness_retains_its_dictionary_representation() {
+    let source = include_str!("../../../../tests/run/codegen/gadt_dicts.fl");
+    let out = build(source);
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+    let file = |name: &str| {
+        let found = out.files.iter().find(|(file, _)| file.ends_with(name));
+        found.map(|(_, go)| go.as_str())
+    };
+    let go = file("m_App_Main.go").expect("m_App_Main.go");
+    // Witness retains its runtime dictionary representation: never a zero-size own type.
+    if let Some(types) = file("own_types.go") {
+        assert!(!types.contains("Witness"), "{types}");
+    }
+    assert!(!go.contains("T_App_Main__Witness"), "{go}");
+    assert!(
+        go.contains("flickrt.NewData(\"Witness#") && go.contains("I_Instances__Show_x20_Int"),
+        "{go}"
+    );
+    assert!(go.contains("flickrt.IsData(l_witness, \"Witness#"), "{go}");
+    assert!(go.contains("flickrt.Get(l_witness, 0)"), "{go}");
+    assert!(go.contains("flickrt.Method(fb, "), "{go}");
+    assert!(go.contains("\"show\""), "{go}");
+}
+
+#[test]
+fn all_nullary_equality_reads_tags_through_tag_field() {
+    let go = app("module App exposing (main)\n\n\
+         type Color = Red | Green | Blue\n\n\
+         same : Color -> Color -> Bool\n\
+         let same a b = a == b\n\n\
+         main : Unit ->{Host.Console; AppError} Unit\n\
+         let main () = Platform.stdout_line (show (same Red Green))\n");
+    assert!(
+        go.contains("flickrt.Same(flickrt.TagField(l_a), flickrt.TagField(l_b))"),
+        "{go}"
+    );
+    assert!(go.contains("flickrt.Value(T_App__Red{})"), "{go}");
+    assert!(go.contains("flickrt.Value(T_App__Green{})"), "{go}");
 }

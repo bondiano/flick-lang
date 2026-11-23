@@ -201,17 +201,19 @@ func Bool(v Value) bool { return v.(bool) }
 // Not negates a Bool.
 func Not(v Value) bool { return !v.(bool) }
 
-// Field is the field `label` of a record, or the tag of a *Data: compiled
-// code asks one for its tag where a type is equal by its constructor alone,
-// and every value of such a type is a *Data. Of any constructor value the
-// tag is `TagOf`.
+// Field is the field `label` of a record.
 func Field(v Value, label string) Value {
-	if label == "_tag" {
-		if d, ok := v.(*Data); ok {
-			return d.Tag
-		}
-	}
 	return record(v).Get(label)
+}
+
+// TagField is the tag of a constructor value, or the `_tag` field of a record:
+// compiled code asks a value for `_tag` where a type is equal by its
+// constructor alone, and a record may also carry a `_tag` label.
+func TagField(v Value) Value {
+	if r, ok := v.(*Record); ok {
+		return r.Get("_tag")
+	}
+	return tagName(v)
 }
 
 // Len is the length of a list or a tuple.

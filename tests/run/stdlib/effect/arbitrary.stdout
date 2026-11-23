@@ -47,3 +47,4 @@ durations: [0, 710036ns, Infinity, Infinity, Infinityd 10h 38m 16s 453ms 340842n
 chunks: [Chunk [], Chunk [false, false, false, false, true, true, true, true], Chunk [true, true, false, true, true, false, true, true, true]]
 instants: [-8639999999999964, 4950130058503672, 6279833006461975, -39]
 zones: ["+06:07", "Asia/Tokyo", "Australia/Sydney", "-00:00"]
+nullary arbitrary: count 20, valid true, has_dot true, has_leaf true, round_trip passed 50

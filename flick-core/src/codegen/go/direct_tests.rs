@@ -23,9 +23,12 @@ fn a_method_of_a_known_instance_is_a_function_called_directly() {
         )),
         "{go}"
     );
-    assert!(go.contains(&format!("{written}(fb, K_App__")), "{go}");
     assert!(
-        go.contains("F_App__Show_x20_Color_x24_show(fb, K_App__"),
+        go.contains(&format!("{written}(fb, flickrt.Value(T_App__Green{{}}))")),
+        "{go}"
+    );
+    assert!(
+        go.contains("F_App__Show_x20_Color_x24_show(fb, flickrt.Value(T_App__Red{}))"),
         "{go}"
     );
     // the call may break over lines, as wide as its arguments are
@@ -73,7 +76,7 @@ fn a_dictionary_the_checker_does_not_know_is_looked_up() {
     );
     // a known instance passed as a dictionary is the dictionary still
     assert!(
-        go.contains("F_App__heavy(fb, I_App__Weight_x20_Color, K_App__"),
+        go.contains("F_App__heavy(fb, I_App__Weight_x20_Color, flickrt.Value(T_App__Red{}))"),
         "{go}"
     );
 }
