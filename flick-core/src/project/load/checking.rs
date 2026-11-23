@@ -189,7 +189,8 @@ impl ModuleCache {
             return;
         }
         let paths: HashSet<&Path> = modules.iter().map(|m| m.path.as_path()).collect();
-        self.entries.retain(|path, _| paths.contains(path.as_path()));
+        self.entries
+            .retain(|path, _| paths.contains(path.as_path()));
         self.parses.retain(|path, _| paths.contains(path.as_path()));
     }
 
