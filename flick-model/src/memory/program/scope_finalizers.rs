@@ -97,17 +97,68 @@ impl<'p> Machine<'p, '_> {
         Ok(true)
     }
 
+    /// Conservatively reports whether an enclosing frame can recover from an
+    /// interrupt-bearing cause, trigger a discard, or execute user code after
+    /// unwinding/discarding a `LazyComplete` frame. Keep this match exhaustive
+    /// so every new `Destination` variant is classified explicitly.
     fn destination_can_reset_local(&self, dest: &Destination<'p>) -> bool {
         match dest {
             Destination::Handle { activation, .. } => self
                 .activations
                 .get(activation)
-                .is_some_and(|act| act.operations.iter().any(|op| op.class != OpClass::Tail)),
-            Destination::CaptureExit { .. } | Destination::CatchCause { .. } => true,
+                .is_none_or(|act| act.errors.is_some() || !act.operations.is_empty()),
+            // `CloseScope` returns `true` unconditionally because the lazy
+            // initializer itself may register `defer`/finalizers or children on
+            // the enclosing scope owner before unwinding.
+            Destination::Catch { .. }
+            | Destination::CaptureExit { .. }
+            | Destination::CatchDefect { .. }
+            | Destination::CatchCause { .. }
+            | Destination::EnsuringFinish { .. }
+            | Destination::OnExitDecide { .. }
+            | Destination::BracketRelease { .. }
+            | Destination::CloseScope { .. }
+            | Destination::ClosingScope { .. }
+            | Destination::LayerRun { .. }
+            | Destination::LayerBuildFinish { .. }
+            | Destination::ForeignLayerBuildFinish { .. }
+            | Destination::HostSyncCallback { .. }
+            | Destination::Discontinue { .. }
+            | Destination::Invocation(_)
+            | Destination::DiscardCleanupDone { .. }
+            | Destination::OnExitDiscardRunFin { .. }
+            | Destination::BracketFinish { .. }
+            | Destination::EnsuringDone { .. }
+            | Destination::OnExitRunFin { .. }
+            | Destination::OnExitFinish { .. } => true,
             Destination::RestoreMask { next, .. }
             | Destination::WithServices { next, .. }
             | Destination::CachedComplete { next, .. } => self.destination_can_reset_local(next),
-            _ => false,
+            Destination::Top
+            | Destination::Bind(_)
+            | Destination::Initialize { .. }
+            | Destination::Modify { .. }
+            | Destination::FunctionBoundary { .. }
+            | Destination::Loop { .. }
+            | Destination::GenerateStrict { .. }
+            | Destination::GeneratorStep { .. }
+            | Destination::LazyComplete { .. }
+            | Destination::AcquireRegister { .. }
+            | Destination::BracketUse { .. }
+            | Destination::RestoreOwner { .. }
+            | Destination::RestoreOwnerEvidence { .. }
+            | Destination::RestoreFiberRef { .. }
+            | Destination::RestoreEnvRefs { .. }
+            | Destination::RestoreRandom { .. }
+            | Destination::ProvideContext { .. }
+            | Destination::OrDie { .. }
+            | Destination::TimedFinish { .. }
+            | Destination::RecoverySelection { .. }
+            | Destination::RecoveryHelper { .. }
+            | Destination::RecoveryBody { .. }
+            | Destination::RaiseFromCatch
+            | Destination::HostApplyChain { .. }
+            | Destination::DiscardFinalizer => false,
         }
     }
 
