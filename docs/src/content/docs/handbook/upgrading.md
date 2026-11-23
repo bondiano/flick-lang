@@ -59,6 +59,7 @@ change needs.
 | [Backend options move to `--target` and `[target.<name>]`](#backend-options-move-to---target-and-targetname) | no | `FLICK-P057`, `FLICK-P058`, `FLICK-P059` |
 | [Target dependencies move to `[target.<name>.dependencies]` and backends own package managers](#target-dependencies-move-to-targetnamedependencies-and-backends-own-package-managers) | no | `FLICK-P051`, `FLICK-P057`, `FLICK-P063` |
 | [The IR carries full layout types (`0.14.0`)](#the-ir-carries-full-layout-types-0140) | no | — |
+| [Backends declare foreign adapter words and type-form attributes (`0.15.0`)](#backends-declare-foreign-adapter-words-and-type-form-attributes-0150) | no | `FLICK-S011`, `FLICK-S014`, `FLICK-F001` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -747,3 +748,22 @@ checks type well-formedness, type argument counts and annotation agreement with
 the terms they describe, while keeping erased nodes valid. Ordinary Flick
 programs require no source changes; `flick/js` and `flick/go` ignore the new
 compound type fields beyond bare type-constructor names.
+
+## Backends declare foreign adapter words and type-form attributes (`0.15.0`)
+
+Core foreign metadata now consists of the target-independent contract words
+(`arity`, `catch`, `retention`, `nullable`, `optional`, `reviewed`, and `owned`),
+while target-specific adapter words (`this`, `cancel signal`, `variadic`, or
+custom backend words) and type-form attributes (such as `@ts` on `flick/js`)
+are declared by each backend's descriptor (`adapter-words` and
+`type-form-attributes`). Unknown adapter words (`FLICK-S011`), unknown
+attributes (`FLICK-S014`), editor completion, and hover all follow the active
+package's backend. Using `@ts` in a `flick/go` project without `@when "js"` now
+reports `FLICK-S014`.
+
+The portable IR moves from `0.14.0` to `0.15.0`: `Adapter` replaces the
+JS-specific `receiver`, `cancel`, and `variadic` booleans with `owned: Vec<usize>`
+and `words: Vec<AdapterWord>` carrying exact source spans, and backends validate
+their adapter words in `check-target`. Backend components and `ir`-hook plugins
+must rebuild against `flick-ir` `0.15.0` and update their descriptor `ir` range
+to `[0.15.0, 0.16.0)`.

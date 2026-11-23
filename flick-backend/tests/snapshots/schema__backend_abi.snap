@@ -85,6 +85,30 @@ interface types {
     services: list<string>,
   }
 
+  enum adapter-arg-kind {
+    index,
+    ident,
+    text,
+  }
+
+  record adapter-arg {
+    name: string,
+    kind: adapter-arg-kind,
+    choices: list<string>,
+  }
+
+  record adapter-word {
+    name: string,
+    args: list<adapter-arg>,
+    repeatable: bool,
+    help: string,
+  }
+
+  record type-form-attribute {
+    name: string,
+    help: string,
+  }
+
   record descriptor {
     identity: backend-id,
     backend-api: version-range,
@@ -105,6 +129,8 @@ interface types {
     foreign-extension: option<string>,
     foreign-suffixes: list<string>,
     handled-services: list<environment-services>,
+    adapter-words: list<adapter-word>,
+    type-form-attributes: list<type-form-attribute>,
   }
 
   record target-request {

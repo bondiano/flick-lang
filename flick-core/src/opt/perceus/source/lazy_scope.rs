@@ -7,10 +7,9 @@ use super::{Code, Env, Intrinsic, Local, Lower, LowerError, Operation, Span};
 
 pub(super) fn has_standard_shape(value: &Foreign) -> bool {
     value.catch.is_none()
-        && !value.adapter.receiver
-        && !value.adapter.cancel
+        && value.adapter.words.is_empty()
+        && value.adapter.owned.is_empty()
         && value.adapter.optional.is_empty()
-        && !value.adapter.variadic
         && !value.adapter.result.nullable
 }
 

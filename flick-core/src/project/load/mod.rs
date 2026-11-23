@@ -144,6 +144,7 @@ struct Loader<'a> {
     project: Option<&'a Project>,
     /// The mode every module of the run and the built-in modules are checked in.
     stages_by_class: bool,
+    env_ctx: &'a environment::EnvironmentContext,
     #[cfg(feature = "native-project")]
     packages: Packages,
     modules: Vec<Loaded>,
@@ -151,6 +152,9 @@ struct Loader<'a> {
     /// The built-in modules a run reads, by name.
     from_packages: BTreeMap<String, Interface>,
     diagnostics: Vec<Diagnostic>,
+    /// Official-backend fallback adapter diagnostics collected during checking,
+    /// applied when a backend runner does not execute `check-target`.
+    adapter_diagnostics: Vec<Diagnostic>,
     /// With `Some`, the IR of each module that checks without errors.
     lowered: Option<Vec<Option<Lowered>>>,
     /// Lowers only the modules of source packages, to save them.
@@ -350,12 +354,14 @@ fn run_in(
         sources,
         project,
         stages_by_class,
+        env_ctx: &env_ctx,
         #[cfg(feature = "native-project")]
         packages,
         modules: Vec::new(),
         by_name: BTreeMap::new(),
         from_packages: BTreeMap::new(),
         diagnostics,
+        adapter_diagnostics: Vec::new(),
         lowered: (mode != Mode::Check || lower_packages_only || environment_preflight)
             .then(Vec::new),
         lower_packages_only,
@@ -468,6 +474,7 @@ fn run_in(
         }
     }
     let mut diagnostics = loader.reported();
+    let adapter_diagnostics = mem::take(&mut loader.adapter_diagnostics);
     #[cfg(feature = "ide")]
     let analyzed = loader.ide.take().unwrap_or_default();
     drop(loader);
@@ -483,74 +490,22 @@ fn run_in(
         #[cfg(not(target_arch = "wasm32"))]
         environment: env_ctx.resolved,
     };
-    #[cfg(not(target_arch = "wasm32"))]
-    if let Some(resolved) = compilation.environment.as_ref() {
-        target::check_environment(
-            host,
-            &compilation,
-            project,
-            target_override,
-            stages_by_class,
-            resolved,
-            sources,
-            &mut diagnostics,
-        );
-    }
-    // by path, not by load order, which follows the order of imports
-    diagnostics.sort_by_cached_key(|d| {
-        (
-            d.span.is_none(),
-            d.span
-                .map(|s| (sources.get(s.file).path.clone(), s.start, s.end)),
-        )
-    });
+    target::finalize_diagnostics(
+        host,
+        mode,
+        &compilation,
+        project,
+        target_override,
+        stages_by_class,
+        sources,
+        &mut diagnostics,
+        adapter_diagnostics,
+    );
     Output {
         diagnostics,
         compilation,
         fresh,
         #[cfg(feature = "ide")]
         analyzed,
-    }
-}
-
-impl Loader<'_> {
-    /// The interfaces of the built-in modules, in the mode of this run.
-    fn builtins(&self) -> &'static [Interface] {
-        types::builtins_of(self.stages_by_class)
-    }
-
-    /// The diagnostics of the run without the warnings it does not report:
-    /// those the project allows, and those of source packages, whose
-    /// dependent does not answer for them.
-    fn reported(&mut self) -> Vec<Diagnostic> {
-        let package_files: Vec<FileId> = self
-            .modules
-            .iter()
-            .filter(|m| matches!(m.root, Root::Package(_)))
-            .map(|m| m.file)
-            .collect();
-        let allowed = self.project.map(|p| &p.config.allow);
-        let mut diagnostics = mem::take(&mut self.diagnostics);
-        diagnostics.retain(|d| {
-            d.severity != Severity::Warning
-                || (d.span.is_none_or(|s| !package_files.contains(&s.file))
-                    && allowed.is_none_or(|a| !a.contains(&d.code)))
-        });
-        diagnostics
-    }
-
-    /// The parse of a module, from an earlier run while its text stays the same.
-    fn parsed(&mut self, path: &Path, file: FileId) -> (Arc<Parse>, Arc<ModuleSyntax>) {
-        let text = &self.sources.get(file).text;
-        if let Some(found) = self.cache.as_ref().and_then(|c| c.parsed(path, file, text)) {
-            return found;
-        }
-        let parse = Arc::new(syntax::parse(text, file).into_module());
-        let module = Arc::new(resolve::module_syntax(&parse.tree, text, file));
-        if let Some(cache) = &mut self.cache {
-            let parsed = (parse.clone(), module.clone());
-            cache.keep_parsed(path, file, text, parsed);
-        }
-        (parse, module)
     }
 }

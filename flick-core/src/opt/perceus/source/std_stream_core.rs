@@ -29,14 +29,14 @@ impl Lower<'_> {
         let bind = value.binding.name.as_str();
         let stages = value.stages.len();
         let allow_variadic = matches!(bind, "make" | "fromArrays" | "zipLatestAll" | "raceAll")
-            && value.adapter.variadic;
+            && value.adapter.has_word("variadic");
         if !allow_variadic && !has_standard_shape(value) {
             return None;
         }
         if allow_variadic
             && (value.catch.is_some()
-                || value.adapter.receiver
-                || value.adapter.cancel
+                || value.adapter.words.iter().any(|w| w.name != "variadic")
+                || !value.adapter.owned.is_empty()
                 || !value.adapter.optional.is_empty()
                 || value.adapter.result.nullable)
         {

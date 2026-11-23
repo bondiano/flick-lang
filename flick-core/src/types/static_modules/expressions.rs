@@ -228,6 +228,7 @@ impl Checker<'_> {
                 #[cfg(not(target_arch = "wasm32"))]
                 ir_lookup: None,
                 skip_ir_types: true,
+                foreign_meta: self.foreign_meta,
             },
         );
         self.diagnostics.extend(checked);

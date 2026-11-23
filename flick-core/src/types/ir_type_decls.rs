@@ -116,6 +116,33 @@ impl Checker<'_> {
         self.collect_ir_type_decls(&mut lower, typing);
     }
 
+    /// Lowers only the top-level schemes of `foreign` declarations when full
+    /// IR types are skipped (for `flick check` / LSP `check-target` runs).
+    pub(super) fn finish_foreign_ir_types(
+        &mut self,
+        typing: &mut Typing,
+        ir_lookup: Option<ModuleLookup<'_>>,
+    ) {
+        let Some(root) = self.root else { return };
+        let foreign_names: Vec<String> = root
+            .nodes()
+            .filter(|n| n.kind == K::ForeignDecl)
+            .filter_map(|decl| super::toplevel::foreign_name(decl, self.text).map(str::to_owned))
+            .collect();
+        if foreign_names.is_empty() {
+            return;
+        }
+        let mut lower = IrTypeLower::with_lookup(self, ir_lookup);
+        for name in foreign_names {
+            let entity = self.env.entity(Namespace::Value, &name);
+            if let Some(scheme) = self.env.value(&entity)
+                && let Some(lowered) = lower.lower_scheme(scheme)
+            {
+                typing.ir_top_schemes.insert(name, lowered);
+            }
+        }
+    }
+
     fn collect_ir_type_decls(&self, lower: &mut IrTypeLower<'_, '_>, typing: &mut Typing) {
         let Some(root) = self.root else { return };
         let module = &self.env.module;

@@ -18,10 +18,10 @@ mod typed_tests;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::{
-    Constraint, Expr, ExprKind, FileId, Handler, ItemKind, Pat, Program, Span, Stage, Stmt, TypeRef,
-};
+use crate::{Expr, ExprKind, FileId, Handler, ItemKind, Pat, Program, Span, Stmt, TypeRef};
 use decls::TypeIndex;
+use exprs::evidence_invocation;
+use patterns::bind;
 
 /// What is wrong with `program`, in order: module/form errors and type
 /// well-formedness or consistency errors.
@@ -92,6 +92,16 @@ pub fn validate(
                     if let Some(ty) = &foreign.ty {
                         v.check_type_wf(ty, None);
                     }
+                    for word in &foreign.adapter.words {
+                        v.span(word.span);
+                        if word.name.is_empty() {
+                            let here = v.module;
+                            v.problems.push(format!(
+                                "`{here}` foreign `{}` has an empty adapter word name",
+                                foreign.name
+                            ));
+                        }
+                    }
                     if let Some(catch) = &foreign.catch {
                         v.expr(catch);
                     }
@@ -102,18 +112,6 @@ pub fn validate(
         }
     }
     v.problems
-}
-
-/// Invocation operands must be captured before installing contextual evidence.
-fn evidence_invocation(invocation: &Expr) -> bool {
-    let evaluated = |e: &Expr| matches!(e.kind, ExprKind::Local(_) | ExprKind::Lit(_));
-    match &invocation.kind {
-        ExprKind::App {
-            func, arg, stage, ..
-        } => *stage != Stage::Pure && evaluated(func) && evaluated(arg),
-        ExprKind::Await(task) => evaluated(task),
-        _ => false,
-    }
 }
 
 struct LocalBinding {
@@ -483,71 +481,5 @@ impl Validator<'_> {
                 None,
             );
         }
-    }
-
-    fn check_fun_stmt(
-        &mut self,
-        name: &str,
-        _type_params: &[String],
-        dicts: &[String],
-        dict_constraints: &[Constraint],
-        ty: Option<&TypeRef>,
-        value: &Expr,
-    ) {
-        if !dict_constraints.is_empty() && dict_constraints.len() != dicts.len() {
-            let module = self.module;
-            self.problems.push(format!(
-                "`{module}` local function `{name}` has {} dictionary constraints for {} dictionaries",
-                dict_constraints.len(),
-                dicts.len()
-            ));
-        }
-        for c in dict_constraints {
-            for a in &c.args {
-                self.check_type_wf(a, None);
-            }
-        }
-        if let Some(ty) = ty {
-            self.check_type_wf(ty, None);
-            if let Some(vty) = self.effective_expr_type(value) {
-                self.expect_agree(ty, &vty, &format!("local function `{name}` body"));
-            }
-        }
-    }
-}
-
-/// Pushes the names `pat` binds onto `scope`.
-pub(super) fn bind(pat: &Pat, scope: &mut Vec<String>) {
-    match pat {
-        Pat::Bind(name) => scope.push(name.clone()),
-        Pat::Tuple(items) | Pat::Con(_, items) => {
-            for p in items {
-                bind(p, scope);
-            }
-        }
-        Pat::Or(alternatives) => {
-            let common = alternatives
-                .iter()
-                .fold(None, |common: Option<BTreeSet<String>>, p| {
-                    let mut names = Vec::new();
-                    bind(p, &mut names);
-                    let names: BTreeSet<_> = names.into_iter().collect();
-                    Some(match common {
-                        Some(common) => common.intersection(&names).cloned().collect(),
-                        None => names,
-                    })
-                });
-            scope.extend(common.into_iter().flatten());
-        }
-        Pat::List(items, rest) => {
-            for p in items {
-                bind(p, scope);
-            }
-            if let Some(rest) = rest {
-                bind(rest, scope);
-            }
-        }
-        Pat::Record(fields) => fields.iter().for_each(|(_, p)| bind(p, scope)),
-        Pat::Wild | Pat::Lit(_) => {}
     }
 }

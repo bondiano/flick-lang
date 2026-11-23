@@ -29,10 +29,9 @@ impl Lower<'_> {
         if bind == "sqlIdentifier"
             && stages == 1
             && value.catch.is_none()
-            && !value.adapter.receiver
-            && !value.adapter.cancel
+            && value.adapter.words.is_empty()
+            && value.adapter.owned.is_empty()
             && value.adapter.optional.is_empty()
-            && !value.adapter.variadic
             && value.adapter.result.nullable
         {
             let expr = sql_identifier(&b);

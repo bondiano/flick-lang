@@ -1,6 +1,7 @@
 //! JavaScript and TypeScript emission without a checker or project driver.
 //! Component integration uses the separate `flick:backend` contract.
 
+pub mod adapter;
 pub mod codegen;
 
 pub mod numeric;

@@ -1,10 +1,13 @@
-//! Validation for `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`,
-//! `@sync`, `@ts`, `@stores`, `@implicit` and `@when` attributes.
+//! Validation for core attributes (`@lang`, `@derive`, `@maker`, `@cell`,
+//! `@label`, `@owner`, `@sync`, `@stores`, `@implicit` and `@when`).
+//! Backend-owned type-form attributes (such as `@ts`) and unknown attribute
+//! checks run in [`super::foreign_meta::validate_tree`] once the active
+//! backend descriptor is known.
 
 use super::cst::{Node, Token};
 use super::heads::{CHECKED_BY, INVARIANT_OF};
 use super::kind::SyntaxKind as K;
-use super::{ts_mark, when};
+use super::when;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::{FileId, Span};
 use crate::syntax::lang::Lang;
@@ -47,15 +50,6 @@ pub(super) fn check(
                 }
             }
         }
-        [name, ..] if name.text(src) == "ts" => match ts_mark::read(node, src) {
-            Some(Err(why)) => why,
-            _ if matches!(next, Some(K::TypeDecl | K::ServiceDecl | K::Attribute))
-                || (next.is_none() && allow_trailing_attribute) =>
-            {
-                return;
-            }
-            _ => "`@ts` belongs before the declaration of a type or a service".to_owned(),
-        },
         [name] | [name, _] if name.text(src) == "derive" => return,
         [name] if name.text(src) == "maker" => return,
         [name, ..] if name.text(src) == "maker" => "`@maker` takes no argument".to_owned(),
@@ -143,13 +137,16 @@ pub(super) fn check(
         [name, ..] if name.text(src) == "derive" => {
             "`@derive` names at most the package of its plugin: `@derive std`".to_owned()
         }
-        [name, ..] if name.text(src) != "lang" => format!(
-            "unknown attribute `@{}`: the attributes are `@lang`, `@derive`, `@maker`, `@cell`, `@label`, `@owner`, `@sync`, `@ts`, `@stores`, `@implicit` and `@when`",
-            name.text(src)
-        ),
-        [_, item] if Lang::from_name(item.text(src)).is_some() => return,
-        [_, item] => format!("unknown lang item `{}`", item.text(src)),
-        _ => "`@lang` names one lang item".to_owned(),
+        [name, item] if name.text(src) == "lang" && Lang::from_name(item.text(src)).is_some() => {
+            return;
+        }
+        [name, item] if name.text(src) == "lang" => {
+            format!("unknown lang item `{}`", item.text(src))
+        }
+        [name, ..] if name.text(src) == "lang" => "`@lang` names one lang item".to_owned(),
+        // Backend-owned type-form attributes (such as `@ts`) and unknown
+        // attribute diagnostics are validated by `foreign_meta::validate_tree`.
+        _ => return,
     };
     let (start, end) = node.range();
     errors.push(Diagnostic::error(

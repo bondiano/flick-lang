@@ -2,8 +2,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::Validator;
 use super::agree::unfold_opaque_alias;
-use super::{Validator, bind};
 use crate::{Constructor, IrType, Lang, Pat, TypeInterner, TypeRef};
 
 impl Validator<'_> {
@@ -246,5 +246,41 @@ impl Validator<'_> {
             "`{module}` constructor pattern `{}.{}` does not match scrutinee type `{expected}`",
             c.module, c.name
         ));
+    }
+}
+
+/// Pushes the names `pat` binds onto `scope`.
+pub(super) fn bind(pat: &Pat, scope: &mut Vec<String>) {
+    match pat {
+        Pat::Bind(name) => scope.push(name.clone()),
+        Pat::Tuple(items) | Pat::Con(_, items) => {
+            for p in items {
+                bind(p, scope);
+            }
+        }
+        Pat::Or(alternatives) => {
+            let common = alternatives
+                .iter()
+                .fold(None, |common: Option<BTreeSet<String>>, p| {
+                    let mut names = Vec::new();
+                    bind(p, &mut names);
+                    let names: BTreeSet<_> = names.into_iter().collect();
+                    Some(match common {
+                        Some(common) => common.intersection(&names).cloned().collect(),
+                        None => names,
+                    })
+                });
+            scope.extend(common.into_iter().flatten());
+        }
+        Pat::List(items, rest) => {
+            for p in items {
+                bind(p, scope);
+            }
+            if let Some(rest) = rest {
+                bind(rest, scope);
+            }
+        }
+        Pat::Record(fields) => fields.iter().for_each(|(_, p)| bind(p, scope)),
+        Pat::Wild | Pat::Lit(_) => {}
     }
 }

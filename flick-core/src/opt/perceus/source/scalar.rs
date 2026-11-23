@@ -33,10 +33,8 @@ pub(super) fn candidate(value: &Foreign) -> Option<Intrinsic> {
         && value.catch.is_none()
         && value.adapter
             == Adapter {
-                receiver: false,
-                cancel: false,
                 optional: vec![],
-                variadic: false,
+                owned: vec![],
                 result: ResultAdapter {
                     nullable: false,
                     unit: false,
@@ -49,6 +47,7 @@ pub(super) fn candidate(value: &Foreign) -> Option<Intrinsic> {
                 },
                 shapes: vec![Shape::Data],
                 result_shape: Shape::Data,
+                words: vec![],
             })
     .then_some(kind)
 }

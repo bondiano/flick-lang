@@ -1,0 +1,20 @@
+module App.OwnedForeignFail exposing (..)
+
+take_one : String ->{} Unit
+foreign take_one from "./native.js" "takeOne"
+  arity 1
+  owned 3
+//^^^^^^^ FLICK-F001 `owned 3` is past the 1 arguments of the call
+
+missing_idx : String ->{} Unit
+foreign missing_idx from "./native.js" "missingIdx"
+  arity 1
+  owned
+//^^^^^ FLICK-F001 `owned` takes the position of an argument, from 0
+
+dup_owned : String ->{} Unit
+foreign dup_owned from "./native.js" "dupOwned"
+  arity 1
+  owned 0
+  owned 0
+//^^^^^^^ FLICK-F001 duplicate `owned 0` in foreign metadata

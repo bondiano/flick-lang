@@ -1,0 +1,12 @@
+module App.OwnedForeign exposing (consume, pair_consume)
+
+consume : String ->{} Unit
+foreign consume from "./native.js" "consume"
+  arity 1
+  owned 0
+
+pair_consume : String -> String ->{} Unit
+foreign pair_consume from "./native.js" "pairConsume"
+  arity 2
+  owned 0
+  owned 1

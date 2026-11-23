@@ -10,12 +10,12 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
 #[cfg(feature = "wasm-backends")]
-use flick_core::project::Foreign;
-#[cfg(feature = "wasm-backends")]
 use flick_core::project::config::BackendEnvironment;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::target::Wanted;
 use flick_core::project::{BackendTags, Host, Project, is_companion};
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::{Compilation, Foreign, ResolvedEnvironment};
 use flick_core::source::{FileId, SourceMap};
 
 #[cfg(feature = "wasm-backends")]
@@ -132,6 +132,27 @@ impl Host for FsHost {
 
     fn loads_backends(&self) -> bool {
         self.load_backends
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn has_backend_runner(&self) -> bool {
+        self.load_backends
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn check_target(
+        &self,
+        project: &Project,
+        compilation: &Compilation,
+        environment: &ResolvedEnvironment,
+        stages_by_class: bool,
+        sources: &mut SourceMap,
+    ) -> Option<Vec<Diagnostic>> {
+        if self.load_backends {
+            backends::check_target(project, compilation, environment, stages_by_class, sources)
+        } else {
+            None
+        }
     }
 }
 

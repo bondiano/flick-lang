@@ -3,6 +3,7 @@
 
 use super::{Dict, Type, Watched};
 use crate::resolve::Interface;
+use crate::syntax::foreign_meta::ForeignMeta;
 use crate::syntax::structure::Thresholds;
 
 /// Bounds of instance resolution for one definition; exceeding them is a
@@ -57,4 +58,7 @@ pub(crate) struct StaticContext<'a> {
     pub ir_lookup: Option<ModuleLookup<'a>>,
     /// Skip building interned IR types (for `flick check` / LSP runs that do not lower).
     pub skip_ir_types: bool,
+    /// Backend-declared foreign adapter words and type-form attributes for this
+    /// module; defaults to the official JS descriptor when `None`.
+    pub foreign_meta: Option<&'a ForeignMeta>,
 }

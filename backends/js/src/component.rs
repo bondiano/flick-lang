@@ -16,10 +16,10 @@ mod packages;
 mod templates;
 
 use flick_backend::{
-    Abi, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment,
-    EnvironmentServices, Inputs, Mode, NamedRange, OptionDescriptor, OptionValue, Packages,
-    Parameter, Profile, ProjectFile, Severity, TagAxis, TargetSupport, ValueKind, Verb,
-    VersionRange, command,
+    Abi, AdapterArg, AdapterArgKind, AdapterWord, Backend, BackendId, BuildRequest, BuildResult,
+    Descriptor, Diagnostic, Environment, EnvironmentServices, Inputs, Mode, NamedRange,
+    OptionDescriptor, OptionValue, Packages, Parameter, Profile, ProjectFile, Severity, TagAxis,
+    TargetSupport, TypeFormAttribute, ValueKind, Verb, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -212,7 +212,7 @@ impl Backend for Javascript {
                 version: "0.1.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.14.0", "0.15.0"),
+            ir: range("0.15.0", "0.16.0"),
             language: range("0.1.0", "0.2.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
@@ -271,6 +271,34 @@ impl Backend for Javascript {
                     platform: "node".into(),
                 },
                 services: vec!["Database".into(), "Db".into(), "Server".into()],
+            }],
+            adapter_words: vec![
+                AdapterWord {
+                    name: "this".into(),
+                    args: vec![],
+                    repeatable: false,
+                    help: "Pass the first argument as the JavaScript `this` receiver (`target.call(a0, a1, …)`).".into(),
+                },
+                AdapterWord {
+                    name: "cancel".into(),
+                    args: vec![AdapterArg {
+                        name: "mode".into(),
+                        kind: AdapterArgKind::Ident,
+                        choices: vec!["signal".into()],
+                    }],
+                    repeatable: false,
+                    help: "Pass an `AbortSignal` as the last argument of an `Async` call, aborted on interruption.".into(),
+                },
+                AdapterWord {
+                    name: "variadic".into(),
+                    args: vec![],
+                    repeatable: false,
+                    help: "Spread the last `List a` argument into the JavaScript call (`...xs`).".into(),
+                },
+            ],
+            type_form_attributes: vec![TypeFormAttribute {
+                name: "ts".into(),
+                help: "Says what the type or service declared next is in TypeScript: it is not declared in `.d.ts`, and every module that names it writes this form. In a form `{0}` is the first argument of the type, `{0:row}` that argument as a row, and `$Export` an export that `@ts import \"module\" \"Export\"` brings from a package or from a file beside the module. `@ts none` says the type has no form. The built-in types have their forms from the backend. The compiler does not check that a form is true of the values.".into(),
             }],
         }
     }

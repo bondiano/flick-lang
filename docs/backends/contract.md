@@ -16,7 +16,7 @@ language that implements this world.
 This is an initial 0.x contract and validation library. It does not freeze
 IR 1.0 or complete every semantic prerequisite of R3a. Ordinary JS/TS and Go
 `build/run/dev/test/inspect` select the distributed `flick/js` or `flick/go`
-component by default. The portable IR is 0.14.0. The official
+component by default. The portable IR is 0.15.0. The official
 JS and Go emitters live in `backends/js` and `backends/go`, independently of
 `flick-core`. The contract probe exercises both with IR
 and plain data without `Compilation` or `Settings`. The distributed components
@@ -40,11 +40,20 @@ Each backend declares its own CLI and `[target.<name>]` options in
 `descriptor.options` (`option-descriptor`: `parameter`, `default`,
 `implicit-value`, `choices`, `verbs`), along with target metadata
 (`launch-runtimes`, `host-tools`, `projections`,
-`stages-by-class-option`, `foreign-extension`, `foreign-suffixes`, and
-`handled-services`), cached by component digest in
-`<store>/descriptors/<sha256>.cbor` so `--help` never reaches the network.
+`stages-by-class-option`, `foreign-extension`, `foreign-suffixes`,
+`handled-services`, `adapter-words`, and `type-form-attributes`), cached by
+component digest in `<store>/descriptors/<sha256>.cbor` so `--help`,
+diagnostics, and editor completion never reach the network.
+`adapter-words` lists the backend-owned `foreign` metadata words (each with
+typed argument shapes: `ident`, `index`, or `text`, optional `choices`,
+`repeatable`, and hover/completion `help`), and `type-form-attributes` lists
+backend-owned `@<name>` attributes allowed before `type` and `service`
+declarations (such as `@ts` on `flick/js`). Handshake validation rejects
+adapter words that collide with core foreign contract words (`arity`, `catch`,
+`retention`, `nullable`, `optional`, `reviewed`, `owned`) and attributes that
+collide with core compiler attributes.
 Resolved active options arrive in `TargetRequest.options` as `option.<name>`
-entries alongside `command` (`build`, `run`, `dev`, `test` or `inspect`) and,
+entries alongside `command` (`build`, `check`, `run`, `dev`, `test` or `inspect`) and,
 for `inspect`, `inspect.module`. `BuildRequest.declared-dependencies` carries
 the target package dependencies declared by the project so each backend derives
 internal runtime/bridge settings itself. The browser
@@ -83,10 +92,10 @@ request and result; request membership alone does not validate a pin.
 The complete module layout is checked for portable paths and collisions in
 both compilation modes. Module package ownership must match the IR, and
 entry, test and root-handler module references stay inside the closed graph.
-Every item and nested expression span must fit the supplied UTF-8 source.
+Every item, foreign adapter word, and nested expression span must fit the supplied UTF-8 source.
 Source aliases share one retained input buffer and line index during validation.
 
-In IR 0.14.0, `Program` carries the checker's layout-relevant types (`IrType`:
+In IR 0.15.0, `Program` carries the checker's layout-relevant types (`IrType`:
 named type applications, type variables, staged functions, tuples, closed and
 open record rows, higher-rank `forall` schemes and packed-module existentials)
 shared behind `Arc` in memory and interned in a top-level `types` table on the
@@ -96,10 +105,14 @@ wire. Each module records its data, error and opaque-alias type declarations
 constraints and result indices), binder types (`let`, parameters, pattern
 variables, `Var`, `Each`), function result types, and instantiation `type_args`
 on polymorphic globals, constructors and methods. Effect, service and region
-rows are omitted because no value layout depends on them. `flick_ir::validate`
-checks type well-formedness, type argument counts and annotation agreement
-with the terms they describe, while permitting erased paths where optional type
-annotations are omitted. UI metadata and complete effect analyses are still not
+rows are omitted because no value layout depends on them. On `Foreign.adapter`,
+core contract fields (`owned` parameter indices, `optional`, `result`,
+`callbacks`, `copies`, `shapes`, `result_shape`) sit alongside backend-owned
+`words` (`Vec<AdapterWord>`, each carrying its word name, parsed arguments, and
+source `Span`), replacing target-specific booleans. `flick_ir::validate`
+checks type well-formedness, type argument counts, foreign adapter word spans
+and annotation agreement with the terms they describe, while permitting erased
+paths where optional type annotations are omitted. UI metadata and complete effect analyses are still not
 implied by receiving a `Program`. A consumer that needs an extra projection
 must require its declared schema and refuse missing or incompatible data. It
 cannot call the checker through this world. Layout-aware backends compute
@@ -167,9 +180,13 @@ npm dependency pinning or Go foreign inputs.
 Future changes to memory or execution semantics need a coordinated IR
 version, independently of this backend package version.
 
-`check-target` receives the complete request, so unsupported operations can
-be refused with source spans before generation. Static handshake precedes
-that call. Descriptor capabilities and the preflight response must agree.
+`check-target` receives the complete request, so unsupported operations and
+backend-owned foreign adapter metadata can be refused with source spans before
+generation. `flick check` and the language server also invoke `check-target`
+(with `command = "check"` and without codegen projections) when a project
+selects a target or environment and declares own `foreign` items. Static
+handshake precedes that call. Descriptor capabilities and the preflight
+response must agree.
 Structural IR validation does not establish semantic equivalence; official
 backends also require the language conformance corpus.
 

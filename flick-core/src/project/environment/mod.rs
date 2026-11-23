@@ -4,22 +4,19 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
+mod resolve;
 #[cfg(not(target_arch = "wasm32"))]
 mod select;
 
+pub(super) use resolve::resolve;
+
 #[cfg(not(target_arch = "wasm32"))]
-use super::config::{BackendEnvironment, HostConfig};
-#[cfg(feature = "native-project")]
-use super::packages::Packages;
-#[cfg(feature = "native-project")]
-use super::target;
-use super::{Host, Project};
+use super::config::BackendEnvironment;
 use crate::diagnostics::{Diagnostic, Severity, codes, suggest};
 use crate::resolve::ModuleSyntax;
-use crate::source::{SourceFile, SourceMap, Span};
+use crate::source::{SourceFile, Span};
+use crate::syntax::foreign_meta::ForeignMeta;
 use crate::syntax::when;
-#[cfg(not(target_arch = "wasm32"))]
-use select::resolve_selected;
 
 /// One selectable tag axis published by a backend descriptor.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +40,8 @@ pub struct BackendTags {
     pub axes: Vec<BackendAxis>,
     /// Built-in `(backend, host)` environment pairs published by the backend.
     pub environments: Vec<(String, String)>,
+    /// Backend-declared foreign adapter words and type-form attributes.
+    pub foreign_meta: ForeignMeta,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -168,6 +167,7 @@ pub fn official_backends() -> Vec<BackendTags> {
                 ("js".into(), "bun".into()),
                 ("js".into(), "cloudflare".into()),
             ],
+            foreign_meta: ForeignMeta::js(),
         },
         BackendTags {
             id: "flick/go".into(),
@@ -180,6 +180,7 @@ pub fn official_backends() -> Vec<BackendTags> {
                 exclusive: false,
             }],
             environments: vec![("go".into(), "native".into())],
+            foreign_meta: ForeignMeta::go(),
         },
     ]
 }
@@ -193,6 +194,73 @@ pub(super) struct EnvironmentContext {
     /// incomplete and must not emit false `FLICK-P066` errors.
     pub validate_tags: bool,
     pub resolved: Option<ResolvedEnvironment>,
+    /// Active backend's declared foreign adapter words and type-form attributes.
+    pub foreign_meta: ForeignMeta,
+    /// False when the selected backend descriptor could not be loaded or is
+    /// unknown, so S011/S014 validation must not emit cascading errors.
+    pub validate_foreign_meta: bool,
+    /// All known backend descriptors for resolving per-package or `@when`-gated
+    /// module foreign metadata.
+    pub backends: Vec<BackendTags>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl EnvironmentContext {
+    pub(super) fn standalone_js() -> Self {
+        let backends = official_backends();
+        let mut vocabulary = BTreeSet::new();
+        for backend in &backends {
+            vocabulary.extend(backend.full_vocabulary());
+        }
+        Self {
+            vocabulary,
+            validate_tags: true,
+            resolved: None,
+            foreign_meta: ForeignMeta::js(),
+            validate_foreign_meta: true,
+            backends,
+        }
+    }
+
+    /// Selects the foreign metadata descriptor for one module: its package's
+    /// declared backend if any, else a uniquely matching backend for an
+    /// inactive `@when` module, else the project's active backend.
+    pub(super) fn foreign_meta_for(
+        &self,
+        package_backend: Option<&str>,
+        module_when: Option<&str>,
+    ) -> &ForeignMeta {
+        if let Some(name) = package_backend
+            && let Some(backend) = self.backends.iter().find(|b| b.matches_name(name))
+        {
+            return &backend.foreign_meta;
+        }
+        if let Some(cond) = module_when
+            && let Ok(expr) = when::parse(cond)
+        {
+            let active_matches = match &self.resolved {
+                Some(env) => expr.eval(&|tag| env.tags.contains(tag)),
+                None => self
+                    .backends
+                    .iter()
+                    .find(|b| b.id == self.foreign_meta.backend_id)
+                    .is_some_and(|b| {
+                        let vocab = b.full_vocabulary();
+                        expr.eval(&|tag| vocab.contains(tag))
+                    }),
+            };
+            if !active_matches {
+                let mut matching = self.backends.iter().filter(|b| {
+                    let vocab = b.full_vocabulary();
+                    expr.eval(&|tag| vocab.contains(tag))
+                });
+                if let (Some(only), None) = (matching.next(), matching.next()) {
+                    return &only.foreign_meta;
+                }
+            }
+        }
+        &self.foreign_meta
+    }
 }
 
 /// Validates `@when "<cond>"` on a standalone file checked outside any project.
@@ -305,7 +373,28 @@ const OFFICIAL_TAGS: &[&str] = &[
 ];
 
 #[cfg(target_arch = "wasm32")]
-pub(super) struct EnvironmentContext;
+pub(super) struct EnvironmentContext {
+    pub foreign_meta: ForeignMeta,
+    pub validate_foreign_meta: bool,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl EnvironmentContext {
+    pub(super) fn standalone_js() -> Self {
+        Self {
+            foreign_meta: ForeignMeta::js(),
+            validate_foreign_meta: true,
+        }
+    }
+
+    pub(super) fn foreign_meta_for(
+        &self,
+        _package_backend: Option<&str>,
+        _module_when: Option<&str>,
+    ) -> &ForeignMeta {
+        &self.foreign_meta
+    }
+}
 
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn validate_standalone_when(
@@ -334,176 +423,4 @@ pub(super) fn validate_module_when(
     diagnostics: &mut Vec<Diagnostic>,
 ) {
     validate_tags_against(cond, literal_span, source_text, OFFICIAL_TAGS, diagnostics);
-}
-
-#[cfg(target_arch = "wasm32")]
-#[allow(clippy::too_many_arguments)]
-pub(super) fn resolve(
-    _host: &dyn Host,
-    _project: Option<&Project>,
-    _target_override: Option<&TargetOverride>,
-    _require_resolved: bool,
-    _sources: &SourceMap,
-    _diagnostics: &mut Vec<Diagnostic>,
-) -> EnvironmentContext {
-    EnvironmentContext
-}
-
-/// Resolves the project's active environment (when `require_resolved` is true)
-/// and validates host declarations, `[host] requires`, and `[package] when` tags.
-#[cfg(not(target_arch = "wasm32"))]
-#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
-pub(super) fn resolve(
-    host: &dyn Host,
-    project: Option<&Project>,
-    #[cfg(feature = "native-project")] packages: &Packages,
-    #[cfg(feature = "native-project")] target_dependencies: &[target::Wanted],
-    target_override: Option<&TargetOverride>,
-    require_resolved: bool,
-    sources: &SourceMap,
-    diagnostics: &mut Vec<Diagnostic>,
-) -> EnvironmentContext {
-    let mut backends = official_backends();
-    if let Some(project) = project {
-        for extra in host.backend_tags(project) {
-            if !backends.iter().any(|b| b.id == extra.id) {
-                backends.push(extra);
-            }
-        }
-    }
-    if let Some(extra) = target_override.and_then(|o| o.backend.clone()) {
-        upsert_backend(&mut backends, extra);
-    }
-
-    // Frontend-only commands (`flick inspect --emit iface`) intentionally avoid
-    // instantiating `[build.backend]` components. When a pinned third-party
-    // backend has no cached descriptor yet, its tags, axes and built-in hosts
-    // are unknown, so skip vocabulary validation and environment resolution
-    // rather than fabricating an empty-axes fallback that emits false errors.
-    #[cfg(feature = "native-project")]
-    let uncached_custom_backend = !host.loads_backends()
-        && project
-            .and_then(|p| p.config.build.backend.as_ref())
-            .is_some_and(|pkg| !backends.iter().any(|b| b.id == pkg.id));
-    #[cfg(not(feature = "native-project"))]
-    let uncached_custom_backend = false;
-    if uncached_custom_backend {
-        return EnvironmentContext {
-            vocabulary: BTreeSet::new(),
-            validate_tags: false,
-            resolved: None,
-        };
-    }
-
-    // Collect every declared `[host]` (from dependency packages and, if this project
-    // itself is a host library, from the project manifest).
-    let mut hosts: Vec<(Option<String>, &HostConfig)> = Vec::new();
-    if let Some(own_host) = project.and_then(|p| p.config.host.as_ref()) {
-        hosts.push((None, own_host));
-    }
-    #[cfg(feature = "native-project")]
-    for (pkg_name, host_cfg) in packages.hosts() {
-        hosts.push((Some(pkg_name.to_owned()), host_cfg));
-    }
-
-    // Detect duplicate `(backend, host name)` declarations across packages.
-    let mut seen_hosts: BTreeMap<(String, String), String> = BTreeMap::new();
-    for (pkg_opt, host_cfg) in &hosts {
-        let canonical_backend = backends
-            .iter()
-            .find(|b| b.matches_name(&host_cfg.backend))
-            .map_or_else(|| host_cfg.backend.clone(), |b| b.id.clone());
-        let owner = pkg_opt.clone().unwrap_or_else(|| {
-            project
-                .and_then(|p| p.config.package.as_ref().map(|pk| pk.name.clone()))
-                .unwrap_or_else(|| "this project".to_owned())
-        });
-        let key = (canonical_backend, host_cfg.name.clone());
-        if let Some(first) = seen_hosts.get(&key) {
-            diagnostics.push(Diagnostic::error(
-                codes::P065,
-                format!(
-                    "duplicate host `{}` for backend `{}`: already declared by `{first}`",
-                    host_cfg.name, host_cfg.backend
-                ),
-                host_cfg.span,
-            ));
-        } else {
-            seen_hosts.insert(key, owner);
-        }
-    }
-
-    // Build combined tag vocabulary (backends + axes + built-in hosts + loaded host packages).
-    let mut vocabulary = BTreeSet::new();
-    let mut all_backend_tags = BTreeSet::new();
-    for backend in &backends {
-        vocabulary.extend(backend.full_vocabulary());
-        all_backend_tags.extend(backend.backend_vocabulary());
-    }
-    for (_, host_cfg) in &hosts {
-        vocabulary.insert(host_cfg.name.clone());
-        for (tag, _) in &host_cfg.tags {
-            vocabulary.insert(tag.clone());
-        }
-    }
-
-    // Validate `[host] requires` against backend tags (not host tags).
-    for (_, host_cfg) in &hosts {
-        if let Some((cond, span)) = &host_cfg.requires {
-            let backend_vocab = backends
-                .iter()
-                .find(|b| b.matches_name(&host_cfg.backend))
-                .map_or_else(|| all_backend_tags.clone(), BackendTags::backend_vocabulary);
-            let text = &sources.get(span.file).text;
-            validate_condition_tags(cond, Some(*span), Some(text), &backend_vocab, diagnostics);
-        }
-    }
-
-    // Validate `[package] when` on the project and all dependency packages.
-    if let Some((cond, span)) = project
-        .and_then(|p| p.config.package.as_ref())
-        .and_then(|p| p.when.as_ref())
-    {
-        let text = &sources.get(span.file).text;
-        validate_condition_tags(cond, Some(*span), Some(text), &vocabulary, diagnostics);
-    }
-    #[cfg(feature = "native-project")]
-    for (_, cond, span) in packages.package_when() {
-        let text = &sources.get(span.file).text;
-        validate_condition_tags(cond, Some(span), Some(text), &vocabulary, diagnostics);
-    }
-
-    if !require_resolved {
-        return EnvironmentContext {
-            vocabulary,
-            validate_tags: true,
-            resolved: None,
-        };
-    }
-
-    let resolved = resolve_selected(
-        host,
-        project,
-        #[cfg(feature = "native-project")]
-        target_dependencies,
-        target_override,
-        &backends,
-        &hosts,
-        diagnostics,
-    );
-
-    EnvironmentContext {
-        vocabulary,
-        validate_tags: true,
-        resolved,
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn upsert_backend(backends: &mut Vec<BackendTags>, extra: BackendTags) {
-    if let Some(existing) = backends.iter_mut().find(|b| b.id == extra.id) {
-        *existing = extra;
-    } else {
-        backends.push(extra);
-    }
 }

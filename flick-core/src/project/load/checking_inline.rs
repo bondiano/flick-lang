@@ -20,6 +20,7 @@ fn merge_inline_ide(output: &mut Output, child_output: &Output, child: &Loaded) 
         child,
         child_output.typing.clone(),
         child_output.interface.clone(),
+        child_output.foreign_meta.clone(),
     );
     analyzed_child.inline = true;
     output.inline_ide.push(analyzed_child);

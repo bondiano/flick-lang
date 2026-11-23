@@ -15,6 +15,7 @@ pub(super) const BINDINGS: &str = "go/bindings/";
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Command {
     Build,
+    Check,
     Run,
     Dev,
     Test,
@@ -122,6 +123,7 @@ fn options(
             "command" => command
                 .replace(match option.value.as_str() {
                     "build" => Command::Build,
+                    "check" => Command::Check,
                     "run" => Command::Run,
                     "dev" => Command::Dev,
                     "test" => Command::Test,

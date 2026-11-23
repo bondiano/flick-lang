@@ -41,6 +41,9 @@ struct Package {
     when: Option<(String, Span)>,
     /// Host declaration `[host]`, if this package defines a host environment.
     host: Option<HostConfig>,
+    /// Backend declared by this package (`[host] backend`, `[build.backend]`,
+    /// `[build] target`, or `[build] environment`), if any.
+    backend: Option<String>,
 }
 
 /// What the modules of a library of `[dependencies]` depend on besides the
@@ -116,6 +119,7 @@ impl Packages {
                 watch: Vec::new(),
                 when: None,
                 host: None,
+                backend: None,
             });
         }
         packages.extend(installed);
@@ -195,6 +199,14 @@ impl Packages {
         self.packages
             .iter()
             .filter_map(|p| Some((p.name.as_str(), p.host.as_ref()?)))
+    }
+
+    /// Declared backend short name or id for dependency package `name`, if any.
+    pub fn package_backend(&self, name: &str) -> Option<&str> {
+        self.packages
+            .iter()
+            .find(|p| p.name == name)
+            .and_then(|p| p.backend.as_deref())
     }
 }
 
@@ -306,6 +318,7 @@ impl Libraries<'_> {
     }
 
     /// The library `dependency` names, with its directory and dependencies.
+    #[allow(clippy::too_many_lines)]
     fn library(
         &mut self,
         dir: &Path,
@@ -385,6 +398,19 @@ impl Libraries<'_> {
             .filter(|d| !is_implicit_package(&d.name))
             .map(|d| d.name.clone())
             .collect();
+        let backend = library
+            .host
+            .as_ref()
+            .map(|h| h.backend.clone())
+            .or_else(|| library.build.backend.as_ref().map(|b| b.id.clone()))
+            .or_else(|| library.build.target.clone())
+            .or_else(|| {
+                library
+                    .build
+                    .environment
+                    .as_ref()
+                    .map(|e| e.backend.clone())
+            });
         out.push(Package {
             name: dependency.name.clone(),
             installed: true,
@@ -402,6 +428,7 @@ impl Libraries<'_> {
             watch: (library.package.as_ref()).map_or_else(Vec::new, |p| p.watch.clone()),
             when: library.package.as_ref().and_then(|p| p.when.clone()),
             host: library.host,
+            backend,
         });
         Some((at, library.dependencies))
     }

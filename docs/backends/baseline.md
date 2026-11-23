@@ -60,9 +60,11 @@ declarations remain in the frontend. The native source-map adapter supplies
 plain UTF-16 positions to the emitter. This source move does not establish
 the production WIT component path or the browser component loader.
 
-`Program` (IR 0.14.0) carries layout-relevant types — `Module.types` data and
+`Program` (IR 0.15.0) carries layout-relevant types — `Module.types` data and
 constructor declarations, constructor field types, binder/expression types and
-instantiation `type_args` — shared via `Arc` and interned on the wire, while
+instantiation `type_args` — shared via `Arc` and interned on the wire, along
+with core `Foreign.adapter` contract fields (`owned`, `optional`, `result`,
+callbacks and copies) and backend-declared `words` with source spans, while
 leaving out effect, service and region rows as well as the checker's UI
 metadata. A required extra projection still needs an identified schema,
 version and content input. Missing data must be rejected rather than inferred

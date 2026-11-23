@@ -1,12 +1,12 @@
 //! Target runtime mode and reachable-use environment preflight.
 
-#[cfg(not(target_arch = "wasm32"))]
-use super::{Compilation, SourceMap};
-use super::{Host, Project};
-#[cfg(not(target_arch = "wasm32"))]
+use super::{Compilation, Host, Mode, Project, SourceMap};
 use crate::diagnostics::{Diagnostic, Severity};
+#[cfg(feature = "native-project")]
+use crate::ir;
 #[cfg(not(target_arch = "wasm32"))]
-use crate::project::environment::{ResolvedEnvironment, TargetOverride};
+use crate::project::environment::ResolvedEnvironment;
+use crate::project::environment::TargetOverride;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::project::target_preflight::{self, CheckOptions, RunnerRef};
 #[cfg(not(target_arch = "wasm32"))]
@@ -83,6 +83,74 @@ pub(super) fn check_environment(
         environment,
         diagnostics,
     );
+}
+
+/// Runs environment preflight, optional backend `check-target` validation,
+/// official adapter fallbacks, and deterministic diagnostic sorting.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn finalize_diagnostics(
+    host: &dyn Host,
+    mode: Mode,
+    compilation: &Compilation,
+    project: Option<&Project>,
+    target_override: Option<&TargetOverride>,
+    stages_by_class: bool,
+    sources: &mut SourceMap,
+    diagnostics: &mut Vec<Diagnostic>,
+    adapter_diagnostics: Vec<Diagnostic>,
+) {
+    #[cfg(target_arch = "wasm32")]
+    let _ = (compilation, project, target_override, stages_by_class);
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(resolved) = compilation.environment.as_ref() {
+        check_environment(
+            host,
+            compilation,
+            project,
+            target_override,
+            stages_by_class,
+            resolved,
+            sources,
+            diagnostics,
+        );
+    }
+    let has_error = diagnostics.iter().any(|d| d.severity == Severity::Error);
+    if mode == Mode::Compile {
+        if has_error || !host.has_backend_runner() {
+            diagnostics.extend(adapter_diagnostics);
+        }
+    } else {
+        #[cfg(feature = "native-project")]
+        let backend_checked = if !has_error
+            && host.has_backend_runner()
+            && let Some(project) = project
+            && let Some(resolved) = compilation.environment.as_ref()
+            && compilation.modules.iter().any(|m| {
+                m.package.is_none()
+                    && m.ir
+                        .items
+                        .iter()
+                        .any(|i| matches!(i.kind, ir::ItemKind::Foreign(_)))
+            }) {
+            host.check_target(project, compilation, resolved, stages_by_class, sources)
+        } else {
+            None
+        };
+        #[cfg(not(feature = "native-project"))]
+        let backend_checked: Option<Vec<Diagnostic>> = None;
+        match backend_checked {
+            Some(backend_diags) => diagnostics.extend(backend_diags),
+            None => diagnostics.extend(adapter_diagnostics),
+        }
+    }
+    // by path, not by load order, which follows the order of imports
+    diagnostics.sort_by_cached_key(|d| {
+        (
+            d.span.is_none(),
+            d.span
+                .map(|s| (sources.get(s.file).path.clone(), s.start, s.end)),
+        )
+    });
 }
 
 /// Whether a run over `project` checks with the stages of a class derived

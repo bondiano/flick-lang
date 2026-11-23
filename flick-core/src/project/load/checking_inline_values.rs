@@ -1,4 +1,5 @@
 impl Checking<'_> {
+    #[allow(clippy::too_many_lines)]
     fn check_inline(
         &self,
         loaded: &Loaded,
@@ -107,6 +108,9 @@ impl Checking<'_> {
             .diagnostics
             .extend(resolve::import_warnings(&source_module, lookup));
         output.diagnostics.extend(child_output.diagnostics.clone());
+        output
+            .adapter_diagnostics
+            .extend(child_output.adapter_diagnostics.clone());
         merge_inline_lowering(&mut output, &mut child_output, loaded, &units);
         output
     }

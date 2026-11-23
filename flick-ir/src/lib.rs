@@ -28,7 +28,9 @@ pub use expr::{
     Arm, BinOp, Exported, Exports, Expr, ExprKind, Initialization, Item, ItemKind, Label, Lit,
     Module, Param, Pat, Prefix, Reexport, Stmt, operation_arity,
 };
-pub use foreign::{Adapter, Binding, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
+pub use foreign::{
+    Adapter, AdapterArg, AdapterWord, Binding, Copies, Foreign, ForeignMode, ResultAdapter, Shape,
+};
 pub use handler::{Handled, Handler, OpArm};
 pub use instance::{GenericInfo, InstanceInfo, default_method};
 pub use lang::{Lang, LangItem, Namespace, STRUCTURAL};

@@ -1,6 +1,7 @@
 //! Decode only declared plain inputs, without compiler objects or callbacks.
 
 use super::failure;
+use crate::adapter;
 use crate::codegen::{EffectBridge, Labels, Resolved, ts::Typed};
 use flick_backend::{
     BuildRequest, Diagnostic, Inputs, JavascriptProjection, ModuleRole, TypescriptModuleProjection,
@@ -29,6 +30,7 @@ pub(super) struct Data {
     pub declarations: bool,
     pub schema_aot: bool,
     pub inspect: bool,
+    pub check_only: bool,
     pub devtools: Option<String>,
     pub labels: Labels,
     pub bridge: EffectBridge,
@@ -122,6 +124,7 @@ impl Data {
             declarations: parsed.declarations,
             schema_aot: parsed.schema_aot,
             inspect: parsed.inspect,
+            check_only: parsed.check_only,
             devtools: parsed.devtools,
             labels: parsed.labels,
             bridge,
@@ -145,40 +148,53 @@ impl Data {
             &self.sources.iter().map(String::as_str).collect::<Vec<_>>(),
         )
         .map_err(failure)?;
+        let own_modules: BTreeSet<&str> = request
+            .modules
+            .iter()
+            .filter(|m| m.role == ModuleRole::Own)
+            .map(|m| m.name.as_str())
+            .collect();
+        let adapter_diagnostics = adapter::validate_program(&self.program, &own_modules);
+        if !adapter_diagnostics.is_empty() {
+            return Err(adapter_diagnostics);
+        }
         for module in &self.program.modules {
             let meta = request
                 .modules
                 .iter()
                 .find(|m| m.name == module.name)
                 .ok_or_else(|| failure("IR module has no metadata"))?;
-            let facts = self.facts.get(&module.name).ok_or_else(|| {
-                failure(format!(
-                    "missing flick.javascript@0.1.0 for {}",
-                    module.name
-                ))
-            })?;
-            let mut names = BTreeSet::new();
-            for file in &facts.files {
-                if !names.insert(&file.module) || file.source_paths.len() != self.sources.len() {
+            if !self.check_only {
+                let facts = self.facts.get(&module.name).ok_or_else(|| {
+                    failure(format!(
+                        "missing flick.javascript@0.1.0 for {}",
+                        module.name
+                    ))
+                })?;
+                let mut names = BTreeSet::new();
+                for file in &facts.files {
+                    if !names.insert(&file.module) || file.source_paths.len() != self.sources.len()
+                    {
+                        return Err(failure(
+                            "inconsistent JavaScript file layout or source map paths",
+                        ));
+                    }
+                    if self.typescript && self.typed_paths.get(&file.module) != Some(&file.output) {
+                        return Err(failure(format!(
+                            "missing TypeScript projection for {}",
+                            file.module
+                        )));
+                    }
+                }
+                if !facts
+                    .files
+                    .iter()
+                    .any(|f| f.module == module.name && f.output == meta.output)
+                {
                     return Err(failure(
-                        "inconsistent JavaScript file layout or source map paths",
+                        "module output disagrees with JavaScript projection",
                     ));
                 }
-                if self.typescript && self.typed_paths.get(&file.module) != Some(&file.output) {
-                    return Err(failure(format!(
-                        "missing TypeScript projection for {}",
-                        file.module
-                    )));
-                }
-            }
-            if !facts
-                .files
-                .iter()
-                .any(|f| f.module == module.name && f.output == meta.output)
-            {
-                return Err(failure(
-                    "module output disagrees with JavaScript projection",
-                ));
             }
             if !self.rt && meta.role == ModuleRole::Own {
                 let mut diagnostics = Vec::new();
@@ -190,14 +206,16 @@ impl Data {
                 }
             }
         }
-        for entry in &request.entries {
-            let facts = self
-                .facts
-                .get(&entry.symbol.module)
-                .and_then(|f| f.entries.iter().find(|e| e.name == entry.name))
-                .ok_or_else(|| failure("missing entry classification"))?;
-            if !request.modules.iter().any(|m| m.name == facts.module) {
-                return Err(failure("entry defining module is outside the graph"));
+        if !self.check_only {
+            for entry in &request.entries {
+                let facts = self
+                    .facts
+                    .get(&entry.symbol.module)
+                    .and_then(|f| f.entries.iter().find(|e| e.name == entry.name))
+                    .ok_or_else(|| failure("missing entry classification"))?;
+                if !request.modules.iter().any(|m| m.name == facts.module) {
+                    return Err(failure("entry defining module is outside the graph"));
+                }
             }
         }
         Ok(())
@@ -236,6 +254,7 @@ struct ParsedOptions {
     declarations: bool,
     schema_aot: bool,
     inspect: bool,
+    check_only: bool,
     devtools: Option<String>,
     labels: Labels,
 }
@@ -295,10 +314,17 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
     let _promise_facade = flag("option.promise-facade")?;
     let schema_aot = flag("option.schema-aot")?;
     let devtools = option("option.devtools").map(str::to_owned);
+    let (inspect, check_only) = match option("command") {
+        Some("build" | "run" | "dev" | "test") => (false, false),
+        Some("inspect") => (true, false),
+        Some("check") => (false, true),
+        _ => return Err(failure("missing or unknown command")),
+    };
     let labels = match option("labels") {
         Some("all") => Labels::All,
         Some("components") => Labels::Components,
         Some("none") => Labels::None,
+        None if check_only => Labels::None,
         _ => return Err(failure("missing or unknown labels")),
     };
     let mut seen = BTreeSet::new();
@@ -324,17 +350,13 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
             )));
         }
     }
-    let inspect = match option("command") {
-        Some("build" | "run" | "dev" | "test") => false,
-        Some("inspect") => true,
-        _ => return Err(failure("missing or unknown command")),
-    };
     Ok(ParsedOptions {
         rt,
         typescript,
         declarations,
         schema_aot,
         inspect,
+        check_only,
         devtools,
         labels,
     })

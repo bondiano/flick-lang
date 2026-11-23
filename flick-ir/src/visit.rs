@@ -189,6 +189,9 @@ impl Module {
                     }
                 }
                 ItemKind::Foreign(foreign) => {
+                    for word in &mut foreign.adapter.words {
+                        f(&mut word.span);
+                    }
                     if let Some(catch) = &mut foreign.catch {
                         catch.each_span_mut(f);
                     }

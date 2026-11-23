@@ -3,8 +3,8 @@ use std::{error, fmt};
 use crate::request::validate_size;
 use crate::validate::diagnostics;
 use crate::{
-    Backend, BuildRequest, BuildResult, DeclaredInputs, Diagnostic, Policy, Severity, cache_key,
-    handshake, validate_request, validate_result,
+    Backend, BuildRequest, BuildResult, DeclaredInputs, Diagnostic, Limits, Policy, Severity,
+    TargetSupport, cache_key, handshake, validate_request, validate_result,
 };
 
 #[derive(Debug)]
@@ -52,15 +52,25 @@ impl Generated {
     }
 }
 
-/// Run static handshake, target preflight and generation in that order.
-/// Cache eligibility requires a second independent, identical generation.
-pub fn generate(
+/// Run static handshake, request validation, and target preflight (`check-target`)
+/// without invoking code generation. Used by `flick check` and the IDE when a
+/// target environment is configured.
+pub fn check_target(
     backend: &dyn Backend,
     request: &BuildRequest,
-    policy: &Policy,
+    limits: Limits,
+    read: impl FnMut(&str) -> Option<Vec<u8>>,
+) -> Result<TargetSupport, Failure> {
+    let (support, _) = preflight(backend, request, limits, read)?;
+    Ok(support)
+}
+
+fn preflight(
+    backend: &dyn Backend,
+    request: &BuildRequest,
+    limits: Limits,
     mut read: impl FnMut(&str) -> Option<Vec<u8>>,
-    verify_determinism: bool,
-) -> Result<Generated, Failure> {
+) -> Result<(TargetSupport, DeclaredInputs), Failure> {
     let protocol = Failure::Protocol;
     if let Some(pin) = backend.loaded_pin()
         && pin != &request.backend
@@ -77,7 +87,7 @@ pub fn generate(
         }]));
     }
     backend.check_cancelled().map_err(Failure::Rejected)?;
-    let sized = validate_size(request, policy.limits);
+    let sized = validate_size(request, limits);
     backend.check_cancelled().map_err(Failure::Rejected)?;
     sized.map_err(protocol)?;
     let descriptor = backend.describe();
@@ -87,28 +97,18 @@ pub fn generate(
         .inputs
         .iter()
         .try_fold(0_u64, |n, i| n.checked_add(i.size));
-    if size.is_none_or(|n| n > u64::try_from(policy.limits.request_bytes).unwrap_or(u64::MAX)) {
+    if size.is_none_or(|n| n > u64::try_from(limits.request_bytes).unwrap_or(u64::MAX)) {
         return Err(protocol(
             "backend side inputs exceed their total input limit".into(),
         ));
     }
     let mut inputs = snapshot(backend, request, &mut read)?;
-    let validated = validate_request(request, &mut inputs, policy.limits);
+    let validated = validate_request(request, &mut inputs, limits);
     backend.check_cancelled().map_err(Failure::Rejected)?;
     validated.map_err(protocol)?;
-    let refused = |found: Vec<Diagnostic>, inputs: &mut DeclaredInputs| match diagnostics(
-        request,
-        &found,
-        inputs,
-        policy.limits,
-    ) {
-        Ok(()) if !found.is_empty() => Failure::Rejected(found),
-        Ok(()) => protocol("backend refused a request without a diagnostic".into()),
-        Err(why) => protocol(why),
-    };
     let support = backend
         .check_target(request, &mut inputs)
-        .map_err(|d| refused(d, &mut inputs))?;
+        .map_err(|d| refuse(request, d, &mut inputs, limits))?;
     if request
         .target
         .required_capabilities
@@ -123,9 +123,36 @@ pub fn generate(
             "target preflight returned inconsistent capabilities".into(),
         ));
     }
+    Ok((support, inputs))
+}
+
+fn refuse(
+    request: &BuildRequest,
+    found: Vec<Diagnostic>,
+    inputs: &mut DeclaredInputs,
+    limits: Limits,
+) -> Failure {
+    match diagnostics(request, &found, inputs, limits) {
+        Ok(()) if !found.is_empty() => Failure::Rejected(found),
+        Ok(()) => Failure::Protocol("backend refused a request without a diagnostic".into()),
+        Err(why) => Failure::Protocol(why),
+    }
+}
+
+/// Run static handshake, target preflight and generation in that order.
+/// Cache eligibility requires a second independent, identical generation.
+pub fn generate(
+    backend: &dyn Backend,
+    request: &BuildRequest,
+    policy: &Policy,
+    read: impl FnMut(&str) -> Option<Vec<u8>>,
+    verify_determinism: bool,
+) -> Result<Generated, Failure> {
+    let protocol = Failure::Protocol;
+    let (_, mut inputs) = preflight(backend, request, policy.limits, read)?;
     let result = backend
         .generate(request, &mut inputs)
-        .map_err(|d| refused(d, &mut inputs))?;
+        .map_err(|d| refuse(request, d, &mut inputs, policy.limits))?;
     if result
         .diagnostics
         .iter()
@@ -138,7 +165,7 @@ pub fn generate(
     if verify_determinism {
         let repeated = backend
             .generate(request, &mut inputs)
-            .map_err(|d| refused(d, &mut inputs))?;
+            .map_err(|d| refuse(request, d, &mut inputs, policy.limits))?;
         validate_result(request, &repeated, policy, &mut inputs).map_err(protocol)?;
         if result != repeated {
             return Err(Failure::Unstable);

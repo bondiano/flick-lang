@@ -18,7 +18,7 @@ crate-type = ["cdylib", "rlib"]
 # a test keeps the two equal.
 [package.metadata.flick]
 backend-api = { minimum = "0.1.0", maximum-exclusive = "0.2.0" }
-ir = { minimum = "0.14.0", maximum-exclusive = "0.15.0" }
+ir = { minimum = "0.15.0", maximum-exclusive = "0.16.0" }
 
 [features]
 component = ["dep:flick-backend", "dep:ciborium", "flick-ir/cbor"]

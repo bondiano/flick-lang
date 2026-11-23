@@ -16,6 +16,7 @@ use crate::plugin::expansion::Expansion;
 use crate::project::{Host, Project};
 use crate::source::{FileId, SourceMap};
 use crate::syntax::cst::Node;
+use crate::syntax::foreign_meta::ForeignMeta;
 use crate::types::Typing;
 
 /// A module as editors see it.
@@ -36,10 +37,17 @@ pub struct Analyzed {
     pub editing: Vec<EditorBlock>,
     /// The module with its plugin blocks expanded, when it has any.
     pub expansion: Option<Arc<Expansion>>,
+    /// Active backend's declared foreign adapter words and type-form attributes.
+    pub foreign_meta: Arc<ForeignMeta>,
 }
 
 impl Analyzed {
-    pub(super) fn new(loaded: &Loaded, typing: Arc<Typing>, interface: Interface) -> Self {
+    pub(super) fn new(
+        loaded: &Loaded,
+        typing: Arc<Typing>,
+        interface: Interface,
+        foreign_meta: Arc<ForeignMeta>,
+    ) -> Self {
         Analyzed {
             name: loaded.name.clone(),
             inline: false,
@@ -59,6 +67,7 @@ impl Analyzed {
             interface,
             editing: loaded.editing.clone(),
             expansion: loaded.expansion.clone(),
+            foreign_meta,
         }
     }
 }

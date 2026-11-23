@@ -14,6 +14,8 @@ use crate::project::config::{TargetOption, TargetValue};
 use crate::project::target;
 use crate::project::{Host, Project};
 use crate::source::Span;
+#[cfg(feature = "native-project")]
+use crate::syntax::foreign_meta::ForeignMeta;
 use crate::syntax::when;
 
 #[allow(clippy::too_many_arguments)]
@@ -259,7 +261,7 @@ fn emit_unsupported_environment(
     diagnostics.push(diag);
 }
 
-fn select_backend(
+pub(super) fn select_backend(
     project: Option<&Project>,
     target_override: Option<&TargetOverride>,
     backends: &[BackendTags],
@@ -293,6 +295,10 @@ fn select_backend(
             tags: vec![short.to_owned()],
             axes: Vec::new(),
             environments: Vec::new(),
+            foreign_meta: ForeignMeta {
+                backend_id: pkg.id.clone(),
+                ..ForeignMeta::default()
+            },
         });
     }
     #[cfg(feature = "native-project")]

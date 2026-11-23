@@ -98,6 +98,11 @@ impl Key {
                 "module arguments",
             ),
             (self.watching != current.watching, "plugin inputs"),
+            (
+                self.foreign_meta != current.foreign_meta
+                    || self.validate_foreign_meta != current.validate_foreign_meta,
+                "backend",
+            ),
         ];
         labels.extend((flags.iter()).filter(|(differs, _)| *differs).map(|(_, l)| (*l).to_owned()));
         if self.imports.len() == current.imports.len() {
@@ -164,6 +169,8 @@ impl Checking<'_> {
             watching: (self.watching.iter())
                 .map(|w| w.plugin.id().to_owned())
                 .collect(),
+            foreign_meta: self.foreign_meta_for(loaded).fingerprint(),
+            validate_foreign_meta: self.env_ctx.validate_foreign_meta,
         }
     }
 }
@@ -185,6 +192,7 @@ pub(super) fn changed_inputs(saved: &[(String, String)], now: &[(String, String)
         .map(|label| match label.as_str() {
             "salt" | "iface-version" | "ir-version" => "compiler".to_owned(),
             "mode" | "config" | "path" | "source" => label.clone(),
+            "foreign-meta" | "validate-foreign-meta" => "backend".to_owned(),
             // the text checking reads is the source with the code of its blocks
             "text" => "plugin output".to_owned(),
             "modules" => "project modules".to_owned(),

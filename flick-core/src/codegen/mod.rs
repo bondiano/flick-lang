@@ -7,6 +7,9 @@ pub mod go;
 pub mod sourcemap;
 pub mod ts;
 
+#[cfg(feature = "native-project")]
+pub use flick_backend_go::adapter as go_adapter;
+pub use flick_backend_js::adapter as js_adapter;
 pub use flick_backend_js::codegen::{
     BUILTIN_DIR, EffectBridge, Known, Labels, Options, Output, Resolved, direct_methods,
     exported_worker, ident, instance_export, js, module_path, prefix_key, qualified_id, relative,

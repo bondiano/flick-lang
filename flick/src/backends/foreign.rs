@@ -3,6 +3,7 @@
 //! backend is taken without the network: a project's own pin, or an
 //! official one a checkout or the store holds; without one there is none.
 
+use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -10,15 +11,17 @@ use std::sync::Arc;
 
 use flick_backend::command::Dependency;
 use flick_backend::host::{Budget, WasmBackend};
-use flick_backend::{Backend, BackendId, BackendPin, Limits, OptionValue};
+use flick_backend::{Backend, BackendId, BackendPin, Failure, Limits, OptionValue, Verb};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::project::config::BackendEnvironment;
 use flick_core::project::target::Wanted;
-use flick_core::project::{Foreign, ForeignPackage, Project, store};
-use flick_core::source::{FileId, Span};
+use flick_core::project::{
+    Compilation, Foreign, ForeignPackage, Project, ResolvedEnvironment, store,
+};
+use flick_core::source::{FileId, SourceMap, Span};
 
 use super::options::{self, TargetChoice};
-use super::{official, packages, runtimes};
+use super::{component as backend_component, official, packages, request, runtimes};
 use crate::{cache, component, saved, toolchain};
 
 pub(crate) fn foreign(project: &Project) -> Foreign {
@@ -330,6 +333,57 @@ pub(crate) fn check_runtime_with(
             let code = codes::lookup(&format!("FLICK-{}", d.code)).map_or(codes::P015, |i| i.code);
             Diagnostic::new(code, Severity::Error, d.message)
         })
+}
+
+/// Runs the selected backend's `check-target` on `compilation` without code
+/// generation, returning `None` when the backend component is unavailable offline.
+pub(crate) fn check_target(
+    project: &Project,
+    compilation: &Compilation,
+    environment: &ResolvedEnvironment,
+    stages_by_class: bool,
+    sources: &mut SourceMap,
+) -> Option<Vec<Diagnostic>> {
+    let (pin, bytes) = selected_bytes(project, Some(&environment.backend_id))?;
+    let backend = load(&pin, &bytes)?;
+    let descriptor = backend.describe();
+    options::save_descriptor(&pin.sha256, &descriptor);
+    let extra_options = options::resolve(&descriptor, Verb::Build, Some(project), &BTreeMap::new())
+        .ok()
+        .map(|resolved| resolved.to_wire())
+        .unwrap_or_default();
+    let prepared = request::Prepared::for_check(
+        sources,
+        compilation,
+        environment,
+        stages_by_class,
+        pin.clone(),
+        &descriptor,
+        extra_options,
+    );
+    match flick_backend::check_target(&*backend, &prepared.request, Limits::default(), |id| {
+        prepared.bytes.get(id).cloned()
+    }) {
+        Ok(_) => Some(Vec::new()),
+        Err(Failure::Rejected(diags)) => Some(
+            diags
+                .iter()
+                .map(|d| backend_component::map_diagnostic(&pin, d, &prepared.files))
+                .collect(),
+        ),
+        Err(why) => Some(vec![Diagnostic::new(
+            codes::P013,
+            Severity::Error,
+            format!(
+                "backend {}@{}#{} check-target on {}/{}: {why}",
+                pin.identity.id,
+                pin.identity.version,
+                pin.sha256,
+                environment.backend,
+                environment.platform
+            ),
+        )]),
+    }
 }
 
 /// Checks the runtime contract of `project` using its selected backend.

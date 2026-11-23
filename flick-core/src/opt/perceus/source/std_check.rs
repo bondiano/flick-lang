@@ -32,10 +32,9 @@ impl Lower<'_> {
             && value.dicts == 0
             && stages == 1
             && value.catch.is_none()
-            && !value.adapter.receiver
-            && !value.adapter.cancel
+            && value.adapter.words.is_empty()
+            && value.adapter.owned.is_empty()
             && value.adapter.optional == [0]
-            && !value.adapter.variadic
             && !value.adapter.result.nullable
         {
             let expr = b.lam(&["ver"], builtin_check(&b, "uuid", b.loc("ver")));

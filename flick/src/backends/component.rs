@@ -444,27 +444,37 @@ impl Package {
     }
 
     fn diagnostic(&self, diagnostic: &flick_backend::Diagnostic, files: &[FileId]) -> Diagnostic {
-        let code = codes::lookup(&format!("FLICK-{}", diagnostic.code))
-            .map(|info| info.code)
-            .or_else(|| codes::plugin(&self.pin.identity.id, &diagnostic.code))
-            .unwrap_or(codes::P013);
-        let severity = match diagnostic.severity {
-            flick_backend::Severity::Error => Severity::Error,
-            flick_backend::Severity::Warning => Severity::Warning,
-            flick_backend::Severity::Note => Severity::Note,
-        };
-        let mut message = format!(
-            "{}\nbackend {}@{}#{}",
-            diagnostic.message, self.pin.identity.id, self.pin.identity.version, self.pin.sha256
-        );
-        for note in &diagnostic.notes {
-            message.push_str("\nnote: ");
-            message.push_str(note);
-        }
-        let mut mapped = Diagnostic::new(code, severity, message);
-        if let Some(span) = diagnostic.span {
-            mapped.span = Some(Span::new(files[span.file as usize], span.start, span.end));
-        }
-        mapped
+        map_diagnostic(&self.pin, diagnostic, files)
     }
+}
+
+pub(super) fn map_diagnostic(
+    pin: &BackendPin,
+    diagnostic: &flick_backend::Diagnostic,
+    files: &[FileId],
+) -> Diagnostic {
+    let code = codes::lookup(&format!("FLICK-{}", diagnostic.code))
+        .map(|info| info.code)
+        .or_else(|| codes::plugin(&pin.identity.id, &diagnostic.code))
+        .unwrap_or(codes::P013);
+    let severity = match diagnostic.severity {
+        flick_backend::Severity::Error => Severity::Error,
+        flick_backend::Severity::Warning => Severity::Warning,
+        flick_backend::Severity::Note => Severity::Note,
+    };
+    let mut message = format!(
+        "{}\nbackend {}@{}#{}",
+        diagnostic.message, pin.identity.id, pin.identity.version, pin.sha256
+    );
+    for note in &diagnostic.notes {
+        message.push_str("\nnote: ");
+        message.push_str(note);
+    }
+    let mut mapped = Diagnostic::new(code, severity, message);
+    if let Some(span) = diagnostic.span
+        && let Some(&file) = files.get(span.file as usize)
+    {
+        mapped.span = Some(Span::new(file, span.start, span.end));
+    }
+    mapped
 }

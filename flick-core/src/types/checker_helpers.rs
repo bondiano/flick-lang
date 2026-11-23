@@ -64,4 +64,10 @@ impl Checker<'_> {
             format!("field `{label}` is given more than once; labels of a record are unique"),
         );
     }
+
+    pub(super) fn foreign_meta(&self) -> &ForeignMeta {
+        static DEFAULT_JS: OnceLock<ForeignMeta> = OnceLock::new();
+        self.foreign_meta
+            .unwrap_or_else(|| DEFAULT_JS.get_or_init(ForeignMeta::js))
+    }
 }

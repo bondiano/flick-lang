@@ -245,7 +245,7 @@ fn callback_failure_transfers_payload_and_closes_owner_at_every_fuel_cut() {
 
 #[test]
 fn unknown_layer_adapters_reject_before_execution_or_heap_changes() {
-    use flick_core::ir::ItemKind;
+    use flick_core::ir::{AdapterArg, AdapterWord, ItemKind};
     use flick_core::opt::perceus::LowerError;
 
     for binding in ["layerSucceed", "layerRun"] {
@@ -264,7 +264,11 @@ fn unknown_layer_adapters_reject_before_execution_or_heap_changes() {
             .iter_mut()
             .find_map(|item| match &mut item.kind {
                 ItemKind::Foreign(value) if value.binding.name == binding => {
-                    value.adapter.cancel = true;
+                    value.adapter.words.push(AdapterWord {
+                        name: "cancel".into(),
+                        args: vec![AdapterArg::Ident("signal".into())],
+                        span: item.span,
+                    });
                     Some((item.span, value.name.clone()))
                 }
                 _ => None,

@@ -378,6 +378,10 @@ pub struct ForeignInfo {
     pub adapter: Adapter,
     /// How the host is called: the mode as written, else as the signature tells.
     pub mode: ForeignMode,
+    /// Whether parameter `arity - 1` has type `List a` (used by official-backend
+    /// fallback adapter checks when a backend runner is not invoked).
+    #[serde(default)]
+    pub last_param_is_list: Option<bool>,
 }
 
 /// The scopes around a call, as their regions and `scope` expressions,

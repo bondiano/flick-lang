@@ -16,10 +16,8 @@ fn supports(value: &Foreign) -> bool {
         && value.catch.is_none()
         && value.adapter
             == Adapter {
-                receiver: false,
-                cancel: false,
                 optional: vec![],
-                variadic: false,
+                owned: vec![],
                 result: ResultAdapter {
                     nullable: false,
                     unit: false,
@@ -36,6 +34,7 @@ fn supports(value: &Foreign) -> bool {
                     Shape::Result(Box::new(Shape::Data), Box::new(Shape::Data)),
                 ],
                 result_shape: Shape::Result(Box::new(Shape::Data), Box::new(Shape::Data)),
+                words: vec![],
             }
 }
 
@@ -148,10 +147,28 @@ mod tests {
                     Span::new(FileId::new(0), 0, 0),
                 ));
             }),
-            Box::new(|v| v.adapter.receiver = true),
-            Box::new(|v| v.adapter.cancel = true),
+            Box::new(|v| {
+                v.adapter.words.push(flick_ir::AdapterWord {
+                    name: "this".into(),
+                    args: vec![],
+                    span: Span::new(FileId::new(0), 0, 0),
+                });
+            }),
+            Box::new(|v| {
+                v.adapter.words.push(flick_ir::AdapterWord {
+                    name: "cancel".into(),
+                    args: vec![flick_ir::AdapterArg::Ident("signal".into())],
+                    span: Span::new(FileId::new(0), 0, 0),
+                });
+            }),
             Box::new(|v| v.adapter.optional.push(0)),
-            Box::new(|v| v.adapter.variadic = true),
+            Box::new(|v| {
+                v.adapter.words.push(flick_ir::AdapterWord {
+                    name: "variadic".into(),
+                    args: vec![],
+                    span: Span::new(FileId::new(0), 0, 0),
+                });
+            }),
             Box::new(|v| v.adapter.result.nullable = true),
             Box::new(|v| v.adapter.result.unit = true),
             Box::new(|v| v.adapter.callbacks.clear()),

@@ -1,6 +1,8 @@
 impl Checker<'_> {
     /// Reads the metadata lines of `decl` into `info`; the retention, if
-    /// written.
+    /// written. Core contract words are handled here; backend-declared adapter
+    /// words are parsed according to the active backend's descriptor and
+    /// carried on `Adapter.words` for backend validation and code generation.
     fn read_meta(&mut self, decl: &Node, scheme: &Type) -> PendingForeign {
         let mut pending = PendingForeign {
             decl: decl.clone(),
@@ -8,7 +10,7 @@ impl Checker<'_> {
             info: ForeignInfo::default(),
             retention: None,
             arity: Vec::new(),
-            cancel: Vec::new(),
+            owned: Vec::new(),
             catch: Vec::new(),
             span: self.span(decl),
             name: super::toplevel::foreign_name(decl, self.text)
@@ -38,23 +40,26 @@ impl Checker<'_> {
                     info.arity = number(0);
                     pending.arity.push(((*item).clone(), info.arity));
                 }
-                "this" => info.adapter.receiver = true,
                 "reviewed" if !word(0).is_some_and(|w| w.starts_with('"')) => self.bad_meta(
                     item,
                     "`reviewed` takes the package and fingerprint the binding was checked against, as a string",
                 ),
+                "reviewed" => {}
                 "nullable" => info.adapter.result.nullable = true,
-                "variadic" => info.adapter.variadic = true,
                 "optional" => match number(0) {
                     Some(i) => info.adapter.optional.push(i),
                     None => self.bad_meta(item, "`optional` takes the position of an `Option` argument, from 0"),
                 },
-                "cancel" => match word(0).as_deref() {
-                    Some("signal") => {
-                        info.adapter.cancel = true;
-                        pending.cancel.push((*item).clone());
+                "owned" => match number(0) {
+                    Some(i) if args.len() == 1 => {
+                        if info.adapter.owned.contains(&i) {
+                            self.bad_meta(item, &format!("duplicate `owned {i}` in foreign metadata"));
+                        } else {
+                            info.adapter.owned.push(i);
+                            pending.owned.push(((*item).clone(), i));
+                        }
                     }
-                    _ => self.bad_meta(item, "write `cancel signal`"),
+                    _ => self.bad_meta(item, "`owned` takes the position of an argument, from 0"),
                 },
                 "retention" => match word(0).as_deref() {
                     Some("call") => retention = Some(Retention::Call),
@@ -70,15 +75,46 @@ impl Checker<'_> {
                     Some(_) => self.bad_meta(item, "a `foreign pure` call cannot throw: `catch` needs another mode"),
                     None => self.bad_meta(item, "`catch` takes the function that maps a JS exception to an error"),
                 },
-                _ => {}
+                other => {
+                    let Some(spec) = self.foreign_meta().adapter_word(other).cloned() else {
+                        // Unknown metadata words are reported by `syntax::foreign_meta::validate_tree` (`FLICK-S011`).
+                        continue;
+                    };
+                    if !spec.repeatable && info.adapter.has_word(&spec.name) {
+                        self.bad_meta(
+                            item,
+                            &format!("duplicate `{}` in foreign metadata", spec.name),
+                        );
+                        continue;
+                    }
+                    match parse_adapter_word_args(self.text, &args, &spec) {
+                        Ok(parsed_args) => {
+                            info.adapter.words.push(flick_ir::AdapterWord {
+                                name: spec.name,
+                                args: parsed_args,
+                                span: self.span(item),
+                            });
+                        }
+                        Err(message) => self.bad_meta(item, &message),
+                    }
+                }
             }
         }
         pending.retention = retention;
         pending
     }
 
-    /// Checks the metadata in `info` against the parameters of the signature.
-    fn check_meta(&mut self, info: &ForeignInfo, params: &[Type], body: &Type, span: Span) {
+    /// Checks the core contract metadata in `info` against the parameters of
+    /// the signature. Backend-owned adapter words are validated by the target
+    /// backend in `check-target`.
+    fn check_meta(
+        &mut self,
+        info: &ForeignInfo,
+        owned: &[(Node, usize)],
+        params: &[Type],
+        body: &Type,
+        span: Span,
+    ) {
         let arity = info.js_arity();
         let stages = &info.stages;
         if arity == 0
@@ -89,13 +125,6 @@ impl Checker<'_> {
                 codes::F001,
                 span,
                 "`arity 0` drops the first argument, which must be `()`".to_owned(),
-            );
-        }
-        if info.adapter.receiver && arity == 0 {
-            self.error(
-                codes::F001,
-                span,
-                "`this` needs an argument to be the receiver".to_owned(),
             );
         }
         for &i in &info.adapter.optional {
@@ -111,14 +140,13 @@ impl Checker<'_> {
                 );
             }
         }
-        if info.adapter.variadic
-            && (arity == 0 || !self.whnf(&params[arity - 1]).spine().0.is_lang(Lang::List))
-        {
-            self.error(
-                codes::F001,
-                span,
-                "`variadic` spreads a last argument of type `List a`".to_owned(),
-            );
+        for (item, i) in owned {
+            if *i >= arity {
+                self.bad_meta(
+                    item,
+                    &format!("`owned {i}` is past the {arity} arguments of the call"),
+                );
+            }
         }
         if info.adapter.result.nullable
             && !self
@@ -132,4 +160,83 @@ impl Checker<'_> {
             );
         }
     }
+}
+
+fn parse_adapter_word_args(
+    text: &str,
+    args: &[&Node],
+    spec: &AdapterWordSpec,
+) -> Result<Vec<flick_ir::AdapterArg>, String> {
+    let err = || adapter_usage_error(spec);
+    if args.len() != spec.args.len() {
+        return Err(err());
+    }
+    let mut parsed = Vec::with_capacity(spec.args.len());
+    for (node, arg_spec) in args.iter().zip(&spec.args) {
+        let raw_text = node.text(text);
+        let raw = raw_text.trim();
+        match arg_spec.kind {
+            AdapterArgKind::Index => {
+                let value = raw.parse::<usize>().map_err(|_| err())?;
+                parsed.push(flick_ir::AdapterArg::Index(value));
+            }
+            AdapterArgKind::Ident => {
+                if !is_ident(raw) {
+                    return Err(err());
+                }
+                if !arg_spec.choices.is_empty() && !arg_spec.choices.iter().any(|c| c == raw) {
+                    return Err(err());
+                }
+                parsed.push(flick_ir::AdapterArg::Ident(raw.to_owned()));
+            }
+            AdapterArgKind::Text => {
+                if !(raw.starts_with('"') || raw.starts_with("r\"") || raw.starts_with("r#")) {
+                    return Err(err());
+                }
+                let decoded = literal::string_value(raw);
+                if !arg_spec.choices.is_empty() && !arg_spec.choices.iter().any(|c| c == &decoded) {
+                    return Err(err());
+                }
+                parsed.push(flick_ir::AdapterArg::Text(decoded));
+            }
+        }
+    }
+    Ok(parsed)
+}
+
+fn is_ident(raw: &str) -> bool {
+    let mut chars = raw.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first.is_ascii_alphabetic() || first == '_')
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+fn adapter_usage_error(spec: &AdapterWordSpec) -> String {
+    if spec.args.is_empty() {
+        return format!("`{}` takes no arguments", spec.name);
+    }
+    if let [only] = spec.args.as_slice()
+        && only.kind == AdapterArgKind::Ident
+        && let [choice] = only.choices.as_slice()
+    {
+        return format!("write `{} {choice}`", spec.name);
+    }
+    let parts: Vec<String> = spec
+        .args
+        .iter()
+        .map(|arg| {
+            if arg.choices.is_empty() {
+                match arg.kind {
+                    AdapterArgKind::Index => format!("<{}: index>", arg.name),
+                    AdapterArgKind::Ident => format!("<{}>", arg.name),
+                    AdapterArgKind::Text => format!("\"<{}>\"", arg.name),
+                }
+            } else {
+                arg.choices.join(" | ")
+            }
+        })
+        .collect();
+    format!("`{}` expects `{}`", spec.name, parts.join(" "))
 }

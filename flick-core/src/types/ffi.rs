@@ -31,7 +31,9 @@ use super::typing::{ForeignInfo, ForeignOwnerPolicy, range};
 use crate::diagnostics::codes;
 use crate::source::Span;
 use crate::syntax::cst::{Node, foreign_words};
+use crate::syntax::foreign_meta::{AdapterArgKind, AdapterWordSpec};
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::literal;
 use crate::types::lang::{self, Lang};
 use flick_ir::{Copies, ForeignMode};
 
@@ -109,7 +111,12 @@ impl Checker<'_> {
             return;
         }
         let span = self.span(decl);
-        self.check_meta(&info, &params, &body, span);
+        self.check_meta(&info, &pending.owned, &params, &body, span);
+        info.last_param_is_list = (arity > 0).then(|| {
+            params
+                .get(arity - 1)
+                .is_some_and(|p| self.whnf(p).spine().0.is_lang(Lang::List))
+        });
         info.adapter.result.unit = self
             .call_result(&body, arity)
             .is_some_and(|r| r.is_lang(Lang::Unit));

@@ -14,14 +14,14 @@ use flick_core::diagnostics::Diagnostic;
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
 #[cfg(feature = "wasm-backends")]
-use flick_core::project::Foreign;
-#[cfg(feature = "wasm-backends")]
 use flick_core::project::config::BackendEnvironment;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::target::Wanted;
 use flick_core::project::{
     self, Analysis, Analyzed, BackendTags, Compilation, Host, ModuleCache, Project,
 };
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::{Foreign, ResolvedEnvironment};
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{resolve, syntax, types};
 use tracing::{debug, debug_span};
@@ -123,6 +123,23 @@ impl Host for Overlay<'_> {
 
     fn backend_tags(&self, project: &Project) -> Vec<BackendTags> {
         options::project_backend_tags(project, true)
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn has_backend_runner(&self) -> bool {
+        true
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn check_target(
+        &self,
+        project: &Project,
+        compilation: &Compilation,
+        environment: &ResolvedEnvironment,
+        stages_by_class: bool,
+        sources: &mut SourceMap,
+    ) -> Option<Vec<Diagnostic>> {
+        backends::check_target(project, compilation, environment, stages_by_class, sources)
     }
 }
 
@@ -341,6 +358,7 @@ pub(super) fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
                 tree: parsed.tree,
                 typing: typing.into(),
                 interface,
+                foreign_meta: Arc::new(syntax::foreign_meta::ForeignMeta::js()),
                 editing: Vec::new(),
                 expansion: None,
             }],

@@ -41,17 +41,38 @@ whose fix removes the word and gives a promise's row its `Async`.
 
 ## Metadata
 
+Foreign metadata splits into core contract words (understood by the compiler
+for every backend) and backend adapter words (declared by the active package's
+backend descriptor, validated in `check-target` with source spans, and offered
+by IDE completion and hover for that backend only).
+
+### Core contract words
+
 | Metadata | Meaning |
 | - | - |
-| `arity n` | `n` positional JS arguments, adapting `n` stages; `arity 0` takes the `()` of a first `Unit` parameter and calls JS without arguments, after evaluating that argument |
-| `this` | the first argument is the receiver: `target.call(a0, a1, …)` |
+| `arity n` | `n` positional host arguments, adapting `n` stages; `arity 0` takes the `()` of a first `Unit` parameter and calls the host without arguments, after evaluating that argument |
 | `catch f` | a throw or rejection becomes the typed error `f value`, with `f : JsValue -> E` and `E` in the error row; `E` may hold no capability of a scope (`FLICK-F003`) |
-| `cancel signal` | a promise only, a row with `Async`: an `AbortSignal` is passed last and aborted on interruption; the owner still waits for the promise |
 | `nullable` | the result is `Option a`: `null` and `undefined` are `None` |
 | `optional i` | argument `i` (from 0) is `Option a`: `None` is passed as `undefined` |
-| `variadic` | the last argument is a `List a` spread into the call |
-| `retention call` / `retention owner` | what JS keeps of an argument that may hold a scope's capabilities: nothing past the call, or until the owner of the region closes |
+| `retention call` / `retention owner` | what the host keeps of an argument that may hold a scope's capabilities: nothing past the call, or until the owner of the region closes |
 | `reviewed "<pkg>@<ver> sha256:…"` | the binding was checked against that declaration of a package export; `flick ffi check` compares it with the installed one |
+| `owned i` | argument `i` (from 0) transfers ownership to the foreign callee (for future reference-counted backends; garbage-collected backends such as JS and Go ignore it) |
+
+### Backend adapter words
+
+Each backend declares its target-specific adapter words in its descriptor;
+unknown words for the active backend report `FLICK-S011`. The official `flick/js`
+and `flick/go` backends declare:
+
+| Metadata | Meaning |
+| - | - |
+| `this` | the first argument is the receiver: `target.call(a0, a1, …)` |
+| `cancel signal` | a promise only, a row with `Async`: an `AbortSignal` is passed last and aborted on interruption; the owner still waits for the promise |
+| `variadic` | the last argument is a `List a` spread into the call |
+
+Backends may also declare target-specific type-form attributes in their
+descriptor (such as [`@ts`](../codegen/#the-form-of-a-type) on `flick/js`).
+An attribute not declared by the active backend reports `FLICK-S014`.
 
 A metadata line that does not fit the signature or the mode is `FLICK-F001`.
 A result of type `Unit` is `()` whatever JS returns. A parameter whose type

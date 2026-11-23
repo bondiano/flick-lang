@@ -11,8 +11,8 @@ mod request;
 mod validate;
 mod wit;
 
-pub use driver::{Failure, Generated, generate};
-pub use handshake::{handshake, validate_options, validate_tags};
+pub use driver::{Failure, Generated, check_target, generate};
+pub use handshake::{handshake, validate_foreign_metadata, validate_options, validate_tags};
 pub use inputs::{DeclaredInputs, Inputs, sha256};
 pub use request::{validate_request, validate_source_spans};
 pub use validate::{

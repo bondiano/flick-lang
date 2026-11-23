@@ -9,6 +9,7 @@ use flick_ir::Shape;
 use super::bridge::Toward;
 use super::doc::{After, Before, Head, Js, Stmt, call};
 use super::{Gen, names};
+use crate::adapter::{has_cancel_signal, has_this, has_variadic};
 use crate::codegen::Options;
 use crate::effects::owned;
 use crate::effects::{belongs_to, bindings};
@@ -221,6 +222,9 @@ impl<'d> Gen<'_, 'd> {
     ) -> Js<'d> {
         let a = self.a;
         let info = &f.adapter;
+        let receiver = has_this(info);
+        let cancel = has_cancel_signal(info);
+        let variadic = has_variadic(info);
         let copies = copies(f);
         let mut args: Vec<Js<'d>> = dicts.iter().map(|d| self.leaf(d)).collect();
         for (i, param) in params.iter().take(f.arity).enumerate() {
@@ -265,13 +269,13 @@ impl<'d> Gen<'_, 'd> {
                             );
                             self.callback(host, n, callback.as_ref())
                         }
-                        None if info.variadic && i + 1 == f.arity => self.spread(host),
+                        None if variadic && i + 1 == f.arity => self.spread(host),
                         None => host,
                     }
                 }
-                _ if info.receiver && i == 0 => self.copied(copy, value),
+                _ if receiver && i == 0 => self.copied(copy, value),
                 Some(n) => self.callback(value, n, callback.as_ref()),
-                None if info.variadic && i + 1 == f.arity => {
+                None if variadic && i + 1 == f.arity => {
                     let value = self.copied(copy, value);
                     self.spread(value)
                 }
@@ -279,10 +283,10 @@ impl<'d> Gen<'_, 'd> {
             };
             args.push(arg);
         }
-        if info.cancel {
+        if cancel {
             args.push(self.leaf("$signal"));
         }
-        if info.receiver && !args.is_empty() {
+        if receiver && !args.is_empty() {
             let receiver = args.remove(dicts.len());
             let rest: Vec<Js<'d>> = [receiver].into_iter().chain(args).collect();
             call(a, self.leaf(&format!("{target}.call")), &rest)
@@ -363,7 +367,7 @@ pub(super) fn plain(f: &Foreign) -> bool {
         && f.stages.iter().all(|&runtime| !runtime)
         && f.arity == f.stages.len()
         && f.taken() == f.arity
-        && !(info.receiver || info.cancel || info.variadic)
+        && !(has_this(info) || has_cancel_signal(info) || has_variadic(info))
         && info.optional.is_empty()
         && info.callbacks.iter().all(|c| matches!(c, None | Some(1)))
         && !(info.result.nullable || info.result.unit)

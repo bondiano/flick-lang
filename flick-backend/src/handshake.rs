@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use semver::Version;
 
-use crate::{BackendPin, Descriptor, TargetRequest, ValueKind, Verb, VersionRange};
+use crate::{AdapterArgKind, BackendPin, Descriptor, TargetRequest, ValueKind, Verb, VersionRange};
 
 fn accepts(range: &VersionRange, version: &str) -> bool {
     let (Ok(min), Ok(max), Ok(version)) = (
@@ -32,6 +32,100 @@ fn is_tag_name(name: &str) -> bool {
     };
     first.is_ascii_lowercase()
         && bytes.all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'-' | b'_'))
+}
+
+fn is_ident_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    let Some(first) = bytes.next() else {
+        return false;
+    };
+    first.is_ascii_lowercase()
+        && bytes.all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+}
+
+const CORE_FOREIGN_WORDS: [&str; 7] = [
+    "arity",
+    "catch",
+    "retention",
+    "nullable",
+    "optional",
+    "reviewed",
+    "owned",
+];
+
+const CORE_ATTRIBUTES: [&str; 10] = [
+    "lang", "derive", "maker", "cell", "label", "owner", "sync", "stores", "implicit", "when",
+];
+
+/// Validate the foreign adapter words and type-form attributes a backend
+/// publishes in `describe`.
+pub fn validate_foreign_metadata(descriptor: &Descriptor) -> Result<(), String> {
+    let mut seen_words = BTreeSet::new();
+    for word in &descriptor.adapter_words {
+        if !is_ident_name(&word.name) {
+            return Err(format!(
+                "invalid adapter word `{}`: use lowercase ASCII letters, digits, or `_`",
+                word.name
+            ));
+        }
+        if CORE_FOREIGN_WORDS.contains(&word.name.as_str()) {
+            return Err(format!(
+                "adapter word `{}` collides with a core foreign contract word",
+                word.name
+            ));
+        }
+        if !seen_words.insert(word.name.as_str()) {
+            return Err(format!("duplicate adapter word `{}`", word.name));
+        }
+        for arg in &word.args {
+            if !is_ident_name(&arg.name) {
+                return Err(format!(
+                    "invalid argument name `{}` on adapter word `{}`",
+                    arg.name, word.name
+                ));
+            }
+            if arg.kind == AdapterArgKind::Index && !arg.choices.is_empty() {
+                return Err(format!(
+                    "index argument `{}` on adapter word `{}` cannot declare `choices`",
+                    arg.name, word.name
+                ));
+            }
+            let mut seen_choices = BTreeSet::new();
+            for choice in &arg.choices {
+                if choice.is_empty() || !seen_choices.insert(choice.as_str()) {
+                    return Err(format!(
+                        "adapter word `{}` argument `{}` has an empty or duplicate choice `{choice}`",
+                        word.name, arg.name
+                    ));
+                }
+                if arg.kind == AdapterArgKind::Ident && !is_ident_name(choice) {
+                    return Err(format!(
+                        "adapter word `{}` argument `{}` has invalid identifier choice `{choice}`",
+                        word.name, arg.name
+                    ));
+                }
+            }
+        }
+    }
+    let mut seen_attrs = BTreeSet::new();
+    for attr in &descriptor.type_form_attributes {
+        if !is_ident_name(&attr.name) {
+            return Err(format!(
+                "invalid type-form attribute `@{}`: use lowercase ASCII letters, digits, or `_`",
+                attr.name
+            ));
+        }
+        if CORE_ATTRIBUTES.contains(&attr.name.as_str()) {
+            return Err(format!(
+                "type-form attribute `@{}` collides with a core compiler attribute",
+                attr.name
+            ));
+        }
+        if !seen_attrs.insert(attr.name.as_str()) {
+            return Err(format!("duplicate type-form attribute `@{}`", attr.name));
+        }
+    }
+    Ok(())
 }
 
 /// Validate the environment tags and axes a backend publishes in `describe`.
@@ -223,6 +317,7 @@ pub fn handshake(
     }
     validate_tags(descriptor)?;
     validate_options(descriptor)?;
+    validate_foreign_metadata(descriptor)?;
     for (name, range, version) in [
         ("backend API", &descriptor.backend_api, &request.backend_api),
         ("IR", &descriptor.ir, &request.ir_version),

@@ -8,10 +8,15 @@ mod guest;
 mod optimize;
 mod templates;
 
+use std::collections::BTreeSet;
+
+use crate::adapter;
+
 use flick_backend::{
-    Abi, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment,
-    EnvironmentServices, Inputs, Mode, NamedRange, OptionDescriptor, Parameter, Profile, Severity,
-    TagAxis, TargetSupport, ValueKind, Verb, VersionRange, command,
+    Abi, AdapterArg, AdapterArgKind, AdapterWord, Backend, BackendId, BuildRequest, BuildResult,
+    Descriptor, Diagnostic, Environment, EnvironmentServices, Inputs, Mode, ModuleRole, NamedRange,
+    OptionDescriptor, Parameter, Profile, Severity, TagAxis, TargetSupport, ValueKind, Verb,
+    VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -66,7 +71,7 @@ impl Backend for Go {
                 version: "0.1.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.14.0", "0.15.0"),
+            ir: range("0.15.0", "0.16.0"),
             language: range("0.1.0", "0.2.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
@@ -115,6 +120,31 @@ impl Backend for Go {
                 },
                 services: vec!["Database".into(), "Db".into(), "Server".into()],
             }],
+            adapter_words: vec![
+                AdapterWord {
+                    name: "this".into(),
+                    args: vec![],
+                    repeatable: false,
+                    help: "Call the exported Go method on the first argument via `flickrt.CallMethod`.".into(),
+                },
+                AdapterWord {
+                    name: "cancel".into(),
+                    args: vec![AdapterArg {
+                        name: "mode".into(),
+                        kind: AdapterArgKind::Ident,
+                        choices: vec!["signal".into()],
+                    }],
+                    repeatable: false,
+                    help: "Deliver interruption on an `Async` call through its `flickrt.Context`.".into(),
+                },
+                AdapterWord {
+                    name: "variadic".into(),
+                    args: vec![],
+                    repeatable: false,
+                    help: "Spread the last `List a` argument into Go variadic parameters (`flickrt.List(xs)...`).".into(),
+                },
+            ],
+            type_form_attributes: vec![],
         }
     }
 
@@ -123,7 +153,17 @@ impl Backend for Go {
         request: &BuildRequest,
         inputs: &mut dyn Inputs,
     ) -> Result<TargetSupport, Vec<Diagnostic>> {
-        data::Data::read(request, inputs)?;
+        let data = data::Data::read(request, inputs)?;
+        let own_modules: BTreeSet<&str> = request
+            .modules
+            .iter()
+            .filter(|m| m.role == ModuleRole::Own)
+            .map(|m| m.name.as_str())
+            .collect();
+        let adapter_diagnostics = adapter::validate_program(&data.program, &own_modules);
+        if !adapter_diagnostics.is_empty() {
+            return Err(adapter_diagnostics);
+        }
         Ok(TargetSupport {
             capabilities: vec![],
         })
@@ -135,6 +175,16 @@ impl Backend for Go {
         inputs: &mut dyn Inputs,
     ) -> Result<BuildResult, Vec<Diagnostic>> {
         let data = data::Data::read(request, inputs)?;
+        let own_modules: BTreeSet<&str> = request
+            .modules
+            .iter()
+            .filter(|m| m.role == ModuleRole::Own)
+            .map(|m| m.name.as_str())
+            .collect();
+        let adapter_diagnostics = adapter::validate_program(&data.program, &own_modules);
+        if !adapter_diagnostics.is_empty() {
+            return Err(adapter_diagnostics);
+        }
         emit::generate(request, &data)
     }
 }

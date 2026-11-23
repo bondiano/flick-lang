@@ -37,6 +37,10 @@ pub(crate) fn project_backend_tags(_project: &Project, _allow_load: bool) -> Vec
 
 /// Converts a backend component descriptor into the core environment metadata.
 pub(crate) fn descriptor_tags(descriptor: &Descriptor) -> BackendTags {
+    use flick_core::syntax::foreign_meta::{
+        AdapterArgKind, AdapterArgSpec, AdapterWordSpec, ForeignMeta, TypeFormAttrSpec,
+    };
+
     BackendTags {
         id: descriptor.identity.id.clone(),
         short: short_name(&descriptor.identity.id).to_owned(),
@@ -56,6 +60,39 @@ pub(crate) fn descriptor_tags(descriptor: &Descriptor) -> BackendTags {
             .iter()
             .map(|e| (e.backend.clone(), e.platform.clone()))
             .collect(),
+        foreign_meta: ForeignMeta {
+            backend_id: descriptor.identity.id.clone(),
+            adapter_words: descriptor
+                .adapter_words
+                .iter()
+                .map(|w| AdapterWordSpec {
+                    name: w.name.clone(),
+                    args: w
+                        .args
+                        .iter()
+                        .map(|a| AdapterArgSpec {
+                            name: a.name.clone(),
+                            kind: match a.kind {
+                                flick_backend::AdapterArgKind::Ident => AdapterArgKind::Ident,
+                                flick_backend::AdapterArgKind::Index => AdapterArgKind::Index,
+                                flick_backend::AdapterArgKind::Text => AdapterArgKind::Text,
+                            },
+                            choices: a.choices.clone(),
+                        })
+                        .collect(),
+                    repeatable: w.repeatable,
+                    help: w.help.clone(),
+                })
+                .collect(),
+            type_form_attributes: descriptor
+                .type_form_attributes
+                .iter()
+                .map(|a| TypeFormAttrSpec {
+                    name: a.name.clone(),
+                    help: a.help.clone(),
+                })
+                .collect(),
+        },
     }
 }
 

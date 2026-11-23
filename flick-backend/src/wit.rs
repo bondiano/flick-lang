@@ -82,7 +82,10 @@ macro_rules! wit_conversions {
             OptionDescriptor { parameter, default, implicit_value, choices, verbs }
             OptionValue { key, value }
             EnvironmentServices { environment, services }
-            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, tags, axes, profiles, modes, capabilities, options, launch_runtimes, host_tools, projections, stages_by_class_option, foreign_extension, foreign_suffixes, handled_services }
+            AdapterArg { name, kind, choices }
+            AdapterWord { name, args, repeatable, help }
+            TypeFormAttribute { name, help }
+            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, tags, axes, profiles, modes, capabilities, options, launch_runtimes, host_tools, projections, stages_by_class_option, foreign_extension, foreign_suffixes, handled_services, adapter_words, type_form_attributes }
             TargetRequest { backend_api, ir_version, language_version, runtime_abis, environment, tags, host_package, profile, mode, required_capabilities, options }
             TargetSupport { capabilities }
             Span { file, start, end }
@@ -115,6 +118,7 @@ macro_rules! wit_conversions {
             Mode { PerModule, WholeProgram }
             Verb { Build, Run, Dev, Test, Inspect }
             ValueKind { Flag, Text, Path }
+            AdapterArgKind { Index, Ident, Text }
             Severity { Error, Warning, Note }
             InputKind { Source, Foreign, Interface, TargetFacts, Resource, Lockfile }
             ModuleRole { Own, Builtin, External }

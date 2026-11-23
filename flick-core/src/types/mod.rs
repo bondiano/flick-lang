@@ -14,6 +14,9 @@
 //! the types and kinds of the exports.
 
 use std::mem;
+use std::sync::OnceLock;
+
+use crate::syntax::foreign_meta::ForeignMeta;
 
 mod abi;
 mod applicative_do;
@@ -391,6 +394,7 @@ fn checker_in<'a>(
         error_rows: None,
         unfolding: Vec::new(),
         skip_ir_types: context.skip_ir_types,
+        foreign_meta: context.foreign_meta,
     }
 }
 

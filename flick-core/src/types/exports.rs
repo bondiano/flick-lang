@@ -82,6 +82,12 @@ impl Checker<'_> {
         if !forms.is_empty() {
             interface.tags.insert(ts_mark::TAG.to_owned(), forms);
         }
+        for (tag, mut entries) in self.backend_type_form_tags() {
+            entries.retain(|(name, _)| exported(name));
+            if !entries.is_empty() {
+                interface.tags.insert(tag, entries);
+            }
+        }
         let owners: Vec<(String, Vec<String>)> = (self.typing.owner_services.iter())
             .filter(|name| exported(name))
             .map(|name| (name.clone(), Vec::new()))

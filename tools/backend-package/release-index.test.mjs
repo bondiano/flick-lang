@@ -16,7 +16,7 @@ const checkout = (t) => {
     identity: { id: "flick/js", version: "0.1.0" },
     sha256: "c".repeat(64),
     backend_api: { minimum: "0.1.0", maximum_exclusive: "0.2.0" },
-    ir: { minimum: "0.14.0", maximum_exclusive: "0.15.0" },
+    ir: { minimum: "0.15.0", maximum_exclusive: "0.16.0" },
   };
   writeFileSync(join(root, "backends/js/package/backend.json"), JSON.stringify(pin));
   const script = join(root, "tools/backend-package/release-index.mjs");

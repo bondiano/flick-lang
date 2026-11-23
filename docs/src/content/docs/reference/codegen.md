@@ -306,7 +306,10 @@ exported values with their projected types (see [Public TypeScript interfaces](.
 
 ### The form of a type
 
-`@ts` before the declaration of a type or a service says what the type is in
+`@ts` is a type-form attribute declared by the `flick/js` backend descriptor
+(other backends may declare their own type-form attributes or none at all; an
+attribute not declared by the active backend is `FLICK-S014`). Placed before
+the declaration of a type or a service, `@ts` says what the type is in
 TypeScript. Such a type is not declared: every module that names it writes
 the form, and imports only what the forms it wrote name.
 
@@ -651,21 +654,24 @@ in `flick.toml`, or `--allow-tool go` for a file built outside a project
 (`FLICK-P029` otherwise). It is built without cgo by default, so no C compiler is
 needed either; pass `--cgo` (or `[target.go] cgo = true`) to build with `CGO_ENABLED=1`.
 
-## Portable IR (0.14.0)
+## Portable IR (0.15.0)
 
-Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.14.0"`),
-checked against the `ir` version range (`[0.14.0, 0.15.0)`) in its descriptor.
-Alongside values, stages, dictionaries and lang items, IR `0.14.0` carries the
+Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.15.0"`),
+checked against the `ir` version range (`[0.15.0, 0.16.0)`) in its descriptor.
+Alongside values, stages, dictionaries and lang items, IR `0.15.0` carries the
 layout-relevant types the checker inferred so layout-aware and monomorphizing
-backends can lay out values by value without calling back into the checker:
+backends can lay out values by value without calling back into the checker, as
+well as core foreign ownership metadata and backend-declared foreign adapter
+words with source spans:
 
-| IR structure | Type information carried |
+| IR structure | Type and metadata information carried |
 | - | - |
 | `IrType` (`TypeRef`) | named type applied to arguments (`Named`), type variable (`Var`), higher-kinded application (`App`), staged function (`Fun`), tuple (`Tuple`), closed or open record row (`Record`), higher-rank scheme (`Forall`), and packed-module existential (`Exists`); effect, service and region rows are omitted |
 | `Module.types` (`TypeDecl`) | each data type, `type error` and `opaque type alias` declared in the module, its layout type parameters, and each `ConstructorDecl`'s `type_params`, `existentials`, dictionary `constraints`, `fields`, `record` labels (for record-over-constructor declarations) and GADT `result_args` |
 | `Constructor` | constructor `fields` (declared on `ItemKind::Constructor`, instantiated at `ExprKind::Con`) and instantiation `type_args`, alongside `dicts` and `rep` |
 | Binders and expressions | `Expr.ty`, `Param.{ty, binder_types}`, `ItemKind::Value.{type_params, dict_constraints, ty}`, `ItemKind::Destructure.binder_types`, `Stmt::Let.binder_types`, `Stmt::Var.ty`, `Stmt::Fun.{type_params, dict_constraints, ty}`, `Arm.binder_types`, `Each.binder_types` and `Foreign.{type_params, ty}` |
 | Polymorphic uses | `type_args` on `ExprKind::Global`, `ExprKind::Method` and `ExprKind::Con`, next to `ExprKind::Dicts` |
+| `Foreign.adapter` (`Adapter`) | core contract fields (`owned` parameter indices, `optional`, `result`, `callbacks`, `copies`, `shapes`, `result_shape`) plus backend-declared `words` (`Vec<AdapterWord>`, each with `name`, typed `args`, and source `span`) |
 
 In memory, types are shared behind `Arc<IrType>` (`TypeRef`). On the CBOR and
 JSON wire (`flick build --emit-ir`), `Program` deduplicates distinct `IrType`

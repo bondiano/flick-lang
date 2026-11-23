@@ -432,10 +432,8 @@ fn supports(value: &Foreign, arity: usize, copies_args: bool, copies_result: boo
         && value.catch.is_none()
         && value.adapter
             == Adapter {
-                receiver: false,
-                cancel: false,
                 optional: vec![],
-                variadic: false,
+                owned: vec![],
                 result: ResultAdapter {
                     nullable: false,
                     unit: false,
@@ -448,5 +446,6 @@ fn supports(value: &Foreign, arity: usize, copies_args: bool, copies_result: boo
                 },
                 shapes: vec![Shape::Data; arity],
                 result_shape: Shape::Data,
+                words: vec![],
             }
 }

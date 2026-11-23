@@ -83,4 +83,6 @@ struct Checker<'a> {
     /// Skip building interned IR types when lowering will not run.
     #[cfg_attr(target_arch = "wasm32", expect(dead_code))]
     skip_ir_types: bool,
+    /// Active backend's declared foreign adapter words and type-form attributes.
+    foreign_meta: Option<&'a ForeignMeta>,
 }

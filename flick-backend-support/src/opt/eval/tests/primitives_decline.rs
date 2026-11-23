@@ -80,13 +80,16 @@ fn declines_homonyms_alternate_adapters_missing_roles_and_bad_ctor_rep() {
     assert_eq!(prims.arity("Int", "parse", &known), None);
 }
 
-#[test]
-fn declines_mutated_foreign_declarations_dynamic_dicts_and_unknown_operands() {
-    let (lang, builtins) = default_env();
-    let known = Known::of(&lang);
+fn word(name: &str, args: Vec<flick_ir::AdapterArg>) -> flick_ir::AdapterWord {
+    flick_ir::AdapterWord {
+        name: name.into(),
+        args,
+        span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+    }
+}
 
-    // 6. Mutating any Foreign field declines that declaration.
-    let mutations: Vec<fn(&mut Foreign)> = vec![
+fn foreign_mutations() -> Vec<fn(&mut Foreign)> {
+    vec![
         |f| f.source_name = Some("orig".into()),
         |f| f.mode = ForeignMode::Sync,
         |f| f.mode = ForeignMode::Async,
@@ -100,10 +103,16 @@ fn declines_mutated_foreign_declarations_dynamic_dicts_and_unknown_operands() {
         |f| f.binding.from = Some("./evil.mjs".into()),
         |f| f.binding.name.push('X'),
         |f| f.catch = Some(int(0)),
-        |f| f.adapter.receiver = true,
-        |f| f.adapter.cancel = true,
+        |f| f.adapter.words.push(word("this", vec![])),
+        |f| {
+            f.adapter.words.push(word(
+                "cancel",
+                vec![flick_ir::AdapterArg::Ident("signal".into())],
+            ));
+        },
         |f| f.adapter.optional.push(0),
-        |f| f.adapter.variadic = true,
+        |f| f.adapter.owned.push(0),
+        |f| f.adapter.words.push(word("variadic", vec![])),
         |f| f.adapter.result.nullable = true,
         |f| f.adapter.result.unit = true,
         |f| f.adapter.callbacks[0] = Some(1),
@@ -112,8 +121,16 @@ fn declines_mutated_foreign_declarations_dynamic_dicts_and_unknown_operands() {
         |f| f.adapter.copies.callbacks[0] = Some((vec![], false)),
         |f| f.adapter.shapes[0] = Shape::Layer,
         |f| f.adapter.result_shape = Shape::Layer,
-    ];
-    for (idx, mutate) in mutations.into_iter().enumerate() {
+    ]
+}
+
+#[test]
+fn declines_mutated_foreign_declarations_dynamic_dicts_and_unknown_operands() {
+    let (lang, builtins) = default_env();
+    let known = Known::of(&lang);
+
+    // 6. Mutating any Foreign field declines that declaration.
+    for (idx, mutate) in foreign_mutations().into_iter().enumerate() {
         let mut mutated = builtins.clone();
         let ItemKind::Foreign(f) = &mut mutated[1].items[0].kind else {
             panic!("Int.parse foreign");

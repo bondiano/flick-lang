@@ -324,10 +324,9 @@ fn has_expected_adapter(a: &Adapter, foreign_arity: usize, prim: NativePrimitive
     } else {
         matches!(a.result_shape, Shape::Data)
     };
-    !a.receiver
-        && !a.cancel
+    a.words.is_empty()
+        && a.owned.is_empty()
         && a.optional.is_empty()
-        && !a.variadic
         && !a.result.nullable
         && !a.result.unit
         && a.callbacks.len() == foreign_arity

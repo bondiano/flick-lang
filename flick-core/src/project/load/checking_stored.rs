@@ -86,6 +86,7 @@ impl Checking<'_> {
         let digest = exported_digest(&output.exported);
         if let (Some((key, parts)), Some(digest)) = (&signed, &digest)
             && output.diagnostics.is_empty()
+            && output.adapter_diagnostics.is_empty()
             && let Some(saved) = saved_module(loaded.file, &output, digest.clone())
         {
             let which = if saved.ir.is_some() { "i" } else { "n" };
@@ -123,10 +124,13 @@ impl Checking<'_> {
         }
         Output {
             diagnostics: Vec::new(),
+            adapter_diagnostics: Vec::new(),
             #[cfg(feature = "ide")]
             typing: Arc::new(types::Typing::default()),
             #[cfg(feature = "ide")]
             inline_ide: Vec::new(),
+            #[cfg(feature = "ide")]
+            foreign_meta: Arc::new(self.foreign_meta_for(loaded).clone()),
             exported: interface.clone(),
             interface,
             ir: ir.map(Arc::new),
@@ -158,6 +162,14 @@ impl Checking<'_> {
             format!("{} {}", self.stages_by_class, self.lower_packages_only),
         );
         key.add("config", format!("{:?}", project.config.checked()));
+        key.add(
+            "foreign-meta",
+            self.foreign_meta_for(loaded).fingerprint(),
+        );
+        key.add(
+            "validate-foreign-meta",
+            [u8::from(self.env_ctx.validate_foreign_meta)],
+        );
         key.add("path", loaded.path.to_string_lossy().as_bytes());
         key.add("source", self.sources.get(loaded.file).text.as_bytes());
         key.add("text", self.text_of(loaded));

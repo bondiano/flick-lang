@@ -107,33 +107,6 @@ impl Checking<'_> {
             .is_some_and(|header| !header.parameters.is_empty())
     }
 
-    fn module_template(loaded: &Loaded) -> Output {
-        // A parsed `InlineModuleDecl` always carries the parser's `ModulePath`,
-        // so this is a defensive recovery: the structure it would check is
-        // gone. Mark what importers see incomplete exactly when parsing failed,
-        // as `check` does on the ordinary path, so they trust names the parser
-        // may have lost. Do not fabricate exports or a parameterized signature.
-        let interface = Interface {
-            module: loaded.name.clone(),
-            ..Interface::default()
-        };
-        Output {
-            diagnostics: loaded.parse.diagnostics.clone(),
-            #[cfg(feature = "ide")]
-            typing: Arc::new(types::Typing::default()),
-            #[cfg(feature = "ide")]
-            inline_ide: Vec::new(),
-            exported: Interface {
-                incomplete: !loaded.parse.diagnostics.is_empty(),
-                ..interface.clone()
-            },
-            interface: interface.clone(),
-            ir: None,
-            declarations: Arc::new(interface),
-            proofs: Vec::new(),
-        }
-    }
-
     #[allow(clippy::too_many_lines)]
     fn check(
         &self,
@@ -223,6 +196,17 @@ impl Checking<'_> {
             stages_by_class: self.stages_by_class,
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();
+        let foreign_meta = self.foreign_meta_for(loaded);
+        if self.env_ctx.validate_foreign_meta {
+            foreign_meta::validate_tree(
+                tree,
+                self.text_of(loaded),
+                loaded.file,
+                foreign_meta,
+                false,
+                &mut diagnostics,
+            );
+        }
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);
         diagnostics.extend(resolved);
         diagnostics.extend(contract_errors);
@@ -254,6 +238,7 @@ impl Checking<'_> {
                 ir_lookup: Some(lookup),
                 skip_ir_types: !self.lower
                     || (self.cache.is_some() && self.cached_ir != CachedIr::Kept),
+                foreign_meta: Some(foreign_meta),
             },
         );
         if let Some(mut expected) = result_signature {
@@ -375,8 +360,11 @@ impl Checking<'_> {
             ir.initialization.prefixes.sort_by_key(|p| p.before);
             ir.initialization.prefixes.dedup_by_key(|p| p.before);
         }
+        let mut adapter_diagnostics =
+            types::beside_syntax_errors(tree, official_adapter_diagnostics(&typing, foreign_meta));
         if let Some(expansion) = &loaded.expansion {
             expansion.restore(&mut diagnostics, ir.as_mut());
+            expansion.restore(&mut adapter_diagnostics, None);
             expansion.place_interface(&mut interface);
         }
         #[cfg(feature = "ide")]
@@ -389,10 +377,13 @@ impl Checking<'_> {
         };
         Output {
             diagnostics,
+            adapter_diagnostics,
             #[cfg(feature = "ide")]
             typing: Arc::new(typing),
             #[cfg(feature = "ide")]
             inline_ide: Vec::new(),
+            #[cfg(feature = "ide")]
+            foreign_meta: Arc::new(foreign_meta.clone()),
             exported: Interface {
                 incomplete: broken,
                 ..exported(&interface, clean)
@@ -405,56 +396,6 @@ impl Checking<'_> {
                 .map(Arc::new),
             declarations,
             proofs,
-        }
-    }
-
-    fn lower_if_clean(
-        &self,
-        loaded: &Loaded,
-        module: &resolve::Module<'_>,
-        typing: &types::Typing,
-        clean: bool,
-        declarations: &mut Arc<Interface>,
-        diagnostics: &mut Vec<Diagnostic>,
-    ) -> Option<ir::Module> {
-        let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
-        if clean
-            && self.lower
-            && lowers
-            && loaded.scope_of.is_none()
-            && !Self::is_module_template(loaded)
-        {
-            #[cfg(not(target_arch = "wasm32"))]
-            match ir::lower_with_local_schemes(module, typing) {
-                Ok((lowered, local_schemes)) => {
-                    if !local_schemes.is_empty() {
-                        Arc::make_mut(declarations).local_schemes = local_schemes;
-                    }
-                    return Some(lowered);
-                }
-                Err(d) => diagnostics.extend(d),
-            }
-            #[cfg(target_arch = "wasm32")]
-            {
-                let _ = declarations;
-                match ir::lower(module, typing) {
-                    Ok(lowered) => return Some(lowered),
-                    Err(d) => diagnostics.extend(d),
-                }
-            }
-        }
-        None
-    }
-}
-
-/// Takes where `imported` declares the names `interface` re-exports.
-fn redeclare(interface: &mut Interface, imported: &Interface) {
-    for export in &mut interface.exports {
-        if export.entity.module == interface.module {
-            continue;
-        }
-        if let Some(found) = imported.exports.iter().find(|e| e.entity == export.entity) {
-            export.at = found.at;
         }
     }
 }

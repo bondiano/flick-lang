@@ -30,6 +30,7 @@ use crate::toolchain;
 mod assets;
 #[cfg(test)]
 mod assets_tests;
+mod check;
 #[cfg(test)]
 mod component_tests;
 mod go;

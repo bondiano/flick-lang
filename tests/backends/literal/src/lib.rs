@@ -2,6 +2,8 @@
 //! The same implementation is exercised natively and as a component.
 
 mod commands;
+mod descriptor;
+mod foreign;
 mod launches;
 mod packages;
 mod steps;
@@ -14,10 +16,8 @@ use std::time::SystemTime;
 
 use flick_backend::command;
 use flick_backend::{
-    Artifact, ArtifactKind, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic,
-    Environment, EnvironmentServices, Inputs, Mode, ModuleRole, NamedRange, OptionDescriptor,
-    OptionValue, Packages, Parameter, Profile, ProjectFile, Severity, Span, TagAxis, TargetSupport,
-    ValueKind, Verb, VersionRange,
+    Artifact, ArtifactKind, Backend, BuildRequest, BuildResult, Descriptor, Diagnostic, Inputs,
+    Mode, ModuleRole, OptionValue, Packages, ProjectFile, Severity, Span, TargetSupport,
 };
 use flick_ir::{ExprKind, ItemKind, Lit, Program, Stage};
 
@@ -64,6 +64,7 @@ fn case(request: &BuildRequest) -> &str {
                         "Fixture.Steps" => Some("steps"),
                         "Fixture.StepsEscape" => Some("steps-escape"),
                         "Fixture.TypedIr" => Some("typed-ir"),
+                        "Fixture.Foreign" => Some("foreign"),
                         _ => None,
                     })
                     .unwrap_or("")
@@ -87,6 +88,14 @@ fn is_inspect(request: &BuildRequest) -> bool {
         .options
         .iter()
         .any(|o| o.key == "command" && o.value == "inspect")
+}
+
+fn is_check(request: &BuildRequest) -> bool {
+    request
+        .target
+        .options
+        .iter()
+        .any(|o| o.key == "command" && o.value == "check")
 }
 
 fn selected(request: &BuildRequest, module: &str) -> bool {
@@ -172,59 +181,7 @@ impl Backend for Literal {
     }
 
     fn describe(&self) -> Descriptor {
-        let range = |a: &str, b: &str| VersionRange {
-            minimum: a.into(),
-            maximum_exclusive: b.into(),
-        };
-        Descriptor {
-            identity: BackendId {
-                id: "test/literal".into(),
-                version: "1.0.0".into(),
-            },
-            backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.14.0", "0.15.0"),
-            language: range("0.1.0", "0.2.0"),
-            runtime_abis: vec![NamedRange {
-                name: "flickrt".into(),
-                versions: range("0.1.0", "0.2.0"),
-            }],
-            environments: vec![Environment {
-                backend: "js".into(),
-                platform: "node".into(),
-            }],
-            tags: vec!["literal".into()],
-            axes: vec![
-                TagAxis {
-                    name: "dialect".into(),
-                    tags: vec!["alpha".into(), "beta".into()],
-                    default: Some("alpha".into()),
-                    exclusive: true,
-                },
-                TagAxis {
-                    name: "capabilities".into(),
-                    tags: vec!["jit".into(), "ffi".into()],
-                    default: None,
-                    exclusive: false,
-                },
-            ],
-            profiles: vec![Profile::Debug, Profile::Release],
-            modes: vec![Mode::PerModule, Mode::WholeProgram],
-            capabilities: vec![],
-            options: literal_options(),
-            launch_runtimes: vec!["node".into()],
-            host_tools: vec!["node".into()],
-            projections: vec![],
-            stages_by_class_option: None,
-            foreign_extension: None,
-            foreign_suffixes: vec![],
-            handled_services: vec![EnvironmentServices {
-                environment: Environment {
-                    backend: "js".into(),
-                    platform: "node".into(),
-                },
-                services: vec!["Database".into(), "Db".into(), "Server".into()],
-            }],
-        }
+        descriptor::descriptor()
     }
 
     fn check_target(
@@ -242,13 +199,19 @@ impl Backend for Literal {
         }
         let program =
             Program::from_cbor(&request.program).map_err(|e| diagnostic(&e.to_string(), None))?;
+        foreign::validate_foreign_adapters(&program, request)?;
+        if is_check(request) {
+            return Ok(TargetSupport {
+                capabilities: self.describe().capabilities,
+            });
+        }
         if case(request) == "typed-ir" {
             typed_ir::validate_program(&program, request)?;
             return Ok(TargetSupport {
                 capabilities: self.describe().capabilities,
             });
         }
-        if request.target.host_package.is_none() && case(request) != "env" {
+        if request.target.host_package.is_none() && !matches!(case(request), "env" | "foreign") {
             for module in &program.modules {
                 if !request
                     .modules
@@ -369,6 +332,11 @@ fn apply_case_artifacts(
                 .map_err(|e| diagnostic(&e.to_string(), None))?;
             artifacts.push(typed_ir::report_artifact(program, request)?);
         }
+        "foreign" => {
+            let program = Program::from_cbor(&request.program)
+                .map_err(|e| diagnostic(&e.to_string(), None))?;
+            artifacts.push(foreign::report_artifact(&program, request));
+        }
         "ir" => artifacts.push(Artifact {
             id: "request-ir".into(),
             path: "request.ir.cbor".into(),
@@ -450,76 +418,6 @@ fn module_artifacts(request: &BuildRequest) -> Vec<Artifact> {
             }
         })
         .collect()
-}
-
-fn literal_options() -> Vec<OptionDescriptor> {
-    vec![
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "case".into(),
-                kind: ValueKind::Text,
-                multiple: false,
-                required: false,
-                help: "Select a test fixture behavior.".into(),
-            },
-            default: None,
-            implicit_value: None,
-            choices: vec![],
-            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
-        },
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "banner".into(),
-                kind: ValueKind::Text,
-                multiple: false,
-                required: false,
-                help: "Prepend a comment banner to generated JavaScript output.".into(),
-            },
-            default: None,
-            implicit_value: None,
-            choices: vec![],
-            verbs: vec![Verb::Build, Verb::Inspect],
-        },
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "dialect".into(),
-                kind: ValueKind::Text,
-                multiple: false,
-                required: false,
-                help: "Select literal fixture dialect tag.".into(),
-            },
-            default: Some("alpha".into()),
-            implicit_value: None,
-            choices: vec!["alpha".into(), "beta".into()],
-            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
-        },
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "jit".into(),
-                kind: ValueKind::Flag,
-                multiple: false,
-                required: false,
-                help: "Enable fixture JIT capability tag.".into(),
-            },
-            default: Some("false".into()),
-            implicit_value: None,
-            choices: vec![],
-            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
-        },
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "ffi".into(),
-                kind: ValueKind::Flag,
-                multiple: false,
-                required: false,
-                help: "Enable fixture FFI capability tag.".into(),
-            },
-            default: Some("false".into()),
-            implicit_value: None,
-            choices: vec![],
-            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
-        },
-    ]
 }
 
 #[cfg(feature = "guest")]

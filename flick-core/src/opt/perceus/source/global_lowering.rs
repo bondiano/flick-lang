@@ -308,10 +308,9 @@ fn foreign_intrinsic_adapter_valid(value: &Foreign, kind: Intrinsic) -> bool {
         && value.stages.len() == kind.arity()
         && value.taken() == kind.arity()
         && value.catch.is_none()
-        && !adapter.receiver
-        && !adapter.cancel
+        && adapter.words.is_empty()
+        && adapter.owned.is_empty()
         && adapter.optional.is_empty()
-        && !adapter.variadic
         && !adapter.result.nullable
         && callbacks_valid
         && copies_valid

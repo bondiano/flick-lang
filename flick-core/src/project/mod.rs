@@ -146,6 +146,28 @@ pub trait Host {
     fn loads_backends(&self) -> bool {
         true
     }
+    /// Whether this host executes backend components (`check-target`) for
+    /// foreign adapter validation. False for in-memory test hosts and
+    /// browser/WASM builds.
+    fn has_backend_runner(&self) -> bool {
+        false
+    }
+    /// Runs the selected backend's `check-target` on `compilation` during
+    /// `flick check` or editor analysis. Returns `None` when no backend
+    /// component could be invoked offline, allowing the caller to fall back
+    /// to official adapter validation when applicable.
+    #[cfg(feature = "native-project")]
+    fn check_target(
+        &self,
+        project: &Project,
+        compilation: &Compilation,
+        environment: &ResolvedEnvironment,
+        stages_by_class: bool,
+        sources: &mut SourceMap,
+    ) -> Option<Vec<Diagnostic>> {
+        let _ = (project, compilation, environment, stages_by_class, sources);
+        None
+    }
 }
 
 /// What a backend reports of its ecosystem's packages: the project's own

@@ -5,7 +5,7 @@ use std::collections::btree_map::Entry;
 use std::iter;
 use std::sync::Arc;
 
-use flick_ir::{Expr, Program, Span};
+use flick_ir::{Expr, ItemKind, Program, Span};
 
 use crate::{BuildRequest, InputKind, Inputs};
 
@@ -65,11 +65,16 @@ fn expression(expr: &Expr, texts: &[&str]) -> bool {
     checked
 }
 
-/// Check every item and expression byte span against its UTF-8 source.
+/// Check every item, foreign adapter word, and expression byte span against its UTF-8 source.
 pub fn validate_source_spans(program: &Program, texts: &[&str]) -> Result<(), String> {
     for module in &program.modules {
         for item in &module.items {
             let mut checked = valid(item.span, texts);
+            if let ItemKind::Foreign(foreign) = &item.kind {
+                for word in &foreign.adapter.words {
+                    checked = checked && valid(word.span, texts);
+                }
+            }
             item.each_body(&mut |body| checked = checked && expression(body, texts));
             if !checked {
                 return Err("backend IR span is outside its source or splits UTF-8".into());

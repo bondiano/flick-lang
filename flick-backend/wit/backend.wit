@@ -38,6 +38,28 @@ interface types {
         environment: environment,
         services: list<string>,
     }
+    /// Syntactic shape of one positional argument of a backend-declared
+    /// foreign adapter word.
+    enum adapter-arg-kind { index, ident, text }
+    /// One positional argument of a backend-declared foreign adapter word.
+    record adapter-arg {
+        name: string,
+        kind: adapter-arg-kind,
+        /// Allowed values for `ident` or `text`; empty allows any value of `kind`.
+        choices: list<string>,
+    }
+    /// A backend-owned metadata word accepted under a `foreign` declaration.
+    record adapter-word {
+        name: string,
+        args: list<adapter-arg>,
+        repeatable: bool,
+        help: string,
+    }
+    /// A backend-owned type-form attribute (such as `@ts` on JS).
+    record type-form-attribute {
+        name: string,
+        help: string,
+    }
     record descriptor {
         identity: backend-id,
         backend-api: version-range,
@@ -66,6 +88,10 @@ interface types {
         foreign-suffixes: list<string>,
         /// Gated services handled at the root of each environment.
         handled-services: list<environment-services>,
+        /// Backend-owned foreign adapter words and their argument shapes.
+        adapter-words: list<adapter-word>,
+        /// Backend-owned type-form attributes (such as `@ts` on JS).
+        type-form-attributes: list<type-form-attribute>,
     }
     /// Available before IR generation; the host checks descriptor ranges
     /// first, then asks the backend for target-specific refusals.

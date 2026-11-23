@@ -32,6 +32,17 @@ import {
   wireCtx,
 } from "./worker_runtime.mjs";
 
+export function hasAdapterWord(adapter, name, identArg = null) {
+  const words = adapter?.words;
+  if (!Array.isArray(words)) return false;
+  return words.some(
+    (w) =>
+      w.name === name &&
+      (identArg === null ||
+        (Array.isArray(w.args) && w.args.length === 1 && w.args[0]?.Ident === identArg)),
+  );
+}
+
 function isBridgedSpec(spec) {
   return (
     spec.mode === "Effect" ||
@@ -432,14 +443,14 @@ export function prepareArgs(exec, spec, rawWireArgs, bridged, controller) {
     valueArgs.push(val);
   }
   const finalArgs = [...decoded];
-  if (spec.adapter.variadic && valueArgs.length > 0) {
+  if (hasAdapterWord(spec.adapter, "variadic") && valueArgs.length > 0) {
     const last = valueArgs.pop();
     finalArgs.push(...valueArgs);
     if (Array.isArray(last)) finalArgs.push(...last);
   } else {
     finalArgs.push(...valueArgs);
   }
-  if (spec.adapter.cancel && controller) {
+  if (hasAdapterWord(spec.adapter, "cancel", "signal") && controller) {
     finalArgs.push(controller.signal);
   }
   return finalArgs;
@@ -449,7 +460,7 @@ export function invokeTarget(spec, target, finalArgs) {
   if (spec.arity === 0 && spec.taken === 0 && spec.dicts === 0 && spec.mode === "Pure") {
     return target;
   }
-  if (spec.adapter.receiver && finalArgs.length > spec.dicts) {
+  if (hasAdapterWord(spec.adapter, "this") && finalArgs.length > spec.dicts) {
     const receiver = finalArgs.splice(spec.dicts, 1)[0];
     return target.apply(receiver, finalArgs);
   }

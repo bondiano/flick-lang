@@ -22,10 +22,8 @@ fn supports_join(value: &Foreign) -> bool {
         && value.catch.is_none()
         && value.adapter
             == Adapter {
-                receiver: false,
-                cancel: false,
                 optional: vec![],
-                variadic: false,
+                owned: vec![],
                 result: ResultAdapter {
                     nullable: false,
                     unit: false,
@@ -38,6 +36,7 @@ fn supports_join(value: &Foreign) -> bool {
                 },
                 shapes: vec![Shape::Data, Shape::Data],
                 result_shape: Shape::Data,
+                words: vec![],
             }
 }
 
@@ -126,10 +125,8 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
         && value.catch.is_none()
         && value.adapter
             == Adapter {
-                receiver: false,
-                cancel: false,
                 optional: vec![],
-                variadic: false,
+                owned: vec![],
                 result: ResultAdapter {
                     nullable: false,
                     unit: false,
@@ -142,6 +139,7 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
                 },
                 shapes: vec![Shape::Data],
                 result_shape: Shape::Data,
+                words: vec![],
             })
     .then_some(kind)
 }
@@ -274,10 +272,29 @@ mod tests {
                     Span::new(FileId::new(0), 0, 0),
                 ));
             },
-            |v| v.adapter.receiver = true,
-            |v| v.adapter.cancel = true,
+            |v| {
+                v.adapter.words.push(flick_ir::AdapterWord {
+                    name: "this".into(),
+                    args: vec![],
+                    span: Span::new(FileId::new(0), 0, 0),
+                });
+            },
+            |v| {
+                v.adapter.words.push(flick_ir::AdapterWord {
+                    name: "cancel".into(),
+                    args: vec![flick_ir::AdapterArg::Ident("signal".into())],
+                    span: Span::new(FileId::new(0), 0, 0),
+                });
+            },
             |v| v.adapter.optional.push(0),
-            |v| v.adapter.variadic = true,
+            |v| v.adapter.owned.push(0),
+            |v| {
+                v.adapter.words.push(flick_ir::AdapterWord {
+                    name: "variadic".into(),
+                    args: vec![],
+                    span: Span::new(FileId::new(0), 0, 0),
+                });
+            },
             |v| v.adapter.result.nullable = true,
             |v| v.adapter.result.unit = true,
             |v| v.adapter.callbacks[0] = Some(1),

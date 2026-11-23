@@ -209,10 +209,29 @@ fn live_builtin_native_primitives_reject_foreign_mutations() {
                 Span::new(FileId::new(0), 0, 0),
             ));
         },
-        |f| f.adapter.receiver = true,
-        |f| f.adapter.cancel = true,
+        |f| {
+            f.adapter.words.push(flick_ir::AdapterWord {
+                name: "this".into(),
+                args: vec![],
+                span: Span::new(FileId::new(0), 0, 0),
+            });
+        },
+        |f| {
+            f.adapter.words.push(flick_ir::AdapterWord {
+                name: "cancel".into(),
+                args: vec![flick_ir::AdapterArg::Ident("signal".into())],
+                span: Span::new(FileId::new(0), 0, 0),
+            });
+        },
         |f| f.adapter.optional.push(0),
-        |f| f.adapter.variadic = true,
+        |f| f.adapter.owned.push(0),
+        |f| {
+            f.adapter.words.push(flick_ir::AdapterWord {
+                name: "variadic".into(),
+                args: vec![],
+                span: Span::new(FileId::new(0), 0, 0),
+            });
+        },
         |f| f.adapter.result.nullable = true,
         |f| f.adapter.result.unit = true,
         |f| f.adapter.callbacks[0] = Some(1),

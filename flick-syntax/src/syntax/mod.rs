@@ -3,6 +3,7 @@
 
 pub mod ast;
 pub mod cst;
+pub mod foreign_meta;
 pub mod heads;
 pub mod kind;
 #[cfg(test)]
