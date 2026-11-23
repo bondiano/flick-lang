@@ -1,8 +1,9 @@
 package flickrt
 
 // Constructed is a value of a constructor, whatever its Go type: generated code
-// gives a constructor with fields of a program's own type a Go type of its
-// own, and every other value of a constructor is a *Data.
+// gives a tagged, dictionary-free constructor of a program's own type a Go type
+// of its own (a zero-size struct when it has no fields), and every other value
+// of a constructor is a *Data.
 type Constructed interface {
 	// TagName is the tag of the constructor.
 	TagName() string
@@ -57,6 +58,9 @@ func Owned(tag string, build func(fields []Value) Value) bool {
 func Construct(tag string, fields ...Value) Value {
 	if build, ok := builders[tag]; ok {
 		return build(fields)
+	}
+	if len(fields) == 0 {
+		return Nullary(tag)
 	}
 	return NewData(tag, fields...)
 }

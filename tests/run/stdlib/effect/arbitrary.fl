@@ -9,7 +9,13 @@ type alias Point = { x : Float; tags : List String }
   deriving Schema
 
 type Shape = Dot | Circle Float
-  deriving Show, Schema
+  deriving Eq, Show, Schema
+
+type Color = Red | Green | Blue
+  deriving Eq, Show, Schema
+
+type Tree = Leaf | Node Tree Int Tree
+  deriving Eq, Show, Schema
 
 seeded : Int -> Arbitrary.SampleOptions
 let seeded n = { count = Some n; size = None; maxDiscards = None; seed = Some 42 }
@@ -165,6 +171,53 @@ let run () =
   Platform.stdout_line sampled
   reports ()
   linked ()
+  nullary_adts ()
+
+color_matches : Color -> Bool
+let color_matches c =
+  match c with
+  | Red -> c == Red && show c == "Red"
+  | Green -> c == Green && show c == "Green"
+  | Blue -> c == Blue && show c == "Blue"
+
+is_dot : Shape -> Bool
+let is_dot s =
+  match s with
+  | Dot -> s == Dot && show s == "Dot"
+  | Circle _ -> false
+
+is_leaf : Tree -> Bool
+let is_leaf t =
+  match t with
+  | Leaf -> t == Leaf && show t == "Leaf"
+  | Node _ _ _ -> false
+
+/// Payload-free constructors generated via `Arbitrary.from_schema`: match, `==`, `show`, and JSON round-trip.
+nullary_adts : Unit ->{Host.Console; Arbitrary.SampleError} Unit
+let nullary_adts () =
+  let colors = Arbitrary.sample (seeded 20) (Arbitrary.from_schema Color.schema)
+  let shapes = Arbitrary.sample (seeded 20) (Arbitrary.from_schema Shape.schema)
+  let trees = Arbitrary.sample (seeded 20) (Arbitrary.from_schema Tree.schema)
+  let round_trip =
+    Arbitrary.check
+      checking
+      (fun c ->
+        match Codec.encode_result (Codec.json Color.schema) c with
+        | Ok wire -> Codec.decode_result (Codec.json Color.schema) (Json.to_unknown wire) == Ok c
+        | Err _ -> false
+      )
+      (Arbitrary.from_schema Color.schema)
+  Platform.stdout_line
+    ("nullary arbitrary: count "
+      ++ show (List.length colors)
+      ++ ", valid "
+      ++ show (List.all color_matches colors)
+      ++ ", has_dot "
+      ++ show (List.any is_dot shapes)
+      ++ ", has_leaf "
+      ++ show (List.any is_leaf trees)
+      ++ ", round_trip "
+      ++ describe round_trip)
 
 report : Arbitrary.CheckResult e a ->{Host.Console} Unit
 let report result =

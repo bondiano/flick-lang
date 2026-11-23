@@ -27,14 +27,23 @@ impl<'a> Gen<'a> {
                 Box::new(move |_, _: &[Code<'a>]| a.text(lit).into())
             }
             Rep::Tagged if c.arity == 0 && held.is_empty() => {
+                if let Some((ty, own::Held::Zero)) = self.own_type(c) {
+                    let value = a.alloc_str(&format!("flickrt.Value({ty}{{}})"));
+                    return Box::new(move |_, _: &[Code<'a>]| a.text(value).into());
+                }
                 let value = self.once(&format!("flickrt.Nullary({tag})"));
                 Box::new(move |_, _: &[Code<'a>]| a.text(value).into())
             }
             Rep::Tagged => {
-                let own = self.own_type(c).map(|(ty, held)| match held {
-                    own::Held::Fields(_) => a.alloc_str(&own::make(&ty)),
-                    own::Held::Record(_) => a.alloc_str(&own::of(&ty)),
-                });
+                let own = held
+                    .is_empty()
+                    .then(|| self.own_type(c))
+                    .flatten()
+                    .and_then(|(ty, held)| match held {
+                        own::Held::Zero => None,
+                        own::Held::Fields(_) => Some(a.alloc_str(&own::make(&ty))),
+                        own::Held::Record(_) => Some(a.alloc_str(&own::of(&ty))),
+                    });
                 Box::new(move |_, args: &[Code<'a>]| {
                     let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
                     match own {

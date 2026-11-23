@@ -3,7 +3,13 @@
 module Language.Schemas exposing (tests)
 
 type Shape = Circle Float | Rect Float Float | Dot
-  deriving Schema
+  deriving Eq, Show, Schema
+
+type Color = Red | Green | Blue
+  deriving Eq, Ord, Hash, Show, Schema
+
+type Tree = Leaf | Node Tree String Tree
+  deriving Eq, Show, Schema
 
 type alias Point = { x : Int; y : Int; label : Option String }
   deriving Schema
@@ -24,6 +30,13 @@ let encoded s value =
   | Ok json -> Json.stringify json
   | Err (SchemaError issues) ->
     String.join "; " (List.map (fun i -> i.path ++ ": " ++ i.message) issues)
+
+/// Decodes a JSON string through a schema's canonical codec.
+decode_value : Schema a -> String -> Result SchemaError a
+let decode_value s text =
+  match Json.parse text with
+  | Ok input -> Codec.decode_result (Codec.json s) input
+  | Err err -> Err err
 
 /// The value decoded and encoded again, or the issues by path.
 decoded : Schema a -> String -> String
@@ -133,5 +146,70 @@ let tests = [
     Test.test "rejects an invalid value" (fun () ->
       Test.equal "(root): not a valid Port" (decoded Port.schema "70000")
     ),
+  ],
+  Test.group "payload-free constructors" [
+    Test.test "decode matches, equals, and shows" (fun () ->
+      let shape_result = decode_value Shape.schema "{\"_tag\": \"Dot\"}"
+      let color_result = decode_value Color.schema "{\"_tag\": \"Green\"}"
+      let tree_result =
+        decode_value
+          Tree.schema
+          "{\"_tag\": \"Node\", \"_0\": {\"_tag\": \"Leaf\"}, \"_1\": \"mid\", \"_2\": {\"_tag\": \"Leaf\"}}"
+      let shape_label =
+        match shape_result with
+        | Ok Dot -> "dot"
+        | Ok (Circle _) -> "circle"
+        | Ok (Rect _ _) -> "rect"
+        | Err _ -> "err"
+      let color_label =
+        match color_result with
+        | Ok Red -> "red"
+        | Ok Green -> "green"
+        | Ok Blue -> "blue"
+        | Err _ -> "err"
+      let tree_label =
+        match tree_result with
+        | Ok (Node Leaf s Leaf) -> s
+        | Ok Leaf | Ok (Node _ _ _) | Err _ -> "other"
+      Test.all [
+        Test.equal "dot" shape_label,
+        Test.equal (Ok Dot) shape_result,
+        Test.equal "Ok Dot" (show shape_result),
+        Test.equal "green" color_label,
+        Test.equal (Ok Green) color_result,
+        Test.equal "Ok Green" (show color_result),
+        Test.equal "mid" tree_label,
+        Test.equal (Ok (Node Leaf "mid" Leaf)) tree_result,
+        Test.equal "Ok (Node Leaf \"mid\" Leaf)" (show tree_result),
+      ]
+    ),
+    Test.property
+      "Schema.arbitrary of all-nullary Color matches, compares, shows, and round-trips"
+      (Schema.arbitrary Color.schema)
+      (fun c ->
+        let expected =
+          match c with
+          | Red -> ("Red", c == Red)
+          | Green -> ("Green", c == Green)
+          | Blue -> ("Blue", c == Blue)
+        let (name, same) = expected
+        Test.all [
+          Test.equal true same,
+          Test.equal name (show c),
+          Test.equal
+            ("ok {\"_tag\":\"" ++ name ++ "\"}")
+            (decoded Color.schema (encoded Color.schema c)),
+        ]
+      ),
+    Test.property
+      "Schema.arbitrary of Shape handles payload-free Dot"
+      (Schema.arbitrary Shape.schema)
+      (fun s ->
+        let checked =
+          match s with
+          | Dot -> s == Dot && show s == "Dot" && encoded Shape.schema s == "{\"_tag\":\"Dot\"}"
+          | Circle _ | Rect _ _ -> decode_value Shape.schema (encoded Shape.schema s) == Ok s
+        Test.is_true (show s) checked
+      ),
   ],
 ]

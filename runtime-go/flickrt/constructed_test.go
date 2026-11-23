@@ -12,6 +12,22 @@ type ownPair struct{ f [2]Value }
 func (p *ownPair) TagName() string { return "Pair#1" }
 func (p *ownPair) Fields() []Value { return p.f[:] }
 
+// Payload-free constructors with zero-size Go types of their own.
+type (
+	ownLeaf  struct{}
+	ownOther struct{}
+)
+
+func (ownLeaf) TagName() string  { return "Leaf#1" }
+func (ownLeaf) Fields() []Value  { return nil }
+func (ownOther) TagName() string { return "Other#1" }
+func (ownOther) Fields() []Value { return nil }
+
+func isOwnLeaf(v Value) bool {
+	_, ok := v.(ownLeaf)
+	return ok
+}
+
 func TestAValueOfItsOwnGoTypeIsReadAsAnyConstructorValue(t *testing.T) {
 	own := &ownPair{[2]Value{int32(1), "x"}}
 	same, other := &ownPair{[2]Value{int32(1), "x"}}, &ownPair{[2]Value{int32(2), "x"}}
@@ -62,6 +78,91 @@ func TestTheRuntimeBuildsAValueInTheGoTypeOfItsConstructor(t *testing.T) {
 	}
 	if d, isData := Construct("Other#1", int32(1)).(*Data); !isData || d.Tag != "Other#1" || d.Fields()[0] != int32(1) {
 		t.Errorf("a constructor without a Go type of its own: %#v", d)
+	}
+	if a, b := Construct("NullaryUnowned#1"), Construct("NullaryUnowned#1"); a != b {
+		t.Errorf("unowned nullary constructor is not canonical: %#v != %#v", a, b)
+	}
+}
+
+func TestAZeroSizeConstructorAllocatesNothingAndPreservesValueSemantics(t *testing.T) {
+	Owned("Leaf#1", func([]Value) Value { return ownLeaf{} })
+	defer delete(builders, "Leaf#1")
+
+	if n := testing.AllocsPerRun(100, func() { variantKept = Value(ownLeaf{}) }); n != 0 {
+		t.Errorf("building zero-size constructor: %v allocations, want 0", n)
+	}
+	if n := testing.AllocsPerRun(100, func() { variantKept = Construct("Leaf#1") }); n != 0 {
+		t.Errorf("Construct zero-size constructor: %v allocations, want 0", n)
+	}
+	leaf := Value(ownLeaf{})
+	other := Value(ownOther{})
+	data := Nullary("Leaf#1")
+	if !isOwnLeaf(leaf) || isOwnLeaf(other) || isOwnLeaf(data) {
+		t.Errorf("type test on zero-size constructor failed")
+	}
+	if n := testing.AllocsPerRun(100, func() {
+		if isOwnLeaf(leaf) {
+			variantCount++
+		}
+	}); n != 0 {
+		t.Errorf("type test on zero-size constructor: %v allocations, want 0", n)
+	}
+	// Two values of one zero-size type are equal as Go interfaces.
+	if leaf != Value(ownLeaf{}) || leaf == other {
+		t.Errorf("Go interface equality failed")
+	}
+	if !Same(leaf, Value(ownLeaf{})) || Same(leaf, other) {
+		t.Errorf("Same on zero-size constructor failed")
+	}
+	if !Equals(leaf, Value(ownLeaf{})) || Equals(leaf, other) || !Equals(leaf, data) || !Equals(data, leaf) {
+		t.Errorf("Equals on zero-size constructor failed")
+	}
+	if !SameValue(leaf, Value(ownLeaf{})) || SameValue(leaf, other) || !SameValue(leaf, data) {
+		t.Errorf("SameValue on zero-size constructor failed")
+	}
+	if Equals(leaf, "Leaf") || Equals(leaf, NewData("Other#1")) {
+		t.Errorf("zero-size constructor equal to unrelated value")
+	}
+	if n := testing.AllocsPerRun(100, func() { Equals(leaf, Value(ownLeaf{})) }); n != 0 {
+		t.Errorf("Equals on zero-size constructor: %v allocations, want 0", n)
+	}
+	if got := Show(leaf); got != "Leaf" {
+		t.Errorf("Show: %v, want Leaf", got)
+	}
+	if got, want := Format(leaf), `{"_tag":"Leaf#1"}`; got != want {
+		t.Errorf("Format: %v, want %v", got, want)
+	}
+	if got, want := hash(leaf), hash(data); got != want || got == hash(other) {
+		t.Errorf("hash: %v, data %v, other %v", got, want, hash(other))
+	}
+	if TagOf(leaf) != "Leaf#1" || TagField(leaf) != "Leaf#1" || TagField(data) != "Leaf#1" || TagField(Rec("_tag", "rec")) != "rec" {
+		t.Errorf("TagOf / TagField failed")
+	}
+
+	// Schema decoding, Schema.arbitrary, and Arbitrary.from_schema build the owned zero-size type.
+	schema := SchemaAdt("Tree", []Variant{{Tag: "Leaf#1", Name: "Leaf"}})
+	fb := rootFiber()
+	decoded, issues := sch(schema).jsonOf().decode(fb, Rec("_tag", "Leaf"))
+	if issues != nil || !isOwnLeaf(decoded) {
+		t.Errorf("schema decode: %#v (issues: %v)", decoded, issues)
+	}
+	encoded, issues := sch(schema).jsonOf().encode(fb, leaf)
+	if issues != nil || recordField(encoded.(*Record), "_tag") != "Leaf" {
+		t.Errorf("schema encode: %#v (issues: %v)", encoded, issues)
+	}
+	validated, issues := sch(schema).validate(fb, leaf)
+	if issues != nil || !isOwnLeaf(validated) {
+		t.Errorf("schema validate: %#v (issues: %v)", validated, issues)
+	}
+	drawn := SchemaArbitrary(schema).(gen)(fb, random(42))
+	if !isOwnLeaf(drawn) {
+		t.Errorf("SchemaArbitrary: got %T (%#v), want ownLeaf", drawn, drawn)
+	}
+	samples := ArbitrarySample(fb, Rec("count", Some(int32(3)), "size", None, "maxDiscards", None, "seed", Some(int32(42))), ArbitrarySchema(schema))
+	for _, sample := range List(samples) {
+		if !isOwnLeaf(sample) {
+			t.Errorf("ArbitraryFromSchema: got %T (%#v), want ownLeaf", sample, sample)
+		}
 	}
 }
 

@@ -111,16 +111,20 @@ type Mark = Low | High Int\n\n\
 scale : BigInt -> BigInt\nlet scale n =\n  match n with\n  | 0n -> 10n\n  | _ -> n * 10n\n\n\
 pick : Bool -> Mark\nlet pick high = if high then High 1 else Low\n\n\
 label : Mark -> String\nlet label mark =\n  match mark with\n  | Low -> \"low\"\n  | High _ -> \"high\"\n\n\
+missing : Bool -> Option Int\nlet missing ok = if ok then Some 1 else None\n\n\
 main : Unit ->{Host.Console; AppError} Unit\n\
-let main () = Platform.stdout_line (label (pick false) ++ BigInt.to_string (scale 2n))\n";
+let main () = Platform.stdout_line (label (pick false) ++ show (missing false) ++ BigInt.to_string (scale 2n))\n";
 
 #[test]
-fn a_bigint_literal_and_a_constructor_without_fields_are_made_once() {
+fn a_bigint_literal_and_a_builtin_nullary_constructor_are_made_once() {
     let go = app(ONCE);
     // `10n` twice is one variable, and with `0n` in the pattern and `2n` three
     assert_eq!(go.matches("flickrt.BigLit(\"10\")").count(), 1, "{go}");
     assert_eq!(go.matches("flickrt.BigLit(").count(), 3, "{go}");
-    assert_eq!(go.matches("flickrt.Nullary(").count(), 1, "{go}");
+    // built-in `None` is made once via `flickrt.Nullary`; program `Low` is a zero-size type
+    assert_eq!(go.matches("flickrt.Nullary(\"None\")").count(), 1, "{go}");
+    assert!(!go.contains("flickrt.Nullary(\"Low#"), "{go}");
+    assert!(go.contains("flickrt.Value(T_App__Low{})"), "{go}");
     // each is made by a package variable, not where the code runs
     let made = |line: &&str| line.contains("flickrt.BigLit(") || line.contains("flickrt.Nullary(");
     for line in go.lines().filter(made) {

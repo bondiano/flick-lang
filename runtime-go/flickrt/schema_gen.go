@@ -152,7 +152,7 @@ func drawVariant(fb *Fiber, r rng, s *Schema, depth int) Value {
 		}
 	}
 	if len(v.Fields) == 0 {
-		return Nullary(v.Tag)
+		return Construct(v.Tag)
 	}
 	fields := make([]Value, len(v.Fields))
 	for i, f := range v.Fields {

@@ -265,9 +265,6 @@ func (b *arbASTs) build(s *Schema, wire bool) *arbAST {
 			}
 			tag := v.Tag
 			members[i] = structNode(tag, fields, func(vs []Value) Value {
-				if len(vs) == 0 {
-					return Nullary(tag)
-				}
 				return Construct(tag, vs...)
 			})
 		}
