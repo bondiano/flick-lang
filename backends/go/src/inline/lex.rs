@@ -244,11 +244,22 @@ impl<'a> Lexer<'a> {
                 return Ok(self.tok(Kind::String, start));
             }
             if b == b'\\' {
+                let esc_start = self.pos;
                 self.pos += 1;
-                if self.peek().is_none() || self.peek() == Some(b'\n') {
+                let Some(ch) = self.src[self.pos..].chars().next() else {
+                    return Err(lex_err(start, self.pos, "unterminated Go string literal"));
+                };
+                if ch == '\n' {
                     return Err(lex_err(start, self.pos, "unterminated Go string literal"));
                 }
-                self.pos += 1;
+                self.pos += ch.len_utf8();
+                if !is_go_escape_start(ch, '"') {
+                    return Err(lex_err(
+                        esc_start,
+                        self.pos,
+                        format!("unknown Go escape sequence `\\{ch}`"),
+                    ));
+                }
                 continue;
             }
             if b == b'\n' {
@@ -291,11 +302,22 @@ impl<'a> Lexer<'a> {
                 return Err(lex_err(start, self.pos, "unterminated Go rune literal"));
             }
             if b == b'\\' {
+                let esc_start = self.pos;
                 self.pos += 1;
-                if self.peek().is_none() || self.peek() == Some(b'\n') {
+                let Some(ch) = self.src[self.pos..].chars().next() else {
+                    return Err(lex_err(start, self.pos, "unterminated Go rune literal"));
+                };
+                if ch == '\n' {
                     return Err(lex_err(start, self.pos, "unterminated Go rune literal"));
                 }
-                self.pos += 1;
+                self.pos += ch.len_utf8();
+                if !is_go_escape_start(ch, '\'') {
+                    return Err(lex_err(
+                        esc_start,
+                        self.pos,
+                        format!("unknown Go escape sequence `\\{ch}`"),
+                    ));
+                }
                 count += 1;
                 continue;
             }
@@ -485,6 +507,14 @@ impl<'a> Lexer<'a> {
         self.pos += len;
         Ok(self.tok(kind, start))
     }
+}
+
+fn is_go_escape_start(ch: char, quote: char) -> bool {
+    ch == quote
+        || matches!(
+            ch,
+            'a' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\\' | 'x' | 'u' | 'U' | '0'..='7'
+        )
 }
 
 fn lex_err(start: usize, end: usize, msg: impl Into<String>) -> LexError {

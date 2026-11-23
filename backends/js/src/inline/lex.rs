@@ -266,14 +266,13 @@ impl<'a> Lexer<'a> {
             }
             if b == b'\\' {
                 self.pos += 1;
-                if let Some(esc) = self.peek() {
-                    if esc == b'\r' && self.peek_at(1) == Some(b'\n') {
-                        self.pos += 2;
-                    } else {
-                        self.pos += 1;
-                    }
-                } else {
+                let Some(ch) = self.src[self.pos..].chars().next() else {
                     return Err(lex_err(start, self.pos, "unterminated string literal"));
+                };
+                if ch == '\r' && self.peek_at(1) == Some(b'\n') {
+                    self.pos += 2;
+                } else {
+                    self.pos += ch.len_utf8();
                 }
                 continue;
             }
@@ -312,10 +311,13 @@ impl<'a> Lexer<'a> {
             }
             if b == b'\\' {
                 self.pos += 1;
-                if self.pos < self.bytes.len() {
-                    self.pos += 1;
-                } else {
+                let Some(ch) = self.src[self.pos..].chars().next() else {
                     return Err(lex_err(start, self.pos, "unterminated template literal"));
+                };
+                if ch == '\r' && self.peek_at(1) == Some(b'\n') {
+                    self.pos += 2;
+                } else {
+                    self.pos += ch.len_utf8();
                 }
                 continue;
             }
@@ -338,15 +340,15 @@ impl<'a> Lexer<'a> {
             }
             if b == b'\\' {
                 self.pos += 1;
-                match self.peek() {
-                    Some(b'\n' | b'\r') | None => {
+                match self.src[self.pos..].chars().next() {
+                    Some('\n' | '\r') | None => {
                         return Err(lex_err(
                             start,
                             self.pos,
                             "unterminated regular expression literal",
                         ));
                     }
-                    Some(_) => self.pos += 1,
+                    Some(ch) => self.pos += ch.len_utf8(),
                 }
                 continue;
             }

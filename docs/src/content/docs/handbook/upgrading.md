@@ -768,7 +768,6 @@ Backend components and `ir`-hook plugins must rebuild against `flick-ir`
 `[0.15.0, 0.16.0)`. Ordinary Flick bindings on `flick/js` and `flick/go`
 require no source changes.
 
-<<<<<<< HEAD
 ## Fixed-width numeric types in IR `0.16.0`
 
 The portable IR moves from `0.15.0` to `0.16.0` to add the fixed-width numeric

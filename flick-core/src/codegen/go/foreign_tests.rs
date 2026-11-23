@@ -213,4 +213,30 @@ mod owner_identity_tests {
             "relocation leaves the host binding unchanged"
         );
     }
+
+    #[test]
+    fn inline_preamble_is_omitted_when_no_inline_binding_is_reached() {
+        let base = "module App exposing (main, unused_cos)\nforeign module inline \"import \\\"math\\\"\\nfunc unusedHelper(x float64) float64 { return math.Cos(x) }\"\nunused_cos : Float -> Float\nforeign pure unused_cos from inline \"func(fb *flickrt.Fiber, d flickrt.Value) flickrt.Value { return unusedHelper(d.(float64)) }\"\n";
+        let unreached = format!("{base}main : Unit -> Unit\nlet main () = ()\n");
+        let go_unreached = super::app_with_foreign(&unreached, &[]);
+        assert!(
+            !go_unreached.contains("import \"math\""),
+            "unreached inline binding must not emit unused preamble import:\n{go_unreached}"
+        );
+        assert!(
+            !go_unreached.contains("unusedHelper"),
+            "unreached inline binding must not emit preamble body:\n{go_unreached}"
+        );
+
+        let reached = format!("{base}main : Unit -> Float\nlet main () = unused_cos 0.0\n");
+        let go_reached = super::app_with_foreign(&reached, &[]);
+        assert!(
+            go_reached.contains("import \"math\""),
+            "reached inline binding must emit preamble import:\n{go_reached}"
+        );
+        assert!(
+            go_reached.contains("unusedHelper"),
+            "reached inline binding must emit preamble body:\n{go_reached}"
+        );
+    }
 }

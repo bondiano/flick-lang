@@ -151,4 +151,21 @@ mod tests {
         let span = Span::new(FileId::new(0), 0, 2);
         assert!(validate_binding("", span, empty).is_some());
     }
+
+    #[test]
+    fn handles_multibyte_utf8_escapes_without_panicking() {
+        for valid in ["\"\\π\"", "`\\π`", "/\\π/"] {
+            let src = format!("\"{}\"", valid.replace('\\', "\\\\").replace('"', "\\\""));
+            assert_eq!(
+                validate_binding(valid, full_span(&src), &src),
+                None,
+                "{valid}"
+            );
+        }
+        for invalid in ["\"\\π", "`\\π", "/\\π"] {
+            let src = format!("\"{}\"", invalid.replace('\\', "\\\\").replace('"', "\\\""));
+            let diag = validate_binding(invalid, full_span(&src), &src).expect("unterminated");
+            assert_eq!(diag.code, "F011");
+        }
+    }
 }

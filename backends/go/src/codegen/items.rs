@@ -3,7 +3,7 @@
 
 use std::iter;
 
-use flick_ir::{Constructor, Dict, InstanceInfo, Rep, STRUCTURAL, default_method};
+use flick_ir::{Binding, Constructor, Dict, InstanceInfo, Rep, STRUCTURAL, default_method};
 use flick_pretty::{Document, docvec};
 
 use super::arith::Native;
@@ -25,7 +25,17 @@ impl<'a> Gen<'a> {
     /// The Go file of `module` with the items at `order`.
     pub(super) fn module(&mut self, module: &Module, order: &[usize]) -> String {
         let a = self.a;
-        let (extra_imports, mut decls) = self.preambles(&module.preambles);
+        let has_inline = order.iter().any(|&i| {
+            matches!(
+                module.items[i].kind,
+                ItemKind::Foreign(ref f) if matches!(f.binding, Binding::Inline(_))
+            )
+        });
+        let (extra_imports, mut decls) = if has_inline {
+            self.preambles(&module.preambles)
+        } else {
+            (Vec::new(), Vec::new())
+        };
         let mut init = Vec::new();
         (self.groups, self.grouped) = loops::groups(self.module, &module.items);
         // every member of a group reaches the others: all are reached or none

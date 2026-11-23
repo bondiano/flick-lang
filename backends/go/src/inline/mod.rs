@@ -178,4 +178,76 @@ mod tests {
             validate_preamble("func f() {}\nimport \"math\"", span2, src2).expect("late import");
         assert_eq!(diag2.code, "F011");
     }
+
+    #[test]
+    fn distinguishes_named_slice_array_params_and_fields_from_generic_types() {
+        let preamble = "\
+type Box[T any] struct {
+\tv T
+}
+
+type Bag struct {
+\tdata   []byte
+\tfixed  [4]byte
+\ttagged []byte \"json:\\\"tagged\\\"\"
+\tBox[int]
+\tBox[[]byte] \"tag\"
+}
+
+func helper(xs []byte) int {
+\treturn len(xs)
+}
+
+func sum(items []flickrt.Value) flickrt.Value {
+\treturn items[0]
+}
+
+func fixed(buf [4]byte, mat [][]int, fns []func(int) int) byte {
+\t_ = mat
+\t_ = fns
+\treturn buf[0]
+}
+
+func unnamed(Box[int], Box[[]byte]) int {
+\treturn 0
+}
+";
+        let src = format!("\"\"\"\n{preamble}\"\"\"");
+        let span = full_span(&src);
+        assert_eq!(validate_preamble(preamble, span, &src), None);
+
+        let expr =
+            "func(fb *flickrt.Fiber, items []flickrt.Value) flickrt.Value { return items[0] }";
+        let expr_src = format!("\"{expr}\"");
+        assert_eq!(
+            validate_binding(expr, full_span(&expr_src), &expr_src),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_multibyte_utf8_escapes_in_runes_and_strings_without_panicking() {
+        let rune_code = "'\\π'";
+        let rune_src = "\"'\\\\π'\"";
+        let diag = validate_binding(rune_code, full_span(rune_src), rune_src)
+            .expect("invalid rune escape");
+        assert_eq!(diag.code, "F011");
+        assert!(diag.message.contains("escape"), "{}", diag.message);
+
+        let str_code = "\"\\π\"";
+        let str_src = "\"\\\"\\\\π\\\"\"";
+        let diag =
+            validate_binding(str_code, full_span(str_src), str_src).expect("invalid string escape");
+        assert_eq!(diag.code, "F011");
+        assert!(diag.message.contains("escape"), "{}", diag.message);
+
+        for valid in ["'π'", "'\\n'", "'\\''", "'\\u03c0'", "\"π\\n\\\"ok\\\"\""] {
+            let src = format!("\"{}\"", valid.replace('\\', "\\\\").replace('"', "\\\""));
+            assert_eq!(
+                validate_binding(valid, full_span(&src), &src),
+                None,
+                "{valid}"
+            );
+        }
+    }
 }

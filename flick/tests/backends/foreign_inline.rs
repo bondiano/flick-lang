@@ -370,3 +370,85 @@ let main () = ()
     }
     fs::remove_dir_all(&root).expect("cleanup");
 }
+
+#[test]
+#[ignore = "requires Go"]
+fn inline_go_unreached_binding_skips_preamble_imports() {
+    let config = format!("{CONFIG}[build]\ntarget = \"go\"\n[tools]\n\"flick/go\" = [\"go\"]\n");
+    let source = "\
+module App exposing (main, unused_cos)
+
+foreign module inline \"\"\"
+  import \"math\"
+
+  func unusedHelper(x float64) float64 {
+    return math.Cos(x)
+  }
+  \"\"\"
+
+unused_cos : Float -> Float
+foreign pure unused_cos from inline \"func(fb *flickrt.Fiber, d flickrt.Value) flickrt.Value { return unusedHelper(d.(float64)) }\"
+
+main : Unit ->{Host.Console} Unit
+let main () = Platform.stdout_line \"ok\"
+";
+    let root = project(
+        "inline_go_unreached_preamble",
+        &[("flick.toml", &config), ("src/App.fl", source)],
+    );
+    let built = flick_in(&root, &["build", "--offline"]);
+    assert!(
+        built.status.success(),
+        "build failed: {}",
+        String::from_utf8_lossy(&built.stderr)
+    );
+    let run = flick_in(&root, &["run", "--offline"]);
+    assert!(
+        run.status.success(),
+        "run failed: {}",
+        String::from_utf8_lossy(&run.stderr)
+    );
+    assert_eq!(String::from_utf8(run.stdout).expect("UTF-8"), "ok\n");
+    fs::remove_dir_all(&root).expect("cleanup");
+}
+
+#[test]
+fn inspect_iface_skips_js_inline_validation_for_uncached_custom_backend() {
+    let config = pinned().replace("test/literal", "custom/nonjs");
+    let source = "\
+module App exposing (main, custom)
+
+foreign module inline \"not valid js (((\"
+
+custom : Int -> Int
+foreign pure custom from inline \"also not valid js (((\"
+  custom_adapter
+
+main : Unit -> Unit
+let main () = ()
+";
+    let root = project(
+        "inline_uncached_custom_iface",
+        &[("flick.toml", &config), ("src/App.fl", source)],
+    );
+    let out = flick_in(
+        &root,
+        &[
+            "inspect",
+            "App",
+            "--emit",
+            "iface",
+            "--offline",
+            "--diagnostics",
+            "json",
+        ],
+    );
+    assert!(
+        out.status.success(),
+        "inspect --emit iface failed with false-positive backend validation: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8(out.stdout).expect("UTF-8");
+    assert!(stdout.contains("custom"), "{stdout}");
+    fs::remove_dir_all(&root).expect("cleanup");
+}

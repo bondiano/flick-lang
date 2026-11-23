@@ -314,12 +314,13 @@ impl<'a> Parser<'a> {
                 self.type_expr()?;
             } else {
                 let first_is_ident = self.at(Kind::Ident) && !is_go_keyword(self.cur().text);
-                if first_is_ident
-                    && !matches!(
-                        self.peek(1).kind,
-                        Kind::Comma | Kind::RParen | Kind::Dot | Kind::LBracket
-                    )
-                {
+                let is_named = first_is_ident
+                    && match self.peek(1).kind {
+                        Kind::Comma | Kind::RParen | Kind::Dot => false,
+                        Kind::LBracket => self.bracketed_is_named_type(),
+                        _ => true,
+                    };
+                if is_named {
                     self.bump(); // param name
                     if allow_variadic {
                         let _ = self.eat(Kind::Ellipsis);
@@ -407,17 +408,44 @@ impl<'a> Parser<'a> {
     }
 
     fn starts_type(&self) -> bool {
-        match self.cur().kind {
+        self.starts_type_at(self.pos)
+    }
+
+    fn starts_type_at(&self, idx: usize) -> bool {
+        let tok = &self.tokens[idx.min(self.tokens.len() - 1)];
+        match tok.kind {
             Kind::Star | Kind::LBracket | Kind::Arrow => true,
             Kind::Ident => {
-                !is_go_keyword(self.cur().text)
-                    || matches!(
-                        self.cur().text,
-                        "func" | "struct" | "interface" | "map" | "chan"
-                    )
+                !is_go_keyword(tok.text)
+                    || matches!(tok.text, "func" | "struct" | "interface" | "map" | "chan")
             }
             _ => false,
         }
+    }
+
+    /// Distinguishes a named slice/array parameter or field (`ident []T`,
+    /// `ident [N]T`, `ident [...]T`) from an unnamed generic instantiation
+    /// (`Box[T]`) by checking whether a type follows the matching `]`.
+    fn bracketed_is_named_type(&self) -> bool {
+        let mut idx = self.pos + 1;
+        let mut depth = 0usize;
+        while idx < self.tokens.len() {
+            match self.tokens[idx].kind {
+                Kind::LBracket => depth += 1,
+                Kind::RBracket => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        let after = (idx + 1).min(self.tokens.len() - 1);
+                        return self.tokens[after].kind == Kind::LParen
+                            || self.starts_type_at(after);
+                    }
+                }
+                Kind::Eof => return false,
+                _ => {}
+            }
+            idx += 1;
+        }
+        false
     }
 
     pub(super) fn type_expr(&mut self) -> Result<(), ParseError> {
@@ -535,12 +563,13 @@ impl<'a> Parser<'a> {
             }
             return self.type_expr();
         }
-        if first_ident
-            && !matches!(
-                self.peek(1).kind,
-                Kind::Dot | Kind::LBracket | Kind::Semi | Kind::RBrace | Kind::String
-            )
-        {
+        let is_named = first_ident
+            && match self.peek(1).kind {
+                Kind::Dot | Kind::Semi | Kind::RBrace | Kind::String => false,
+                Kind::LBracket => self.bracketed_is_named_type(),
+                _ => true,
+            };
+        if is_named {
             self.bump();
             return self.type_expr();
         }
