@@ -1,0 +1,234 @@
+# Temporary acceptance measurements for #876. Remove after recording the results.
+name: Playground 876 browser A/B
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playground-876-bench-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  chromium:
+    # Never run on unrelated PRs or use a PR merge ref as the candidate.
+    if: ${{ github.head_ref == 'codex/876-playground-first-run' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 75
+    env:
+      FLICK_876_BASELINE_SHA: 1918f8919368817bac94f8c84244607d68f28557
+      FLICK_876_CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}
+      FLICK_876_BASELINE_DIR: ${{ runner.temp }}/flick-876-before
+      FLICK_876_ARTIFACT_DIR: ${{ runner.temp }}/flick-876-browser
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target/issue-876
+      CARGO_BUILD_JOBS: "2"
+      CARGO_INCREMENTAL: "0"
+      ENGINE: chromium
+      FIXTURES: hello,classes,sales-report
+      SAMPLES: "12"
+      WARMUP: "3"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: issue-876-browser
+          workspaces: . -> target/issue-876
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+      - uses: actions/cache@v6
+        with:
+          path: target/tools
+          key: tools-${{ runner.os }}-wasm-bindgen-0.2.130
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-1.64.1
+      - name: Install browser and binding tools
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm -C docs exec playwright install chromium
+          cargo install wasm-bindgen-cli --version 0.2.130 --locked --root target/tools
+      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Install the existing pinned Binaryen build
+        run: |
+          flick_876_binaryen=$(nix build --no-link --print-out-paths .#binaryen)
+          echo "$flick_876_binaryen/bin" >> "$GITHUB_PATH"
+      - name: Pin both source revisions and record the environment
+        run: |
+          test "$(git rev-parse HEAD)" = "$FLICK_876_CANDIDATE_SHA"
+          git fetch --no-tags --depth=1 origin "$FLICK_876_BASELINE_SHA"
+          git worktree add --detach "$FLICK_876_BASELINE_DIR" "$FLICK_876_BASELINE_SHA"
+          cmp rust-toolchain.toml "$FLICK_876_BASELINE_DIR/rust-toolchain.toml"
+          cmp .tool-versions "$FLICK_876_BASELINE_DIR/.tool-versions"
+          cmp Cargo.lock "$FLICK_876_BASELINE_DIR/Cargo.lock"
+          cmp flake.lock "$FLICK_876_BASELINE_DIR/flake.lock"
+          cmp tools/wasm-dedup/index.mjs "$FLICK_876_BASELINE_DIR/tools/wasm-dedup/index.mjs"
+          mkdir -p "$FLICK_876_ARTIFACT_DIR/reports"
+          {
+            rustc --version --verbose
+            cargo --version
+            node --version
+            pnpm --version
+            wasm-opt --version
+            target/tools/bin/wasm-bindgen --version
+            git diff --stat "$FLICK_876_BASELINE_SHA" HEAD
+          } | tee "$FLICK_876_ARTIFACT_DIR/reports/environment.txt"
+      - name: Build equivalent production WASM variants
+        env:
+          CARGO_PROFILE_RELEASE_OPT_LEVEL: z
+          CARGO_PROFILE_RELEASE_LTO: fat
+          CARGO_PROFILE_RELEASE_STRIP: debuginfo
+        run: |
+          build_variant() {
+            local checkout="$1"
+            local variant="$2"
+            (
+              cd "$checkout"
+              cargo build --locked -p flick-wasm --target wasm32-unknown-unknown --release
+              node tools/wasm-dedup/index.mjs "$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/flick_wasm.wasm"
+            )
+            # The same raw-byte gate as just wasm; never relax it for this probe.
+            test "$(wc -c < "$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/flick_wasm.wasm")" -le 4600000
+            "$GITHUB_WORKSPACE/target/tools/bin/wasm-bindgen" \
+              --target web --out-name flick_wasm \
+              --out-dir "$FLICK_876_ARTIFACT_DIR/$variant" \
+              "$CARGO_TARGET_DIR/wasm32-unknown-unknown/release/flick_wasm.wasm"
+          }
+          build_variant "$FLICK_876_BASELINE_DIR" before
+          build_variant "$GITHUB_WORKSPACE" after
+      - name: Measure real initialized Chromium workers in A-B then B-A order
+        run: |
+          measure_variant() {
+            local variant="$1"
+            local round="$2"
+            local revision
+            local worker
+            if [ "$variant" = before ]; then
+              revision="$FLICK_876_BASELINE_SHA"
+              worker="$FLICK_876_BASELINE_DIR/docs/src/playground/compiler.worker.ts"
+            else
+              revision="$FLICK_876_CANDIDATE_SHA"
+              worker="$GITHUB_WORKSPACE/docs/src/playground/compiler.worker.ts"
+            fi
+            BUILD_REVISION="$revision" WORKER_SOURCE="$worker" \
+              node tools/playground-bench/index.mjs \
+                "$FLICK_876_ARTIFACT_DIR/$variant" \
+                "$FLICK_876_ARTIFACT_DIR/reports/$variant-$round.json"
+          }
+          # Both builds are complete; each harness invocation creates fresh
+          # initialized workers and excludes its warm-up edits from timings.
+          measure_variant before 1
+          measure_variant after 1
+          measure_variant after 2
+          measure_variant before 2
+      - name: Verify output parity and print the measured JSON
+        run: |
+          node --input-type=module <<'JS'
+          import assert from "node:assert/strict";
+          import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+          import path from "node:path";
+          const directory = path.join(process.env.FLICK_876_ARTIFACT_DIR, "reports");
+          const labels = ["before-1", "after-1", "after-2", "before-2"];
+          const reports = labels.map((label) => JSON.parse(readFileSync(path.join(directory, label + ".json"), "utf8")));
+          const reference = reports[0];
+          for (const [i, report] of reports.entries()) {
+            assert.equal(report.host.engine, "chromium");
+            assert.ok(report.host.chromium, "real Chromium version recorded");
+            assert.equal(report.samples, Number(process.env.SAMPLES));
+            assert.equal(report.warmup, Number(process.env.WARMUP));
+            assert.equal(report.harnessRevision, process.env.FLICK_876_CANDIDATE_SHA);
+            assert.equal(report.revision, labels[i].startsWith("before") ? process.env.FLICK_876_BASELINE_SHA : process.env.FLICK_876_CANDIDATE_SHA);
+            assert.deepEqual(report.fixtures, reference.fixtures);
+            assert.deepEqual(report.validation, reference.validation, "complete JS/declarations/files/entry/diagnostics payloads agree");
+            assert.equal(report.validation.length, 12, "six revisions in both profiles were verified");
+            assert.deepEqual(report.runs.map((run) => [run.fixture, run.scenario]), reference.runs.map((run) => [run.fixture, run.scenario]));
+            console.log(JSON.stringify({ report: labels[i], ...report, runs: report.runs.map(({ observations, ...summary }) => summary) }));
+          }
+          assert.deepEqual(reports[0].wasm, reports[3].wasm);
+          assert.deepEqual(reports[1].wasm, reports[2].wasm);
+          assert.equal(reports[0].workerSha256, reports[3].workerSha256);
+          assert.equal(reports[1].workerSha256, reports[2].workerSha256);
+          const distribution = (values) => {
+            const sorted = [...values].sort((a, b) => a - b);
+            const at = (p) => sorted[Math.ceil(sorted.length * p) - 1];
+            return { samples: sorted.length, min: sorted[0], p50: at(0.5), p95: at(0.95), max: sorted.at(-1) };
+          };
+          const aggregate = (indexes, runIndex) => {
+            const runs = indexes.map((i) => reports[i].runs[runIndex]);
+            const observations = runs.flatMap((run) => run.observations);
+            return {
+              workerMs: distribution(observations.map((sample) => sample.workerMs)),
+              roundTripMs: distribution(observations.map((sample) => sample.roundTripMs)),
+              peakLinearMemoryBytes: Math.max(...runs.map((run) => run.peakLinearMemoryBytes)),
+            };
+          };
+          const comparison = {
+            baseline: process.env.FLICK_876_BASELINE_SHA,
+            candidate: process.env.FLICK_876_CANDIDATE_SHA,
+            order: labels,
+            host: reference.host,
+            warmupPerSession: Number(process.env.WARMUP),
+            samplesPerSession: Number(process.env.SAMPLES),
+            fixtures: reference.fixtures,
+            validation: reference.validation,
+            wasm: {
+              before: reports[0].wasm,
+              after: reports[1].wasm,
+              rawByteDelta: reports[1].wasm.rawBytes - reports[0].wasm.rawBytes,
+              gzipByteDelta: reports[1].wasm.gzipBytes - reports[0].wasm.gzipBytes,
+            },
+            runs: reference.runs.map((run, index) => ({
+              fixture: run.fixture, scenario: run.scenario,
+              before: aggregate([0, 3], index), after: aggregate([1, 2], index),
+            })),
+          };
+          const json = JSON.stringify(comparison, null, 2);
+          writeFileSync(path.join(directory, "comparison.json"), json + "\n");
+          console.log(json);
+          const rows = comparison.runs.map((run) =>
+            "| " + [run.fixture, run.scenario,
+              run.before.workerMs.p50.toFixed(2), run.after.workerMs.p50.toFixed(2),
+              run.before.workerMs.p95.toFixed(2), run.after.workerMs.p95.toFixed(2),
+              (run.before.peakLinearMemoryBytes / 1048576).toFixed(2),
+              (run.after.peakLinearMemoryBytes / 1048576).toFixed(2)].join(" | ") + " |");
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, [
+            "## Issue #876: initialized Chromium workers",
+            "",
+            "Baseline: " + comparison.baseline,
+            "",
+            "Candidate: " + comparison.candidate,
+            "",
+            "Order A-B/B-A; 3 warm-up edits and 12 measured edits per independent session; 24 measured observations per fixture/scenario/variant. Full samples are in the artifact.",
+            "",
+            "| Fixture | Scenario | Before p50 ms | After p50 ms | Before p95 ms | After p95 ms | Before peak MiB | After peak MiB |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ...rows,
+            "",
+            "WASM raw-byte delta: " + comparison.wasm.rawByteDelta + "; gzip-byte delta: " + comparison.wasm.gzipByteDelta + ".",
+            "",
+            "All 12 output-payload digests match across both builds and repeats.",
+            "",
+          ].join("\n"));
+          JS
+      - name: Preserve raw observations and reproduction metadata
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playground-876-browser-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/flick-876-browser/reports
+          retention-days: 14
+          if-no-files-found: warn

@@ -95,7 +95,7 @@ export type Result = string | Array<Diagnostic> | Generated | Built | Hover | nu
 export type Reply = { readonly id: number; readonly result: Result } | { readonly error: string };
 
 let ready: Promise<string> | undefined;
-// one analysis of each edit serves its check, the emits of either profile and a run
+// Checks stay lazy. A direct emit prepares typed IR once for both profiles and a run.
 let session: Session | undefined;
 
 const analysed = (source: string): Array<Event> => {
@@ -120,8 +120,8 @@ const diagnostics = (events: ReadonlyArray<Event>): Array<Diagnostic> => events.
 }));
 
 const emitted = (source: string, profile: string, declarations = false): Emitted => {
-  analysed(source);
-  const current = session as Session;
+  const current = session ??= new Session();
+  current.prepare_emit(source);
   return JSON.parse(declarations ? current.emit_declarations(profile) : current.emit(profile)) as Emitted;
 };
 
