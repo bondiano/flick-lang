@@ -53,9 +53,7 @@ impl Server {
             return false;
         };
         let context = Context::of(&self.docs, &path);
-        self.pending
-            .keys()
-            .any(|queued| Context::of(&self.docs, queued) == context)
+        self.pending.contains_key(&context)
     }
 
     pub(super) fn defer(&mut self, id: Value, method: &str, params: Value) {

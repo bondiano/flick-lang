@@ -38,6 +38,13 @@ use snapshot::{BUILTIN_DIR, builtin_index, canonical, overlay};
 pub use snapshot::{Caches, Context, Snapshot, analyze};
 use worker::Worker;
 
+/// Changes in other contexts can still touch an input of an in-flight analysis.
+/// Its source map is available when it finishes.
+struct Pending {
+    generation: u64,
+    changed_inputs: HashSet<PathBuf>,
+}
+
 pub struct Server {
     docs: HashMap<PathBuf, String>,
     /// The analysis of each context since the last change of a document it
@@ -57,8 +64,8 @@ pub struct Server {
     requests: u64,
     /// The thread that analyzes document changes off the message loop.
     worker: Worker,
-    /// The newest revision asked for each document.
-    pending: HashMap<PathBuf, u64>,
+    /// The newest analysis asked for each independently published context.
+    pending: HashMap<Context, Pending>,
     /// Counts revisions, so a slow analysis of an old text is dropped.
     generation: u64,
     /// The requests held until the analysis of their document is published.
@@ -216,8 +223,7 @@ impl Server {
             }
             return;
         }
-        // whatever read this document reads it anew
-        self.snapshots.retain(|_, s| s.file(&path).is_none());
+
         match method {
             "textDocument/didOpen" => {
                 let text = params["textDocument"]["text"]
@@ -237,16 +243,12 @@ impl Server {
                 }
             }
             "textDocument/didClose" => {
+                self.input_changed(&path);
                 let context = Context::of(&self.docs, &path);
                 self.docs.remove(&path);
                 // the closed text is gone: analyze an open document of its
                 // project instead, so the disk view is what gets published
-                let open = self
-                    .docs
-                    .keys()
-                    .find(|p| Context::of(&self.docs, p) == context)
-                    .cloned();
-                match open {
+                match self.open_in(&context) {
                     Some(open) => self.refresh(&open),
                     None => self.clear(&context),
                 }
@@ -255,7 +257,22 @@ impl Server {
             "textDocument/didSave" => {}
             _ => return,
         }
+        self.input_changed(&path);
         self.refresh(&path);
+    }
+
+    fn open_in(&self, context: &Context) -> Option<PathBuf> {
+        self.docs
+            .keys()
+            .find(|p| Context::of(&self.docs, p) == *context)
+            .cloned()
+    }
+
+    fn input_changed(&mut self, path: &Path) {
+        self.snapshots.retain(|_, snapshot| !snapshot.reads(path));
+        for pending in self.pending.values_mut() {
+            pending.changed_inputs.insert(path.to_path_buf());
+        }
     }
 
     fn clear(&mut self, context: &Context) {
@@ -286,8 +303,7 @@ impl Server {
             Context::Builtin(_) => {}
         }
         // analyses still running for it describe a text nobody sees now
-        self.pending
-            .retain(|path, _| Context::of(&self.docs, path) != *context);
+        self.pending.remove(context);
         if let Some(files) = self.published.remove(context) {
             let others = self.release(files);
             for open in others {
@@ -307,12 +323,7 @@ impl Server {
                 .iter()
                 .find(|(_, published)| published.contains(&file))
                 .map(|(context, _)| context.clone());
-            let open = owner.and_then(|owner| {
-                self.docs
-                    .keys()
-                    .find(|doc| Context::of(&self.docs, doc) == owner)
-                    .cloned()
-            });
+            let open = owner.and_then(|owner| self.open_in(&owner));
             match open {
                 Some(open) => others.push(open),
                 None => self.send(&publish(&file, &[])),
@@ -323,26 +334,61 @@ impl Server {
         others
     }
 
-    /// Re-analyzes and publishes this context's diagnostics.
     /// Analyzes the document's context in the background and publishes the
     /// result when the worker finishes, unless a newer revision replaced it.
     fn refresh(&mut self, path: &Path) {
         self.generation += 1;
         let generation = self.generation;
-        self.pending.insert(path.to_path_buf(), generation);
+        let context = Context::of(&self.docs, path);
+        self.pending.insert(
+            context.clone(),
+            Pending {
+                generation,
+                changed_inputs: HashSet::new(),
+            },
+        );
         self.worker.submit(worker::Job {
             path: path.to_path_buf(),
+            context,
             docs: self.docs.clone(),
             generation,
         });
     }
 
-    /// Publishes a finished analysis if it is still the newest of its document.
-    fn publish(&mut self, path: &Path, generation: u64, snapshot: Snapshot) {
-        if self.pending.get(path) != Some(&generation) {
+    /// Consumes a completion only for the job still responsible for its context.
+    fn publish(&mut self, done: worker::Done) {
+        let Some(pending) = self.pending.get(&done.context) else {
+            return;
+        };
+        if pending.generation != done.generation {
             return;
         }
-        self.pending.remove(path);
+        let snapshot = done.snapshot;
+        let current = Context::of(&self.docs, &done.path);
+        let stale = current != done.context
+            || snapshot.context != done.context
+            || pending
+                .changed_inputs
+                .iter()
+                .any(|path| snapshot.reads(path));
+        self.pending.remove(&done.context);
+        if stale {
+            // A new manifest may have moved this document, or another project
+            // edited a dependency while we were discovering the inputs.
+            if current != done.context
+                && let Some(open) = self.open_in(&done.context)
+            {
+                self.refresh(&open);
+            }
+            if !self.pending.contains_key(&current) && self.docs.contains_key(&done.path) {
+                self.refresh(&done.path);
+            }
+            return;
+        }
+        self.publish_snapshot(&done.path, snapshot);
+    }
+
+    fn publish_snapshot(&mut self, path: &Path, snapshot: Snapshot) {
         self.register_loaded(snapshot.analysis.modules.iter().map(|m| m.path.as_path()));
         let mut by_file: HashMap<PathBuf, Vec<&Diagnostic>> = HashMap::new();
         for d in &snapshot.analysis.diagnostics {
@@ -406,12 +452,7 @@ impl Server {
         if let Context::Project(dir) = &context {
             for member in members::dependents(&self.docs, dir) {
                 let member = Context::Project(canonical(&member));
-                let open = self
-                    .docs
-                    .keys()
-                    .find(|doc| Context::of(&self.docs, doc) == member)
-                    .cloned();
-                if let Some(open) = open {
+                if let Some(open) = self.open_in(&member) {
                     self.refresh(&open);
                 }
             }
@@ -421,7 +462,7 @@ impl Server {
     /// Publishes the analyses that finished and answers the requests they held.
     fn poll(&mut self) {
         while let Some(done) = self.worker.try_recv() {
-            self.publish(&done.path, done.generation, done.snapshot);
+            self.publish(done);
         }
         self.resume();
     }
@@ -430,7 +471,7 @@ impl Server {
     fn settle(&mut self) {
         while !self.pending.is_empty() {
             match self.worker.recv_timeout(Duration::from_secs(30)) {
-                Some(done) => self.publish(&done.path, done.generation, done.snapshot),
+                Some(done) => self.publish(done),
                 None => break,
             }
         }
@@ -445,6 +486,7 @@ impl Server {
             let Some(path) = change["uri"].as_str().and_then(protocol::path_of) else {
                 continue;
             };
+            self.input_changed(&path);
             manifest |= path.file_name() == Some(OsStr::new(project::CONFIG_FILE));
             contexts.insert(Context::of(&self.docs, &path));
         }
@@ -461,7 +503,7 @@ impl Server {
                 self.snapshots.remove(context);
             }
             self.pending
-                .retain(|path, _| !contexts.contains(&Context::of(&self.docs, path)));
+                .retain(|context, _| !contexts.contains(context));
         }
         let open: Vec<PathBuf> = self.docs.keys().cloned().collect();
         for path in open {

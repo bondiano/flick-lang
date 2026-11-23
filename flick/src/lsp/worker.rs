@@ -1,10 +1,10 @@
 //! The analysis worker: document changes are analyzed off the message loop,
 //! so a long analysis never holds up a request the editor sends meanwhile.
 //!
-//! A change is debounced for [`DEBOUNCE`] and only the last text of each
-//! document in that window is analyzed. Each job carries a generation; the
+//! A change is debounced for [`DEBOUNCE`] and only the last job of each
+//! context in that window is analyzed. Each job carries a generation; the
 //! server publishes a result only when it is still the latest one asked for
-//! its document, so a slow analysis of an old revision is cancelled in
+//! its context, so a slow analysis of an old revision is cancelled in
 //! effect and never overwrites newer diagnostics.
 
 use std::collections::{HashMap, HashSet};
@@ -17,12 +17,13 @@ use std::time::{Duration, Instant};
 
 use super::{Caches, Context, Snapshot, analyze};
 
-/// How long changes to the same document are collected before analyzing.
+/// How long changes to the same context are collected before analyzing.
 const DEBOUNCE: Duration = Duration::from_millis(15);
 
 /// One revision of one document to analyze, over the open buffers.
 pub(super) struct Job {
     pub path: PathBuf,
+    pub context: Context,
     pub docs: HashMap<PathBuf, String>,
     pub generation: u64,
 }
@@ -30,6 +31,7 @@ pub(super) struct Job {
 /// An analysis of one revision.
 pub(super) struct Done {
     pub path: PathBuf,
+    pub context: Context,
     pub generation: u64,
     pub snapshot: Snapshot,
 }
@@ -69,7 +71,7 @@ impl Worker {
         Worker { tasks, done, len }
     }
 
-    /// Queues a revision; the worker analyzes the last one queued per path.
+    /// Queues a revision; the worker analyzes the last one queued per context.
     pub fn submit(&self, job: Job) {
         let _ = self.tasks.send(Task::Analyze(job));
     }
@@ -172,6 +174,7 @@ fn run(tasks: Receiver<Task>, done: Sender<Done>, len: Arc<AtomicUsize>) {
             len.store(caches.len(), Ordering::Relaxed);
             let finished = Done {
                 path: job.path,
+                context: job.context,
                 generation: job.generation,
                 snapshot,
             };
@@ -182,9 +185,12 @@ fn run(tasks: Receiver<Task>, done: Sender<Done>, len: Arc<AtomicUsize>) {
     }
 }
 
-/// Queues `job` last: a newer revision of a document supersedes the queued one.
+/// Queues `job` last: a newer revision of a context supersedes the queued one.
 fn queue(queued: &mut Vec<Job>, job: Job) {
-    if let Some(index) = queued.iter().position(|queued| queued.path == job.path) {
+    if let Some(index) = queued
+        .iter()
+        .position(|queued| queued.context == job.context)
+    {
         queued.remove(index);
     }
     queued.push(job);
@@ -203,20 +209,21 @@ fn clear(caches: &mut Caches, context: Option<Context>) {
 mod tests {
     use super::*;
 
-    fn job(path: &str, generation: u64) -> Job {
+    fn job(path: &str, project: &str, generation: u64) -> Job {
         Job {
             path: PathBuf::from(path),
+            context: Context::Project(PathBuf::from(project)),
             docs: HashMap::new(),
             generation,
         }
     }
 
     #[test]
-    fn a_newer_revision_of_a_document_supersedes_the_queued_one() {
+    fn a_sibling_edit_supersedes_the_queued_project_but_keeps_another_project() {
         let mut queued = Vec::new();
-        queue(&mut queued, job("a", 1));
-        queue(&mut queued, job("b", 1));
-        queue(&mut queued, job("a", 2));
+        queue(&mut queued, job("a", "project", 1));
+        queue(&mut queued, job("b", "other", 1));
+        queue(&mut queued, job("c", "project", 2));
 
         let order: Vec<_> = queued
             .iter()
@@ -224,8 +231,8 @@ mod tests {
             .collect();
         assert_eq!(
             order,
-            [("b".to_owned(), 1), ("a".to_owned(), 2)],
-            "a burst of changes analyzes the last text of each document once"
+            [("b".to_owned(), 1), ("c".to_owned(), 2)],
+            "a burst of changes analyzes the last overlay of each project once"
         );
     }
 }
