@@ -218,3 +218,76 @@ fn literal_backend_enforces_in_place_step_contract_end_to_end() {
 
     fs::remove_dir_all(root).expect("cleanup");
 }
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn literal_backend_optional_pack_command_emits_ecosystem_artifact_alongside_source_tarball() {
+    let root = setup_literal(
+        "backend_literal_pack",
+        "[package]\nname = \"litpkg\"\nversion = \"0.4.0\"\n\n[target.literal]\ndialect = \"beta\"\n",
+        &[(
+            "literal-pack.json",
+            "{\"name\":\"litpkg\",\"version\":\"0.4.0\"}\n",
+        )],
+    );
+
+    // 1. Both the Flick source tarball (stdout) and test/literal's `.literal-pkg` are written.
+    let packed = flick_in(&root, &["pack", "--out-dir", "artifacts", "--offline"]);
+    assert_eq!(packed.status.code(), Some(0), "{packed:?}");
+    let out = stdout(&packed);
+    let (sha, tarball) = out.trim().split_once("  ").expect("sha and tarball path");
+    assert_eq!(sha.len(), 64, "{out}");
+    assert!(
+        Path::new(tarball).is_file() && tarball.ends_with("litpkg-0.4.0.tgz"),
+        "{out}"
+    );
+    let pkg_path = root.join("artifacts/litpkg-0.4.0.literal-pkg");
+    assert!(pkg_path.is_file(), "expected {}", pkg_path.display());
+    let payload: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&pkg_path).expect("literal pkg")).expect("json");
+    assert_eq!(payload["kind"], "app");
+    assert_eq!(payload["has_package"], true);
+    let entries = payload["entries"].as_array().expect("entries");
+    assert!(entries.iter().any(|e| e == "main"), "{payload}");
+    let runners = payload["runners"].as_array().expect("runners");
+    assert!(
+        runners.iter().any(|r| r == "main=invoke-main.mjs"),
+        "expected backend-supplied launch path, got: {payload}"
+    );
+    let options = payload["options"].as_array().expect("options");
+    assert!(
+        options.iter().any(|o| o == "dialect=beta"),
+        "expected resolved target option, got: {payload}"
+    );
+
+    // 2. Without `literal-pack.json`, `has-package = true` produces only the Flick source tarball.
+    fs::remove_file(root.join("literal-pack.json")).expect("remove pack manifest");
+    let source_only = flick_in(
+        &root,
+        &["pack", "--out-dir", "artifacts_source", "--offline"],
+    );
+    assert_eq!(source_only.status.code(), Some(0), "{source_only:?}");
+    assert!(root.join("artifacts_source/litpkg-0.4.0.tgz").is_file());
+    assert!(
+        !root
+            .join("artifacts_source/litpkg-0.4.0.literal-pkg")
+            .exists()
+    );
+
+    // 3. A backend `pack` plan writing outside `.flick/pack` is rejected with FLICK-P055 before touching out_dir.
+    fs::write(root.join("literal-pack.json"), "{\"escape\":true}\n").expect("escape manifest");
+    let escaped = flick_in(
+        &root,
+        &["pack", "--out-dir", "artifacts_escape", "--offline"],
+    );
+    assert_eq!(escaped.status.code(), Some(1), "{escaped:?}");
+    assert!(
+        stderr(&escaped).contains("FLICK-P055"),
+        "{}",
+        stderr(&escaped)
+    );
+    assert!(!root.join("artifacts_escape").exists());
+    assert!(!root.join("escaped.literal-pkg").exists());
+
+    fs::remove_dir_all(root).expect("cleanup");
+}

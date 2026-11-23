@@ -54,7 +54,7 @@ max-params = 5
 | `project.runner` | the module that starts each entry without a runner of its own: it exports `type alias Main`, the type `main` must have (`FLICK-P026` otherwise), and `run`, which takes `main` and whose result the runner exports as `default`; built in are `"Runner.Node"`, `"Runner.Browser"` and `"Runner.Cloudflare"`, a Worker whose `fetch` gives `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` the request and the context (`wait_until`), and provides the bindings as the service `Env` (`Runner.Cloudflare.var`, `binding`) and the live browser services `Host.BrowserLive`; a runner may provide services this way, and `main` may need any of those its `Main` names; a package may provide another; without one, a pure `main` is called and an effect runs as on Node | — |
 | `build.out-dir` | base directory of artifacts; not the project's root, the directory of its sources or tests, or one above them (`FLICK-P028`, before anything is written) | `"dist"` |
 | `build.profile` | `"debug"` or `"release"` (see [codegen.md](../codegen/)); `--profile` of `build` and `test` overrides it | `"debug"` |
-| `build.target` | default target backend short name (`"js"`, `"go"`, or the short name of a pinned `[build.backend]`); overridden by `--target <name>` on `build`, `run`, `dev`, `test` and `inspect`. On `"go"`, Go must be on `PATH` and allowed in `[tools]` as `"flick/go" = ["go"]` (`FLICK-P029`), reachable uses of JS-only modules (`Ui`, `Atom`, `Action`, `Form`, `Otlp`, `DevTools`, `Js`, `Reactivity.*`, the `Node`/`Browser`/`Cloudflare` runners) or other gated modules report `FLICK-P064` in `flick check`, the editor and `flick build` (unused imports do not fail), and constructs the go target does not compile yet are `FLICK-P012` (see [Go target](../codegen/#go-target)) | `"js"` (or the backend prefix of `build.environment`) |
+| `build.target` | default target backend short name (`"js"`, `"go"`, or the short name of a pinned `[build.backend]`); overridden by `--target <name>` on `build`, `run`, `dev`, `test`, `pack` and `inspect`. On `"go"`, Go must be on `PATH` and allowed in `[tools]` as `"flick/go" = ["go"]` (`FLICK-P029`), reachable uses of JS-only modules (`Ui`, `Atom`, `Action`, `Form`, `Otlp`, `DevTools`, `Js`, `Reactivity.*`, the `Node`/`Browser`/`Cloudflare` runners) or other gated modules report `FLICK-P064` in `flick check`, the editor and `flick build` (unused imports do not fail), and constructs the go target does not compile yet are `FLICK-P012` (see [Go target](../codegen/#go-target)) | `"js"` (or the backend prefix of `build.environment`) |
 | `build.environment` | `<backend>/<host>` pair such as `"js/node"`, `"js/browser"`, `"js/bun"`, `"js/cloudflare"`, `"go/native"`, or a host provided by a `[host]` dependency package; resolves to the backend's active tags plus the host's tags. Unknown backends report `FLICK-P059`; unknown or incompatible hosts report `FLICK-P065`; unknown condition tags report `FLICK-P066`. `flick check`, the editor and `flick build` share reachable-use preflight: unavailable modules, packages or Effect-adapter bindings report `FLICK-P064` at the use site with the path from entry, and reachable gated effects without a root handler report `FLICK-E020`. Unused imports and unreachable functions do not fail; public library exports follow the export policy | the default environment of the selected backend |
 | `build.solver-steps` | instance resolution steps per definition | `100000` |
 | `build.solver-depth` | depth of nested class constraints | `256` |
@@ -176,11 +176,11 @@ Every tag referenced in `@when`, `[package] when`, and `[host] requires` is chec
 An app's entries are the programs it builds: `flick build` writes a runner
 `flick-<name>.js` next to the modules for each, and the modules once, so two
 entries share what they import. A runner imports the entry's `main`, from the
-module that defines it when the entry re-exports it, and starts it; it begins
-with `#!/usr/bin/env node`, so `flick pack` names each runner in the
-package's `bin`, and the only entry `main` under the package's name.
-`flick run <name>` and `flick dev <name>` start one; with a single entry the
-name may be left out.
+module that defines it when the entry re-exports it, and starts it; on the JS
+target it begins with `#!/usr/bin/env node`, so `flick/js`'s `pack` command
+names each runner in the npm package's `bin`, and the only entry `main` under
+the package's name. `flick run <name>` and `flick dev <name>` start one; with a
+single entry the name may be left out.
 
 Every entry exports `main : Unit -> Unit` or a runtime function taking and
 returning `Unit`, requiring no services but those of `Host.Live` (with a
@@ -298,8 +298,9 @@ in `[dependencies]`.
 
 The library's directory holds a `flick.toml` of `kind = "lib"`; its
 `source-dir` is where the modules are, and its own dependencies come along.
-A library others fetch says what it is and which compilers build it, the
-last a semver requirement:
+A project declaring `[package]` (a library others fetch, or an app packed as a
+Flick source tarball, including Go projects) says what it is and which compilers
+build it, the last a semver requirement:
 
 ```toml
 [package]
@@ -390,8 +391,9 @@ the project, and `--watch` follows them.
 A module of a library binds a file beside it as a project's module does:
 `foreign pad from "./pad.mjs" "pad"`. An `.mjs` or `.cjs` inside the library's
 source directory ships with a js build: the output holds it beside the compiled
-module, with the other `.mjs` and `.cjs` of the library it may import, so an app
-packed by `flick pack` has them and they find npm packages from the project. A
+module, with the other `.mjs` and `.cjs` of the library it may import, so a JS
+app packed by `flick/js`'s `pack` command has them and they find npm packages
+from the project. A
 file the `foreign` names that is not there, a link that leaves the library, or
 two libraries with different files at one path are `FLICK-P041`. Any other
 relative file, a `.js` or one outside the source directory, stays where it is
@@ -420,7 +422,7 @@ another, check that declarations for the same `(target, package)` agree
 `flick/js` (with `[tools] "flick/js" = ["pnpm"]`), the backend adds what
 `package.json` lacks to its `dependencies`, creating the file if the project
 has none; `pnpm` then installs and pins them as the project's own, and
-`flick pack` ships them in the manifest of an app. `--locked` fails rather
+`flick/js`'s `pack` command ships them in the npm manifest of an app. `--locked` fails rather
 than change `package.json`.
 
 A js build without them fails with `FLICK-P034`, which says to run
@@ -429,6 +431,44 @@ neither Node nor pnpm. Two packages must name one target dependency with the
 same text, and the backend's manifest (such as `package.json`) with it, or the
 build and `flick install` report `FLICK-P040`. The old `[js.dependencies]`
 table is removed and fails with `FLICK-P057`.
+
+### Packaging (`flick pack`)
+
+`flick pack [--target <name>] [--out-dir <dir>]` produces up to two kinds of
+release artifacts, after checking that no `todo` or `echo` remains in the
+project (`FLICK-P024`) and warning on stderr if the public API breaks importers
+since the latest git tag (`flick diff <tag>`):
+
+1. **Flick source tarball (core, backend-neutral).** Whenever `flick.toml`
+   declares `[package]` (`name` and `version`), core writes a deterministic
+   `<name>-<version>.tgz` (normalizing `@scope/name` to `scope-name-<version>.tgz`)
+   containing `flick.toml`, the project's `source-dir` (excluding test
+   companions, `.git`, `.flick`, build outputs, and target package directories),
+   any declared `[package] plugin` component, and root `README*` / `LICENSE*`
+   files under `package/` with zeroed timestamps and fixed permissions. stdout
+   prints `<sha256>  <path>` so a dependent project can install the tarball
+   directly with `flick add <name> --url <url> --sha256 <sha256>`. A library
+   inheriting `[[workspace.plugins]]` is refused (`FLICK-P032`), because those
+   plugins would be missing from the published manifest.
+2. **Optional backend ecosystem artifact.** If the selected target backend
+   declares a `pack` capability, core runs a release build, verifies every
+   emitted `.iface` file (`FLICK-P020`), and delegates target packaging to that
+   backend inside `.flick/pack/`. For `flick/js`, an app with `package.json`
+   and `[tools] "flick/js" = ["pnpm"]` stages a production `package.json`
+   (without `devDependencies` or `scripts`, with `"type": "module"`,
+   `"files": ["dist"]`, and entry `bin` fields), checks JS `.iface`/`.d.ts`
+   companions and explicit `exports` (`FLICK-P020`; `[target.js] typescript = true`
+   is refused), verifies the pinned `packageManager` (`FLICK-P016`), and runs
+   `pnpm pack`. Libraries and JS apps with `[package]` and no `package.json`
+   skip `pnpm` and emit only the Flick source tarball. When a backend artifact
+   has the same filename as the Flick source tarball, core keeps the Flick
+   source tarball at `<out-dir>/<name>-<version>.tgz` (matching stdout) and
+   moves the backend artifact to `<out-dir>/<target>/<filename>`.
+
+Backends without a `pack` capability (such as `flick/go`) run a target-aware
+frontend check and write only the Flick source tarball without requiring Node
+or pnpm; invoking `flick pack` on such a project without `[package]` fails with
+`FLICK-P032`.
 
 ## Scripts
 

@@ -22,6 +22,10 @@ pub struct Built {
     pub out_dir: PathBuf,
     /// Each entry's module and the runner that starts it.
     pub runners: Vec<(String, PathBuf)>,
+    /// Each entry's name and its backend-supplied launch path relative to `out_dir`.
+    pub launches: Vec<(String, String)>,
+    /// Resolved active backend option `(key, value)` pairs for this build.
+    pub options: Vec<(String, String)>,
 }
 
 const SUCCESS: Style = Style::new()
@@ -167,6 +171,8 @@ mod tests {
                 ),
                 ("App.Web".to_owned(), PathBuf::from("/x/dist/flick-web.js")),
             ],
+            launches: Vec::new(),
+            options: Vec::new(),
         };
         let text = text(
             Some(&built),
@@ -197,6 +203,8 @@ mod tests {
             modules: Some(1),
             out_dir: PathBuf::new(),
             runners: Vec::new(),
+            launches: Vec::new(),
+            options: Vec::new(),
         };
         let text = text(Some(&built), &outcome(diagnostics), Duration::ZERO, false);
         assert!(text.contains("Build failed:"), "{text}");

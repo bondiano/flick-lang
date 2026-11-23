@@ -54,8 +54,8 @@ pub enum Commands {
     Update(PackagesArguments),
     /// Show the installed dependencies and their Flick libraries.
     Deps(DepsArguments),
-    /// Build a release package (or an app archive through the selected backend).
-    Pack(OutDirArguments),
+    /// Pack a deterministic Flick source tarball (and any artifact from the selected backend).
+    Pack(PackArguments),
     /// Show the plugins of the project's path, git and url dependencies, where
     /// each comes from, and whether `flick.lock` pins the build of its
     /// component.

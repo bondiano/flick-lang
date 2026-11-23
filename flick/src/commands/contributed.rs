@@ -4,6 +4,7 @@
 
 mod delegate;
 mod inputs;
+mod pack;
 pub(crate) mod plan;
 mod preview;
 mod projection;
@@ -12,6 +13,7 @@ mod session;
 mod validate;
 
 pub(crate) use delegate::{delegate, doctor, run_client, spawn_dev_client};
+pub(crate) use pack::run_pack_command;
 pub(crate) use preview::preview;
 pub(crate) use registry::Contributor;
 

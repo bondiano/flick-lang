@@ -79,7 +79,46 @@ pub(super) fn commands() -> Vec<Descriptor> {
             )],
             &[],
         ),
+        pack_descriptor(),
     ]
+}
+
+fn pack_descriptor() -> Descriptor {
+    Descriptor {
+        name: "pack".into(),
+        summary: "Packs a literal ecosystem artifact when `literal-pack.json` is present".into(),
+        positionals: vec![],
+        options: vec![
+            dep_param("kind", ValueKind::Text, false, false, "Project kind"),
+            dep_param(
+                "has-package",
+                ValueKind::Flag,
+                false,
+                false,
+                "Whether `[package]` is declared",
+            ),
+            dep_param("entry", ValueKind::Text, true, false, "Declared entry name"),
+            dep_param(
+                "runner",
+                ValueKind::Text,
+                true,
+                false,
+                "Entry runner mapping `<entry>=<file>`",
+            ),
+            dep_param("file", ValueKind::Text, true, false, "Staged file path"),
+            dep_param(
+                "option",
+                ValueKind::Text,
+                true,
+                false,
+                "Resolved build option `<key>=<value>`",
+            ),
+        ],
+        inputs: vec!["literal-pack.json".into()],
+        reads: vec![],
+        writes: vec![".flick/pack".into()],
+        style: Style::Plan,
+    }
 }
 
 fn dep_param(name: &str, kind: ValueKind, multiple: bool, required: bool, help: &str) -> Parameter {
@@ -180,6 +219,9 @@ impl LiteralManifest {
 }
 
 pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
+    if invocation.name == "pack" {
+        return run_pack(invocation);
+    }
     let mut state = LiteralManifest::load(invocation)?;
     let mut plan = Plan::empty();
     match invocation.name.as_str() {
@@ -262,5 +304,55 @@ pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
         }
         _ => {}
     }
+    Ok(plan)
+}
+
+fn run_pack(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
+    let kind = value(invocation, "kind").unwrap_or("app");
+    let has_package = !values(invocation, "has-package").is_empty();
+    let Some(pack_file) = invocation
+        .inputs
+        .iter()
+        .find(|f| f.path == "literal-pack.json")
+    else {
+        if kind == "lib" || has_package {
+            return Ok(Plan::empty());
+        }
+        return Err(vec![Diagnostic::error(
+            "P020",
+            "cannot read `literal-pack.json`: file not found".into(),
+        )]);
+    };
+    let doc: serde_json::Value = serde_json::from_slice(&pack_file.bytes).map_err(|e| {
+        vec![Diagnostic::error(
+            "P020",
+            format!("`literal-pack.json` is not JSON: {e}"),
+        )]
+    })?;
+    let mut plan = Plan::empty();
+    if doc.get("escape").and_then(serde_json::Value::as_bool) == Some(true) {
+        plan.files.push(file("escaped.literal-pkg", "forbidden\n"));
+        return Ok(plan);
+    }
+    let name = doc["name"].as_str().unwrap_or("literal-app");
+    let version = doc["version"].as_str().unwrap_or("0.0.0");
+    let ext = doc["ext"].as_str().unwrap_or("literal-pkg");
+    let payload = serde_json::json!({
+        "name": name,
+        "version": version,
+        "kind": kind,
+        "has_package": has_package,
+        "entries": values(invocation, "entry"),
+        "runners": values(invocation, "runner"),
+        "files": values(invocation, "file"),
+        "options": values(invocation, "option"),
+    });
+    plan.files.push(file(
+        &format!(".flick/pack/out/{name}-{version}.{ext}"),
+        &format!(
+            "{}\n",
+            serde_json::to_string_pretty(&payload).expect("json")
+        ),
+    ));
     Ok(plan)
 }

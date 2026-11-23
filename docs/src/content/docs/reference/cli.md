@@ -39,7 +39,7 @@ run as `flick <command>` or `flick <contributor>:<command>` (see
 | `add <pkg>… [--dev]`, `remove <pkg>…`, `update [pkg]…` | manages Flick `[dependencies]` (`--path`, `--git`, `--url`) and delegates target-ecosystem package operations to the selected backend (`FLICK-P063` if the backend manages no packages of its own) |
 | `deps [--why <pkg>]` | shows the Flick dependency graph and delegates target package inspection to the selected backend |
 | `plugins` | the plugins of the project's path, git and url dependencies, the compiler's own first: where each comes from, the hash of its component and whether `flick.lock` pins that build |
-| `pack --out-dir <dir>` | a release build and its package archive; refuses `todo` and `echo` (`FLICK-P024`), and warns when the public API breaks importers since the latest tag |
+| `pack --out-dir <dir> [--target <name>]` | writes a deterministic Flick source tarball (printing `<sha256>  <path>` on stdout, installable via `flick add --url --sha256`) and any optional artifact from the selected backend's `pack` command; refuses `todo` and `echo` (`FLICK-P024`), and warns when the public API breaks importers since the latest tag |
 | `diff [ref]` | the public API changes since a git revision (the latest tag by default), each `MAJOR` (removed or changed) or `MINOR` (added), and the version they call for |
 | `ffi import <pkg> --out <dir> [--select a,b]` | a command of the JavaScript backend (`js:ffi import`): reads the `.d.ts` of an installed package and writes `<dir>/<Pkg>/Generated.fl` with a coverage report; `--select` imports only the named exports (see [Importing a package's `.d.ts`](../ffi/#importing-a-packages-dts)) |
 | `ffi check [paths]` | a command of the JavaScript backend: checks generated and reviewed bindings and their policies against the installed packages; without paths the source root |
@@ -71,7 +71,7 @@ exported strictly fails with `FLICK-D008` pointing at the exported declaration.
 
 ## Target and backend options
 
-`build`, `run`, `dev`, `test`, `doctor`, `inspect` and `doc` (when checking examples) take `--target <name>` to select
+`build`, `run`, `dev`, `test`, `pack`, `doctor`, `inspect` and `doc` (when checking examples) take `--target <name>` to select
 which backend component runs (`js` for `flick/js`, `go` for `flick/go`, or the
 short name of a pinned `[build.backend]`). Without `--target`, the target comes
 from `[build.backend]`, then `[build] target`, then the backend prefix of
@@ -97,10 +97,12 @@ in `flick.toml`).
   [observability](../observability/#devtools)), and `--ui <specifier>` (`build`,
   `run`, `dev`, `test`). Client entries (`target = "client"`) run through Vite
   via the backend's `run-client` / `dev-client` commands (requiring `"node"` in
-  `[tools]`); `flick doctor` reports Node.js, pnpm, `@flick-lang/runtime`,
+  `[tools]`); `flick pack` optionally produces an npm tarball for apps with
+  `package.json` using pinned `pnpm`; `flick doctor` reports Node.js, pnpm, `@flick-lang/runtime`,
   `effect`, the Content Mapper, and optional adapters without checking Go.
 - **`flick/go` options**: `--cgo` (`build`, `run`, `dev`, `test`; enables
-  `CGO_ENABLED=1`, default `false`). `flick doctor` checks `go` and `[tools]`
+  `CGO_ENABLED=1`, default `false`). `flick pack` writes only the Flick source
+  tarball without Node, pnpm, or `go`; `flick doctor` checks `go` and `[tools]`
   without checking Node.js or pnpm; client entries are unsupported
   (`FLICK-P067`).
 
@@ -219,17 +221,23 @@ command that changes `package.json`, its lockfile or the tree first checks that
 it, and `flick doctor` prints both versions. `install --locked` without
 `pnpm-lock.yaml`, or with one out of date, is `FLICK-P017` with exit code 2.
 
-`pack` builds the project in the release profile and refuses a `todo` or
-`echo` left in it (`FLICK-P024`). A library with `[package]` packs its sources:
-`<name>-<version>.tgz` holds its `flick.toml`, its source directory and its
-readme and license under `package/`, without times or owners, so the same
-sources give the same bytes; stdout shows the sha256 a `url` dependency
-names. An app checks that every module has its `.iface` (and
-`.d.ts` with `[target.js] declarations = true`) and that interfaces in the
-package agree on each other's fingerprints (`FLICK-P020`), then delegates
-staging and archiving to the selected backend's `pack` command (for `flick/js`,
-staging `package.json` with entry `bin` fields, checking `exports`, and running
-`pnpm pack`).
+`pack` checks or release-builds the project for the selected target, refuses any
+`todo` or `echo` left in it (`FLICK-P024`), and warns when the public API breaks
+importers since the latest git tag. Whenever `flick.toml` declares `[package]`
+(`name` and `version`), core writes a deterministic Flick source tarball
+`<name>-<version>.tgz` containing `flick.toml`, the source directory (excluding
+test companions), any declared `[package] plugin` component, and readme/license
+files under `package/`, without timestamps or owners so the same sources give
+the same bytes; stdout prints `<sha256>  <path>` for `flick add --url --sha256`.
+A library inheriting `[[workspace.plugins]]` is refused (`FLICK-P032`). If the
+selected backend also declares an optional `pack` command, core verifies emitted
+`.iface` files (`FLICK-P020`) and delegates target packaging to that backend
+(for `flick/js`, staging `package.json` with entry `bin` fields, checking JS
+`.iface`/`.d.ts` companions and `exports`, and running pinned `pnpm pack` for
+apps; if a backend artifact collides with the Flick source tarball filename, it
+is placed under `<out-dir>/<target>/`). Backends without a `pack` command (such
+as `flick/go`) run a target-aware frontend check and write only the Flick source
+tarball without requiring Node or pnpm.
 
 ## Checked package documentation
 

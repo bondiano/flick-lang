@@ -40,6 +40,7 @@ pub mod fmt_command;
 pub mod help_command;
 pub mod lsp_command;
 pub mod module_store;
+pub mod pack_command;
 pub mod package_cache;
 pub mod package_js;
 pub mod package_ts;

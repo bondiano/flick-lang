@@ -173,6 +173,15 @@ pub struct OutDirArguments {
     pub out_dir: String,
 }
 
+#[derive(Args)]
+pub struct PackArguments {
+    #[command(flatten)]
+    pub output: OutDirArguments,
+    /// Target backend; by default `build.target` of the project.
+    #[arg(long, value_name = "NAME")]
+    pub target: Option<String>,
+}
+
 /// Documentation rendered from checked public interfaces.
 #[derive(Args)]
 pub struct DocArguments {

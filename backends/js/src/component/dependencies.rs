@@ -11,7 +11,7 @@ use flick_backend::command::{
 };
 use serde_json::Value;
 
-use super::manifest;
+use super::{manifest, pack};
 
 /// The pnpm a project takes without `packageManager`.
 pub(super) const PNPM: &str = "12.16.1";
@@ -26,7 +26,13 @@ const WRITES: [&str; 4] = [
 
 pub(super) const NAMES: [&str; 6] = ["install", "add", "remove", "update", "deps", "pack"];
 
-fn parameter(name: &str, kind: ValueKind, multiple: bool, required: bool, help: &str) -> Parameter {
+pub(super) fn parameter(
+    name: &str,
+    kind: ValueKind,
+    multiple: bool,
+    required: bool,
+    help: &str,
+) -> Parameter {
     Parameter {
         name: name.into(),
         kind,
@@ -101,51 +107,27 @@ pub(super) fn descriptors() -> Vec<Descriptor> {
                 "Show why this package is installed",
             )],
         ),
-        Descriptor {
-            name: "pack".into(),
-            summary: "Stages `package.json` for a built app and packs it with pnpm".into(),
-            positionals: vec![],
-            options: vec![
-                parameter(
-                    "runner",
-                    ValueKind::Text,
-                    true,
-                    false,
-                    "Entry runner mapping `<entry>=<runner-file>`",
-                ),
-                parameter(
-                    "file",
-                    ValueKind::Text,
-                    true,
-                    false,
-                    "Relative file path present in the staged pack directory",
-                ),
-            ],
-            inputs: vec!["package.json".into()],
-            reads: vec![],
-            writes: vec![".flick/pack".into()],
-            style: Style::Plan,
-        },
+        pack::descriptor(),
     ]
 }
 
-fn values<'a>(invocation: &'a Invocation, name: &str) -> &'a [String] {
+pub(super) fn values<'a>(invocation: &'a Invocation, name: &str) -> &'a [String] {
     (invocation.arguments.iter())
         .find(|a| a.name == name)
         .map_or(&[], |a| a.values.as_slice())
 }
 
-fn flag(invocation: &Invocation, name: &str) -> bool {
+pub(super) fn flag(invocation: &Invocation, name: &str) -> bool {
     !values(invocation, name).is_empty()
 }
 
-fn input<'a>(invocation: &'a Invocation, path: &str) -> Option<&'a File> {
+pub(super) fn input<'a>(invocation: &'a Invocation, path: &str) -> Option<&'a File> {
     invocation.inputs.iter().find(|f| f.path == path)
 }
 
 pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
     if invocation.name == "pack" {
-        return run_pack(invocation);
+        return pack::run(invocation);
     }
     let text = input(invocation, "package.json").map(|f| String::from_utf8_lossy(&f.bytes));
     let parsed: Option<Value> = text.as_deref().and_then(|t| serde_json::from_str(t).ok());
@@ -217,113 +199,9 @@ pub(super) fn run(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
     Ok(plan)
 }
 
-/// Stages `.flick/pack/package.json` for a built JS app and runs `pnpm pack`.
-fn run_pack(invocation: &Invocation) -> Result<Plan, Vec<Diagnostic>> {
-    let Some(raw) = input(invocation, "package.json") else {
-        return Err(vec![Diagnostic::error(
-            "P020",
-            "cannot read `package.json`: file not found".into(),
-        )]);
-    };
-    let text = String::from_utf8_lossy(&raw.bytes);
-    let mut manifest: Value = serde_json::from_str(&text).map_err(|err| {
-        vec![Diagnostic::error(
-            "P020",
-            format!("`package.json` is not JSON: {err}"),
-        )]
-    })?;
-    let Some(object) = manifest.as_object_mut() else {
-        return Err(vec![Diagnostic::error(
-            "P020",
-            "`package.json` is not an object".into(),
-        )]);
-    };
-    object.insert("type".into(), "module".into());
-    object.insert("files".into(), serde_json::json!(["dist"]));
-    object
-        .entry("exports")
-        .or_insert(serde_json::json!({ "./*": "./dist/*" }));
-    let runners: Vec<(&str, &str)> = values(invocation, "runner")
-        .iter()
-        .filter_map(|entry| entry.split_once('='))
-        .collect();
-    if !runners.is_empty() {
-        let package = object
-            .get("name")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let unscoped = package.rsplit('/').next().unwrap_or(package).to_owned();
-        let bin: serde_json::Map<String, Value> = runners
-            .iter()
-            .map(|&(name, file)| {
-                let command = if runners.len() == 1 && name == "main" && !unscoped.is_empty() {
-                    unscoped.clone()
-                } else {
-                    name.to_owned()
-                };
-                (command, format!("./dist/{file}").into())
-            })
-            .collect();
-        object.entry("bin").or_insert(Value::Object(bin));
-    }
-    object.remove("devDependencies");
-    object.remove("scripts");
-    if let Some(missing) = missing_exports(&manifest, values(invocation, "file")) {
-        return Err(vec![Diagnostic::error("P020", missing)]);
-    }
-    let pnpm = pnpm(invocation, Some(&manifest), false)?;
-    let mut plan = Plan::empty();
-    plan.files.push(File {
-        path: ".flick/pack/package.json".into(),
-        bytes: format!("{manifest:#}\n").into_bytes(),
-        executable: false,
-    });
-    plan.steps.push(Step::Tool(ToolStep {
-        id: "pack".into(),
-        tool: pnpm,
-        arguments: vec![
-            "--dir".into(),
-            ".flick/pack".into(),
-            "pack".into(),
-            "--pack-destination".into(),
-            ".".into(),
-        ],
-        environment: vec![],
-        inputs: vec![],
-        reads: vec![],
-        outputs: vec![".flick/pack".into()],
-        in_place: true,
-    }));
-    Ok(plan)
-}
-
-/// The first path `exports` names that the staged package lacks.
-fn missing_exports(manifest: &Value, staged: &[String]) -> Option<String> {
-    fn targets(value: &Value, out: &mut Vec<String>) {
-        match value {
-            Value::String(s) => out.push(s.clone()),
-            Value::Object(map) => map.values().for_each(|v| targets(v, out)),
-            Value::Array(items) => items.iter().for_each(|v| targets(v, out)),
-            _ => {}
-        }
-    }
-    let mut paths = Vec::new();
-    targets(manifest.get("exports")?, &mut paths);
-    paths
-        .into_iter()
-        .find(|p| {
-            if p.contains('*') {
-                return false;
-            }
-            let norm = p.strip_prefix("./").unwrap_or(p);
-            !staged.iter().any(|f| f == norm)
-        })
-        .map(|p| format!("`exports` names `{p}`, which the package does not have"))
-}
-
 /// The pnpm the host found and the project allows; with `exact`, only the
 /// version the project pins, else nothing is changed.
-fn pnpm(
+pub(super) fn pnpm(
     invocation: &Invocation,
     manifest: Option<&Value>,
     exact: bool,

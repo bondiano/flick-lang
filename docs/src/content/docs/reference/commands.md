@@ -123,6 +123,15 @@ itself: it returns a plan, which the host checks and carries out.
 - **Dependencies**: delegated backend verbs also receive
   `invocation.dependencies`, the transitive closure of
   `[target.<name>.dependencies]` for that backend.
+- **Optional `pack` verb**: implementing `pack` (`writes = [".flick/pack"]`) is
+  optional for backends; omitting it (as `flick/go` does) leaves core `flick
+  pack` to write only the deterministic Flick source tarball. When a backend
+  declares `pack`, the host stages the release build in `.flick/pack/dist/`,
+  creates `.flick/pack/out/`, passes host-context options filtered to the
+  parameters the descriptor declares (`kind`, `has-package`, `entry`, `runner`,
+  `file`, `option`), and moves regular files produced under `.flick/pack/out/`
+  into `--out-dir` (or `<out-dir>/<target>/` on collision with the Flick source
+  tarball).
 - **`run-flick` steps** compile and run a Flick program through the project's
   selected backend in an isolated temporary generation, without writing to the
   project tree or the disk module cache. A step may overlay in-memory

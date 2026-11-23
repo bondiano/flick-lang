@@ -137,6 +137,7 @@ fn run(args: CommandArguments, raw_argv: &[OsString]) -> ExitCode {
             | Commands::Remove(_)
             | Commands::Update(_)
             | Commands::Deps(_)
+            | Commands::Pack(_)
             | Commands::Plugins
             | Commands::Explain(_)
             | Commands::Doctor(_)

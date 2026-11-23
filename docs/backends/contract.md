@@ -349,7 +349,22 @@ layout:
   `invocation.dependencies`. If the selected backend does not declare the
   requested dependency verb (for example `flick add pkg` under `flick/go`),
   `flick` reports `FLICK-P063` (exit code `2`) naming the backend and suggesting
-  `--path`, `--git`, or `--url`. `doctor` plans must be strictly read-only
+  `--path`, `--git`, or `--url`.
+- Implementing `pack` (`style = Style::Plan`, `writes = [".flick/pack"]`) is
+  optional: core `flick pack` owns the deterministic Flick source tarball
+  (written whenever `[package]` is declared), `FLICK-P024` (`todo`/`echo`)
+  enforcement, and the public API-diff warning. Backends that omit `pack` (such
+  as `flick/go`) run a target-aware frontend check without invoking any host
+  tool and produce only the Flick source tarball. When a backend declares
+  `pack`, core runs a release build into `.flick/pack/dist/`, verifies emitted
+  `.iface` files (`FLICK-P020`), creates `.flick/pack/out/`, and passes
+  host-context options filtered to the parameters declared by the backend's
+  `pack` descriptor (`kind`, `has-package`, `entry`, `runner`, `file`,
+  `option`). Any regular files written under `.flick/pack/out/` (directly via
+  `plan.files` or by a validated `Step::Tool`) are moved into `--out-dir` (or
+  `<out-dir>/<target-short>/` when a filename collides with the Flick source
+  tarball).
+- `doctor` plans must be strictly read-only
   (no `files`, `steps`, `resume`, or `needs`; violations are refused with
   `FLICK-P055`), reporting check lines via `plan.diagnostics` using codes
   `"doctor-ok"`, `"doctor-fail"`, and `"doctor-note"` with message format

@@ -105,12 +105,20 @@ impl BuildCommand {
                     .map(|(_, path)| (module.clone(), output.out_dir.join(path)))
             })
             .collect();
+        let options = output
+            .options
+            .values
+            .iter()
+            .flat_map(|(key, values)| values.iter().map(move |value| (key.clone(), value.clone())))
+            .collect();
         *self.built.borrow_mut() = Some(Built {
             #[cfg(feature = "wasm-backends")]
             backend: output.backend.pin(),
             modules,
             out_dir: output.out_dir.clone(),
             runners,
+            launches: paths,
+            options,
         });
     }
 }
