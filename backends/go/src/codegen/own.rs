@@ -1,5 +1,7 @@
-//! The Go types of constructors of the program's own types. A constructor
-//! with fields that only compiled code makes has a Go type of its own: its
+//! The Go types of constructors of the program's own types. A tagged
+//! constructor without retained dictionaries that only compiled code makes has
+//! a Go type of its own: a zero-size `struct{}` when it has no fields (so
+//! constructing one allocates nothing), or a struct holding its fields. Its
 //! values are that type and nothing else, so a `match` asks Go for the type
 //! and reads a field where it is, with no tag to compare and no list of
 //! fields to find. The runtime reads such a value as `flickrt.Constructed`
@@ -30,6 +32,8 @@ use flick_ir::{Expr, ExprKind, Module};
 /// How a value of a constructor with a Go type of its own holds its fields.
 #[derive(Clone, PartialEq, Eq)]
 pub(super) enum Held {
+    /// No fields: a zero-size value `T{}`.
+    Zero,
     /// So many fields, each a value.
     Fields(usize),
     /// One field: a record of these labels, which lies in the value.
@@ -57,25 +61,28 @@ pub(super) fn records(modules: &[&Module]) -> Records {
 
 impl<'a> Gen<'a> {
     /// The Go type of the values of `c` and how it holds their fields, when
-    /// they have a type of their own: a tagged constructor with fields, of
-    /// a module of the program, that holds no dictionary. One without
-    /// fields stays the one `*flickrt.Data` of its tag, and a built-in type
-    /// is made by the runtime too.
+    /// they have a type of their own: a tagged constructor of a module of
+    /// the program that holds no dictionary. A constructor of a built-in
+    /// module, or one that holds a dictionary, stays a `*flickrt.Data`.
     pub(super) fn own_type(&mut self, c: &Constructor) -> Option<(String, Held)> {
         let own = self.input.own_module(&c.module).is_some();
-        if c.rep != Rep::Tagged || c.arity == 0 || c.dicts > 0 || !own {
+        if c.rep != Rep::Tagged || c.dicts > 0 || !own {
             return None;
         }
         let ty = names::own_type(&c.module, &c.name);
         if let Some((_, held)) = self.owned.get(&ty) {
             return Some((ty, held.clone()));
         }
-        let labels = self
-            .records
-            .and_then(|records| records.get(&(c.module.clone(), c.name.clone())));
-        let held = match labels {
-            Some(labels) if c.arity == 1 && !labels.is_empty() => Held::Record(labels.clone()),
-            _ => Held::Fields(c.arity),
+        let held = if c.arity == 0 {
+            Held::Zero
+        } else {
+            let labels = self
+                .records
+                .and_then(|records| records.get(&(c.module.clone(), c.name.clone())));
+            match labels {
+                Some(labels) if c.arity == 1 && !labels.is_empty() => Held::Record(labels.clone()),
+                _ => Held::Fields(c.arity),
+            }
         };
         let tag = names::string(&self.tag(c));
         self.owned.insert(ty.clone(), (tag, held.clone()));
@@ -94,6 +101,7 @@ impl<'a> Gen<'a> {
         };
         match held.and_then(|labels| labels.iter().position(|l| l == label)) {
             Some(place) => call(a, "flickrt.FieldAt", [r.doc, docvec![a, place]]).into(),
+            None if label == "_tag" => call(a, "flickrt.TagField", [r.doc]).into(),
             None => call(a, "flickrt.Field", [r.doc, self.string(label)]).into(),
         }
     }
@@ -174,14 +182,29 @@ pub(super) fn test(ty: &str) -> String {
 pub(super) fn file(types: &Owned) -> String {
     let mut go = String::from("package main\n\nimport \"flick.app/flickrt\"\n");
     for (ty, (tag, held)) in types {
+        let test = test(ty);
+        if matches!(held, Held::Zero) {
+            let _ = write!(
+                go,
+                "\ntype {ty} struct{{}}\n\n\
+                 func ({ty}) TagName() string {{ return {tag} }}\n\n\
+                 func ({ty}) Fields() []flickrt.Value {{ return nil }}\n\n\
+                 func {test}(v flickrt.Value) bool {{\n\t_, ok := v.({ty})\n\treturn ok\n}}\n\n\
+                 var _ = flickrt.Owned({tag}, func([]flickrt.Value) flickrt.Value {{\n\
+                 \treturn {ty}{{}}\n}})\n",
+            );
+            continue;
+        }
         let n = match held {
+            Held::Zero => unreachable!("handled above"),
             Held::Fields(n) => *n,
             Held::Record(labels) => labels.len(),
         };
         let params: Vec<String> = (0..n).map(|i| format!("f{i}")).collect();
         let params = params.join(", ");
-        let (make, of, test) = (make(ty), of(ty), test(ty));
+        let (make, of) = (make(ty), of(ty));
         let _ = match held {
+            Held::Zero => unreachable!("handled above"),
             Held::Fields(_) => write!(
                 go,
                 "\ntype {ty} struct{{ f [{n}]flickrt.Value }}\n\n\

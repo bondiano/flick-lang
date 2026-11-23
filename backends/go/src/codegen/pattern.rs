@@ -117,6 +117,9 @@ impl<'a> Gen<'a> {
             // a Go type of its own: Go tells the constructor and has the fields
             t.conds
                 .push(call(a, a.alloc_str(&own::test(&ty)), [subject]));
+            if matches!(held, own::Held::Zero) {
+                return;
+            }
             let ty = a.alloc_str(&ty);
             let field = |i: usize| docvec![a, subject, ".(*", ty, ").f[", i, "]"];
             let places = match (&held, args) {

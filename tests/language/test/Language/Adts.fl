@@ -74,4 +74,32 @@ let tests = [
   Test.test "results" (fun () ->
     Test.equal "[Ok 1, Err \"no\"]" (show [(Ok 1 : Result String Int), Err "no"])
   ),
+  Test.test "payload-free constructors equality, order, hash, and show" (fun () ->
+    let empty : Tree Int = Leaf
+    let red_suit = Hearts
+    let joker = Joker
+    let map = HashMap.insert Hearts "red" (HashMap.insert Spades "black" HashMap.empty)
+    Test.all [
+      Test.equal true (red_suit == Hearts),
+      Test.equal false (red_suit == Spades),
+      Test.equal true (red_suit != Spades),
+      Test.equal true (empty == Leaf),
+      Test.equal false (empty == Node Leaf 1 Leaf),
+      Test.equal true (joker == Joker),
+      Test.equal false (joker == Card Hearts 1),
+      Test.equal LT (compare red_suit Spades),
+      Test.equal EQ (compare red_suit Hearts),
+      Test.equal GT (compare joker (Card Spades 9)),
+      Test.equal (hash red_suit) (hash Hearts),
+      Test.equal (hash joker) (hash Joker),
+      Test.equal "Leaf" (show empty),
+      Test.equal "[Hearts, Spades]" (show [Hearts, Spades]),
+      Test.equal true ((empty, red_suit) == (Leaf, Hearts)),
+      Test.equal false ((empty, red_suit) == (Leaf, Spades)),
+      Test.equal LT (compare (empty, red_suit) (Leaf, Spades)),
+      Test.equal "{ suit = Spades, tree = Leaf }" (show { tree = empty; suit = Spades }),
+      Test.equal (Some "red") (HashMap.get red_suit map),
+      Test.equal (Some "black") (HashMap.get Spades map),
+    ]
+  ),
 ]

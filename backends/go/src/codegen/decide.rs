@@ -235,6 +235,9 @@ impl<'a> Gen<'a> {
                     Some((ty, held)) => {
                         let ty = a.alloc_str(&ty);
                         match held {
+                            own::Held::Zero => {
+                                unreachable!("a zero-size constructor has no fields")
+                            }
                             own::Held::Record(_) => {
                                 docvec![a, "flickrt.Value(&", of, ".(*", ty, ").rec)"]
                             }
