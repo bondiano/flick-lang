@@ -2,6 +2,8 @@
 //! purely becomes polymorphic over the variables that are not free in its
 //! environment; the result of a runtime call stays monomorphic, even of `->{}`.
 
+use std::collections::HashMap;
+
 use super::bindings::LetParts;
 use super::classes::Outcome;
 use super::kinds::Kind;
@@ -131,13 +133,14 @@ impl Checker<'_> {
         if metas.is_empty() {
             return ty;
         }
+        let mut kinds = kinds_of(&ty, &|h| param_kinds(self, h));
         let mut names = self.free_names(&ty);
         let mut vars = Vec::new();
         for m in metas {
             let name = names.next().expect("names are endless");
             vars.push(Binder {
                 name: name.clone(),
-                kind: kind_of(&ty, m, &|h| param_kinds(self, h)),
+                kind: kinds.remove(&m).unwrap_or(Kind::Type),
             });
             self.store.set(m, Type::Var(name));
         }
@@ -189,11 +192,15 @@ impl Checker<'_> {
         let substituted = |t: &Type| replace_metas(t, &subst);
         // a capture row cannot name a type variable, and the written signature
         // implies its projections through the stages' parameters
+        let kinds = if subst.iter().any(|(_, value)| matches!(value, Type::Var(_))) {
+            kinds_of(&ty, &|h| param_kinds(self, h))
+        } else {
+            HashMap::new()
+        };
         let types: Vec<String> = subst
             .iter()
-            .filter(|(m, _)| matches!(kind_of(&ty, *m, &|h| param_kinds(self, h)), Kind::Type))
-            .filter_map(|(_, v)| match v {
-                Type::Var(name) => Some(name.clone()),
+            .filter_map(|(m, v)| match v {
+                Type::Var(name) if !kinds.contains_key(m) => Some(name.clone()),
                 _ => None,
             })
             .collect();
@@ -350,36 +357,34 @@ fn param_kinds(checker: &Checker<'_>, head: &Type) -> Vec<Kind> {
     kinds
 }
 
-/// The kind of a variable by where it occurs: a record tail is a field row,
-/// the rows of a runtime arrow are service and error rows, an argument of a
-/// type has the kind of its parameter (`params` gives them).
-fn kind_of(ty: &Type, m: u32, params: &dyn Fn(&Type) -> Vec<Kind>) -> Kind {
-    fn is(t: &Type, m: u32) -> bool {
-        match t {
-            Type::Meta(meta) => meta.inference_type_root() == Some(m),
-            Type::Row(row) => row.tail.as_deref().is_some_and(|t| is(t, m)),
-            Type::Union(a, b) => is(a, m) || is(b, m),
-            Type::Without { row, .. } => is(row, m),
-            _ => false,
-        }
-    }
-    let is = |t: &Type| is(t, m);
-    let mut kind = Kind::Type;
+/// Records kind evidence in the original preorder, keeping the last kind
+/// assigned to each root. Roots without evidence have kind `Type`.
+fn kinds_of(ty: &Type, params: &dyn Fn(&Type) -> Vec<Kind>) -> HashMap<u32, Kind> {
+    let mut kinds = HashMap::new();
+    let mut remember = |t: &Type, kind: Kind| {
+        row_metas(t, &mut |root| {
+            if kind == Kind::Type {
+                kinds.remove(&root);
+            } else {
+                kinds.insert(root, kind.clone());
+            }
+        });
+    };
     ty.visit(&mut |t| match t {
-        Type::Record(row) if row.tail.as_deref().is_some_and(is) => {
-            kind = Kind::Row(Box::new(Kind::Type));
+        Type::Record(row) => {
+            if let Some(tail) = row.tail.as_deref() {
+                remember(tail, Kind::Row(Box::new(Kind::Type)));
+            }
         }
-        Type::Captured { captures, .. } | Type::Bounded { captures, .. } if is(captures) => {
-            kind = Kind::CaptureRow;
+        Type::Captured { captures, .. } | Type::Bounded { captures, .. } => {
+            remember(captures, Kind::CaptureRow);
         }
         Type::Fun {
             effects: Some(e), ..
         } => {
-            if is(&e.services) {
-                kind = Kind::ServiceRow;
-            } else if is(&e.errors) {
-                kind = Kind::ErrorRow;
-            }
+            // At this arrow a root shared by both rows is a service root.
+            remember(&e.errors, Kind::ErrorRow);
+            remember(&e.services, Kind::ServiceRow);
         }
         Type::App { .. } => {
             let (head, args) = t.spine();
@@ -391,12 +396,38 @@ fn kind_of(ty: &Type, m: u32, params: &dyn Fn(&Type) -> Vec<Kind>) -> Kind {
                 params(head)
             };
             for (arg, row) in args.iter().zip(rows) {
-                if is(arg) && !matches!(row, Kind::Meta(_)) {
-                    kind = row;
+                if !matches!(row, Kind::Meta(_)) {
+                    remember(arg, row);
                 }
             }
         }
         _ => {}
     });
-    kind
+    kinds
 }
+
+/// The root of an argument or leaves of its row expression. The types of
+/// row entries are visited separately as children of the enclosing type.
+fn row_metas(ty: &Type, f: &mut impl FnMut(u32)) {
+    match ty {
+        Type::Meta(meta) => {
+            if let Some(root) = meta.inference_type_root() {
+                f(root);
+            }
+        }
+        Type::Row(row) => {
+            if let Some(tail) = row.tail.as_deref() {
+                row_metas(tail, f);
+            }
+        }
+        Type::Union(a, b) => {
+            row_metas(a, f);
+            row_metas(b, f);
+        }
+        Type::Without { row, .. } => row_metas(row, f),
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests;
