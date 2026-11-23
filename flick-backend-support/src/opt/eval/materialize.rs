@@ -363,7 +363,7 @@ pub fn expr_cost(expr: &Expr) -> ExprCost {
 /// Validates UTF-16 code units, computes their exact UTF-8 byte length, and
 /// optionally appends decoded characters into `out` (avoiding `String::from_utf16`
 /// stdlib iterator monomorphization in browser WASM).
-fn decode_utf16(units: &[u16], mut out: Option<&mut String>) -> Result<u32, StopReason> {
+pub(super) fn decode_utf16(units: &[u16], mut out: Option<&mut String>) -> Result<u32, StopReason> {
     let mut len = 0_u32;
     let mut i = 0;
     while i < units.len() {

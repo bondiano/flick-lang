@@ -79,16 +79,18 @@ let nested () = scope {
 children : Unit ->{Async} Unit
 let children () = scope owner {
   let _parent = open "parent"
+  let started : Deferred.Deferred none Unit = Deferred.make ()
   ignore (Fiber.spawn
     owner
     (fun _ -> ())
     (task {
       scope {
         let _child = open "child"
+        ignore (Deferred.succeed () started)
         nap 10000
       }
     }))
-  nap 5
+  Deferred.await_ started
   say "body ends"
 }
 
@@ -124,9 +126,10 @@ let main () =
   children ()
   try failing () with
   | Oops text -> say text
-  try timeout 5 (task { slow () }) with
+  // long enough for the scope to open on a slow machine, well short of its sleep
+  try timeout 200 (task { slow () }) with
   | TimeoutError -> say "timed out"
-  try timeout 5 (task { slow_close () }) with
+  try timeout 200 (task { slow_close () }) with
   | TimeoutError -> say "timed out after the close"
   let outcome = Effect.exit (task { broken () })
   say ("broken: " ++ (if Exit.has_dies outcome then "died" else "kept its value"))

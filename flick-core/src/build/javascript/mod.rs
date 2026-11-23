@@ -13,7 +13,7 @@ use std::path::Path;
 use super::Backend;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::codegen::ts::Typing;
-use crate::codegen::{self, Known, Options, Resolved};
+use crate::codegen::{self, EffectBridge, Known, Options, Resolved};
 use crate::diagnostics::Diagnostic;
 use crate::iface::Interface;
 #[cfg(not(target_arch = "wasm32"))]
@@ -21,6 +21,7 @@ use crate::project::target_preflight::prune_compilation_for_env;
 use crate::project::{Compilation, Compiled, normalize};
 use crate::source::SourceMap;
 use crate::{ir, types};
+use flick_backend_support::opt::eval::ReviewedPrimitives;
 
 #[cfg(feature = "native-project")]
 use super::runner_file;
@@ -52,17 +53,7 @@ pub fn emit(
     let modules = &compilation.modules;
     let builtin_names: Vec<&str> = types::builtin_sources().iter().map(|(n, _)| *n).collect();
     let path = |m: &str| codegen::module_path(&builtin_names, settings.typescript, m);
-    let mut packages = BTreeMap::new();
-    for c in modules {
-        if let Some(package) =
-            c.ir.package
-                .as_deref()
-                .or(c.package.as_deref())
-                .or(settings.package)
-        {
-            packages.insert(c.name.clone(), package.to_owned());
-        }
-    }
+    let packages = module_packages(modules, settings.package);
     let package = |m: &str| packages.get(m).cloned();
     let published_interfaces =
         published_interfaces(compilation, settings.package, settings.root, None);
@@ -116,6 +107,9 @@ pub fn emit(
         effect_bridge: bridge_select::select(compilation, settings.effect_bridge, settings.runners),
         lang: &known,
     };
+    let primitives = settings
+        .release
+        .then(|| reviewed_primitives(modules, by_class, &known, options.effect_bridge, &resolved));
     let mut out = Vec::new();
     #[cfg(feature = "native-project")]
     out.push(package_json(settings));
@@ -127,6 +121,7 @@ pub fn emit(
         #[cfg(feature = "native-project")]
         sources,
         options: &options,
+        primitives: primitives.as_ref(),
         #[cfg(not(target_arch = "wasm32"))]
         typing: settings.typescript.then_some(&typing),
         path: &path,
@@ -141,6 +136,39 @@ pub fn emit(
     builtins(&ctx, imports, &mut out);
     entry_runners(settings, modules, &path, &mut out, &mut diagnostics);
     (out, diagnostics)
+}
+
+fn module_packages(modules: &[Compiled], default: Option<&str>) -> BTreeMap<String, String> {
+    let mut packages = BTreeMap::new();
+    for c in modules {
+        if let Some(package) = c.ir.package.as_deref().or(c.package.as_deref()).or(default) {
+            packages.insert(c.name.clone(), package.to_owned());
+        }
+    }
+    packages
+}
+
+fn reviewed_primitives(
+    modules: &[Compiled],
+    by_class: bool,
+    known: &Known<'_>,
+    bridge: EffectBridge,
+    resolved: &[Resolved],
+) -> ReviewedPrimitives {
+    let is_builtin = |owner: &str| !modules.iter().any(|m| m.name == owner);
+    ReviewedPrimitives::for_js(
+        builtin_modules_of(by_class),
+        &is_builtin,
+        known,
+        by_class,
+        bridge,
+        &|module, spec| {
+            resolved
+                .iter()
+                .find(|r| r.module == module && r.spec == spec)
+                .map(|r| r.specifier.as_str())
+        },
+    )
 }
 
 /// Common runtime capability and environment checks before generation.
@@ -398,6 +426,7 @@ struct Context<'a> {
     #[cfg(feature = "native-project")]
     sources: &'a SourceMap,
     options: &'a Options<'a>,
+    primitives: Option<&'a ReviewedPrimitives>,
     /// In TypeScript, what projects the types of a module's exports.
     #[cfg(not(target_arch = "wasm32"))]
     typing: Option<&'a Typing<'a>>,

@@ -33,11 +33,38 @@ pub(super) fn exports(request: &BuildRequest, data: &Data) -> Exports {
     exports
 }
 
+pub(super) fn primitives(
+    request: &BuildRequest,
+    data: &Data,
+    lang: &Known<'_>,
+) -> opt::eval::ReviewedPrimitives {
+    let builtin = |owner: &str| {
+        request
+            .modules
+            .iter()
+            .any(|m| m.name == owner && m.role == ModuleRole::Builtin)
+    };
+    opt::eval::ReviewedPrimitives::for_js(
+        &data.program.modules,
+        &builtin,
+        lang,
+        data.rt,
+        data.bridge,
+        &|module, spec| {
+            data.foreign
+                .iter()
+                .find(|r| r.module == module && r.spec == spec)
+                .map(|r| r.specifier.as_str())
+        },
+    )
+}
+
 pub(super) fn module(
     request: &BuildRequest,
     data: &Data,
     module: &Module,
     lang: &Known<'_>,
+    primitives: &dyn opt::eval::PrimitiveEval,
 ) -> Module {
     let mut result = module.clone();
     let exported = |name: &str| {
@@ -69,6 +96,16 @@ pub(super) fn module(
             .iter()
             .any(|m| m.name == owner && m.role == ModuleRole::Builtin)
     };
-    opt::optimize(&mut result, &exported, &generics, &arity, lang, &builtin);
+    let config = opt::eval::EvalConfig::default();
+    let _ = opt::optimize_with_eval(
+        &mut result,
+        &exported,
+        &generics,
+        &arity,
+        lang,
+        &builtin,
+        &config,
+        primitives,
+    );
     result
 }

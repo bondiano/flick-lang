@@ -8,11 +8,28 @@ use flick_ir::Module;
 
 use super::data::Data;
 
+pub(super) fn primitives(
+    request: &BuildRequest,
+    data: &Data,
+    lang: &Known<'_>,
+) -> opt::eval::ReviewedPrimitives {
+    let builtin = |owner: &str| {
+        (request.modules.iter()).any(|m| m.name == owner && m.role == ModuleRole::Builtin)
+    };
+    opt::eval::ReviewedPrimitives::build(
+        &data.program.modules,
+        &builtin,
+        lang,
+        &|module, foreign, prim| data.bindings.allows_primitive(module, foreign, prim),
+    )
+}
+
 pub(super) fn module(
     request: &BuildRequest,
     data: &Data,
     module: &Module,
     lang: &Known<'_>,
+    primitives: &dyn opt::eval::PrimitiveEval,
 ) -> Module {
     let mut result = module.clone();
     let exports = |owner: &str| data.facts.get(owner).map(|f| f.exports.as_slice());
@@ -35,6 +52,16 @@ pub(super) fn module(
         (request.modules.iter()).any(|m| m.name == owner && m.role == ModuleRole::Builtin)
     };
     tuple_match::fold_tuple_matches(&mut result);
-    opt::optimize(&mut result, &exported, &generics, &arity, lang, &builtin);
+    let config = opt::eval::EvalConfig::default();
+    let _ = opt::optimize_with_eval(
+        &mut result,
+        &exported,
+        &generics,
+        &arity,
+        lang,
+        &builtin,
+        &config,
+        primitives,
+    );
     result
 }
