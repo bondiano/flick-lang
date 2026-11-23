@@ -1,7 +1,7 @@
 ---
 title: Зачем Flick
 description: Какие гарантии даёт Flick, каковы их ограничения и кому язык пока не подходит.
-source_hash: 90e0fecef529fffa
+source_hash: acde3e41cff28fa3
 ---
 
 Flick — один язык для всего приложения: браузера, сервера и командной строки. Его
@@ -90,8 +90,38 @@ let read_later path =
 
 Чтобы писать на Flick, не нужно знать, что такое монада. Вызов сервиса — это
 прямой вызов, `let` связывает его результат, а строки выполняются сверху вниз.
-В `load_view` выше нет `yield`, `flatMap` и `pipe`. Чтобы выполнять работу
-параллельно, создайте отложенные вычисления через `task`:
+В `load_view` выше нет `yield`, `flatMap` и `pipe`.
+
+Значения и типизированные ошибки работают вместе. Здесь `?` извлекает успешное
+значение `Result` или поднимает его ошибку, а `catch` превращает эту ошибку в
+сообщение. Сигнатура `sum` называет возможную ошибку; `sum_text` обрабатывает её,
+поэтому в строке ошибок этой функции ничего нет.
+
+```flick
+type error InvalidNumber = InvalidNumber String
+
+parse_number : String -> Result InvalidNumber Float
+let parse_number text =
+  match String.to_number text with
+  | Some number -> Ok number
+  | None -> Err (InvalidNumber text)
+
+sum : String -> String ->{; InvalidNumber} Float
+let sum left right = (parse_number left)? + (parse_number right)?
+
+sum_text : String -> String ->{} String
+let sum_text left right =
+  show (sum left right) catch
+  | InvalidNumber text -> "Not a number: \{text}"
+```
+
+Используйте `result { … }`, если вызывающая функция должна получить значение
+`Ok` или `Err` вместо поднятой ошибки. Для `Option` оператор `orelse`
+вычисляет запасное значение только при `None`.
+
+Параллельность задана явно. `task` создаёт вычисление, не запуская его;
+`parallel` выполняет оба вычисления параллельно и возвращает их результаты.
+Требования к сервисам и возможные ошибки по-прежнему видны в сигнатуре функции.
 
 ```flick
 # opaque type alias UserId = String
@@ -102,7 +132,10 @@ let read_later path =
 # service Log =
 #   info : String ->{} Unit
 # load_view : UserId ->{Users, Log; NotFound} UserView
-# let load_view id = Users.get id
+# let load_view id =
+#   let view = Users.get id
+#   Log.info "Loaded \{view.title}"
+#   view
 #
 load_two : UserId -> UserId ->{Users, Log; NotFound} (UserView, UserView)
 let load_two first_id second_id =
@@ -111,9 +144,45 @@ let load_two first_id second_id =
   parallel first second
 ```
 
-Так же читаются локальные изменяемые переменные и циклы: `let mut`, `loop` и
-`while`, с метками для `break` и `continue`. Функция, которая меняет свои
-переменные, снаружи остаётся чистой.
+Сервисы позволяют подменять зависимости, не меняя функцию. `greeting` читает
+часы обычным вызовом; `provide` задаёт фиксированное время для
+детерминированной проверки. Требование к сервису удовлетворено внутри блока,
+поэтому у `check_greeting` пустая строка сервисов.
+
+```flick
+service Clock =
+  hour : Unit ->{} Int
+
+greeting : Unit ->{Clock} String
+let greeting () =
+  if Clock.hour () < 12 then "Good morning" else "Good afternoon"
+
+check_greeting : Unit ->{} Bool
+let check_greeting () =
+  let clock = Layer.succeed Clock { hour = fun () -> 9 }
+  provide clock { greeting () == "Good morning" }
+```
+
+Локальные изменения не требуют рантайма. Эта функция использует `let mut` и
+`while`, но остаётся чистой: она меняет только собственные переменные.
+
+```flick
+digits : Int -> Int
+let digits number =
+  let mut left = number
+  let mut count = 1
+  while left >= 10 do {
+    left = left / 10
+    count = count + 1
+  }
+  count
+```
+
+Циклы поддерживают `break`, `continue` и метки для вложенных циклов.
+Та же структура блоков управляет ресурсами: `scope { … }` задаёт их время
+жизни, а `defer { … }` регистрирует очистку при завершении этой области.
+См. [эффекты и ошибки](../../reference/effects/),
+[сервисы](../../reference/services/) и [ресурсы](../../reference/resources/).
 
 ## Один язык на всё приложение
 
