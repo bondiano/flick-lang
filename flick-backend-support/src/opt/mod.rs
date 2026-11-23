@@ -170,6 +170,7 @@ fn optimize_inner(
     primitives: &dyn eval::PrimitiveEval,
     preserve_types: bool,
 ) -> eval::EvalCounters {
+    tuple_match::fold_tuple_matches(module);
     let preserve_types = cfg!(feature = "typed-ir") && preserve_types;
     let mut fresh = 0;
     let foreign = inline::Foreign::new(generics, builtin);

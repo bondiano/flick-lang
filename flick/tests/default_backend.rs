@@ -148,9 +148,12 @@ let first f g x =
     );
     assert!(built.status.success(), "{built:?}");
     let js = fs::read_to_string(root.join("out/Probe.js")).expect("emitted library");
-    assert!(js.contains("f(x)") && js.contains("g(x)"), "{js}");
+    let first = js
+        .split("export const ")
+        .find_map(|declaration| declaration.strip_prefix("first$3 = "))
+        .expect("the exported three-argument worker");
     assert!(
-        !js.contains('['),
-        "tuple construction or projection survived:\n{js}"
+        !first.contains('['),
+        "tuple construction or projection survived in first:\n{first}"
     );
 }

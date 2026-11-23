@@ -46,7 +46,6 @@ fn emit_js_with_config(
             .iter()
             .any(|(name, _)| *name == module)
     };
-    portable::tuple_match::fold_tuple_matches(&mut ir);
     let counters = portable::optimize_with_eval(
         &mut ir,
         &|name: &str| interface.exports_value(name),

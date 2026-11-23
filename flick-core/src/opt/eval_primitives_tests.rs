@@ -33,7 +33,6 @@ fn emit_js_with_reviewed_primitives(
         EffectBridge::Absent,
         &|_, _| None,
     );
-    portable::tuple_match::fold_tuple_matches(&mut ir);
     let counters = portable::optimize_with_eval(
         &mut ir,
         &|name: &str| interface.exports_value(name),

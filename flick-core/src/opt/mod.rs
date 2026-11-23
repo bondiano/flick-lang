@@ -45,7 +45,6 @@ pub fn optimize_with_primitives(
             .any(|(name, _)| *name == module)
     };
     let config = portable::eval::EvalConfig::default();
-    tuple_match::fold_tuple_matches(module);
     let _ = portable::optimize_with_eval(
         module, exported, generics, arity, &known, &builtin, &config, primitives,
     );
@@ -67,7 +66,6 @@ pub fn optimize_legacy_bare(
             .any(|(name, _)| *name == module)
     };
     let config = portable::eval::EvalConfig::default();
-    tuple_match::fold_tuple_matches(module);
     let _ = portable::optimize_legacy_bare(
         module, exported, generics, arity, &known, &builtin, &config, primitives,
     );
