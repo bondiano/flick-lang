@@ -1,0 +1,93 @@
+// Imported custom collections, default-taking instances, generic consumers,
+// and a local packed dictionary contract for cross-module coherence tests.
+module Language.CollectionClassDefs exposing (
+  Bag(..),
+  AssocMap(..),
+  SizedOverride,
+  packed_sized_override,
+  bag_of,
+  assoc_of,
+  generic_summary,
+  generic_lookup_report,
+  generic_size_of,
+)
+
+import Collections exposing (Indexed(..), Keyed(..), Member(..), Sized(..), ToSeq(..))
+
+/// Custom finite indexed collection taking defaults for `first`, `is_empty`,
+/// `last`, and default-signature `Member`.
+type Bag a = Bag (List a)
+  deriving Eq, Show
+
+bag_of : List a -> Bag a
+let bag_of xs = Bag xs
+
+instance ToSeq (Bag a) a =
+  let to_seq (Bag xs) = to_seq xs
+
+instance Sized (Bag a) =
+  let size (Bag xs) = size xs
+
+instance Indexed (Bag a) a =
+  let at index (Bag xs) = at index xs
+
+instance Eq a => Member (Bag a) a
+
+/// Custom keyed collection taking defaults for `is_empty` and `has_key`.
+type AssocMap k v = AssocMap (List (k, v))
+  deriving Eq, Show
+
+assoc_of : List (k, v) -> AssocMap k v
+let assoc_of entries = AssocMap entries
+
+instance ToSeq (AssocMap k v) (k, v) =
+  let to_seq (AssocMap xs) = to_seq xs
+
+instance Sized (AssocMap k v) =
+  let size (AssocMap xs) = size xs
+
+instance Eq k => Keyed (AssocMap k v) k v =
+  let lookup key (AssocMap xs) =
+    Option.map (fun (_, value) -> value) (List.find (fun (k, _) -> eq k key) xs)
+
+/// Generic consumer compiled in this module, exercising imported dictionaries.
+generic_summary : (Sized c, ToSeq c Int) => c -> (Int, Bool, Option Int, Int)
+let generic_summary xs = (
+  size xs,
+  is_empty xs,
+  first xs,
+  Seq.fold (fun acc n -> acc + n) 0 (to_seq xs),
+)
+
+generic_lookup_report : Keyed c String Int => List String -> c -> (Int, List (String, Int), Int)
+let generic_lookup_report keys m = (
+  size m,
+  Seq.to_list (Collections.lookup_all keys m),
+  Collections.lookup_or (-1) "missing" m,
+)
+
+generic_size_of : Sized c => c -> Int
+let generic_size_of xs = size xs
+
+/// Local module dictionary contract overriding `Collections.Sized (Bag Int)`
+/// inside `unpack` without affecting the canonical global instance outside.
+type module SizedOverride =
+  type Target = Bag Int
+  class Sized = Collections.Sized
+  sizing : Sized.Dict Target
+  instance Sized Target from sizing
+
+module CustomSizedImpl exposing (Target, Sized(..), sizing) =
+  import Collections exposing (Sized(..))
+
+  type alias Target = Bag Int
+
+  sizing : Sized.Dict Target
+  let sizing =
+    Sized.dictionary {
+      size = fun (Bag xs) -> List.length xs * 100
+      is_empty = fun (Bag xs) -> List.is_empty xs
+    }
+
+packed_sized_override : Module SizedOverride
+let packed_sized_override = pack CustomSizedImpl as SizedOverride

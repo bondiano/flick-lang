@@ -460,6 +460,12 @@ instance Alternative Seq =
   let nothing = seq_of_list []
   let or_else xs ys = append_seq xs ys
 
+instance Semigroup (Seq a) =
+  let combine xs ys = append_seq xs ys
+
+instance Monoid (Seq a) =
+  let empty = seq_of_list []
+
 instance Eq SchemaError =
   let eq x y =
     match (x, y) with

@@ -1,0 +1,109 @@
+// Negative contracts of the shared collection type-class hierarchy:
+// - potentially infinite `Seq` lacks `Sized`, `Indexed`, `Member`, `Traversable`
+// - `HashSet` intentionally lacks `Functor` and `Traversable`
+// - `NonEmpty`, `NonEmptyChunk`, and non-canonical hash collections lack `Monoid`
+// - `Collections.to_seq` preserves hidden captures so scoped sequences cannot escape
+module App.CollectionsFail exposing (..)
+
+import Collections exposing (at, is_empty, lookup, member, size, to_list, to_seq)
+
+type Handle (s : Region) = Handle
+
+open_handle : Fiber.Owner s -> String ->{Scope s} Handle s
+let open_handle _ _ = Handle
+
+read_handle : Handle s ->{} Int
+let read_handle _ = 1
+
+seq_size : Int
+let seq_size = size (Seq.from 0)
+
+seq_is_empty : Bool
+let seq_is_empty = is_empty (Seq.range 0 5)
+
+seq_to_list : List Int
+let seq_to_list = to_list (Seq.from 0)
+
+seq_indexed : Option Int
+let seq_indexed = at 0 (Seq.range 0 5)
+
+seq_member : Bool
+let seq_member = member 1 (Seq.range 0 5)
+
+seq_traverse : Unit ->{} Seq Int
+let seq_traverse () = traverse (fun x -> x) (Seq.range 0 3)
+
+hash_set_functor : HashSet.HashSet EqHash.Canonical Int
+let hash_set_functor = map (fun n -> n + 1) (HashSet.from_list EqHash.canonical [1, 2])
+
+hash_set_traverse : Unit ->{} HashSet.HashSet EqHash.Canonical Int
+let hash_set_traverse () = traverse (fun n -> n + 1) (HashSet.from_list EqHash.canonical [1, 2])
+
+hash_map_indexed : Option (String, Int)
+let hash_map_indexed = at 0 (HashMap.empty : HashMap.HashMap EqHash.Canonical String Int)
+
+list_keyed : Option String
+let list_keyed = lookup "a" ["a", "b"]
+
+non_empty_monoid : NonEmpty.NonEmpty Int
+let non_empty_monoid = empty
+
+non_empty_chunk_monoid : Chunk.NonEmptyChunk Int
+let non_empty_chunk_monoid = empty
+
+custom_hash_map_monoid : Int
+let custom_hash_map_monoid =
+  EqHash.with
+    (fun a b -> a == b)
+    (fun n -> n)
+    (fun w ->
+      let m = HashMap.insert 1 2 (HashMap.with w)
+      let z = combine empty m
+      size z
+    )
+
+custom_hash_set_monoid : Int
+let custom_hash_set_monoid =
+  EqHash.with
+    (fun a b -> a == b)
+    (fun n -> n)
+    (fun w ->
+      let s = HashSet.insert 1 (HashSet.with w)
+      let z = combine empty s
+      size z
+    )
+
+escape_to_seq : Unit ->{} Seq (Unit ->{} Int)
+let escape_to_seq () = scope s {
+  let h : Handle s = Handle
+  let f = fun () -> read_handle h
+  to_seq [f]
+}
+
+escape_to_seq_use : Unit ->{} Int
+let escape_to_seq_use () =
+  let leaked = scope s {
+    let h = open_handle s "x"
+    to_seq [h]
+  }
+  match Seq.first leaked with
+  | Some h -> read_handle h
+  | None -> 0
+
+//~ FLICK-C001 @19:16-19:20 no instance for `Sized (Seq Int)`
+//~ FLICK-C001 @22:20-22:28 no instance for `Sized (Seq Int)`
+//~ FLICK-C001 @25:19-25:26 no instance for `Sized (Seq Int)`
+//~ FLICK-C001 @28:19-28:21 no instance for `Indexed (Seq Int) Int`
+//~ FLICK-C001 @31:18-31:24 no instance for `Member (Seq Int) Int`
+//~ FLICK-C001 @34:23-34:31 no instance for `Traversable Seq`
+//~ FLICK-C001 @37:24-37:27 no instance for `Functor (HashSet Canonical)`
+//~ FLICK-C001 @40:28-40:36 no instance for `Traversable (HashSet Canonical)`
+//~ FLICK-C001 @43:24-43:26 no instance for `Indexed (HashMap Canonical String Int) (String, Int)`
+//~ FLICK-C001 @46:18-46:24 no instance for `Keyed (List String) String String`
+//~ FLICK-C001 @49:24-49:29 no instance for `Monoid (NonEmpty Int)`
+//~ FLICK-C001 @52:30-52:35 no instance for `Monoid (NonEmptyChunk Int)`
+//~ FLICK-C001 @61:23-61:28 cannot deduce `Monoid (HashMap w Int Int)`
+//~ FLICK-C001 @72:23-72:28 cannot deduce `Monoid (HashSet w Int)`
+//~ FLICK-C001 @80:3-80:9 cannot deduce `ToSeq (List (Unit ->{; _} Int)) (Unit ->{} Int)`
+//~ FLICK-G002 @86:5-87:15
+//~ FLICK-G002 @89:19-89:25 this value holds region `s`, so it cannot leave the `scope` that owns the region

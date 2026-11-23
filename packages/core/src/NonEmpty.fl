@@ -67,6 +67,40 @@ instance Eq a => Eq (NonEmpty a) =
 instance Show a => Show (NonEmpty a) =
   let show x = "NonEmpty " ++ show (to_list x)
 
+to_list_held : (NonEmpty a)^d -> (List a)^d
+foreign pure to_list_held from "flick:rt" "identity"
+  retention call
+
+from_list_held : (List a)^d -> (NonEmpty a)^d
+foreign pure from_list_held from "flick:rt" "identity"
+  retention call
+
+pure_ne_held : a^c -> (NonEmpty a)^c
+let pure_ne_held x = from_list_held [x]
+
+instance Functor NonEmpty =
+  let map f xs = from_list_held (Prelude.map f (to_list_held xs))
+
+instance Foldable NonEmpty =
+  let fold f init xs = Prelude.fold f init (to_list xs)
+
+instance Traversable NonEmpty =
+  let traverse f xs =
+    let first = f (head xs)
+    let rest = Prelude.traverse f (tail xs)
+    cons first rest
+
+instance Applicative NonEmpty =
+  let pure x = pure_ne_held x
+  let map2 f xs ys = from_list_held (Prelude.map2 f (to_list_held xs) (to_list_held ys))
+
+instance Monad NonEmpty =
+  let flat_map f xs =
+    from_list_held (Prelude.flat_map (fun x -> to_list_held (f x)) (to_list_held xs))
+
+instance Semigroup (NonEmpty a) =
+  let combine xs ys = cons (head xs) (tail xs ++ to_list ys)
+
 /// The list with `x` added at the end.
 append : a -> List a -> NonEmpty a
 foreign pure append from "flick:Array" "append"

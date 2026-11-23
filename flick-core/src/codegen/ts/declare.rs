@@ -252,20 +252,51 @@ impl Projection<'_> {
                 members.push(format!("readonly ${class}: {}", self.ty(s, &vars)?));
             }
         }
+        let self_constraint = Type::apps(
+            Type::con(self.module, name),
+            params.iter().map(|p| Type::Var(p.clone())),
+        );
         for method in methods {
             let scheme = interface
                 .find(Namespace::Value, method)
                 .and_then(|e| e.scheme.clone())
                 .ok_or_else(|| format!("method `{method}` is not exported"))?;
-            let body = match scheme {
-                Type::Forall { body, .. } => *body,
-                other => other,
+            let method_ty = match scheme {
+                Type::Forall {
+                    vars: method_vars,
+                    constraints,
+                    body,
+                } => {
+                    let extra_vars: Vec<Binder> = method_vars
+                        .into_iter()
+                        .filter(|b| !params.contains(&b.name))
+                        .collect();
+                    let mut dropped_self = false;
+                    let extra_constraints: Vec<Type> = constraints
+                        .into_iter()
+                        .filter(|c| {
+                            if !dropped_self && *c == self_constraint {
+                                dropped_self = true;
+                                false
+                            } else {
+                                true
+                            }
+                        })
+                        .collect();
+                    if extra_vars.is_empty() && extra_constraints.is_empty() {
+                        self.ty(&body, &vars)?
+                    } else {
+                        let inner = Type::Forall {
+                            vars: extra_vars,
+                            constraints: extra_constraints,
+                            body,
+                        };
+                        self.value_in(&inner, &vars)?
+                    }
+                }
+                other => self.ty(&other, &vars)?,
             };
-            members.push(format!(
-                "readonly {}: {}",
-                key(method),
-                self.ty(&body, &vars)?
-            ));
+            members.push(format!("readonly {}: {}", key(method), method_ty));
         }
         let shown: Vec<String> = params.iter().map(|p| generic(p)).collect();
         Ok(format!(

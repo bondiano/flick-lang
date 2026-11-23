@@ -3,7 +3,21 @@
 /// `union` compare by `==`.
 module Chunk.Ops exposing (..)
 
-import Chunk.Core exposing (Chunk, to_list)
+import Chunk.Core exposing (
+  Chunk,
+  NonEmptyChunk,
+  concat,
+  empty,
+  from_list,
+  get,
+  head_non_empty,
+  is_empty,
+  last,
+  last_non_empty,
+  size,
+  to_chunk,
+  to_list,
+)
 
 /// The elements that satisfy `p`.
 filter : (a -> Bool)^c -> Chunk a -> Chunk a
@@ -177,3 +191,122 @@ zip_with : Chunk b -> (a -> b -> d)^c -> (Chunk a -> Chunk d)^c
 foreign pure zip_with from "flick:Chunk" "zipWith"
   arity 2
   retention call
+
+map_chunk : (a^v -> b)^c -> (Chunk a)^d -> (Chunk b)^c
+foreign pure map_chunk from "flick:rt" "chunkMap"
+  arity 2
+  retention call
+
+get_chunk_held : Int -> (Chunk a)^d -> Option a
+foreign pure get_chunk_held from "flick:rt" "chunkGet"
+  retention call
+
+head_chunk_held : (Chunk a)^d -> Option a
+let head_chunk_held chunk = get_chunk_held 0 chunk
+
+chunk_to_seq_held : (Chunk a)^d -> (Seq a)^d
+let chunk_to_seq_held chunk =
+  Seq.unfold
+    (fun index -> Option.map (fun value -> (value, index + 1)) (get_chunk_held index chunk))
+    0
+
+map_non_empty_chunk : (a^v -> b)^c -> (NonEmptyChunk a)^d -> (NonEmptyChunk b)^c
+foreign pure map_non_empty_chunk from "flick:rt" "chunkMap"
+  arity 2
+  retention call
+
+to_chunk_held : (NonEmptyChunk a)^d -> (Chunk a)^d
+foreign pure to_chunk_held from "flick:rt" "identity"
+  retention call
+
+to_list_held : (Chunk a)^d -> (List a)^d
+foreign pure to_list_held from "flick:rt" "chunkToList"
+  retention call
+
+from_list_held : (List a)^d -> (Chunk a)^d
+foreign pure from_list_held from "flick:rt" "chunkFromList"
+  retention call
+
+pure_chunk_held : a^c -> (Chunk a)^c
+let pure_chunk_held x = from_list_held [x]
+
+instance Functor Chunk =
+  let map f chunk = map_chunk f chunk
+
+instance Foldable Chunk =
+  let fold f init chunk = reduce init f chunk
+
+instance Traversable Chunk =
+  let traverse f chunk = from_list (Prelude.traverse f (to_list chunk))
+
+instance Applicative Chunk =
+  let pure x = pure_chunk_held x
+  let map2 f left right = from_list_held (Prelude.map2 f (to_list_held left) (to_list_held right))
+
+instance Monad Chunk =
+  let flat_map f chunk =
+    from_list_held (Prelude.flat_map (fun x -> to_list_held (f x)) (to_list_held chunk))
+
+instance Alternative Chunk =
+  let nothing = empty
+  let or_else left right = concat left right
+
+instance Semigroup (Chunk a) =
+  let combine left right = concat left right
+
+instance Monoid (Chunk a) =
+  let empty = empty
+
+instance Collections.ToSeq (Chunk a) a =
+  let to_seq chunk = chunk_to_seq_held chunk
+  let first chunk = head_chunk_held chunk
+
+instance Collections.Sized (Chunk a) =
+  let size chunk = size chunk
+  let is_empty chunk = is_empty chunk
+
+instance Collections.Indexed (Chunk a) a =
+  let at index chunk = get index chunk
+  let last chunk = last chunk
+
+instance Eq a => Collections.Member (Chunk a) a =
+  let member value chunk = contains value chunk
+
+instance Eq a => Eq (NonEmptyChunk a) =
+  let eq left right = eq (to_chunk left) (to_chunk right)
+
+instance Show a => Show (NonEmptyChunk a) =
+  let show chunk = "NonEmptyChunk " ++ show (to_list (to_chunk chunk))
+
+instance Functor NonEmptyChunk =
+  let map f chunk = map_non_empty_chunk f chunk
+
+instance Foldable NonEmptyChunk =
+  let fold f init chunk = reduce init f (to_chunk chunk)
+
+instance Traversable NonEmptyChunk =
+  let traverse f chunk =
+    let first = f (head_non_empty chunk)
+    let rest = Prelude.traverse f (to_list (Chunk.Core.tail_non_empty chunk))
+    Chunk.Core.prepend first (from_list rest)
+
+instance Semigroup (NonEmptyChunk a) =
+  let combine left right =
+    Chunk.Core.prepend
+      (head_non_empty left)
+      (concat (Chunk.Core.tail_non_empty left) (to_chunk right))
+
+instance Collections.ToSeq (NonEmptyChunk a) a =
+  let to_seq chunk = chunk_to_seq_held (to_chunk_held chunk)
+  let first chunk = head_chunk_held (to_chunk_held chunk)
+
+instance Collections.Sized (NonEmptyChunk a) =
+  let size chunk = size (to_chunk chunk)
+  let is_empty _ = false
+
+instance Collections.Indexed (NonEmptyChunk a) a =
+  let at index chunk = get index (to_chunk chunk)
+  let last chunk = Some (last_non_empty chunk)
+
+instance Eq a => Collections.Member (NonEmptyChunk a) a =
+  let member value chunk = contains value (to_chunk chunk)

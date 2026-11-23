@@ -429,3 +429,51 @@ fn a_release_build_in_typescript_types_a_constructed_value_as_its_constructor_do
     assert!(ts.contains("_0: \"a\", _1: 1 } as any"), "{ts}");
     assert!(!emit(false).contains("as any"));
 }
+
+#[test]
+fn class_with_capture_polymorphic_methods_emits_typescript_interface() {
+    let out = project(
+        "module App.Shapes exposing (..)\n\
+         class Walk c a | c -> a =\n  walk : forall d. c^d -> (Seq a)^d\n  peek : forall d. c^d -> Option a\n\
+         take_one : Walk c a => c^d -> (Seq a)^d\n\
+         let take_one xs = Seq.take 1 (walk xs)\n",
+    );
+    assert!(
+        out.contains(
+            "export interface Walk<C, A> { readonly walk: (arg: C) => Iterable<A>; readonly peek: (arg: C) => $Option.Option<A> }"
+        ),
+        "{out}"
+    );
+    assert!(
+        out.contains("take_one: <C, A>(dictionary0: Walk<C, A>) => (arg: C) => Iterable<A>"),
+        "{out}"
+    );
+    assert!(!out.contains("type Walk:"), "{out}");
+
+    let builtins = types::builtins();
+    let collections = builtins
+        .iter()
+        .find(|i| i.module == "Collections")
+        .expect("Collections built-in interface");
+    let lookup = |m: &str| builtins.iter().find(|i| i.module == m).cloned();
+    let package = |_: &str| None;
+    let projection = Projection::new("Collections", &lookup, &package);
+    let (decls, refused) = projection.declarations(collections);
+    assert!(
+        refused.is_empty(),
+        "Collections declarations refused: {refused:?}"
+    );
+    let joined = decls.join("\n");
+    for expected in [
+        "export interface ToSeq<C, A>",
+        "export interface Sized<C>",
+        "export interface Indexed<C, A>",
+        "export interface Keyed<C, K, V>",
+        "export interface Member<C, A>",
+    ] {
+        assert!(
+            joined.contains(expected),
+            "missing `{expected}` in:\n{joined}"
+        );
+    }
+}

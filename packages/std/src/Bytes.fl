@@ -102,3 +102,30 @@ foreign pure from_base64url from "flick:Crypto" "flickBase64UrlDecode"
 equal : List Int -> List Int -> Bool
 let equal a b =
   List.length a == List.length b && List.fold_left Int.bit_or 0 (List.zip_with b Int.bit_xor a) == 0
+
+bytes_to_seq : Bytes -> Seq Int
+let bytes_to_seq bs =
+  Seq.unfold (fun index -> Option.map (fun value -> (value, index + 1)) (get index bs)) 0
+
+instance Eq Bytes =
+  let eq left right = equal_constant_time left right
+
+instance Semigroup Bytes =
+  let combine left right = Result.with_default empty (from_list (to_list left ++ to_list right))
+
+instance Monoid Bytes =
+  let empty = empty
+
+instance Collections.ToSeq Bytes Int =
+  let to_seq bs = bytes_to_seq bs
+  let first bs = get 0 bs
+
+instance Collections.Sized Bytes =
+  let size bs = length bs
+
+instance Collections.Indexed Bytes Int =
+  let at index bs = get index bs
+
+instance Collections.Member Bytes Int =
+  let member byte bs =
+    if byte < 0 || byte > 255 then false else Seq.any (fun b -> b == byte) (bytes_to_seq bs)

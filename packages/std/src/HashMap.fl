@@ -178,3 +178,51 @@ let for_each f m = List.each_effect (fun (key, value) -> f value key) (to_list m
 json :
   Hash k => PureCodec Json k -> PureCodec Json v -> PureCodec Json (HashMap EqHash.Canonical k v)
 foreign pure json from "flick:Schema" "flickHashMapJson"
+
+map_values_held : (v^u -> k -> b)^c -> (HashMap w k v)^d -> (HashMap w k b)^(c + d)
+foreign pure map_values_held from "flick:HashMap" "flickMap"
+  arity 2
+  retention call
+
+to_seq_held : (HashMap w k v)^d -> (Seq (k, v))^d
+foreign pure to_seq_held from "flick:rt" "hashMapToSeq"
+  retention call
+
+instance Eq v => Eq (HashMap w k v) =
+  let eq left right =
+    size left == size right
+      && every
+        (fun value key ->
+          match get key right with
+          | Some other -> eq value other
+          | None -> false
+        )
+        left
+
+instance Functor (HashMap w k) =
+  let map f m = map_values_held (fun value _key -> f value) m
+
+instance Foldable (HashMap w k) =
+  let fold f init m = reduce init (fun acc value _key -> f acc value) m
+
+instance Traversable (HashMap w k) =
+  let traverse f m =
+    let empty_like = filter_map (fun _value _key -> Err ()) m
+    Seq.fold_effect (fun acc (key, value) -> insert key (f value) acc) empty_like (to_seq m)
+
+instance Semigroup (HashMap w k v) =
+  let combine left right = union left right
+
+instance Hash k => Monoid (HashMap EqHash.Canonical k v) =
+  let empty = empty
+
+instance Collections.ToSeq (HashMap w k v) (k, v) =
+  let to_seq m = to_seq_held m
+
+instance Collections.Sized (HashMap w k v) =
+  let size m = size m
+  let is_empty m = is_empty m
+
+instance Collections.Keyed (HashMap w k v) k v =
+  let lookup key m = get key m
+  let has_key key m = has key m

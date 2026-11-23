@@ -1,0 +1,139 @@
+// Shared collection type-class hierarchy: minimal capabilities, custom
+// witnesses, defaults, scoped callbacks, and #723 capture handling.
+module App.CollectionsPass exposing (..)
+
+import Arena
+import Collections exposing (Indexed(..), Keyed(..), Member(..), Sized(..), ToSeq(..))
+
+// A custom finite collection taking default `first`, `is_empty`, `last`, and
+// default-signature `Member`.
+type PairList a = PairList (List a)
+
+instance ToSeq (PairList a) a =
+  let to_seq (PairList xs) = to_seq xs
+
+instance Sized (PairList a) =
+  let size (PairList xs) = size xs
+
+instance Indexed (PairList a) a =
+  let at index (PairList xs) = at index xs
+
+instance Eq a => Member (PairList a) a
+
+// A custom keyed map taking default `is_empty` and `has_key`.
+type Assoc k v = Assoc (List (k, v))
+
+instance ToSeq (Assoc k v) (k, v) =
+  let to_seq (Assoc xs) = to_seq xs
+
+instance Sized (Assoc k v) =
+  let size (Assoc xs) = size xs
+
+instance Eq k => Keyed (Assoc k v) k v =
+  let lookup key (Assoc xs) =
+    Option.map (fun (_, value) -> value) (List.find (fun (k, _) -> eq k key) xs)
+
+defaults_work : (Option Int, Bool, Option Int, Bool, Bool)
+let defaults_work =
+  let pl = PairList [10, 20, 30]
+  let assoc = Assoc [("a", 1), ("b", 2)]
+  (first pl, is_empty pl, last pl, member 20 pl, has_key "a" assoc)
+
+// Minimal capability consumers.
+non_empty_first : (Sized c, ToSeq c a) => c -> Option a
+let non_empty_first xs = if is_empty xs then None else first xs
+
+lazy_prefix : ToSeq c a => Int -> c^d -> (Seq a)^d
+let lazy_prefix n xs = Collections.take n xs
+
+has_pair : (Keyed c k v, Eq v) => k -> v -> c -> Bool
+let has_pair key expected m =
+  match lookup key m with
+  | Some actual -> eq actual expected
+  | None -> false
+
+// #723 regression: mixed capture-free and region-capturing closures in both
+// argument orders flow through generic collection capabilities and Prelude
+// classes without losing region tracking.
+type Handle (s : Region) = Handle
+
+read_handle : Handle s ->{} String
+let read_handle _ = "ok"
+
+keep2 : List (a^c) -> a^c ->{} List (a^c)
+let keep2 xs x =
+  match xs with
+  | [y, ..._] -> [x, y]
+  | [] -> [x]
+
+fresh : Unit ->{} String
+let fresh () = "fresh"
+
+call_in : Handle s -> (Unit ->{; e} String)^{s} ->{; e} String
+let call_in _ f = f ()
+
+capture_value_first : Handle s ->{} (Int, String, String)
+let capture_value_first h =
+  let xs = keep2 [fresh] (fun () -> read_handle h)
+  let count = size xs
+  let from_at =
+    match at 0 xs with
+    | Some k -> call_in h k
+    | None -> ""
+  let from_seq =
+    match first xs with
+    | Some k -> call_in h k
+    | None -> ""
+  (count, from_at, from_seq)
+
+capture_closure_first : Handle s ->{} (Int, String, String)
+let capture_closure_first h =
+  let xs = keep2 [fun () -> read_handle h] fresh
+  let from_first =
+    match first xs with
+    | Some k -> call_in h k
+    | None -> ""
+  let from_last =
+    match last xs with
+    | Some k -> call_in h k
+    | None -> ""
+  (size xs, from_first, from_last)
+
+// A region-capturing `Seq` stays usable inside its scope through `ToSeq`.
+scoped_seq_consumer : Unit ->{} List String
+let scoped_seq_consumer () = scope {
+  let arena = Arena.make ()
+  let slot = Arena.alloc arena "item"
+  let scoped = Seq.map (fun n -> show n) (Seq.range 0 3)
+  let walked = Collections.take 2 scoped
+  let mut out : List String = []
+  for item <- to_seq walked do out = out ++ [Arena.get slot ++ ":" ++ item]
+  out
+}
+
+// Scoped callbacks work with `Collections.each_effect`, `Collections.fold_effect`,
+// `Functor`, `Foldable`, and `Traversable`.
+scoped_callbacks : Unit ->{} (Int, List String)
+let scoped_callbacks () = scope {
+  let arena = Arena.make ()
+  let prefix = Arena.alloc arena "p-"
+  let mapped = map (fun n -> show n) (Chunk.from_list [1, 2])
+  let folded = fold (fun acc s -> acc + String.length s) 0 mapped
+  let traversed = traverse (fun s -> Arena.get prefix ++ s) (NonEmpty.cons "a" ["b"])
+  let total = Collections.fold_effect (fun acc s -> acc + String.length s) folded traversed
+  (total, NonEmpty.to_list traversed)
+}
+
+// Custom `EqHash` witnesses work across `Keyed`, `Member`, `Functor`,
+// `Foldable`, `Traversable`, `Semigroup`, and `ToSeq` without `Eq`/`Hash`.
+custom_witness : (Option Int, Bool, Int)
+let custom_witness =
+  EqHash.with
+    (fun a b -> String.to_lower a == String.to_lower b)
+    (fun s -> hash (String.to_lower s))
+    (fun w ->
+      let m = HashMap.from_list w [("Ada", 1), ("Bob", 2)]
+      let doubled = map (fun n -> n * 2) m
+      let s = HashSet.from_list w ["Ada", "Bob"]
+      (lookup "ADA" doubled, member "BOB" s, size doubled)
+    )
