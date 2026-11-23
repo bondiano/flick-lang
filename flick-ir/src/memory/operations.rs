@@ -58,6 +58,7 @@ impl Intrinsic {
             | Self::EffectCatchDefect => 2,
             Self::Bracket | Self::RecordExtend => 3,
             Self::Int(op) => op.arity(),
+            Self::FixedWidth(op) => op.arity(),
             Self::Float(op) => op.arity(),
             Self::BigInt(op) => op.arity(),
             Self::String(op) => op.arity(),

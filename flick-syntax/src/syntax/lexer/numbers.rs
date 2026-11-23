@@ -72,36 +72,69 @@ impl Lexer<'_> {
                 );
             }
         }
-        let mut kind = SyntaxKind::Number;
-        if self.peek(0) == b'n' {
-            self.pos += 1;
-            kind = SyntaxKind::BigInt;
-            let legacy = radix == 10 && self.src[start] == b'0' && self.pos - start > 2;
-            if !integer_only || legacy {
-                note(
-                    &mut problem,
-                    start,
-                    self.pos,
-                    "a BigInt literal is an integer without fraction, exponent or leading zero",
-                );
-            }
-        }
-        if is_ident_byte(self.peek(0)) {
-            let at = self.pos;
-            while is_ident_byte(self.peek(0)) {
-                self.pos += 1;
-            }
-            note(
-                &mut problem,
-                at,
-                self.pos,
-                "a number cannot be directly followed by a letter or digit of another base",
-            );
-        }
+        let kind = if is_ident_byte(self.peek(0)) {
+            self.number_suffix(start, radix, integer_only, &mut problem)
+        } else {
+            SyntaxKind::Number
+        };
         if let Some((at, end, message)) = problem {
             self.error(codes::S006, at, end, message);
         }
         kind
+    }
+
+    fn number_suffix(
+        &mut self,
+        start: usize,
+        radix: u32,
+        integer_only: bool,
+        problem: &mut Option<(usize, usize, &'static str)>,
+    ) -> SyntaxKind {
+        let suffix_start = self.pos;
+        while is_ident_byte(self.peek(0)) {
+            self.pos += 1;
+        }
+        match &self.text[suffix_start..self.pos] {
+            "n" => {
+                let legacy = radix == 10 && self.src[start] == b'0' && self.pos - start > 2;
+                if !integer_only || legacy {
+                    problem.get_or_insert((
+                        start,
+                        self.pos,
+                        "a BigInt literal is an integer without fraction, exponent or leading zero",
+                    ));
+                }
+                SyntaxKind::BigInt
+            }
+            "i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64" => {
+                if !integer_only {
+                    problem.get_or_insert((
+                        start,
+                        self.pos,
+                        "an integer literal suffix cannot be used with a fraction or exponent",
+                    ));
+                }
+                SyntaxKind::Number
+            }
+            "f32" => {
+                if radix != 10 {
+                    problem.get_or_insert((
+                        start,
+                        self.pos,
+                        "a `f32` literal must be written in decimal",
+                    ));
+                }
+                SyntaxKind::Number
+            }
+            _ => {
+                problem.get_or_insert((
+                    suffix_start,
+                    self.pos,
+                    "a number cannot be directly followed by a letter or digit of another base",
+                ));
+                SyntaxKind::Number
+            }
+        }
     }
 
     /// A digit run with `_` separators; returns whether it had any digit.

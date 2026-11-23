@@ -10,12 +10,30 @@ import (
 // The foreign functions of `Int`, `Float` and `Numeric`, with the JS
 // semantics of the bindings they implement.
 
-// StringFromNumber is JS `String(n)` of an Int or a Float, `-0` kept.
+// StringFromNumber is JS `String(n)` of a numeric scalar, `-0` kept.
 func StringFromNumber(n Value) Value {
-	if i, ok := n.(int32); ok {
-		return strconv.Itoa(int(i))
+	switch x := n.(type) {
+	case int8:
+		return strconv.FormatInt(int64(x), 10)
+	case int16:
+		return strconv.FormatInt(int64(x), 10)
+	case int32:
+		return strconv.Itoa(int(x))
+	case int64:
+		return strconv.FormatInt(x, 10)
+	case uint8:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint32:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint64:
+		return strconv.FormatUint(x, 10)
+	case float32:
+		return ShowNumber(float64(x))
+	default:
+		return ShowNumber(n.(float64))
 	}
-	return ShowNumber(n.(float64))
 }
 
 var digits = lazyRegexp{pattern: `^[+-]?[0-9]+$`}

@@ -186,9 +186,41 @@ fn materialize_scalar(val: &Value<'_>, acc: &mut MatAcc) -> Result<Option<Lit>, 
             acc.charge(1, 4)?;
             Lit::Int(*n)
         }
+        Value::Int8(n) => {
+            acc.charge(1, 1)?;
+            Lit::Int8(*n)
+        }
+        Value::Int16(n) => {
+            acc.charge(1, 2)?;
+            Lit::Int16(*n)
+        }
+        Value::Int64(n) => {
+            acc.charge(1, 8)?;
+            Lit::Int64(*n)
+        }
+        Value::UInt8(n) => {
+            acc.charge(1, 1)?;
+            Lit::UInt8(*n)
+        }
+        Value::UInt16(n) => {
+            acc.charge(1, 2)?;
+            Lit::UInt16(*n)
+        }
+        Value::UInt32(n) => {
+            acc.charge(1, 4)?;
+            Lit::UInt32(*n)
+        }
+        Value::UInt64(n) => {
+            acc.charge(1, 8)?;
+            Lit::UInt64(*n)
+        }
         Value::Float(x) => {
             acc.charge(1, 8)?;
             Lit::Float(*x)
+        }
+        Value::Float32(x) => {
+            acc.charge(1, 4)?;
+            Lit::Float32(*x)
         }
         Value::BigInt(n) => {
             acc.charge(1, bigint_byte_len(*n))?;
@@ -371,9 +403,16 @@ pub fn expr_cost(expr: &Expr) -> ExprCost {
             ExprKind::Lit(Lit::String(s) | Lit::BigInt(s)) => {
                 bytes = bytes.saturating_add(u32::try_from(s.len()).unwrap_or(u32::MAX));
             }
-            ExprKind::Lit(Lit::Float(_)) => bytes = bytes.saturating_add(8),
-            ExprKind::Lit(Lit::Int(_)) => bytes = bytes.saturating_add(4),
-            ExprKind::Lit(Lit::Bool(_)) => bytes = bytes.saturating_add(1),
+            ExprKind::Lit(Lit::Float(_) | Lit::Int64(_) | Lit::UInt64(_)) => {
+                bytes = bytes.saturating_add(8);
+            }
+            ExprKind::Lit(Lit::Int(_) | Lit::UInt32(_) | Lit::Float32(_)) => {
+                bytes = bytes.saturating_add(4);
+            }
+            ExprKind::Lit(Lit::Int16(_) | Lit::UInt16(_)) => bytes = bytes.saturating_add(2),
+            ExprKind::Lit(Lit::Bool(_) | Lit::Int8(_) | Lit::UInt8(_)) => {
+                bytes = bytes.saturating_add(1);
+            }
             _ => {}
         }
         each_expr_pat(e, false, &mut |pat| {

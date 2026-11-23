@@ -424,7 +424,15 @@ pub fn pat(p: &ir::Pat) -> Pat {
 fn lit(l: &ir::Lit) -> Option<Lit> {
     Some(match l {
         ir::Lit::Int(i) => Lit::Int(*i),
+        ir::Lit::Int8(i) => Lit::Int8(*i),
+        ir::Lit::Int16(i) => Lit::Int16(*i),
+        ir::Lit::Int64(i) => Lit::Int64(*i),
+        ir::Lit::UInt8(i) => Lit::UInt8(*i),
+        ir::Lit::UInt16(i) => Lit::UInt16(*i),
+        ir::Lit::UInt32(i) => Lit::UInt32(*i),
+        ir::Lit::UInt64(i) => Lit::UInt64(*i),
         ir::Lit::Float(x) => Lit::Float(*x),
+        ir::Lit::Float32(x) => Lit::Float32(*x),
         ir::Lit::String(s) => Lit::String(s.as_str().into()),
         ir::Lit::Bool(b) => Lit::Bool(*b),
         ir::Lit::Unit => Lit::Unit,

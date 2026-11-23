@@ -14,5 +14,5 @@ let compare = bools < identity
 
 //~ FLICK-T003 @4:13-4:19 expected `Float`, found `BigInt`
 //~ FLICK-T003 @7:21-7:22 expected `String`, found `Int`
-//~ FLICK-T003 @10:15-10:20 `+` works on `Int` or `Float` or `BigInt`, not on `Bool`
-//~ FLICK-C001 @13:15-13:31 no instance for `Ord (Bool -> Bool)`; instances of `Ord`: `Ord Int`, `Ord Float`, `Ord BigInt`, `Ord String`, `Ord Bool`, and 11 more
+//~ FLICK-T003 @10:15-10:20 `+` works on `Int` or `Float` or `BigInt` or `Int8` or `Int16` or `Int64` or `UInt8` or `UInt16` or `UInt32` or `UInt64` or `Float32`, not on `Bool`
+//~ FLICK-C001 @13:15-13:31 no instance for `Ord (Bool -> Bool)`; instances of `Ord`: `Ord Int`, `Ord Float`, `Ord BigInt`, `Ord Int8`, `Ord Int16`, and 19 more

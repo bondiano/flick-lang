@@ -673,3 +673,39 @@ let Some x = m else
   (keyword)
   (identifier)
   (identifier))
+
+==================
+Fixed-width numbers
+==================
+
+let nums = [127i8, -32768i16, 42i32, 9223372036854775807i64, 0xFFu8, 0b1010_0101u16, 0o77u32, 18446744073709551615u64, 3.14f32, 1e-5f32, 0x1f32]
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (operator)
+  (brackets
+    (number)
+    (operator)
+    (operator)
+    (number)
+    (operator)
+    (number)
+    (operator)
+    (number)
+    (operator)
+    (number)
+    (operator)
+    (number)
+    (operator)
+    (number)
+    (operator)
+    (number)
+    (operator)
+    (number)
+    (operator)
+    (number)
+    (operator)
+    (number)))

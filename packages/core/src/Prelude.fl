@@ -15,6 +15,26 @@ type Int
 type Float
 @lang bigint
 type BigInt
+@lang int8
+type Int8
+@lang int16
+type Int16
+/// Explicit 32-bit signed integer alias for `Int`.
+type alias Int32 = Int
+@lang int64
+type Int64
+@lang uint8
+type UInt8
+/// An unsigned 8-bit integer (`0..=255`).
+type alias Byte = UInt8
+@lang uint16
+type UInt16
+@lang uint32
+type UInt32
+@lang uint64
+type UInt64
+@lang float32
+type Float32
 @lang string
 type String
 @lang unknown

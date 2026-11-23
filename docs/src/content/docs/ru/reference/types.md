@@ -1,6 +1,6 @@
 ---
 title: "Кинды и типы"
-source_hash: 6a9c029b38d4baab
+source_hash: d54c99d170cd1669
 ---
 
 После разрешения имён компилятор проверяет типы в каждом модуле без
@@ -17,7 +17,7 @@ source_hash: 6a9c029b38d4baab
 
 | Тип | Кинд |
 | - | - |
-| `Unit`, `Never`, `Bool`, `Int`, `Float`, `BigInt`, `String`, `Unknown`, `JsValue`, `Ordering`, `Ui` | `Type` |
+| `Unit`, `Never`, `Bool`, `Int`, `Int8`, `Int16`, `Int32` (= `Int`), `Int64`, `UInt8`, `Byte` (= `UInt8`), `UInt16`, `UInt32`, `UInt64`, `Float`, `Float32`, `BigInt`, `String`, `Unknown`, `JsValue`, `Ordering`, `Ui` | `Type` |
 | `List`, `Seq`, `Option`, `Ref`, `Redacted`, `Schema`, `Url`, `Form` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |

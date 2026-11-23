@@ -5,7 +5,10 @@
 use num_bigint::{BigInt, Sign};
 use std::cmp::Ordering;
 
-use flick_core::numeric::{Arith, Num, int_arith};
+use flick_core::numeric::{
+    Arith, Num, int_arith, int8_arith, int16_arith, int64_arith, uint8_arith, uint16_arith,
+    uint32_arith, uint64_arith,
+};
 
 use crate::subst::lit_eq;
 use crate::syntax::{Head, Lit, Prim, Term};
@@ -16,15 +19,48 @@ pub fn run(p: Prim, args: &[Term]) -> Result<Term, String> {
         (Prim::Arith(op, Num::Int), [Term::Lit(Lit::Int(a)), Term::Lit(Lit::Int(b))]) => {
             lit(Lit::Int(int_arith(op, *a, *b)))
         }
+        (Prim::Arith(op, Num::Int8), [Term::Lit(Lit::Int8(a)), Term::Lit(Lit::Int8(b))]) => {
+            lit(Lit::Int8(int8_arith(op, *a, *b)))
+        }
+        (Prim::Arith(op, Num::Int16), [Term::Lit(Lit::Int16(a)), Term::Lit(Lit::Int16(b))]) => {
+            lit(Lit::Int16(int16_arith(op, *a, *b)))
+        }
+        (Prim::Arith(op, Num::Int64), [Term::Lit(Lit::Int64(a)), Term::Lit(Lit::Int64(b))]) => {
+            lit(Lit::Int64(int64_arith(op, *a, *b)))
+        }
+        (Prim::Arith(op, Num::UInt8), [Term::Lit(Lit::UInt8(a)), Term::Lit(Lit::UInt8(b))]) => {
+            lit(Lit::UInt8(uint8_arith(op, *a, *b)))
+        }
+        (Prim::Arith(op, Num::UInt16), [Term::Lit(Lit::UInt16(a)), Term::Lit(Lit::UInt16(b))]) => {
+            lit(Lit::UInt16(uint16_arith(op, *a, *b)))
+        }
+        (Prim::Arith(op, Num::UInt32), [Term::Lit(Lit::UInt32(a)), Term::Lit(Lit::UInt32(b))]) => {
+            lit(Lit::UInt32(uint32_arith(op, *a, *b)))
+        }
+        (Prim::Arith(op, Num::UInt64), [Term::Lit(Lit::UInt64(a)), Term::Lit(Lit::UInt64(b))]) => {
+            lit(Lit::UInt64(uint64_arith(op, *a, *b)))
+        }
         (Prim::Arith(op, Num::Float), [Term::Lit(Lit::Float(a)), Term::Lit(Lit::Float(b))]) => {
             lit(Lit::Float(float_arith(op, *a, *b)))
         }
+        (
+            Prim::Arith(op, Num::Float32),
+            [Term::Lit(Lit::Float32(a)), Term::Lit(Lit::Float32(b))],
+        ) => lit(Lit::Float32(float32_arith(op, *a, *b))),
         (Prim::Arith(op, Num::BigInt), [Term::Lit(Lit::BigInt(a)), Term::Lit(Lit::BigInt(b))]) => {
             Ok(big_arith(op, a, b)
                 .map_or_else(|why| Term::Die(why.into()), |n| Term::Lit(Lit::BigInt(n))))
         }
         (Prim::Neg(Num::Int), [Term::Lit(Lit::Int(a))]) => lit(Lit::Int(a.wrapping_neg())),
+        (Prim::Neg(Num::Int8), [Term::Lit(Lit::Int8(a))]) => lit(Lit::Int8(a.wrapping_neg())),
+        (Prim::Neg(Num::Int16), [Term::Lit(Lit::Int16(a))]) => lit(Lit::Int16(a.wrapping_neg())),
+        (Prim::Neg(Num::Int64), [Term::Lit(Lit::Int64(a))]) => lit(Lit::Int64(a.wrapping_neg())),
+        (Prim::Neg(Num::UInt8), [Term::Lit(Lit::UInt8(a))]) => lit(Lit::UInt8(a.wrapping_neg())),
+        (Prim::Neg(Num::UInt16), [Term::Lit(Lit::UInt16(a))]) => lit(Lit::UInt16(a.wrapping_neg())),
+        (Prim::Neg(Num::UInt32), [Term::Lit(Lit::UInt32(a))]) => lit(Lit::UInt32(a.wrapping_neg())),
+        (Prim::Neg(Num::UInt64), [Term::Lit(Lit::UInt64(a))]) => lit(Lit::UInt64(a.wrapping_neg())),
         (Prim::Neg(Num::Float), [Term::Lit(Lit::Float(a))]) => lit(Lit::Float(-a)),
+        (Prim::Neg(Num::Float32), [Term::Lit(Lit::Float32(a))]) => lit(Lit::Float32(-a)),
         (Prim::Neg(Num::BigInt), [Term::Lit(Lit::BigInt(a))]) => lit(Lit::BigInt(-a)),
         (Prim::Eq | Prim::NotEq, [a, b]) => match equal(a, b) {
             Some(same) => lit(Lit::Bool(same == (p == Prim::Eq))),
@@ -80,6 +116,24 @@ fn float_arith(op: Arith, a: f64, b: f64) -> f64 {
     }
 }
 
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "binary32 pow rounds f64::powf once to f32, matching JS Math.fround and Go"
+)]
+fn float32_arith(op: Arith, a: f32, b: f32) -> f32 {
+    match op {
+        Arith::Add => a + b,
+        Arith::Sub => a - b,
+        Arith::Mul => a * b,
+        Arith::Div => a / b,
+        Arith::Rem => a % b,
+        Arith::Pow if b.is_nan() || (a.abs().to_bits() == 1.0_f32.to_bits() && b.is_infinite()) => {
+            f32::NAN
+        }
+        Arith::Pow => f64::from(a).powf(f64::from(b)) as f32,
+    }
+}
+
 fn big_arith(op: Arith, a: &BigInt, b: &BigInt) -> Result<BigInt, String> {
     Ok(match op {
         Arith::Add => a + b,
@@ -117,8 +171,16 @@ fn big_arith(op: Arith, a: &BigInt, b: &BigInt) -> Result<BigInt, String> {
 fn order(a: &Lit, b: &Lit) -> Option<Option<Ordering>> {
     Some(match (a, b) {
         (Lit::Int(x), Lit::Int(y)) => Some(x.cmp(y)),
+        (Lit::Int8(x), Lit::Int8(y)) => Some(x.cmp(y)),
+        (Lit::Int16(x), Lit::Int16(y)) => Some(x.cmp(y)),
+        (Lit::Int64(x), Lit::Int64(y)) => Some(x.cmp(y)),
+        (Lit::UInt8(x), Lit::UInt8(y)) => Some(x.cmp(y)),
+        (Lit::UInt16(x), Lit::UInt16(y)) => Some(x.cmp(y)),
+        (Lit::UInt32(x), Lit::UInt32(y)) => Some(x.cmp(y)),
+        (Lit::UInt64(x), Lit::UInt64(y)) => Some(x.cmp(y)),
         (Lit::BigInt(x), Lit::BigInt(y)) => Some(x.cmp(y)),
         (Lit::Float(x), Lit::Float(y)) => x.partial_cmp(y),
+        (Lit::Float32(x), Lit::Float32(y)) => x.partial_cmp(y),
         (Lit::String(x), Lit::String(y)) => Some(x.encode_utf16().cmp(y.encode_utf16())),
         (Lit::Bool(x), Lit::Bool(y)) => Some(x.cmp(y)),
         _ => return None,
@@ -128,11 +190,14 @@ fn order(a: &Lit, b: &Lit) -> Option<Option<Ordering>> {
 /// Structural equality of two values; `None` for values without it.
 #[expect(
     clippy::float_cmp,
-    reason = "`==` on `Float` is `SameValueZero`, exact"
+    reason = "`==` on `Float` and `Float32` is `SameValueZero`, exact"
 )]
 pub fn equal(a: &Term, b: &Term) -> Option<bool> {
     Some(match (a, b) {
         (Term::Lit(Lit::Float(x)), Term::Lit(Lit::Float(y))) => {
+            x == y || (x.is_nan() && y.is_nan())
+        }
+        (Term::Lit(Lit::Float32(x)), Term::Lit(Lit::Float32(y))) => {
             x == y || (x.is_nan() && y.is_nan())
         }
         (Term::Lit(x), Term::Lit(y)) => x == y,

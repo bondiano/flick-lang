@@ -227,6 +227,7 @@ fn all(ps: &[Pat], xs: &[Term], out: &mut Vec<(Name, Term)>) -> bool {
 pub fn lit_eq(a: &Lit, b: &Lit) -> bool {
     match (a, b) {
         (Lit::Float(x), Lit::Float(y)) => x == y,
+        (Lit::Float32(x), Lit::Float32(y)) => x == y,
         _ => a == b,
     }
 }

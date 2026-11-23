@@ -47,12 +47,11 @@ A module that has no runtime stage imports no `Effect` at all.
 | Source value | JS |
 | - | - |
 | `Unit`, `()` | `undefined` |
-| `Int`, `Float`, `BigInt`, `String`, `Bool` | the JS primitive; a number literal is printed from its value (`0xff` and `1_000` become `255` and `1000`, a negative one is parenthesized), a `BigInt` one keeps its radix and gets `n` |
+| `Int`, `Int8`, `Int16`, `Int32`, `UInt8`/`Byte`, `UInt16`, `UInt32`, `Float`, `Float32` | JS `number`; a number literal is printed from its value (`0xff` and `1_000` become `255` and `1000`, a negative one is parenthesized); sub-32-bit and `UInt32` operations mask or sign-extend explicitly (`<< 24 >> 24`, `<< 16 >> 16`, `& 0xff`, `& 0xffff`, `>>> 0`, `Math.imul(...) >>> 0`) and `Float32` rounds via `Math.fround(...)` |
+| `Int64`, `UInt64`, `BigInt` | JS `bigint`; `Int64` and `UInt64` wrap via `BigInt.asIntN(64, …)` / `BigInt.asUintN(64, …)` and format without an `n` suffix via `showInt64` / `showUInt64`; `BigInt` keeps arbitrary precision and appends `n` in `show` |
+| `String`, `Bool` | the JS primitive |
 
-`Int` arithmetic keeps a value in 32 bits: `a + b` is `(a + b \| 0)`, `a * b`
-is `Math.imul(a, b)`, and `/`, `%` and `**` are runtime calls that truncate
-and divide by zero to `0`. `/` and `%` on `BigInt` are runtime calls too,
-for the zero divisor.
+Fixed-width integer arithmetic keeps every value within its width: `Int` (`Int32`) uses `(a + b \| 0)` and `Math.imul(a, b)`, `Int8`/`Int16`/`UInt8`/`UInt16`/`UInt32` mask or sign-extend in JS `number`, `Int64`/`UInt64` wrap with `BigInt.asIntN(64, …)` / `BigInt.asUintN(64, …)`, and `/`, `%` and `**` call runtime helpers that truncate and divide by zero to `0` (with signed `min / -1 = min` and `min % -1 = 0`). `/` and `%` on `BigInt` are runtime calls too, for the zero divisor.
 | tuple, `List` | dense array |
 | record | plain object with exactly its fields in canonical sorted UTF-16 label order (field expressions evaluate in source order; array-index keys, if any, come first numerically per ECMAScript) |
 | ADT value | `{ _tag, _0, _1, … }`, fields in declaration order |
@@ -289,7 +288,9 @@ exported values with their projected types (see [Public TypeScript interfaces](.
 
 | Flick | TypeScript |
 | - | - |
-| `Int`, `Float`, `String`, `Bool`, `BigInt`, `Unit`, `Never`, `Unknown` | `number`, `number`, `string`, `boolean`, `bigint`, `undefined`, `never`, `unknown` |
+| `Int`, `Int8`, `Int16`, `Int32`, `UInt8`/`Byte`, `UInt16`, `UInt32`, `Float`, `Float32` | `number` |
+| `Int64`, `UInt64`, `BigInt` | `bigint` |
+| `String`, `Bool`, `Unit`, `Never`, `Unknown` | `string`, `boolean`, `undefined`, `never`, `unknown` |
 | `List a`, `(a, b)`, `{ x : a }` | `ReadonlyArray<A>`, `readonly [A, B]`, `{ readonly x: A }` |
 | `Option a`, `Result e a` | Effect `Option.Option<A>`, `Result.Result<A, E>` |
 | `a -> b` | `(arg: A) => B`, one arrow per stage |
@@ -440,8 +441,10 @@ Values have the representation of the JS target, in Go terms:
 
 | Flick | Go |
 | - | - |
-| `Int` | `int32` |
-| `Float` | `float64` |
+| `Int` (`Int32`) | `int32` |
+| `Int8`, `Int16`, `Int64` | `int8`, `int16`, `int64` |
+| `UInt8` (`Byte`), `UInt16`, `UInt32`, `UInt64` | `uint8`, `uint16`, `uint32`, `uint64` |
+| `Float`, `Float32` | `float64`, `float32` |
 | `BigInt` | `*big.Int`, never mutated |
 | `String` | `string` holding WTF-8 |
 | `Bool`, `Unit` | `bool`, `flickrt.Unit` |
@@ -653,12 +656,13 @@ in `flick.toml`, or `--allow-tool go` for a file built outside a project
 (`FLICK-P029` otherwise). It is built without cgo by default, so no C compiler is
 needed either; pass `--cgo` (or `[target.go] cgo = true`) to build with `CGO_ENABLED=1`.
 
-## Portable IR (0.15.0)
+## Portable IR (0.16.0)
 
-Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.15.0"`),
-checked against the `ir` version range (`[0.15.0, 0.16.0)`) in its descriptor.
-Alongside values, stages, dictionaries, lang items and backend-declared foreign
-adapter words (`Foreign.adapter.{words, owned}`), IR `0.15.0` carries the
+Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.16.0"`),
+checked against the `ir` version range (`[0.16.0, 0.17.0)`) in its descriptor.
+Alongside values, stages, dictionaries, lang items, backend-declared foreign
+adapter words (`Foreign.adapter.{words, owned}`), and fixed-width numeric types
+(`Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`), IR `0.16.0` carries the
 layout-relevant types the checker inferred so layout-aware and monomorphizing
 backends can lay out values by value without calling back into the checker:
 

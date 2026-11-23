@@ -153,9 +153,41 @@ fn hash_expr(root: &Expr, seed: u64, limit: usize) -> u64 {
                 fnv_mix(&mut h, u64::from(n.cast_unsigned()));
                 (18, "", "")
             }
+            ExprKind::Lit(Lit::Int8(n)) => {
+                fnv_mix(&mut h, u64::from(n.cast_unsigned()));
+                (120, "", "")
+            }
+            ExprKind::Lit(Lit::Int16(n)) => {
+                fnv_mix(&mut h, u64::from(n.cast_unsigned()));
+                (121, "", "")
+            }
+            ExprKind::Lit(Lit::Int64(n)) => {
+                fnv_mix(&mut h, n.cast_unsigned());
+                (122, "", "")
+            }
+            ExprKind::Lit(Lit::UInt8(n)) => {
+                fnv_mix(&mut h, u64::from(*n));
+                (123, "", "")
+            }
+            ExprKind::Lit(Lit::UInt16(n)) => {
+                fnv_mix(&mut h, u64::from(*n));
+                (124, "", "")
+            }
+            ExprKind::Lit(Lit::UInt32(n)) => {
+                fnv_mix(&mut h, u64::from(*n));
+                (125, "", "")
+            }
+            ExprKind::Lit(Lit::UInt64(n)) => {
+                fnv_mix(&mut h, *n);
+                (126, "", "")
+            }
             ExprKind::Lit(Lit::Float(x)) => {
                 fnv_mix(&mut h, x.to_bits());
                 (19, "", "")
+            }
+            ExprKind::Lit(Lit::Float32(x)) => {
+                fnv_mix(&mut h, u64::from(x.to_bits()));
+                (127, "", "")
             }
             ExprKind::Lit(Lit::BigInt(s) | Lit::String(s)) => (20, s, ""),
             ExprKind::Local(s) => (21, s, ""),

@@ -272,7 +272,15 @@ fn arms(arms: &[Arm]) -> String {
 fn lit(l: &Lit) -> String {
     match l {
         Lit::Int(n) => n.to_string(),
+        Lit::Int8(n) => format!("{n}i8"),
+        Lit::Int16(n) => format!("{n}i16"),
+        Lit::Int64(n) => format!("{n}i64"),
+        Lit::UInt8(n) => format!("{n}u8"),
+        Lit::UInt16(n) => format!("{n}u16"),
+        Lit::UInt32(n) => format!("{n}u32"),
+        Lit::UInt64(n) => format!("{n}u64"),
         Lit::Float(x) => x.to_string(),
+        Lit::Float32(x) => format!("{x}f32"),
         Lit::BigInt(n) => format!("{n}n"),
         Lit::String(s) => format!("{s:?}"),
         Lit::Bool(b) => b.to_string(),

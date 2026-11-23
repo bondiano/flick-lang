@@ -60,7 +60,7 @@ declarations remain in the frontend. The native source-map adapter supplies
 plain UTF-16 positions to the emitter. This source move does not establish
 the production WIT component path or the browser component loader.
 
-`Program` (IR 0.15.0) carries layout-relevant types — `Module.types` data and
+`Program` (IR 0.16.0) carries fixed-width numeric types and layout-relevant types — `Module.types` data and
 constructor declarations, constructor field types, binder/expression types and
 instantiation `type_args` — shared via `Arc` and interned on the wire, while
 leaving out effect, service and region rows as well as the checker's UI

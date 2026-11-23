@@ -85,12 +85,20 @@ impl Checker<'_> {
                 let lit = if last.kind == K::Number {
                     let text = last.text(self.text);
                     let negative = tokens.len() > 1;
-                    if numeric::is_integer_literal(text) {
+                    if let Some(num) = literal::split_number_suffix(text).1 {
+                        let fractional = num.fractional();
+                        let value = (!fractional)
+                            .then(|| {
+                                numeric::integer_value(text).map(|v| if negative { -v } else { v })
+                            })
+                            .flatten();
+                        self.suffixed_number_literal(self.span(node), num, value, fractional, true)
+                    } else if numeric::is_integer_literal(text) {
                         let value =
                             numeric::integer_value(text).map(|v| if negative { -v } else { v });
                         self.number_literal(self.span(node), value, false, true)
                     } else {
-                        Type::lang(Lang::Float)
+                        self.number_literal(self.span(node), None, true, true)
                     }
                 } else {
                     super::infer::literal_type(Some(last.kind))
@@ -107,8 +115,17 @@ impl Checker<'_> {
                         Ctor::Literal(format!("{}n", if negative { -value } else { value }))
                     }
                     _ => {
-                        let value = literal::number_value(text).unwrap_or_default();
-                        Ctor::Literal(format!("{}", if negative { -value } else { value }))
+                        if let Some(value) = numeric::integer_value(text) {
+                            Ctor::Literal(format!("{}", if negative { -value } else { value }))
+                        } else if literal::split_number_suffix(text).1
+                            == Some(numeric::Num::Float32)
+                        {
+                            let value = literal::float32_value(text).unwrap_or_default();
+                            Ctor::Literal(format!("{}", if negative { -value } else { value }))
+                        } else {
+                            let value = literal::number_value(text).unwrap_or_default();
+                            Ctor::Literal(format!("{}", if negative { -value } else { value }))
+                        }
                     }
                 };
                 Pat::Ctor(ctor, Vec::new())

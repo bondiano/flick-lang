@@ -141,6 +141,17 @@ signature and golden certificates.
   ordered comparison finds false; `intNum` and `Interval.int_side` cover `Int`'s closed ends.
   `unobserved_or_true` and `or_true_decides_neither` pin definedness. Separate from the core:
   it proves the decision procedure, not the Rust checker or IEEE arithmetic of a runtime.
+- **Fixed-width numeric specification** (`Formal/FixedWidth.lean`, [`numeric-policy.md`](../docs/backends/numeric-policy.md)):
+  models two's-complement wrapping (`wrap_inRange`, `wrap_id`, `wrap_mod_equiv`,
+  `wrap_neg_add_cancel`), total `/` and `%` with zero-divisor returning `0` and signed
+  `min / -1 = min`, `min % -1 = 0` (`safeDiv_inRange`, `safeDiv_min_neg_one`,
+  `safeRem_min_neg_one`, `checkedDiv_sound`), shift count masking modulo bit-width
+  (`maskShift_lt`, `maskShift_periodic`), checked/saturating/lossless widening conversions
+  (`checkedConv_sound`, `saturatingConv_inRange`, `lossless_widening_*`, `lossless_wrap_eq`),
+  and total preorder instances for fixed-width intervals (`fixedIntNum`) and `Ord` with
+  `NaN` greatest (`ordNaNLast`, `ordNaNLast_greatest`). Pinned in `Formal/Axioms.lean`
+  with zero `sorry` and no extra axioms. Separate from the core: it proves the numeric
+  specification contract, not the Rust compiler or JS/Go runtime implementations.
 - **The logic of `proof`** (`Formal/Proofs/`, [`proofs.md`](../docs/formal/proofs.md)): λPT,
   the total calculus a statement is about, has rigid type variables, `unit`, products, sums,
   functions, `let`, `case` and the globals of an acyclic environment, with by-value big-step

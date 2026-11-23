@@ -374,14 +374,15 @@ pub(super) fn file(types: &Owned) -> String {
 }
 
 /// Struct field packing order: pointer-bearing fields first to minimize Go GC
-/// `ptrdata`, then scalar fields by descending alignment (`float64`, `int32`, `bool`).
+/// `ptrdata`, then scalar fields by descending alignment (`8`, `4`, `2`, `1` bytes).
 fn layout_rank(slot: Option<Native>) -> u8 {
     match slot {
         None => 0,
         Some(Native::String) => 1,
-        Some(Native::Float) => 2,
-        Some(Native::Int) => 3,
-        Some(Native::Bool) => 4,
+        Some(Native::Float | Native::Int64 | Native::UInt64) => 2,
+        Some(Native::Int | Native::UInt32 | Native::Float32) => 3,
+        Some(Native::Int16 | Native::UInt16) => 4,
+        Some(Native::Int8 | Native::UInt8 | Native::Bool) => 5,
     }
 }
 
@@ -426,7 +427,21 @@ fn write_scalar_struct(
         .enumerate()
         .map(|(i, slot)| match slot {
             Some(Native::Float) => format!("flickrt.EqualFloat(p.f{i}, q.f{i}, strictZero)"),
-            Some(Native::Int | Native::Bool | Native::String) => format!("p.f{i} == q.f{i}"),
+            Some(Native::Float32) => {
+                format!("flickrt.EqualFloat(float64(p.f{i}), float64(q.f{i}), strictZero)")
+            }
+            Some(
+                Native::Int
+                | Native::Int8
+                | Native::Int16
+                | Native::Int64
+                | Native::UInt8
+                | Native::UInt16
+                | Native::UInt32
+                | Native::UInt64
+                | Native::Bool
+                | Native::String,
+            ) => format!("p.f{i} == q.f{i}"),
             None => format!("flickrt.EqualWith(p.f{i}, q.f{i}, strictZero)"),
         })
         .collect();

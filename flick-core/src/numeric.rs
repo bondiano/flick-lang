@@ -21,11 +21,7 @@ pub trait NumLang: Sized {
 
 impl NumLang for Num {
     fn lang(self) -> Lang {
-        match self {
-            Num::Int => Lang::Int,
-            Num::Float => Lang::Float,
-            Num::BigInt => Lang::BigInt,
-        }
+        Num::lang(self)
     }
 
     fn name(self) -> &'static str {
@@ -53,23 +49,24 @@ pub fn default_num(fractional: bool) -> Num {
 pub use flick_backend_js::numeric::float_text;
 
 /// Whether a number token is written as an integer: in a radix, or with
-/// neither a fraction nor an exponent.
+/// neither a fraction nor an exponent nor a floating suffix (`f32`).
 pub fn is_integer_literal(text: &str) -> bool {
-    let digits: String = text.chars().filter(|&c| c != '_').collect();
+    let (stem, suffix) = literal::split_number_suffix(text);
+    if suffix.is_some_and(Num::fractional) {
+        return false;
+    }
+    let digits: String = stem.chars().filter(|&c| c != '_').collect();
     literal::radix(&digits).is_some() || digits.bytes().all(|b| b.is_ascii_digit())
 }
 
-/// The value of a number token written as an integer.
-pub fn integer_value(text: &str) -> Option<i128> {
-    let digits: String = text.chars().filter(|&c| c != '_').collect();
-    match literal::radix(&digits) {
-        Some((base, rest)) => i128::from_str_radix(rest, base).ok(),
-        None if digits.bytes().all(|b| b.is_ascii_digit()) => digits.parse().ok(),
-        None => None,
-    }
-}
+/// The value of a number token written as an integer (with any integer suffix
+/// stripped).
+pub use crate::syntax::literal::integer_value;
 
-pub use flick_backend_support::numeric::int_arith;
+pub use flick_backend_support::numeric::{
+    int_arith, int8_arith, int16_arith, int64_arith, uint8_arith, uint16_arith, uint32_arith,
+    uint64_arith,
+};
 
 #[cfg(test)]
 mod tests {

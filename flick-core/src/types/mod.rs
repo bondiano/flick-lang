@@ -115,7 +115,6 @@ mod variance;
 mod watched;
 pub mod wire;
 
-use crate::numeric::NumLang;
 pub use crate::syntax::structure::Thresholds;
 pub use applicative_do::{and_keys, group_key, pure_argument};
 pub use bindings::{LetParts, let_parts, signature_name};

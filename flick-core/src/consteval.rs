@@ -13,13 +13,14 @@ use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use flick_backend_support::consteval::{self, Op};
+use flick_ir::Num;
 
 pub use flick_backend_support::consteval::Const;
 
 pub fn eval(node: &Node, src: &str) -> Option<Const> {
     let mut nodes = node.nodes();
     match node.kind {
-        K::Literal => literal_value(first_token(node)?, src),
+        K::Literal => literal_value(first_token(node)?, false, src),
         K::ParenExpr => eval(nodes.next()?, src),
         // a block whose only statement is an expression, e.g. a `let` body
         K::Block => {
@@ -27,7 +28,19 @@ pub fn eval(node: &Node, src: &str) -> Option<Const> {
             (nodes.next().is_none() && only.kind != K::LetDecl && only.kind != K::Signature)
                 .then(|| eval(only, src))?
         }
-        K::PrefixExpr => prefix(first_token(node)?.kind, eval(nodes.next()?, src)?),
+        K::PrefixExpr => {
+            let op = first_token(node)?.kind;
+            let operand = nodes.next()?;
+            if op == K::Minus
+                && operand.kind == K::Literal
+                && let Some(tok) = first_token(operand)
+                && tok.kind == K::Number
+                && literal::split_number_suffix(tok.text(src)).1.is_some()
+            {
+                return literal_value(tok, true, src);
+            }
+            prefix(op, eval(operand, src)?)
+        }
         K::BinExpr => {
             let lhs = eval(nodes.next()?, src)?;
             let rhs = eval(nodes.next()?, src)?;
@@ -59,10 +72,52 @@ fn operator(node: &Node) -> Option<K> {
     })
 }
 
-fn literal_value(token: Token, src: &str) -> Option<Const> {
+fn literal_value(token: Token, negative: bool, src: &str) -> Option<Const> {
     let text = token.text(src);
+    let sign = if negative { -1_i128 } else { 1_i128 };
     Some(match token.kind {
-        K::Number => Const::Number(literal::number_value(text)?),
+        K::Number => match literal::split_number_suffix(text).1 {
+            Some(Num::Int8) => {
+                let v = sign * literal::integer_value(text)?;
+                Const::Int8(i8::try_from(v).ok()?)
+            }
+            Some(Num::Int16) => {
+                let v = sign * literal::integer_value(text)?;
+                Const::Int16(i16::try_from(v).ok()?)
+            }
+            Some(Num::Int) => {
+                let v = sign * literal::integer_value(text)?;
+                Const::Number(f64::from(i32::try_from(v).ok()?))
+            }
+            Some(Num::Int64) => {
+                let v = sign * literal::integer_value(text)?;
+                Const::Int64(i64::try_from(v).ok()?)
+            }
+            Some(Num::UInt8) => {
+                let v = sign * literal::integer_value(text)?;
+                Const::UInt8(u8::try_from(v).ok()?)
+            }
+            Some(Num::UInt16) => {
+                let v = sign * literal::integer_value(text)?;
+                Const::UInt16(u16::try_from(v).ok()?)
+            }
+            Some(Num::UInt32) => {
+                let v = sign * literal::integer_value(text)?;
+                Const::UInt32(u32::try_from(v).ok()?)
+            }
+            Some(Num::UInt64) => {
+                let v = sign * literal::integer_value(text)?;
+                Const::UInt64(u64::try_from(v).ok()?)
+            }
+            Some(Num::Float32) => {
+                let x = literal::float32_value(text)?;
+                Const::Float32(if negative { -x } else { x })
+            }
+            None | Some(Num::Float | Num::BigInt) => {
+                let x = literal::number_value(text)?;
+                Const::Number(if negative { -x } else { x })
+            }
+        },
         K::BigInt => Const::BigInt(literal::bigint_value(text)?),
         K::String => Const::String(literal::string_value(text)),
         K::TrueKw => Const::Bool(true),

@@ -1,0 +1,28 @@
+/// Operations on `Byte`, an alias for `UInt8` (`0..=255`).
+module Byte exposing (..)
+
+import UInt8
+
+min_value : Byte
+let min_value = UInt8.min_value
+
+max_value : Byte
+let max_value = UInt8.max_value
+
+to_string : Byte -> String
+let to_string b = UInt8.to_string b
+
+parse : String -> Option Byte
+let parse s = UInt8.parse s
+
+to_int : Byte -> Int
+let to_int b = UInt8.to_int b
+
+from_int : Int -> Option Byte
+let from_int n = UInt8.from_int n
+
+wrapping_from_int : Int -> Byte
+let wrapping_from_int n = UInt8.wrapping_from_int n
+
+saturating_from_int : Int -> Byte
+let saturating_from_int n = UInt8.saturating_from_int n

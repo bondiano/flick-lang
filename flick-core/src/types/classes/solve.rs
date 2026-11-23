@@ -6,7 +6,6 @@
 
 use super::assumes;
 use crate::diagnostics::codes;
-use crate::numeric::NumLang;
 use std::mem;
 
 use super::matching::{Match, Subst};
@@ -168,7 +167,7 @@ impl Checker<'_> {
             let fractional = self.store.is_fractional(m);
             let fallback = default_num(fractional);
             let mut chosen = fallback;
-            for num in Num::ALL {
+            for num in [Num::Int, Num::Float, Num::BigInt] {
                 if fractional && !num.fractional() {
                     continue;
                 }
