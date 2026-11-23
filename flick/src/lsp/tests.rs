@@ -30,7 +30,7 @@ fn settle(server: &mut Server) {
             .worker
             .recv_timeout(Duration::from_mins(1))
             .expect("the analysis finishes");
-        server.publish(&done.path, done.generation, done.snapshot);
+        server.publish(done);
     }
     server.worker.synchronize();
 }
@@ -320,6 +320,7 @@ fn a_dotted_completion_waits_for_the_background_analysis_and_reads_its_snapshot(
     );
 }
 
+mod freshness;
 mod let_else;
 mod orelse;
 

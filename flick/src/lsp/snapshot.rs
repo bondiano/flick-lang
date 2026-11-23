@@ -161,6 +161,14 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
+    /// An analyzed module (including aliases) or another source, such as a manifest.
+    pub(super) fn reads(&self, path: &Path) -> bool {
+        self.sources
+            .files()
+            .any(|source| Path::new(&source.path) == path)
+            || self.file(path).is_some()
+    }
+
     pub fn file(&self, path: &Path) -> Option<FileId> {
         self.analysis
             .modules
