@@ -246,7 +246,7 @@ mod tests {
     use std::hash::{Hash, Hasher};
 
     use super::{MetaOccurrence, Ordering};
-    use crate::iface::{Decl, Entity, Export, Namespace, closed};
+    use crate::iface::{self, Decl, Entity, Export, Interface, Namespace, closed};
     use crate::types::module_contract::context::{Context, Embedding, Scopes};
     use crate::types::{Atom, Elem, Kind, Row, Type};
 
@@ -373,7 +373,7 @@ mod tests {
                 parent: None,
                 scheme: Some(Type::Without {
                     row: Box::new(Type::Var("r".into())),
-                    gone: vec![Elem::Provided(Box::new(label))],
+                    gone: vec![Elem::Provided(Box::new(label.clone()))],
                 }),
                 definition: None,
                 blocked: None,
@@ -381,11 +381,30 @@ mod tests {
                 via: Vec::new(),
             };
             assert!(!closed::export_is_closed(&export));
+            rejects_publication(&export);
+            export.scheme = Some(Type::Row(Row::closed(vec![(
+                Elem::Provided(Box::new(label)),
+                Type::con("Core", "Unit"),
+            )])));
+            rejects_publication(&export);
             export.scheme = Some(Type::Record(Row::closed(vec![(
                 Elem::Capture(Atom::Meta(MetaOccurrence::legacy(1))),
                 Type::con("Core", "Int"),
             )])));
             assert!(closed::export_is_closed(&export));
+        }
+    }
+
+    fn rejects_publication(export: &Export) {
+        let interface = Interface {
+            module: "M".into(),
+            exports: vec![export.clone()],
+            ..Interface::default()
+        };
+        for result in [iface::write(&interface), iface::fingerprint(&interface)] {
+            let error = result.expect_err("a contextual row atom cannot be published");
+            assert!(error.contains("export `x`"), "{error}");
+            assert!(error.contains("contextual row atoms"), "{error}");
         }
     }
 }
