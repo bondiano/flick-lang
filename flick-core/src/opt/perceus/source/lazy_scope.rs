@@ -1,8 +1,9 @@
-//! Audited Lazy, Scope finalizer, Resource, and Exit foreign adapters.
+//! Audited await, Lazy, Scope finalizer, Resource, and Exit foreign adapters.
 
 use flick_ir::{Foreign, ForeignMode};
 
-use super::{Code, Intrinsic, Local, Lower, LowerError, Operation, Span};
+use super::expr_builder::ExprBuilder;
+use super::{Code, Env, Intrinsic, Local, Lower, LowerError, Operation, Span};
 
 pub(super) fn has_standard_shape(value: &Foreign) -> bool {
     value.catch.is_none()
@@ -26,6 +27,11 @@ impl Lower<'_> {
         let from = value.binding.from.as_deref()?;
         let name = value.binding.name.as_str();
         match (from, name, value.mode, value.dicts, value.arity) {
+            ("flick:rt", "awaitEff", ForeignMode::Effect, 0, 1) => {
+                let b = ExprBuilder::new(span, "$awaitEff");
+                let function = b.lam(&["task"], b.await_(b.loc("task")));
+                Some(self.expr(&function, &Env::new(), block))
+            }
             // `Prelude.lazy_make : Detached r => (Eff r e a)^c ->{} Lazy r e a`
             // (`Detached` is an erased marker class with 0 runtime dictionaries.)
             ("flick:rt", "lazyMake", ForeignMode::Effect, 0, 1) => {

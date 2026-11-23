@@ -1,6 +1,6 @@
 ---
 title: "Values of computations and their execution"
-source_hash: 1cbdebff26461d22
+source_hash: 889907d5e9e6da48
 ---
 
 ## Two different kinds of functions
@@ -58,7 +58,7 @@ let load_twice id =
 
 The call `Users.get` happens twice. Storing `request` does not make it a cache and does not create a Promise. To obtain a result once and reuse it, write `let user = Users.get id` and then use the ready `user`. Memoizing a computation is a separate runtime operation with explicit sharing: `lazy { Users.get id }` builds a `Lazy`, which runs its body at most once, at its first `await`, and gives later `await`s the same outcome.
 
-`await` is needed only for an already existing `Eff` value. An ordinary runtime call `let user = Users.get id` stays direct and needs no additional `await`.
+`await value` calls `Awaitable.await value`. The `Awaitable t r e a` instance for the operand type `t` determines the service row `r`, typed error row `e` and result type `a`. For `Eff r e a` and `Lazy r e a` the method uses those same rows and returns `a`. A `task` includes the method's service and error rows alongside those of its other runtime calls. An ordinary runtime call such as `let user = Users.get id` already runs the operation directly.
 
 ## Purity is separate from error and service rows
 

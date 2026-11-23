@@ -103,6 +103,16 @@ impl Checker<'_> {
                 match outcome {
                     Outcome::Solved(dict) => {
                         progress = true;
+                        if w.await_operand.is_some()
+                            && let Some(args) = super::args_of(&w.constraint, Lang::Awaitable)
+                            && let [_, _, _, result] = args[..]
+                        {
+                            self.record_await_worker(
+                                super::super::typing::range(w.span),
+                                &dict,
+                                result,
+                            );
+                        }
                         // `Detached` and `NoControl` are the compiler's to decide: no dictionary at run time
                         if passes_dictionary(&w.constraint) {
                             self.record_dict(w.span, w.order, dict.clone());
@@ -283,7 +293,12 @@ impl Checker<'_> {
     }
 
     /// Solves a canonical constraint.
-    pub(super) fn entail(&mut self, c: &Type, givens: &Givens, chain: &mut Vec<Type>) -> Outcome {
+    pub(in crate::types) fn entail(
+        &mut self,
+        c: &Type,
+        givens: &Givens,
+        chain: &mut Vec<Type>,
+    ) -> Outcome {
         let limits = self.options.limits;
         self.classes.steps = self.classes.steps.saturating_add(1);
         chain.push(c.clone());

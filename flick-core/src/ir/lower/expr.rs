@@ -114,6 +114,41 @@ impl Lower<'_> {
         ExprKind::If(condition, then, otherwise)
     }
 
+    fn await_call(&mut self, key: Range, operand: Box<Expr>, span: Span) -> Expr {
+        let ty = self.ir_type(key);
+        let stage = Stage::Runtime;
+        let func = if let Some(&builtin) = self.typing.builtin_awaits.get(&key) {
+            // A productive opaque alias can still name the operand in IR.
+            // The selected worker has its declared Eff or Lazy parameter.
+            let builtin = lang::item(builtin);
+            Expr::new(
+                ExprKind::Global {
+                    module: builtin.module.clone(),
+                    name: builtin.name.clone(),
+                    type_args: self.ir_type_args(key),
+                },
+                span,
+            )
+        } else {
+            let mut method = self.prelude_method(key, Lang::AwaitMethod);
+            method.ty = operand.ty.clone().zip(ty.clone()).map(|(param, result)| {
+                flick_ir::TypeRef::new(flick_ir::IrType::Fun {
+                    param,
+                    stage,
+                    result,
+                })
+            });
+            method
+        };
+        let app = ExprKind::App {
+            func: Box::new(func),
+            arg: operand,
+            stage,
+            arg_first: false,
+        };
+        self.within(key, Expr::with_ty(app, span, ty))
+    }
+
     fn expr_kind(&mut self, node: &Node) -> Expr {
         let span = self.span(node);
         let children: Vec<&Node> = node.nodes().collect();
@@ -157,15 +192,10 @@ impl Lower<'_> {
                 match node.child_tokens().next().map(|t| t.kind) {
                     Some(K::NotKw) => ExprKind::Not(operand),
                     Some(K::IgnoreKw) => ExprKind::Ignore(operand),
-                    Some(K::AwaitKw) if self.typing.forced.contains(&node.range()) => {
-                        let local = self.typing.read_lazy.contains(&node.range());
-                        self.force(*operand, span, local)
+                    Some(K::AwaitKw) if self.typing.read_lazy.contains(&node.range()) => {
+                        self.force_local(*operand, span)
                     }
-                    Some(K::AwaitKw) => {
-                        let span = self.span(node);
-                        let wait = Expr::new(ExprKind::Await(operand), span);
-                        return self.within(node.range(), wait);
-                    }
+                    Some(K::AwaitKw) => return self.await_call(node.range(), operand, span),
                     _ if self.typing.generic_numeric.contains(&node.range()) => {
                         let negate = self.prelude_method(node.range(), Lang::Negate);
                         return apply(negate, [operand], span);

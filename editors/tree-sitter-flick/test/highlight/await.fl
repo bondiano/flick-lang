@@ -1,0 +1,13 @@
+class Awaitable a =
+  await : a ->{} Int
+//^ function
+
+instance Awaitable Int =
+  let await x = x
+//    ^ function
+
+let program = task {
+  Awaitable.await (await value)
+//         ^ property
+//                 ^ keyword
+}

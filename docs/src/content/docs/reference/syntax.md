@@ -227,7 +227,7 @@ A loop may carry a label, `'outer: for x <- xs do …`, which `break` and
 | Keyword | Meaning | Example |
 | - | - | - |
 | `task` | builds an `Eff r e a` from its block without running it | `task { Users.get id }` |
-| `await` | runs an `Eff` once in the current fiber and gives its result, or forces a `Lazy` | `await request` |
+| `await` | calls the operand's `Awaitable.await` method | `await request` |
 | `lazy` | builds a `Lazy r e a`, which runs its block at most once, at its first `await`; `let lazy x = e` binds one of its function | `lazy { Config.load () }` |
 | `scope` | runs its block in a fresh region and releases what the block acquired when it ends | `scope { File.read_all (File.open_scoped path) }` |
 | `defer` | contextual: registers cleanup on the nearest explicit enclosing `scope` to run on every close | `defer { close handle }` |
@@ -289,7 +289,7 @@ with what the keyword does:
 | `let`, `else` | `let … = … else … : Result InputError User`: in `let ... else`, the result of the current block, explaining that mismatch finishes the current block and bindings are monomorphic |
 | `fun` | `fun … -> … : Float -> Float`: the function |
 | `sql`, `ui` | the value the block builds, such as `sql { … } : Template Pg {} { label : String }` |
-| `await` | `await … : Float`: the result, with the `Eff` it runs |
+| `await` | `await … : Float`: the result and the type of the operand |
 | `ignore` | `ignore : Eff {Store} {StoreError} Float -> Unit`: the type of what is discarded, with a warning when it is an `Eff` that is not run |
 | `orelse` | `option orelse fallback : String`: the unwrapped result type, lazy evaluation note, and explicit grouping when chained or mixed with `\|>` or `<\|` |
 
@@ -766,8 +766,8 @@ let wrapped_right name = label "[" _ "]" <| name
 ```
 
 `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). A branch in braces holds statements: `if a > b then { low = b; high = a }`. `ignore e` discards a non-`Unit`
-result of an intermediate statement (see [Direct effectful calls](../../spec/01-direct-calls/)). `await e` runs a stored `Eff` once in
-the current fiber; `task { … }` builds a cold computation (see [Values of computations and their execution](../../spec/02-computations/)). In
+result of an intermediate statement (see [Direct effectful calls](../../spec/01-direct-calls/)). `await e` calls `Awaitable.await e`.
+`task { … }` builds a deferred computation (see [Values of computations and their execution](../../spec/02-computations/)). In
 `provide e { … }` the `{` ends the head expression.
 A plugin block keeps its arguments and body as tokens for its plugin, which
 reads them (see [plugins](../plugins/)). `cli "name" { … }` is the block of

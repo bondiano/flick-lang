@@ -1,7 +1,25 @@
 //! Diagnostic code identity, formatting and plugin interning.
-use super::lookup;
+use super::{REGISTRY, named};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::{fmt, str};
+
+#[derive(Debug)]
+pub struct CodeInfo {
+    pub code: Code,
+    pub title: &'static str,
+    /// Text for `flick explain`: short explanation plus an example fix.
+    pub explain: &'static str,
+}
+
+/// Finds a registered code by its public spelling or numeric key.
+pub fn lookup(code: &str) -> Option<&'static CodeInfo> {
+    let spelling = code.strip_prefix("FLICK-").unwrap_or(code);
+    REGISTRY.iter().find(|info| {
+        let code = info.code.to_string();
+        code.strip_prefix("FLICK-").unwrap_or(&code) == spelling
+            || info.code.key().to_string() == spelling
+    })
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Area {
@@ -64,11 +82,28 @@ pub struct Code {
     pub number: u16,
 }
 
+impl Code {
+    pub(super) fn key(self) -> impl fmt::Display {
+        NumericKey(self)
+    }
+}
+
+struct NumericKey(Code);
+
+impl fmt::Display for NumericKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}{:03}", self.0.area.letter(), self.0.number)
+    }
+}
+
 impl fmt::Display for Code {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(name) = named(*self) {
+            return f.write_str(name);
+        }
         match self.area {
             Area::Plugin => f.write_str(plugin_codes()[usize::from(self.number)]),
-            area => write!(f, "FLICK-{}{:03}", area.letter(), self.number),
+            _ => write!(f, "FLICK-{}", self.key()),
         }
     }
 }

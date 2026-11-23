@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: 67153095a1755e13
+source_hash: c5d7a3e2b1afb95f
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -175,7 +175,7 @@ export const load_name = (id) => Effect.gen(function* () {
 | Конструкция | JS |
 | - | - |
 | `task { body }` | `Effect.gen(function* () { … })`, строится без выполнения; каждый `yield*` выполняет тело заново |
-| `await e` | `yield* e` |
+| `await e` | эффектный вызов выбранной реализации `Awaitable.await` |
 | чистая функция там, где ожидается эффектная | оборачивается: каждая стадия, преобразованная в эффектную, выполняется в `Effect.sync` |
 | `try body with arms` | `$rt.tryWith(body, handler)`: ветви видят первую типизированную ошибку причины |
 | `provide layer { body }` | `$rt.provide(layer, body)`: слой строится до тела |

@@ -235,6 +235,13 @@ class Semigroup a => Monoid a =
   law left_identity (x : a) where equal (combine empty x) x
   law right_identity (x : a) where equal (combine x empty) x
 
+@lang awaitable
+/// A computation with requirements `r`, typed errors `e` and result `a`.
+/// Its input type `t` determines all three.
+class Awaitable t (r : ServiceRow) (e : ErrorRow) a | t -> r e a =
+  @lang await_method
+  await : t ->{r; e} a
+
 @lang exit
 /// How a computation ended: its value, or how it failed (`Exit.value`,
 /// `Exit.failure`).
@@ -283,6 +290,12 @@ let identity value = value
 from_result : Result (Errors e) a ->{; e} a
 foreign effect from_result from "flick:rt" "fromResult"
 
+@lang await_eff
+/// Runs a task in the current fiber, once per call.
+await_eff : Eff r e a ->{r; e} a
+foreign effect await_eff from "flick:rt" "awaitEff"
+  retention call
+
 @lang lazy_make
 /// The lazy of `task`, which `lazy { … }` builds: nothing runs yet.
 lazy_make : NoControl r => (Eff r e a)^c ->{} Lazy r e a
@@ -291,13 +304,12 @@ foreign effect lazy_make from "flick:rt" "lazyMake"
 
 @lang lazy_force
 /// Runs `lazy` if no fiber has, or waits for the fiber running it, and gives
-/// its outcome; `await` on a `Lazy` is this.
-lazy_force : Lazy r e a ->{Async | r; e} a
+/// its outcome. The runtime coordinates waiting between fibers.
+lazy_force : Lazy r e a ->{r; e} a
 foreign effect lazy_force from "flick:rt" "lazyForce"
 
 @lang lazy_read
-/// `lazy_force` of a `let lazy`, which only its own function reaches: no
-/// other fiber can be running it, so it never waits.
+/// Forces a cell and gives its outcome, like `lazy_force`.
 lazy_read : Lazy r e a ->{r; e} a
 foreign effect lazy_read from "flick:rt" "lazyForce"
 

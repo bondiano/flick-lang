@@ -1,14 +1,12 @@
 //! `lazy { … }` and `lazy e`: the task of the body, kept to run at most once,
 //! at its first `await` (`docs/formal/lazy.md` §2). Building one allocates
-//! a cell, so it is a runtime call, as `Ref.make` is; forcing it may wait
-//! for the fiber running it, so `await` of a `Lazy` needs `Async`.
+//! a cell, so it is a runtime call, as `Ref.make` is.
 
 use super::Checker;
 use super::infer::eff;
-use super::lang::{self, Lang};
-use super::ty::{Effects, Row, Type};
+use super::lang::Lang;
+use super::ty::{Effects, Type};
 use crate::syntax::cst::Node;
-use crate::types::Elem;
 
 /// `Lazy services errors result`.
 pub fn lazy(services: Type, errors: Type, result: Type) -> Type {
@@ -39,32 +37,6 @@ impl Checker<'_> {
         let cell = Effects::new(Type::empty_row(), Type::empty_row());
         self.call_effects(&cell, span);
         lazy(services, errors, result)
-    }
-
-    /// `await` of `ty`, at `node`, when `ty` is a `Lazy`: its result. Forcing
-    /// runs the initializer here, or waits for the fiber running it.
-    pub fn force(&mut self, node: &Node, ty: &Type) -> Option<Type> {
-        let (services, errors, result) = self.lazy_parts(ty)?;
-        self.typing.forced.insert(node.range());
-        let span = self.span(node);
-        // a `let lazy` is its function's alone: nothing else can be forcing it
-        let shared = !node
-            .nodes()
-            .next()
-            .is_some_and(|operand| self.lazy_local(operand));
-        if !shared {
-            self.typing.read_lazy.insert(node.range());
-        }
-        if self.runtime_allowed(span) && shared {
-            let label = Elem::named(&lang::item(Lang::Async).label);
-            let waits = Type::Row(Row::closed(vec![(label, Type::lang(Lang::Async))]));
-            self.perform(&waits, &Type::empty_row(), span);
-        }
-        if self.runtime_allowed(span) {
-            let services = self.live_await(ty, services);
-            self.perform(&services, &errors, span);
-        }
-        Some(result)
     }
 
     /// The rows and result of a `Lazy` type.

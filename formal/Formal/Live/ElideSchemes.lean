@@ -176,6 +176,12 @@ theorem empty :
       (.arrow (.dict 0 (Ty.spine [(.tvar 0)])) .pure (.tvar 0) Caps.none) := by
   elide_eq
 
+/-- `Prelude.await : forall t r e a. Awaitable t r e a => t ->{r; e} a` -/
+theorem await :
+    Ty.Reads (Ty.elide Caps.none (.arrow (.dict 0 (Ty.spine [(.tvar 0), (.tvar 1), (.tvar 2), (.tvar 3)])) .pure (.arrow (.tvar 0) (.rt (.tvar 1) (.tvar 2)) (.tvar 3) Caps.none) Caps.none) Caps.none)
+      (.arrow (.dict 0 (Ty.spine [(.tvar 0), (.tvar 1), (.tvar 2), (.tvar 3)])) .pure (.arrow (.tvar 0) (.rt (.tvar 1) (.tvar 2)) (.tvar 3) Caps.none) Caps.none) := by
+  elide_eq
+
 /-- `Prelude.TimeoutError : TimeoutError` -/
 theorem TimeoutError :
     Ty.Reads (Ty.elide Caps.none (.adt "Prelude.TimeoutError") Caps.none)
@@ -206,16 +212,22 @@ theorem from_result :
       (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (.tvar 0))) (.tvar 1)) (.rt .cnil (.tvar 0)) (.tvar 1) Caps.none) := by
   elide_eq
 
+/-- `Prelude.await_eff : forall r e a. Eff r e a ->{r; e} a` -/
+theorem await_eff :
+    Ty.Reads (Ty.elide Caps.none (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) Caps.none) (.rt (.tvar 0) (.tvar 1)) (.tvar 2) Caps.none) Caps.none)
+      (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) Caps.none) (.rt (.tvar 0) (.tvar 1)) (.tvar 2) Caps.none) := by
+  elide_eq
+
 /-- `Prelude.lazy_make : forall r e a c. NoControl r => (Eff r e a)^c ->{} Lazy r e a` -/
 theorem lazy_make :
     Ty.Reads (Ty.elide (fun x => x = .v 3) (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt .cnil .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) Caps.none)
       (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt (.caps (fun x => x = .v 3)) .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) := by
   elide_eq
 
-/-- `Prelude.lazy_force : forall r e a. Lazy r e a ->{Async | r; e} a` -/
+/-- `Prelude.lazy_force : forall r e a. Lazy r e a ->{r; e} a` -/
 theorem lazy_force :
-    Ty.Reads (Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) (.rt (.run (.rnm "Prelude.Async" (.adt "Prelude.Async")) (.tvar 0)) (.tvar 1)) (.tvar 2) Caps.none) Caps.none)
-      (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) (.rt (.run (.run (.rnm "Prelude.Async" (.adt "Prelude.Async")) (.tvar 0)) (.caps (fun x => x = .v 3))) (.tvar 1)) (.tvar 2) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) (.rt (.tvar 0) (.tvar 1)) (.tvar 2) Caps.none) Caps.none)
+      (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) (.rt (.run (.tvar 0) (.caps (fun x => x = .v 3))) (.tvar 1)) (.tvar 2) Caps.none) := by
   elide_eq
 
 /-- `Prelude.lazy_read : forall r e a. Lazy r e a ->{r; e} a` -/

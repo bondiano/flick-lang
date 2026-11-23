@@ -165,7 +165,7 @@ constants first.
 | Construct | JS |
 | - | - |
 | `task { body }` | `Effect.gen(function* () { … })`, built without running; each `yield*` runs the body again |
-| `await e` | `yield* e` |
+| `await e` | a runtime call to the selected `Awaitable.await` implementation |
 | a pure function where a runtime one is expected | wrapped: each lifted stage runs in `Effect.sync` |
 | `try body with arms` | `$rt.tryWith(body, handler)`: the arms see the first typed failure of the cause |
 | `provide layer { body }` | `$rt.provide(layer, body)`: the layer is built before the body |

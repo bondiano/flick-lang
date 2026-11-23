@@ -135,6 +135,126 @@ fn ir_makes_stages_dictionaries_and_lifts_explicit() {
     insta::assert_snapshot!(super::print(&ir));
 }
 
+#[test]
+fn awaits_lower_to_calls_of_the_selected_evidence() {
+    fn visit(expr: &super::Expr, methods: &mut Vec<String>, calls: &mut usize) {
+        use super::{ExprKind, Stage};
+        match &expr.kind {
+            ExprKind::Await(_) => panic!("source await lowered to a dedicated operation: {expr:?}"),
+            ExprKind::App {
+                stage: Stage::Runtime,
+                ..
+            } => *calls += 1,
+            ExprKind::Global { module, name, .. } => methods.push(format!("{module}.{name}")),
+            ExprKind::Method {
+                dict: flick_ir::Dict::Given(_),
+                name,
+                ..
+            } => {
+                methods.push(name.clone());
+            }
+            _ => {}
+        }
+        expr.each_child(&mut |child| visit(child, methods, calls));
+    }
+    let module = lower_text(
+        "App",
+        "module App exposing (..)\n\
+         mixed : Eff {} none Int -> Lazy {} none Int -> Eff {} none Int\n\
+         let mixed work cell = task {\n  let first = await work\n  first + await cell\n}\n\
+         forward : Awaitable t r e a => t ->{r; e} a\n\
+         let forward value = await value\n",
+    )
+    .expect("lowers built-in and dictionary calls");
+    let mut methods = Vec::new();
+    let mut calls = 0;
+    for item in &module.items {
+        item.each_body(&mut |body| visit(body, &mut methods, &mut calls));
+    }
+    assert_eq!(calls, 3);
+    assert_eq!(
+        methods,
+        ["Prelude.await_eff", "Prelude.lazy_force", "await"]
+    );
+}
+
+#[test]
+fn a_task_infers_the_exact_rows_of_eff_and_lazy_awaits() {
+    let (_, interface) = check_text(
+        "App",
+        r#"module App exposing (..)
+
+type error DbError
+type error CacheError
+
+service Db =
+  load : Int ->{; DbError} String
+
+service Cache =
+  read : Unit ->{; CacheError} String
+
+load_user : Int -> Eff {Db} {DbError} String
+let load_user id = task { Db.load id }
+
+let program = task {
+  let config = lazy { "cached" }
+  await (load_user 42) ++ await config
+}
+
+let both = task {
+  let config = lazy { Cache.read () }
+  await (load_user 42) ++ await config
+}
+
+expected_program : Eff {Db} {DbError} String
+let expected_program = program
+
+expected_both : Eff {Db, Cache} {DbError, CacheError} String
+let expected_both = both
+"#,
+    )
+    .expect("the mixed tasks check");
+    let scheme = |name: &str| {
+        let export = interface
+            .exports
+            .iter()
+            .find(|e| e.entity.name == name)
+            .expect("the test value is exported");
+        export.scheme.as_ref().expect("the value has a type")
+    };
+    let minimum = |name: &str| {
+        let types::Type::Forall {
+            vars,
+            constraints,
+            body,
+        } = scheme(name)
+        else {
+            return types::show_signature(scheme(name));
+        };
+        assert!(constraints.is_empty(), "{constraints:?}");
+        // A task's inferred scheme can widen its service and error rows.
+        let slack: Vec<_> = vars
+            .iter()
+            .map(|var| {
+                assert!(matches!(
+                    var.kind,
+                    types::Kind::ServiceRow | types::Kind::ErrorRow
+                ));
+                (var.name.clone(), types::Type::empty_row())
+            })
+            .collect();
+        types::show_signature(&body.substitute(&slack)).replace(" | none}", "}")
+    };
+    assert_eq!(
+        minimum("program"),
+        types::show_signature(scheme("expected_program"))
+    );
+    assert_eq!(
+        minimum("both"),
+        types::show_signature(scheme("expected_both"))
+    );
+}
+
 /// A `let lazy` is a variable of its function: no cell. The declaration makes
 /// the task `x$run = task (attempt e)` and the state `x = None`; an `await`
 /// runs the task while the state is `None` and keeps `Some o`. A write to a

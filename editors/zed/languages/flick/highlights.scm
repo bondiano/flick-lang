@@ -24,6 +24,9 @@
 ; them as `@keyword` overlaps the generic identifier rule.
 (_ (keyword) @_let . (identifier) @function
   (#eq? @_let "let"))
+(_ (identifier) @function . (operator) @_colon
+  (#eq? @function "await")
+  (#eq? @_colon ":"))
 (_ (keyword) @_let . (keyword) @_rec . (identifier) @function
   (#eq? @_let "let")
   (#eq? @_rec "rec"))

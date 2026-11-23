@@ -223,6 +223,13 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor("  let [first, ...rest] = xs else []", "else").includes("keyword.control.flick"));
 });
 
+test("await keeps its control scope except in method names", () => {
+  assert.ok(scopesFor("  await : a ->{r; e} b", "await").includes("entity.name.function.flick"));
+  assert.ok(scopesFor("  let await input = run input", "await").includes("entity.name.function.flick"));
+  assert.ok(scopesFor("  Awaitable.await input", "await").includes("variable.other.member.flick"));
+  assert.ok(scopesFor("  await input", "await").includes("keyword.control.flick"));
+});
+
 test("word boundaries prevent spurious keyword matches on partial identifiers and member accesses", () => {
   const nonKeywordCases = [
     ["let sql_query = 1", "sql_query"],

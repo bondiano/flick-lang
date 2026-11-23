@@ -15,6 +15,7 @@ export {
   decimalMultiply, decimalCompare, decimalDivideToScale,
 } from "./decimal.ts";
 export {
+  awaitEff,
   bindEff,
   flatMapEff,
   foreignEffect,

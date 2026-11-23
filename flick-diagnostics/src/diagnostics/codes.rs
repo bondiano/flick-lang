@@ -1,33 +1,30 @@
-//! Registry of diagnostic codes. A code is `FLICK-<area letter><3 digits>`; the
-//! area letter is the code's range. Codes are never reused: a code that stops
+//! Registry of diagnostic codes. A code is named or uses
+//! `FLICK-<area letter><3 digits>`. Codes are never reused: a code that stops
 //! being emitted stays registered and is marked retired in its explanation.
 //! A plugin's codes are its own, shown under its package: `std/L001`.
 
 #[path = "codes/code.rs"]
 mod code;
-pub use code::{Area, Code};
+pub use code::{Area, Code, CodeInfo};
 
 /// Interns a plugin code, keeping its package namespace.
 pub fn plugin(package: &str, code: &str) -> Option<Code> {
     self::code::plugin(package, code)
 }
 
-#[derive(Debug)]
-pub struct CodeInfo {
-    pub code: Code,
-    pub title: &'static str,
-    /// Text for `flick explain`: short explanation plus an example fix.
-    pub explain: &'static str,
-}
-
-/// Finds a registered code by its `FLICK-…` spelling.
+/// Finds a registered code by its public spelling or numeric key.
 pub fn lookup(code: &str) -> Option<&'static CodeInfo> {
-    REGISTRY.iter().find(|info| info.code.to_string() == code)
+    self::code::lookup(code)
 }
 
 macro_rules! codes {
-    ($($name:ident = $area:ident $number:literal, $title:literal;)*) => {
+    ($($name:ident = $area:ident $number:literal, $title:literal $(as $spelling:literal)?;)*) => {
         $(pub const $name: Code = Code { area: Area::$area, number: $number };)*
+
+        pub(super) fn named(code: Code) -> Option<&'static str> {
+            $($(if code == $name { return Some($spelling); })?)*
+            None
+        }
 
         pub static REGISTRY: &[CodeInfo] = &[$(CodeInfo {
             code: $name,
@@ -182,6 +179,7 @@ codes! {
     E018 = Effects 18, "`tail` arm that may suspend";
     E019 = Effects 19, "row variable that may hold another instance of a provided service";
     E020 = Effects 20, "unhandled effect on the selected environment";
+    E021 = Effects 21, "no instance for the operand of await" as "E-AWAITABLE-MISSING";
     C001 = Classes 1, "no instance for a constraint";
     C002 = Classes 2, "ambiguous class constraint";
     C003 = Classes 3, "overlapping instances";

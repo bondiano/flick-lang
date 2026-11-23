@@ -34,7 +34,7 @@ pub(super) fn class_member(p: &mut Parser) {
         statement(p);
         p.complete(m, K::LawDecl);
     } else {
-        super::decl::member(p);
+        super::decl::method_member(p);
     }
 }
 

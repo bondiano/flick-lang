@@ -113,6 +113,7 @@ natives! {
     RT, "optionMap2", 3 => option_map2;
     RT, "resultMap2", 3 => result_map2;
     RT, "succeed", 1 => succeed;
+    RT, "awaitEff", 1 => |args, _| Ok(await_(&args[0]));
     RT, "mapEff", 2 => map_eff;
     RT, "flatMapEff", 2 => flat_map_eff;
     RT, "map2Eff", 3 => map2_eff;

@@ -11,7 +11,7 @@ use crate::types::Checker;
 use crate::types::classes::split;
 use crate::types::env::Form;
 use crate::types::kinds::Kind;
-use crate::types::lang::Lang;
+use crate::types::lang::{self, Lang};
 use crate::types::ty::Type;
 
 /// Joined variance uses for one class parameter.
@@ -172,6 +172,11 @@ impl Checker<'_> {
         let Some(data) = self.class_data(key) else {
             return Vec::new();
         };
+        // An Awaitable dictionary determines these types by equality, even
+        // when the method's arrow alone would admit a wider or narrower type.
+        if lang::is(Lang::Awaitable, &key.0, &key.1) {
+            return vec![Variance::Invariant; data.params.len()];
+        }
         let mut uses: Vec<Uses> = data
             .params
             .iter()

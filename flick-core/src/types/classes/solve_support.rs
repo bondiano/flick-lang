@@ -9,6 +9,45 @@ use crate::types::env::Instance;
 use crate::types::ty::Type;
 
 impl Checker<'_> {
+    /// Reconstructs a class constraint when its first argument determines
+    /// the other arguments. Substitution preserves higher-rank outputs.
+    /// The caller still has to solve the reconstructed constraint.
+    pub(in crate::types) fn project_constraint(
+        &self,
+        class: &Type,
+        input: &Type,
+        givens: &Givens,
+    ) -> Option<Type> {
+        let (class_name, _) = split(class)?;
+        let info = self.class_info(class_name.0, class_name.1)?;
+        let produces_all = info
+            .fundeps
+            .iter()
+            .any(|fd| fd.from == [0] && (1..info.params.len()).all(|i| fd.to.contains(&i)));
+        if !produces_all {
+            return None;
+        }
+        for (given, _) in givens {
+            if let Some((name, args)) = split(given)
+                && name == class_name
+                && args.first().copied() == Some(input)
+            {
+                return Some(given.clone());
+            }
+        }
+        let mut projections = self.env.instances().filter_map(|instance| {
+            let (name, args) = split(&instance.head)?;
+            let pattern = args.first()?;
+            let mut subst = Subst::new();
+            (name == class_name && match_type(pattern, input, &mut subst) == Match::Yes)
+                .then(|| instance.head.substitute(&subst))
+        });
+        let projected = projections.next()?;
+        projections
+            .all(|other| other == projected)
+            .then_some(projected)
+    }
+
     /// An assumption of the same class that agrees on the determining
     /// arguments of a functional dependency fixes the determined ones.
     pub(super) fn improve_by_givens(

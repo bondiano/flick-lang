@@ -188,7 +188,7 @@ theorem program435 (S : Sig) (hS : GenSig S) :
 --         let h10 =
 --           (open_scoped "x")
 --         let as11 : Bool =
---           (await ((scope s13 {
+--           (Prelude.await_eff ((scope s13 {
 --             let h14 =
 --               (open_scoped "x")
 --             (task {

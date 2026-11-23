@@ -71,6 +71,7 @@ ord Type Prelude.Ord
 hash Type Prelude.Hash
 show Type Prelude.Show
 iterable Type Prelude.Iterable
+awaitable Type Prelude.Awaitable
 stream Type Stream.Core.Stream
 numeric Type Numeric.Numeric
 integer Type Numeric.Integer
@@ -93,6 +94,7 @@ detached Type Prelude.Detached
 instances Type Instances.Instances
 map2 Value Prelude.map2
 flat_map Value Prelude.flat_map
+await_method Value Prelude.await
 nothing Value Prelude.nothing
 iter Value Prelude.iter
 show_method Value Prelude.show
@@ -112,6 +114,7 @@ gt Value Numeric.gt
 ge Value Numeric.ge
 from_result Value Prelude.from_result
 lazy_make Value Prelude.lazy_make
+await_eff Value Prelude.await_eff
 lazy_force Value Prelude.lazy_force
 lazy_done Value Prelude.lazy_done
 lazy_read Value Prelude.lazy_read

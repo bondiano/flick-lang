@@ -414,6 +414,12 @@ instance Applicative (Eff r e) =
 instance Monad (Eff r e) =
   let flat_map f eff = flat_map_eff f eff
 
+instance Awaitable (Eff r e a) r e a =
+  let await = await_eff
+
+instance Awaitable (Lazy r e a) r e a =
+  let await = lazy_force
+
 instance Alternative Option =
   let nothing = None
   let or_else first second =

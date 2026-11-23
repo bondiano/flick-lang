@@ -143,8 +143,11 @@ use crate::ir::memory::{
     self, Block, CodeId, Exit, Function, Global, HostPrimitive, Instruction, Intrinsic, Local,
     Name, Operation, Program,
 };
-use crate::ir::{Arm, BinOp, Expr, ExprKind, Item, ItemKind, Lit, Module, Param, Pat, Stage, Stmt};
+use crate::ir::{
+    Arm, BinOp, Expr, ExprKind, ExprLang, Item, ItemKind, Lit, Module, Param, Pat, Stage, Stmt,
+};
 use crate::source::Span;
+use crate::types::lang::Lang;
 
 use super::{Error as OwnershipError, insert};
 use free::{free, given};

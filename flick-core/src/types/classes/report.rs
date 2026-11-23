@@ -19,6 +19,14 @@ impl Checker<'_> {
                 continue;
             }
             let constraint = self.canon(&w.constraint);
+            if matches!(outcome, Outcome::Missing(..) | Outcome::Stuck)
+                && let Some(operand) = w.await_operand
+                && let Some(args) = args_of(&constraint, Lang::Awaitable)
+                && let Some(input) = args.first()
+            {
+                self.missing_awaitable(operand, input);
+                continue;
+            }
             match outcome {
                 Outcome::Missing(part, reason) => {
                     self.missing(&constraint, &part, reason.as_deref(), w.span);
@@ -111,7 +119,7 @@ impl Checker<'_> {
         }
     }
 
-    fn over_budget(&mut self, constraint: &Type, chain: &[Type], span: Span) {
+    pub(in crate::types) fn over_budget(&mut self, constraint: &Type, chain: &[Type], span: Span) {
         let limits = self.options.limits;
         let what = if chain.len() > limits.depth as usize {
             format!("{} nested constraints", limits.depth)

@@ -132,6 +132,7 @@ lang_items! {
     Hash = "hash",
     Show = "show",
     Iterable = "iterable",
+    Awaitable = "awaitable",
     Stream = "stream",
     Numeric = "numeric",
     Integer = "integer",
@@ -158,6 +159,7 @@ lang_items! {
     // class methods that syntax stands for
     Map2 = "map2",
     FlatMap = "flat_map",
+    AwaitMethod = "await_method",
     Nothing = "nothing",
     Iter = "iter",
     ShowMethod = "show_method",
@@ -178,6 +180,7 @@ lang_items! {
     // functions that syntax stands for or the optimizer knows
     FromResult = "from_result",
     LazyMake = "lazy_make",
+    AwaitEff = "await_eff",
     LazyForce = "lazy_force",
     LazyDone = "lazy_done",
     LazyRead = "lazy_read",

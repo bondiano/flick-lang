@@ -71,7 +71,7 @@ let in_cell () =
   let cell =
     Ref.make
       (
-        try { a = Fail.fail (Oops 1); b = await (Fail.fail (Bad "")) } with
+        try { a = Fail.fail (Oops 1); b = await (Fail.fail (Bad "") : Eff {} {} Unit) } with
         | Oops _ -> { a = Fail.fail (Bad ""); b = () }
       )
   0

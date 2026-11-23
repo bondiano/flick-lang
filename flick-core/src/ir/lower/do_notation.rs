@@ -110,7 +110,7 @@ impl Lower<'_> {
         let mut dicts = self.dictionaries(key);
         assert!(
             !dicts.is_empty(),
-            "the checker resolved the `{name}` of a `do` block"
+            "the checker resolved the `{name}` method"
         );
         let dict = dicts.remove(0);
         let method = ExprKind::Method {

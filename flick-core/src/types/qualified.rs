@@ -99,11 +99,10 @@ impl Checker<'_> {
         name: &str,
         span: Span,
     ) -> Type {
-        if name == "dictionary"
-            && namespace == Namespace::Value
-            && let Some(dictionary) = self.dictionary_constructor(qualifier, span)
+        if namespace == Namespace::Value
+            && let Some(member) = self.class_member(qualifier, name, span)
         {
-            return dictionary;
+            return member;
         }
         if let Some(ty) = self.opened_value(qualifier, name, span) {
             return ty;
@@ -206,6 +205,29 @@ impl Checker<'_> {
             return ty;
         }
         self.service_member(qualifier, name, span)
+    }
+
+    /// A class's explicit dictionary constructor or its qualified await method.
+    fn class_member(&mut self, qualifier: &str, name: &str, span: Span) -> Option<Type> {
+        if name == "dictionary" {
+            return self.dictionary_constructor(qualifier, span);
+        }
+        let method = lang::item(Lang::AwaitMethod);
+        if name != method.name {
+            return None;
+        }
+        let super::env::Found::Entity(owner) = self.env.find_type(qualifier) else {
+            return None;
+        };
+        if !lang::is(Lang::Awaitable, &owner.module, &owner.name) {
+            return None;
+        }
+        let entity = method.entity();
+        let scheme = self.env.value(&entity)?.clone();
+        let live = self.live_scheme(&scheme);
+        let (ty, type_args) = self.instantiate_args(&live, span);
+        self.record_entity_args(&entity, &ty, type_args, span);
+        Some(ty)
     }
 
     #[cfg(feature = "ide")]

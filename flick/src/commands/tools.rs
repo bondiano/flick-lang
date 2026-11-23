@@ -31,7 +31,12 @@ pub fn explain(options: &ExplainArguments) -> Outcome {
     };
     match codes::lookup(&wanted) {
         Some(info) => {
-            println!("{wanted}: {}\n\n{}", info.title, info.explain.trim_end());
+            println!(
+                "{}: {}\n\n{}",
+                info.code,
+                info.title,
+                info.explain.trim_end()
+            );
             Outcome::default()
         }
         None => Outcome {

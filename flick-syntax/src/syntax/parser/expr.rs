@@ -345,7 +345,7 @@ pub(super) fn path_continues(p: &Parser) -> bool {
     let next = p.toks[(p.pos + 1).min(p.toks.len() - 1)];
     dot.kind == K::Dot
         && p.adjacent()
-        && matches!(next.kind, K::Con | K::Ident)
+        && matches!(next.kind, K::Con | K::Ident | K::AwaitKw)
         && next.start == dot.end
 }
 
@@ -356,11 +356,11 @@ pub(super) fn con_path(p: &mut Parser) {
     }
     while path_continues(p) {
         p.bump();
-        let lower = p.raw().kind == K::Ident;
-        p.bump();
-        if lower {
+        if p.raw().kind != K::Con {
+            p.bump_as(K::Ident);
             break;
         }
+        p.bump();
     }
 }
 

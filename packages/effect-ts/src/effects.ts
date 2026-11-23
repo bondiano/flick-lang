@@ -1,5 +1,8 @@
-// Services and their operations.
+// Tasks, services and their operations.
 import { Context, Effect } from "effect";
+
+/** Runs a task in the calling fiber. */
+export const awaitEff = <A, E, R>(task: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> => task;
 
 /** The implementation of a service: its operations, curried. */
 export type ServiceImpl = Readonly<Record<string, unknown>>;

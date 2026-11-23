@@ -83,7 +83,7 @@ pub(super) fn member(p: &mut Parser) {
 include!("decl_modules.rs");
 pub(super) fn signature(p: &mut Parser) {
     let m = p.start();
-    p.bump();
+    p.bump_as(K::Ident);
     p.bump();
     types::type_(p);
     p.complete(m, K::Signature);
@@ -92,6 +92,10 @@ pub(super) fn signature(p: &mut Parser) {
 /// `let [rec] name params [: T] = body`, `let pattern [: T] = body`, or
 /// `let assert pattern [: T] = body [as "message"]`.
 pub(super) fn let_decl(p: &mut Parser) {
+    let_member(p, false);
+}
+
+fn let_member(p: &mut Parser, method: bool) {
     let m = p.start();
     let let_kw = p.raw();
     p.bump();
@@ -111,7 +115,7 @@ pub(super) fn let_decl(p: &mut Parser) {
     if assert && !mutable {
         p.eat(K::MutKw);
     }
-    let_rest(p, m, assert);
+    let_rest(p, m, assert, method);
 }
 
 /// Whether the token `n` ahead is the identifier `word`.
@@ -122,7 +126,7 @@ pub(super) fn word_at(p: &Parser, n: usize, word: &str) -> bool {
 
 /// A `let` after its keywords: the name or pattern, the parameters, the
 /// type and the body.
-fn let_rest(p: &mut Parser, m: super::Marker, assert: bool) {
+fn let_rest(p: &mut Parser, m: super::Marker, assert: bool, method: bool) {
     if p.at(K::RecKw) && assert {
         p.error_expected("a pattern after `let assert`");
     }
@@ -130,9 +134,9 @@ fn let_rest(p: &mut Parser, m: super::Marker, assert: bool) {
         p.error_expected("a name after `let rec`");
         p.bump();
     }
-    if p.at(K::Ident) {
+    if p.at(K::Ident) || (method && p.at(K::AwaitKw)) {
         let name = p.start();
-        p.bump();
+        p.bump_as(K::Ident);
         p.complete(name, K::VarPat);
         if pattern::at_atom_start(p) {
             let params = p.start();
@@ -534,9 +538,18 @@ fn instance_decl(p: &mut Parser) {
     context(p);
     types::union(p);
     if p.eat(K::Eq) {
-        p.body(K::Members, member);
+        p.body(K::Members, method_member);
     }
     p.complete(m, K::InstanceDecl);
+}
+
+/// A class or instance member may name the method behind the await prefix.
+pub(super) fn method_member(p: &mut Parser) {
+    match p.current() {
+        K::AwaitKw if p.nth(1) == K::Colon => signature(p),
+        K::LetKw if p.nth(1) == K::AwaitKw => let_member(p, true),
+        _ => member(p),
+    }
 }
 
 const FOREIGN_META: [&str; 9] = [

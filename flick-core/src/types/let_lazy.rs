@@ -1,8 +1,8 @@
 //! `let lazy x = e` and `let lazy mut x = e` (`docs/formal/lazy.md` §4): a
 //! binding of its function, as `let mut` is, forced with `await x` at most
 //! once. Nothing but its own function reaches it, so no other fiber can be
-//! forcing it: `await x` needs no `Async`, and the lowering keeps its state in
-//! a variable of the function (`ir::lower::lazy`). A `let lazy mut` written
+//! forcing it, and the lowering keeps its state in a variable of the
+//! function (`ir::lower::lazy`). A `let lazy mut` written
 //! before it is read never runs `e`.
 
 use super::Checker;

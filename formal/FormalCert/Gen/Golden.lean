@@ -60,7 +60,7 @@ theorem program2 (S : Sig) (hS : GenSig S) :
 --   (scope s1 {
 --     let h2 =
 --       (open_scoped "x")
---     (await (from_result (Err (Bad (describe ((from_result (Err (Bad ""))) : Bool)))))) })
+--     (Prelude.await_eff (from_result (Err (Bad (describe ((from_result (Err (Bad ""))) : Bool)))))) })
 theorem program3 (S : Sig) (hS : GenSig S) :
     Typ S [] Facts.none [] (.lam (.scope (.let_ (.app (.glob 12) (.lit (.str "x"))) (.await (.raise (.app (.ctor "Fixture.Bad") (.app (.proj (.glob 25) "describe") (.let_ (.raise (.app (.ctor "Fixture.Bad") (.lit (.str "")))) (.var 0)))))))))
       (.ex (.arrow (.base .unit) (.rt (.rnm "Fixture.Counter" (.adt "Fixture.Counter")) (.run (.rnm "Fixture.Bad" (.adt "Fixture.Bad")) (.rnm "Fixture.Oops" (.adt "Fixture.Oops")))) (.tapp (.adt "Prelude.Option") (.tapp (.tapp (.adt "Tuple") (.base .unit)) (.base .unit))) Caps.none) .pure) :=
@@ -183,7 +183,7 @@ theorem program7 (S : Sig) (_ : GenSig S) :
 --       (provide (Layer.succeed Log {
 --         log = (fun line ->
 --           let cell6 =
---             (Ref.make (await (scope s3 {
+--             (Ref.make (Prelude.await_eff (scope s3 {
 --               let h4 =
 --                 (open_scoped "x")
 --               let cell5 =
@@ -832,7 +832,7 @@ theorem program14 (S : Sig) (hS : GenSig S) :
 -- program : Eff {Log} {Bad, Oops} { a : JsValue; b : String }
 -- let program =
 --   (task {
---     (await (scope s1 {
+--     (Prelude.await_eff (scope s1 {
 --       let h2 =
 --         (open_scoped "x")
 --       (try
@@ -1063,7 +1063,7 @@ theorem program19 (S : Sig) (_ : GenSig S) :
 --       let h5 =
 --         (open_scoped "x")
 --       let v6 =
---         (await (scope s7 {
+--         (Prelude.await_eff (scope s7 {
 --           let h8 =
 --             (open_scoped "x")
 --           v9 : Unit ->{} Unit
@@ -1259,7 +1259,7 @@ theorem program22 (S : Sig) (hS : GenSig S) :
 --             ())
 --         {
 --           next = (fun u ->
---             (await (provide (Layer.effect Counter (task {
+--             (Prelude.await_eff (provide (Layer.effect Counter (task {
 --               (try
 --                   ()
 --                 with

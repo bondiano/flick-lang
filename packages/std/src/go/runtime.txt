@@ -201,6 +201,7 @@ refGet RefGet
 refSame RefSame
 refSet RefSet
 refModify *RefModify
+awaitEff *Run
 lazyMake LazyMake
 lazyForce *LazyForce
 lazyDone LazyDone

@@ -1,0 +1,47 @@
+module App.Awaitable exposing (..)
+
+type error DbError
+type error CacheError
+
+service Db =
+  load : Int ->{; DbError} String
+
+service Cache =
+  config : Unit ->{; CacheError} String
+
+load_user : Int -> Eff {Db} {DbError} String
+let load_user id = task { Db.load id }
+
+program : Lazy {} {} String -> Eff {Db} {DbError} String
+let program cached_config = task {
+  let user = await (load_user 42)
+  let config = await cached_config
+  user ++ config
+}
+
+both : Lazy {Cache} {CacheError} String -> Eff {Db, Cache} {DbError, CacheError} String
+let both cached_config = task {
+  let user = await (load_user 42)
+  let config = await cached_config
+  user ++ config
+}
+
+type Ready a = Ready a
+
+instance Awaitable (Ready a) {} {} a =
+  let await (Ready x) = x
+
+custom : Ready String ->{} String
+let custom value = await value
+
+forward : Awaitable t r e a => t ->{r; e} a
+let forward value = await value
+
+direct : Eff {} {} Int ->{} Int
+let direct computation = Awaitable.await computation
+
+with_input : (a -> b) -> a -> b
+let with_input f value = f value
+
+deferred : Eff {Db} {DbError} String -> Eff {Db} {DbError} String
+let deferred computation = with_input (fun value -> task { await value }) computation

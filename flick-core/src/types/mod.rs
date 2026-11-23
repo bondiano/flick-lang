@@ -18,6 +18,7 @@ use std::mem;
 mod abi;
 mod applicative_do;
 mod assumed_pure;
+mod awaitable;
 mod binary;
 mod bindings;
 mod braced_branch;

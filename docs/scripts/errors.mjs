@@ -9,8 +9,8 @@ const explanations = path.join(root, "flick-diagnostics/src/diagnostics/explain"
 const translations = path.join(root, "docs/src/error-translations");
 const content = path.join(root, "docs/src/content/docs");
 const registry = readFileSync(path.join(root, "flick-diagnostics/src/diagnostics/codes.rs"), "utf8");
-const entries = [...registry.matchAll(/^\s*([A-Z]\d{3}) = (\w+) \d+, "([^"]+)";/gm)]
-  .map(([, short, area, title]) => ({ short, code: `FLICK-${short}`, area, title }));
+const entries = [...registry.matchAll(/^\s*([A-Z]\d{3}) = (\w+) \d+, "([^"]+)"(?: as "([^"]+)")?;/gm)]
+  .map(([, short, area, title, spelling]) => ({ short, code: spelling ?? `FLICK-${short}`, area, title }));
 // The public index follows `Area::ALL` in `flick-diagnostics/src/diagnostics/codes/code.rs`.
 // `Area::Plugin` stays out of that array: a plugin code is spelled under its
 // package and has no heading here. An area with no registered code is omitted
@@ -28,11 +28,12 @@ const inline = (text) => new Set((text.replace(/```[\s\S]*?```/g, "").match(/`[^
 const forDocs = (text, code) =>
   text.replace(/^```flick(?: (.*))?$/gm, (_line, rest = "") => {
     const words = rest.trim();
+    const exampleCode = code.replace(/^FLICK-/, "");
     if (words === "") return "```flick";
-    if (words === "fail") return `\`\`\`flick fail ${code.slice("FLICK-".length)}`;
-    if (/^fail [A-Z]\d{3}( [A-Z]\d{3})*$/.test(words)) {
+    if (words === "fail") return `\`\`\`flick fail ${exampleCode}`;
+    if (/^fail (?:[A-Z]\d{3}|[A-Z](?:-[A-Z]+)+)(?: (?:[A-Z]\d{3}|[A-Z](?:-[A-Z]+)+))*$/.test(words)) {
       const named = words.slice("fail ".length).split(" ");
-      if (!named.includes(code.slice("FLICK-".length))) throw new Error(`${code}: a \`fail\` fence names the codes of the page: ${words}`);
+      if (!named.includes(exampleCode)) throw new Error(`${code}: a \`fail\` fence names the codes of the page: ${words}`);
       return `\`\`\`flick ${words}`;
     }
     if (words === "keep" || words.startsWith("keep ")) return `\`\`\`flick ${words}`;

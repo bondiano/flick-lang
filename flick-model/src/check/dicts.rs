@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::expr::mono;
-use super::generalize::{Inst, params, substitute, substitute_caps};
+use super::generalize::{Inst, substitute, substitute_caps};
 use super::{Check, Checker, error};
 use crate::syntax::{GETTER, Name, Path, Term};
 use crate::types::{Fields, Kind, Row, Scheme, Type, Var};
@@ -87,7 +87,12 @@ impl Checker<'_> {
         let Some(class) = self.decls.classes.get(c).cloned() else {
             return error("Field", format!("no class `{c}`"));
         };
-        let map = params(&class.params, args);
+        let map = class
+            .params
+            .iter()
+            .cloned()
+            .zip(args.iter().map(arg))
+            .collect();
         if let Some(sup) = l.strip_prefix('$') {
             return match (0..class.supers.len())
                 .find(|&i| class.super_slot(i).as_deref() == Some(sup))
@@ -163,5 +168,55 @@ impl Checker<'_> {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::decls::{Class, Decls};
+    use crate::types::Stage;
+
+    #[test]
+    fn dictionary_method_uses_its_service_and_error_arguments() {
+        let class = Path::new("Test", "UsesRows");
+        let r = Name::from("r");
+        let e = Name::from("e");
+        let unit = Type::con("Prelude", "Unit");
+        let mut decls = Decls::default();
+        decls.classes.insert(
+            class.clone(),
+            Class {
+                params: vec![r.clone(), e.clone()],
+                ..Class::default()
+            },
+        );
+        let services = Row::var(Var::Named(r.clone()));
+        let errors = Row::var(Var::Named(e.clone()));
+        let dict = Type::Dict(
+            class.clone(),
+            Rc::from([Type::Errors(services.clone()), Type::Errors(errors.clone())]),
+        );
+        let method = Type::fun(unit.clone(), Stage::Runtime(services, errors), unit.clone());
+        decls.values.insert(
+            Path::new("Test", "call"),
+            Scheme::new(
+                vec![(r, Kind::Services), (e, Kind::Errors)],
+                Type::fun(dict, Stage::Pure, method),
+            ),
+        );
+        let services = Row::var(Var::Named("services".into()));
+        let errors = Row::var(Var::Named("errors".into()));
+        let actual = Checker::new(&decls)
+            .method(
+                &class,
+                &[Type::Errors(services.clone()), Type::Errors(errors.clone())],
+                "call",
+            )
+            .expect("dictionary method");
+        assert_eq!(
+            actual.body,
+            Type::fun(unit.clone(), Stage::Runtime(services, errors), unit)
+        );
     }
 }
