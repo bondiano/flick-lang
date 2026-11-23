@@ -194,9 +194,16 @@ pub enum Operation {
         kind: Intrinsic,
         args: Vec<Local>,
     },
-    /// Consumes the candidate and fields. Reuses the candidate's storage
-    /// only if it is unique and has the same field capacity. Otherwise
-    /// drops it and allocates, with exactly the same value semantics.
+    /// Consumes an owned object at its last use and detaches a frame-limited
+    /// reuse token when the object is uniquely owned (`references == 1`) and
+    /// reusable (`Data::Tagged` or `Data::Record`). Drops old children
+    /// immediately to preserve cleanup order and restore child uniqueness;
+    /// otherwise drops the operand normally (leaving external aliases intact)
+    /// and yields an immediate null reuse token.
+    DropReuse(Local),
+    /// Consumes the candidate (or a `DropReuse` token) and fields. Reuses the
+    /// candidate's storage only if it is unique and has the same tagged field
+    /// capacity. Otherwise drops it and allocates, with identical value semantics.
     Reuse {
         object: Local,
         tag: String,
@@ -209,6 +216,14 @@ pub enum Operation {
         tag: String,
         fields: Vec<Local>,
         dicts: Vec<Local>,
+    },
+    /// Consumes the candidate (or a `DropReuse` token) and canonical record
+    /// fields. Reuses the candidate's storage only if it is a unique record or
+    /// record reuse token with the same field count; otherwise drops it and
+    /// allocates a fresh record, preserving external aliases.
+    ReuseRecord {
+        object: Local,
+        fields: Vec<(String, Local)>,
     },
     /// Installs operation arms around a delayed body called with Unit.
     /// Owns body, then operation functions in metadata order, then optional

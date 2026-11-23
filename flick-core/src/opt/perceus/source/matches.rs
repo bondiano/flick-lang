@@ -1,12 +1,12 @@
 //! Arm suffixes are direct helpers, not copies of a source continuation.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ir::Arm;
 
 use super::{
-    Block, Code, CodeId, Env, Exit, Expr, Function, Intrinsic, Local, Lower, LowerError, Operation,
-    Param, Pat, Span, Stage, free, lookup, memory,
+    Block, CandidateShape, Code, CodeId, Env, Exit, Expr, Function, Intrinsic, Local, Lower,
+    LowerError, Operation, Param, Pat, Span, Stage, free, lookup, memory, reuse,
 };
 
 #[derive(Clone, Copy)]
@@ -84,6 +84,7 @@ impl Lower<'_> {
             names: vec![],
             mode,
         };
+        let scrutinee_shape = reuse::arms_scrutinee_shape(arms.iter().map(|arm| &arm.pat));
         for arm in arms.iter().rev() {
             let bindings = memory::pattern_bindings(&arm.pat)
                 .map_err(|error| LowerError::Pattern { error, span })?;
@@ -95,7 +96,7 @@ impl Lower<'_> {
                 needed.remove(name);
             }
             needed.extend(suffix.names.iter().cloned());
-            suffix = self.match_arm(arm, needed, &bindings, &suffix, span)?;
+            suffix = self.match_arm(arm, needed, &bindings, &suffix, scrutinee_shape, span)?;
         }
         suffix.call(scrutinee, env, block, span)
     }
@@ -106,6 +107,7 @@ impl Lower<'_> {
         needed: BTreeSet<String>,
         bindings: &[String],
         suffix: &Suffix,
+        scrutinee_shape: CandidateShape,
         span: Span,
     ) -> Result<Suffix, LowerError> {
         let names: Vec<_> = needed.into_iter().collect();
@@ -149,7 +151,11 @@ impl Lower<'_> {
         let mut no = block.successor();
         let fallback = suffix.call(0, &outer, &mut no, span)?;
         let code = self.reserve(span)?;
-        self.finish(
+        let mut hints = BTreeMap::new();
+        if scrutinee_shape != CandidateShape::Unknown {
+            hints.insert(0, scrutinee_shape);
+        }
+        self.finish_with_hints(
             code,
             &Function {
                 params,
@@ -162,6 +168,7 @@ impl Lower<'_> {
                     },
                 },
             },
+            &hints,
         )?;
         Ok(Suffix {
             code,
@@ -180,12 +187,10 @@ impl Lower<'_> {
         span: Span,
     ) -> Result<Block, LowerError> {
         let Some(guard) = &arm.guard else {
-            let value = self.matched_body(arm, inside, &mut block, suffix.mode, span)?;
-            return Ok(block.finish(value).body);
+            return self.matched_body_block(arm, inside, block, suffix.mode, span);
         };
         let condition = self.expr(guard, inside, &mut block)?;
-        let mut yes = block.successor();
-        let value = self.matched_body(arm, inside, &mut yes, suffix.mode, span)?;
+        let yes = self.matched_body_block(arm, inside, block.successor(), suffix.mode, span)?;
         let mut no = block.successor();
         // The successful pattern may shadow an outer name. A false guard
         // resumes the suffix with the original environment, not its bindings.
@@ -194,22 +199,25 @@ impl Lower<'_> {
             instructions: block.instructions,
             exit: Exit::Branch {
                 condition,
-                then_: Box::new(yes.finish(value).body),
+                then_: Box::new(yes),
                 else_: Box::new(no.finish(fallback).body),
             },
         })
     }
-    fn matched_body(
+    fn matched_body_block(
         &mut self,
         arm: &Arm,
         inside: &Env,
-        block: &mut Code,
+        mut block: Code,
         mode: MatchMode,
         span: Span,
-    ) -> Result<Local, LowerError> {
+    ) -> Result<Block, LowerError> {
         match mode {
-            MatchMode::Ordinary => self.expr(&arm.body, inside, block),
-            MatchMode::RecoverySelection => self.recovery_body(arm, inside, block, span),
+            MatchMode::Ordinary => self.expr_tail(&arm.body, inside, block),
+            MatchMode::RecoverySelection => {
+                let value = self.recovery_body(arm, inside, &mut block, span)?;
+                Ok(block.finish(value).body)
+            }
         }
     }
 

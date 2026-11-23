@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: 19e74d04470a3757
+source_hash: c328156af0778a0a
 ---
 
 ## Expected errors
@@ -411,10 +411,35 @@ Scoped lifetime and waiting for the natural success of children are different th
 
 ## Phase M: memory without GC
 
-The shared Wasm and Native contract uses explicit `dup`/`drop`, FBIP reuse only of a unique object with compatible capacity, and `Arena s` storage reclaimed when its region closes. Reusing a shared object falls back to allocation; it never changes the value through another alias. Module `Arena` provides `make`, `alloc` and `get`: an arena strongly holds slot values until its owner closes, `Value s a` is a nonowning slot handle, and `get` returns an ordinary value with an independent lifetime. Work and all finalizers finish before slots are released; an arena is not closed by an ordinary LIFO finalizer. Counted execution of the whole corpus remains incomplete; neither the existing substitution model nor host JS/Go garbage collection proves zero live objects.
+The shared Wasm and Native contract uses explicit `dup`/`drop`, safe functional in-place (FBIP) reuse, and `Arena s` storage reclaimed when its region closes.
 
-Cycles through `Ref` use cell arenas, not a tracing collector. Ordinary `Ref.make` belongs to the execution's root arena, not the nearest `scope`: cell contents are strong, reads retain them, and replacement releases the old contents. A cell handle does not own its contents through a counted edge; the arena owns them. After work and finalizers stop, arena close first detaches all contents slots, then releases their values and cell storage. This breaks `Ref → closure → Ref` cycles without tracing reachability. Unreachable cells may retain memory until their arena closes; this is an explicit tradeoff, not a promise of immediate cycle collection. The counted model implements root cells and tests these cycles; Lean proves exact owner/slot token inventories. This does not yet prove the whole pass, physical reclamation or all backend implementations.
+### Safe FBIP in-place reuse
 
-Accessing `Arena s` storage after region close is rejected at the use. Retention without use is checked separately under RG4: the old `G001` expectation for escape alone is not restored. Close releases edges from the arena into the counted heap; destroying a retained handle must not read already freed storage.
+In-place reuse is a semantically transparent optimization that never violates Flick's immutable value semantics:
 
-Native implementation belongs to N (revision 2026-11-13): M's RC/arenas and platform-independent W2/W3 portions are shared; LLVM IR lowering belongs to the backend component, and codegen/link are host stages. This does not discharge the model and Lean obligations of M1–M4. Exact ownership rules and current implementation boundaries are recorded in the repository's `docs/formal/memory.md`.
+- **Uniqueness and layout conditions.** An object may be reused in place only when its runtime reference count is strictly one (`references == 1`) and its storage kind and physical capacity match (`Construct`/`ConstructWithDicts` and `Reuse`/`ReuseWithDicts` by total physical field count `ordinary + dicts`; `Record`/`ReuseRecord` by field count; functional record `Update` when the base record has `references == 1`). Closures, tasks, strings, `BigInt`, dictionaries, cells, arenas, and list slices are never repurposed as constructor or record storage.
+- **External-alias preservation on fallback.** Whenever a candidate is shared (`references > 1` — for example held by another local, a caller alias, a closure, a `Ref` cell, an arena, or a replacement operand of the same operation) or has an incompatible layout, `DropReuse`, `Reuse*`, and `Update` fall back to ordinary fresh allocation. External aliases always retain their original values unchanged.
+- **Frame-limited reuse (`DropReuse`).** At a dead candidate's drop site, `DropReuse` immediately releases the old children of a unique object (restoring child uniqueness before recursive calls and preserving observable cleanup order) and retains only an empty 0-child reuse token in the frame (or an immediate null sentinel when shared or non-reusable). That token is consumed by the first compatible `Construct`/`ConstructWithDicts`/`Record` along each path, or dropped immediately via `Drop` on non-allocating branches, partial matches, guards, early typed errors, defects, handler signals (`abort`, `control` discontinuation), cancellation, and fuel cuts — with zero leaks and zero double-frees on every prefix.
+- **Observational equivalence.** Reused and non-reused execution on identical inputs produce the exact same independently expected values, output, and LIFO finalizer order.
+
+### Scoped arenas (`Arena s`)
+
+Module `Arena` provides `make`, `alloc`, and `get`: an arena strongly holds slot values until its owner closes, `Value s a` is a nonowning slot handle, and `get` returns an ordinary value with an independent lifetime. Work, settling foreign calls, and all LIFO finalizers finish before slots are released; an arena is not closed by an ordinary LIFO finalizer. Accessing `Arena s` storage after region close is rejected at the use (`FLICK-G002`/`FLICK-G003`), while retention without use is allowed under RG4; dropping a retained view never touches freed storage.
+
+### `Ref` reference-cycle policy
+
+The acyclic reference-counting boundary and the policy for cycles through mutable cells are specified explicitly, with no tracing cycle collector and no weak `Ref` contents:
+
+| Graph class | Status | Reclamation boundary and diagnostic policy |
+| - | - | - |
+| Plain immutable values (ADTs, records, tuples, lists, strings, `BigInt`, closures, tasks, dictionaries, layers) | Supported (acyclic by construction) | Prompt deterministic reclamation via `dup`/`drop` and FBIP; recursive functions use lexical code/self references and dictionary getters are uncached. Any leaked object is a hard heap-finish error (`LiveObjects`), never silently swept. |
+| Direct `Ref` self-cycles, mutual `Ref ↔ Ref` cycles, and `Ref → closure / ADT / record → Ref` cycles | Supported (root-arena retained) | Ordinary `Ref.make` allocates in the execution's root cell arena, not the nearest `scope`. Cell contents are strong, reads retain them, and a `Ref` handle is a nonowning capability that adds no RC edge. The compiler does not reject such cycles. At execution teardown, after work and finalizers stop, two-phase arena close detaches every contents slot first and then releases all values and cell storage by ordinary `drop`, breaking every cycle without tracing. |
+| Broken cycles via overwrite (`Ref.set` / `Ref.modify`) | Supported (prompt old-subgraph reclamation) | Overwriting a cell installs the replacement and immediately drops the old contents via ordinary RC (reclaiming the cyclic subgraph promptly when no other strong root holds it); the cell slot itself remains owned by the root arena until execution teardown. |
+| Frame-local `let mut` cycles | Supported (frame-scoped cell) | Mutable local variables are owned by their frame; frame exit or unwind detaches all variable slots before dropping values. |
+| `Lazy` cell cycles | Supported with self-force defect | `Lazy` cells are root-arena owned and detached at teardown; re-entrant self-forcing raises a runtime `LazyCycle` defect. |
+| Prompt mid-execution collection of unreachable `Ref` cycles | Not guaranteed (explicitly unsupported) | Unreachable `Ref` cells (cyclic or acyclic) may retain memory until overwritten or until root-arena teardown. Use `Arena s`, `ScopedRef`, `let mut`, or explicit `Ref.set` overwrite when scoped reclamation is needed. |
+| Strong reference cycles across FFI / host boundaries | Unsupported without an explicit release contract | Counted RC cannot inspect mutable host edges; defensive JS boundary copying rejects active-path cycles, and host retention requires an explicit `Scope`/`Resource`/dispose contract. |
+
+**Diagnostic and runtime reporting policy.** Well-typed `Ref` cycles are accepted with no compile-time diagnostic. Counted execution never disguises leaks at shutdown: `Heap::finish` strictly requires `live_objects == 0` and `allocations == frees` after explicit outcome release and root-arena teardown, and `cells_detached_on_teardown` separately reports `Ref` cells still holding heap objects at root-arena teardown. Acyclic corpus reclamation is measured separately from the `Ref` cycle suite.
+
+The counted reference model and Lean theorems (`Formal/MemoryPass.lean`, `Formal/MemoryInsert.lean`, `Formal/MemoryReuse.lean`, `Formal/MemoryArena.lean`, `Formal/MemoryScopes.lean`) check token balance, uniqueness/alias invariants, and arena ledgers; verified compiler extraction and native/Wasm codegen remain separate M4/W/N obligations (revision 2026-11-13). Exact ownership rules and measurements are recorded in the repository's `docs/formal/memory.md`.

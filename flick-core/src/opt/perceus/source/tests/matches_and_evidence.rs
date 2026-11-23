@@ -123,7 +123,11 @@ let answer () =
         })
         .expect("nominal constructor with explicit stored evidence");
     assert!(fields.is_empty(), "no ordinary fields");
-    assert_eq!(dicts, &[1], "one owned evidence argument");
+    assert_eq!(
+        dicts,
+        &[2],
+        "one owned evidence argument directly in saturated constructor emission"
+    );
     assert_eq!(memory::validate_program(&program), Ok(()));
 }
 
@@ -319,8 +323,8 @@ let answer () = Packed "payload" 42
         .expect("separate ordinary and dictionary vectors");
     assert_eq!(
         parts.0,
-        &[4, 1],
-        "ordinary written fields follow the two captured dictionaries"
+        &[4, 5],
+        "ordinary written fields follow the two dictionary locals in direct saturated emission"
     );
     assert_eq!(
         parts.1,
@@ -331,7 +335,14 @@ let answer () = Packed "payload" 42
     let program = lower([&module], &memory::Name::new("App.Plain", "answer"))
         .expect("plain constructor lowering");
     assert!(program.functions.values().flat_map(|function| &function.body.instructions).any(|instruction| matches!(instruction,
-        memory::Instruction::Let { value: memory::Operation::Construct { tag, fields }, .. } if tag == "App.Plain.Plain.Plain" && fields == &[1])));
+        memory::Instruction::Let { value: memory::Operation::Construct { tag, fields }, .. } if tag == "App.Plain.Plain.Plain" && fields.len() == 1)));
+    // Partial constructor application still lowers through a curried closure adapter.
+    let partial_mod = lower_text("App.PartialCon", "module App.PartialCon exposing (answer)\ntype Pair = Pair Int Int\nanswer : Int -> Pair\nlet answer = Pair 1\n").expect("partial constructor source");
+    let partial_prog = lower([&partial_mod], &memory::Name::new("App.PartialCon", "answer"))
+        .expect("partial constructor lowering");
+    assert_eq!(memory::validate_program(&partial_prog), Ok(()));
+    assert!(partial_prog.functions.values().flat_map(|f| &f.body.instructions).any(|i| matches!(i,
+        memory::Instruction::Let { value: memory::Operation::Closure { .. }, .. })));
     assert!(
         !program
             .functions

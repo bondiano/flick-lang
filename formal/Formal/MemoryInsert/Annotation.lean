@@ -91,7 +91,10 @@ theorem nextConstructor_shape (block : Block width) (construct : nextConstructor
           cases value with
           | consume values => simp [nextConstructor] at construct
           | borrow receiver => simp [nextConstructor] at construct
+          | record fields => simp [nextConstructor] at construct
+          | dropReuse object => simp [nextConstructor] at construct
           | reuse receiver fields evidence => simp [nextConstructor] at construct
+          | reuseRecord receiver fields => simp [nextConstructor] at construct
           | construct fields evidence => exact ⟨binding, fields, evidence, next, rfl⟩
 
 /-- `entry` distinguishes a block entrance from the next instruction of

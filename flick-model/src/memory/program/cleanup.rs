@@ -109,8 +109,23 @@ impl Machine<'_, '_> {
             }
         }
         let mut detached = Vec::new();
-        // Detach ALL cell and lazy slots before releasing any of their values.
-        // This walks only our explicit roots, never heap reachability.
+        self.detach_root_cells_and_lazies(&mut detached, &mut failure);
+        roots.extend(mem::take(&mut self.cells));
+        roots.extend(mem::take(&mut self.lazies));
+        roots.extend(detached);
+        let released = self.heap.drop_values(roots);
+        let _ = self.heap.take_dropped_continuations(self.execution);
+        let bridge_res = self.finish_foreign_bridge();
+        failure.map_or(released.and(bridge_res), Err)
+    }
+
+    /// Detach ALL cell and lazy slots before releasing any of their values.
+    /// This walks only our explicit roots, never heap reachability.
+    fn detach_root_cells_and_lazies(
+        &mut self,
+        detached: &mut Vec<Value>,
+        failure: &mut Option<Error>,
+    ) {
         for root in &self.cells {
             let Value::Object(token) = root else {
                 failure.get_or_insert(Error::ExpectedCell);
@@ -121,7 +136,14 @@ impl Machine<'_, '_> {
                 .object_mut(token.id)
                 .map(|object| &mut object.data)
             {
-                Ok(Data::Cell { contents, .. }) => detached.extend(contents.take()),
+                Ok(Data::Cell { contents, .. }) => {
+                    if let Some(value) = contents.take() {
+                        if matches!(value, Value::Object(_)) {
+                            self.heap.stats.cells_detached_on_teardown += 1;
+                        }
+                        detached.push(value);
+                    }
+                }
                 Ok(_) => {
                     failure.get_or_insert(Error::ExpectedCell);
                 }
@@ -158,12 +180,5 @@ impl Machine<'_, '_> {
                 }
             }
         }
-        roots.extend(mem::take(&mut self.cells));
-        roots.extend(mem::take(&mut self.lazies));
-        roots.extend(detached);
-        let released = self.heap.drop_values(roots);
-        let _ = self.heap.take_dropped_continuations(self.execution);
-        let bridge_res = self.finish_foreign_bridge();
-        failure.map_or(released.and(bridge_res), Err)
     }
 }

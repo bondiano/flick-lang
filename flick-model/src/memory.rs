@@ -149,6 +149,9 @@ pub enum Value {
     Var(VarHandle),
     Lazy(LazyHandle),
     Iterator(IteratorHandle),
+    /// Immediate sentinel produced by `DropReuse` when the operand was shared
+    /// or non-reusable; consumes zero heap storage and causes `Reuse*` to allocate.
+    ReuseNull,
 }
 
 impl Value {
@@ -208,6 +211,7 @@ impl Value {
                 id: iterator.id,
                 execution: iterator.execution,
             }),
+            Self::ReuseNull => Self::ReuseNull,
         }
     }
 }
@@ -221,10 +225,16 @@ pub struct Stats {
     pub dups: usize,
     pub drops: usize,
     pub reuses: usize,
+    /// Number of reuse/update sites that fell back to fresh allocation
+    /// (shared object, incompatible layout, `ReuseNull`, or reuse disabled).
+    pub reuse_fallbacks: usize,
     pub live_objects: usize,
     pub peak_live_objects: usize,
     pub cells_allocated: usize,
     pub cells_freed: usize,
+    /// Number of root-arena `Ref` cells still holding a counted heap object
+    /// when root-arena teardown detached their slots.
+    pub cells_detached_on_teardown: usize,
     pub arenas_allocated: usize,
     pub arenas_freed: usize,
 }
@@ -233,5 +243,6 @@ include!("memory/errors.rs");
 include!("memory/representation.rs");
 include!("memory/allocation.rs");
 include!("memory/ownership.rs");
+include!("memory/reuse.rs");
 include!("memory/standalone.rs");
 include!("memory/heap_tests.rs");

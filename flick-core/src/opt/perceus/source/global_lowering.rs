@@ -6,7 +6,26 @@ impl Lower<'_> {
     }
 
     fn finish(&mut self, code: CodeId, function: &Function) -> Result<(), LowerError> {
-        let function = insert(function).map_err(|error| LowerError::Ownership { code, error })?;
+        self.finish_with_hints(code, function, &BTreeMap::new())
+    }
+
+    fn finish_closure(&mut self, code: CodeId, function: &Function) -> Result<(), LowerError> {
+        let hints = BTreeMap::from([(0, CandidateShape::Never)]);
+        self.finish_with_hints(code, function, &hints)
+    }
+
+    fn finish_with_hints(
+        &mut self,
+        code: CodeId,
+        function: &Function,
+        hints: &BTreeMap<Local, CandidateShape>,
+    ) -> Result<(), LowerError> {
+        let function = if self.enable_reuse {
+            insert_fbip_with_hints(function, hints)
+        } else {
+            insert_without_reuse(function)
+        }
+        .map_err(|error| LowerError::Ownership { code, error })?;
         self.program.functions.insert(code, function);
         Ok(())
     }

@@ -439,3 +439,16 @@ fn foreign_call_operation_round_trips() {
     }];
     round_trip_operations(&operations);
 }
+
+#[test]
+#[cfg(feature = "json")]
+fn fbip_drop_reuse_and_reuse_record_round_trip() {
+    let operations = vec![
+        Operation::DropReuse(0),
+        Operation::ReuseRecord {
+            object: 2,
+            fields: vec![("a".into(), 1), ("b".into(), 3)],
+        },
+    ];
+    round_trip_operations(&operations);
+}

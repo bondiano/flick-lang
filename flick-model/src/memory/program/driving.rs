@@ -176,7 +176,9 @@ impl Machine<'_, '_> {
                 }
                 Instruction::Dup(local) => {
                     let frame = self.frames.last_mut().expect("running frame");
-                    let value = self.heap.dup(peek(&frame.locals, *local)?)?;
+                    let source = peek(&frame.locals, *local)?;
+                    self.heap.admit_not_reuse_token(source)?;
+                    let value = self.heap.dup(source)?;
                     frame.locals.push(*local, value);
                 }
                 Instruction::Drop(local) => {
@@ -194,10 +196,13 @@ impl Machine<'_, '_> {
             Exit::Return(local) => {
                 let frame = self.frames.last_mut().expect("returning frame");
                 self.pending = Some(take(&mut frame.locals, *local)?);
-                if !matches!(
+                if matches!(
                     frame.destination,
                     Destination::RecoverySelection { .. } | Destination::RecoveryHelper { .. }
                 ) {
+                    self.heap
+                        .admit_not_reuse_token(self.pending.as_ref().expect("return root"))?;
+                } else {
                     self.heap
                         .admit_ordinary(self.pending.as_ref().expect("return root"))?;
                 }

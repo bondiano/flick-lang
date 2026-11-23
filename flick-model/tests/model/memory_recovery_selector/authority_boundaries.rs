@@ -23,12 +23,24 @@ fn sealed_marker_cannot_cross_any_ordinary_operand_or_owned_edge() {
         );
         let annotated = matches!(
             operation,
-            Operation::Reuse { .. } | Operation::ReuseWithDicts { .. }
+            Operation::DropReuse(_)
+                | Operation::Reuse { .. }
+                | Operation::ReuseWithDicts { .. }
+                | Operation::ReuseRecord { .. }
         );
         let input = if annotated {
+            let fields = if matches!(
+                operation,
+                Operation::ReuseRecord { object: 1, .. }
+                    | Operation::ReuseRecord { object: 2, .. }
+            ) {
+                vec![1, 2]
+            } else {
+                vec![2]
+            };
             Operation::Construct {
                 tag: "placeholder".into(),
-                fields: vec![2],
+                fields,
             }
         } else {
             operation.clone()

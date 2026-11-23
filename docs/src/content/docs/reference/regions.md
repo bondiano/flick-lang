@@ -189,6 +189,56 @@ let read_after_close () = scope {
 }
 ```
 
+## Mutable cells, cycles, and in-place reuse
+
+Ordinary `Ref` cells (`Ref.make`, `Ref.get`, `Ref.set`, `Ref.modify`) are owned
+by the execution's **root cell arena**, not by the innermost `scope`. That
+separation defines Flick's explicit reference-cycle policy under deterministic
+reference counting (see [Phase M: memory without GC](../../spec/05-errors-and-concurrency/#phase-m-memory-without-gc)):
+
+- **Immutable values are acyclic.** ADTs, records, tuples, lists, closures,
+  tasks, and dictionaries form an acyclic ownership graph reclaimed promptly
+  when their last reference is dropped.
+- **`Ref` cycles are supported via root-arena detach-all teardown.** Direct
+  self-cycles, mutual `Ref` cycles, and `Ref`-through-closure/ADT cycles are
+  accepted with no compile-time error: `Ref` handles are nonowning capabilities
+  that do not add reference-count edges, while cell slots strongly own their
+  current payload. At execution teardown (after work and finalizers finish),
+  all cell slots are detached before values and cells are dropped.
+- **Unreachable `Ref` cycles are not tracing-collected mid-execution.** Cells
+  retain their payload until overwritten or until execution teardown. Overwriting
+  a cyclic cell (`Ref.set cell None`) immediately releases the old cyclic
+  payload; for scoped reclamation, use `Arena s`, `ScopedRef`, or frame-scoped
+  `let mut`. Foreign/host strong cycles across FFI require an explicit release
+  contract and are not reclaimed automatically.
+- **Functional in-place (FBIP) reuse is invisible to aliases.** When a dead
+  ADT constructor, tuple, or record is uniquely owned (`references == 1`) with
+  a compatible layout, counted execution may update its storage in place
+  (`DropReuse` / `Reuse` / `ReuseRecord` / `Update`). Whenever an external
+  alias exists (`references > 1`), execution falls back to fresh allocation and
+  the alias keeps its original value untouched.
+
+```flick
+type Node = Node String (Ref (Option Node))
+
+break_self_cycle : Unit ->{} Bool
+let break_self_cycle () =
+  let link = Ref.make None
+  let node = Node "root" link
+  Ref.set link (Some node)
+  // Overwriting the cell breaks the cycle and releases `node` promptly once dropped.
+  Ref.set link None
+  match Ref.get link with
+  | None -> true
+  | Some _ -> false
+
+preserve_shared_record : Unit -> (Int, Int)
+let preserve_shared_record () =
+  let base = { x = 1; y = 2 }
+  let updated = { base with x = 10 }
+  (base.x, updated.x)
+```
+
 ## Holding is not using
 
 A closure, a `task` or a constructor may hold a handle past the end of its

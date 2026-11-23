@@ -324,6 +324,21 @@ pub fn counted_main(
     })
 }
 
+/// Lowers `main` of `modules` with FBIP reuse disabled (pure `dup`/`drop` baseline).
+pub fn counted_main_without_reuse(
+    modules: &[Compiled],
+    main: &Path,
+    release: bool,
+) -> Result<CountedMain, String> {
+    let (program, root) = counted_program_without_reuse(modules, slice::from_ref(main), release)?;
+    Ok(CountedMain {
+        program,
+        entry: MemoryName::new(&main.module, &main.name),
+        root,
+        eager_inits: Vec::new(),
+    })
+}
+
 /// Lowers `main` of `modules` with explicit opt-in foreign-bridge support.
 pub fn counted_main_with_bridge(
     modules: &[Compiled],
@@ -346,7 +361,16 @@ pub fn counted_program(
     entries: &[Path],
     release: bool,
 ) -> Result<(ir::memory::Program, Option<MemoryName>), String> {
-    counted_program_inner(modules, entries, release, false)
+    counted_program_inner(modules, entries, release, false, true)
+}
+
+/// Lowers multiple entry roots with FBIP reuse disabled.
+pub fn counted_program_without_reuse(
+    modules: &[Compiled],
+    entries: &[Path],
+    release: bool,
+) -> Result<(ir::memory::Program, Option<MemoryName>), String> {
+    counted_program_inner(modules, entries, release, false, false)
 }
 
 /// Lowers multiple entry roots with explicit opt-in foreign-bridge support.
@@ -355,7 +379,7 @@ pub fn counted_program_with_bridge(
     entries: &[Path],
     release: bool,
 ) -> Result<(ir::memory::Program, Option<MemoryName>), String> {
-    counted_program_inner(modules, entries, release, true)
+    counted_program_inner(modules, entries, release, true, true)
 }
 
 fn counted_program_inner(
@@ -363,6 +387,7 @@ fn counted_program_inner(
     entries: &[Path],
     release: bool,
     allow_foreign_bridge: bool,
+    enable_reuse: bool,
 ) -> Result<(ir::memory::Program, Option<MemoryName>), String> {
     let ir: Vec<_> = modules
         .iter()
@@ -403,8 +428,14 @@ fn counted_program_inner(
             &roots,
             module_dirs,
         )
-    } else {
+    } else if enable_reuse {
         perceus::lower_roots_with_declarations(
+            ir.iter().map(AsRef::as_ref),
+            declarations.iter().map(AsRef::as_ref),
+            &roots,
+        )
+    } else {
+        perceus::lower_roots_with_declarations_without_reuse(
             ir.iter().map(AsRef::as_ref),
             declarations.iter().map(AsRef::as_ref),
             &roots,

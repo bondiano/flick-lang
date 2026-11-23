@@ -9,10 +9,11 @@ use std::{error, fmt};
 
 use crate::ir::memory::{self, Block, Exit, Function, Instruction, Local, Operation};
 
+mod reuse;
 mod source;
 pub use source::{
-    LowerError, lower, lower_roots_with_declarations, lower_roots_with_foreign_bridge,
-    lower_with_declarations,
+    LowerError, lower, lower_roots_with_declarations, lower_roots_with_declarations_without_reuse,
+    lower_roots_with_foreign_bridge, lower_with_declarations, lower_without_reuse,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,8 +39,44 @@ impl fmt::Display for Error {
 
 impl error::Error for Error {}
 
-/// Inserts explicit reference-count operations.
+/// Inserts explicit reference-count operations (Stage 1: `dup`/`drop` plus
+/// immediate borrowed-receiver reuse, matching `Formal/MemoryInsert.lean`).
 pub fn insert(function: &Function) -> Result<Function, Error> {
+    insert_mode(function, true)
+}
+
+/// Inserts explicit reference-count operations with reuse disabled (pure
+/// `dup`/`drop` baseline for reuse-vs-non-reuse equivalence and measurements).
+pub fn insert_without_reuse(function: &Function) -> Result<Function, Error> {
+    insert_mode(function, false)
+}
+
+/// Applies frame-limited FBIP reuse (`DropReuse` + `Reuse`/`ReuseWithDicts`/
+/// `ReuseRecord`) to an already validated token-balanced function.
+pub fn optimize_reuse(function: &Function) -> Result<Function, Error> {
+    memory::validate(function).map_err(Error::Balance)?;
+    let output = reuse::optimize_function(function, &BTreeMap::new());
+    memory::validate(&output).map_err(Error::Balance)?;
+    Ok(output)
+}
+
+/// Inserts explicit reference-count operations and applies frame-limited FBIP reuse.
+pub fn insert_fbip(function: &Function) -> Result<Function, Error> {
+    let inserted = insert(function)?;
+    optimize_reuse(&inserted)
+}
+
+pub(crate) fn insert_fbip_with_hints(
+    function: &Function,
+    hints: &BTreeMap<Local, reuse::CandidateShape>,
+) -> Result<Function, Error> {
+    let inserted = insert(function)?;
+    let output = reuse::optimize_function(&inserted, hints);
+    memory::validate(&output).map_err(Error::Balance)?;
+    Ok(output)
+}
+
+fn insert_mode(function: &Function, immediate_reuse: bool) -> Result<Function, Error> {
     let mut params = BTreeSet::new();
     for &param in &function.params {
         if !params.insert(param) {
@@ -49,7 +86,12 @@ pub fn insert(function: &Function) -> Result<Function, Error> {
     source(&function.body, params.clone())?;
     let output = Function {
         params: function.params.clone(),
-        body: annotate(&function.body, &analyze(&function.body), params),
+        body: annotate(
+            &function.body,
+            &analyze(&function.body),
+            params,
+            immediate_reuse,
+        ),
     };
     memory::validate(&output).map_err(Error::Balance)?;
     Ok(output)
@@ -79,7 +121,10 @@ fn source(block: &Block, mut bound: BTreeSet<Local>) -> Result<(), Error> {
         };
         if matches!(
             value,
-            Operation::Reuse { .. } | Operation::ReuseWithDicts { .. }
+            Operation::DropReuse(_)
+                | Operation::Reuse { .. }
+                | Operation::ReuseWithDicts { .. }
+                | Operation::ReuseRecord { .. }
         ) {
             return Err(Error::Annotated);
         }
@@ -161,7 +206,12 @@ fn trim(owned: &mut BTreeSet<Local>, live: &BTreeSet<Local>, instructions: &mut 
     });
 }
 
-fn annotate(block: &Block, liveness: &Liveness, mut owned: BTreeSet<Local>) -> Block {
+fn annotate(
+    block: &Block,
+    liveness: &Liveness,
+    mut owned: BTreeSet<Local>,
+    immediate_reuse: bool,
+) -> Block {
     let mut instructions = Vec::new();
     trim(&mut owned, &liveness.entry, &mut instructions);
     // A just-borrowed, dead receiver may survive exactly to the next
@@ -209,13 +259,15 @@ fn annotate(block: &Block, liveness: &Liveness, mut owned: BTreeSet<Local>) -> B
         if let Some(local) = borrowed
             && !after.contains(&local)
         {
-            if matches!(
-                block.instructions.get(index + 1),
-                Some(Instruction::Let {
-                    value: Operation::Construct { .. } | Operation::ConstructWithDicts { .. },
-                    ..
-                })
-            ) {
+            if immediate_reuse
+                && matches!(
+                    block.instructions.get(index + 1),
+                    Some(Instruction::Let {
+                        value: Operation::Construct { .. } | Operation::ConstructWithDicts { .. },
+                        ..
+                    })
+                )
+            {
                 pending = Some(local);
             } else {
                 instructions.push(Instruction::Drop(local));
@@ -249,8 +301,8 @@ fn annotate(block: &Block, liveness: &Liveness, mut owned: BTreeSet<Local>) -> B
             trim(&mut owned, &successors, &mut instructions);
             Exit::Branch {
                 condition: *condition,
-                then_: Box::new(annotate(then_, then_live, owned.clone())),
-                else_: Box::new(annotate(else_, else_live, owned)),
+                then_: Box::new(annotate(then_, then_live, owned.clone(), immediate_reuse)),
+                else_: Box::new(annotate(else_, else_live, owned, immediate_reuse)),
             }
         }
     };

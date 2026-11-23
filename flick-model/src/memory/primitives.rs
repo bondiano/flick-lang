@@ -482,6 +482,7 @@ pub(super) fn show_value(heap: &Heap, value: &Value) -> Result<String, Error> {
             | Data::ForeignCycle { .. } => Err(unsupported(
                 "primitive show of record or executable/opaque storage",
             )),
+            Data::ReuseToken { .. } => Err(Error::ReuseTokenEscape),
         },
         Value::Cell(_) | Value::Var(_) | Value::Lazy(_) | Value::Iterator(_) => {
             Err(unsupported("primitive show of cell"))
@@ -489,6 +490,7 @@ pub(super) fn show_value(heap: &Heap, value: &Value) -> Result<String, Error> {
         Value::Owner(_) | Value::Arena(_) | Value::ArenaView(_) => {
             Err(unsupported("primitive show of arena capability"))
         }
+        Value::ReuseNull => Err(Error::ReuseTokenEscape),
     }
 }
 

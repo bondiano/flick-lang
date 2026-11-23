@@ -48,7 +48,10 @@ def consumed : Operation width → List (Local width)
   | .consume operands => operands
   | .borrow _ => []
   | .construct fields evidence => fields ++ evidence
+  | .record fields => fields
+  | .dropReuse object => [object]
   | .reuse receiver fields evidence => receiver :: (fields ++ evidence)
+  | .reuseRecord receiver fields => receiver :: fields
 
 def borrowed : Operation width → Option (Local width)
   | .borrow receiver => some receiver
@@ -65,7 +68,7 @@ theorem operationEvents_projection (value : Operation width) :
   cases value <;> rfl
 
 def sourceOperation : Operation width → Bool
-  | .reuse .. => false
+  | .dropReuse .. | .reuse .. | .reuseRecord .. => false
   | _ => true
 
 /-- Freshness is checked against all names defined on the current path,

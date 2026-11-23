@@ -64,6 +64,9 @@ impl Lower<'_> {
                 arg_first,
                 ..
             } => {
+                if let Some(con) = saturated_constructor(expr) {
+                    return self.saturated_constructor_expr(con, expr, env, block, span);
+                }
                 let (function, argument) = if *arg_first {
                     let argument = self.expr(arg, env, block)?;
                     (self.expr(func, env, block)?, argument)
@@ -181,6 +184,9 @@ impl Lower<'_> {
                         .collect::<Result<Vec<_>, _>>()?;
                     return self.perform(effect, op, stages, dictionaries, block, span);
                 }
+                if let Some(con) = saturated_constructor(expr) {
+                    return self.saturated_constructor_expr(con, expr, env, block, span);
+                }
                 let mut function = self.expr(inner, env, block)?;
                 for dictionary in dictionaries {
                     let argument = self.dictionary(dictionary, env, block, span)?;
@@ -222,6 +228,16 @@ impl Lower<'_> {
         env: &Env,
         block: &mut Code,
     ) -> Result<Local, LowerError> {
+        let env = self.block_statements(statements, env, block)?;
+        self.expr(result, &env, block)
+    }
+
+    fn block_statements(
+        &mut self,
+        statements: &[Stmt],
+        env: &Env,
+        block: &mut Code,
+    ) -> Result<Env, LowerError> {
         let mut env = env.clone();
         for statement in statements {
             match statement {
@@ -264,7 +280,7 @@ impl Lower<'_> {
                 }
             }
         }
-        self.expr(result, &env, block)
+        Ok(env)
     }
 
     #[inline(never)]
@@ -370,20 +386,30 @@ impl Lower<'_> {
         }
         self.pattern(&first.pat, 1, &mut inside, &mut function, span)?;
         let saved_for = self.active_for_loop.take();
-        let result = if rest.is_empty() {
+        let body_block = if rest.is_empty() {
             if loops::contains_direct_unwrap(body) {
-                self.function_boundary(body, &inside, &mut function, span)
+                let result = self.function_boundary(body, &inside, &mut function, span);
+                self.active_for_loop = saved_for;
+                function.finish(result?).body
             } else {
-                self.expr(body, &inside, &mut function)
+                let result = self.expr_tail(body, &inside, function);
+                self.active_for_loop = saved_for;
+                result?
             }
         } else {
             // Later curried stages capture the OUTER recursive self. They
             // must not remap its source name to their own inner self token.
-            self.lambda(rest, body, &inside, None, &mut function, span)
+            let result = self.lambda(rest, body, &inside, None, &mut function, span);
+            self.active_for_loop = saved_for;
+            function.finish(result?).body
         };
-        self.active_for_loop = saved_for;
-        let result = result?;
-        self.finish(code, &function.finish(result))?;
+        self.finish_closure(
+            code,
+            &Function {
+                params: vec![0, 1],
+                body: body_block,
+            },
+        )?;
         block.emit(Operation::Closure { code, captures }, span)
     }
 
@@ -407,14 +433,22 @@ impl Lower<'_> {
             inside.insert(name, value);
         }
         let saved_for = self.active_for_loop.take();
-        let result = if loops::contains_direct_unwrap(body) {
-            self.function_boundary(body, &inside, &mut function, span)
+        let body_block = if loops::contains_direct_unwrap(body) {
+            let result = self.function_boundary(body, &inside, &mut function, span);
+            self.active_for_loop = saved_for;
+            function.finish(result?).body
         } else {
-            self.expr(body, &inside, &mut function)
+            let result = self.expr_tail(body, &inside, function);
+            self.active_for_loop = saved_for;
+            result?
         };
-        self.active_for_loop = saved_for;
-        let result = result?;
-        self.finish(code, &function.finish(result))?;
+        self.finish_closure(
+            code,
+            &Function {
+                params: vec![0, 1],
+                body: body_block,
+            },
+        )?;
         block.emit(Operation::Task { code, captures }, span)
     }
 

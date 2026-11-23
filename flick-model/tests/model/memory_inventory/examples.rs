@@ -96,7 +96,9 @@ fn run_example_main(
             continue;
         }
         match heap.finish() {
-            Ok(stats) if stats.live_objects == 0 && stats.allocations == stats.frees => {}
+            Ok(stats) if stats.live_objects == 0 && stats.allocations == stats.frees => {
+                summary.record_stats(&stats);
+            }
             Ok(stats) => {
                 summary.leaked.push(format!(
                     "{label} ({profile}): live={} alloc={} free={}",
@@ -167,7 +169,9 @@ fn run_example_tests(
             *bridge = HostBridge::new().expect("respawn HostBridge after bridge fault");
         }
         match heap.finish() {
-            Ok(stats) if stats.live_objects == 0 && stats.allocations == stats.frees => {}
+            Ok(stats) if stats.live_objects == 0 && stats.allocations == stats.frees => {
+                summary.record_stats(&stats);
+            }
             Ok(stats) => {
                 summary.leaked.push(format!(
                     "{label} ({profile}): live={} alloc={} free={}",

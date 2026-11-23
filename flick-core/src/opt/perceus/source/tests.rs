@@ -398,7 +398,7 @@ let answer captured =
     );
     assert_eq!(
         program.functions.len(),
-        13,
-        "entry, source lambda, body, handler, two selectors plus two deferred bodies, terminal, from_result initializer and adapter, and two unary constructor adapters"
+        11,
+        "entry, source lambda, body, handler, two selectors plus two deferred bodies, terminal, and from_result initializer and adapter (saturated constructors lower directly)"
     );
 }

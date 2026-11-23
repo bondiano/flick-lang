@@ -3,7 +3,7 @@ mod tests {
     use crate::ir::memory::{self, Block, Exit, Function, Instruction, Operation};
     use crate::ir::{Lit, Pat};
 
-    use super::{Error, copies, insert};
+    use super::{Error, copies, insert, insert_fbip, insert_without_reuse, optimize_reuse};
 
     fn let_(binding: u32, value: Operation) -> Instruction {
         Instruction::Let { binding, value }
@@ -402,5 +402,185 @@ mod tests {
             )),
             Err(Error::Annotated)
         );
+        assert_eq!(
+            insert(&function(&[0], vec![let_(1, Operation::DropReuse(0))], 1)),
+            Err(Error::Annotated)
+        );
+        assert_eq!(
+            insert(&function(
+                &[0, 1],
+                vec![let_(
+                    2,
+                    Operation::ReuseRecord {
+                        object: 0,
+                        fields: vec![("x".into(), 1)]
+                    }
+                )],
+                2
+            )),
+            Err(Error::Annotated)
+        );
+    }
+
+    #[test]
+    fn insert_without_reuse_emits_zero_reuse_operations() {
+        let input = function(
+            &[0],
+            vec![
+                let_(
+                    1,
+                    Operation::Project {
+                        object: 0,
+                        field: 0,
+                    },
+                ),
+                let_(2, construct(&[1])),
+            ],
+            2,
+        );
+        let baseline = insert_without_reuse(&input).expect("baseline insertion");
+        assert_eq!(
+            baseline.body.instructions,
+            [
+                let_(
+                    1,
+                    Operation::Project {
+                        object: 0,
+                        field: 0
+                    }
+                ),
+                Instruction::Drop(0),
+                let_(2, construct(&[1])),
+            ]
+        );
+        assert_eq!(memory::validate(&baseline), Ok(()));
+    }
+
+    #[test]
+    fn fbip_reuse_pairs_drop_reuse_across_intervening_work_and_records() {
+        // Intervening work between Project and Construct uses DropReuse + Reuse.
+        let across_work = function(
+            &[0],
+            vec![
+                let_(
+                    1,
+                    Operation::Project {
+                        object: 0,
+                        field: 0,
+                    },
+                ),
+                let_(2, Operation::Literal(Lit::Int(1))),
+                let_(3, construct(&[1])),
+            ],
+            3,
+        );
+        let fbip = insert_fbip(&across_work).expect("fbip reuse across work");
+        assert!(fbip.body.instructions.iter().any(|i| matches!(
+            i,
+            Instruction::Let {
+                value: Operation::DropReuse(0),
+                ..
+            }
+        )));
+        assert!(fbip.body.instructions.iter().any(|i| matches!(
+            i,
+            Instruction::Let {
+                value: Operation::Reuse { tag, fields, .. },
+                ..
+            } if tag == "Node" && fields == &[1]
+        )));
+        assert_eq!(memory::validate(&fbip), Ok(()));
+
+        // Record destructuring + rebuild emits DropReuse + ReuseRecord.
+        let rec_rebuild = function(
+            &[0],
+            vec![
+                let_(
+                    1,
+                    Operation::Field {
+                        object: 0,
+                        field: "x".into(),
+                    },
+                ),
+                let_(2, Operation::Literal(Lit::Int(1))),
+                let_(
+                    3,
+                    Operation::Record {
+                        fields: vec![("x".into(), 1), ("y".into(), 2)],
+                    },
+                ),
+            ],
+            3,
+        );
+        let fbip_rec = insert_fbip(&rec_rebuild).expect("fbip record rebuild");
+        assert!(fbip_rec.body.instructions.iter().any(|i| matches!(
+            i,
+            Instruction::Let {
+                value: Operation::DropReuse(0),
+                ..
+            }
+        )));
+        assert!(fbip_rec.body.instructions.iter().any(|i| matches!(
+            i,
+            Instruction::Let {
+                value: Operation::ReuseRecord { fields, .. },
+                ..
+            } if fields.len() == 2
+        )));
+        assert_eq!(memory::validate(&fbip_rec), Ok(()));
+    }
+
+    #[test]
+    fn fbip_reuse_pairs_drop_reuse_across_partial_branches() {
+        // Partial branch reuse: then_ reuses via Reuse, else_ drops the reuse token immediately.
+        let partial_branch = Function {
+            params: vec![0, 1],
+            body: Block {
+                instructions: vec![let_(
+                    2,
+                    Operation::Project {
+                        object: 0,
+                        field: 0,
+                    },
+                )],
+                exit: Exit::Branch {
+                    condition: 1,
+                    then_: Box::new(Block {
+                        instructions: vec![let_(3, construct(&[2]))],
+                        exit: Exit::Return(3),
+                    }),
+                    else_: Box::new(Block {
+                        instructions: vec![],
+                        exit: Exit::Return(2),
+                    }),
+                },
+            },
+        };
+        let inserted = insert(&partial_branch).expect("stage 1");
+        let fbip_branch = optimize_reuse(&inserted).expect("fbip partial branch");
+        let token_local = fbip_branch
+            .body
+            .instructions
+            .iter()
+            .find_map(|i| match i {
+                Instruction::Let {
+                    binding,
+                    value: Operation::DropReuse(0),
+                } => Some(*binding),
+                _ => None,
+            })
+            .expect("DropReuse emitted before branch");
+        let Exit::Branch { then_, else_, .. } = &fbip_branch.body.exit else {
+            panic!("branch")
+        };
+        assert!(then_.instructions.iter().any(|i| matches!(
+            i,
+            Instruction::Let {
+                value: Operation::Reuse { object, .. },
+                ..
+            } if *object == token_local
+        )));
+        assert_eq!(else_.instructions.first(), Some(&Instruction::Drop(token_local)));
+        assert_eq!(memory::validate(&fbip_branch), Ok(()));
     }
 }
