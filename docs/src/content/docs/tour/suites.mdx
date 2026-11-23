@@ -8,7 +8,7 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 <TourLesson locale="en" id="suites">
 
-**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+**Where it runs:** in an isolated browser worker. Tests mode shows the real report; List tests prints names without running bodies or hooks. Locally: a project's `test/Main.fl` and `flick test`. CI checks both.
 
 A suite groups tests; each case gets its own scope and live host services.
 `.skip` never runs its body. `.only` keeps only focused cases in the selected
@@ -18,9 +18,8 @@ files; a skipped case stays skipped. Here only `focus` runs.
 `flick test --forbid-only` exits 1 for this intentional focus. CI checks both
 behaviors. Remove `.only` before committing real project tests.
 
-The playground currently runs `main`, not a module's `tests`, and has no
-`--list` report. These lessons are local rather than pretending a green
-compile means green tests.
+Choose List tests and press Run, then return to Tests.
+The filter selects cases by their full names. Each run uses a fresh worker.
 
 [Reference](../../reference/testing/#full-names-skip-and-only).
 

@@ -1,6 +1,6 @@
 ---
 title: "Модули и имена"
-source_hash: 5595102b2628bea1
+source_hash: 26143bc9555f712e
 ---
 
 Каждый файл `.fl` — отдельный модуль.
@@ -295,21 +295,21 @@ type module Answer =
 блок — полный файл; сохраните его по пути из заголовка. Параметрический модуль экспортирует
 `Token` без конструктора, и каждое применение создаёт отдельный тип токена.
 
-```text title="src/App/Contracts.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Contracts.fl"
 module App.Contracts exposing (Source)
 
 type module Source =
   seed : String
 ```
 
-```text title="src/App/Argument.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Argument.fl"
 module App.Argument exposing (seed)
 
 seed : String
 let seed = "Ada"
 ```
 
-```text title="src/App/Make.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Make.fl"
 module App.Make(S : App.Contracts.Source) : Result
 
 type Token = Token String
@@ -322,7 +322,7 @@ type module Result =
   value : Token
 ```
 
-```text title="src/App/Instances.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Instances.fl"
 module App.Instances exposing (A, B)
 
 module A = App.Make(App.Argument)
@@ -333,7 +333,7 @@ module B = App.Make(App.Argument)
 могут обмениваться его токенами. `flick check src/App/Consumer.fl` проходит:
 повторный импорт `A` не создаёт новый тип.
 
-```text title="src/App/Producer.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Producer.fl"
 module App.Producer exposing (value)
 
 import App.Instances.A as A
@@ -342,7 +342,7 @@ value : A.Token
 let value = A.value
 ```
 
-```text title="src/App/Consumer.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Consumer.fl"
 module App.Consumer exposing (value)
 
 import App.Instances.A as A
@@ -356,7 +356,7 @@ let value = App.Producer.value
 `flick check src/App/Bad.fl`: компилятор выдаст `FLICK-T003`, ожидая
 `App.Instances.B.Token` вместо полученного `App.Instances.A.Token`.
 
-```text title="src/App/Bad.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Bad.fl"
 module App.Bad exposing (value)
 
 import App.Instances.A as A

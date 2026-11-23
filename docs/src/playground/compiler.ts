@@ -1,7 +1,7 @@
 // Compiler/worker interoperability only. Widget state and presentation live in Flick.
 import type { Built, CompiledExercise, Completion, Diagnostic, Generated, Hover, Operation, Reply, Request, Result } from "./compiler.worker.ts";
 import { packages } from "./loader.ts";
-import type { Message, Program } from "./runtime.ts";
+import type { BrowserTestOptions, Message, Program } from "./runtime.ts";
 import { notify } from "./dom.ts";
 
 interface Line {
@@ -199,6 +199,7 @@ const openFrame = async (generation: number): Promise<HTMLIFrameElement> => {
 export interface PreparedRun {
   readonly built: Built;
   readonly generation: number;
+  readonly tests?: BrowserTestOptions;
 }
 
 /** Preparation stays cancelable without spending the program's execution budget. */
@@ -215,28 +216,40 @@ export const runPrepared = async (prepared: PreparedRun, signal: AbortSignal): P
   const problems = result.diagnostics;
   if (signal.aborted || generation !== previewGeneration) return { lines: [], status: "stopped", detail: "", diagnostics: problems };
   if (result.files === null) return { lines: [], status: "invalid", detail: "", diagnostics: problems };
-  if (result.entry === null) return { lines: [], status: "no-main", detail: "", diagnostics: problems };
-  const program: Program = { files: result.files, entry: result.entry };
-  const ui = packages(program.files, program.entry).some((spec) =>
+  const entry = prepared.tests !== undefined ? result.tests?.entry : result.entry;
+  if (entry == null) return { lines: [], status: prepared.tests !== undefined ? "no-tests" : "no-main", detail: "", diagnostics: problems };
+  const program: Program = { files: result.files, entry, ...(prepared.tests !== undefined ? { tests: { module: result.tests!.module, options: prepared.tests } } : {}) };
+  const ui = prepared.tests === undefined && packages(program.files, program.entry).some((spec) =>
     spec.startsWith("@flick-lang/runtime/rt/ui") || spec.startsWith("@flick-lang/effect-ts/ui"));
   const lines: Array<Line> = [];
   const { promise, resolve } = Promise.withResolvers<Execution>();
   let settled = false;
   let close = (): void => { };
+  let stopWorker: (() => void) | undefined;
+  let stopping = false;
+  let stopTimer: ReturnType<typeof setTimeout> | undefined;
   const finish = (status: string, detail: string): void => {
     if (settled) return;
     settled = true;
+    if (stopTimer !== undefined) clearTimeout(stopTimer);
     signal.removeEventListener("abort", abort);
     if (status !== "preview") close();
     resolve({ lines, status, detail, diagnostics: problems });
   };
-  const abort = (): void => finish("stopped", "");
+  const abort = (): void => {
+    if (stopWorker === undefined) { finish("stopped", ""); return; }
+    stopping = true;
+    // Cooperative interruption joins fixture/hook cleanup. A blocked JS body
+    // cannot handle messages, so the disposable worker still has a hard bound.
+    stopTimer = setTimeout(() => finish("stopped", "cleanup did not finish within 1000 ms"), 1000);
+    try { stopWorker(); } catch (error) { finish("failure", detail(error)); }
+  };
   signal.addEventListener("abort", abort, { once: true });
   const receive = (message: Message, start: () => void): void => {
     if (message.stream === "ready") start();
     else if (message.stream === "mounted" && ui) finish("preview", "0");
     // a program with an interface that has mounted it and not failed is running
-    else if (message.stream === "exit") finish(ui && message.code === 0 ? "preview" : "exit", String(message.code));
+    else if (message.stream === "exit") finish(stopping ? "stopped" : ui && message.code === 0 ? "preview" : "exit", stopping ? "" : String(message.code));
     else if (message.stream === "crash") finish("failure", message.text);
     else if (message.stream === "stdout" || message.stream === "stderr") lines.push({ stream: message.stream, text: message.text });
   };
@@ -269,6 +282,7 @@ export const runPrepared = async (prepared: PreparedRun, signal: AbortSignal): P
     } else {
       const worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
       close = () => worker.terminate();
+      if (prepared.tests !== undefined) stopWorker = () => worker.postMessage({ action: "stop" });
       worker.onmessage = (event: MessageEvent<Message>) => receive(event.data, () => { });
       worker.onerror = (event) => finish("failure", event.error instanceof Error ? detail(event.error) : event.message);
       worker.onmessageerror = () => finish("failure", "The worker returned an unreadable message");
@@ -285,6 +299,20 @@ export const runBuilt = (built: Built, signal: AbortSignal): Promise<Execution> 
   closePreview();
   return runPrepared({ built, generation: previewGeneration }, signal);
 };
+
+/** Native suites, including hidden exercise suites, always run in a fresh worker. */
+export const runTestsBuilt = (built: Built, options: BrowserTestOptions, signal: AbortSignal): Promise<Execution> => {
+  closePreview();
+  return runPrepared({ built, generation: previewGeneration, tests: options }, signal);
+};
+
+/** Configure a prepared emit without a second compilation. */
+export const prepareTests = async (source: string, profile: string, filter: string, list: boolean, signal: AbortSignal): Promise<PreparedRun> =>
+  ({ ...await prepareRun(source, profile, signal), tests: { filter, list, timeout: 1000 } });
+
+/** Shared exercise consumers can supply source containing their hidden suites. */
+export const runTestSuites = async (source: string, options: BrowserTestOptions, signal: AbortSignal): Promise<Execution> =>
+  runTestsBuilt(await request<Built>({ action: "build", source, profile: "debug" }, signal), options, signal);
 
 /** Build and run under one caller's signal. */
 export const run = async (source: string, profile: string, signal: AbortSignal): Promise<Execution> => {

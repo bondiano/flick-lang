@@ -8,6 +8,20 @@ import { replaceSource } from "./helpers.ts";
 const all = lessons();
 const shown = all.filter((entry) => entry.exercise === undefined);
 
+for (const locale of ["", "ru/"]) {
+  test(`an obsolete draft cannot break the loops lesson (${locale || "en/"})`, async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("flick.lesson.tour.loops.draft", "module Main exposing (main)\nmain : Unit ->{} Unit\nlet main () = Platform.stdout_line \"old\"\n");
+    });
+    await page.goto(`/flick-lang/${locale}tour/loops/`);
+    await ready(page);
+    await expect(page.locator(".cm-content")).toContainText("Host.Console");
+    const entry = shown.find((lesson) => lesson.id === "loops")!;
+    await shows(page, entry);
+    await expect(page.locator(".fp-status")).not.toHaveClass(/fp-bad/);
+  });
+}
+
 for (const [id, exercise] of [["guards", "guarantees/01"], ["cache", "laziness/01"], ["green", "testing/01"]] as const) {
   test(`the ${id} exercise rejects its starter and wrong output, then accepts the solution`, async ({ page }) => {
     const fixture = loadExercise(exercise);
@@ -47,6 +61,9 @@ const shows = async (page: Page, entry: Lesson): Promise<void> => {
     await expect(page.locator("#flick-playground")).toHaveCount(0);
   } else if (entry.expect === "run") {
     await expect(page.locator(".fp-output")).toHaveText(readFileSync(entry.stdout ?? "", "utf8").trim(), { timeout: 30_000 });
+  } else if (entry.expect === "tests") {
+    for (const text of entry.local?.contains ?? []) await expect(page.locator(".fp-output")).toContainText(text, { timeout: 30_000 });
+    await expect(page.locator(".fp-exit")).toContainText(`Exit code ${entry.local?.exit ?? 0}`);
   } else if (entry.expect === "ui") {
     // as the playground's own test of an interface, give the first preview a minute
     await expect(page.frameLocator(".fp-frame iframe").locator("#app")).not.toBeEmpty({ timeout: 60_000 }).catch(async (error: unknown) => {
@@ -95,11 +112,11 @@ test("the app's sibling children stay visible while books are finished", async (
   await expect(root.getByRole("button", { name: "finish", exact: true })).toHaveCount(0);
 });
 
-test("a Russian local lesson shows checked code, not a runnable editor", async ({ page }) => {
-  await page.goto("/flick-lang/ru/tour/suites/");
+test("a Russian native-only lesson shows checked code, not a runnable editor", async ({ page }) => {
+  await page.goto("/flick-lang/ru/tour/companions/");
   await ready(page);
   await expect(page.locator(".tour-local")).toContainText("Локальный пример. Проверяется в CI");
-  await expect(page.locator(".tour-local")).toContainText('suite "names"');
+  await expect(page.locator(".tour-local")).toContainText("module Main");
   await expect(page.locator("#flick-playground")).toHaveCount(0);
 });
 

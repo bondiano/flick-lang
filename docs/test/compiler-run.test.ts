@@ -117,3 +117,34 @@ test("canceling prepared execution terminates its worker and retains collected o
     assert.equal(runtime.terminated, true);
   });
 });
+
+test("suite execution and listing use disposable workers and never the main preview", async () => {
+  await withBridge("tests", async (bridge) => {
+    const suites: Built = { ...built, tests: { module: "Main", entry: "Main.js" } };
+    for (const list of [true, false]) {
+      const execution = bridge.runTestsBuilt(suites, { list, filter: "sum" }, new AbortController().signal);
+      const worker = RunWorker.instances.at(-1)!;
+      assert.deepEqual(worker.messages, [{ files: suites.files, entry: "Main.js", tests: { module: "Main", options: { list, filter: "sum" } } }]);
+      worker.reply({ stream: "stdout", text: "Main > sum\n" });
+      worker.reply({ stream: "exit", code: 0 });
+      assert.equal((await execution).detail, "0");
+      assert.equal(worker.terminated, true);
+    }
+    assert.equal(RunWorker.instances.length, 2);
+  });
+});
+
+test("suite cancellation waits for hook and fixture cleanup before terminating", async () => {
+  await withBridge("tests-stop", async (bridge) => {
+    const controller = new AbortController();
+    const execution = bridge.runTestsBuilt({ ...built, tests: { module: "Main", entry: "Main.js" } }, {}, controller.signal);
+    const worker = RunWorker.instances[0]!;
+    controller.abort();
+    assert.equal(worker.terminated, false);
+    assert.deepEqual(worker.messages.at(-1), { action: "stop" });
+    worker.reply({ stream: "stdout", text: "cleanup\n" });
+    worker.reply({ stream: "exit", code: 130 });
+    assert.deepEqual(await execution, { lines: [{ stream: "stdout", text: "cleanup\n" }], status: "stopped", detail: "", diagnostics: [] });
+    assert.equal(worker.terminated, true);
+  });
+});

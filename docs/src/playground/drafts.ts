@@ -1,7 +1,8 @@
-import { lessonKey } from "./dom.ts";
+import { configuration, lessonKey } from "./dom.ts";
 
 /** Browser persistence and URL encoding for a single-file playground. */
-const key = (): string => document.getElementById("flick-playground")?.dataset.lesson
+const isLesson = (): boolean => Boolean(document.getElementById("flick-playground")?.dataset.lesson);
+const key = (): string => isLesson()
   ? lessonKey("draft")
   : "flick.playground.draft.v1";
 const maxSourceBytes = 64 * 1024;
@@ -32,7 +33,14 @@ const unbase64url = (text: string): Uint8Array => {
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 };
 const stored = (): string => {
-  try { return localStorage.getItem(key()) ?? ""; } catch { return ""; }
+  try {
+    const value = localStorage.getItem(key()) ?? "";
+    if (!isLesson()) return value;
+    const draft: unknown = JSON.parse(value);
+    if (typeof draft !== "object" || draft === null || !("original" in draft) || !("source" in draft)) return "";
+    // Legacy and stale drafts stay in storage, but cannot override a revised lesson.
+    return draft.original === configuration().examples[0]?.source && typeof draft.source === "string" ? draft.source : "";
+  } catch { return ""; }
 };
 
 export const restoreSource = async (): Promise<{ source: string; status: string }> => {
@@ -52,7 +60,10 @@ export const restoreSource = async (): Promise<{ source: string; status: string 
 };
 
 export const saveDraft = (source: string): void => {
-  try { localStorage.setItem(key(), source); } catch { /* Editing still works without storage. */ }
+  try {
+    const value = isLesson() ? JSON.stringify({ original: configuration().examples[0]?.source, source }) : source;
+    localStorage.setItem(key(), value);
+  } catch { /* Editing still works without storage. */ }
 };
 export const clearDraft = (): void => {
   try { localStorage.removeItem(key()); } catch { /* A disabled store is already empty. */ }

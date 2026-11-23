@@ -111,12 +111,12 @@
     {
       "id": "testing", "en": "Testing", "ru": "Тестирование",
       "lessons": [
-        { "id": "suites", "expect": "local", "local": {"command": "test", "exit": 0, "contains": ["1 passed", "2 skipped"], "listed": ["Main > names > focus"], "forbidOnly": true} },
-        { "id": "matchers", "expect": "local", "local": {"command": "test", "exit": 1, "contains": ["5 passed", "1 failed", "expected", "got"]} },
-        { "id": "each", "expect": "local", "local": {"command": "test", "exit": 0, "contains": ["3 passed", "0 failed"], "flags": ["--forbid-only"], "listed": ["Main > trim > input \"  Ada  \"", "Main > trim > input \" Grace \"", "Main > trim > input \"\""]} },
-        { "id": "fixtures", "expect": "local", "local": {"command": "test", "exit": 1, "contains": ["2 passed", "1 failed", "setup", "fixture connection: expected 1, got 2", "close store"]} },
-        { "id": "hooks", "expect": "local", "local": {"command": "test", "exit": 1, "contains": ["1 passed", "1 failed", "timeout"], "printed": ["hook: before_all", "hook: before_each", "hook: body", "hook: after_each", "hook: before_each", "hook: after_each", "hook: after_all"]} },
-        { "id": "fakes", "expect": "local", "local": {"command": "test", "exit": 0, "contains": ["1 passed", "0 failed"], "flags": ["--forbid-only"]} },
+        { "id": "suites", "expect": "tests", "local": {"command": "test", "exit": 0, "contains": ["1 passed", "2 skipped"], "listed": ["Main > names > focus"], "forbidOnly": true} },
+        { "id": "matchers", "expect": "tests", "local": {"command": "test", "exit": 1, "contains": ["5 passed", "1 failed", "expected", "got"]} },
+        { "id": "each", "expect": "tests", "local": {"command": "test", "exit": 0, "contains": ["3 passed", "0 failed"], "flags": ["--forbid-only"], "listed": ["Main > trim > input \"  Ada  \"", "Main > trim > input \" Grace \"", "Main > trim > input \"\""]} },
+        { "id": "fixtures", "expect": "tests", "local": {"command": "test", "exit": 1, "contains": ["2 passed", "1 failed", "setup", "fixture connection: expected 1, got 2", "close store"]} },
+        { "id": "hooks", "expect": "tests", "local": {"command": "test", "exit": 1, "contains": ["1 passed", "1 failed", "timeout"], "printed": ["hook: before_all", "hook: before_each", "hook: body", "hook: after_each", "hook: before_each", "hook: after_each", "hook: after_all"]} },
+        { "id": "fakes", "expect": "tests", "local": {"command": "test", "exit": 0, "contains": ["1 passed", "0 failed"], "flags": ["--forbid-only"]} },
         { "id": "companions", "expect": "local", "local": {"command": "test", "exit": 0, "contains": ["1 passed", "0 failed"], "files": {"src/Main.test.fl": "tour-support/companions/Main.test.fl"}, "listed": ["Main > private trim"], "source": "src"} },
         { "id": "green", "exercise": "testing/01" }
       ]

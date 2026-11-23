@@ -35,6 +35,7 @@ import State exposing (
   Model,
   SyntaxToken,
   Tab(..),
+  RunMode(..),
   emit_key,
   empty_execution,
   errors,
@@ -151,6 +152,12 @@ type PreparedRun
 prepare_run : String -> String ->{Async; JsError} PreparedRun
 foreign prepare_run from "./compiler.ts" "prepareRun"
   arity 2
+  catch JsError.from_js
+  cancel signal
+
+prepare_tests : String -> String -> String -> Bool ->{Async; JsError} PreparedRun
+foreign prepare_tests from "./compiler.ts" "prepareTests"
+  arity 4
   catch JsError.from_js
   cancel signal
 
@@ -518,7 +525,11 @@ let run_program model =
     })
     let execution =
       try
-        let prepared = prepare_run m.source (profile_name m.profile)
+        let prepared =
+          if m.run_mode == Main then
+            prepare_run m.source (profile_name m.profile)
+          else
+            prepare_tests m.source (profile_name m.profile) m.test_filter (m.run_mode == ListTests)
         timeout 10000 (task { run_prepared prepared })
       with
       | TimeoutError -> { empty_execution with status = "timeout" }

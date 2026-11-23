@@ -117,6 +117,8 @@ let execution_status m =
       m.locale
       "Nothing to run: export a main function."
       "Нечего запускать: экспортируйте функцию main."
+  else if m.execution.status == "no-tests" then
+    tr m.locale "No test suites in this module." "В этом модуле нет тестов."
   else if m.execution.status == "invalid" then
     tr
       m.locale
@@ -153,6 +155,11 @@ let printed m = ui {
           List.map (fun line -> span { class_name = "fp-" ++ line.stream } (text line.text)) lines
       ))
 }
+
+/// A failure, or a stop whose cleanup did not finish, explains itself below the status.
+shows_detail : Model -> Bool
+let shows_detail m =
+  m.execution.status == "failure" || (m.execution.status == "stopped" && m.execution.detail != "")
 
 output_pane : Atom.Writable Model -> Model -> Ui
 let output_pane model m =
@@ -201,7 +208,7 @@ let output_pane model m =
                 "fp-exit fp-bad"
           }
             text (execution_status m ++ " · " ++ profile_name m.ran_profile)
-        if m.execution.status == "failure" then
+        if shows_detail m then
           pre { class_name = "fp-failure-detail" } (text m.execution.detail)
         else
           empty

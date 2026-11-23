@@ -16,7 +16,7 @@ const files = ["Contracts", "Argument", "Make", "Instances", "Producer", "Consum
 const example = (locale: string) => {
   const page = path.join(repo, "docs/src/content/docs", locale, "reference/modules.md");
   const markdown = readFileSync(page, "utf8");
-  const blocks = [...markdown.matchAll(/```text title="(src\/App\/\w+\.fl)"\n([\s\S]*?)\n```/g)]
+  const blocks = [...markdown.matchAll(/```flick ignore [^\n]*? title="(src\/App\/\w+\.fl)"\n([\s\S]*?)\n```/g)]
     .map(match => [match[1]!, `${match[2]}\n`] as const);
   assert.deepEqual(blocks.map(([file]) => file), files, page);
   return blocks;

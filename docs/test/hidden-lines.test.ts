@@ -18,6 +18,11 @@ test("the check words leave the meta, with what follows them", () => {
   assert.equal(flickBlocks.code(code("flick", "keeper", "x"))?.meta, "keeper");
 });
 
+test("frame attributes after the check words stay in the meta", () => {
+  assert.equal(flickBlocks.code(code("flick", 'ignore checked as one project title="src/App/A.fl"', "x"))?.meta, 'title="src/App/A.fl"');
+  assert.equal(flickBlocks.code(code("flick", "fail T010 title='Bad file.fl' frame=code", "x"))?.meta, "title='Bad file.fl' frame=code");
+});
+
 test("blocks of other languages are left as written", () => {
   assert.equal(flickBlocks.code(code("toml", "fail", "# a comment\nkey = 1")), undefined);
 });

@@ -57,6 +57,7 @@ interface Emitted {
   readonly declaration_entry?: string;
   readonly files: Record<string, string> | null;
   readonly entry: string | null;
+  readonly tests: TestEntry | null;
   readonly diagnostics: Array<Event>;
 }
 
@@ -73,6 +74,12 @@ export interface Built {
   readonly files: Record<string, string> | null;
   readonly entry: string | null;
   readonly diagnostics: Array<Diagnostic>;
+  readonly tests?: TestEntry | null;
+}
+
+export interface TestEntry {
+  readonly module: string;
+  readonly entry: string;
 }
 
 /** An explicit exercise check receives declarations and the same runnable emit. */
@@ -129,7 +136,7 @@ const generated = (source: string, profile: string, declarations = false): Gener
   const result = emitted(source, profile, declarations);
   const generated: Generated = { code: result.js ?? "", dts: result.dts ?? "", declarations: result.declarations, declarationEntry: result.declaration_entry, diagnostics: diagnostics(result.diagnostics) };
   return declarations
-    ? { ...generated, built: { files: result.files, entry: result.entry, diagnostics: generated.diagnostics } }
+    ? { ...generated, built: { files: result.files, entry: result.entry, tests: result.tests, diagnostics: generated.diagnostics } }
     : generated;
 };
 
@@ -150,7 +157,7 @@ onmessage = async (event: MessageEvent<Request>) => {
         break;
       case "build": {
         const built = emitted(request.source, request.profile);
-        result = { files: built.files, entry: built.entry, diagnostics: diagnostics(built.diagnostics) };
+        result = { files: built.files, entry: built.entry, tests: built.tests, diagnostics: diagnostics(built.diagnostics) };
         break;
       }
       case "hover":
