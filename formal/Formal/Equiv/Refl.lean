@@ -57,7 +57,7 @@ theorem reflect_focus {S : Sig} {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} {
     · obtain ⟨rfl, rfl⟩ := decomp_eq hr₂ h hE₂ hE' ht₂
       exact .inl ((rhead_rev hs hr hr₂ hst hrg hB hh).moves hE)
     · obtain ⟨rfl, rfl⟩ := decomp_eq (E' := F :: _) hr₂ (raise_redex hv) hE₂ (hE'.cons' hF) ht₂
-      exact raise_frame_rev hE hE' hr hs hv hfr hrg hB hty hh
+      exact raise_frame_rev hE hE' hr hs hv hfr hst hrg hB hty hh
     · obtain ⟨rfl, rfl⟩ := decomp_eq (E' := F :: _) hr₂ (unw_redex _ _ _) hE₂ (hE'.cons' hF) ht₂
       exact unw_frame_rev hE hE' hs hfr hst hrg hB hty hh
   | addFin hE' hg hl hv | spawn hE' hg hl hv =>
@@ -83,6 +83,7 @@ theorem reflect_focus {S : Sig} {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} {
     cases hfr with
     | @junkL n E₀ _ _ _ => exact mv (.rt (E := E₀) (hE.cons).2 (.settleRaise hev))
     | junkR => exact (hnc trivial).elim
+    | againF | againR => exact (hnc trivial).elim
     | @cons F' _ E' _ hFS _ =>
       exact mv (.raise (hE.cons).2 (hE.cons).1 (fun h => hnt (hFS.isTry.1 h))
         (fun h => hni (hFS.isInside.1 h)) (fun h => hnc (hFS.isCtl.1 h)) hev)
@@ -92,13 +93,14 @@ theorem reflect_focus {S : Sig} {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} {
     cases hfr with
     | @junkL n E₀ _ _ _ => exact mv (.rt (E := E₀) (hE.cons).2 .settleUnw)
     | junkR => exact (hnc trivial).elim
+    | againF | againR => exact (hnc trivial).elim
     | @cons F' _ E' _ hFS _ =>
       exact mv (.unw (hE.cons).2 (hE.cons).1 (fun h => hni (hFS.isInside.1 h))
         (fun h => hnc (hFS.isCtl.1 h)) (fun h => hnh ((hFS.catches hst.bij hl).1 h)))
   | performAbort hE' hEi hh ha hv | performTail hE' hEi hh ha hv | performCtl hE' hEi hh ha hv =>
     have ht₂' := ht₂.trans (plug_append _ (.hwith _ _ _ _ _ :: _) _).symm
     obtain ⟨rfl, rfl⟩ := decomp_eq hr₂ (perform_redex hv) hE₂ (hEi.append' (hE'.cons' (F := .hwith _ _ _ _ _) trivial)) ht₂'
-    obtain ⟨A, G, B, rfl, hA, hG, -⟩ := hfr.split_right hwith_ne_settle
+    obtain ⟨A, G, B, rfl, hA, hG, -⟩ := hfr.split_right hwith_ne_settle (fun _ h => by cases h)
     obtain ⟨f, a, rfl, hf', -⟩ := hs.rinv_app
     obtain rfl := hf'.top_const_rev rfl
     have hEA : OkE A := fun F hF => hE F (List.mem_append_left _ hF)
@@ -113,7 +115,7 @@ theorem reflect_focus {S : Sig} {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} {
   | performKept hE' hEi hh ha hv hq =>
     have ht₂' := ht₂.trans (plug_append _ (.hkeep _ _ _ _ :: _) _).symm
     obtain ⟨rfl, rfl⟩ := decomp_eq hr₂ (perform_redex hv) hE₂ (hEi.append' (hE'.cons' (F := .hkeep _ _ _ _) trivial)) ht₂'
-    obtain ⟨A, G, B, rfl, hA, hG, -⟩ := hfr.split_right (fun _ h => by cases h)
+    obtain ⟨A, G, B, rfl, hA, hG, -⟩ := hfr.split_right (fun _ h => by cases h) (fun _ h => by cases h)
     obtain ⟨f, a, rfl, hf', -⟩ := hs.rinv_app
     obtain rfl := hf'.top_const_rev rfl
     have hEA : OkE A := fun F hF => hE F (List.mem_append_left _ hF)

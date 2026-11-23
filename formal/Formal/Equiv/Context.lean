@@ -157,12 +157,23 @@ theorem Ctx.sim {W : World} (h₀ : Sim W .any e₁ e₂) (hz : e₁.LzShape ∨
 /-- The world of two runs that have not started; `b`: the pairs of O1b and O4 may stand in it. -/
 def World.empty (root : Roots) (b : Prop) : World :=
   ⟨root, fun _ _ _ => False, fun _ => False, fun _ => False, fun _ _ => False,
-    fun _ _ => False, fun _ _ => False, fun _ _ => False, b⟩
+    fun _ _ => False, fun _ _ => False, fun _ _ => False, fun _ _ _ _ => False, b⟩
 
 theorem StR.empty (root : Roots) (b : Prop) : StR (World.empty root b) [] [] :=
   ⟨fun _ _ _ h => h.elim, fun _ _ _ _ _ _ h => h.elim, fun _ _ _ _ _ h => h.elim,
     fun _ h => h.elim, fun _ h => h.elim, fun _ _ h => h.elim, fun _ _ _ h => h.elim,
-    fun _ _ h => h.elim, fun _ _ h => h.elim, fun _ _ h => h.elim⟩
+    fun _ _ h => h.elim, fun _ _ h => h.elim, fun _ _ h => h.elim, fun _ _ _ _ h => h.elim⟩
+
+theorem _root_.Flick.Tm.Src.noSettle : ∀ {e : Tm}, e.Src → e.NoSettle := by
+  intro e
+  induction e <;> intro h l <;> simp only [Tm.Src, Tm.settleCount] at h ⊢
+  all_goals first
+    | rfl
+    | exact h.elim
+    | (simp_all [Tm.NoSettle])
+
+theorem _root_.Flick.Roots.Src.noSettle {root : Roots} (h : root.Src) : root.NoSettle :=
+  ⟨fun N v hv => (h.1 N v hv).noSettle, fun g v hg => (h.2 g v hg).noSettle⟩
 
 /-- A whole program: a closed typed term of the core under typed roots of the source language
 (T1). -/
@@ -186,46 +197,63 @@ theorem closed_of_typ {S : Sig} {Ψ : List Ty} {Θ : Facts} {e : Tm} {j : J}
   simp at this
 
 /-- **Typing closes the threads** of every configuration a program reaches, keeps lazy cells
-away from where patterns read, guarantees pattern matches bind values, and keeps lazy cells as
-lazy cells across steps. -/
-theorem Prog.reach {S : Sig} {root : Roots} {e : Tm} (h : Prog S root e) :
+away from where patterns read, guarantees pattern matches bind values, keeps settle frames
+paired with running cells (`CfgSettle`), keeps done cells well-formed (`DoneCell`), and keeps
+lazy cells as lazy cells across steps. -/
+theorem Prog.reach {S : Sig} {root : Roots} {e : Tm} (h : Prog S root e) (hns : e.NoSettle) :
     Reach root ⟨[], [], e⟩ := by
-  obtain ⟨hroot, -, hb, t, φ, h₀, ht, hφ⟩ := h
-  intro c hs
-  obtain ⟨X, hcfg⟩ := steps_typed hroot hs ht hφ (CfgTy.init h₀ hb)
-  have hμ := hcfg.1
-  have hm := hcfg.2.1
-  have hΛ := hcfg.2.2.1
-  refine ⟨⟨closed_of_typ hm, hm.noLzTop (fun h => nomatch h), hm.matchVals, fun p g hg k hk => ?_⟩,
-    fun l c'' hs' i d hd hic => ?_⟩
-  · obtain ⟨t', φ', hk'⟩ := (hΛ p g hg).1 k hk
-    exact ⟨closed_of_typ hk', hk'.noLzTop (fun h => nomatch h), hk'.matchVals⟩
-  · obtain ⟨X', hcfg', -⟩ := cstep_typed hroot ht hφ hcfg hs'
+  obtain ⟨hroot, hroot_src, hb, t, φ, h₀, ht, hφ⟩ := h
+  have hcell_all : ∀ c₁, CSteps root ⟨[], [], e⟩ c₁ → ∀ l c₂, CStep root l c₁ c₂ →
+      ∀ (i : Nat) (d : Tm), c₁.mem[i]? = some d → d.IsCell →
+        ∃ d', c₂.mem[i]? = some d' ∧ d'.IsCell := by
+    intro c₁ hs₁ l c₂ hs' i d hd hic
+    obtain ⟨X, hcfg⟩ := steps_typed hroot hs₁ ht hφ (CfgTy.init h₀ hb)
+    have hμ := hcfg.1
+    obtain ⟨X', hcfg', -⟩ := cstep_typed hroot ht hφ hcfg hs'
     have hμ' := hcfg'.1
     have hi : i < ([] ++ X).length := hμ.1 ▸ (List.getElem?_eq_some_iff.mp hd).1
     have hty := List.getElem?_eq_getElem hi
     rcases hμ.2 i d _ hd hty with ⟨hv, -⟩ | ⟨r, ε, a, C, hu, -⟩
     · exact (hv.not_cell hic).elim
-    · have hi' : i < c''.mem.length := hμ'.1.symm ▸ Nat.lt_of_lt_of_le hi (by simp)
+    · have hi' : i < c₂.mem.length := hμ'.1.symm ▸ Nat.lt_of_lt_of_le hi (by simp)
       have hd' := List.getElem?_eq_getElem hi'
       have hty' : (([] ++ X) ++ X')[i]? = some (.lazyCell r ε a C) := by
         rw [List.getElem?_append_left hi, hty, hu]
       rcases hμ'.2 i _ _ hd' hty' with ⟨hv', hvt⟩ | ⟨_, _, _, _, _, hc'⟩
       · exact (hvt.value_not_cell hv').elim
       · exact ⟨_, hd', hc'.isCell⟩
+  intro c hs
+  obtain ⟨X, hcfg⟩ := steps_typed hroot hs ht hφ (CfgTy.init h₀ hb)
+  have hμ := hcfg.1
+  have hm := hcfg.2.1
+  have hΛ := hcfg.2.2.1
+  refine ⟨⟨closed_of_typ hm, hm.noLzTop (fun h => nomatch h), hm.matchVals, fun p g hg k hk => ?_,
+    CSteps.settle hroot_src.noSettle (CfgSettle.init hns) hs hcell_all, fun i o hd => ?_⟩,
+    hcell_all c hs⟩
+  · obtain ⟨t', φ', hk'⟩ := (hΛ p g hg).1 k hk
+    exact ⟨closed_of_typ hk', hk'.noLzTop (fun h => nomatch h), hk'.matchVals⟩
+  · have hi : i < ([] ++ X).length := hμ.1 ▸ (List.getElem?_eq_some_iff.mp hd).1
+    have hty := List.getElem?_eq_getElem hi
+    rcases hμ.2 i (.done o) _ hd hty with ⟨hv, -⟩ | ⟨_, _, _, _, -, hc⟩
+    · exact (hv.not_cell trivial).elim
+    · cases hc with
+      | ok hv htv => exact .inl ⟨hv, closed_of_typ htv⟩
+      | err hv _ => exact .inr (.inl ⟨_, rfl, hv⟩)
+      | defect => exact .inr (.inr rfl)
 
-theorem Prog.noLzTop {S : Sig} {root : Roots} {e : Tm} (h : Prog S root e) : ¬ e.LzTop .any :=
-  (h.reach _ .refl).1.2.1
+theorem Prog.noLzTop {S : Sig} {root : Roots} {e : Tm} (h : Prog S root e) : ¬ e.LzTop .any := by
+  obtain ⟨-, -, -, _, _, h₀, -, -⟩ := h
+  exact h₀.noLzTop (fun h => nomatch h)
 
 /-- A program simulated by another one from the start ends with a literal it ends with. -/
 theorem Ends.sim {S : Sig} {root : Roots} {C₁ C₂ : Tm} {o : Lit} {b : Prop}
     (hs : Sim (World.empty root b) .any C₁ C₂) (p₁ : Prog S root C₁) (p₂ : Prog S root C₂)
-    (h : Ends root C₁ o) : Ends root C₂ o := by
+    (hns₁ : C₁.NoSettle) (hns₂ : C₂.NoSettle) (h : Ends root C₁ o) : Ends root C₂ o := by
   obtain ⟨Λ, μ, h⟩ := h
   have hr : CfgR (World.empty root b) ⟨[], [], C₁⟩ ⟨[], [], C₂⟩ :=
     ⟨.inl hs, StR.empty root b, ⟨rfl, fun _ _ _ h => by simp at h⟩⟩
-  obtain ⟨W', c₂, -, hs₂, hr'⟩ := csteps_sim p₁.2.1 h hr rfl p₁.reach p₂.reach
-  obtain ⟨Λ₂, μ₂, hs₃⟩ := lit_sim (root := root) hr' (fun _ => (p₂.reach _ hs₂).1.1)
+  obtain ⟨W', c₂, -, hs₂, hr'⟩ := csteps_sim p₁.2.1 h hr rfl (p₁.reach hns₁) (p₂.reach hns₂)
+  obtain ⟨Λ₂, μ₂, hs₃⟩ := lit_sim (root := root) hr' (fun _ => (p₂.reach hns₂ _ hs₂).1.main_closed)
   exact ⟨Λ₂, μ₂, hs₂.trans hs₃⟩
 
 /-- **Terms related both ways under typed roots are contextually equivalent**, when one makes or
@@ -235,8 +263,10 @@ theorem ctxEquiv_of_sim_root {S : Sig} {b : Prop}
     (h₂₁ : ∀ root, RootTy S root → Sim (World.empty root b) .any e₂ e₁)
     (hz : e₁.LzShape ∨ e₂.LzShape) (s₁ : e₁.Src) (s₂ : e₂.Src) : CtxEquiv S e₁ e₂ :=
   fun root _ _ hc p₁ p₂ _ =>
-    ⟨Ends.sim (hc.sim (h₁₂ root p₁.1) hz s₂ (by decide) p₁.noLzTop p₂.noLzTop) p₁ p₂,
-      Ends.sim (hc.symm.sim (h₂₁ root p₁.1) hz.symm s₁ (by decide) p₂.noLzTop p₁.noLzTop) p₂ p₁⟩
+    ⟨Ends.sim (hc.sim (h₁₂ root p₁.1) hz s₂ (by decide) p₁.noLzTop p₂.noLzTop) p₁ p₂
+      (hc.symm.src s₁).noSettle (hc.src s₂).noSettle,
+      Ends.sim (hc.symm.sim (h₂₁ root p₁.1) hz.symm s₁ (by decide) p₂.noLzTop p₁.noLzTop) p₂ p₁
+      (hc.src s₂).noSettle (hc.symm.src s₁).noSettle⟩
 
 /-- **Terms related both ways are contextually equivalent**, when one makes or forces a lazy cell
 at its top. -/

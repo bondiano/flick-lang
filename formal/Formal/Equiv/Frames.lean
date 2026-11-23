@@ -39,9 +39,11 @@ theorem Sim.top_head {x : Pos} {f f' : Tm} (h : Sim W x f f') (hx : x = .top) (h
     cases hf with
     | ctorApp hf' _ _ => exact ih₁ hx hf' hK
     | constApp _ _ => simp [Tm.head] at hK
-  | jL hx' | jR hx' => exact (hx' hx).elim
+  | jL hx' | jR hx' | againF2 hx' | againR2 hx' => exact (hx' hx).elim
   | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
-  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle
+  | doneF | doneR | againF1 | againF3 | againR1 | againR3
+  | letRaise | letUnw | letTodo => cases hx
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | ctor => exact hK
   | _ => first | (cases hf; done) | simp [Tm.head] at hK
@@ -60,9 +62,11 @@ theorem Sim.top_value {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .top) (ha
       | jR hx' => exact (hx' rfl).elim
   | rcons _ _ _ ih₁ ih₂ => cases ha with
     | rcons h₁ h₂ => subst hx; exact .rcons (ih₁ rfl h₁) (ih₂ rfl h₂)
-  | jL hx' | jR hx' => exact (hx' hx).elim
+  | jL hx' | jR hx' | againF2 hx' | againR2 hx' => exact (hx' hx).elim
   | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
-  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle
+  | doneF | doneR | againF1 | againF3 | againR1 | againR3
+  | letRaise | letUnw | letTodo => cases hx
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | hloc => exact .loc
   | o4Fix1 | o4Fix2 => exact .fix
@@ -86,6 +90,10 @@ theorem FrL.plugs {E E' : List Frame} (h : FrL W E E') :
   | cons hF _ ih => exact fun ha => ih (hF.plug ha)
   | junkL hn _ ih => exact fun ha => ih (.jL (by decide) hn ha)
   | junkR hn _ ih => exact fun ha => ih (.jR (by decide) hn ha)
+  | againF hB hl hc hσ hσn hσv hσv' _ ih =>
+    exact fun ha => ih (.againF2 (by decide) hB hl ha hc hσ hσn hσv hσv')
+  | againR hB hl hc hσ hσn hσv hσv' _ ih =>
+    exact fun ha => ih (.againR2 (by decide) hB hl ha hc hσ hσn hσv hσv')
 
 theorem FrL.plugsP {E E' : List Frame} (h : FrL W E E') (hE : OkE E) (hE' : OkE E') :
     ∀ {a a' : Tm}, a.Spine → Sim W .park a a' → Sim W .park (plug E a) (plug E' a') := by
@@ -99,6 +107,12 @@ theorem FrL.plugsP {E E' : List Frame} (h : FrL W E E') (hE : OkE E) (hE' : OkE 
     exact fun hs ha => ih hE.cons.2 hE' (by simpa [Frame.plug, Tm.Spine] using hs)
       (.jL (by decide) hn ha)
   | junkR hn _ ih => exact fun hs ha => ih hE hE'.cons.2 hs (.jR (by decide) hn ha)
+  | againF hB hl hc hσ hσn hσv hσv' _ ih =>
+    exact fun hs ha => ih hE.cons.2.cons.2 hE'.cons.2.cons.2
+      (by simpa [Frame.plug, Tm.Spine] using hs) (.againF2 (by decide) hB hl ha hc hσ hσn hσv hσv')
+  | againR hB hl hc hσ hσn hσv hσv' _ ih =>
+    exact fun hs ha => ih hE.cons.2.cons.2 hE'.cons.2.cons.2
+      (by simpa [Frame.plug, Tm.Spine] using hs) (.againR2 (by decide) hB hl ha hc hσ hσn hσv hσv')
 
 theorem FrS.isTry {F F' : Frame} (h : FrS W F F') : F.isTry ↔ F'.isTry := by
   cases h <;> simp [Frame.isTry]
@@ -140,9 +154,11 @@ theorem armOf_eq {o : Name} {x : Pos} {al al' : Tm} (h : Sim W x al al') (hx : x
     by_cases hc : p.headName = some o
     · simp only [hc, if_true]; exact .inr ⟨hd, hn⟩
     · simp only [hc, if_false]; exact ihr hx
-  | jL hx' | jR hx' => exact (hx' hx).elim
+  | jL hx' | jR hx' | againF2 hx' | againR2 hx' => exact (hx' hx).elim
   | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
-  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle
+  | doneF | doneR | againF1 | againF3 | againR1 | againR3
+  | letRaise | letUnw | letTodo => cases hx
   | _ => simp [Tm.armOf, ORel]
 
 theorem FrS.handles {F F' : Frame} (h : FrS W F F') (E o : Name) :
@@ -175,6 +191,13 @@ theorem FrL.handlesE {E E₂ : List Frame} (h : FrL W E E₂) {Ef o : Name}
     rcases List.mem_cons.mp hG with rfl | hG
     · simp [Frame.handles]
     · exact ih hh G hG
+  | againF _ _ _ _ _ _ _ _ ih | againR _ _ _ _ _ _ _ _ ih =>
+    intro G hG
+    rcases List.mem_cons.mp hG with rfl | hG
+    · simp [Frame.handles]
+    · rcases List.mem_cons.mp hG with rfl | hG
+      · simp [Frame.handles]
+      · exact ih (fun G' hG' => hh G' (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ hG'))) G hG
 
 theorem FrL.resumesE {E E₂ : List Frame} (h : FrL W E E₂) {p : Nat}
     (hn : ∀ G ∈ E, ¬ G.resumes p) : ∀ G ∈ E₂, ¬ G.resumes p := by
@@ -191,6 +214,13 @@ theorem FrL.resumesE {E E₂ : List Frame} (h : FrL W E E₂) {p : Nat}
     rcases List.mem_cons.mp hG with rfl | hG
     · simp [Frame.resumes]
     · exact ih hn G hG
+  | againF _ _ _ _ _ _ _ _ ih | againR _ _ _ _ _ _ _ _ ih =>
+    intro G hG
+    rcases List.mem_cons.mp hG with rfl | hG
+    · simp [Frame.resumes]
+    · rcases List.mem_cons.mp hG with rfl | hG
+      · simp [Frame.resumes]
+      · exact ih (fun G' hG' => hn G' (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ hG'))) G hG
 
 /-- The handlers a child inherits from related contexts. -/
 theorem FrL.withs {E E' : List Frame} (h : FrL W E E') (p : Nat) :
@@ -205,68 +235,160 @@ theorem FrL.withs {E E' : List Frame} (h : FrL W E E') (p : Nat) :
       | (split <;> first | exact .hkeep ‹_› ‹_› ha | exact ha)
   | junkL _ _ ih => intro a a' ha; exact ih ha
   | junkR _ _ ih => intro a a' ha; exact ih ha
+  | againF _ _ _ _ _ _ _ _ ih | againR _ _ _ _ _ _ _ _ ih =>
+    intro a a' ha; exact ih ha
 
-/-- A split of the left context at a frame that is no cell's frame. -/
-theorem FrL.split_left {F : Frame} (hF : ∀ n, F ≠ .settle n) :
-    ∀ {A B : List Frame} {E₂ : List Frame}, FrL W (A ++ F :: B) E₂ →
-      ∃ A₂ F₂ B₂, E₂ = A₂ ++ F₂ :: B₂ ∧ FrL W A A₂ ∧ FrS W F F₂ ∧ FrL W B B₂
-  | [], B, _, h => by
-    simp only [List.nil_append] at h
-    generalize hl : F :: B = l at h
-    induction h with
-    | nil => cases hl
-    | cons hF' h' => cases hl; exact ⟨[], _, _, rfl, .nil, hF', h'⟩
-    | junkL _ _ => cases hl; exact (hF _ rfl).elim
-    | junkR hn _ ih =>
-      obtain ⟨A₂, F₂, B₂, rfl, hA, hF₂, hB⟩ := ih hl
-      exact ⟨.settle _ :: A₂, F₂, B₂, rfl, .junkR hn hA, hF₂, hB⟩
-  | G :: A, B, _, h => by
-    simp only [List.cons_append] at h
-    generalize hl : G :: (A ++ F :: B) = l at h
-    induction h with
-    | nil => cases hl
-    | cons hG h' =>
-      cases hl
-      obtain ⟨A₂, F₂, B₂, rfl, hA, hF₂, hB⟩ := FrL.split_left hF h'
-      exact ⟨_ :: A₂, F₂, B₂, rfl, .cons hG hA, hF₂, hB⟩
-    | junkL hn h' =>
-      cases hl
-      obtain ⟨A₂, F₂, B₂, rfl, hA, hF₂, hB⟩ := FrL.split_left hF h'
-      exact ⟨A₂, F₂, B₂, rfl, .junkL hn hA, hF₂, hB⟩
-    | junkR hn _ ih =>
-      obtain ⟨A₂, F₂, B₂, rfl, hA, hF₂, hB⟩ := ih hl
-      exact ⟨.settle _ :: A₂, F₂, B₂, rfl, .junkR hn hA, hF₂, hB⟩
+/-- Split the head frame of the left context when it is no cell's frame. -/
+theorem FrL.split_head {F : Frame} (hF : ∀ n, F ≠ .settle n) :
+    ∀ {B E₂ : List Frame}, FrL W (F :: B) E₂ →
+      ∃ A₂ F₂ B₂, E₂ = A₂ ++ F₂ :: B₂ ∧ FrL W [] A₂ ∧ FrS W F F₂ ∧ FrL W B B₂ := by
+  intro B E₂ h
+  generalize hl : F :: B = l at h
+  induction h with
+  | nil => cases hl
+  | cons hF' h' => cases hl; exact ⟨[], _, _, rfl, .nil, hF', h'⟩
+  | junkL _ _ => cases hl; exact (hF _ rfl).elim
+  | junkR hn _ ih =>
+    obtain ⟨A₂, F₂, B₂, rfl, hA, hF₂, hB⟩ := ih hl
+    exact ⟨.settle _ :: A₂, F₂, B₂, rfl, .junkR hn hA, hF₂, hB⟩
+  | againF | againR => cases hl; exact (hF _ rfl).elim
 
-/-- A split of the right context at a frame that is no cell's frame. -/
-theorem FrL.split_right {F₂ : Frame} (hF : ∀ n, F₂ ≠ .settle n) :
-    ∀ {A₂ B₂ : List Frame} {E : List Frame}, FrL W E (A₂ ++ F₂ :: B₂) →
-      ∃ A F B, E = A ++ F :: B ∧ FrL W A A₂ ∧ FrS W F F₂ ∧ FrL W B B₂
-  | [], B₂, _, h => by
-    simp only [List.nil_append] at h
-    generalize hl : F₂ :: B₂ = l at h
-    induction h with
-    | nil => cases hl
-    | cons hF' h' => cases hl; exact ⟨[], _, _, rfl, .nil, hF', h'⟩
-    | junkL hn _ ih =>
-      obtain ⟨A, F, B, rfl, hA, hF₁, hB⟩ := ih hl
-      exact ⟨.settle _ :: A, F, B, rfl, .junkL hn hA, hF₁, hB⟩
-    | junkR _ _ => cases hl; exact (hF _ rfl).elim
-  | G :: A₂, B₂, _, h => by
-    simp only [List.cons_append] at h
-    generalize hl : G :: (A₂ ++ F₂ :: B₂) = l at h
-    induction h with
-    | nil => cases hl
-    | cons hG h' =>
-      cases hl
-      obtain ⟨A, F, B, rfl, hA, hF₁, hB⟩ := FrL.split_right hF h'
-      exact ⟨_ :: A, F, B, rfl, .cons hG hA, hF₁, hB⟩
-    | junkL hn _ ih =>
-      obtain ⟨A, F, B, rfl, hA, hF₁, hB⟩ := ih hl
-      exact ⟨.settle _ :: A, F, B, rfl, .junkL hn hA, hF₁, hB⟩
-    | junkR hn h' =>
-      cases hl
-      obtain ⟨A, F, B, rfl, hA, hF₁, hB⟩ := FrL.split_right hF h'
-      exact ⟨A, F, B, rfl, .junkR hn hA, hF₁, hB⟩
+private theorem FrL.split_left_aux {F : Frame} (hF : ∀ n, F ≠ .settle n) (hFl : ∀ b, F ≠ .let_ b) :
+    ∀ (m : Nat) {A B E₂ : List Frame}, A.length ≤ m → FrL W (A ++ F :: B) E₂ →
+      ∃ A₂ F₂ B₂, E₂ = A₂ ++ F₂ :: B₂ ∧ FrL W A A₂ ∧ FrS W F F₂ ∧ FrL W B B₂ := by
+  intro m
+  induction m with
+  | zero =>
+    intro A B E₂ hm h
+    cases A with
+    | nil => exact FrL.split_head hF h
+    | cons => simp at hm
+  | succ m ih =>
+    intro A B E₂ hm h
+    cases A with
+    | nil => exact FrL.split_head hF h
+    | cons G A' =>
+      simp only [List.cons_append] at h
+      generalize hl : G :: (A' ++ F :: B) = l at h
+      induction h with
+      | nil => cases hl
+      | cons hG h' =>
+        cases hl
+        obtain ⟨A₂, F₂, B₂, rfl, hA, hF₂, hB⟩ := ih (by simp at hm; omega) h'
+        exact ⟨_ :: A₂, F₂, B₂, rfl, .cons hG hA, hF₂, hB⟩
+      | junkL hn h' =>
+        cases hl
+        obtain ⟨A₂, F₂, B₂, rfl, hA, hF₂, hB⟩ := ih (by simp at hm; omega) h'
+        exact ⟨A₂, F₂, B₂, rfl, .junkL hn hA, hF₂, hB⟩
+      | junkR hn _ ih' =>
+        obtain ⟨A₂, F₂, B₂, rfl, hA, hF₂, hB⟩ := ih' hl
+        exact ⟨.settle _ :: A₂, F₂, B₂, rfl, .junkR hn hA, hF₂, hB⟩
+      | againF hB hll hc hσ hσn hσv hσv' h' =>
+        injection hl with hG heq
+        subst hG
+        cases A' with
+        | nil => simp only [List.nil_append, List.cons.injEq] at heq; exact (hFl _ heq.1).elim
+        | cons G' A'' =>
+          simp only [List.cons_append, List.cons.injEq] at heq
+          obtain ⟨rfl, heq'⟩ := heq
+          subst heq'
+          obtain ⟨A₂, F₂, B₂, rfl, hA, hF₂, hB'⟩ := ih (by simp at hm; omega) h'
+          exact ⟨.settle _ :: .let_ _ :: A₂, F₂, B₂, rfl,
+            .againF hB hll hc hσ hσn hσv hσv' hA, hF₂, hB'⟩
+      | againR hB hll hc hσ hσn hσv hσv' h' =>
+        injection hl with hG heq
+        subst hG
+        cases A' with
+        | nil => simp only [List.nil_append, List.cons.injEq] at heq; exact (hFl _ heq.1).elim
+        | cons G' A'' =>
+          simp only [List.cons_append, List.cons.injEq] at heq
+          obtain ⟨rfl, heq'⟩ := heq
+          subst heq'
+          obtain ⟨A₂, F₂, B₂, rfl, hA, hF₂, hB'⟩ := ih (by simp at hm; omega) h'
+          exact ⟨.settle _ :: .let_ _ :: A₂, F₂, B₂, rfl,
+            .againR hB hll hc hσ hσn hσv hσv' hA, hF₂, hB'⟩
+
+/-- A split of the left context at a frame that is neither a cell's frame nor a `let`. -/
+theorem FrL.split_left {F : Frame} (hF : ∀ n, F ≠ .settle n) (hFl : ∀ b, F ≠ .let_ b)
+    {A B E₂ : List Frame} (h : FrL W (A ++ F :: B) E₂) :
+    ∃ A₂ F₂ B₂, E₂ = A₂ ++ F₂ :: B₂ ∧ FrL W A A₂ ∧ FrS W F F₂ ∧ FrL W B B₂ :=
+  FrL.split_left_aux hF hFl A.length (Nat.le_refl _) h
+
+/-- Split the head frame of the right context when it is no cell's frame. -/
+theorem FrL.split_head_right {F₂ : Frame} (hF : ∀ n, F₂ ≠ .settle n) :
+    ∀ {B₂ E : List Frame}, FrL W E (F₂ :: B₂) →
+      ∃ A F B, E = A ++ F :: B ∧ FrL W A [] ∧ FrS W F F₂ ∧ FrL W B B₂ := by
+  intro B₂ E h
+  generalize hl : F₂ :: B₂ = l at h
+  induction h with
+  | nil => cases hl
+  | cons hF' h' => cases hl; exact ⟨[], _, _, rfl, .nil, hF', h'⟩
+  | junkL hn _ ih =>
+    obtain ⟨A, F, B, rfl, hA, hF₁, hB⟩ := ih hl
+    exact ⟨.settle _ :: A, F, B, rfl, .junkL hn hA, hF₁, hB⟩
+  | junkR _ _ => cases hl; exact (hF _ rfl).elim
+  | againF | againR => cases hl; exact (hF _ rfl).elim
+
+private theorem FrL.split_right_aux {F₂ : Frame} (hF : ∀ n, F₂ ≠ .settle n) (hFl : ∀ b, F₂ ≠ .let_ b) :
+    ∀ (m : Nat) {A₂ B₂ E : List Frame}, A₂.length ≤ m → FrL W E (A₂ ++ F₂ :: B₂) →
+      ∃ A F B, E = A ++ F :: B ∧ FrL W A A₂ ∧ FrS W F F₂ ∧ FrL W B B₂ := by
+  intro m
+  induction m with
+  | zero =>
+    intro A₂ B₂ E hm h
+    cases A₂ with
+    | nil => exact FrL.split_head_right hF h
+    | cons => simp at hm
+  | succ m ih =>
+    intro A₂ B₂ E hm h
+    cases A₂ with
+    | nil => exact FrL.split_head_right hF h
+    | cons G A₂' =>
+      simp only [List.cons_append] at h
+      generalize hl : G :: (A₂' ++ F₂ :: B₂) = l at h
+      induction h with
+      | nil => cases hl
+      | cons hG h' =>
+        cases hl
+        obtain ⟨A, F, B, rfl, hA, hF₁, hB⟩ := ih (by simp at hm; omega) h'
+        exact ⟨_ :: A, F, B, rfl, .cons hG hA, hF₁, hB⟩
+      | junkL hn _ ih' =>
+        obtain ⟨A, F, B, rfl, hA, hF₁, hB⟩ := ih' hl
+        exact ⟨.settle _ :: A, F, B, rfl, .junkL hn hA, hF₁, hB⟩
+      | junkR hn h' =>
+        cases hl
+        obtain ⟨A, F, B, rfl, hA, hF₁, hB⟩ := ih (by simp at hm; omega) h'
+        exact ⟨A, F, B, rfl, .junkR hn hA, hF₁, hB⟩
+      | againF hB hll hc hσ hσn hσv hσv' h' =>
+        injection hl with hG heq
+        subst hG
+        cases A₂' with
+        | nil => simp only [List.nil_append, List.cons.injEq] at heq; exact (hFl _ heq.1).elim
+        | cons G' A₂'' =>
+          simp only [List.cons_append, List.cons.injEq] at heq
+          obtain ⟨rfl, heq'⟩ := heq
+          subst heq'
+          obtain ⟨A, F, B, rfl, hA, hF₁, hB'⟩ := ih (by simp at hm; omega) h'
+          exact ⟨.settle _ :: .let_ _ :: A, F, B, rfl,
+            .againF hB hll hc hσ hσn hσv hσv' hA, hF₁, hB'⟩
+      | againR hB hll hc hσ hσn hσv hσv' h' =>
+        injection hl with hG heq
+        subst hG
+        cases A₂' with
+        | nil => simp only [List.nil_append, List.cons.injEq] at heq; exact (hFl _ heq.1).elim
+        | cons G' A₂'' =>
+          simp only [List.cons_append, List.cons.injEq] at heq
+          obtain ⟨rfl, heq'⟩ := heq
+          subst heq'
+          obtain ⟨A, F, B, rfl, hA, hF₁, hB'⟩ := ih (by simp at hm; omega) h'
+          exact ⟨.settle _ :: .let_ _ :: A, F, B, rfl,
+            .againR hB hll hc hσ hσn hσv hσv' hA, hF₁, hB'⟩
+
+/-- A split of the right context at a frame that is neither a cell's frame nor a `let`. -/
+theorem FrL.split_right {F₂ : Frame} (hF : ∀ n, F₂ ≠ .settle n) (hFl : ∀ b, F₂ ≠ .let_ b)
+    {A₂ B₂ E : List Frame} (h : FrL W E (A₂ ++ F₂ :: B₂)) :
+    ∃ A F B, E = A ++ F :: B ∧ FrL W A A₂ ∧ FrS W F F₂ ∧ FrL W B B₂ :=
+  FrL.split_right_aux hF hFl A₂.length (Nat.le_refl _) h
 
 theorem FrL.append {A A₂ B B₂ : List Frame} (h₁ : FrL W A A₂) (h₂ : FrL W B B₂) :
     FrL W (A ++ B) (A₂ ++ B₂) := by
@@ -275,5 +397,7 @@ theorem FrL.append {A A₂ B B₂ : List Frame} (h₁ : FrL W A A₂) (h₂ : Fr
   | cons hF _ ih => exact .cons hF ih
   | junkL hn _ ih => exact .junkL hn ih
   | junkR hn _ ih => exact .junkR hn ih
+  | againF hB hl hc hσ hσn hσv hσv' _ ih => exact .againF hB hl hc hσ hσn hσv hσv' ih
+  | againR hB hl hc hσ hσn hσv hσv' _ ih => exact .againR hB hl hc hσ hσn hσv hσv' ih
 
 end Flick.Equiv

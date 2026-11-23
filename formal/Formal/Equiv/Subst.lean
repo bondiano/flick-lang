@@ -1,236 +1,12 @@
-import Formal.Equiv.Mono
+import Formal.Equiv.SubstRename
 
 /-!
-# Contextual equivalence: renaming and substitution of related terms
-
-Related terms stay related under renaming (`Sim.rename`) and under related substitutions
-(`Sim.subst`): two substitutions are related when their terms are, at either index, and the right
-ones hold no run-time form (`SubR`), as the terms the steps substitute are values
-(`Sim.value_noIns`). A rewrite is closed under both by its form; the states of the run of `born`
-name only closed values (`bornS`, `bornV`).
+# Contextual equivalence: substitution of related terms
 -/
 
 namespace Flick.Equiv
 
 open Flick.Elab (All2)
-
-theorem liftS_has {n : Nat} {σ : Nat → Tm} {i : Nat} {s : Site} (h : (liftS n σ i).Has s) :
-    ∃ j, (σ j).Has s := by
-  unfold liftS at h
-  split at h
-  · simp [Tm.Has] at h
-  · exact ⟨_, (Tm.has_rename _ _ _).mp h⟩
-
-/-- Substitution writes what the term writes and what the substituted terms write. -/
-theorem Tm.has_subst_inv : ∀ (e : Tm) (σ : Nat → Tm) (s : Site), (e.subst σ).Has s →
-    e.Has s ∨ ∃ i, (σ i).Has s := by
-  intro e
-  induction e <;> intro σ s h <;> simp only [Tm.subst, Tm.Has] at h ⊢ <;> grind [liftS_has]
-
-theorem Tm.NoIns.subst {e : Tm} (h : e.NoIns) {σ : Nat → Tm} (hσ : ∀ i, (σ i).NoIns) :
-    (e.subst σ).NoIns := fun h' => by
-  rcases Tm.has_subst_inv _ _ _ h' with h' | ⟨i, h'⟩
-  · exact h h'
-  · exact hσ i h'
-
-theorem _root_.Flick.Tm.Spine.rename : ∀ {t : Tm}, t.Spine → ∀ ξ : Nat → Nat, (t.rename ξ).Spine := by
-  intro t
-  induction t <;> intro h ξ <;> simp only [Tm.Spine, Tm.rename] at h ⊢
-  all_goals first
-    | trivial
-    | exact h.elim
-    | (apply_assumption; exact h)
-    | (rcases h with h | ⟨hv, h⟩
-       · exact .inl (by apply_assumption; exact h)
-       · exact .inr ⟨hv.rename, by apply_assumption; exact h⟩)
-
-theorem _root_.Flick.Tm.Spine.subst : ∀ {t : Tm}, t.Spine → ∀ σ : Nat → Tm, (t.subst σ).Spine := by
-  intro t
-  induction t <;> intro h σ <;> simp only [Tm.Spine, Tm.subst] at h ⊢
-  all_goals first
-    | trivial
-    | exact h.elim
-    | (apply_assumption; exact h)
-    | (rcases h with h | ⟨hv, h⟩
-       · exact .inl (by apply_assumption; exact h)
-       · exact .inr ⟨hv.subst, by apply_assumption; exact h⟩)
-
-theorem _root_.Flick.Tm.Spine.not_value : ∀ {t : Tm}, t.Spine → ¬ Value t := by
-  intro t
-  induction t with
-  | app f a ihf iha =>
-    intro h hv
-    cases hv with
-    | ctorApp hf _ he => rcases h with h | ⟨_, h⟩; exact ihf h hf; exact iha h he
-    | constApp _ he => rcases h with h | ⟨_, h⟩; simp [Tm.Spine] at h; exact iha h he
-  | rcons l e r ihe ihr =>
-    intro h hv
-    cases hv with
-    | rcons h₁ h₂ => rcases h with h | ⟨_, h⟩; exact ihe h h₁; exact ihr h h₂
-  | _ => intro h hv; simp only [Tm.Spine] at h <;> first | exact h.elim | (cases hv; done)
-
-variable {W : World}
-
-/-- A value on the right of related terms holds no run-time form. -/
-theorem Sim.value_noIns {x : Pos} {a b : Tm} (h : Sim W x a b) : Value b → b.NoIns := by
-  induction h with
-  | lam _ hn => intro _; simpa [Tm.NoIns, Tm.Has] using hn
-  | fix _ hn => intro _; simpa [Tm.NoIns, Tm.Has] using hn
-  | task _ hn => intro _; simpa [Tm.NoIns, Tm.Has] using hn
-  | drec _ hn => intro _; simpa [Tm.NoIns, Tm.Has] using hn
-  | @app _ _ f' _ a' _ _ _ ih₁ ih₂ | @appK _ f' _ a' _ _ _ ih₁ ih₂ | @appV _ f' _ a' _ _ _ ih₁ ih₂ =>
-    intro hv
-    have : Value f' ∧ Value a' := by cases hv with
-      | ctorApp hf _ he => exact ⟨hf, he⟩
-      | constApp _ he => exact ⟨.const, he⟩
-    have h₁ := ih₁ this.1; have h₂ := ih₂ this.2
-    simp_all [Tm.NoIns, Tm.Has]
-  | rcons _ _ _ ih₁ ih₂ | rconsK _ _ _ ih₁ ih₂ | rconsV _ _ _ ih₁ ih₂ =>
-    intro hv
-    cases hv with
-    | rcons h₁ h₂ => have h₁ := ih₁ h₁; have h₂ := ih₂ h₂; simp_all [Tm.NoIns, Tm.Has]
-  | dropA _ _ ih | dropB _ _ _ ih | forceA _ ih | jL _ _ _ ih | o4Bind _ _ ih => exact ih
-  | bornV _ _ _ _ hn => intro _; exact hn
-  | dead _ hn => intro _; exact hn
-  | hloc => intro _; simp [Tm.NoIns, Tm.Has]
-  | o4A | o4AllocR | o4Settle => intro hv; cases hv
-  | o4B _ _ hf' _ _ _ _ hne hnb =>
-    subst hf'; intro _; simp only [Tm.NoIns, Tm.Has]
-    intro h; rcases h with h | h
-    · exact Tm.NoIns.rename (· + 2) hne h
-    · exact hnb h
-  | o4Fix1 _ _ _ hf' _ _ _ _ hnb =>
-    subst hf'; intro _; simp only [Tm.NoIns, Tm.Has]
-    exact Tm.NoIns.subst hnb fun i => by cases i <;> simp [inst, Tm.NoIns, Tm.Has]
-  | o4Fix2 _ _ _ hf' _ _ _ _ hne hnb =>
-    subst hf'; intro _; simp only [Tm.NoIns, Tm.Has]
-    intro h; rcases h with h | h
-    · exact Tm.NoIns.rename (· + 2) hne h
-    · exact hnb h
-  | o4Alloc1 _ _ hs' _ _ _ _ hnc =>
-    subst hs'; intro _
-    exact Tm.NoIns.subst hnc fun i => by cases i <;> simp [inst, Tm.NoIns, Tm.Has]
-  | _ => intro hv; first | (cases hv; done) | simp [Tm.NoIns, Tm.Has]
-
-/-- A value is related to a value only by a congruence, so at any index. -/
-theorem Sim.value_any {x : Pos} {a b : Tm} (h : Sim W x a b) (ha : Value a) (hb : Value b) :
-    ∀ y, Sim W y a b := by
-  induction h with
-  | @app _ f f' a a' _ _ _ ih₁ ih₂ | @appK f f' a a' _ _ _ ih₁ ih₂ | @appV f f' a a' _ _ _ ih₁ ih₂ =>
-    intro y
-    have hfa : Value f ∧ Value a := by cases ha with
-      | ctorApp hf _ he => exact ⟨hf, he⟩
-      | constApp _ he => exact ⟨.const, he⟩
-    have hfb : Value f' ∧ Value a' := by cases hb with
-      | ctorApp hf _ he => exact ⟨hf, he⟩
-      | constApp _ he => exact ⟨.const, he⟩
-    by_cases hy : y = .park
-    · subst hy; exact .appV hfa.1 (ih₁ hfa.1 hfb.1 _) (ih₂ hfa.2 hfb.2 _)
-    · exact .app hy (ih₁ hfa.1 hfb.1 y) (ih₂ hfa.2 hfb.2 y)
-  | rcons _ _ _ ih₁ ih₂ | rconsK _ _ _ ih₁ ih₂ | rconsV _ _ _ ih₁ ih₂ =>
-    intro y
-    cases ha with
-    | rcons ha₁ ha₂ => cases hb with
-      | rcons hb₁ hb₂ =>
-        by_cases hy : y = .park
-        · subst hy; exact .rconsV ha₁ (ih₁ ha₁ hb₁ _) (ih₂ ha₂ hb₂ _)
-        · exact .rcons hy (ih₁ ha₁ hb₁ y) (ih₂ ha₂ hb₂ y)
-  | dropA | dropB | forceA | jL | bornV | dead | bornA | bornB
-  | o4B | o4Alloc1 | o4Bind | o4Settle => cases ha
-  | bornS _ _ _ hs => rcases hs with rfl | rfl | rfl | rfl | rfl <;> cases ha
-  | dropC | forceC | jR | o4A | o4AllocR => cases hb
-  | hloc hB hH => intro _; exact .hloc hB hH
-  | o4Fix1 hB hr hf hf' hcl hpe he hbd hnb _ _ => intro _; exact .o4Fix1 hB hr hf hf' hcl hpe he hbd hnb
-  | o4Fix2 hB hl hf hf' hcl hpe he hbd hne hnb _ _ => intro _; exact .o4Fix2 hB hl hf hf' hcl hpe he hbd hne hnb
-  | _ => intro y; first | (cases ha; done) | (constructor <;> assumption)
-
-/-- Related substitutions: related terms at either index, variables or values on both sides, and
-the right ones without a run-time form. -/
-def SubR (W : World) (σ σ' : Nat → Tm) : Prop :=
-  ∀ i, (∀ y, y ≠ .park → Sim W y (σ i) (σ' i)) ∧ (σ' i).NoIns ∧
-    ((∃ j, σ i = .var j) ∨ Value (σ i)) ∧ ((∃ j, σ' i = .var j) ∨ Value (σ' i))
-
-theorem liftR_succ (ξ : Nat → Nat) : (liftR 1 ξ) ∘ (· + 1) = (· + 1) ∘ ξ := by
-  funext i; simp [liftR]
-
-theorem rename_up (c : Tm) (ξ : Nat → Nat) :
-    (c.rename (· + 1)).rename (liftR 1 ξ) = (c.rename ξ).rename (· + 1) := by
-  rw [Tm.rename_rename, Tm.rename_rename, liftR_succ]
-
-theorem subst_up (c : Tm) (σ : Nat → Tm) :
-    (c.rename (· + 1)).subst (liftS 1 σ) = (c.subst σ).rename (· + 1) := by
-  rw [Tm.subst_rename, Tm.rename_subst]
-  congr 1
-
-theorem BornSt.rename {l : Nat} {v t : Tm} (hc : v.Closed) (h : BornSt l v t) (ξ : Nat → Nat) :
-    t.rename ξ = t := by
-  rcases h with rfl | rfl | rfl | rfl | rfl <;> simp [Tm.rename, liftR, hc.rename]
-
-theorem BornSt.subst {l : Nat} {v t : Tm} (hc : v.Closed) (h : BornSt l v t) (σ : Nat → Tm) :
-    t.subst σ = t := by
-  rcases h with rfl | rfl | rfl | rfl | rfl <;> simp [Tm.subst, Tm.rename, liftS, hc.subst]
-
-theorem Sim.rename {x : Pos} {a b : Tm} (h : Sim W x a b) :
-    ∀ ξ : Nat → Nat, Sim W x (a.rename ξ) (b.rename ξ) := by
-  induction h with
-  | dropA hb _ ih =>
-    intro ξ; subst hb; simp only [Tm.rename]; exact .dropA (rename_up _ _) (ih ξ)
-  | dropB hn hb _ ih =>
-    intro ξ; subst hb; simp only [Tm.rename]; exact .dropB hn (rename_up _ _) (ih ξ)
-  | dropC hb hn _ ih =>
-    intro ξ; subst hb; simp only [Tm.rename]; exact .dropC (rename_up _ _) (Tm.NoIns.rename ξ hn) (ih ξ)
-  | forceC hn _ ih => intro ξ; exact .forceC (Tm.NoIns.rename ξ hn) (ih ξ)
-  | bornA hB hv hv' _ ih =>
-    intro ξ; simp only [Tm.rename, liftR]; exact .bornA hB hv.rename hv'.rename (ih ξ)
-  | bornB hB hv hv' _ ih =>
-    intro ξ; simp only [Tm.rename, liftR]; exact .bornB hB hv.rename hv'.rename (ih ξ)
-  | bornS hB hl hc hs =>
-    intro ξ; rw [hs.rename hc]; exact .bornS hB hl hc hs
-  | bornV hB hl hc hc' hn =>
-    intro ξ; simp only [Tm.rename]; rw [hc.rename, hc'.rename]; exact .bornV hB hl hc hc' hn
-  | dead hB hn => intro ξ; exact .dead hB (Tm.NoIns.rename ξ hn)
-  | hloc hB hH => intro _; exact .hloc hB hH
-  | o4A hB hf hbr hpe hpe' _ _ hne hnb ihe ihb =>
-    subst hf hbr; intro ξ; simp only [Tm.rename]
-    exact .o4A hB (by simp only [rename_up2]) (rot_rename _ _)
-      (hpe.rename ξ) (hpe'.rename ξ) (ihe ξ) (ihb _) (Tm.NoIns.rename ξ hne) (Tm.NoIns.rename _ hnb)
-  | o4B hB hbr hf' hpe hpe' _ _ hne hnb ihe ihb =>
-    subst hbr hf'; intro ξ; simp only [Tm.rename]
-    exact .o4B hB (rot_rename _ _) (by simp only [rename_up2])
-      (hpe.rename ξ) (hpe'.rename ξ) (ihe ξ) (ihb _) (Tm.NoIns.rename ξ hne) (Tm.NoIns.rename _ hnb)
-  | o4Fix1 hB hr hf hf' hcl hpe he _ hnb _ ihb =>
-    subst hf hf'; intro ξ; simp only [Tm.rename]
-    exact .o4Fix1 hB hr (by rw [rename_up2, hcl.rename]) (subst_loc_rename2 _ _ _)
-      hcl hpe he (ihb _) (Tm.NoIns.rename _ hnb)
-  | o4Fix2 hB hl hf hf' hcl hpe he _ hne hnb _ ihb =>
-    subst hf hf'; intro ξ; simp only [Tm.rename]
-    exact .o4Fix2 hB hl (subst_loc_rename2 _ _ _) (by rw [rename_up2, hcl.rename])
-      hcl hpe he (ihb _) hne (Tm.NoIns.rename _ hnb)
-  | o4Alloc1 hB hr hs' hcl hpe he _ hnc _ ihc =>
-    subst hs'; intro ξ; simp only [Tm.rename, hcl.rename]
-    exact .o4Alloc1 hB hr (subst_loc_rename _ _ _) hcl hpe he (ihc _) (Tm.NoIns.rename _ hnc)
-  | o4AllocR hB hl hs hcl hpe he _ _ ihc =>
-    subst hs; intro ξ; simp only [Tm.rename, hcl.rename]
-    exact .o4AllocR hB hl (subst_loc_rename _ _ _) hcl hpe he (ihc _)
-  | o4Bind hB _ ih =>
-    intro ξ; simp only [Tm.rename]
-    refine .o4Bind hB ?_
-    rw [← subst_loc_rename]; exact ih ξ
-  | o4Settle hB hH hhl hce hct hpt =>
-    intro ξ; simp only [Tm.rename]; rw [hct.rename]
-    exact .o4Settle hB hH hhl hce hct hpt
-  | appK hs _ _ ih₁ ih₂ => intro ξ; exact .appK (hs.rename ξ) (ih₁ ξ) (ih₂ ξ)
-  | appV hv _ _ ih₁ ih₂ => intro ξ; exact .appV hv.rename (ih₁ ξ) (ih₂ ξ)
-  | rconsK hs _ _ ih₁ ih₂ => intro ξ; exact .rconsK (hs.rename ξ) (ih₁ ξ) (ih₂ ξ)
-  | rconsV hv _ _ ih₁ ih₂ => intro ξ; exact .rconsV hv.rename (ih₁ ξ) (ih₂ ξ)
-  | updK hs _ _ ih₁ ih₂ => intro ξ; exact .updK (hs.rename ξ) (ih₁ ξ) (ih₂ ξ)
-  | updV hv _ _ ih₁ ih₂ => intro ξ; exact .updV hv.rename (ih₁ ξ) (ih₂ ξ)
-  | aconsD hd hn _ ih =>
-    intro ξ; simp only [Tm.rename]
-    exact .aconsD (hd.imp (·.rename _) (·.rename _)) (Tm.NoIns.rename _ hn) (ih ξ)
-  | _ =>
-    intro ξ; simp only [Tm.rename]
-    constructor <;> first | assumption | exact Tm.NoIns.rename _ ‹_› | apply_assumption
 
 theorem SubR.lift {σ σ' : Nat → Tm} (h : SubR W σ σ') (n : Nat) :
     SubR W (liftS n σ) (liftS n σ') := by
@@ -312,6 +88,48 @@ theorem Sim.subst {x : Pos} {a b : Tm} (h : Sim W x a b) :
   | o4Settle hB hH hhl hce hct hpt =>
     intro σ σ' _; simp only [Tm.subst]; rw [hct.subst]
     exact .o4Settle hB hH hhl hce hct hpt
+  | doneF hB hd hv' hc' hn =>
+    intro σ σ' _; simp only [Tm.subst]; rw [hc'.subst]; exact .doneF hB hd hv' hc' hn
+  | doneR hB hd hv hc =>
+    intro σ σ' _; simp only [Tm.subst]; rw [hc.subst]; exact .doneR hB hd hv hc
+  | againF1 hB hc _ hev hev' _ hσn hσv hσv' ihe ihσ =>
+    intro τ τ' hτ; simp only [Tm.subst, subForce_subst, subVar_subst]
+    exact .againF1 hB hc (fun y hy => ihe y hy τ τ' hτ)
+      (varVal_subst hev hτ.leftVarVal) (varVal_subst hev' hτ.rightVarVal)
+      (fun i y hy => ihσ i y hy τ τ' hτ) (fun i => Tm.NoIns.subst (hσn i) hτ.noIns)
+      (fun i => varVal_subst (hσv i) hτ.leftVarVal) (fun i => varVal_subst (hσv' i) hτ.rightVarVal)
+  | againF2 hx hB hl _ hc _ hσn hσv hσv' iht ihσ =>
+    intro τ τ' hτ; simp only [Tm.subst, subForce_subst, subVar_subst]
+    exact .againF2 hx hB hl (iht τ τ' hτ) hc (fun i y hy => ihσ i y hy τ τ' hτ)
+      (fun i => Tm.NoIns.subst (hσn i) hτ.noIns)
+      (fun i => varVal_subst (hσv i) hτ.leftVarVal) (fun i => varVal_subst (hσv' i) hτ.rightVarVal)
+  | againF3 hB hd hv hv' hcv hcv' hnv' _ hc _ hσn hσv hσv' ihv ihσ =>
+    intro τ τ' hτ; simp only [Tm.subst, hcv.subst, hcv'.subst, subForce_subst, subVar_subst]
+    exact .againF3 hB hd hv hv' hcv hcv' hnv' (by simpa [hcv.subst, hcv'.subst] using ihv τ τ' hτ) hc
+      (fun i y hy => ihσ i y hy τ τ' hτ) (fun i => Tm.NoIns.subst (hσn i) hτ.noIns)
+      (fun i => varVal_subst (hσv i) hτ.leftVarVal) (fun i => varVal_subst (hσv' i) hτ.rightVarVal)
+  | againR1 hB hc _ hev hev' _ hσn hσv hσv' ihe ihσ =>
+    intro τ τ' hτ; simp only [Tm.subst, subForce_subst, subVar_subst]
+    exact .againR1 hB hc (fun y hy => ihe y hy τ τ' hτ)
+      (varVal_subst hev hτ.leftVarVal) (varVal_subst hev' hτ.rightVarVal)
+      (fun i y hy => ihσ i y hy τ τ' hτ) (fun i => Tm.NoIns.subst (hσn i) hτ.noIns)
+      (fun i => varVal_subst (hσv i) hτ.leftVarVal) (fun i => varVal_subst (hσv' i) hτ.rightVarVal)
+  | againR2 hx hB hl _ hc _ hσn hσv hσv' iht ihσ =>
+    intro τ τ' hτ; simp only [Tm.subst, subForce_subst, subVar_subst]
+    exact .againR2 hx hB hl (iht τ τ' hτ) hc (fun i y hy => ihσ i y hy τ τ' hτ)
+      (fun i => Tm.NoIns.subst (hσn i) hτ.noIns)
+      (fun i => varVal_subst (hσv i) hτ.leftVarVal) (fun i => varVal_subst (hσv' i) hτ.rightVarVal)
+  | againR3 hB hd hv hv' hcv hcv' hnv' _ hc _ hσn hσv hσv' ihv ihσ =>
+    intro τ τ' hτ; simp only [Tm.subst, hcv.subst, hcv'.subst, subForce_subst, subVar_subst]
+    exact .againR3 hB hd hv hv' hcv hcv' hnv' (by simpa [hcv.subst, hcv'.subst] using ihv τ τ' hτ) hc
+      (fun i y hy => ihσ i y hy τ τ' hτ) (fun i => Tm.NoIns.subst (hσn i) hτ.noIns)
+      (fun i => varVal_subst (hσv i) hτ.leftVarVal) (fun i => varVal_subst (hσv' i) hτ.rightVarVal)
+  | letRaise hB hv hv' _ ih =>
+    intro τ τ' hτ; simp only [Tm.subst]; exact .letRaise hB hv.subst hv'.subst (ih τ τ' hτ)
+  | letUnw hB hl _ ih =>
+    intro τ τ' hτ; simp only [Tm.subst]; exact .letUnw hB hl (ih τ τ' hτ)
+  | letTodo hB =>
+    intro τ τ' _; simp only [Tm.subst]; exact .letTodo hB
   | appK hs _ _ ih₁ ih₂ => intro σ σ' hσ; exact .appK (hs.subst σ) (ih₁ _ _ hσ) (ih₂ _ _ hσ)
   | appV hv _ _ ih₁ ih₂ => intro σ σ' hσ; exact .appV hv.subst (ih₁ _ _ hσ) (ih₂ _ _ hσ)
   | rconsK hs _ _ ih₁ ih₂ => intro σ σ' hσ; exact .rconsK (hs.subst σ) (ih₁ _ _ hσ) (ih₂ _ _ hσ)
@@ -328,5 +146,136 @@ theorem Sim.subst {x : Pos} {a b : Tm} (h : Sim W x a b) :
       | (apply_assumption <;> first | exact hσ | exact hσ.lift _)
       | exact Tm.NoIns.subst ‹_› (hσ.lift _).noIns
       | exact Tm.NoIns.subst ‹_› hσ.noIns
+
+/-- Substitutions used when firing O2a's `let`: related at `any`, right side has `NoIns`, and
+every slot is either related at `top` or has `LzShape` on one side (so it cannot stand at `top`). -/
+def SubD (W : World) (σ₁ σ₂ : Nat → Tm) : Prop :=
+  ∀ i, Sim W .any (σ₁ i) (σ₂ i) ∧ (σ₂ i).NoIns ∧
+    (Sim W .top (σ₁ i) (σ₂ i) ∨ (σ₁ i).LzShape ∨ (σ₂ i).LzShape)
+
+theorem SubD.noIns {σ₁ σ₂ : Nat → Tm} (h : SubD W σ₁ σ₂) : ∀ i, (σ₂ i).NoIns := fun i => (h i).2.1
+
+theorem SubD.lift {σ₁ σ₂ : Nat → Tm} (h : SubD W σ₁ σ₂) (n : Nat) :
+    SubD W (liftS n σ₁) (liftS n σ₂) := by
+  intro i
+  unfold liftS
+  split
+  · exact ⟨.var (by decide), by simp [Tm.NoIns, Tm.Has], .inl (.var (by decide))⟩
+  · exact ⟨(h _).1.rename _, Tm.NoIns.rename _ (h _).2.1,
+      (h _).2.2.imp (·.rename _) (fun h' => h'.imp (·.rename _) (·.rename _))⟩
+
+/-- Substituting a `SubD` pair into a source term `c₀` yields related terms whenever neither side
+puts a lazy/force form at a `top` position. -/
+theorem _root_.Flick.Tm.Src.subst_any :
+    ∀ {c₀ : Tm}, c₀.Src → ∀ {σ₁ σ₂ : Nat → Tm}, SubD W σ₁ σ₂ →
+      ∀ {x : Pos}, x ≠ .park → ¬ (c₀.subst σ₁).LzTop x → ¬ (c₀.subst σ₂).LzTop x →
+        Sim W x (c₀.subst σ₁) (c₀.subst σ₂) := by
+  have any : Pos.any ≠ .park := by decide
+  have top : Pos.top ≠ .park := by decide
+  have fr_any : ∀ {x : Pos}, x ≠ .park → x.fr = .any := fun {x} hx => by cases x <;> simp_all
+  intro c₀
+  induction c₀ with
+  | var i =>
+    intro _ σ₁ σ₂ hσ x hx h₁ h₂
+    cases x with
+    | any => exact (hσ i).1
+    | top =>
+      rcases (hσ i).2.2 with ht | hs₁ | hs₂
+      · exact ht
+      · exact (h₁ (.here hs₁)).elim
+      · exact (h₂ (.here hs₂)).elim
+    | park => exact (hx rfl).elim
+  | lit => intro _ _ _ _ _ _ _ _; exact .lit
+  | const => intro _ _ _ _ _ _ _ _; exact .const
+  | ctor => intro _ _ _ _ _ _ _ _; exact .ctor
+  | rnil => intro _ _ _ _ _ _ _ _; exact .rnil
+  | anil => intro _ _ _ _ _ _ _ _; exact .anil
+  | todo => intro _ _ _ _ _ _ _ _; exact .todo
+  | glob => intro _ _ _ _ _ _ _ _; exact .glob
+  | lam b ih =>
+    intro hc σ₁ σ₂ hσ x _ h₁ h₂
+    exact .lam (ih hc (hσ.lift 1) any (h₁ ∘ .lam) (h₂ ∘ .lam))
+      (Tm.NoIns.subst (Tm.Src.noIns (e := b) hc) (hσ.lift 1).noIns)
+  | fix b ih =>
+    intro hc σ₁ σ₂ hσ x _ h₁ h₂
+    exact .fix (ih hc (hσ.lift 2) any (h₁ ∘ .fix) (h₂ ∘ .fix))
+      (Tm.NoIns.subst (Tm.Src.noIns (e := b) hc) (hσ.lift 2).noIns)
+  | task b ih =>
+    intro hc σ₁ σ₂ hσ x _ h₁ h₂
+    exact .task (ih hc hσ any (h₁ ∘ .task) (h₂ ∘ .task))
+      (Tm.NoIns.subst (Tm.Src.noIns (e := b) hc) hσ.noIns)
+  | await b ih =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .await ((fr_any hx).symm ▸ ih hc hσ any (h₁ ∘ .await) (h₂ ∘ .await))
+  | lazy b ih =>
+    intro hc σ₁ σ₂ hσ x _ h₁ h₂
+    exact .lazy (ih hc hσ any (h₁ ∘ .lazy) (h₂ ∘ .lazy))
+  | force b ih =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .force ((fr_any hx).symm ▸ ih hc hσ any (h₁ ∘ .force) (h₂ ∘ .force))
+  | raise b ih =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .raise ((fr_any hx).symm ▸ ih hc hσ any (h₁ ∘ .raise) (h₂ ∘ .raise))
+  | scope b ih =>
+    intro hc σ₁ σ₂ hσ x _ h₁ h₂
+    exact .scope (ih hc (hσ.lift 1) any (h₁ ∘ .scope) (h₂ ∘ .scope))
+  | proj b l ih =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .proj ((fr_any hx).symm ▸ ih hc hσ any (h₁ ∘ .proj) (h₂ ∘ .proj))
+  | drec c r ih =>
+    intro hc σ₁ σ₂ hσ x _ h₁ h₂
+    exact .drec (ih hc hσ top (h₁ ∘ .drec) (h₂ ∘ .drec))
+      (Tm.NoIns.subst (Tm.Src.noIns (e := r) hc) hσ.noIns)
+  | app f a ih₁ ih₂ =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .app hx (ih₁ hc.1 hσ hx (h₁ ∘ .appL) (h₂ ∘ .appL))
+      (ih₂ hc.2 hσ hx (h₁ ∘ .appR) (h₂ ∘ .appR))
+  | let_ e b ih₁ ih₂ =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .let_ ((fr_any hx).symm ▸ ih₁ hc.1 hσ any (h₁ ∘ .letL) (h₂ ∘ .letL))
+      (ih₂ hc.2 (hσ.lift 1) any (h₁ ∘ .letR) (h₂ ∘ .letR))
+  | letrec f b ih₁ ih₂ =>
+    intro hc σ₁ σ₂ hσ x _ h₁ h₂
+    exact .letrec (ih₁ hc.1 (hσ.lift 2) any (h₁ ∘ .letrecL) (h₂ ∘ .letrecL))
+      (Tm.NoIns.subst hc.1.noIns (hσ.lift 2).noIns)
+      (ih₂ hc.2 (hσ.lift 1) any (h₁ ∘ .letrecR) (h₂ ∘ .letrecR))
+  | rcons l e r ih₁ ih₂ =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .rcons hx (ih₁ hc.1 hσ hx (h₁ ∘ .rconsL) (h₂ ∘ .rconsL))
+      (ih₂ hc.2 hσ hx (h₁ ∘ .rconsR) (h₂ ∘ .rconsR))
+  | update e l a ih₁ ih₂ =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .update hx (ih₁ hc.1 hσ any (h₁ ∘ .updL) (h₂ ∘ .updL))
+      (ih₂ hc.2 hσ any (h₁ ∘ .updR) (h₂ ∘ .updR))
+  | match_ e al ih₁ ih₂ =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .match_ ((fr_any hx).symm ▸ ih₁ hc.1 hσ any (h₁ ∘ .matchL) (h₂ ∘ .matchL))
+      (ih₂ hc.2 hσ top (h₁ ∘ .matchR) (h₂ ∘ .matchR))
+  | acons p b r ihb ihr =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    by_cases hd : (b.subst (liftS p.binds σ₁)).LzTop .any ∨ (b.subst (liftS p.binds σ₂)).LzTop .any
+    · exact .aconsD hd (Tm.NoIns.subst hc.1.noIns (hσ.lift p.binds).noIns)
+        (ihr hc.2 hσ hx (h₁ ∘ .acons) (h₂ ∘ .acons))
+    · exact .acons (ihb hc.1 (hσ.lift p.binds) any (fun h => hd (.inl h)) (fun h => hd (.inr h)))
+        (ihr hc.2 hσ hx (h₁ ∘ .acons) (h₂ ∘ .acons))
+  | aguard p g b r ih₁ ih₂ ih₃ =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .aguard (ih₁ hc.1 (hσ.lift p.binds) any (h₁ ∘ .aguardG) (h₂ ∘ .aguardG))
+      (ih₂ hc.2.1 (hσ.lift p.binds) any (h₁ ∘ .aguardB) (h₂ ∘ .aguardB))
+      (ih₃ hc.2.2 hσ hx (h₁ ∘ .aguardR) (h₂ ∘ .aguardR))
+  | try_ e al ih₁ ih₂ =>
+    intro hc σ₁ σ₂ hσ x hx h₁ h₂
+    exact .try_ ((fr_any hx).symm ▸ ih₁ hc.1 hσ any (h₁ ∘ .tryL) (h₂ ∘ .tryL))
+      (ih₂ hc.2 hσ top (h₁ ∘ .tryR) (h₂ ∘ .tryR))
+  | handle v al ih₁ ih₂ =>
+    intro hc σ₁ σ₂ hσ x _ h₁ h₂
+    exact .handle (ih₁ hc.1 hσ top (h₁ ∘ .handleV) (h₂ ∘ .handleV))
+      (ih₂ hc.2 hσ top (h₁ ∘ .handleA) (h₂ ∘ .handleA))
+  | hdl E al r b ih₁ ih₂ ih₃ =>
+    intro hc σ₁ σ₂ hσ x _ h₁ h₂
+    exact .hdl (ih₁ hc.1 hσ top (h₁ ∘ .hdlA) (h₂ ∘ .hdlA))
+      (ih₂ hc.2.1 hσ any (h₁ ∘ .hdlR) (h₂ ∘ .hdlR))
+      (ih₃ hc.2.2 hσ any (h₁ ∘ .hdlE) (h₂ ∘ .hdlE))
+  | _ => intro hc; exact hc.elim
 
 end Flick.Equiv

@@ -15,8 +15,8 @@ namespace Flick.Equiv
 to force and the frame of a cell to settle. -/
 def _root_.Flick.Tm.pot : Tm → Nat
   | .var _ | .lit _ | .loc _ | .const _ | .ctor _ | .rnil | .anil | .todo | .cap _ | .own _
-  | .glob _ | .kont _ _ | .hole _ => 0
-  | .lam b | .fix b | .task b | .await b | .raise b | .scope b | .proj b _ | .drec _ b
+  | .glob _ | .kont _ _ | .hole _ | .lam _ | .fix _ | .task _ | .drec _ _ => 0
+  | .await b | .raise b | .scope b | .proj b _
   | .inside _ b | .hdone _ b | .unw _ _ b => b.pot
   | .lazy b => b.pot + 1
   | .force b => b.pot + 2
@@ -27,6 +27,13 @@ def _root_.Flick.Tm.pot : Tm → Nat
   | .aguard _ a b c | .hdl _ a b c | .hwith _ _ _ a b c | .hkarm _ _ _ a b c =>
     a.pot + b.pot + c.pot
   | .hctl _ _ _ _ _ a b c d => a.pot + b.pot + c.pot + d.pot
+
+theorem _root_.Flick.Value.pot_zero {v : Tm} (hv : Value v) : v.pot = 0 := by
+  induction hv with
+  | rcons _ _ ih₁ ih₂ => simp [Tm.pot, ih₁, ih₂]
+  | ctorApp _ _ _ ih₁ ih₂ => simp [Tm.pot, ih₁, ih₂]
+  | constApp _ _ ih => simp [Tm.pot, ih]
+  | _ => rfl
 
 theorem _root_.Flick.Tm.pot_rename : ∀ (e : Tm) (ξ : Nat → Nat), (e.rename ξ).pot = e.pot := by
   intro e

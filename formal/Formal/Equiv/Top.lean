@@ -37,7 +37,8 @@ inductive Pos
 def _root_.Flick.Tm.LzShape : Tm → Prop
   | .lazy _ => True
   | .let_ (.lazy _) _ => True
-  | .force (.lazy _) => True
+  | .force _ => True
+  | .let_ (.force _) _ => True
   | _ => False
 
 /-- `e` has a term that makes a lazy cell at a place a pattern reads, outside the bodies of
@@ -92,14 +93,16 @@ theorem _root_.Flick.Tm.LzShape.rename {e : Tm} (h : e.LzShape) (ξ : Nat → Na
   match e, h with
   | .lazy _, _ => trivial
   | .let_ (.lazy _) _, _ => trivial
-  | .force (.lazy _), _ => trivial
+  | .force _, _ => trivial
+  | .let_ (.force _) _, _ => trivial
 
 theorem _root_.Flick.Tm.LzShape.subst {e : Tm} (h : e.LzShape) (σ : Nat → Tm) :
     (e.subst σ).LzShape := by
   match e, h with
   | .lazy _, _ => trivial
   | .let_ (.lazy _) _, _ => trivial
-  | .force (.lazy _), _ => trivial
+  | .force _, _ => trivial
+  | .let_ (.force _) _, _ => trivial
 
 theorem _root_.Flick.Tm.LzTop.rename {x : Pos} {e : Tm} (h : e.LzTop x) :
     ∀ ξ : Nat → Nat, (e.rename ξ).LzTop x := by

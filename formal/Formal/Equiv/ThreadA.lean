@@ -30,17 +30,24 @@ theorem dec_act {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ : Lis
     (hR : W.R = root) (hglob : ∀ g v, root.glob g = some v → v.Src)
     (hcl₁ : (plug E r).Closed) (hcl₁' : t'.Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
+    (hrun : ∀ m, 0 < (plug E r).settleCount m → Running μ m)
+    (hdone₁ : ∀ (i : Nat) (o : Tm), μ[i]? = some (.done o) → DoneCell o)
+    (hdone₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ∀ (i : Nat) (o : Tm), μ''[i]? = some (.done o) → DoneCell o)
+    (hzl : ¬ t'.LzTop .any)
+    (hzr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ¬ t''.LzTop .any)
     (hs : Step root l Λ μ (plug E r) (.cfg Λ' μ' t'))
     (hd : ∃ W' μ₂' E₀ E₁ a b E₂, RJ W μ₂ t₂ W' μ₂' (plug E₂ b) ∧ E = E₀ ++ E₁ ∧
       a = plug E₀ r ∧ FrL W' E₁ E₂ ∧ OkE E₂ ∧ Act W' a b) :
     Λ' = Λ ∧ KAns root W τ μ₂ t₂ μ μ' (plug E r) t' := by
   obtain ⟨W', μ₂', E₀, E₁, a, b, E₂, hj, rfl, rfl, hfr, hE₂, hact⟩ := hd
-  rw [plug_append] at hs hcl₁ ⊢
+  rw [plug_append] at hs hcl₁ hrun ⊢
   have hk₀ : KSteps root μ₂ t₂ μ₂' (plug E₂ (b)) := hj.ksteps
   obtain ⟨rfl, W'', μ₂'', t₂'', hW, hk, ht, hst', hko⟩ :=
     act_sim (τ := τ) (fun G hG => hE G (List.mem_append_right _ hG)) hE₂ hfr hact (hj.st _ hst)
       (hj.le.R.symm.trans hR) hglob hcl₁ hcl₁'
-      (fun μ'' t'' h => hcl₂ μ'' t'' (hk₀.trans h)) hs
+      (fun μ'' t'' h => hcl₂ μ'' t'' (hk₀.trans h))
+      hrun hdone₁ (fun μ'' t'' h => hdone₂ μ'' t'' (hk₀.trans h))
+      hzl (fun μ'' t'' h => hzr μ'' t'' (hk₀.trans h)) hs
   refine ⟨rfl, W'', μ₂'', t₂'', hj.le.trans hW, ?_, ht, hst', hko.mono hj.le⟩
   rcases hk with hk | ⟨rfl, rfl, hz⟩
   · exact .inl (hk₀.pos hk)
@@ -83,16 +90,23 @@ theorem pure_sim {root : Roots} {μ μ₂ : List Tm} {τ : Option (Nat × Nat)}
     (hcl₁ : (plug E r).Closed) (hcl₁' : (plug E r').Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
     (hmvl : (plug E r).MatchVals) (hmvr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.MatchVals)
+    (hrun : ∀ m, 0 < (plug E r).settleCount m → Running μ m)
+    (hdone₁ : ∀ (i : Nat) (o : Tm), μ[i]? = some (.done o) → DoneCell o)
+    (hdone₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ∀ (i : Nat) (o : Tm), μ''[i]? = some (.done o) → DoneCell o)
     (hzl : ¬ (plug E r').LzTop .any)
     (hzr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ¬ t''.LzTop .any) :
     KAns root W τ μ₂ t₂ μ μ (plug E r) (plug E r') := by
   have hr := hh.redex
   rcases ht.dec hr.1 (fun _ _ he => Redex.app hr he) (fun _ _ _ he => by subst he; cases hh)
-      (fun ha => by cases hh <;> exact ha) _ _ rfl hE μ₂ (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
+      (fun ha => by cases hh <;> exact ha)
+      (fun _ _ he => by subst he; cases hh with | let_ hv => exact hv)
+      (fun _ _ he => by subst he; cases hh)
+      _ _ rfl hE μ₂ hst (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
     hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
     ⟨W', μ₂', E₂, n, a, b, hj, hfr, hE₂, rfl, hn, hs⟩
-  · exact (dec_act (τ := τ) (Λ := []) hE hst hR hglob hcl₁ hcl₁' hcl₂ (.pure hE hh) hd).2
-  · obtain ⟨W₁, μ₁, a₂, r₂', hj₁, hh₂, hs₂⟩ := phead_sim hh hs μ₂'
+  · exact (dec_act (τ := τ) (Λ := []) hE hst hR hglob hcl₁ hcl₁' hcl₂ hrun hdone₁ hdone₂ hzl hzr
+      (.pure hE hh) hd).2
+  · obtain ⟨W₁, μ₁, a₂, r₂', hj₁, hh₂, hs₂⟩ := phead_sim hh hs μ₂' (hj.st _ hst)
       (fun _ => ⟨plug_closed hcl₁, plug_closed (hcl₂ _ _ hj.ksteps)⟩)
       (hmvl.plug_inner hE)
       (fun _ _ ha => (hmvr _ _ (hj.ksteps.trans (ha.plug hE₂).ksteps)).plug_inner hE₂)
@@ -118,6 +132,9 @@ theorem rt_sim {root : Roots} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {τ :
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
     (hmvl : (plug E r).MatchVals) (hmvr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.MatchVals)
     (hcell : ∀ (l : Nat) (c : Tm), μ[l]? = some c → c.IsCell → ∃ c', μ'[l]? = some c' ∧ c'.IsCell)
+    (hrun : ∀ m, 0 < (plug E r).settleCount m → Running μ m)
+    (hdone₁ : ∀ (i : Nat) (o : Tm), μ[i]? = some (.done o) → DoneCell o)
+    (hdone₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ∀ (i : Nat) (o : Tm), μ''[i]? = some (.done o) → DoneCell o)
     (hzl : ¬ (plug E r').LzTop .any)
     (hzr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ¬ t''.LzTop .any) :
     Λ' = Λ ∧ KAns root W τ μ₂ t₂ μ μ' (plug E r) (plug E r') := by
@@ -128,11 +145,19 @@ theorem rt_sim {root : Roots} {Λ Λ' : List Rgn} {μ μ' μ₂ : List Tm} {τ :
     · exact Redex.app h he
     · cases F <;> simp [Frame.plug] at he <;> cases hh <;> (rename_i hv; cases hv)
     · cases F <;> simp [Frame.plug] at he <;> cases hh <;> (rename_i hv; cases hv)
+  have hset : ∀ l a, r = .settle l a → Final a := by
+    intro l a he; subst he
+    cases hh with
+    | settleVal hv => exact .inl hv
+    | settleRaise hv => exact .inr (.inl ⟨_, hv, rfl⟩)
+    | settleUnw => exact .inr (.inr ⟨_, _, _, rfl⟩)
   rcases ht.dec hh.not_value happ (fun _ _ _ he => by subst he; cases hh)
-      (fun ha => by cases hh <;> exact ha) _ _ rfl hE μ₂ (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
+      (fun ha => by cases hh <;> exact ha)
+      (fun _ _ he => by subst he; cases hh) hset
+      _ _ rfl hE μ₂ hst (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
     hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
     ⟨W', μ₂', E₂, n, a, b, hj, hfr, hE₂, rfl, hn, hs⟩
-  · exact dec_act hE hst hR hglob hcl₁ hcl₁' hcl₂ (.rt hE hh) hd
+  · exact dec_act hE hst hR hglob hcl₁ hcl₁' hcl₂ hrun hdone₁ hdone₂ hzl hzr (.rt hE hh) hd
   · obtain ⟨W₁, μ₁, r₁, W'', μ₂'', r₂', hj₁, hq, hW, hs₂, hst', hjk⟩ :=
       rhead_sim hh hreg hs (hj.st _ hst)
         ((hj.le.R.symm.trans hR) ▸ hglob)

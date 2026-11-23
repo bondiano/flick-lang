@@ -17,14 +17,14 @@ variable {W : World}
 
 /-- **The right side finishes** what the left side finished. -/
 theorem Sim.fcu {x : Pos} {w b : Tm} (h : Sim W x w b) (hx : x = .any) (hw : Final w)
-    (μ : List Tm) (hcl : W.B → w.Closed ∧ b.Closed) :
+    {μ₁ : List Tm} (μ : List Tm) (hst : StR W μ₁ μ) (hcl : W.B → w.Closed ∧ b.Closed) :
     ∃ W' μ' b', RJ W μ b W' μ' b' ∧ Final b' ∧ Sim W' .any w b' := by
   rcases hw with hv | ⟨v, hv, rfl⟩ | ⟨p, ℓ, a, rfl⟩
-  · obtain ⟨W', μ', b', r, hb, s⟩ := h.vcu hx hv W μ (World.le.refl _) hcl
+  · obtain ⟨W', μ', b', r, hb, s⟩ := h.vcu hx hv W μ (World.le.refl _) hst hcl
     exact ⟨W', μ', b', r, .inl hb, s⟩
-  · obtain ⟨W', μ', v', r, hv', s⟩ := h.rcu hx rfl hv W μ (World.le.refl _) hcl
+  · obtain ⟨W', μ', v', r, hv', s⟩ := h.rcu hx rfl hv W μ (World.le.refl _) hst hcl
     exact ⟨W', μ', _, r, .inr (.inl ⟨v', hv', rfl⟩), .raise s⟩
-  · obtain ⟨W', μ', ℓ', k, a', r, hl, s⟩ := h.ucu hx rfl W μ (World.le.refl _) hcl
+  · obtain ⟨W', μ', ℓ', k, a', r, hl, s⟩ := h.ucu hx rfl W μ (World.le.refl _) hst hcl
     exact ⟨W', μ', _, r, .inr (.inr ⟨p, ℓ', a', rfl⟩), .unw hl s⟩
 
 theorem RgsR.append {μ : List Tm} {τ : Option (Nat × Nat)} {Λ Λ₂ : List Rgn}

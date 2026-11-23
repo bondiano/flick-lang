@@ -10,7 +10,7 @@ open Flick.Elab (All2 IsAlts)
 
 variable {W : World}
 
-private theorem pure_base_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
+private theorem pure_base_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂) (hB : W.B)
     (hglob : ∀ g v, W.R.glob g = some v → v.Src)
     {r r' t : Tm} (hp : PHead r r' ∨ ∃ g, r = .glob g ∧ W.R.glob g = some r')
     (hpa : PureEval W.R r) (hpb : PureEval W.R t) (hs : Sim W .any r t) :
@@ -27,6 +27,9 @@ private theorem pure_base_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
   | dropC | forceC | jR | bornB | o4A | o4AllocR =>
     first | exact hpb.not_let_lazy.elim | exact hpb.not_force_lazy.elim
           | exact hpb.not_settle.elim | exact hpb.not_lazy.elim
+  | doneF hnB | doneR hnB | againF1 hnB | againF2 _ hnB | againF3 hnB
+  | againR1 hnB | againR2 _ hnB | againR3 hnB | letRaise hnB | letUnw hnB | letTodo hnB =>
+    exact (hnB hB).elim
   | dead =>
     rcases hp with hh | ⟨_, h, -⟩
     · cases hh
@@ -64,11 +67,11 @@ private theorem pure_base_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
         have hr := hh.redex
         have hf := hr.2 (.appL a₀) f trivial rfl
         exact ⟨hf, hr.2 (.appR f) a₀ hf rfl⟩
-      have ⟨hf', s₁⟩ := pure_val h₁ rfl hfa.1
+      have ⟨hf', s₁⟩ := pure_val h₁ rfl hfa.1 hB
         (hpa.of_frame (F := .appL a₀) trivial) (hpb.of_frame (F := .appL a₀') trivial)
-      have ⟨ha', s₂⟩ := pure_val h₂ rfl hfa.2
+      have ⟨ha', s₂⟩ := pure_val h₂ rfl hfa.2 hB
         (hpa.of_frame (F := .appR f) hfa.1) (hpb.of_frame (F := .appR f') hf')
-      obtain ⟨t', ht', hs'⟩ := pure_phead hh (.app (by decide) s₁ s₂) hpa hpb
+      obtain ⟨t', ht', hs'⟩ := pure_phead hh (.app (by decide) s₁ s₂) hB hpa hpb
       exact ⟨t', .inr (.head OkE.nil ht'), hs'⟩
     · cases h
   | rcons | acons | aconsD | aguard =>
@@ -90,11 +93,11 @@ private theorem pure_base_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
     · first
         | exact (hnv (by constructor)).elim
         | (obtain ⟨t', ht', hs'⟩ :=
-            pure_phead hh (by constructor <;> first | assumption | decide) hpa hpb
+            pure_phead hh (by constructor <;> first | assumption | decide) hB hpa hpb
            exact ⟨t', .inr (.head OkE.nil ht'), hs'⟩)
     · cases h
 
-private theorem pure_plug_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
+private theorem pure_plug_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂) (hB : W.B)
     (hglob : ∀ g v, W.R.glob g = some v → v.Src)
     {r r' : Tm} (hp : PHead r r' ∨ ∃ g, r = .glob g ∧ W.R.glob g = some r') :
     ∀ (m : Nat) {E : List Frame} {t : Tm}, E.length = m → OkE E →
@@ -109,7 +112,7 @@ private theorem pure_plug_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
   | zero =>
     intro E t hl _ hpa hpb hs
     cases E with
-    | nil => exact pure_base_step hst hglob hp hpa hpb hs
+    | nil => exact pure_base_step hst hB hglob hp hpa hpb hs
     | cons => cases hl
   | succ m ih =>
     intro E t hl hE hpa hpb hs
@@ -140,6 +143,9 @@ private theorem pure_plug_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
       | dropC | forceC | jR | bornB | o4A | o4AllocR =>
         first | exact hpb.not_let_lazy.elim | exact hpb.not_force_lazy.elim
               | exact hpb.not_settle.elim | exact hpb.not_lazy.elim
+      | doneF hnB | doneR hnB | againF1 hnB | againF2 _ hnB | againF3 hnB
+      | againR1 hnB | againR2 _ hnB | againR3 hnB | letRaise hnB | letUnw hnB | letTodo hnB =>
+        exact (hnB hB).elim
       | dead => cases F <;> simp [Frame.plug] at hsf
       | dropB | o4Bind =>
         cases F <;> simp only [Frame.plug, reduceCtorEq, Tm.let_.injEq] at hsf
@@ -167,21 +173,21 @@ private theorem pure_plug_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
         subst hx
         cases F <;> simp only [Frame.plug] at hsf <;> cases hsf
         · exact wrap (F' := .appL _) trivial (fun hb => .app (by decide) hb h₂) h₁ hpb
-        · have ⟨hf', _⟩ := pure_val h₁ rfl hF
+        · have ⟨hf', _⟩ := pure_val h₁ rfl hF hB
             (hpa.of_frame (F := .appL _) trivial) (hpb.of_frame (F := .appL _) trivial)
           exact wrap (F' := .appR _) hf' (fun hb => .app (by decide) h₁ hb) h₂ hpb
       | rcons _ h₁ h₂ =>
         subst hx
         cases F <;> simp only [Frame.plug] at hsf <;> cases hsf
         · exact wrap (F' := .rconsL _ _) trivial (fun hb => .rcons (by decide) hb h₂) h₁ hpb
-        · have ⟨he', _⟩ := pure_val h₁ rfl hF
+        · have ⟨he', _⟩ := pure_val h₁ rfl hF hB
             (hpa.of_frame (F := .rconsL _ _) trivial) (hpb.of_frame (F := .rconsL _ _) trivial)
           exact wrap (F' := .rconsR _ _) he' (fun hb => .rcons (by decide) h₁ hb) h₂ hpb
       | update _ h₁ h₂ =>
         subst hx
         cases F <;> simp only [Frame.plug] at hsf <;> cases hsf
         · exact wrap (F' := .updL _ _) trivial (fun hb => .update (by decide) hb h₂) h₁ hpb
-        · have ⟨he', _⟩ := pure_val h₁ rfl hF
+        · have ⟨he', _⟩ := pure_val h₁ rfl hF hB
             (hpa.of_frame (F := .updL _ _) trivial) (hpb.of_frame (F := .updL _ _) trivial)
           exact wrap (F' := .updR _ _) he' (fun hb => .update (by decide) h₁ hb) h₂ hpb
       | appK | appV | rconsK | rconsV | updK | updV => cases hx
@@ -234,28 +240,28 @@ private theorem pure_plug_step {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
 
 /-- **Pure step simulation**: a `PStep` of a pure left term is matched by zero or one `PStep` of
 the pure right term in the same world `W`. -/
-theorem pure_step_sim {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
+theorem pure_step_sim {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂) (hB : W.B)
     (hglob : ∀ g v, W.R.glob g = some v → v.Src)
     {e e₁ t : Tm} (hpa : PureEval W.R e) (hpb : PureEval W.R t) (hs : Sim W .any e t)
     (hstep : PStep W.R e e₁) :
     ∃ t₁, (t₁ = t ∨ PStep W.R t t₁) ∧ Sim W .any e₁ t₁ := by
   cases hstep with
-  | head hE hh => exact pure_plug_step hst hglob (.inl hh) _ rfl hE hpa hpb hs
-  | glob hE hg => exact pure_plug_step hst hglob (.inr ⟨_, rfl, hg⟩) _ rfl hE hpa hpb hs
+  | head hE hh => exact pure_plug_step hst hB hglob (.inl hh) _ rfl hE hpa hpb hs
+  | glob hE hg => exact pure_plug_step hst hB hglob (.inr ⟨_, rfl, hg⟩) _ rfl hE hpa hpb hs
 
 /-- **Pure evaluation simulation**: if a pure term reaches a value `v`, a related pure term
 reaches a related value `v'` in the same world `W`. -/
-theorem pure_sim_val {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂)
+theorem pure_sim_val {μ₁ μ₂ : List Tm} (hst : StR W μ₁ μ₂) (hB : W.B)
     (hglob : ∀ g v, W.R.glob g = some v → v.Src)
     {e e' v : Tm} (hpe : PureEval W.R e) (hpe' : PureEval W.R e') (hs : Sim W .any e e')
     (hp : PSteps W.R e v) (hv : Value v) :
     ∃ v', PSteps W.R e' v' ∧ Value v' ∧ Sim W .any v v' := by
   induction hp generalizing e' with
   | refl =>
-    have ⟨hv', _⟩ := pure_val hs rfl hv hpe hpe'
+    have ⟨hv', _⟩ := pure_val hs rfl hv hB hpe hpe'
     exact ⟨e', .refl, hv', hs⟩
   | step s _ ih =>
-    obtain ⟨t₁, ht₁, hs₁⟩ := pure_step_sim hst hglob hpe hpe' hs s
+    obtain ⟨t₁, ht₁, hs₁⟩ := pure_step_sim hst hB hglob hpe hpe' hs s
     rcases ht₁ with rfl | s'
     · exact ih (hpe.step s) hpe' hs₁ hv
     · obtain ⟨v', hp', hv', hsv⟩ := ih (hpe.step s) (hpe'.step s') hs₁ hv

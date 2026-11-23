@@ -43,9 +43,12 @@ theorem focus_cases {root : Roots} {l : Lbl} {Λ Λ' Λ₂ : List Rgn} {μ μ' �
     (hs : Step root l Λ μ (plug E r) (.cfg Λ' μ' t'))
     (hcong : ∀ W' μ₂' E₂ r₂, RJ W μ₂ t₂ W' μ₂' (plug E₂ r₂) → FrL W' E E₂ → OkE E₂ →
       Sim W' .top r r₂ → TRes root W τ Λ₂ μ₂ t₂ μ Λ' μ' t')
-    (hsr : ¬ r.Simple := by simp [Tm.Simple]) (hnp : l ≠ .pure := by intro h; cases h) :
+    (hsr : ¬ r.ActFocus := by simp [Tm.ActFocus]) (hnp : l ≠ .pure := by intro h; cases h) :
     TRes root W τ Λ₂ μ₂ t₂ μ Λ' μ' t' := by
-  rcases ht.dec hrv hr hrc hal _ _ rfl hE μ₂ (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
+  rcases ht.dec hrv hr hrc hal
+      (fun _ _ he => by subst he; exact (hsr trivial).elim)
+      (fun _ _ he => by subst he; exact (hsr trivial).elim)
+      _ _ rfl hE μ₂ hst (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
     hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs'⟩ |
     ⟨W', μ₂', E₂, n, a, b, hj, hfr, hE₂, rfl, hn, hs'⟩
   · obtain ⟨W', μ₂', E₀, E₁, a, b, E₂, hj, rfl, ha, -, -, hact⟩ := hd
@@ -73,6 +76,7 @@ theorem FrL.nil_left {A : List Frame} (h : FrL W [] A) : ∀ G ∈ A, ∃ n, G =
   | nil => intro G hG; cases hG
   | cons => cases he
   | junkL => cases he
+  | againF | againR => cases he
   | junkR hn _ ih =>
     intro G hG
     rcases List.mem_cons.mp hG with rfl | hG

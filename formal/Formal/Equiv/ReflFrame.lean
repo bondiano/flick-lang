@@ -40,13 +40,13 @@ theorem catch_settle {μ₂ μ₂' : List Tm} {E E₂ : List Frame} {n : Nat} {r
 
 /-- A region the right side closes or runs a finalizer of: so does the left side, or one of its
 children steps alone. -/
-theorem inside_rev {root : Roots} {Λ Λ₂ : List Rgn} {μ : List Tm} {E : List Frame} {p : Nat}
-    {w : Tm} {g₂ : Rgn} (hE : OkE E) (hw : Final w) (hrg : RgsR W μ none Λ Λ₂) (hB : ¬ W.B)
-    (hg : Λ₂[p]? = some g₂) (hl : g₂.live = true) (hk : ∀ k ∈ g₂.kids, Final k)
+theorem inside_rev {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {E : List Frame} {p : Nat}
+    {w : Tm} {g₂ : Rgn} (hE : OkE E) (hw : Final w) (hst : StR W μ μ₂) (hrg : RgsR W μ none Λ Λ₂)
+    (hB : ¬ W.B) (hg : Λ₂[p]? = some g₂) (hl : g₂.live = true) (hk : ∀ k ∈ g₂.kids, Final k)
     (hfs : g₂.fins = [] ∨ ∃ fs f, g₂.fins = fs ++ [f]) : Moves root Λ μ (plug E (.inside p w)) := by
   obtain ⟨g, hg', hR⟩ := hrg.get' hg
   have hl' : g.live = true := hR.live ▸ hl
-  rcases hR.kids_rev hk hB with hk' | hs'
+  rcases hR.kids_rev hk hst hB with hk' | hs'
   · rcases hfs with hfs | ⟨fs, f, hfs⟩
     · exact .inl ⟨_, _, .rt hE (.close hg' hl' hw hk' (All2.nil_right (hfs ▸ hR.fins)))⟩
     · obtain ⟨fs', f', hfs'⟩ := All2.snoc_left (hfs ▸ hR.fins)
@@ -57,7 +57,7 @@ theorem inside_rev {root : Roots} {Λ Λ₂ : List Rgn} {μ : List Tm} {E : List
 theorem raise_frame_rev {S : Sig} {root : Roots} {Λ Λ₂ Λ₂' : List Rgn} {μ μ₂ μ₂' : List Tm}
     {E E₂ : List Frame} {F : Frame} {r v₂ x' : Tm} (hE : OkE E) (hE₂ : OkE E₂) (hr : Redex r)
     (hs : Sim W .top r (.raise v₂)) (hv₂ : Value v₂) (hfr : FrL W E (F :: E₂))
-    (hrg : RgsR W μ none Λ Λ₂) (hB : ¬ W.B) (hty : TypedT S (plug E r))
+    (hst : StR W μ μ₂) (hrg : RgsR W μ none Λ Λ₂) (hB : ¬ W.B) (hty : TypedT S (plug E r))
     (hh : RHead Λ₂ μ₂ (F.plug (.raise v₂)) Λ₂' μ₂' x') :
     Moves root Λ μ (plug E r) ∨ Catch W μ₂ (plug E r) (plug (F :: E₂) (.raise v₂)) := by
   obtain ⟨e, rfl, he⟩ := hs.rinv_raise
@@ -67,6 +67,8 @@ theorem raise_frame_rev {S : Sig} {root : Roots} {Λ Λ₂ Λ₂' : List Rgn} {�
     exact .inl (.inl ⟨_, _, .rt (E := E₀) (hE.cons).2 (.settleRaise hev)⟩)
   | junkR hn hfr' =>
     exact .inr (catch_settle hfr' (.raise he) hE₂ (RJ.settleR hn hv₂) (by simp [Tm.pot]))
+  | againF | againR =>
+    exact .inl (.inl ⟨_, _, .rt (E := .let_ _ :: _) (hE.cons).2 (.settleRaise hev)⟩)
   | @cons F' _ E' _ hFS hfr' =>
     have hE' := (hE.cons).2
     have hty' : TypedT S (F'.plug (.raise e)) :=
@@ -84,9 +86,9 @@ theorem raise_frame_rev {S : Sig} {root : Roots} {Λ Λ₂ Λ₂' : List Rgn} {�
          exact .inl (.inl ⟨_, _, .rt (E := E') hE' (.hresRaise hA rfl hev)⟩))
       | (obtain ⟨Ei, hEi, rfl⟩ := ht.hkarm_parked rfl
          exact .inl (.inl ⟨_, _, .rt (E := E') hE' (.hkarmRaise hEi rfl hev)⟩))
-      | exact .inl (inside_rev hE' (.inr (.inl ⟨_, hev, rfl⟩)) hrg hB ‹_› ‹_› ‹_›
+      | exact .inl (inside_rev hE' (.inr (.inl ⟨_, hev, rfl⟩)) hst hrg hB ‹_› ‹_› ‹_›
           (.inr ⟨_, _, ‹_›⟩))
-      | exact .inl (inside_rev hE' (.inr (.inl ⟨_, hev, rfl⟩)) hrg hB ‹_› ‹_› ‹_› (.inl ‹_›))
+      | exact .inl (inside_rev hE' (.inr (.inl ⟨_, hev, rfl⟩)) hst hrg hB ‹_› ‹_› ‹_› (.inl ‹_›))
 
 /-- **A signal leaves a frame** by a head step of the right side. -/
 theorem unw_frame_rev {S : Sig} {root : Roots} {Λ Λ₂ Λ₂' : List Rgn} {μ μ₂ μ₂' : List Tm}
@@ -102,6 +104,8 @@ theorem unw_frame_rev {S : Sig} {root : Roots} {Λ Λ₂ Λ₂' : List Rgn} {μ 
     exact .inl (.inl ⟨_, _, .rt (E := E₀) (hE.cons).2 .settleUnw⟩)
   | junkR hn hfr' =>
     exact .inr (catch_settle hfr' (.unw hl hc) hE₂ (RJ.settleU hn) (by simp [Tm.pot]))
+  | againF | againR =>
+    exact .inl (.inl ⟨_, _, .rt (E := .let_ _ :: _) (hE.cons).2 .settleUnw⟩)
   | @cons F' _ E' _ hFS hfr' =>
     have hE' := (hE.cons).2
     have hty' : TypedT S (F'.plug (.unw q ℓ c)) :=
@@ -119,7 +123,7 @@ theorem unw_frame_rev {S : Sig} {root : Roots} {Λ Λ₂ Λ₂' : List Rgn} {μ 
          exact .inl (.inl ⟨_, _, .rt (E := E') hE' (.hkarmUnw hEi rfl)⟩))
       | (obtain rfl := (hst.bij _ _ _ _ _ _ ‹W.L _ ℓ' _› hl).2 rfl
          exact .inl (.inl ⟨_, _, .rt (E := E') hE' .hwithCatch⟩))
-      | exact .inl (inside_rev hE' hw hrg hB ‹_› ‹_› ‹_› (.inr ⟨_, _, ‹_›⟩))
-      | exact .inl (inside_rev hE' hw hrg hB ‹_› ‹_› ‹_› (.inl ‹_›))
+      | exact .inl (inside_rev hE' hw hst hrg hB ‹_› ‹_› ‹_› (.inr ⟨_, _, ‹_›⟩))
+      | exact .inl (inside_rev hE' hw hst hrg hB ‹_› ‹_› ‹_› (.inl ‹_›))
 
 end Flick.Equiv

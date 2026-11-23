@@ -25,9 +25,10 @@ theorem Sim.top_head_rev {x : Pos} {f f' : Tm} (h : Sim W x f f') (hx : x = .top
     cases hf with
     | ctorApp hf' _ _ => exact ih₁ hx hf' hK
     | constApp _ _ => simp [Tm.head] at hK
-  | jL hx' | jR hx' => exact (hx' hx).elim
+  | jL hx' | jR hx' | againF2 hx' | againR2 hx' => exact (hx' hx).elim
   | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
-  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle
+  | doneF | doneR | againF1 | againF3 | againR1 | againR3 | letRaise | letUnw | letTodo => cases hx
   | o4Fix1 | o4Fix2 => simp [Tm.head] at hK
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | ctor => exact hK
@@ -47,9 +48,10 @@ theorem Sim.top_value_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .top)
       | jL hx' => exact (hx' rfl).elim
   | rcons _ _ _ ih₁ ih₂ => cases hb with
     | rcons h₁ h₂ => subst hx; exact .rcons (ih₁ rfl h₁) (ih₂ rfl h₂)
-  | jL hx' | jR hx' => exact (hx' hx).elim
+  | jL hx' | jR hx' | againF2 hx' | againR2 hx' => exact (hx' hx).elim
   | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
-  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle
+  | doneF | doneR | againF1 | againF3 | againR1 | againR3 | letRaise | letUnw | letTodo => cases hx
   | hloc => exact .loc
   | o4Fix1 | o4Fix2 => exact .fix
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
@@ -178,7 +180,7 @@ theorem _root_.Flick.Redex.frame_ok {r a : Tm} {F : Frame} (hr : Redex r) (h : r
 
 /-- **The right counterpart of a focus** is one, once the right side has caught up its parts. -/
 theorem Sim.redex_cu {r r₂ : Tm} (h : Sim W .top r r₂) (hr : Redex r) (hB : ¬ W.B)
-    (μ₂ : List Tm) :
+    {μ₁ : List Tm} (μ₂ : List Tm) (hst : StR W μ₁ μ₂) :
     Redex r₂ ∨ ∃ W' μ₂' r₂', RJ W μ₂ r₂ W' μ₂' r₂' ∧ r₂'.pot < r₂.pot ∧ Sim W' .any r r₂' := by
   by_cases hr₂ : Redex r₂
   · exact .inl hr₂
@@ -189,7 +191,7 @@ theorem Sim.redex_cu {r r₂ : Tm} (h : Sim W .top r r₂) (hr : Redex r) (hB : 
         Classical.byContradiction fun hv => hc ⟨F, a, hF, ha, hv⟩⟩
     obtain ⟨F, a, rfl, hfs, hs⟩ := h.frame_rev
     obtain ⟨W', μ₂', v₂, rj, hv₂, s⟩ :=
-      hs.vcu rfl (hr.2 F a (hr.frame_ok rfl) rfl) W μ₂ (World.le.refl _) (fun h => (hB h).elim)
+      hs.vcu rfl (hr.2 F a (hr.frame_ok rfl) rfl) W μ₂ (World.le.refl _) hst (fun h => (hB h).elim)
     have hlt : v₂.pot < a₂.pot := by
       rcases rj.pot with ⟨-, rfl⟩ | h
       · exact (ha₂ hv₂).elim
@@ -218,7 +220,7 @@ theorem LStep.pure {μ : List Tm} {a a' : Tm} (h : PHead a a') : LStep μ a :=
 
 /-- **A left term related to a value** is a value, or takes a step the right side does not. -/
 theorem Sim.value_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) (hb : Value b)
-    (hB : ¬ W.B) (μ : List Tm) : Value a ∨ LStep μ a := by
+    (hB : ¬ W.B) {μ₂ : List Tm} (μ : List Tm) (hst : StR W μ μ₂) : Value a ∨ LStep μ a := by
   induction h with
   | @app x f f' a₀ a₀' _ h₁ h₂ ih₁ ih₂ =>
     subst hx
@@ -246,6 +248,9 @@ theorem Sim.value_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) (hb
   | dropA => exact .inr ⟨_, _, [.let_ _], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
   | dropB => exact .inr (.pure (.let_ .loc))
   | forceA => exact .inr ⟨_, _, [.force], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
+  | doneF _ hd =>
+    obtain ⟨-, -, -, -, -, -, hμ₁, -⟩ := hst.done _ _ _ _ hd
+    exact .inr (.head fun _ => .forceDone hμ₁)
   | jL _ _ _ ih =>
     subst hx
     rcases ih rfl hb with hv | s
@@ -259,16 +264,18 @@ theorem Sim.value_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) (hb
 
 /-- A left term related to a raised error raises one, or takes a step the right side does not. -/
 theorem Sim.raise_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) {v : Tm}
-    (hb : b = .raise v) (hv : Value v) (hB : ¬ W.B) (μ : List Tm) : Final a ∨ LStep μ a := by
+    (hb : b = .raise v) (hv : Value v) (hB : ¬ W.B) {μ₂ : List Tm} (μ : List Tm)
+    (hst : StR W μ μ₂) : Final a ∨ LStep μ a := by
   induction h with
   | raise h' =>
     cases hb
-    rcases h'.value_rev (by subst hx; rfl) hv hB μ with hv' | s
+    rcases h'.value_rev (by subst hx; rfl) hv hB μ hst with hv' | s
     · exact .inl (.inr (.inl ⟨_, hv', rfl⟩))
     · exact .inr (s.frame (F := .raise) trivial)
   | dropA => exact .inr ⟨_, _, [.let_ _], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
   | dropB => exact .inr (.pure (.let_ .loc))
   | forceA => exact .inr ⟨_, _, [.force], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
+  | doneF _ _ hv' => subst hb; cases hv'
   | jL _ _ _ ih =>
     subst hx
     rcases ih rfl hb with ((hw | ⟨w, hw, rfl⟩ | ⟨p, ℓ, c, rfl⟩) | s)
@@ -284,12 +291,14 @@ theorem Sim.raise_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) {v 
 
 /-- A left term related to a signal is one, or takes a step the right side does not. -/
 theorem Sim.unw_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) {p ℓ : Nat} {c : Tm}
-    (hb : b = .unw p ℓ c) (hB : ¬ W.B) (μ : List Tm) : Final a ∨ LStep μ a := by
+    (hb : b = .unw p ℓ c) (hB : ¬ W.B) (μ : List Tm) :
+    Final a ∨ LStep μ a := by
   induction h with
   | unw => exact .inl (.inr (.inr ⟨_, _, _, rfl⟩))
   | dropA => exact .inr ⟨_, _, [.let_ _], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
   | dropB => exact .inr (.pure (.let_ .loc))
   | forceA => exact .inr ⟨_, _, [.force], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
+  | doneF _ _ hv' => subst hb; cases hv'
   | jL _ _ _ ih =>
     subst hx
     rcases ih rfl hb with ((hw | ⟨w, hw, rfl⟩ | ⟨q, ℓ', c', rfl⟩) | s)
@@ -305,12 +314,12 @@ theorem Sim.unw_rev {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) {p �
 
 /-- **A left thread related to a finished one** is finished, or takes a step the right side does
 not. -/
-theorem ThR.final_rev {μ : List Tm} {τ : Option (Nat × Nat)} {a b : Tm} (h : ThR W μ τ a b)
-    (hb : Final b) (hB : ¬ W.B) : Final a ∨ LStep μ a := by
+theorem ThR.final_rev {μ μ₂ : List Tm} {τ : Option (Nat × Nat)} {a b : Tm} (h : ThR W μ τ a b)
+    (hb : Final b) (hst : StR W μ μ₂) (hB : ¬ W.B) : Final a ∨ LStep μ a := by
   rcases h with h | ⟨E, E', n, e, e', rfl, -, hE, -, -, -, hc, -⟩
   · rcases hb with hv | ⟨v, hv, rfl⟩ | ⟨p, ℓ, c, rfl⟩
-    · exact (h.value_rev rfl hv hB μ).imp .inl id
-    · exact h.raise_rev rfl rfl hv hB μ
+    · exact (h.value_rev rfl hv hB μ hst).imp .inl id
+    · exact h.raise_rev rfl rfl hv hB μ hst
     · exact h.unw_rev rfl rfl hB μ
   · exact .inr ⟨_, _, E, _, _, hE, rfl, rfl, .inr fun _ => .forcePending hc⟩
 
@@ -329,5 +338,12 @@ theorem FrL.handlesE' {E E₂ : List Frame} (h : FrL W E E₂) {Ef o : Name}
     · simp [Frame.handles]
     · exact ih hh G hG
   | junkR _ _ ih => exact ih (fun G' hG' => hh G' (List.mem_cons_of_mem _ hG'))
+  | againF _ _ _ _ _ _ _ _ ih | againR _ _ _ _ _ _ _ _ ih =>
+    intro G hG
+    rcases List.mem_cons.mp hG with rfl | hG
+    · simp [Frame.handles]
+    · rcases List.mem_cons.mp hG with rfl | hG
+      · simp [Frame.handles]
+      · exact ih (fun G' hG' => hh G' (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ hG'))) G hG
 
 end Flick.Equiv
