@@ -32,6 +32,7 @@ pub(super) fn module(
     primitives: &dyn opt::eval::PrimitiveEval,
 ) -> Module {
     let mut result = module.clone();
+    opt::strip_legacy_bare_types(&mut result);
     let exports = |owner: &str| data.facts.get(owner).map(|f| f.exports.as_slice());
     let exported = |name: &str| {
         exports(&module.name).is_some_and(|e| e.iter().any(|e| e == name))
@@ -40,7 +41,9 @@ pub(super) fn module(
     let generics = |owner: &str, name: &str| {
         let module = data.program.modules.iter().find(|m| m.name == owner)?;
         let exports = exports(owner)?;
-        opt::names_only(module, name, &|name| exports.iter().any(|e| e == name))
+        let mut g = opt::names_only(module, name, &|name| exports.iter().any(|e| e == name))?;
+        opt::strip_legacy_bare_generic(&mut g);
+        Some(g)
     };
     let arity = |owner: &str, name: &str| {
         let module = data.program.modules.iter().find(|m| m.name == owner)?;
@@ -53,7 +56,7 @@ pub(super) fn module(
     };
     tuple_match::fold_tuple_matches(&mut result);
     let config = opt::eval::EvalConfig::default();
-    let _ = opt::optimize_with_eval(
+    let _ = opt::optimize_legacy_bare(
         &mut result,
         &exported,
         &generics,

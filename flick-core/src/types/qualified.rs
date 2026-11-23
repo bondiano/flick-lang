@@ -38,12 +38,21 @@ impl Checker<'_> {
         Some(self.instantiate(scheme, span))
     }
 
-    /// Records what a top-level name refers to; `ty` is its type at the use.
-    pub(super) fn record_entity(&mut self, entity: &Entity, ty: &Type, span: Span) {
+    /// Records what a top-level name refers to; `ty` is its type at the use,
+    /// with its instantiation `type_args`.
+    pub(super) fn record_entity_args(
+        &mut self,
+        entity: &Entity,
+        ty: &Type,
+        type_args: Vec<(super::kinds::Kind, Type)>,
+        span: Span,
+    ) {
         let parent = self.env.parent(entity);
+        let at = range(span);
         let r = match (entity.namespace, parent) {
             (Namespace::Constructor, Some((module, ty_name))) => {
                 self.note_constructor(&module, &entity.name, span);
+                self.record_con_use(at, entity.clone(), type_args);
                 let arity = self.arrow_stages(ty).len();
                 let rep = self.env.constructor_rep(&module, &ty_name, &entity.name);
                 let dicts = self.env.value(entity).map_or(0, dicts);
@@ -54,22 +63,30 @@ impl Checker<'_> {
                     arity,
                     rep,
                     dicts,
+                    fields: Vec::new(),
+                    type_args: Vec::new(),
                 })
             }
-            (Namespace::Value, Some(_)) => Ref::Method {
-                module: entity.module.clone(),
-                name: entity.name.clone(),
-            },
-            _ => Ref::Value {
-                module: entity.module.clone(),
-                name: entity.name.clone(),
-            },
+            (Namespace::Value, Some(_)) => {
+                self.record_type_args(at, type_args);
+                Ref::Method {
+                    module: entity.module.clone(),
+                    name: entity.name.clone(),
+                }
+            }
+            _ => {
+                self.record_type_args(at, type_args);
+                Ref::Value {
+                    module: entity.module.clone(),
+                    name: entity.name.clone(),
+                }
+            }
         };
         if lang::is(Lang::RecordLabel, &entity.module, &entity.name) {
             self.record_label(span, ty.clone());
         }
         if lang::is(Lang::WireCodec, &entity.module, &entity.name) {
-            self.typing.pending_wire.push((range(span), span));
+            self.typing.pending_wire.push((at, span));
         }
         self.record_name(span, r);
     }
@@ -169,14 +186,15 @@ impl Checker<'_> {
                 return Type::Error;
             }
             let scheme = entity.as_ref().and_then(|e| self.env.value(e).cloned());
-            let ty = scheme.map_or(Type::Error, |s| {
-                self.instantiate(&self.live_scheme(&s), span)
+            let (ty, type_args) = scheme.map_or((Type::Error, Vec::new()), |s| {
+                let live = self.live_scheme(&s);
+                self.instantiate_args(&live, span)
             });
             match entity {
                 Some(entity) => {
                     #[cfg(feature = "ide")]
                     self.record_method_dispatch(qualifier, &entity, span);
-                    self.record_entity(&entity, &ty, span);
+                    self.record_entity_args(&entity, &ty, type_args, span);
                 }
                 // reported by name resolution, or taken on trust
                 None => self.cx.trusted = true,
@@ -306,8 +324,9 @@ impl Checker<'_> {
             name: super::companion_name(&e.name, name),
         };
         let scheme = self.env.value(&entity).cloned()?;
-        let ty = self.instantiate(&self.live_scheme(&scheme), span);
-        self.record_entity(&entity, &ty, span);
+        let live = self.live_scheme(&scheme);
+        let (ty, type_args) = self.instantiate_args(&live, span);
+        self.record_entity_args(&entity, &ty, type_args, span);
         Some(ty)
     }
 

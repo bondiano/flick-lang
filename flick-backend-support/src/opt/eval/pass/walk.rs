@@ -173,6 +173,7 @@ impl<'a> PassCtx<'a, '_> {
                 pat,
                 source,
                 body,
+                ..
             } => {
                 if let Some(stop) = stop {
                     self.visit_expr(stop, env, false, depth + 1);

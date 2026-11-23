@@ -12,7 +12,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-flick-backend-support = { path = "../flick-backend-support" }
+flick-backend-support = { path = "../flick-backend-support", default-features = false }
 flick-diagnostics = { path = "../flick-diagnostics" }
 flick-ir = { path = "../flick-ir" }
 flick-plugin = { path = "../flick-plugin" }

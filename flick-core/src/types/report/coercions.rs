@@ -39,7 +39,9 @@ impl Checker<'_> {
         if candidates.next().is_some() {
             return false;
         }
+        drop(candidates);
         self.typing.coercions.insert(range(span), coercion);
+        self.record_coercion_target(range(span), expected);
         true
     }
 }

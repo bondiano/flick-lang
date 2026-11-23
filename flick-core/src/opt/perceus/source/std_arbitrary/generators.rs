@@ -31,7 +31,10 @@ fn vshrink_fun(b: &ExprBuilder) -> Stmt {
     Stmt::Fun {
         name: b.name("vshrink"),
         rec: true,
+        type_params: Vec::new(),
         dicts: vec![],
+        dict_constraints: Vec::new(),
+        ty: None,
         value: b.lam(&["v"], body),
     }
 }

@@ -167,7 +167,8 @@ fn run(tasks: Receiver<Task>, done: Sender<Done>, len: Arc<AtomicUsize>) {
             }
         }
         for job in queued.drain(..) {
-            let snapshot = analyze(&job.docs, &job.path, &mut caches);
+            let mut snapshot = analyze(&job.docs, &job.path, &mut caches);
+            snapshot.drop_compilation();
             len.store(caches.len(), Ordering::Relaxed);
             let finished = Done {
                 path: job.path,

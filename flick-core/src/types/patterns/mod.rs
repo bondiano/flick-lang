@@ -1,17 +1,19 @@
 //! Patterns: their types, the names they bind, and their shape for the
 //! exhaustiveness check.
 
+mod resolve;
+
 use crate::types::Elem;
 use crate::types::Elided;
 use std::{iter, mem};
 
 use super::gadt::scheme::dicts;
+use super::kinds::Kind;
 use super::ty::{Row, Type};
+use super::typing::Range;
 use super::{Checker, Local};
 use crate::diagnostics::codes;
-use crate::diagnostics::suggest::closest;
 use crate::iface;
-use crate::iface::Namespace;
 use crate::numeric;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
@@ -50,11 +52,12 @@ pub enum Ctor {
 
 pub use crate::syntax::patterns::is_pattern;
 
-impl<'c> Checker<'c> {
+impl Checker<'_> {
     /// Checks `node` against `ty` and brings its names into scope. A
     /// data qualifier bounds its fields too, including callback fields.
     #[allow(clippy::too_many_lines)]
     pub fn bind_pattern(&mut self, node: &Node, ty: &Type) -> Pat {
+        self.note_ir_value(node.range(), ty);
         let children: Vec<&Node> = node.nodes().collect();
         let span = self.span(node);
         match node.kind {
@@ -242,7 +245,7 @@ impl<'c> Checker<'c> {
     }
 
     fn record_pattern(&mut self, node: &Node, ty: &Type) -> Pat {
-        let mut fields: Vec<(String, Type, Option<&Node>)> = Vec::new();
+        let mut fields: Vec<(String, Type, Option<&Node>, Range)> = Vec::new();
         for field in node.nodes().filter(|n| n.kind == K::RecordPatField) {
             let Some(label) = field.child_tokens().find(|t| t.kind == K::Ident) else {
                 continue;
@@ -255,14 +258,14 @@ impl<'c> Checker<'c> {
                 continue;
             }
             let field_ty = self.fresh();
-            fields.push((name, field_ty, field.nodes().next()));
+            fields.push((name, field_ty, field.nodes().next(), field.range()));
         }
         let rest = self.fresh();
         let shape = Type::Record(Row {
             entries: {
                 let mut entries: Vec<(Elem, Type)> = fields
                     .iter()
-                    .map(|(l, t, _)| (Elem::named(l), t.clone()))
+                    .map(|(l, t, ..)| (Elem::named(l), t.clone()))
                     .collect();
                 Row::sort_entries(&mut entries);
                 entries
@@ -274,7 +277,7 @@ impl<'c> Checker<'c> {
         self.pattern_type(&shape, &bare, node);
         let mut pats: Vec<(String, Pat)> = fields
             .into_iter()
-            .map(|(label, field_ty, pattern)| {
+            .map(|(label, field_ty, pattern, field_range)| {
                 let field_ty = captures.as_ref().map_or_else(
                     || field_ty.clone(),
                     |captures| self.data_field(&field_ty, captures),
@@ -282,6 +285,7 @@ impl<'c> Checker<'c> {
                 let pat = if let Some(p) = pattern {
                     self.bind_pattern(p, &field_ty)
                 } else {
+                    self.note_ir_value(field_range, &field_ty);
                     self.cx.locals.push(Local {
                         name: label.clone(),
                         at: None,
@@ -322,6 +326,42 @@ impl<'c> Checker<'c> {
         Some(arity)
     }
 
+    fn instantiate_con_pattern(
+        &mut self,
+        node: &Node,
+        scheme: &Type,
+        ty: &Type,
+        adt_params: Option<usize>,
+        indexed: Option<&(Type, Vec<(Kind, Type)>)>,
+    ) -> (Type, Vec<(Kind, Type)>) {
+        if let Some((body, type_args)) = indexed {
+            return (body.clone(), type_args.clone());
+        }
+        let captures = self.captures_of(ty).into_type();
+        if let Type::Forall { vars, body, .. } = scheme
+            && let Some(arity) = adt_params
+        {
+            let mut recorded = Vec::with_capacity(vars.len());
+            let subst: Vec<(String, Type)> = vars
+                .iter()
+                .map(|v| {
+                    let fresh = self.store.fresh_of(&v.kind);
+                    recorded.push((v.kind.clone(), fresh.clone()));
+                    (v.name.clone(), fresh)
+                })
+                .collect();
+            if vars.len() > arity
+                && let Some((_, capture)) = subst.last()
+            {
+                let _ = self.unify(capture, &captures);
+            }
+            let (inst, more) = self.instantiate_args(&body.substitute(&subst), self.span(node));
+            recorded.extend(more);
+            return (inst, recorded);
+        }
+        self.instantiate_args(scheme, self.span(node))
+    }
+
     fn constructor_pattern(&mut self, node: &Node, args: &[&Node], ty: &Type) -> Pat {
         let Some((name, entity)) = self.pattern_constructor(node) else {
             return Pat::Wild;
@@ -334,27 +374,10 @@ impl<'c> Checker<'c> {
         };
         let scheme = self.env.value(&entity).cloned().unwrap_or(Type::Error);
         self.note_type(self.name_span(node), &scheme);
-        let captures = self.captures_of(ty).into_type();
         let adt_params = self.adt_arity(&entity);
         let indexed = self.indexed_pattern(&scheme, self.env.parent(&entity), ty, node);
-        let mut current = if let Some(body) = &indexed {
-            body.clone()
-        } else if let Type::Forall { vars, body, .. } = &scheme
-            && let Some(arity) = adt_params
-        {
-            let subst: Vec<(String, Type)> = vars
-                .iter()
-                .map(|v| (v.name.clone(), self.store.fresh_of(&v.kind)))
-                .collect();
-            if vars.len() > arity
-                && let Some((_, capture)) = subst.last()
-            {
-                let _ = self.unify(capture, &captures);
-            }
-            self.instantiate(&body.substitute(&subst), self.span(node))
-        } else {
-            self.instantiate(&scheme, self.span(node))
-        };
+        let (mut current, con_type_args) =
+            self.instantiate_con_pattern(node, &scheme, ty, adt_params, indexed.as_ref());
         let mut params = Vec::new();
         while let Type::Fun { param, result, .. } = self.whnf(&current) {
             params.push(*param);
@@ -390,6 +413,7 @@ impl<'c> Checker<'c> {
             args_pats.push(self.bind_pattern(arg, param));
         }
         if let Some((module, ty)) = self.env.parent(&entity) {
+            self.record_con_use(node.range(), entity.clone(), con_type_args);
             let rep = self.env.constructor_rep(&module, &ty, name);
             let constructor = super::typing::Constructor {
                 module,
@@ -398,6 +422,8 @@ impl<'c> Checker<'c> {
                 arity: params.len(),
                 rep,
                 dicts: dicts(&scheme),
+                fields: Vec::new(),
+                type_args: Vec::new(),
             };
             self.record_name(
                 self.span(node),
@@ -414,81 +440,6 @@ impl<'c> Checker<'c> {
                 args_pats,
             ),
             None => Pat::Wild,
-        }
-    }
-
-    /// The name of the constructor a pattern names, and its entity: `None`
-    /// after a diagnostic or when its module could not be checked.
-    pub(super) fn pattern_constructor(
-        &mut self,
-        node: &Node,
-    ) -> Option<(&'c str, Option<iface::Entity>)> {
-        let text = self.text;
-        let parts: Vec<&'c str> = node
-            .child_tokens()
-            .filter(|t| matches!(t.kind, K::Con | K::Ident))
-            .map(|t| t.text(text))
-            .collect();
-        let (&name, qualifier) = parts.split_last()?;
-        Some((name, self.constructor(&qualifier.join("."), name, node)))
-    }
-
-    /// The entity of a constructor; `None` after a diagnostic or when its
-    /// module could not be checked.
-    fn constructor(&mut self, qualifier: &str, name: &str, node: &Node) -> Option<iface::Entity> {
-        if !qualifier.is_empty() {
-            let found = self.env.qualified_module(qualifier).map(|(_, interface)| {
-                interface.map(|i| {
-                    i.find(Namespace::Constructor, name)
-                        .map(|e| e.entity.clone())
-                })
-            });
-            // a module that was checked but exports no such constructor: say so, or nothing records the pattern
-            if let Some(Some(None)) = &found {
-                self.error_guess(
-                    codes::T001,
-                    self.name_span(node),
-                    format!("`{qualifier}` does not export constructor `{name}`"),
-                    |this| {
-                        let (_, Some(interface)) = this.env.qualified_module(qualifier)? else {
-                            return None;
-                        };
-                        let constructors = interface
-                            .exports
-                            .iter()
-                            .filter(|e| e.entity.namespace == Namespace::Constructor);
-                        closest(name, constructors.map(|e| e.entity.name.as_str()))
-                            .map(|g| format!("{qualifier}.{g}"))
-                    },
-                );
-                return None;
-            }
-            let found = found.map(Option::flatten);
-            if found.is_none() {
-                self.error_guess(
-                    codes::T001,
-                    self.name_span(node),
-                    format!("unknown module `{qualifier}`"),
-                    |this| {
-                        closest(qualifier, this.env.qualifier_names())
-                            .map(|g| format!("{g}.{name}"))
-                    },
-                );
-            }
-            return found.flatten();
-        }
-        match self.env.find(Namespace::Constructor, name) {
-            super::env::Found::Entity(entity) => Some(entity),
-            super::env::Found::Unknown => None,
-            super::env::Found::Missing => {
-                self.error_guess(
-                    codes::T001,
-                    self.name_span(node),
-                    format!("cannot find constructor `{name}`"),
-                    |this| closest(name, this.env.names(Namespace::Constructor)).map(str::to_owned),
-                );
-                None
-            }
         }
     }
 }

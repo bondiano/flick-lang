@@ -137,6 +137,7 @@ pub fn js_parts(
                 phase.map_or_else(|| module.name.clone(), |id| prefix_key(&module.name, id));
             let part = Module {
                 name: module.name.clone(),
+                types: module.types.clone(),
                 items,
                 labels: module.labels.clone(),
                 initialization: module.initialization.clone(),

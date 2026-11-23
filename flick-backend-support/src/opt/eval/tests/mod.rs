@@ -48,6 +48,7 @@ pub(super) fn global(module: &str, name: &str) -> Expr {
     ex(ExprKind::Global {
         module: module.to_owned(),
         name: name.to_owned(),
+        type_args: Vec::new(),
     })
 }
 
@@ -81,6 +82,7 @@ pub(super) fn lam(names: &[&str], body: Expr) -> Expr {
                 },
                 stage: Stage::Pure,
                 ty: None,
+                binder_types: Vec::new(),
             })
             .collect(),
         body: Box::new(body),
@@ -99,12 +101,15 @@ pub(super) fn ctor(module: &str, ty: &str, name: &str, arity: usize) -> Construc
         arity,
         rep: Rep::Tagged,
         dicts: 0,
+        fields: Vec::new(),
+        type_args: Vec::new(),
     }
 }
 
 pub(super) fn empty_module(name: &str, items: Vec<Item>) -> Module {
     Module {
         name: name.to_owned(),
+        types: Vec::new(),
         items,
         labels: BTreeMap::new(),
         initialization: Initialization::default(),
@@ -118,7 +123,10 @@ pub(super) fn val_item(name: &str, body: Expr) -> Item {
     Item {
         kind: ItemKind::Value {
             name: name.to_owned(),
+            type_params: Vec::new(),
             dicts: Vec::new(),
+            dict_constraints: Vec::new(),
+            ty: None,
             body,
         },
         span: sp(0, 1),
@@ -161,11 +169,13 @@ fn build_formula_module() -> Module {
             vec![
                 Arm {
                     pat: Pat::Con(input_c.clone(), vec![]),
+                    binder_types: Vec::new(),
                     guard: None,
                     body: local("x"),
                 },
                 Arm {
                     pat: Pat::Con(number_c.clone(), vec![Pat::Bind("n".into())]),
+                    binder_types: Vec::new(),
                     guard: None,
                     body: local("n"),
                 },
@@ -174,6 +184,7 @@ fn build_formula_module() -> Module {
                         add_c.clone(),
                         vec![Pat::Bind("a".into()), Pat::Bind("b".into())],
                     ),
+                    binder_types: Vec::new(),
                     guard: None,
                     body: eval_rec("a", "b", Arith::Add),
                 },
@@ -182,6 +193,7 @@ fn build_formula_module() -> Module {
                         times_c.clone(),
                         vec![Pat::Bind("a".into()), Pat::Bind("b".into())],
                     ),
+                    binder_types: Vec::new(),
                     guard: None,
                     body: eval_rec("a", "b", Arith::Mul),
                 },
@@ -264,11 +276,11 @@ fn two_closures_of_same_lambda_keep_distinct_captures() {
     );
     let expr = ex(ExprKind::Block(
         vec![
-            Stmt::Let(
+            Stmt::let_bind(
                 Pat::Bind("f".into()),
                 app(global("App", "make_adder"), int(10)),
             ),
-            Stmt::Let(
+            Stmt::let_bind(
                 Pat::Bind("g".into()),
                 app(global("App", "make_adder"), int(20)),
             ),
@@ -306,7 +318,7 @@ fn staged_trap_stops_at_stage_one_before_next_arg_and_respects_arg_first() {
         lam(
             &["x"],
             ex(ExprKind::Block(
-                vec![Stmt::Let(
+                vec![Stmt::let_bind(
                     Pat::Bind("checked".into()),
                     bin(
                         BinOp::Arith(Arith::Pow, Num::BigInt),
@@ -490,7 +502,7 @@ fn known_none_and_err_are_valid_results_distinct_from_stopped() {
         lam(
             &["_"],
             ex(ExprKind::Block(
-                vec![Stmt::Let(
+                vec![Stmt::let_bind(
                     Pat::Bind("x".into()),
                     ex(ExprKind::Unwrap(Box::new(none_expr))),
                 )],

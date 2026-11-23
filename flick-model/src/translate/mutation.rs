@@ -92,14 +92,21 @@ impl Tr<'_> {
                 let rest = tr.block(rest, tail, pack);
                 tr.write_cell(x, v, rest)
             }),
-            Stmt::Var(x, e) | Stmt::Assign(x, e) => self.with_value(e, |tr, v| {
+            Stmt::Var {
+                name: x, value: e, ..
+            }
+            | Stmt::Assign(x, e) => self.with_value(e, |tr, v| {
                 let name = tr.fresh(x);
                 tr.versions.push((x.clone(), name.clone()));
                 let body = tr.block(rest, tail, pack);
                 tr.versions.pop();
                 Term::Let(name, None, rc(v), rc(body))
             }),
-            Stmt::Let(ir::Pat::Bind(x), e) => self.with_value(e, |tr, v| {
+            Stmt::Let {
+                pat: ir::Pat::Bind(x),
+                value: e,
+                ..
+            } => self.with_value(e, |tr, v| {
                 let body = tr.block(rest, tail, pack);
                 if let Some(sig) = tr.local_scheme(x) {
                     Term::Let(x.as_str().into(), Some(sig), rc(v), rc(body))
@@ -107,11 +114,18 @@ impl Tr<'_> {
                     tr.value_let(x.as_str().into(), v, body)
                 }
             }),
-            Stmt::Let(ir::Pat::Wild, e) | Stmt::Expr(e) => self.with_value(e, |tr, v| {
+            Stmt::Let {
+                pat: ir::Pat::Wild,
+                value: e,
+                ..
+            }
+            | Stmt::Expr(e) => self.with_value(e, |tr, v| {
                 let body = tr.block(rest, tail, pack);
                 Term::Let("_".into(), None, rc(v), rc(body))
             }),
-            Stmt::Let(p, e) => self.with_value(e, |tr, v| {
+            Stmt::Let {
+                pat: p, value: e, ..
+            } => self.with_value(e, |tr, v| {
                 let body = tr.block(rest, tail, pack);
                 let arm = Arm {
                     pat: pat(p),
@@ -255,7 +269,7 @@ pub fn modified(e: &ir::Expr) -> Vec<String> {
         if let ExprKind::Block(stmts, _) = &e.kind {
             for s in stmts {
                 match s {
-                    Stmt::Var(x, _) => declared.push(x.clone()),
+                    Stmt::Var { name: x, .. } => declared.push(x.clone()),
                     Stmt::Assign(x, _) => assigned.push(x.clone()),
                     _ => {}
                 }

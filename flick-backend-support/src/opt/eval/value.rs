@@ -224,6 +224,7 @@ impl<'a> Env<'a> {
                 rec: true,
                 dicts,
                 value,
+                ..
             } = stmt
                 && let ExprKind::Lambda { params, body } = &value.kind
             {
@@ -414,7 +415,7 @@ pub(super) fn each_expr_pat<'a>(e: &'a Expr, include_lambda: bool, f: &mut dyn F
         ExprKind::Each { pat, .. } => f(pat),
         ExprKind::Block(stmts, _) => {
             for stmt in stmts {
-                if let Stmt::Let(pat, _) = stmt {
+                if let Stmt::Let { pat, .. } = stmt {
                     f(pat);
                 }
             }

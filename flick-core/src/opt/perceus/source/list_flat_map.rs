@@ -4,14 +4,14 @@ impl Builder {
     pub(super) fn flat_map(&self) -> Expr {
         let more = self.block(
             vec![
-                Stmt::Let(
+                Stmt::let_bind(
                     Self::bind("row"),
                     self.apply(
                         "normalize",
                         vec![self.apply("callback", vec![self.local("head")])],
                     ),
                 ),
-                Stmt::Let(
+                Stmt::let_bind(
                     Self::bind("rest"),
                     self.apply("loop", vec![self.local("tail")]),
                 ),
@@ -143,7 +143,7 @@ mod tests {
         let ExprKind::Block(steps, _) = &arms[1].body.kind else {
             panic!("strict row before recursion")
         };
-        let Stmt::Let(_, row) = &steps[0] else {
+        let Stmt::Let { value: row, .. } = &steps[0] else {
             panic!("row")
         };
         assert_eq!(callee(row), "$collection.normalize");
@@ -151,7 +151,7 @@ mod tests {
             unreachable!()
         };
         assert_eq!(callee(arg), "$collection.callback");
-        let Stmt::Let(_, rest) = &steps[1] else {
+        let Stmt::Let { value: rest, .. } = &steps[1] else {
             panic!("tail")
         };
         assert_eq!(callee(rest), "$collection.loop");

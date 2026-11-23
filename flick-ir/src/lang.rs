@@ -32,7 +32,7 @@ pub const STRUCTURAL: [Lang; 4] = [Lang::Eq, Lang::Ord, Lang::Hash, Lang::Show];
 macro_rules! lang_items {
     ($($item:ident = $name:literal,)*) => {
         /// A lang item, spelled in snake case after `@lang`.
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub enum Lang {
             $($item,)*
         }

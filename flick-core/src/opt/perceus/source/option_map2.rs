@@ -62,6 +62,8 @@ impl Builder {
             arity: usize::from(name == "Some"),
             dicts: 0,
             rep: Rep::Tagged,
+            fields: Vec::new(),
+            type_args: Vec::new(),
         }
     }
     fn apply(&self, func: Expr, arg: Expr) -> Expr {
@@ -81,11 +83,13 @@ impl Builder {
             vec![
                 Arm {
                     pat: Pat::Con(Self::constructor("None"), vec![]),
+                    binder_types: Vec::new(),
                     guard: None,
                     body: self.none(),
                 },
                 Arm {
                     pat: Pat::Con(Self::constructor("Some"), vec![Self::bind(payload)]),
+                    binder_types: Vec::new(),
                     guard: None,
                     body: some,
                 },
@@ -109,6 +113,7 @@ impl Builder {
                     pat: Self::bind(name),
                     stage: Stage::Pure,
                     ty: None,
+                    binder_types: Vec::new(),
                 })
                 .collect(),
             body: Box::new(body),

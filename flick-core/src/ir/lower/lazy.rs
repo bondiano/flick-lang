@@ -67,13 +67,17 @@ impl Lower<'_> {
         );
         let at = (decl.nodes().find(|n| n.kind == K::VarPat)).map_or(span.start, |n| n.range().0);
         let unique = self.bind(&parts.name.unwrap_or_default(), at);
-        stmts.push(Stmt::Let(Pat::Bind(format!("{unique}$run")), run));
+        stmts.push(Stmt::let_bind(Pat::Bind(format!("{unique}$run")), run));
         self.vars.insert(unique.clone());
         let none = Constructor {
             arity: 0,
             ..native(Lang::None, Lang::Option)
         };
-        stmts.push(Stmt::Var(unique, Expr::new(ExprKind::Con(none), span)));
+        stmts.push(Stmt::var(
+            unique,
+            None,
+            Expr::new(ExprKind::Con(none), span),
+        ));
     }
 
     /// `await` of a `Lazy`: `lazy_force` of it; or, of a `let lazy` `x`, the
@@ -100,7 +104,7 @@ impl Lower<'_> {
         let run = Expr::new(ExprKind::Local(format!("{x}$run")), span);
         let local = |name: &String| Expr::new(ExprKind::Local(name.clone()), span);
         let start = vec![
-            Stmt::Let(
+            Stmt::let_bind(
                 Pat::Bind(outcome.clone()),
                 Expr::new(ExprKind::Await(Box::new(run)), span),
             ),
@@ -121,6 +125,7 @@ impl Lower<'_> {
 fn arm(pat: Pat, body: Expr) -> Arm {
     Arm {
         pat,
+        binder_types: Vec::new(),
         guard: None,
         body,
     }

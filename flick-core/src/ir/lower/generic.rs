@@ -30,6 +30,7 @@ pub fn methods(info: &GenericInfo, span: Span) -> Vec<(String, Expr)> {
             pat,
             stage: Stage::Pure,
             ty: None,
+            binder_types: Vec::new(),
         }];
         at(ExprKind::Lambda {
             params,
@@ -91,11 +92,13 @@ pub fn methods(info: &GenericInfo, span: Span) -> Vec<(String, Expr)> {
         }
         to.push(Arm {
             pat: Pat::Con(case.clone(), taken),
+            binder_types: Vec::new(),
             guard: None,
             body: value,
         });
         from.push(Arm {
             pat,
+            binder_types: Vec::new(),
             guard: None,
             body: apply(case, rebuilt),
         });

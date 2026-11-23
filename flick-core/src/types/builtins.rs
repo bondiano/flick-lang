@@ -220,7 +220,13 @@ pub fn builtins_of(stages_by_class: bool) -> &'static [Interface] {
 }
 
 fn check_builtins(stages_by_class: bool) -> Vec<Interface> {
-    check_each(builtin_sources(), stages_by_class, |_, _| {})
+    check_allowing(
+        builtin_sources(),
+        &ALLOWED,
+        stages_by_class,
+        true,
+        |_, _| {},
+    )
 }
 
 /// [`builtins_of`], or what the first module of an implicit package that does not
@@ -246,6 +252,7 @@ pub fn try_builtins(stages_by_class: bool) -> Result<&'static [Interface], Strin
         builtin_sources(),
         &mut report,
         stages_by_class,
+        true,
         &mut |_, _| {},
     );
     match problem {
@@ -263,7 +270,7 @@ const ALLOWED: [Code; 2] = [codes::T059, codes::R012];
 /// dependency order.
 #[cfg(test)]
 pub(crate) fn check_sources(modules: &[(&str, &str)]) -> Vec<Interface> {
-    check_each(modules, false, |_, _| {})
+    check_allowing(modules, &ALLOWED, false, true, |_, _| {})
 }
 
 /// [`check_sources`], also giving each module with its typing to `each`.
@@ -274,7 +281,7 @@ pub fn check_each(
     stages_by_class: bool,
     each: impl FnMut(&Module, &Typing),
 ) -> Vec<Interface> {
-    check_allowing(modules, &ALLOWED, stages_by_class, each)
+    check_allowing(modules, &ALLOWED, stages_by_class, false, each)
 }
 
 /// [`check_each`], with the built-in modules allowed the warnings `allowed`.
@@ -282,6 +289,7 @@ fn check_allowing(
     modules: &[(&str, &str)],
     allowed: &[Code],
     stages_by_class: bool,
+    skip_ir_types: bool,
     mut each: impl FnMut(&Module, &Typing),
 ) -> Vec<Interface> {
     let mut report = |name: &str, mut diagnostics: Vec<Diagnostic>| {
@@ -291,7 +299,13 @@ fn check_allowing(
             "built-in module {name} does not check: {diagnostics:?}"
         );
     };
-    check_reporting(modules, &mut report, stages_by_class, &mut each)
+    check_reporting(
+        modules,
+        &mut report,
+        stages_by_class,
+        skip_ir_types,
+        &mut each,
+    )
 }
 
 /// [`check_each`], giving what each module's check says to `report`.
@@ -299,6 +313,7 @@ fn check_reporting(
     modules: &[(&str, &str)],
     report: &mut dyn FnMut(&str, Vec<Diagnostic>),
     stages_by_class: bool,
+    skip_ir_types: bool,
     each: &mut dyn FnMut(&Module, &Typing),
 ) -> Vec<Interface> {
     let mut done: Vec<Interface> = Vec::new();
@@ -355,7 +370,10 @@ fn check_reporting(
             &known,
             options,
             &mut interface,
-            super::StaticContext::default(),
+            super::StaticContext {
+                skip_ir_types,
+                ..super::StaticContext::default()
+            },
         );
         diagnostics.extend(checked);
         if let Some(expansion) = &expansion {

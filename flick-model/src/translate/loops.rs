@@ -200,14 +200,21 @@ impl Tr<'_> {
                 let rest = tr.loop_block(rest, tail, id, xs);
                 tr.write_cell(x, v, rest)
             }),
-            Stmt::Var(x, e) | Stmt::Assign(x, e) => self.loop_with(e, id, xs, &|tr, v| {
+            Stmt::Var {
+                name: x, value: e, ..
+            }
+            | Stmt::Assign(x, e) => self.loop_with(e, id, xs, &|tr, v| {
                 let name = tr.fresh(x);
                 tr.versions.push((x.clone(), name.clone()));
                 let body = tr.loop_block(rest, tail, id, xs);
                 tr.versions.pop();
                 Term::Let(name, None, Rc::new(v), Rc::new(body))
             }),
-            Stmt::Let(ir::Pat::Bind(x), e) => self.loop_with(e, id, xs, &|tr, v| {
+            Stmt::Let {
+                pat: ir::Pat::Bind(x),
+                value: e,
+                ..
+            } => self.loop_with(e, id, xs, &|tr, v| {
                 let body = tr.loop_block(rest, tail, id, xs);
                 if let Some(sig) = tr.local_scheme(x) {
                     Term::Let(x.as_str().into(), Some(sig), Rc::new(v), Rc::new(body))
@@ -222,7 +229,9 @@ impl Tr<'_> {
                     )
                 }
             }),
-            Stmt::Let(p, e) => self.loop_with(e, id, xs, &|tr, v| {
+            Stmt::Let {
+                pat: p, value: e, ..
+            } => self.loop_with(e, id, xs, &|tr, v| {
                 let body = tr.loop_block(rest, tail, id, xs);
                 Term::Match(
                     Rc::new(v),
@@ -289,6 +298,7 @@ impl Tr<'_> {
                 pat: p,
                 source,
                 body,
+                ..
             } => self.loop_each(stop.is_some(), p, source, body, id, xs),
             ExprKind::Block(stmts, tail) => self.loop_block(stmts, tail, id, xs),
             ExprKind::If(c, a, b) => self.loop_with(c, id, xs, &|tr, c| {

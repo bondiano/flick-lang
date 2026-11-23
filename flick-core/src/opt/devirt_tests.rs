@@ -98,6 +98,7 @@ fn settling_data_does_not_expand_a_recursive_method_function() {
         ExprKind::Method {
             dict,
             name: "eq".to_owned(),
+            type_args: Vec::new(),
         },
         at,
     );
@@ -117,7 +118,12 @@ fn settling_data_does_not_expand_a_recursive_method_function() {
             1,
             "data settling must not follow a method function's body"
         );
-        Some((Vec::new(), method.clone()))
+        Some(super::Generic {
+            type_params: Vec::new(),
+            dicts: Vec::new(),
+            dict_constraints: Vec::new(),
+            body: method.clone(),
+        })
     };
     let table = ir::lang_items();
     let known = crate::codegen::Known::of(&table);

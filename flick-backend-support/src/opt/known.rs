@@ -14,7 +14,7 @@ use super::devirt::{built, matches};
 use super::walk::{applied, rename, size};
 use super::{atom, place};
 use crate::ir::{Arm, Expr, ExprKind, Lit, Pat, Stage, Stmt};
-use flick_ir::Span;
+use flick_ir::{Span, TypeRef};
 
 /// The size of an arm that may be copied to more than one branch.
 const SMALL: usize = 8;
@@ -25,7 +25,12 @@ const SMALL: usize = 8;
 pub fn scrutinees(stmts: &mut [Stmt], result: &mut Expr) -> bool {
     let mut changed = false;
     for i in 0..stmts.len() {
-        let Stmt::Let(Pat::Bind(name), value) = &stmts[i] else {
+        let Stmt::Let {
+            pat: Pat::Bind(name),
+            value,
+            ..
+        } = &stmts[i]
+        else {
             continue;
         };
         if !built(value) {
@@ -34,7 +39,10 @@ pub fn scrutinees(stmts: &mut [Stmt], result: &mut Expr) -> bool {
         let (name, value) = (name.clone(), value.clone());
         for later in &mut stmts[i + 1..] {
             match later {
-                Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
+                Stmt::Let { value: v, .. }
+                | Stmt::Var { value: v, .. }
+                | Stmt::Assign(_, v)
+                | Stmt::Expr(v) => {
                     changed |= given(v, &name, &value);
                 }
                 Stmt::Fun { value: v, .. } => changed |= given(v, &name, &value),
@@ -68,6 +76,7 @@ pub fn named_again(e: &mut Expr) -> bool {
         if arm.body.uses(name) == 0 && arm.guard.as_ref().is_none_or(|guard| guard.uses(name) == 0)
         {
             arm.pat = Pat::Wild;
+            arm.binder_types.clear();
             changed = true;
         }
     }
@@ -126,11 +135,12 @@ fn into_branches(e: &mut Expr, fresh: &mut usize) -> bool {
     if !branching || !movable(scrutinee, arms) {
         return false;
     }
+    let result_ty = e.ty.clone();
     let ExprKind::Match(mut scrutinee, arms) = mem::replace(&mut e.kind, ExprKind::Lit(Lit::Unit))
     else {
         unreachable!("a match, as tested above")
     };
-    moved(&mut scrutinee, &arms, None, fresh);
+    moved(&mut scrutinee, &arms, None, result_ty.as_ref(), fresh);
     *e = *scrutinee;
     true
 }
@@ -146,17 +156,34 @@ fn bound_choices(stmts: &mut Vec<Stmt>, result: &mut Expr, fresh: &mut usize) ->
             i += 1;
             continue;
         }
-        let Stmt::Let(Pat::Bind(name), mut choice) = stmts.remove(i) else {
+        let Stmt::Let {
+            pat: Pat::Bind(name),
+            binder_types,
+            value: mut choice,
+        } = stmts.remove(i)
+        else {
             unreachable!("a `let` of a name, as tested")
         };
+        let bound_ty = binder_types
+            .into_iter()
+            .find(|(n, _)| n == &name)
+            .map(|(_, t)| t)
+            .or_else(|| choice.ty.clone());
         let next = match stmts.get_mut(i) {
-            Some(Stmt::Let(_, v) | Stmt::Expr(v)) => v,
+            Some(Stmt::Let { value: v, .. } | Stmt::Expr(v)) => v,
             _ => &mut *result,
         };
+        let result_ty = next.ty.clone();
         let ExprKind::Match(_, arms) = &next.kind else {
             unreachable!("a `match`, as tested")
         };
-        moved(&mut choice, arms, Some(&name), fresh);
+        moved(
+            &mut choice,
+            arms,
+            Some((&name, bound_ty.as_ref())),
+            result_ty.as_ref(),
+            fresh,
+        );
         *next = choice;
         changed = true;
     }
@@ -167,11 +194,16 @@ fn bound_choices(stmts: &mut Vec<Stmt>, result: &mut Expr, fresh: &mut usize) ->
 /// next statement, or the result after the last one, takes apart, and
 /// nothing after that reads.
 fn next_takes_apart(stmts: &[Stmt], i: usize, result: &Expr) -> bool {
-    let Stmt::Let(Pat::Bind(name), choice) = &stmts[i] else {
+    let Stmt::Let {
+        pat: Pat::Bind(name),
+        value: choice,
+        ..
+    } = &stmts[i]
+    else {
         return false;
     };
     let next = match stmts.get(i + 1) {
-        Some(Stmt::Let(_, v) | Stmt::Expr(v)) => v,
+        Some(Stmt::Let { value: v, .. } | Stmt::Expr(v)) => v,
         Some(_) => return false,
         None => result,
     };
@@ -182,7 +214,10 @@ fn next_takes_apart(stmts: &[Stmt], i: usize, result: &Expr) -> bool {
         return false;
     }
     let read = |s: &Stmt| match s {
-        Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => v.uses(name),
+        Stmt::Let { value: v, .. }
+        | Stmt::Var { value: v, .. }
+        | Stmt::Assign(_, v)
+        | Stmt::Expr(v) => v.uses(name),
         Stmt::Fun { value, .. } => value.uses(name),
     };
     let after: usize = stmts
@@ -219,28 +254,47 @@ fn movable(tree: &Expr, arms: &[Arm]) -> bool {
 /// [`movable`] accepted: each branch ends in a `match` of its data. With
 /// `bound`, the arms read the value taken apart by that name, and each
 /// branch binds it to what it ends in.
-fn moved(tree: &mut Expr, arms: &[Arm], bound: Option<&str>, fresh: &mut usize) {
+fn moved(
+    tree: &mut Expr,
+    arms: &[Arm],
+    bound: Option<(&str, Option<&TypeRef>)>,
+    result_ty: Option<&TypeRef>,
+    fresh: &mut usize,
+) {
     let span = tree.span;
     let mut first = true;
-    each_end_mut(tree, &mut Vec::new(), &mut |end, mut data| {
+    each_end_mut(tree, result_ty, &mut Vec::new(), &mut |end, mut data| {
         // the parts are evaluated where they were, whatever the arm does
         // with them: each one that is not a name gets one
         let mut stmts = Vec::new();
         name_parts(&mut data, fresh, &mut stmts);
-        if let Some(name) = bound {
+        if let Some((name, bound_ty)) = bound {
             // a name the branch ends in is the value; data is built again
             // only if an arm reads the whole of it
             let whole = match &end.kind {
                 ExprKind::Local(_) => end.clone(),
                 _ => data.clone(),
             };
-            stmts.push(Stmt::Let(Pat::Bind(name.to_owned()), whole));
+            let bt = bound_ty
+                .cloned()
+                .or_else(|| whole.ty.clone())
+                .map(|t| vec![(name.to_owned(), t)])
+                .unwrap_or_default();
+            stmts.push(Stmt::let_typed(Pat::Bind(name.to_owned()), bt, whole));
         }
-        let taken = Expr::new(ExprKind::Match(Box::new(data), arms.to_vec()), span);
+        let taken = Expr::with_ty(
+            ExprKind::Match(Box::new(data), arms.to_vec()),
+            span,
+            result_ty.cloned(),
+        );
         let mut taken = if stmts.is_empty() {
             taken
         } else {
-            Expr::new(ExprKind::Block(stmts, Box::new(taken)), span)
+            Expr::with_ty(
+                ExprKind::Block(stmts, Box::new(taken)),
+                span,
+                result_ty.cloned(),
+            )
         };
         // a local is bound once in a definition: every copy but one has
         // names of its own
@@ -267,8 +321,14 @@ fn name_parts(data: &mut Expr, fresh: &mut usize, parts: &mut Vec<Stmt>) {
     }
     *fresh += 1;
     let name = format!("$p{fresh}");
-    let local = Expr::new(ExprKind::Local(name.clone()), arg.span);
-    parts.push(Stmt::Let(Pat::Bind(name), mem::replace(&mut **arg, local)));
+    let ty = arg.ty.clone();
+    let local = Expr::with_ty(ExprKind::Local(name.clone()), arg.span, ty.clone());
+    let bt = ty.map(|t| vec![(name.clone(), t)]).unwrap_or_default();
+    parts.push(Stmt::let_typed(
+        Pat::Bind(name),
+        bt,
+        mem::replace(&mut **arg, local),
+    ));
 }
 
 /// The arm of `arms` the data `end` chooses, when that is known here.
@@ -287,20 +347,34 @@ type Known = Vec<(String, Expr)>;
 
 /// The data a pattern of names describes: `Some x` as the pattern, `Some x`
 /// as the value. A pattern that ignores a part describes no one value.
-fn described(pat: &Pat, span: Span) -> Option<Expr> {
+fn described(
+    pat: &Pat,
+    binder_types: &[(String, TypeRef)],
+    ty: Option<&TypeRef>,
+    span: Span,
+) -> Option<Expr> {
     match pat {
-        Pat::Bind(name) => Some(Expr::new(ExprKind::Local(name.clone()), span)),
-        Pat::Con(c, parts) => {
+        Pat::Bind(name) => {
+            let local_ty = binder_types
+                .iter()
+                .find(|(n, _)| n == name)
+                .map(|(_, t)| t.clone())
+                .or_else(|| ty.cloned());
+            Some(Expr::with_ty(ExprKind::Local(name.clone()), span, local_ty))
+        }
+        Pat::Con(c, parts) if c.dicts == 0 => {
             let mut data = Expr::new(ExprKind::Con(c.clone()), span);
-            for part in parts {
+            for (idx, part) in parts.iter().enumerate() {
+                let field_ty = c.fields.get(idx);
                 let app = ExprKind::App {
                     func: Box::new(data),
-                    arg: Box::new(described(part, span)?),
+                    arg: Box::new(described(part, binder_types, field_ty, span)?),
                     stage: Stage::Pure,
                     arg_first: false,
                 };
                 data = Expr::new(app, span);
             }
+            data.ty = ty.cloned();
             Some(data)
         }
         _ => None,
@@ -312,7 +386,12 @@ fn found(scrutinee: &Expr, arm: &Arm) -> Option<(String, Expr)> {
     let ExprKind::Local(name) = &scrutinee.kind else {
         return None;
     };
-    let data = described(&arm.pat, scrutinee.span)?;
+    let data = described(
+        &arm.pat,
+        &arm.binder_types,
+        scrutinee.ty.as_ref(),
+        scrutinee.span,
+    )?;
     built(&data).then(|| (name.clone(), data))
 }
 
@@ -353,19 +432,30 @@ fn each_end(tree: &Expr, known: &mut Known, f: &mut dyn FnMut(&Expr) -> Option<(
 }
 
 /// As [`each_end`], on a tree it has accepted: gives `f` each end to
-/// replace, with the data it is known to be.
-fn each_end_mut(tree: &mut Expr, known: &mut Known, f: &mut dyn FnMut(&mut Expr, Expr)) {
+/// replace, with the data it is known to be, and updates enclosing branch
+/// result types to `result_ty`.
+fn each_end_mut(
+    tree: &mut Expr,
+    result_ty: Option<&TypeRef>,
+    known: &mut Known,
+    f: &mut dyn FnMut(&mut Expr, Expr),
+) {
     match &mut tree.kind {
-        ExprKind::Block(_, tail) => each_end_mut(tail, known, f),
+        ExprKind::Block(_, tail) => {
+            tree.ty = result_ty.cloned();
+            each_end_mut(tail, result_ty, known, f);
+        }
         ExprKind::If(_, then, other) => {
-            each_end_mut(then, known, f);
-            each_end_mut(other, known, f);
+            tree.ty = result_ty.cloned();
+            each_end_mut(then, result_ty, known, f);
+            each_end_mut(other, result_ty, known, f);
         }
         ExprKind::Match(scrutinee, arms) => {
+            tree.ty = result_ty.cloned();
             for arm in arms {
                 let mark = known.len();
                 known.extend(found(scrutinee, arm));
-                each_end_mut(&mut arm.body, known, f);
+                each_end_mut(&mut arm.body, result_ty, known, f);
                 known.truncate(mark);
             }
         }

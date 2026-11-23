@@ -28,6 +28,7 @@
 //! runtime call: only pure code is rewritten, and the lazy cells of [`lazy`],
 //! each a contextual equivalence of the core.
 
+mod beta;
 pub mod devirt;
 pub mod eval;
 mod fold;
@@ -35,10 +36,15 @@ mod fuse;
 mod inline;
 mod known;
 mod lazy;
+#[cfg(feature = "native-project")]
+mod legacy_bare;
 mod specialize;
 mod sroa;
 pub mod tuple_match;
+mod types;
 mod walk;
+#[cfg(feature = "native-project")]
+pub use legacy_bare::{strip_legacy_bare_generic, strip_legacy_bare_types};
 pub use walk::{Arity, arity, rename};
 
 use std::cell::RefCell;
@@ -47,7 +53,7 @@ use std::{mem, ptr};
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Module, Pat, Stmt};
 pub use fold::{js_number, json_string};
-pub use specialize::names_only;
+pub use specialize::{Generic, names_only};
 use walk::{droppable, each_strict_use, each_use, inert, partial};
 
 /// Rounds of inlining: a body inlined in the first may inline again.
@@ -61,9 +67,9 @@ const STEPS: usize = 8;
 const NO_ARITY: usize = usize::MAX;
 
 /// The values of the other modules of the build, by module and name: their
-/// dictionary parameters and body, when the body names only what its
-/// module exports.
-pub type Generics<'a> = &'a dyn Fn(&str, &str) -> Option<(Vec<String>, Expr)>;
+/// type and dictionary parameters and body, when the body names only what
+/// its module exports.
+pub type Generics<'a> = &'a dyn Fn(&str, &str) -> Option<Generic>;
 
 /// Optimizes `module` in place; `exported` tells the values importers see,
 /// `generics` what [`specialize`] may copy and [`inline`] may inline from
@@ -90,6 +96,36 @@ pub fn optimize(
     );
 }
 
+/// [`optimize_with_eval`] in legacy bare-constructor mode (for backends that
+/// have not migrated to full IR 0.14 layout types yet).
+#[cfg(feature = "native-project")]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "explicit optimizer configuration boundary"
+)]
+pub fn optimize_legacy_bare(
+    module: &mut Module,
+    exported: &dyn Fn(&str) -> bool,
+    generics: Generics,
+    arity: Arity,
+    lang: &crate::Known<'_>,
+    builtin: &dyn Fn(&str) -> bool,
+    eval_config: &eval::EvalConfig,
+    primitives: &dyn eval::PrimitiveEval,
+) -> eval::EvalCounters {
+    optimize_inner(
+        module,
+        exported,
+        generics,
+        arity,
+        lang,
+        builtin,
+        eval_config,
+        primitives,
+        false,
+    )
+}
+
 /// [`optimize`], with explicit evaluator budgets and a target [`eval::PrimitiveEval`]
 /// hook, returning stable internal outcome counters.
 #[allow(
@@ -106,6 +142,35 @@ pub fn optimize_with_eval(
     eval_config: &eval::EvalConfig,
     primitives: &dyn eval::PrimitiveEval,
 ) -> eval::EvalCounters {
+    optimize_inner(
+        module,
+        exported,
+        generics,
+        arity,
+        lang,
+        builtin,
+        eval_config,
+        primitives,
+        true,
+    )
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "explicit optimizer configuration boundary"
+)]
+fn optimize_inner(
+    module: &mut Module,
+    exported: &dyn Fn(&str) -> bool,
+    generics: Generics,
+    arity: Arity,
+    lang: &crate::Known<'_>,
+    builtin: &dyn Fn(&str) -> bool,
+    eval_config: &eval::EvalConfig,
+    primitives: &dyn eval::PrimitiveEval,
+    preserve_types: bool,
+) -> eval::EvalCounters {
+    let preserve_types = cfg!(feature = "typed-ir") && preserve_types;
     let mut fresh = 0;
     let foreign = inline::Foreign::new(generics, builtin);
     // what other modules' functions take, by `module.name`: one map type
@@ -126,12 +191,12 @@ pub fn optimize_with_eval(
         &devirt::Lookup::new(module, generics, lang),
         &mut fresh,
     );
-    specialize::specialize(module, generics, lang);
+    specialize::specialize_with_types(module, generics, lang, preserve_types);
     let mut module_steps = eval_config.max_module_steps;
     let mut retries = eval::RetryTracker::default();
     let mut counters = eval::EvalCounters::default();
     for _ in 0..ROUNDS {
-        constants(module, lang);
+        constants(module, lang, preserve_types);
         let lookup = devirt::Lookup::new(module, generics, lang);
         let candidates = inline::candidates(&module.name, &module.items, exported);
         let mut own: HashMap<String, usize> = HashMap::new();
@@ -149,26 +214,34 @@ pub fn optimize_with_eval(
         for item in &mut module.items {
             for body in bodies(item) {
                 devirt::methods(body, &lookup, &mut fresh, 0);
-                inline::inline(body, &module.name, &candidates, &foreign, &mut fresh);
+                inline::inline(
+                    body,
+                    &module.name,
+                    &candidates,
+                    &foreign,
+                    &mut fresh,
+                    preserve_types,
+                );
                 fuse::fuse(body, &mut fresh, lang);
                 lazy::hoist(body, &mut fresh, lang);
-                simplify_with(body, &arities, lang);
+                simplify_with(body, &arities, lang, preserve_types);
                 // a value built only to be taken apart: each step may
                 // show the next one
                 for _ in 0..STEPS {
-                    let inlined = inline::shaped(body, &foreign, &mut fresh, &mut Vec::new());
+                    let inlined =
+                        inline::shaped(body, &foreign, &mut fresh, &mut Vec::new(), preserve_types);
                     if !(inlined | known::branches(body, &mut fresh)) {
                         break;
                     }
-                    simplify_with(body, &arities, lang);
+                    simplify_with(body, &arities, lang, preserve_types);
                 }
                 if lazy::hoist(body, &mut fresh, lang) {
-                    simplify_with(body, &arities, lang);
+                    simplify_with(body, &arities, lang, preserve_types);
                 }
             }
         }
         let eval_lookup = devirt::Lookup::new(module, generics, lang);
-        if eval::run_module_pass(
+        if eval::run_module_pass_with_types(
             module,
             exported,
             &eval_lookup,
@@ -179,10 +252,11 @@ pub fn optimize_with_eval(
             &mut module_steps,
             &mut retries,
             &mut counters,
+            preserve_types,
         ) {
             for item in &mut module.items {
                 for body in bodies(item) {
-                    simplify_with(body, &arities, lang);
+                    simplify_with(body, &arities, lang, preserve_types);
                 }
             }
         }
@@ -201,38 +275,38 @@ fn bodies(item: &mut Item) -> Vec<&mut Expr> {
 
 /// Simplifies `e` until nothing changes, a few times at most.
 pub fn simplify(e: &mut Expr, lang: &crate::Known<'_>) {
-    simplify_with(e, &|_, _| None, lang);
+    simplify_with(e, &|_, _| None, lang, cfg!(feature = "typed-ir"));
 }
 
 /// [`simplify`], knowing how many arguments the functions `arity` names take.
-fn simplify_with(e: &mut Expr, arity: Arity, lang: &crate::Known<'_>) {
+fn simplify_with(e: &mut Expr, arity: Arity, lang: &crate::Known<'_>, preserve_types: bool) {
     for _ in 0..8 {
-        if !pass(e, arity, lang) {
+        if !pass(e, arity, lang, preserve_types) {
             return;
         }
     }
 }
 
-fn pass(e: &mut Expr, arity: Arity, lang: &crate::Known<'_>) -> bool {
+fn pass(e: &mut Expr, arity: Arity, lang: &crate::Known<'_>, preserve_types: bool) -> bool {
     if let ExprKind::WithOwnerEvidence(owner, call) = &mut e.kind {
-        let mut changed = pass(owner, arity, lang);
-        call.each_child_mut(&mut |child| changed |= pass(child, arity, lang));
+        let mut changed = pass(owner, arity, lang, preserve_types);
+        call.each_child_mut(&mut |child| changed |= pass(child, arity, lang, preserve_types));
         return changed;
     }
     // the owner is the call's: in another shape of it, the first call code
     // generation meets would take it, maybe one inside its argument
     if let ExprKind::Within(_, call) = &mut e.kind {
         let mut changed = false;
-        call.each_child_mut(&mut |c| changed |= pass(c, arity, lang));
+        call.each_child_mut(&mut |c| changed |= pass(c, arity, lang, preserve_types));
         return changed;
     }
     let mut changed = false;
-    e.each_child_mut(&mut |c| changed |= pass(c, arity, lang));
+    e.each_child_mut(&mut |c| changed |= pass(c, arity, lang, preserve_types));
     changed |= walk::ordered(e, arity);
-    changed |= specialize::operator(e, lang)
-        | fold::fold(e, lang)
-        | inline::beta(e)
-        | devirt::known_match(e)
+    changed |= specialize::operator(e, lang, preserve_types)
+        | fold::fold(e, lang, preserve_types)
+        | beta::beta(e, preserve_types)
+        | devirt::known_match(e, preserve_types)
         | lazy::cells(e, lang);
     changed |= known::named_again(e);
     if let ExprKind::Block(stmts, result) = &mut e.kind {
@@ -256,22 +330,37 @@ fn pass(e: &mut Expr, arity: Arity, lang: &crate::Known<'_>) -> bool {
 /// Hoists the statements of blocks a `let` binds or the block ends with:
 /// locals are unique in a definition, so nothing is captured differently.
 fn flatten(stmts: &mut Vec<Stmt>, result: &mut Box<Expr>) -> bool {
-    let nested = |s: &Stmt| matches!(s, Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) if matches!(v.kind, ExprKind::Block(..)));
+    let nested = |s: &Stmt| {
+        matches!(
+            s,
+            Stmt::Let { value: v, .. }
+                | Stmt::Var { value: v, .. }
+                | Stmt::Assign(_, v)
+                | Stmt::Expr(v)
+                if matches!(v.kind, ExprKind::Block(..))
+        )
+    };
     if !stmts.iter().any(nested) && !matches!(result.kind, ExprKind::Block(..)) {
         return false;
     }
     let mut out = Vec::with_capacity(stmts.len());
     for stmt in mem::take(stmts) {
         match stmt {
-            Stmt::Let(
-                p,
-                Expr {
-                    kind: ExprKind::Block(inner, value),
-                    ..
-                },
-            ) => {
+            Stmt::Let {
+                pat: p,
+                binder_types,
+                value:
+                    Expr {
+                        kind: ExprKind::Block(inner, value),
+                        ..
+                    },
+            } => {
                 out.extend(inner);
-                out.push(Stmt::Let(p, *value));
+                out.push(Stmt::Let {
+                    pat: p,
+                    binder_types,
+                    value: *value,
+                });
             }
             Stmt::Expr(Expr {
                 kind: ExprKind::Block(inner, value),
@@ -309,14 +398,14 @@ include!("propagation.rs");
 
 /// Replaces the uses of a top-level value of the module bound to a literal
 /// with the literal, as `ReScript` does; `unused_items` drops it if private.
-fn constants(module: &mut Module, lang: &crate::Known<'_>) {
+fn constants(module: &mut Module, lang: &crate::Known<'_>, preserve_types: bool) {
     let literals: Vec<(String, Expr)> = module
         .items
         .iter()
         .filter_map(|item| match &item.kind {
-            ItemKind::Value { name, dicts, body }
-                if dicts.is_empty() && atom(body) && fold::constant(body, lang).is_some() =>
-            {
+            ItemKind::Value {
+                name, dicts, body, ..
+            } if dicts.is_empty() && atom(body) && fold::constant(body, lang).is_some() => {
                 Some((name.clone(), body.clone()))
             }
             _ => None,
@@ -327,20 +416,25 @@ fn constants(module: &mut Module, lang: &crate::Known<'_>) {
     }
     for item in &mut module.items {
         for body in bodies(item) {
-            replace_globals(body, &module.name, &literals);
+            replace_globals(body, &module.name, &literals, preserve_types);
         }
     }
 }
 
-fn replace_globals(e: &mut Expr, module: &str, literals: &[(String, Expr)]) {
-    if let ExprKind::Global { module: m, name } = &e.kind
+fn replace_globals(e: &mut Expr, module: &str, literals: &[(String, Expr)], preserve_types: bool) {
+    if let ExprKind::Global {
+        module: m, name, ..
+    } = &e.kind
         && m == module
         && let Some((_, value)) = literals.iter().find(|(n, _)| n == name)
     {
-        *e = Expr::new(value.kind.clone(), e.span);
+        let ty = preserve_types
+            .then(|| e.ty.clone().or_else(|| value.ty.clone()))
+            .flatten();
+        *e = Expr::with_ty(value.kind.clone(), e.span, ty);
         return;
     }
-    e.each_child_mut(&mut |c| replace_globals(c, module, literals));
+    e.each_child_mut(&mut |c| replace_globals(c, module, literals, preserve_types));
 }
 
 /// Drops private top-level values nothing reaches whose definition shows
@@ -353,7 +447,9 @@ fn unused_items(module: &mut Module, exported: &dyn Fn(&str) -> bool) {
         }
         let before = module.items.len();
         module.items.retain(|item| match &item.kind {
-            ItemKind::Value { name, dicts, body } => {
+            ItemKind::Value {
+                name, dicts, body, ..
+            } => {
                 exported(name)
                     || name.contains('$')
                     || used.contains(name)
@@ -368,7 +464,9 @@ fn unused_items(module: &mut Module, exported: &dyn Fn(&str) -> bool) {
 }
 
 fn globals(e: &Expr, module: &str, out: &mut BTreeSet<String>) {
-    if let ExprKind::Global { module: m, name } = &e.kind
+    if let ExprKind::Global {
+        module: m, name, ..
+    } = &e.kind
         && m == module
     {
         out.insert(name.clone());
@@ -378,3 +476,5 @@ fn globals(e: &Expr, module: &str, out: &mut BTreeSet<String>) {
 
 #[cfg(test)]
 mod context_tests;
+#[cfg(all(test, feature = "typed-ir"))]
+mod specialize_tests;

@@ -51,6 +51,7 @@ pub fn function(item: &Item, calls: Calls) -> Option<(&str, &[Param], &Expr)> {
                     kind: ExprKind::Lambda { params, body },
                     ..
                 },
+            ..
         } if dicts.is_empty() && jumpable(params, calls) => Some((name, params, body)),
         _ => None,
     }
@@ -212,7 +213,7 @@ pub fn self_call<'e>(
     }
     let callee = match &head.kind {
         ExprKind::Local(name) => Callee::Local(name.clone()),
-        ExprKind::Global { module, name } => Callee::Global(format!("{module}.{name}")),
+        ExprKind::Global { module, name, .. } => Callee::Global(format!("{module}.{name}")),
         _ => return None,
     };
     let target = Target { callee, dicts };

@@ -51,6 +51,10 @@ mod holes;
 mod infer;
 mod instances;
 mod interpolation;
+#[cfg(not(target_arch = "wasm32"))]
+mod ir_type_decls;
+#[cfg(not(target_arch = "wasm32"))]
+mod ir_types;
 mod irrefutable;
 mod kinds;
 mod labels;
@@ -197,7 +201,18 @@ pub fn check(
     options: Options,
     interface: &mut Interface,
 ) -> Vec<Diagnostic> {
-    check_typed(module, imported, builtins, options, interface).0
+    check_typed_with_static_context(
+        module,
+        imported,
+        builtins,
+        options,
+        interface,
+        StaticContext {
+            skip_ir_types: true,
+            ..StaticContext::default()
+        },
+    )
+    .0
 }
 
 /// [`check`], also returning the dictionary each class constraint resolved
@@ -225,13 +240,7 @@ pub fn check_typed(
     (diagnostics, typing)
 }
 
-#[derive(Clone, Copy, Default)]
-pub(crate) struct StaticContext<'a> {
-    pub dictionaries: &'a [(Type, Dict)],
-    /// Transparent definitions available when comparing a concrete result.
-    /// They are not added to the body's abstract parameter environment.
-    pub witnesses: &'a [Interface],
-}
+pub(crate) use options::StaticContext;
 
 /// Checks a named result with its static arguments' dictionaries and
 /// equality context. Body lookup still uses only the projected interfaces.
@@ -380,6 +389,7 @@ fn checker_in<'a>(
         gadt: gadt::branch::State::default(),
         error_rows: None,
         unfolding: Vec::new(),
+        skip_ir_types: context.skip_ir_types,
     }
 }
 
@@ -442,7 +452,7 @@ fn run_in(
     checker.typing.declarations =
         Arc::new(checker.static_declarations(module, interface, &static_results));
     checker.sugar_lints(module.tree);
-    let typing = checker.finish_typing();
+    let typing = checker.finish_typing_with(context);
     let mut evidence = checker.classes.evidence;
     evidence.sort_by_key(|(span, _)| (span.start, span.end));
     (checker.diagnostics, typing, evidence)

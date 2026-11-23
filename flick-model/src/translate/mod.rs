@@ -71,7 +71,9 @@ pub fn program_with_decls<'a>(
                 .iter()
                 .flat_map(|m| {
                     m.items.iter().filter_map(|i| {
-                        if let ItemKind::Value { name, dicts, body } = &i.kind
+                        if let ItemKind::Value {
+                            name, dicts, body, ..
+                        } = &i.kind
                             && dicts.is_empty()
                         {
                             Some((Path::new(&m.name, name), body.clone()))
@@ -184,12 +186,14 @@ impl<'a> Tr<'a> {
         self.current_item.clear();
         let globals = &mut program.globals;
         match &item.kind {
-            ItemKind::Value { name, dicts, body } => {
+            ItemKind::Value {
+                name, dicts, body, ..
+            } => {
                 self.current_item.clone_from(name);
                 let value = lams(dicts.iter().map(|d| given(d)), self.expr(body));
                 globals.insert(self.path(name), value);
             }
-            ItemKind::Destructure { pattern, body } => {
+            ItemKind::Destructure { pattern, body, .. } => {
                 self.current_item = format!("destructure {}..{}", item.span.start, item.span.end);
                 let value = Rc::new(self.expr(body));
                 let pat = pat(pattern);
@@ -426,8 +430,10 @@ mod foreign_staging_tests {
                         name: "hostExport".to_owned(),
                     },
                     stages,
+                    type_params: Vec::new(),
                     dicts,
                     arity,
+                    ty: None,
                     adapter: Adapter::default(),
                     catch: None,
                 };
@@ -465,6 +471,8 @@ mod foreign_staging_tests {
             arity: 0,
             rep: Rep::Tagged,
             dicts: 0,
+            fields: Vec::new(),
+            type_args: Vec::new(),
         };
         let info = InstanceInfo {
             module: "App.Main".to_owned(),

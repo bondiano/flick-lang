@@ -38,6 +38,7 @@ impl Lower<'_> {
             let Some(name) = self.token_text(variant, K::Con) else {
                 continue;
             };
+            let fields = self.ir_ctor_fields(&name);
             let constructor = Constructor {
                 module: self.module.to_owned(),
                 ty: ty.clone(),
@@ -45,6 +46,8 @@ impl Lower<'_> {
                 arity: variant.nodes().filter(|n| is_type(n.kind)).count(),
                 rep: abi.rep(i),
                 dicts: written_dicts(variant),
+                fields,
+                type_args: Vec::new(),
             };
             if let Some(labels) = self.record_field(variant) {
                 self.records.insert(constructor.name.clone(), labels);
@@ -67,6 +70,8 @@ impl Lower<'_> {
                 arity: 0,
                 rep: Rep::Tagged,
                 dicts: 0,
+                fields: Vec::new(),
+                type_args: Vec::new(),
             };
             items.push(Item {
                 kind: ItemKind::Constructor(constructor),

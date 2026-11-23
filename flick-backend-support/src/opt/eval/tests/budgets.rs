@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
-use flick_ir::{Arith, BinOp, Dict, Expr, ExprKind, Item, ItemKind, Lit, Num, Stage, Stmt};
+use flick_ir::{Arith, BinOp, Dict, ExprKind, Item, ItemKind, Lit, Num, Stage, Stmt};
 
 use super::super::materialize::{
     MaterializeContext, MaterializeLimits, check_profitability, expr_cost, materialize,
@@ -14,7 +14,7 @@ use super::super::{
 };
 use super::{app, bin, empty_module, ex, ex_at, global, int, lam, local, sp, val_item};
 use crate::Known;
-use crate::opt::optimize_with_eval;
+use crate::opt::{Generic, optimize_with_eval};
 
 struct StubPrim;
 
@@ -288,7 +288,7 @@ fn outer_refusal_keeps_independent_inner_fold() {
         panic!("outer opaque call must stay: {res:?}");
     };
     assert!(
-        matches!(&func.kind, ExprKind::Global { module, name } if module == "Ext" && name == "opaque")
+        matches!(&func.kind, ExprKind::Global { module, name, .. } if module == "Ext" && name == "opaque")
     );
     assert_eq!(arg.kind, ExprKind::Lit(Lit::Int(21)));
     assert_eq!(arg.span, sp(20, 30));
@@ -310,6 +310,7 @@ fn resolved_dictionary_consumed_internally_without_materializing() {
                 ex(ExprKind::Method {
                     dict: Dict::Given("d".into()),
                     name: "inc".into(),
+                    type_args: Vec::new(),
                 }),
                 local("x"),
             ),
@@ -357,7 +358,10 @@ fn capture_avoidance_and_shadowing_in_nested_blocks_and_rec_groups() {
             Stmt::Fun {
                 name: "even".into(),
                 rec: true,
+                type_params: Vec::new(),
                 dicts: vec![],
+                dict_constraints: Vec::new(),
+                ty: None,
                 value: lam(
                     &["n"],
                     ex(ExprKind::If(
@@ -373,7 +377,10 @@ fn capture_avoidance_and_shadowing_in_nested_blocks_and_rec_groups() {
             Stmt::Fun {
                 name: "odd".into(),
                 rec: true,
+                type_params: Vec::new(),
                 dicts: vec![],
+                dict_constraints: Vec::new(),
+                ty: None,
                 value: lam(
                     &["n"],
                     ex(ExprKind::If(
@@ -511,13 +518,17 @@ fn external_polymorphic_preload_is_deterministic_at_cap() {
     let poly_fn = Item {
         kind: ItemKind::Value {
             name: "poly".into(),
+            type_params: Vec::new(),
             dicts: vec!["d".into()],
+            dict_constraints: Vec::new(),
+            ty: None,
             body: lam(
                 &["x"],
                 app(
                     ex(ExprKind::Method {
                         dict: Dict::Given("d".into()),
                         name: "m".into(),
+                        type_args: Vec::new(),
                     }),
                     local("x"),
                 ),
@@ -543,8 +554,13 @@ fn external_polymorphic_preload_is_deterministic_at_cap() {
     }
     let module = empty_module("App", items);
     let known = Known::of(&[]);
-    let generics = |owner: &str, key: &str| -> Option<(Vec<String>, Expr)> {
-        (owner == "Ext" && key.ends_with("#m")).then(|| (vec![], lam(&["n"], local("n"))))
+    let generics = |owner: &str, key: &str| -> Option<Generic> {
+        (owner == "Ext" && key.ends_with("#m")).then(|| Generic {
+            type_params: Vec::new(),
+            dicts: vec![],
+            dict_constraints: Vec::new(),
+            body: lam(&["n"], local("n")),
+        })
     };
     let lookup = devirt::Lookup::new(&module, &generics, &known);
 

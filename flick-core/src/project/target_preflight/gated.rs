@@ -192,8 +192,8 @@ fn scan_expr_gated_services(
                     continue;
                 }
                 let child = match stmt {
-                    Stmt::Let(_, v)
-                    | Stmt::Var(_, v)
+                    Stmt::Let { value: v, .. }
+                    | Stmt::Var { value: v, .. }
                     | Stmt::Assign(_, v)
                     | Stmt::Expr(v)
                     | Stmt::Fun { value: v, .. } => v,

@@ -7,13 +7,15 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::mem;
 
 use super::Generics;
 use super::devirt::built;
 use super::known::{chooses, ends_in_data};
+use super::specialize::Generic;
+use super::types::subst_types;
 use super::walk::{rename, respan, size};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Param, Pat, Stage, Stmt};
+use flick_ir::TypeRef;
 
 /// The size budget of a body inlined at every use, in IR nodes: no bigger
 /// than the call it replaces, give or take.
@@ -26,14 +28,15 @@ const ONCE: usize = 60;
 /// `match` of an option and what its arms do.
 const SHAPED: usize = 24;
 
-/// The parameters and body of a function that may be inlined.
-type Inlined = (Vec<Param>, Expr);
+/// The type parameters, parameters and body of a function that may be inlined.
+type Inlined = (Vec<String>, Vec<Param>, Expr);
 
-/// A full application to inline: the function, its arguments in the order
-/// of its parameters, whether it is of another module, and whether the last
-/// argument was written first.
+/// A full application to inline: the function, its type arguments, its
+/// arguments in the order of its parameters, whether it is of another
+/// module, and whether the last argument was written first.
 struct Applied {
     function: Inlined,
+    type_args: Vec<TypeRef>,
     args: Vec<Expr>,
     theirs: bool,
     piped: bool,
@@ -78,7 +81,12 @@ impl<'a> Foreign<'a> {
         let budget = if choosing { SHAPED } else { SMALL };
         let mut found = None;
         if (self.builtin)(module)
-            && let Some((dicts, body)) = (self.generics)(module, name)
+            && let Some(Generic {
+                type_params,
+                dicts,
+                body,
+                ..
+            }) = (self.generics)(module, name)
             && let ExprKind::Lambda { params, body } = body.kind
             && dicts.is_empty()
             && params
@@ -88,7 +96,7 @@ impl<'a> Foreign<'a> {
             && plain(&body, choosing)
             && !calls(&body, module, name)
         {
-            found = Some((params, *body));
+            found = Some((type_params, params, *body));
         }
         cache.borrow_mut().insert(key, found.clone());
         found
@@ -105,7 +113,13 @@ pub fn candidates(module: &str, items: &[Item], exported: &dyn Fn(&str) -> bool)
     items
         .iter()
         .filter_map(|item| match &item.kind {
-            ItemKind::Value { name, dicts, body } if dicts.is_empty() => match &body.kind {
+            ItemKind::Value {
+                name,
+                type_params,
+                dicts,
+                body,
+                ..
+            } if dicts.is_empty() => match &body.kind {
                 ExprKind::Lambda { params, body }
                     if params
                         .iter()
@@ -117,7 +131,10 @@ pub fn candidates(module: &str, items: &[Item], exported: &dyn Fn(&str) -> bool)
                         && inlinable(body)
                         && !calls(body, module, name) =>
                 {
-                    Some((name.clone(), (params.clone(), (**body).clone())))
+                    Some((
+                        name.clone(),
+                        (type_params.clone(), params.clone(), (**body).clone()),
+                    ))
                 }
                 _ => None,
             },
@@ -142,7 +159,9 @@ fn item_refs<'a>(item: &'a Item, module: &str, out: &mut HashMap<&'a str, usize>
 }
 
 fn refs<'a>(e: &'a Expr, module: &str, out: &mut HashMap<&'a str, usize>) {
-    if let ExprKind::Global { module: m, name } = &e.kind
+    if let ExprKind::Global {
+        module: m, name, ..
+    } = &e.kind
         && m == module
     {
         *out.entry(name.as_str()).or_default() += 1;
@@ -208,7 +227,7 @@ fn plain(e: &Expr, choosing: bool) -> bool {
 }
 
 fn calls(e: &Expr, module: &str, name: &str) -> bool {
-    if matches!(&e.kind, ExprKind::Global { module: m, name: n } if m == module && n == name) {
+    if matches!(&e.kind, ExprKind::Global { module: m, name: n, .. } if m == module && n == name) {
         return true;
     }
     let mut found = false;
@@ -225,11 +244,15 @@ pub fn inline(
     candidates: &Candidates,
     foreign: &Foreign,
     fresh: &mut usize,
+    preserve_types: bool,
 ) -> bool {
     let mut changed = false;
-    e.each_child_mut(&mut |c| changed |= inline(c, module, candidates, foreign, fresh));
+    e.each_child_mut(&mut |c| {
+        changed |= inline(c, module, candidates, foreign, fresh, preserve_types);
+    });
     let Some(Applied {
-        function: (params, mut body),
+        function: (type_params, params, mut body),
+        type_args,
         args,
         theirs,
         piped,
@@ -241,6 +264,27 @@ pub fn inline(
     if theirs {
         respan(&mut body, e.span);
     }
+    let (params, body) = prepare_lambda(&type_params, params, body, &type_args, e.span, fresh);
+    let mut stmts: Vec<Stmt> = params.iter().zip(args).map(|(p, a)| bind(p, a)).collect();
+    // the argument written first, of `a |> f`, is evaluated first
+    if piped {
+        stmts.rotate_right(1);
+    }
+    let ty = preserve_types
+        .then(|| e.ty.clone().or_else(|| body.ty.clone()))
+        .flatten();
+    *e = Expr::with_ty(ExprKind::Block(stmts, body), e.span, ty);
+    true
+}
+
+fn prepare_lambda(
+    type_params: &[String],
+    params: Vec<Param>,
+    body: Expr,
+    type_args: &[TypeRef],
+    span: flick_ir::Span,
+    fresh: &mut usize,
+) -> (Vec<Param>, Box<Expr>) {
     *fresh += 1;
     let suffix = format!("$i{fresh}");
     let mut lambda = Expr::new(
@@ -248,23 +292,21 @@ pub fn inline(
             params,
             body: Box::new(body),
         },
-        e.span,
+        span,
     );
+    if !type_params.is_empty() && type_params.len() == type_args.len() {
+        let subst: Vec<(&str, &TypeRef)> = type_params
+            .iter()
+            .map(String::as_str)
+            .zip(type_args)
+            .collect();
+        subst_types(&mut lambda, &subst);
+    }
     rename(&mut lambda, &suffix);
     let ExprKind::Lambda { params, body } = lambda.kind else {
         unreachable!("a lambda stays one when renamed")
     };
-    let mut stmts: Vec<Stmt> = params
-        .iter()
-        .zip(args)
-        .map(|(p, a)| bind(&p.pat, a))
-        .collect();
-    // the argument written first, of `a |> f`, is evaluated first
-    if piped {
-        stmts.rotate_right(1);
-    }
-    *e = Expr::new(ExprKind::Block(stmts, body), e.span);
-    true
+    (params, body)
 }
 
 /// `f a b` or `b |> f a` of a candidate `f`, of the module or a small one
@@ -275,14 +317,15 @@ fn full_application(
     candidates: &Candidates,
     foreign: &Foreign,
 ) -> Option<Applied> {
-    let (m, name, args, piped) = applied_global(e)?;
+    let (m, name, type_args, args, piped) = applied_global(e)?;
     let function = if m == module {
         candidates.get(name).cloned()?
     } else {
         foreign.body(m, name, false)?
     };
-    (args.len() == function.0.len()).then(|| Applied {
+    (args.len() == function.1.len()).then(|| Applied {
         function,
+        type_args: type_args.to_vec(),
         args: args.into_iter().cloned().collect(),
         theirs: m != module,
         piped,
@@ -290,79 +333,28 @@ fn full_application(
 }
 
 /// `let pat = value`; a `()` or `_` parameter only evaluates its argument.
-fn bind(pat: &Pat, value: Expr) -> Stmt {
-    match pat {
-        Pat::Bind(_) => Stmt::Let(pat.clone(), value),
+pub(super) fn bind(param: &Param, value: Expr) -> Stmt {
+    match &param.pat {
+        Pat::Bind(name) => {
+            let bt = param
+                .binder_type(name)
+                .cloned()
+                .or_else(|| value.ty.clone())
+                .map(|t| vec![(name.clone(), t)])
+                .unwrap_or_default();
+            Stmt::let_typed(param.pat.clone(), bt, value)
+        }
         _ => Stmt::Expr(value),
     }
 }
 
-/// `(fun p … -> body) arg` → `let p = arg` before the rest of the function,
-/// for a pure stage, or a last stage that its call runs;
-/// `{ stmts; f } arg` → `{ stmts; f arg }`, which evaluates in the same order.
-pub fn beta(e: &mut Expr) -> bool {
-    if let ExprKind::App {
-        func,
-        arg_first: false,
-        ..
-    } = &mut e.kind
-        && let ExprKind::Block(stmts, value) = &mut func.kind
-    {
-        let stmts = mem::take(stmts);
-        let value = mem::replace(&mut **value, Expr::new(ExprKind::Lit(Lit::Unit), e.span));
-        let span = e.span;
-        let ExprKind::App { arg, stage, .. } = mem::replace(&mut e.kind, ExprKind::Lit(Lit::Unit))
-        else {
-            unreachable!("matched above")
-        };
-        let app = ExprKind::App {
-            func: Box::new(value),
-            arg,
-            stage,
-            arg_first: false,
-        };
-        *e = Expr::new(ExprKind::Block(stmts, Box::new(Expr::new(app, span))), span);
-        return true;
-    }
-    let ExprKind::App {
-        func, arg, stage, ..
-    } = &mut e.kind
-    else {
-        return false;
-    };
-    // `a |> (fun x -> …)` evaluates `a` first too: the function value is inert
-    let ExprKind::Lambda { params, body } = &mut func.kind else {
-        return false;
-    };
-    if params
-        .first()
-        .is_none_or(|p| p.stage != *stage || !simple(&p.pat))
-        // a call of an effectful stage runs the body, which then runs here,
-        // in the stage of the call; a stage before others runs nothing
-        || (*stage != Stage::Pure && params.len() > 1)
-        // an `o?` returns from the function it is in, not from the one around
-        || (params.len() == 1 && exits(body))
-    {
-        return false;
-    }
-    let first = params.remove(0);
-    let arg = mem::replace(&mut **arg, Expr::new(ExprKind::Lit(Lit::Unit), e.span));
-    let rest = if params.is_empty() {
-        mem::replace(&mut **body, Expr::new(ExprKind::Lit(Lit::Unit), e.span))
-    } else {
-        mem::replace(&mut **func, Expr::new(ExprKind::Lit(Lit::Unit), e.span))
-    };
-    *e = Expr::new(
-        ExprKind::Block(vec![bind(&first.pat, arg)], Box::new(rest)),
-        e.span,
-    );
-    true
-}
+type AppliedGlobal<'a> = (&'a str, &'a str, &'a [TypeRef], Vec<&'a Expr>, bool);
 
 /// `f a b` or `b |> f a` of a top-level function, every stage pure: the
-/// function, and its arguments in the order of its parameters; whether the
-/// last one was written first, and so is evaluated first.
-fn applied_global(e: &Expr) -> Option<(&str, &str, Vec<&Expr>, bool)> {
+/// function, its type arguments, and its arguments in the order of its
+/// parameters; whether the last one was written first, and so is evaluated
+/// first.
+fn applied_global(e: &Expr) -> Option<AppliedGlobal<'_>> {
     let (mut head, mut piped) = (e, None);
     if let ExprKind::App {
         func,
@@ -374,11 +366,16 @@ fn applied_global(e: &Expr) -> Option<(&str, &str, Vec<&Expr>, bool)> {
         (head, piped) = (func, Some(&**arg));
     }
     let (head, mut args) = head.pure_spine();
-    let ExprKind::Global { module, name } = &head.kind else {
+    let ExprKind::Global {
+        module,
+        name,
+        type_args,
+    } = &head.kind
+    else {
         return None;
     };
     args.extend(piped);
-    Some((module, name, args, piped.is_some()))
+    Some((module, name, type_args, args, piped.is_some()))
 }
 
 /// Whether `body` reads `name` once, to call it.
@@ -424,35 +421,43 @@ fn substitute(e: &mut Expr, name: &str, value: &mut Option<Expr>) {
 /// passed to be taken apart is taken apart, and a result taken apart at
 /// once is never built. `data` is the locals in scope bound to data, or to
 /// a choice between data. Whether anything changed.
-pub fn shaped(e: &mut Expr, foreign: &Foreign, fresh: &mut usize, data: &mut Vec<String>) -> bool {
+pub fn shaped(
+    e: &mut Expr,
+    foreign: &Foreign,
+    fresh: &mut usize,
+    data: &mut Vec<String>,
+    preserve_types: bool,
+) -> bool {
     let mut changed = false;
     if let ExprKind::Block(stmts, result) = &mut e.kind {
         let mark = data.len();
         for stmt in stmts.iter_mut() {
             match stmt {
-                Stmt::Let(pat, v) => {
-                    changed |= shaped(v, foreign, fresh, data);
+                Stmt::Let { pat, value: v, .. } => {
+                    changed |= shaped(v, foreign, fresh, data, preserve_types);
                     if let Pat::Bind(name) = pat
                         && (built(v) || chooses(v))
                     {
                         data.push(name.clone());
                     }
                 }
-                Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
-                    changed |= shaped(v, foreign, fresh, data);
+                Stmt::Var { value: v, .. } | Stmt::Assign(_, v) | Stmt::Expr(v) => {
+                    changed |= shaped(v, foreign, fresh, data, preserve_types);
                 }
-                Stmt::Fun { value, .. } => changed |= shaped(value, foreign, fresh, data),
+                Stmt::Fun { value, .. } => {
+                    changed |= shaped(value, foreign, fresh, data, preserve_types);
+                }
             }
         }
-        changed |= shaped(result, foreign, fresh, data);
+        changed |= shaped(result, foreign, fresh, data, preserve_types);
         data.truncate(mark);
         return changed;
     }
-    e.each_child_mut(&mut |c| changed |= shaped(c, foreign, fresh, data));
+    e.each_child_mut(&mut |c| changed |= shaped(c, foreign, fresh, data, preserve_types));
     if let ExprKind::Match(scrutinee, _) = &mut e.kind {
-        changed |= shape(scrutinee, foreign, fresh, data, true);
+        changed |= shape(scrutinee, foreign, fresh, data, true, preserve_types);
     }
-    changed | shape(e, foreign, fresh, data, false)
+    changed | shape(e, foreign, fresh, data, false, preserve_types)
 }
 
 /// Inlines the application `e` when it spares an object; `taken_apart`
@@ -463,11 +468,12 @@ fn shape(
     fresh: &mut usize,
     data: &[String],
     taken_apart: bool,
+    preserve_types: bool,
 ) -> bool {
-    let Some((module, name, args, piped)) = applied_global(e) else {
+    let Some((module, name, type_args, args, piped)) = applied_global(e) else {
         return false;
     };
-    let Some((params, mut body)) = foreign.body(module, name, true) else {
+    let Some((type_params, params, mut body)) = foreign.body(module, name, true) else {
         return false;
     };
     if args.len() != params.len() {
@@ -488,21 +494,10 @@ fn shape(
     if !(called.contains(&true) || apart || (taken_apart && ends_in_data(&body))) {
         return false;
     }
+    let type_args: Vec<TypeRef> = type_args.to_vec();
     let args: Vec<Expr> = args.into_iter().cloned().collect();
     respan(&mut body, e.span);
-    *fresh += 1;
-    let suffix = format!("$i{fresh}");
-    let mut lambda = Expr::new(
-        ExprKind::Lambda {
-            params,
-            body: Box::new(body),
-        },
-        e.span,
-    );
-    rename(&mut lambda, &suffix);
-    let ExprKind::Lambda { params, mut body } = lambda.kind else {
-        unreachable!("a lambda stays one when renamed")
-    };
+    let (params, mut body) = prepare_lambda(&type_params, params, body, &type_args, e.span, fresh);
     let last = params.len() - 1;
     let mut stmts = Vec::new();
     for (i, ((p, a), called)) in params.iter().zip(args).zip(called).enumerate() {
@@ -510,10 +505,13 @@ fn shape(
             // made where it is called: making a function shows nothing
             Pat::Bind(x) if called => substitute(&mut body, x, &mut Some(a)),
             // the argument written first, of `a |> f`, is evaluated first
-            pat if piped && i == last => stmts.insert(0, bind(pat, a)),
-            pat => stmts.push(bind(pat, a)),
+            _ if piped && i == last => stmts.insert(0, bind(p, a)),
+            _ => stmts.push(bind(p, a)),
         }
     }
-    *e = Expr::new(ExprKind::Block(stmts, body), e.span);
+    let ty = preserve_types
+        .then(|| e.ty.clone().or_else(|| body.ty.clone()))
+        .flatten();
+    *e = Expr::with_ty(ExprKind::Block(stmts, body), e.span, ty);
     true
 }

@@ -6,6 +6,7 @@ mod launches;
 mod packages;
 mod steps;
 mod tests;
+mod typed_ir;
 
 use std::hint;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -62,6 +63,7 @@ fn case(request: &BuildRequest) -> &str {
                         "Fixture.CommonJs" => Some("commonjs"),
                         "Fixture.Steps" => Some("steps"),
                         "Fixture.StepsEscape" => Some("steps-escape"),
+                        "Fixture.TypedIr" => Some("typed-ir"),
                         _ => None,
                     })
                     .unwrap_or("")
@@ -180,7 +182,7 @@ impl Backend for Literal {
                 version: "1.0.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.13.0", "0.14.0"),
+            ir: range("0.14.0", "0.15.0"),
             language: range("0.1.0", "0.2.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
@@ -240,6 +242,12 @@ impl Backend for Literal {
         }
         let program =
             Program::from_cbor(&request.program).map_err(|e| diagnostic(&e.to_string(), None))?;
+        if case(request) == "typed-ir" {
+            typed_ir::validate_program(&program, request)?;
+            return Ok(TargetSupport {
+                capabilities: self.describe().capabilities,
+            });
+        }
         if request.target.host_package.is_none() && case(request) != "env" {
             for module in &program.modules {
                 if !request
@@ -259,7 +267,7 @@ impl Backend for Literal {
                     if tests::supported(item, request) {
                         continue;
                     }
-                    let supported = matches!(&item.kind, ItemKind::Value { name, dicts, body }
+                    let supported = matches!(&item.kind, ItemKind::Value { name, dicts, body, .. }
                         if name == "main" && dicts.is_empty()
                         && matches!(&body.kind, ExprKind::Lambda { params, body }
                             if params.len() == 1 && params[0].stage == Stage::Pure
@@ -337,52 +345,8 @@ impl Backend for Literal {
             kind: ArtifactKind::Resource,
             bytes: vec![0, 255, 128],
         });
-        if case(request) == "ir" {
-            artifacts.push(Artifact {
-                id: "request-ir".into(),
-                path: "request.ir.cbor".into(),
-                kind: ArtifactKind::Metadata,
-                bytes: request.program.clone(),
-            });
-        }
-        if case(request) == "state" {
-            static COUNT: AtomicU32 = AtomicU32::new(0);
-            artifacts.push(Artifact {
-                id: "state".into(),
-                path: "state.bin".into(),
-                kind: ArtifactKind::Resource,
-                bytes: COUNT.fetch_add(1, Ordering::Relaxed).to_le_bytes().to_vec(),
-            });
-        }
-        if case(request) == "path" {
-            artifacts[0].path = "../outside.js".into();
-        }
-        if case(request) == "duplicate" {
-            artifacts.push(artifacts[0].clone());
-        }
-        let diagnostics = if matches!(case(request), "warning" | "note") {
-            let mut diagnostics = diagnostic("successful backend diagnostic", None);
-            diagnostics[0].severity = if case(request) == "note" {
-                Severity::Note
-            } else {
-                Severity::Warning
-            };
-            diagnostics
-        } else if case(request) == "span" {
-            vec![Diagnostic {
-                code: "P012".into(),
-                severity: Severity::Warning,
-                message: "bad span".into(),
-                span: Some(Span {
-                    file: u32::MAX,
-                    start: 0,
-                    end: 1,
-                }),
-                notes: vec![],
-            }]
-        } else {
-            vec![]
-        };
+        apply_case_artifacts(request, &mut artifacts)?;
+        let diagnostics = case_diagnostics(request);
         let mut launches = launches::run(request, &mut artifacts);
         let runtime_dependencies = tests::runner(request, &mut artifacts, &mut launches);
         Ok(BuildResult {
@@ -392,6 +356,64 @@ impl Backend for Literal {
             launches,
             diagnostics,
         })
+    }
+}
+
+fn apply_case_artifacts(
+    request: &BuildRequest,
+    artifacts: &mut Vec<Artifact>,
+) -> Result<(), Vec<Diagnostic>> {
+    match case(request) {
+        "typed-ir" => {
+            let program = Program::from_cbor(&request.program)
+                .map_err(|e| diagnostic(&e.to_string(), None))?;
+            artifacts.push(typed_ir::report_artifact(program, request)?);
+        }
+        "ir" => artifacts.push(Artifact {
+            id: "request-ir".into(),
+            path: "request.ir.cbor".into(),
+            kind: ArtifactKind::Metadata,
+            bytes: request.program.clone(),
+        }),
+        "state" => {
+            static COUNT: AtomicU32 = AtomicU32::new(0);
+            artifacts.push(Artifact {
+                id: "state".into(),
+                path: "state.bin".into(),
+                kind: ArtifactKind::Resource,
+                bytes: COUNT.fetch_add(1, Ordering::Relaxed).to_le_bytes().to_vec(),
+            });
+        }
+        "path" => artifacts[0].path = "../outside.js".into(),
+        "duplicate" => artifacts.push(artifacts[0].clone()),
+        _ => {}
+    }
+    Ok(())
+}
+
+fn case_diagnostics(request: &BuildRequest) -> Vec<Diagnostic> {
+    if matches!(case(request), "warning" | "note") {
+        let mut diagnostics = diagnostic("successful backend diagnostic", None);
+        diagnostics[0].severity = if case(request) == "note" {
+            Severity::Note
+        } else {
+            Severity::Warning
+        };
+        diagnostics
+    } else if case(request) == "span" {
+        vec![Diagnostic {
+            code: "P012".into(),
+            severity: Severity::Warning,
+            message: "bad span".into(),
+            span: Some(Span {
+                file: u32::MAX,
+                start: 0,
+                end: 1,
+            }),
+            notes: vec![],
+        }]
+    } else {
+        vec![]
     }
 }
 

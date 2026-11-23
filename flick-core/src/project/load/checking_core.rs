@@ -240,7 +240,8 @@ impl Checking<'_> {
             })
             .filter_map(|argument| Self::argument_interface(argument, lookup, contracts))
             .collect();
-        let (mut checked, typing) = types::check_typed_with_static_context(
+        #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
+        let (mut checked, mut typing) = types::check_typed_with_static_context(
             &module,
             &projected_lookup,
             types::builtins_of(self.stages_by_class),
@@ -249,6 +250,10 @@ impl Checking<'_> {
             types::StaticContext {
                 dictionaries: &local_dictionaries,
                 witnesses: &witnesses,
+                #[cfg(not(target_arch = "wasm32"))]
+                ir_lookup: Some(lookup),
+                skip_ir_types: !self.lower
+                    || (self.cache.is_some() && self.cached_ir != CachedIr::Kept),
             },
         );
         if let Some(mut expected) = result_signature {
@@ -334,6 +339,8 @@ impl Checking<'_> {
             &mut declarations,
             &mut diagnostics,
         );
+        #[cfg(not(target_arch = "wasm32"))]
+        typing.clear_ir_types();
         if let Some(ir) = &mut ir {
             for scope in self
                 .modules
@@ -391,7 +398,11 @@ impl Checking<'_> {
                 ..exported(&interface, clean)
             },
             interface,
-            ir: ir.filter(|_| self.cache.is_none() || self.cached_ir == CachedIr::Kept || self.proving),
+            ir: ir
+                .filter(|_| {
+                    self.cache.is_none() || self.cached_ir != CachedIr::Dropped || self.proving
+                })
+                .map(Arc::new),
             declarations,
             proofs,
         }
@@ -433,6 +444,18 @@ impl Checking<'_> {
             }
         }
         None
+    }
+}
+
+/// Takes where `imported` declares the names `interface` re-exports.
+fn redeclare(interface: &mut Interface, imported: &Interface) {
+    for export in &mut interface.exports {
+        if export.entity.module == interface.module {
+            continue;
+        }
+        if let Some(found) = imported.exports.iter().find(|e| e.entity == export.entity) {
+            export.at = found.at;
+        }
     }
 }
 

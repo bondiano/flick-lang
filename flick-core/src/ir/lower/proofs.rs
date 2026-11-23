@@ -333,7 +333,7 @@ fn imported_lemmas(proofs: &[Proven], run: &Run, depth: u32) -> Vec<logic::Lemma
 
 /// The modules of the lemmas `e` names as `M.name`.
 fn lemma_modules(e: &Expr, out: &mut Vec<String>) {
-    if let ExprKind::Global { module, name } = &e.kind
+    if let ExprKind::Global { module, name, .. } = &e.kind
         && module == logic::LEMMAS
         && let Some((m, _)) = name.rsplit_once('.')
     {

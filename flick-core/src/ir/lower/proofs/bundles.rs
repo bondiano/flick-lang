@@ -146,7 +146,7 @@ impl Checking<'_, '_> {
             stated.goal = GoalType::Equal(at_bundle(t));
         }
         let statement = statement(&at, &stated)?;
-        let ExprKind::Global { module, name } = &field.value.kind else {
+        let ExprKind::Global { module, name, .. } = &field.value.kind else {
             return Err(invalid(
                 field.span,
                 "a law's field names the proof of it".into(),

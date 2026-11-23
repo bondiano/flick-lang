@@ -4,12 +4,13 @@ use crate::build::builtin_modules;
 use crate::codegen::test_options::resolved_by;
 use crate::codegen::{EffectBridge, Known, Labels, Options, js};
 use crate::effects::rt_specifier;
+use crate::ir::lang_items;
 use crate::ir::tests::check_text;
-use crate::ir::{Expr, lang_items};
 use crate::types::builtins;
+use flick_backend_support::opt::Generic;
 
 /// A generic function of a built-in module, as a build offers it.
-pub(super) fn builtin_generic(module: &str, name: &str) -> Option<(Vec<String>, Expr)> {
+pub(super) fn builtin_generic(module: &str, name: &str) -> Option<Generic> {
     let ir = builtin_modules().iter().find(|m| m.name == module)?;
     let interface = builtins().iter().find(|i| i.module == module)?;
     super::names_only(ir, name, &|n| interface.exports_value(n))

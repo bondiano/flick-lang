@@ -106,12 +106,12 @@ fn pure_block(
     let mut vars = inner_vars.clone();
     for stmt in stmts {
         match stmt {
-            Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => {
+            Stmt::Let { value: v, .. } | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => {
                 if !pure_body(v, &vars, inner_loops) {
                     return false;
                 }
             }
-            Stmt::Var(name, v) => {
+            Stmt::Var { name, value: v, .. } => {
                 if !pure_body(v, &vars, inner_loops) {
                     return false;
                 }
@@ -159,12 +159,12 @@ pub(super) fn no_outer_var_or_exit(
             let mut vars = inner_vars.clone();
             for stmt in stmts {
                 match stmt {
-                    Stmt::Let(_, v) | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => {
+                    Stmt::Let { value: v, .. } | Stmt::Expr(v) | Stmt::Fun { value: v, .. } => {
                         if !no_outer_var_or_exit(v, &vars, inner_loops) {
                             return false;
                         }
                     }
-                    Stmt::Var(name, v) => {
+                    Stmt::Var { name, value: v, .. } => {
                         if !no_outer_var_or_exit(v, &vars, inner_loops) {
                             return false;
                         }

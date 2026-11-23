@@ -115,15 +115,15 @@ fn contains_with_owner_defer(e: &Expr) -> bool {
             ExprKind::WithOwnerEvidence(_, body)
                 if contains_expr(body, &|k| matches!(
                     k,
-                    ExprKind::Global { module, name } if module == "Scope" && name == "defer"
+                    ExprKind::Global { module, name, .. } if module == "Scope" && name == "defer"
                 ))
         ) || matches!(
             kind,
             ExprKind::Block(stmts, tail)
                 if stmts.iter().any(|s| matches!(
                     s,
-                    Stmt::Let(_, rhs)
-                        if matches!(&rhs.kind, ExprKind::Global { module, name } if module == "Scope" && name == "defer")
+                    Stmt::Let { value: rhs, .. }
+                        if matches!(&rhs.kind, ExprKind::Global { module, name, .. } if module == "Scope" && name == "defer")
                 )) && contains_expr(tail, &|k| matches!(k, ExprKind::WithOwnerEvidence(..)))
         )
     })
@@ -179,7 +179,7 @@ let run () = scope outer {
     );
     assert!(
         contains_expr(run_body, &|k| {
-            matches!(k, ExprKind::Global { module, name } if module == "Exit" && name == "is_failure")
+            matches!(k, ExprKind::Global { module, name, .. } if module == "Exit" && name == "is_failure")
         }),
         "expected Exit.is_failure in errdefer IR:\n{run_body:#?}"
     );

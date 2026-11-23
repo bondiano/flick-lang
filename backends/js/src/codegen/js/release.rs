@@ -14,7 +14,9 @@ use crate::ir::{Expr, ExprKind, Item, ItemKind, Stage};
 /// importer calls `name$n` for a full application.
 pub fn exported_worker(item: &Item) -> Option<(&str, usize)> {
     let (name, arity, before_last_pure) = match &item.kind {
-        ItemKind::Value { name, dicts, body } if dicts.is_empty() => match &body.kind {
+        ItemKind::Value {
+            name, dicts, body, ..
+        } if dicts.is_empty() => match &body.kind {
             ExprKind::Lambda { params, .. } => (
                 name,
                 params.len(),
@@ -51,7 +53,9 @@ pub(super) fn workers(
     items
         .iter()
         .filter_map(|item| match &item.kind {
-            ItemKind::Value { name, dicts, body } if dicts.is_empty() => match &body.kind {
+            ItemKind::Value {
+                name, dicts, body, ..
+            } if dicts.is_empty() => match &body.kind {
                 ExprKind::Lambda { params, .. }
                     if params.len() >= 2
                         && params[..params.len() - 1]
@@ -88,7 +92,9 @@ fn count_calls<'a>(e: &'a Expr, module: &str, out: &mut HashMap<&'a str, HashMap
         head = func;
         n += 1;
     }
-    if let ExprKind::Global { module: m, name } = &head.kind
+    if let ExprKind::Global {
+        module: m, name, ..
+    } = &head.kind
         && m == module
     {
         *out.entry(name.as_str()).or_default().entry(n).or_default() += 1;

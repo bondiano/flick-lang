@@ -77,6 +77,7 @@ fn every_passing_fixture_lowers() {
     let mut paths = Vec::new();
     paths.extend(fixture_files(&root, "fl"));
     let builtin = |m: &str| types::builtins().iter().any(|b| b.module == m);
+    let mut all_failures = Vec::new();
     for path in paths {
         let text = fs::read_to_string(&path).expect("utf-8");
         match lower_text("Fixture", &text) {
@@ -94,7 +95,9 @@ fn every_passing_fixture_lowers() {
                     lang: super::lang_items(),
                 };
                 let problems = flick_ir::validate(&program, &builtin, &files);
-                assert!(problems.is_empty(), "{}: {problems:?}", path.display());
+                if !problems.is_empty() {
+                    all_failures.push(format!("{}: {problems:?}", path.display()));
+                }
             }
             // blocks compiled by later phases are reported, never miscompiled
             Err(d) => assert!(
@@ -104,6 +107,12 @@ fn every_passing_fixture_lowers() {
             ),
         }
     }
+    assert!(
+        all_failures.is_empty(),
+        "{} fixture(s) failed validation:\n{}",
+        all_failures.len(),
+        all_failures.join("\n")
+    );
 }
 
 #[test]
@@ -255,7 +264,7 @@ fn ir_carries_the_checker_types() {
                 ExprKind::App { .. } => "app",
                 _ => "",
             };
-            let ty = e.ty.as_ref().map_or("none".to_owned(), |t| t.name.clone());
+            let ty = e.ty.as_ref().map_or("none".to_owned(), ToString::to_string);
             if !kind.is_empty() {
                 seen.push(format!("{name} {kind} {ty}"));
             }
@@ -263,10 +272,10 @@ fn ir_carries_the_checker_types() {
         }
     }
     for want in [
-        "area arith Float",
-        "area local Float",
-        "ident local none",
-        "label app String",
+        "area arith Prelude.Float",
+        "area local Prelude.Float",
+        "ident local a",
+        "label app Prelude.String",
     ] {
         assert!(seen.iter().any(|s| s == want), "no `{want}` in {seen:?}");
     }
@@ -393,3 +402,7 @@ fn equality_in_a_local_function_compares_by_identity() {
 
 #[path = "owner_tests.rs"]
 mod owner_tests;
+#[path = "typed_ir_more_tests.rs"]
+mod typed_ir_more_tests;
+#[path = "typed_ir_tests.rs"]
+mod typed_ir_tests;

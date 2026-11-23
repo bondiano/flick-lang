@@ -5,14 +5,14 @@ impl Builder {
     pub(super) fn map2(&self) -> Expr {
         let row_more = self.block(
             vec![
-                Stmt::Let(
+                Stmt::let_bind(
                     Self::bind("mapped"),
                     self.apply(
                         "callback",
                         vec![self.local("leftHead"), self.local("rightHead")],
                     ),
                 ),
-                Stmt::Let(
+                Stmt::let_bind(
                     Self::bind("rest"),
                     self.apply("row", vec![self.local("leftHead"), self.local("rightTail")]),
                 ),
@@ -34,11 +34,11 @@ impl Builder {
         // eager recursion as a callback argument would reverse callback order.
         let outer_more = self.block(
             vec![
-                Stmt::Let(
+                Stmt::let_bind(
                     Self::bind("rowValues"),
                     self.apply("row", vec![self.local("head"), self.local("right")]),
                 ),
-                Stmt::Let(
+                Stmt::let_bind(
                     Self::bind("rest"),
                     self.apply("outer", vec![self.local("tail")]),
                 ),
@@ -188,7 +188,7 @@ mod tests {
             };
             assert_eq!(steps.len(), 2);
             for (step, expected) in steps.iter().zip([first, second]) {
-                let Stmt::Let(_, value) = step else {
+                let Stmt::Let { value, .. } = step else {
                     panic!("explicit result binding")
                 };
                 assert_eq!(callee(value), expected);

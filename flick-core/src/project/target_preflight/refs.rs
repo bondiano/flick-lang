@@ -75,7 +75,7 @@ pub(super) fn collect_expr_references(
 ) {
     let at = span_for(expr.span);
     match &expr.kind {
-        ExprKind::Global { module, name } => {
+        ExprKind::Global { module, name, .. } => {
             out.push(Reference::Value {
                 key: (module.clone(), name.clone()),
                 span: at,
@@ -151,7 +151,7 @@ pub(super) fn collect_expr_references(
                 if !is_active {
                     continue;
                 }
-                if let Stmt::Let(pat, _) = stmt {
+                if let Stmt::Let { pat, .. } = stmt {
                     collect_pat_references(pat, at, out);
                 }
                 collect_expr_references(stmt_expr(stmt), span_for, covered, out);
@@ -243,7 +243,7 @@ pub(super) fn initialization_refs(item: &Item, out: &mut Vec<Reference>) {
         }
         let span_for = |s: Span| Some(s);
         match &expr.kind {
-            ExprKind::Global { module, name } => out.push(Reference::Value {
+            ExprKind::Global { module, name, .. } => out.push(Reference::Value {
                 key: (module.clone(), name.clone()),
                 span: Some(expr.span),
                 covered: 0,

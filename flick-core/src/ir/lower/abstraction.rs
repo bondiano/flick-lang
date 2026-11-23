@@ -24,8 +24,8 @@ fn depends(e: &Expr, names: &[String]) -> bool {
 }
 fn statement(s: &Stmt) -> &Expr {
     match s {
-        Stmt::Let(_, e)
-        | Stmt::Var(_, e)
+        Stmt::Let { value: e, .. }
+        | Stmt::Var { value: e, .. }
         | Stmt::Assign(_, e)
         | Stmt::Expr(e)
         | Stmt::Fun { value: e, .. } => e,
@@ -36,6 +36,7 @@ fn statement(s: &Stmt) -> &Expr {
 /// lambda, so mutable reads and lexical exits keep their original timing.
 pub(super) fn abstract_value(names: Vec<String>, body: Expr) -> Expr {
     let span = body.span;
+    let ty = body.ty.clone();
     let kind = match &body.kind {
         ExprKind::LoopExit { value, .. } if value.as_ref().is_none_or(|e| !depends(e, &names)) => {
             return body;
@@ -71,7 +72,7 @@ pub(super) fn abstract_value(names: Vec<String>, body: Expr) -> Expr {
         _ => None,
     };
     if let Some(kind) = kind {
-        return Expr::new(kind, span);
+        return Expr::with_ty(kind, span, ty);
     }
-    Expr::new(ExprKind::Abstract(names, Box::new(body)), span)
+    Expr::with_ty(ExprKind::Abstract(names, Box::new(body)), span, ty)
 }

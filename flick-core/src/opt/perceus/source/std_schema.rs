@@ -401,7 +401,10 @@ fn schema_recursive(b: &ExprBuilder) -> Expr {
             vec![Stmt::Fun {
                 name: b.name("self"),
                 rec: true,
+                type_params: Vec::new(),
                 dicts: vec![],
+                dict_constraints: Vec::new(),
+                ty: None,
                 value: b.lam(
                     &["_u"],
                     b.app2(

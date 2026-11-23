@@ -185,6 +185,7 @@ impl Builder {
                     pat: Self::bind(name),
                     stage: Stage::Pure,
                     ty: None,
+                    binder_types: Vec::new(),
                 })
                 .collect(),
             body: Box::new(body),
@@ -193,6 +194,7 @@ impl Builder {
     fn arm(pat: Pat, body: Expr) -> Arm {
         Arm {
             pat,
+            binder_types: Vec::new(),
             guard: None,
             body,
         }
@@ -213,7 +215,10 @@ impl Builder {
         Stmt::Fun {
             name: format!("$collection.{name}"),
             rec: true,
+            type_params: vec![],
             dicts: vec![],
+            dict_constraints: vec![],
+            ty: None,
             value: self.lambda(params, body),
         }
     }
@@ -228,6 +233,8 @@ impl Builder {
             arity: 0,
             dicts: 0,
             rep: Rep::Tagged,
+            fields: Vec::new(),
+            type_args: Vec::new(),
         }
     }
     fn order(&self, name: &str) -> Expr {
@@ -260,11 +267,11 @@ impl Builder {
         // Explicit lets lock callback-before-recursion and once-per-element.
         let more = self.block(
             vec![
-                Stmt::Let(
+                Stmt::let_bind(
                     Self::bind("mapped"),
                     self.apply("callback", vec![self.local("head")]),
                 ),
-                Stmt::Let(
+                Stmt::let_bind(
                     Self::bind("rest"),
                     self.apply("loop", vec![self.local("tail")]),
                 ),
@@ -301,7 +308,7 @@ impl Builder {
             self.local("hashed"),
         );
         let more = self.block(
-            vec![Stmt::Let(
+            vec![Stmt::let_bind(
                 Self::bind("hashed"),
                 self.apply("callback", vec![self.local("head")]),
             )],
@@ -329,7 +336,7 @@ impl Builder {
         // Transfer the accumulator through the callback exactly once, before
         // visiting the next element. Empty input returns the seed untouched.
         let more = self.block(
-            vec![Stmt::Let(
+            vec![Stmt::let_bind(
                 Self::bind("next"),
                 self.apply("callback", vec![self.local("acc"), self.local("head")]),
             )],
@@ -357,7 +364,7 @@ impl Builder {
         // Recurse before even the first curried application of the callback:
         // a pure callback may already diverge or defect at that first stage.
         let more = self.block(
-            vec![Stmt::Let(
+            vec![Stmt::let_bind(
                 Self::bind("rest"),
                 self.apply("loop", vec![self.local("acc"), self.local("tail")]),
             )],

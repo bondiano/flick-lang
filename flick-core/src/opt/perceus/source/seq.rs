@@ -126,13 +126,15 @@ impl Lower<'_> {
                 arity: 1,
                 dicts: 0,
                 rep: Rep::Tagged,
+                fields: Vec::new(),
+                type_args: Vec::new(),
             },
             vec![Pat::Bind(bind.into())],
         );
         let matched = code.emit(
             Operation::Match {
                 object: next,
-                pattern,
+                pattern: Box::new(pattern),
             },
             span,
         )?;
@@ -337,6 +339,7 @@ impl SeqBuilder {
                     pat: Pat::Bind(Self::vname(n)),
                     stage: Stage::Pure,
                     ty: None,
+                    binder_types: Vec::new(),
                 })
                 .collect(),
             body: Box::new(body),
@@ -384,6 +387,7 @@ impl SeqBuilder {
         self.at(ExprKind::Each {
             stop: None,
             pat: Pat::Bind(Self::vname(item)),
+            binder_types: Vec::new(),
             source: Box::new(src),
             body: Box::new(body),
         })
@@ -410,6 +414,8 @@ impl SeqBuilder {
             arity: 1,
             dicts: 0,
             rep: Rep::Tagged,
+            fields: Vec::new(),
+            type_args: Vec::new(),
         }
     }
     fn none_con() -> Constructor {
@@ -420,6 +426,8 @@ impl SeqBuilder {
             arity: 0,
             dicts: 0,
             rep: Rep::Tagged,
+            fields: Vec::new(),
+            type_args: Vec::new(),
         }
     }
     fn some(&self, v: Expr) -> Expr {

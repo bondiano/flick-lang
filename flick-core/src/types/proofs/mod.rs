@@ -220,13 +220,16 @@ impl Checker<'_> {
                 arity: 1,
                 rep: Rep::Unboxed,
                 dicts: 0,
+                fields: Vec::new(),
+                type_args: Vec::new(),
             };
             self.record_name(span, Ref::Constructor(constructor));
             return Some(made);
         }
         let scheme = self.env.value(&entity).cloned()?;
-        let t = self.instantiate(&self.live_scheme(&scheme), span);
-        self.record_entity(&entity, &t, span);
+        let live = self.live_scheme(&scheme);
+        let (t, type_args) = self.instantiate_args(&live, span);
+        self.record_entity_args(&entity, &t, type_args, span);
         Some(t)
     }
 

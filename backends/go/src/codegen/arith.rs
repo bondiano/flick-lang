@@ -10,7 +10,7 @@ use super::Gen;
 use super::layout::{Code, block, call, statement};
 use flick_backend_support::Known;
 use flick_ir::{Arith, Num};
-use flick_ir::{BinOp, Expr, ExprKind, Lit, TypeName};
+use flick_ir::{BinOp, Expr, ExprKind, IrType, Lit};
 
 /// A type whose values are Go's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -63,8 +63,8 @@ impl Native {
     }
 
     /// The type of values of type `ty`, when it is one of these.
-    pub(super) fn of(lang: &Known, ty: Option<&TypeName>) -> Option<Native> {
-        let ty = ty?;
+    pub(super) fn of(lang: &Known, ty: Option<&IrType>) -> Option<Native> {
+        let (module, name) = ty?.as_bare_con()?;
         [
             (Lang::Int, Native::Int),
             (Lang::Float, Native::Float),
@@ -72,7 +72,7 @@ impl Native {
             (Lang::String, Native::String),
         ]
         .into_iter()
-        .find(|&(item, _)| lang.is(item, &ty.module, &ty.name))
+        .find(|&(item, _)| lang.is(item, module, name))
         .map(|(_, native)| native)
     }
 }

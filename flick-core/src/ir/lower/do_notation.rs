@@ -71,19 +71,25 @@ impl Lower<'_> {
                     None => Expr::new(ExprKind::Lit(Lit::Unit), at),
                 };
                 let mark = self.scope.len();
-                let pat = pattern.map_or(Pat::Wild, |p| self.pattern(p));
+                let (pat, binder_types) =
+                    pattern.map_or((Pat::Wild, Vec::new()), |p| self.pattern_typed(p));
+                let param_ty = pattern.and_then(|p| self.ir_type(p.range()));
                 let body = self.do_rest(rest, span);
                 self.scope.truncate(mark);
-                let continuation = Expr::new(
+                let params = vec![Param {
+                    pat,
+                    stage: Stage::Pure,
+                    ty: param_ty,
+                    binder_types,
+                }];
+                let lam_ty = super::types::lambda_type(&params, &body);
+                let continuation = Expr::with_ty(
                     ExprKind::Lambda {
-                        params: vec![Param {
-                            pat,
-                            stage: Stage::Pure,
-                            ty: None,
-                        }],
+                        params,
                         body: Box::new(body),
                     },
                     at,
+                    lam_ty,
                 );
                 let app = |func, arg| ExprKind::App {
                     func: Box::new(func),
@@ -110,6 +116,7 @@ impl Lower<'_> {
         let method = ExprKind::Method {
             dict,
             name: name.to_owned(),
+            type_args: self.ir_type_args(key),
         };
         with_dicts(Expr::new(method, span), dicts)
     }

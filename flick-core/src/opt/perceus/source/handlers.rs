@@ -33,6 +33,7 @@ impl Lower<'_> {
                 pat: Pat::Wild,
                 stage: Stage::Pure,
                 ty: None,
+                binder_types: Vec::new(),
             }],
             &handler.body,
             env,

@@ -27,6 +27,7 @@ fn call(module: &str, method: &str) -> Expr {
                 args: vec![],
             },
             name: method.into(),
+            type_args: vec![],
         },
         at,
     );
@@ -102,6 +103,7 @@ fn global() -> Expr {
     expr(ExprKind::Global {
         module: "Test".into(),
         name: "value".into(),
+        type_args: vec![],
     })
 }
 
@@ -125,6 +127,7 @@ fn named_match_retains_a_binder_needed_by_an_evidence_bracket() {
             Box::new(global()),
             vec![Arm {
                 pat: Pat::Bind("spilled".into()),
+                binder_types: vec![],
                 guard: None,
                 body: bracket(position),
             }],
@@ -172,13 +175,14 @@ fn opened() -> Expr {
             class: "Base".into(),
         },
         name: "render".into(),
+        type_args: vec![],
     })
 }
 
 #[test]
 fn dictionary_metadata_reads_participate_in_use_counts_and_alpha_renaming() {
     let mut body = expr(ExprKind::Block(
-        vec![Stmt::Let(Pat::Bind("module".into()), global())],
+        vec![Stmt::let_bind(Pat::Bind("module".into()), global())],
         Box::new(opened()),
     ));
     assert_eq!(body.uses("module"), 1);
@@ -206,17 +210,20 @@ fn dictionary_substitution_accepts_local_aliases_but_retains_nonlocal_bindings()
 #[test]
 fn propagation_without_named_lets_preserves_statements_and_metadata() {
     let mut statements = vec![
-        Stmt::Let(
+        Stmt::let_bind(
             Pat::Tuple(vec![Pat::Bind("part".into())]),
             expr(ExprKind::Tuple(vec![global()])),
         ),
         Stmt::Fun {
             name: "helper".into(),
             rec: true,
+            type_params: vec![],
             dicts: vec![],
+            dict_constraints: vec![],
+            ty: None,
             value: bracket(0),
         },
-        Stmt::Var("state".into(), local("part")),
+        Stmt::var("state".into(), None, local("part")),
         Stmt::Assign("state".into(), local("helper")),
         Stmt::Expr(opened()),
     ];
@@ -235,19 +242,23 @@ fn simplification_visits_named_lets_inside_function_only_blocks() {
     let function = |body| Stmt::Fun {
         name: "helper".into(),
         rec: false,
+        type_params: vec![],
         dicts: vec![],
+        dict_constraints: vec![],
+        ty: None,
         value: expr(ExprKind::Lambda {
             params: vec![flick_ir::Param {
                 pat: Pat::Wild,
                 stage: Stage::Pure,
                 ty: None,
+                binder_types: vec![],
             }],
             body: Box::new(body),
         }),
     };
     let mut body = expr(ExprKind::Block(
         vec![function(expr(ExprKind::Block(
-            vec![Stmt::Let(Pat::Bind("answer".into()), answer.clone())],
+            vec![Stmt::let_bind(Pat::Bind("answer".into()), answer.clone())],
             Box::new(local("answer")),
         )))],
         Box::new(local("helper")),
@@ -275,10 +286,13 @@ fn nonmovable_named_lets_leave_function_bodies_untouched() {
         Stmt::Fun {
             name: "helper".into(),
             rec: true,
+            type_params: vec![],
             dicts: vec![],
+            dict_constraints: vec![],
+            ty: None,
             value: bracket(0),
         },
-        Stmt::Let(Pat::Bind("raw".into()), raw),
+        Stmt::let_bind(Pat::Bind("raw".into()), raw),
     ];
     let mut result = expr(ExprKind::Tuple(vec![local("raw"), local("helper")]));
     let original = (statements.clone(), result.clone());
@@ -304,12 +318,13 @@ fn partial_applications_can_move_to_their_completing_use() {
                 pat: Pat::Bind("second".into()),
                 stage: Stage::Pure,
                 ty: None,
+                binder_types: vec![],
             }],
             body: Box::new(body),
         })
     };
     let partial = apply(global(), local("first"));
-    let mut statements = vec![Stmt::Let(Pat::Bind("partial".into()), partial.clone())];
+    let mut statements = vec![Stmt::let_bind(Pat::Bind("partial".into()), partial.clone())];
     let mut result = function(apply(local("partial"), local("second")));
     assert!(super::propagate(
         &mut statements,

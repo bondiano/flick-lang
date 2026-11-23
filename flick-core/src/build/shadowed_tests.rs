@@ -125,7 +125,7 @@ fn shadowed_builtin_module_foreign_homonym_is_never_folded_in_optimized_ir() {
                 &result_body.kind,
                 ExprKind::App { func, .. }
                     if matches!(&func.kind, ExprKind::Local(n) if n == "parse")
-                        || matches!(&func.kind, ExprKind::Global { module, name } if module == "Int" && name == "parse")
+                        || matches!(&func.kind, ExprKind::Global { module, name, .. } if module == "Int" && name == "parse")
             ),
             "shadowed Int.parse must stay a call (by_class={by_class}): {result_body:?}"
         );
@@ -135,7 +135,7 @@ fn shadowed_builtin_module_foreign_homonym_is_never_folded_in_optimized_ir() {
             matches!(
                 &caller_body.kind,
                 ExprKind::App { func, .. }
-                    if matches!(&func.kind, ExprKind::Global { module, name } if module == "Int" && name == "parse")
+                    if matches!(&func.kind, ExprKind::Global { module, name, .. } if module == "Int" && name == "parse")
             ),
             "caller Int.parse must stay a call (by_class={by_class}): {caller_body:?}"
         );

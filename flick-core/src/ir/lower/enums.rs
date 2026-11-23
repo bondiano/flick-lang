@@ -29,6 +29,7 @@ pub fn companions(ty: &str, constructors: &[Constructor], span: Span) -> Vec<Ite
             pat,
             stage: Stage::Pure,
             ty: None,
+            binder_types: Vec::new(),
         }];
         at(ExprKind::Lambda {
             params,
@@ -45,6 +46,7 @@ pub fn companions(ty: &str, constructors: &[Constructor], span: Span) -> Vec<Ite
         .collect();
     let value = literals.iter().map(|(c, lit)| Arm {
         pat: Pat::Con((*c).clone(), Vec::new()),
+        binder_types: Vec::new(),
         guard: None,
         body: at(ExprKind::Lit(lit.clone())),
     });
@@ -52,6 +54,7 @@ pub fn companions(ty: &str, constructors: &[Constructor], span: Span) -> Vec<Ite
     let err = native(Lang::Err, Lang::Result);
     let parsed = literals.iter().map(|(c, lit)| Arm {
         pat: Pat::Lit(lit.clone()),
+        binder_types: Vec::new(),
         guard: None,
         body: apply(ok.clone(), at(ExprKind::Con((*c).clone()))),
     });
@@ -69,6 +72,7 @@ pub fn companions(ty: &str, constructors: &[Constructor], span: Span) -> Vec<Ite
     let error = apply(err, apply(schema_error(), at(ExprKind::List(vec![issue]))));
     let otherwise = Arm {
         pat: Pat::Wild,
+        binder_types: Vec::new(),
         guard: None,
         body: error,
     };
@@ -79,7 +83,10 @@ pub fn companions(ty: &str, constructors: &[Constructor], span: Span) -> Vec<Ite
     let item = |member: &str, body: Expr| Item {
         kind: ItemKind::Value {
             name: companion_name(ty, member),
+            type_params: Vec::new(),
             dicts: Vec::new(),
+            dict_constraints: Vec::new(),
+            ty: None,
             body,
         },
         span,
@@ -103,6 +110,7 @@ pub fn methods(module: &str, ty: &str, span: Span) -> Vec<(String, Expr)> {
     let global = |member: &str| ExprKind::Global {
         module: module.to_owned(),
         name: companion_name(ty, member),
+        type_args: Vec::new(),
     };
     (METHODS.iter())
         .map(|m| ((*m).to_owned(), Expr::new(global(m), span)))
@@ -119,6 +127,8 @@ pub(super) fn native(lang: Lang, ty: Lang) -> Constructor {
         arity: 1,
         rep: Rep::Tagged,
         dicts: 0,
+        fields: Vec::new(),
+        type_args: Vec::new(),
     }
 }
 
@@ -132,5 +142,7 @@ fn schema_error() -> Constructor {
         arity: 1,
         rep: Rep::Tagged,
         dicts: 0,
+        fields: Vec::new(),
+        type_args: Vec::new(),
     }
 }

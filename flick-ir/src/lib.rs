@@ -18,10 +18,11 @@ mod order;
 mod program;
 mod span;
 mod stage;
+mod ty;
 mod validate;
 mod visit;
 
-pub use data::{Constructor, EnumLit, JsClass, Rep, TypeName};
+pub use data::{Constructor, ConstructorDecl, EnumLit, JsClass, Rep, TypeDecl, TypeName};
 pub use dict::Dict;
 pub use expr::{
     Arm, BinOp, Exported, Exports, Expr, ExprKind, Initialization, Item, ItemKind, Label, Lit,
@@ -40,4 +41,5 @@ pub use order::{
 pub use program::{Error, Program, VERSION};
 pub use span::{FileId, Span};
 pub use stage::{Lift, Stage};
+pub use ty::{Constraint, IrType, TypeInterner, TypeRef};
 pub use validate::validate;

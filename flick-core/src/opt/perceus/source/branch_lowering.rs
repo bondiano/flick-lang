@@ -101,6 +101,7 @@ impl Lower<'_> {
                 );
                 let arm = Arm {
                     pat: pattern.clone(),
+                    binder_types: Vec::new(),
                     guard: None,
                     body: result,
                 };

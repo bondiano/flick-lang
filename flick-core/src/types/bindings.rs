@@ -282,6 +282,9 @@ impl Checker<'_> {
                     .pending_local_schemes
                     .push((decl.range(), ty.clone()));
             }
+            if parts.is_function() || matches!(ty, Type::Forall { .. }) {
+                self.record_ir_local_scheme(decl.range(), &ty);
+            }
             let alias = self.let_alias(&parts);
             self.push_local(&name, at, ty);
             self.proof_alias(at, alias);
@@ -312,6 +315,7 @@ impl Checker<'_> {
         self.typing
             .pending_local_schemes
             .push((decl.range(), scheme.clone()));
+        self.record_ir_local_scheme(decl.range(), &scheme);
         let rec = parts.rec.then(|| {
             let rec = (!explicit).then(|| self.new_rec(name));
             self.cx.locals.push(Local {

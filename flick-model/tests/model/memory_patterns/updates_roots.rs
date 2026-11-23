@@ -285,7 +285,13 @@ fn borrowed_match_reuse_respects_whole_aliases_children_and_dead_results() {
         let p = program(function(
             &[0, 1],
             vec![
-                bind(2, Operation::Match { object: 1, pattern }),
+                bind(
+                    2,
+                    Operation::Match {
+                        object: 1,
+                        pattern: Box::new(pattern),
+                    },
+                ),
                 bind(
                     3,
                     Operation::Construct {
@@ -332,7 +338,7 @@ fn borrowed_match_reuse_respects_whole_aliases_children_and_dead_results() {
                 2,
                 Operation::Match {
                     object: 1,
-                    pattern: bound("unused"),
+                    pattern: Box::new(bound("unused")),
                 },
             ),
             bind(
@@ -364,7 +370,7 @@ fn match_update_and_failure_are_program_only_in_standalone_execution() {
     for operation in [
         Operation::Match {
             object: 0,
-            pattern: Pat::Wild,
+            pattern: Box::new(Pat::Wild),
         },
         Operation::Update {
             object: 0,

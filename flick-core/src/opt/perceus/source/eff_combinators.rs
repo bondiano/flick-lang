@@ -125,7 +125,7 @@ impl Builder {
                 (
                     vec!["callback", "input"],
                     self.at(ExprKind::Block(
-                        vec![Stmt::Let(Self::bind("value"), self.await_("input"))],
+                        vec![Stmt::let_bind(Self::bind("value"), self.await_("input"))],
                         Box::new(result),
                     )),
                 )
@@ -134,8 +134,8 @@ impl Builder {
                 vec!["callback", "left", "right"],
                 self.at(ExprKind::Block(
                     vec![
-                        Stmt::Let(Self::bind("leftValue"), self.await_("left")),
-                        Stmt::Let(Self::bind("rightValue"), self.await_("right")),
+                        Stmt::let_bind(Self::bind("leftValue"), self.await_("left")),
+                        Stmt::let_bind(Self::bind("rightValue"), self.await_("right")),
                     ],
                     Box::new(self.apply(&["leftValue", "rightValue"])),
                 )),
@@ -150,6 +150,7 @@ impl Builder {
                     pat: Self::bind(name),
                     stage: Stage::Pure,
                     ty: None,
+                    binder_types: Vec::new(),
                 })
                 .collect(),
             body: Box::new(self.at(ExprKind::Task(Box::new(body)))),
@@ -334,7 +335,7 @@ mod tests {
                 };
                 assert_eq!(steps.len(), 2);
                 for (step, name) in steps.iter().zip(["$eff.left", "$eff.right"]) {
-                    let Stmt::Let(_, value) = step else {
+                    let Stmt::Let { value, .. } = step else {
                         panic!("await binding")
                     };
                     let ExprKind::Await(input) = &value.kind else {

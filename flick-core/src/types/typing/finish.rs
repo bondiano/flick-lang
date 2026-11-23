@@ -3,7 +3,7 @@
 use std::mem;
 
 use super::Typing;
-use crate::types::{Checker, Type};
+use crate::types::{Checker, StaticContext, Type};
 #[cfg(feature = "ide")]
 use crate::types::{Elem, regions, ty::Norm};
 
@@ -18,7 +18,16 @@ impl Checker<'_> {
     }
 
     /// Settles what waited for the whole module to be solved.
-    pub fn finish_typing(&mut self) -> Typing {
+    #[cfg(test)]
+    pub(crate) fn finish_typing(&mut self) -> Typing {
+        self.finish_typing_with(StaticContext::default())
+    }
+
+    /// Settles what waited for the whole module to be solved, using `context`
+    /// for unsealed transparent-alias expansion during IR lowering.
+    pub(crate) fn finish_typing_with(&mut self, context: StaticContext<'_>) -> Typing {
+        #[cfg(target_arch = "wasm32")]
+        let _ = context;
         self.finish_foreigns();
         let mut typing = mem::take(&mut self.typing);
         let pending = mem::take(&mut typing.pending_values);
@@ -27,6 +36,10 @@ impl Checker<'_> {
             if let t @ Type::Con { .. } = observed.as_ref() {
                 typing.values.entry(*at).or_insert_with(|| t.clone());
             }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if !self.skip_ir_types {
+            self.finish_ir_types(&mut typing, context.ir_lookup);
         }
         #[cfg(feature = "ide")]
         {

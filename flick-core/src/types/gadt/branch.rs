@@ -13,6 +13,7 @@ use crate::diagnostics::codes;
 use crate::syntax::cst::Node;
 use crate::types::Checker;
 use crate::types::classes::args_of;
+use crate::types::kinds::Kind;
 use crate::types::lang::Lang;
 use crate::types::patterns::Pat;
 use crate::types::ty::{Binder, Type};
@@ -151,7 +152,7 @@ impl Checker<'_> {
         parent: Option<(String, String)>,
         scrutinee: &Type,
         node: &Node,
-    ) -> Option<Type> {
+    ) -> Option<(Type, Vec<(Kind, Type)>)> {
         let (module, name) = parent?;
         if !is_indexed(scheme, &module, &name) {
             return None;
@@ -179,6 +180,16 @@ impl Checker<'_> {
                 self.classes.givens.push(given);
             }
         }
+        let type_args: Vec<(Kind, Type)> = locals
+            .iter()
+            .map(|v| {
+                let ty = subst
+                    .iter()
+                    .find(|(n, _)| *n == v.name)
+                    .map_or(Type::Error, |(_, t)| t.clone());
+                (v.kind.clone(), ty)
+            })
+            .collect();
         if let Some(hidden) = vars.iter().find(|v| is_hidden_captures(v)) {
             // what the value holds, as the arm knows its type
             let captures = self.fresh();
@@ -186,7 +197,7 @@ impl Checker<'_> {
             let _ = self.unify(&captures, &held);
             subst.push((hidden.name.clone(), captures));
         }
-        Some(body.substitute(&subst))
+        Some((body.substitute(&subst), type_args))
     }
 
     /// The types of a constructor's variables in the arm, after recording

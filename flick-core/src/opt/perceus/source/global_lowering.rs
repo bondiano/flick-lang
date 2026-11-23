@@ -54,7 +54,7 @@ impl Lower<'_> {
             ItemKind::Instance { info, methods } => {
                 self.instance(info, methods, &[], &mut block, item.span)?
             }
-            ItemKind::Destructure { pattern, body } => {
+            ItemKind::Destructure { pattern, body, .. } => {
                 let bindings = memory::pattern_bindings(pattern).map_err(|error| {
                     LowerError::Pattern {
                         error,

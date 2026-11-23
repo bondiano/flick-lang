@@ -430,6 +430,7 @@ fn run_in(
                             items: Vec::new(),
                             labels: BTreeMap::new(),
                             initialization: flick_ir::Initialization::default(),
+                            types: Vec::new(),
                             records: BTreeMap::new(),
                             package: None,
                             exports: flick_ir::Exports::default(),
@@ -448,6 +449,8 @@ fn run_in(
         mode != Mode::Check || environment_preflight,
         saved.is_some() && !failed,
     );
+    #[cfg(not(target_arch = "wasm32"))]
+    checking::relocate_inline_importers(&mut compiled);
     for c in &mut compiled {
         // the code of a module with a loaded test companion exports to it all
         // it declares; a build never loads a companion, nor makes this code

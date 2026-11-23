@@ -1,7 +1,8 @@
 //! What checking a module is given besides the module and its imports: the
 //! bounds of instance resolution and the settings of the project.
 
-use super::Watched;
+use super::{Dict, Type, Watched};
+use crate::resolve::Interface;
 use crate::syntax::structure::Thresholds;
 
 /// Bounds of instance resolution for one definition; exceeding them is a
@@ -38,4 +39,22 @@ pub struct Options<'a> {
     /// on Flick's own runtime: see [`super::effects::Effects::direct`]. Every module of a build
     /// and the built-in modules it reads are checked alike.
     pub stages_by_class: bool,
+}
+
+/// Unsealed module interface lookup used during IR type lowering.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) type ModuleLookup<'a> = &'a dyn Fn(&str) -> Option<Interface>;
+
+#[derive(Clone, Copy, Default)]
+pub(crate) struct StaticContext<'a> {
+    pub dictionaries: &'a [(Type, Dict)],
+    /// Transparent definitions available when comparing a concrete result.
+    /// They are not added to the body's abstract parameter environment.
+    pub witnesses: &'a [Interface],
+    /// Unsealed module lookup used only during IR type lowering so transparent
+    /// aliases sealed behind a module contract expand to their concrete layout.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub ir_lookup: Option<ModuleLookup<'a>>,
+    /// Skip building interned IR types (for `flick check` / LSP runs that do not lower).
+    pub skip_ir_types: bool,
 }

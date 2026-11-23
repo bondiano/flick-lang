@@ -258,6 +258,7 @@ fn gen_function_template(b: &ExprBuilder) -> Expr {
     let hash_fn = b.at(ExprKind::Method {
         dict: Dict::Field(b.name("hdict")),
         name: "hash".into(),
+        type_args: Vec::new(),
     });
     b.lam(
         &["step", "hdict", "g", "s"],

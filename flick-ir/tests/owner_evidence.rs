@@ -30,6 +30,7 @@ fn program(body: Expr) -> Program {
                 pat: Pat::Bind(name.into()),
                 stage: Stage::Pure,
                 ty: None,
+                binder_types: Vec::new(),
             })
             .to_vec(),
         body: Box::new(body),
@@ -44,10 +45,14 @@ fn program(body: Expr) -> Program {
                 span: body.span,
                 kind: ItemKind::Value {
                     name: "test".into(),
+                    type_params: vec![],
                     dicts: vec![],
+                    dict_constraints: vec![],
+                    ty: None,
                     body,
                 },
             }],
+            types: vec![],
             labels: BTreeMap::default(),
             initialization: flick_ir::Initialization::default(),
             records: BTreeMap::default(),
@@ -175,7 +180,7 @@ fn evidence_round_trips_and_rejects_the_previous_semantic_version() {
         Program::from_json(&value.to_json()).expect("evidence JSON"),
         value
     );
-    for version in ["0.10.0", "0.11.0", "0.12.0"] {
+    for version in ["0.10.0", "0.11.0", "0.12.0", "0.13.0"] {
         let mut previous = value.clone();
         previous.ir_version = version.into();
         assert!(Program::from_json(&previous.to_json()).is_err());

@@ -7,15 +7,16 @@
 
 use std::collections::{HashMap, HashSet};
 
+use super::types::subst_types;
 use super::walk::respan;
 use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Lit, Module};
 use crate::numeric::{Arith, Num};
-use flick_ir::Dict;
-use flick_ir::Span;
+#[cfg(feature = "typed-ir")]
+use flick_ir::IrType;
+use flick_ir::{Constraint, Dict, Lang, Span, TypeRef};
 
 use super::Generics;
 use crate::Known;
-use flick_ir::Lang;
 
 /// The methods of the numeric classes the specializer turns into operators.
 const METHODS: [Lang; 13] = [
@@ -34,28 +35,60 @@ const METHODS: [Lang; 13] = [
     Lang::FromFloat,
 ];
 
-/// A generic function by module and name: its dictionary parameters and body.
-type Generic = (Vec<String>, Expr);
+/// A generic function or method offered across modules: its quantified type
+/// parameters, dictionary parameters, dictionary constraints, and body.
+#[derive(Clone)]
+pub struct Generic {
+    pub type_params: Vec<String>,
+    pub dicts: Vec<String>,
+    pub dict_constraints: Vec<Constraint>,
+    pub body: Expr,
+}
 
 /// A copy still to make, for `dicts`, named `copy`; one of another module
 /// takes the place of its first call, `at`, as the source of its code.
 struct Pending {
     generic: Generic,
     dicts: Vec<Dict>,
+    subst: Vec<(String, TypeRef)>,
+    remaining_params: Vec<String>,
     copy: String,
     at: Option<Span>,
 }
 
 /// Copies the generic functions `module` calls with numeric instances, its
 /// own and those `generics` offers, until no call is left to copy for.
-pub fn specialize(module: &mut Module, generics: Generics, lang: &Known<'_>) {
+#[cfg(test)]
+pub(super) fn specialize(module: &mut Module, generics: Generics, lang: &Known<'_>) {
+    specialize_with_types(module, generics, lang, true);
+}
+
+pub(super) fn specialize_with_types(
+    module: &mut Module,
+    generics: Generics,
+    lang: &Known<'_>,
+    preserve_types: bool,
+) {
     let own: HashMap<String, Generic> = module
         .items
         .iter()
         .filter_map(|item| match &item.kind {
-            ItemKind::Value { name, dicts, body } if !dicts.is_empty() => {
-                Some((name.clone(), (dicts.clone(), body.clone())))
-            }
+            ItemKind::Value {
+                name,
+                type_params,
+                dicts,
+                dict_constraints,
+                body,
+                ..
+            } if !dicts.is_empty() => Some((
+                name.clone(),
+                Generic {
+                    type_params: type_params.clone(),
+                    dicts: dicts.clone(),
+                    dict_constraints: dict_constraints.clone(),
+                    body: body.clone(),
+                },
+            )),
             _ => None,
         })
         .collect();
@@ -66,7 +99,7 @@ pub fn specialize(module: &mut Module, generics: Generics, lang: &Known<'_>) {
         }
         found
             .entry((m.to_owned(), name.to_owned()))
-            .or_insert_with(|| generics(m, name).filter(|(dicts, _)| !dicts.is_empty()))
+            .or_insert_with(|| generics(m, name).filter(|g| !g.dicts.is_empty()))
             .clone()
     };
     let mut made: HashSet<String> = HashSet::new();
@@ -74,29 +107,60 @@ pub fn specialize(module: &mut Module, generics: Generics, lang: &Known<'_>) {
     let this = module.name.clone();
     for item in &mut module.items {
         for body in super::bodies(item) {
-            calls(body, &this, &mut find, &mut made, &mut pending, lang);
+            calls(
+                body,
+                &this,
+                &mut find,
+                &mut made,
+                &mut pending,
+                lang,
+                preserve_types,
+            );
         }
     }
     // a copy may call another generic function, or itself, with instances
     while let Some(Pending {
-        generic: (params, body),
+        generic,
         dicts,
+        subst,
+        remaining_params,
         copy,
         at,
     }) = pending.pop()
     {
-        let given: Vec<(&str, &Dict)> = params.iter().map(String::as_str).zip(&dicts).collect();
-        let mut body = body.clone();
+        let given: Vec<(&str, &Dict)> = generic
+            .dicts
+            .iter()
+            .map(String::as_str)
+            .zip(&dicts)
+            .collect();
+        let mut body = generic.body;
         if let Some(span) = at {
             respan(&mut body, span);
         }
-        instantiate(&mut body, &given, lang);
-        calls(&mut body, &this, &mut find, &mut made, &mut pending, lang);
+        if !subst.is_empty() {
+            let pairs: Vec<(&str, &TypeRef)> = subst.iter().map(|(k, v)| (k.as_str(), v)).collect();
+            subst_types(&mut body, &pairs);
+        }
+        instantiate(&mut body, &given, lang, preserve_types);
+        calls(
+            &mut body,
+            &this,
+            &mut find,
+            &mut made,
+            &mut pending,
+            lang,
+            preserve_types,
+        );
         let span = body.span;
+        let ty = preserve_types.then(|| body.ty.clone()).flatten();
         module.items.push(Item {
             kind: ItemKind::Value {
                 name: copy,
+                type_params: remaining_params,
                 dicts: Vec::new(),
+                dict_constraints: Vec::new(),
+                ty,
                 body,
             },
             span,
@@ -104,40 +168,57 @@ pub fn specialize(module: &mut Module, generics: Generics, lang: &Known<'_>) {
     }
 }
 
-/// The dictionary parameters and body of the value `name` of `module`, or
-/// of the method `<instance>#<method>` and the dictionaries of its
-/// instance's context, when its body names only what `exported` allows of
-/// `module`, so a copy in another module can reach all it uses.
+/// The type and dictionary parameters and body of the value `name` of
+/// `module`, or of the method `<instance>#<method>` and the dictionaries of
+/// its instance's context, when its body names only what `exported` allows
+/// of `module`, so a copy in another module can reach all it uses.
 pub fn names_only(module: &Module, name: &str, exported: &dyn Fn(&str) -> bool) -> Option<Generic> {
     // `<instance>#<method>`: a method of an instance, over its context
     let method = name.split_once('#');
-    let (dicts, body) = module
-        .items
-        .iter()
-        .find_map(|item| match (&item.kind, method) {
-            (
-                ItemKind::Value {
-                    name: n,
-                    dicts,
+    let (type_params, dicts, dict_constraints, body) =
+        module
+            .items
+            .iter()
+            .find_map(|item| match (&item.kind, method) {
+                (
+                    ItemKind::Value {
+                        name: n,
+                        type_params,
+                        dicts,
+                        dict_constraints,
+                        body,
+                        ..
+                    },
+                    None,
+                ) if n == name => Some((
+                    type_params.as_slice(),
+                    dicts.as_slice(),
+                    dict_constraints.as_slice(),
                     body,
-                },
-                None,
-            ) if n == name => Some((dicts, body)),
-            (ItemKind::Instance { info, methods }, Some((instance, method)))
-                if info.name == instance =>
-            {
-                let (_, body) = methods.iter().find(|(m, _)| m == method)?;
-                Some((&info.context, body))
-            }
-            _ => None,
-        })?;
+                )),
+                (ItemKind::Instance { info, methods }, Some((instance, method)))
+                    if info.name == instance =>
+                {
+                    let (_, body) = methods.iter().find(|(m, _)| m == method)?;
+                    Some((&[][..], info.context.as_slice(), &[][..], body))
+                }
+                _ => None,
+            })?;
     let mut reachable = true;
     visit(body, &mut |e| {
-        if let ExprKind::Global { module: m, name } = &e.kind {
+        if let ExprKind::Global {
+            module: m, name, ..
+        } = &e.kind
+        {
             reachable &= *m != module.name || exported(name);
         }
     });
-    reachable.then(|| (dicts.clone(), body.clone()))
+    reachable.then(|| Generic {
+        type_params: type_params.to_vec(),
+        dicts: dicts.to_vec(),
+        dict_constraints: dict_constraints.to_vec(),
+        body: body.clone(),
+    })
 }
 
 fn visit<'a>(e: &'a Expr, f: &mut dyn FnMut(&'a Expr)) {
@@ -154,12 +235,18 @@ fn calls(
     made: &mut HashSet<String>,
     pending: &mut Vec<Pending>,
     lang: &Known<'_>,
+    preserve_types: bool,
 ) {
-    e.each_child_mut(&mut |c| calls(c, module, find, made, pending, lang));
+    e.each_child_mut(&mut |c| calls(c, module, find, made, pending, lang, preserve_types));
     let ExprKind::Dicts(inner, dicts) = &e.kind else {
         return;
     };
-    let ExprKind::Global { module: m, name } = &inner.kind else {
+    let ExprKind::Global {
+        module: m,
+        name,
+        type_args,
+    } = &inner.kind
+    else {
         return;
     };
     let Some(dicts) = dicts
@@ -180,21 +267,50 @@ fn calls(
     };
     let copy = format!("{owner}{name}${}", suffix.join("$"));
     let span = inner.span;
+    let (subst, remaining_params, remaining_args) = if preserve_types {
+        let subst = dict_subst(&generic.dict_constraints, &dicts, lang);
+        let subst_vars: HashSet<&str> = subst.iter().map(|(v, _)| v.as_str()).collect();
+        let remaining_params: Vec<String> = generic
+            .type_params
+            .iter()
+            .filter(|tp| !subst_vars.contains(tp.as_str()))
+            .cloned()
+            .collect();
+        let remaining_args = if type_args.len() == generic.type_params.len() {
+            generic
+                .type_params
+                .iter()
+                .zip(type_args)
+                .filter(|(tp, _)| !subst_vars.contains(tp.as_str()))
+                .map(|(_, ta)| ta.clone())
+                .collect()
+        } else {
+            Vec::new()
+        };
+        (subst, remaining_params, remaining_args)
+    } else {
+        (Vec::new(), Vec::new(), Vec::new())
+    };
     if made.insert(copy.clone()) {
         let at = (m != module).then_some(span);
         pending.push(Pending {
             generic,
             dicts,
+            subst,
+            remaining_params,
             copy: copy.clone(),
             at,
         });
     }
-    *e = Expr::new(
+    let ty = preserve_types.then(|| e.ty.clone()).flatten();
+    *e = Expr::with_ty(
         ExprKind::Global {
             module: module.to_owned(),
             name: copy,
+            type_args: remaining_args,
         },
         span,
+        ty,
     );
 }
 
@@ -231,8 +347,13 @@ fn instance_suffix(d: &Dict) -> String {
 
 /// `e` with each dictionary parameter in `given` replaced by its instance,
 /// and each method of a numeric instance by the operator of its type.
-pub(super) fn instantiate(e: &mut Expr, given: &[(&str, &Dict)], lang: &Known<'_>) {
-    e.each_child_mut(&mut |c| instantiate(c, given, lang));
+pub(super) fn instantiate(
+    e: &mut Expr,
+    given: &[(&str, &Dict)],
+    lang: &Known<'_>,
+    preserve_types: bool,
+) {
+    e.each_child_mut(&mut |c| instantiate(c, given, lang, preserve_types));
     match &mut e.kind {
         ExprKind::Method { dict, .. } => *dict = resolve(dict, given, lang),
         ExprKind::Dicts(_, dicts) => {
@@ -242,7 +363,7 @@ pub(super) fn instantiate(e: &mut Expr, given: &[(&str, &Dict)], lang: &Known<'_
         }
         _ => {}
     }
-    operator(e, lang);
+    operator(e, lang, preserve_types);
 }
 
 fn resolve(d: &Dict, given: &[(&str, &Dict)], lang: &Known<'_>) -> Dict {
@@ -267,7 +388,7 @@ fn resolve(d: &Dict, given: &[(&str, &Dict)], lang: &Known<'_>) -> Dict {
 
 /// A full application of a method of a numeric instance as the operator of
 /// its type; whether it was one.
-pub fn operator(e: &mut Expr, lang: &Known<'_>) -> bool {
+pub fn operator(e: &mut Expr, lang: &Known<'_>, preserve_types: bool) -> bool {
     let span = e.span;
     let replaced = match &e.kind {
         ExprKind::App { func, arg, .. } => match &func.kind {
@@ -291,9 +412,67 @@ pub fn operator(e: &mut Expr, lang: &Known<'_>) -> bool {
     };
     let changed = replaced.is_some();
     if let Some(kind) = replaced {
-        *e = Expr::new(kind, span);
+        let ty = preserve_types.then(|| e.ty.clone()).flatten();
+        *e = Expr::with_ty(kind, span, ty);
     }
     changed
+}
+
+/// Type-variable substitutions implied by specializing `constraints` to
+/// concrete numeric instances `dicts`. Derived deterministically from
+/// `constraints` and `dicts` alone so mixed typed/erased call sites always
+/// agree on the specialized copy's remaining type parameters.
+#[cfg(not(feature = "typed-ir"))]
+fn dict_subst(
+    _constraints: &[Constraint],
+    _dicts: &[Dict],
+    _lang: &Known<'_>,
+) -> Vec<(String, TypeRef)> {
+    Vec::new()
+}
+
+/// Type-variable substitutions implied by specializing `constraints` to
+/// concrete numeric instances `dicts`. Derived deterministically from
+/// `constraints` and `dicts` alone so mixed typed/erased call sites always
+/// agree on the specialized copy's remaining type parameters.
+#[cfg(feature = "typed-ir")]
+fn dict_subst(
+    constraints: &[Constraint],
+    dicts: &[Dict],
+    lang: &Known<'_>,
+) -> Vec<(String, TypeRef)> {
+    let mut subst = Vec::new();
+    let mut seen = HashSet::new();
+    for (constraint, dict) in constraints.iter().zip(dicts) {
+        if let [arg] = constraint.args.as_slice()
+            && let IrType::Var(var) = &**arg
+            && let Some(ty) = dict_numeric_type(dict, lang)
+            && seen.insert(var.clone())
+        {
+            subst.push((var.clone(), ty));
+        }
+    }
+    subst
+}
+
+#[cfg(feature = "typed-ir")]
+fn dict_numeric_type(dict: &Dict, lang: &Known<'_>) -> Option<TypeRef> {
+    let Dict::Instance { name, .. } = dict else {
+        return None;
+    };
+    let suffix = name.rsplit(' ').next()?;
+    for role in [Lang::Int, Lang::Float, Lang::BigInt] {
+        if let Some((module, ty_name)) = lang.get(role)
+            && ty_name == suffix
+        {
+            return Some(TypeRef::new(IrType::Named {
+                module: module.to_owned(),
+                name: ty_name.to_owned(),
+                args: Vec::new(),
+            }));
+        }
+    }
+    None
 }
 
 /// The numeric type and method name of a method of a numeric instance.
@@ -332,6 +511,7 @@ fn method_of(e: &Expr, lang: &Known<'_>) -> Option<(Num, Lang)> {
                 args,
             },
         name,
+        ..
     } = &e.kind
     else {
         return None;

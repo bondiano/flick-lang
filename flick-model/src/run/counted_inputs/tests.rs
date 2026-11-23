@@ -99,6 +99,7 @@ fn partial_destructure_projection_preserves_initializer_checks_and_every_remaini
     original.items = vec![Item {
         kind: ItemKind::Destructure {
             pattern: Pat::Or(vec![alternative.clone(), alternative]),
+            binder_types: Vec::new(),
             body: Expr::new(
                 ExprKind::Lit(Lit::Unit),
                 Span::new(FileId::default(), 11, 29),
@@ -120,6 +121,7 @@ fn partial_destructure_projection_preserves_initializer_checks_and_every_remaini
     let ItemKind::Destructure {
         pattern: Pat::Or(alternatives),
         body,
+        ..
     } = &resolved.items[0].kind
     else {
         panic!("destructure checks retained");
