@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 #[cfg(not(target_arch = "wasm32"))]
 use super::select::{resolve_selected, select_backend};
 #[cfg(not(target_arch = "wasm32"))]
-use super::{BackendTags, official_backends, validate_condition_tags};
+use super::{BackendHost, BackendTags, official_backends, validate_condition_tags};
 use super::{EnvironmentContext, TargetOverride};
 use crate::diagnostics::Diagnostic;
 #[cfg(not(target_arch = "wasm32"))]
@@ -84,6 +84,7 @@ pub(in crate::project) fn resolve(
             foreign_meta: ForeignMeta::default(),
             validate_foreign_meta: false,
             backends,
+            hosts: BTreeMap::new(),
         };
     }
 
@@ -165,6 +166,21 @@ pub(in crate::project) fn resolve(
         validate_condition_tags(cond, Some(span), Some(text), &vocabulary, diagnostics);
     }
 
+    let mut backend_hosts: BTreeMap<String, Vec<BackendHost>> = BTreeMap::new();
+    for (_, host_cfg) in &hosts {
+        if let Some(backend) = backends.iter().find(|b| b.matches_name(&host_cfg.backend)) {
+            let mut tags = vec![host_cfg.name.clone()];
+            tags.extend(host_cfg.tags.iter().map(|(t, _)| t.clone()));
+            backend_hosts
+                .entry(backend.id.clone())
+                .or_default()
+                .push(BackendHost {
+                    tags,
+                    requires: host_cfg.requires.as_ref().map(|(c, _)| c.clone()),
+                });
+        }
+    }
+
     if !require_resolved {
         let mut ignored = Vec::new();
         let selected = select_backend(project, target_override, &backends, &mut ignored);
@@ -178,6 +194,7 @@ pub(in crate::project) fn resolve(
             foreign_meta,
             validate_foreign_meta: true,
             backends,
+            hosts: backend_hosts,
         };
     }
 
@@ -216,6 +233,7 @@ pub(in crate::project) fn resolve(
         foreign_meta,
         validate_foreign_meta,
         backends,
+        hosts: backend_hosts,
     }
 }
 

@@ -226,7 +226,7 @@ fn literal_backend_prunes_inactive_when_js_module_and_validates_pack_and_doc() {
         "let main () = ()\n",
     );
     let inactive_js_source = concat!(
-        "@when \"js\"\n",
+        "@when \"js && !browser\"\n",
         "module Fixture.JsOnly exposing (JsDate, js_method)\n",
         "@ts \"Date\"\n",
         "type JsDate\n\n",

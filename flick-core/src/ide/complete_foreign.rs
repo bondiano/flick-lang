@@ -146,7 +146,7 @@ fn foreign_meta_completions(
         let word = first.text(text);
         let arg_index = meta_item
             .nodes()
-            .filter(|arg| arg.range().1 <= offset)
+            .filter(|arg| arg.range().1 < offset)
             .count();
         return arg_completions(word, arg_index, meta);
     }

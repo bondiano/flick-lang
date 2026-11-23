@@ -425,3 +425,144 @@ fn compiled_ir_carries_core_owned_and_backend_adapter_words_with_spans() {
     assert_eq!(&source[foreign.adapter.words[0].span.range()], "slot 0");
     assert_eq!(&source[foreign.adapter.words[1].span.range()], "slot 1");
 }
+
+#[test]
+fn foreign_arg_completion_works_on_partial_argument_prefixes() {
+    // Cursor at end of a partially typed argument (`cancel sig|`) must still
+    // treat that argument as position 0 and offer `signal`.
+    let cancel_src = "module App exposing (f)\n\
+f : String ->{Async} String\n\
+foreign f from \"./m.js\" \"f\"\n  cancel sig\n";
+    let (sources, analysis) = analyze_project(JS_TOML, cancel_src, vec![]);
+    let ide = Ide {
+        analysis: &analysis,
+        sources: &sources,
+    };
+    let file = analysis.module("App").expect("App").file;
+    let cancel_offset = u32::try_from(cancel_src.len() - 1).expect("small");
+    let labels: Vec<String> = ide
+        .complete(file, cancel_offset, false)
+        .into_iter()
+        .map(|c| c.label)
+        .collect();
+    assert_eq!(labels, vec!["signal"]);
+
+    // Core `retention c|` at cursor end offers `call` and `owner`.
+    let retention_src = "module App exposing (f)\n\
+f : String ->{} String\n\
+foreign f from \"./m.js\" \"f\"\n  retention c\n";
+    let (sources, analysis) = analyze_project(JS_TOML, retention_src, vec![]);
+    let ide = Ide {
+        analysis: &analysis,
+        sources: &sources,
+    };
+    let file = analysis.module("App").expect("App").file;
+    let ret_offset = u32::try_from(retention_src.len() - 1).expect("small");
+    let labels: Vec<String> = ide
+        .complete(file, ret_offset, false)
+        .into_iter()
+        .map(|c| c.label)
+        .collect();
+    assert_eq!(labels, vec!["call", "owner"]);
+
+    // Custom backend word with multi-arg choices offers arg 0 on `mode f|`
+    // and arg 1 on `mode fast s|`.
+    let mut tags = literal_backend_tags();
+    tags.foreign_meta.adapter_words.push(AdapterWordSpec {
+        name: "mode".into(),
+        args: vec![
+            AdapterArgSpec {
+                name: "speed".into(),
+                kind: AdapterArgKind::Ident,
+                choices: vec!["fast".into(), "safe".into()],
+            },
+            AdapterArgSpec {
+                name: "scope".into(),
+                kind: AdapterArgKind::Ident,
+                choices: vec!["strict".into(), "loose".into()],
+            },
+        ],
+        repeatable: false,
+        help: "Select literal calling mode.".into(),
+    });
+    let mode_src0 = "module App exposing (f)\n\
+f : String ->{} String\n\
+foreign f from \"./lit.js\" \"f\"\n  mode f\n";
+    let (sources, analysis) = analyze_project(LITERAL_TOML, mode_src0, vec![tags.clone()]);
+    let ide = Ide {
+        analysis: &analysis,
+        sources: &sources,
+    };
+    let file = analysis.module("App").expect("App").file;
+    let labels0: Vec<String> = ide
+        .complete(
+            file,
+            u32::try_from(mode_src0.len() - 1).expect("small"),
+            false,
+        )
+        .into_iter()
+        .map(|c| c.label)
+        .collect();
+    assert_eq!(labels0, vec!["fast", "safe"]);
+
+    let mode_src1 = "module App exposing (f)\n\
+f : String ->{} String\n\
+foreign f from \"./lit.js\" \"f\"\n  mode fast s\n";
+    let (sources, analysis) = analyze_project(LITERAL_TOML, mode_src1, vec![tags]);
+    let ide = Ide {
+        analysis: &analysis,
+        sources: &sources,
+    };
+    let file = analysis.module("App").expect("App").file;
+    let labels1: Vec<String> = ide
+        .complete(
+            file,
+            u32::try_from(mode_src1.len() - 1).expect("small"),
+            false,
+        )
+        .into_iter()
+        .map(|c| c.label)
+        .collect();
+    assert_eq!(labels1, vec!["strict", "loose"]);
+}
+
+#[test]
+fn inactive_negated_when_js_module_uses_js_foreign_meta_in_go_and_custom_projects() {
+    let js_server_src = concat!(
+        "@when \"js && !browser\"\n",
+        "module App exposing (JsHandle, call_it)\n",
+        "@ts \"Date\"\n",
+        "type JsHandle\n",
+        "call_it : JsHandle ->{} String\n",
+        "foreign call_it from \"./js_only.mjs\" \"toISOString\"\n",
+        "  arity 1\n",
+        "  this\n",
+    );
+
+    // Go project: inactive `@when "js && !browser"` module must use JS ForeignMeta
+    // (no false FLICK-S014 on `@ts` or FLICK-S011 on `this`).
+    let (_, go_analysis) = analyze_project(GO_TOML, js_server_src, vec![]);
+    assert!(
+        !go_analysis
+            .diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error),
+        "Go project falsely rejected inactive @when \"js && !browser\" module: {:?}",
+        go_analysis.diagnostics
+    );
+
+    // Custom `test/literal` project: neither `@when "js && !browser"` nor
+    // `@when "js && !rt"` should fall back to `test/literal` ForeignMeta.
+    for cond in ["js && !browser", "js && !rt"] {
+        let src = js_server_src.replace("js && !browser", cond);
+        let (_, lit_analysis) = analyze_project(LITERAL_TOML, &src, vec![literal_backend_tags()]);
+        assert!(
+            !lit_analysis
+                .diagnostics
+                .iter()
+                .any(|d| d.severity == Severity::Error),
+            "literal project falsely rejected inactive @when \"{cond}\" module: {:?}",
+            lit_analysis.diagnostics
+        );
+    }
+}

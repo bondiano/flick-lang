@@ -6,6 +6,8 @@ use std::path::PathBuf;
 
 mod resolve;
 #[cfg(not(target_arch = "wasm32"))]
+mod satisfies;
+#[cfg(not(target_arch = "wasm32"))]
 mod select;
 
 pub(super) use resolve::resolve;
@@ -189,6 +191,14 @@ pub fn official_backends() -> Vec<BackendTags> {
     ]
 }
 
+/// Loaded `[host]` package tags associated with one backend.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Debug, Clone)]
+pub(super) struct BackendHost {
+    pub tags: Vec<String>,
+    pub requires: Option<String>,
+}
+
 /// Result of resolving a project's environment and building its tag vocabulary.
 #[cfg(not(target_arch = "wasm32"))]
 pub(super) struct EnvironmentContext {
@@ -206,6 +216,8 @@ pub(super) struct EnvironmentContext {
     /// All known backend descriptors for resolving per-package or `@when`-gated
     /// module foreign metadata.
     pub backends: Vec<BackendTags>,
+    /// Loaded `[host]` packages keyed by canonical backend id.
+    pub hosts: BTreeMap<String, Vec<BackendHost>>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -223,7 +235,13 @@ impl EnvironmentContext {
             foreign_meta: ForeignMeta::js(),
             validate_foreign_meta: true,
             backends,
+            hosts: BTreeMap::new(),
         }
+    }
+
+    fn backend_can_satisfy(&self, backend: &BackendTags, expr: &when::Expr) -> bool {
+        let extra_hosts = self.hosts.get(&backend.id).map_or(&[][..], Vec::as_slice);
+        satisfies::backend_can_satisfy(backend, extra_hosts, expr)
     }
 
     /// Selects the foreign metadata descriptor for one module: its package's
@@ -248,16 +266,13 @@ impl EnvironmentContext {
                     .backends
                     .iter()
                     .find(|b| b.id == self.foreign_meta.backend_id)
-                    .is_some_and(|b| {
-                        let vocab = b.full_vocabulary();
-                        expr.eval(&|tag| vocab.contains(tag))
-                    }),
+                    .is_some_and(|b| self.backend_can_satisfy(b, &expr)),
             };
             if !active_matches {
-                let mut matching = self.backends.iter().filter(|b| {
-                    let vocab = b.full_vocabulary();
-                    expr.eval(&|tag| vocab.contains(tag))
-                });
+                let mut matching = self
+                    .backends
+                    .iter()
+                    .filter(|b| self.backend_can_satisfy(b, &expr));
                 if let (Some(only), None) = (matching.next(), matching.next()) {
                     return &only.foreign_meta;
                 }
