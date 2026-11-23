@@ -116,3 +116,41 @@ fn ordinary_run_and_empty_test_use_the_selected_component() {
     assert_eq!(json["tests"], serde_json::json!([]));
     assert!(root.join(".flick/test/.flick-backend.cbor").is_file());
 }
+
+#[test]
+fn the_release_js_component_folds_an_immediate_tuple_match() {
+    // Opaque callbacks keep the scrutinee dynamic through release evaluation.
+    let root = project(
+        "default_js_tuple_match",
+        &[(
+            "Probe.fl",
+            "module Probe exposing (first)
+first : (Int -> Int) -> (Int -> Int) -> Int -> Int
+let first f g x =
+  match (f x, g x) with
+  | (a, _) -> a
+",
+        )],
+    );
+    let built = flick_in(
+        &root,
+        &[
+            "build",
+            "Probe.fl",
+            "--offline",
+            "--target",
+            "js",
+            "--profile",
+            "release",
+            "--out-dir",
+            "out",
+        ],
+    );
+    assert!(built.status.success(), "{built:?}");
+    let js = fs::read_to_string(root.join("out/Probe.js")).expect("emitted library");
+    assert!(js.contains("f(x)") && js.contains("g(x)"), "{js}");
+    assert!(
+        !js.contains('['),
+        "tuple construction or projection survived:\n{js}"
+    );
+}
