@@ -8,9 +8,12 @@ use std::mem;
 use super::Checker;
 use super::env::{Abi, EnumLit, Form};
 use crate::diagnostics::codes;
+use crate::numeric::Num;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::literal::{bigint_digits, bigint_digits_value, string_value};
+use crate::syntax::literal::{
+    bigint_digits, bigint_digits_value, split_number_suffix, string_value,
+};
 
 impl Form {
     /// A nominal type of no literals.
@@ -146,7 +149,12 @@ impl Checker<'_> {
         } else {
             text.to_owned()
         };
-        let Some(magnitude) = bigint_digits_value(&bigint_digits(text)) else {
+        let (stem, suffix) = split_number_suffix(text);
+        let magnitude = match suffix {
+            None | Some(Num::Int) => bigint_digits_value(&bigint_digits(stem)),
+            Some(_) => None,
+        };
+        let Some(magnitude) = magnitude else {
             let message =
                 format!("`{shown}` is no `Int`: an enum's literal is a string or an `Int`");
             self.error(codes::T020, self.span(literal), message);

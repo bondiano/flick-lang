@@ -17,6 +17,7 @@ import Formal.TypeEquivShape
 import Formal.Lazy
 import Formal.Refine
 import Formal.Refine.Numbers
+import Formal.FixedWidth
 import Formal.Proofs.CheckSound
 import Formal.RT.LazyCell
 import Formal.Equiv.Context
@@ -337,3 +338,31 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Memory.Reuse.cycle_break_vs_teardown' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Memory.Reuse.cycle_break_vs_teardown
+
+/-- info: 'Flick.FixedWidth.wrap_inRange' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.FixedWidth.wrap_inRange
+
+/-- info: 'Flick.FixedWidth.wrap_neg_add_cancel' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.FixedWidth.wrap_neg_add_cancel
+
+/-- info: 'Flick.FixedWidth.safeDiv_min_neg_one' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.FixedWidth.safeDiv_min_neg_one
+
+/-- info: 'Flick.FixedWidth.safeRem_min_neg_one' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.FixedWidth.safeRem_min_neg_one
+
+/-- info: 'Flick.FixedWidth.checkedDiv_sound' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.FixedWidth.checkedDiv_sound
+
+/-- info: 'Flick.FixedWidth.lossless_wrap_eq' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.FixedWidth.lossless_wrap_eq
+
+/-- info: 'Flick.FixedWidth.ordNaNLast_greatest' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.FixedWidth.ordNaNLast_greatest

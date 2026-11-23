@@ -15,8 +15,22 @@ pub(super) fn compare(
     charge(fuel, 1)?;
     let order = match (left, right) {
         (Value::Int(a), Value::Int(b)) => a.cmp(b),
+        (Value::Int8(a), Value::Int8(b)) => a.cmp(b),
+        (Value::Int16(a), Value::Int16(b)) => a.cmp(b),
+        (Value::Int64(a), Value::Int64(b)) => a.cmp(b),
+        (Value::UInt8(a), Value::UInt8(b)) => a.cmp(b),
+        (Value::UInt16(a), Value::UInt16(b)) => a.cmp(b),
+        (Value::UInt32(a), Value::UInt32(b)) => a.cmp(b),
+        (Value::UInt64(a), Value::UInt64(b)) => a.cmp(b),
         (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
         (Value::Float(a), Value::Float(b)) => {
+            if a.is_nan() || b.is_nan() {
+                a.is_nan().cmp(&b.is_nan())
+            } else {
+                a.partial_cmp(b).expect("non-NaN floating comparison")
+            }
+        }
+        (Value::Float32(a), Value::Float32(b)) => {
             if a.is_nan() || b.is_nan() {
                 a.is_nan().cmp(&b.is_nan())
             } else {
@@ -64,7 +78,15 @@ pub(super) fn hash(heap: &Heap, value: &Value, fuel: &mut u64) -> Result<i32, Er
     charge(fuel, 1)?;
     Ok(match value {
         Value::Int(value) => signed(optimize(unsigned(*value))),
+        Value::Int8(value) => signed(optimize(unsigned(i32::from(*value)))),
+        Value::Int16(value) => signed(optimize(unsigned(i32::from(*value)))),
+        Value::UInt8(value) => signed(optimize(unsigned(i32::from(*value)))),
+        Value::UInt16(value) => signed(optimize(unsigned(i32::from(*value)))),
+        Value::UInt32(value) => hash_number(f64::from(*value)),
+        Value::Int64(value) => signed(hash_string(&value.to_string(), fuel)?),
+        Value::UInt64(value) => signed(hash_string(&value.to_string(), fuel)?),
         Value::Float(value) => hash_number(*value),
+        Value::Float32(value) => hash_number(f64::from(*value)),
         Value::Bool(value) => signed(optimize(mix(hash_string(
             if *value { "true" } else { "false" },
             fuel,

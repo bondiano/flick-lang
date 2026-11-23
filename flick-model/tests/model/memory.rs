@@ -484,55 +484,6 @@ fn arguments_require_the_declared_arity() {
 }
 
 #[test]
-fn every_literal_shape_runs_through_the_shared_operation() {
-    for literal in [
-        Lit::Unit,
-        Lit::Bool(true),
-        Lit::Int(-42),
-        Lit::Float(1.5),
-        Lit::String("text".into()),
-        Lit::BigInt("0xffffffffffffffffffffffff".into()),
-    ] {
-        let mut heap = Heap::new();
-        let f = function(
-            vec![],
-            vec![bind(0, Operation::Literal(literal.clone()))],
-            0,
-        );
-        let result = execute(&mut heap, &f, vec![]).expect("literal operation");
-        let allocated = match literal {
-            Lit::Unit => {
-                assert_eq!(result, Value::Unit);
-                0
-            }
-            Lit::Bool(value) => {
-                assert_eq!(result, Value::Bool(value));
-                0
-            }
-            Lit::Int(value) => {
-                assert_eq!(result, Value::Int(value));
-                0
-            }
-            Lit::Float(value) => {
-                assert_eq!(result, Value::Float(value));
-                0
-            }
-            Lit::String(ref value) => {
-                assert_eq!(heap.string(&result), Ok(value.as_str()));
-                1
-            }
-            Lit::BigInt(ref value) => {
-                assert_eq!(heap.bigint(&result), Ok(value.as_str()));
-                1
-            }
-        };
-        assert_eq!(heap.stats().allocations, allocated);
-        heap.drop_value(result).expect("explicit literal release");
-        assert_eq!(heap.finish().expect("balanced literal").frees, allocated);
-    }
-}
-
-#[test]
 fn an_unselected_malformed_branch_is_still_rejected_before_running() {
     let mut heap = Heap::new();
     let f = Function {

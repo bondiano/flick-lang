@@ -1,0 +1,95 @@
+// Constant-folded and runtime fixed-width operations agree across debug and
+// release on JS, Go, Flick's own runtime, and the reference model.
+module App.Main exposing (main)
+
+import Float32
+import Int16
+import Int32
+import Int64
+import Int8
+import UInt16
+import UInt32
+import UInt64
+import UInt8
+
+add_i8 : Int8 -> Int8 -> Int8
+let add_i8 a b = a + b
+
+div_i8 : Int8 -> Int8 -> Int8
+let div_i8 a b = a / b
+
+rem_i8 : Int8 -> Int8 -> Int8
+let rem_i8 a b = a % b
+
+mul_u32 : UInt32 -> UInt32 -> UInt32
+let mul_u32 a b = a * b
+
+add_i64 : Int64 -> Int64 -> Int64
+let add_i64 a b = a + b
+
+div_i64 : Int64 -> Int64 -> Int64
+let div_i64 a b = a / b
+
+rem_i64 : Int64 -> Int64 -> Int64
+let rem_i64 a b = a % b
+
+neg_u8 : UInt8 -> UInt8
+let neg_u8 a = -a
+
+pow_u64 : UInt64 -> UInt64 -> UInt64
+let pow_u64 a b = a ** b
+
+add_f32 : Float32 -> Float32 -> Float32
+let add_f32 a b = a + b
+
+classify_u8 : UInt8 -> String
+let classify_u8 n =
+  match n with
+  | 0u8 -> "zero"
+  | 0xFFu8 -> "max"
+  | _ -> "other"
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  // Constant-folded vs runtime equality on every boundary.
+  let c1 = 127i8 + 1i8
+  let r1 = add_i8 127i8 1i8
+  Platform.stdout_line (show (c1 == r1) ++ " " ++ show c1)
+  let c2 = -128i8 / -1i8
+  let r2 = div_i8 (-128i8) (-1i8)
+  Platform.stdout_line (show (c2 == r2) ++ " " ++ show c2)
+  let c3 = -128i8 % -1i8
+  let r3 = rem_i8 (-128i8) (-1i8)
+  Platform.stdout_line (show (c3 == r3) ++ " " ++ show c3)
+  let c4 = 4294967295u32 * 4294967295u32
+  let r4 = mul_u32 4294967295u32 4294967295u32
+  Platform.stdout_line (show (c4 == r4) ++ " " ++ show c4)
+  let c5 = 9223372036854775807i64 + 1i64
+  let r5 = add_i64 9223372036854775807i64 1i64
+  Platform.stdout_line (show (c5 == r5) ++ " " ++ show c5)
+  let c6 = -9223372036854775808i64 / -1i64
+  let r6 = div_i64 (-9223372036854775808i64) (-1i64)
+  Platform.stdout_line (show (c6 == r6) ++ " " ++ show c6)
+  let c7 = -9223372036854775808i64 % -1i64
+  let r7 = rem_i64 (-9223372036854775808i64) (-1i64)
+  Platform.stdout_line (show (c7 == r7) ++ " " ++ show c7)
+  let c8 = -(1u8)
+  let r8 = neg_u8 1u8
+  Platform.stdout_line (show (c8 == r8) ++ " " ++ show c8)
+  let c9 = 2u64 ** 4294967296u64
+  let r9 = pow_u64 2u64 4294967296u64
+  Platform.stdout_line (show (c9 == r9) ++ " " ++ show c9)
+  let c10 = 16777216.0f32 + 1.0f32
+  let r10 = add_f32 16777216.0f32 1.0f32
+  Platform.stdout_line (show (c10 == r10) ++ " " ++ show c10)
+  // Bitwise shifts, conversions, patterns, and total Float32 ordering.
+  Platform.stdout_line (show (Int64.shift_right_unsigned (-9223372036854775808i64) 63))
+  Platform.stdout_line (show (UInt8.wrapping_from_int (-1)))
+  Platform.stdout_line (show (Int8.saturating_from_int 500))
+  Platform.stdout_line (show (Int8.from_int 128))
+  let rounded = Float32.from_bigint 18014399583223809n
+  Platform.stdout_line (show (rounded == 18014400656965632.0f32) ++ " " ++ show rounded)
+  Platform.stdout_line (show (compare Float32.infinity Float32.nan))
+  Platform.stdout_line (classify_u8 255u8)
+  let widened : Int64 = into 4294967295u32
+  Platform.stdout_line (display widened)

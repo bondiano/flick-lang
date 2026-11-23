@@ -12,18 +12,18 @@ const LAST: &str = "Validation";
 
 const PROGRAM: &str = "module Main exposing (bump, next, evens, half)
 
-bump : Maybe Int32 -> Maybe Int32
+bump : Maybe Whole -> Maybe Whole
 let bump x =
   match x with
   | Just n -> Just (n + 1)
   | None -> None
 
-next : Maybe Int32 -> Maybe Int32
+next : Maybe Whole -> Maybe Whole
 let next x =
   let n = x?
   Just (n * 2)
 
-evens : List Int32
+evens : List Whole
 let evens = [for n <- [1..<10] yield n * 2]
 
 half : Float -> Float
@@ -53,7 +53,7 @@ fn rename(text: &str, renames: &[(&str, &str)]) -> String {
 
 #[test]
 fn renamed_lang_items_still_compile() {
-    let renames = [("Option", "Maybe"), ("Some", "Just"), ("Int", "Int32")];
+    let renames = [("Option", "Maybe"), ("Some", "Just"), ("Int", "Whole")];
     let last = builtin_sources()
         .iter()
         .position(|(name, _)| *name == LAST)
@@ -77,7 +77,7 @@ fn renamed_lang_items_still_compile() {
         };
         assert_eq!(named("option").as_deref(), Some("Prelude.Maybe"));
         assert_eq!(named("some").as_deref(), Some("Prelude.Just"));
-        assert_eq!(named("int").as_deref(), Some("Prelude.Int32"));
+        assert_eq!(named("int").as_deref(), Some("Prelude.Whole"));
         let builtins = check_sources(&sources);
         let lowered = super::tests::check_text_with("Main", PROGRAM, &builtins);
         assert!(lowered.is_ok(), "{:?}", lowered.err());

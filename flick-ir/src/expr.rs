@@ -404,12 +404,20 @@ pub struct Arm {
     pub body: Expr,
 }
 
-/// A literal; a `Float` equals another with the same bits, and any NaN
-/// another NaN: `0.0` is not `-0.0`.
+/// A literal; a `Float` or `Float32` equals another with the same bits, and
+/// any NaN another NaN: `0.0` is not `-0.0`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Lit {
     Int(i32),
+    Int8(i8),
+    Int16(i16),
+    Int64(i64),
+    UInt8(u8),
+    UInt16(u16),
+    UInt32(u32),
+    UInt64(u64),
     Float(#[serde(with = "crate::float")] f64),
+    Float32(#[serde(with = "crate::float::f32")] f32),
     /// Decimal or `0x`/`0o`/`0b` digits with an optional `-`, without `_`
     /// or a suffix: its size is not bounded.
     BigInt(String),
@@ -539,7 +547,17 @@ impl PartialEq for Lit {
     fn eq(&self, other: &Lit) -> bool {
         match (self, other) {
             (Lit::Int(a), Lit::Int(b)) => a == b,
+            (Lit::Int8(a), Lit::Int8(b)) => a == b,
+            (Lit::Int16(a), Lit::Int16(b)) => a == b,
+            (Lit::Int64(a), Lit::Int64(b)) => a == b,
+            (Lit::UInt8(a), Lit::UInt8(b)) => a == b,
+            (Lit::UInt16(a), Lit::UInt16(b)) => a == b,
+            (Lit::UInt32(a), Lit::UInt32(b)) => a == b,
+            (Lit::UInt64(a), Lit::UInt64(b)) => a == b,
             (Lit::Float(a), Lit::Float(b)) => {
+                a.to_bits() == b.to_bits() || a.is_nan() && b.is_nan()
+            }
+            (Lit::Float32(a), Lit::Float32(b)) => {
                 a.to_bits() == b.to_bits() || a.is_nan() && b.is_nan()
             }
             (Lit::BigInt(a), Lit::BigInt(b)) | (Lit::String(a), Lit::String(b)) => a == b,

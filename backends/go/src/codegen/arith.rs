@@ -19,6 +19,14 @@ pub(super) enum Native {
     Float,
     Bool,
     String,
+    Int8,
+    Int16,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+    Float32,
 }
 
 impl Native {
@@ -28,12 +36,33 @@ impl Native {
             Native::Float => "float64",
             Native::Bool => "bool",
             Native::String => "string",
+            Native::Int8 => "int8",
+            Native::Int16 => "int16",
+            Native::Int64 => "int64",
+            Native::UInt8 => "uint8",
+            Native::UInt16 => "uint16",
+            Native::UInt32 => "uint32",
+            Native::UInt64 => "uint64",
+            Native::Float32 => "float32",
         }
     }
 
     /// Every one of them, in the order their numbers have in the shape of
     /// a function.
-    pub(super) const ALL: [Native; 4] = [Native::Int, Native::Float, Native::Bool, Native::String];
+    pub(super) const ALL: [Native; 12] = [
+        Native::Int,
+        Native::Float,
+        Native::Bool,
+        Native::String,
+        Native::Int8,
+        Native::Int16,
+        Native::Int64,
+        Native::UInt8,
+        Native::UInt16,
+        Native::UInt32,
+        Native::UInt64,
+        Native::Float32,
+    ];
 
     /// The type Go names `go`.
     pub(super) fn named(go: &str) -> Option<Native> {
@@ -46,6 +75,14 @@ impl Native {
             Native::Float => "Float",
             Native::Bool => "Bool",
             Native::String => "String",
+            Native::Int8 => "Int8",
+            Native::Int16 => "Int16",
+            Native::Int64 => "Int64",
+            Native::UInt8 => "UInt8",
+            Native::UInt16 => "UInt16",
+            Native::UInt32 => "UInt32",
+            Native::UInt64 => "UInt64",
+            Native::Float32 => "Float32",
         }
     }
 
@@ -55,10 +92,24 @@ impl Native {
         x.is_finite() && (x != 0.0 || x.is_sign_positive())
     }
 
+    /// Whether a `Lit::Float32(x)` emits a native Go `float32(...)` literal
+    /// rather than a runtime `flickrt.Value` variable (`NaN32`, `Inf32`, `NegInf32`, `NegZero32`).
+    pub(super) fn is_native_float32_lit(x: f32) -> bool {
+        x.is_finite() && (x != 0.0 || x.is_sign_positive())
+    }
+
     fn of_num(num: Num) -> Option<Native> {
         match num {
             Num::Int => Some(Native::Int),
             Num::Float => Some(Native::Float),
+            Num::Int8 => Some(Native::Int8),
+            Num::Int16 => Some(Native::Int16),
+            Num::Int64 => Some(Native::Int64),
+            Num::UInt8 => Some(Native::UInt8),
+            Num::UInt16 => Some(Native::UInt16),
+            Num::UInt32 => Some(Native::UInt32),
+            Num::UInt64 => Some(Native::UInt64),
+            Num::Float32 => Some(Native::Float32),
             Num::BigInt => None,
         }
     }
@@ -82,6 +133,14 @@ impl Native {
             (Lang::Float, Native::Float),
             (Lang::Bool, Native::Bool),
             (Lang::String, Native::String),
+            (Lang::Int8, Native::Int8),
+            (Lang::Int16, Native::Int16),
+            (Lang::Int64, Native::Int64),
+            (Lang::UInt8, Native::UInt8),
+            (Lang::UInt16, Native::UInt16),
+            (Lang::UInt32, Native::UInt32),
+            (Lang::UInt64, Native::UInt64),
+            (Lang::Float32, Native::Float32),
         ]
         .into_iter()
         .find(|&(item, _)| lang.is(item, module, name))
@@ -120,8 +179,18 @@ impl<'a> Gen<'a> {
     fn native_with(&self, e: &Expr, extra: &[(&str, Native)]) -> Option<Native> {
         match &e.kind {
             ExprKind::Lit(Lit::Int(_)) => Some(Native::Int),
+            ExprKind::Lit(Lit::Int8(_)) => Some(Native::Int8),
+            ExprKind::Lit(Lit::Int16(_)) => Some(Native::Int16),
+            ExprKind::Lit(Lit::Int64(_)) => Some(Native::Int64),
+            ExprKind::Lit(Lit::UInt8(_)) => Some(Native::UInt8),
+            ExprKind::Lit(Lit::UInt16(_)) => Some(Native::UInt16),
+            ExprKind::Lit(Lit::UInt32(_)) => Some(Native::UInt32),
+            ExprKind::Lit(Lit::UInt64(_)) => Some(Native::UInt64),
             // the other floats are variables of the runtime
             ExprKind::Lit(Lit::Float(x)) if Native::is_native_float_lit(*x) => Some(Native::Float),
+            ExprKind::Lit(Lit::Float32(x)) if Native::is_native_float32_lit(*x) => {
+                Some(Native::Float32)
+            }
             ExprKind::Lit(Lit::String(_)) => Some(Native::String),
             ExprKind::Local(name) | ExprKind::Var(name) => extra
                 .iter()
@@ -254,6 +323,8 @@ impl<'a> Gen<'a> {
                 // `==` holds of NaN and NaN, `===` does not
                 (BinOp::Eq, Native::Float) => Some(Comparison::Call("flickrt.EqFloat")),
                 (BinOp::NotEq, Native::Float) => Some(Comparison::Call("!flickrt.EqFloat")),
+                (BinOp::Eq, Native::Float32) => Some(Comparison::Call("flickrt.EqFloat32")),
+                (BinOp::NotEq, Native::Float32) => Some(Comparison::Call("!flickrt.EqFloat32")),
                 (BinOp::Eq | BinOp::Same, _) => Some(Comparison::Infix(" == ")),
                 (BinOp::NotEq | BinOp::NotSame, _) => Some(Comparison::Infix(" != ")),
                 (_, Native::Bool) => None,

@@ -1,8 +1,10 @@
 /// The numeric types as classes, for functions over any of them: `Numeric`
-/// holds `Int`, `Float` and `BigInt`, `Integer` the integers, `Floating`
-/// `Float`. The classes are closed: this module has every instance, and a
-/// program cannot declare another. On a type variable with one of them, the
-/// operators and number literals use its methods.
+/// holds `Int`, `Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`,
+/// `UInt64`, `Float`, `Float32` and `BigInt`; `Integer` holds the integers;
+/// `Floating` holds `Float` and `Float32`. The classes are closed: this module
+/// has every instance, and a program cannot declare another. On a type
+/// variable with one of them, the operators and number literals use its
+/// methods.
 module Numeric exposing (..)
 
 @lang numeric
@@ -101,3 +103,219 @@ instance Integer BigInt =
 
 instance Floating Float =
   let from_float x = x
+
+int8_from_int : Int -> Int8
+foreign pure int8_from_int from "flick:rt" "toInt8"
+
+int8_to_float : Int8 -> Float
+foreign pure int8_to_float from "flick:rt" "toFloat64"
+
+int8_to_bigint : Int8 -> BigInt
+foreign pure int8_to_bigint from "flick:rt" "toBigInt"
+
+int16_from_int : Int -> Int16
+foreign pure int16_from_int from "flick:rt" "toInt16"
+
+int16_to_float : Int16 -> Float
+foreign pure int16_to_float from "flick:rt" "toFloat64"
+
+int16_to_bigint : Int16 -> BigInt
+foreign pure int16_to_bigint from "flick:rt" "toBigInt"
+
+int64_from_int : Int -> Int64
+foreign pure int64_from_int from "flick:rt" "toInt64"
+
+int64_to_float : Int64 -> Float
+foreign pure int64_to_float from "flick:rt" "toFloat64"
+
+int64_to_bigint : Int64 -> BigInt
+foreign pure int64_to_bigint from "flick:rt" "toBigInt"
+
+uint8_from_int : Int -> UInt8
+foreign pure uint8_from_int from "flick:rt" "toUInt8"
+
+uint8_to_float : UInt8 -> Float
+foreign pure uint8_to_float from "flick:rt" "toFloat64"
+
+uint8_to_bigint : UInt8 -> BigInt
+foreign pure uint8_to_bigint from "flick:rt" "toBigInt"
+
+uint16_from_int : Int -> UInt16
+foreign pure uint16_from_int from "flick:rt" "toUInt16"
+
+uint16_to_float : UInt16 -> Float
+foreign pure uint16_to_float from "flick:rt" "toFloat64"
+
+uint16_to_bigint : UInt16 -> BigInt
+foreign pure uint16_to_bigint from "flick:rt" "toBigInt"
+
+uint32_from_int : Int -> UInt32
+foreign pure uint32_from_int from "flick:rt" "toUInt32"
+
+uint32_to_float : UInt32 -> Float
+foreign pure uint32_to_float from "flick:rt" "toFloat64"
+
+uint32_to_bigint : UInt32 -> BigInt
+foreign pure uint32_to_bigint from "flick:rt" "toBigInt"
+
+uint64_from_int : Int -> UInt64
+foreign pure uint64_from_int from "flick:rt" "toUInt64"
+
+uint64_to_float : UInt64 -> Float
+foreign pure uint64_to_float from "flick:rt" "toFloat64"
+
+uint64_to_bigint : UInt64 -> BigInt
+foreign pure uint64_to_bigint from "flick:rt" "toBigInt"
+
+float32_from_int : Int -> Float32
+foreign pure float32_from_int from "flick:rt" "toFloat32"
+
+float32_from_float : Float -> Float32
+foreign pure float32_from_float from "flick:rt" "toFloat32"
+
+float32_to_float : Float32 -> Float
+foreign pure float32_to_float from "flick:rt" "toFloat64"
+
+instance Numeric Int8 =
+  let add a b = a + b
+  let sub a b = a - b
+  let mul a b = a * b
+  let div a b = a / b
+  let rem a b = a % b
+  let pow a b = a ** b
+  let negate a = -a
+  let from_int n = int8_from_int n
+  let to_float n = int8_to_float n
+  let lt a b = a < b
+  let le a b = a <= b
+  let gt a b = a > b
+  let ge a b = a >= b
+
+instance Numeric Int16 =
+  let add a b = a + b
+  let sub a b = a - b
+  let mul a b = a * b
+  let div a b = a / b
+  let rem a b = a % b
+  let pow a b = a ** b
+  let negate a = -a
+  let from_int n = int16_from_int n
+  let to_float n = int16_to_float n
+  let lt a b = a < b
+  let le a b = a <= b
+  let gt a b = a > b
+  let ge a b = a >= b
+
+instance Numeric Int64 =
+  let add a b = a + b
+  let sub a b = a - b
+  let mul a b = a * b
+  let div a b = a / b
+  let rem a b = a % b
+  let pow a b = a ** b
+  let negate a = -a
+  let from_int n = int64_from_int n
+  let to_float n = int64_to_float n
+  let lt a b = a < b
+  let le a b = a <= b
+  let gt a b = a > b
+  let ge a b = a >= b
+
+instance Numeric UInt8 =
+  let add a b = a + b
+  let sub a b = a - b
+  let mul a b = a * b
+  let div a b = a / b
+  let rem a b = a % b
+  let pow a b = a ** b
+  let negate a = -a
+  let from_int n = uint8_from_int n
+  let to_float n = uint8_to_float n
+  let lt a b = a < b
+  let le a b = a <= b
+  let gt a b = a > b
+  let ge a b = a >= b
+
+instance Numeric UInt16 =
+  let add a b = a + b
+  let sub a b = a - b
+  let mul a b = a * b
+  let div a b = a / b
+  let rem a b = a % b
+  let pow a b = a ** b
+  let negate a = -a
+  let from_int n = uint16_from_int n
+  let to_float n = uint16_to_float n
+  let lt a b = a < b
+  let le a b = a <= b
+  let gt a b = a > b
+  let ge a b = a >= b
+
+instance Numeric UInt32 =
+  let add a b = a + b
+  let sub a b = a - b
+  let mul a b = a * b
+  let div a b = a / b
+  let rem a b = a % b
+  let pow a b = a ** b
+  let negate a = -a
+  let from_int n = uint32_from_int n
+  let to_float n = uint32_to_float n
+  let lt a b = a < b
+  let le a b = a <= b
+  let gt a b = a > b
+  let ge a b = a >= b
+
+instance Numeric UInt64 =
+  let add a b = a + b
+  let sub a b = a - b
+  let mul a b = a * b
+  let div a b = a / b
+  let rem a b = a % b
+  let pow a b = a ** b
+  let negate a = -a
+  let from_int n = uint64_from_int n
+  let to_float n = uint64_to_float n
+  let lt a b = a < b
+  let le a b = a <= b
+  let gt a b = a > b
+  let ge a b = a >= b
+
+instance Numeric Float32 =
+  let add a b = a + b
+  let sub a b = a - b
+  let mul a b = a * b
+  let div a b = a / b
+  let rem a b = a % b
+  let pow a b = a ** b
+  let negate a = -a
+  let from_int n = float32_from_int n
+  let to_float x = float32_to_float x
+  let lt a b = a < b
+  let le a b = a <= b
+  let gt a b = a > b
+  let ge a b = a >= b
+
+instance Integer Int8 =
+  let to_bigint n = int8_to_bigint n
+
+instance Integer Int16 =
+  let to_bigint n = int16_to_bigint n
+
+instance Integer Int64 =
+  let to_bigint n = int64_to_bigint n
+
+instance Integer UInt8 =
+  let to_bigint n = uint8_to_bigint n
+
+instance Integer UInt16 =
+  let to_bigint n = uint16_to_bigint n
+
+instance Integer UInt32 =
+  let to_bigint n = uint32_to_bigint n
+
+instance Integer UInt64 =
+  let to_bigint n = uint64_to_bigint n
+
+instance Floating Float32 =
+  let from_float x = float32_from_float x

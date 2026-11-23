@@ -169,14 +169,29 @@ impl<'a> Machine<'a, '_> {
         match method_lang {
             Lang::Negate => Ok(Control::Return(self.eval_neg(num, arg)?)),
             Lang::FromInt | Lang::FromFloat => {
+                #[allow(
+                    clippy::cast_possible_truncation,
+                    clippy::cast_sign_loss,
+                    clippy::cast_precision_loss,
+                    reason = "from_int wraps for fixed-width integers and rounds once for Float32"
+                )]
                 let res = match (num, arg) {
                     (Num::Int, Value::Int(n)) => Value::Int(n),
+                    (Num::Int8, Value::Int(n)) => Value::Int8(n as i8),
+                    (Num::Int16, Value::Int(n)) => Value::Int16(n as i16),
+                    (Num::Int64, Value::Int(n)) => Value::Int64(i64::from(n)),
+                    (Num::UInt8, Value::Int(n)) => Value::UInt8(n as u8),
+                    (Num::UInt16, Value::Int(n)) => Value::UInt16(n as u16),
+                    (Num::UInt32, Value::Int(n)) => Value::UInt32(n as u32),
+                    (Num::UInt64, Value::Int(n)) => Value::UInt64(i64::from(n) as u64),
                     (Num::Float, Value::Int(n)) => Value::Float(f64::from(n)),
+                    (Num::Float32, Value::Int(n)) => Value::Float32(n as f32),
                     (Num::BigInt, Value::Int(n)) => {
                         self.budget.charge_bytes(16)?;
                         Value::BigInt(i128::from(n))
                     }
                     (Num::Float, Value::Float(x)) => Value::Float(x),
+                    (Num::Float32, Value::Float(x)) => Value::Float32(x as f32),
                     _ => return Err(StopReason::UnknownOp),
                 };
                 Ok(Control::Return(res))
@@ -232,8 +247,15 @@ impl<'a> Machine<'a, '_> {
                 }
             }
             Value::Int(n) => bigint_byte_len(i128::from(*n)),
+            Value::Int8(n) => bigint_byte_len(i128::from(*n)),
+            Value::Int16(n) => bigint_byte_len(i128::from(*n)),
+            Value::Int64(n) => bigint_byte_len(i128::from(*n)),
+            Value::UInt8(n) => bigint_byte_len(i128::from(*n)),
+            Value::UInt16(n) => bigint_byte_len(i128::from(*n)),
+            Value::UInt32(n) => bigint_byte_len(i128::from(*n)),
+            Value::UInt64(n) => bigint_byte_len(i128::from(*n)),
             Value::BigInt(n) => bigint_byte_len(*n).saturating_add(1),
-            Value::Float(_) => MAX_JS_NUMBER_BYTES,
+            Value::Float(_) | Value::Float32(_) => MAX_JS_NUMBER_BYTES,
             _ => return Err(StopReason::UnknownOp),
         };
         let c = value_to_const(&arg)?;
@@ -302,7 +324,21 @@ pub(super) fn is_builtin_method(
     if let Some(is_show) = show_display_kind(module, method, lang) {
         let prefix = if is_show { "Show " } else { "Display " };
         return instance.strip_prefix(prefix).is_some_and(|ty| {
-            matches!(ty, "Float" | "Int" | "Bool" | "String") || (is_show && ty == "BigInt")
+            matches!(
+                ty,
+                "Float"
+                    | "Float32"
+                    | "Int"
+                    | "Int8"
+                    | "Int16"
+                    | "Int64"
+                    | "UInt8"
+                    | "UInt16"
+                    | "UInt32"
+                    | "UInt64"
+                    | "Bool"
+                    | "String"
+            ) || (is_show && ty == "BigInt")
         });
     }
     false

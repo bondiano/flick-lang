@@ -60,6 +60,7 @@ change needs.
 | [Target dependencies move to `[target.<name>.dependencies]` and backends own package managers](#target-dependencies-move-to-targetnamedependencies-and-backends-own-package-managers) | no | `FLICK-P051`, `FLICK-P057`, `FLICK-P063` |
 | [The IR carries full layout types (`0.14.0`)](#the-ir-carries-full-layout-types-0140) | no | — |
 | [Backends declare foreign adapter metadata (`0.15.0`)](#backends-declare-foreign-adapter-metadata-0150) | no | `FLICK-S011`, `FLICK-S014` |
+| [Fixed-width numeric types in IR `0.16.0`](#fixed-width-numeric-types-in-ir-0160) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -765,3 +766,16 @@ Backend components and `ir`-hook plugins must rebuild against `flick-ir`
 `0.15.0` and `flick-backend` and update their descriptor `ir` range to
 `[0.15.0, 0.16.0)`. Ordinary Flick bindings on `flick/js` and `flick/go`
 require no source changes.
+
+## Fixed-width numeric types in IR `0.16.0`
+
+The portable IR moves from `0.15.0` to `0.16.0` to add the fixed-width numeric
+built-ins (`Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`,
+`Float32`) as first-class `Lang`, `Num`, and `Lit` variants (`Int32` is an alias
+for `Int`, and `Byte` is an alias for `UInt8`).
+
+Backend components and `ir`-hook plugins must rebuild against `flick-ir` `0.16.0`
+and update their descriptor `ir` range to `[0.16.0, 0.17.0)`. Ordinary Flick
+programs require no source changes unless they previously defined top-level types
+or modules named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `Byte`, `UInt16`,
+`UInt32`, `UInt64`, or `Float32`.

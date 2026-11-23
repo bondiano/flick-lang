@@ -78,6 +78,56 @@ fn folds_comparisons_bools_strings_and_bigints() {
 }
 
 #[test]
+fn folds_fixed_width_boundary_cases() {
+    assert_eq!(value("127i8 + 1i8"), Some(Const::Int8(-128)));
+    assert_eq!(value("-128i8 - 1i8"), Some(Const::Int8(127)));
+    assert_eq!(value("-128i8 / -1i8"), Some(Const::Int8(-128)));
+    assert_eq!(value("-128i8 % -1i8"), Some(Const::Int8(0)));
+    assert_eq!(value("10i8 / 0i8"), Some(Const::Int8(0)));
+    assert_eq!(value("10i8 % 0i8"), Some(Const::Int8(0)));
+    assert_eq!(value("-(1u8)"), Some(Const::UInt8(255)));
+    assert_eq!(value("0u8 - 1u8"), Some(Const::UInt8(255)));
+    assert_eq!(value("255u8 + 1u8"), Some(Const::UInt8(0)));
+    assert_eq!(value("255u8 / 0u8"), Some(Const::UInt8(0)));
+    assert_eq!(value("255u8 % 0u8"), Some(Const::UInt8(0)));
+    assert_eq!(value("32767i16 + 1i16"), Some(Const::Int16(-32_768)));
+    assert_eq!(value("-32768i16 / -1i16"), Some(Const::Int16(-32_768)));
+    assert_eq!(value("65535u16 + 1u16"), Some(Const::UInt16(0)));
+    assert_eq!(value("4294967295u32 + 1u32"), Some(Const::UInt32(0)));
+    assert_eq!(
+        value("9223372036854775807i64 + 1i64"),
+        Some(Const::Int64(i64::MIN))
+    );
+    assert_eq!(
+        value("-9223372036854775808i64 / -1i64"),
+        Some(Const::Int64(i64::MIN))
+    );
+    assert_eq!(
+        value("-9223372036854775808i64 % -1i64"),
+        Some(Const::Int64(0))
+    );
+    assert_eq!(
+        value("18446744073709551615u64 + 1u64"),
+        Some(Const::UInt64(0))
+    );
+    assert_eq!(value("2i64 ** 40i64"), Some(Const::Int64(1_i64 << 40)));
+    assert_eq!(value("2u64 ** 63u64"), Some(Const::UInt64(1_u64 << 63)));
+    assert_eq!(
+        value("16777216.0f32 + 1.0f32"),
+        Some(Const::Float32(16_777_216.0))
+    );
+    assert_eq!(
+        value("0.0f32 / 0.0f32 == 0.0f32 / 0.0f32"),
+        Some(Const::Bool(true))
+    );
+    assert_eq!(value("0.0f32 == -0.0f32"), Some(Const::Bool(true)));
+    assert_eq!(value("1i8 + 1i16"), None);
+    assert_eq!(value("2i8 ** -1i8"), Some(Const::Int8(0)));
+    assert_eq!(value("(-1i8) ** -128i8"), Some(Const::Int8(1)));
+    assert_eq!(value("(-1i8) ** -127i8"), Some(Const::Int8(-1)));
+}
+
+#[test]
 fn leaves_non_literals_and_mixed_types_alone() {
     for expr in [
         "x + 1",

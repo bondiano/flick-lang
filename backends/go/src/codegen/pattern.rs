@@ -37,6 +37,26 @@ fn merge_let<'a>(
 }
 
 impl<'a> Gen<'a> {
+    /// Formats a literal for equality against `subject_native`, unboxing special
+    /// runtime float constants (`NaN`, `Inf`, `NegInf`, `NegZero`) when needed.
+    pub(super) fn pattern_lit(
+        &mut self,
+        lit: &Lit,
+        subject_native: Option<Native>,
+    ) -> Document<'a> {
+        let a = self.a;
+        let lit_doc = self.literal(lit).to_doc(a);
+        match (lit, subject_native) {
+            (Lit::Float(x), Some(Native::Float)) if !Native::is_native_float_lit(*x) => {
+                Native::Float.unbox(a, lit_doc)
+            }
+            (Lit::Float32(x), Some(Native::Float32)) if !Native::is_native_float32_lit(*x) => {
+                Native::Float32.unbox(a, lit_doc)
+            }
+            _ => lit_doc,
+        }
+    }
+
     fn test(
         &mut self,
         pat: &Pat,
@@ -60,13 +80,7 @@ impl<'a> Gen<'a> {
                 t.conds.push(call(a, "flickrt.Same", [subject, lit]));
             }
             Pat::Lit(lit) => {
-                let mut lit_doc = self.literal(lit).to_doc(a);
-                if let Lit::Float(x) = lit
-                    && !Native::is_native_float_lit(*x)
-                    && subject_native == Some(Native::Float)
-                {
-                    lit_doc = Native::Float.unbox(a, lit_doc);
-                }
+                let lit_doc = self.pattern_lit(lit, subject_native);
                 t.conds.push(docvec![a, "(", subject, " == ", lit_doc, ")"]);
             }
             Pat::Tuple(items) => {

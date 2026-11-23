@@ -13,6 +13,7 @@
 ../rt/wake_chain
 bootstrap/app_fail
 codegen/bigints
+codegen/fixed_width
 bootstrap/debug
 bootstrap/hello
 bootstrap/inline_declarations

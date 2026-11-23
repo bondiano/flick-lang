@@ -378,13 +378,7 @@ impl<'a> Gen<'a> {
                 call(a, "flickrt.Same", [subject, lit])
             }
             Test::Lit(lit) => {
-                let mut lit_doc = self.literal(lit).to_doc(a);
-                if let Lit::Float(x) = lit
-                    && !Native::is_native_float_lit(*x)
-                    && self.place_native(w, place) == Some(Native::Float)
-                {
-                    lit_doc = Native::Float.unbox(a, lit_doc);
-                }
+                let lit_doc = self.pattern_lit(lit, self.place_native(w, place));
                 docvec![a, "(", subject, " == ", lit_doc, ")"]
             }
             Test::Len { n, rest } => {

@@ -1,0 +1,195 @@
+/// Operations and explicit conversions on `UInt64`, the 64-bit unsigned
+/// integers (`0..=18446744073709551615`).
+module UInt64 exposing (..)
+
+import BigInt
+import Int64
+
+min_value : UInt64
+let min_value = 0u64
+
+max_value : UInt64
+let max_value = 18446744073709551615u64
+
+max_bigint : BigInt
+let max_bigint = 18446744073709551615n
+
+to_string : UInt64 -> String
+let to_string n = display n
+
+parse : String -> Option UInt64
+let parse s = Option.bind from_bigint (BigInt.parse s)
+
+to_float : UInt64 -> Float
+foreign pure to_float from "flick:rt" "toFloat64"
+
+to_float32 : UInt64 -> Float32
+foreign pure to_float32 from "flick:rt" "toFloat32"
+
+to_bigint : UInt64 -> BigInt
+foreign pure to_bigint from "flick:rt" "toBigInt"
+
+from_uint8 : UInt8 -> UInt64
+let from_uint8 n = into n
+
+from_uint16 : UInt16 -> UInt64
+let from_uint16 n = into n
+
+from_uint32 : UInt32 -> UInt64
+let from_uint32 n = into n
+
+wrapping_from_int8 : Int8 -> UInt64
+foreign pure wrapping_from_int8 from "flick:rt" "toUInt64"
+
+wrapping_from_int16 : Int16 -> UInt64
+foreign pure wrapping_from_int16 from "flick:rt" "toUInt64"
+
+wrapping_from_int : Int -> UInt64
+foreign pure wrapping_from_int from "flick:rt" "toUInt64"
+
+wrapping_from_int32 : Int32 -> UInt64
+let wrapping_from_int32 n = wrapping_from_int n
+
+wrapping_from_int64 : Int64 -> UInt64
+foreign pure wrapping_from_int64 from "flick:rt" "toUInt64"
+
+wrapping_from_bigint : BigInt -> UInt64
+foreign pure wrapping_from_bigint from "flick:rt" "toUInt64"
+
+from_bigint : BigInt -> Option UInt64
+let from_bigint n = if n < 0n || n > max_bigint then None else Some (wrapping_from_bigint n)
+
+from_int8 : Int8 -> Option UInt64
+let from_int8 n = if n < 0i8 then None else Some (wrapping_from_int8 n)
+
+from_int16 : Int16 -> Option UInt64
+let from_int16 n = if n < 0i16 then None else Some (wrapping_from_int16 n)
+
+from_int : Int -> Option UInt64
+let from_int n = if n < 0 then None else Some (wrapping_from_int n)
+
+from_int32 : Int32 -> Option UInt64
+let from_int32 n = from_int n
+
+from_int64 : Int64 -> Option UInt64
+let from_int64 n = if n < 0i64 then None else Some (wrapping_from_int64 n)
+
+from_float : Float -> Option UInt64
+let from_float x = Option.bind from_bigint (BigInt.from_number x)
+
+from_float32 : Float32 -> Option UInt64
+let from_float32 x = from_float (into x)
+
+saturating_from_bigint : BigInt -> UInt64
+let saturating_from_bigint n =
+  if n < 0n then min_value else if n > max_bigint then max_value else wrapping_from_bigint n
+
+saturating_from_int8 : Int8 -> UInt64
+let saturating_from_int8 n = if n < 0i8 then min_value else wrapping_from_int8 n
+
+saturating_from_int16 : Int16 -> UInt64
+let saturating_from_int16 n = if n < 0i16 then min_value else wrapping_from_int16 n
+
+saturating_from_int : Int -> UInt64
+let saturating_from_int n = if n < 0 then min_value else wrapping_from_int n
+
+saturating_from_int32 : Int32 -> UInt64
+let saturating_from_int32 n = saturating_from_int n
+
+saturating_from_int64 : Int64 -> UInt64
+let saturating_from_int64 n = if n < 0i64 then min_value else wrapping_from_int64 n
+
+saturating_from_float : Float -> UInt64
+let saturating_from_float x =
+  if Float.is_nan x || x <= 0.0 then
+    0u64
+  else if x >= 18446744073709551616.0 then
+    max_value
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> saturating_from_bigint n
+    | None -> 0u64
+
+saturating_from_float32 : Float32 -> UInt64
+let saturating_from_float32 x = saturating_from_float (into x)
+
+truncate : Float -> UInt64
+let truncate x =
+  if not (Float.is_finite x) then
+    0u64
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> wrapping_from_bigint n
+    | None -> 0u64
+
+min : UInt64 -> UInt64 -> UInt64
+let min a b = if a <= b then a else b
+
+max : UInt64 -> UInt64 -> UInt64
+let max a b = if a >= b then a else b
+
+checked_add : UInt64 -> UInt64 -> Result Int.ArithmeticError UInt64
+let checked_add a b =
+  let r = a + b
+  if r < a then Err (Int.ArithmeticError "UInt64.checked_add: overflow") else Ok r
+
+checked_sub : UInt64 -> UInt64 -> Result Int.ArithmeticError UInt64
+let checked_sub a b =
+  if a < b then Err (Int.ArithmeticError "UInt64.checked_sub: underflow") else Ok (a - b)
+
+checked_mul : UInt64 -> UInt64 -> Result Int.ArithmeticError UInt64
+let checked_mul a b =
+  let p = to_bigint a * to_bigint b
+  if p > max_bigint then Err (Int.ArithmeticError "UInt64.checked_mul: overflow") else Ok (a * b)
+
+checked_div : UInt64 -> UInt64 -> Result Int.ArithmeticError UInt64
+let checked_div a b =
+  if b == 0u64 then Err (Int.ArithmeticError "UInt64.checked_div: division by zero") else Ok (a / b)
+
+checked_rem : UInt64 -> UInt64 -> Result Int.ArithmeticError UInt64
+let checked_rem a b =
+  if b == 0u64 then Err (Int.ArithmeticError "UInt64.checked_rem: division by zero") else Ok (a % b)
+
+divide : UInt64 -> UInt64 -> Result Int.ArithmeticError UInt64
+let divide a b = checked_div a b
+
+remainder : UInt64 -> UInt64 -> Result Int.ArithmeticError UInt64
+let remainder a b = checked_rem a b
+
+unsafe_div : UInt64 -> UInt64 -> UInt64
+let unsafe_div a b =
+  if b == 0u64 then
+    let _ = Int.unsafe_div 1 0
+    0u64
+  else
+    a / b
+
+unsafe_rem : UInt64 -> UInt64 -> UInt64
+let unsafe_rem a b =
+  if b == 0u64 then
+    let _ = Int.unsafe_rem 1 0
+    0u64
+  else
+    a % b
+
+bit_and : UInt64 -> UInt64 -> UInt64
+let bit_and a b =
+  wrapping_from_int64 (Int64.bit_and (Int64.wrapping_from_uint64 a) (Int64.wrapping_from_uint64 b))
+
+bit_or : UInt64 -> UInt64 -> UInt64
+let bit_or a b =
+  wrapping_from_int64 (Int64.bit_or (Int64.wrapping_from_uint64 a) (Int64.wrapping_from_uint64 b))
+
+bit_xor : UInt64 -> UInt64 -> UInt64
+let bit_xor a b =
+  wrapping_from_int64 (Int64.bit_xor (Int64.wrapping_from_uint64 a) (Int64.wrapping_from_uint64 b))
+
+bit_not : UInt64 -> UInt64
+let bit_not a = wrapping_from_int64 (Int64.bit_not (Int64.wrapping_from_uint64 a))
+
+shift_left : UInt64 -> Int -> UInt64
+let shift_left a n = wrapping_from_int64 (Int64.shift_left (Int64.wrapping_from_uint64 a) n)
+
+shift_right : UInt64 -> Int -> UInt64
+let shift_right a n =
+  wrapping_from_int64 (Int64.shift_right_unsigned (Int64.wrapping_from_uint64 a) n)

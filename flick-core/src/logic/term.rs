@@ -25,7 +25,15 @@ impl PartialEq for Literal {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
             (Lit::Int(a), Lit::Int(b)) => a == b,
+            (Lit::Int8(a), Lit::Int8(b)) => a == b,
+            (Lit::Int16(a), Lit::Int16(b)) => a == b,
+            (Lit::Int64(a), Lit::Int64(b)) => a == b,
+            (Lit::UInt8(a), Lit::UInt8(b)) => a == b,
+            (Lit::UInt16(a), Lit::UInt16(b)) => a == b,
+            (Lit::UInt32(a), Lit::UInt32(b)) => a == b,
+            (Lit::UInt64(a), Lit::UInt64(b)) => a == b,
             (Lit::Float(a), Lit::Float(b)) => a.to_bits() == b.to_bits(),
+            (Lit::Float32(a), Lit::Float32(b)) => a.to_bits() == b.to_bits(),
             (Lit::BigInt(a), Lit::BigInt(b)) | (Lit::String(a), Lit::String(b)) => a == b,
             (Lit::Bool(a), Lit::Bool(b)) => a == b,
             (Lit::Unit, Lit::Unit) => true,

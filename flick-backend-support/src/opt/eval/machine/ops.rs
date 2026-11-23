@@ -20,7 +20,15 @@ impl<'a> Machine<'a, '_> {
             Lit::Unit => Ok(Value::Unit),
             Lit::Bool(b) => Ok(Value::Bool(*b)),
             Lit::Int(n) => Ok(Value::Int(*n)),
+            Lit::Int8(n) => Ok(Value::Int8(*n)),
+            Lit::Int16(n) => Ok(Value::Int16(*n)),
+            Lit::Int64(n) => Ok(Value::Int64(*n)),
+            Lit::UInt8(n) => Ok(Value::UInt8(*n)),
+            Lit::UInt16(n) => Ok(Value::UInt16(*n)),
+            Lit::UInt32(n) => Ok(Value::UInt32(*n)),
+            Lit::UInt64(n) => Ok(Value::UInt64(*n)),
             Lit::Float(x) => Ok(Value::Float(*x)),
+            Lit::Float32(x) => Ok(Value::Float32(*x)),
             Lit::BigInt(digits) => {
                 self.budget.charge_bytes(16)?;
                 let value = bigint_value(digits).ok_or(StopReason::UnknownOp)?;
@@ -37,7 +45,15 @@ impl<'a> Machine<'a, '_> {
     pub(super) fn eval_neg(&mut self, num: Num, value: Value<'a>) -> Result<Value<'a>, StopReason> {
         match (num, value) {
             (Num::Int, Value::Int(n)) => Ok(Value::Int(n.wrapping_neg())),
+            (Num::Int8, Value::Int8(n)) => Ok(Value::Int8(n.wrapping_neg())),
+            (Num::Int16, Value::Int16(n)) => Ok(Value::Int16(n.wrapping_neg())),
+            (Num::Int64, Value::Int64(n)) => Ok(Value::Int64(n.wrapping_neg())),
+            (Num::UInt8, Value::UInt8(n)) => Ok(Value::UInt8(n.wrapping_neg())),
+            (Num::UInt16, Value::UInt16(n)) => Ok(Value::UInt16(n.wrapping_neg())),
+            (Num::UInt32, Value::UInt32(n)) => Ok(Value::UInt32(n.wrapping_neg())),
+            (Num::UInt64, Value::UInt64(n)) => Ok(Value::UInt64(n.wrapping_neg())),
             (Num::Float, Value::Float(x)) => Ok(Value::Float(-x)),
+            (Num::Float32, Value::Float32(x)) => Ok(Value::Float32(-x)),
             (Num::BigInt, Value::BigInt(n)) => {
                 self.budget.charge_bytes(16)?;
                 let negated = n.checked_neg().ok_or(StopReason::UnknownOp)?;
@@ -66,13 +82,55 @@ impl<'a> Machine<'a, '_> {
                 (Value::Int(a), Value::Int(b)) => Ok(Value::Int(numeric::int_arith(arith, *a, *b))),
                 _ => Err(StopReason::UnsafeContext),
             },
+            BinOp::Arith(arith, Num::Int8) => match (lhs, rhs) {
+                (Value::Int8(a), Value::Int8(b)) => {
+                    Ok(Value::Int8(numeric::int8_arith(arith, *a, *b)))
+                }
+                _ => Err(StopReason::UnsafeContext),
+            },
+            BinOp::Arith(arith, Num::Int16) => match (lhs, rhs) {
+                (Value::Int16(a), Value::Int16(b)) => {
+                    Ok(Value::Int16(numeric::int16_arith(arith, *a, *b)))
+                }
+                _ => Err(StopReason::UnsafeContext),
+            },
+            BinOp::Arith(arith, Num::Int64) => match (lhs, rhs) {
+                (Value::Int64(a), Value::Int64(b)) => {
+                    Ok(Value::Int64(numeric::int64_arith(arith, *a, *b)))
+                }
+                _ => Err(StopReason::UnsafeContext),
+            },
+            BinOp::Arith(arith, Num::UInt8) => match (lhs, rhs) {
+                (Value::UInt8(a), Value::UInt8(b)) => {
+                    Ok(Value::UInt8(numeric::uint8_arith(arith, *a, *b)))
+                }
+                _ => Err(StopReason::UnsafeContext),
+            },
+            BinOp::Arith(arith, Num::UInt16) => match (lhs, rhs) {
+                (Value::UInt16(a), Value::UInt16(b)) => {
+                    Ok(Value::UInt16(numeric::uint16_arith(arith, *a, *b)))
+                }
+                _ => Err(StopReason::UnsafeContext),
+            },
+            BinOp::Arith(arith, Num::UInt32) => match (lhs, rhs) {
+                (Value::UInt32(a), Value::UInt32(b)) => {
+                    Ok(Value::UInt32(numeric::uint32_arith(arith, *a, *b)))
+                }
+                _ => Err(StopReason::UnsafeContext),
+            },
+            BinOp::Arith(arith, Num::UInt64) => match (lhs, rhs) {
+                (Value::UInt64(a), Value::UInt64(b)) => {
+                    Ok(Value::UInt64(numeric::uint64_arith(arith, *a, *b)))
+                }
+                _ => Err(StopReason::UnsafeContext),
+            },
             BinOp::Concat => self.eval_string_concat(lhs, rhs),
             BinOp::ListConcat => self.eval_list_concat(lhs, rhs),
             BinOp::Lt
             | BinOp::Le
             | BinOp::Gt
             | BinOp::Ge
-            | BinOp::Arith(_, Num::Float | Num::BigInt) => {
+            | BinOp::Arith(_, Num::Float | Num::Float32 | Num::BigInt) => {
                 if matches!(op, BinOp::Arith(Arith::Pow, Num::BigInt)) {
                     match (lhs, rhs) {
                         (Value::BigInt(_), Value::BigInt(b)) if *b < 0 => {
@@ -202,6 +260,14 @@ impl<'a> Machine<'a, '_> {
     fn const_to_value(&mut self, c: Const) -> Result<Value<'a>, StopReason> {
         match c {
             Const::Number(x) => Ok(Value::Float(x)),
+            Const::Float32(x) => Ok(Value::Float32(x)),
+            Const::Int8(n) => Ok(Value::Int8(n)),
+            Const::Int16(n) => Ok(Value::Int16(n)),
+            Const::Int64(n) => Ok(Value::Int64(n)),
+            Const::UInt8(n) => Ok(Value::UInt8(n)),
+            Const::UInt16(n) => Ok(Value::UInt16(n)),
+            Const::UInt32(n) => Ok(Value::UInt32(n)),
+            Const::UInt64(n) => Ok(Value::UInt64(n)),
             Const::BigInt(n) => {
                 self.budget.charge_bytes(16)?;
                 Ok(Value::BigInt(n))
@@ -227,7 +293,15 @@ fn as_utf16<'a>(v: &'a Value<'a>) -> Option<(usize, Utf16Source<'a>)> {
 pub(super) fn value_to_const(value: &Value<'_>) -> Result<Const, StopReason> {
     match value {
         Value::Int(n) => Ok(Const::Number(f64::from(*n))),
+        Value::Int8(n) => Ok(Const::Int8(*n)),
+        Value::Int16(n) => Ok(Const::Int16(*n)),
+        Value::Int64(n) => Ok(Const::Int64(*n)),
+        Value::UInt8(n) => Ok(Const::UInt8(*n)),
+        Value::UInt16(n) => Ok(Const::UInt16(*n)),
+        Value::UInt32(n) => Ok(Const::UInt32(*n)),
+        Value::UInt64(n) => Ok(Const::UInt64(*n)),
         Value::Float(x) => Ok(Const::Number(*x)),
+        Value::Float32(x) => Ok(Const::Float32(*x)),
         Value::BigInt(n) => Ok(Const::BigInt(*n)),
         Value::Bool(b) => Ok(Const::Bool(*b)),
         _ => Err(StopReason::UnknownOp),

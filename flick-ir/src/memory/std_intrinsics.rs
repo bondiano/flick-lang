@@ -1,3 +1,42 @@
+/// Pure fixed-width integer and binary32 float intrinsics (`flick:rt`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FixedWidthIntrinsic {
+    ShowInt64,
+    ShowUInt64,
+    ToInt8,
+    ToInt16,
+    ToInt32,
+    ToInt64,
+    ToUInt8,
+    ToUInt16,
+    ToUInt32,
+    ToUInt64,
+    ToFloat32,
+    ToFloat64,
+    ToBigInt,
+    Int64BitAnd,
+    Int64BitOr,
+    Int64BitXor,
+    Int64BitNot,
+    Int64ShiftLeft,
+    Int64ShiftRight,
+    Int64ShiftRightUnsigned,
+}
+
+impl FixedWidthIntrinsic {
+    pub fn arity(self) -> usize {
+        match self {
+            Self::Int64BitAnd
+            | Self::Int64BitOr
+            | Self::Int64BitXor
+            | Self::Int64ShiftLeft
+            | Self::Int64ShiftRight
+            | Self::Int64ShiftRightUnsigned => 2,
+            _ => 1,
+        }
+    }
+}
+
 /// Pure 32-bit signed integer intrinsics for `packages/core/src/Int.fl`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum IntIntrinsic {

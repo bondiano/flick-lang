@@ -73,7 +73,47 @@ fn compare_values<'a>(
                     return Ok(false);
                 }
             }
+            (Value::Int8(x), Value::Int8(y)) => {
+                if x != y {
+                    return Ok(false);
+                }
+            }
+            (Value::Int16(x), Value::Int16(y)) => {
+                if x != y {
+                    return Ok(false);
+                }
+            }
+            (Value::Int64(x), Value::Int64(y)) => {
+                if x != y {
+                    return Ok(false);
+                }
+            }
+            (Value::UInt8(x), Value::UInt8(y)) => {
+                if x != y {
+                    return Ok(false);
+                }
+            }
+            (Value::UInt16(x), Value::UInt16(y)) => {
+                if x != y {
+                    return Ok(false);
+                }
+            }
+            (Value::UInt32(x), Value::UInt32(y)) => {
+                if x != y {
+                    return Ok(false);
+                }
+            }
+            (Value::UInt64(x), Value::UInt64(y)) => {
+                if x != y {
+                    return Ok(false);
+                }
+            }
             (Value::Float(x), Value::Float(y)) => {
+                if x != y && (strict || !(x.is_nan() && y.is_nan())) {
+                    return Ok(false);
+                }
+            }
+            (Value::Float32(x), Value::Float32(y)) => {
                 if x != y && (strict || !(x.is_nan() && y.is_nan())) {
                     return Ok(false);
                 }
@@ -408,7 +448,15 @@ fn match_lit(lit: &Lit, value: &Value<'_>, budget: &mut EvalBudget) -> Result<bo
         (Lit::Unit, Value::Unit) => Ok(true),
         (Lit::Bool(a), Value::Bool(b)) => Ok(a == b),
         (Lit::Int(a), Value::Int(b)) => Ok(a == b),
+        (Lit::Int8(a), Value::Int8(b)) => Ok(a == b),
+        (Lit::Int16(a), Value::Int16(b)) => Ok(a == b),
+        (Lit::Int64(a), Value::Int64(b)) => Ok(a == b),
+        (Lit::UInt8(a), Value::UInt8(b)) => Ok(a == b),
+        (Lit::UInt16(a), Value::UInt16(b)) => Ok(a == b),
+        (Lit::UInt32(a), Value::UInt32(b)) => Ok(a == b),
+        (Lit::UInt64(a), Value::UInt64(b)) => Ok(a == b),
         (Lit::Float(a), Value::Float(b)) => Ok(a == b),
+        (Lit::Float32(a), Value::Float32(b)) => Ok(a == b),
         (Lit::BigInt(digits), Value::BigInt(b)) => {
             let a = bigint_value(digits).ok_or(StopReason::UnknownOp)?;
             Ok(a == *b)

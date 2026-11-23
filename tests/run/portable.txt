@@ -16,6 +16,7 @@ bootstrap/stderr
 codegen/apply_order
 codegen/applicative_do
 codegen/bigints
+codegen/fixed_width
 codegen/category_classes
 codegen/classes
 codegen/closures

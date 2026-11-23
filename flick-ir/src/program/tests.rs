@@ -128,6 +128,48 @@ fn cbor_keeps_accepting_tagged_programs_and_trailing_input() {
 }
 
 #[test]
+fn fixed_width_literals_survive_both_forms() {
+    let span = Span::new(FileId::new(0), 0, 1);
+    let lits = vec![
+        Lit::Int8(i8::MIN),
+        Lit::Int8(i8::MAX),
+        Lit::Int16(i16::MIN),
+        Lit::Int16(i16::MAX),
+        Lit::Int64(i64::MIN),
+        Lit::Int64(i64::MAX),
+        Lit::UInt8(0),
+        Lit::UInt8(u8::MAX),
+        Lit::UInt16(u16::MAX),
+        Lit::UInt32(u32::MAX),
+        Lit::UInt64(u64::MAX),
+        Lit::Float32(f32::NAN),
+        Lit::Float32(f32::INFINITY),
+        Lit::Float32(f32::NEG_INFINITY),
+        Lit::Float32(-0.0),
+        Lit::Float32(0.0),
+        Lit::Float32(0.1_f32),
+        Lit::Float32(f32::MIN_POSITIVE),
+        Lit::Float32(f32::from_bits(1)),
+        Lit::Float32(f32::MAX),
+        Lit::Float32(16_777_216.0_f32),
+    ];
+    for lit in lits {
+        let mut p = program(0.0);
+        p.modules[0].items[0].kind = ItemKind::Value {
+            name: "v".into(),
+            type_params: Vec::new(),
+            dicts: Vec::new(),
+            dict_constraints: Vec::new(),
+            ty: None,
+            body: Expr::new(ExprKind::Lit(lit.clone()), span),
+        };
+        assert_eq!(Program::from_json(&p.to_json()), Ok(p.clone()), "{lit:?}");
+        #[cfg(feature = "cbor")]
+        assert_eq!(Program::from_cbor(&p.to_cbor()), Ok(p), "{lit:?}");
+    }
+}
+
+#[test]
 fn a_reader_takes_only_its_own_minor_version_before_1_0() {
     assert!(compatible(VERSION));
     assert!(!compatible("0.5.0"));
@@ -139,9 +181,10 @@ fn a_reader_takes_only_its_own_minor_version_before_1_0() {
     assert!(!compatible("0.12.0"));
     assert!(!compatible("0.13.0"));
     assert!(!compatible("0.14.0"));
+    assert!(!compatible("0.15.0"));
     let mut p = program(1.0);
-    p.ir_version = "0.16.0".to_owned();
-    let found = "0.16.0".to_owned();
+    p.ir_version = "0.17.0".to_owned();
+    let found = "0.17.0".to_owned();
     assert_eq!(
         Program::from_json(&p.to_json()),
         Err(Error::Version { found })

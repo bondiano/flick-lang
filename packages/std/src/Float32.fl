@@ -1,0 +1,140 @@
+/// Operations and explicit conversions on `Float32`, IEEE 754 binary32
+/// single-precision floating-point numbers. `==` uses SameValueZero (`NaN == NaN`
+/// and `0.0f32 == -0.0f32`), and `Ord` is total with `NaN` greatest.
+module Float32 exposing (..)
+
+min_value : Float32
+let min_value = -3.4028234663852886e38f32
+
+max_value : Float32
+let max_value = 3.4028234663852886e38f32
+
+min_positive : Float32
+let min_positive = 1.1754943508222875e-38f32
+
+epsilon : Float32
+let epsilon = 1.1920928955078125e-7f32
+
+pi : Float32
+let pi = 3.1415927f32
+
+infinity : Float32
+let infinity = 1.0f32 / 0.0f32
+
+neg_infinity : Float32
+let neg_infinity = -1.0f32 / 0.0f32
+
+nan : Float32
+let nan = 0.0f32 / 0.0f32
+
+/// Exact widening to `Float` (binary64).
+to_float : Float32 -> Float
+let to_float x = into x
+
+/// Rounds a `Float` (binary64) to the nearest IEEE 754 binary32 value (ties to even).
+from_float : Float -> Float32
+foreign pure from_float from "flick:rt" "toFloat32"
+
+from_int8 : Int8 -> Float32
+let from_int8 n = into n
+
+from_int16 : Int16 -> Float32
+let from_int16 n = into n
+
+from_int : Int -> Float32
+foreign pure from_int from "flick:rt" "toFloat32"
+
+from_int32 : Int32 -> Float32
+let from_int32 n = from_int n
+
+from_int64 : Int64 -> Float32
+foreign pure from_int64 from "flick:rt" "toFloat32"
+
+from_uint8 : UInt8 -> Float32
+let from_uint8 n = into n
+
+from_uint16 : UInt16 -> Float32
+let from_uint16 n = into n
+
+from_uint32 : UInt32 -> Float32
+foreign pure from_uint32 from "flick:rt" "toFloat32"
+
+from_uint64 : UInt64 -> Float32
+foreign pure from_uint64 from "flick:rt" "toFloat32"
+
+from_bigint : BigInt -> Float32
+foreign pure from_bigint from "flick:rt" "toFloat32"
+
+to_string : Float32 -> String
+let to_string x = display x
+
+parse : String -> Option Float32
+let parse s = Option.map from_float (Float.parse s)
+
+/// IEEE strict equality: `NaN` differs from itself, `0.0f32` equals `-0.0f32`.
+strict_equal : Float32 -> Float32 -> Bool
+let strict_equal a b = Float.strict_equal (to_float a) (to_float b)
+
+/// SameValue (`Object.is`): `NaN` equals itself, `0.0f32` differs from `-0.0f32`.
+same_value : Float32 -> Float32 -> Bool
+let same_value a b = Float.same_value (to_float a) (to_float b)
+
+is_nan : Float32 -> Bool
+let is_nan x = Float.is_nan (to_float x)
+
+is_finite : Float32 -> Bool
+let is_finite x = Float.is_finite (to_float x)
+
+is_infinite : Float32 -> Bool
+let is_infinite x = not (is_finite x) && not (is_nan x)
+
+is_integer : Float32 -> Bool
+let is_integer x = Float.is_integer (to_float x)
+
+abs : Float32 -> Float32
+let abs x = from_float (Float.abs (to_float x))
+
+floor : Float32 -> Float32
+let floor x = from_float (Float.floor (to_float x))
+
+ceil : Float32 -> Float32
+let ceil x = from_float (Float.ceil (to_float x))
+
+round : Float32 -> Float32
+let round x = from_float (Float.round (to_float x))
+
+trunc : Float32 -> Float32
+let trunc x = from_float (Float.trunc (to_float x))
+
+sqrt : Float32 -> Float32
+let sqrt x = from_float (Float.sqrt (to_float x))
+
+/// The lesser of two values under `Ord` (`NaN` is greatest).
+min : Float32 -> Float32 -> Float32
+let min a b =
+  match compare a b with
+  | GT -> b
+  | _ -> a
+
+/// The greater of two values under `Ord` (`NaN` is greatest).
+max : Float32 -> Float32 -> Float32
+let max a b =
+  match compare a b with
+  | LT -> b
+  | _ -> a
+
+/// Whether `x` lies within `minimum` and `maximum` (inclusive) under `Ord`.
+between : { minimum : Float32; maximum : Float32 } -> Float32 -> Bool
+let between bounds x = compare x bounds.minimum != LT && compare x bounds.maximum != GT
+
+/// `x` clamped to `minimum`..=`maximum` under `Ord`.
+clamp : { minimum : Float32; maximum : Float32 } -> Float32 -> Float32
+let clamp bounds x = min bounds.maximum (max bounds.minimum x)
+
+/// `a / b`, or `None` when `b` is zero (`0.0f32` or `-0.0f32`).
+divide : Float32 -> Float32 -> Option Float32
+let divide a b = if b == 0.0f32 then None else Some (a / b)
+
+/// Binary32 floating-point remainder (`a % b`).
+remainder : Float32 -> Float32 -> Float32
+let remainder a b = a % b

@@ -27,28 +27,28 @@ pub(super) enum Shape {
 }
 
 /// The parameters and the result of a function that are of Go's own types,
-/// in three bits each, the result first: a number passed to a function or
+/// in four bits each, the result first: a number passed to a function or
 /// returned by it is then no value made for the call. A function of more
-/// parameters than a word holds has none.
+/// parameters than 31 slots hold has none.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Types(u64);
+pub struct Types(u128);
 
 impl Types {
     pub(super) fn of(result: Option<Native>, params: &[Option<Native>]) -> Types {
-        if params.len() > 20 {
+        if params.len() > 31 {
             return Types(0);
         }
         let code = |n: &Option<Native>| {
             n.and_then(|n| Native::ALL.iter().position(|&m| m == n))
-                .map_or(0, |at| at as u64 + 1)
+                .map_or(0, |at| at as u128 + 1)
         };
         let slots = iter::once(&result).chain(params).enumerate();
-        Types(slots.fold(0, |bits, (i, n)| bits | code(n) << (3 * i)))
+        Types(slots.fold(0, |bits, (i, n)| bits | code(n) << (4 * i)))
     }
 
     fn slot(self, i: usize) -> Option<Native> {
-        let shift = u32::try_from(3 * i).ok();
-        let code = shift.and_then(|s| self.0.checked_shr(s)).unwrap_or(0) & 7;
+        let shift = u32::try_from(4 * i).ok();
+        let code = shift.and_then(|s| self.0.checked_shr(s)).unwrap_or(0) & 15;
         (code > 0).then(|| Native::ALL[code as usize - 1])
     }
 

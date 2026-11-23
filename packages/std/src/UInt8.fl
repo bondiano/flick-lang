@@ -1,0 +1,217 @@
+/// Operations and explicit conversions on `UInt8`, the 8-bit unsigned integers
+/// (`0..=255`). `Byte` is an alias for `UInt8`.
+module UInt8 exposing (..)
+
+import BigInt
+
+min_value : UInt8
+let min_value = 0u8
+
+max_value : UInt8
+let max_value = 255u8
+
+max_bigint : BigInt
+let max_bigint = 255n
+
+to_string : UInt8 -> String
+let to_string n = display n
+
+parse : String -> Option UInt8
+let parse s = Option.bind from_bigint (BigInt.parse s)
+
+to_float : UInt8 -> Float
+foreign pure to_float from "flick:rt" "toFloat64"
+
+to_float32 : UInt8 -> Float32
+foreign pure to_float32 from "flick:rt" "toFloat32"
+
+to_bigint : UInt8 -> BigInt
+foreign pure to_bigint from "flick:rt" "toBigInt"
+
+to_int : UInt8 -> Int
+foreign pure to_int from "flick:rt" "toInt32"
+
+wrapping_from_int8 : Int8 -> UInt8
+foreign pure wrapping_from_int8 from "flick:rt" "toUInt8"
+
+wrapping_from_int16 : Int16 -> UInt8
+foreign pure wrapping_from_int16 from "flick:rt" "toUInt8"
+
+wrapping_from_int : Int -> UInt8
+foreign pure wrapping_from_int from "flick:rt" "toUInt8"
+
+wrapping_from_int32 : Int32 -> UInt8
+let wrapping_from_int32 n = wrapping_from_int n
+
+wrapping_from_int64 : Int64 -> UInt8
+foreign pure wrapping_from_int64 from "flick:rt" "toUInt8"
+
+wrapping_from_uint16 : UInt16 -> UInt8
+foreign pure wrapping_from_uint16 from "flick:rt" "toUInt8"
+
+wrapping_from_uint32 : UInt32 -> UInt8
+foreign pure wrapping_from_uint32 from "flick:rt" "toUInt8"
+
+wrapping_from_uint64 : UInt64 -> UInt8
+foreign pure wrapping_from_uint64 from "flick:rt" "toUInt8"
+
+wrapping_from_bigint : BigInt -> UInt8
+foreign pure wrapping_from_bigint from "flick:rt" "toUInt8"
+
+from_bigint : BigInt -> Option UInt8
+let from_bigint n = if n < 0n || n > max_bigint then None else Some (wrapping_from_bigint n)
+
+from_int8 : Int8 -> Option UInt8
+let from_int8 n = if n < 0i8 then None else Some (wrapping_from_int8 n)
+
+from_int16 : Int16 -> Option UInt8
+let from_int16 n = if n < 0i16 || n > 255i16 then None else Some (wrapping_from_int16 n)
+
+from_int : Int -> Option UInt8
+let from_int n = if n < 0 || n > 255 then None else Some (wrapping_from_int n)
+
+from_int32 : Int32 -> Option UInt8
+let from_int32 n = from_int n
+
+from_int64 : Int64 -> Option UInt8
+let from_int64 n = if n < 0i64 || n > 255i64 then None else Some (wrapping_from_int64 n)
+
+from_uint16 : UInt16 -> Option UInt8
+let from_uint16 n = if n > 255u16 then None else Some (wrapping_from_uint16 n)
+
+from_uint32 : UInt32 -> Option UInt8
+let from_uint32 n = if n > 255u32 then None else Some (wrapping_from_uint32 n)
+
+from_uint64 : UInt64 -> Option UInt8
+let from_uint64 n = if n > 255u64 then None else Some (wrapping_from_uint64 n)
+
+from_float : Float -> Option UInt8
+let from_float x = Option.bind from_bigint (BigInt.from_number x)
+
+from_float32 : Float32 -> Option UInt8
+let from_float32 x = from_float (into x)
+
+saturating_from_bigint : BigInt -> UInt8
+let saturating_from_bigint n =
+  if n < 0n then min_value else if n > max_bigint then max_value else wrapping_from_bigint n
+
+saturating_from_int8 : Int8 -> UInt8
+let saturating_from_int8 n = if n < 0i8 then min_value else wrapping_from_int8 n
+
+saturating_from_int16 : Int16 -> UInt8
+let saturating_from_int16 n =
+  if n < 0i16 then min_value else if n > 255i16 then max_value else wrapping_from_int16 n
+
+saturating_from_int : Int -> UInt8
+let saturating_from_int n =
+  if n < 0 then min_value else if n > 255 then max_value else wrapping_from_int n
+
+saturating_from_int32 : Int32 -> UInt8
+let saturating_from_int32 n = saturating_from_int n
+
+saturating_from_int64 : Int64 -> UInt8
+let saturating_from_int64 n =
+  if n < 0i64 then min_value else if n > 255i64 then max_value else wrapping_from_int64 n
+
+saturating_from_uint16 : UInt16 -> UInt8
+let saturating_from_uint16 n = if n > 255u16 then max_value else wrapping_from_uint16 n
+
+saturating_from_uint32 : UInt32 -> UInt8
+let saturating_from_uint32 n = if n > 255u32 then max_value else wrapping_from_uint32 n
+
+saturating_from_uint64 : UInt64 -> UInt8
+let saturating_from_uint64 n = if n > 255u64 then max_value else wrapping_from_uint64 n
+
+saturating_from_float : Float -> UInt8
+let saturating_from_float x =
+  if Float.is_nan x || x <= 0.0 then
+    0u8
+  else if x >= 255.0 then
+    max_value
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> saturating_from_bigint n
+    | None -> 0u8
+
+saturating_from_float32 : Float32 -> UInt8
+let saturating_from_float32 x = saturating_from_float (into x)
+
+truncate : Float -> UInt8
+let truncate x =
+  if not (Float.is_finite x) then
+    0u8
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> wrapping_from_bigint n
+    | None -> 0u8
+
+min : UInt8 -> UInt8 -> UInt8
+let min a b = if a <= b then a else b
+
+max : UInt8 -> UInt8 -> UInt8
+let max a b = if a >= b then a else b
+
+checked_add : UInt8 -> UInt8 -> Result Int.ArithmeticError UInt8
+let checked_add a b =
+  let r = a + b
+  if r < a then Err (Int.ArithmeticError "UInt8.checked_add: overflow") else Ok r
+
+checked_sub : UInt8 -> UInt8 -> Result Int.ArithmeticError UInt8
+let checked_sub a b =
+  if a < b then Err (Int.ArithmeticError "UInt8.checked_sub: underflow") else Ok (a - b)
+
+checked_mul : UInt8 -> UInt8 -> Result Int.ArithmeticError UInt8
+let checked_mul a b =
+  let p = to_int a * to_int b
+  if p > 255 then
+    Err (Int.ArithmeticError "UInt8.checked_mul: overflow")
+  else
+    Ok (wrapping_from_int p)
+
+checked_div : UInt8 -> UInt8 -> Result Int.ArithmeticError UInt8
+let checked_div a b =
+  if b == 0u8 then Err (Int.ArithmeticError "UInt8.checked_div: division by zero") else Ok (a / b)
+
+checked_rem : UInt8 -> UInt8 -> Result Int.ArithmeticError UInt8
+let checked_rem a b =
+  if b == 0u8 then Err (Int.ArithmeticError "UInt8.checked_rem: division by zero") else Ok (a % b)
+
+divide : UInt8 -> UInt8 -> Result Int.ArithmeticError UInt8
+let divide a b = checked_div a b
+
+remainder : UInt8 -> UInt8 -> Result Int.ArithmeticError UInt8
+let remainder a b = checked_rem a b
+
+unsafe_div : UInt8 -> UInt8 -> UInt8
+let unsafe_div a b =
+  if b == 0u8 then
+    let _ = Int.unsafe_div 1 0
+    0u8
+  else
+    a / b
+
+unsafe_rem : UInt8 -> UInt8 -> UInt8
+let unsafe_rem a b =
+  if b == 0u8 then
+    let _ = Int.unsafe_rem 1 0
+    0u8
+  else
+    a % b
+
+bit_and : UInt8 -> UInt8 -> UInt8
+let bit_and a b = wrapping_from_int (Int.bit_and (to_int a) (to_int b))
+
+bit_or : UInt8 -> UInt8 -> UInt8
+let bit_or a b = wrapping_from_int (Int.bit_or (to_int a) (to_int b))
+
+bit_xor : UInt8 -> UInt8 -> UInt8
+let bit_xor a b = wrapping_from_int (Int.bit_xor (to_int a) (to_int b))
+
+bit_not : UInt8 -> UInt8
+let bit_not a = wrapping_from_int (Int.bit_not (to_int a))
+
+shift_left : UInt8 -> Int -> UInt8
+let shift_left a n = wrapping_from_int (Int.shift_left (to_int a) (Int.bit_and n 7))
+
+shift_right : UInt8 -> Int -> UInt8
+let shift_right a n = wrapping_from_int (Int.shift_right_unsigned (to_int a) (Int.bit_and n 7))

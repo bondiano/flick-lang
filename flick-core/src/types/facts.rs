@@ -204,7 +204,15 @@ pub(super) fn constant_of(c: &Const) -> Option<Constant> {
         Const::Number(n) => Some(Constant::Number(*n)),
         Const::String(s) => Some(Constant::Text(s.clone())),
         Const::Bool(b) => Some(Constant::Boolean(*b)),
-        Const::BigInt(_) => None,
+        Const::BigInt(_)
+        | Const::Float32(_)
+        | Const::Int8(_)
+        | Const::Int16(_)
+        | Const::Int64(_)
+        | Const::UInt8(_)
+        | Const::UInt16(_)
+        | Const::UInt32(_)
+        | Const::UInt64(_) => None,
     }
 }
 

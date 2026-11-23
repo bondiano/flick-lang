@@ -8,7 +8,6 @@ use flick_pretty::docvec;
 use super::doc::{After, Before, Form, Head, Js, Stmt, array, block_js, call, object};
 use super::{Callee, Gen, Target, names};
 use crate::ir::{Arm, Expr, ExprKind, Pat, Stmt as IrStmt};
-use crate::numeric::Num;
 use flick_ir::{Constructor, Rep};
 
 impl<'d> Gen<'_, 'd> {
@@ -63,19 +62,6 @@ impl<'d> Gen<'_, 'd> {
         let a = self.a;
         let doc = docvec![a, v.at(a, Before::Statement, After::Semicolon), ";"];
         Stmt::new(doc, v.flags)
-    }
-
-    /// `-inner`, kept in 32 bits on `Int`; a literal is in range already, as
-    /// an `Int` literal is checked with its sign.
-    fn neg(&mut self, num: Num, inner: &Expr) -> Js<'d> {
-        let js = self.expr(inner);
-        let a = self.a;
-        let doc = if num == Num::Int && !matches!(inner.kind, ExprKind::Lit(_)) {
-            docvec![a, "-", js.at(a, Before::Other, After::Other), " | 0"]
-        } else {
-            docvec![a, "-", js.at(a, Before::Other, After::Delimiter)]
-        };
-        Js::code(doc, Head::Other, &[js]).in_parens()
     }
 
     fn not(&mut self, inner: &Expr) -> Js<'d> {

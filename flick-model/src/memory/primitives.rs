@@ -4,7 +4,10 @@ use std::collections::BTreeSet;
 
 use flick_core::ir::memory::Intrinsic;
 use flick_core::ir::{BinOp, Lit};
-use flick_core::numeric::{Arith, Num, int_arith};
+use flick_core::numeric::{
+    Arith, Num, int_arith, int8_arith, int16_arith, int64_arith, uint8_arith, uint16_arith,
+    uint32_arith, uint64_arith,
+};
 use flick_core::opt::{js_number, json_string};
 
 use super::{
@@ -29,6 +32,9 @@ mod host;
 
 #[path = "primitives/int_ops.rs"]
 mod int_ops;
+
+#[path = "primitives/fixed_width_ops.rs"]
+mod fixed_width_ops;
 
 #[path = "primitives/float_ops.rs"]
 mod float_ops;
@@ -276,6 +282,7 @@ pub(super) fn metered_primitive(
             exit_predicate(heap, kind, &arguments[0], fuel)
         }
         Intrinsic::Int(op) => int_ops::run(heap, op, arguments, fuel),
+        Intrinsic::FixedWidth(op) => fixed_width_ops::run(heap, op, arguments, fuel),
         Intrinsic::Float(op) => float_ops::run(heap, op, arguments, fuel),
         Intrinsic::BigInt(op) => bigint_ops::run(heap, op, arguments, fuel),
         Intrinsic::String(op) => string_ops::run(heap, op, arguments, fuel),
@@ -375,7 +382,15 @@ pub(super) fn neg(heap: &mut Heap, num: Num, value: &Value) -> Result<Value, Err
     heap.admit_ordinary(value)?;
     match (num, value) {
         (Num::Int, Value::Int(value)) => Ok(Value::Int(value.wrapping_neg())),
+        (Num::Int8, Value::Int8(value)) => Ok(Value::Int8(value.wrapping_neg())),
+        (Num::Int16, Value::Int16(value)) => Ok(Value::Int16(value.wrapping_neg())),
+        (Num::Int64, Value::Int64(value)) => Ok(Value::Int64(value.wrapping_neg())),
+        (Num::UInt8, Value::UInt8(value)) => Ok(Value::UInt8(value.wrapping_neg())),
+        (Num::UInt16, Value::UInt16(value)) => Ok(Value::UInt16(value.wrapping_neg())),
+        (Num::UInt32, Value::UInt32(value)) => Ok(Value::UInt32(value.wrapping_neg())),
+        (Num::UInt64, Value::UInt64(value)) => Ok(Value::UInt64(value.wrapping_neg())),
         (Num::Float, Value::Float(value)) => Ok(Value::Float(-value)),
+        (Num::Float32, Value::Float32(value)) => Ok(Value::Float32(-value)),
         (Num::BigInt, _) => {
             let text = bigint_text(heap.bigint(value)?)?;
             let negative = if let Some(positive) = text.strip_prefix('-') {
@@ -420,7 +435,15 @@ pub(super) fn show_value(heap: &Heap, value: &Value) -> Result<String, Error> {
         Value::Unit => Ok("undefined".into()),
         Value::Bool(value) => Ok(value.to_string()),
         Value::Int(value) => Ok(value.to_string()),
+        Value::Int8(value) => Ok(value.to_string()),
+        Value::Int16(value) => Ok(value.to_string()),
+        Value::Int64(value) => Ok(value.to_string()),
+        Value::UInt8(value) => Ok(value.to_string()),
+        Value::UInt16(value) => Ok(value.to_string()),
+        Value::UInt32(value) => Ok(value.to_string()),
+        Value::UInt64(value) => Ok(value.to_string()),
         Value::Float(value) => Ok(js_number(*value)),
+        Value::Float32(value) => Ok(js_number(f64::from(*value))),
         Value::Object(token) => match &heap.object(token.id)?.data {
             Data::String(text) => Ok(json_string(text)),
             Data::Utf16(units) => Ok(show_utf16_string(units)),
@@ -559,6 +582,7 @@ pub(super) fn intrinsic_with_host(
         _ => Err(Error::NeedsProgram),
     }
 }
+include!("primitives/arith.rs");
 include!("primitives/operators.rs");
 
 #[cfg(test)]

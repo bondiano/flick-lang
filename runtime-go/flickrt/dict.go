@@ -88,13 +88,13 @@ type Constructor struct {
 // fields of an `untagged` type apart.
 func IsClass(v Value, class string) bool {
 	switch v.(type) {
-	case int32, float64:
+	case int8, int16, int32, uint8, uint16, uint32, float32, float64:
 		return class == "number"
 	case string:
 		return class == "string"
 	case bool:
 		return class == "boolean"
-	case *big.Int:
+	case int64, uint64, *big.Int:
 		return class == "bigint"
 	case []Value:
 		return class == "array"

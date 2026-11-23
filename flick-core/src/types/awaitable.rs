@@ -8,7 +8,7 @@ use super::lang::{self, Lang};
 use super::ty::{Effects, Type};
 use super::typing::Range;
 use crate::diagnostics::codes;
-use crate::numeric::{NumLang, default_num};
+use crate::numeric::default_num;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 

@@ -1,0 +1,92 @@
+// Fixed-width integer and binary32 float types, aliases, suffixes, radix
+// literals, negative minimum boundaries, pattern matching, and type classes.
+module App.FixedWidth exposing (..)
+
+import Numeric exposing (Floating, Integer, Numeric)
+
+same_int : Int -> Int32
+let same_int x = x
+
+same_int_back : Int32 -> Int
+let same_int_back x = x
+
+same_byte : Byte -> UInt8
+let same_byte x = x
+
+same_byte_back : UInt8 -> Byte
+let same_byte_back x = x
+
+i8_bounds : (Int8, Int8)
+let i8_bounds = (-128i8, 127i8)
+
+i16_bounds : (Int16, Int16)
+let i16_bounds = (-32768i16, 32767i16)
+
+i32_bounds : (Int32, Int32)
+let i32_bounds = (-2147483648i32, 2147483647i32)
+
+i64_bounds : (Int64, Int64)
+let i64_bounds = (-9223372036854775808i64, 9223372036854775807i64)
+
+u8_bounds : (UInt8, Byte)
+let u8_bounds = (0u8, 0xFFu8)
+
+u16_bounds : (UInt16, UInt16)
+let u16_bounds = (0b0u16, 0xFFFFu16)
+
+u32_bounds : (UInt32, UInt32)
+let u32_bounds = (0o0u32, 4_294_967_295u32)
+
+u64_bounds : (UInt64, UInt64)
+let u64_bounds = (0u64, 18_446_744_073_709_551_615u64)
+
+hex_keeps_f32_digits : Int
+let hex_keeps_f32_digits = 0x1f32
+
+f32_literals : (Float32, Float32, Float32)
+let f32_literals = (1.5f32, -0.0f32, 1e-3f32)
+
+contextual_i8 : Int8
+let contextual_i8 = -128
+
+contextual_u8 : UInt8
+let contextual_u8 = 255
+
+contextual_f32 : Float32
+let contextual_f32 = 2.5
+
+double : Numeric a => a -> a
+let double x = x + x
+
+div_rem : Integer a => a -> a -> (a, a)
+let div_rem a b = (a / b, a % b)
+
+half : Floating a => a -> a
+let half x = x / 2.0
+
+widen_chain : UInt8 -> BigInt
+let widen_chain b =
+  let a : UInt16 = into b
+  let c : UInt32 = into a
+  let d : Int64 = into c
+  into d
+
+widen_f32 : Float32 -> Float
+let widen_f32 x = into x
+
+match_u8 : UInt8 -> String
+let match_u8 x =
+  match x with
+  | 0u8 -> "zero"
+  | 255u8 -> "max"
+  | _ -> "mid"
+
+match_i64 : Int64 -> String
+let match_i64 x =
+  match x with
+  | -9223372036854775808i64 -> "min"
+  | 9223372036854775807i64 -> "max"
+  | _ -> "other"
+
+use_classes : (Int8, UInt64, Float32, (Int64, Int64), String)
+let use_classes = (double 5i8, double 10u64, half 3.0f32, div_rem (-7i64) 2i64, display 42u64)

@@ -9,12 +9,18 @@ use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 
 impl Lower<'_> {
-    /// Whether `node` is `-` of an `Int` literal, a literal itself:
-    /// `-2147483648` is an `Int`, though `2147483648` is not.
+    /// Whether `node` is `-` of a signed fixed-width integer literal, a
+    /// literal itself: `-128i8`, `-32768i16`, `-2147483648` and
+    /// `-9223372036854775808i64` are valid literals even though their positive
+    /// magnitudes are out of range.
     pub(super) fn negative_int(&self, node: &Node, children: &[&Node]) -> bool {
         node.has_token(K::Minus)
             && children.first().is_some_and(|c| {
-                c.kind == K::Literal && self.typing.numeric.get(&c.range()) == Some(&Num::Int)
+                c.kind == K::Literal
+                    && matches!(
+                        self.typing.numeric.get(&c.range()),
+                        Some(Num::Int | Num::Int8 | Num::Int16 | Num::Int64)
+                    )
             })
     }
 
@@ -63,6 +69,45 @@ pub(super) fn number(num: Option<Num>, text: &str, negative: bool) -> Lit {
                 .and_then(|v| i32::try_from(sign * v).ok())
                 .unwrap_or_default(),
         ),
+        Some(Num::Int8) => Lit::Int8(
+            numeric::integer_value(text)
+                .and_then(|v| i8::try_from(sign * v).ok())
+                .unwrap_or_default(),
+        ),
+        Some(Num::Int16) => Lit::Int16(
+            numeric::integer_value(text)
+                .and_then(|v| i16::try_from(sign * v).ok())
+                .unwrap_or_default(),
+        ),
+        Some(Num::Int64) => Lit::Int64(
+            numeric::integer_value(text)
+                .and_then(|v| i64::try_from(sign * v).ok())
+                .unwrap_or_default(),
+        ),
+        Some(Num::UInt8) => Lit::UInt8(
+            numeric::integer_value(text)
+                .and_then(|v| u8::try_from(sign * v).ok())
+                .unwrap_or_default(),
+        ),
+        Some(Num::UInt16) => Lit::UInt16(
+            numeric::integer_value(text)
+                .and_then(|v| u16::try_from(sign * v).ok())
+                .unwrap_or_default(),
+        ),
+        Some(Num::UInt32) => Lit::UInt32(
+            numeric::integer_value(text)
+                .and_then(|v| u32::try_from(sign * v).ok())
+                .unwrap_or_default(),
+        ),
+        Some(Num::UInt64) => Lit::UInt64(
+            numeric::integer_value(text)
+                .and_then(|v| u64::try_from(sign * v).ok())
+                .unwrap_or_default(),
+        ),
+        Some(Num::Float32) => {
+            let x = literal::float32_value(text).unwrap_or_default();
+            Lit::Float32(if negative { -x } else { x })
+        }
         Some(Num::Float) | None => {
             let x = literal::number_value(text).unwrap_or_default();
             Lit::Float(if negative { -x } else { x })

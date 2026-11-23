@@ -77,7 +77,15 @@ impl<'p> TypeIndex<'p> {
         }
         match role {
             Lang::Int => ("Prelude", "Int"),
+            Lang::Int8 => ("Prelude", "Int8"),
+            Lang::Int16 => ("Prelude", "Int16"),
+            Lang::Int64 => ("Prelude", "Int64"),
+            Lang::UInt8 => ("Prelude", "UInt8"),
+            Lang::UInt16 => ("Prelude", "UInt16"),
+            Lang::UInt32 => ("Prelude", "UInt32"),
+            Lang::UInt64 => ("Prelude", "UInt64"),
             Lang::Float => ("Prelude", "Float"),
+            Lang::Float32 => ("Prelude", "Float32"),
             Lang::BigInt => ("Prelude", "BigInt"),
             Lang::String => ("Prelude", "String"),
             Lang::Bool => ("Prelude", "Bool"),

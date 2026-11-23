@@ -270,7 +270,7 @@ impl<'n> Checker<'_> {
             self.error(
                 codes::C012,
                 span,
-                format!("`{cn}` is closed: the module `Numeric` has every instance of it, for `Int`, `Float` and `BigInt`"),
+                format!("`{cn}` is closed: the module `Numeric` has every instance of it, for the built-in numeric types"),
             );
             return false;
         }

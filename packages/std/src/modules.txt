@@ -14,6 +14,16 @@ Js.Array
 Js
 JsError
 BigInt
+Int8
+Int16
+Int32
+Int64
+UInt8
+Byte
+UInt16
+UInt32
+UInt64
+Float32
 Redacted
 BigDecimal
 Duration

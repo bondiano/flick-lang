@@ -1,0 +1,170 @@
+/// Operations and explicit conversions on `Int32`, an alias for `Int`
+/// (`-2147483648..=2147483647`).
+module Int32 exposing (..)
+
+import BigInt
+
+min_value : Int32
+let min_value = Int.min_value
+
+max_value : Int32
+let max_value = Int.max_value
+
+min_bigint : BigInt
+let min_bigint = -2147483648n
+
+max_bigint : BigInt
+let max_bigint = 2147483647n
+
+to_string : Int32 -> String
+let to_string n = Int.to_string n
+
+parse : String -> Option Int32
+let parse s = Int.parse s
+
+to_float : Int32 -> Float
+let to_float n = Int.to_float n
+
+to_float32 : Int32 -> Float32
+foreign pure to_float32 from "flick:rt" "toFloat32"
+
+to_bigint : Int32 -> BigInt
+let to_bigint n = into n
+
+from_int8 : Int8 -> Int32
+let from_int8 n = into n
+
+from_int16 : Int16 -> Int32
+let from_int16 n = into n
+
+from_uint8 : UInt8 -> Int32
+let from_uint8 n = into n
+
+from_uint16 : UInt16 -> Int32
+let from_uint16 n = into n
+
+wrapping_from_int64 : Int64 -> Int32
+foreign pure wrapping_from_int64 from "flick:rt" "toInt32"
+
+wrapping_from_uint32 : UInt32 -> Int32
+foreign pure wrapping_from_uint32 from "flick:rt" "toInt32"
+
+wrapping_from_uint64 : UInt64 -> Int32
+foreign pure wrapping_from_uint64 from "flick:rt" "toInt32"
+
+wrapping_from_bigint : BigInt -> Int32
+foreign pure wrapping_from_bigint from "flick:rt" "toInt32"
+
+from_bigint : BigInt -> Option Int32
+let from_bigint n = if n < min_bigint || n > max_bigint then None else Some (wrapping_from_bigint n)
+
+from_int64 : Int64 -> Option Int32
+let from_int64 n =
+  if n < -2147483648i64 || n > 2147483647i64 then None else Some (wrapping_from_int64 n)
+
+from_uint32 : UInt32 -> Option Int32
+let from_uint32 n = if n > 2147483647u32 then None else Some (wrapping_from_uint32 n)
+
+from_uint64 : UInt64 -> Option Int32
+let from_uint64 n = if n > 2147483647u64 then None else Some (wrapping_from_uint64 n)
+
+from_float : Float -> Option Int32
+let from_float x = Int.from_float x
+
+from_float32 : Float32 -> Option Int32
+let from_float32 x = Int.from_float (into x)
+
+saturating_from_bigint : BigInt -> Int32
+let saturating_from_bigint n =
+  if n < min_bigint then min_value else if n > max_bigint then max_value else wrapping_from_bigint n
+
+saturating_from_int64 : Int64 -> Int32
+let saturating_from_int64 n =
+  if n < -2147483648i64 then
+    min_value
+  else if n > 2147483647i64 then
+    max_value
+  else
+    wrapping_from_int64 n
+
+saturating_from_uint32 : UInt32 -> Int32
+let saturating_from_uint32 n = if n > 2147483647u32 then max_value else wrapping_from_uint32 n
+
+saturating_from_uint64 : UInt64 -> Int32
+let saturating_from_uint64 n = if n > 2147483647u64 then max_value else wrapping_from_uint64 n
+
+saturating_from_float : Float -> Int32
+let saturating_from_float x =
+  if Float.is_nan x then
+    0
+  else if x <= -2147483648.0 then
+    min_value
+  else if x >= 2147483647.0 then
+    max_value
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> saturating_from_bigint n
+    | None -> 0
+
+saturating_from_float32 : Float32 -> Int32
+let saturating_from_float32 x = saturating_from_float (into x)
+
+truncate : Float -> Int32
+let truncate x = Int.truncate x
+
+abs : Int32 -> Int32
+let abs x = Int.abs x
+
+min : Int32 -> Int32 -> Int32
+let min a b = Int.min a b
+
+max : Int32 -> Int32 -> Int32
+let max a b = Int.max a b
+
+checked_add : Int32 -> Int32 -> Result Int.ArithmeticError Int32
+let checked_add a b = Int.checked_add a b
+
+checked_sub : Int32 -> Int32 -> Result Int.ArithmeticError Int32
+let checked_sub a b = Int.checked_sub a b
+
+checked_mul : Int32 -> Int32 -> Result Int.ArithmeticError Int32
+let checked_mul a b = Int.checked_mul a b
+
+checked_div : Int32 -> Int32 -> Result Int.ArithmeticError Int32
+let checked_div a b = Int.checked_div a b
+
+checked_rem : Int32 -> Int32 -> Result Int.ArithmeticError Int32
+let checked_rem a b = Int.checked_rem a b
+
+divide : Int32 -> Int32 -> Result Int.ArithmeticError Int32
+let divide a b = Int.checked_div a b
+
+remainder : Int32 -> Int32 -> Result Int.ArithmeticError Int32
+let remainder a b = Int.checked_rem a b
+
+unsafe_div : Int32 -> Int32 -> Int32
+let unsafe_div a b = Int.unsafe_div a b
+
+unsafe_rem : Int32 -> Int32 -> Int32
+let unsafe_rem a b = Int.unsafe_rem a b
+
+bit_and : Int32 -> Int32 -> Int32
+let bit_and a b = Int.bit_and a b
+
+bit_or : Int32 -> Int32 -> Int32
+let bit_or a b = Int.bit_or a b
+
+bit_xor : Int32 -> Int32 -> Int32
+let bit_xor a b = Int.bit_xor a b
+
+bit_not : Int32 -> Int32
+let bit_not a = Int.bit_not a
+
+shift_left : Int32 -> Int -> Int32
+let shift_left a n = Int.shift_left a n
+
+shift_right : Int32 -> Int -> Int32
+let shift_right a n = Int.shift_right a n
+
+shift_right_unsigned : Int32 -> Int -> Int32
+let shift_right_unsigned a n = Int.shift_right_unsigned a n

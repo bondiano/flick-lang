@@ -48,7 +48,15 @@ impl fmt::Display for Path {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Lit {
     Int(i32),
+    Int8(i8),
+    Int16(i16),
+    Int64(i64),
+    UInt8(u8),
+    UInt16(u16),
+    UInt32(u32),
+    UInt64(u64),
     Float(f64),
+    Float32(f32),
     BigInt(num_bigint::BigInt),
     String(Rc<str>),
     Bool(bool),

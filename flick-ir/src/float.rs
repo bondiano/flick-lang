@@ -88,6 +88,103 @@ impl<'de> Visitor<'de> for Float {
     }
 }
 
+/// Binary32 (`f32`) serialization matching [`crate::float`]: finite numbers
+/// or binary CBOR keep IEEE 754 `f32`, while non-finite JSON values encode as
+/// `"NaN"`, `"inf"` or `"-inf"`.
+pub mod f32 {
+    use std::fmt;
+    use std::primitive::f32 as PrimF32;
+
+    use serde::de::{self, Visitor};
+    use serde::{Deserializer, Serializer};
+
+    #[allow(clippy::trivially_copy_pass_by_ref)]
+    pub fn serialize<S: Serializer>(x: &PrimF32, s: S) -> Result<S::Ok, S::Error> {
+        match *x {
+            x if x.is_finite() || !s.is_human_readable() => s.serialize_f32(x),
+            x if x.is_nan() => s.serialize_str("NaN"),
+            x if x > 0.0 => s.serialize_str("inf"),
+            _ => s.serialize_str("-inf"),
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<PrimF32, D::Error> {
+        let text = d.is_human_readable();
+        d.deserialize_any(Float32 { text })
+    }
+
+    struct Float32 {
+        text: bool,
+    }
+
+    impl<'de> Visitor<'de> for Float32 {
+        type Value = PrimF32;
+
+        fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            f.write_str("a 32-bit float, \"NaN\", \"inf\" or \"-inf\"")
+        }
+
+        fn visit_f32<E: de::Error>(self, x: PrimF32) -> Result<Self::Value, E> {
+            Ok(x)
+        }
+
+        #[allow(
+            clippy::cast_possible_truncation,
+            reason = "f32 wire values round-trip exactly through JSON f64 and CBOR floats"
+        )]
+        fn visit_f64<E: de::Error>(self, x: f64) -> Result<Self::Value, E> {
+            Ok(x as PrimF32)
+        }
+
+        #[allow(clippy::cast_precision_loss)]
+        fn visit_i64<E: de::Error>(self, x: i64) -> Result<Self::Value, E> {
+            if !self.text {
+                return Err(E::invalid_type(de::Unexpected::Signed(x), &self));
+            }
+            Ok(x as PrimF32)
+        }
+
+        #[allow(clippy::cast_precision_loss)]
+        fn visit_u64<E: de::Error>(self, x: u64) -> Result<Self::Value, E> {
+            if !self.text {
+                return Err(E::invalid_type(de::Unexpected::Unsigned(x), &self));
+            }
+            Ok(x as PrimF32)
+        }
+
+        fn visit_enum<A: de::EnumAccess<'de>>(self, data: A) -> Result<Self::Value, A::Error> {
+            #[cfg(feature = "cbor")]
+            {
+                use ciborium::tag::Captured;
+                use serde::Deserialize;
+                use serde::de::value::EnumAccessDeserializer;
+                #[derive(Deserialize)]
+                struct Number(#[serde(with = "crate::float::f32")] PrimF32);
+                let Captured(_, Number(value)) =
+                    Captured::deserialize(EnumAccessDeserializer::new(data))?;
+                Ok(value)
+            }
+            #[cfg(not(feature = "cbor"))]
+            {
+                let _ = data;
+                Err(de::Error::invalid_type(de::Unexpected::Enum, &self))
+            }
+        }
+
+        fn visit_str<E: de::Error>(self, x: &str) -> Result<Self::Value, E> {
+            if !self.text {
+                return Err(E::invalid_type(de::Unexpected::Str(x), &self));
+            }
+            match x {
+                "NaN" => Ok(PrimF32::NAN),
+                "inf" => Ok(PrimF32::INFINITY),
+                "-inf" => Ok(PrimF32::NEG_INFINITY),
+                _ => Err(E::invalid_value(de::Unexpected::Str(x), &self)),
+            }
+        }
+    }
+}
+
 #[cfg(all(test, feature = "cbor"))]
 mod tests {
     use cbor4ii::serde::from_slice;
