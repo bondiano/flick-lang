@@ -15,13 +15,13 @@ impl Lower<'_> {
         span: Span,
         block: &mut Code,
     ) -> Option<Result<Local, LowerError>> {
-        if value.binding.from.as_deref() != Some("flick:rt")
+        if value.binding.from() != Some("flick:rt")
             || value.dicts != 0
             || !has_standard_shape(value)
         {
             return None;
         }
-        let name = value.binding.name.as_str();
+        let name = value.binding.export_name().unwrap_or("");
         match (name, value.mode, value.arity) {
             ("seqOfList", ForeignMode::Pure, 1) => {
                 Some(self.intrinsic(Intrinsic::SeqOfList, false, vec![], block, span))

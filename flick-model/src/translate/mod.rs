@@ -317,13 +317,24 @@ fn dict(d: &Dict) -> Term {
 /// `docs/formal/regions.md` (§6), are steps of the machine (§3.2).
 fn foreign(path: Path, f: &ir::Foreign) -> Term {
     let arity = f.dicts + f.stages.len();
-    let module = f.binding.from.as_deref().unwrap_or("global");
+    let (module, export) = match &f.binding {
+        ir::Binding::Module { from, name } => (from.as_str(), name.as_str()),
+        ir::Binding::Global { name } => ("global", name.as_str()),
+        ir::Binding::Inline(_) => {
+            let name = f.source_name.as_deref().unwrap_or(&f.name);
+            let unsupported = Term::Stuck(format!("no native for `{name}` (inline)").into());
+            return lams(
+                (0..f.dicts + f.taken()).map(|i| Name::from(format!("$foreign{i}"))),
+                unsupported,
+            );
+        }
+    };
     // Keep the internal default-owner primitive operational even when it
     // is reached through an alias instead of the direct @lang call path.
-    if module == "flick:rt" && f.binding.name == "scopeCurrent" {
+    if module == "flick:rt" && export == "scopeCurrent" {
         return Term::lam("_", Term::DefaultOwner);
     }
-    if module == "flick:rt" && f.binding.name == "layerRun" {
+    if module == "flick:rt" && export == "layerRun" {
         return Term::lam(
             "$layer",
             Term::lam(
@@ -335,7 +346,7 @@ fn foreign(path: Path, f: &ir::Foreign) -> Term {
             ),
         );
     }
-    if module == "flick:rt" && f.binding.name == "scopeRun" {
+    if module == "flick:rt" && export == "scopeRun" {
         return Term::lam(
             "$body",
             Term::Scope(
@@ -347,7 +358,7 @@ fn foreign(path: Path, f: &ir::Foreign) -> Term {
             ),
         );
     }
-    let core = match (module, f.binding.name.as_str()) {
+    let core = match (module, export) {
         ("flick:rt", "refMake") => Some(Const::RefMake),
         ("flick:rt", "refGet") => Some(Const::RefGet),
         ("flick:rt", "refSet") => Some(Const::RefSet),
@@ -358,7 +369,7 @@ fn foreign(path: Path, f: &ir::Foreign) -> Term {
             Term::Stuck(format!("{c:?} takes {} arguments, the binding {arity}", c.arity()).into())
         }
         Some(c) => Term::konst(c),
-        None => match native::find(module, &f.binding.name) {
+        None => match native::find(module, export) {
             Some(n) if n.arity == arity => Term::konst(Const::Native(n)),
             Some(n) => Term::Stuck(
                 format!(
@@ -369,9 +380,8 @@ fn foreign(path: Path, f: &ir::Foreign) -> Term {
             ),
             None => {
                 let name = f.source_name.as_deref().unwrap_or(&f.name);
-                let unsupported = Term::Stuck(
-                    format!("no native for `{name}` ({module} {})", f.binding.name).into(),
-                );
+                let unsupported =
+                    Term::Stuck(format!("no native for `{name}` ({module} {export})").into());
                 // Lookup of a callable does not invoke its host. Stop only
                 // once its dictionaries and actual host-call arguments arrive;
                 // later source arrows describe the unknown returned value.
@@ -425,8 +435,8 @@ mod foreign_staging_tests {
                     name: "$raw_source".to_owned(),
                     source_name: Some("source".to_owned()),
                     mode,
-                    binding: Binding {
-                        from: Some("./unknown.mjs".to_owned()),
+                    binding: Binding::Module {
+                        from: "./unknown.mjs".to_owned(),
                         name: "hostExport".to_owned(),
                     },
                     stages,

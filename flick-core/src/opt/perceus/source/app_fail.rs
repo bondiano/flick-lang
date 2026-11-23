@@ -3,7 +3,7 @@ use super::{Code, Intrinsic, Local, Lower, LowerError, Name, Operation, Span, un
 use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 
 pub(super) fn is_binding(value: &Foreign) -> bool {
-    value.binding.from.as_deref() == Some("flick:rt") && value.binding.name == "appFail"
+    value.binding.module_export() == Some(("flick:rt", "appFail"))
 }
 
 pub(super) fn supports(value: &Foreign) -> bool {
@@ -127,8 +127,18 @@ mod tests {
             .expect("genuine foreign");
         assert!(supports(original), "{original:#?}");
         let mutations: Vec<fn(&mut Foreign)> = vec![
-            |v| v.binding.from = None,
-            |v| v.binding.name.push('!'),
+            |v| {
+                v.binding = flick_ir::Binding::Global {
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            },
+            |v| {
+                if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                    &mut v.binding
+                {
+                    name.push('!');
+                }
+            },
             |v| v.mode = ForeignMode::Pure,
             |v| v.mode = ForeignMode::Sync,
             |v| v.arity = 0,

@@ -10,8 +10,19 @@ use flick_ir::{ForeignMode, Shape};
 type Mutation = Box<dyn Fn(&mut Foreign)>;
 fn mutations() -> Vec<Mutation> {
     vec![
-        Box::new(|v| v.binding.from = Some("other".into())),
-        Box::new(|v| v.binding.name.push('!')),
+        Box::new(|v| {
+            v.binding = flick_ir::Binding::Module {
+                from: "other".into(),
+                name: v.binding.export_name().unwrap_or("").to_owned(),
+            };
+        }),
+        Box::new(|v| {
+            if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                &mut v.binding
+            {
+                name.push('!');
+            }
+        }),
         Box::new(|v| v.mode = ForeignMode::Sync),
         Box::new(|v| v.mode = ForeignMode::Async),
         Box::new(|v| v.mode = ForeignMode::Effect),
@@ -76,7 +87,7 @@ fn every_real_bigint_global_requires_type_evidence_and_the_complete_audited_adap
             let ItemKind::Foreign(original) = &item.kind else {
                 continue;
             };
-            if original.binding.from.is_some() || original.binding.name != "BigInt" {
+            if original.binding.global_name() != Some("BigInt") {
                 continue;
             }
             seen.push((module.name.as_str(), original.name.as_str()));

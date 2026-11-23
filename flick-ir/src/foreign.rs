@@ -46,14 +46,65 @@ impl Foreign {
     }
 }
 
-/// The name of a function of the host.
+/// Host-language source text carried inline in a Flick file, together with the
+/// byte span of its source string literal token for span-mapped diagnostics.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Binding {
-    /// The module of the host it comes from; none for one the host has
-    /// everywhere, a `global`.
-    pub from: Option<String>,
-    /// Its name there, or the path of a global (`Date.now`).
-    pub name: String,
+pub struct InlineCode {
+    pub code: String,
+    pub span: Span,
+}
+
+/// How a `foreign` declaration names its host implementation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Binding {
+    /// An export of a host module: `from "module" "export"`.
+    Module { from: String, name: String },
+    /// A global path available everywhere on the host: `from global "Date.now"`.
+    Global { name: String },
+    /// Host code written inline in the Flick source: `from inline "(d) => Math.cos(d)"`.
+    Inline(InlineCode),
+}
+
+impl Binding {
+    /// Host module specifier (`Some` only for [`Binding::Module`]).
+    pub fn from(&self) -> Option<&str> {
+        match self {
+            Binding::Module { from, .. } => Some(from.as_str()),
+            Binding::Global { .. } | Binding::Inline(_) => None,
+        }
+    }
+
+    /// Host export name or global path (`None` for [`Binding::Inline`]).
+    pub fn export_name(&self) -> Option<&str> {
+        match self {
+            Binding::Module { name, .. } | Binding::Global { name } => Some(name.as_str()),
+            Binding::Inline(_) => None,
+        }
+    }
+
+    /// `(module, export)` pair for [`Binding::Module`] bindings only.
+    pub fn module_export(&self) -> Option<(&str, &str)> {
+        match self {
+            Binding::Module { from, name } => Some((from.as_str(), name.as_str())),
+            Binding::Global { .. } | Binding::Inline(_) => None,
+        }
+    }
+
+    /// Global path for [`Binding::Global`] bindings only.
+    pub fn global_name(&self) -> Option<&str> {
+        match self {
+            Binding::Global { name } => Some(name.as_str()),
+            Binding::Module { .. } | Binding::Inline(_) => None,
+        }
+    }
+
+    /// Inline host code and its source span, if this is a [`Binding::Inline`] binding.
+    pub fn inline(&self) -> Option<&InlineCode> {
+        match self {
+            Binding::Inline(code) => Some(code),
+            Binding::Module { .. } | Binding::Global { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

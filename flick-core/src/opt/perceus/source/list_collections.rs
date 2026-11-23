@@ -33,7 +33,7 @@ enum Collection {
 }
 
 fn kind(value: &Foreign) -> Option<Collection> {
-    match value.binding.name.as_str() {
+    match value.binding.export_name().unwrap_or("") {
         "listMap" => Some(Collection::Map),
         "listMap2" => Some(Collection::Map2),
         "listFlatMap" => Some(Collection::FlatMap),
@@ -123,7 +123,7 @@ fn supports(value: &Foreign, kind: Collection) -> bool {
     } else {
         2
     };
-    value.binding.from.as_deref() == Some("flick:rt")
+    value.binding.from() == Some("flick:rt")
         && value.mode == ForeignMode::Pure
         && value.dicts == 0
         && value.arity == arity

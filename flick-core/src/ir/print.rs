@@ -3,11 +3,16 @@
 
 use std::fmt::Write;
 
-use super::{Arm, Expr, ExprKind, ForeignMode, Handler, ItemKind, Lit, Module, Pat, Stage, Stmt};
+use super::{
+    Arm, Binding, Expr, ExprKind, ForeignMode, Handler, ItemKind, Lit, Module, Pat, Stage, Stmt,
+};
 use crate::types::{Dict, Lift};
 
 pub fn print(module: &Module) -> String {
     let mut out = format!("module {}\n", module.name);
+    for preamble in &module.preambles {
+        let _ = writeln!(out, "foreign module inline {:?}", preamble.code);
+    }
     for item in &module.items {
         let line = match &item.kind {
             ItemKind::Value {
@@ -25,11 +30,14 @@ pub fn print(module: &Module) -> String {
                     ForeignMode::Async => "async",
                     ForeignMode::Effect => "effect",
                 };
+                let target = match &f.binding {
+                    Binding::Module { from, name } => format!("{from}:{name}"),
+                    Binding::Global { name } => format!("global:{name}"),
+                    Binding::Inline(inline) => format!("inline:{:?}", inline.code),
+                };
                 format!(
-                    "foreign {mode} {} = {}:{} arity {} dicts {} stages {}",
+                    "foreign {mode} {} = {target} arity {} dicts {} stages {}",
                     f.name,
-                    f.binding.from.as_deref().unwrap_or("global"),
-                    f.binding.name,
                     f.arity,
                     f.dicts,
                     stages(&f.stages)

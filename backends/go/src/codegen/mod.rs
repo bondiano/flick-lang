@@ -18,6 +18,7 @@ mod direct;
 mod effects;
 mod expr;
 mod foreign;
+mod foreign_inline;
 mod generate;
 mod handle;
 mod input;

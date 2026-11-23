@@ -1,0 +1,17 @@
+---
+title: "FLICK-F011"
+---
+
+The selected backend found a syntax error inside inline foreign host code
+written with `from inline` or a `foreign module inline` preamble. The
+compiler treats inline host text as opaque and hands it with its source span
+to the backend, which validates the code and maps the error back to the
+corresponding line in the `.fl` file.
+
+Fix the host-language syntax inside the string literal, or wrap the binding in
+a `@when` module targeting the backend that understands that host language.
+
+```flick
+cos : Float -> Float
+foreign pure cos from inline "(d) => Math.cos(d)"
+```

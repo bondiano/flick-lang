@@ -656,13 +656,14 @@ in `flick.toml`, or `--allow-tool go` for a file built outside a project
 (`FLICK-P029` otherwise). It is built without cgo by default, so no C compiler is
 needed either; pass `--cgo` (or `[target.go] cgo = true`) to build with `CGO_ENABLED=1`.
 
-## Portable IR (0.16.0)
+## Portable IR (0.17.0)
 
-Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.16.0"`),
-checked against the `ir` version range (`[0.16.0, 0.17.0)`) in its descriptor.
-Alongside values, stages, dictionaries, lang items, backend-declared foreign
+Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.17.0"`),
+checked against the `ir` version range (`[0.17.0, 0.18.0)`) in its descriptor.
+Alongside values, stages, dictionaries, lang items, inline foreign preambles and
+bindings (`Module.preambles`, `Binding::Inline`), backend-declared foreign
 adapter words (`Foreign.adapter.{words, owned}`), and fixed-width numeric types
-(`Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`), IR `0.16.0` carries the
+(`Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`), IR `0.17.0` carries the
 layout-relevant types the checker inferred so layout-aware and monomorphizing
 backends can lay out values by value without calling back into the checker:
 

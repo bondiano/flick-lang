@@ -27,6 +27,7 @@ fn app_with_foreign(text: &str, foreigns: &[(&str, &str, &str)]) -> String {
         test: false,
         paths: &BTreeMap::new(),
         lines: &[],
+        sources: &[],
         foreign: &foreign_map,
         bindings: bindings(),
         lang: &Known::of(&lang_items()),
@@ -133,8 +134,9 @@ mod bindings_tests {
                 if f.name == "mount" {
                     let mut global = f.clone();
                     global.name = "local".to_owned();
-                    global.binding.from = None;
-                    global.binding.name = "external".to_owned();
+                    global.binding = flick_ir::Binding::Global {
+                        name: "external".to_owned(),
+                    };
                     let globals = Bindings::parse(["[global App]\nlocal Global@1\n"]);
                     assert_eq!(globals.parameters("App", &global), 1);
                     assert!(globals.lookup("App", "local", None, "external").is_some());
@@ -170,8 +172,7 @@ mod owner_identity_tests {
             .expect("raw item");
         assert_ne!(raw.name, "acquire");
         assert_eq!(raw.source_name.as_deref(), Some("acquire"));
-        assert_eq!(raw.binding.from, None);
-        assert_eq!(raw.binding.name, "Object.acquire");
+        assert_eq!(raw.binding.global_name(), Some("Object.acquire"));
         let bindings = Bindings::parse(["[global Test]\nacquire NativeAcquire(float64) float64\n"]);
         assert_ne!(
             bindings.types("Test", raw),
@@ -207,7 +208,8 @@ mod owner_identity_tests {
             "inline source identity must not select a parent homonym"
         );
         assert_eq!(
-            raw.binding.name, "Object.make",
+            raw.binding.global_name(),
+            Some("Object.make"),
             "relocation leaves the host binding unchanged"
         );
     }

@@ -95,6 +95,7 @@ fn adapter_word(name: &str, arg: Option<&str>) -> BackendAdapter {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn declines_mutated_foreign_declarations_dynamic_dicts_and_unknown_operands() {
     let (lang, builtins) = default_env();
     let known = Known::of(&lang);
@@ -110,9 +111,29 @@ fn declines_mutated_foreign_declarations_dynamic_dicts_and_unknown_operands() {
         |f| f.arity += 1,
         |f| f.stages[0] = true,
         |f| f.stages.push(false),
-        |f| f.binding.from = None,
-        |f| f.binding.from = Some("./evil.mjs".into()),
-        |f| f.binding.name.push('X'),
+        |f| {
+            f.binding = flick_ir::Binding::Global {
+                name: f.binding.export_name().unwrap_or_default().into(),
+            };
+        },
+        |f| {
+            f.binding = flick_ir::Binding::Module {
+                from: "./evil.mjs".into(),
+                name: f.binding.export_name().unwrap_or_default().into(),
+            };
+        },
+        |f| {
+            f.binding = flick_ir::Binding::Module {
+                from: f.binding.from().unwrap_or_default().into(),
+                name: format!("{}X", f.binding.export_name().unwrap_or_default()),
+            };
+        },
+        |f| {
+            f.binding = flick_ir::Binding::Inline(flick_ir::InlineCode {
+                code: "(s) => s".into(),
+                span: Span::new(FileId::new(0), 0, 0),
+            });
+        },
         |f| f.catch = Some(int(0)),
         |f| f.adapter.words.push(adapter_word("this", None)),
         |f| f.adapter.words.push(adapter_word("cancel", Some("signal"))),

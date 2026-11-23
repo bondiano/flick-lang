@@ -552,9 +552,23 @@ pub(super) fn method_member(p: &mut Parser) {
     }
 }
 
-/// `foreign mode name from (global "path" | "module" "export")` + metadata
-/// lines, or `foreign blocked name "reason"`.
+/// `foreign mode name from (global "path" | inline "code" | "module" "export")`
+/// with metadata lines, `foreign blocked name "reason"`, or
+/// `foreign module inline "preamble"`.
 fn foreign_decl(p: &mut Parser) {
+    if p.nth(1) == K::ModuleKw {
+        let m = p.start();
+        p.bump();
+        p.bump();
+        if p.at_word("inline") {
+            p.bump();
+        } else {
+            p.error_expected("`inline`");
+        }
+        p.expect(K::String);
+        p.complete(m, K::ForeignPreamble);
+        return;
+    }
     let m = p.start();
     p.bump();
     // `foreign name from …` has no mode: two words before `from` do
@@ -573,7 +587,7 @@ fn foreign_decl(p: &mut Parser) {
     }
     let source = p.start();
     if p.expect(K::FromKw) {
-        if p.at_word("global") {
+        if p.at_word("global") || p.at_word("inline") {
             p.bump();
         } else {
             p.expect(K::String);

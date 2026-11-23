@@ -413,3 +413,31 @@ fn formats_when_attribute_before_module_header() {
     let main () = ()
     "#);
 }
+
+#[test]
+fn preserves_inline_foreign_code_and_preambles_byte_for_byte() {
+    let preamble =
+        "\"\"\"\n  const k = 2;   \n\tfunction helper(x) {\n    return x * k;\n  }\n  \"\"\"";
+    let body = "\"\"\"\n  (d) => helper(d)   \n  \"\"\"";
+    let raw = "r#\"(x) => \"raw  \" + x\"#";
+    let unformatted = format!(
+        "foreign   module   inline   {preamble}\n\ncos : Float -> Float\nforeign   pure   cos   from   inline   \"(d) => Math.cos(d)\"\n\nscaled : Float -> Float\nforeign   scaled   from   inline   {body}\n  arity   1\n\ntag : String -> String\nforeign   tag   from   inline   {raw}\n"
+    );
+    let expected = format!(
+        "foreign module inline {preamble}\n\ncos : Float -> Float\nforeign pure cos from inline \"(d) => Math.cos(d)\"\n\nscaled : Float -> Float\nforeign scaled from inline {body}\n  arity 1\n\ntag : String -> String\nforeign tag from inline {raw}\n"
+    );
+    let mut map = SourceMap::default();
+    let file = map.add("inline.fl", &unformatted);
+    let (formatted, kept) =
+        super::format_reporting(&unformatted, file, &|_| None).unwrap_or_else(|d| panic!("{d:?}"));
+    assert!(kept.is_empty(), "left as written: {kept:?}\n{formatted}");
+    assert_eq!(
+        formatted, expected,
+        "inline foreign literals must survive byte for byte"
+    );
+    assert_eq!(
+        super::format(&formatted, file).as_deref(),
+        Ok(formatted.as_str()),
+        "formatting must be idempotent"
+    );
+}

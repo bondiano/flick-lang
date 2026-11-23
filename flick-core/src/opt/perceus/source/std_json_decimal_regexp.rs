@@ -18,8 +18,7 @@ impl Lower<'_> {
         if value.dicts != 0 {
             return None;
         }
-        let from = value.binding.from.as_deref()?;
-        let bind = value.binding.name.as_str();
+        let (from, bind) = value.binding.module_export()?;
         let stages = value.stages.len();
 
         // `JsonPointer.parse_uri_fragment` uses `nullable` result adaptation (`Option (List String)`).

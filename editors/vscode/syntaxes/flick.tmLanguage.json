@@ -173,6 +173,14 @@
           }
         },
         {
+          "match": "(?<![.\\w])(foreign)[ \\t]+(module)[ \\t]+(inline)\\b",
+          "captures": {
+            "1": { "name": "keyword.other.flick" },
+            "2": { "name": "keyword.other.flick" },
+            "3": { "name": "keyword.other.flick" }
+          }
+        },
+        {
           "match": "(?<![.\\w])(foreign)\\s+(?:(pure|effect|blocked|sync|async)\\s+)?([a-z_][A-Za-z0-9_]*)(?=\\s+(?:from\\b|\"))",
           "captures": {
             "1": { "name": "keyword.other.flick" },
@@ -279,7 +287,7 @@
           }
         },
         {
-          "match": "(?<![.\\w])(from)[ \\t]+(global)\\b",
+          "match": "(?<![.\\w])(from)[ \\t]+(global|inline)\\b",
           "captures": {
             "1": { "name": "keyword.other.flick" },
             "2": { "name": "keyword.other.flick" }

@@ -70,32 +70,30 @@ fn needs_web_adapter(item: &Item) -> bool {
     let ItemKind::Foreign(foreign) = &item.kind else {
         return false;
     };
-    let Some(source) = foreign.binding.from.as_deref() else {
+    let Some((source, export)) = foreign.binding.module_export() else {
         return false;
     };
     web_family(source)
-        && !rt_specifier(source)
-            .is_some_and(|spec| on_kernel_with_bridge(&spec, &foreign.binding.name, true))
+        && !rt_specifier(source).is_some_and(|spec| on_kernel_with_bridge(&spec, export, true))
 }
 
 fn needs_host(item: &Item) -> bool {
     let ItemKind::Foreign(foreign) = &item.kind else {
         return false;
     };
-    let Some(source) = foreign.binding.from.as_deref() else {
+    let Some((source, export)) = foreign.binding.module_export() else {
         return false;
     };
     if bindings::UI_REQUIRED
         .iter()
-        .any(|line| line.split_once(' ') == Some((source, foreign.binding.name.as_str())))
+        .any(|line| line.split_once(' ') == Some((source, export)))
     {
         return true;
     }
     let Some(spec) = rt_specifier(source) else {
         return false;
     };
-    ui_family(&spec, &foreign.binding.name)
-        && !on_kernel_with_bridge(&spec, &foreign.binding.name, true)
+    ui_family(&spec, export) && !on_kernel_with_bridge(&spec, export, true)
 }
 
 fn globals(expr: &Expr, pending: &mut Vec<(String, String)>) {

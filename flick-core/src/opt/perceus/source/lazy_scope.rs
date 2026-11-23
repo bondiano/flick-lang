@@ -23,8 +23,8 @@ impl Lower<'_> {
         if !has_standard_shape(value) {
             return None;
         }
-        let from = value.binding.from.as_deref()?;
-        let name = value.binding.name.as_str();
+        let from = value.binding.from()?;
+        let name = value.binding.export_name().unwrap_or("");
         match (from, name, value.mode, value.dicts, value.arity) {
             ("flick:rt", "awaitEff", ForeignMode::Effect, 0, 1) => {
                 let b = ExprBuilder::new(span, "$awaitEff");

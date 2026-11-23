@@ -1,6 +1,8 @@
 mod common;
 
-use flick_backend::{Abi, InputKind, Limits, Mode, ModuleRole, Projection, validate_request};
+use flick_backend::{
+    Abi, InlineForeign, InputKind, Limits, Mode, ModuleRole, Projection, Span, validate_request,
+};
 
 #[test]
 fn a_complete_whole_program_request_is_accepted() {
@@ -68,5 +70,83 @@ fn incomplete_graphs_and_inconsistent_source_metadata_are_rejected() {
         let error = validate_request(&request, &mut common::inputs(&request), Limits::default())
             .expect_err(case);
         assert!(!error.is_empty(), "{case}");
+    }
+}
+
+#[test]
+fn inline_foreign_entries_are_validated() {
+    let mut request = common::request();
+    request.inline_foreign.push(InlineForeign {
+        module: "App".into(),
+        name: None,
+        code: "const k = 1;\n".repeat(2000),
+        span: Span {
+            file: 0,
+            start: 0,
+            end: 5,
+        },
+    });
+    request.inline_foreign.push(InlineForeign {
+        module: "App".into(),
+        name: Some("cos".into()),
+        code: "(d) => Math.cos(d)".into(),
+        span: Span {
+            file: 0,
+            start: 0,
+            end: 5,
+        },
+    });
+    validate_request(&request, &mut common::inputs(&request), Limits::default())
+        .expect("large preamble and binding accepted");
+
+    for case in ["unknown-module", "empty-name", "nul-code", "bad-span"] {
+        let mut bad = common::request();
+        bad.inline_foreign.push(match case {
+            "unknown-module" => InlineForeign {
+                module: "Unknown".into(),
+                name: None,
+                code: "const k = 1;".into(),
+                span: Span {
+                    file: 0,
+                    start: 0,
+                    end: 5,
+                },
+            },
+            "empty-name" => InlineForeign {
+                module: "App".into(),
+                name: Some(String::new()),
+                code: "x".into(),
+                span: Span {
+                    file: 0,
+                    start: 0,
+                    end: 5,
+                },
+            },
+            "nul-code" => InlineForeign {
+                module: "App".into(),
+                name: Some("f".into()),
+                code: "a\0b".into(),
+                span: Span {
+                    file: 0,
+                    start: 0,
+                    end: 5,
+                },
+            },
+            "bad-span" => InlineForeign {
+                module: "App".into(),
+                name: None,
+                code: "const k = 1;".into(),
+                span: Span {
+                    file: 0,
+                    start: 0,
+                    end: 9999,
+                },
+            },
+            _ => unreachable!(),
+        });
+        assert!(
+            validate_request(&bad, &mut common::inputs(&bad), Limits::default()).is_err(),
+            "{case}"
+        );
     }
 }

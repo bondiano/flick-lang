@@ -37,7 +37,7 @@ const KEYWORD: u32 = 7;
 const MACRO: u32 = 8;
 
 /// Nodes worth folding when they span several lines.
-const FOLDED: [K; 19] = [
+const FOLDED: [K; 20] = [
     K::LetDecl,
     K::ProofDecl,
     K::LawDecl,
@@ -45,6 +45,7 @@ const FOLDED: [K; 19] = [
     K::ServiceDecl,
     K::ClassDecl,
     K::InstanceDecl,
+    K::ForeignPreamble,
     K::MatchExpr,
     K::CatchExpr,
     K::RecordExpr,
@@ -180,21 +181,32 @@ fn binders(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
     }
 }
 
-/// `pure` of `foreign pure f from …`, and `global` of `from global`.
+/// `pure` of `foreign pure f from …`, `global`/`inline` of `from global`/`from inline`,
+/// and `inline` of `foreign module inline`.
 fn foreign_modes(tree: &Node, text: &str, out: &mut Vec<(u32, u32, u32)>) {
-    for decl in tree.nodes().filter(|n| n.kind == K::ForeignDecl) {
-        let names: Vec<_> = decl.child_tokens().filter(|t| t.kind == K::Ident).collect();
-        if let [mode, _, ..] = names[..]
-            && FOREIGN_MODES.contains(&mode.text(text))
-        {
-            out.push((mode.start, mode.end, KEYWORD));
-        }
-        let global = decl
-            .nodes()
-            .flat_map(Node::child_tokens)
-            .find(|t| t.kind == K::Ident && t.text(text) == "global");
-        if let Some(t) = global {
-            out.push((t.start, t.end, KEYWORD));
+    for decl in tree.nodes() {
+        if decl.kind == K::ForeignDecl {
+            let names: Vec<_> = decl.child_tokens().filter(|t| t.kind == K::Ident).collect();
+            if let [mode, _, ..] = names[..]
+                && FOREIGN_MODES.contains(&mode.text(text))
+            {
+                out.push((mode.start, mode.end, KEYWORD));
+            }
+            let source_kw = decl
+                .nodes()
+                .filter(|n| n.kind == K::ForeignSource)
+                .flat_map(Node::child_tokens)
+                .find(|t| t.kind == K::Ident && matches!(t.text(text), "global" | "inline"));
+            if let Some(t) = source_kw {
+                out.push((t.start, t.end, KEYWORD));
+            }
+        } else if decl.kind == K::ForeignPreamble {
+            let inline = decl
+                .child_tokens()
+                .find(|t| t.kind == K::Ident && t.text(text) == "inline");
+            if let Some(t) = inline {
+                out.push((t.start, t.end, KEYWORD));
+            }
         }
     }
 }

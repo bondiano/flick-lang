@@ -95,6 +95,13 @@ foreign push from "./array.js" "push"
 fetch_user : UserId ->{Http; HttpError} User
 foreign effect fetch_user from "./users.js" "fetchUser"
 
+foreign module inline """
+  const scale = 2;
+  """
+
+cos : Float -> Float
+foreign cos from inline "(d) => Math.cos(d) * scale"
+
 rec {
   is_even : Float -> Bool
   let is_even n = if n == 0 then true else is_odd (n - 1)

@@ -3,6 +3,7 @@
 
 pub mod codegen;
 pub mod foreign_meta;
+pub mod inline;
 
 pub mod numeric;
 

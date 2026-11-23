@@ -18,8 +18,7 @@ impl Lower<'_> {
         if value.dicts != 0 || !has_standard_shape(value) {
             return None;
         }
-        let from = value.binding.from.as_deref()?;
-        let bind = value.binding.name.as_str();
+        let (from, bind) = value.binding.module_export()?;
         let stages = value.stages.len();
 
         if let Some(kind) = direct_async_intrinsic(from, bind, value.mode, stages) {

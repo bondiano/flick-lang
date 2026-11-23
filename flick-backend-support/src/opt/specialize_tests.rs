@@ -211,6 +211,7 @@ fn specialize_handles_mixed_erased_and_typed_call_sites() {
             name: "App".into(),
             items,
             types: Vec::new(),
+            preambles: Vec::new(),
             labels: BTreeMap::new(),
             initialization: flick_ir::Initialization::default(),
             records: BTreeMap::new(),

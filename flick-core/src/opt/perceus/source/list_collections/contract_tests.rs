@@ -23,7 +23,7 @@ mod tests {
                 contracts.insert((
                     module.name.as_str(),
                     foreign.name.as_str(),
-                    foreign.binding.name.as_str(),
+                    foreign.binding.export_name().unwrap_or(""),
                 ));
                 assert!(
                     supports(foreign, kind),
@@ -121,9 +121,9 @@ mod tests {
     type Mutation = Box<dyn Fn(&mut Foreign)>;
     pub(super) fn mutations(original: &Foreign) -> Vec<Mutation> {
         let mut mutations: Vec<Mutation> = vec![
-            Box::new(|f| f.binding.from = None),
-            Box::new(|f| f.binding.from = Some("other".into())),
-            Box::new(|f| f.binding.name.push('!')),
+            Box::new(|f| f.binding = flick_ir::Binding::Global { name: f.binding.export_name().unwrap_or("").to_owned() }),
+            Box::new(|f| f.binding = flick_ir::Binding::Module { from: "other".into(), name: f.binding.export_name().unwrap_or("").to_owned() }),
+            Box::new(|f| if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } = &mut f.binding { name.push('!'); }),
             Box::new(|f| f.mode = ForeignMode::Sync),
             Box::new(|f| f.mode = ForeignMode::Async),
             Box::new(|f| f.mode = ForeignMode::Effect),

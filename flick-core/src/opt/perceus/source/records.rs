@@ -12,13 +12,17 @@ impl Lower<'_> {
         span: Span,
         block: &mut Code,
     ) -> Option<Result<Local, LowerError>> {
-        if value.binding.from.as_deref() != Some("flick:rt")
+        if value.binding.from() != Some("flick:rt")
             || value.mode != ForeignMode::Pure
             || !has_standard_shape(value)
         {
             return None;
         }
-        match (value.binding.name.as_str(), value.dicts, value.arity) {
+        match (
+            value.binding.export_name().unwrap_or(""),
+            value.dicts,
+            value.arity,
+        ) {
             ("recordGet", 1, 2) => {
                 Some(self.curried_intrinsic(Intrinsic::RecordGet, 1, false, block, span))
             }

@@ -25,7 +25,7 @@ impl<'a> Gen<'a> {
     /// The Go file of `module` with the items at `order`.
     pub(super) fn module(&mut self, module: &Module, order: &[usize]) -> String {
         let a = self.a;
-        let mut decls = Vec::new();
+        let (extra_imports, mut decls) = self.preambles(&module.preambles);
         let mut init = Vec::new();
         (self.groups, self.grouped) = loops::groups(self.module, &module.items);
         // every member of a group reaches the others: all are reached or none
@@ -69,6 +69,11 @@ impl<'a> Gen<'a> {
         } else {
             docvec![a, "func ", names::init(self.module), "() ", block(a, init)]
         };
+        let extra_imports = a.concat(
+            extra_imports
+                .into_iter()
+                .map(|imp| docvec![a, imp, a.lines(2)]),
+        );
         print(docvec![
             a,
             "package main",
@@ -77,6 +82,7 @@ impl<'a> Gen<'a> {
             RUNTIME_PACKAGE,
             "\"",
             a.lines(2),
+            extra_imports,
             "var _ = flickrt.Unit",
             a.lines(2),
             a.concat(decls),
@@ -125,7 +131,7 @@ impl<'a> Gen<'a> {
             }
             ItemKind::Foreign(f) => {
                 if let Some(decl) = self.foreign(f, item.span) {
-                    decls.push((decl, false));
+                    decls.push((decl, self.lines > lines));
                 }
             }
             ItemKind::Instance { info, methods } => {

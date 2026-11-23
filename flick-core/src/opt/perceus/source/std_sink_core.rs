@@ -24,10 +24,10 @@ impl Lower<'_> {
         if value.dicts != 0 || value.mode != ForeignMode::Pure || !has_standard_shape(value) {
             return None;
         }
-        if value.binding.from.as_deref()? != "flick:Sink" {
+        if value.binding.from()? != "flick:Sink" {
             return None;
         }
-        let bind = value.binding.name.as_str();
+        let bind = value.binding.export_name().unwrap_or("");
         let stages = value.stages.len();
         let b = ExprBuilder::new(span, "$sk");
         let expr = sink_core_template(&b, bind, stages)

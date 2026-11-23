@@ -17,8 +17,7 @@ impl Lower<'_> {
         if value.mode != ForeignMode::Pure || value.dicts != 0 || !has_standard_shape(value) {
             return None;
         }
-        let from = value.binding.from.as_deref()?;
-        let bind = value.binding.name.as_str();
+        let (from, bind) = value.binding.module_export()?;
         if from == "flick:String" && bind == "isNonEmpty" && value.stages.len() == 1 {
             let b = ExprBuilder::new(span, "$str");
             let expr = b.lam(

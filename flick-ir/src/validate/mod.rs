@@ -10,6 +10,7 @@
 mod agree;
 mod decls;
 mod exprs;
+mod items;
 mod patterns;
 #[cfg(test)]
 mod tests;
@@ -88,17 +89,7 @@ pub fn validate(
                         v.within(&info.context, body);
                     }
                 }
-                ItemKind::Foreign(foreign) => {
-                    for word in &foreign.adapter.words {
-                        v.span(word.span);
-                    }
-                    if let Some(ty) = &foreign.ty {
-                        v.check_type_wf(ty, None);
-                    }
-                    if let Some(catch) = &foreign.catch {
-                        v.expr(catch);
-                    }
-                }
+                ItemKind::Foreign(foreign) => v.check_foreign_item(foreign),
                 ItemKind::Constructor(c) => v.check_constructor_item(c),
                 ItemKind::Service { .. } => {}
             }

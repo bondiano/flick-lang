@@ -191,7 +191,7 @@ impl Backend for Literal {
                 version: "1.0.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.16.0", "0.17.0"),
+            ir: range("0.17.0", "0.18.0"),
             language: range("0.1.0", "0.2.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
@@ -241,7 +241,7 @@ impl Backend for Literal {
     fn check_target(
         &self,
         request: &BuildRequest,
-        _: &mut dyn Inputs,
+        inputs: &mut dyn Inputs,
     ) -> Result<TargetSupport, Vec<Diagnostic>> {
         if case(request) == "refuse-warning" {
             let mut refusal = diagnostic("intentional warning-only refusal", None);
@@ -253,7 +253,7 @@ impl Backend for Literal {
         }
         let program =
             Program::from_cbor(&request.program).map_err(|e| diagnostic(&e.to_string(), None))?;
-        foreign::validate_foreigns(&program, request)?;
+        foreign::validate_foreigns(&program, request, inputs)?;
         if is_check(request) {
             return Ok(TargetSupport {
                 capabilities: self.describe().capabilities,
@@ -403,6 +403,9 @@ fn apply_case_artifacts(
         }
         "path" => artifacts[0].path = "../outside.js".into(),
         "duplicate" => artifacts.push(artifacts[0].clone()),
+        "foreign" if !request.inline_foreign.is_empty() => {
+            artifacts.push(foreign::inline_report(request));
+        }
         _ => {}
     }
     Ok(())

@@ -225,7 +225,7 @@ fn resolved(
             let ir::ItemKind::Foreign(f) = &item.kind else {
                 continue;
             };
-            let Some(spec) = f.binding.from.as_deref() else {
+            let Some(spec) = f.binding.from() else {
                 continue;
             };
             let ui = settings.ui.is_some() && bindings::UI_RENDERER.contains(&spec);
@@ -265,7 +265,7 @@ pub fn foreign_inputs(compilation: &Compilation, settings: &Settings) -> Vec<Res
     for module in own.chain(builtin_modules_of(settings.backend == Backend::Rt)) {
         for item in &module.items {
             if let ir::ItemKind::Foreign(f) = &item.kind
-                && let Some(spec) = f.binding.from.as_deref()
+                && let Some(spec) = f.binding.from()
                 && !out
                     .iter()
                     .any(|r| r.module == module.name && r.spec == spec)
