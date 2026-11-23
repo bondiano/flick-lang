@@ -1,0 +1,39 @@
+module Main exposing (main, order_button)
+
+import Server
+
+type alias Order = { item : String; count : Float }
+  deriving Schema
+
+type error OutOfStock = OutOfStock String
+  deriving Schema
+
+/// Up to three of an item.
+place : Order ->{Server.Server; OutOfStock} String
+server fn place order =
+  if order.count > 3 then Fail.fail (OutOfStock order.item) else "placed \{order.item}"
+
+order_button : Ui
+let order_button = ui {
+  button {
+    disabled = false
+    on_click =
+      Ui.Event.exhaust (fun _ -> task {
+        let message =
+          try place { item = "tea"; count = 1 } with
+          | OutOfStock item -> "out of stock: " ++ item
+          | Rpc.ClientError reason -> reason
+        Platform.stdout_line message
+      })
+  }
+    text "Place order"
+}
+
+main : Unit ->{Host.Environment, Host.Console, Async; AppError} Unit
+let main () =
+  let origin = Option.with_default "http://127.0.0.1:3000" (Platform.env "SHOP_URL")
+  let placed =
+    try Server.with_origin origin (task { place { item = "tea"; count = 1 } }) with
+    | OutOfStock item -> "out of stock: " ++ item
+    | Rpc.ClientError message -> message
+  Platform.stdout_line placed

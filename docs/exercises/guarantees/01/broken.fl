@@ -1,0 +1,9 @@
+module Main exposing (main, port_or_zero)
+
+refined type Port = Int where fun n -> n > 0 && n < 65536
+
+port_or_zero : Int -> Int
+let port_or_zero n = if n > 0 && n < 1000 then Port.value (Port.prove n) else 0
+
+main : Unit ->{Host.Console} Unit
+let main () = Platform.stdout_line "\{show (port_or_zero 8080)} \{show (port_or_zero 70000)}"

@@ -1,0 +1,14 @@
+module Main exposing (main)
+
+refined type Port = Int where fun n -> n > 0 && n < 65536
+
+port_text : Int -> String
+let port_text n =
+  match Port.parse n with
+  | Ok port -> show (Port.value port)
+  | Err _ -> "invalid"
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (port_text 8080)
+  Platform.stdout_line (port_text 0)

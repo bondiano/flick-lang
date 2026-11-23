@@ -1,0 +1,27 @@
+---
+title: Suites, selection and listing
+description: Suites, selection and listing
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="suites">
+
+**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+
+A suite groups tests; each case gets its own scope and live host services.
+`.skip` never runs its body. `.only` keeps only focused cases in the selected
+files; a skipped case stays skipped. Here only `focus` runs.
+
+`flick test --list` prints `Main > names > focus` and runs nothing.
+`flick test --forbid-only` exits 1 for this intentional focus. CI checks both
+behaviors. Remove `.only` before committing real project tests.
+
+The playground currently runs `main`, not a module's `tests`, and has no
+`--list` report. These lessons are local rather than pretending a green
+compile means green tests.
+
+[Reference](../../reference/testing/#full-names-skip-and-only).
+
+</TourLesson>

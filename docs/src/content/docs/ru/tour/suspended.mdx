@@ -1,0 +1,25 @@
+---
+title: Отложенные параметры
+description: Отложенные параметры
+tableOfContents: false
+source_hash: 9f1017b4d896aef5
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="suspended">
+
+**Где запускается:** браузер и локально.
+
+`~` у параметра `Eff` откладывает прямой вызов в позиции этого аргумента.
+Он не запоминает результат: каждый `await job` запускает холодное вычисление.
+`Effect.or_die`, `retry`, `repeat`, `exit`, `delay` и комбинаторы таймаута
+используют ту же форму. Готовый `Eff` передаётся без изменений.
+
+Маркер относится к именованной сигнатуре, а не к типу функции. Конвейер
+сначала выполняет левую часть. `~` у параметра не-`Eff` — `FLICK-T076`.
+Для рекурсивных схем текущее имя — `Schema.suspend`, а не `Schema.lazy`.
+
+[Справочник](../../reference/effects/#task-и-await).
+
+</TourLesson>

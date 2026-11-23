@@ -1,0 +1,21 @@
+---
+title: Child processes
+description: Child processes
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="child-process">
+
+**Where it runs:** locally, on JS and Go: the module goes in a project's `test/Main.fl`, then `flick test`. CI runs it on both targets. For JS, add `@flick-lang/effect-ts` to the project's dependencies (`pnpm add @flick-lang/effect-ts`); Go needs no npm adapter.
+
+`ChildProcess.make` describes a command; `ChildProcess.lines` runs it through
+`Host.Process` and gives the lines of its stdout. The process belongs to a
+scope of its own and is stopped when that scope ends. `Host.Process` is a
+service like the other host ports, so a test can provide a fake one instead
+of starting programs.
+
+[Reference](../../reference/stdlib/).
+
+</TourLesson>

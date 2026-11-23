@@ -1,5 +1,17 @@
 module Main exposing (main)
 
+import Test exposing (expect, to)
+
+scripts : List (List String, Int)
+let scripts = [(["add Dune 412", "finish Dune"], 0), (["add Dune 412", "add Emma many"], 412)]
+
+suite "books" {
+  test "a new book counts" { expect (left_after ["add Dune 412"]) |> to.equal 412 }
+  test.each scripts "script {0}" (script, pages) {
+    expect (left_after script) |> to.equal pages
+  }
+}
+
 module Books exposing (Book, add, finish, pages_left, line) =
   type alias Book = { title : String; pages : Int; read : Bool }
 

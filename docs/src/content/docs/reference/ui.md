@@ -52,6 +52,8 @@ to props inside the block also inserts `Ui.component` automatically.
 
 ## Elements and props
 
+The tour's [app interface](../../tour/app-ui/) shows sibling children and the fixes for their diagnostics.
+
 Props are exact records: a missing field, an unknown one or a wrong type is
 an error. A key is metadata, given with `Ui.keyed`, never a prop.
 

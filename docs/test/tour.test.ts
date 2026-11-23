@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { lessons } from "../tour/load.ts";
 import { verifyExample } from "./helpers/verify-example.ts";
+import { verifyLocalLesson } from "./helpers/verify-local-lesson.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const docs = path.join(here, "..");
@@ -22,6 +23,7 @@ test("the index, the lesson files and the pages match one to one", () => {
     .sort();
   assert.deepEqual(files, own.flatMap((entry) => [entry.file ?? "", ...(entry.stdout ? [entry.stdout] : [])]).sort());
   for (const entry of all) {
+    if (entry.expect === "local") assert.ok(entry.local, `${entry.id}: local lesson needs a CI check`);
     if (entry.file !== undefined) assert.ok(existsSync(entry.file), `${entry.id}: ${entry.file}`);
     if (entry.stdout !== undefined) assert.ok(existsSync(entry.stdout), `${entry.id}: ${entry.stdout}`);
     if (entry.exercise !== undefined) assert.ok(existsSync(path.join(docs, "exercises", entry.exercise, "check.toml")), entry.id);
@@ -34,6 +36,7 @@ test("the index, the lesson files and the pages match one to one", () => {
 
 for (const entry of own) {
   test(`lesson ${entry.id}: ${entry.expect}`, () => {
-    verifyExample(`docs-tour/${entry.id}`, entry.file ?? "", entry.expect, entry.stdout);
+    if (entry.expect !== "local") verifyExample(`docs-tour/${entry.id}`, entry.file ?? "", entry.expect, entry.stdout);
+    if (entry.local) verifyLocalLesson(entry);
   });
 }

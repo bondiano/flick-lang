@@ -1,0 +1,25 @@
+---
+title: One run for several fibers
+description: One run for several fibers
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="lazy-shared">
+
+**Where it runs:** browser and locally.
+
+Two concurrent awaits share the cell, not two copies of the body.
+The first line shows one execution. Interruption is not cached: the timeout
+interrupts the fiber that owns `slow`, resetting the cell. The next await
+runs again after the gate opens; the second line shows two attempts.
+Other waiters do not inherit the owner's interruption.
+
+A lazy retains its captures and cached error, so a scoped resource it
+captures cannot escape its region. These are observable guarantees, not
+instructions to depend on the compiler's lazy optimizations.
+
+[Reference](../../reference/effects/#lazy).
+
+</TourLesson>

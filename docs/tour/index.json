@@ -52,6 +52,19 @@
       ]
     },
     {
+      "id": "guarantees", "en": "Checked guarantees", "ru": "Проверяемые гарантии",
+      "lessons": [
+        { "id": "refined", "expect": "run" },
+        { "id": "prove", "expect": "run" },
+        { "id": "prove-fails", "expect": "fail FLICK-T077" },
+        { "id": "invariants", "expect": "run" },
+        { "id": "fn-contracts", "expect": "run" },
+        { "id": "proofs", "expect": "run", "local": {"command": "prove", "exit": 0, "contains": []} },
+        { "id": "laws", "expect": "run", "local": {"command": "prove", "exit": 0, "contains": []} },
+        { "id": "guards", "exercise": "guarantees/01" }
+      ]
+    },
+    {
       "id": "effects", "en": "Effects", "ru": "Эффекты",
       "lessons": [
         { "id": "arrows", "expect": "run" },
@@ -61,6 +74,7 @@
         { "id": "hidden-service", "example": "missing-service" },
         { "id": "layers", "expect": "run" },
         { "id": "host", "expect": "run" },
+        { "id": "host-ports", "expect": "run" },
         { "id": "handlers", "example": "handlers" },
         { "id": "tasks", "expect": "run" },
         { "id": "captures", "expect": "fail FLICK-G005" },
@@ -71,6 +85,17 @@
       ]
     },
     {
+      "id": "laziness", "en": "Laziness", "ru": "Ленивость",
+      "lessons": [
+        { "id": "lazy", "expect": "run" },
+        { "id": "lazy-shared", "expect": "run" },
+        { "id": "let-lazy", "expect": "run" },
+        { "id": "let-lazy-capture", "expect": "fail FLICK-G005" },
+        { "id": "suspended", "expect": "run" },
+        { "id": "cache", "exercise": "laziness/01" }
+      ]
+    },
+    {
       "id": "resources", "en": "Resources and regions", "ru": "Ресурсы и регионы",
       "lessons": [
         { "id": "scope", "example": "resources" },
@@ -78,7 +103,35 @@
         { "id": "scope-type", "expect": "run" },
         { "id": "leaks", "example": "escaping-resource" },
         { "id": "fibers", "expect": "run" },
+        { "id": "pool", "expect": "run" },
+        { "id": "layer-finalizers", "expect": "run" },
         { "id": "owner", "exercise": "resources/01" }
+      ]
+    },
+    {
+      "id": "testing", "en": "Testing", "ru": "Тестирование",
+      "lessons": [
+        { "id": "suites", "expect": "local", "local": {"command": "test", "exit": 0, "contains": ["1 passed", "2 skipped"], "listed": ["Main > names > focus"], "forbidOnly": true} },
+        { "id": "matchers", "expect": "local", "local": {"command": "test", "exit": 1, "contains": ["5 passed", "1 failed", "expected", "got"]} },
+        { "id": "each", "expect": "local", "local": {"command": "test", "exit": 0, "contains": ["3 passed", "0 failed"], "flags": ["--forbid-only"], "listed": ["Main > trim > input \"  Ada  \"", "Main > trim > input \" Grace \"", "Main > trim > input \"\""]} },
+        { "id": "fixtures", "expect": "local", "local": {"command": "test", "exit": 1, "contains": ["2 passed", "1 failed", "setup", "fixture connection: expected 1, got 2", "close store"]} },
+        { "id": "hooks", "expect": "local", "local": {"command": "test", "exit": 1, "contains": ["1 passed", "1 failed", "timeout"], "printed": ["hook: before_all", "hook: before_each", "hook: body", "hook: after_each", "hook: before_each", "hook: after_each", "hook: after_all"]} },
+        { "id": "fakes", "expect": "local", "local": {"command": "test", "exit": 0, "contains": ["1 passed", "0 failed"], "flags": ["--forbid-only"]} },
+        { "id": "companions", "expect": "local", "local": {"command": "test", "exit": 0, "contains": ["1 passed", "0 failed"], "files": {"src/Main.test.fl": "tour-support/companions/Main.test.fl"}, "listed": ["Main > private trim"], "source": "src"} },
+        { "id": "green", "exercise": "testing/01" }
+      ]
+    },
+    {
+      "id": "programs", "en": "Real programs", "ru": "Настоящие программы",
+      "lessons": [
+        { "id": "schema", "expect": "run" },
+        { "id": "config", "expect": "run" },
+        { "id": "bytes", "expect": "run" },
+        { "id": "sql", "expect": "local", "local": {"adapter": true, "command": "run", "exit": 0, "contains": ["SELECT \"b\".\"title\" AS \"title\", \"b\".\"pages\" AS \"pages\" FROM \"books\" AS \"b\" WHERE (\"b\".\"pages\" > $1) ORDER BY \"b\".\"pages\" DESC", "parameters: 1"], "targets": ["js", "go"]} },
+        { "id": "cli", "expect": "local", "local": {"adapter": true, "command": "test", "exit": 0, "contains": ["HELLO, ADA", "2 passed", "0 failed"], "targets": ["js", "go"]} },
+        { "id": "http-api", "expect": "local", "local": {"adapter": true, "command": "test", "exit": 0, "contains": ["1 passed", "0 failed"], "targets": ["js", "go"]} },
+        { "id": "server-fn", "expect": "local", "local": {"command": "check", "exit": 0, "contains": []} },
+        { "id": "child-process", "expect": "local", "local": {"adapter": true, "command": "test", "exit": 0, "contains": ["1 passed", "0 failed"], "targets": ["js", "go"]} }
       ]
     },
     {
@@ -87,7 +140,7 @@
         { "id": "app-domain", "expect": "run" },
         { "id": "app-store", "expect": "run" },
         { "id": "app-commands", "expect": "run" },
-        { "id": "app-tests", "expect": "run" },
+        { "id": "app-tests", "expect": "run", "local": {"command": "test", "exit": 0, "contains": ["3 passed", "0 failed"], "flags": ["--forbid-only"]} },
         { "id": "app-ui", "expect": "ui" },
         { "id": "app-practice", "exercise": "app/01" }
       ]

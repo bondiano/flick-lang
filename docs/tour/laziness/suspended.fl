@@ -1,0 +1,15 @@
+module Main exposing (main)
+
+twice : ~(Eff r e Int)^c ->{r; e} Int
+let twice job = await job + await job
+
+count : Ref Int ->{} Int
+let count cell =
+  Ref.update cell (fun n -> n + 1)
+  Ref.get cell
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let cell = Ref.make 0
+  Platform.stdout_line (show (twice (count cell)))
+  Platform.stdout_line "runs: \{Ref.get cell}"

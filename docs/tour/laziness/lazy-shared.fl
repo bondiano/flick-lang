@@ -1,0 +1,23 @@
+module Main exposing (main)
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  let runs = Ref.make 0
+  let shared = lazy {
+    Ref.update runs (fun n -> n + 1)
+    Effect.sleep (Result.with_default Duration.zero (Duration.millis 20))
+    7
+  }
+  let (a, b) = parallel (task { await shared }) (task { await shared })
+  Platform.stdout_line "together: \{a} \{b}, runs: \{Ref.get runs}"
+  let gate : Deferred.Deferred none Unit = Deferred.make ()
+  let attempts = Ref.make 0
+  let slow = lazy {
+    Ref.update attempts (fun n -> n + 1)
+    Deferred.await_ gate
+    1
+  }
+  let cut = timeout_option 5 (await slow)
+  ignore (Deferred.succeed () gate)
+  let after = await slow
+  Platform.stdout_line "cut: \{show cut}, after: \{after}, runs: \{Ref.get attempts}"

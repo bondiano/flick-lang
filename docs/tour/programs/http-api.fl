@@ -1,0 +1,54 @@
+module Main
+
+import Test exposing (expect, to)
+
+type alias Book = { id : String; title : String }
+  deriving Schema
+
+type alias BookPath = { id : String }
+  deriving Schema
+
+type error NotFound = NotFound { id : String }
+  deriving Schema
+
+get_book :
+  HttpApi.Endpoint "get_book" (HttpApi.Request BookPath Unit Unit Unit ->{r; NotFound} Book)
+let get_book =
+  HttpApi.endpoint HttpApi.Get "/books/:id" (Record.label : Record.Label "get_book")
+  |> HttpApi.with_path (Codec.json BookPath.schema)
+  |> HttpApi.with_success 200 (Codec.json Book.schema)
+  |> HttpApi.with_errors (HttpApi.errors |> HttpApi.error_case 404 (Codec.json NotFound.schema))
+
+api :
+  HttpApi.Api
+    r
+    { books : { get_book : HttpApi.Request BookPath Unit Unit Unit ->{r; NotFound} Book } }
+let api =
+  HttpApi.api "Books"
+  |> HttpApi.add_group (HttpApi.group (Record.label : Record.Label "books") |> HttpApi.add get_book)
+
+find : HttpApi.Request BookPath Unit Unit Unit ->{; NotFound} Book
+let find request =
+  if request.path.id == "1" then
+    ({ id = "1"; title = "Dune" })
+  else
+    Fail.fail (NotFound { id = request.path.id })
+
+options : HttpApi.ServeOptions
+let options = { host = "127.0.0.1"; port = 0; openapi = None; swagger = None; scalar = None }
+
+test "serves and calls one endpoint" {
+  scope {
+    let server = HttpApi.listen options api { books = { get_book = find } }
+    let base = "http://127.0.0.1:" ++ show (HttpApi.port server)
+    let book =
+      HttpApi.call base get_book { path = { id = "1" }; query = (); headers = (); payload = () }
+    expect book.title |> to.equal "Dune"
+    let missing =
+      try
+        (HttpApi.call base get_book { path = { id = "9" }; query = (); headers = (); payload = () }).title
+      with
+      | NotFound e -> "missing " ++ e.id
+    expect missing |> to.equal "missing 9"
+  }
+}

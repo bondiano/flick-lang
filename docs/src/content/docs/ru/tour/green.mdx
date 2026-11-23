@@ -1,0 +1,17 @@
+---
+title: "Практика: исправьте код, а не тест"
+description: "Практика: исправьте код, а не тест"
+tableOfContents: false
+source_hash: b406bbb786f6427c
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="green">
+
+Упражнение главы. Два теста описывают, что должна делать `count_words`,
+и не компилируются с ней: она возвращает `String`, а тесты ждут `Int`
+(`FLICK-T003`). Исправьте `count_words`, не меняя тесты. Редактор
+запускает `main`; локально `flick test` запускает оба случая.
+
+</TourLesson>

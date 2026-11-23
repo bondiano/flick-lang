@@ -1,4 +1,5 @@
-open file
 reading file
-close file
+flush: failure
+close: failure
+rollback books
 handled -3

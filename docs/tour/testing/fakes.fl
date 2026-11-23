@@ -1,0 +1,22 @@
+module Main
+
+import Test exposing (expect, to)
+
+ticket : Unit ->{Host.Clock, Host.Random} (Float, Float)
+let ticket () = (Host.Clock.current_time_millis (), Host.Random.next ())
+
+fake_clock : Layer none none {Host.Clock}
+let fake_clock =
+  Layer.succeed Host.Clock {
+    current_time_millis = fun () -> 1000
+    current_time_nanos = fun () -> 1000000000n
+    monotonic_time_nanos = fun () -> 0n
+  }
+
+fake_random : Layer none none {Host.Random}
+let fake_random = Layer.succeed Host.Random { next = fun () -> 0.25 }
+
+test "exact ticket" {
+  let actual = provide (Layer.merge fake_clock fake_random) { ticket () }
+  expect actual |> to.equal (1000, 0.25)
+}

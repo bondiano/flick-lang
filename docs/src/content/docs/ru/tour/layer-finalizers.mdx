@@ -1,0 +1,24 @@
+---
+title: Слой с освобождением
+description: Слой с освобождением
+tableOfContents: false
+source_hash: 3ed92467353b0b35
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="layer-finalizers">
+
+**Где запускается:** браузер и локально.
+
+`Layer.from_build` строит сервис в области, которую открывает `provide`.
+Очистка `Scope.defer` выполняется, когда этот `provide` завершается, и всё ещё
+может вызвать `Log`, вход слоя: входы слоя живут дольше области, в которой он
+строится (`Fiber.Provided`). Поэтому `release box` печатается раньше
+`after the provide`.
+
+**Попробуйте:** перенесите `Log.line "after the provide"` во внутренний `provide`.
+
+[Справочник](../../reference/services/).
+
+</TourLesson>

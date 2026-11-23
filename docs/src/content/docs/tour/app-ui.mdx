@@ -12,7 +12,35 @@ The same `Books` module now drives an interface, shown beside the editor.
 
 `shelf` is an atom: a value the interface watches. `reading_list` is a
 component that reads it with `Atom.value` and shows a line for each book and
-the pages left. The button of an unread book updates the atom with
+the pages left. Its `ui { … }` block has two lines after its `let`, the list
+and the paragraph: they are siblings, with no `fragment` around them. A `let`
+after the first child is `FLICK-T085`, whose fix moves it above; a `fragment`
+of children written as the block's one line is the warning `FLICK-T086`,
+whose fix writes them as lines. See [ui](../../reference/ui/).
+
+```flick fail T085
+view : Ui
+let view = ui {
+  text "a"
+  let b = "b"
+  text b
+}
+```
+
+The redundant wrapper still compiles, but reports `FLICK-T086`:
+
+```flick fail T086
+view : Ui
+let view = ui {
+  fragment
+    heading (text "count")
+    paragraph (text "one")
+}
+```
+
+`flick check --fix --only T085,T086` applies these safe fixes.
+
+The button of an unread book updates the atom with
 `Books.finish`, and every component that read it shows the change.
 
 `main` mounts the view on the page's `#app` element. The interface runs in a

@@ -1,0 +1,23 @@
+---
+title: Типизированный HTTP API
+description: Типизированный HTTP API
+tableOfContents: false
+source_hash: 9d7cfd3206c5ca4c
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="http-api">
+
+**Где запускается:** локально, на JS и Go: модуль помещается в `test/Main.fl` проекта, затем `flick test`. Тест слушает `127.0.0.1` на свободном порту и не обращается к другим хостам. CI запускает его на обеих целях. Для JS добавьте `@flick-lang/effect-ts` в зависимости проекта (`pnpm add @flick-lang/effect-ts`); Go не требует npm-адаптера.
+
+`get_book` — одна конечная точка: кодек пути, успешный ответ и одна
+объявленная ошибка со статусом 404. Тип API — запись нужных ему обработчиков,
+поэтому `HttpApi.listen` принимает ровно один обработчик на точку.
+`HttpApi.call` использует то же значение как клиент: успех декодируется как
+`Book`, а 404 возвращается как типизированный `NotFound`. Сервер принадлежит
+`scope` и останавливается при его завершении.
+
+[Справочник](../../reference/http-api/).
+
+</TourLesson>

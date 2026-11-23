@@ -1,0 +1,22 @@
+---
+title: Load once, on demand
+description: Load once, on demand
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="lazy">
+
+**Where it runs:** browser and locally.
+
+`lazy { … }` builds a `Lazy r e a` without running its body. The first
+`await` runs it in the forcing fiber. Later awaits reuse the value, typed
+error or defect. A never-awaited lazy does no work. Creating a lazy is a
+runtime call, and awaiting it needs `Async` because another fiber may own the run.
+
+**Try:** replace `lazy` with `task`: the load prints twice.
+
+[Reference](../../reference/effects/#lazy).
+
+</TourLesson>

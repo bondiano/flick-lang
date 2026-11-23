@@ -1,0 +1,16 @@
+module Main exposing (main, label)
+
+label : String -> String
+let label name = "[\{name}]"
+
+load : Ref Int ->{} String
+let load loads =
+  Ref.update loads (fun n -> n + 1)
+  "dev"
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  let loads = Ref.make 0
+  let config = task { load loads }
+  let (a, b) = parallel (task { label (await config) }) (task { label (await config) })
+  Platform.stdout_line "\{a} \{b}, loads: \{show (Ref.get loads)}"

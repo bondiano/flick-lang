@@ -1,0 +1,10 @@
+module Main
+
+suite "lifecycle" timeout 1000 {
+  before_all { Platform.stdout_line "hook: before_all" }
+  before_each { Platform.stdout_line "hook: before_each" }
+  after_each { Platform.stdout_line "hook: after_each" }
+  after_all { Platform.stdout_line "hook: after_all" }
+  test "ordinary" { Platform.stdout_line "hook: body" }
+  test "timeout (intentionally red)" timeout 5 { Effect.never () }
+}

@@ -1,0 +1,11 @@
+export = "count_words"
+argument_types = ["string"]
+return_type = "number"
+output = "2 3"
+starter_error = "FLICK-T003"
+title = "Practice: fix the code, not the test"
+title_ru = "Практика: исправьте код, а не тест"
+task = "The tests expect count_words to give a number, but it gives text, so they do not compile (FLICK-T003). Change count_words so the tests pass as written, then check your answer."
+task_ru = "Тесты ожидают, что count_words вернёт число, но она возвращает текст, поэтому тесты не компилируются (FLICK-T003). Измените count_words так, чтобы тесты прошли без изменений, и проверьте ответ."
+hint = "Give count_words the type String -> Int and drop the show."
+hint_ru = "Дайте count_words тип String -> Int и уберите show."

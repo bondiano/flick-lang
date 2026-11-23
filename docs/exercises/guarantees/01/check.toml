@@ -1,0 +1,11 @@
+export = "port_or_zero"
+argument_types = ["number"]
+return_type = "number"
+output = "8080 0"
+starter_error = "FLICK-T077"
+title = "Practice: prove the port"
+title_ru = "Практика: докажите порт"
+task = "port_or_zero makes a Port with Port.prove, but its guard proves only half of the check, so the compiler reports FLICK-T077. Write the guard that proves the whole check, then check your answer."
+task_ru = "port_or_zero создаёт Port через Port.prove, но условие доказывает только половину проверки, и компилятор сообщает FLICK-T077. Напишите условие, доказывающее всю проверку, и проверьте ответ."
+hint = "The check of Port has two bounds; the condition of the if must state both, joined with &&."
+hint_ru = "У проверки Port две границы; условие if должно указать обе, соединив их через &&."

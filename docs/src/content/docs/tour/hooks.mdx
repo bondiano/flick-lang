@@ -1,0 +1,25 @@
+---
+title: Hook order and timeouts
+description: Hook order and timeouts
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="hooks">
+
+**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+
+Setup runs outer to inner; cleanup runs inner to outer. `before_all` and
+`after_all` belong to the suite; `before_each` and `after_each` surround each
+selected case. Unselected and skipped cases run no hooks. CI checks every
+`hook:` line in order, including cleanup after the timed-out case.
+
+`timeout 5` interrupts this never-ending body after 5 ms. Cleanup still runs;
+the report says `timeout` and exits 1. A suite timeout supplies its cases'
+default and bounds hooks too. `Test.timeout` wraps tests built by hand;
+`flick test --timeout 500ms` supplies a run-wide default, otherwise absent.
+
+[Reference](../../reference/testing/#hooks).
+
+</TourLesson>

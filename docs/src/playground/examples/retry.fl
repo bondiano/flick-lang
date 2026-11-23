@@ -3,13 +3,12 @@ module Main exposing (main)
 
 type error Flaky = Flaky Float
 
-flaky : Ref Float -> Eff {Host.Console} {Flaky} String
-let flaky calls = task {
+flaky : Ref Float ->{Host.Console; Flaky} String
+let flaky calls =
   let n = Ref.get calls + 1
   Ref.set calls n
   Platform.stdout_line "attempt \{n}"
   if n < 3 then Fail.fail (Flaky n) else "done after \{n}"
-}
 
 main : Unit ->{Host.Console, Async} Unit
 let main () =

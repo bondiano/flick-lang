@@ -1,23 +1,33 @@
 module Main exposing (main)
 
+import Resource exposing (Close(..), own)
+
 type error Invalid = Invalid Int
+
+type Tx = Tx String
+
+instance Close Tx =
+  let close _ (Tx name) = Host.raw_stdout_line ("rollback " ++ name)
+  let close_exit _ exit (Tx name) =
+    Host.raw_stdout_line ((if Exit.is_success exit then "commit " else "rollback ") ++ name)
 
 check : Int ->{; Invalid} Int
 let check n = if n < 0 then Fail.fail (Invalid n) else n
 
-open : String -> Eff {Host.Console} none String
-let open name = task {
-  Platform.stdout_line "open \{name}"
-  name
-}
-
-main : Unit ->{Host.Console} Unit
+main : Unit ->{Host.Console, Async} Unit
 let main () =
   let result =
     try
       scope {
+        let _tx = own (Tx "books")
         let file =
-          Resource.acquire_release (open "file") (fun _ -> Platform.stdout_line "close file")
+          Resource.make (task { "file" }) (fun _ exit ->
+            Platform.stdout_line
+              (if Exit.is_success exit then "close: success" else "close: failure")
+          )
+        Scope.defer (fun exit ->
+          Platform.stdout_line (if Exit.is_success exit then "flush: success" else "flush: failure")
+        )
         Platform.stdout_line "reading \{file}"
         check (-3)
       }

@@ -1,0 +1,16 @@
+---
+title: "Practice: fix the code, not the test"
+description: "Practice: fix the code, not the test"
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="green">
+
+The chapter's exercise. The two tests describe what `count_words` should do,
+and they do not compile against it: it gives a `String` where they expect an
+`Int` (`FLICK-T003`). Fix `count_words` and leave the tests as they are.
+The editor runs `main`; locally `flick test` runs the two cases.
+
+</TourLesson>

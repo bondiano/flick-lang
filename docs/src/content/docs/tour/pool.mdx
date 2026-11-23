@@ -1,0 +1,23 @@
+---
+title: A pool of resources
+description: A pool of resources
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="pool">
+
+**Where it runs:** browser and locally.
+
+`Pool.make` acquires items on demand, here at most one, and the pool belongs to
+the enclosing `scope`. `Pool.use` lends an item for one function call. After a
+success or a typed error the item returns to the pool, so the second lease gets
+item 1 again. After a defect, or an interruption, the item may be broken: the
+pool releases it and acquires item 2.
+
+`Effect.exit` turns the defect into a value here, so `main` goes on.
+
+[Reference](../../reference/resources/#pools-transactions-and-servers).
+
+</TourLesson>

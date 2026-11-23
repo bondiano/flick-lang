@@ -1,0 +1,23 @@
+module Main exposing (main)
+
+import Sql exposing (Pg)
+
+sql table Books "books" {
+  id : bigint primary key generated always as BigInt
+  title : text not null as String
+  pages : integer not null as Int
+}
+
+longer_than : Sql.Template Pg { min : Int } { title : String; pages : Int }
+let longer_than = sql p {
+  from b in Books
+  where b.pages > p.min
+  order_by desc b.pages
+  select { title = b.title; pages = b.pages }
+}
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let query = Sql.bind longer_than { min = 300 }
+  Platform.stdout_line (Sql.text query)
+  Platform.stdout_line "parameters: \{show (Sql.parameter_count query)}"

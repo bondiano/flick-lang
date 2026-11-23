@@ -1,0 +1,3 @@
+live: localhost:8080
+fake: shop.test:9000
+bad port: true

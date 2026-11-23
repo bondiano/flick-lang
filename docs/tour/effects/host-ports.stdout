@@ -1,0 +1,2 @@
+live: clock running: true, draw in range: true, draw is 0.25: false
+fake: clock running: false, draw in range: true, draw is 0.25: true

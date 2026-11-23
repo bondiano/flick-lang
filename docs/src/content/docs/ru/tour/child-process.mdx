@@ -1,0 +1,22 @@
+---
+title: Дочерние процессы
+description: Дочерние процессы
+tableOfContents: false
+source_hash: b1de7e61776da891
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="child-process">
+
+**Где запускается:** локально, на JS и Go: модуль помещается в `test/Main.fl` проекта, затем `flick test`. CI запускает его на обеих целях. Для JS добавьте `@flick-lang/effect-ts` в зависимости проекта (`pnpm add @flick-lang/effect-ts`); Go не требует npm-адаптера.
+
+`ChildProcess.make` описывает команду; `ChildProcess.lines` запускает её
+через `Host.Process` и возвращает строки её stdout. Процесс принадлежит
+собственной области и останавливается при её завершении. `Host.Process` —
+такой же сервис, как другие порты хоста, поэтому тест может предоставить
+фейковый вместо запуска программ.
+
+[Справочник](../../reference/stdlib/).
+
+</TourLesson>

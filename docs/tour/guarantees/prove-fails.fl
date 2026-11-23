@@ -1,0 +1,6 @@
+module Main exposing (as_port)
+
+refined type Port = Int where fun n -> n > 0 && n < 65536
+
+as_port : Int -> Option Port
+let as_port n = if n > 0 then Some (Port.prove n) else None

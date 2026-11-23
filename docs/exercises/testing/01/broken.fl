@@ -1,0 +1,14 @@
+module Main exposing (main, count_words)
+
+import Test exposing (expect, to)
+
+count_words : String -> Int
+let count_words text = List.length (String.split "," text)
+
+test "counts two words" { expect (count_words "red green") |> to.equal 2 }
+
+test "counts three words" { expect (count_words "red green blue") |> to.equal 3 }
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line "\{show (count_words "red green")} \{show (count_words "red green blue")}"

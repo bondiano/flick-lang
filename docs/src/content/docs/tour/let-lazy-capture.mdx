@@ -1,0 +1,22 @@
+---
+title: A local lazy cannot be captured
+description: A local lazy cannot be captured
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="let-lazy-capture">
+
+**Where it runs:** checked in the editor, with the expected error.
+
+A closure, and also a `task`, cannot use a `let lazy` from another
+function frame: `FLICK-G005`. The restriction is what allows local laziness
+without a shared cell or `Async`.
+
+**Try:** keep both awaits inside the function, or use `lazy { 42 }` when
+you need a shared value and add `Async` to the awaiting function.
+
+[Reference](../../reference/effects/#lazy).
+
+</TourLesson>

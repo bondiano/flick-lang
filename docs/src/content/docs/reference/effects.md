@@ -8,6 +8,9 @@ Services, layers and the host services are in [services](../services/); types an
 
 ## Stages
 
+Start with the tour's [errors](../../tour/errors/), [suspended parameters](../../tour/tasks/)
+and [laziness](../../tour/lazy/) lessons.
+
 A runtime call runs when the last argument of a runtime arrow is supplied.
 Each arrow of a curried function is a *stage*: `A -> B ->{R; E} C` is a pure
 partial application followed by a runtime call, `A ->{R; E} (B -> C)` runs

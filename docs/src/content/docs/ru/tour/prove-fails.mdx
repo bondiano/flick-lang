@@ -1,0 +1,38 @@
+---
+title: Неизвестное, ложное и NaN
+description: Неизвестное, ложное и NaN
+tableOfContents: false
+source_hash: 436b360e1cf340e9
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="prove-fails">
+
+**Где запускается:** проверяется в редакторе, ожидается ошибка.
+
+Условие доказывает нижнюю границу, но не верхнюю: `FLICK-T077` означает
+неизвестность, а не обязательную ложность. Если нужна проверка при выполнении,
+используйте `Port.parse`. Опровергнутый предикат — `FLICK-T078`:
+
+```flick fail T078
+refined type Positive = Int where fun n -> n > 0
+bad : Positive
+let bad = Positive.prove 0
+```
+
+Для NaN все сравнения порядка ложны. Поэтому условие ниже может быть
+истинным для NaN и не доказывает положительность:
+
+```flick fail T077
+refined type Positive = Float where fun n -> n > 0
+positive : Float -> Option Positive
+let positive n = if not (n <= 0) then Some (Positive.prove n) else None
+```
+
+**Гарантия:** компилятор отклоняет недоказанный или опровергнутый `T.prove`,
+не предполагая молча, что Float отличается от NaN.
+
+[Справочник](../../reference/schema/#доказательство-уточнения).
+
+</TourLesson>

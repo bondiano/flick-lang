@@ -1,0 +1,23 @@
+---
+title: A test for every row
+description: A test for every row
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="each">
+
+**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+
+The tuple pattern binds one row's input and expected result. `{0}` in the
+name is replaced with the first tuple field as `show` writes it, including
+quotes around strings. Without placeholders names get `[0]`, `[1]`, ….
+`--list` and `--filter` see the expanded names.
+
+Rows are pure and built once. Every case has its own scope and fixtures;
+effectful data belongs in a fixture or hook, not in the table initializer.
+
+[Reference](../../reference/testing/#a-case-for-each-row).
+
+</TourLesson>

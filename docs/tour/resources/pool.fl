@@ -1,0 +1,23 @@
+module Main exposing (main)
+
+say : String ->{} Unit
+let say line = Host.raw_stdout_line line
+
+main : Unit ->{Async; AppError} Unit
+let main () = scope {
+  let count = Ref.make 0
+  let pool =
+    Pool.make {
+      acquire = task {
+        Ref.set count (Ref.get count + 1)
+        Ref.get count
+      }
+      size = 1
+      concurrency = None
+      targetUtilization = None
+    }
+  say ("first lease: item " ++ show (Pool.use (fun item -> item) pool))
+  say ("second lease: item " ++ show (Pool.use (fun item -> item) pool))
+  ignore (Effect.exit (task { Pool.use (fun _ -> Effect.die "broken") pool }))
+  say ("after a defect: item " ++ show (Pool.use (fun item -> item) pool))
+}

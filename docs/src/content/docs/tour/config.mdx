@@ -1,0 +1,22 @@
+---
+title: Configuration from the environment
+description: Configuration from the environment
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="config">
+
+**Where it runs:** browser and locally.
+
+A `Config.Config` describes values to read and their defaults; it reads
+nothing yet. `Config.get` reads it through `Host.Environment` unless a
+`ConfigProvider` is provided. `describe` runs three times: with the live
+environment, which has neither variable, so the defaults apply; with a fake
+environment; and with a port out of range, which is a `ConfigError`.
+Variables are prefixed with `SHOP_` so a real `PORT` cannot change the output.
+
+[Reference](../../reference/services/).
+
+</TourLesson>

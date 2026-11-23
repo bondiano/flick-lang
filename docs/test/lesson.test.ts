@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { loadExercise } from "../exercises/load.ts";
 import { evaluateExercise, type ExerciseOperations } from "../src/playground/exercise.ts";
 import { errorCodes } from "./helpers/verify-example.ts";
+import { verifyLocalLesson } from "./helpers/verify-local-lesson.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.join(here, "../..");
@@ -44,6 +45,23 @@ for (const id of exerciseIds) {
       const result = await evaluateExercise(exercise.check, nativeOperations(dir, exercise.starter_error));
       assert.equal(result, name === "starter" ? "fix-errors" : name === "broken" ? "output" : "passed");
     }
+  });
+}
+
+for (const name of ["solution", "broken"]) {
+  test(`testing/01: flick test checks the ${name}'s unchanged cases`, () => {
+    verifyLocalLesson({
+      id: `testing-green-${name}`,
+      chapter: { id: "testing", en: "Testing", ru: "Тестирование" },
+      expect: "local",
+      file: path.join(repo, "docs/exercises/testing/01", `${name}.fl`),
+      local: {
+        command: "test",
+        exit: name === "solution" ? 0 : 1,
+        contains: name === "solution" ? ["2 passed", "0 failed"] : ["0 passed", "2 failed"],
+        flags: ["--forbid-only"],
+      },
+    });
   });
 }
 

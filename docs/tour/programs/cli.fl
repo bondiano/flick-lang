@@ -1,0 +1,34 @@
+module Main
+
+import Cli
+import Test exposing (expect, to)
+
+greet : Cli.Command {Host.Console} none
+let greet = cli "greet" {
+  description "Prints a greeting"
+  /// Print in capitals
+  flag loud : Bool
+  /// Who to greet
+  arg name : String
+  handle fun { loud; name } ->
+    let text = "Hello, \{name}"
+    Platform.stdout_line (if loud then String.to_upper text else text)
+}
+
+shop : Cli.Command {Host.Console} none
+let shop = cli "shop" {
+  description "Reading-list tools"
+  subcommand greet
+}
+
+test "runs a subcommand" { Cli.run shop ["greet", "--loud", "Ada"] }
+
+test "rejects an unknown flag" {
+  let refused =
+    try
+      Cli.run shop ["greet", "--nope"]
+      false
+    with
+    | Cli.CliError _ -> true
+  expect refused |> to.be_true
+}

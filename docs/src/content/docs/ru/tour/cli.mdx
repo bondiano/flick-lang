@@ -1,0 +1,33 @@
+---
+title: Командная строка
+description: Командная строка
+tableOfContents: false
+source_hash: dde57f518a1cab93
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="cli">
+
+**Где запускается:** локально, на JS и Go: модуль помещается в `test/Main.fl` проекта, затем `flick test`. CI запускает его на обеих целях. Для JS добавьте `@flick-lang/effect-ts` в зависимости проекта (`pnpm add @flick-lang/effect-ts`); Go не требует npm-адаптера.
+
+Блок `cli` описывает флаги, аргументы и обработчик; его построение ничего
+не запускает. `shop` объединяет подкоманду `greet`. `Cli.run shop args` разбирает аргументы и только затем
+вызывает обработчик. Некорректный ввод, например неизвестный флаг, печатает
+справку и завершается `Cli.CliError`, обработчик не запускается. Тесты
+вызывают `Cli.run` с фиксированными аргументами; программа передаёт свои:
+
+```flick
+# import App.Greet exposing (greet)
+#
+main : Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError} Unit
+let main () =
+  try Cli.run greet (Platform.args ()) with
+  | Cli.CliError message -> App.fail message
+```
+
+`App.fail` даёт код выхода 1; `--help` и `--version` печатают и завершаются с 0.
+
+[Справочник](../../reference/cli-dsl/).
+
+</TourLesson>

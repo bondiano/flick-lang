@@ -8,17 +8,23 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 <TourLesson locale="en" id="errors">
 
-A failure the caller should handle is a typed error.
-`type error NotFound = NotFound String` declares one, and
-`find : String ->{; NotFound} Float` says, after the `;`, that `find` may fail
-with it.
+`type error` declares an expected failure. `find` names both possibilities
+after `;`. `try` catches the failure (postfix `expr catch | NotFound _ -> …`
+also works when handling typed errors alone); its arm receives a value of
+`Errors {NotFound, Unavailable}`. A pure `match` then takes that value apart.
+The `match` itself catches nothing and removes no error from a function's row.
 
-`Fail.fail (NotFound name)` fails with that error. `try … with` (or postfix
-`expr catch | NotFound _ -> …` when handling typed errors alone) handles the
-failure, with an arm for each error. Once handled, the error leaves the
-signature: `main` has no `NotFound` in its own.
+`to_http` returns one error where a row containing it is expected.
+`Exit.map_error` uses that function to translate an outcome.
+See [error values](../../reference/effects/#expected-errors).
 
-**Try:** remove `; NotFound` from the signature of `find`. The compiler
-reports `FLICK-E002`: the body needs an error the signature does not allow.
+```flick fail T009
+type error NotFound = NotFound String
+type error Unavailable = Unavailable
+problem : Errors {NotFound, Unavailable} -> String
+let problem err = match err with | NotFound name -> name
+```
+
+**Try:** add the missing `Unavailable` arm.
 
 </TourLesson>

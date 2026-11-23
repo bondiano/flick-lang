@@ -1,13 +1,19 @@
 module Main exposing (main)
 
+count : Ref Int ->{} Int
+let count runs =
+  Ref.set runs (Ref.get runs + 1)
+  Ref.get runs
+
+twice : ~(Eff r e Int)^c ->{r; e} Int
+let twice job = await job + await job
+
 main : Unit ->{Host.Console} Unit
 let main () =
   let runs = Ref.make 0
-  let counted : Eff none none Int = task {
-    Ref.set runs (Ref.get runs + 1)
-    Ref.get runs
-  }
+  let counted : Eff none none Int = task { count runs }
   Platform.stdout_line "before: \{Ref.get runs}"
   let first = await counted
   let second = await counted
   Platform.stdout_line "first \{first}, second \{second}"
+  Platform.stdout_line "twice: \{twice (count runs)}"
