@@ -25,3 +25,6 @@ serde_json = { workspace = true }
 [dependencies]
 flick-ir = { path = "../flick-ir" }
 serde_json = { workspace = true }
+
+[dev-dependencies]
+proptest = { version = "1.12.0", default-features = false, features = ["std"] }

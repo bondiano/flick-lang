@@ -8,6 +8,9 @@ dependency boundary.
 
 - `src/decision.rs` — the `match` decision graph that `decide.rs` in both
   emitters walks.
+- `src/layout/` — deterministic data layout computation (`LayoutEngine`,
+  `PrimitiveTable`, niches, field packing, and finite two-phase recursion
+  indirection) for layout-aware backends.
 - `src/opt/` — the portable release passes. `flick-core/src/opt/` is their
   compiler adapter and holds most of their tests and snapshots.
 - `build.rs` — generates the binding tables from

@@ -680,3 +680,73 @@ operands, binders, calls and results). Backends and transforms may still use an
 erased representation where optional annotations are omitted (`None` or empty
 lists) and the erased path stays valid. The official `flick/js` and `flick/go`
 backends ignore the new compound type fields beyond bare type-constructor names.
+
+## Shared data layouts
+
+Layout-aware backends (C, WebAssembly in linear memory, LLVM) share one
+deterministic layout computation in `flick-backend-support/src/layout/`
+(`LayoutEngine` and `compute_layout`), alongside the shared `match` decision
+graph in `flick-backend-support/src/decision.rs`. Layouts are internal to
+backends and stay out of the value-ABI tables; the Go backend reads field types
+without using byte sizes.
+
+### Primitive table
+
+A backend supplies a `PrimitiveTable` giving each primitive or handle's
+`PrimitiveLayout { size, align, niche }`, where `align` is a non-zero power of
+two, `size` is a multiple of `align`, and an optional `Niche { offset, width,
+start, end }` names a contiguous range of unused unsigned integer bit patterns
+(`width` in `{1, 2, 4, 8}` bytes) that valid values of the primitive never
+hold:
+
+| Entry | Role in layout computation | `target_32()` preset | `target_64()` preset |
+| - | - | - | - |
+| `unit` | `Unit` | size `0`, align `1`, no niche | size `0`, align `1`, no niche |
+| `bool` | `Bool` (valid `0` or `1`) | size `1`, align `1`, niche `2..=255` | size `1`, align `1`, niche `2..=255` |
+| `int`, `float` | 32-bit signed `Int`, IEEE binary64 `Float` | `4/4`, `8/8`, no niche | `4/4`, `8/8`, no niche |
+| `int8`, `int16`, `int64`, `uint8`, `uint16`, `uint32`, `uint64`, `float32` | fixed-width numeric types | natural width/align, no niche | natural width/align, no niche |
+| `pointer` | non-null pointer (`List`, opaque nominal handles, indirected recursive fields, erased existentials, GADT dictionaries) | size `4`, align `4`, null niche `0..=0` | size `8`, align `8`, null niche `0..=0` |
+| `closure` | function values (`IrType::Fun`, higher-rank `Forall`) | size `8`, align `4`, null niche `0..=0` at offset `0` | size `16`, align `8`, null niche `0..=0` at offset `0` |
+| `string`, `bigint`, `bytes` | runtime handles of `String`, `BigInt` and `Bytes` | size `4`, align `4`, null niche `0..=0` | size `8`, align `8`, null niche `0..=0` |
+
+### Layout rules
+
+Given a `Program` (its `Module.types` declarations and `Program.lang` table), a
+validated `PrimitiveTable`, and a monomorphic `TypeRef`, `LayoutEngine::layout`
+computes a `TypeLayout` containing `size`, `align`, remaining `niche`, and
+`repr`:
+
+- **Single-constructor types and `unboxed type`:** a data or error type with
+  one active constructor has `Discriminant::None`. An `unboxed type` has the
+  exact size, alignment and niche of its single field.
+- **Multi-constructor types, `untagged type` and literal enums:** `untagged
+  type` (`Rep::Typeof`) and literal enums (`Rep::Literal`) are JS forms;
+  layout-aware backends give their constructors discriminants so constructors
+  remain distinguishable. Payload-free constructors carry no fields and are
+  encoded as discriminant values only (`Ordering` is 1 byte with tags `0`, `1`,
+  `2` and remaining niche `3..=255`).
+- **Niche encoding:** when a multi-constructor type has one constructor with
+  non-zero payload size and that payload exposes a `Niche` with enough free bit
+  patterns for all remaining (zero-payload) constructors, the discriminant is
+  `Discriminant::Niche`: for example, `Option (List Int)` uses the null niche
+  of the `List` pointer (`None = 0`, `Some = non-null pointer`, size `4` on
+  32-bit and `8` on 64-bit), and `Option Bool` uses `2` in the `Bool` byte with
+  remaining niche `3..=255`. Otherwise the type uses an explicit minimal-width
+  unsigned tag (`1`, `2`, `4` or `8` bytes) at offset `0`, exposing unused tag
+  values above the constructor count as a niche for enclosing enums.
+- **Records and tuples:** closed records return fields in canonical
+  `Record.labels` UTF-16 order and tuples return items in positional order.
+  Physical byte offsets are packed deterministically by descending alignment,
+  descending size, and canonical index (filling earlier alignment gaps) to
+  reduce padding, since field order in memory is not observable.
+- **Finite indirection analysis:** pointer indirection is decided before
+  recursively expanding layouts. First, a finite declaration-level pass finds
+  strongly connected components of type declarations and marks fields with
+  growing recursive instantiations (such as `Nest (Nested (List a))` in
+  `type Nested a = Flat a | Nest (Nested (List a))`) as `FieldStorage::Pointer`,
+  leaving non-growing fields like `Flat a` by value. Second, Tarjan's strongly
+  connected components over the remaining finite graph of instantiated by-value
+  nominal types mark cycle-forming constructor fields (including mutual
+  recursion across modules) as `FieldStorage::Pointer`. Every recursive type
+  gets a finite size, non-recursive types get no unnecessary pointers, and the
+  result is deterministic across module and query order.
