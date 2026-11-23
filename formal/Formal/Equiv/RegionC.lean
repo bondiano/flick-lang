@@ -81,7 +81,7 @@ theorem finRun_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ
     (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg (.rt hE (.finRun hg hl hw hk hfs)) ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨e₂, rfl, h₁⟩ := hs.inv_inside
-  obtain ⟨W₁, μ₁, w₂, r₁, hw₂, s₁⟩ := h₁.fcu rfl hw μ₂'
+  obtain ⟨W₁, μ₁, w₂, r₁, hw₂, s₁⟩ := h₁.fcu rfl hw μ₂' (hj.st _ hst)
     (fun _ => ⟨closed_frame_inner (F := .inside p) (plug_closed hcl₁),
       closed_frame_inner (F := .inside p) (plug_closed (hcl₂ _ _ hj.ksteps))⟩)
   have hrg' := hrg.keep (hj.le.trans r₁.le) keepO_refl
@@ -108,7 +108,7 @@ theorem close_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ 
     (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg (.rt hE (.close hg hl hw hk hfs)) ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨e₂, rfl, h₁⟩ := hs.inv_inside
-  obtain ⟨W₁, μ₁, w₂, r₁, hw₂, s₁⟩ := h₁.fcu rfl hw μ₂'
+  obtain ⟨W₁, μ₁, w₂, r₁, hw₂, s₁⟩ := h₁.fcu rfl hw μ₂' (hj.st _ hst)
     (fun _ => ⟨closed_frame_inner (F := .inside p) (plug_closed hcl₁),
       closed_frame_inner (F := .inside p) (plug_closed (hcl₂ _ _ hj.ksteps))⟩)
   have hrg' := hrg.keep (hj.le.trans r₁.le) keepO_refl

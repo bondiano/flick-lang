@@ -76,13 +76,11 @@ theorem _root_.Flick.Typ.let_lazy_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) 
     exact ⟨_, _, rfl, hφ⟩
   | _ => intro _ _ he; cases he
 
-theorem _root_.Flick.Typ.force_lazy_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
-    ∀ {a}, e = .force (.lazy a) → RtJ J := by
+theorem _root_.Flick.Typ.force_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    ∀ {a}, e = .force a → RtJ J := by
   induction h with
-  | force h₁ _ _ _ =>
-    intro _ he; cases he
-    obtain ⟨_, _, he', hφ⟩ := h₁.lazy_stage rfl
-    cases he'; exact ⟨_, _, rfl, hφ⟩
+  | force _ hφ _ _ =>
+    intro _ _; exact ⟨_, _, rfl, Stage.none_le (Stage.use_rt_le_ne_pure hφ)⟩
   | allI hv => intro _ he; subst he; cases hv
   | errVal _ _ _ ih =>
     intro _ he
@@ -96,13 +94,38 @@ theorem _root_.Flick.Typ.force_lazy_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J
     exact ⟨_, _, rfl, hφ⟩
   | _ => intro _ he; cases he
 
+theorem _root_.Flick.Typ.let_force_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    ∀ {a b}, e = .let_ (.force a) b → RtJ J := by
+  induction h with
+  | let_ h₁ _ _ _ =>
+    intro _ _ he; cases he
+    obtain ⟨_, _, he', hφ⟩ := h₁.force_stage rfl
+    cases he'; exact ⟨_, _, rfl, hφ⟩
+  | letGen h₁ _ _ _ =>
+    intro _ _ he; cases he
+    obtain ⟨_, _, he', hφ⟩ := h₁.force_stage rfl
+    cases he'; exact (rt_not_pure hφ).elim
+  | allI hv => intro _ _ he; subst he; cases hv
+  | errVal _ _ _ ih =>
+    intro _ _ he
+    obtain ⟨_, _, he', hφ⟩ := ih he
+    cases he'
+    exact ⟨_, _, rfl, hφ⟩
+  | conv _ _ ih =>
+    intro _ _ he
+    obtain ⟨_, _, he', hφ⟩ := ih he
+    cases he'
+    exact ⟨_, _, rfl, hφ⟩
+  | _ => intro _ _ he; cases he
+
 /-- **A term that makes or forces a lazy cell has the stage `rt` at least.** -/
 theorem _root_.Flick.Typ.lzShape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) (hs : e.LzShape) :
     ¬ PureJ J := by
   match e, hs with
   | .lazy _, _ => exact (h.lazy_stage rfl).not_pure
   | .let_ (.lazy _) _, _ => exact (h.let_lazy_stage rfl).not_pure
-  | .force (.lazy _), _ => exact (h.force_lazy_stage rfl).not_pure
+  | .force _, _ => exact (h.force_stage rfl).not_pure
+  | .let_ (.force _) _, _ => exact (h.let_force_stage rfl).not_pure
 
 theorem noLzTop_aux {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     Typ S Ψ Θ Γ e J → ∀ {x : Pos}, (x = .top → PureJ J) → ¬ e.LzTop x := by

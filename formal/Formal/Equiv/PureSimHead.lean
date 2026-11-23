@@ -26,7 +26,7 @@ theorem PureEval.not_let_force_loc {root : Roots} {l : Nat} {b : Tm}
 
 /-- A pure value related to a pure term is related to a value at `top` without any catch-up. -/
 theorem pure_val {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) (ha : Value a)
-    (hpa : PureEval W.R a) (hpb : PureEval W.R b) : Value b ∧ Sim W .top a b := by
+    (hB : W.B) (hpa : PureEval W.R a) (hpb : PureEval W.R b) : Value b ∧ Sim W .top a b := by
   induction h with
   | @app _ f f' a₀ a₀' _ h₁ h₂ ih₁ ih₂ =>
     subst hx
@@ -55,6 +55,9 @@ theorem pure_val {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) (ha : Va
   | jR => exact hpb.not_settle.elim
   | dropA | dropB | forceA | jL | bornA | bornB | bornV | dead
   | o4B | o4Alloc1 | o4Bind | o4Settle => cases ha
+  | doneF hnB | doneR hnB | againF1 hnB | againF2 _ hnB | againF3 hnB
+  | againR1 hnB | againR2 _ hnB | againR3 hnB | letRaise hnB | letUnw hnB | letTodo hnB =>
+    exact (hnB hB).elim
   | bornS _ _ _ hs => rcases hs with rfl | rfl | rfl | rfl | rfl <;> cases ha
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | hloc hB hH => exact ⟨.loc, .hloc hB hH⟩
@@ -69,7 +72,7 @@ theorem pure_val {x : Pos} {a b : Tm} (h : Sim W x a b) (hx : x = .any) (ha : Va
 
 /-- A pure head step of pure terms related at `top` is matched by the same pure head step in the
 same world `W`. -/
-theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
+theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂) (hB : W.B)
     (hpa : PureEval W.R r) (hpb : PureEval W.R r₂) :
     ∃ r₂', PHead r₂ r₂' ∧ Sim W .any r' r₂' := by
   cases hh with
@@ -94,7 +97,7 @@ theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
       exact hp'.not_let_lazy.elim
   | @let_ v b hv =>
     obtain ⟨e', b', rfl, h₁, h₂⟩ := h.inv_let
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .let_ b) trivial) (hpb.of_frame (F := .let_ b') trivial)
     exact ⟨_, .let_ hv', h₂.subst _ _ (SubR.inst (.cons (s₁.sub hv hv') .nil))⟩
   | @letrec f b =>
@@ -103,22 +106,22 @@ theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
       h₂.subst _ _ (SubR.inst (.cons (Sim.sub (Sim.fix (x := .any) h₁ hn) .fix .fix) .nil))⟩
   | @proj v l w hv hf =>
     obtain ⟨e', rfl, h₁⟩ := h.inv_proj
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .proj l) trivial) (hpb.of_frame (F := .proj l) trivial)
     obtain ⟨w', hw', hw⟩ := (s₁.field rfl l).some_left hf
     exact ⟨_, .proj hv' hw', hw.lower⟩
   | @update v w l v₁ hv hw hs =>
     obtain ⟨e', a', rfl, h₁, h₂⟩ := h.inv_update
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .updL l w) trivial) (hpb.of_frame (F := .updL l a') trivial)
-    have ⟨hw', s₂⟩ := pure_val h₂ rfl hw
+    have ⟨hw', s₂⟩ := pure_val h₂ rfl hw hB
       (hpa.of_frame (F := .updR v l) hv) (hpb.of_frame (F := .updR e' l) hv')
     obtain ⟨v₂, hs', hvv⟩ := (Sim.setField s₁ s₂ l).some_left hs
     exact ⟨_, .update hv' hw' hs', hvv.lower⟩
   | @matchYes v p δ b rest hv hm =>
     obtain ⟨e', al', rfl, h₁, h₂⟩ := h.inv_match
     obtain ⟨b', r', rfl, hb, hr⟩ := h₂.inv_acons
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .match_ (.acons p b rest)) trivial)
       (hpb.of_frame (F := .match_ (.acons p b' r')) trivial)
     obtain ⟨δ₂, hm', hδ⟩ := s₁.matchP_sub hv' hm
@@ -131,14 +134,14 @@ theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
   | @matchNo v p b rest hv hm =>
     obtain ⟨e', al', rfl, h₁, h₂⟩ := h.inv_match
     obtain ⟨b', r', rfl, hb, hr⟩ := h₂.inv_acons
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .match_ (.acons p b rest)) trivial)
       (hpb.of_frame (F := .match_ (.acons p b' r')) trivial)
     exact ⟨_, .matchNo hv' ((s₁.matchP (p := p)).none_left hm), .match_ s₁.lower hr⟩
   | @guardYes v p δ g b rest hv hm =>
     obtain ⟨e', al', rfl, h₁, h₂⟩ := h.inv_match
     obtain ⟨g', b', r', rfl, hg, hb, hr⟩ := h₂.inv_aguard
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .match_ (.aguard p g b rest)) trivial)
       (hpb.of_frame (F := .match_ (.aguard p g' b' r')) trivial)
     obtain ⟨δ₂, hm', hδ⟩ := s₁.matchP_sub hv' hm
@@ -149,13 +152,13 @@ theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
   | @guardNo v p g b rest hv hm =>
     obtain ⟨e', al', rfl, h₁, h₂⟩ := h.inv_match
     obtain ⟨g', b', r', rfl, hg, hb, hr⟩ := h₂.inv_aguard
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .match_ (.aguard p g b rest)) trivial)
       (hpb.of_frame (F := .match_ (.aguard p g' b' r')) trivial)
     exact ⟨_, .guardNo hv' ((s₁.matchP (p := p)).none_left hm), .match_ s₁.lower hr⟩
   | @tryVal v A hv =>
     obtain ⟨e', al', rfl, h₁, h₂⟩ := h.inv_try
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .try_ A) trivial) (hpb.of_frame (F := .try_ al') trivial)
     exact ⟨_, .tryVal hv', s₁.lower⟩
   | @intEq a b =>
@@ -165,7 +168,7 @@ theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
     exact ⟨_, .intEq, .lit⟩
   | @hwithVal v p ℓ E rf al hv =>
     obtain ⟨ℓ', k, al', r', e', rfl, hl, hal, hr, h₁⟩ := h.inv_hwith
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .hwith p ℓ E al rf) trivial)
       (hpb.of_frame (F := .hwith p ℓ' E al' r') trivial)
     exact ⟨_, .hwithVal hv', .app (by decide) hr s₁.lower⟩
@@ -173,7 +176,7 @@ theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
     obtain ⟨ℓ', kd, κ', al', r', a', k', rfl, hl, hkap, hal, hr, h₁, hc⟩ := h.inv_hctl
     subst hk
     obtain ⟨Ei₂, rfl, hfr, hEi₂⟩ := hc.plug_hole hEi
-    have ⟨hw', s₁⟩ := pure_val h₁ rfl hw
+    have ⟨hw', s₁⟩ := pure_val h₁ rfl hw hB
       (hpa.of_frame (F := .hctlA p ℓ κ true E al rf (plug Ei (.hole p))) trivial)
       (hpb.of_frame (F := .hctlA p ℓ' κ' true E al' r' (plug Ei₂ (.hole p))) trivial)
     exact ⟨_, .hctlTail hEi₂ rfl hw', .hwith hl hal hr (hfr.plugs s₁.lower)⟩
@@ -181,7 +184,7 @@ theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
     obtain ⟨ℓ', kd, κ', al', r', a', k', rfl, hl, hkap, hal, hr, h₁, hc⟩ := h.inv_hctl
     subst hk
     obtain ⟨Ei₂, rfl, hfr, hEi₂⟩ := hc.plug_hole hEi
-    have ⟨hw', s₁⟩ := pure_val h₁ rfl hw
+    have ⟨hw', s₁⟩ := pure_val h₁ rfl hw hB
       (hpa.of_frame (F := .hctlA p ℓ κ false E al rf (plug Ei (.hole p))) trivial)
       (hpb.of_frame (F := .hctlA p ℓ' κ' false E al' r' (plug Ei₂ (.hole p))) trivial)
     exact ⟨_, .hctlDisc hEi₂ rfl hw', .hwith hl hal hr (hfr.plugs (.unw hl s₁.lower))⟩
@@ -189,18 +192,18 @@ theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
     obtain ⟨ℓ', kd, a', b', rfl, hl, hc, h₁⟩ := h.inv_hres
     subst ha
     obtain ⟨A₂, rfl, hfr, hA₂⟩ := hc.plug_hole hA
-    have ⟨hw', s₁⟩ := pure_val h₁ rfl hw
+    have ⟨hw', s₁⟩ := pure_val h₁ rfl hw hB
       (hpa.of_frame (F := .hresB p ℓ (plug A (.hole p))) trivial)
       (hpb.of_frame (F := .hresB p ℓ' (plug A₂ (.hole p))) trivial)
     exact ⟨_, .hresVal hA₂ rfl hw', .hdone (hfr.plugs s₁.lower)⟩
   | @hdoneVal v p hv =>
     obtain ⟨a', rfl, h₁⟩ := h.inv_hdone
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .hdone p) trivial) (hpb.of_frame (F := .hdone p) trivial)
     exact ⟨_, .hdoneVal hv', s₁.lower⟩
   | @hkeepVal v q ℓ E al hv =>
     obtain ⟨ℓ', k, al', e', rfl, hl, hal, h₁⟩ := h.inv_hkeep
-    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv
+    have ⟨hv', s₁⟩ := pure_val h₁ rfl hv hB
       (hpa.of_frame (F := .hkeep q ℓ E al) trivial)
       (hpb.of_frame (F := .hkeep q ℓ' E al') trivial)
     exact ⟨_, .hkeepVal hv', s₁.lower⟩
@@ -208,7 +211,7 @@ theorem pure_phead {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
     obtain ⟨ℓ', kd, al', a', k', rfl, hl, hal, h₁, hc⟩ := h.inv_hkarm
     subst hk
     obtain ⟨Ei₂, rfl, hfr, hEi₂⟩ := hc.plug_hole hEi
-    have ⟨hw', s₁⟩ := pure_val h₁ rfl hw
+    have ⟨hw', s₁⟩ := pure_val h₁ rfl hw hB
       (hpa.of_frame (F := .hkarmA q ℓ E al (plug Ei (.hole q))) trivial)
       (hpb.of_frame (F := .hkarmA q ℓ' E al' (plug Ei₂ (.hole q))) trivial)
     exact ⟨_, .hkarmVal hEi₂ rfl hw', .hkeep hl hal (hfr.plugs s₁.lower)⟩

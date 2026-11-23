@@ -32,25 +32,27 @@ def HAns (W : World) (μ₂ : List Tm) (r₂ : Tm) (μ μ' : List Tm) (r' : Tm) 
     Sim W' .any r' r₂' ∧ StR W' μ' μ₂' ∧ ∀ n, W.J₁ n → μ'[n]? = μ[n]?
 
 theorem rcu_frame {x : Pos} {a b v : Tm} (h : Sim W x a b) (hx : x = .any) (ha : a = .raise v)
-    (hv : Value v) (μ : List Tm) {F : Frame} (hF : F.ok) (hcl : W.B → a.Closed ∧ b.Closed) :
+    (hv : Value v) {μ₁ : List Tm} (μ : List Tm) (hst : StR W μ₁ μ) {F : Frame} (hF : F.ok)
+    (hcl : W.B → a.Closed ∧ b.Closed) :
     ∃ W' μ' v', RJ W μ (F.plug b) W' μ' (F.plug (.raise v')) ∧ Value v' ∧ Sim W' .any v v' := by
-  obtain ⟨W', μ', v', r, hv', s⟩ := h.rcu hx ha hv W μ (World.le.refl _) hcl
+  obtain ⟨W', μ', v', r, hv', s⟩ := h.rcu hx ha hv W μ (World.le.refl _) hst hcl
   exact ⟨W', μ', v', r.frame hF, hv', s⟩
 
 theorem ucu_frame {x : Pos} {a b : Tm} {p ℓ : Nat} {c : Tm} (h : Sim W x a b) (hx : x = .any)
-    (ha : a = .unw p ℓ c) (μ : List Tm) {F : Frame} (hF : F.ok) (hcl : W.B → a.Closed ∧ b.Closed) :
+    (ha : a = .unw p ℓ c) {μ₁ : List Tm} (μ : List Tm) (hst : StR W μ₁ μ) {F : Frame} (hF : F.ok)
+    (hcl : W.B → a.Closed ∧ b.Closed) :
     ∃ W' μ' ℓ' k c', RJ W μ (F.plug b) W' μ' (F.plug (.unw p ℓ' c')) ∧ W'.L ℓ ℓ' k ∧
       Sim W' .any c c' := by
-  obtain ⟨W', μ', ℓ', k, c', r, hl, s⟩ := h.ucu hx ha W μ (World.le.refl _) hcl
+  obtain ⟨W', μ', ℓ', k, c', r, hl, s⟩ := h.ucu hx ha W μ (World.le.refl _) hst hcl
   exact ⟨W', μ', ℓ', k, c', r.frame hF, hl, s⟩
 
 /-- The location under a force, after the right side catches up. -/
-theorem force_loc {l : Nat} {e₂ : Tm} (h : Sim W .any (.loc l) e₂) (μ : List Tm)
-    (hcl : W.B → e₂.Closed) :
+theorem force_loc {l : Nat} {e₂ : Tm} (h : Sim W .any (.loc l) e₂)
+    {μ₁ : List Tm} (μ : List Tm) (hst : StR W μ₁ μ) (hcl : W.B → e₂.Closed) :
     ∃ W' μ' l', RJ W μ (.force e₂) W' μ' (.force (.loc l')) ∧
       ((∃ k, W'.L l l' k) ∨ (W'.B ∧ W'.H l l')) := by
   obtain ⟨W', μ', v', r, hv', s⟩ :=
-    h.vcu rfl .loc W μ (World.le.refl _) (fun hB => ⟨fun _ hi => hi, hcl hB⟩)
+    h.vcu rfl .loc W μ (World.le.refl _) hst (fun hB => ⟨fun _ hi => hi, hcl hB⟩)
   obtain ⟨l', rfl, hl⟩ := (s.value_any .loc hv' .top).inv_loc
   exact ⟨W', μ', l', r.frame (F := .force) trivial, hl⟩
 
@@ -65,7 +67,7 @@ theorem force_sim {Λ : List Rgn} {μ μ' μ₂ : List Tm} {l : Nat} {r' e₂ : 
     (hh : RHead Λ μ (.force (.loc l)) Λ μ' r') (h : Sim W .any (.loc l) e₂) (hst : StR W μ μ₂)
     (hglob : ∀ g v, W.R.glob g = some v → v.Src) (hcl : W.B → e₂.Closed) :
     HAns W μ₂ (.force e₂) μ μ' r' := by
-  obtain ⟨W₁, μ₁, l', r₁, hloc⟩ := force_loc h μ₂ hcl
+  obtain ⟨W₁, μ₁, l', r₁, hloc⟩ := force_loc h μ₂ hst hcl
   have hst₁ := r₁.st _ hst
   rcases hloc with ⟨k, hlk⟩ | ⟨hB, hH⟩
   · have hnj : ∀ n, W.J₁ n → n ≠ l := fun n hn e => hst₁.not_j₁ hlk (e ▸ r₁.le.J₁ _ hn)
@@ -78,8 +80,11 @@ theorem force_sim {Λ : List Rgn} {μ μ' μ₂ : List Tm} {l : Nat} {r' e₂ : 
       | forcePending hc₀ =>
         rw [hc₀] at hc; cases hc
         obtain ⟨e', rfl, he'⟩ := hcr.inv_lazy
-        exact ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .forcePending hc'), World.le.refl _,
-          .settle hlk he', hst₁.set hlk (.force he'), fun n hn => getElem?_set_of_ne (hnj n hn)⟩
+        refine ⟨W₁, μ₁, _, W₁, _, _, r₁, HSeqP.one (fun _ => .forcePending hc'), World.le.refl _,
+          .settle hlk he', hst₁.set hlk (.force he') ?_, fun n hn => getElem?_set_of_ne (hnj n hn)⟩
+        intro l₀ v₀ v₀' hd
+        have ⟨_, _, _, _, _, _, hdone, _, _⟩ := hst₁.done l l₀ v₀ v₀' hd
+        rw [hdone] at hc₀; cases hc₀
       | forceDone hc₀ =>
         rw [hc₀] at hc; cases hc
         obtain ⟨o', rfl, ho'⟩ := hcr.inv_await
@@ -94,6 +99,9 @@ theorem force_sim {Λ : List Rgn} {μ μ' μ₂ : List Tm} {l : Nat} {r' e₂ : 
         · intro o ho; obtain ⟨o₀, ho₀⟩ := hsh.2.2.2 ⟨o, ho⟩; exact hnd o₀ ho₀
     | born v v' =>
       obtain ⟨hv, hv', hcl, hcl', hn', hvv, hs, hB⟩ := hcr
+      have hnd : ∀ l₀ v₀ v₀', ¬ W₁.D l l₀ v₀ v₀' := fun l₀ v₀ v₀' hd => by
+        obtain ⟨hl₀, -⟩ := hst₁.done l l₀ v₀ v₀' hd
+        cases hst₁.kd _ _ _ _ _ hlk hl₀
       have hinv : ∀ {c c' : Tm}, ((c = .lazy v ∨ c = .running v ∨ c = .done v) ∧
           (c' = .lazy v' ∨ c' = .done v')) → CellR W₁ (.born v v') c c' :=
         fun hcs => ⟨hv, hv', hcl, hcl', hn', hvv, .inl hcs, hB⟩
@@ -112,7 +120,7 @@ theorem force_sim {Λ : List Rgn} {μ μ' μ₂ : List Tm} {l : Nat} {r' e₂ : 
         · cases hl₁
           obtain ⟨μ₂', hq, rfl⟩ := reach hr₁
           exact ⟨W₁, μ₁, _, W₁, _, _, r₁, hq, World.le.refl _, .bornV hB hlk hcl hcl' hn',
-            hst₁.set hlk (hinv ⟨.inr (.inl rfl), .inr rfl⟩), fun n hn => getElem?_set_of_ne (hnj n hn)⟩
+            hst₁.set hlk (hinv ⟨.inr (.inl rfl), .inr rfl⟩) hnd, fun n hn => getElem?_set_of_ne (hnj n hn)⟩
         · cases hl₁
         · cases hl₁
         · exact (hnc trivial).elim
@@ -125,7 +133,7 @@ theorem force_sim {Λ : List Rgn} {μ μ' μ₂ : List Tm} {l : Nat} {r' e₂ : 
           obtain ⟨μ₂', hq, rfl⟩ := reach hr₁
           have hμ : μ = μ.set l _ := (Flick.Elab.List.set_of_getElem? hc₀).symm
           refine ⟨W₁, μ₁, _, W₁, _, _, r₁, hq, World.le.refl _, hvv, ?_, fun _ _ => rfl⟩
-          rw [hμ]; exact hst₁.set hlk (hinv ⟨.inr (.inr rfl), .inr rfl⟩)
+          rw [hμ]; exact hst₁.set hlk (hinv ⟨.inr (.inr rfl), .inr rfl⟩) hnd
         · exact (hnc trivial).elim
       | forceRunning hc₀ hnl hnd =>
         rw [hc₀] at hc; cases hc
@@ -160,7 +168,7 @@ theorem force_sim {Λ : List Rgn} {μ μ' μ₂ : List Tm} {l : Nat} {r' e₂ : 
       · cases h₁
       · cases h₁
       · cases h₁
-        obtain ⟨v', hpev', hv', hvv⟩ := pure_sim_val hst₁ hglob₁ hpe hpe' hee hpev hv
+        obtain ⟨v', hpev', hv', hvv⟩ := pure_sim_val hst₁ hB hglob₁ hpe hpe' hee hpev hv
         rcases hstR with rfl | ⟨v₀', rfl, hv₀', hpev₀'⟩
         · refine ⟨W₁, μ₁, _, W₁, μ₁.set l' (.done v'), v', r₁, ?_, World.le.refl _, hvv,
             hst₁.setHR hhr (.inr ⟨v', rfl, hv', hpev'⟩), fun _ _ => rfl⟩

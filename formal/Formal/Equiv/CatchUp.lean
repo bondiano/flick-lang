@@ -165,7 +165,7 @@ theorem RJ.o4A (μ : List Tm) {e' b' : Tm} (hB : W.B) (hcl : e'.Closed) (hpe : P
   have h₂ := RJ.pure (W := W.addHR μ.length e') (μ := μ ++ [.lazy e'])
     (PHead.let_ (v := .loc μ.length) (b := .fix (b'.rename rot)) .loc)
     (by
-      simp only [Tm.subst, subst_rot_loc, Tm.pot, Tm.pot_subst_loc, Tm.pot_rename]
+      simp only [Tm.subst, subst_rot_loc, Tm.pot]
       omega)
     (fun hc => closed_let_subst_loc hc μ.length)
   simp only [Tm.subst, subst_rot_loc] at h₂
@@ -189,5 +189,11 @@ theorem RJ.o4AllocR (μ : List Tm) {l : Nat} {e e' c' : Tm}
   exact RJ.pure (PHead.let_ (v := .loc μ.length) (b := c') .loc)
     (by simp only [Tm.pot, Tm.pot_subst_loc]; omega)
     (fun hc => closed_let_subst_loc hc μ.length)
+
+/-- O2a reverse: forcing a cell known to be done with `v'` steps to `v'`. -/
+theorem RJ.doneR {μ : List Tm} {l' : Nat} {v' : Tm} (hl' : μ[l']? = some (.done v'))
+    (hv' : Value v') (hcv' : v'.Closed) : RJ W μ (.force (.loc l')) W μ v' :=
+  RJ.head (fun _ => .forceDone hl') (fun _ h => h)
+    (by simp [Tm.pot, hv'.pot_zero]) (fun _ => hcv')
 
 end Flick.Equiv

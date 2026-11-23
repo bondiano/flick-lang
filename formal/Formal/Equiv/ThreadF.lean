@@ -52,7 +52,8 @@ theorem abort_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ 
     (fun _ _ _ h => by cases h) id (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg hs₀ ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨v₂, rfl, hv₂, h₂⟩ := perform_right hv hs
-  obtain ⟨A₂, G₂, B₂, rfl, hA, hG, hB, hA₂, hB₂, -⟩ := split_at (fun _ h => by cases h) hfr hE₂
+  obtain ⟨A₂, G₂, B₂, rfl, hA, hG, hB, hA₂, hB₂, -⟩ :=
+    split_at (fun _ h => by cases h) (fun _ h => by cases h) hfr hE₂
   cases hG with
   | @hwith _ _ ℓ' _ _ _ al₂ _ r₂' hl hal hr =>
     obtain ⟨b₂, hb₂, hbb⟩ := armOf_right hal ha
@@ -91,7 +92,8 @@ theorem tail_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ :
     (fun _ _ _ h => by cases h) id (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg hs₀ ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨v₂, rfl, hv₂, h₂⟩ := perform_right hv hs
-  obtain ⟨A₂, G₂, B₂, rfl, hA, hG, hB, hA₂, hB₂, -⟩ := split_at (fun _ h => by cases h) hfr hE₂
+  obtain ⟨A₂, G₂, B₂, rfl, hA, hG, hB, hA₂, hB₂, -⟩ :=
+    split_at (fun _ h => by cases h) (fun _ h => by cases h) hfr hE₂
   cases hG with
   | @hwith _ _ ℓ' _ _ _ al₂ _ r₂' hl hal hr =>
     obtain ⟨b₂, hb₂, hbb⟩ := armOf_right hal ha
@@ -132,7 +134,8 @@ theorem ctl_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ : 
     (fun _ _ _ h => by cases h) id (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg hs₀ ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨v₂, rfl, hv₂, h₂⟩ := perform_right hv hs
-  obtain ⟨A₂, G₂, B₂, rfl, hA, hG, hB, hA₂, hB₂, -⟩ := split_at (fun _ h => by cases h) hfr hE₂
+  obtain ⟨A₂, G₂, B₂, rfl, hA, hG, hB, hA₂, hB₂, -⟩ :=
+    split_at (fun _ h => by cases h) (fun _ h => by cases h) hfr hE₂
   cases hG with
   | @hwith _ _ ℓ' _ _ _ al₂ _ r₂' hl hal hr =>
     obtain ⟨b₂, hb₂, hbb⟩ := armOf_right hal ha

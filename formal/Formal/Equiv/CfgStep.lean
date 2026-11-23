@@ -86,9 +86,12 @@ theorem cstep_every {root : Roots} (hroot : root.Src) {l : Lbl} {c₁ c₁' c₂
   cases hs with
   | @main lb Λ μ e Λ' μ' e' hs =>
     obtain ⟨W', Λ₂', μ₂', t₂', hW, -, ht', hst', hko, hrg', hans⟩ := thread_ans
-      (thread_sim hroot ht hst hR h₁.1 h₁'.1 (fun _ _ h => (hcl₂ _ (h.main Λ₂)).1.1)
-        h₁.2.2.1 (fun _ _ h => (hcl₂ _ (h.main Λ₂)).1.2.2.1) hcell hrg
-        (fun _ _ h => nomatch h) hs h₁'.2.1 (fun _ _ _ h => (hcl₂ _ h.main).1.2.1)) hrg
+      (thread_sim hroot ht hst hR h₁.main_closed h₁'.main_closed
+        (fun _ _ h => (hcl₂ _ (h.main Λ₂)).1.main_closed)
+        h₁.main_matchVals (fun _ _ h => (hcl₂ _ (h.main Λ₂)).1.main_matchVals) hcell
+        (fun m hm => h₁.settle.running_of_main hm) h₁.done
+        (fun _ _ h => (hcl₂ _ (h.main Λ₂)).1.done) hrg
+        (fun _ _ h => nomatch h) hs h₁'.main_noLz (fun _ _ _ h => (hcl₂ _ h.main).1.main_noLz)) hrg
     refine ⟨W', ⟨Λ₂', μ₂', t₂'⟩, hW, ⟨ht', hst', hrg'⟩, ?_⟩
     rcases hans with hp | ⟨e₁, e₂', e₃, e₄, hz⟩
     · exact .inl hp.main
@@ -109,21 +112,25 @@ theorem cstep_every {root : Roots} (hroot : root.Src) {l : Lbl} {c₁ c₁' c₂
       exact ⟨_, List.getElem?_eq_getElem this⟩
     have hl₂ : g₂.live = true := hR'.live ▸ hl
     have right : ∀ Λ' μ'' t'', TAns root Λ₂ μ₂ k₂ Λ' μ'' t'' →
-        t''.Closed ∧ ¬ t''.LzTop .any ∧ t''.MatchVals :=
+        t''.Closed ∧ ¬ t''.LzTop .any ∧ t''.MatchVals ∧
+          (∀ (i : Nat) (o : Tm), μ''[i]? = some (.done o) → DoneCell o) :=
       fun _ _ _ h => by
         obtain ⟨hc, g', hg', hm⟩ := h.kid e₂ hg₂ hl₂ hk₂
-        exact (hcl₂ _ hc).1.2.2.2 p g' hg' _ hm
+        have hc' := (hcl₂ _ hc).1
+        have hk' := hc'.kids p g' hg' _ hm
+        exact ⟨hk'.1, hk'.2.1, hk'.2.2, hc'.done⟩
     have left : k'.Closed ∧ ¬ k'.LzTop .any ∧ k'.MatchVals := by
       obtain ⟨g₀, hg₀, hle⟩ := hs.kids hg
       obtain ⟨g', hg', hm⟩ := slot_mem hg₀ (Nat.lt_of_lt_of_le (Flick.Elab.lt_of_getElem? hk) hle) k'
-      exact h₁'.2.2.2 p g' hg' k' hm
+      exact h₁'.kids p g' hg' k' hm
     obtain ⟨W', Λ₂', μ₂', t₂', hW, hT, ht', hst', hko, hrg', hans⟩ := thread_ans
       (thread_sim hroot (hR'.kids j k k₂ (by simp) hk hk₂) hst hR
-        (h₁.2.2.2 p g hg k (List.mem_of_getElem? hk)).1 left.1
+        (h₁.kids p g hg k (List.mem_of_getElem? hk)).1 left.1
         (fun _ _ h => (right _ _ _ ⟨_, _, h, .inl ⟨rfl, rfl, rfl⟩⟩).1)
-        (h₁.2.2.2 p g hg k (List.mem_of_getElem? hk)).2.2
-        (fun _ _ h => (right _ _ _ ⟨_, _, h, .inl ⟨rfl, rfl, rfl⟩⟩).2.2)
-        hcell (hrg.any _)
+        (h₁.kids p g hg k (List.mem_of_getElem? hk)).2.2
+        (fun _ _ h => (right _ _ _ ⟨_, _, h, .inl ⟨rfl, rfl, rfl⟩⟩).2.2.1)
+        hcell (fun m hm => h₁.settle.running_of_kid hg hk hm) h₁.done
+        (fun _ _ h => (right _ _ _ ⟨_, _, h, .inl ⟨rfl, rfl, rfl⟩⟩).2.2.2) (hrg.any _)
         (fun _ _ h => by cases h; exact ⟨g, hg, hk⟩) hs left.2.1 (fun _ _ _ h => (right _ _ _ h).2.1))
       (hrg.any _)
     -- the right child's steps, back in its slot
@@ -211,10 +218,10 @@ theorem lit_sim {root : Roots} {Λ : List Rgn} {μ : List Tm} {o : Lit} {c₂ : 
     (hr : CfgR W ⟨Λ, μ, .lit o⟩ c₂) (hcl₂ : W.B → c₂.main.Closed) :
     ∃ Λ₂ μ₂, CSteps root c₂ ⟨Λ₂, μ₂, .lit o⟩ := by
   obtain ⟨Λ₂, μ₂, e₂⟩ := c₂
-  obtain ⟨ht, -, -⟩ := hr
+  obtain ⟨ht, hst, -⟩ := hr
   rcases ht with ht | ht
   · obtain ⟨W', μ₂', v, r, hv, s⟩ :=
-      ht.vcu rfl .lit W μ₂ (World.le.refl _) (fun hB => ⟨fun _ hi => hi, hcl₂ hB⟩)
+      ht.vcu rfl .lit W μ₂ (World.le.refl _) hst (fun hB => ⟨fun _ hi => hi, hcl₂ hB⟩)
     have := (s.value_any .lit hv .top).inv_lit
     subst this
     exact ⟨Λ₂, μ₂', r.ksteps.main Λ₂⟩

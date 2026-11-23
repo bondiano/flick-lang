@@ -31,6 +31,16 @@ theorem force_redex (l : Nat) : Redex (.force (.loc l)) := by
   · cases h
   · cases F <;> simp [Frame.plug] at h; exact h ▸ .loc
 
+theorem force_val_redex {v : Tm} (hv : Value v) : Redex (.force v) := by
+  refine ⟨fun h => ?_, fun F a _ h => ?_⟩
+  · cases h
+  · cases F <;> simp [Frame.plug] at h; exact h ▸ hv
+
+theorem var_redex (j : Nat) : Redex (.var j) := by
+  refine ⟨fun h => ?_, fun F a _ h => ?_⟩
+  · cases h
+  · cases F <;> simp [Frame.plug] at h
+
 theorem settle_redex {l : Nat} {v : Tm} (hv : Value v) : Redex (.settle l v) := by
   refine ⟨fun h => ?_, fun F a _ h => ?_⟩
   · cases h
@@ -80,9 +90,10 @@ theorem xpot_le {W' : World} {μ μ' : List Tm} {t : Tm}
     exact Nat.le_refl _
   · rw [xpot_zero (fun q h => hq ⟨q, h⟩)]; exact Nat.zero_le _
 
-/-- A frame of a special pair holds no force. -/
-theorem Act.not_force {a b : Tm} (h : Act W a b) (hB : ¬ W.B) {E : List Frame} {n : Nat}
-    (hE : OkE E) (ha : a = plug E (.force (.loc n))) : False := by
+/-- A frame of a special pair holds no force of a left-only cell. -/
+theorem Act.not_force {μ μ₂ : List Tm} (hst : StR W μ μ₂) {a b : Tm} (h : Act W a b)
+    (hB : ¬ W.B) {E : List Frame} {n : Nat} (hE : OkE E) (ha : a = plug E (.force (.loc n)))
+    (hn : W.J₁ n) : False := by
   cases h with
   | dropA =>
     obtain ⟨-, h⟩ := decomp_eq (E := [.let_ _]) (lazy_redex _) (force_redex n)
@@ -93,6 +104,48 @@ theorem Act.not_force {a b : Tm} (h : Act W a b) (hB : ¬ W.B) {E : List Frame} 
     cases h
   | forceA =>
     obtain ⟨-, h⟩ := decomp_eq (E := [.force]) (lazy_redex _) (force_redex n)
+      (OkE.nil.cons' trivial) hE ha
+    cases h
+  | doneF _ hd =>
+    obtain ⟨-, h⟩ := decomp_eq (E := []) (force_redex _) (force_redex n) OkE.nil hE ha
+    cases h
+    exact hst.not_j₁ (hst.done _ _ _ _ hd).1 hn
+  | againF1 _ _ he hve _ _ _ _ _ | againR1 _ _ he hve _ _ _ _ _ =>
+    rcases hve with ⟨j, rfl⟩ | hv
+    · obtain ⟨-, h⟩ := decomp_eq (E := [.force, .let_ _]) (var_redex j) (force_redex n)
+        ((OkE.nil.cons' (F := .let_ _) trivial).cons' (F := .force) trivial) hE ha
+      cases h
+    · obtain ⟨-, h⟩ := decomp_eq (E := [.let_ _]) (force_val_redex hv) (force_redex n)
+        (OkE.nil.cons' (F := .let_ _) trivial) hE ha
+      cases h
+      obtain ⟨l', -, ⟨k, hl⟩ | ⟨hB', -⟩⟩ := (he .top (by decide)).inv_loc
+      · exact hst.not_j₁ hl hn
+      · exact hB hB'
+  | againF2 _ _ hfn _ _ _ _ _ _ | againR2 _ _ hfn _ _ _ _ _ _ =>
+    rcases hfn with hv | ⟨v, hv, rfl⟩ | ⟨p, ℓ, u, rfl⟩
+    · obtain ⟨-, h⟩ := decomp_eq (E := [.let_ _]) (settle_redex hv) (force_redex n)
+        (OkE.nil.cons' (F := .let_ _) trivial) hE ha
+      cases h
+    · obtain ⟨-, h⟩ := decomp_eq (E := [.settle _, .let_ _]) (Flick.Elab.raise_redex hv) (force_redex n)
+        ((OkE.nil.cons' (F := .let_ _) trivial).cons' (F := .settle _) trivial) hE ha
+      cases h
+    · obtain ⟨-, h⟩ := decomp_eq (E := [.settle _, .let_ _]) (Flick.Elab.unw_redex p ℓ u) (force_redex n)
+        ((OkE.nil.cons' (F := .let_ _) trivial).cons' (F := .settle _) trivial) hE ha
+      cases h
+  | againF3 _ hd | againR3 _ hd =>
+    obtain ⟨-, h⟩ := decomp_eq (E := []) (let_redex (hst.done _ _ _ _ hd).2.1) (force_redex n)
+      OkE.nil hE ha
+    cases h
+  | letRaise _ hv =>
+    obtain ⟨-, h⟩ := decomp_eq (E := [.let_ _]) (Flick.Elab.raise_redex hv) (force_redex n)
+      (OkE.nil.cons' trivial) hE ha
+    cases h
+  | letUnw =>
+    obtain ⟨-, h⟩ := decomp_eq (E := [.let_ _]) (Flick.Elab.unw_redex _ _ _) (force_redex n)
+      (OkE.nil.cons' trivial) hE ha
+    cases h
+  | letTodo =>
+    obtain ⟨-, h⟩ := decomp_eq (E := [.let_ _]) todo_redex (force_redex n)
       (OkE.nil.cons' trivial) hE ha
     cases h
   | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB'
@@ -106,12 +159,14 @@ theorem Sim.no_force {μ μ₂ : List Tm} {t t₂ : Tm} (h : Sim W .any t t₂) 
   intro hn
   subst ht
   rcases h.dec (force_redex n).1 (fun _ _ h => by cases h) (fun _ _ _ h => by cases h)
-      (fun h => h) _ _ rfl hE μ₂ (fun h => (hB h).elim) with
+      (fun h => h) (fun _ _ h => by cases h) (fun _ _ h => by cases h) _ _ rfl hE μ₂ hst
+      (fun h => (hB h).elim) with
     ⟨W', μ', E₀, E₁, a, b, E₂, hj, rfl, rfl, -, -, hact⟩ |
     ⟨W', μ', E₂, r₂, hj, -, -, hs⟩ | ⟨_, _, _, _, _, _, _, _, _, h', _, _⟩
-  · exact hact.not_force (fun h => hB (hj.le.B.2 h)) (fun F hF => hE F (List.mem_append_left _ hF)) rfl
+  · exact hact.not_force (hj.st _ hst) (fun h => hB (hj.le.B.2 h))
+      (fun F hF => hE F (List.mem_append_left _ hF)) rfl (hj.le.J₁ _ hn)
   · obtain ⟨e₂, rfl, he⟩ := hs.inv_force
-    obtain ⟨W'', μ'', l', r, hl⟩ := force_loc he μ' (fun h => (hB (hj.le.B.2 h)).elim)
+    obtain ⟨W'', μ'', l', r, hl⟩ := force_loc he μ' (hj.st _ hst) (fun h => (hB (hj.le.B.2 h)).elim)
     rcases hl with ⟨k, hl⟩ | ⟨hB', -⟩
     · exact (r.st _ (hj.st _ hst)).not_j₁ hl (r.le.J₁ _ (hj.le.J₁ _ hn))
     · exact hB (hj.le.B.2 (r.le.B.2 hB'))

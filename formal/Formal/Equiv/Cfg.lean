@@ -1,4 +1,5 @@
 import Formal.Equiv.Slot
+import Formal.SettleStep
 
 /-!
 # Contextual equivalence: runs of configurations
@@ -7,8 +8,9 @@ Two configurations are related (`CfgR`) when their main threads, their stores an
 are. The right side answers a step of the main thread, and of a child in its slot
 (`Step.reslot`), by steps of its own (`Formal/Equiv/CfgStep.lean`).
 
-The threads of both runs are closed and have no lazy cell where a pattern reads, wherever the
-runs go (`Reach`). Typing gives both (`Formal/Equiv/Context.lean`).
+The threads of both runs are closed, have no lazy cell where a pattern reads, satisfy the settle
+reachability invariant (`CfgSettle`), and hold well-formed done cells (`DoneCell`), wherever the
+runs go (`Reach`). Typing gives all of these (`Formal/Equiv/Context.lean`).
 -/
 
 namespace Flick.Equiv
@@ -21,12 +23,17 @@ variable {W : World}
 def CfgR (W : World) (c₁ c₂ : Cfg) : Prop :=
   ThR W c₁.mem none c₁.main c₂.main ∧ StR W c₁.mem c₂.mem ∧ RgsR W c₁.mem none c₁.rgs c₂.rgs
 
-/-- The threads of a configuration are closed, have no lazy cell where a pattern reads, and every
-pattern match binds only values. -/
-def CfgClosed (c : Cfg) : Prop :=
-  c.main.Closed ∧ ¬ c.main.LzTop .any ∧ c.main.MatchVals ∧
-    ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g →
-      ∀ k ∈ g.kids, k.Closed ∧ ¬ k.LzTop .any ∧ k.MatchVals
+/-- The threads of a configuration are closed, have no lazy cell where a pattern reads, every
+pattern match binds only values, settle frames match running cells (`CfgSettle`), and every done
+cell holds a closed value, a raised value, or `todo` (`DoneCell`). -/
+structure CfgClosed (c : Cfg) : Prop where
+  main_closed : c.main.Closed
+  main_noLz : ¬ c.main.LzTop .any
+  main_matchVals : c.main.MatchVals
+  kids : ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g →
+    ∀ k ∈ g.kids, k.Closed ∧ ¬ k.LzTop .any ∧ k.MatchVals
+  settle : CfgSettle c
+  done : ∀ (i : Nat) (o : Tm), c.mem[i]? = some (.done o) → DoneCell o
 
 /-- The threads of every configuration a run from `c` reaches are closed, and lazy cells stay
 lazy cells across every step. -/
@@ -143,7 +150,7 @@ theorem ThR.fcu {μ μ₂ : List Tm} {τ : Option (Nat × Nat)} {k k₂ : Tm} (h
     (hf : Final k) (hst : StR W μ μ₂) (hcl : W.B → k.Closed ∧ k₂.Closed) :
     ∃ W' μ₂' k₂', RJ W μ₂ k₂ W' μ₂' k₂' ∧ Final k₂' ∧ ThR W' μ τ k k₂' ∧ StR W' μ μ₂' := by
   rcases h with h | h
-  · obtain ⟨W', μ₂', k₂', r, hk, s⟩ := h.fcu rfl hf μ₂ hcl
+  · obtain ⟨W', μ₂', k₂', r, hk, s⟩ := h.fcu rfl hf μ₂ hst hcl
     exact ⟨W', μ₂', k₂', r, hk, .inl s, r.st _ hst⟩
   · exact (h.not_final hf).elim
 

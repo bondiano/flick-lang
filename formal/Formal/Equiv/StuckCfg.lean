@@ -22,9 +22,9 @@ def CfgTyped (S : Sig) (c : Cfg) : Prop :=
   TypedT S c.main ∧ ∀ (p : Nat) (g : Rgn), c.rgs[p]? = some g → ∀ k ∈ g.kids, TypedT S k
 
 /-- A left thread related to a literal is that literal, or steps alone. -/
-theorem ThR.lit_rev {μ : List Tm} {τ : Option (Nat × Nat)} {a : Tm} {o : Lit}
-    (h : ThR W μ τ a (.lit o)) (hB : ¬ W.B) : a = .lit o ∨ LStep μ a := by
-  rcases h.final_rev (.inl .lit) hB with hf | hs
+theorem ThR.lit_rev {μ μ₂ : List Tm} {τ : Option (Nat × Nat)} {a : Tm} {o : Lit}
+    (h : ThR W μ τ a (.lit o)) (hst : StR W μ μ₂) (hB : ¬ W.B) : a = .lit o ∨ LStep μ a := by
+  rcases h.final_rev (.inl .lit) hst hB with hf | hs
   · rcases h with h | ⟨E, E', n, e, e', rfl, -, hE, -, -, -, hc, -⟩
     · rcases hf with hv | ⟨v, -, rfl⟩ | ⟨p, ℓ, c, rfl⟩
       · exact .inl (h.value_any hv .lit .top).rinv_lit
@@ -126,7 +126,7 @@ theorem stuck_sim {S : Sig} {root : Roots} :
         · exact kid rj hlt ht'
     · exact mstep hd
     · subst ho
-      rcases ht.lit_rev hB with rfl | hs
+      rcases ht.lit_rev hst hB with rfl | hs
       · exact (hnl _ rfl).elim
       · exact (moves hs.moves).elim
 

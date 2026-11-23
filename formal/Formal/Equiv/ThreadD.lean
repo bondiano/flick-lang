@@ -96,13 +96,20 @@ theorem glob_sim {root : Roots} (hroot : root.Src) {μ μ₂ : List Tm}
     {τ : Option (Nat × Nat)} {E : List Frame} {g : Nat} {v t₂ : Tm} (hE : OkE E)
     (hg : root.glob g = some v) (ht : Sim W .any (plug E (.glob g)) t₂) (hst : StR W μ μ₂)
     (hR : W.R = root) (hcl₁ : (plug E (.glob g)).Closed) (hcl₁' : (plug E v).Closed)
-    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed) :
+    (hcl₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → t''.Closed)
+    (hrun : ∀ m, 0 < (plug E (.glob g)).settleCount m → Running μ m)
+    (hdone₁ : ∀ (i : Nat) (o : Tm), μ[i]? = some (.done o) → DoneCell o)
+    (hdone₂ : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ∀ (i : Nat) (o : Tm), μ''[i]? = some (.done o) → DoneCell o)
+    (hzl : ¬ (plug E v).LzTop .any)
+    (hzr : ∀ μ'' t'', KSteps root μ₂ t₂ μ'' t'' → ¬ t''.LzTop .any) :
     KAns root W τ μ₂ t₂ μ μ (plug E (.glob g)) (plug E v) := by
   rcases ht.dec (glob_redex g).1 (fun _ _ h => by cases h) (fun _ _ _ h => by cases h) id
-      _ _ rfl hE μ₂ (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
+      (fun _ _ h => by cases h) (fun _ _ h => by cases h)
+      _ _ rfl hE μ₂ hst (fun _ => ⟨hcl₁, hcl₂ _ _ .refl⟩) with
     hd | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
     ⟨_, _, _, _, _, _, _, _, _, h', _, _⟩
-  · exact (dec_act (τ := τ) (Λ := []) hE hst hR hroot.2 hcl₁ hcl₁' hcl₂ (.glob hE hg) hd).2
+  · exact (dec_act (τ := τ) (Λ := []) hE hst hR hroot.2 hcl₁ hcl₁' hcl₂ hrun hdone₁ hdone₂ hzl hzr
+      (.glob hE hg) hd).2
   · obtain rfl := hs.inv_glob
     exact ⟨W', μ₂', plug E₂ v, hj.le,
       .inl (hj.ksteps.pos ⟨_, _, fun _ => ⟨_, .glob hE₂ hg⟩, .refl⟩),

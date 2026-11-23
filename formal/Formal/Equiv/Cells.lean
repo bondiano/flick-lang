@@ -42,9 +42,10 @@ theorem Sim.top_cell {x : Pos} {c c' : Tm} (h : Sim W x c c') (hx : x = .top) :
     ((∃ e, c = .lazy e) ↔ ∃ e', c' = .lazy e') ∧ ((∃ e, c = .running e) ↔ ∃ e', c' = .running e') ∧
       ((∃ o, c = .done o) ↔ ∃ o', c' = .done o') := by
   cases h with
-  | jL hx' | jR hx' => exact (hx' hx).elim
+  | jL hx' | jR hx' | againF2 hx' | againR2 hx' => exact (hx' hx).elim
   | dropA | dropB | dropC | forceA | forceC | bornA | bornB | bornS | bornV | dead
-  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle => cases hx
+  | o4A | o4B | o4Alloc1 | o4AllocR | o4Bind | o4Settle
+  | doneF | doneR | againF1 | againF3 | againR1 | againR3 | letRaise | letUnw | letTodo => cases hx
   | appK | appV | rconsK | rconsV | updK | updV => cases hx
   | _ => simp
 
@@ -69,7 +70,9 @@ theorem StR.settleSym {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {l l' : Na
   have hr := ((hc : Sim W .top c c').top_cell rfl).2.1
   rcases settleCell_cases μ₁ l o with ⟨e, he, e₁⟩ | ⟨hn, e₁⟩ <;>
     rcases settleCell_cases μ₂ l' o' with ⟨e', he', e₂⟩ | ⟨hn', e₂⟩ <;> rw [e₁, e₂]
-  · exact h.set hl (.await ho)
+  · exact h.set hl (.await ho) fun l₀ v₀ v₀' hd => by
+      have ⟨_, _, _, _, _, _, hdone, _, _⟩ := h.done l l₀ v₀ v₀' hd
+      rw [hdone] at he; cases he
   · rw [h₁] at he; cases he
     obtain ⟨e', rfl⟩ := hr.1 ⟨_, rfl⟩
     exact absurd h₂ (hn' e')
@@ -88,7 +91,9 @@ theorem StR.resetSym {μ₁ μ₂ : List Tm} (h : StR W μ₁ μ₂) {l l' : Nat
   · rw [h₁] at he; rw [h₂] at he'; cases he; cases he'
     obtain ⟨e₀, he₀, h'⟩ := (hc : Sim W .top _ _).inv_force
     cases he₀
-    exact h.set hl (.lazy h')
+    exact h.set hl (.lazy h') fun l₀ v₀ v₀' hd => by
+      have ⟨_, _, _, _, _, _, hdone, _, _⟩ := h.done l l₀ v₀ v₀' hd
+      rw [hdone] at h₁; cases h₁
   · rw [h₁] at he; cases he
     obtain ⟨e', rfl⟩ := hr.1 ⟨_, rfl⟩
     exact absurd h₂ (hn' e')

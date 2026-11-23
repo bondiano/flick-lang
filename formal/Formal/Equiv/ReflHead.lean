@@ -106,8 +106,8 @@ theorem RgsR.get' {μ : List Tm} {τ : Option (Nat × Nat)} {Λ Λ₂ : List Rgn
 
 /-- A region of the right side whose children are finished: the left children are, or one of
 them steps alone. -/
-theorem RgR.kids_rev {μ : List Tm} {p : Nat} {g g₂ : Rgn} (hr : RgR W μ none p g g₂)
-    (hk : ∀ k ∈ g₂.kids, Final k) (hB : ¬ W.B) :
+theorem RgR.kids_rev {μ μ₂ : List Tm} {p : Nat} {g g₂ : Rgn} (hr : RgR W μ none p g g₂)
+    (hk : ∀ k ∈ g₂.kids, Final k) (hst : StR W μ μ₂) (hB : ¬ W.B) :
     (∀ k ∈ g.kids, Final k) ∨ ∃ k ∈ g.kids, LStep μ k := by
   by_cases h : ∃ k ∈ g.kids, LStep μ k
   · exact .inr h
@@ -115,7 +115,7 @@ theorem RgR.kids_rev {μ : List Tm} {p : Nat} {g g₂ : Rgn} (hr : RgR W μ none
     obtain ⟨j, hj⟩ := List.mem_iff_getElem?.mp hk'
     have hj₂ : j < g₂.kids.length := hr.len ▸ Flick.Elab.lt_of_getElem? hj
     have hk₂ := List.getElem?_eq_getElem hj₂
-    rcases (hr.kids j k _ (by simp) hj hk₂).final_rev (hk _ (List.mem_of_getElem? hk₂)) hB with
+    rcases (hr.kids j k _ (by simp) hj hk₂).final_rev (hk _ (List.mem_of_getElem? hk₂)) hst hB with
       hf | hs
     · exact hf
     · exact (h ⟨k, hk', hs⟩).elim
@@ -226,7 +226,7 @@ theorem rhead_rev {Λ Λ₂ Λ₂' : List Rgn} {μ μ₂ μ₂' : List Tm} {r r�
     have hwv : Final w := .inl (hr.2 (.inside _) w trivial rfl)
     obtain ⟨g, hg', hR⟩ := hrg.get' hg
     have hl' : g.live = true := hR.live ▸ hl
-    rcases hR.kids_rev hk hB with hk' | hs'
+    rcases hR.kids_rev hk hst hB with hk' | hs'
     · first
         | (obtain ⟨fs', f', hfs'⟩ := All2.snoc_left (hfs ▸ hR.fins)
            exact Or.inl ⟨_, _, _, .finRun hg' hl' hwv hk' hfs'⟩)

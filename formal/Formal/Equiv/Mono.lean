@@ -40,24 +40,27 @@ inductive FrS (W : World) : Frame → Frame → Prop
   | force : FrS W .force .force
   | settle {ℓ ℓ'} : W.L ℓ ℓ' .sym → FrS W (.settle ℓ) (.settle ℓ')
 
-/-- Related contexts, the innermost frame first: related frames, and the frames of cells only
-one side has. -/
+/-- Related contexts, the innermost frame first: related frames, the frames of cells only
+one side has, and coupled `settle` + `let` frames of O2a. -/
 inductive FrL (W : World) : List Frame → List Frame → Prop
   | nil : FrL W [] []
   | cons {F F' E E'} : FrS W F F' → FrL W E E' → FrL W (F :: E) (F' :: E')
   | junkL {n E E'} : W.J₁ n → FrL W E E' → FrL W (.settle n :: E) E'
   | junkR {n E E'} : W.J₂ n → FrL W E E' → FrL W E (.settle n :: E')
-
-/-- Source code: no run-time form. -/
-def _root_.Flick.Tm.Src : Tm → Prop
-  | .var _ | .lit _ | .const _ | .ctor _ | .rnil | .anil | .todo | .glob _ => True
-  | .lam b | .fix b | .task b | .await b | .lazy b | .force b | .raise b | .scope b | .proj b _ =>
-    b.Src
-  | .drec _ r => r.Src
-  | .app f a | .let_ f a | .letrec f a | .rcons _ f a | .update f _ a | .match_ f a
-  | .acons _ f a | .try_ f a | .handle f a => f.Src ∧ a.Src
-  | .aguard _ g b r | .hdl _ g b r => g.Src ∧ b.Src ∧ r.Src
-  | _ => False
+  | againF {l l' : Nat} {c₀ : Tm} {σ σ' : Nat → Tm} {E E' : List Frame} :
+      ¬ W.B → W.L l l' .sym → c₀.Src →
+      (∀ i y, y ≠ .park → Sim W y (σ i) (σ' i)) → (∀ i, (σ' i).NoIns) →
+      (∀ i, (∃ j, σ i = .var j) ∨ Value (σ i)) → (∀ i, (∃ j, σ' i = .var j) ∨ Value (σ' i)) →
+      FrL W E E' →
+      FrL W (.settle l :: .let_ (c₀.subst (subForce (.loc l) σ)) :: E)
+        (.settle l' :: .let_ (c₀.subst (subVar σ')) :: E')
+  | againR {l l' : Nat} {c₀ : Tm} {σ σ' : Nat → Tm} {E E' : List Frame} :
+      ¬ W.B → W.L l l' .sym → c₀.Src →
+      (∀ i y, y ≠ .park → Sim W y (σ i) (σ' i)) → (∀ i, (σ' i).NoIns) →
+      (∀ i, (∃ j, σ i = .var j) ∨ Value (σ i)) → (∀ i, (∃ j, σ' i = .var j) ∨ Value (σ' i)) →
+      FrL W E E' →
+      FrL W (.settle l :: .let_ (c₀.subst (subVar σ)) :: E)
+        (.settle l' :: .let_ (c₀.subst (subForce (.loc l') σ')) :: E')
 
 theorem _root_.Flick.Tm.Src.noIns : ∀ {e : Tm}, e.Src → e.NoIns := by
   intro e
@@ -133,11 +136,29 @@ theorem Sim.lower {x : Pos} {a b : Tm} (h : Sim W x a b) : Sim W .any a b := by
   | o4AllocR hB hl hs hcl hpe he hc _ _ => exact .o4AllocR hB hl hs hcl hpe he hc
   | o4Bind hB hc _ => exact .o4Bind hB hc
   | o4Settle hB hH hhl hce hct hpt => exact .o4Settle hB hH hhl hce hct hpt
+  | doneF hB hd hv' hc' hn => exact .doneF hB hd hv' hc' hn
+  | doneR hB hd hv hc => exact .doneR hB hd hv hc
+  | againF1 hB hc he hev hev' hσ hσn hσv hσv' _ _ =>
+    exact .againF1 hB hc he hev hev' hσ hσn hσv hσv'
+  | againF2 _ hB hl _ hc hσ hσn hσv hσv' iht _ =>
+    exact .againF2 (by simp) hB hl iht hc hσ hσn hσv hσv'
+  | againF3 hB hd hv hv' hcv hcv' hnv' hvv hc hσ hσn hσv hσv' _ _ =>
+    exact .againF3 hB hd hv hv' hcv hcv' hnv' hvv hc hσ hσn hσv hσv'
+  | againR1 hB hc he hev hev' hσ hσn hσv hσv' _ _ =>
+    exact .againR1 hB hc he hev hev' hσ hσn hσv hσv'
+  | againR2 _ hB hl _ hc hσ hσn hσv hσv' iht _ =>
+    exact .againR2 (by simp) hB hl iht hc hσ hσn hσv hσv'
+  | againR3 hB hd hv hv' hcv hcv' hnv' hvv hc hσ hσn hσv hσv' _ _ =>
+    exact .againR3 hB hd hv hv' hcv hcv' hnv' hvv hc hσ hσn hσv hσv'
+  | letRaise hB hv hv' hvv _ => exact .letRaise hB hv hv' hvv
+  | letUnw hB hl ha _ => exact .letUnw hB hl ha
+  | letTodo hB => exact .letTodo hB
   | aconsD hd hn _ ih => exact .aconsD hd hn ih
   | _ => constructor <;> first | assumption | decide
 
 theorem Sim.mono {W' : World} (hW : W.le W') {x : Pos} {a b : Tm} (h : Sim W x a b) :
     Sim W' x a b := by
+  have hnB : ¬ W.B → ¬ W'.B := fun h h' => h (hW.B.2 h')
   induction h with
   | loc hl => exact .loc (hW.L _ _ _ hl)
   | hwith hl _ _ _ ih₁ ih₂ ih₃ => exact .hwith (hW.L _ _ _ hl) ih₁ ih₂ ih₃
@@ -176,6 +197,23 @@ theorem Sim.mono {W' : World} (hW : W.le W') {x : Pos} {a b : Tm} (h : Sim W x a
   | o4Bind hB _ ih => exact .o4Bind (hW.B.1 hB) ih
   | o4Settle hB hH hhl hce hct hpt =>
     exact .o4Settle (hW.B.1 hB) (hW.H _ _ hH) (hW.HL _ _ hhl) hce hct (hW.R ▸ hpt)
+  | doneF hB hd hv' hc' hn => exact .doneF (hnB hB) (hW.D _ _ _ _ hd) hv' hc' hn
+  | doneR hB hd hv hc => exact .doneR (hnB hB) (hW.D _ _ _ _ hd) hv hc
+  | againF1 hB hc _ hev hev' _ hσn hσv hσv' ihe ihσ =>
+    exact .againF1 (hnB hB) hc ihe hev hev' ihσ hσn hσv hσv'
+  | againF2 hx hB hl _ hc _ hσn hσv hσv' iht ihσ =>
+    exact .againF2 hx (hnB hB) (hW.L _ _ _ hl) iht hc ihσ hσn hσv hσv'
+  | againF3 hB hd hv hv' hcv hcv' hnv' _ hc _ hσn hσv hσv' ihv ihσ =>
+    exact .againF3 (hnB hB) (hW.D _ _ _ _ hd) hv hv' hcv hcv' hnv' ihv hc ihσ hσn hσv hσv'
+  | againR1 hB hc _ hev hev' _ hσn hσv hσv' ihe ihσ =>
+    exact .againR1 (hnB hB) hc ihe hev hev' ihσ hσn hσv hσv'
+  | againR2 hx hB hl _ hc _ hσn hσv hσv' iht ihσ =>
+    exact .againR2 hx (hnB hB) (hW.L _ _ _ hl) iht hc ihσ hσn hσv hσv'
+  | againR3 hB hd hv hv' hcv hcv' hnv' _ hc _ hσn hσv hσv' ihv ihσ =>
+    exact .againR3 (hnB hB) (hW.D _ _ _ _ hd) hv hv' hcv hcv' hnv' ihv hc ihσ hσn hσv hσv'
+  | letRaise hB hv hv' _ ih => exact .letRaise (hnB hB) hv hv' ih
+  | letUnw hB hl _ ih => exact .letUnw (hnB hB) (hW.L _ _ _ hl) ih
+  | letTodo hB => exact .letTodo (hnB hB)
   | appK hs _ _ ih₁ ih₂ => exact .appK hs ih₁ ih₂
   | appV hv _ _ ih₁ ih₂ => exact .appV hv ih₁ ih₂
   | rconsK hs _ _ ih₁ ih₂ => exact .rconsK hs ih₁ ih₂
@@ -196,10 +234,15 @@ theorem FrS.mono {W' : World} (hW : W.le W') {F F' : Frame} (h : FrS W F F') : F
   | _ => constructor <;> apply Sim.mono hW <;> assumption
 
 theorem FrL.mono {W' : World} (hW : W.le W') {E E' : List Frame} (h : FrL W E E') : FrL W' E E' := by
+  have hnB : ¬ W.B → ¬ W'.B := fun h h' => h (hW.B.2 h')
   induction h with
   | nil => exact .nil
   | cons hF _ ih => exact .cons (hF.mono hW) ih
   | junkL hn _ ih => exact .junkL (hW.J₁ _ hn) ih
   | junkR hn _ ih => exact .junkR (hW.J₂ _ hn) ih
+  | againF hB hl hc hσ hσn hσv hσv' _ ih =>
+    exact .againF (hnB hB) (hW.L _ _ _ hl) hc (fun i y hy => (hσ i y hy).mono hW) hσn hσv hσv' ih
+  | againR hB hl hc hσ hσn hσv hσv' _ ih =>
+    exact .againR (hnB hB) (hW.L _ _ _ hl) hc (fun i y hy => (hσ i y hy).mono hW) hσn hσv hσv' ih
 
 end Flick.Equiv

@@ -100,6 +100,10 @@ import Formal.LetMut.Lazy
 import Formal.LetMut.LazyWitness
 import Formal.Generalization
 import Formal.Lazy
+import Formal.Settle
+import Formal.SettlePHead
+import Formal.SettleRHead
+import Formal.SettleStep
 import Formal.Refine
 import Formal.Refine.Numbers
 import Formal.Proofs.CheckSound

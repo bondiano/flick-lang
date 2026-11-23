@@ -1,4 +1,5 @@
-import Formal.Equiv.Act
+import Formal.Equiv.ActSimAgainF
+import Formal.Equiv.ActSimAgainR
 
 /-!
 # Contextual equivalence: a step of a special pair
@@ -23,6 +24,7 @@ theorem StR.setBorn {μ μ₂ : List Tm} (h : StR W μ μ₂) {l l' : Nat} {v v'
     (hd : d = .lazy v ∨ d = .running v ∨ d = .done v)
     (hc'' : c' = .lazy v' ∨ c' = .done v') : StR W (μ.set l d) μ₂ := by
   have := h.set hl (c' := c') (c := d) ⟨hi.val, hi.val', hi.cl, hi.cl', hi.noIns, hi.rel, .inl ⟨hd, hc''⟩, hi.flag⟩
+    fun l₀ v₀ v₀' hd' => by obtain ⟨hl₀, -⟩ := h.done l l₀ v₀ v₀' hd'; cases h.kd _ _ _ _ _ hl hl₀
   rwa [Flick.Elab.List.set_of_getElem? hc'] at this
 
 /-- **A step of a special pair**: the left side steps by its redex. -/
@@ -32,6 +34,11 @@ theorem act_sim {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ : Lis
     (hR : W.R = root) (hglob : ∀ g v, root.glob g = some v → v.Src)
     (hcl₁ : (plug E₁ a).Closed) (hcl₁' : t'.Closed)
     (hcl₂ : ∀ μ'' t'', KSteps root μ₂ (plug E₂ b) μ'' t'' → t''.Closed)
+    (hrun : ∀ m, 0 < (plug E₁ a).settleCount m → Running μ m)
+    (hdone₁ : ∀ (i : Nat) (o : Tm), μ[i]? = some (.done o) → DoneCell o)
+    (hdone₂ : ∀ μ'' t'', KSteps root μ₂ (plug E₂ b) μ'' t'' → ∀ (i : Nat) (o : Tm), μ''[i]? = some (.done o) → DoneCell o)
+    (hzl : ¬ t'.LzTop .any)
+    (hzr : ∀ μ'' t'', KSteps root μ₂ (plug E₂ b) μ'' t'' → ¬ t''.LzTop .any)
     (hs : Step root l Λ μ (plug E₁ a) (.cfg Λ' μ' t')) :
     Λ' = Λ ∧ KAns root W τ μ₂ (plug E₂ b) μ μ' (plug E₁ a) t' := by
   have keep : KeepO W τ μ μ := fun _ _ _ _ _ h => h
@@ -245,7 +252,7 @@ theorem act_sim {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ : Lis
       · cases hh
       · cases hh with
         | settleVal =>
-          obtain ⟨v', hpev', hv', hvv⟩ := pure_sim_val hst (hR ▸ hglob) hpe hpe' hee hpt hvt
+          obtain ⟨v', hpev', hv', hvv⟩ := pure_sim_val hst hB (hR ▸ hglob) hpe hpe' hee hpt hvt
           have hstL' : StR W (settleCell μ l₀ t) μ₂ := by
             rcases settleCell_cases μ l₀ t with ⟨_, _, e₁⟩ | ⟨_, e₁⟩ <;> rw [e₁]
             · exact hst.setHL hhl (.inr (.inr ⟨t, rfl, hvt, hpt⟩))
@@ -276,5 +283,34 @@ theorem act_sim {root : Roots} {l : Lbl} {Λ Λ' : List Rgn} {μ μ' μ₂ : Lis
       exact ⟨rfl, W, μ₂, _, World.le.refl _, .inr ⟨rfl, rfl, Zero.of_B hB⟩,
         .inl (hfr.plugs (.o4Settle hB hH hhl hce hct₁ (hpt.trans (.single (hR.symm ▸ hp₁))))),
         hst, keep⟩
+  | doneF _ hd _ _ _ =>
+    exact act_sim_doneF hE₁ hfr hst hd hs
+  | againF1 hnB hc he hve _ hσ hσn hσv hσv' =>
+    exact act_sim_againF1 hE₁ hE₂ hfr hst hcl₁ hdone₁ hdone₂ hnB hc he hve hσ hσn hσv hσv' hs
+  | againF2 hnB hl hfn he hc hσ hσn hσv hσv' =>
+    exact act_sim_againF2 hE₁ hE₂ hfr hst hcl₁ hcl₂ hrun hnB hl hfn he hc hσ hσn hσv hσv' hs
+  | againF3 hnB hd hv hv' _ hcv' hnv' hvv hc hσ hσn _ _ =>
+    exact act_sim_againF3 hE₁ hE₂ hfr hst hzl hzr hnB hd hv hv' hcv' hnv' hvv hc hσ hσn hs
+  | againR1 hnB hc he hve _ hσ hσn hσv hσv' =>
+    exact act_sim_againR1 hE₁ hE₂ hfr hst hcl₁ hdone₁ hdone₂ hnB hc he hve hσ hσn hσv hσv' hs
+  | againR2 hnB hl hfn he hc hσ hσn hσv hσv' =>
+    exact act_sim_againR2 hE₁ hE₂ hfr hst hcl₁ hcl₂ hrun hnB hl hfn he hc hσ hσn hσv hσv' hs
+  | againR3 hnB hd hv hv' hcv _ hnv' hvv hc hσ hσn _ _ =>
+    exact act_sim_againR3 hE₁ hE₂ hfr hst hzl hzr hnB hd hv hv' hcv hnv' hvv hc hσ hσn hs
+  | @letRaise v v' b₁ b₂ _ hv hv' hvv =>
+    obtain ⟨rfl, rfl, rfl⟩ := step_let_raise hE₁ hv hs
+    exact ⟨rfl, W, μ₂, _, World.le.refl _,
+      .inl ⟨_, _, fun _ => ⟨_, .raise hE₂ (F := .let_ b₂) trivial (by simp [Frame.isTry])
+        (by simp [Frame.isInside]) (by simp [Frame.isCtl]) hv'⟩, .refl⟩,
+      .inl (hfr.plugs (.raise hvv)), hst, keep⟩
+  | @letUnw p ℓ ℓ' k u u' b₁ b₂ hnB hl hu =>
+    obtain ⟨rfl, rfl, rfl⟩ := step_let_unw hE₁ hs
+    exact ⟨rfl, W, μ₂, _, World.le.refl _,
+      .inl ⟨_, _, fun _ => ⟨_, .unw hE₂ (F := .let_ b₂) trivial (by simp [Frame.isInside])
+        (by simp [Frame.isCtl]) (by simp [Frame.catches])⟩, .refl⟩,
+      .inl (hfr.plugs (.unw hl hu)), hst, keep⟩
+  | letTodo =>
+    rcases step_in (F := .let_ _) hE₁ trivial todo_redex trivial hs with
+      ⟨_, hh, -⟩ | ⟨_, hh, -⟩ <;> cases hh
 
 end Flick.Equiv

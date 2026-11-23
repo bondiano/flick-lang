@@ -71,18 +71,147 @@ theorem Catch.thr {μ μ₂ : List Tm} {τ : Option (Nat × Nat)} {t t₂ : Tm}
     (h : Catch W μ₂ t t₂) : RCatch W μ τ μ₂ t t₂ :=
   let ⟨W', μ₂', t₂', rj, hlt, hs⟩ := h; ⟨W', μ₂', t₂', rj, hlt, .inl hs⟩
 
-/-- The left side of a special pair of O1a or O1c steps alone. -/
-theorem Act.lstep {μ : List Tm} {a b : Tm} (h : Act W a b) (hB : ¬ W.B) : LStep μ a := by
-  cases h with
-  | dropA => exact ⟨_, _, [.let_ _], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
-  | dropB => exact .pure (.let_ .loc)
-  | forceA => exact ⟨_, _, [.force], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
-  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB'
-  | o4B hB' | o4Alloc1 hB' | o4Bind hB' | o4Settle hB' => exact (hB hB').elim
+/-- A thread focused on a free variable cannot step. -/
+theorem Step.not_var {root : Roots} {l : Lbl} {Λ : List Rgn} {μ : List Tm} {E : List Frame}
+    {j : Nat} {o : Out} (hE : OkE E) (hs : Step root l Λ μ (plug E (.var j)) o) : False := by
+  have bad : ∀ {E' : List Frame} {r' : Tm}, OkE E' → Redex r' → (∀ k, r' ≠ .var k) →
+      plug E' r' = plug E (.var j) → False := fun hE' hr' hne he => by
+    obtain ⟨-, rfl⟩ := decomp_eq hr' (var_redex j) hE' hE he; exact hne j rfl
+  generalize ht : plug E (.var j) = t at hs
+  cases hs with
+  | pure hE' hh => exact bad hE' hh.redex (fun _ he => by subst he; cases hh) ht.symm
+  | rt hE' hh =>
+    rcases hh.redex' with h' | ⟨F, v, hF, hv, rfl⟩ | ⟨F, q, ℓ, u, hF, rfl⟩
+    · exact bad hE' h' (fun _ he => by subst he; cases hh) ht.symm
+    · exact bad (E' := F :: _) (hE'.cons' hF) (raise_redex hv) (fun _ h => by cases h) ht.symm
+    · exact bad (E' := F :: _) (hE'.cons' hF) (unw_redex _ _ _) (fun _ h => by cases h) ht.symm
+  | addFin hE' _ _ hv => exact bad hE' (fin_redex (.inl rfl) hv) (fun _ h => by cases h) ht.symm
+  | spawn hE' _ _ hv => exact bad hE' (fin_redex (.inr rfl) hv) (fun _ h => by cases h) ht.symm
+  | performRoot hE' _ _ _ hv => exact bad hE' (perform_redex hv) (fun _ h => by cases h) ht.symm
+  | raise hE' hF _ _ _ hv => exact bad (E' := _ :: _) (hE'.cons' hF) (raise_redex hv) (fun _ h => by cases h) ht.symm
+  | unw hE' hF => exact bad (E' := _ :: _) (hE'.cons' hF) (unw_redex _ _ _) (fun _ h => by cases h) ht.symm
+  | performAbort hE' hEi _ _ hv | performTail hE' hEi _ _ hv | performCtl hE' hEi _ _ hv =>
+    exact bad (hEi.append' (hE'.cons' (F := .hwith _ _ _ _ _) trivial)) (perform_redex hv)
+      (fun _ h => by cases h) ((plug_append _ _ _).trans ht.symm)
+  | performKept hE' hEi _ _ hv _ =>
+    exact bad (hEi.append' (hE'.cons' (F := .hkeep _ _ _ _) trivial)) (perform_redex hv)
+      (fun _ h => by cases h) ((plug_append _ _ _).trans ht.symm)
+  | resume hE' hA hEi _ _ hu =>
+    exact bad (hA.append' (hE'.cons' (F := .hctlA _ _ _ _ _ _ _ _) trivial)) (kont_redex hu)
+      (fun _ h => by cases h) ((plug_append _ _ _).trans ht.symm)
+  | resumeDie hE' hu _ => exact bad hE' (kont_redex hu) (fun _ h => by cases h) ht.symm
+  | todo hE' => exact bad hE' todo_redex (fun _ h => by cases h) ht.symm
+  | glob hE' _ => exact bad hE' (glob_redex _) (fun _ h => by cases h) ht.symm
+
+/-- A step at `force v` (with `Value v`) implies `v` is a location. -/
+theorem Step.force_val_loc {root : Roots} {l : Lbl} {Λ : List Rgn} {μ : List Tm} {E : List Frame}
+    {v : Tm} {o : Out} (hE : OkE E) (hv : Value v)
+    (hs : Step root l Λ μ (plug E (.force v)) o) : ∃ l', v = .loc l' := by
+  have hr : Redex (.force v) := force_val_redex hv
+  have bad : ∀ {E' : List Frame} {r' : Tm}, OkE E' → Redex r' → (∀ x, r' ≠ .force x) →
+      plug E' r' = plug E (.force v) → False := fun hE' hr' hne he => by
+    obtain ⟨-, rfl⟩ := decomp_eq hr' hr hE' hE he; exact hne v rfl
+  generalize ht : plug E (.force v) = t at hs
+  cases hs with
+  | pure hE' hh => exact (bad hE' hh.redex (fun _ he => by subst he; cases hh) ht.symm).elim
+  | rt hE' hh =>
+    rcases hh.redex' with h' | ⟨F, w, hF, hw, rfl⟩ | ⟨F, q, ℓ, u, hF, rfl⟩
+    · obtain ⟨-, hrEq⟩ := decomp_eq h' hr hE' hE ht.symm
+      cases hh <;> cases hrEq
+      all_goals exact ⟨_, rfl⟩
+    · exact (bad (E' := F :: _) (hE'.cons' hF) (raise_redex hw) (fun _ h => by cases h) ht.symm).elim
+    · exact (bad (E' := F :: _) (hE'.cons' hF) (unw_redex _ _ _) (fun _ h => by cases h) ht.symm).elim
+  | addFin hE' _ _ hv' => exact (bad hE' (fin_redex (.inl rfl) hv') (fun _ h => by cases h) ht.symm).elim
+  | spawn hE' _ _ hv' => exact (bad hE' (fin_redex (.inr rfl) hv') (fun _ h => by cases h) ht.symm).elim
+  | performRoot hE' _ _ _ hv' => exact (bad hE' (perform_redex hv') (fun _ h => by cases h) ht.symm).elim
+  | raise hE' hF _ _ _ hv' => exact (bad (E' := _ :: _) (hE'.cons' hF) (raise_redex hv') (fun _ h => by cases h) ht.symm).elim
+  | unw hE' hF => exact (bad (E' := _ :: _) (hE'.cons' hF) (unw_redex _ _ _) (fun _ h => by cases h) ht.symm).elim
+  | performAbort hE' hEi _ _ hv' | performTail hE' hEi _ _ hv' | performCtl hE' hEi _ _ hv' =>
+    exact (bad (hEi.append' (hE'.cons' (F := .hwith _ _ _ _ _) trivial)) (perform_redex hv')
+      (fun _ h => by cases h) ((plug_append _ _ _).trans ht.symm)).elim
+  | performKept hE' hEi _ _ hv' _ =>
+    exact (bad (hEi.append' (hE'.cons' (F := .hkeep _ _ _ _) trivial)) (perform_redex hv')
+      (fun _ h => by cases h) ((plug_append _ _ _).trans ht.symm)).elim
+  | resume hE' hA hEi _ _ hu =>
+    exact (bad (hA.append' (hE'.cons' (F := .hctlA _ _ _ _ _ _ _ _) trivial)) (kont_redex hu)
+      (fun _ h => by cases h) ((plug_append _ _ _).trans ht.symm)).elim
+  | resumeDie hE' hu _ => exact (bad hE' (kont_redex hu) (fun _ h => by cases h) ht.symm).elim
+  | todo hE' => exact (bad hE' todo_redex (fun _ h => by cases h) ht.symm).elim
+  | glob hE' _ => exact (bad hE' (glob_redex _) (fun _ h => by cases h) ht.symm).elim
 
 theorem LStep.moves {root : Roots} {Λ : List Rgn} {μ : List Tm} {t : Tm} (h : LStep μ t) :
     Moves root Λ μ t :=
   let ⟨_, _, s⟩ := h; let ⟨_, s'⟩ := s.step (root := root) Λ; .inl ⟨_, _, s'⟩
+
+theorem Act.toSim {a b : Tm} (h : Act W a b) (hB : ¬ W.B) : Sim W .any a b := by
+  cases h with
+  | dropA hb h => exact .dropA hb h
+  | dropB hn hb h => exact .dropB hn hb h
+  | forceA h => exact .forceA h
+  | doneF hB' hd hv' hc' hn => exact .doneF hB' hd hv' hc' hn
+  | againF1 hB' hc he hev hev' hσ hσn hσv hσv' =>
+    exact .againF1 hB' hc he hev hev' hσ hσn hσv hσv'
+  | againF2 hB' hl _ ht hc hσ hσn hσv hσv' =>
+    exact .againF2 (by decide) hB' hl ht hc hσ hσn hσv hσv'
+  | againF3 hB' hd hv hv' hcv hcv' hnv' hvv hc hσ hσn hσv hσv' =>
+    exact .againF3 hB' hd hv hv' hcv hcv' hnv' hvv hc hσ hσn hσv hσv'
+  | againR1 hB' hc he hev hev' hσ hσn hσv hσv' =>
+    exact .againR1 hB' hc he hev hev' hσ hσn hσv hσv'
+  | againR2 hB' hl _ ht hc hσ hσn hσv hσv' =>
+    exact .againR2 (by decide) hB' hl ht hc hσ hσn hσv hσv'
+  | againR3 hB' hd hv hv' hcv hcv' hnv' hvv hc hσ hσn hσv hσv' =>
+    exact .againR3 hB' hd hv hv' hcv hcv' hnv' hvv hc hσ hσn hσv hσv'
+  | letRaise hB' hv hv' hvv => exact .letRaise hB' hv hv' hvv
+  | letUnw hB' hl ha => exact .letUnw hB' hl ha
+  | letTodo hB' => exact .letTodo hB'
+  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB'
+  | o4B hB' | o4Alloc1 hB' | o4Bind hB' | o4Settle hB' => exact (hB hB').elim
+
+/-- The left side of a special pair (without `W.B`) steps whenever the right side steps. -/
+theorem Act.moves {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm}
+    {E₁ E₂ : List Frame} {a b : Tm} {o₂ : Out} (h : Act W a b) (hst : StR W μ μ₂) (hB : ¬ W.B)
+    (hE₁ : OkE E₁) (hE₂ : OkE E₂) (hs₂ : Step root l Λ₂ μ₂ (plug E₂ b) o₂) :
+    Moves root Λ μ (plug E₁ a) := by
+  have ofL : LStep μ a → Moves root Λ μ (plug E₁ a) := fun ⟨μ', _, s⟩ =>
+    LStep.moves ⟨μ', _, s.plug hE₁⟩
+  cases h with
+  | dropA => exact ofL ⟨_, _, [.let_ _], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
+  | dropB => exact ofL (.pure (.let_ .loc))
+  | forceA => exact ofL ⟨_, _, [.force], _, _, OkE.nil.cons' trivial, rfl, rfl, .inr fun _ => .lazy⟩
+  | doneF _ hd =>
+    obtain ⟨-, -, -, -, -, -, hμ₁, -⟩ := hst.done _ _ _ _ hd
+    exact ofL (.head fun _ => .forceDone hμ₁)
+  | againF1 _ _ he _ hve' _ _ _ _ | againR1 _ _ he _ hve' _ _ _ _ =>
+    rcases hve' with ⟨j, rfl⟩ | hv'
+    · exact (Step.not_var ((hE₂.cons' (F := .let_ _) trivial).cons' (F := .force) trivial) hs₂).elim
+    · obtain ⟨l', rfl⟩ := Step.force_val_loc (hE₂.cons' (F := .let_ _) trivial) hv' hs₂
+      obtain ⟨l₀, k, rfl, hl⟩ := (he .top (by decide)).rinv_loc hB
+      obtain ⟨c, -, hc, -, -⟩ := hst.cell _ _ _ hl
+      by_cases h₁ : ∃ d, c = .lazy d
+      · obtain ⟨d, rfl⟩ := h₁
+        exact .inl ⟨_, _, .rt (E := .let_ _ :: E₁) (hE₁.cons' trivial) (.forcePending hc)⟩
+      · by_cases h₂ : ∃ o, c = .done o
+        · obtain ⟨o, rfl⟩ := h₂
+          exact .inl ⟨_, _, .rt (E := .let_ _ :: E₁) (hE₁.cons' trivial) (.forceDone hc)⟩
+        · exact .inl ⟨_, _, .rt (E := .let_ _ :: E₁) (hE₁.cons' trivial)
+            (.forceRunning hc (fun d h => h₁ ⟨d, h⟩) (fun o h => h₂ ⟨o, h⟩))⟩
+  | againF2 _ _ hfn _ _ _ _ _ _ | againR2 _ _ hfn _ _ _ _ _ _ =>
+    rcases hfn with hv | ⟨v, hv, rfl⟩ | ⟨p, ℓ, u, rfl⟩
+    · exact .inl ⟨_, _, .rt (E := .let_ _ :: E₁) (hE₁.cons' trivial) (.settleVal hv)⟩
+    · exact .inl ⟨_, _, .rt (E := .let_ _ :: E₁) (hE₁.cons' trivial) (.settleRaise hv)⟩
+    · exact .inl ⟨_, _, .rt (E := .let_ _ :: E₁) (hE₁.cons' trivial) .settleUnw⟩
+  | againF3 _ hd | againR3 _ hd =>
+    exact ofL (.pure (.let_ (hst.done _ _ _ _ hd).2.1))
+  | letRaise _ hv =>
+    exact .inl ⟨_, _, .raise hE₁ (F := .let_ _) trivial (by simp [Frame.isTry])
+      (by simp [Frame.isInside]) (by simp [Frame.isCtl]) hv⟩
+  | letUnw =>
+    exact .inl ⟨_, _, .unw hE₁ (F := .let_ _) trivial (by simp [Frame.isInside])
+      (by simp [Frame.isCtl]) (by simp [Frame.catches])⟩
+  | letTodo =>
+    exact .inl ⟨_, _, .todo (E := .let_ _ :: E₁) (hE₁.cons' trivial)⟩
+  | bornA hB' | bornB hB' | bornS hB' | bornV hB' | dead hB'
+  | o4B hB' | o4Alloc1 hB' | o4Bind hB' | o4Settle hB' => exact (hB hB').elim
 
 /-- **A step of a right thread** is answered by the left side, or the right side catches up. -/
 theorem thread_reflect {S : Sig} {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm}
@@ -92,7 +221,7 @@ theorem thread_reflect {S : Sig} {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} 
   rcases ht with ht | ⟨E, E', n, e, e', rfl, rfl, hE, -, -, -, hc, -⟩
   case inr => exact .inl (.inl ⟨_, _, .rt hE (.forcePending hc)⟩)
   by_cases hf : Final t
-  · obtain ⟨W', μ₂', b', rj, hb', s⟩ := ht.fcu rfl hf μ₂ (fun h => (hB h).elim)
+  · obtain ⟨W', μ₂', b', rj, hb', s⟩ := ht.fcu rfl hf μ₂ hst (fun h => (hB h).elim)
     rcases rj.pot with ⟨-, rfl⟩ | hlt
     · exact (hs₂.not_final hb').elim
     · exact .inr ⟨W', μ₂', b', rj, hlt, .inl s⟩
@@ -102,20 +231,25 @@ theorem thread_reflect {S : Sig} {root : Roots} {l : Lbl} {Λ Λ₂ : List Rgn} 
     rintro l e a rfl
     have he := hr.2 (.rconsL l a) e trivial rfl
     exact hr.1 (.rcons he (hr.2 (.rconsR l e) a he rfl))
-  rcases ht.dec hr.1 (fun _ _ h => Redex.app hr h) hrc ((hty.inner hE hr.1 rfl).not_alts) _ _ rfl
-      hE μ₂ (fun h => (hB h).elim) with
-    ⟨W', μ', E₀, E₁, a, b, E₂, hj, rfl, rfl, -, -, hact⟩ | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
+  rcases ht.dec hr.1 (fun _ _ h => Redex.app hr h) hrc ((hty.inner hE hr.1 rfl).not_alts)
+      (fun a b he => by subst he; exact hr.2 (.let_ b) a trivial rfl)
+      (fun l a he => by subst he; exact .inl (hr.2 (.settle l) a trivial rfl))
+      _ _ rfl hE μ₂ hst (fun h => (hB h).elim) with
+    ⟨W', μ', E₀, E₁, a, b, E₂, hj, rfl, rfl, hfr, hE₂, hact⟩ | ⟨W', μ₂', E₂, r₂, hj, hfr, hE₂, hs⟩ |
     ⟨W', μ', E₂, n, a, b, hj, -, -, rfl, -, -⟩
   · rw [plug_append]
-    obtain ⟨μ', a', s⟩ := hact.lstep (μ := μ) (fun h => hB (hj.le.B.2 h))
-    exact .inl (LStep.moves ⟨μ', _, s.plug (fun G hG => hE G (List.mem_append_right _ hG))⟩)
+    rcases hj.pot with ⟨e₁, e₂⟩ | hlt
+    · subst μ' t₂
+      exact .inl (hact.moves (hj.st _ hst) (fun h => hB (hj.le.B.2 h))
+        (fun G hG => hE G (List.mem_append_right _ hG)) hE₂ hs₂)
+    · exact .inr ⟨W', μ', plug E₂ b, hj, hlt, .inl (hfr.plugs (hact.toSim (fun h => hB (hj.le.B.2 h))))⟩
   · have hrel : Sim W' .any (plug E r) (plug E₂ r₂) := hfr.plugs hs.lower
     rcases hj.pot with ⟨e₁, e₂⟩ | hlt
     · subst μ₂' t₂
       have hst' := hj.st _ hst
       have hrg' := hrg.keep hj.le keepO_refl
       have hB' : ¬ W'.B := fun h => hB (hj.le.B.2 h)
-      rcases hs.redex_cu hr hB' μ₂ with hr₂ | ⟨W'', μ₂'', r₂', rj, hlt, hs'⟩
+      rcases hs.redex_cu hr hB' μ₂ hst' with hr₂ | ⟨W'', μ₂'', r₂', rj, hlt, hs'⟩
       · rcases reflect_focus hE hE₂ hr hr₂ hs hfr hst' hrg' hB' hty hs₂ with h | h
         · exact .inl h
         · obtain ⟨W'', μ₂'', t₂', rj, hlt, s⟩ := h

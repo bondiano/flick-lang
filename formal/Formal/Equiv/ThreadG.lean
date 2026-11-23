@@ -42,7 +42,8 @@ theorem kept_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ :
     (fun _ _ _ h => by cases h) id (fun _ _ h => by cases h) ht hst hR hcl₁ hcl₂ hrg hs₀ ?_
   intro W' μ₂' E₂ r₂ hj hfr hE₂ hs
   obtain ⟨v₂, rfl, hv₂, h₂⟩ := perform_right hv hs
-  obtain ⟨A₂, G₂, B₂, rfl, hA, hG, hB, hA₂, hB₂, -⟩ := split_at (fun _ h => by cases h) hfr hE₂
+  obtain ⟨A₂, G₂, B₂, rfl, hA, hG, hB, hA₂, hB₂, -⟩ :=
+    split_at (fun _ h => by cases h) (fun _ h => by cases h) hfr hE₂
   cases hG with
   | @hkeep _ _ ℓ' _ _ _ al₂ hl hal =>
     obtain ⟨b₂, hb₂, hbb⟩ := armOf_right hal ha
@@ -82,7 +83,8 @@ theorem resume_sim {root : Roots} {Λ Λ₂ : List Rgn} {μ μ₂ : List Tm} {τ
   obtain ⟨k₂, u₂, rfl, h₁, h₂⟩ := hs.inv_app
   obtain ⟨ℓ₂, kd, rfl, hl₂⟩ := h₁.inv_kont
   have hu₂ := h₂.top_value rfl hu
-  obtain ⟨A₂, G₂, B₂, rfl, hfA, hG, hB, hA₂, hB₂, -⟩ := split_at (fun _ h => by cases h) hfr hE₂
+  obtain ⟨A₂, G₂, B₂, rfl, hfA, hG, hB, hA₂, hB₂, -⟩ :=
+    split_at (fun _ h => by cases h) (fun _ h => by cases h) hfr hE₂
   have hst' := hj.st _ hst
   cases hG with
   | @hctlA _ _ ℓh' _ _ κ' _ _ _ al₂ _ r₂' _ k₂ hlh hk hal hr hc =>
