@@ -327,17 +327,13 @@ fn pass(e: &mut Expr, arity: Arity, lang: &crate::Known<'_>, preserve_types: boo
     changed
 }
 
-/// Hoists the statements of blocks a `let` binds or the block ends with:
+/// Hoists inner statements from let bindings, expression statements and block results:
 /// locals are unique in a definition, so nothing is captured differently.
 fn flatten(stmts: &mut Vec<Stmt>, result: &mut Box<Expr>) -> bool {
     let nested = |s: &Stmt| {
         matches!(
             s,
-            Stmt::Let { value: v, .. }
-                | Stmt::Var { value: v, .. }
-                | Stmt::Assign(_, v)
-                | Stmt::Expr(v)
-                if matches!(v.kind, ExprKind::Block(..))
+            Stmt::Let { value, .. } | Stmt::Expr(value) if matches!(value.kind, ExprKind::Block(..))
         )
     };
     if !stmts.iter().any(nested) && !matches!(result.kind, ExprKind::Block(..)) {
@@ -476,5 +472,7 @@ fn globals(e: &Expr, module: &str, out: &mut BTreeSet<String>) {
 
 #[cfg(test)]
 mod context_tests;
+#[cfg(test)]
+mod flatten_tests;
 #[cfg(all(test, feature = "typed-ir"))]
 mod specialize_tests;
