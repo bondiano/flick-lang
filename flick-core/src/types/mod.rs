@@ -132,6 +132,7 @@ pub use builtins::{
 pub use class_members::class_defaults;
 pub use classes::{Dict, Match, STRUCTURAL, match_type, which};
 pub use comprehension::{comprehension, for_parts};
+pub use contracts::ContractInfo;
 pub use convert::is_type;
 pub use display::{show_signature, show_type};
 pub use do_notation::{bind_key, guard_key};

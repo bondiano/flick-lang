@@ -43,94 +43,7 @@ use crate::syntax::cst::{Element, Node};
 use crate::syntax::{Parse, kind::SyntaxKind as K};
 use crate::types;
 
-/// A file checked on its own takes the path of a module of a project run,
-/// while resolving only built-in imports.
-pub(crate) fn check_file(
-    sources: &SourceMap,
-    file: FileId,
-    parse: Parse,
-    syntax: ModuleSyntax,
-    expansion: Option<Expansion>,
-    mut derived: Vec<Diagnostic>,
-) -> Vec<Diagnostic> {
-    let name = syntax
-        .header
-        .as_ref()
-        .map_or(String::new(), |h| h.name.clone());
-    let loaded = Loaded {
-        path: PathBuf::from(&sources.get(file).path),
-        file,
-        root: Root::Other(None),
-        parse: Arc::new(parse),
-        syntax: Arc::new(syntax),
-        name: name.clone(),
-        expansion: expansion.map(Arc::new),
-        editing: Vec::new(),
-        loader: None,
-        virtual_of: None,
-        member_of: None,
-        scope_of: None,
-    };
-    let modules = [loaded];
-    let mut by_name = BTreeMap::new();
-    by_name.insert(name, 0);
-    let from_packages = BTreeMap::new();
-    let precompiled = Precompiled::default();
-    let watched = types::Watched::new(first_party::WATCH);
-    let watching = first_party::plugin(first_party::PACKAGE).map(|plugin| Watching {
-        package: first_party::PACKAGE.to_owned(),
-        plugin,
-        watched: types::Watched::new(first_party::WATCH),
-    });
-    let watching: Vec<_> = watching.into_iter().collect();
-    let checking = Checking {
-        modules: &modules,
-        sources,
-        by_name: &by_name,
-        from_packages: &from_packages,
-        project: None,
-        stages_by_class: false,
-        lower: false,
-        lowered: &[],
-        proving: false,
-        cached_ir: CachedIr::Dropped,
-        lower_packages_only: false,
-        precompiled: &precompiled,
-        cache: None,
-        watching: &watching,
-        watched: &watched,
-        privates: &BTreeMap::new(),
-    };
-    let builtin = |name: &str| {
-        types::builtins()
-            .iter()
-            .find(|i| i.module == name && !i.private)
-            .cloned()
-    };
-    let mut diagnostics = checking.check(&modules[0], &builtin, &builtin).diagnostics;
-    diagnostics.append(&mut derived);
-    super::environment::validate_standalone_when(
-        &modules[0].syntax,
-        sources.get(file),
-        &mut diagnostics,
-    );
-    // a lone file has no package, so no private module of one is its own
-    for import in &modules[0].syntax.imports {
-        let private = |i: &Interface| i.module == import.module && i.private;
-        if types::builtins().iter().any(private) {
-            diagnostics.push(Diagnostic::error(
-                codes::R017,
-                format!(
-                    "module `{}` is private to its package; import its public facade instead",
-                    import.module
-                ),
-                import.span,
-            ));
-        }
-    }
-    Diagnostic::sort_by_span(&mut diagnostics);
-    diagnostics
-}
+include!("checking_file.rs");
 
 mod graph;
 
@@ -304,13 +217,21 @@ impl Loader<'_> {
             watched: &self.watchers.watched,
             stages_by_class: self.stages_by_class,
             lowered: self.lowered.as_deref().unwrap_or(&[]),
-            proving: self.modules.iter().any(Loaded::has_proofs),
-            // a failed import leaves names unresolved, and the build fails anyway
+            proving: self.modules.iter().any(Loaded::has_proofs) || self.has_selected_contracts(),
+            prove_contracts: self.prove_contracts,
+            selected: self.prove_contracts.then_some(&self.selected_roots),
+            all_contracted: &self.all_contracted,
+            verified_contracts: &self.verified_contracts,
+            // a failed import leaves names unresolved, and the build fails anyway;
+            // during proving, clean helper modules still lower so one failed
+            // contract does not cascade spurious `T082` into unrelated modules
             lower: self.lowered.is_some()
-                && !self
-                    .diagnostics
-                    .iter()
-                    .any(|d| d.severity == Severity::Error),
+                && (self.prove_contracts
+                    || self.modules.iter().any(Loaded::has_proofs)
+                    || !self
+                        .diagnostics
+                        .iter()
+                        .any(|d| d.severity == Severity::Error)),
             // an editor's run drops IR unless a selected target/environment needs
             // it for reachable-use preflight (which needs no IR types); a check
             // or build keeps full typed IR
@@ -349,6 +270,9 @@ impl Loader<'_> {
                 .insert(self.modules[i].path.clone(), (key, output.clone()));
         }
         self.diagnostics.extend(output.diagnostics);
+        if i < self.verified_contracts.len() {
+            self.verified_contracts[i] = output.contracts;
+        }
         if let (Some(lowered), Some(ir)) = (&mut self.lowered, output.ir) {
             lowered[i] = Some((Arc::unwrap_or_clone(ir), output.declarations, output.proofs));
         }
@@ -404,8 +328,17 @@ struct Checking<'a> {
     lower: bool,
     /// The IR of the modules checked before this level, which proofs read.
     lowered: &'a [Option<Lowered>],
-    /// The run has proofs: its modules keep their IR for them.
+    /// The run has proofs or selected contracts: its modules keep their IR for them.
     proving: bool,
+    /// Whether this run verifies contracts (`Mode::Prove` / `prove_file`).
+    prove_contracts: bool,
+    /// When `Some`, only modules whose normalized path is in this set have
+    /// their contracts verified.
+    selected: Option<&'a HashSet<PathBuf>>,
+    /// Every `(module, name)` declared with a contract across all loaded modules.
+    all_contracted: &'a HashSet<(String, String)>,
+    /// Verified contracts produced per module earlier in this run.
+    verified_contracts: &'a [Vec<ir::ProvenContract>],
     cached_ir: CachedIr,
     lower_packages_only: bool,
     precompiled: &'a Precompiled,
@@ -487,6 +420,8 @@ struct Output {
     declarations: Arc<Interface>,
     /// The proofs it declares, which a proof of an importer replays.
     proofs: Vec<ir::Proven>,
+    /// The verified contracts certified for this module in this run.
+    contracts: Vec<ir::ProvenContract>,
 }
 
 /// What importers see of a module: all of a clean one; of one with errors,

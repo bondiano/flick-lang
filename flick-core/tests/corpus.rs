@@ -361,7 +361,17 @@ fn checked(page: &str, block: &Block, counts: &mut Counts, failures: &mut Vec<St
     counts.checked += 1;
     let mut sources = SourceMap::default();
     let file = sources.add(format!("{page}:{line}"), block.text.as_str());
-    let diagnostics = flick_core::check(&sources, file);
+    let prove = page_code(page)
+        .is_some_and(|code| matches!(code.as_str(), "T087" | "T088" | "T089"))
+        || block
+            .codes
+            .iter()
+            .any(|code| matches!(short(code), "T087" | "T088" | "T089"));
+    let diagnostics = if prove {
+        flick_core::prove(&sources, file)
+    } else {
+        flick_core::check(&sources, file)
+    };
     let found: Vec<String> = diagnostics
         .iter()
         .map(|d| {

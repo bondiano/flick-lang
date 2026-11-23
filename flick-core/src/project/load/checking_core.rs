@@ -1,4 +1,14 @@
 impl Checking<'_> {
+    fn proves_contracts(&self, loaded: &Loaded) -> bool {
+        self.prove_contracts
+            && loaded.has_contracts()
+            && self.selected.is_none_or(|s| s.contains(&loaded.path))
+    }
+
+    fn lowers(&self, loaded: &Loaded) -> bool {
+        self.lower && (!self.lower_packages_only || matches!(loaded.root, Root::Package(_)))
+    }
+
     fn raw_interface<'i>(
         &'i self,
         interfaces: &'i [Option<Interface>],
@@ -34,10 +44,13 @@ impl Checking<'_> {
                 .extend(self.namespace_import_errors(loaded, interfaces));
             output
         };
-        // a proof reads the bodies of what it names, which no interface shows:
-        // its module is checked again on every run, never taken from a cache,
-        // as is a module whose laws a bundle of the run may read
-        let fresh = loaded.has_proofs() || (self.proving && loaded.has_laws());
+        // a proof or contract reads the bodies of what it names, which no
+        // interface shows: its module is checked again on every run, never
+        // taken from a cache, as is a module whose laws a bundle of the run
+        // may read
+        let fresh = loaded.has_proofs()
+            || (self.proving && loaded.has_laws())
+            || self.proves_contracts(loaded);
         let Some(cache) = self.cache.filter(|_| !fresh) else {
             return (check(), None, None, Reason::Changed(Vec::new()));
         };
@@ -72,7 +85,7 @@ impl Checking<'_> {
                     .map(|i| i.module.as_str());
                 let changed = (entry.filter(|_| cache.explain))
                     .map_or_else(Vec::new, |(cached, _)| cached.differs(&key, imports));
-                key.lower = self.lower;
+                key.lower = self.lowers(loaded);
                 (check(), Some(key), None, Reason::Changed(changed))
             }
         }
@@ -131,6 +144,7 @@ impl Checking<'_> {
             ir: None,
             declarations: Arc::new(interface),
             proofs: Vec::new(),
+            contracts: Vec::new(),
         }
     }
 
@@ -313,8 +327,9 @@ impl Checking<'_> {
             });
         }
         diagnostics.extend(checked);
-        // a module that checked is the only one whose proofs are about something
+        // a module that checked is the only one whose proofs or contracts are about something
         let mut proofs = Vec::new();
+        let mut verified_contracts = Vec::new();
         if clean {
             use crate::project::builtins::builtin_laws;
             let stages = self.stages_by_class;
@@ -322,12 +337,28 @@ impl Checking<'_> {
             let run = ir::Run {
                 builtins: &|| builtin_modules_of(stages),
                 builtin_laws: &|| builtin_laws(stages),
-                project: &|name| lowered(name).map(|(ir, _, _)| ir),
+                project: &|name| {
+                    lowered(name)
+                        .map(|(ir, _, _)| ir)
+                        .or_else(|| self.precompiled.ir(name))
+                },
                 proven: &|name| lowered(name).map(|(_, _, p)| p.as_slice()),
+                all_contracted: self.all_contracted,
+                contracts: &|name| {
+                    self.by_name
+                        .get(name)
+                        .and_then(|&idx| self.verified_contracts.get(idx))
+                        .map_or(&[], Vec::as_slice)
+                },
             };
             let (found, proven) = ir::check_proofs(&module, &typing, &run);
             diagnostics.extend(found);
             proofs = proven;
+            if self.proves_contracts(loaded) {
+                let (contract_diags, summaries) = ir::check_contracts(&module, &typing, &run);
+                diagnostics.extend(contract_diags);
+                verified_contracts = summaries;
+            }
         }
         interface.proofs = typing.proofs.iter().map(|p| p.name.clone()).collect();
         let mut declarations = typing.declarations.clone();
@@ -405,46 +436,10 @@ impl Checking<'_> {
                 .map(Arc::new),
             declarations,
             proofs,
+            contracts: verified_contracts,
         }
     }
 
-    fn lower_if_clean(
-        &self,
-        loaded: &Loaded,
-        module: &resolve::Module<'_>,
-        typing: &types::Typing,
-        clean: bool,
-        declarations: &mut Arc<Interface>,
-        diagnostics: &mut Vec<Diagnostic>,
-    ) -> Option<ir::Module> {
-        let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
-        if clean
-            && self.lower
-            && lowers
-            && loaded.scope_of.is_none()
-            && !Self::is_module_template(loaded)
-        {
-            #[cfg(not(target_arch = "wasm32"))]
-            match ir::lower_with_local_schemes(module, typing) {
-                Ok((lowered, local_schemes)) => {
-                    if !local_schemes.is_empty() {
-                        Arc::make_mut(declarations).local_schemes = local_schemes;
-                    }
-                    return Some(lowered);
-                }
-                Err(d) => diagnostics.extend(d),
-            }
-            #[cfg(target_arch = "wasm32")]
-            {
-                let _ = declarations;
-                match ir::lower(module, typing) {
-                    Ok(lowered) => return Some(lowered),
-                    Err(d) => diagnostics.extend(d),
-                }
-            }
-        }
-        None
-    }
 }
 
 /// Takes where `imported` declares the names `interface` re-exports.
@@ -458,6 +453,8 @@ fn redeclare(interface: &mut Interface, imported: &Interface) {
         }
     }
 }
+
+include!("checking_lower.rs");
 
 include!("checking_inline_values.rs");
 

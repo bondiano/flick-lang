@@ -197,7 +197,10 @@ impl Ide<'_> {
         if let Some(hover) = self.head_hover(file, offset) {
             return Some(hover);
         }
-        if let Some((code, note, range)) = self.keyword(file, offset) {
+        if let Some((code, note, range)) = self
+            .contract_keyword(file, offset)
+            .or_else(|| self.keyword(file, offset))
+        {
             return Some((format!("```flick\n{code}\n```\n\n{note}"), range));
         }
         if let Some(hover) = self.operator_hover(file, offset) {

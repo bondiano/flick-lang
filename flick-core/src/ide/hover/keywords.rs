@@ -119,4 +119,35 @@ impl Ide<'_> {
             (kw.start, kw.end),
         ))
     }
+
+    /// `require` and `ensure` inside a function contract, which only
+    /// `flick prove` checks.
+    pub(super) fn contract_keyword(
+        &self,
+        file: FileId,
+        offset: u32,
+    ) -> Option<(String, String, (u32, u32))> {
+        let m = self.module(file)?;
+        let path = tree::path_to(&m.tree, offset);
+        if !path.iter().any(|n| n.kind == K::Contract) {
+            return None;
+        }
+        let kw = (*path.last()?)
+            .child_tokens()
+            .find(|t| t.start <= offset && offset <= t.end)?;
+        let (head, note) = match kw.kind {
+            K::RequireKw => (
+                "require …",
+                "Contract precondition (`Bool` of the function's parameters). \
+                 Unchecked by `flick check`; run `flick prove` to verify.",
+            ),
+            K::EnsureKw => (
+                "ensure …",
+                "Contract postcondition (`Result -> Bool`). \
+                 Unchecked by `flick check`; run `flick prove` to verify.",
+            ),
+            _ => return None,
+        };
+        Some((head.to_owned(), note.to_owned(), (kw.start, kw.end)))
+    }
 }

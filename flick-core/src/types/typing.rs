@@ -281,6 +281,8 @@ pub struct Typing {
     pub proofs: Vec<super::proof_decls::ProofInfo>,
     /// The laws of the module's classes, typed as proofs are.
     pub laws: Vec<super::proof_decls::ProofInfo>,
+    /// The function contracts, as the checker settled them.
+    pub contracts: Vec<super::contracts::ContractInfo>,
     /// Local `let` / `let rec` signatures and annotations keyed by `K::LetDecl`
     /// range, keeping enclosing `Type::Skolem` ids until lowering resolves
     /// scope regions to their unique IR names.

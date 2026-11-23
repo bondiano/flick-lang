@@ -130,7 +130,7 @@ impl Checking<'_> {
             // the code of its blocks too, which other modules' blocks change
             text: self.text_of(loaded).to_owned(),
             config: self.project.map(|p| p.config.clone()),
-            lower: self.lower,
+            lower: self.lowers(loaded),
             cached_ir: self.cached_ir,
             imports: loaded
                 .syntax

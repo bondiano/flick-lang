@@ -132,6 +132,7 @@ impl Checking<'_> {
             ir: ir.map(Arc::new),
             declarations,
             proofs: Vec::new(),
+            contracts: Vec::new(),
         }
     }
 

@@ -155,7 +155,7 @@ impl Checker<'_> {
     /// Whether `ty` is a type of the domain.
     fn admit(&self, ty: &Ty, span: Span) -> Result<(), Failure> {
         match ty {
-            Ty::Rigid(_) | Ty::Bool => Ok(()),
+            Ty::Rigid(_) | Ty::Bool | Ty::Int => Ok(()),
             Ty::Refused(why) => refused(span, why.clone()),
             Ty::Fun(a, b) => {
                 self.admit(a, span)?;

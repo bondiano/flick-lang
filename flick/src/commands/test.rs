@@ -291,6 +291,23 @@ pub fn watched(global: &GlobalArguments) -> Vec<PathBuf> {
     }
 }
 
+/// Like [`watched`], also watching the project's proof root for `flick prove --watch`.
+pub fn watched_with_proofs(global: &GlobalArguments) -> Vec<PathBuf> {
+    let host = FsHost::new();
+    let explicit = global.project.as_deref().map(Path::new);
+    match project::discover(&host, &mut SourceMap::default(), &host.cwd, explicit) {
+        Ok(Some(project)) => {
+            let mut roots = watched_roots(&project);
+            let proof_root = project.proof_root();
+            if proof_root.is_dir() {
+                roots.push(proof_root);
+            }
+            roots
+        }
+        _ => vec![host.cwd],
+    }
+}
+
 /// What a watch of `project` follows: its roots, its configuration and the
 /// libraries it depends on by path.
 pub fn watched_roots(project: &Project) -> Vec<PathBuf> {
