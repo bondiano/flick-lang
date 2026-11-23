@@ -102,7 +102,10 @@ with the terms they describe, while permitting erased paths where optional type
 annotations are omitted. UI metadata and complete effect analyses are still not
 implied by receiving a `Program`. A consumer that needs an extra projection
 must require its declared schema and refuse missing or incompatible data. It
-cannot call the checker through this world.
+cannot call the checker through this world. Layout-aware backends compute
+monomorphic data, record and tuple layouts from `Program` and a target
+`PrimitiveTable` through the shared `flick-backend-support::layout` library
+without storing layout facts in value-ABI tables.
 
 The CLI supplies `flick.typescript@0.2.0` as CBOR of the WIT
 `typescript-module-projection` record. Each logical module contains every

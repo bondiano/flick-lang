@@ -400,6 +400,9 @@ fn equality_in_a_local_function_compares_by_identity() {
     assert!(!printed.contains(" != "), "{printed}");
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "layout_tests.rs"]
+mod layout_tests;
 #[path = "owner_tests.rs"]
 mod owner_tests;
 #[path = "typed_ir_more_tests.rs"]

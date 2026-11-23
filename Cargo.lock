@@ -711,6 +711,7 @@ name = "flick-backend-support"
 version = "0.1.0"
 dependencies = [
  "flick-ir",
+ "proptest",
  "serde_json",
 ]
 
