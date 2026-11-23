@@ -115,29 +115,31 @@ impl Lower<'_> {
     }
 
     fn await_call(&mut self, key: Range, operand: Box<Expr>, span: Span) -> Expr {
-        let mut func = match self.typing.builtin_awaits.get(&key).copied() {
-            Some(builtin) => {
-                let builtin = lang::item(builtin);
-                Expr::new(
-                    ExprKind::Global {
-                        module: builtin.module.clone(),
-                        name: builtin.name.clone(),
-                        type_args: self.ir_type_args(key),
-                    },
-                    span,
-                )
-            }
-            None => self.prelude_method(key, Lang::AwaitMethod),
-        };
         let ty = self.ir_type(key);
         let stage = Stage::Runtime;
-        func.ty = operand.ty.clone().zip(ty.clone()).map(|(param, result)| {
-            flick_ir::TypeRef::new(flick_ir::IrType::Fun {
-                param,
-                stage,
-                result,
-            })
-        });
+        let func = if let Some(&builtin) = self.typing.builtin_awaits.get(&key) {
+            // A productive opaque alias can still name the operand in IR.
+            // The selected worker has its declared Eff or Lazy parameter.
+            let builtin = lang::item(builtin);
+            Expr::new(
+                ExprKind::Global {
+                    module: builtin.module.clone(),
+                    name: builtin.name.clone(),
+                    type_args: self.ir_type_args(key),
+                },
+                span,
+            )
+        } else {
+            let mut method = self.prelude_method(key, Lang::AwaitMethod);
+            method.ty = operand.ty.clone().zip(ty.clone()).map(|(param, result)| {
+                flick_ir::TypeRef::new(flick_ir::IrType::Fun {
+                    param,
+                    stage,
+                    result,
+                })
+            });
+            method
+        };
         let app = ExprKind::App {
             func: Box::new(func),
             arg: operand,
