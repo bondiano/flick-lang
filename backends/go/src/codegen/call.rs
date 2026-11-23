@@ -41,17 +41,28 @@ impl<'a> Gen<'a> {
                     .flatten()
                     .and_then(|(ty, held)| match held {
                         own::Held::Zero => None,
-                        own::Held::Fields(_) => Some(a.alloc_str(&own::make(&ty))),
-                        own::Held::Record(_) => Some(a.alloc_str(&own::of(&ty))),
-                    });
-                Box::new(move |_, args: &[Code<'a>]| {
-                    let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
-                    match own {
-                        // a Go type of its own, which is its tag
-                        Some(make) => call(a, make, args).into(),
-                        None => {
-                            call(a, "flickrt.NewData", iter::once(a.text(tag)).chain(args)).into()
+                        own::Held::Fields(slots) => {
+                            Some((a.alloc_str(&own::make(&ty)), Some(slots)))
                         }
+                        own::Held::Record(_) => Some((a.alloc_str(&own::of(&ty)), None)),
+                    });
+                Box::new(move |_, args: &[Code<'a>]| match &own {
+                    // a Go type of its own, which is its tag; a curried value
+                    // unboxes scalar fields nil-safely so `tagOf` can probe it
+                    Some((make, Some(slots))) if slots.iter().any(Option::is_some) => {
+                        let args = args.iter().enumerate().map(|(i, arg)| match slots[i] {
+                            Some(native) => native.field_unbox(a, arg.doc),
+                            None => arg.doc,
+                        });
+                        call(a, *make, args).into()
+                    }
+                    Some((make, _)) => {
+                        let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
+                        call(a, *make, args).into()
+                    }
+                    None => {
+                        let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
+                        call(a, "flickrt.NewData", iter::once(a.text(tag)).chain(args)).into()
                     }
                 })
             }
@@ -191,6 +202,94 @@ impl<'a> Gen<'a> {
             }
         }
     }
+}
+
+struct AppTarget<'a> {
+    make: Call<'a>,
+    given: Vec<Code<'a>>,
+    arity: usize,
+    effects: u64,
+    typed_con: Option<(&'a str, Vec<Option<super::arith::Native>>)>,
+    scalar_method: Option<super::typed::ScalarMethod>,
+}
+
+impl<'a> Gen<'a> {
+    fn app_target(&mut self, head: &Expr, total_args: usize) -> AppTarget<'a> {
+        let a = self.a;
+        let mut typed_con = None;
+        let mut scalar_method = None;
+        let (make, given, arity, effects): (Call<'a>, Vec<Code<'a>>, usize, u64) = match &head.kind
+        {
+            ExprKind::Con(c) => {
+                if let Some((ty, own::Held::Fields(slots))) = self.own_type(c)
+                    && slots.iter().any(Option::is_some)
+                {
+                    typed_con = Some((a.alloc_str(&own::make(&ty)), slots));
+                }
+                (self.construct(c, Vec::new()), Vec::new(), c.arity, 0)
+            }
+            // a constructor of a GADT with the dictionaries its value holds
+            ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Con(_)) => {
+                let ExprKind::Con(c) = &inner.kind else {
+                    unreachable!("a constructor, as the guard tested");
+                };
+                let carried = dicts.iter().map(|d| self.dict(d).doc).collect();
+                (self.construct(c, carried), Vec::new(), c.arity, 0)
+            }
+            ExprKind::Global { module, name, .. } => self.direct(module, name, Vec::new()),
+            // an operation that runs here once it has its arguments
+            ExprKind::Perform {
+                effect: service,
+                op: name,
+                stages,
+            } if self.fiber.is_some()
+                && stages.iter().any(|&s| s != Stage::Pure)
+                && total_args >= operation_arity(stages) =>
+            {
+                let arity = operation_arity(stages);
+                (self.perform(service, name), Vec::new(), arity, 0)
+            }
+            ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Global { .. }) => {
+                let ExprKind::Global { module, name, .. } = &inner.kind else {
+                    unreachable!("a global, as the guard tested");
+                };
+                let dicts: Vec<Code<'a>> = dicts.iter().map(|d| self.dict(d)).collect();
+                self.direct(module, name, dicts)
+            }
+            ExprKind::Method { .. }
+                if self
+                    .scalar_method_head(head)
+                    .is_some_and(|m| total_args >= m.arity()) =>
+            {
+                let m = self.scalar_method_head(head).expect("tested by the guard");
+                scalar_method = Some(m);
+                (
+                    Box::new(|_, _: &[Code<'a>]| unreachable!("full scalar method call")),
+                    Vec::new(),
+                    m.arity(),
+                    0,
+                )
+            }
+            ExprKind::Method { dict, name, .. } if self.direct_method(dict, name).is_some() => {
+                let (module, name) = self.direct_method(dict, name).expect("tested by the guard");
+                let dicts = self.context_dicts(dict);
+                self.direct(&module, &name, dicts)
+            }
+            _ => {
+                let f = self.expr(head);
+                let f = self.spill(f);
+                (Box::new(move |_, _: &[Code<'a>]| f), Vec::new(), 0, 0)
+            }
+        };
+        AppTarget {
+            make,
+            given,
+            arity,
+            effects,
+            typed_con,
+            scalar_method,
+        }
+    }
 
     /// An application, or a constructor: a known function of all its
     /// arguments is called directly; an application of an effectful stage
@@ -214,48 +313,8 @@ impl<'a> Gen<'a> {
             head = func;
         }
         let (head, args) = head.spine();
-        let (make, given, arity, effects): (Call<'a>, Vec<Code<'a>>, usize, u64) = match &head.kind
-        {
-            ExprKind::Con(c) => (self.construct(c, Vec::new()), Vec::new(), c.arity, 0),
-            // a constructor of a GADT with the dictionaries its value holds
-            ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Con(_)) => {
-                let ExprKind::Con(c) = &inner.kind else {
-                    unreachable!("a constructor, as the guard tested");
-                };
-                let carried = dicts.iter().map(|d| self.dict(d).doc).collect();
-                (self.construct(c, carried), Vec::new(), c.arity, 0)
-            }
-            ExprKind::Global { module, name, .. } => self.direct(module, name, Vec::new()),
-            // an operation that runs here once it has its arguments
-            ExprKind::Perform {
-                effect: service,
-                op: name,
-                stages,
-            } if self.fiber.is_some()
-                && stages.iter().any(|&s| s != Stage::Pure)
-                && args.len() + usize::from(first.is_some()) >= operation_arity(stages) =>
-            {
-                let arity = operation_arity(stages);
-                (self.perform(service, name), Vec::new(), arity, 0)
-            }
-            ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Global { .. }) => {
-                let ExprKind::Global { module, name, .. } = &inner.kind else {
-                    unreachable!("a global, as the guard tested");
-                };
-                let dicts: Vec<Code<'a>> = dicts.iter().map(|d| self.dict(d)).collect();
-                self.direct(module, name, dicts)
-            }
-            ExprKind::Method { dict, name, .. } if self.direct_method(dict, name).is_some() => {
-                let (module, name) = self.direct_method(dict, name).expect("tested by the guard");
-                let dicts = self.context_dicts(dict);
-                self.direct(&module, &name, dicts)
-            }
-            _ => {
-                let f = self.expr(head);
-                let f = self.spill(f);
-                (Box::new(move |_, _: &[Code<'a>]| f), Vec::new(), 0, 0)
-            }
-        };
+        let total_args = args.len() + usize::from(first.is_some());
+        let target = self.app_target(head, total_args);
         let typed = self.typed_head(head).filter(|(_, types, _)| types.any());
         let exprs: Vec<&Expr> = args.iter().map(|(arg, _)| *arg).collect();
         let mut values: Vec<(Code<'a>, Stage)> = self
@@ -268,32 +327,39 @@ impl<'a> Gen<'a> {
         let mut quiet: Vec<bool> = exprs.iter().map(|e| quiet(e)).collect();
         quiet.extend(first.iter().map(|_| true));
         values.extend(first);
-        if values.len() < arity {
+        if values.len() < target.arity {
             // a partial application keeps what it was given
             let taken = values.len();
-            let given: Vec<Code<'a>> = given
+            let given: Vec<Code<'a>> = target
+                .given
                 .into_iter()
                 .chain(values.into_iter().map(|(v, _)| v))
                 .map(|v| self.spill(v))
                 .collect();
             return curried(
                 a,
-                &make,
+                &target.make,
                 given,
-                arity - taken,
-                effects >> taken,
+                target.arity - taken,
+                target.effects >> taken,
                 &mut || self.temp(),
             );
         }
-        let rest = values.split_off(arity);
-        let quiet = quiet.split_off(arity.min(quiet.len()));
-        let all: Vec<Code<'a>> = given
+        let rest = values.split_off(target.arity);
+        let quiet = quiet.split_off(target.arity.min(quiet.len()));
+        let all: Vec<Code<'a>> = target
+            .given
             .into_iter()
             .chain(values.into_iter().map(|(v, _)| v))
             .collect();
-        let v = match typed {
-            Some(typed) => self.typed_call(typed, &all, &exprs, e),
-            None => make(self.context.unwrap_or("nil"), &all),
+        let v = if let Some((make, slots)) = target.typed_con {
+            self.typed_con_call(make, &slots, &all, &exprs)
+        } else if let Some(method) = target.scalar_method {
+            self.scalar_method_call(method, &all, &exprs)
+        } else if let Some(typed) = typed {
+            self.typed_call(typed, &all, &exprs, e)
+        } else {
+            (target.make)(self.context.unwrap_or("nil"), &all)
         };
         self.applied(v, rest, quiet)
     }

@@ -1,5 +1,5 @@
 //! The Go release adapter supplies primitive bindings and visibility to the
-//! shared passes in legacy bare-constructor mode.
+//! shared type-preserving optimizer passes.
 
 use flick_backend::{BuildRequest, ModuleRole};
 use flick_backend_support::Known;
@@ -32,7 +32,6 @@ pub(super) fn module(
     primitives: &dyn opt::eval::PrimitiveEval,
 ) -> Module {
     let mut result = module.clone();
-    opt::strip_legacy_bare_types(&mut result);
     let exports = |owner: &str| data.facts.get(owner).map(|f| f.exports.as_slice());
     let exported = |name: &str| {
         exports(&module.name).is_some_and(|e| e.iter().any(|e| e == name))
@@ -41,9 +40,7 @@ pub(super) fn module(
     let generics = |owner: &str, name: &str| {
         let module = data.program.modules.iter().find(|m| m.name == owner)?;
         let exports = exports(owner)?;
-        let mut g = opt::names_only(module, name, &|name| exports.iter().any(|e| e == name))?;
-        opt::strip_legacy_bare_generic(&mut g);
-        Some(g)
+        opt::names_only(module, name, &|name| exports.iter().any(|e| e == name))
     };
     let arity = |owner: &str, name: &str| {
         let module = data.program.modules.iter().find(|m| m.name == owner)?;
@@ -55,7 +52,7 @@ pub(super) fn module(
         (request.modules.iter()).any(|m| m.name == owner && m.role == ModuleRole::Builtin)
     };
     let config = opt::eval::EvalConfig::default();
-    let _ = opt::optimize_legacy_bare(
+    let _ = opt::optimize_with_eval(
         &mut result,
         &exported,
         &generics,

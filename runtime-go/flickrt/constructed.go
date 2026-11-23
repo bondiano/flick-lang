@@ -12,6 +12,14 @@ type Constructed interface {
 	Fields() []Value
 }
 
+// ConstructedEqual is an optional fast path for structural equality between two
+// values of the same generated constructor Go type, avoiding boxing scalar
+// fields through Fields().
+type ConstructedEqual interface {
+	Constructed
+	EqualConstructed(other Value, strictZero bool) (equal bool, sameType bool)
+}
+
 func (d *Data) TagName() string { return d.Tag }
 
 // tagName and fieldsIn are the tag and the fields of a constructor value,

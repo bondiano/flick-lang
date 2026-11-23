@@ -230,34 +230,6 @@ pub(super) fn optimized_with_primitives(
     ir
 }
 
-#[cfg(feature = "native-project")]
-pub(crate) fn optimized_legacy_bare(
-    modules: &[Compiled],
-    module: &Compiled,
-    by_class: bool,
-    primitives: &dyn PrimitiveEval,
-) -> ir::Module {
-    let mut ir = module.ir.clone();
-    opt::strip_legacy_bare_types(&mut ir);
-    let exported = |name: &str| {
-        module.interface.exports_value(name)
-            || module
-                .ir
-                .initialization
-                .prefixes
-                .iter()
-                .any(|p| p.bindings.iter().any(|n| n == name))
-    };
-    let generics = |m: &str, name: &str| {
-        let mut g = generic_of(modules, m, name, by_class)?;
-        opt::strip_legacy_bare_generic(&mut g);
-        Some(g)
-    };
-    let arity = |m: &str, name: &str| arity_of(modules, m, name, by_class);
-    opt::optimize_legacy_bare(&mut ir, &exported, &generics, &arity, primitives);
-    ir
-}
-
 #[cfg(test)]
 mod tests {
     use crate::iface::{self, Interface};

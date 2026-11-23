@@ -16,6 +16,10 @@ func Equals(a, b Value) bool { return equalValues(a, b, false) }
 // structurally without observing storage identity or written field order.
 func SameValue(a, b Value) bool { return equalValues(a, b, true) }
 
+// EqualWith compares two Flick values structurally under SameValue when
+// strictZero is true, or SameValueZero otherwise.
+func EqualWith(a, b Value, strictZero bool) bool { return equalValues(a, b, strictZero) }
+
 func equalValues(a, b Value, strictZero bool) bool {
 	switch x := a.(type) {
 	case float64:
@@ -90,6 +94,11 @@ func equalValues(a, b Value, strictZero bool) bool {
 		// a constructor value of a Go type of its own, asked last: a number
 		// or a string never gets here
 		if x, ok := a.(Constructed); ok {
+			if eq, ok := x.(ConstructedEqual); ok {
+				if equal, same := eq.EqualConstructed(b, strictZero); same {
+					return equal
+				}
+			}
 			return sameConstructedValues(x, b, strictZero)
 		}
 		return a == b
@@ -139,6 +148,44 @@ func ordering(c int) Value {
 // finite < +Infinity < NaN, signed zeros and all NaNs equal; strings by
 // UTF-16 code units.
 func Compare(a, b Value) Value { return ordering(compare(a, b)) }
+
+// CompareInt, CompareFloat, CompareBool and CompareString are the typed total
+// order comparisons for unboxed scalar values, matching Compare without boxing.
+func CompareInt(a, b int32) Value {
+	if a < b {
+		return LT
+	}
+	if a > b {
+		return GT
+	}
+	return EQ
+}
+
+func CompareFloat(a, b float64) Value {
+	xn, yn := math.IsNaN(a), math.IsNaN(b)
+	if xn || yn {
+		return ordering(boolInt(xn) - boolInt(yn))
+	}
+	if a < b {
+		return LT
+	}
+	if a > b {
+		return GT
+	}
+	return EQ
+}
+
+func CompareBool(a, b bool) Value {
+	if a == b {
+		return EQ
+	}
+	if !a {
+		return LT
+	}
+	return GT
+}
+
+func CompareString(a, b string) Value { return ordering(CompareStrings(a, b)) }
 
 func compare(a, b Value) int {
 	switch x := a.(type) {
@@ -201,6 +248,18 @@ func combine(h, x int32) int32 { return h*31 + x }
 // Hash is `hash` of a primitive, computed as on the JS target, which hash
 // collections order their elements by.
 func Hash(a Value) Value { return hash(a) }
+
+// HashInt, HashFloat, HashBool and HashString compute primitive hashes without
+// boxing scalar arguments or results.
+func HashInt(x int32) int32     { return optimize(x) }
+func HashFloat(x float64) int32 { return hashNumber(x) }
+func HashBool(x bool) int32 {
+	if x {
+		return hashTrue
+	}
+	return hashFalse
+}
+func HashString(s string) int32 { return hashString(s) }
 
 func optimize(n int32) int32 { return n&-0x40000001 | int32(uint32(n)>>1)&0x40000000 }
 
@@ -343,6 +402,18 @@ func Show(a Value) Value {
 	}
 	return "[object Object]"
 }
+
+// ShowInt, ShowFloat, ShowBool and ShowString format unboxed scalar values
+// without boxing arguments or results.
+func ShowInt(x int32) string     { return strconv.Itoa(int(x)) }
+func ShowFloat(x float64) string { return ShowNumber(x) }
+func ShowBool(x bool) string {
+	if x {
+		return "true"
+	}
+	return "false"
+}
+func ShowString(s string) string { return QuoteJSON(s) }
 
 // ListEquals, ListCompare, ListHash and ListShow are the instances of
 // lists, given those of the elements.

@@ -53,8 +53,9 @@ fn an_arm_on_several_branches_is_written_once_and_gone_to() {
          | Line n | Pair (Line n) _ when n > 0 -> n\n  | _ -> 0\n\n\
          main : Unit ->{{Host.Console; AppError}} Unit\nlet main () = Platform.stdout_line (show (first Dot))\n"
     ));
-    // the guard under `Line` and under `Pair`, one body
+    // the guard under `Line` and under `Pair`, one body; `n` stays native `int32`
     assert_eq!(go.matches("goto arm_").count(), 2, "{go}");
-    assert_eq!(go.matches("return flickrt.AsInt(l_n)").count(), 1, "{go}");
-    assert!(go.contains("var l_n flickrt.Value\n"), "{go}");
+    assert_eq!(go.matches("return l_n").count(), 1, "{go}");
+    assert!(go.contains("var l_n int32\n"), "{go}");
+    assert!(!go.contains("flickrt.AsInt(l_n)"), "{go}");
 }

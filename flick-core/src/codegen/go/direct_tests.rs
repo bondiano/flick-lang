@@ -13,9 +13,10 @@ const WEIGHT: &str = "module App exposing (main)\n\n\
 fn a_method_of_a_known_instance_is_a_function_called_directly() {
     let go = app(&format!(
         "{WEIGHT}main : Unit ->{{Host.Console; AppError}} Unit\n\
-         let main () = Platform.stdout_line (show (weight Green) ++ show Red)\n"
+         let main () = Platform.stdout_line (show (weight Green) ++ show Red ++ show LT)\n"
     ));
-    // a method written in the instance, a derived one and one of the core
+    // a method written in the instance, a derived one, a non-scalar core one,
+    // and a scalar core one lowered straight to its typed runtime helper
     let written = "F_App__Weight_x20_Color_x24_weight";
     assert!(
         go.contains(&format!(
@@ -31,10 +32,15 @@ fn a_method_of_a_known_instance_is_a_function_called_directly() {
         go.contains("F_App__Show_x20_Color_x24_show(fb, flickrt.Value(T_App__Red{}))"),
         "{go}"
     );
-    // the call may break over lines, as wide as its arguments are
+    // non-scalar core instance method still calls its direct Go function
+    assert!(
+        go.contains("F_Instances__Show_x20_Ordering_x24_show(fb, "),
+        "{go}"
+    );
+    // scalar `Show Int` lowers directly to `flickrt.ShowInt` without reboxing
     let flat = go.replace(char::is_whitespace, "");
     assert!(
-        flat.contains("F_Instances__Show_x20_Int_x24_show(fb,F_App__Weight"),
+        flat.contains("flickrt.ShowInt(flickrt.AsInt(F_App__Weight"),
         "{go}"
     );
     // generic code reaches the same function through the dictionary,

@@ -75,8 +75,11 @@ func Length(v Value) Value {
 
 // Concat is `++` on strings: a high surrogate at the end of `a` and a low
 // one at the start of `b` become one pair.
-func Concat(a, b Value) Value {
-	x, y := a.(string), b.(string)
+func Concat(a, b Value) Value { return ConcatString(a.(string), b.(string)) }
+
+// ConcatString is Concat on unboxed Go strings, preserving WTF-8 surrogate
+// pair joining without boxing arguments or the result.
+func ConcatString(x, y string) string {
 	if len(x) >= 3 && len(y) >= 3 {
 		hi, n := decode(x[len(x)-3:])
 		lo, m := decode(y)
