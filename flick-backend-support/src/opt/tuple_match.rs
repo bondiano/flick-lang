@@ -454,35 +454,34 @@ mod tests {
 
     #[test]
     fn the_optimizer_pipeline_folds_the_match() {
-        let mut module = module_with(vec![match_on(
+        let input = module_with(vec![match_on(
             tuple(vec![local("a"), local("b")]),
             vec![arm(
                 Pat::Tuple(vec![Pat::Bind("x".into()), Pat::Wild]),
                 local("x"),
             )],
         )]);
-
-        fold_tuple_matches(&mut module);
-        super::super::optimize(
-            &mut module,
-            &|name| name == "v0",
-            &|_, _| None,
-            &|_, _| None,
-            &Known::of(&[]),
-            &|_| false,
-        );
-
-        // the pass turned the match into bindings the other passes then
-        // simplify to the element it selected; a match the pass skipped
-        // would still be here
-        let ItemKind::Value { body, .. } = &module.items[0].kind else {
-            panic!("the module's value");
-        };
-        assert_eq!(
-            body,
-            &local("a"),
-            "the portable passes simplify what the pass folded"
-        );
+        for optimize in [
+            super::super::optimize_with_eval,
+            #[cfg(feature = "native-project")]
+            super::super::optimize_legacy_bare,
+        ] {
+            let mut module = input.clone();
+            let _ = optimize(
+                &mut module,
+                &|name| name == "v0",
+                &|_, _| None,
+                &|_, _| None,
+                &Known::of(&[]),
+                &|_| false,
+                &super::super::eval::EvalConfig::default(),
+                &super::super::eval::NoPrimitives,
+            );
+            let ItemKind::Value { body, .. } = &module.items[0].kind else {
+                panic!("the module's value");
+            };
+            assert_eq!(body, &local("a"), "the selected tuple element");
+        }
     }
 
     #[test]

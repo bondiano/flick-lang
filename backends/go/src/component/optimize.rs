@@ -1,9 +1,9 @@
-//! Release passes over explicit IR and visibility facts, as the native
-//! build runs them: the tuple-match fold, then the portable passes.
+//! The Go release adapter supplies primitive bindings and visibility to the
+//! shared passes in legacy bare-constructor mode.
 
 use flick_backend::{BuildRequest, ModuleRole};
 use flick_backend_support::Known;
-use flick_backend_support::opt::{self, tuple_match};
+use flick_backend_support::opt;
 use flick_ir::Module;
 
 use super::data::Data;
@@ -54,7 +54,6 @@ pub(super) fn module(
     let builtin = |owner: &str| {
         (request.modules.iter()).any(|m| m.name == owner && m.role == ModuleRole::Builtin)
     };
-    tuple_match::fold_tuple_matches(&mut result);
     let config = opt::eval::EvalConfig::default();
     let _ = opt::optimize_legacy_bare(
         &mut result,
