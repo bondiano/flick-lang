@@ -18,7 +18,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::fmt;
 use flick_core::ide::{CompletionKind, Ide};
 use flick_core::project::config::Config;
-use flick_core::project::{self, Analysis, Compilation, Host, ModuleCache, Project};
+use flick_core::project::{self, Analysis, Host, ModuleCache, Project};
 use flick_core::source::{FileId, SourceMap};
 use serde_json::{Value, json};
 
@@ -42,9 +42,6 @@ pub struct Session {
     /// the built-in modules as a run on Flick's own runtime does.
     rt: Project,
     cache: ModuleCache,
-    /// The current analysis already includes typed IR because the caller
-    /// requested emission directly, without an editor-only update first.
-    prepared: bool,
     /// The analysis `emit` builds from: a cached editor run drops IR, so
     /// emission takes a cold run of the same text, kept until it changes.
     emitted: RefCell<Option<Box<Emitted>>>,
@@ -79,7 +76,6 @@ impl Session {
             analysis,
             rt,
             cache,
-            prepared: false,
             emitted: RefCell::new(None),
         }
     }
@@ -92,9 +88,6 @@ impl Session {
             source.clone_into(&mut self.text);
             self.sources = SourceMap::default();
             self.emitted = RefCell::new(None);
-            self.prepared = false;
-            self.analysis.modules.clear();
-            self.analysis.compilation = Compilation::default();
             let text = &self.text;
             let sources = &mut self.sources;
             let (rt, cache) = (&self.rt, &mut self.cache);
@@ -102,27 +95,6 @@ impl Session {
         }
         self.diagnostics(&self.sources, &self.analysis.diagnostics)
             .to_string()
-    }
-
-    /// Prepares `source` for emission. A changed-text build needs one full
-    /// analysis, instead of an editor update followed by a second analysis
-    /// for typed IR. Its editor queries use that same revision. An edit
-    /// checked with [`Session::update`] still materializes typed IR lazily.
-    pub fn prepare_emit(&mut self, source: &str) {
-        if source != self.text {
-            source.clone_into(&mut self.text);
-            self.sources = SourceMap::default();
-            self.emitted = RefCell::new(None);
-            // This full analysis does not consume the editor-only cache. Do
-            // not keep an older, possibly larger checked revision alive.
-            self.cache = ModuleCache::default();
-            self.analysis.modules.clear();
-            self.analysis.compilation = Compilation::default();
-            self.analysis = project::analyze_rt(&Demo(source), &mut self.sources, None, &[path()]);
-            self.prepared = true;
-        } else if !self.prepared {
-            drop(self.emitted());
-        }
     }
 
     /// `{ "js", "dts", "files", "entry", "diagnostics", "dts_diagnostics" }`
@@ -206,12 +178,9 @@ impl Session {
     }
 
     fn emit_output(&self, profile: &str, include_declarations: bool) -> String {
-        let emitted = (!self.prepared).then(|| self.emitted());
-        let (sources, analysis) = emitted
-            .as_ref()
-            .map_or((&self.sources, &self.analysis), |emitted| {
-                (&emitted.sources, &emitted.analysis)
-            });
+        let emitted = self.emitted();
+        let sources = &emitted.sources;
+        let analysis = &emitted.analysis;
         let mut diagnostics = analysis.diagnostics.clone();
         let mut declarations = Vec::new();
         let mut out = json!({ "js": null, "dts": null, "files": null, "entry": null });

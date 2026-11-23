@@ -1,7 +1,7 @@
-//! Direct compiler-worker emission and the editor's lazy check path must
-//! agree with the original cold emit, including across invalid revisions.
+//! A persistent compiler-worker session must agree with a fresh cold run,
+//! including across invalid revisions and profile changes.
 
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use serde_json::Value;
 
@@ -14,13 +14,13 @@ fn json(text: &str) -> Value {
 }
 
 #[test]
-fn direct_emission_matches_cold_after_edits_errors_and_fixes() {
+fn emission_matches_cold_after_edits_errors_and_fixes() {
     let edited = SOURCE.replace("first", "second 😀");
     let invalid = edited.replace("\"second 😀\"", "42");
     let fixed = SOURCE.replace("first", "fixed 🎉");
     let mut session = Session::new();
     for source in [SOURCE, &edited, &invalid, &fixed] {
-        session.prepare_emit(source);
+        session.update(source);
         let mut cold = Session::new();
         let checked = json(&cold.update(source));
         for profile in ["debug", "release"] {
@@ -65,12 +65,12 @@ fn direct_emission_matches_cold_after_edits_errors_and_fixes() {
 }
 
 #[test]
-fn direct_emission_drops_removed_exports_and_runners() {
+fn emission_drops_removed_exports_and_runners() {
     let library = "module Renamed exposing (answer)\nanswer : Int\nlet answer = 7\n";
     let mut session = Session::new();
-    session.prepare_emit(SOURCE);
+    session.update(SOURCE);
     assert!(json(&session.emit("debug"))["files"]["Main.js"].is_string());
-    session.prepare_emit(library);
+    session.update(library);
     let mut cold = Session::new();
     cold.update(library);
     for profile in ["debug", "release"] {
@@ -86,7 +86,7 @@ fn direct_emission_drops_removed_exports_and_runners() {
 fn empty_source_never_reuses_an_earlier_program() {
     let mut session = Session::new();
     for source in ["", SOURCE, "", "module Main exposing (\n", "", SOURCE] {
-        session.prepare_emit(source);
+        session.update(source);
         let mut cold = Session::new();
         cold.update(source);
         for profile in ["debug", "release"] {
@@ -96,61 +96,78 @@ fn empty_source_never_reuses_an_earlier_program() {
 }
 
 #[test]
-fn direct_preparation_releases_the_previous_editor_snapshot() {
+fn a_changed_check_releases_the_previous_emitted_revision() {
     let mut session = Session::new();
     session.update(SOURCE);
-    let old = Arc::downgrade(&session.analysis.module("Main").expect("Main").typing);
-    session.prepare_emit("module Main exposing (answer)\nlet answer = 7\n");
+    assert!(json(&session.emit("debug"))["js"].is_string());
+    let old = {
+        let emitted = session.emitted.borrow();
+        Arc::downgrade(
+            &emitted
+                .as_ref()
+                .expect("emitted")
+                .analysis
+                .module("Main")
+                .expect("Main")
+                .typing,
+        )
+    };
+    let invalid = SOURCE.replace("\"first\"", "42");
+    assert!(
+        json(&session.update(&invalid))
+            .as_array()
+            .expect("diagnostics")
+            .iter()
+            .any(|d| d["severity"] == "error")
+    );
     assert!(
         old.upgrade().is_none(),
-        "a direct build releases the old checked cache"
+        "a changed check releases the old emitted analysis before another Run"
     );
+    assert!(session.emitted.borrow().is_none());
 }
 
 #[test]
-fn checks_remain_lazy_and_profiles_share_the_prepared_revision() {
+fn checks_remain_lazy_and_profiles_share_the_emitted_revision() {
     let mut session = Session::new();
     session.update(SOURCE);
-    assert!(!session.prepared);
     assert!(session.emitted.borrow().is_none());
     assert!(session.analysis.compilation.modules.is_empty());
 
-    // A check followed by a Run still creates typed IR only when requested.
-    session.prepare_emit(SOURCE);
-    assert!(!session.prepared);
-    assert!(session.emitted.borrow().is_some());
     assert!(json(&session.emit("debug"))["js"].is_string());
-
-    let changed = SOURCE.replace("first", "direct");
-    session.prepare_emit(&changed);
-    assert!(session.prepared);
-    assert!(session.emitted.borrow().is_none());
-    let typing = session
-        .analysis
-        .module("Main")
-        .expect("Main")
-        .typing
-        .clone();
-    assert!(
-        session
-            .analysis
-            .compilation
-            .modules
-            .iter()
-            .any(|m| m.path == path())
-    );
+    let typing = {
+        let emitted = session.emitted.borrow();
+        let analysis = &emitted.as_ref().expect("emitted").analysis;
+        assert!(
+            analysis
+                .compilation
+                .modules
+                .iter()
+                .any(|m| m.path == path())
+        );
+        Arc::downgrade(&analysis.module("Main").expect("Main").typing)
+    };
     for profile in ["debug", "release", "debug"] {
-        session.prepare_emit(&changed);
+        // Queries for the same revision must not invalidate its emitted IR.
+        session.update(SOURCE);
         assert!(json(&session.emit(profile))["js"].is_string());
-        assert!(Arc::ptr_eq(
+        let emitted = session.emitted.borrow();
+        assert!(Weak::ptr_eq(
             &typing,
-            &session.analysis.module("Main").expect("Main").typing
+            &Arc::downgrade(
+                &emitted
+                    .as_ref()
+                    .expect("emitted")
+                    .analysis
+                    .module("Main")
+                    .expect("Main")
+                    .typing
+            )
         ));
-        assert!(session.emitted.borrow().is_none(), "no second analysis");
     }
 
-    session.update(SOURCE);
-    assert!(!session.prepared);
+    session.update(&SOURCE.replace("first", "changed"));
+    assert!(typing.upgrade().is_none());
     assert!(session.emitted.borrow().is_none());
     assert!(session.analysis.compilation.modules.is_empty());
 }

@@ -11,6 +11,21 @@ The primary comparison uses ordinary optimized production artifacts. The
 optional stage probe below is a separate instrumented build and must not be
 used for a production latency or bundle-size claim.
 
+## Recorded decision for #876
+
+The [measured report](results/876/README.md) retains the production session
+and worker implementation. The direct-emission candidate did not show a
+repeatable browser latency benefit and increased diagnostics-only linear
+memory capacity. The raw Chromium and separate Node attribution reports are
+committed beside that decision.
+
+`direct-emit.patch` preserves the experimental production delta. Apply it
+only in an isolated worktree for further experiments. It adds the candidate
+`prepare_emit` API and its worker dispatch; neither is active in production.
+The report pins the historical baseline and candidate commits used for the
+recorded A/B test. Applying this patch to a later main checkout starts a new
+experiment and does not recreate those historical compiler inputs.
+
 ## Build and run
 
 Use the pinned Rust, Node, wasm-bindgen and Binaryen versions described in
@@ -28,17 +43,22 @@ SAMPLES=20 WARMUP=3 node tools/playground-bench/index.mjs \
 
 For a comparison, build the two revisions in isolated worktrees, save each
 WASM plus bindings in a separate directory, and preserve the baseline worker
-source. Build with identical settings:
+source. Install the pinned binding CLI in each isolated worktree, as the
+repository's `docs-wasm` recipe does, and build with identical settings:
 
 ```sh
+cargo install wasm-bindgen-cli --version 0.2.130 --locked --root target/tools
 CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=fat \
   CARGO_PROFILE_RELEASE_STRIP=debuginfo \
   cargo build -p flick-wasm --target wasm32-unknown-unknown --release --locked
 node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
-wasm-bindgen --target web --out-name flick_wasm --out-dir /tmp/flick-before \
+target/tools/bin/wasm-bindgen --target web --out-name flick_wasm --out-dir /tmp/flick-before \
   target/wasm32-unknown-unknown/release/flick_wasm.wasm
 cp docs/src/playground/compiler.worker.ts /tmp/flick-before/compiler.worker.ts
 ```
+
+Repeat those commands in the candidate worktree, changing the output paths
+to `/tmp/flick-after`. Preserve each worker source along with its own WASM.
 
 Run the same harness against both saved artifacts, with no competing builds
 or benchmark processes. Repeat in reverse order to expose drift:
@@ -48,6 +68,7 @@ BUILD_REVISION=<baseline-sha> \
   WORKER_SOURCE=/tmp/flick-before/compiler.worker.ts \
   node tools/playground-bench/index.mjs /tmp/flick-before target/playground-perf/before.json
 BUILD_REVISION=<candidate-sha> \
+  WORKER_SOURCE=/tmp/flick-after/compiler.worker.ts \
   node tools/playground-bench/index.mjs /tmp/flick-after target/playground-perf/after.json
 ```
 
@@ -97,8 +118,9 @@ declarations, checks UTF-16 error/hover ranges after a non-BMP prefix, and
 rejects stale JS, declarations, file maps or entry points after failure. The
 `validation` array hashes the complete generated payload. Compare it exactly
 between reports; an equal hash is an output parity check, not a latency claim.
-The Rust session regressions also compare direct emission against the
-original cold `update` + `emit` path and check lazy editing and cache lifetime.
+The Rust session regressions compare a persistent `update` + `emit` session
+against fresh cold runs and check lazy editing, profile reuse and the lifetime
+of the previous emitted revision.
 
 ## Optional stage attribution
 
@@ -114,23 +136,32 @@ and `emit_declarations` calls. Interpret them according to their paths:
   account for part of the residual outside exported calls.
 
 For finer attribution, apply `stages.patch` **only in an isolated scratch
-worktree** at the candidate revision. It adds a WASM-only timing import and
+worktree**. To inspect the candidate, first check out its historical revision
+or apply `direct-emit.patch` to a separate checkout of this revision. The
+stage patch adds a WASM-only timing import and
 scope markers; it deliberately does not belong to production compiler code.
 It uses the already locked wasm-bindgen version. Build its WASM with the same
 commands above, then run the same harness against that directory:
 
 ```sh
 git apply tools/playground-bench/stages.patch
-cargo build -p flick-wasm --target wasm32-unknown-unknown --release --locked
-# Apply the same release overrides, Binaryen step and wasm-bindgen command
-# as the ordinary build when comparing stage distributions.
-node tools/playground-bench/index.mjs /tmp/flick-stages target/playground-perf/stages.json
+cargo install wasm-bindgen-cli --version 0.2.130 --locked --root target/tools
+CARGO_PROFILE_RELEASE_OPT_LEVEL=z CARGO_PROFILE_RELEASE_LTO=fat \
+  CARGO_PROFILE_RELEASE_STRIP=debuginfo \
+  cargo build -p flick-wasm --target wasm32-unknown-unknown --release --locked
+node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
+target/tools/bin/wasm-bindgen --target web --out-name flick_wasm --out-dir /tmp/flick-stages \
+  target/wasm32-unknown-unknown/release/flick_wasm.wasm
+WORKER_SOURCE="$PWD/docs/src/playground/compiler.worker.ts" \
+  node tools/playground-bench/index.mjs /tmp/flick-stages target/playground-perf/stages.json
 ```
 
 `instrumentedStages` reports inclusive and exclusive times for parse,
-resolve/check, lowering, backend, output-map construction and JSON string
-serialization. Resolve/check includes lowering, so use its **exclusive** time
-when adding stages. The backend can trigger builtin initialization on a cold
+resolve/check, the `lower_if_clean` scope, backend, output-map construction and
+JSON string serialization. The lowering marker includes its eligibility
+guard; an entry does not by itself prove that IR was materialized.
+Resolve/check includes that scope, so use its **exclusive** time when adding
+stages. The backend can trigger builtin initialization on a cold
 worker; discard warmups before interpreting steady-state attribution.
 Instrumentation calls and timer resolution can dominate tiny stages; use
 their counts and proportions to locate repeated work, and use uninstrumented
@@ -142,6 +173,6 @@ the instrumented candidate**, not an independently built baseline revision.
 It helps attribute the removed frontend pass without conflating marker
 overhead with the primary A/B result.
 
-No timing hook changes language semantics, the reference model or Lean
-contracts. The session candidate changes when existing analyses run and
-which revision owns their memory, not type checking, lowering or execution.
+The experiment concerns when existing analyses run and which revision owns
+their memory. The final production implementation, language semantics,
+reference model and Lean contracts are retained.
