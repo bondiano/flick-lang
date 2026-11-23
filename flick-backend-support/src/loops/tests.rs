@@ -55,6 +55,27 @@ fn find_exit_block(e: &Expr, out: &mut Vec<String>) {
 }
 
 #[test]
+fn iterable_without_an_exit_runs_its_clauses_and_returns_unit() {
+    let span = Span::new(FileId::new(0), 0, 0);
+    let known = Known::of(&[]);
+    let clauses = Expr::new(
+        ExprKind::Each {
+            stop: None,
+            pat: Pat::Bind("item".into()),
+            binder_types: Vec::new(),
+            source: Box::new(read("source", span)),
+            body: Box::new(unit(span)),
+        },
+        span,
+    );
+
+    assert_eq!(
+        lower(&known, "loop", None, &clauses, true, span).kind,
+        ExprKind::Block(vec![Stmt::Expr(clauses)], Box::new(unit(span)))
+    );
+}
+
+#[test]
 fn multi_level_exit_clears_intervening_and_target_flags() {
     let span = Span::new(FileId::new(0), 0, 0);
     let known = Known::of(&[]);

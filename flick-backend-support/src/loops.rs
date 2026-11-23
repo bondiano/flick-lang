@@ -398,7 +398,7 @@ impl Control<'_> {
     }
 }
 
-/// Whether `e` has an exit of the loop `id`.
+/// Whether `e` exits loop `id`, including exits lowered by an enclosing loop.
 fn leaves(e: &Expr, id: &str) -> bool {
     if matches!(&e.kind, ExprKind::LoopExit { id: of, .. } if of == id) {
         return true;
@@ -423,21 +423,24 @@ pub fn lower(
     iterable: bool,
     span: Span,
 ) -> Expr {
-    // a `while` nothing leaves early is the loop itself: it has no flags to test
-    if let Some(condition) = condition
-        && !iterable
-        && !leaves(condition, id)
-        && !leaves(body, id)
-    {
-        let repeat = ExprKind::Loop {
-            condition: Box::new(condition.clone()),
-            body: Box::new(body.clone()),
-        };
+    let plain = if iterable {
+        (!leaves(body, id)).then(|| body.clone())
+    } else {
+        condition
+            .filter(|condition| !leaves(condition, id) && !leaves(body, id))
+            .map(|condition| {
+                Expr::new(
+                    ExprKind::Loop {
+                        condition: Box::new(condition.clone()),
+                        body: Box::new(body.clone()),
+                    },
+                    span,
+                )
+            })
+    };
+    if let Some(plain) = plain {
         return Expr::new(
-            ExprKind::Block(
-                vec![Stmt::Expr(Expr::new(repeat, span))],
-                Box::new(unit(span)),
-            ),
+            ExprKind::Block(vec![Stmt::Expr(plain)], Box::new(unit(span))),
             span,
         );
     }

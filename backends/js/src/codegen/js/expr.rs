@@ -151,10 +151,7 @@ impl<'d> Gen<'_, 'd> {
             ExprKind::Unwrap(inner) => self.unwrap(inner),
             ExprKind::Neg(num, inner) => self.neg(*num, inner),
             ExprKind::Ignore(inner) => {
-                let v = self.expr(inner);
-                if v.atom().is_none() {
-                    self.buf.push(self.expr_stmt(v));
-                }
+                self.discard(inner);
                 self.leaf("undefined")
             }
             ExprKind::Await(inner) => {
@@ -447,12 +444,7 @@ impl<'d> Gen<'_, 'd> {
                 let f = self.function(dicts, value, target);
                 self.buf.push(self.constant(&names::ident(name), f));
             }
-            IrStmt::Expr(e) => {
-                let v = self.expr(e);
-                if v.atom().is_none() {
-                    self.buf.push(self.expr_stmt(v));
-                }
-            }
+            IrStmt::Expr(e) => self.discard(e),
         }
     }
 

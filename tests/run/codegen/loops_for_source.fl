@@ -38,6 +38,28 @@ let skip_nested_loop () = for x <- [1, 2] do {
   Platform.stdout_line ("after nested " ++ show x)
 }
 
+first : Int ->{Host.Console} Bool
+let first n =
+  Platform.stdout_line ("test " ++ show n)
+  n == 1
+
+plain_for : Unit ->{Host.Console} Unit
+let plain_for () =
+  let mut visits = 0
+  for {
+    x <- [1, 2]
+    y <- source x
+  } do {
+    if first y then {
+      visits = visits + 1
+      Platform.stdout_line "then"
+    } else {
+      visits = visits + 2
+      Platform.stdout_line "else"
+    }
+    Platform.stdout_line (show visits)
+  }
+
 main : Unit ->{Host.Console} Unit
 let main () =
   stop_before_source true
@@ -46,3 +68,4 @@ let main () =
   skip_clause_suffix false
   skip_clause_suffix true
   skip_nested_loop ()
+  plain_for ()

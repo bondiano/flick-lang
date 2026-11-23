@@ -69,6 +69,32 @@ fn record_literals_emit_canonical_key_order_while_preserving_source_evaluation_o
 }
 
 #[test]
+fn discarded_conditionals_emit_statements_and_used_conditionals_keep_their_value() {
+    let code = compile(
+        "module App exposing (discarded, returned)\n\n\
+         discarded : Bool -> Int\n\
+         let discarded flag =\n\
+         \x20 let mut n = 0\n\
+         \x20 if flag then { n = 1 } else { n = 2 }\n\
+         \x20 ignore (if flag then { n = 3; 4 } else { n = 5; 6 })\n\
+         \x20 n\n\n\
+         returned : Bool -> Int\n\
+         let returned flag =\n\
+         \x20 let mut n = 0\n\
+         \x20 let chosen = if flag then { n = 1; n } else { n = 2; n }\n\
+         \x20 chosen\n",
+    );
+    let (discarded, returned) = code.split_once("export const returned").expect(&code);
+    assert_eq!(discarded.matches("if (flag) {").count(), 2, "{code}");
+    for assignment in ["n = 1;", "n = 2;", "n = 3;", "n = 5;"] {
+        assert!(discarded.contains(assignment), "{code}");
+    }
+    assert!(!discarded.contains("$t"), "{code}");
+    assert!(returned.contains("const chosen = $t"), "{code}");
+    assert!(returned.contains("return chosen;"), "{code}");
+}
+
+#[test]
 fn a_while_nothing_leaves_is_a_plain_loop_in_javascript() {
     let text = "module App exposing (sum)\n\nsum : Int -> Int\nlet sum n =\n  let mut acc = 0\n  \
                 let mut i = n\n  while i > 0 do\n    acc = acc + i\n    i = i - 1\n  acc\n";
