@@ -65,7 +65,7 @@ let private_box x = x
     let (interface, diagnostics) = check_module_with("App.Provider", provider, &|_| None);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
 
-    let json = write(&interface);
+    let json = write(&interface).expect("publishable interface");
     let encoded: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
     let export_variance = |name: &str| {
         encoded["exports"]
@@ -141,7 +141,11 @@ let widen_thunk t = t
         .expect("Box def")
         .variance
         .clear();
-    let unknown = read(write(&unknown).as_bytes(), "App.Provider").expect("unknown is valid");
+    let unknown = read(
+        write(&unknown).expect("publishable interface").as_bytes(),
+        "App.Provider",
+    )
+    .expect("unknown is valid");
     let (_, diagnostics) = check_module_with(
         "App.Consumer",
         "module App.Consumer exposing (..)\nimport App.Provider exposing (Box)\nwiden_box : Box (Float -> Float) -> Box (Float ->{Async} Float)\nlet widen_box b = b\n",
@@ -174,7 +178,10 @@ class Map (f : Type -> Type) =
     let (invariant, d2) = check_module_with("App.Var", &invariant_src, &|_| None);
     assert!(d1.is_empty() && d2.is_empty(), "{d1:?} {d2:?}");
 
-    assert_ne!(fingerprint(&covariant), fingerprint(&invariant));
+    assert_ne!(
+        fingerprint(&covariant).expect("publishable interface"),
+        fingerprint(&invariant).expect("publishable interface")
+    );
     let changes = diff(slice::from_ref(&covariant), slice::from_ref(&invariant));
     assert_eq!(
         bump(&changes),
@@ -234,7 +241,11 @@ class Map (f : Type -> Type) =
         ),
     ] {
         assert!(
-            read(write(&forged).as_bytes(), "App.Var").is_err(),
+            read(
+                write(&forged).expect("publishable interface").as_bytes(),
+                "App.Var"
+            )
+            .is_err(),
             "iface::read must reject {label}"
         );
         assert!(
@@ -270,9 +281,13 @@ type Mix a = Mix (CycleA a) (CycleB a -> Unit)
     let (first, d1) = check_module_with("App.Provider", provider, &|_| None);
     let (second, d2) = check_module_with("App.Provider", provider, &|_| None);
     assert!(d1.is_empty() && d2.is_empty(), "{d1:?} {d2:?}");
-    assert_eq!(fingerprint(&first), fingerprint(&second));
+    assert_eq!(
+        fingerprint(&first).expect("publishable interface"),
+        fingerprint(&second).expect("publishable interface")
+    );
 
-    let encoded: serde_json::Value = serde_json::from_str(&write(&first)).expect("valid JSON");
+    let encoded: serde_json::Value =
+        serde_json::from_str(&write(&first).expect("publishable interface")).expect("valid JSON");
     let variance_of = |name: &str| {
         encoded["exports"]
             .as_array()
@@ -299,7 +314,11 @@ type Mix a = Mix (CycleA a) (CycleB a -> Unit)
         assert_eq!(variance_of(name), Some(expected), "{name}");
     }
 
-    let restored = read(write(&first).as_bytes(), "App.Provider").expect("valid iface");
+    let restored = read(
+        write(&first).expect("publishable interface").as_bytes(),
+        "App.Provider",
+    )
+    .expect("valid iface");
     let consumer = "\
 module App.Consumer exposing (WrapSink, WrapSecretSink, narrow_sink, narrow_secret)
 import App.Provider exposing (Sink, SecretSink)
@@ -454,7 +473,11 @@ fn rejects_forged_variance_in_nested_module_signatures_and_anonymous_nominals() 
         ),
     ] {
         assert!(
-            read(write(&forged).as_bytes(), "App.Mod").is_err(),
+            read(
+                write(&forged).expect("publishable interface").as_bytes(),
+                "App.Mod"
+            )
+            .is_err(),
             "iface::read must reject {label}"
         );
         assert!(

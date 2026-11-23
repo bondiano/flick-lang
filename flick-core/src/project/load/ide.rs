@@ -154,12 +154,12 @@ pub fn analyze_with(
 /// A fingerprint of the modules a compilation holds: their interfaces and
 /// IR. An executable build and an editor projection made from the same
 /// analysis have the same one.
-pub fn analysis_fingerprint(compilation: &Compilation) -> String {
+pub fn analysis_fingerprint(compilation: &Compilation) -> Result<String, String> {
     let mut parts: BTreeMap<&str, String> = BTreeMap::new();
     for m in &compilation.modules {
         parts.insert(
             &m.name,
-            format!("{} {}", fingerprint(&m.interface), ir::print(&m.ir)),
+            format!("{} {}", fingerprint(&m.interface)?, ir::print(&m.ir)),
         );
     }
     let text = parts.into_iter().fold(String::new(), |mut acc, (n, p)| {
@@ -169,5 +169,5 @@ pub fn analysis_fingerprint(compilation: &Compilation) -> String {
     let hash = text.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
         (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
     });
-    format!("{hash:016x}")
+    Ok(format!("{hash:016x}"))
 }

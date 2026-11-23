@@ -192,12 +192,18 @@ mod tests {
             }],
             ..Interface::default()
         };
-        let json = iface::write(&interface);
+        let json = iface::write(&interface).expect("publishable interface");
         let left = iface::read(json.as_bytes(), "Consumer").expect("closed interface");
         let right = iface::read(json.as_bytes(), "Consumer").expect("closed interface");
         assert_eq!(left, right);
-        assert_eq!(iface::fingerprint(&interface), iface::fingerprint(&left));
-        assert_eq!(iface::fingerprint(&left), iface::fingerprint(&right));
+        assert_eq!(
+            iface::fingerprint(&interface).expect("publishable fingerprint"),
+            iface::fingerprint(&left).expect("publishable fingerprint")
+        );
+        assert_eq!(
+            iface::fingerprint(&left).expect("publishable fingerprint"),
+            iface::fingerprint(&right).expect("publishable fingerprint")
+        );
         let left = left.exports[0].scheme.as_ref().expect("packed scheme");
         let right = right.exports[0].scheme.as_ref().expect("packed scheme");
         assert_ne!(identity(left), identity(right));

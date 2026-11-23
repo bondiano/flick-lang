@@ -20,17 +20,19 @@ pub fn interface(
     package: Option<&str>,
     imports: &[String],
     interface_of: &dyn Fn(&str) -> Option<Interface>,
-) -> Interface {
+) -> Result<Interface, String> {
     #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
     let mut out = interface_without_dependencies(module, interface, package, interface_of);
-    // `extend`, not `collect`: collecting compiles a sort of its own into the
-    // wasm compiler, where `insert` of this map type is already there
     #[cfg(not(target_arch = "wasm32"))]
-    out.dependencies
-        .extend((imports.iter()).filter_map(|m| Some((m.clone(), fingerprint(&interface_of(m)?)))));
+    for name in imports {
+        if let Some(dependency) = interface_of(name) {
+            out.dependencies
+                .insert(name.clone(), fingerprint(&dependency)?);
+        }
+    }
     #[cfg(target_arch = "wasm32")]
     let _ = imports;
-    out
+    Ok(out)
 }
 
 /// The interface with its ABI and empty `dependencies`: callers that compute

@@ -57,7 +57,7 @@ impl Projections {
         let snapshot = analyze(&docs, &path, &mut self.caches);
         let module = module_at(&snapshot, &path)?;
         let text = snapshot.sources.get(module.file).text.clone();
-        let projected = project_module(&mut self.written, &snapshot, module, &path);
+        let projected = project_module(&mut self.written, &snapshot, module, &path).ok()?;
         let spans = (projected.mappings.iter())
             .map(|m| TsSpan {
                 ts_start: m.ts[0],
@@ -89,7 +89,7 @@ fn project_module(
     snapshot: &Snapshot,
     module: &Analyzed,
     path: &Path,
-) -> Projected {
+) -> Result<Projected, String> {
     let text = &snapshot.sources.get(module.file).text;
     let dir = path.parent().unwrap_or(Path::new("/"));
     let elsewhere = snapshot.root.join(".flick/projections");

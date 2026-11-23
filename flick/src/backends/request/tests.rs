@@ -191,7 +191,7 @@ fn assert_interfaces(prepared: &Prepared, expected: Target) {
     assert_eq!(main.targets, [expected]);
     assert_eq!(
         main.dependencies.get("Helper"),
-        Some(&iface::fingerprint(&helper))
+        Some(&iface::fingerprint(&helper).expect("publishable fingerprint"))
     );
 }
 

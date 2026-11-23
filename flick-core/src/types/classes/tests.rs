@@ -49,7 +49,7 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
         diagnostics.retain(|d| !d.unnecessary());
         if index + 1 < modules.len() {
             assert!(diagnostics.is_empty(), "{name}: {diagnostics:?}");
-            let encoded = iface::write(&interface);
+            let encoded = iface::write(&interface).expect("publishable interface");
             let decoded = iface::read(encoded.as_bytes(), name).expect("interface round trip");
             assert_eq!(decoded, interface);
             done.insert((*name).to_owned(), decoded);

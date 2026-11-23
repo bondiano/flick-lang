@@ -52,9 +52,10 @@ fn projection_and_executable_share_the_analysis() {
             analysis.diagnostics
         );
         let (_, compilation) = project::compile(&Files, &mut SourceMap::default(), None, &roots);
-        let fingerprint = analysis_fingerprint(&analysis.compilation);
+        let fingerprint =
+            analysis_fingerprint(&analysis.compilation).expect("publishable fingerprint");
         assert_eq!(
-            analysis_fingerprint(&compilation),
+            analysis_fingerprint(&compilation).expect("publishable fingerprint"),
             fingerprint,
             "{}",
             path.display()

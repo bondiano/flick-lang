@@ -107,7 +107,7 @@ fn checked_module_contract_is_preserved_in_its_interface() {
         }
         other => panic!("expected module contract, got {other:?}"),
     }
-    let written = iface::write(&interface);
+    let written = iface::write(&interface).expect("publishable interface");
     let read = iface::read(written.as_bytes(), "App.Contracts").expect("interface round trip");
     assert_eq!(read, interface);
 }

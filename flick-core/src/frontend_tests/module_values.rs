@@ -235,7 +235,7 @@ fn static_module_contract_preserves_abstract_class_and_service_shapes() {
             ..
         }
     )));
-    let written = iface::write(&interface);
+    let written = iface::write(&interface).expect("publishable interface");
     let read = iface::read(written.as_bytes(), "App.Contracts").expect("interface round trip");
     assert_eq!(read, interface);
     let page = doc::page(&interface, src);

@@ -72,7 +72,7 @@ fn unused_forall_alias_kinds_are_defaulted_before_publication() {
             assert_eq!(vars.len(), 1);
             assert_eq!(vars[0].kind, expected, "{opacity}alias: {body:?}");
             for interface in [&module.interface, module.declarations.as_ref()] {
-                let encoded = iface::write(interface);
+                let encoded = iface::write(interface).expect("publishable interface");
                 assert_eq!(
                     iface::read(encoded.as_bytes(), "Probe"),
                     Ok(interface.clone())

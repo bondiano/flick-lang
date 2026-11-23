@@ -588,7 +588,7 @@ fn higher_order_signatures_survive_interface_serialization() {
         structure(&["answer"]),
     );
     let interface = signature.interface("App.Factory");
-    let written = write(&interface);
+    let written = write(&interface).expect("publishable interface");
     let read = read(written.as_bytes(), "App.Factory").expect("interface");
     assert_eq!(read.parameterized, Some(signature));
 }

@@ -287,13 +287,20 @@ mod tests {
             Some("@acme/shapes"),
             &["Geo".into()],
             &lookup,
-        );
-        let json = iface::write(&built);
+        )
+        .expect("publishable dependency");
+        let json = iface::write(&built).expect("publishable interface");
         insta::assert_snapshot!(json);
         let back = iface::read(json.as_bytes(), "App.Shapes").expect("valid");
-        assert_eq!(iface::write(&back), json);
-        assert_eq!(iface::fingerprint(&back), iface::fingerprint(&built));
-        assert_eq!(built.dependencies["Geo"], iface::fingerprint(&dependency));
+        assert_eq!(iface::write(&back).expect("publishable interface"), json);
+        assert_eq!(
+            iface::fingerprint(&back).expect("publishable fingerprint"),
+            iface::fingerprint(&built).expect("publishable fingerprint")
+        );
+        assert_eq!(
+            built.dependencies["Geo"],
+            iface::fingerprint(&dependency).expect("publishable fingerprint")
+        );
     }
 
     #[test]
@@ -310,7 +317,8 @@ mod tests {
              ratio : Float -> Float\nlet ratio x = x / 2\n",
         )
         .expect("checks");
-        let built = super::interface(&ir, &interface, None, &[], &|_| None);
+        let built =
+            super::interface(&ir, &interface, None, &[], &|_| None).expect("publishable interface");
         let partial: Vec<(String, bool)> = built
             .abi
             .expect("abi")

@@ -14,7 +14,7 @@ use std::collections::HashSet;
 
 use flick_core::build;
 use flick_core::codegen;
-use flick_core::diagnostics::{Diagnostic, Severity};
+use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface::{self, Target};
 use flick_core::project::{self, Compilation, Host, Project};
 use flick_core::source::{FileId, SourceMap};
@@ -181,15 +181,21 @@ impl Prepared {
                 line_starts: file.line_starts().to_vec(),
             });
         }
-        data.modules(
+        match data.modules(
             host,
             compilation,
             project,
             package.as_deref(),
             output,
             descriptor,
-        );
-        data.fill_environment_facts(descriptor, package.as_deref());
+        ) {
+            Ok(()) => data.fill_environment_facts(descriptor, package.as_deref()),
+            Err(error) => {
+                data.shared.clear();
+                data.diagnostics
+                    .push(Diagnostic::new(codes::P010, Severity::Error, error));
+            }
+        }
 
         data
     }
@@ -203,7 +209,7 @@ impl Prepared {
         package: Option<&str>,
         output: &BuildPlan,
         descriptor: &Descriptor,
-    ) {
+    ) -> Result<(), String> {
         let interfaces = build::published_interfaces(
             compilation,
             package,
@@ -213,14 +219,14 @@ impl Prepared {
                 "go" => Some(&[Target::Go]),
                 _ => None,
             },
-        );
+        )?;
         let builtins: Vec<&str> = types::builtin_sources()
             .iter()
             .map(|(name, _)| *name)
             .collect();
         for module in &compilation.modules {
             let interface = &interfaces[module.name.as_str()];
-            let text = iface::write(interface);
+            let text = iface::write(interface)?;
             let input = self.input(
                 format!("interface/{}", module.name),
                 InputKind::Interface,
@@ -257,7 +263,7 @@ impl Prepared {
             let input = self.input(
                 format!("interface/{}", interface.module),
                 InputKind::Interface,
-                iface::write(interface).into_bytes(),
+                iface::write(interface)?.into_bytes(),
             );
             self.request.modules.push(ModuleInput {
                 name: interface.module.clone(),
@@ -274,6 +280,7 @@ impl Prepared {
         if wants("flick.javascript") || wants("flick.typescript") {
             self.javascript(host, project, compilation, output, &interfaces);
         }
+        Ok(())
     }
 
     fn input(&mut self, id: String, kind: InputKind, bytes: Vec<u8>) -> String {

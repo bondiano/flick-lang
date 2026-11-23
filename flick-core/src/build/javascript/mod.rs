@@ -14,7 +14,7 @@ use super::Backend;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::codegen::ts::Typing;
 use crate::codegen::{self, EffectBridge, Known, Options, Resolved};
-use crate::diagnostics::Diagnostic;
+use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::Interface;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::project::target_preflight::prune_compilation_for_env;
@@ -56,7 +56,10 @@ pub fn emit(
     let packages = module_packages(modules, settings.package);
     let package = |m: &str| packages.get(m).cloned();
     let published_interfaces =
-        published_interfaces(compilation, settings.package, settings.root, None);
+        match published_interfaces(compilation, settings.package, settings.root, None) {
+            Ok(interfaces) => interfaces,
+            Err(error) => return interface_failure(diagnostics, error),
+        };
     let interface_of = |m: &str| published_interfaces.get(m).cloned();
     let foreign = |module: &str, spec: &str| {
         // a library's own file ships beside its module, so its spelling holds
@@ -132,10 +135,21 @@ pub fn emit(
     };
     // a built-in runner is written like any module the program imports
     let mut imports: Vec<String> = settings.runners.iter().map(|(_, r)| r.clone()).collect();
-    imports.extend(own_modules(&ctx, compilation, &mut out, &mut diagnostics));
+    match own_modules(&ctx, compilation, &mut out, &mut diagnostics) {
+        Ok(own) => imports.extend(own),
+        Err(error) => return interface_failure(diagnostics, error),
+    }
     builtins(&ctx, imports, &mut out);
     entry_runners(settings, modules, &path, &mut out, &mut diagnostics);
     (out, diagnostics)
+}
+
+fn interface_failure(
+    mut diagnostics: Vec<Diagnostic>,
+    error: String,
+) -> (Vec<Artifact>, Vec<Diagnostic>) {
+    diagnostics.push(Diagnostic::new(codes::P010, Severity::Error, error));
+    (Vec::new(), diagnostics)
 }
 
 fn module_packages(modules: &[Compiled], default: Option<&str>) -> BTreeMap<String, String> {
@@ -307,11 +321,12 @@ fn own_modules(
     compilation: &Compilation,
     out: &mut Vec<Artifact>,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Vec<String> {
-    let modules = compilation.modules.iter();
-    modules
-        .flat_map(|module| compiled_module(ctx, module, out, diagnostics))
-        .collect()
+) -> Result<Vec<String>, String> {
+    let mut imports = Vec::new();
+    for module in &compilation.modules {
+        imports.extend(compiled_module(ctx, module, out, diagnostics)?);
+    }
+    Ok(imports)
 }
 
 #[cfg(feature = "native-project")]

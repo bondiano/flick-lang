@@ -176,7 +176,7 @@ fn same_tree_support_cannot_override_a_child_public_definition() {
             ..Interface::default()
         },
     );
-    assert!(read(write(&parent).as_bytes(), "Provider").is_err());
+    assert!(read(write(&parent).expect("publishable interface").as_bytes(), "Provider").is_err());
     assert!(
         env.learn_type_support(&parent).is_err(),
         "support cannot win over a conflicting child public definition"
@@ -186,7 +186,7 @@ fn same_tree_support_cannot_override_a_child_public_definition() {
         "failed learning must be atomic"
     );
     parent.support_types[0].definition = alias("Int");
-    assert!(read(write(&parent).as_bytes(), "Provider").is_ok());
+    assert!(read(write(&parent).expect("publishable interface").as_bytes(), "Provider").is_ok());
     env.learn_type_support(&parent)
         .expect("equal support and child public authority");
     env.learn_type_support(&parent)
@@ -198,7 +198,7 @@ fn same_tree_support_cannot_override_a_child_public_definition() {
         definition: alias("String"),
         owner_path: vec![],
     });
-    assert!(read(write(&parent).as_bytes(), "Provider").is_err());
+    assert!(read(write(&parent).expect("publishable interface").as_bytes(), "Provider").is_err());
 }
 #[test]
 fn support_cannot_override_a_child_services_generated_implementation() {
@@ -254,7 +254,7 @@ fn support_cannot_override_a_child_services_generated_implementation() {
             ..Interface::default()
         },
     );
-    let reader_rejects = read(write(&parent).as_bytes(), "Provider").is_err();
+    let reader_rejects = read(write(&parent).expect("publishable interface").as_bytes(), "Provider").is_err();
     let learning_rejects = env.learn_type_support(&parent).is_err();
     assert!(
         reader_rejects && learning_rejects,
@@ -272,7 +272,7 @@ fn support_cannot_override_a_child_services_generated_implementation() {
         .as_ref()
         .expect("real service");
     parent.support_types[0].definition = impl_def(service).expect("real generated authority");
-    assert!(read(write(&parent).as_bytes(), "Provider").is_ok());
+    assert!(read(write(&parent).expect("publishable interface").as_bytes(), "Provider").is_ok());
     env.learn_type_support(&parent)
         .expect("equal generated support");
     env.learn_type_support(&parent)
@@ -337,7 +337,7 @@ fn support_service_cannot_override_a_child_public_implementation() {
             ..Interface::default()
         },
     );
-    let reader_rejects = read(write(&parent).as_bytes(), "Provider").is_err();
+    let reader_rejects = read(write(&parent).expect("publishable interface").as_bytes(), "Provider").is_err();
     let learning_rejects = env.learn_type_support(&parent).is_err();
     assert!(
         reader_rejects && learning_rejects,

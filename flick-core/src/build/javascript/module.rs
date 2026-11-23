@@ -32,12 +32,19 @@ use super::{Context, typed_options};
 
 /// The JS, source map, interface and, when asked, `.d.ts` and Promise
 /// façade of one module of the build.
+#[cfg_attr(
+    not(feature = "native-project"),
+    allow(
+        clippy::unnecessary_wraps,
+        reason = "only native builds publish interfaces"
+    )
+)]
 pub(super) fn compiled_module(
     ctx: &Context,
     module: &Compiled,
     out: &mut Vec<Artifact>,
     diagnostics: &mut Vec<Diagnostic>,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
     // the interface and its summaries come from the reference lowering
     let by_class = ctx.settings.backend == Backend::Rt;
     let optimized = ctx
@@ -79,9 +86,9 @@ pub(super) fn compiled_module(
     #[cfg(feature = "native-project")]
     out.push(Artifact {
         path: format!("{}.iface", module.name.replace('.', "/")),
-        contents: iface::write(built),
+        contents: iface::write(built)?,
     });
-    imports
+    Ok(imports)
 }
 
 fn write_js_output(

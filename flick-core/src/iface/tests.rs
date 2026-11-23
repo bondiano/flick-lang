@@ -67,8 +67,17 @@ fn private_visibility_round_trips_and_changes_fingerprint() {
     let private = interface_of("private module App.Shapes exposing (answer)\nlet answer = 42\n");
     assert!(!public.private);
     assert!(private.private);
-    assert_ne!(fingerprint(&public), fingerprint(&private));
-    assert_eq!(read(write(&private).as_bytes(), "App.Shapes"), Ok(private));
+    assert_ne!(
+        fingerprint(&public).expect("publishable interface"),
+        fingerprint(&private).expect("publishable interface")
+    );
+    assert_eq!(
+        read(
+            write(&private).expect("publishable interface").as_bytes(),
+            "App.Shapes"
+        ),
+        Ok(private)
+    );
 }
 
 #[test]
@@ -93,10 +102,10 @@ fn schema_is_pinned_and_round_trips() {
          later : forall s. Handle s -> (Unit -> Handle s)^{s}\nlet later h = fun () -> h\n\
          type Handle (s : Region)\n",
     );
-    let json = write(&interface);
+    let json = write(&interface).expect("publishable interface");
     insta::assert_snapshot!(json);
     let back = read(json.as_bytes(), "App.Shapes").expect("valid");
-    assert_eq!(write(&back), json);
+    assert_eq!(write(&back).expect("publishable interface"), json);
 }
 
 #[test]
@@ -111,7 +120,7 @@ fn capture_qualification_kind_round_trips() {
             value,
             elided: Elided(value),
         });
-        let json = write(&interface);
+        let json = write(&interface).expect("publishable interface");
         let encoded: serde_json::Value = serde_json::from_str(&json).expect("valid JSON");
         assert_eq!(encoded["exports"][0]["type"]["captured"]["value"], value);
         let elided = &encoded["exports"][0]["type"]["captured"]["elided"];
@@ -128,7 +137,8 @@ fn rejects_other_versions_and_modules() {
     let json = write(&Interface {
         module: "A".into(),
         ..Interface::default()
-    });
+    })
+    .expect("publishable interface");
     assert!(
         read(json.as_bytes(), "B")
             .expect_err("rejected")

@@ -203,8 +203,11 @@ fn inferred_witness_kind_is_closed_before_json_and_reopens_in_a_fresh_consumer()
         }],
         ..Interface::default()
     };
-    let provider =
-        read(write(&provider).as_bytes(), "Provider").expect("real signature persistence");
+    let provider = read(
+        write(&provider).expect("publishable interface").as_bytes(),
+        "Provider",
+    )
+    .expect("real signature persistence");
     let consumer = checked_interface(
         "Consumer",
         "module Consumer exposing (Packed)\nimport Provider\ntype alias Packed = exists K : Provider.S. forall a. K.At a\n",
@@ -238,7 +241,7 @@ fn inferred_witness_kind_is_closed_before_json_and_reopens_in_a_fresh_consumer()
             .all(|entity| entity.module != "$exists:K"),
         "bound kinds are not external globals"
     );
-    let encoded = write(&consumer);
+    let encoded = write(&consumer).expect("publishable interface");
     assert!(
         !encoded.contains("$witness"),
         "no checker-fresh kind identity in published JSON"
@@ -267,7 +270,11 @@ fn an_existential_annotation_hole_can_be_closed_and_reopened_for_roundtrip() {
         "module Probe exposing (S, Packed, roundtrip)\ntype module S =\n  type Token\ntype alias Packed = exists K : S. K.Token\nroundtrip : Packed -> Packed\nlet roundtrip value =\n  let x : exists J : S. _ = value\n  x\n",
         &[],
     );
-    assert!(!write(&interface).contains("$witness"));
+    assert!(
+        !write(&interface)
+            .expect("publishable interface")
+            .contains("$witness")
+    );
 }
 
 #[test]
