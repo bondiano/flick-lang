@@ -89,7 +89,7 @@ impl<'d> Gen<'_, 'd> {
         result
     }
 
-    /// Emits `e` for what it does: the loops, guards and yields of a `for`.
+    /// Emits `e` in statement position, where its value is unused.
     pub(super) fn discard(&mut self, e: &Expr) {
         let arena = self.a;
         match &e.kind {

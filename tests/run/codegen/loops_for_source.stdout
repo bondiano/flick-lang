@@ -10,3 +10,11 @@ source 1
 body 1
 nested 2
 after nested 2
+source 1
+test 1
+then
+1
+source 2
+test 2
+else
+3

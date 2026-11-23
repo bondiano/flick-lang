@@ -1,5 +1,6 @@
 // The playground in a browser, with the real WebAssembly compiler.
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
 
 import { hoverWord, ready, replaceSource } from "./helpers.ts";
 
@@ -64,6 +65,27 @@ test("Run prints what the program writes", async ({ page }) => {
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.locator(".fp-output")).toContainText("Hello from Flick", { timeout: 60_000 });
 });
+
+for (const profile of ["Debug", "Release"]) {
+  test(`the bracket-balancing exercise emits a plain loop in ${profile}`, async ({ page }) => {
+    await page.goto("/flick-lang/play/?tab=js");
+    await ready(page);
+    await page.getByRole("button", { name: profile, exact: true }).click();
+    const source = readFileSync(new URL("../exercises/capstone/03/solution.fl", import.meta.url), "utf8");
+    await replaceSource(page, source);
+    const generated = page.locator(".fp-generated-code");
+    await expect(generated).toContainText("export const balanced", { timeout: 30_000 });
+    await expect(generated).toContainText("for (const char of ");
+    await expect(generated).toContainText('if (char === "(")');
+    await expect(generated).toContainText('if (char === ")")');
+    await expect(generated).toContainText("if (depth < 0)");
+    await expect(generated).not.toContainText("$loop");
+    await expect(generated).not.toContainText("= undefined");
+    await expect(generated).not.toContainText("break;");
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.locator(".fp-output")).toHaveText("true false false", { timeout: 60_000 });
+  });
+}
 
 test("an inline module compiles and runs in the browser", async ({ page }) => {
   await page.goto("/flick-lang/play/");
