@@ -12,7 +12,7 @@ are not evidence for this contract.
 | - | - | - |
 | M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), Stage 3 pure/pure-effect stdlib counted lowering/primitives, Stage 4 cooperative single-threaded async/fiber/layer/STM/observability/config/arbitrary/streaming runtime (`Fiber`, `Deferred`, `FiberGroup`, `Layer` dynamic/memo/merge, `Context.Reference`, `Clock`/`TestClock`, `Schedule`/`ExecutionPlan`, `Latch`/`Semaphore`/`PartitionedSemaphore`, `Queue`/`PubSub`/`SynchronizedRef`/`SubscriptionRef`, `Cache`/`ScopedCache`/`Pool`/`RcRef`/`RcMap`/`LayerMap`/`LayerRef`, `Tx` STM, `Events`/`ErrorReporter`/`Tracer`/`Logger`/`Metric`/`Request`/`Crypto`, `Config`/`ConfigProvider`, `Arbitrary`, `Channel`/`Sink`/`Stream`), Stage 5 `HostMode::LiveOs`, pure `flick:sql`, and explicit opt-in counted Host/FFI bridge (`lower_roots_with_foreign_bridge`, `Operation::ForeignCall`, persistent Node `HostBridge` with 1-to-1 handle refcount symmetry and zero-live-handle teardown), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs` `--release` gate: **1,064/1,064** clean profiles across `tests/run`, `tests/rt`, `docs`, `tests/language`, and runnable `examples/`, plus generated `flick_model::generate` programs, with zero live Rust heap slots and zero live host handles) | M1 reference-model corpus gate complete; production backend RC codegen and physical reclamation remain in M2–M5 / Phase N |
 | M2: `Arena s` | Public `Arena.make/alloc/get`, by-use checker rules (`T4'`/`SafeUse` retention vs post-close `FLICK-G002`/`G003`), full counted C0–C6 owner close (children -> hooks -> C4 mirrored foreign settle -> LIFO C5 finalizers with late arena allocation -> exact-once detach-all retirement) across success, failure/recovery, cancellation/interruption, nested scopes, persistent contexts (`Context`, `Context.Reference`, dynamic/memo `Layer`), Signals (`tail` failure, `abort`, `control` resume & discontinue, partial layer build abort/discontinue), and HostBridge late async callbacks (`Js.promise_callback`, C4 callbacks); JS/Effect-TS/Go storage retirement after finalizers; Lean multi-phase lifecycle ledger (`Formal/MemoryScopes.lean` pinned in `Formal/Axioms.lean`); independent source (`arena_holding_contexts.fl`, `arena_after_close_captures.fl`), language (`Language.Arenas`), counted fuel-prefix (`memory_m2_arenas.rs`, `memory_m2_host_bridge.rs`, `memory_m2_signals.rs`), and JS/Effect-TS/Go runtime regressions; paired EN/RU user docs (`regions.md`) | M2 reference-model, checker, runtime, Lean ledger, and doc contract complete; production backend RC/arena codegen and physical native reclamation remain in M3–M5 / Phase N |
-| M3: FBIP and cycles | Two-stage Perceus FBIP reuse (`DropReuse`, `Reuse`, `ReuseWithDicts`, `ReuseRecord`, in-place unique `Update`), saturated constructor uncurrying, tail-branch lowering, `Error::ReuseTokenEscape` enforcement, measured baseline-vs-FBIP allocation savings (`memory_m3_reuse.rs`), explicit `Ref` reference-cycle policy and `cells_detached_on_teardown` accounting (`memory_m3_cycles.rs`, `memory_inventory.rs`), Lean whole-block token-preservation and dynamic alias/cycle-break proofs (`Formal/MemoryReuse.lean`, pinned in `Formal/Axioms.lean`), and paired EN/RU docs (`spec/05-errors-and-concurrency.md`, `reference/regions.md`) | M3 reference-model, Perceus lowering, Lean proof, and doc contract complete; production backend RC/FBIP codegen and physical native reclamation remain in M4–M5 / Phase N |
+| M3: FBIP and cycles | Two-stage Perceus FBIP reuse (`DropReuse`, `Reuse`, `ReuseWithDicts`, `ReuseRecord`, in-place unique `Update`), saturated constructor uncurrying, tail-branch lowering, `Error::ReuseTokenEscape` enforcement (program VM, standalone `execute(Function)`, and `Heap::dup`), measured 4-class baseline-vs-FBIP allocation/reuse/peak-object/cycle counts (`memory_m3_reuse/measurements.rs`), explicit `Ref` reference-cycle policy and `cells_detached_on_teardown` accounting (`memory_m3_cycles.rs`, `memory_inventory.rs`), Lean whole-block token-preservation and dynamic alias/cycle-break proofs (`Formal/MemoryReuse.lean`, pinned in `Formal/Axioms.lean`), and paired EN/RU docs (`spec/05-errors-and-concurrency.md`, `reference/regions.md`) | M3 reference-model, Perceus lowering, Lean proof, and doc contract complete; production backend RC/FBIP codegen and physical native reclamation remain in M4–M5 / Phase N |
 | M4: Lean | `Formal/MemoryInsert.lean`: whole-function token balance for the executable cached insertion projection, before output validation, with distinct parameters and every selected-path prefix; `Formal/MemoryReuse.lean`: whole-block token preservation and prefix safety of frame-limited `DropReuse`/`pairReuse` plus abstract counted-heap uniqueness, alias preservation, unused-token cleanup, and `Ref` cycle-break vs teardown theorems; `Formal/MemoryPass.lean`: independent token checking and computed live-in availability; `Formal/Memory.lean`: local arithmetic; `Formal/MemoryArena.lean` and `MemoryScopes.lean`: root inventories and selected-owner storage retirement (all pinned in `Formal/Axioms.lean`, zero `sorry`, standard axioms only) | Verified Rust correspondence, machine bounds, full VM operation/exception-unwind semantics, and physical reclamation remain outside these proofs |
 | M5: Native split (2026-11-13) | Backend boundary below | Implementation belongs to phase N, not a replacement for M1–M4 |
 
@@ -324,7 +324,11 @@ pending results, queued arguments, suspended frames and global roots by
 ordinary drops, after detaching the root cell arena as specified in §5,
 not by sweeping heap storage. External aliases survive.
 The older standalone `execute(Function)` deliberately leaves error roots
-observable; it is not the program runner's unwinding contract.
+observable; it is not the program runner's unwinding contract. Both
+`Heap::dup` and standalone `execute(Function)` still enforce frame-limited
+reuse-token isolation (`Error::ReuseTokenEscape`) on entry arguments,
+`Instruction::Dup`, `Exit::Return`, `Exit::Branch`, and ordinary operation
+operands.
 
 A successful returned value remains caller-owned. Code IDs are local to an
 execution; returned closures are safely inspectable/droppable but cannot be
@@ -767,30 +771,74 @@ token-balanced memory IR:
 
 ### Measured allocation and reuse counts (M3)
 
-`flick-model/tests/model/memory_m3_reuse.rs` (`m3_allocation_and_reuse_measurements`)
-executes identical source workloads in both debug and release profiles under the
-non-reused baseline (`counted_main_without_reuse` + `Heap::without_reuse()`) and
-under FBIP (`counted_main` + `Heap::new()`), asserting identical independently
-expected outputs and zero leaks:
+`flick-model/tests/model/memory_m3_reuse/measurements.rs`
+(`m3_allocation_and_reuse_measurements`) executes identical source workloads
+across all four required M3 scenario classes (`unique`, `shared`, `early_exit`,
+and `cycle`) in both debug and release profiles under the non-reused baseline
+(`counted_main_without_reuse` + `Heap::without_reuse()`) and under FBIP
+(`counted_main` + `Heap::new()`), asserting identical independently expected
+outputs (including untouched shared aliases, LIFO finalizer order, and cyclic
+traversal results) and zero leaked live objects after teardown:
 
-| Workload | Profile | Baseline allocs | FBIP allocs | Allocs saved | FBIP reuses | Fallbacks |
-| - | - | -: | -: | -: | -: | -: |
-| `list_map` (`N = 100`) | debug / release | 863 | 762 | 101 | 101 | 0 |
-| `list_reverse` (`N = 100`) | debug / release | 964 | 864 | 100 | 100 | 0 |
-| `list_filter` (`N = 100`, 50% kept) | debug / release | 663 | 612 | 51 | 51 | 0 |
-| `tree_map` (`depth = 6`, 63 nodes) | debug / release | 818 | 691 | 127 | 127 | 0 |
-| `bst_insert` (`N = 40` inserts) | debug / release | 1252 | 1004 | 248 | 248 | 0 |
-| `record_update` (`N = 100` steps) | debug / release | 261 | 161 | 100 | 100 | 0 |
-| `record_rebuild` (`N = 100` steps) | debug / release | 261 | 161 | 100 | 100 | 0 |
+| Class | Workload | Profile | Engine | Static reuse sites | Eligible attempts | Runtime reuses | Fallbacks | Baseline allocs | FBIP allocs | Saved | Base peak objs | FBIP peak objs | Peak bytes | Cells detached |
+| - | - | - | - | -: | -: | -: | -: | -: | -: | -: | -: | -: | - | -: |
+| `unique` | `list_map (N=100)` | debug / release | `flick-model` counted VM | 2 | 101 | 101 | 0 | 863 | 762 | 101 | 145 | 145 | `unmeasured` | 0 |
+| `unique` | `list_reverse (N=100)` | debug / release | `flick-model` counted VM | 1 | 100 | 100 | 0 | 964 | 864 | 100 | 146 | 146 | `unmeasured` | 0 |
+| `unique` | `list_filter (N=100, 50% kept)` | debug / release | `flick-model` counted VM | 2 | 51 | 51 | 0 | 663 | 612 | 51 | 145 | 145 | `unmeasured` | 0 |
+| `unique` | `tree_map (depth=6, 63 nodes)` | debug / release | `flick-model` counted VM | 2 | 127 | 127 | 0 | 818 | 691 | 127 | 171 | 171 | `unmeasured` | 0 |
+| `unique` | `bst_insert (N=40 inserts)` | debug / release | `flick-model` counted VM | 4 | 248 | 248 | 0 | 1252 | 1004 | 248 | 125 | 125 | `unmeasured` | 0 |
+| `unique` | `record_update (N=100 steps)` | debug / release | `flick-model` counted VM | 1 | 100 | 100 | 0 | 261 | 161 | 100 | 46 | 46 | `unmeasured` | 0 |
+| `unique` | `record_rebuild (N=100 steps)` | debug / release | `flick-model` counted VM | 1 | 100 | 100 | 0 | 261 | 161 | 100 | 46 | 46 | `unmeasured` | 0 |
+| `shared` | `list_map_shared (N=50, alias checked)` | debug / release | `flick-model` counted VM | 2 | 51 | 0 | 51 | 621 | 621 | 0 | 147 | 147 | `unmeasured` | 0 |
+| `shared` | `record_update_shared (N=50, alias checked)` | debug / release | `flick-model` counted VM | 1 | 50 | 0 | 50 | 218 | 218 | 0 | 49 | 49 | `unmeasured` | 0 |
+| `early_exit` | `fallible_map_lifo_finalizers (N=20, fail@10)` | debug / release | `flick-model` counted VM | 2 | 0 | 0 | 0 | 136 | 136 | 0 | 67 | 67 | `unmeasured` | 0 |
+| `early_exit` | `fallible_rev_lifo_finalizers (N=20, fail@10)` | debug / release | `flick-model` counted VM | 1 | 9 | 9 | 0 | 156 | 147 | 9 | 68 | 68 | `unmeasured` | 0 |
+| `cycle` | `ref_self_and_mutual_teardown (3 cells)` | debug / release | `flick-model` counted VM | 0 | 0 | 0 | 0 | 84 | 84 | 0 | 57 | 57 | `unmeasured` | 3 |
 
-Separate M3 regressions in `memory_m3_reuse.rs` cover shared-input fallback with
-untouched external aliases, cross-tag reuse, mismatched-layout fallback,
-constrained GADTs with held dictionaries, partial matches with guards,
-wildcards, nested patterns, whole-scrutinee aliases, `Error::ReuseTokenEscape`,
-and early typed errors, defects, handler `abort`/`control` (resume once,
-discontinue, `ResumeTwice`), cancellation/timeout, LIFO finalizer order
-equivalence, and exhaustive consecutive fuel-prefix sweeps with zero leaks and
-zero double-frees.
+Debug and release profiles produced identical deterministic counts on every row
+above (24 measured profile rows total).
+
+#### Measurement provenance, unmeasured metrics, and limits
+
+- **Execution engine per counter:** `Static reuse sites` counts eligible
+  `Operation::Reuse`, `ReuseWithDicts`, `ReuseRecord`, and `Update` instructions
+  emitted in the `flick-core` Perceus-lowered memory IR. Every runtime column
+  (`Eligible attempts = reuses + reuse_fallbacks`, `Runtime reuses`,
+  `Fallbacks`, `Baseline allocs`, `FBIP allocs`, `Base peak objs`,
+  `FBIP peak objs`, and `Cells detached`) is measured directly by the
+  `flick-model` counted VM (`flick-model/src/memory/`).
+- **Explicitly `unmeasured` metrics:** Physical `Peak live bytes`, target-native
+  Wasm/LLVM/Native heap allocation and RSS, wall-clock throughput/latency, and
+  JS/Go host-GC runtime comparisons are explicitly `unmeasured` here (JS/Go
+  runtime performance and comparison belong under `#503`; formal Lean proof
+  obligations belong under `#463`).
+- **Provenance and reproduction method:** Recorded on target
+  `aarch64-apple-darwin` (`Darwin arm64`) with `rustc 1.95.0 (59807616e 2026-04-14)`,
+  `cargo 1.95.0 (f2d3ce0bd 2026-03-21)`, `Lean 4.29.1` (`formal/lean-toolchain`),
+  `Node v24.18.0`, and `go1.27.4` using
+  `cargo test -p flick-model --test model -- memory_m3_reuse::measurements::m3_allocation_and_reuse_measurements --nocapture`.
+  Exact verified HEAD commit SHA and full suite logs are attached in PR `#883`.
+- **Limits:** `flick-model` is an abstract counted reference VM, not a physical
+  machine allocator or native codegen backend. `peak_live_objects` counts live
+  VM heap slots across the entire run (including `Host.live` root-provider
+  initialization and active frame-local `Data::ReuseToken` slots, which occupy
+  one slot until reused or dropped). In `fallible_map_lifo_finalizers`, 9 live
+  `ReuseToken`s sit on active frames when `h == 10` raises and unwinds cleanly
+  before `Reuse` executes (0 dynamic reuse attempts); in
+  `fallible_rev_lifo_finalizers`, 9 in-place reuses complete (saving 9
+  allocations) before `h == 10` raises and unwinds both the reused accumulator
+  and LIFO scope finalizers (`fin-2`, `fin-1`, `caught:10`).
+
+Separate M3 regressions in `flick-model/tests/model/memory_m3_reuse.rs`,
+`records_and_matches.rs`, and `effects_and_benchmarks.rs` cover shared-input
+fallback with untouched external aliases, cross-tag reuse, mismatched-layout
+fallback, constrained GADTs with held dictionaries, partial matches with guards,
+wildcards, nested patterns, whole-scrutinee aliases, `Error::ReuseTokenEscape`
+(including standalone `execute(Function)` and `Heap::dup`), and early typed
+errors, defects, handler `abort`/`control` (resume once, discontinue,
+`ResumeTwice`), cancellation/timeout, LIFO finalizer order equivalence, and
+exhaustive consecutive fuel-prefix sweeps with zero leaks and zero
+double-frees.
 
 `Formal/MemoryReuse.lean` proves whole-block token preservation and prefix
 safety for `DropReuse` + `pairReuse` across arbitrary finite local width and

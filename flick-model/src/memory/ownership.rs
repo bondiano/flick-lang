@@ -1,5 +1,6 @@
 impl Heap {
     pub fn dup(&mut self, value: &Value) -> Result<Value, Error> {
+        self.admit_not_reuse_token(value)?;
         if let Value::Object(id) = value {
             let object = self.object_mut(id.id)?;
             object.references = object

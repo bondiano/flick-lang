@@ -1,10 +1,10 @@
-//! Early failure/handler/cancellation FBIP safety, reuse-token escape, and measurements.
+//! Early failure/handler/cancellation FBIP safety and reuse-token escape isolation tests.
 
 use flick_core::ir::{
     Lit, Pat,
     memory::{Block, Exit, Function, Global, Instruction, Name, Operation, Program},
 };
-use flick_model::memory::{Error, Heap, ProgramOutcome, execute_program_outcome};
+use flick_model::memory::{Error, Heap, ProgramOutcome, Value, execute, execute_program_outcome};
 
 use super::{compare_fbip_vs_baseline, sweep_fuel_prefixes};
 
@@ -322,169 +322,160 @@ fn reuse_token_escape_is_rejected_without_leaks_across_all_fuel_prefixes() {
     }
 }
 
-const BENCH_WORKLOADS: &[(&str, &str, &str, usize)] = &[
-    (
-        "list_map (N=100)",
-        r"
-module App.Main exposing (main)
-type IntList = Nil | Cons Int IntList
-build : Int -> IntList ->{} IntList
-let rec build n acc = if n <= 0 then acc else build (n - 1) (Cons n acc)
-map_inc : IntList ->{} IntList
-let rec map_inc xs = match xs with | Nil -> Nil | Cons h t -> Cons (h + 1) (map_inc t)
-sum : IntList -> Int ->{} Int
-let rec sum xs acc = match xs with | Nil -> acc | Cons h t -> sum t (acc + h)
-main : Unit ->{Host.Console} Unit
-let main () = Platform.stdout_line (show (sum (map_inc (build 100 Nil)) 0))
-",
-        "5150\n",
-        100,
-    ),
-    (
-        "list_reverse (N=100)",
-        r"
-module App.Main exposing (main)
-type IntList = Nil | Cons Int IntList
-build : Int -> IntList ->{} IntList
-let rec build n acc = if n <= 0 then acc else build (n - 1) (Cons n acc)
-rev_into : IntList -> IntList ->{} IntList
-let rec rev_into xs acc = match xs with | Nil -> acc | Cons h t -> rev_into t (Cons h acc)
-sum : IntList -> Int ->{} Int
-let rec sum xs acc = match xs with | Nil -> acc | Cons h t -> sum t (acc + h)
-main : Unit ->{Host.Console} Unit
-let main () = Platform.stdout_line (show (sum (rev_into (build 100 Nil) Nil) 0))
-",
-        "5050\n",
-        100,
-    ),
-    (
-        "list_filter (N=100, 50% kept)",
-        r"
-module App.Main exposing (main)
-type IntList = Nil | Cons Int IntList
-build : Int -> IntList ->{} IntList
-let rec build n acc = if n <= 0 then acc else build (n - 1) (Cons n acc)
-filter_even : IntList ->{} IntList
-let rec filter_even xs =
-  match xs with
-  | Nil -> Nil
-  | Cons h t -> if h % 2 == 0 then Cons h (filter_even t) else filter_even t
-sum : IntList -> Int ->{} Int
-let rec sum xs acc = match xs with | Nil -> acc | Cons h t -> sum t (acc + h)
-main : Unit ->{Host.Console} Unit
-let main () = Platform.stdout_line (show (sum (filter_even (build 100 Nil)) 0))
-",
-        "2550\n",
-        50,
-    ),
-    (
-        "tree_map (depth=6, 63 nodes)",
-        r"
-module App.Main exposing (main)
-type Tree = Leaf | Node Tree Int Tree
-mk : Int -> Int ->{} Tree
-let rec mk d v = if d <= 0 then Leaf else Node (mk (d - 1) (v * 2)) v (mk (d - 1) (v * 2 + 1))
-tmap : Tree ->{} Tree
-let rec tmap t = match t with | Leaf -> Leaf | Node l v r -> Node (tmap l) (v + 1) (tmap r)
-tsum : Tree ->{} Int
-let rec tsum t = match t with | Leaf -> 0 | Node l v r -> v + tsum l + tsum r
-main : Unit ->{Host.Console} Unit
-let main () = Platform.stdout_line (show (tsum (tmap (mk 6 1))))
-",
-        "2079\n",
-        63,
-    ),
-    (
-        "bst_insert (N=40 inserts)",
-        r"
-module App.Main exposing (main)
-type Tree = Leaf | Node Tree Int Tree
-insert : Int -> Tree ->{} Tree
-let rec insert k t =
-  match t with
-  | Leaf -> Node Leaf k Leaf
-  | Node l v r ->
-      if k < v then Node (insert k l) v r
-      else if k > v then Node l v (insert k r)
-      else Node l v r
-fill : Int -> Tree ->{} Tree
-let rec fill n t = if n <= 0 then t else fill (n - 1) (insert ((n * 17) % 40) t)
-tcount : Tree ->{} Int
-let rec tcount t = match t with | Leaf -> 0 | Node l _ r -> 1 + tcount l + tcount r
-main : Unit ->{Host.Console} Unit
-let main () = Platform.stdout_line (show (tcount (fill 40 Leaf)))
-",
-        "40\n",
-        100,
-    ),
-    (
-        "record_update (N=100 steps)",
-        r#"
-module App.Main exposing (main)
-type alias Point = { x : Int; y : Int }
-step : Int -> Point ->{} Point
-let rec step n p = if n <= 0 then p else step (n - 1) { p with x = p.x + 1; y = p.y + 2 }
-main : Unit ->{Host.Console} Unit
-let main () =
-  let p = step 100 { x = 0; y = 0 }
-  Platform.stdout_line (show p.x ++ "," ++ show p.y)
-"#,
-        "100,200\n",
-        100,
-    ),
-    (
-        "record_rebuild (N=100 steps)",
-        r#"
-module App.Main exposing (main)
-type alias Point = { x : Int; y : Int }
-step : Int -> Point ->{} Point
-let rec step n p =
-  if n <= 0 then p
-  else
-    let { x; y } = p
-    step (n - 1) { x = x + 1; y = y + 3 }
-main : Unit ->{Host.Console} Unit
-let main () =
-  let p = step 100 { x = 0; y = 0 }
-  Platform.stdout_line (show p.x ++ "," ++ show p.y)
-"#,
-        "100,300\n",
-        100,
-    ),
-];
+fn standalone_escape_cases() -> Vec<(&'static str, Function)> {
+    let bind = |binding: u32, value: Operation| Instruction::Let { binding, value };
+    vec![
+        (
+            "standalone_return_reuse_token",
+            Function {
+                params: vec![0],
+                body: Block {
+                    instructions: vec![bind(1, Operation::DropReuse(0))],
+                    exit: Exit::Return(1),
+                },
+            },
+        ),
+        (
+            "standalone_dup_reuse_token",
+            Function {
+                params: vec![0],
+                body: Block {
+                    instructions: vec![
+                        bind(1, Operation::DropReuse(0)),
+                        Instruction::Dup(1),
+                        Instruction::Drop(1),
+                        Instruction::Drop(1),
+                        bind(2, Operation::Literal(Lit::Unit)),
+                    ],
+                    exit: Exit::Return(2),
+                },
+            },
+        ),
+        (
+            "standalone_branch_on_reuse_token",
+            Function {
+                params: vec![0],
+                body: Block {
+                    instructions: vec![bind(1, Operation::DropReuse(0))],
+                    exit: Exit::Branch {
+                        condition: 1,
+                        then_: Box::new(Block {
+                            instructions: vec![bind(2, Operation::Literal(Lit::Unit))],
+                            exit: Exit::Return(2),
+                        }),
+                        else_: Box::new(Block {
+                            instructions: vec![bind(2, Operation::Literal(Lit::Unit))],
+                            exit: Exit::Return(2),
+                        }),
+                    },
+                },
+            },
+        ),
+        (
+            "standalone_construct_with_reuse_token",
+            Function {
+                params: vec![0],
+                body: Block {
+                    instructions: vec![
+                        bind(1, Operation::DropReuse(0)),
+                        bind(
+                            2,
+                            Operation::Construct {
+                                tag: "M.Box.Box".into(),
+                                fields: vec![1],
+                            },
+                        ),
+                    ],
+                    exit: Exit::Return(2),
+                },
+            },
+        ),
+    ]
+}
 
 #[test]
-fn m3_allocation_and_reuse_measurements() {
-    println!(
-        "| Workload | Profile | Baseline allocs | FBIP allocs | Allocs saved | FBIP reuses | Fallbacks |"
-    );
-    println!("| - | - | -: | -: | -: | -: | -: |");
-    for &(name, source, expected, min_reuses) in BENCH_WORKLOADS {
-        let (dbg, rel) = compare_fbip_vs_baseline(name, source, expected);
-        for (profile, cmp) in [("debug", &dbg), ("release", &rel)] {
-            let saved = cmp
-                .baseline
-                .allocations
-                .saturating_sub(cmp.fbip.allocations);
-            println!(
-                "| {name} | {profile} | {} | {} | {} | {} | {} |",
-                cmp.baseline.allocations,
-                cmp.fbip.allocations,
-                saved,
-                cmp.fbip.reuses,
-                cmp.fbip.reuse_fallbacks,
+fn standalone_execute_and_heap_dup_reject_reuse_token_escape() {
+    // 1. Direct `Heap::dup` rejects both live `Data::ReuseToken` and `Value::ReuseNull`.
+    for shared in [false, true] {
+        let mut heap = Heap::new();
+        let child = heap.literal(&Lit::String("inner".into())).expect("child");
+        let input = heap.construct("M.Box.Box", vec![child]).expect("box");
+        let alias = shared.then(|| heap.dup(&input).expect("alias"));
+        let token = heap.drop_reuse(input).expect("drop_reuse");
+        let dups_before = heap.stats().dups;
+        assert_eq!(heap.dup(&token), Err(Error::ReuseTokenEscape));
+        assert_eq!(heap.stats().dups, dups_before);
+        // Standalone entry arguments also reject both `Data::ReuseToken` and `Value::ReuseNull`.
+        let identity = Function {
+            params: vec![0],
+            body: Block {
+                instructions: vec![],
+                exit: Exit::Return(0),
+            },
+        };
+        assert_eq!(
+            execute(&mut heap, &identity, vec![Value::ReuseNull]),
+            Err(Error::ReuseTokenEscape)
+        );
+        let token_id = token.object_id();
+        assert_eq!(
+            execute(&mut heap, &identity, vec![token]),
+            Err(Error::ReuseTokenEscape)
+        );
+        if let Some(a) = alias {
+            assert_eq!(heap.string(heap.field(&a, 0).expect("inner")), Ok("inner"));
+            heap.drop_value(a).expect("drop alias");
+        }
+        // Standalone `execute` deliberately does not sweep rejected heap arguments;
+        // verify the unique token stayed untouched with rc == 1 and zero dups.
+        assert_eq!(heap.stats().live_objects, usize::from(token_id.is_some()));
+    }
+
+    // 2. Standalone `Return`, `Dup`, `Branch`, and `Construct` reject reuse tokens.
+    for (label, func) in standalone_escape_cases() {
+        for shared in [false, true] {
+            let mut heap = Heap::new();
+            let child = heap.literal(&Lit::String("inner".into())).expect("child");
+            let input = heap.construct("M.Box.Box", vec![child]).expect("box");
+            let alias = shared.then(|| heap.dup(&input).expect("alias"));
+            assert_eq!(
+                execute(&mut heap, &func, vec![input]),
+                Err(Error::ReuseTokenEscape),
+                "{label} shared={shared}"
             );
-            assert!(
-                cmp.fbip.reuses >= min_reuses,
-                "{name} ({profile}): expected >= {min_reuses} reuses, got {}",
-                cmp.fbip.reuses
-            );
-            assert!(
-                cmp.fbip.allocations + min_reuses <= cmp.baseline.allocations,
-                "{name} ({profile}): expected >= {min_reuses} allocations saved (baseline={}, fbip={})",
-                cmp.baseline.allocations,
-                cmp.fbip.allocations
-            );
+            if let Some(a) = alias {
+                assert_eq!(heap.string(heap.field(&a, 0).expect("inner")), Ok("inner"));
+                heap.drop_value(a).expect("drop alias");
+            }
         }
     }
+
+    // 3. Valid `DropReuse` -> `ReuseRecord` succeeds in place under standalone `execute`.
+    let bind = |binding: u32, value: Operation| Instruction::Let { binding, value };
+    let valid = Function {
+        params: vec![0],
+        body: Block {
+            instructions: vec![
+                bind(1, Operation::DropReuse(0)),
+                bind(2, Operation::Literal(Lit::Int(42))),
+                bind(
+                    3,
+                    Operation::ReuseRecord {
+                        object: 1,
+                        fields: vec![("x".into(), 2)],
+                    },
+                ),
+            ],
+            exit: Exit::Return(3),
+        },
+    };
+    let mut heap = Heap::new();
+    let rec = heap.record(vec![("x".into(), Value::Int(1))]).expect("rec");
+    let rec_id = rec.object_id();
+    let out = execute(&mut heap, &valid, vec![rec]).expect("valid standalone reuse");
+    assert_eq!(out.object_id(), rec_id);
+    assert_eq!(heap.named_field(&out, "x"), Ok(&Value::Int(42)));
+    assert_eq!(heap.stats().reuses, 1);
+    heap.drop_value(out).expect("drop out");
+    heap.finish().expect("zero leaks");
 }

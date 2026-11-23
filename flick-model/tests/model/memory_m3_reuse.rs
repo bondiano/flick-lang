@@ -1,17 +1,53 @@
 //! M3 safe FBIP / in-place reuse verification suite (shared harness + constructor reuse).
 
-use flick_core::ir::Lit;
+use flick_core::ir::{
+    Lit,
+    memory::{Block, Exit, Instruction, Operation, Program},
+};
 use flick_model::memory::{Error, Heap, ProgramOutcome, Stats, Value};
 use flick_model::run::{
     CountedMain, compile_source, counted_main, counted_main_without_reuse, main_of,
 };
 
 mod effects_and_benchmarks;
+mod measurements;
 mod records_and_matches;
 
 pub(super) struct Comparison {
     pub baseline: Stats,
     pub fbip: Stats,
+    pub static_reuse_sites: usize,
+}
+
+fn count_block_reuse_sites(block: &Block) -> usize {
+    let mut count = block
+        .instructions
+        .iter()
+        .filter(|inst| {
+            matches!(
+                inst,
+                Instruction::Let {
+                    value: Operation::Reuse { .. }
+                        | Operation::ReuseWithDicts { .. }
+                        | Operation::ReuseRecord { .. }
+                        | Operation::Update { .. },
+                    ..
+                }
+            )
+        })
+        .count();
+    if let Exit::Branch { then_, else_, .. } = &block.exit {
+        count += count_block_reuse_sites(then_) + count_block_reuse_sites(else_);
+    }
+    count
+}
+
+fn count_program_reuse_sites(program: &Program) -> usize {
+    program
+        .functions
+        .values()
+        .map(|f| count_block_reuse_sites(&f.body))
+        .sum()
 }
 
 fn run_once(
@@ -88,7 +124,12 @@ pub(super) fn compare_fbip_vs_baseline(
             baseline.reuses, 0,
             "{tag} ({profile} baseline): baseline must perform zero reuses"
         );
-        out.push(Comparison { baseline, fbip });
+        let static_reuse_sites = count_program_reuse_sites(&fbip_prog.program);
+        out.push(Comparison {
+            baseline,
+            fbip,
+            static_reuse_sites,
+        });
     }
     let release_cmp = out.pop().expect("release comparison");
     let debug_cmp = out.pop().expect("debug comparison");

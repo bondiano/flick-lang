@@ -202,6 +202,7 @@ pub fn execute(
         });
     }
     heap.ensure_owned(&arguments)?;
+    heap.admit_values(&arguments)?;
     let mut locals = Locals::new();
     for (&param, value) in function.params.iter().zip(arguments) {
         locals.insert_one(param, value);
@@ -215,7 +216,9 @@ pub fn execute(
                     locals.insert_one(*binding, value);
                 }
                 Instruction::Dup(local) => {
-                    let value = heap.dup(peek(&locals, *local)?)?;
+                    let source = peek(&locals, *local)?;
+                    heap.admit_not_reuse_token(source)?;
+                    let value = heap.dup(source)?;
                     locals.push(*local, value);
                 }
                 Instruction::Drop(local) => heap.drop_value(take(&mut locals, *local)?)?,
@@ -224,6 +227,7 @@ pub fn execute(
         match &block.exit {
             Exit::Return(local) => {
                 let result = take(&mut locals, *local)?;
+                heap.admit_ordinary(&result)?;
                 if locals.is_empty() {
                     return Ok(result);
                 }
@@ -234,6 +238,7 @@ pub fn execute(
                 then_,
                 else_,
             } => {
+                heap.admit_ordinary(peek(&locals, *condition)?)?;
                 let Value::Bool(condition) = take(&mut locals, *condition)? else {
                     return Err(Error::ExpectedBoolean);
                 };
