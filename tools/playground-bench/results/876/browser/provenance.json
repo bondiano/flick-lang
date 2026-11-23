@@ -1,0 +1,71 @@
+{
+  "repository": "bondiano/flick-lang",
+  "pull_request": 888,
+  "baseline": "1918f8919368817bac94f8c84244607d68f28557",
+  "candidate": "0ee305261875a85ef3d6e52923080d555aab3d27",
+  "workflow": ".github/workflows/playground-876-bench.yml",
+  "run": {
+    "id": 45156657215,
+    "url": "https://github.com/bondiano/flick-lang/actions/runs/45156657215",
+    "event": "pull_request",
+    "head_sha": "0ee305261875a85ef3d6e52923080d555aab3d27",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "created_at": "2026-11-23T10:30:05Z",
+    "updated_at": "2026-11-23T10:56:24Z"
+  },
+  "job_id": 137631222996,
+  "artifact": {
+    "id": 14810038322,
+    "name": "playground-876-browser-0ee305261875a85ef3d6e52923080d555aab3d27",
+    "size_in_bytes": 27986,
+    "url": "https://api.github.com/repos/bondiano/flick-lang/actions/artifacts/14810038322",
+    "archive_download_url": "https://api.github.com/repos/bondiano/flick-lang/actions/artifacts/14810038322/zip",
+    "expired": false,
+    "created_at": "2026-11-23T10:56:15Z",
+    "expires_at": "2026-12-07T10:56:15Z",
+    "updated_at": "2026-11-23T10:56:15Z",
+    "digest": "sha256:6d7034a81000daaed5fb83a6fb661c409e6108a09cf82981d8e6e3477329fb54",
+    "workflow_run": {
+      "id": 45156657215,
+      "repository_id": 1429547431,
+      "head_repository_id": 1429547431,
+      "head_branch": "codex/876-playground-first-run",
+      "head_sha": "0ee305261875a85ef3d6e52923080d555aab3d27"
+    }
+  },
+  "verified_archive_sha256": "6d7034a81000daaed5fb83a6fb661c409e6108a09cf82981d8e6e3477329fb54",
+  "measurement": {
+    "engine": "chromium",
+    "order": [
+      "before-1",
+      "after-1",
+      "after-2",
+      "before-2"
+    ],
+    "warmup_per_session": 3,
+    "samples_per_session": 12,
+    "samples_per_scenario_per_variant": 24,
+    "fixtures": [
+      "hello",
+      "classes",
+      "sales-report"
+    ],
+    "scenarios": [
+      "diagnostics-only",
+      "edit-first-emit",
+      "checked-first-emit",
+      "unchanged-profile",
+      "check-after-direct-run",
+      "large-check-small-run"
+    ],
+    "output_validation_cases": 12,
+    "optional_stage_instrumentation": false
+  },
+  "limitations": [
+    "Peak memory is WebAssembly linear-memory high-water size, not browser resident memory or JS heap.",
+    "Byte deltas describe the bound production WASM payload, not a complete generated documentation site.",
+    "The experiment compares pinned baseline and candidate source commits; later main merges do not change either artifact."
+  ]
+}

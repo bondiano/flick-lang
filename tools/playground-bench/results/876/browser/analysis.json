@@ -1,0 +1,939 @@
+{
+  "conclusion": "Defer the production prepare_emit API/state change: no repeatable direct-run latency benefit, no improvement in the normal checked-first path, and higher editor-only linear-memory high-water size.",
+  "source": "comparison.json plus all four original reports",
+  "validated": {
+    "cleanWorkingTrees": true,
+    "exactRevisions": true,
+    "sameHostAndFixtures": true,
+    "allOutputDigestsMatch": true,
+    "samplesPerCasePerVariant": 24,
+    "summaryRecomputedFromEveryObservation": true,
+    "optionalStageHooksAbsent": true
+  },
+  "workerSha256": {
+    "before": "32f32bedfa58c6d233e03153b59e9ff91705dbe5a5f042a8c3c192170efca42f",
+    "after": "a9e2b6a2cd05d7a94da180432599968a97bb69410fb8909dce8ca8d9693a17e4"
+  },
+  "reportMeasuredAt": {
+    "before-1": "2026-11-23T10:40:57.229Z",
+    "after-1": "2026-11-23T10:46:01.243Z",
+    "after-2": "2026-11-23T10:51:07.104Z",
+    "before-2": "2026-11-23T10:56:14.667Z"
+  },
+  "wasm": {
+    "before": {
+      "sha256": "0da1eeda7c4063c09b1fc80aa58d0d8c9d85ca420780da31bdba9c71b99facb2",
+      "rawBytes": 4545296,
+      "gzipBytes": 1766527
+    },
+    "after": {
+      "sha256": "818a47f3256dcb4136819967f1f9ac0ccb21051324026b3f3e9b78f25a861b00",
+      "rawBytes": 4546300,
+      "gzipBytes": 1766428
+    },
+    "rawByteDelta": 1004,
+    "gzipByteDelta": -99
+  },
+  "runs": [
+    {
+      "fixture": "hello",
+      "scenario": "diagnostics-only",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 0.39999999990686774,
+          "p50": 0.5,
+          "p95": 0.5,
+          "max": 0.6000000000931323
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 0.5,
+          "p50": 0.5999999999767169,
+          "p95": 0.7000000000116415,
+          "max": 0.7000000001862645
+        },
+        "peakLinearMemoryBytes": 21889024
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 0.40000000002328306,
+          "p50": 0.5,
+          "p95": 0.5,
+          "max": 0.5999999999767169
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 0.5,
+          "p50": 0.5999999999767169,
+          "p95": 0.6000000000931323,
+          "max": 0.6999999999534339
+        },
+        "peakLinearMemoryBytes": 22478848
+      },
+      "workerP50DeltaPct": 0.0,
+      "workerP95DeltaPct": 0.0,
+      "roundTripP50DeltaPct": 0.0,
+      "peakLinearMemoryDeltaBytes": 589824,
+      "phaseWorkerP50Ms": {
+        "before-1": 0.40000000002328306,
+        "after-1": 0.5,
+        "after-2": 0.5,
+        "before-2": 0.5
+      },
+      "round1WorkerP50DeltaPct": 24.999999992724042,
+      "round2WorkerP50DeltaPct": 0.0
+    },
+    {
+      "fixture": "hello",
+      "scenario": "edit-first-emit",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 444.9000000000233,
+          "p50": 454.20000000001164,
+          "p95": 466.29999999981374,
+          "max": 471
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 446.30000000004657,
+          "p50": 456.10000000009313,
+          "p95": 469.69999999995343,
+          "max": 474.30000000004657
+        },
+        "peakLinearMemoryBytes": 49807360
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 441.39999999990687,
+          "p50": 455.80000000004657,
+          "p95": 475.5,
+          "max": 482.69999999995343
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 443,
+          "p50": 457.0999999999767,
+          "p95": 479.20000000006985,
+          "max": 486.0999999999767
+        },
+        "peakLinearMemoryBytes": 49807360
+      },
+      "workerP50DeltaPct": 0.35226772347751734,
+      "workerP95DeltaPct": 1.9729787690735412,
+      "roundTripP50DeltaPct": 0.2192501644120437,
+      "peakLinearMemoryDeltaBytes": 0,
+      "phaseWorkerP50Ms": {
+        "before-1": 452,
+        "after-1": 466.0999999999767,
+        "after-2": 450.20000000006985,
+        "before-2": 460.20000000018626
+      },
+      "round1WorkerP50DeltaPct": 3.11946902654352,
+      "round2WorkerP50DeltaPct": -2.1729682746876033
+    },
+    {
+      "fixture": "hello",
+      "scenario": "checked-first-emit",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 444.9000000000233,
+          "p50": 456.0999999999767,
+          "p95": 466.39999999990687,
+          "max": 467.9000000001397
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 445.8999999999651,
+          "p50": 457.20000000001164,
+          "p95": 467.80000000004657,
+          "max": 468.9000000001397
+        },
+        "peakLinearMemoryBytes": 49807360
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 454.19999999995343,
+          "p50": 458.5999999999767,
+          "p95": 470.5999999998603,
+          "max": 472.39999999990687
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 455.19999999995343,
+          "p50": 461.30000000004657,
+          "p95": 471.5999999998603,
+          "max": 473.39999999990687
+        },
+        "peakLinearMemoryBytes": 49807360
+      },
+      "workerP50DeltaPct": 0.5481254110940803,
+      "workerP95DeltaPct": 0.9005145797500669,
+      "roundTripP50DeltaPct": 0.8967629046445325,
+      "peakLinearMemoryDeltaBytes": 0,
+      "phaseWorkerP50Ms": {
+        "before-1": 450.69999999995343,
+        "after-1": 457.0999999999767,
+        "after-2": 461,
+        "before-2": 462.69999999995343
+      },
+      "round1WorkerP50DeltaPct": 1.4200133126301084,
+      "round2WorkerP50DeltaPct": -0.3674086881248373
+    },
+    {
+      "fixture": "hello",
+      "scenario": "unchanged-profile",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 455.5999999999767,
+          "p50": 464.79999999998836,
+          "p95": 479.10000000009313,
+          "max": 481
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 457.29999999998836,
+          "p50": 466.30000000004657,
+          "p95": 480.60000000009313,
+          "max": 481.89999999990687
+        },
+        "peakLinearMemoryBytes": 49807360
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 444.5,
+          "p50": 450.4000000001397,
+          "p95": 470.80000000004657,
+          "max": 473
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 445.5999999998603,
+          "p50": 453.60000000009313,
+          "p95": 471.70000000006985,
+          "max": 476.5
+        },
+        "peakLinearMemoryBytes": 49807360
+      },
+      "workerP50DeltaPct": -3.098106712532056,
+      "workerP95DeltaPct": -1.7324149446973358,
+      "roundTripP50DeltaPct": -2.723568518111119,
+      "peakLinearMemoryDeltaBytes": 0,
+      "phaseWorkerP50Ms": {
+        "before-1": 460.5,
+        "after-1": 460.4000000000233,
+        "after-2": 448.0999999998603,
+        "before-2": 477
+      },
+      "round1WorkerP50DeltaPct": -0.02171552659646636,
+      "round2WorkerP50DeltaPct": -6.058700209672896
+    },
+    {
+      "fixture": "hello",
+      "scenario": "check-after-direct-run",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 0.6999999999534339,
+          "p50": 0.8000000000465661,
+          "p95": 0.9000000001396984,
+          "max": 0.9000000001396984
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 0.7999999999883585,
+          "p50": 1,
+          "p95": 3.699999999953434,
+          "max": 3.8999999999068677
+        },
+        "peakLinearMemoryBytes": 49807360
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 0.6000000000931323,
+          "p50": 0.7000000001862645,
+          "p95": 0.8000000000465661,
+          "max": 0.8000000000465661
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 0.7999999998137355,
+          "p50": 0.8999999999068677,
+          "p95": 1,
+          "max": 1
+        },
+        "peakLinearMemoryBytes": 49807360
+      },
+      "workerP50DeltaPct": -12.499999981810106,
+      "workerP95DeltaPct": -11.111111119734474,
+      "roundTripP50DeltaPct": -10.000000009313226,
+      "peakLinearMemoryDeltaBytes": 0,
+      "phaseWorkerP50Ms": {
+        "before-1": 0.7999999999883585,
+        "after-1": 0.7999999999301508,
+        "after-2": 0.6999999999534339,
+        "before-2": 0.8000000000465661
+      },
+      "round1WorkerP50DeltaPct": -7.275957614183426e-09,
+      "round2WorkerP50DeltaPct": -12.500000010913936
+    },
+    {
+      "fixture": "hello",
+      "scenario": "large-check-small-run",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 436.70000000001164,
+          "p50": 447.80000000004657,
+          "p95": 467.10000000009313,
+          "max": 485.30000000004657
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 437.6000000000349,
+          "p50": 449.19999999995343,
+          "p95": 468.29999999981374,
+          "max": 486.5
+        },
+        "peakLinearMemoryBytes": 49872896
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 443.89999999990687,
+          "p50": 447.5,
+          "p95": 456.0999999998603,
+          "max": 457.5
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 445.10000000009313,
+          "p50": 449.10000000009313,
+          "p95": 457.19999999995343,
+          "max": 459
+        },
+        "peakLinearMemoryBytes": 49807360
+      },
+      "workerP50DeltaPct": -0.0669941938469254,
+      "workerP95DeltaPct": -2.3549561122309215,
+      "roundTripP50DeltaPct": -0.022261798722245096,
+      "peakLinearMemoryDeltaBytes": -65536,
+      "phaseWorkerP50Ms": {
+        "before-1": 440.6000000000349,
+        "after-1": 446.5,
+        "after-2": 448.5999999998603,
+        "before-2": 455.89999999990687
+      },
+      "round1WorkerP50DeltaPct": 1.3390830685348742,
+      "round2WorkerP50DeltaPct": -1.6012283395586913
+    },
+    {
+      "fixture": "classes",
+      "scenario": "diagnostics-only",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 3.800000000046566,
+          "p50": 4.099999999976717,
+          "p95": 5.2000000001862645,
+          "max": 5.900000000139698
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 3.9000000001396984,
+          "p50": 4.2000000000116415,
+          "p95": 5.300000000046566,
+          "max": 6
+        },
+        "peakLinearMemoryBytes": 21889024
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 3.799999999930151,
+          "p50": 4.300000000046566,
+          "p95": 6.100000000093132,
+          "max": 6.300000000046566
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 3.8999999999068677,
+          "p50": 4.5,
+          "p95": 6.300000000046566,
+          "max": 6.800000000046566
+        },
+        "peakLinearMemoryBytes": 22478848
+      },
+      "workerP50DeltaPct": 4.878048782219135,
+      "workerP95DeltaPct": 17.30769230528133,
+      "roundTripP50DeltaPct": 7.142857142560155,
+      "peakLinearMemoryDeltaBytes": 589824,
+      "phaseWorkerP50Ms": {
+        "before-1": 4.099999999976717,
+        "after-1": 4.199999999953434,
+        "after-2": 5.899999999906868,
+        "before-2": 4
+      },
+      "round1WorkerP50DeltaPct": 2.439024389689881,
+      "round2WorkerP50DeltaPct": 47.499999997671694
+    },
+    {
+      "fixture": "classes",
+      "scenario": "edit-first-emit",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 439.69999999995343,
+          "p50": 452.30000000004657,
+          "p95": 461.0999999998603,
+          "max": 462.5
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 440.5,
+          "p50": 453.5999999999767,
+          "p95": 463.5999999998603,
+          "max": 464.39999999990687
+        },
+        "peakLinearMemoryBytes": 49938432
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 437.30000000004657,
+          "p50": 451.69999999995343,
+          "p95": 472.30000000004657,
+          "max": 474.4000000000233
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 438.80000000004657,
+          "p50": 453.79999999981374,
+          "p95": 473.5,
+          "max": 476.79999999993015
+        },
+        "peakLinearMemoryBytes": 49872896
+      },
+      "workerP50DeltaPct": -0.1326553172878775,
+      "workerP95DeltaPct": 2.4289741921903474,
+      "roundTripP50DeltaPct": 0.044091710722438116,
+      "peakLinearMemoryDeltaBytes": -65536,
+      "phaseWorkerP50Ms": {
+        "before-1": 444.5999999999767,
+        "after-1": 468.30000000004657,
+        "after-2": 441.4000000001397,
+        "before-2": 456.69999999995343
+      },
+      "round1WorkerP50DeltaPct": 5.330634278018698,
+      "round2WorkerP50DeltaPct": -3.350120429125314
+    },
+    {
+      "fixture": "classes",
+      "scenario": "checked-first-emit",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 435.4000000000233,
+          "p50": 450.4000000000233,
+          "p95": 467.19999999995343,
+          "max": 469.5
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 436.80000000004657,
+          "p50": 452.0999999999767,
+          "p95": 468.0999999998603,
+          "max": 471.70000000018626
+        },
+        "peakLinearMemoryBytes": 49938432
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 438.0999999999767,
+          "p50": 464.19999999995343,
+          "p95": 472.80000000004657,
+          "max": 475.30000000004657
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 439.5,
+          "p50": 465.80000000004657,
+          "p95": 474.4000000001397,
+          "max": 476.19999999995343
+        },
+        "peakLinearMemoryBytes": 49938432
+      },
+      "workerP50DeltaPct": 3.063943161618443,
+      "workerP95DeltaPct": 1.1986301370063623,
+      "roundTripP50DeltaPct": 3.0303030303186373,
+      "peakLinearMemoryDeltaBytes": 0,
+      "phaseWorkerP50Ms": {
+        "before-1": 439.9000000000233,
+        "after-1": 446.79999999993015,
+        "after-2": 468.30000000004657,
+        "before-2": 456.9000000001397
+      },
+      "round1WorkerP50DeltaPct": 1.568538304138789,
+      "round2WorkerP50DeltaPct": 2.4950755088429366
+    },
+    {
+      "fixture": "classes",
+      "scenario": "unchanged-profile",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 442.4000000000233,
+          "p50": 459.79999999993015,
+          "p95": 484,
+          "max": 485.5
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 443.30000000004657,
+          "p50": 461.5,
+          "p95": 486,
+          "max": 487.4000000001397
+        },
+        "peakLinearMemoryBytes": 49938432
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 444.29999999981374,
+          "p50": 456.5,
+          "p95": 468.0999999999767,
+          "max": 472.9000000000233
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 445.80000000004657,
+          "p50": 458.30000000004657,
+          "p95": 469.5999999999767,
+          "max": 477.19999999995343
+        },
+        "peakLinearMemoryBytes": 49872896
+      },
+      "workerP50DeltaPct": -0.717703349267218,
+      "workerP95DeltaPct": -3.2851239669469567,
+      "roundTripP50DeltaPct": -0.693391115916242,
+      "peakLinearMemoryDeltaBytes": -65536,
+      "phaseWorkerP50Ms": {
+        "before-1": 449.19999999995343,
+        "after-1": 458.5,
+        "after-2": 450,
+        "before-2": 467.60000000009313
+      },
+      "round1WorkerP50DeltaPct": 2.070347284071139,
+      "round2WorkerP50DeltaPct": -3.7639007699079574
+    },
+    {
+      "fixture": "classes",
+      "scenario": "check-after-direct-run",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 4.5,
+          "p50": 4.800000000046566,
+          "p95": 5.599999999860302,
+          "max": 5.900000000139698
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 4.699999999953434,
+          "p50": 4.900000000139698,
+          "p95": 8.600000000093132,
+          "max": 8.900000000023283
+        },
+        "peakLinearMemoryBytes": 49938432
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 4.5,
+          "p50": 4.900000000023283,
+          "p95": 5.900000000023283,
+          "max": 6.099999999976717
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 4.699999999953434,
+          "p50": 5.099999999860302,
+          "p95": 6,
+          "max": 6.300000000046566
+        },
+        "peakLinearMemoryBytes": 49872896
+      },
+      "workerP50DeltaPct": 2.0833333328280634,
+      "workerP95DeltaPct": 5.35714286018687,
+      "roundTripP50DeltaPct": 4.081632647242883,
+      "peakLinearMemoryDeltaBytes": -65536,
+      "phaseWorkerP50Ms": {
+        "before-1": 4.899999999906868,
+        "after-1": 4.899999999906868,
+        "after-2": 4.900000000139698,
+        "before-2": 4.7999999998137355
+      },
+      "round1WorkerP50DeltaPct": 0.0,
+      "round2WorkerP50DeltaPct": 2.0833333402050735
+    },
+    {
+      "fixture": "classes",
+      "scenario": "large-check-small-run",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 439.4000000000233,
+          "p50": 458.5999999999767,
+          "p95": 474,
+          "max": 479.30000000004657
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 441.30000000004657,
+          "p50": 459.69999999995343,
+          "p95": 475.19999999995343,
+          "max": 480.39999999990687
+        },
+        "peakLinearMemoryBytes": 49938432
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 449.19999999995343,
+          "p50": 454.4000000000233,
+          "p95": 466,
+          "max": 480.19999999995343
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 450.30000000004657,
+          "p50": 455.5,
+          "p95": 467,
+          "max": 481.19999999995343
+        },
+        "peakLinearMemoryBytes": 49872896
+      },
+      "workerP50DeltaPct": -0.9158307893488149,
+      "workerP95DeltaPct": -1.6877637130801704,
+      "roundTripP50DeltaPct": -0.9136393299877921,
+      "peakLinearMemoryDeltaBytes": -65536,
+      "phaseWorkerP50Ms": {
+        "before-1": 445.5,
+        "after-1": 454,
+        "after-2": 455,
+        "before-2": 465.5
+      },
+      "round1WorkerP50DeltaPct": 1.9079685746352437,
+      "round2WorkerP50DeltaPct": -2.2556390977443663
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "diagnostics-only",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 5.199999999953434,
+          "p50": 5.5,
+          "p95": 8.199999999953434,
+          "max": 8.199999999953434
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 5.399999999906868,
+          "p50": 5.700000000069849,
+          "p95": 8.29999999993015,
+          "max": 8.300000000046566
+        },
+        "peakLinearMemoryBytes": 21889024
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 5.5,
+          "p50": 5.900000000139698,
+          "p95": 8.900000000023283,
+          "max": 9
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 5.599999999860302,
+          "p50": 6.099999999860302,
+          "p95": 9.199999999953434,
+          "max": 9.300000000046566
+        },
+        "peakLinearMemoryBytes": 22478848
+      },
+      "workerP50DeltaPct": 7.272727275267243,
+      "workerP95DeltaPct": 8.536585366753947,
+      "roundTripP50DeltaPct": 7.017543855886865,
+      "peakLinearMemoryDeltaBytes": 589824,
+      "phaseWorkerP50Ms": {
+        "before-1": 5.5,
+        "after-1": 6,
+        "after-2": 5.899999999906868,
+        "before-2": 5.5
+      },
+      "round1WorkerP50DeltaPct": 9.090909090909083,
+      "round2WorkerP50DeltaPct": 7.272727271033963
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "edit-first-emit",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 448.19999999995343,
+          "p50": 467.30000000004657,
+          "p95": 485.19999999995343,
+          "max": 485.80000000004657
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 449.39999999990687,
+          "p50": 468.5,
+          "p95": 486.80000000004657,
+          "max": 487.20000000018626
+        },
+        "peakLinearMemoryBytes": 50069504
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 454.0999999998603,
+          "p50": 462.69999999995343,
+          "p95": 477.30000000004657,
+          "max": 477.9000000000233
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 455,
+          "p50": 464.30000000004657,
+          "p95": 478.30000000004657,
+          "max": 478.9000000000233
+        },
+        "peakLinearMemoryBytes": 49872896
+      },
+      "workerP50DeltaPct": -0.9843783436962683,
+      "workerP95DeltaPct": -1.6281945589257218,
+      "roundTripP50DeltaPct": -0.8964781216549533,
+      "peakLinearMemoryDeltaBytes": -196608,
+      "phaseWorkerP50Ms": {
+        "before-1": 455.0999999999767,
+        "after-1": 462.69999999995343,
+        "after-2": 462,
+        "before-2": 474
+      },
+      "round1WorkerP50DeltaPct": 1.66996264556738,
+      "round2WorkerP50DeltaPct": -2.5316455696202556
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "checked-first-emit",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 449.5,
+          "p50": 462.0999999998603,
+          "p95": 479.0999999999767,
+          "max": 479.4000000000233
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 451,
+          "p50": 463.30000000004657,
+          "p95": 480.5999999999767,
+          "max": 480.89999999990687
+        },
+        "peakLinearMemoryBytes": 50069504
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 448.69999999995343,
+          "p50": 465.69999999995343,
+          "p95": 499,
+          "max": 500.60000000009313
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 449.5,
+          "p50": 467.89999999990687,
+          "p95": 501.30000000004657,
+          "max": 502.10000000009313
+        },
+        "peakLinearMemoryBytes": 50069504
+      },
+      "workerP50DeltaPct": 0.7790521532339723,
+      "workerP95DeltaPct": 4.15362137341353,
+      "roundTripP50DeltaPct": 0.992877185378771,
+      "peakLinearMemoryDeltaBytes": 0,
+      "phaseWorkerP50Ms": {
+        "before-1": 460.4000000000233,
+        "after-1": 454.9000000000233,
+        "after-2": 495,
+        "before-2": 465.4000000001397
+      },
+      "round1WorkerP50DeltaPct": -1.1946133796697955,
+      "round2WorkerP50DeltaPct": 6.360120326568852
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "unchanged-profile",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 453.19999999995343,
+          "p50": 467.10000000009313,
+          "p95": 477.89999999990687,
+          "max": 481.5
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 454.19999999995343,
+          "p50": 469.29999999993015,
+          "p95": 481.69999999995343,
+          "max": 482.4000000000233
+        },
+        "peakLinearMemoryBytes": 50069504
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 459.19999999995343,
+          "p50": 465.4000000001397,
+          "p95": 479.69999999995343,
+          "max": 481.5
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 460.19999999995343,
+          "p50": 466.5,
+          "p95": 480.79999999981374,
+          "max": 483
+        },
+        "peakLinearMemoryBytes": 49872896
+      },
+      "workerP50DeltaPct": -0.36394776278164676,
+      "workerP95DeltaPct": 0.3766478342847712,
+      "roundTripP50DeltaPct": -0.5966332835991017,
+      "peakLinearMemoryDeltaBytes": -196608,
+      "phaseWorkerP50Ms": {
+        "before-1": 461.69999999995343,
+        "after-1": 463.20000000006985,
+        "after-2": 469.10000000009313,
+        "before-2": 470.60000000009313
+      },
+      "round1WorkerP50DeltaPct": 0.3248862898238114,
+      "round2WorkerP50DeltaPct": -0.3187420314491485
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "check-after-direct-run",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 6.300000000046566,
+          "p50": 6.900000000023283,
+          "p95": 8.599999999976717,
+          "max": 10
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 6.5,
+          "p50": 7.099999999976717,
+          "p95": 11.099999999976717,
+          "max": 11.100000000093132
+        },
+        "peakLinearMemoryBytes": 50069504
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 6.299999999930151,
+          "p50": 6.900000000139698,
+          "p95": 7.800000000046566,
+          "max": 8
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 6.400000000023283,
+          "p50": 7.099999999860302,
+          "p95": 8,
+          "max": 8.200000000186265
+        },
+        "peakLinearMemoryBytes": 49872896
+      },
+      "workerP50DeltaPct": 1.6871837260623579e-09,
+      "workerP95DeltaPct": -9.30232558060833,
+      "roundTripP50DeltaPct": -1.639655078378155e-09,
+      "peakLinearMemoryDeltaBytes": -196608,
+      "phaseWorkerP50Ms": {
+        "before-1": 6.900000000023283,
+        "after-1": 6.400000000023283,
+        "after-2": 7.100000000093132,
+        "before-2": 6.899999999906868
+      },
+      "round1WorkerP50DeltaPct": -7.246376811569755,
+      "round2WorkerP50DeltaPct": 2.898550727376281
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "large-check-small-run",
+      "before": {
+        "workerMs": {
+          "samples": 24,
+          "min": 454.9000000000233,
+          "p50": 464.5,
+          "p95": 478.4000000000233,
+          "max": 484.30000000004657
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 456.20000000006985,
+          "p50": 465.60000000009313,
+          "p95": 479.5,
+          "max": 485.4000000000233
+        },
+        "peakLinearMemoryBytes": 50069504
+      },
+      "after": {
+        "workerMs": {
+          "samples": 24,
+          "min": 450.20000000006985,
+          "p50": 461.30000000004657,
+          "p95": 476.5,
+          "max": 478.30000000004657
+        },
+        "roundTripMs": {
+          "samples": 24,
+          "min": 451.4000000000233,
+          "p50": 462.79999999981374,
+          "p95": 478.19999999995343,
+          "max": 480.19999999995343
+        },
+        "peakLinearMemoryBytes": 49872896
+      },
+      "workerP50DeltaPct": -0.6889128094625274,
+      "workerP95DeltaPct": -0.397157190640296,
+      "roundTripP50DeltaPct": -0.6013745705066187,
+      "peakLinearMemoryDeltaBytes": -196608,
+      "phaseWorkerP50Ms": {
+        "before-1": 460.0999999999767,
+        "after-1": 462.5999999999767,
+        "after-2": 460.5,
+        "before-2": 466.5
+      },
+      "round1WorkerP50DeltaPct": 0.543360139100213,
+      "round2WorkerP50DeltaPct": -1.2861736334405127
+    }
+  ]
+}

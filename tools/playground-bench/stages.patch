@@ -1,0 +1,120 @@
+--- a/flick-core/Cargo.toml
++++ b/flick-core/Cargo.toml
+@@ -62,5 +62,8 @@
+ toml = { version = "1.1.8", optional = true }
+ tracing = { version = "0.1.44", default-features = false, features = ["std"] }
+ 
++[target.'cfg(target_arch = "wasm32")'.dependencies]
++wasm-bindgen = "0.2.130"
++
+ [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+ flick-backend-support = { path = "../flick-backend-support", features = ["typed-ir"] }
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -751,6 +751,7 @@
+  "sha2",
+  "toml 1.1.8+spec-1.1.0",
+  "tracing",
++ "wasm-bindgen",
+ ]
+ 
+ [[package]]
+--- a/flick-core/src/lib.rs
++++ b/flick-core/src/lib.rs
+@@ -8,7 +8,7 @@
+ 
+ pub mod api_diff;
+ pub mod build;
+-mod clock;
++pub mod clock;
+ pub mod codegen;
+ pub mod consteval;
+ pub mod doc;
+--- a/flick-core/src/clock.rs
++++ b/flick-core/src/clock.rs
+@@ -21,3 +21,31 @@
+ pub fn timed<T>(f: impl FnOnce() -> T) -> (T, Duration) {
+     (f(), Duration::ZERO)
+ }
++
++// Benchmark-only markers. Apply this patch only in an isolated worktree.
++#[cfg(target_arch = "wasm32")]
++mod probe {
++    use wasm_bindgen::prelude::*;
++
++    #[wasm_bindgen]
++    extern "C" {
++        #[wasm_bindgen(js_namespace = globalThis, js_name = __flickBenchMark)]
++        fn mark(stage: u32, enter: bool);
++    }
++
++    pub struct Stage(u32);
++
++    pub fn stage(id: u32) -> Stage {
++        mark(id, true);
++        Stage(id)
++    }
++
++    impl Drop for Stage {
++        fn drop(&mut self) {
++            mark(self.0, false);
++        }
++    }
++}
++
++#[cfg(target_arch = "wasm32")]
++pub use probe::stage;
+--- a/flick-core/src/project/load/files.rs
++++ b/flick-core/src/project/load/files.rs
+@@ -124,6 +124,7 @@
+         loaded: bool,
+         name: Option<&str>,
+     ) -> (Arc<Parse>, Arc<ModuleSyntax>) {
++        let _probe = crate::clock::stage(1);
+         #[cfg(feature = "native-project")]
+         if loaded {
+             return Self::unparsed(file, name.unwrap_or(""));
+--- a/flick-core/src/project/load/checking_core.rs
++++ b/flick-core/src/project/load/checking_core.rs
+@@ -141,6 +141,7 @@
+         lookup: &dyn Fn(&str) -> Option<Interface>,
+         contracts: &dyn Fn(&str) -> Option<Interface>,
+     ) -> Output {
++        let _probe = crate::clock::stage(2);
+         let tree = loaded
+             .expansion
+             .as_ref()
+@@ -417,6 +418,7 @@
+         declarations: &mut Arc<Interface>,
+         diagnostics: &mut Vec<Diagnostic>,
+     ) -> Option<ir::Module> {
++        let _probe = crate::clock::stage(3);
+         let lowers = !self.lower_packages_only || matches!(loaded.root, Root::Package(_));
+         if clean
+             && self.lower
+--- a/flick-wasm/src/lib.rs
++++ b/flick-wasm/src/lib.rs
+@@ -223,6 +223,7 @@
+         }
+         out["diagnostics"] = self.diagnostics(sources, &diagnostics);
+         out["dts_diagnostics"] = self.diagnostics(sources, &declarations);
++        let _probe = flick_core::clock::stage(6);
+         out.to_string()
+     }
+ 
+@@ -239,6 +240,7 @@
+         analysis: &Analysis,
+         sources: &SourceMap,
+     ) -> (Vec<build::Artifact>, Vec<Diagnostic>) {
++        let _probe = flick_core::clock::stage(4);
+         let compilation = &analysis.compilation;
+         let module = compilation.modules.iter().find(|m| m.path == path());
+         // like `flick build` without a project: a module with `main` gets the runner
+@@ -277,6 +279,7 @@
+         include_declarations: bool,
+         analysis: &Analysis,
+     ) -> Value {
++        let _probe = flick_core::clock::stage(5);
+         let stem = (analysis.compilation.modules.iter())
+             .find(|m| m.path == path())
+             .map(|m| m.name.replace('.', "/"));

@@ -1,0 +1,40 @@
+{
+  "experiment": "Node stage attribution: legacy dispatch then candidate dispatch on the same instrumented candidate WASM; not browser acceptance",
+  "productionRevision": "0ee305261875a85ef3d6e52923080d555aab3d27",
+  "localHarnessRevision": "23eb8b65e3d32f38bc72ccfcac746f9fd1edbc72",
+  "legacyWorkerRevision": "1918f8919368817bac94f8c84244607d68f28557",
+  "instrumentedSource": "production revision plus tools/playground-bench/stages.patch; built in separate flick-876-profile worktree",
+  "stagePatchSha256": "b0bc6cbb91d313b4c3a34d6695ba2d9d95f4444e89ea48f99c4f17f39e6261b6",
+  "wasmSha256": "bc688754d8df129f604e2986402d7b60154a90de87a9184c118fb37ff11a20c7",
+  "rust": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "wasmBindgen": "wasm-bindgen 0.2.130",
+  "binaryen": "wasm-opt version 133 (version_133)",
+  "build": {
+    "target": "wasm32-unknown-unknown",
+    "optLevel": "z",
+    "lto": "fat",
+    "strip": "debuginfo",
+    "locked": true,
+    "dedup": "tools/wasm-dedup/index.mjs",
+    "bindgenTarget": "web"
+  },
+  "fixtures": [
+    "hello"
+  ],
+  "samples": 5,
+  "warmup": 3,
+  "stageNames": {
+    "1": "parse",
+    "2": "resolve-check",
+    "3": "lower",
+    "4": "backend",
+    "5": "output-map",
+    "6": "json-stringify"
+  },
+  "limitations": [
+    "Instrumentation changes timing and binary layout; use uninstrumented browser A/B for latency and size decisions.",
+    "Linear-memory capacity is a high-water mark, not live heap or process RSS.",
+    "The lower stage includes its eligibility guard, including cases that do not retain IR.",
+    "Only hello was stage-instrumented; all three shipped fixtures belong to the uninstrumented Chromium comparison."
+  ]
+}

@@ -481,3 +481,6 @@ impl Host for Demo<'_> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod emit_tests;

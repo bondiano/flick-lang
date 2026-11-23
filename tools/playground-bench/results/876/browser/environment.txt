@@ -1,0 +1,20 @@
+rustc 1.95.0 (59807616e 2026-04-14)
+binary: rustc
+commit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860
+commit-date: 2026-04-14
+host: x86_64-unknown-linux-gnu
+release: 1.95.0
+LLVM version: 22.1.2
+cargo 1.95.0 (f2d3ce0bd 2026-03-21)
+v24.18.0
+12.16.1
+wasm-opt version 133
+wasm-bindgen 0.2.130
+ .github/workflows/playground-876-bench.yml | 236 +++++++++++++++++++++++++
+ docs/src/playground/compiler.worker.ts     |   6 +-
+ flick-wasm/src/emit_tests.rs               | 156 +++++++++++++++++
+ flick-wasm/src/lib.rs                      |  42 ++++-
+ tools/playground-bench/README.md           | 147 ++++++++++++++++
+ tools/playground-bench/index.mjs           | 272 +++++++++++++++++++++++++++++
+ tools/playground-bench/stages.patch        | 120 +++++++++++++
+ 7 files changed, 972 insertions(+), 7 deletions(-)

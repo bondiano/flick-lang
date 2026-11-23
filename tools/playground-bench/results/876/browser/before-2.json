@@ -1,0 +1,3882 @@
+{
+  "schema": 1,
+  "measuredAt": "2026-11-23T10:56:14.667Z",
+  "revision": "1918f8919368817bac94f8c84244607d68f28557",
+  "harnessRevision": "0ee305261875a85ef3d6e52923080d555aab3d27",
+  "workingTree": "",
+  "host": {
+    "platform": "linux",
+    "arch": "x64",
+    "cpu": "AMD EPYC 7763 64-Core Processor",
+    "node": "v24.18.0",
+    "engine": "chromium",
+    "chromium": "156.0.8078.4",
+    "nodeV8": "13.6.233.17-node.50"
+  },
+  "samples": 12,
+  "warmup": 3,
+  "workerSha256": "32f32bedfa58c6d233e03153b59e9ff91705dbe5a5f042a8c3c192170efca42f",
+  "wasm": {
+    "sha256": "0da1eeda7c4063c09b1fc80aa58d0d8c9d85ca420780da31bdba9c71b99facb2",
+    "rawBytes": 4545296,
+    "gzipBytes": 1766527
+  },
+  "fixtures": [
+    {
+      "name": "hello",
+      "sha256": "4b25b076e10190766ef47094cd201d7cc3a668379de1a97d42fbd081eecfce2d"
+    },
+    {
+      "name": "classes",
+      "sha256": "ba7a5d4b50e467d9cdbbf06944afa9a8ceda4b3d15215ce8cbae14b9816753db"
+    },
+    {
+      "name": "sales-report",
+      "sha256": "e4bcd4e660e92f6b2a7072638b40df418d209cd9e2d7fe6ae87974a080f37152"
+    }
+  ],
+  "validation": [
+    {
+      "revision": 0,
+      "profile": "debug",
+      "sha256": "7c2e136bd225bc457cf342f4de670909180ecefe9c949cb17c14ff860babfbb1"
+    },
+    {
+      "revision": 0,
+      "profile": "release",
+      "sha256": "49e836d6b6c7819e2dc0621fd059d97fb6041e662f4891427dd3873739388a59"
+    },
+    {
+      "revision": 1,
+      "profile": "debug",
+      "sha256": "6643325b46bbb39eee82975d0ec14b3317fa1f6aad62d7f8193bc380cd97b413"
+    },
+    {
+      "revision": 1,
+      "profile": "release",
+      "sha256": "8db37d696f1bab0b079ffd485492dbb3af678b46eb4a5b25d5bec55a17ec7338"
+    },
+    {
+      "revision": 2,
+      "profile": "debug",
+      "sha256": "fc75cb51b80f634310bdc8d73095c46a5b2ca64fd5d93156661baac10eb2f413"
+    },
+    {
+      "revision": 2,
+      "profile": "release",
+      "sha256": "fc75cb51b80f634310bdc8d73095c46a5b2ca64fd5d93156661baac10eb2f413"
+    },
+    {
+      "revision": 3,
+      "profile": "debug",
+      "sha256": "3edcd1d217e3e8da70ecbcea90b25dddf4041ad4d3aa4a3db1f6b4c83f8bc12a"
+    },
+    {
+      "revision": 3,
+      "profile": "release",
+      "sha256": "e7d76ab8e9877f9141b760f7e898651b03efae2b1fcf07b37a0e9f77653df0e6"
+    },
+    {
+      "revision": 4,
+      "profile": "debug",
+      "sha256": "40fc1492ac754691681399ee5ef19c161ab731270751f70564c53e24c8bbfd3e"
+    },
+    {
+      "revision": 4,
+      "profile": "release",
+      "sha256": "8ece53a00f229e76409bf98681537bff8886d8581b23326c5fd728f7d6af32a4"
+    },
+    {
+      "revision": 5,
+      "profile": "debug",
+      "sha256": "7c2e136bd225bc457cf342f4de670909180ecefe9c949cb17c14ff860babfbb1"
+    },
+    {
+      "revision": 5,
+      "profile": "release",
+      "sha256": "49e836d6b6c7819e2dc0621fd059d97fb6041e662f4891427dd3873739388a59"
+    }
+  ],
+  "runs": [
+    {
+      "fixture": "hello",
+      "scenario": "diagnostics-only",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 21889024,
+      "observations": [
+        {
+          "roundTripMs": 0.5999999998603016,
+          "workerMs": 0.4000000001396984,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.4000000001396984
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.7000000001862645,
+          "workerMs": 0.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.5,
+          "workerMs": 0.39999999990686774,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.39999999990686774
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.5999999998603016,
+          "workerMs": 0.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.5,
+          "workerMs": 0.4000000001396984,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.4000000001396984
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.6000000000931323,
+          "workerMs": 0.6000000000931323,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.5999999998603016,
+          "workerMs": 0.4000000001396984,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.4000000001396984
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.5,
+          "workerMs": 0.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.5,
+          "workerMs": 0.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.5,
+          "workerMs": 0.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.6000000000931323,
+          "workerMs": 0.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 0.6000000000931323,
+          "workerMs": 0.39999999990686774,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.39999999990686774
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        }
+      ],
+      "roundTripMs": {
+        "min": 0.5,
+        "p50": 0.5999999998603016,
+        "p95": 0.7000000001862645,
+        "max": 0.7000000001862645
+      },
+      "workerMs": {
+        "min": 0.39999999990686774,
+        "p50": 0.5,
+        "p95": 0.6000000000931323,
+        "max": 0.6000000000931323
+      },
+      "stages": {
+        "update": {
+          "min": 0.39999999990686774,
+          "p50": 0.5,
+          "p95": 0.5,
+          "max": 0.5
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "hello",
+      "scenario": "edit-first-emit",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 49807360,
+      "observations": [
+        {
+          "roundTripMs": 474.30000000004657,
+          "workerMs": 471,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1
+            },
+            {
+              "name": "emit",
+              "ms": 468.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 465.60000000009313,
+          "workerMs": 464.5999999998603,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.7999999998137355
+            },
+            {
+              "name": "emit",
+              "ms": 461.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 463.9000000001397,
+          "workerMs": 462.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.9000000001396984
+            },
+            {
+              "name": "emit",
+              "ms": 459.79999999981374
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 465.89999999990687,
+          "workerMs": 464.39999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            },
+            {
+              "name": "emit",
+              "ms": 461.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 469.69999999995343,
+          "workerMs": 466.29999999981374,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.7999999998137355
+            },
+            {
+              "name": "emit",
+              "ms": 463.69999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 456.10000000009313,
+          "workerMs": 455.10000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            },
+            {
+              "name": "emit",
+              "ms": 452.0999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 461.19999999995343,
+          "workerMs": 460.20000000018626,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.7000000001862645
+            },
+            {
+              "name": "emit",
+              "ms": 458.0999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 457.80000000004657,
+          "workerMs": 456.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.6999999999534339
+            },
+            {
+              "name": "emit",
+              "ms": 454.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 455.5,
+          "workerMs": 453.9000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            },
+            {
+              "name": "emit",
+              "ms": 451.10000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 460.80000000004657,
+          "workerMs": 459.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            },
+            {
+              "name": "emit",
+              "ms": 457
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 455.5,
+          "workerMs": 454,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            },
+            {
+              "name": "emit",
+              "ms": 451.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 466.29999999981374,
+          "workerMs": 461.10000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.1999999999534339
+            },
+            {
+              "name": "emit",
+              "ms": 458.19999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        }
+      ],
+      "roundTripMs": {
+        "min": 455.5,
+        "p50": 461.19999999995343,
+        "p95": 474.30000000004657,
+        "max": 474.30000000004657
+      },
+      "workerMs": {
+        "min": 453.9000000001397,
+        "p50": 460.20000000018626,
+        "p95": 471,
+        "max": 471
+      },
+      "stages": {
+        "update": {
+          "min": 0.6999999999534339,
+          "p50": 0.8000000000465661,
+          "p95": 1.1999999999534339,
+          "max": 1.1999999999534339
+        },
+        "emit": {
+          "min": 451.10000000009313,
+          "p50": 458.0999999998603,
+          "p95": 468.30000000004657,
+          "max": 468.30000000004657
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "hello",
+      "scenario": "checked-first-emit",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 49807360,
+      "observations": [
+        {
+          "roundTripMs": 464.19999999995343,
+          "workerMs": 463.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 461.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 463.5,
+          "workerMs": 462.4000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 460.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 468.9000000001397,
+          "workerMs": 467.9000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 466.10000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 464,
+          "workerMs": 462.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 461
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 466.5,
+          "workerMs": 462.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 461
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 465.80000000004657,
+          "workerMs": 464.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.09999999986030161
+            },
+            {
+              "name": "emit",
+              "ms": 462.20000000018626
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 467.80000000004657,
+          "workerMs": 466.39999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 464.89999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 464,
+          "workerMs": 463,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 461.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 458.10000000009313,
+          "workerMs": 457.20000000018626,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 455.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 459.10000000009313,
+          "workerMs": 458,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 456.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 458.89999999990687,
+          "workerMs": 457.89999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 456.19999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 453.9000000001397,
+          "workerMs": 452.9000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.10000000009313226
+            },
+            {
+              "name": "emit",
+              "ms": 451.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        }
+      ],
+      "roundTripMs": {
+        "min": 453.9000000001397,
+        "p50": 464,
+        "p95": 468.9000000001397,
+        "max": 468.9000000001397
+      },
+      "workerMs": {
+        "min": 452.9000000001397,
+        "p50": 462.69999999995343,
+        "p95": 467.9000000001397,
+        "max": 467.9000000001397
+      },
+      "stages": {
+        "update": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0.10000000009313226,
+          "max": 0.10000000009313226
+        },
+        "emit": {
+          "min": 451.30000000004657,
+          "p50": 461,
+          "p95": 466.10000000009313,
+          "max": 466.10000000009313
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "hello",
+      "scenario": "unchanged-profile",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 49807360,
+      "observations": [
+        {
+          "roundTripMs": 480.4000000001397,
+          "workerMs": 476.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 475.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 475.5,
+          "workerMs": 474.39999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 473.0999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 481.89999999990687,
+          "workerMs": 481,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.10000000009313226
+            },
+            {
+              "name": "emit",
+              "ms": 479.5999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 480.0999999998603,
+          "workerMs": 478.5999999998603,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.09999999986030161
+            },
+            {
+              "name": "emit",
+              "ms": 477.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 476.60000000009313,
+          "workerMs": 475.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 473.69999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 471.89999999990687,
+          "workerMs": 470.9000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 469.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 474.69999999995343,
+          "workerMs": 473.60000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 472.4000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 478,
+          "workerMs": 477,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 475.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 478.5999999998603,
+          "workerMs": 477.0999999998603,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.09999999986030161
+            },
+            {
+              "name": "emit",
+              "ms": 475.70000000018626
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 480.60000000009313,
+          "workerMs": 479.10000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 477.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 479.69999999995343,
+          "workerMs": 478.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 476.39999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 478.10000000009313,
+          "workerMs": 477,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 475.69999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        }
+      ],
+      "roundTripMs": {
+        "min": 471.89999999990687,
+        "p50": 478.10000000009313,
+        "p95": 481.89999999990687,
+        "max": 481.89999999990687
+      },
+      "workerMs": {
+        "min": 470.9000000001397,
+        "p50": 477,
+        "p95": 481,
+        "max": 481
+      },
+      "stages": {
+        "update": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0.10000000009313226,
+          "max": 0.10000000009313226
+        },
+        "emit": {
+          "min": 469.5,
+          "p50": 475.60000000009313,
+          "p95": 479.5999999998603,
+          "max": 479.5999999998603
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "hello",
+      "scenario": "check-after-direct-run",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 49807360,
+      "observations": [
+        {
+          "roundTripMs": 1,
+          "workerMs": 0.8000000000465661,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 1,
+          "workerMs": 0.9000000001396984,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.9000000001396984
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 1,
+          "workerMs": 0.8000000000465661,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 1,
+          "workerMs": 0.9000000001396984,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 1,
+          "workerMs": 0.7999999998137355,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.7999999998137355
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 1.1000000000931323,
+          "workerMs": 0.8999999999068677,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8999999999068677
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 1,
+          "workerMs": 0.8000000000465661,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 0.9000000001396984,
+          "workerMs": 0.8000000000465661,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 0.9000000001396984,
+          "workerMs": 0.8000000000465661,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 1,
+          "workerMs": 0.9000000001396984,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 3.8999999999068677,
+          "workerMs": 0.8999999999068677,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8999999999068677
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        },
+        {
+          "roundTripMs": 0.8999999999068677,
+          "workerMs": 0.8000000000465661,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.8000000000465661
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49807360
+        }
+      ],
+      "roundTripMs": {
+        "min": 0.8999999999068677,
+        "p50": 1,
+        "p95": 3.8999999999068677,
+        "max": 3.8999999999068677
+      },
+      "workerMs": {
+        "min": 0.7999999998137355,
+        "p50": 0.8000000000465661,
+        "p95": 0.9000000001396984,
+        "max": 0.9000000001396984
+      },
+      "stages": {
+        "update": {
+          "min": 0.7999999998137355,
+          "p50": 0.8000000000465661,
+          "p95": 0.9000000001396984,
+          "max": 0.9000000001396984
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "hello",
+      "scenario": "large-check-small-run",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 49872896,
+      "observations": [
+        {
+          "roundTripMs": 463.5,
+          "workerMs": 462,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.3000000000465661
+            },
+            {
+              "name": "emit",
+              "ms": 458.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 453.89999999990687,
+          "workerMs": 452.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.0999999998603016
+            },
+            {
+              "name": "emit",
+              "ms": 449.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 449.89999999990687,
+          "workerMs": 448.5999999998603,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1
+            },
+            {
+              "name": "emit",
+              "ms": 445.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 457.39999999990687,
+          "workerMs": 455.89999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.0999999998603016
+            },
+            {
+              "name": "emit",
+              "ms": 453.19999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 454.30000000004657,
+          "workerMs": 453.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.0999999998603016
+            },
+            {
+              "name": "emit",
+              "ms": 450.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 455.30000000004657,
+          "workerMs": 454.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.1999999999534339
+            },
+            {
+              "name": "emit",
+              "ms": 451.4000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 464.80000000004657,
+          "workerMs": 463.9000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.5
+            },
+            {
+              "name": "emit",
+              "ms": 460.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 468.29999999981374,
+          "workerMs": 467.10000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.6999999999534339
+            },
+            {
+              "name": "emit",
+              "ms": 463.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 486.5,
+          "workerMs": 485.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.5
+            },
+            {
+              "name": "emit",
+              "ms": 482.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 458.60000000009313,
+          "workerMs": 457.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.5
+            },
+            {
+              "name": "emit",
+              "ms": 454.19999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 449.19999999995343,
+          "workerMs": 447.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.1000000000931323
+            },
+            {
+              "name": "emit",
+              "ms": 445.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        },
+        {
+          "roundTripMs": 459.80000000004657,
+          "workerMs": 458.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 1.1000000000931323
+            },
+            {
+              "name": "emit",
+              "ms": 456
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49872896
+        }
+      ],
+      "roundTripMs": {
+        "min": 449.19999999995343,
+        "p50": 457.39999999990687,
+        "p95": 486.5,
+        "max": 486.5
+      },
+      "workerMs": {
+        "min": 447.80000000004657,
+        "p50": 455.89999999990687,
+        "p95": 485.30000000004657,
+        "max": 485.30000000004657
+      },
+      "stages": {
+        "update": {
+          "min": 1,
+          "p50": 1.1000000000931323,
+          "p95": 1.6999999999534339,
+          "max": 1.6999999999534339
+        },
+        "emit": {
+          "min": 445.30000000004657,
+          "p50": 453.19999999995343,
+          "p95": 482.30000000004657,
+          "max": 482.30000000004657
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "classes",
+      "scenario": "diagnostics-only",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 21889024,
+      "observations": [
+        {
+          "roundTripMs": 4.100000000093132,
+          "workerMs": 3.800000000046566,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 3.800000000046566
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 4.100000000093132,
+          "workerMs": 4,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 3.8999999999068677
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 4.099999999860302,
+          "workerMs": 3.9000000001396984,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 3.9000000001396984
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 4.199999999953434,
+          "workerMs": 4.100000000093132,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.100000000093132
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 5.300000000046566,
+          "workerMs": 5.2000000001862645,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.2000000001862645
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 6,
+          "workerMs": 5.900000000139698,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.900000000139698
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 4.600000000093132,
+          "workerMs": 4.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.400000000139698
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 4.300000000046566,
+          "workerMs": 4.100000000093132,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.100000000093132
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 4.099999999860302,
+          "workerMs": 3.800000000046566,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 3.800000000046566
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 3.9000000001396984,
+          "workerMs": 3.9000000001396984,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 3.9000000001396984
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 4,
+          "workerMs": 3.800000000046566,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 3.800000000046566
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 4.399999999906868,
+          "workerMs": 4.199999999953434,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.199999999953434
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        }
+      ],
+      "roundTripMs": {
+        "min": 3.9000000001396984,
+        "p50": 4.100000000093132,
+        "p95": 6,
+        "max": 6
+      },
+      "workerMs": {
+        "min": 3.800000000046566,
+        "p50": 4,
+        "p95": 5.900000000139698,
+        "max": 5.900000000139698
+      },
+      "stages": {
+        "update": {
+          "min": 3.800000000046566,
+          "p50": 3.9000000001396984,
+          "p95": 5.900000000139698,
+          "max": 5.900000000139698
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "classes",
+      "scenario": "edit-first-emit",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 49938432,
+      "observations": [
+        {
+          "roundTripMs": 462.30000000004657,
+          "workerMs": 460,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.300000000046566
+            },
+            {
+              "name": "emit",
+              "ms": 453.10000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 450.89999999990687,
+          "workerMs": 450,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5
+            },
+            {
+              "name": "emit",
+              "ms": 443.10000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 452.30000000004657,
+          "workerMs": 451.10000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.5
+            },
+            {
+              "name": "emit",
+              "ms": 444.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 456.69999999995343,
+          "workerMs": 455.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.899999999906868
+            },
+            {
+              "name": "emit",
+              "ms": 448.89999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 464.39999999990687,
+          "workerMs": 461.0999999998603,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.2999999998137355
+            },
+            {
+              "name": "emit",
+              "ms": 454.10000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 461.10000000009313,
+          "workerMs": 459.89999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.2999999998137355
+            },
+            {
+              "name": "emit",
+              "ms": 452.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 463.5999999998603,
+          "workerMs": 462.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.300000000046566
+            },
+            {
+              "name": "emit",
+              "ms": 455.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 457.9000000001397,
+          "workerMs": 456.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.199999999953434
+            },
+            {
+              "name": "emit",
+              "ms": 449.89999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 460.5,
+          "workerMs": 459.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.900000000139698
+            },
+            {
+              "name": "emit",
+              "ms": 452.0999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 455.30000000004657,
+          "workerMs": 453.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.400000000139698
+            },
+            {
+              "name": "emit",
+              "ms": 446.79999999981374
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 453.69999999995343,
+          "workerMs": 452.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.699999999953434
+            },
+            {
+              "name": "emit",
+              "ms": 445.9000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 460.5,
+          "workerMs": 458.89999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.300000000046566
+            },
+            {
+              "name": "emit",
+              "ms": 452
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        }
+      ],
+      "roundTripMs": {
+        "min": 450.89999999990687,
+        "p50": 457.9000000001397,
+        "p95": 464.39999999990687,
+        "max": 464.39999999990687
+      },
+      "workerMs": {
+        "min": 450,
+        "p50": 456.69999999995343,
+        "p95": 462.5,
+        "max": 462.5
+      },
+      "stages": {
+        "update": {
+          "min": 4.5,
+          "p50": 5.199999999953434,
+          "p95": 5.400000000139698,
+          "max": 5.400000000139698
+        },
+        "emit": {
+          "min": 443.10000000009313,
+          "p50": 449.89999999990687,
+          "p95": 455.60000000009313,
+          "max": 455.60000000009313
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "classes",
+      "scenario": "checked-first-emit",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 49938432,
+      "observations": [
+        {
+          "roundTripMs": 468.0999999998603,
+          "workerMs": 467.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.10000000009313226
+            },
+            {
+              "name": "emit",
+              "ms": 465.39999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 460.80000000004657,
+          "workerMs": 459.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 457.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 453.30000000004657,
+          "workerMs": 452.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 450.4000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 457.80000000004657,
+          "workerMs": 456.9000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 455
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 450.69999999995343,
+          "workerMs": 449.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 447.69999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 450.80000000004657,
+          "workerMs": 449.10000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 447
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 459.4000000001397,
+          "workerMs": 457.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 456.19999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 459.0999999998603,
+          "workerMs": 457.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 455.69999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 459.5,
+          "workerMs": 457.9000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 455.9000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 455.69999999995343,
+          "workerMs": 454.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 452.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 455.5,
+          "workerMs": 453.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 451.5999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 471.70000000018626,
+          "workerMs": 469.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 468.0999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        }
+      ],
+      "roundTripMs": {
+        "min": 450.69999999995343,
+        "p50": 457.80000000004657,
+        "p95": 471.70000000018626,
+        "max": 471.70000000018626
+      },
+      "workerMs": {
+        "min": 449.10000000009313,
+        "p50": 456.9000000001397,
+        "p95": 469.5,
+        "max": 469.5
+      },
+      "stages": {
+        "update": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0.10000000009313226,
+          "max": 0.10000000009313226
+        },
+        "emit": {
+          "min": 447,
+          "p50": 455,
+          "p95": 468.0999999998603,
+          "max": 468.0999999998603
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "classes",
+      "scenario": "unchanged-profile",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 49938432,
+      "observations": [
+        {
+          "roundTripMs": 478.30000000004657,
+          "workerMs": 473.79999999981374,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.09999999986030161
+            },
+            {
+              "name": "emit",
+              "ms": 472.4000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 465.89999999990687,
+          "workerMs": 464.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 462.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 468.60000000009313,
+          "workerMs": 466.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 465.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 465.5,
+          "workerMs": 463.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 462.39999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 486,
+          "workerMs": 484,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.10000000009313226
+            },
+            {
+              "name": "emit",
+              "ms": 482.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 481.5999999998603,
+          "workerMs": 479.9000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 478.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 487.4000000001397,
+          "workerMs": 485.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 484.19999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 472,
+          "workerMs": 470.39999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.09999999986030161
+            },
+            {
+              "name": "emit",
+              "ms": 468.9000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 473.4000000001397,
+          "workerMs": 472,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 470.69999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 469.20000000018626,
+          "workerMs": 467.60000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 466
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 468.30000000004657,
+          "workerMs": 466.60000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 465.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 467,
+          "workerMs": 466,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.10000000009313226
+            },
+            {
+              "name": "emit",
+              "ms": 464.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        }
+      ],
+      "roundTripMs": {
+        "min": 465.5,
+        "p50": 469.20000000018626,
+        "p95": 487.4000000001397,
+        "max": 487.4000000001397
+      },
+      "workerMs": {
+        "min": 463.80000000004657,
+        "p50": 467.60000000009313,
+        "p95": 485.5,
+        "max": 485.5
+      },
+      "stages": {
+        "update": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0.10000000009313226,
+          "max": 0.10000000009313226
+        },
+        "emit": {
+          "min": 462.39999999990687,
+          "p50": 466,
+          "p95": 484.19999999995343,
+          "max": 484.19999999995343
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "classes",
+      "scenario": "check-after-direct-run",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 49938432,
+      "observations": [
+        {
+          "roundTripMs": 4.800000000046566,
+          "workerMs": 4.7000000001862645,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.7000000001862645
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 4.899999999906868,
+          "workerMs": 4.7999999998137355,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.7999999998137355
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 4.699999999953434,
+          "workerMs": 4.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 4.900000000139698,
+          "workerMs": 4.900000000139698,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.800000000046566
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 5.800000000046566,
+          "workerMs": 5.599999999860302,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.599999999860302
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 5,
+          "workerMs": 4.899999999906868,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.800000000046566
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 4.899999999906868,
+          "workerMs": 4.800000000046566,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.800000000046566
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 4.7999999998137355,
+          "workerMs": 4.7999999998137355,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.7999999998137355
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 8.600000000093132,
+          "workerMs": 4.699999999953434,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.699999999953434
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 4.7999999998137355,
+          "workerMs": 4.600000000093132,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.600000000093132
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 4.800000000046566,
+          "workerMs": 4.699999999953434,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.699999999953434
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 6.599999999860302,
+          "workerMs": 5.900000000139698,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.900000000139698
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        }
+      ],
+      "roundTripMs": {
+        "min": 4.699999999953434,
+        "p50": 4.899999999906868,
+        "p95": 8.600000000093132,
+        "max": 8.600000000093132
+      },
+      "workerMs": {
+        "min": 4.5,
+        "p50": 4.7999999998137355,
+        "p95": 5.900000000139698,
+        "max": 5.900000000139698
+      },
+      "stages": {
+        "update": {
+          "min": 4.5,
+          "p50": 4.7999999998137355,
+          "p95": 5.900000000139698,
+          "max": 5.900000000139698
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "classes",
+      "scenario": "large-check-small-run",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 49938432,
+      "observations": [
+        {
+          "roundTripMs": 480.39999999990687,
+          "workerMs": 479.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.300000000046566
+            },
+            {
+              "name": "emit",
+              "ms": 471.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 475.19999999995343,
+          "workerMs": 474,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.199999999953434
+            },
+            {
+              "name": "emit",
+              "ms": 466.5999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 472.39999999990687,
+          "workerMs": 471.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.600000000093132
+            },
+            {
+              "name": "emit",
+              "ms": 463.89999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 470.69999999995343,
+          "workerMs": 469.0999999998603,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.599999999860302
+            },
+            {
+              "name": "emit",
+              "ms": 461.9000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 470.20000000018626,
+          "workerMs": 468.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.5
+            },
+            {
+              "name": "emit",
+              "ms": 461
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 472.60000000009313,
+          "workerMs": 471,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.300000000046566
+            },
+            {
+              "name": "emit",
+              "ms": 464.29999999981374
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 464.30000000004657,
+          "workerMs": 462.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.399999999906868
+            },
+            {
+              "name": "emit",
+              "ms": 455.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 467.20000000018626,
+          "workerMs": 465.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.300000000046566
+            },
+            {
+              "name": "emit",
+              "ms": 458.19999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 466.0999999998603,
+          "workerMs": 463.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.300000000046566
+            },
+            {
+              "name": "emit",
+              "ms": 456.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 462,
+          "workerMs": 459.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.900000000139698
+            },
+            {
+              "name": "emit",
+              "ms": 453.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 454,
+          "workerMs": 452.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.399999999906868
+            },
+            {
+              "name": "emit",
+              "ms": 446.20000000018626
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        },
+        {
+          "roundTripMs": 461.69999999995343,
+          "workerMs": 459.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 4.900000000139698
+            },
+            {
+              "name": "emit",
+              "ms": 453.39999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 49938432
+        }
+      ],
+      "roundTripMs": {
+        "min": 454,
+        "p50": 467.20000000018626,
+        "p95": 480.39999999990687,
+        "max": 480.39999999990687
+      },
+      "workerMs": {
+        "min": 452.30000000004657,
+        "p50": 465.5,
+        "p95": 479.30000000004657,
+        "max": 479.30000000004657
+      },
+      "stages": {
+        "update": {
+          "min": 4.399999999906868,
+          "p50": 5.300000000046566,
+          "p95": 5.600000000093132,
+          "max": 5.600000000093132
+        },
+        "emit": {
+          "min": 446.20000000018626,
+          "p50": 458.19999999995343,
+          "p95": 471.80000000004657,
+          "max": 471.80000000004657
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "diagnostics-only",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 21889024,
+      "observations": [
+        {
+          "roundTripMs": 6,
+          "workerMs": 5.899999999906868,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.899999999906868
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 6,
+          "workerMs": 6,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.899999999906868
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 6.100000000093132,
+          "workerMs": 5.899999999906868,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.899999999906868
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 5.899999999906868,
+          "workerMs": 5.699999999953434,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.699999999953434
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 5.600000000093132,
+          "workerMs": 5.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 5.699999999953434,
+          "workerMs": 5.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.400000000139698
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 5.599999999860302,
+          "workerMs": 5.400000000139698,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.400000000139698
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 5.600000000093132,
+          "workerMs": 5.399999999906868,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.399999999906868
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 5.600000000093132,
+          "workerMs": 5.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 5.899999999906868,
+          "workerMs": 5.600000000093132,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.600000000093132
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 5.600000000093132,
+          "workerMs": 5.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        },
+        {
+          "roundTripMs": 5.7999999998137355,
+          "workerMs": 5.600000000093132,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 5.600000000093132
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 21889024
+        }
+      ],
+      "roundTripMs": {
+        "min": 5.599999999860302,
+        "p50": 5.699999999953434,
+        "p95": 6.100000000093132,
+        "max": 6.100000000093132
+      },
+      "workerMs": {
+        "min": 5.399999999906868,
+        "p50": 5.5,
+        "p95": 6,
+        "max": 6
+      },
+      "stages": {
+        "update": {
+          "min": 5.399999999906868,
+          "p50": 5.5,
+          "p95": 5.899999999906868,
+          "max": 5.899999999906868
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "edit-first-emit",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 50069504,
+      "observations": [
+        {
+          "roundTripMs": 472.19999999995343,
+          "workerMs": 470,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.800000000046566
+            },
+            {
+              "name": "emit",
+              "ms": 461.39999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 486.19999999995343,
+          "workerMs": 485.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7.199999999953434
+            },
+            {
+              "name": "emit",
+              "ms": 475.9000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 486.80000000004657,
+          "workerMs": 485.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7.600000000093132
+            },
+            {
+              "name": "emit",
+              "ms": 476.39999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 465.39999999990687,
+          "workerMs": 464.39999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.900000000139698
+            },
+            {
+              "name": "emit",
+              "ms": 455.5999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 478.60000000009313,
+          "workerMs": 475.39999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.699999999953434
+            },
+            {
+              "name": "emit",
+              "ms": 467.0999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 468.5,
+          "workerMs": 467.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7.900000000139698
+            },
+            {
+              "name": "emit",
+              "ms": 457.5999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 477.0999999998603,
+          "workerMs": 476.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.7999999998137355
+            },
+            {
+              "name": "emit",
+              "ms": 467.9000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 479.30000000004657,
+          "workerMs": 478.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7.099999999860302
+            },
+            {
+              "name": "emit",
+              "ms": 469.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 471.89999999990687,
+          "workerMs": 470.79999999981374,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7.099999999860302
+            },
+            {
+              "name": "emit",
+              "ms": 461.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 471.80000000004657,
+          "workerMs": 470.10000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.899999999906868
+            },
+            {
+              "name": "emit",
+              "ms": 461.70000000018626
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 475.5999999998603,
+          "workerMs": 474,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.899999999906868
+            },
+            {
+              "name": "emit",
+              "ms": 465.4000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 487.20000000018626,
+          "workerMs": 485.19999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 8.799999999813735
+            },
+            {
+              "name": "emit",
+              "ms": 474.9000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        }
+      ],
+      "roundTripMs": {
+        "min": 465.39999999990687,
+        "p50": 475.5999999998603,
+        "p95": 487.20000000018626,
+        "max": 487.20000000018626
+      },
+      "workerMs": {
+        "min": 464.39999999990687,
+        "p50": 474,
+        "p95": 485.80000000004657,
+        "max": 485.80000000004657
+      },
+      "stages": {
+        "update": {
+          "min": 6.699999999953434,
+          "p50": 6.900000000139698,
+          "p95": 8.799999999813735,
+          "max": 8.799999999813735
+        },
+        "emit": {
+          "min": 455.5999999998603,
+          "p50": 465.4000000001397,
+          "p95": 476.39999999990687,
+          "max": 476.39999999990687
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "checked-first-emit",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 50069504,
+      "observations": [
+        {
+          "roundTripMs": 469.30000000004657,
+          "workerMs": 468.20000000018626,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 466.70000000018626
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 463.30000000004657,
+          "workerMs": 462.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.10000000009313226
+            },
+            {
+              "name": "emit",
+              "ms": 460.10000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 466.4000000001397,
+          "workerMs": 465.4000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 463.39999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 469.30000000004657,
+          "workerMs": 468.10000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 466.30000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 471.30000000004657,
+          "workerMs": 469.5999999998603,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 467.89999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 472.5,
+          "workerMs": 470.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 468.5999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 467.19999999995343,
+          "workerMs": 465.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 464.19999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 463.30000000004657,
+          "workerMs": 461.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.09999999986030161
+            },
+            {
+              "name": "emit",
+              "ms": 460.20000000018626
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 461.29999999981374,
+          "workerMs": 459.89999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 457.89999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 468.69999999995343,
+          "workerMs": 467,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 465.39999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 464,
+          "workerMs": 462.30000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 460.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 463.39999999990687,
+          "workerMs": 462.0999999998603,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 460.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        }
+      ],
+      "roundTripMs": {
+        "min": 461.29999999981374,
+        "p50": 466.4000000001397,
+        "p95": 472.5,
+        "max": 472.5
+      },
+      "workerMs": {
+        "min": 459.89999999990687,
+        "p50": 465.4000000001397,
+        "p95": 470.69999999995343,
+        "max": 470.69999999995343
+      },
+      "stages": {
+        "update": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0.10000000009313226,
+          "max": 0.10000000009313226
+        },
+        "emit": {
+          "min": 457.89999999990687,
+          "p50": 463.39999999990687,
+          "p95": 468.5999999998603,
+          "max": 468.5999999998603
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "unchanged-profile",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 50069504,
+      "observations": [
+        {
+          "roundTripMs": 481.69999999995343,
+          "workerMs": 477.89999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 476.4000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 472.10000000009313,
+          "workerMs": 467.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.09999999986030161
+            },
+            {
+              "name": "emit",
+              "ms": 466.10000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 472.39999999990687,
+          "workerMs": 471.39999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 469.89999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 471.80000000004657,
+          "workerMs": 470.60000000009313,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 469.39999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 467.60000000009313,
+          "workerMs": 466,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 464.5999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 470.80000000004657,
+          "workerMs": 469.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 468.29999999981374
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 472.19999999995343,
+          "workerMs": 471.0999999998603,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 469.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 471,
+          "workerMs": 470,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 468.5999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 473.10000000009313,
+          "workerMs": 471.39999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0.10000000009313226
+            },
+            {
+              "name": "emit",
+              "ms": 470
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 470.39999999990687,
+          "workerMs": 468.9000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 467.39999999990687
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 474.9000000001397,
+          "workerMs": 473.4000000001397,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 471.80000000004657
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 476,
+          "workerMs": 475,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 0
+            },
+            {
+              "name": "emit",
+              "ms": 473.69999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        }
+      ],
+      "roundTripMs": {
+        "min": 467.60000000009313,
+        "p50": 472.10000000009313,
+        "p95": 481.69999999995343,
+        "max": 481.69999999995343
+      },
+      "workerMs": {
+        "min": 466,
+        "p50": 470.60000000009313,
+        "p95": 477.89999999990687,
+        "max": 477.89999999990687
+      },
+      "stages": {
+        "update": {
+          "min": 0,
+          "p50": 0,
+          "p95": 0.10000000009313226,
+          "max": 0.10000000009313226
+        },
+        "emit": {
+          "min": 464.5999999998603,
+          "p50": 469.39999999990687,
+          "p95": 476.4000000001397,
+          "max": 476.4000000001397
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "check-after-direct-run",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 50069504,
+      "observations": [
+        {
+          "roundTripMs": 7.399999999906868,
+          "workerMs": 7.300000000046566,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7.199999999953434
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 6.900000000139698,
+          "workerMs": 6.800000000046566,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.800000000046566
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 6.899999999906868,
+          "workerMs": 6.899999999906868,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.800000000046566
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 6.800000000046566,
+          "workerMs": 6.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.5
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 6.800000000046566,
+          "workerMs": 6.600000000093132,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.600000000093132
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 7.300000000046566,
+          "workerMs": 7.199999999953434,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7.199999999953434
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 6.800000000046566,
+          "workerMs": 6.699999999953434,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.599999999860302
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 7.199999999953434,
+          "workerMs": 7.099999999860302,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7.099999999860302
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 11.100000000093132,
+          "workerMs": 7.199999999953434,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7.199999999953434
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 7.199999999953434,
+          "workerMs": 7.099999999860302,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7.099999999860302
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 7.100000000093132,
+          "workerMs": 7,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 7,
+          "workerMs": 6.899999999906868,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.899999999906868
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        }
+      ],
+      "roundTripMs": {
+        "min": 6.800000000046566,
+        "p50": 7,
+        "p95": 11.100000000093132,
+        "max": 11.100000000093132
+      },
+      "workerMs": {
+        "min": 6.5,
+        "p50": 6.899999999906868,
+        "p95": 7.300000000046566,
+        "max": 7.300000000046566
+      },
+      "stages": {
+        "update": {
+          "min": 6.5,
+          "p50": 6.899999999906868,
+          "p95": 7.199999999953434,
+          "max": 7.199999999953434
+        }
+      },
+      "instrumentedStages": {}
+    },
+    {
+      "fixture": "sales-report",
+      "scenario": "large-check-small-run",
+      "compilerVersion": "0.1.0",
+      "initialLinearMemoryBytes": 2293760,
+      "peakLinearMemoryBytes": 50069504,
+      "observations": [
+        {
+          "roundTripMs": 470.30000000004657,
+          "workerMs": 468.69999999995343,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.900000000139698
+            },
+            {
+              "name": "emit",
+              "ms": 460
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 470.10000000009313,
+          "workerMs": 469.20000000018626,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7
+            },
+            {
+              "name": "emit",
+              "ms": 460.4000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 466.89999999990687,
+          "workerMs": 465.89999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.899999999906868
+            },
+            {
+              "name": "emit",
+              "ms": 457.20000000018626
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 469.39999999990687,
+          "workerMs": 468.39999999990687,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.899999999906868
+            },
+            {
+              "name": "emit",
+              "ms": 460
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 474.19999999995343,
+          "workerMs": 472.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 8.299999999813735
+            },
+            {
+              "name": "emit",
+              "ms": 462.70000000018626
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 466.80000000004657,
+          "workerMs": 465.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7
+            },
+            {
+              "name": "emit",
+              "ms": 457.0999999998603
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 465.60000000009313,
+          "workerMs": 464.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7
+            },
+            {
+              "name": "emit",
+              "ms": 456
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 467.89999999990687,
+          "workerMs": 466.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7
+            },
+            {
+              "name": "emit",
+              "ms": 458.19999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 464.80000000004657,
+          "workerMs": 463.80000000004657,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.899999999906868
+            },
+            {
+              "name": "emit",
+              "ms": 455.4000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 472.10000000009313,
+          "workerMs": 471,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.899999999906868
+            },
+            {
+              "name": "emit",
+              "ms": 462.60000000009313
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 467.60000000009313,
+          "workerMs": 466.5,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 7
+            },
+            {
+              "name": "emit",
+              "ms": 457.9000000001397
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        },
+        {
+          "roundTripMs": 458.5,
+          "workerMs": 457,
+          "calls": [
+            {
+              "name": "update",
+              "ms": 6.800000000046566
+            },
+            {
+              "name": "emit",
+              "ms": 448.69999999995343
+            }
+          ],
+          "stages": [],
+          "linearMemoryBytes": 50069504
+        }
+      ],
+      "roundTripMs": {
+        "min": 458.5,
+        "p50": 467.60000000009313,
+        "p95": 474.19999999995343,
+        "max": 474.19999999995343
+      },
+      "workerMs": {
+        "min": 457,
+        "p50": 466.5,
+        "p95": 472.5,
+        "max": 472.5
+      },
+      "stages": {
+        "update": {
+          "min": 6.800000000046566,
+          "p50": 6.900000000139698,
+          "p95": 8.299999999813735,
+          "max": 8.299999999813735
+        },
+        "emit": {
+          "min": 448.69999999995343,
+          "p50": 457.9000000001397,
+          "p95": 462.70000000018626,
+          "max": 462.70000000018626
+        }
+      },
+      "instrumentedStages": {}
+    }
+  ]
+}
