@@ -11,6 +11,7 @@ mod machine;
 pub mod materialize;
 mod pass;
 mod pattern;
+pub mod primitives;
 pub mod value;
 
 #[cfg(test)]
@@ -22,6 +23,7 @@ use crate::Known;
 pub use defs::DefTable;
 use machine::Machine;
 pub use pass::{RetryTracker, run_module_pass};
+pub use primitives::{NativePrimitive, ReviewedPrimitives, js_target_allows};
 pub use value::{DictEnv, DictValue, Env, Value};
 
 /// Deterministic resource budgets controlling bounded concrete evaluation.

@@ -27,7 +27,7 @@ use crate::source::FileId;
 use super::super::Settings;
 #[cfg(feature = "native-project")]
 use super::super::specifier;
-use super::super::{Artifact, optimized};
+use super::super::{Artifact, optimized_with_primitives};
 use super::{Context, typed_options};
 
 /// The JS, source map, interface and, when asked, `.d.ts` and Promise
@@ -41,9 +41,8 @@ pub(super) fn compiled_module(
     // the interface and its summaries come from the reference lowering
     let by_class = ctx.settings.backend == Backend::Rt;
     let optimized = ctx
-        .settings
-        .release
-        .then(|| optimized(ctx.modules, module, by_class));
+        .primitives
+        .map(|prims| optimized_with_primitives(ctx.modules, module, by_class, prims));
     // Flick's own runtime has `control` arms, and takes what it lacks when it is
     // called: a module binds more than a program uses
     if ctx.settings.backend != Backend::Rt {

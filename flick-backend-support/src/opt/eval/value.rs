@@ -326,7 +326,7 @@ impl<'a> Utf16Source<'a> {
         Utf16Source::Units(units)
     }
 
-    fn next_unit(&mut self) -> Option<u16> {
+    pub(super) fn next_unit(&mut self) -> Option<u16> {
         match self {
             Utf16Source::Utf8 { chars, pending_low } => {
                 if let Some(low) = pending_low.take() {

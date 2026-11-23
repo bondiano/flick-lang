@@ -5,6 +5,7 @@
 
 use std::collections::HashMap;
 
+use flick_backend_support::opt::eval::NativePrimitive;
 use flick_pretty::{Document, Documentable, docvec};
 
 use super::arith::Native;
@@ -142,6 +143,30 @@ impl Bindings {
             &f.binding.name,
         )
         .map_or_else(Types::default, |(_, types)| types)
+    }
+
+    /// Validates that `f` of `module` resolves in this Go binding table to the
+    /// exact audited `flickrt` implementation and ABI expected for `prim`.
+    pub fn allows_primitive(&self, module: &str, f: &Foreign, prim: NativePrimitive) -> bool {
+        let expected_target = match prim {
+            NativePrimitive::IntParse => "flickrt.IntParse",
+            NativePrimitive::StringLength => "flickrt.Length",
+            NativePrimitive::StringSlice => "flickrt.Slice",
+            NativePrimitive::StringStartsWith => "flickrt.StartsWith",
+            NativePrimitive::StringContains => "flickrt.Includes",
+            NativePrimitive::StringEndsWith => "flickrt.EndsWith",
+        };
+        let Some((target, types)) = self.lookup(
+            module,
+            f.source_name.as_deref().unwrap_or(&f.name),
+            f.binding.from.as_deref(),
+            &f.binding.name,
+        ) else {
+            return false;
+        };
+        target == expected_target
+            && types == Types::default()
+            && self.parameters(module, f) == prim.arity()
     }
 }
 
