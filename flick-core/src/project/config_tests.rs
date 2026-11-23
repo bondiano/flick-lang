@@ -216,6 +216,24 @@ fn rejects_with_spans() {
 }
 
 #[test]
+fn invalid_entry_name_diagnostic_is_backend_neutral() {
+    let err =
+        parse_text("schema-version = 1\n[project]\nkind = \"app\"\nentries = { Server = \"B\" }\n")
+            .expect_err("uppercase entry name");
+    assert_eq!(err.code, codes::P005);
+    assert!(
+        err.message.contains("`Server` is not an entry name"),
+        "{}",
+        err.message
+    );
+    assert!(
+        !err.message.contains(".js") && !err.message.contains("flick-"),
+        "entry-name diagnostic must stay backend-neutral: {}",
+        err.message
+    );
+}
+
+#[test]
 fn lint_thresholds_default_and_override() {
     let lib = |lint: &str| {
         parse_text(&format!(

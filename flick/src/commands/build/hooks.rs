@@ -4,7 +4,6 @@
 //! gets the files `flick build` writes and gives what it writes instead.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::path::Path;
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::lang_items;
@@ -125,9 +124,9 @@ pub(crate) fn ir(
 }
 
 /// The files of the build as each plugin whose package says `hooks =
-/// ["emit"]` writes them instead; a `.js` it changes while the map it was
-/// given stays the same or is gone is `FLICK-P046`, and the files stay as
-/// they were.
+/// ["emit"]` writes them instead; an emitted artifact it changes while the
+/// `.map` companion it was given stays the same or is gone is `FLICK-P046`,
+/// and the files stay as they were.
 pub(super) fn emit(project: &Project, emitted: &mut Emission) {
     let hooked =
         project::hooked_plugins(&FsHost::new(), &mut SourceMap::default(), project, "emit");
@@ -181,25 +180,26 @@ pub(super) fn emit(project: &Project, emitted: &mut Emission) {
     }
 }
 
-/// The first `.js` of `written` that differs from `given` while its `.map`,
-/// which `given` has, stays the same or is gone: a script that lost the map
-/// of its code.
+/// The first artifact of `written` that differs from `given` while its `.map`
+/// companion, which `given` has, stays the same or is gone: an emitted file
+/// that lost the source map of its code.
 fn unmapped(
     given: &[flick_plugin::Artifact],
     written: &[flick_plugin::Artifact],
 ) -> Option<String> {
-    let text = |files: &[flick_plugin::Artifact], path: &str| {
-        (files.iter())
+    fn text<'a>(files: &'a [flick_plugin::Artifact], path: &str) -> Option<&'a str> {
+        files
+            .iter()
             .find(|a| a.path == path)
-            .map(|a| a.contents.clone())
-    };
-    (written.iter())
-        .filter(|a| Path::new(&a.path).extension().is_some_and(|e| e == "js"))
+            .map(|a| a.contents.as_str())
+    }
+    written
+        .iter()
         .find(|a| {
             let map = format!("{}.map", a.path);
             let old_map = text(given, &map);
             let new_map = text(written, &map);
-            text(given, &a.path).as_ref() != Some(&a.contents)
+            text(given, &a.path) != Some(a.contents.as_str())
                 && old_map.is_some()
                 && (new_map.is_none() || new_map == old_map)
         })
@@ -220,7 +220,7 @@ mod tests {
     }
 
     #[test]
-    fn a_changed_script_needs_a_changed_map_when_the_build_wrote_one() {
+    fn a_changed_artifact_needs_a_changed_map_when_the_build_wrote_one() {
         let given = [file("a.js", "x"), file("a.js.map", "m"), file("b.js", "y")];
         let mapped = [
             file("a.js", "x2"),
@@ -232,8 +232,52 @@ mod tests {
         assert_eq!(unmapped(&given, &stale).as_deref(), Some("a.js"));
         let dropped = [file("a.js", "x2"), file("b.js", "y")];
         assert_eq!(unmapped(&given, &dropped).as_deref(), Some("a.js"));
-        // a script the build wrote no map for may change alone
+        // an artifact the build wrote no map for may change alone
         let alone = [file("a.js", "x"), file("a.js.map", "m"), file("b.js", "y2")];
         assert_eq!(unmapped(&given, &alone), None);
+    }
+
+    #[test]
+    fn non_js_artifacts_with_a_given_map_are_checked_too() {
+        for name in ["a.ts", "a.out", "pkg/mod.go"] {
+            let map_name = format!("{name}.map");
+            let given = [
+                file(name, "x"),
+                file(&map_name, "m"),
+                file("other.out", "y"),
+            ];
+            let mapped = [
+                file(name, "x2"),
+                file(&map_name, "m2"),
+                file("other.out", "y"),
+            ];
+            assert_eq!(unmapped(&given, &mapped), None, "{name}");
+
+            let stale = [
+                file(name, "x2"),
+                file(&map_name, "m"),
+                file("other.out", "y"),
+            ];
+            assert_eq!(unmapped(&given, &stale).as_deref(), Some(name), "{name}");
+
+            let dropped = [file(name, "x2"), file("other.out", "y")];
+            assert_eq!(unmapped(&given, &dropped).as_deref(), Some(name), "{name}");
+
+            // changing an artifact that had no .map companion in `given` is allowed
+            let unmapped_other = [
+                file(name, "x"),
+                file(&map_name, "m"),
+                file("other.out", "y2"),
+            ];
+            assert_eq!(unmapped(&given, &unmapped_other), None, "{name}");
+
+            // updating only the .map file does not falsely trigger on the .map itself
+            let map_only = [
+                file(name, "x"),
+                file(&map_name, "m2"),
+                file("other.out", "y"),
+            ];
+            assert_eq!(unmapped(&given, &map_only), None, "{name}");
+        }
     }
 }

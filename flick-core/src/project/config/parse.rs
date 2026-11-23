@@ -415,8 +415,8 @@ fn entries(
                 return Err(Diagnostic::error(
                     codes::P005,
                     format!(
-                        "`{}` is not an entry name: lower-case letters, digits and `-`, starting with a letter, as it names the file `flick-{}.js`",
-                        bad.name, bad.name
+                        "`{}` is not an entry name: lower-case letters, digits and `-`, starting with a letter, as it names the entry's runner file",
+                        bad.name
                     ),
                     table_span,
                 ));
