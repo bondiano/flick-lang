@@ -1,0 +1,23 @@
+module Main exposing (main)
+
+refined type Age = Int where fun n -> n >= 0 && n < 150
+  deriving Schema
+
+type alias Person = { name : String; age : Age }
+  deriving Schema
+
+decode : String -> Result SchemaError Person
+let decode text = Result.bind (Codec.decode_result (Codec.json Person.schema)) (Json.parse text)
+
+report : String ->{Host.Console} Unit
+let report text =
+  match decode text with
+  | Ok person -> Platform.stdout_line "\{person.name} is \{show (Age.value person.age)}"
+  | Err (SchemaError issues) -> for issue <- issues do {
+    Platform.stdout_line "invalid \{issue.path}"
+  }
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  report "{\"name\":\"Ada\",\"age\":36}"
+  report "{\"name\":7,\"age\":200}"

@@ -1,0 +1,26 @@
+---
+title: Function contracts are not runtime checks
+description: Function contracts are not runtime checks
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="fn-contracts">
+
+**Where it runs:** browser and locally.
+
+`require` describes the inputs; `ensure` takes the result. Each expression
+is checked for types against the finished signature, and neither is lowered
+or executed today. The second call breaks the stated requirement and still
+returns -3, exactly as the body says.
+
+Use a refined input, a runtime validation, or a supported proof when you
+need enforcement. A [module contract](../contracts/) checks exports instead.
+
+**Guarantee:** function contracts are well-typed descriptions today, not
+verified pre/postconditions and not runtime assertions.
+
+[Reference](../../reference/types/).
+
+</TourLesson>

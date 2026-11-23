@@ -1,0 +1,22 @@
+---
+title: A typed HTTP API
+description: A typed HTTP API
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="http-api">
+
+**Where it runs:** locally, on JS and Go: the module goes in a project's `test/Main.fl`, then `flick test`. The test serves on `127.0.0.1` with a free port and reaches no other host. CI runs it on both targets. For JS, add `@flick-lang/effect-ts` to the project's dependencies (`pnpm add @flick-lang/effect-ts`); Go needs no npm adapter.
+
+`get_book` is one endpoint: its path codec, its success and its one declared
+error with status 404. The API's type is the record of handlers it needs, so
+`HttpApi.listen` takes exactly one handler per endpoint. `HttpApi.call` uses
+the same endpoint value as a client: the success decodes as a `Book`, and the
+404 comes back as the typed `NotFound`. The server belongs to the `scope` and
+stops when it ends.
+
+[Reference](../../reference/http-api/).
+
+</TourLesson>

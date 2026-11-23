@@ -1,0 +1,14 @@
+module Main exposing (main)
+
+module Ports exposing (Port, default_port) =
+  refined type Port = Int where fun n -> n > 0 && n < 65536
+  default_port : Port
+  let default_port = Port.prove 8080
+
+refined type Positive = Int where fun n -> n > 0
+
+positive_port : Ports.Port -> Positive
+let positive_port port = Positive.prove (Ports.Port.value port)
+
+main : Unit ->{Host.Console} Unit
+let main () = Platform.stdout_line (show (Positive.value (positive_port Ports.default_port)))

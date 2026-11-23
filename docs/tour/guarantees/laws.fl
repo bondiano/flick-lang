@@ -1,0 +1,23 @@
+module Main exposing (main)
+
+type Maybe a = Empty | Full a
+
+instance Functor Maybe =
+  let map f value = match value with | Empty -> Empty | Full x -> Full (f x)
+
+proof maybe_identity (v : Maybe a) where equal (map identity v) v =
+  match v with | Empty -> refl | Full x -> refl
+
+proof maybe_composition (g : b -> c) (h : a -> b) (v : Maybe a)
+where equal (map (fun x -> g (h x)) v) (map g (map h v)) =
+  match v with | Empty -> refl | Full x -> refl
+
+proof maybe where lawful Functor Maybe = {
+  identity = maybe_identity
+  composition = maybe_composition
+}
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let value = map (fun n -> n + 1) (Full 2)
+  Platform.stdout_line (match value with | Empty -> "empty" | Full n -> show n)

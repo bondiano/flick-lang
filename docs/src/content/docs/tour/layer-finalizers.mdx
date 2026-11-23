@@ -1,0 +1,22 @@
+---
+title: A layer that cleans up
+description: A layer that cleans up
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="layer-finalizers">
+
+**Where it runs:** browser and locally.
+
+`Layer.from_build` builds a service in the scope that `provide` opens.
+Its `Scope.defer` cleanup runs when that `provide` ends, and it may still call
+`Log`, an input of the layer: the layer's inputs outlive the scope it is built
+into (`Fiber.Provided`). So `release box` prints before `after the provide`.
+
+**Try:** move `Log.line "after the provide"` inside the inner `provide`.
+
+[Reference](../../reference/services/).
+
+</TourLesson>

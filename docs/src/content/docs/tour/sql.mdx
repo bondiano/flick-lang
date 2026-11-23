@@ -1,0 +1,25 @@
+---
+title: Checked SQL
+description: Checked SQL
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="sql">
+
+**Where it runs:** locally, without a database: put the module in `src/Main.fl`
+and run `flick run src/Main.fl`. CI checks its SQL and parameter count on JS
+and Go. On JS, `Sql` needs `@flick-lang/effect-ts` in the project's dependencies
+(`pnpm add @flick-lang/effect-ts`), which the browser sandbox does not provide.
+
+`sql table` declares the table and the type of its rows; a `sql p { … }`
+query is checked against it when the program compiles: a column that does not
+exist, or `p.min` compared with text, is a type error. Building and binding a
+query does no I/O, so this lesson prints the SQL and its one placeholder
+without a database. The value of `p.min` is never spliced into the text.
+`Database.query` runs a bound query against PostgreSQL in a real program.
+
+[Reference](../../reference/sql/).
+
+</TourLesson>

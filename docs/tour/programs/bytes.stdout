@@ -1,0 +1,5 @@
+3 bytes: [72, 105, 33]
+first: Some 72, tenth: None
+slice: Some "Hi"
+past the end: false
+300 at 1 is not a byte

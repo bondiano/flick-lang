@@ -1,0 +1,35 @@
+---
+title: Проверить приватную функцию
+description: Проверить приватную функцию
+tableOfContents: false
+source_hash: 26e6d12850f69f18
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="companions">
+
+**Где запускается:** локально: модуль и его компаньон помещаются в `src/` проекта, затем `flick test`. CI проверяет отчёт.
+
+Поместите модуль в `src/Main.fl`, а компаньон рядом в `src/Main.test.fl`.
+У компаньона тот же заголовок модуля, без `exposing` и импорта `Main`;
+он видит приватную функцию `trim`.
+
+```flick
+module Main
+import Test exposing (expect, to)
+# trim : String -> String
+# let trim name = String.trim name
+test "private trim" { expect (trim "  Ada  ") |> to.equal "Ada" }
+```
+
+CI создаёт настоящую пару файлов и выполняет `flick test`, проверяя полное
+имя `Main > private trim`. Скрытое объявление выше нужно лишь отдельной
+проверке фрагмента страницы; не копируйте его в компаньон.
+
+Компаньоны читают только `flick test`, `flick fmt` и `flick check` с явным
+путём. Обычные сборки и опубликованные интерфейсы их исключают.
+
+[Справочник](../../reference/testing/#тестовые-компаньоны).
+
+</TourLesson>

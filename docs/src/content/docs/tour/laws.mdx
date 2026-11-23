@@ -1,0 +1,27 @@
+---
+title: Laws of an instance
+description: Laws of an instance
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="laws">
+
+**Where it runs:** browser and locally.
+
+`Functor` declares identity and composition laws. Each lemma proves one
+for our `Maybe` instance by splitting its two constructors. The `lawful`
+bundle names every required lemma; a missing field is `FLICK-T083`.
+A class declaration alone does not prove that all its instances are lawful.
+
+The browser checks the proofs and runs `main`; CI also runs `flick prove`
+with this module in the proof root. The laws quantify over total functions,
+not callbacks that fail or loop.
+
+**Guarantee:** the bundle certifies this instance's declared laws in the
+kernel's domain; it neither verifies every instance nor the runtime.
+
+[Reference](../../reference/proofs/#laws-and-bundles).
+
+</TourLesson>

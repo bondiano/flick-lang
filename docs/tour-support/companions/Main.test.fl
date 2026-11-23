@@ -1,0 +1,5 @@
+module Main
+
+import Test exposing (expect, to)
+
+test "private trim" { expect (trim "  Ada  ") |> to.equal "Ada" }

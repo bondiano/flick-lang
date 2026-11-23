@@ -1,0 +1,25 @@
+---
+title: Декодирование входа через Schema
+description: Декодирование входа через Schema
+tableOfContents: false
+source_hash: d2cbf6ffd36b4b7e
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="schema">
+
+**Где запускается:** браузер и локально.
+
+`deriving Schema` даёт `Person` свидетеля, а `Codec.json Person.schema`
+декодирует JSON в запись. Поле `age` — уточнённый `Age`, поэтому число вне
+диапазона не декодируется, как и строка на месте числа. Ошибка —
+`SchemaError`, проблемы которого указывают путь к неудачному полю, здесь
+`age`, и не содержат сам вход.
+
+**Попробуйте:** замените `200` на `20` во втором входе и посмотрите, какое
+поле указано теперь.
+
+[Справочник](../../reference/schema/).
+
+</TourLesson>

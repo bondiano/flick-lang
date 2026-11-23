@@ -1,0 +1,26 @@
+---
+title: Уточнённые значения
+description: Уточнённые значения
+tableOfContents: false
+source_hash: 54f5329751b114b7
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="refined">
+
+**Где запускается:** браузер и локально.
+
+`Port` — номинальный тип без публичного конструктора. `Port.parse n`
+проверяет предикат при выполнении и возвращает `Ok port` или `Err SchemaError`.
+`Port.value` читает исходное целое; `Port.check` возвращает только Boolean.
+Основа `Int` исключает и дробные порты.
+
+**Попробуйте:** проверьте 65536.
+
+**Гарантия:** в безопасном коде Flick каждый `Port` прошёл предикат или
+получен доказательством; foreign и unsafe остаются доверенной границей.
+
+[Справочник](../../reference/schema/#уточнённые-типы).
+
+</TourLesson>

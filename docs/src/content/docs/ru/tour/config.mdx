@@ -1,0 +1,23 @@
+---
+title: Конфигурация из окружения
+description: Конфигурация из окружения
+tableOfContents: false
+source_hash: 1115dd131b466baf
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="config">
+
+**Где запускается:** браузер и локально.
+
+`Config.Config` описывает читаемые значения и их значения по умолчанию;
+пока он ничего не читает. `Config.get` читает его через `Host.Environment`,
+если не предоставлен `ConfigProvider`. `describe` выполняется трижды: с живым
+окружением без этих переменных, поэтому действуют значения по умолчанию;
+с фейковым окружением; и с портом вне диапазона, что даёт `ConfigError`.
+Префикс `SHOP_` не даёт настоящей переменной `PORT` изменить вывод.
+
+[Справочник](../../reference/services/).
+
+</TourLesson>

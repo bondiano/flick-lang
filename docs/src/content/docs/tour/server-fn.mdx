@@ -1,0 +1,28 @@
+---
+title: Server functions
+description: Server functions
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="server-fn">
+
+**Where it runs:** locally: the module goes in a project's `src/Main.fl`; CI checks it with `flick check`. Running it needs a server at `SHOP_URL`, which CI does not start.
+
+The signature above `server fn` is what the server runs: it needs
+`Server.Server` and may fail with `OutOfStock`. Callers see
+`Order ->{; Rpc.ClientError, OutOfStock} String`, so a browser entry or a
+command-line client can call `place` by name. Outside a browser a call needs an
+origin: `Server.with_origin` gives one, and the program reads it from the
+environment itself. `Server.handler [server place]` serves the function on
+`Server.path`.
+
+`order_button` is the browser client: mount it with `Ui.Dom.mount` in a UI
+entry. Its click calls `place` at the page's origin. The local `main` calls
+the same function with an explicit origin. Both clients are checked here;
+neither is run in CI, because it needs the application's server.
+
+[Reference](../../reference/server-fn/).
+
+</TourLesson>

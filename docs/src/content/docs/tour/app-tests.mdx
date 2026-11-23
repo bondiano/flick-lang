@@ -8,15 +8,18 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 <TourLesson locale="en" id="app-tests">
 
-Tests here are plain functions. `left_after` runs a script on a fresh memory
-shelf and gives back the pages left, and `check` prints whether a condition
-holds.
+`suite` groups cases, `test` names one, and `test.each` makes a case for each
+command script. `expect actual |> to.equal expected` fails a case when its
+result differs. `left_after` gives each case a fresh `Ref` and a fake `Shelf`
+layer, so cases cannot change each other's state.
 
-Each test gets its own `Ref`, so they cannot affect each other. A project
-would put them in its tests and run `flick test`; the idea is the same: the
-services a function names are the ones a test replaces.
+**Where it runs:** the editor runs `main`, a short demonstration of the same
+scripts. It does not run `tests`. Locally, put this module in `test/Main.fl`
+of a Flick project and run `flick test --forbid-only`. CI runs that entry
+point and checks **3 passed, 0 failed**. The [Testing chapter](../suites/)
+explains this split; see also the [reference](../../reference/testing/).
 
-**Try:** break `Books.finish` by writing `read = false` in it. The second
-test prints `FAILED`.
+**Try:** set `read = false` in `Books.finish`. The second local case fails;
+the browser demonstration prints `FAILED`.
 
 </TourLesson>

@@ -1,0 +1,39 @@
+---
+title: Владение фикстурами и ошибки setup
+description: Владение фикстурами и ошибки setup
+tableOfContents: false
+source_hash: 04b82655f3fe0d4d
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="fixtures">
+
+**Где запускается:** локально: модуль в `test/Main.fl` проекта, затем `flick test` (для компаньонов путь указан ниже). CI проверяет отчёт.
+
+`fixture` ленив и создаётся для случая; `fixture shared` — для набора.
+`await names` открывает хранилище один раз, а `Fixture.cleanup` освобождает его
+после `after_all`. Фикстуры случая освобождаются после `after_each`, в обратном
+порядке создания. `Resource.own` может фиксировать или откатывать фикстуру по её `Exit`.
+
+Последняя фикстура завершается ошибкой до начала тела теста. Отчёт указывает
+`setup`, а не утверждение тела, и именует `connection`. CI ожидает
+2 passed, 1 failed и код 1.
+
+Общие фикстуры сериализуют набор. Для намеренного параллелизма используйте
+`suite parallel` и `fixture shared concurrent` с безопасными общими данными.
+Общая фикстура не может зависеть от фикстуры случая (`std/T003`); общая фикстура
+без concurrent в параллельном наборе — `std/T004`.
+
+```flick
+module ConcurrentTest
+suite parallel "read-only" {
+  fixture shared concurrent names = ["Ada"]
+  test "one" { Test.check (Test.equal ["Ada"] (await names)) }
+  test "two" { Test.check (Test.equal ["Ada"] (await names)) }
+}
+```
+
+[Справочник](../../reference/testing/#фикстуры).
+
+</TourLesson>

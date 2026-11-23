@@ -35,9 +35,8 @@ component book_row (book : Books.Book) = ui {
 
 component reading_list () = ui {
   let books = Atom.value shelf
-  div { class_name = "books" }
-    list [for book <- books yield Ui.keyed book.title (Ui.render book_row book)]
-    paragraph (text "pages left: \{Books.pages_left books}")
+  list [for book <- books yield Ui.keyed book.title (Ui.render book_row book)]
+  paragraph (text "pages left: \{Books.pages_left books}")
 }
 
 main : Unit ->{Host.Clock, Host.Console, Host.Random, Async; AppError} Unit

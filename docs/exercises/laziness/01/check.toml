@@ -1,0 +1,11 @@
+export = "label"
+argument_types = ["string"]
+return_type = "string"
+output = "[dev] [dev], loads: 1"
+starter_error = "FLICK-G005"
+title = "Practice: load once"
+title_ru = "Практика: загрузите один раз"
+task = "Two fibers ask for the configuration, which must load once. main keeps it in a let lazy, which a task cannot use (FLICK-G005). Make a lazy both fibers can share, then check your answer."
+task_ru = "Два файбера запрашивают конфигурацию, которая должна загрузиться один раз. main хранит её в let lazy, которую task не может использовать (FLICK-G005). Создайте lazy, общую для обоих файберов, и проверьте ответ."
+hint = "lazy { … } is a value that tasks may capture; its first await runs the body once for everyone."
+hint_ru = "lazy { … } — значение, которое могут захватывать задачи; первый await выполняет тело один раз для всех."

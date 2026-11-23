@@ -1,0 +1,14 @@
+module Main exposing (main)
+
+consume : Int -> Int -> Int
+let consume available used
+where
+  require (0 <= used && used <= available)
+  ensure (fun remaining -> 0 <= remaining && remaining + used == available)
+=
+  available - used
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (show (consume 10 3))
+  Platform.stdout_line (show (consume 2 5))

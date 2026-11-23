@@ -1,0 +1,25 @@
+module Main exposing (main)
+
+show_bytes : Bytes.Bytes -> String
+let show_bytes bytes = show (Bytes.to_list bytes)
+
+describe : Result Bytes.ByteError Bytes.Bytes -> String
+let describe result =
+  match result with
+  | Ok bytes -> "\{show (Bytes.length bytes)} bytes: \{show_bytes bytes}"
+  | Err (Bytes.ByteOutOfRange index value) -> "\{show value} at \{show index} is not a byte"
+
+head : Bytes.Bytes -> String
+let head bytes =
+  match Bytes.slice 0 2 bytes with
+  | Some first -> show (Bytes.decode_utf8 first)
+  | None -> "no slice"
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let greeting = Bytes.encode_utf8 "Hi!"
+  Platform.stdout_line (describe (Ok greeting))
+  Platform.stdout_line "first: \{show (Bytes.get 0 greeting)}, tenth: \{show (Bytes.get 9 greeting)}"
+  Platform.stdout_line ("slice: " ++ head greeting)
+  Platform.stdout_line ("past the end: " ++ show (Option.is_some (Bytes.slice 2 9 greeting)))
+  Platform.stdout_line (describe (Bytes.from_list [72, 300]))

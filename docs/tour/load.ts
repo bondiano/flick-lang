@@ -11,13 +11,29 @@ export interface Chapter {
 export interface Lesson {
   readonly id: string;
   readonly chapter: Chapter;
-  /** `run`, `ui`, or `fail` and the one code its errors have; empty for an exercise. */
+  /** `run`, `ui`, `local`, or `fail` and its diagnostic code; empty for an exercise. */
   readonly expect: string;
   /** The program the lesson opens with; absent for an exercise, which brings its own. */
   readonly file?: string;
   /** What a `run` lesson prints, in both profiles. */
   readonly stdout?: string;
   readonly exercise?: string;
+  /** Native checks, separate from the browser's single-module main runner. */
+  readonly local?: LocalCheck;
+}
+
+export interface LocalCheck {
+  readonly command: "test" | "prove" | "check" | "run";
+  readonly exit: number;
+  readonly contains: ReadonlyArray<string>;
+  readonly flags?: ReadonlyArray<string>;
+  readonly listed?: ReadonlyArray<string>;
+  readonly printed?: ReadonlyArray<string>;
+  readonly files?: Readonly<Record<string, string>>;
+  readonly targets?: ReadonlyArray<"js" | "go">;
+  readonly source?: "src" | "test" | "proofs";
+  readonly forbidOnly?: boolean;
+  readonly adapter?: boolean;
 }
 
 interface Entry {
@@ -25,6 +41,7 @@ interface Entry {
   readonly expect?: string;
   readonly example?: string;
   readonly exercise?: string;
+  readonly local?: LocalCheck;
 }
 interface Index {
   readonly chapters: ReadonlyArray<Chapter & { readonly lessons: ReadonlyArray<Entry> }>;
@@ -52,7 +69,7 @@ export const lessons = (): ReadonlyArray<Lesson> => {
         ? [path.join(site, "tour", chapter.id, `${entry.id}.fl`), entry.expect ?? ""]
         : [path.join(gallery, `${entry.example}.fl`), examples.get(entry.example) ?? ""];
       if (expect === "") throw new Error(`tour lesson ${entry.id}: no expectation`);
-      return { id: entry.id, chapter, expect, file, ...(expect === "run" ? { stdout: file.replace(/\.fl$/, ".stdout") } : {}) };
+      return { id: entry.id, chapter, expect, file, ...(expect === "run" ? { stdout: file.replace(/\.fl$/, ".stdout") } : {}), ...(entry.local ? { local: entry.local } : {}) };
     }),
   );
 };

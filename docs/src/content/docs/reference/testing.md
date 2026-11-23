@@ -34,6 +34,9 @@ for.
 
 ## Blocks
 
+Learn these APIs in the tour's [testing chapter](../../tour/suites/),
+then use them in [the reading-list app](../../tour/app-tests/).
+
 A block starts a top-level declaration, as `suite` and `test` are heads only
 there: elsewhere the words are names, and `Test.test "x" (fun () -> …)` is a
 call. A top-level declaration may not start with a value named `suite` or

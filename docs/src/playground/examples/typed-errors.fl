@@ -1,18 +1,33 @@
-// A failure is part of the signature: `find` says it may fail with `NotFound`.
-module Main exposing (main)
+// A match takes apart an error value; try catches the failure that produced it.
+module Main exposing (main, mapped)
 
 type error NotFound = NotFound String
+type error Unavailable = Unavailable
 
-find : String ->{; NotFound} Float
+type error Http404 = Http404 String
+type error Http503 = Http503
+
+find : String ->{; NotFound, Unavailable} Float
 let find name = if name == "ada" then 36 else Fail.fail (NotFound name)
+
+problem : Errors {NotFound, Unavailable} -> String
+let problem err =
+  match err with
+  | NotFound who -> "no \{who}"
+  | Unavailable -> "try later"
+
+to_http : Errors {NotFound, Unavailable} -> Errors {Http404, Http503}
+let to_http err =
+  match err with
+  | NotFound who -> Http404 who
+  | Unavailable -> Http503
+
+mapped : Exit {NotFound, Unavailable} Float -> Exit {Http404, Http503} Float
+let mapped exit = Exit.map_error to_http exit
 
 main : Unit ->{Host.Console} Unit
 let main () =
-  let age =
-    try find "ada" with
-    | NotFound _ -> 0
+  let age = try find "ada" with | _ -> 0
   Platform.stdout_line "ada is \{age}"
-  let other =
-    try show (find "bob") with
-    | NotFound who -> "no \{who}"
+  let other = try show (find "bob") with | err -> problem err
   Platform.stdout_line other

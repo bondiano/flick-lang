@@ -1,0 +1,9 @@
+module Main
+
+import Test exposing (expect, to)
+
+suite "names" {
+  test "trims" { expect (String.trim "  Ada  ") |> to.equal "Ada" }
+  test.skip "later" { expect "TODO" |> to.equal "done" }
+  test.only "focus" { expect (String.length "Ada") |> to.equal 3 }
+}

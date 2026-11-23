@@ -8,19 +8,20 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 <TourLesson locale="en" id="tasks">
 
-`task { … }` describes work without doing it: a task is cold. `counted` adds
-1 to `runs` and gives it back, but `before: 0` shows that making it ran
-nothing.
+A `task { … }` is cold: building `counted` changes nothing. Each `await`
+runs it again, so the first two reads give 1 and 2.
 
-`await` runs a task and gives its result, and each `await` runs it again, so
-the two results differ.
+`~` on `twice` says that its `Eff` argument is passed unstarted.
+`twice (count runs)` needs no `task` wrapper: it runs at each `await`, giving
+3 and 4, whose sum is 7. `Effect.or_die (count runs)` works the same way.
+A pipe still evaluates its left side first.
+See [suspended parameters](../../reference/effects/#task-and-await).
 
-`Ref.make` makes a cell that holds a changing value. `let mut` from the first
-chapter belongs to one function, while a `Ref` can be shared, here with the
-task.
+```flick fail T076
+wrong : ~Int -> Int
+let wrong n = n
+```
 
-**Try:** remove the first `await`. The compiler reports `FLICK-C001`: a task
-is not a value that can be shown, and `await` is what turns it into its
-result.
+**Try:** await `counted` again, then compare it with a [lazy](../lazy/).
 
 </TourLesson>

@@ -8,17 +8,13 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 <TourLesson locale="en" id="scope-type">
 
-A function that opens a resource in its caller's scope says so:
-`Scope s` in the row of `open_res` needs a scope `s` from whoever calls it.
-Its release prints when `s` closes, so it also asks for a `Host.Console`
-that lasts as long: `Fiber.Provided {Host.Console} s`. `both` passes these
-needs on, and `main` provides the scope, which closes both resources once
-`both ()` is done.
+`Scope s` says that `open_res` acquires into its caller's scope.
+`Resource.make` registers cleanup there. `Fiber.Provided {Host.Console} s`
+ensures that the console used by that cleanup outlives the scope.
 
-This is how a signature tells you that a function opens something that has
-to be closed.
+Here the resource is a string, which holds no region. Handles that capture
+resources carry `^{s}` and cannot escape. See [resources](../../reference/resources/).
 
-**Try:** call `both ()` in `main` without `scope { … }`. The compiler reports
-`FLICK-G004`: nothing owns the resources.
+**Try:** call `both ()` without `scope`: `FLICK-G004` reports the missing owner.
 
 </TourLesson>

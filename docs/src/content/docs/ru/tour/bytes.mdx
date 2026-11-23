@@ -1,0 +1,22 @@
+---
+title: Упакованные байты
+description: Упакованные байты
+tableOfContents: false
+source_hash: 78c8710850b90f1b
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="bytes">
+
+**Где запускается:** браузер и локально.
+
+`Bytes` хранит один байт на элемент и никогда не меняется. `encode_utf8`
+создаёт байты из текста; `get` и `slice` возвращают `None` за пределами
+последовательности вместо ошибки; `decode_utf8` возвращает `None` для
+некорректного UTF-8. `from_list` проверяет каждое целое и сообщает первое
+значение вне `0..255` вместе с индексом.
+
+[Справочник](../../reference/stdlib/).
+
+</TourLesson>

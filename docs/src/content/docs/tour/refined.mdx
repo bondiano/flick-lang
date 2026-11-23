@@ -1,0 +1,25 @@
+---
+title: Refined values
+description: Refined values
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="refined">
+
+**Where it runs:** browser and locally.
+
+`Port` is nominal, with no public constructor. `Port.parse n` checks its
+predicate at run time and returns `Ok port` or `Err SchemaError`.
+`Port.value` reads the underlying integer; `Port.check` only returns a Boolean.
+Keeping `Int` as the base rejects fractional ports too.
+
+**Try:** parse 65536.
+
+**Guarantee:** within safe Flick code, every `Port` passed its predicate or
+was proved to satisfy it; foreign and unsafe construction remain trusted.
+
+[Reference](../../reference/schema/#refined-types).
+
+</TourLesson>

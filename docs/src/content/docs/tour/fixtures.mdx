@@ -1,0 +1,38 @@
+---
+title: Fixture ownership and setup failures
+description: Fixture ownership and setup failures
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="fixtures">
+
+**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+
+`fixture` is lazy and per case; `fixture shared` is lazy and per suite.
+`await names` opens the store once, and `Fixture.cleanup` releases it after
+`after_all`. Per-case fixtures are released after `after_each`, in reverse
+creation order. `Resource.own` can commit or roll back a fixture by its `Exit`.
+
+The last fixture fails before its test body can start. The report identifies
+`setup`, not an assertion in the body, and names `connection`. CI expects
+2 passed, 1 failed and exit 1.
+
+Shared fixtures serialize their suite. For intentional concurrency use
+`suite parallel` and `fixture shared concurrent`, with data safe to share.
+A shared fixture cannot depend on a per-case one (`std/T003`); a parallel
+suite with a non-concurrent shared fixture is `std/T004`.
+
+```flick
+module ConcurrentTest
+suite parallel "read-only" {
+  fixture shared concurrent names = ["Ada"]
+  test "one" { Test.check (Test.equal ["Ada"] (await names)) }
+  test "two" { Test.check (Test.equal ["Ada"] (await names)) }
+}
+```
+
+[Reference](../../reference/testing/#fixtures).
+
+</TourLesson>

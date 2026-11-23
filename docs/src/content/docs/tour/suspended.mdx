@@ -1,0 +1,24 @@
+---
+title: Suspended parameters
+description: Suspended parameters
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="suspended">
+
+**Where it runs:** browser and locally.
+
+`~` on an `Eff` parameter suspends a direct call written in that argument
+position. It does not memoize it: each `await job` runs the cold computation.
+`Effect.or_die`, `retry`, `repeat`, `exit`, `delay` and the timeout combinators
+use the same convention. An existing `Eff` is passed unchanged.
+
+The marker belongs to the named signature, not the function type. A pipe
+runs its left side first. `~` on a non-`Eff` parameter is `FLICK-T076`.
+For recursive schemas, the current name is `Schema.suspend`, not `Schema.lazy`.
+
+[Reference](../../reference/effects/#task-and-await).
+
+</TourLesson>

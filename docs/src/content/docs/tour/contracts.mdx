@@ -25,6 +25,9 @@ A contract can also describe a parameterized module: `Style` is one from
 The [reference](../../reference/modules/#module-contracts-and-parameterized-modules)
 has the full rules, and examples over several files.
 
+A function has contracts too, `where require … ensure …`; the chapter
+[Checked guarantees](../fn-contracts/) shows what they promise.
+
 **Try:** add `module Plain(T : Text) : Banner` whose `banner` gives the word
 as it is, then `module Bare = Framed(Plain)`, and print `Bare.banner "flick"`.
 

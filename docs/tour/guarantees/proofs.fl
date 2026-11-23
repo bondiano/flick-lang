@@ -1,0 +1,11 @@
+module Main exposing (main)
+
+is_some : Option a -> Bool
+let is_some value = match value with | Some _ -> true | None -> false
+
+proof some_is_some (x : a) where holds (is_some (Some x)) = refl
+
+proof back (x : a) (y : a) (h : equal x y) where equal y x = symm h
+
+main : Unit ->{Host.Console} Unit
+let main () = Platform.stdout_line (show (is_some (Some "Ada")))

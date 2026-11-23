@@ -8,12 +8,12 @@ let note log line = Ref.update log (fun lines -> lines ++ [line])
 
 open_res : Ref (List String) -> String ->{Scope s} String
 let open_res log name =
-  Resource.acquire_release
+  Resource.make
     (task {
       note log "open \{name}"
       name
     })
-    (fun n -> note log "release \{n}")
+    (fun n _ -> note log "release \{n}")
 
 main : Unit ->{Host.Console} Unit
 let main () =

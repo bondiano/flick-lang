@@ -1,0 +1,29 @@
+---
+title: Серверные функции
+description: Серверные функции
+tableOfContents: false
+source_hash: b44dd20f7b6710b3
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="server-fn">
+
+**Где запускается:** локально: модуль помещается в `src/Main.fl` проекта; CI проверяет его командой `flick check`. Для запуска нужен сервер по адресу `SHOP_URL`, который CI не запускает.
+
+Сигнатура над `server fn` — то, что выполняет сервер: ей нужен
+`Server.Server`, и она может завершиться `OutOfStock`. Вызывающие видят
+`Order ->{; Rpc.ClientError, OutOfStock} String`, поэтому точка входа
+браузера или клиент командной строки вызывают `place` по имени. Вне браузера
+вызову нужен адрес: его даёт `Server.with_origin`, а программа сама читает
+его из окружения. `Server.handler [server place]` обслуживает функцию на
+`Server.path`.
+
+`order_button` — браузерный клиент: смонтируйте его через `Ui.Dom.mount` в
+точке входа UI. Нажатие вызывает `place` на origin страницы. Локальный
+`main` вызывает ту же функцию с явным адресом. Здесь проверяются оба
+клиента; CI не запускает их, поскольку нужен сервер приложения.
+
+[Справочник](../../reference/server-fn/).
+
+</TourLesson>

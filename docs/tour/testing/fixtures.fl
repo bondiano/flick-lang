@@ -1,0 +1,20 @@
+module Main
+
+import Test exposing (expect, to)
+
+open_store : Unit ->{Host.Console} Ref (List String)
+let open_store () =
+  Platform.stdout_line "open store"
+  Ref.make ["Ada"]
+
+suite "store" {
+  fixture shared names = open_store () |> Fixture.cleanup (fun _ -> Platform.stdout_line "close store")
+  fixture count = List.length (Ref.get (await names))
+  test "count" { expect (await count) |> to.equal 1 }
+  test "read" { expect (Ref.get (await names)) |> to.contain "Ada" }
+}
+
+suite "broken setup" {
+  fixture connection = Test.check (Test.equal 1 2)
+  test "cannot start" { await connection }
+}

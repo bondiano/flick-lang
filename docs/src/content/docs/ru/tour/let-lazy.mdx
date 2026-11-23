@@ -1,0 +1,23 @@
+---
+title: Ленивая локальная переменная
+description: Ленивая локальная переменная
+tableOfContents: false
+source_hash: b871c63aa50609a9
+---
+
+import TourLesson from "../../../../components/TourLesson.astro";
+
+<TourLesson locale="ru" id="let-lazy">
+
+**Где запускается:** браузер и локально.
+
+`let lazy` принадлежит своей функции, как `let mut`, и не требует `Async`.
+Читать его можно только через `await name`. Присваивание до первого чтения
+`let lazy mut` заменяет инициализатор, поэтому `counted runs 7` не выполняется.
+Использование без `await name` — `FLICK-T003`.
+
+**Попробуйте:** уберите чтения `answer`; ни один инициализатор не запустится.
+
+[Справочник](../../reference/effects/#lazy).
+
+</TourLesson>

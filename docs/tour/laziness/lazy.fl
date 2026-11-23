@@ -1,0 +1,11 @@
+module Main exposing (main)
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  let config = lazy {
+    Platform.stdout_line "load config"
+    "development"
+  }
+  Platform.stdout_line "before await"
+  Platform.stdout_line (await config)
+  Platform.stdout_line (await config)

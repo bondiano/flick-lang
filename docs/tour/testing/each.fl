@@ -1,0 +1,12 @@
+module Main
+
+import Test exposing (expect, to)
+
+rows : List (String, String)
+let rows = [("  Ada  ", "Ada"), (" Grace ", "Grace"), ("", "")]
+
+suite "trim" {
+  test.each rows "input {0}" (input, expected) {
+    expect (String.trim input) |> to.equal expected
+  }
+}

@@ -2,7 +2,7 @@
 title: Контракты модулей
 description: "`type module` описывает модуль, а параметризованный модуль строится по такому описанию."
 tableOfContents: false
-source_hash: 199d70f1d97d4aa6
+source_hash: db69ccb45ae81ac6
 ---
 
 import TourLesson from "../../../../components/TourLesson.astro";
@@ -27,6 +27,9 @@ import TourLesson from "../../../../components/TourLesson.astro";
 
 Полные правила и примеры из нескольких файлов приведены в
 [справочнике](../../reference/modules/#контракты-модулей-и-параметризованные-модули).
+
+У функций тоже есть контракты, `where require … ensure …`; глава
+[«Проверяемые гарантии»](../fn-contracts/) показывает, что они обещают.
 
 **Попробуйте:** добавьте `module Plain(T : Text) : Banner`, в котором
 `banner` возвращает слово без изменений, затем `module Bare = Framed(Plain)`,

@@ -1,0 +1,22 @@
+---
+title: A lazy local variable
+description: A lazy local variable
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="let-lazy">
+
+**Where it runs:** browser and locally.
+
+`let lazy` belongs to its function, like `let mut`, and needs no `Async`.
+It can only be read with `await name`. Assignment before the first read of
+`let lazy mut` replaces the initializer, so `counted runs 7` never runs.
+A use other than `await name` is `FLICK-T003`.
+
+**Try:** remove the reads of `answer`; no initializer runs.
+
+[Reference](../../reference/effects/#lazy).
+
+</TourLesson>

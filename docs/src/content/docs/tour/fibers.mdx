@@ -10,7 +10,9 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 A scope can own running work too. `Fiber.spawn owner quiet task` starts a
 child that belongs to the scope `owner`, and `quiet` decides what a failure
-of the child does. `Scope.add_finalizer` adds work for the scope's end.
+of the child does. `Scope.defer` adds work for the scope's end; it receives the scope's `Exit`.
+`Scope.add_finalizer` is the low-level form, which takes a task and ignores
+the outcome.
 
 When the scope ends, its children stop first, which `Effect.ensuring` lets
 the child report, and then its finalizers run, each once, in reverse order.

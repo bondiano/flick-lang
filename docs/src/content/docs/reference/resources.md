@@ -13,6 +13,9 @@ low-level way to register a release.
 
 ## Owning a value
 
+The tour introduces [scoped cleanup](../../tour/scope/),
+[rollback on failure](../../tour/release-on-failure/) and [fiber cleanup](../../tour/fibers/).
+
 ```flick
 # import Resource exposing (Closing)
 #

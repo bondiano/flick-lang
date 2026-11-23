@@ -1,0 +1,33 @@
+module Main exposing (main)
+
+type alias Server = { host : String; port : Float }
+
+server : Config.Config Server
+let server =
+  Config.with_default "localhost" (Config.string "SHOP_HOST")
+  |> Config.flat_map (fun host ->
+    Config.with_default 8080 (Config.port "SHOP_PORT") |> Config.map (fun port -> { host = host; port = port })
+  )
+
+describe : Unit ->{Host.Environment} String
+let describe () =
+  try
+    let s = Config.get server
+    "\{s.host}:\{show s.port}"
+  with
+  | Config.ConfigError message -> "error: " ++ message
+
+fake_env : List (String, String) -> Layer none none {Host.Environment}
+let fake_env vars =
+  Layer.succeed Host.Environment {
+    env = fun name -> List.find (fun (key, _) -> key == name) vars |> Option.map (fun (_, value) -> value)
+    vars = fun () -> vars
+  }
+
+main : Unit ->{Host.Environment, Host.Console} Unit
+let main () =
+  Platform.stdout_line ("live: " ++ describe ())
+  let fake = provide (fake_env [("SHOP_HOST", "shop.test"), ("SHOP_PORT", "9000")]) { describe () }
+  Platform.stdout_line ("fake: " ++ fake)
+  let bad = provide (fake_env [("SHOP_PORT", "99999")]) { describe () }
+  Platform.stdout_line ("bad port: " ++ show (String.starts_with "error: " bad))

@@ -1,0 +1,16 @@
+---
+title: "Practice: load once"
+description: "Practice: load once"
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="cache">
+
+The chapter's exercise. Two fibers await the configuration, which must load
+once. A `let lazy` cannot be captured by a `task`, so the compiler reports
+`FLICK-G005`. Share one lazy, then press **Check answer**: the output counts
+the loads.
+
+</TourLesson>

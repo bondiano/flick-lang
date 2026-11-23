@@ -1,0 +1,30 @@
+---
+title: Kernel-checked proofs
+description: Kernel-checked proofs
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="proofs">
+
+**Where it runs:** browser and locally.
+
+`holds p` states that `p` is true. `refl` closes a goal whose sides normalize
+to the same value. `back` assumes a premise `h` and reverses it with `symm`.
+Earlier proofs are lemmas; a proof module can import another module's lemmas.
+
+The browser compiler checks these declarations and runs only `main`.
+Proof-root modules are local: put one in `proofs/Main.fl` and use `flick prove`;
+CI checks this program through that command as well.
+
+The current domain is `PureTotalV1`: pure total functions, Bool, nonrecursive
+data, tuples and functions, not IO, recursion or primitive integer arithmetic.
+See the [formal boundary](https://github.com/bondiano/flick-lang/blob/main/docs/formal/proofs.md).
+
+**Guarantee:** the kernel checks the goal in its supported domain and erases
+the proof; this is not a proof of the compiler or runtimes.
+
+[Reference](../../reference/proofs/).
+
+</TourLesson>

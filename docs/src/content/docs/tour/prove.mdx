@@ -1,0 +1,27 @@
+---
+title: A guard proves a value
+description: A guard proves a value
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="prove">
+
+**Where it runs:** browser and locally.
+
+`Port.prove n` returns a `Port`, not a `Result`. The compiler uses both
+facts from the true branch; the predicate does not run again.
+A successful `Port.check n` supplies the same facts.
+
+Facts belong to one immutable value. An alias keeps them; shadowing gives
+a different value. `let mut` has no facts, and `fun` and `task` bodies start
+with none. Snapshot arithmetic into an immutable name and guard that name,
+rather than assuming integer arithmetic cannot wrap.
+
+**Guarantee:** a successful `T.prove` establishes the predicate at compile
+time, within the supported refinement logic.
+
+[Reference](../../reference/schema/#proving-a-refinement).
+
+</TourLesson>

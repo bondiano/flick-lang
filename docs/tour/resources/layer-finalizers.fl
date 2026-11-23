@@ -1,0 +1,25 @@
+module Main exposing (main)
+
+service Log =
+  line : String ->{} Unit
+
+service Box =
+  value : Unit ->{} String
+
+log : Layer none none {Log}
+let log = Layer.succeed Log { line = fun text -> Host.raw_stdout_line text }
+
+box : Layer {Log} none {Box}
+let box =
+  Layer.from_build (fun memo ->
+    Log.line "build box"
+    Scope.defer (fun _ -> Log.line "release box")
+    Layer.build_with_memo_map memo (Layer.succeed Box { value = fun () -> "box" })
+  )
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  provide log {
+    provide box { Log.line ("use " ++ Box.value ()) }
+    Log.line "after the provide"
+  }

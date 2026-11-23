@@ -1,0 +1,24 @@
+---
+title: Host services as ports
+description: Host services as ports
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="host-ports">
+
+**Where it runs:** browser and locally.
+
+`stamp` names `Host.Clock` and `Host.Random` in its row and nothing else. `main`
+runs it twice: once with the live services the runner gives `main`, and once
+inside `provide`, with a fixed clock and a fixed draw. The function is the
+same; only the layer around it changes. Tests replace host services the same
+way (see the [Testing chapter](../fakes/)).
+
+**Try:** make `fixed_random` return 0.5: the last field of the fake line
+becomes `false`.
+
+[Reference](../../reference/services/).
+
+</TourLesson>

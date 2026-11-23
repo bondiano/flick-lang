@@ -1,0 +1,8 @@
+module Main
+
+import Test exposing (expect, to)
+
+test "reads the lines a command writes" {
+  let lines = ChildProcess.lines (ChildProcess.make "printf" ["%s\n", "Ada", "Grace"])
+  expect lines |> to.equal ["Ada", "Grace"]
+}

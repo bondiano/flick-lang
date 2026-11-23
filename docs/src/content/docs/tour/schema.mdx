@@ -1,0 +1,24 @@
+---
+title: Decode input with Schema
+description: Decode input with Schema
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="schema">
+
+**Where it runs:** browser and locally.
+
+`deriving Schema` gives `Person` a witness, and `Codec.json Person.schema`
+decodes JSON into the record. The field `age` is a refined `Age`, so a number
+outside its range fails to decode like a string where a number belongs. The
+failure is a `SchemaError` whose issues name the path of the field that
+failed, here `age`, and never hold the input.
+
+**Try:** change `200` to `20` in the second input and see which field is
+reported now.
+
+[Reference](../../reference/schema/).
+
+</TourLesson>

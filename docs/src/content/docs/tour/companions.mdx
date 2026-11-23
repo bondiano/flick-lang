@@ -1,0 +1,34 @@
+---
+title: Test a private helper
+description: Test a private helper
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="companions">
+
+**Where it runs:** locally: the module and its companion go in a project's `src/` directory, then run `flick test`. CI checks the report.
+
+Place this module in `src/Main.fl`, and this companion beside it in
+`src/Main.test.fl`. The companion uses the same module header, no `exposing`
+and no import of `Main`; it can see private `trim`.
+
+```flick
+module Main
+import Test exposing (expect, to)
+# trim : String -> String
+# let trim name = String.trim name
+test "private trim" { expect (trim "  Ada  ") |> to.equal "Ada" }
+```
+
+CI creates those actual files and runs `flick test`, checking the full name
+`Main > private trim`. The hidden declaration above only makes the page's
+standalone snippet checkable; do not copy it into the companion.
+
+Only `flick test`, `flick fmt` and path-named `flick check` read companions.
+Ordinary builds and published interfaces omit them.
+
+[Reference](../../reference/testing/#test-companions).
+
+</TourLesson>

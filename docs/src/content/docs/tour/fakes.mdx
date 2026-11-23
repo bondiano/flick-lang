@@ -1,0 +1,23 @@
+---
+title: Fake host ports
+description: Fake host ports
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="fakes">
+
+**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+
+`flick test` provides `Host.Live`. A nested layer replaces just the clock
+and random ports; `ticket` is unchanged and still declares both dependencies.
+This test asserts an exact time and draw, not a range that occasionally fails.
+The clock's three operations are explicit; elapsed time is not wall-clock time.
+
+Never print environment secrets to make a test deterministic. Replace the
+port or provider and provide only the data the case needs.
+
+[Reference](../../reference/services/).
+
+</TourLesson>

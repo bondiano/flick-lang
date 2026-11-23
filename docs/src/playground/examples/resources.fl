@@ -10,8 +10,8 @@ let open name = task {
 main : Unit ->{Host.Console} Unit
 let main () =
   let result = scope s {
-    let a = Resource.acquire_release (open "file") (fun _ -> Platform.stdout_line "close file")
-    let b = Resource.acquire_release (open "socket") (fun _ -> Platform.stdout_line "close socket")
+    let a = Resource.make (open "file") (fun _ _ -> Platform.stdout_line "close file")
+    let b = Resource.make (open "socket") (fun _ _ -> Platform.stdout_line "close socket")
     ignore s
     "\{a} and \{b}"
   }

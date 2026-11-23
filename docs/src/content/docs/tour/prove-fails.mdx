@@ -1,0 +1,37 @@
+---
+title: Unknown, false, and NaN
+description: Unknown, false, and NaN
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="prove-fails">
+
+**Where it runs:** checked in the editor, with the expected error.
+
+The guard proves the lower bound, not the upper bound: `FLICK-T077`
+means unknown, not necessarily false. Use `Port.parse` when a runtime
+check is appropriate. A refuted predicate is `FLICK-T078`:
+
+```flick fail T078
+refined type Positive = Int where fun n -> n > 0
+bad : Positive
+let bad = Positive.prove 0
+```
+
+NaN makes every ordered comparison false. Consequently this guard can be
+true for NaN and proves no positivity:
+
+```flick fail T077
+refined type Positive = Float where fun n -> n > 0
+positive : Float -> Option Positive
+let positive n = if not (n <= 0) then Some (Positive.prove n) else None
+```
+
+**Guarantee:** the compiler rejects an unproved or refuted `T.prove`; it
+does not silently assume that a Float is not NaN.
+
+[Reference](../../reference/schema/#proving-a-refinement).
+
+</TourLesson>

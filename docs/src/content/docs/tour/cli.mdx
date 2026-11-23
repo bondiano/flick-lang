@@ -1,0 +1,32 @@
+---
+title: A command line
+description: A command line
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="cli">
+
+**Where it runs:** locally, on JS and Go: the module goes in a project's `test/Main.fl`, then `flick test`. CI runs it on both targets. For JS, add `@flick-lang/effect-ts` to the project's dependencies (`pnpm add @flick-lang/effect-ts`); Go needs no npm adapter.
+
+A `cli` block describes flags, arguments and a handler; building it runs
+nothing. `shop` groups the `greet` subcommand. `Cli.run shop args` parses the arguments and only then runs the
+handler. Invalid input, such as an unknown flag, prints the help and fails
+with `Cli.CliError`, and no handler runs. The tests call `Cli.run` with
+fixed argument lists; a program passes its own:
+
+```flick
+# import App.Greet exposing (greet)
+#
+main : Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError} Unit
+let main () =
+  try Cli.run greet (Platform.args ()) with
+  | Cli.CliError message -> App.fail message
+```
+
+`App.fail` makes the exit code 1; `--help` and `--version` print and exit 0.
+
+[Reference](../../reference/cli-dsl/).
+
+</TourLesson>

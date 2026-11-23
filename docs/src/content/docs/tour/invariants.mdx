@@ -1,0 +1,23 @@
+---
+title: Invariants cross module boundaries
+description: Invariants cross module boundaries
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="invariants">
+
+**Where it runs:** browser and locally.
+
+The `Ports` module hides construction, not the invariant. A `Port`'s
+underlying value is positive, so `Positive.prove` needs no new guard.
+In a project the invariant also travels through `.iface`, aliases and
+re-exports; changing it rechecks consumers.
+
+**Guarantee:** the checker can reuse a refined value's declared invariant
+across a module boundary, not an arbitrary claim made by foreign code.
+
+[Reference](../../reference/schema/#proving-a-refinement).
+
+</TourLesson>

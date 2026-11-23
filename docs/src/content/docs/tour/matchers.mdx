@@ -1,0 +1,27 @@
+---
+title: Assertions and a failing diff
+description: Assertions and a failing diff
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="matchers">
+
+**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+
+`expect actual |> to.equal expected` compares values with `Eq` and shows
+them with `Show`. Boolean, ordering and containment matchers name the property
+being checked. `to.fail_with` runs an `Eff` and checks its typed failure.
+The old assertion-taking operation is `Test.check`, not `Test.expect`.
+
+The final test deliberately fails: a multiline equality failure shows
+removed expected lines and added actual lines. This run exits 1, with five
+passed cases and one assertion failure; CI checks that failure too.
+
+**Try:** change `actual` to `expected`, then rerun `flick test`. Do not delete
+the assertion to make a suite green.
+
+[Reference](../../reference/testing/#assertions).
+
+</TourLesson>

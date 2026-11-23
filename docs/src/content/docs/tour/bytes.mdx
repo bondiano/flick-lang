@@ -1,0 +1,20 @@
+---
+title: Packed bytes
+description: Packed bytes
+tableOfContents: false
+---
+
+import TourLesson from "../../../components/TourLesson.astro";
+
+<TourLesson locale="en" id="bytes">
+
+**Where it runs:** browser and locally.
+
+`Bytes` stores one byte per element and never changes. `encode_utf8` makes
+them from text; `get` and `slice` give `None` outside the sequence instead of
+failing; `decode_utf8` gives `None` for invalid UTF-8. `from_list` checks
+every integer and reports the first one outside `0..255` with its index.
+
+[Reference](../../reference/stdlib/).
+
+</TourLesson>

@@ -1,0 +1,7 @@
+module Main exposing (greet)
+
+trim : String -> String
+let trim name = String.trim name
+
+greet : String -> String
+let greet name = "Hello, " ++ trim name
