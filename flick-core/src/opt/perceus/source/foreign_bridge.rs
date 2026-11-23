@@ -172,7 +172,7 @@ fn collect_dict_globals(dict: &Dict, out: &mut Vec<Name>) {
 
 fn collect_expr_globals(expr: &Expr, out: &mut Vec<Name>) {
     match &expr.kind {
-        ExprKind::Global { module, name } => out.push(Name::new(module, name)),
+        ExprKind::Global { module, name, .. } => out.push(Name::new(module, name)),
         ExprKind::Method { dict, .. } => collect_dict_globals(dict, out),
         ExprKind::Dicts(inner, dicts) => {
             collect_expr_globals(inner, out);

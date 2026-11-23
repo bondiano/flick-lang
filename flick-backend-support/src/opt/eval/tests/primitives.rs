@@ -64,6 +64,8 @@ fn foreign_item(
             arity,
             adapter: canonical_adapter(arity, result_copies, result_shape),
             catch: None,
+            type_params: Vec::new(),
+            ty: None,
         }),
         span: sp(0, 1),
     }
@@ -78,6 +80,8 @@ fn ctor_item(module: &str, ty: &str, name: &str, arity: usize) -> Item {
             arity,
             rep: Rep::Tagged,
             dicts: 0,
+            fields: Vec::new(),
+            type_args: Vec::new(),
         }),
         span: sp(0, 1),
     }

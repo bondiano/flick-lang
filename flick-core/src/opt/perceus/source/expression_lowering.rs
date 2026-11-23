@@ -41,9 +41,10 @@ impl Lower<'_> {
                 pat,
                 source,
                 body,
+                ..
             } => self.each(stop.as_deref(), pat, source, body, env, block, span),
             ExprKind::Yield(value) => self.yield_expr(value, env, block, span),
-            ExprKind::Global { module, name } => {
+            ExprKind::Global { module, name, .. } => {
                 let name = Name::new(module, name);
                 self.global(&name, Some(span))?;
                 block.emit(Operation::Global(name), span)
@@ -74,12 +75,10 @@ impl Lower<'_> {
             }
             ExprKind::Match(value, arms) => self.matching(value, arms, env, block, span),
             ExprKind::Binary(BinOp::And, left, right) => {
-                let no = Expr::new(ExprKind::Lit(Lit::Bool(false)), span);
-                self.conditional(left, right, &no, env, block, span)
+                self.short_circuit(true, left, right, env, block, span)
             }
             ExprKind::Binary(BinOp::Or, left, right) => {
-                let yes = Expr::new(ExprKind::Lit(Lit::Bool(true)), span);
-                self.conditional(left, &yes, right, env, block, span)
+                self.short_circuit(false, left, right, env, block, span)
             }
             ExprKind::Binary(op, left, right) => {
                 let left = self.expr(left, env, block)?;
@@ -160,7 +159,7 @@ impl Lower<'_> {
                     span,
                 )
             }
-            ExprKind::Method { dict, name } => {
+            ExprKind::Method { dict, name, .. } => {
                 let object = self.dictionary(dict, env, block, span)?;
                 block.emit(
                     Operation::Method {
@@ -222,7 +221,11 @@ impl Lower<'_> {
         let mut env = env.clone();
         for statement in statements {
             match statement {
-                Stmt::Let(pattern, value) => {
+                Stmt::Let {
+                    pat: pattern,
+                    value,
+                    ..
+                } => {
                     let local = self.expr(value, &env, block)?;
                     self.pattern(pattern, local, &mut env, block, value.span)?;
                 }
@@ -234,36 +237,12 @@ impl Lower<'_> {
                     rec,
                     dicts,
                     value,
+                    ..
                 } => {
-                    let value = if dicts.is_empty() {
-                        value.clone()
-                    } else {
-                        Expr::new(
-                            ExprKind::Abstract(dicts.clone(), Box::new(value.clone())),
-                            value.span,
-                        )
-                    };
-                    let local = if *rec {
-                        match &value.kind {
-                            ExprKind::Lambda { params, body } => {
-                                self.lambda(params, body, &env, Some(name), block, value.span)?
-                            }
-                            ExprKind::Abstract(names, body) => self.lambda(
-                                &abstract_params(names),
-                                body,
-                                &env,
-                                Some(name),
-                                block,
-                                value.span,
-                            )?,
-                            _ => return Err(unsupported("recursive nonfunction", value.span)),
-                        }
-                    } else {
-                        self.expr(&value, &env, block)?
-                    };
+                    let local = self.fun_stmt(name, *rec, dicts, value, &env, block)?;
                     env.insert(name.clone(), local);
                 }
-                Stmt::Var(name, value) => {
+                Stmt::Var { name, value, .. } => {
                     let init = self.expr(value, &env, block)?;
                     let handle = block.emit(Operation::VarMake(init), value.span)?;
                     env.insert(name.clone(), handle);
@@ -282,6 +261,63 @@ impl Lower<'_> {
             }
         }
         self.expr(result, &env, block)
+    }
+
+    #[inline(never)]
+    fn short_circuit(
+        &mut self,
+        is_and: bool,
+        left: &Expr,
+        right: &Expr,
+        env: &Env,
+        block: &mut Code,
+        span: Span,
+    ) -> Result<Local, LowerError> {
+        if is_and {
+            let no = Expr::new(ExprKind::Lit(Lit::Bool(false)), span);
+            self.conditional(left, right, &no, env, block, span)
+        } else {
+            let yes = Expr::new(ExprKind::Lit(Lit::Bool(true)), span);
+            self.conditional(left, &yes, right, env, block, span)
+        }
+    }
+
+    #[inline(never)]
+    fn fun_stmt(
+        &mut self,
+        name: &str,
+        rec: bool,
+        dicts: &[String],
+        value: &Expr,
+        env: &Env,
+        block: &mut Code,
+    ) -> Result<Local, LowerError> {
+        let value = if dicts.is_empty() {
+            value.clone()
+        } else {
+            Expr::new(
+                ExprKind::Abstract(dicts.to_vec(), Box::new(value.clone())),
+                value.span,
+            )
+        };
+        if rec {
+            match &value.kind {
+                ExprKind::Lambda { params, body } => {
+                    self.lambda(params, body, env, Some(name), block, value.span)
+                }
+                ExprKind::Abstract(names, body) => self.lambda(
+                    &abstract_params(names),
+                    body,
+                    env,
+                    Some(name),
+                    block,
+                    value.span,
+                ),
+                _ => Err(unsupported("recursive nonfunction", value.span)),
+            }
+        } else {
+            self.expr(&value, env, block)
+        }
     }
 
     fn lambda(

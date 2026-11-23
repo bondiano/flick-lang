@@ -105,6 +105,7 @@ fn lambda(params: Vec<Pat>, body: Expr, span: Span) -> Expr {
             pat,
             stage: Stage::Pure,
             ty: None,
+            binder_types: Vec::new(),
         })
         .collect();
     Expr::new(

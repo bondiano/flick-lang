@@ -162,6 +162,7 @@ fn a_call_that_acquires_into_an_owner_keeps_its_shape() {
         e(ExprKind::Global {
             module: "App".to_owned(),
             name: "acquire".to_owned(),
+            type_args: Vec::new(),
         })
     };
     let x = e(ExprKind::Local("x".to_owned()));
@@ -170,6 +171,7 @@ fn a_call_that_acquires_into_an_owner_keeps_its_shape() {
             pat: Pat::Bind("x".to_owned()),
             stage: Stage::Runtime,
             ty: None,
+            binder_types: Vec::new(),
         }],
         body: Box::new(call(acquire(), call(acquire(), x))),
     });

@@ -71,7 +71,7 @@ impl<'a> Machine<'a, '_> {
                     dicts: Rc::new(resolved),
                 }))
             }
-            ExprKind::Global { module, name } => {
+            ExprKind::Global { module, name, .. } => {
                 if let Some((dict_params, body)) = self.defs.value(module, name)
                     && dict_params.len() == resolved.len()
                 {

@@ -129,6 +129,7 @@ let answer () =
                 ExprKind::Global {
                     module: "Host".into(),
                     name: "raw_stdout_line".into(),
+                    type_args: Vec::new(),
                 },
                 span,
             )),

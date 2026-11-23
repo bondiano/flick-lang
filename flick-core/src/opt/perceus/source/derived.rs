@@ -72,6 +72,7 @@ fn parameter(name: &str) -> Param {
         pat: Pat::Bind(name.into()),
         stage: Stage::Pure,
         ty: None,
+        binder_types: Vec::new(),
     }
 }
 
@@ -90,6 +91,8 @@ fn ordering(name: &str) -> Constructor {
         arity: 0,
         dicts: 0,
         rep: Rep::Tagged,
+        fields: Vec::new(),
+        type_args: Vec::new(),
     }
 }
 
@@ -148,6 +151,7 @@ impl Builder<'_> {
         let method = self.at(ExprKind::Method {
             dict: Dict::Field(evidence(index)),
             name: name.into(),
+            type_args: Vec::new(),
         });
         let call = self.apply(method, left);
         if let Some(right) = right {
@@ -170,7 +174,7 @@ impl Builder<'_> {
             .iter()
             .enumerate()
             .map(|(index, field)| {
-                Ok(Stmt::Let(
+                Ok(Stmt::let_bind(
                     Pat::Bind(evidence(index)),
                     dictionary(field, self.span)?,
                 ))
@@ -204,12 +208,14 @@ impl Builder<'_> {
                     variant.pattern(LEFT, true),
                     variant.pattern(RIGHT, true),
                 ]),
+                binder_types: Vec::new(),
                 guard: None,
                 body: self.with_fields(variant, result)?,
             });
         }
         arms.push(Arm {
             pat: Pat::Wild,
+            binder_types: Vec::new(),
             guard: None,
             body: self.at(ExprKind::Lit(Lit::Bool(false))),
         });
@@ -225,6 +231,7 @@ impl Builder<'_> {
                 .iter()
                 .map(|variant| Arm {
                     pat: variant.pattern(side, false),
+                    binder_types: Vec::new(),
                     guard: None,
                     body: self.int(variant.index),
                 })
@@ -241,11 +248,13 @@ impl Builder<'_> {
                     vec![
                         Arm {
                             pat: Pat::Con(ordering("EQ"), vec![]),
+                            binder_types: Vec::new(),
                             guard: None,
                             body: result,
                         },
                         Arm {
                             pat: Pat::Bind("$derived$order".into()),
+                            binder_types: Vec::new(),
                             guard: None,
                             body: self.local("$derived$order"),
                         },
@@ -257,6 +266,7 @@ impl Builder<'_> {
                     variant.pattern(LEFT, true),
                     variant.pattern(RIGHT, true),
                 ]),
+                binder_types: Vec::new(),
                 guard: None,
                 body: self.with_fields(variant, result)?,
             });
@@ -272,6 +282,7 @@ impl Builder<'_> {
         ));
         arms.push(Arm {
             pat: Pat::Wild,
+            binder_types: Vec::new(),
             guard: None,
             body: different,
         });
@@ -294,6 +305,7 @@ impl Builder<'_> {
             }
             arms.push(Arm {
                 pat: variant.pattern(LEFT, true),
+                binder_types: Vec::new(),
                 guard: None,
                 body: self.with_fields(variant, result)?,
             });
@@ -304,6 +316,7 @@ impl Builder<'_> {
         let function = self.at(ExprKind::Global {
             module: "String".into(),
             name: name.into(),
+            type_args: Vec::new(),
         });
         self.apply(self.apply(function, self.text(needle)), text)
     }
@@ -332,7 +345,7 @@ impl Builder<'_> {
             Box::new(parenthesized),
         ));
         self.at(ExprKind::Block(
-            vec![Stmt::Let(Pat::Bind(name.into()), shown)],
+            vec![Stmt::let_bind(Pat::Bind(name.into()), shown)],
             Box::new(result),
         ))
     }
@@ -350,6 +363,7 @@ impl Builder<'_> {
             }
             arms.push(Arm {
                 pat: variant.pattern(LEFT, true),
+                binder_types: Vec::new(),
                 guard: None,
                 body: self.with_fields(variant, result)?,
             });

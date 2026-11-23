@@ -335,6 +335,7 @@ pub(super) fn equality_expression(value: &Foreign, span: Span) -> Option<Expr> {
                 pat: Pat::Bind(name.into()),
                 stage: Stage::Pure,
                 ty: None,
+                binder_types: Vec::new(),
             })
             .collect()
     };

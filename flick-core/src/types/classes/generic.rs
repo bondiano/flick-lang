@@ -154,6 +154,8 @@ impl<'n> Checker<'_> {
             ty: name.to_owned(),
             name: c,
             dicts: 0,
+            fields: Vec::new(),
+            type_args: Vec::new(),
         };
         (rep, (constructor, labels))
     }
@@ -180,6 +182,8 @@ impl<'n> Checker<'_> {
                     rep: self.env.constructor_rep(module, ty, &name),
                     name,
                     dicts: 0,
+                    fields: Vec::new(),
+                    type_args: Vec::new(),
                 }
             })
             .collect()

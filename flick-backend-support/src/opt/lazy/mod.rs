@@ -19,7 +19,7 @@ use std::mem;
 use super::walk::{droppable, each_use};
 use crate::Known;
 use crate::ir::{Expr, ExprKind, Lit, Pat, Stmt};
-use flick_ir::Lang;
+use flick_ir::{IrType, Lang, TypeRef};
 
 mod hoist;
 mod purity;
@@ -28,7 +28,7 @@ pub use hoist::hoist;
 
 /// Whether `e` names the lang item `item`.
 pub(super) fn is(e: &Expr, item: Lang, lang: &Known<'_>) -> bool {
-    matches!(&e.kind, ExprKind::Global { module, name } if lang.is(item, module, name))
+    matches!(&e.kind, ExprKind::Global { module, name, .. } if lang.is(item, module, name))
 }
 
 /// The task of `lazy_make task`.
@@ -80,9 +80,24 @@ pub fn cells(e: &mut Expr, lang: &Known<'_>) -> bool {
         && let Some((module, name)) = lang.get(Lang::LazyDone)
     {
         let body = mem::replace(&mut **body, Expr::new(ExprKind::Lit(Lit::Unit), e.span));
+        let type_args = match &mut func.kind {
+            ExprKind::Global { type_args, .. } => mem::take(type_args),
+            _ => Vec::new(),
+        };
+        func.ty = match (func.ty.as_deref(), body.ty.as_ref()) {
+            (Some(IrType::Fun { stage, result, .. }), Some(param)) => {
+                Some(TypeRef::new(IrType::Fun {
+                    param: param.clone(),
+                    stage: *stage,
+                    result: result.clone(),
+                }))
+            }
+            _ => None,
+        };
         func.kind = ExprKind::Global {
             module: module.to_owned(),
             name: name.to_owned(),
+            type_args,
         };
         **arg = body;
         return true;
@@ -99,7 +114,8 @@ pub fn unnamed(stmts: &mut Vec<Stmt>, result: &Expr, lang: &Known<'_>) -> bool {
         _ => unread(v),
     };
     let any = |s: &Stmt| {
-        matches!(s, Stmt::Let(_, v) if unread(v)) || matches!(s, Stmt::Expr(v) if dropped(v))
+        matches!(s, Stmt::Let { value: v, .. } if unread(v))
+            || matches!(s, Stmt::Expr(v) if dropped(v))
     };
     if !stmts.iter().any(any) {
         return false;
@@ -111,7 +127,9 @@ pub fn unnamed(stmts: &mut Vec<Stmt>, result: &Expr, lang: &Known<'_>) -> bool {
     let mut keep = vec![true; stmts.len()];
     for (i, stmt) in stmts.iter().enumerate().rev() {
         let drop = match stmt {
-            Stmt::Let(p, v) if unread(v) && p.irrefutable() => {
+            Stmt::Let {
+                pat: p, value: v, ..
+            } if unread(v) && p.irrefutable() => {
                 let mut bound = Vec::new();
                 p.binders(&mut bound);
                 bound.iter().all(|n| !read.contains(n))
@@ -124,8 +142,8 @@ pub fn unnamed(stmts: &mut Vec<Stmt>, result: &Expr, lang: &Known<'_>) -> bool {
             continue;
         }
         match stmt {
-            Stmt::Let(_, v)
-            | Stmt::Var(_, v)
+            Stmt::Let { value: v, .. }
+            | Stmt::Var { value: v, .. }
             | Stmt::Assign(_, v)
             | Stmt::Expr(v)
             | Stmt::Fun { value: v, .. } => each_use(v, &mut |l| {
@@ -169,7 +187,12 @@ pub fn forced_again(stmts: &mut [Stmt], result: &mut Expr, lang: &Known<'_>) -> 
     let mut changed = false;
     for i in 0..stmts.len() {
         let (head, rest) = stmts.split_at_mut(i + 1);
-        let Stmt::Let(Pat::Bind(y), v) = &head[i] else {
+        let Stmt::Let {
+            pat: Pat::Bind(y),
+            value: v,
+            ..
+        } = &head[i]
+        else {
             continue;
         };
         let Some(l) = forced(v, lang) else {
@@ -177,8 +200,8 @@ pub fn forced_again(stmts: &mut [Stmt], result: &mut Expr, lang: &Known<'_>) -> 
         };
         for stmt in rest.iter_mut() {
             match stmt {
-                Stmt::Let(_, v)
-                | Stmt::Var(_, v)
+                Stmt::Let { value: v, .. }
+                | Stmt::Var { value: v, .. }
                 | Stmt::Assign(_, v)
                 | Stmt::Expr(v)
                 | Stmt::Fun { value: v, .. } => changed |= reuse(v, l, y, lang),

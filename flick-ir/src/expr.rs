@@ -2,13 +2,12 @@
 //! stage, dictionary and lift explicit, patterns and literals.
 
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Arith, Constructor, Dict, Foreign, Handler, InstanceInfo, Lift, Namespace, Num, Span, Stage,
-    TypeName,
+    Arith, Constraint, Constructor, Dict, Foreign, Handler, InstanceInfo, Lift, Namespace, Num,
+    Span, Stage, TypeDecl, TypeRef,
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -17,6 +16,9 @@ pub struct Module {
     /// Top-level definitions in source order; code generation orders them
     /// by what each one uses.
     pub items: Vec<Item>,
+    /// Data, error and nominal type declarations of this module.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub types: Vec<TypeDecl>,
     /// The top-level values debugging tools know by `Module.name`.
     pub labels: BTreeMap<String, Label>,
     #[serde(default, skip_serializing_if = "Initialization::is_empty")]
@@ -119,11 +121,26 @@ pub enum ItemKind {
     /// dictionaries first.
     Value {
         name: String,
+        /// Quantified layout-relevant type parameters of this definition.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        type_params: Vec<String>,
         dicts: Vec<String>,
+        /// Class constraints matching `dicts` in order.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        dict_constraints: Vec<Constraint>,
+        /// The layout-relevant type of the definition in terms of `type_params`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ty: Option<TypeRef>,
         body: Expr,
     },
     /// `let (a, b) = …`.
-    Destructure { pattern: Pat, body: Expr },
+    Destructure {
+        pattern: Pat,
+        /// Types of the pattern's bound variables, in `Pat::binders` order.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        binder_types: Vec<(String, TypeRef)>,
+        body: Expr,
+    },
     /// A function of the host, called by its convention.
     Foreign(Foreign),
     /// A constructor of a type or error declared here.
@@ -142,9 +159,8 @@ pub enum ItemKind {
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
-    /// The checker's type of the expression when that is a type constructor
-    /// on its own (`Float`, `String`); none otherwise.
-    pub ty: Option<Arc<TypeName>>,
+    /// The checker's layout-relevant type of the expression, when available.
+    pub ty: Option<TypeRef>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -160,11 +176,17 @@ pub enum ExprKind {
     Global {
         module: String,
         name: String,
+        /// Type arguments instantiating the global's quantified type parameters.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        type_args: Vec<TypeRef>,
     },
     /// The method `name` of a class dictionary.
     Method {
         dict: Dict,
         name: String,
+        /// Type arguments instantiating the method's quantified type parameters.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        type_args: Vec<TypeRef>,
     },
     /// A constructor as a function of its fields (a value without fields).
     Con(Constructor),
@@ -197,6 +219,9 @@ pub enum ExprKind {
         #[serde(default)]
         stop: Option<Box<Expr>>,
         pat: Pat,
+        /// Types of the pattern's bound variables, in `Pat::binders` order.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        binder_types: Vec<(String, TypeRef)>,
         source: Box<Expr>,
         body: Box<Expr>,
     },
@@ -288,34 +313,93 @@ pub struct Param {
     pub pat: Pat,
     /// The stage of the arrow of this parameter.
     pub stage: Stage,
-    /// The parameter's type when it is a type constructor on its own, as
-    /// [`Expr::ty`].
-    pub ty: Option<Arc<TypeName>>,
+    /// The parameter's layout-relevant type, when available.
+    pub ty: Option<TypeRef>,
+    /// Types of pattern variables bound by `pat`, in `Pat::binders` order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub binder_types: Vec<(String, TypeRef)>,
+}
+
+impl Param {
+    /// Type of a variable `name` bound by this parameter's pattern.
+    pub fn binder_type(&self, name: &str) -> Option<&TypeRef> {
+        self.binder_types
+            .iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, ty)| ty)
+            .or_else(|| {
+                matches!(&self.pat, Pat::Bind(n) if n == name)
+                    .then_some(self.ty.as_ref())
+                    .flatten()
+            })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Stmt {
-    Let(Pat, Expr),
+    Let {
+        pat: Pat,
+        /// Types of pattern variables bound by `pat`, in `Pat::binders` order.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        binder_types: Vec<(String, TypeRef)>,
+        value: Expr,
+    },
     /// `let mut name = value`: a variable of the enclosing function, read
-    /// as a `Local` and changed by an `Assign` after it. No function inside
+    /// as a `Var` and changed by an `Assign` after it. No function inside
     /// the function uses it, but the body of `Scope.run` or a layer's run,
     /// which runs once, in place.
-    Var(String, Expr),
+    Var {
+        name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ty: Option<TypeRef>,
+        value: Expr,
+    },
     /// `name = value` of a `Var` in scope.
     Assign(String, Expr),
     /// A local function; `rec` when it may call itself.
     Fun {
         name: String,
         rec: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        type_params: Vec<String>,
         dicts: Vec<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        dict_constraints: Vec<Constraint>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        ty: Option<TypeRef>,
         value: Expr,
     },
     Expr(Expr),
 }
 
+impl Stmt {
+    pub fn let_bind(pat: Pat, value: Expr) -> Stmt {
+        Stmt::Let {
+            pat,
+            binder_types: Vec::new(),
+            value,
+        }
+    }
+
+    pub fn let_typed(pat: Pat, binder_types: Vec<(String, TypeRef)>, value: Expr) -> Stmt {
+        Stmt::Let {
+            pat,
+            binder_types,
+            value,
+        }
+    }
+
+    pub fn var(name: String, ty: Option<TypeRef>, value: Expr) -> Stmt {
+        Stmt::Var { name, ty, value }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Arm {
     pub pat: Pat,
+    /// Types of pattern variables bound by `pat`, in `Pat::binders` order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub binder_types: Vec<(String, TypeRef)>,
     pub guard: Option<Expr>,
     pub body: Expr,
 }
@@ -401,6 +485,10 @@ impl Expr {
             span,
             ty: None,
         }
+    }
+
+    pub fn with_ty(kind: ExprKind, span: Span, ty: Option<TypeRef>) -> Self {
+        Expr { kind, span, ty }
     }
 }
 

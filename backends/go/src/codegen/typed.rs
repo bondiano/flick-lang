@@ -17,9 +17,9 @@ impl<'a> Gen<'a> {
     /// arguments is a call of that function.
     pub(super) fn typed_head(&self, head: &Expr) -> Option<(&'a str, Types, usize)> {
         let (module, name, dicts) = match &head.kind {
-            ExprKind::Global { module, name } => (module, name, 0),
+            ExprKind::Global { module, name, .. } => (module, name, 0),
             ExprKind::Dicts(inner, dicts) => match &inner.kind {
-                ExprKind::Global { module, name } => (module, name, dicts.len()),
+                ExprKind::Global { module, name, .. } => (module, name, dicts.len()),
                 _ => return None,
             },
             _ => return None,

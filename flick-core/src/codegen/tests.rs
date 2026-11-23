@@ -279,6 +279,8 @@ fn constructor_ids_name_package_module_and_type() {
         arity: 1,
         rep: Rep::Tagged,
         dicts: 0,
+        fields: Vec::new(),
+        type_args: Vec::new(),
     };
     let tag = super::tag(&c("App.Users"), Some("@acme/users"));
     assert!(

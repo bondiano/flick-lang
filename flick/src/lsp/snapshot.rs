@@ -175,6 +175,10 @@ impl Snapshot {
             })
             .map(|m| m.file)
     }
+
+    pub(super) fn drop_compilation(&mut self) {
+        self.analysis.compilation = Compilation::default();
+    }
 }
 
 /// What each context kept of its earlier analyses.

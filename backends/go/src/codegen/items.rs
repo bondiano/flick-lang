@@ -93,22 +93,22 @@ impl<'a> Gen<'a> {
         // whether the declaration made now holds a `//line` directive
         let lines = self.lines;
         match &item.kind {
-            ItemKind::Value { name, dicts, body } => {
-                match super::shape(self.input, self.module, &item.kind) {
-                    Shape::Var => {
-                        let var = a.alloc_str(&names::var(self.module, name));
-                        decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
-                        let (mut stmts, v) = self.block(|g| g.expr(body));
-                        stmts.push(statement(a, docvec![a, var, " = ", v]));
-                        init.push(statement(a, block(a, stmts)));
-                    }
-                    Shape::Func { .. } => {
-                        let decl = self.function(name, dicts, body);
-                        decls.push((decl, self.lines > lines));
-                    }
+            ItemKind::Value {
+                name, dicts, body, ..
+            } => match super::shape(self.input, self.module, &item.kind) {
+                Shape::Var => {
+                    let var = a.alloc_str(&names::var(self.module, name));
+                    decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
+                    let (mut stmts, v) = self.block(|g| g.expr(body));
+                    stmts.push(statement(a, docvec![a, var, " = ", v]));
+                    init.push(statement(a, block(a, stmts)));
                 }
-            }
-            ItemKind::Destructure { pattern, body } => {
+                Shape::Func { .. } => {
+                    let decl = self.function(name, dicts, body);
+                    decls.push((decl, self.lines > lines));
+                }
+            },
+            ItemKind::Destructure { pattern, body, .. } => {
                 let mut binders = Vec::new();
                 pattern.binders(&mut binders);
                 let (mut stmts, ()) = self.block(|g| {

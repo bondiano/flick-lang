@@ -225,6 +225,9 @@ impl Checker<'_> {
             super::StaticContext {
                 dictionaries: &dictionaries,
                 witnesses: self.static_witnesses,
+                #[cfg(not(target_arch = "wasm32"))]
+                ir_lookup: None,
+                skip_ir_types: true,
             },
         );
         self.diagnostics.extend(checked);

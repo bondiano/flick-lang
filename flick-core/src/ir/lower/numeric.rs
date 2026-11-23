@@ -30,9 +30,11 @@ impl Lower<'_> {
         }
         if self.typing.generic_ordered.contains(&key) {
             let function = lang::item(ord_function(op)?);
+            let type_args = lhs.ty.clone().into_iter().collect();
             let global = ExprKind::Global {
                 module: function.module.clone(),
                 name: function.name.clone(),
+                type_args,
             };
             let dicts = self.dictionaries(key);
             return Some(apply(
@@ -70,13 +72,14 @@ impl Lower<'_> {
 /// `func` applied to `args` one at a time, at once.
 pub(super) fn apply(func: Expr, args: impl IntoIterator<Item = Box<Expr>>, span: Span) -> Expr {
     args.into_iter().fold(func, |func, arg| {
+        let ty = super::types::app_result_type(&func);
         let app = ExprKind::App {
             func: Box::new(func),
             arg,
             stage: Stage::Pure,
             arg_first: false,
         };
-        Expr::new(app, span)
+        Expr::with_ty(app, span, ty)
     })
 }
 

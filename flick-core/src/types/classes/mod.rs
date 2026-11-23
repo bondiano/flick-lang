@@ -13,6 +13,7 @@ mod enum_instance;
 mod generic;
 mod matching;
 mod prims;
+mod record;
 mod report;
 mod solve;
 mod solve_support;

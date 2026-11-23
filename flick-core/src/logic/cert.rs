@@ -78,7 +78,12 @@ pub fn cert(e: &Expr, lemmas: &[Lemma]) -> Result<Cert, Failure> {
         ExprKind::Block(stmts, rest) => {
             let mut out = cert(rest, lemmas)?;
             for stmt in stmts.iter().rev() {
-                let Stmt::Let(IrPat::Bind(h), p) = stmt else {
+                let Stmt::Let {
+                    pat: IrPat::Bind(h),
+                    value: p,
+                    ..
+                } = stmt
+                else {
                     return invalid(span, "a `let` in a proof names a proof: `let h = …`");
                 };
                 out = Cert {
@@ -102,7 +107,7 @@ fn rule(e: &Expr, lemmas: &[Lemma]) -> Result<Rule, Failure> {
         head = func;
     }
     args.reverse();
-    let ExprKind::Global { module, name } = &head.kind else {
+    let ExprKind::Global { module, name, .. } = &head.kind else {
         return invalid(
             e.span,
             "this is no proof: a proof is `refl`, a rule applied, a `match` on a variable or a premise",

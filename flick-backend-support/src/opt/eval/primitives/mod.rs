@@ -410,5 +410,25 @@ fn resolve_option_constructors(
         }
         *slot = Some(Rc::new(c.clone()));
     }
-    Some((some?, none?))
+    #[cfg_attr(not(feature = "typed-ir"), allow(unused_mut))]
+    let mut some = some?;
+    #[cfg_attr(not(feature = "typed-ir"), allow(unused_mut))]
+    let mut none = none?;
+    #[cfg(feature = "typed-ir")]
+    if !some.fields.is_empty()
+        && let Some((int_mod, int_name)) = lang.get(Lang::Int)
+    {
+        let int_ty = flick_ir::TypeRef::new(flick_ir::IrType::Named {
+            module: int_mod.to_owned(),
+            name: int_name.to_owned(),
+            args: Vec::new(),
+        });
+        let s = Rc::make_mut(&mut some);
+        s.fields = vec![int_ty.clone()];
+        s.type_args = vec![int_ty.clone()];
+        let n = Rc::make_mut(&mut none);
+        n.fields.clear();
+        n.type_args = vec![int_ty];
+    }
+    Some((some, none))
 }

@@ -10,7 +10,8 @@
 //! The pass is pure over one [`Module`]: it reads and rewrites the IR only,
 //! and leaves syntax, type checking and code generation untouched.
 
-use flick_ir::{Expr, ExprKind, ItemKind, Module, Pat, Span, Stmt};
+use super::types::filter_binder_types;
+use flick_ir::{Expr, ExprKind, ItemKind, Module, Pat, Span, Stmt, TypeRef};
 use std::mem;
 
 /// Folds every foldable tuple match of `module`, giving how many it folded.
@@ -51,7 +52,7 @@ pub fn fold(expr: &mut Expr) -> usize {
 /// Rewrites `expr` when it is a match on a tuple the code builds and its
 /// first arm cannot fail. Returns whether it rewrote it.
 fn fold_here(expr: &mut Expr) -> bool {
-    let Some((pattern, body)) = foldable(expr) else {
+    let Some((pattern, binder_types, body)) = foldable(expr) else {
         return false;
     };
     let (span, ty) = (expr.span, expr.ty.clone());
@@ -59,11 +60,19 @@ fn fold_here(expr: &mut Expr) -> bool {
     else {
         unreachable!("a foldable match was found above");
     };
+    let scrutinee_ty = scrutinee.ty;
     let ExprKind::Tuple(items) = scrutinee.kind else {
         unreachable!("a tuple scrutinee was found above");
     };
     let mut stmts = Vec::new();
-    bind_tuple(&pattern, items, span, &mut stmts);
+    bind_tuple(
+        &pattern,
+        &binder_types,
+        items,
+        span,
+        scrutinee_ty,
+        &mut stmts,
+    );
     *expr = Expr {
         kind: ExprKind::Block(stmts, Box::new(body)),
         span,
@@ -72,9 +81,12 @@ fn fold_here(expr: &mut Expr) -> bool {
     true
 }
 
-/// The pattern and body a match on a tuple expression folds to: the first
-/// arm, which no value of the tuple can escape and which has no guard.
-fn foldable(expr: &Expr) -> Option<(Pat, Expr)> {
+type FoldedArm = (Pat, Vec<(String, TypeRef)>, Expr);
+
+/// The pattern, binder types and body a match on a tuple expression folds
+/// to: the first arm, which no value of the tuple can escape and which has
+/// no guard.
+fn foldable(expr: &Expr) -> Option<FoldedArm> {
     let ExprKind::Match(scrutinee, arms) = &expr.kind else {
         return None;
     };
@@ -85,7 +97,7 @@ fn foldable(expr: &Expr) -> Option<(Pat, Expr)> {
     if arm.guard.is_some() || !irrefutable(&arm.pat) {
         return None;
     }
-    Some((arm.pat.clone(), arm.body.clone()))
+    Some((arm.pat.clone(), arm.binder_types.clone(), arm.body.clone()))
 }
 
 /// Whether `pattern` matches every value of its type. Wildcards and names
@@ -102,12 +114,19 @@ fn irrefutable(pattern: &Pat) -> bool {
 }
 
 /// Binds the tuple `items` to `pattern`.
-fn bind_tuple(pattern: &Pat, items: Vec<Expr>, span: Span, out: &mut Vec<Stmt>) {
+fn bind_tuple(
+    pattern: &Pat,
+    binder_types: &[(String, TypeRef)],
+    items: Vec<Expr>,
+    span: Span,
+    ty: Option<TypeRef>,
+    out: &mut Vec<Stmt>,
+) {
     if let Pat::Tuple(patterns) = pattern
         && patterns.len() == items.len()
     {
         for (pattern, item) in patterns.iter().zip(items) {
-            bind_value(pattern, item, out);
+            bind_value(pattern, binder_types, item, out);
         }
         return;
     }
@@ -115,12 +134,13 @@ fn bind_tuple(pattern: &Pat, items: Vec<Expr>, span: Span, out: &mut Vec<Stmt>) 
     // see every element evaluated, in order
     match pattern {
         Pat::Wild => out.extend(items.into_iter().map(Stmt::Expr)),
-        _ => out.push(Stmt::Let(
+        _ => out.push(Stmt::let_typed(
             pattern.clone(),
+            filter_binder_types(pattern, binder_types),
             Expr {
                 kind: ExprKind::Tuple(items),
                 span,
-                ty: None,
+                ty,
             },
         )),
     }
@@ -128,7 +148,7 @@ fn bind_tuple(pattern: &Pat, items: Vec<Expr>, span: Span, out: &mut Vec<Stmt>) 
 
 /// Binds `item` to `pattern`, flattening a nested tuple whose pattern is a
 /// tuple too, so that no destructuring of a built tuple is left behind.
-fn bind_value(pattern: &Pat, item: Expr, out: &mut Vec<Stmt>) {
+fn bind_value(pattern: &Pat, binder_types: &[(String, TypeRef)], item: Expr, out: &mut Vec<Stmt>) {
     match item {
         Expr {
             kind: ExprKind::Tuple(items),
@@ -137,11 +157,12 @@ fn bind_value(pattern: &Pat, item: Expr, out: &mut Vec<Stmt>) {
         } => match pattern {
             Pat::Tuple(patterns) if patterns.len() == items.len() => {
                 for (pattern, item) in patterns.iter().zip(items) {
-                    bind_value(pattern, item, out);
+                    bind_value(pattern, binder_types, item, out);
                 }
             }
-            pattern => out.push(Stmt::Let(
+            pattern => out.push(Stmt::let_typed(
                 pattern.clone(),
+                filter_binder_types(pattern, binder_types),
                 Expr {
                     kind: ExprKind::Tuple(items),
                     span,
@@ -149,7 +170,11 @@ fn bind_value(pattern: &Pat, item: Expr, out: &mut Vec<Stmt>) {
                 },
             )),
         },
-        item => out.push(Stmt::Let(pattern.clone(), item)),
+        item => out.push(Stmt::let_typed(
+            pattern.clone(),
+            filter_binder_types(pattern, binder_types),
+            item,
+        )),
     }
 }
 
@@ -183,6 +208,7 @@ mod tests {
     fn arm(pattern: Pat, body: Expr) -> Arm {
         Arm {
             pat: pattern,
+            binder_types: Vec::new(),
             guard: None,
             body,
         }
@@ -198,11 +224,15 @@ mod tests {
     fn module_with(bodies: Vec<Expr>) -> Module {
         Module {
             name: "App".to_owned(),
+            types: Vec::new(),
             items: (bodies.into_iter().enumerate())
                 .map(|(i, body)| Item {
                     kind: ItemKind::Value {
                         name: format!("v{i}"),
+                        type_params: Vec::new(),
                         dicts: Vec::new(),
+                        dict_constraints: Vec::new(),
+                        ty: None,
                         body,
                     },
                     span: Span::new(FileId::default(), 0, 0),
@@ -225,7 +255,7 @@ mod tests {
 
     fn let_pattern(stmt: &Stmt) -> (&Pat, &Expr) {
         match stmt {
-            Stmt::Let(pattern, value) => (pattern, value),
+            Stmt::Let { pat, value, .. } => (pat, value),
             other => panic!("expected a let, found {other:?}"),
         }
     }

@@ -98,6 +98,7 @@ impl<'d> Gen<'_, 'd> {
                 source,
                 body,
                 stop,
+                ..
             } => {
                 let s = self.expr(source);
                 let s = if stop.is_some() { self.spill(s) } else { s };

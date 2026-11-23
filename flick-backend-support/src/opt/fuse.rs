@@ -22,8 +22,7 @@ use super::inline::{exits, simple};
 use super::walk::droppable;
 use crate::Known;
 use crate::ir::{Expr, ExprKind, Lit, Pat, Stage, Stmt};
-use flick_ir::Lang;
-use flick_ir::Span;
+use flick_ir::{IrType, Lang, Span, TypeRef};
 
 /// Fuses combinators of `e` and below into the `for`s they take; `fresh`
 /// numbers the names it binds.
@@ -37,8 +36,8 @@ pub fn fuse(e: &mut Expr, fresh: &mut usize, lang: &Known<'_>) -> bool {
 /// The function a combinator applies: a lambda of one simple parameter is
 /// applied in place, any other function is bound once before the loop.
 enum Function {
-    Lambda(Pat, Box<Expr>),
-    Bound(String),
+    Lambda(Pat, Option<TypeRef>, Box<Expr>),
+    Bound(String, Option<TypeRef>, Option<TypeRef>),
 }
 
 impl Function {
@@ -51,32 +50,67 @@ impl Function {
             // its `o?` returns from the lambda, not from the loop's function
             && !exits(body)
         {
-            return Function::Lambda(param.pat.clone(), body.clone());
+            let p_ty = match &param.pat {
+                Pat::Bind(n) => param.binder_type(n).cloned(),
+                _ => param.ty.clone(),
+            };
+            return Function::Lambda(param.pat.clone(), p_ty, body.clone());
         }
         let name = fresh_name(fresh);
-        hoisted.push(Stmt::Let(Pat::Bind(name.clone()), f));
-        Function::Bound(name)
+        let fn_ty = f.ty.clone();
+        let res_ty = match fn_ty.as_deref() {
+            Some(IrType::Fun { result, .. }) => Some(result.clone()),
+            _ => None,
+        };
+        let bt = fn_ty
+            .clone()
+            .map(|t| vec![(name.clone(), t)])
+            .unwrap_or_default();
+        hoisted.push(Stmt::let_typed(Pat::Bind(name.clone()), bt, f));
+        Function::Bound(name, fn_ty, res_ty)
     }
 
     /// The function applied to `arg`.
     fn apply(&self, arg: Expr) -> Expr {
         let span = arg.span;
         match self {
-            Function::Lambda(Pat::Bind(name), body) => Expr::new(
-                ExprKind::Block(vec![Stmt::Let(Pat::Bind(name.clone()), arg)], body.clone()),
-                span,
-            ),
-            Function::Lambda(_, body) => {
-                Expr::new(ExprKind::Block(vec![Stmt::Expr(arg)], body.clone()), span)
+            Function::Lambda(Pat::Bind(name), param_ty, body) => {
+                let bt = param_ty
+                    .clone()
+                    .or_else(|| arg.ty.clone())
+                    .map(|t| vec![(name.clone(), t)])
+                    .unwrap_or_default();
+                let res_ty = body.ty.clone();
+                Expr::with_ty(
+                    ExprKind::Block(
+                        vec![Stmt::let_typed(Pat::Bind(name.clone()), bt, arg)],
+                        body.clone(),
+                    ),
+                    span,
+                    res_ty,
+                )
             }
-            Function::Bound(name) => Expr::new(
+            Function::Lambda(_, _, body) => {
+                let res_ty = body.ty.clone();
+                Expr::with_ty(
+                    ExprKind::Block(vec![Stmt::Expr(arg)], body.clone()),
+                    span,
+                    res_ty,
+                )
+            }
+            Function::Bound(name, fn_ty, res_ty) => Expr::with_ty(
                 ExprKind::App {
-                    func: Box::new(Expr::new(ExprKind::Local(name.clone()), span)),
+                    func: Box::new(Expr::with_ty(
+                        ExprKind::Local(name.clone()),
+                        span,
+                        fn_ty.clone(),
+                    )),
                     arg: Box::new(arg),
                     stage: Stage::Pure,
                     arg_first: false,
                 },
                 span,
+                res_ty.clone(),
             ),
         }
     }
@@ -106,7 +140,7 @@ fn call(e: &mut Expr, arity: usize) -> Option<(&str, &str, Vec<&mut Expr>)> {
     }
     args.reverse();
     match &head.kind {
-        ExprKind::Global { module, name } => Some((module.as_str(), name.as_str(), args)),
+        ExprKind::Global { module, name, .. } => Some((module.as_str(), name.as_str(), args)),
         _ => None,
     }
 }
@@ -131,8 +165,10 @@ const COMBINATORS: [Lang; 6] = [
 ];
 
 /// A combinator applied to a `for`, rewritten into it.
+#[allow(clippy::too_many_lines)]
 fn combinator(e: &mut Expr, fresh: &mut usize, lang: &Known<'_>) -> bool {
     let span = e.span;
+    let out_ty = e.ty.clone();
     // `Seq.to_list (for …)`
     if let Some((module, name, mut args)) = call(e, 1)
         && lang.is(Lang::SeqToList, module, name)
@@ -142,6 +178,7 @@ fn combinator(e: &mut Expr, fresh: &mut usize, lang: &Known<'_>) -> bool {
         if let ExprKind::Generate { strict, .. } = &mut generate.kind {
             *strict = true;
         }
+        generate.ty = out_ty;
         *e = generate;
         return true;
     }
@@ -166,6 +203,7 @@ fn combinator(e: &mut Expr, fresh: &mut usize, lang: &Known<'_>) -> bool {
     };
     if step == Lang::SeqTake {
         *limit = Some(Box::new(f));
+        generate.ty = out_ty;
         *e = generate;
         return true;
     }
@@ -174,11 +212,12 @@ fn combinator(e: &mut Expr, fresh: &mut usize, lang: &Known<'_>) -> bool {
     let function = Function::of(f, yields(body) == 1, fresh, &mut hoisted);
     let element = |value: Expr, fresh: &mut usize| -> Expr {
         let at = value.span;
+        let elem_ty = value.ty.clone();
         match step {
             Lang::SeqMap | Lang::ListMap => yield_of(function.apply(value)),
             Lang::SeqFilter | Lang::ListFilter => {
                 let v = fresh_name(fresh);
-                let local = || Expr::new(ExprKind::Local(v.clone()), at);
+                let local = || Expr::with_ty(ExprKind::Local(v.clone()), at, elem_ty.clone());
                 let test = function.apply(local());
                 let keep = Expr::new(
                     ExprKind::If(
@@ -188,19 +227,36 @@ fn combinator(e: &mut Expr, fresh: &mut usize, lang: &Known<'_>) -> bool {
                     ),
                     at,
                 );
+                let bt = elem_ty
+                    .clone()
+                    .map(|t| vec![(v.clone(), t)])
+                    .unwrap_or_default();
                 Expr::new(
-                    ExprKind::Block(vec![Stmt::Let(Pat::Bind(v.clone()), value)], Box::new(keep)),
+                    ExprKind::Block(
+                        vec![Stmt::let_typed(Pat::Bind(v.clone()), bt, value)],
+                        Box::new(keep),
+                    ),
                     at,
                 )
             }
             _ => {
                 let v = fresh_name(fresh);
+                let source = function.apply(value);
+                let inner_elem = match source.ty.as_deref() {
+                    Some(IrType::Named { args, .. }) if args.len() == 1 => Some(args[0].clone()),
+                    _ => None,
+                };
+                let binder_types = inner_elem
+                    .clone()
+                    .map(|t| vec![(v.clone(), t)])
+                    .unwrap_or_default();
                 Expr::new(
                     ExprKind::Each {
                         stop: None,
                         pat: Pat::Bind(v.clone()),
-                        source: Box::new(function.apply(value)),
-                        body: Box::new(yield_of(Expr::new(ExprKind::Local(v), at))),
+                        binder_types,
+                        source: Box::new(source),
+                        body: Box::new(yield_of(Expr::with_ty(ExprKind::Local(v), at, inner_elem))),
                     },
                     at,
                 )
@@ -208,10 +264,11 @@ fn combinator(e: &mut Expr, fresh: &mut usize, lang: &Known<'_>) -> bool {
         }
     };
     map_yields(body, &mut |value| element(value, fresh));
+    generate.ty.clone_from(&out_ty);
     *e = if hoisted.is_empty() {
         generate
     } else {
-        Expr::new(ExprKind::Block(hoisted, Box::new(generate)), span)
+        Expr::with_ty(ExprKind::Block(hoisted, Box::new(generate)), span, out_ty)
     };
     true
 }
@@ -219,8 +276,13 @@ fn combinator(e: &mut Expr, fresh: &mut usize, lang: &Known<'_>) -> bool {
 /// `for { x <- (for { … } yield e); … }`: the clauses of the inner `for`
 /// around the rest, `x` bound to `e`.
 fn nested(e: &mut Expr) -> bool {
+    let out_ty = e.ty.clone();
     let ExprKind::Each {
-        pat, source, body, ..
+        pat,
+        binder_types,
+        source,
+        body,
+        ..
     } = &mut e.kind
     else {
         return false;
@@ -244,18 +306,26 @@ fn nested(e: &mut Expr) -> bool {
     if yields(inner) != 1 {
         return false;
     }
-    let (pat, rest) = (pat.clone(), mem::replace(&mut **body, unit(e.span)));
+    let (pat, binder_types, rest) = (
+        pat.clone(),
+        binder_types.clone(),
+        mem::replace(&mut **body, unit(e.span)),
+    );
     let mut inner = mem::replace(&mut **inner, unit(e.span));
     let mut rest = Some(rest);
     map_yields(&mut inner, &mut |value| {
         let at = value.span;
         let rest = rest.take().expect("one yield");
+        let rest_ty = rest.ty.clone();
         let stmt = match &pat {
-            Pat::Bind(_) => Stmt::Let(pat.clone(), value),
+            Pat::Bind(_) => Stmt::let_typed(pat.clone(), binder_types.clone(), value),
             _ => Stmt::Expr(value),
         };
-        Expr::new(ExprKind::Block(vec![stmt], Box::new(rest)), at)
+        Expr::with_ty(ExprKind::Block(vec![stmt], Box::new(rest)), at, rest_ty)
     });
+    if inner.ty.is_none() {
+        inner.ty = out_ty;
+    }
     *e = inner;
     true
 }
@@ -280,9 +350,10 @@ fn total(body: &Expr) -> bool {
         ExprKind::If(c, t, f) => droppable(c) && total(t) && total(f),
         ExprKind::Block(stmts, tail) => {
             stmts.iter().all(|s| match s {
-                Stmt::Let(_, v) | Stmt::Var(_, v) | Stmt::Assign(_, v) | Stmt::Expr(v) => {
-                    droppable(v)
-                }
+                Stmt::Let { value: v, .. }
+                | Stmt::Var { value: v, .. }
+                | Stmt::Assign(_, v)
+                | Stmt::Expr(v) => droppable(v),
                 Stmt::Fun { .. } => false,
             }) && total(tail)
         }

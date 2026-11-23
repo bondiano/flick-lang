@@ -125,7 +125,7 @@ pub(super) type Body<'b> = &'b dyn Fn(&mut Tr<'_>, &ir::Expr) -> Term;
 fn binding(name: &Name, value: &ir::Expr, body: ir::Expr) -> ir::Expr {
     ir::Expr::new(
         ExprKind::Block(
-            vec![ir::Stmt::Let(
+            vec![ir::Stmt::let_bind(
                 ir::Pat::Bind(name.to_string()),
                 value.clone(),
             )],
@@ -141,6 +141,7 @@ fn lambda(pat: ir::Pat, body: ir::Expr, span: Span) -> ir::Expr {
                 pat,
                 stage: ir::Stage::Runtime,
                 ty: None,
+                binder_types: Vec::new(),
             }],
             body: Box::new(body),
         },
@@ -153,6 +154,7 @@ fn global(item: Lang, span: Span) -> ir::Expr {
         ExprKind::Global {
             module: item.module.clone(),
             name: item.name.clone(),
+            type_args: Vec::new(),
         },
         span,
     )

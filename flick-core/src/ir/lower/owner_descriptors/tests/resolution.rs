@@ -54,7 +54,7 @@ fn resolution_preserves_exact_names_original_environments_and_dictionary_fallbac
         let ExprKind::Block(lookup, result) = &branch.kind else {
             panic!("one environment lookup");
         };
-        let [Stmt::Let(_, value)] = &lookup[..] else {
+        let [Stmt::Let { value, .. }] = &lookup[..] else {
             panic!("single lookup binding");
         };
         assert!(

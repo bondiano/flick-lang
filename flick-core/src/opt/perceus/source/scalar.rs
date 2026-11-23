@@ -65,6 +65,7 @@ pub(super) fn int_selection(minimum: bool, span: Span) -> Expr {
                 pat: Pat::Bind(name.to_owned()),
                 stage: Stage::Pure,
                 ty: None,
+                binder_types: Vec::new(),
             })
             .collect(),
         body: Box::new(at(ExprKind::If(

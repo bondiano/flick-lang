@@ -7,6 +7,7 @@ use super::{Arm, Expr, ExprKind, Lit, Param, Pat, Span, Stage, Stmt};
 pub(super) fn arm(pat: Pat, body: Expr) -> Arm {
     Arm {
         pat,
+        binder_types: Vec::new(),
         guard: None,
         body,
     }
@@ -62,6 +63,7 @@ impl ExprBuilder {
         self.at(ExprKind::Global {
             module: module.into(),
             name: name.into(),
+            type_args: Vec::new(),
         })
     }
 
@@ -73,6 +75,7 @@ impl ExprBuilder {
                     pat: Pat::Bind(self.name(n)),
                     stage: Stage::Pure,
                     ty: None,
+                    binder_types: Vec::new(),
                 })
                 .collect(),
             body: Box::new(body),
@@ -223,11 +226,11 @@ impl ExprBuilder {
     }
 
     pub(super) fn let_(&self, name: &str, val: Expr) -> Stmt {
-        Stmt::Let(Pat::Bind(self.name(name)), val)
+        Stmt::let_bind(Pat::Bind(self.name(name)), val)
     }
 
     pub(super) fn var_decl(&self, name: &str, init: Expr) -> Stmt {
-        Stmt::Var(self.name(name), init)
+        Stmt::var(self.name(name), None, init)
     }
 
     pub(super) fn assign(&self, name: &str, val: Expr) -> Stmt {
@@ -272,6 +275,7 @@ impl ExprBuilder {
         self.at(ExprKind::Each {
             stop: None,
             pat: Pat::Bind(self.name(item)),
+            binder_types: Vec::new(),
             source: Box::new(src),
             body: Box::new(body),
         })
@@ -312,6 +316,8 @@ impl ExprBuilder {
             arity,
             dicts: 0,
             rep: Rep::Tagged,
+            fields: Vec::new(),
+            type_args: Vec::new(),
         }
     }
 

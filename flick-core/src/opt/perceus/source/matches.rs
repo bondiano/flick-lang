@@ -121,7 +121,7 @@ impl Lower<'_> {
         let matched = block.emit(
             Operation::Match {
                 object: 0,
-                pattern: arm.pat.clone(),
+                pattern: Box::new(arm.pat.clone()),
             },
             span,
         )?;
@@ -209,26 +209,36 @@ impl Lower<'_> {
     ) -> Result<Local, LowerError> {
         match mode {
             MatchMode::Ordinary => self.expr(&arm.body, inside, block),
-            MatchMode::RecoverySelection => {
-                let selected = self.lambda(
-                    &[Param {
-                        pat: Pat::Wild,
-                        stage: Stage::Pure,
-                        ty: None,
-                    }],
-                    &arm.body,
-                    inside,
-                    None,
-                    block,
-                    span,
-                )?;
-                block.emit(
-                    Operation::RecoveryResult {
-                        selected: Some(selected),
-                    },
-                    span,
-                )
-            }
+            MatchMode::RecoverySelection => self.recovery_body(arm, inside, block, span),
         }
+    }
+
+    #[inline(never)]
+    fn recovery_body(
+        &mut self,
+        arm: &Arm,
+        inside: &Env,
+        block: &mut Code,
+        span: Span,
+    ) -> Result<Local, LowerError> {
+        let selected = self.lambda(
+            &[Param {
+                pat: Pat::Wild,
+                stage: Stage::Pure,
+                ty: None,
+                binder_types: Vec::new(),
+            }],
+            &arm.body,
+            inside,
+            None,
+            block,
+            span,
+        )?;
+        block.emit(
+            Operation::RecoveryResult {
+                selected: Some(selected),
+            },
+            span,
+        )
     }
 }

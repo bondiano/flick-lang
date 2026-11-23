@@ -1,7 +1,7 @@
 impl SeqBuilder {
     fn seq_from(&self) -> Expr {
         let body = self.block(
-            vec![Stmt::Var(Self::vname("i"), self.loc("n"))],
+            vec![Stmt::var(Self::vname("i"), None, self.loc("n"))],
             self.at(ExprKind::ControlLoop {
                 id: "$seq_from".into(),
                 condition: None,
@@ -49,7 +49,7 @@ impl SeqBuilder {
             )
         };
         let body = self.block(
-            vec![Stmt::Var(Self::vname("i"), self.loc("start"))],
+            vec![Stmt::var(Self::vname("i"), None, self.loc("start"))],
             self.at(ExprKind::ControlLoop {
                 id: "$seq_range".into(),
                 condition: Some(Box::new(cond)),
@@ -82,7 +82,7 @@ impl SeqBuilder {
             )),
         });
         let body = self.block(
-            vec![Stmt::Var(Self::vname("i"), self.loc("from"))],
+            vec![Stmt::var(Self::vname("i"), None, self.loc("from"))],
             self.if_(
                 self.bin(BinOp::Gt, self.loc("step"), self.int(0)),
                 pos_loop,
@@ -98,7 +98,7 @@ impl SeqBuilder {
 
     fn seq_iterate(&self) -> Expr {
         let body = self.block(
-            vec![Stmt::Var(Self::vname("cur"), self.loc("x"))],
+            vec![Stmt::var(Self::vname("cur"), None, self.loc("x"))],
             self.at(ExprKind::ControlLoop {
                 id: "$seq_iter".into(),
                 condition: None,
@@ -148,6 +148,7 @@ impl SeqBuilder {
                         Pat::Bind(Self::vname("val")),
                         Pat::Bind(Self::vname("next")),
                     ])),
+                    binder_types: Vec::new(),
                     guard: None,
                     body: self.block(
                         vec![
@@ -159,13 +160,14 @@ impl SeqBuilder {
                 },
                 Arm {
                     pat: Pat::Wild,
+                    binder_types: Vec::new(),
                     guard: None,
                     body: self.break_("$seq_unfold", self.unit()),
                 },
             ],
         ));
         let body = self.block(
-            vec![Stmt::Var(Self::vname("state"), self.loc("seed"))],
+            vec![Stmt::var(Self::vname("state"), None, self.loc("seed"))],
             self.at(ExprKind::ControlLoop {
                 id: "$seq_unfold".into(),
                 condition: None,

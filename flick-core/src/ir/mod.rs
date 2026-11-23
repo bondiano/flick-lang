@@ -16,9 +16,10 @@ pub(crate) use flick_backend_support::reach;
 
 pub use exports::exports;
 pub use flick_ir::{
-    Adapter, Arm, BinOp, Binding, Copies, EnumLit, Expr, ExprKind, Foreign, ForeignMode, Handled,
-    Handler, Item, ItemKind, JsClass, Label, LangItem, Lit, Module, OpArm, Param, Pat, Rep,
-    ResultAdapter, Shape, Stage, Stmt, TypeName, memory, operation_arity,
+    Adapter, Arm, BinOp, Binding, Constraint, ConstructorDecl, Copies, EnumLit, Expr, ExprKind,
+    Foreign, ForeignMode, Handled, Handler, IrType, Item, ItemKind, JsClass, Label, LangItem, Lit,
+    Module, OpArm, Param, Pat, Rep, ResultAdapter, Shape, Stage, Stmt, TypeDecl, TypeInterner,
+    TypeName, TypeRef, memory, operation_arity,
 };
 pub use lower::lower;
 #[cfg(not(target_arch = "wasm32"))]
@@ -66,11 +67,12 @@ impl ExprLang for ExprKind {
         ExprKind::Global {
             module: item.module.clone(),
             name: item.name.clone(),
+            type_args: Vec::new(),
         }
     }
 
     fn is_lang(&self, item: Lang) -> bool {
-        matches!(self, ExprKind::Global { module, name } if lang::is(item, module, name))
+        matches!(self, ExprKind::Global { module, name, .. } if lang::is(item, module, name))
     }
 }
 

@@ -301,12 +301,15 @@ impl Loader<'_> {
                     .iter()
                     .any(|d| d.severity == Severity::Error),
             // an editor's run drops IR unless a selected target/environment needs
-            // it for reachable-use preflight; a check and a build keep it
+            // it for reachable-use preflight (which needs no IR types); a check
+            // or build keeps full typed IR
             #[cfg(feature = "ide")]
-            cached_ir: if self.ide.is_some()
-                && self.project.is_none_or(|p| !p.config.has_selected_target())
-            {
-                CachedIr::Dropped
+            cached_ir: if self.ide.is_some() {
+                if self.project.is_none_or(|p| !p.config.has_selected_target()) {
+                    CachedIr::Dropped
+                } else {
+                    CachedIr::Untyped
+                }
             } else {
                 CachedIr::Kept
             },
@@ -336,7 +339,7 @@ impl Loader<'_> {
         }
         self.diagnostics.extend(output.diagnostics);
         if let (Some(lowered), Some(ir)) = (&mut self.lowered, output.ir) {
-            lowered[i] = Some((ir, output.declarations, output.proofs));
+            lowered[i] = Some((Arc::unwrap_or_clone(ir), output.declarations, output.proofs));
         }
         #[cfg(feature = "ide")]
         if let Some(ide) = &mut self.ide
@@ -353,12 +356,13 @@ impl Loader<'_> {
     }
 }
 
-/// What a cached output does with a module's IR: an editor reads its
-/// diagnostics only, and keeping the IR would copy all of it on every
-/// keystroke; a check or a build that runs again reads it.
+/// What a cached output does with a module's IR: an editor drops it unless
+/// reachable-use preflight needs untyped IR; a check or build keeps typed IR.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum CachedIr {
     Kept,
+    #[cfg(feature = "ide")]
+    Untyped,
     Dropped,
 }
 
@@ -410,6 +414,7 @@ include!("checking_lexical.rs");
 
 include!("checking_inline.rs");
 include!("checking_relocate.rs");
+include!("checking_relocate_types.rs");
 include!("checking_relocate_decls.rs");
 #[cfg(feature = "native-project")]
 include!("checking_stored.rs");
@@ -466,7 +471,7 @@ struct Output {
     interface: Interface,
     /// What importers see: without types when the module has errors.
     exported: Interface,
-    ir: Option<ir::Module>,
+    ir: Option<Arc<ir::Module>>,
     /// Every top-level entity with its type, for the reference model.
     declarations: Arc<Interface>,
     /// The proofs it declares, which a proof of an importer replays.
@@ -502,18 +507,6 @@ fn comparable_copy(interface: &Interface) -> Arc<Interface> {
     }
     copy.docs.clear();
     Arc::new(copy)
-}
-
-/// Takes where `imported` declares the names `interface` re-exports.
-fn redeclare(interface: &mut Interface, imported: &Interface) {
-    for export in &mut interface.exports {
-        if export.entity.module == interface.module {
-            continue;
-        }
-        if let Some(found) = imported.exports.iter().find(|e| e.entity == export.entity) {
-            export.at = found.at;
-        }
-    }
 }
 
 /// The names editors find and rename: those of the module's own text, and

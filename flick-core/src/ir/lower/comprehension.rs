@@ -84,11 +84,13 @@ impl Lower<'_> {
                 let (pattern, source) = (children.next(), children.next());
                 // the source cannot see the names its pattern binds
                 let source = source.map_or_else(|| unit(at), |s| self.expr(s));
-                let pat = pattern.map_or(Pat::Wild, |p| self.pattern(p));
+                let (pat, binder_types) =
+                    pattern.map_or((Pat::Wild, Vec::new()), |p| self.pattern_typed(p));
                 let body = self.clauses(rest, element, looping, span);
                 ExprKind::Each {
                     stop: None,
                     pat,
+                    binder_types,
                     source: Box::new(source),
                     body: Box::new(body),
                 }

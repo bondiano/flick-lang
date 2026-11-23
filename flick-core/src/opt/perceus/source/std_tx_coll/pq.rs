@@ -9,6 +9,7 @@ pub(super) fn tx_pq_dict_template(b: &ExprBuilder, bind: &str, stages: usize) ->
     let cmp_method = b.at(ExprKind::Method {
         dict: Dict::Field(b.name("ord")),
         name: "compare".into(),
+        type_args: Vec::new(),
     });
     match (bind, stages) {
         ("flickEmpty", 1) => Some(b.lam(

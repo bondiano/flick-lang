@@ -60,7 +60,7 @@ impl<'a> PassCtx<'a, '_> {
                     break;
                 };
                 let stmt_hint = match first {
-                    Stmt::Let(_, rhs) | Stmt::Expr(rhs) => {
+                    Stmt::Let { value: rhs, .. } | Stmt::Expr(rhs) => {
                         self.visit_expr(rhs, &env, false, depth + 1)
                     }
                     Stmt::Fun {
@@ -72,7 +72,7 @@ impl<'a> PassCtx<'a, '_> {
                         let h = self.visit_expr(value, &env, false, depth + 1);
                         if dicts.is_empty() { h } else { Hint::Concrete }
                     }
-                    Stmt::Var(_, rhs) | Stmt::Assign(_, rhs) => {
+                    Stmt::Var { value: rhs, .. } | Stmt::Assign(_, rhs) => {
                         self.visit_expr(rhs, &env, false, depth + 1);
                         Hint::NonConcrete
                     }
@@ -83,7 +83,9 @@ impl<'a> PassCtx<'a, '_> {
                 }
                 let first_ref: &Stmt = &*first;
                 match first_ref {
-                    Stmt::Let(pat, rhs) => {
+                    Stmt::Let {
+                        pat, value: rhs, ..
+                    } => {
                         if stmt_hint == Hint::Concrete {
                             if let Some(next_env) = self.bind_let_in_env(pat, rhs, &env) {
                                 env = next_env;
@@ -100,6 +102,7 @@ impl<'a> PassCtx<'a, '_> {
                         rec: false,
                         dicts,
                         value,
+                        ..
                     } => {
                         let next = if !dicts.is_empty() {
                             self.bind_poly_fun_in_env(name, dicts, value, &env)
@@ -116,7 +119,7 @@ impl<'a> PassCtx<'a, '_> {
                             all_concrete = false;
                         }
                     }
-                    Stmt::Var(name, _) => {
+                    Stmt::Var { name, .. } => {
                         env = env.shadow(rc_str(name));
                     }
                     Stmt::Assign(..) | Stmt::Expr(_) | Stmt::Fun { rec: true, .. } => {}

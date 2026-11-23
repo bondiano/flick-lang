@@ -28,6 +28,9 @@ mod steps;
 #[cfg(feature = "wasm-backends")]
 #[path = "backends/templates.rs"]
 mod templates;
+#[cfg(feature = "wasm-backends")]
+#[path = "backends/typed_ir.rs"]
+mod typed_ir;
 
 use std::fs;
 #[cfg(feature = "wasm-backends")]

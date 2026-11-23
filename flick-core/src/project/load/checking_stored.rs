@@ -129,7 +129,7 @@ impl Checking<'_> {
             inline_ide: Vec::new(),
             exported: interface.clone(),
             interface,
-            ir,
+            ir: ir.map(Arc::new),
             declarations,
             proofs: Vec::new(),
         }
@@ -271,7 +271,7 @@ fn exported_digest(exported: &Interface) -> Option<String> {
 /// What to save of `output`, a module of `file` checked cleanly, with its
 /// IR in file 0; `None` when the IR has spans in another file.
 fn saved_module(file: FileId, output: &Output, digest: String) -> Option<SavedModule> {
-    let mut ir = output.ir.clone();
+    let mut ir = output.ir.as_deref().cloned();
     let mut own = true;
     if let Some(ir) = &mut ir {
         ir.each_span_mut(&mut |span| {

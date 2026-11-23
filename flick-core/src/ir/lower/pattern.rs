@@ -16,7 +16,12 @@ impl Lower<'_> {
         match node.kind {
             K::VarPat => {
                 let name = self.token_text(node, K::Ident).unwrap_or_default();
-                Pat::Bind(self.binder(&name, node.range().0))
+                let fresh = self.reuse.is_none();
+                let unique = self.binder(&name, node.range().0);
+                if fresh {
+                    self.record_pat_binder_type(&unique, node.range());
+                }
+                Pat::Bind(unique)
             }
             K::ParenPat | K::AnnotPat => self.pattern(children[0]),
             K::LitPat => {
@@ -55,9 +60,15 @@ impl Lower<'_> {
                     .filter(|n| n.kind == K::RecordPatField)
                     .filter_map(|field| {
                         let label = self.token_text(field, K::Ident)?;
-                        let pat = match field.nodes().next() {
-                            Some(p) => self.pattern(p),
-                            None => Pat::Bind(self.binder(&label, field.range().0)),
+                        let pat = if let Some(p) = field.nodes().next() {
+                            self.pattern(p)
+                        } else {
+                            let fresh = self.reuse.is_none();
+                            let unique = self.binder(&label, field.range().0);
+                            if fresh {
+                                self.record_pat_binder_type(&unique, field.range());
+                            }
+                            Pat::Bind(unique)
                         };
                         Some((label, pat))
                     })
@@ -80,7 +91,14 @@ impl Lower<'_> {
                 let Some(Ref::Constructor(c)) = self.typing.names.get(&node.range()) else {
                     panic!("the checker resolved the constructor pattern");
                 };
-                let c = c.clone();
+                let mut c = c.clone();
+                if let Some(fields) = self.ir_con_fields(node.range()) {
+                    c.fields = fields;
+                }
+                let type_args = self.ir_type_args(node.range());
+                if !type_args.is_empty() {
+                    c.type_args = type_args;
+                }
                 let mut args: Vec<Pat> = children.iter().map(|p| self.pattern(p)).collect();
                 // the dictionaries the value holds, after its fields
                 let start = node.range().0;

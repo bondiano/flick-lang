@@ -48,9 +48,9 @@ impl Lower<'_> {
         rest: impl FnOnce(&mut Self) -> Expr,
     ) -> Expr {
         let value = self.definition(decl);
-        let pat = let_parts(decl, self.text)
+        let (pat, binder_types) = let_parts(decl, self.text)
             .pattern
-            .map_or(Pat::Wild, |p| self.pattern(p));
+            .map_or((Pat::Wild, Vec::new()), |p| self.pattern_typed(p));
         let body = rest(self);
         let message = decl
             .child_tokens()
@@ -71,14 +71,21 @@ impl Lower<'_> {
             Expr::new(ExprKind::Local(missed.clone()), span),
             span,
         );
+        let missed_binders = value
+            .ty
+            .clone()
+            .map(|t| vec![(missed.clone(), t)])
+            .unwrap_or_default();
         let arms = vec![
             Arm {
                 pat,
+                binder_types,
                 guard: None,
                 body,
             },
             Arm {
                 pat: Pat::Bind(missed),
+                binder_types: missed_binders,
                 guard: None,
                 body: fail,
             },

@@ -236,9 +236,16 @@ fn global_number_abi_cannot_distinguish_registered_numeric_types_from_other_inpu
         let ItemKind::Foreign(value) = &item.kind else {
             continue;
         };
+        assert_ne!(
+            value.ty, canonical.ty,
+            "{} carries its own Flick signature in typed IR",
+            value.name
+        );
         let mut normalized = value.clone();
         normalized.name.clone_from(&canonical.name);
         normalized.source_name.clone_from(&canonical.source_name);
+        normalized.type_params.clone_from(&canonical.type_params);
+        normalized.ty.clone_from(&canonical.ty);
         assert_eq!(
             &normalized, canonical,
             "{} has indistinguishable physical metadata",

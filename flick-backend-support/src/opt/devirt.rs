@@ -10,11 +10,11 @@ use std::collections::HashMap;
 use std::mem;
 
 use super::Generics;
-use super::specialize::instantiate;
+use super::specialize::{Generic, instantiate};
+use super::types::{match_type, subst_types};
 use super::walk::{applied, rename, respan, size};
 use crate::ir::{Arm, Expr, ExprKind, ItemKind, Lit, Module, Pat, Stmt};
-use flick_ir::Span;
-use flick_ir::{Dict, default_method};
+use flick_ir::{Dict, Span, TypeRef, default_method};
 
 /// The size budget of data copied where a method of a known instance is.
 const DATA: usize = 32;
@@ -30,7 +30,7 @@ pub struct Lookup<'a> {
     /// The defaults instances of this module take, without dictionaries of
     /// their own: the context, the class and those of the default signature.
     taken: HashMap<(String, String), Taken>,
-    values: HashMap<String, (Vec<String>, Expr)>,
+    values: HashMap<String, Generic>,
     generics: Generics<'a>,
     lang: &'a crate::Known<'a>,
 }
@@ -62,8 +62,23 @@ impl<'a> Lookup<'a> {
                         taken.insert((info.name.clone(), m.clone()), entry);
                     }
                 }
-                ItemKind::Value { name, dicts, body } if !dicts.is_empty() => {
-                    values.insert(name.clone(), (dicts.clone(), body.clone()));
+                ItemKind::Value {
+                    name,
+                    type_params,
+                    dicts,
+                    dict_constraints,
+                    body,
+                    ..
+                } if !dicts.is_empty() => {
+                    values.insert(
+                        name.clone(),
+                        Generic {
+                            type_params: type_params.clone(),
+                            dicts: dicts.clone(),
+                            dict_constraints: dict_constraints.clone(),
+                            body: body.clone(),
+                        },
+                    );
                 }
                 _ => {}
             }
@@ -79,7 +94,7 @@ impl<'a> Lookup<'a> {
     }
 
     /// The value `name` of `module` that takes dictionaries.
-    fn value(&self, module: &str, name: &str) -> Option<(Vec<String>, Expr)> {
+    fn value(&self, module: &str, name: &str) -> Option<Generic> {
         if module == self.module {
             return self.values.get(name).cloned();
         }
@@ -94,7 +109,8 @@ impl<'a> Lookup<'a> {
         method: &str,
     ) -> Option<(Vec<String>, Expr)> {
         if module != self.module {
-            return (self.generics)(module, &format!("{instance}#{method}"));
+            let g = (self.generics)(module, &format!("{instance}#{method}"))?;
+            return Some((g.dicts, g.body));
         }
         let key = (instance.to_owned(), method.to_owned());
         if let Some(own) = self.own.get(&key) {
@@ -120,7 +136,8 @@ impl<'a> Lookup<'a> {
         // the code of a default is of the class's module, whatever the instance's
         let mut elsewhere = *module != self.module;
         let (context, mut code) = if elsewhere {
-            (self.generics)(module, &format!("{name}#{method}"))?
+            let g = (self.generics)(module, &format!("{name}#{method}"))?;
+            (g.dicts, g.body)
         } else if let Some(own) = self.own.get(&key) {
             own.clone()
         } else {
@@ -133,7 +150,7 @@ impl<'a> Lookup<'a> {
             return None;
         }
         let given: Vec<(&str, &Dict)> = context.iter().map(String::as_str).zip(args).collect();
-        instantiate(&mut code, &given, self.lang);
+        instantiate(&mut code, &given, self.lang, true);
         if elsewhere {
             respan(&mut code, at);
         }
@@ -147,7 +164,11 @@ impl<'a> Lookup<'a> {
             return None;
         };
         let (class_module, class) = &taken.class;
-        let (params, mut code) = self.value(class_module, &default_method(class, method))?;
+        let Generic {
+            dicts: params,
+            body: mut code,
+            ..
+        } = self.value(class_module, &default_method(class, method))?;
         let this = Dict::Instance {
             module: module.clone(),
             name: name.clone(),
@@ -162,7 +183,7 @@ impl<'a> Lookup<'a> {
             return None;
         }
         let given: Vec<(&str, &Dict)> = params.iter().map(String::as_str).zip(&dicts).collect();
-        instantiate(&mut code, &given, self.lang);
+        instantiate(&mut code, &given, self.lang, true);
         Some(code)
     }
 }
@@ -223,7 +244,7 @@ pub fn methods(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -
         }
         ExprKind::Block(stmts, _) => {
             for stmt in stmts {
-                if let Stmt::Let(pat, value) = stmt
+                if let Stmt::Let { pat, value, .. } = stmt
                     && !matches!(pat, Pat::Bind(_) | Pat::Wild)
                 {
                     changed |= settle(value, lookup, fresh, depth);
@@ -231,7 +252,7 @@ pub fn methods(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -
             }
         }
         ExprKind::App { func, arg, .. } => {
-            if let ExprKind::Method { dict, name } = &func.kind
+            if let ExprKind::Method { dict, name, .. } = &func.kind
                 && let Some(mut code) = lookup.method(dict, name, func.span)
                 && takes_apart(&code)
             {
@@ -242,6 +263,7 @@ pub fn methods(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -
                     ExprKind::App { .. } | ExprKind::Tuple(_) | ExprKind::Record(_)
                 );
                 if data(arg) && shaped {
+                    specialize_method_types(&mut code, func.ty.as_ref());
                     *fresh += 1;
                     rename(&mut code, &format!("$m{fresh}"));
                     **func = code;
@@ -261,6 +283,19 @@ pub fn methods(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -
     changed
 }
 
+/// Instantiates free type variables in an inlined method body against the
+/// method reference's concrete type.
+fn specialize_method_types(code: &mut Expr, expected: Option<&TypeRef>) {
+    if let (Some(template), Some(concrete)) = (&code.ty, expected) {
+        let mut subst = HashMap::new();
+        match_type(template, concrete, &mut subst);
+        if !subst.is_empty() {
+            let pairs: Vec<(&str, &TypeRef)> = subst.iter().map(|(k, v)| (k.as_str(), v)).collect();
+            subst_types(code, &pairs);
+        }
+    }
+}
+
 /// Replaces `e`, when it is a method of a known instance, with its code
 /// where that is data no bigger than [`DATA`], the methods in it settled
 /// first; and settles the parts of data. Whether anything changed.
@@ -268,7 +303,7 @@ fn settle(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -> boo
     if depth > DEPTH {
         return false;
     }
-    let ExprKind::Method { dict, name } = &e.kind else {
+    let ExprKind::Method { dict, name, .. } = &e.kind else {
         return settle_parts(e, lookup, fresh, depth);
     };
     let Some(mut code) = lookup.method(dict, name, e.span) else {
@@ -280,6 +315,7 @@ fn settle(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -> boo
     if matches!(code.kind, ExprKind::Lambda { .. }) {
         return false;
     }
+    specialize_method_types(&mut code, e.ty.as_ref());
     *fresh += 1;
     rename(&mut code, &format!("$s{fresh}"));
     settle_parts(&mut code, lookup, fresh, depth + 1);
@@ -289,6 +325,9 @@ fn settle(e: &mut Expr, lookup: &Lookup, fresh: &mut usize, depth: usize) -> boo
         return false;
     }
     code.span = e.span;
+    if code.ty.is_none() {
+        code.ty.clone_from(&e.ty);
+    }
     *e = code;
     true
 }
@@ -371,104 +410,4 @@ fn data(e: &Expr) -> bool {
     }
 }
 
-/// A `match` of data: the arm it takes, its names bound to the parts;
-/// whether it was one.
-pub fn known_match(e: &mut Expr) -> bool {
-    let ExprKind::Match(scrutinee, arms) = &e.kind else {
-        return false;
-    };
-    if !data(scrutinee) {
-        return false;
-    }
-    for Arm { pat, guard, body } in arms {
-        if guard.is_some() {
-            return false;
-        }
-        let mut binds = Vec::new();
-        match matches(pat, scrutinee, &mut binds) {
-            Some(true) => {
-                let stmts = (binds.into_iter())
-                    .map(|(x, v)| Stmt::Let(Pat::Bind(x), v))
-                    .collect();
-                *e = Expr::new(ExprKind::Block(stmts, Box::new(body.clone())), e.span);
-                return true;
-            }
-            Some(false) => {}
-            None => return false,
-        }
-    }
-    false
-}
-
-/// The `let`s of `stmts` whose pattern takes data apart, as `let`s of the
-/// names it binds to the parts; whether there was one.
-pub fn known_lets(stmts: &mut Vec<Stmt>) -> bool {
-    let taken_apart = |s: &Stmt| matches!(s, Stmt::Let(pat, value) if !matches!(pat, Pat::Bind(_)) && data(value));
-    if !stmts.iter().any(taken_apart) {
-        return false;
-    }
-    let mut changed = false;
-    let mut out = Vec::with_capacity(stmts.len());
-    for stmt in mem::take(stmts) {
-        if let Stmt::Let(pat, value) = &stmt
-            && taken_apart(&stmt)
-        {
-            let mut binds = Vec::new();
-            // a pattern that does not match keeps its failure
-            if matches(pat, value, &mut binds) == Some(true) {
-                out.extend(binds.into_iter().map(|(x, v)| Stmt::Let(Pat::Bind(x), v)));
-                changed = true;
-                continue;
-            }
-        }
-        out.push(stmt);
-    }
-    *stmts = out;
-    changed
-}
-
-/// Whether `pat` matches the data `e`, binding its names; `None` when that
-/// is not known here.
-pub(super) fn matches(pat: &Pat, e: &Expr, binds: &mut Vec<(String, Expr)>) -> Option<bool> {
-    match (pat, &e.kind) {
-        (Pat::Wild, _) => Some(true),
-        (Pat::Bind(x), _) => {
-            binds.push((x.clone(), e.clone()));
-            Some(true)
-        }
-        (Pat::Tuple(pats), ExprKind::Tuple(items)) if pats.len() == items.len() => {
-            all(pats.iter().zip(items), binds)
-        }
-        (Pat::Record(fields), ExprKind::Record(values)) => {
-            let pairs: Option<Vec<(&Pat, &Expr)>> = (fields.iter())
-                .map(|(l, p)| values.iter().find(|(m, _)| m == l).map(|(_, v)| (p, v)))
-                .collect();
-            all(pairs?.into_iter(), binds)
-        }
-        (Pat::Con(c, pats), _) => {
-            let (d, args) = applied(e)?;
-            if (d.module.as_str(), d.ty.as_str()) != (c.module.as_str(), c.ty.as_str()) {
-                return None;
-            }
-            if d.name != c.name {
-                return Some(false);
-            }
-            (pats.len() == args.len()).then_some(())?;
-            all(pats.iter().zip(args), binds)
-        }
-        (Pat::Lit(Lit::Bool(b)), ExprKind::Lit(Lit::Bool(v))) => Some(b == v),
-        _ => None,
-    }
-}
-
-fn all<'p>(
-    pairs: impl Iterator<Item = (&'p Pat, &'p Expr)>,
-    binds: &mut Vec<(String, Expr)>,
-) -> Option<bool> {
-    for (p, v) in pairs {
-        if !matches(p, v, binds)? {
-            return Some(false);
-        }
-    }
-    Some(true)
-}
+include!("devirt_match.rs");

@@ -564,7 +564,7 @@ fn tuple_reducer(b: &ExprBuilder, triple: bool) -> Expr {
         .map(|((c, a), bv)| b.app2(comb_fn(b, b.loc(c)), b.loc(a), b.loc(bv)))
         .collect();
     let body = b.block(
-        vec![Stmt::Let(pat(c_names), b.loc("rs"))],
+        vec![Stmt::let_bind(pat(c_names), b.loc("rs"))],
         make_reducer_val(
             b,
             b.lam(

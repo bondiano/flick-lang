@@ -498,11 +498,13 @@ modules but with where they declare each lang item, after the checks of
 effects pass it and before the build optimizes
 it, in `flick build`, `run` and `test`, never in `flick check` or the editor.
 Its `transform` gives the program the build compiles instead. The compiler
-checks it for form only: the version of the IR, every module of the build
-and no other, the lang items as it got them, every local bound where it is
-used, every global of a module
-there is, every span of a file the build read; anything else is
-`FLICK-P047`, naming the plugin. A build it rewrote says so with the note
+checks it for form and type consistency (`0.14.0`): the version of the IR,
+every module of the build and no other, the lang items as it got them, every
+local bound where it is used, every global of a module there is, every span of
+a file the build read, well-formed IR types and type argument counts, and
+agreement between layout type annotations and the terms they describe
+(constructor operands, binders, calls and results; erased nodes without
+annotations stay valid); anything else is `FLICK-P047`, naming the plugin. A build it rewrote says so with the note
 `FLICK-P048`: what the program does is then the plugin's to answer for,
 outside Flick's checks and its model of the language, and the build is not
 cached. Each version of the IR is a breaking change for such a plugin until

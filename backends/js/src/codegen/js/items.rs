@@ -47,6 +47,7 @@ impl<'d> Gen<'_, 'd> {
                         kind: ExprKind::Lambda { params, body },
                         ..
                     },
+                ..
             } if dicts.is_empty() && self.workers.contains_key(name) => {
                 let target = Target {
                     callee: Callee::Global(format!("{}.{name}", self.module)),
@@ -70,7 +71,9 @@ impl<'d> Gen<'_, 'd> {
                 }
                 stmts
             }
-            ItemKind::Value { name, dicts, body } => {
+            ItemKind::Value {
+                name, dicts, body, ..
+            } => {
                 let target = Target {
                     callee: Callee::Global(format!("{}.{name}", self.module)),
                     dicts: dicts.clone(),
@@ -89,7 +92,7 @@ impl<'d> Gen<'_, 'd> {
                     None => vec![code],
                 }
             }
-            ItemKind::Destructure { pattern, body } => {
+            ItemKind::Destructure { pattern, body, .. } => {
                 let (stmts, value) = self.block(|g| g.expr(body));
                 let value = self.scoped(&stmts, value);
                 let t = self.temp();
@@ -436,7 +439,9 @@ fn dict_uses(d: &Dict, module: &str, out: &mut BTreeSet<String>) {
 
 fn expr_uses(e: &Expr, module: &str, out: &mut BTreeSet<String>) {
     match &e.kind {
-        ExprKind::Global { module: m, name } if m == module => {
+        ExprKind::Global {
+            module: m, name, ..
+        } if m == module => {
             out.insert(names::ident(name));
         }
         ExprKind::Con(c) if c.module == module => {

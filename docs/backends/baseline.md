@@ -60,9 +60,11 @@ declarations remain in the frontend. The native source-map adapter supplies
 plain UTF-16 positions to the emitter. This source move does not establish
 the production WIT component path or the browser component loader.
 
-`Program` contains neither complete typing/effect facts nor the checker's UI
-metadata. Receiving its optional `Expr::ty`/`Param::ty` names does not provide
-either analysis. A required extra projection needs an identified schema,
+`Program` (IR 0.14.0) carries layout-relevant types — `Module.types` data and
+constructor declarations, constructor field types, binder/expression types and
+instantiation `type_args` — shared via `Arc` and interned on the wire, while
+leaving out effect, service and region rows as well as the checker's UI
+metadata. A required extra projection still needs an identified schema,
 version and content input. Missing data must be rejected rather than inferred
 from prelude spellings or supplied through a checker callback.
 

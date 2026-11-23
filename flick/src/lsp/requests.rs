@@ -92,7 +92,8 @@ impl Server {
         let fresh = kept.is_some_and(|s| s.file(path).is_some());
         tracing::debug!(cached = fresh, "selecting analysis snapshot");
         if !fresh {
-            let snapshot = analyze(&self.docs, path, &mut self.caches);
+            let mut snapshot = analyze(&self.docs, path, &mut self.caches);
+            snapshot.drop_compilation();
             self.snapshots.insert(context.clone(), snapshot);
         }
         self.latest = Some(context.clone());

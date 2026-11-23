@@ -55,7 +55,7 @@ impl Build<'_> {
                 let owner = self.name();
                 let raw = self.e(ExprKind::Within(owner.clone(), Box::new(call.clone())));
                 let activated = self.block(
-                    vec![Stmt::Let(
+                    vec![Stmt::let_bind(
                         Pat::Bind(owner),
                         self.e(ExprKind::ReadOwnerEvidence),
                     )],

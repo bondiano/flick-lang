@@ -169,8 +169,8 @@ impl<'a> Gen<'a> {
             ExprKind::Local(name) => self.code(&names::local(name)),
             // not atomic: an operand after it that assigns it is ordered after the read
             ExprKind::Var(name) => Code::from(a.text(a.alloc_str(&names::local(name)))),
-            ExprKind::Global { module, name } => self.global_value(module, name, Vec::new()),
-            ExprKind::Method { dict, name } => self.method(dict, name),
+            ExprKind::Global { module, name, .. } => self.global_value(module, name, Vec::new()),
+            ExprKind::Method { dict, name, .. } => self.method(dict, name),
             ExprKind::Con(_) | ExprKind::App { .. } => self.app(e),
             // Constructor evidence is stored after ordinary fields, even for a
             // nullary GADT; constructing first would pass Data to Inst as Poly.
@@ -336,25 +336,33 @@ impl<'a> Gen<'a> {
 
     pub(super) fn stmt(&mut self, stmt: &Stmt) {
         let a = self.a;
-        let (Stmt::Let(_, e)
-        | Stmt::Var(_, e)
+        let (Stmt::Let { value: e, .. }
+        | Stmt::Var { value: e, .. }
         | Stmt::Assign(_, e)
         | Stmt::Expr(e)
         | Stmt::Fun { value: e, .. }) = stmt;
         self.line(e.span);
         match stmt {
-            Stmt::Let(Pat::Bind(name), value) => {
+            Stmt::Let {
+                pat: Pat::Bind(name),
+                value,
+                ..
+            } => {
                 let v = self.expr(value);
                 match self.native(value) {
                     Some(n) => self.bind_native(name, v, n),
                     None => self.bind(name, v),
                 }
             }
-            Stmt::Let(Pat::Wild, value) => {
+            Stmt::Let {
+                pat: Pat::Wild,
+                value,
+                ..
+            } => {
                 let v = self.expr(value);
                 self.emit(docvec![a, "_ = ", v]);
             }
-            Stmt::Var(name, value) => {
+            Stmt::Var { name, value, .. } => {
                 let v = self.expr(value);
                 // a variable has one type, so a scalar one is unboxed where it is
                 // declared and where it is assigned, not boxed on every assignment
@@ -378,7 +386,7 @@ impl<'a> Gen<'a> {
                 let l = a.alloc_str(&names::local(name));
                 self.emit(docvec![a, l, " = ", v]);
             }
-            Stmt::Let(pat, value) => {
+            Stmt::Let { pat, value, .. } => {
                 let v = self.expr(value);
                 let v = self.spill(v);
                 self.destructure(pat, v.doc);
@@ -388,6 +396,7 @@ impl<'a> Gen<'a> {
                 rec,
                 dicts,
                 value,
+                ..
             } => {
                 let l = a.alloc_str(&names::local(name));
                 // declared first: a recursive function refers to itself

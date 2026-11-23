@@ -411,13 +411,15 @@ impl Lower<'_> {
                 arity: 1,
                 dicts: 0,
                 rep: Rep::Tagged,
+                fields: Vec::new(),
+                type_args: Vec::new(),
             },
             vec![Pat::Bind("$each.elem".into())],
         );
         let matched = step.emit(
             Operation::Match {
                 object: next,
-                pattern: some_pat,
+                pattern: Box::new(some_pat),
             },
             span,
         )?;
@@ -440,7 +442,7 @@ impl Lower<'_> {
         let pat_matched = on_some.emit(
             Operation::Match {
                 object: elem,
-                pattern: pat.clone(),
+                pattern: Box::new(pat.clone()),
             },
             span,
         )?;

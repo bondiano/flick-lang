@@ -162,6 +162,7 @@ impl Build<'_> {
                 pat,
                 stage,
                 ty: None,
+                binder_types: Vec::new(),
             }],
             body: Box::new(body),
         })
@@ -247,6 +248,7 @@ impl Build<'_> {
                 .into_iter()
                 .map(|(pat, body)| Arm {
                     pat,
+                    binder_types: Vec::new(),
                     guard: None,
                     body,
                 })
@@ -265,11 +267,11 @@ impl Build<'_> {
     fn bind(&mut self, value: Expr, body: impl FnOnce(&mut Self, Expr) -> Expr) -> Expr {
         let name = self.name();
         let result = body(self, self.local(&name));
-        self.block(vec![Stmt::Let(Pat::Bind(name), value)], result)
+        self.block(vec![Stmt::let_bind(Pat::Bind(name), value)], result)
     }
     fn unpack(&self, value: Expr, names: &[&str], body: Expr) -> Expr {
         self.block(
-            vec![Stmt::Let(
+            vec![Stmt::let_bind(
                 Pat::Tuple(names.iter().map(|s| Pat::Bind((*s).to_owned())).collect()),
                 value,
             )],
@@ -376,7 +378,10 @@ impl Build<'_> {
                 Stmt::Fun {
                     name: self.impossible.clone(),
                     rec: true,
+                    type_params: Vec::new(),
                     dicts: Vec::new(),
+                    dict_constraints: Vec::new(),
+                    ty: None,
                     value: self.lambda(
                         Pat::Wild,
                         Stage::Pure,
@@ -386,10 +391,13 @@ impl Build<'_> {
                 Stmt::Fun {
                     name: self.run.clone(),
                     rec: true,
+                    type_params: Vec::new(),
                     dicts: Vec::new(),
+                    dict_constraints: Vec::new(),
+                    ty: None,
                     value: function,
                 },
-                Stmt::Let(Pat::Bind(raw), value),
+                Stmt::let_bind(Pat::Bind(raw), value),
             ],
             result,
         )

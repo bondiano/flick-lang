@@ -215,13 +215,21 @@ fn check_layout(heap: &mut Heap, value: &Value, fields: usize, dicts: bool) {
             arity: fields,
             dicts: usize::from(dicts),
             rep: Rep::Tagged,
+            fields: Vec::new(),
+            type_args: Vec::new(),
         },
         vec![Pat::Wild; fields + usize::from(dicts)],
     );
     let matched = run(
         heap,
         insert(&raw(
-            vec![bind(3, Operation::Match { object: 1, pattern })],
+            vec![bind(
+                3,
+                Operation::Match {
+                    object: 1,
+                    pattern: Box::new(pattern),
+                },
+            )],
             3,
         )),
         alias,

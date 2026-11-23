@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::Expr;
+use crate::{Expr, TypeRef};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Foreign {
@@ -27,6 +27,12 @@ pub struct Foreign {
     pub adapter: Adapter,
     /// The `catch` mapping, a function of the thrown value.
     pub catch: Option<Expr>,
+    /// Quantified layout-relevant type parameters of this foreign declaration.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub type_params: Vec<String>,
+    /// The full layout-relevant type in terms of `type_params`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ty: Option<TypeRef>,
 }
 
 impl Foreign {

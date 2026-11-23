@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// How a stage of a function runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum Stage {
     /// `->`: at once, with nothing.
     Pure,

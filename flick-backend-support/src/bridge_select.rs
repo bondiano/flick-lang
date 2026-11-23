@@ -99,7 +99,7 @@ fn needs_host(item: &Item) -> bool {
 }
 
 fn globals(expr: &Expr, pending: &mut Vec<(String, String)>) {
-    if let ExprKind::Global { module, name } = &expr.kind {
+    if let ExprKind::Global { module, name, .. } = &expr.kind {
         pending.push((module.clone(), name.clone()));
     }
     expr.each_child(&mut |child| globals(child, pending));

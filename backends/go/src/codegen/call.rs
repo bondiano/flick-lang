@@ -60,7 +60,7 @@ impl<'a> Gen<'a> {
             })
             .collect();
         match &inner.kind {
-            ExprKind::Global { module, name } => self.global_value(module, name, dicts),
+            ExprKind::Global { module, name, .. } => self.global_value(module, name, dicts),
             // the implementation takes them, once the operation looked it up
             ExprKind::Perform {
                 effect: service,
@@ -216,7 +216,7 @@ impl<'a> Gen<'a> {
                 let carried = dicts.iter().map(|d| self.dict(d).doc).collect();
                 (self.construct(c, carried), Vec::new(), c.arity, 0)
             }
-            ExprKind::Global { module, name } => self.direct(module, name, Vec::new()),
+            ExprKind::Global { module, name, .. } => self.direct(module, name, Vec::new()),
             // an operation that runs here once it has its arguments
             ExprKind::Perform {
                 effect: service,
@@ -230,13 +230,13 @@ impl<'a> Gen<'a> {
                 (self.perform(service, name), Vec::new(), arity, 0)
             }
             ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Global { .. }) => {
-                let ExprKind::Global { module, name } = &inner.kind else {
+                let ExprKind::Global { module, name, .. } = &inner.kind else {
                     unreachable!("a global, as the guard tested");
                 };
                 let dicts: Vec<Code<'a>> = dicts.iter().map(|d| self.dict(d)).collect();
                 self.direct(module, name, dicts)
             }
-            ExprKind::Method { dict, name } if self.direct_method(dict, name).is_some() => {
+            ExprKind::Method { dict, name, .. } if self.direct_method(dict, name).is_some() => {
                 let (module, name) = self.direct_method(dict, name).expect("tested by the guard");
                 let dicts = self.context_dicts(dict);
                 self.direct(&module, &name, dicts)

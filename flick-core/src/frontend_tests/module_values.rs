@@ -86,7 +86,7 @@ fn pack_lowers_to_a_record_of_public_values() {
     );
     assert!(checked.is_empty(), "{checked:?}");
     let ir = ir::lower(&module, &typing).expect("packed module lowers");
-    assert!(ir.items.iter().any(|item| matches!(&item.kind, ir::ItemKind::Value { name, body, .. } if name == "packed" && matches!(&body.kind, ir::ExprKind::Record(fields) if matches!(&fields[..], [(field, value)] if field == "identity" && matches!(&value.kind, ir::ExprKind::Global { module, name } if module == "Prelude" && name == "identity"))))), "{ir:?}");
+    assert!(ir.items.iter().any(|item| matches!(&item.kind, ir::ItemKind::Value { name, body, .. } if name == "packed" && matches!(&body.kind, ir::ExprKind::Record(fields) if matches!(&fields[..], [(field, value)] if field == "identity" && matches!(&value.kind, ir::ExprKind::Global { module, name, .. } if module == "Prelude" && name == "identity"))))), "{ir:?}");
 }
 
 #[test]

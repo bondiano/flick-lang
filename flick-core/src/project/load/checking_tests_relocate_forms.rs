@@ -62,6 +62,11 @@ const VISITS: [&str; 5] = ["destructure", "for", "defaults", "generic", "catch"]
 
 /// `Pair` of the child as the parent's file holds it.
 fn pair() -> types::Constructor {
+    let int_ty = flick_ir::TypeRef::new(flick_ir::IrType::Named {
+        module: "Prelude".into(),
+        name: "Int".into(),
+        args: Vec::new(),
+    });
     types::Constructor {
         module: "App.Parent".into(),
         ty: "Child$Pair".into(),
@@ -69,6 +74,8 @@ fn pair() -> types::Constructor {
         arity: 2,
         rep: types::Rep::Tagged,
         dicts: 0,
+        fields: vec![int_ty.clone(), int_ty],
+        type_args: Vec::new(),
     }
 }
 
@@ -77,6 +84,7 @@ fn global(name: &str) -> ir::ExprKind {
     ir::ExprKind::Global {
         module: "App.Parent".into(),
         name: name.into(),
+        type_args: Vec::new(),
     }
 }
 
@@ -250,9 +258,15 @@ fn defaulted(parent: &Parent) -> Result<(), String> {
             return Err(format!("`{name}` is {info:?}"));
         }
     }
+    let box_ty = flick_ir::TypeRef::new(flick_ir::IrType::Named {
+        module: "App.Parent".into(),
+        name: "Child$Box".into(),
+        args: Vec::new(),
+    });
     let described = ir::ExprKind::Method {
         dict: instance("Child$Describe Box"),
         name: "describe".into(),
+        type_args: vec![box_ty],
     };
     parent.calls(ANSWER, &described)
 }
@@ -269,9 +283,13 @@ fn generic(parent: &Parent) -> Result<(), String> {
         })
         .ok_or("no derived `Generic`")?;
     let cases = generic.generic.as_ref().map(|g| (&g.cases, &g.inl.module));
+    let generic_pair = types::Constructor {
+        fields: Vec::new(),
+        ..pair()
+    };
     if generic.module != "App.Parent"
         || !generic.name.starts_with("Child$Generic Pair ")
-        || cases != Some((&vec![(pair(), None)], &"Generic".to_owned()))
+        || cases != Some((&vec![(generic_pair, None)], &"Generic".to_owned()))
     {
         return Err(format!("the derived `Generic` is {generic:?}"));
     }

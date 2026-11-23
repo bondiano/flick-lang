@@ -14,6 +14,7 @@ impl Lower<'_> {
         let global = |module: &str, name: String| ExprKind::Global {
             module: module.to_owned(),
             name,
+            type_args: Vec::new(),
         };
         match self.typing.wire_codecs.get(&key) {
             Some(WireCodec::Value { module, name }) => global(module, name.clone()),

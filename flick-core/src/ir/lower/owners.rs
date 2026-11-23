@@ -17,13 +17,15 @@ impl Lower<'_> {
             return body;
         };
         let span = body.span;
+        let ty = body.ty.clone();
         let current = Expr::new(ExprKind::ReadOwnerEvidence, span);
-        Expr::new(
+        Expr::with_ty(
             ExprKind::Block(
-                vec![Stmt::Let(Pat::Bind(name.clone()), current)],
+                vec![Stmt::let_bind(Pat::Bind(name.clone()), current)],
                 Box::new(body),
             ),
             span,
+            ty,
         )
     }
 
@@ -36,14 +38,20 @@ impl Lower<'_> {
 
     pub(super) fn evidence_call(&mut self, owner: Expr, call: Expr) -> Expr {
         let span = call.span;
+        let call_ty = call.ty.clone();
         let mut stmts = Vec::new();
         let mut spill = |this: &mut Self, value: Expr| {
             if matches!(value.kind, ExprKind::Local(_) | ExprKind::Lit(_)) {
                 value
             } else {
                 let name = this.hidden("$operand");
-                stmts.push(Stmt::Let(Pat::Bind(name.clone()), value));
-                Expr::new(ExprKind::Local(name), span)
+                let ty = value.ty.clone();
+                let binders = ty
+                    .clone()
+                    .map(|t| vec![(name.clone(), t)])
+                    .unwrap_or_default();
+                stmts.push(Stmt::let_typed(Pat::Bind(name.clone()), binders, value));
+                Expr::with_ty(ExprKind::Local(name), span, ty)
             }
         };
         let body = match call.kind {
@@ -60,7 +68,7 @@ impl Lower<'_> {
                     let func = spill(self, *func);
                     (func, spill(self, *arg))
                 };
-                Expr::new(
+                Expr::with_ty(
                     ExprKind::App {
                         func: Box::new(func),
                         arg: Box::new(arg),
@@ -68,21 +76,25 @@ impl Lower<'_> {
                         arg_first,
                     },
                     span,
+                    call_ty.clone(),
                 )
             }
-            ExprKind::Await(value) => {
-                Expr::new(ExprKind::Await(Box::new(spill(self, *value))), span)
-            }
+            ExprKind::Await(value) => Expr::with_ty(
+                ExprKind::Await(Box::new(spill(self, *value))),
+                span,
+                call_ty.clone(),
+            ),
             _ => return call,
         };
-        let bracket = Expr::new(
+        let bracket = Expr::with_ty(
             ExprKind::WithOwnerEvidence(Box::new(owner), Box::new(body)),
             span,
+            call_ty.clone(),
         );
         if stmts.is_empty() {
             bracket
         } else {
-            Expr::new(ExprKind::Block(stmts, Box::new(bracket)), span)
+            Expr::with_ty(ExprKind::Block(stmts, Box::new(bracket)), span, call_ty)
         }
     }
     pub(super) fn scoped_foreign(
@@ -100,6 +112,12 @@ impl Lower<'_> {
         let stages = foreign.stages.clone();
         let taken = foreign.taken();
         let dicts: Vec<_> = (0..foreign.dicts).map(|_| self.hidden("$dict")).collect();
+        let type_params = foreign.type_params.clone();
+        let shim_ty = foreign.ty.clone();
+        let type_args: Vec<_> = type_params
+            .iter()
+            .map(|p| flick_ir::TypeRef::new(flick_ir::IrType::Var(p.clone())))
+            .collect();
         items.push(Item {
             kind: ItemKind::Foreign(foreign),
             span,
@@ -109,6 +127,7 @@ impl Lower<'_> {
             ExprKind::Global {
                 module: self.module.to_owned(),
                 name: raw,
+                type_args,
             },
             span,
         );
@@ -142,7 +161,7 @@ impl Lower<'_> {
             let owner = self.hidden("$rawOwner");
             call = Expr::new(
                 ExprKind::Block(
-                    vec![Stmt::Let(
+                    vec![Stmt::let_bind(
                         Pat::Bind(owner.clone()),
                         Expr::new(ExprKind::ReadOwnerEvidence, span),
                     )],
@@ -165,6 +184,7 @@ impl Lower<'_> {
                             Stage::Pure
                         },
                         ty: None,
+                        binder_types: Vec::new(),
                     }],
                     body: Box::new(call),
                 },
@@ -174,7 +194,10 @@ impl Lower<'_> {
         items.push(Item {
             kind: ItemKind::Value {
                 name,
+                type_params,
                 dicts,
+                dict_constraints: Vec::new(),
+                ty: shim_ty,
                 body: call,
             },
             span,
@@ -241,6 +264,7 @@ impl Lower<'_> {
                             pat: Pat::Bind(argument),
                             stage: *stage,
                             ty: None,
+                            binder_types: Vec::new(),
                         }],
                         body: Box::new(body),
                     },
@@ -256,7 +280,7 @@ impl Lower<'_> {
         };
         Expr::new(
             ExprKind::Block(
-                vec![Stmt::Let(Pat::Bind(name), value)],
+                vec![Stmt::let_bind(Pat::Bind(name), value)],
                 Box::new(executable),
             ),
             span,
@@ -271,7 +295,7 @@ impl Lower<'_> {
         let owner = self.hidden("$rawOwner");
         Expr::new(
             ExprKind::Block(
-                vec![Stmt::Let(
+                vec![Stmt::let_bind(
                     Pat::Bind(owner.clone()),
                     Expr::new(ExprKind::ReadOwnerEvidence, span),
                 )],

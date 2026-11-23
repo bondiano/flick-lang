@@ -139,6 +139,7 @@ impl Tr<'_> {
             _ => unreachable!("loop"),
         }
     }
+    #[allow(clippy::too_many_lines)]
     pub(super) fn expr(&mut self, e: &ir::Expr) -> Term {
         let rc = |t: Term| Rc::new(t);
         match &e.kind {
@@ -147,8 +148,10 @@ impl Tr<'_> {
             }
             ExprKind::Local(x) => Term::Var(x.as_str().into()),
             ExprKind::Var(x) => self.version(x),
-            ExprKind::Global { module, name } => Term::Global(Path::new(module, name)),
-            ExprKind::Method { dict: d, name } => Term::Field(rc(dict(d)), name.as_str().into()),
+            ExprKind::Global { module, name, .. } => Term::Global(Path::new(module, name)),
+            ExprKind::Method { dict: d, name, .. } => {
+                Term::Field(rc(dict(d)), name.as_str().into())
+            }
             ExprKind::Con(c) => Term::konst_con(con(c)),
             ExprKind::Perform {
                 effect: service,
@@ -293,7 +296,11 @@ impl Tr<'_> {
     pub(super) fn stmt(&mut self, s: &Stmt, rest: Term) -> Term {
         let rc = |t: Term| Rc::new(t);
         match s {
-            Stmt::Let(ir::Pat::Bind(x), e) => {
+            Stmt::Let {
+                pat: ir::Pat::Bind(x),
+                value: e,
+                ..
+            } => {
                 let value = self.expr(e);
                 if let Some(sig) = self.local_scheme(x) {
                     Term::Let(x.as_str().into(), Some(sig), rc(value), rc(rest))
@@ -301,11 +308,16 @@ impl Tr<'_> {
                     self.value_let(x.as_str().into(), value, rest)
                 }
             }
-            Stmt::Var(..) | Stmt::Assign(..) => stuck("a variable outside a block"),
-            Stmt::Let(ir::Pat::Wild, e) | Stmt::Expr(e) => {
-                Term::Let("_".into(), None, rc(self.expr(e)), rc(rest))
+            Stmt::Var { .. } | Stmt::Assign(..) => stuck("a variable outside a block"),
+            Stmt::Let {
+                pat: ir::Pat::Wild,
+                value: e,
+                ..
             }
-            Stmt::Let(p, e) => {
+            | Stmt::Expr(e) => Term::Let("_".into(), None, rc(self.expr(e)), rc(rest)),
+            Stmt::Let {
+                pat: p, value: e, ..
+            } => {
                 let arm = Arm {
                     pat: pat(p),
                     guard: None,
@@ -318,6 +330,7 @@ impl Tr<'_> {
                 rec,
                 dicts,
                 value,
+                ..
             } => {
                 let value = lams(dicts.iter().map(|d| given(d)), self.expr(value));
                 let sig = self.local_scheme(name);
@@ -474,5 +487,5 @@ fn has_runtime_step(e: &ir::Expr) -> bool {
 }
 
 pub(super) fn is_lang(func: &ir::Expr, item: Lang) -> bool {
-    matches!(&func.kind, ExprKind::Global { module, name } if lang::is(item, module, name))
+    matches!(&func.kind, ExprKind::Global { module, name, .. } if lang::is(item, module, name))
 }

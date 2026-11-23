@@ -186,8 +186,8 @@ impl Checker<'_> {
         let Some(scheme) = self.env.value(&entity).cloned() else {
             return Type::Error;
         };
-        let ty = self.instantiate(&scheme, span);
-        self.record_entity(&entity, &ty, span);
+        let (ty, type_args) = self.instantiate_args(&scheme, span);
+        self.record_entity_args(&entity, &ty, type_args, span);
         ty
     }
 }

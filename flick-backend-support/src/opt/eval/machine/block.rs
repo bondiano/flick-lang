@@ -68,7 +68,9 @@ impl<'a> Machine<'a, '_> {
     ) -> Result<Control<'a>, StopReason> {
         while let Some((first, tail)) = stmts.split_first() {
             match first {
-                Stmt::Let(pat, rhs) => {
+                Stmt::Let {
+                    pat, value: rhs, ..
+                } => {
                     self.push_frame(
                         FrameKind::Block {
                             kind: BlockKind::Let(pat),
@@ -95,6 +97,7 @@ impl<'a> Machine<'a, '_> {
                     rec: false,
                     dicts,
                     value,
+                    ..
                 } => {
                     if dicts.is_empty() {
                         self.push_frame(
@@ -119,7 +122,7 @@ impl<'a> Machine<'a, '_> {
                     env = bind_rec_group(group, &env, self.budget)?;
                     stmts = rest;
                 }
-                Stmt::Var(..) | Stmt::Assign(..) => return Err(StopReason::UnsafeContext),
+                Stmt::Var { .. } | Stmt::Assign(..) => return Err(StopReason::UnsafeContext),
             }
         }
         Ok(Control::Eval { expr: result, env })
