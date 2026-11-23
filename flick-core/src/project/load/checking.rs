@@ -185,10 +185,20 @@ impl ModuleCache {
 
     /// Drops the modules a run no longer loaded.
     pub(super) fn retain_loaded(&mut self, modules: &[Loaded]) {
-        self.entries
-            .retain(|path, _| modules.iter().any(|m| m.path == *path));
-        self.parses
-            .retain(|path, _| modules.iter().any(|m| m.path == *path));
+        if self.entries.is_empty() && self.parses.is_empty() {
+            return;
+        }
+        let paths: HashSet<&Path> = modules.iter().map(|m| m.path.as_path()).collect();
+        self.entries.retain(|path, _| paths.contains(path.as_path()));
+        self.parses.retain(|path, _| paths.contains(path.as_path()));
+    }
+
+    #[cfg(all(test, feature = "ide"))]
+    pub(super) fn cached_paths(&self) -> (HashSet<&Path>, HashSet<&Path>) {
+        (
+            self.entries.keys().map(PathBuf::as_path).collect(),
+            self.parses.keys().map(PathBuf::as_path).collect(),
+        )
     }
 
     /// The parse kept of `path`, if it is of this file and this text.

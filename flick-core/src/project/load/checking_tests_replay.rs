@@ -17,14 +17,25 @@ fn said_in(
     shift: usize,
     edit: impl Fn(&mut Project),
 ) -> Said {
+    let roots = [PathBuf::from("/p/src/A/Use.fl")];
+    said_for(host, &roots, mode, cache, shift, edit)
+}
+
+fn said_for(
+    host: &Memory,
+    roots: &[PathBuf],
+    mode: Mode,
+    cache: Option<&mut ModuleCache>,
+    shift: usize,
+    edit: impl Fn(&mut Project),
+) -> Said {
     let mut sources = SourceMap::default();
     for n in 0..shift {
         sources.add(format!("/elsewhere/{n}.fl"), "");
     }
     let mut project = library(&mut sources);
     edit(&mut project);
-    let roots = [PathBuf::from("/p/src/A/Use.fl")];
-    let output = run(host, &mut sources, Some(&project), &roots, mode, cache, None);
+    let output = run(host, &mut sources, Some(&project), roots, mode, cache, None);
     let mut diagnostics: Vec<String> = output
         .diagnostics
         .iter()
@@ -155,5 +166,63 @@ fn a_cache_kept_through_a_session_of_edits_changes_nothing_a_run_says() {
         assert_eq!(stored_count(&taken) > taken_before, mode != Mode::Analyze);
         // a compilation with a cache still gives every module it lowered
         assert_eq!(compiled > 0, mode == Mode::Compile);
+    }
+}
+
+#[test]
+fn the_module_cache_retains_only_loaded_paths_in_both_maps() {
+    const USE_BASE: &str =
+        "module A.Use exposing (y)\nimport A.Base exposing (x)\ny : Int\nlet y = x\n";
+    const USE_RENAMED: &str =
+        "module A.Use exposing (y)\nimport A.Next exposing (x)\ny : Int\nlet y = x\n";
+    let modules = |files: &[(&str, &str)]| {
+        Memory(
+            files
+                .iter()
+                .map(|(name, text)| (PathBuf::from(format!("/p/src/A/{name}.fl")), (*text).into()))
+                .collect(),
+        )
+    };
+    let before = modules(&[
+        ("Use", USE_BASE),
+        ("Base", "module A.Base exposing (x)\nx : Int\nlet x = 1\n"),
+        ("Extra", "module A.Extra exposing (z)\nz : Int\nlet z = 2\n"),
+    ]);
+    let after_rename = modules(&[
+        ("Use", USE_RENAMED),
+        ("Next", "module A.Next exposing (x)\n\nx : Int\nlet x = 1\n"),
+    ]);
+    let other = modules(&[(
+        "Other",
+        "module A.Other exposing (x)\nx : Int\nlet x = unknown\n",
+    )]);
+    let use_file = PathBuf::from("/p/src/A/Use.fl");
+    let extra = PathBuf::from("/p/src/A/Extra.fl");
+    let other_file = PathBuf::from("/p/src/A/Other.fl");
+    let both_roots = [use_file.clone(), extra];
+    let use_only = [use_file];
+    let other_only = [other_file];
+    let steps: [(_, &[_], &[_], _); 6] = [
+        (&before, &both_roots, &["Base", "Extra", "Use"], true),
+        (&before, &both_roots, &["Base", "Extra", "Use"], true),
+        (&before, &use_only, &["Base", "Use"], true),
+        (&after_rename, &use_only, &["Next", "Use"], true),
+        (&other, &other_only, &["Other"], false),
+        (&other, &[], &[], true),
+    ];
+    let mut cache = ModuleCache::default();
+    for (host, roots, retained, valid) in steps {
+        let warm = said_for(host, roots, Mode::Analyze, Some(&mut cache), 0, |_| {});
+        let cold = said_for(host, roots, Mode::Analyze, None, 0, |_| {});
+        assert_eq!(warm.0.is_empty(), valid, "{:?}", warm.0);
+        assert_eq!(warm, cold, "cached diagnostics, interfaces and spans");
+        let paths: Vec<_> = retained
+            .iter()
+            .map(|name| PathBuf::from(format!("/p/src/A/{name}.fl")))
+            .collect();
+        let expected = paths.iter().map(PathBuf::as_path).collect();
+        let (checked, parsed) = cache.cached_paths();
+        assert_eq!(checked, expected, "checked cache");
+        assert_eq!(parsed, expected, "parse cache");
     }
 }
