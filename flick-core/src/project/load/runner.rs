@@ -86,6 +86,8 @@ impl Loader<'_> {
             thresholds: types::Thresholds::default(),
             watched: Watched::none(),
             stages_by_class: self.stages_by_class,
+            foreign_backend: &self.foreign_backend,
+            validate_foreign_metadata: self.validate_foreign_metadata,
         };
         diagnostics.extend(types::check(
             &checked,

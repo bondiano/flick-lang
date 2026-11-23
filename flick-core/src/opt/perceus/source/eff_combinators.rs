@@ -57,10 +57,8 @@ fn adapter(kind: Kind) -> Adapter {
         };
     }
     Adapter {
-        receiver: false,
-        cancel: false,
         optional: vec![],
-        variadic: false,
+        owned: vec![],
         result: ResultAdapter {
             nullable: false,
             unit: false,
@@ -73,6 +71,7 @@ fn adapter(kind: Kind) -> Adapter {
         },
         shapes,
         result_shape: task_shape(),
+        words: vec![],
     }
 }
 fn supports(value: &Foreign, kind: Kind) -> bool {
@@ -187,10 +186,28 @@ mod tests {
                     Span::new(FileId::new(0), 0, 0),
                 ));
             }),
-            Box::new(|v| v.adapter.receiver = true),
-            Box::new(|v| v.adapter.cancel = true),
+            Box::new(|v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "this".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            }),
+            Box::new(|v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "cancel".into(),
+                    args: vec![flick_ir::AdapterArg::Word("signal".into())],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            }),
             Box::new(|v| v.adapter.optional.push(0)),
-            Box::new(|v| v.adapter.variadic = true),
+            Box::new(|v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "variadic".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            }),
             Box::new(|v| v.adapter.result.unit = true),
             Box::new(|v| v.adapter.result.nullable = true),
             Box::new(|v| v.adapter.callbacks.clear()),

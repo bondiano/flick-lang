@@ -83,6 +83,12 @@ pub(super) fn check_environment(
         environment,
         diagnostics,
     );
+    if !target_override.is_some_and(|o| o.skip_backend_check_target)
+        && !diagnostics.iter().any(|d| d.severity == Severity::Error)
+        && let Some(project) = project
+    {
+        diagnostics.extend(host.check_target(project, compilation, sources, environment, by_class));
+    }
 }
 
 /// Whether a run over `project` checks with the stages of a class derived

@@ -138,13 +138,72 @@ fn a_reader_takes_only_its_own_minor_version_before_1_0() {
     assert!(!compatible("0.11.0"));
     assert!(!compatible("0.12.0"));
     assert!(!compatible("0.13.0"));
+    assert!(!compatible("0.14.0"));
     let mut p = program(1.0);
-    p.ir_version = "0.15.0".to_owned();
-    let found = "0.15.0".to_owned();
+    p.ir_version = "0.16.0".to_owned();
+    let found = "0.16.0".to_owned();
     assert_eq!(
         Program::from_json(&p.to_json()),
         Err(Error::Version { found })
     );
+}
+
+#[test]
+fn foreign_adapter_words_round_trip_and_remap_spans() {
+    let decl_span = Span::new(FileId::new(9), 0, 20);
+    let word_span = Span::new(FileId::new(9), 10, 19);
+    let foreign = crate::Foreign {
+        name: "call".into(),
+        source_name: None,
+        mode: crate::ForeignMode::Pure,
+        binding: crate::Binding {
+            from: Some("./host".into()),
+            name: "call".into(),
+        },
+        stages: vec![false, false],
+        dicts: 0,
+        arity: 2,
+        adapter: crate::Adapter {
+            owned: vec![0],
+            words: vec![crate::BackendAdapter {
+                name: "callback".into(),
+                args: vec![
+                    crate::AdapterArg::Int(0),
+                    crate::AdapterArg::Word("data".into()),
+                    crate::AdapterArg::Int(1),
+                ],
+                span: word_span,
+            }],
+            ..crate::Adapter::default()
+        },
+        catch: None,
+        type_params: Vec::new(),
+        ty: None,
+    };
+    let module = Module {
+        name: "App".into(),
+        items: vec![Item {
+            kind: ItemKind::Foreign(foreign),
+            span: decl_span,
+        }],
+        types: Vec::new(),
+        labels: BTreeMap::default(),
+        initialization: crate::Initialization::default(),
+        records: BTreeMap::default(),
+        package: None,
+        exports: crate::Exports::default(),
+    };
+    let p = Program::new("flick test", vec![module], Vec::new(), &|f| {
+        format!("file{}.fl", f.index())
+    });
+    assert_eq!(p.files, ["file9.fl"]);
+    let ItemKind::Foreign(f) = &p.modules[0].items[0].kind else {
+        unreachable!();
+    };
+    assert_eq!(f.adapter.words[0].span, Span::new(FileId::new(0), 10, 19));
+    assert_eq!(Program::from_json(&p.to_json()), Ok(p.clone()));
+    #[cfg(feature = "cbor")]
+    assert_eq!(Program::from_cbor(&p.to_cbor()), Ok(p));
 }
 
 #[test]

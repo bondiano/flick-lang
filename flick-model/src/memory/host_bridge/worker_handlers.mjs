@@ -5,6 +5,7 @@ import {
   buildCallCtx,
   finishCallErr,
   finishCallOk,
+  hasAdapterWordArg,
   invokeTarget,
   prepareArgs,
   resolveTarget,
@@ -90,7 +91,10 @@ export async function handleCall(msg, alreadyPending = false, prePinned = null) 
       ? await resolveTarget(exec, spec)
       : syncResolved;
     if (alreadyPending && (!exec.pendingCalls.has(callId) || exec.closing)) return;
-    const controller = spec.mode === "Async" || spec.adapter.cancel ? new AbortController() : null;
+    const controller =
+      spec.mode === "Async" || hasAdapterWordArg(spec.adapter, "cancel", "signal")
+        ? new AbortController()
+        : null;
     const finalArgs = prepareArgs(exec, spec, msg.args, bridged, controller);
     const callCtx = buildCallCtx(exec, msg);
     releasePinned();

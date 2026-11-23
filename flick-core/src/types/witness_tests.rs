@@ -3,6 +3,7 @@ use crate::diagnostics::Severity;
 use crate::iface::{Interface, Namespace, support, write};
 use crate::ir::tests::check_text;
 use crate::source::SourceMap;
+use crate::types::ForeignBackendSpec;
 use crate::types::{Form, Kind, ModuleRequirement, Type};
 use std::slice;
 
@@ -158,6 +159,8 @@ fn checked_interface(name: &str, text: &str, dependencies: &[Interface]) -> Inte
             thresholds: types::Thresholds::default(),
             watched: types::Watched::none(),
             stages_by_class: false,
+            foreign_backend: ForeignBackendSpec::default_js(),
+            validate_foreign_metadata: true,
         },
         &mut interface,
     ));

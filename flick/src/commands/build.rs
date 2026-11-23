@@ -497,6 +497,7 @@ pub(crate) fn target_override(
         effect_adapter: None,
         for_tests,
         test_paths,
+        skip_backend_check_target: true,
     }
 }
 

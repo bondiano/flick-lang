@@ -1,7 +1,7 @@
 //! What checking a module is given besides the module and its imports: the
 //! bounds of instance resolution and the settings of the project.
 
-use super::{Dict, Type, Watched};
+use super::{Dict, ForeignBackendSpec, Type, Watched};
 use crate::resolve::Interface;
 use crate::syntax::structure::Thresholds;
 
@@ -39,6 +39,12 @@ pub struct Options<'a> {
     /// on Flick's own runtime: see [`super::effects::Effects::direct`]. Every module of a build
     /// and the built-in modules it reads are checked alike.
     pub stages_by_class: bool,
+    /// Foreign adapter words and type-form attributes declared by the active backend.
+    pub foreign_backend: &'a ForeignBackendSpec,
+    /// Whether unknown foreign metadata words (`FLICK-S011`) and unknown
+    /// attributes (`FLICK-S014`) should be rejected against `foreign_backend`.
+    /// False only when a frontend-only host cannot load an uncached custom backend.
+    pub validate_foreign_metadata: bool,
 }
 
 /// Unsealed module interface lookup used during IR type lowering.

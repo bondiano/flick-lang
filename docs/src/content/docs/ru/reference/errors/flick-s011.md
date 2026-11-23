@@ -1,9 +1,16 @@
 ---
 title: "FLICK-S011"
-source_hash: "83a626965cdca0d7"
+source_hash: "0e474b5630c37333"
 ---
 
-Строка метаданных под объявлением `foreign` содержит неизвестное имя. Известные метаданные: `arity`, `this`, `catch`, `cancel`, `nullable`, `retention`, `optional`, `variadic`.
+Строка метаданных под объявлением `foreign` содержит имя, которое не является
+ни словом ядра контракта, ни словом адаптера, объявленным активным бэкендом
+пакета.
+
+Слова ядра контракта (доступны на каждом бэкенде): `arity`, `catch`,
+`retention`, `nullable`, `optional`, `reviewed`, `owned`. Официальные бэкенды
+дополнительно объявляют свои слова адаптеров в дескрипторе (например, `this`,
+`cancel`, `variadic` в `flick/js` и `flick/go`).
 
 ```flick ignore
 read_text : Path ->{Async; FsError} String

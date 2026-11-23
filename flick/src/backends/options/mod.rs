@@ -15,12 +15,13 @@ use std::fmt::Write as _;
 
 #[cfg(feature = "wasm-backends")]
 use flick_backend::OptionValue;
-use flick_backend::{Descriptor, OptionDescriptor, Verb};
+use flick_backend::{AdapterArgKind as WireArgKind, Descriptor, OptionDescriptor, Verb};
 use flick_core::diagnostics::{Diagnostic, Severity, codes, suggest};
 use flick_core::project::config::BackendPackage;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::config::TargetValue;
 use flick_core::project::{BackendAxis, BackendTags, Project};
+use flick_core::types::{AdapterArgKind, AdapterArgSpec, AdapterWordSpec, TypeFormAttrSpec};
 
 #[cfg(feature = "wasm-backends")]
 pub(crate) use cache::{
@@ -55,6 +56,39 @@ pub(crate) fn descriptor_tags(descriptor: &Descriptor) -> BackendTags {
             .environments
             .iter()
             .map(|e| (e.backend.clone(), e.platform.clone()))
+            .collect(),
+        foreign_adapters: descriptor
+            .foreign_adapters
+            .iter()
+            .map(|w| AdapterWordSpec {
+                name: w.name.clone(),
+                args: w
+                    .args
+                    .iter()
+                    .map(|a| AdapterArgSpec {
+                        name: a.name.clone(),
+                        kind: match &a.kind {
+                            WireArgKind::Keyword(choices) => {
+                                AdapterArgKind::Keyword(choices.clone())
+                            }
+                            WireArgKind::ParamIndex => AdapterArgKind::ParamIndex,
+                            WireArgKind::Uint => AdapterArgKind::Uint,
+                            WireArgKind::Text => AdapterArgKind::Text,
+                            WireArgKind::Word => AdapterArgKind::Word,
+                        },
+                    })
+                    .collect(),
+                repeatable: w.repeatable,
+                doc: w.doc.clone(),
+            })
+            .collect(),
+        type_form_attributes: descriptor
+            .type_form_attributes
+            .iter()
+            .map(|a| TypeFormAttrSpec {
+                name: a.name.clone(),
+                doc: a.doc.clone(),
+            })
             .collect(),
     }
 }

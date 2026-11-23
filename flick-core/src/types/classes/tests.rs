@@ -1,3 +1,4 @@
+use crate::types::ForeignBackendSpec;
 use std::collections::HashMap;
 
 mod fd_coherence;
@@ -42,6 +43,8 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
             thresholds: Thresholds::default(),
             watched: Watched::none(),
             stages_by_class: false,
+            foreign_backend: ForeignBackendSpec::default_js(),
+            validate_foreign_metadata: true,
         };
         let (more, evidence) =
             check_with_evidence(&module, &imported, builtins(), options, &mut interface);

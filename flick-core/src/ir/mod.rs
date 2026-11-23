@@ -16,10 +16,10 @@ pub(crate) use flick_backend_support::reach;
 
 pub use exports::exports;
 pub use flick_ir::{
-    Adapter, Arm, BinOp, Binding, Constraint, ConstructorDecl, Copies, EnumLit, Expr, ExprKind,
-    Foreign, ForeignMode, Handled, Handler, IrType, Item, ItemKind, JsClass, Label, LangItem, Lit,
-    Module, OpArm, Param, Pat, Rep, ResultAdapter, Shape, Stage, Stmt, TypeDecl, TypeInterner,
-    TypeName, TypeRef, memory, operation_arity,
+    Adapter, AdapterArg, Arm, BackendAdapter, BinOp, Binding, Constraint, ConstructorDecl, Copies,
+    EnumLit, Expr, ExprKind, Foreign, ForeignMode, Handled, Handler, IrType, Item, ItemKind,
+    JsClass, Label, LangItem, Lit, Module, OpArm, Param, Pat, Rep, ResultAdapter, Shape, Stage,
+    Stmt, TypeDecl, TypeInterner, TypeName, TypeRef, memory, operation_arity,
 };
 pub use lower::lower;
 #[cfg(not(target_arch = "wasm32"))]

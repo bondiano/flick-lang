@@ -10,6 +10,9 @@ use std::slice;
 use std::sync::Arc;
 
 #[cfg(feature = "native-project")]
+use flick_backend_go::foreign_meta as go_foreign_meta;
+use flick_backend_js::foreign_meta as js_foreign_meta;
+#[cfg(feature = "native-project")]
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -90,6 +93,8 @@ pub(crate) fn check_file(
         from_packages: &from_packages,
         project: None,
         stages_by_class: false,
+        foreign_backend: types::ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
         lower: false,
         lowered: &[],
         proving: false,
@@ -226,6 +231,8 @@ struct Key {
     text: String,
     /// The effective configuration, including programmatically supplied values.
     config: Option<Config>,
+    foreign_backend: types::ForeignBackendSpec,
+    validate_foreign_metadata: bool,
     lower: bool,
     /// An editor's entry, without the IR, is none a build reads.
     cached_ir: CachedIr,
@@ -303,6 +310,8 @@ impl Loader<'_> {
             watching: &self.watchers.plugins,
             watched: &self.watchers.watched,
             stages_by_class: self.stages_by_class,
+            foreign_backend: &self.foreign_backend,
+            validate_foreign_metadata: self.validate_foreign_metadata,
             lowered: self.lowered.as_deref().unwrap_or(&[]),
             proving: self.modules.iter().any(Loaded::has_proofs),
             // a failed import leaves names unresolved, and the build fails anyway
@@ -401,6 +410,8 @@ struct Checking<'a> {
     from_packages: &'a BTreeMap<String, Interface>,
     project: Option<&'a Project>,
     stages_by_class: bool,
+    foreign_backend: &'a types::ForeignBackendSpec,
+    validate_foreign_metadata: bool,
     lower: bool,
     /// The IR of the modules checked before this level, which proofs read.
     lowered: &'a [Option<Lowered>],

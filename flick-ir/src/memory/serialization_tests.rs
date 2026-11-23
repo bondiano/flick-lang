@@ -424,7 +424,11 @@ fn foreign_call_operation_round_trips() {
         runtime: true,
         has_catch: true,
         adapter: crate::Adapter {
-            cancel: true,
+            words: vec![crate::BackendAdapter {
+                name: "cancel".into(),
+                args: vec![crate::AdapterArg::Word("signal".into())],
+                span: crate::Span::new(crate::FileId::new(0), 0, 13),
+            }],
             ..crate::Adapter::default()
         },
         arg_hints: vec![WireHint::Any, WireHint::Unit],

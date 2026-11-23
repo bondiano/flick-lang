@@ -1,5 +1,6 @@
 use super::*;
 use crate::source::SourceMap;
+use crate::types::ForeignBackendSpec;
 use crate::types::{Atom, Elem};
 use std::slice;
 
@@ -28,6 +29,8 @@ fn interface(text: &str) -> Interface {
         thresholds: types::Thresholds::default(),
         watched: types::Watched::none(),
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     let _ = types::check(
         &module,

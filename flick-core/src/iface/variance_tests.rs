@@ -1,3 +1,4 @@
+use crate::types::ForeignBackendSpec;
 use std::slice;
 
 use super::*;
@@ -34,6 +35,8 @@ pub(super) fn check_module_with(
         thresholds: types::Thresholds::default(),
         watched: types::Watched::none(),
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     diagnostics.extend(types::check(
         &module,

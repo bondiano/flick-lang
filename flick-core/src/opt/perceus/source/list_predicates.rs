@@ -22,10 +22,8 @@ fn adapter(observer: Observer, copied_input: bool) -> Adapter {
         )
     };
     Adapter {
-        receiver: false,
-        cancel: false,
         optional: vec![],
-        variadic: false,
+        owned: vec![],
         result: ResultAdapter {
             nullable: false,
             unit: false,
@@ -38,6 +36,7 @@ fn adapter(observer: Observer, copied_input: bool) -> Adapter {
             result: false,
             callbacks: callback_copies,
         },
+        words: vec![],
     }
 }
 

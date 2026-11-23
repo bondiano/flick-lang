@@ -17,6 +17,9 @@ mod env_gating;
 #[path = "backends/environments.rs"]
 mod environments;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/foreign_adapters.rs"]
+mod foreign_adapters;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/go.rs"]
 mod go;
 #[cfg(feature = "wasm-backends")]

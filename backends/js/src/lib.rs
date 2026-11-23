@@ -2,6 +2,7 @@
 //! Component integration uses the separate `flick:backend` contract.
 
 pub mod codegen;
+pub mod foreign_meta;
 
 pub mod numeric;
 

@@ -70,10 +70,8 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
         && value.stages == stages
         && value.adapter
             == Adapter {
-                receiver: false,
-                cancel: false,
                 optional: vec![],
-                variadic: false,
+                owned: vec![],
                 result: ResultAdapter {
                     nullable: false,
                     unit: false,
@@ -82,6 +80,7 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
                 copies,
                 shapes,
                 result_shape,
+                words: vec![],
             })
     .then_some(kind)
 }
@@ -179,10 +178,28 @@ mod tests {
                     Span::new(FileId::new(0), 0, 0),
                 ));
             },
-            |v| v.adapter.receiver = true,
-            |v| v.adapter.cancel = true,
+            |v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "this".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
+            |v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "cancel".into(),
+                    args: vec![flick_ir::AdapterArg::Word("signal".into())],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
             |v| v.adapter.optional.push(0),
-            |v| v.adapter.variadic = true,
+            |v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "variadic".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
             |v| v.adapter.result.nullable = true,
             |v| v.adapter.result.unit = true,
             |v| v.adapter.callbacks[0] = Some(1),

@@ -53,6 +53,8 @@ fn js_descriptor() -> Descriptor {
         foreign_extension: None,
         foreign_suffixes: vec![],
         handled_services: vec![],
+        foreign_adapters: vec![],
+        type_form_attributes: vec![],
         options: vec![
             OptionDescriptor {
                 parameter: Parameter {
@@ -271,6 +273,7 @@ fn official_js_backend_descriptor_matches_core_official_backends() {
     use flick_backend::Backend as _;
     let desc = flick_backend_js::Javascript.describe();
     assert!(flick_backend::validate_tags(&desc).is_ok());
+    assert!(flick_backend::validate_foreign_metadata(&desc).is_ok());
     let from_component = super::descriptor_tags(&desc);
     let from_core = official_backends()
         .into_iter()

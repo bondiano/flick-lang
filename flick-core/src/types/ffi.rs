@@ -1,25 +1,24 @@
-//! Foreign declarations: their metadata, checked against the signature and
-//! the mode, becomes the calling convention code generation follows.
-//!
-//! | Metadata | Meaning |
-//! | - | - |
-//! | `arity n` | `n` positional JS arguments; `arity 0` takes the `()` of a first `Unit` parameter |
-//! | `this` | the first argument is the receiver: `target.call(a0, …)` |
-//! | `catch f` | a throw or rejection becomes the typed error `f : JsValue -> E`, `E` in the error row |
-//! | `cancel signal` | an async call gets an `AbortSignal` last, aborted on interruption |
-//! | `nullable` | the result is `Option a`: `null` and `undefined` are `None` |
-//! | `optional i` | argument `i` is `Option a`: `None` is passed as `undefined` |
-//! | `variadic` | the last argument is a `List a` spread into the call |
-//! | `retention call` / `retention owner` | what a parameter that may hold a scope's capabilities is kept for |
+//! Foreign declarations: core contract metadata (`arity`, `catch`,
+//! `retention`, `nullable`, `optional`, `reviewed`, `owned`) is validated
+//! here, while backend-declared adapter words (such as JS `this`,
+//! `cancel signal`, `variadic`, Go equivalents, or third-party words) are
+//! parsed against the active backend's descriptor and lowered into
+//! `Adapter::words` for backend validation.
 
 mod bridge_shape;
 mod retention;
+pub mod spec;
 pub use retention::keeps_for_owner;
+pub use spec::{
+    AdapterArgKind, AdapterArgSpec, AdapterWordSpec, CORE_FOREIGN_META, CoreForeignMeta,
+    ForeignBackendSpec, TypeFormAttrSpec, core_foreign_meta,
+};
 
 mod pending;
 mod suspends;
 pub(super) use pending::PendingForeign;
 
+use std::collections::BTreeSet;
 use std::slice;
 
 use super::Checker;
@@ -30,10 +29,11 @@ use super::ty::{Stage, Type};
 use super::typing::{ForeignInfo, ForeignOwnerPolicy, range};
 use crate::diagnostics::codes;
 use crate::source::Span;
-use crate::syntax::cst::{Node, foreign_words};
+use crate::syntax::cst::{Node, Token, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::literal;
 use crate::types::lang::{self, Lang};
-use flick_ir::{Copies, ForeignMode};
+use flick_ir::{AdapterArg, BackendAdapter, Copies, ForeignMode};
 
 /// Pure foreign functions over a capability whose answer does not depend on
 /// whether its region is still open (G4 in `docs/formal/regions.md`): each
@@ -110,6 +110,11 @@ impl Checker<'_> {
         }
         let span = self.span(decl);
         self.check_meta(&info, &params, &body, span);
+        info.list_params = params
+            .iter()
+            .take(arity)
+            .map(|p| self.whnf(p).spine().0.is_lang(Lang::List))
+            .collect();
         info.adapter.result.unit = self
             .call_result(&body, arity)
             .is_some_and(|r| r.is_lang(Lang::Unit));

@@ -221,6 +221,8 @@ impl Checking<'_> {
             thresholds: read.thresholds,
             watched: self.watched,
             stages_by_class: self.stages_by_class,
+            foreign_backend: self.foreign_backend,
+            validate_foreign_metadata: self.validate_foreign_metadata,
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);
@@ -292,6 +294,7 @@ impl Checking<'_> {
                 options.thresholds,
             ));
         }
+        self.validate_official_foreign_adapters(&typing, &mut checked);
         self.watched_calls(loaded, &typing, &mut checked);
         let checked = types::beside_syntax_errors(tree, checked);
         let clean = !broken
@@ -458,6 +461,8 @@ fn redeclare(interface: &mut Interface, imported: &Interface) {
         }
     }
 }
+
+include!("checking_foreign.rs");
 
 include!("checking_inline_values.rs");
 

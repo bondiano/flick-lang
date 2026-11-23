@@ -432,24 +432,41 @@ export function prepareArgs(exec, spec, rawWireArgs, bridged, controller) {
     valueArgs.push(val);
   }
   const finalArgs = [...decoded];
-  if (spec.adapter.variadic && valueArgs.length > 0) {
+  if (hasAdapterWord(spec.adapter, "variadic") && valueArgs.length > 0) {
     const last = valueArgs.pop();
     finalArgs.push(...valueArgs);
     if (Array.isArray(last)) finalArgs.push(...last);
   } else {
     finalArgs.push(...valueArgs);
   }
-  if (spec.adapter.cancel && controller) {
+  if (hasAdapterWordArg(spec.adapter, "cancel", "signal") && controller) {
     finalArgs.push(controller.signal);
   }
   return finalArgs;
+}
+
+export function hasAdapterWord(adapter, name) {
+  return Array.isArray(adapter?.words) && adapter.words.some((w) => w.name === name);
+}
+
+export function hasAdapterWordArg(adapter, name, arg) {
+  return (
+    Array.isArray(adapter?.words) &&
+    adapter.words.some(
+      (w) =>
+        w.name === name &&
+        Array.isArray(w.args) &&
+        w.args.length === 1 &&
+        w.args[0]?.Word === arg,
+    )
+  );
 }
 
 export function invokeTarget(spec, target, finalArgs) {
   if (spec.arity === 0 && spec.taken === 0 && spec.dicts === 0 && spec.mode === "Pure") {
     return target;
   }
-  if (spec.adapter.receiver && finalArgs.length > spec.dicts) {
+  if (hasAdapterWord(spec.adapter, "this") && finalArgs.length > spec.dicts) {
     const receiver = finalArgs.splice(spec.dicts, 1)[0];
     return target.apply(receiver, finalArgs);
   }

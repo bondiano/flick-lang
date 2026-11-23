@@ -153,6 +153,9 @@ impl Ide<'_> {
         if let Some(items) = self.plugin_complete(file, offset, dotted) {
             return items;
         }
+        if !dotted && let Some(items) = self.foreign_meta_complete(file, offset) {
+            return items;
+        }
         let mut items = if dotted {
             self.after_dot(file, offset)
         } else {

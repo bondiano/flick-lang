@@ -282,6 +282,7 @@ impl<'a> Gen<'a> {
     ) -> Document<'a> {
         let a = self.a;
         let info = &f.adapter;
+        let variadic = info.has_word("variadic");
         let receiver_name = heads[f.dicts];
         let mut method_args: Vec<Document<'a>> = Vec::new();
         for i in 1..count {
@@ -298,13 +299,13 @@ impl<'a> Gen<'a> {
                         a.text(a.alloc_str(&n.to_string())),
                     ],
                 ));
-            } else if info.variadic && i + 1 == f.arity {
+            } else if variadic && i + 1 == f.arity {
                 method_args.push(call(a, "flickrt.List", [a.text(param_name)]));
             } else {
                 method_args.push(a.text(param_name));
             }
         }
-        let args_slice = if info.variadic && count > 1 {
+        let args_slice = if variadic && count > 1 {
             if let Some(last) = method_args.pop() {
                 if method_args.is_empty() {
                     last
@@ -340,6 +341,7 @@ impl<'a> Gen<'a> {
     ) -> Document<'a> {
         let a = self.a;
         let info = &f.adapter;
+        let variadic = info.has_word("variadic");
         let mut call_args: Vec<Document<'a>> = Vec::new();
         call_args.push(a.text(first));
         for &head in heads.iter().take(f.dicts) {
@@ -359,7 +361,7 @@ impl<'a> Gen<'a> {
                         a.text(a.alloc_str(&n.to_string())),
                     ],
                 ));
-            } else if info.variadic && i + 1 == f.arity {
+            } else if variadic && i + 1 == f.arity {
                 call_args.push(docvec![a, "flickrt.List(", param_name, ")..."]);
             } else {
                 call_args.push(a.text(param_name));
@@ -405,13 +407,14 @@ impl<'a> Gen<'a> {
             .collect();
 
         let info = &f.adapter;
+        let receiver = info.has_word("this");
         let first = match f.mode {
             ForeignMode::Pure | ForeignMode::Sync | ForeignMode::Effect => "fb",
             ForeignMode::Async => "ctx",
         };
         let count = if f.arity == 0 { 0 } else { taken };
 
-        let mut go = if info.receiver {
+        let mut go = if receiver {
             self.local_receiver_call(f, first, &heads, count)
         } else {
             self.local_free_call(f, first, &heads, count)
@@ -420,7 +423,7 @@ impl<'a> Gen<'a> {
         if let Some(catch_expr) = &f.catch {
             let catch_code = self.expr(catch_expr);
             let catch_doc = catch_code.to_doc(a);
-            let body = if info.receiver {
+            let body = if receiver {
                 docvec![a, "return ", go, ", nil"]
             } else {
                 docvec![a, "return ", go]

@@ -22,10 +22,8 @@ pub(super) fn str_lit(s: &str) -> Expr {
 
 fn canonical_adapter(arity: usize, result_copies: bool, result_shape: Shape) -> Adapter {
     Adapter {
-        receiver: false,
-        cancel: false,
         optional: Vec::new(),
-        variadic: false,
+        owned: Vec::new(),
         result: ResultAdapter {
             nullable: false,
             unit: false,
@@ -38,6 +36,7 @@ fn canonical_adapter(arity: usize, result_copies: bool, result_shape: Shape) -> 
         },
         shapes: vec![Shape::Data; arity],
         result_shape,
+        words: Vec::new(),
     }
 }
 

@@ -356,14 +356,17 @@ mod tests {
 
     use flick_backend::Backend;
     use flick_backend::host::{Budget, WasmBackend};
+    use flick_core::project::official_backends;
 
     use super::{IDS, checkout};
+    use crate::backends::options;
     use crate::component;
 
     /// The backends index lists what each pin says its component accepts,
     /// so the pin must say what the component's descriptor does.
     #[test]
     fn each_official_pin_lists_what_its_component_accepts() {
+        let core_official = official_backends();
         for id in IDS {
             let (pin, bytes) = checkout(id).expect("this checkout's component");
             let engine = component::engine().expect("an engine");
@@ -372,6 +375,20 @@ mod tests {
                 WasmBackend::load_with_cancellation(engine, pin, &bytes, Budget::default(), cancel)
                     .expect("the component loads");
             let descriptor = backend.describe();
+            assert!(flick_backend::validate_tags(&descriptor).is_ok(), "{id}");
+            assert!(
+                flick_backend::validate_foreign_metadata(&descriptor).is_ok(),
+                "{id}"
+            );
+            let from_core = core_official
+                .iter()
+                .find(|b| b.id == id)
+                .unwrap_or_else(|| panic!("official_backends missing {id}"));
+            assert_eq!(
+                &options::descriptor_tags(&descriptor),
+                from_core,
+                "{id} component descriptor differs from core official_backends()"
+            );
             let name = id.trim_start_matches("flick/");
             let path = Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join(format!("../backends/{name}/package/backend.json"));

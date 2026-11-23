@@ -1,3 +1,4 @@
+use crate::types::ForeignBackendSpec;
 use std::collections::HashMap;
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
@@ -62,6 +63,8 @@ fn check_modules(modules: &[(&str, &str, &str)]) -> Vec<Diagnostic> {
             thresholds: Thresholds::default(),
             watched: Watched::none(),
             stages_by_class: false,
+            foreign_backend: ForeignBackendSpec::default_js(),
+            validate_foreign_metadata: true,
         };
         diags.extend(types::check(
             &module,

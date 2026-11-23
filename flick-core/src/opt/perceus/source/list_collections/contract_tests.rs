@@ -138,10 +138,10 @@ mod tests {
                     Span::new(FileId::new(0), 0, 0),
                 ));
             }),
-            Box::new(|f| f.adapter.receiver = true),
-            Box::new(|f| f.adapter.cancel = true),
+            Box::new(|f| f.adapter.words.push(flick_ir::BackendAdapter { name: "this".into(), args: vec![], span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0) })),
+            Box::new(|f| f.adapter.words.push(flick_ir::BackendAdapter { name: "cancel".into(), args: vec![flick_ir::AdapterArg::Word("signal".into())], span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0) })),
             Box::new(|f| f.adapter.optional.push(1)),
-            Box::new(|f| f.adapter.variadic = true),
+            Box::new(|f| f.adapter.words.push(flick_ir::BackendAdapter { name: "variadic".into(), args: vec![], span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0) })),
             Box::new(|f| f.adapter.result.nullable = true),
             Box::new(|f| f.adapter.result.unit = true),
             Box::new(|f| f.adapter.callbacks.clear()),

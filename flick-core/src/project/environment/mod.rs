@@ -5,7 +5,14 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 
 #[cfg(not(target_arch = "wasm32"))]
+mod backends;
+#[cfg(not(target_arch = "wasm32"))]
 mod select;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use backends::official_backends;
+#[cfg(not(target_arch = "wasm32"))]
+use backends::{select_foreign_backend, upsert_backend};
 
 #[cfg(not(target_arch = "wasm32"))]
 use super::config::{BackendEnvironment, HostConfig};
@@ -18,6 +25,7 @@ use crate::diagnostics::{Diagnostic, Severity, codes, suggest};
 use crate::resolve::ModuleSyntax;
 use crate::source::{SourceFile, SourceMap, Span};
 use crate::syntax::when;
+use crate::types::{AdapterWordSpec, ForeignBackendSpec, TypeFormAttrSpec};
 #[cfg(not(target_arch = "wasm32"))]
 use select::resolve_selected;
 
@@ -30,7 +38,8 @@ pub struct BackendAxis {
     pub exclusive: bool,
 }
 
-/// Environment tags, axes, and built-in hosts published by a backend.
+/// Environment tags, axes, built-in hosts, and foreign metadata vocabulary
+/// published by a backend.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BackendTags {
     /// Full backend id, e.g. `"flick/js"`, `"flick/go"`, `"test/literal"`.
@@ -43,6 +52,22 @@ pub struct BackendTags {
     pub axes: Vec<BackendAxis>,
     /// Built-in `(backend, host)` environment pairs published by the backend.
     pub environments: Vec<(String, String)>,
+    /// Backend-declared foreign adapter words.
+    pub foreign_adapters: Vec<AdapterWordSpec>,
+    /// Backend-declared foreign type-form attributes (such as `@ts`, `@go`).
+    pub type_form_attributes: Vec<TypeFormAttrSpec>,
+}
+
+impl BackendTags {
+    /// Converts this backend's foreign adapter words and type-form attributes
+    /// into a [`ForeignBackendSpec`] for type checking and IDE queries.
+    pub fn foreign_spec(&self) -> ForeignBackendSpec {
+        ForeignBackendSpec {
+            backend_id: self.id.clone(),
+            adapters: self.foreign_adapters.clone(),
+            type_form_attributes: self.type_form_attributes.clone(),
+        }
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -93,6 +118,10 @@ pub struct TargetOverride {
     pub for_tests: bool,
     /// Specific test file paths selected for `flick test`, if any.
     pub test_paths: Vec<PathBuf>,
+    /// Skip invoking `Host::check_target` during `check_environment` when the
+    /// caller (`flick build` / `run` / `test` / `inspect`) runs backend
+    /// `check-target` itself during artifact generation.
+    pub skip_backend_check_target: bool,
 }
 
 /// Concrete environment resolved for checking, IDE analysis, or building.
@@ -139,51 +168,6 @@ impl ResolvedEnvironment {
     }
 }
 
-/// Built-in metadata for the official `flick/js` and `flick/go` backends.
-/// Must stay in sync with `backends/js/src/component.rs` and `backends/go/src/component.rs`.
-#[cfg(not(target_arch = "wasm32"))]
-pub fn official_backends() -> Vec<BackendTags> {
-    vec![
-        BackendTags {
-            id: "flick/js".into(),
-            short: "js".into(),
-            tags: vec!["js".into()],
-            axes: vec![
-                BackendAxis {
-                    name: "runtime".into(),
-                    tags: vec!["rt".into(), "effect".into()],
-                    default: Some("rt".into()),
-                    exclusive: true,
-                },
-                BackendAxis {
-                    name: "adapter".into(),
-                    tags: vec!["effect-adapter".into()],
-                    default: None,
-                    exclusive: false,
-                },
-            ],
-            environments: vec![
-                ("js".into(), "node".into()),
-                ("js".into(), "browser".into()),
-                ("js".into(), "bun".into()),
-                ("js".into(), "cloudflare".into()),
-            ],
-        },
-        BackendTags {
-            id: "flick/go".into(),
-            short: "go".into(),
-            tags: vec!["go".into()],
-            axes: vec![BackendAxis {
-                name: "cgo".into(),
-                tags: vec!["cgo".into()],
-                default: None,
-                exclusive: false,
-            }],
-            environments: vec![("go".into(), "native".into())],
-        },
-    ]
-}
-
 /// Result of resolving a project's environment and building its tag vocabulary.
 #[cfg(not(target_arch = "wasm32"))]
 pub(super) struct EnvironmentContext {
@@ -193,6 +177,11 @@ pub(super) struct EnvironmentContext {
     /// incomplete and must not emit false `FLICK-P066` errors.
     pub validate_tags: bool,
     pub resolved: Option<ResolvedEnvironment>,
+    /// Active backend's declared foreign adapter words and type-form attributes.
+    pub foreign_backend: ForeignBackendSpec,
+    /// Whether foreign metadata words and attributes should be validated against
+    /// `foreign_backend` (false when an uncached custom backend could not be loaded).
+    pub validate_foreign_metadata: bool,
 }
 
 /// Validates `@when "<cond>"` on a standalone file checked outside any project.
@@ -305,7 +294,10 @@ const OFFICIAL_TAGS: &[&str] = &[
 ];
 
 #[cfg(target_arch = "wasm32")]
-pub(super) struct EnvironmentContext;
+pub(super) struct EnvironmentContext {
+    pub foreign_backend: ForeignBackendSpec,
+    pub validate_foreign_metadata: bool,
+}
 
 #[cfg(target_arch = "wasm32")]
 pub(crate) fn validate_standalone_when(
@@ -346,7 +338,10 @@ pub(super) fn resolve(
     _sources: &SourceMap,
     _diagnostics: &mut Vec<Diagnostic>,
 ) -> EnvironmentContext {
-    EnvironmentContext
+    EnvironmentContext {
+        foreign_backend: ForeignBackendSpec::js(),
+        validate_foreign_metadata: true,
+    }
 }
 
 /// Resolves the project's active environment (when `require_resolved` is true)
@@ -392,6 +387,8 @@ pub(super) fn resolve(
             vocabulary: BTreeSet::new(),
             validate_tags: false,
             resolved: None,
+            foreign_backend: ForeignBackendSpec::js(),
+            validate_foreign_metadata: false,
         };
     }
 
@@ -473,11 +470,16 @@ pub(super) fn resolve(
         validate_condition_tags(cond, Some(span), Some(text), &vocabulary, diagnostics);
     }
 
+    let (foreign_backend, validate_foreign_metadata) =
+        select_foreign_backend(project, target_override, &backends);
+
     if !require_resolved {
         return EnvironmentContext {
             vocabulary,
             validate_tags: true,
             resolved: None,
+            foreign_backend,
+            validate_foreign_metadata,
         };
     }
 
@@ -496,14 +498,7 @@ pub(super) fn resolve(
         vocabulary,
         validate_tags: true,
         resolved,
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn upsert_backend(backends: &mut Vec<BackendTags>, extra: BackendTags) {
-    if let Some(existing) = backends.iter_mut().find(|b| b.id == extra.id) {
-        *existing = extra;
-    } else {
-        backends.push(extra);
+        foreign_backend,
+        validate_foreign_metadata,
     }
 }

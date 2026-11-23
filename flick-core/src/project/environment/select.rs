@@ -293,6 +293,8 @@ fn select_backend(
             tags: vec![short.to_owned()],
             axes: Vec::new(),
             environments: Vec::new(),
+            foreign_adapters: Vec::new(),
+            type_form_attributes: Vec::new(),
         });
     }
     #[cfg(feature = "native-project")]

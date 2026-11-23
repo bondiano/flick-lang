@@ -28,10 +28,9 @@ impl Lower<'_> {
             && value.mode == ForeignMode::Pure
             && stages == 1
             && value.catch.is_none()
-            && !value.adapter.receiver
-            && !value.adapter.cancel
+            && value.adapter.words.is_empty()
             && value.adapter.optional.is_empty()
-            && !value.adapter.variadic
+            && value.adapter.owned.is_empty()
             && value.adapter.result.nullable
         {
             return Some(self.intrinsic(

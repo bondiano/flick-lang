@@ -116,6 +116,29 @@ impl Checker<'_> {
         self.collect_ir_type_decls(&mut lower, typing);
     }
 
+    /// Lowers only the top-level schemes of `foreign` declarations when full
+    /// IR type lowering is skipped (for example during `CachedIr::Untyped`
+    /// target preflight), so backends always have `Foreign.ty`.
+    pub(super) fn finish_foreign_ir_types(
+        &self,
+        typing: &mut Typing,
+        ir_lookup: Option<ModuleLookup<'_>>,
+    ) {
+        let Some(root) = self.root else { return };
+        let mut lower = IrTypeLower::with_lookup(self, ir_lookup);
+        for decl in root.nodes().filter(|n| n.kind == K::ForeignDecl) {
+            let Some(name) = super::toplevel::foreign_name(decl, self.text) else {
+                continue;
+            };
+            let entity = self.env.entity(Namespace::Value, name);
+            if let Some(scheme) = self.env.value(&entity)
+                && let Some(lowered) = lower.lower_scheme(scheme)
+            {
+                typing.ir_top_schemes.insert(name.to_owned(), lowered);
+            }
+        }
+    }
+
     fn collect_ir_type_decls(&self, lower: &mut IrTypeLower<'_, '_>, typing: &mut Typing) {
         let Some(root) = self.root else { return };
         let module = &self.env.module;

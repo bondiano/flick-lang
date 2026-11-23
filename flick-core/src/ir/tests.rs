@@ -1,3 +1,4 @@
+use crate::types::ForeignBackendSpec;
 use std::collections::BTreeSet;
 use std::path::Path;
 use std::{env, fs};
@@ -57,6 +58,8 @@ pub(crate) fn check_text_with(
         thresholds: types::Thresholds::default(),
         watched: Watched::none(),
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     let (more, typing) = types::check_typed(&module, &builtin, builtins, options, &mut interface);
     diagnostics.extend(parse.diagnostics);

@@ -28,10 +28,9 @@ impl Lower<'_> {
             from == "flick:rt" && bind == "routeParse" && value.adapter.result.nullable;
         if is_route_parse {
             if value.catch.is_some()
-                || value.adapter.receiver
-                || value.adapter.cancel
+                || !value.adapter.words.is_empty()
                 || !value.adapter.optional.is_empty()
-                || value.adapter.variadic
+                || !value.adapter.owned.is_empty()
                 || stages != 2
             {
                 return None;

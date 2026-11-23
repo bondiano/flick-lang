@@ -62,6 +62,8 @@ fn go_test_descriptor() -> Descriptor {
             },
             services: vec!["Database".into(), "Db".into(), "Server".into()],
         }],
+        foreign_adapters: vec![],
+        type_form_attributes: vec![],
     }
 }
 

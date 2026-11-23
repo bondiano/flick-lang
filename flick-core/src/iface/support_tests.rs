@@ -1,3 +1,4 @@
+use crate::types::ForeignBackendSpec;
 use std::io;
 use std::path::Path;
 use std::slice;
@@ -208,6 +209,8 @@ fn consumer(interface: &Interface, text: &str) -> Vec<Diagnostic> {
             thresholds: types::Thresholds::default(),
             watched: types::Watched::none(),
             stages_by_class: false,
+            foreign_backend: ForeignBackendSpec::default_js(),
+            validate_foreign_metadata: true,
         },
         &mut checked,
     ));

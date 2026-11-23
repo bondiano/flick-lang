@@ -134,6 +134,8 @@ struct Output {
     fresh: Vec<Fresh>,
     #[cfg(feature = "ide")]
     analyzed: Vec<Analyzed>,
+    #[cfg(feature = "ide")]
+    foreign_backend: types::ForeignBackendSpec,
 }
 
 struct Loader<'a> {
@@ -144,6 +146,10 @@ struct Loader<'a> {
     project: Option<&'a Project>,
     /// The mode every module of the run and the built-in modules are checked in.
     stages_by_class: bool,
+    /// Foreign adapter words and type-form attributes declared by the active backend.
+    foreign_backend: types::ForeignBackendSpec,
+    /// Whether unknown foreign metadata words and attributes should be rejected.
+    validate_foreign_metadata: bool,
     #[cfg(feature = "native-project")]
     packages: Packages,
     modules: Vec<Loaded>,
@@ -343,6 +349,8 @@ fn run_in(
     // a check lowers the modules of source packages only to save them;
     // a selected target or environment also needs IR for reachable-use preflight
     let lower_packages_only = mode == Mode::Check && saved.is_some() && !environment_preflight;
+    #[cfg(feature = "ide")]
+    let ide_foreign_backend = env_ctx.foreign_backend.clone();
     let mut loader = Loader {
         expression_serial: 0,
         expressions_active: BTreeSet::new(),
@@ -350,6 +358,8 @@ fn run_in(
         sources,
         project,
         stages_by_class,
+        foreign_backend: env_ctx.foreign_backend.clone(),
+        validate_foreign_metadata: env_ctx.validate_foreign_metadata,
         #[cfg(feature = "native-project")]
         packages,
         modules: Vec::new(),
@@ -510,6 +520,8 @@ fn run_in(
         fresh,
         #[cfg(feature = "ide")]
         analyzed,
+        #[cfg(feature = "ide")]
+        foreign_backend: ide_foreign_backend,
     }
 }
 

@@ -89,6 +89,9 @@ pub fn validate(
                     }
                 }
                 ItemKind::Foreign(foreign) => {
+                    for word in &foreign.adapter.words {
+                        v.span(word.span);
+                    }
                     if let Some(ty) = &foreign.ty {
                         v.check_type_wf(ty, None);
                     }

@@ -59,6 +59,7 @@ change needs.
 | [Backend options move to `--target` and `[target.<name>]`](#backend-options-move-to---target-and-targetname) | no | `FLICK-P057`, `FLICK-P058`, `FLICK-P059` |
 | [Target dependencies move to `[target.<name>.dependencies]` and backends own package managers](#target-dependencies-move-to-targetnamedependencies-and-backends-own-package-managers) | no | `FLICK-P051`, `FLICK-P057`, `FLICK-P063` |
 | [The IR carries full layout types (`0.14.0`)](#the-ir-carries-full-layout-types-0140) | no | — |
+| [Backends declare foreign adapter metadata (`0.15.0`)](#backends-declare-foreign-adapter-metadata-0150) | no | `FLICK-S011`, `FLICK-S014` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -747,3 +748,20 @@ checks type well-formedness, type argument counts and annotation agreement with
 the terms they describe, while keeping erased nodes valid. Ordinary Flick
 programs require no source changes; `flick/js` and `flick/go` ignore the new
 compound type fields beyond bare type-constructor names.
+
+## Backends declare foreign adapter metadata (`0.15.0`)
+
+The portable IR moves from `0.14.0` to `0.15.0`: `flick_ir::Adapter` replaces
+hardcoded `receiver`/`cancel`/`variadic` booleans with backend-declared adapter
+words (`words: Vec<BackendAdapter>`, each carrying its name, typed arguments,
+and source span) alongside core contract fields (`nullable`, `optional`,
+`retention`, `owned`, `callbacks`). Each backend component now declares its own
+foreign adapter words (`foreign-adapters`) and foreign type-form attributes
+(`type-form-attributes`, such as `@ts` on `flick/js` or `@go` on `flick/go`) in
+its WIT `descriptor` and validates its own adapter words in `check-target`
+(including during `flick check` and editor analysis with `command = "check"`).
+
+Backend components and `ir`-hook plugins must rebuild against `flick-ir`
+`0.15.0` and `flick-backend` and update their descriptor `ir` range to
+`[0.15.0, 0.16.0)`. Ordinary Flick bindings on `flick/js` and `flick/go`
+require no source changes.
