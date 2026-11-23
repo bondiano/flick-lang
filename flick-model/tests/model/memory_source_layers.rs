@@ -2,8 +2,8 @@
 use std::{fs, path::Path};
 
 use flick_core::build;
-use flick_core::ir::Lit;
 use flick_core::ir::memory::{self, Name};
+use flick_core::ir::{AdapterArg, BackendAdapter, Lit};
 use flick_core::opt::perceus;
 use flick_model::memory::{Error, Heap, ProgramOutcome, execute_program_outcome};
 use flick_model::run;
@@ -264,7 +264,11 @@ fn unknown_layer_adapters_reject_before_execution_or_heap_changes() {
             .iter_mut()
             .find_map(|item| match &mut item.kind {
                 ItemKind::Foreign(value) if value.binding.name == binding => {
-                    value.adapter.cancel = true;
+                    value.adapter.words.push(BackendAdapter {
+                        name: "cancel".into(),
+                        args: vec![AdapterArg::Word("signal".into())],
+                        span: item.span,
+                    });
                     Some((item.span, value.name.clone()))
                 }
                 _ => None,

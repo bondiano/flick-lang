@@ -1,6 +1,7 @@
 use super::parse_ok;
 use crate::diagnostics::codes;
 use crate::source::SourceMap;
+use crate::types::ForeignBackendSpec;
 use crate::types::{Limits, Options, Thresholds, Watched};
 use crate::{doc, iface, ir, resolve, types};
 
@@ -76,6 +77,8 @@ fn pack_lowers_to_a_record_of_public_values() {
         thresholds: types::Thresholds::default(),
         watched,
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     let (checked, typing) = types::check_typed(
         &module,
@@ -206,6 +209,8 @@ fn static_module_contract_preserves_abstract_class_and_service_shapes() {
         thresholds: Thresholds::default(),
         watched,
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     let diagnostics = types::check(
         &module,

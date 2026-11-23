@@ -2,11 +2,14 @@
 title: "FLICK-F001"
 ---
 
-Foreign metadata must fit the signature and the mode: `arity` counts the JS
-arguments and is at most the number of parameters, `arity 0` drops a first
-`()` argument, `optional i` names an `Option` argument, `variadic` spreads a
-last `List`, `nullable` makes an `Option` result, `cancel signal` is for
-a promise, a row with `Async`, and `catch` is for a mode that can throw.
+Foreign metadata must fit the signature, the mode, and the active backend's
+adapter rules: core contract words require `arity` to be at most the number of
+parameters (`arity 0` drops a first `()` argument), `optional i` to name an
+`Option` argument, `nullable` to have an `Option` result, `owned i` to name a
+valid argument, and `catch` to be used on a mode that can fail. Backend-declared
+adapter words (such as `this`, `variadic`, and `cancel signal` /
+`cancel context` on `flick/js` and `flick/go`, or custom words declared by
+another backend) are validated against the binding by that backend.
 `foreign sync` and `foreign async` are words of before: without a mode word
 the signature tells how the host is called.
 

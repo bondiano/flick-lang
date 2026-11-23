@@ -11,7 +11,6 @@ pub(in crate::types) struct PendingForeign {
     pub(super) info: ForeignInfo,
     pub(super) retention: Option<Retention>,
     pub(super) arity: Vec<(Node, Option<usize>)>,
-    pub(super) cancel: Vec<Node>,
     pub(super) catch: Vec<(Node, Node, Option<Type>)>,
     pub(super) span: Span,
     pub(super) name: String,
@@ -88,12 +87,6 @@ impl Checker<'_> {
                 self.bad_meta(node, &format!(
                     "`arity` takes the number of JS arguments, at most the {stages} parameters of the signature"
                 ));
-            }
-        }
-        if mode != ForeignMode::Async {
-            pending.info.adapter.cancel = false;
-            for node in &pending.cancel {
-                self.bad_meta(node, "`cancel signal` is for a call whose row has `Async`: only a promise can be aborted");
             }
         }
         for (item, mapping, error) in &pending.catch {

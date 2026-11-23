@@ -92,10 +92,8 @@ fn adapter(kind: Collection, map_variant: usize) -> Adapter {
         }
     }
     Adapter {
-        receiver: false,
-        cancel: false,
         optional: vec![],
-        variadic: false,
+        owned: vec![],
         result: ResultAdapter {
             nullable: false,
             unit: false,
@@ -108,6 +106,7 @@ fn adapter(kind: Collection, map_variant: usize) -> Adapter {
         },
         shapes: vec![Shape::Data; arity],
         result_shape: Shape::Data,
+        words: vec![],
     }
 }
 

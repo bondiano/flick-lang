@@ -552,18 +552,6 @@ pub(super) fn method_member(p: &mut Parser) {
     }
 }
 
-const FOREIGN_META: [&str; 9] = [
-    "arity",
-    "this",
-    "catch",
-    "cancel",
-    "nullable",
-    "retention",
-    "optional",
-    "variadic",
-    "reviewed",
-];
-
 /// `foreign mode name from (global "path" | "module" "export")` + metadata
 /// lines, or `foreign blocked name "reason"`.
 fn foreign_decl(p: &mut Parser) {
@@ -602,18 +590,6 @@ fn foreign_decl(p: &mut Parser) {
 fn meta_item(p: &mut Parser) {
     let m = p.start();
     if p.at(K::Ident) || p.at(K::CatchKw) {
-        let name = p.raw();
-        if !FOREIGN_META.contains(&p.text_of(name)) {
-            p.error_at(
-                codes::S011,
-                p.span(name.start, name.end),
-                format!(
-                    "unknown foreign metadata `{}`; expected one of: {}",
-                    p.text_of(name),
-                    FOREIGN_META.join(", ")
-                ),
-            );
-        }
         if p.at(K::CatchKw) {
             p.bump_as(K::Ident);
         } else {

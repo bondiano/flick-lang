@@ -1,12 +1,15 @@
 //! Decode only declared plain inputs, without compiler objects or callbacks.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use flick_backend::{BuildRequest, Diagnostic, GoProjection, InputKind, Inputs};
+use flick_backend::{
+    BuildRequest, Diagnostic, GoProjection, InputKind, Inputs, ModuleRole, Severity, Span,
+};
 use flick_ir::Program;
 
 use super::failure;
 use crate::codegen::Bindings;
+use crate::foreign_meta;
 
 /// The Go binding tables of the implicit packages: resource inputs whose id
 /// starts so, one table each.
@@ -19,6 +22,7 @@ pub(super) enum Command {
     Dev,
     Test,
     Inspect,
+    Check,
 }
 
 pub(super) struct Data {
@@ -108,6 +112,34 @@ impl Data {
             inspect_module,
         })
     }
+
+    pub fn check(&self, request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
+        let own_modules: BTreeSet<&str> = request
+            .modules
+            .iter()
+            .filter(|m| m.role == ModuleRole::Own)
+            .map(|m| m.name.as_str())
+            .collect();
+        let foreign_diagnostics: Vec<Diagnostic> =
+            foreign_meta::validate_program(&self.program, &own_modules)
+                .into_iter()
+                .map(|d| Diagnostic {
+                    code: d.code.into(),
+                    severity: Severity::Error,
+                    message: d.message,
+                    span: Some(Span {
+                        file: d.span.file.index(),
+                        start: d.span.start,
+                        end: d.span.end,
+                    }),
+                    notes: vec![],
+                })
+                .collect();
+        if !foreign_diagnostics.is_empty() {
+            return Err(foreign_diagnostics);
+        }
+        Ok(())
+    }
 }
 
 fn options(
@@ -126,6 +158,7 @@ fn options(
                     "dev" => Command::Dev,
                     "test" => Command::Test,
                     "inspect" => Command::Inspect,
+                    "check" => Command::Check,
                     other => return Err(failure("P012", format!("unknown command `{other}`"))),
                 })
                 .is_some(),

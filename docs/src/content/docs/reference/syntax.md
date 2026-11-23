@@ -128,9 +128,10 @@ Contextual words are ordinary names everywhere except in one position:
   and `:` in a type (see [packed modules](../modules/#packed-modules-and-existential-results));
 - foreign modes `pure`, `effect`, `blocked` and the source
   `global`;
-- foreign metadata `arity`, `this`, `catch`, `cancel`, `nullable`,
-  `retention`, `optional`, `variadic`, `reviewed` (unknown metadata is
-  `FLICK-S011`);
+- foreign metadata: core contract words (`arity`, `catch`, `retention`,
+  `nullable`, `optional`, `reviewed`, `owned`) plus adapter words declared by
+  the active backend (such as `this`, `cancel`, `variadic` on `flick/js` and
+  `flick/go`; unknown metadata is `FLICK-S011`);
 - `sql` before a body, a name and a body, `table` or `migration`: a block of
   the plugin of `std`, which reads its clauses, its columns and its DDL (see
   [sql.md](../sql/));
@@ -593,7 +594,7 @@ type Gauge = Gauge Float
 | - | - | - | - |
 | `@implicit` | an instance | the instance converts between two types where the expected type is known | [implicit conversions](../classes/#implicit-conversions) |
 | `@derive` | a class | a plugin derives it: that of the class's package, or of the package named, `@derive std` | [deriving](../classes/#deriving) |
-| `@ts` | a type or a service | its TypeScript form, `none`, or `import` of a type of a package | [the form of a type](../codegen/#the-form-of-a-type) |
+| `@ts` (and backend type-form attributes such as `@go`) | a type or a service | backend-declared foreign type form, `none`, or `import` of a type of a package | [the form of a type](../codegen/#the-form-of-a-type) |
 | `@stores` | a type without constructors or a body | its values keep the functions they are given | [qualifiers](../regions/#qualifiers) |
 | `@label` | a type | its top-level values carry their names where the program runs; the kind, `@label atom`, says which builds keep them | [observability](../observability/#ui-actions-and-atom-writes) |
 | `@cell`, `@maker`, `@owner` | a type; a value; a service | each value of the type holds one value; the value makes an atom, an action or a view; the service's handler owns what is made under it | [checks of calls](../plugins/#checks-of-calls) |

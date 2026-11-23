@@ -20,15 +20,17 @@ impl Lower<'_> {
         let bind = value.binding.name.as_str();
         let stages = value.stages.len();
 
-        let is_make = from == "flick:Chunk" && bind == "make" && value.adapter.variadic;
+        let is_make = from == "flick:Chunk"
+            && bind == "make"
+            && value.adapter.words.len() == 1
+            && value.adapter.has_word("variadic");
         if !is_make && !has_standard_shape(value) {
             return None;
         }
         if is_make
             && (value.catch.is_some()
-                || value.adapter.receiver
-                || value.adapter.cancel
                 || !value.adapter.optional.is_empty()
+                || !value.adapter.owned.is_empty()
                 || value.adapter.result.nullable)
         {
             return None;

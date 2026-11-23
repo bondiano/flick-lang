@@ -1,3 +1,4 @@
+use crate::types::ForeignBackendSpec;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::syntax::{self, cst::Node};
@@ -30,6 +31,8 @@ pub(in crate::types) fn with_source<T>(
         thresholds: Thresholds::default(),
         watched: Watched::none(),
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     let mut checker = types::checker_in(
         &module,

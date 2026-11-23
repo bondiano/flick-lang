@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Expr, TypeRef};
+use crate::{Expr, Span, TypeRef};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Foreign {
@@ -69,19 +69,34 @@ pub enum ForeignMode {
     Effect,
 }
 
-/// What a `foreign` declaration says about how values cross: the arguments
-/// as the function takes them, and its result as the program gets it.
+/// One positional argument passed to a backend-declared foreign adapter word.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AdapterArg {
+    Word(String),
+    Int(u64),
+    String(String),
+}
+
+/// One backend-declared adapter word attached to a `foreign` binding, with
+/// its parsed arguments and source span for backend-owned diagnostics.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackendAdapter {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<AdapterArg>,
+    pub span: Span,
+}
+
+/// What a `foreign` declaration says about how values cross: the core
+/// contract fields plus any backend-declared adapter words.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Adapter {
-    /// The first argument is the receiver of the call, `this`.
-    pub receiver: bool,
-    /// The function also takes what cancels it, as its last argument.
-    pub cancel: bool,
     /// The arguments the function may go without: an absent `Option` is
     /// left out.
     pub optional: Vec<usize>,
-    /// The last argument, a list, is spread into the arguments.
-    pub variadic: bool,
+    /// The arguments whose ownership transfers to the foreign call (`owned`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub owned: Vec<usize>,
     pub result: ResultAdapter,
     /// For each argument: the number of arguments of the function of the
     /// host a callback is adapted to.
@@ -92,6 +107,35 @@ pub struct Adapter {
     pub shapes: Vec<Shape>,
     #[serde(default)]
     pub result_shape: Shape,
+    /// Backend-declared adapter words (for example `this`, `cancel signal`,
+    /// `variadic`, or third-party backend words) in declaration order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub words: Vec<BackendAdapter>,
+}
+
+impl Adapter {
+    /// Whether the binding carries a backend-declared adapter word named `name`.
+    pub fn has_word(&self, name: &str) -> bool {
+        self.words.iter().any(|word| word.name == name)
+    }
+
+    /// The first backend-declared adapter word named `name`, if any.
+    pub fn word(&self, name: &str) -> Option<&BackendAdapter> {
+        self.words.iter().find(|word| word.name == name)
+    }
+
+    /// Every backend-declared adapter word named `name`, in declaration order.
+    pub fn words_named<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a BackendAdapter> {
+        self.words.iter().filter(move |word| word.name == name)
+    }
+
+    /// Whether the binding carries `name` with a single `AdapterArg::Word(arg)`.
+    pub fn has_word_arg(&self, name: &str, arg: &str) -> bool {
+        self.words.iter().any(|word| {
+            word.name == name
+                && matches!(word.args.as_slice(), [AdapterArg::Word(actual)] if actual == arg)
+        })
+    }
 }
 
 /// The part of a type that must change when a value crosses the Effect bridge.

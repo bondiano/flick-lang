@@ -158,6 +158,14 @@ impl Checking<'_> {
             format!("{} {}", self.stages_by_class, self.lower_packages_only),
         );
         key.add("config", format!("{:?}", project.config.checked()));
+        key.add(
+            "foreign-backend",
+            serde_json::to_vec(&(
+                self.foreign_backend_for(loaded),
+                self.env_ctx.validate_foreign_metadata,
+            ))
+            .unwrap_or_default(),
+        );
         key.add("path", loaded.path.to_string_lossy().as_bytes());
         key.add("source", self.sources.get(loaded.file).text.as_bytes());
         key.add("text", self.text_of(loaded));

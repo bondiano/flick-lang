@@ -1,4 +1,5 @@
 use crate::types::Elided;
+use crate::types::ForeignBackendSpec;
 use std::fmt::Write;
 
 use crate::iface::Interface;
@@ -40,6 +41,8 @@ fn probe(text: &str) -> Interface {
         thresholds: types::Thresholds::default(),
         watched: Watched::none(),
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     types::check(
         &module,

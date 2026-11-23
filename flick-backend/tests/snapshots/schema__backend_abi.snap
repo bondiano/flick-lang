@@ -85,6 +85,31 @@ interface types {
     services: list<string>,
   }
 
+  variant adapter-arg-kind {
+    keyword(list<string>),
+    param-index,
+    uint,
+    text,
+    word,
+  }
+
+  record adapter-arg {
+    name: string,
+    kind: adapter-arg-kind,
+  }
+
+  record adapter-word {
+    name: string,
+    args: list<adapter-arg>,
+    repeatable: bool,
+    doc: string,
+  }
+
+  record type-form-attribute {
+    name: string,
+    doc: string,
+  }
+
   record descriptor {
     identity: backend-id,
     backend-api: version-range,
@@ -105,6 +130,8 @@ interface types {
     foreign-extension: option<string>,
     foreign-suffixes: list<string>,
     handled-services: list<environment-services>,
+    foreign-adapters: list<adapter-word>,
+    type-form-attributes: list<type-form-attribute>,
   }
 
   record target-request {

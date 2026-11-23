@@ -2,6 +2,7 @@ use super::*;
 use crate::resolve::{self, Module};
 use crate::source::SourceMap;
 use crate::types::Elided;
+use crate::types::ForeignBackendSpec;
 use crate::{syntax, types};
 
 #[test]
@@ -48,6 +49,8 @@ fn interface_of(text: &str) -> Interface {
         thresholds: types::Thresholds::default(),
         watched: types::Watched::none(),
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     diagnostics.extend(types::check(
         &module,

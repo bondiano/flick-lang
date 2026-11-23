@@ -3,7 +3,10 @@
 
 use std::rc::Rc;
 
-use flick_ir::{Dict, ExprKind, Foreign, ForeignMode, ItemKind, LangItem, Rep, Shape, Stage};
+use flick_ir::{
+    AdapterArg, BackendAdapter, Dict, ExprKind, FileId, Foreign, ForeignMode, ItemKind, LangItem,
+    Rep, Shape, Span, Stage,
+};
 
 use super::super::{
     DefTable, DictEnv, DictValue, Env, EvalBudget, EvalConfig, EvalOutcome, NativePrimitive,
@@ -80,6 +83,17 @@ fn declines_homonyms_alternate_adapters_missing_roles_and_bad_ctor_rep() {
     assert_eq!(prims.arity("Int", "parse", &known), None);
 }
 
+fn adapter_word(name: &str, arg: Option<&str>) -> BackendAdapter {
+    BackendAdapter {
+        name: name.into(),
+        args: arg
+            .into_iter()
+            .map(|w| AdapterArg::Word(w.into()))
+            .collect(),
+        span: Span::new(FileId::new(0), 0, 0),
+    }
+}
+
 #[test]
 fn declines_mutated_foreign_declarations_dynamic_dicts_and_unknown_operands() {
     let (lang, builtins) = default_env();
@@ -100,10 +114,10 @@ fn declines_mutated_foreign_declarations_dynamic_dicts_and_unknown_operands() {
         |f| f.binding.from = Some("./evil.mjs".into()),
         |f| f.binding.name.push('X'),
         |f| f.catch = Some(int(0)),
-        |f| f.adapter.receiver = true,
-        |f| f.adapter.cancel = true,
+        |f| f.adapter.words.push(adapter_word("this", None)),
+        |f| f.adapter.words.push(adapter_word("cancel", Some("signal"))),
         |f| f.adapter.optional.push(0),
-        |f| f.adapter.variadic = true,
+        |f| f.adapter.words.push(adapter_word("variadic", None)),
         |f| f.adapter.result.nullable = true,
         |f| f.adapter.result.unit = true,
         |f| f.adapter.callbacks[0] = Some(1),

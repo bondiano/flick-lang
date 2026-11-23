@@ -214,6 +214,7 @@ impl Checking<'_> {
                 .is_some_and(|p| loaded.definition_package() == Some(p)),
         };
         let read = (self.project).map_or_else(Checked::default, |p| p.config.checked());
+        let foreign_backend = self.foreign_backend_for(loaded);
         let options = types::Options {
             local: &local,
             limits: read.limits,
@@ -221,6 +222,8 @@ impl Checking<'_> {
             thresholds: read.thresholds,
             watched: self.watched,
             stages_by_class: self.stages_by_class,
+            foreign_backend: &foreign_backend,
+            validate_foreign_metadata: self.env_ctx.validate_foreign_metadata,
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);
@@ -292,6 +295,7 @@ impl Checking<'_> {
                 options.thresholds,
             ));
         }
+        Self::validate_official_foreign_adapters(&foreign_backend, &typing, &mut checked);
         self.watched_calls(loaded, &typing, &mut checked);
         let checked = types::beside_syntax_errors(tree, checked);
         let clean = !broken
@@ -458,6 +462,8 @@ fn redeclare(interface: &mut Interface, imported: &Interface) {
         }
     }
 }
+
+include!("checking_foreign.rs");
 
 include!("checking_inline_values.rs");
 

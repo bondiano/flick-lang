@@ -62,12 +62,14 @@ use std::io;
 #[cfg(test)]
 mod tests;
 
+#[cfg(any(feature = "native-project", not(target_arch = "wasm32")))]
+use crate::diagnostics::Diagnostic;
 #[cfg(feature = "native-project")]
-use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::diagnostics::{Severity, codes};
 use crate::plugin::Expander;
 use crate::plugin::reach::Outside;
 use crate::source::FileId;
-#[cfg(feature = "native-project")]
+#[cfg(any(feature = "native-project", not(target_arch = "wasm32")))]
 use crate::source::SourceMap;
 
 #[cfg(feature = "native-project")]
@@ -145,6 +147,20 @@ pub trait Host {
     /// such as `flick inspect --emit iface`.
     fn loads_backends(&self) -> bool {
         true
+    }
+    /// Runs the selected backend's `check-target` validation during `flick check`
+    /// and IDE analysis when a target/environment is selected.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn check_target(
+        &self,
+        project: &Project,
+        compilation: &Compilation,
+        sources: &SourceMap,
+        environment: &ResolvedEnvironment,
+        stages_by_class: bool,
+    ) -> Vec<Diagnostic> {
+        let _ = (project, compilation, sources, environment, stages_by_class);
+        Vec::new()
     }
 }
 

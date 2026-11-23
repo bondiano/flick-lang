@@ -17,10 +17,8 @@ pub(super) fn supports(value: &Foreign) -> bool {
         && value.catch.is_none()
         && value.adapter
             == Adapter {
-                receiver: false,
-                cancel: false,
                 optional: vec![],
-                variadic: false,
+                owned: vec![],
                 result: ResultAdapter {
                     nullable: false,
                     unit: false,
@@ -33,6 +31,7 @@ pub(super) fn supports(value: &Foreign) -> bool {
                 },
                 shapes: vec![Shape::Data, Shape::Data],
                 result_shape: Shape::Data,
+                words: vec![],
             }
 }
 
@@ -162,10 +161,8 @@ mod tests {
     }
     fn adapter() -> Adapter {
         Adapter {
-            receiver: false,
-            cancel: false,
             optional: vec![],
-            variadic: false,
+            owned: vec![],
             result: ResultAdapter {
                 nullable: false,
                 unit: false,
@@ -178,6 +175,7 @@ mod tests {
             },
             shapes: vec![Shape::Data, Shape::Data],
             result_shape: Shape::Data,
+            words: vec![],
         }
     }
     #[test]
@@ -220,10 +218,28 @@ mod tests {
                     Span::new(FileId::new(0), 0, 0),
                 ));
             },
-            |f| f.adapter.receiver = true,
-            |f| f.adapter.cancel = true,
+            |f| {
+                f.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "this".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
+            |f| {
+                f.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "cancel".into(),
+                    args: vec![flick_ir::AdapterArg::Word("signal".into())],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
             |f| f.adapter.optional.push(1),
-            |f| f.adapter.variadic = true,
+            |f| {
+                f.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "variadic".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
             |f| f.adapter.result.nullable = true,
             |f| f.adapter.result.unit = true,
             |f| f.adapter.callbacks[0] = Some(2),
@@ -303,7 +319,7 @@ mod tests {
                 | ExprKind::Await(_)
                 | ExprKind::Within(..)
                 | ExprKind::Global { .. } => {
-                    panic!("synthetic listShow must not add task, owner or host/global boundaries")
+                    panic!("synthetic listShow must not add task, owner or host/global boundaries");
                 }
                 _ => {}
             }

@@ -168,6 +168,8 @@ impl Ide<'_> {
             thresholds: types::Thresholds::default(),
             watched: Watched::none(),
             stages_by_class: false,
+            foreign_backend: &self.analysis.foreign_backend,
+            validate_foreign_metadata: true,
         };
         !types::check(
             &module,

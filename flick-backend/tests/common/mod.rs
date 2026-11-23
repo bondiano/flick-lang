@@ -120,7 +120,7 @@ pub fn descriptor() -> Descriptor {
     Descriptor {
         identity: request().backend.identity,
         backend_api: range("0.1.0", "0.2.0"),
-        ir: range("0.14.0", "0.15.0"),
+        ir: range("0.15.0", "0.16.0"),
         language: range("0.1.0", "0.2.0"),
         runtime_abis: vec![NamedRange {
             name: "flickrt".into(),
@@ -140,6 +140,8 @@ pub fn descriptor() -> Descriptor {
         foreign_extension: None,
         foreign_suffixes: vec![],
         handled_services: vec![],
+        foreign_adapters: vec![],
+        type_form_attributes: vec![],
     }
 }
 

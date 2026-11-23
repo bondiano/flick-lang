@@ -306,9 +306,11 @@ exported values with their projected types (see [Public TypeScript interfaces](.
 
 ### The form of a type
 
-`@ts` before the declaration of a type or a service says what the type is in
-TypeScript. Such a type is not declared: every module that names it writes
-the form, and imports only what the forms it wrote name.
+`@ts` (a foreign type-form attribute declared by `flick/js` in
+`descriptor.type-form-attributes`; other backends declare their own, such as
+`@go` on `flick/go`) before the declaration of a type or a service says what
+the type is in TypeScript. Such a type is not declared: every module that names
+it writes the form, and imports only what the forms it wrote name.
 
 ```flick
 @ts "$Dayjs"
@@ -651,11 +653,12 @@ in `flick.toml`, or `--allow-tool go` for a file built outside a project
 (`FLICK-P029` otherwise). It is built without cgo by default, so no C compiler is
 needed either; pass `--cgo` (or `[target.go] cgo = true`) to build with `CGO_ENABLED=1`.
 
-## Portable IR (0.14.0)
+## Portable IR (0.15.0)
 
-Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.14.0"`),
-checked against the `ir` version range (`[0.14.0, 0.15.0)`) in its descriptor.
-Alongside values, stages, dictionaries and lang items, IR `0.14.0` carries the
+Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.15.0"`),
+checked against the `ir` version range (`[0.15.0, 0.16.0)`) in its descriptor.
+Alongside values, stages, dictionaries, lang items and backend-declared foreign
+adapter words (`Foreign.adapter.{words, owned}`), IR `0.15.0` carries the
 layout-relevant types the checker inferred so layout-aware and monomorphizing
 backends can lay out values by value without calling back into the checker:
 
