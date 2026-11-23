@@ -1,0 +1,312 @@
+// Algebraic and capability law tests for every shipped collection instance.
+module Language.CollectionClassLaws exposing (tests)
+
+import Collections exposing (Indexed(..), Keyed(..), Member(..), Sized(..), ToSeq(..))
+
+bytes_of : List Int -> Bytes.Bytes
+let bytes_of xs = Bytes.from_list xs |> Result.with_default Bytes.empty
+
+// Law helper for `Sized` + `ToSeq`.
+sized_to_seq_laws : (Sized c, ToSeq c a, Eq a) => c -> Bool
+let sized_to_seq_laws xs =
+  let s = to_seq xs
+  let first_pass = Seq.to_list s
+  let second_pass = Seq.to_list s
+  let counted = Seq.fold (fun n _ -> n + 1) 0 s
+  size xs >= 0
+    && is_empty xs == (size xs == 0)
+    && size xs == counted
+    && eq first_pass second_pass
+    && eq (first xs) (Seq.first s)
+
+// Law helper for `Indexed` + `ToSeq`.
+indexed_laws : (Indexed c a, ToSeq c a, Eq a) => c -> Bool
+let indexed_laws xs =
+  let n = size xs
+  let enum_ok = Seq.all (fun (i, x) -> eq (at i xs) (Some x)) (Seq.enumerate (to_seq xs))
+  let bounds_ok =
+    Option.is_none (at (-1) xs)
+      && Option.is_none (at n xs)
+      && eq (at 0 xs) (first xs)
+      && eq (last xs) (at (n - 1) xs)
+  enum_ok && bounds_ok
+
+// Law helper for `Keyed` + `ToSeq`.
+keyed_laws : (Keyed c k v, ToSeq c (k, v), Eq v) => k -> c -> Bool
+let keyed_laws absent m =
+  let entries_ok = Seq.all (fun (k, v) -> has_key k m && eq (lookup k m) (Some v)) (to_seq m)
+  let absent_ok = has_key absent m == Option.is_some (lookup absent m)
+  let empty_ok =
+    if is_empty m then Option.is_none (lookup absent m) && not (has_key absent m) else true
+  entries_ok && absent_ok && empty_ok
+
+// Law helper for `Member` + `ToSeq`.
+member_laws : (Member c Int, ToSeq c Int) => c -> Bool
+let member_laws xs =
+  let all_present = Seq.all (fun x -> member x xs) (to_seq xs)
+  let absent_ok = not (member 250 xs)
+  let empty_ok = if is_empty xs then not (member 1 xs) else true
+  all_present && absent_ok && empty_ok
+
+// Law helper for `Functor`.
+functor_laws : (Functor f, Eq (f Int)) => f Int -> Bool
+let functor_laws xs =
+  let g = fun n -> n * 3 + 1
+  let h = fun n -> n - 2
+  eq (map identity xs) xs && eq (map (fun x -> g (h x)) xs) (map g (map h xs))
+
+// Law helper for `Semigroup`.
+semigroup_laws : (Semigroup a, Eq a) => a -> a -> a -> Bool
+let semigroup_laws x y z = eq (combine (combine x y) z) (combine x (combine y z))
+
+// Law helper for `Monoid`.
+monoid_laws : (Monoid a, Eq a) => a -> Bool
+let monoid_laws x = eq (combine empty x) x && eq (combine x empty) x
+
+// Law helper for `Foldable`: `fold_map` agrees with `fold`.
+foldable_laws : Foldable f => f Int -> Bool
+let foldable_laws xs =
+  let via_fold = fold (fun acc n -> acc ++ [n + 1]) [] xs
+  let via_fold_map = fold_map (fun n -> [n + 1]) xs
+  via_fold == via_fold_map
+
+tests : List Test.Test
+let tests = [
+  Test.group "instance laws" [
+    Test.test "ToSeq and Sized laws hold for every shipped finite collection" (fun () ->
+      let hm = HashMap.from_list EqHash.canonical [("a", 1), ("b", 2), ("c", 3)]
+      let hs = HashSet.from_list EqHash.canonical [1, 2, 3]
+      let tr = Trie.from_list [("", 0), ("a", 1), ("ab", 2)]
+      Test.equal [true, true, true, true, true, true, true, true, true, true, true] [
+        sized_to_seq_laws ([] : List Int),
+        sized_to_seq_laws [1, 2, 3],
+        sized_to_seq_laws (NonEmpty.cons 1 [2, 3]),
+        sized_to_seq_laws (Chunk.empty : Chunk.Chunk Int),
+        sized_to_seq_laws (Chunk.concat (Chunk.from_list [1, 2]) (Chunk.from_list [3])),
+        sized_to_seq_laws (Chunk.make 1 [2, 3]),
+        sized_to_seq_laws Bytes.empty,
+        sized_to_seq_laws (bytes_of [0, 127, 255]),
+        sized_to_seq_laws hm,
+        sized_to_seq_laws hs,
+        sized_to_seq_laws tr,
+      ]
+    ),
+    Test.test "ToSeq restartability and first law hold for Seq" (fun () ->
+      let s = Seq.range 5 9
+      let p1 = Seq.to_list (to_seq s)
+      let p2 = Seq.to_list (to_seq s)
+      let empty_s : Seq Int = Seq.empty
+      Test.equal (true, true, true) (
+        p1 == p2 && p1 == [5, 6, 7, 8],
+        first s == Seq.first (to_seq s),
+        first empty_s == None,
+      )
+    ),
+    Test.test "Indexed laws hold for every shipped indexed collection" (fun () ->
+      Test.equal [true, true, true, true, true, true, true, true] [
+        indexed_laws ([] : List Int),
+        indexed_laws [10, 20, 30],
+        indexed_laws (NonEmpty.cons 10 [20, 30]),
+        indexed_laws (Chunk.empty : Chunk.Chunk Int),
+        indexed_laws (Chunk.concat (Chunk.from_list [10]) (Chunk.from_list [20, 30])),
+        indexed_laws (Chunk.make 10 [20, 30]),
+        indexed_laws Bytes.empty,
+        indexed_laws (bytes_of [10, 20, 30]),
+      ]
+    ),
+    Test.test "Keyed and Functor-Keyed coherence laws hold for HashMap and Trie" (fun () ->
+      let hm = HashMap.from_list EqHash.canonical [("a", 1), ("b", 2), ("c", 3)]
+      let hm_empty : HashMap.HashMap EqHash.Canonical String Int = HashMap.empty
+      let tr = Trie.from_list [("", 0), ("a", 1), ("b", 2)]
+      let tr_empty : Trie.Trie Int = Trie.empty
+      let f = fun n -> n * 10
+      let hm_mapped = map f hm
+      let tr_mapped = map f tr
+      let functor_keyed_ok =
+        size hm_mapped == size hm
+          && lookup "b" hm_mapped == Option.map f (lookup "b" hm)
+          && lookup "z" hm_mapped == None
+          && size tr_mapped == size tr
+          && lookup "" tr_mapped == Option.map f (lookup "" tr)
+          && lookup "z" tr_mapped == None
+      Test.equal [true, true, true, true, true] [
+        keyed_laws "missing" hm,
+        keyed_laws "missing" hm_empty,
+        keyed_laws "missing" tr,
+        keyed_laws "missing" tr_empty,
+        functor_keyed_ok,
+      ]
+    ),
+    Test.test "Member laws hold for every shipped member collection" (fun () ->
+      Test.equal [true, true, true, true, true, true, true, true, true] [
+        member_laws ([] : List Int),
+        member_laws [1, 2, 3],
+        member_laws (NonEmpty.cons 1 [2, 3]),
+        member_laws (Chunk.empty : Chunk.Chunk Int),
+        member_laws (Chunk.from_list [1, 2, 3]),
+        member_laws (Chunk.make 1 [2, 3]),
+        member_laws (HashSet.empty : HashSet.HashSet EqHash.Canonical Int),
+        member_laws (HashSet.from_list EqHash.canonical [1, 2, 3]),
+        member_laws (bytes_of [1, 2, 3])
+          && not (member (-1) (bytes_of [1, 2, 3]))
+          && not (member 256 (bytes_of [1, 2, 3])),
+      ]
+    ),
+    Test.test "Functor laws hold for every shipped Functor collection" (fun () ->
+      let seq_ok =
+        let s = Seq.range 1 5
+        let g = fun n -> n * 3 + 1
+        let h = fun n -> n - 2
+        Seq.to_list (map identity s) == Seq.to_list s
+          && Seq.to_list (map (fun x -> g (h x)) s) == Seq.to_list (map g (map h s))
+      Test.equal [true, true, true, true, true, true, true] [
+        functor_laws [1, 2, 3],
+        seq_ok,
+        functor_laws (NonEmpty.cons 1 [2, 3]),
+        functor_laws (Chunk.from_list [1, 2, 3]),
+        functor_laws (Chunk.make 1 [2, 3]),
+        functor_laws (HashMap.from_list EqHash.canonical [("a", 1), ("b", 2)]),
+        functor_laws (Trie.from_list [("", 0), ("a", 1), ("b", 2)]),
+      ]
+    ),
+    Test.test
+      "Foldable laws and traversal-order agreement hold for every shipped Foldable collection"
+      (fun () ->
+        let seq_order =
+          fold (fun acc n -> acc ++ [n]) [] (Seq.range 1 4) == Seq.to_list (to_seq (Seq.range 1 4))
+        let hm = HashMap.from_list EqHash.canonical [("a", 1), ("b", 2), ("c", 3)]
+        let hs = HashSet.from_list EqHash.canonical [1, 2, 3]
+        let tr = Trie.from_list [("c", 3), ("a", 1), ("b", 2)]
+        let hm_order =
+          fold (fun acc v -> acc ++ [v]) [] hm
+            == List.map (fun (_, v) -> v) (Seq.to_list (to_seq hm))
+        let hs_order = fold (fun acc x -> acc ++ [x]) [] hs == Seq.to_list (to_seq hs)
+        let tr_order = fold (fun acc v -> acc ++ [v]) [] tr == [1, 2, 3]
+        Test.equal [true, true, true, true, true, true, true, true, true, true, true, true] [
+          foldable_laws [1, 2, 3],
+          foldable_laws (Seq.range 1 4),
+          foldable_laws (NonEmpty.cons 1 [2, 3]),
+          foldable_laws (Chunk.from_list [1, 2, 3]),
+          foldable_laws (Chunk.make 1 [2, 3]),
+          foldable_laws hm,
+          foldable_laws hs,
+          foldable_laws tr,
+          seq_order,
+          hm_order,
+          hs_order,
+          tr_order,
+        ]
+      ),
+    Test.effect_test
+      "Traversable identity and order laws hold for every shipped Traversable collection"
+      (task {
+        let l = [1, 2, 3]
+        let ne = NonEmpty.cons 1 [2, 3]
+        let ch = Chunk.from_list [1, 2, 3]
+        let nech = Chunk.make 1 [2, 3]
+        let hm = HashMap.from_list EqHash.canonical [("a", 1), ("b", 2)]
+        let tr = Trie.from_list [("b", 2), ("a", 1)]
+        let log = Ref.make ([] : List Int)
+        let record_id = fun n ->
+          Ref.modify log (fun xs -> ((), xs ++ [n]))
+          n
+        let l2 = traverse record_id l
+        let ne2 = traverse record_id ne
+        let ch2 = traverse record_id ch
+        let nech2 = traverse record_id nech
+        let hm2 = traverse record_id hm
+        let tr2 = traverse record_id tr
+        Test.check
+          (Test.equal (true, true, true, true, true, true, [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]) (
+            eq l2 l,
+            eq ne2 ne,
+            eq ch2 ch,
+            eq nech2 nech,
+            eq hm2 hm,
+            eq tr2 tr,
+            List.take 12 (Ref.get log),
+          ))
+      }),
+    Test.test "Semigroup and Monoid laws hold for every shipped collection" (fun () ->
+      let s1 = Seq.of_list [1]
+      let s2 = Seq.of_list [2, 3]
+      let s3 = Seq.of_list [4]
+      let seq_semi =
+        Seq.to_list (combine (combine s1 s2) s3) == Seq.to_list (combine s1 (combine s2 s3))
+      let seq_monoid =
+        Seq.to_list (combine empty s2) == Seq.to_list s2
+          && Seq.to_list (combine s2 empty) == Seq.to_list s2
+      let hm1 = HashMap.from_list EqHash.canonical [("a", 1), ("b", 2)]
+      let hm2 = HashMap.from_list EqHash.canonical [("b", 20), ("c", 3)]
+      let hm3 = HashMap.from_list EqHash.canonical [("c", 30), ("d", 4)]
+      let hs1 = HashSet.from_list EqHash.canonical [1, 2]
+      let hs2 = HashSet.from_list EqHash.canonical [2, 3]
+      let hs3 = HashSet.from_list EqHash.canonical [3, 4]
+      let t1 = Trie.from_list [("a", 1), ("b", 2)]
+      let t2 = Trie.from_list [("b", 20), ("c", 3)]
+      let t3 = Trie.from_list [("c", 30), ("d", 4)]
+      let b1 = bytes_of [1, 2]
+      let b2 = bytes_of [3]
+      let b3 = bytes_of [4, 5]
+      Test.equal
+        [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+        ]
+        [
+          semigroup_laws [1] [2, 3] [4],
+          monoid_laws [1, 2],
+          seq_semi,
+          seq_monoid,
+          semigroup_laws (NonEmpty.singleton 1) (NonEmpty.cons 2 [3]) (NonEmpty.singleton 4),
+          semigroup_laws (Chunk.from_list [1]) (Chunk.from_list [2, 3]) (Chunk.from_list [4]),
+          monoid_laws (Chunk.from_list [1, 2]),
+          semigroup_laws (Chunk.of 1) (Chunk.make 2 [3]) (Chunk.of 4),
+          semigroup_laws hm1 hm2 hm3,
+          monoid_laws hm1,
+          semigroup_laws hs1 hs2 hs3,
+          monoid_laws hs1,
+          semigroup_laws t1 t2 t3,
+          monoid_laws t1,
+          semigroup_laws b1 b2 b3,
+          monoid_laws b1,
+        ]
+    ),
+    Test.test "Applicative, Monad, and Alternative laws hold for NonEmpty and Chunk" (fun () ->
+      let ne = NonEmpty.cons 1 [2]
+      let f_ne = fun n -> NonEmpty.cons n [n * 10]
+      let g_ne = fun n -> NonEmpty.cons (n + 1) [n + 2]
+      let ne_laws =
+        eq (flat_map f_ne (pure 3)) (f_ne 3)
+          && eq (flat_map pure ne) ne
+          && eq (flat_map g_ne (flat_map f_ne ne)) (flat_map (fun x -> flat_map g_ne (f_ne x)) ne)
+          && eq
+            (map2 (fun a b -> a + b) (NonEmpty.cons 1 [2]) (NonEmpty.cons 10 [20]))
+            (NonEmpty.cons 11 [21, 12, 22])
+      let ch = Chunk.from_list [1, 2]
+      let f_ch = fun n -> Chunk.from_list [n, n * 10]
+      let g_ch = fun n -> Chunk.from_list [n + 1]
+      let ch_laws =
+        eq (flat_map f_ch (pure 3)) (f_ch 3)
+          && eq (flat_map pure ch) ch
+          && eq (flat_map g_ch (flat_map f_ch ch)) (flat_map (fun x -> flat_map g_ch (f_ch x)) ch)
+          && eq (or_else (nothing : Chunk.Chunk Int) ch) ch
+          && eq (or_else ch nothing) ch
+      Test.equal (true, true) (ne_laws, ch_laws)
+    ),
+  ],
+]

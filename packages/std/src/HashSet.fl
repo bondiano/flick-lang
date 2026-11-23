@@ -106,3 +106,29 @@ foreign pure reduce from "flick:HashSet" "flickReduce"
 /// instances; a repeated element is kept once.
 json : Hash a => PureCodec Json a -> PureCodec Json (HashSet EqHash.Canonical a)
 foreign pure json from "flick:Schema" "flickHashSetJson"
+
+to_seq_held : (HashSet w a)^d -> (Seq a)^d
+foreign pure to_seq_held from "flick:rt" "hashSetToSeq"
+  retention call
+
+instance Eq (HashSet w a) =
+  let eq left right = size left == size right && is_subset right left
+
+instance Foldable (HashSet w) =
+  let fold f init set = reduce init f set
+
+instance Semigroup (HashSet w a) =
+  let combine left right = union left right
+
+instance Hash a => Monoid (HashSet EqHash.Canonical a) =
+  let empty = empty
+
+instance Collections.ToSeq (HashSet w a) a =
+  let to_seq set = to_seq_held set
+
+instance Collections.Sized (HashSet w a) =
+  let size set = size set
+  let is_empty set = is_empty set
+
+instance Collections.Member (HashSet w a) a =
+  let member value set = member value set

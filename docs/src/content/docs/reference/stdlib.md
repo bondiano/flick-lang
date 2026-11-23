@@ -30,14 +30,17 @@ Signatures the specification gives are declared word for word;
 | `parallel`, `parallel_all`, `parallel_results`, `parallel_exits`, `race_success`, `race_first`, `timeout`, `timeout_option` | structured concurrency, see [runtime.md](../runtime/) |
 | `Failure`, `Exit`, `RawCause`, `CauseReport` | opaque outcomes |
 
-`Option`, `Result`, `List` and `Eff r e` have instances of the classes that
-fit them: `Functor`, `Foldable`, `Traversable` (sequential), `Applicative`
-and `Monad`.
+`Option`, `Result`, `List`, `Seq`, `NonEmpty`, `Chunk`, `NonEmptyChunk`,
+`HashMap`, `HashSet`, `Trie`, `Bytes` and `Eff r e` have instances of the
+Prelude and `Collections` classes whose laws they satisfy; see
+[collection type classes](../collections/) for the full hierarchy, laws,
+instance matrix and complexity bounds.
 
 ## Modules
 
 | Module | Contents |
 | - | - |
+| `Collections` | shared collection capability classes (`ToSeq`, `Sized`, `Indexed`, `Keyed`, `Member`) and minimal-capability generic consumers (`take`, `find`, `any`, `all`, `each_effect`, `fold_effect`, `to_list`, `count`, `lookup_or`, `lookup_all`, `filter_members`, `all_in`, `endpoints`, `nth_from_end`); see [collection type classes](../collections/) |
 | `List` | `map` (pure callback), `map_effect` (runtime callback, one element after another), `map_indexed`, `each_effect`, folds, `filter`, `find`, `sort` (stable, by `Ord`), `sort_by`, `get`, `slice`, `range`, `zip`, … |
 | `Seq` | lazy sequences that start over on each iteration: infinite `from`, `iterate`, `repeat`, `cycle`, `unfold`; `range`, `map`, `filter`, `flat_map`, `take`, `take_while`, `drop`, `zip`, `enumerate`, `scan`, `chunks`, `windows`, `find`, `first`, `to_list`, `fold`, `each_effect`; a `Monad` for `do`; `Stream.from_seq` streams one |
 | `Option`, `Result` | `map`, `bind`, `with_default` and conversions |

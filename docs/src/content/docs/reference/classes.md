@@ -52,7 +52,9 @@ in order), `Applicative` (`pure`, `map2`), `Monad` (`flat_map`),
 (`combine`) and `Monoid` (`empty`). `do` goes through `Monad`, `Applicative`
 and `Alternative`, and `for` through `Iterable` (see
 [expressions](../syntax/#expressions)). What their callbacks hold is in
-[qualifiers](../regions/#qualifiers).
+[qualifiers](../regions/#qualifiers). Core module `Collections` adds open
+collection capability classes (`ToSeq`, `Sized`, `Indexed`, `Keyed`, `Member`)
+over concrete collection types; see [collection type classes](../collections/).
 
 ## Implicit conversions
 

@@ -1,0 +1,221 @@
+/// Shared collection capabilities: restartable `Seq` traversal, finite size,
+/// zero-based indexed access, keyed lookup, and membership.
+///
+/// Prelude classes (`Functor`, `Foldable`, `Traversable`, `Semigroup`,
+/// `Monoid`) handle compatible mapping, folding, effectful traversal, and
+/// combination. Each class here captures one capability shared by at least two
+/// collections under the same laws, so generic consumers request only what
+/// they need.
+module Collections exposing (
+  ToSeq(..),
+  Sized(..),
+  Indexed(..),
+  Keyed(..),
+  Member(..),
+  take,
+  find,
+  any,
+  all,
+  each_effect,
+  fold_effect,
+  to_list,
+  count,
+  lookup_or,
+  lookup_all,
+  filter_members,
+  all_in,
+  endpoints,
+  nth_from_end,
+)
+
+/// Collections whose elements or entries can be traversed lazily from the
+/// start as a restartable `Seq`, preserving captures.
+///
+/// Laws:
+/// - `first xs == Seq.first (to_seq xs)`
+/// - Restartability: iterating `to_seq xs` again yields the same elements in
+///   the same order without mutating `xs`.
+/// - Prefix laziness: `Seq.take n (to_seq xs)` pulls at most `n` elements.
+class ToSeq c a | c -> a =
+  /// A lazy, restartable sequence of the elements or entries in traversal order.
+  to_seq : forall d. c^d -> (Seq a)^d
+  /// The first element or entry in traversal order, or `None` when empty.
+  first : forall d. c^d -> Option a
+  let first xs = Seq.first (to_seq xs)
+  law first_is_seq_first (xs : c) where equal (first xs) (Seq.first (to_seq xs))
+
+/// Collections with a finite, non-negative count of elements or entries.
+/// Potentially infinite `Seq` intentionally has no instance.
+///
+/// Laws:
+/// - `size xs >= 0`
+/// - `is_empty xs == (size xs == 0)`
+class Sized c =
+  /// The finite number of elements or entries.
+  size : c -> Int
+  /// Whether the collection holds no elements or entries.
+  is_empty : c -> Bool
+  let is_empty xs = size xs == 0
+  law non_negative (xs : c) where holds (size xs >= 0)
+  law is_empty_zero (xs : c) where equal (is_empty xs) (size xs == 0)
+
+/// Finite collections with zero-based positional access in `0 .. size xs - 1`.
+///
+/// Laws:
+/// - `Option.is_some (at i xs) == (i >= 0 && i < size xs)`
+/// - `at (-1) xs == None` and `at (size xs) xs == None`
+/// - `last xs == at (size xs - 1) xs`
+/// - When `ToSeq c a` also holds, `at i xs` matches the `i`-th element of
+///   `to_seq xs` and `at 0 xs == first xs`.
+class Sized c => Indexed c a | c -> a =
+  /// The element at zero-based `index`, or `None` outside `0 .. size xs - 1`.
+  at : Int -> c -> Option a
+  /// The last element, or `None` when empty.
+  last : c -> Option a
+  let last xs = at (size xs - 1) xs
+  law in_bounds (i : Int) (xs : c) where equal (Option.is_some (at i xs)) (i >= 0 && i < size xs)
+  law negative_out_of_bounds (xs : c) where equal (at (-1) xs) None
+  law end_out_of_bounds (xs : c) where equal (at (size xs) xs) None
+  law last_at_end (xs : c) where equal (last xs) (at (size xs - 1) xs)
+
+/// Finite associative collections supporting lookup by key under the
+/// collection's own key equivalence.
+///
+/// Laws:
+/// - `has_key key m == Option.is_some (lookup key m)`
+/// - If `is_empty m`, then `lookup key m == None` and `has_key key m == false`.
+/// - When `ToSeq c (k, v)` also holds, every `(k, v)` yielded by `to_seq m`
+///   satisfies `lookup k m == Some v`.
+class Sized c => Keyed c k v | c -> k v =
+  /// The value bound to `key` under the collection's key equivalence, if any.
+  lookup : k -> c -> Option v
+  /// Whether `key` has a binding in the collection.
+  has_key : k -> c -> Bool
+  let has_key key m = Option.is_some (lookup key m)
+  law has_key_is_lookup (key : k) (m : c)
+  where equal (has_key key m) (Option.is_some (lookup key m))
+
+/// Finite collections supporting element membership testing under the
+/// collection's own equivalence.
+///
+/// Laws:
+/// - If `is_empty xs`, then `member value xs == false`.
+/// - When `ToSeq c a` also holds, `member value xs` holds iff `to_seq xs`
+///   yields an element equivalent to `value` under `xs`'s equivalence.
+class Sized c => Member c a | c -> a =
+  /// Whether an element equivalent to `value` belongs to the collection.
+  member : a -> c -> Bool
+  member : (ToSeq c a, Eq a) => a -> c -> Bool
+  let member value xs = Seq.any (fun y -> eq value y) (to_seq xs)
+
+seq_of_list_held : (List a)^d -> (Seq a)^d
+foreign pure seq_of_list_held from "flick:rt" "seqOfList"
+  retention call
+
+seq_of_non_empty_held : (NonEmpty.NonEmpty a)^d -> (Seq a)^d
+foreign pure seq_of_non_empty_held from "flick:rt" "seqOfList"
+  retention call
+
+head_list_held : (List a)^d -> Option a
+let head_list_held xs = Seq.first (seq_of_list_held xs)
+
+head_non_empty_held : (NonEmpty.NonEmpty a)^d -> Option a
+let head_non_empty_held xs = Seq.first (seq_of_non_empty_held xs)
+
+instance ToSeq (List a) a =
+  let to_seq xs = seq_of_list_held xs
+  let first xs = head_list_held xs
+
+instance Sized (List a) =
+  let size xs = List.length xs
+
+instance Indexed (List a) a =
+  let at index xs = List.get index xs
+
+instance Eq a => Member (List a) a =
+  let member value xs = List.contains value xs
+
+instance ToSeq (Seq a) a =
+  let to_seq xs = xs
+  let first xs = Seq.first xs
+
+instance ToSeq (NonEmpty.NonEmpty a) a =
+  let to_seq xs = seq_of_non_empty_held xs
+  let first xs = head_non_empty_held xs
+
+instance Sized (NonEmpty.NonEmpty a) =
+  let size xs = NonEmpty.length xs
+  let is_empty _ = false
+
+instance Indexed (NonEmpty.NonEmpty a) a =
+  let at index xs = List.get index (NonEmpty.to_list xs)
+  let last xs = Some (NonEmpty.last xs)
+
+instance Eq a => Member (NonEmpty.NonEmpty a) a =
+  let member value xs = List.contains value (NonEmpty.to_list xs)
+
+/// The first `n` elements as a lazy sequence; works on infinite `Seq`.
+take : ToSeq c a => Int -> c^d -> (Seq a)^d
+let take n xs = Seq.take n (to_seq xs)
+
+/// The first element satisfying `p`, short-circuiting on the first match.
+find : ToSeq c a => (a -> Bool)^f -> c^d -> Option a
+let find p xs = Seq.find p (to_seq xs)
+
+/// Whether some element satisfies `p`, short-circuiting on the first match.
+any : ToSeq c a => (a -> Bool)^f -> c^d -> Bool
+let any p xs = Seq.any p (to_seq xs)
+
+/// Whether every element satisfies `p`, short-circuiting on the first mismatch.
+all : ToSeq c a => (a -> Bool)^f -> c^d -> Bool
+let all p xs = Seq.all p (to_seq xs)
+
+/// Runs a runtime function on each element in traversal order, short-circuiting
+/// on typed failure.
+each_effect : ToSeq c a => (a ->{r; e} Unit)^f -> c^d ->{r; e} Unit
+let each_effect f xs = Seq.each_effect f (to_seq xs)
+
+/// Folds elements in traversal order with a runtime step, short-circuiting on
+/// typed failure.
+fold_effect : ToSeq c a => (b -> a ->{r; e} b)^f -> b -> c^d ->{r; e} b
+let fold_effect f init xs = Seq.fold_effect f init (to_seq xs)
+
+/// Materializes any finite traversable collection into a `List` in traversal
+/// order. Refuses potentially infinite `Seq` at compile time via `Sized`.
+to_list : (Sized c, ToSeq c a) => c^d -> List a
+let to_list xs = Seq.to_list (to_seq xs)
+
+/// Counts how many elements of a finite traversable collection satisfy `p`.
+count : (Sized c, ToSeq c a) => (a -> Bool)^f -> c^d -> Int
+let count p xs = Seq.fold (fun n x -> if p x then n + 1 else n) 0 (to_seq xs)
+
+/// The value bound to `key`, or `fallback` when absent.
+lookup_or : Keyed c k v => v -> k -> c -> v
+let lookup_or fallback key m = Option.with_default fallback (lookup key m)
+
+/// Looks up every key yielded by `keys` in `m`, keeping found `(key, value)`
+/// pairs lazily in key-sequence order.
+lookup_all : (Keyed c k v, ToSeq ks k) => ks^d -> c -> (Seq (k, v))^d
+let lookup_all keys m =
+  Seq.filter_map (fun k -> Option.map (fun v -> (k, v)) (lookup k m)) (to_seq keys)
+
+/// Lazily yields the elements of `xs` that are members of `allowed`.
+filter_members : (ToSeq c a, Member s a) => s -> c^d -> (Seq a)^d
+let filter_members allowed xs = Seq.filter (fun x -> member x allowed) (to_seq xs)
+
+/// Whether every element of `xs` belongs to `allowed`, short-circuiting on the
+/// first element not in `allowed`.
+all_in : (ToSeq c a, Member s a) => s -> c^d -> Bool
+let all_in allowed xs = Seq.all (fun x -> member x allowed) (to_seq xs)
+
+/// The first and last elements of an indexed collection, or `None` when empty.
+endpoints : Indexed c a => c -> Option (a, a)
+let endpoints xs =
+  match (at 0 xs, last xs) with
+  | (Some a, Some b) -> Some (a, b)
+  | _ -> None
+
+/// The element `n` positions from the end (`0` is the last), or `None` out of
+/// bounds.
+nth_from_end : Indexed c a => Int -> c -> Option a
+let nth_from_end n xs = if n < 0 then None else at (size xs - 1 - n) xs

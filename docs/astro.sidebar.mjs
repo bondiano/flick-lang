@@ -63,7 +63,7 @@ export const sidebar = [
       {
         label: "Runtime",
         translations: { ru: "Среда выполнения" },
-        items: ["stdlib", "runtime"].map(reference),
+        items: ["stdlib", "collections", "runtime"].map(reference),
       },
       {
         label: "Specification",

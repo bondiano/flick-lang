@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: eba3798544d21abc
+source_hash: d91336c0d73c2a29
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -33,14 +33,17 @@ source_hash: eba3798544d21abc
 | `parallel`, `parallel_all`, `parallel_results`, `parallel_exits`, `race_success`, `race_first`, `timeout`, `timeout_option` | структурированная конкурентность, см. [среду выполнения](../runtime/) |
 | `Failure`, `Exit`, `RawCause`, `CauseReport` | непрозрачные исходы выполнения |
 
-Для `Option`, `Result`, `List` и `Eff r e` определены подходящие им
-экземпляры классов из списка `Functor`, `Foldable`, `Traversable`
-(последовательный), `Applicative` и `Monad`.
+Для `Option`, `Result`, `List`, `Seq`, `NonEmpty`, `Chunk`, `NonEmptyChunk`,
+`HashMap`, `HashSet`, `Trie`, `Bytes` и `Eff r e` определены те экземпляры
+классов `Prelude` и `Collections`, чьи законы они выполняют; полная иерархия,
+законы, матрица экземпляров и оценки сложности приведены в разделе
+[классы типов для коллекций](../collections/).
 
 ## Модули
 
 | Модуль | Содержимое |
 | - | - |
+| `Collections` | общие классы возможностей коллекций (`ToSeq`, `Sized`, `Indexed`, `Keyed`, `Member`) и обобщённые операции с минимальными ограничениями (`take`, `find`, `any`, `all`, `each_effect`, `fold_effect`, `to_list`, `count`, `lookup_or`, `lookup_all`, `filter_members`, `all_in`, `endpoints`, `nth_from_end`); см. [классы типов для коллекций](../collections/) |
 | `List` | `map` (принимает чистую функцию), `map_effect` (принимает эффектную функцию и обрабатывает элементы последовательно), `map_indexed`, `each_effect`, свёртки, `filter`, `find`, `sort` (стабильная сортировка по `Ord`), `sort_by`, `get`, `slice`, `range`, `zip`, … |
 | `Seq` | ленивые последовательности, каждая итерация начинается заново: бесконечные `from`, `iterate`, `repeat`, `cycle`, `unfold`; `range`, `map`, `filter`, `flat_map`, `take`, `take_while`, `drop`, `zip`, `enumerate`, `scan`, `chunks`, `windows`, `find`, `first`, `to_list`, `fold`, `each_effect`; `Monad` для `do`; `Stream.from_seq` превращает её в поток |
 | `Monoids` | `Sum` и `Product` чисел, `First` и `Last` от `Option`, `Min` и `Max` по `Ord`: `fold_map Sum xs` говорит, как складывать числа |

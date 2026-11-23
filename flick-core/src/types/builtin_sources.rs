@@ -43,6 +43,7 @@ pub(super) const CORE: &[(&str, &str)] = &[
     ),
     ("List", builtin_source!("core", "List.fl")),
     ("Seq", builtin_source!("core", "Seq.fl")),
+    ("Collections", builtin_source!("core", "Collections.fl")),
     ("Monoids", builtin_source!("core", "Monoids.fl")),
     ("Validation", builtin_source!("core", "Validation.fl")),
     ("CallSite", builtin_source!("core", "CallSite.fl")),

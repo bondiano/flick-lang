@@ -226,10 +226,14 @@ class Iterable (f : Type -> Type) =
 /// Values with an associative `combine`.
 class Semigroup a =
   combine : a -> a -> a
+  law associativity (x : a) (y : a) (z : a)
+  where equal (combine (combine x y) z) (combine x (combine y z))
 
 /// A `Semigroup` whose `empty` changes nothing it is combined with.
 class Semigroup a => Monoid a =
   empty : a
+  law left_identity (x : a) where equal (combine empty x) x
+  law right_identity (x : a) where equal (combine x empty) x
 
 @lang exit
 /// How a computation ended: its value, or how it failed (`Exit.value`,

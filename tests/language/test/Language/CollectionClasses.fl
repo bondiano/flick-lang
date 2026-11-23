@@ -1,0 +1,512 @@
+// Shared collection type-class hierarchy: generic consumers, defaults, lazy
+// prefixes, custom witnesses, scoped callbacks, #695/#723 regressions, and
+// dictionary coherence across imports and local givens.
+module Language.CollectionClasses exposing (tests)
+
+import Arena
+import Collections exposing (Indexed(..), Keyed(..), Member(..), Sized(..), ToSeq(..))
+import Language.CollectionClassDefs exposing (
+  AssocMap,
+  Bag,
+  assoc_of,
+  bag_of,
+  generic_lookup_report,
+  generic_size_of,
+  generic_summary,
+  packed_sized_override,
+)
+
+type error Stop = Stop Int
+  deriving Eq, Show
+
+// #723 helper: mixed capture-free and region-capturing closures in both orders.
+keep2 : List (a^c) -> a^c ->{} List (a^c)
+let keep2 xs x =
+  match xs with
+  | [y, ..._] -> [x, y]
+  | [] -> [x]
+
+fresh_label : Unit ->{} String
+let fresh_label () = "fresh"
+
+call_in_slot : Arena.Value s String -> (Unit ->{; e} String)^{s} ->{; e} String
+let call_in_slot _ f = f ()
+
+bytes_of : List Int -> Bytes.Bytes
+let bytes_of xs = Bytes.from_list xs |> Result.with_default Bytes.empty
+
+// Higher-rank generic consumer verifying local given propagation.
+with_to_seq_first : (forall c a. ToSeq c a => c -> Option a) -> (Option Int, Option Int)
+let with_to_seq_first pick = (pick [7, 8], pick (bytes_of [9, 10]))
+
+tests : List Test.Test
+let tests = [
+  Test.group "generic operations and defaults" [
+    Test.test "ToSeq, Sized, Indexed, Member across sequence collections" (fun () ->
+      let xs = [10, 20, 30]
+      let ne = NonEmpty.cons 10 [20, 30]
+      let ch = Chunk.concat (Chunk.from_list [10]) (Chunk.from_list [20, 30])
+      let nech = Chunk.make 10 [20, 30]
+      let bs = bytes_of [10, 20, 30]
+      let bag = bag_of [10, 20, 30]
+      Test.equal
+        (
+          [3, 3, 3, 3, 3, 3],
+          [false, false, false, false, false, false],
+          [Some 10, Some 10, Some 10, Some 10, Some 10, Some 10],
+          [Some 20, Some 20, Some 20, Some 20, Some 20, Some 20],
+          [Some 30, Some 30, Some 30, Some 30, Some 30, Some 30],
+          [true, true, true, true, true, true],
+          [false, false, false, false, false, false],
+          [
+            Some (10, 30),
+            Some (10, 30),
+            Some (10, 30),
+            Some (10, 30),
+            Some (10, 30),
+            Some (10, 30),
+          ],
+          [Some 20, Some 20, Some 20, Some 20, Some 20, Some 20],
+          [[10, 20, 30], [10, 20, 30], [10, 20, 30], [10, 20, 30], [10, 20, 30], [10, 20, 30]],
+        )
+        (
+          [size xs, size ne, size ch, size nech, size bs, size bag],
+          [is_empty xs, is_empty ne, is_empty ch, is_empty nech, is_empty bs, is_empty bag],
+          [first xs, first ne, first ch, first nech, first bs, first bag],
+          [at 1 xs, at 1 ne, at 1 ch, at 1 nech, at 1 bs, at 1 bag],
+          [last xs, last ne, last ch, last nech, last bs, last bag],
+          [member 20 xs, member 20 ne, member 20 ch, member 20 nech, member 20 bs, member 20 bag],
+          [member 99 xs, member 99 ne, member 99 ch, member 99 nech, member 300 bs, member 99 bag],
+          [
+            Collections.endpoints xs,
+            Collections.endpoints ne,
+            Collections.endpoints ch,
+            Collections.endpoints nech,
+            Collections.endpoints bs,
+            Collections.endpoints bag,
+          ],
+          [
+            Collections.nth_from_end 1 xs,
+            Collections.nth_from_end 1 ne,
+            Collections.nth_from_end 1 ch,
+            Collections.nth_from_end 1 nech,
+            Collections.nth_from_end 1 bs,
+            Collections.nth_from_end 1 bag,
+          ],
+          [
+            Collections.to_list xs,
+            Collections.to_list ne,
+            Collections.to_list ch,
+            Collections.to_list nech,
+            Collections.to_list bs,
+            Collections.to_list bag,
+          ],
+        )
+    ),
+    Test.test "empty defaults across finite collections" (fun () ->
+      let empty_list : List Int = []
+      let empty_chunk : Chunk.Chunk Int = Chunk.empty
+      let empty_map : HashMap.HashMap EqHash.Canonical String Int = HashMap.empty
+      let empty_set : HashSet.HashSet EqHash.Canonical Int = HashSet.empty
+      let empty_trie : Trie.Trie Int = Trie.empty
+      let empty_bag : Bag Int = bag_of []
+      let empty_assoc : AssocMap String Int = assoc_of []
+      Test.equal
+        (
+          [true, true, true, true, true, true, true, true],
+          [None, None, None, None],
+          [None, None, None, None],
+          [false, false, false],
+          [None, None, None],
+          [false, false, false],
+        )
+        (
+          [
+            is_empty empty_list,
+            is_empty empty_chunk,
+            is_empty Bytes.empty,
+            is_empty empty_map,
+            is_empty empty_set,
+            is_empty empty_trie,
+            is_empty empty_bag,
+            is_empty empty_assoc,
+          ],
+          [first empty_list, first empty_chunk, first Bytes.empty, first empty_bag],
+          [last empty_list, last empty_chunk, last Bytes.empty, last empty_bag],
+          [member 1 empty_list, member 1 empty_set, member 1 empty_bag],
+          [lookup "k" empty_map, lookup "k" empty_trie, lookup "k" empty_assoc],
+          [has_key "k" empty_map, has_key "k" empty_trie, has_key "k" empty_assoc],
+        )
+    ),
+    Test.test "Keyed consumers work identically across HashMap, Trie, and AssocMap" (fun () ->
+      let pairs = [("beta", 2), ("alpha", 1), ("gamma", 3)]
+      let hm = HashMap.from_list EqHash.canonical pairs
+      let tr = Trie.from_list pairs
+      let assoc = assoc_of pairs
+      let query = ["alpha", "missing", "gamma"]
+      Test.equal
+        (
+          (3, [("alpha", 1), ("gamma", 3)], -1),
+          (3, [("alpha", 1), ("gamma", 3)], -1),
+          (3, [("alpha", 1), ("gamma", 3)], -1),
+          [true, false, true, false, true, false],
+        )
+        (
+          generic_lookup_report query hm,
+          generic_lookup_report query tr,
+          generic_lookup_report query assoc,
+          [
+            has_key "beta" hm,
+            has_key "none" hm,
+            has_key "beta" tr,
+            has_key "none" tr,
+            has_key "beta" assoc,
+            has_key "none" assoc,
+          ],
+        )
+    ),
+    Test.test "generic consumers require minimal capabilities" (fun () ->
+      let allowed_set = HashSet.from_list EqHash.canonical [2, 4, 6]
+      let allowed_bytes = bytes_of [2, 4, 6]
+      let kept_from_infinite =
+        Seq.to_list (Seq.take 3 (Collections.filter_members allowed_set (Seq.from 0)))
+      let kept_from_chunk =
+        Seq.to_list (Collections.filter_members allowed_bytes (Chunk.from_list [1, 2, 3, 4, 5, 6]))
+      let subset_checks = (
+        Collections.all_in allowed_set [2, 6, 4],
+        Collections.all_in allowed_set [2, 5, 4],
+        Collections.all_in allowed_bytes (NonEmpty.cons 2 [6]),
+        Collections.count (fun n -> n % 2 == 0) (Chunk.from_list [1, 2, 3, 4, 5, 6]),
+        Collections.count (fun b -> b >= 128) (bytes_of [10, 128, 255, 64]),
+      )
+      Test.equal ([2, 4, 6], [2, 4, 6], (true, false, true, 3, 2)) (
+        kept_from_infinite,
+        kept_from_chunk,
+        subset_checks,
+      )
+    ),
+  ],
+  Test.group "lazy prefixes and short-circuiting" [
+    Test.test "ToSeq consumers terminate on infinite Seq" (fun () ->
+      let nats = Seq.from 10
+      let prefix = Seq.to_list (Collections.take 4 nats)
+      let found = Collections.find (fun n -> n % 7 == 0) nats
+      let has_even = Collections.any (fun n -> n > 15 && n % 2 == 0) nats
+      let all_small = Collections.all (fun n -> n < 13) nats
+      let head_nat = first nats
+      let lookup_map = HashMap.from_list EqHash.canonical [(11, "eleven"), (13, "thirteen")]
+      let lazy_hits = Seq.to_list (Seq.take 2 (Collections.lookup_all nats lookup_map))
+      Test.equal
+        ([10, 11, 12, 13], Some 14, true, false, Some 10, [(11, "eleven"), (13, "thirteen")])
+        (
+          prefix,
+          found,
+          has_even,
+          all_small,
+          head_nat,
+          lazy_hits,
+        )
+    ),
+    Test.test
+      "Trie, Chunk, Bytes, HashMap, HashSet to_seq are restartable and prefix-friendly"
+      (fun () ->
+        let tr = Trie.from_list [("", 0), ("car", 2), ("cat", 3), ("ant", 1), ("dog", 4)]
+        let tr_seq = to_seq tr
+        let ch = Chunk.concat (Chunk.from_list [1, 2]) (Chunk.from_list [3, 4, 5])
+        let ch_seq = to_seq ch
+        let bs = bytes_of [9, 8, 7, 6, 5]
+        let bs_seq = to_seq bs
+        let hm = HashMap.from_seq EqHash.canonical (for { n <- Seq.range 0 20 } yield (n, n * 10))
+        let hm_seq = to_seq hm
+        Test.equal
+          (
+            [("", 0), ("ant", 1), ("car", 2)],
+            [("", 0), ("ant", 1), ("car", 2)],
+            [("", 0), ("ant", 1), ("car", 2), ("cat", 3), ("dog", 4)],
+            [1, 2, 3],
+            [1, 2, 3],
+            [9, 8],
+            [9, 8, 7, 6, 5],
+            Seq.to_list (Seq.take 3 hm_seq),
+          )
+          (
+            Seq.to_list (Seq.take 3 tr_seq),
+            Seq.to_list (Seq.take 3 tr_seq),
+            Seq.to_list tr_seq,
+            Seq.to_list (Seq.take 3 ch_seq),
+            Seq.to_list (Seq.take 3 ch_seq),
+            Seq.to_list (Seq.take 2 bs_seq),
+            Seq.to_list bs_seq,
+            Seq.to_list (Seq.take 3 hm_seq),
+          )
+      ),
+    Test.effect_test
+      "each_effect, fold_effect, and traverse short-circuit on typed failure"
+      (task {
+        let visited_each = Ref.make ([] : List Int)
+        let each_outcome =
+          try
+            Collections.each_effect
+              (fun n ->
+                if n == 3 then Fail.fail (Stop n)
+                Ref.modify visited_each (fun xs -> ((), xs ++ [n]))
+              )
+              (Seq.from 1)
+            Ok ()
+          with
+          | Stop n -> Err n
+        let visited_fold = Ref.make ([] : List Int)
+        let fold_outcome =
+          try
+            Ok
+              (Collections.fold_effect
+                (fun acc n ->
+                  if n == 3 then Fail.fail (Stop n)
+                  Ref.modify visited_fold (fun xs -> ((), xs ++ [n]))
+                  acc + n
+                )
+                0
+                (Chunk.from_list [1, 2, 3, 4, 5]))
+          with
+          | Stop n -> Err n
+        let visited_trav = Ref.make ([] : List Int)
+        let trav_outcome =
+          try
+            Ok
+              (Trie.entries
+                (traverse
+                  (fun n ->
+                    if n == 20 then Fail.fail (Stop n)
+                    Ref.modify visited_trav (fun xs -> ((), xs ++ [n]))
+                    n + 1
+                  )
+                  (Trie.from_list [("a", 10), ("b", 20), ("c", 30)])))
+          with
+          | Stop n -> Err n
+        Test.check
+          (Test.equal (Err 3, [1, 2], Err 3, [1, 2], Err 20, [10]) (
+            each_outcome,
+            Ref.get visited_each,
+            fold_outcome,
+            Ref.get visited_fold,
+            trav_outcome,
+            Ref.get visited_trav,
+          ))
+      }),
+  ],
+  Test.group "distinct witnesses" [
+    Test.test "HashMap and HashSet capabilities respect custom EqHash witnesses" (fun () ->
+      let case_blind =
+        EqHash.with
+          (fun a b -> String.to_lower a == String.to_lower b)
+          (fun s -> hash (String.to_lower s))
+          (fun w ->
+            let m1 = HashMap.from_list w [("Ada", 1), ("Bob", 2)]
+            let m2 = HashMap.from_list w [("BOB", 20), ("Cid", 3)]
+            let merged = combine m1 m2
+            let mapped = map (fun n -> n + 100) merged
+            let set1 = HashSet.from_list w ["Ada", "Bob"]
+            let set2 = HashSet.from_list w ["ADA", "Cid"]
+            let union_set = combine set1 set2
+            let matched = Seq.to_list (Collections.filter_members union_set ["ada", "DAN", "cid"])
+            let sum_values = fold (fun acc n -> acc + n) 0 mapped
+            (
+              size merged,
+              lookup "ADA" mapped,
+              lookup "bob" mapped,
+              has_key "CID" mapped,
+              size union_set,
+              member "ada" union_set,
+              member "dan" union_set,
+              matched,
+              sum_values,
+            )
+          )
+      let mod3_set =
+        EqHash.with (fun a b -> a % 3 == b % 3) (fun n -> n % 3) (fun w ->
+          let s = HashSet.from_list w [1, 4, 7, 2]
+          (size s, member 10 s, member 5 s, member 6 s)
+        )
+      Test.equal
+        ((3, Some 101, Some 120, true, 3, true, false, ["ada", "cid"], 324), (2, true, true, false))
+        (case_blind, mod3_set)
+    ),
+    Test.effect_test
+      "Traversable on HashMap preserves custom witness on empty and non-empty maps"
+      (task {
+        let outcome =
+          await (EqHash.with
+            (fun a b -> String.to_lower a == String.to_lower b)
+            (fun s -> hash (String.to_lower s))
+            (fun w -> task {
+              let empty_w = HashMap.with w
+              let m = HashMap.from_list w [("Ada", 2), ("Bob", 3)]
+              let empty_trav = traverse (fun (n : Int) -> n * 10) empty_w
+              let rebuilt_empty = HashMap.insert "ADA" 99 empty_trav
+              let trav = traverse (fun n -> n * 10) m
+              let seen = Ref.make ([] : List Int)
+              let stopped =
+                try
+                  ignore (traverse
+                    (fun n ->
+                      Ref.modify seen (fun xs -> ((), xs ++ [n]))
+                      if n == 3 then Fail.fail (Stop n)
+                      n + 1
+                    )
+                    m)
+                  Ok ()
+                with
+                | Stop n -> Err n
+              (
+                size empty_trav,
+                lookup "ada" rebuilt_empty,
+                size trav,
+                lookup "ADA" trav,
+                lookup "BOB" trav,
+                stopped,
+                not (List.is_empty (Ref.get seen)) && List.length (Ref.get seen) <= 2,
+              )
+            }))
+        Test.check (Test.equal (0, Some 99, 2, Some 20, Some 30, Err 3, true) outcome)
+      }),
+  ],
+  Test.group "scoped callbacks and #695/#723 regressions" [
+    Test.effect_test
+      "#723 mixed closures in both orders work through Collections and Prelude classes"
+      (task {
+        let result = scope {
+          let arena = Arena.make ()
+          let slot = Arena.alloc arena "scoped"
+          let value_first = keep2 [fresh_label] (fun () -> Arena.get slot)
+          let closure_first = keep2 [fun () -> Arena.get slot] fresh_label
+          let vf_first =
+            match at 0 value_first with
+            | Some k -> call_in_slot slot k
+            | None -> ""
+          let vf_last =
+            match last value_first with
+            | Some k -> call_in_slot slot k
+            | None -> ""
+          let cf_mapped = map (fun k -> k) closure_first
+          let cf_first =
+            match at 0 cf_mapped with
+            | Some k -> call_in_slot slot k
+            | None -> ""
+          let cf_last =
+            match last cf_mapped with
+            | Some k -> call_in_slot slot k
+            | None -> ""
+          let vf_items =
+            Collections.fold_effect (fun acc k -> acc ++ [call_in_slot slot k]) [] value_first
+          let chunk_closures = Chunk.from_list value_first
+          let chunk_first =
+            match first chunk_closures with
+            | Some k -> call_in_slot slot k
+            | None -> ""
+          (size value_first, vf_first, vf_last, [cf_first, cf_last], vf_items, chunk_first)
+        }
+        Test.check
+          (Test.equal
+            (2, "scoped", "fresh", ["fresh", "scoped"], ["scoped", "fresh"], "scoped")
+            result)
+      }),
+    Test.effect_test
+      "scoped callbacks work with Collections and Traversable"
+      (task {
+        let result = scope {
+          let arena = Arena.make ()
+          let tag = Arena.alloc arena "tag:"
+          let walked = Ref.make ([] : List String)
+          Collections.each_effect
+            (fun n ->
+              let prefix = Arena.get tag
+              Ref.modify walked (fun xs -> ((), xs ++ [prefix ++ show n]))
+            )
+            (Chunk.from_list [1, 2])
+          let traversed_ne = traverse (fun n -> Arena.get tag ++ show n) (NonEmpty.cons 3 [4])
+          let traversed_trie =
+            traverse (fun n -> Arena.get tag ++ show n) (Trie.from_list [("x", 5), ("y", 6)])
+          (
+            Ref.get walked,
+            NonEmpty.to_list traversed_ne,
+            lookup "x" traversed_trie,
+            lookup "y" traversed_trie,
+          )
+        }
+        Test.check
+          (Test.equal (["tag:1", "tag:2"], ["tag:3", "tag:4"], Some "tag:5", Some "tag:6") result)
+      }),
+    Test.test "#695 for over Collections.to_seq with break, continue, and comprehensions" (fun () ->
+      let mut from_inf : List Int = []
+      for n <- to_seq (Seq.from 1) do {
+        if n == 2 then continue
+        if n > 4 then break
+        from_inf = from_inf ++ [n]
+      }
+      let mut from_bytes : List Int = []
+      for b <- to_seq (bytes_of [10, 20, 30, 40]) do {
+        if b == 20 then continue
+        if b == 40 then break
+        from_bytes = from_bytes ++ [b]
+      }
+      let from_trie = [
+        for (k, v) <- to_seq (Trie.from_list [("b", 2), ("a", 1), ("c", 3)]) if v != 2 yield k,
+      ]
+      let from_ne = [for n <- to_seq (NonEmpty.cons 5 [6, 7]) yield n * 2]
+      Test.equal ([1, 3, 4], [10, 30], ["a", "c"], [10, 12, 14]) (
+        from_inf,
+        from_bytes,
+        from_trie,
+        from_ne,
+      )
+    ),
+  ],
+  Test.group "dictionary coherence across imports and local givens" [
+    Test.test "imported module and local calls agree on canonical dictionaries" (fun () ->
+      let xs = [2, 4, 6]
+      let ch = Chunk.from_list [2, 4, 6]
+      let bs = bytes_of [2, 4, 6]
+      let bag = bag_of [2, 4, 6]
+      Test.equal
+        (
+          (3, false, Some 2, 12),
+          (3, false, Some 2, 12),
+          (3, false, Some 2, 12),
+          (3, false, Some 2, 12),
+          (Some 7, Some 9),
+        )
+        (
+          generic_summary xs,
+          generic_summary ch,
+          generic_summary bs,
+          generic_summary bag,
+          with_to_seq_first first,
+        )
+    ),
+    Test.test "unpack local dictionary overrides locally without leaking globally" (fun () ->
+      let b : Bag Int = bag_of [1, 2, 3]
+      let inside =
+        unpack packed_sized_override as Local in (size b, generic_size_of b, is_empty b)
+      let outside = (size b, generic_size_of b, is_empty b)
+      Test.equal ((300, 300, false), (3, 3, false)) (inside, outside)
+    ),
+    Test.test "existing qualified module APIs remain valid alongside Collections" (fun () ->
+      let xs = [1, 2, 3]
+      let ne = NonEmpty.cons 1 [2, 3]
+      let ch = Chunk.from_list [1, 2, 3]
+      let hm = HashMap.from_list EqHash.canonical [("a", 1)]
+      let hs = HashSet.from_list EqHash.canonical ["a"]
+      let tr = Trie.from_list [("a", 1)]
+      let bs = bytes_of [65, 66]
+      Test.equal (3, 3, 3, Some 1, true, Some 1, Some 65) (
+        List.length xs,
+        NonEmpty.length ne,
+        Chunk.size ch,
+        HashMap.get "a" hm,
+        HashSet.member "a" hs,
+        Trie.get "a" tr,
+        Bytes.get 0 bs,
+      )
+    ),
+  ],
+]
