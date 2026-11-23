@@ -169,7 +169,7 @@ def from_result (result errors : Nat) : Scheme :=
   ⟨2, [],
     .arr (.R .cnil (.var 0)) (.app (.app (.con result) (.app (.con errors) (.var 0))) (.var 1)) (.var 1) .cnil, .cnil, []⟩
 
-/-- `Prelude.await_eff : forall r e a. Eff r e a ->{r; e} a` -/
+/-- `Prelude.await_eff : forall r e a c. (Eff r e a)^c ->{r; e} a` -/
 def await_eff (eff : Nat) : Scheme :=
   ⟨4, [],
     .arr (.R (.run (.cun (.var 3) .cnil) (.var 0)) (.var 1)) (.app (.app (.con eff) (.var 3)) (.var 2)) (.var 2) .cnil, .cnil, []⟩

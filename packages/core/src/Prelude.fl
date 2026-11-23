@@ -292,7 +292,7 @@ foreign effect from_result from "flick:rt" "fromResult"
 
 @lang await_eff
 /// Runs a task in the current fiber, once per call.
-await_eff : Eff r e a ->{r; e} a
+await_eff : (Eff r e a)^c ->{r; e} a
 foreign effect await_eff from "flick:rt" "awaitEff"
   retention call
 
