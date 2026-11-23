@@ -46,6 +46,14 @@ enum LazyState {
         task: Value,
         owner: usize,
     },
+    /// Unsynchronized fiber-local cell (`LazyMakeLocal`, O3): no waiters or
+    /// cross-fiber ownership. `task` is `None` when no enclosing abort or
+    /// interrupt catcher can observe a reset, so Perceus frees the task and its
+    /// captures on `Pending -> Running`; `Some(task)` when a handler/catcher on
+    /// the stack may catch an abort/interrupt and force the cell again.
+    RunningLocal {
+        task: Option<Value>,
+    },
     DoneOk(Value),
     DoneCause(CauseToken),
 }
@@ -231,6 +239,8 @@ enum Data {
     },
     Lazy {
         execution: usize,
+        /// `Some(fiber)` for an O3 local cell (`LazyMakeLocal`), `None` for shared `LazyMake`.
+        local_owner: Option<usize>,
         state: Option<LazyState>,
     },
     Arena {

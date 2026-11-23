@@ -1,0 +1,4 @@
+self: die / die, runs: 1
+die: die / die, runs: 1
+interrupt: None / 99 / 99, runs: 2
+shared: 11 11 (1), closure: 13 13 (1), record: 17 17 (1)

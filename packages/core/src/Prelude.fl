@@ -292,7 +292,7 @@ foreign effect from_result from "flick:rt" "fromResult"
 
 @lang await_eff
 /// Runs a task in the current fiber, once per call.
-await_eff : Eff r e a ->{r; e} a
+await_eff : (Eff r e a)^c ->{r; e} a
 foreign effect await_eff from "flick:rt" "awaitEff"
   retention call
 
@@ -300,6 +300,12 @@ foreign effect await_eff from "flick:rt" "awaitEff"
 /// The lazy of `task`, which `lazy { … }` builds: nothing runs yet.
 lazy_make : NoControl r => (Eff r e a)^c ->{} Lazy r e a
 foreign effect lazy_make from "flick:rt" "lazyMake"
+  retention call
+
+@lang lazy_make_local
+/// An unsynchronized lazy cell for a lazy only its own fiber can force.
+lazy_make_local : NoControl r => (Eff r e a)^c ->{} Lazy r e a
+foreign effect lazy_make_local from "flick:rt" "lazyMakeLocal"
   retention call
 
 @lang lazy_force

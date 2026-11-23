@@ -212,14 +212,20 @@ theorem from_result :
       (.arrow (.tapp (.tapp (.adt "Prelude.Result") (.errors (.tvar 0))) (.tvar 1)) (.rt .cnil (.tvar 0)) (.tvar 1) Caps.none) := by
   elide_eq
 
-/-- `Prelude.await_eff : forall r e a. Eff r e a ->{r; e} a` -/
+/-- `Prelude.await_eff : forall r e a c. (Eff r e a)^c ->{r; e} a` -/
 theorem await_eff :
-    Ty.Reads (Ty.elide Caps.none (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) Caps.none) (.rt (.tvar 0) (.tvar 1)) (.tvar 2) Caps.none) Caps.none)
-      (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) Caps.none) (.rt (.tvar 0) (.tvar 1)) (.tvar 2) Caps.none) := by
+    Ty.Reads (Ty.elide (fun x => x = .v 3) (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt (.tvar 0) (.tvar 1)) (.tvar 2) Caps.none) Caps.none)
+      (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt (.run (.tvar 0) (.caps (fun x => x = .v 3))) (.tvar 1)) (.tvar 2) Caps.none) := by
   elide_eq
 
 /-- `Prelude.lazy_make : forall r e a c. NoControl r => (Eff r e a)^c ->{} Lazy r e a` -/
 theorem lazy_make :
+    Ty.Reads (Ty.elide (fun x => x = .v 3) (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt .cnil .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) Caps.none)
+      (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt (.caps (fun x => x = .v 3)) .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) := by
+  elide_eq
+
+/-- `Prelude.lazy_make_local : forall r e a c. NoControl r => (Eff r e a)^c ->{} Lazy r e a` -/
+theorem lazy_make_local :
     Ty.Reads (Ty.elide (fun x => x = .v 3) (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt .cnil .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) Caps.none)
       (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt (.caps (fun x => x = .v 3)) .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) := by
   elide_eq

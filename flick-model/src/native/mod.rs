@@ -120,6 +120,7 @@ natives! {
     RT, "fromResult", 1 => from_result;
     RT, "refModify", 2 => ref_modify;
     RT, "lazyMake", 1 => lazy::lazy_make;
+    RT, "lazyMakeLocal", 1 => lazy::lazy_make_local;
     RT, "lazyForce", 1 => lazy::lazy_force;
     RT, "lazyDone", 1 => lazy::lazy_done;
     RT, "layerSucceed", 2 => layer_succeed;

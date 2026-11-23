@@ -167,8 +167,10 @@ impl Machine<'_, '_> {
                         match prev {
                             LazyState::Pending(v)
                             | LazyState::Running { task: v, .. }
+                            | LazyState::RunningLocal { task: Some(v) }
                             | LazyState::DoneOk(v) => detached.push(v),
                             LazyState::DoneCause(c) => detached.push(c.into_value()),
+                            LazyState::RunningLocal { task: None } => {}
                         }
                     }
                 }

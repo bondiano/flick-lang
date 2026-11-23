@@ -203,6 +203,7 @@ refSet RefSet
 refModify *RefModify
 awaitEff *Run
 lazyMake LazyMake
+lazyMakeLocal LazyMakeLocal
 lazyForce *LazyForce
 lazyDone LazyDone
 stringFromNumber StringFromNumber

@@ -4,7 +4,7 @@ use crate::ir::tests::check_text;
 use super::tests::{builtin_arity, builtin_generic};
 
 /// The optimized IR of a self-contained module.
-fn optimized(text: &str) -> String {
+pub(super) fn optimized(text: &str) -> String {
     let (mut ir, interface) = check_text("App", text).expect("lowers");
     super::optimize(
         &mut ir,
@@ -15,7 +15,7 @@ fn optimized(text: &str) -> String {
     print(&ir)
 }
 
-const MARK: &str = "module App exposing (..)\nmark : Int ->{} Int\nlet mark n = n\n";
+pub(super) const MARK: &str = "module App exposing (..)\nmark : Int ->{} Int\nlet mark n = n\n";
 
 /// O1a: a cell nothing reads is not made, nor its task.
 #[test]
@@ -101,7 +101,7 @@ fn a_force_of_another_lazy_stays() {
 
 /// A pure recursive helper the inliner will not erase, so `lazy { work x }`
 /// stays a `lazy_make (task ...)` rather than folding to `lazy_done`.
-const PURE_WORK: &str = "module App exposing (..)\n\
+pub(super) const PURE_WORK: &str = "module App exposing (..)\n\
     work : Int -> Int\n\
     let rec work n = if n <= 0 then 1 else n + work (n - 1)\n";
 

@@ -338,6 +338,7 @@ fn stage2_operations_and_intrinsics_round_trip() {
         &[
             Intrinsic::ListRange,
             Intrinsic::LazyMake,
+            Intrinsic::LazyMakeLocal,
             Intrinsic::LazyForce,
             Intrinsic::ScopeAddFinalizer,
             Intrinsic::ScopeAddFinalizerExit,

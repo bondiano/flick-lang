@@ -20,9 +20,26 @@ export class LazyCell<A, E, R> {
   }
 }
 
+/** An unsynchronized lazy cell for a lazy only its own fiber can force (O3). */
+export class LocalLazyCell<A, E, R> {
+  /** The initializer while pending; released on transition out of Pending. */
+  task: Effect.Effect<A, E, R> | undefined;
+  /** True while this fiber is running the initializer. */
+  running = false;
+  /** How the attempt that settled the cell ended: final. */
+  exit: Exit.Exit<A, E> | undefined = undefined;
+  constructor(task: Effect.Effect<A, E, R>) {
+    this.task = task;
+  }
+}
+
 /** `lazy task`: a pending cell; nothing runs. */
 export const lazyMake = <A, E, R>(task: Effect.Effect<A, E, R>): Effect.Effect<LazyCell<A, E, R>> =>
   Effect.sync(() => new LazyCell(task));
+
+/** Unsynchronized `lazy task` for a cell only its own fiber can force (O3). */
+export const lazyMakeLocal = <A, E, R>(task: Effect.Effect<A, E, R>): Effect.Effect<LocalLazyCell<A, E, R>> =>
+  Effect.sync(() => new LocalLazyCell(task));
 
 /** A cell already done with `value`: forcing it runs nothing. */
 export const lazyDone = <A>(value: A): Effect.Effect<LazyCell<A, never, never>> =>
@@ -39,9 +56,34 @@ const cached = (cause: Cause.Cause<unknown>): boolean =>
   !Cause.hasInterrupts(cause) && (hasRealDie(cause) || !unwinds(cause));
 
 /** `await cell`: its outcome, running the initializer in this fiber when no attempt has settled it. */
-export const lazyForce = <A, E, R>(cell: LazyCell<A, E, R>): Effect.Effect<A, E, R> =>
+export const lazyForce = <A, E, R>(cell: LazyCell<A, E, R> | LocalLazyCell<A, E, R>): Effect.Effect<A, E, R> => {
+  if (cell instanceof LocalLazyCell) {
+    return Effect.uninterruptibleMask((restore) =>
+      Effect.suspend((): Effect.Effect<A, E, R> => {
+        if (cell.exit !== undefined) return cell.exit;
+        if (cell.running) return Effect.die(new Error(SELF_FORCE));
+        // oxlint-disable-next-line typescript/no-non-null-assertion -- a pending local cell keeps its task
+        const task = cell.task!;
+        cell.task = undefined;
+        cell.running = true;
+        return Effect.flatMap(Effect.exit(restore(task)), (exit) => {
+          cell.running = false;
+          const outcome =
+            Exit.isFailure(exit) && hasRealDie(exit.cause) && hasSignal(exit.cause)
+              ? Exit.failCause(stripSignals(exit.cause))
+              : exit;
+          if (Exit.isSuccess(outcome) || cached(outcome.cause)) {
+            cell.exit = outcome;
+          } else {
+            cell.task = task;
+          }
+          return outcome;
+        });
+      }),
+    );
+  }
   // the state is read and claimed in one step that no interruption splits
-  Effect.uninterruptibleMask((restore) =>
+  return Effect.uninterruptibleMask((restore) =>
     Effect.withFiber((fiber): Effect.Effect<A, E, R> => {
       if (cell.exit !== undefined) return cell.exit;
       const running = cell.running;
@@ -66,3 +108,4 @@ export const lazyForce = <A, E, R>(cell: LazyCell<A, E, R>): Effect.Effect<A, E,
       });
     }),
   );
+};

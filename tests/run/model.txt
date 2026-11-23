@@ -109,6 +109,7 @@ runtime/suspended
 runtime/lazy_let
 runtime/lazy_let_state
 runtime/lazy_opt
+runtime/lazy_local
 runtime/defer_core
 effect/result_blocks
 schema/prove

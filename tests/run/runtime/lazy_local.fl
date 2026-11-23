@@ -1,0 +1,82 @@
+// O3: an unsynchronized local lazy cell for a lazy only its own fiber forces
+// (`docs/formal/lazy.md` §6) caches values and typed failures, resets on an
+// abort unwind, and matches debug output identically in release.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+effect Stop =
+  abort stop : forall a. String ->{} a
+
+counted : Ref Int -> Int ->{; Boom} Int
+let counted runs n =
+  Ref.set runs (Ref.get runs + 1)
+  if n < 0 then Fail.fail (Boom "bad:\{n}") else n * 3
+
+step : Ref Int -> Int ->{Stop} Int
+let step runs n =
+  Ref.set runs (Ref.get runs + 1)
+  if Ref.get runs < 2 then Stop.stop "stopped:\{Ref.get runs}" else n * 4
+
+pass_through : Lazy r e Int -> Lazy r e Int
+let pass_through l = l
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  let runs = Ref.make 0
+
+  // Non-escaping lazy value cached across multiple forces (inlined helper + loop)
+  let ok_cell = lazy { counted runs 7 }
+  let ok_sum =
+    try
+      let a = await (pass_through ok_cell) + await ok_cell
+      let mut i = 0
+      let mut acc = a
+      while i < 2 do {
+        acc = acc + await ok_cell
+        i = i + 1
+      }
+      acc
+    with
+    | Boom _ -> 0
+
+  // Non-escaping lazy typed failure cached across forces
+  let err_cell = lazy { counted runs (-2) }
+  let e1 =
+    try show (await err_cell) with
+    | Boom m -> m
+  let e2 =
+    try show (await err_cell) with
+    | Boom m -> m
+
+  // Non-escaping lazy abort unwind resets to Pending; second force succeeds and caches
+  let abort_runs = Ref.make 0
+  let abort_cell = lazy { step abort_runs 5 }
+  let a1 =
+    try show (await abort_cell) with
+    | Stop.stop why -> why
+  let a2 =
+    try show (await abort_cell) with
+    | Stop.stop why -> why
+  let a3 =
+    try show (await abort_cell) with
+    | Stop.stop why -> why
+
+  // Direct `lazy_make_local`: value caching and typed failure caching
+  let direct_runs = Ref.make 0
+  let d_ok = lazy_make_local (task { counted direct_runs 3 })
+  let d_ok_val =
+    try await d_ok + await d_ok with
+    | Boom _ -> 0
+  let d_err = lazy_make_local (task { counted direct_runs (-4) })
+  let de1 =
+    try show (await d_err) with
+    | Boom m -> m
+  let de2 =
+    try show (await d_err) with
+    | Boom m -> m
+
+  Platform.stdout_line "ok: \{ok_sum}, runs: \{Ref.get runs}"
+  Platform.stdout_line "err: \{e1} / \{e2}"
+  Platform.stdout_line "abort: \{a1} / \{a2} / \{a3}, runs: \{Ref.get abort_runs}"
+  Platform.stdout_line "direct: \{d_ok_val} / \{de1} / \{de2}, runs: \{Ref.get direct_runs}"

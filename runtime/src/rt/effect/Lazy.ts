@@ -21,8 +21,24 @@ export class LazyCell {
   }
 }
 
+/** An unsynchronized lazy cell for a lazy only its own fiber can force (O3). */
+export class LocalLazyCell {
+  /** The initializer while pending; released on transition out of Pending. */
+  task: Task | undefined;
+  /** True while this fiber is running the initializer. */
+  running = false;
+  /** How the attempt that settled the cell ended: final. */
+  exit: Exit | undefined = undefined;
+  constructor(task: Task) {
+    this.task = task;
+  }
+}
+
 /** `lazy task`: a pending cell; nothing runs. */
 export const lazyMake = (task: Task): LazyCell => new LazyCell(task);
+
+/** Unsynchronized `lazy task` for a cell only its own fiber can force (O3). */
+export const lazyMakeLocal = (task: Task): LocalLazyCell => new LocalLazyCell(task);
 
 /** A cell already done with `value`: forcing it runs nothing. */
 export const lazyDone = (value: unknown): LazyCell => {
@@ -35,7 +51,36 @@ export const lazyDone = (value: unknown): LazyCell => {
 const SELF_FORCE = "lazy forced during its own initialization";
 
 /** `await cell`: its outcome, running the initializer in this fiber when no attempt has settled it. */
-export function* lazyForce(cell: LazyCell): Run {
+export function* lazyForce(cell: LazyCell | LocalLazyCell): Run {
+  if (cell instanceof LocalLazyCell) {
+    if (cell.exit !== undefined) return raiseOf(cell.exit);
+    if (cell.running) throw new Error(SELF_FORCE);
+    // oxlint-disable-next-line typescript/no-non-null-assertion -- a pending local cell keeps its task
+    const task = cell.task!;
+    cell.task = undefined;
+    cell.running = true;
+    let exit: Exit | undefined;
+    try {
+      const value: unknown = yield task();
+      exit = succeeded(value);
+      return value;
+    } catch (thrown) {
+      const cause = causeOf(thrown);
+      const cleaned = hasRealDie(cause) ? stripSignals(cause) : cause;
+      if (!hasInterrupts(cleaned) && (hasRealDie(cause) || !unwinds(cause))) {
+        exit = failed(cleaned);
+      }
+      if (cleaned !== cause) return raise(cleaned);
+      throw thrown;
+    } finally {
+      cell.running = false;
+      if (exit !== undefined) {
+        cell.exit = exit;
+      } else {
+        cell.task = task;
+      }
+    }
+  }
   const fiber = currentFiber();
   for (;;) {
     if (cell.exit !== undefined) return raiseOf(cell.exit);

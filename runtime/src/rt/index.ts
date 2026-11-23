@@ -75,7 +75,7 @@ export {
 } from "./schema.ts";
 export { schemaGenerator, schemaWithGenerator } from "./schema_gen.ts";
 export { schemaArbitrary } from "./effect/Arbitrary.ts";
-export { lazyDone, lazyForce, lazyMake } from "./effect/Lazy.ts";
+export { lazyDone, lazyForce, lazyMake, lazyMakeLocal } from "./effect/Lazy.ts";
 export { codecJsonSchema, jsonParse, jsonStringify } from "./schema_export.ts";
 export {
   eqHashCanonical,
