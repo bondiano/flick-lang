@@ -188,8 +188,8 @@ impl<'a> Gen<'a> {
             ExprKind::Match(scrutinee, arms) => {
                 let s = self.expr(scrutinee);
                 let s = self.spill(s);
-                let r = self.result(e);
-                self.arms(s.doc, arms, Some(r));
+                let (r, native) = self.result(e);
+                self.arms(s.doc, arms, Some((r, native)));
                 self.code(r)
             }
             ExprKind::Tuple(items) | ExprKind::List(items) => {
@@ -261,11 +261,12 @@ impl<'a> Gen<'a> {
     /// Declares the variable of the result of `e`, an `if` or a `match`:
     /// of the Go type every branch has, when they have one, so that a number
     /// is not made a value on the way from a branch to what uses it.
-    fn result(&mut self, e: &Expr) -> &'a str {
+    fn result(&mut self, e: &Expr) -> (&'a str, Option<Native>) {
         let r = self.temp();
-        let ty = self.native(e).map_or("flickrt.Value", Native::go);
+        let native = self.native(e);
+        let ty = native.map_or("flickrt.Value", Native::go);
         self.emit(docvec![self.a, "var ", r, " ", ty]);
-        r
+        (r, native)
     }
 
     fn if_expr(&mut self, e: &Expr, cond: &Expr, then: &Expr, other: &Expr) -> Code<'a> {
@@ -274,7 +275,7 @@ impl<'a> Gen<'a> {
         let test = self.unboxed(cond, test, Native::Bool).doc;
         // the branches are compiled after the variable is declared, and
         // nothing they bind is a branch itself: the type is known before
-        let r = self.result(e);
+        let (r, _) = self.result(e);
         let (mut then_stmts, then_value) = self.block(|g| g.expr(then));
         let (mut other_stmts, other_value) = self.block(|g| g.expr(other));
         then_stmts.push(statement(a, docvec![a, r, " = ", then_value]));

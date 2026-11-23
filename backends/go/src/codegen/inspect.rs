@@ -61,11 +61,13 @@ pub fn go_module(input: &Input, module_name: &str) -> Output {
     let settled = shape::settled(reached_items, &shapes);
     let item_initializers = modules.iter().any(|m| !m.initialization.is_empty());
     let records = own::records(modules);
+    let fields = own::fields(input.own, input.lang);
     let items: Vec<usize> = (0..module.items.len()).collect();
     let arena = DocumentArena::new();
     let mut g = Gen::new(&module.name, &shapes, input, &arena);
     g.settled = Some(&settled);
     g.records = Some(&records);
+    g.fields = Some(&fields);
     g.item_initializers = item_initializers;
     let order = item_order(module, &items, &index);
     let code = g.module(module, &order);

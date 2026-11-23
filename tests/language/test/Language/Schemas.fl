@@ -11,6 +11,12 @@ type Color = Red | Green | Blue
 type Tree = Leaf | Node Tree String Tree
   deriving Eq, Show, Schema
 
+type Entry = Empty | Entry Int Float Bool String | Mixed Bool (Option Int) Int String
+  deriving Eq, Ord, Hash, Show, Schema
+
+type ScalarVal = SFloat Float | SBool Bool | SString String | SAll Float Bool String
+  deriving Eq, Ord, Hash, Show, Schema
+
 type alias Point = { x : Int; y : Int; label : Option String }
   deriving Schema
 
@@ -210,6 +216,51 @@ let tests = [
           | Dot -> s == Dot && show s == "Dot" && encoded Shape.schema s == "{\"_tag\":\"Dot\"}"
           | Circle _ | Rect _ _ -> decode_value Shape.schema (encoded Shape.schema s) == Ok s
         Test.is_true (show s) checked
+      ),
+  ],
+  Test.group "scalar-field constructors" [
+    Test.test "decode, match, equal, hash, and show" (fun () ->
+      let entry_res =
+        decode_value
+          Entry.schema
+          "{\"_tag\": \"Entry\", \"_0\": -42, \"_1\": 3.25, \"_2\": true, \"_3\": \"ok\"}"
+      let mixed_res =
+        decode_value
+          Entry.schema
+          "{\"_tag\": \"Mixed\", \"_0\": false, \"_1\": 7, \"_2\": 9, \"_3\": \"hi\"}"
+      let expected_entry = Entry (-42) 3.25 true "ok"
+      let expected_mixed = Mixed false (Some 7) 9 "hi"
+      let entry_summary =
+        match entry_res with
+        | Ok (Entry i f b s) -> show i ++ ":" ++ show f ++ ":" ++ show b ++ ":" ++ s
+        | _ -> "other"
+      Test.all [
+        Test.equal "-42:3.25:true:ok" entry_summary,
+        Test.equal (Ok expected_entry) entry_res,
+        Test.equal (Ok expected_mixed) mixed_res,
+        Test.equal "Ok (Entry -42 3.25 true \"ok\")" (show entry_res),
+        Test.equal
+          "{\"_tag\":\"Entry\",\"_0\":-42,\"_1\":3.25,\"_2\":true,\"_3\":\"ok\"}"
+          (encoded Entry.schema expected_entry),
+        Test.equal
+          "{\"_tag\":\"Mixed\",\"_0\":false,\"_1\":7,\"_2\":9,\"_3\":\"hi\"}"
+          (encoded Entry.schema expected_mixed),
+      ]
+    ),
+    Test.property
+      "Schema.arbitrary of scalar-field ScalarVal round-trips and preserves equality"
+      (Schema.arbitrary ScalarVal.schema)
+      (fun v ->
+        match decode_value ScalarVal.schema (encoded ScalarVal.schema v) with
+        | Ok d ->
+          Test.all [
+            Test.equal true (v == d),
+            Test.equal true (eq v d),
+            Test.equal EQ (compare v d),
+            Test.equal (hash v) (hash d),
+            Test.equal (encoded ScalarVal.schema v) (encoded ScalarVal.schema d),
+          ]
+        | Err err -> Test.is_true ("decode failed: " ++ show err) false
       ),
   ],
 ]

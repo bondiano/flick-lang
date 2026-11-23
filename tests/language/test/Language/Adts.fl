@@ -14,6 +14,28 @@ type Suit = Hearts | Spades
 type Card = Card Suit Int | Joker
   deriving Eq, Ord, Hash, Show
 
+type ScalarRec = Empty | Entry Int Float Bool String | Pair Float Float | Mixed Bool (Option Int) Int String
+  deriving Eq, Ord, Hash, Show
+
+type Wrap a = Wrap a
+  deriving Eq, Ord, Hash, Show
+
+type Tagged a = Tagged Int a
+  deriving Eq, Ord, Hash, Show
+
+type Choice a = NumVal Int | PolyVal a
+
+extract_choice : Choice Int -> Int
+let extract_choice c =
+  match c with
+  | NumVal n | PolyVal n -> n
+
+is_zero_pair : ScalarRec -> Bool
+let is_zero_pair r =
+  match r with
+  | Pair 0.0 -0.0 -> true
+  | Empty | Entry _ _ _ _ | Pair _ _ | Mixed _ _ _ _ -> false
+
 insert : Int -> Tree Int -> Tree Int
 let rec insert x tree =
   match tree with
@@ -100,6 +122,60 @@ let tests = [
       Test.equal "{ suit = Spades, tree = Leaf }" (show { tree = empty; suit = Spades }),
       Test.equal (Some "red") (HashMap.get red_suit map),
       Test.equal (Some "black") (HashMap.get Spades map),
+    ]
+  ),
+  Test.test "unboxed scalar fields equality, order, hash, show, and patterns" (fun () ->
+    let nan = 0.0 / 0.0
+    let neg_zero = -1.0 * 0.0
+    let inf = 1.0 / 0.0
+    let e1 = Entry (-7) 2.5 true "alpha"
+    let e2 = Entry (-7) 2.5 true "alpha"
+    let e3 = Entry (-7) 2.5 false "alpha"
+    let p_pos = Pair 0.0 1.5
+    let p_neg = Pair neg_zero 1.5
+    let p_nan1 = Pair nan 1.5
+    let p_nan2 = Pair nan 1.5
+    let m1 = Mixed true (Some 4) (-2) "hi"
+    let m2 = Mixed true (Some 4) (-2) "hi"
+    let curried = List.map (Entry 1 0.5 false) ["a", "b"]
+    let Tagged tag_id tag_val = Tagged 9 "ok"
+    let map =
+      HashMap.insert p_neg "zero" (HashMap.insert p_nan1 "nan" (HashMap.insert e1 "entry" HashMap.empty))
+    Test.all [
+      Test.equal true (e1 == e2),
+      Test.equal false (e1 == e3),
+      Test.equal true (eq e1 e2),
+      Test.equal false (eq e1 e3),
+      Test.equal true (p_pos == p_neg),
+      Test.equal true (eq p_pos p_neg),
+      Test.equal true (p_nan1 == p_nan2),
+      Test.equal true (eq p_nan1 p_nan2),
+      Test.equal true (m1 == m2),
+      Test.equal EQ (compare p_pos p_neg),
+      Test.equal LT (compare (Pair inf 1.5) p_nan1),
+      Test.equal GT (compare p_nan1 (Pair inf 1.5)),
+      Test.equal LT (compare e3 e1),
+      Test.equal LT (compare Empty e1),
+      Test.equal (hash e1) (hash e2),
+      Test.equal (hash p_pos) (hash p_neg),
+      Test.equal (hash p_nan1) (hash p_nan2),
+      Test.equal (Some "zero") (HashMap.get p_pos map),
+      Test.equal (Some "nan") (HashMap.get p_nan2 map),
+      Test.equal (Some "entry") (HashMap.get e2 map),
+      Test.equal "Entry -7 2.5 true \"alpha\"" (show e1),
+      Test.equal "Pair -0 1.5" (show p_neg),
+      Test.equal "Pair NaN 1.5" (show p_nan1),
+      Test.equal "Mixed true (Some 4) -2 \"hi\"" (show m1),
+      Test.equal [Entry 1 0.5 false "a", Entry 1 0.5 false "b"] curried,
+      Test.equal (9, "ok") (tag_id, tag_val),
+      Test.equal (Wrap 1 == Wrap 1, Wrap "a" == Wrap "a") (true, true),
+      Test.equal (Tagged 1 "x" == Tagged 1 "x", Tagged 1 "x" == Tagged 2 "x") (true, false),
+      Test.equal [11, 22] [extract_choice (NumVal 11), extract_choice (PolyVal 22)],
+      Test.equal [true, true, false] [
+        is_zero_pair (Pair 0.0 neg_zero),
+        is_zero_pair (Pair neg_zero 0.0),
+        is_zero_pair p_nan1,
+      ],
     ]
   ),
 ]

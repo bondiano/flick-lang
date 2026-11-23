@@ -10,7 +10,7 @@ use super::Gen;
 use super::layout::{Code, block, call, statement};
 use flick_backend_support::Known;
 use flick_ir::{Arith, Num};
-use flick_ir::{BinOp, Expr, ExprKind, IrType, Lit};
+use flick_ir::{Arm, BinOp, Expr, ExprKind, IrType, Lit};
 
 /// A type whose values are Go's own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,13 +40,19 @@ impl Native {
         Self::ALL.into_iter().find(|native| native.go() == go)
     }
 
-    fn name(self) -> &'static str {
+    pub(super) fn name(self) -> &'static str {
         match self {
             Native::Int => "Int",
             Native::Float => "Float",
             Native::Bool => "Bool",
             Native::String => "String",
         }
+    }
+
+    /// Whether a `Lit::Float(x)` emits a native Go `float64(...)` literal
+    /// rather than a runtime `flickrt.Value` variable (`NaN`, `Inf`, `NegZero`).
+    pub(super) fn is_native_float_lit(x: f64) -> bool {
+        x.is_finite() && (x != 0.0 || x.is_sign_positive())
     }
 
     fn of_num(num: Num) -> Option<Native> {
@@ -60,6 +66,12 @@ impl Native {
     /// `v`, a `flickrt.Value`, as this type.
     pub(super) fn unbox<'a>(self, a: &'a DocumentArena<'a>, v: Document<'a>) -> Document<'a> {
         call(a, docvec![a, "flickrt.As", self.name()], [v])
+    }
+
+    /// `v`, a `flickrt.Value`, as a constructor field of this type; `nil` maps
+    /// to Go's zero value so runtime `tagOf` probing does not panic.
+    pub(super) fn field_unbox<'a>(self, a: &'a DocumentArena<'a>, v: Document<'a>) -> Document<'a> {
+        call(a, docvec![a, "flickrt.Field", self.name()], [v])
     }
 
     /// The type of values of type `ty`, when it is one of these.
@@ -102,19 +114,27 @@ impl<'a> Gen<'a> {
     /// The Go type the code of `e` has when it is not a `flickrt.Value`;
     /// none when it may be one.
     pub(super) fn native(&self, e: &Expr) -> Option<Native> {
+        self.native_with(e, &[])
+    }
+
+    fn native_with(&self, e: &Expr, extra: &[(&str, Native)]) -> Option<Native> {
         match &e.kind {
             ExprKind::Lit(Lit::Int(_)) => Some(Native::Int),
             // the other floats are variables of the runtime
-            ExprKind::Lit(Lit::Float(x))
-                if x.is_finite() && (*x != 0.0 || x.is_sign_positive()) =>
-            {
-                Some(Native::Float)
-            }
+            ExprKind::Lit(Lit::Float(x)) if Native::is_native_float_lit(*x) => Some(Native::Float),
             ExprKind::Lit(Lit::String(_)) => Some(Native::String),
-            ExprKind::Local(name) | ExprKind::Var(name) => self.natives.get(name).copied(),
+            ExprKind::Local(name) | ExprKind::Var(name) => extra
+                .iter()
+                .rev()
+                .find_map(|&(k, v)| (k == name).then_some(v))
+                .or_else(|| self.natives.get(name).copied()),
             ExprKind::Neg(num, _) | ExprKind::Binary(BinOp::Arith(_, num), _, _) => {
                 Native::of_num(*num)
             }
+            ExprKind::Binary(BinOp::Concat, lhs, rhs) => (self.native_with(lhs, extra)
+                == Some(Native::String)
+                && self.native_with(rhs, extra) == Some(Native::String))
+            .then_some(Native::String),
             ExprKind::Lit(Lit::Bool(_))
             | ExprKind::Not(_)
             | ExprKind::Binary(
@@ -131,25 +151,45 @@ impl<'a> Gen<'a> {
                 _,
                 _,
             ) => Some(Native::Bool),
-            // a call of a known function that returns a Go type
+            // a call of a known function or scalar instance method that returns a Go type
             ExprKind::App { .. } => self.typed_result(e),
             // a choice whose every branch is of one Go type is of that type
-            ExprKind::If(_, then, other) => self.agreed([&**then, &**other]),
-            ExprKind::Match(_, arms) => self.agreed(arms.iter().map(|arm| &arm.body)),
+            ExprKind::If(_, then, other) => self.agreed_with([&**then, &**other], extra),
+            ExprKind::Match(_, arms) => self.match_native(arms, extra),
             _ => None,
         }
     }
 
     /// The Go type every one of `branches` has, when they have one.
-    pub(super) fn agreed<'e>(
+    fn agreed_with<'e>(
         &self,
         branches: impl IntoIterator<Item = &'e Expr>,
+        extra: &[(&str, Native)],
     ) -> Option<Native> {
         let mut branches = branches.into_iter();
-        let first = self.native(branches.next()?)?;
+        let first = self.native_with(branches.next()?, extra)?;
         branches
-            .all(|b| self.native(b) == Some(first))
+            .all(|b| self.native_with(b, extra) == Some(first))
             .then_some(first)
+    }
+
+    /// The Go type every arm of a `match` produces when its guaranteed-native
+    /// pattern bindings are in scope.
+    fn match_native(&self, arms: &[Arm], extra: &[(&str, Native)]) -> Option<Native> {
+        let mut arms = arms.iter();
+        let first_arm = arms.next()?;
+        let arm_ty = |arm: &Arm| {
+            let bound = self.pat_natives(&arm.pat);
+            if bound.is_empty() {
+                return self.native_with(&arm.body, extra);
+            }
+            let mut scoped = Vec::with_capacity(extra.len() + bound.len());
+            scoped.extend_from_slice(extra);
+            scoped.extend(bound);
+            self.native_with(&arm.body, &scoped)
+        };
+        let first = arm_ty(first_arm)?;
+        arms.all(|arm| arm_ty(arm) == Some(first)).then_some(first)
     }
 
     /// `go`, the code of `e`, as a `want`: code that already is one, as a
@@ -243,6 +283,13 @@ impl<'a> Gen<'a> {
                 }
                 .into();
             }
+        }
+        if op == BinOp::Concat
+            && self.native(lhs) == Some(Native::String)
+            && self.native(rhs) == Some(Native::String)
+        {
+            let operands = self.operands(lhs, rhs, Native::String);
+            return call(a, "flickrt.ConcatString", operands).into();
         }
         let go = self.ordered(&[lhs, rhs]);
         let operands = [go[0].doc, go[1].doc];

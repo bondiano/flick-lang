@@ -74,10 +74,10 @@ fn a_constructor_with_fields_of_the_program_has_a_go_type_of_its_own() {
         found.map(|(_, go)| go.as_str()).expect(name)
     };
     let (go, types) = (file("m_App.go"), file("own_types.go"));
-    // the type is the tag: Go tells the constructor, and a field is read where it is
+    // the type is the tag: Go tells the constructor, and scalar fields stay unboxed
     assert!(go.contains("if Is_T_App__Rect(l_shape) {"), "{go}");
     assert!(
-        go.contains("var l_h flickrt.Value = l_shape.(*T_App__Rect).f[1]"),
+        go.contains("var l_h float64 = l_shape.(*T_App__Rect).f1"),
         "{go}"
     );
     assert!(
@@ -90,14 +90,20 @@ fn a_constructor_with_fields_of_the_program_has_a_go_type_of_its_own() {
     // a constructor of a built-in type is made by the runtime too: it stays as it was
     assert!(go.contains("flickrt.NewData(\"Some\", "), "{go}");
     assert!(!go.contains("flickrt.NewData(\"Rect#"), "{go}");
-    // declared once for the program, with what the runtime reads and builds it by
+    // declared once for the program, with typed scalar fields and runtime boundary adapters
     assert!(types.contains("type T_App__Dot struct{}"), "{types}");
     assert!(
-        types.contains("type T_App__Rect struct{ f [2]flickrt.Value }"),
+        types.contains("type T_App__Rect struct {\n\tf0 float64\n\tf1 float64\n}"),
         "{types}"
     );
     assert!(
-        types.contains("func (p *T_App__Rect) Fields() []flickrt.Value { return p.f[:] }"),
+        types.contains(
+            "func (p *T_App__Rect) Fields() []flickrt.Value { return []flickrt.Value{p.f0, p.f1} }"
+        ),
+        "{types}"
+    );
+    assert!(
+        types.contains("func (p *T_App__Rect) EqualConstructed(other flickrt.Value, strictZero bool) (bool, bool)"),
         "{types}"
     );
     assert_eq!(types.matches("flickrt.Owned(\"").count(), 3, "{types}");

@@ -134,12 +134,13 @@ func (s *Schema) validate(fb *Fiber, in Value) (Value, []issue) {
 	case kindAdt:
 		d, ok := in.(Constructed)
 		if ok {
+			dFields := d.Fields()
 			for at, variant := range s.variants {
-				if variant.Tag != d.TagName() || len(d.Fields()) != len(variant.Fields) {
+				if variant.Tag != d.TagName() || len(dFields) != len(variant.Fields) {
 					continue
 				}
-				fields := make([]Value, len(d.Fields()))
-				for i, f := range d.Fields() {
+				fields := make([]Value, len(dFields))
+				for i, f := range dFields {
 					v, issues := s.fields[at][i+1].validate(fb, f)
 					if issues != nil {
 						return nil, under("_"+strconv.Itoa(i), issues)
