@@ -12,8 +12,8 @@ are not evidence for this contract.
 | - | - | - |
 | M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), Stage 3 pure/pure-effect stdlib counted lowering/primitives, Stage 4 cooperative single-threaded async/fiber/layer/STM/observability/config/arbitrary/streaming runtime (`Fiber`, `Deferred`, `FiberGroup`, `Layer` dynamic/memo/merge, `Context.Reference`, `Clock`/`TestClock`, `Schedule`/`ExecutionPlan`, `Latch`/`Semaphore`/`PartitionedSemaphore`, `Queue`/`PubSub`/`SynchronizedRef`/`SubscriptionRef`, `Cache`/`ScopedCache`/`Pool`/`RcRef`/`RcMap`/`LayerMap`/`LayerRef`, `Tx` STM, `Events`/`ErrorReporter`/`Tracer`/`Logger`/`Metric`/`Request`/`Crypto`, `Config`/`ConfigProvider`, `Arbitrary`, `Channel`/`Sink`/`Stream`), Stage 5 `HostMode::LiveOs`, pure `flick:sql`, and explicit opt-in counted Host/FFI bridge (`lower_roots_with_foreign_bridge`, `Operation::ForeignCall`, persistent Node `HostBridge` with 1-to-1 handle refcount symmetry and zero-live-handle teardown), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs` `--release` gate: **1,064/1,064** clean profiles across `tests/run`, `tests/rt`, `docs`, `tests/language`, and runnable `examples/`, plus generated `flick_model::generate` programs, with zero live Rust heap slots and zero live host handles) | M1 reference-model corpus gate complete; production backend RC codegen and physical reclamation remain in M2–M5 / Phase N |
 | M2: `Arena s` | Public `Arena.make/alloc/get`, by-use checker rules (`T4'`/`SafeUse` retention vs post-close `FLICK-G002`/`G003`), full counted C0–C6 owner close (children -> hooks -> C4 mirrored foreign settle -> LIFO C5 finalizers with late arena allocation -> exact-once detach-all retirement) across success, failure/recovery, cancellation/interruption, nested scopes, persistent contexts (`Context`, `Context.Reference`, dynamic/memo `Layer`), Signals (`tail` failure, `abort`, `control` resume & discontinue, partial layer build abort/discontinue), and HostBridge late async callbacks (`Js.promise_callback`, C4 callbacks); JS/Effect-TS/Go storage retirement after finalizers; Lean multi-phase lifecycle ledger (`Formal/MemoryScopes.lean` pinned in `Formal/Axioms.lean`); independent source (`arena_holding_contexts.fl`, `arena_after_close_captures.fl`), language (`Language.Arenas`), counted fuel-prefix (`memory_m2_arenas.rs`, `memory_m2_host_bridge.rs`, `memory_m2_signals.rs`), and JS/Effect-TS/Go runtime regressions; paired EN/RU user docs (`regions.md`) | M2 reference-model, checker, runtime, Lean ledger, and doc contract complete; production backend RC/arena codegen and physical native reclamation remain in M3–M5 / Phase N |
-| M3: FBIP and cycles | Dynamic uniqueness/layout-checked reuse for a last borrowed receiver followed by construction; root-owned counted cells, strong reads/replacement and detach-all teardown, with closure/cell-cycle tests | Full constructor/destructor lowering and backend implementation |
-| M4: Lean | `Formal/MemoryInsert.lean`: whole-function token balance for the executable cached insertion projection, before output validation, with distinct parameters and every selected-path prefix; `Formal/MemoryPass.lean`: independent token checking and computed live-in availability; `Formal/Memory.lean`: local arithmetic; `Formal/MemoryArena.lean` and `MemoryScopes.lean`: root inventories and selected-owner storage retirement | Verified Rust correspondence, machine bounds, operation/heap and exception-unwind semantics, dynamic reuse and physical reclamation remain outside these proofs |
+| M3: FBIP and cycles | Two-stage Perceus FBIP reuse (`DropReuse`, `Reuse`, `ReuseWithDicts`, `ReuseRecord`, in-place unique `Update`), saturated constructor uncurrying, tail-branch lowering, `Error::ReuseTokenEscape` enforcement, measured baseline-vs-FBIP allocation savings (`memory_m3_reuse.rs`), explicit `Ref` reference-cycle policy and `cells_detached_on_teardown` accounting (`memory_m3_cycles.rs`, `memory_inventory.rs`), Lean whole-block token-preservation and dynamic alias/cycle-break proofs (`Formal/MemoryReuse.lean`, pinned in `Formal/Axioms.lean`), and paired EN/RU docs (`spec/05-errors-and-concurrency.md`, `reference/regions.md`) | M3 reference-model, Perceus lowering, Lean proof, and doc contract complete; production backend RC/FBIP codegen and physical native reclamation remain in M4–M5 / Phase N |
+| M4: Lean | `Formal/MemoryInsert.lean`: whole-function token balance for the executable cached insertion projection, before output validation, with distinct parameters and every selected-path prefix; `Formal/MemoryReuse.lean`: whole-block token preservation and prefix safety of frame-limited `DropReuse`/`pairReuse` plus abstract counted-heap uniqueness, alias preservation, unused-token cleanup, and `Ref` cycle-break vs teardown theorems; `Formal/MemoryPass.lean`: independent token checking and computed live-in availability; `Formal/Memory.lean`: local arithmetic; `Formal/MemoryArena.lean` and `MemoryScopes.lean`: root inventories and selected-owner storage retirement (all pinned in `Formal/Axioms.lean`, zero `sorry`, standard axioms only) | Verified Rust correspondence, machine bounds, full VM operation/exception-unwind semantics, and physical reclamation remain outside these proofs |
 | M5: Native split (2026-11-13) | Backend boundary below | Implementation belongs to phase N, not a replacement for M1–M4 |
 
 `run::run_main` and the existing `tests/run/model.txt` harness still use the
@@ -664,18 +664,24 @@ invented successful value. Unsupported parameter/let destructuring remains
 an explicit lowering error rather than an assumed successful match.
 
 `Update` consumes the base and every written replacement, evaluates them in
-source order, and constructs a fresh record with the original field order.
-It replaces existing labels only; shared bases and unchanged fields retain
-their values. Raw IR duplicates use the last replacement and still release
-every overwritten input (checked source rejects duplicate labels). This
-operation does not mutate or reuse record storage. Matching/update retain
-the current program-only fuel/cleanup contract; standalone `execute(Function)`
+source order, and preserves the original field order. It replaces existing
+labels only. When reuse is enabled (`Heap::new()`) and the base record is
+uniquely owned (`references == 1` — noting that any alias held by another local,
+closure, `Ref`, `Arena`, or replacement operand itself raises `references > 1`),
+`Update` charges fuel before mutating, moves the new field values into the
+existing `Data::Record` slot in place (incrementing `Stats::reuses`), and
+releases overwritten old field values normally. Otherwise (`references > 1` or
+`Heap::without_reuse()`), it increments `Stats::reuse_fallbacks` and allocates
+a fresh record while preserving shared bases and all external aliases unchanged.
+Raw IR duplicates use the last replacement and still release every overwritten
+input (checked source rejects duplicate labels). Matching/update retain the
+current program-only fuel/cleanup contract; standalone `execute(Function)`
 rejects them with `NeedsProgram` rather than running an unmetered variant.
 
 ## 3. Insertion and reuse
 
 For an existing local with `u` consuming occurrences in the next operation
-and continuation liveness `k ∈ {0,1}`, insertion emits
+and continuation liveness `k ∈ {0,1}`, Stage 1 insertion (`perceus::insert`) emits
 
 ```text
 copies(u, k) = u - (1 - k)       (saturating natural subtraction)
@@ -686,41 +692,118 @@ discarded(u, k) = 1 if u = 0 and k = 0, otherwise 0
 Copies precede consumption. A last borrowed receiver is released after
 projection, not before it. A value live only in one successor is dropped
 on the other edge. Liveness is path-sensitive; adding the syntactic uses
-of both successors would over-retain it.
+of both successors would over-retain it. Stage 1 keeps the immediate-borrow
+reuse opportunity (a last borrowed receiver immediately followed by a
+constructor) 1-to-1 with `Formal/MemoryInsert.lean`.
 
-The current reuse opportunity is a last borrowed receiver immediately
-followed by a constructor. Insertion may keep the receiver's token until
-that constructor and emit `Reuse candidate tag fields`. It may not move
-the release across unrelated work or a control-flow edge.
+Stage 2 (`perceus::optimize_reuse`, enabled by default in `perceus::lower*` and
+disabled in the baseline entry points `perceus::lower*_without_reuse` /
+`run::counted_main_without_reuse`) performs **frame-limited FBIP reuse** over
+token-balanced memory IR:
 
-`Reuse` consumes the candidate and the new field tokens. If the candidate
-is a unique constructed object with the same field capacity, its old
-fields are released and the same storage holds the new tag and fields.
-Otherwise it releases the candidate token and allocates normally. Tag
-equality is not required; layout compatibility is. Aliases, including
-aliases among new fields, must survive both cases. Reuse never changes a
-shared object in place and never reinterprets a string as constructor
-storage. This dynamic fallback is mandatory even when static liveness
-says the candidate local is dead: another local or field may still alias
-its object.
+1. **Direct saturated constructors and tail branches.** Source lowering emits
+   saturated constructor applications (`Con` and `Dicts(Con, dicts)`) directly
+   with `arg_first` evaluation order instead of curried closure chains, and
+   lowers tail-position conditionals (`if`/`Block`/`Lift`) to inline
+   `Exit::Branch` without duplicating continuations. Partial constructor
+   applications retain their curried closure lowering.
+2. **`DropReuse` token detachment.** Whenever a dead `Drop(x)` targets a local
+   statically shaped as a tagged constructor/tuple/list or record (excluding
+   immediates, closures, tasks, strings, `BigInt`, dictionaries, and synthetic
+   `$match` wrappers) and a compatible `Construct`, `ConstructWithDicts`, or
+   `Record` allocation is reachable in the same frame, `Drop(x)` is rewritten to
+   `r = DropReuse(x)` for a fresh local `r`.
+3. **Immediate child drop and uniqueness restoration.** At runtime, when `x` is
+   uniquely owned (`references == 1`) and is a `Data::Tagged` or `Data::Record`
+   object, `DropReuse(x)` replaces `x`'s payload with an empty 0-child
+   `Data::ReuseToken { kind, capacity }` and **immediately drops all old child
+   fields** at the original `Drop(x)` position. This preserves observable drop
+   and cleanup order and restores child uniqueness (`references == 1`) before
+   recursive calls (such as `map`, `reverse`, `filter`, `tree_map`, and
+   `bst_insert`). When `x` is shared (`references > 1`), non-reusable, or reuse
+   is disabled (`Heap::without_reuse()`), `DropReuse(x)` executes a normal drop
+   and returns the immediate sentinel `Value::ReuseNull`, leaving every external
+   alias untouched.
+4. **Control-flow pairing and escape rejection.** The fresh reuse token `r` is
+   paired along every control-flow path with either the first compatible
+   allocation — rewritten to `Reuse`, `ReuseWithDicts`, or `ReuseRecord` — or an
+   immediate `Drop(r)` at entry of non-allocating branches (including partial
+   match arms, dropped filter branches, wildcard/guard arms, and early exits).
+   Reuse tokens (`Data::ReuseToken` and `Value::ReuseNull`) are strictly
+   frame-limited: returning, duplicating, inspecting, or storing one as an
+   ordinary operand faults with `Error::ReuseTokenEscape` and releases all roots
+   cleanly. On early typed failure, defect, handler `abort`/`control`
+   discontinuation, cancellation, or fuel cut, unwinding drops any live
+   `ReuseToken` in the frame cleanly with zero child drops, zero leaks, and zero
+   double-frees.
 
-`ReuseWithDicts` carries the same explicit payload/evidence partition as
-construction. Eligibility still compares total physical capacity; reuse may
-change the partition but replaces its metadata together with the tag and
-fields. Both reuse and allocation fallback release every old physical edge,
-including evidence, rather than discarding the observationally hidden suffix.
+### Uniqueness, layout, and fallback rules
 
-This includes borrowed matching: whole-scrutinee bindings retain an alias
-and prevent destructive reuse; selected children are retained before old
-fields are released. A dead `$match` result is ordinary tagged storage and
-can itself be reused when unique and layout-compatible. Reuse tests pin
-both the shared fallback and these unique cases.
+- **`Reuse` / `ReuseWithDicts`** consumes the candidate (either a
+  `Data::ReuseToken { kind: Tagged, capacity }` or a live `Data::Tagged`) and
+  the new ordinary and dictionary field tokens. Reuse occurs in place iff
+  `heap.reuse_enabled && references == 1 && capacity == fields.len() + dicts.len()`.
+  Tag equality is not required (cross-tag same-capacity constructors such as
+  `Red`/`Black` reuse in place), and `ReuseWithDicts` updates the ordinary vs
+  evidence partition metadata together with the tag and fields. Otherwise the
+  candidate is dropped, `Stats::reuse_fallbacks` is incremented, and a fresh
+  `Data::Tagged` is allocated.
+- **`ReuseRecord`** consumes the candidate (either a
+  `Data::ReuseToken { kind: Record, capacity }` or a live `Data::Record`) and
+  the new `(label, value)` pairs. Reuse occurs in place iff
+  `heap.reuse_enabled && references == 1 && capacity == fields.len()`. Otherwise
+  the candidate is dropped, `Stats::reuse_fallbacks` is incremented, and a fresh
+  `Data::Record` is allocated.
+- **In-place `Update`** reuses `Data::Record` in place iff
+  `heap.reuse_enabled && references == 1`; otherwise it falls back to fresh
+  allocation and increments `Stats::reuse_fallbacks`.
+- **Forbidden storage kinds.** Closures, tasks, strings, `BigInt`, dictionaries,
+  cells, arenas, list slices, and service tags are never repurposed as
+  constructor or record storage.
+- **Dynamic fallback is mandatory.** Even when static liveness proves a local is
+  dead, another local, closure, `Ref`, `Arena`, or operand may alias its object.
+  External aliases always retain their original values bit-for-bit across both
+  reused and fallback paths.
 
-The Lean local-token theorem covers arbitrary natural use counts, both
-continuation choices, and failed-prefix exclusion. It does not assert that
-the Rust liveness calculation is correct or that reuse preserves heap
-values. No theorem about the core's existing `Ref` store is a counted-heap
-proof by itself.
+### Measured allocation and reuse counts (M3)
+
+`flick-model/tests/model/memory_m3_reuse.rs` (`m3_allocation_and_reuse_measurements`)
+executes identical source workloads in both debug and release profiles under the
+non-reused baseline (`counted_main_without_reuse` + `Heap::without_reuse()`) and
+under FBIP (`counted_main` + `Heap::new()`), asserting identical independently
+expected outputs and zero leaks:
+
+| Workload | Profile | Baseline allocs | FBIP allocs | Allocs saved | FBIP reuses | Fallbacks |
+| - | - | -: | -: | -: | -: | -: |
+| `list_map` (`N = 100`) | debug / release | 863 | 762 | 101 | 101 | 0 |
+| `list_reverse` (`N = 100`) | debug / release | 964 | 864 | 100 | 100 | 0 |
+| `list_filter` (`N = 100`, 50% kept) | debug / release | 663 | 612 | 51 | 51 | 0 |
+| `tree_map` (`depth = 6`, 63 nodes) | debug / release | 818 | 691 | 127 | 127 | 0 |
+| `bst_insert` (`N = 40` inserts) | debug / release | 1252 | 1004 | 248 | 248 | 0 |
+| `record_update` (`N = 100` steps) | debug / release | 261 | 161 | 100 | 100 | 0 |
+| `record_rebuild` (`N = 100` steps) | debug / release | 261 | 161 | 100 | 100 | 0 |
+
+Separate M3 regressions in `memory_m3_reuse.rs` cover shared-input fallback with
+untouched external aliases, cross-tag reuse, mismatched-layout fallback,
+constrained GADTs with held dictionaries, partial matches with guards,
+wildcards, nested patterns, whole-scrutinee aliases, `Error::ReuseTokenEscape`,
+and early typed errors, defects, handler `abort`/`control` (resume once,
+discontinue, `ResumeTwice`), cancellation/timeout, LIFO finalizer order
+equivalence, and exhaustive consecutive fuel-prefix sweeps with zero leaks and
+zero double-frees.
+
+`Formal/MemoryReuse.lean` proves whole-block token preservation and prefix
+safety for `DropReuse` + `pairReuse` across arbitrary finite local width and
+arbitrary branch nesting (`pairReuse_preserves_checkTokens`,
+`dropToReuse_preserves_checkTokens`, `dropToReuse_prefix_safe`), plus abstract
+counted-heap theorems for unique `dropReuse` child release, shared alias
+preservation, unique vs fallback reuse and record update, and clean unused-token
+drop (`dropReuseHeap_unique_tagged`, `dropReuseHeap_shared_preserves_aliases`,
+`reuseTaggedHeap_unique_in_place`, `reuseTaggedHeap_null_preserves_aliases`,
+`updateRecordHeap_shared_preserves_aliases`, `drop_unused_reuseToken_clean`),
+all pinned in `Formal/Axioms.lean` with zero `sorry` and standard Lean axioms
+only. These are abstract model theorems, not verified Rust extraction or a proof
+of physical machine-memory reclamation.
 
 ## 4. Arena lifetime and by-use regions
 
@@ -875,7 +958,32 @@ tracing collector and not weak `Ref` contents:
 
 The tradeoff is deliberate: unreachable mutable cells may retain memory
 until their arena closes. This is deterministic region retention, not
-prompt cycle collection. A zero-live-object gate must close the root cell
+prompt cycle collection.
+
+### Supported vs. unsupported cycle policy matrix (M3)
+
+| Graph class | Policy | Reclamation boundary & diagnostic / reporting behavior |
+| - | - | - |
+| Plain immutable values (ADTs, records, tuples, lists, strings, `BigInt`, closures, tasks, dictionaries, layers) | Supported (acyclic by construction) | Prompt deterministic RC reclamation (`dup`/`drop` + FBIP); `cells_detached_on_teardown == 0`. Any remaining slot is a hard `Heap::finish` error (`Error::LiveObjects`). |
+| Direct `Ref` self-cycles, mutual `Ref ↔ Ref` cycles, and `Ref → closure / ADT / record → Ref` cycles | Supported (root-arena retained) | Accepted with no compile-time diagnostic. Nonowning `Ref` handles add no RC edge; payloads stay live until overwritten or execution teardown, where detach-all clears every slot before ordinary drops (`cells_detached_on_teardown` counts detached heap-object slots; `live_objects == 0` and `cells_allocated == cells_freed` still strictly required). |
+| Broken cycles via overwrite (`Ref.set` / `Ref.modify`) before drop | Supported (prompt old-subgraph reclamation) | Installing the replacement immediately drops the old cyclic payload via normal RC drops while the cell owner stays in the root arena until teardown. |
+| Frame-scoped `let mut` cycles | Supported (frame-scoped cell) | Owned by the enclosing frame (`Data::Var`); detached and released on frame exit or unwind without touching the root `Ref` arena (`cells_allocated == 0`). |
+| `Lazy` cell cycles | Supported with self-force defect | Root-arena owned and detached at teardown; re-entrant self-forcing raises a structured `LazyCycle` defect. |
+| Prompt mid-execution reclamation of unreachable `Ref` cycles | Explicitly unsupported (not promised) | No tracing cycle collector or weak `Ref` contents. Programs requiring bounded scoped reclamation must use `Arena s`, `ScopedRef`, `let mut`, or explicit `Ref.set` overwrite. |
+| Strong reference cycles across FFI / host boundaries | Unsupported without explicit host release contract | Defensive JS boundary copies reject active-path cycles; host retention requires an explicit `Scope`/`Resource`/dispose boundary. |
+
+**Diagnostic and measurement separation.** `memory_m3_cycles.rs` tests direct
+self-cycles, mutual `Ref` cycles, `Ref`-through-closure/ADT/record cycles,
+immediate old-payload reclamation when a cycle is broken via overwrite before
+drop, frame-scoped `let mut` reclamation, preserved external aliases across
+cyclic teardown, and the separate pure-acyclic reclamation boundary
+(`cells_allocated == 0`, `cells_detached_on_teardown == 0`).
+`memory_inventory.rs` separately counts acyclic-reclaimed profiles
+(`cells_detached_on_teardown == 0`) versus profiles using root-cell teardown
+(`cells_detached_on_teardown > 0`), without weakening the strict
+`live_objects == 0 && allocations == frees` gate on any profile.
+
+A zero-live-object gate must close the root cell
 arena and release the program outcome and other runtime roots. It must
 also demonstrate closure/cell cycles and replacement of old contents;
 freeing every object unconditionally at shutdown is not that evidence.
@@ -884,7 +992,8 @@ an occupied `Data::Cell` heap slot with one private owner in `Machine.cells`;
 the returned handle is nonowning and guarded by heap/execution identity.
 `Ref.modify` calls its unary pure callback and commits the tuple
 `(result, new contents)`, not the reverse. Teardown first takes every slot's
-contents, then ordinarily drops the detached values and private owner
+contents (incrementing `Stats::cells_detached_on_teardown` for each detached
+heap object), then ordinarily drops the detached values and private owner
 tokens. It does not scan the heap to dispose of unreachable objects.
 Tests cover self/mutual cell-closure cycles, strong aliases, replacement,
 callback errors and fuel exhaustion, replayed tasks and main's same-arena
@@ -893,13 +1002,14 @@ checked occupied slots include the cells themselves.
 
 `Formal/MemoryArena.lean` proves exact per-object token multiplicities for
 make, strong reads, replacement in an arbitrary arena context, and close
-composed with other roots. Detaching all slots preserves owners and leaves
-every slot empty; close emits precisely the old owner/slot inventory.
-Handles, including self/mutual handles, contribute no counted edge. These
-are ledger theorems, not proofs of heap acyclicity, physical reclamation,
-fresh identities, stale-handle rejection or the Rust implementation.
-Arbitrary counted scope work, persistent host ownership and the whole-pass/heap
-proofs remain separate obligations.
+composed with other roots; `Formal/MemoryReuse.lean` (`cycle_break_vs_teardown`)
+packages the immediate replacement release vs detach-all close corollary.
+Detaching all slots preserves owners and leaves every slot empty; close emits
+precisely the old owner/slot inventory. Handles, including self/mutual handles,
+contribute no counted edge. These are ledger theorems, not proofs of heap
+acyclicity, physical reclamation, fresh identities, stale-handle rejection or
+the Rust implementation. Arbitrary counted scope work, persistent host ownership
+and verified compiler extraction remain separate obligations.
 
 ## 6. Platform and completion gates
 

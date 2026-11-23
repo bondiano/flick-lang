@@ -146,8 +146,20 @@ struct GraphWalkerData {
     values: Vec<Value>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ReuseKind {
+    Tagged,
+    Record,
+}
+
 #[derive(Debug)]
 enum Data {
+    /// Detached 0-child slot held by a frame-limited reuse token between
+    /// `DropReuse` and a matching `Reuse`/`ReuseWithDicts`/`ReuseRecord` or `Drop`.
+    ReuseToken {
+        kind: ReuseKind,
+        capacity: usize,
+    },
     RecoveryResult {
         execution: usize,
         recovery_id: usize,
@@ -321,6 +333,7 @@ pub struct Heap {
     objects: Vec<Slot>,
     free_list: Vec<usize>,
     stats: Stats,
+    reuse_enabled: bool,
     // Weak metadata: only live tag identities, never owned language tokens.
     service_tags: BTreeMap<String, ObjectId>,
     // Freed unresumed continuations queued for deterministic VM unwind/finalization.

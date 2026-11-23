@@ -251,24 +251,102 @@ fn take(locals: &mut Locals, local: Local) -> Result<Value, Error> {
     locals.take(local)
 }
 
-fn operation(heap: &mut Heap, locals: &mut Locals, value: &Operation) -> Result<Value, Error> {
-    for local in value.consumed().into_iter().chain(value.borrowed()) {
-        heap.admit_ordinary(peek(locals, local)?)?;
+fn admit_standalone_operands(heap: &Heap, locals: &Locals, value: &Operation) -> Result<(), Error> {
+    match value {
+        Operation::Reuse { object, fields, .. } => {
+            heap.admit_reuse_candidate(peek(locals, *object)?)?;
+            for local in fields {
+                heap.admit_ordinary(peek(locals, *local)?)?;
+            }
+        }
+        Operation::ReuseWithDicts {
+            object,
+            fields,
+            dicts,
+            ..
+        } => {
+            heap.admit_reuse_candidate(peek(locals, *object)?)?;
+            for local in fields.iter().chain(dicts) {
+                heap.admit_ordinary(peek(locals, *local)?)?;
+            }
+        }
+        Operation::ReuseRecord { object, fields } => {
+            heap.admit_reuse_candidate(peek(locals, *object)?)?;
+            for (_, local) in fields {
+                heap.admit_ordinary(peek(locals, *local)?)?;
+            }
+        }
+        _ => {
+            for local in value.consumed().into_iter().chain(value.borrowed()) {
+                heap.admit_ordinary(peek(locals, local)?)?;
+            }
+        }
     }
-    let operands = |locals: &mut Locals, fields: &[Local]| {
-        fields
-            .iter()
-            .map(|local| take(locals, *local))
-            .collect::<Result<Vec<_>, _>>()
-    };
+    Ok(())
+}
+
+fn take_operands(locals: &mut Locals, fields: &[Local]) -> Result<Vec<Value>, Error> {
+    fields.iter().map(|local| take(locals, *local)).collect()
+}
+
+fn standalone_reuse_operation(
+    heap: &mut Heap,
+    locals: &mut Locals,
+    value: &Operation,
+) -> Result<Value, Error> {
+    match value {
+        Operation::DropReuse(object) => {
+            let candidate = take(locals, *object)?;
+            heap.drop_reuse(candidate)
+        }
+        Operation::Reuse {
+            object,
+            tag,
+            fields,
+        } => {
+            let candidate = take(locals, *object)?;
+            heap.reuse(candidate, tag, take_operands(locals, fields)?)
+        }
+        Operation::ReuseWithDicts {
+            object,
+            tag,
+            fields,
+            dicts,
+        } => {
+            let candidate = take(locals, *object)?;
+            heap.reuse_with_dicts(
+                candidate,
+                tag,
+                take_operands(locals, fields)?,
+                take_operands(locals, dicts)?,
+            )
+        }
+        Operation::ReuseRecord { object, fields } => {
+            let candidate = take(locals, *object)?;
+            let values = fields
+                .iter()
+                .map(|(name, local)| Ok((name.clone(), take(locals, *local)?)))
+                .collect::<Result<Vec<_>, Error>>()?;
+            heap.reuse_record(candidate, values)
+        }
+        _ => unreachable!("non-reuse operation"),
+    }
+}
+
+fn operation(heap: &mut Heap, locals: &mut Locals, value: &Operation) -> Result<Value, Error> {
+    admit_standalone_operands(heap, locals, value)?;
     match value {
         Operation::ServiceTag(key) => heap.service_tag(key),
         Operation::Label(name) => Ok(heap.allocate(Data::Label(name.clone()))),
         Operation::Literal(literal) => heap.literal(literal),
-        Operation::Construct { tag, fields } => heap.construct(tag, operands(locals, fields)?),
-        Operation::ConstructWithDicts { tag, fields, dicts } => {
-            heap.construct_with_dicts(tag, operands(locals, fields)?, operands(locals, dicts)?)
+        Operation::Construct { tag, fields } => {
+            heap.construct(tag, take_operands(locals, fields)?)
         }
+        Operation::ConstructWithDicts { tag, fields, dicts } => heap.construct_with_dicts(
+            tag,
+            take_operands(locals, fields)?,
+            take_operands(locals, dicts)?,
+        ),
         Operation::Project { object, field } => heap.project(peek(locals, *object)?, *field),
         Operation::Record { fields } => {
             let values = fields
@@ -297,6 +375,10 @@ fn operation(heap: &mut Heap, locals: &mut Locals, value: &Operation) -> Result<
             heap.drop_value(value)?;
             Ok(result)
         }
+        Operation::DropReuse(_)
+        | Operation::Reuse { .. }
+        | Operation::ReuseWithDicts { .. }
+        | Operation::ReuseRecord { .. } => standalone_reuse_operation(heap, locals, value),
         Operation::RecoveryResult { .. }
         | Operation::Dictionary { .. }
         | Operation::Method { .. }
@@ -328,27 +410,5 @@ fn operation(heap: &mut Heap, locals: &mut Locals, value: &Operation) -> Result<
         | Operation::SeqOpen(_)
         | Operation::SeqNext(_)
         | Operation::ForeignCall { .. } => Err(Error::NeedsProgram),
-        Operation::Reuse {
-            object,
-            tag,
-            fields,
-        } => {
-            let candidate = take(locals, *object)?;
-            heap.reuse(candidate, tag, operands(locals, fields)?)
-        }
-        Operation::ReuseWithDicts {
-            object,
-            tag,
-            fields,
-            dicts,
-        } => {
-            let candidate = take(locals, *object)?;
-            heap.reuse_with_dicts(
-                candidate,
-                tag,
-                operands(locals, fields)?,
-                operands(locals, dicts)?,
-            )
-        }
     }
 }

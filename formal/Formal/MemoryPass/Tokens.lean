@@ -30,7 +30,10 @@ inductive Operation (width : Nat) where
   | consume (operands : List (Local width))
   | borrow (receiver : Local width)
   | construct (fields evidence : List (Local width))
+  | record (fields : List (Local width))
+  | dropReuse (object : Local width)
   | reuse (receiver : Local width) (fields evidence : List (Local width))
+  | reuseRecord (receiver : Local width) (fields : List (Local width))
   deriving DecidableEq, Repr
 
 inductive Instruction (width : Nat) where
@@ -50,7 +53,10 @@ def operationEvents : Operation width → List (Event width)
   | .consume operands => operands.map .take
   | .borrow receiver => [.borrow receiver]
   | .construct fields evidence => (fields ++ evidence).map .take
+  | .record fields => fields.map .take
+  | .dropReuse object => [.take object]
   | .reuse receiver fields evidence => (receiver :: (fields ++ evidence)).map .take
+  | .reuseRecord receiver fields => (receiver :: fields).map .take
 
 def instructionEvents : Instruction width → List (Event width)
   | .let_ binding value => operationEvents value ++ [.bind binding]

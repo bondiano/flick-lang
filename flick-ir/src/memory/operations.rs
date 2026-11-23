@@ -108,7 +108,8 @@ impl Operation {
             | Self::SeqNext(value)
             | Self::Not(value)
             | Self::Neg { value, .. }
-            | Self::Await(value) => vec![*value],
+            | Self::Await(value)
+            | Self::DropReuse(value) => vec![*value],
             Self::VarSet { var, value } => vec![*var, *value],
             Self::Loop { args, .. }
             | Self::FunctionBoundary { args, .. }
@@ -168,6 +169,9 @@ impl Operation {
                 operands.extend(fields);
                 operands
             }
+            Self::ReuseRecord { object, fields } => iter::once(*object)
+                .chain(fields.iter().map(|(_, local)| *local))
+                .collect(),
         }
     }
 

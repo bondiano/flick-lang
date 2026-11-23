@@ -161,7 +161,10 @@ theorem prepare_live_step (binding : Local width) (value : Operation width) (nex
       cases value with
       | consume arguments => simp [nextConstructor] at isConstructor
       | borrow argument => simp [nextConstructor] at isConstructor
+      | record fields => simp [nextConstructor] at isConstructor
+      | dropReuse object => simp [nextConstructor] at isConstructor
       | reuse candidate fields evidence => simp [nextConstructor] at isConstructor
+      | reuseRecord candidate fields => simp [nextConstructor] at isConstructor
       | construct fields evidence =>
           let owned := withPending (live (.seq (.let_ binding (.construct fields evidence)) next)) (some receiver)
           let emitted := Operation.reuse receiver fields evidence

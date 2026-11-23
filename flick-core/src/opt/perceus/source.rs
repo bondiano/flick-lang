@@ -149,7 +149,8 @@ use crate::ir::{
 use crate::source::Span;
 use crate::types::lang::Lang;
 
-use super::{Error as OwnershipError, insert};
+use super::reuse::{self, CandidateShape};
+use super::{Error as OwnershipError, insert_fbip_with_hints, insert_without_reuse};
 use free::{free, given};
 
 type Env = BTreeMap<String, Local>;
@@ -221,7 +222,17 @@ pub fn lower<'a>(
     modules: impl IntoIterator<Item = &'a Module>,
     entry: &Name,
 ) -> Result<Program, LowerError> {
-    lower_in(modules, &[entry], None, false, BTreeMap::new())
+    lower_in(modules, &[entry], None, false, true, BTreeMap::new())
+}
+
+/// Lowers the entry-reachable checked definitions with FBIP reuse disabled
+/// (pure `dup`/`drop` baseline for reuse-vs-non-reuse equivalence tests and
+/// allocation measurements).
+pub fn lower_without_reuse<'a>(
+    modules: impl IntoIterator<Item = &'a Module>,
+    entry: &Name,
+) -> Result<Program, LowerError> {
+    lower_in(modules, &[entry], None, false, false, BTreeMap::new())
 }
 
 /// Adds matching checked compiler declaration facts, including private/open
@@ -245,7 +256,33 @@ pub fn lower_roots_with_declarations<'a>(
 ) -> Result<Program, LowerError> {
     let declarations =
         scalar_context::ScalarContext::new(declarations).map_err(LowerError::Declarations)?;
-    lower_in(modules, roots, Some(declarations), false, BTreeMap::new())
+    lower_in(
+        modules,
+        roots,
+        Some(declarations),
+        false,
+        true,
+        BTreeMap::new(),
+    )
+}
+
+/// [`lower_roots_with_declarations`] with FBIP reuse disabled (pure `dup`/`drop`
+/// baseline for measuring allocations and comparing reused vs non-reused execution).
+pub fn lower_roots_with_declarations_without_reuse<'a>(
+    modules: impl IntoIterator<Item = &'a Module>,
+    declarations: impl IntoIterator<Item = &'a Interface>,
+    roots: &[&Name],
+) -> Result<Program, LowerError> {
+    let declarations =
+        scalar_context::ScalarContext::new(declarations).map_err(LowerError::Declarations)?;
+    lower_in(
+        modules,
+        roots,
+        Some(declarations),
+        false,
+        false,
+        BTreeMap::new(),
+    )
 }
 
 /// Explicitly opts into lowering unadapted `foreign` declarations to
@@ -260,7 +297,7 @@ pub fn lower_roots_with_foreign_bridge<'a>(
 ) -> Result<Program, LowerError> {
     let declarations =
         scalar_context::ScalarContext::new(declarations).map_err(LowerError::Declarations)?;
-    lower_in(modules, roots, Some(declarations), true, module_dirs)
+    lower_in(modules, roots, Some(declarations), true, true, module_dirs)
 }
 
 fn lower_in<'a>(
@@ -268,6 +305,7 @@ fn lower_in<'a>(
     roots: &[&Name],
     declarations: Option<scalar_context::ScalarContext<'a>>,
     allow_foreign_bridge: bool,
+    enable_reuse: bool,
     module_dirs: BTreeMap<String, String>,
 ) -> Result<Program, LowerError> {
     let mut sources = BTreeMap::new();
@@ -306,6 +344,7 @@ fn lower_in<'a>(
     let mut lower = Lower {
         declarations,
         allow_foreign_bridge,
+        enable_reuse,
         bridge_families,
         module_dirs,
         sources,
@@ -330,6 +369,7 @@ fn lower_in<'a>(
 struct Lower<'a> {
     declarations: Option<scalar_context::ScalarContext<'a>>,
     allow_foreign_bridge: bool,
+    enable_reuse: bool,
     bridge_families: foreign_bridge::BridgeFamilies,
     module_dirs: BTreeMap<String, String>,
     sources: BTreeMap<Name, &'a Item>,
@@ -394,6 +434,7 @@ impl Code {
 
 include!("source/global_lowering.rs");
 include!("source/expression_lowering.rs");
+include!("source/constructor_lowering.rs");
 include!("source/branch_lowering.rs");
 
 fn foreign_intrinsic(value: &Foreign) -> Option<Intrinsic> {

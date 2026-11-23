@@ -17,96 +17,6 @@ impl Heap {
         self.drop_values(vec![value])
     }
 
-    /// Reuses only a unique tagged object of exactly the same field count.
-    /// Alias/layout/string/immediate cases use ordinary drop + allocation.
-    pub fn reuse(
-        &mut self,
-        candidate: Value,
-        tag: &str,
-        fields: Vec<Value>,
-    ) -> Result<Value, Error> {
-        self.reuse_with_dicts(candidate, tag, fields, vec![])
-    }
-
-    /// Reuses physical capacity, not the old semantic partition. Both
-    /// ordinary/evidence metadata and every owned field are replaced.
-    pub fn reuse_with_dicts(
-        &mut self,
-        candidate: Value,
-        tag: &str,
-        mut fields: Vec<Value>,
-        dicts: Vec<Value>,
-    ) -> Result<Value, Error> {
-        self.ensure_owned(iter::once(&candidate).chain(&fields).chain(&dicts))?;
-        if let Err(error) = self.admit_values(iter::once(&candidate).chain(&fields).chain(&dicts)) {
-            fields.extend(dicts);
-            fields.push(candidate);
-            self.drop_values(fields)?;
-            return Err(error);
-        }
-        let ordinary_fields = fields.len();
-        let total = ordinary_fields
-            .checked_add(dicts.len())
-            .ok_or(Error::ConstructorFieldOverflow)?;
-        if let Err(error) = tagged_boundary(tag, ordinary_fields, total) {
-            fields.extend(dicts);
-            fields.push(candidate);
-            self.drop_values(fields)?;
-            return Err(error);
-        }
-        fields.extend(dicts);
-        let reusable = match self.can_reuse(&candidate, total) {
-            Ok(reusable) => reusable,
-            Err(error) => {
-                fields.push(candidate);
-                self.drop_values(fields)?;
-                return Err(error);
-            }
-        };
-        if reusable {
-            let Value::Object(id) = candidate else {
-                unreachable!("only objects are reusable")
-            };
-            let old = mem::replace(
-                &mut self.object_mut(id.id)?.data,
-                Data::Tagged {
-                    tag: tag.to_owned(),
-                    ordinary_fields,
-                    fields,
-                },
-            );
-            self.stats.reuses += 1;
-            if let Data::Tagged { fields, .. } = old {
-                self.drop_values(fields)?;
-            }
-            Ok(Value::Object(id))
-        } else {
-            self.drop_value(candidate)?;
-            Ok(self.allocate(Data::Tagged {
-                tag: tag.to_owned(),
-                ordinary_fields,
-                fields,
-            }))
-        }
-    }
-
-    fn can_reuse(&self, candidate: &Value, total: usize) -> Result<bool, Error> {
-        let Value::Object(id) = candidate else {
-            return Ok(false);
-        };
-        let object = self.object(id.id)?;
-        let Data::Tagged {
-            tag,
-            ordinary_fields,
-            fields,
-        } = &object.data
-        else {
-            return Ok(false);
-        };
-        tagged_boundary(tag, *ordinary_fields, fields.len())?;
-        Ok(object.references == 1 && fields.len() == total)
-    }
-
     fn allocate(&mut self, data: Data) -> Value {
         self.stats.cells_allocated += usize::from(matches!(data, Data::Cell { .. }));
         self.stats.arenas_allocated += usize::from(matches!(data, Data::Arena { .. }));
@@ -264,12 +174,37 @@ impl Heap {
     }
 
     fn admit_ordinary(&self, value: &Value) -> Result<(), Error> {
+        match value {
+            Value::ReuseNull => return Err(Error::ReuseTokenEscape),
+            Value::Object(token) => match self.object(token.id)?.data {
+                Data::RecoveryResult { .. } => return Err(Error::RecoveryEscape),
+                Data::ReuseToken { .. } => return Err(Error::ReuseTokenEscape),
+                _ => {}
+            },
+            _ => {}
+        }
+        Ok(())
+    }
+
+    fn admit_reuse_candidate(&self, value: &Value) -> Result<(), Error> {
         if let Value::Object(token) = value
             && matches!(self.object(token.id)?.data, Data::RecoveryResult { .. })
         {
             return Err(Error::RecoveryEscape);
         }
         Ok(())
+    }
+
+    fn admit_not_reuse_token(&self, value: &Value) -> Result<(), Error> {
+        match value {
+            Value::ReuseNull => Err(Error::ReuseTokenEscape),
+            Value::Object(token)
+                if matches!(self.object(token.id)?.data, Data::ReuseToken { .. }) =>
+            {
+                Err(Error::ReuseTokenEscape)
+            }
+            _ => Ok(()),
+        }
     }
 
     fn admit_values<'a>(&self, values: impl IntoIterator<Item = &'a Value>) -> Result<(), Error> {
@@ -445,7 +380,8 @@ fn release_data_children(data: Data, pending: &mut Vec<Value>) {
             pending.extend(walker.indices);
             pending.extend(walker.values);
         }
-        Data::Defect(_)
+        Data::ReuseToken { .. }
+        | Data::Defect(_)
         | Data::Duration(_)
         | Data::DateTime(_)
         | Data::TimeZone(_)

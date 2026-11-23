@@ -79,6 +79,7 @@ impl Machine<'_, '_> {
             Operation::ConstructWithDicts { tag, fields, dicts } => {
                 self.construct(binding, tag, fields, dicts)?;
             }
+            Operation::DropReuse(object) => self.drop_reuse(binding, *object)?,
             Operation::Reuse {
                 object,
                 tag,
@@ -90,6 +91,9 @@ impl Machine<'_, '_> {
                 fields,
                 dicts,
             } => self.reuse(binding, *object, tag, fields, dicts)?,
+            Operation::ReuseRecord { object, fields } => {
+                self.reuse_record(binding, *object, fields)?;
+            }
             Operation::Binary { .. }
             | Operation::Not(_)
             | Operation::Neg { .. }
@@ -146,11 +150,36 @@ impl Machine<'_, '_> {
     }
 
     fn admit_operands(&self, operation: &Operation) -> Result<(), Error> {
-        for local in operation.consumed().into_iter().chain(operation.borrowed()) {
-            self.heap.admit_ordinary(peek(
-                &self.frames.last().expect("operand caller").locals,
-                local,
-            )?)?;
+        let locals = &self.frames.last().expect("operand caller").locals;
+        match operation {
+            Operation::Reuse { object, fields, .. } => {
+                self.heap.admit_reuse_candidate(peek(locals, *object)?)?;
+                for local in fields {
+                    self.heap.admit_ordinary(peek(locals, *local)?)?;
+                }
+            }
+            Operation::ReuseWithDicts {
+                object,
+                fields,
+                dicts,
+                ..
+            } => {
+                self.heap.admit_reuse_candidate(peek(locals, *object)?)?;
+                for local in fields.iter().chain(dicts) {
+                    self.heap.admit_ordinary(peek(locals, *local)?)?;
+                }
+            }
+            Operation::ReuseRecord { object, fields } => {
+                self.heap.admit_reuse_candidate(peek(locals, *object)?)?;
+                for (_, local) in fields {
+                    self.heap.admit_ordinary(peek(locals, *local)?)?;
+                }
+            }
+            _ => {
+                for local in operation.consumed().into_iter().chain(operation.borrowed()) {
+                    self.heap.admit_ordinary(peek(locals, local)?)?;
+                }
+            }
         }
         Ok(())
     }
@@ -207,6 +236,14 @@ impl Machine<'_, '_> {
         Ok(())
     }
 
+    fn drop_reuse(&mut self, binding: Local, object: Local) -> Result<(), Error> {
+        self.stage([object])?;
+        let candidate = self.scratch.remove(0);
+        let token = self.heap.drop_reuse(candidate)?;
+        self.store_raw(binding, token);
+        Ok(())
+    }
+
     fn reuse(
         &mut self,
         binding: Local,
@@ -222,6 +259,24 @@ impl Machine<'_, '_> {
         let value = self
             .heap
             .reuse_with_dicts(candidate, tag, fields_owned, dicts_owned)?;
+        self.store(binding, value)?;
+        Ok(())
+    }
+
+    fn reuse_record(
+        &mut self,
+        binding: Local,
+        object: Local,
+        fields: &[(String, Local)],
+    ) -> Result<(), Error> {
+        self.stage(iter::once(object).chain(fields.iter().map(|(_, local)| *local)))?;
+        let candidate = self.scratch.remove(0);
+        let fields_owned = fields
+            .iter()
+            .map(|(name, _)| name.clone())
+            .zip(mem::take(&mut self.scratch))
+            .collect();
+        let value = self.heap.reuse_record(candidate, fields_owned)?;
         self.store(binding, value)?;
         Ok(())
     }

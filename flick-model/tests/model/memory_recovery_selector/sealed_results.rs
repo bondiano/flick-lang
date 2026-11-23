@@ -157,6 +157,7 @@ fn sealed_selection_every_fuel_prefix_preserves_external_owned_alias() {
 fn forbidden_marker_edges() -> Vec<Operation> {
     use flick_core::{ir::memory::DictionaryEntry, numeric::Num};
     vec![
+        Operation::DropReuse(2),
         Operation::Reuse {
             object: 2,
             tag: "Box".into(),
@@ -167,6 +168,14 @@ fn forbidden_marker_edges() -> Vec<Operation> {
             tag: "Box".into(),
             fields: vec![],
             dicts: vec![],
+        },
+        Operation::ReuseRecord {
+            object: 2,
+            fields: vec![("value".into(), 1)],
+        },
+        Operation::ReuseRecord {
+            object: 1,
+            fields: vec![("value".into(), 2)],
         },
         Operation::Update {
             object: 1,

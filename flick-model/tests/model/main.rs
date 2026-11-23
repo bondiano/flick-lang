@@ -46,6 +46,8 @@ pub mod memory_lexical_owners;
 pub mod memory_m2_arenas;
 pub mod memory_m2_host_bridge;
 pub mod memory_m2_signals;
+pub mod memory_m3_cycles;
+pub mod memory_m3_reuse;
 pub mod memory_numeric;
 pub mod memory_owner_evidence;
 pub mod memory_patterns;

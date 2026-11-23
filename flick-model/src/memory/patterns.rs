@@ -564,6 +564,28 @@ pub(super) fn update(
         charge(fuel, label.len().saturating_add(1))?;
         sources.push((label.clone(), source));
     }
+    if heap.reuse_enabled && heap.object(object)?.references == 1 {
+        // Charge commit work before any mutation so fuel exhaustion leaves
+        // the base record intact and all operands cleanly droppable.
+        charge(fuel, sources.len().saturating_add(1))?;
+        let base_value = mem::replace(&mut operands[0], Value::Unit);
+        let mut overwritten = Vec::new();
+        {
+            let Data::Record(base_fields) = &mut heap.object_mut(object)?.data else {
+                unreachable!("validated record object")
+            };
+            for (index, (_, source)) in sources.iter().enumerate() {
+                if let UpdateSource::Replacement(rep_index) = source {
+                    let replacement = mem::replace(&mut operands[*rep_index], Value::Unit);
+                    let old = mem::replace(&mut base_fields[index].1, replacement);
+                    overwritten.push(old);
+                }
+            }
+        }
+        operands.extend(overwritten);
+        heap.stats.reuses += 1;
+        return Ok(base_value);
+    }
     let checkpoint = operands.len();
     for (_, source) in &sources {
         charge(fuel, 1)?;
@@ -583,6 +605,7 @@ pub(super) fn update(
     }
     charge(fuel, 1)?;
     let values = operands.split_off(checkpoint);
+    heap.stats.reuse_fallbacks += 1;
     Ok(heap.allocate(Data::Record(
         sources
             .into_iter()

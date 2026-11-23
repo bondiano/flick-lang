@@ -24,6 +24,7 @@ import Formal.Equiv.All
 import Formal.RecordOrder
 import Formal.MemoryArena
 import Formal.MemoryScopes
+import Formal.MemoryReuse
 
 /-!
 # The axioms of the main theorems
@@ -296,3 +297,43 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.MemoryScopes.closeLifecycle_idempotent' depends on axioms: [propext] -/
 #guard_msgs in
 #print axioms Flick.MemoryScopes.closeLifecycle_idempotent
+
+/-- info: 'Flick.Memory.Reuse.pairReuse_preserves_checkTokens' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Reuse.pairReuse_preserves_checkTokens
+
+/-- info: 'Flick.Memory.Reuse.dropToReuse_preserves_checkTokens' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Reuse.dropToReuse_preserves_checkTokens
+
+/-- info: 'Flick.Memory.Reuse.dropToReuse_prefix_safe' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Reuse.dropToReuse_prefix_safe
+
+/-- info: 'Flick.Memory.Reuse.dropReuseHeap_unique_tagged' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Reuse.dropReuseHeap_unique_tagged
+
+/-- info: 'Flick.Memory.Reuse.dropReuseHeap_shared_preserves_aliases' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Reuse.dropReuseHeap_shared_preserves_aliases
+
+/-- info: 'Flick.Memory.Reuse.reuseTaggedHeap_unique_in_place' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Reuse.reuseTaggedHeap_unique_in_place
+
+/-- info: 'Flick.Memory.Reuse.reuseTaggedHeap_null_preserves_aliases' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Reuse.reuseTaggedHeap_null_preserves_aliases
+
+/-- info: 'Flick.Memory.Reuse.updateRecordHeap_shared_preserves_aliases' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Reuse.updateRecordHeap_shared_preserves_aliases
+
+/-- info: 'Flick.Memory.Reuse.drop_unused_reuseToken_clean' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Reuse.drop_unused_reuseToken_clean
+
+/-- info: 'Flick.Memory.Reuse.cycle_break_vs_teardown' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Reuse.cycle_break_vs_teardown

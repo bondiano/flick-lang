@@ -5,7 +5,6 @@
 //! fallback, verifying exact expected outcomes where pinned and asserting
 //! zero occupied heap slots (`Heap::finish`) on every executed run.
 
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 use std::{env, fs};
@@ -22,7 +21,9 @@ use flick_test_support::files as fixture_files;
 
 mod examples;
 mod helpers;
+mod summary;
 use helpers::{FsHost, compile_self_spawn_entry, describe_outcome_detail, load_doc_expectations};
+use summary::CorpusSummary;
 
 /// Fuel cap for debug `just model` runs so the inventory finishes quickly while
 /// still executing every corpus program and verifying zero leaks on `OutOfFuel`.
@@ -46,98 +47,6 @@ fn inventory_fuel() -> u64 {
 
 fn repo() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
-}
-
-#[derive(Default)]
-struct CorpusSummary {
-    passed: usize,
-    expected_failure: usize,
-    failed_outcome: Vec<String>,
-    out_of_fuel: Vec<String>,
-    leaked: Vec<String>,
-    unsupported: BTreeMap<String, usize>,
-    compile_error: usize,
-    no_main: usize,
-    total_profiles: usize,
-}
-
-impl CorpusSummary {
-    fn record_unsupported(&mut self, error: &str) {
-        // Normalize span suffix so identical lowering gaps aggregate cleanly.
-        let key = error
-            .split(" at Span")
-            .next()
-            .unwrap_or(error)
-            .lines()
-            .next()
-            .unwrap_or(error)
-            .to_owned();
-        *self.unsupported.entry(key).or_default() += 1;
-    }
-
-    fn print(&self, title: &str) {
-        let unsupported_total: usize = self.unsupported.values().sum();
-        println!("=== {title} (profiles={}) ===", self.total_profiles);
-        println!(
-            "  passed={} expected_failure={} out_of_fuel={} failed_outcome={} leaked={} unsupported={} compile_error={} no_main={}",
-            self.passed,
-            self.expected_failure,
-            self.out_of_fuel.len(),
-            self.failed_outcome.len(),
-            self.leaked.len(),
-            unsupported_total,
-            self.compile_error,
-            self.no_main,
-        );
-        if !self.out_of_fuel.is_empty() {
-            println!("  [out_of_fuel]: {}", self.out_of_fuel.join(", "));
-        }
-        if !self.failed_outcome.is_empty() {
-            if env::var("FLICK_INVENTORY_DIFF").is_ok() {
-                for item in &self.failed_outcome {
-                    println!("  [FAIL]: {item}");
-                }
-            }
-            let mut by_reason: BTreeMap<String, Vec<String>> = BTreeMap::new();
-            for item in &self.failed_outcome {
-                let (name, rest) = item.split_once(": ").unwrap_or((item, ""));
-                let key = rest.split(" expected=").next().unwrap_or(rest).to_owned();
-                by_reason.entry(key).or_default().push(name.to_owned());
-            }
-            let mut ranked_fail: Vec<_> = by_reason.into_iter().collect();
-            ranked_fail.sort_by(|a, b| b.1.len().cmp(&a.1.len()).then_with(|| a.0.cmp(&b.0)));
-            println!(
-                "  [failed_outcome grouped ({} total)]:",
-                self.failed_outcome.len()
-            );
-            for (reason, names) in ranked_fail {
-                let sample: Vec<_> = names.iter().take(6).cloned().collect();
-                let more = if names.len() > 6 {
-                    format!(" ... +{}", names.len() - 6)
-                } else {
-                    String::new()
-                };
-                println!(
-                    "    {:4}  {reason}  [{}]{more}",
-                    names.len(),
-                    sample.join(", ")
-                );
-            }
-        }
-        if !self.leaked.is_empty() {
-            for item in &self.leaked {
-                println!("  [LEAK]: {item}");
-            }
-        }
-        let mut ranked: Vec<_> = self.unsupported.iter().collect();
-        ranked.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
-        if !ranked.is_empty() {
-            println!("  [top unsupported reasons]:");
-            for (reason, count) in ranked.into_iter().take(25) {
-                println!("    {count:4}  {reason}");
-            }
-        }
-    }
 }
 
 fn check_file_fixture(
@@ -288,7 +197,9 @@ fn record_fixture_report(
         return;
     }
     match finish_res {
-        Ok(stats) if stats.live_objects == 0 && stats.allocations == stats.frees => {}
+        Ok(stats) if stats.live_objects == 0 && stats.allocations == stats.frees => {
+            summary.record_stats(&stats);
+        }
         Ok(stats) => {
             summary.leaked.push(format!(
                 "{label} ({profile}): live={} alloc={} free={}",
@@ -386,11 +297,23 @@ fn check_language_exports(fuel: u64, bridge: &mut HostBridge, summary: &mut Corp
                     .push(format!("{} ({profile}): release error: {err}", module.name));
                 continue;
             }
-            if let Err(err) = heap.finish() {
-                summary
-                    .leaked
-                    .push(format!("{} ({profile}): {err}", module.name));
-                continue;
+            match heap.finish() {
+                Ok(stats) if stats.live_objects == 0 && stats.allocations == stats.frees => {
+                    summary.record_stats(&stats);
+                }
+                Ok(stats) => {
+                    summary.leaked.push(format!(
+                        "{} ({profile}): live={} alloc={} free={}",
+                        module.name, stats.live_objects, stats.allocations, stats.frees
+                    ));
+                    continue;
+                }
+                Err(err) => {
+                    summary
+                        .leaked
+                        .push(format!("{} ({profile}): {err}", module.name));
+                    continue;
+                }
             }
             if is_ok {
                 summary.passed += 1;

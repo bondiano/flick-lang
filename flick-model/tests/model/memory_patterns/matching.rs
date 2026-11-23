@@ -48,7 +48,7 @@ fn no_match_intrinsic_is_a_real_error_with_no_operands() {
     heap.finish().expect("error released real roots");
 }
 #[test]
-fn updates_are_fresh_and_last_written_duplicate_wins() {
+fn updates_reuse_unique_records_allocate_when_shared_or_disabled_and_last_duplicate_wins() {
     let p = program(function(
         &[0, 1],
         vec![
@@ -64,6 +64,8 @@ fn updates_are_fresh_and_last_written_duplicate_wins() {
         ],
         4,
     ));
+
+    // Unique receiver with reuse enabled updates the record slot in place.
     let mut heap = Heap::new();
     let input = heap
         .record(vec![
@@ -72,11 +74,52 @@ fn updates_are_fresh_and_last_written_duplicate_wins() {
         ])
         .expect("record");
     let id = input.object_id();
-    let result = run(&mut heap, &p, input, 100).expect("record update");
-    assert_ne!(result.object_id(), id);
+    let result = run(&mut heap, &p, input, 100).expect("unique record update");
+    assert_eq!(result.object_id(), id);
+    assert_eq!(heap.stats().reuses, 1);
+    assert_eq!(heap.stats().reuse_fallbacks, 0);
     assert_eq!(heap.named_field(&result, "a"), Ok(&Value::Int(9)));
     assert_eq!(heap.named_field(&result, "b"), Ok(&Value::Int(2)));
     heap.drop_value(result).expect("record release");
+    heap.finish().expect("no leaks");
+
+    // Shared receiver falls back to a fresh record and preserves the external alias.
+    let mut heap = Heap::new();
+    let input = heap
+        .record(vec![
+            ("a".into(), Value::Int(1)),
+            ("b".into(), Value::Int(2)),
+        ])
+        .expect("shared record");
+    let alias = heap.dup(&input).expect("external alias");
+    let id = input.object_id();
+    let result = run(&mut heap, &p, input, 100).expect("shared record update");
+    assert_ne!(result.object_id(), id);
+    assert_eq!(heap.stats().reuses, 0);
+    assert_eq!(heap.stats().reuse_fallbacks, 1);
+    assert_eq!(heap.named_field(&result, "a"), Ok(&Value::Int(9)));
+    assert_eq!(heap.named_field(&result, "b"), Ok(&Value::Int(2)));
+    assert_eq!(heap.named_field(&alias, "a"), Ok(&Value::Int(1)));
+    assert_eq!(heap.named_field(&alias, "b"), Ok(&Value::Int(2)));
+    heap.drop_value(result).expect("updated release");
+    heap.drop_value(alias).expect("alias release");
+    heap.finish().expect("no leaks");
+
+    // Baseline execution with reuse disabled allocates a fresh record even when unique.
+    let mut heap = Heap::without_reuse();
+    let input = heap
+        .record(vec![
+            ("a".into(), Value::Int(1)),
+            ("b".into(), Value::Int(2)),
+        ])
+        .expect("baseline record");
+    let id = input.object_id();
+    let result = run(&mut heap, &p, input, 100).expect("baseline record update");
+    assert_ne!(result.object_id(), id);
+    assert_eq!(heap.stats().reuses, 0);
+    assert_eq!(heap.named_field(&result, "a"), Ok(&Value::Int(9)));
+    assert_eq!(heap.named_field(&result, "b"), Ok(&Value::Int(2)));
+    heap.drop_value(result).expect("baseline release");
     heap.finish().expect("no leaks");
 }
 

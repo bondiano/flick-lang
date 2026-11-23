@@ -457,3 +457,57 @@ fn validates_foreign_call_arity_and_ownership() {
         })
     );
 }
+
+#[test]
+fn drop_reuse_and_reuse_record_validate_exact_token_balance() {
+    let valid = Function {
+        params: vec![0, 1],
+        body: Block {
+            instructions: vec![
+                Instruction::Let {
+                    binding: 2,
+                    value: Operation::DropReuse(0),
+                },
+                Instruction::Let {
+                    binding: 3,
+                    value: Operation::ReuseRecord {
+                        object: 2,
+                        fields: vec![("x".into(), 1)],
+                    },
+                },
+            ],
+            exit: Exit::Return(3),
+        },
+    };
+    assert_eq!(validate(&valid), Ok(()));
+
+    let leaked_token = Function {
+        params: vec![0, 1],
+        body: Block {
+            instructions: vec![Instruction::Let {
+                binding: 2,
+                value: Operation::DropReuse(0),
+            }],
+            exit: Exit::Return(1),
+        },
+    };
+    assert_eq!(validate(&leaked_token), Err(Error::Leftover(vec![(2, 1)])));
+
+    let missing_candidate = Function {
+        params: vec![0, 1],
+        body: Block {
+            instructions: vec![
+                Instruction::Drop(0),
+                Instruction::Let {
+                    binding: 2,
+                    value: Operation::ReuseRecord {
+                        object: 0,
+                        fields: vec![("x".into(), 1)],
+                    },
+                },
+            ],
+            exit: Exit::Return(2),
+        },
+    };
+    assert_eq!(validate(&missing_candidate), Err(Error::NoToken(0)));
+}

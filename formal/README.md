@@ -62,6 +62,22 @@ signature and golden certificates.
   corollaries cover arbitrary finite width and repeated/evidence operands.
   Pending-reuse lemmas establish local-name distinctness, not heap-object
   nonaliasing or dynamic reuse eligibility.
+  `Formal/MemoryReuse.lean` formalizes the M3 frame-limited FBIP reuse pass
+  (`DropReuse`, `Reuse`, `ReuseRecord`, and `Update`) and the dynamic
+  uniqueness/alias and cycle-boundary invariants: replacing a dead `Drop x`
+  with `r = DropReuse x` paired via `pairReuse` across sequential instructions
+  and branches preserves independent token validation and prefix safety
+  (`pairReuse_preserves_checkTokens`, `dropToReuse_preserves_checkTokens`,
+  `dropToReuse_prefix_safe`); on the idealized counted heap, unique `DropReuse`
+  releases old children immediately and leaves a 0-child `reuseToken`
+  (`dropReuseHeap_unique_tagged`), shared `DropReuse` / fallback `Reuse` /
+  shared `Update` preserve every external alias bit-for-bit
+  (`dropReuseHeap_shared_preserves_aliases`, `reuseTaggedHeap_null_preserves_aliases`,
+  `updateRecordHeap_shared_preserves_aliases`), unique compatible `Reuse`
+  reuses storage in place with zero allocation (`reuseTaggedHeap_unique_in_place`),
+  dropping an unused `reuseToken` releases the exact slot cleanly
+  (`drop_unused_reuseToken_clean`), and `cycle_break_vs_teardown` pins prompt
+  old-payload release on `Ref` overwrite versus detach-all teardown retention.
   `Formal/MemoryArena.lean` additionally proves exact
   per-object owner/slot inventories for root-cell allocation, strong reads,
   replacement and detach-all close, including aliases and independent
@@ -76,12 +92,12 @@ signature and golden certificates.
   (`closeLifecycle_idempotent`), and closed owners/arenas reject admission
   (`closed_rejects_make/alloc/get`) across success, failure, and cancellation
   outcomes. `Formal/Axioms.lean` pins these theorems together with
-  `MemoryArena.close_balance` using `#guard_msgs` (standard Lean axioms
-  `propext`, `Quot.sound` only; zero `sorry`). These results do NOT prove
-  source-to-memory lowering equivalence, verified correspondence with the Rust
-  pass or compiler checker, handle freshness/provenance checks, counted
-  heap-graph acyclicity, host-bridge wire marshalling, dynamic reuse/FBIP, or
-  physical memory reclamation. See the
+  `MemoryArena.close_balance` and the `MemoryReuse` theorems using `#guard_msgs`
+  (standard Lean axioms `propext`, `Quot.sound` only; zero `sorry`). These
+  results do NOT prove source-to-memory lowering equivalence, verified
+  correspondence with the Rust pass or compiler checker, handle
+  freshness/provenance checks, counted heap-graph acyclicity, host-bridge wire
+  marshalling, fuel-cut unwinding, or physical memory reclamation. See the
   [memory contract](../docs/formal/memory.md) for
   the M1–M5 boundaries.
 - **The module boundary** (`Formal/Modules.lean`): separate named application

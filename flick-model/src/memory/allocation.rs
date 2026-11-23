@@ -8,10 +8,25 @@ impl Heap {
             objects: Vec::new(),
             free_list: Vec::new(),
             stats: Stats::default(),
+            reuse_enabled: true,
             service_tags: BTreeMap::new(),
             dropped_continuations: Vec::new(),
             released_foreign_handles: Vec::new(),
         }
+    }
+
+    /// Creates a counted heap with in-place reuse disabled (all `DropReuse`,
+    /// `Reuse*`, and `Update` operations take the fresh-allocation fallback)
+    /// for comparing reused vs non-reused execution on identical inputs.
+    pub fn without_reuse() -> Self {
+        let mut heap = Self::new();
+        heap.reuse_enabled = false;
+        heap
+    }
+
+    /// Enables or disables dynamic in-place reuse on this heap.
+    pub fn set_reuse_enabled(&mut self, enabled: bool) {
+        self.reuse_enabled = enabled;
     }
 
     /// Drains foreign host handle IDs whose last counted reference hit zero in `execution`.

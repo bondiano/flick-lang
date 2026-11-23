@@ -207,6 +207,7 @@ import Formal.LocalControl
 import Formal.Memory
 import Formal.MemoryPass
 import Formal.MemoryInsert
+import Formal.MemoryReuse
 import Formal.MemoryArena
 import Formal.MemoryScopes
 import Formal.RecordOrder
