@@ -2,10 +2,12 @@
 impl<'p> Machine<'p, '_> {
     fn control_intrinsic(&mut self, kind: Intrinsic, binding: Local) -> Result<bool, Error> {
         match kind {
-            Intrinsic::LazyMake => {
+            Intrinsic::LazyMake | Intrinsic::LazyMakeLocal => {
                 let task = self.scratch.pop().expect("lazy task");
+                let local_owner = matches!(kind, Intrinsic::LazyMakeLocal).then_some(self.active_fiber);
                 let root = self.heap.allocate(Data::Lazy {
                     execution: self.execution,
+                    local_owner,
                     state: Some(LazyState::Pending(task)),
                 });
                 let id = root.object_id().expect("lazy allocation");
@@ -95,6 +97,26 @@ impl<'p> Machine<'p, '_> {
         Ok(true)
     }
 
+    fn destination_can_reset_local(&self, dest: &Destination<'p>) -> bool {
+        match dest {
+            Destination::Handle { activation, .. } => self
+                .activations
+                .get(activation)
+                .is_some_and(|act| act.operations.iter().any(|op| op.class != OpClass::Tail)),
+            Destination::CaptureExit { .. } | Destination::CatchCause { .. } => true,
+            Destination::RestoreMask { next, .. }
+            | Destination::WithServices { next, .. }
+            | Destination::CachedComplete { next, .. } => self.destination_can_reset_local(next),
+            _ => false,
+        }
+    }
+
+    fn has_local_reset_frame(&self) -> bool {
+        self.frames
+            .iter()
+            .any(|frame| self.destination_can_reset_local(&frame.destination))
+    }
+
     fn lazy_force(&mut self, binding: Local) -> Result<(), Error> {
         enum LazyAction {
             Return(Value),
@@ -111,8 +133,9 @@ impl<'p> Machine<'p, '_> {
         };
         self.release_operands()?;
         let active = self.active_fiber;
+        let has_reset_frame = self.has_local_reset_frame();
         let action = {
-            let slot = self.heap.lazy_state_mut(self.execution, &handle)?;
+            let (slot, local_owner) = self.heap.lazy_slot_mut(self.execution, &handle)?;
             match slot {
                 Some(LazyState::DoneOk(value)) => {
                     let rep = value.representation();
@@ -128,16 +151,33 @@ impl<'p> Machine<'p, '_> {
                     }
                     LazyAction::Wait
                 }
+                Some(LazyState::RunningLocal { .. }) => {
+                    return Err(Error::LazyCycle);
+                }
                 Some(LazyState::Pending(_)) => {
                     let Some(LazyState::Pending(task)) = slot.take() else {
                         unreachable!()
                     };
-                    let rep = task.representation();
-                    *slot = Some(LazyState::Running {
-                        task,
-                        owner: active,
-                    });
-                    LazyAction::Start(self.heap.dup(&rep)?)
+                    if let Some(creator) = local_owner {
+                        if active != creator || has_reset_frame {
+                            let rep = task.representation();
+                            *slot = Some(LazyState::RunningLocal { task: Some(task) });
+                            LazyAction::Start(self.heap.dup(&rep)?)
+                        } else {
+                            // O3 Perceus: move the task out on Pending -> Running
+                            // so the task and its captures are owned uniquely and
+                            // reclaimed immediately instead of kept alive by the cell.
+                            *slot = Some(LazyState::RunningLocal { task: None });
+                            LazyAction::Start(task)
+                        }
+                    } else {
+                        let rep = task.representation();
+                        *slot = Some(LazyState::Running {
+                            task,
+                            owner: active,
+                        });
+                        LazyAction::Start(self.heap.dup(&rep)?)
+                    }
                 }
                 None => return Err(Error::ClosedLazy),
             }

@@ -23,7 +23,7 @@ import {
 } from "../src/rt/kernel.ts";
 import { parallelExits, parallelResults } from "../src/rt/concurrency.ts";
 import { ensuring, flickOnExit } from "../src/rt/effect/Effect.ts";
-import { lazyForce, lazyMake } from "../src/rt/effect/Lazy.ts";
+import { lazyForce, lazyMake, lazyMakeLocal } from "../src/rt/effect/Lazy.ts";
 
 const Abort = service("Test.AbortHygiene");
 const abort = operation(Abort, "abort", 1) as (value: unknown) => unknown;
@@ -111,33 +111,37 @@ test("elect ignores Die(Signal) when no real defect is present", () => {
 });
 
 test("lazyForce does not cache Interrupt+Die (R9) and strips+caches Die+Signal", async () => {
-  let runs1 = 0;
-  const cell1 = lazyMake(() => {
-    runs1 += 1;
-    if (runs1 === 1) {
-      return raise({ reasons: [...interrupt(undefined).reasons, ...die("int-die").reasons] });
-    }
-    return 42;
-  });
-  const first = await root(() => lazyForce(cell1));
-  assert.equal(first.cause?.reasons.length, 2);
-  const second = await root(() => lazyForce(cell1));
-  assert.equal(second.cause, undefined);
-  assert.equal(second.value, 42);
-  assert.equal(runs1, 2);
+  await Promise.all(
+    [lazyMake, lazyMakeLocal].map(async (make) => {
+      let runs1 = 0;
+      const cell1 = make(() => {
+        runs1 += 1;
+        if (runs1 === 1) {
+          return raise({ reasons: [...interrupt(undefined).reasons, ...die("int-die").reasons] });
+        }
+        return 42;
+      });
+      const first = await root(() => lazyForce(cell1));
+      assert.equal(first.cause?.reasons.length, 2);
+      const second = await root(() => lazyForce(cell1));
+      assert.equal(second.cause, undefined);
+      assert.equal(second.value, 42);
+      assert.equal(runs1, 2);
 
-  let runs2 = 0;
-  const cell2 = lazyMake(() => {
-    runs2 += 1;
-    return ensuring(() => raise(die("fin-boom")))(() => abort("body"));
-  });
-  const withAbort = (task: () => unknown) =>
-    handle([[Abort, [["abort", () => "swallowed", "abort", 0, 1]]]], task, undefined, undefined);
-  const g1 = await root(() => withAbort(() => lazyForce(cell2)));
-  const g2 = await root(() => withAbort(() => lazyForce(cell2)));
-  assert.equal(runs2, 1);
-  assert.deepEqual(g1.cause?.reasons, [{ _tag: "Die", defect: "fin-boom" }]);
-  assert.deepEqual(g2.cause?.reasons, [{ _tag: "Die", defect: "fin-boom" }]);
+      let runs2 = 0;
+      const cell2 = make(() => {
+        runs2 += 1;
+        return ensuring(() => raise(die("fin-boom")))(() => abort("body"));
+      });
+      const withAbort = (task: () => unknown) =>
+        handle([[Abort, [["abort", () => "swallowed", "abort", 0, 1]]]], task, undefined, undefined);
+      const g1 = await root(() => withAbort(() => lazyForce(cell2)));
+      const g2 = await root(() => withAbort(() => lazyForce(cell2)));
+      assert.equal(runs2, 1);
+      assert.deepEqual(g1.cause?.reasons, [{ _tag: "Die", defect: "fin-boom" }]);
+      assert.deepEqual(g2.cause?.reasons, [{ _tag: "Die", defect: "fin-boom" }]);
+    }),
+  );
 });
 
 test("flickOnExit strips handler signals before passing exit to callback", async () => {

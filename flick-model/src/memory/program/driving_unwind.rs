@@ -255,7 +255,10 @@ impl<'p> Machine<'p, '_> {
             let cached = self.heap.dup_cause_id(cause_id)?;
             let slot = self.heap.lazy_state_mut(self.execution, lazy)?;
             let prev = slot.replace(LazyState::DoneCause(cached));
-            if let Some(LazyState::Running { task, .. }) = prev {
+            if let Some(
+                LazyState::Running { task, .. } | LazyState::RunningLocal { task: Some(task) },
+            ) = prev
+            {
                 self.heap.drop_value(task)?;
             }
             if let Some(waiters) = self.lazy_waiters.remove(&lazy.id) {
@@ -320,7 +323,10 @@ impl<'p> Machine<'p, '_> {
             }
         }
         let slot = self.heap.lazy_state_mut(self.execution, lazy)?;
-        if let Some(LazyState::Running { task, .. }) = slot.take() {
+        if let Some(
+            LazyState::Running { task, .. } | LazyState::RunningLocal { task: Some(task) },
+        ) = slot.take()
+        {
             *slot = Some(LazyState::Pending(task));
         }
         Ok(())

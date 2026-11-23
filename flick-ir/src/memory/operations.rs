@@ -19,6 +19,7 @@ impl Intrinsic {
             | Self::ToBigInt
             | Self::Host(_)
             | Self::LazyMake
+            | Self::LazyMakeLocal
             | Self::LazyForce
             | Self::ScopeAddFinalizer
             | Self::ScopeAddFinalizerExit

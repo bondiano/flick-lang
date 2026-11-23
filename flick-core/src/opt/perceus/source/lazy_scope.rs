@@ -32,10 +32,14 @@ impl Lower<'_> {
                 let function = b.lam(&["task"], b.await_(b.loc("task")));
                 Some(self.expr(&function, &Env::new(), block))
             }
-            // `Prelude.lazy_make : Detached r => (Eff r e a)^c ->{} Lazy r e a`
-            // (`Detached` is an erased marker class with 0 runtime dictionaries.)
+            // `Prelude.lazy_make : NoControl r => (Eff r e a)^c ->{} Lazy r e a`
+            // (`NoControl` is an erased marker class with 0 runtime dictionaries.)
             ("flick:rt", "lazyMake", ForeignMode::Effect, 0, 1) => {
                 Some(self.intrinsic(Intrinsic::LazyMake, false, vec![], block, span))
+            }
+            // `Prelude.lazy_make_local : NoControl r => (Eff r e a)^c ->{} Lazy r e a`
+            ("flick:rt", "lazyMakeLocal", ForeignMode::Effect, 0, 1) => {
+                Some(self.intrinsic(Intrinsic::LazyMakeLocal, false, vec![], block, span))
             }
             // `Prelude.lazy_force` / `Prelude.lazy_read`
             ("flick:rt", "lazyForce", ForeignMode::Effect, 0, 1) => {

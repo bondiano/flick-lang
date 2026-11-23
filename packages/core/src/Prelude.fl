@@ -302,6 +302,12 @@ lazy_make : NoControl r => (Eff r e a)^c ->{} Lazy r e a
 foreign effect lazy_make from "flick:rt" "lazyMake"
   retention call
 
+@lang lazy_make_local
+/// An unsynchronized lazy cell for a lazy only its own fiber can force.
+lazy_make_local : NoControl r => (Eff r e a)^c ->{} Lazy r e a
+foreign effect lazy_make_local from "flick:rt" "lazyMakeLocal"
+  retention call
+
 @lang lazy_force
 /// Runs `lazy` if no fiber has, or waits for the fiber running it, and gives
 /// its outcome. The runtime coordinates waiting between fibers.

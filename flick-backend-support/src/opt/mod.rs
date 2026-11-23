@@ -262,6 +262,11 @@ fn optimize_inner(
             }
         }
     }
+    for item in &mut module.items {
+        for body in bodies(item) {
+            lazy::localize(body, lang);
+        }
+    }
     unused_items(module, exported);
     counters
 }

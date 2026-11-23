@@ -181,6 +181,7 @@ lang_items! {
     FromResult = "from_result",
     LazyMake = "lazy_make",
     AwaitEff = "await_eff",
+    LazyMakeLocal = "lazy_make_local",
     LazyForce = "lazy_force",
     LazyDone = "lazy_done",
     LazyRead = "lazy_read",

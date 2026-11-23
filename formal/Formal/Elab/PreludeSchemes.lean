@@ -179,6 +179,11 @@ def lazy_make (nocontrol eff lazy : Nat) : Scheme :=
   ⟨4, [⟨nocontrol, [.var 0]⟩],
     .arr (.R (.run (.cun (.var 3) .cnil) .cnil) .cnil) (.app (.app (.con eff) (.var 3)) (.var 2)) (.app (.app (.app (.con lazy) (.var 0)) (.var 1)) (.var 2)) .cnil, .cnil, []⟩
 
+/-- `Prelude.lazy_make_local : forall r e a c. NoControl r => (Eff r e a)^c ->{} Lazy r e a` -/
+def lazy_make_local (nocontrol eff lazy : Nat) : Scheme :=
+  ⟨4, [⟨nocontrol, [.var 0]⟩],
+    .arr (.R (.run (.cun (.var 3) .cnil) .cnil) .cnil) (.app (.app (.con eff) (.var 3)) (.var 2)) (.app (.app (.app (.con lazy) (.var 0)) (.var 1)) (.var 2)) .cnil, .cnil, []⟩
+
 /-- `Prelude.lazy_force : forall r e a. Lazy r e a ->{r; e} a` -/
 def lazy_force (lazy : Nat) : Scheme :=
   ⟨3, [],

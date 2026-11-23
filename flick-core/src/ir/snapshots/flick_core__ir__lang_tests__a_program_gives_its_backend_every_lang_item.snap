@@ -115,6 +115,7 @@ ge Value Numeric.ge
 from_result Value Prelude.from_result
 lazy_make Value Prelude.lazy_make
 await_eff Value Prelude.await_eff
+lazy_make_local Value Prelude.lazy_make_local
 lazy_force Value Prelude.lazy_force
 lazy_done Value Prelude.lazy_done
 lazy_read Value Prelude.lazy_read

@@ -72,6 +72,8 @@ pub enum Intrinsic {
     ListRange,
     /// Allocates a single-flight `Lazy r e a` cell from a delayed task.
     LazyMake,
+    /// Allocates an unsynchronized fiber-local `Lazy r e a` cell (O3) from a delayed task.
+    LazyMakeLocal,
     /// Forces a `Lazy r e a` cell once, caching Ok/Err and dropping the task on completion.
     LazyForce,
     /// Registers a LIFO `Eff r none Unit` finalizer on the current owner.

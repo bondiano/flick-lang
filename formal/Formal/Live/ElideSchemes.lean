@@ -224,6 +224,12 @@ theorem lazy_make :
       (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt (.caps (fun x => x = .v 3)) .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) := by
   elide_eq
 
+/-- `Prelude.lazy_make_local : forall r e a c. NoControl r => (Eff r e a)^c ->{} Lazy r e a` -/
+theorem lazy_make_local :
+    Ty.Reads (Ty.elide (fun x => x = .v 3) (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt .cnil .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) Caps.none)
+      (.arrow (.eff (.tvar 0) (.tvar 1) (.tvar 2) (fun x => x = .v 3)) (.rt (.caps (fun x => x = .v 3)) .cnil) (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) Caps.none) := by
+  elide_eq
+
 /-- `Prelude.lazy_force : forall r e a. Lazy r e a ->{r; e} a` -/
 theorem lazy_force :
     Ty.Reads (Ty.elide (fun x => x = .v 3) (.arrow (.tapp (.tapp (.tapp (.tapp (.adt "Prelude.Lazy") (.caps (fun x => x = .v 3))) (.tvar 0)) (.tvar 1)) (.tvar 2)) (.rt (.tvar 0) (.tvar 1)) (.tvar 2) Caps.none) Caps.none)

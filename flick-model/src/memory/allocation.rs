@@ -177,6 +177,14 @@ impl Heap {
         execution: usize,
         lazy: &LazyHandle,
     ) -> Result<&'a mut Option<LazyState>, Error> {
+        self.lazy_slot_mut(execution, lazy).map(|(state, _)| state)
+    }
+
+    fn lazy_slot_mut<'a>(
+        &'a mut self,
+        execution: usize,
+        lazy: &LazyHandle,
+    ) -> Result<(&'a mut Option<LazyState>, Option<usize>), Error> {
         if lazy.execution != execution {
             return Err(Error::ForeignLazy);
         }
@@ -191,6 +199,7 @@ impl Heap {
         let object = slot.object.as_mut().ok_or(Error::ClosedLazy)?;
         let Data::Lazy {
             execution: owner,
+            local_owner,
             state,
         } = &mut object.data
         else {
@@ -199,7 +208,7 @@ impl Heap {
         if *owner != execution {
             return Err(Error::ForeignLazy);
         }
-        Ok(state)
+        Ok((state, *local_owner))
     }
 
     fn iterator_state_mut<'a>(

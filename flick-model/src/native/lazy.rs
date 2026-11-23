@@ -48,6 +48,12 @@ pub(super) fn lazy_make(args: &[Term], _: &mut String) -> Result<Term, String> {
     ))
 }
 
+/// Unsynchronized local lazy cell (`lazy_make_local`, O3): on the core's
+/// single thread, the same `Ref`-backed cell as `lazy_make`.
+pub(super) fn lazy_make_local(args: &[Term], out: &mut String) -> Result<Term, String> {
+    lazy_make(args, out)
+}
+
 /// `Ref.make (2, (0, value))`: a cell already done with `value`.
 pub(super) fn lazy_done(args: &[Term], _: &mut String) -> Result<Term, String> {
     let done = tagged(DONE, tagged(0, args[0].clone()));

@@ -170,3 +170,105 @@ func TestLazyRunsWithTheServicesOfTheForcingFiber(t *testing.T) {
 		t.Fatalf("got %v, %v", e.value, e.cause)
 	}
 }
+
+func TestLocalLazyCachesValueAndReleasesTaskOnStart(t *testing.T) {
+	var runs int
+	var taskDuringRun Value = "unset"
+	var cell *LocalLazyCell
+	cell = LazyMakeLocal(Eff(func(*Fiber) Value {
+		runs++
+		taskDuringRun = cell.task
+		return 42.0
+	})).(*LocalLazyCell)
+	if cell.task == nil {
+		t.Fatal("pending local cell lost its task")
+	}
+	for range 2 {
+		if e := forced(rootFiber(), cell); e.cause != nil || e.value != 42.0 {
+			t.Fatalf("got %v, %v", e.value, e.cause)
+		}
+	}
+	if taskDuringRun != nil || cell.task != nil || runs != 1 {
+		t.Fatalf("taskDuringRun=%v cell.task=%v runs=%d", taskDuringRun, cell.task, runs)
+	}
+}
+
+func TestLocalLazyCachesFailuresAndDefects(t *testing.T) {
+	for _, end := range []func(*Fiber) Value{
+		func(*Fiber) Value { return Fail("local-failed") },
+		func(*Fiber) Value { return Die("local-boom") },
+	} {
+		var runs int
+		cell := LazyMakeLocal(Eff(func(fb *Fiber) Value {
+			runs++
+			return end(fb)
+		})).(*LocalLazyCell)
+		first := forced(rootFiber(), cell)
+		second := forced(rootFiber(), cell)
+		if first.cause == nil || second.cause != first.cause {
+			t.Fatalf("got %v then %v, want the same failure", first.cause, second.cause)
+		}
+		if first.cause.has(causeInterrupt) || runs != 1 || cell.task != nil {
+			t.Fatalf("cause=%v runs=%d task=%v", first.cause, runs, cell.task)
+		}
+	}
+}
+
+func TestLocalLazySelfForceIsACachedDefect(t *testing.T) {
+	var runs int
+	var cell *LocalLazyCell
+	cell = LazyMakeLocal(Eff(func(fb *Fiber) Value {
+		runs++
+		return LazyForce(fb, cell)
+	})).(*LocalLazyCell)
+	for range 2 {
+		e := forced(rootFiber(), cell)
+		if e.cause == nil || !strings.HasPrefix(e.cause.firstOf(causeDie).defect, lazySelfForce) {
+			t.Fatalf("got %v, %v", e.value, e.cause)
+		}
+	}
+	if runs != 1 || cell.task != nil {
+		t.Fatalf("ran %d times, task=%v", runs, cell.task)
+	}
+}
+
+func TestLocalLazyInterruptedOwnerResetsTheCell(t *testing.T) {
+	gate := make(chan struct{})
+	runs := &atomic.Int64{}
+	cell := LazyMakeLocal(Eff(func(fb *Fiber) Value {
+		run := runs.Add(1)
+		wait(fb, gate)
+		return float64(run)
+	})).(*LocalLazyCell)
+	owner := rootFiber()
+	ownerExit := forcing(owner, cell)
+	untilRuns(t, runs, 1)
+	owner.state.interrupt(99)
+	if e := <-ownerExit; e.cause == nil || !e.cause.has(causeInterrupt) {
+		t.Fatalf("the owner ended with %v, %v", e.value, e.cause)
+	}
+	if cell.task == nil || cell.running {
+		t.Fatalf("expected reset to pending, task=%v running=%v", cell.task, cell.running)
+	}
+	close(gate)
+	for range 2 {
+		if e := forced(rootFiber(), cell); e.cause != nil || e.value != 2.0 {
+			t.Fatalf("got %v, %v", e.value, e.cause)
+		}
+	}
+	if runs.Load() != 2 || cell.task != nil {
+		t.Fatalf("runs=%d task=%v", runs.Load(), cell.task)
+	}
+}
+
+func TestLocalLazyRunsWithTheServicesOfTheForcingFiber(t *testing.T) {
+	cell := LazyMakeLocal(Eff(func(fb *Fiber) Value {
+		v, _ := fb.env.get("Test.LocalName")
+		return v
+	}))
+	fb := rootFiber()
+	fb.env = fb.env.with("Test.LocalName", "local-forcer")
+	if e := forced(fb, cell); e.cause != nil || e.value != "local-forcer" {
+		t.Fatalf("got %v, %v", e.value, e.cause)
+	}
+}
