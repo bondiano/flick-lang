@@ -93,8 +93,8 @@ pub struct Typing {
     pub applicative: HashSet<Range>,
     /// What each postfix `?` does.
     pub questions: HashMap<Range, super::Question>,
-    /// `await`s of a `Lazy`, which force it rather than run a task.
-    pub forced: HashSet<Range>,
+    /// Worker of a built-in `Awaitable.await` selected by the class solver.
+    pub builtin_awaits: HashMap<Range, Lang>,
     /// The parameters each top-level signature marks `~`, by position.
     pub suspended: Vec<(String, Vec<usize>)>,
     /// Arguments passed unstarted to a parameter marked `~`: the task of each.

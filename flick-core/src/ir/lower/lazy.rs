@@ -1,5 +1,4 @@
-//! `lazy { … }` and `await` of a `Lazy` (`docs/formal/lazy.md`): calls of
-//! the Prelude's `lazy_make` and `lazy_force`, which the runtimes implement;
+//! `lazy { … }`, the Prelude's `lazy_make` (`docs/formal/lazy.md`);
 //! `let lazy`, a variable of its function; and the tasks of arguments passed
 //! unstarted to a parameter marked `~`.
 
@@ -80,9 +79,8 @@ impl Lower<'_> {
         ));
     }
 
-    /// `await` of a `Lazy`: `lazy_force` of it; or, of a `let lazy` `x`, the
-    /// outcome its state keeps, or the one of a run of `x$run`, kept. Only
-    /// the first force runs anything or makes a value, `Some o`.
+    /// `await x` of a confined `let lazy` reads the cached outcome or runs
+    /// `x$run` and caches the outcome as `Some o`.
     ///
     /// ```text
     /// from_result (match x with
@@ -92,13 +90,10 @@ impl Lower<'_> {
     ///
     /// A signal or a defect leaves the `await` before `x` is written, so `x`
     /// stays `None`.
-    pub(super) fn force(&mut self, operand: Expr, span: Span, local: bool) -> ExprKind {
-        // the checker read the operand of a local force as the name of a
-        // `let lazy`, a variable
-        let (true, ExprKind::Var(x)) = (local, &operand.kind) else {
-            return runtime_call(Lang::LazyForce, operand, span);
+    pub(super) fn force_local(&mut self, operand: Expr, span: Span) -> ExprKind {
+        let ExprKind::Var(x) = operand.kind else {
+            unreachable!("the checker resolved a local force to a let lazy variable");
         };
-        let x = x.clone();
         let kept = self.hidden("$kept");
         let outcome = self.hidden("$outcome");
         let run = Expr::new(ExprKind::Local(format!("{x}$run")), span);
@@ -106,7 +101,7 @@ impl Lower<'_> {
         let start = vec![
             Stmt::let_bind(
                 Pat::Bind(outcome.clone()),
-                Expr::new(ExprKind::Await(Box::new(run)), span),
+                Expr::new(runtime_call(Lang::AwaitEff, run, span), span),
             ),
             Stmt::Assign(x.clone(), some(local(&outcome))),
         ];

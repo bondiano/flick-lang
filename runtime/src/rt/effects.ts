@@ -9,6 +9,9 @@ import { fail, raise } from "./cause.ts";
 import { type Ctx, Instruction, type Run, currentCtx, inCtx, isRun } from "./fiber.ts";
 import { args, env, vars, writeStderr, writeStdout } from "./host.ts";
 
+/** Runs a task in the calling fiber. */
+export const awaitEff = (task: () => unknown): unknown => task();
+
 function* then(call: unknown, f: (value: unknown) => unknown): Run {
   return f(yield call);
 }

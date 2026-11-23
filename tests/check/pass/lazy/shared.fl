@@ -1,5 +1,5 @@
-// A lazy is built where runtime calls may run and forced with `await`, which
-// needs `Async`: another fiber may be running its task.
+// Building and forcing a lazy are runtime calls. Forcing uses the initializer's
+// service and error rows.
 module App.Shared exposing (..)
 
 type error Missing = Missing
@@ -10,8 +10,8 @@ service Users =
 lookup : Int ->{Users} Lazy {Users} {Missing} String
 let lookup id = lazy { Users.find id }
 
-shown : Lazy {Users} {Missing} String ->{Async, Users; Missing} String
+shown : Lazy {Users} {Missing} String ->{Users; Missing} String
 let shown name = await name
 
-either : Lazy {} {} Int ->{Async} Int
+either : Lazy {} {} Int ->{} Int
 let either l = await (lazy { await l + 1 })

@@ -147,7 +147,10 @@ fn expr(e: &Term, col: usize) -> String {
         // `0.a` would read as a number
         Term::Field(r, l) => format!("({}).{l}", expr(r, col)),
         Term::Task(body) => format!("(task {{\n{} }})", block(body, inner)),
-        Term::Await(x) => format!("(await {})", expr(x, col)),
+        Term::Await(x) if matches!(&**x, Term::Task(_)) => format!("(await {})", expr(x, col)),
+        // The core `Await` chooses Eff even when an operand, such as a
+        // match whose branches all raise, leaves its type open in Flick.
+        Term::Await(x) => format!("(Prelude.await_eff {})", expr(x, col)),
         Term::Match(s, arms) => format!("(match {} with{})", expr(s, col), cases(arms, col)),
         Term::Try(body, arms) => format!(
             "(try\n{}\n{}with{})",
@@ -427,5 +430,24 @@ fn items(r: &Row) -> String {
         Some(Var::Named(v)) if elems.is_empty() => v.to_string(),
         Some(Var::Named(v)) => format!("{elems} | {v}"),
         _ => elems,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use super::*;
+
+    #[test]
+    fn core_await_preserves_the_eff_choice_in_generated_source() {
+        let raise = Term::app(Term::konst(Const::Raise), Term::Var("error".into()));
+        let await_raise = Term::Await(Rc::new(raise));
+        assert_eq!(
+            expr(&await_raise, 0),
+            "(Prelude.await_eff (from_result (Err error)))"
+        );
+        let await_task = Term::Await(Rc::new(Term::Task(Rc::new(Term::unit()))));
+        assert_eq!(expr(&await_task, 0), "(await (task {\n  () }))");
     }
 }

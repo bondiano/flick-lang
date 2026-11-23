@@ -21,6 +21,7 @@ export const Effect = /*#__PURE__*/ Object.freeze({
 /** A service tag: a built-in module declares its services when it loads. */
 export const service = (key: string): Readonly<{ key: string }> => Object.freeze({ key });
 
+export const awaitEff = /*#__PURE__*/ needsEffect("awaitEff");
 export const bindEff = /*#__PURE__*/ needsEffect("bindEff");
 export const codecBlock = /*#__PURE__*/ needsEffect("codecBlock");
 export const codecField = /*#__PURE__*/ needsEffect("codecField");

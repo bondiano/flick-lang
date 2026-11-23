@@ -42,12 +42,12 @@ type Lazy (r : ServiceRow) (e : ErrorRow) a
 | Rule | Typing | Stage of the form |
 | - | - | - |
 | (T-Lazy) | `Γ ⊢ e : a ! ρ; ε` and `NoControl ρ` ⟹ `Γ ⊢ lazy e : Lazy ρ ε a` | runtime: `R⟨none; none⟩`, it allocates (as `Ref.make`) |
-| (T-Force) | `Γ ⊢ l : Lazy ρ ε a` ⟹ `Γ ⊢ await l : a` | `R⟨Async \| ρ; ε⟩`: forcing may wait for another fiber |
-| (T-LetLazy) | `Γ ⊢ e : a ! ρ; ε`, `x` confined (§4) ⟹ `await x : a` | `R⟨ρ; ε⟩`, no `Async`: nothing else can hold `x` |
+| (T-Force) | `Γ ⊢ l : Lazy ρ ε a` ⟹ `Γ ⊢ await l : a` | `R⟨ρ; ε⟩`. The runtime coordinates waiting between fibers. |
+| (T-LetLazy) | `Γ ⊢ e : a ! ρ; ε`, `x` confined (§4) ⟹ `await x : a` | `R⟨ρ; ε⟩` |
 
 - `NoControl ρ` (`classes/detached.rs`, superclass of `Detached ρ`): the initializer uses no `control` operation, which makes the reset after an owner's unwind (§5) well-defined. Unlike `Detached ρ` (which rejects both `control` and `abort` for detached child fibers and kept finalizers), `NoControl ρ` still allows `abort` because forcing runs the initializer synchronously in the forcing fiber, so an `abort` unwinds to a handler in that fiber and resets the cell. Forcing a `Lazy` with an `abort` effect inside a detached child still requires handling that effect inside the child (`Detached`, `FLICK-E017`).
 - **Reach** (`regions.md` §2.1): `⌈Lazy ρ ε a⌉ = ⌈a⌉ ∪ ⌈ε⌉ ∪ captures(e)`. Unlike `⌈Eff ρ ε a⌉`, the error row counts, because a `Lazy` *stores* a typed failure once it is forced. `@stores` gives the captures. As a result, a `Lazy` holding `File s` cannot leave `scope s` (`FLICK-G001`/`G002`), so no lazy is forced after its region closes (RFC question 5).
-- `await e` dispatches on the type of `e`: `Eff` → (Await), `Lazy` → (T-Force). An operand whose type is still unknown at the site is taken as `Eff`. This is the same incompleteness as `?` (`elaboration.md` "unknown type at the site"), recorded in `core.md` §5.
+- `await e` calls `Awaitable.await` with the instance selected for the type `t` of `e`. The functional dependency `t -> r e a` in `Awaitable t r e a` determines the service row `r`, error row `e` and result type `a`. The `Eff` instance uses (Await) and the `Lazy` instance uses (T-Force). The operand must have a type for which the solver can select an instance or use a dictionary supplied by the caller.
 
 Checked by: `tests/check/{pass,fail}/lazy/*`, the checker's unit tests, `flick-model`, Lean `T1` / `T2b` (typing is preserved).
 
@@ -119,7 +119,7 @@ out o                     =  from_result o               -- the value, or the er
 - `attempt e` runs `e` and gives its outcome. A signal of a handler or a defect leaves `await x$run` before `x$` is written, so `x$` stays `None` and a later `await x` runs `e` again, as the reset of §3 leaves a cell `Pending`. A defect ends the fiber, and with it the function that holds `x$`, so a defect needs no outcome.
 - These are the states of the cell of §3 without `Running`. One fiber holds `x$`, and `e` cannot read `x` (`FLICK-G005`), so nothing can find it running.
 - `e` reads the values it had at the declaration, as a `task` does. `x$run` is made at the declaration and holds them, and `e` reads no `let mut` (`FLICK-G005`).
-- No cell, no `Async`, no synchronization: the state is a local variable, threaded as the state of `let mut` is.
+- The forcing fiber owns the state and threads it as a local variable, as with `let mut`.
 - `let lazy mut` written before its first read never runs `e` (RFC). A write after a read replaces the cached outcome.
 
 The compiler lowers it so (`flick-core/src/ir/lower/lazy.rs`). `x$run` is a `Stmt::Let` of a `Task`, `x$` a `Stmt::Var`, and `await x` the `match` above.

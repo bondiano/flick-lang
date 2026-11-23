@@ -252,12 +252,16 @@ fn deeply_qualified_foreign_tasks_are_observed_without_a_head_budget() {
 
 #[test]
 fn an_unproductive_opaque_value_is_not_guessed_to_be_a_task() {
+    use crate::diagnostics::codes;
+
     let text = "module Test exposing (main)\nopaque type alias Idle a = Idle (List a)\nidle : Idle Int\nforeign pure idle from \"./owner.mjs\" \"idle\"\nmain : Unit ->{} Unit\nlet main () = scope s { await idle }\n";
     let diagnostics = lower_text("Test", text).expect_err("no executable head exists");
     assert!(
-        diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.message.contains("`await` runs an `Eff` value")),
+        diagnostics.iter().any(
+            |diagnostic| diagnostic.code == codes::E021
+                && diagnostic.message.contains("no Awaitable instance for")
+                && diagnostic.message.contains("Idle Int")
+        ),
         "{diagnostics:?}"
     );
 }

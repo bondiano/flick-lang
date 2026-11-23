@@ -209,7 +209,7 @@ failure, or the defect. `lazy e` is `lazy { e }`.
 # type error Missing = Missing
 # service Users =
 #   find : Int ->{; Missing} String
-names : Int ->{Users, Async; Missing} (String, String)
+names : Int ->{Users; Missing} (String, String)
 let names id =
   let name = lazy { Users.find id }
   (await name, await name)
@@ -217,9 +217,9 @@ let names id =
 
 - Building a lazy allocates its cell, as `Ref.make` does, so it is a runtime
   call (`FLICK-E001` in a pure function).
-- `await` of a `Lazy r e a` needs `{Async | r}` and fails with `e`: another
-  fiber may be running the body, and then the `await` waits for it. Fibers
-  that await one lazy at once share one run.
+- `await` of a `Lazy r e a` requires `r` and can fail with `e`. Fibers that
+  await the same lazy concurrently share one run, with the runtime handling
+  the wait.
 - An interruption is not kept. When the fiber running the body is
   interrupted, the next `await` runs the body again; the fibers waiting for
   it see no interruption.
@@ -232,11 +232,10 @@ let names id =
   so it cannot outlive the `scope` of a resource it holds.
 
 `let lazy x = e` binds a lazy of its function alone, as `let mut` binds a
-variable: it is read only as `await x`, which runs `e` the first time and
-gives its outcome after that, and needs no `Async`, since no other fiber
-can reach it. A closure or a `task` cannot use it (`FLICK-G005`); share one
-with `lazy { … }`. A `let lazy mut` can be assigned, and a value assigned
-before the first `await` means `e` never runs.
+variable. `await x` is its only read and runs `e` the first time, then
+returns its stored outcome. A closure or a `task` cannot use it
+(`FLICK-G005`). Use `lazy { … }` to share a cell. A value assigned to
+`let lazy mut` before the first `await` takes the place of running `e`.
 
 ```flick
 # service Config =
@@ -460,15 +459,15 @@ let found name =
 
 ## What may suspend: `Async`
 
-A function that waits for time, input or output or another fiber says so
-with the effect `Async` in its row: `Effect.sleep : Duration ->{Async} Unit`,
-`Database.query`, `Http.Client.get`, `Fiber.join`, `Queue.take`. A row
-without it performs no asynchronous wait. Ordinary runtime calls and recursive
-loops still have interruption points, including `->{}`; an empty row does not
-promise termination or atomic execution. Pure calls and intrinsic UI Sync stages
-remain synchronous. `Async` has no operations: the scheduler of the
-runtime handles it at the root, so `main` may have it, and so may the tasks
-of `spawn` and `parallel`; `provide Async` is `FLICK-E016`.
+Explicit waits for time, input or output, or another fiber require `Async`
+in the row. Examples include `Effect.sleep : Duration ->{Async} Unit`,
+`Database.query`, `Http.Client.get`, `Fiber.join`, and `Queue.take`. Ordinary
+runtime calls and recursive loops still have interruption points, including
+`->{}`. An empty row carries no termination or atomicity guarantee. The
+runtime also coordinates [shared lazy cells](#lazy). Pure calls and intrinsic
+UI Sync stages remain synchronous. `Async` has no operations. The runtime
+scheduler handles it at the root, so `main` and the tasks of `spawn` and
+`parallel` may require it. `provide Async` is `FLICK-E016`.
 
 ```flick
 wait : Float ->{Async} Unit
@@ -482,9 +481,11 @@ let twice () =
 
 A `foreign` whose row has `Async` is a call whose JS result is a promise;
 without it, a call that returns at once. A `foreign effect` is as written:
-without `Async` it runs at once, and a suspension is a defect. A call that may suspend in a row without `Async`
-is `FLICK-E002`, whose fix adds `Async` where the row is written: the
-signature, an `Eff`, or the row given to a type such as `Handlers none`.
+if a foreign effect suspends for asynchronous host work, declare `Async` in
+its signature. Suspending for host work without that declaration is a defect.
+Calling an operation that requires `Async` from a row that omits it reports
+`FLICK-E002`. The fix adds `Async` to the signature, `Eff`, or row argument
+such as the one in `Handlers none`.
 
 ## Effects and handlers
 
@@ -622,10 +623,10 @@ let children () =
   parallel (task { collect (fun () -> Emit.emit 1) }) (task { collect (fun () -> Emit.emit 2) })
 ```
 
-A `tail` arm runs on the stack of the caller, which may be Sync, so nothing
-it calls may suspend: an effect with a `control` operation, `Async` or a row
-variable there is `FLICK-E018`, unless the row of the operation declares it
-or a handler inside the arm catches it.
+A `tail` arm runs on the caller's stack, which may be Sync. A call in the arm
+that needs an effect with a `control` operation, `Async`, or a row variable
+reports `FLICK-E018` unless the operation declares it or an inner handler
+covers it.
 
 Handlers run on both targets. A `control` arm needs the body to wait as a
 coroutine: Go and Flick's own JavaScript runtime (`[target.js] runtime = "rt"`) run it,

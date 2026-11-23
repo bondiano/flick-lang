@@ -398,35 +398,7 @@ impl Checker<'_> {
                 let ty = self.infer(operand);
                 self.cx.awaiting = awaiting;
                 self.note_type(self.token_span(op), &ty);
-                if let Some(result) = self.force(node, &ty) {
-                    return result;
-                }
-                let (services, errors, result) = if let Some(parts) = self.known_eff_parts(&ty) {
-                    // A known task may return a polymorphic opaque value.
-                    // Decomposition does not force that result through a
-                    // fresh monotype variable merely to discover the rows.
-                    parts
-                } else {
-                    let (services, errors, result) =
-                        (self.fresh(), self.store.fresh_error_row(), self.fresh());
-                    let shape = super::infer::eff(services.clone(), errors.clone(), result.clone());
-                    if self.unify(&self.whnf(&ty), &shape).is_err() {
-                        let shown = self.show(&ty);
-                        self.error(
-                            codes::T003,
-                            self.span(operand),
-                            format!("`await` runs an `Eff` value or forces a `Lazy`, but this has type `{shown}`"),
-                        );
-                        return Type::Error;
-                    }
-                    (services, errors, result)
-                };
-                let span = self.span(node);
-                if self.runtime_allowed(span) {
-                    let services = self.live_await(&ty, services);
-                    self.perform(&services, &errors, span);
-                }
-                result
+                self.await_expression(node, operand, &ty)
             }
             _ => {
                 let ty = self.infer(operand);

@@ -201,6 +201,7 @@
 @flick-lang/runtime/core/index Effect
 @flick-lang/runtime/core/index GT
 @flick-lang/runtime/core/index LT
+@flick-lang/runtime/core/index awaitEff
 @flick-lang/runtime/core/index bigintAbs
 @flick-lang/runtime/core/index bigintDivide
 @flick-lang/runtime/core/index bigintFromNumber
@@ -503,6 +504,7 @@
 @flick-lang/runtime/core/snapshot snapshotCopy
 @flick-lang/runtime/core/snapshot snapshotReason
 @flick-lang/runtime/core/stubs Effect
+@flick-lang/runtime/core/stubs awaitEff
 @flick-lang/runtime/core/stubs bindEff
 @flick-lang/runtime/core/stubs codecBlock
 @flick-lang/runtime/core/stubs codecField
@@ -697,6 +699,7 @@
 @flick-lang/runtime/rt atomState
 @flick-lang/runtime/rt atomStored
 @flick-lang/runtime/rt atomTask
+@flick-lang/runtime/rt awaitEff
 @flick-lang/runtime/rt bigintAbs
 @flick-lang/runtime/rt bigintDivide
 @flick-lang/runtime/rt bigintFromNumber

@@ -54,6 +54,10 @@ impl Lower<'_> {
                 let params = abstract_params(names);
                 self.lambda(&params, body, env, None, block, span)
             }
+            ExprKind::App { func, arg, .. } if func.kind.is_lang(Lang::AwaitEff) => {
+                let task = self.expr(arg, env, block)?;
+                block.emit(Operation::Await(task), span)
+            }
             ExprKind::App {
                 func,
                 arg,

@@ -28,6 +28,7 @@ module.exports = grammar({
   conflicts: $ => [
     [$._loop, $.identifier], [$._defer, $.identifier], [$._result, $.identifier], [$._while, $.identifier], [$._case, $.identifier], [$._hook, $.identifier],
     [$._fixture, $.identifier], [$._case], [$._fixture],
+    [$._await_signature, $.keyword], [$._await_definition, $.keyword],
   ],
 
   rules: {
@@ -43,6 +44,8 @@ module.exports = grammar({
       $._hook,
       $._fixture,
       $._each,
+      $._await_signature,
+      $._await_definition,
       alias($._proof, $.keyword),
       $.attribute,
       $.label,
@@ -160,5 +163,10 @@ module.exports = grammar({
 
     doc_comment: _ => token(seq('///', optional(seq(/[^/\n]/, /[^\n]*/)))),
     line_comment: _ => token(seq('//', /[^\n]*/)),
+
+    // The keyword is an identifier in a method header. Dotted member names
+    // already accept any word.
+    _await_signature: $ => prec.dynamic(1, seq(alias('await', $.identifier), alias(':', $.operator))),
+    _await_definition: $ => prec.dynamic(1, seq(alias('let', $.keyword), alias('await', $.identifier))),
   },
 });

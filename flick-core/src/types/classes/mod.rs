@@ -80,6 +80,8 @@ fn assumes(d: &Dict) -> bool {
 pub struct Wanted {
     pub constraint: Type,
     pub span: Span,
+    /// Operand to highlight when a deferred `await` cannot be resolved.
+    pub await_operand: Option<Span>,
     pub givens: Vec<Type>,
     /// Local module dictionaries visible when this use was written.
     pub local: Vec<(Type, Dict)>,
@@ -167,10 +169,25 @@ impl Checker<'_> {
 
     /// Requires `constraint` at `span` where `givens` are in scope.
     pub fn want_under(&mut self, constraint: Type, span: Span, givens: Vec<Type>) {
+        self.enqueue_wanted(constraint, span, givens, None);
+    }
+
+    pub(in crate::types) fn want_awaitable(&mut self, constraint: Type, span: Span, operand: Span) {
+        self.enqueue_wanted(constraint, span, self.classes.givens.clone(), Some(operand));
+    }
+
+    fn enqueue_wanted(
+        &mut self,
+        constraint: Type,
+        span: Span,
+        givens: Vec<Type>,
+        await_operand: Option<Span>,
+    ) {
         self.classes.required += 1;
         self.classes.wanted.push(Wanted {
             constraint,
             span,
+            await_operand,
             givens,
             local: self.classes.local.clone(),
             order: self.classes.required,

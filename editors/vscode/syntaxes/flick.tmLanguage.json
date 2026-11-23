@@ -146,6 +146,10 @@
     "definitions": {
       "patterns": [
         {
+          "name": "entity.name.function.flick",
+          "match": "(?<![.\\w])await\\b(?=[ \\t]*:(?!:))"
+        },
+        {
           "match": "(?<![.\\w])(let)\\s+(mut)\\s+([a-z_][A-Za-z0-9_]*)",
           "captures": {
             "1": { "name": "keyword.other.flick" },

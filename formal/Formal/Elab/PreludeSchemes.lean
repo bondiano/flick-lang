@@ -139,6 +139,11 @@ def empty (monoid : Nat) : Scheme :=
   ⟨1, [⟨monoid, [.var 0]⟩],
     .var 0, .cnil, []⟩
 
+/-- `Prelude.await : forall t r e a. Awaitable t r e a => t ->{r; e} a` -/
+def await (awaitable : Nat) : Scheme :=
+  ⟨4, [⟨awaitable, [.var 0, .var 1, .var 2, .var 3]⟩],
+    .arr (.R (.var 1) (.var 2)) (.var 0) (.var 3) .cnil, .cnil, []⟩
+
 /-- `Prelude.TimeoutError : TimeoutError` -/
 def TimeoutError (timeouterror : Nat) : Scheme :=
   ⟨0, [],
@@ -164,15 +169,20 @@ def from_result (result errors : Nat) : Scheme :=
   ⟨2, [],
     .arr (.R .cnil (.var 0)) (.app (.app (.con result) (.app (.con errors) (.var 0))) (.var 1)) (.var 1) .cnil, .cnil, []⟩
 
+/-- `Prelude.await_eff : forall r e a. Eff r e a ->{r; e} a` -/
+def await_eff (eff : Nat) : Scheme :=
+  ⟨4, [],
+    .arr (.R (.run (.cun (.var 3) .cnil) (.var 0)) (.var 1)) (.app (.app (.con eff) (.var 3)) (.var 2)) (.var 2) .cnil, .cnil, []⟩
+
 /-- `Prelude.lazy_make : forall r e a c. NoControl r => (Eff r e a)^c ->{} Lazy r e a` -/
 def lazy_make (nocontrol eff lazy : Nat) : Scheme :=
   ⟨4, [⟨nocontrol, [.var 0]⟩],
     .arr (.R (.run (.cun (.var 3) .cnil) .cnil) .cnil) (.app (.app (.con eff) (.var 3)) (.var 2)) (.app (.app (.app (.con lazy) (.var 0)) (.var 1)) (.var 2)) .cnil, .cnil, []⟩
 
-/-- `Prelude.lazy_force : forall r e a. Lazy r e a ->{Async | r; e} a` -/
-def lazy_force (async lazy : Nat) : Scheme :=
+/-- `Prelude.lazy_force : forall r e a. Lazy r e a ->{r; e} a` -/
+def lazy_force (lazy : Nat) : Scheme :=
   ⟨3, [],
-    .arr (.R (.run (.rnm async (.con async)) (.var 0)) (.var 1)) (.app (.app (.app (.con lazy) (.var 0)) (.var 1)) (.var 2)) (.var 2) .cnil, .cnil, []⟩
+    .arr (.R (.var 0) (.var 1)) (.app (.app (.app (.con lazy) (.var 0)) (.var 1)) (.var 2)) (.var 2) .cnil, .cnil, []⟩
 
 /-- `Prelude.lazy_read : forall r e a. Lazy r e a ->{r; e} a` -/
 def lazy_read (lazy : Nat) : Scheme :=

@@ -24,7 +24,7 @@ The source of an expected error is `raise`; the source of a defect is `todo`.
 | Classes, dictionaries, `do`, `for`, `?` | `elaboration.md` | The core receives a program with dictionaries already inserted; schemes carry no constraints |
 | `type module`, parameterized modules, `Module Sig`, `exists K : Sig. T` | source checker and lowering | Static applications become named modules; packed modules and existential witnesses become records. The core does not prove the source rules for generativity, nominal identity, or existential opening |
 | Fibers, `parallel`, `race`, `spawn`, Cause, interruption, layer memoization | `runtime.md` (λRT) | The core has one thread of execution; the "interrupted" outcome appears only in λRT |
-| The Sync stage | — | For typing this is the runtime arrow `R⟨ρ; ε⟩`. Intrinsic UI Sync rows may use a synchronous calling convention; ordinary runtime arrows retain λRT interruption points even without `Async`. Asynchronous waiting requires `Async` in `ρ`; scheduler preemption does not. Sync is implementation metadata, not a separate core stage |
+| The Sync stage | — | For typing this is the runtime arrow `R⟨ρ; ε⟩`. Intrinsic UI Sync rows may use a synchronous calling convention. Ordinary runtime arrows retain λRT interruption points even without `Async`. Explicit asynchronous operations require `Async` in `ρ`. Scheduler preemption and lazy-cell synchronization are runtime operations. Sync is implementation metadata for the runtime stage. |
 | `foreign` | hypothesis G1 (§4) | Bindings enter Γ₀ with their declared types |
 
 ## 1. Syntax
@@ -141,7 +141,7 @@ v ::= λx. e | K v₁ … vₖ | {ℓ₁ = v₁, …, ℓₙ = vₙ} | task e | 
     | c v₁ … vₖ                   k less than the arity of c
 ```
 
-`task e` is a value for any `e`. A computation in the core is itself a value: its body is not evaluated until `await`. `lazy e` is not a value: it makes a lazy cell, and its value is the location of the cell (§3.4). `force e` forces it; the surface `await l` with `l : Lazy ρ ε τ` is `force l` ([`lazy.md`](lazy.md) §2). Runtime-only forms (`fix`, locations, `env`, `with`, `handle`, `settle`) are described in §3.1.
+`task e` is a value for any `e`. The core primitive `await` runs its body. `lazy e` allocates a cell and evaluates to its location (§3.4). The core primitive `force` forces the cell. Surface `await` selects an `Awaitable.await` method that uses the corresponding primitive for `Eff` or `Lazy` ([`lazy.md`](lazy.md) §2). Runtime-only forms (`fix`, locations, `env`, `with`, `handle`, `settle`) are described in §3.1.
 
 ### 1.4 Reduction of the surface
 

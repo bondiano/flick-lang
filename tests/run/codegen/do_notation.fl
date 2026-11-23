@@ -47,7 +47,7 @@ let main () =
   Platform.stdout_line (show (triples 13))
   Platform.stdout_line (show (twice (Some 21)))
   Platform.stdout_line (show (twice [1, 2]))
-  let eff = do {
+  let eff : Eff {Host.Console} {} Int = do {
     x <- pure 40
     task { Platform.stdout_line "inside" }
     pure (x + 2)

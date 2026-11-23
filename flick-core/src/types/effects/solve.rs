@@ -189,6 +189,7 @@ impl Checker<'_> {
     /// the end of the declaration closes it, as for a binding not generalized.
     /// Type arguments of labels whose inclusion already holds can generalize.
     pub fn settle_rows(&mut self) {
+        self.settle_awaitable_constraints();
         self.grow();
         let level = self.store.level;
         let deep = |tail: &Type| {
@@ -332,6 +333,7 @@ impl Checker<'_> {
     /// `close_rows` for the rows of variables deeper than `level` only: a
     /// binding's own, while an enclosing declaration still gathers its calls.
     pub fn close_rows_above(&mut self, level: Option<u32>) {
+        self.settle_awaitable_constraints();
         self.grow();
         let mut open = Vec::new();
         for c in &self.cx.subrows {

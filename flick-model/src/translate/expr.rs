@@ -7,6 +7,8 @@
 //! No calculus rule or runtime term is added; annotated/shared/effectful
 //! bindings retain their let and evaluation order.
 
+mod await_call;
+
 use std::mem;
 use std::rc::Rc;
 
@@ -177,6 +179,9 @@ impl Tr<'_> {
             ExprKind::App { func, arg, .. } if layer_run(func).is_some() => self.provide(func, arg),
             ExprKind::App { func, arg, .. } if is_lang(func, Lang::ScopeRun) => self.scope(arg),
             ExprKind::App { func, .. } if is_lang(func, Lang::ScopeCurrent) => Term::DefaultOwner,
+            ExprKind::App { func, arg, .. } if is_lang(func, Lang::AwaitEff) => {
+                Term::Await(rc(self.expr(arg)))
+            }
             ExprKind::App {
                 func,
                 arg,
@@ -195,7 +200,9 @@ impl Tr<'_> {
             ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
                 self.control_expr(e)
             }
-            ExprKind::Block(stmts, tail) => self.block(stmts, tail, None),
+            ExprKind::Block(stmts, tail) => self
+                .owner_await(stmts, tail)
+                .unwrap_or_else(|| self.block(stmts, tail, None)),
             ExprKind::If(c, a, b) => cond(self.expr(c), self.expr(a), self.expr(b)),
             ExprKind::Match(e, arms) => Term::Match(rc(self.expr(e)), self.arms(arms)),
             ExprKind::Handle(h) if h.is_try() => self.try_value(&h.body, &h.errors),

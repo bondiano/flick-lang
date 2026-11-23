@@ -242,5 +242,5 @@ let abort_lazy_in_parallel () =
     "ok"
   with
   | Throw.throw s -> s
-//~ FLICK-E017 @241:13-241:21 `Detached {Throw, Async}` does not hold: effect
+//~ FLICK-E017 @241:13-241:21 `Detached {Throw}` does not hold: effect
 //~ FLICK-G002 @36:18-36:24 this uses region `resume`, which the expected type `Unit ->{} Int` does not keep live

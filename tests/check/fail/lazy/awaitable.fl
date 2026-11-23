@@ -1,0 +1,13 @@
+module App.Awaitable exposing (..)
+
+let number = task { await 42 }
+
+unsupported : Json ->{} Unit
+let unsupported json = ignore (await json)
+
+unknown : a ->{} Unit
+let unknown value = ignore (await value)
+
+//~ E-AWAITABLE-MISSING @3:27-3:29 no Awaitable instance for `Int`
+//~ E-AWAITABLE-MISSING @6:38-6:42 no Awaitable instance for `Json`
+//~ E-AWAITABLE-MISSING @9:35-9:40 no Awaitable instance for

@@ -1,8 +1,9 @@
 use super::Tr;
 use crate::run::compile_source;
 use crate::syntax::Term;
-use flick_core::ir::{Expr, ExprKind, ItemKind, Lit, Stage};
+use flick_core::ir::{Expr, ExprKind, ExprLang, ItemKind, Lit, Pat, Stage, Stmt};
 use flick_core::source::{FileId, Span};
+use flick_core::types::lang::Lang;
 
 fn expression(kind: ExprKind) -> Expr {
     Expr::new(kind, Span::new(FileId::new(0), 0, 0))
@@ -32,6 +33,61 @@ fn argument_first_staging_keeps_task_expectations_but_not_computations() {
     let translated = Tr::new("Test").expr(&call(computation));
     assert!(
         matches!(translated, Term::Let(_, None, value, _) if !matches!(&*value, Term::Task(_) | Term::Lam(..)))
+    );
+}
+
+#[test]
+fn selected_eff_worker_translates_to_the_core_await() {
+    let ir = expression(ExprKind::App {
+        func: Box::new(expression(ExprKind::lang(Lang::AwaitEff))),
+        arg: Box::new(expression(ExprKind::Local("task".to_owned()))),
+        stage: Stage::Runtime,
+        arg_first: false,
+    });
+    let translated = Tr::new("Test").expr(&ir);
+    assert!(
+        matches!(translated, Term::Await(operand) if matches!(&*operand, Term::Var(name) if &**name == "task"))
+    );
+}
+
+#[test]
+fn selected_eff_worker_keeps_task_evaluation_outside_owner_evidence() {
+    let worker = "worker".to_owned();
+    let task = "task".to_owned();
+    let await_call = expression(ExprKind::App {
+        func: Box::new(expression(ExprKind::Local(worker.clone()))),
+        arg: Box::new(expression(ExprKind::Local(task.clone()))),
+        stage: Stage::Runtime,
+        arg_first: false,
+    });
+    let bracket = expression(ExprKind::WithOwnerEvidence(
+        Box::new(expression(ExprKind::Local("owner".to_owned()))),
+        Box::new(await_call),
+    ));
+    let ir = expression(ExprKind::Block(
+        vec![
+            Stmt::let_bind(
+                Pat::Bind(worker),
+                expression(ExprKind::lang(Lang::AwaitEff)),
+            ),
+            Stmt::let_bind(
+                Pat::Bind(task),
+                call(expression(ExprKind::Local("dependency".to_owned()))),
+            ),
+        ],
+        Box::new(bracket),
+    ));
+    let translated = Tr::new("Test").expr(&ir);
+    let Term::Let(name, None, value, body) = translated else {
+        panic!("task operand staging: {translated:?}");
+    };
+    assert_eq!(&*name, "task");
+    assert!(matches!(&*value, Term::Let(..)));
+    let Term::WithOwnerEvidence(_, inside) = &*body else {
+        panic!("owner evidence: {body:?}");
+    };
+    assert!(
+        matches!(&**inside, Term::Await(task) if matches!(&**task, Term::Var(local) if &**local == "task"))
     );
 }
 

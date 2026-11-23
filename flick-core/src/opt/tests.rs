@@ -139,7 +139,11 @@ fn forbidden_transformations_stay_out() {
     assert!(js.contains("a + b + c"), "{js}");
     assert!(js.contains("x * 0"), "{js}");
     // a task runs as often as it is awaited
-    assert_eq!(js.matches("yield* t;").count(), 2, "{js}");
+    assert_eq!(
+        js.matches("yield* $m_Prelude.await_eff(t);").count(),
+        2,
+        "{js}"
+    );
     // two layers stay two builds
     assert_eq!(js.matches("Layer.succeed").count(), 2, "{js}");
     // the lookup stays inside `provide`

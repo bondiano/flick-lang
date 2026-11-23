@@ -5,12 +5,20 @@ module App.Main exposing (main)
 
 type error Boom = Boom String
 
+type Ready = Ready Int
+
+instance Awaitable Ready {} {} Int =
+  let await (Ready value) = value
+
+force : Awaitable t r e a => t ->{r; e} a
+let force value = await value
+
 counted : Ref Int -> Int ->{; Boom} Int
 let counted runs n =
   Ref.set runs (Ref.get runs + 1)
   if n < 0 then Fail.fail (Boom "negative \{n}") else n * 2
 
-main : Unit ->{Host.Console, Async} Unit
+main : Unit ->{Host.Console} Unit
 let main () =
   let runs = Ref.make 0
   let doubled = lazy { counted runs 21 }
@@ -31,3 +39,12 @@ let main () =
   Platform.stdout_line "\{a} \{b}"
   Platform.stdout_line "\{first} / \{second}"
   Platform.stdout_line "runs: \{Ref.get runs}"
+  let work = task {
+    let next = Ref.get runs + 1
+    Ref.set runs next
+    next
+  }
+  let third = await work
+  let fourth = Awaitable.await work
+  let ready = force (Ready 42)
+  Platform.stdout_line "awaits: \{third} \{fourth} \{ready}"
