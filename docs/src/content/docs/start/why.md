@@ -86,8 +86,38 @@ let read_later path =
 
 You do not need to know what a monad is to write Flick. A service call is a
 direct call, `let` binds its result, and the lines run from top to bottom.
-`load_view` above has no `yield`, `flatMap` or `pipe`. To run work concurrently,
-make the calls values with `task`:
+`load_view` above has no `yield`, `flatMap` or `pipe`.
+
+Values and typed failures work together. Here `?` unwraps a successful
+`Result` or raises its error, and `catch` turns that error into a message.
+The signature of `sum` names the failure; `sum_text` handles it and needs
+no error in its row.
+
+```flick
+type error InvalidNumber = InvalidNumber String
+
+parse_number : String -> Result InvalidNumber Float
+let parse_number text =
+  match String.to_number text with
+  | Some number -> Ok number
+  | None -> Err (InvalidNumber text)
+
+sum : String -> String ->{; InvalidNumber} Float
+let sum left right = (parse_number left)? + (parse_number right)?
+
+sum_text : String -> String ->{} String
+let sum_text left right =
+  show (sum left right) catch
+  | InvalidNumber text -> "Not a number: \{text}"
+```
+
+Use `result { … }` when the caller should receive an `Ok` or `Err` value
+instead. For an `Option`, `orelse` supplies a fallback only when the value
+is `None`.
+
+Concurrency is explicit. `task` builds work without starting it;
+`parallel` runs both computations concurrently and returns their results.
+The service and error requirements still appear in the function's signature.
 
 ```flick
 # opaque type alias UserId = String
@@ -98,7 +128,10 @@ make the calls values with `task`:
 # service Log =
 #   info : String ->{} Unit
 # load_view : UserId ->{Users, Log; NotFound} UserView
-# let load_view id = Users.get id
+# let load_view id =
+#   let view = Users.get id
+#   Log.info "Loaded \{view.title}"
+#   view
 #
 load_two : UserId -> UserId ->{Users, Log; NotFound} (UserView, UserView)
 let load_two first_id second_id =
@@ -107,9 +140,45 @@ let load_two first_id second_id =
   parallel first second
 ```
 
-Local mutable variables and loops read the same way: `let mut`, `loop` and
-`while`, with labels for `break` and `continue`. A function that mutates its
-own variables stays pure from the outside.
+Services also make dependencies replaceable without changing the function.
+`greeting` reads a clock in ordinary code; `provide` supplies a fixed
+clock for a deterministic check. Its service requirement is satisfied inside
+the block, so `check_greeting` has an empty service row.
+
+```flick
+service Clock =
+  hour : Unit ->{} Int
+
+greeting : Unit ->{Clock} String
+let greeting () =
+  if Clock.hour () < 12 then "Good morning" else "Good afternoon"
+
+check_greeting : Unit ->{} Bool
+let check_greeting () =
+  let clock = Layer.succeed Clock { hour = fun () -> 9 }
+  provide clock { greeting () == "Good morning" }
+```
+
+Local mutation needs no runtime machinery. This function uses `let mut` and
+`while` but stays pure: it changes only its own variables.
+
+```flick
+digits : Int -> Int
+let digits number =
+  let mut left = number
+  let mut count = 1
+  while left >= 10 do {
+    left = left / 10
+    count = count + 1
+  }
+  count
+```
+
+Loops support `break`, `continue` and labels for nested loops.
+Scoped resources use the same block structure: `scope { … }` owns their
+lifetime, and `defer { … }` registers cleanup when that scope ends.
+See [effects and errors](../../reference/effects/),
+[services](../../reference/services/) and [resources](../../reference/resources/).
 
 ## One language for the whole app
 
