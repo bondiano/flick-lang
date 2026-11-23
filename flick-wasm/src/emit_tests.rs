@@ -14,6 +14,34 @@ fn json(text: &str) -> Value {
 }
 
 #[test]
+fn suite_entry_is_available_without_main_and_disappears_after_edit() {
+    let mut session = Session::new();
+    let suite = "module Main\n\nimport Test exposing (expect, to)\n\nsuite \"math\" {\n  test \"sum\" { expect (1 + 1) |> to.equal 2 }\n}\n";
+    assert!(
+        !session.update(suite).contains("\"error\""),
+        "the suite fixture checks"
+    );
+    for profile in ["debug", "release"] {
+        let emitted = json(&session.emit(profile));
+        assert_eq!(
+            emitted["tests"],
+            serde_json::json!({"module": "Main", "entry": "Main.js"})
+        );
+        assert!(emitted["entry"].is_null());
+        assert!(
+            emitted["files"]["Main.js"]
+                .as_str()
+                .expect("module")
+                .contains("export const tests")
+        );
+    }
+    session.update(SOURCE);
+    assert!(json(&session.emit("debug"))["tests"].is_null());
+    session.update("module Main\nlet broken = missing\n");
+    assert!(json(&session.emit("debug"))["tests"].is_null());
+}
+
+#[test]
 fn emission_matches_cold_after_edits_errors_and_fixes() {
     let edited = SOURCE.replace("first", "second 😀");
     let invalid = edited.replace("\"second 😀\"", "42");

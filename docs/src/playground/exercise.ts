@@ -18,7 +18,28 @@ export interface ExerciseOperations {
   check(): Promise<ReadonlyArray<{ readonly severity: string }>>;
   compile(): Promise<ExerciseDeclarations>;
   run(): Promise<{ readonly status: string; readonly code: number; readonly lines: ReadonlyArray<{ readonly stream: string; readonly text: string }> }>;
+  /** Hidden suites use the shared browser runner with reporter=json and forbidOnly. */
+  tests?(): Promise<TestExecution>;
 }
+
+export interface TestExecution {
+  readonly status: string;
+  readonly detail: string;
+  readonly lines: ReadonlyArray<{ readonly stream: string; readonly text: string }>;
+}
+
+/** A clean compile or empty/skipped suite is not evidence that an answer passes. */
+export const evaluateTestSuites = (execution: TestExecution): string => {
+  if (execution.status !== "exit" || execution.detail !== "0") return "tests";
+  try {
+    const output = execution.lines.filter((line) => line.stream === "stdout").map((line) => line.text).join("").trim();
+    const report: unknown = JSON.parse(output.slice(output.lastIndexOf("\n") + 1));
+    if (typeof report !== "object" || report === null || !("tests" in report) || !Array.isArray(report.tests)) return "tests";
+    const tests: Array<unknown> = report.tests;
+    if (tests.length === 0 || !tests.every((test) => typeof test === "object" && test !== null && "name" in test && typeof test.name === "string" && "status" in test && test.status === "passed")) return "tests";
+    return "passed";
+  } catch { return "tests"; }
+};
 
 export const evaluateExercise = async (rules: ExerciseCheck, operations: ExerciseOperations): Promise<string> => {
   if ((await operations.check()).some((problem) => problem.severity === "error")) return "fix-errors";
@@ -50,5 +71,7 @@ export const evaluateExercise = async (rules: ExerciseCheck, operations: Exercis
   // The emitter appends $ to reserved JS names; Flick identifiers cannot contain $.
   if (!matches(entry, rules.export) && !matches(entry, `${rules.export}$`)) return "type";
   const execution = await operations.run();
-  return execution.status === "exit" && execution.code === 0 && execution.lines.filter((line) => line.stream === "stdout").map((line) => line.text).join("").trim() === rules.output ? "passed" : "output";
+  const outputMatches = execution.status === "exit" && execution.code === 0 && execution.lines.filter((line) => line.stream === "stdout").map((line) => line.text).join("").trim() === rules.output;
+  if (!outputMatches) return "output";
+  return operations.tests === undefined ? "passed" : evaluateTestSuites(await operations.tests());
 };

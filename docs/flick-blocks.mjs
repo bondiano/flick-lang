@@ -14,10 +14,14 @@ const shown = (value) =>
     .filter((line) => !hidden(line))
     .join("\n");
 
-/** The meta of a block without the words only the checker reads. */
+/** Expressive Code's `key=value` props, such as `title="Main.fl"`. */
+const props = /\b[\w-]+=(?:"[^"]*"|'[^']*'|\S+)/g;
+
+/** The meta of a block without the words only the checker reads; frame props stay. */
 const meta = (words) => {
   const rest = (words ?? "").trim();
-  return /^(ignore|fail|keep)(\s|$)/.test(rest) ? null : rest || null;
+  if (!/^(ignore|fail|keep)(\s|$)/.test(rest)) return rest || null;
+  return rest.match(props)?.join(" ") || null;
 };
 
 /** A Sätteri mdast plugin: ```flick blocks as the reader sees them. */

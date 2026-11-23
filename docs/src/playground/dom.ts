@@ -32,6 +32,7 @@ export const configuration = (): Configuration => {
     ...lessonConfiguration(exercise),
     done,
     autorun: root.dataset.autorun === "true",
+    run_mode: root.dataset.runMode ?? "",
   };
 };
 

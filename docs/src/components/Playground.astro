@@ -17,9 +17,10 @@ interface Props {
   /** One program to show and run, under `id`, which keys its draft apart from the gallery's. */
   source?: string;
   id?: string;
+  runMode?: "main" | "tests";
 }
 
-const { locale, lesson = "", source, id = "" } = Astro.props;
+const { locale, lesson = "", source, id = "", runMode = "main" } = Astro.props;
 const exercise = lesson ? loadExercise(lesson) : undefined;
 const { starter, ...lessonData } = exercise ?? { starter: "" };
 const solution = exercise?.solution ?? "";
@@ -29,13 +30,14 @@ const autorun = !lesson && source !== undefined;
 const configuration = {
   locale, examples: gallery, lesson: Boolean(exercise), solution, done: false, autorun,
   ...lessonConfiguration(exercise),
+  run_mode: runMode,
 };
 const markup = renderToString(uiRenderStatic(await runPromise<Ui>(() => initial_view(configuration))));
 // the browser reads the same examples back; `<` cannot end the script early
 const embedded = JSON.stringify(gallery).replaceAll("<", "\\u003c");
 ---
 
-<div id="flick-playground" class="not-content flick-playground-shell" data-locale={locale} data-lesson={lesson || id} data-autorun={String(autorun)} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
+<div id="flick-playground" class="not-content flick-playground-shell" data-locale={locale} data-lesson={lesson || id} data-autorun={String(autorun)} data-run-mode={runMode} data-flick-ssr data-pagefind-ignore set:html={markup}></div>
 <script is:inline type="application/json" id="flick-playground-examples" set:html={embedded}></script>
 {exercise && <script is:inline type="application/json" id="flick-lesson" set:html={JSON.stringify(lessonData).replaceAll("<", "\\u003c")}></script>}
 <noscript>

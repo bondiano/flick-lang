@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { evaluateExercise } from "../src/playground/exercise.ts";
+import { evaluateExercise, evaluateTestSuites } from "../src/playground/exercise.ts";
 
 const contract = { export: "length_of", argument_types: ["string"], return_type: "number", output: "5" };
 const operations = {
@@ -8,6 +8,22 @@ const operations = {
   compile: async () => ({ dts: "export declare const length_of: (text: string) => number;" }),
   run: async () => ({ status: "exit", code: 0, lines: [{ stream: "stdout", text: "5\n" }] }),
 };
+
+test("hidden suites require actual passing cases, not compilation, skips or empty reports", async () => {
+  const report = (tests: unknown, detail = "0", status = "exit") => ({
+    status, detail, lines: [{ stream: "stdout", text: JSON.stringify({ tests }) + "\n" }],
+  });
+  assert.equal(evaluateTestSuites(report([{ name: "hidden > sum", status: "passed" }])), "passed");
+  for (const execution of [
+    report([]), report([{ name: "hidden > sum", status: "skipped" }]),
+    report([{ name: "hidden > sum", status: "failed", kind: "setup" }], "1"),
+    report([{ name: "hidden > sum", status: "passed" }], "", "stopped"),
+    report([null]), report([{ status: "passed" }]),
+    { status: "exit", detail: "0", lines: [] },
+  ]) assert.equal(evaluateTestSuites(execution), "tests");
+  assert.equal(await evaluateExercise(contract, { ...operations, tests: async () => report([{ name: "hidden > sum", status: "passed" }]) }), "passed");
+  assert.equal(await evaluateExercise(contract, { ...operations, tests: async () => report([]) }), "tests");
+});
 test("rules control signature and output, including compilable wrong answers", async () => {
   assert.equal(await evaluateExercise(contract, operations), "passed");
   assert.equal(await evaluateExercise(contract, { ...operations, run: async () => ({ status: "exit", code: 1, lines: [{ stream: "stdout", text: "5" }] }) }), "output");

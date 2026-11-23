@@ -8,7 +8,7 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 <TourLesson locale="en" id="fakes">
 
-**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+**Where it runs:** in an isolated browser worker. Tests mode shows the real report; List tests prints names without running bodies or hooks. Locally: a project's `test/Main.fl` and `flick test`. CI checks both.
 
 `flick test` provides `Host.Live`. A nested layer replaces just the clock
 and random ports; `ticket` is unchanged and still declares both dependencies.

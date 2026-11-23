@@ -2,14 +2,14 @@
 title: Утверждения и diff ошибки
 description: Утверждения и diff ошибки
 tableOfContents: false
-source_hash: b91370a0a8ae4163
+source_hash: 22a820d539d04685
 ---
 
 import TourLesson from "../../../../components/TourLesson.astro";
 
 <TourLesson locale="ru" id="matchers">
 
-**Где запускается:** локально: модуль в `test/Main.fl` проекта, затем `flick test` (для компаньонов путь указан ниже). CI проверяет отчёт.
+**Где запускается:** в изолированном потоке браузера. Режим «Тесты» показывает настоящий отчёт; «Список тестов» выводит имена без запуска тел и хуков. Локально: `test/Main.fl` проекта и `flick test`. CI проверяет оба варианта.
 
 `expect actual |> to.equal expected` сравнивает значения через `Eq` и
 показывает их через `Show`. Матчеры Boolean, порядка и вхождения называют

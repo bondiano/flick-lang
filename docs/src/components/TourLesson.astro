@@ -39,7 +39,7 @@ const source = file !== undefined ? readFileSync(file, "utf8") : whole ? loadExe
               <Code code={source} lang="flick" />
             </div>
           : exercise === undefined
-          ? <Playground locale={locale} source={source} id={`tour/${id}`} />
+          ? <Playground locale={locale} source={source} id={`tour/${id}`} runMode={mode === "tests" ? "tests" : "main"} />
           : <Playground locale={locale} lesson={exercise} />}
       </div>
     </div>}

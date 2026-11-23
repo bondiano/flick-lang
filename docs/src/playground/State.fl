@@ -2,6 +2,7 @@ module State exposing (
   Locale(..),
   Profile(..),
   Tab(..),
+  RunMode(..),
   Configuration,
   SyntaxToken,
   Diagnostic,
@@ -29,6 +30,9 @@ type Locale = En | Ru
   deriving Eq
 
 type Profile = Debug | Release
+  deriving Eq
+
+type RunMode = Main | Tests | ListTests
   deriving Eq
 
 /// What the result panel shows: the program's output, the diagnostics, or
@@ -60,6 +64,7 @@ type alias Configuration = {
   done : Bool
   /// Whether a clean source runs by itself once typing pauses, as on a page of the tour.
   autorun : Bool
+  run_mode : String
 }
 type alias SyntaxToken = { text : String; class_name : String }
 /// A change a fix makes; `start` and `end` are UTF-16 offsets of the module.
@@ -100,6 +105,8 @@ type alias Model = {
   ran_source : String
   ran_profile : Profile
   running : Bool
+  run_mode : RunMode
+  test_filter : String
   loading : Bool
   checking : Bool
   highlighting : Bool
@@ -224,6 +231,8 @@ let initial_model config = {
   ran_source = ""
   ran_profile = Debug
   running = false
+  run_mode = if config.run_mode == "tests" then Tests else Main
+  test_filter = ""
   loading = true
   checking = false
   highlighting = false

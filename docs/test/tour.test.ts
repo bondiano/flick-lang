@@ -23,7 +23,7 @@ test("the index, the lesson files and the pages match one to one", () => {
     .sort();
   assert.deepEqual(files, own.flatMap((entry) => [entry.file ?? "", ...(entry.stdout ? [entry.stdout] : [])]).sort());
   for (const entry of all) {
-    if (entry.expect === "local") assert.ok(entry.local, `${entry.id}: local lesson needs a CI check`);
+    if (entry.expect === "local" || entry.expect === "tests") assert.ok(entry.local, `${entry.id}: lesson needs a CI check`);
     if (entry.file !== undefined) assert.ok(existsSync(entry.file), `${entry.id}: ${entry.file}`);
     if (entry.stdout !== undefined) assert.ok(existsSync(entry.stdout), `${entry.id}: ${entry.stdout}`);
     if (entry.exercise !== undefined) assert.ok(existsSync(path.join(docs, "exercises", entry.exercise, "check.toml")), entry.id);

@@ -139,6 +139,8 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem 1.25rem;
+  /* the workspace has a fixed height: a toolbar that wraps keeps its rows above the panes */
+  flex-shrink: 0;
   min-height: 4rem;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--fp-rule);
@@ -146,6 +148,7 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 }
 
 .fp-profiles .fp-control-label { margin-right: 0.375rem; }
+.fp-modes input { width: 11rem; min-width: 0; }
 .fp-storage-notice { color: var(--sl-color-gray-2); font-size: 0.8125rem; }
 .fp-lesson { padding: 1.25rem; border-bottom: 1px solid var(--fp-rule); background: var(--fp-surface); }
 .fp-lesson h2 { margin: 0 0 0.5rem; font-size: 1.25rem; }

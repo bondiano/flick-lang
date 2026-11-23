@@ -8,7 +8,7 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 <TourLesson locale="en" id="hooks">
 
-**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+**Where it runs:** in an isolated browser worker. Tests mode shows the real report; List tests prints names without running bodies or hooks. Locally: a project's `test/Main.fl` and `flick test`. CI checks both.
 
 Setup runs outer to inner; cleanup runs inner to outer. `before_all` and
 `after_all` belong to the suite; `before_each` and `after_each` surround each

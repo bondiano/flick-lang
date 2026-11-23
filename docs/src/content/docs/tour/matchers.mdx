@@ -8,7 +8,7 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 <TourLesson locale="en" id="matchers">
 
-**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+**Where it runs:** in an isolated browser worker. Tests mode shows the real report; List tests prints names without running bodies or hooks. Locally: a project's `test/Main.fl` and `flick test`. CI checks both.
 
 `expect actual |> to.equal expected` compares values with `Eq` and shows
 them with `Show`. Boolean, ordering and containment matchers name the property

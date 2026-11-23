@@ -286,21 +286,21 @@ is a complete file; save it at the path shown in its title. The parameterized mo
 exports `Token` without its constructor, and each application creates a
 distinct token type.
 
-```text title="src/App/Contracts.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Contracts.fl"
 module App.Contracts exposing (Source)
 
 type module Source =
   seed : String
 ```
 
-```text title="src/App/Argument.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Argument.fl"
 module App.Argument exposing (seed)
 
 seed : String
 let seed = "Ada"
 ```
 
-```text title="src/App/Make.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Make.fl"
 module App.Make(S : App.Contracts.Source) : Result
 
 type Token = Token String
@@ -313,7 +313,7 @@ type module Result =
   value : Token
 ```
 
-```text title="src/App/Instances.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Instances.fl"
 module App.Instances exposing (A, B)
 
 module A = App.Make(App.Argument)
@@ -324,7 +324,7 @@ Both files below import the **same result**, `App.Instances.A`, so they can
 exchange its tokens. `flick check src/App/Consumer.fl` succeeds: importing
 `A` again does not create a new type.
 
-```text title="src/App/Producer.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Producer.fl"
 module App.Producer exposing (value)
 
 import App.Instances.A as A
@@ -333,7 +333,7 @@ value : A.Token
 let value = A.value
 ```
 
-```text title="src/App/Consumer.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Consumer.fl"
 module App.Consumer exposing (value)
 
 import App.Instances.A as A
@@ -347,7 +347,7 @@ The second application, `B`, has its own type. Add this file and run
 `flick check src/App/Bad.fl`: it reports `FLICK-T003`, with
 `App.Instances.B.Token` expected and `App.Instances.A.Token` found.
 
-```text title="src/App/Bad.fl"
+```flick ignore checked as one project by docs/test/parameterized-modules.test.ts title="src/App/Bad.fl"
 module App.Bad exposing (value)
 
 import App.Instances.A as A

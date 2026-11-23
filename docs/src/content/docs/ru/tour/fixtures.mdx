@@ -2,14 +2,14 @@
 title: Владение фикстурами и ошибки setup
 description: Владение фикстурами и ошибки setup
 tableOfContents: false
-source_hash: 04b82655f3fe0d4d
+source_hash: 062849014578d1fd
 ---
 
 import TourLesson from "../../../../components/TourLesson.astro";
 
 <TourLesson locale="ru" id="fixtures">
 
-**Где запускается:** локально: модуль в `test/Main.fl` проекта, затем `flick test` (для компаньонов путь указан ниже). CI проверяет отчёт.
+**Где запускается:** в изолированном потоке браузера. Режим «Тесты» показывает настоящий отчёт; «Список тестов» выводит имена без запуска тел и хуков. Локально: `test/Main.fl` проекта и `flick test`. CI проверяет оба варианта.
 
 `fixture` ленив и создаётся для случая; `fixture shared` — для набора.
 `await names` открывает хранилище один раз, а `Fixture.cleanup` освобождает его

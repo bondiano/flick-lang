@@ -8,7 +8,7 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 <TourLesson locale="en" id="each">
 
-**Where it runs:** locally: place the module in a project's `test/Main.fl`, then run `flick test` (companion paths are below). CI checks the report.
+**Where it runs:** in an isolated browser worker. Tests mode shows the real report; List tests prints names without running bodies or hooks. Locally: a project's `test/Main.fl` and `flick test`. CI checks both.
 
 The tuple pattern binds one row's input and expected result. `{0}` in the
 name is replaced with the first tuple field as `show` writes it, including

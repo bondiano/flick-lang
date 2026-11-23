@@ -183,7 +183,8 @@ impl Session {
         let analysis = &emitted.analysis;
         let mut diagnostics = analysis.diagnostics.clone();
         let mut declarations = Vec::new();
-        let mut out = json!({ "js": null, "dts": null, "files": null, "entry": null });
+        let mut out =
+            json!({ "js": null, "dts": null, "files": null, "entry": null, "tests": null });
         if !has_errors(&diagnostics) {
             let (artifacts, problems) = Self::artifacts(profile, analysis, sources);
             let (left_out, problems): (Vec<_>, Vec<_>) =
@@ -297,6 +298,9 @@ impl Session {
             "dts": dts,
             "files": files,
             "entry": entry.unwrap_or(Value::Null),
+            "tests": analysis.compilation.modules.iter()
+                .find(|m| m.path == path() && m.interface.exports_value("tests"))
+                .map(|m| json!({ "module": m.name, "entry": format!("{}.js", m.name.replace('.', "/")) })),
         });
         if include_declarations {
             output["declarations"] = Value::Object(declarations);

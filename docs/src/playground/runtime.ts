@@ -16,6 +16,17 @@ export type Message =
 export interface Program {
   readonly files: Files;
   readonly entry: string;
+  readonly tests?: { readonly module: string; readonly options: BrowserTestOptions };
+}
+
+export interface BrowserTestOptions {
+  readonly list?: boolean;
+  readonly filter?: string;
+  readonly timeout?: number;
+  readonly jobs?: number;
+  readonly seed?: number;
+  readonly forbidOnly?: boolean;
+  readonly reporter?: "human" | "json";
 }
 
 const modules = import.meta.glob<Namespace>([
@@ -49,12 +60,21 @@ const fileOf = (spec: string): string | undefined => {
 };
 
 /** Runs the program, posting what it writes, then `exit` with its code or `crash`. */
-export const execute = async ({ files, entry }: Program, post: (message: Message) => void): Promise<void> => {
+export const execute = async (program: Program, post: (message: Message) => void, signal?: AbortSignal): Promise<void> => {
+  let { files, entry } = program;
+  if (program.tests !== undefined) {
+    const launcher = "flick-tests.js";
+    files = { ...files, [launcher]: `import { runTests } from "@flick-lang/runtime/rt/testing";\nimport * as suite from ${JSON.stringify(`./${entry}`)};\nawait runTests([[${JSON.stringify(program.tests.module)}, suite.tests]], ${JSON.stringify(program.tests.options)});\n` };
+    entry = launcher;
+  }
+  const events = new EventTarget();
+  const listeners = new Map<() => void, EventListener>();
   const writer = (stream: "stdout" | "stderr") => ({
     write: (text: string): boolean => {
       post({ stream, text });
       return true;
     },
+    on: (): void => { },
   });
   const proc = {
     stdout: writer("stdout"),
@@ -63,8 +83,20 @@ export const execute = async ({ files, entry }: Program, post: (message: Message
     env: {},
     exitCode: undefined as number | undefined,
     on: (): void => { },
-    off: (): void => { },
+    once: (name: string, listener: () => void): void => {
+      const wrapped: EventListener = () => listener();
+      listeners.set(listener, wrapped);
+      events.addEventListener(name, wrapped, { once: true });
+      if (name === "SIGINT" && signal?.aborted) wrapped(new Event(name));
+    },
+    off: (name: string, listener: () => void): void => {
+      const wrapped = listeners.get(listener);
+      if (wrapped !== undefined) events.removeEventListener(name, wrapped);
+      listeners.delete(listener);
+    },
   };
+  const stop = (): void => { events.dispatchEvent(new Event("SIGINT")); };
+  signal?.addEventListener("abort", stop, { once: true });
   (globalThis as { process?: unknown }).process = proc;
   try {
     const store: Record<string, Namespace> = {};
@@ -79,5 +111,7 @@ export const execute = async ({ files, entry }: Program, post: (message: Message
     post({ stream: "exit", code: proc.exitCode ?? 0 });
   } catch (error) {
     post({ stream: "crash", text: error instanceof Error ? (error.stack ?? error.message) : String(error) });
+  } finally {
+    signal?.removeEventListener("abort", stop);
   }
 };

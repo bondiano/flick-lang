@@ -2,13 +2,23 @@
 
 `index.json` owns chapter and lesson order. A lesson uses its chapter's
 `<id>.fl`, a gallery `example`, or an `exercise`. `expect` is `run`, `ui`,
-`fail FLICK-…`, or `local`. A runnable lesson has a matching `.stdout`;
+`fail FLICK-…`, `tests`, or `local`. A `run` lesson has a matching `.stdout`;
 both native profiles and the browser compare that output.
 
-The browser runs `main`, not a module's generated `tests`. `local` lessons
-show static code and say that the browser did not run it. A runnable lesson
-can also have a `local` check, as the proof and app-testing lessons do.
-The browser test-runner follow-up is [#904](https://github.com/bondiano/flick-lang/issues/904).
+The browser runs `main` or a module's generated `tests` in a disposable
+worker. `tests` lessons select Tests mode and compare the native report,
+including intentional failures, with their `local` expectations. List tests
+and its name filter discover cases without running bodies or hooks.
+Each case defaults to 1000 ms unless it declares its own timeout; the
+playground's execution limit remains ten seconds. Stop interrupts the native
+runner before terminating its worker so hooks and fixtures can close.
+`local` lessons show static code for native-only examples, including
+companion files. A runnable lesson can also have a `local` check.
+
+Exercise consumers use `runTestsBuilt` for a compiled result or
+`runTestSuites` for source with hidden suites, with `reporter: "json"` and
+`forbidOnly: true`. The shared evaluator's optional `tests` operation
+requires a nonempty report of passing cases, not a clean compile or skips.
 
 `local` describes the real CLI entry point checked by
 `test/helpers/verify-local-lesson.ts` in a private temporary project:
