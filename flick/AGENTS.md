@@ -28,8 +28,9 @@ editor queries live in `flick-core`.
   log through `tracing` or stderr.
 - LSP message handlers run in `Server::guarded`, which catches a panic,
   logs `language server panicked` and drops caches. The analysis thread
-  in `src/lsp/worker.rs` has no guard: after a panic there, diagnostics
-  stop updating.
+  in `src/lsp/worker.rs` has no guard: after a panic there, `Server::poll`
+  starts a new worker, held requests are analyzed in place, and
+  diagnostics update again on the next edit.
 - Update `docs/src/content/docs/reference/cli.md` and its `ru/` pair
   with a user-visible command or flag.
 

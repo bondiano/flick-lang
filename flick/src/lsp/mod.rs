@@ -461,8 +461,18 @@ impl Server {
 
     /// Publishes the analyses that finished and answers the requests they held.
     fn poll(&mut self) {
-        while let Some(done) = self.worker.try_recv() {
-            self.publish(done);
+        loop {
+            match self.worker.try_recv() {
+                Ok(done) => self.publish(done),
+                Err(mpsc::TryRecvError::Empty) => break,
+                // its jobs never finish: held requests fall back to analyzing in place
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    error!("analysis thread stopped; starting a new one");
+                    self.worker = Worker::new();
+                    self.pending.clear();
+                    break;
+                }
+            }
         }
         self.resume();
     }
@@ -471,8 +481,8 @@ impl Server {
     fn settle(&mut self) {
         while !self.pending.is_empty() {
             match self.worker.recv_timeout(Duration::from_secs(30)) {
-                Some(done) => self.publish(done),
-                None => break,
+                Ok(done) => self.publish(done),
+                Err(_) => break,
             }
         }
     }

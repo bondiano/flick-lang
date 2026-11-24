@@ -45,6 +45,9 @@ enum Task {
     /// Report how many contexts are cached, for the tests to observe reuse.
     #[allow(dead_code)]
     Sync(Sender<()>),
+    /// Unwinds the thread, for the tests of a worker that died.
+    #[cfg(test)]
+    Panic,
     Stop,
 }
 
@@ -73,6 +76,7 @@ impl Worker {
 
     /// Queues a revision; the worker analyzes the last one queued per context.
     pub fn submit(&self, job: Job) {
+        // a dead worker is noticed when `poll` finds its results disconnected
         let _ = self.tasks.send(Task::Analyze(job));
     }
 
@@ -87,13 +91,13 @@ impl Worker {
     }
 
     /// A finished analysis, if one is waiting.
-    pub fn try_recv(&self) -> Option<Done> {
-        self.done.try_recv().ok()
+    pub fn try_recv(&self) -> Result<Done, mpsc::TryRecvError> {
+        self.done.try_recv()
     }
 
     /// A finished analysis, waiting at most `timeout` for one.
-    pub fn recv_timeout(&self, timeout: Duration) -> Option<Done> {
-        self.done.recv_timeout(timeout).ok()
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<Done, mpsc::RecvTimeoutError> {
+        self.done.recv_timeout(timeout)
     }
 
     /// How many contexts the worker still caches.
@@ -108,6 +112,12 @@ impl Worker {
         let (ack, done) = mpsc::channel();
         let _ = self.tasks.send(Task::Sync(ack));
         let _ = done.recv_timeout(Duration::from_secs(30));
+    }
+
+    /// Makes the analysis thread panic, as a defect in the checker would.
+    #[cfg(test)]
+    pub fn crash(&self) {
+        let _ = self.tasks.send(Task::Panic);
     }
 }
 
@@ -140,6 +150,8 @@ fn run(tasks: Receiver<Task>, done: Sender<Done>, len: Arc<AtomicUsize>) {
                 let _ = ack.send(());
                 continue;
             }
+            #[cfg(test)]
+            Ok(Task::Panic) => panic!("the analysis thread crashed"),
             Ok(Task::Stop) | Err(_) => return,
         }
         // collect the changes that follow closely: a burst of keystrokes is
@@ -164,6 +176,8 @@ fn run(tasks: Receiver<Task>, done: Sender<Done>, len: Arc<AtomicUsize>) {
                     len.store(caches.len(), Ordering::Relaxed);
                     let _ = ack.send(());
                 }
+                #[cfg(test)]
+                Ok(Task::Panic) => panic!("the analysis thread crashed"),
                 Ok(Task::Stop) | Err(mpsc::RecvTimeoutError::Disconnected) => return,
                 Err(mpsc::RecvTimeoutError::Timeout) => break,
             }
