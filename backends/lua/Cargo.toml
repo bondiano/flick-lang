@@ -1,0 +1,30 @@
+[package]
+name = "flick-backend-lua"
+description = "The Flick Lua backend: host profiles and target checks, no code generation yet"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+# What the component's descriptor accepts; a test keeps the two equal.
+[package.metadata.flick]
+backend-api = { minimum = "0.1.0", maximum-exclusive = "0.2.0" }
+ir = { minimum = "0.17.0", maximum-exclusive = "0.18.0" }
+
+[features]
+guest = []
+
+[dependencies]
+flick-backend = { path = "../../flick-backend" }
+flick-ir = { path = "../../flick-ir", features = ["cbor"] }
+
+[dev-dependencies]
+toml = "1.1.8"

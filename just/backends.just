@@ -11,6 +11,15 @@ js-component: (backend-component "js")
 
 go-component: (backend-component "go")
 
+lua-component: (backend-component "lua")
+
+# The Lua profile probes on the pinned hosts `nix develop` puts on PATH (or
+# LUA51, LUAC, LUAJIT, LOVE): Lua 5.1.5, LuaJIT 2.1 with the JIT on and
+# off, and LÖVE 11.5 headless; then the API snapshots of those hosts and
+# the generated WoW addons, which no host here runs.
+lua-probes:
+    node backends/lua/probes/run.mjs
+
 # Update the component `name` distributed with every compiler binary;
 # CI only checks that a rebuild reproduces it.
 update-component name: (backend-component name)
@@ -32,6 +41,7 @@ wasm-backends: backend-fixtures
     cargo clippy -p flick-test-backend --features guest --target wasm32-wasip2 -- -D warnings
     just check-component js
     just check-component go
+    just check-component lua
     cargo clippy -p flick-backend --features host --all-targets -- -D warnings
     cargo test -p flick-backend --profile e2e --features host --test component_host -- --include-ignored
     cargo clippy -p flick --features wasm-backends --all-targets -- -D warnings

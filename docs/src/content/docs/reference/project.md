@@ -141,6 +141,19 @@ Each backend component declares its base environment tags, selectable tag axes, 
 - `flick/go` publishes tag `go`, additive axis `cgo` (`cgo`, active with `[target.go] cgo = true`), and built-in host `native`.
 - Third-party backends can publish their own tags, axes, and hosts through the same descriptor schema.
 
+`flick/lua` is a preview backend for World of Warcraft addons and LÖVE games.
+It lives in the repository at `backends/lua` and is not distributed with the
+compiler: pin its `package/component.wasm` in `[build.backend]`. It publishes
+tag `lua`, exclusive axis `dialect` (`lua51` default, `luajit`), additive axis
+`capabilities` (`jit` and `ffi`, each needing `dialect = "luajit"`), and hosts
+`wow-retail`, `wow-forever` and `love`, each pinned to one client or release.
+It generates no code yet. `flick check` and the editor check the project's
+modules against the selected host and report what they reach but the host
+cannot run, such as `BigInt`, `Int64` without `ffi`, suspension on WoW or a
+global outside the host's API, with `FLICK-P012` at the use. `flick build`
+also follows the built-in modules, reports what they need at the project's
+call, then stops with `FLICK-P012` and writes nothing.
+
 A library (`kind = "lib"`) may also declare `[host]` to define a named host environment `<backend>/<name>` and contribute extra tags when selected:
 
 ```toml

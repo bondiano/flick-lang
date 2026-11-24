@@ -5,6 +5,9 @@ the [`flick:backend`](../flick-backend/AGENTS.md) world: `js` (JavaScript
 and TypeScript, see its [README](js/README.md)) and `go` (one Go module per
 entry, with `runtime-go` embedded). They read portable `flick_ir` and the
 host's projections, never `flick-core`.
+`lua` is a preview component of the same world, not official: it pins the
+host profiles of `lua/profiles/` and checks programs against them, and its
+`generate` refuses. See [Lua host profiles](../docs/backends/lua-profiles.md).
 
 ## Layout
 
@@ -37,5 +40,8 @@ host's projections, never `flick-core`.
 - `cargo test -p flick-core --lib codegen::` and the JS README's
   standalone checks.
 - `just check-component js` or `go`, then `just wasm-backends`.
+- Lua: `cargo test -p flick-backend-lua`, `just lua-probes` (in `nix
+  develop`), `just check-component lua`, and the `lua_profiles` tests of
+  `just wasm-backends`.
 - The "IR, lowering or optimization" row of the
   [validation matrix](../docs/agents/validation.md).

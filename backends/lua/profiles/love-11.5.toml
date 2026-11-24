@@ -1,0 +1,95 @@
+# LÖVE 11.5: a game is main.lua and the modules it requires, run by LuaJIT
+# 2.1 through host callbacks. Each fact carries `doc`, a pinned source, or
+# `exec`, a probe of backends/lua/probes that ran on `host` on `date`; the
+# probes ran inside love.load of a headless game, then one love.update quit.
+schema = 1
+id = "love-11.5"
+kind = "host"
+environment = "lua/love"
+title = "LÖVE 11.5"
+product = "LÖVE"
+version = "11.5"
+build = "nixpkgs 0bb2eedc20e4739f29e8045034f2828ad7054f8f love 11.5, linked to LuaJIT 2.1.1785763465"
+source = "https://github.com/love2d/love/tree/6eb8d546736d5915a8b5af30b2cf33456dfdcb1a"
+api = "api/love-11.5.txt"
+status = "executed"
+
+[[fact]]
+name = "vm"
+value = "LuaJIT 2.1.1785763465"
+exec = "extensions"
+host = "LOVE 11.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "dialects"
+value = ["lua51", "luajit"]
+exec = "extensions"
+host = "LOVE 11.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "jit"
+value = true
+exec = "extensions"
+host = "LOVE 11.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "ffi"
+value = true
+exec = "extensions"
+host = "LOVE 11.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "require"
+value = true
+doc = "https://github.com/love2d/love/blob/6eb8d546736d5915a8b5af30b2cf33456dfdcb1a/src/modules/filesystem/wrap_Filesystem.cpp#L738-L777"
+
+[[fact]]
+name = "loader"
+value = "main.lua of the game, then modules through require on the game's filesystem"
+doc = "https://github.com/love2d/love/blob/6eb8d546736d5915a8b5af30b2cf33456dfdcb1a/src/modules/filesystem/wrap_Filesystem.cpp#L1019"
+
+[[fact]]
+name = "callbacks"
+value = "love.load(args) once, then love.update(dt) per frame, on the main coroutine of love.run"
+exec = "numbers"
+host = "LOVE 11.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "suspension"
+value = true
+exec = "coroutines"
+host = "LOVE 11.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "yield-across-pcall"
+value = true
+exec = "coroutines"
+host = "LOVE 11.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "numbers-strings-limits"
+value = "as LuaJIT 2.1: every probe matches the expectations of the JIT"
+exec = "limits"
+host = "LOVE 11.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "compat-globals"
+value = "math.mod and string.gfind, which LuaJIT alone lacks, are defined"
+exec = "api"
+host = "LOVE 11.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "headless"
+value = "t.window = false with SDL_VIDEODRIVER=dummy, SDL_AUDIODRIVER=dummy and ALSOFT_DRIVERS=null"
+exec = "numbers"
+host = "LOVE 11.5"
+date = "2026-11-24"
