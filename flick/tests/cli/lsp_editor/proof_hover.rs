@@ -75,78 +75,7 @@ proof yes where holds true = refl
         );
     }
 
-    let cases: &[(&str, &str, &[&str])] = &[
-        ("where equal y x", "equal", &["Value equality", "`y = x`"]),
-        ("equal y x =", "y", &["y : Bool", "`y = x`"]),
-        ("x = symm h", "x", &["x : Bool", "`y = x`"]),
-        ("reversed (x : Bool)", "x", &["x : Bool"]),
-        ("h : equal x y", "h", &["**h**", "`x = y`"]),
-        ("symm h", "symm", &["Symmetry", "`y = x`"]),
-        ("symm h", "h", &["**h**", "reversed equality", "`x = y`"]),
-        ("trans y p q", "trans", &["Transitivity", "`x = z`"]),
-        ("trans y p q", "y", &["middle term", "y : Bool"]),
-        ("trans y p q", "p", &["first proof", "`x = y`"]),
-        ("trans y p q", "q", &["second proof", "`y = z`"]),
-        (
-            "funext (fun y -> refl)",
-            "funext",
-            &["Function extensionality", "**Goal**"],
-        ),
-        (
-            "fun y -> refl",
-            "y",
-            &["y : a", "fresh argument", "**Goal**"],
-        ),
-        (
-            "let back = symm",
-            "let",
-            &["introduces a local fact", "back", "`y = x`"],
-        ),
-        (
-            "cong (fun z -> Some z) back",
-            "cong",
-            &["Congruence", "**Goal**"],
-        ),
-        (
-            "cong (fun z -> Some z) back",
-            "fun",
-            &["function applied to both sides"],
-        ),
-        (
-            "Some z) back",
-            "back",
-            &["**back**", "`y = x`", "before applying the context"],
-        ),
-        ("match v with\n", "match", &["each constructor", "**Goal**"]),
-        (
-            "v with\n  | None",
-            "v",
-            &["v : Option a", "each constructor"],
-        ),
-        ("None -> refl", "None", &["**Branch**", "`v = None`"]),
-        ("Some y -> refl", "Some", &["**Branch**", "`v = Some y`"]),
-        ("Some y -> refl", "y", &["y : a", "`v = Some y`"]),
-        ("Some y -> refl", "refl", &["Reflexivity", "`v = Some y`"]),
-        (
-            "same_type a a",
-            "same_type",
-            &["Type equality", "`same_type a a`"],
-        ),
-        (
-            "holds true",
-            "holds",
-            &["Boolean proposition", "`true = true`"],
-        ),
-    ];
-    for &(site, token, expected) in cases {
-        hover(
-            &mut lsp,
-            &main,
-            source,
-            offset(source, site, token),
-            expected,
-        );
-    }
+    assert_rule_arguments(&mut lsp, &main, source);
     lsp.close();
 }
 
@@ -294,88 +223,8 @@ let outside = true
             range(source, at, token)
         );
     }
-    let bundle: &[(&str, &str, &[&str])] = &[
-        (
-            "lawful Monad Option",
-            "lawful",
-            &["selected instance and its superclasses", "Monad Option"],
-        ),
-        (
-            "lawful Monad Option",
-            "Monad",
-            &["dictionary selected", "Monad Option"],
-        ),
-        (
-            "lawful Monad Option",
-            "Option",
-            &["dictionary selected", "Monad Option"],
-        ),
-        (
-            "Applicative =",
-            "Applicative",
-            &["superclass path", "Applicative.Functor.identity"],
-        ),
-        (
-            "Functor =",
-            "Functor",
-            &["superclass path", "Applicative.Functor.identity"],
-        ),
-        (
-            "identity = wrong",
-            "identity",
-            &[
-                "instantiated law",
-                "Applicative.Functor.identity",
-                "**Goal**",
-                "map",
-            ],
-        ),
-        (
-            "identity = wrong",
-            "wrong",
-            &["Applicative.Functor.identity", "**Goal**", "map"],
-        ),
-    ];
-    for &(site, token, expected) in bundle {
-        hover(
-            &mut lsp,
-            &main,
-            source,
-            offset(source, site, token),
-            expected,
-        );
-    }
-
-    let key = offset(source, "identity = wrong", "identity");
-    let params = json!({
-        "textDocument": {"uri": main}, "position": position(source, key),
-        "context": {"includeDeclaration": true},
-    });
-    let definition = lsp.request("textDocument/definition", &params);
-    let law = &definition["result"];
-    let path = law["uri"]
-        .as_str()
-        .and_then(|uri| uri.strip_prefix("file://"))
-        .unwrap_or_else(|| panic!("{definition}"));
-    let found = fs::read_to_string(path).expect("the actual law source");
-    let line = usize::try_from(law["range"]["start"]["line"].as_u64().expect("law line"))
-        .expect("small line");
-    assert!(
-        found
-            .lines()
-            .nth(line)
-            .is_some_and(|line| line.contains("map identity v")),
-        "{law}"
-    );
-    let references = lsp.request("textDocument/references", &params);
-    assert!(
-        references["result"]
-            .as_array()
-            .expect("law references")
-            .contains(&json!({"uri": main, "range": range(source, key, "identity")})),
-        "{references}"
-    );
-
+    assert_bundle_fields(&mut lsp, &main, source);
+    assert_law_navigation(&mut lsp, &main, source);
     let symbols = lsp.request(
         "textDocument/documentSymbol",
         &json!({ "textDocument": { "uri": main } }),
@@ -427,4 +276,153 @@ let outside = true
         range(&edited, at, "y")
     );
     lsp.close();
+}
+
+fn assert_rule_arguments(lsp: &mut Lsp, main: &str, source: &str) {
+    let cases: &[(&str, &str, &[&str])] = &[
+        ("where equal y x", "equal", &["Value equality", "`y = x`"]),
+        ("equal y x =", "y", &["y : Bool", "`y = x`"]),
+        ("x = symm h", "x", &["x : Bool", "`y = x`"]),
+        ("reversed (x : Bool)", "x", &["x : Bool"]),
+        ("h : equal x y", "h", &["**h**", "`x = y`"]),
+        ("symm h", "symm", &["Symmetry", "`y = x`"]),
+        ("symm h", "h", &["**h**", "reversed equality", "`x = y`"]),
+        ("trans y p q", "trans", &["Transitivity", "`x = z`"]),
+        ("trans y p q", "y", &["middle term", "y : Bool"]),
+        ("trans y p q", "p", &["first proof", "`x = y`"]),
+        ("trans y p q", "q", &["second proof", "`y = z`"]),
+        (
+            "funext (fun y -> refl)",
+            "funext",
+            &["Function extensionality", "**Goal**"],
+        ),
+        (
+            "fun y -> refl",
+            "y",
+            &["y : a", "fresh argument", "**Goal**"],
+        ),
+        (
+            "let back = symm",
+            "let",
+            &["introduces a local fact", "back", "`y = x`"],
+        ),
+        (
+            "cong (fun z -> Some z) back",
+            "cong",
+            &["Congruence", "**Goal**"],
+        ),
+        (
+            "cong (fun z -> Some z) back",
+            "fun",
+            &["function applied to both sides"],
+        ),
+        (
+            "Some z) back",
+            "back",
+            &["**back**", "`y = x`", "before applying the context"],
+        ),
+        ("match v with\n", "match", &["each constructor", "**Goal**"]),
+        (
+            "v with\n  | None",
+            "v",
+            &["v : Option a", "each constructor"],
+        ),
+        ("None -> refl", "None", &["**Branch**", "`v = None`"]),
+        ("Some y -> refl", "Some", &["**Branch**", "`v = Some y`"]),
+        ("Some y -> refl", "y", &["y : a", "`v = Some y`"]),
+        ("Some y -> refl", "refl", &["Reflexivity", "`v = Some y`"]),
+        (
+            "same_type a a",
+            "same_type",
+            &["Type equality", "`same_type a a`"],
+        ),
+        (
+            "holds true",
+            "holds",
+            &["Boolean proposition", "`true = true`"],
+        ),
+    ];
+    for &(site, token, expected) in cases {
+        hover(lsp, main, source, offset(source, site, token), expected);
+    }
+}
+
+fn assert_bundle_fields(lsp: &mut Lsp, main: &str, source: &str) {
+    let bundle: &[(&str, &str, &[&str])] = &[
+        (
+            "lawful Monad Option",
+            "lawful",
+            &["selected instance and its superclasses", "Monad Option"],
+        ),
+        (
+            "lawful Monad Option",
+            "Monad",
+            &["dictionary selected", "Monad Option"],
+        ),
+        (
+            "lawful Monad Option",
+            "Option",
+            &["dictionary selected", "Monad Option"],
+        ),
+        (
+            "Applicative =",
+            "Applicative",
+            &["superclass path", "Applicative.Functor.identity"],
+        ),
+        (
+            "Functor =",
+            "Functor",
+            &["superclass path", "Applicative.Functor.identity"],
+        ),
+        (
+            "identity = wrong",
+            "identity",
+            &[
+                "instantiated law",
+                "Applicative.Functor.identity",
+                "**Goal**",
+                "map",
+            ],
+        ),
+        (
+            "identity = wrong",
+            "wrong",
+            &["Applicative.Functor.identity", "**Goal**", "map"],
+        ),
+    ];
+    for &(site, token, expected) in bundle {
+        hover(lsp, main, source, offset(source, site, token), expected);
+    }
+}
+
+fn assert_law_navigation(lsp: &mut Lsp, main: &str, source: &str) {
+    let key = offset(source, "identity = wrong", "identity");
+    let params = json!({
+        "textDocument": {"uri": main}, "position": position(source, key),
+        "context": {"includeDeclaration": true},
+    });
+    let definition = lsp.request("textDocument/definition", &params);
+    let law = &definition["result"];
+    let path = law["uri"]
+        .as_str()
+        .and_then(|uri| uri.strip_prefix("file://"))
+        .unwrap_or_else(|| panic!("{definition}"));
+    let found = fs::read_to_string(path).expect("the actual law source");
+    let line = usize::try_from(law["range"]["start"]["line"].as_u64().expect("law line"))
+        .expect("small line");
+    assert!(
+        found
+            .lines()
+            .nth(line)
+            .is_some_and(|line| line.contains("map identity v")),
+        "{law}"
+    );
+    let references = lsp.request("textDocument/references", &params);
+    assert!(
+        references["result"]
+            .as_array()
+            .expect("law references")
+            .contains(&json!({"uri": main, "range": range(source, key, "identity")})),
+        "{references}"
+    );
 }
