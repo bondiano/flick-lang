@@ -1,6 +1,7 @@
 // Client for `flick lsp --stdio`, managing lifecycle, configuration, output, and status bar.
 const vscode = require("vscode");
 const { LanguageClient, State, CloseAction, ErrorAction } = require("vscode-languageclient/node");
+const { createProofView } = require("./proof-view.js");
 
 const DEFAULT_START_TIMEOUT_MS = 15_000;
 
@@ -8,6 +9,8 @@ let client;
 let outputChannel;
 let statusBar;
 let stateDisposable;
+let proofStateDisposable;
+let proofView;
 let extensionDisposables = [];
 let fileWatchers = [];
 let lifecycleQueue = Promise.resolve();
@@ -155,11 +158,14 @@ function createWatchers() {
 async function stopCurrentClient() {
   stateDisposable?.dispose?.();
   stateDisposable = undefined;
+  proofStateDisposable?.dispose();
+  proofStateDisposable = undefined;
   inFlightRequests = 0;
 
   const active = client;
   client = undefined;
   activeState = State.Stopped;
+  proofView?.connectionChanged();
 
   if (!active) {
     disposeWatchers();
@@ -289,6 +295,11 @@ async function startNewClient(expectedGeneration) {
     }
 
     client = instance;
+    proofStateDisposable = instance.onNotification("flick/proofStateChanged", (event) => {
+      if (instance === client && !aborted && !isDeactivated) {
+        proofView?.snapshotChanged(event);
+      }
+    });
 
     if (typeof instance.onDidChangeState === "function") {
       stateDisposable = instance.onDidChangeState(({ newState }) => {
@@ -309,6 +320,7 @@ async function startNewClient(expectedGeneration) {
             updateStatus("stopped");
           }
         }
+        proofView?.connectionChanged();
       });
     }
 
@@ -380,14 +392,18 @@ async function startNewClient(expectedGeneration) {
     if (activeState === State.Starting) {
       activeState = State.Running;
       updateStatus(inFlightRequests > 0 ? "busy" : "ready");
+      proofView?.connectionChanged();
     }
   } catch (err) {
     if (err instanceof StartAbortedError) {
       if (instance === client) {
         stateDisposable?.dispose?.();
         stateDisposable = undefined;
+        proofStateDisposable?.dispose();
+        proofStateDisposable = undefined;
         client = undefined;
         activeState = State.Stopped;
+        proofView?.connectionChanged();
         disposeWatchers();
       }
       return;
@@ -401,6 +417,7 @@ async function startNewClient(expectedGeneration) {
       hasStartError = true;
       activeState = State.StartFailed;
       updateStatus("error", `Flick language server (${command}) failed: ${message}. Click to restart.`);
+      proofView?.connectionChanged();
     }
   }
 }
@@ -433,6 +450,7 @@ function activate(context) {
   outputChannel = vscode.window.createOutputChannel("Flick", { log: true });
   statusBar = vscode.window.createStatusBarItem("flick.statusBar", vscode.StatusBarAlignment.Left, 0);
   statusBar.show();
+  proofView = createProofView(vscode, () => activeState === State.Running ? client : undefined, logError);
 
   const restartCommand = vscode.commands.registerCommand("flick.restartServer", () => restartServer());
   const showOutputCommand = vscode.commands.registerCommand("flick.showOutput", () => {
@@ -460,6 +478,7 @@ function activate(context) {
       restartCommand,
       showOutputCommand,
       configListener,
+      proofView,
     );
   }
 
@@ -471,6 +490,8 @@ function deactivate() {
   lifecycleGeneration += 1;
   abortInFlightStart("Deactivating Flick extension");
   disposeExtensionDisposables();
+  proofView?.dispose();
+  proofView = undefined;
   return enqueue(async () => {
     await stopCurrentClient();
     statusBar?.dispose?.();

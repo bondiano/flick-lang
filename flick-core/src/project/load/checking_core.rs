@@ -344,7 +344,17 @@ impl Checking<'_> {
         // a module that checked is the only one whose proofs or contracts are about something
         let mut proofs = Vec::new();
         let mut verified_contracts = Vec::new();
-        if clean {
+        #[cfg(all(feature = "ide", not(target_arch = "wasm32")))]
+        let mut proof_evidence = Vec::new();
+        #[cfg(all(feature = "ide", not(target_arch = "wasm32")))]
+        let mut evidence = self.observe_proofs.then_some(&mut proof_evidence);
+        #[cfg(all(not(feature = "ide"), not(target_arch = "wasm32")))]
+        let mut evidence = None;
+        #[cfg(not(target_arch = "wasm32"))]
+        let recovering_proofs = evidence.is_some() && !typing.proofs.is_empty();
+        #[cfg(target_arch = "wasm32")]
+        let recovering_proofs = false;
+        if clean || recovering_proofs {
             use crate::project::builtins::builtin_laws;
             let stages = self.stages_by_class;
             let lowered = |name: &str| self.lowered.get(*self.by_name.get(name)?)?.as_ref();
@@ -365,14 +375,28 @@ impl Checking<'_> {
                         .map_or(&[], Vec::as_slice)
                 },
             };
-            let (found, proven) = ir::check_proofs(&module, &typing, &run);
-            diagnostics.extend(found);
-            proofs = proven;
-            if self.proves_contracts(loaded) {
+            if clean {
+                let (found, proven) = ir::check_proofs(
+                    &module, &typing, &run,
+                    #[cfg(not(target_arch = "wasm32"))]
+                    evidence.take(),
+                );
+                diagnostics.extend(found);
+                proofs = proven;
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            if !clean && let Some(evidence) = evidence {
+                ir::observe_proofs(&module, &typing, &run, &diagnostics, evidence);
+            }
+            if clean && self.proves_contracts(loaded) {
                 let (contract_diags, summaries) = ir::check_contracts(&module, &typing, &run);
                 diagnostics.extend(contract_diags);
                 verified_contracts = summaries;
             }
+        }
+        #[cfg(all(feature = "ide", not(target_arch = "wasm32")))]
+        {
+            typing.proof_evidence = proof_evidence;
         }
         interface.proofs = typing.proofs.iter().map(|p| p.name.clone()).collect();
         let mut declarations = typing.declarations.clone();

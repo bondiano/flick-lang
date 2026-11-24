@@ -36,6 +36,50 @@ pub struct ProofInfo {
 /// A class by its module and name, with its parameters and their kinds.
 type ClassOf<'a> = (&'a str, &'a str, &'a [(String, Kind)]);
 
+/// Verification evidence tied to one elaborated declaration.
+#[derive(Debug, Clone)]
+pub struct ProofEvidence {
+    pub at: Range,
+    pub status: ProofStatus,
+    pub failure: Option<Span>,
+    pub steps: Vec<logic::ProofStep>,
+    /// Checked lemmas visible before this declaration, using source qualifiers.
+    pub lemmas: Vec<String>,
+    pub instance: Option<String>,
+    pub obligations: Vec<LawObligation>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ProofStatus {
+    Checked,
+    Open,
+    Blocked,
+    BudgetExhausted,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl ProofStatus {
+    pub(crate) fn of_failure(failure: &logic::Failure) -> Self {
+        match failure.cause() {
+            logic::Failure::Refused(_) => Self::Blocked,
+            logic::Failure::Exhausted { .. } => Self::BudgetExhausted,
+            _ => Self::Open,
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LawObligation {
+    pub path: Vec<String>,
+    pub class: String,
+    pub law: String,
+    pub status: ProofStatus,
+    pub statement: Option<String>,
+    pub range: Option<Range>,
+}
+
 /// The class a law is of, with the names its parameters have in the law's
 /// types.
 #[derive(Debug, Clone)]

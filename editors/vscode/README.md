@@ -3,6 +3,8 @@
 Flick language support: a TextMate grammar for highlighting, and a client of
 `flick lsp --stdio` for diagnostics, hover, navigation, completion, rename,
 quick fixes, formatting, symbols, semantic tokens, folding and inlay hints.
+The Explorer's [Proof Goals view](https://github.com/bondiano/flick-lang/blob/main/docs/src/content/docs/reference/editor.md#proof-goals)
+follows the cursor in Flick proofs.
 
 ## Requirements
 

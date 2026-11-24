@@ -411,3 +411,90 @@ fn a_proof_that_runs_out_proves_nothing() {
     // the same, every time
     assert_eq!(code(&prove(&goal, &refl(), &data(), &Nothing, &[])), "T084");
 }
+
+#[test]
+fn traced_trans_uses_each_goal_and_preserves_the_verdict() {
+    let mut goal = equal(
+        vec![("x", Ty::Bool), ("y", Ty::Bool)],
+        Ty::Bool,
+        var("x"),
+        var("y"),
+    );
+    goal.premises.push((
+        "h".into(),
+        Equation {
+            ty: Ty::Bool,
+            left: var("x"),
+            right: var("y"),
+        },
+    ));
+    let proof = cert(Rule::Trans(
+        var("x"),
+        Box::new(refl()),
+        Box::new(cert(Rule::Fact("h".into()))),
+    ));
+
+    let mut steps = Vec::new();
+    let traced = super::prove_traced(&goal, &proof, &data(), &Nothing, &[], &mut steps);
+
+    assert_eq!(traced, Ok(()));
+    assert_eq!(traced, prove(&goal, &proof, &data(), &Nothing, &[]));
+    assert_eq!(
+        steps
+            .iter()
+            .map(|step| step.goal.as_str())
+            .collect::<Vec<_>>(),
+        ["x = y", "x = x", "x = y"]
+    );
+    assert_eq!(steps[2].premises, [("h".to_owned(), "x = y".to_owned())]);
+    assert!(steps[0].normalization_steps > 0);
+    assert_eq!(
+        steps[0].normalization_steps,
+        steps[1].normalization_steps + steps[2].normalization_steps
+    );
+}
+
+#[test]
+fn recovery_keeps_each_case_context_when_an_arm_has_no_certificate() {
+    use flick_ir::{Arm, Expr, ExprKind, Pat};
+
+    let goal = equal(vec![("v", Ty::Bool)], Ty::Bool, var("v"), var("v"));
+    let expr = |kind| Expr {
+        kind,
+        span: span(),
+        ty: None,
+    };
+    let malformed = expr(ExprKind::Lit(Lit::Bool(true)));
+    let name = expr(ExprKind::Global {
+        module: super::RULES.into(),
+        name: "refl".into(),
+        type_args: Vec::new(),
+    });
+    let arm = |b, body| Arm {
+        pat: Pat::Lit(Lit::Bool(b)),
+        binder_types: Vec::new(),
+        guard: None,
+        body,
+    };
+    let body = expr(ExprKind::Match(
+        Box::new(expr(ExprKind::Local("v".into()))),
+        vec![arm(false, malformed), arm(true, name)],
+    ));
+
+    assert!(super::cert(&body, &[]).is_err());
+    let mut steps = Vec::new();
+    super::observe(&goal, &body, &data(), &[], &mut steps);
+
+    assert_eq!(steps.len(), 3);
+    assert_eq!(steps[1].goal, "false = false");
+    assert_eq!(
+        steps[1].substitutions,
+        [("v".to_owned(), "false".to_owned())]
+    );
+    assert_eq!(steps[2].goal, "true = true");
+    assert_eq!(
+        steps[2].substitutions,
+        [("v".to_owned(), "true".to_owned())]
+    );
+    assert!(steps.iter().all(|step| step.normalization_steps == 0));
+}

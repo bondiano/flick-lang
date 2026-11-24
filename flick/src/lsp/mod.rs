@@ -47,6 +47,9 @@ struct Pending {
 
 pub struct Server {
     docs: HashMap<PathBuf, String>,
+    versions: HashMap<PathBuf, i64>,
+    /// Clients subscribe to proof updates by querying a goal.
+    proof_watch: bool,
     /// The analysis of each context since the last change of a document it
     /// reads: a request of one context does not cost the next request of
     /// another its analysis.
@@ -84,20 +87,7 @@ pub fn serve() -> ExitCode {
         pid = process::id(),
         "language server started"
     );
-    let mut server = Server {
-        docs: HashMap::new(),
-        snapshots: HashMap::new(),
-        latest: None,
-        caches: Caches::new(),
-        published: HashMap::new(),
-        out: Box::new(io::stdout()),
-        registered: None,
-        requests: 0,
-        worker: Worker::new(),
-        pending: HashMap::new(),
-        generation: 0,
-        deferred: Vec::new(),
-    };
+    let mut server = Server::new(Box::new(io::stdout()));
     // the protocol reader has its own thread: waiting for the editor's next
     // message does not stop a finished analysis from being published
     let (messages, input) = mpsc::channel::<io::Result<Option<Value>>>();
@@ -185,6 +175,25 @@ pub fn serve() -> ExitCode {
 }
 
 impl Server {
+    fn new(out: Box<dyn Write>) -> Self {
+        Self {
+            docs: HashMap::new(),
+            versions: HashMap::new(),
+            proof_watch: false,
+            snapshots: HashMap::new(),
+            latest: None,
+            caches: Caches::new(),
+            published: HashMap::new(),
+            out,
+            registered: None,
+            requests: 0,
+            worker: Worker::new(),
+            pending: HashMap::new(),
+            generation: 0,
+            deferred: Vec::new(),
+        }
+    }
+
     /// Runs `f`; a panic in it, which the hook has logged, is `None`, and
     /// the analyses it may have left half-built are dropped, so the next
     /// message analyzes anew instead of the editor losing the server.
@@ -243,19 +252,26 @@ impl Server {
                 }
             }
             "textDocument/didClose" => {
-                self.input_changed(&path);
                 let context = Context::of(&self.docs, &path);
                 self.docs.remove(&path);
+                self.versions.remove(&path);
+                self.input_changed(&path);
                 // the closed text is gone: analyze an open document of its
                 // project instead, so the disk view is what gets published
-                match self.open_in(&context) {
-                    Some(open) => self.refresh(&open),
-                    None => self.clear(&context),
+                if let Some(open) = self.open_in(&context) {
+                    self.refresh(&open);
+                } else {
+                    self.clear(&context);
+                    self.generation += 1;
+                    self.proof_state_changed();
                 }
                 return;
             }
             "textDocument/didSave" => {}
             _ => return,
+        }
+        if let Some(version) = params["textDocument"]["version"].as_i64() {
+            self.versions.insert(path.clone(), version);
         }
         self.input_changed(&path);
         self.refresh(&path);
@@ -269,9 +285,22 @@ impl Server {
     }
 
     fn input_changed(&mut self, path: &Path) {
-        self.snapshots.retain(|_, snapshot| !snapshot.reads(path));
+        let mut dependents = Vec::new();
+        let changed = Context::of(&self.docs, path);
+        self.snapshots.retain(|context, snapshot| {
+            let invalidated = snapshot.reads(path);
+            if invalidated && *context != changed {
+                dependents.push(context.clone());
+            }
+            !invalidated
+        });
         for pending in self.pending.values_mut() {
             pending.changed_inputs.insert(path.to_path_buf());
+        }
+        for context in dependents {
+            if let Some(open) = self.open_in(&context) {
+                self.refresh(&open);
+            }
         }
     }
 
@@ -353,6 +382,16 @@ impl Server {
             docs: self.docs.clone(),
             generation,
         });
+        self.proof_state_changed();
+    }
+
+    fn proof_state_changed(&mut self) {
+        if self.proof_watch {
+            self.send(&protocol::notification(
+                "flick/proofStateChanged",
+                &serde_json::json!({ "generation": self.generation }),
+            ));
+        }
     }
 
     /// Consumes a completion only for the job still responsible for its context.
@@ -363,7 +402,7 @@ impl Server {
         if pending.generation != done.generation {
             return;
         }
-        let snapshot = done.snapshot;
+        let mut snapshot = done.snapshot;
         let current = Context::of(&self.docs, &done.path);
         let stale = current != done.context
             || snapshot.context != done.context
@@ -385,6 +424,7 @@ impl Server {
             }
             return;
         }
+        snapshot.generation = done.generation;
         self.publish_snapshot(&done.path, snapshot);
     }
 
@@ -439,6 +479,7 @@ impl Server {
         let context = snapshot.context.clone();
         self.latest = Some(context.clone());
         self.snapshots.insert(context.clone(), snapshot);
+        self.proof_state_changed();
         for m in messages {
             self.send(&m);
         }

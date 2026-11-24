@@ -1,6 +1,7 @@
 # Build inputs, not files the extension loads: the VSIX holds the bundled
 # `dist/extension.js` and no `node_modules` (`scripts/bundle.mjs`).
 extension.js
+proof-view.js
 scripts/**
 node_modules/**
 **/*.map

@@ -40,7 +40,8 @@ impl Server {
 
     /// Whether the request reads a context whose analysis is still running.
     pub(super) fn should_defer(&self, method: &str, params: &Value) -> bool {
-        if self.pending.is_empty() || matches!(method, "initialize" | "shutdown") {
+        if self.pending.is_empty() || matches!(method, "initialize" | "shutdown" | "flick/proofAt")
+        {
             return false;
         }
         if method == "workspace/symbol" {

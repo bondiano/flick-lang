@@ -38,6 +38,26 @@ function createHarness({
   const createdClients = [];
   const createdStatusBars = [];
   const createdChannels = [];
+  const createdViews = [];
+
+  class FakeEventEmitter {
+    listeners = new Set();
+    event = (listener) => {
+      this.listeners.add(listener);
+      return { dispose: () => this.listeners.delete(listener) };
+    };
+    fire(value) {
+      for (const listener of [...this.listeners]) listener(value);
+    }
+    dispose() {
+      this.listeners.clear();
+    }
+  }
+
+  const activeEditorChanged = new FakeEventEmitter();
+  const selectionChanged = new FakeEventEmitter();
+  const documentChanged = new FakeEventEmitter();
+  const documentClosed = new FakeEventEmitter();
 
   class FakeThemeColor {
     constructor(id) {
@@ -103,7 +123,19 @@ function createHarness({
       this.stateListeners = [];
       this.serverProcess = undefined;
       this.killedSignals = [];
+      this.requests = [];
+      this.notifications = new Map();
+      this.code2ProtocolConverter = {
+        asTextDocumentIdentifier: (document) => ({ uri: document.uri.toString() }),
+      };
       createdClients.push(this);
+    }
+    onNotification(method, handler) {
+      this.notifications.set(method, handler);
+      return { dispose: () => this.notifications.delete(method) };
+    }
+    sendRequest(method, params, token) {
+      return new Promise((resolve, reject) => this.requests.push({ method, params, token, resolve, reject }));
     }
     onDidChangeState(listener) {
       this.stateListeners.push(listener);
@@ -165,7 +197,49 @@ function createHarness({
   const fakeVscode = {
     StatusBarAlignment: { Left: 1, Right: 2 },
     ThemeColor: FakeThemeColor,
+    EventEmitter: FakeEventEmitter,
+    CancellationTokenSource: class {
+      token = { isCancellationRequested: false };
+      cancel() {
+        this.token.isCancellationRequested = true;
+      }
+      dispose() {}
+    },
+    TreeItemCollapsibleState: { None: 0, Expanded: 2 },
+    TreeItem: class {
+      constructor(label, collapsibleState) {
+        this.label = label;
+        this.collapsibleState = collapsibleState;
+      }
+    },
     window: {
+      activeTextEditor: undefined,
+      onDidChangeActiveTextEditor: activeEditorChanged.event,
+      onDidChangeTextEditorSelection: selectionChanged.event,
+      createTreeView(id, { treeDataProvider }) {
+        const visibilityChanged = new FakeEventEmitter();
+        const view = {
+          id,
+          visible: false,
+          onDidChangeVisibility: visibilityChanged.event,
+          setVisible(visible) {
+            this.visible = visible;
+            visibilityChanged.fire({ visible });
+          },
+          items(parent) {
+            return treeDataProvider.getChildren(parent).map((row) => treeDataProvider.getTreeItem(row));
+          },
+          children(label) {
+            return this.items(treeDataProvider.getChildren().find((row) => row.label === label));
+          },
+          dispose() {
+            this.disposed = true;
+            visibilityChanged.dispose();
+          },
+        };
+        createdViews.push(view);
+        return view;
+      },
       createOutputChannel(name, options) {
         const channel = new FakeOutputChannel(name, options);
         createdChannels.push(channel);
@@ -188,6 +262,8 @@ function createHarness({
       },
     },
     workspace: {
+      onDidChangeTextDocument: documentChanged.event,
+      onDidCloseTextDocument: documentClosed.event,
       getConfiguration(section) {
         assert.equal(section, "flick");
         return {
@@ -239,6 +315,23 @@ function createHarness({
     createdStatusBars,
     createdChannels,
     createdWatchers,
+    createdViews,
+    setActiveEditor(editor) {
+      fakeVscode.window.activeTextEditor = editor;
+      activeEditorChanged.fire(editor);
+    },
+    setCursor(editor, line, character) {
+      editor.selection = { active: { line, character } };
+      selectionChanged.fire({ textEditor: editor });
+    },
+    changeDocument(document) {
+      document.version += 1;
+      documentChanged.fire({ document, contentChanges: [{}] });
+    },
+    closeDocument(document) {
+      document.isClosed = true;
+      documentClosed.fire(document);
+    },
     fireConfigChange(affectedSection) {
       const event = {
         affectsConfiguration(section) {
@@ -261,6 +354,7 @@ test("package.json contributes restartServer, showOutput, configuration, and gra
 
   const showOutput = commands.find((c) => c.command === "flick.showOutput");
   assert.ok(showOutput, "flick.showOutput command must be contributed");
+  assert.ok(manifest.contributes?.views?.explorer?.some(({ id }) => id === "flick.proofGoals"));
 
   const props = manifest.contributes?.configuration?.properties ?? {};
   assert.ok(props["flick.path"], "flick.path setting must exist");
@@ -537,4 +631,145 @@ test("synchronous throw in middleware sendRequest next() resets status bar from 
   assert.match(bar.text, /Ready/);
 
   await h.extension.deactivate();
+});
+
+function flickDocument(file) {
+  return { languageId: "flick", version: 1, uri: { scheme: "file", toString: () => `file:///${file}` } };
+}
+
+function proofReply(request, generation, version, overrides = {}) {
+  return {
+    generation,
+    version,
+    position: request.params.position,
+    pending: false,
+    proof: {
+      name: "back",
+      status: "checked",
+      declaredGoal: "y = x",
+      goal: "x = y",
+      binders: [{ name: "x", type: "Bool" }],
+      premises: [{ name: "h", statement: "x = y" }],
+      substitutions: [{ name: "v", value: "Some x" }],
+      lemmas: ["Laws.identity"],
+      instance: null,
+      obligations: [],
+      ...overrides,
+    },
+  };
+}
+
+test("Proof Goals follows the active cursor and distinguishes pending verification from an open goal", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const h = createHarness();
+  await h.extension.activate({ subscriptions: [] });
+  t.after(() => h.extension.deactivate());
+  const [client] = h.createdClients;
+  const [view] = h.createdViews;
+  const document = flickDocument("Main.fl");
+  const editor = { document, selection: { active: { line: 2, character: 12 } } };
+  h.setActiveEditor(editor);
+  t.mock.timers.tick(100);
+  assert.equal(client.requests.length, 0, "the collapsed view does no work");
+
+  view.setVisible(true);
+  t.mock.timers.tick(100);
+  const pending = client.requests.at(-1);
+  assert.equal(pending.method, "flick/proofAt");
+  assert.deepEqual(pending.params, {
+    textDocument: { uri: "file:///Main.fl" }, position: { line: 2, character: 12 },
+  });
+  pending.resolve({ ...proofReply(pending, 2, 1), proof: null, pending: true });
+  await Promise.resolve();
+  assert.equal(view.message, "Verification pending");
+  assert.deepEqual(view.items(), []);
+
+  client.notifications.get("flick/proofStateChanged")({ generation: 2 });
+  t.mock.timers.tick(100);
+  const open = client.requests.at(-1);
+  assert.notEqual(open, pending);
+  open.resolve(proofReply(open, 2, 1, { status: "open", goal: "y = x" }));
+  await Promise.resolve();
+  assert.equal(view.message, undefined);
+  assert.deepEqual(view.items().slice(0, 2).map(({ label, description }) => [label, description]), [
+    ["back", "Open obligation"], ["Goal", "y = x"],
+  ]);
+
+  h.setCursor(editor, 3, 9);
+  t.mock.timers.tick(100);
+  const inside = client.requests.at(-1);
+  assert.deepEqual(inside.params.position, { line: 3, character: 9 });
+  inside.resolve(proofReply(inside, 2, 1));
+  await Promise.resolve();
+  assert.deepEqual(view.items().slice(0, 3).map(({ label, description }) => [label, description]), [
+    ["back", "Checked"], ["Declared goal", "y = x"], ["Goal", "x = y"],
+  ]);
+  assert.equal(view.children("Binders")[0].description, "Bool");
+  assert.equal(view.children("Premises")[0].description, "x = y");
+  assert.equal(view.children("Branch substitutions")[0].description, "Some x");
+  assert.equal(view.children("Available lemmas")[0].label, "Laws.identity");
+
+  view.setVisible(false);
+  assert.deepEqual(view.items(), [], "reopening the view must start without the previous goal");
+});
+
+test("Proof Goals discards results superseded by dependency changes, edits and close", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const h = createHarness();
+  await h.extension.activate({ subscriptions: [] });
+  t.after(() => h.extension.deactivate());
+  const [client] = h.createdClients;
+  const [view] = h.createdViews;
+  const document = flickDocument("Main.fl");
+  const editor = { document, selection: { active: { line: 2, character: 12 } } };
+  h.setActiveEditor(editor);
+  view.setVisible(true);
+  t.mock.timers.tick(100);
+
+  const superseded = client.requests.at(-1);
+  const snapshotChanged = client.notifications.get("flick/proofStateChanged");
+  snapshotChanged({ generation: 3 });
+  assert.equal(superseded.token.isCancellationRequested, true);
+  superseded.resolve(proofReply(superseded, 2, 1));
+  await Promise.resolve();
+  assert.deepEqual(view.items(), []);
+
+  t.mock.timers.tick(100);
+  const oldGeneration = client.requests.at(-1);
+  oldGeneration.resolve(proofReply(oldGeneration, 2, 1));
+  await Promise.resolve();
+  assert.deepEqual(view.items(), [], "a delayed snapshot cannot restore checked status");
+
+  h.changeDocument(document);
+  t.mock.timers.tick(100);
+  const oldVersion = client.requests.at(-1);
+  oldVersion.resolve(proofReply(oldVersion, 3, 1));
+  await Promise.resolve();
+  assert.deepEqual(view.items(), [], "the reply must match the editor document version");
+
+  snapshotChanged({ generation: 4 });
+  t.mock.timers.tick(100);
+  const bundle = client.requests.at(-1);
+  bundle.resolve(proofReply(bundle, 4, 2, {
+    name: "monad",
+    status: "blocked",
+    instance: "Monad Option",
+    failureRange: { start: { line: 4, character: 9 }, end: { line: 4, character: 10 } },
+    obligations: [{ path: ["Applicative", "Functor"], law: "mapIdentity", status: "open", statement: null }],
+  }));
+  await Promise.resolve();
+  assert.equal(view.items()[0].description, "Verification blocked");
+  assert.equal(view.items().find(({ label }) => label === "Instance").description, "Monad Option");
+  assert.equal(view.items().find(({ label }) => label === "Failed step").description, "Line 5, column 10");
+  assert.equal(view.children("Law obligations")[0].label, "Applicative.Functor.mapIdentity");
+
+  h.setCursor(editor, 4, 14);
+  t.mock.timers.tick(100);
+  const afterClose = client.requests.at(-1);
+  h.closeDocument(document);
+  afterClose.resolve(proofReply(afterClose, 4, 2));
+  await Promise.resolve();
+  assert.equal(afterClose.token.isCancellationRequested, true);
+  assert.equal(view.message, "Open a Flick file and move the cursor into a proof.");
+  assert.deepEqual(view.items(), []);
 });

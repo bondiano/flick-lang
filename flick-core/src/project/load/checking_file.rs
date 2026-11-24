@@ -92,6 +92,8 @@ fn check_file_with(
         own_package_when: None,
         lower: false,
         lowered: &[],
+        #[cfg(all(feature = "ide", not(target_arch = "wasm32")))]
+        observe_proofs: false,
         proving: prove_contracts,
         prove_contracts,
         selected: None,

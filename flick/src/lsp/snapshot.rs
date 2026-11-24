@@ -177,6 +177,7 @@ pub struct Snapshot {
     /// Alternate companion file extension for local foreign bindings, if any.
     pub foreign_extension: Option<String>,
     pub(super) context: Context,
+    pub(super) generation: u64,
 }
 
 impl Snapshot {
@@ -298,6 +299,7 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
         root,
         foreign_extension,
         context,
+        generation: 0,
     }
 }
 
@@ -374,5 +376,6 @@ pub(super) fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         root: path.parent().expect("source directory").to_path_buf(),
         foreign_extension: None,
         context: Context::Builtin(path.to_path_buf()),
+        generation: 0,
     }
 }

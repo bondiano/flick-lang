@@ -14,6 +14,7 @@ mod hover;
 mod locals;
 mod navigate;
 mod plugins;
+mod proofs;
 mod rename;
 mod scope;
 mod symbols;
@@ -24,6 +25,7 @@ pub use actions::Action;
 pub use complete::{Completion, CompletionKind};
 pub use highlights::{Highlight, HighlightKind};
 pub use hints::Help;
+pub use proofs::ProofView;
 pub use symbols::Outline;
 pub use tokens::TOKEN_TYPES;
 

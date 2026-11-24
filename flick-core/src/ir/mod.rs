@@ -27,6 +27,8 @@ pub use lower::contracts::{ProvenContract, check_contracts};
 pub use lower::lower;
 #[cfg(not(target_arch = "wasm32"))]
 pub use lower::lower_with_local_schemes;
+#[cfg(not(target_arch = "wasm32"))]
+pub use lower::proofs::observe_proofs;
 pub use lower::proofs::{LoweredProof, Proven, Run, check_proofs, laws_of, lower_proofs};
 pub use print::print;
 

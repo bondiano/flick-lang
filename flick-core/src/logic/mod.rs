@@ -14,6 +14,7 @@ pub(crate) mod lean;
 pub mod omega;
 mod show;
 mod term;
+mod trace;
 
 use std::fmt;
 use std::rc::Rc;
@@ -24,6 +25,7 @@ use crate::source::Span;
 pub use cert::{Arg, Cert, Rule, cert};
 pub use defs::{Admitted, Program, admit};
 pub use term::{Ctor, Def, LEMMAS, Literal, Pat, RULES, Refused, TUPLES, Term, term};
+pub use trace::{ProofStep, show_equation, show_goal};
 
 /// The domain every statement is about, and the version of its checker.
 pub const DOMAIN: &str = "PureTotalV1";
@@ -349,7 +351,42 @@ pub fn prove(
     program: &dyn Program,
     lemmas: &[Lemma],
 ) -> Result<(), Failure> {
-    check::prove(statement, proof, data, program, lemmas)
+    check::prove(
+        statement,
+        proof,
+        data,
+        program,
+        lemmas,
+        #[cfg(not(target_arch = "wasm32"))]
+        None,
+    )
+}
+
+/// Checks a certificate and records the context used for each visited step.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn prove_traced(
+    statement: &Statement,
+    proof: &Cert,
+    data: &Data,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+    steps: &mut Vec<ProofStep>,
+) -> Result<(), Failure> {
+    check::prove(statement, proof, data, program, lemmas, Some(steps))
+}
+
+/// Observes goals in an incomplete body with definitions folded. The editor
+/// can show these goals even before the body yields a checkable certificate.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn observe(
+    statement: &Statement,
+    body: &flick_ir::Expr,
+    data: &Data,
+    lemmas: &[Lemma],
+    steps: &mut Vec<ProofStep>,
+) {
+    let proof = cert::recover(body, lemmas);
+    check::observe(statement, &proof, data, lemmas, steps);
 }
 
 #[cfg(test)]
