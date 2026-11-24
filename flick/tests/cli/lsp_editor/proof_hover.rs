@@ -346,6 +346,36 @@ let outside = true
         );
     }
 
+    let key = offset(source, "identity = wrong", "identity");
+    let params = json!({
+        "textDocument": {"uri": main}, "position": position(source, key),
+        "context": {"includeDeclaration": true},
+    });
+    let definition = lsp.request("textDocument/definition", &params);
+    let law = &definition["result"];
+    let path = law["uri"]
+        .as_str()
+        .and_then(|uri| uri.strip_prefix("file://"))
+        .unwrap_or_else(|| panic!("{definition}"));
+    let found = fs::read_to_string(path).expect("the actual law source");
+    let line = usize::try_from(law["range"]["start"]["line"].as_u64().expect("law line"))
+        .expect("small line");
+    assert!(
+        found
+            .lines()
+            .nth(line)
+            .is_some_and(|line| line.contains("map identity v")),
+        "{law}"
+    );
+    let references = lsp.request("textDocument/references", &params);
+    assert!(
+        references["result"]
+            .as_array()
+            .expect("law references")
+            .contains(&json!({"uri": main, "range": range(source, key, "identity")})),
+        "{references}"
+    );
+
     let symbols = lsp.request(
         "textDocument/documentSymbol",
         &json!({ "textDocument": { "uri": main } }),

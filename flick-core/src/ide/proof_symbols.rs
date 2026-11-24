@@ -2,6 +2,8 @@
 
 use super::{Ide, Location, Symbol, tree};
 use crate::logic;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::project::Analyzed;
 use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
@@ -46,6 +48,10 @@ impl Ide<'_> {
             .iter()
             .rev()
             .find(|node| matches!(node.kind, K::ProofDecl | K::LawDecl))?;
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(field) = Self::law_field_at(module, decl, &path, offset) {
+            return Some(field);
+        }
         let name = proof_name(decl)?;
         let class = path
             .iter()
@@ -62,6 +68,67 @@ impl Ide<'_> {
                 (name.start, name.end),
             )
         })
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn law_field_at(
+        module: &Analyzed,
+        decl: &Node,
+        path: &[&Node],
+        offset: u32,
+    ) -> Option<(Symbol, (u32, u32))> {
+        let record = path.iter().rev().find(|node| node.kind == K::RecordField)?;
+        let key = law_key(record)?;
+        if offset < key.start || offset > key.end {
+            return None;
+        }
+        let proof = module
+            .typing
+            .proof_evidence
+            .iter()
+            .find(|proof| proof.at == decl.range())?;
+        let law = proof
+            .obligations
+            .iter()
+            .find(|law| law.range == Some(record.range()))?;
+        Some((
+            Symbol::Proof {
+                module: law.class_module.clone(),
+                class: Some(law.class.clone()),
+                name: law.law.clone(),
+            },
+            (key.start, key.end),
+        ))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(super) fn law_references(
+        &self,
+        module: &str,
+        class: &str,
+        name: &str,
+    ) -> Vec<super::rename::Occurrence> {
+        self.analysis
+            .modules
+            .iter()
+            .flat_map(|source| {
+                source
+                    .typing
+                    .proof_evidence
+                    .iter()
+                    .flat_map(|proof| &proof.obligations)
+                    .filter(|law| {
+                        law.class_module == module && law.class == class && law.law == name
+                    })
+                    .filter_map(|law| {
+                        let range = law.range?;
+                        let tree = tree::find(&source.tree, range)?;
+                        let field = (tree.kind == K::RecordField).then_some(tree)?;
+                        let key = law_key(field)?;
+                        Some((source.file, (key.start, key.end)))
+                    })
+            })
+            .collect()
     }
 
     pub(super) fn proof_definition(
@@ -90,6 +157,13 @@ impl Ide<'_> {
             end: token.end,
         })
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn law_key(field: &Node) -> Option<Token> {
+    field
+        .child_tokens()
+        .find(|token| matches!(token.kind, K::Ident | K::Con))
 }
 
 /// Internal proof names are identities, even when a source alias was used.
