@@ -83,7 +83,9 @@ impl Ide<'_> {
         let mut fields = Vec::new();
         self.record_fields(file, record, &mut fields, 0);
         let declared = if let Ok((module, name)) = self.owner_at(m, range, record, label) {
-            self.declared_in(&module, &name, label).into_iter().collect()
+            self.declared_in(&module, &name, label)
+                .into_iter()
+                .collect()
         } else {
             let mut labels: Vec<&str> = fields.iter().map(|(l, _)| l.as_str()).collect();
             labels.sort_unstable();

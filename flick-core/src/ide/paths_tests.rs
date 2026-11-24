@@ -254,7 +254,12 @@ fn tokens_of(needle: &str) -> Vec<(String, &'static str)> {
     let end = start + u32::try_from(needle.len()).expect("small");
     (f.ide().semantic_tokens(f.file("App.Main")).into_iter())
         .filter(|(s, e, _)| start <= *s && *e <= end)
-        .map(|(s, e, kind)| (MAIN[s as usize..e as usize].to_owned(), TOKEN_TYPES[kind as usize]))
+        .map(|(s, e, kind)| {
+            (
+                MAIN[s as usize..e as usize].to_owned(),
+                TOKEN_TYPES[kind as usize],
+            )
+        })
         .collect()
 }
 
