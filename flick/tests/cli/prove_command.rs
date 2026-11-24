@@ -66,7 +66,7 @@ fn prove_points_to_the_obligation_that_failed() {
     assert!(
         d["message"]
             .as_str()
-            .unwrap()
+            .expect("message")
             .contains("`refuted` is false")
     );
 

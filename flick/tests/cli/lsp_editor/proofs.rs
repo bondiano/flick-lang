@@ -39,7 +39,10 @@ fn a_failed_proof_step_reports_its_obligation_and_related_ranges() {
             d["range"],
             json!({ "start": position(STEP_PROOFS, start), "end": position(STEP_PROOFS, start + 4) })
         );
-        assert!(d["message"].as_str().unwrap().contains(obligation), "{d}");
+        assert!(
+            d["message"].as_str().expect("message").contains(obligation),
+            "{d}"
+        );
         let related = d["relatedInformation"]
             .as_array()
             .expect("related locations");
