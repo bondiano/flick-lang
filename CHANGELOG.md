@@ -8,821 +8,90 @@ break programs.
 
 ## 0.2.0 — 2026-11-24
 
-The second public release: the changes below, then
-[CHANGELOG-0.2-2.md](CHANGELOG-0.2-2.md) and
-[CHANGELOG-0.2-1.md](CHANGELOG-0.2-1.md).
+The second public release. Before 1.0 a minor release may break programs:
+the **Breaking** section lists what to change, and
+`flick check --fix --only <codes>` rewrites most of it.
 
-- **A local function without a signature is generic.** `let same x = x`
-  and `let get = fun r -> r.value` inside a function are generalized as
-  `let f = (fun …)` already was, so each use may give them other types. A
-  top-level or recursive function still needs a signature (`FLICK-T004`).
-  When a runtime function is given to a callback of such a function that
-  was taken for a pure one, `FLICK-T003` points to the callback parameter
-  and offers an annotation where the parameter can be annotated.
+### Language
 
-- **A generalized local binding keeps the rows of its calls open.** Inside
-  a function, a row of calls still unknown when a binding is generalized
-  stays of one type, which the uses of the binding fill, instead of
-  becoming `none`. A local helper may pass its callback to a function that
-  runs it: `let each_line = (fun f -> List.each_effect f lines)` used as
-  `each_line shout`, with `shout` calling a service, is no longer
-  `FLICK-E002`. A named task awaited in a `Layer.from_build` body may
-  register a finalizer that uses the layer's inputs, as a direct call may,
-  without `FLICK-G003`. Local helpers can still be polymorphic over type
-  arguments of known services.
+- **Function contracts:** `where require … ensure …` on a function is
+  type-checked by every build and verified by `flick prove` in a decidable
+  fragment of pure integer and data code (`FLICK-T087`…`T089`). `flick prove`
+  also checks the proof modules of a project's proof root.
+- **Refined types** are a block of `std`; `T.prove v` builds one without a
+  runtime check where the compiler proves the check from the facts of the
+  path, and exported invariants cross modules.
+- **Effect handlers:** `effect E =` with `tail`, `abort` and `control`
+  operations, handled by `try … with`; `Async` marks what may suspend.
+- **GADTs**, **enums** (`untagged type`), default signatures,
+  `deriving Generic` and derives written as plugins.
+- **Local mutation and loops:** `let mut`, `loop`, `while`, `for`, labeled
+  `break`/`continue`.
+- **New forms:** `lazy { … }`, `let lazy` and suspended `~` parameters;
+  `defer`/`errdefer`; `let … else`; `result { … }`; `orelse`; `<|`, `>>`,
+  `<<`; string holes `"\{x}"`; sets of services and errors in rows
+  (`...Orders`, `-Log`).
+- **Fixed-width numbers:** `Int8`…`Int64`, `UInt8`…`UInt64`, `Float32`.
+- **Errors of a row:** `match` takes apart a value of `Errors {…}`, and one
+  error fits where several are expected.
+- **Type inference:** local functions need no signature and are generic;
+  class instances are resolved with inferred variance.
+- **Regions** are checked by use, with soundness proved in Lean for the
+  reference core; several holes the formal rules close are now errors.
 
-- **An unresolved operand type stays monomorphic in a generalized binding.**
-  Uses of the binding settle the type when they determine which implementation
-  an operator uses. For example, `let add = (fun x y -> x + y)` inside a
-  function can be used at `Int`. When both operands are already known to be
-  lists, `++` and `==` can still be used at different element types. A
-  `FLICK-T003` on an argument can point to the operator that kept the type
-  monomorphic.
+### Tooling
 
-- **A fixture that fails to be made is a `setup` failure.** A case that
-  awaits a fixture whose expression fails, and does not handle the error,
-  is reported as `setup`, `fixture conn: <the fixture's error>`, as a failed
-  `before_*` hook is; each case that awaits a failed shared fixture is too.
-  Alike on Flick's runtime, through the Effect adapter and on Go.
+- **Backends are WebAssembly components.** The official `flick/js` and
+  `flick/go` backends ship as pinned components; `--target js|go` selects
+  one, and a backend declares its own options, templates, package commands
+  and runners. Third-party backends use the same interface.
+- **Plugins:** `std` ships `sql`, `cli`, `server`, `codec`, `ui`,
+  `component`, `refined`, `suite`/`test` and the derives as plugin blocks.
+  Plugins can check calls, rewrite the IR, rewrite emitted files and load
+  files of other languages (`load = ["proto"]`). Plugins may be workspace
+  plugins, with granted file, network and environment access.
+- **FFI:** inline foreign code and preambles, `@native` overrides over Flick
+  fallback bodies, backend-declared adapter metadata, and foreign modules
+  that ship with a library.
+- **Testing:** `suite`/`test` blocks with `.skip`/`.only`, hooks, timeouts,
+  fixtures, `test.each`, typed matchers (`expect x |> to.equal y`) and test
+  companions that see a module's private declarations, alike on Flick's
+  runtime, the Effect adapter and Go.
+- **Flick's own runtime** is the default for JS: Console, HTTP values and
+  servers, RPC clients, serializable atoms, routes and streamed markup run
+  without the Effect adapter. The playground runs on it too.
+- **Performance:** saved checked modules between runs, a faster Go target
+  (direct instance calls, unboxed fields, allocation-free `Option`),
+  release-time evaluation of closed pure code and lazy-cell rewrites proved
+  equivalent in Lean.
+- **Editor:** incremental LSP with background analysis, rename of class
+  methods across a workspace, completion ranked by expected type, and fixes
+  for captured `let mut` and missing services.
 
-- **`test.each`.** `test.each rows "name" (pattern) { body }` in a suite or
-  on its own is a case for each row of a list, named `name [i]`, or with
-  `{0}`…`{n}` in the name replaced by the parts of the row as `show` writes
-  them. Each case has its own scope, fixtures and full name. A test block's
-  arguments may now hold a bracketed list, the rows. Alike on every engine.
+### Breaking
 
-- **Breaking: `Test.expect` takes the value it checks.** `expect actual |>
-  to.equal expected`, with `import Test exposing (expect, to)`, and the
-  matchers `to.be_true`, `to.be_greater_than`, `to.contain` and
-  `to.fail_with`, which runs a task and expects its typed error. A failed
-  `to.equal` of long or multi-line values shows a diff of their lines, the
-  same on every engine, and so does `Test.equal`. The old `Test.expect` of
-  an `Assertion` is `Test.check`: `assert` is a keyword. Replace
-  `Test.expect (…)` with `Test.check (…)`, or with a matcher.
-
-- **Test fixtures.** A `suite` holds `fixture name = expression`, which its
-  cases and hooks read with `await name`: made the first time a case awaits
-  it, once for that case, or with `fixture shared` once for the run of the
-  suite; one no code awaits is never made. A fixture may use those declared
-  before it (`std/T003` otherwise), a shared one only shared ones, as may
-  `before_all` and `after_all`. Each runs in a scope of its own, released
-  after the case's `after_each` hooks, or the suite's `after_all`, in the
-  reverse order the fixtures were made; `Fixture.cleanup` releases a value
-  then, and a value `Resource.own`s sees how its case ended, so a
-  transaction rolls back when its case fails. A suite with a shared fixture
-  runs its cases one at a time, also under `--jobs`, unless it is `suite
-  parallel`, which shares only `fixture shared concurrent` ones
-  (`std/T004`); `Test.serial` does the same by hand. A fixture's value holds
-  no region. Alike on Flick's runtime, through the Effect adapter and on Go.
-  A `before_all` or `after_all` hook that acquires into its scope now
-  acquires into the suite's, not the scope of the case that set it up, on
-  Flick's runtime and through the Effect adapter.
-
-- **Several children in `ui { … }` without `fragment`.** After its `let`s,
-  two or more lines of a `ui` block are the children of one `Ui.fragment`,
-  as the children of an element already stand one by one; one line is the
-  node itself, as before. Two lines were `FLICK-T011` until now, so no
-  program that compiled changes meaning. A `let` after the first child is
-  the new `FLICK-T085`, whose safe fix moves it above that child when that
-  changes nothing. A branch of `if` or `match` with several nodes is a
-  `ui { … }` of its own, and `fragment` stays the function it was. A
-  plugin's `Open` names the function with its new `siblings` field.
-
-- **A one-line `ui { … }` keeps all its code.** On the line of `ui {`, the
-  body was the longest expression from its first token, and what followed
-  was dropped without a diagnostic: `ui { text "a"; no_such_name }` checked.
-  Now `;` separates its lines, as in braces, so `ui { a; b }` is two
-  children, and any other code after the body is `std/U010`.
-
-- **`FLICK-T086`: a `fragment` around the lines of a `ui` block.** A
-  `fragment` of two or more children written one by one, as the one line
-  of a `ui { … }`, is a warning; its safe fix writes the children as the
-  lines of the block, the same program. `fragment x` and `fragment rows`
-  stay. The examples, the docs and the tests are written so with
-  `flick check --fix --only T086`.
-
-- **Test hooks and timeouts.** A `suite` holds `before_all`, `before_each`,
-  `after_each` and `after_all { … }`, which run around the cases of the
-  suite that the run selects: setup outer to inner, cleanup inner to outer,
-  `*_each` in each case's scope and `*_all` in the suite's. A suite with no
-  selected case, a skipped case and a filtered-out one run no hooks. A failed
-  `before_*` reports its cases as `setup` failures without running them,
-  and the `after_*` hooks still run, also after a timeout or an interrupted
-  run. `timeout <millis>` after a case's or a suite's name, `Test.timeout`
-  by hand, and `flick test --timeout <duration>` limit a case's
-  `before_each` hooks and body; a case out of time is interrupted, cleaned
-  up and reported as `timeout`. A suite's `before_all`, `after_each` and
-  `after_all` hooks have the suite's time, or the run's: out of time, a
-  `before_all` fails its cases' setup and a cleanup hook their cleanup, and
-  the run goes on. `Test.before_all` and the other hooks add
-  them to a group built by hand. Alike on Flick's runtime, through the
-  Effect adapter and on Go.
-
-- **Added: `Resource.make` and `Scope.defer`, cleanup that sees the
-  outcome.** `Resource.make acquire release` acquires a value under a
-  mask and makes the innermost `scope` release it once, with the value and
-  how the body ended (`Exit.is_success`, `Exit.has_interrupts`); an
-  acquisition that fails registers nothing. `Scope.defer cleanup`
-  registers cleanup the same way without a value. Both run with the
-  scope's other finalizers, last registered first, after its children
-  ended, on the Effect adapter, Flick's own runtime and Go.
-  `Resource.acquire_release` and `Scope.add_finalizer` stay as the
-  low-level API.
-
-- **Test companions.** `src/App/Users.test.fl` beside `src/App/Users.fl`
-  begins with `module App.Users`, without `exposing`, and sees every
-  top-level declaration of the module, private ones included, without an
-  import; its cases are named after the module. Only `flick test` and
-  `flick fmt` read companions, and `flick check` one that a path names:
-  `flick build`, any other `flick check`, the published `.iface` and
-  `.d.ts`, the API docs and `flick pack` leave them out, so a build's
-  output is the same with or without them. Under `flick test` a
-  module with a companion exports to it all it declares, and the
-  companion's view is cached apart from the module's public interface. A
-  module whose Go file name ended in a lower-case part that Go reads as a
-  build constraint, `_test`, `_linux` or `_386`, no longer drops out of the
-  Go build.
-
-- **UI children on lines:** in a `ui { … }` body, `flick fmt` puts the
-  calls in parentheses that end the arguments of a call that does not fit
-  on its line on lines of their own under it, without the parentheses, and
-  drops them around a call alone on a child line where its first line fits.
-  A tree written `div props (div props (text a) (text b))` comes out as
-  `div props`, `div props` one level in, then a line for each child, with
-  no new syntax: the lines under a call were already its arguments. Only
-  calls of a name move; `(-x)`, `if`, `match`, `fun`, anything with a
-  comment and anything inside brackets keep their parentheses. Run
-  `flick fmt` to update a project.
-
-- **`match` on the errors of a row.** A value of `Errors {E1, E2, …}`, the
-  `x` of a `try` arm, is taken apart by a `match` with an arm for each error
-  of its row (`| NotFound id -> … | Conflict _ -> …`), with no `try` over
-  `from_result (Err e)` again. The arms cover every error of a closed row,
-  or the `match` is `FLICK-T009`, whose fix adds the missing arms, by a
-  qualified name for an error of another module; a row with a variable needs
-  an arm for the rest, and an arm for an error outside a closed row is
-  `FLICK-T003`. When the errors of the value are not known yet, as for the
-  `x` of a `try`, the patterns tell them, at the top of an arm or inside it:
-  the row holds the errors they name, and stays open for the others behind
-  an arm that matches every error. A `let` or a parameter with the pattern
-  of one error, `let NotFound id = e`, is `FLICK-T009` at a row of several.
-  The `match` is pure and removes no error from a row; the reference model
-  and the Lean proofs cover it.
-
-- **A value of one error is a value of the errors of a row.** Where
-  `Errors {NotFound, Timeout}` is expected, `Timeout` or `NotFound id` fits:
-  in an arm of a `match`, as a result or as an argument. A function can so
-  turn one row of errors into another, as `Exit.map_error` and `Layer.catch`
-  take, and a value of one error is passed where several are expected. The
-  rule types the value, not the types built of it: a function returning
-  `Timeout` is no function returning `Errors {NotFound, Timeout}`, and an
-  error outside the row is `FLICK-T003`. The arms of a `try`'s `x` may name
-  an error its body does not raise. The reference model, its certificates
-  and the Lean proofs cover the rule.
-
-- **Fixed: two constructors of one name in a `match`.** The Go and
-  JavaScript backends told the arms of a `match` apart by the constructor's
-  name alone, so with `HttpApi.ServeError` and `Rpc.ServeError` in one
-  `match` or `try` one of the arms was never reached. On Go, an arm of a
-  `try` for an error of a library before one for an error of the program
-  stopped the program with a failed type assertion when the error of the
-  program came.
-
-- **Breaking: a `server fn` call outside a browser takes its server from
-  `Server.with_origin`.** The new `Server.with_origin origin task` sends
-  the calls of `server fn` in `task` to `origin`, at `Server.path`. Outside
-  it a call in a browser goes to the page's origin, as before, and a call
-  elsewhere fails with `Rpc.ClientError "no server for <name>: call it
-  within Server.with_origin"`. Neither Node nor Go reads
-  `FLICK_SERVER_URL` any more: a program that takes the server from the
-  environment reads it with `Platform.env`, naming `Host.Environment` in
-  its row, and passes it to `Server.with_origin`. The call itself still
-  needs no service, so a client entry reaches it as before.
-
-- **Changed: a pool takes an item back by how its lease ended.** When the
-  scope of `Pool.get`, or the function of `Pool.use`, ends with a defect or
-  an interruption, which may have broken the item, the pool releases it and
-  acquires another, on the Effect adapter, Flick's own runtime and Go.
-  After a success or a typed error the item goes back as before, and
-  `Pool.invalidate` still drops one by hand.
-
-- **Fixed: a plugin block repeated in another module is collected for it.**
-  The kept state of a plugin's group was keyed by the text of its blocks
-  alone, so a build whose `sql table` repeated, word for word, one that
-  an earlier build saw in another module took that module's tables, and
-  its queries failed with `std/Q010` ("is not a `sql table`"). The key now
-  holds each block's module, docs, signature and place too.
-
-- **Fixed: cleanup off the normal path cuts a `control` operation off.**
-  When the body of `Effect.ensuring`, `on_exit`, `on_interrupt` or
-  `Resource.bracket` is interrupted, or an `abort` unwinds through it, a
-  `control` operation its cleanup performs for a handler around it is no
-  longer answered: the cleanup stops there and the interruption or the
-  unwind goes on. On Go such an arm ran and could drop the interruption,
-  and on both runtimes it could run the code an unwind leaves. On Go,
-  `on_exit` now runs its cleanup on an unwind too.
-
-- **Callback binders of capture rows may be left out.** A capture row of a
-  signature, `^v`, that only one callback mentions, not on the callback's
-  own qualifier, and that bounds a parameter of it is bound on that
-  callback: `(a^v -> (m b)^(c + v))^c -> (m a)^d -> (m b)^(c + d)` means
-  `(forall v. a^v -> (m b)^(c + v))^c -> …`, so a body may give the callback
-  what it holds. Before, such a row was quantified over the whole signature,
-  where only the caller chose it. A row mentioned anywhere else keeps its
-  meaning, and a region binder `forall t.` is still written. Prelude, `Option`,
-  `Result`, `Seq`, `Validation` and the `mtl` example drop their written
-  `forall v.`; their types and interfaces are unchanged.
-
-- **Breaking: `suite` and `test` blocks.** `suite "name" { … }` holds
-  `test "name" { body }` and nested suites, and a top-level `test "name" {
-  … }` stands alone; either may be `.skip` or `.only`. Std's plugin expands
-  them into calls of `Test` (`Test.group`, `Test.effect_test` of a `task`,
-  and the new `Test.skip` and `Test.only`), each top-level block a case of the module's `tests` in
-  the order written, which the module exports without naming it, so
-  `flick test` finds it as before. A body is an effectful test, as
-  `Test.effect_test` runs one. `suite` and `test` are now reserved heads at
-  the start of a top-level declaration: a top-level declaration may no
-  longer start with a value named `suite` or `test` (a signature `test : T`
-  still declares one). Elsewhere the words stay names, so `Test.test "x"
-  (fun () -> …)` is unchanged and modules that build `tests` by hand run as
-  before; a module with blocks and a hand-written `tests` is `FLICK-R008`.
-  A malformed block is `std/T001` and two cases of one full name
-  `std/T002`. `flick test --list` prints the full names a run would run,
-  `Module > suite > test`, and runs none; `--forbid-only` fails a run with
-  a test marked `only`. While a test of the run is marked `only`, the run
-  keeps only such tests, and a skipped test is reported as `skipped`: in the
-  summary, and in the JSON report with a `skipped` count when there is one.
-  `flick new` writes its test as a `suite`. The plugin interface gains
-  `Expr::Task`, `task { body }` in a plugin's code.
-
-- **Breaking: a UI root asks its caller for the host services of its
-  tasks.** `Ui.Dom.mount` and `Ui.mount_with` need `Host.BrowserLive`
-  (`Host.Console`, `Host.Clock` and `Host.Random`), with which the root
-  runs the tasks of `Ui.mounted`, `on_mount`, `watched`, `watch`,
-  `Ui.Event` and `Action`. A `main` that mounts a root now names them, so
-  the launcher of a `main` without a runner provides them; before, such a
-  `main` checked without them and its tasks died for want of a service.
-  `flick check --fix --only E002` adds them to the rows.
-  `Ui.Server.render`, `stream` and `to_html` start no task and need none.
-
-- **Added: a scope owns a value of `Close`.** `Resource.own value` makes the
-  innermost `scope` the owner of a value of the new class `Resource.Close`
-  and gives it back with the scope's region: when the scope ends,
-  `close_exit` runs once with how its body ended (an `Exit` of errors and a
-  value it cannot read; by default it calls `close`), last owned first,
-  after the children of the scope ended, on the Effect adapter, Flick's own
-  runtime and Go. A close takes a `Closing` token only `own` makes, so no
-  other code can close an owned value, and `own` takes only a value that
-  holds no region. See the [resources reference](docs/src/content/docs/reference/resources.md).
-
-- **Breaking, fixed: two region checks the formal rules ask for.** An
-  instance method may use a region of its head only where the class
-  signature keeps it live (`FLICK-G002`): a closure that called such a
-  method could read a handle after its `scope`. And a qualifier on a type
-  variable bounds the whole value it stands for, so `a^{}` rejects a
-  `File s` or data that holds a scope's value (`FLICK-G001`), as
-  `docs/formal/regions.md` states.
-
-- **Fixed: a taken default keeps the spans of the module that takes it.**
-  In a release build, an instance that takes a default of a class of
-  another module got the default's code with that module's spans, so Go's
-  line directives read the wrong file, and with a class of std the Go
-  build panicked; the code now has the spans of where it is taken.
-
-- **Changed: what an acquisition registers may use its services.** The
-  acquisition of `Resource.manual` and `Effect.resource_auto` assumes
-  `Fiber.Provided` for its own region, so a release it registers there may
-  use the services it runs with instead of `FLICK-G003`.
-
-- **Fixed: a re-exported type keeps its companions.** A module that
-  re-exports a type (`import App.Ports exposing (Port)` with
-  `exposing (Port)`) now exports its `parse`, `value`, `check`, `prove` and
-  the other companions too, so `A.Port.parse` and `A.Port.prove` work through
-  the re-exporter alone, and the invariant it passes on proves. Interfaces
-  are `iface-version` 29.
-
-- **Breaking: the standard library names the host services it uses.**
-  `Platform.stdout_line`, `stderr_line` and `stdout_write` and the five
-  levels of `Console` need `Host.Console`, and `Log.console` is a layer made
-  of the live `Host.console`, which needs nothing; `Platform.args`
-  `Host.Arguments`; `Platform.env` and `ConfigProvider.from_env`, the
-  default provider of `Config.get`, `Host.Environment`, which reads a
-  variable with `env` and lists them all with `vars`; `Clock`,
-  `DateTime.now`, `DateTime.is_past` and `DateTime.is_future`
-  `Host.Clock`; `Random` `Host.Random`, whose every
-  operation is now made of `Host.Random.next` draws, so a fake fixes them,
-  while `Random.with_seed` keeps the same draws. What else reads the
-  environment when no `ConfigProvider` is current reads it through
-  `Host.Environment` too: `ConfigProvider.layer_add` and every `Otlp`
-  exporter (`layer`, `traces`, `logs`, `metrics`, their `_with` forms and
-  `from_config`) take it as an input of their layer and `Otlp.tracer` in
-  its row, and `Cli.run`, `run_with` and `run_version` read through it a
-  missing value's `Cli.from_config`, the colors (`NO_COLOR`,
-  `FORCE_COLOR`, `TERM`) and the settings of `--trace`. A new service
-  `Host.Process` starts child processes: `ChildProcess.spawn`, `string`,
-  `lines` and `exit_code` need it, `Host.Live` and `Host.live` include it,
-  and every Node and Go root provides it. The built-in flags of
-  `Cli.run_with` print through `Host.Console`, and tests run with
-  `Host.Live` (`Test.effect_test`, `clock_test`, `suite` and `it`), as UI
-  tasks run with `Host.BrowserLive` (`Ui.mounted`, `on_mount`, `watched`,
-  `watch`, `Ui.Event`, `Action` and `Runner.Cloudflare.wait_until`).
-  Removed: the `Clock` value with `clock_with` and the `*_of` reads, the JS
-  console extras of `Console` (`current`, `with_console`, `to_stderr`,
-  `trace`, `assert`, `clear`, `count`, `dir`, `table`, `group`, `time` and
-  their variants) and `Log.write_console`. New:
-  `Host.Environment.vars`, `DateTime.unsafe_from_epoch_millis`,
-  `Config.get_with` (`get` with a provider of its own when none is
-  current) and `ChildProcess.output_string` and `output_lines`, the text
-  of a spawned process, which `string` and `lines` read.
-  `flick check --fix --only E002`
-  adds the services a program now needs to its rows; a function whose arrow
-  is pure, or a callback whose row another module closes, needs editing by
-  hand. A fix that adds a service to `->{none; E}` now writes `->{S; E}`.
-
-- **Breaking: a layer's build may use its inputs when it is released.**
-  The build of `Layer.from_build` and `Layer.from_build_memo` assumes
-  `Fiber.Provided ri s` for the region `s` it is built into, so a finalizer
-  it registers may use the layer's inputs `ri` instead of `FLICK-G003`.
-  `Layer.build`, `Layer.build_with_memo_map`, `LayerRef.make`,
-  `LayerMap.make` and `LayerMap.from_record` require `Fiber.Provided ri s`
-  of their caller: a build inside the `provide` of one of its inputs, or
-  into a region a function's signature names without the constraint, is now
-  `FLICK-G003`, as a lazy build of `LayerRef` or `LayerMap` after that
-  `provide` ended could use a released service. `provide` and `Layer.launch`
-  are unchanged. The fix of a `FLICK-G003` that would add `Fiber.Provided`
-  to a signature is offered only when that signature names the region, not
-  for the region of a `forall` in an argument such as a `from_build` body.
-
-- **`T.prove` for refined types:** `T.prove v` makes a `T` with no
-  `Result` and without running the check again, where the compiler proves
-  the check holds for `v` from the facts of its path: the condition of an
-  `if` or the left of `&&`/`||` around it, a `T.check v` that gave `true`,
-  a call of the same check, or `v` under another immutable name. A fact
-  is about the value bound at one place, so shadowing and `let mut` give
-  none, and the body of a `fun` or a `task` starts with none. An unproved
-  check is `FLICK-T077`, a refuted one `FLICK-T078`, and `T.prove` used
-  other than applied to its argument `FLICK-T079`. The plugin interface
-  gains `Decl::Invariant`, the `@invariant$of` attribute of generated code:
-  the compiler checks the relation of the type to its check and value
-  (`FLICK-P049`) and proves the check wherever the type's constructor is
-  applied, in the plugin's own code too. `docs/formal/refinements.md` is
-  the contract. Comparisons of an `Int` or a `Float` with a literal are
-  facts too, read as intervals that keep NaN apart: `if n > 0 && n < 65536
-  then Some (Port.prove n)` checks, `Positive.prove (Port.value p)` follows
-  from the invariant of `Port`, and `not (n <= 0)` does not prove `n > 0`.
-  The logic is proved sound in Lean (`formal/Formal/Refine.lean`). An
-  exported refined type publishes its invariant in its `.iface`
-  (`iface-version` 28), and importers, module aliases and re-exports prove
-  with it; an edit of the check alone rechecks what relied on it. Rebuild
-  dependencies written with an older interface.
-- **`let lazy`:** `let lazy x = e` binds a lazy of its function alone, read
-  as `await x`: `e` runs the first time, and later awaits get its outcome.
-  No other fiber can reach it, so awaiting it needs no `Async`; a closure or
-  a `task` using it is `FLICK-G005`, and a use other than `await x` is
-  `FLICK-T003`. `let lazy mut x = e` can be assigned, and a value assigned
-  before the first `await` means `e` never runs.
-- **Suspended parameters `~`:** a signature can mark a parameter of type
-  `Eff` with `~`, `or_die : ~(Eff r e a)^c ->{r} a`, and a runtime call
-  written there is passed unstarted, as `task { … }` would pass it. The
-  combinators of the standard library that run a computation are marked
-  (`Effect.or_die`, `Effect.retry`, `Effect.repeat`, `Effect.exit`,
-  `Effect.delay`, `Effect.forever`, `Effect.ignore_`, `timeout`,
-  `timeout_option`, `Effect.timeout_or_else`), so
-  `Effect.or_die (Database.query q)` needs no `task`. The marker is not part
-  of the type and works where the function is called by name; a misplaced
-  `~` is `FLICK-T076`. Interfaces are version 27.
-- **`lazy`:** `lazy { body }` (or `lazy e`) builds a `Lazy r e a`, which runs
-  its body at most once, at its first `await`, in the fiber that awaits;
-  every later `await` gets the same value, typed failure or defect. Fibers
-  that await one lazy at once share one run, and an interrupted run leaves
-  nothing behind, so the next `await` runs the body again. Building one is a
-  runtime call; awaiting one needs `Async`. On JavaScript, Flick's own
-  runtime and Go; the reference model runs it. **Breaking:** `lazy` is a
-  keyword, so `Schema.lazy` is now `Schema.suspend`.
-- **Raise with `Fail.fail`:** `from_result (Err e)` is `FLICK-T075`, a
-  warning whose safe fix writes `Fail.fail e`: the same type and meaning,
-  without building a `Result` to fail with. `flick check --fix --only T075`
-  rewrites a project; the examples, the standard library and the docs now
-  raise this way. `FLICK-T034` also recognizes a `match` that fails with
-  `Fail.fail e` as `r?`.
-- **A runner-less `main` gets the live host services:** an entry without a
-  runner whose `main` needs `Host.Console`, `Host.Clock`, `Host.Random`,
-  `Host.Environment` or `Host.Arguments` now runs on both JavaScript runtimes,
-  as it already did on the go target, instead of failing at run time with no
-  handler. The launcher imports and provides only the services `main` names,
-  so a `main` that names none keeps its bundle; a layer `main` provides
-  itself still wins. `Runner.Cloudflare` provides `Host.BrowserLive` beside
-  `Env`. The reference model and its counted memory executor give `main`
-  the live services as its root on a fixed host: no environment variables
-  or arguments, a clock stopped at 1 700 000 000 000 ms and every random
-  draw 0.5.
-- **`let mut` captured by a closure or a `task`:** `FLICK-G005` says what
-  to do for a read and for an assignment, and an editor offers "keep `x` in
-  a `Ref`", which rewrites the declaration, its reads and its assignments
-  into `Ref.make`, `Ref.get` and `Ref.set`. A callback parameter taken for a
-  pure function because it is applied before its type is known,
-  `(fun h -> h ()) f`, is now pointed at in the `FLICK-T003` it causes, with
-  a fix that annotates it. An editor no longer marks a fix that is not safe
-  as preferred.
-- **Broken records without `;`:** `flick fmt` puts one field of a broken
-  record, record type, pattern or update per line with no `;`, as a block
-  puts its statements, so a field ending in a `match` or `try` no longer
-  carries a stray `;` on its last arm. A line break right after a record's
-  `{` keeps it broken; a trailing `;` no longer does. One-line records keep
-  `{ a = 1; b = 2 }`, and `;` is still accepted everywhere. Codec blocks,
-  `HttpApi` records and `Sql.Template` parameters read fields separated by
-  line breaks. Run `flick fmt` to update a project.
-- **Braces next to an arrow:** `a ->{ x : Int }`, meant as an arrow to a
-  record, is `FLICK-S007` with a fix that adds the space, and
-  `a -> {r; e} b`, meant as an effect annotation, is `FLICK-T002` with a fix
-  that removes it, instead of an error about `:` or a kind. `then { id = id }`
-  with an `else`, whose fields name parameters, is `FLICK-T074` with its
-  parentheses fix instead of one `FLICK-T069` per field. The VS Code grammar
-  highlights an effect row only where `{` touches `->`, as the compiler reads it.
-- **Environment-specific target preflight:** with `build.environment` set,
-  `flick check`, the editor and build share a reachable-only check for gated
-  effects (`Db`, `Database`, `Server`). A use without a root handler for that
-  pair is `FLICK-E020` at the requirement (for example `unhandled effect Db on
-  js/browser`); `js/node` accepts the same export, unused unsupported code does
-  not fail, and public library exports are checked. Toolchain gaps stay
-  `FLICK-P015` / `FLICK-P029`. Changing the environment invalidates cached
-  preflight decisions.
-- **Known instances called directly on the go target:** a method written as
-  a function in an instance without a context, derived ones included, is a
-  Go function of its own, and a call the checker resolved to that instance
-  calls it instead of looking the method up in the dictionary (`show 3`,
-  `compare` of a derived `Ord`). A program of such calls runs about a third
-  faster. The dictionaries of constraints, module arguments, `unpack`,
-  values that hold them and instances with a context stay lookups, and
-  generic code reaches the same function through the dictionary at the
-  cost it had.
-- **`flick plugins` across every source:** it lists the plugin of each path,
-  git-tag and url+sha256 dependency, in the order the manifests name them,
-  marks the ones a workspace gives a member, and shows a fetched plugin by
-  the `flick.lock` source and commit that pins it instead of a package-store
-  path. A dependency missing from the lock or store is `FLICK-P034`; the
-  listing fetches and builds nothing.
-- **Rename class methods in the editor:** renaming a project's method from
-  its class, an instance or a call updates its signatures, defaults,
-  implementations, imports and calls across dependent workspace members.
-  Same-spelled methods of other classes, locals and record fields stay
-  unchanged. Analysis errors and name collisions are refused, as are generated
-  implementations and dictionary, packed module or static contract fields
-  without an exact mapping.
-- **Plugins get the types a declaration writes:** a derive's
-  `CaseTarget.fields`, `DeriveTarget.alias` and `DeriveTarget.wraps` are now
-  `Written` types, the compiler's own parse at their spans: named types and
-  variables with their arguments, records, tuples, arrows with their effect
-  row, captured types. A target also says the kind each parameter is written
-  with (`kinds`), the words before its name (`modifiers`) and the classes its
-  `deriving` names, and a block's `Signature` carries its type. A plugin no
-  longer parses the tokens of a declaration or a signature to tell what a
-  field holds; std's derives and `server fn` read these. Over the component
-  interface a type crosses as an arena of nodes (`flick-plugin/wit/written.wit`).
-- **A lambda made in a named scope:** a lambda or a composition made in
-  `scope outer { … }` and called inside a nested scope acquires into `outer`,
-  as its type says. When the call was checked before the lambda's row named
-  the region, it acquired into the nested scope, which released the resource
-  early, on JS, Go and Flick's runtime alike.
-- **The language server outlives a defect:** a panic while `flick lsp`
-  handles a message is logged with its backtrace and answered with a
-  JSON-RPC internal error; the server drops its cached analyses and keeps
-  serving, instead of the editor losing it.
-- **`retention owner` without `std`:** checking a foreign declaration with
-  `retention owner` in a build of the core modules alone, which has no
-  `Fiber.Outlives`, is `FLICK-F010` instead of a crash of the compiler.
-- **RPC clients on Flick's own runtime:** `Rpc` procedures, groups and their
-  unary calls over HTTP in NDJSON or JSON run on RT, in the protocol of
-  Effect's RPC server, so a browser client of a procedure bundles no Effect:
-  6.9 KB gzip instead of 55 KB. Http, RPC and server functions are one
-  family: a build that serves procedures, calls a stream, uses another
-  transport or serialization, or uses Http takes all of them from the
-  Effect adapter, as before.
-- **`Console` on Flick's own runtime:** every `Console` binding runs on RT
-  without the Effect adapter, writing to the host's console or to the one
-  `Console.with_console` gives a task; a group or a timer ends when its
-  scope closes or its task ends, however it ends. The adapter's code under a
-  layer provided on RT, such as `Logger.console_logfmt`, writes to that
-  console too: it now sees all the evidence below the layer, the runtime's
-  clock included, not only the services Effect supplied last.
-- **Http values on Flick's own runtime:** `Http.Headers`, `Http.Cookies`,
-  `Http.Url`, `Http.UrlParams`, `Http.Mime` and `Http.Etag` run on RT, with
-  the encodings, orders, parsers and error messages of Effect's modules,
-  so a program that only uses them, or them with an RPC client, loads no
-  Effect for them. A build that reaches any other Http binding still takes
-  every web binding from the adapter.
-- **An HTTP server on Flick's own runtime:** `Http.Server.serve`,
-  `Http.ServerRequest`, `Http.ServerResponse`, `Http.Body`, `Http.Router`
-  (with the find-my-way router Effect vendors) and `Http.Platform.node` run
-  on RT and answer as the adapter's server does: the same statuses for
-  typed failures, defects, interruptions and a closing server (503), the
-  same headers, `HEAD` and body limits. Closing the scope stops admission,
-  drains requests within `gracefulShutdownTimeout` on the task's clock,
-  then interrupts what is left and waits for its cleanup before the scope's
-  later resources are released. A server that streams a body, sends a file
-  body of `Http.Body`, logs its address or converts to or from the client's
-  values still takes every web binding from the adapter.
-- **`<|`, `>>` and `<<`:** `f <| x` is `f x`, the weakest operator and
-  right-associative, so `say <| show <| total xs` needs no parentheses;
-  `f a <| x` is the call `f a x`. `f >> g` applies `f`, then `g`, and
-  `f << g` applies `g` first; they bind tighter than any other operator,
-  right below application. A composition is typed as the closure
-  `let f' = f; let g' = g; fun x -> g' (f' x)`: its operands are evaluated
-  once, left to right, any functions compose, the effect rows join, and it
-  holds what they hold. Mixing `<|` with `|>`, or `>>` with `<<`, without
-  parentheses is `FLICK-S007`. Lints, inlay hints, signature help and the
-  formatter treat a `<|` pipeline as they treat `|>`, and a pipeline written
-  with its operators at the ends of lines now stays one step per line too.
-  On Go a composition takes and returns numbers in their Go type, as the
-  function written out does. In release a composition applied is the
-  nested call, `x |> f` is `f x` when the order cannot be told, and a
-  partial application moves to where it completes, so `|>` pipelines now
-  get workers and inlining too.
-- **A provided instance leaves the body no other:** `provide` of a layer of a
-  service with arguments, `Store Int`, under which the body needs a row
-  variable that may hold `Store` at other arguments is `FLICK-E019`, which the
-  checker and the model accepted, though the handler answered by name and the
-  program got the wrong type. `{-Store | r}` takes every instance out, and
-  `{Store Int | r}` holds no other.
-- **No build without a runtime:** `[build] effect = "none"` is gone
-  (`FLICK-P005` in `flick.toml`); such a program builds on Flick's own
-  runtime. A library no longer writes `_core/`, `.iface` loses `abi.core`
-  (version 22), and `FLICK-E008` is no longer reported.
-- **Braces after `then` and `else`:** they hold statements, as after `do` and
-  `loop`, so `if a > b then { low = b; high = a }` assigns both variables. A
-  record right after `then` or `else` goes in parentheses; written the old way
-  it is `FLICK-T074`, which `flick check --fix --only T074` rewrites.
-- **A closure over a generic callback in a payload:** with `k : Int -> c`,
-  `Som (fun x -> k (x + 1))` checks against `Opt (Int -> c)` as `Som k`
-  does, where it was `FLICK-T003` "region `c` differs". Such a closure that
-  returns another type variable than the payload's is now `FLICK-T008`.
-- **Children in `ui`:** inside `ui { … }` the children of an element stand
-  one by one, each an argument on the line of the call or a line of its own
-  under it, with no list around them; an element with none is written
-  without them, and one argument that is a list is the list of the
-  children. A list literal there is `FLICK-T073`, which
-  `flick check --fix --only T073` rewrites. `Ui.each items node` gives a
-  node for each item. `ui` is a block of the plugin of `std` and no longer
-  a reserved word.
-- **Plugins:** a declaration a plugin gives may be an `unboxed type`, and
-  `flick!` reads one. With a constructor only generated code can name, a
-  plugin declares a type of its own over another at no cost when the program
-  runs. Such a constructor is named by the code of the declaring plugin
-  alone (`FLICK-P036` otherwise), and its type leaves the module opaque.
-  A type the code of a block declares names classes in `deriving` as a
-  declaration of the module does, and a derive is told what such a type
-  wraps (`DeriveTarget.wraps`, which was `refined`).
-- **Plugins:** the code of a block may declare a function with the value
-  that reads a constant given to it (`Decl::Checked`); a plugin that watches
-  the function is then told how that value is written. The refined plugin
-  names `T.check` for `T.parse` this way, where the compiler paired the two
-  by their names.
-- **Plugins:** a plugin is told where each value it watches is named, with
-  the declaration around it (`CallSite.binding`), as it was for the
-  serializable atoms alone.
-- **The hidden row of data under a `forall`:** data with hidden storage
-  written bare under a `forall` of a signature is read as the core reads
-  `.all`: a result there holds what the parameters before it reach of the
-  atoms outside the `forall`, never one of its binders. A callback typed
-  `forall a. File s -> a -> G a` may return data over the file of `s`; one
-  typed `forall t. File t -> G String` still may not over its own `t`.
-- **`@stores`:** an attribute before a type without constructors says that
-  the values foreign code makes keep the functions they are given, as data
-  with a function field does: written bare in a signature, its result holds
-  what the parameters before it reach. `PureCodec`, `Codec`, `FieldCodec`
-  and `Codec.Derive.Fields` are marked, so a codec whose field default or
-  decoding reads a file cannot leave the file's `scope` (`FLICK-G001`);
-  before, decoding with it afterwards read the closed file without an error.
-- **Deep nesting:** checking a nested `fun` or a `<|` takes far less of the
-  stack, so the deepest code the parser accepts (198 nested functions with
-  their signature, or 199 `<|` in a row) checks on a thread's 2 MiB stack,
-  where it overflowed.
-- **Regions:** a pure foreign function with a parameter that reaches a
-  region its result does not carry is `FLICK-F009`: a closure that only held
-  the capability could leave its `scope` and call it on a released resource.
-  Give it a stage (`->{}`, `foreign effect`). `ChildProcess.pid`,
-  `HttpApi.port`, `Rpc.port` and `Http.Server.address` stay pure as reviewed
-  exemptions: they return what was fixed when the capability was acquired.
-- **Too deep nesting:** past the depth the parser accepts, the rest of the
-  line or brackets is one error after the `FLICK-S007`; a longer `<|` chain
-  no longer wraps each operator around the one before it, which made a tree
-  as deep as the chain and overflowed the checker.
-- **Operator chains:** the checker goes down a chain of binary operators
-  (`a + b + …`, `x |> f |> …`, `f >> g >> …`) in a loop, not a call per
-  operator, so a chain of 5000 checks on a thread's 2 MiB stack, where some
-  700 overflowed it.
-- **`ErrorReporter.layer` and `LayerRef.get`** return `(Layer …)^{s}`: the
-  layer sends reports to listeners of region `s`, or builds the services the
-  ref of `s` owns, so it cannot leave the `scope` of `s`. A layer returned
-  from that `scope` is `FLICK-G001`; before, its reports went to a closed
-  listener and were lost.
-- **Refined types:** `refined type` is a declaration of the plugin of `std`,
-  which writes the type and its `parse`, `value` and check as code of the
-  language; `refined` is no reserved word. The check is a companion too,
-  `T.check : U -> Bool`, a refined type needs no Effect of its own, and
-  another module sees it as an opaque type. A class in its `deriving` takes
-  no arguments.
-- **Plugins:** a block that opens a module may name a function its values
-  are applied through (`Expr::Open.through`): inside `ui` a foreign component
-  takes its props through `Ui.component` by this, not by a rule of the
-  checker.
-- **`RequestResolver.from_effect` on Go:** a batch completes every entry
-  whose effect ended before the resolver returns, so a request no longer
-  fails now and then with "RequestResolver did not complete request".
-- **An import of a name that spells a keyword:** an export list may name
-  `none`, but `import M exposing (none)` brings nothing a module can use,
-  as the word stays the keyword in an expression. Its `FLICK-R012` now says
-  so, and that the module reaches the name as `M.none`.
-- **The hidden row of data in a callback's signature:** a parameter that is a
-  function is read as the signature is: in `(File s -> G String) -> …` the
-  callback's result holds what its own parameter reaches, so the callback may
-  return a closure over the file (rejected before with `FLICK-G001`), and
-  what the outer function returns then holds the file's region too.
-- **The hidden row of data in signatures:** data that stores a function or a
-  `task`, written bare in a signature, has its hidden row read as `Live` is:
-  in a parameter any row, in the result what the parameters before it reach,
-  and a written qualifier turns that off. What the data's other arguments
-  show no longer stands in for its row, and a row only widens. A
-  composition through a helper generic in the data's arguments that kept a
-  file of a `scope` past it, accepted before and reading the released file,
-  is now `FLICK-G001` at the `scope`, and a callback taken out of such data
-  that a bare callback parameter does not keep live is `FLICK-G002`.
-  `make : Handle r -> G Unit Int` returning a fresh closure holds `{r}` and
-  cannot leave the `scope` of `r`; write `(G Unit Int)^{}` if it holds
-  nothing. `cf (F f) (F g) = F (fun x -> f (g x))` for
-  `type F s a = F (s -> a)` is accepted, where it was `FLICK-G001`.
-  Interfaces are of version 21.
-- **Recursion through the regions of its signature:** a recursive use of a
-  signed function in its own body takes the regions and capture rows of its
-  signature, as the core types `letrec` at its own arrow. A callback
-  qualified `^{c}` passed on as it came no longer makes `FLICK-T015`;
-  callbacks passed on in another order are `FLICK-G001` (pure) or
-  `FLICK-G002` (with effects) instead of `FLICK-T015`.
-- **What a callback holds:** a function passed where a qualifier is written
-  fits only if the qualifier covers what it holds, pure functions too, as
-  the core compares arrows. A pure `(Float -> Float)^{d}` given for
-  `(Float -> Float)^{c}` is now `FLICK-G001`, where it passed before.
-- **Labels:** `@label kind` before a type declaration gives the top-level
-  values of that type their names where the program runs, as the atoms,
-  views and actions of the standard library have them; a library marks its
-  own types. `labels = "components"` keeps the kind `component`.
-- **Owner services:** `@owner` before a service declaration says that what
-  is made under the service belongs to its handler. A function that needs
-  one is no maker to those that name it, as one that needs `Setup` was by a
-  rule of the compiler; `Setup` is marked so.
-- **Sync services:** a service whose operations run at once is marked
-  `@sync` in the module that declares it, and one that only reads, which a
-  stage lends to the clauses of a `for`, `@sync reader`. `Setup` and
-  `Atom.Read` are marked so; the compiler no longer names them. The marks
-  are those of the built-in modules.
-- **TypeScript forms of types:** `@ts "form"` before the declaration of a
-  type or a service says what the type is in `.ts` and `.d.ts`, with `{0}`
-  for an argument and `$Export` for a name `@ts import "module" "Export"`
-  brings, from a package or a file beside the module; `@ts none` says the
-  type has none. A package gives its own types their forms, and its `.d.ts`
-  files ship beside its modules. The built-in modules do the same, as
-  `@ts "ReadonlyArray<{0}>"` before `type List a`, and the backend names no
-  type of a library. A generated module imports from the runtime only the
-  types its declarations name. `.iface` is version 23. `flick ffi import`
-  writes the form of an opaque type the package exports or the global
-  scope has, also in a namespace (`Intl.DateTimeFormatOptions`), so a
-  `Generated.fl` of before is out of date for `flick ffi check` until
-  imported again; an editor explains `@ts`, `@label`, `@owner` and `@sync`
-  on hover.
-- **Comparisons by `Ord`:** `< <= > >=` order any type with an `Ord`
-  instance by its `compare`, as they already did a type variable: `Bool`, a
-  derived type, a record, a list. A type without one is `FLICK-C001`, where
-  it was `FLICK-T003`.
-- **`show` of `Option` and `Result`:** an argument with fields is shown in
-  parentheses, as a derived `Show` writes one: `Some (Card Spades 3)` and
-  `Err (ArithmeticError "division by zero")`, where they were
-  `Some Card Spades 3` and `Err ArithmeticError "division by zero"`. A number,
-  a string, a list, a tuple or a record stays as it was (`Some -1`).
-- **Cells:** `@cell` before a type declaration marks a type whose values
-  hold one value each, as a state made by a pure call does. A value of such a
-  type that is no function is not generalized over what the cell holds, and
-  one whose type has variables there is `FLICK-T072`. The atoms of the
-  standard library are cells; for an atom the refusal stays `FLICK-U005`,
-  now worded by the UI plugin. A package's `watch` may name the tag `@cell`.
-- **Stream queries on Flick's runtime:** `Atom.query_stream` runs on the
-  default runtime: its atom shows the latest element of the adapter's
-  `Stream`, starts it anew on a mutation of its keys and stops it when no view
-  reads it. A program that uses it keeps its UI on the runtime.
-- **Routes on Flick's runtime:** `Atom.route` and `Ui.route_link` run on the
-  default runtime: the route reads the served URL on a server and the page's
-  in a browser, again on back and forward, and a write or a plain click on a
-  link pushes its URL without a reload. A program that uses them keeps its UI
-  on the runtime.
-- **Playground on Flick's own runtime:** the browser compiler checks and builds
-  a program as `flick build --rt` does, and the playground runs it on Flick's
-  own runtime. Bindings that runtime does not have yet still reach the Effect
-  adapter, which the playground loads as before.
-
-- **Serializable atoms on Flick's runtime:** `Atom.serializable`,
-  `serializable_family`, `serializable_task` and `serializable_result` run on
-  the default runtime. `Ui.Server.state` hands their values to the client, and
-  `Ui.Dom.mount` starts from them, without running a hydrated task again. A
-  program that uses them no longer needs `@flick-lang/effect-ts`.
-- **Streamed server markup on Flick's runtime:** `Ui.Server.stream` renders on
-  the default runtime and hands its chunks to the adapter's `Stream`, so a
-  program that streams pages keeps its atoms and views on the runtime instead
-  of moving its whole UI to the adapter.
-- **Local mutation and loops:** `let mut name = value` declares a local
-  monomorphic variable and `name = value` assigns it. Pure functions may
-  change their variables; nested functions, tasks and lazy sequences cannot
-  capture them (`FLICK-G005`). `loop { … }` returns its `break value`;
-  `while condition do body` and `for … do` return `Unit`. `continue` starts
-  the next iteration. Exits target the nearest loop and close scopes normally.
-  Completed assignments survive an error in `try`; an error in the right-hand
-  side leaves its target unchanged. Assigning an immutable name is
-  `FLICK-T069`, mutation in a strict comprehension is `FLICK-T070`, invalid
-  loop control is `FLICK-T071`, and unused `mut` is `FLICK-R020`.
-  `loop` and `while` are contextual words, preserving `Loop.loop` and
-  `Schedule.while`. IR 0.7.0 adds variables and explicit sequential loops.
-
-- **Saved modules:** `flick check`, `build`, `run` and `test` save each module
-  of the project that checks without a diagnostic in the user's cache
-  directory (`flick/modules`), under a key of its text, the interfaces it
-  imports, the checked configuration, the compiler and std. The next process
-  takes it instead of checking it again. A module with plugin blocks, a
-  module application or an inline module, or in a project whose packages
-  watch calls, is checked each time.
-
-- **Watching:** `flick dev`, `flick test --watch` and `--watch` start a run
-  once the watched files settle, so a save that truncates a file and then
-  writes it is built once and `dev` restarts the app once for it.
-
-- **HTTP request ownership:** each request owns its resources through response
-  streaming. Closing a server stops admission before outer resources are
-  released, interrupts requests left after the grace period and waits for
-  their finalizers on native JS, Effect and Go. Cleanup and uninterruptible
-  work may outlast that period. Go now applies the documented 20-second
-  default and distinguishes an immediate timeout from an infinite one.
-
-- **Regions by use:** the checker asks where a value uses a region, not what
-  it holds, everywhere: a value may keep a handle past its `scope` while
-  nothing uses it there, and a use there is `FLICK-G002`. The `captures`
-  discipline, the `[build] regions` key and the `flick live` code-block tag
-  are gone; `.iface` version 12. `Setup s` keeps an instance's region live,
-  a handler of a region-indexed service needs its region live where it is
-  installed, and lifecycle work outlives its instance (`Lifecycle s`). The
-  reference model and the Lean development have one typing judgment, by use,
-  with T4′ as their region safety theorem.
-
-- **Opt-in implicit conversions:** `@implicit` marks a ground, context-free
-  instance of a class with one pure `a -> b` method. A unique visible
-  conversion is inserted at a ground nominal type mismatch, without chains
-  or inference. Built-in numeric conversions remain explicit.
-- **Explicit conversions:** the Prelude class `Into a b` with `into : a -> b`
-  names a conversion that loses nothing, to the type its place expects:
-  `(into n : Float)`, `into n * 10n`. The core has `Into Int Float` and
-  `Into Int BigInt`; a program declares it for its own types.
-- **SQL composition:** `exists $(template)` and `is_in value $(template)`
-  accept reusable `Sql.Template` values with no named parameters. Captures,
-  codecs and placeholders compose without running a query. `is_in` requires
-  one result column of the compared type. Conduit's article list and count
-  now share one filter, including the slug filter.
-- **Effect rows:** `->{Async, Database}` means `->{Async, Database; none}`.
-  The trailing `;` before omitted errors is optional in every runtime arrow,
-  not just rows with sets; `flick fmt` removes it. Errors still follow `;`.
-- **Holes in strings:** `"n = \{n + 1}"` is `"n = " ++ display (n + 1)`, through
-  the new Prelude class `Display`: a `String` is itself, without the quotes of
-  `show`, and `Int`, `Float` and `Bool` are spelled as `show` spells them. A
-  hole ends on the line of its string and may nest strings with holes. Raw
-  strings have no holes, `\{` in a multi-line string is `FLICK-S005`, and the
-  release optimizer folds the constant parts into one string. `\{` was an
-  invalid escape before, so no program changes its meaning.
-- **Plugins check calls:** a library whose `[package]` says
-  `watch = ["Ui.Event.queue", "*.parse"]` beside its `plugin` gets, through the
-  new `check-calls`, every place of a checked module that applies one of those
-  names, with each argument's span, type and constant value after constant
-  folding. For a refined type's `parse`, it also receives the refinement
-  metadata needed to validate that constant. An entry
-  that is no `Module.name`, `Module.Sub.name` or `*.name`, and a `watch` without a `plugin`, are
-  `FLICK-P032`. Two checks of the compiler's moved into the plugin of `std` and
-  kept their codes, spans, messages and explanations: `FLICK-U001`, the capacity
-  or limit of an event policy, and `FLICK-D006`, a constant that fails the check
-  of its refined type. Rebuild a plugin's component for the new interface.
-- **A plugin's pass over the IR:** a library whose `[package]` says `hooks = ["ir"]`
-  beside its `plugin` gets the IR of the project's modules as CBOR after the
-  checks of effects and gives what `flick build`, `run` and `test` compile
-  instead. The compiler checks it for form (`FLICK-P047` when it does not hold
-  together, from a new validator in `flick-ir`) and notes the rewrite with
-  `FLICK-P048`: what the program does is then outside Flick's checks.
-- **A plugin's `emit`:** a library whose `[package]` says `hooks = ["emit"]` beside
-  its `plugin` rewrites the files `flick build` writes, its scripts, their maps
-  and interfaces, before they are written; a script changed without its map is
-  `FLICK-P046`. `flick run` and `flick test` build without it.
-- **Files of other languages:** a library whose `[package]` says `load = ["proto"]`
-  beside its `plugin` turns each `.proto` file into a module: `import App.User`
-  finds `App/User.proto`, the plugin's `load` gives its declarations at the
-  file's spans, the project checks them, the editor goes to the file, and a
-  changed file rebuilds the project. Two libraries loading one extension are
-  `FLICK-P045`. Rebuild a plugin's component for the new interface.
-
-Earlier changes of 0.2: [CHANGELOG-0.2-2.md](CHANGELOG-0.2-2.md), then
-[CHANGELOG-0.2-1.md](CHANGELOG-0.2-1.md).
-
+- **Host services:** the standard library names what it uses
+  (`Host.Console`, `Host.Clock`, `Host.Random`, `Host.Environment`,
+  `Host.Arguments`, `Host.Process`); UI roots need `Host.BrowserLive`.
+  `flick check --fix --only E002` adds them to rows.
+- **Plugin blocks need no import**, but `import … exposing (plugin …)`
+  written for 0.1 is `FLICK-R012`, which `--fix` removes.
+- **Tests:** `Test.expect` takes the value it checks; the old form is
+  `Test.check`. `suite` and `test` are reserved at the start of a top-level
+  declaration.
+- **Syntax:** `lazy` is a keyword (`Schema.lazy` is `Schema.suspend`);
+  braces after `then`/`else` hold statements (`FLICK-T074`); `ui` children
+  stand one by one without a list (`FLICK-T073`); `from_result (Err e)` is
+  `Fail.fail e` (`FLICK-T075`).
+- **CLI:** backend-specific build flags became backend options with
+  `--target`; `[build] effect = "none"` is gone.
+- **Server functions** outside a browser take their server from
+  `Server.with_origin`, not `FLICK_SERVER_URL`.
+- **Layers and regions:** a layer's build and lazy layer refs require
+  `Fiber.Provided`; `Scope.current` is no longer exposed; `LogLevel` is an
+  enum.
+- Interfaces (`.iface`), the IR and the plugin and backend interfaces have
+  new versions: rebuild dependencies and plugin components with 0.2.
 ## 0.1.0 — 2026-11-03
 
 The first public release: [CHANGELOG-0.1.md](CHANGELOG-0.1.md).
