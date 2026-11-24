@@ -33,6 +33,7 @@ pub(in crate::types) fn with_source<T>(
         stages_by_class: false,
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
+        native_overrides: None,
     };
     let mut checker = types::checker_in(
         &module,

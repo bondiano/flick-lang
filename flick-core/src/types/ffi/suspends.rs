@@ -10,6 +10,20 @@ use crate::types::lang::{self, Lang};
 use crate::types::ty::{Effects, Type};
 use flick_ir::ForeignMode;
 
+/// Derives the calling mode of a `@native` override solely from the paired signature.
+pub(super) fn native_override_mode(body: &Type) -> ForeignMode {
+    let effects = runtime_effects(body);
+    let has_async = effects.is_some_and(|e| {
+        let label = lang::label(Lang::Async);
+        matches!(&e.services, Type::Row(r) if r.entries.iter().any(|(l, _)| l.name() == label))
+    });
+    match effects {
+        Some(_) if has_async => ForeignMode::Async,
+        Some(_) => ForeignMode::Sync,
+        None => ForeignMode::Pure,
+    }
+}
+
 impl Checker<'_> {
     pub(super) fn foreign_mode(&mut self, decl: &Node, body: &Type) -> ForeignMode {
         let (word, name) = foreign_words(decl);

@@ -126,16 +126,45 @@ impl Checker<'_> {
     ) {
         let Some(root) = self.root else { return };
         let mut lower = IrTypeLower::with_lookup(self, ir_lookup);
-        for decl in root.nodes().filter(|n| n.kind == K::ForeignDecl) {
-            let Some(name) = super::toplevel::foreign_name(decl, self.text) else {
-                continue;
-            };
-            let entity = self.env.entity(Namespace::Value, name);
-            if let Some(scheme) = self.env.value(&entity)
-                && let Some(lowered) = lower.lower_scheme(scheme)
+        for decl in root.nodes() {
+            if decl.kind == K::ForeignDecl {
+                let Some(name) = super::toplevel::foreign_name(decl, self.text) else {
+                    continue;
+                };
+                self.lower_foreign_top_scheme(&mut lower, typing, name);
+            } else if decl.kind == K::LetDecl && typing.native_overrides.contains_key(&decl.range())
             {
-                typing.ir_top_schemes.insert(name.to_owned(), lowered);
+                if let Some(name) = super::bindings::let_parts(decl, self.text).name {
+                    self.lower_foreign_top_scheme(&mut lower, typing, &name);
+                }
+            } else if decl.kind == K::RecGroup {
+                for member in decl
+                    .nodes()
+                    .filter(|n| n.kind == K::Members)
+                    .flat_map(Node::nodes)
+                {
+                    if member.kind == K::LetDecl
+                        && typing.native_overrides.contains_key(&member.range())
+                        && let Some(name) = super::bindings::let_parts(member, self.text).name
+                    {
+                        self.lower_foreign_top_scheme(&mut lower, typing, &name);
+                    }
+                }
             }
+        }
+    }
+
+    fn lower_foreign_top_scheme(
+        &self,
+        lower: &mut IrTypeLower<'_, '_>,
+        typing: &mut Typing,
+        name: &str,
+    ) {
+        let entity = self.env.entity(Namespace::Value, name);
+        if let Some(scheme) = self.env.value(&entity)
+            && let Some(lowered) = lower.lower_scheme(scheme)
+        {
+            typing.ir_top_schemes.insert(name.to_owned(), lowered);
         }
     }
 

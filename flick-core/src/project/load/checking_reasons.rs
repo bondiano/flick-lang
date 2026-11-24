@@ -90,7 +90,8 @@ impl Key {
             (
                 self.config != current.config
                     || self.foreign_backend != current.foreign_backend
-                    || self.validate_foreign_metadata != current.validate_foreign_metadata,
+                    || self.validate_foreign_metadata != current.validate_foreign_metadata
+                    || self.native_overrides != current.native_overrides,
                 "config",
             ),
             (
@@ -137,6 +138,7 @@ impl Checking<'_> {
             config: self.project.map(|p| p.config.clone()),
             foreign_backend: self.foreign_backend_for(loaded),
             validate_foreign_metadata: self.env_ctx.validate_foreign_metadata,
+            native_overrides: self.env_ctx.native_overrides.clone(),
             lower: self.lower,
             cached_ir: self.cached_ir,
             imports: loaded

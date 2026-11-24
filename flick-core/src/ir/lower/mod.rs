@@ -23,6 +23,7 @@ mod literals;
 #[cfg(not(target_arch = "wasm32"))]
 mod local_schemes;
 mod loops;
+mod native;
 mod numeric;
 mod owner_descriptors;
 mod owners;
@@ -297,6 +298,9 @@ impl Lower<'_> {
         let parts = let_parts(decl, self.text);
         let kind = match (&parts.name, parts.pattern) {
             (Some(name), _) => {
+                if self.try_native_override(decl, name, span, items) {
+                    return;
+                }
                 #[cfg(not(target_arch = "wasm32"))]
                 self.current_item.clone_from(name);
                 let (type_params, dict_constraints, ty) = self.ir_top_scheme(name);

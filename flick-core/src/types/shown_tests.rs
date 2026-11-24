@@ -43,6 +43,7 @@ fn probe(text: &str) -> Interface {
         stages_by_class: false,
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
+        native_overrides: None,
     };
     types::check(
         &module,

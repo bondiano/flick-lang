@@ -3,6 +3,11 @@ impl Checker<'_> {
     /// signature, so unknown foreign metadata words (`FLICK-S011`) are still
     /// reported at the exact word span.
     pub(super) fn check_foreign_meta_words(&mut self, decl: &Node) {
+        let spec = self.options.foreign_backend.clone();
+        self.check_meta_words_with_spec(decl, &spec);
+    }
+
+    pub(super) fn check_meta_words_with_spec(&mut self, decl: &Node, spec: &ForeignBackendSpec) {
         let meta: Vec<&Node> = decl
             .nodes()
             .filter(|n| n.kind == K::ForeignMeta)
@@ -14,10 +19,10 @@ impl Checker<'_> {
             };
             let word = name.text(self.text);
             if core_foreign_meta(word).is_none()
-                && self.options.foreign_backend.adapter(word).is_none()
+                && spec.adapter(word).is_none()
                 && self.options.validate_foreign_metadata
             {
-                let expected = self.options.foreign_backend.all_foreign_words();
+                let expected = spec.all_foreign_words();
                 self.error(
                     codes::S011,
                     self.token_span(name),
@@ -47,6 +52,7 @@ impl Checker<'_> {
                 .unwrap_or_default()
                 .into(),
             unknown: None,
+            native_override: None,
         };
         let pure = foreign_words(decl)
             .0
@@ -135,7 +141,22 @@ impl Checker<'_> {
         seen_backend: &mut BTreeSet<String>,
         words: &mut Vec<BackendAdapter>,
     ) {
-        if let Some(spec) = self.options.foreign_backend.adapter(word).cloned() {
+        let spec = self.options.foreign_backend.clone();
+        self.read_backend_meta_item_with_spec(item, name, word, args, &spec, seen_backend, words);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn read_backend_meta_item_with_spec(
+        &mut self,
+        item: &Node,
+        name: Token,
+        word: &str,
+        args: &[&Node],
+        backend: &ForeignBackendSpec,
+        seen_backend: &mut BTreeSet<String>,
+        words: &mut Vec<BackendAdapter>,
+    ) {
+        if let Some(spec) = backend.adapter(word).cloned() {
             if !spec.repeatable && !seen_backend.insert(spec.name.clone()) {
                 self.bad_meta(item, &format!("duplicate foreign metadata `{word}`"));
                 return;
@@ -144,7 +165,7 @@ impl Checker<'_> {
                 words.push(parsed);
             }
         } else if self.options.validate_foreign_metadata {
-            let expected = self.options.foreign_backend.all_foreign_words();
+            let expected = backend.all_foreign_words();
             self.error(
                 codes::S011,
                 self.token_span(name),

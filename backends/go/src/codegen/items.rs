@@ -2,6 +2,7 @@
 //! init function that assign its values.
 
 use std::iter;
+use std::mem;
 
 use flick_ir::{Binding, Constructor, Dict, InstanceInfo, Rep, STRUCTURAL, default_method};
 use flick_pretty::{Document, docvec};
@@ -30,7 +31,7 @@ impl<'a> Gen<'a> {
                 ItemKind::Foreign(ref f) if matches!(f.binding, Binding::Inline(_))
             )
         });
-        let (extra_imports, mut decls) = if has_inline {
+        let (mut extra_imports, mut decls) = if has_inline {
             self.preambles(&module.preambles)
         } else {
             (Vec::new(), Vec::new())
@@ -78,6 +79,20 @@ impl<'a> Gen<'a> {
         } else {
             docvec![a, "func ", names::init(self.module), "() ", block(a, init)]
         };
+        for (alias, path) in mem::take(&mut self.go_extra_imports) {
+            let path_lit = names::string(&path);
+            let doc = match alias {
+                Some(alias) => docvec![
+                    a,
+                    "import ",
+                    a.alloc_str(&alias),
+                    " ",
+                    a.alloc_str(&path_lit)
+                ],
+                None => docvec![a, "import ", a.alloc_str(&path_lit)],
+            };
+            extra_imports.push(doc);
+        }
         let extra_imports = a.concat(
             extra_imports
                 .into_iter()

@@ -179,6 +179,7 @@ syntax_kinds! {
         AndAnd,
         EqEq,
         NotEq,
+        Bang,
         Lt,
         Le,
         Gt,
@@ -271,6 +272,10 @@ syntax_kinds! {
         ForeignSource,
         ForeignMeta,
         MetaItem,
+        /// `@native <binding> when <cond>` (plus optional adapter metadata) on a top-level `let`.
+        NativeOverride,
+        /// Unquoted boolean environment condition after `when` in `@native`.
+        WhenCond,
         /// `proof name params where goal = proof`: a checked, erased statement.
         ProofDecl,
         /// The goal of a proof or of a premise: an expression, `equal l r`.
@@ -514,6 +519,7 @@ pub fn describe(kind: SyntaxKind) -> &'static str {
         K::Arrow => "`->`",
         K::LArrow => "`<-`",
         K::Question => "`?`",
+        K::Bang => "`!`",
         K::At => "`@`",
         K::Pipe => "`|`",
         K::Eof => "end of file",

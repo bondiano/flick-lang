@@ -121,6 +121,7 @@ pub fn pack(options: &PackArguments, global: &GlobalArguments) -> Outcome {
                 labels: None,
                 watch: false,
                 inputs: false,
+                no_native_overrides: false,
                 backend_options: BTreeMap::new(),
             },
             project: Some(root.to_string_lossy().into_owned()),

@@ -50,6 +50,9 @@ pub(super) fn check(
                 }
             }
         }
+        [name, ..] if name.text(src) == "native" => {
+            "`@native` belongs indented after the body of a top-level `let` definition".to_owned()
+        }
         [name] | [name, _] if name.text(src) == "derive" => return,
         [name] if name.text(src) == "maker" => return,
         [name, ..] if name.text(src) == "maker" => "`@maker` takes no argument".to_owned(),

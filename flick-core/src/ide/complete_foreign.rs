@@ -43,11 +43,30 @@ impl Ide<'_> {
             }
         }
 
+        if let Some(ov) = path.iter().rev().find(|n| n.kind == K::NativeOverride) {
+            if path.iter().any(|n| n.kind == K::ForeignMeta) {
+                return complete_indented_line(ov, text, offset, spec);
+            }
+            if let Some(when_cond) = ov.nodes().find(|n| n.kind == K::WhenCond)
+                && offset >= when_cond.range().1
+            {
+                return complete_indented_line(ov, text, offset, spec);
+            }
+        }
+
         // Cursor on a blank indented line immediately following a non-blocked
-        // `foreign` declaration whose CST node ended at the previous line.
+        // `foreign` declaration or `@native` override whose CST node ended at the previous line.
         let prev = m.tree.nodes().filter(|n| n.range().1 <= offset).last()?;
         if prev.kind == K::ForeignDecl && !is_blocked_foreign(prev, text) {
             return complete_indented_line(prev, text, offset, spec);
+        }
+        if prev.kind == K::LetDecl
+            && let Some(last_ov) = prev
+                .nodes()
+                .filter(|n| n.kind == K::NativeOverride && n.range().1 <= offset)
+                .last()
+        {
+            return complete_indented_line(last_ov, text, offset, spec);
         }
         None
     }

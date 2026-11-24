@@ -19,6 +19,7 @@ const OWNER: &str = "Marks a service whose handler owns what is made under it: a
 const SYNC: &str = "Marks a service whose operations run at once, without a runtime: a stage that needs only such services and has no errors is Sync. `@sync reader` marks one that only reads, which a stage lends to code that runs later, as the clauses of a `for`. Used in built-in modules only; elsewhere the mark has no effect. Belongs before a service declaration.";
 const IMPLICIT: &str = "Opts an instance into automatic conversion between two distinct ground nominal types when the expected type is known. The class must have two parameters and one pure method of type `a -> b`; the instance must have no context or type variables. Exactly one visible instance must match; conversions do not chain. Takes no argument and belongs before an instance declaration.";
 const WHEN: &str = "Restricts the module to environments whose active backend and host tags satisfy the boolean condition (`&&`, `||`, `!`, and parentheses), for example `@when \"js && !browser\"`. Unused imports of the module are allowed in other environments; reachable uses report `FLICK-P064`. Belongs before the module header.";
+const NATIVE: &str = "Attaches a target-specific native binding override to a top-level Flick function while keeping the Flick body as its reference semantics and fallback. When multiple `@native` clauses match the active environment, the one whose `when` condition implies every other matching clause wins; incomparable or equivalent matching pairs report `FLICK-F012`.";
 
 impl Ide<'_> {
     pub(super) fn attribute_hover(
@@ -29,6 +30,22 @@ impl Ide<'_> {
         let m = self.module(file)?;
         let text = self.text(file);
         let path = tree::path_to(&m.tree, offset);
+        if let Some(ov) = path.iter().rev().find(|n| n.kind == K::NativeOverride) {
+            let at = ov.child_tokens().find(|t| t.kind == K::At)?;
+            let name = ov.child_tokens().find(|t| t.kind == K::Ident)?;
+            if offset >= at.start && offset < name.end {
+                let end = ov
+                    .nodes()
+                    .find(|n| n.kind == K::WhenCond)
+                    .map_or_else(|| ov.range().1, |w| w.range().1);
+                let header = text[at.start as usize..end as usize].trim();
+                return Some((
+                    format!("```flick\n{header}\n```\n\n{NATIVE}"),
+                    (at.start, name.end),
+                ));
+            }
+            return None;
+        }
         let attribute = path.iter().find(|n| n.kind == K::Attribute)?;
         let token = attribute
             .child_tokens()

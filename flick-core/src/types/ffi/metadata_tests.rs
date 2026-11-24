@@ -55,6 +55,7 @@ fn check_with_backend(
             stages_by_class: false,
             foreign_backend: backend,
             validate_foreign_metadata: true,
+            native_overrides: None,
         },
         &mut iface,
         StaticContext {

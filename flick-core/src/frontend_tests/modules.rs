@@ -76,6 +76,7 @@ fn checked_module_contract_is_preserved_in_its_interface() {
         stages_by_class: false,
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
+        native_overrides: None,
     };
     let diagnostics = types::check(
         &module,
@@ -185,6 +186,7 @@ fn manifest_class_name_can_be_used_by_later_dictionary_requirement() {
         stages_by_class: false,
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
+        native_overrides: None,
     };
     let checked = types::check(
         &module,

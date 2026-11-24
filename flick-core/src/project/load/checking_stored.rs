@@ -163,6 +163,7 @@ impl Checking<'_> {
             serde_json::to_vec(&(
                 self.foreign_backend_for(loaded),
                 self.env_ctx.validate_foreign_metadata,
+                &self.env_ctx.native_overrides,
             ))
             .unwrap_or_default(),
         );

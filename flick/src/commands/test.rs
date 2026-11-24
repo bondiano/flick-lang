@@ -140,10 +140,11 @@ fn prepare(
     }
     let identity = backend.cache_identity(&resolved);
     let settings = format!(
-        "test {:?} {} {:?} {} {identity}",
+        "test {:?} {} {:?} {} {} {identity}",
         selected,
         choice.short(),
         release(options.profile, Some(&project.config.build)),
+        options.no_native_overrides,
         resolved.cache_key(),
     );
     let key = cache::key(
@@ -181,6 +182,7 @@ fn prepare(
         wanted.clone(),
     );
     override_cfg.skip_backend_check_target = true;
+    override_cfg.disable_native_overrides = options.no_native_overrides;
     let (mut diagnostics, mut compilation) = package_cache::compile_for(
         &host,
         &mut sources,

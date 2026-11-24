@@ -265,6 +265,7 @@ impl Command for BuildCommand {
             Vec::new(),
         );
         target_override.skip_backend_check_target = true;
+        target_override.disable_native_overrides = self.options.no_native_overrides;
         let (mut diagnostics, mut compilation) = package_cache::compile_for(
             &host,
             &mut sources,
@@ -452,13 +453,14 @@ impl BuildCommand {
             output.options.cache_key(),
         );
         let settings = format!(
-            "{} {:?} {} {} {:?} {} {package} {backend}",
+            "{} {:?} {} {} {:?} {} {} {package} {backend}",
             out_dir.display(),
             output.entries,
             output.typescript,
             output.stages_by_class,
             output.extras,
-            output.release
+            output.release,
+            self.options.no_native_overrides
         );
         cache::key(
             project,
@@ -499,6 +501,7 @@ pub(crate) fn target_override(
         for_tests,
         test_paths,
         skip_backend_check_target: false,
+        disable_native_overrides: false,
     }
 }
 

@@ -2,6 +2,7 @@
 //! The same implementation is exercised natively and as a component.
 
 mod commands;
+mod fallback;
 mod foreign;
 mod launches;
 mod packages;
@@ -265,6 +266,12 @@ impl Backend for Literal {
                 capabilities: self.describe().capabilities,
             });
         }
+        if case(request) == "fallback" {
+            fallback::check_target(&program, request)?;
+            return Ok(TargetSupport {
+                capabilities: self.describe().capabilities,
+            });
+        }
         if request.target.host_package.is_none() && !matches!(case(request), "env" | "foreign") {
             for module in &program.modules {
                 if !request
@@ -346,7 +353,7 @@ impl Backend for Literal {
                 .read(&source.input)
                 .map_err(|_| diagnostic("source input is unavailable", None))?;
         }
-        let mut artifacts = module_artifacts(request);
+        let mut artifacts = module_artifacts(request)?;
         if is_inspect(request) {
             return Ok(BuildResult {
                 steps: vec![],
@@ -437,7 +444,7 @@ fn case_diagnostics(request: &BuildRequest) -> Vec<Diagnostic> {
     }
 }
 
-fn module_artifacts(request: &BuildRequest) -> Vec<Artifact> {
+fn module_artifacts(request: &BuildRequest) -> Result<Vec<Artifact>, Vec<Diagnostic>> {
     let prefix = banner(request).map(|b| format!("// {b}\n").into_bytes());
     let env_header = (request.target.host_package.is_some() || case(request) == "env").then(|| {
         format!(
@@ -449,27 +456,32 @@ fn module_artifacts(request: &BuildRequest) -> Vec<Artifact> {
         )
         .into_bytes()
     });
-    request
+    let mut out = Vec::new();
+    for m in request
         .modules
         .iter()
         .filter(|m| m.role == ModuleRole::Own && selected(request, &m.name))
-        .map(|m| {
-            let mut bytes = prefix.clone().unwrap_or_default();
-            if let Some(header) = &env_header {
-                bytes.extend(header);
-            }
+    {
+        let mut bytes = prefix.clone().unwrap_or_default();
+        if let Some(header) = &env_header {
+            bytes.extend(header);
+        }
+        if case(request) == "fallback" {
+            bytes.extend(fallback::source(request, &m.name)?);
+        } else {
             bytes.extend(
                 tests::source(request, &m.name)
                     .unwrap_or_else(|| b"export const main = (_) => undefined;\n".to_vec()),
             );
-            Artifact {
-                id: format!("module:{}", m.name),
-                path: m.output.clone(),
-                kind: ArtifactKind::Source,
-                bytes,
-            }
-        })
-        .collect()
+        }
+        out.push(Artifact {
+            id: format!("module:{}", m.name),
+            path: m.output.clone(),
+            kind: ArtifactKind::Source,
+            bytes,
+        });
+    }
+    Ok(out)
 }
 
 fn literal_options() -> Vec<OptionDescriptor> {

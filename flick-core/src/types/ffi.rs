@@ -6,8 +6,14 @@
 //! `Adapter::words` for backend validation.
 
 mod bridge_shape;
+pub mod imply;
+mod native;
 mod retention;
 pub mod spec;
+pub use imply::{
+    AxisTagModel, BackendTagModel, HostTagModel, NativeOverrideEnv, OverrideSelection,
+};
+pub use native::NativeOverrideInfo;
 pub use retention::keeps_for_owner;
 pub use spec::{
     AdapterArgKind, AdapterArgSpec, AdapterWordSpec, CORE_FOREIGN_META, CoreForeignMeta,
@@ -84,7 +90,11 @@ impl Checker<'_> {
                 "a foreign function returns an Effect, so its arrows cannot be Sync (`->{Atom.Read}`): define the Sync function in Flick around a foreign",
             );
         }
-        let mode = self.foreign_mode(decl, &body);
+        let mode = if pending.native_override.is_some() {
+            suspends::native_override_mode(&body)
+        } else {
+            self.foreign_mode(decl, &body)
+        };
         let stages: Vec<bool> = stages.iter().map(|&s| s != Stage::Pure).collect();
         let dicts = match scheme {
             Type::Forall { constraints, .. } => constraints
@@ -108,7 +118,7 @@ impl Checker<'_> {
             self.defer_foreign(pending, scheme);
             return;
         }
-        let span = self.span(decl);
+        let span = pending.span;
         self.check_meta(&info, &params, &body, span);
         info.list_params = params
             .iter()
@@ -127,6 +137,36 @@ impl Checker<'_> {
                 (arity == 0 && mode == ForeignMode::Pure).then(|| self.whnf_captured(&body).0)
             })
             .map_or(flick_ir::Shape::Data, |r| self.shape(&r, 0));
+        self.check_foreign_regions(
+            decl, scheme, &body, &binders, &params, &stages, retention, span,
+        );
+        if let Some((override_range, backend_id, enabled)) = pending.native_override {
+            self.typing.native_overrides.insert(
+                decl.range(),
+                NativeOverrideInfo {
+                    override_range,
+                    info,
+                    backend_id,
+                    enabled,
+                },
+            );
+        } else {
+            self.typing.foreigns.insert(range(span), info);
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn check_foreign_regions(
+        &mut self,
+        decl: &Node,
+        scheme: &Type,
+        body: &Type,
+        binders: &[super::ty::Binder],
+        params: &[Type],
+        stages: &[bool],
+        retention: Option<Retention>,
+        span: Span,
+    ) {
         let scoped: Vec<String> = binders
             .iter()
             // a hidden row read into the signature is no capability it took
@@ -144,12 +184,12 @@ impl Checker<'_> {
             );
         }
         if retention == Some(Retention::Owner) {
-            self.owner_retention(scheme, &body, span);
+            self.owner_retention(scheme, body, span);
         }
         // G4: a parameter that reaches a region its result does not carry is
         // used by the call, so the call needs a stage that keeps it live; a
         // capture row is no use of its own: a pure callback uses nothing (T4′)
-        let result = self.result_of(&body);
+        let result = self.result_of(body);
         let used: Vec<String> = binders
             .iter()
             .filter(|b| b.kind == Kind::Region && !mentions(&result, slice::from_ref(&b.name)))
@@ -169,7 +209,6 @@ impl Checker<'_> {
                 format!("`{shown}` reaches the region of a scope, but the foreign function runs no stage, so a call after the scope closed would read what it released: give it a stage, `->{{}}` and `foreign effect`"),
             );
         }
-        self.typing.foreigns.insert(range(span), info);
     }
 
     fn foreign_callbacks(&self, params: &[Type], arity: usize) -> Vec<Option<usize>> {

@@ -171,7 +171,7 @@ impl<'a> Printer<'a> {
             | K::InstanceDecl
             | K::ServiceDecl
             | K::InlineModuleDecl => self.class(n),
-            K::ForeignDecl => self.foreign(n),
+            K::ForeignDecl | K::NativeOverride => self.foreign(n),
             // the arguments of a derive are its plugin's words
             K::DerivingArgs => self.as_written(n),
             K::PluginExpr | K::PluginDecl => self.plugin_block(n),
@@ -342,6 +342,8 @@ fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
         (K::Arrow, K::LBrace) if b_parent == K::EffectAnnot => false,
         (K::LBrace, _) => !tight_braces(a_parent),
         (_, K::RBrace) => !tight_braces(b_parent),
+        (K::Bang | K::Minus, _) if a_parent == K::WhenCond => false,
+        (_, K::Minus) if b_parent == K::WhenCond => false,
         (K::Minus, _) => !matches!(a_parent, K::PrefixExpr | K::LitPat | K::RowOmit),
         (K::Tilde, _) => false,
         (K::Con, K::LParen) => !matches!(

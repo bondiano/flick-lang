@@ -19,6 +19,7 @@ mod fragment;
 mod handlers;
 mod holes;
 mod layout;
+mod native;
 mod pattern;
 mod plugin;
 mod proofs;
@@ -527,10 +528,23 @@ impl<'t> Parser<'t> {
     /// Statements separated by line breaks at the block column, or by `;` in
     /// braces. `glue` lets an item start without a separator (e.g. SQL clauses).
     fn items(&mut self, item: fn(&mut Self), braces: bool, glue: fn(&Self) -> bool) {
+        self.items_with_stop(item, braces, glue, |_| false);
+    }
+
+    fn items_with_stop(
+        &mut self,
+        item: fn(&mut Self),
+        braces: bool,
+        glue: fn(&Self) -> bool,
+        stop: fn(&Self) -> bool,
+    ) {
         let mut may_start = true;
         let mut item_failed = false;
         loop {
             if braces && self.raw().kind == K::RBrace {
+                break;
+            }
+            if stop(self) {
                 break;
             }
             match self.sep() {
@@ -586,6 +600,8 @@ mod exposing_tests;
 mod hole_tests;
 #[cfg(test)]
 mod let_else_tests;
+#[cfg(test)]
+mod native_tests;
 #[cfg(test)]
 mod operator_tests;
 #[cfg(test)]

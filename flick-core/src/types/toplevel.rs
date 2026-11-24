@@ -117,6 +117,8 @@ impl<'a> Checker<'a> {
                 } else {
                     self.check_foreign_meta_words(decl);
                 }
+            } else if decl.kind == K::LetDecl && decl.nodes().any(|n| n.kind == K::NativeOverride) {
+                self.check_native_overrides(decl, scheme.as_ref().map(|(s, _)| s));
             }
         }
         self.record_atom_bindings(&decls);
@@ -153,6 +155,20 @@ impl<'a> Checker<'a> {
                         group += 1;
                         group
                     });
+                    if sig.is_none() && decl.nodes().any(|n| n.kind == K::NativeOverride) {
+                        let name = let_parts(decl, self.text).name.unwrap_or_default();
+                        let end = decl
+                            .nodes()
+                            .find(|n| n.kind == K::VarPat)
+                            .map_or_else(|| decl.range().1, |v| v.range().1);
+                        self.error(
+                            codes::T004,
+                            Span::new(self.file, decl.range().0, end),
+                            format!(
+                                "function `{name}` with `@native` overrides needs a signature right above it"
+                            ),
+                        );
+                    }
                     self.add_item(decl, sig, own);
                 }
                 K::ForeignDecl => {
@@ -196,6 +212,23 @@ impl<'a> Checker<'a> {
                                     .checked_sub(1)
                                     .map(|k| members[k])
                                     .filter(|s| s.kind == K::Signature && self.pairs(s, member));
+                                if sig.is_none()
+                                    && member.nodes().any(|n| n.kind == K::NativeOverride)
+                                {
+                                    let name =
+                                        let_parts(member, self.text).name.unwrap_or_default();
+                                    let end = member
+                                        .nodes()
+                                        .find(|n| n.kind == K::VarPat)
+                                        .map_or_else(|| member.range().1, |v| v.range().1);
+                                    self.error(
+                                        codes::T004,
+                                        Span::new(self.file, member.range().0, end),
+                                        format!(
+                                            "function `{name}` with `@native` overrides needs a signature right above it"
+                                        ),
+                                    );
+                                }
                                 self.add_item(member, sig, Some(group));
                             }
                             K::Signature

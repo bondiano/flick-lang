@@ -1,0 +1,28 @@
+module NativeOverridesFail exposing (ambig, unknown_tag, unsigned, bad_meta)
+
+import Float
+
+// Ambiguous pair: in default `js/rt/node`, neither `js && node` nor `js && rt` implies the other
+ambig : Float -> Float -> Float
+let ambig a b = Float.sqrt (a * a + b * b)
+  @native "Math.hypot" when js && node
+//^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-F012 ambiguous `@native` overrides on `ambig`
+  @native "Math.hypot" when js && rt
+
+// Unknown environment tag reports FLICK-P066 at the tag span
+unknown_tag : Float -> Float
+let unknown_tag x = x
+  @native "Math.abs" when bogus_tag
+//                        ^^^^^^^^^ FLICK-P066 unknown environment tag `bogus_tag`
+
+// Missing signature on a function with `@native` overrides
+let unsigned x = x + 1.0
+  @native "Math.abs" when js
+//~ FLICK-T004 @19:1-19:13 function `unsigned` with `@native` overrides needs a signature right above it
+
+// Unknown adapter metadata word under `@native`
+bad_meta : Float -> Float
+let bad_meta x = x
+  @native "Math.abs" when js
+    nonsense_word
+//  ^^^^^^^^^^^^^ FLICK-S011 unknown foreign metadata `nonsense_word`

@@ -65,6 +65,7 @@ fn check_modules(modules: &[(&str, &str, &str)]) -> Vec<Diagnostic> {
             stages_by_class: false,
             foreign_backend: ForeignBackendSpec::default_js(),
             validate_foreign_metadata: true,
+            native_overrides: None,
         };
         diags.extend(types::check(
             &module,

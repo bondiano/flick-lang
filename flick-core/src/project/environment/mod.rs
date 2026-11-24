@@ -25,7 +25,7 @@ use crate::diagnostics::{Diagnostic, Severity, codes, suggest};
 use crate::resolve::ModuleSyntax;
 use crate::source::{SourceFile, SourceMap, Span};
 use crate::syntax::when;
-use crate::types::{AdapterWordSpec, ForeignBackendSpec, TypeFormAttrSpec};
+use crate::types::{AdapterWordSpec, ForeignBackendSpec, NativeOverrideEnv, TypeFormAttrSpec};
 #[cfg(not(target_arch = "wasm32"))]
 use select::resolve_selected;
 
@@ -98,6 +98,10 @@ impl BackendTags {
 }
 
 /// CLI or build-time override of the target backend and its resolved options.
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "one per target override flag"
+)]
 #[derive(Debug, Clone, Default)]
 pub struct TargetOverride {
     /// Selected backend short name or id (e.g. `"js"`, `"go"`, `"literal"`).
@@ -122,6 +126,9 @@ pub struct TargetOverride {
     /// caller (`flick build`, `flick test`, `flick inspect --emit output`) runs
     /// backend `check-target` itself during artifact generation.
     pub skip_backend_check_target: bool,
+    /// Disable `@native` override lowering (`--no-native-overrides`) so functions run
+    /// their Flick fallback body for conformance testing while still validating overrides.
+    pub disable_native_overrides: bool,
 }
 
 /// Concrete environment resolved for checking, IDE analysis, or building.
@@ -185,6 +192,8 @@ pub(super) struct EnvironmentContext {
     /// Official and project-loaded backend descriptors, used to pick the right
     /// foreign metadata vocabulary for inactive `@when` modules.
     pub backends: Vec<BackendTags>,
+    /// Tag world model and active selection state for `@native` overrides.
+    pub native_overrides: NativeOverrideEnv,
 }
 
 /// Validates `@when "<cond>"` on a standalone file checked outside any project.
@@ -300,6 +309,7 @@ const OFFICIAL_TAGS: &[&str] = &[
 pub(super) struct EnvironmentContext {
     pub foreign_backend: ForeignBackendSpec,
     pub validate_foreign_metadata: bool,
+    pub native_overrides: NativeOverrideEnv,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -308,6 +318,7 @@ impl EnvironmentContext {
         Self {
             foreign_backend: ForeignBackendSpec::js(),
             validate_foreign_metadata: true,
+            native_overrides: NativeOverrideEnv::official_js(),
         }
     }
 
@@ -358,6 +369,7 @@ pub(super) fn resolve(
     EnvironmentContext {
         foreign_backend: ForeignBackendSpec::js(),
         validate_foreign_metadata: true,
+        native_overrides: NativeOverrideEnv::official_js(),
     }
 }
 
@@ -400,6 +412,15 @@ pub(super) fn resolve(
     #[cfg(not(feature = "native-project"))]
     let uncached_custom_backend = false;
     if uncached_custom_backend {
+        let native_overrides = backends::build_native_override_env(
+            &BTreeSet::new(),
+            false,
+            &backends,
+            &[],
+            None,
+            &ForeignBackendSpec::js(),
+            target_override,
+        );
         return EnvironmentContext {
             vocabulary: BTreeSet::new(),
             validate_tags: false,
@@ -407,6 +428,7 @@ pub(super) fn resolve(
             foreign_backend: ForeignBackendSpec::js(),
             validate_foreign_metadata: false,
             backends,
+            native_overrides,
         };
     }
 
@@ -492,6 +514,15 @@ pub(super) fn resolve(
         select_foreign_backend(project, target_override, &backends);
 
     if !require_resolved {
+        let native_overrides = backends::build_native_override_env(
+            &vocabulary,
+            true,
+            &backends,
+            &hosts,
+            None,
+            &foreign_backend,
+            target_override,
+        );
         return EnvironmentContext {
             vocabulary,
             validate_tags: true,
@@ -499,6 +530,7 @@ pub(super) fn resolve(
             foreign_backend,
             validate_foreign_metadata,
             backends,
+            native_overrides,
         };
     }
 
@@ -512,6 +544,15 @@ pub(super) fn resolve(
         &hosts,
         diagnostics,
     );
+    let native_overrides = backends::build_native_override_env(
+        &vocabulary,
+        true,
+        &backends,
+        &hosts,
+        resolved.as_ref(),
+        &foreign_backend,
+        target_override,
+    );
 
     EnvironmentContext {
         vocabulary,
@@ -520,5 +561,6 @@ pub(super) fn resolve(
         foreign_backend,
         validate_foreign_metadata,
         backends,
+        native_overrides,
     }
 }

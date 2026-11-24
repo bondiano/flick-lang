@@ -40,6 +40,10 @@ use crate::source::Span;
 #[cfg(feature = "native-project")]
 use crate::source::{FileId, SourceMap};
 #[cfg(feature = "native-project")]
+use crate::syntax::cst::Node;
+#[cfg(feature = "native-project")]
+use crate::syntax::kind::SyntaxKind as K;
+#[cfg(feature = "native-project")]
 use crate::{resolve, syntax};
 
 /// A module of a source package as a run checked and lowered it.
@@ -345,8 +349,11 @@ impl Loader<'_> {
         #[cfg(feature = "native-project")]
         {
             let fresh = if save {
+                // Packages with plugin blocks or `@native` overrides depend on
+                // plugins or the active target environment, so they are skipped
+                // from the environment-independent package cache.
                 let expanded: Vec<&str> = (self.modules.iter())
-                    .filter(|m| !m.derives_alone())
+                    .filter(|m| !m.derives_alone() || has_native_override(&m.parse.tree))
                     .filter_map(|m| match &m.root {
                         super::Root::Package(name) => Some(name.as_str()),
                         _ => None,
@@ -420,6 +427,17 @@ impl Loader<'_> {
             });
         }
         out
+    }
+}
+
+#[cfg(feature = "native-project")]
+fn has_native_override(node: &Node) -> bool {
+    match node.kind {
+        K::NativeOverride => true,
+        K::SourceFile | K::InlineModuleDecl | K::RecGroup | K::Members | K::LetDecl => {
+            node.nodes().any(has_native_override)
+        }
+        _ => false,
     }
 }
 

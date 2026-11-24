@@ -207,6 +207,34 @@ fn foreign_modes(tree: &Node, text: &str, out: &mut Vec<(u32, u32, u32)>) {
             if let Some(t) = inline {
                 out.push((t.start, t.end, KEYWORD));
             }
+        } else if decl.kind == K::LetDecl {
+            native_override_tokens(decl, text, out);
+        } else if decl.kind == K::RecGroup {
+            for member in decl
+                .nodes()
+                .filter(|n| n.kind == K::Members)
+                .flat_map(Node::nodes)
+            {
+                if member.kind == K::LetDecl {
+                    native_override_tokens(member, text, out);
+                }
+            }
+        }
+    }
+}
+
+fn native_override_tokens(decl: &Node, text: &str, out: &mut Vec<(u32, u32, u32)>) {
+    for ov in decl.nodes().filter(|n| n.kind == K::NativeOverride) {
+        if let Some(native_kw) = ov.child_tokens().find(|t| t.kind == K::Ident) {
+            out.push((native_kw.start, native_kw.end, KEYWORD));
+        }
+        let source_kw = ov
+            .nodes()
+            .filter(|n| n.kind == K::ForeignSource)
+            .flat_map(Node::child_tokens)
+            .find(|t| t.kind == K::Ident && matches!(t.text(text), "global" | "inline"));
+        if let Some(t) = source_kw {
+            out.push((t.start, t.end, KEYWORD));
         }
     }
 }

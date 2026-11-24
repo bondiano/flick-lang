@@ -1,0 +1,52 @@
+================
+Native overrides
+================
+
+hypot : Float -> Float -> Float
+let hypot a b = Float.sqrt (a * a + b * b)
+  @native "Math.hypot" when js && !browser
+  @native global "math.Hypot" when go
+  @native inline "(a, b) => Math.hypot(a, b)" when bun
+
+---
+
+(source_file
+  (identifier)
+  (operator)
+  (constructor)
+  (operator)
+  (constructor)
+  (operator)
+  (constructor)
+  (keyword)
+  (identifier)
+  (identifier)
+  (identifier)
+  (operator)
+  (constructor)
+  (member)
+  (parens
+    (identifier)
+    (operator)
+    (identifier)
+    (operator)
+    (identifier)
+    (operator)
+    (identifier))
+  (attribute)
+  (string)
+  (keyword)
+  (identifier)
+  (operator)
+  (operator)
+  (identifier)
+  (attribute)
+  (keyword)
+  (string)
+  (keyword)
+  (identifier)
+  (attribute)
+  (keyword)
+  (string)
+  (keyword)
+  (identifier))

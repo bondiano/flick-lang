@@ -84,6 +84,8 @@ pub(crate) mod foralls;
 mod handlers;
 mod let_else;
 mod lines;
+#[cfg(test)]
+mod native_tests;
 mod plugins;
 mod printer;
 mod program;

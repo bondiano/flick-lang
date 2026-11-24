@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: 5ece4fa0bf742bc3
+source_hash: f84dbb580a593109
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -491,6 +491,7 @@ contract    = block of: "require" expr | "ensure" expr   // one entry inline
 foreign     = "foreign" [mode] name "from" ("global" String | "inline" String | String String) [metadata]
             | "foreign" "module" "inline" String
             | "foreign" "blocked" name String
+native      = "@native" (String | "global" String | "inline" String | String String) "when" when_cond [metadata]
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
 proof       = "proof" name { atom_pattern | premise } "where" goal "=" block
@@ -622,6 +623,7 @@ type Gauge = Gauge Float
 | `@implicit` | экземпляр | экземпляр преобразует один тип в другой там, где ожидаемый тип известен | [неявные преобразования](../classes/#неявные-преобразования) |
 | `@derive` | класс | его выводит плагин: плагин пакета класса или названного пакета, `@derive std` | [вывод экземпляров](../classes/#автоматический-вывод-экземпляров-классов) |
 | `@ts` (и атрибуты формы типа других бэкендов, например `@go`) | тип или сервис | объявленная бэкендом внешняя форма типа, `none` или `import` типа из пакета | [форма типа](../codegen/#форма-типа) |
+| `@native` | с отступом после тела верхнеуровневого `let` | условное нативное переопределение поверх резервного тела на Flick | [нативные переопределения](../ffi/#нативные-переопределения) |
 | `@stores` | тип без конструкторов и тела | его значения хранят переданные им функции | [квалификаторы](../regions/#квалификаторы) |
 | `@label` | тип | его значения верхнего уровня несут свои имена во время выполнения; вид, `@label atom`, определяет, какие сборки их сохраняют | [наблюдаемость](../observability/#действия-ui-и-записи-атомов) |
 | `@cell`, `@maker`, `@owner` | тип; значение; сервис | каждое значение типа хранит одно значение; значение создаёт атом, действие или представление; обработчик сервиса владеет тем, что создано под ним | [проверки вызовов](../plugins/#проверки-вызовов) |

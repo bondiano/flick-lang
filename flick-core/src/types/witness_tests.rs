@@ -161,6 +161,7 @@ fn checked_interface(name: &str, text: &str, dependencies: &[Interface]) -> Inte
             stages_by_class: false,
             foreign_backend: ForeignBackendSpec::default_js(),
             validate_foreign_metadata: true,
+            native_overrides: None,
         },
         &mut interface,
     ));

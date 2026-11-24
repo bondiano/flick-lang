@@ -206,6 +206,11 @@ impl<'a> Gen<'a> {
             {
                 return self.local(f, spec, export, span);
             }
+            if let IrBinding::Global { name } = &f.binding
+                && let Some(doc) = self.global_foreign(f, name, span)
+            {
+                return Some(doc);
+            }
             let (export, from) = match &f.binding {
                 IrBinding::Module { from, name } => (name.as_str(), format!("from `{from}`")),
                 IrBinding::Global { name } => (name.as_str(), "global".to_owned()),
@@ -250,7 +255,13 @@ impl<'a> Gen<'a> {
 
     /// The Go function of the binding `f` taking `params` and returning
     /// `go`, a `result`.
-    fn wrapper(&self, f: &Foreign, params: String, result: &str, go: Document<'a>) -> Document<'a> {
+    pub(super) fn wrapper(
+        &self,
+        f: &Foreign,
+        params: String,
+        result: &str,
+        go: Document<'a>,
+    ) -> Document<'a> {
         let a = self.a;
         let name = names::func(self.module, &f.name);
         let body = single(a, docvec![a, "return ", go]);

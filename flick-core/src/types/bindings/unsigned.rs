@@ -34,6 +34,7 @@ impl Checker<'_> {
         // a plugin's code needs no signature: no one reads it. Nor does a local
         // function: nothing outside its body sees it
         let local = self.store.level > 0 && !parts.rec;
+        let has_native = decl.nodes().any(|n| n.kind == super::K::NativeOverride);
         let signed = header || local || self.span(decl).start >= self.generated;
         if let (true, Some(written), true) = (is_fun, parts.header, parts.params.is_empty()) {
             let written = self.text_of(written);
@@ -44,7 +45,7 @@ impl Checker<'_> {
                     "write the type of function `{name}` as a signature above the `let`: `{name} : {written}`"
                 ),
             );
-        } else if (function || is_fun) && !signed {
+        } else if (function || is_fun) && !signed && !has_native {
             // the suggestion shows the rows the body needs, not their unknowns;
             // only this binding's own: an enclosing row still gathers its calls
             self.close_rows_above(Some(self.store.level));

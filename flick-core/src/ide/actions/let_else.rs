@@ -324,6 +324,7 @@ impl Ide<'_> {
             stages_by_class: false,
             foreign_backend: &self.analysis.foreign_backend,
             validate_foreign_metadata: true,
+            native_overrides: None,
         };
         let diagnostics = types::check(
             &module,
