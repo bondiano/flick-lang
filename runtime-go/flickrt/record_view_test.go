@@ -315,13 +315,20 @@ func TestRecordViewMutationsRecordOpsSchemaCodecAndInert(t *testing.T) {
 func TestRecordViewSameAndIdenticalDoNotPanicOnUncomparableFields(t *testing.T) {
 	r1 := Rec("items", []Value{int32(1)}, "tag", "a")
 	r2 := Rec("items", []Value{int32(1)}, "tag", "a")
-	u1 := viewUncomparable{f0: []Value{int32(1), int32(2)}, f1: "a"}
+	sharedSlice := []Value{int32(1), int32(2)}
+	u1 := viewUncomparable{f0: sharedSlice, f1: "a"}
 	u2 := viewUncomparable{f0: []Value{int32(1), int32(2)}, f1: "a"}
 	fn := Fn(func(_ *Fiber, v Value) Value { return v })
 	f1 := viewFunc{f0: fn, f1: 7}
 	f2 := viewFunc{f0: fn, f1: 7}
 	p1 := viewPoint{f0: 1.5, f1: 2.5}
 	p2 := viewPoint{f0: 1.5, f1: 2.5}
+	pDiff := viewPoint{f0: 1.5, f1: 3.0}
+	ref1 := RefMake(true)
+	ref2 := RefMake(true)
+	refRec1 := viewUncomparable{f0: ref1, f1: "conn"}
+	refRec1Copy := viewUncomparable{f0: ref1, f1: "conn"}
+	refRec2 := viewUncomparable{f0: ref2, f1: "conn"}
 
 	// `*Record` keeps pointer identity in both Same and identical.
 	if !Same(r1, r1) || Same(r1, r2) {
@@ -331,9 +338,7 @@ func TestRecordViewSameAndIdenticalDoNotPanicOnUncomparableFields(t *testing.T) 
 		t.Errorf("identical on *Record broke pointer identity")
 	}
 
-	// Value-type RecordView structs (including slice-bearing and Fn-bearing ones)
-	// must never panic in Same, identical, or non-grouped resolver key lookup.
-	res := &resolver{}
+	// `Same` never panics on value-type RecordView structs and returns false.
 	for _, pair := range [][2]Value{
 		{u1, u1},
 		{u1, u2},
@@ -343,17 +348,122 @@ func TestRecordViewSameAndIdenticalDoNotPanicOnUncomparableFields(t *testing.T) 
 		{f1, f2},
 		{f1, r1},
 		{p1, p2},
+		{refRec1, refRec1Copy},
 		{int32(1), u1},
 		{u1, int32(1)},
 	} {
 		if Same(pair[0], pair[1]) {
 			t.Errorf("Same(%T, %T) = true, want false", pair[0], pair[1])
 		}
+	}
+
+	// `identical` and non-grouped `resolver.sameKey` compare non-`*Record`
+	// RecordView values field-by-field via `identical` without raw Go `==`:
+	// matching scalars, Refs, and shared slices succeed; distinct slices,
+	// different field values, `*Record` vs struct, and `Fn` fields return false
+	// without panicking.
+	res := &resolver{}
+	for _, pair := range [][2]Value{
+		{p1, p2},
+		{u1, u1},
+		{refRec1, refRec1Copy},
+	} {
+		if !identical(pair[0], pair[1]) {
+			t.Errorf("identical(%#v, %#v) = false, want true", pair[0], pair[1])
+		}
+		if !res.sameKey(pair[0], pair[1]) {
+			t.Errorf("resolver.sameKey(%#v, %#v) = false, want true", pair[0], pair[1])
+		}
+	}
+	for _, pair := range [][2]Value{
+		{p1, pDiff},
+		{u1, u2},
+		{u1, r1},
+		{r1, u1},
+		{p1, r1},
+		{r1, p1},
+		{f1, f1},
+		{f1, f2},
+		{f1, r1},
+		{refRec1, refRec2},
+		{int32(1), u1},
+		{u1, int32(1)},
+	} {
 		if identical(pair[0], pair[1]) {
 			t.Errorf("identical(%T, %T) = true, want false", pair[0], pair[1])
 		}
 		if res.sameKey(pair[0], pair[1]) {
 			t.Errorf("resolver.sameKey(%T, %T) = true, want false", pair[0], pair[1])
+		}
+	}
+}
+
+func TestPoolInvalidateAndReserveWithClosedRecordView(t *testing.T) {
+	fb := rootFiber()
+	fb.owner = newOwner()
+	defer fb.owner.close(fb, nil)
+
+	var nextID int32
+	pool := PoolMake(fb, Rec(
+		"acquire", Eff(func(_ *Fiber) Value {
+			nextID++
+			return viewUncomparable{f0: RefMake(true), f1: ShowInt(nextID)}
+		}),
+		"size", int32(1),
+		"concurrency", Some(int32(2)),
+		"targetUtilization", None,
+	))
+	p := poolOf(pool)
+
+	// Lease a closed-record item, reserve it, verify reservation took effect,
+	// then invalidate it so the next lease acquires a replacement item.
+	lease1 := *fb
+	lease1.owner = newOwner()
+	got1 := PoolGet(&lease1, pool)
+	if got1.(viewUncomparable).f1 != "1" {
+		t.Fatalf("first leased item = %#v, want tag \"1\"", got1)
+	}
+	PoolReserve(&lease1, got1, pool)
+	p.mu.Lock()
+	found := p.find(got1)
+	reserved, usage := 0, p.usage
+	if found != nil {
+		reserved = found.reservations
+	}
+	p.mu.Unlock()
+	if found == nil || reserved != 1 || usage != 2 {
+		lease1.owner.close(&lease1, nil)
+		t.Fatalf("PoolReserve did not reserve closed-record item: found=%v reserved=%d usage=%d", found, reserved, usage)
+	}
+
+	PoolInvalidate(&lease1, got1, pool)
+	lease1.owner.close(&lease1, nil)
+
+	lease2 := *fb
+	lease2.owner = newOwner()
+	got2 := PoolGet(&lease2, pool)
+	lease2.owner.close(&lease2, nil)
+	if got2.(viewUncomparable).f1 != "2" {
+		t.Fatalf("leased item after PoolInvalidate = %#v, want replacement tag \"2\"", got2)
+	}
+}
+
+func TestDatabaseTransactionRejectsUncomparableRecordViewWithoutHashPanic(t *testing.T) {
+	fn := Fn(func(_ *Fiber, v Value) Value { return v })
+	for _, impl := range []Value{
+		viewFunc{f0: fn, f1: 1},
+		viewUncomparable{f0: []Value{int32(1)}, f1: "db"},
+	} {
+		fb := rootFiber()
+		fb.env = fb.env.with(databaseKey, impl)
+		var recovered any
+		func() {
+			defer func() { recovered = recover() }()
+			DatabaseTransaction(fb, Eff(func(_ *Fiber) Value { return Unit }))
+		}()
+		defect, ok := recovered.(Defect)
+		if !ok || defect.Message != "Error: this `Database` runs no transactions" {
+			t.Fatalf("DatabaseTransaction(%T) panicked with %#v, want Defect{\"Error: this `Database` runs no transactions\"}", impl, recovered)
 		}
 	}
 }

@@ -188,7 +188,9 @@ func (s *usageTTL) run(fb *Fiber, p *pool) {
 }
 
 // identical is JS `===` on Flick values: primitives by value, other values
-// by reference.
+// by reference. Value-type closed record structs have no pointer address, so
+// two non-`*Record` RecordView values are compared structurally field-by-field
+// via `identical` without raw Go `==` (preventing panics on `[]Value`/`Fn` fields).
 func identical(a, b Value) bool {
 	switch x := a.(type) {
 	case float64, float32, string, bool, int8, int16, int32, int64, uint8, uint16, uint32, uint64, UnitType:
@@ -202,7 +204,20 @@ func identical(a, b Value) bool {
 		y, ok := b.(*Record)
 		return ok && x == y
 	case RecordView:
-		return false
+		if _, isRec := b.(*Record); isRec {
+			return false
+		}
+		y, ok := b.(RecordView)
+		if !ok || x.Len() != y.Len() {
+			return false
+		}
+		for i, k := range x.Keys() {
+			yv, found := y.Lookup(k)
+			if !found || !identical(x.At(i), yv) {
+				return false
+			}
+		}
+		return true
 	}
 	return Same(a, b)
 }
