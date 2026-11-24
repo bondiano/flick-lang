@@ -160,6 +160,15 @@ interface types {
         abi: abi,
         inputs: list<string>,
     }
+    /// Inline host code carried by a module: either a `foreign module inline`
+    /// preamble (`name` is `none`) or a `from inline` binding (`name` is the
+    /// lowered Flick binding name), with the span of its source string literal.
+    record inline-foreign {
+        module: string,
+        name: option<string>,
+        code: string,
+        span: span,
+    }
     /// A projection has a declared schema and version, and plain data in a
     /// content-addressed input. Unknown schemas must be refused, not guessed.
     /// Complete typing/effect facts and UI metadata are not implied by IR.
@@ -212,6 +221,7 @@ interface types {
         entries: list<entry>,
         test-roots: list<symbol>,
         foreign: list<foreign-binding>,
+        inline-foreign: list<inline-foreign>,
         projections: list<projection>,
         package-targets: list<package-target>,
         root-handlers: list<root-handler>,

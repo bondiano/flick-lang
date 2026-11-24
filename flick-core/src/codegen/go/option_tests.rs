@@ -364,6 +364,7 @@ let main () = Platform.stdout_line (show (use_opt (List.length (Platform.args ()
         test: false,
         paths: &BTreeMap::new(),
         lines: &[],
+        sources: &[],
         foreign: &BTreeMap::new(),
         bindings: bindings(),
         lang: &Known::of(&lang_items()),

@@ -227,6 +227,13 @@ interface types {
     inputs: list<string>,
   }
 
+  record inline-foreign {
+    module: string,
+    name: option<string>,
+    code: string,
+    span: span,
+  }
+
   record projection {
     module: string,
     schema: abi,
@@ -346,6 +353,7 @@ interface types {
     entries: list<entry>,
     test-roots: list<symbol>,
     foreign: list<foreign-binding>,
+    inline-foreign: list<inline-foreign>,
     projections: list<projection>,
     package-targets: list<package-target>,
     root-handlers: list<root-handler>,

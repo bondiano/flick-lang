@@ -2,7 +2,7 @@
 use super::{Code, Intrinsic, Local, Lower, LowerError, Name, Span, unsupported};
 use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 pub(super) fn is_binding(value: &Foreign) -> bool {
-    value.binding.from.as_deref() == Some("flick:rt") && value.binding.name == "listRange"
+    value.binding.module_export() == Some(("flick:rt", "listRange"))
 }
 fn supports(value: &Foreign) -> bool {
     is_binding(value)
@@ -68,9 +68,24 @@ mod tests {
     type Mutation = Box<dyn Fn(&mut Foreign)>;
     fn mutations() -> Vec<Mutation> {
         let mut edits: Vec<Mutation> = vec![
-            Box::new(|v| v.binding.from = None),
-            Box::new(|v| v.binding.from = Some("other".into())),
-            Box::new(|v| v.binding.name.push('!')),
+            Box::new(|v| {
+                v.binding = flick_ir::Binding::Global {
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            }),
+            Box::new(|v| {
+                v.binding = flick_ir::Binding::Module {
+                    from: "other".into(),
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            }),
+            Box::new(|v| {
+                if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                    &mut v.binding
+                {
+                    name.push('!');
+                }
+            }),
             Box::new(|v| v.mode = ForeignMode::Sync),
             Box::new(|v| v.mode = ForeignMode::Async),
             Box::new(|v| v.mode = ForeignMode::Effect),

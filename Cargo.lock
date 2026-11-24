@@ -913,6 +913,7 @@ name = "flick-test-backend"
 version = "0.1.0"
 dependencies = [
  "flick-backend",
+ "flick-backend-support",
  "flick-ir",
  "serde_json",
 ]

@@ -135,6 +135,7 @@ fn go_uses_ir_and_plain_data_without_compilation_or_settings() {
         test: false,
         paths: &paths,
         lines: &lines,
+        sources: &[],
         foreign: &BTreeMap::new(),
         bindings: &bindings,
         lang: &known,

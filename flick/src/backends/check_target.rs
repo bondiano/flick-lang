@@ -41,10 +41,11 @@ pub(crate) fn check_target_for_project(
     let has_foreign = compilation.modules.iter().any(|m| {
         m.package.is_none()
             && compilation.module_available(&m.name)
-            && m.ir
-                .items
-                .iter()
-                .any(|item| matches!(item.kind, ItemKind::Foreign(_)))
+            && (!m.ir.preambles.is_empty()
+                || m.ir
+                    .items
+                    .iter()
+                    .any(|item| matches!(item.kind, ItemKind::Foreign(_))))
     });
     if !has_foreign {
         return Vec::new();
@@ -97,6 +98,7 @@ fn build_check_request(
         },
     );
     let files = files.into_inner();
+    let inline_foreign = super::request::collect_inline_foreign(&program);
     let mut input_bytes: BTreeMap<String, Vec<u8>> = BTreeMap::new();
     let mut inputs = Vec::new();
     let mut req_sources = Vec::new();
@@ -170,6 +172,7 @@ fn build_check_request(
         entries: Vec::new(),
         test_roots: Vec::new(),
         foreign: Vec::new(),
+        inline_foreign,
         projections: Vec::new(),
         package_targets: Vec::new(),
         root_handlers: Vec::new(),

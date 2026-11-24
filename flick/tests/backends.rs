@@ -20,6 +20,9 @@ mod environments;
 #[path = "backends/foreign_adapters.rs"]
 mod foreign_adapters;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/foreign_inline.rs"]
+mod foreign_inline;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/foreign_meta_regression.rs"]
 mod foreign_meta_regression;
 #[cfg(feature = "wasm-backends")]

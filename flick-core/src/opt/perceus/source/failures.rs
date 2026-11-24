@@ -8,8 +8,7 @@ use super::{
 };
 
 pub(super) fn supports(value: &Foreign) -> bool {
-    value.binding.from.as_deref() == Some("flick:rt")
-        && value.binding.name == "fromResult"
+    value.binding.module_export() == Some(("flick:rt", "fromResult"))
         && value.mode == ForeignMode::Effect
         && value.arity == 1
         && value.dicts == 0
@@ -135,8 +134,18 @@ mod tests {
         let entry = memory::Name::new("Prelude", "from_result");
         assert!(lower([module], &entry).is_ok());
         let mutations: Vec<fn(&mut Foreign)> = vec![
-            |v| v.binding.from = None,
-            |v| v.binding.name.push('!'),
+            |v| {
+                v.binding = flick_ir::Binding::Global {
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            },
+            |v| {
+                if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                    &mut v.binding
+                {
+                    name.push('!');
+                }
+            },
             |v| v.mode = ForeignMode::Sync,
             |v| v.arity = 2,
             |v| v.dicts = 1,

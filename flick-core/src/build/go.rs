@@ -98,6 +98,7 @@ pub fn emit(
         .collect();
     let foreign = foreign_files(compilation, settings, read);
     let lines: Vec<&[u32]> = sources.files().map(SourceFile::line_starts).collect();
+    let source_texts: Vec<&str> = sources.files().map(|f| f.text.as_str()).collect();
     let mut out = Vec::new();
     for (name, entry) in programs {
         let dir = module_dir(name);
@@ -114,6 +115,7 @@ pub fn emit(
             test,
             paths: &paths,
             lines: &lines,
+            sources: &source_texts,
             foreign: &foreign,
             bindings: bindings(),
             lang: &known,
@@ -191,7 +193,7 @@ pub fn foreign_files(
     for c in &compilation.modules {
         for item in &c.ir.items {
             if let ItemKind::Foreign(f) = &item.kind
-                && let Some(spec) = f.binding.from.as_deref().filter(|s| go::is_relative(s))
+                && let Some(spec) = f.binding.from().filter(|s| go::is_relative(s))
             {
                 let key = (c.name.clone(), spec.to_owned());
                 if !foreign.contains_key(&key)

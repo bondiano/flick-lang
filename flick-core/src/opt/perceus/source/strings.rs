@@ -13,8 +13,7 @@ pub(super) fn expression(value: &Foreign, span: Span) -> Option<Expr> {
 }
 
 fn supports_join(value: &Foreign) -> bool {
-    value.binding.from.as_deref() == Some("flick:rt")
-        && value.binding.name == "stringJoin"
+    value.binding.module_export() == Some(("flick:rt", "stringJoin"))
         && value.mode == ForeignMode::Pure
         && value.dicts == 0
         && value.arity == 2
@@ -109,7 +108,7 @@ fn join(span: Span) -> Expr {
 }
 
 pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
-    let kind = match value.binding.name.as_str() {
+    let kind = match value.binding.export_name().unwrap_or("") {
         "startsWith" => Intrinsic::StringStartsWith,
         "includes" => Intrinsic::StringIncludes,
         "length" => Intrinsic::StringLength,
@@ -117,7 +116,7 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
     };
     // Host arity is one; predicates return another unary pure function.
     // Counted closures preserve those stages and subject-last order.
-    (value.binding.from.as_deref() == Some("flick:String")
+    (value.binding.from() == Some("flick:String")
         && value.mode == ForeignMode::Pure
         && value.dicts == 0
         && value.arity == 1
@@ -164,8 +163,11 @@ mod tests {
                 let ItemKind::Foreign(original) = &item.kind else {
                     continue;
                 };
-                if original.binding.from.as_deref() != Some("flick:String")
-                    || !matches!(original.binding.name.as_str(), "startsWith" | "includes")
+                if original.binding.from() != Some("flick:String")
+                    || !matches!(
+                        original.binding.export_name().unwrap_or(""),
+                        "startsWith" | "includes"
+                    )
                 {
                     continue;
                 }
@@ -208,7 +210,7 @@ mod tests {
                 let ItemKind::Foreign(original) = &item.kind else {
                     continue;
                 };
-                if original.binding.name != "stringJoin" {
+                if original.binding.export_name() != Some("stringJoin") {
                     continue;
                 }
                 checked += 1;
@@ -251,9 +253,24 @@ mod tests {
 
     fn mutations() -> Vec<fn(&mut Foreign)> {
         vec![
-            |v| v.binding.from = None,
-            |v| v.binding.from = Some("other".into()),
-            |v| v.binding.name.push('!'),
+            |v| {
+                v.binding = flick_ir::Binding::Global {
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            },
+            |v| {
+                v.binding = flick_ir::Binding::Module {
+                    from: "other".into(),
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            },
+            |v| {
+                if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                    &mut v.binding
+                {
+                    name.push('!');
+                }
+            },
             |v| v.mode = ForeignMode::Sync,
             |v| v.mode = ForeignMode::Async,
             |v| v.mode = ForeignMode::Effect,

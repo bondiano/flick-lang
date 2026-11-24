@@ -224,8 +224,10 @@ let answer () = Inner.make ()
         })
         .expect("relocated raw foreign");
     assert_eq!(foreign.source_name.as_deref(), Some("Inner$make"));
-    assert_eq!(foreign.binding.from.as_deref(), Some("./scope.js"));
-    assert_eq!(foreign.binding.name, "make");
+    assert_eq!(
+        foreign.binding.module_export(),
+        Some(("./scope.js", "make"))
+    );
     let errors = check_program(
         &run::program(&modules),
         &run::decls(&modules),

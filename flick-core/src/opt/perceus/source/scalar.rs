@@ -4,14 +4,18 @@ use crate::{
     ir::{BinOp, Expr, ExprKind, Param, Pat, Stage},
     source::Span,
 };
-use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
+use flick_ir::{Adapter, Binding, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 
 pub(super) fn candidate(value: &Foreign) -> Option<Intrinsic> {
-    let kind = match (value.binding.from.as_deref(), value.binding.name.as_str()) {
-        (None, "Number") => Intrinsic::NumberToFloat,
-        (None, "BigInt") => Intrinsic::ToBigInt,
-        (Some("flick:Number"), "min") => Intrinsic::FloatMin,
-        (Some("flick:Number"), "max") => Intrinsic::FloatMax,
+    let kind = match &value.binding {
+        Binding::Global { name } if name == "Number" => Intrinsic::NumberToFloat,
+        Binding::Global { name } if name == "BigInt" => Intrinsic::ToBigInt,
+        Binding::Module { from, name } if from == "flick:Number" && name == "min" => {
+            Intrinsic::FloatMin
+        }
+        Binding::Module { from, name } if from == "flick:Number" && name == "max" => {
+            Intrinsic::FloatMax
+        }
         _ => return None,
     };
     // Deep/opaque Number signatures may conservatively request an input copy.

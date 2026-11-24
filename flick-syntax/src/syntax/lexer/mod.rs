@@ -256,13 +256,21 @@ impl Lexer<'_> {
                 return true;
             }
         }
-        matches!(
-            before[..],
-            [.., "foreign"] | [.., "foreign", "pure" | "sync" | "async" | "effect"]
-        ) || (matches!(
-            before[..],
-            ["let"] | ["let", "rec" | "mut" | "lazy"] | ["let", "lazy", "mut"]
-        ) && !matches!(word, "rec" | "assert" | "mut" | "lazy" | "catch"))
+        let foreign_preamble = word == "module"
+            && matches!(before[..], [.., "foreign"])
+            && self.text[self.pos..]
+                .trim_start_matches([' ', '\t'])
+                .strip_prefix("inline")
+                .is_some_and(|rest| rest.as_bytes().first().is_none_or(|b| !is_ident_byte(*b)));
+        (!foreign_preamble
+            && matches!(
+                before[..],
+                [.., "foreign"] | [.., "foreign", "pure" | "sync" | "async" | "effect"]
+            ))
+            || (matches!(
+                before[..],
+                ["let"] | ["let", "rec" | "mut" | "lazy"] | ["let", "lazy", "mut"]
+            ) && !matches!(word, "rec" | "assert" | "mut" | "lazy" | "catch"))
     }
 
     /// Length and kind of the operator or delimiter at `pos`, if any.

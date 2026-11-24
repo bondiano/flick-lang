@@ -31,6 +31,7 @@ fn program(body: Expr) -> Program {
             name: "App.Main".into(),
             items: vec![item],
             types: Vec::new(),
+            preambles: Vec::new(),
             labels: BTreeMap::default(),
             initialization: crate::Initialization::default(),
             records: BTreeMap::default(),

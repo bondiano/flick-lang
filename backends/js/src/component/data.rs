@@ -2,7 +2,7 @@
 
 use super::failure;
 use crate::codegen::{EffectBridge, Labels, Resolved, ts::Typed};
-use crate::foreign_meta;
+use crate::{foreign_meta, inline};
 use flick_backend::{
     BuildRequest, Diagnostic, Inputs, JavascriptProjection, ModuleRole, Severity, Span,
     TypescriptModuleProjection, validate_source_spans,
@@ -131,6 +131,44 @@ impl Data {
         })
     }
 
+    fn check_foreign(&self, request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
+        let own_modules: BTreeSet<&str> = request
+            .modules
+            .iter()
+            .filter(|m| m.role == ModuleRole::Own)
+            .map(|m| m.name.as_str())
+            .collect();
+        let mut foreign_diagnostics: Vec<Diagnostic> =
+            foreign_meta::validate_program(&self.program, &own_modules)
+                .into_iter()
+                .chain(inline::validate_program(
+                    &self.program,
+                    &self.sources,
+                    &own_modules,
+                ))
+                .map(|d| Diagnostic {
+                    code: d.code.into(),
+                    severity: Severity::Error,
+                    message: d.message,
+                    span: Some(Span {
+                        file: d.span.file.index(),
+                        start: d.span.start,
+                        end: d.span.end,
+                    }),
+                    notes: vec![],
+                })
+                .collect();
+        if !foreign_diagnostics.is_empty() {
+            foreign_diagnostics.sort_by_key(|d| {
+                d.span
+                    .as_ref()
+                    .map_or((u32::MAX, u32::MAX, u32::MAX), |s| (s.file, s.start, s.end))
+            });
+            return Err(foreign_diagnostics);
+        }
+        Ok(())
+    }
+
     pub fn check(&self, request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
         if request.sources.len() != self.program.files.len()
             || self.sources.len() != request.sources.len()
@@ -148,30 +186,7 @@ impl Data {
             &self.sources.iter().map(String::as_str).collect::<Vec<_>>(),
         )
         .map_err(failure)?;
-        let own_modules: BTreeSet<&str> = request
-            .modules
-            .iter()
-            .filter(|m| m.role == ModuleRole::Own)
-            .map(|m| m.name.as_str())
-            .collect();
-        let foreign_diagnostics: Vec<Diagnostic> =
-            foreign_meta::validate_program(&self.program, &own_modules)
-                .into_iter()
-                .map(|d| Diagnostic {
-                    code: d.code.into(),
-                    severity: Severity::Error,
-                    message: d.message,
-                    span: Some(Span {
-                        file: d.span.file.index(),
-                        start: d.span.start,
-                        end: d.span.end,
-                    }),
-                    notes: vec![],
-                })
-                .collect();
-        if !foreign_diagnostics.is_empty() {
-            return Err(foreign_diagnostics);
-        }
+        self.check_foreign(request)?;
         if self.check {
             return Ok(());
         }

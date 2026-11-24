@@ -7,8 +7,7 @@ use crate::{
 use flick_ir::{Adapter, Constructor, Copies, Foreign, ForeignMode, Rep, ResultAdapter, Shape};
 
 fn supports(value: &Foreign) -> bool {
-    value.binding.from.as_deref() == Some("flick:rt")
-        && value.binding.name == "resultMap2"
+    value.binding.module_export() == Some(("flick:rt", "resultMap2"))
         && value.mode == ForeignMode::Pure
         && value.arity == 3
         && value.dicts == 0
@@ -130,8 +129,18 @@ mod tests {
     type Mutation = Box<dyn Fn(&mut Foreign)>;
     fn mutations() -> Vec<Mutation> {
         let mut changes: Vec<Mutation> = vec![
-            Box::new(|v| v.binding.from = None),
-            Box::new(|v| v.binding.name.push('!')),
+            Box::new(|v| {
+                v.binding = flick_ir::Binding::Global {
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            }),
+            Box::new(|v| {
+                if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                    &mut v.binding
+                {
+                    name.push('!');
+                }
+            }),
             Box::new(|v| v.mode = ForeignMode::Sync),
             Box::new(|v| v.mode = ForeignMode::Async),
             Box::new(|v| v.mode = ForeignMode::Effect),

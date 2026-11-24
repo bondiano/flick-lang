@@ -16,8 +16,7 @@ impl Lower<'_> {
         if value.mode != ForeignMode::Pure || value.dicts != 0 {
             return None;
         }
-        let from = value.binding.from.as_deref()?;
-        let bind = value.binding.name.as_str();
+        let (from, bind) = value.binding.module_export()?;
         let stages = value.stages.len();
 
         let is_make = from == "flick:Chunk"

@@ -5,7 +5,7 @@ use std::collections::btree_map::Entry;
 use std::iter;
 use std::sync::Arc;
 
-use flick_ir::{Expr, ItemKind, Program, Span};
+use flick_ir::{Binding, Expr, FileId, ItemKind, Program, Span};
 
 use crate::{BuildRequest, InputKind, Inputs};
 
@@ -65,12 +65,20 @@ fn expression(expr: &Expr, texts: &[&str]) -> bool {
     checked
 }
 
-/// Check every item and expression byte span against its UTF-8 source.
+/// Check every item, preamble, and expression byte span against its UTF-8 source.
 pub fn validate_source_spans(program: &Program, texts: &[&str]) -> Result<(), String> {
     for module in &program.modules {
+        for preamble in &module.preambles {
+            if !valid(preamble.span, texts) {
+                return Err("backend IR span is outside its source or splits UTF-8".into());
+            }
+        }
         for item in &module.items {
             let mut checked = valid(item.span, texts);
             if let ItemKind::Foreign(foreign) = &item.kind {
+                if let Binding::Inline(inline) = &foreign.binding {
+                    checked = checked && valid(inline.span, texts);
+                }
                 for word in &foreign.adapter.words {
                     checked = checked && valid(word.span, texts);
                 }
@@ -79,6 +87,21 @@ pub fn validate_source_spans(program: &Program, texts: &[&str]) -> Result<(), St
             if !checked {
                 return Err("backend IR span is outside its source or splits UTF-8".into());
             }
+        }
+    }
+    Ok(())
+}
+
+/// Check every `inline_foreign` entry's source span against its UTF-8 source.
+pub(super) fn validate_inline_spans(request: &BuildRequest, texts: &[&str]) -> Result<(), String> {
+    for inline in &request.inline_foreign {
+        let span = Span::new(
+            FileId::new(inline.span.file),
+            inline.span.start,
+            inline.span.end,
+        );
+        if !valid(span, texts) {
+            return Err("inline foreign span is outside its source or splits UTF-8".into());
         }
     }
     Ok(())

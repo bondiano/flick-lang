@@ -24,8 +24,11 @@ impl Lower<'_> {
         if value.mode != ForeignMode::Pure || value.dicts != 0 || !has_standard_shape(value) {
             return None;
         }
-        let from = value.binding.from.as_deref();
-        let bind = value.binding.name.as_str();
+        let (from, bind) = match &value.binding {
+            flick_ir::Binding::Module { from, name } => (Some(from.as_str()), name.as_str()),
+            flick_ir::Binding::Global { name } => (None, name.as_str()),
+            flick_ir::Binding::Inline(_) => return None,
+        };
         // Zero-argument Float constants (`Math.PI`, `Infinity`, `NaN`).
         if from.is_none() && value.arity == 0 && value.stages.is_empty() {
             let constant = match bind {

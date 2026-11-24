@@ -23,6 +23,7 @@ pub(super) fn build(text: &str) -> Output {
         test: false,
         paths: &BTreeMap::new(),
         lines: &[],
+        sources: &[],
         foreign: &BTreeMap::new(),
         bindings: bindings(),
         lang: &Known::of(&lang_items()),
@@ -389,22 +390,23 @@ fn go_bindings_cover_builtins() {
             let ItemKind::Foreign(f) = &item.kind else {
                 continue;
             };
-            let (from, key) = match &f.binding.from {
-                Some(from) => (from.clone(), f.binding.name.clone()),
-                None => (format!("global {}", module.name), f.name.clone()),
+            let (from, key, export) = match &f.binding {
+                flick_ir::Binding::Module { from, name } => {
+                    (from.clone(), name.clone(), name.as_str())
+                }
+                flick_ir::Binding::Global { name } => (
+                    format!("global {}", module.name),
+                    f.name.clone(),
+                    name.as_str(),
+                ),
+                flick_ir::Binding::Inline(_) => continue,
             };
-            if (bindings().lookup(
-                &module.name,
-                &f.name,
-                f.binding.from.as_deref(),
-                &f.binding.name,
-            ))
-            .is_some()
+            if (bindings().lookup(&module.name, &f.name, f.binding.from(), export)).is_some()
                 || js_only_exports.contains(&(from.clone(), key))
             {
                 continue;
             }
-            let entry = format!("{}.{} ({})", module.name, f.name, f.binding.name);
+            let entry = format!("{}.{} ({export})", module.name, f.name);
             missing.entry(from).or_default().push(entry);
         }
     }

@@ -24,6 +24,8 @@ pub struct Input<'a> {
     pub paths: &'a BTreeMap<String, String>,
     /// The offsets where the lines of each source file start, by `FileId`.
     pub lines: &'a [&'a [u32]],
+    /// The text of each source file, by `FileId` (used for inline `//line` mapping).
+    pub sources: &'a [&'a str],
     /// The Go side of a foreign module of an own module, by the module and
     /// its relative specifier: the file's name in the Go module and its text.
     pub foreign: &'a BTreeMap<(String, String), (String, String)>,

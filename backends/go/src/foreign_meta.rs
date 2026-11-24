@@ -82,7 +82,13 @@ pub fn validate_foreign(
                     diagnostics.push(err("F001", "duplicate foreign metadata `this`", word.span));
                 } else {
                     seen_this = true;
-                    if foreign.arity == 0 {
+                    if foreign.binding.inline().is_some() {
+                        diagnostics.push(err(
+                            "F001",
+                            "`this` is not supported on inline Go foreign bindings; pass the receiver as a parameter",
+                            word.span,
+                        ));
+                    } else if foreign.arity == 0 {
                         diagnostics.push(err(
                             "F001",
                             "`this` needs an argument to be the receiver",

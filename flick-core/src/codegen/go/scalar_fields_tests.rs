@@ -228,6 +228,7 @@ fn optimized_release_ir_preserves_scalar_field_unboxing() {
         test: false,
         paths: &BTreeMap::new(),
         lines: &[],
+        sources: &[],
         foreign: &BTreeMap::new(),
         bindings: bindings(),
         lang: &Known::of(&lang_items()),

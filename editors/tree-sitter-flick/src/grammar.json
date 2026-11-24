@@ -1113,34 +1113,62 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "ALIAS",
-              "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "STRING",
-                    "value": "pure"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": "pure"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "sync"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "async"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "effect"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "blocked"
+                      }
+                    ]
                   },
-                  {
-                    "type": "STRING",
-                    "value": "sync"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "async"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "effect"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "blocked"
-                  }
-                ]
-              },
-              "named": true,
-              "value": "keyword"
+                  "named": true,
+                  "value": "keyword"
+                },
+                {
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "ALIAS",
+                      "content": {
+                        "type": "STRING",
+                        "value": "module"
+                      },
+                      "named": true,
+                      "value": "keyword"
+                    },
+                    {
+                      "type": "ALIAS",
+                      "content": {
+                        "type": "STRING",
+                        "value": "inline"
+                      },
+                      "named": true,
+                      "value": "keyword"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "type": "BLANK"
@@ -1167,8 +1195,17 @@
             {
               "type": "ALIAS",
               "content": {
-                "type": "STRING",
-                "value": "global"
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "global"
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "inline"
+                  }
+                ]
               },
               "named": true,
               "value": "keyword"
@@ -1829,6 +1866,9 @@
     ],
     [
       "_fixture"
+    ],
+    [
+      "_foreign"
     ],
     [
       "_await_signature",

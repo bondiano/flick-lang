@@ -96,10 +96,11 @@ macro_rules! wit_conversions {
             Symbol { module, name }
             Entry { name, symbol, runner }
             ForeignBinding { module, specifier, resolved, abi, inputs }
+            InlineForeign { module, name, code, span }
             Projection { module, schema, input }
             PackageTarget { package, environments }
             RootHandler { environment, service, handler }
-            BuildRequest { target, backend, program, module_root, modules, sources, entries, test_roots, foreign, projections, package_targets, root_handlers, inputs, toolchains, runtime_dependencies, declared_dependencies }
+            BuildRequest { target, backend, program, module_root, modules, sources, entries, test_roots, foreign, inline_foreign, projections, package_targets, root_handlers, inputs, toolchains, runtime_dependencies, declared_dependencies }
             Artifact { id, path, kind, bytes }
             Toolchain { id, version, sha256 }
             StepOutput { id, path, kind }

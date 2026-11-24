@@ -317,6 +317,7 @@ fn release_source_map_preserves_call_site_span_and_go_folds_formula() {
             test: false,
             paths: &BTreeMap::new(),
             lines: &[],
+            sources: &[],
             foreign: &BTreeMap::new(),
             bindings: bindings(),
             lang: &known,

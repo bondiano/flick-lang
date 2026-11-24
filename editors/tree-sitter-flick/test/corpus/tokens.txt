@@ -99,7 +99,12 @@ Foreign modes
 
 foreign pure double from "./d.js" "double"
 foreign sync now from global "Date.now"
+foreign cos from inline "(d) => Math.cos(d)"
+foreign module inline """
+  const k = 1;
+  """
 let pure = async
+let inline = 1
 
 ---
 
@@ -118,8 +123,21 @@ let pure = async
   (string)
   (keyword)
   (identifier)
+  (keyword)
+  (keyword)
+  (string)
+  (keyword)
+  (keyword)
+  (keyword)
+  (multiline_string)
+  (keyword)
+  (identifier)
   (operator)
-  (identifier))
+  (identifier)
+  (keyword)
+  (identifier)
+  (operator)
+  (number))
 
 ==================
 Do block

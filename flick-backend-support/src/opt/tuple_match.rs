@@ -225,6 +225,7 @@ mod tests {
         Module {
             name: "App".to_owned(),
             types: Vec::new(),
+            preambles: Vec::new(),
             items: (bodies.into_iter().enumerate())
                 .map(|(i, body)| Item {
                     kind: ItemKind::Value {
