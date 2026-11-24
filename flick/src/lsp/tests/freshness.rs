@@ -252,3 +252,79 @@ fn opening_a_nested_manifest_while_a_file_moves_refreshes_both_live_projects() {
     );
     fs::remove_dir_all(dir).expect("removed");
 }
+
+#[test]
+fn a_dead_worker_settles_held_requests_and_a_new_one_analyzes_the_next_edit() {
+    let dir = project_dir("dead-worker");
+    let a = dir.join("A.fl");
+    let written = Written::default();
+    let mut server = server(Box::new(written.clone()));
+    server.notify(
+        "textDocument/didOpen",
+        &opened(&a, "module A exposing (x)\n\nx : Int\nlet x = 1\n"),
+    );
+    settle(&mut server);
+    take_messages(&written);
+    // an idle healthy worker is kept, with its cache
+    server.poll();
+    assert!(take_messages(&written).is_empty());
+    assert_eq!(server.worker.cache_len(), 1);
+
+    server.worker.crash();
+    server.notify("textDocument/didChange", &change(&a, (3, 8), (3, 9), "2"));
+    assert!(
+        !server.pending.is_empty(),
+        "the change waits for the worker"
+    );
+    let hover = json!({ "textDocument": { "uri": protocol::uri_of(&a) },
+        "position": { "line": 3, "character": 4 } });
+    for id in [7, 8] {
+        assert!(server.should_defer("textDocument/hover", &hover));
+        server.defer(json!(id), "textDocument/hover", hover.clone());
+    }
+    server.cancel_request(&json!({ "id": 8 }));
+    assert_eq!(
+        server.worker.recv_timeout(Duration::from_mins(1)).err(),
+        Some(mpsc::RecvTimeoutError::Disconnected)
+    );
+    server.poll();
+    let replies: Vec<_> = take_messages(&written)
+        .into_iter()
+        .filter(|m| m.get("id").is_some())
+        .collect();
+    let ids: Vec<_> = replies.iter().map(|m| &m["id"]).collect();
+    assert_eq!(ids, [&json!(8), &json!(7)], "{replies:?}");
+    assert_eq!(replies[0]["error"]["code"], -32800);
+    assert!(
+        replies[1]["result"]["contents"]["value"]
+            .as_str()
+            .is_some_and(|s| s.contains("x : Int")),
+        "{replies:?}"
+    );
+    assert!(server.pending.is_empty() && server.deferred.is_empty());
+
+    let text = "module A exposing (y)\n\ny : String\nlet y = missingValue\n";
+    let whole = json!({ "textDocument": { "uri": protocol::uri_of(&a) },
+        "contentChanges": [{ "text": text }] });
+    server.notify("textDocument/didChange", &whole);
+    settle(&mut server);
+    let published = take_messages(&written);
+    assert!(
+        published
+            .iter()
+            .any(|m| m["params"]["uri"] == protocol::uri_of(&a)
+                && m["params"]["diagnostics"]
+                    .as_array()
+                    .is_some_and(|ds| ds.iter().any(|d| d["code"] == "FLICK-T001"))),
+        "the new worker publishes the current text: {published:?}"
+    );
+    server.answer(&json!(9), "textDocument/hover", &hover);
+    let reply = take_messages(&written);
+    assert!(
+        reply[0]["result"]["contents"]["value"]
+            .as_str()
+            .is_some_and(|s| s.contains("y : String")),
+        "{reply:?}"
+    );
+    fs::remove_dir_all(dir).expect("removed");
+}
