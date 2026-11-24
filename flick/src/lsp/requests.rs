@@ -34,7 +34,7 @@ mod proofs;
 
 pub(super) type Reply = Result<Value, (i64, String)>;
 
-const INVALID_PARAMS: i64 = -32602;
+pub(super) const INVALID_PARAMS: i64 = -32602;
 pub(super) const REQUEST_FAILED: i64 = -32803;
 
 pub(super) fn ide(snapshot: &Snapshot) -> Ide<'_> {
@@ -70,6 +70,7 @@ impl Server {
                 Ok(json!([{ "range": protocol::range(&text, 0, end), "newText": formatted }]))
             }
             "flick/proofAt" => self.proof_at(params),
+            "flick/validateProofSearch" => self.validate_proof_search(params),
             "textDocument/completion" => self.completion(params),
             "textDocument/codeAction" => self.code_actions(params),
             "workspace/symbol" => Ok(self.workspace_symbols(params)),

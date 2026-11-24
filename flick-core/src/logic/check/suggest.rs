@@ -3,19 +3,45 @@
 
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::super::show::source_name;
+use super::super::{SEARCH_CANDIDATES, SEARCH_NORMALIZATION, SEARCH_PROBE_STEPS};
 use super::{
-    Arg, Cert, Checker, Equation, Goal, Lemma, LemmaAliases, Program, Rule, Span, Statement, Term,
-    Ty, probe,
+    Arg, Cert, Checker, Equation, Goal, Lemma, LemmaAliases, Probe, Program, ProofSearchResult,
+    ProofSearchStatus, Rule, Span, Statement, Term, Ty, probe,
 };
 
-const MAX_ATTEMPTS: usize = 128;
-const MAX_NORMALIZATION: u64 = 12_000;
-const ATTEMPTS_PER_GOAL: usize = 20;
-const LEMMAS_PER_GOAL: usize = 64;
-const INSTANTIATIONS_PER_LEMMA: usize = 8;
-const MAX_ARGUMENTS: usize = 8;
+#[derive(Clone, Copy)]
+struct Limits {
+    candidates: usize,
+    normalization: u64,
+    per_goal: usize,
+    lemmas: usize,
+    instantiations: usize,
+    arguments: usize,
+}
+
+const COMPLETION: Limits = Limits {
+    candidates: 128,
+    normalization: 12_000,
+    per_goal: 20,
+    lemmas: 64,
+    instantiations: 8,
+    arguments: 8,
+};
+
+const EXPLICIT: Limits = Limits {
+    candidates: SEARCH_CANDIDATES,
+    normalization: SEARCH_NORMALIZATION,
+    per_goal: SEARCH_CANDIDATES,
+    lemmas: 160,
+    instantiations: 32,
+    arguments: 12,
+};
+
+const MIDDLES: usize = 16;
+const FACTS: usize = 64;
 const MAX_CHECKED: usize = 8;
 
 pub(super) struct Candidates<'a> {
@@ -23,15 +49,74 @@ pub(super) struct Candidates<'a> {
     aliases: &'a LemmaAliases,
     attempts: usize,
     normalization: u64,
+    limits: Limits,
+    cancelled: Option<&'a AtomicBool>,
+    limited: bool,
 }
 
 impl<'a> Candidates<'a> {
     pub fn new(program: &'a dyn Program, aliases: &'a LemmaAliases) -> Self {
+        Self::bounded(program, aliases, COMPLETION, None)
+    }
+
+    pub fn explicit(
+        program: &'a dyn Program,
+        aliases: &'a LemmaAliases,
+        cancelled: &'a AtomicBool,
+    ) -> Self {
+        Self::bounded(program, aliases, EXPLICIT, Some(cancelled))
+    }
+
+    fn bounded(
+        program: &'a dyn Program,
+        aliases: &'a LemmaAliases,
+        limits: Limits,
+        cancelled: Option<&'a AtomicBool>,
+    ) -> Self {
         Self {
             program,
             aliases,
-            attempts: MAX_ATTEMPTS,
-            normalization: MAX_NORMALIZATION,
+            attempts: limits.candidates,
+            normalization: limits.normalization,
+            limits,
+            cancelled,
+            limited: false,
+        }
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.cancelled
+            .is_some_and(|flag| flag.load(Ordering::Relaxed))
+    }
+
+    pub fn search(
+        &mut self,
+        checker: &Checker<'_>,
+        goal: Result<&Equation, (&Ty, &Ty)>,
+        span: Option<Span>,
+        declaration: Span,
+        synthesizing: bool,
+    ) -> ProofSearchResult {
+        let suggestions = self.at(checker, goal, span.unwrap_or(declaration), synthesizing);
+        let status = if self.is_cancelled() {
+            ProofSearchStatus::Cancelled
+        } else if !suggestions.is_empty() {
+            ProofSearchStatus::Found
+        } else if self.attempts == 0 || self.normalization == 0 || self.limited {
+            ProofSearchStatus::BudgetExhausted
+        } else {
+            ProofSearchStatus::NoCandidate
+        };
+        ProofSearchResult {
+            status,
+            suggestions: if status == ProofSearchStatus::Cancelled {
+                Vec::new()
+            } else {
+                suggestions
+            },
+            candidates: self.limits.candidates - self.attempts,
+            normalization_steps: self.limits.normalization - self.normalization,
+            span,
         }
     }
 
@@ -42,7 +127,7 @@ impl<'a> Candidates<'a> {
         span: Span,
         synthesizing: bool,
     ) -> Vec<String> {
-        if self.attempts == 0 || self.normalization == 0 {
+        if self.attempts == 0 || self.normalization == 0 || self.is_cancelled() {
             return Vec::new();
         }
         let locals = locals(checker);
@@ -75,7 +160,7 @@ impl<'a> Candidates<'a> {
             if !testing.available() {
                 break;
             }
-            if local.fact && local.ty == &goal.ty {
+            if local.equation.is_some() && local.ty == &goal.ty {
                 testing.test(Rule::Fact(local.unique.clone()), name);
                 if symm {
                     testing.test(
@@ -88,7 +173,14 @@ impl<'a> Candidates<'a> {
                 }
             }
         }
-        testing.lemmas(goal, &locals, refl, symm);
+        let explicit = testing.budget.cancelled.is_some();
+        if explicit && !locals.contains_key("trans") {
+            testing.transitivity(goal, &locals, symm);
+        }
+        testing.lemmas(goal, &locals, refl, symm, false);
+        if explicit && symm {
+            testing.lemmas(goal, &locals, refl, symm, true);
+        }
         testing.found
     }
 }
@@ -105,8 +197,9 @@ impl Testing<'_, '_, '_> {
     fn available(&self) -> bool {
         self.budget.attempts > 0
             && self.budget.normalization > 0
-            && self.attempted < ATTEMPTS_PER_GOAL
+            && self.attempted < self.budget.limits.per_goal
             && self.found.len() < MAX_CHECKED
+            && !self.budget.is_cancelled()
     }
 
     fn test(&mut self, rule: Rule, text: &str) -> bool {
@@ -119,23 +212,51 @@ impl Testing<'_, '_, '_> {
             kind: rule,
             span: self.statement.span,
         };
-        let accepted = probe(
+        let before = if self.budget.cancelled.is_some() {
+            self.budget.normalization.min(SEARCH_PROBE_STEPS)
+        } else {
+            self.budget.normalization
+        };
+        let mut remaining = before;
+        let checked = probe(
             self.statement,
             &proof,
             self.checker.data,
             self.budget.program,
             self.checker.lemmas,
             &self.checker.refined,
-            &mut self.budget.normalization,
+            &mut remaining,
         );
+        self.budget.normalization -= before - remaining;
+        self.budget.limited |= checked == Probe::Exhausted;
+        let accepted = checked == Probe::Accepted;
         if accepted && !self.found.iter().any(|suggestion| suggestion == text) {
             self.found.push(text.to_owned());
         }
         accepted
     }
 
-    fn lemmas(&mut self, goal: &Equation, locals: &Locals<'_>, refl: bool, symm: bool) {
-        for lemma in self.checker.lemmas.iter().rev().take(LEMMAS_PER_GOAL) {
+    fn lemmas(
+        &mut self,
+        goal: &Equation,
+        locals: &Locals<'_>,
+        refl: bool,
+        symm: bool,
+        reverse: bool,
+    ) {
+        let wrap = |name: &str, args: &str| match (reverse, args.is_empty()) {
+            (true, true) => format!("symm {name}"),
+            (true, false) => format!("symm ({name}{args})"),
+            (false, _) => format!("{name}{args}"),
+        };
+        let span = self.statement.span;
+        for lemma in self
+            .checker
+            .lemmas
+            .iter()
+            .rev()
+            .take(self.budget.limits.lemmas)
+        {
             if !self.available() {
                 break;
             }
@@ -149,21 +270,87 @@ impl Testing<'_, '_, '_> {
                 None => None,
             };
             let Some(spelling) = spelling else { continue };
-            for application in applications(lemma, goal, locals, refl, symm, self.statement.span) {
-                let text = format!("{spelling}{}", application.source);
-                if self.test(Rule::Lemma(name.as_str().into(), application.args), &text)
+            for application in
+                applications(lemma, goal, locals, refl, symm, span, self.budget.limits)
+            {
+                let text = wrap(spelling, &application.source);
+                let direct = Rule::Lemma(name.as_str().into(), application.args);
+                let rule = if reverse {
+                    Rule::Symm(Box::new(Cert { kind: direct, span }))
+                } else {
+                    direct
+                };
+                if self.test(rule, &text)
                     && let Some(aliases) = self.budget.aliases.get(name)
                 {
                     for alias in aliases.iter().skip(1) {
                         if self.found.len() == MAX_CHECKED {
                             break;
                         }
-                        self.found.push(format!("{alias}{}", application.source));
+                        self.found.push(wrap(alias, &application.source));
                     }
                 }
             }
         }
     }
+
+    fn transitivity(&mut self, goal: &Equation, locals: &Locals<'_>, symm: bool) {
+        let span = self.statement.span;
+        let middles = locals
+            .iter()
+            .filter(|(_, local)| local.equation.is_none() && local.ty == &goal.ty)
+            .take(MIDDLES);
+        for (name, local) in middles {
+            if !self.available() {
+                break;
+            }
+            let middle = Term::Var(local.unique.clone());
+            if let Some((left, p)) = witness(locals, goal, &goal.left, &middle, span, symm)
+                && let Some((right, q)) = witness(locals, goal, &middle, &goal.right, span, symm)
+            {
+                self.test(
+                    Rule::Trans(middle, Box::new(left), Box::new(right)),
+                    &format!("trans {name} {p} {q}"),
+                );
+            }
+        }
+    }
+}
+
+fn witness(
+    locals: &Locals<'_>,
+    goal: &Equation,
+    left: &Term,
+    right: &Term,
+    span: Span,
+    symm: bool,
+) -> Option<(Cert, String)> {
+    locals
+        .iter()
+        .filter_map(|(&name, local)| Some((name, local.unique, local.equation?)))
+        .take(FACTS)
+        .find_map(|(name, unique, equation)| {
+            if equation.ty != goal.ty {
+                return None;
+            }
+            let fact = Cert {
+                kind: Rule::Fact(unique.clone()),
+                span,
+            };
+            if &equation.left == left && &equation.right == right {
+                Some((fact, name.to_owned()))
+            } else if symm && &equation.left == right && &equation.right == left {
+                Some((
+                    Cert {
+                        kind: Rule::Symm(Box::new(fact)),
+                        span,
+                    },
+                    format!("(symm {name})"),
+                ))
+            } else {
+                None
+            }
+        })
 }
 
 fn is_rule(name: &str) -> bool {
@@ -174,7 +361,7 @@ fn is_rule(name: &str) -> bool {
 struct Local<'a> {
     unique: &'a Rc<str>,
     ty: &'a Ty,
-    fact: bool,
+    equation: Option<&'a Equation>,
 }
 
 type Locals<'a> = BTreeMap<&'a str, Local<'a>>;
@@ -184,12 +371,12 @@ fn locals<'a>(checker: &'a Checker<'_>) -> Locals<'a> {
     let variables = checker.vars.iter().map(|(unique, ty)| Local {
         unique,
         ty,
-        fact: false,
+        equation: None,
     });
     let facts = checker.facts.iter().map(|(unique, equation)| Local {
         unique,
         ty: &equation.ty,
-        fact: true,
+        equation: Some(equation),
     });
     for local in variables
         .chain(facts)
@@ -236,8 +423,9 @@ fn applications(
     refl: bool,
     symm: bool,
     span: Span,
+    limits: Limits,
 ) -> Vec<Application> {
-    if lemma.order.len() > MAX_ARGUMENTS {
+    if lemma.order.len() > limits.arguments {
         return Vec::new();
     }
     let Goal::Equal(conclusion) = &lemma.statement.goal else {
@@ -268,7 +456,7 @@ fn applications(
         let mut options: Vec<_> = locals
             .iter()
             .map(|(&name, &local)| (name, local))
-            .filter(|(_, l)| l.fact == *premise)
+            .filter(|(_, l)| l.equation.is_some() == *premise)
             .collect();
         options.sort_by_key(|(name, _)| *name != source_name(formal));
         let mut next = Vec::new();
@@ -294,11 +482,11 @@ fn applications(
                 } else {
                     next.push(app.with(name, Arg::Value(Term::Var(local.unique.clone())), types));
                 }
-                if next.len() >= INSTANTIATIONS_PER_LEMMA {
+                if next.len() >= limits.instantiations {
                     break;
                 }
             }
-            if *premise && refl && next.len() < INSTANTIATIONS_PER_LEMMA {
+            if *premise && refl && next.len() < limits.instantiations {
                 next.push(app.with(
                     "refl",
                     Arg::Proof(Cert {
@@ -308,11 +496,11 @@ fn applications(
                     app.types.clone(),
                 ));
             }
-            if next.len() >= INSTANTIATIONS_PER_LEMMA {
+            if next.len() >= limits.instantiations {
                 break;
             }
         }
-        next.truncate(INSTANTIATIONS_PER_LEMMA);
+        next.truncate(limits.instantiations);
         if next.is_empty() {
             return next;
         }

@@ -3,6 +3,10 @@
 
 use std::rc::Rc;
 use std::slice;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::atomic::AtomicBool;
 
 use flick_ir::Lit;
 
@@ -10,6 +14,8 @@ use super::{
     Cert, Ctor, Data, DataDecl, Equation, Failure, Goal, Literal, Pat, Rule, Statement, Term, Ty,
     prove,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use super::{ProofSearchRequest, ProofSearchStatus};
 use crate::source::{SourceMap, Span};
 
 /// A program without definitions.
@@ -657,4 +663,138 @@ fn a_synthesized_proof_term_requires_a_rule_that_states_its_equation() {
     );
     assert!(steps[0].suggestions.iter().any(|s| s == "refl"));
     assert_eq!(steps[1].suggestions, ["h", "symm h"]);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn search_at(offset: u32, cancelled: bool) -> ProofSearchRequest {
+    ProofSearchRequest {
+        declaration: (0, 100),
+        offset,
+        cancelled: Arc::new(AtomicBool::new(cancelled)),
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn explicit_search_composes_visible_facts_in_a_deterministic_order() {
+    let mut goal = equal(
+        vec![("x", Ty::Bool), ("y", Ty::Bool), ("z", Ty::Bool)],
+        Ty::Bool,
+        var("x"),
+        var("z"),
+    );
+    goal.premises = [("first", "x", "y"), ("second", "z", "y")]
+        .into_iter()
+        .map(|(h, left, right)| {
+            (
+                h.into(),
+                Equation {
+                    ty: Ty::Bool,
+                    left: var(left),
+                    right: var(right),
+                },
+            )
+        })
+        .collect();
+    let aliases = super::LemmaAliases::new();
+    assert!(super::suggest_header(&goal, &data(), &Nothing, &[], &aliases).is_empty());
+    let search = || {
+        super::search_proof(
+            &goal,
+            None,
+            &data(),
+            &Nothing,
+            &[],
+            &aliases,
+            &search_at(11, false),
+        )
+    };
+    let checked = search();
+    assert_eq!(checked.status, ProofSearchStatus::Found);
+    assert_eq!(checked.suggestions, ["trans y first (symm second)"]);
+    assert_eq!(checked.span, None, "the draft has no existing term");
+    assert_eq!(checked.suggestions, search().suggestions);
+    assert_eq!(checked.candidates, search().candidates);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn a_search_targets_the_obligation_of_an_incomplete_proof_argument() {
+    use flick_ir::{Expr, ExprKind, Stage};
+
+    let mut goal = equal(
+        vec![("x", Ty::Bool), ("y", Ty::Bool)],
+        Ty::Bool,
+        var("y"),
+        var("x"),
+    );
+    goal.premises.push((
+        "h".into(),
+        Equation {
+            ty: Ty::Bool,
+            left: var("x"),
+            right: var("y"),
+        },
+    ));
+    let file = span().file;
+    let name = Expr::new(
+        ExprKind::Global {
+            module: super::RULES.into(),
+            name: "symm".into(),
+            type_args: Vec::new(),
+        },
+        Span::new(file, 12, 16),
+    );
+    let selected = Span::new(file, 17, 21);
+    let body = Expr::new(
+        ExprKind::App {
+            func: Box::new(name),
+            arg: Box::new(Expr::new(ExprKind::Lit(Lit::Bool(true)), selected)),
+            stage: Stage::Pure,
+            arg_first: false,
+        },
+        Span::new(file, 12, 21),
+    );
+    let found = super::search_proof(
+        &goal,
+        Some(&body),
+        &data(),
+        &Nothing,
+        &[],
+        &super::LemmaAliases::new(),
+        &search_at(19, false),
+    );
+    assert_eq!(found.status, ProofSearchStatus::Found);
+    assert_eq!(found.suggestions, ["h"]);
+    assert_eq!(found.span, Some(selected));
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn search_distinguishes_cancelled_empty_and_budget_exhausted() {
+    let check = |goal: &Statement, cancelled| {
+        super::search_proof(
+            goal,
+            None,
+            &data(),
+            &Nothing,
+            &[],
+            &super::LemmaAliases::new(),
+            &search_at(9, cancelled),
+        )
+    };
+    let literal = |value| Term::Lit(Literal(Lit::Bool(value)));
+    let different = equal(Vec::new(), Ty::Bool, literal(true), literal(false));
+    let empty = check(&different, false);
+    assert_eq!(empty.status, ProofSearchStatus::NoCandidate);
+    assert!(empty.suggestions.is_empty());
+    let cancelled = check(&different, true);
+    assert_eq!(cancelled.status, ProofSearchStatus::Cancelled);
+    assert_eq!(cancelled.candidates, 0);
+    let nested = (0..450).fold(literal(true), |term, _| app(lam("z", var("z")), term));
+    let deep = equal(Vec::new(), Ty::Bool, nested.clone(), nested);
+    let exhausted = check(&deep, false);
+    assert_eq!(exhausted.status, ProofSearchStatus::BudgetExhausted);
+    assert!(exhausted.suggestions.is_empty());
+    assert!(exhausted.normalization_steps > 0);
 }

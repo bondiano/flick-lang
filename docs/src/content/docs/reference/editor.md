@@ -197,6 +197,15 @@ proof arguments. In a `lawful` bundle, completion offers law names and checked
 lemmas for the selected instance. **Add missing law fields** adds placeholders
 for missing laws and superclass records while preserving written entries.
 
+### Find a proof
+
+Place the cursor in the proof term you want to fill or replace, then run
+**Flick: Find Proof** from the Command Palette. The command searches the
+current goal and previews ordinary Flick terms that passed the checker.
+Select a term to insert it. The search is cancellable and reports when it
+finds no checked term or reaches its limit. Edits to the proof or its
+dependencies invalidate the preview.
+
 ## Zed
 
 The extension first uses `lsp.flick.binary.path`, if set, then `flick` on

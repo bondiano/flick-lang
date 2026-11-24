@@ -12,6 +12,8 @@ mod eval;
 #[cfg(test)]
 pub(crate) mod lean;
 pub mod omega;
+#[cfg(not(target_arch = "wasm32"))]
+mod search;
 mod show;
 mod term;
 mod trace;
@@ -24,7 +26,13 @@ use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
 
 pub use cert::{Arg, Cert, Rule, cert};
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use check::Probe as CandidateVerdict;
 pub use defs::{Admitted, Program, admit};
+#[cfg(not(target_arch = "wasm32"))]
+pub use search::{ProofSearchRequest, ProofSearchResult, ProofSearchStatus};
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use search::{SEARCH_CANDIDATES, SEARCH_NORMALIZATION, SEARCH_PROBE_STEPS};
 pub use term::{Ctor, Def, LEMMAS, Literal, Pat, RULES, Refused, TUPLES, Term, term};
 pub use trace::{ProofStep, show_equation, show_goal};
 
@@ -419,14 +427,14 @@ pub fn prove_with_suggestions(
 
 /// Checks an editor candidate against its current subject with a separate budget.
 #[cfg(not(target_arch = "wasm32"))]
-pub fn check_candidate(
+pub(crate) fn check_candidate(
     statement: &Statement,
     proof: &Cert,
     data: &Data,
     program: &dyn Program,
     lemmas: &[Lemma],
     remaining: &mut u64,
-) -> bool {
+) -> CandidateVerdict {
     check::probe(statement, proof, data, program, lemmas, &[], remaining)
 }
 
@@ -478,6 +486,35 @@ pub fn suggest_header(
         Some((program, aliases)),
     );
     steps.pop().map_or_else(Vec::new, |step| step.suggestions)
+}
+
+/// Searches one selected obligation using only the current program and scope.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn search_proof(
+    statement: &Statement,
+    body: Option<&flick_ir::Expr>,
+    data: &Data,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+    aliases: &LemmaAliases,
+    request: &ProofSearchRequest,
+) -> ProofSearchResult {
+    if request.is_cancelled() {
+        return ProofSearchResult::empty(ProofSearchStatus::Cancelled);
+    }
+    // The parser can recover a missing body as an empty, source-less block.
+    let proof = body
+        .filter(|expr| (expr.span.start, expr.span.end) != (0, 0))
+        .map(|expr| cert::recover(expr, lemmas));
+    check::search_proof(
+        statement,
+        proof.as_ref(),
+        data,
+        program,
+        lemmas,
+        aliases,
+        request,
+    )
 }
 
 #[cfg(test)]

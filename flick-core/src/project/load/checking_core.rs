@@ -375,20 +375,28 @@ impl Checking<'_> {
                         .map_or(&[], Vec::as_slice)
                 },
             };
+            #[cfg(not(target_arch = "wasm32"))]
+            let search = self
+                .cache
+                .and_then(|cache| cache.proof_search(&loaded.path));
             if clean {
                 let (found, proven) = ir::check_proofs(
-                    &module, &typing, &run,
+                    &module,
+                    &typing,
+                    &run,
                     #[cfg(not(target_arch = "wasm32"))]
                     evidence.take(),
                     #[cfg(not(target_arch = "wasm32"))]
                     self.project.is_some_and(|p| p.config.unused_proof_premises),
+                    #[cfg(not(target_arch = "wasm32"))]
+                    search,
                 );
                 diagnostics.extend(found);
                 proofs = proven;
             }
             #[cfg(not(target_arch = "wasm32"))]
             if !clean && let Some(evidence) = evidence {
-                ir::observe_proofs(&module, &typing, &run, &diagnostics, evidence);
+                ir::observe_proofs(&module, &typing, &run, &diagnostics, evidence, search);
             }
             if clean && self.proves_contracts(loaded) {
                 let (contract_diags, summaries) = ir::check_contracts(&module, &typing, &run);
@@ -479,7 +487,6 @@ impl Checking<'_> {
             contracts: verified_contracts,
         }
     }
-
 }
 
 /// Takes where `imported` declares the names `interface` re-exports.

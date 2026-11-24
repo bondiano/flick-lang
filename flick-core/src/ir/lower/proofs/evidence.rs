@@ -4,18 +4,21 @@ use std::collections::HashSet;
 
 use super::{Lower, LoweredProof, Run, replay_lemmas, statement};
 use crate::diagnostics::{Diagnostic, Severity};
-use crate::logic::{self, Lemma, LemmaAliases, Program};
+use crate::logic::{
+    self, Lemma, LemmaAliases, Program, ProofSearchRequest, ProofSearchResult, ProofSearchStatus,
+};
 use crate::resolve;
 use crate::source::Span;
 use crate::syntax::cst::{Element, Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{ProofEvidence, ProofStatus};
+use crate::types::{GoalType, ProofEvidence, ProofStatus};
 use crate::types::{ProofInfo, Typing};
 use flick_ir::Dict;
 
 pub(super) struct Recording<'a> {
     pub aliases: LemmaAliases,
     pub out: &'a mut Vec<ProofEvidence>,
+    search: Option<&'a ProofSearchRequest>,
 }
 
 impl<'a> Recording<'a> {
@@ -24,6 +27,7 @@ impl<'a> Recording<'a> {
         run: &Run,
         lemmas: &mut Vec<Lemma>,
         out: &'a mut Vec<ProofEvidence>,
+        search: Option<&'a ProofSearchRequest>,
     ) -> Self {
         let mut modules: Vec<_> = module
             .syntax
@@ -60,7 +64,11 @@ impl<'a> Recording<'a> {
                 lemmas.push(lemma);
             }
         }
-        Self { aliases, out }
+        Self {
+            aliases,
+            out,
+            search,
+        }
     }
 
     pub fn begin(&self, lowered: &LoweredProof, lemmas: &[Lemma]) -> ProofEvidence {
@@ -80,6 +88,7 @@ impl<'a> Recording<'a> {
             failure: None,
             steps: Vec::new(),
             header_suggestions: Vec::new(),
+            search: None,
             lemmas: visible,
             instance: lowered.subject.as_ref().and_then(|dict| match dict {
                 Dict::Instance { module, name, .. } => Some(format!("{module}.{name}")),
@@ -87,6 +96,70 @@ impl<'a> Recording<'a> {
             }),
             obligations: Vec::new(),
         }
+    }
+
+    pub fn request_for(
+        &self,
+        proof: &LoweredProof,
+        diagnostics: &[Diagnostic],
+        evidence: &mut ProofEvidence,
+    ) -> Option<&ProofSearchRequest> {
+        let request = self
+            .search
+            .filter(|request| request.declaration == proof.at)?;
+        let status = if request.is_cancelled() {
+            Some(ProofSearchStatus::Cancelled)
+        } else if proof.assignment.is_none_or(|body| {
+            diagnostics.iter().any(|diagnostic| {
+                diagnostic.severity == Severity::Error
+                    && diagnostic.span.is_some_and(|span| {
+                        span.file == proof.span.file
+                            && proof.span.start <= span.start
+                            && span.start < body
+                    })
+            })
+        }) {
+            // A malformed statement is not the subject of a checked edit.
+            Some(ProofSearchStatus::NoCandidate)
+        } else {
+            None
+        };
+        if let Some(status) = status {
+            evidence.search = Some(ProofSearchResult::empty(status));
+            None
+        } else {
+            Some(request)
+        }
+    }
+
+    pub fn search(
+        &self,
+        lowered: &LoweredProof,
+        info: &ProofInfo,
+        program: &dyn Program,
+        lemmas: &[Lemma],
+        evidence: &mut ProofEvidence,
+        request: &ProofSearchRequest,
+    ) {
+        if matches!(info.goal, GoalType::Lawful(_)) {
+            return;
+        }
+        let result = if request.is_cancelled() {
+            ProofSearchResult::empty(ProofSearchStatus::Cancelled)
+        } else if let Ok(statement) = statement(lowered, info) {
+            logic::search_proof(
+                &statement,
+                lowered.body.as_ref(),
+                &info.data,
+                program,
+                lemmas,
+                &self.aliases,
+                request,
+            )
+        } else {
+            ProofSearchResult::empty(ProofSearchStatus::NoCandidate)
+        };
+        evidence.search = Some(result);
     }
 }
 

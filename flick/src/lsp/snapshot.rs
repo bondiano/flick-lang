@@ -6,11 +6,13 @@ use std::env;
 use std::fs;
 use std::io;
 use std::path::{MAIN_SEPARATOR, Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock};
 use std::time::Instant;
 
 #[cfg(feature = "wasm-backends")]
 use flick_core::diagnostics::Diagnostic;
+use flick_core::ide::Ide;
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
 #[cfg(feature = "wasm-backends")]
@@ -24,6 +26,9 @@ use flick_core::project::{
     ResolvedEnvironment,
 };
 use flick_core::source::{FileId, SourceMap};
+use flick_core::syntax::cst::Node;
+use flick_core::syntax::kind::SyntaxKind as K;
+use flick_core::types::{ProofSearchRequest, ProofSearchStatus};
 use flick_core::{resolve, syntax, types};
 use tracing::{debug, debug_span};
 
@@ -300,6 +305,169 @@ pub fn analyze(docs: &HashMap<PathBuf, String>, path: &Path, caches: &mut Caches
         foreign_extension,
         context,
         generation: 0,
+    }
+}
+
+pub(super) struct ProofSearchResult {
+    pub status: &'static str,
+    pub suggestions: Vec<(String, (u32, u32))>,
+}
+
+impl ProofSearchResult {
+    fn empty(status: &'static str) -> Self {
+        Self {
+            status,
+            suggestions: Vec::new(),
+        }
+    }
+}
+
+/// Reruns the current overlays on the search lane with a bounded search at
+/// just the selected obligation.
+pub(super) fn search_proof(
+    docs: &HashMap<PathBuf, String>,
+    path: &Path,
+    offset: u32,
+    cancelled: &Arc<AtomicBool>,
+) -> ProofSearchResult {
+    if cancelled.load(Ordering::Relaxed) {
+        return ProofSearchResult::empty("cancelled");
+    }
+    let Some(text) = docs.get(path) else {
+        return ProofSearchResult::empty("no-candidate");
+    };
+    let parsed = syntax::parse(text, FileId::default());
+    let Some(decl) = search_declaration(&parsed.tree, text, offset) else {
+        return ProofSearchResult::empty("no-candidate");
+    };
+    let request = ProofSearchRequest {
+        declaration: decl.range(),
+        offset,
+        cancelled: Arc::clone(cancelled),
+    };
+    let context = Context::of(docs, path);
+    let mut caches = Caches::from([(
+        context,
+        ModuleCache::for_proof_search(canonical(path), request),
+    )]);
+    let snapshot = analyze(docs, path, &mut caches);
+    if cancelled.load(Ordering::Relaxed) {
+        return ProofSearchResult::empty("cancelled");
+    }
+    let ide = Ide {
+        analysis: &snapshot.analysis,
+        sources: &snapshot.sources,
+    };
+    let result = snapshot.file(path).and_then(|file| {
+        if ide.ordinary_value_in_proof(file, offset) {
+            return None;
+        }
+        snapshot
+            .analysis
+            .by_file(file)?
+            .typing
+            .proof_evidence
+            .iter()
+            .find(|proof| proof.at == decl.range())?
+            .search
+            .as_ref()
+    });
+    let Some(result) = result else {
+        return ProofSearchResult::empty("no-candidate");
+    };
+    debug!(
+        candidates = result.candidates,
+        normalization_steps = result.normalization_steps,
+        ?result.status,
+        "proof search finished",
+    );
+    let status = match result.status {
+        ProofSearchStatus::Found => "found",
+        ProofSearchStatus::NoCandidate => "no-candidate",
+        ProofSearchStatus::BudgetExhausted => "budget-exhausted",
+        ProofSearchStatus::Cancelled => "cancelled",
+    };
+    let range = result
+        .span
+        .map_or((offset, offset), |span| (span.start, span.end));
+    let range = search_range(decl, text, offset, range);
+    let suggestions = range.map_or_else(Vec::new, |(range, nested)| {
+        let prefix = if range.0 == range.1 {
+            let before = &text[..range.0 as usize];
+            let line = before.rsplit_once('\n').map_or(before, |(_, line)| line);
+            if line.ends_with('=') {
+                " "
+            } else if line.is_empty() {
+                "  "
+            } else {
+                ""
+            }
+        } else {
+            ""
+        };
+        result
+            .suggestions
+            .iter()
+            .map(|term| {
+                let text = if !prefix.is_empty() {
+                    format!("{prefix}{term}")
+                } else if nested && term.contains(char::is_whitespace) {
+                    format!("({term})")
+                } else {
+                    term.clone()
+                };
+                (text, range)
+            })
+            .collect()
+    });
+    let status = if status == "found" && suggestions.is_empty() {
+        "no-candidate"
+    } else {
+        status
+    };
+    ProofSearchResult {
+        status,
+        suggestions,
+    }
+}
+
+fn search_declaration<'a>(tree: &'a Node, text: &str, at: u32) -> Option<&'a Node> {
+    let decl = tree
+        .nodes()
+        .take_while(|node| node.range().0 <= at)
+        .last()?;
+    if decl.kind != K::ProofDecl {
+        return None;
+    }
+    let equal = decl.child_tokens().find(|token| token.kind == K::Eq)?;
+    if at < equal.end {
+        return None;
+    }
+    let end = decl.range().1;
+    (at <= end
+        || text
+            .get(end as usize..at as usize)
+            .is_some_and(|gap| gap.trim().is_empty()))
+    .then_some(decl)
+}
+
+/// The edit range and whether it belongs to a term inside the body. An
+/// application inserted as an argument needs parentheses to stay one term.
+fn search_range(
+    decl: &Node,
+    text: &str,
+    at: u32,
+    (start, end): (u32, u32),
+) -> Option<((u32, u32), bool)> {
+    let body = decl.nodes().find(|node| node.kind == K::Block);
+    if let Some(body) = body.filter(|body| body.nodes().next().is_some()) {
+        let (from, to) = body.range();
+        (from <= start && start <= at && at <= end && end <= to)
+            .then_some(((start, end), (start, end) != (from, to)))
+    } else {
+        let equal = decl.child_tokens().find(|token| token.kind == K::Eq)?;
+        let gap = text.get(equal.end as usize..at as usize)?;
+        gap.trim().is_empty().then_some(((at, at), false))
     }
 }
 

@@ -2,6 +2,7 @@
 const vscode = require("vscode");
 const { LanguageClient, State, CloseAction, ErrorAction } = require("vscode-languageclient/node");
 const { createProofView } = require("./proof-view.js");
+const { createProofSearch } = require("./proof-search.js");
 
 const DEFAULT_START_TIMEOUT_MS = 15_000;
 
@@ -11,6 +12,7 @@ let statusBar;
 let stateDisposable;
 let proofStateDisposable;
 let proofView;
+let proofSearch;
 let extensionDisposables = [];
 let fileWatchers = [];
 let lifecycleQueue = Promise.resolve();
@@ -83,6 +85,11 @@ function logError(message) {
   } else {
     outputChannel?.appendLine?.(message);
   }
+}
+
+function proofConnectionChanged() {
+  proofView?.connectionChanged();
+  proofSearch?.connectionChanged();
 }
 
 function updateStatus(kind, detail) {
@@ -165,7 +172,7 @@ async function stopCurrentClient() {
   const active = client;
   client = undefined;
   activeState = State.Stopped;
-  proofView?.connectionChanged();
+  proofConnectionChanged();
 
   if (!active) {
     disposeWatchers();
@@ -298,6 +305,7 @@ async function startNewClient(expectedGeneration) {
     proofStateDisposable = instance.onNotification("flick/proofStateChanged", (event) => {
       if (instance === client && !aborted && !isDeactivated) {
         proofView?.snapshotChanged(event);
+        proofSearch?.snapshotChanged(event);
       }
     });
 
@@ -320,7 +328,7 @@ async function startNewClient(expectedGeneration) {
             updateStatus("stopped");
           }
         }
-        proofView?.connectionChanged();
+        proofConnectionChanged();
       });
     }
 
@@ -392,7 +400,7 @@ async function startNewClient(expectedGeneration) {
     if (activeState === State.Starting) {
       activeState = State.Running;
       updateStatus(inFlightRequests > 0 ? "busy" : "ready");
-      proofView?.connectionChanged();
+      proofConnectionChanged();
     }
   } catch (err) {
     if (err instanceof StartAbortedError) {
@@ -403,7 +411,7 @@ async function startNewClient(expectedGeneration) {
         proofStateDisposable = undefined;
         client = undefined;
         activeState = State.Stopped;
-        proofView?.connectionChanged();
+        proofConnectionChanged();
         disposeWatchers();
       }
       return;
@@ -417,7 +425,7 @@ async function startNewClient(expectedGeneration) {
       hasStartError = true;
       activeState = State.StartFailed;
       updateStatus("error", `Flick language server (${command}) failed: ${message}. Click to restart.`);
-      proofView?.connectionChanged();
+      proofConnectionChanged();
     }
   }
 }
@@ -450,12 +458,15 @@ function activate(context) {
   outputChannel = vscode.window.createOutputChannel("Flick", { log: true });
   statusBar = vscode.window.createStatusBarItem("flick.statusBar", vscode.StatusBarAlignment.Left, 0);
   statusBar.show();
-  proofView = createProofView(vscode, () => activeState === State.Running ? client : undefined, logError);
+  const readyClient = () => activeState === State.Running ? client : undefined;
+  proofView = createProofView(vscode, readyClient, logError);
+  proofSearch = createProofSearch(vscode, readyClient, logError);
 
   const restartCommand = vscode.commands.registerCommand("flick.restartServer", () => restartServer());
   const showOutputCommand = vscode.commands.registerCommand("flick.showOutput", () => {
     outputChannel?.show?.(true);
   });
+  const searchProofCommand = vscode.commands.registerCommand("flick.searchProof", proofSearch.run);
 
   const configListener = vscode.workspace.onDidChangeConfiguration((event) => {
     if (isDeactivated || !event.affectsConfiguration("flick")) {
@@ -470,15 +481,17 @@ function activate(context) {
     }
   });
 
-  extensionDisposables = [restartCommand, showOutputCommand, configListener];
+  extensionDisposables = [restartCommand, showOutputCommand, searchProofCommand, configListener];
   if (Array.isArray(context?.subscriptions)) {
     context.subscriptions.push(
       outputChannel,
       statusBar,
       restartCommand,
       showOutputCommand,
+      searchProofCommand,
       configListener,
       proofView,
+      proofSearch,
     );
   }
 
@@ -492,6 +505,8 @@ function deactivate() {
   disposeExtensionDisposables();
   proofView?.dispose();
   proofView = undefined;
+  proofSearch?.dispose();
+  proofSearch = undefined;
   return enqueue(async () => {
     await stopCurrentClient();
     statusBar?.dispose?.();

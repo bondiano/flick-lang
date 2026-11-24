@@ -45,6 +45,8 @@ pub struct ProofEvidence {
     pub steps: Vec<logic::ProofStep>,
     /// Checked terms at the declaration goal, including when the body is empty.
     pub header_suggestions: Vec<String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub search: Option<logic::ProofSearchResult>,
     /// Checked lemmas visible before this declaration, using source qualifiers.
     pub lemmas: Vec<String>,
     pub instance: Option<String>,

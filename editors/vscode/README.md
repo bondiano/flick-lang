@@ -37,6 +37,7 @@ no `node_modules` and no other npm package.
 
 - **Flick: Restart Language Server** (`flick.restartServer`) restarts the language server process.
 - **Flick: Show Language Server Output** (`flick.showOutput`) opens the Flick output channel.
+- **Flick: Find Proof** (`flick.searchProof`) previews checked proof terms for the goal at the cursor. Select a term to insert it.
 
 Files ending in `.fl` are recognized as Flick, with spaces-only indentation,
 and are formatted by the server on save.

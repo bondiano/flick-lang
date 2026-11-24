@@ -33,6 +33,9 @@ pub struct LoweredProof {
     /// The declaration, as `ProofInfo::at`.
     pub at: Range,
     pub span: Span,
+    /// Start of the proof's assignment token, after the statement.
+    #[cfg(not(target_arch = "wasm32"))]
+    assignment: Option<u32>,
     /// The unique names of the parameters and premises, in order.
     pub params: Vec<String>,
     /// Which of them are premises.
@@ -144,6 +147,11 @@ impl Lower<'_> {
         LoweredProof {
             at: decl.range(),
             span,
+            #[cfg(not(target_arch = "wasm32"))]
+            assignment: decl
+                .child_tokens()
+                .find(|token| token.kind == K::Eq)
+                .map(|token| token.start),
             params,
             premise: patterns_premise,
             sides,
@@ -215,6 +223,7 @@ pub fn check_proofs(
     run: &Run,
     #[cfg(not(target_arch = "wasm32"))] evidence: Option<&mut Vec<ProofEvidence>>,
     #[cfg(not(target_arch = "wasm32"))] unused_premises: bool,
+    #[cfg(not(target_arch = "wasm32"))] search: Option<&logic::ProofSearchRequest>,
 ) -> (Vec<Diagnostic>, Vec<Proven>) {
     if typing.proofs.is_empty() && typing.laws.is_empty() {
         return (Vec::new(), Vec::new());
@@ -234,7 +243,8 @@ pub fn check_proofs(
     let mut lemmas = imported_lemmas(&proofs, run, 0);
     let of = |m: &str, c: &str| class_laws(run, module.name, &laws, m, c);
     #[cfg(not(target_arch = "wasm32"))]
-    let mut evidence = evidence.map(|out| evidence::Recording::new(module, run, &mut lemmas, out));
+    let mut evidence =
+        evidence.map(|out| evidence::Recording::new(module, run, &mut lemmas, out, search));
     #[cfg(not(target_arch = "wasm32"))]
     let mut lints = lints::Lints::new(module, typing, unused_premises);
     let diagnostics = prove_each(
@@ -260,6 +270,7 @@ pub fn observe_proofs(
     run: &Run,
     diagnostics: &[Diagnostic],
     out: &mut Vec<ProofEvidence>,
+    search: Option<&logic::ProofSearchRequest>,
 ) {
     let proofs = paired(
         evidence::lower_drafts(module, typing, diagnostics),
@@ -290,10 +301,14 @@ pub fn observe_proofs(
         builtins: (run.builtins)(),
     };
     let mut lemmas = imported_lemmas(&proofs, run, 0);
-    let recording = evidence::Recording::new(module, run, &mut lemmas, out);
+    let recording = evidence::Recording::new(module, run, &mut lemmas, out, search);
     for proof in &proofs {
         let (lowered, info) = proof;
         let mut evidence = recording.begin(lowered, &lemmas);
+        let target = recording.request_for(lowered, diagnostics, &mut evidence);
+        if let Some(request) = target {
+            recording.search(lowered, info, &program, &lemmas, &mut evidence, request);
+        }
         let error = diagnostics
             .iter()
             .filter(|d| d.severity == Severity::Error)
@@ -312,6 +327,7 @@ pub fn observe_proofs(
                 &program,
                 &lemmas,
                 (&mut evidence, &recording.aliases),
+                target,
             );
         } else if let Some(span) = error {
             evidence.failure = Some(span);
@@ -397,6 +413,17 @@ fn prove_each(
         #[cfg(not(target_arch = "wasm32"))]
         let mut evidence = recording.as_ref().map(|r| r.begin(lowered, lemmas));
         #[cfg(not(target_arch = "wasm32"))]
+        let target = recording
+            .as_ref()
+            .zip(evidence.as_mut())
+            .and_then(|(recording, evidence)| {
+                let target = recording.request_for(lowered, &[], evidence);
+                if let Some(request) = target {
+                    recording.search(lowered, info, program, lemmas, evidence, request);
+                }
+                target
+            });
+        #[cfg(not(target_arch = "wasm32"))]
         let candidate_scope = evidence
             .as_mut()
             .zip(recording.as_ref().map(|r| &r.aliases));
@@ -411,6 +438,8 @@ fn prove_each(
                     lemmas,
                     #[cfg(not(target_arch = "wasm32"))]
                     candidate_scope,
+                    #[cfg(not(target_arch = "wasm32"))]
+                    target,
                 );
                 #[cfg(not(target_arch = "wasm32"))]
                 if found.is_empty()

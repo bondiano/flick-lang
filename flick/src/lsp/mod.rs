@@ -9,6 +9,7 @@ mod diagnostics;
 mod features;
 mod logging;
 mod members;
+mod proof_search;
 pub mod protocol;
 mod registration;
 mod requests;
@@ -34,6 +35,7 @@ use tracing::{debug, error, info, info_span};
 use crate::builtins;
 use deferred::Deferred;
 use diagnostics::{lsp_diagnostic, publish};
+use proof_search::Search;
 use snapshot::{BUILTIN_DIR, builtin_index, canonical, overlay};
 pub use snapshot::{Caches, Context, Snapshot, analyze};
 use worker::Worker;
@@ -73,6 +75,7 @@ pub struct Server {
     generation: u64,
     /// The requests held until the analysis of their document is published.
     deferred: Vec<Deferred>,
+    search: Search,
 }
 
 pub fn serve() -> ExitCode {
@@ -151,11 +154,24 @@ pub fn serve() -> ExitCode {
             ("shutdown", Some(id)) => {
                 info!("shutdown requested");
                 shut_down = true;
+                server.cancel_proof_search(None);
                 server.send(&protocol::response(id, &Value::Null));
             }
             // what the client answers a request of the server's
             ("", Some(_)) => debug!("response received"),
             ("$/cancelRequest", None) => server.cancel_request(params),
+            ("flick/searchProof", Some(id)) if !shut_down => {
+                if server
+                    .guarded(|s| s.start_proof_search(id, params))
+                    .is_none()
+                {
+                    server.send(&protocol::error(
+                        id,
+                        deferred::INTERNAL_ERROR,
+                        "proof search failed",
+                    ));
+                }
+            }
             (_, Some(id)) => {
                 // a request reads the analysis of its document: holding it
                 // until the background analysis lands keeps the loop free
@@ -191,6 +207,7 @@ impl Server {
             pending: HashMap::new(),
             generation: 0,
             deferred: Vec::new(),
+            search: Search::default(),
         }
     }
 
@@ -204,6 +221,8 @@ impl Server {
             self.latest = None;
             self.caches.clear();
             self.worker.clear(None);
+            self.cancel_proof_search(None);
+            self.generation += 1;
         }
         out
     }
@@ -285,6 +304,10 @@ impl Server {
     }
 
     fn input_changed(&mut self, path: &Path) {
+        // Disk changes may reach an in-flight search before an analysis has
+        // found that input. Every input update invalidates older search results.
+        self.cancel_proof_search(None);
+        self.generation += 1;
         let mut dependents = Vec::new();
         let changed = Context::of(&self.docs, path);
         self.snapshots.retain(|context, snapshot| {
@@ -366,6 +389,7 @@ impl Server {
     /// Analyzes the document's context in the background and publishes the
     /// result when the worker finishes, unless a newer revision replaced it.
     fn refresh(&mut self, path: &Path) {
+        self.cancel_proof_search(None);
         self.generation += 1;
         let generation = self.generation;
         let context = Context::of(&self.docs, path);
@@ -516,6 +540,7 @@ impl Server {
             }
         }
         self.resume();
+        self.poll_proof_search();
     }
 
     /// Waits for every queued analysis, for the end of input.

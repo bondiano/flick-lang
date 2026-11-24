@@ -12,9 +12,12 @@ use flick_ir::{Dict, Expr, ExprKind};
 
 use super::{Field, Proven, statement};
 use crate::diagnostics::Diagnostic;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::logic::LemmaAliases;
 use crate::logic::{self, Arg, Cert, Failure, Lemma, Rule, Statement, Term, Ty};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::logic::{
+    CandidateVerdict, LemmaAliases, ProofSearchRequest, ProofSearchResult, ProofSearchStatus,
+    SEARCH_CANDIDATES, SEARCH_NORMALIZATION, SEARCH_PROBE_STEPS,
+};
 use crate::source::Span;
 use crate::types::{Bundle, GoalType};
 #[cfg(not(target_arch = "wasm32"))]
@@ -33,6 +36,29 @@ const LEMMAS_PER_FIELD: usize = 64;
 #[cfg(not(target_arch = "wasm32"))]
 const CHECKED_PER_FIELD: usize = 8;
 
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy)]
+struct CandidateBudget {
+    remaining: usize,
+    normalization: u64,
+    exhausted: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+struct SelectedSearch {
+    request: ProofSearchRequest,
+    result: Option<ProofSearchResult>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn empty_search(request: &ProofSearchRequest) -> ProofSearchResult {
+    ProofSearchResult::empty(if request.is_cancelled() {
+        ProofSearchStatus::Cancelled
+    } else {
+        ProofSearchStatus::NoCandidate
+    })
+}
+
 fn invalid(span: Span, why: String) -> Failure {
     Failure::Invalid { span, why }
 }
@@ -45,6 +71,7 @@ pub(super) fn check_bundle(
     program: &dyn logic::Program,
     lemmas: &[logic::Lemma],
     #[cfg(not(target_arch = "wasm32"))] mut evidence: Option<(&mut ProofEvidence, &LemmaAliases)>,
+    #[cfg(not(target_arch = "wasm32"))] search: Option<&ProofSearchRequest>,
 ) -> Vec<Diagnostic> {
     let Some(subject) = &lowered.subject else {
         let why = "its constraint resolved to no dictionary".into();
@@ -52,6 +79,9 @@ pub(super) fn check_bundle(
         if let Some((evidence, _)) = evidence {
             evidence.status = ProofStatus::Blocked;
             evidence.failure = Some(lowered.span);
+            if let Some(request) = search {
+                evidence.search = Some(empty_search(request));
+            }
         }
         return vec![invalid(lowered.span, why).diagnostic(&info.name)];
     };
@@ -75,12 +105,25 @@ pub(super) fn check_bundle(
         #[cfg(not(target_arch = "wasm32"))]
         params: &lowered.params,
         #[cfg(not(target_arch = "wasm32"))]
-        attempts: MAX_CANDIDATES,
+        budget: CandidateBudget {
+            remaining: MAX_CANDIDATES,
+            normalization: MAX_NORMALIZATION,
+            exhausted: false,
+        },
         #[cfg(not(target_arch = "wasm32"))]
-        normalization: MAX_NORMALIZATION,
+        search: search.cloned().map(|request| SelectedSearch {
+            request,
+            result: None,
+        }),
     };
     checking.class(bundle, subject, &mut Vec::new());
-    let Checking { used, mut out, .. } = checking;
+    let Checking {
+        used,
+        mut out,
+        #[cfg(not(target_arch = "wasm32"))]
+        search,
+        ..
+    } = checking;
     for (field, _) in lowered.fields.iter().zip(used).filter(|(_, used)| !used) {
         let why = format!("`{}` is no law of the classes of the bundle", field.name);
         out.push(invalid(field.span, why));
@@ -92,6 +135,9 @@ pub(super) fn check_bundle(
             .first()
             .map_or(ProofStatus::Checked, ProofStatus::of_failure);
         evidence.failure = diagnostics.first().and_then(|d| d.span);
+        if let Some(s) = search {
+            evidence.search = Some(s.result.unwrap_or_else(|| empty_search(&s.request)));
+        }
     }
     diagnostics
 }
@@ -104,6 +150,7 @@ pub(super) fn observe_bundle(
     program: &dyn logic::Program,
     lemmas: &[logic::Lemma],
     (evidence, aliases): (&mut ProofEvidence, &LemmaAliases),
+    search: Option<&ProofSearchRequest>,
 ) {
     let _ = check_bundle(
         proof,
@@ -112,6 +159,7 @@ pub(super) fn observe_bundle(
         program,
         lemmas,
         Some((evidence, aliases)),
+        search,
     );
     if evidence.status == ProofStatus::Checked {
         evidence.status = ProofStatus::Open;
@@ -134,9 +182,9 @@ struct Checking<'a, 'p> {
     #[cfg(not(target_arch = "wasm32"))]
     params: &'a [String],
     #[cfg(not(target_arch = "wasm32"))]
-    attempts: usize,
+    budget: CandidateBudget,
     #[cfg(not(target_arch = "wasm32"))]
-    normalization: u64,
+    search: Option<SelectedSearch>,
 }
 
 impl Checking<'_, '_> {
@@ -223,7 +271,15 @@ impl Checking<'_, '_> {
             ))
         };
         #[cfg(not(target_arch = "wasm32"))]
-        let suggestions = self.candidates(law, bundle, dict);
+        let suggestions = {
+            let mut budget = self.budget;
+            let suggestions = self.candidates(law, bundle, dict, &mut budget, None);
+            self.budget = budget;
+            if let Some(field) = field {
+                self.search_field(law, bundle, dict, field);
+            }
+            suggestions
+        };
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(obligations) = &mut self.obligations {
             obligations.push(LawObligation {
@@ -312,17 +368,39 @@ impl Checking<'_, '_> {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn candidates(&mut self, proved: &Proven, bundle: &Bundle, dict: &Dict) -> Vec<String> {
+    fn candidates(
+        &self,
+        proved: &Proven,
+        bundle: &Bundle,
+        dict: &Dict,
+        budget: &mut CandidateBudget,
+        search: Option<&ProofSearchRequest>,
+    ) -> Vec<String> {
         let Some(aliases) = self.aliases else {
             return Vec::new();
         };
+        if budget.remaining == 0
+            || budget.normalization == 0
+            || search.is_some_and(ProofSearchRequest::is_cancelled)
+        {
+            return Vec::new();
+        }
         let Ok(statement) = self.law_statement(proved, bundle, dict) else {
             return Vec::new();
         };
         let data = self.law_data(proved);
         let mut found = Vec::new();
-        for lemma in self.lemmas.iter().rev().take(LEMMAS_PER_FIELD) {
-            if self.attempts == 0 || self.normalization == 0 || found.len() >= CHECKED_PER_FIELD {
+        let scanned = if search.is_some() {
+            SEARCH_CANDIDATES
+        } else {
+            LEMMAS_PER_FIELD
+        };
+        for lemma in self.lemmas.iter().rev().take(scanned) {
+            if budget.remaining == 0
+                || budget.normalization == 0
+                || found.len() >= CHECKED_PER_FIELD
+                || search.is_some_and(ProofSearchRequest::is_cancelled)
+            {
                 break;
             }
             let name = &lemma.statement.name;
@@ -339,22 +417,70 @@ impl Checking<'_, '_> {
             } else {
                 slice::from_ref(name)
             };
-            self.attempts -= 1;
+            budget.remaining -= 1;
             let Ok(cert) = law_certificate(proved, &statement, lemma, self.span, self.span) else {
                 continue;
             };
-            if logic::check_candidate(
+            let before = if search.is_some() {
+                budget.normalization.min(SEARCH_PROBE_STEPS)
+            } else {
+                budget.normalization
+            };
+            let mut remaining = before;
+            let checked = logic::check_candidate(
                 &statement,
                 &cert,
                 &data,
                 self.program,
                 self.lemmas,
-                &mut self.normalization,
-            ) {
+                &mut remaining,
+            );
+            budget.normalization -= before - remaining;
+            budget.exhausted |= checked == CandidateVerdict::Exhausted;
+            if checked == CandidateVerdict::Accepted {
                 found.extend(names.iter().take(CHECKED_PER_FIELD - found.len()).cloned());
             }
         }
         found
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn search_field(&mut self, proved: &Proven, bundle: &Bundle, dict: &Dict, field: &Field) {
+        let Some(search) = &self.search else {
+            return;
+        };
+        let request = &search.request;
+        if search.result.is_some()
+            || request.offset < field.span.start
+            || field.span.end < request.offset
+        {
+            return;
+        }
+        let mut budget = CandidateBudget {
+            remaining: SEARCH_CANDIDATES,
+            normalization: SEARCH_NORMALIZATION,
+            exhausted: false,
+        };
+        let mut suggestions = self.candidates(proved, bundle, dict, &mut budget, Some(request));
+        let status = if request.is_cancelled() {
+            suggestions.clear();
+            ProofSearchStatus::Cancelled
+        } else if !suggestions.is_empty() {
+            ProofSearchStatus::Found
+        } else if budget.remaining == 0 || budget.normalization == 0 || budget.exhausted {
+            ProofSearchStatus::BudgetExhausted
+        } else {
+            ProofSearchStatus::NoCandidate
+        };
+        if let Some(search) = &mut self.search {
+            search.result = Some(ProofSearchResult {
+                status,
+                suggestions,
+                candidates: SEARCH_CANDIDATES - budget.remaining,
+                normalization_steps: SEARCH_NORMALIZATION - budget.normalization,
+                span: Some(field.value.span),
+            });
+        }
     }
 
     /// `e` with the law's given dictionary `dict`: each superclass of it the
@@ -508,5 +634,72 @@ fn renames<'a>(ours: &'a Ty, theirs: &'a Ty, renaming: &mut Vec<(&'a str, &'a st
         }
         (Ty::Bool, Ty::Bool) | (Ty::Int, Ty::Int) => true,
         _ => false,
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+    use std::sync::Arc;
+    use std::sync::atomic::AtomicBool;
+
+    use super::{ProofSearchRequest, ProofSearchStatus};
+    use crate::ir::{Run, check_proofs};
+    use crate::project::builtins::{builtin_laws, builtin_modules_of};
+    use crate::types;
+
+    #[test]
+    fn explicit_search_checks_one_inherited_law_of_the_selected_instance() {
+        let source = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../packages/core/proofs/Laws/Option.fl"
+        ));
+        let mut sources = types::builtin_sources().to_vec();
+        sources.push(("Laws.Option", source));
+        let run = Run {
+            builtins: &|| builtin_modules_of(false),
+            builtin_laws: &|| builtin_laws(false),
+            project: &|_| None,
+            proven: &|_| None,
+            all_contracted: &HashSet::new(),
+            contracts: &|_| &[],
+        };
+        let at = source
+            .find("identity = map_identity")
+            .expect("Functor identity field")
+            + "identity = ".len();
+        let mut found = None;
+        types::check_each(&sources, false, |module, typing| {
+            if module.name != "Laws.Option" {
+                return;
+            }
+            let proof = typing
+                .proofs
+                .iter()
+                .find(|p| p.name == "option")
+                .expect("bundle");
+            let request = ProofSearchRequest {
+                declaration: proof.at,
+                offset: u32::try_from(at).expect("source length fits in u32"),
+                cancelled: Arc::new(AtomicBool::new(false)),
+            };
+            let mut evidence = Vec::new();
+            let (diagnostics, _) = check_proofs(
+                module,
+                typing,
+                &run,
+                Some(&mut evidence),
+                false,
+                Some(&request),
+            );
+            assert!(diagnostics.is_empty(), "{diagnostics:?}");
+            found = evidence.into_iter().find_map(|proof| proof.search);
+        });
+        let found = found.expect("selected law result");
+        assert_eq!(found.status, ProofSearchStatus::Found);
+        assert_eq!(found.suggestions, ["map_identity"]);
+        let range = found.span.expect("the selected lemma expression").range();
+        assert_eq!(&source[range], "map_identity");
     }
 }

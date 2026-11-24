@@ -68,6 +68,12 @@
         "command": "flick.showOutput",
         "title": "Show Language Server Output",
         "category": "Flick"
+      },
+      {
+        "command": "flick.searchProof",
+        "title": "Find Proof",
+        "category": "Flick",
+        "enablement": "editorLangId == flick"
       }
     ],
     "configuration": {
