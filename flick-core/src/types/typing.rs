@@ -167,7 +167,7 @@ pub struct Typing {
     /// Each `foreign`: its calling convention.
     pub foreigns: HashMap<Range, ForeignInfo>,
     /// Selected `@native` override on a top-level `let`, keyed by `K::LetDecl` range.
-    pub native_overrides: HashMap<Range, super::ffi::NativeOverrideInfo>,
+    pub native_overrides: Vec<(Range, super::ffi::NativeOverrideInfo)>,
     /// Parsed/catch-typed original declarations with unfinished representation.
     pub(super) pending_foreigns: Vec<super::ffi::PendingForeign>,
     /// Instances declared or derived in this module.

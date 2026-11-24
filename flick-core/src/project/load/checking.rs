@@ -143,8 +143,11 @@ struct Key {
     text: String,
     /// The effective configuration, including programmatically supplied values.
     config: Option<Config>,
+    #[cfg(not(target_arch = "wasm32"))]
     foreign_backend: types::ForeignBackendSpec,
+    #[cfg(not(target_arch = "wasm32"))]
     validate_foreign_metadata: bool,
+    #[cfg(not(target_arch = "wasm32"))]
     native_overrides: types::NativeOverrideEnv,
     lower: bool,
     /// An editor's entry, without the IR, is none a build reads.

@@ -57,25 +57,42 @@ impl Checker<'_> {
         let pure = foreign_words(decl)
             .0
             .is_some_and(|word| word.text(self.text) == "pure");
+        let spec = self.options.foreign_backend.clone();
+        self.read_meta_items(decl, pure, false, &spec, &mut pending);
+        pending
+    }
+
+    pub(super) fn read_meta_items(
+        &mut self,
+        meta_owner: &Node,
+        pure: bool,
+        is_native: bool,
+        spec: &ForeignBackendSpec,
+        pending: &mut PendingForeign,
+    ) {
         let info = &mut pending.info;
         let mut retention = None;
         let mut seen_backend: BTreeSet<String> = BTreeSet::new();
-        let meta: Vec<&Node> = decl
+        for item in meta_owner
             .nodes()
             .filter(|n| n.kind == K::ForeignMeta)
             .flat_map(Node::nodes)
-            .collect();
-        for item in &meta {
+        {
             let Some(name) = item.child_tokens().find(|t| t.kind == K::Ident) else {
                 continue;
             };
             let args: Vec<&Node> = item.nodes().collect();
-            let word = |i: usize| args.get(i).map(|n| n.text(self.text).trim().to_owned());
+            let word = |i: usize| {
+                args.get(i).map(|n| {
+                    let (start, end) = n.range();
+                    self.text[start as usize..end as usize].trim()
+                })
+            };
             let number = |i: usize| word(i).and_then(|w| w.parse::<usize>().ok());
             match name.text(self.text) {
                 "arity" => {
                     info.arity = number(0);
-                    pending.arity.push(((*item).clone(), info.arity));
+                    pending.arity.push((item.clone(), info.arity));
                 }
                 "reviewed" if !word(0).is_some_and(|w| w.starts_with('"')) => self.bad_meta(
                     item,
@@ -94,7 +111,7 @@ impl Checker<'_> {
                     Some(i) => info.adapter.owned.push(i),
                     None => self.bad_meta(item, "`owned` takes the position of an argument, from 0"),
                 },
-                "retention" => match word(0).as_deref() {
+                "retention" => match word(0) {
                     Some("call") => retention = Some(Retention::Call),
                     Some("owner") => retention = Some(Retention::Owner),
                     _ => self.bad_meta(item, "write `retention call` or `retention owner`"),
@@ -104,24 +121,33 @@ impl Checker<'_> {
                         let error = self.infer_catch_mapping(mapping);
                         pending
                             .catch
-                            .push(((*item).clone(), (*mapping).clone(), error));
+                            .push((item.clone(), (*mapping).clone(), error));
                         info.catch = Some(mapping.range());
                     }
                     Some(_) => self.bad_meta(
                         item,
-                        "a `foreign pure` call cannot throw: `catch` needs another mode",
+                        if is_native {
+                            "a pure function cannot throw: `catch` needs an effectful signature"
+                        } else {
+                            "a `foreign pure` call cannot throw: `catch` needs another mode"
+                        },
                     ),
                     None => self.bad_meta(
                         item,
-                        "`catch` takes the function that maps a JS exception to an error",
+                        if is_native {
+                            "`catch` takes the function that maps a host exception to an error"
+                        } else {
+                            "`catch` takes the function that maps a JS exception to an error"
+                        },
                     ),
                 },
                 other => {
-                    self.read_backend_meta_item(
+                    self.read_backend_meta_item_with_spec(
                         item,
                         name,
                         other,
                         &args,
+                        spec,
                         &mut seen_backend,
                         &mut info.adapter.words,
                     );
@@ -129,20 +155,6 @@ impl Checker<'_> {
             }
         }
         pending.retention = retention;
-        pending
-    }
-
-    fn read_backend_meta_item(
-        &mut self,
-        item: &Node,
-        name: Token,
-        word: &str,
-        args: &[&Node],
-        seen_backend: &mut BTreeSet<String>,
-        words: &mut Vec<BackendAdapter>,
-    ) {
-        let spec = self.options.foreign_backend.clone();
-        self.read_backend_meta_item_with_spec(item, name, word, args, &spec, seen_backend, words);
     }
 
     #[allow(clippy::too_many_arguments)]

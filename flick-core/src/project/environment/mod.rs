@@ -305,11 +305,17 @@ const OFFICIAL_TAGS: &[&str] = &[
     "rt",
 ];
 
+#[cfg(not(target_arch = "wasm32"))]
+impl EnvironmentContext {
+    pub(crate) fn native_overrides(&self) -> &NativeOverrideEnv {
+        &self.native_overrides
+    }
+}
+
 #[cfg(target_arch = "wasm32")]
 pub(super) struct EnvironmentContext {
     pub foreign_backend: ForeignBackendSpec,
     pub validate_foreign_metadata: bool,
-    pub native_overrides: NativeOverrideEnv,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -318,12 +324,16 @@ impl EnvironmentContext {
         Self {
             foreign_backend: ForeignBackendSpec::js(),
             validate_foreign_metadata: true,
-            native_overrides: NativeOverrideEnv::official_js(),
         }
     }
 
     pub(super) fn foreign_backend_for(&self, _module_when: Option<&str>) -> ForeignBackendSpec {
         self.foreign_backend.clone()
+    }
+
+    #[allow(clippy::unused_self)]
+    pub(crate) fn native_overrides(&self) -> &NativeOverrideEnv {
+        NativeOverrideEnv::default_js()
     }
 }
 
@@ -369,7 +379,6 @@ pub(super) fn resolve(
     EnvironmentContext {
         foreign_backend: ForeignBackendSpec::js(),
         validate_foreign_metadata: true,
-        native_overrides: NativeOverrideEnv::official_js(),
     }
 }
 

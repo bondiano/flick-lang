@@ -141,7 +141,7 @@ impl Checker<'_> {
             decl, scheme, &body, &binders, &params, &stages, retention, span,
         );
         if let Some((override_range, backend_id, enabled)) = pending.native_override {
-            self.typing.native_overrides.insert(
+            self.typing.native_overrides.push((
                 decl.range(),
                 NativeOverrideInfo {
                     override_range,
@@ -149,7 +149,7 @@ impl Checker<'_> {
                     backend_id,
                     enabled,
                 },
-            );
+            ));
         } else {
             self.typing.foreigns.insert(range(span), info);
         }

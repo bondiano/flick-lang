@@ -4,11 +4,13 @@
 use std::fmt::Write as _;
 use std::sync::OnceLock;
 
+#[cfg(feature = "native-project")]
 use serde::{Deserialize, Serialize};
 
 /// Expected shape of one positional argument after a backend-declared foreign
 /// adapter word. Mirrors `flick:backend/types.adapter-arg-kind`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "native-project", derive(Serialize, Deserialize))]
 pub enum AdapterArgKind {
     /// One of a closed set of lowercase keyword choices.
     Keyword(Vec<String>),
@@ -23,14 +25,16 @@ pub enum AdapterArgKind {
 }
 
 /// One positional argument slot of a backend-declared foreign adapter word.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "native-project", derive(Serialize, Deserialize))]
 pub struct AdapterArgSpec {
     pub name: String,
     pub kind: AdapterArgKind,
 }
 
 /// A foreign metadata adapter word declared by a backend descriptor.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "native-project", derive(Serialize, Deserialize))]
 pub struct AdapterWordSpec {
     pub name: String,
     pub args: Vec<AdapterArgSpec>,
@@ -96,14 +100,16 @@ impl AdapterWordSpec {
 }
 
 /// A foreign type-form attribute declared by a backend descriptor (e.g. `@ts`, `@go`).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "native-project", derive(Serialize, Deserialize))]
 pub struct TypeFormAttrSpec {
     pub name: String,
     pub doc: String,
 }
 
 /// Foreign metadata specification owned by the active package backend.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "native-project", derive(Serialize, Deserialize))]
 pub struct ForeignBackendSpec {
     pub backend_id: String,
     pub adapters: Vec<AdapterWordSpec>,
@@ -123,74 +129,80 @@ impl ForeignBackendSpec {
             .find(|attr| attr.name == name)
     }
 
-    /// The official `flick/js` backend's foreign adapter words and `@ts` attribute.
-    /// Must stay in sync with `backends/js/src/component.rs`.
-    pub fn js() -> Self {
+    fn builtin(
+        backend_id: &str,
+        this_doc: &str,
+        cancel_choices: &[&str],
+        cancel_doc: &str,
+        variadic_doc: &str,
+        attr_name: &str,
+        attr_doc: &str,
+    ) -> Self {
         Self {
-            backend_id: "flick/js".into(),
+            backend_id: backend_id.to_owned(),
             adapters: vec![
                 AdapterWordSpec {
-                    name: "this".into(),
+                    name: "this".to_owned(),
                     args: Vec::new(),
                     repeatable: false,
-                    doc: "Pass the first argument as the JavaScript `this` receiver (`target.call(a0, ...)`).".into(),
+                    doc: this_doc.to_owned(),
                 },
                 AdapterWordSpec {
-                    name: "cancel".into(),
+                    name: "cancel".to_owned(),
                     args: vec![AdapterArgSpec {
-                        name: "kind".into(),
-                        kind: AdapterArgKind::Keyword(vec!["signal".into()]),
+                        name: "kind".to_owned(),
+                        kind: AdapterArgKind::Keyword(
+                            cancel_choices.iter().map(|s| (*s).to_owned()).collect(),
+                        ),
                     }],
                     repeatable: false,
-                    doc: "Pass an `AbortSignal` as the last argument of an `Async` call, aborted on interruption.".into(),
+                    doc: cancel_doc.to_owned(),
                 },
                 AdapterWordSpec {
-                    name: "variadic".into(),
+                    name: "variadic".to_owned(),
                     args: Vec::new(),
                     repeatable: false,
-                    doc: "Spread the last argument (a `List a`) into the JavaScript call.".into(),
+                    doc: variadic_doc.to_owned(),
                 },
             ],
             type_form_attributes: vec![TypeFormAttrSpec {
-                name: "ts".into(),
-                doc: "Declare the TypeScript form of a foreign `type` or `service` (`@ts \"...\"`, `@ts from \"pkg\" \"Name\"`, or `@ts none`).".into(),
+                name: attr_name.to_owned(),
+                doc: attr_doc.to_owned(),
             }],
         }
+    }
+
+    /// The official `flick/js` backend's foreign adapter words and `@ts` attribute.
+    /// Must stay in sync with `backends/js/src/component.rs`.
+    pub fn js() -> Self {
+        Self::builtin(
+            "flick/js",
+            "Pass the first argument as the JavaScript `this` receiver (`target.call(a0, ...)`).",
+            &["signal"],
+            "Pass an `AbortSignal` as the last argument of an `Async` call, aborted on interruption.",
+            "Spread the last argument (a `List a`) into the JavaScript call.",
+            "ts",
+            "Declare the TypeScript form of a foreign `type` or `service` (`@ts \"...\"`, `@ts from \"pkg\" \"Name\"`, or `@ts none`).",
+        )
     }
 
     /// The official `flick/go` backend's foreign adapter words and `@go` attribute.
     /// Must stay in sync with `backends/go/src/component.rs`.
     pub fn go() -> Self {
-        Self {
-            backend_id: "flick/go".into(),
-            adapters: vec![
-                AdapterWordSpec {
-                    name: "this".into(),
-                    args: Vec::new(),
-                    repeatable: false,
-                    doc: "Pass the first argument as the receiver of a Go method call (`flickrt.CallMethod`).".into(),
-                },
-                AdapterWordSpec {
-                    name: "cancel".into(),
-                    args: vec![AdapterArgSpec {
-                        name: "kind".into(),
-                        kind: AdapterArgKind::Keyword(vec!["context".into(), "signal".into()]),
-                    }],
-                    repeatable: false,
-                    doc: "Receive cancellation via `flickrt.Context` on an `Async` foreign call (`cancel context`; `cancel signal` is accepted for portable bindings).".into(),
-                },
-                AdapterWordSpec {
-                    name: "variadic".into(),
-                    args: Vec::new(),
-                    repeatable: false,
-                    doc: "Spread the last argument (a `List a`) into Go variadic arguments.".into(),
-                },
-            ],
-            type_form_attributes: vec![TypeFormAttrSpec {
-                name: "go".into(),
-                doc: "Declare the Go type form of a foreign `type` or `service` (`@go \"...\"`, `@go from \"pkg\" \"Name\"`, or `@go none`).".into(),
-            }],
+        #[cfg(target_arch = "wasm32")]
+        {
+            Self::builtin("flick/go", "", &["context", "signal"], "", "", "go", "")
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        Self::builtin(
+            "flick/go",
+            "Pass the first argument as the receiver of a Go method call (`flickrt.CallMethod`).",
+            &["context", "signal"],
+            "Receive cancellation via `flickrt.Context` on an `Async` foreign call (`cancel context`; `cancel signal` is accepted for portable bindings).",
+            "Spread the last argument (a `List a`) into Go variadic arguments.",
+            "go",
+            "Declare the Go type form of a foreign `type` or `service` (`@go \"...\"`, `@go from \"pkg\" \"Name\"`, or `@go none`).",
+        )
     }
 
     /// Shared static reference to the default `flick/js` specification.

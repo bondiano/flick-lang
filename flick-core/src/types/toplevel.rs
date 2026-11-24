@@ -156,18 +156,7 @@ impl<'a> Checker<'a> {
                         group
                     });
                     if sig.is_none() && decl.nodes().any(|n| n.kind == K::NativeOverride) {
-                        let name = let_parts(decl, self.text).name.unwrap_or_default();
-                        let end = decl
-                            .nodes()
-                            .find(|n| n.kind == K::VarPat)
-                            .map_or_else(|| decl.range().1, |v| v.range().1);
-                        self.error(
-                            codes::T004,
-                            Span::new(self.file, decl.range().0, end),
-                            format!(
-                                "function `{name}` with `@native` overrides needs a signature right above it"
-                            ),
-                        );
+                        self.missing_native_signature(decl);
                     }
                     self.add_item(decl, sig, own);
                 }
@@ -215,19 +204,7 @@ impl<'a> Checker<'a> {
                                 if sig.is_none()
                                     && member.nodes().any(|n| n.kind == K::NativeOverride)
                                 {
-                                    let name =
-                                        let_parts(member, self.text).name.unwrap_or_default();
-                                    let end = member
-                                        .nodes()
-                                        .find(|n| n.kind == K::VarPat)
-                                        .map_or_else(|| member.range().1, |v| v.range().1);
-                                    self.error(
-                                        codes::T004,
-                                        Span::new(self.file, member.range().0, end),
-                                        format!(
-                                            "function `{name}` with `@native` overrides needs a signature right above it"
-                                        ),
-                                    );
+                                    self.missing_native_signature(member);
                                 }
                                 self.add_item(member, sig, Some(group));
                             }
@@ -243,6 +220,19 @@ impl<'a> Checker<'a> {
                 _ => {}
             }
         }
+    }
+
+    fn missing_native_signature(&mut self, decl: &Node) {
+        let name = let_parts(decl, self.text).name.unwrap_or_default();
+        let end = decl
+            .nodes()
+            .find(|n| n.kind == K::VarPat)
+            .map_or_else(|| decl.range().1, |v| v.range().1);
+        self.error(
+            codes::T004,
+            Span::new(self.file, decl.range().0, end),
+            format!("function `{name}` with `@native` overrides needs a signature right above it"),
+        );
     }
 
     /// A signature of `decl` that is not right above it.

@@ -23,7 +23,6 @@ mod literals;
 #[cfg(not(target_arch = "wasm32"))]
 mod local_schemes;
 mod loops;
-mod native;
 mod numeric;
 mod owner_descriptors;
 mod owners;

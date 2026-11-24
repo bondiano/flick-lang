@@ -1,16 +1,18 @@
 //! Finite environment tag worlds, implication over `#663` tag vocabularies,
 //! and `@native` override selection.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::sync::OnceLock;
 
+#[cfg(feature = "native-project")]
 use serde::{Deserialize, Serialize};
 
 use super::spec::ForeignBackendSpec;
 use crate::syntax::when;
 
 /// One tag axis in a backend's finite environment vocabulary.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "native-project", derive(Serialize, Deserialize))]
 pub struct AxisTagModel {
     pub tags: Vec<String>,
     pub default: Option<String>,
@@ -18,7 +20,8 @@ pub struct AxisTagModel {
 }
 
 /// Tag vocabulary and foreign adapter spec of one known backend.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "native-project", derive(Serialize, Deserialize))]
 pub struct BackendTagModel {
     pub id: String,
     pub short: String,
@@ -28,6 +31,7 @@ pub struct BackendTagModel {
     pub foreign_spec: ForeignBackendSpec,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl BackendTagModel {
     fn matches_name(&self, name: &str) -> bool {
         self.short == name || self.id == name || self.tags.iter().any(|t| t == name)
@@ -35,7 +39,8 @@ impl BackendTagModel {
 }
 
 /// A declared `[host]` package's tag contribution and backend requirement.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "native-project", derive(Serialize, Deserialize))]
 pub struct HostTagModel {
     pub name: String,
     pub backend: String,
@@ -44,7 +49,8 @@ pub struct HostTagModel {
 }
 
 /// Environment vocabulary, world model, and active selection state for `@native`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "native-project", derive(Serialize, Deserialize))]
 pub struct NativeOverrideEnv {
     /// All known environment tags (backends, axes, built-in hosts, host packages).
     pub vocabulary: BTreeSet<String>,
@@ -74,6 +80,41 @@ pub enum OverrideSelection {
     Ambiguous(usize, usize),
 }
 
+type BuiltinAxis = (&'static [&'static str], Option<&'static str>, bool);
+type BuiltinBackend = (
+    &'static str,
+    &'static str,
+    &'static [BuiltinAxis],
+    &'static [&'static str],
+);
+
+const OFFICIAL_MODELS: &[BuiltinBackend] = &[
+    (
+        "flick/js",
+        "js",
+        &[
+            (&["rt", "effect"], Some("rt"), true),
+            (&["effect-adapter"], None, false),
+        ],
+        &["node", "browser", "bun", "cloudflare"],
+    ),
+    ("flick/go", "go", &[(&["cgo"], None, false)], &["native"]),
+];
+
+fn owned(items: &[&str]) -> Vec<String> {
+    items.iter().map(|s| (*s).to_owned()).collect()
+}
+
+fn extend_vocab(vocab: &mut BTreeSet<String>, items: &[&str]) {
+    for &t in items {
+        vocab.insert(t.to_owned());
+    }
+}
+
+fn eval_world(expr: &when::Expr, world: &[&str]) -> bool {
+    expr.eval(&|t| world.contains(&t))
+}
+
 impl NativeOverrideEnv {
     /// Default standalone environment (`flick/js` + `flick/go` vocabulary, active `js/rt/node`).
     pub fn default_js() -> &'static Self {
@@ -84,63 +125,43 @@ impl NativeOverrideEnv {
     /// Builds an environment with the official `flick/js` and `flick/go` models
     /// and default active tags `{js, rt, node}`.
     pub fn official_js() -> Self {
-        let backends = vec![
-            BackendTagModel {
-                id: "flick/js".into(),
-                short: "js".into(),
-                tags: vec!["js".into()],
-                axes: vec![
-                    AxisTagModel {
-                        tags: vec!["rt".into(), "effect".into()],
-                        default: Some("rt".into()),
-                        exclusive: true,
-                    },
-                    AxisTagModel {
-                        tags: vec!["effect-adapter".into()],
-                        default: None,
-                        exclusive: false,
-                    },
-                ],
-                builtin_hosts: vec![
-                    "node".into(),
-                    "browser".into(),
-                    "bun".into(),
-                    "cloudflare".into(),
-                ],
-                foreign_spec: ForeignBackendSpec::js(),
-            },
-            BackendTagModel {
-                id: "flick/go".into(),
-                short: "go".into(),
-                tags: vec!["go".into()],
-                axes: vec![AxisTagModel {
-                    tags: vec!["cgo".into()],
-                    default: None,
-                    exclusive: false,
-                }],
-                builtin_hosts: vec!["native".into()],
-                foreign_spec: ForeignBackendSpec::go(),
-            },
-        ];
+        let mut backends = Vec::with_capacity(OFFICIAL_MODELS.len());
         let mut vocabulary = BTreeSet::new();
-        for b in &backends {
-            vocabulary.extend(b.tags.iter().cloned());
-            for axis in &b.axes {
-                vocabulary.extend(axis.tags.iter().cloned());
+        for &(id, short, axes, builtin_hosts) in OFFICIAL_MODELS {
+            extend_vocab(&mut vocabulary, &[short]);
+            let mut axis_models = Vec::with_capacity(axes.len());
+            for &(tags, default, exclusive) in axes {
+                extend_vocab(&mut vocabulary, tags);
+                axis_models.push(AxisTagModel {
+                    tags: owned(tags),
+                    default: default.map(str::to_owned),
+                    exclusive,
+                });
             }
-            vocabulary.extend(b.builtin_hosts.iter().cloned());
+            extend_vocab(&mut vocabulary, builtin_hosts);
+            let foreign_spec = if short == "go" {
+                ForeignBackendSpec::go()
+            } else {
+                ForeignBackendSpec::js()
+            };
+            backends.push(BackendTagModel {
+                id: id.to_owned(),
+                short: short.to_owned(),
+                tags: vec![short.to_owned()],
+                axes: axis_models,
+                builtin_hosts: owned(builtin_hosts),
+                foreign_spec,
+            });
         }
-        let active_tags = ["js", "rt", "node"]
-            .into_iter()
-            .map(str::to_owned)
-            .collect();
+        let mut active_tags = BTreeSet::new();
+        extend_vocab(&mut active_tags, &["js", "rt", "node"]);
         Self {
             vocabulary,
             validate_tags: true,
             backends,
             hosts: Vec::new(),
             active_tags: Some(active_tags),
-            active_backend_id: Some("flick/js".into()),
+            active_backend_id: Some("flick/js".to_owned()),
             disable_native_overrides: false,
         }
     }
@@ -158,18 +179,31 @@ impl NativeOverrideEnv {
 
     /// Whether `a` implies `b` over every valid environment world in this model.
     pub fn implies(&self, a: &when::Expr, b: &when::Expr) -> bool {
-        let mut relevant = BTreeSet::new();
-        for (tag, _) in a.tags().into_iter().chain(b.tags()) {
-            relevant.insert(tag.to_owned());
-        }
-        let mut holds = true;
-        self.for_each_world(&relevant, &mut |world| {
-            if a.eval(&|t| world.contains(t)) && !b.eval(&|t| world.contains(t)) {
-                holds = false;
-                return false;
+        #[cfg(not(target_arch = "wasm32"))]
+        let relevant = {
+            let mut relevant = Vec::new();
+            for (tag, _) in a.tags().into_iter().chain(b.tags()) {
+                if !relevant.contains(&tag) {
+                    relevant.push(tag);
+                }
             }
-            true
-        });
+            relevant
+        };
+        #[cfg(target_arch = "wasm32")]
+        let relevant: [&str; 0] = [];
+        let mut holds = true;
+        for backend in &self.backends {
+            let mut check = |world: &[&str]| {
+                if eval_world(a, world) && !eval_world(b, world) {
+                    holds = false;
+                    return false;
+                }
+                true
+            };
+            if !self.for_each_backend_world(backend, &relevant, &mut check) {
+                break;
+            }
+        }
         holds
     }
 
@@ -179,10 +213,11 @@ impl NativeOverrideEnv {
         let Some(active) = &self.active_tags else {
             return OverrideSelection::None;
         };
+        let active_slice: Vec<&str> = active.iter().map(String::as_str).collect();
         let matching: Vec<usize> = conds
             .iter()
             .enumerate()
-            .filter_map(|(i, expr)| expr.eval(&|t| active.contains(t)).then_some(i))
+            .filter_map(|(i, expr)| eval_world(expr, &active_slice).then_some(i))
             .collect();
         match matching.as_slice() {
             [] => OverrideSelection::None,
@@ -212,20 +247,29 @@ impl NativeOverrideEnv {
     /// If `cond` is satisfiable in valid worlds of exactly one known backend,
     /// returns that backend's foreign adapter specification.
     pub fn unique_backend_for(&self, cond: &when::Expr) -> Option<&ForeignBackendSpec> {
-        let mut relevant = BTreeSet::new();
-        for (tag, _) in cond.tags() {
-            relevant.insert(tag.to_owned());
-        }
+        #[cfg(not(target_arch = "wasm32"))]
+        let relevant = {
+            let mut relevant = Vec::new();
+            for (tag, _) in cond.tags() {
+                if !relevant.contains(&tag) {
+                    relevant.push(tag);
+                }
+            }
+            relevant
+        };
+        #[cfg(target_arch = "wasm32")]
+        let relevant: [&str; 0] = [];
         let mut found: Option<&ForeignBackendSpec> = None;
         for backend in &self.backends {
             let mut matched = false;
-            self.for_each_backend_world(backend, &relevant, &mut |world| {
-                if cond.eval(&|t| world.contains(t)) {
+            let mut probe = |world: &[&str]| {
+                if eval_world(cond, world) {
                     matched = true;
                     return false;
                 }
                 true
-            });
+            };
+            self.for_each_backend_world(backend, &relevant, &mut probe);
             if matched {
                 if found.is_some() {
                     return None;
@@ -236,144 +280,139 @@ impl NativeOverrideEnv {
         found
     }
 
-    fn for_each_world(
-        &self,
-        relevant: &BTreeSet<String>,
-        visit: &mut impl FnMut(&BTreeSet<String>) -> bool,
-    ) {
-        for backend in &self.backends {
-            if !self.for_each_backend_world(backend, relevant, visit) {
-                return;
-            }
-        }
-    }
-
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::unused_self))]
     fn for_each_backend_world(
         &self,
         backend: &BackendTagModel,
-        relevant: &BTreeSet<String>,
-        visit: &mut impl FnMut(&BTreeSet<String>) -> bool,
+        relevant: &[&str],
+        visit: &mut dyn FnMut(&[&str]) -> bool,
     ) -> bool {
-        // Collect all hosts targeting this backend (declared hosts override built-in hosts of the same name).
-        let mut host_map: BTreeMap<String, (Option<when::Expr>, Vec<String>)> = BTreeMap::new();
-        for builtin in &backend.builtin_hosts {
-            host_map.insert(builtin.clone(), (None, vec![builtin.clone()]));
-        }
-        for host in &self.hosts {
-            if backend.matches_name(&host.backend) {
-                let req = host.requires.as_deref().and_then(|s| when::parse(s).ok());
-                let mut htags = Vec::with_capacity(1 + host.tags.len());
-                htags.push(host.name.clone());
-                htags.extend(host.tags.iter().cloned());
-                host_map.insert(host.name.clone(), (req, htags));
-            }
-        }
-        let hosts: Vec<(Option<when::Expr>, Vec<String>)> = host_map.into_values().collect();
-        // Tags referenced in host `requires` are also relevant for non-exclusive axes.
-        let mut axis_relevant = relevant.clone();
-        for (req, _) in &hosts {
-            if let Some(expr) = req {
-                for (tag, _) in expr.tags() {
-                    axis_relevant.insert(tag.to_owned());
-                }
-            }
-        }
-
-        // Build per-axis choices.
-        let mut axis_choices: Vec<Vec<Vec<String>>> = Vec::with_capacity(backend.axes.len());
-        for axis in &backend.axes {
-            if axis.exclusive {
-                let mut choices: Vec<Vec<String>> =
-                    axis.tags.iter().map(|t| vec![t.clone()]).collect();
-                if axis.default.is_none() || choices.is_empty() {
-                    choices.push(Vec::new());
-                }
-                axis_choices.push(choices);
-            } else {
-                let active_tags: Vec<String> = axis
-                    .tags
-                    .iter()
-                    .filter(|t| axis_relevant.contains(t.as_str()))
-                    .cloned()
-                    .collect();
-                let subsets = non_exclusive_subsets(&active_tags, axis.default.as_deref());
-                axis_choices.push(subsets);
-            }
-        }
-
-        let mut base = BTreeSet::new();
-        base.extend(backend.tags.iter().cloned());
-        enumerate_axes(&axis_choices, 0, &mut base, &hosts, visit)
-    }
-}
-
-fn non_exclusive_subsets(tags: &[String], default: Option<&str>) -> Vec<Vec<String>> {
-    // Cap exponential fan-out defensively while remaining exact for all practical axes.
-    let count = tags.len().min(12);
-    let total = 1usize << count;
-    let mut out = Vec::with_capacity(total);
-    for mask in 0..total {
-        let mut subset = Vec::new();
-        for (i, tag) in tags[..count].iter().enumerate() {
-            if (mask >> i) & 1 == 1 {
-                subset.push(tag.clone());
-            }
-        }
-        if subset.is_empty()
-            && let Some(def) = default
+        #[cfg(target_arch = "wasm32")]
         {
-            subset.push(def.to_owned());
+            let _ = relevant;
+            if backend.short == "js" {
+                for rt in ["rt", "effect"] {
+                    for host in ["node", "browser", "bun", "cloudflare"] {
+                        if !visit(&["js", rt, host]) || !visit(&["js", rt, "effect-adapter", host])
+                        {
+                            return false;
+                        }
+                    }
+                }
+                true
+            } else {
+                visit(&["go", "native"]) && visit(&["go", "cgo", "native"])
+            }
         }
-        if !out.contains(&subset) {
-            out.push(subset);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            // Collect all hosts targeting this backend (declared hosts override built-ins of the same name).
+            let mut hosts: Vec<(&str, Option<when::Expr>, Vec<&str>)> = backend
+                .builtin_hosts
+                .iter()
+                .map(|b| (b.as_str(), None, vec![b.as_str()]))
+                .collect();
+            for host in &self.hosts {
+                if backend.matches_name(&host.backend) {
+                    let req = host.requires.as_deref().and_then(|s| when::parse(s).ok());
+                    let mut htags = Vec::with_capacity(1 + host.tags.len());
+                    htags.push(host.name.as_str());
+                    htags.extend(host.tags.iter().map(String::as_str));
+                    if let Some(slot) = hosts.iter_mut().find(|(n, _, _)| *n == host.name) {
+                        *slot = (host.name.as_str(), req, htags);
+                    } else {
+                        hosts.push((host.name.as_str(), req, htags));
+                    }
+                }
+            }
+            // Tags referenced in host `requires` are also relevant for non-exclusive axes.
+            let mut axis_relevant: Vec<&str> = relevant.to_vec();
+            for (_, req, _) in &hosts {
+                if let Some(expr) = req {
+                    for (tag, _) in expr.tags() {
+                        if !axis_relevant.contains(&tag) {
+                            axis_relevant.push(tag);
+                        }
+                    }
+                }
+            }
+            let mut world: Vec<&str> = backend.tags.iter().map(String::as_str).collect();
+            enumerate_axes(&backend.axes, 0, &axis_relevant, &mut world, &hosts, visit)
         }
     }
-    out
 }
 
-fn enumerate_axes(
-    axes: &[Vec<Vec<String>>],
+#[cfg(not(target_arch = "wasm32"))]
+fn enumerate_axes<'a>(
+    axes: &'a [AxisTagModel],
     index: usize,
-    current: &mut BTreeSet<String>,
-    hosts: &[(Option<when::Expr>, Vec<String>)],
-    visit: &mut impl FnMut(&BTreeSet<String>) -> bool,
+    relevant: &[&str],
+    world: &mut Vec<&'a str>,
+    hosts: &[(&'a str, Option<when::Expr>, Vec<&'a str>)],
+    visit: &mut dyn FnMut(&[&str]) -> bool,
 ) -> bool {
     if index == axes.len() {
         if hosts.is_empty() {
-            return visit(current);
+            return visit(world);
         }
         let mut any_host = false;
-        for (req, host_tags) in hosts {
-            if req
-                .as_ref()
-                .is_some_and(|expr| !expr.eval(&|t| current.contains(t)))
-            {
+        for (_, req, host_tags) in hosts {
+            if req.as_ref().is_some_and(|expr| !eval_world(expr, world)) {
                 continue;
             }
             any_host = true;
-            let mut world = current.clone();
-            world.extend(host_tags.iter().cloned());
-            if !visit(&world) {
+            let mark = world.len();
+            world.extend_from_slice(host_tags);
+            let keep_going = visit(world);
+            world.truncate(mark);
+            if !keep_going {
                 return false;
             }
         }
         if !any_host {
-            return visit(current);
+            return visit(world);
         }
         return true;
     }
-    for choice in &axes[index] {
-        let mut added = Vec::new();
-        for tag in choice {
-            if current.insert(tag.clone()) {
-                added.push(tag.clone());
+    let current = &axes[index];
+    let mark = world.len();
+    if current.exclusive {
+        for tag in &current.tags {
+            world.push(tag.as_str());
+            let keep_going = enumerate_axes(axes, index + 1, relevant, world, hosts, visit);
+            world.truncate(mark);
+            if !keep_going {
+                return false;
             }
         }
-        let cont = enumerate_axes(axes, index + 1, current, hosts, visit);
-        for tag in added {
-            current.remove(&tag);
+        if current.default.is_none() || current.tags.is_empty() {
+            return enumerate_axes(axes, index + 1, relevant, world, hosts, visit);
         }
-        if !cont {
+        return true;
+    }
+    let active: Vec<&'a str> = current
+        .tags
+        .iter()
+        .map(String::as_str)
+        .filter(|t| relevant.contains(t))
+        .collect();
+    // Cap exponential fan-out defensively while remaining exact for all practical axes.
+    let bits = active.len().min(12);
+    let total = 1usize << bits;
+    for mask in 0..total {
+        for (i, &tag) in active[..bits].iter().enumerate() {
+            if (mask >> i) & 1 == 1 {
+                world.push(tag);
+            }
+        }
+        if world.len() == mark
+            && let Some(def) = current.default.as_deref()
+        {
+            world.push(def);
+        }
+        let keep_going = enumerate_axes(axes, index + 1, relevant, world, hosts, visit);
+        world.truncate(mark);
+        if !keep_going {
             return false;
         }
     }

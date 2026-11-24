@@ -132,7 +132,11 @@ impl Checker<'_> {
                     continue;
                 };
                 self.lower_foreign_top_scheme(&mut lower, typing, name);
-            } else if decl.kind == K::LetDecl && typing.native_overrides.contains_key(&decl.range())
+            } else if decl.kind == K::LetDecl
+                && typing
+                    .native_overrides
+                    .iter()
+                    .any(|(r, _)| *r == decl.range())
             {
                 if let Some(name) = super::bindings::let_parts(decl, self.text).name {
                     self.lower_foreign_top_scheme(&mut lower, typing, &name);
@@ -144,7 +148,10 @@ impl Checker<'_> {
                     .flat_map(Node::nodes)
                 {
                     if member.kind == K::LetDecl
-                        && typing.native_overrides.contains_key(&member.range())
+                        && typing
+                            .native_overrides
+                            .iter()
+                            .any(|(r, _)| *r == member.range())
                         && let Some(name) = super::bindings::let_parts(member, self.text).name
                     {
                         self.lower_foreign_top_scheme(&mut lower, typing, &name);

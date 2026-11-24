@@ -62,11 +62,7 @@ impl Checking<'_> {
                     .tree
                     .nodes()
                     .find(|n| n.kind == K::ForeignDecl && n.range() == *range)
-                    .and_then(|n| n.nodes().find(|c| c.kind == K::ForeignSource))
-                    .is_some_and(|src| {
-                        src.child_tokens()
-                            .any(|t| t.kind == K::Ident && t.text(module.text) == "inline")
-                    });
+                    .is_some_and(|n| has_inline_source(n, module.text));
                 Self::validate_one_official_adapter(
                     backend_id,
                     module.file,
@@ -77,20 +73,18 @@ impl Checking<'_> {
                 );
             }
         }
-        let mut overrides: Vec<_> = typing.native_overrides.iter().collect();
-        overrides.sort_by_key(|(range, _)| *range);
-        for (_, ov) in overrides {
+        for (_, ov) in &typing.native_overrides {
             if ov.info.adapter.words.is_empty()
                 || !matches!(ov.backend_id.as_str(), "flick/js" | "flick/go")
             {
                 continue;
             }
-            let is_inline = find_native_override(module.tree, ov.override_range)
-                .and_then(|n| n.nodes().find(|c| c.kind == K::ForeignSource))
-                .is_some_and(|src| {
-                    src.child_tokens()
-                        .any(|t| t.kind == K::Ident && t.text(module.text) == "inline")
-                });
+            let mut is_inline = false;
+            for_each_native_override(module.tree, &mut |_, node| {
+                if node.range() == ov.override_range {
+                    is_inline = has_inline_source(node, module.text);
+                }
+            });
             Self::validate_one_official_adapter(
                 &ov.backend_id,
                 module.file,
@@ -200,26 +194,29 @@ impl Checking<'_> {
             }
         }
         // Validate `@native inline "..."` clauses for their selected or uniquely matched backend.
-        let mut overrides = Vec::new();
-        collect_native_overrides(module.tree, &mut overrides);
-        for (decl_range, ov) in overrides {
+        for_each_native_override(module.tree, &mut |decl_range, ov| {
+            if !has_inline_source(ov, module.text) {
+                return;
+            }
             let selected_backend = typing
                 .native_overrides
-                .get(&decl_range)
-                .filter(|n| n.override_range == ov.range())
-                .map(|n| n.backend_id.as_str());
+                .iter()
+                .find(|(range, ov_info)| {
+                    *range == decl_range && ov_info.override_range == ov.range()
+                })
+                .map(|(_, ov_info)| ov_info.backend_id.as_str());
             let target_backend = selected_backend.or_else(|| {
                 let cond_text = ov.nodes().find(|n| n.kind == K::WhenCond)?.text(module.text);
                 let expr = when::parse(cond_text.trim()).ok()?;
                 self.env_ctx
-                    .native_overrides
+                    .native_overrides()
                     .unique_backend_for(&expr)
                     .map(|s| s.backend_id.as_str())
             });
             if let Some(id @ ("flick/js" | "flick/go")) = target_backend {
                 Self::check_inline_source(id, ov, module, checked);
             }
-        }
+        });
     }
 
     fn check_inline_preamble(
@@ -252,15 +249,12 @@ impl Checking<'_> {
         module: &resolve::Module<'_>,
         checked: &mut Vec<Diagnostic>,
     ) {
+        if !has_inline_source(parent, module.text) {
+            return;
+        }
         let Some(source) = parent.nodes().find(|n| n.kind == K::ForeignSource) else {
             return;
         };
-        let is_inline = source
-            .child_tokens()
-            .any(|t| t.kind == K::Ident && t.text(module.text) == "inline");
-        if !is_inline {
-            return;
-        }
         let Some(tok) = source.child_tokens().find(|t| t.kind == K::String) else {
             return;
         };
@@ -284,21 +278,21 @@ impl Checking<'_> {
     }
 }
 
-fn find_native_override(tree: &Node, target: (u32, u32)) -> Option<&Node> {
-    let mut found = Vec::new();
-    collect_native_overrides(tree, &mut found);
-    found
-        .into_iter()
-        .find(|(_, ov)| ov.range() == target)
-        .map(|(_, ov)| ov)
+fn has_inline_source(node: &Node, text: &str) -> bool {
+    node.nodes()
+        .find(|c| c.kind == K::ForeignSource)
+        .is_some_and(|src| {
+            src.child_tokens()
+                .any(|t| t.kind == K::Ident && t.text(text) == "inline")
+        })
 }
 
-fn collect_native_overrides<'a>(tree: &'a Node, out: &mut Vec<((u32, u32), &'a Node)>) {
+fn for_each_native_override<'a>(tree: &'a Node, visit: &mut dyn FnMut((u32, u32), &'a Node)) {
     for decl in tree.nodes() {
         match decl.kind {
             K::LetDecl => {
                 for ov in decl.nodes().filter(|n| n.kind == K::NativeOverride) {
-                    out.push((decl.range(), ov));
+                    visit(decl.range(), ov);
                 }
             }
             K::RecGroup => {
@@ -306,11 +300,10 @@ fn collect_native_overrides<'a>(tree: &'a Node, out: &mut Vec<((u32, u32), &'a N
                     .nodes()
                     .filter(|n| n.kind == K::Members)
                     .flat_map(Node::nodes)
+                    .filter(|n| n.kind == K::LetDecl)
                 {
-                    if member.kind == K::LetDecl {
-                        for ov in member.nodes().filter(|n| n.kind == K::NativeOverride) {
-                            out.push((member.range(), ov));
-                        }
+                    for ov in member.nodes().filter(|n| n.kind == K::NativeOverride) {
+                        visit(member.range(), ov);
                     }
                 }
             }
