@@ -30,6 +30,7 @@ pub mod control_handlers;
 pub mod diff_command;
 pub mod doc_run_examples;
 pub mod dts_command;
+pub mod dts_gadt;
 pub mod e2e_native_primitives;
 pub mod e2e_numbers;
 pub mod examples;

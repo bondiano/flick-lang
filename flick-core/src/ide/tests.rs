@@ -123,7 +123,7 @@ let items_of owner =
 ";
 
 pub(super) struct Fixture {
-    analysis: Analysis,
+    pub(super) analysis: Analysis,
     sources: SourceMap,
 }
 

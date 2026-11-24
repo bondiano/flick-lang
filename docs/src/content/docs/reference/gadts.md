@@ -315,8 +315,17 @@ and the [limits](#limits) below are the other constraints on a refining branch.
   or an alternative of an or-pattern does not, and each is `FLICK-T058`.
 - Patterns do not identify different regions (`FLICK-T058`).
   [Service, error and capture row indices](#row-indices) can be refined.
-- TypeScript has no refinement: in a `.d.ts` file each constructor is a case of
-  every instance of its type, and a type it hides is `unknown`.
+- In a `.d.ts` file a constructor whose result fixes a parameter to a closed
+  type, such as `NatLit Int : Expr Int`, is a case only of the instances that
+  admit that type: `Expr<boolean>` is not an `Expr<number>`, and a `switch` on
+  the `_tag` of an `Expr<number>` is exhaustive without `BoolLit`. An index with
+  a type variable, such as `If … : Expr a`, a row index and a type without a
+  TypeScript form are not checked, and a type a constructor hides is `unknown`.
+  At a call site TypeScript infers `number` for `eval$(NatLit(1))`. Inside a
+  generic function a tag check narrows the value and its fields, but the
+  parameter stays generic, so a branch casts its result. `Int` and `Float` are
+  both `number`, so `Expr<number>` also admits a case that fixes `Float`, and
+  equality such as `Refl : Equ a a` is not expressed.
 - Lean proves the row-index rules by examples
   (`formal/Formal/GadtRowExamples.lean`): membership from absorption,
   inclusion for every residual, exclusion by subtraction, transport of capture

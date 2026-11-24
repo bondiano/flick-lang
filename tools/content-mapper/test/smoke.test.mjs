@@ -32,6 +32,23 @@ const names = `module Lib.Names exposing (Badge(..))
 type Badge = Badge String
 `;
 
+const expr = `module Lib.Expr exposing (..)
+
+type Expr a =
+  | NatLit Int : Expr Int
+  | BoolLit Bool : Expr Bool
+  | Add (Expr Int) (Expr Int) : Expr Int
+  | If (Expr Bool) (Expr a) (Expr a) : Expr a
+
+eval : forall a. Expr a -> a
+let rec eval e =
+  match e with
+  | NatLit n -> n
+  | BoolLit b -> b
+  | Add x y -> eval x + eval y
+  | If c t f -> if eval c then eval t else eval f
+`;
+
 const flick = () => {
   if (process.env.FLICK_BIN) return process.env.FLICK_BIN;
   execFileSync("cargo", ["build", "-q", "-p", "flick"], { cwd: repo, stdio: "inherit" });
@@ -48,6 +65,7 @@ const check = (bin, main) => {
   writeFileSync(join(dir, "flick.toml"), 'schema-version = 1\n\n[project]\nkind = "lib"\nsource-dir = "src"\n');
   writeFileSync(join(dir, "src/Lib/Greeting.fl"), greeting);
   writeFileSync(join(dir, "src/Lib/Names.fl"), names);
+  writeFileSync(join(dir, "src/Lib/Expr.fl"), expr);
   writeFileSync(join(dir, "main.ts"), main);
   writeFileSync(
     join(dir, "tsconfig.json"),
@@ -78,4 +96,23 @@ export { said, first };
   const wrong = check(bin, `import { greet } from "./src/Lib/Greeting.fl";\nexport const said = greet("Ada");\n`);
   assert.notEqual(wrong.status, 0);
   assert.match(wrong.output, /main\.ts\(2,\d+\): error TS2345/);
+});
+
+test("a GADT's cases keep the index its constructors fix", () => {
+  const ok = check(
+    flick(),
+    `import { Add, BoolLit, If, NatLit, eval$ } from "./src/Lib/Expr.fl";
+import type { Expr } from "./src/Lib/Expr.fl";
+const n: number = eval$(If(BoolLit(true))(NatLit(1))(Add(NatLit(2))(NatLit(3))));
+const b: boolean = eval$(BoolLit(true));
+// @ts-expect-error BoolLit builds Expr<boolean>
+const bad: Expr<number> = BoolLit(true);
+// @ts-expect-error Add requires two Expr<number> values
+Add(NatLit(1))(BoolLit(true));
+// @ts-expect-error eval$<number> requires Expr<number>
+eval$<number>(BoolLit(true));
+export { n, b, bad };
+`,
+  );
+  assert.equal(ok.status, 0, ok.output);
 });

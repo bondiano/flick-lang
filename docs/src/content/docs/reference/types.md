@@ -258,5 +258,12 @@ let coerce a b x =
   | None -> None
 ```
 
-TypeScript has no refinement: in a `.d.ts` file each constructor of a GADT is
-a case of every instance of its type, and a type it hides is `unknown`.
+In a `.d.ts` file a GADT constructor whose result fixes a parameter to a
+closed type is a case only of the instances that admit that type: `TInt` is a
+`Ty<number>`, not a `Ty<string>`, and a `switch` on the `_tag` of a
+`Ty<number>` needs no `TStr` branch. An index with a type variable, a row
+index and a type without a TypeScript form are not checked, and a type a
+constructor hides is `unknown`. A tag check narrows the value at a call site
+and inside a generic function, where the parameter stays generic. `Int` and
+`Float` are both `number`, and type equality such as `TypeEq a b` is not
+expressed ([limits](../gadts/#limits)).
