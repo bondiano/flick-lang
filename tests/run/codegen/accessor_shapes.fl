@@ -1,0 +1,22 @@
+// One accessor reads records of different shapes: a top-level one open in
+// the rest of its record, a local one, and paths mapped over lists of each.
+module App.Main exposing (main)
+
+type alias User = { name : String; age : Int }
+
+type alias Pet = { name : String; legs : Int; owner : User }
+
+name_of : { name : String | rest } -> String
+let name_of = .name
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let ada = { name = "Ada"; age = 36 }
+  let rex = { name = "Rex"; legs = 4; owner = ada }
+  let fido = { rex with name = "Fido"; owner = { ada with name = "Alan"; age = 41 } }
+  Platform.stdout_line (name_of ada ++ " " ++ name_of rex)
+  Platform.stdout_line (show (List.map name_of [ada]) ++ show (List.map name_of [rex, fido]))
+  Platform.stdout_line (show (List.map .owner.name [rex, fido]))
+  Platform.stdout_line (show (List.map .owner.age [fido, rex]))
+  let named = .name
+  Platform.stdout_line (named ada ++ " and " ++ named fido)

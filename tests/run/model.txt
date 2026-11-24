@@ -28,6 +28,8 @@ codegen/counted_failures
 codegen/counted_patterns
 codegen/composition
 codegen/accessors
+codegen/accessor_projections
+codegen/accessor_shapes
 codegen/task_twice
 codegen/errors
 codegen/error_match
