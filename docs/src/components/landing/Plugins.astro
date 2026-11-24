@@ -17,7 +17,7 @@ const manifest = text(
 ---
 <section class="stop" style={style} aria-labelledby="plugins-title">
   <RouteBend from={from} to={to} />
-  <h2 id="plugins-title">{text("A compiler made of plugins", "Компилятор из плагинов")} <span class="stop-new">{text("New in 0.2", "Новое в 0.2")}</span></h2>
+  <h2 id="plugins-title">{text("A compiler made of plugins", "Компилятор из плагинов")}</h2>
   <p class="stop-lead" set:html={inlineCode(text("The compiler itself keeps types, effects and regions. `sql`, `ui`, `cli`, `server`, `codec`, `component`, `refined` and `test` are blocks of the standard library's plugin, and a package of yours adds a block the same way.", "В самом компиляторе остались типы, эффекты и регионы. `sql`, `ui`, `cli`, `server`, `codec`, `component`, `refined` и `test` — блоки плагина стандартной библиотеки, и ваш пакет добавляет свой блок точно так же."))} />
   <div class="split">
     <div class="split-text">

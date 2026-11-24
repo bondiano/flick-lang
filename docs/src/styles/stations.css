@@ -1,5 +1,4 @@
-/* The stations added for 0.2 and the yard at the end of the rail; the rail itself is in landing.css. */
-.stop-new { display: inline-block; margin-left: 0.4rem; padding: 0.3em 0.55em 0.15em; background: var(--flick-line-amber); color: #0e1116; font-size: 0.32em; font-weight: 700; line-height: 1; letter-spacing: 0.02em; vertical-align: middle; white-space: nowrap; }
+/* The later stations and the yard at the end of the rail; the rail itself is in landing.css. */
 .stop-links { display: flex; flex-wrap: wrap; gap: 0 1.75rem; }
 .read-code { display: grid; gap: 0.6rem; min-width: 0; }
 .hover-hint { font-size: 0.95rem; line-height: 1.4; color: var(--sl-color-gray-2); }
@@ -26,8 +25,6 @@
 .depot-name { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--sl-color-white); font-size: 1.35rem; font-weight: 800; line-height: 1.2; }
 .depot-body { font-size: 1.0625rem; line-height: 1.45; }
 .depot-cards a:hover .depot-name { color: var(--sl-color-accent-high); text-decoration: underline; }
-.depot-head a { color: var(--sl-color-text-accent); }
-.stop-depot .hero-actions { margin-top: 0.5rem; }
 
 /* Desktop: the tracks leave the rail one by one and run down into a row of cards, each card's
    edge the end of its track. Both are measured in design pixels, a track every 256. */
@@ -35,8 +32,11 @@
   .stop-depot { max-width: calc(var(--u) * 1296); }
   .depot-map { display: block; width: calc(var(--u) * (var(--width) + 48)); height: auto; margin-left: calc(var(--rail-x) - var(--pad-left) - var(--u) * 24); overflow: visible; }
   .depot-cards { grid-template-columns: repeat(5, calc(var(--u) * 232)); column-gap: calc(var(--u) * 24); margin-top: -1.25rem; }
-  .depot-cards li { padding: 1rem 0 0.25rem 1rem; }
-  .depot-cards li::before { display: none; }
+  /* each track runs down its card's edge, turns under the text and ends at a station */
+  .depot-cards li { border-left: 0; padding: 1rem 0 2.4rem calc(var(--rail) + 1rem); }
+  .depot-cards li::before { top: 0; bottom: calc(1.35rem + var(--rail) - 1px); left: 0; translate: none; width: var(--rail); height: auto; border: 0; border-radius: 0; background: var(--line); }
+  .depot-cards li::after { content: ''; position: absolute; left: 0; bottom: 0.6rem; width: 1.75rem; height: calc(0.75rem + var(--rail)); border: solid var(--line); border-width: 0 0 var(--rail) var(--rail); border-bottom-left-radius: calc(0.75rem + var(--rail)); }
+  .depot-cards a::after { content: ''; position: absolute; left: 1.75rem; bottom: calc(0.6rem + var(--rail) / 2); z-index: 1; translate: -50% 50%; width: 1.15rem; height: 1.15rem; border: 4px solid var(--line); border-radius: 50%; background: var(--sl-color-bg); }
   .depot-name { font-size: 1.25rem; }
   .depot-body { font-size: 1rem; }
 }

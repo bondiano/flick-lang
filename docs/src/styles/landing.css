@@ -205,14 +205,16 @@
 }
 /* The rail stands where the violet line leaves the diagram, in the hero's own units. A section
    may stand a column or two aside; the line bends into it like the hero's lines do, and the
-   section starts below the bend. */
+   section starts below the bend. Columns and the rail sit on whole pixels, so a bend, drawn in
+   SVG, meets the straight rail, a box the browser snaps to pixels, without a step. */
 @media (min-width: 75rem) {
-  .route { container-type: inline-size; padding-inline: 0; --rail-x: calc(var(--u) * 9); }
-  .route::before { left: calc(var(--u) * 81 - var(--rail) / 2); }
-  .stop { --pad-top: calc(var(--u) * var(--bend, 0) + 2rem); --rail-top: calc(var(--u) * var(--bend, 0)); margin-left: calc(var(--u) * (72 + 120 * var(--shift, 0))); margin-right: calc(var(--u) * 72); max-width: min(72rem, calc(var(--u) * (1296 - 120 * var(--shift, 0)))); }
-  .route-bend { display: block; position: absolute; top: 0; width: calc(var(--u) * var(--dx)); height: auto; overflow: visible; }
-  .route-bend-right { left: calc(var(--rail-x) - var(--u) * var(--dx)); }
-  .route-bend-left { left: var(--rail-x); }
+  .route { container-type: inline-size; padding-inline: 0; --rail-x: round(calc(var(--u) * 9), 1px); }
+  .route::before { left: calc(round(calc(var(--u) * 72), 1px) + var(--rail-x) - var(--rail) / 2); }
+  /* the rail starts under the end of the bend, which is vertical there, so no hairline shows */
+  .stop { --x: round(calc(var(--u) * (72 + 120 * var(--shift, 0))), 1px); --pad-top: calc(var(--u) * var(--bend, 0) + 2rem); --rail-top: max(0px, calc(var(--u) * var(--bend, 0) - 3px)); margin-left: var(--x); margin-right: calc(var(--u) * 72); max-width: min(72rem, calc(var(--u) * (1296 - 120 * var(--shift, 0)))); }
+  .route-bend { --from-x: round(calc(var(--u) * (72 + 120 * var(--from))), 1px); display: block; position: absolute; top: 0; height: auto; overflow: visible; }
+  .route-bend-right { left: calc(var(--rail-x) - var(--x) + var(--from-x)); width: calc(var(--x) - var(--from-x)); }
+  .route-bend-left { left: var(--rail-x); width: calc(var(--from-x) - var(--x)); }
   /* the bend is the way to the next section, so the gap before it is the bend itself */
   .stop:has(+ .stop > .route-bend) { padding-bottom: 1.5rem; }
 }

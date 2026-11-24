@@ -17,7 +17,7 @@ const manifest = text(
 ---
 <section class="stop" style={style} aria-labelledby="targets-title">
   <RouteBend from={from} to={to} />
-  <h2 id="targets-title">{text("Backends and hosts are plugins too", "Бэкенды и хосты — тоже плагины")} <span class="stop-new">{text("New in 0.2", "Новое в 0.2")}</span></h2>
+  <h2 id="targets-title">{text("Backends and hosts are plugins too", "Бэкенды и хосты — тоже плагины")}</h2>
   <div class="split">
     <div class="split-text">
       <p class="stop-lead" set:html={inlineCode(text("`flick/js` and `flick/go` are WebAssembly components as well. `--target` picks one, and `flick.lock` pins it by hash. A backend reads the checked program and the inputs its request lists, nothing else: no files of its own, no clock, no network.", "`flick/js` и `flick/go` — тоже компоненты WebAssembly. `--target` выбирает бэкенд, а `flick.lock` закрепляет его по хешу. Бэкенд читает проверенную программу и входные данные из своего запроса, и больше ничего: ни своих файлов, ни часов, ни сети."))} />

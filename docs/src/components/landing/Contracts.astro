@@ -12,7 +12,7 @@ const text = texts(locale);
 ---
 <section class="stop" style={style} aria-labelledby="contracts-title">
   <RouteBend from={from} to={to} />
-  <h2 id="contracts-title">{text("Contracts the compiler proves", "Контракты, которые доказывает компилятор")} <span class="stop-new">{text("New in 0.2", "Новое в 0.2")}</span></h2>
+  <h2 id="contracts-title">{text("Contracts the compiler proves", "Контракты, которые доказывает компилятор")}</h2>
   <p class="stop-lead" set:html={inlineCode(text("`require` and `ensure` say what a function expects and what it promises. Every build checks their types, and `flick prove` proves them for pure code over integers and data, or answers with a counterexample.", "`require` и `ensure` говорят, что функция ожидает и что обещает. Каждая сборка проверяет их типы, а `flick prove` доказывает их для чистого кода над целыми числами и данными или отвечает контрпримером."))} />
   <div class="split">
     <Sample name="contracts" />
