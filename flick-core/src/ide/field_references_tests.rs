@@ -258,3 +258,16 @@ fn a_record_read_from_a_field_is_of_the_alias_that_field_is_declared_with() {
     assert!(main.contains("let city_of = .address.area"), "{main}");
     assert_eq!(edits.len(), 2);
 }
+
+#[test]
+fn a_field_is_highlighted_where_its_alias_is_read() {
+    let f = project(MAIN);
+    let ide = f.ide();
+    let file = f.file("App.Main");
+    let at = f.at("App.Main", "user.name", 0) + 5;
+    let shout = f.at("App.Main", "|> .name", 0) + 4;
+    let ranges: Vec<(u32, u32)> = (ide.document_highlights(file, at).into_iter())
+        .map(|h| (h.start, h.end))
+        .collect();
+    assert_eq!(ranges, [(at, at + 4), (shout, shout + 4)]);
+}

@@ -172,3 +172,19 @@ fn an_error_in_the_project_refuses() {
         "the project has errors, and an unchecked label may read it",
     );
 }
+
+/// A Flick body that a native implementation overrides is a foreign
+/// boundary all the same.
+#[test]
+fn a_native_override_refuses() {
+    let main = format!(
+        "{MAIN}\nfetch_name : User -> String\nlet fetch_name u = u.name\n  @native \"fetchName\" when js\n"
+    );
+    refused(
+        &main,
+        &format!(
+            "`fetch_name` at src/App/Main.fl:{} passes it to foreign code, which reads fields by their names",
+            line(&main, "let fetch_name")
+        ),
+    );
+}

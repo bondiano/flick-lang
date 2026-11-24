@@ -196,7 +196,13 @@ impl Ide<'_> {
     /// alias `owner`: either names its fields by their spelling.
     fn boundary(&self, m: &Analyzed, owner: &Owner, labels: &[&str]) -> Option<String> {
         let text = self.text(m.file);
-        for decl in m.tree.nodes() {
+        // the members of a group of recursive definitions are declarations too
+        let members = (m.tree.nodes())
+            .filter(|n| n.kind == K::RecGroup)
+            .flat_map(Node::nodes)
+            .filter(|n| n.kind == K::Members)
+            .flat_map(Node::nodes);
+        for decl in m.tree.nodes().chain(members) {
             let name = match decl.kind {
                 K::ForeignDecl => foreign_words(decl).1.map(|t| t.text(text)),
                 K::LetDecl
