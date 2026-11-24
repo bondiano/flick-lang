@@ -63,3 +63,9 @@ let echoes logs = (List.map .echo logs, .log.todo { log = { echo = "a"; todo = t
 
 made : (Unit -> Log) -> String
 let made make = (make ()).echo
+
+// a local accessor is generic over the other fields of a record too
+others : Unit ->{} (Int, Bool)
+let others () =
+  let get = .value
+  (get { value = 1 }, get { value = true; other = 2 })

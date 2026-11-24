@@ -253,12 +253,16 @@ impl Lower<'_> {
 
     /// A field; a polymorphic one with constraints takes their dictionaries.
     fn field(&mut self, node: &Node, record: &Node) -> Expr {
-        let label = self.token_text(node, K::Ident).unwrap_or_default();
-        let field = Expr::new(ExprKind::Field(self.boxed(record), label), self.span(node));
-        let dicts = self
-            .typing
-            .dicts
-            .get(&node.range())
+        let record = self.expr(record);
+        self.read_field(record, node, self.span(node))
+    }
+
+    /// `record.label` with the label written in `label`: the field takes
+    /// the dictionaries its instance needs there, keyed by that node.
+    fn read_field(&self, record: Expr, label: &Node, span: Span) -> Expr {
+        let name = self.token_text(label, K::Ident).unwrap_or_default();
+        let field = Expr::new(ExprKind::Field(Box::new(record), name), span);
+        let dicts = (self.typing.dicts.get(&label.range()))
             .cloned()
             .unwrap_or_default();
         with_dicts(field, dicts)
@@ -278,14 +282,9 @@ impl Lower<'_> {
         let x = self.hidden("$x");
         let mut value = Expr::new(ExprKind::Local(x.clone()), span);
         for step in node.nodes() {
-            let label = self.token_text(step, K::Ident).unwrap_or_default();
             // as the span of `x.a.b` is that of the whole path so far
             let at = Span::new(self.file, node.range().0, step.range().1);
-            let field = Expr::new(ExprKind::Field(Box::new(value), label), at);
-            let dicts = (self.typing.dicts.get(&step.range()))
-                .cloned()
-                .unwrap_or_default();
-            value = with_dicts(field, dicts);
+            value = self.read_field(value, step, at);
         }
         let stage = self
             .typing

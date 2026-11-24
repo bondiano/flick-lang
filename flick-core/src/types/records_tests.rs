@@ -1,5 +1,4 @@
-//! Accessors on records of different fields, which the model does not
-//! check: its records are exact; and on polymorphic fields.
+//! Accessors on records of different fields and on polymorphic fields.
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::source::SourceMap;
@@ -11,9 +10,8 @@ fn check(text: &str) -> Vec<Diagnostic> {
 }
 
 /// A local accessor is generic over the other fields of a record as well,
-/// as an explicit `fun` is. The model rejects one local function applied to
-/// records of different fields (`records are exact`); `tests/check/pass`,
-/// which it checks too, keeps to records of the same fields.
+/// as an explicit `fun` is (`tests/check/pass/types/accessors.fl` runs it
+/// through the model), and a record without the field is still rejected.
 #[test]
 fn a_local_accessor_takes_records_of_different_fields() {
     for get in [".value", "fun r -> r.value"] {
