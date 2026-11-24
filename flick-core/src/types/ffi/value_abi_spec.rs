@@ -1,5 +1,8 @@
 //! Versioned backend value-ABI specification mirrored from `flick:backend/types`.
 
+#[path = "value_abi_spec_go.rs"]
+mod go;
+
 #[cfg(feature = "native-project")]
 use serde::{Deserialize, Serialize};
 

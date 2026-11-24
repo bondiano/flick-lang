@@ -153,24 +153,14 @@ impl Checker<'_> {
             decl, scheme, &body, &binders, &params, &stages, retention, span,
         );
         #[cfg(not(target_arch = "wasm32"))]
-        {
-            let value_abi_spec = if pending.native_override.is_some() {
-                self.options
-                    .native_env()
-                    .active_backend_spec(self.options.foreign_backend)
-                    .clone()
-            } else {
-                self.options.foreign_backend.clone()
-            };
-            self.check_foreign_value_abi(
-                pending.native_override.is_none().then_some(decl),
-                &info,
-                &params,
-                &body,
-                &value_abi_spec,
-                span,
-            );
-        }
+        self.check_pending_foreign_value_abi(
+            decl,
+            pending.native_override.as_ref().map(|(r, _, _)| *r),
+            &info,
+            &params,
+            &body,
+            span,
+        );
         if let Some((override_range, backend_id, enabled)) = pending.native_override {
             self.typing.native_overrides.push((
                 decl.range(),
@@ -504,6 +494,9 @@ mod metadata_tests;
 #[cfg(test)]
 #[path = "ffi/pending_tests.rs"]
 mod pending_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+#[path = "ffi/value_abi_go_tests.rs"]
+mod value_abi_go_tests;
 #[cfg(test)]
 #[path = "ffi/value_abi_tests.rs"]
 mod value_abi_tests;

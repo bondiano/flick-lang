@@ -10,6 +10,8 @@ mod decide_tests;
 #[cfg(test)]
 mod direct_tests;
 #[cfg(test)]
+mod foreign_pkg_tests;
+#[cfg(test)]
 mod foreign_tests;
 #[cfg(test)]
 mod loops_tests;

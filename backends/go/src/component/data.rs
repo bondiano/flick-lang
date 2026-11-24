@@ -7,13 +7,17 @@ use flick_backend::{
 };
 use flick_ir::Program;
 
-use super::failure;
-use crate::codegen::Bindings;
+use super::{failure, value_abi};
+use crate::codegen::{Bindings, is_relative};
 use crate::{foreign_meta, inline};
 
 /// The Go binding tables of the implicit packages: resource inputs whose id
 /// starts so, one table each.
 pub(super) const BINDINGS: &str = "go/bindings/";
+/// Declared `[target.go.dependencies]` pairs (`<module> <version>\n`).
+pub(super) const GO_DEPENDENCIES: &str = "go/dependencies";
+/// Optional project-level `go.sum` lockfile.
+pub(super) const GO_SUM_INPUT: &str = "go/go.sum";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Command {
@@ -43,6 +47,10 @@ pub(super) struct Data {
     pub cgo: bool,
     /// Module selected for `inspect --emit output`.
     pub inspect_module: Option<String>,
+    /// Third-party Go modules declared via `[target.go.dependencies]`.
+    pub go_deps: BTreeMap<String, String>,
+    /// Optional project `go.sum` supplied as a lockfile input.
+    pub project_go_sum: Option<String>,
 }
 
 impl Data {
@@ -76,23 +84,35 @@ impl Data {
         let mut foreign = BTreeMap::new();
         for binding in &request.foreign {
             if (binding.abi.name.as_str(), binding.abi.version.as_str())
-                != ("flick.go-ffi", "0.1.0")
+                != (value_abi::ABI_NAME, value_abi::ABI_VERSION)
             {
                 return Err(failure(
                     "F014",
                     format!(
-                        "foreign binding ABI mismatch for `{}` in `{}`: expected `flick.go-ffi@0.1.0`, got `{}@{}`",
-                        binding.specifier, binding.module, binding.abi.name, binding.abi.version
+                        "foreign binding ABI mismatch for `{}` in `{}`: expected `{}@{}`, got `{}@{}`",
+                        binding.specifier,
+                        binding.module,
+                        value_abi::ABI_NAME,
+                        value_abi::ABI_VERSION,
+                        binding.abi.name,
+                        binding.abi.version
                     ),
                 ));
             }
-            let [input] = binding.inputs.as_slice() else {
-                return Err(failure("P012", "a foreign Go file is one input"));
-            };
-            let text = String::from_utf8(read(input, "foreign")?)
-                .map_err(|e| failure("P012", format!("foreign Go encoding: {e}")))?;
-            let key = (binding.module.clone(), binding.specifier.clone());
-            foreign.insert(key, (binding.resolved.clone(), text));
+            if is_relative(&binding.specifier) {
+                let [input] = binding.inputs.as_slice() else {
+                    return Err(failure("P012", "a foreign Go file is one input"));
+                };
+                let text = String::from_utf8(read(input, "foreign")?)
+                    .map_err(|e| failure("P012", format!("foreign Go encoding: {e}")))?;
+                let key = (binding.module.clone(), binding.specifier.clone());
+                foreign.insert(key, (binding.resolved.clone(), text));
+            } else if !binding.inputs.is_empty() {
+                return Err(failure(
+                    "P012",
+                    "a direct Go package binding takes no sibling file input",
+                ));
+            }
         }
         let mut tables = Vec::new();
         for input in (request.inputs.iter())
@@ -108,6 +128,10 @@ impl Data {
                 .map_err(|e| failure("P012", format!("source encoding: {e}")))?;
             sources.push(text);
         }
+        let GoDepInputs {
+            deps: go_deps,
+            go_sum: project_go_sum,
+        } = read_go_deps_and_sum(request, inputs)?;
         let (command, windows, cgo, inspect_module) = options(request)?;
         Ok(Self {
             program,
@@ -122,6 +146,8 @@ impl Data {
             windows,
             cgo,
             inspect_module,
+            go_deps,
+            project_go_sum,
         })
     }
 
@@ -220,4 +246,55 @@ fn options(
         cgo.unwrap_or(false),
         inspect_module,
     ))
+}
+
+struct GoDepInputs {
+    deps: BTreeMap<String, String>,
+    go_sum: Option<String>,
+}
+
+fn read_go_deps_and_sum(
+    request: &BuildRequest,
+    inputs: &mut dyn Inputs,
+) -> Result<GoDepInputs, Vec<Diagnostic>> {
+    let mut deps = BTreeMap::new();
+    if request
+        .inputs
+        .iter()
+        .any(|i| i.kind == InputKind::TargetFacts && i.id == GO_DEPENDENCIES)
+    {
+        let raw = inputs
+            .read(GO_DEPENDENCIES)
+            .map_err(|e| failure("P012", format!("Go dependencies input: {e:?}")))?;
+        let text = String::from_utf8(raw)
+            .map_err(|e| failure("P012", format!("Go dependencies encoding: {e}")))?;
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            let Some((module, version)) = trimmed.split_once(' ') else {
+                return Err(failure(
+                    "P012",
+                    format!("malformed Go dependency entry `{trimmed}`"),
+                ));
+            };
+            deps.insert(module.to_owned(), version.trim().to_owned());
+        }
+    }
+    let go_sum = if request
+        .inputs
+        .iter()
+        .any(|i| i.kind == InputKind::Lockfile && i.id == GO_SUM_INPUT)
+    {
+        let raw = inputs
+            .read(GO_SUM_INPUT)
+            .map_err(|e| failure("P012", format!("go.sum input: {e:?}")))?;
+        let text =
+            String::from_utf8(raw).map_err(|e| failure("P012", format!("go.sum encoding: {e}")))?;
+        Some(text)
+    } else {
+        None
+    };
+    Ok(GoDepInputs { deps, go_sum })
 }

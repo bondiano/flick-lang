@@ -704,6 +704,32 @@ in `flick.toml`, or `--allow-tool go` for a file built outside a project
 (`FLICK-P029` otherwise). It is built without cgo by default, so no C compiler is
 needed either; pass `--cgo` (or `[target.go] cgo = true`) to build with `CGO_ENABLED=1`.
 
+### Value ABI (`flick/go`)
+
+Direct Go package bindings (`foreign name from "pkg" "Sym"`) and Go package
+globals are checked against the versioned value-ABI table published by
+`flick/go` (`FLICK-F013` for unsupported types, `FLICK-F014` for ABI version
+mismatches). Sibling `.go` files and `from inline` bindings keep the
+`flickrt.Value` escape hatch for types outside the table. Rendered from the
+`flick/go` backend descriptor:
+
+<!-- value-abi:flick/go:en:start -->
+**ABI:** `flick.go-ffi@0.1.0` · **Opaque fallback:** `flickrt.Value` · **Host `catch` type:** `error` (lang item `string`)
+
+| Key | Flick | Host | Conversion | Direction | Notes |
+| - | - | - | - | - | - |
+| `unit` | `Unit` | `()` | `none` | `both` | No Go parameter with `arity 0`, or no Go return value (bare `error` with `catch`); a successful Flick result is `()` |
+| `bool` | `Bool` | `bool` | `none` | `both` | Go `bool` primitive |
+| `int` | `Int` | `int32` | `none` | `both` | Go signed 32-bit integer `int32` |
+| `float` | `Float` | `float64` | `none` | `both` | Go IEEE 754 binary64 `float64` |
+| `string` | `String` | `string` | `none` | `both` | Go `string` value |
+| `bytes` | `Bytes` | `[]byte` | `copy` | `both` | Freshly copied Go `[]byte` slice; host mutations never alias immutable Flick `Bytes` |
+| `list` | `List a` | `[]T` | `copy` | `both` | Freshly copied Go slice `[]T` with recursive element conversion; host mutations never alias Flick `List` |
+| `option` | `Option a` | `*T or (T, bool)` | `copy` | `both` | Go pointer `*T` when `nil` unambiguously represents `None` (parameters, slice elements, and `nullable` returns); presence flag `(T, bool)` / `struct{ Val T; Ok bool }` for comma-ok returns, nested `Option`, and opaque payloads; trailing `error` maps via `catch` and `Async` passes a leading `context.Context` cancelled on interruption |
+
+Records and user-defined ADTs have no stable layout and are not in this table; direct bindings refuse them unless wrapped in an opaque nominal handle.
+<!-- value-abi:flick/go:en:end -->
+
 ## Portable IR (0.17.0)
 
 Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.17.0"`),

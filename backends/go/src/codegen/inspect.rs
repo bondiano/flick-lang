@@ -1,6 +1,6 @@
 //! Single-module Go codegen for `flick inspect --emit output --target go`.
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 
 use flick_backend_support::reach::{self, Key};
 use flick_ir::Module;
@@ -26,6 +26,7 @@ pub fn go_module(input: &Input, module_name: &str) -> Output {
             files: Vec::new(),
             diagnostics: vec![Unsupported::new(format!("unknown module `{module_name}`"))],
             packages: Vec::new(),
+            go_imports: BTreeSet::new(),
         };
     };
     let keys: Vec<Key> = module
@@ -79,10 +80,12 @@ pub fn go_module(input: &Input, module_name: &str) -> Output {
         message,
         span: span.filter(|_| m < input.own.len()),
     }));
+    let go_imports = g.go_imports.into_keys().collect();
     dedup(&mut diagnostics);
     Output {
         files: vec![(names::file(&module.name), code)],
         diagnostics,
         packages: Vec::new(),
+        go_imports,
     }
 }

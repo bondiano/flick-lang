@@ -1,7 +1,7 @@
 //! A Go module per program, with the runtime beside it, and the host step
 //! that builds its executable.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use flick_backend::{
     Artifact, ArtifactKind, BuildRequest, BuildResult, Diagnostic, InputRef, Launch, LaunchKind,
@@ -12,7 +12,9 @@ use flick_ir::Module;
 
 use super::data::{Command, Data};
 use super::{failure, optimize};
-use crate::codegen::{self, GO_SUM, Input, PACKAGES, Package, RUNTIME, Unsupported, go_mod};
+use crate::codegen::{
+    self, GO_SUM, Input, PACKAGES, Package, RUNTIME, Unsupported, go_mod_with_deps, merge_go_sum,
+};
 
 /// The name of the program that runs a project's tests.
 const TEST: &str = "test";
@@ -153,7 +155,15 @@ pub(super) fn generate(
             lang: &lang,
         });
         unsupported.extend(output.diagnostics);
-        add(&mut result, data, go, name, output.files, &output.packages);
+        add(
+            &mut result,
+            data,
+            go,
+            name,
+            output.files,
+            &output.packages,
+            &output.go_imports,
+        );
     }
     if unsupported.is_empty() {
         Ok(result)
@@ -171,16 +181,34 @@ fn add(
     name: &str,
     code: Vec<(String, String)>,
     reached: &[&str],
+    go_imports: &BTreeSet<String>,
 ) {
     let dir = format!("go/{name}");
     let packages: Vec<&Package> = (PACKAGES.iter())
         .filter(|p| reached.contains(&p.name))
         .collect();
-    let mut files = vec![("go.mod".to_owned(), go_mod(&packages))];
-    // the modules of a package go build downloads once; go.sum pins them
-    if !packages.is_empty() {
-        files.push(("go.sum".to_owned(), GO_SUM.to_owned()));
-    }
+    let uses_go_deps = data.go_deps.keys().any(|dep| {
+        let prefix = format!("{dep}/");
+        go_imports
+            .iter()
+            .any(|imp| imp == dep || imp.starts_with(&prefix))
+    });
+    let mut files = vec![(
+        "go.mod".to_owned(),
+        go_mod_with_deps(&packages, &data.go_deps),
+    )];
+    let seed_sum = merge_go_sum(
+        (!packages.is_empty()).then_some(GO_SUM),
+        data.project_go_sum.as_deref(),
+    );
+    let capture_generated_go_sum = if let Some(sum) = seed_sum {
+        files.push(("go.sum".to_owned(), sum));
+        false
+    } else {
+        // `go build -mod=mod` generates `go.sum` when imported `[target.go.dependencies]`
+        // are present and no runtime or project `go.sum` was seeded.
+        uses_go_deps
+    };
     let package_files = packages.iter().flat_map(|p| p.files);
     files.extend(package_files.map(|(p, c)| ((*p).to_owned(), (*c).to_owned())));
     files.extend(code);
@@ -201,6 +229,18 @@ fn add(
         key: key.into(),
         value: value.into(),
     };
+    let mut outputs = vec![StepOutput {
+        id: format!("exe:{name}"),
+        path: executable,
+        kind: ArtifactKind::Executable,
+    }];
+    if capture_generated_go_sum {
+        outputs.push(StepOutput {
+            id: format!("gosum:{name}"),
+            path: format!("{dir}/go.sum"),
+            kind: ArtifactKind::Source,
+        });
+    }
     // -trimpath keeps the build directory out of Go's cache keys and the binary
     result.steps.push(ToolchainStep {
         id: format!("build:{name}"),
@@ -209,20 +249,16 @@ fn add(
         arguments: ["build", "-C", &dir, "-trimpath", "-buildvcs=false", "-o"]
             .into_iter()
             .map(str::to_owned)
-            .chain([format!("../../{executable}"), ".".to_owned()])
+            .chain([format!("../../{}", outputs[0].path), ".".to_owned()])
             .collect(),
-        // only optional packages need modules, which go downloads once
+        // only optional packages and declared Go modules download once
         environment: vec![
             env("GOFLAGS", "-mod=mod"),
             env("GOTOOLCHAIN", "local"),
             env("CGO_ENABLED", if data.cgo { "1" } else { "0" }),
         ],
         inputs,
-        outputs: vec![StepOutput {
-            id: format!("exe:{name}"),
-            path: executable,
-            kind: ArtifactKind::Executable,
-        }],
+        outputs,
     });
     result.launches.push(Launch {
         name: name.to_owned(),
@@ -250,5 +286,128 @@ fn diagnostic(unsupported: Unsupported) -> Diagnostic {
             end: s.end,
         }),
         notes: vec![],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{iter, str};
+
+    use super::*;
+    use crate::codegen::Bindings;
+    use flick_ir::Program;
+
+    fn test_data(go_deps: &[(&str, &str)], project_go_sum: Option<&str>) -> Data {
+        Data {
+            program: Program::new("test", vec![], vec![], &|_| String::new()),
+            facts: BTreeMap::new(),
+            lines: vec![],
+            sources: vec![],
+            foreign: BTreeMap::new(),
+            bindings: Bindings::parse(iter::empty()),
+            command: Command::Build,
+            windows: false,
+            cgo: false,
+            inspect_module: None,
+            go_deps: go_deps
+                .iter()
+                .map(|&(k, v)| (k.to_owned(), v.to_owned()))
+                .collect(),
+            project_go_sum: project_go_sum.map(str::to_owned),
+        }
+    }
+
+    fn test_go_tool() -> Toolchain {
+        Toolchain {
+            id: "go".into(),
+            version: "1.23.0".into(),
+            sha256: "0".repeat(64),
+        }
+    }
+
+    fn run_add(
+        data: &Data,
+        code: Vec<(String, String)>,
+        reached: &[&str],
+        go_imports: &[&str],
+    ) -> BuildResult {
+        let mut result = BuildResult {
+            artifacts: vec![],
+            steps: vec![],
+            runtime_dependencies: vec![],
+            launches: vec![],
+            diagnostics: vec![],
+        };
+        let imports: BTreeSet<String> = go_imports.iter().map(|&s| s.to_owned()).collect();
+        add(
+            &mut result,
+            data,
+            &test_go_tool(),
+            "main",
+            code,
+            reached,
+            &imports,
+        );
+        result
+    }
+
+    #[test]
+    fn unimported_dep_string_literal_does_not_declare_go_sum_step_output() {
+        let data = test_data(&[("example.com/pkg", "v1.0.0")], None);
+        let code = vec![(
+            "m_App.go".to_owned(),
+            "package main\nvar s = \"example.com/pkg\"\n".to_owned(),
+        )];
+        let res = run_add(&data, code, &[], &[]);
+        assert!(
+            !res.steps[0]
+                .outputs
+                .iter()
+                .any(|o| o.path.ends_with("go.sum")),
+            "unimported string literal must not declare go.sum StepOutput: {:?}",
+            res.steps[0].outputs
+        );
+    }
+
+    #[test]
+    fn imported_dep_without_runtime_packages_declares_go_sum_step_output() {
+        let data = test_data(&[("example.com/pkg", "v1.0.0")], None);
+        let res = run_add(&data, vec![], &[], &["example.com/pkg"]);
+        assert!(
+            res.steps[0]
+                .outputs
+                .iter()
+                .any(|o| o.path == "go/main/go.sum"),
+            "expected go/main/go.sum StepOutput: {:?}",
+            res.steps[0].outputs
+        );
+        assert!(
+            !res.artifacts.iter().any(|a| a.path == "go/main/go.sum"),
+            "go/main/go.sum must not collide with artifacts"
+        );
+    }
+
+    #[test]
+    fn optional_runtime_package_with_go_deps_preserves_pinned_runtime_go_sum() {
+        let pkg_name = PACKAGES.first().expect("optional runtime package").name;
+        let data = test_data(&[("example.com/pkg", "v1.0.0")], None);
+        let res = run_add(&data, vec![], &[pkg_name], &["example.com/pkg"]);
+        let sum_artifact = res
+            .artifacts
+            .iter()
+            .find(|a| a.path == "go/main/go.sum")
+            .expect("pinned runtime GO_SUM artifact must be preserved");
+        let text = str::from_utf8(&sum_artifact.bytes).expect("utf-8 go.sum");
+        assert!(
+            text.contains("h1:"),
+            "expected pinned runtime checksums in go.sum: {text}"
+        );
+        assert!(
+            !res.steps[0]
+                .outputs
+                .iter()
+                .any(|o| o.path == "go/main/go.sum"),
+            "go/main/go.sum must not be duplicated in StepOutput"
+        );
     }
 }

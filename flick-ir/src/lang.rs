@@ -75,6 +75,7 @@ lang_items! {
     UInt64 = "uint64",
     Float32 = "float32",
     String = "string",
+    Bytes = "bytes",
     Unknown = "unknown",
     JsValue = "js_value",
     List = "list",

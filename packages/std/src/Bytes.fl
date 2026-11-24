@@ -20,6 +20,7 @@ module Bytes exposing (
   equal,
 )
 
+@lang bytes
 /// An immutable sequence of bytes, with one byte of storage per element.
 type Bytes
 

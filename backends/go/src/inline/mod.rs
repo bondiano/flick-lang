@@ -37,6 +37,101 @@ pub fn split_preamble(code: &str) -> ParsedPreamble {
     })
 }
 
+/// Extracts Go import paths declared in top-level `import` clauses of a Go source
+/// file (such as a sibling foreign `.go` file), stopping at the first non-import
+/// declaration so string literals inside code are never mistaken for imports.
+pub fn imported_packages(src: &str) -> Vec<String> {
+    let Ok(tokens) = lex::lex(src) else {
+        return Vec::new();
+    };
+    let mut pos = 0usize;
+    let skip_semi = |pos: &mut usize| {
+        while tokens.get(*pos).is_some_and(|t| t.kind == lex::Kind::Semi) {
+            *pos += 1;
+        }
+    };
+    skip_semi(&mut pos);
+    if tokens
+        .get(pos)
+        .is_some_and(|t| t.kind == lex::Kind::Ident && t.text == "package")
+    {
+        pos += 1;
+        if tokens.get(pos).is_some_and(|t| t.kind == lex::Kind::Ident) {
+            pos += 1;
+        }
+    }
+    let mut imports = Vec::new();
+    loop {
+        skip_semi(&mut pos);
+        let Some(tok) = tokens.get(pos) else {
+            break;
+        };
+        if tok.kind != lex::Kind::Ident || tok.text != "import" {
+            break;
+        }
+        pos += 1;
+        if tokens.get(pos).is_some_and(|t| t.kind == lex::Kind::LParen) {
+            pos += 1;
+            while let Some(t) = tokens.get(pos) {
+                if t.kind == lex::Kind::RParen || t.kind == lex::Kind::Eof {
+                    pos += 1;
+                    break;
+                }
+                if t.kind == lex::Kind::Semi {
+                    pos += 1;
+                    continue;
+                }
+                if let Some(path) = eat_import_spec(&tokens, &mut pos) {
+                    imports.push(path);
+                } else {
+                    break;
+                }
+            }
+        } else if let Some(path) = eat_import_spec(&tokens, &mut pos) {
+            imports.push(path);
+        } else {
+            break;
+        }
+    }
+    imports
+}
+
+fn eat_import_spec(tokens: &[lex::Token<'_>], pos: &mut usize) -> Option<String> {
+    if tokens
+        .get(*pos)
+        .is_some_and(|t| matches!(t.kind, lex::Kind::Ident | lex::Kind::Dot))
+    {
+        *pos += 1;
+    }
+    let tok = tokens.get(*pos)?;
+    if tok.kind != lex::Kind::String {
+        return None;
+    }
+    *pos += 1;
+    Some(unquote_import(tok.text))
+}
+
+fn unquote_import(raw: &str) -> String {
+    if let Some(inner) = raw.strip_prefix('`').and_then(|s| s.strip_suffix('`')) {
+        return inner.to_owned();
+    }
+    let Some(inner) = raw.strip_prefix('"').and_then(|s| s.strip_suffix('"')) else {
+        return raw.to_owned();
+    };
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\\'
+            && let Some(next) = chars.next()
+        {
+            out.push(next);
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
 /// Validate all inline foreign bindings and module preambles in `own_modules`.
 pub fn validate_program(
     program: &Program,
@@ -249,5 +344,35 @@ func unnamed(Box[int], Box[[]byte]) int {
                 "{valid}"
             );
         }
+    }
+
+    #[test]
+    fn imported_packages_reads_only_top_level_import_clauses() {
+        let src = r#"
+// leading comment with "example.com/commented"
+package main
+
+import "fmt"
+import (
+	alias "example.com/acme/alpha"
+	_ "example.com/acme/side"
+	. `example.com/acme/raw`
+)
+
+const notAnImport = "example.com/acme/literal"
+
+func Helper() string {
+	return "example.com/acme/body"
+}
+"#;
+        assert_eq!(
+            imported_packages(src),
+            vec![
+                "fmt".to_owned(),
+                "example.com/acme/alpha".to_owned(),
+                "example.com/acme/side".to_owned(),
+                "example.com/acme/raw".to_owned(),
+            ]
+        );
     }
 }

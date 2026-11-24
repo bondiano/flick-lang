@@ -120,6 +120,7 @@ impl<'w> Want<'w> {
 /// non-nil for every valid value (never `nil` interface).
 const NON_NIL_LANG: &[Lang] = &[
     Lang::Unit,
+    Lang::Bytes,
     Lang::BigInt,
     Lang::List,
     Lang::Seq,
