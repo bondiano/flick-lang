@@ -34,7 +34,7 @@ fn query_everywhere(ide: &Ide<'_>, file: FileId, len: usize) {
         ide.complete(file, offset, true);
         ide.signature_help(file, offset);
         ide.type_definition(file, offset);
-        ide.field_definition(file, offset);
+        ide.field_definitions(file, offset);
         ide.actions(file, offset, offset);
         let _ = ide.renamable(file, offset);
         if let Some((symbol, _)) = ide.symbol_at(file, offset) {

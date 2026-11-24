@@ -11,6 +11,7 @@ use crate::syntax::cst::Node;
 use crate::syntax::kind::{SyntaxKind as K, keyword};
 
 mod contracts;
+mod fields;
 mod methods;
 mod scopes;
 
@@ -20,6 +21,14 @@ pub type Occurrence = (FileId, (u32, u32));
 impl Ide<'_> {
     /// Every occurrence of `symbol` in the analysis, its declaration first.
     pub fn references(&self, symbol: &Symbol) -> Vec<Occurrence> {
+        if let Symbol::Field {
+            module,
+            record,
+            label,
+        } = symbol
+        {
+            return self.field_references(module, record, label);
+        }
         let mut out = Vec::new();
         if let Symbol::Entity(e) = symbol
             && let Ok(Some(class)) = self.method_class(e)
@@ -86,10 +95,21 @@ impl Ide<'_> {
         file: FileId,
         offset: u32,
     ) -> Result<(Symbol, (u32, u32), bool), String> {
-        let (symbol, range) = self
+        let found = self
             .method_at(file, offset)?
-            .or_else(|| self.symbol_at(file, offset))
-            .ok_or("nothing to rename here")?;
+            .or_else(|| self.symbol_at(file, offset));
+        let Some((symbol, range)) = found else {
+            // a label whose record is not shown to be one alias names no field
+            let unproven =
+                (self.label_at(file, offset)).and_then(|l| Some((l.owner.err()?, l.name)));
+            return Err(match unproven {
+                Some((why, name)) => format!(
+                    "cannot rename `{name}`: {}; it may not be one declaration's field",
+                    why.reason()
+                ),
+                None => "nothing to rename here".into(),
+            });
+        };
         let capital = match &symbol {
             Symbol::Local { .. } => false,
             Symbol::Entity(e) => {
@@ -110,6 +130,10 @@ impl Ide<'_> {
                     self.check_method_mapping(e, &class)?;
                 }
                 e.namespace != Namespace::Value
+            }
+            Symbol::Field { module, record, .. } => {
+                self.renamable_record(module, record)?;
+                false
             }
             Symbol::Module(_) => return Err("module names require renaming their files".into()),
             Symbol::Operation { .. } | Symbol::InstanceMethod { .. } => {
@@ -156,6 +180,14 @@ impl Ide<'_> {
         symbol: &Symbol,
         new_name: &str,
     ) -> Result<Vec<Occurrence>, String> {
+        if let Symbol::Field {
+            module,
+            record,
+            label,
+        } = symbol
+        {
+            return self.field_rename(module, record, label, new_name);
+        }
         let edits = self.references(symbol);
         if let Symbol::Entity(e) = symbol
             && let Some(class) = self.method_class(e)?

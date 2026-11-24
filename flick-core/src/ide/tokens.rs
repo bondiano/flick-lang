@@ -12,7 +12,7 @@ use crate::types::{Ref, Type};
 use flick_plugin::HighlightKind;
 
 /// The token types, in the order of the legend the server announces.
-pub const TOKEN_TYPES: [&str; 9] = [
+pub const TOKEN_TYPES: [&str; 10] = [
     "namespace",
     "type",
     "enumMember",
@@ -22,6 +22,7 @@ pub const TOKEN_TYPES: [&str; 9] = [
     "parameter",
     "keyword",
     "macro",
+    "property",
 ];
 
 const NAMESPACE: u32 = 0;
@@ -35,6 +36,8 @@ pub(super) const PARAMETER: u32 = 6;
 const KEYWORD: u32 = 7;
 /// The head of a plugin's blocks.
 const MACRO: u32 = 8;
+/// A field label, of a record type or where a field is read or given.
+const PROPERTY: u32 = 9;
 
 /// Nodes worth folding when they span several lines.
 const FOLDED: [K; 20] = [
@@ -105,6 +108,14 @@ impl Ide<'_> {
             out.push((d.span.start, d.span.end, kind));
         }
         binders(&m.tree, &mut out);
+        // a label that also binds a name, `{ name }`, is that binder
+        let own = text.len();
+        out.extend(
+            (m.typing.fields.keys())
+                .filter(|r| r.1 as usize <= own)
+                .map(|&(start, end)| (start, end, PROPERTY)),
+        );
+        written_labels(&m.tree, &mut out);
         for b in &m.editing {
             let len = u32::try_from(b.block.text.len()).unwrap_or(u32::MAX);
             let found = (b.plugin.highlight(&b.block, &b.state))
@@ -178,6 +189,18 @@ fn binders(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
             out.push((t.start, t.end, PARAMETER));
         }
         binders(child, out);
+    }
+}
+
+/// The labels of the fields record types write.
+fn written_labels(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
+    for child in node.nodes() {
+        if child.kind == K::RecordTypeField
+            && let Some(t) = child.child_tokens().find(|t| t.kind == K::Ident)
+        {
+            out.push((t.start, t.end, PROPERTY));
+        }
+        written_labels(child, out);
     }
 }
 

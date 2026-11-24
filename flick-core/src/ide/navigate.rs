@@ -75,6 +75,11 @@ impl Ide<'_> {
                 end: binder.1,
             }),
             Symbol::Entity(entity) => self.entity_definition(entity),
+            Symbol::Field {
+                module,
+                record,
+                label,
+            } => self.field_declaration(module, record, label),
             Symbol::Operation {
                 module,
                 service,

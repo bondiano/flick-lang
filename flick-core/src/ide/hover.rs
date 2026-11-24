@@ -210,7 +210,10 @@ impl Ide<'_> {
         if let Some(hover) = self.operator_hover(file, offset) {
             return Some(hover);
         }
-        if let Some(hover) = self.embedded_hover(file, offset) {
+        if let Some(hover) = self
+            .embedded_hover(file, offset)
+            .or_else(|| self.accessor_hover(file, offset))
+        {
             return Some(hover);
         }
         if let Some(hover) = self.exposing_hover(file, offset) {
@@ -313,6 +316,8 @@ impl Ide<'_> {
                 instance,
                 method,
             } => self.instance_method_hover(file, offset, module, instance, method)?,
+            // a label's hover is its field's, shown before any symbol's
+            Symbol::Field { .. } => return None,
         };
         let mut text = format!("```flick\n{code}\n```");
         if let Some(note) = note {

@@ -143,7 +143,26 @@ impl Checker<'_> {
                 None => value,
             }
         };
-        self.function_typed(&[None], &mut body, expected, node)
+        let ty = self.function_typed(&[None], &mut body, expected, node);
+        // an editor shows the whole path's type there, and the first step's
+        // receiver is its parameter, also while that step has no label yet
+        #[cfg(feature = "ide")]
+        self.note_type(self.span(node), &ty);
+        ty
+    }
+
+    /// The labels of the literal `node` checked against `expected`, noted
+    /// with that type as it is written, an alias too: the declaration an
+    /// editor relates them to.
+    #[cfg(feature = "ide")]
+    pub(super) fn note_literal(&mut self, node: &Node, expected: &Type) {
+        for field in node.nodes().filter(|n| n.kind == K::RecordField) {
+            if let Some(label) =
+                (field.child_tokens()).find(|t| matches!(t.kind, K::Ident | K::Con))
+            {
+                self.note_field(self.token_span(label), expected);
+            }
+        }
     }
 
     /// A record literal; `expected` gives the types of fields it mentions.

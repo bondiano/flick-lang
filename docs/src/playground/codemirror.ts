@@ -82,10 +82,9 @@ const completions = async (context: CompletionContext): Promise<CompletionResult
   if (word === null && !dotted && !context.explicit) return null;
   const controller = new AbortController();
   context.addEventListener("abort", () => controller.abort(), { onDocChange: true });
-  // as the language server does: after a `.` the member is cut out, so that the module parses, and the dot is the place
-  const doc = context.state.doc;
-  const [text, at] = dotted ? [doc.sliceString(0, from - 1) + doc.sliceString(context.pos), from - 1] : [doc.toString(), from];
-  const items = await complete(text, at, dotted, controller.signal).catch(() => null);
+  // as the language server does: the text as written, and after a `.` the dot is the place, so that a step of `.address.` reads its record
+  const at = dotted ? from - 1 : from;
+  const items = await complete(context.state.doc.toString(), at, dotted, controller.signal).catch(() => null);
   if (items === null || items.length === 0) return null;
   return {
     from,
