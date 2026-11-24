@@ -12,7 +12,7 @@ use super::{Field, Proven, statement};
 use crate::diagnostics::Diagnostic;
 use crate::logic::{self, Arg, Cert, Failure, Rule, Term, Ty};
 use crate::source::Span;
-use crate::types::{Bundle, GoalType};
+use crate::types::{Bundle, GoalType, LawObligation, ProofEvidence, ProofStatus};
 
 /// The laws of a class, by its module and name; `None` where its module's
 /// laws are not available to the run.
@@ -29,9 +29,14 @@ pub(super) fn check_bundle(
     laws: Laws<'_, '_>,
     program: &dyn logic::Program,
     lemmas: &[logic::Lemma],
+    mut evidence: Option<&mut ProofEvidence>,
 ) -> Vec<Diagnostic> {
     let Some(subject) = &lowered.subject else {
         let why = "its constraint resolved to no dictionary".into();
+        if let Some(evidence) = evidence {
+            evidence.status = ProofStatus::Blocked;
+            evidence.failure = Some(lowered.span);
+        }
         return vec![invalid(lowered.span, why).diagnostic(&info.name)];
     };
     let mut checking = Checking {
@@ -43,6 +48,7 @@ pub(super) fn check_bundle(
         program,
         lemmas,
         out: Vec::new(),
+        obligations: evidence.as_mut().map(|e| &mut e.obligations),
     };
     checking.class(bundle, subject, &mut Vec::new());
     let Checking { used, mut out, .. } = checking;
@@ -50,7 +56,28 @@ pub(super) fn check_bundle(
         let why = format!("`{}` is no law of the classes of the bundle", field.name);
         out.push(invalid(field.span, why));
     }
-    out.iter().map(|f| f.diagnostic(&info.name)).collect()
+    let diagnostics: Vec<_> = out.iter().map(|f| f.diagnostic(&info.name)).collect();
+    if let Some(evidence) = evidence {
+        evidence.status = out
+            .first()
+            .map_or(ProofStatus::Checked, ProofStatus::of_failure);
+        evidence.failure = diagnostics.first().and_then(|d| d.span);
+    }
+    diagnostics
+}
+
+pub(super) fn observe_bundle(
+    proof: &Proven,
+    bundle: &Bundle,
+    laws: Laws<'_, '_>,
+    program: &dyn logic::Program,
+    lemmas: &[logic::Lemma],
+    evidence: &mut ProofEvidence,
+) {
+    let _ = check_bundle(proof, bundle, laws, program, lemmas, Some(evidence));
+    if evidence.status == ProofStatus::Checked {
+        evidence.status = ProofStatus::Open;
+    }
 }
 
 struct Checking<'a, 'p> {
@@ -62,6 +89,7 @@ struct Checking<'a, 'p> {
     program: &'a dyn logic::Program,
     lemmas: &'a [logic::Lemma],
     out: Vec<Failure>,
+    obligations: Option<&'a mut Vec<LawObligation>>,
 }
 
 impl Checking<'_, '_> {
@@ -80,23 +108,7 @@ impl Checking<'_, '_> {
             return;
         };
         for law in laws {
-            let name = &law.1.name;
-            let field = (self.fields.iter()).position(|f| f.path == *path && f.name == *name);
-            let Some(i) = field else {
-                let why = format!(
-                    "the bundle has no lemma for the law `{name}` of `{}`",
-                    bundle.class
-                );
-                self.out.push(invalid(self.span, why));
-                continue;
-            };
-            self.used[i] = true;
-            let field = &self.fields[i];
-            if let Err(failure) = self.law(law, bundle, dict, field) {
-                self.out.push(
-                    failure.with_related(field.span, format!("law `{name}` of `{}`", bundle.class)),
-                );
-            }
+            self.obligation(law, bundle, dict, path);
         }
         let slots: Vec<&String> = bundle.supers.iter().map(|(s, _)| s).collect();
         let shared = (slots.iter().enumerate()).find(|(i, s)| slots[..*i].contains(s));
@@ -126,14 +138,64 @@ impl Checking<'_, '_> {
         }
     }
 
-    /// The law `law` of `bundle`'s class at `dict`, by the lemma of `field`.
-    fn law(
+    fn obligation(&mut self, law: &Proven, bundle: &Bundle, dict: &Dict, path: &[String]) {
+        let name = &law.1.name;
+        let field = self
+            .fields
+            .iter()
+            .position(|f| f.path == path && f.name == *name);
+        let field = field.map(|i| {
+            self.used[i] = true;
+            &self.fields[i]
+        });
+        let mut shown = None;
+        let result = if let Some(field) = field {
+            self.law(law, bundle, dict, field, &mut shown)
+        } else {
+            if self.obligations.is_some() {
+                shown = self
+                    .law_statement(law, bundle, dict)
+                    .ok()
+                    .map(|s| logic::show_goal(&s.goal));
+            }
+            Err(invalid(
+                self.span,
+                format!(
+                    "the bundle has no lemma for the law `{name}` of `{}`",
+                    bundle.class
+                ),
+            ))
+        };
+        if let Some(obligations) = &mut self.obligations {
+            obligations.push(LawObligation {
+                path: path.to_vec(),
+                class: bundle.class.clone(),
+                law: name.clone(),
+                status: result
+                    .as_ref()
+                    .err()
+                    .map_or(ProofStatus::Checked, ProofStatus::of_failure),
+                statement: shown,
+                range: field.map(|f| (f.span.start, f.span.end)),
+            });
+        }
+        if let Err(failure) = result {
+            let failure = match field {
+                Some(field) => {
+                    failure.with_related(field.span, format!("law `{name}` of `{}`", bundle.class))
+                }
+                None => failure,
+            };
+            self.out.push(failure);
+        }
+    }
+
+    fn law_statement(
         &self,
         (law, info): &Proven,
         bundle: &Bundle,
         dict: &Dict,
-        field: &Field,
-    ) -> Result<(), Failure> {
+    ) -> Result<logic::Statement, Failure> {
         let params = info.class.as_ref().map_or(&[][..], |c| &c.params[..]);
         let mut at = law.clone();
         for (l, r) in at.sides.iter_mut().flatten() {
@@ -148,7 +210,23 @@ impl Checking<'_, '_> {
         if let GoalType::Equal(t) = &info.goal {
             stated.goal = GoalType::Equal(at_bundle(t));
         }
-        let statement = statement(&at, &stated)?;
+        statement(&at, &stated)
+    }
+
+    /// The law of `bundle`'s class at `dict`, by the lemma of `field`.
+    fn law(
+        &self,
+        proved: &Proven,
+        bundle: &Bundle,
+        dict: &Dict,
+        field: &Field,
+        shown: &mut Option<String>,
+    ) -> Result<(), Failure> {
+        let (law, info) = proved;
+        let statement = self.law_statement(proved, bundle, dict)?;
+        if self.obligations.is_some() {
+            *shown = Some(logic::show_goal(&statement.goal));
+        }
         let ExprKind::Global { module, name, .. } = &field.value.kind else {
             return Err(invalid(
                 field.span,

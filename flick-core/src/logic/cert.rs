@@ -17,6 +17,8 @@ pub struct Cert {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Rule {
+    /// An incomplete or malformed expression encountered by editor recovery.
+    Hole(Box<Failure>),
     Refl,
     Symm(Box<Cert>),
     /// `trans m p q`: `p` proves `l = m`, `q` proves `m = r`.
@@ -51,6 +53,29 @@ fn invalid<T>(span: Span, why: impl Into<String>) -> Result<T, Failure> {
 
 /// The certificate the body `e` of a proof spells.
 pub fn cert(e: &Expr, lemmas: &[Lemma]) -> Result<Cert, Failure> {
+    read(e, lemmas, false)
+}
+
+pub(super) fn recover(e: &Expr, lemmas: &[Lemma]) -> Cert {
+    read(e, lemmas, true).unwrap_or_else(|why| hole(e, why))
+}
+
+fn hole(e: &Expr, why: Failure) -> Cert {
+    Cert {
+        kind: Rule::Hole(Box::new(why)),
+        span: e.span,
+    }
+}
+
+fn read(e: &Expr, lemmas: &[Lemma], recover: bool) -> Result<Cert, Failure> {
+    let child = |e: &Expr| {
+        let found = read(e, lemmas, recover);
+        if recover {
+            Ok(found.unwrap_or_else(|why| hole(e, why)))
+        } else {
+            found
+        }
+    };
     let span = e.span;
     let kind = match &e.kind {
         ExprKind::Local(h) => Rule::Fact(h.as_str().into()),
@@ -61,22 +86,33 @@ pub fn cert(e: &Expr, lemmas: &[Lemma]) -> Result<Cert, Failure> {
                     "a proof splits a variable: `match v with …`",
                 );
             };
-            let arms = arms
-                .iter()
-                .map(|a| {
-                    if a.guard.is_some() {
-                        return invalid(a.body.span, "an arm of a proof has no guard");
-                    }
-                    Ok((
-                        pat(&a.pat, a.body.span).map_err(Failure::Refused)?,
-                        cert(&a.body, lemmas)?,
-                    ))
-                })
-                .collect::<Result<_, _>>()?;
-            Rule::Case(v.as_str().into(), arms)
+            let mut branches = Vec::with_capacity(arms.len());
+            for a in arms {
+                if a.guard.is_some() && !recover {
+                    return invalid(a.body.span, "an arm of a proof has no guard");
+                }
+                let pattern = match pat(&a.pat, a.body.span).map_err(Failure::Refused) {
+                    Ok(pattern) => pattern,
+                    Err(_) if recover => continue,
+                    Err(why) => return Err(why),
+                };
+                let proof = if a.guard.is_some() {
+                    hole(
+                        &a.body,
+                        Failure::Invalid {
+                            span: a.body.span,
+                            why: "an arm of a proof has no guard".into(),
+                        },
+                    )
+                } else {
+                    child(&a.body)?
+                };
+                branches.push((pattern, proof));
+            }
+            Rule::Case(v.as_str().into(), branches)
         }
         ExprKind::Block(stmts, rest) => {
-            let mut out = cert(rest, lemmas)?;
+            let mut out = child(rest)?;
             for stmt in stmts.iter().rev() {
                 let Stmt::Let {
                     pat: IrPat::Bind(h),
@@ -87,19 +123,23 @@ pub fn cert(e: &Expr, lemmas: &[Lemma]) -> Result<Cert, Failure> {
                     return invalid(span, "a `let` in a proof names a proof: `let h = …`");
                 };
                 out = Cert {
-                    kind: Rule::Let(h.as_str().into(), Box::new(cert(p, lemmas)?), Box::new(out)),
+                    kind: Rule::Let(h.as_str().into(), Box::new(child(p)?), Box::new(out)),
                     span: p.span,
                 };
             }
             return Ok(out);
         }
-        _ => rule(e, lemmas)?,
+        _ => rule(e, lemmas, &child)?,
     };
     Ok(Cert { kind, span })
 }
 
 /// A rule applied to its arguments.
-fn rule(e: &Expr, lemmas: &[Lemma]) -> Result<Rule, Failure> {
+fn rule(
+    e: &Expr,
+    lemmas: &[Lemma],
+    child: &impl Fn(&Expr) -> Result<Cert, Failure>,
+) -> Result<Rule, Failure> {
     let mut args = Vec::new();
     let mut head = e;
     while let ExprKind::App { func, arg, .. } = &head.kind {
@@ -114,12 +154,12 @@ fn rule(e: &Expr, lemmas: &[Lemma]) -> Result<Rule, Failure> {
         );
     };
     if module == LEMMAS {
-        return lemma(e, name, &args, lemmas);
+        return lemma(e, name, &args, lemmas, child);
     }
     if module != RULES {
         return invalid(e.span, format!("`{name}` is no rule of a proof"));
     }
-    let boxed = |e: &Expr| cert(e, lemmas).map(Box::new);
+    let boxed = |e: &Expr| child(e).map(Box::new);
     Ok(match (name.as_str(), args.as_slice()) {
         ("refl", []) => Rule::Refl,
         ("symm", [p]) => Rule::Symm(boxed(p)?),
@@ -140,7 +180,13 @@ fn rule(e: &Expr, lemmas: &[Lemma]) -> Result<Rule, Failure> {
 
 /// `name args` of a lemma proved before: a value for each parameter and a
 /// proof for each premise, in the order it declares them.
-fn lemma(e: &Expr, name: &str, args: &[&Expr], lemmas: &[Lemma]) -> Result<Rule, Failure> {
+fn lemma(
+    e: &Expr,
+    name: &str,
+    args: &[&Expr],
+    lemmas: &[Lemma],
+    child: &impl Fn(&Expr) -> Result<Cert, Failure>,
+) -> Result<Rule, Failure> {
     let Some(lemma) = lemmas.iter().find(|l| l.statement.name == name) else {
         return invalid(
             e.span,
@@ -158,7 +204,7 @@ fn lemma(e: &Expr, name: &str, args: &[&Expr], lemmas: &[Lemma]) -> Result<Rule,
     }
     let args = (lemma.order.iter().zip(args))
         .map(|((_, premise), arg)| match premise {
-            true => cert(arg, lemmas).map(Arg::Proof),
+            true => child(arg).map(Arg::Proof),
             false => term(arg).map(Arg::Value).map_err(Failure::Refused),
         })
         .collect::<Result<_, _>>()?;
@@ -205,14 +251,14 @@ impl Cert {
                 q.lemmas(out);
             }
             Rule::Case(_, arms) => arms.iter().for_each(|(_, p)| p.lemmas(out)),
-            Rule::Refl | Rule::Fact(_) => {}
+            Rule::Hole(_) | Rule::Refl | Rule::Fact(_) => {}
         }
     }
 
     /// The terms the certificate writes: what its rules name too.
     pub fn terms<'a>(&'a self, out: &mut Vec<&'a Term>) {
         match &self.kind {
-            Rule::Refl | Rule::Fact(_) => {}
+            Rule::Hole(_) | Rule::Refl | Rule::Fact(_) => {}
             Rule::Symm(p) | Rule::Funext(_, p) => p.terms(out),
             Rule::Trans(m, p, q) => {
                 out.push(m);

@@ -38,6 +38,16 @@
         "path": "./syntaxes/flick.tmLanguage.json"
       }
     ],
+    "views": {
+      "explorer": [
+        {
+          "id": "flick.proofGoals",
+          "name": "Proof Goals",
+          "contextualTitle": "Flick",
+          "visibility": "collapsed"
+        }
+      ]
+    },
     "configurationDefaults": {
       "[flick]": {
         "editor.insertSpaces": true,

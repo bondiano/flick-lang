@@ -155,6 +155,7 @@ impl Tx<'_> {
         facts: &[Rc<str>],
     ) -> Result<String, String> {
         Ok(match &c.kind {
+            Rule::Hole(_) => return Err("an incomplete certificate cannot be replayed".into()),
             Rule::Refl => ".refl".into(),
             Rule::Symm(p) => format!("(.symm {})", self.cert(p, ctx, facts)?),
             Rule::Trans(m, p, q) => {

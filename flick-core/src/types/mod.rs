@@ -155,7 +155,10 @@ pub use pipes::{
     applied_order, composed_key, composition, param_key, result_key, right_application,
 };
 pub use proof_bundles::record;
-pub use proof_decls::{Bundle, GoalSyntax, GoalType, Law, ProofInfo, goal_syntax};
+pub use proof_decls::{
+    Bundle, GoalSyntax, GoalType, Law, LawObligation, ProofEvidence, ProofInfo, ProofStatus,
+    goal_syntax,
+};
 pub use question::Question;
 pub use ranges::range_list;
 pub use schemas::companion_name;

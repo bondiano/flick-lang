@@ -217,3 +217,222 @@ fn a_proof_follows_a_body_edit_of_another_module() {
     assert_eq!(codes(&lsp.diagnostics(&laws)), Vec::<String>::new());
     lsp.close();
 }
+
+fn goal_at(lsp: &mut Lsp, uri: &str, text: &str, at: usize) -> Value {
+    let response = lsp.request(
+        "flick/proofAt",
+        &json!({
+            "textDocument": { "uri": uri }, "position": position(text, at),
+        }),
+    );
+    assert!(response.get("error").is_none(), "{response}");
+    response["result"].clone()
+}
+
+#[test]
+fn proof_goals_follow_the_cursor_through_drafts_and_steps() {
+    let draft = "module App.Main exposing (..)\n\nproof back (x : Bool) (y : Bool) (h : equal x y) where equal y x = ";
+    let proved = format!(
+        "{draft}symm h\n\
+proof both (x : Bool) (y : Bool) (z : Bool) (p : equal x y) (q : equal y z) where equal x z = trans y p q\n\
+proof eta (f : a -> b) where equal (fun x -> f x) f = funext (fun y -> refl)\n\
+proof rebuilt (v : Option a) where equal (match v with | None -> None | Some x -> Some x) v =\n  match v with\n  | None -> refl\n  | Some y -> refl\n"
+    );
+    let dir = project(
+        "lsp_proof_cursor",
+        &[("flick.toml", LIB), ("src/App/Main.fl", draft)],
+    );
+    let main = uri(&dir.join("src/App/Main.fl"));
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": {
+        "uri": main, "languageId": "flick", "version": 1, "text": draft,
+    } }),
+    );
+    let _ = lsp.diagnostics(&main);
+    let open = goal_at(&mut lsp, &main, draft, draft.len());
+    assert_eq!(open["version"], 1, "{open}");
+    assert_eq!(open["proof"]["status"], "open", "{open}");
+    assert_eq!(open["proof"]["goal"], "y = x", "{open}");
+    assert_eq!(
+        open["proof"]["premises"],
+        json!([{ "name": "h", "statement": "x = y" }]),
+        "{open}"
+    );
+
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({
+            "textDocument": { "uri": main, "version": 2 },
+            "contentChanges": [{ "text": proved }],
+        }),
+    );
+    assert!(lsp.diagnostics(&main).is_empty());
+    let read = |lsp: &mut Lsp, needle: &str, inside: usize| {
+        goal_at(
+            lsp,
+            &main,
+            &proved,
+            proved.find(needle).expect("proof step") + inside,
+        )
+    };
+    let symmetry = read(&mut lsp, "symm h", 5);
+    assert_eq!(symmetry["version"], 2, "{symmetry}");
+    assert_eq!(symmetry["proof"]["status"], "checked", "{symmetry}");
+    assert_eq!(symmetry["proof"]["goal"], "x = y", "{symmetry}");
+    assert_eq!(read(&mut lsp, "trans y p q", 8)["proof"]["goal"], "x = y");
+    assert_eq!(read(&mut lsp, "trans y p q", 10)["proof"]["goal"], "y = z");
+    let eta = read(&mut lsp, "y -> refl", 5);
+    let binds = eta["proof"]["binders"].as_array().expect("binders");
+    assert!(
+        binds.contains(&json!({ "name": "y", "type": "a" })),
+        "{eta}"
+    );
+    for (arm, value) in [("| None -> refl", "None"), ("| Some y -> refl", "Some y")] {
+        let at = proved.rfind(arm).expect("arm") + arm.len() - 3;
+        let found = goal_at(&mut lsp, &main, &proved, at);
+        assert_eq!(
+            found["proof"]["substitutions"],
+            json!([{ "name": "v", "value": value }]),
+            "{found}"
+        );
+    }
+
+    let broken = proved.replace("| Some y -> refl", "| Some y -> missing");
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({
+            "textDocument": { "uri": main, "version": 3 },
+            "contentChanges": [{ "text": broken }],
+        }),
+    );
+    let _ = lsp.diagnostics(&main);
+    let found = goal_at(
+        &mut lsp,
+        &main,
+        &broken,
+        broken.find("missing").expect("arm"),
+    );
+    assert_eq!(found["proof"]["status"], "open", "{found}");
+    assert_eq!(
+        found["proof"]["substitutions"],
+        json!([{ "name": "v", "value": "Some y" }]),
+        "{found}"
+    );
+    lsp.close();
+}
+
+#[test]
+fn proof_goal_revisions_cover_dependencies_and_closed_documents() {
+    let source = "module App.Steps exposing (..)\nlet pick (x : Bool) (y : Bool) = x\n";
+    let text = concat!(
+        "module App.Laws exposing (..)\n",
+        "import App.Steps exposing (pick)\n",
+        "proof chosen (x : Bool) (y : Bool) where equal (pick x y) x = refl\n",
+        "proof draft where equal /* 🥝 */ true true =\n",
+    );
+    let dir = project(
+        "lsp_proof_revisions",
+        &[
+            ("flick.toml", LIB),
+            ("src/App/Steps.fl", source),
+            ("proofs/App/Laws.fl", text),
+        ],
+    );
+    let laws = uri(&dir.join("proofs/App/Laws.fl"));
+    let dep = uri(&dir.join("src/App/Steps.fl"));
+    let mut lsp = Lsp::start(&dir);
+    let open = |lsp: &mut Lsp, uri: &str, text: &str| {
+        lsp.notify(
+            "textDocument/didOpen",
+            &json!({ "textDocument": {
+            "uri": uri, "languageId": "flick", "version": 1, "text": text,
+        } }),
+        );
+    };
+    let proved = text.replace("true true =\n", "true true = refl\n");
+    open(&mut lsp, &laws, &proved);
+    assert!(lsp.diagnostics(&laws).is_empty());
+    let at = proved.find("refl").expect("certificate");
+    let first = goal_at(&mut lsp, &laws, &proved, at);
+    assert_eq!(first["proof"]["status"], "checked", "{first}");
+
+    open(&mut lsp, &dep, &source.replace("= x", "= y"));
+    let after_edit = goal_at(&mut lsp, &laws, &proved, at);
+    assert!(after_edit["generation"].as_u64() > first["generation"].as_u64());
+    let changed = if after_edit["pending"] == true {
+        assert_eq!(after_edit["proof"], Value::Null);
+        assert_eq!(after_edit["snapshotGeneration"], Value::Null);
+        let _ = lsp.diagnostics(&laws);
+        goal_at(&mut lsp, &laws, &proved, at)
+    } else {
+        after_edit
+    };
+    assert_eq!(changed["proof"]["status"], "open", "{changed}");
+    assert!(changed["snapshotGeneration"].as_u64() > first["snapshotGeneration"].as_u64());
+
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({ "textDocument": { "uri": laws, "version": 2 },
+        "contentChanges": [{ "text": text }] }),
+    );
+    let _ = lsp.diagnostics(&laws);
+    let at = text.rfind('=').expect("draft") + 1;
+    let utf16 = goal_at(&mut lsp, &laws, text, at);
+    assert_eq!(utf16["position"], position(text, at));
+    assert_eq!(utf16["proof"]["name"], "draft", "{utf16}");
+    assert_eq!(utf16["proof"]["goal"], "true = true", "{utf16}");
+    assert_eq!(utf16["proof"]["lemmas"], json!([]), "{utf16}");
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({ "textDocument": { "uri": laws, "version": 3 },
+        "contentChanges": [{ "text": proved }] }),
+    );
+    lsp.notify(
+        "textDocument/didClose",
+        &json!({ "textDocument": { "uri": laws } }),
+    );
+    let closed = goal_at(&mut lsp, &laws, &proved, at);
+    assert_eq!(closed["version"], Value::Null, "{closed}");
+    assert_eq!(closed["proof"], Value::Null, "{closed}");
+    lsp.close();
+}
+
+#[test]
+fn proof_goals_include_missing_laws_of_the_resolved_instance() {
+    let text = "module App.Main exposing (..)\nproof opt where lawful Monad Option = {}\n";
+    let dir = project(
+        "lsp_proof_bundle_goals",
+        &[("flick.toml", LIB), ("proofs/App/Main.fl", text)],
+    );
+    let main = uri(&dir.join("proofs/App/Main.fl"));
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": {
+        "uri": main, "languageId": "flick", "version": 1, "text": text,
+    } }),
+    );
+    let _ = lsp.diagnostics(&main);
+    let view = goal_at(&mut lsp, &main, text, text.find("{}").expect("bundle"));
+    let proof = &view["proof"];
+    assert_eq!(proof["status"], "open", "{view}");
+    assert!(
+        proof["instance"]
+            .as_str()
+            .is_some_and(|instance| instance.contains("Monad Option")),
+        "{view}"
+    );
+    let obligations = proof["obligations"].as_array().expect("obligations");
+    assert!(
+        obligations.iter().any(|o| {
+            o["path"] == json!(["Applicative", "Functor"])
+                && o["law"] == "identity"
+                && o["status"] == "open"
+                && o["statement"].is_string()
+        }),
+        "{view}"
+    );
+    lsp.close();
+}

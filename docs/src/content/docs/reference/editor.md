@@ -152,6 +152,21 @@ It starts `flick lsp --stdio`, taking `flick` from `PATH`; the `flick.path`
 setting names another binary. The extension carries the language client it
 needs, so nothing is installed beside it.
 
+### Proof goals
+
+Expand **Proof Goals** in the Explorer and place the cursor inside a `proof`,
+including just after the `=` of an empty body. The view shows the current goal,
+which can differ from the declared goal inside a rule argument or `match` arm.
+It lists the binders, premises, branch substitutions and checked lemmas
+available there. For a `lawful` bundle it shows the selected instance and the
+obligations for its laws, including inherited laws.
+
+**Verification pending** means the server is checking the current project.
+**Open obligation** means the current proof still needs work. The view also
+reports checked proofs, blocked verification and exhausted proof budgets. When
+the checker locates a failing step, the view shows its line and column. It
+refreshes after unsaved edits to the proof and the definitions it uses.
+
 ## Zed
 
 The extension first uses `lsp.flick.binary.path`, if set, then `flick` on

@@ -15,7 +15,7 @@ pub fn show(nf: &Nf) -> String {
 
 /// The name of a variable as the source spells it: the lowering numbers
 /// names it repeats, `x$1`.
-fn source_name(x: &str) -> &str {
+pub(super) fn source_name(x: &str) -> &str {
     x.split('$').next().filter(|n| !n.is_empty()).unwrap_or(x)
 }
 

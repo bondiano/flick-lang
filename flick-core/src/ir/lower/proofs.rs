@@ -5,17 +5,20 @@
 use std::collections::HashSet;
 
 use super::{Expr, ExprKind, Item, ItemKind, Lit, Lower, Module};
-use crate::diagnostics::Diagnostic;
+use crate::diagnostics::{Diagnostic, Severity};
 use crate::logic::{self, Failure};
 use crate::resolve;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::record as record_of;
-use crate::types::{GoalSyntax, GoalType, ProofInfo, Range, Typing, goal_syntax};
+use crate::types::{
+    GoalSyntax, GoalType, ProofEvidence, ProofInfo, ProofStatus, Range, Typing, goal_syntax,
+};
 use flick_ir::{Dict, InstanceInfo};
 
 mod bundles;
+mod evidence;
 #[cfg(test)]
 mod replay;
 
@@ -205,6 +208,7 @@ pub fn check_proofs(
     module: &resolve::Module,
     typing: &Typing,
     run: &Run,
+    evidence: Option<&mut Vec<ProofEvidence>>,
 ) -> (Vec<Diagnostic>, Vec<Proven>) {
     if typing.proofs.is_empty() && typing.laws.is_empty() {
         return (Vec::new(), Vec::new());
@@ -222,23 +226,83 @@ pub fn check_proofs(
         builtins: (run.builtins)(),
     };
     let mut lemmas = imported_lemmas(&proofs, run, 0);
-    let of = |m: &str, c: &str| -> Option<Vec<&Proven>> {
-        let own = (m == module.name).then_some(&laws[..]);
-        // the module a definition is read from: the run's before a built-in
-        let found = (own.or_else(|| (run.proven)(m))).or_else(|| {
-            let builtin = (run.builtins)().iter().any(|b| b.name == m);
+    let of = |m: &str, c: &str| class_laws(run, module.name, &laws, m, c);
+    let mut evidence = evidence.map(|out| evidence::Recording::new(module, run, out));
+    let diagnostics = prove_each(&proofs, &program, &mut lemmas, Some(&of), evidence.as_mut());
+    proofs.extend(laws);
+    (diagnostics, proofs)
+}
+
+/// Observes a module with syntax or typing errors for editors. Only complete,
+/// independently checked certificates can contribute facts to later drafts.
+pub fn observe_proofs(
+    module: &resolve::Module,
+    typing: &Typing,
+    run: &Run,
+    diagnostics: &[Diagnostic],
+    out: &mut Vec<ProofEvidence>,
+) {
+    let recording = evidence::Recording::new(module, run, out);
+    let proofs = paired(lower_proofs(module, typing), &typing.proofs);
+    let laws = laws_of(module, typing);
+    let of = |m: &str, c: &str| class_laws(run, module.name, &laws, m, c);
+    let program = Modules {
+        // The IR of a module with analysis errors is not a verified subject.
+        own: None,
+        project: run.project,
+        builtins: (run.builtins)(),
+    };
+    let mut lemmas = imported_lemmas(&proofs, run, 0);
+    for proof in &proofs {
+        let (lowered, info) = proof;
+        let mut evidence = recording.begin(lowered, &lemmas);
+        let error = diagnostics
+            .iter()
+            .filter(|d| d.severity == Severity::Error)
+            .find_map(|d| {
+                d.span.filter(|span| {
+                    span.file == lowered.span.file
+                        && lowered.span.start <= span.start
+                        && span.start <= lowered.span.end
+                })
+            });
+        if let GoalType::Lawful(bundle) = &info.goal {
+            bundles::observe_bundle(proof, bundle, &of, &program, &lemmas, &mut evidence);
+        } else if let Some(span) = error {
+            evidence.failure = Some(span);
+            evidence::observe_body(lowered, info, &lemmas, &mut evidence.steps);
+        } else {
+            let checked = verify(lowered, info, &program, &lemmas, Some(&mut evidence));
+            save_lemma(checked, lowered, &mut lemmas);
+        }
+        recording.out.push(evidence);
+    }
+}
+
+fn class_laws<'p>(
+    run: &'p Run<'_>,
+    own: &str,
+    own_laws: &'p [Proven],
+    module: &str,
+    class: &str,
+) -> Option<Vec<&'p Proven>> {
+    let found = (module == own)
+        .then_some(own_laws)
+        .or_else(|| (run.proven)(module))
+        .or_else(|| {
+            let builtin = (run.builtins)().iter().any(|b| b.name == module);
             builtin.then(|| (run.builtin_laws)())
         });
-        let is = |p: &&Proven| {
-            p.1.class
-                .as_ref()
-                .is_some_and(|l| l.module == m && l.class == c)
-        };
-        Some(found?.iter().filter(is).collect())
-    };
-    let diagnostics = prove_each(&proofs, &program, &mut lemmas, Some(&of));
-    proofs.extend(laws.iter().cloned());
-    (diagnostics, proofs)
+    Some(
+        found?
+            .iter()
+            .filter(|p| {
+                p.1.class
+                    .as_ref()
+                    .is_some_and(|l| l.module == module && l.class == class)
+            })
+            .collect(),
+    )
 }
 
 /// The laws of the classes of `module`, which checked without errors.
@@ -262,6 +326,7 @@ fn prove_each(
     program: &dyn logic::Program,
     lemmas: &mut Vec<logic::Lemma>,
     laws: Option<bundles::Laws<'_, '_>>,
+    mut recording: Option<&mut evidence::Recording<'_>>,
 ) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for proven in proofs {
@@ -269,39 +334,90 @@ fn prove_each(
         if info.class.is_some() {
             continue;
         }
+        let mut evidence = recording.as_ref().map(|r| r.begin(lowered, lemmas));
         if let GoalType::Lawful(bundle) = &info.goal {
-            // a bundle is no lemma: an importer has nothing to replay of it
+            // A bundle is no lemma: an importer has nothing to replay of it.
             if let Some(laws) = laws {
-                out.extend(bundles::check_bundle(proven, bundle, laws, program, lemmas));
+                out.extend(bundles::check_bundle(
+                    proven,
+                    bundle,
+                    laws,
+                    program,
+                    lemmas,
+                    evidence.as_mut(),
+                ));
             }
-            continue;
+        } else {
+            let checked = verify(lowered, info, program, lemmas, evidence.as_mut());
+            if let Some(failure) = save_lemma(checked, lowered, lemmas) {
+                out.push(
+                    failure
+                        .with_related(lowered.span, format!("proof `{}`", info.name))
+                        .diagnostic(&info.name),
+                );
+            }
         }
-        let checked = statement(lowered, info).and_then(|s| {
-            let body = (lowered.body.as_ref()).ok_or_else(|| {
-                Failure::Refused(logic::Refused {
-                    span: lowered.span,
-                    why: "it has no proof".into(),
-                })
-            })?;
-            let cert = logic::cert(body, lemmas)?;
-            logic::prove(&s, &cert, &info.data, program, lemmas).map(|()| s)
-        });
-        match checked {
-            Ok(statement) => lemmas.push(logic::Lemma {
+        if let Some((recording, evidence)) = recording.as_mut().zip(evidence) {
+            recording.out.push(evidence);
+        }
+    }
+    out
+}
+
+fn verify(
+    lowered: &LoweredProof,
+    info: &ProofInfo,
+    program: &dyn logic::Program,
+    lemmas: &[logic::Lemma],
+    mut evidence: Option<&mut ProofEvidence>,
+) -> Result<logic::Statement, Failure> {
+    let checked = statement(lowered, info).and_then(|statement| {
+        let body = lowered.body.as_ref().ok_or_else(|| {
+            Failure::Refused(logic::Refused {
+                span: lowered.span,
+                why: "it has no proof".into(),
+            })
+        })?;
+        let cert = logic::cert(body, lemmas)?;
+        match &mut evidence {
+            Some(e) => {
+                logic::prove_traced(&statement, &cert, &info.data, program, lemmas, &mut e.steps)?;
+            }
+            None => logic::prove(&statement, &cert, &info.data, program, lemmas)?,
+        }
+        Ok(statement)
+    });
+    if let Some(evidence) = evidence {
+        match &checked {
+            Ok(_) => evidence.status = ProofStatus::Checked,
+            Err(failure) => {
+                evidence.status = ProofStatus::of_failure(failure);
+                evidence.failure = failure.diagnostic(&info.name).span;
+                evidence::observe_body(lowered, info, lemmas, &mut evidence.steps);
+            }
+        }
+    }
+    checked
+}
+
+fn save_lemma(
+    checked: Result<logic::Statement, Failure>,
+    lowered: &LoweredProof,
+    lemmas: &mut Vec<logic::Lemma>,
+) -> Option<Failure> {
+    match checked {
+        Ok(statement) => {
+            lemmas.push(logic::Lemma {
                 statement,
                 order: (lowered.params.iter())
                     .zip(&lowered.premise)
                     .map(|(x, p)| (x.as_str().into(), *p))
                     .collect(),
-            }),
-            Err(failure) => out.push(
-                failure
-                    .with_related(lowered.span, format!("proof `{}`", info.name))
-                    .diagnostic(&info.name),
-            ),
+            });
+            None
         }
+        Err(failure) => Some(failure),
     }
-    out
 }
 
 /// The lemmas `proofs` name of other proof modules, each replayed against
@@ -315,13 +431,17 @@ fn imported_lemmas(proofs: &[Proven], run: &Run, depth: u32) -> Vec<logic::Lemma
     }
     modules.sort();
     modules.dedup();
+    replay_lemmas(&modules, run, depth)
+}
+
+fn replay_lemmas(modules: &[String], run: &Run, depth: u32) -> Vec<logic::Lemma> {
     let mut out = Vec::new();
     // imports are acyclic; the bound only keeps a malformed graph finite
     if depth > 16 {
         return out;
     }
     for name in modules {
-        let (Some(proofs), Some(ir)) = ((run.proven)(&name), (run.project)(&name)) else {
+        let (Some(proofs), Some(ir)) = ((run.proven)(name), (run.project)(name)) else {
             continue;
         };
         let program = Modules {
@@ -332,7 +452,7 @@ fn imported_lemmas(proofs: &[Proven], run: &Run, depth: u32) -> Vec<logic::Lemma
         let mut lemmas = imported_lemmas(proofs, run, depth + 1);
         let imported = lemmas.len();
         // the module's own diagnostics are its own check's to report
-        let _ = prove_each(proofs, &program, &mut lemmas, None);
+        let _ = prove_each(proofs, &program, &mut lemmas, None, None);
         out.extend(lemmas.drain(imported..).map(|mut l| {
             l.statement.name = format!("{name}.{}", l.statement.name);
             l

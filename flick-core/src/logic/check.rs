@@ -7,6 +7,7 @@ use super::defs::{Admitted, Program, admit};
 use super::eval::{Env, Machine, Nf, STEPS, Stop, Value, distinct};
 use super::show::show;
 use super::term::{Pat, Refused, TUPLES, Term};
+use super::trace::{ProofStep, Trace};
 use super::{Arg, Cert, Data, Equation, Failure, Goal, Lemma, Rule, Statement, Ty};
 use crate::source::Span;
 
@@ -28,6 +29,8 @@ struct Checker<'a> {
     facts: Vec<(Rc<str>, Equation)>,
     steps: u64,
     fresh: u32,
+    trace: Option<Trace<'a>>,
+    observing: bool,
 }
 
 /// A distinct pair only refutes a declaration while it still represents
@@ -63,6 +66,7 @@ pub(super) fn prove(
     data: &Data,
     program: &dyn Program,
     lemmas: &[Lemma],
+    trace: Option<&mut Vec<ProofStep>>,
 ) -> Result<(), Failure> {
     let mut terms: Vec<&Term> = statement
         .premises
@@ -102,6 +106,8 @@ pub(super) fn prove(
         facts: Vec::new(),
         steps: STEPS,
         fresh: 0,
+        trace: trace.map(Trace::new),
+        observing: false,
     };
     for (x, ty) in &statement.params {
         checker.admit(ty, statement.span)?;
@@ -122,6 +128,7 @@ pub(super) fn prove(
             checker.check(eq, proof, origin)
         }
         Goal::SameType(a, b) => {
+            checker.record(proof.span, Err((a, b)));
             checker.admit(a, statement.span)?;
             checker.admit(b, statement.span)?;
             if !matches!(proof.kind, Rule::Refl) {
@@ -144,6 +151,36 @@ pub(super) fn prove(
                     note: None,
                 }
             })
+        }
+    }
+}
+
+pub(super) fn observe(
+    statement: &Statement,
+    proof: &Cert,
+    data: &Data,
+    lemmas: &[Lemma],
+    steps: &mut Vec<ProofStep>,
+) {
+    let mut checker = Checker {
+        data,
+        defs: Admitted::default(),
+        lemmas,
+        unfold: false,
+        vars: statement.params.clone(),
+        refined: Vec::new(),
+        facts: statement.premises.clone(),
+        steps: STEPS,
+        fresh: 0,
+        trace: Some(Trace::new(steps)),
+        observing: true,
+    };
+    match &statement.goal {
+        Goal::Equal(eq) => {
+            let _ = checker.check(eq, proof, GoalOrigin::Step);
+        }
+        Goal::SameType(a, b) => {
+            checker.record(proof.span, Err((a, b)));
         }
     }
 }
@@ -316,9 +353,33 @@ impl Checker<'_> {
         Ok(())
     }
 
+    fn record(&mut self, span: Span, goal: Result<&Equation, (&Ty, &Ty)>) -> Option<usize> {
+        self.trace
+            .as_mut()
+            .map(|trace| trace.record(span, goal, &self.vars, &self.facts, &self.refined))
+    }
+
     fn check(&mut self, goal: &Equation, cert: &Cert, origin: GoalOrigin) -> Result<(), Failure> {
+        let from = self.steps;
+        let recorded = self.record(cert.span, Ok(goal));
+        let result = self.check_rule(goal, cert, origin);
+        if let (Some(trace), Some(i)) = (&mut self.trace, recorded)
+            && !self.observing
+        {
+            trace.steps[i].normalization_steps = from - self.steps;
+        }
+        result
+    }
+
+    fn check_rule(
+        &mut self,
+        goal: &Equation,
+        cert: &Cert,
+        origin: GoalOrigin,
+    ) -> Result<(), Failure> {
         let span = cert.span;
         match &cert.kind {
+            Rule::Hole(why) => Err((**why).clone()),
             Rule::Refl => self.check_equality(&goal.left, &goal.right, span, origin),
             Rule::Symm(p) => self.check(&goal.swapped(), p, origin),
             Rule::Trans(m, p, q) => {
@@ -328,8 +389,13 @@ impl Checker<'_> {
                     left: left.clone(),
                     right: right.clone(),
                 };
-                self.check(&to(&goal.left, m), p, GoalOrigin::Step)?;
-                self.check(&to(m, &goal.right), q, GoalOrigin::Step)
+                let first = self.check(&to(&goal.left, m), p, GoalOrigin::Step);
+                if !self.observing {
+                    first?;
+                    return self.check(&to(m, &goal.right), q, GoalOrigin::Step);
+                }
+                let second = self.check(&to(m, &goal.right), q, GoalOrigin::Step);
+                first.and(second)
             }
             Rule::Cong(x, e, p) => {
                 self.admit_term(e, span)?;
@@ -390,7 +456,14 @@ impl Checker<'_> {
                 })
             }
             Rule::Let(h, p, rest) => {
-                let eq = self.synth(p)?;
+                let eq = match self.synth(p) {
+                    Ok(eq) => eq,
+                    Err(why) if self.observing => {
+                        let _ = self.check(goal, rest, origin);
+                        return Err(why);
+                    }
+                    Err(why) => return Err(why),
+                };
                 self.facts.push((h.clone(), eq));
                 let result = self.check(goal, rest, origin);
                 self.facts.pop();
@@ -401,7 +474,20 @@ impl Checker<'_> {
 
     /// The equation a proof proves, where it can be read off the proof.
     fn synth(&mut self, cert: &Cert) -> Result<Equation, Failure> {
+        let from = self.steps;
+        let eq = self.synth_rule(cert)?;
+        let recorded = self.record(cert.span, Ok(&eq));
+        if let (Some(trace), Some(i)) = (&mut self.trace, recorded)
+            && !self.observing
+        {
+            trace.steps[i].normalization_steps = from - self.steps;
+        }
+        Ok(eq)
+    }
+
+    fn synth_rule(&mut self, cert: &Cert) -> Result<Equation, Failure> {
         match &cert.kind {
+            Rule::Hole(why) => Err((**why).clone()),
             Rule::Fact(h) => self.fact(h, cert.span),
             Rule::Lemma(name, args) => self.lemma(name, args, cert.span).map(|(eq, _)| eq),
             Rule::Symm(p) => Ok(self.synth(p)?.swapped()),
@@ -468,6 +554,7 @@ impl Checker<'_> {
             Arg::Proof(p) => Some((x, p)),
             Arg::Value(_) => None,
         });
+        let mut failure = None;
         for (h, proof) in proofs {
             let eq = premises
                 .iter()
@@ -477,12 +564,17 @@ impl Checker<'_> {
                 span,
                 why: format!("`{h}` is no premise of `{name}`"),
             })?;
-            self.check(&eq, proof, GoalOrigin::Step)
-                .map_err(|failure| {
-                    failure.with_related(lemma_span, format!("premise `{h}` of `{name}`"))
-                })?;
+            let result = self.check(&eq, proof, GoalOrigin::Step).map_err(|failure| {
+                failure.with_related(lemma_span, format!("premise `{h}` of `{name}`"))
+            });
+            if let Err(why) = result {
+                if !self.observing {
+                    return Err(why);
+                }
+                failure.get_or_insert(why);
+            }
         }
-        Ok((conclusion, lemma_span))
+        failure.map_or(Ok((conclusion, lemma_span)), Err)
     }
 
     fn fact(&self, h: &str, span: Span) -> Result<Equation, Failure> {

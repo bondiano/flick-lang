@@ -55,33 +55,20 @@ impl Checker<'_> {
             }
         };
         let mut covered = vec![false; cases.len()];
-        for (pat, proof) in arms {
-            let (index, binders) = self.arm(pat, &cases, &covered, proof.span)?;
-            let Some(index) = index else {
-                // a variable or `_`: every case not covered yet, with `v` as it is
-                let reachable = covered.iter().any(|covered| !covered);
-                covered.fill(true);
-                let origin = if reachable { origin } else { GoalOrigin::Step };
-                self.check(goal, proof, origin)?;
-                continue;
-            };
-            covered[index] = true;
+        let mut failure = None;
+        for arm in arms {
             let mark = self.vars.len();
-            let mut fields = Vec::new();
-            for (b, field_ty) in binders.into_iter().zip(&cases[index].1) {
-                self.bind(&b, field_ty, proof.span)?;
-                fields.push(Value::Sym(b));
-            }
-            let value = match pat {
-                Pat::Lit(l) => Value::Lit(l.clone()),
-                Pat::Con(c, _) => Value::Con(c.clone(), fields.into()),
-                _ => unreachable!("an arm of a case is a constructor or a literal"),
-            };
-            self.refined.push((v.clone(), value));
-            let result = self.check(goal, proof, origin);
-            self.refined.pop();
+            let result = self.check_arm(goal, v, &cases, &mut covered, arm, origin);
             self.vars.truncate(mark);
-            result?;
+            if let Err(why) = result {
+                if !self.observing {
+                    return Err(why);
+                }
+                failure.get_or_insert(why);
+            }
+        }
+        if let Some(why) = failure {
+            return Err(why);
         }
         if let Some(i) = covered.iter().position(|c| !c) {
             return invalid(
@@ -90,6 +77,40 @@ impl Checker<'_> {
             );
         }
         Ok(())
+    }
+
+    fn check_arm(
+        &mut self,
+        goal: &Equation,
+        v: &Rc<str>,
+        cases: &[(Pat, Vec<Ty>)],
+        covered: &mut [bool],
+        (pat, proof): &(Pat, Cert),
+        origin: GoalOrigin,
+    ) -> Result<(), Failure> {
+        let (index, binders) = self.arm(pat, cases, covered, proof.span)?;
+        let Some(index) = index else {
+            // a variable or `_`: every case not covered yet, with `v` as it is
+            let reachable = covered.iter().any(|covered| !covered);
+            covered.fill(true);
+            let origin = if reachable { origin } else { GoalOrigin::Step };
+            return self.check(goal, proof, origin);
+        };
+        covered[index] = true;
+        let mut fields = Vec::new();
+        for (b, field_ty) in binders.into_iter().zip(&cases[index].1) {
+            self.bind(&b, field_ty, proof.span)?;
+            fields.push(Value::Sym(b));
+        }
+        let value = match pat {
+            Pat::Lit(l) => Value::Lit(l.clone()),
+            Pat::Con(c, _) => Value::Con(c.clone(), fields.into()),
+            _ => unreachable!("an arm of a case is a constructor or a literal"),
+        };
+        self.refined.push((v.clone(), value));
+        let result = self.check(goal, proof, origin);
+        self.refined.pop();
+        result
     }
 
     /// Which case an arm proves, and the names of its fields.

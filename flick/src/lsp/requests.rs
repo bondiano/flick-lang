@@ -29,6 +29,8 @@ use super::{
 mod ffi;
 #[path = "foreign.rs"]
 mod foreign;
+#[path = "proofs.rs"]
+mod proofs;
 
 pub(super) type Reply = Result<Value, (i64, String)>;
 
@@ -67,6 +69,7 @@ impl Server {
                 let end = u32::try_from(text.len()).unwrap_or(u32::MAX);
                 Ok(json!([{ "range": protocol::range(&text, 0, end), "newText": formatted }]))
             }
+            "flick/proofAt" => self.proof_at(params),
             "textDocument/completion" => self.completion(params),
             "textDocument/codeAction" => self.code_actions(params),
             "workspace/symbol" => Ok(self.workspace_symbols(params)),
@@ -94,6 +97,7 @@ impl Server {
         if !fresh {
             let mut snapshot = analyze(&self.docs, path, &mut self.caches);
             snapshot.drop_compilation();
+            snapshot.generation = self.generation;
             self.snapshots.insert(context.clone(), snapshot);
         }
         self.latest = Some(context.clone());
@@ -353,6 +357,7 @@ fn capabilities() -> Value {
         "capabilities": {
             "textDocumentSync": { "openClose": true, "change": 2, "save": true },
             "hoverProvider": true,
+            "experimental": { "proofAt": true },
             "documentHighlightProvider": true,
             "definitionProvider": true,
             "referencesProvider": true,

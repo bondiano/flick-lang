@@ -9,6 +9,8 @@ use serde_json::json;
 fn server(out: Box<dyn Write>) -> Server {
     Server {
         docs: HashMap::new(),
+        versions: HashMap::new(),
+        proof_watch: false,
         snapshots: HashMap::new(),
         latest: None,
         caches: Caches::new(),
