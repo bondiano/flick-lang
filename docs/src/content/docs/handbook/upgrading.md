@@ -90,16 +90,16 @@ of the compiler's own source:
 std = { path = "../flick-lang/packages/std" }
 ```
 
-The standard-library sources are split into `std`, `stream`, `process`, `ui`,
-`http`, `rpc`, `observability` and `cli`. Run `flick install` again and commit
-the updated `flick.lock`, so fetched packages are pinned together; then
+The standard library uses several [implicit source packages](../../reference/project/#flick-dependencies).
+Run `flick install` again and commit the updated `flick.lock`, so fetched
+packages are pinned together. Then
 `flick install --locked --offline` uses the installed set. Public module names
 and the logical `std` plugin remain the same, including its diagnostic codes.
 A project that uses only RT-supported bindings still needs no adapter; a mixed
 project keeps the adapter version and runtime ABI its manifest requires.
 
 For a local override, set `FLICK_STD_PATH` to `packages/std` of a complete
-checkout, keeping the seven other packages beside it with their own
+checkout, keeping the other implicit packages beside it with their own
 `src/modules.txt`. A copied `std` directory alone no longer provides the whole
 standard library. Alternatively, add a path entry like the one above for each
 package you override; unspecified packages retain their release source.

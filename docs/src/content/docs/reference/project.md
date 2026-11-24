@@ -275,6 +275,7 @@ import spelling.
 | `rpc` | `Rpc`, `Server` and `Config` | `std`, `stream`, `http` |
 | `observability` | `Otlp`, `Prometheus`, `DevTools` | `std`, `http` |
 | `cli` | `Cli.Prompt`, `Cli` | `std`, `rpc` |
+| `js` | `Js`, `Js.Array`, `JsError` | compiler core |
 
 `Config` belongs with `Server` because secret configuration needs its
 server-only capability. Source ownership does not select a runtime: a program
@@ -291,8 +292,8 @@ as the `std` above does. Keep the complete lock:
 updating pins or reaching the network. A compiler built from a checkout takes
 that checkout's packages instead of the release. An incompatible implicit module is `FLICK-P043`.
 
-For a source override, `FLICK_STD_PATH` still names `packages/std`; the other
-seven package directories must be its siblings, each with `src/modules.txt`.
+For a source override, `FLICK_STD_PATH` names `packages/std`. The other
+implicit packages must be its siblings, each with `src/modules.txt`.
 To override packages individually, give each its own path, git or tarball entry
 in `[dependencies]`.
 

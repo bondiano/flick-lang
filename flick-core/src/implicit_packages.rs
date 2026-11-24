@@ -14,6 +14,7 @@ pub const IMPLICIT_PACKAGES: &[&str] = &[
     "rpc",
     "observability",
     "cli",
+    "js",
 ];
 
 /// Whether the package `name` is implicit.

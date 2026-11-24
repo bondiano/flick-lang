@@ -1,12 +1,11 @@
 ---
 title: "Стандартная библиотека"
-source_hash: d91336c0d73c2a29
+source_hash: 2518f69e49908231
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
 (см. [Функции высшего порядка и обход коллекций](../../spec/04-higher-order/), [Schema и стандартные типы данных](../../spec/07-schema/), [CLI компилятора](../cli/)).
-Её модули распределены по восьми неявным пакетам (`std`, `stream`,
-`process`, `ui`, `http`, `rpc`, `observability`, `cli`). К ним можно обращаться
+Её модули распределены по неявным пакетам исходников. К ним можно обращаться
 по полному имени без импорта (`List.map`, `Ref.make`) или импортировать
 отдельные имена, как из любого другого модуля (`import File exposing (FileSystem, OpenError)`).
 Имена из Prelude доступны в каждом модуле без квалификатора.
@@ -18,6 +17,8 @@ source_hash: d91336c0d73c2a29
 Это проверяет `flick-core/tests/stdlib_signatures.rs`.
 
 [Сгенерированный API пакета](../../api/) содержит публичные сигнатуры, doc comments и ссылки на исходники из `flick doc --std`.
+
+Модули `Js.Array` и `JsError` описаны в разделе о [взаимодействии с JavaScript](../ffi/).
 
 ## Prelude
 
@@ -54,7 +55,6 @@ source_hash: d91336c0d73c2a29
 | `Option`, `Result` | `map`, `bind`, `with_default` и преобразования |
 | `NonEmpty` | списки как минимум с одним элементом |
 | `Chunk` | последовательности для многократной конкатенации |
-| `Js.Array` | изменяемые массивы JS, доступные через эффектные операции; списки копируются на входе и выходе |
 | `String` | `split`, `join`, `slice`, `index_of`, `to_number`, … над кодовыми единицами UTF-16 |
 | `Markdown` | `to_html`: наиболее употребительные конструкции CommonMark (заголовки, абзацы, списки, цитаты, блоки кода, линии, `code`, жирный, курсив, ссылки) в HTML, где каждый текст экранирован, а ссылки ведут только на `http`, `https`, `mailto` и относительные URL, так что скрипт из исходника остаётся текстом; `escape` |
 | `Int` | `to_float`, `from_float`, `truncate`, `parse`, побитовые `bit_*` и `shift_*`, проверяемые `checked_add`, `checked_div`, …, возвращающие `Result ArithmeticError Int`, и `unsafe_div`, `unsafe_rem` |
@@ -81,7 +81,6 @@ source_hash: d91336c0d73c2a29
 | `Rpc` | типизированные удалённые вызовы: процедуры с кодеками, группы, серверы и клиенты поверх HTTP, WebSocket, TCP и стандартных потоков, см. [типизированные RPC](../rpc/) |
 | `Metric`, `Tracer` | метрики реестра программы и спаны вокруг её задач, см. [наблюдаемость](../observability/) |
 | `Otlp`, `Prometheus`, `DevTools` | куда уходят спаны, записи журнала и метрики: коллектор OTLP, маршрут Prometheus, Effect DevTools, см. [наблюдаемость](../observability/) |
-| `JsError` | `JsError.from_js`, ошибка внешнего исключения или отклонения промиса, см. [внешние функции](../ffi/) |
 | `Fiber`, `Failure`, `Exit`, `RawCause` | дочерние задачи области и исходы выполнения |
 | `Test`, `Gen` | тесты и генераторы, см. ниже |
 | `Schedule` | расписания для `Effect.repeat` и `Effect.retry`: `recurs`, `spaced`, `exponential`, `fibonacci`, `up_to`, `while`, `tap`, … |
