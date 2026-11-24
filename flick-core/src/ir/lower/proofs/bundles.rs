@@ -187,6 +187,7 @@ impl Checking<'_, '_> {
             obligations.push(LawObligation {
                 path: path.to_vec(),
                 class: bundle.class.clone(),
+                class_module: bundle.module.clone(),
                 law: name.clone(),
                 status: result
                     .as_ref()

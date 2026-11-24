@@ -5,6 +5,8 @@ use serde::Serialize;
 use super::{Ide, tree};
 use crate::source::FileId;
 use crate::syntax::{cst::Node, kind::SyntaxKind as K};
+#[cfg(target_arch = "wasm32")]
+use crate::types::ProofEvidence;
 use crate::types::{
     GoalSyntax, GoalType, LawObligation, ProofInfo, ProofStatus, Range, goal_syntax,
 };
@@ -62,7 +64,10 @@ impl Ide<'_> {
             .iter()
             .chain(&module.typing.laws)
             .find(|info| info.at == at)?;
+        #[cfg(not(target_arch = "wasm32"))]
         let evidence = module.typing.proof_evidence.iter().find(|e| e.at == at);
+        #[cfg(target_arch = "wasm32")]
+        let evidence: Option<&ProofEvidence> = None;
         let step_offset = step_offset(declaration, text, offset);
         let step = evidence
             .into_iter()
@@ -191,7 +196,7 @@ fn goal_of(node: &Node) -> Option<&Node> {
         .find(|n| matches!(n.kind, K::Goal | K::SameTypeGoal | K::LawfulGoal))
 }
 
-fn show_goal(node: &Node, text: &str) -> Option<String> {
+pub(super) fn show_goal(node: &Node, text: &str) -> Option<String> {
     let shown = match goal_syntax(node, text) {
         GoalSyntax::Equal(left, right) => {
             format!("{} = {}", left.text(text).trim(), right.text(text).trim())

@@ -3,11 +3,12 @@
 
 use std::iter;
 
-use super::Ide;
+use super::{Ide, proof_symbols, tree};
 use crate::iface::{Decl, Namespace};
 use crate::resolve::{Declared, declarations};
 use crate::source::FileId;
 use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind as K;
 
 /// A declaration as an outline entry; `kind` is an LSP `SymbolKind`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,12 +50,12 @@ impl Ide<'_> {
             selection: (d.span.start, d.span.end),
             children,
         };
-        decls
+        let mut out: Vec<_> = decls
             .iter()
             .filter(|d| d.parent.is_none() || !nested(d))
             .map(|d| {
                 let range = enclosing(d);
-                let children = decls
+                let mut children: Vec<_> = decls
                     .iter()
                     .filter(|c| {
                         nested(c)
@@ -64,9 +65,26 @@ impl Ide<'_> {
                     })
                     .map(|c| outline(c, Vec::new()))
                     .collect();
+                if d.decl == Decl::Class
+                    && let Some(class) = tree::find(&m.tree, range)
+                {
+                    children.extend(
+                        proof_symbols::laws(class)
+                            .filter_map(|law| proof_outline(law, self.text(file))),
+                    );
+                    children.sort_by_key(|child| child.selection.0);
+                }
                 outline(d, children)
             })
-            .collect()
+            .collect();
+        out.extend(
+            m.tree
+                .nodes()
+                .filter(|node| node.kind == K::ProofDecl)
+                .filter_map(|node| proof_outline(node, self.text(file))),
+        );
+        out.sort_by_key(|item| item.selection.0);
+        out
     }
 
     /// Declarations of every module whose name has the letters of `query` in
@@ -96,6 +114,17 @@ impl Ide<'_> {
             })
             .collect()
     }
+}
+
+fn proof_outline(node: &Node, text: &str) -> Option<Outline> {
+    let token = proof_symbols::proof_name(node)?;
+    Some(Outline {
+        name: token.text(text).to_owned(),
+        kind: if node.kind == K::LawDecl { 6 } else { 12 },
+        range: node.range(),
+        selection: (token.start, token.end),
+        children: Vec::new(),
+    })
 }
 
 /// Constructors and methods go under their type or class.

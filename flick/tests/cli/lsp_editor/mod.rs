@@ -10,6 +10,7 @@ mod manifests;
 mod mutable;
 mod operators;
 mod privacy;
+mod proof_hover;
 mod proofs;
 mod quick_fix;
 mod sql_table;

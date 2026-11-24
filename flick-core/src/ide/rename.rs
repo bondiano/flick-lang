@@ -21,6 +21,15 @@ impl Ide<'_> {
     /// Every occurrence of `symbol` in the analysis, its declaration first.
     pub fn references(&self, symbol: &Symbol) -> Vec<Occurrence> {
         let mut out = Vec::new();
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Symbol::Proof {
+            module,
+            class: Some(class),
+            name,
+        } = symbol
+        {
+            out.extend(self.law_references(module, class, name));
+        }
         if let Symbol::Entity(e) = symbol
             && let Ok(Some(class)) = self.method_class(e)
         {
@@ -112,6 +121,8 @@ impl Ide<'_> {
                 e.namespace != Namespace::Value
             }
             Symbol::Module(_) => return Err("module names require renaming their files".into()),
+            #[cfg(not(target_arch = "wasm32"))]
+            Symbol::Proof { .. } => return Err("proof and law names cannot be renamed here".into()),
             Symbol::Operation { .. } | Symbol::InstanceMethod { .. } => {
                 return Err("generated code names this by its spelling: no exact mapping".into());
             }

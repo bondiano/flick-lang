@@ -281,7 +281,7 @@ pub struct Typing {
     pending_dicts: Vec<(Range, u32, Dict)>,
     /// The proof declarations, as the checker settled them.
     pub proofs: Vec<super::proof_decls::ProofInfo>,
-    #[cfg(feature = "ide")]
+    #[cfg(all(feature = "ide", not(target_arch = "wasm32")))]
     pub proof_evidence: Vec<super::proof_decls::ProofEvidence>,
     /// The laws of the module's classes, typed as proofs are.
     pub laws: Vec<super::proof_decls::ProofInfo>,

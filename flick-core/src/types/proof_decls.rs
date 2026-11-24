@@ -74,6 +74,7 @@ impl ProofStatus {
 pub struct LawObligation {
     pub path: Vec<String>,
     pub class: String,
+    pub class_module: String,
     pub law: String,
     pub status: ProofStatus,
     pub statement: Option<String>,

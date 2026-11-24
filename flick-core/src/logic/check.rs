@@ -44,6 +44,13 @@ enum GoalOrigin {
     Step,
 }
 
+#[derive(Clone, Copy)]
+enum EquationSource<'a> {
+    Congruence,
+    Fact(&'a str),
+    Lemma(&'a str),
+}
+
 impl GoalOrigin {
     fn mismatch(self, span: Span, left: String, right: String, kind: &'static str) -> Failure {
         match self {
@@ -338,22 +345,33 @@ impl Checker<'_> {
 
     /// Checks that a supplied equation is the required one, in the same
     /// order and budget as normalization of its two sides.
+    #[cfg_attr(target_arch = "wasm32", inline(never))]
     fn match_equation(
         &mut self,
         provided: &Equation,
         goal: &Equation,
         span: Span,
-        describe: impl FnOnce(&Self) -> String,
+        source: EquationSource<'_>,
     ) -> Result<(), Failure> {
         for (supplied, expected) in [(&provided.left, &goal.left), (&provided.right, &goal.right)] {
             let supplied = self.nf(supplied, span)?;
             let expected = self.nf(expected, span)?;
             if supplied != expected {
+                let (name, verb, attribution) = match source {
+                    EquationSource::Congruence => ("cong", "supplies", ""),
+                    EquationSource::Fact(name) => (name, "proves", ""),
+                    EquationSource::Lemma(name) => {
+                        (name, "proves", " of exactly the definitions it names")
+                    }
+                };
                 return Err(Failure::Unproved {
                     span,
                     left: self.show_term(&goal.left),
                     right: self.show_term(&goal.right),
-                    note: Some(describe(self)),
+                    note: Some(format!(
+                        "`{name}` {verb} `{}`{attribution}",
+                        self.show_equation(provided)
+                    )),
                 });
             }
         }
@@ -405,6 +423,7 @@ impl Checker<'_> {
     ) -> Result<(), Failure> {
         let span = cert.span;
         match &cert.kind {
+            #[cfg(not(target_arch = "wasm32"))]
             Rule::Hole(why) => Err((**why).clone()),
             Rule::Refl => self.check_equality(&goal.left, &goal.right, span, origin),
             Rule::Symm(p) => self.check(&goal.swapped(), p, origin),
@@ -433,9 +452,7 @@ impl Checker<'_> {
                     left: at(&eq.left),
                     right: at(&eq.right),
                 };
-                self.match_equation(&provided, goal, span, |checker| {
-                    format!("`cong` supplies `{}`", checker.show_equation(&provided))
-                })
+                self.match_equation(&provided, goal, span, EquationSource::Congruence)
             }
             Rule::Funext(x, p) => {
                 let Ty::Fun(a, b) = &goal.ty else {
@@ -462,20 +479,13 @@ impl Checker<'_> {
             Rule::Case(v, arms) => self.case(goal, v, arms, span, origin),
             Rule::Fact(h) => {
                 let eq = self.fact(h, span)?;
-                self.match_equation(&eq, goal, span, |checker| {
-                    format!("`{h}` proves `{}`", checker.show_equation(&eq))
-                })
+                self.match_equation(&eq, goal, span, EquationSource::Fact(h))
             }
             Rule::Lemma(name, args) => {
                 let (eq, lemma_span) = self.lemma(name, args, span)?;
                 // its instance is the goal itself, definitions folded
                 let unfold = mem::replace(&mut self.unfold, false);
-                let result = self.match_equation(&eq, goal, span, |checker| {
-                    format!(
-                        "`{name}` proves `{}` of exactly the definitions it names",
-                        checker.show_equation(&eq)
-                    )
-                });
+                let result = self.match_equation(&eq, goal, span, EquationSource::Lemma(name));
                 self.unfold = unfold;
                 result.map_err(|failure| {
                     failure.with_related(lemma_span, format!("`{name}` is declared here"))
@@ -519,6 +529,7 @@ impl Checker<'_> {
 
     fn synth_rule(&mut self, cert: &Cert) -> Result<Equation, Failure> {
         match &cert.kind {
+            #[cfg(not(target_arch = "wasm32"))]
             Rule::Hole(why) => Err((**why).clone()),
             Rule::Fact(h) => self.fact(h, cert.span),
             Rule::Lemma(name, args) => self.lemma(name, args, cert.span).map(|(eq, _)| eq),
