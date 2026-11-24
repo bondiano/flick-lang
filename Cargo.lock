@@ -636,6 +636,7 @@ dependencies = [
  "flate2",
  "flick-backend",
  "flick-backend-js",
+ "flick-backend-support",
  "flick-core",
  "flick-ir",
  "flick-model",

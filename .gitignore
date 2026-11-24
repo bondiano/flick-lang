@@ -8,6 +8,8 @@ node_modules/
 /tools/load/*/.flick/
 /tests/language/.flick/
 /tests/language/dist/
+/tests/kernel/.flick/
+/tests/kernel/dist/
 /tools/dts-importer/.flick/
 /tools/bundle-size/none/.flick/
 /tools/bundle-size/fullstack/.flick/

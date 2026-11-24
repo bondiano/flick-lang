@@ -4,7 +4,9 @@
 mod commands;
 mod fallback;
 mod foreign;
+mod kernel;
 mod launches;
+mod options;
 mod packages;
 mod steps;
 mod tests;
@@ -17,9 +19,8 @@ use std::time::SystemTime;
 use flick_backend::command;
 use flick_backend::{
     Artifact, ArtifactKind, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic,
-    Environment, EnvironmentServices, Inputs, Mode, ModuleRole, NamedRange, OptionDescriptor,
-    OptionValue, Packages, Parameter, Profile, ProjectFile, Severity, Span, TagAxis, TargetSupport,
-    ValueKind, Verb, VersionRange,
+    Environment, EnvironmentServices, Inputs, Mode, ModuleRole, NamedRange, OptionValue, Packages,
+    Profile, ProjectFile, Severity, Span, TagAxis, TargetSupport, VersionRange,
 };
 use flick_ir::{ExprKind, ItemKind, Lit, Program, Stage};
 
@@ -194,10 +195,16 @@ impl Backend for Literal {
             backend_api: range("0.1.0", "0.2.0"),
             ir: range("0.17.0", "0.18.0"),
             language: range("0.2.0", "0.3.0"),
-            runtime_abis: vec![NamedRange {
-                name: "flickrt".into(),
-                versions: range("0.2.0", "0.3.0"),
-            }],
+            runtime_abis: vec![
+                NamedRange {
+                    name: "flickrt".into(),
+                    versions: range("0.2.0", "0.3.0"),
+                },
+                NamedRange {
+                    name: "flick.kernel".into(),
+                    versions: range("0.1.0", "0.2.0"),
+                },
+            ],
             environments: vec![Environment {
                 backend: "js".into(),
                 platform: "node".into(),
@@ -220,7 +227,7 @@ impl Backend for Literal {
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::PerModule, Mode::WholeProgram],
             capabilities: vec![],
-            options: literal_options(),
+            options: options::literal_options(),
             launch_runtimes: vec!["node".into()],
             host_tools: vec!["node".into()],
             projections: vec![],
@@ -269,6 +276,12 @@ impl Backend for Literal {
         }
         if case(request) == "fallback" {
             fallback::check_target(&program, request)?;
+            return Ok(TargetSupport {
+                capabilities: self.describe().capabilities,
+            });
+        }
+        if case(request) == "kernel" {
+            kernel::check_target(&program, &kernel::roots(request))?;
             return Ok(TargetSupport {
                 capabilities: self.describe().capabilities,
             });
@@ -458,6 +471,18 @@ fn module_artifacts(request: &BuildRequest) -> Result<Vec<Artifact>, Vec<Diagnos
         )
         .into_bytes()
     });
+    let kernel = if case(request) == "kernel" {
+        let program =
+            Program::from_cbor(&request.program).map_err(|e| diagnostic(&e.to_string(), None))?;
+        let profile = format!("{:?}", request.target.profile).to_lowercase();
+        Some(kernel::generate(
+            &program,
+            &kernel::roots(request),
+            &profile,
+        )?)
+    } else {
+        None
+    };
     let mut out = Vec::new();
     for m in request
         .modules
@@ -468,7 +493,12 @@ fn module_artifacts(request: &BuildRequest) -> Result<Vec<Artifact>, Vec<Diagnos
         if let Some(header) = &env_header {
             bytes.extend(header);
         }
-        if case(request) == "fallback" {
+        let suite = (kernel.iter())
+            .flat_map(|(sources, _)| sources)
+            .find(|(module, _)| *module == m.name);
+        if let Some((_, source)) = suite {
+            bytes.extend(source);
+        } else if case(request) == "fallback" {
             bytes.extend(fallback::source(request, &m.name)?);
         } else {
             bytes.extend(
@@ -483,77 +513,8 @@ fn module_artifacts(request: &BuildRequest) -> Result<Vec<Artifact>, Vec<Diagnos
             bytes,
         });
     }
+    out.extend(kernel.map(|(_, report)| report));
     Ok(out)
-}
-
-fn literal_options() -> Vec<OptionDescriptor> {
-    vec![
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "case".into(),
-                kind: ValueKind::Text,
-                multiple: false,
-                required: false,
-                help: "Select a test fixture behavior.".into(),
-            },
-            default: None,
-            implicit_value: None,
-            choices: vec![],
-            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
-        },
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "banner".into(),
-                kind: ValueKind::Text,
-                multiple: false,
-                required: false,
-                help: "Prepend a comment banner to generated JavaScript output.".into(),
-            },
-            default: None,
-            implicit_value: None,
-            choices: vec![],
-            verbs: vec![Verb::Build, Verb::Inspect],
-        },
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "dialect".into(),
-                kind: ValueKind::Text,
-                multiple: false,
-                required: false,
-                help: "Select literal fixture dialect tag.".into(),
-            },
-            default: Some("alpha".into()),
-            implicit_value: None,
-            choices: vec!["alpha".into(), "beta".into()],
-            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
-        },
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "jit".into(),
-                kind: ValueKind::Flag,
-                multiple: false,
-                required: false,
-                help: "Enable fixture JIT capability tag.".into(),
-            },
-            default: Some("false".into()),
-            implicit_value: None,
-            choices: vec![],
-            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
-        },
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "ffi".into(),
-                kind: ValueKind::Flag,
-                multiple: false,
-                required: false,
-                help: "Enable fixture FFI capability tag.".into(),
-            },
-            default: Some("false".into()),
-            implicit_value: None,
-            choices: vec![],
-            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
-        },
-    ]
 }
 
 #[cfg(feature = "guest")]

@@ -1,0 +1,15 @@
+schema-version = 1
+
+[project]
+kind = "app"
+entry = "Kernel.Main"
+source-dir = "src"
+test-dir = "test"
+
+[build]
+out-dir = "dist"
+profile = "debug"
+target = "js"
+
+[tools]
+"flick/go" = ["go"]

@@ -39,3 +39,22 @@ wasm-backends: backend-fixtures
     cargo test -p flick --release --features wasm-plugins --test default_backend -- --include-ignored
     node --test tools/backend-conformance/report.test.mjs
     node tools/backend-conformance/index.mjs {{flick}} target/backends/js.wasm
+
+# tests/kernel on both JS runtimes and as a Go executable, in debug and release,
+# then in release the tests/language modules tests/kernel/language.txt lists
+# (`just language` runs them in debug).
+# The primitive kernel's conformance suite on JS and Go, in debug and release
+kernel: e2e-compiler
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pnpm -C runtime build
+    pnpm -C packages/effect-ts build
+    modules=$(grep -v '^#' tests/kernel/language.txt | sed 's|.*|test/Language/&.fl|')
+    for profile in debug release; do
+        for target in "js --runtime rt" "js --runtime effect" go; do
+            (cd tests/kernel && {{flick}} test --target $target --profile $profile)
+        done
+    done
+    for target in js go; do
+        (cd tests/language && {{flick}} test --target $target --profile release $modules)
+    done
