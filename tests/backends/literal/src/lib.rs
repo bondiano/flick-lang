@@ -354,6 +354,7 @@ impl Backend for Literal {
                 .read(&source.input)
                 .map_err(|_| diagnostic("source input is unavailable", None))?;
         }
+        foreign::validate_foreign_abis(request)?;
         let mut artifacts = module_artifacts(request)?;
         if is_inspect(request) {
             return Ok(BuildResult {

@@ -208,11 +208,7 @@ fn validate_foreign(foreign: &Foreign, diagnostics: &mut Vec<Diagnostic>) {
     }
 }
 
-pub(crate) fn validate_foreigns(
-    program: &Program,
-    request: &BuildRequest,
-    inputs: &mut dyn Inputs,
-) -> Result<(), Vec<Diagnostic>> {
+pub(crate) fn validate_foreign_abis(request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     for binding in &request.foreign {
         if binding.abi.name != ABI_NAME || binding.abi.version != ABI_VERSION {
@@ -228,6 +224,22 @@ pub(crate) fn validate_foreigns(
             });
         }
     }
+    if diagnostics.is_empty() {
+        Ok(())
+    } else {
+        Err(diagnostics)
+    }
+}
+
+pub(crate) fn validate_foreigns(
+    program: &Program,
+    request: &BuildRequest,
+    inputs: &mut dyn Inputs,
+) -> Result<(), Vec<Diagnostic>> {
+    let mut diagnostics = match validate_foreign_abis(request) {
+        Ok(()) => Vec::new(),
+        Err(diags) => diags,
+    };
     for module in &program.modules {
         if !request
             .modules

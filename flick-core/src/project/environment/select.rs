@@ -295,6 +295,7 @@ fn select_backend(
             environments: Vec::new(),
             foreign_adapters: Vec::new(),
             type_form_attributes: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
             value_abi: None,
         });
     }

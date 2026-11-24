@@ -30,21 +30,18 @@ fn check_one_package(
         return;
     }
     let Some(table) = foreign_backend.value_abi.as_ref() else {
-        let short = foreign_backend
-            .backend_id
-            .rsplit('/')
-            .next()
-            .unwrap_or(&foreign_backend.backend_id);
-        let expected_prefix = format!("flick.{short}-ffi");
-        if let Some((req, span)) = abi_reqs.get(&expected_prefix) {
-            diagnostics.push(Diagnostic::error(
-                codes::F014,
-                format!(
-                    "package `{pkg_name}` requires value ABI `{expected_prefix}` `{req}`, but backend `{}` publishes no versioned value ABI table",
-                    foreign_backend.backend_id
-                ),
-                *span,
-            ));
+        let first_span = abi_reqs.values().next().map(|(_, s)| *s);
+        let listed: Vec<String> = abi_reqs
+            .iter()
+            .map(|(name, (req, _))| format!("`{name}` `{req}`"))
+            .collect();
+        let message = format!(
+            "package `{pkg_name}` requires value ABI {}, but backend `{}` publishes no versioned value ABI table",
+            listed.join(", "),
+            foreign_backend.backend_id
+        );
+        if let Some(span) = first_span {
+            diagnostics.push(Diagnostic::error(codes::F014, message, span));
         }
         return;
     };

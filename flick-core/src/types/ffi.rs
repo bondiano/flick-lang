@@ -10,9 +10,11 @@ pub(super) mod imply;
 mod native;
 mod retention;
 pub(super) mod spec;
+#[cfg(not(target_arch = "wasm32"))]
 mod value_abi;
 #[cfg(not(target_arch = "wasm32"))]
 pub(super) mod value_abi_doc;
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) mod value_abi_spec;
 pub use imply::{
     AxisTagModel, BackendTagModel, HostTagModel, NativeOverrideEnv, OverrideSelection,
@@ -25,6 +27,7 @@ pub use spec::{
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use value_abi_doc::{DocLocale, render_value_abi_markdown, replace_value_abi_block};
+#[cfg(not(target_arch = "wasm32"))]
 pub use value_abi_spec::{
     AbiConversion, AbiDirection, ValueAbiEntrySpec, ValueAbiId, ValueAbiRefusalSpec, ValueAbiSpec,
 };
@@ -149,22 +152,25 @@ impl Checker<'_> {
         self.check_foreign_regions(
             decl, scheme, &body, &binders, &params, &stages, retention, span,
         );
-        let value_abi_spec = if pending.native_override.is_some() {
-            self.options
-                .native_env()
-                .active_backend_spec(self.options.foreign_backend)
-                .clone()
-        } else {
-            self.options.foreign_backend.clone()
-        };
-        self.check_foreign_value_abi(
-            pending.native_override.is_none().then_some(decl),
-            &info,
-            &params,
-            &body,
-            &value_abi_spec,
-            span,
-        );
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let value_abi_spec = if pending.native_override.is_some() {
+                self.options
+                    .native_env()
+                    .active_backend_spec(self.options.foreign_backend)
+                    .clone()
+            } else {
+                self.options.foreign_backend.clone()
+            };
+            self.check_foreign_value_abi(
+                pending.native_override.is_none().then_some(decl),
+                &info,
+                &params,
+                &body,
+                &value_abi_spec,
+                span,
+            );
+        }
         if let Some((override_range, backend_id, enabled)) = pending.native_override {
             self.typing.native_overrides.push((
                 decl.range(),
@@ -365,12 +371,18 @@ impl Checker<'_> {
     fn infer_catch_mapping(&mut self, mapping: &Node, spec: &ForeignBackendSpec) -> Option<Type> {
         let span = self.span(mapping);
         let error = self.fresh();
+        #[cfg(not(target_arch = "wasm32"))]
         let catch_lang = spec
             .value_abi
             .as_ref()
             .and_then(|abi| abi.catch_lang_item.as_deref())
             .and_then(Lang::from_name)
             .unwrap_or(Lang::JsValue);
+        #[cfg(target_arch = "wasm32")]
+        let catch_lang = {
+            let _ = spec;
+            Lang::JsValue
+        };
         let expected = Type::pure_fun(Type::lang(catch_lang), error.clone());
         let actual = self.infer(mapping);
         if let Err(m) = self.unify(&actual, &expected) {

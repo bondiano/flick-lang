@@ -43,6 +43,7 @@ pub fn official_backends() -> Vec<BackendTags> {
             ],
             foreign_adapters: js.adapters,
             type_form_attributes: js.type_form_attributes,
+            #[cfg(not(target_arch = "wasm32"))]
             value_abi: js.value_abi,
         },
         BackendTags {
@@ -58,6 +59,7 @@ pub fn official_backends() -> Vec<BackendTags> {
             environments: vec![("go".into(), "native".into())],
             foreign_adapters: go.adapters,
             type_form_attributes: go.type_form_attributes,
+            #[cfg(not(target_arch = "wasm32"))]
             value_abi: go.value_abi,
         },
     ]
@@ -83,6 +85,7 @@ pub(super) fn select_foreign_backend(
                     backend_id: pkg.id.clone(),
                     adapters: Vec::new(),
                     type_form_attributes: Vec::new(),
+                    #[cfg(not(target_arch = "wasm32"))]
                     value_abi: None,
                 },
                 false,

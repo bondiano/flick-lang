@@ -12,7 +12,12 @@ pub enum DocLocale {
     Ru,
 }
 
-fn ru_notes(entry: &ValueAbiEntrySpec) -> &str {
+const JS_ABI_NAME: &str = "flick.javascript-ffi";
+
+fn ru_notes<'a>(abi_name: &str, entry: &'a ValueAbiEntrySpec) -> &'a str {
+    if abi_name != JS_ABI_NAME {
+        return &entry.notes;
+    }
     match entry.key.as_str() {
         "unit" => {
             "JS `undefined`; успешный внешний результат типа `Unit` — `()`, что бы ни вернул JS"
@@ -86,7 +91,11 @@ pub fn render_value_abi_markdown(table: &ValueAbiSpec, locale: DocLocale) -> Str
             }
             out.push('\n');
             if table.admits_copied_data {
-                out.push_str("Records and user-defined ADTs have no stable layout and are not in this table. On this backend they may still cross bindings as deep-copied plain JS objects / tagged objects (`_tag` = `Name#hash`, fields `_0`, `_1`, …); `unboxed type` and `untagged type` declare explicit representations.\n");
+                if table.abi.name == JS_ABI_NAME {
+                    out.push_str("Records and user-defined ADTs have no stable layout and are not in this table. On this backend they may still cross bindings as deep-copied plain JS objects / tagged objects (`_tag` = `Name#hash`, fields `_0`, `_1`, …); `unboxed type` and `untagged type` declare explicit representations.\n");
+                } else {
+                    out.push_str("Records and user-defined ADTs have no stable layout and are not in this table; this backend admits them across bindings as deep-copied host values.\n");
+                }
             } else {
                 out.push_str("Records and user-defined ADTs have no stable layout and are not in this table; direct bindings refuse them unless wrapped in an opaque nominal handle.\n");
             }
@@ -113,12 +122,16 @@ pub fn render_value_abi_markdown(table: &ValueAbiSpec, locale: DocLocale) -> Str
                     escape_cell(&entry.host_type),
                     entry.conversion.as_str(),
                     entry.direction.as_str(),
-                    escape_cell(ru_notes(entry)),
+                    escape_cell(ru_notes(&table.abi.name, entry)),
                 );
             }
             out.push('\n');
             if table.admits_copied_data {
-                out.push_str("Записи и пользовательские ADT не имеют стабильной раскладки и в эту таблицу не входят. В этом бэкенде они по-прежнему могут проходить через привязки с глубоким копированием как обычные JS-объекты / объекты с тегом (`_tag` = `Имя#hash`, поля `_0`, `_1`, …); `unboxed type` и `untagged type` объявляют явное представление.\n");
+                if table.abi.name == JS_ABI_NAME {
+                    out.push_str("Записи и пользовательские ADT не имеют стабильной раскладки и в эту таблицу не входят. В этом бэкенде они по-прежнему могут проходить через привязки с глубоким копированием как обычные JS-объекты / объекты с тегом (`_tag` = `Имя#hash`, поля `_0`, `_1`, …); `unboxed type` и `untagged type` объявляют явное представление.\n");
+                } else {
+                    out.push_str("Записи и пользовательские ADT не имеют стабильной раскладки и в эту таблицу не входят; этот бэкенд допускает их передачу через привязки с глубоким копированием значений.\n");
+                }
             } else {
                 out.push_str("Записи и пользовательские ADT не имеют стабильной раскладки и в эту таблицу не входят; прямые привязки отклоняют их, если не использовать непрозрачный номинальный дескриптор.\n");
             }

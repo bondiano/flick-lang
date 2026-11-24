@@ -322,6 +322,53 @@ fn value_abi_markdown_renderer_outputs_en_and_ru_tables_from_data() {
     assert!(synced.contains("| `int` | `Int` | `number` | `none` | `both` |"));
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn value_abi_markdown_renderer_preserves_non_js_backend_notes_and_footer() {
+    use crate::types::ffi::{DocLocale, render_value_abi_markdown};
+
+    let mut strict = strict_backend().value_abi.expect("strict table");
+    for entry in &mut strict.entries {
+        match entry.key.as_str() {
+            "int" => entry.notes = "32-bit int".to_owned(),
+            "string" => entry.notes = "C string view".to_owned(),
+            _ => {}
+        }
+    }
+    let strict_en = render_value_abi_markdown(&strict, DocLocale::En);
+    let strict_ru = render_value_abi_markdown(&strict, DocLocale::Ru);
+    for rendered in [&strict_en, &strict_ru] {
+        assert!(rendered.contains("test.strict-ffi@0.1.0"), "{rendered}");
+        assert!(
+            rendered.contains("| `int` | `Int` | `int32_t` | `none` | `both` | 32-bit int |"),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains(
+                "| `string` | `String` | `const char *` | `view` | `in` | C string view |"
+            ),
+            "{rendered}"
+        );
+        assert!(
+            !rendered.contains("JS"),
+            "non-JS table leaked JS wording: {rendered}"
+        );
+    }
+
+    let mut copied = strict;
+    copied.abi.name = "acme.custom-ffi".to_owned();
+    copied.admits_copied_data = true;
+    let copied_en = render_value_abi_markdown(&copied, DocLocale::En);
+    let copied_ru = render_value_abi_markdown(&copied, DocLocale::Ru);
+    assert!(copied_en.contains("deep-copied host values"), "{copied_en}");
+    assert!(
+        copied_ru.contains("глубоким копированием значений"),
+        "{copied_ru}"
+    );
+    assert!(!copied_en.contains("JS"), "{copied_en}");
+    assert!(!copied_ru.contains("JS"), "{copied_ru}");
+}
+
 #[cfg(feature = "native-project")]
 mod package_abi_tests {
     use std::collections::BTreeMap;
@@ -470,5 +517,86 @@ when = \"go\"
             ("/dep/src/Dep.fl", dep_src),
         ]);
         assert!(ok_diags.is_empty(), "{ok_diags:?}");
+    }
+
+    #[test]
+    fn backend_without_value_abi_rejects_any_active_package_abi_requirement() {
+        let main_src = "module Main exposing (x)\nx : Int\nlet x = 1\n";
+        let go_ungated = "\
+schema-version = 1
+[project]
+kind = \"lib\"
+[build]
+target = \"go\"
+[package]
+name = \"demo\"
+version = \"0.1.0\"
+[package.abi]
+\"flick.javascript-ffi\" = \"^0.1.0\"
+";
+        let (diags, sources) = run(&[
+            ("/app/flick.toml", go_ungated),
+            ("/app/src/Main.fl", main_src),
+        ]);
+        let f014 = diags
+            .iter()
+            .find(|d| d.code == codes::F014)
+            .unwrap_or_else(|| panic!("expected FLICK-F014 on go target, got {diags:?}"));
+        assert!(
+            f014.message.contains("flick.javascript-ffi"),
+            "{}",
+            f014.message
+        );
+        assert!(f014.message.contains("flick/go"), "{}", f014.message);
+        let span = f014.span.expect("span");
+        assert_eq!(
+            &sources.get(span.file).text[span.start as usize..span.end as usize],
+            "\"^0.1.0\""
+        );
+
+        let go_custom_abi = "\
+schema-version = 1
+[project]
+kind = \"lib\"
+[build]
+target = \"go\"
+[package]
+name = \"demo\"
+version = \"0.1.0\"
+[package.abi]
+\"acme.c-ffi\" = \"^1.0.0\"
+";
+        let (custom_diags, _) = run(&[
+            ("/app/flick.toml", go_custom_abi),
+            ("/app/src/Main.fl", main_src),
+        ]);
+        assert!(
+            custom_diags
+                .iter()
+                .any(|d| d.code == codes::F014 && d.message.contains("acme.c-ffi")),
+            "expected FLICK-F014 for non-flick ABI against backend with no value_abi: {custom_diags:?}"
+        );
+
+        let go_inactive = "\
+schema-version = 1
+[project]
+kind = \"lib\"
+[build]
+target = \"go\"
+[package]
+name = \"demo\"
+version = \"0.1.0\"
+when = \"js\"
+[package.abi]
+\"flick.javascript-ffi\" = \"^0.1.0\"
+";
+        let (inactive_diags, _) = run(&[
+            ("/app/flick.toml", go_inactive),
+            ("/app/src/Main.fl", main_src),
+        ]);
+        assert!(
+            inactive_diags.is_empty(),
+            "inactive `when = \"js\"` package should be skipped under `--target go`: {inactive_diags:?}"
+        );
     }
 }

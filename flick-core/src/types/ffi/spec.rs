@@ -7,6 +7,7 @@ use std::sync::OnceLock;
 #[cfg(feature = "native-project")]
 use serde::{Deserialize, Serialize};
 
+#[cfg(not(target_arch = "wasm32"))]
 use super::value_abi_spec::ValueAbiSpec;
 
 /// Expected shape of one positional argument after a backend-declared foreign
@@ -116,6 +117,7 @@ pub struct ForeignBackendSpec {
     pub backend_id: String,
     pub adapters: Vec<AdapterWordSpec>,
     pub type_form_attributes: Vec<TypeFormAttrSpec>,
+    #[cfg(not(target_arch = "wasm32"))]
     pub value_abi: Option<ValueAbiSpec>,
 }
 
@@ -141,7 +143,7 @@ impl ForeignBackendSpec {
         variadic_doc: &str,
         attr_name: &str,
         attr_doc: &str,
-        value_abi: Option<ValueAbiSpec>,
+        #[cfg(not(target_arch = "wasm32"))] value_abi: Option<ValueAbiSpec>,
     ) -> Self {
         Self {
             backend_id: backend_id.to_owned(),
@@ -174,6 +176,7 @@ impl ForeignBackendSpec {
                 name: attr_name.to_owned(),
                 doc: attr_doc.to_owned(),
             }],
+            #[cfg(not(target_arch = "wasm32"))]
             value_abi,
         }
     }
@@ -189,6 +192,7 @@ impl ForeignBackendSpec {
             "Spread the last argument (a `List a`) into the JavaScript call.",
             "ts",
             "Declare the TypeScript form of a foreign `type` or `service` (`@ts \"...\"`, `@ts from \"pkg\" \"Name\"`, or `@ts none`).",
+            #[cfg(not(target_arch = "wasm32"))]
             Some(ValueAbiSpec::js()),
         )
     }
@@ -198,16 +202,7 @@ impl ForeignBackendSpec {
     pub fn go() -> Self {
         #[cfg(target_arch = "wasm32")]
         {
-            Self::builtin(
-                "flick/go",
-                "",
-                &["context", "signal"],
-                "",
-                "",
-                "go",
-                "",
-                None,
-            )
+            Self::builtin("flick/go", "", &["context", "signal"], "", "", "go", "")
         }
         #[cfg(not(target_arch = "wasm32"))]
         Self::builtin(

@@ -92,6 +92,7 @@ impl Checker<'_> {
     /// Like [`Self::whnf_captured`], but stops expanding any alias already in
     /// `stop_at` (or already expanded along this head chain) and returns the
     /// newly expanded `(module, name)` alias pairs.
+    #[cfg(not(target_arch = "wasm32"))]
     pub(in crate::types) fn whnf_captured_stopping_at(
         &self,
         t: &Type,

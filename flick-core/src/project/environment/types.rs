@@ -7,7 +7,9 @@ use std::path::PathBuf;
 use crate::project::config::BackendEnvironment;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::syntax::when;
-use crate::types::{AdapterWordSpec, ForeignBackendSpec, TypeFormAttrSpec, ValueAbiSpec};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::types::ValueAbiSpec;
+use crate::types::{AdapterWordSpec, ForeignBackendSpec, TypeFormAttrSpec};
 
 /// One selectable tag axis published by a backend descriptor.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +39,7 @@ pub struct BackendTags {
     /// Backend-declared foreign type-form attributes (such as `@ts`, `@go`).
     pub type_form_attributes: Vec<TypeFormAttrSpec>,
     /// Versioned value-ABI table published by this backend, if any.
+    #[cfg(not(target_arch = "wasm32"))]
     pub value_abi: Option<ValueAbiSpec>,
 }
 
@@ -48,6 +51,7 @@ impl BackendTags {
             backend_id: self.id.clone(),
             adapters: self.foreign_adapters.clone(),
             type_form_attributes: self.type_form_attributes.clone(),
+            #[cfg(not(target_arch = "wasm32"))]
             value_abi: self.value_abi.clone(),
         }
     }

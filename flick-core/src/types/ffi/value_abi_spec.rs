@@ -348,20 +348,13 @@ impl ValueAbiSpec {
                 .iter()
                 .map(
                     |&(key, flick_type, host_type, conversion, direction, notes)| {
-                        #[cfg(target_arch = "wasm32")]
-                        let notes = {
-                            let _ = notes;
-                            String::new()
-                        };
-                        #[cfg(not(target_arch = "wasm32"))]
-                        let notes = notes.to_owned();
                         ValueAbiEntrySpec {
                             key: key.to_owned(),
                             flick_type: flick_type.to_owned(),
                             host_type: host_type.to_owned(),
                             conversion,
                             direction,
-                            notes,
+                            notes: notes.to_owned(),
                         }
                     },
                 )

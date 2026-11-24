@@ -139,3 +139,52 @@ fn malformed_value_abi_tables_are_rejected_in_handshake() {
         );
     }
 }
+
+#[test]
+fn literal_backend_rejects_mismatched_foreign_binding_abi_with_f014() {
+    let backend = flick_test_backend::Literal;
+    let desc = backend.describe();
+    let mut req = request();
+    req.backend = BackendPin {
+        identity: desc.identity.clone(),
+        sha256: sha256(b"literal-fixture"),
+    };
+    req.target.environment = Environment {
+        backend: "literal".into(),
+        platform: "native".into(),
+    };
+    req.target.options.push(OptionValue {
+        key: "option.case".into(),
+        value: "foreign".into(),
+    });
+    req.foreign.push(ForeignBinding {
+        module: "App".into(),
+        specifier: "./native.c".into(),
+        resolved: "./native.c".into(),
+        abi: Abi {
+            name: "test.literal-ffi".into(),
+            version: "9.9.9".into(),
+        },
+        inputs: vec![],
+    });
+    let mut inputs = DeclaredInputs::new(&req.inputs, |_| Some(common::TEXT.as_bytes().to_vec()))
+        .expect("inputs");
+    let check_err = backend
+        .check_target(&req, &mut inputs)
+        .expect_err("check_target must reject mismatched foreign binding ABI");
+    assert!(
+        check_err.iter().any(|d| d.code == "F014"
+            && d.message.contains("test.literal-ffi@0.1.0")
+            && d.message.contains("test.literal-ffi@9.9.9")),
+        "expected F014 from check_target, got {check_err:?}"
+    );
+    let gen_err = backend
+        .generate(&req, &mut inputs)
+        .expect_err("generate must reject mismatched foreign binding ABI");
+    assert!(
+        gen_err.iter().any(|d| d.code == "F014"
+            && d.message.contains("test.literal-ffi@0.1.0")
+            && d.message.contains("test.literal-ffi@9.9.9")),
+        "expected F014 from generate, got {gen_err:?}"
+    );
+}

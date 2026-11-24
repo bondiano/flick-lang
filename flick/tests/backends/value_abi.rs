@@ -207,3 +207,135 @@ let main () = ()
     }
     fs::remove_dir_all(&root).expect("cleanup");
 }
+
+fn literal_abi_mismatch_request(
+    pin: flick_backend::BackendPin,
+    source: &str,
+) -> flick_backend::BuildRequest {
+    use std::collections::BTreeMap;
+
+    use flick_backend::{
+        Abi, BuildRequest, Environment, ForeignBinding, Input, InputKind, Mode, ModuleInput,
+        ModuleRole, OptionValue, Profile, Source, TargetRequest, sha256,
+    };
+    use flick_ir::{Exports, Initialization, Module, Program};
+
+    let module = Module {
+        name: "App".into(),
+        types: vec![],
+        preambles: vec![],
+        items: vec![],
+        labels: BTreeMap::new(),
+        initialization: Initialization::default(),
+        records: BTreeMap::new(),
+        package: None,
+        exports: Exports::default(),
+    };
+    let program = Program::new("value abi test", vec![module], vec![], &|_| "App.fl".into());
+    BuildRequest {
+        backend: pin,
+        target: TargetRequest {
+            backend_api: flick_backend::VERSION.into(),
+            ir_version: flick_ir::VERSION.into(),
+            language_version: "0.1.0".into(),
+            runtime_abis: vec![],
+            environment: Environment {
+                backend: "js".into(),
+                platform: "node".into(),
+            },
+            tags: vec!["literal".into()],
+            host_package: None,
+            profile: Profile::Debug,
+            mode: Mode::WholeProgram,
+            required_capabilities: vec![],
+            options: vec![OptionValue {
+                key: "option.case".into(),
+                value: "foreign".into(),
+            }],
+        },
+        program: program.to_cbor(),
+        module_root: None,
+        modules: vec![ModuleInput {
+            name: "App".into(),
+            package: None,
+            role: ModuleRole::Own,
+            output: "App.out".into(),
+            interface: None,
+        }],
+        sources: vec![Source {
+            name: "App.fl".into(),
+            input: "source/App".into(),
+            line_starts: vec![0],
+        }],
+        entries: vec![],
+        test_roots: vec![],
+        root_handlers: vec![],
+        foreign: vec![ForeignBinding {
+            module: "App".into(),
+            specifier: "./native.c".into(),
+            resolved: "./native.c".into(),
+            abi: Abi {
+                name: "test.literal-ffi".into(),
+                version: "9.9.9".into(),
+            },
+            inputs: vec![],
+        }],
+        inline_foreign: vec![],
+        projections: vec![],
+        package_targets: vec![],
+        declared_dependencies: None,
+        runtime_dependencies: vec![],
+        toolchains: vec![],
+        inputs: vec![Input {
+            id: "source/App".into(),
+            kind: InputKind::Source,
+            sha256: sha256(source.as_bytes()),
+            size: source.len() as u64,
+        }],
+    }
+}
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn fixture_backend_component_rejects_mismatched_foreign_binding_abi_with_f014() {
+    use flick_backend::host::{Budget, WasmBackend, runtime};
+    use flick_backend::{Backend, BackendId, BackendPin, DeclaredInputs, sha256};
+
+    let component = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../target/wasm32-wasip2/release/flick_test_backend.wasm");
+    let bytes = fs::read(component).expect("just wasm-backends builds flick_test_backend.wasm");
+    let pin = BackendPin {
+        identity: BackendId {
+            id: "test/literal".into(),
+            version: "1.0.0".into(),
+        },
+        sha256: sha256(&bytes),
+    };
+    let engine = runtime::engine(None).expect("wasmtime engine");
+    let backend = WasmBackend::load(&engine, pin.clone(), &bytes, Budget::default())
+        .expect("component loads");
+
+    let source = "module App exposing ()\n";
+    let request = literal_abi_mismatch_request(pin, source);
+    let mut inputs =
+        DeclaredInputs::new(&request.inputs, |_| Some(source.as_bytes().to_vec())).expect("inputs");
+
+    let check_err = backend
+        .check_target(&request, &mut inputs)
+        .expect_err("WASM component check_target must reject mismatched foreign-binding.abi");
+    assert!(
+        check_err.iter().any(|d| d.code == "F014"
+            && d.message.contains("test.literal-ffi@0.1.0")
+            && d.message.contains("test.literal-ffi@9.9.9")),
+        "expected F014 from component check_target, got {check_err:?}"
+    );
+    let gen_err = backend
+        .generate(&request, &mut inputs)
+        .expect_err("WASM component generate must reject mismatched foreign-binding.abi");
+    assert!(
+        gen_err.iter().any(|d| d.code == "F014"
+            && d.message.contains("test.literal-ffi@0.1.0")
+            && d.message.contains("test.literal-ffi@9.9.9")),
+        "expected F014 from component generate, got {gen_err:?}"
+    );
+}
