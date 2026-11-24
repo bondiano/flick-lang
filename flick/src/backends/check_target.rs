@@ -7,9 +7,9 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use flick_backend::{
-    Backend, BackendPin, BuildRequest, CHECK_TARGET_CAPABILITY, DeclaredInputs, Entry,
-    Environment, Input, InputKind, Mode, ModuleInput, ModuleRole, OptionValue, Profile, Source,
-    Symbol, TargetRequest, sha256,
+    Backend, BackendPin, BuildRequest, CHECK_TARGET_CAPABILITY, DeclaredInputs, Entry, Environment,
+    Input, InputKind, Mode, ModuleInput, ModuleRole, OptionValue, Profile, Source, Symbol,
+    TargetRequest, sha256,
 };
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir;
