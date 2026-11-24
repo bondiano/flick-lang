@@ -1,4 +1,4 @@
-module Edges exposing (main, in_a_test)
+module Main exposing (main, in_a_test)
 
 opaque type alias UserId = String
   deriving Eq

@@ -1,4 +1,4 @@
-module LoadView exposing (load_view)
+module Main exposing (load_view)
 
 opaque type alias UserId = String
 

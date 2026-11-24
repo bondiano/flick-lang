@@ -1,6 +1,8 @@
 ---
 import "../styles/custom.css";
 import "../styles/landing.css";
+import "../styles/stations.css";
+import "../styles/hover.css";
 import Header from "./Header.astro";
 import ThemeInit from "./ThemeInit.astro";
 import Brand from "./Brand.astro";
@@ -8,7 +10,14 @@ import Icon from "./Icon.astro";
 import HeroMap from "./HeroMap.astro";
 import ServedMap from "./ServedMap.astro";
 import RouteBend from "./RouteBend.astro";
-import { highlight, shown } from "./highlight.ts";
+import Sample from "./landing/Sample.astro";
+import Language from "./landing/Language.astro";
+import Plugins from "./landing/Plugins.astro";
+import Targets from "./landing/Targets.astro";
+import Contracts from "./landing/Contracts.astro";
+import Depot from "./landing/Depot.astro";
+import { inlineCode, texts } from "./landing/copy.ts";
+import { highlight, sampleSources, shown } from "./highlight.ts";
 import { runPromise } from "@flick-lang/runtime/rt";
 import { uiRenderStatic } from "@flick-lang/runtime/rt/ui/react";
 import type { Ui } from "@flick-lang/runtime/ui/react/nodes";
@@ -20,15 +29,13 @@ const ru = locale === "ru";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const origin = Astro.site?.origin ?? "";
 const prefix = `${base}${ru ? "/ru" : ""}`;
-const text = (en: string, russian: string) => ru ? russian : en;
+const text = texts(locale);
 const title = text("Flick — Functions that do what they say", "Flick — функции делают то, что говорят");
 const description = text("Flick is a language for whole apps, where every function does what it says. It compiles to JavaScript and Go. Try it in your browser.", "Flick — один язык для всего приложения. Компилятор проверяет соответствие функций их сигнатурам. Компилируется в JavaScript и Go. Попробуйте прямо в браузере.");
 const heroHtml = renderToString(uiRenderStatic(await runPromise<Ui>(() => initial_view(ru))));
 
 const repository = "https://github.com/bondiano/flick-lang";
 const [loadView] = shown("load_view");
-const [edgeMain, edgeTest] = shown("edges");
-const [lookup] = shown("lookup");
 const signatureLine = (loadView ?? "").split("\n").findIndex((line) => line.startsWith("load_view :")) + 1;
 
 const legend = [
@@ -36,7 +43,6 @@ const legend = [
   { line: "fails", names: [["NotFound", "fails"]], body: text("How it can fail. Handle it with `try`, or it stays in the caller's signature.", "Как она может упасть. Обработайте ошибку через `try`, иначе она останется в сигнатуре вызывающей функции.") },
   { line: "returns", names: [["UserView", "returns"]], body: text("What it returns. The body gets there with plain calls: no `yield`, no `flatMap`.", "Что она возвращает. Результат вычисляется обычными вызовами функций, без `yield` и `flatMap`.") },
 ];
-const inlineCode = (value: string) => value.replace(/`([^`]+)`/g, "<code>$1</code>");
 
 const signatures = [
   {
@@ -51,30 +57,19 @@ const signatures = [
   },
   {
     name: "Flick",
-    code: highlight("load_view : UserId ->{Users, Log; NotFound} UserView\nlet load_view id =\n  let user = Users.get id\n  Log.info (\"Loaded \" ++ user.name)\n  to_view user", "flick", 1),
+    sample: "compare",
     verdict: text("Says all of it, and the body is plain calls. The price is a new language and a smaller ecosystem.", "Описывает результат, зависимости и ошибки, а реализация состоит из обычных вызовов. Но придётся освоить новый язык с меньшей экосистемой."),
   },
 ];
 
-// Stations on main, for the next release; the track beyond them is planned.
-const built = [
-  { title: text("The host in the signature", "Хост в сигнатуре"), body: text("The console, the clock, randomness, the environment, the arguments and child processes are `Host` services. The signature names them, and a test swaps them like any other.", "Консоль, часы, случайные числа, окружение, аргументы и дочерние процессы — сервисы `Host`. Сигнатура их называет, а тест подменяет, как любой другой сервис.") },
-  { title: text("A runtime of its own", "Свой рантайм"), body: text("Effects run on a small runtime of Flick's own, on JavaScript and Go alike. Effect is a package that only some bindings still need.", "Эффекты работают на собственном небольшом рантайме Flick и в JavaScript, и в Go. Effect стал пакетом, который нужен лишь части привязок.") },
-  { title: text("Loops and local state", "Циклы и локальное состояние"), body: text("`let mut`, `loop` and `while`, with labels for `break` and `continue`. A function that changes its own variables stays pure from the outside.", "`let mut`, `loop` и `while`, с метками для `break` и `continue`. Функция, которая меняет свои переменные, снаружи остаётся чистой.") },
-  { title: text("A small core", "Маленькое ядро"), body: text("The compiler keeps types, effects and regions. The standard library is a package, its blocks come from its plugin, and the JavaScript and Go backends are components.", "В компиляторе остались типы, эффекты и регионы. Стандартная библиотека — пакет, её блоки даёт её плагин, а бэкенды JavaScript и Go — компоненты.") },
-];
-const next = [
-  { title: text("Effect only by choice", "Effect только по выбору"), body: text("Streams, the command line and the rest of HTTP and RPC move to Flick's runtime, so a program needs the Effect adapter only when it asks for it.", "Потоки, командная строка и остальная часть HTTP и RPC переходят на рантайм Flick, и адаптер Effect нужен программе, только если она сама его выбрала.") },
-  { title: "WebAssembly", body: text("A third target: command-line programs and servers on WASI, Node, and the browser with `ui`.", "Третья цель: консольные программы и серверы на WASI, Node и браузер вместе с `ui`.") },
-];
-
 // The column each station stands in, in steps of 120 design pixels; the rail bends between them.
-const columns = { read: 0, three: 1, app: 2, unread: 1, proved: 2, host: 0, next: 0 };
+const columns = { read: 0, three: 1, language: 2, app: 1, plugins: 0, targets: 1, host: 2, unread: 1, contracts: 0, proved: 1, depot: 0 };
 type Stop = keyof typeof columns;
 const order = Object.keys(columns) as Stop[];
 const from = (stop: Stop) => columns[order[Math.max(0, order.indexOf(stop) - 1)]];
 const bendHeight = (stop: Stop) => columns[stop] === from(stop) ? 0 : Math.abs(columns[stop] - from(stop)) * 120 + 32;
 const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(stop)}`;
+const station = (stop: Stop) => ({ style: place(stop), from: from(stop), to: columns[stop] });
 ---
 <!doctype html>
 <html lang={locale} data-theme="light">
@@ -129,7 +124,10 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
           <h2 id="read-title">{text("Read the signature", "Прочитайте сигнатуру")}</h2>
           <p class="stop-lead" set:html={inlineCode(text("Every named function has one, right above its `let`. It is the whole contract: what the function takes, what it needs, how it can fail and what it returns.", "Она есть у каждой именованной функции, прямо над `let`. Это весь контракт: что функция принимает, что ей нужно, как она может упасть и что возвращает."))} />
           <div class="read-grid">
-            <div class="code-panel" set:html={highlight(loadView ?? "", "flick", signatureLine)} />
+            <div class="read-code">
+              <Sample name="load_view" focus={signatureLine} />
+              <p class="hover-hint" hidden>{text("Point at a name, or tap it: the compiler, loaded in your browser, says what it is.", "Наведите курсор на имя или коснитесь его — компилятор, загруженный в браузер, подскажет, что это.")}</p>
+            </div>
             <dl class="legend">
               {legend.map(({ line, names, body }) => <div class={`legend-${line}`}>
                 <dt>{names.map(([name, colour]) => <code class={`chip chip-${colour}`}>{name}</code>)}</dt>
@@ -142,11 +140,11 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
           <div class="edge-grid">
             <div class="edge">
               <ServedMap serves="provide live_users, live_log" handled={true} />
-              <div class="code-panel" set:html={highlight(edgeMain ?? "", "flick")} />
+              <Sample name="edges" />
             </div>
             <div class="edge">
               <ServedMap serves="provide test_users, test_log" handled={false} note={text("NotFound stays in the signature", "NotFound остаётся в сигнатуре")} />
-              <div class="code-panel" set:html={highlight(edgeTest ?? "", "flick")} />
+              <Sample name="edges" part={1} />
             </div>
           </div>
         </section>
@@ -155,13 +153,15 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
           <RouteBend from={from("three")} to={columns.three} />
           <h2 id="three-title">{text("One function, three signatures", "Одна функция, три сигнатуры")}</h2>
           <div class="compare">
-            {signatures.map(({ name, code, verdict }) => <article>
+            {signatures.map(({ name, code, sample, verdict }) => <article>
               <h3>{name}</h3>
-              <div class="code-panel" set:html={code} />
+              {sample === undefined ? <div class="code-panel" set:html={code} /> : <Sample name={sample} focus={1} />}
               <p set:html={inlineCode(verdict)} />
             </article>)}
           </div>
         </section>
+
+        <Language locale={locale} {...station("language")} />
 
         <section class="stop" style={place("app")} aria-labelledby="app-title">
           <RouteBend from={from("app")} to={columns.app} />
@@ -194,6 +194,21 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
           <a class="stop-link" href={`${repository}/tree/main/examples/conduit`}>{text("Read the Conduit example", "Посмотреть пример Conduit")} <Icon name="arrow" size={18} /></a>
         </section>
 
+        <Plugins locale={locale} prefix={prefix} {...station("plugins")} />
+        <Targets locale={locale} prefix={prefix} {...station("targets")} />
+
+        <section class="stop" style={place("host")} aria-labelledby="host-title">
+          <RouteBend from={from("host")} to={columns.host} />
+          <h2 id="host-title">{text("Use the host, don't rewrite it", "Используйте библиотеки хоста")}</h2>
+          <div class="split">
+            <div class="split-text">
+              <p class="stop-lead" set:html={inlineCode(text("`flick ffi import <package>` reads an npm package's `.d.ts` and writes the bindings, with a report on every export. The compiler takes a binding's signature on trust, so `flick ffi check` tells you when the declarations change.", "`flick ffi import <package>` читает `.d.ts` пакета npm и пишет привязки, с отчётом по каждому экспорту. Сигнатуру привязки компилятор принимает на веру, поэтому `flick ffi check` сообщает, когда объявления меняются."))} />
+              <p class="stop-text" set:html={inlineCode(text("In the other direction, `flick build --emit-dts` writes TypeScript declarations of Flick modules. On Go, bindings are written by hand for now.", "В обратную сторону `flick build --emit-dts` пишет объявления TypeScript для модулей Flick. В Go привязки пока пишутся вручную."))} />
+            </div>
+            <Sample name="lookup" />
+          </div>
+        </section>
+
         <section class="stop" style={place("unread")} aria-labelledby="unread-title">
           <RouteBend from={from("unread")} to={columns.unread} />
           <h2 id="unread-title">{text("For code you didn't write", "Для кода, который писали не вы")}</h2>
@@ -209,6 +224,8 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
             </div>
           </div>
         </section>
+
+        <Contracts locale={locale} prefix={prefix} {...station("contracts")} />
 
         <section class="stop" style={place("proved")} aria-labelledby="proved-title">
           <RouteBend from={from("proved")} to={columns.proved} />
@@ -228,41 +245,8 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
           <a class="stop-link" href={`${repository}/blob/main/formal/README.md`}>{text("What exactly is proved", "Что именно доказано")} <Icon name="arrow" size={18} /></a>
         </section>
 
-        <section class="stop" style={place("host")} aria-labelledby="host-title">
-          <RouteBend from={from("host")} to={columns.host} />
-          <h2 id="host-title">{text("Use the host, don't rewrite it", "Используйте библиотеки хоста")}</h2>
-          <div class="split">
-            <div class="split-text">
-              <p class="stop-lead" set:html={inlineCode(text("`flick ffi import <package>` reads an npm package's `.d.ts` and writes the bindings, with a report on every export. The compiler takes a binding's signature on trust, so `flick ffi check` tells you when the declarations change.", "`flick ffi import <package>` читает `.d.ts` пакета npm и пишет привязки, с отчётом по каждому экспорту. Сигнатуру привязки компилятор принимает на веру, поэтому `flick ffi check` сообщает, когда объявления меняются."))} />
-              <p class="stop-text" set:html={inlineCode(text("In the other direction, `flick build --emit-dts` writes TypeScript declarations of Flick modules. On Go, bindings are written by hand for now.", "В обратную сторону `flick build --emit-dts` пишет объявления TypeScript для модулей Flick. В Go привязки пока пишутся вручную."))} />
-            </div>
-            <div class="code-panel" set:html={highlight(lookup ?? "", "flick")} />
-          </div>
-        </section>
 
-        <section class="stop stop-next" style={place("next")} aria-labelledby="next-title">
-          <RouteBend from={from("next")} to={columns.next} />
-          <div class="next-built">
-            <h2 id="next-title">{text("Where it's going", "Куда движется Flick")}</h2>
-            <p class="stop-lead">{text("Flick is in alpha, at version 0.1: before 1.0 a minor release may break programs. The first four stations are on main and ship in 0.2; the last two are still ahead.", "Flick в альфе, версия 0.1: до 1.0 минорный релиз может сломать программы. Первые четыре станции уже в main и войдут в версию 0.2, последние две ещё впереди.")}</p>
-            <ol class="next-stops">
-              {built.map(({ title, body }) => <li>
-                <h3>{title}</h3>
-                <p set:html={inlineCode(body)} />
-              </li>)}
-            </ol>
-          </div>
-          <ol class="next-stops">
-            {next.map(({ title, body }) => <li>
-              <h3>{title}</h3>
-              <p set:html={inlineCode(body)} />
-            </li>)}
-          </ol>
-          <div class="hero-actions">
-            <a class="action action-primary" href={`${prefix}/start/getting-started/`}>{text("Get started", "Начать")} <Icon name="arrow" size={20} /></a>
-            <a class="action" href={`${prefix}/start/why/`}>{text("Why Flick, in full", "Зачем Flick, подробно")}</a>
-          </div>
-        </section>
+        <Depot locale={locale} prefix={prefix} repository={repository} {...station("depot")} />
       </div>
     </main>
     <footer class="home-footer">
@@ -270,10 +254,13 @@ const place = (stop: Stop) => `--shift: ${columns[stop]}; --bend: ${bendHeight(s
       <p>{text("A language for whole apps.", "Один язык для всего приложения.")}</p>
       <a href={repository}><Icon name="github" /> GitHub</a>
     </footer>
+    <script type="application/json" id="flick-samples" set:html={sampleSources()} />
     <script>
       import { run } from "@flick-lang/runtime/rt/runner/browser";
       import { main } from "../widgets/Hero.fl";
+      import { watch } from "../widgets/code-hover.ts";
       void run(main);
+      watch();
     </script>
   </body>
 </html>

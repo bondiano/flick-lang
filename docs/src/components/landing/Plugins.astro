@@ -1,0 +1,34 @@
+---
+// Syntax plugins: the standard library's blocks, and a package's own, under the project's grants.
+import RouteBend from "../RouteBend.astro";
+import Icon from "../Icon.astro";
+import Sample from "./Sample.astro";
+import { highlight } from "../highlight.ts";
+import { inlineCode, texts } from "./copy.ts";
+
+interface Props { locale: string; prefix: string; style: string; from: number; to: number }
+const { locale, prefix, style, from, to } = Astro.props;
+const text = texts(locale);
+
+const manifest = text(
+  "# protos/flick.toml: a library with a block\n[package]\nname = \"protos\"\nversion = \"0.1.0\"\nplugin = \"protos.wasm\"\nload = [\"proto\"]\n\n# the app's flick.toml: what it may reach\n[plugins.protos]\nfs-read = [\"schema/\"]\nnet = [\"registry.example.com\"]\n\n[plugins.std]\ndisable = [\"sql\"]",
+  "# protos/flick.toml: библиотека с блоком\n[package]\nname = \"protos\"\nversion = \"0.1.0\"\nplugin = \"protos.wasm\"\nload = [\"proto\"]\n\n# flick.toml приложения: что ей можно\n[plugins.protos]\nfs-read = [\"schema/\"]\nnet = [\"registry.example.com\"]\n\n[plugins.std]\ndisable = [\"sql\"]",
+);
+---
+<section class="stop" style={style} aria-labelledby="plugins-title">
+  <RouteBend from={from} to={to} />
+  <h2 id="plugins-title">{text("A compiler made of plugins", "Компилятор из плагинов")} <span class="stop-new">{text("New in 0.2", "Новое в 0.2")}</span></h2>
+  <p class="stop-lead" set:html={inlineCode(text("The compiler itself keeps types, effects and regions. `sql`, `ui`, `cli`, `server`, `codec`, `component`, `refined` and `test` are blocks of the standard library's plugin, and a package of yours adds a block the same way.", "В самом компиляторе остались типы, эффекты и регионы. `sql`, `ui`, `cli`, `server`, `codec`, `component`, `refined` и `test` — блоки плагина стандартной библиотеки, и ваш пакет добавляет свой блок точно так же."))} />
+  <div class="split">
+    <div class="split-text">
+      <Sample name="plugins" />
+      <p class="stop-text" set:html={inlineCode(text("A block expands into Flick code, and the compiler checks that code like any other, so errors and hovers land on what you wrote: point at `loud`.", "Блок разворачивается в код на Flick, и компилятор проверяет его как любой другой, поэтому ошибки и подсказки указывают на то, что написали вы: наведите курсор на `loud`."))} />
+    </div>
+    <div class="code-panel" set:html={highlight(manifest, "toml")} />
+  </div>
+  <p class="stop-text" set:html={inlineCode(text("A plugin is a WebAssembly component. It runs on a budget of fuel and 64 MiB of memory, and reaches no file, host or variable the project has not granted. Besides expanding blocks, it can check calls, rewrite the IR or the files a build writes, and turn files of other languages, such as `.proto`, into modules. Editors ask it for completion and hovers inside its blocks.", "Плагин — компонент WebAssembly. Он работает с ограниченным бюджетом шагов и 64 МиБ памяти и не видит ни файлов, ни сетевых адресов, ни переменных окружения, которые проект ему не разрешил. Кроме разворачивания блоков, плагин может проверять вызовы, переписывать IR или файлы, которые пишет сборка, и превращать в модули файлы других языков, например `.proto`. Редакторы спрашивают у него автодополнение и подсказки внутри его блоков."))} />
+  <div class="stop-links">
+    <a class="stop-link" href={`${prefix}/reference/plugins/`}>{text("How plugins work", "Как устроены плагины")} <Icon name="arrow" size={18} /></a>
+    <a class="stop-link" href={`${prefix}/handbook/typed-dsl/`}>{text("Write a block of your own", "Написать свой блок")} <Icon name="arrow" size={18} /></a>
+  </div>
+</section>

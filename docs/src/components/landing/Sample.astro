@@ -1,0 +1,11 @@
+---
+// A part of a checked sample, highlighted at build time; `data-sample` and `data-offset` let
+// `widgets/code-hover.ts` ask the browser compiler about it in the whole file.
+import { highlight, sample } from "../highlight.ts";
+
+interface Props { name: string; part?: number; focus?: number }
+const { name, part = 0, focus } = Astro.props;
+const shown = sample(name)[part];
+if (shown === undefined) throw new Error(`The sample ${name} has no part ${part}`);
+---
+<div class="code-panel" data-sample={name} data-offset={shown.offset} set:html={highlight(shown.text, "flick", focus)} />

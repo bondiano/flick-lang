@@ -1,0 +1,27 @@
+---
+// Function contracts and refined types, from the checked sample `contracts.fl`; the answer of
+// `flick prove` below is what it reports when `ensure` says `available + 1`.
+import RouteBend from "../RouteBend.astro";
+import Icon from "../Icon.astro";
+import Sample from "./Sample.astro";
+import { inlineCode, texts } from "./copy.ts";
+
+interface Props { locale: string; prefix: string; style: string; from: number; to: number }
+const { locale, prefix, style, from, to } = Astro.props;
+const text = texts(locale);
+---
+<section class="stop" style={style} aria-labelledby="contracts-title">
+  <RouteBend from={from} to={to} />
+  <h2 id="contracts-title">{text("Contracts the compiler proves", "Контракты, которые доказывает компилятор")} <span class="stop-new">{text("New in 0.2", "Новое в 0.2")}</span></h2>
+  <p class="stop-lead" set:html={inlineCode(text("`require` and `ensure` say what a function expects and what it promises. Every build checks their types, and `flick prove` proves them for pure code over integers and data, or answers with a counterexample.", "`require` и `ensure` говорят, что функция ожидает и что обещает. Каждая сборка проверяет их типы, а `flick prove` доказывает их для чистого кода над целыми числами и данными или отвечает контрпримером."))} />
+  <div class="split">
+    <Sample name="contracts" />
+    <div class="sign-panel sign-output">
+      <p class="sign-caption" set:html={inlineCode(text("If `ensure` said `available + 1`", "Если бы в `ensure` было `available + 1`"))} />
+      <p><span class="sign-fails">error[FLICK-T087]</span>: the postcondition of `consume` is not established, e.g. when `available = 0, used = 0`</p>
+    </div>
+  </div>
+  <p class="stop-text" set:html={inlineCode(text("A refined type carries its check. `Port.prove n` makes a `Port` with no check at run time where the compiler proves it from the path, here from the `if` around it. Where it cannot, that is a compile error, such as `FLICK-T077`.", "Уточнённый тип несёт свою проверку. `Port.prove n` создаёт `Port` без проверки во время работы, если компилятор доказывает условие по пути выполнения — здесь по окружающему `if`. Если доказать не удаётся, это ошибка компиляции, например `FLICK-T077`."))} />
+  <Sample name="contracts" part={1} />
+  <a class="stop-link" href={`${prefix}/reference/proofs/`}>{text("Proofs and flick prove", "Доказательства и flick prove")} <Icon name="arrow" size={18} /></a>
+</section>

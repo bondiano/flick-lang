@@ -1,0 +1,42 @@
+/* The stations added for 0.2 and the yard at the end of the rail; the rail itself is in landing.css. */
+.stop-new { display: inline-block; margin-left: 0.4rem; padding: 0.3em 0.55em 0.15em; background: var(--flick-line-amber); color: #0e1116; font-size: 0.32em; font-weight: 700; line-height: 1; letter-spacing: 0.02em; vertical-align: middle; white-space: nowrap; }
+.stop-links { display: flex; flex-wrap: wrap; gap: 0 1.75rem; }
+.read-code { display: grid; gap: 0.6rem; min-width: 0; }
+.hover-hint { font-size: 0.95rem; line-height: 1.4; color: var(--sl-color-gray-2); }
+
+.tiles { display: grid; gap: 2rem 2.5rem; }
+.tiles article { display: grid; gap: 0.5rem; align-content: start; min-width: 0; }
+.tiles h3 { margin: 0; font-size: 1.2rem; }
+.tiles p { max-width: 36rem; font-size: 1.0625rem; line-height: 1.5; }
+@media (min-width: 64rem) {
+  .tiles { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+/* The yard. The head lays the violet rail down to the tracks; below the desktop layout the cards
+   stand on the rail itself, so the line takes each section's colour in turn and ends at the last. */
+.stop-depot::before { display: none; }
+.depot-head { position: relative; display: grid; gap: 1.25rem; }
+.depot-head::before { content: ''; position: absolute; top: calc(var(--rail-top) - var(--pad-top)); bottom: -1.25rem; left: calc(var(--rail-x) - var(--pad-left) - var(--rail) / 2); width: var(--rail); background: var(--flick-line-violet); }
+.depot-map { display: none; }
+.depot-map path { fill: none; stroke: var(--line); stroke-width: var(--rail); stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.depot-cards { display: grid; margin: 0 0 0 calc(var(--rail-x) - var(--pad-left) - var(--rail) / 2); padding: 0; list-style: none; }
+.depot-cards li { position: relative; border-left: var(--rail) solid var(--line); padding: 0.45rem 0 1.4rem calc(var(--pad-left) - var(--rail-x) - var(--rail) / 2); }
+.depot-cards li::before { content: ''; position: absolute; top: 0.95rem; left: calc(var(--rail) / -2); translate: -50% -50%; width: 1.15rem; height: 1.15rem; border: 4px solid var(--line); border-radius: 50%; background: var(--sl-color-bg); }
+.depot-cards a { display: grid; gap: 0.25rem; max-width: 36rem; color: var(--sl-color-gray-2); text-decoration: none; }
+.depot-name { display: inline-flex; align-items: center; gap: 0.45rem; color: var(--sl-color-white); font-size: 1.35rem; font-weight: 800; line-height: 1.2; }
+.depot-body { font-size: 1.0625rem; line-height: 1.45; }
+.depot-cards a:hover .depot-name { color: var(--sl-color-accent-high); text-decoration: underline; }
+.depot-head a { color: var(--sl-color-text-accent); }
+.stop-depot .hero-actions { margin-top: 0.5rem; }
+
+/* Desktop: the tracks leave the rail one by one and run down into a row of cards, each card's
+   edge the end of its track. Both are measured in design pixels, a track every 256. */
+@media (min-width: 75rem) {
+  .stop-depot { max-width: calc(var(--u) * 1296); }
+  .depot-map { display: block; width: calc(var(--u) * (var(--width) + 48)); height: auto; margin-left: calc(var(--rail-x) - var(--pad-left) - var(--u) * 24); overflow: visible; }
+  .depot-cards { grid-template-columns: repeat(5, calc(var(--u) * 232)); column-gap: calc(var(--u) * 24); margin-top: -1.25rem; }
+  .depot-cards li { padding: 1rem 0 0.25rem 1rem; }
+  .depot-cards li::before { display: none; }
+  .depot-name { font-size: 1.25rem; }
+  .depot-body { font-size: 1rem; }
+}

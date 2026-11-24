@@ -1,0 +1,36 @@
+/* What the compiler says on hover, in the playground's editor and on the landing page's panels. */
+.fp-hover :is(p, pre, ul, ol, blockquote, h1, h2, h3, h4, h5, h6) { margin: 0; }
+.fp-hover > * + * { margin-top: 0.625rem; }
+.fp-hover :is(pre, code) { font-family: var(--__sl-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: inherit; }
+.fp-hover pre { padding: 0; background: transparent; color: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fp-hover :not(pre) > code { padding: 0.08em 0.25em; background: var(--fp-surface); }
+.fp-hover :is(ul, ol) { padding-left: 1.25rem; }
+.fp-hover li + li { margin-top: 0.25rem; }
+.fp-hover blockquote { padding-left: 0.75rem; border-left: 1px solid var(--fp-rule); color: var(--sl-color-gray-2); }
+.fp-hover :is(h1, h2, h3, h4, h5, h6) { font-size: 1em; font-weight: 600; }
+.fp-hover a { color: var(--sl-color-text-accent); text-decoration: underline; text-underline-offset: 0.15em; }
+:is(.fp, .fp-hover) .fp-token-comment { color: var(--sl-color-gray-3); }
+:is(.fp, .fp-hover) .fp-token-keyword { color: var(--sl-color-accent-high); }
+:is(.fp, .fp-hover) .fp-token-string { color: var(--flick-success); }
+:is(.fp, .fp-hover) .fp-token-invalid { color: var(--flick-error); }
+:is(.fp, .fp-hover) .fp-token-needs { color: var(--flick-line-cobalt); }
+:is(.fp, .fp-hover) .fp-token-fails { color: var(--flick-line-coral-ink); }
+
+/* The landing page's tooltip: one for the page, placed by widgets/code-hover.ts. */
+.code-hover {
+  --fp-surface: color-mix(in srgb, var(--sl-color-gray-6) 45%, var(--sl-color-bg));
+  --fp-rule: var(--sl-color-gray-5);
+  position: absolute;
+  z-index: 20;
+  max-width: min(60ch, calc(100vw - 16px));
+  max-height: min(32rem, 70dvh);
+  overflow: auto;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--sl-color-gray-4);
+  background: var(--sl-color-bg);
+  color: var(--sl-color-white);
+  box-shadow: 0 6px 18px #0e111626;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.code-hover[hidden] { display: none; }
