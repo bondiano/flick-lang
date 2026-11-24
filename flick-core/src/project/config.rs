@@ -195,6 +195,8 @@ pub struct Config {
     pub allow: Vec<Code>,
     /// `[lint] no-let-assert`: every `let assert` is an error.
     pub no_let_assert: bool,
+    /// `[lint] unused-proof-premises`: warn about unused premises of checked proofs.
+    pub unused_proof_premises: bool,
     /// `[lint] max-function-lines`, `max-nesting`, `max-complexity`,
     /// `max-params`.
     pub thresholds: Thresholds,
@@ -364,6 +366,7 @@ impl Default for Config {
             sql_dialect: "",
             allow: Vec::new(),
             no_let_assert: false,
+            unused_proof_premises: false,
             thresholds: Thresholds::default(),
             #[cfg(feature = "native-project")]
             plugins: BTreeMap::new(),

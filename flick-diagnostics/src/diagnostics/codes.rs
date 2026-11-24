@@ -163,6 +163,8 @@ codes! {
     T088 = Types 88, "a call's precondition is not established";
     T089 = Types 89, "an `Int` operation may leave the range of `Int`";
     T090 = Types 90, "a proof step requires an equality between different sides";
+    T091 = Types 91, "two applications of `symm` leave the same equation";
+    T092 = Types 92, "an unused premise of a checked proof";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

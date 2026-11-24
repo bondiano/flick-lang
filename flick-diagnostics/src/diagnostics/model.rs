@@ -77,6 +77,7 @@ impl Diagnostic {
             codes::R014,
             codes::R020,
             codes::T059,
+            codes::T092,
         ]
         .contains(&self.code)
     }

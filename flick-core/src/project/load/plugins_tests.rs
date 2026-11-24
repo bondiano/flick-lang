@@ -202,6 +202,7 @@ fn library(sources: &mut SourceMap) -> Project {
             sql_dialect: Default::default(),
             allow: Vec::new(),
             no_let_assert: false,
+            unused_proof_premises: false,
             thresholds: Thresholds::default(),
             plugins: BTreeMap::new(),
             tools: BTreeMap::new(),

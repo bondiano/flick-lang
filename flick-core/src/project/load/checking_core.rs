@@ -380,6 +380,8 @@ impl Checking<'_> {
                     &module, &typing, &run,
                     #[cfg(not(target_arch = "wasm32"))]
                     evidence.take(),
+                    #[cfg(not(target_arch = "wasm32"))]
+                    self.project.is_some_and(|p| p.config.unused_proof_premises),
                 );
                 diagnostics.extend(found);
                 proofs = proven;

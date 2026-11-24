@@ -22,6 +22,8 @@ use flick_ir::{Dict, InstanceInfo};
 mod bundles;
 #[cfg(not(target_arch = "wasm32"))]
 mod evidence;
+#[cfg(not(target_arch = "wasm32"))]
+mod lints;
 #[cfg(test)]
 mod replay;
 
@@ -212,6 +214,7 @@ pub fn check_proofs(
     typing: &Typing,
     run: &Run,
     #[cfg(not(target_arch = "wasm32"))] evidence: Option<&mut Vec<ProofEvidence>>,
+    #[cfg(not(target_arch = "wasm32"))] unused_premises: bool,
 ) -> (Vec<Diagnostic>, Vec<Proven>) {
     if typing.proofs.is_empty() && typing.laws.is_empty() {
         return (Vec::new(), Vec::new());
@@ -232,6 +235,8 @@ pub fn check_proofs(
     let of = |m: &str, c: &str| class_laws(run, module.name, &laws, m, c);
     #[cfg(not(target_arch = "wasm32"))]
     let mut evidence = evidence.map(|out| evidence::Recording::new(module, run, &mut lemmas, out));
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut lints = lints::Lints::new(module, typing, unused_premises);
     let diagnostics = prove_each(
         &proofs,
         &program,
@@ -239,6 +244,8 @@ pub fn check_proofs(
         Some(&of),
         #[cfg(not(target_arch = "wasm32"))]
         evidence.as_mut(),
+        #[cfg(not(target_arch = "wasm32"))]
+        Some(&mut lints),
     );
     proofs.extend(laws);
     (diagnostics, proofs)
@@ -378,6 +385,7 @@ fn prove_each(
     lemmas: &mut Vec<logic::Lemma>,
     laws: Option<bundles::Laws<'_, '_>>,
     #[cfg(not(target_arch = "wasm32"))] mut recording: Option<&mut evidence::Recording<'_>>,
+    #[cfg(not(target_arch = "wasm32"))] mut lints: Option<&mut lints::Lints<'_>>,
 ) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for proven in proofs {
@@ -394,7 +402,7 @@ fn prove_each(
         if let GoalType::Lawful(bundle) = &info.goal {
             // A bundle is no lemma: an importer has nothing to replay of it.
             if let Some(laws) = laws {
-                out.extend(bundles::check_bundle(
+                let found = bundles::check_bundle(
                     proven,
                     bundle,
                     laws,
@@ -402,7 +410,14 @@ fn prove_each(
                     lemmas,
                     #[cfg(not(target_arch = "wasm32"))]
                     candidate_scope,
-                ));
+                );
+                #[cfg(not(target_arch = "wasm32"))]
+                if found.is_empty()
+                    && let Some(lints) = &mut lints
+                {
+                    lints.premises(lowered.at, &mut out);
+                }
+                out.extend(found);
             }
         } else {
             let checked = verify(
@@ -413,6 +428,11 @@ fn prove_each(
                 #[cfg(not(target_arch = "wasm32"))]
                 candidate_scope,
             );
+            #[cfg(not(target_arch = "wasm32"))]
+            if let (Some(lints), Ok(verified)) = (&mut lints, &checked) {
+                lints.premises(lowered.at, &mut out);
+                lints.steps(&verified.certificate, &mut out);
+            }
             if let Some(failure) = save_lemma(checked, lowered, lemmas) {
                 out.push(
                     failure
@@ -429,6 +449,12 @@ fn prove_each(
     out
 }
 
+struct Verified {
+    statement: logic::Statement,
+    #[cfg(not(target_arch = "wasm32"))]
+    certificate: logic::Cert,
+}
+
 fn verify(
     lowered: &LoweredProof,
     info: &ProofInfo,
@@ -438,7 +464,7 @@ fn verify(
         &mut ProofEvidence,
         &logic::LemmaAliases,
     )>,
-) -> Result<logic::Statement, Failure> {
+) -> Result<Verified, Failure> {
     let checked = statement(lowered, info).and_then(|statement| {
         let body = lowered.body.as_ref().ok_or_else(|| {
             Failure::Refused(logic::Refused {
@@ -464,7 +490,11 @@ fn verify(
         }
         #[cfg(target_arch = "wasm32")]
         logic::prove(&statement, &cert, &info.data, program, lemmas)?;
-        Ok(statement)
+        Ok(Verified {
+            statement,
+            #[cfg(not(target_arch = "wasm32"))]
+            certificate: cert,
+        })
     });
     #[cfg(not(target_arch = "wasm32"))]
     if let Some((evidence, aliases)) = evidence {
@@ -486,12 +516,12 @@ fn verify(
 }
 
 fn save_lemma(
-    checked: Result<logic::Statement, Failure>,
+    checked: Result<Verified, Failure>,
     lowered: &LoweredProof,
     lemmas: &mut Vec<logic::Lemma>,
 ) -> Option<Failure> {
     match checked {
-        Ok(statement) => {
+        Ok(Verified { statement, .. }) => {
             lemmas.push(logic::Lemma {
                 statement,
                 order: (lowered.params.iter())
@@ -541,6 +571,8 @@ fn replay_lemmas(modules: &[String], run: &Run, depth: u32) -> Vec<logic::Lemma>
             proofs,
             &program,
             &mut lemmas,
+            None,
+            #[cfg(not(target_arch = "wasm32"))]
             None,
             #[cfg(not(target_arch = "wasm32"))]
             None,
