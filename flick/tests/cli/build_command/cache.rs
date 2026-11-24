@@ -112,3 +112,43 @@ fn a_project_keeps_the_builds_stored_last() {
     assert!(flick_in(&dir, &["build"]).status.success());
     assert_eq!(written(&module), before);
 }
+
+/// In release, a module reads the fields of a projection another module
+/// exports where it uses it, from that module's body: the build cache keys
+/// on every source, so an edit of that body alone, its type the same,
+/// builds the module that inlined it again.
+#[test]
+fn an_edited_projection_builds_again_the_module_that_inlined_it() {
+    let lib = |label: &str| {
+        format!(
+            "module App.Lib exposing (User, get)\n\n\
+             type alias User = {{ name : String; nick : String }}\n\n\
+             get : User -> String\nlet get = .{label}\n"
+        )
+    };
+    let main = "module App.Main exposing (main)\n\n\
+        import App.Lib exposing (User)\n\n\
+        main : Unit ->{Host.Arguments, Host.Console; AppError} Unit\n\
+        let main () =\n  \
+        let users = List.map (fun a -> { name = a; nick = a ++ \"!\" }) (Platform.args ())\n  \
+        Platform.stdout_line (show (List.map App.Lib.get users))\n";
+    let dir = project(
+        "build_projection",
+        &[
+            ("flick.toml", APP),
+            ("src/App/Lib.fl", &lib("name")),
+            ("src/App/Main.fl", main),
+        ],
+    );
+    let built = |dir: &Path| {
+        let out = flick_in(dir, &["build", "--profile", "release"]);
+        assert!(out.status.success(), "{out:?}");
+        fs::read_to_string(dir.join("dist/App/Main.js")).expect("the module")
+    };
+    let read = |js: &str, label: &str| js.contains(&format!(".{label});"));
+    let before = built(&dir);
+    assert!(read(&before, "name") && !before.contains("get"), "{before}");
+    fs::write(dir.join("src/App/Lib.fl"), lib("nick")).expect("an edit");
+    let after = built(&dir);
+    assert!(read(&after, "nick") && !read(&after, "name"), "{after}");
+}

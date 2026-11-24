@@ -7,6 +7,8 @@
 //!   instances it is called with, whose methods become operators;
 //! - [`inline`]: known full applications of small pure functions of the
 //!   module, and beta reduction;
+//! - [`project`]: a known projection, a path of field reads, applied or
+//!   mapped over a list by `List.map`, is its reads;
 //! - [`known`]: a function that chooses what it gives is inlined where that
 //!   spares an object, and a `match` goes to where its data is known, so a
 //!   value built only to be taken apart is not built;
@@ -38,6 +40,7 @@ mod known;
 mod lazy;
 #[cfg(feature = "native-project")]
 mod legacy_bare;
+mod project;
 mod specialize;
 mod sroa;
 pub mod tuple_match;
@@ -223,6 +226,7 @@ fn optimize_inner(
                     &mut fresh,
                     preserve_types,
                 );
+                project::projections(body, &module.name, &candidates, &foreign, lang, &mut fresh);
                 fuse::fuse(body, &mut fresh, lang);
                 lazy::hoist(body, &mut fresh, lang);
                 simplify_with(body, &arities, lang, preserve_types);

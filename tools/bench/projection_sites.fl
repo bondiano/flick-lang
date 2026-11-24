@@ -1,0 +1,300 @@
+// Many call sites of accessors: 64 functions, each mapping a path of
+// one to three fields over a list of 1 000 records and applying another
+// to one record, called 200 rounds.
+module App.Main exposing (main)
+
+type alias Address = { zip : Int; street : Int; city : Int; country : Int }
+
+type alias Place = { code : Int; floor : Int; door : Int; address : Address }
+
+type alias Row = { name : Int; place : Place }
+
+sum : List Int -> Int
+let sum xs = List.fold_left (fun acc x -> (acc + x) % 1000003) 0 xs
+
+site0 : List Row -> Row -> Int
+let site0 rows row = sum (List.map .name rows) + .place.code row + 0
+
+site1 : List Row -> Row -> Int
+let site1 rows row = sum (List.map .place.code rows) + .place.address.zip row + 1
+
+site2 : List Row -> Row -> Int
+let site2 rows row = sum (List.map .place.floor rows) + .place.address.country row + 2
+
+site3 : List Row -> Row -> Int
+let site3 rows row = sum (List.map .place.door rows) + .place.floor row + 3
+
+site4 : List Row -> Row -> Int
+let site4 rows row = sum (List.map .place.address.zip rows) + .place.address.street row + 4
+
+site5 : List Row -> Row -> Int
+let site5 rows row = sum (List.map .place.address.street rows) + .name row + 5
+
+site6 : List Row -> Row -> Int
+let site6 rows row = sum (List.map .place.address.city rows) + .place.door row + 6
+
+site7 : List Row -> Row -> Int
+let site7 rows row = sum (List.map .place.address.country rows) + .place.address.city row + 7
+
+site8 : List Row -> Row -> Int
+let site8 rows row = sum (List.map .name rows) + .place.code row + 8
+
+site9 : List Row -> Row -> Int
+let site9 rows row = sum (List.map .place.code rows) + .place.address.zip row + 9
+
+site10 : List Row -> Row -> Int
+let site10 rows row = sum (List.map .place.floor rows) + .place.address.country row + 10
+
+site11 : List Row -> Row -> Int
+let site11 rows row = sum (List.map .place.door rows) + .place.floor row + 11
+
+site12 : List Row -> Row -> Int
+let site12 rows row = sum (List.map .place.address.zip rows) + .place.address.street row + 12
+
+site13 : List Row -> Row -> Int
+let site13 rows row = sum (List.map .place.address.street rows) + .name row + 13
+
+site14 : List Row -> Row -> Int
+let site14 rows row = sum (List.map .place.address.city rows) + .place.door row + 14
+
+site15 : List Row -> Row -> Int
+let site15 rows row = sum (List.map .place.address.country rows) + .place.address.city row + 15
+
+site16 : List Row -> Row -> Int
+let site16 rows row = sum (List.map .name rows) + .place.code row + 16
+
+site17 : List Row -> Row -> Int
+let site17 rows row = sum (List.map .place.code rows) + .place.address.zip row + 17
+
+site18 : List Row -> Row -> Int
+let site18 rows row = sum (List.map .place.floor rows) + .place.address.country row + 18
+
+site19 : List Row -> Row -> Int
+let site19 rows row = sum (List.map .place.door rows) + .place.floor row + 19
+
+site20 : List Row -> Row -> Int
+let site20 rows row = sum (List.map .place.address.zip rows) + .place.address.street row + 20
+
+site21 : List Row -> Row -> Int
+let site21 rows row = sum (List.map .place.address.street rows) + .name row + 21
+
+site22 : List Row -> Row -> Int
+let site22 rows row = sum (List.map .place.address.city rows) + .place.door row + 22
+
+site23 : List Row -> Row -> Int
+let site23 rows row = sum (List.map .place.address.country rows) + .place.address.city row + 23
+
+site24 : List Row -> Row -> Int
+let site24 rows row = sum (List.map .name rows) + .place.code row + 24
+
+site25 : List Row -> Row -> Int
+let site25 rows row = sum (List.map .place.code rows) + .place.address.zip row + 25
+
+site26 : List Row -> Row -> Int
+let site26 rows row = sum (List.map .place.floor rows) + .place.address.country row + 26
+
+site27 : List Row -> Row -> Int
+let site27 rows row = sum (List.map .place.door rows) + .place.floor row + 27
+
+site28 : List Row -> Row -> Int
+let site28 rows row = sum (List.map .place.address.zip rows) + .place.address.street row + 28
+
+site29 : List Row -> Row -> Int
+let site29 rows row = sum (List.map .place.address.street rows) + .name row + 29
+
+site30 : List Row -> Row -> Int
+let site30 rows row = sum (List.map .place.address.city rows) + .place.door row + 30
+
+site31 : List Row -> Row -> Int
+let site31 rows row = sum (List.map .place.address.country rows) + .place.address.city row + 31
+
+site32 : List Row -> Row -> Int
+let site32 rows row = sum (List.map .name rows) + .place.code row + 32
+
+site33 : List Row -> Row -> Int
+let site33 rows row = sum (List.map .place.code rows) + .place.address.zip row + 33
+
+site34 : List Row -> Row -> Int
+let site34 rows row = sum (List.map .place.floor rows) + .place.address.country row + 34
+
+site35 : List Row -> Row -> Int
+let site35 rows row = sum (List.map .place.door rows) + .place.floor row + 35
+
+site36 : List Row -> Row -> Int
+let site36 rows row = sum (List.map .place.address.zip rows) + .place.address.street row + 36
+
+site37 : List Row -> Row -> Int
+let site37 rows row = sum (List.map .place.address.street rows) + .name row + 37
+
+site38 : List Row -> Row -> Int
+let site38 rows row = sum (List.map .place.address.city rows) + .place.door row + 38
+
+site39 : List Row -> Row -> Int
+let site39 rows row = sum (List.map .place.address.country rows) + .place.address.city row + 39
+
+site40 : List Row -> Row -> Int
+let site40 rows row = sum (List.map .name rows) + .place.code row + 40
+
+site41 : List Row -> Row -> Int
+let site41 rows row = sum (List.map .place.code rows) + .place.address.zip row + 41
+
+site42 : List Row -> Row -> Int
+let site42 rows row = sum (List.map .place.floor rows) + .place.address.country row + 42
+
+site43 : List Row -> Row -> Int
+let site43 rows row = sum (List.map .place.door rows) + .place.floor row + 43
+
+site44 : List Row -> Row -> Int
+let site44 rows row = sum (List.map .place.address.zip rows) + .place.address.street row + 44
+
+site45 : List Row -> Row -> Int
+let site45 rows row = sum (List.map .place.address.street rows) + .name row + 45
+
+site46 : List Row -> Row -> Int
+let site46 rows row = sum (List.map .place.address.city rows) + .place.door row + 46
+
+site47 : List Row -> Row -> Int
+let site47 rows row = sum (List.map .place.address.country rows) + .place.address.city row + 47
+
+site48 : List Row -> Row -> Int
+let site48 rows row = sum (List.map .name rows) + .place.code row + 48
+
+site49 : List Row -> Row -> Int
+let site49 rows row = sum (List.map .place.code rows) + .place.address.zip row + 49
+
+site50 : List Row -> Row -> Int
+let site50 rows row = sum (List.map .place.floor rows) + .place.address.country row + 50
+
+site51 : List Row -> Row -> Int
+let site51 rows row = sum (List.map .place.door rows) + .place.floor row + 51
+
+site52 : List Row -> Row -> Int
+let site52 rows row = sum (List.map .place.address.zip rows) + .place.address.street row + 52
+
+site53 : List Row -> Row -> Int
+let site53 rows row = sum (List.map .place.address.street rows) + .name row + 53
+
+site54 : List Row -> Row -> Int
+let site54 rows row = sum (List.map .place.address.city rows) + .place.door row + 54
+
+site55 : List Row -> Row -> Int
+let site55 rows row = sum (List.map .place.address.country rows) + .place.address.city row + 55
+
+site56 : List Row -> Row -> Int
+let site56 rows row = sum (List.map .name rows) + .place.code row + 56
+
+site57 : List Row -> Row -> Int
+let site57 rows row = sum (List.map .place.code rows) + .place.address.zip row + 57
+
+site58 : List Row -> Row -> Int
+let site58 rows row = sum (List.map .place.floor rows) + .place.address.country row + 58
+
+site59 : List Row -> Row -> Int
+let site59 rows row = sum (List.map .place.door rows) + .place.floor row + 59
+
+site60 : List Row -> Row -> Int
+let site60 rows row = sum (List.map .place.address.zip rows) + .place.address.street row + 60
+
+site61 : List Row -> Row -> Int
+let site61 rows row = sum (List.map .place.address.street rows) + .name row + 61
+
+site62 : List Row -> Row -> Int
+let site62 rows row = sum (List.map .place.address.city rows) + .place.door row + 62
+
+site63 : List Row -> Row -> Int
+let site63 rows row = sum (List.map .place.address.country rows) + .place.address.city row + 63
+
+quarter0 : List Row -> Row -> Int
+let quarter0 rows row =
+  site0 rows row
+    + site1 rows row
+    + site2 rows row
+    + site3 rows row
+    + site4 rows row
+    + site5 rows row
+    + site6 rows row
+    + site7 rows row
+    + site8 rows row
+    + site9 rows row
+    + site10 rows row
+    + site11 rows row
+    + site12 rows row
+    + site13 rows row
+    + site14 rows row
+    + site15 rows row
+
+quarter1 : List Row -> Row -> Int
+let quarter1 rows row =
+  site16 rows row
+    + site17 rows row
+    + site18 rows row
+    + site19 rows row
+    + site20 rows row
+    + site21 rows row
+    + site22 rows row
+    + site23 rows row
+    + site24 rows row
+    + site25 rows row
+    + site26 rows row
+    + site27 rows row
+    + site28 rows row
+    + site29 rows row
+    + site30 rows row
+    + site31 rows row
+
+quarter2 : List Row -> Row -> Int
+let quarter2 rows row =
+  site32 rows row
+    + site33 rows row
+    + site34 rows row
+    + site35 rows row
+    + site36 rows row
+    + site37 rows row
+    + site38 rows row
+    + site39 rows row
+    + site40 rows row
+    + site41 rows row
+    + site42 rows row
+    + site43 rows row
+    + site44 rows row
+    + site45 rows row
+    + site46 rows row
+    + site47 rows row
+
+quarter3 : List Row -> Row -> Int
+let quarter3 rows row =
+  site48 rows row
+    + site49 rows row
+    + site50 rows row
+    + site51 rows row
+    + site52 rows row
+    + site53 rows row
+    + site54 rows row
+    + site55 rows row
+    + site56 rows row
+    + site57 rows row
+    + site58 rows row
+    + site59 rows row
+    + site60 rows row
+    + site61 rows row
+    + site62 rows row
+    + site63 rows row
+
+all : List Row -> Row -> Int
+let all rows row =
+  (quarter0 rows row + quarter1 rows row + quarter2 rows row + quarter3 rows row) % 1000003
+
+rounds : List Row -> Int -> Int -> Int
+let rec rounds rows left acc =
+  match List.head rows with
+  | None -> acc
+  | Some row ->
+    if left == 0 then acc else rounds rows (left - 1) ((acc * 31 + all rows row) % 1000003)
+
+make : Int -> Row
+let make i =
+  let address = { zip = i; street = i + 1; city = i + 2; country = i + 3 }
+  { name = i; place = { code = i * 2; floor = i % 7; door = i % 11; address = address } }
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () = Platform.stdout_line (show (rounds (List.map make (List.range 0 1000)) 200 0))

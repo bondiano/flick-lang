@@ -26,6 +26,8 @@ bootstrap/stderr
 codegen/abi
 codegen/accessor_fields
 codegen/accessors
+codegen/accessor_projections
+codegen/accessor_shapes
 codegen/apply_order
 codegen/applicative_do
 codegen/call_site
