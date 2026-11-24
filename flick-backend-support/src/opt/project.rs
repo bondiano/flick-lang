@@ -10,9 +10,13 @@
 //!
 //! A projection of the module or of another module of the build is known
 //! by its body, which the build gives with the program; a value whose body
-//! is not given stays a call. The argument is evaluated once and first, and
-//! each field is read once per use, as the call would: a field of a foreign
-//! value may be a getter, so reads are neither repeated nor dropped.
+//! is not given stays a call. The code of a module then depends on bodies
+//! of other modules: a build that keeps generated code keys it on every
+//! source of the program and on the backend that optimized it, never on
+//! interfaces alone, as the build cache of `flick` does. The argument is
+//! evaluated once and first, and each field is read once per use, as the
+//! call would: a field of a foreign value may be a getter, so reads are
+//! neither repeated nor dropped.
 
 use std::collections::HashMap;
 use std::mem;
