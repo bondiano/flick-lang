@@ -14,6 +14,7 @@ mod hover;
 mod locals;
 mod navigate;
 mod plugins;
+mod proof_symbols;
 mod proofs;
 mod rename;
 mod scope;
@@ -61,6 +62,12 @@ pub struct Location {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Symbol {
     Entity(Entity),
+    /// A proof declaration, or the law of a class.
+    Proof {
+        module: String,
+        class: Option<String>,
+        name: String,
+    },
     /// A module qualifier or an import/module path.
     Module(String),
     /// An operation of the service `service` of `module`.
@@ -109,6 +116,9 @@ impl<'a> Ide<'a> {
     pub fn symbol_at(&self, file: FileId, offset: u32) -> Option<(Symbol, (u32, u32))> {
         let m = self.module(file)?;
         let text = self.text(file);
+        if let Some(symbol) = self.proof_symbol_at(file, offset) {
+            return Some(symbol);
+        }
         if let Some(symbol) = self.module_at(m, offset) {
             return Some(symbol);
         }
@@ -132,6 +142,9 @@ impl<'a> Ide<'a> {
                     Symbol::Local { file, binder, name }
                 }
                 Ref::PackedField { .. } => return None,
+                Ref::Value { module, name } if proof_symbols::is_lemma(module) => {
+                    proof_symbols::lemma_symbol(&m.name, name)
+                }
                 Ref::Value { module, name } => match name.split_once('$') {
                     Some((ty, _)) => entity(module, Namespace::Type, ty),
                     None => entity(module, Namespace::Value, name),

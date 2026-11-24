@@ -112,6 +112,7 @@ impl Ide<'_> {
                 e.namespace != Namespace::Value
             }
             Symbol::Module(_) => return Err("module names require renaming their files".into()),
+            Symbol::Proof { .. } => return Err("proof and law names cannot be renamed here".into()),
             Symbol::Operation { .. } | Symbol::InstanceMethod { .. } => {
                 return Err("generated code names this by its spelling: no exact mapping".into());
             }

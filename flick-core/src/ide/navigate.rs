@@ -75,6 +75,11 @@ impl Ide<'_> {
                 end: binder.1,
             }),
             Symbol::Entity(entity) => self.entity_definition(entity),
+            Symbol::Proof {
+                module,
+                class,
+                name,
+            } => self.proof_definition(module, class.as_deref(), name),
             Symbol::Operation {
                 module,
                 service,

@@ -23,6 +23,7 @@ mod foreign;
 mod keywords;
 mod kinds;
 mod operators;
+mod proof;
 mod types;
 mod written;
 
@@ -189,6 +190,9 @@ impl Ide<'_> {
 
     /// Markdown for the symbol at `offset`, and the range it covers.
     pub fn hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
+        if let Some(hover) = self.proof_hover(file, offset) {
+            return Some(hover);
+        }
         if let Some(hover) = self.attribute_hover(file, offset) {
             return Some(hover);
         }
@@ -245,6 +249,7 @@ impl Ide<'_> {
                 });
                 (local_code(name, &m.typing.shown(at, ty), mutable), None)
             }
+            Symbol::Proof { .. } => return None,
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;
                 let export = self
