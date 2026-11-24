@@ -10,9 +10,6 @@ Markdown
 Chunk.Core
 Chunk.Ops
 Chunk
-Js.Array
-Js
-JsError
 BigInt
 Int8
 Int16

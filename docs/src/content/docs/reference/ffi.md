@@ -133,6 +133,10 @@ the default of a field, shows it with `@stores` before its declaration: it is
 then [data with hidden storage](../regions/), and a result of that type holds
 what the arguments before it reach.
 
+Use `catch JsError.from_js` to turn a JS exception or promise rejection
+into a typed `JsError`. It stores only a string description of the thrown
+value in `message`, for example `name: message` for a JS `Error`.
+
 ## Callbacks
 
 A Flick function passed to JS is adapted to the JS arity of its type:
@@ -172,6 +176,10 @@ JS may sort the array it got in place or change an object it returned
 earlier; the Flick value stays as it was. Primitives, `JsValue`, opaque types
 and functions pass as they are, and a callback without data keeps its
 identity.
+
+`Js.Array` exposes mutable JS arrays through effectful operations.
+`Js.Array.from_list` copies a Flick list into a JS array, and
+`Js.Array.to_list` copies the array back into a Flick list.
 
 Structural records always cross the JS and Go foreign boundaries in canonical
 sorted label order (JS array-index keys first in ascending numeric order, then
@@ -398,9 +406,6 @@ foreign lookup from "lookup-lib" "lookup"
   catch JsError.from_js
   nullable
 ```
-
-`JsError.from_js` keeps what a thrown value says — `name: message` of an
-`Error` — never the value.
 
 In an editor, the code action "Regenerate from `<pkg>@<version>`" on the
 header line `// flick ffi import <pkg> [--select a,b]` replaces the file

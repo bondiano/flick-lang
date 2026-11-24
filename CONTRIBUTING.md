@@ -103,9 +103,8 @@ Both are included in the existing lint/test recipes.
 ## Standard-library source packages
 
 The compiler core is in `packages/core`. The implicit source packages are
-`std`, `stream`, `process`, `ui`, `http`, `rpc`, `observability` and `cli`,
 listed in dependency order in `flick-core/src/implicit_packages.rs`. Each owns
-its `src/modules.txt` and Go binding tables under `src/go`; keep source
+its `src/modules.txt` and any Go binding tables under `src/go`. Keep source
 ownership, build inputs and coverage checks together when moving a module.
 Public Flick module names remain independent of the source package name.
 
