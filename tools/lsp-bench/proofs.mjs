@@ -28,6 +28,18 @@ function position(text, marker, inside = 0) {
   return { line: lines.length - 1, character: lines.at(-1).length };
 }
 
+function applyEdit(text, { text: replacement, range }) {
+  const offset = ({ line, character }) => {
+    const lines = text.split("\n");
+    assert.ok(line < lines.length && character <= lines[line].length, "valid UTF-16 edit");
+    return lines.slice(0, line).reduce((size, value) => size + value.length + 1, 0) + character;
+  };
+  const start = offset(range.start);
+  const end = offset(range.end);
+  assert.ok(start <= end, "ordered edit range");
+  return text.slice(0, start) + replacement + text.slice(end);
+}
+
 function project(root) {
   cpSync(FIXTURE, root, { recursive: true });
   const laws = join(root, "proofs/Laws");
@@ -63,7 +75,7 @@ function changeSignal() {
 }
 
 function workload(client, signal) {
-  const { send, request } = client;
+  const { send, request, startRequest } = client;
   const ask = async (method, params) => {
     const reply = await request(method, params);
     assert.equal(reply.error, undefined, `${method}: ${JSON.stringify(reply.error)}`);
@@ -81,7 +93,10 @@ function workload(client, signal) {
     method: "textDocument/didClose",
     params: { textDocument: { uri: doc.uri } },
   });
-  const query = (method, doc, at) => ask(method, { textDocument: { uri: doc.uri }, position: at });
+  const params = (doc, position) => ({ textDocument: { uri: doc.uri }, position });
+  const query = (method, doc, at) => ask(method, params(doc, at));
+  const startSearch = (doc, at) => startRequest("flick/searchProof", params(doc, at));
+  const cancel = (id) => send({ method: "$/cancelRequest", params: { id } });
   const inspect = (doc, at) => query("flick/proofAt", doc, at);
   const ready = async (doc, at, { version, name, status }) => {
     for (;;) {
@@ -98,7 +113,7 @@ function workload(client, signal) {
       await signal.after(before);
     }
   };
-  return { ask, opened, changed, closed, query, inspect, ready };
+  return { ask, opened, changed, closed, query, inspect, ready, startSearch, cancel };
 }
 
 function quantiles(values) {
@@ -174,6 +189,49 @@ async function latency(run, { main, dependency, optionLaws }, opts) {
     await readyCase(mainVersion);
   }
 
+  let searchChecks = null;
+  if (!opts.statusOnly) {
+    const draft = edit(main.text, "= Options.map_identity v\n", "= \n");
+    const atDraft = position(draft, "= \n", 2);
+    run.changed(main, ++mainVersion, draft);
+    await run.ready(main, atDraft, state(mainVersion, "use_option", "open"));
+    let checked;
+    await sample("explicitProofSearch", async () => {
+      checked = await run.query("flick/searchProof", main, atDraft);
+      assert.equal(checked.status, "found", JSON.stringify(checked));
+      assert.ok(checked.suggestions.some(({ text }) => text === "Options.map_identity v"),
+        "search must find an independently checked qualified lemma");
+    });
+    const proof = checked.suggestions.find(({ text }) => text === "Options.map_identity v");
+    const verification = {
+      textDocument: { uri: main.uri },
+      generation: checked.generation,
+      version: checked.version,
+    };
+    assert.equal(await run.ask("flick/validateProofSearch", verification), true);
+
+    const active = run.startSearch(main, atDraft);
+    run.cancel(active.id);
+    const hover = await timed(() => run.query("textDocument/hover", main, atLemma));
+    assert.ok(hover.value?.contents, "ordinary hover remains available after search cancellation");
+    assert.equal((await active.reply).error?.code, -32800, "cancel an in-flight explicit search");
+    const inserted = applyEdit(draft, proof);
+    const superseded = await timed(async () => {
+      const active = run.startSearch(main, atDraft);
+      run.changed(main, ++mainVersion, inserted);
+      return active.reply;
+    });
+    assert.equal(superseded.value.result?.status, "cancelled", "a newer edit supersedes explicit search");
+    searchChecks = {
+      hoverAfterCancelMs: hover.milliseconds,
+      supersedeAfterEditMs: superseded.milliseconds,
+    };
+    await run.ready(main, atDraft, state(mainVersion, "use_option"));
+    assert.equal(await run.ask("flick/validateProofSearch", verification), false, "a subsequent revision invalidates the edit");
+    run.changed(main, ++mainVersion, main.text);
+    await readyCase(mainVersion);
+  }
+
   const incorrect = wrongCase(main.text);
   await sample("proofStatusAfterBodyEdit", async (i) => {
     const broken = i % 2 === 0;
@@ -216,6 +274,7 @@ async function latency(run, { main, dependency, optionLaws }, opts) {
   return {
     firstProofOpenMs: opened.milliseconds,
     normalizationSteps: { rebuild: initial.proof.normalizationSteps },
+    searchChecks,
     timingsMs: measurements,
   };
 }

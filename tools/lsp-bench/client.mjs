@@ -26,12 +26,13 @@ export const connect = (binary, { onNotification } = {}) => {
   };
   const expect = (matches) => new Promise((resolve) => waiting.push({ matches, resolve }));
   let id = 0;
-  const request = (method, params) => {
+  const startRequest = (method, params) => {
     const current = ++id;
     const reply = expect((m) => m.id === current);
     send({ id: current, method, params });
-    return reply;
+    return { id: current, reply };
   };
+  const request = (method, params) => startRequest(method, params).reply;
   const diagnostics = (uri) => expect((m) => m.method === "textDocument/publishDiagnostics" && m.params.uri === uri);
-  return { server, send, expect, request, diagnostics };
+  return { server, send, expect, request, startRequest, diagnostics };
 };
