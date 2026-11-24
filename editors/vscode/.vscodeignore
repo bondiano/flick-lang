@@ -2,6 +2,7 @@
 # `dist/extension.js` and no `node_modules` (`scripts/bundle.mjs`).
 extension.js
 proof-view.js
+proof-search.js
 scripts/**
 node_modules/**
 **/*.map

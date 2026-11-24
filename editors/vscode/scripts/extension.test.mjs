@@ -39,6 +39,9 @@ function createHarness({
   const createdStatusBars = [];
   const createdChannels = [];
   const createdViews = [];
+  const searches = [];
+  const previews = [];
+  const information = [];
 
   class FakeEventEmitter {
     listeners = new Set();
@@ -199,11 +202,22 @@ function createHarness({
     ThemeColor: FakeThemeColor,
     EventEmitter: FakeEventEmitter,
     CancellationTokenSource: class {
-      token = { isCancellationRequested: false };
+      event = new FakeEventEmitter();
+      token = { isCancellationRequested: false, onCancellationRequested: this.event.event };
       cancel() {
+        if (this.token.isCancellationRequested) return;
         this.token.isCancellationRequested = true;
+        this.event.fire();
       }
-      dispose() {}
+      dispose() { this.event.dispose(); }
+    },
+    ProgressLocation: { Notification: 15 },
+    Range: class {
+      constructor(startLine, startCharacter, endLine, endCharacter) {
+        this.start = { line: startLine, character: startCharacter };
+        this.end = { line: endLine, character: endCharacter };
+      }
+      isEqual(other) { return JSON.stringify(this) === JSON.stringify(other); }
     },
     TreeItemCollapsibleState: { None: 0, Expanded: 2 },
     TreeItem: class {
@@ -216,6 +230,22 @@ function createHarness({
       activeTextEditor: undefined,
       onDidChangeActiveTextEditor: activeEditorChanged.event,
       onDidChangeTextEditorSelection: selectionChanged.event,
+      withProgress(options, task) {
+        const source = new fakeVscode.CancellationTokenSource();
+        searches.push({ options, source });
+        return task({}, source.token).finally(() => source.dispose());
+      },
+      showQuickPick(items, options, token) {
+        return new Promise((resolve) => {
+          const listener = token.onCancellationRequested(() => resolve(undefined));
+          previews.push({
+            items, options, token,
+            select(index) { listener.dispose(); resolve(items[index]); },
+          });
+        });
+      },
+      showInformationMessage(message) { information.push(message); },
+      showErrorMessage(message) { information.push(message); },
       createTreeView(id, { treeDataProvider }) {
         const visibilityChanged = new FakeEventEmitter();
         const view = {
@@ -316,6 +346,9 @@ function createHarness({
     createdChannels,
     createdWatchers,
     createdViews,
+    searches,
+    previews,
+    information,
     setActiveEditor(editor) {
       fakeVscode.window.activeTextEditor = editor;
       activeEditorChanged.fire(editor);
@@ -345,7 +378,7 @@ function createHarness({
   };
 }
 
-test("package.json contributes restartServer, showOutput, configuration, and grammar", () => {
+test("package.json contributes commands, configuration, and grammar", () => {
   const commands = manifest.contributes?.commands ?? [];
   const restart = commands.find((c) => c.command === "flick.restartServer");
   assert.ok(restart, "flick.restartServer command must be contributed");
@@ -354,6 +387,7 @@ test("package.json contributes restartServer, showOutput, configuration, and gra
 
   const showOutput = commands.find((c) => c.command === "flick.showOutput");
   assert.ok(showOutput, "flick.showOutput command must be contributed");
+  assert.equal(commands.find((c) => c.command === "flick.searchProof")?.title, "Find Proof");
   assert.ok(manifest.contributes?.views?.explorer?.some(({ id }) => id === "flick.proofGoals"));
 
   const props = manifest.contributes?.configuration?.properties ?? {};
@@ -772,4 +806,134 @@ test("Proof Goals discards results superseded by dependency changes, edits and c
   assert.equal(afterClose.token.isCancellationRequested, true);
   assert.equal(view.message, "Open a Flick file and move the cursor into a proof.");
   assert.deepEqual(view.items(), []);
+});
+
+const OPEN_PROOF = "proof back (h : equal true true) where equal true true = todo";
+const PROOF_BODY = OPEN_PROOF.indexOf("todo");
+const turn = () => new Promise((resolve) => setImmediate(resolve));
+
+function searchEditor() {
+  const document = {
+    ...flickDocument("Proofs.fl"),
+    text: OPEN_PROOF,
+    validateRange: (range) => range,
+  };
+  return {
+    document,
+    selection: { active: { line: 0, character: PROOF_BODY } },
+    async edit(apply) {
+      apply({ replace({ start, end }, text) {
+        document.text = document.text.slice(0, start.character) + text + document.text.slice(end.character);
+        document.version += 1;
+      } });
+      return true;
+    },
+  };
+}
+
+function searchReply(request, generation, status = "found") {
+  return {
+    generation, status, version: 1, position: request.params.position,
+    suggestions: status === "found" ? [{ text: "symm h", range: {
+      start: { line: 0, character: PROOF_BODY }, end: { line: 0, character: PROOF_BODY + 4 },
+    } }] : [],
+  };
+}
+
+test("Find Proof previews source and applies it only after validating the selected revision", async (t) => {
+  const h = createHarness();
+  await h.extension.activate({ subscriptions: [] });
+  t.after(() => h.extension.deactivate());
+  const [client] = h.createdClients;
+  const editor = searchEditor();
+  h.setActiveEditor(editor);
+
+  const search = h.registeredCommands.get("flick.searchProof")();
+  const request = client.requests.at(-1);
+  assert.equal(request.method, "flick/searchProof");
+  assert.deepEqual(request.params, {
+    textDocument: { uri: "file:///Proofs.fl" }, position: { line: 0, character: PROOF_BODY },
+  });
+  assert.equal(h.searches[0].options.cancellable, true);
+  request.resolve(searchReply(request, 22));
+  await turn();
+
+  const [preview] = h.previews;
+  assert.deepEqual(preview.items.map(({ label }) => label), ["symm h"]);
+  assert.equal(editor.document.text, OPEN_PROOF);
+  preview.select(0);
+  await turn();
+  const validate = client.requests.at(-1);
+  assert.equal(validate.method, "flick/validateProofSearch");
+  assert.deepEqual(validate.params, { textDocument: request.params.textDocument, generation: 22, version: 1 });
+  assert.equal(editor.document.text, OPEN_PROOF);
+  validate.resolve(true);
+  await search;
+  assert.equal(editor.document.text, OPEN_PROOF.replace("todo", "symm h"));
+});
+
+test("Find Proof cancels on request and discards revisions changed before insertion", async (t) => {
+  const h = createHarness();
+  await h.extension.activate({ subscriptions: [] });
+  t.after(() => h.extension.deactivate());
+  const [client] = h.createdClients;
+  const editor = searchEditor();
+  h.setActiveEditor(editor);
+  const run = h.registeredCommands.get("flick.searchProof");
+
+  const cancelled = run();
+  const cancelledRequest = client.requests.at(-1);
+  h.searches.at(-1).source.cancel();
+  assert.equal(cancelledRequest.token.isCancellationRequested, true);
+  cancelledRequest.resolve(searchReply(cancelledRequest, 2));
+  await cancelled;
+  assert.equal(h.previews.length, 0);
+
+  const dependencyChanged = run();
+  const request = client.requests.at(-1);
+  request.resolve(searchReply(request, 2));
+  await turn();
+  const preview = h.previews.at(-1);
+  client.notifications.get("flick/proofStateChanged")({ generation: 3 });
+  assert.equal(preview.token.isCancellationRequested, true);
+  preview.select(0);
+  await dependencyChanged;
+  assert.equal(client.requests.at(-1), request, "the superseded preview cannot request insertion");
+
+  const stale = run();
+  const staleRequest = client.requests.at(-1);
+  staleRequest.resolve(searchReply(staleRequest, 3));
+  await turn();
+  h.previews.at(-1).select(0);
+  await turn();
+  client.requests.at(-1).resolve(false);
+  await stale;
+  assert.match(h.information.at(-1), /proof context changed/);
+
+  const edited = run();
+  const beforeEdit = client.requests.at(-1);
+  beforeEdit.resolve(searchReply(beforeEdit, 4));
+  await turn();
+  h.previews.at(-1).select(0);
+  await turn();
+  h.changeDocument(editor.document);
+  client.requests.at(-1).resolve(true);
+  await edited;
+  assert.equal(editor.document.text, OPEN_PROOF);
+});
+
+test("Find Proof distinguishes exhaustion from no checked candidate", async (t) => {
+  const h = createHarness();
+  await h.extension.activate({ subscriptions: [] });
+  t.after(() => h.extension.deactivate());
+  const [client] = h.createdClients;
+  h.setActiveEditor(searchEditor());
+  for (const status of ["no-candidate", "budget-exhausted"]) {
+    const search = h.registeredCommands.get("flick.searchProof")();
+    const request = client.requests.at(-1);
+    request.resolve(searchReply(request, 1, status));
+    await search;
+  }
+  assert.deepEqual(h.previews, []);
+  assert.deepEqual(h.information, ["No checked proof term was found.", "Proof search reached its limit."]);
 });

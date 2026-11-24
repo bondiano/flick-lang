@@ -13,6 +13,7 @@ mod privacy;
 mod proof_completion;
 mod proof_hover;
 mod proof_lints;
+mod proof_search;
 mod proofs;
 mod quick_fix;
 mod sql_table;

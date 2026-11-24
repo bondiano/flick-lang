@@ -19,10 +19,10 @@ pub(super) struct Deferred {
 }
 
 /// The JSON-RPC code of a request the client cancelled.
-const REQUEST_CANCELLED: i64 = -32800;
+pub(super) const REQUEST_CANCELLED: i64 = -32800;
 
 /// The JSON-RPC code of a request the server failed on itself.
-const INTERNAL_ERROR: i64 = -32603;
+pub(super) const INTERNAL_ERROR: i64 = -32603;
 
 impl Server {
     /// Answers the held requests whose analysis has been published, in order.
@@ -40,7 +40,11 @@ impl Server {
 
     /// Whether the request reads a context whose analysis is still running.
     pub(super) fn should_defer(&self, method: &str, params: &Value) -> bool {
-        if self.pending.is_empty() || matches!(method, "initialize" | "shutdown" | "flick/proofAt")
+        if self.pending.is_empty()
+            || matches!(
+                method,
+                "initialize" | "shutdown" | "flick/proofAt" | "flick/validateProofSearch"
+            )
         {
             return false;
         }
@@ -67,17 +71,16 @@ impl Server {
 
     /// Forgets a held request, as the client no longer wants its answer.
     pub(super) fn cancel_request(&mut self, params: &Value) {
-        let Some(id) = params["id"].as_i64() else {
+        let Some(id) = params
+            .get("id")
+            .filter(|id| id.is_i64() || id.is_u64() || id.is_string())
+        else {
             return;
         };
-        let id = Value::from(id);
-        if let Some(at) = self.deferred.iter().position(|d| d.id == id) {
+        self.cancel_proof_search(Some(id));
+        if let Some(at) = self.deferred.iter().position(|d| d.id == *id) {
             self.deferred.remove(at);
-            self.send(&protocol::error(
-                &id,
-                REQUEST_CANCELLED,
-                "request cancelled",
-            ));
+            self.send(&protocol::error(id, REQUEST_CANCELLED, "request cancelled"));
         }
     }
 
