@@ -75,7 +75,7 @@ fn a_generation_uses_the_successful_build_selection_after_config_changes() {
     .expect("shipped component");
     let pin = generation.backend.as_ref().expect("default component pin");
     assert_eq!(pin.identity.id, "flick/js");
-    assert_eq!(pin.identity.version, "0.1.0");
+    assert_eq!(pin.identity.version, "0.2.0");
     assert_eq!(pin.sha256, flick_backend::sha256(&bundled));
     drop(generation);
     fs::remove_dir_all(root).expect("cleanup");

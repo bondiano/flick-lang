@@ -52,10 +52,10 @@ pub fn request() -> BuildRequest {
         target: TargetRequest {
             backend_api: VERSION.into(),
             ir_version: flick_ir::VERSION.into(),
-            language_version: "0.1.0".into(),
+            language_version: "0.2.0".into(),
             runtime_abis: vec![Abi {
                 name: "flickrt".into(),
-                version: "0.1.0".into(),
+                version: "0.2.0".into(),
             }],
             environment: Environment {
                 backend: "js".into(),
@@ -124,10 +124,10 @@ pub fn descriptor() -> Descriptor {
         identity: request().backend.identity,
         backend_api: range("0.1.0", "0.2.0"),
         ir: range("0.17.0", "0.18.0"),
-        language: range("0.1.0", "0.2.0"),
+        language: range("0.2.0", "0.3.0"),
         runtime_abis: vec![NamedRange {
             name: "flickrt".into(),
-            versions: range("0.1.0", "0.2.0"),
+            versions: range("0.2.0", "0.3.0"),
         }],
         environments: vec![request().target.environment],
         tags: vec!["js".into()],
