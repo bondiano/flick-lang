@@ -14,7 +14,7 @@ var (
 
 func lowerName(name Value) string { return ToLowerCase(name).(string) }
 
-func headersOf(v Value) *Record { return v.(*Record) }
+func headersOf(v Value) *Record { return record(v) }
 
 var HeadersEmpty Value = &Record{}
 

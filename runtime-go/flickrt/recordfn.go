@@ -7,7 +7,7 @@ package flickrt
 
 // RecordLabels is the labels of a record, sorted.
 func RecordLabels(_, r Value) Value {
-	keys := sortedKeys(record(r))
+	keys := sortedViewKeys(AsRecord(r))
 	out := make([]Value, len(keys))
 	for i, k := range keys {
 		out[i] = k
@@ -20,19 +20,27 @@ func RecordLabels(_, r Value) Value {
 var RecordLabel Value = Unit
 
 // RecordGet is the field `label` of `r`; the dictionary is erased.
-func RecordGet(_, label, r Value) Value { return record(r).Get(label.(string)) }
+func RecordGet(_, label, r Value) Value { return AsRecord(r).Get(label.(string)) }
 
 // RecordExtend is `r` with the field `label`, in canonical label order.
-func RecordExtend(_, _, label, v, r Value) Value { return record(r).setCanonical(label.(string), v) }
+func RecordExtend(_, _, label, v, r Value) Value {
+	x := AsRecord(r)
+	out := newRecord(x.Len() + 1)
+	for i, k := range x.Keys() {
+		out.putCanonical(k, x.At(i))
+	}
+	out.putCanonical(label.(string), v)
+	return out
+}
 
 // RecordRemove is `r` without the field `label`, in canonical label order.
 func RecordRemove(_, label, r Value) Value {
-	x := record(r)
+	x := AsRecord(r)
 	drop := label.(string)
-	out := newRecord(len(x.keys))
-	for i, k := range x.keys {
+	out := newRecord(x.Len())
+	for i, k := range x.Keys() {
 		if k != drop {
-			out.putCanonical(k, x.vals[i])
+			out.putCanonical(k, x.At(i))
 		}
 	}
 	return out
@@ -40,13 +48,13 @@ func RecordRemove(_, label, r Value) Value {
 
 // RecordMergeDisjoint merges two disjoint structural records in canonical label order.
 func RecordMergeDisjoint(_, a, b Value) Value {
-	x, y := record(a), record(b)
-	out := newRecord(len(x.keys) + len(y.keys))
-	for i, k := range x.keys {
-		out.putCanonical(k, x.vals[i])
+	x, y := AsRecord(a), AsRecord(b)
+	out := newRecord(x.Len() + y.Len())
+	for i, k := range x.Keys() {
+		out.putCanonical(k, x.At(i))
 	}
-	for i, k := range y.keys {
-		out.putCanonical(k, y.vals[i])
+	for i, k := range y.Keys() {
+		out.putCanonical(k, y.At(i))
 	}
 	return out
 }
@@ -54,7 +62,7 @@ func RecordMergeDisjoint(_, a, b Value) Value {
 // RecordProject is the fields of `r` the dictionary's labels name, in
 // canonical label order.
 func RecordProject(labels, r Value) Value {
-	x := record(r)
+	x := AsRecord(r)
 	ls := List(labels)
 	out := newRecord(len(ls))
 	for _, l := range ls {
@@ -66,19 +74,28 @@ func RecordProject(labels, r Value) Value {
 
 func RecordEmpty() Value { return &Record{} }
 
-func RecordIsEmpty(r Value) Value { return len(record(r).keys) == 0 }
-func RecordSize(r Value) Value    { return int32(len(record(r).keys)) }
+func RecordIsEmpty(r Value) Value { return AsRecord(r).Len() == 0 }
+func RecordSize(r Value) Value    { return int32(AsRecord(r).Len()) }
 
 func RecordKeys(r Value) Value {
-	x := record(r)
-	out := make([]Value, len(x.keys))
-	for i, k := range x.keys {
+	x := AsRecord(r)
+	keys := x.Keys()
+	out := make([]Value, len(keys))
+	for i, k := range keys {
 		out[i] = k
 	}
 	return out
 }
 
-func RecordValues(r Value) Value { return append([]Value{}, record(r).vals...) }
+func RecordValues(r Value) Value {
+	x := AsRecord(r)
+	n := x.Len()
+	out := make([]Value, n)
+	for i := range n {
+		out[i] = x.At(i)
+	}
+	return out
+}
 
 func RecordSingleton(k, v Value) Value { return (&Record{}).set(k.(string), v) }
 
@@ -108,38 +125,42 @@ func RecordFromIterableBy(fb *Fiber, f, xs Value) Value {
 }
 
 func RecordCollect(fb *Fiber, f, r Value) Value {
-	x := record(r)
-	out := make([]Value, len(x.keys))
-	for i, k := range x.keys {
-		out[i] = Apply2(fb, f, k, x.vals[i])
+	x := AsRecord(r)
+	keys := x.Keys()
+	out := make([]Value, len(keys))
+	for i, k := range keys {
+		out[i] = Apply2(fb, f, k, x.At(i))
 	}
 	return out
 }
 
-func RecordHas(k, r Value) Value { return record(r).index(k.(string)) >= 0 }
+func RecordHas(k, r Value) Value {
+	_, ok := AsRecord(r).Lookup(k.(string))
+	return ok
+}
 
 func RecordGetKey(k, r Value) Value {
-	x := record(r)
-	if i := x.index(k.(string)); i >= 0 {
-		return Some(x.vals[i])
+	if v, ok := AsRecord(r).Lookup(k.(string)); ok {
+		return Some(v)
 	}
 	return None
 }
 
 func RecordModify(fb *Fiber, k, f, r Value) Value {
-	x := record(r)
-	i := x.index(k.(string))
-	if i < 0 {
+	x := AsRecord(r)
+	key := k.(string)
+	v, ok := x.Lookup(key)
+	if !ok {
 		return None
 	}
-	return Some(x.set(k.(string), Apply(fb, f, x.vals[i])))
+	return Some(copiedView(r).set(key, Apply(fb, f, v)))
 }
 
 func RecordReplace(fb *Fiber, k, v, r Value) Value {
 	return RecordModify(fb, k, Fn(func(fb *Fiber, _ Value) Value { return v }), r)
 }
 
-func RecordSet(k, v, r Value) Value { return record(r).set(k.(string), v) }
+func RecordSet(k, v, r Value) Value { return copiedView(r).set(k.(string), v) }
 
 // without is `x` without the field `k`.
 func (x *Record) without(k string) *Record {
@@ -153,22 +174,34 @@ func (x *Record) without(k string) *Record {
 	return out
 }
 
-func RecordRemoveKey(k, r Value) Value { return record(r).without(k.(string)) }
+func withoutView(x RecordView, k string) *Record {
+	out := &Record{}
+	for i, key := range x.Keys() {
+		if key != k {
+			out.keys = append(out.keys, key)
+			out.vals = append(out.vals, x.At(i))
+		}
+	}
+	return out
+}
+
+func RecordRemoveKey(k, r Value) Value { return withoutView(AsRecord(r), k.(string)) }
 
 func RecordPop(k, r Value) Value {
-	x := record(r)
-	i := x.index(k.(string))
-	if i < 0 {
+	x := AsRecord(r)
+	key := k.(string)
+	v, ok := x.Lookup(key)
+	if !ok {
 		return None
 	}
-	return Some([]Value{x.vals[i], x.without(k.(string))})
+	return Some([]Value{v, withoutView(x, key)})
 }
 
 // entries builds a record from each field `f` makes something of.
 func entries(r Value, f func(k string, v Value) (string, Value, bool)) *Record {
-	x, out := record(r), &Record{}
-	for i, k := range x.keys {
-		if key, v, ok := f(k, x.vals[i]); ok {
+	x, out := AsRecord(r), &Record{}
+	for i, k := range x.Keys() {
+		if key, v, ok := f(k, x.At(i)); ok {
 			out = out.set(key, v)
 		}
 	}
@@ -206,9 +239,9 @@ func RecordFilterMap(fb *Fiber, f, r Value) Value {
 
 func RecordPartition(fb *Fiber, f, r Value) Value {
 	passes, fails := &Record{}, &Record{}
-	x := record(r)
-	for i, k := range x.keys {
-		if res := Apply2(fb, f, x.vals[i], k); isOk(res) {
+	x := AsRecord(r)
+	for i, k := range x.Keys() {
+		if res := Apply2(fb, f, x.At(i), k); isOk(res) {
 			passes = passes.set(k, value(res))
 		} else {
 			fails = fails.set(k, value(res))
@@ -243,17 +276,17 @@ func RecordGetFailures(r Value) Value  { return recordResults(r, false) }
 func RecordGetSuccesses(r Value) Value { return recordResults(r, true) }
 
 func RecordReduce(fb *Fiber, zero, f, r Value) Value {
-	acc, x := zero, record(r)
-	for i, k := range x.keys {
-		acc = Apply(fb, Apply2(fb, f, acc, x.vals[i]), k)
+	acc, x := zero, AsRecord(r)
+	for i, k := range x.Keys() {
+		acc = Apply(fb, Apply2(fb, f, acc, x.At(i)), k)
 	}
 	return acc
 }
 
 func RecordEvery(fb *Fiber, f, r Value) Value {
-	x := record(r)
-	for i, k := range x.keys {
-		if !Bool(Apply2(fb, f, x.vals[i], k)) {
+	x := AsRecord(r)
+	for i, k := range x.Keys() {
+		if !Bool(Apply2(fb, f, x.At(i), k)) {
 			return false
 		}
 	}
@@ -261,9 +294,9 @@ func RecordEvery(fb *Fiber, f, r Value) Value {
 }
 
 func RecordSome(fb *Fiber, f, r Value) Value {
-	x := record(r)
-	for i, k := range x.keys {
-		if Bool(Apply2(fb, f, x.vals[i], k)) {
+	x := AsRecord(r)
+	for i, k := range x.Keys() {
+		if Bool(Apply2(fb, f, x.At(i), k)) {
 			return true
 		}
 	}
@@ -271,10 +304,11 @@ func RecordSome(fb *Fiber, f, r Value) Value {
 }
 
 func RecordFindFirst(fb *Fiber, f, r Value) Value {
-	x := record(r)
-	for i, k := range x.keys {
-		if Bool(Apply2(fb, f, x.vals[i], k)) {
-			return Some([]Value{k, x.vals[i]})
+	x := AsRecord(r)
+	for i, k := range x.Keys() {
+		v := x.At(i)
+		if Bool(Apply2(fb, f, v, k)) {
+			return Some([]Value{k, v})
 		}
 	}
 	return None
@@ -287,11 +321,11 @@ func RecordUnion(fb *Fiber, that, f, self Value) Value {
 }
 
 func RecordIntersection(fb *Fiber, that, f, self Value) Value {
-	x, y := record(self), record(that)
+	x, y := AsRecord(self), AsRecord(that)
 	out := &Record{}
-	for i, k := range x.keys {
-		if j := y.index(k); j >= 0 {
-			out = out.set(k, Apply2(fb, f, x.vals[i], y.vals[j]))
+	for i, k := range x.Keys() {
+		if yv, ok := y.Lookup(k); ok {
+			out = out.set(k, Apply2(fb, f, x.At(i), yv))
 		}
 	}
 	return out
@@ -299,31 +333,31 @@ func RecordIntersection(fb *Fiber, that, f, self Value) Value {
 
 // RecordDifference is the labels only one of them has, `self`'s first.
 func RecordDifference(that, self Value) Value {
-	x, y := record(self), record(that)
+	x, y := AsRecord(self), AsRecord(that)
 	switch {
-	case len(x.keys) == 0:
-		return y
-	case len(y.keys) == 0:
-		return x
+	case x.Len() == 0:
+		return that
+	case y.Len() == 0:
+		return self
 	}
 	out := &Record{}
-	for i, k := range x.keys {
-		if y.index(k) < 0 {
-			out = out.set(k, x.vals[i])
+	for i, k := range x.Keys() {
+		if _, ok := y.Lookup(k); !ok {
+			out = out.set(k, x.At(i))
 		}
 	}
-	for j, k := range y.keys {
-		if x.index(k) < 0 {
-			out = out.set(k, y.vals[j])
+	for j, k := range y.Keys() {
+		if _, ok := x.Lookup(k); !ok {
+			out = out.set(k, y.At(j))
 		}
 	}
 	return out
 }
 
-func subrecord(fb *Fiber, eq Value, self, that *Record) bool {
-	for i, k := range self.keys {
-		j := that.index(k)
-		if j < 0 || !Bool(Apply2(fb, eq, self.vals[i], that.vals[j])) {
+func subrecord(fb *Fiber, eq Value, self, that RecordView) bool {
+	for i, k := range self.Keys() {
+		yv, ok := that.Lookup(k)
+		if !ok || !Bool(Apply2(fb, eq, self.At(i), yv)) {
 			return false
 		}
 	}
@@ -332,9 +366,10 @@ func subrecord(fb *Fiber, eq Value, self, that *Record) bool {
 
 // RecordIsSubrecordBy is whether every field of `self` is in `that`.
 func RecordIsSubrecordBy(fb *Fiber, eq, that, self Value) Value {
-	return subrecord(fb, eq, record(self), record(that))
+	return subrecord(fb, eq, AsRecord(self), AsRecord(that))
 }
 
 func RecordEquivalence(fb *Fiber, eq, self, that Value) Value {
-	return subrecord(fb, eq, record(self), record(that)) && subrecord(fb, eq, record(that), record(self))
+	a, b := AsRecord(self), AsRecord(that)
+	return subrecord(fb, eq, a, b) && subrecord(fb, eq, b, a)
 }

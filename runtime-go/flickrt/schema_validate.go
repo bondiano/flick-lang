@@ -119,14 +119,14 @@ func (s *Schema) validate(fb *Fiber, in Value) (Value, []issue) {
 		}
 		return &Data{Tag: d.Tag, n: 1, in: [2]Value{v}}, nil
 	case kindRecord:
-		r, ok := in.(*Record)
+		r, ok := in.(RecordView)
 		if !ok {
 			return nil, expected("a record", in)
 		}
 		fields := make([]Value, len(s.labels))
 		for i, l := range s.labels {
-			v := recordField(r, l)
-			if v == nil {
+			v, present := r.Lookup(l)
+			if !present {
 				return nil, under(l, fail("a missing key"))
 			}
 			x, issues := s.items[i].validate(fb, v)

@@ -136,7 +136,7 @@ type promptTextOptions struct {
 }
 
 func promptTextLoop(options Value, kind string) Value {
-	o := options.(*Record)
+	o := AsRecord(options)
 	opts := &promptTextOptions{kind, o.Get("message").(string), promptOr(o.Get("default"), ""), o.Get("validate")}
 	initial := []rune(opts.initial)
 	return &promptLoop{
@@ -162,7 +162,7 @@ func PromptHidden(options Value) Value {
 }
 
 func PromptList(options Value) Value {
-	delimiter := promptOr(options.(*Record).Get("delimiter"), "")
+	delimiter := promptOr(AsRecord(options).Get("delimiter"), "")
 	if delimiter == "" {
 		delimiter = ","
 	}
@@ -229,7 +229,8 @@ func (o *promptTextOptions) render(c *promptCtx, state Value, action promptActio
 
 func (o *promptTextOptions) process(c *promptCtx, input, state Value) promptAction {
 	s := state.(promptTextState)
-	key := input.(*Record).Get("key").(*Record)
+	in := AsRecord(input)
+	key := AsRecord(in.Get("key"))
 	name := key.Get("name").(string)
 	next := func(cursor int, value []rune) promptAction { return promptNext(promptTextState{cursor, value, nil}) }
 	if key.Get("ctrl").(bool) {
@@ -281,7 +282,7 @@ func (o *promptTextOptions) process(c *promptCtx, input, state Value) promptActi
 		return next(len(value), value)
 	}
 	// typed control bytes must not become terminal commands when echoed
-	typed := []rune(promptVisible(promptOr(input.(*Record).Get("input"), "")))
+	typed := []rune(promptVisible(promptOr(in.Get("input"), "")))
 	value := append(append(append([]rune{}, s.value[:s.cursor]...), typed...), s.value[s.cursor:]...)
 	return next(s.cursor+len(typed), value)
 }
@@ -289,7 +290,7 @@ func (o *promptTextOptions) process(c *promptCtx, input, state Value) promptActi
 // Confirm.
 
 func PromptConfirm(options Value) Value {
-	o := options.(*Record)
+	o := AsRecord(options)
 	message := o.Get("message").(string)
 	initial := false
 	if v, ok := some(o.Get("initial")); ok {
@@ -297,12 +298,14 @@ func PromptConfirm(options Value) Value {
 	}
 	yes, no := "yes", "no"
 	if label, ok := some(o.Get("label")); ok {
-		yes, no = label.(*Record).Get("confirm").(string), label.(*Record).Get("deny").(string)
+		lr := AsRecord(label)
+		yes, no = lr.Get("confirm").(string), lr.Get("deny").(string)
 	}
 	byDefault, otherwise := "(Y/n)", "(y/N)"
 	if p, ok := some(o.Get("placeholder")); ok {
-		byDefault = promptOr(p.(*Record).Get("defaultConfirm"), byDefault)
-		otherwise = promptOr(p.(*Record).Get("defaultDeny"), otherwise)
+		pr := AsRecord(p)
+		byDefault = promptOr(pr.Get("defaultConfirm"), byDefault)
+		otherwise = promptOr(pr.Get("defaultDeny"), otherwise)
 	}
 	placeholder := func(value bool) string {
 		if value {
@@ -328,11 +331,12 @@ func PromptConfirm(options Value) Value {
 			return ansiCursorHide + promptRender(confirm, message, promptAnnotateSymbol(t, t.prefix, t.primary), promptAnnotateSymbol(t, t.pointerSmall, t.muted), t, false)
 		},
 		process: func(_ *promptCtx, input, _ Value) promptAction {
-			name := input.(*Record).Get("key").(*Record).Get("name").(string)
+			in := AsRecord(input)
+			name := AsRecord(in.Get("key")).Get("name").(string)
 			if name == "enter" || name == "return" {
 				return promptSubmit(initial)
 			}
-			value := strings.ToLower(promptOr(input.(*Record).Get("input"), ""))
+			value := strings.ToLower(promptOr(in.Get("input"), ""))
 			switch {
 			case strings.HasPrefix(value, "y") || strings.HasSuffix(value, "t"):
 				return promptSubmit(true)
@@ -352,7 +356,7 @@ func PromptConfirm(options Value) Value {
 // Toggle.
 
 func PromptToggle(options Value) Value {
-	o := options.(*Record)
+	o := AsRecord(options)
 	message := o.Get("message").(string)
 	initial := false
 	if v, ok := some(o.Get("initial")); ok {
@@ -384,7 +388,7 @@ func PromptToggle(options Value) Value {
 			return ansiCursorHide + promptRender(toggle(t, state.(bool), false), message, promptAnnotateSymbol(t, t.prefix, t.primary), promptAnnotateSymbol(t, t.pointerSmall, t.muted), t, false)
 		},
 		process: func(_ *promptCtx, input, state Value) promptAction {
-			switch input.(*Record).Get("key").(*Record).Get("name").(string) {
+			switch AsRecord(AsRecord(input).Get("key")).Get("name").(string) {
 			case "0", "j", "delete", "right", "down":
 				return promptNext(false)
 			case "1", "k", "left", "up":

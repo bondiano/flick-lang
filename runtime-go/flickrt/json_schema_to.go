@@ -146,8 +146,8 @@ func convertReference(out *Record, reference Value, cx *convContext) {
 }
 
 func convertDependencies(source, out *Record, cx *convContext, draft04 bool) {
-	required, _ := lookup(source, "dependentRequired").(*Record)
-	schemas, _ := lookup(source, "dependentSchemas").(*Record)
+	required, _ := asRecord(lookup(source, "dependentRequired"))
+	schemas, _ := asRecord(lookup(source, "dependentSchemas"))
 	if required == nil && schemas == nil {
 		return
 	}
@@ -308,7 +308,7 @@ func draft04Conditionals(source, out *Record, cx *convContext) {
 }
 
 func hasSchemaIdentifier(node Value) bool {
-	r, ok := node.(*Record)
+	r, ok := asRecord(node)
 	if !ok {
 		return false
 	}
@@ -318,7 +318,7 @@ func hasSchemaIdentifier(node Value) bool {
 	for i, key := range r.keys {
 		switch v := r.vals[i]; key {
 		case "$defs", "properties", "patternProperties", "dependentSchemas":
-			if m, ok := v.(*Record); ok {
+			if m, ok := asRecord(v); ok {
 				for _, x := range m.vals {
 					if hasSchemaIdentifier(x) {
 						return true

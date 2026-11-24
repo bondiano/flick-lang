@@ -276,7 +276,7 @@ func LoggerToFile(file, options, path, l Value) Value {
 		if !ok {
 			panic(Defect{"Service not found: FileSystem.FileSystem"})
 		}
-		opened := Run(Within(fb, scope), Apply(fb, Apply(fb, fs.(*Record).Get("open"), open), path))
+		opened := Run(Within(fb, scope), Apply(fb, Apply(fb, AsRecord(fs).Get("open"), open), path))
 		return []Value{batched(fb, scope, loggerOf(l), window, func(fb *Fiber, out []Value) {
 			lines := make([]string, len(out))
 			for i, line := range out {

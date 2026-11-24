@@ -365,7 +365,7 @@ func apiRoutes(fb *Fiber, a *apiDefinition, handlers Value) []Value {
 	for _, g := range a.groups {
 		for _, e := range g.endpoints {
 			var handler Value
-			if group, ok := recordField(all, g.name).(*Record); ok {
+			if group, ok := recordField(all, g.name).(RecordView); ok {
 				handler = recordField(group, e.name)
 			}
 			if handler == nil {

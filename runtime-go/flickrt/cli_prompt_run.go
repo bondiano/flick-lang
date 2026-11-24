@@ -28,7 +28,7 @@ func promptSubmit(value Value) promptAction { return promptAction{'s', value} }
 // promptCtx is what a step sees: its fiber, the terminal and the theme.
 type promptCtx struct {
 	fb    *Fiber
-	tty   *Record
+	tty   RecordView
 	theme *promptTheme
 }
 
@@ -54,16 +54,16 @@ type promptDone struct{ value Value }
 
 type promptAll []Value
 
-func promptCall(fb *Fiber, tty *Record, name string, argument Value) Value {
+func promptCall(fb *Fiber, tty RecordView, name string, argument Value) Value {
 	return Run(fb, Apply(fb, tty.Get(name), argument))
 }
 
-func promptTty(fb *Fiber, key Value) *Record {
+func promptTty(fb *Fiber, key Value) RecordView {
 	impl, ok := fb.env.get(key.(string))
 	if !ok {
 		panic(Defect{"Service not found: " + key.(string)})
 	}
-	return impl.(*Record)
+	return AsRecord(impl)
 }
 
 func PromptRun(fb *Fiber, key, prompt Value) Value {
@@ -210,7 +210,7 @@ func promptActionOf(v Value) promptAction {
 }
 
 func promptCustomLoop(state, handlers Value, events *Queue) Value {
-	h := handlers.(*Record)
+	h := AsRecord(handlers)
 	draw := func(name string) func(*promptCtx, Value, promptAction) string {
 		return func(c *promptCtx, s Value, a promptAction) string {
 			return Apply(c.fb, Apply(c.fb, h.Get(name), s), promptActionToFlick(a)).(string)
@@ -257,7 +257,7 @@ func (t *promptTheme) strings() []*string {
 }
 
 func promptThemeOf(v Value) *promptTheme {
-	r, t := v.(*Record), &promptTheme{}
+	r, t := AsRecord(v), &promptTheme{}
 	for i, p := range t.strings() {
 		*p = r.Get(promptThemeFields[i]).(string)
 	}

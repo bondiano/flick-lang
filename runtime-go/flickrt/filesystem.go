@@ -169,7 +169,7 @@ func fsOpen(fb *Fiber, options Value, path string) Value {
 
 func isNotFound(platformError Value) bool {
 	reason := platformError.(*Data).Fields()[0].(*Data)
-	return reason.Tag == systemReasonTag && reason.Fields()[0].(*Record).Get("tag").(*Data).Tag == Tag("PlatformError.SystemErrorTag.NotFound")
+	return reason.Tag == systemReasonTag && AsRecord(reason.Fields()[0]).Get("tag").(*Data).Tag == Tag("PlatformError.SystemErrorTag.NotFound")
 }
 
 // infoOf is `FileSystem.Info` of what Go's stat gives.

@@ -14,6 +14,7 @@ use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::arith::Native;
 use super::layout::{Code, call};
+use super::record::RecordShape;
 
 /// Type declarations indexed by `(module, type_name)`.
 pub(super) type TypeDecls<'a> = HashMap<(String, String), &'a TypeDecl>;
@@ -81,6 +82,9 @@ pub(super) enum GoType {
     /// Allocation-free concrete `Option`: must be converted to `*flickrt.Data`
     /// before entering a `flickrt.Value` slot.
     Opt(OptRepr),
+    /// Closed record shape struct carried by value: implements `flickrt.RecordView`
+    /// with value receivers, so already valid as a `flickrt.Value` without conversion.
+    Record(RecordShape),
 }
 
 /// A compiled Go expression together with its actual Go type (`None` means
@@ -121,7 +125,7 @@ const NON_NIL_LANG: &[Lang] = &[
     Lang::Seq,
     Lang::Ref,
     // `Record.Field l a` projects to `{ l : a }` (`IrType::Record`) during
-    // unification and is always a non-nil `*flickrt.Record` at runtime.
+    // unification and is always a non-nil `flickrt.RecordView` at runtime.
     Lang::Field,
     Lang::Schema,
     Lang::Url,
@@ -435,7 +439,7 @@ impl GoType {
     pub(super) fn as_scalar(&self) -> Option<Native> {
         match self {
             GoType::Scalar(n) => Some(*n),
-            GoType::Opt(_) => None,
+            GoType::Opt(_) | GoType::Record(_) => None,
         }
     }
 
@@ -443,13 +447,17 @@ impl GoType {
         if let Some(native) = Native::of(lang, ty) {
             return Some(GoType::Scalar(native));
         }
-        OptRepr::of(lang, decls, ty).map(GoType::Opt)
+        if let Some(repr) = OptRepr::of(lang, decls, ty) {
+            return Some(GoType::Opt(repr));
+        }
+        RecordShape::of(lang, decls, ty).map(GoType::Record)
     }
 
     pub(super) fn go_type(&self) -> String {
         match self {
             GoType::Scalar(n) => n.go().to_owned(),
             GoType::Opt(r) => r.go_type(),
+            GoType::Record(s) => s.go_type(),
         }
     }
 
@@ -457,6 +465,7 @@ impl GoType {
         match self {
             GoType::Scalar(n) => n.unbox(a, v),
             GoType::Opt(r) => r.unbox_doc(a, v),
+            GoType::Record(s) => s.unbox_doc(a, v),
         }
     }
 
@@ -466,7 +475,7 @@ impl GoType {
         v: Document<'a>,
     ) -> Document<'a> {
         match self {
-            GoType::Scalar(_) => v,
+            GoType::Scalar(_) | GoType::Record(_) => v,
             GoType::Opt(r) => r.box_doc(a, v),
         }
     }

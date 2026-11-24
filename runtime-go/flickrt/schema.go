@@ -216,7 +216,7 @@ func (w *wire) accepts(in Value) bool {
 		_, ok := in.([]Value)
 		return ok
 	case kindRecord, kindAdt, kindResult:
-		_, ok := in.(*Record)
+		_, ok := in.(RecordView)
 		return ok
 	case kindOption:
 		return in == JsonNull || s.item.jsonOf().accepts(in)
@@ -332,7 +332,7 @@ func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 		}
 		return Some(v), nil
 	case kindResult:
-		obj, ok := in.(*Record)
+		obj, ok := in.(RecordView)
 		if !ok {
 			return nil, expected("an object with `ok` or `err`", in)
 		}
@@ -346,7 +346,7 @@ func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 		}
 		return nil, append(okIssues, errIssues...)
 	case kindRecord:
-		obj, ok := in.(*Record)
+		obj, ok := in.(RecordView)
 		if !ok {
 			return nil, expected("an object", in)
 		}
@@ -356,7 +356,7 @@ func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 		}
 		return shaped(s.keys, s.pos, fields), nil
 	case kindAdt:
-		obj, ok := in.(*Record)
+		obj, ok := in.(RecordView)
 		if !ok {
 			return nil, expected("an object with a `_tag`", in)
 		}
@@ -383,9 +383,9 @@ func (w *wire) decode(fb *Fiber, in Value) (Value, []issue) {
 	panic(Defect{"a schema of no kind"})
 }
 
-func recordField(r *Record, k string) Value {
-	if i := r.index(k); i >= 0 {
-		return r.vals[i]
+func recordField(r RecordView, k string) Value {
+	if v, ok := r.Lookup(k); ok {
+		return v
 	}
 	return nil
 }
@@ -393,8 +393,8 @@ func recordField(r *Record, k string) Value {
 // object decodes the fields `keys` of a JSON object: a key it does not
 // know comes first, then a missing one, then each field in order. A nil
 // schema takes the value as it is.
-func object(fb *Fiber, obj *Record, keys []string, schemas []*Schema) ([]Value, []issue) {
-	for _, k := range obj.keys {
+func object(fb *Fiber, obj RecordView, keys []string, schemas []*Schema) ([]Value, []issue) {
+	for _, k := range obj.Keys() {
 		known := false
 		for _, want := range keys {
 			known = known || k == want
@@ -405,8 +405,8 @@ func object(fb *Fiber, obj *Record, keys []string, schemas []*Schema) ([]Value, 
 	}
 	out := make([]Value, len(keys))
 	for i, k := range keys {
-		v := recordField(obj, k)
-		if v == nil {
+		v, ok := obj.Lookup(k)
+		if !ok {
 			return nil, under(k, fail("a missing key"))
 		}
 		if schemas[i] == nil {
@@ -481,7 +481,7 @@ func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 		}
 		return Rec(key, e), nil
 	case kindRecord:
-		r := v.(*Record)
+		r := AsRecord(v)
 		out := make([]Value, len(s.labels))
 		for i, l := range s.labels {
 			e, issues := s.items[i].jsonOf().encode(fb, r.Get(l))

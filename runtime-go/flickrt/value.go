@@ -242,15 +242,13 @@ func Bool(v Value) bool { return v.(bool) }
 func Not(v Value) bool { return !v.(bool) }
 
 // Field is the field `label` of a record.
-func Field(v Value, label string) Value {
-	return record(v).Get(label)
-}
+func Field(v Value, label string) Value { return v.(RecordView).Get(label) }
 
 // TagField is the tag of a constructor value, or the `_tag` field of a record:
 // compiled code asks a value for `_tag` where a type is equal by its
 // constructor alone, and a record may also carry a `_tag` label.
 func TagField(v Value) Value {
-	if r, ok := v.(*Record); ok {
+	if r, ok := v.(RecordView); ok {
 		return r.Get("_tag")
 	}
 	return tagName(v)

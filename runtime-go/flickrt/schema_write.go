@@ -62,7 +62,7 @@ func (w *wire) write(fb *Fiber, b *strings.Builder, v Value) []issue {
 		if s.pos != nil {
 			return w.writeEncoded(fb, b, v)
 		}
-		r := v.(*Record)
+		r := AsRecord(v)
 		b.WriteByte('{')
 		for i, l := range s.labels {
 			if i > 0 {

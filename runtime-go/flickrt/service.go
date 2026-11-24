@@ -42,9 +42,11 @@ func (e *env) operation(key, name string) Value {
 		if e.key != key {
 			continue
 		}
-		impl := e.v.(*Record)
-		if e.partial && impl.index(name) < 0 {
-			continue
+		impl := e.v.(RecordView)
+		if e.partial {
+			if _, ok := impl.Lookup(name); !ok {
+				continue
+			}
 		}
 		return impl.Get(name)
 	}

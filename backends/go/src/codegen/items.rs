@@ -119,7 +119,6 @@ impl<'a> Gen<'a> {
         let a = self.a;
         // local names are unique only within a definition
         self.go_types.clear();
-        self.held.clear();
         // whether the declaration made now holds a `//line` directive
         let lines = self.lines;
         match &item.kind {
@@ -209,6 +208,7 @@ impl<'a> Gen<'a> {
             Shape::Func { types, .. } => types,
             Shape::Var => Types::default(),
         };
+        self.register_types(&types);
         self.fiber = effectful.then_some("fb");
         self.context = Some("fb");
         let mut heads = self.bind_givens(dicts);
@@ -322,7 +322,6 @@ impl<'a> Gen<'a> {
         };
         for (name, value) in methods {
             self.go_types.clear();
-            self.held.clear();
             let v = self.method_entry(&this, name, value);
             self.emit(call(a, "d.Set", [self.string(name), v]));
         }

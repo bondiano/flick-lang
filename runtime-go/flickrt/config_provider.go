@@ -261,12 +261,16 @@ func ConfigProviderFromUnknown(options, root Value) Value {
 					return nil, nil
 				}
 				cur = x[i]
-			case *Record:
+			case RecordView:
 				k, ok := seg.(string)
-				if !ok || x.index(k) < 0 {
+				if !ok {
 					return nil, nil
 				}
-				cur = x.Get(k)
+				v, found := x.Lookup(k)
+				if !found {
+					return nil, nil
+				}
+				cur = v
 			default:
 				return nil, nil
 			}
@@ -281,8 +285,8 @@ func ConfigProviderFromUnknown(options, root Value) Value {
 			return nil, nil
 		case []Value:
 			return &cfgNode{kind: cfgArray, length: len(x)}, nil
-		case *Record:
-			return &cfgNode{kind: cfgRecord, keys: jsKeys(x.keys)}, nil
+		case RecordView:
+			return &cfgNode{kind: cfgRecord, keys: jsKeys(x.Keys())}, nil
 		}
 		if cur == JsonNull || cur == Unit {
 			return nil, nil
@@ -417,7 +421,7 @@ func ConfigProviderFromDir(fb *Fiber, options Value) Value {
 	if !ok {
 		panic(Defect{"Service not found: FileSystem.FileSystem"})
 	}
-	impl := fs.(*Record)
+	impl := AsRecord(fs)
 	return &source{get: func(fb *Fiber, path []Value) (*cfgNode, *string) {
 		parts := append([]string{root}, make([]string, len(path))...)
 		for i, seg := range path {

@@ -14,16 +14,17 @@ type entriesCodec struct{ value codec }
 
 func CodecEntries(value Value) Value { return &entriesCodec{codecOf(value)} }
 
-func (e *entriesCodec) accepts(in Value) bool { _, ok := in.(*Record); return ok }
+func (e *entriesCodec) accepts(in Value) bool { _, ok := in.(RecordView); return ok }
 
 func (e *entriesCodec) decode(fb *Fiber, in Value) (Value, []issue) {
-	obj, ok := in.(*Record)
+	obj, ok := in.(RecordView)
 	if !ok {
 		return nil, expected("an object", in)
 	}
-	out := make([]Value, len(obj.keys))
-	for i, k := range obj.keys {
-		v, issues := e.value.decode(fb, obj.vals[i])
+	keys := obj.Keys()
+	out := make([]Value, len(keys))
+	for i, k := range keys {
+		v, issues := e.value.decode(fb, obj.At(i))
 		if issues != nil {
 			return nil, under(k, issues)
 		}
@@ -335,13 +336,13 @@ func xmlNode(lines *[]string, name string, node Value, depth int, original strin
 			xmlNode(lines, "item", e, depth+1, "")
 		}
 		push("</" + safe + ">")
-	case *Record:
-		if len(x.keys) == 0 {
+	case RecordView:
+		if x.Len() == 0 {
 			push("<" + safe + attrs + "/>")
 			return
 		}
 		push("<" + safe + attrs + ">")
-		keys := slices.Clone(x.keys)
+		keys := slices.Clone(x.Keys())
 		slices.Sort(keys)
 		for _, k := range keys {
 			xmlNode(lines, xmlName(k), recordField(x, k), depth+1, k)

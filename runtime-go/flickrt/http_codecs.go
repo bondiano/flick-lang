@@ -72,16 +72,17 @@ func (s *stringAs) decode(_ *Fiber, in Value) (Value, []issue) {
 // stringRecord is a JSON object of strings.
 type stringRecord struct{}
 
-func (stringRecord) accepts(in Value) bool                     { _, ok := in.(*Record); return ok }
+func (stringRecord) accepts(in Value) bool                     { _, ok := in.(RecordView); return ok }
 func (stringRecord) encode(_ *Fiber, v Value) (Value, []issue) { return v, nil }
 func (stringRecord) decode(_ *Fiber, in Value) (Value, []issue) {
-	r, ok := in.(*Record)
+	r, ok := in.(RecordView)
 	if !ok {
 		return nil, expected("an object", in)
 	}
-	for i, v := range r.vals {
+	for i, k := range r.Keys() {
+		v := r.At(i)
 		if _, ok := v.(string); !ok {
-			return nil, under(r.keys[i], expected("a string", v))
+			return nil, under(k, expected("a string", v))
 		}
 	}
 	return r, nil
@@ -158,11 +159,11 @@ func CodecFromCookies(inner Value) Value {
 		if issues != nil {
 			return nil, issues
 		}
-		r, _ := w.(*Record)
+		r, _ := w.(RecordView)
 		cookies := []Value{}
 		if r != nil {
-			for i, k := range r.keys {
-				cookie, reason := makeCookie(k, jsString(r.vals[i]), nil)
+			for i, k := range r.Keys() {
+				cookie, reason := makeCookie(k, jsString(r.At(i)), nil)
 				if reason != "" {
 					panic(Defect{reason})
 				}
@@ -245,9 +246,9 @@ func paramsOfInput(w Value) []Value {
 					out = append(out, []Value{path, jsString(item)})
 				}
 			}
-		case *Record:
-			for i, k := range x.keys {
-				walk(path+"["+k+"]", x.vals[i])
+		case RecordView:
+			for i, k := range x.Keys() {
+				walk(path+"["+k+"]", x.At(i))
 			}
 		default:
 			if v != Unit {
@@ -255,9 +256,9 @@ func paramsOfInput(w Value) []Value {
 			}
 		}
 	}
-	if r, ok := w.(*Record); ok {
-		for i, k := range r.keys {
-			walk(k, r.vals[i])
+	if r, ok := w.(RecordView); ok {
+		for i, k := range r.Keys() {
+			walk(k, r.At(i))
 		}
 	}
 	return out
@@ -285,7 +286,7 @@ func jsString(v Value) string {
 			}
 		}
 		return strings.Join(parts, ",")
-	case *Record:
+	case RecordView:
 		return "[object Object]"
 	}
 	if v == Unit {

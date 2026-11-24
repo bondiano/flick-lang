@@ -240,8 +240,9 @@ func markNode(impl Value) Value {
 // service of `key` is not node's and so has no native streams.
 func requireNode(fb *Fiber, key, module, method, path string) {
 	impl, ok := fb.env.get(key)
+	rec, isRec := impl.(*Record)
 	nodesMu.Lock()
-	native := ok && nodes[impl.(*Record)]
+	native := ok && isRec && nodes[rec]
 	nodesMu.Unlock()
 	if !native {
 		Fail(NewData(platformErrorTag, NewData(systemReasonTag, Rec(

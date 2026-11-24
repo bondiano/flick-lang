@@ -90,8 +90,13 @@ func formatSpaced(v Value, space int) string {
 			return x.String() + "n"
 		case []Value:
 			return entries("[", "]", nil, x, d)
-		case *Record:
-			return entries("{", "}", x.keys, x.vals, d)
+		case RecordView:
+			keys := x.Keys()
+			vals := make([]Value, len(keys))
+			for i := range keys {
+				vals[i] = x.At(i)
+			}
+			return entries("{", "}", keys, vals, d)
 		case *Redacted:
 			return "<redacted>"
 		case *Duration:

@@ -56,11 +56,11 @@ func prettyErrors(c *Cause) []*prettyError {
 // `name`, as an object's, else its JSON.
 func prettyFailure(err Value, trace *stackFrame) *prettyError {
 	name, message := "Error", formatJSON(err)
-	if r, ok := err.(*Record); ok {
-		if m, ok := optField(r, "message", nil).(string); ok {
+	if r, ok := err.(RecordView); ok {
+		if m, ok := recordField(r, "message").(string); ok {
 			message = m
 		}
-		if n, ok := optField(r, "name", nil).(string); ok {
+		if n, ok := recordField(r, "name").(string); ok {
 			name = n
 		}
 	}
@@ -144,10 +144,11 @@ func formatJSON(v Value) string {
 			out += "," + QuoteJSON(nativeField(x.Tag, i)) + ":" + formatJSON(f)
 		}
 		return out + "}"
-	case *Record:
-		parts := make([]string, len(x.keys))
-		for i, k := range x.keys {
-			parts[i] = QuoteJSON(k) + ":" + formatJSON(x.vals[i])
+	case RecordView:
+		keys := x.Keys()
+		parts := make([]string, len(keys))
+		for i, k := range keys {
+			parts[i] = QuoteJSON(k) + ":" + formatJSON(x.At(i))
 		}
 		return "{" + strings.Join(parts, ",") + "}"
 	}

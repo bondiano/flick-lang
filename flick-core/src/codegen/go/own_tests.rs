@@ -127,38 +127,68 @@ fn a_record_under_a_constructor_lies_in_its_value() {
         let found = out.files.iter().find(|(file, _)| file.ends_with(name));
         found.map(|(_, go)| go.as_str()).expect(name)
     };
-    let (go, types) = (file("m_App.go"), file("own_types.go"));
-    // one object: the header of a record over the values, in canonical label order
+    let (go, types, records) = (
+        file("m_App.go"),
+        file("own_types.go"),
+        file("record_types.go"),
+    );
+    // The constructor struct holds the closed record shape directly by value,
+    // with scalar fields unboxed and no flickrt.Record header.
+    assert!(
+        types.contains("type T_App__Box struct {\n\trec R_h_name_w_"),
+        "{types}"
+    );
     assert!(
         types.contains(
-            "type T_App__Box struct {\n\trec  flickrt.Record\n\tf    [3]flickrt.Value\n\tself [1]flickrt.Value\n}"
+            "func (p *T_App__Box) Fields() []flickrt.Value { return []flickrt.Value{p.rec} }"
         ),
         "{types}"
     );
     assert!(
-        types.contains("var S_T_App__Box = flickrt.ShapeOf(\"h\", \"name\", \"w\")"),
+        types.contains("func New_T_App__Box(rec R_h_name_w_"),
         "{types}"
     );
-    // the list of its one field is kept in the value: none is made where the runtime asks
     assert!(
-        types.contains("func (p *T_App__Box) Fields() []flickrt.Value { return p.self[:] }"),
+        types.contains("func Of_T_App__Box(r flickrt.Value) flickrt.Value"),
         "{types}"
     );
-    // a literal gives its values to their canonical places ("h", "name", "w"), whatever order it writes them in
-    assert!(go.contains("New_T_App__Box(int32(2), t"), "{go}");
-    // `{ box with … }` is a copy in a new value with a place set: no record apart
-    assert!(go.contains("With_T_App__Box(l_box).Set(0, "), "{go}");
-    assert!(!go.contains("flickrt.With("), "{go}");
-    // a label of the pattern is a place; the record taken whole is a pointer into the value
-    assert!(go.contains("l_shape.(*T_App__Box).f[0]"), "{go}");
     assert!(
-        go.contains("var l_box flickrt.Value = flickrt.Value(&l_shape.(*T_App__Box).rec)"),
+        types.contains("func (p *T_App__Box) EqualConstructed(other flickrt.Value, strictZero bool) (bool, bool)"),
+        "{types}"
+    );
+    assert!(!types.contains("S_T_App__Box"), "{types}");
+    assert!(!types.contains("With_T_App__Box"), "{types}");
+    // The closed record shape keeps canonical label order ("h", "name", "w")
+    // and packs pointer-bearing fields (`string`) before `int32`.
+    assert!(
+        records.contains("var k_R_h_name_w_")
+            && records.contains("= []string{\"h\", \"name\", \"w\"}"),
+        "{records}"
+    );
+    assert!(
+        records.contains("\tf1 string\n\tf0 int32\n\tf2 int32\n"),
+        "{records}"
+    );
+    // Literal passes the closed record struct by value in source evaluation order
+    // (f1="a", f0=2, f2=3) directly to New_T_App__Box.
+    assert!(
+        go.contains("New_T_App__Box(")
+            && go.contains("R_h_name_w_")
+            && go.contains("{f1: \"a\", f0: int32(2), f2: int32(3)}"),
         "{go}"
     );
-    // read through the name, a label is a place too
-    assert!(go.contains("flickrt.FieldAt(l_box, 0)"), "{go}");
-    // any other record is copied in
-    assert!(go.contains("Of_T_App__Box(l_r)"), "{go}");
+    // `{ box with h = box.h + 1 }` copies the struct on stack, updates `.f0` directly,
+    // and constructs `New_T_App__Box` with no flickrt.With or flickrt.FieldAt.
+    assert!(go.contains("l_box.f0"), "{go}");
+    assert!(!go.contains("flickrt.With("), "{go}");
+    assert!(!go.contains("flickrt.FieldAt("), "{go}");
+    assert!(!go.contains("flickrt.Field("), "{go}");
+    // Pattern matching reads directly through `.rec.f0` and `.rec.f2` as `int32`.
+    assert!(go.contains("l_shape.(*T_App__Box).rec.f0"), "{go}");
+    assert!(go.contains("l_shape.(*T_App__Box).rec.f2"), "{go}");
+    assert!(go.contains("var l_box R_h_name_w_"), "{go}");
+    // Passing an existing typed record calls `New_T_App__Box(l_r)` directly by value.
+    assert!(go.contains("New_T_App__Box(l_r)"), "{go}");
 }
 
 #[test]

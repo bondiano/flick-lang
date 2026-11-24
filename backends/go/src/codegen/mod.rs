@@ -36,6 +36,8 @@ mod once;
 mod own;
 mod pattern;
 mod predict;
+mod record;
+mod record_emit;
 mod runtime;
 mod shape;
 mod stmt;
@@ -153,6 +155,24 @@ fn tests_start<'a>(a: &'a DocumentArena<'a>, suites: &[String]) -> Document<'a> 
     call(a, "flickrt.RunTests", [a.text("fb"), suites])
 }
 
+fn collect_shapes(
+    input: &Input,
+    modules: &[&Module],
+    decls: &go_type::TypeDecls<'_>,
+    reached: &HashSet<(usize, usize)>,
+) -> HashMap<Key, Shape> {
+    let mut shapes = HashMap::new();
+    for &(m, i) in reached {
+        let item = &modules[m].items[i];
+        for name in reach::defined(item) {
+            let held = shape(input, decls, &modules[m].name, &item.kind);
+            shapes.insert((modules[m].name.clone(), name), held);
+        }
+        shapes.extend(direct::shapes(input, decls, &modules[m].name, &item.kind));
+    }
+    shapes
+}
+
 /// The program of the items `roots` reach, whose `main.go`, of documents
 /// of `a`, initializes the modules of `roots` and runs `start`.
 fn compile<'a>(
@@ -179,15 +199,7 @@ fn compile<'a>(
             "the module `{module}` of a package is not available on the go target yet"
         )));
     }
-    let mut shapes = HashMap::new();
-    for &(m, i) in &reached {
-        let item = &modules[m].items[i];
-        for name in reach::defined(item) {
-            let held = shape(input, decls, &modules[m].name, &item.kind);
-            shapes.insert((modules[m].name.clone(), name), held);
-        }
-        shapes.extend(direct::shapes(input, decls, &modules[m].name, &item.kind));
-    }
+    let shapes = collect_shapes(input, modules, decls, &reached);
     let reached_items = reached
         .iter()
         .map(|&(m, i)| (&*modules[m].name, &modules[m].items[i]));
@@ -198,9 +210,10 @@ fn compile<'a>(
     // the modules each module's initialization reads
     let mut deps: HashMap<String, BTreeSet<String>> = HashMap::new();
     let mut seen = HashSet::new();
-    let (mut owned, records, fields) = (
+    let (mut owned, mut record_shapes, records, fields) = (
         own::Owned::new(),
-        own::records(modules),
+        BTreeSet::new(),
+        own::records(modules, input.lang),
         own::fields(input.own, input.lang),
     );
     for (m, module) in modules.iter().enumerate() {
@@ -226,8 +239,14 @@ fn compile<'a>(
         }));
         deps.insert(module.name.clone(), g.modules);
         owned.extend(g.owned);
+        record_shapes.extend(g.record_shapes);
         sources.extend(g.sources);
         files.push((names::file(&module.name), code));
+    }
+    for (_, held) in owned.values() {
+        if let own::Held::Record(shape) = held {
+            record_shapes.insert(shape.clone());
+        }
     }
     let inits: Vec<_> = if item_initializers {
         initialization_order(modules, index, &reached)
@@ -253,6 +272,12 @@ fn compile<'a>(
     files.extend(sources);
     if !owned.is_empty() {
         files.push(("own_types.go".to_owned(), own::file(&owned)));
+    }
+    if !record_shapes.is_empty() {
+        files.push((
+            "record_types.go".to_owned(),
+            record_emit::file(&record_shapes),
+        ));
     }
     dedup(&mut diagnostics);
     Output {
@@ -421,11 +446,10 @@ struct Gen<'a> {
     records: Option<&'a own::Records>,
     /// Declaration-site scalar field eligibility for program constructors.
     fields: Option<&'a own::CtorFields>,
-    /// Type declarations across all modules, for typed `Option` layout selection.
+    /// Type declarations across all modules, for typed `Option` and record layout selection.
     decls: Option<&'a go_type::TypeDecls<'a>>,
-    /// The locals of the definition being emitted bound to the record that
-    /// lies in a value of a constructor, with its labels in their places.
-    held: HashMap<String, Vec<String>>,
+    /// Closed record shapes referenced by the module's generated Go code.
+    record_shapes: BTreeSet<record::RecordShape>,
     /// Extra Go package imports collected while emitting qualified global bindings:
     /// `import_path -> local package identifier`.
     go_imports: BTreeMap<String, String>,
@@ -470,7 +494,7 @@ impl<'a> Gen<'a> {
             records: None,
             fields: None,
             decls: None,
-            held: HashMap::new(),
+            record_shapes: BTreeSet::new(),
             go_imports: BTreeMap::new(),
             go_import_idents: HashSet::new(),
             go_extra_imports: Vec::new(),

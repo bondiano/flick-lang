@@ -9,10 +9,11 @@ use flick_pretty::{Document, DocumentArena, docvec};
 use super::Gen;
 use super::go_type::{GoType, OptRepr, Typed};
 use super::layout::{block, call, statement};
+use super::record::RecordShape;
 use flick_backend_support::Known;
 
 /// A type whose values are Go's own.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(super) enum Native {
     Int,
     Float,
@@ -228,6 +229,38 @@ impl<'a> Gen<'a> {
         }
     }
 
+    /// The closed record shape both operands of `==` / `!=` share.
+    fn compared_record(&self, lhs: &Expr, rhs: &Expr) -> Option<RecordShape> {
+        let known = |e: &Expr| match self.predict_go_type(e, &[]) {
+            Some(GoType::Record(s)) => Some(s),
+            _ => self.record_shape_of(e.ty.as_deref()),
+        };
+        known(lhs).filter(|s| known(rhs).as_ref() == Some(s))
+    }
+
+    fn compare_record(
+        &mut self,
+        op: BinOp,
+        lhs: &Expr,
+        rhs: &Expr,
+        shape: &RecordShape,
+    ) -> Typed<'a> {
+        let a = self.a;
+        self.register_shape(shape);
+        let want = Some(GoType::Record(shape.clone()));
+        let go = self.ordered_into(&[lhs, rhs], &[want.clone(), want]);
+        let eq = shape.eq_doc(a, go[0].doc, go[1].doc);
+        let doc = if op == BinOp::NotEq {
+            docvec![a, "!", eq]
+        } else {
+            eq
+        };
+        Typed {
+            code: doc.into(),
+            ty: Some(GoType::Scalar(Native::Bool)),
+        }
+    }
+
     pub(super) fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) -> Typed<'a> {
         let a = self.a;
         if matches!(op, BinOp::And | BinOp::Or) {
@@ -289,6 +322,11 @@ impl<'a> Gen<'a> {
             && let Some(repr) = self.compared_opt(lhs, rhs)
         {
             return self.compare_opt(op, lhs, rhs, &repr);
+        }
+        if matches!(op, BinOp::Eq | BinOp::NotEq)
+            && let Some(shape) = self.compared_record(lhs, rhs)
+        {
+            return self.compare_record(op, lhs, rhs, &shape);
         }
         if op == BinOp::Concat
             && self.predict_go_type(lhs, &[]) == Some(GoType::Scalar(Native::String))

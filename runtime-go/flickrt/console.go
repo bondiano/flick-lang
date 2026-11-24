@@ -69,13 +69,14 @@ func inspect(v Value) string {
 			parts[i] = inspect(e)
 		}
 		return "[ " + strings.Join(parts, ", ") + " ]"
-	case *Record:
-		if len(x.keys) == 0 {
+	case RecordView:
+		keys := x.Keys()
+		if len(keys) == 0 {
 			return "{}"
 		}
-		parts := make([]string, len(x.keys))
-		for i, k := range x.keys {
-			parts[i] = inspectKey(k) + ": " + inspect(x.vals[i])
+		parts := make([]string, len(keys))
+		for i, k := range keys {
+			parts[i] = inspectKey(k) + ": " + inspect(x.At(i))
 		}
 		return "{ " + strings.Join(parts, ", ") + " }"
 	case *Data:

@@ -86,6 +86,9 @@ impl<'a> Gen<'a> {
                 .any(|j| (!plain(e) && reads[j]) || (reads[i] && !plain(exprs[j])));
             if later && !go.code.atomic {
                 let t = self.temp();
+                if let Some(gt) = &go.ty {
+                    self.register_go_type(gt);
+                }
                 let ty = self.go_type_name(go.ty.as_ref());
                 self.emit(docvec![a, "var ", t, " ", ty, " = ", go.code]);
                 go.code = self.code(t);
@@ -95,6 +98,9 @@ impl<'a> Gen<'a> {
                 for prev in &mut out {
                     if !prev.code.atomic {
                         let t = self.temp();
+                        if let Some(gt) = &prev.ty {
+                            self.register_go_type(gt);
+                        }
                         let ty = self.go_type_name(prev.ty.as_ref());
                         spills.push(statement(
                             a,
@@ -207,6 +213,9 @@ impl<'a> Gen<'a> {
             },
             ExprKind::Unwrap(inner) => self.unwrap(inner),
             ExprKind::Neg(num, inner) => self.neg(*num, inner),
+            ExprKind::Record(fields) => self.record_typed(e, fields, want),
+            ExprKind::Update(base, fields) => self.update_typed(e, base, fields, want),
+            ExprKind::Field(record, label) => self.field_typed(record, label),
             _ => Typed {
                 code: self.erased_expr(e),
                 ty: None,
@@ -221,10 +230,13 @@ impl<'a> Gen<'a> {
                 },
                 _ => raw,
             },
-            Want::Exact(gt) => Typed {
-                code: self.coerce(raw, Some(gt)),
-                ty: Some(gt.clone()),
-            },
+            Want::Exact(gt) => {
+                self.register_go_type(gt);
+                Typed {
+                    code: self.coerce(raw, Some(gt)),
+                    ty: Some(gt.clone()),
+                }
+            }
         }
     }
 
@@ -244,14 +256,11 @@ impl<'a> Gen<'a> {
                 let items = self.ordered(&items).into_iter().map(|item| item.doc);
                 list(a, "[]flickrt.Value{", items, "}").into()
             }
-            ExprKind::Record(fields) => self.record(None, fields),
             ExprKind::Dictionary(fields) => {
                 let all: Vec<&Expr> = fields.iter().map(|(_, value)| value).collect();
                 let values = self.ordered(&all);
                 call(self.a, "flickrt.DictOf", self.entries(fields, values)).into()
             }
-            ExprKind::Update(base, fields) => self.record(Some(base), fields),
-            ExprKind::Field(record, label) => self.field(record, label),
             ExprKind::Ignore(inner) => {
                 let v = self.expr_typed(inner).code;
                 // a result read by nothing: Go refuses a variable nobody reads
@@ -306,12 +315,13 @@ impl<'a> Gen<'a> {
         let (mut other_stmts, other_val) = self.block(|g| g.eval(other, want));
         let r_ty = match want {
             Want::Exact(gt) => Some(gt.clone()),
-            Want::Value => match (&then_val.ty, &other_val.ty) {
-                (Some(GoType::Scalar(x)), Some(GoType::Scalar(y))) if x == y => {
-                    Some(GoType::Scalar(*x))
+            Want::Value => {
+                if then_val.ty == other_val.ty && !matches!(then_val.ty, Some(GoType::Opt(_))) {
+                    then_val.ty.clone()
+                } else {
+                    None
                 }
-                _ => None,
-            },
+            }
             Want::Any => {
                 if then_val.ty == other_val.ty {
                     then_val.ty.clone()
@@ -320,6 +330,9 @@ impl<'a> Gen<'a> {
                 }
             }
         };
+        if let Some(gt) = &r_ty {
+            self.register_go_type(gt);
+        }
         let r = self.temp();
         let go_ty = self.go_type_name(r_ty.as_ref());
         self.emit(docvec![a, "var ", r, " ", go_ty]);
@@ -346,11 +359,14 @@ impl<'a> Gen<'a> {
         let r_ty = match want {
             Want::Exact(gt) => Some(gt.clone()),
             Want::Value => match self.match_go_type(e, s.ty.as_ref(), arms, &[]) {
-                Some(GoType::Scalar(n)) => Some(GoType::Scalar(n)),
+                Some(gt @ (GoType::Scalar(_) | GoType::Record(_))) => Some(gt),
                 _ => None,
             },
             Want::Any => self.match_go_type(e, s.ty.as_ref(), arms, &[]),
         };
+        if let Some(gt) = &r_ty {
+            self.register_go_type(gt);
+        }
         let r = self.temp();
         let go_ty = self.go_type_name(r_ty.as_ref());
         self.emit(docvec![self.a, "var ", r, " ", go_ty]);

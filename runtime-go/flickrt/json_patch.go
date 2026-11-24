@@ -125,26 +125,29 @@ func jsonPatchGet(old, new Value, path string, out []patchOp) []patchOp {
 			}
 			return out
 		}
-	case *Record:
-		if n, ok := new.(*Record); ok {
-			if o == n {
-				return out
+	case RecordView:
+		if n, ok := new.(RecordView); ok {
+			if op, okO := o.(*Record); okO {
+				if np, okN := n.(*Record); okN && op == np {
+					return out
+				}
 			}
 			all := &Record{}
-			for _, k := range o.keys {
+			for _, k := range o.Keys() {
 				all.put(k, nil)
 			}
-			for _, k := range n.keys {
+			for _, k := range n.Keys() {
 				all.put(k, nil)
 			}
 			for _, k := range sortedKeys(all) {
 				at := path + "/" + escapeToken(k)
-				i, j := o.index(k), n.index(k)
+				ov, hasO := o.Lookup(k)
+				nv, hasN := n.Lookup(k)
 				switch {
-				case i >= 0 && j >= 0:
-					out = jsonPatchGet(o.vals[i], n.vals[j], at, out)
-				case j >= 0:
-					out = append(out, patchOp{"add", at, n.vals[j]})
+				case hasO && hasN:
+					out = jsonPatchGet(ov, nv, at, out)
+				case hasN:
+					out = append(out, patchOp{"add", at, nv})
 				default:
 					out = append(out, patchOp{"remove", at, nil})
 				}
@@ -224,9 +227,9 @@ func applyPatchOp(doc Value, op patchOp) Value {
 			}
 			stack, cur = append(stack, c, i), c[i]
 			continue
-		case *Record:
-			if i := c.index(token); i >= 0 {
-				stack, cur = append(stack, c, token), c.vals[i]
+		case RecordView:
+			if v, ok := c.Lookup(token); ok {
+				stack, cur = append(stack, c, token), v
 				continue
 			}
 		}
@@ -259,14 +262,14 @@ func applyPatchOp(doc Value, op patchOp) Value {
 			out = append(append(out, op.value), parent[i+1:]...)
 		}
 		updated = out
-	case *Record:
-		if op.op != "add" && parent.index(last) < 0 {
+	case RecordView:
+		if _, has := parent.Lookup(last); op.op != "add" && !has {
 			patchFail(`Property "%s" does not exist at "%s".`, last, op.path)
 		}
 		if op.op == "remove" {
-			updated = parent.without(last)
+			updated = withoutView(parent, last)
 		} else {
-			updated = parent.set(last, op.value)
+			updated = copiedView(parent).set(last, op.value)
 		}
 	default:
 		patchFail(notFound, op.op, op.path)
@@ -277,7 +280,7 @@ func applyPatchOp(doc Value, op patchOp) Value {
 			c[stack[i+1].(int)] = updated
 			updated = c
 		} else {
-			updated = stack[i].(*Record).set(stack[i+1].(string), updated)
+			updated = copiedView(stack[i]).set(stack[i+1].(string), updated)
 		}
 	}
 	return updated

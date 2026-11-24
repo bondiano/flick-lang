@@ -56,7 +56,7 @@ func promptJsString(x float64) string {
 	return ShowNumber(x)
 }
 
-func promptNumberLoop(o *Record, opts *promptNumberOptions) Value {
+func promptNumberLoop(o RecordView, opts *promptNumberOptions) Value {
 	initial := ""
 	if v, ok := some(o.Get("default")); ok {
 		initial = promptJsString(promptToFloat(v))
@@ -90,7 +90,7 @@ func promptFloatOr(option Value, otherwise float64) float64 {
 // PromptInt is `Cli.Prompt.int`: the bounds default to those of Flick's
 // 32-bit `Int` and hold before `validate` runs, as the JS binding has it.
 func PromptInt(options Value) Value {
-	o := options.(*Record)
+	o := AsRecord(options)
 	return promptNumberLoop(o, &promptNumberOptions{
 		message:     o.Get("message").(string),
 		incrementBy: promptFloatOr(o.Get("incrementBy"), 1),
@@ -102,7 +102,7 @@ func PromptInt(options Value) Value {
 }
 
 func PromptNumber(options Value) Value {
-	o := options.(*Record)
+	o := AsRecord(options)
 	return promptNumberLoop(o, &promptNumberOptions{
 		message:     o.Get("message").(string),
 		incrementBy: promptFloatOr(o.Get("incrementBy"), 1),
@@ -157,7 +157,8 @@ func (o *promptNumberOptions) check(fb *Fiber, n float64) (Value, *string) {
 
 func (o *promptNumberOptions) process(c *promptCtx, input, state Value) promptAction {
 	s := state.(promptNumberState)
-	key := input.(*Record).Get("key").(*Record)
+	in := AsRecord(input)
+	key := AsRecord(in.Get("key"))
 	name := key.Get("name").(string)
 	next := func(value string) promptAction { return promptNext(promptNumberState{s.cursor, value, nil}) }
 	if key.Get("ctrl").(bool) && name == "u" {
@@ -200,7 +201,7 @@ func (o *promptNumberOptions) process(c *promptCtx, input, state Value) promptAc
 		}
 		return promptSubmit(value)
 	}
-	typed := promptOr(input.(*Record).Get("input"), "")
+	typed := promptOr(in.Get("input"), "")
 	if o.float && typed == "." && strings.Contains(s.value, ".") {
 		return promptBeep
 	}

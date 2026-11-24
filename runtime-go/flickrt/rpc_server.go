@@ -323,7 +323,7 @@ func rpcJSText(v Value) string {
 		return "undefined"
 	case string:
 		return x
-	case *Record:
+	case RecordView:
 		return "[object Object]"
 	}
 	return JsonStringify(v).(string)

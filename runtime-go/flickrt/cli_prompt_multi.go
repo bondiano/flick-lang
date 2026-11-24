@@ -17,7 +17,7 @@ type promptMultiState struct {
 const promptMetaOptions = 2
 
 func PromptMultiSelect(options, multi Value) Value {
-	o, m := options.(*Record), multi.(*Record)
+	o, m := AsRecord(options), AsRecord(multi)
 	message, choices, perPage := o.Get("message"), promptChoices(o.Get("choices")), promptMaxPerPage(o.Get("maxPerPage"))
 	selectAll, selectNone := promptOr(m.Get("selectAll"), "Select All"), promptOr(m.Get("selectNone"), "Select None")
 	inverse := promptOr(m.Get("inverseSelection"), "Inverse Selection")

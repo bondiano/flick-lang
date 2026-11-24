@@ -491,11 +491,12 @@ Values have the representation of the JS target, in Go terms:
 | `String` | `string` holding WTF-8 |
 | `Bool`, `Unit` | `bool`, `flickrt.Unit` |
 | a tuple, a `List` | `[]flickrt.Value`; `[x, ...rest]` shares the storage of the list |
-| a record | `*flickrt.Record`, its labels in canonical sorted order (JS array-index keys ascending, then UTF-16 code-unit order — matching `Record.labels` and the JS target), copied by `{ r with … }` |
+| a record (closed shape) | a dedicated Go struct `R_…` (or `R_empty` for `{}`), declared once in `record_types.go`, carried by value through known closed-type calls, locals, `let mut` variables and self tail loops. Fields lie in canonical sorted label order (JS array-index keys ascending, then UTF-16 code-unit order — matching `Record.labels` and the JS target), with concrete scalar fields stored unboxed (`int32`, `float64`, `bool`, `string`, fixed-width scalars) packed pointer-bearing fields first and non-scalar fields as `flickrt.Value`. Code that knows the closed shape reads fields directly (`p.f0`), copies and updates `{ r with … }` by value on the stack, and compares with Go `==` or a typed `Eq_R_…` helper; field expressions still evaluate in source order. Value-receiver methods implement `flickrt.RecordView` and `flickrt.RecordEqual`, so a struct crosses into `flickrt.Value` directly without rebuilding a `*flickrt.Record` |
+| an open, polymorphic, or runtime-built record | `*flickrt.Record` (or any `flickrt.RecordView` passed across the erased boundary), read by label through `flickrt.RecordView` (`Get`, `Lookup`, `Keys`, `Len`, `At`), copied by `{ r with … }`, and converted back into a closed struct via `As_R_…` at typed boundaries |
 | a constructor | `*flickrt.Data` with the tag of the JS target; `Fields()` is its fields, up to two of them held in the value itself |
 | a tagged constructor without retained dictionaries, of a type the program declares | a Go type of its own: `*T_Module__Name` holding the fields when it has fields, or a zero-size value type `T_Module__Name` (`struct{}`) constructed as `T_Module__Name{}` with no allocation when it has none. Fields declared with a concrete scalar type (`Int`, `Float`, `Bool`, `String`) are stored unboxed (`int32`, `float64`, `bool`, `string`), packed with pointer-bearing fields first; polymorphic and non-scalar fields stay `flickrt.Value`. A `match` asks Go for the type (`Is_T_Module__Name`), compares no tag, and reads unboxed scalar fields directly without boxing; derived `Eq`, `Ord`, `Hash`, `Show`, and `==` operate directly on those typed fields. The runtime reads any constructor value as `flickrt.Constructed` (`TagName()`, `Fields()`) and builds one with `flickrt.Construct(tag, fields...)`; a constructor of a built-in module (`Ordering`, erased `Option`, …) and one holding a dictionary stay `*flickrt.Data` |
 | a concrete `Option T` on a typed Go path | an allocation-free by-value Go representation chosen from `T`: `flickrt.OptBool` (`uint8` sentinel: `0` = `None`, `1` = `Some false`, `2` = `Some true`) for `Option Bool`; `flickrt.OptRef` (`struct{ val flickrt.Value }` with `nil` sentinel for `None`) when the non-`Option` payload is guaranteed non-nil (tuples, records, functions, `List`, `BigInt`, `Result`, non-unboxed ADTs); `flickrt.Opt[T]` (`{ Val T; Ok bool }` presence flag) for `Int`, `Float`, `String`, `Unknown`/opaque payloads, and every nested `Option (Option U)` so `Some None` and deeper nestings stay distinct. Polymorphic `Option a` stays tagged `*flickrt.Data`, and erased boundaries (polymorphic calls, generic runtime observers, `flickrt.Value` Go FFI) convert to and from the tagged `"Some"` / `"None"` `*flickrt.Data` form |
-| a constructor declared over a record, `Node { left : Tree; key : Int }` | the record lies in the value of the constructor: one object, and the record a `match` binds is a `*flickrt.Record` pointing into it. Its labels are in canonical sorted order, whatever order the declaration or literal writes them in (field expressions still evaluate in source order); a record given whole (`Node r`) is copied in |
+| a constructor declared over a record, `Node { left : Tree; key : Int }` | `*T_Module__Name` holding the closed record shape's Go struct `R_…` directly by value (`struct { rec R_… }`): one constructor allocation with unboxed scalar fields and direct `.rec.f…` access in `match`, no `*flickrt.Record` header. Labels lie in canonical sorted order (field expressions still evaluate in source order); an erased record passed whole (`Node r`) is converted via `As_R_…` |
 | a function | `func(*flickrt.Fiber, flickrt.Value) flickrt.Value` per stage; one of two or three arguments whose stages before the last are pure is `flickrt.Fn2` or `flickrt.Fn3`, which takes them at once |
 | a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
 
@@ -555,13 +556,13 @@ so an unsorted `to_list` prints the same on both targets.
 
 A top-level function is a Go function of its execution fiber, dictionaries
 and all its parameters; a full application calls it, and a partial one or a
-use as a value makes a function of values around it. A parameter that is an `Int`, a `Float`, a `Bool`, a `String`, or an eligible
-concrete `Option T`, and a result that is one, has its typed Go representation
-there (`func F(fb *flickrt.Fiber, n int32) flickrt.Opt[int32]`), so a scalar or
-concrete `Option` passed to a known function, matched, unwrapped with `?`,
-compared with `==`, stored in a `let mut`, or carried across a self tail loop
-adds no `flickrt.Value` or `*flickrt.Data` allocation; converting to or from
-erased `*flickrt.Data` happens only when crossing into polymorphic code,
+use as a value makes a function of values around it. A parameter that is an `Int`, a `Float`, a `Bool`, a `String`, an eligible
+concrete `Option T`, or a closed record shape, and a result that is one, has its typed Go representation
+there (`func F(fb *flickrt.Fiber, n int32) flickrt.Opt[int32]`), so a scalar,
+concrete `Option`, or closed record passed to a known function, matched, unwrapped with `?`,
+updated with `{ r with … }`, read via `p.field`, compared with `==`, stored in a `let mut`, or carried across a self tail loop
+adds no `flickrt.Value`, `*flickrt.Record`, or `*flickrt.Data` allocation; adapting at the
+erased `flickrt.Value` boundary happens only when crossing into open-row or polymorphic code,
 closures returning `flickrt.Value`, generic runtime helpers, or `flickrt.Value`
 FFI. The tail calls that are loops on the JS
 target (see [Recursion](#recursion-stack-safety-is-not-the-whole-cost))

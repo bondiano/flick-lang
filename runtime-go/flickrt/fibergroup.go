@@ -60,10 +60,10 @@ func (g *fiberGroup) find(key Value) int {
 // `onlyIfMissing` keeping) the one already there.
 func (g *fiberGroup) add(key Value, c *child, options Value) {
 	propagate, onlyIfMissing := false, false
-	if r, ok := options.(*Record); ok {
+	if r, ok := options.(RecordView); ok {
 		propagate = Bool(r.Get("propagateInterruption"))
-		if r.index("onlyIfMissing") >= 0 {
-			onlyIfMissing = Bool(r.Get("onlyIfMissing"))
+		if v, ok := r.Lookup("onlyIfMissing"); ok {
+			onlyIfMissing = Bool(v)
 		}
 	} else if b, ok := options.(bool); ok {
 		propagate = b

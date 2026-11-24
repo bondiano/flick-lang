@@ -39,9 +39,9 @@ func jsonSchemaDocument(dialect string, schema, definitions Value) Value {
 // shortcut: a schema that is not an object reads as `{}`, where JS spreads a string's characters into one; a string is no schema, so match it only if a program shows one
 func fromDraft202012(js Value) Value {
 	schema, defs := &Record{}, Value(&Record{})
-	if r, ok := js.(*Record); ok {
+	if r, ok := asRecord(js); ok {
 		schema = r.without("$defs")
-		if d, ok := lookup(r, "$defs").(*Record); ok {
+		if d, ok := asRecord(lookup(r, "$defs")); ok {
 			defs = d
 		}
 	}
@@ -62,7 +62,7 @@ func JsonSchemaFromOpenApi30(js Value) Value {
 
 func JsonSchemaFromOpenApi31(js Value) Value {
 	root := false
-	if r, ok := js.(*Record); ok {
+	if r, ok := asRecord(js); ok {
 		root = createsResource(lookup(r, "$id"))
 	}
 	return fromDraft202012(transformSchema(js, func(schema *Record, inEmbedded bool) {
@@ -109,7 +109,7 @@ func draft07To2020(source *Record, cx *convContext) *Record {
 		case "definitions":
 			out.put("$defs", cx.schemaMap(v, key, "$defs"))
 		case "dependencies":
-			deps, ok := v.(*Record)
+			deps, ok := asRecord(v)
 			if !ok {
 				out.put(key, v)
 				break
@@ -218,7 +218,7 @@ func sanitizeOpenApiComponentsKey(s string) string {
 // `#/components/schemas`, their keys made valid component names.
 func JsonSchemaToOpenApi31(multi Value) Value {
 	m := record(multi)
-	shared, _ := m.Get("definitions").(*Record)
+	shared, _ := asRecord(m.Get("definitions"))
 	if shared == nil {
 		shared = &Record{}
 	}
@@ -260,9 +260,9 @@ func JsonSchemaToOpenApi31(multi Value) Value {
 	rewrite := func(schema Value, rejectShared bool) Value {
 		var local *Record
 		isRoot := false
-		if r, ok := schema.(*Record); ok {
+		if r, ok := asRecord(schema); ok {
 			isRoot = createsResource(lookup(r, "$id"))
-			local, _ = lookup(r, "$defs").(*Record)
+			local, _ = asRecord(lookup(r, "$defs"))
 		}
 		return transformSchema(schema, func(s *Record, inEmbedded bool) {
 			rejectKeywordCollisions(s, openApi31TargetCollisions, "OpenAPI 3.1", "Draft 2020-12")

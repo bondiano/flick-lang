@@ -142,11 +142,12 @@ func (f *formWriter) done() ([]byte, string) {
 // formOf is a form of the fields of an encoded record; a list is a field of each value.
 func formOf(encoded Value) ([]byte, string) {
 	f := newFormWriter()
-	if r, ok := encoded.(*Record); ok {
-		for i, k := range r.keys {
-			values, ok := r.vals[i].([]Value)
+	if r, ok := encoded.(RecordView); ok {
+		for i, k := range r.Keys() {
+			val := r.At(i)
+			values, ok := val.([]Value)
 			if !ok {
-				values = []Value{r.vals[i]}
+				values = []Value{val}
 			}
 			for _, v := range values {
 				switch x := v.(type) {
@@ -404,7 +405,7 @@ func clientExtras(fb *Fiber, e *apiEndpoint, r *received, v Value) Value {
 type ignoring struct{ codec }
 
 func (i *ignoring) decode(fb *Fiber, in Value) (Value, []issue) {
-	r, ok := in.(*Record)
+	r, ok := asRecord(in)
 	if !ok {
 		return i.codec.decode(fb, in)
 	}

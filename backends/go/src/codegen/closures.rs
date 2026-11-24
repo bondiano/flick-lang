@@ -200,15 +200,15 @@ impl<'a> Gen<'a> {
 
     /// Binds the parameters of a function to Go parameter names; a pattern
     /// is destructured into the current statements.
-    pub(super) fn bind_params(&mut self, params: &[Param]) -> Vec<&'a str> {
+    pub(super) fn bind_params(&mut self, params: &[Param], types: &Types) -> Vec<&'a str> {
         let mut heads = Vec::new();
-        for p in params {
+        for (i, p) in params.iter().enumerate() {
             let name = match &p.pat {
                 Pat::Bind(n) => self.a.alloc_str(&names::local(n)),
                 Pat::Wild | Pat::Lit(Lit::Unit) => "_",
                 pat => {
                     let t = self.temp();
-                    self.destructure(pat, self.a.text(t), None);
+                    self.destructure(pat, self.a.text(t), types.param(i).cloned());
                     t
                 }
             };

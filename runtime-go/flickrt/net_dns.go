@@ -110,10 +110,10 @@ func dnsRecordCodec(t string) codec {
 // issue, as no member is a candidate for it.
 type dnsUnion struct{}
 
-func (dnsUnion) accepts(in Value) bool { _, ok := in.(*Record); return ok }
+func (dnsUnion) accepts(in Value) bool { _, ok := in.(RecordView); return ok }
 
 func (dnsUnion) decode(fb *Fiber, in Value) (Value, []issue) {
-	if r, ok := in.(*Record); ok {
+	if r, ok := in.(RecordView); ok {
 		if t, ok := recordField(r, "_tag").(string); ok && dnsCodecs[t] != nil {
 			return dnsCodecs[t].decode(fb, in)
 		}

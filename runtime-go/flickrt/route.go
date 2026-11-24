@@ -130,7 +130,7 @@ func RoutePrint(codec, value Value) Value {
 	if route.Query == nil {
 		return b.String()
 	}
-	r := d.Fields()[len(route.Segments)].(*Record)
+	r := AsRecord(d.Fields()[len(route.Segments)])
 	var pairs []Value
 	for _, q := range route.Query {
 		field := recordField(r, q.Label)

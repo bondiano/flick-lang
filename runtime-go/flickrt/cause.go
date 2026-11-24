@@ -353,9 +353,11 @@ func AppFail(message Value) Value {
 // describe is the text of a reason, as the JS runner writes one: a
 // record's `message`, else JSON.
 func describe(err Value) string {
-	if r, ok := err.(*Record); ok && r.index("message") >= 0 {
-		if m, ok := r.Get("message").(string); ok {
-			return m
+	if r, ok := err.(RecordView); ok {
+		if msg, found := r.Lookup("message"); found {
+			if m, ok := msg.(string); ok {
+				return m
+			}
 		}
 	}
 	if s, ok := err.(string); ok {
@@ -390,7 +392,7 @@ func report(c *Cause) string {
 	if !c.has(causeDie) {
 		for _, r := range c.reasons() {
 			if d, ok := r.err.(*Data); ok && r.kind == causeFail && d.Tag == appErrorTag {
-				return "error: " + d.Fields()[0].(*Record).Get("message").(string)
+				return "error: " + AsRecord(d.Fields()[0]).Get("message").(string)
 			}
 		}
 	}

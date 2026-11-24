@@ -26,8 +26,13 @@ func isJSONTree(in Value) bool {
 		return !math.IsNaN(x) && !math.IsInf(x, 0)
 	case []Value:
 		return !slices.ContainsFunc(x, func(v Value) bool { return !isJSONTree(v) })
-	case *Record:
-		return !slices.ContainsFunc(x.vals, func(v Value) bool { return !isJSONTree(v) })
+	case RecordView:
+		for i := range x.Len() {
+			if !isJSONTree(x.At(i)) {
+				return false
+			}
+		}
+		return true
 	}
 	return false
 }
@@ -157,10 +162,10 @@ type taggedOption struct{ item codec }
 
 func CodecTaggedOption(item Value) Value { return &taggedOption{codecOf(item)} }
 
-func (t *taggedOption) accepts(in Value) bool { _, ok := in.(*Record); return ok }
+func (t *taggedOption) accepts(in Value) bool { _, ok := in.(RecordView); return ok }
 
 func (t *taggedOption) decode(fb *Fiber, in Value) (Value, []issue) {
-	obj, ok := in.(*Record)
+	obj, ok := in.(RecordView)
 	if !ok {
 		return nil, expected("an object with `_tag` None or Some", in)
 	}
@@ -233,7 +238,7 @@ func CodecTransformPure(decode, encode, from Value) Value {
 func issuesOf(err Value) []issue {
 	var messages []string
 	for _, i := range List(err.(*Data).Fields()[0]) {
-		messages = append(messages, i.(*Record).Get("message").(string))
+		messages = append(messages, AsRecord(i).Get("message").(string))
 	}
 	return fail(strings.Join(messages, "; "))
 }

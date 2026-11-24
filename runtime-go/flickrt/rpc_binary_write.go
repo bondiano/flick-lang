@@ -233,7 +233,7 @@ func (w *binWriter) value(n *binNode, v Value) error {
 		}
 		w.buf = append(w.buf, JsonStringify(v).(string)...)
 	case binStruct:
-		r, ok := v.(*Record)
+		r, ok := asRecord(v)
 		if !ok {
 			return binExpected("an object")
 		}
@@ -573,7 +573,7 @@ func (w *binWriter) run(st *binNode, xs []Value) error {
 	var shapes []uint32
 	tables := make([]*binTable, len(st.fields))
 	for _, x := range xs {
-		r, ok := x.(*Record)
+		r, ok := asRecord(x)
 		if !ok {
 			return binExpected("an object")
 		}
@@ -669,12 +669,12 @@ func (w *binWriter) union(n *binNode, v Value) error {
 
 func (m *binMember) matches(v Value) bool {
 	if m.variant {
-		r, ok := v.(*Record)
+		r, ok := v.(RecordView)
 		if !ok {
 			return false
 		}
 		for _, s := range m.node.sentinels {
-			if at := r.index(s.key); at < 0 || r.vals[at] != s.lit {
+			if val, found := r.Lookup(s.key); !found || val != s.lit {
 				return false
 			}
 		}
@@ -703,7 +703,7 @@ func (m *binMember) matches(v Value) bool {
 		_, ok := v.([]Value)
 		return ok
 	case binStruct, binExit:
-		_, ok := v.(*Record)
+		_, ok := v.(RecordView)
 		return ok
 	case binJSON:
 		return true
@@ -715,7 +715,7 @@ func (m *binMember) matches(v Value) bool {
 // reasons, each sized: a Fail's error, a Die's defect, an Interrupt with
 // or without its fiber id.
 func (w *binWriter) exit(n *binNode, v Value) error {
-	r, ok := v.(*Record)
+	r, ok := v.(RecordView)
 	if !ok {
 		return binExpected("an Exit")
 	}
@@ -743,7 +743,7 @@ func (w *binWriter) exit(n *binNode, v Value) error {
 }
 
 func (w *binWriter) reason(n *binNode, v Value) error {
-	r, ok := v.(*Record)
+	r, ok := v.(RecordView)
 	if !ok {
 		return binExpected("a cause reason")
 	}

@@ -211,7 +211,7 @@ func isFiles(v Value) bool {
 	if !ok || len(xs) == 0 {
 		return false
 	}
-	_, ok = xs[0].(*Record)
+	_, ok = xs[0].(RecordView)
 	return ok
 }
 

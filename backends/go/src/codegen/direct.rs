@@ -177,7 +177,6 @@ impl<'a> Gen<'a> {
                 Some(Shape::Func { .. }) => {
                     // local names are unique only within a definition
                     self.go_types.clear();
-                    self.held.clear();
                     let lines = self.lines;
                     let decl = self.function(&name, &info.context, code);
                     decls.push((decl, self.lines > lines));

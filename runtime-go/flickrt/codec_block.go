@@ -101,15 +101,15 @@ func CodecIgnoreExtra(c Value) Value {
 	return c
 }
 
-func (b *block) accepts(in Value) bool { _, ok := in.(*Record); return ok }
+func (b *block) accepts(in Value) bool { _, ok := in.(RecordView); return ok }
 
 func (b *block) decode(fb *Fiber, in Value) (Value, []issue) {
-	obj, ok := in.(*Record)
+	obj, ok := in.(RecordView)
 	if !ok {
 		return nil, expected("an object", in)
 	}
 	if !b.ignoreExtra {
-		for _, k := range obj.keys {
+		for _, k := range obj.Keys() {
 			known := false
 			for _, f := range b.fields {
 				known = known || f.wire == k
@@ -121,8 +121,8 @@ func (b *block) decode(fb *Fiber, in Value) (Value, []issue) {
 	}
 	out := newRecord(len(b.fields))
 	for _, f := range b.fields {
-		v := recordField(obj, f.wire)
-		if v == nil {
+		v, present := obj.Lookup(f.wire)
+		if !present {
 			x, issues := f.missing(fb)
 			if issues != nil {
 				return nil, under(f.wire, issues)
@@ -143,7 +143,7 @@ func (b *block) decode(fb *Fiber, in Value) (Value, []issue) {
 }
 
 func (b *block) encode(fb *Fiber, v Value) (Value, []issue) {
-	r := record(v)
+	r := AsRecord(v)
 	out := newRecord(len(b.fields))
 	for _, f := range b.fields {
 		x := r.Get(f.label)
