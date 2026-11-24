@@ -64,11 +64,18 @@ impl Backend for Lua {
             backend_api: range("0.1.0", "0.2.0"),
             ir: range("0.17.0", "0.18.0"),
             language: range("0.2.0", "0.3.0"),
-            // every request names the runtime ABI of the compiler
-            runtime_abis: vec![NamedRange {
-                name: "flickrt".into(),
-                versions: range("0.2.0", "0.3.0"),
-            }],
+            // every request names the runtime ABI of the compiler and the
+            // primitive kernel
+            runtime_abis: vec![
+                NamedRange {
+                    name: "flickrt".into(),
+                    versions: range("0.2.0", "0.3.0"),
+                },
+                NamedRange {
+                    name: "flick.kernel".into(),
+                    versions: range("0.1.0", "0.2.0"),
+                },
+            ],
             environments: PROFILES
                 .iter()
                 .map(|p| Environment {
