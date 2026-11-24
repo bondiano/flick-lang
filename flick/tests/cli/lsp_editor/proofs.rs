@@ -332,12 +332,12 @@ fn proof_cost_and_exhaustion_point_to_the_failing_step() {
     );
     for i in 1..16 {
         let previous = i - 1;
-        writeln!(text, "double{i} : (a -> a) -> a -> a").unwrap();
+        writeln!(text, "double{i} : (a -> a) -> a -> a").expect("write signature into the fixture");
         writeln!(
             text,
             "let double{i} f x = double{previous} f (double{previous} f x)"
         )
-        .unwrap();
+        .expect("write definition into the fixture");
     }
     text.push_str("\nproof costly where equal true (double15 (fun x -> x) true) = symm refl\n");
     let dir = project(
