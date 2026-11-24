@@ -3,6 +3,8 @@
 use std::mem;
 use std::rc::Rc;
 
+#[cfg(not(target_arch = "wasm32"))]
+use super::LemmaAliases;
 use super::defs::{Admitted, Program, admit};
 use super::eval::{Env, Machine, Nf, STEPS, Stop, Value, distinct};
 use super::show::show;
@@ -13,6 +15,8 @@ use super::{Arg, Cert, Data, Equation, Failure, Goal, Lemma, Rule, Statement, Ty
 use crate::source::Span;
 
 mod cases;
+#[cfg(not(target_arch = "wasm32"))]
+mod suggest;
 
 struct Checker<'a> {
     data: &'a Data,
@@ -34,6 +38,18 @@ struct Checker<'a> {
     trace: Option<Trace<'a>>,
     #[cfg(not(target_arch = "wasm32"))]
     observing: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    suggestions: Option<suggest::Candidates<'a>>,
+    #[cfg(not(target_arch = "wasm32"))]
+    probing: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy)]
+enum Site {
+    Expected,
+    Synthesized,
+    Scope,
 }
 
 /// A distinct pair only refutes a declaration while it still represents
@@ -77,35 +93,9 @@ pub(super) fn prove(
     program: &dyn Program,
     lemmas: &[Lemma],
     #[cfg(not(target_arch = "wasm32"))] trace: Option<&mut Vec<ProofStep>>,
+    #[cfg(not(target_arch = "wasm32"))] aliases: Option<&LemmaAliases>,
 ) -> Result<(), Failure> {
-    let mut terms: Vec<&Term> = statement
-        .premises
-        .iter()
-        .flat_map(|(_, eq)| [&eq.left, &eq.right])
-        .collect();
-    if let Goal::Equal(eq) = &statement.goal {
-        terms.extend([&eq.left, &eq.right]);
-    }
-    proof.terms(&mut terms);
-    // what the lemmas it uses state is unfolded where their premises are proved
-    let mut used = Vec::new();
-    proof.lemmas(&mut used);
-    for lemma in lemmas
-        .iter()
-        .filter(|l| used.contains(&l.statement.name.as_str()))
-    {
-        let statement = &lemma.statement;
-        terms.extend(
-            statement
-                .premises
-                .iter()
-                .flat_map(|(_, eq)| [&eq.left, &eq.right]),
-        );
-        if let Goal::Equal(eq) = &statement.goal {
-            terms.extend([&eq.left, &eq.right]);
-        }
-    }
-    let defs = admit(&terms, program, statement.span).map_err(Failure::Refused)?;
+    let defs = admit_certificate(statement, proof, program, lemmas)?;
     let mut checker = Checker {
         data,
         defs,
@@ -120,50 +110,134 @@ pub(super) fn prove(
         trace: trace.map(Trace::new),
         #[cfg(not(target_arch = "wasm32"))]
         observing: false,
+        #[cfg(not(target_arch = "wasm32"))]
+        suggestions: aliases.map(|aliases| suggest::Candidates::new(program, aliases)),
+        #[cfg(not(target_arch = "wasm32"))]
+        probing: false,
     };
-    for (x, ty) in &statement.params {
-        checker.admit(ty, statement.span)?;
-        checker.vars.push((x.clone(), ty.clone()));
+    checker.statement(statement, proof)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn probe(
+    statement: &Statement,
+    proof: &Cert,
+    data: &Data,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+    refined: &[(Rc<str>, Value)],
+    remaining: &mut u64,
+) -> bool {
+    if *remaining == 0 {
+        return false;
     }
-    for (h, eq) in &statement.premises {
-        checker.admit_equation(eq, statement.span)?;
-        checker.facts.push((h.clone(), eq.clone()));
-    }
-    let origin = if statement.premises.is_empty() {
-        GoalOrigin::Statement
-    } else {
-        GoalOrigin::Step
+    let Ok(defs) = admit_certificate(statement, proof, program, lemmas) else {
+        return false;
     };
-    match &statement.goal {
-        Goal::Equal(eq) => {
-            checker.admit_equation(eq, statement.span)?;
-            checker.check(eq, proof, origin)
+    let mut kernel = Checker {
+        data,
+        defs,
+        lemmas,
+        unfold: true,
+        vars: Vec::new(),
+        refined: refined.to_vec(),
+        facts: Vec::new(),
+        steps: *remaining,
+        fresh: 0,
+        trace: None,
+        observing: false,
+        suggestions: None,
+        probing: true,
+    };
+    let accepted = kernel.statement(statement, proof).is_ok();
+    *remaining = kernel.steps;
+    accepted
+}
+
+fn admit_certificate(
+    statement: &Statement,
+    proof: &Cert,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+) -> Result<Admitted, Failure> {
+    let mut terms: Vec<&Term> = statement
+        .premises
+        .iter()
+        .flat_map(|(_, eq)| [&eq.left, &eq.right])
+        .collect();
+    if let Goal::Equal(eq) = &statement.goal {
+        terms.extend([&eq.left, &eq.right]);
+    }
+    proof.terms(&mut terms);
+    // what the lemmas it uses state is unfolded where their premises are proved
+    let mut used = Vec::new();
+    proof.lemmas(&mut used);
+    if !used.is_empty() {
+        for lemma in lemmas
+            .iter()
+            .filter(|l| used.contains(&l.statement.name.as_str()))
+        {
+            let statement = &lemma.statement;
+            terms.extend(
+                statement
+                    .premises
+                    .iter()
+                    .flat_map(|(_, eq)| [&eq.left, &eq.right]),
+            );
+            if let Goal::Equal(eq) = &statement.goal {
+                terms.extend([&eq.left, &eq.right]);
+            }
         }
-        Goal::SameType(a, b) => {
-            #[cfg(not(target_arch = "wasm32"))]
-            checker.record(proof.span, Err((a, b)));
-            checker.admit(a, statement.span)?;
-            checker.admit(b, statement.span)?;
-            if !matches!(proof.kind, Rule::Refl) {
-                return Err(Failure::Invalid {
-                    span: proof.span,
-                    why: "the proof of `same_type` is `refl`".into(),
-                });
+    }
+    admit(&terms, program, statement.span).map_err(Failure::Refused)
+}
+
+impl Checker<'_> {
+    fn statement(&mut self, statement: &Statement, proof: &Cert) -> Result<(), Failure> {
+        for (x, ty) in &statement.params {
+            self.admit(ty, statement.span)?;
+            self.vars.push((x.clone(), ty.clone()));
+        }
+        for (h, eq) in &statement.premises {
+            self.admit_equation(eq, statement.span)?;
+            self.facts.push((h.clone(), eq.clone()));
+        }
+        let origin = if statement.premises.is_empty() {
+            GoalOrigin::Statement
+        } else {
+            GoalOrigin::Step
+        };
+        match &statement.goal {
+            Goal::Equal(eq) => {
+                self.admit_equation(eq, statement.span)?;
+                self.check(eq, proof, origin)
             }
-            if a == b {
-                return Ok(());
-            }
-            let (left, right) = (a.to_string(), b.to_string());
-            Err(if different_heads(a, b) {
-                origin.mismatch(proof.span, left, right, "types")
-            } else {
-                Failure::Unproved {
-                    span: proof.span,
-                    left,
-                    right,
-                    note: None,
+            Goal::SameType(a, b) => {
+                #[cfg(not(target_arch = "wasm32"))]
+                self.record(proof.span, Err((a, b)), Site::Expected);
+                self.admit(a, statement.span)?;
+                self.admit(b, statement.span)?;
+                if !matches!(proof.kind, Rule::Refl) {
+                    return Err(Failure::Invalid {
+                        span: proof.span,
+                        why: "the proof of `same_type` is `refl`".into(),
+                    });
                 }
-            })
+                if a == b {
+                    return Ok(());
+                }
+                let (left, right) = (a.to_string(), b.to_string());
+                Err(if different_heads(a, b) {
+                    origin.mismatch(proof.span, left, right, "types")
+                } else {
+                    Failure::Unproved {
+                        span: proof.span,
+                        left,
+                        right,
+                        note: None,
+                    }
+                })
+            }
         }
     }
 }
@@ -175,6 +249,7 @@ pub(super) fn observe(
     data: &Data,
     lemmas: &[Lemma],
     steps: &mut Vec<ProofStep>,
+    suggestions: Option<(&dyn Program, &LemmaAliases)>,
 ) {
     let mut checker = Checker {
         data,
@@ -188,13 +263,16 @@ pub(super) fn observe(
         fresh: 0,
         trace: Some(Trace::new(steps)),
         observing: true,
+        suggestions: suggestions
+            .map(|(program, aliases)| suggest::Candidates::new(program, aliases)),
+        probing: false,
     };
     match &statement.goal {
         Goal::Equal(eq) => {
             let _ = checker.check(eq, proof, GoalOrigin::Step);
         }
         Goal::SameType(a, b) => {
-            checker.record(proof.span, Err((a, b)));
+            checker.record(proof.span, Err((a, b)), Site::Expected);
         }
     }
 }
@@ -330,6 +408,10 @@ impl Checker<'_> {
         if l == r {
             return Ok(());
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.probing {
+            return invalid(span, "the candidate does not close its goal");
+        }
         let (left, right) = (show(&l), show(&r));
         Err(if distinct(&l, &r) {
             origin.mismatch(span, left, right, "values")
@@ -357,6 +439,10 @@ impl Checker<'_> {
             let supplied = self.nf(supplied, span)?;
             let expected = self.nf(expected, span)?;
             if supplied != expected {
+                #[cfg(not(target_arch = "wasm32"))]
+                if self.probing {
+                    return invalid(span, "the candidate does not close its goal");
+                }
                 let (name, verb, attribution) = match source {
                     EquationSource::Congruence => ("cong", "supplies", ""),
                     EquationSource::Fact(name) => (name, "proves", ""),
@@ -391,10 +477,23 @@ impl Checker<'_> {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn record(&mut self, span: Span, goal: Result<&Equation, (&Ty, &Ty)>) -> Option<usize> {
-        self.trace
-            .as_mut()
-            .map(|trace| trace.record(span, goal, &self.vars, &self.facts, &self.refined))
+    fn record(
+        &mut self,
+        span: Span,
+        goal: Result<&Equation, (&Ty, &Ty)>,
+        site: Site,
+    ) -> Option<usize> {
+        let mut trace = self.trace.take()?;
+        let i = trace.record(span, goal, &self.vars, &self.facts, &self.refined);
+        if !matches!(site, Site::Scope)
+            && let Some(mut suggestions) = self.suggestions.take()
+        {
+            trace.steps[i].suggestions =
+                suggestions.at(self, goal, span, matches!(site, Site::Synthesized));
+            self.suggestions = Some(suggestions);
+        }
+        self.trace = Some(trace);
+        Some(i)
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -405,7 +504,22 @@ impl Checker<'_> {
     #[cfg(not(target_arch = "wasm32"))]
     fn check(&mut self, goal: &Equation, cert: &Cert, origin: GoalOrigin) -> Result<(), Failure> {
         let from = self.steps;
-        let recorded = self.record(cert.span, Ok(goal));
+        let recorded = if self.trace.is_none() {
+            None
+        } else if matches!(cert.kind, Rule::Let(..)) {
+            let mut rest = cert;
+            while let Rule::Let(_, _, next) = &rest.kind {
+                rest = next;
+            }
+            let span = Span::new(
+                cert.span.file,
+                cert.span.start,
+                cert.span.end.max(rest.span.end),
+            );
+            self.record(span, Ok(goal), Site::Scope)
+        } else {
+            self.record(cert.span, Ok(goal), Site::Expected)
+        };
         let result = self.check_rule(goal, cert, origin);
         if let (Some(trace), Some(i)) = (&mut self.trace, recorded)
             && !self.observing
@@ -518,7 +632,7 @@ impl Checker<'_> {
     fn synth(&mut self, cert: &Cert) -> Result<Equation, Failure> {
         let from = self.steps;
         let eq = self.synth_rule(cert)?;
-        let recorded = self.record(cert.span, Ok(&eq));
+        let recorded = self.record(cert.span, Ok(&eq), Site::Synthesized);
         if let (Some(trace), Some(i)) = (&mut self.trace, recorded)
             && !self.observing
         {

@@ -16,6 +16,7 @@ mod show;
 mod term;
 mod trace;
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::rc::Rc;
 
@@ -215,6 +216,9 @@ pub struct Lemma {
     pub order: Vec<(Rc<str>, bool)>,
 }
 
+/// Source-qualified spellings of checked imported lemma identities.
+pub type LemmaAliases = BTreeMap<String, Vec<String>>;
+
 /// Why a proof gives no certificate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Failure {
@@ -359,6 +363,8 @@ pub fn prove(
         lemmas,
         #[cfg(not(target_arch = "wasm32"))]
         None,
+        #[cfg(not(target_arch = "wasm32"))]
+        None,
     )
 }
 
@@ -372,7 +378,7 @@ pub fn prove_traced(
     lemmas: &[Lemma],
     steps: &mut Vec<ProofStep>,
 ) -> Result<(), Failure> {
-    check::prove(statement, proof, data, program, lemmas, Some(steps))
+    check::prove(statement, proof, data, program, lemmas, Some(steps), None)
 }
 
 /// Observes goals in an incomplete body with definitions folded. The editor
@@ -386,7 +392,92 @@ pub fn observe(
     steps: &mut Vec<ProofStep>,
 ) {
     let proof = cert::recover(body, lemmas);
-    check::observe(statement, &proof, data, lemmas, steps);
+    check::observe(statement, &proof, data, lemmas, steps, None);
+}
+
+/// Checks the certificate and saves independently checked candidates at its steps.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn prove_with_suggestions(
+    statement: &Statement,
+    proof: &Cert,
+    data: &Data,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+    aliases: &LemmaAliases,
+    steps: &mut Vec<ProofStep>,
+) -> Result<(), Failure> {
+    check::prove(
+        statement,
+        proof,
+        data,
+        program,
+        lemmas,
+        Some(steps),
+        Some(aliases),
+    )
+}
+
+/// Checks an editor candidate against its current subject with a separate budget.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn check_candidate(
+    statement: &Statement,
+    proof: &Cert,
+    data: &Data,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+    remaining: &mut u64,
+) -> bool {
+    check::probe(statement, proof, data, program, lemmas, &[], remaining)
+}
+
+/// Observes a draft, with independently checked suggestions where possible.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn observe_with_suggestions(
+    statement: &Statement,
+    body: &flick_ir::Expr,
+    data: &Data,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+    aliases: &LemmaAliases,
+    steps: &mut Vec<ProofStep>,
+) {
+    let proof = cert::recover(body, lemmas);
+    check::observe(
+        statement,
+        &proof,
+        data,
+        lemmas,
+        steps,
+        Some((program, aliases)),
+    );
+}
+
+/// Checks candidates for the header of a proof with an empty body.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn suggest_header(
+    statement: &Statement,
+    data: &Data,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+    aliases: &LemmaAliases,
+) -> Vec<String> {
+    let mut steps = Vec::new();
+    let proof = Cert {
+        kind: Rule::Hole(Box::new(Failure::Invalid {
+            span: statement.span,
+            why: "the proof body is empty".into(),
+        })),
+        span: statement.span,
+    };
+    check::observe(
+        statement,
+        &proof,
+        data,
+        lemmas,
+        &mut steps,
+        Some((program, aliases)),
+    );
+    steps.pop().map_or_else(Vec::new, |step| step.suggestions)
 }
 
 #[cfg(test)]
