@@ -93,7 +93,20 @@ impl Admitting<'_> {
                 ),
             );
         }
-        let body = self.body_of(d)?;
+        let body = self.body_of(d).map_err(|mut failure| {
+            if !self.path.is_empty() {
+                let chain: Vec<_> = self
+                    .path
+                    .iter()
+                    .chain(std::iter::once(d))
+                    .map(|def| format!("`{}`", def.shown()))
+                    .collect();
+                failure
+                    .why
+                    .push_str(&format!("; dependency chain {}", chain.join(" → ")));
+            }
+            failure
+        })?;
         self.path.push(d.clone());
         self.visit(&body)?;
         self.path.pop();

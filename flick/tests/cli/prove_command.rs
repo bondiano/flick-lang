@@ -4,7 +4,10 @@
 
 use std::fs;
 
+use serde_json::{Value, json};
+
 use crate::common;
+use crate::prove_contracts::json_diagnostics;
 
 use common::{flick_in, project};
 
@@ -13,6 +16,68 @@ const LIB: &str = "schema-version = 1\n\n[project]\nkind = \"lib\"\n";
 const PROOF: &str = "module App.Laws exposing (..)\n\nproof right_identity (v : Option a)\nwhere equal (flat_map pure v) v =\n  match v with\n  | None -> refl\n  | Some x -> refl\n";
 
 const LIBRARY: &str = "module App.Lib exposing (..)\n\nanswer : Int\nlet answer = 42\n";
+
+pub(crate) const STEP_PROOFS: &str = "module App.Laws exposing (..)\n\
+\n\
+proof given (x : Bool) (h : equal x true) where equal x true = h\n\
+proof wrong_step where equal true true = trans false refl refl\n\
+proof wrong_premise where equal true true = given false refl\n\
+proof refuted where equal true false = refl\n";
+
+pub(crate) fn proof_step_diagnostic<'a>(diagnostics: &'a [Value], name: &str) -> &'a Value {
+    diagnostics
+        .iter()
+        .find(|d| d["message"].as_str().unwrap_or_default().contains(name))
+        .unwrap_or_else(|| panic!("missing {name} in {diagnostics:?}"))
+}
+
+#[test]
+fn prove_points_to_the_obligation_that_failed() {
+    let dir = project(
+        "prove_failed_obligation",
+        &[("flick.toml", LIB), ("proofs/App/Laws.fl", STEP_PROOFS)],
+    );
+    let broken = flick_in(&dir, &["--diagnostics", "json", "prove"]);
+    assert_eq!(broken.status.code(), Some(1), "{broken:?}");
+    let diagnostics = json_diagnostics(&broken.stderr);
+    assert_eq!(diagnostics.len(), 3, "{diagnostics:?}");
+    let offset = |needle: &str| STEP_PROOFS.find(needle).expect("fixture text");
+    for (name, obligation, argument) in [
+        ("wrong_step", "true = false", "trans false "),
+        ("wrong_premise", "false = true", "given false "),
+    ] {
+        let d = proof_step_diagnostic(&diagnostics, name);
+        let start = offset(argument) + argument.len();
+        assert_eq!(d["code"], "FLICK-T090", "{d}");
+        assert_eq!(d["range"], json!({ "start": start, "end": start + 4 }));
+        let message = d["message"].as_str().expect("message");
+        assert!(message.contains(obligation), "{d}");
+        assert!(message.contains("different values"), "{d}");
+        let related = d["related"].as_array().expect("related locations");
+        let declaration = offset(&format!("proof {name}"));
+        assert!(related.iter().any(|r| r["range"]["start"] == declaration));
+        if name == "wrong_premise" {
+            let lemma = offset("proof given");
+            assert!(related.iter().any(|r| r["range"]["start"] == lemma));
+        }
+    }
+    let d = proof_step_diagnostic(&diagnostics, "refuted");
+    assert_eq!(d["code"], "FLICK-T080");
+    assert!(
+        d["message"]
+            .as_str()
+            .unwrap()
+            .contains("`refuted` is false")
+    );
+
+    let fixed = STEP_PROOFS
+        .replace("trans false refl refl", "refl")
+        .replace("given false refl", "refl")
+        .replace("equal true false", "equal true true");
+    fs::write(dir.join("proofs/App/Laws.fl"), fixed).expect("replace proof bodies");
+    let proved = flick_in(&dir, &["prove"]);
+    assert_eq!(proved.status.code(), Some(0), "{proved:?}");
+}
 
 #[test]
 fn prove_checks_the_proof_root_and_check_leaves_it_alone() {

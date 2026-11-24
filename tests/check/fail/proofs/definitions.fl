@@ -44,3 +44,9 @@ proof through_ffi (b : Bool) where equal (flip (flip b)) b = refl
 //~ FLICK-T082 @31:1-31:69 `App.Diverging.forever` names itself
 //~ FLICK-T082 @35:1-36:79 `App.Diverging.countdown` names itself
 //~ FLICK-T082 @38:1-38:66 `App.Diverging.flip` is foreign code
+
+flip_through : Bool -> Bool
+let flip_through b = flip b
+
+proof via (b : Bool) where equal (flip_through b) b = refl
+//~ FLICK-T082 @51:1-51:59 dependency chain `App.Diverging.flip_through` → `App.Diverging.flip`

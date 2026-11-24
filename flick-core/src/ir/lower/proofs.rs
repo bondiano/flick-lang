@@ -294,7 +294,11 @@ fn prove_each(
                     .map(|(x, p)| (x.as_str().into(), *p))
                     .collect(),
             }),
-            Err(failure) => out.push(failure.diagnostic(&info.name)),
+            Err(failure) => out.push(
+                failure
+                    .with_related(lowered.span, format!("proof `{}`", info.name))
+                    .diagnostic(&info.name),
+            ),
         }
     }
     out

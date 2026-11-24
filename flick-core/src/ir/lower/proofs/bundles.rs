@@ -91,8 +91,11 @@ impl Checking<'_, '_> {
                 continue;
             };
             self.used[i] = true;
-            if let Err(failure) = self.law(law, bundle, dict, &self.fields[i]) {
-                self.out.push(failure);
+            let field = &self.fields[i];
+            if let Err(failure) = self.law(law, bundle, dict, field) {
+                self.out.push(
+                    failure.with_related(field.span, format!("law `{name}` of `{}`", bundle.class)),
+                );
             }
         }
         let slots: Vec<&String> = bundle.supers.iter().map(|(s, _)| s).collect();
@@ -200,7 +203,7 @@ impl Checking<'_, '_> {
                 if *premise {
                     Arg::Proof(Cert {
                         kind: Rule::Fact(x),
-                        span: field.span,
+                        span: field.value.span,
                     })
                 } else {
                     Arg::Value(Term::Var(x))
@@ -209,7 +212,7 @@ impl Checking<'_, '_> {
             .collect();
         let cert = Cert {
             kind: Rule::Lemma(name.as_str().into(), args),
-            span: field.span,
+            span: field.value.span,
         };
         let mut data = info.data.clone();
         data.extend(self.data);

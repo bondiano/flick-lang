@@ -216,11 +216,19 @@ pub struct Lemma {
 /// Why a proof gives no certificate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Failure {
-    /// The two sides are different values.
+    /// The statement's sides are demonstrably different.
     Disproved {
         span: Span,
         left: String,
         right: String,
+        kind: &'static str,
+    },
+    /// Two sides of an obligation chosen by the proof are different.
+    StepMismatch {
+        span: Span,
+        left: String,
+        right: String,
+        kind: &'static str,
     },
     /// Nothing here makes the two sides the same.
     Unproved {
@@ -235,14 +243,52 @@ pub enum Failure {
     Invalid { span: Span, why: String },
     /// The budget ran out; nothing is known.
     Exhausted { span: Span },
+    /// A source location that explains why this obligation arose.
+    Related {
+        failure: Box<Failure>,
+        span: Span,
+        message: String,
+    },
 }
 
 impl Failure {
+    pub fn with_related(self, span: Span, message: impl Into<String>) -> Self {
+        Self::Related {
+            failure: Box::new(self),
+            span,
+            message: message.into(),
+        }
+    }
+
+    pub fn cause(&self) -> &Self {
+        match self {
+            Self::Related { failure, .. } => failure.cause(),
+            _ => self,
+        }
+    }
+
     pub fn diagnostic(&self, proof: &str) -> Diagnostic {
         match self {
-            Failure::Disproved { span, left, right } => Diagnostic::error(
+            Failure::Disproved {
+                span,
+                left,
+                right,
+                kind,
+            } => Diagnostic::error(
                 codes::T080,
-                format!("`{proof}` is false: `{left}` and `{right}` are different values"),
+                format!("`{proof}` is false: `{left}` and `{right}` are different {kind}"),
+                *span,
+            ),
+            Failure::StepMismatch {
+                span,
+                left,
+                right,
+                kind,
+            } => Diagnostic::error(
+                codes::T090,
+                format!(
+                    "this step of `{proof}` needs `{left} = {right}`, but `{left}` and `{right}` are different {kind}"
+                ),
                 *span,
             ),
             Failure::Unproved {
@@ -278,6 +324,18 @@ impl Failure {
                 format!("the proof of `{proof}` ran out of its budget: nothing is proved"),
                 *span,
             ),
+            Failure::Related {
+                failure,
+                span,
+                message,
+            } => {
+                let diagnostic = failure.diagnostic(proof);
+                if diagnostic.span == Some(*span) {
+                    diagnostic
+                } else {
+                    diagnostic.with_related(*span, message)
+                }
+            }
         }
     }
 }
