@@ -1,35 +1,30 @@
 //! Editor evidence retained alongside a proof check.
 
-#[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashSet;
 
-#[cfg(not(target_arch = "wasm32"))]
-use super::{Lower, statement};
-use super::{LoweredProof, Run, replay_lemmas};
-#[cfg(not(target_arch = "wasm32"))]
+use super::{Lower, LoweredProof, Run, replay_lemmas, statement};
 use crate::diagnostics::{Diagnostic, Severity};
-use crate::logic::Lemma;
-#[cfg(not(target_arch = "wasm32"))]
-use crate::logic::{self, ProofStep};
+use crate::logic::{self, Lemma, LemmaAliases, Program};
 use crate::resolve;
-#[cfg(not(target_arch = "wasm32"))]
 use crate::source::Span;
-#[cfg(not(target_arch = "wasm32"))]
 use crate::syntax::cst::{Element, Node, Token};
-#[cfg(not(target_arch = "wasm32"))]
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::{ProofEvidence, ProofStatus};
-#[cfg(not(target_arch = "wasm32"))]
 use crate::types::{ProofInfo, Typing};
 use flick_ir::Dict;
 
 pub(super) struct Recording<'a> {
-    imports: Vec<String>,
+    pub aliases: LemmaAliases,
     pub out: &'a mut Vec<ProofEvidence>,
 }
 
 impl<'a> Recording<'a> {
-    pub fn new(module: &resolve::Module, run: &Run, out: &'a mut Vec<ProofEvidence>) -> Self {
+    pub fn new(
+        module: &resolve::Module,
+        run: &Run,
+        lemmas: &mut Vec<Lemma>,
+        out: &'a mut Vec<ProofEvidence>,
+    ) -> Self {
         let mut modules: Vec<_> = module
             .syntax
             .imports
@@ -39,30 +34,39 @@ impl<'a> Recording<'a> {
             .collect();
         modules.sort_unstable();
         modules.dedup();
-        let imports = replay_lemmas(&modules, run, 0);
-        let mut qualified = Vec::new();
-        for lemma in &imports {
-            if let Some((module_name, name)) = lemma.statement.name.rsplit_once('.') {
-                qualified.extend(
-                    module
-                        .syntax
-                        .imports
-                        .iter()
-                        .filter(|import| import.module == module_name)
-                        .map(|import| format!("{}.{}", import.qualifier(), name)),
-                );
+        let mut aliases = LemmaAliases::new();
+        let mut known: HashSet<_> = lemmas
+            .iter()
+            .map(|lemma| lemma.statement.name.clone())
+            .collect();
+        // These are the same independently replayed certificates which an
+        // explicitly written use would read. Share their identities with
+        // the verifier so candidate checking uses the full visible scope.
+        for lemma in replay_lemmas(&modules, run, 0) {
+            let identity = &lemma.statement.name;
+            if let Some((module_name, name)) = identity.rsplit_once('.') {
+                let mut source: Vec<_> = module
+                    .syntax
+                    .imports
+                    .iter()
+                    .filter(|import| import.module == module_name)
+                    .map(|import| format!("{}.{}", import.qualifier(), name))
+                    .collect();
+                source.sort_unstable();
+                source.dedup();
+                aliases.insert(identity.clone(), source);
+            }
+            if known.insert(identity.clone()) {
+                lemmas.push(lemma);
             }
         }
-        qualified.sort_unstable();
-        qualified.dedup();
-        Self {
-            imports: qualified,
-            out,
-        }
+        Self { aliases, out }
     }
 
     pub fn begin(&self, lowered: &LoweredProof, lemmas: &[Lemma]) -> ProofEvidence {
-        let mut visible = self.imports.clone();
+        let mut visible: Vec<_> = self.aliases.values().flatten().cloned().collect();
+        visible.sort_unstable();
+        visible.dedup();
         visible.extend(
             lemmas
                 .iter()
@@ -75,6 +79,7 @@ impl<'a> Recording<'a> {
             status: ProofStatus::Open,
             failure: None,
             steps: Vec::new(),
+            header_suggestions: Vec::new(),
             lemmas: visible,
             instance: lowered.subject.as_ref().and_then(|dict| match dict {
                 Dict::Instance { module, name, .. } => Some(format!("{module}.{name}")),
@@ -85,28 +90,45 @@ impl<'a> Recording<'a> {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn observe_body(
     lowered: &LoweredProof,
     info: &ProofInfo,
+    program: &dyn Program,
     lemmas: &[Lemma],
-    steps: &mut Vec<ProofStep>,
+    aliases: &LemmaAliases,
+    evidence: &mut ProofEvidence,
 ) {
-    if let (Ok(statement), Some(body)) = (statement(lowered, info), &lowered.body) {
-        let mut recovered = Vec::new();
-        logic::observe(&statement, body, &info.data, lemmas, &mut recovered);
-        let checked: HashSet<_> = steps.iter().map(|step| step.span).collect();
-        steps.extend(
-            recovered
-                .into_iter()
-                .filter(|step| !checked.contains(&step.span)),
-        );
+    let Ok(statement) = statement(lowered, info) else {
+        return;
+    };
+    let Some(body) = &lowered.body else {
+        evidence.header_suggestions =
+            logic::suggest_header(&statement, &info.data, program, lemmas, aliases);
+        return;
+    };
+    let mut recovered = Vec::new();
+    logic::observe_with_suggestions(
+        &statement,
+        body,
+        &info.data,
+        program,
+        lemmas,
+        aliases,
+        &mut recovered,
+    );
+    let checked: HashSet<_> = evidence.steps.iter().map(|step| step.span).collect();
+    evidence.steps.extend(
+        recovered
+            .into_iter()
+            .filter(|step| !checked.contains(&step.span)),
+    );
+    if let Some(root) = evidence.steps.first() {
+        evidence.header_suggestions.clone_from(&root.suggestions);
     }
 }
 
 /// Preserve certificate structure around broken source. Ordinary lowering
 /// assumes successful elaboration, so keep broken leaves out of its input.
-#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn lower_drafts(
     module: &resolve::Module,
     typing: &Typing,
@@ -156,7 +178,6 @@ pub(super) fn lower_drafts(
         .collect()
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn has_error(node: &Node, errors: &[Span]) -> bool {
     let (start, end) = node.range();
     errors
@@ -164,7 +185,6 @@ fn has_error(node: &Node, errors: &[Span]) -> bool {
         .any(|error| start <= error.start && error.start <= end)
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 fn repair(node: &Node, errors: &[Span]) -> Node {
     if !has_error(node, errors) {
         return node.clone();

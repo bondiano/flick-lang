@@ -47,6 +47,7 @@ pub struct ProofView<'a> {
     pub premises: Vec<ProofFact>,
     pub substitutions: Vec<ProofSubstitution>,
     pub lemmas: &'a [String],
+    pub suggestions: &'a [String],
     pub instance: Option<&'a str>,
     pub obligations: &'a [LawObligation],
     pub normalization_steps: Option<u64>,
@@ -141,6 +142,10 @@ impl Ide<'_> {
                     .collect()
             }),
             lemmas: evidence.map_or(&[], |e| &e.lemmas),
+            suggestions: step.map_or_else(
+                || evidence.map_or(&[][..], |e| e.header_suggestions.as_slice()),
+                |step| step.suggestions.as_slice(),
+            ),
             instance: evidence.and_then(|e| e.instance.as_deref()),
             obligations,
             normalization_steps: step.map(|s| s.normalization_steps),
@@ -148,7 +153,7 @@ impl Ide<'_> {
     }
 }
 
-fn declaration_at<'a>(root: &'a Node, text: &str, offset: u32) -> Option<&'a Node> {
+pub(super) fn declaration_at<'a>(root: &'a Node, text: &str, offset: u32) -> Option<&'a Node> {
     tree::path_to(root, offset)
         .into_iter()
         .rev()
@@ -157,7 +162,9 @@ fn declaration_at<'a>(root: &'a Node, text: &str, offset: u32) -> Option<&'a Nod
             // Just after an empty body, whitespace belongs to the cursor's draft.
             let decl = root.nodes().take_while(|n| n.range().1 < offset).last()?;
             let draft = decl.kind == K::ProofDecl
-                && decl.has_token(K::Eq)
+                && (decl.has_token(K::Eq)
+                    || decl.has_token(K::WhereKw)
+                        && goal_of(decl).is_none_or(|g| g.range() == (0, 0)))
                 && decl
                     .nodes()
                     .find(|n| n.kind == K::Block)
@@ -191,7 +198,7 @@ fn step_offset(declaration: &Node, text: &str, offset: u32) -> u32 {
     offset
 }
 
-fn goal_of(node: &Node) -> Option<&Node> {
+pub(super) fn goal_of(node: &Node) -> Option<&Node> {
     node.nodes()
         .find(|n| matches!(n.kind, K::Goal | K::SameTypeGoal | K::LawfulGoal))
 }

@@ -2,6 +2,7 @@
 //! a certificate fails to be one.
 
 use std::rc::Rc;
+use std::slice;
 
 use flick_ir::Lit;
 
@@ -497,4 +498,163 @@ fn recovery_keeps_each_case_context_when_an_arm_has_no_certificate() {
         [("v".to_owned(), "true".to_owned())]
     );
     assert!(steps.iter().all(|step| step.normalization_steps == 0));
+}
+
+#[test]
+fn checked_draft_suggestions_use_the_live_goal_and_visible_premises() {
+    let mut draft = equal(
+        vec![("x", Ty::Bool), ("y", Ty::Bool)],
+        Ty::Bool,
+        var("y"),
+        var("x"),
+    );
+    draft.premises.push((
+        "h".into(),
+        Equation {
+            ty: Ty::Bool,
+            left: var("x"),
+            right: var("y"),
+        },
+    ));
+    let aliases = super::LemmaAliases::new();
+    let suggest =
+        |draft: &Statement| super::suggest_header(draft, &data(), &Nothing, &[], &aliases);
+    assert_eq!(suggest(&draft), ["symm h"]);
+
+    draft.params.push(("symm".into(), Ty::Bool));
+    assert!(suggest(&draft).is_empty(), "a local shadows the proof rule");
+    draft.params.pop();
+    draft.params.push(("h$1".into(), Ty::Bool));
+    assert!(
+        suggest(&draft).is_empty(),
+        "the outer premise cannot be written here"
+    );
+}
+
+#[test]
+fn a_qualified_suggestion_instantiates_and_checks_lemma_premises() {
+    let mut proved = equal(
+        vec![("x", Ty::Bool), ("y", Ty::Bool)],
+        Ty::Bool,
+        var("x"),
+        var("y"),
+    );
+    proved.name = "Module.earlier".into();
+    let Goal::Equal(goal) = &proved.goal else {
+        unreachable!()
+    };
+    proved.premises.push(("p".into(), goal.clone()));
+    let proof = cert(Rule::Fact("p".into()));
+    assert_eq!(prove(&proved, &proof, &data(), &Nothing, &[]), Ok(()));
+    let lemma = super::Lemma {
+        statement: proved.clone(),
+        order: vec![("x".into(), false), ("y".into(), false), ("p".into(), true)],
+    };
+    let aliases = super::LemmaAliases::from([("Module.earlier".into(), vec!["M.earlier".into()])]);
+    let mut draft = proved;
+    draft.premises[0].1 = draft.premises[0].1.swapped();
+    let suggestions =
+        super::suggest_header(&draft, &data(), &Nothing, slice::from_ref(&lemma), &aliases);
+    assert!(suggestions.iter().any(|s| s == "M.earlier x y (symm p)"));
+
+    draft.premises.clear();
+    let rejected = super::suggest_header(&draft, &data(), &Nothing, &[lemma], &aliases);
+    assert!(
+        rejected.is_empty(),
+        "no proof for the lemma's premise exists"
+    );
+}
+
+#[test]
+fn a_checked_lemma_for_equal_definitions_keeps_its_exact_subject() {
+    use flick_ir::{Expr, ExprKind, Item, ItemKind};
+
+    use super::Def;
+
+    struct Flag(Item);
+
+    impl super::Program for Flag {
+        fn item(&self, module: &str, name: &str) -> Option<&Item> {
+            (matches!(module, "A" | "B") && name == "flag").then_some(&self.0)
+        }
+
+        fn instance(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> Option<(&flick_ir::InstanceInfo, &[(String, Expr)])> {
+            None
+        }
+    }
+
+    let program = Flag(Item {
+        span: span(),
+        kind: ItemKind::Value {
+            name: "flag".into(),
+            type_params: Vec::new(),
+            dicts: Vec::new(),
+            dict_constraints: Vec::new(),
+            ty: None,
+            body: Expr::new(ExprKind::Lit(Lit::Bool(true)), span()),
+        },
+    });
+    let flag = |module: &str| {
+        Term::Def(Rc::new(Def::Value {
+            module: module.into(),
+            name: "flag".into(),
+        }))
+    };
+    let equation = |module| {
+        equal(
+            vec![],
+            Ty::Bool,
+            flag(module),
+            Term::Lit(Literal(Lit::Bool(true))),
+        )
+    };
+    let mut earlier = equation("A");
+    earlier.name = "earlier".into();
+    assert_eq!(prove(&earlier, &refl(), &data(), &program, &[]), Ok(()));
+    let lemmas = [super::Lemma {
+        statement: earlier,
+        order: Vec::new(),
+    }];
+    let aliases = super::LemmaAliases::new();
+    assert_eq!(
+        super::suggest_header(&equation("A"), &data(), &program, &lemmas, &aliases),
+        ["refl", "earlier"]
+    );
+    assert_eq!(
+        super::suggest_header(&equation("B"), &data(), &program, &lemmas, &aliases),
+        ["refl"]
+    );
+}
+
+#[test]
+fn a_synthesized_proof_term_requires_a_rule_that_states_its_equation() {
+    let mut goal = equal(vec![("x", Ty::Bool)], Ty::Bool, var("x"), var("x"));
+    let Goal::Equal(equation) = &goal.goal else {
+        unreachable!()
+    };
+    goal.premises.push(("h".into(), equation.clone()));
+    let proof = cert(Rule::Cong(
+        "v".into(),
+        var("v"),
+        Box::new(cert(Rule::Fact("h".into()))),
+    ));
+    let mut steps = Vec::new();
+    assert_eq!(
+        super::prove_with_suggestions(
+            &goal,
+            &proof,
+            &data(),
+            &Nothing,
+            &[],
+            &super::LemmaAliases::new(),
+            &mut steps,
+        ),
+        Ok(())
+    );
+    assert!(steps[0].suggestions.iter().any(|s| s == "refl"));
+    assert_eq!(steps[1].suggestions, ["h", "symm h"]);
 }

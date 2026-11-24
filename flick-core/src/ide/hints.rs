@@ -20,6 +20,10 @@ pub struct Help {
 impl Ide<'_> {
     /// For a cursor among the arguments of a call `f a b`, or `f a <| b`.
     pub fn signature_help(&self, file: FileId, offset: u32) -> Option<Help> {
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(help) = self.proof_signature_help(file, offset) {
+            return Some(help);
+        }
         let m = self.module(file)?;
         let text = self.text(file);
         let path = tree::path_to(&m.tree, offset);

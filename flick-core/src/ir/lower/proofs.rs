@@ -231,7 +231,7 @@ pub fn check_proofs(
     let mut lemmas = imported_lemmas(&proofs, run, 0);
     let of = |m: &str, c: &str| class_laws(run, module.name, &laws, m, c);
     #[cfg(not(target_arch = "wasm32"))]
-    let mut evidence = evidence.map(|out| evidence::Recording::new(module, run, out));
+    let mut evidence = evidence.map(|out| evidence::Recording::new(module, run, &mut lemmas, out));
     let diagnostics = prove_each(
         &proofs,
         &program,
@@ -254,20 +254,36 @@ pub fn observe_proofs(
     diagnostics: &[Diagnostic],
     out: &mut Vec<ProofEvidence>,
 ) {
-    let recording = evidence::Recording::new(module, run, out);
     let proofs = paired(
         evidence::lower_drafts(module, typing, diagnostics),
         &typing.proofs,
     );
     let laws = laws_of(module, typing);
     let of = |m: &str, c: &str| class_laws(run, module.name, &laws, m, c);
+    // Proof declarations have no runtime IR. Ordinary definitions still
+    // provide an exact subject if every error belongs to a proof body.
+    let ordinary_checked = diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.severity == Severity::Error)
+        .all(|diagnostic| {
+            diagnostic.span.is_some_and(|span| {
+                proofs.iter().any(|(proof, _)| {
+                    span.file == proof.span.file
+                        && proof.span.start <= span.start
+                        && span.end <= proof.span.end
+                })
+            })
+        });
+    let own = ordinary_checked
+        .then(|| super::lower(module, typing).ok())
+        .flatten();
     let program = Modules {
-        // The IR of a module with analysis errors is not a verified subject.
-        own: None,
+        own: own.as_ref(),
         project: run.project,
         builtins: (run.builtins)(),
     };
     let mut lemmas = imported_lemmas(&proofs, run, 0);
+    let recording = evidence::Recording::new(module, run, &mut lemmas, out);
     for proof in &proofs {
         let (lowered, info) = proof;
         let mut evidence = recording.begin(lowered, &lemmas);
@@ -282,12 +298,32 @@ pub fn observe_proofs(
                 })
             });
         if let GoalType::Lawful(bundle) = &info.goal {
-            bundles::observe_bundle(proof, bundle, &of, &program, &lemmas, &mut evidence);
+            bundles::observe_bundle(
+                proof,
+                bundle,
+                &of,
+                &program,
+                &lemmas,
+                (&mut evidence, &recording.aliases),
+            );
         } else if let Some(span) = error {
             evidence.failure = Some(span);
-            evidence::observe_body(lowered, info, &lemmas, &mut evidence.steps);
+            evidence::observe_body(
+                lowered,
+                info,
+                &program,
+                &lemmas,
+                &recording.aliases,
+                &mut evidence,
+            );
         } else {
-            let checked = verify(lowered, info, &program, &lemmas, Some(&mut evidence));
+            let checked = verify(
+                lowered,
+                info,
+                &program,
+                &lemmas,
+                Some((&mut evidence, &recording.aliases)),
+            );
             save_lemma(checked, lowered, &mut lemmas);
         }
         recording.out.push(evidence);
@@ -351,6 +387,10 @@ fn prove_each(
         }
         #[cfg(not(target_arch = "wasm32"))]
         let mut evidence = recording.as_ref().map(|r| r.begin(lowered, lemmas));
+        #[cfg(not(target_arch = "wasm32"))]
+        let candidate_scope = evidence
+            .as_mut()
+            .zip(recording.as_ref().map(|r| &r.aliases));
         if let GoalType::Lawful(bundle) = &info.goal {
             // A bundle is no lemma: an importer has nothing to replay of it.
             if let Some(laws) = laws {
@@ -361,7 +401,7 @@ fn prove_each(
                     program,
                     lemmas,
                     #[cfg(not(target_arch = "wasm32"))]
-                    evidence.as_mut(),
+                    candidate_scope,
                 ));
             }
         } else {
@@ -371,7 +411,7 @@ fn prove_each(
                 program,
                 lemmas,
                 #[cfg(not(target_arch = "wasm32"))]
-                evidence.as_mut(),
+                candidate_scope,
             );
             if let Some(failure) = save_lemma(checked, lowered, lemmas) {
                 out.push(
@@ -394,7 +434,10 @@ fn verify(
     info: &ProofInfo,
     program: &dyn logic::Program,
     lemmas: &[logic::Lemma],
-    #[cfg(not(target_arch = "wasm32"))] mut evidence: Option<&mut ProofEvidence>,
+    #[cfg(not(target_arch = "wasm32"))] mut evidence: Option<(
+        &mut ProofEvidence,
+        &logic::LemmaAliases,
+    )>,
 ) -> Result<logic::Statement, Failure> {
     let checked = statement(lowered, info).and_then(|statement| {
         let body = lowered.body.as_ref().ok_or_else(|| {
@@ -406,8 +449,16 @@ fn verify(
         let cert = logic::cert(body, lemmas)?;
         #[cfg(not(target_arch = "wasm32"))]
         match &mut evidence {
-            Some(e) => {
-                logic::prove_traced(&statement, &cert, &info.data, program, lemmas, &mut e.steps)?;
+            Some((e, aliases)) => {
+                logic::prove_with_suggestions(
+                    &statement,
+                    &cert,
+                    &info.data,
+                    program,
+                    lemmas,
+                    aliases,
+                    &mut e.steps,
+                )?;
             }
             None => logic::prove(&statement, &cert, &info.data, program, lemmas)?,
         }
@@ -416,13 +467,18 @@ fn verify(
         Ok(statement)
     });
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(evidence) = evidence {
+    if let Some((evidence, aliases)) = evidence {
         match &checked {
-            Ok(_) => evidence.status = ProofStatus::Checked,
+            Ok(_) => {
+                evidence.status = ProofStatus::Checked;
+                if let Some(root) = evidence.steps.first() {
+                    evidence.header_suggestions.clone_from(&root.suggestions);
+                }
+            }
             Err(failure) => {
                 evidence.status = ProofStatus::of_failure(failure);
                 evidence.failure = failure.diagnostic(&info.name).span;
-                evidence::observe_body(lowered, info, lemmas, &mut evidence.steps);
+                evidence::observe_body(lowered, info, program, lemmas, aliases, evidence);
             }
         }
     }

@@ -19,6 +19,8 @@ pub struct ProofStep {
     pub binders: Vec<(String, String)>,
     pub premises: Vec<(String, String)>,
     pub substitutions: Vec<(String, String)>,
+    /// Source terms checked against this obligation in its current scope.
+    pub suggestions: Vec<String>,
     /// Normalization work for this step and its children in a real check.
     pub normalization_steps: u64,
 }
@@ -92,6 +94,7 @@ impl<'a> Trace<'a> {
             binders,
             premises,
             substitutions,
+            suggestions: Vec::new(),
             normalization_steps: 0,
         });
         i

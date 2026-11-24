@@ -5,12 +5,16 @@
 //! instance, or of a local dictionary, proves nothing of it.
 
 use std::rc::Rc;
+#[cfg(not(target_arch = "wasm32"))]
+use std::slice;
 
 use flick_ir::{Dict, Expr, ExprKind};
 
 use super::{Field, Proven, statement};
 use crate::diagnostics::Diagnostic;
-use crate::logic::{self, Arg, Cert, Failure, Rule, Term, Ty};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::logic::LemmaAliases;
+use crate::logic::{self, Arg, Cert, Failure, Lemma, Rule, Statement, Term, Ty};
 use crate::source::Span;
 use crate::types::{Bundle, GoalType};
 #[cfg(not(target_arch = "wasm32"))]
@@ -19,6 +23,15 @@ use crate::types::{LawObligation, ProofEvidence, ProofStatus};
 /// The laws of a class, by its module and name; `None` where its module's
 /// laws are not available to the run.
 pub type Laws<'a, 'p> = &'a dyn Fn(&str, &str) -> Option<Vec<&'p Proven>>;
+
+#[cfg(not(target_arch = "wasm32"))]
+const MAX_CANDIDATES: usize = 192;
+#[cfg(not(target_arch = "wasm32"))]
+const MAX_NORMALIZATION: u64 = 12_000;
+#[cfg(not(target_arch = "wasm32"))]
+const LEMMAS_PER_FIELD: usize = 64;
+#[cfg(not(target_arch = "wasm32"))]
+const CHECKED_PER_FIELD: usize = 8;
 
 fn invalid(span: Span, why: String) -> Failure {
     Failure::Invalid { span, why }
@@ -31,17 +44,21 @@ pub(super) fn check_bundle(
     laws: Laws<'_, '_>,
     program: &dyn logic::Program,
     lemmas: &[logic::Lemma],
-    #[cfg(not(target_arch = "wasm32"))] mut evidence: Option<&mut ProofEvidence>,
+    #[cfg(not(target_arch = "wasm32"))] mut evidence: Option<(&mut ProofEvidence, &LemmaAliases)>,
 ) -> Vec<Diagnostic> {
     let Some(subject) = &lowered.subject else {
         let why = "its constraint resolved to no dictionary".into();
         #[cfg(not(target_arch = "wasm32"))]
-        if let Some(evidence) = evidence {
+        if let Some((evidence, _)) = evidence {
             evidence.status = ProofStatus::Blocked;
             evidence.failure = Some(lowered.span);
         }
         return vec![invalid(lowered.span, why).diagnostic(&info.name)];
     };
+    #[cfg(not(target_arch = "wasm32"))]
+    let (obligations, aliases) = evidence
+        .as_mut()
+        .map_or((None, None), |(e, a)| (Some(&mut e.obligations), Some(*a)));
     let mut checking = Checking {
         fields: &lowered.fields,
         used: vec![false; lowered.fields.len()],
@@ -52,7 +69,15 @@ pub(super) fn check_bundle(
         lemmas,
         out: Vec::new(),
         #[cfg(not(target_arch = "wasm32"))]
-        obligations: evidence.as_mut().map(|e| &mut e.obligations),
+        obligations,
+        #[cfg(not(target_arch = "wasm32"))]
+        aliases,
+        #[cfg(not(target_arch = "wasm32"))]
+        params: &lowered.params,
+        #[cfg(not(target_arch = "wasm32"))]
+        attempts: MAX_CANDIDATES,
+        #[cfg(not(target_arch = "wasm32"))]
+        normalization: MAX_NORMALIZATION,
     };
     checking.class(bundle, subject, &mut Vec::new());
     let Checking { used, mut out, .. } = checking;
@@ -62,7 +87,7 @@ pub(super) fn check_bundle(
     }
     let diagnostics: Vec<_> = out.iter().map(|f| f.diagnostic(&info.name)).collect();
     #[cfg(not(target_arch = "wasm32"))]
-    if let Some(evidence) = evidence {
+    if let Some((evidence, _)) = evidence {
         evidence.status = out
             .first()
             .map_or(ProofStatus::Checked, ProofStatus::of_failure);
@@ -78,9 +103,16 @@ pub(super) fn observe_bundle(
     laws: Laws<'_, '_>,
     program: &dyn logic::Program,
     lemmas: &[logic::Lemma],
-    evidence: &mut ProofEvidence,
+    (evidence, aliases): (&mut ProofEvidence, &LemmaAliases),
 ) {
-    let _ = check_bundle(proof, bundle, laws, program, lemmas, Some(evidence));
+    let _ = check_bundle(
+        proof,
+        bundle,
+        laws,
+        program,
+        lemmas,
+        Some((evidence, aliases)),
+    );
     if evidence.status == ProofStatus::Checked {
         evidence.status = ProofStatus::Open;
     }
@@ -97,6 +129,14 @@ struct Checking<'a, 'p> {
     out: Vec<Failure>,
     #[cfg(not(target_arch = "wasm32"))]
     obligations: Option<&'a mut Vec<LawObligation>>,
+    #[cfg(not(target_arch = "wasm32"))]
+    aliases: Option<&'a LemmaAliases>,
+    #[cfg(not(target_arch = "wasm32"))]
+    params: &'a [String],
+    #[cfg(not(target_arch = "wasm32"))]
+    attempts: usize,
+    #[cfg(not(target_arch = "wasm32"))]
+    normalization: u64,
 }
 
 impl Checking<'_, '_> {
@@ -183,6 +223,8 @@ impl Checking<'_, '_> {
             ))
         };
         #[cfg(not(target_arch = "wasm32"))]
+        let suggestions = self.candidates(law, bundle, dict);
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(obligations) = &mut self.obligations {
             obligations.push(LawObligation {
                 path: path.to_vec(),
@@ -195,6 +237,7 @@ impl Checking<'_, '_> {
                     .map_or(ProofStatus::Checked, ProofStatus::of_failure),
                 statement: shown,
                 range: field.map(|f| (f.span.start, f.span.end)),
+                suggestions,
             });
         }
         if let Err(failure) = result {
@@ -240,7 +283,6 @@ impl Checking<'_, '_> {
         field: &Field,
         #[cfg(not(target_arch = "wasm32"))] shown: &mut Option<String>,
     ) -> Result<(), Failure> {
-        let (law, info) = proved;
         let statement = self.law_statement(proved, bundle, dict)?;
         #[cfg(not(target_arch = "wasm32"))]
         if self.obligations.is_some() {
@@ -258,62 +300,67 @@ impl Checking<'_, '_> {
             let why = format!("`{name}` is no proof checked before this one");
             return Err(invalid(field.span, why));
         };
-        let order: Vec<bool> = law.premise.clone();
-        let types: Vec<&Ty> = statement.params.iter().map(|(_, t)| t).collect();
-        let theirs: Vec<&Ty> = lemma.statement.params.iter().map(|(_, t)| t).collect();
-        // the lemma is about values of exactly the law's types: its
-        // parameters, premises and equation, up to a renaming
-        let mut renaming = Vec::new();
-        let equations = |s: &logic::Statement| -> Vec<Ty> {
-            let goal = match &s.goal {
-                logic::Goal::Equal(e) => Some(e.ty.clone()),
-                logic::Goal::SameType(..) => None,
-            };
-            (s.premises.iter().map(|(_, e)| e.ty.clone()))
-                .chain(goal)
-                .collect()
-        };
-        let (ours, others) = (equations(&statement), equations(&lemma.statement));
-        let fits = lemma
-            .order
-            .iter()
-            .map(|(_, p)| *p)
-            .eq(order.iter().copied())
-            && types.len() == theirs.len()
-            && types
-                .iter()
-                .zip(&theirs)
-                .all(|(a, b)| renames(b, a, &mut renaming))
-            && ours.len() == others.len()
-            && (ours.iter().zip(&others)).all(|(a, b)| renames(b, a, &mut renaming));
-        if !fits {
-            let why = format!(
-                "`{name}` is not stated over the parameters of the law `{}`",
-                info.name
-            );
-            return Err(invalid(field.span, why));
-        }
-        let args = (law.params.iter())
-            .zip(&law.premise)
-            .map(|(x, premise)| {
-                let x: Rc<str> = x.as_str().into();
-                if *premise {
-                    Arg::Proof(Cert {
-                        kind: Rule::Fact(x),
-                        span: field.value.span,
-                    })
-                } else {
-                    Arg::Value(Term::Var(x))
+        let cert =
+            law_certificate(proved, &statement, lemma, field.value.span).map_err(|failure| {
+                match failure {
+                    Failure::Invalid { why, .. } => invalid(field.span, why),
+                    other => other,
                 }
-            })
-            .collect();
-        let cert = Cert {
-            kind: Rule::Lemma(name.as_str().into(), args),
-            span: field.value.span,
-        };
+            })?;
+        let data = self.law_data(proved);
+        logic::prove(&statement, &cert, &data, self.program, self.lemmas)
+    }
+
+    fn law_data(&self, (_, info): &Proven) -> logic::Data {
         let mut data = info.data.clone();
         data.extend(self.data);
-        logic::prove(&statement, &cert, &data, self.program, self.lemmas)
+        data
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn candidates(&mut self, proved: &Proven, bundle: &Bundle, dict: &Dict) -> Vec<String> {
+        let Some(aliases) = self.aliases else {
+            return Vec::new();
+        };
+        let Ok(statement) = self.law_statement(proved, bundle, dict) else {
+            return Vec::new();
+        };
+        let data = self.law_data(proved);
+        let mut found = Vec::new();
+        for lemma in self.lemmas.iter().rev().take(LEMMAS_PER_FIELD) {
+            if self.attempts == 0 || self.normalization == 0 || found.len() >= CHECKED_PER_FIELD {
+                break;
+            }
+            let name = &lemma.statement.name;
+            let names = if let Some(names) = aliases.get(name) {
+                names.as_slice()
+            } else if name.contains('.')
+                || matches!(name.as_str(), "refl" | "symm" | "trans" | "cong" | "funext")
+                || self
+                    .params
+                    .iter()
+                    .any(|param| param.split('$').next() == Some(name.as_str()))
+            {
+                continue;
+            } else {
+                slice::from_ref(name)
+            };
+            self.attempts -= 1;
+            let Ok(cert) = law_certificate(proved, &statement, lemma, self.span) else {
+                continue;
+            };
+            if logic::check_candidate(
+                &statement,
+                &cert,
+                &data,
+                self.program,
+                self.lemmas,
+                &mut self.normalization,
+            ) {
+                found.extend(names.iter().take(CHECKED_PER_FIELD - found.len()).cloned());
+            }
+        }
+        found
     }
 
     /// `e` with the law's given dictionary `dict`: each superclass of it the
@@ -343,6 +390,70 @@ impl Checking<'_, '_> {
             class,
         }
     }
+}
+
+/// Applies a lemma to the law's parameters, keeping its printed subject
+/// and its dictionary identities for the kernel to compare.
+fn law_certificate(
+    proved: &Proven,
+    statement: &Statement,
+    lemma: &Lemma,
+    span: Span,
+) -> Result<Cert, Failure> {
+    let (law, info) = proved;
+    let name = &lemma.statement.name;
+    let types: Vec<&Ty> = statement.params.iter().map(|(_, t)| t).collect();
+    let theirs: Vec<&Ty> = lemma.statement.params.iter().map(|(_, t)| t).collect();
+    // the lemma is about values of exactly the law's types: its
+    // parameters, premises and equation, up to a renaming
+    let mut renaming = Vec::new();
+    let equations = |s: &logic::Statement| -> Vec<Ty> {
+        let goal = match &s.goal {
+            logic::Goal::Equal(e) => Some(e.ty.clone()),
+            logic::Goal::SameType(..) => None,
+        };
+        (s.premises.iter().map(|(_, e)| e.ty.clone()))
+            .chain(goal)
+            .collect()
+    };
+    let (ours, others) = (equations(statement), equations(&lemma.statement));
+    let fits = lemma
+        .order
+        .iter()
+        .map(|(_, p)| *p)
+        .eq(law.premise.iter().copied())
+        && types.len() == theirs.len()
+        && types
+            .iter()
+            .zip(&theirs)
+            .all(|(a, b)| renames(b, a, &mut renaming))
+        && ours.len() == others.len()
+        && (ours.iter().zip(&others)).all(|(a, b)| renames(b, a, &mut renaming));
+    if !fits {
+        let why = format!(
+            "`{name}` is not stated over the parameters of the law `{}`",
+            info.name
+        );
+        return Err(invalid(span, why));
+    }
+    let args = (law.params.iter())
+        .zip(&law.premise)
+        .map(|(x, premise)| {
+            let x: Rc<str> = x.as_str().into();
+            if *premise {
+                Arg::Proof(Cert {
+                    kind: Rule::Fact(x),
+                    span,
+                })
+            } else {
+                Arg::Value(Term::Var(x))
+            }
+        })
+        .collect();
+    Ok(Cert {
+        kind: Rule::Lemma(name.as_str().into(), args),
+        span,
+    })
 }
 
 /// `d` with the given dictionary it stands on replaced by `dict`.

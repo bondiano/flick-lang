@@ -43,6 +43,8 @@ pub struct ProofEvidence {
     pub status: ProofStatus,
     pub failure: Option<Span>,
     pub steps: Vec<logic::ProofStep>,
+    /// Checked terms at the declaration goal, including when the body is empty.
+    pub header_suggestions: Vec<String>,
     /// Checked lemmas visible before this declaration, using source qualifiers.
     pub lemmas: Vec<String>,
     pub instance: Option<String>,
@@ -79,6 +81,8 @@ pub struct LawObligation {
     pub status: ProofStatus,
     pub statement: Option<String>,
     pub range: Option<Range>,
+    /// Checked lemma names for this law of exactly the selected instance.
+    pub suggestions: Vec<String>,
 }
 
 /// The class a law is of, with the names its parameters have in the law's

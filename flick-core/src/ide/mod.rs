@@ -14,6 +14,8 @@ mod hover;
 mod locals;
 mod navigate;
 mod plugins;
+#[cfg(not(target_arch = "wasm32"))]
+mod proof_complete;
 mod proof_symbols;
 mod proofs;
 mod rename;
