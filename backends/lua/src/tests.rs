@@ -223,10 +223,16 @@ fn request(platform: &str, tags: &[&str], items: Vec<Item>) -> BuildRequest {
             backend_api: "0.1.0".into(),
             ir_version: flick_ir::VERSION.into(),
             language_version: "0.2.0".into(),
-            runtime_abis: vec![Abi {
-                name: "flickrt".into(),
-                version: "0.2.0".into(),
-            }],
+            runtime_abis: vec![
+                Abi {
+                    name: "flickrt".into(),
+                    version: "0.2.0".into(),
+                },
+                Abi {
+                    name: "flick.kernel".into(),
+                    version: "0.1.0".into(),
+                },
+            ],
             environment: Environment {
                 backend: "lua".into(),
                 platform: platform.into(),

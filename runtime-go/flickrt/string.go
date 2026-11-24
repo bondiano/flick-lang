@@ -1,6 +1,7 @@
 package flickrt
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -367,8 +368,11 @@ func indexUnits(s string, b int) int32 { return Length(s[:b]).(int32) }
 
 // IndexOf is the unit position of the first `part` in `s`, if any.
 func IndexOf(part, v Value) Value {
-	s := v.(string)
-	b := strings.Index(s, part.(string))
+	s, p := v.(string), part.(string)
+	if lone(p) {
+		return unitIndex(s, p, false)
+	}
+	b := strings.Index(s, p)
 	if b < 0 {
 		return None
 	}
@@ -377,12 +381,43 @@ func IndexOf(part, v Value) Value {
 
 // LastIndexOf is the unit position of the last `part` in `s`, if any.
 func LastIndexOf(part, v Value) Value {
-	s := v.(string)
-	b := strings.LastIndex(s, part.(string))
+	s, p := v.(string), part.(string)
+	if lone(p) {
+		return unitIndex(s, p, true)
+	}
+	b := strings.LastIndex(s, p)
 	if b < 0 {
 		return None
 	}
 	return Some(indexUnits(s, b))
+}
+
+// lone is whether `s` holds a lone surrogate: its WTF-8 bytes are not in
+// a string where it is half of a pair, so a search for it goes by units.
+func lone(s string) bool {
+	for i := 0; i+1 < len(s); i++ {
+		if s[i] == 0xED && s[i+1] >= 0xA0 {
+			return true
+		}
+	}
+	return false
+}
+
+// unitIndex is the unit position of the first, or with `last` the last,
+// `part` in `s`, comparing UTF-16 code units.
+func unitIndex(s, part string, last bool) Value {
+	units, want := utf16Units(s), utf16Units(part)
+	n := len(units) - len(want)
+	for i := 0; i <= n; i++ {
+		k := i
+		if last {
+			k = n - i
+		}
+		if slices.Equal(units[k:k+len(want)], want) {
+			return Some(int32(k))
+		}
+	}
+	return None
 }
 
 // Chars is the code points of a string, each a string.

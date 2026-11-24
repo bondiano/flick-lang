@@ -7,6 +7,7 @@ use std::cell::Cell;
 use flick_backend::*;
 
 use common::{descriptor, diagnostic, inputs, request, result, step, validate};
+use flick_test_backend::Literal;
 
 #[test]
 fn binary_results_and_requests_round_trip_without_text_conversion() {
@@ -55,6 +56,7 @@ fn handshake_rejects_each_incompatible_dimension() {
         "ir-old",
         "language",
         "runtime",
+        "kernel",
         "environment",
         "profile",
         "mode",
@@ -68,6 +70,7 @@ fn handshake_rejects_each_incompatible_dimension() {
             "ir-old" => target.ir_version = "0.15.0".into(),
             "language" => target.language_version = "0.3.0".into(),
             "runtime" => target.runtime_abis[0].version = "0.3.0".into(),
+            "kernel" => target.runtime_abis[1].version = "0.2.0".into(),
             "environment" => target.environment.platform = "browser".into(),
             "profile" => descriptor.profiles.clear(),
             "mode" => descriptor.modes.clear(),
@@ -560,4 +563,70 @@ fn cache_key_tracks_backend_runtime_toolchain_environment_and_side_inputs() {
         }
         assert_ne!(cache_key(&changed), key, "{case}");
     }
+}
+
+/// The literal fixture, declaring another kernel than the request names.
+struct OtherKernel {
+    calls: Cell<usize>,
+}
+impl Backend for OtherKernel {
+    fn describe(&self) -> Descriptor {
+        let mut descriptor = Literal.describe();
+        for abi in &mut descriptor.runtime_abis {
+            if abi.name == "flick.kernel" {
+                abi.versions = VersionRange {
+                    minimum: "0.2.0".into(),
+                    maximum_exclusive: "0.3.0".into(),
+                };
+            }
+        }
+        descriptor
+    }
+    fn check_target(
+        &self,
+        request: &BuildRequest,
+        inputs: &mut dyn Inputs,
+    ) -> Result<TargetSupport, Vec<Diagnostic>> {
+        self.calls.set(self.calls.get() + 1);
+        Literal.check_target(request, inputs)
+    }
+    fn generate(
+        &self,
+        request: &BuildRequest,
+        inputs: &mut dyn Inputs,
+    ) -> Result<BuildResult, Vec<Diagnostic>> {
+        self.calls.set(self.calls.get() + 1);
+        Literal.generate(request, inputs)
+    }
+}
+
+#[test]
+fn a_backend_of_another_kernel_is_refused_before_generation() {
+    let mut request = request();
+    request.backend.identity = Literal.describe().identity;
+    let policy = Policy {
+        authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
+        toolchains: &[],
+        environment: &[],
+        reserved_paths: &[],
+        limits: Limits::default(),
+    };
+    let text = |_: &str| Some(common::TEXT.as_bytes().to_vec());
+    let backend = OtherKernel {
+        calls: Cell::new(0),
+    };
+    match generate(&backend, &request, &policy, text, true) {
+        Err(Failure::Protocol(why)) => {
+            assert_eq!(why, "incompatible runtime ABI `flick.kernel`");
+        }
+        other => panic!(
+            "expected a refusal, got {:?}",
+            other.map(|g| g.result().clone())
+        ),
+    }
+    assert_eq!(backend.calls.get(), 0, "no preflight or generation ran");
+    let generated =
+        generate(&Literal, &request, &policy, text, true).expect("the fixture's kernel");
+    assert!(!generated.result().artifacts.is_empty());
 }

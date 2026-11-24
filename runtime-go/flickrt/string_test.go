@@ -37,6 +37,12 @@ func TestStringsCountUTF16CodeUnits(t *testing.T) {
 	if IndexOf("b", s).(*Data).Fields()[0] != int32(3) {
 		t.Error("index counts code units")
 	}
+	if IndexOf(low, s).(*Data).Fields()[0] != int32(2) || IndexOf(high, s).(*Data).Fields()[0] != int32(1) {
+		t.Error("a lone surrogate is found as half of a pair")
+	}
+	if LastIndexOf(low, Concat(s, s)).(*Data).Fields()[0] != int32(6) || IndexOf(low, "ab") != None {
+		t.Error("the last half of a pair, and none")
+	}
 	if Substring(int32(3), int32(-1), s) != "a\U0001F30D" {
 		t.Error("substring swaps its bounds and reads negative as 0")
 	}

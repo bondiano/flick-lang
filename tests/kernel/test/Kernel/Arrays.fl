@@ -1,0 +1,41 @@
+// The array primitives of the kernel: a `List` is an immutable array with
+// a length, reads by an index from 0, and a constructor from a function of
+// the index. Literals, `++` and patterns are the rest. Operands come in
+// through `same`, so the runtime computes them, not the compiler.
+module Kernel.Arrays exposing (tests)
+
+same : a -> a
+let same x = x
+
+tests : List Test.Test
+let tests = [
+  Test.group "length" [
+    Test.test "of a literal" (fun () -> Test.equal 3 (List.length (same [7, 8, 9]))),
+    Test.test "of the empty list" (fun () -> Test.equal 0 (List.length (same ([] : List Int)))),
+    Test.test "of a concatenation" (fun () ->
+      Test.equal 5 (List.length (same [1, 2] ++ same [3, 4, 5]))
+    ),
+  ],
+  Test.group "get" [
+    Test.test "the first" (fun () -> Test.is_true "first" (List.get 0 (same [10, 20]) == Some 10)),
+    Test.test "the last" (fun () -> Test.is_true "last" (List.get 1 (same [10, 20]) == Some 20)),
+    Test.test "past the end" (fun () -> Test.is_true "end" (List.get 2 (same [10, 20]) == None)),
+    Test.test "a negative index" (fun () ->
+      Test.is_true "negative" (List.get (-1) (same [10, 20]) == None)
+    ),
+    Test.test "of a nested list" (fun () ->
+      Test.is_true "nested" (List.get 1 (same [[1], [2, 3]]) == Some [2, 3])
+    ),
+  ],
+  Test.group "initialize" [
+    Test.test "calls the function with each index in order" (fun () ->
+      Test.is_true "squares" (List.initialize (same 4) (fun i -> i * i) == [0, 1, 4, 9])
+    ),
+    Test.test "of no elements" (fun () ->
+      Test.is_true "empty" (List.initialize (same 0) (fun i -> i) == [])
+    ),
+    Test.test "of a negative count is empty" (fun () ->
+      Test.is_true "negative" (List.initialize (same (-3)) (fun i -> i) == [])
+    ),
+  ],
+]
