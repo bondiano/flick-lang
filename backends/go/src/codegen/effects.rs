@@ -151,7 +151,7 @@ impl<'a> Gen<'a> {
             match &self.returns {
                 Some(GoType::Opt(r)) => docvec![a, "return ", r.none_code(a)],
                 None => a.text("return flickrt.None"),
-                Some(GoType::Scalar(_) | GoType::Record(_)) => {
+                Some(GoType::Scalar(_) | GoType::Record(_) | GoType::Adt(_)) => {
                     unreachable!("`?` only appears in Option-returning functions")
                 }
             }
@@ -173,7 +173,9 @@ impl<'a> Gen<'a> {
                     ty: None,
                 }
             }
-            Some(GoType::Scalar(_) | GoType::Record(_)) => unreachable!("`?` only unwraps Option"),
+            Some(GoType::Scalar(_) | GoType::Record(_) | GoType::Adt(_)) => {
+                unreachable!("`?` only unwraps Option")
+            }
         }
     }
 

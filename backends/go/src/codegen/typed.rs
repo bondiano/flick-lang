@@ -109,6 +109,7 @@ impl<'a> Gen<'a> {
     pub(super) fn to_value(&self, t: Typed<'a>) -> Code<'a> {
         match t.ty {
             Some(GoType::Opt(r)) => r.box_doc(self.a, t.code.doc).into(),
+            Some(GoType::Adt(s)) => s.box_doc(self.a, t.code.doc).into(),
             Some(GoType::Scalar(_) | GoType::Record(_)) | None => t.code,
         }
     }
@@ -166,7 +167,9 @@ impl<'a> Gen<'a> {
         match want {
             Want::Exact(GoType::Opt(r)) => Some(r.clone()),
             Want::Any => self.opt_repr_of(e.ty.as_deref()),
-            Want::Value | Want::Exact(GoType::Scalar(_) | GoType::Record(_)) => None,
+            Want::Value | Want::Exact(GoType::Scalar(_) | GoType::Record(_) | GoType::Adt(_)) => {
+                None
+            }
         }
     }
 
@@ -210,14 +213,23 @@ impl<'a> Gen<'a> {
 
     /// Computes the desired Go type for the last (`arg_first`) argument of a
     /// piped call `arg |> func`, when `func` is a direct full application of a
-    /// typed function, scalar method, or unboxed-scalar constructor.
-    pub(super) fn piped_arg_want(&self, func: &Expr) -> Option<GoType> {
+    /// typed function, scalar/ADT method, or typed constructor.
+    pub(super) fn piped_arg_want(
+        &self,
+        func: &Expr,
+        arg: &Expr,
+        e_ty: Option<&IrType>,
+        want: Want<'_>,
+    ) -> Option<GoType> {
         let (head, args) = func.spine();
         let total = args.len() + 1;
         let last = total - 1;
         if let ExprKind::Con(c) = &head.kind
             && c.arity == total
         {
+            if let Some((shape, vi)) = self.adt_con_target(c, e_ty, want) {
+                return shape.field_go_type(vi, last);
+            }
             match self.own_held(c) {
                 Some(own::Held::Fields(slots)) if slots.iter().any(Option::is_some) => {
                     return slots.get(last).copied().flatten().map(GoType::Scalar);
@@ -232,6 +244,12 @@ impl<'a> Gen<'a> {
             && total == m.arity()
         {
             return Some(GoType::Scalar(m.scalar()));
+        }
+        let first_op = args.first().map(|(a, _)| *a).or(Some(arg));
+        if let Some(m) = self.adt_method_head(head, first_op, None)
+            && total == m.arity()
+        {
+            return Some(GoType::Adt(m.shape().clone()));
         }
         let (_, types, params) = self.typed_head(head)?;
         (total >= params && last < params)
@@ -315,28 +333,52 @@ impl<'a> Gen<'a> {
     }
 
     /// The Go type of the application `e`, when `app` compiles it to a call
-    /// of a known function or scalar instance method, of all its arguments,
-    /// that returns one.
-    pub(super) fn typed_result(&self, e: &Expr) -> Option<GoType> {
+    /// of a known function, typed constructor, or scalar/ADT instance method.
+    pub(super) fn typed_result_with(
+        &self,
+        e: &Expr,
+        extra: &[(&str, Option<GoType>)],
+    ) -> Option<GoType> {
         let mut head = e;
         let mut given = 0;
+        let mut piped_arg = None;
         if let ExprKind::App {
             func,
+            arg,
             arg_first: true,
             ..
         } = &e.kind
         {
-            (head, given) = (func, 1);
+            head = func;
+            given = 1;
+            piped_arg = Some(arg.as_ref());
         }
+        let mut spine_first = None;
         while let ExprKind::App {
             func,
+            arg,
             arg_first: false,
             ..
         } = &head.kind
         {
-            (head, given) = (func, given + 1);
+            spine_first = Some(arg.as_ref());
+            head = func;
+            given += 1;
+        }
+        let first_arg = spine_first.or(piped_arg);
+        if let ExprKind::Con(c) = &head.kind
+            && c.arity == given
+            && let Some((shape, _)) = self.adt_con_target(c, e.ty.as_deref(), Want::Any)
+        {
+            return Some(GoType::Adt(shape));
         }
         if let Some(method) = self.scalar_method_head(head)
+            && given == method.arity()
+        {
+            return method.result();
+        }
+        let first_ty = first_arg.and_then(|a| self.predict_go_type(a, extra));
+        if let Some(method) = self.adt_method_head(head, first_arg, first_ty.as_ref())
             && given == method.arity()
         {
             return method.result();

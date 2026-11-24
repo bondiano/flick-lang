@@ -166,7 +166,7 @@ impl<'a> Gen<'a> {
                 }
                 return self.eval(result, want);
             }
-            ExprKind::If(cond, then, other) => return self.if_expr(cond, then, other, want),
+            ExprKind::If(cond, then, other) => return self.if_expr(e, cond, then, other, want),
             ExprKind::Match(scrutinee, arms) => return self.match_expr(e, scrutinee, arms, want),
             ExprKind::Con(_) | ExprKind::App { .. } => self.app_typed(e, want),
             ExprKind::Dicts(inner, _) if matches!(inner.kind, ExprKind::Con(_)) => {
@@ -224,7 +224,7 @@ impl<'a> Gen<'a> {
         match want {
             Want::Any => raw,
             Want::Value => match raw.ty {
-                Some(GoType::Opt(_)) => Typed {
+                Some(ref gt) if gt.needs_boxing() => Typed {
                     code: self.to_value(raw),
                     ty: None,
                 },
@@ -308,7 +308,14 @@ impl<'a> Gen<'a> {
         }
     }
 
-    fn if_expr(&mut self, cond: &Expr, then: &Expr, other: &Expr, want: Want<'_>) -> Typed<'a> {
+    fn if_expr(
+        &mut self,
+        e: &Expr,
+        cond: &Expr,
+        then: &Expr,
+        other: &Expr,
+        want: Want<'_>,
+    ) -> Typed<'a> {
         let a = self.a;
         let test = self.expr_bool(cond).doc;
         let (mut then_stmts, then_val) = self.block(|g| g.eval(then, want));
@@ -316,7 +323,9 @@ impl<'a> Gen<'a> {
         let r_ty = match want {
             Want::Exact(gt) => Some(gt.clone()),
             Want::Value => {
-                if then_val.ty == other_val.ty && !matches!(then_val.ty, Some(GoType::Opt(_))) {
+                if then_val.ty == other_val.ty
+                    && !then_val.ty.as_ref().is_some_and(GoType::needs_boxing)
+                {
                     then_val.ty.clone()
                 } else {
                     None
@@ -325,6 +334,11 @@ impl<'a> Gen<'a> {
             Want::Any => {
                 if then_val.ty == other_val.ty {
                     then_val.ty.clone()
+                } else if let Some(gt) = self.go_type_of(e.ty.as_deref())
+                    && matches!(gt, GoType::Opt(_) | GoType::Record(_) | GoType::Adt(_))
+                    && (then_val.ty.as_ref() == Some(&gt) || other_val.ty.as_ref() == Some(&gt))
+                {
+                    Some(gt)
                 } else {
                     None
                 }

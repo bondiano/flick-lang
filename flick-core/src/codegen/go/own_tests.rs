@@ -62,9 +62,9 @@ let main () = Platform.stdout_line (show (allowed (constructor () 1)))
 fn a_constructor_with_fields_of_the_program_has_a_go_type_of_its_own() {
     let out = build(
         "module App exposing (main)\n\n\
-         type Shape = Dot | Circle Float | Rect Float Float\n\n\
+         type Shape = Dot | Circle Float | Rect Float Float | Group (List Shape)\n\n\
          area : Shape -> Float\n\
-         let area shape =\n  match shape with\n  | Dot -> 0.0\n  | Circle r -> r\n  | Rect w h -> w * h\n\n\
+         let rec area shape =\n  match shape with\n  | Dot -> 0.0\n  | Circle r -> r\n  | Rect w h -> w * h\n  | Group _ -> 0.0\n\n\
          main : Unit ->{Host.Console; AppError} Unit\n\
          let main () = Platform.stdout_line (show (area (Rect 2.0 3.0), area (Circle 1.0), Some 1))\n",
     );
@@ -106,18 +106,18 @@ fn a_constructor_with_fields_of_the_program_has_a_go_type_of_its_own() {
         types.contains("func (p *T_App__Rect) EqualConstructed(other flickrt.Value, strictZero bool) (bool, bool)"),
         "{types}"
     );
-    assert_eq!(types.matches("flickrt.Owned(\"").count(), 3, "{types}");
+    assert_eq!(types.matches("flickrt.Owned(\"").count(), 4, "{types}");
 }
 
 #[test]
 fn a_record_under_a_constructor_lies_in_its_value() {
     let out = build(
         "module App exposing (main)\n\n\
-         type Shape = Dot | Box { w : Int; h : Int; name : String }\n\n\
+         type Shape = Dot | Box { w : Int; h : Int; name : String } | Group (List Shape)\n\n\
          area : Shape -> Int\n\
-         let area shape =\n  match shape with\n  | Dot -> 0\n  | Box { w; h } -> w * h\n\n\
+         let area shape =\n  match shape with\n  | Dot -> 0\n  | Box { w; h } -> w * h\n  | Group _ -> 0\n\n\
          wider : Shape -> Shape\n\
-         let wider shape =\n  match shape with\n  | Dot -> Dot\n  | Box box -> Box { box with h = box.h + 1 }\n\n\
+         let wider shape =\n  match shape with\n  | Dot -> Dot\n  | Box box -> Box { box with h = box.h + 1 }\n  | Group xs -> Group xs\n\n\
          main : Unit ->{Host.Console; AppError} Unit\n\
          let main () =\n  let r = { w = 1; h = 1; name = \"r\" }\n  \
          Platform.stdout_line (show (area (wider (Box { name = \"a\"; h = 2; w = 3 })), area (Box r)))\n",
@@ -302,14 +302,17 @@ fn a_nullary_gadt_witness_retains_its_dictionary_representation() {
 fn all_nullary_equality_reads_tags_through_tag_field() {
     let go = app("module App exposing (main)\n\n\
          type Color = Red | Green | Blue\n\n\
-         same : Color -> Color -> Bool\n\
-         let same a b = a == b\n\n\
+         same_color : Color -> Color -> Bool\n\
+         let same_color a b = a == b\n\n\
+         same_ord : Ordering -> Ordering -> Bool\n\
+         let same_ord a b = a == b\n\n\
          main : Unit ->{Host.Console; AppError} Unit\n\
-         let main () = Platform.stdout_line (show (same Red Green))\n");
+         let main () = Platform.stdout_line (show (same_color Red Green, same_ord LT GT))\n");
+    // By-value closed all-nullary ADT compares `.tag` directly without boxing.
+    assert!(go.contains("return (l_a.tag == l_b.tag)"), "{go}");
+    // Erased all-nullary ADT (built-in `Ordering`) still compares through `TagField`.
     assert!(
         go.contains("flickrt.Same(flickrt.TagField(l_a), flickrt.TagField(l_b))"),
         "{go}"
     );
-    assert!(go.contains("flickrt.Value(T_App__Red{})"), "{go}");
-    assert!(go.contains("flickrt.Value(T_App__Green{})"), "{go}");
 }

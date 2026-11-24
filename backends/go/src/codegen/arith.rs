@@ -3,10 +3,11 @@
 //! comparisons and the locals they are bound to; concrete `Option` values
 //! compare without allocation via their typed layouts.
 
-use flick_ir::{Arith, BinOp, Expr, IrType, Lang, Num};
+use flick_ir::{Arith, BinOp, Expr, ExprKind, IrType, Lang, Num};
 use flick_pretty::{Document, DocumentArena, docvec};
 
 use super::Gen;
+use super::adt::AdtShape;
 use super::go_type::{GoType, OptRepr, Typed};
 use super::layout::{block, call, statement};
 use super::record::RecordShape;
@@ -261,6 +262,110 @@ impl<'a> Gen<'a> {
         }
     }
 
+    /// The closed ADT shape both operands of `==` / `!=` share.
+    fn compared_adt(&self, lhs: &Expr, rhs: &Expr) -> Option<AdtShape> {
+        let known = |e: &Expr| match self.predict_go_type(e, &[]) {
+            Some(GoType::Adt(s)) => Some(s),
+            _ => self.adt_shape_of(e.ty.as_deref()),
+        };
+        known(lhs).filter(|s| known(rhs).as_ref() == Some(s))
+    }
+
+    fn compare_adt(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr, shape: &AdtShape) -> Typed<'a> {
+        let a = self.a;
+        self.register_adt(shape);
+        let want = Some(GoType::Adt(shape.clone()));
+        let go = self.ordered_into(&[lhs, rhs], &[want.clone(), want]);
+        let eq = shape.eq_doc(a, go[0].doc, go[1].doc);
+        let doc = if op == BinOp::NotEq {
+            docvec![a, "!", eq]
+        } else {
+            eq
+        };
+        Typed {
+            code: doc.into(),
+            ty: Some(GoType::Scalar(Native::Bool)),
+        }
+    }
+
+    fn compare_adt_tag(
+        &mut self,
+        op: BinOp,
+        lhs: &Expr,
+        rhs: &Expr,
+        shape: &AdtShape,
+    ) -> Typed<'a> {
+        let a = self.a;
+        self.register_adt(shape);
+        let want = Some(GoType::Adt(shape.clone()));
+        let go = self.ordered_into(&[lhs, rhs], &[want.clone(), want]);
+        let doc = if shape.has_discriminant() {
+            let cmp = if op == BinOp::NotSame { " != " } else { " == " };
+            docvec![a, "(", go[0].doc, ".tag", cmp, go[1].doc, ".tag)"]
+        } else {
+            for code in go {
+                if !code.atomic {
+                    self.emit(docvec![a, "_ = ", code]);
+                }
+            }
+            a.text(if op == BinOp::NotSame {
+                "false"
+            } else {
+                "true"
+            })
+        };
+        Typed {
+            code: doc.into(),
+            ty: Some(GoType::Scalar(Native::Bool)),
+        }
+    }
+
+    fn compare_scalar(
+        &mut self,
+        op: BinOp,
+        lhs: &Expr,
+        rhs: &Expr,
+        n: Native,
+    ) -> Option<Typed<'a>> {
+        let a = self.a;
+        let go = match (op, n) {
+            // `==` holds of NaN and NaN, `===` does not
+            (BinOp::Eq, Native::Float) => Some(Comparison::Call("flickrt.EqFloat")),
+            (BinOp::NotEq, Native::Float) => Some(Comparison::Call("!flickrt.EqFloat")),
+            (BinOp::Eq, Native::Float32) => Some(Comparison::Call("flickrt.EqFloat32")),
+            (BinOp::NotEq, Native::Float32) => Some(Comparison::Call("!flickrt.EqFloat32")),
+            (BinOp::Eq | BinOp::Same, _) => Some(Comparison::Infix(" == ")),
+            (BinOp::NotEq | BinOp::NotSame, _) => Some(Comparison::Infix(" != ")),
+            (_, Native::Bool) => None,
+            // JS orders strings by UTF-16 code units, as the runtime does
+            (BinOp::Lt, Native::String) => Some(Comparison::Order(" < 0")),
+            (BinOp::Le, Native::String) => Some(Comparison::Order(" <= 0")),
+            (BinOp::Gt, Native::String) => Some(Comparison::Order(" > 0")),
+            (BinOp::Ge, Native::String) => Some(Comparison::Order(" >= 0")),
+            (BinOp::Lt, _) => Some(Comparison::Infix(" < ")),
+            (BinOp::Le, _) => Some(Comparison::Infix(" <= ")),
+            (BinOp::Gt, _) => Some(Comparison::Infix(" > ")),
+            (BinOp::Ge, _) => Some(Comparison::Infix(" >= ")),
+            _ => None,
+        }?;
+        let operands = self.operands(lhs, rhs, n);
+        let doc = match go {
+            Comparison::Call(f) => call(a, f, operands),
+            Comparison::Infix(op) => {
+                let [l, r] = operands;
+                docvec![a, "(", l, op, r, ")"]
+            }
+            Comparison::Order(test) => {
+                let order = call(a, "flickrt.CompareStrings", operands);
+                docvec![a, "(", order, test, ")"]
+            }
+        };
+        Some(Typed {
+            code: doc.into(),
+            ty: Some(GoType::Scalar(Native::Bool)),
+        })
+    }
+
     pub(super) fn binary(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) -> Typed<'a> {
         let a = self.a;
         if matches!(op, BinOp::And | BinOp::Or) {
@@ -278,45 +383,19 @@ impl<'a> Gen<'a> {
                 ty: Some(GoType::Scalar(n)),
             };
         }
-        if let Some(n) = self.compared_scalar(lhs, rhs) {
-            let go = match (op, n) {
-                // `==` holds of NaN and NaN, `===` does not
-                (BinOp::Eq, Native::Float) => Some(Comparison::Call("flickrt.EqFloat")),
-                (BinOp::NotEq, Native::Float) => Some(Comparison::Call("!flickrt.EqFloat")),
-                (BinOp::Eq, Native::Float32) => Some(Comparison::Call("flickrt.EqFloat32")),
-                (BinOp::NotEq, Native::Float32) => Some(Comparison::Call("!flickrt.EqFloat32")),
-                (BinOp::Eq | BinOp::Same, _) => Some(Comparison::Infix(" == ")),
-                (BinOp::NotEq | BinOp::NotSame, _) => Some(Comparison::Infix(" != ")),
-                (_, Native::Bool) => None,
-                // JS orders strings by UTF-16 code units, as the runtime does
-                (BinOp::Lt, Native::String) => Some(Comparison::Order(" < 0")),
-                (BinOp::Le, Native::String) => Some(Comparison::Order(" <= 0")),
-                (BinOp::Gt, Native::String) => Some(Comparison::Order(" > 0")),
-                (BinOp::Ge, Native::String) => Some(Comparison::Order(" >= 0")),
-                (BinOp::Lt, _) => Some(Comparison::Infix(" < ")),
-                (BinOp::Le, _) => Some(Comparison::Infix(" <= ")),
-                (BinOp::Gt, _) => Some(Comparison::Infix(" > ")),
-                (BinOp::Ge, _) => Some(Comparison::Infix(" >= ")),
-                _ => None,
-            };
-            if let Some(go) = go {
-                let operands = self.operands(lhs, rhs, n);
-                let doc = match go {
-                    Comparison::Call(f) => call(a, f, operands),
-                    Comparison::Infix(op) => {
-                        let [l, r] = operands;
-                        docvec![a, "(", l, op, r, ")"]
-                    }
-                    Comparison::Order(test) => {
-                        let order = call(a, "flickrt.CompareStrings", operands);
-                        docvec![a, "(", order, test, ")"]
-                    }
-                };
-                return Typed {
-                    code: doc.into(),
-                    ty: Some(GoType::Scalar(Native::Bool)),
-                };
-            }
+        if matches!(op, BinOp::Same | BinOp::NotSame)
+            && let ExprKind::Field(l_inner, l_lbl) = &lhs.kind
+            && let ExprKind::Field(r_inner, r_lbl) = &rhs.kind
+            && l_lbl == "_tag"
+            && r_lbl == "_tag"
+            && let Some(shape) = self.compared_adt(l_inner, r_inner)
+        {
+            return self.compare_adt_tag(op, l_inner, r_inner, &shape);
+        }
+        if let Some(n) = self.compared_scalar(lhs, rhs)
+            && let Some(typed) = self.compare_scalar(op, lhs, rhs, n)
+        {
+            return typed;
         }
         if matches!(op, BinOp::Eq | BinOp::NotEq)
             && let Some(repr) = self.compared_opt(lhs, rhs)
@@ -327,6 +406,11 @@ impl<'a> Gen<'a> {
             && let Some(shape) = self.compared_record(lhs, rhs)
         {
             return self.compare_record(op, lhs, rhs, &shape);
+        }
+        if matches!(op, BinOp::Eq | BinOp::NotEq)
+            && let Some(shape) = self.compared_adt(lhs, rhs)
+        {
+            return self.compare_adt(op, lhs, rhs, &shape);
         }
         if op == BinOp::Concat
             && self.predict_go_type(lhs, &[]) == Some(GoType::Scalar(Native::String))

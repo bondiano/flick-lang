@@ -141,7 +141,7 @@ impl<'a> Gen<'a> {
                 let loop_types: Vec<Option<GoType>> = params
                     .iter()
                     .map(|p| {
-                        matches!(p.pat, Pat::Bind(_) | Pat::Record(_))
+                        matches!(p.pat, Pat::Bind(_) | Pat::Record(_) | Pat::Con(_, _))
                             .then(|| self.go_type_of(p.ty.as_deref()))
                             .flatten()
                     })

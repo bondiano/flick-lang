@@ -29,6 +29,9 @@ mod foreign_meta_regression;
 #[path = "backends/go.rs"]
 mod go;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/go_adt.rs"]
+mod go_adt;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/go_option.rs"]
 mod go_option;
 #[cfg(feature = "wasm-backends")]

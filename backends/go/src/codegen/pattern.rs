@@ -14,14 +14,8 @@ use flick_ir::{Arm, Constructor, Expr, Lit, Pat, Rep};
 #[derive(Default)]
 struct Test<'a> {
     conds: Vec<Document<'a>>,
-    /// `(raw_name, local_name, path, go_type)` for direct bindings.
     binds: Vec<(&'a str, &'a str, Document<'a>, Option<GoType>)>,
-    /// Locals an or-pattern assigns inside its test, declared before it:
-    /// `(raw_name, local_name, agreed_go_type)`.
     lets: Vec<(&'a str, &'a str, Option<GoType>)>,
-    /// When inside an enclosing `Pat::Or`, the final merged `GoType` of every
-    /// binder declared for that `Pat::Or` so nested `Pat::Or`s coerce directly
-    /// into the outer variable's declared Go type.
     or_targets: Option<Vec<(&'a str, Option<GoType>)>>,
 }
 
@@ -195,8 +189,15 @@ impl<'a> Gen<'a> {
                     if self.opt_con(c) == Some(OptCon::Some)
                         && let Some(arg) = args.first()
                     {
-                        let inner = repr.payload_go_type();
-                        self.collect_or_lets(arg, inner.as_ref(), out);
+                        self.collect_or_lets(arg, repr.payload_go_type().as_ref(), out);
+                    }
+                    return;
+                }
+                if let Some(GoType::Adt(shape)) = subject_ty {
+                    if let Some(vi) = shape.variant_index(c) {
+                        for (i, arg) in args.iter().enumerate() {
+                            self.collect_or_lets(arg, shape.field_go_type(vi, i).as_ref(), out);
+                        }
                     }
                     return;
                 }
@@ -242,9 +243,6 @@ impl<'a> Gen<'a> {
         t: &mut Test<'a>,
     ) {
         let a = self.a;
-        // At the outermost `Pat::Or`, resolve the final agreed GoType across
-        // every nested alternative before emitting any inner assignment so
-        // inner `Pat::Or` closures coerce directly into the declared variable.
         let targets: Vec<(&'a str, Option<GoType>)> = if let Some(outer) = &t.or_targets {
             outer.clone()
         } else {
@@ -322,6 +320,22 @@ impl<'a> Gen<'a> {
                     }
                 }
                 None => unreachable!("Option value matched against non-Option constructor"),
+            }
+            return;
+        }
+        if let Some(GoType::Adt(shape)) = subject_ty {
+            if let Some(vi) = shape.variant_index(c) {
+                self.register_adt(&shape);
+                if shape.has_discriminant() {
+                    t.conds.push(docvec![a, "(", subject, ".tag == ", vi, ")"]);
+                }
+                for (i, arg) in args.iter().enumerate() {
+                    let path = match shape.slot_index(vi, i) {
+                        Some(p) => docvec![a, subject, ".f", p],
+                        None => self.unit().doc,
+                    };
+                    self.test(arg, path, shape.field_go_type(vi, i), t);
+                }
             }
             return;
         }

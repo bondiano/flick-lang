@@ -6,8 +6,9 @@ use flick_backend_support::reach::{self, Key};
 use flick_ir::Module;
 use flick_pretty::DocumentArena;
 
+use super::main_file::item_order;
 use super::{
-    Gen, Input, Output, Unsupported, dedup, direct, go_type, item_order, names, own, shape,
+    Gen, Input, Output, Unsupported, adt_derive, dedup, direct, go_type, names, own, shape,
 };
 
 /// Compiles one module for `flick inspect --emit output --target go`, without
@@ -15,7 +16,7 @@ use super::{
 pub fn go_module(input: &Input, module_name: &str) -> Output {
     let modules: Vec<&Module> = input.own.iter().chain(input.builtins).copied().collect();
     let modules = &modules[..];
-    let decls = go_type::type_decls(modules);
+    let decls = go_type::type_decls(input.own, input.builtins);
     let index = reach::index(modules);
     let Some((m, module)) = modules
         .iter()
@@ -63,8 +64,9 @@ pub fn go_module(input: &Input, module_name: &str) -> Output {
         .iter()
         .map(|&(mi, ii)| (&*modules[mi].name, &modules[mi].items[ii]));
     let settled = shape::settled(reached_items, &shapes);
+    let derived = adt_derive::derived_instances(modules, input.lang);
     let item_initializers = modules.iter().any(|m| !m.initialization.is_empty());
-    let records = own::records(modules, input.lang);
+    let records = own::records(modules, input.lang, &decls);
     let fields = own::fields(input.own, input.lang);
     let items: Vec<usize> = (0..module.items.len()).collect();
     let arena = DocumentArena::new();
@@ -73,6 +75,7 @@ pub fn go_module(input: &Input, module_name: &str) -> Output {
     g.records = Some(&records);
     g.fields = Some(&fields);
     g.decls = Some(&decls);
+    g.derived = Some(&derived);
     g.item_initializers = item_initializers;
     let order = item_order(module, &items, &index);
     let code = g.module(module, &order);

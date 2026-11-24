@@ -4,7 +4,7 @@
 use flick_ir::{Arm, BinOp, Expr, ExprKind, Lit, Pat, Rep, Stmt};
 
 use super::arith::Native;
-use super::go_type::{GoType, OptCon};
+use super::go_type::{GoType, OptCon, Want};
 use super::{Gen, own};
 
 fn lit_go_type(lit: &Lit) -> Option<GoType> {
@@ -69,10 +69,13 @@ impl Gen<'_> {
             ExprKind::Con(c) if self.opt_con(c) == Some(OptCon::None) => {
                 self.opt_repr_of(e.ty.as_deref()).map(GoType::Opt)
             }
+            ExprKind::Con(c) if c.arity == 0 => self
+                .adt_con_target(c, e.ty.as_deref(), Want::Any)
+                .map(|(shape, _)| GoType::Adt(shape)),
             ExprKind::App { func, .. } if matches!(&func.kind, ExprKind::Con(c) if self.opt_con(c) == Some(OptCon::Some)) => {
                 self.opt_repr_of(e.ty.as_deref()).map(GoType::Opt)
             }
-            ExprKind::App { .. } => self.typed_result(e),
+            ExprKind::App { .. } => self.typed_result_with(e, extra),
             ExprKind::Record(fields) => self
                 .record_shape_of(e.ty.as_deref())
                 .filter(|s| s.matches_literal(fields))
@@ -89,38 +92,27 @@ impl Gen<'_> {
                 Some(GoType::Record(shape)) => {
                     shape.index_of(label).and_then(|i| shape.field_go_type(i))
                 }
+                Some(GoType::Adt(_)) if label == "_tag" => Some(GoType::Scalar(Native::String)),
                 _ => None,
             },
             ExprKind::Unwrap(inner) => match self.predict_go_type(inner, extra) {
                 Some(GoType::Opt(repr)) => repr.payload_go_type(),
                 _ => None,
             },
-            ExprKind::Block(stmts, result) => {
-                if stmts.is_empty() {
-                    self.predict_go_type(result, extra)
-                } else {
-                    let mut scoped: Vec<(&str, Option<GoType>)> = extra.to_vec();
-                    for stmt in stmts {
-                        match stmt {
-                            Stmt::Let { pat, .. } => {
-                                let mut binders = Vec::new();
-                                pat.binders(&mut binders);
-                                for b in binders {
-                                    scoped.push((b, None));
-                                }
-                            }
-                            Stmt::Var { name, .. } | Stmt::Fun { name, .. } => {
-                                scoped.push((name.as_str(), None));
-                            }
-                            Stmt::Assign(_, _) | Stmt::Expr(_) => {}
-                        }
-                    }
-                    self.predict_go_type(result, &scoped)
-                }
-            }
+            ExprKind::Block(stmts, result) => self.predict_block(stmts, result, extra),
             ExprKind::If(_, then, other) => {
-                let a = self.predict_go_type(then, extra)?;
-                (self.predict_go_type(other, extra).as_ref() == Some(&a)).then_some(a)
+                let a = self.predict_go_type(then, extra);
+                let b = self.predict_go_type(other, extra);
+                if a.is_some() && a == b {
+                    a
+                } else if let Some(gt) = self.go_type_of(e.ty.as_deref())
+                    && matches!(gt, GoType::Opt(_) | GoType::Record(_) | GoType::Adt(_))
+                    && (a.as_ref() == Some(&gt) || b.as_ref() == Some(&gt))
+                {
+                    Some(gt)
+                } else {
+                    None
+                }
             }
             ExprKind::Match(scrutinee, arms) => {
                 let s_ty = self.predict_go_type(scrutinee, extra);
@@ -128,6 +120,34 @@ impl Gen<'_> {
             }
             _ => None,
         }
+    }
+
+    fn predict_block(
+        &self,
+        stmts: &[Stmt],
+        result: &Expr,
+        extra: &[(&str, Option<GoType>)],
+    ) -> Option<GoType> {
+        if stmts.is_empty() {
+            return self.predict_go_type(result, extra);
+        }
+        let mut scoped: Vec<(&str, Option<GoType>)> = extra.to_vec();
+        for stmt in stmts {
+            match stmt {
+                Stmt::Let { pat, .. } => {
+                    let mut binders = Vec::new();
+                    pat.binders(&mut binders);
+                    for b in binders {
+                        scoped.push((b, None));
+                    }
+                }
+                Stmt::Var { name, .. } | Stmt::Fun { name, .. } => {
+                    scoped.push((name.as_str(), None));
+                }
+                Stmt::Assign(_, _) | Stmt::Expr(_) => {}
+            }
+        }
+        self.predict_go_type(result, &scoped)
     }
 
     /// Bindings of `pat` guaranteed to have a typed Go representation given the
@@ -181,6 +201,15 @@ impl Gen<'_> {
                         {
                             let inner = repr.payload_go_type();
                             collect(g, arg, inner.as_ref(), out);
+                        }
+                        return;
+                    }
+                    if let Some(GoType::Adt(shape)) = subj {
+                        if let Some(vi) = shape.variant_index(c) {
+                            for (i, arg) in args.iter().enumerate() {
+                                let slot = shape.field_go_type(vi, i);
+                                collect(g, arg, slot.as_ref(), out);
+                            }
                         }
                         return;
                     }
@@ -264,7 +293,7 @@ impl Gen<'_> {
             return Some(gt.clone());
         }
         if let Some(gt) = self.go_type_of(e.ty.as_deref())
-            && matches!(gt, GoType::Opt(_) | GoType::Record(_))
+            && matches!(gt, GoType::Opt(_) | GoType::Record(_) | GoType::Adt(_))
             && arm_types.iter().any(|t| t.as_ref() == Some(&gt))
         {
             return Some(gt);

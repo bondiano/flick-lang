@@ -120,7 +120,9 @@ pub(super) fn function(
     let param_types: Vec<Option<GoType>> = params
         .iter()
         .map(|p| match p.pat {
-            Pat::Bind(_) | Pat::Record(_) => GoType::of(input.lang, decls, p.ty.as_deref()),
+            Pat::Bind(_) | Pat::Record(_) | Pat::Con(_, _) => {
+                GoType::of(input.lang, decls, p.ty.as_deref())
+            }
             _ => None,
         })
         .collect();

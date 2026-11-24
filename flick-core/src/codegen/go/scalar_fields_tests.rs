@@ -81,18 +81,18 @@ fn polymorphic_and_mixed_constructors_unbox_only_declaration_site_scalars() {
         "module App exposing (main)\n\n\
          type Box a = Box a\n\
          type Tagged a = Tagged Int a\n\n\
-         unbox_int : Box Int -> Int\n\
-         let unbox_int b =\n  match b with\n  | Box x -> x\n\n\
-         tag_of : Tagged String -> Int\n\
-         let tag_of t =\n  match t with\n  | Tagged n _ -> n\n\n\
+         unbox_poly : Box a -> a\n\
+         let unbox_poly b =\n  match b with\n  | Box x -> x\n\n\
+         tag_of_poly : Tagged a -> Int\n\
+         let tag_of_poly t =\n  match t with\n  | Tagged n _ -> n\n\n\
          main : Unit ->{Host.Console; AppError} Unit\n\
-         let main () = Platform.stdout_line (show (unbox_int (Box 7), tag_of (Tagged 9 \"a\")))\n",
+         let main () = Platform.stdout_line (show (unbox_poly (Box 7), tag_of_poly (Tagged 9 \"a\")))\n",
     );
     assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
     let types = file(&out.files, "own_types.go");
     let go = file(&out.files, "m_App.go");
 
-    // `Box a` is polymorphic at its declaration site, so it stays boxed even when used at `Int`.
+    // `Box a` is polymorphic at its declaration site, so its erased constructor struct stays boxed.
     assert!(
         types.contains("type T_App__Box struct{ f [1]flickrt.Value }"),
         "{types}"
@@ -179,21 +179,21 @@ fn curried_constructors_use_nil_safe_field_unboxing() {
 fn patterns_handle_destructure_neg_zero_literal_and_mixed_or_bindings() {
     let out = build(
         "module App exposing (main)\n\n\
-         type Pair = Pair Int Float\n\
-         type Mix a = Num Int | Any a\n\n\
+         type Pair = Pair Int Float (List Int)\n\
+         type Mix a = Num Int | Any a | Many (List Int)\n\n\
          destr : Pair -> Float\n\
-         let destr p =\n  let Pair n x = p\n  Int.to_float n + x\n\n\
+         let destr p =\n  let Pair n x _ = p\n  Int.to_float n + x\n\n\
          is_neg_zero : Pair -> Bool\n\
-         let is_neg_zero p =\n  match p with\n  | Pair 0 -0.0 -> true\n  | Pair _ _ -> false\n\n\
+         let is_neg_zero p =\n  match p with\n  | Pair 0 -0.0 _ -> true\n  | Pair _ _ _ -> false\n\n\
          extract : Mix Int -> Int\n\
-         let extract m =\n  match m with\n  | Num n | Any n -> n\n\n\
+         let extract m =\n  match m with\n  | Num n | Any n -> n\n  | Many _ -> 0\n\n\
          main : Unit ->{Host.Console; AppError} Unit\n\
-         let main () = Platform.stdout_line (show (destr (Pair 2 3.5), is_neg_zero (Pair 0 (-0.0)), extract (Num 4)))\n",
+         let main () = Platform.stdout_line (show (destr (Pair 2 3.5 []), is_neg_zero (Pair 0 (-0.0) []), extract (Num 4)))\n",
     );
     assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
     let go = file(&out.files, "m_App.go");
 
-    // Single-constructor `let` destructuring reads typed fields directly.
+    // Single-constructor `let` destructuring reads typed fields directly on erased `*T_App__Pair`.
     assert!(go.contains("var l_n int32 = l_p.(*T_App__Pair).f0"), "{go}");
     assert!(
         go.contains("var l_x float64 = l_p.(*T_App__Pair).f1"),

@@ -21,7 +21,8 @@ use std::fmt::{self, Write};
 use flick_backend_support::Known;
 
 use super::arith::Native;
-use super::record::{RecordShape, equal_with_expr, layout_rank};
+use super::go_type::TypeDecls;
+use super::record::{RecordShape, RecordSlot, equal_with_expr, layout_rank};
 use super::{Gen, names};
 use flick_ir::{Constructor, Module, Rep};
 
@@ -86,13 +87,13 @@ pub(super) fn fields(modules: &[&Module], lang: &Known) -> CtorFields {
     out
 }
 
-pub(super) fn records(modules: &[&Module], lang: &Known) -> Records {
+pub(super) fn records(modules: &[&Module], lang: &Known, decls: &TypeDecls) -> Records {
     let mut out = Records::new();
     for m in modules {
         for decl in &m.types {
             for ctor in &decl.constructors {
                 if let [field_ty] = ctor.fields.as_slice()
-                    && let Some(shape) = RecordShape::for_ctor_record(lang, field_ty)
+                    && let Some(shape) = RecordShape::for_ctor_record(lang, decls, field_ty)
                 {
                     out.insert((m.name.clone(), ctor.name.clone()), shape);
                 }
@@ -235,9 +236,7 @@ fn write_record_ctor(
         .fields
         .iter()
         .enumerate()
-        .map(|(i, (_, slot))| {
-            equal_with_expr(&format!("p.rec.f{i}"), &format!("q.rec.f{i}"), *slot)
-        })
+        .map(|(i, (_, slot))| equal_with_expr(&format!("p.rec.f{i}"), &format!("q.rec.f{i}"), slot))
         .collect();
     write!(
         go,
@@ -293,7 +292,10 @@ fn write_scalar_struct(
     let eqs: Vec<String> = slots
         .iter()
         .enumerate()
-        .map(|(i, slot)| equal_with_expr(&format!("p.f{i}"), &format!("q.f{i}"), *slot))
+        .map(|(i, slot)| {
+            let rslot = slot.map_or(RecordSlot::Value, RecordSlot::Scalar);
+            equal_with_expr(&format!("p.f{i}"), &format!("q.f{i}"), &rslot)
+        })
         .collect();
     writeln!(
         go,
