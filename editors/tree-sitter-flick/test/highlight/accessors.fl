@@ -1,0 +1,12 @@
+let cities = List.map .address.city users
+//                    ^ property
+//                            ^ property
+let city = user |> .name
+//                 ^ property
+let logs = List.map .echo records
+//                  ^ property
+let both = (.todo log, .log.todo entry)
+//          ^ property
+//                         ^ property
+let range = 0..echo x
+//             ^ keyword
