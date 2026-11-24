@@ -2,18 +2,17 @@
 //! arguments is a direct Go call; any other application goes through the
 //! curried value.
 
-use std::{iter, mem, slice};
+use std::iter;
 
-use flick_pretty::{Document, docvec};
+use flick_pretty::Document;
 
-use super::closures::{Call, at_once, callee, curried, poly, quiet, returning};
+use super::closures::{Call, at_once, callee, curried, quiet, returning};
 use super::expr::enum_literal;
-use super::layout::{Code, block, call, closure, signature, single};
+use super::go_type::{GoType, Typed, Want};
+use super::layout::{Code, call, closure};
 use super::shape::Types;
 use super::{Gen, Shape, names, own};
-use flick_backend_support::tail::Target;
-use flick_ir::{Constructor, Dict, Rep};
-use flick_ir::{Expr, ExprKind, Lit, Param, Pat, Stage, operation_arity};
+use flick_ir::{Constructor, Expr, ExprKind, Rep, Stage, operation_arity};
 
 impl<'a> Gen<'a> {
     /// Builds a value of the constructor `c` from its fields, holding the
@@ -41,71 +40,33 @@ impl<'a> Gen<'a> {
                     .flatten()
                     .and_then(|(ty, held)| match held {
                         own::Held::Zero => None,
-                        own::Held::Fields(_) => Some(a.alloc_str(&own::make(&ty))),
-                        own::Held::Record(_) => Some(a.alloc_str(&own::of(&ty))),
-                    });
-                Box::new(move |_, args: &[Code<'a>]| {
-                    let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
-                    match own {
-                        // a Go type of its own, which is its tag
-                        Some(make) => call(a, make, args).into(),
-                        None => {
-                            call(a, "flickrt.NewData", iter::once(a.text(tag)).chain(args)).into()
+                        own::Held::Fields(slots) => {
+                            Some((a.alloc_str(&own::make(&ty)), Some(slots)))
                         }
+                        own::Held::Record(_) => Some((a.alloc_str(&own::of(&ty)), None)),
+                    });
+                Box::new(move |_, args: &[Code<'a>]| match &own {
+                    // a Go type of its own, which is its tag; a curried value
+                    // unboxes scalar fields nil-safely so `tagOf` can probe it
+                    Some((make, Some(slots))) if slots.iter().any(Option::is_some) => {
+                        let args = args.iter().enumerate().map(|(i, arg)| match slots[i] {
+                            Some(native) => native.field_unbox(a, arg.doc),
+                            None => arg.doc,
+                        });
+                        call(a, *make, args).into()
+                    }
+                    Some((make, _)) => {
+                        let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
+                        call(a, *make, args).into()
+                    }
+                    None => {
+                        let args = args.iter().map(|arg| arg.doc).chain(held.iter().copied());
+                        call(a, "flickrt.NewData", iter::once(a.text(tag)).chain(args)).into()
                     }
                 })
             }
             Rep::Unboxed | Rep::Typeof(_) => Box::new(|_, args: &[Code<'a>]| args[0]),
         }
-    }
-
-    /// A constrained value given its dictionaries.
-    pub(super) fn given(&mut self, inner: &Expr, dicts: &[Dict]) -> Code<'a> {
-        let dicts: Vec<Code<'a>> = dicts
-            .iter()
-            .map(|d| {
-                let d = self.dict(d);
-                self.spill(d)
-            })
-            .collect();
-        match &inner.kind {
-            ExprKind::Global { module, name, .. } => self.global_value(module, name, dicts),
-            // the implementation takes them, once the operation looked it up
-            ExprKind::Perform {
-                effect: service,
-                op: name,
-                stages,
-            } => {
-                let arity = self.a.alloc_str(&operation_arity(stages).to_string());
-                let args = iter::once(self.string(service))
-                    .chain(iter::once(self.string(name)))
-                    .chain(iter::once(self.a.text(arity)))
-                    .chain(dicts.iter().map(|d| d.doc));
-                call(self.a, "flickrt.OperationGiven", args).into()
-            }
-            _ => {
-                let f = self.expr(inner);
-                let args =
-                    iter::once(self.context()).chain(iter::once(f).chain(dicts).map(|d| d.doc));
-                call(self.a, "flickrt.Inst", args).into()
-            }
-        }
-    }
-
-    /// A value that takes the dictionaries `shown` before it is computed.
-    pub(super) fn abstraction(&mut self, shown: &[String], inner: &Expr) -> Code<'a> {
-        let mark = self.givens.len();
-        let dicts = self.bind_givens(shown);
-        let saved = (
-            self.tail.take(),
-            mem::replace(&mut self.generator, false),
-            self.fiber.take(),
-            self.context.replace("fb"),
-        );
-        let (stmts, v) = self.block(|g| g.expr(inner));
-        (self.tail, self.generator, self.fiber, self.context) = saved;
-        self.givens.truncate(mark);
-        poly(self.a, &dicts, stmts, v).into()
     }
 
     /// A top-level value of `module` with `dicts` given: a function of
@@ -191,32 +152,56 @@ impl<'a> Gen<'a> {
             }
         }
     }
+}
 
-    /// An application, or a constructor: a known function of all its
-    /// arguments is called directly; an application of an effectful stage
-    /// of any other value runs the task it gives.
-    pub(super) fn app(&mut self, e: &Expr) -> Code<'a> {
-        if let Some(made) = self.over_record(e) {
-            return made;
+struct AppTarget<'a> {
+    make: Call<'a>,
+    given: Vec<Code<'a>>,
+    arity: usize,
+    effects: u64,
+    typed_con: Option<(&'a str, Vec<Option<super::arith::Native>>)>,
+    scalar_method: Option<super::typed::ScalarMethod>,
+}
+
+impl<'a> AppTarget<'a> {
+    fn arg_want(
+        &self,
+        typed: Option<&(&'a str, Types, usize)>,
+        total_args: usize,
+        index: usize,
+    ) -> Option<GoType> {
+        if total_args < self.arity {
+            return None;
         }
+        if let Some((_, slots)) = &self.typed_con {
+            slots.get(index).copied().flatten().map(GoType::Scalar)
+        } else if let Some(m) = self.scalar_method {
+            (index < m.arity()).then_some(GoType::Scalar(m.scalar()))
+        } else if let Some((_, types, params)) = typed {
+            (index < *params)
+                .then(|| types.param(index).cloned())
+                .flatten()
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> Gen<'a> {
+    fn app_target(&mut self, head: &Expr, total_args: usize) -> AppTarget<'a> {
         let a = self.a;
-        let mut head = e;
-        let mut first = None;
-        if let ExprKind::App {
-            func,
-            arg,
-            arg_first: true,
-            stage,
-        } = &e.kind
-        {
-            let v = self.expr(arg);
-            first = Some((self.spill(v), *stage));
-            head = func;
-        }
-        let (head, args) = head.spine();
+        let mut typed_con = None;
+        let mut scalar_method = None;
         let (make, given, arity, effects): (Call<'a>, Vec<Code<'a>>, usize, u64) = match &head.kind
         {
-            ExprKind::Con(c) => (self.construct(c, Vec::new()), Vec::new(), c.arity, 0),
+            ExprKind::Con(c) => {
+                if let Some((ty, own::Held::Fields(slots))) = self.own_type(c)
+                    && slots.iter().any(Option::is_some)
+                {
+                    typed_con = Some((a.alloc_str(&own::make(&ty)), slots));
+                }
+                (self.construct(c, Vec::new()), Vec::new(), c.arity, 0)
+            }
             // a constructor of a GADT with the dictionaries its value holds
             ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Con(_)) => {
                 let ExprKind::Con(c) = &inner.kind else {
@@ -233,7 +218,7 @@ impl<'a> Gen<'a> {
                 stages,
             } if self.fiber.is_some()
                 && stages.iter().any(|&s| s != Stage::Pure)
-                && args.len() + usize::from(first.is_some()) >= operation_arity(stages) =>
+                && total_args >= operation_arity(stages) =>
             {
                 let arity = operation_arity(stages);
                 (self.perform(service, name), Vec::new(), arity, 0)
@@ -244,6 +229,20 @@ impl<'a> Gen<'a> {
                 };
                 let dicts: Vec<Code<'a>> = dicts.iter().map(|d| self.dict(d)).collect();
                 self.direct(module, name, dicts)
+            }
+            ExprKind::Method { .. }
+                if self
+                    .scalar_method_head(head)
+                    .is_some_and(|m| total_args >= m.arity()) =>
+            {
+                let m = self.scalar_method_head(head).expect("tested by the guard");
+                scalar_method = Some(m);
+                (
+                    Box::new(|_, _: &[Code<'a>]| unreachable!("full scalar method call")),
+                    Vec::new(),
+                    m.arity(),
+                    0,
+                )
             }
             ExprKind::Method { dict, name, .. } if self.direct_method(dict, name).is_some() => {
                 let (module, name) = self.direct_method(dict, name).expect("tested by the guard");
@@ -256,10 +255,54 @@ impl<'a> Gen<'a> {
                 (Box::new(move |_, _: &[Code<'a>]| f), Vec::new(), 0, 0)
             }
         };
+        AppTarget {
+            make,
+            given,
+            arity,
+            effects,
+            typed_con,
+            scalar_method,
+        }
+    }
+
+    /// An application, or a constructor: a known function of all its
+    /// arguments is called directly; an application of an effectful stage
+    /// of any other value runs the task it gives.
+    pub(super) fn app_typed(&mut self, e: &Expr, want: Want<'_>) -> Typed<'a> {
+        if let Some(opt) = self.try_opt_con(e, want) {
+            return opt;
+        }
+        if let Some(made) = self.over_record(e) {
+            return Typed {
+                code: made,
+                ty: None,
+            };
+        }
+        let a = self.a;
+        let mut head = e;
+        let mut first = None;
+        if let ExprKind::App {
+            func,
+            arg,
+            arg_first: true,
+            stage,
+        } = &e.kind
+        {
+            let first_want = self.piped_arg_want(func);
+            let v = self.eval(arg, Want::of(first_want.as_ref()));
+            first = Some((self.spill_typed(v), *stage));
+            head = func;
+        }
+        let (head, args) = head.spine();
+        let total_args = args.len() + usize::from(first.is_some());
+        let target = self.app_target(head, total_args);
         let typed = self.typed_head(head).filter(|(_, types, _)| types.any());
         let exprs: Vec<&Expr> = args.iter().map(|(arg, _)| *arg).collect();
+        let wants: Vec<Option<GoType>> = (0..exprs.len())
+            .map(|i| target.arg_want(typed.as_ref(), total_args, i))
+            .collect();
         let mut values: Vec<(Code<'a>, Stage)> = self
-            .ordered(&exprs)
+            .ordered_into(&exprs, &wants)
             .into_iter()
             .zip(args.iter().map(|(_, s)| *s))
             .collect();
@@ -267,35 +310,59 @@ impl<'a> Gen<'a> {
         // a name, a literal or a function, and the one taken before the rest
         let mut quiet: Vec<bool> = exprs.iter().map(|e| quiet(e)).collect();
         quiet.extend(first.iter().map(|_| true));
-        values.extend(first);
-        if values.len() < arity {
+        if let Some((first_val, stage)) = first {
+            let first_want = target.arg_want(typed.as_ref(), total_args, args.len());
+            values.push((self.coerce(first_val, first_want.as_ref()), stage));
+        }
+        if values.len() < target.arity {
             // a partial application keeps what it was given
             let taken = values.len();
-            let given: Vec<Code<'a>> = given
+            let given: Vec<Code<'a>> = target
+                .given
                 .into_iter()
                 .chain(values.into_iter().map(|(v, _)| v))
                 .map(|v| self.spill(v))
                 .collect();
-            return curried(
-                a,
-                &make,
-                given,
-                arity - taken,
-                effects >> taken,
-                &mut || self.temp(),
-            );
+            return Typed {
+                code: curried(
+                    a,
+                    &target.make,
+                    given,
+                    target.arity - taken,
+                    target.effects >> taken,
+                    &mut || self.temp(),
+                ),
+                ty: None,
+            };
         }
-        let rest = values.split_off(arity);
-        let quiet = quiet.split_off(arity.min(quiet.len()));
-        let all: Vec<Code<'a>> = given
+        let rest = values.split_off(target.arity);
+        let quiet = quiet.split_off(target.arity.min(quiet.len()));
+        let all: Vec<Code<'a>> = target
+            .given
             .into_iter()
             .chain(values.into_iter().map(|(v, _)| v))
             .collect();
-        let v = match typed {
-            Some(typed) => self.typed_call(typed, &all, &exprs, e),
-            None => make(self.context.unwrap_or("nil"), &all),
+        let v = if let Some((make, _)) = target.typed_con {
+            self.typed_con_call(make, &all)
+        } else if let Some(method) = target.scalar_method {
+            self.scalar_method_call(method, &all)
+        } else if let Some(typed) = typed {
+            self.typed_call(typed, &all, &exprs, e)
+        } else {
+            Typed {
+                code: (target.make)(self.context.unwrap_or("nil"), &all),
+                ty: None,
+            }
         };
-        self.applied(v, rest, quiet)
+        if rest.is_empty() {
+            v
+        } else {
+            let fn_val = self.to_value(v);
+            Typed {
+                code: self.applied(fn_val, rest, quiet),
+                ty: None,
+            }
+        }
     }
 
     /// The task `task` run in the fiber in scope.
@@ -314,13 +381,14 @@ impl<'a> Gen<'a> {
         dicts: usize,
     ) -> Option<(usize, u64, Types)> {
         let shape = self.shape_of(module, name);
+        let effectful = shape.effectful();
         match shape {
             Shape::Func {
                 dicts: n,
                 params,
                 effects,
                 types,
-            } if n == dicts && params > 0 && (self.fiber.is_some() || !shape.effectful()) => {
+            } if n == dicts && params > 0 && (self.fiber.is_some() || !effectful) => {
                 Some((params, effects, types))
             }
             _ => None,
@@ -345,83 +413,5 @@ impl<'a> Gen<'a> {
             let f = self.global_value(module, name, dicts);
             (Box::new(move |_, _: &[Code<'a>]| f), Vec::new(), 0, 0)
         }
-    }
-
-    /// Binds the parameters of a function to Go parameter names; a pattern
-    /// is destructured into the current statements.
-    pub(super) fn bind_params(&mut self, params: &[Param]) -> Vec<&'a str> {
-        let mut heads = Vec::new();
-        for p in params {
-            let name = match &p.pat {
-                Pat::Bind(n) => self.a.alloc_str(&names::local(n)),
-                Pat::Wild | Pat::Lit(Lit::Unit) => "_",
-                pat => {
-                    let t = self.temp();
-                    self.destructure(pat, self.a.text(t));
-                    t
-                }
-            };
-            heads.push(name);
-        }
-        heads
-    }
-
-    /// A curried function: one Go function per stage, the body at the last.
-    pub(super) fn lambda(
-        &mut self,
-        params: &[Param],
-        body: &Expr,
-        target: Option<Target>,
-    ) -> Code<'a> {
-        let a = self.a;
-        let effectful = |p: &Param| p.stage != Stage::Pure;
-        let last_effectful = params.last().is_some_and(effectful);
-        let saved = (
-            mem::replace(&mut self.fiber, last_effectful.then_some("fb")),
-            self.context.replace("fb"),
-        );
-        let (heads, stmts) = self.function_body(params, body, target, Types::default());
-        (self.fiber, self.context) = saved;
-        let body = if last_effectful {
-            let task = docvec![a, "func(fb *flickrt.Fiber) flickrt.Value ", block(a, stmts)];
-            single(a, docvec![a, "return ", call(a, "flickrt.Eff", [task])])
-        } else {
-            block(a, stmts)
-        };
-        // only the first three stages matter to a function of up to three
-        let effects = params
-            .iter()
-            .take(3)
-            .enumerate()
-            .fold(0, |bits, (i, p)| bits | u64::from(effectful(p)) << i);
-        if let Some(wrap) = at_once(params.len(), effects) {
-            let all = signature(&heads);
-            return call(
-                a,
-                wrap,
-                [docvec![a, "func(", all, ") flickrt.Value ", body]],
-            )
-            .into();
-        }
-        let last = signature(&heads[heads.len() - 1..]);
-        let mut text = docvec![a, "func(", last, ") flickrt.Value ", body];
-        for (h, p) in heads[..heads.len() - 1].iter().zip(params).rev() {
-            let mut next = call(a, "flickrt.Fn", [text]);
-            if effectful(p) {
-                // an effectful stage before the last is a task that gives the next function
-                let task = single(a, docvec![a, "return ", next]);
-                let task = docvec![a, "func(*flickrt.Fiber) flickrt.Value ", task];
-                next = call(a, "flickrt.Eff", [task]);
-            }
-            let head = signature(slice::from_ref(h));
-            text = docvec![
-                a,
-                "func(",
-                head,
-                ") flickrt.Value ",
-                single(a, docvec![a, "return ", next])
-            ];
-        }
-        call(a, "flickrt.Fn", [text]).into()
     }
 }

@@ -7,7 +7,7 @@ import { parallelResults } from "../src/concurrency.ts";
 import { handle } from "../src/handlers.ts";
 import { operation, service } from "../src/effects.ts";
 import { none } from "../src/data.ts";
-import { lazyForce, lazyMake } from "../src/effect/Lazy.ts";
+import { type LazyCell, type LocalLazyCell, lazyForce, lazyMake, lazyMakeLocal } from "../src/effect/Lazy.ts";
 import { flickEnsuring, flickEventually, flickFirstSuccessOf } from "../src/stdlib/effect-core.ts";
 import {
   flickCatchDefect,
@@ -302,10 +302,12 @@ test("orDie, ignore, tap/catch defect, tapCause, onError, onExit handle abort an
   assert.ok(Exit.isFailure(onExitOut) && onExitOut.cause.reasons.length === 1);
 });
 
-test("lazyForce follows R9 on Interrupt+Die and strips+caches Die+HandlerSignal", async () => {
+const checkLazyR9 = async (
+  make: <A, E, R>(task: Effect.Effect<A, E, R>) => Effect.Effect<LazyCell<A, E, R> | LocalLazyCell<A, E, R>>,
+) => {
   let runs1 = 0;
   const cell1 = await Effect.runPromise(
-    lazyMake(
+    make(
       Effect.suspend(() => {
         runs1 += 1;
         return runs1 === 1
@@ -322,7 +324,7 @@ test("lazyForce follows R9 on Interrupt+Die and strips+caches Die+HandlerSignal"
 
   let runs2 = 0;
   const cell2 = await Effect.runPromise(
-    lazyMake(
+    make(
       Effect.suspend(() => {
         runs2 += 1;
         return flickEnsuring(Effect.die("fin-boom"))(stopOp("body-abort"));
@@ -336,4 +338,8 @@ test("lazyForce follows R9 on Interrupt+Die and strips+caches Die+HandlerSignal"
   const r2 = Exit.isFailure(g2) ? g2.cause.reasons : [];
   assert.ok(r1.length === 1 && r1[0] !== undefined && Cause.isDieReason(r1[0]));
   assert.ok(r2.length === 1 && r2[0] !== undefined && Cause.isDieReason(r2[0]));
+};
+
+test("lazyForce follows R9 on Interrupt+Die and strips+caches Die+HandlerSignal", async () => {
+  await Promise.all([checkLazyR9(lazyMake), checkLazyR9(lazyMakeLocal)]);
 });

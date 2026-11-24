@@ -2,9 +2,10 @@
 
 use super::failure;
 use crate::codegen::{EffectBridge, Labels, Resolved, ts::Typed};
+use crate::{foreign_meta, inline};
 use flick_backend::{
-    BuildRequest, Diagnostic, Inputs, JavascriptProjection, ModuleRole, TypescriptModuleProjection,
-    validate_source_spans,
+    BuildRequest, Diagnostic, Inputs, JavascriptProjection, ModuleRole, Severity, Span,
+    TypescriptModuleProjection, validate_source_spans,
 };
 use flick_backend_support::bridge_select;
 use flick_ir::{Expr, ExprKind, OpClass, Program};
@@ -29,6 +30,7 @@ pub(super) struct Data {
     pub declarations: bool,
     pub schema_aot: bool,
     pub inspect: bool,
+    pub check: bool,
     pub devtools: Option<String>,
     pub labels: Labels,
     pub bridge: EffectBridge,
@@ -122,10 +124,49 @@ impl Data {
             declarations: parsed.declarations,
             schema_aot: parsed.schema_aot,
             inspect: parsed.inspect,
+            check: parsed.check,
             devtools: parsed.devtools,
             labels: parsed.labels,
             bridge,
         })
+    }
+
+    fn check_foreign(&self, request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
+        let own_modules: BTreeSet<&str> = request
+            .modules
+            .iter()
+            .filter(|m| m.role == ModuleRole::Own)
+            .map(|m| m.name.as_str())
+            .collect();
+        let mut foreign_diagnostics: Vec<Diagnostic> =
+            foreign_meta::validate_program(&self.program, &own_modules)
+                .into_iter()
+                .chain(inline::validate_program(
+                    &self.program,
+                    &self.sources,
+                    &own_modules,
+                ))
+                .map(|d| Diagnostic {
+                    code: d.code.into(),
+                    severity: Severity::Error,
+                    message: d.message,
+                    span: Some(Span {
+                        file: d.span.file.index(),
+                        start: d.span.start,
+                        end: d.span.end,
+                    }),
+                    notes: vec![],
+                })
+                .collect();
+        if !foreign_diagnostics.is_empty() {
+            foreign_diagnostics.sort_by_key(|d| {
+                d.span
+                    .as_ref()
+                    .map_or((u32::MAX, u32::MAX, u32::MAX), |s| (s.file, s.start, s.end))
+            });
+            return Err(foreign_diagnostics);
+        }
+        Ok(())
     }
 
     pub fn check(&self, request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
@@ -145,6 +186,10 @@ impl Data {
             &self.sources.iter().map(String::as_str).collect::<Vec<_>>(),
         )
         .map_err(failure)?;
+        self.check_foreign(request)?;
+        if self.check {
+            return Ok(());
+        }
         for module in &self.program.modules {
             let meta = request
                 .modules
@@ -236,6 +281,7 @@ struct ParsedOptions {
     declarations: bool,
     schema_aot: bool,
     inspect: bool,
+    check: bool,
     devtools: Option<String>,
     labels: Labels,
 }
@@ -324,9 +370,10 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
             )));
         }
     }
-    let inspect = match option("command") {
-        Some("build" | "run" | "dev" | "test") => false,
-        Some("inspect") => true,
+    let (inspect, check) = match option("command") {
+        Some("build" | "run" | "dev" | "test") => (false, false),
+        Some("inspect") => (true, false),
+        Some("check") => (false, true),
         _ => return Err(failure("missing or unknown command")),
     };
     Ok(ParsedOptions {
@@ -335,6 +382,7 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
         declarations,
         schema_aot,
         inspect,
+        check,
         devtools,
         labels,
     })

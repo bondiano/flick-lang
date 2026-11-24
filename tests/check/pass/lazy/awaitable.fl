@@ -45,3 +45,11 @@ let with_input f value = f value
 
 deferred : Eff {Db} {DbError} String -> Eff {Db} {DbError} String
 let deferred computation = with_input (fun value -> task { await value }) computation
+
+// `Prelude.await_eff` accepts a task capturing a live region, matching `await`
+// (found by `props::checkers_agree`).
+scoped_await_eff : Unit ->{} Unit
+let scoped_await_eff () = scope s {
+  let work : (Eff none none Unit)^{s} = task { await (task { () }) }
+  Prelude.await_eff work
+}

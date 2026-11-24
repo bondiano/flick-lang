@@ -81,7 +81,8 @@ impl Lower<'_> {
                 if let Some(first) = iter.next() {
                     alternatives.push(self.pattern(first));
                 }
-                let bound = self.scope[mark..].to_vec();
+                let mut bound = self.reuse.clone().unwrap_or_default();
+                bound.extend_from_slice(&self.scope[mark..]);
                 let saved = self.reuse.replace(bound);
                 alternatives.extend(iter.map(|alt| self.pattern(alt)));
                 self.reuse = saved;

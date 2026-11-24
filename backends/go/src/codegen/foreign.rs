@@ -9,11 +9,12 @@ use flick_backend_support::opt::eval::NativePrimitive;
 use flick_pretty::{Document, Documentable, docvec};
 
 use super::arith::Native;
+use super::go_type::GoType;
 use super::layout::{call, closure, list, signature, single, typed_signature};
 use super::shape::Types;
 use super::{Gen, names};
 use flick_ir::Span;
-use flick_ir::{Foreign, ForeignMode};
+use flick_ir::{Binding as IrBinding, Foreign, ForeignMode};
 
 /// What a table says of a Go function written `Name(float64, int32) bool`:
 /// its name, and the Go types it takes and gives where a binding without
@@ -27,7 +28,7 @@ fn typed(go: &str) -> (&str, Types) {
         .expect("the result after the parameters");
     let native = |ty: &str| Some(Native::named(ty.trim()).expect("a Go type of a scalar"));
     let params: Vec<Option<Native>> = params.split(',').map(native).collect();
-    (name, Types::of(native(result), &params))
+    (name, Types::of_natives(native(result), &params))
 }
 
 /// The Go functions of `flickrt` that the tables of the implicit packages
@@ -104,7 +105,7 @@ impl Bindings {
         export: &str,
     ) -> Option<(&str, Types)> {
         self.binding(module, name, from, export)
-            .map(|binding| (binding.target.as_str(), binding.types))
+            .map(|binding| (binding.target.as_str(), binding.types.clone()))
     }
 
     fn binding(
@@ -121,14 +122,23 @@ impl Bindings {
         self.0.get(&key)
     }
 
+    fn binding_of(&self, module: &str, name: &str, binding: &IrBinding) -> Option<&Binding> {
+        match binding {
+            IrBinding::Module { from, name: export } => {
+                self.binding(module, name, Some(from), export)
+            }
+            IrBinding::Global { name: export } => self.binding(module, name, None, export),
+            IrBinding::Inline(_) => None,
+        }
+    }
+
     /// The stages the Go function takes. Most bindings flatten all stages;
     /// an explicit `@N` mounts once and returns Fn for its remaining stages.
     pub fn parameters(&self, module: &str, f: &Foreign) -> usize {
-        self.binding(
+        self.binding_of(
             module,
             f.source_name.as_deref().unwrap_or(&f.name),
-            f.binding.from.as_deref(),
-            &f.binding.name,
+            &f.binding,
         )
         .and_then(|binding| binding.stages)
         .unwrap_or_else(|| parameters(f))
@@ -136,13 +146,12 @@ impl Bindings {
 
     /// The Go types of the function the binding `f` of `module` is bound to.
     pub fn types(&self, module: &str, f: &Foreign) -> Types {
-        self.lookup(
+        self.binding_of(
             module,
             f.source_name.as_deref().unwrap_or(&f.name),
-            f.binding.from.as_deref(),
-            &f.binding.name,
+            &f.binding,
         )
-        .map_or_else(Types::default, |(_, types)| types)
+        .map_or_else(Types::default, |binding| binding.types.clone())
     }
 
     /// Validates that `f` of `module` resolves in this Go binding table to the
@@ -156,16 +165,15 @@ impl Bindings {
             NativePrimitive::StringContains => "flickrt.Includes",
             NativePrimitive::StringEndsWith => "flickrt.EndsWith",
         };
-        let Some((target, types)) = self.lookup(
+        let Some(binding) = self.binding_of(
             module,
             f.source_name.as_deref().unwrap_or(&f.name),
-            f.binding.from.as_deref(),
-            &f.binding.name,
+            &f.binding,
         ) else {
             return false;
         };
-        target == expected_target
-            && types == Types::default()
+        binding.target == expected_target
+            && binding.types == Types::default()
             && self.parameters(module, f) == prim.arity()
     }
 }
@@ -186,29 +194,33 @@ impl<'a> Gen<'a> {
     /// Go form, which is reported.
     pub(super) fn foreign(&mut self, f: &Foreign, span: Span) -> Option<Document<'a>> {
         let a = self.a;
-        let Some((target, types)) = self.input.bindings.lookup(
+        if let IrBinding::Inline(inline) = &f.binding {
+            return Some(self.inline_foreign(f, inline));
+        }
+        let Some(bound) = self.input.bindings.binding_of(
             self.module,
             f.source_name.as_deref().unwrap_or(&f.name),
-            f.binding.from.as_deref(),
-            &f.binding.name,
+            &f.binding,
         ) else {
-            if let Some(spec) = f.binding.from.as_deref().filter(|m| is_relative(m)) {
-                return self.local(f, spec, span);
+            if let Some((spec, export)) = f.binding.module_export().filter(|(m, _)| is_relative(m))
+            {
+                return self.local(f, spec, export, span);
             }
-            let from = f
-                .binding
-                .from
-                .as_deref()
-                .map_or_else(|| "global".to_owned(), |m| format!("from `{m}`"));
+            let (export, from) = match &f.binding {
+                IrBinding::Module { from, name } => (name.as_str(), format!("from `{from}`")),
+                IrBinding::Global { name } => (name.as_str(), "global".to_owned()),
+                IrBinding::Inline(_) => unreachable!(),
+            };
             self.errors.push((
                 format!(
-                    "`{}.{}` (foreign `{}` {from}) is not available on the go target",
-                    self.module, f.name, f.binding.name
+                    "`{}.{}` (foreign `{export}` {from}) is not available on the go target",
+                    self.module, f.name
                 ),
                 Some(span),
             ));
             return None;
         };
+        let (target, types) = (bound.target.as_str(), bound.types.clone());
         // `*` marks a runtime function that takes the fiber first
         let (target, wants_fiber) = match target.strip_prefix('*') {
             Some(t) => (t, true),
@@ -230,23 +242,29 @@ impl<'a> Gen<'a> {
         let go = call(a, target, args.into_iter().map(|arg| arg.to_doc(a)));
         // a function of Go's own types is given and gives them as they are
         let heads: Vec<&str> = heads.iter().map(String::as_str).collect();
-        let result = types.result().map_or("flickrt.Value", Native::go);
-        Some(self.wrapper(f, typed_signature(&heads, f.dicts, types), result, go))
+        let result = types
+            .result()
+            .map_or_else(|| "flickrt.Value".to_owned(), GoType::go_type);
+        Some(self.wrapper(f, typed_signature(&heads, f.dicts, &types), &result, go))
     }
 
     /// The Go function of the binding `f` taking `params` and returning
     /// `go`, a `result`.
-    fn wrapper(
-        &self,
-        f: &Foreign,
-        params: String,
-        result: &'static str,
-        go: Document<'a>,
-    ) -> Document<'a> {
+    fn wrapper(&self, f: &Foreign, params: String, result: &str, go: Document<'a>) -> Document<'a> {
         let a = self.a;
         let name = names::func(self.module, &f.name);
         let body = single(a, docvec![a, "return ", go]);
-        docvec![a, "func ", name, "(", params, ") ", result, " ", body]
+        docvec![
+            a,
+            "func ",
+            name,
+            "(",
+            params,
+            ") ",
+            a.alloc_str(result),
+            " ",
+            body
+        ]
     }
 }
 
@@ -276,12 +294,14 @@ impl<'a> Gen<'a> {
     fn local_receiver_call(
         &self,
         f: &Foreign,
+        export: &str,
         first: &'a str,
         heads: &[&'a str],
         count: usize,
     ) -> Document<'a> {
         let a = self.a;
         let info = &f.adapter;
+        let variadic = info.has_word("variadic");
         let receiver_name = heads[f.dicts];
         let mut method_args: Vec<Document<'a>> = Vec::new();
         for i in 1..count {
@@ -298,13 +318,13 @@ impl<'a> Gen<'a> {
                         a.text(a.alloc_str(&n.to_string())),
                     ],
                 ));
-            } else if info.variadic && i + 1 == f.arity {
+            } else if variadic && i + 1 == f.arity {
                 method_args.push(call(a, "flickrt.List", [a.text(param_name)]));
             } else {
                 method_args.push(a.text(param_name));
             }
         }
-        let args_slice = if info.variadic && count > 1 {
+        let args_slice = if variadic && count > 1 {
             if let Some(last) = method_args.pop() {
                 if method_args.is_empty() {
                     last
@@ -318,7 +338,7 @@ impl<'a> Gen<'a> {
         } else {
             list(a, "[]flickrt.Value{", method_args, "}")
         };
-        let method_lit = a.alloc_str(&format!("\"{}\"", f.binding.name));
+        let method_lit = a.alloc_str(&format!("\"{export}\""));
         call(
             a,
             "flickrt.CallMethod",
@@ -331,15 +351,16 @@ impl<'a> Gen<'a> {
         )
     }
 
-    fn local_free_call(
+    pub(super) fn local_call_args(
         &self,
         f: &Foreign,
         first: &'a str,
         heads: &[&'a str],
         count: usize,
-    ) -> Document<'a> {
+    ) -> Vec<Document<'a>> {
         let a = self.a;
         let info = &f.adapter;
+        let variadic = info.has_word("variadic");
         let mut call_args: Vec<Document<'a>> = Vec::new();
         call_args.push(a.text(first));
         for &head in heads.iter().take(f.dicts) {
@@ -359,68 +380,27 @@ impl<'a> Gen<'a> {
                         a.text(a.alloc_str(&n.to_string())),
                     ],
                 ));
-            } else if info.variadic && i + 1 == f.arity {
+            } else if variadic && i + 1 == f.arity {
                 call_args.push(docvec![a, "flickrt.List(", param_name, ")..."]);
             } else {
                 call_args.push(a.text(param_name));
             }
         }
-        let export = a.alloc_str(&f.binding.name);
-        call(a, export, call_args)
+        call_args
     }
 
-    /// A binding to the JS module `spec` beside the program's code: on Go,
-    /// the function of the same name in the Go file beside that module.
-    fn local(&mut self, f: &Foreign, spec: &str, span: Span) -> Option<Document<'a>> {
+    pub(super) fn wrap_foreign_result(
+        &mut self,
+        f: &Foreign,
+        mut go: Document<'a>,
+        receiver: bool,
+    ) -> Document<'a> {
         let a = self.a;
-        let found = (self.input.foreign).get(&(self.module.to_owned(), spec.to_owned()));
-        let Some((file, text)) = found else {
-            self.errors.push((
-                format!(
-                    "`{}.{}` (foreign `{}` from `{spec}`) needs `{}` beside `{spec}` on the go target",
-                    self.module,
-                    f.name,
-                    f.binding.name,
-                    sibling(spec)
-                ),
-                Some(span),
-            ));
-            return None;
-        };
-        self.sources.insert(file.clone(), text.clone());
-        let taken = parameters(f);
-        if f.dicts == 0 && taken == 0 {
-            let var = names::var(self.module, &f.name);
-            return Some(docvec![
-                a,
-                "var ",
-                var,
-                " flickrt.Value = ",
-                f.binding.name.clone()
-            ]);
-        }
-        let heads: Vec<&'a str> = (0..f.dicts)
-            .map(|i| a.alloc_str(&format!("d{i}")))
-            .chain((0..taken).map(|i| a.alloc_str(&format!("a{i}"))))
-            .collect();
-
         let info = &f.adapter;
-        let first = match f.mode {
-            ForeignMode::Pure | ForeignMode::Sync | ForeignMode::Effect => "fb",
-            ForeignMode::Async => "ctx",
-        };
-        let count = if f.arity == 0 { 0 } else { taken };
-
-        let mut go = if info.receiver {
-            self.local_receiver_call(f, first, &heads, count)
-        } else {
-            self.local_free_call(f, first, &heads, count)
-        };
-
         if let Some(catch_expr) = &f.catch {
             let catch_code = self.expr(catch_expr);
             let catch_doc = catch_code.to_doc(a);
-            let body = if info.receiver {
+            let body = if receiver {
                 docvec![a, "return ", go, ", nil"]
             } else {
                 docvec![a, "return ", go]
@@ -442,6 +422,57 @@ impl<'a> Gen<'a> {
             let run = closure(a, head, [docvec![a, "return ", go]]);
             go = call(a, "flickrt.ForeignAsync", [a.text("fb"), run]);
         }
+        go
+    }
+
+    /// A binding to the JS module `spec` beside the program's code: on Go,
+    /// the function of the same name in the Go file beside that module.
+    fn local(&mut self, f: &Foreign, spec: &str, export: &str, span: Span) -> Option<Document<'a>> {
+        let a = self.a;
+        let found = (self.input.foreign).get(&(self.module.to_owned(), spec.to_owned()));
+        let Some((file, text)) = found else {
+            self.errors.push((
+                format!(
+                    "`{}.{}` (foreign `{export}` from `{spec}`) needs `{}` beside `{spec}` on the go target",
+                    self.module,
+                    f.name,
+                    sibling(spec)
+                ),
+                Some(span),
+            ));
+            return None;
+        };
+        self.sources.insert(file.clone(), text.clone());
+        let taken = parameters(f);
+        if f.dicts == 0 && taken == 0 {
+            let var = names::var(self.module, &f.name);
+            return Some(docvec![
+                a,
+                "var ",
+                var,
+                " flickrt.Value = ",
+                export.to_owned()
+            ]);
+        }
+        let heads: Vec<&'a str> = (0..f.dicts)
+            .map(|i| a.alloc_str(&format!("d{i}")))
+            .chain((0..taken).map(|i| a.alloc_str(&format!("a{i}"))))
+            .collect();
+
+        let receiver = f.adapter.has_word("this");
+        let first = match f.mode {
+            ForeignMode::Pure | ForeignMode::Sync | ForeignMode::Effect => "fb",
+            ForeignMode::Async => "ctx",
+        };
+        let count = if f.arity == 0 { 0 } else { taken };
+
+        let go = if receiver {
+            self.local_receiver_call(f, export, first, &heads, count)
+        } else {
+            let call_args = self.local_call_args(f, first, &heads, count);
+            call(a, a.alloc_str(export), call_args)
+        };
+        let go = self.wrap_foreign_result(f, go, receiver);
         Some(self.wrapper(f, signature(&heads), "flickrt.Value", go))
     }
 }

@@ -24,6 +24,7 @@ mod patterns;
 mod primitives;
 pub use primitives::HostMode;
 mod program;
+mod record_update;
 pub use program::{
     Executed, ExecutionReport, ProgramOutcome, TestCaseResult, execute_main_program,
     execute_main_program_outcome, execute_main_program_outcome_with_bridge,
@@ -140,7 +141,15 @@ pub enum Value {
     Unit,
     Bool(bool),
     Int(i32),
+    Int8(i8),
+    Int16(i16),
+    Int64(i64),
+    UInt8(u8),
+    UInt16(u16),
+    UInt32(u32),
+    UInt64(u64),
     Float(f64),
+    Float32(f32),
     Object(ObjectToken),
     Cell(CellHandle),
     Owner(OwnerHandle),
@@ -177,7 +186,15 @@ impl Value {
             Self::Unit => Self::Unit,
             Self::Bool(value) => Self::Bool(*value),
             Self::Int(value) => Self::Int(*value),
+            Self::Int8(value) => Self::Int8(*value),
+            Self::Int16(value) => Self::Int16(*value),
+            Self::Int64(value) => Self::Int64(*value),
+            Self::UInt8(value) => Self::UInt8(*value),
+            Self::UInt16(value) => Self::UInt16(*value),
+            Self::UInt32(value) => Self::UInt32(*value),
+            Self::UInt64(value) => Self::UInt64(*value),
             Self::Float(value) => Self::Float(*value),
+            Self::Float32(value) => Self::Float32(*value),
             Self::Object(token) => Self::Object(ObjectToken { id: token.id }),
             Self::Owner(owner) => Self::Owner(OwnerHandle {
                 heap: owner.heap,

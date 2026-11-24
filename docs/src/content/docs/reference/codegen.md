@@ -47,12 +47,11 @@ A module that has no runtime stage imports no `Effect` at all.
 | Source value | JS |
 | - | - |
 | `Unit`, `()` | `undefined` |
-| `Int`, `Float`, `BigInt`, `String`, `Bool` | the JS primitive; a number literal is printed from its value (`0xff` and `1_000` become `255` and `1000`, a negative one is parenthesized), a `BigInt` one keeps its radix and gets `n` |
+| `Int`, `Int8`, `Int16`, `Int32`, `UInt8`/`Byte`, `UInt16`, `UInt32`, `Float`, `Float32` | JS `number`; a number literal is printed from its value (`0xff` and `1_000` become `255` and `1000`, a negative one is parenthesized); sub-32-bit and `UInt32` operations mask or sign-extend explicitly (`<< 24 >> 24`, `<< 16 >> 16`, `& 0xff`, `& 0xffff`, `>>> 0`, `Math.imul(...) >>> 0`) and `Float32` rounds via `Math.fround(...)` |
+| `Int64`, `UInt64`, `BigInt` | JS `bigint`; `Int64` and `UInt64` wrap via `BigInt.asIntN(64, …)` / `BigInt.asUintN(64, …)` and format without an `n` suffix via `showInt64` / `showUInt64`; `BigInt` keeps arbitrary precision and appends `n` in `show` |
+| `String`, `Bool` | the JS primitive |
 
-`Int` arithmetic keeps a value in 32 bits: `a + b` is `(a + b \| 0)`, `a * b`
-is `Math.imul(a, b)`, and `/`, `%` and `**` are runtime calls that truncate
-and divide by zero to `0`. `/` and `%` on `BigInt` are runtime calls too,
-for the zero divisor.
+Fixed-width integer arithmetic keeps every value within its width: `Int` (`Int32`) uses `(a + b \| 0)` and `Math.imul(a, b)`, `Int8`/`Int16`/`UInt8`/`UInt16`/`UInt32` mask or sign-extend in JS `number`, `Int64`/`UInt64` wrap with `BigInt.asIntN(64, …)` / `BigInt.asUintN(64, …)`, and `/`, `%` and `**` call runtime helpers that truncate and divide by zero to `0` (with signed `min / -1 = min` and `min % -1 = 0`). `/` and `%` on `BigInt` are runtime calls too, for the zero divisor.
 | tuple, `List` | dense array |
 | record | plain object with exactly its fields in canonical sorted UTF-16 label order (field expressions evaluate in source order; array-index keys, if any, come first numerically per ECMAScript) |
 | ADT value | `{ _tag, _0, _1, … }`, fields in declaration order |
@@ -289,7 +288,9 @@ exported values with their projected types (see [Public TypeScript interfaces](.
 
 | Flick | TypeScript |
 | - | - |
-| `Int`, `Float`, `String`, `Bool`, `BigInt`, `Unit`, `Never`, `Unknown` | `number`, `number`, `string`, `boolean`, `bigint`, `undefined`, `never`, `unknown` |
+| `Int`, `Int8`, `Int16`, `Int32`, `UInt8`/`Byte`, `UInt16`, `UInt32`, `Float`, `Float32` | `number` |
+| `Int64`, `UInt64`, `BigInt` | `bigint` |
+| `String`, `Bool`, `Unit`, `Never`, `Unknown` | `string`, `boolean`, `undefined`, `never`, `unknown` |
 | `List a`, `(a, b)`, `{ x : a }` | `ReadonlyArray<A>`, `readonly [A, B]`, `{ readonly x: A }` |
 | `Option a`, `Result e a` | Effect `Option.Option<A>`, `Result.Result<A, E>` |
 | `a -> b` | `(arg: A) => B`, one arrow per stage |
@@ -306,9 +307,11 @@ exported values with their projected types (see [Public TypeScript interfaces](.
 
 ### The form of a type
 
-`@ts` before the declaration of a type or a service says what the type is in
-TypeScript. Such a type is not declared: every module that names it writes
-the form, and imports only what the forms it wrote name.
+`@ts` (a foreign type-form attribute declared by `flick/js` in
+`descriptor.type-form-attributes`; other backends declare their own, such as
+`@go` on `flick/go`) before the declaration of a type or a service says what
+the type is in TypeScript. Such a type is not declared: every module that names
+it writes the form, and imports only what the forms it wrote name.
 
 ```flick
 @ts "$Dayjs"
@@ -395,7 +398,7 @@ corpus runs in both profiles against the same expectations.
 | fusion | `Seq.map`, `Seq.filter`, `Seq.flat_map` and `Seq.take` of a lazy `for`, and `List.map`, `List.filter` of a strict one, run in its loop; `Seq.to_list` of a lazy `for` is the strict one, a loop pushing into an array; a `for` over a `for` nests the inner clauses. Their functions are pure, so running them between the clauses is not observable; a known lambda is applied in place, another function is bound once before the loop. A `for` whose body makes Sync calls stays as it is. A pipeline of a `for`, a filter and a map to a list is one loop: 17× faster than the generators of debug (`tools/fusion-bench`) |
 | scalar replacement | a local record whose every use reads a field, or a local tuple only destructured, becomes one local per part: no object |
 | dead code | unused pure bindings (an unused `task { … }` included) and private top-level values nothing reaches; a runtime call always stays, its result used or not, but the making of a lazy cell nothing reads (below) |
-| lazy cells | a lazy nothing reads is not made: `ignore (lazy { … })`, or one an inlined function takes and drops; `lazy { v }` of a value (a literal, a name, a constructor, a function, or a tuple, list or record of them) is a cell made done, whose `await` runs nothing; `await (lazy { … })` is `await (task { … })`, which runs its task there, once, and `await (lazy { v })` is `v`; a pure `lazy { e }` whose free variables are loop-invariant is hoisted out of a loop so iterations share one cell instead of making one per iteration. Each of these is a contextual equivalence of the core, proved in Lean (`formal/Formal/Equiv/`). After `let a = await l`, a later `await l` is `a`: the cell is done with what the first gave, as the protocol of a cell proves (`formal/Formal/RT/LazyCell.lean`) |
+| lazy cells | a lazy nothing reads is not made: `ignore (lazy { … })`, or one an inlined function takes and drops; `lazy { v }` of a value (a literal, a name, a constructor, a function, or a tuple, list or record of them) is a cell made done, whose `await` runs nothing; `await (lazy { … })` is `await (task { … })`, which runs its task there, once, and `await (lazy { v })` is `v`; a pure `lazy { e }` whose free variables are loop-invariant is hoisted out of a loop so iterations share one cell instead of making one per iteration; a `let l = lazy { … }` that never escapes its creating fiber/scope (never entering a `task`, closure, local function, lazy `Seq`, handler arm, data field, `Ref`/mutable, return value or non-inlined call) uses an unsynchronized local cell (`lazy_make_local`) without waiter tracking or locks. Each of the core rewrites is a contextual equivalence proved in Lean (`formal/Formal/Equiv/`). After `let a = await l`, a later `await l` is `a`: the cell is done with what the first gave, as both the core (`Equiv.o2a_all`) and the protocol (`formal/Formal/RT/LazyCell.lean`) prove |
 | workers | a top-level function whose stages before the last are pure gets `f$n` taking all `n` arguments; a known full application calls it, a partial one keeps the curried `f`; a private function only ever applied fully has no curried form. An exported function of two or more parameters without dictionaries, `foreign` included, exports `f$n` beside `f`, and a full application in another module calls it: the `stages` of its `.iface` summary give `n` |
 | dictionaries | a method of an instance without a context, written, derived or a default made its own, is an exported constant `<instance>$<method>`; a method of an instance with a context whose methods are all written as functions, and that takes no default, is the constant `<instance>$<method>` of the context's dictionaries, which its dictionary is built with. A canonical use calls it directly, in the module or an importer, given the dictionaries of the context as resolved (`$i_Show_Option_a_…$show($i_Show_Int)(x)`): no dictionary of the instance is built, which runs none of the program's code. A dictionary passed as a value (an `EqHash` witness) is never replaced |
 | foreign | a pure `foreign` that passes its arguments and result as they are is the import itself: `export const div$2 = $f_div`, and a full application in the module calls `$f_div` |
@@ -438,15 +441,18 @@ Values have the representation of the JS target, in Go terms:
 
 | Flick | Go |
 | - | - |
-| `Int` | `int32` |
-| `Float` | `float64` |
+| `Int` (`Int32`) | `int32` |
+| `Int8`, `Int16`, `Int64` | `int8`, `int16`, `int64` |
+| `UInt8` (`Byte`), `UInt16`, `UInt32`, `UInt64` | `uint8`, `uint16`, `uint32`, `uint64` |
+| `Float`, `Float32` | `float64`, `float32` |
 | `BigInt` | `*big.Int`, never mutated |
 | `String` | `string` holding WTF-8 |
 | `Bool`, `Unit` | `bool`, `flickrt.Unit` |
 | a tuple, a `List` | `[]flickrt.Value`; `[x, ...rest]` shares the storage of the list |
 | a record | `*flickrt.Record`, its labels in canonical sorted order (JS array-index keys ascending, then UTF-16 code-unit order — matching `Record.labels` and the JS target), copied by `{ r with … }` |
 | a constructor | `*flickrt.Data` with the tag of the JS target; `Fields()` is its fields, up to two of them held in the value itself |
-| a tagged constructor without retained dictionaries, of a type the program declares | a Go type of its own: `*T_Module__Name` holding the fields when it has fields, or a zero-size value type `T_Module__Name` (`struct{}`) constructed as `T_Module__Name{}` with no allocation when it has none. A `match` asks Go for the type (`Is_T_Module__Name`) and compares no tag. The runtime reads any constructor value as `flickrt.Constructed` (`TagName()`, `Fields()`) and builds one with `flickrt.Construct(tag, fields...)`; a constructor of a built-in module (`Option`, `Ordering`, …) and one holding a dictionary stay `*flickrt.Data` |
+| a tagged constructor without retained dictionaries, of a type the program declares | a Go type of its own: `*T_Module__Name` holding the fields when it has fields, or a zero-size value type `T_Module__Name` (`struct{}`) constructed as `T_Module__Name{}` with no allocation when it has none. Fields declared with a concrete scalar type (`Int`, `Float`, `Bool`, `String`) are stored unboxed (`int32`, `float64`, `bool`, `string`), packed with pointer-bearing fields first; polymorphic and non-scalar fields stay `flickrt.Value`. A `match` asks Go for the type (`Is_T_Module__Name`), compares no tag, and reads unboxed scalar fields directly without boxing; derived `Eq`, `Ord`, `Hash`, `Show`, and `==` operate directly on those typed fields. The runtime reads any constructor value as `flickrt.Constructed` (`TagName()`, `Fields()`) and builds one with `flickrt.Construct(tag, fields...)`; a constructor of a built-in module (`Ordering`, erased `Option`, …) and one holding a dictionary stay `*flickrt.Data` |
+| a concrete `Option T` on a typed Go path | an allocation-free by-value Go representation chosen from `T`: `flickrt.OptBool` (`uint8` sentinel: `0` = `None`, `1` = `Some false`, `2` = `Some true`) for `Option Bool`; `flickrt.OptRef` (`struct{ val flickrt.Value }` with `nil` sentinel for `None`) when the non-`Option` payload is guaranteed non-nil (tuples, records, functions, `List`, `BigInt`, `Result`, non-unboxed ADTs); `flickrt.Opt[T]` (`{ Val T; Ok bool }` presence flag) for `Int`, `Float`, `String`, `Unknown`/opaque payloads, and every nested `Option (Option U)` so `Some None` and deeper nestings stay distinct. Polymorphic `Option a` stays tagged `*flickrt.Data`, and erased boundaries (polymorphic calls, generic runtime observers, `flickrt.Value` Go FFI) convert to and from the tagged `"Some"` / `"None"` `*flickrt.Data` form |
 | a constructor declared over a record, `Node { left : Tree; key : Int }` | the record lies in the value of the constructor: one object, and the record a `match` binds is a `*flickrt.Record` pointing into it. Its labels are in canonical sorted order, whatever order the declaration or literal writes them in (field expressions still evaluate in source order); a record given whole (`Node r`) is copied in |
 | a function | `func(*flickrt.Fiber, flickrt.Value) flickrt.Value` per stage; one of two or three arguments whose stages before the last are pure is `flickrt.Fn2` or `flickrt.Fn3`, which takes them at once |
 | a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
@@ -507,11 +513,15 @@ so an unsorted `to_list` prints the same on both targets.
 
 A top-level function is a Go function of its execution fiber, dictionaries
 and all its parameters; a full application calls it, and a partial one or a
-use as a value makes a function of values around it. A parameter that is an
-`Int`, a `Float`, a `Bool` or a `String`, and a result that is one, has its
-Go type there (`func F(fb *flickrt.Fiber, n int32) int32`), so a number
-passed to a known function or returned by it is no `flickrt.Value` made for
-the call. The tail calls that are loops on the JS
+use as a value makes a function of values around it. A parameter that is an `Int`, a `Float`, a `Bool`, a `String`, or an eligible
+concrete `Option T`, and a result that is one, has its typed Go representation
+there (`func F(fb *flickrt.Fiber, n int32) flickrt.Opt[int32]`), so a scalar or
+concrete `Option` passed to a known function, matched, unwrapped with `?`,
+compared with `==`, stored in a `let mut`, or carried across a self tail loop
+adds no `flickrt.Value` or `*flickrt.Data` allocation; converting to or from
+erased `*flickrt.Data` happens only when crossing into polymorphic code,
+closures returning `flickrt.Value`, generic runtime helpers, or `flickrt.Value`
+FFI. The tail calls that are loops on the JS
 target (see [Recursion](#recursion-stack-safety-is-not-the-whole-cost))
 are loops in Go too: a self call is a `for` that assigns the next arguments
 and continues, and a group of functions calling each other is one Go
@@ -651,11 +661,14 @@ in `flick.toml`, or `--allow-tool go` for a file built outside a project
 (`FLICK-P029` otherwise). It is built without cgo by default, so no C compiler is
 needed either; pass `--cgo` (or `[target.go] cgo = true`) to build with `CGO_ENABLED=1`.
 
-## Portable IR (0.14.0)
+## Portable IR (0.17.0)
 
-Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.14.0"`),
-checked against the `ir` version range (`[0.14.0, 0.15.0)`) in its descriptor.
-Alongside values, stages, dictionaries and lang items, IR `0.14.0` carries the
+Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.17.0"`),
+checked against the `ir` version range (`[0.17.0, 0.18.0)`) in its descriptor.
+Alongside values, stages, dictionaries, lang items, inline foreign preambles and
+bindings (`Module.preambles`, `Binding::Inline`), backend-declared foreign
+adapter words (`Foreign.adapter.{words, owned}`), and fixed-width numeric types
+(`Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`), IR `0.17.0` carries the
 layout-relevant types the checker inferred so layout-aware and monomorphizing
 backends can lay out values by value without calling back into the checker:
 
@@ -678,8 +691,10 @@ type arguments match the parameters of their declaration, and that type
 annotations used for layout agree with the terms they describe (constructor
 operands, binders, calls and results). Backends and transforms may still use an
 erased representation where optional annotations are omitted (`None` or empty
-lists) and the erased path stays valid. The official `flick/js` and `flick/go`
-backends ignore the new compound type fields beyond bare type-constructor names.
+lists) and the erased path stays valid. The official `flick/js` backend ignores the new compound type fields beyond bare
+type-constructor names; `flick/go` reads compound `Option T` types and
+`Module.types` declarations to choose allocation-free typed `Option` layouts
+without calling back into the checker.
 
 ## Shared data layouts
 

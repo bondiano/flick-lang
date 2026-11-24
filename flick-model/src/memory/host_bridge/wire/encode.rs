@@ -264,7 +264,51 @@ fn encode_visit<'a>(
             let id = emit(nodes, json!(["i", n]));
             store_slot(stack, root_idx, slot, id);
         }
+        Value::Int8(n) => {
+            let id = emit(nodes, json!(["i", n]));
+            store_slot(stack, root_idx, slot, id);
+        }
+        Value::Int16(n) => {
+            let id = emit(nodes, json!(["i", n]));
+            store_slot(stack, root_idx, slot, id);
+        }
+        Value::UInt8(n) => {
+            let id = emit(nodes, json!(["i", n]));
+            store_slot(stack, root_idx, slot, id);
+        }
+        Value::UInt16(n) => {
+            let id = emit(nodes, json!(["i", n]));
+            store_slot(stack, root_idx, slot, id);
+        }
+        Value::UInt32(n) => {
+            let id = emit(nodes, json!(["f", f64::from(n)]));
+            store_slot(stack, root_idx, slot, id);
+        }
+        Value::Int64(n) => {
+            let id = emit(nodes, json!(["n", n.to_string()]));
+            store_slot(stack, root_idx, slot, id);
+        }
+        Value::UInt64(n) => {
+            let id = emit(nodes, json!(["n", n.to_string()]));
+            store_slot(stack, root_idx, slot, id);
+        }
         Value::Float(f) => {
+            let node = if f.is_nan() {
+                json!(["fs", "NaN"])
+            } else if f == f64::INFINITY {
+                json!(["fs", "Infinity"])
+            } else if f == f64::NEG_INFINITY {
+                json!(["fs", "-Infinity"])
+            } else if f == 0.0 && f.is_sign_negative() {
+                json!(["fs", "-0"])
+            } else {
+                json!(["f", f])
+            };
+            let id = emit(nodes, node);
+            store_slot(stack, root_idx, slot, id);
+        }
+        Value::Float32(f) => {
+            let f = f64::from(f);
             let node = if f.is_nan() {
                 json!(["fs", "NaN"])
             } else if f == f64::INFINITY {
@@ -437,5 +481,53 @@ pub(super) fn encode_cause(
             cb_arity: None,
             slot: Some((frame_idx, i)),
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::memory::{CellHandle, ObjectId};
+
+    struct NoopRegistrar;
+
+    impl WireRegistrar for NoopRegistrar {
+        fn register_closure(&mut self, _: &mut Heap, _: ObjectId, _: usize) -> Result<u64, Error> {
+            unreachable!("no closures in scalar wire test")
+        }
+        fn register_task(&mut self, _: &mut Heap, _: ObjectId) -> Result<u64, Error> {
+            unreachable!("no tasks in scalar wire test")
+        }
+        fn register_dict_getter(
+            &mut self,
+            _: &mut Heap,
+            _: ObjectId,
+            _: ObjectId,
+        ) -> Result<u64, Error> {
+            unreachable!("no dict getters in scalar wire test")
+        }
+        fn register_cell(&mut self, _: &CellHandle) -> u64 {
+            unreachable!("no cells in scalar wire test")
+        }
+        fn record_owner(&mut self, _: usize) {}
+    }
+
+    #[test]
+    fn int64_and_uint64_encode_with_bigint_wire_tag() {
+        let mut heap = Heap::new();
+        let mut reg = NoopRegistrar;
+        for (value, expected) in [
+            (Value::Int64(i64::MIN), "-9223372036854775808"),
+            (Value::Int64(i64::MAX), "9223372036854775807"),
+            (Value::UInt64(0), "0"),
+            (Value::UInt64(u64::MAX), "18446744073709551615"),
+        ] {
+            let wire = encode_value(&mut heap, 0, &value, None, None, &mut reg).expect("encode");
+            assert_eq!(wire, json!({ "root": 0, "nodes": [["n", expected]] }));
+            let decoded = super::super::decode_value(&mut heap, 0, &wire).expect("decode");
+            assert_eq!(heap.bigint(&decoded), Ok(expected));
+            heap.drop_value(decoded).expect("drop");
+        }
+        assert!(heap.finish().is_ok());
     }
 }

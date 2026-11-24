@@ -3,7 +3,7 @@ use super::{Code, Intrinsic, Local, Lower, LowerError, Name, Operation, Span, un
 use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 
 pub(super) fn is_binding(value: &Foreign) -> bool {
-    value.binding.from.as_deref() == Some("flick:rt") && value.binding.name == "appFail"
+    value.binding.module_export() == Some(("flick:rt", "appFail"))
 }
 
 pub(super) fn supports(value: &Foreign) -> bool {
@@ -15,10 +15,8 @@ pub(super) fn supports(value: &Foreign) -> bool {
         && value.catch.is_none()
         && value.adapter
             == Adapter {
-                receiver: false,
-                cancel: false,
                 optional: vec![],
-                variadic: false,
+                owned: vec![],
                 result: ResultAdapter {
                     nullable: false,
                     unit: false,
@@ -31,6 +29,7 @@ pub(super) fn supports(value: &Foreign) -> bool {
                 },
                 shapes: vec![Shape::Data],
                 result_shape: Shape::Data,
+                words: vec![],
             }
 }
 
@@ -110,6 +109,7 @@ mod tests {
     use flick_ir::{Foreign, ForeignMode, Shape};
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn genuine_builtin_app_fail_pins_every_abi_dimension() {
         let original = build::builtin_modules()
             .iter()
@@ -127,8 +127,18 @@ mod tests {
             .expect("genuine foreign");
         assert!(supports(original), "{original:#?}");
         let mutations: Vec<fn(&mut Foreign)> = vec![
-            |v| v.binding.from = None,
-            |v| v.binding.name.push('!'),
+            |v| {
+                v.binding = flick_ir::Binding::Global {
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            },
+            |v| {
+                if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                    &mut v.binding
+                {
+                    name.push('!');
+                }
+            },
             |v| v.mode = ForeignMode::Pure,
             |v| v.mode = ForeignMode::Sync,
             |v| v.arity = 0,
@@ -143,10 +153,28 @@ mod tests {
                     Span::new(FileId::new(0), 0, 0),
                 ));
             },
-            |v| v.adapter.receiver = true,
-            |v| v.adapter.cancel = true,
+            |v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "this".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
+            |v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "cancel".into(),
+                    args: vec![flick_ir::AdapterArg::Word("signal".into())],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
             |v| v.adapter.optional.push(0),
-            |v| v.adapter.variadic = true,
+            |v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "variadic".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
             |v| v.adapter.result.nullable = true,
             |v| v.adapter.result.unit = true,
             |v| v.adapter.callbacks.clear(),

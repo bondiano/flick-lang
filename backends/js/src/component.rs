@@ -16,10 +16,10 @@ mod packages;
 mod templates;
 
 use flick_backend::{
-    Abi, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment,
-    EnvironmentServices, Inputs, Mode, NamedRange, OptionDescriptor, OptionValue, Packages,
-    Parameter, Profile, ProjectFile, Severity, TagAxis, TargetSupport, ValueKind, Verb,
-    VersionRange, command,
+    Abi, AdapterArg, AdapterArgKind, AdapterWord, Backend, BackendId, BuildRequest, BuildResult,
+    Descriptor, Diagnostic, Environment, EnvironmentServices, Inputs, Mode, NamedRange,
+    OptionDescriptor, OptionValue, Packages, Parameter, Profile, ProjectFile, Severity, TagAxis,
+    TargetSupport, TypeFormAttribute, ValueKind, Verb, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -212,7 +212,7 @@ impl Backend for Javascript {
                 version: "0.1.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.14.0", "0.15.0"),
+            ir: range("0.17.0", "0.18.0"),
             language: range("0.1.0", "0.2.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
@@ -271,6 +271,33 @@ impl Backend for Javascript {
                     platform: "node".into(),
                 },
                 services: vec!["Database".into(), "Db".into(), "Server".into()],
+            }],
+            foreign_adapters: vec![
+                AdapterWord {
+                    name: "this".into(),
+                    args: vec![],
+                    repeatable: false,
+                    doc: "Pass the first argument as the JavaScript `this` receiver (`target.call(a0, ...)`).".into(),
+                },
+                AdapterWord {
+                    name: "cancel".into(),
+                    args: vec![AdapterArg {
+                        name: "kind".into(),
+                        kind: AdapterArgKind::Keyword(vec!["signal".into()]),
+                    }],
+                    repeatable: false,
+                    doc: "Pass an `AbortSignal` as the last argument of an `Async` call, aborted on interruption.".into(),
+                },
+                AdapterWord {
+                    name: "variadic".into(),
+                    args: vec![],
+                    repeatable: false,
+                    doc: "Spread the last argument (a `List a`) into the JavaScript call.".into(),
+                },
+            ],
+            type_form_attributes: vec![TypeFormAttribute {
+                name: "ts".into(),
+                doc: "Declare the TypeScript form of a foreign `type` or `service` (`@ts \"...\"`, `@ts from \"pkg\" \"Name\"`, or `@ts none`).".into(),
             }],
         }
     }

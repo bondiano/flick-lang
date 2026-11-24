@@ -38,6 +38,37 @@ interface types {
         environment: environment,
         services: list<string>,
     }
+    /// Expected shape of one positional argument to a backend-declared foreign
+    /// adapter word.
+    variant adapter-arg-kind {
+        /// One of a closed set of lowercase keyword choices.
+        keyword(list<string>),
+        /// A zero-based parameter index validated against the foreign binding's arity.
+        param-index,
+        /// A non-negative integer literal.
+        uint,
+        /// A string literal.
+        text,
+        /// Any identifier word.
+        word,
+    }
+    /// One positional argument slot of a backend-declared foreign adapter word.
+    record adapter-arg {
+        name: string,
+        kind: adapter-arg-kind,
+    }
+    /// A foreign metadata adapter word declared by a backend.
+    record adapter-word {
+        name: string,
+        args: list<adapter-arg>,
+        repeatable: bool,
+        doc: string,
+    }
+    /// A foreign type-form attribute declared by a backend (such as `@ts` or `@go`).
+    record type-form-attribute {
+        name: string,
+        doc: string,
+    }
     record descriptor {
         identity: backend-id,
         backend-api: version-range,
@@ -66,6 +97,10 @@ interface types {
         foreign-suffixes: list<string>,
         /// Gated services handled at the root of each environment.
         handled-services: list<environment-services>,
+        /// Backend-owned foreign adapter words accepted in `foreign` metadata blocks.
+        foreign-adapters: list<adapter-word>,
+        /// Backend-owned type-form attributes accepted on `type` and `service` declarations.
+        type-form-attributes: list<type-form-attribute>,
     }
     /// Available before IR generation; the host checks descriptor ranges
     /// first, then asks the backend for target-specific refusals.
@@ -125,6 +160,15 @@ interface types {
         abi: abi,
         inputs: list<string>,
     }
+    /// Inline host code carried by a module: either a `foreign module inline`
+    /// preamble (`name` is `none`) or a `from inline` binding (`name` is the
+    /// lowered Flick binding name), with the span of its source string literal.
+    record inline-foreign {
+        module: string,
+        name: option<string>,
+        code: string,
+        span: span,
+    }
     /// A projection has a declared schema and version, and plain data in a
     /// content-addressed input. Unknown schemas must be refused, not guessed.
     /// Complete typing/effect facts and UI metadata are not implied by IR.
@@ -177,6 +221,7 @@ interface types {
         entries: list<entry>,
         test-roots: list<symbol>,
         foreign: list<foreign-binding>,
+        inline-foreign: list<inline-foreign>,
         projections: list<projection>,
         package-targets: list<package-target>,
         root-handlers: list<root-handler>,

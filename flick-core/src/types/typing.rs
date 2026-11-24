@@ -378,6 +378,11 @@ pub struct ForeignInfo {
     /// The `catch` mapping expression.
     pub catch: Option<Range>,
     pub adapter: Adapter,
+    /// Whether each parameter `0..arity` has head type `List a` (after WHNF
+    /// alias expansion). Used by in-process backend adapter validation on
+    /// platforms where `Foreign.ty` is not populated.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub list_params: Vec<bool>,
     /// How the host is called: the mode as written, else as the signature tells.
     pub mode: ForeignMode,
 }

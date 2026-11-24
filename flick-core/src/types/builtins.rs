@@ -363,6 +363,8 @@ fn check_reporting(
             thresholds: super::Thresholds::default(),
             watched: Watched::none(),
             stages_by_class,
+            foreign_backend: super::ForeignBackendSpec::default_js(),
+            validate_foreign_metadata: true,
         };
         let (checked, typing, _) = super::run_in(
             &module,

@@ -1,0 +1,229 @@
+/// Operations and explicit conversions on `Int16`, the 16-bit signed integers
+/// (`-32768..=32767`). Operators wrap around; `/` and `%` by zero yield `0`.
+module Int16 exposing (..)
+
+import BigInt
+
+min_value : Int16
+let min_value = -32768i16
+
+max_value : Int16
+let max_value = 32767i16
+
+min_bigint : BigInt
+let min_bigint = -32768n
+
+max_bigint : BigInt
+let max_bigint = 32767n
+
+to_string : Int16 -> String
+let to_string n = display n
+
+parse : String -> Option Int16
+let parse s = Option.bind from_bigint (BigInt.parse s)
+
+to_float : Int16 -> Float
+foreign pure to_float from "flick:rt" "toFloat64"
+
+to_float32 : Int16 -> Float32
+foreign pure to_float32 from "flick:rt" "toFloat32"
+
+to_bigint : Int16 -> BigInt
+foreign pure to_bigint from "flick:rt" "toBigInt"
+
+to_int : Int16 -> Int
+foreign pure to_int from "flick:rt" "toInt32"
+
+from_int8 : Int8 -> Int16
+let from_int8 n = into n
+
+from_uint8 : UInt8 -> Int16
+let from_uint8 n = into n
+
+wrapping_from_int : Int -> Int16
+foreign pure wrapping_from_int from "flick:rt" "toInt16"
+
+wrapping_from_int32 : Int32 -> Int16
+let wrapping_from_int32 n = wrapping_from_int n
+
+wrapping_from_int64 : Int64 -> Int16
+foreign pure wrapping_from_int64 from "flick:rt" "toInt16"
+
+wrapping_from_uint16 : UInt16 -> Int16
+foreign pure wrapping_from_uint16 from "flick:rt" "toInt16"
+
+wrapping_from_uint32 : UInt32 -> Int16
+foreign pure wrapping_from_uint32 from "flick:rt" "toInt16"
+
+wrapping_from_uint64 : UInt64 -> Int16
+foreign pure wrapping_from_uint64 from "flick:rt" "toInt16"
+
+wrapping_from_bigint : BigInt -> Int16
+foreign pure wrapping_from_bigint from "flick:rt" "toInt16"
+
+from_bigint : BigInt -> Option Int16
+let from_bigint n = if n < min_bigint || n > max_bigint then None else Some (wrapping_from_bigint n)
+
+from_int : Int -> Option Int16
+let from_int n = if n < -32768 || n > 32767 then None else Some (wrapping_from_int n)
+
+from_int32 : Int32 -> Option Int16
+let from_int32 n = from_int n
+
+from_int64 : Int64 -> Option Int16
+let from_int64 n = if n < -32768i64 || n > 32767i64 then None else Some (wrapping_from_int64 n)
+
+from_uint16 : UInt16 -> Option Int16
+let from_uint16 n = if n > 32767u16 then None else Some (wrapping_from_uint16 n)
+
+from_uint32 : UInt32 -> Option Int16
+let from_uint32 n = if n > 32767u32 then None else Some (wrapping_from_uint32 n)
+
+from_uint64 : UInt64 -> Option Int16
+let from_uint64 n = if n > 32767u64 then None else Some (wrapping_from_uint64 n)
+
+from_float : Float -> Option Int16
+let from_float x = Option.bind from_bigint (BigInt.from_number x)
+
+from_float32 : Float32 -> Option Int16
+let from_float32 x = from_float (into x)
+
+saturating_from_bigint : BigInt -> Int16
+let saturating_from_bigint n =
+  if n < min_bigint then min_value else if n > max_bigint then max_value else wrapping_from_bigint n
+
+saturating_from_int : Int -> Int16
+let saturating_from_int n =
+  if n < -32768 then min_value else if n > 32767 then max_value else wrapping_from_int n
+
+saturating_from_int32 : Int32 -> Int16
+let saturating_from_int32 n = saturating_from_int n
+
+saturating_from_int64 : Int64 -> Int16
+let saturating_from_int64 n =
+  if n < -32768i64 then min_value else if n > 32767i64 then max_value else wrapping_from_int64 n
+
+saturating_from_uint16 : UInt16 -> Int16
+let saturating_from_uint16 n = if n > 32767u16 then max_value else wrapping_from_uint16 n
+
+saturating_from_uint32 : UInt32 -> Int16
+let saturating_from_uint32 n = if n > 32767u32 then max_value else wrapping_from_uint32 n
+
+saturating_from_uint64 : UInt64 -> Int16
+let saturating_from_uint64 n = if n > 32767u64 then max_value else wrapping_from_uint64 n
+
+saturating_from_float : Float -> Int16
+let saturating_from_float x =
+  if Float.is_nan x then
+    0i16
+  else if x <= -32768.0 then
+    min_value
+  else if x >= 32767.0 then
+    max_value
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> saturating_from_bigint n
+    | None -> 0i16
+
+saturating_from_float32 : Float32 -> Int16
+let saturating_from_float32 x = saturating_from_float (into x)
+
+truncate : Float -> Int16
+let truncate x =
+  if not (Float.is_finite x) then
+    0i16
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> wrapping_from_bigint n
+    | None -> 0i16
+
+/// `abs min_value` wraps around to `min_value`.
+abs : Int16 -> Int16
+let abs x = if x < 0i16 then -x else x
+
+min : Int16 -> Int16 -> Int16
+let min a b = if a <= b then a else b
+
+max : Int16 -> Int16 -> Int16
+let max a b = if a >= b then a else b
+
+checked_add : Int16 -> Int16 -> Result Int.ArithmeticError Int16
+let checked_add a b =
+  let r = a + b
+  if (b > 0i16 && r < a) || (b < 0i16 && r > a) then
+    Err (Int.ArithmeticError "Int16.checked_add: overflow")
+  else
+    Ok r
+
+checked_sub : Int16 -> Int16 -> Result Int.ArithmeticError Int16
+let checked_sub a b =
+  let r = a - b
+  if (b > 0i16 && r > a) || (b < 0i16 && r < a) then
+    Err (Int.ArithmeticError "Int16.checked_sub: overflow")
+  else
+    Ok r
+
+checked_mul : Int16 -> Int16 -> Result Int.ArithmeticError Int16
+let checked_mul a b =
+  let p = to_int a * to_int b
+  if p < -32768 || p > 32767 then
+    Err (Int.ArithmeticError "Int16.checked_mul: overflow")
+  else
+    Ok (wrapping_from_int p)
+
+checked_div : Int16 -> Int16 -> Result Int.ArithmeticError Int16
+let checked_div a b =
+  if b == 0i16 then
+    Err (Int.ArithmeticError "Int16.checked_div: division by zero")
+  else if a == min_value && b == -1i16 then
+    Err (Int.ArithmeticError "Int16.checked_div: overflow")
+  else
+    Ok (a / b)
+
+checked_rem : Int16 -> Int16 -> Result Int.ArithmeticError Int16
+let checked_rem a b =
+  if b == 0i16 then Err (Int.ArithmeticError "Int16.checked_rem: division by zero") else Ok (a % b)
+
+divide : Int16 -> Int16 -> Result Int.ArithmeticError Int16
+let divide a b = checked_div a b
+
+remainder : Int16 -> Int16 -> Result Int.ArithmeticError Int16
+let remainder a b = checked_rem a b
+
+unsafe_div : Int16 -> Int16 -> Int16
+let unsafe_div a b =
+  if b == 0i16 then
+    let _ = Int.unsafe_div 1 0
+    0i16
+  else
+    a / b
+
+unsafe_rem : Int16 -> Int16 -> Int16
+let unsafe_rem a b =
+  if b == 0i16 then
+    let _ = Int.unsafe_rem 1 0
+    0i16
+  else
+    a % b
+
+bit_and : Int16 -> Int16 -> Int16
+let bit_and a b = wrapping_from_int (Int.bit_and (to_int a) (to_int b))
+
+bit_or : Int16 -> Int16 -> Int16
+let bit_or a b = wrapping_from_int (Int.bit_or (to_int a) (to_int b))
+
+bit_xor : Int16 -> Int16 -> Int16
+let bit_xor a b = wrapping_from_int (Int.bit_xor (to_int a) (to_int b))
+
+bit_not : Int16 -> Int16
+let bit_not a = wrapping_from_int (Int.bit_not (to_int a))
+
+shift_left : Int16 -> Int -> Int16
+let shift_left a n = wrapping_from_int (Int.shift_left (to_int a) (Int.bit_and n 15))
+
+shift_right : Int16 -> Int -> Int16
+let shift_right a n = wrapping_from_int (Int.shift_right (to_int a) (Int.bit_and n 15))
+
+shift_right_unsigned : Int16 -> Int -> Int16
+let shift_right_unsigned a n =
+  wrapping_from_int (Int.shift_right_unsigned (Int.bit_and (to_int a) 65535) (Int.bit_and n 15))

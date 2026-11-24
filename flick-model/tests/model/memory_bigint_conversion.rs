@@ -71,7 +71,20 @@ fn preserves(heap: &Heap, value: &Value, input: &Lit) {
             };
             assert_eq!(actual.to_bits(), expected.to_bits());
         }
+        Lit::Float32(expected) => {
+            let Value::Float32(actual) = value else {
+                panic!("preserved Float32 representation")
+            };
+            assert_eq!(actual.to_bits(), expected.to_bits());
+        }
         Lit::Int(expected) => assert_eq!(value, &Value::Int(*expected)),
+        Lit::Int8(expected) => assert_eq!(value, &Value::Int8(*expected)),
+        Lit::Int16(expected) => assert_eq!(value, &Value::Int16(*expected)),
+        Lit::Int64(expected) => assert_eq!(value, &Value::Int64(*expected)),
+        Lit::UInt8(expected) => assert_eq!(value, &Value::UInt8(*expected)),
+        Lit::UInt16(expected) => assert_eq!(value, &Value::UInt16(*expected)),
+        Lit::UInt32(expected) => assert_eq!(value, &Value::UInt32(*expected)),
+        Lit::UInt64(expected) => assert_eq!(value, &Value::UInt64(*expected)),
         Lit::Bool(expected) => assert_eq!(value, &Value::Bool(*expected)),
         Lit::Unit => assert_eq!(value, &Value::Unit),
     }

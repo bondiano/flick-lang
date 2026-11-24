@@ -15,6 +15,12 @@ foreign pure hash_prim from "flick:rt" "hash"
 show_prim : a -> String
 foreign pure show_prim from "flick:rt" "show"
 
+show_int64 : Int64 -> String
+foreign pure show_int64 from "flick:rt" "showInt64"
+
+show_uint64 : UInt64 -> String
+foreign pure show_uint64 from "flick:rt" "showUInt64"
+
 eq_list : (a -> a -> Bool) -> List a -> List a -> Bool
 foreign pure eq_list from "flick:rt" "listEquals"
 
@@ -53,6 +59,30 @@ instance Eq Float =
   let eq x y = eq_prim x y
 
 instance Eq BigInt =
+  let eq x y = eq_prim x y
+
+instance Eq Int8 =
+  let eq x y = eq_prim x y
+
+instance Eq Int16 =
+  let eq x y = eq_prim x y
+
+instance Eq Int64 =
+  let eq x y = eq_prim x y
+
+instance Eq UInt8 =
+  let eq x y = eq_prim x y
+
+instance Eq UInt16 =
+  let eq x y = eq_prim x y
+
+instance Eq UInt32 =
+  let eq x y = eq_prim x y
+
+instance Eq UInt64 =
+  let eq x y = eq_prim x y
+
+instance Eq Float32 =
   let eq x y = eq_prim x y
 
 instance Eq String =
@@ -110,6 +140,30 @@ instance Ord Float =
 instance Ord BigInt =
   let compare x y = compare_prim x y
 
+instance Ord Int8 =
+  let compare x y = compare_prim x y
+
+instance Ord Int16 =
+  let compare x y = compare_prim x y
+
+instance Ord Int64 =
+  let compare x y = compare_prim x y
+
+instance Ord UInt8 =
+  let compare x y = compare_prim x y
+
+instance Ord UInt16 =
+  let compare x y = compare_prim x y
+
+instance Ord UInt32 =
+  let compare x y = compare_prim x y
+
+instance Ord UInt64 =
+  let compare x y = compare_prim x y
+
+instance Ord Float32 =
+  let compare x y = compare_prim x y
+
 instance Ord String =
   let compare x y = compare_prim x y
 
@@ -139,6 +193,30 @@ instance Hash Float =
 instance Hash BigInt =
   let hash x = hash_prim x
 
+instance Hash Int8 =
+  let hash x = hash_prim x
+
+instance Hash Int16 =
+  let hash x = hash_prim x
+
+instance Hash Int64 =
+  let hash x = hash_prim x
+
+instance Hash UInt8 =
+  let hash x = hash_prim x
+
+instance Hash UInt16 =
+  let hash x = hash_prim x
+
+instance Hash UInt32 =
+  let hash x = hash_prim x
+
+instance Hash UInt64 =
+  let hash x = hash_prim x
+
+instance Hash Float32 =
+  let hash x = hash_prim x
+
 instance Hash String =
   let hash x = hash_prim x
 
@@ -166,6 +244,30 @@ instance Show Float =
 instance Show BigInt =
   let show x = show_prim x
 
+instance Show Int8 =
+  let show x = show_prim x
+
+instance Show Int16 =
+  let show x = show_prim x
+
+instance Show Int64 =
+  let show x = show_int64 x
+
+instance Show UInt8 =
+  let show x = show_prim x
+
+instance Show UInt16 =
+  let show x = show_prim x
+
+instance Show UInt32 =
+  let show x = show_prim x
+
+instance Show UInt64 =
+  let show x = show_uint64 x
+
+instance Show Float32 =
+  let show x = show_prim x
+
 instance Show String =
   let show x = show_prim x
 
@@ -184,17 +286,251 @@ instance Display Float =
 instance Display Bool =
   let display x = show_prim x
 
+instance Display Int8 =
+  let display x = show_prim x
+
+instance Display Int16 =
+  let display x = show_prim x
+
+instance Display Int64 =
+  let display x = show_int64 x
+
+instance Display UInt8 =
+  let display x = show_prim x
+
+instance Display UInt16 =
+  let display x = show_prim x
+
+instance Display UInt32 =
+  let display x = show_prim x
+
+instance Display UInt64 =
+  let display x = show_uint64 x
+
+instance Display Float32 =
+  let display x = show_prim x
+
 float_of_int : Int -> Float
 foreign pure float_of_int from global "Number"
 
 bigint_of_int : Int -> BigInt
 foreign pure bigint_of_int from global "BigInt"
 
+int8_to_int16 : Int8 -> Int16
+foreign pure int8_to_int16 from "flick:rt" "toInt16"
+
+int8_to_int : Int8 -> Int
+foreign pure int8_to_int from "flick:rt" "toInt32"
+
+int8_to_int64 : Int8 -> Int64
+foreign pure int8_to_int64 from "flick:rt" "toInt64"
+
+int8_to_bigint : Int8 -> BigInt
+foreign pure int8_to_bigint from "flick:rt" "toBigInt"
+
+int8_to_float32 : Int8 -> Float32
+foreign pure int8_to_float32 from "flick:rt" "toFloat32"
+
+int8_to_float : Int8 -> Float
+foreign pure int8_to_float from "flick:rt" "toFloat64"
+
+int16_to_int : Int16 -> Int
+foreign pure int16_to_int from "flick:rt" "toInt32"
+
+int16_to_int64 : Int16 -> Int64
+foreign pure int16_to_int64 from "flick:rt" "toInt64"
+
+int16_to_bigint : Int16 -> BigInt
+foreign pure int16_to_bigint from "flick:rt" "toBigInt"
+
+int16_to_float32 : Int16 -> Float32
+foreign pure int16_to_float32 from "flick:rt" "toFloat32"
+
+int16_to_float : Int16 -> Float
+foreign pure int16_to_float from "flick:rt" "toFloat64"
+
+int_to_int64 : Int -> Int64
+foreign pure int_to_int64 from "flick:rt" "toInt64"
+
+int64_to_bigint : Int64 -> BigInt
+foreign pure int64_to_bigint from "flick:rt" "toBigInt"
+
+uint8_to_uint16 : UInt8 -> UInt16
+foreign pure uint8_to_uint16 from "flick:rt" "toUInt16"
+
+uint8_to_uint32 : UInt8 -> UInt32
+foreign pure uint8_to_uint32 from "flick:rt" "toUInt32"
+
+uint8_to_uint64 : UInt8 -> UInt64
+foreign pure uint8_to_uint64 from "flick:rt" "toUInt64"
+
+uint8_to_int16 : UInt8 -> Int16
+foreign pure uint8_to_int16 from "flick:rt" "toInt16"
+
+uint8_to_int : UInt8 -> Int
+foreign pure uint8_to_int from "flick:rt" "toInt32"
+
+uint8_to_int64 : UInt8 -> Int64
+foreign pure uint8_to_int64 from "flick:rt" "toInt64"
+
+uint8_to_bigint : UInt8 -> BigInt
+foreign pure uint8_to_bigint from "flick:rt" "toBigInt"
+
+uint8_to_float32 : UInt8 -> Float32
+foreign pure uint8_to_float32 from "flick:rt" "toFloat32"
+
+uint8_to_float : UInt8 -> Float
+foreign pure uint8_to_float from "flick:rt" "toFloat64"
+
+uint16_to_uint32 : UInt16 -> UInt32
+foreign pure uint16_to_uint32 from "flick:rt" "toUInt32"
+
+uint16_to_uint64 : UInt16 -> UInt64
+foreign pure uint16_to_uint64 from "flick:rt" "toUInt64"
+
+uint16_to_int : UInt16 -> Int
+foreign pure uint16_to_int from "flick:rt" "toInt32"
+
+uint16_to_int64 : UInt16 -> Int64
+foreign pure uint16_to_int64 from "flick:rt" "toInt64"
+
+uint16_to_bigint : UInt16 -> BigInt
+foreign pure uint16_to_bigint from "flick:rt" "toBigInt"
+
+uint16_to_float32 : UInt16 -> Float32
+foreign pure uint16_to_float32 from "flick:rt" "toFloat32"
+
+uint16_to_float : UInt16 -> Float
+foreign pure uint16_to_float from "flick:rt" "toFloat64"
+
+uint32_to_uint64 : UInt32 -> UInt64
+foreign pure uint32_to_uint64 from "flick:rt" "toUInt64"
+
+uint32_to_int64 : UInt32 -> Int64
+foreign pure uint32_to_int64 from "flick:rt" "toInt64"
+
+uint32_to_bigint : UInt32 -> BigInt
+foreign pure uint32_to_bigint from "flick:rt" "toBigInt"
+
+uint32_to_float : UInt32 -> Float
+foreign pure uint32_to_float from "flick:rt" "toFloat64"
+
+uint64_to_bigint : UInt64 -> BigInt
+foreign pure uint64_to_bigint from "flick:rt" "toBigInt"
+
+float32_to_float : Float32 -> Float
+foreign pure float32_to_float from "flick:rt" "toFloat64"
+
 instance Into Int Float =
   let into n = float_of_int n
 
 instance Into Int BigInt =
   let into n = bigint_of_int n
+
+instance Into Int Int64 =
+  let into n = int_to_int64 n
+
+instance Into Int8 Int16 =
+  let into n = int8_to_int16 n
+
+instance Into Int8 Int =
+  let into n = int8_to_int n
+
+instance Into Int8 Int64 =
+  let into n = int8_to_int64 n
+
+instance Into Int8 BigInt =
+  let into n = int8_to_bigint n
+
+instance Into Int8 Float32 =
+  let into n = int8_to_float32 n
+
+instance Into Int8 Float =
+  let into n = int8_to_float n
+
+instance Into Int16 Int =
+  let into n = int16_to_int n
+
+instance Into Int16 Int64 =
+  let into n = int16_to_int64 n
+
+instance Into Int16 BigInt =
+  let into n = int16_to_bigint n
+
+instance Into Int16 Float32 =
+  let into n = int16_to_float32 n
+
+instance Into Int16 Float =
+  let into n = int16_to_float n
+
+instance Into Int64 BigInt =
+  let into n = int64_to_bigint n
+
+instance Into UInt8 UInt16 =
+  let into n = uint8_to_uint16 n
+
+instance Into UInt8 UInt32 =
+  let into n = uint8_to_uint32 n
+
+instance Into UInt8 UInt64 =
+  let into n = uint8_to_uint64 n
+
+instance Into UInt8 Int16 =
+  let into n = uint8_to_int16 n
+
+instance Into UInt8 Int =
+  let into n = uint8_to_int n
+
+instance Into UInt8 Int64 =
+  let into n = uint8_to_int64 n
+
+instance Into UInt8 BigInt =
+  let into n = uint8_to_bigint n
+
+instance Into UInt8 Float32 =
+  let into n = uint8_to_float32 n
+
+instance Into UInt8 Float =
+  let into n = uint8_to_float n
+
+instance Into UInt16 UInt32 =
+  let into n = uint16_to_uint32 n
+
+instance Into UInt16 UInt64 =
+  let into n = uint16_to_uint64 n
+
+instance Into UInt16 Int =
+  let into n = uint16_to_int n
+
+instance Into UInt16 Int64 =
+  let into n = uint16_to_int64 n
+
+instance Into UInt16 BigInt =
+  let into n = uint16_to_bigint n
+
+instance Into UInt16 Float32 =
+  let into n = uint16_to_float32 n
+
+instance Into UInt16 Float =
+  let into n = uint16_to_float n
+
+instance Into UInt32 UInt64 =
+  let into n = uint32_to_uint64 n
+
+instance Into UInt32 Int64 =
+  let into n = uint32_to_int64 n
+
+instance Into UInt32 BigInt =
+  let into n = uint32_to_bigint n
+
+instance Into UInt32 Float =
+  let into n = uint32_to_float n
+
+instance Into UInt64 BigInt =
+  let into n = uint64_to_bigint n
+
+instance Into Float32 Float =
+  let into x = float32_to_float x
 
 instance Show Unit =
   let show _x = "()"

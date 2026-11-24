@@ -14,7 +14,15 @@ use crate::syntax::{Arm, Head, Lit, Pat, Term};
 pub fn show(args: &[Term], _: &mut String) -> Result<Term, String> {
     let text = match &args[0] {
         Term::Lit(Lit::Int(i)) => i.to_string(),
+        Term::Lit(Lit::Int8(i)) => i.to_string(),
+        Term::Lit(Lit::Int16(i)) => i.to_string(),
+        Term::Lit(Lit::Int64(i)) => i.to_string(),
+        Term::Lit(Lit::UInt8(i)) => i.to_string(),
+        Term::Lit(Lit::UInt16(i)) => i.to_string(),
+        Term::Lit(Lit::UInt32(i)) => i.to_string(),
+        Term::Lit(Lit::UInt64(i)) => i.to_string(),
         Term::Lit(Lit::Float(x)) => js_number(*x),
+        Term::Lit(Lit::Float32(x)) => js_number(f64::from(*x)),
         Term::Lit(Lit::BigInt(n)) => format!("{n}n"),
         Term::Lit(Lit::String(s)) => json_string(s),
         Term::Lit(Lit::Bool(b)) => b.to_string(),
@@ -35,8 +43,17 @@ fn hash_string(s: &str) -> i32 {
 pub fn hash(args: &[Term], _: &mut String) -> Result<Term, String> {
     let h = match &args[0] {
         Term::Lit(Lit::Int(i)) => hash_string(&i.to_string()),
+        Term::Lit(Lit::Int8(i)) => hash_string(&i.to_string()),
+        Term::Lit(Lit::Int16(i)) => hash_string(&i.to_string()),
+        Term::Lit(Lit::UInt8(i)) => hash_string(&i.to_string()),
+        Term::Lit(Lit::UInt16(i)) => hash_string(&i.to_string()),
+        Term::Lit(Lit::UInt32(i)) => hash_string(&i.to_string()),
+        Term::Lit(Lit::Int64(i)) => hash_string(&format!("bigint:{i}")),
+        Term::Lit(Lit::UInt64(i)) => hash_string(&format!("bigint:{i}")),
         Term::Lit(Lit::Float(x)) if *x == 0.0 => hash_string("0"),
         Term::Lit(Lit::Float(x)) => hash_string(&js_number(*x)),
+        Term::Lit(Lit::Float32(x)) if *x == 0.0 => hash_string("0"),
+        Term::Lit(Lit::Float32(x)) => hash_string(&js_number(f64::from(*x))),
         Term::Lit(Lit::BigInt(n)) => hash_string(&format!("bigint:{n}")),
         Term::Lit(Lit::String(s)) => hash_string(&format!("string:{s}")),
         Term::Lit(Lit::Bool(b)) => hash_string(&format!("boolean:{b}")),
@@ -73,6 +90,13 @@ fn ordering(o: Ordering) -> Term {
 pub fn compare(args: &[Term], _: &mut String) -> Result<Term, String> {
     let o = match (&args[0], &args[1]) {
         (Term::Lit(Lit::Int(a)), Term::Lit(Lit::Int(b))) => a.cmp(b),
+        (Term::Lit(Lit::Int8(a)), Term::Lit(Lit::Int8(b))) => a.cmp(b),
+        (Term::Lit(Lit::Int16(a)), Term::Lit(Lit::Int16(b))) => a.cmp(b),
+        (Term::Lit(Lit::Int64(a)), Term::Lit(Lit::Int64(b))) => a.cmp(b),
+        (Term::Lit(Lit::UInt8(a)), Term::Lit(Lit::UInt8(b))) => a.cmp(b),
+        (Term::Lit(Lit::UInt16(a)), Term::Lit(Lit::UInt16(b))) => a.cmp(b),
+        (Term::Lit(Lit::UInt32(a)), Term::Lit(Lit::UInt32(b))) => a.cmp(b),
+        (Term::Lit(Lit::UInt64(a)), Term::Lit(Lit::UInt64(b))) => a.cmp(b),
         (Term::Lit(Lit::BigInt(a)), Term::Lit(Lit::BigInt(b))) => a.cmp(b),
         (Term::Lit(Lit::Float(a)), Term::Lit(Lit::Float(b))) => match (a.is_nan(), b.is_nan()) {
             (true, true) => Ordering::Equal,
@@ -80,6 +104,14 @@ pub fn compare(args: &[Term], _: &mut String) -> Result<Term, String> {
             (false, true) => Ordering::Less,
             (false, false) => a.partial_cmp(b).unwrap_or(Ordering::Equal),
         },
+        (Term::Lit(Lit::Float32(a)), Term::Lit(Lit::Float32(b))) => {
+            match (a.is_nan(), b.is_nan()) {
+                (true, true) => Ordering::Equal,
+                (true, false) => Ordering::Greater,
+                (false, true) => Ordering::Less,
+                (false, false) => a.partial_cmp(b).unwrap_or(Ordering::Equal),
+            }
+        }
         (Term::Lit(Lit::String(a)), Term::Lit(Lit::String(b))) => {
             a.encode_utf16().cmp(b.encode_utf16())
         }

@@ -9,7 +9,7 @@ use crate::ir::{ItemKind, Module};
 pub(crate) fn resolved_by(module: &Module, spec: &dyn Fn(&str) -> String) -> Vec<Resolved> {
     (module.items.iter())
         .filter_map(|item| match &item.kind {
-            ItemKind::Foreign(f) => f.binding.from.as_deref(),
+            ItemKind::Foreign(f) => f.binding.from(),
             _ => None,
         })
         .map(|from| Resolved {

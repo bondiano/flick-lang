@@ -59,6 +59,9 @@ change needs.
 | [Backend options move to `--target` and `[target.<name>]`](#backend-options-move-to---target-and-targetname) | no | `FLICK-P057`, `FLICK-P058`, `FLICK-P059` |
 | [Target dependencies move to `[target.<name>.dependencies]` and backends own package managers](#target-dependencies-move-to-targetnamedependencies-and-backends-own-package-managers) | no | `FLICK-P051`, `FLICK-P057`, `FLICK-P063` |
 | [The IR carries full layout types (`0.14.0`)](#the-ir-carries-full-layout-types-0140) | no | — |
+| [Backends declare foreign adapter metadata (`0.15.0`)](#backends-declare-foreign-adapter-metadata-0150) | no | `FLICK-S011`, `FLICK-S014` |
+| [Fixed-width numeric types in IR `0.16.0`](#fixed-width-numeric-types-in-ir-0160) | no | — |
+| [Inline foreign bindings and module preambles (`0.17.0`)](#inline-foreign-bindings-and-module-preambles-0170) | no | `FLICK-F011` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -747,3 +750,46 @@ checks type well-formedness, type argument counts and annotation agreement with
 the terms they describe, while keeping erased nodes valid. Ordinary Flick
 programs require no source changes; `flick/js` and `flick/go` ignore the new
 compound type fields beyond bare type-constructor names.
+
+## Backends declare foreign adapter metadata (`0.15.0`)
+
+The portable IR moves from `0.14.0` to `0.15.0`: `flick_ir::Adapter` replaces
+hardcoded `receiver`/`cancel`/`variadic` booleans with backend-declared adapter
+words (`words: Vec<BackendAdapter>`, each carrying its name, typed arguments,
+and source span) alongside core contract fields (`nullable`, `optional`,
+`retention`, `owned`, `callbacks`). Each backend component now declares its own
+foreign adapter words (`foreign-adapters`) and foreign type-form attributes
+(`type-form-attributes`, such as `@ts` on `flick/js` or `@go` on `flick/go`) in
+its WIT `descriptor` and validates its own adapter words in `check-target`
+(including during `flick check` and editor analysis with `command = "check"`).
+
+Backend components and `ir`-hook plugins must rebuild against `flick-ir`
+`0.15.0` and `flick-backend` and update their descriptor `ir` range to
+`[0.15.0, 0.16.0)`. Ordinary Flick bindings on `flick/js` and `flick/go`
+require no source changes.
+
+## Fixed-width numeric types in IR `0.16.0`
+
+The portable IR moves from `0.15.0` to `0.16.0` to add the fixed-width numeric
+built-ins (`Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`,
+`Float32`) as first-class `Lang`, `Num`, and `Lit` variants (`Int32` is an alias
+for `Int`, and `Byte` is an alias for `UInt8`).
+
+Backend components and `ir`-hook plugins must rebuild against `flick-ir` `0.16.0`
+and update their descriptor `ir` range to `[0.16.0, 0.17.0)`. Ordinary Flick
+programs require no source changes unless they previously defined top-level types
+or modules named `Int8`, `Int16`, `Int32`, `Int64`, `UInt8`, `Byte`, `UInt16`,
+`UInt32`, `UInt64`, or `Float32`.
+
+## Inline foreign bindings and module preambles (`0.17.0`)
+
+The portable IR moves from `0.16.0` to `0.17.0` to carry inline foreign code
+with source spans: `flick_ir::Binding` is now an enum (`Module`, `Global`,
+`Inline(InlineCode)`), `flick_ir::Module` gains `preambles: Vec<InlineCode>`
+for `foreign module inline` declarations, and the WIT `build-request` gains
+`inline-foreign: list<inline-foreign>`. Backends validate inline foreign code
+and map syntax errors back to the `.fl` source span as `FLICK-F011`.
+
+Backend components and `ir`-hook plugins must rebuild against `flick-ir`
+`0.17.0` and `flick-backend` and update their descriptor `ir` range to
+`[0.17.0, 0.18.0)`. Existing Flick sources require no changes.

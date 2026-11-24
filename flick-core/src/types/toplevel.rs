@@ -95,7 +95,7 @@ impl<'a> Checker<'a> {
         self.declare_types(&decls);
         self.declare_cells(&decls);
         self.declare_labels(&decls);
-        self.check_ts_forms(&decls);
+        self.check_backend_attributes(tree, &decls);
         self.declare_classes(&decls);
         if let Some(header) = tree.nodes().find(|n| n.kind == K::ModuleHeader) {
             self.imported_conflicts(self.span(header));
@@ -110,11 +110,13 @@ impl<'a> Checker<'a> {
         }
         for i in 0..self.top.items.len() {
             let (decl, scheme) = (self.top.items[i].decl, self.top.items[i].scheme.clone());
-            if decl.kind == K::ForeignDecl
-                && let Some((scheme, _)) = scheme
-            {
-                self.foreign_info(decl, &scheme);
-                self.settle_operators();
+            if decl.kind == K::ForeignDecl {
+                if let Some((scheme, _)) = scheme {
+                    self.foreign_info(decl, &scheme);
+                    self.settle_operators();
+                } else {
+                    self.check_foreign_meta_words(decl);
+                }
             }
         }
         self.record_atom_bindings(&decls);

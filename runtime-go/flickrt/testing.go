@@ -269,12 +269,14 @@ func previewJSON(v Value) (string, bool) {
 	case *Record:
 		return previewObject(x.keys, x.vals), true
 	case *Data:
-		switch x.Tag {
-		case "Some", "None":
-			return previewObject(append([]string{"_id", "_tag"}, fieldNames(x)...), append([]Value{"Option", x.Tag}, x.Fields()...)), true
-		case "Success":
+		switch {
+		case IsNone(x):
+			return previewObject([]string{"_id", "_tag"}, []Value{"Option", "None"}), true
+		case IsSome(x):
+			return previewObject([]string{"_id", "_tag", "value"}, []Value{"Option", "Some", UnwrapSome(x)}), true
+		case x.Tag == "Success":
 			return previewObject([]string{"_id", "_tag", "value"}, []Value{"Result", x.Tag, x.Fields()[0]}), true
-		case "Failure":
+		case x.Tag == "Failure":
 			return previewObject([]string{"_id", "_tag", "failure"}, []Value{"Result", x.Tag, x.Fields()[0]}), true
 		}
 		return previewObject(append([]string{"_tag"}, fieldNames(x)...), append([]Value{x.Tag}, x.Fields()...)), true

@@ -4,6 +4,10 @@ use super::{normalize_bigint, unsupported};
 use flick_core::ir::memory::Intrinsic;
 use std::cmp::Ordering;
 
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "IEEE 754 rounding from 64-bit integers to binary64"
+)]
 pub(super) fn run(
     heap: &Heap,
     kind: Intrinsic,
@@ -13,11 +17,17 @@ pub(super) fn run(
     match kind {
         Intrinsic::NumberToFloat => match &args[0] {
             Value::Int(value) => Ok(Value::Float(f64::from(*value))),
+            Value::Int8(value) => Ok(Value::Float(f64::from(*value))),
+            Value::Int16(value) => Ok(Value::Float(f64::from(*value))),
+            Value::Int64(value) => Ok(Value::Float(*value as f64)),
+            Value::UInt8(value) => Ok(Value::Float(f64::from(*value))),
+            Value::UInt16(value) => Ok(Value::Float(f64::from(*value))),
+            Value::UInt32(value) => Ok(Value::Float(f64::from(*value))),
+            Value::UInt64(value) => Ok(Value::Float(*value as f64)),
             Value::Float(value) => Ok(Value::Float(*value)),
+            Value::Float32(value) => Ok(Value::Float(f64::from(*value))),
             Value::Object(_) => bigint_float(heap.bigint(&args[0])?, fuel).map(Value::Float),
-            _ => Err(unsupported(
-                "Number conversion requires an Int, BigInt or Float",
-            )),
+            _ => Err(unsupported("Number conversion requires a numeric operand")),
         },
         Intrinsic::FloatMin | Intrinsic::FloatMax => select(kind, &args[0], &args[1]),
         _ => Err(unsupported("not a scalar conversion or selection")),
@@ -45,7 +55,7 @@ fn select(kind: Intrinsic, that: &Value, this: &Value) -> Result<Value, Error> {
     Ok(Value::Float(if keep_self { *this } else { *that }))
 }
 
-fn bigint_float(text: &str, fuel: &mut u64) -> Result<f64, Error> {
+pub(super) fn bigint_float(text: &str, fuel: &mut u64) -> Result<f64, Error> {
     let normalized = normalize_bigint(text, |work| charge(fuel, work))?;
     let (negative, digits) = normalized
         .strip_prefix('-')
@@ -61,6 +71,58 @@ fn bigint_float(text: &str, fuel: &mut u64) -> Result<f64, Error> {
         return Ok(0.0);
     }
     rounded(&bits, sign, fuel)
+}
+
+pub(super) fn bigint_float32(text: &str, fuel: &mut u64) -> Result<f32, Error> {
+    let normalized = normalize_bigint(text, |work| charge(fuel, work))?;
+    let (negative, digits) = normalized
+        .strip_prefix('-')
+        .map_or((false, normalized.as_str()), |s| (true, s));
+    let sign = if negative { 1_u32 << 31 } else { 0 };
+    // Any 40-digit integer is >= 10^39 > binary32's largest finite value (~3.4e38).
+    if digits.len() > 39 {
+        return Ok(f32::from_bits(sign | 0x7f80_0000));
+    }
+    let bits = binary_digits(digits, fuel)?;
+    if bits.is_empty() {
+        return Ok(0.0);
+    }
+    rounded32(&bits, sign, fuel)
+}
+
+fn rounded32(bits: &[u8], sign: u32, fuel: &mut u64) -> Result<f32, Error> {
+    let mut exponent = u32::try_from(bits.len() - 1).expect("bounded canonical integer");
+    if exponent > 127 {
+        return Ok(f32::from_bits(sign | 0x7f80_0000));
+    }
+    charge(fuel, 24)?;
+    let mut significand = bits
+        .iter()
+        .rev()
+        .take(24)
+        .fold(0_u32, |value, bit| (value << 1) | u32::from(*bit));
+    for _ in bits.len()..24 {
+        significand <<= 1;
+    }
+    if bits.len() > 24 {
+        let discarded = bits.len() - 24;
+        charge(fuel, discarded)?;
+        let guard = bits[discarded - 1] != 0;
+        let sticky = bits[..discarded - 1].iter().any(|bit| *bit != 0);
+        if guard && (sticky || significand & 1 != 0) {
+            significand += 1;
+            if significand == 1_u32 << 24 {
+                significand >>= 1;
+                exponent += 1;
+            }
+        }
+    }
+    if exponent > 127 {
+        return Ok(f32::from_bits(sign | 0x7f80_0000));
+    }
+    Ok(f32::from_bits(
+        sign | ((exponent + 127) << 23) | (significand & 0x007f_ffff),
+    ))
 }
 
 /// Least-significant bit first, via exact base-2^32 decimal accumulation.

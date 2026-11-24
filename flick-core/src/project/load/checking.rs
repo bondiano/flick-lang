@@ -2,6 +2,7 @@
 //! of one level of the import graph in parallel, reusing what a
 //! [`ModuleCache`] kept of earlier runs.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap, HashSet};
 #[cfg(feature = "native-project")]
 use std::fmt::Write as _;
@@ -9,6 +10,9 @@ use std::path::{Path, PathBuf};
 use std::slice;
 use std::sync::Arc;
 
+#[cfg(feature = "native-project")]
+use flick_backend_go::{foreign_meta as go_foreign_meta, inline as go_inline};
+use flick_backend_js::{foreign_meta as js_foreign_meta, inline as js_inline};
 #[cfg(feature = "native-project")]
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -40,7 +44,7 @@ use crate::resolve::{Header, Import, Item, ItemKind};
 use crate::source::Span;
 use crate::source::{FileId, SourceMap};
 use crate::syntax::cst::{Element, Node};
-use crate::syntax::{Parse, kind::SyntaxKind as K};
+use crate::syntax::{Parse, kind::SyntaxKind as K, literal::string_value};
 use crate::types;
 
 include!("checking_file.rs");
@@ -139,6 +143,8 @@ struct Key {
     text: String,
     /// The effective configuration, including programmatically supplied values.
     config: Option<Config>,
+    foreign_backend: types::ForeignBackendSpec,
+    validate_foreign_metadata: bool,
     lower: bool,
     /// An editor's entry, without the IR, is none a build reads.
     cached_ir: CachedIr,
@@ -216,6 +222,11 @@ impl Loader<'_> {
             watching: &self.watchers.plugins,
             watched: &self.watchers.watched,
             stages_by_class: self.stages_by_class,
+            env_ctx: self.env_ctx,
+            #[cfg(not(target_arch = "wasm32"))]
+            package_when: self.package_when,
+            #[cfg(not(target_arch = "wasm32"))]
+            own_package_when: self.own_package_when,
             lowered: self.lowered.as_deref().unwrap_or(&[]),
             proving: self.modules.iter().any(Loaded::has_proofs) || self.has_selected_contracts(),
             prove_contracts: self.prove_contracts,
@@ -325,6 +336,11 @@ struct Checking<'a> {
     from_packages: &'a BTreeMap<String, Interface>,
     project: Option<&'a Project>,
     stages_by_class: bool,
+    env_ctx: &'a super::environment::EnvironmentContext,
+    #[cfg(not(target_arch = "wasm32"))]
+    package_when: &'a BTreeMap<String, String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    own_package_when: Option<&'a str>,
     lower: bool,
     /// The IR of the modules checked before this level, which proofs read.
     lowered: &'a [Option<Lowered>],

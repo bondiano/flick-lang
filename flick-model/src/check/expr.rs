@@ -63,7 +63,15 @@ pub(super) fn mono(t: Type) -> Scheme {
 fn lit(l: &Lit) -> Type {
     prelude(match l {
         Lit::Int(_) => "Int",
+        Lit::Int8(_) => "Int8",
+        Lit::Int16(_) => "Int16",
+        Lit::Int64(_) => "Int64",
+        Lit::UInt8(_) => "UInt8",
+        Lit::UInt16(_) => "UInt16",
+        Lit::UInt32(_) => "UInt32",
+        Lit::UInt64(_) => "UInt64",
         Lit::Float(_) => "Float",
+        Lit::Float32(_) => "Float32",
         Lit::BigInt(_) => "BigInt",
         Lit::String(_) => "String",
         Lit::Bool(_) => "Bool",

@@ -117,7 +117,15 @@ pub(super) fn lit(l: &Lit) -> Result<String, Unsupported> {
         Lit::Int(n) if *n < 0 => format!("(.int ({n}))"),
         Lit::Int(n) => format!("(.int {n})"),
         Lit::String(s) => format!("(.str {s:?})"),
+        Lit::Int8(n) => return Err(format!("the literal {n}i8")),
+        Lit::Int16(n) => return Err(format!("the literal {n}i16")),
+        Lit::Int64(n) => return Err(format!("the literal {n}i64")),
+        Lit::UInt8(n) => return Err(format!("the literal {n}u8")),
+        Lit::UInt16(n) => return Err(format!("the literal {n}u16")),
+        Lit::UInt32(n) => return Err(format!("the literal {n}u32")),
+        Lit::UInt64(n) => return Err(format!("the literal {n}u64")),
         Lit::Float(f) => return Err(format!("the literal {f}")),
+        Lit::Float32(f) => return Err(format!("the literal {f}f32")),
         Lit::BigInt(n) => return Err(format!("the literal {n}n")),
     })
 }

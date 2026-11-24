@@ -19,11 +19,10 @@ impl Lower<'_> {
         span: Span,
         block: &mut Code,
     ) -> Option<Result<Local, LowerError>> {
-        if value.mode != ForeignMode::Pure || value.binding.from.as_deref() != Some("flick:Schema")
-        {
+        if value.mode != ForeignMode::Pure || value.binding.from() != Some("flick:Schema") {
             return None;
         }
-        let bind = value.binding.name.as_str();
+        let bind = value.binding.export_name().unwrap_or("");
         let stages = value.stages.len();
         let b = ExprBuilder::new(span, "$chk");
 
@@ -32,10 +31,9 @@ impl Lower<'_> {
             && value.dicts == 0
             && stages == 1
             && value.catch.is_none()
-            && !value.adapter.receiver
-            && !value.adapter.cancel
+            && value.adapter.words.is_empty()
             && value.adapter.optional == [0]
-            && !value.adapter.variadic
+            && value.adapter.owned.is_empty()
             && !value.adapter.result.nullable
         {
             let expr = b.lam(&["ver"], builtin_check(&b, "uuid", b.loc("ver")));

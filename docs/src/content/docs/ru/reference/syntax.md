@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: aad9c6549b89813c
+source_hash: 5ece4fa0bf742bc3
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -139,11 +139,12 @@ false in when for yield do break continue
   ним (см. [генерацию кода](../codegen/));
 - `pack` и `unpack` перед модулем и `as`, а `exists` перед именем и `:` в
   типе (см. [упакованные модули](../modules/#упакованные-модули-и-экзистенциальные-результаты));
-- режимы внешних функций `pure`, `effect`, `blocked` и источник
-  `global`;
-- метаданные внешних функций `arity`, `this`, `catch`, `cancel`, `nullable`,
-  `retention`, `optional`, `variadic`, `reviewed` (неизвестные метаданные —
-  `FLICK-S011`);
+- режимы внешних функций `pure`, `effect`, `blocked`, источники `global` и
+  `inline` после `from`, а также `inline` после `foreign module`;
+- метаданные внешних функций: слова ядра контракта (`arity`, `catch`,
+  `retention`, `nullable`, `optional`, `reviewed`, `owned`) и слова адаптеров,
+  объявленные активным бэкендом (например, `this`, `cancel`, `variadic` в
+  `flick/js` и `flick/go`; неизвестные метаданные — `FLICK-S011`);
 - `sql` перед телом, именем и телом, `table` или `migration`: блок плагина
   пакета `std`, который читает его предложения, столбцы и DDL (см.
   [SQL](../sql/));
@@ -487,7 +488,8 @@ members     = block of: signature | let | type_decl
 class_members = block of: signature | let | type_decl | law
 law         = "law" name { atom_pattern | premise } "where" goal
 contract    = block of: "require" expr | "ensure" expr   // one entry inline
-foreign     = "foreign" [mode] name "from" ("global" String | String String) [metadata]
+foreign     = "foreign" [mode] name "from" ("global" String | "inline" String | String String) [metadata]
+            | "foreign" "module" "inline" String
             | "foreign" "blocked" name String
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }
@@ -619,7 +621,7 @@ type Gauge = Gauge Float
 | - | - | - | - |
 | `@implicit` | экземпляр | экземпляр преобразует один тип в другой там, где ожидаемый тип известен | [неявные преобразования](../classes/#неявные-преобразования) |
 | `@derive` | класс | его выводит плагин: плагин пакета класса или названного пакета, `@derive std` | [вывод экземпляров](../classes/#автоматический-вывод-экземпляров-классов) |
-| `@ts` | тип или сервис | его форма в TypeScript, `none` или `import` типа из пакета | [форма типа](../codegen/#форма-типа) |
+| `@ts` (и атрибуты формы типа других бэкендов, например `@go`) | тип или сервис | объявленная бэкендом внешняя форма типа, `none` или `import` типа из пакета | [форма типа](../codegen/#форма-типа) |
 | `@stores` | тип без конструкторов и тела | его значения хранят переданные им функции | [квалификаторы](../regions/#квалификаторы) |
 | `@label` | тип | его значения верхнего уровня несут свои имена во время выполнения; вид, `@label atom`, определяет, какие сборки их сохраняют | [наблюдаемость](../observability/#действия-ui-и-записи-атомов) |
 | `@cell`, `@maker`, `@owner` | тип; значение; сервис | каждое значение типа хранит одно значение; значение создаёт атом, действие или представление; обработчик сервиса владеет тем, что создано под ним | [проверки вызовов](../plugins/#проверки-вызовов) |

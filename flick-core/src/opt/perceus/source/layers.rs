@@ -4,7 +4,7 @@ use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 use super::Intrinsic;
 
 pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
-    if value.binding.from.as_deref() != Some("flick:rt")
+    if value.binding.from() != Some("flick:rt")
         || value.dicts != 0
         || value.arity != 2
         || value.catch.is_some()
@@ -12,7 +12,7 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
         return None;
     }
     let (kind, mode, stages, callbacks, copies, shapes, result_shape) =
-        match value.binding.name.as_str() {
+        match value.binding.export_name().unwrap_or("") {
             "layerSucceed" => (
                 Intrinsic::LayerSucceed,
                 ForeignMode::Pure,
@@ -70,10 +70,8 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
         && value.stages == stages
         && value.adapter
             == Adapter {
-                receiver: false,
-                cancel: false,
                 optional: vec![],
-                variadic: false,
+                owned: vec![],
                 result: ResultAdapter {
                     nullable: false,
                     unit: false,
@@ -82,6 +80,7 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
                 copies,
                 shapes,
                 result_shape,
+                words: vec![],
             })
     .then_some(kind)
 }
@@ -103,7 +102,7 @@ mod tests {
                     .iter()
                     .find(|module| {
                         module.items.iter().any(|item| matches!(
-                    &item.kind, ItemKind::Foreign(value) if value.binding.name == binding
+                    &item.kind, ItemKind::Foreign(value) if value.binding.export_name() == Some(binding)
                 ))
                     })
                     .expect("live Layer builtin module");
@@ -111,7 +110,7 @@ mod tests {
                 .items
                 .iter()
                 .find_map(|item| match &item.kind {
-                    ItemKind::Foreign(value) if value.binding.name == binding => {
+                    ItemKind::Foreign(value) if value.binding.export_name() == Some(binding) => {
                         Some((item.span, value))
                     }
                     _ => None,
@@ -162,9 +161,24 @@ mod tests {
 
     fn common_mutations() -> Vec<fn(&mut Foreign)> {
         vec![
-            |v| v.binding.from = None,
-            |v| v.binding.from = Some("other".into()),
-            |v| v.binding.name.push('!'),
+            |v| {
+                v.binding = flick_ir::Binding::Global {
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            },
+            |v| {
+                v.binding = flick_ir::Binding::Module {
+                    from: "other".into(),
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            },
+            |v| {
+                if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                    &mut v.binding
+                {
+                    name.push('!');
+                }
+            },
             |v| v.mode = ForeignMode::Sync,
             |v| v.arity = 1,
             |v| v.arity = 3,
@@ -179,10 +193,28 @@ mod tests {
                     Span::new(FileId::new(0), 0, 0),
                 ));
             },
-            |v| v.adapter.receiver = true,
-            |v| v.adapter.cancel = true,
+            |v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "this".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
+            |v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "cancel".into(),
+                    args: vec![flick_ir::AdapterArg::Word("signal".into())],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
             |v| v.adapter.optional.push(0),
-            |v| v.adapter.variadic = true,
+            |v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "variadic".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            },
             |v| v.adapter.result.nullable = true,
             |v| v.adapter.result.unit = true,
             |v| v.adapter.callbacks[0] = Some(1),

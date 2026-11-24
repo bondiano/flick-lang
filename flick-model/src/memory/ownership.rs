@@ -313,11 +313,16 @@ fn release_layer_data(layer: LayerData, pending: &mut Vec<Value>) {
 
 fn release_lazy_state(state: Option<LazyState>, pending: &mut Vec<Value>) {
     match state {
-        Some(LazyState::Pending(v) | LazyState::Running { task: v, .. } | LazyState::DoneOk(v)) => {
+        Some(
+            LazyState::Pending(v)
+            | LazyState::Running { task: v, .. }
+            | LazyState::RunningLocal { task: Some(v) }
+            | LazyState::DoneOk(v),
+        ) => {
             pending.push(v);
         }
         Some(LazyState::DoneCause(c)) => pending.push(c.into_value()),
-        None => {}
+        Some(LazyState::RunningLocal { task: None }) | None => {}
     }
 }
 

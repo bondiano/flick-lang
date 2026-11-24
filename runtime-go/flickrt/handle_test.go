@@ -338,46 +338,48 @@ func TestHandleWithErrorArmsElectsDieAndFailAndRunsSkipHandler(t *testing.T) {
 }
 
 func TestLazyForceInterruptDieAndSignalDefect(t *testing.T) {
-	// R9: Interrupt + Die must NOT be cached; a second force retries.
-	runs := 0
-	cell := LazyMake(Eff(func(*Fiber) Value {
-		runs++
-		if runs == 1 {
-			panic(&Failure{Sequential(&Cause{kind: causeInterrupt}, &Cause{kind: causeDie, defect: "int-die"})})
-		}
-		return int32(42)
-	}))
-	_, c1 := catch(func() Value { return LazyForce(rootFiber(), cell) })
-	if c1 == nil || !c1.has(causeInterrupt) || !c1.hasRealDie() {
-		t.Fatalf("first force want Interrupt+Die, got %v", c1)
-	}
-	v2 := LazyForce(rootFiber(), cell)
-	if runs != 2 || v2 != int32(42) {
-		t.Fatalf("second force want runs=2 v=42, got runs=%d v=%v", runs, v2)
-	}
-
-	// Die + Fail(Signal) without Interrupt MUST strip the signal and cache the clean defect.
-	key := "test.LazyDieSignal"
-	arm := Fn(func(*Fiber, Value) Value { return Eff(func(*Fiber) Value { return "swallowed" }) })
-	runs2 := 0
-	cell2 := LazyMake(Eff(func(fb *Fiber) Value {
-		runs2++
-		return EffectEnsuring(fb, Eff(func(*Fiber) Value { return Die("fin-boom") }), Eff(func(fb *Fiber) Value {
-			return Run(fb, Apply(fb, Operation(key, "stop", 1), Unit))
+	for _, makeCell := range []func(Value) Value{LazyMake, LazyMakeLocal} {
+		// R9: Interrupt + Die must NOT be cached; a second force retries.
+		runs := 0
+		cell := makeCell(Eff(func(*Fiber) Value {
+			runs++
+			if runs == 1 {
+				panic(&Failure{Sequential(&Cause{kind: causeInterrupt}, &Cause{kind: causeDie, defect: "int-die"})})
+			}
+			return int32(42)
 		}))
-	}))
-	for attempt := 1; attempt <= 2; attempt++ {
-		_, c := catch(func() Value {
-			return Handle(rootFiber(), []Install{{Key: key, Arms: Rec("stop", arm), Aborts: []string{"stop"}}}, Eff(func(fb *Fiber) Value {
-				return LazyForce(fb, cell2)
-			}), nil, nil)
-		})
-		if c == nil || len(c.reasons()) != 1 || c.reasons()[0].kind != causeDie || c.reasons()[0].message() != "fin-boom" {
-			t.Fatalf("attempt %d: want single Die(fin-boom), got %v", attempt, c)
+		_, c1 := catch(func() Value { return LazyForce(rootFiber(), cell) })
+		if c1 == nil || !c1.has(causeInterrupt) || !c1.hasRealDie() {
+			t.Fatalf("first force want Interrupt+Die, got %v", c1)
 		}
-	}
-	if runs2 != 1 {
-		t.Fatalf("want defect cached (runs=1), got runs=%d", runs2)
+		v2 := LazyForce(rootFiber(), cell)
+		if runs != 2 || v2 != int32(42) {
+			t.Fatalf("second force want runs=2 v=42, got runs=%d v=%v", runs, v2)
+		}
+
+		// Die + Fail(Signal) without Interrupt MUST strip the signal and cache the clean defect.
+		key := "test.LazyDieSignal"
+		arm := Fn(func(*Fiber, Value) Value { return Eff(func(*Fiber) Value { return "swallowed" }) })
+		runs2 := 0
+		cell2 := makeCell(Eff(func(fb *Fiber) Value {
+			runs2++
+			return EffectEnsuring(fb, Eff(func(*Fiber) Value { return Die("fin-boom") }), Eff(func(fb *Fiber) Value {
+				return Run(fb, Apply(fb, Operation(key, "stop", 1), Unit))
+			}))
+		}))
+		for attempt := 1; attempt <= 2; attempt++ {
+			_, c := catch(func() Value {
+				return Handle(rootFiber(), []Install{{Key: key, Arms: Rec("stop", arm), Aborts: []string{"stop"}}}, Eff(func(fb *Fiber) Value {
+					return LazyForce(fb, cell2)
+				}), nil, nil)
+			})
+			if c == nil || len(c.reasons()) != 1 || c.reasons()[0].kind != causeDie || c.reasons()[0].message() != "fin-boom" {
+				t.Fatalf("attempt %d: want single Die(fin-boom), got %v", attempt, c)
+			}
+		}
+		if runs2 != 1 {
+			t.Fatalf("want defect cached (runs=1), got runs=%d", runs2)
+		}
 	}
 }
 

@@ -22,10 +22,8 @@ fn adapter(observer: Observer, copied_input: bool) -> Adapter {
         )
     };
     Adapter {
-        receiver: false,
-        cancel: false,
         optional: vec![],
-        variadic: false,
+        owned: vec![],
         result: ResultAdapter {
             nullable: false,
             unit: false,
@@ -38,17 +36,18 @@ fn adapter(observer: Observer, copied_input: bool) -> Adapter {
             result: false,
             callbacks: callback_copies,
         },
+        words: vec![],
     }
 }
 
 pub(super) fn expression(value: &Foreign, span: Span) -> Option<Expr> {
-    let observer = match value.binding.name.as_str() {
+    let observer = match value.binding.export_name().unwrap_or("") {
         "listLength" => Observer::Length,
         "listAny" => Observer::Any,
         _ => return None,
     };
     let arity = if observer == Observer::Length { 1 } else { 2 };
-    if value.binding.from.as_deref() != Some("flick:rt")
+    if value.binding.from() != Some("flick:rt")
         || value.mode != ForeignMode::Pure
         || value.arity != arity
         || value.dicts != 0
@@ -150,8 +149,11 @@ mod tests {
                 let ItemKind::Foreign(original) = &item.kind else {
                     continue;
                 };
-                if original.binding.from.as_deref() != Some("flick:rt")
-                    || !matches!(original.binding.name.as_str(), "listLength" | "listAny")
+                if original.binding.from() != Some("flick:rt")
+                    || !matches!(
+                        original.binding.export_name().unwrap_or(""),
+                        "listLength" | "listAny"
+                    )
                 {
                     continue;
                 }
@@ -172,7 +174,7 @@ mod tests {
                 super::super::tests::pure(&template);
                 assert_eq!(
                     super::super::tests::callback_mentions(&template),
-                    usize::from(original.binding.name == "listAny"),
+                    usize::from(original.binding.export_name() == Some("listAny")),
                 );
                 let program = lower([module], &entry).expect("ordinary pure observer template");
                 assert_eq!(memory::validate_program(&program), Ok(()));
@@ -189,7 +191,8 @@ mod tests {
                         })
                         .expect("matching declaration");
                     mutate(value);
-                    if original.binding.name == "listLength" && *value == other_copy {
+                    if original.binding.export_name() == Some("listLength") && *value == other_copy
+                    {
                         // List and nominal NonEmpty share this read-only code:
                         // neither publishes the input or mutates its elements.
                         assert!(expression(value, item.span).is_some());

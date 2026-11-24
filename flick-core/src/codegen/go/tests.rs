@@ -23,6 +23,7 @@ pub(super) fn build(text: &str) -> Output {
         test: false,
         paths: &BTreeMap::new(),
         lines: &[],
+        sources: &[],
         foreign: &BTreeMap::new(),
         bindings: bindings(),
         lang: &Known::of(&lang_items()),
@@ -111,9 +112,9 @@ type Mark = Low | High Int\n\n\
 scale : BigInt -> BigInt\nlet scale n =\n  match n with\n  | 0n -> 10n\n  | _ -> n * 10n\n\n\
 pick : Bool -> Mark\nlet pick high = if high then High 1 else Low\n\n\
 label : Mark -> String\nlet label mark =\n  match mark with\n  | Low -> \"low\"\n  | High _ -> \"high\"\n\n\
-missing : Bool -> Option Int\nlet missing ok = if ok then Some 1 else None\n\n\
+missing : Bool -> a -> Option a\nlet missing ok x = if ok then Some x else None\n\n\
 main : Unit ->{Host.Console; AppError} Unit\n\
-let main () = Platform.stdout_line (label (pick false) ++ show (missing false) ++ BigInt.to_string (scale 2n))\n";
+let main () = Platform.stdout_line (label (pick false) ++ show (missing false 1) ++ BigInt.to_string (scale 2n))\n";
 
 #[test]
 fn a_bigint_literal_and_a_builtin_nullary_constructor_are_made_once() {
@@ -389,22 +390,23 @@ fn go_bindings_cover_builtins() {
             let ItemKind::Foreign(f) = &item.kind else {
                 continue;
             };
-            let (from, key) = match &f.binding.from {
-                Some(from) => (from.clone(), f.binding.name.clone()),
-                None => (format!("global {}", module.name), f.name.clone()),
+            let (from, key, export) = match &f.binding {
+                flick_ir::Binding::Module { from, name } => {
+                    (from.clone(), name.clone(), name.as_str())
+                }
+                flick_ir::Binding::Global { name } => (
+                    format!("global {}", module.name),
+                    f.name.clone(),
+                    name.as_str(),
+                ),
+                flick_ir::Binding::Inline(_) => continue,
             };
-            if (bindings().lookup(
-                &module.name,
-                &f.name,
-                f.binding.from.as_deref(),
-                &f.binding.name,
-            ))
-            .is_some()
+            if (bindings().lookup(&module.name, &f.name, f.binding.from(), export)).is_some()
                 || js_only_exports.contains(&(from.clone(), key))
             {
                 continue;
             }
-            let entry = format!("{}.{} ({})", module.name, f.name, f.binding.name);
+            let entry = format!("{}.{} ({export})", module.name, f.name);
             missing.entry(from).or_default().push(entry);
         }
     }

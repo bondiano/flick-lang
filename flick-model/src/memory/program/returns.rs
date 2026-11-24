@@ -251,7 +251,10 @@ impl<'p> Machine<'p, '_> {
                 let rep = cached.representation();
                 let slot = self.heap.lazy_state_mut(self.execution, &lazy)?;
                 let prev = slot.replace(LazyState::DoneOk(cached));
-                if let Some(LazyState::Running { task, .. }) = prev {
+                if let Some(
+                    LazyState::Running { task, .. } | LazyState::RunningLocal { task: Some(task) },
+                ) = prev
+                {
                     self.heap.drop_value(task)?;
                 }
                 self.store(binding, value)?;

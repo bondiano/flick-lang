@@ -11,8 +11,8 @@ import (
 var modeNames = []string{"Ceiling", "Floor", "TowardZero", "AwayFromZero", "HalfCeiling", "HalfFloor", "HalfTowardZero", "HalfAwayFromZero", "HalfEven", "HalfOdd"}
 
 func optionText(o Value, f func(Value) Value) string {
-	if d := o.(*Data); d.Tag == "Some" {
-		return f(d.Fields()[0]).(string)
+	if IsSome(o) {
+		return f(UnwrapSome(o)).(string)
 	}
 	return "none"
 }

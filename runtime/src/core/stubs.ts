@@ -48,6 +48,7 @@ export const label = /*#__PURE__*/ needsEffect("label");
 export const lazyDone = /*#__PURE__*/ needsEffect("lazyDone");
 export const lazyForce = /*#__PURE__*/ needsEffect("lazyForce");
 export const lazyMake = /*#__PURE__*/ needsEffect("lazyMake");
+export const lazyMakeLocal = /*#__PURE__*/ needsEffect("lazyMakeLocal");
 export const listEachEffect = /*#__PURE__*/ needsEffect("listEachEffect");
 export const listFoldEffect = /*#__PURE__*/ needsEffect("listFoldEffect");
 export const listMapEffect = /*#__PURE__*/ needsEffect("listMapEffect");

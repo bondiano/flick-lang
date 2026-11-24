@@ -15,6 +15,26 @@ type Int
 type Float
 @lang bigint
 type BigInt
+@lang int8
+type Int8
+@lang int16
+type Int16
+/// Explicit 32-bit signed integer alias for `Int`.
+type alias Int32 = Int
+@lang int64
+type Int64
+@lang uint8
+type UInt8
+/// An unsigned 8-bit integer (`0..=255`).
+type alias Byte = UInt8
+@lang uint16
+type UInt16
+@lang uint32
+type UInt32
+@lang uint64
+type UInt64
+@lang float32
+type Float32
 @lang string
 type String
 @lang unknown
@@ -292,7 +312,7 @@ foreign effect from_result from "flick:rt" "fromResult"
 
 @lang await_eff
 /// Runs a task in the current fiber, once per call.
-await_eff : Eff r e a ->{r; e} a
+await_eff : (Eff r e a)^c ->{r; e} a
 foreign effect await_eff from "flick:rt" "awaitEff"
   retention call
 
@@ -300,6 +320,12 @@ foreign effect await_eff from "flick:rt" "awaitEff"
 /// The lazy of `task`, which `lazy { … }` builds: nothing runs yet.
 lazy_make : NoControl r => (Eff r e a)^c ->{} Lazy r e a
 foreign effect lazy_make from "flick:rt" "lazyMake"
+  retention call
+
+@lang lazy_make_local
+/// An unsynchronized lazy cell for a lazy only its own fiber can force.
+lazy_make_local : NoControl r => (Eff r e a)^c ->{} Lazy r e a
+foreign effect lazy_make_local from "flick:rt" "lazyMakeLocal"
   retention call
 
 @lang lazy_force

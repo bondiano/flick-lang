@@ -1,0 +1,246 @@
+// Concrete and nested Option values: matching, Show, Eq, Ord, Hash, codecs,
+// sentinel vs presence-flag layouts, `?` unwrapping, mutation, closures, and
+// erased polymorphic observation across JS and Go.
+module Language.Options exposing (tests)
+
+import Language.Shapes exposing (Shape(..))
+
+type Boxed = Boxed Int
+  deriving Eq, Ord, Hash, Show
+
+classify2 : Option (Option Int) -> String
+let classify2 o =
+  match o with
+  | None -> "none"
+  | Some None -> "some-none"
+  | Some (Some n) -> "some-some:" ++ show n
+
+classify3 : Option (Option (Option Int)) -> String
+let classify3 o =
+  match o with
+  | None -> "none"
+  | Some None -> "some-none"
+  | Some (Some None) -> "some-some-none"
+  | Some (Some (Some n)) -> "some-some-some:" ++ show n
+
+add_opts : Option Int -> Option Int -> Option Int
+let add_opts a b =
+  let x = a?
+  let y = b?
+  Some (x + y)
+
+unwrap_nested : Option (Option Int) -> Option Int
+let unwrap_nested o =
+  let inner = o?
+  inner
+
+unwrap_poly : Option a -> Option a
+let unwrap_poly o =
+  let x = o?
+  Some x
+
+poly_id : a -> a
+let poly_id x = x
+
+poly_show : Show a => a -> String
+let poly_show x = show x
+
+encode_codec : PureCodec Json a -> a -> String
+let encode_codec c v =
+  match Codec.encode_result c v with
+  | Ok json -> Json.stringify json
+  | Err err -> "err:" ++ show err
+
+roundtrip_codec : PureCodec Json a -> a -> Result SchemaError a
+let roundtrip_codec c v = do {
+  json <- Codec.encode_result c v
+  parsed <- Json.parse (Json.stringify json)
+  Codec.decode_result c parsed
+}
+
+mut_option_step : Int -> Option Int
+let mut_option_step n =
+  let mut cur : Option Int = None
+  if n > 0 then cur = Some n else cur = None
+  cur
+
+capture_option : Option Int -> Unit -> Option Int
+let capture_option o = fun () -> o
+
+tail_find : Int -> Option Int -> Option Int
+let rec tail_find n acc = if n <= 0 then acc else tail_find (n - 1) (Some (n * 10))
+
+tests : List Test.Test
+let tests = [
+  Test.test "nested Option matching, Show, Eq, Ord, and Hash" (fun () ->
+    let o0 : Option (Option (Option Int)) = None
+    let o1 : Option (Option (Option Int)) = Some None
+    let o2 : Option (Option (Option Int)) = Some (Some None)
+    let o3 : Option (Option (Option Int)) = Some (Some (Some 1))
+    let o3_alt : Option (Option (Option Int)) = Some (Some (Some (2 - 1)))
+    let m2_0 : Option (Option Int) = None
+    let m2_1 : Option (Option Int) = Some None
+    let m2_2 : Option (Option Int) = Some (Some 1)
+    let m2_2_alt : Option (Option Int) = Some (Some (3 - 2))
+    let hmap =
+      HashMap.insert
+        o3
+        "d3"
+        (HashMap.insert o2 "d2" (HashMap.insert o1 "d1" (HashMap.insert o0 "d0" HashMap.empty)))
+    let hmap2 =
+      HashMap.insert
+        m2_2
+        "two"
+        (HashMap.insert m2_1 "one" (HashMap.insert m2_0 "zero" HashMap.empty))
+    Test.all [
+      Test.equal "none" (classify2 m2_0),
+      Test.equal "some-none" (classify2 m2_1),
+      Test.equal "some-some:1" (classify2 m2_2),
+      Test.equal "none" (classify3 o0),
+      Test.equal "some-none" (classify3 o1),
+      Test.equal "some-some-none" (classify3 o2),
+      Test.equal "some-some-some:1" (classify3 o3),
+      Test.equal "None" (show o0),
+      Test.equal "Some None" (show o1),
+      Test.equal "Some (Some None)" (show o2),
+      Test.equal "Some (Some (Some 1))" (show o3),
+      Test.equal "Some (Some 1)" (show m2_2),
+      Test.equal true (o0 == None),
+      Test.equal false (o0 == o1),
+      Test.equal false (o1 == o2),
+      Test.equal false (o2 == o3),
+      Test.equal true (o3 == o3_alt),
+      Test.equal true (eq o3 o3_alt),
+      Test.equal false (eq o1 o0),
+      Test.equal true (m2_2 == m2_2_alt),
+      Test.equal false (m2_1 == m2_0),
+      Test.equal [o0, o1, o2, o3] (List.sort [o3, o1, o2, o0]),
+      Test.equal [m2_0, m2_1, m2_2] (List.sort [m2_2, m2_0, m2_1]),
+      Test.equal (hash o3) (hash o3_alt),
+      Test.equal (hash m2_2) (hash m2_2_alt),
+      Test.equal (Some "d0") (HashMap.get None hmap),
+      Test.equal (Some "d1") (HashMap.get (Some None) hmap),
+      Test.equal (Some "d2") (HashMap.get (Some (Some None)) hmap),
+      Test.equal (Some "d3") (HashMap.get o3_alt hmap),
+      Test.equal (Some "zero") (HashMap.get None hmap2),
+      Test.equal (Some "one") (HashMap.get (Some None) hmap2),
+      Test.equal (Some "two") (HashMap.get m2_2_alt hmap2),
+    ]
+  ),
+  Test.test "nested Option codecs preserve every nesting level" (fun () ->
+    let c1 = Codec.json (Schema.option Schema.int)
+    let c2 = Codec.tagged_option (Codec.tagged_option (Codec.json Schema.int))
+    let c3 = Codec.tagged_option (Codec.tagged_option (Codec.tagged_option (Codec.json Schema.int)))
+    let v_none : Option (Option Int) = None
+    let v_some_none : Option (Option Int) = Some None
+    let v_some_some : Option (Option Int) = Some (Some 1)
+    let w_none : Option (Option (Option Int)) = None
+    let w_some_none : Option (Option (Option Int)) = Some None
+    let w_some_some_none : Option (Option (Option Int)) = Some (Some None)
+    let w_some_some_some : Option (Option (Option Int)) = Some (Some (Some 1))
+    Test.all [
+      Test.equal "null" (encode_codec c1 None),
+      Test.equal "1" (encode_codec c1 (Some 1)),
+      Test.equal (Ok None) (roundtrip_codec c1 None),
+      Test.equal (Ok (Some 1)) (roundtrip_codec c1 (Some 1)),
+      Test.equal "{\"_tag\":\"None\"}" (encode_codec c2 v_none),
+      Test.equal "{\"_tag\":\"Some\",\"value\":{\"_tag\":\"None\"}}" (encode_codec c2 v_some_none),
+      Test.equal
+        "{\"_tag\":\"Some\",\"value\":{\"_tag\":\"Some\",\"value\":1}}"
+        (encode_codec c2 v_some_some),
+      Test.equal (Ok v_none) (roundtrip_codec c2 v_none),
+      Test.equal (Ok v_some_none) (roundtrip_codec c2 v_some_none),
+      Test.equal (Ok v_some_some) (roundtrip_codec c2 v_some_some),
+      Test.equal "{\"_tag\":\"None\"}" (encode_codec c3 w_none),
+      Test.equal "{\"_tag\":\"Some\",\"value\":{\"_tag\":\"None\"}}" (encode_codec c3 w_some_none),
+      Test.equal
+        "{\"_tag\":\"Some\",\"value\":{\"_tag\":\"Some\",\"value\":{\"_tag\":\"None\"}}}"
+        (encode_codec c3 w_some_some_none),
+      Test.equal
+        "{\"_tag\":\"Some\",\"value\":{\"_tag\":\"Some\",\"value\":{\"_tag\":\"Some\",\"value\":1}}}"
+        (encode_codec c3 w_some_some_some),
+      Test.equal (Ok w_none) (roundtrip_codec c3 w_none),
+      Test.equal (Ok w_some_none) (roundtrip_codec c3 w_some_none),
+      Test.equal (Ok w_some_some_none) (roundtrip_codec c3 w_some_some_none),
+      Test.equal (Ok w_some_some_some) (roundtrip_codec c3 w_some_some_some),
+    ]
+  ),
+  Test.test "sentinel and presence-flag concrete Option payloads" (fun () ->
+    let nan = 0.0 / 0.0
+    let neg_zero = -1.0 * 0.0
+    let ob_none : Option Bool = None
+    let ob_false : Option Bool = Some false
+    let ob_true : Option Bool = Some true
+    let of_pos : Option Float = Some 0.0
+    let of_neg : Option Float = Some neg_zero
+    let of_nan1 : Option Float = Some nan
+    let of_nan2 : Option Float = Some nan
+    let os_empty : Option String = Some ""
+    let os_none : Option String = None
+    let o_shape : Option Shape = Some (Rect 2 3)
+    let o_list : Option (List Int) = Some []
+    let o_rec : Option { x : Int } = Some { x = 7 }
+    let o_unk : Option Unknown =
+      match Json.parse "null" with
+      | Ok u -> Some u
+      | Err _ -> None
+    let o_boxed_nested : Option (Option Boxed) = Some (Some (Boxed 5))
+    Test.all [
+      Test.equal true (ob_none != ob_false && ob_false != ob_true && ob_none != ob_true),
+      Test.equal "Some false" (show ob_false),
+      Test.equal true (of_pos == of_neg),
+      Test.equal true (of_nan1 == of_nan2),
+      Test.equal false (of_pos == None),
+      Test.equal false (os_empty == os_none),
+      Test.equal true (os_empty == Some ""),
+      Test.equal true (o_shape == Some (Rect 2 3)),
+      Test.equal false (o_shape == None),
+      Test.equal true (o_list == Some []),
+      Test.equal false (o_list == None),
+      Test.equal true (o_rec == Some { x = 7 }),
+      Test.equal false (o_rec == None),
+      Test.equal "Some ()" (show (Some ())),
+      Test.equal
+        true
+        (
+          match o_unk with
+          | Some _ -> true
+          | None -> false
+        ),
+      Test.equal true (o_boxed_nested == Some (Some (Boxed 5))),
+      Test.equal false (o_boxed_nested == Some None),
+      Test.equal (Some 7) (add_opts (Some 3) (Some 4)),
+      Test.equal None (add_opts (Some 3) None),
+      Test.equal None (add_opts None (Some 4)),
+      Test.equal None (unwrap_nested None),
+      Test.equal None (unwrap_nested (Some None)),
+      Test.equal (Some 9) (unwrap_nested (Some (Some 9))),
+      Test.equal (Some 4) (unwrap_poly (Some 4)),
+      Test.equal (None : Option Int) (unwrap_poly None),
+      Test.equal (Some 5) (mut_option_step 5),
+      Test.equal None (mut_option_step 0),
+      Test.equal (Some 12) (capture_option (Some 12) ()),
+      Test.equal None (capture_option None ()),
+      Test.equal (Some 10) (tail_find 3 None),
+    ]
+  ),
+  Test.test "erased polymorphic observer distinguishes 1, Some 1, and Some (Some 1)" (fun () ->
+    let raw : Int = 1
+    let one : Option Int = Some 1
+    let two : Option (Option Int) = Some (Some 1)
+    let raw_back = poly_id raw
+    let one_back = poly_id one
+    let two_back = poly_id two
+    let none_back : Option (Option Int) = poly_id (Some None)
+    Test.all [
+      Test.equal "1" (poly_show raw),
+      Test.equal "Some 1" (poly_show one),
+      Test.equal "Some (Some 1)" (poly_show two),
+      Test.equal 1 raw_back,
+      Test.equal (Some 1) one_back,
+      Test.equal (Some (Some 1)) two_back,
+      Test.equal (Some None) none_back,
+      Test.equal false (none_back == None),
+    ]
+  ),
+]

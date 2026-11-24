@@ -27,6 +27,7 @@ fn app_with_foreign(text: &str, foreigns: &[(&str, &str, &str)]) -> String {
         test: false,
         paths: &BTreeMap::new(),
         lines: &[],
+        sources: &[],
         foreign: &foreign_map,
         bindings: bindings(),
         lang: &Known::of(&lang_items()),
@@ -133,8 +134,9 @@ mod bindings_tests {
                 if f.name == "mount" {
                     let mut global = f.clone();
                     global.name = "local".to_owned();
-                    global.binding.from = None;
-                    global.binding.name = "external".to_owned();
+                    global.binding = flick_ir::Binding::Global {
+                        name: "external".to_owned(),
+                    };
                     let globals = Bindings::parse(["[global App]\nlocal Global@1\n"]);
                     assert_eq!(globals.parameters("App", &global), 1);
                     assert!(globals.lookup("App", "local", None, "external").is_some());
@@ -170,8 +172,7 @@ mod owner_identity_tests {
             .expect("raw item");
         assert_ne!(raw.name, "acquire");
         assert_eq!(raw.source_name.as_deref(), Some("acquire"));
-        assert_eq!(raw.binding.from, None);
-        assert_eq!(raw.binding.name, "Object.acquire");
+        assert_eq!(raw.binding.global_name(), Some("Object.acquire"));
         let bindings = Bindings::parse(["[global Test]\nacquire NativeAcquire(float64) float64\n"]);
         assert_ne!(
             bindings.types("Test", raw),
@@ -207,8 +208,35 @@ mod owner_identity_tests {
             "inline source identity must not select a parent homonym"
         );
         assert_eq!(
-            raw.binding.name, "Object.make",
+            raw.binding.global_name(),
+            Some("Object.make"),
             "relocation leaves the host binding unchanged"
+        );
+    }
+
+    #[test]
+    fn inline_preamble_is_omitted_when_no_inline_binding_is_reached() {
+        let base = "module App exposing (main, unused_cos)\nforeign module inline \"import \\\"math\\\"\\nfunc unusedHelper(x float64) float64 { return math.Cos(x) }\"\nunused_cos : Float -> Float\nforeign pure unused_cos from inline \"func(fb *flickrt.Fiber, d flickrt.Value) flickrt.Value { return unusedHelper(d.(float64)) }\"\n";
+        let unreached = format!("{base}main : Unit -> Unit\nlet main () = ()\n");
+        let go_unreached = super::app_with_foreign(&unreached, &[]);
+        assert!(
+            !go_unreached.contains("import \"math\""),
+            "unreached inline binding must not emit unused preamble import:\n{go_unreached}"
+        );
+        assert!(
+            !go_unreached.contains("unusedHelper"),
+            "unreached inline binding must not emit preamble body:\n{go_unreached}"
+        );
+
+        let reached = format!("{base}main : Unit -> Float\nlet main () = unused_cos 0.0\n");
+        let go_reached = super::app_with_foreign(&reached, &[]);
+        assert!(
+            go_reached.contains("import \"math\""),
+            "reached inline binding must emit preamble import:\n{go_reached}"
+        );
+        assert!(
+            go_reached.contains("unusedHelper"),
+            "reached inline binding must emit preamble body:\n{go_reached}"
         );
     }
 }

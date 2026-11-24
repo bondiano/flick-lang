@@ -175,6 +175,7 @@ fn live_builtin_native_primitives_match_js_and_go_contracts() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn live_builtin_native_primitives_reject_foreign_mutations() {
     use crate::build::builtin_modules;
     use crate::ir::{Expr, ExprKind, ItemKind, Lit};
@@ -200,19 +201,52 @@ fn live_builtin_native_primitives_reject_foreign_mutations() {
             let _ = f.stages.pop();
         },
         |f| f.stages.push(false),
-        |f| f.binding.from = None,
-        |f| f.binding.from = Some("./alt.mjs".into()),
-        |f| f.binding.name.push('!'),
+        |f| {
+            f.binding = flick_ir::Binding::Global {
+                name: f.binding.export_name().unwrap_or("").to_owned(),
+            };
+        },
+        |f| {
+            f.binding = flick_ir::Binding::Module {
+                from: "./alt.mjs".into(),
+                name: f.binding.export_name().unwrap_or("").to_owned(),
+            };
+        },
+        |f| {
+            if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                &mut f.binding
+            {
+                name.push('!');
+            }
+        },
         |f| {
             f.catch = Some(Expr::new(
                 ExprKind::Lit(Lit::Unit),
                 Span::new(FileId::new(0), 0, 0),
             ));
         },
-        |f| f.adapter.receiver = true,
-        |f| f.adapter.cancel = true,
+        |f| {
+            f.adapter.words.push(flick_ir::BackendAdapter {
+                name: "this".into(),
+                args: vec![],
+                span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+            });
+        },
+        |f| {
+            f.adapter.words.push(flick_ir::BackendAdapter {
+                name: "cancel".into(),
+                args: vec![flick_ir::AdapterArg::Word("signal".into())],
+                span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+            });
+        },
         |f| f.adapter.optional.push(0),
-        |f| f.adapter.variadic = true,
+        |f| {
+            f.adapter.words.push(flick_ir::BackendAdapter {
+                name: "variadic".into(),
+                args: vec![],
+                span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+            });
+        },
         |f| f.adapter.result.nullable = true,
         |f| f.adapter.result.unit = true,
         |f| f.adapter.callbacks[0] = Some(1),
@@ -235,7 +269,7 @@ fn live_builtin_native_primitives_reject_foreign_mutations() {
                 .find(|i| matches!(&i.kind, ItemKind::Foreign(f) if f.name == decl_name))
                 .expect("foreign decl");
             let ItemKind::Foreign(f) = &mut item.kind else {
-                unreachable!()
+                unreachable!();
             };
             mutate(f);
             let prims = ReviewedPrimitives::for_js(
@@ -483,6 +517,7 @@ let main () =
         test: false,
         paths: &BTreeMap::new(),
         lines: &[],
+        sources: &[],
         foreign: &BTreeMap::new(),
         bindings: go_bindings,
         lang: &known,

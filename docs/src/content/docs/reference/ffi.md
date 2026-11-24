@@ -39,21 +39,87 @@ foreign read_text from "./fs.js" "readText"
 `foreign sync` and `foreign async` are the words of before: `FLICK-F001`,
 whose fix removes the word and gives a promise's row its `Async`.
 
+## Inline foreign code
+
+Small host adapters can live directly inside a `.fl` module without a separate
+companion file. Use `from inline` with any non-interpolated string literal
+(`"..."`, multi-line `"""..."""`, or raw `r#"..."#`) for a single binding, and
+`foreign module inline` for top-level declarations shared across the module's
+inline bindings:
+
+```flick
+foreign module inline """
+  const SCALE = 2;
+  function scaled(x) {
+    return x * SCALE;
+  }
+  """
+
+cos : Float -> Float
+foreign pure cos from inline "(d) => Math.cos(d)"
+
+double_it : Float -> Float
+foreign pure double_it from inline """
+  (d) => scaled(d)
+  """
+```
+
+The compiler core treats inline text as opaque and carries it with its exact
+source span in IR and `BuildRequest.inline-foreign`. `flick fmt` preserves
+inline string literals byte for byte. Each backend validates and places inline
+code according to its target language:
+
+- **`flick/js`**: emits each `foreign module inline` preamble at module top
+  level and each `from inline` binding as a module-level constant wrapped by
+  the binding's normal adapters and boundary copies.
+- **`flick/go`**: hoists and deduplicates `import` declarations from `foreign
+  module inline` preambles, places preamble declarations at package scope, and
+  invokes `from inline` expressions with the Go foreign calling convention
+  (`func(fb *flickrt.Fiber, a0 flickrt.Value) flickrt.Value`, or
+  `func(ctx flickrt.Context, ...)` for `Async`).
+
+Syntax errors discovered by the backend inside an inline binding or module
+preamble are reported as `FLICK-F011` and mapped back to the exact line and
+span inside the `.fl` string literal.
+
 ## Metadata
+
+Metadata lines below a `foreign` declaration split into **core contract words**
+owned by the compiler on every backend and **backend-declared adapter words**
+contributed by the active package backend's descriptor.
+
+### Core contract metadata
 
 | Metadata | Meaning |
 | - | - |
-| `arity n` | `n` positional JS arguments, adapting `n` stages; `arity 0` takes the `()` of a first `Unit` parameter and calls JS without arguments, after evaluating that argument |
-| `this` | the first argument is the receiver: `target.call(a0, a1, …)` |
-| `catch f` | a throw or rejection becomes the typed error `f value`, with `f : JsValue -> E` and `E` in the error row; `E` may hold no capability of a scope (`FLICK-F003`) |
-| `cancel signal` | a promise only, a row with `Async`: an `AbortSignal` is passed last and aborted on interruption; the owner still waits for the promise |
-| `nullable` | the result is `Option a`: `null` and `undefined` are `None` |
-| `optional i` | argument `i` (from 0) is `Option a`: `None` is passed as `undefined` |
-| `variadic` | the last argument is a `List a` spread into the call |
-| `retention call` / `retention owner` | what JS keeps of an argument that may hold a scope's capabilities: nothing past the call, or until the owner of the region closes |
+| `arity n` | `n` positional foreign arguments, adapting `n` stages; `arity 0` takes the `()` of a first `Unit` parameter and calls the host without arguments, after evaluating that argument |
+| `catch f` | a throw, panic, or rejection becomes the typed error `f value`, with `f : JsValue -> E` and `E` in the error row; `E` may hold no capability of a scope (`FLICK-F003`) |
+| `retention call` / `retention owner` | what the host keeps of an argument that may hold a scope's capabilities: nothing past the call, or until the owner of the region closes |
+| `nullable` | the result is `Option a`: `null` and `undefined` (or host absent values) become `None` |
+| `optional i` | argument `i` (from 0) is `Option a`: `None` is passed as absent (`undefined` on JS) |
 | `reviewed "<pkg>@<ver> sha256:…"` | the binding was checked against that declaration of a package export; `flick ffi check` compares it with the installed one |
+| `owned i` | argument `i` (from 0) transfers ownership to the foreign call |
 
-A metadata line that does not fit the signature or the mode is `FLICK-F001`.
+### Backend-declared adapter words and type-form attributes
+
+Target-specific adapter words and type-form attributes are declared by each
+backend in its WIT descriptor (`descriptor.foreign-adapters` and
+`descriptor.type-form-attributes`), not hardcoded in the compiler core.
+Unknown metadata words for the active backend report `FLICK-S011`, unknown or
+other-backend type-form attributes report `FLICK-S014`, and editor completion
+and hover offer only core contract words plus the active package backend's
+declared adapter words. Each backend validates its own adapter words against
+the binding in `check-target` (during both `flick check` / IDE analysis and
+`flick build`) and reports misuse at the metadata line's exact span.
+
+| Backend | Declared adapter words | Declared type-form attribute |
+| - | - | - |
+| `flick/js` | `this` (first argument is JS receiver `target.call(a0, a1, …)`), `cancel signal` (for `Async`: passes an `AbortSignal` last and aborts on interruption while the owner waits), `variadic` (last argument is `List a`, spread into the call) | [`@ts`](../codegen/#the-form-of-a-type) |
+| `flick/go` | `this` (receiver for `flickrt.CallMethod`), `cancel context` (and `cancel signal` for portable bindings; receives cancellation on `flickrt.Context` for `Async`), `variadic` (spreads last `List a` argument) | `@go` |
+| Custom backends | Any non-colliding words declared in `descriptor.foreign-adapters` (flags, keyword choices, parameter indices, integers, strings, or words; repeatable or once) | Any non-colliding attributes declared in `descriptor.type-form-attributes` |
+
+A metadata line that does not fit the signature, the mode, or the active
+backend's adapter rules is `FLICK-F001`.
 A result of type `Unit` is `()` whatever JS returns. A parameter whose type
 may hold a scope's capabilities — a region, as in `File s`, or a capture
 qualifier `^c` — needs a `retention` line (`FLICK-F002`): without one the

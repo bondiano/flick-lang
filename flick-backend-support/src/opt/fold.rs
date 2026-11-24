@@ -26,6 +26,17 @@ pub fn fold(e: &mut Expr, lang: &Known<'_>, preserve_types: bool) -> bool {
         ExprKind::Neg(Num::Int, inner) => {
             int(inner, lang).map(|x| Const::Number(x.wrapping_neg().into()))
         }
+        ExprKind::Neg(
+            Num::Int8
+            | Num::Int16
+            | Num::Int64
+            | Num::UInt8
+            | Num::UInt16
+            | Num::UInt32
+            | Num::UInt64
+            | Num::Float32,
+            inner,
+        ) => constant(inner, lang).and_then(|c| consteval::prefix(K::Minus, c)),
         ExprKind::Not(inner) => constant(inner, lang).and_then(|c| consteval::prefix(K::NotKw, c)),
         ExprKind::App { func, arg, .. } => match &func.kind {
             ExprKind::Method {
@@ -94,7 +105,15 @@ pub fn fold(e: &mut Expr, lang: &Known<'_>, preserve_types: bool) -> bool {
 pub(super) fn show(instance: &str, c: Const) -> Option<String> {
     Some(match (instance, c) {
         ("Show Float", Const::Number(x)) => js_number(x),
+        ("Show Float32", Const::Float32(x)) => js_number(f64::from(x)),
         ("Show Int", Const::Number(x)) => format!("{x}"),
+        ("Show Int8", Const::Int8(x)) => x.to_string(),
+        ("Show Int16", Const::Int16(x)) => x.to_string(),
+        ("Show Int64", Const::Int64(x)) => x.to_string(),
+        ("Show UInt8", Const::UInt8(x)) => x.to_string(),
+        ("Show UInt16", Const::UInt16(x)) => x.to_string(),
+        ("Show UInt32", Const::UInt32(x)) => x.to_string(),
+        ("Show UInt64", Const::UInt64(x)) => x.to_string(),
         ("Show BigInt", Const::BigInt(x)) => format!("{x}n"),
         ("Show Bool", Const::Bool(b)) => b.to_string(),
         ("Show String", Const::String(s)) => json_string(&s),
@@ -107,7 +126,15 @@ pub(super) fn display(instance: &str, c: Const) -> Option<String> {
     match (instance, c) {
         ("Display String", Const::String(s)) => Some(s),
         ("Display Float", c) => show("Show Float", c),
+        ("Display Float32", c) => show("Show Float32", c),
         ("Display Int", c) => show("Show Int", c),
+        ("Display Int8", c) => show("Show Int8", c),
+        ("Display Int16", c) => show("Show Int16", c),
+        ("Display Int64", c) => show("Show Int64", c),
+        ("Display UInt8", c) => show("Show UInt8", c),
+        ("Display UInt16", c) => show("Show UInt16", c),
+        ("Display UInt32", c) => show("Show UInt32", c),
+        ("Display UInt64", c) => show("Show UInt64", c),
         ("Display Bool", c) => show("Show Bool", c),
         _ => None,
     }
@@ -237,10 +264,21 @@ fn int(e: &Expr, lang: &Known<'_>) -> Option<i32> {
 pub fn constant(e: &Expr, lang: &Known<'_>) -> Option<Const> {
     match &e.kind {
         ExprKind::Lit(Lit::Int(n)) => Some(Const::Number((*n).into())),
+        ExprKind::Lit(Lit::Int8(n)) => Some(Const::Int8(*n)),
+        ExprKind::Lit(Lit::Int16(n)) => Some(Const::Int16(*n)),
+        ExprKind::Lit(Lit::Int64(n)) => Some(Const::Int64(*n)),
+        ExprKind::Lit(Lit::UInt8(n)) => Some(Const::UInt8(*n)),
+        ExprKind::Lit(Lit::UInt16(n)) => Some(Const::UInt16(*n)),
+        ExprKind::Lit(Lit::UInt32(n)) => Some(Const::UInt32(*n)),
+        ExprKind::Lit(Lit::UInt64(n)) => Some(Const::UInt64(*n)),
         ExprKind::Lit(Lit::Float(x)) => Some(Const::Number(*x)),
+        ExprKind::Lit(Lit::Float32(x)) => Some(Const::Float32(*x)),
         ExprKind::Lit(Lit::BigInt(n)) => literal::bigint_digits_value(n).map(Const::BigInt),
         ExprKind::Lit(Lit::String(s)) => Some(Const::String(s.clone())),
         ExprKind::Lit(Lit::Bool(b)) => Some(Const::Bool(*b)),
+        ExprKind::Neg(Num::Int, inner) => {
+            int(inner, lang).map(|x| Const::Number(x.wrapping_neg().into()))
+        }
         ExprKind::Neg(_, inner) => consteval::prefix(K::Minus, constant(inner, lang)?),
         ExprKind::Global { module, name, .. } if lang.is(Lang::FloatInfinity, module, name) => {
             Some(Const::Number(f64::INFINITY))
@@ -261,6 +299,14 @@ fn expr(c: &Const, num: Num, at: &Expr, preserve_types: bool) -> Expr {
         )]
         Const::Number(x) if num == Num::Int => Lit::Int(*x as i32),
         Const::Number(x) => Lit::Float(*x),
+        Const::Float32(x) => Lit::Float32(*x),
+        Const::Int8(x) => Lit::Int8(*x),
+        Const::Int16(x) => Lit::Int16(*x),
+        Const::Int64(x) => Lit::Int64(*x),
+        Const::UInt8(x) => Lit::UInt8(*x),
+        Const::UInt16(x) => Lit::UInt16(*x),
+        Const::UInt32(x) => Lit::UInt32(*x),
+        Const::UInt64(x) => Lit::UInt64(*x),
         Const::BigInt(x) => Lit::BigInt(x.to_string()),
         Const::String(s) => Lit::String(s.clone()),
         Const::Bool(b) => Lit::Bool(*b),

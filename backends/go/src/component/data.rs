@@ -1,12 +1,15 @@
 //! Decode only declared plain inputs, without compiler objects or callbacks.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use flick_backend::{BuildRequest, Diagnostic, GoProjection, InputKind, Inputs};
+use flick_backend::{
+    BuildRequest, Diagnostic, GoProjection, InputKind, Inputs, ModuleRole, Severity, Span,
+};
 use flick_ir::Program;
 
 use super::failure;
 use crate::codegen::Bindings;
+use crate::{foreign_meta, inline};
 
 /// The Go binding tables of the implicit packages: resource inputs whose id
 /// starts so, one table each.
@@ -19,6 +22,7 @@ pub(super) enum Command {
     Dev,
     Test,
     Inspect,
+    Check,
 }
 
 pub(super) struct Data {
@@ -27,6 +31,8 @@ pub(super) struct Data {
     pub facts: BTreeMap<String, GoProjection>,
     /// The line starts of each source, by its index in `Program.files`.
     pub lines: Vec<Vec<u32>>,
+    /// The text of each source file, by its index in `Program.files`.
+    pub sources: Vec<String>,
     /// By module and specifier: the name of a foreign Go file and its text.
     pub foreign: BTreeMap<(String, String), (String, String)>,
     pub bindings: Bindings,
@@ -93,6 +99,12 @@ impl Data {
                 .map_err(|e| failure("P012", format!("binding table encoding: {e}")))?;
             tables.push(text);
         }
+        let mut sources = Vec::with_capacity(request.sources.len());
+        for source in &request.sources {
+            let text = String::from_utf8(read(&source.input, "source")?)
+                .map_err(|e| failure("P012", format!("source encoding: {e}")))?;
+            sources.push(text);
+        }
         let (command, windows, cgo, inspect_module) = options(request)?;
         Ok(Self {
             program,
@@ -100,6 +112,7 @@ impl Data {
             lines: (request.sources.iter())
                 .map(|s| s.line_starts.clone())
                 .collect(),
+            sources,
             foreign,
             bindings: Bindings::parse(tables.iter().map(String::as_str)),
             command,
@@ -107,6 +120,44 @@ impl Data {
             cgo,
             inspect_module,
         })
+    }
+
+    pub fn check(&self, request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
+        let own_modules: BTreeSet<&str> = request
+            .modules
+            .iter()
+            .filter(|m| m.role == ModuleRole::Own)
+            .map(|m| m.name.as_str())
+            .collect();
+        let mut foreign_diagnostics: Vec<Diagnostic> =
+            foreign_meta::validate_program(&self.program, &own_modules)
+                .into_iter()
+                .chain(inline::validate_program(
+                    &self.program,
+                    &self.sources,
+                    &own_modules,
+                ))
+                .map(|d| Diagnostic {
+                    code: d.code.into(),
+                    severity: Severity::Error,
+                    message: d.message,
+                    span: Some(Span {
+                        file: d.span.file.index(),
+                        start: d.span.start,
+                        end: d.span.end,
+                    }),
+                    notes: vec![],
+                })
+                .collect();
+        if !foreign_diagnostics.is_empty() {
+            foreign_diagnostics.sort_by_key(|d| {
+                d.span
+                    .as_ref()
+                    .map_or((u32::MAX, u32::MAX, u32::MAX), |s| (s.file, s.start, s.end))
+            });
+            return Err(foreign_diagnostics);
+        }
+        Ok(())
     }
 }
 
@@ -126,6 +177,7 @@ fn options(
                     "dev" => Command::Dev,
                     "test" => Command::Test,
                     "inspect" => Command::Inspect,
+                    "check" => Command::Check,
                     other => return Err(failure("P012", format!("unknown command `{other}`"))),
                 })
                 .is_some(),

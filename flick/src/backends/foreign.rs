@@ -392,7 +392,7 @@ fn selected_choice(project: &Project, target_override: Option<&str>) -> Option<T
 }
 
 /// The component `project` selects and its pin, without the network.
-fn selected_bytes(
+pub(super) fn selected_bytes(
     project: &Project,
     target_override: Option<&str>,
 ) -> Option<(BackendPin, Vec<u8>)> {
@@ -420,7 +420,7 @@ fn selected_bytes(
 }
 
 /// The backend of `pin`, loaded once a process.
-fn load(pin: &BackendPin, bytes: &[u8]) -> Option<Arc<WasmBackend>> {
+pub(super) fn load(pin: &BackendPin, bytes: &[u8]) -> Option<Arc<WasmBackend>> {
     if let Some(loaded) = runtimes::find(pin) {
         return Some(loaded);
     }

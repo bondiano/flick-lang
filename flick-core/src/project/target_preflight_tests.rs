@@ -211,6 +211,8 @@ mod environments {
                 },
             ],
             environments: vec![("lua".into(), "standalone".into())],
+            foreign_adapters: Vec::new(),
+            type_form_attributes: Vec::new(),
         }
     }
 

@@ -18,8 +18,7 @@ impl Lower<'_> {
         if value.dicts != 0 {
             return None;
         }
-        let from = value.binding.from.as_deref()?;
-        let bind = value.binding.name.as_str();
+        let (from, bind) = value.binding.module_export()?;
         let stages = value.stages.len();
 
         // `JsonPointer.parse_uri_fragment` uses `nullable` result adaptation (`Option (List String)`).
@@ -28,10 +27,9 @@ impl Lower<'_> {
             && value.mode == ForeignMode::Pure
             && stages == 1
             && value.catch.is_none()
-            && !value.adapter.receiver
-            && !value.adapter.cancel
+            && value.adapter.words.is_empty()
             && value.adapter.optional.is_empty()
-            && !value.adapter.variadic
+            && value.adapter.owned.is_empty()
             && value.adapter.result.nullable
         {
             return Some(self.intrinsic(

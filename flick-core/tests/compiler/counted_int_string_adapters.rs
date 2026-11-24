@@ -8,9 +8,24 @@ use flick_ir::{ForeignMode, Shape};
 type Mutation = Box<dyn Fn(&mut Foreign)>;
 fn mutations(arity: usize) -> Vec<Mutation> {
     let mut changes: Vec<Mutation> = vec![
-        Box::new(|v| v.binding.from = None),
-        Box::new(|v| v.binding.from = Some("other".into())),
-        Box::new(|v| v.binding.name.push('!')),
+        Box::new(|v| {
+            v.binding = flick_ir::Binding::Global {
+                name: v.binding.export_name().unwrap_or("").to_owned(),
+            };
+        }),
+        Box::new(|v| {
+            v.binding = flick_ir::Binding::Module {
+                from: "other".into(),
+                name: v.binding.export_name().unwrap_or("").to_owned(),
+            };
+        }),
+        Box::new(|v| {
+            if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                &mut v.binding
+            {
+                name.push('!');
+            }
+        }),
         Box::new(|v| v.mode = ForeignMode::Sync),
         Box::new(|v| v.mode = ForeignMode::Async),
         Box::new(|v| v.mode = ForeignMode::Effect),
@@ -25,10 +40,28 @@ fn mutations(arity: usize) -> Vec<Mutation> {
                 Span::new(FileId::new(0), 0, 0),
             ));
         }),
-        Box::new(|v| v.adapter.receiver = true),
-        Box::new(|v| v.adapter.cancel = true),
+        Box::new(|v| {
+            v.adapter.words.push(flick_ir::BackendAdapter {
+                name: "this".into(),
+                args: vec![],
+                span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+            });
+        }),
+        Box::new(|v| {
+            v.adapter.words.push(flick_ir::BackendAdapter {
+                name: "cancel".into(),
+                args: vec![flick_ir::AdapterArg::Word("signal".into())],
+                span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+            });
+        }),
         Box::new(|v| v.adapter.optional.push(0)),
-        Box::new(|v| v.adapter.variadic = true),
+        Box::new(|v| {
+            v.adapter.words.push(flick_ir::BackendAdapter {
+                name: "variadic".into(),
+                args: vec![],
+                span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+            });
+        }),
         Box::new(|v| v.adapter.result.nullable = true),
         Box::new(|v| v.adapter.result.unit = true),
         Box::new(|v| v.adapter.callbacks.clear()),
@@ -62,13 +95,16 @@ fn exact_live_int_and_length_metadata_is_not_generic_foreign_erasure() {
             let ItemKind::Foreign(original) = &item.kind else {
                 continue;
             };
+            let Some(bind_name) = original.binding.export_name() else {
+                continue;
+            };
             if !matches!(
-                (module.name.as_str(), original.binding.name.as_str()),
+                (module.name.as_str(), bind_name),
                 ("Int", "intUnsafeDiv" | "intUnsafeRem") | ("String", "length")
             ) {
                 continue;
             }
-            seen.push((module.name.clone(), original.binding.name.clone()));
+            seen.push((module.name.clone(), bind_name.to_owned()));
             let entry = memory::Name::new(&module.name, &original.name);
             let program = perceus::lower([module], &entry).expect("canonical adapter lowers");
             assert_eq!(memory::validate_program(&program), Ok(()));
@@ -84,8 +120,7 @@ fn exact_live_int_and_length_metadata_is_not_generic_foreign_erasure() {
                     failure
                         .to_string()
                         .starts_with("memory lowering does not yet support foreign binding"),
-                    "{} mutation{mutation_index}: {failure}",
-                    original.binding.name
+                    "{bind_name} mutation{mutation_index}: {failure}"
                 );
                 assert!(
                     failure.to_string().contains(&format!("at {:?}", item.span)),

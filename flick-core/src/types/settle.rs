@@ -20,7 +20,7 @@ use crate::source::Span;
 use crate::types::lang::{self, Lang};
 
 impl Checker<'_> {
-    /// The type of a number literal: any numeric type, a `Float` one when it
+    /// The type of a number literal: any numeric type, a floating one when it
     /// is `fractional`, settled with the operators.
     pub fn number_literal(
         &mut self,
@@ -30,6 +30,29 @@ impl Checker<'_> {
         pattern: bool,
     ) -> Type {
         let ty = self.store.fresh_numeric(fractional);
+        self.literals.push(NumLiteral {
+            ty: ty.clone(),
+            span,
+            value,
+            fractional,
+            pattern,
+            givens: self.classes.givens.clone(),
+        });
+        ty
+    }
+
+    /// The type of a suffixed number literal (`42u8`, `-128i8`, `1.5f32`):
+    /// fixed to `num` immediately, while still participating in negative
+    /// literal folding and range checking during settlement.
+    pub fn suffixed_number_literal(
+        &mut self,
+        span: Span,
+        num: Num,
+        value: Option<i128>,
+        fractional: bool,
+        pattern: bool,
+    ) -> Type {
+        let ty = Type::lang(num.lang());
         self.literals.push(NumLiteral {
             ty: ty.clone(),
             span,
@@ -249,10 +272,7 @@ impl Checker<'_> {
                 }
             }
         };
-        if literal.fractional {
-            return;
-        }
-        if !literal.value.is_some_and(|v| num.holds(v)) {
+        if !literal.fractional && !literal.value.is_some_and(|v| num.holds(v)) {
             self.error(
                 codes::T003,
                 literal.span,
@@ -286,9 +306,21 @@ impl Checker<'_> {
     fn identity(&mut self, ty: &Type) -> Option<Identity> {
         let ty = self.whnf(ty);
         let (head, _) = ty.spine();
-        if [Lang::Int, Lang::String, Lang::Bool, Lang::BigInt]
-            .into_iter()
-            .any(|p| head.is_lang(p))
+        if [
+            Lang::Int,
+            Lang::Int8,
+            Lang::Int16,
+            Lang::Int64,
+            Lang::UInt8,
+            Lang::UInt16,
+            Lang::UInt32,
+            Lang::UInt64,
+            Lang::String,
+            Lang::Bool,
+            Lang::BigInt,
+        ]
+        .into_iter()
+        .any(|p| head.is_lang(p))
         {
             return Some(Identity::Value);
         }

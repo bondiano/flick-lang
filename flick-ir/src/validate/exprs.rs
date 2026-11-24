@@ -341,7 +341,15 @@ impl Validator<'_> {
 fn lit_lang(lit: &Lit) -> Lang {
     match lit {
         Lit::Int(_) => Lang::Int,
+        Lit::Int8(_) => Lang::Int8,
+        Lit::Int16(_) => Lang::Int16,
+        Lit::Int64(_) => Lang::Int64,
+        Lit::UInt8(_) => Lang::UInt8,
+        Lit::UInt16(_) => Lang::UInt16,
+        Lit::UInt32(_) => Lang::UInt32,
+        Lit::UInt64(_) => Lang::UInt64,
         Lit::Float(_) => Lang::Float,
+        Lit::Float32(_) => Lang::Float32,
         Lit::BigInt(_) => Lang::BigInt,
         Lit::String(_) => Lang::String,
         Lit::Bool(_) => Lang::Bool,
@@ -350,9 +358,5 @@ fn lit_lang(lit: &Lit) -> Lang {
 }
 
 fn num_lang(num: Num) -> Lang {
-    match num {
-        Num::Int => Lang::Int,
-        Num::Float => Lang::Float,
-        Num::BigInt => Lang::BigInt,
-    }
+    num.lang()
 }

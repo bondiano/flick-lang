@@ -1,0 +1,107 @@
+// O3 local lazy cells cache defects (including self-force R9(e)) and reset on
+// interruption, while escaping lazies (into tasks, closures, records) stay on
+// the synchronized cell and remain safe across concurrent fibers.
+module App.Main exposing (main)
+
+import Deferred
+import Duration
+import Effect
+
+nap : Float ->{Async} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+defect_tag : Exit e Int -> String
+let defect_tag ex =
+  Exit.match_
+    (fun v -> "ok:" ++ show v)
+    (fun f ->
+      match Cause.reasons f with
+      | [r] ->
+        if Cause.is_fail_reason r then "fail" else if Cause.is_die_reason r then "die" else "int"
+      | _ -> "other"
+    )
+    ex
+
+check_self_force : Unit ->{Host.Console, Async} Unit
+let check_self_force () =
+  let self_runs = Ref.make 0
+  let self_ref : Ref (Option (Lazy {Async} none Int)) = Ref.make None
+  let self_task = task {
+    Ref.set self_runs (Ref.get self_runs + 1)
+    match Ref.get self_ref with
+    | Some c -> await c
+    | None -> 0
+  }
+  let self_cell = lazy_make_local self_task
+  Ref.set self_ref (Some self_cell)
+  let s1 = Effect.exit (task { await self_cell })
+  let s2 = Effect.exit (task { await self_cell })
+  Platform.stdout_line "self: \{defect_tag s1} / \{defect_tag s2}, runs: \{Ref.get self_runs}"
+
+check_die : Unit ->{Host.Console, Async} Unit
+let check_die () =
+  let die_runs = Ref.make 0
+  let die_task = task {
+    Ref.set die_runs (Ref.get die_runs + 1)
+    Effect.die "local-boom"
+  }
+  let die_cell = lazy_make_local die_task
+  let d1 = Effect.exit (task { await die_cell })
+  let d2 = Effect.exit (task { await die_cell })
+  Platform.stdout_line "die: \{defect_tag d1} / \{defect_tag d2}, runs: \{Ref.get die_runs}"
+
+check_interrupt : Unit ->{Host.Console, Async} Unit
+let check_interrupt () =
+  let gate : Deferred.Deferred none Unit = Deferred.make ()
+  let int_runs = Ref.make 0
+  let int_task = task {
+    Ref.set int_runs (Ref.get int_runs + 1)
+    Deferred.await_ gate
+    99
+  }
+  let int_cell = lazy_make_local int_task
+  let cut = timeout_option 5 (task { await int_cell })
+  ignore (Deferred.succeed () gate)
+  let after1 = await int_cell
+  let after2 = await int_cell
+  Platform.stdout_line "interrupt: \{show cut} / \{after1} / \{after2}, runs: \{Ref.get int_runs}"
+
+check_escaping : Unit ->{Host.Console, Async} Unit
+let check_escaping () =
+  let shared_runs = Ref.make 0
+  let shared = lazy {
+    Ref.set shared_runs (Ref.get shared_runs + 1)
+    nap 20
+    11
+  }
+  let (p1, p2) = parallel (task { await shared }) (task { await shared })
+  let closure_runs = Ref.make 0
+  let via_closure = lazy {
+    Ref.set closure_runs (Ref.get closure_runs + 1)
+    nap 20
+    13
+  }
+  let read_closure = fun () -> await via_closure
+  let (c1, c2) = parallel (task { read_closure () }) (task { read_closure () })
+  let record_runs = Ref.make 0
+  let via_record = lazy {
+    Ref.set record_runs (Ref.get record_runs + 1)
+    nap 20
+    17
+  }
+  let box = { cell = via_record }
+  let (r1, r2) = parallel (task { await box.cell }) (task { await box.cell })
+  let s_part = "shared: \{p1} \{p2} (\{Ref.get shared_runs})"
+  let c_part = "closure: \{c1} \{c2} (\{Ref.get closure_runs})"
+  let r_part = "record: \{r1} \{r2} (\{Ref.get record_runs})"
+  Platform.stdout_line "\{s_part}, \{c_part}, \{r_part}"
+
+main : Unit ->{Host.Console, Async} Unit
+let main () =
+  check_self_force ()
+  check_die ()
+  check_interrupt ()
+  check_escaping ()

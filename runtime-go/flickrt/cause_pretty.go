@@ -129,14 +129,14 @@ func formatJSON(v Value) string {
 		}
 		return "[" + strings.Join(parts, ",") + "]"
 	case *Data:
-		switch x.Tag {
-		case "None":
+		switch {
+		case IsNone(x):
 			return `{"_id":"Option","_tag":"None"}`
-		case "Some":
-			return `{"_id":"Option","_tag":"Some","value":` + formatJSON(x.Fields()[0]) + "}"
-		case "Success":
+		case IsSome(x):
+			return `{"_id":"Option","_tag":"Some","value":` + formatJSON(UnwrapSome(x)) + "}"
+		case x.Tag == "Success":
 			return `{"_id":"Result","_tag":"Success","value":` + formatJSON(x.Fields()[0]) + "}"
-		case "Failure":
+		case x.Tag == "Failure":
 			return `{"_id":"Result","_tag":"Failure","failure":` + formatJSON(x.Fields()[0]) + "}"
 		}
 		out := `{"_tag":` + QuoteJSON(x.Tag)

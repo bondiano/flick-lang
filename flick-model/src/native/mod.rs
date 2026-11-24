@@ -16,6 +16,7 @@ mod lazy;
 mod numbers;
 pub(crate) mod seq;
 mod show;
+mod struct_ops;
 
 pub(crate) use lazy::settled;
 
@@ -52,6 +53,26 @@ macro_rules! natives {
 natives! {
     "global", "Number", 1 => numbers::number;
     "global", "BigInt", 1 => numbers::bigint;
+    RT, "showInt64", 1 => numbers::show_int64;
+    RT, "showUInt64", 1 => numbers::show_uint64;
+    RT, "toInt8", 1 => numbers::to_int8;
+    RT, "toInt16", 1 => numbers::to_int16;
+    RT, "toInt32", 1 => numbers::to_int32;
+    RT, "toInt64", 1 => numbers::to_int64;
+    RT, "toUInt8", 1 => numbers::to_uint8;
+    RT, "toUInt16", 1 => numbers::to_uint16;
+    RT, "toUInt32", 1 => numbers::to_uint32;
+    RT, "toUInt64", 1 => numbers::to_uint64;
+    RT, "toFloat32", 1 => numbers::to_float32;
+    RT, "toFloat64", 1 => numbers::number;
+    RT, "toBigInt", 1 => numbers::bigint;
+    RT, "int64BitAnd", 2 => numbers::int64_bit_and;
+    RT, "int64BitOr", 2 => numbers::int64_bit_or;
+    RT, "int64BitXor", 2 => numbers::int64_bit_xor;
+    RT, "int64BitNot", 1 => numbers::int64_bit_not;
+    RT, "int64ShiftLeft", 2 => numbers::int64_shift_left;
+    RT, "int64ShiftRight", 2 => numbers::int64_shift_right;
+    RT, "int64ShiftRightUnsigned", 2 => numbers::int64_shift_right_unsigned;
     RT, "stdoutLine", 1 => stdout_line;
     RT, "stderrLine", 1 => host::stderr_line;
     RT, "stdoutWrite", 1 => host::stdout_write;
@@ -120,6 +141,7 @@ natives! {
     RT, "fromResult", 1 => from_result;
     RT, "refModify", 2 => ref_modify;
     RT, "lazyMake", 1 => lazy::lazy_make;
+    RT, "lazyMakeLocal", 1 => lazy::lazy_make_local;
     RT, "lazyForce", 1 => lazy::lazy_force;
     RT, "lazyDone", 1 => lazy::lazy_done;
     RT, "layerSucceed", 2 => layer_succeed;
@@ -131,8 +153,8 @@ natives! {
     RT, "flickTodo", 1 => todo;
     STRING, "includes", 2 => includes;
     STRING, "startsWith", 2 => starts_with;
-    MODEL, "structShow", 2 => struct_show;
-    MODEL, "structEq", 3 => struct_eq;
+    MODEL, "structShow", 2 => struct_ops::struct_show;
+    MODEL, "structEq", 3 => struct_ops::struct_eq;
     MODEL, "seqListAt", 3 => seq::list_at;
     MODEL, "seqFromStep", 2 => seq::from_step;
     MODEL, "seqRangeStep", 3 => seq::range_step;
@@ -244,7 +266,7 @@ fn of<'a>(v: &'a Term, name: &str) -> Option<&'a [Term]> {
     }
 }
 
-fn list(v: &Term) -> Result<&[Term], String> {
+pub(super) fn list(v: &Term) -> Result<&[Term], String> {
     match v {
         Term::List(xs) => Ok(xs),
         other => Err(format!("not a list: {other:?}")),
@@ -252,7 +274,7 @@ fn list(v: &Term) -> Result<&[Term], String> {
 }
 
 /// `match c with True → then | False → else`.
-fn cond(c: Term, then: Term, otherwise: Term) -> Term {
+pub(super) fn cond(c: Term, then: Term, otherwise: Term) -> Term {
     Term::Match(
         Rc::new(c),
         Rc::from([
@@ -516,74 +538,6 @@ fn layer_effect(args: &[Term], _: &mut String) -> Result<Term, String> {
 
 fn layer_merge(args: &[Term], _: &mut String) -> Result<Term, String> {
     Ok(Term::Apply(Head::Const(Const::LayerMerge), args.into()))
-}
-
-/// The values of the fields, and their labels if a record.
-type Fields = (Vec<Term>, Option<Vec<Rc<str>>>);
-
-/// The fields of a record in label order, or of a tuple by position.
-fn fields(v: &Term) -> Result<Fields, String> {
-    match v {
-        Term::Tuple(xs) => Ok((xs.to_vec(), None)),
-        Term::Record(fs) => {
-            let mut fs = fs.to_vec();
-            fs.sort_by(|a, b| a.0.encode_utf16().cmp(b.0.encode_utf16()));
-            let labels = fs.iter().map(|(l, _)| l.clone()).collect();
-            Ok((fs.into_iter().map(|(_, x)| x).collect(), Some(labels)))
-        }
-        other => Err(format!("not a record or tuple: {other:?}")),
-    }
-}
-
-fn field_call(dict: &Term, method: &str, args: impl IntoIterator<Item = Term>) -> Term {
-    Term::apps(Term::Field(Rc::new(dict.clone()), method.into()), args)
-}
-
-/// `(a, b)` or `{ x = a, y = b }`.
-fn struct_show(args: &[Term], _: &mut String) -> Result<Term, String> {
-    let dicts = list(&args[0])?;
-    let (xs, labels) = fields(&args[1])?;
-    let shown = xs
-        .iter()
-        .zip(dicts)
-        .map(|(x, d)| field_call(d, "show", [x.clone()]));
-    let mut parts = Vec::new();
-    match labels {
-        None => {
-            parts.push(Term::string("("));
-            for (i, s) in shown.enumerate() {
-                if i > 0 {
-                    parts.push(Term::string(", "));
-                }
-                parts.push(s);
-            }
-            parts.push(Term::string(")"));
-        }
-        Some(labels) => {
-            parts.push(Term::string("{ "));
-            for (i, (l, s)) in labels.iter().zip(shown).enumerate() {
-                if i > 0 {
-                    parts.push(Term::string(", "));
-                }
-                parts.push(Term::string(&format!("{l} = ")));
-                parts.push(s);
-            }
-            parts.push(Term::string(" }"));
-        }
-    }
-    Ok(concat(parts))
-}
-
-fn struct_eq(args: &[Term], _: &mut String) -> Result<Term, String> {
-    let dicts = list(&args[0])?;
-    let ((xs, _), (ys, _)) = (fields(&args[1])?, fields(&args[2])?);
-    let pairs: Vec<_> = xs.into_iter().zip(ys).zip(dicts).collect();
-    Ok(pairs
-        .into_iter()
-        .rev()
-        .fold(Term::bool(true), |rest, ((x, y), d)| {
-            cond(field_call(d, "eq", [x, y]), rest, Term::bool(false))
-        }))
 }
 
 fn todo(args: &[Term], _: &mut String) -> Result<Term, String> {

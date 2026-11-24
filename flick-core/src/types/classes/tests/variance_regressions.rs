@@ -1,3 +1,4 @@
+use crate::types::ForeignBackendSpec;
 use std::slice;
 
 use super::{Dict, check_all};
@@ -249,6 +250,8 @@ class ShowFn a =
         thresholds: Thresholds::default(),
         watched: Watched::none(),
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     let mut checker = checker_in(
         &module,
@@ -381,6 +384,8 @@ let first = base (fun () -> ())
             thresholds: Thresholds::default(),
             watched: Watched::none(),
             stages_by_class: false,
+            foreign_backend: ForeignBackendSpec::default_js(),
+            validate_foreign_metadata: true,
         };
         let (more, _) =
             check_with_evidence(&module, &imported, builtins(), options, &mut interface);

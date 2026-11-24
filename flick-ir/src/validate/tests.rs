@@ -31,6 +31,7 @@ fn program(body: Expr) -> Program {
             name: "App.Main".into(),
             items: vec![item],
             types: Vec::new(),
+            preambles: Vec::new(),
             labels: BTreeMap::default(),
             initialization: crate::Initialization::default(),
             records: BTreeMap::default(),
@@ -410,4 +411,38 @@ fn rejects_constructor_operand_replaced_with_string_retaining_int_annotation() {
             .any(|e| e.contains("local `s` has type `Prelude.Int`, expected `Prelude.String`")),
         "expected local binder mismatch, got: {errs:?}"
     );
+}
+
+#[test]
+fn fixed_width_literals_validate_without_explicit_lang_table() {
+    let files = BTreeSet::from([FileId::new(0)]);
+    let span = Span::new(FileId::new(0), 0, 1);
+    let mut interner = TypeInterner::default();
+    let cases = [
+        (Lit::Int8(-128), "Int8"),
+        (Lit::Int16(-32_768), "Int16"),
+        (Lit::Int64(i64::MIN), "Int64"),
+        (Lit::UInt8(255), "UInt8"),
+        (Lit::UInt16(65_535), "UInt16"),
+        (Lit::UInt32(u32::MAX), "UInt32"),
+        (Lit::UInt64(u64::MAX), "UInt64"),
+        (Lit::Float32(1.5), "Float32"),
+    ];
+    for (lit, name) in cases {
+        let ty = interner.named("Prelude", name, Vec::new());
+        let ok_prog = program(Expr::with_ty(ExprKind::Lit(lit.clone()), span, Some(ty)));
+        assert_eq!(
+            validate(&ok_prog, &|m| m == "Prelude", &files),
+            Vec::<String>::new(),
+            "literal {lit:?} with fallback Prelude.{name}"
+        );
+        let wrong_ty = interner.named("Prelude", "String", Vec::new());
+        let bad_prog = program(Expr::with_ty(ExprKind::Lit(lit), span, Some(wrong_ty)));
+        let errs = validate(&bad_prog, &|m| m == "Prelude", &files);
+        assert!(
+            errs.iter()
+                .any(|e| e.contains(&format!("expected `Prelude.{name}`"))),
+            "expected diagnostic naming Prelude.{name}, got: {errs:?}"
+        );
+    }
 }

@@ -1,0 +1,4 @@
+ok: 84, runs: 2
+err: bad:-2 / bad:-2
+abort: stopped:1 / 20 / 20, runs: 2
+direct: 18 / bad:-4 / bad:-4, runs: 2

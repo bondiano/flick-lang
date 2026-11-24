@@ -466,11 +466,10 @@ func (w *wire) encode(fb *Fiber, v Value) (Value, []issue) {
 		}
 		return out, nil
 	case kindOption:
-		o := v.(*Data)
-		if o.Tag != "Some" {
+		if !IsSome(v) {
 			return JsonNull, nil
 		}
-		return s.item.jsonOf().encode(fb, o.Fields()[0])
+		return s.item.jsonOf().encode(fb, UnwrapSome(v))
 	case kindResult:
 		key, part := "err", s.items[0]
 		if isOk(v) {

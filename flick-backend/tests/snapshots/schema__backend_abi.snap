@@ -85,6 +85,31 @@ interface types {
     services: list<string>,
   }
 
+  variant adapter-arg-kind {
+    keyword(list<string>),
+    param-index,
+    uint,
+    text,
+    word,
+  }
+
+  record adapter-arg {
+    name: string,
+    kind: adapter-arg-kind,
+  }
+
+  record adapter-word {
+    name: string,
+    args: list<adapter-arg>,
+    repeatable: bool,
+    doc: string,
+  }
+
+  record type-form-attribute {
+    name: string,
+    doc: string,
+  }
+
   record descriptor {
     identity: backend-id,
     backend-api: version-range,
@@ -105,6 +130,8 @@ interface types {
     foreign-extension: option<string>,
     foreign-suffixes: list<string>,
     handled-services: list<environment-services>,
+    foreign-adapters: list<adapter-word>,
+    type-form-attributes: list<type-form-attribute>,
   }
 
   record target-request {
@@ -198,6 +225,13 @@ interface types {
     resolved: string,
     abi: abi,
     inputs: list<string>,
+  }
+
+  record inline-foreign {
+    module: string,
+    name: option<string>,
+    code: string,
+    span: span,
   }
 
   record projection {
@@ -319,6 +353,7 @@ interface types {
     entries: list<entry>,
     test-roots: list<symbol>,
     foreign: list<foreign-binding>,
+    inline-foreign: list<inline-foreign>,
     projections: list<projection>,
     package-targets: list<package-target>,
     root-handlers: list<root-handler>,

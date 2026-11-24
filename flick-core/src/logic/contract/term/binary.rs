@@ -34,11 +34,8 @@ pub(super) fn extract_binary(
         BinOp::Arith(op @ (Arith::Mul | Arith::Div | Arith::Rem | Arith::Pow), _) => {
             return refuse(span, format!("`{}` is outside the domain", op.symbol()));
         }
-        BinOp::Arith(_, Num::Float) => {
-            return refuse(span, "`Float` arithmetic is outside the domain");
-        }
-        BinOp::Arith(_, Num::BigInt) => {
-            return refuse(span, "`BigInt` arithmetic is outside the domain");
+        BinOp::Arith(_, num) => {
+            return refuse(span, format!("`{num:?}` arithmetic is outside the domain"));
         }
         BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge => {
             let tl = infer_prim(lhs, env, program, lang, INFER_DEPTH);

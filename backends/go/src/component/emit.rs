@@ -8,7 +8,6 @@ use flick_backend::{
     ModuleRole, OptionValue, Profile, Severity, Span, StepOutput, Toolchain, ToolchainStep,
 };
 use flick_backend_support::Known;
-use flick_backend_support::opt::strip_legacy_bare_types;
 use flick_ir::Module;
 
 use super::data::{Command, Data};
@@ -27,6 +26,7 @@ fn inspect(
     lines: &[&[u32]],
     lang: &Known,
 ) -> Result<BuildResult, Vec<Diagnostic>> {
+    let sources: Vec<&str> = data.sources.iter().map(String::as_str).collect();
     let module = data
         .inspect_module
         .as_deref()
@@ -41,6 +41,7 @@ fn inspect(
             test: false,
             paths,
             lines,
+            sources: &sources,
             foreign: &data.foreign,
             bindings: &data.bindings,
             lang,
@@ -86,22 +87,14 @@ pub(super) fn generate(
             if let Some(prims) = primitives.as_ref() {
                 optimize::module(request, data, m, &lang, prims)
             } else {
-                let mut m = m.clone();
-                strip_legacy_bare_types(&mut m);
-                m
+                m.clone()
             }
         })
         .collect();
     let own: Vec<&Module> = own.iter().collect();
-    let builtins: Vec<Module> = (data.program.modules.iter())
+    let builtins: Vec<&Module> = (data.program.modules.iter())
         .filter(|m| role(m) == Some(ModuleRole::Builtin))
-        .map(|m| {
-            let mut m = m.clone();
-            strip_legacy_bare_types(&mut m);
-            m
-        })
         .collect();
-    let builtins: Vec<&Module> = builtins.iter().collect();
     // a built-in module has no source of the build to name
     let paths: BTreeMap<String, String> = (own.iter())
         .filter_map(|m| Some((m.name.clone(), data.facts.get(&m.name)?.line_path.clone())))
@@ -110,6 +103,7 @@ pub(super) fn generate(
     if data.command == Command::Inspect {
         return inspect(request, data, &own, &builtins, &paths, &lines, &lang);
     }
+    let sources: Vec<&str> = data.sources.iter().map(String::as_str).collect();
     let programs: Vec<(&str, &str)> = if data.command == Command::Test {
         vec![(TEST, "")]
     } else {
@@ -153,6 +147,7 @@ pub(super) fn generate(
             test: data.command == Command::Test,
             paths: &paths,
             lines: &lines,
+            sources: &sources,
             foreign: &data.foreign,
             bindings: &data.bindings,
             lang: &lang,

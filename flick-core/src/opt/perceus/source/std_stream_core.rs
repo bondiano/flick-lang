@@ -23,21 +23,21 @@ impl Lower<'_> {
         if value.dicts != 0 {
             return None;
         }
-        if value.binding.from.as_deref()? != "flick:Stream" {
+        if value.binding.from()? != "flick:Stream" {
             return None;
         }
-        let bind = value.binding.name.as_str();
+        let bind = value.binding.export_name().unwrap_or("");
         let stages = value.stages.len();
         let allow_variadic = matches!(bind, "make" | "fromArrays" | "zipLatestAll" | "raceAll")
-            && value.adapter.variadic;
+            && value.adapter.words.len() == 1
+            && value.adapter.has_word("variadic");
         if !allow_variadic && !has_standard_shape(value) {
             return None;
         }
         if allow_variadic
             && (value.catch.is_some()
-                || value.adapter.receiver
-                || value.adapter.cancel
                 || !value.adapter.optional.is_empty()
+                || !value.adapter.owned.is_empty()
                 || value.adapter.result.nullable)
         {
             return None;

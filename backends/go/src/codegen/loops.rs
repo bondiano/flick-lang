@@ -10,8 +10,8 @@ use std::mem;
 
 use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
-use super::arith::Native;
-use super::layout::{Code, INDENT, block, call, param_list, single, statement};
+use super::go_type::{GoType, Typed};
+use super::layout::{INDENT, block, call, param_list, single, statement};
 use super::shape::Types;
 use super::{Gen, names};
 use flick_backend_support::tail::{
@@ -28,7 +28,7 @@ pub(super) struct Tail<'a> {
     vars: Vec<&'a str>,
     binds: Vec<Option<String>>,
     /// The Go type of each loop variable that is not a `flickrt.Value`.
-    natives: Vec<Option<Native>>,
+    types: Vec<Option<GoType>>,
     /// In a group, the variable naming the member that runs next.
     state: Option<&'static str>,
 }
@@ -97,7 +97,7 @@ impl<'a> Gen<'a> {
         params: &[Param],
         body: &Expr,
         target: Option<Target>,
-        types: Types,
+        types: &Types,
     ) -> (Vec<&'a str>, Vec<Document<'a>>) {
         let a = self.a;
         // what the body returns is of the function's Go type, and nothing
@@ -105,7 +105,8 @@ impl<'a> Gen<'a> {
         let saved = (
             self.tail.take(),
             mem::replace(&mut self.generator, false),
-            mem::replace(&mut self.returns, types.result()),
+            mem::replace(&mut self.returns, types.result().cloned()),
+            self.go_types.clone(),
         );
         let looping = target.filter(|t| {
             jumpable(params, Calls::Direct)
@@ -117,8 +118,15 @@ impl<'a> Gen<'a> {
                     let heads = g.bind_params(params);
                     for (i, p) in params.iter().enumerate() {
                         // a parameter of a Go type is that type from the start
-                        if let (Pat::Bind(name), Some(native)) = (&p.pat, types.param(i)) {
-                            g.natives.insert(name.clone(), native);
+                        if let Pat::Bind(name) = &p.pat {
+                            match types.param(i) {
+                                Some(gt) => {
+                                    g.go_types.insert(name.clone(), gt.clone());
+                                }
+                                None => {
+                                    g.go_types.remove(name);
+                                }
+                            }
                         }
                     }
                     g.tail_expr(body);
@@ -129,12 +137,12 @@ impl<'a> Gen<'a> {
             Some(target) => {
                 let heads: Vec<&'a str> = params.iter().map(|_| self.temp()).collect();
                 let vars: Vec<&'a str> = params.iter().map(|_| self.temp()).collect();
-                // a loop variable of a known scalar type is unboxed once, not per iteration
-                let natives: Vec<Option<Native>> = params
+                // a loop variable of a known Go type is unboxed once, not per iteration
+                let loop_types: Vec<Option<GoType>> = params
                     .iter()
                     .map(|p| {
                         matches!(p.pat, Pat::Bind(_))
-                            .then(|| Native::of(self.input.lang, p.ty.as_deref()))
+                            .then(|| self.go_type_of(p.ty.as_deref()))
                             .flatten()
                     })
                     .collect();
@@ -143,25 +151,25 @@ impl<'a> Gen<'a> {
                     current: 0,
                     vars: vars.clone(),
                     binds: binds(params),
-                    natives: natives.clone(),
+                    types: loop_types.clone(),
                     state: None,
                 };
                 let (inner, ()) = self.block(|g| g.iteration(params, &vars, body, tail));
                 let mut stmts: Vec<Document<'a>> = vars
                     .iter()
                     .zip(&heads)
-                    .zip(&natives)
+                    .zip(&loop_types)
                     .enumerate()
-                    .map(|(i, ((&var, &head), native))| match native {
-                        Some(n) => {
-                            // a parameter of the function's own Go type needs no unboxing
-                            let value = match types.param(i) {
-                                Some(_) => a.text(head),
-                                None => n.unbox(a, a.text(head)),
-                            };
-                            statement(a, docvec![a, "var ", var, " ", n.go(), " = ", value])
-                        }
-                        None => statement(a, docvec![a, "var ", var, " flickrt.Value = ", head]),
+                    .map(|(i, ((&var, &head), loop_ty))| {
+                        let init = self.coerce(
+                            Typed {
+                                code: self.code(head),
+                                ty: types.param(i).cloned(),
+                            },
+                            loop_ty.as_ref(),
+                        );
+                        let go_ty = self.go_type_name(loop_ty.as_ref());
+                        statement(a, docvec![a, "var ", var, " ", go_ty, " = ", init])
                     })
                     .collect();
                 // A wildcard/unit parameter can be carried only by jumps;
@@ -175,19 +183,18 @@ impl<'a> Gen<'a> {
                 (heads, stmts)
             }
         };
-        (self.tail, self.generator, self.returns) = saved;
+        (self.tail, self.generator, self.returns, self.go_types) = saved;
         result
     }
 
     /// One iteration of a loop: the parameters bound from the loop
     /// variables, then the body in tail position.
     fn iteration(&mut self, params: &[Param], vars: &[&'a str], body: &Expr, tail: Tail<'a>) {
-        for ((p, &var), native) in params.iter().zip(vars).zip(&tail.natives) {
-            match (&p.pat, native) {
-                (Pat::Bind(n), Some(native)) => self.bind_native(n, self.code(var), *native),
-                (Pat::Bind(n), None) => self.bind(n, self.code(var)),
-                (Pat::Wild | Pat::Lit(Lit::Unit), _) => {}
-                (pat, _) => self.destructure(pat, self.a.text(var)),
+        for ((p, &var), go_ty) in params.iter().zip(vars).zip(&tail.types) {
+            match &p.pat {
+                Pat::Bind(n) => self.bind_typed(n, self.code(var), go_ty.clone()),
+                Pat::Wild | Pat::Lit(Lit::Unit) => {}
+                pat => self.destructure(pat, self.a.text(var), None),
             }
         }
         self.tail = Some(tail);
@@ -201,7 +208,7 @@ impl<'a> Gen<'a> {
         &mut self,
         name: &str,
         params: &[Param],
-        result: Option<Native>,
+        types: &Types,
     ) -> Option<(Vec<&'a str>, Document<'a>)> {
         let a = self.a;
         let &(g, k) = self.grouped.get(name)?;
@@ -216,16 +223,20 @@ impl<'a> Gen<'a> {
             })
             .collect();
         let mut args = vec![k.to_doc(a)];
-        args.extend(
-            heads
-                .iter()
-                .map(|&h| a.text(if h == "_" { "nil" } else { h })),
-        );
+        args.extend(heads.iter().enumerate().map(|(i, &h)| {
+            if h == "_" {
+                a.text("nil")
+            } else if let Some(gt) = types.param(i) {
+                gt.box_if_needed(a, a.text(h))
+            } else {
+                a.text(h)
+            }
+        }));
         args.resize(arity + 1, a.text("nil"));
         args.insert(0, self.context());
         // the group runs on values: its result is made the function's type
         let go = call(a, group, args);
-        let go = result.map_or(go, |native| native.unbox(a, go));
+        let go = types.result().map_or(go, |gt| gt.unbox_doc(a, go));
         Some((heads, statement(a, docvec![a, "return ", go])))
     }
 
@@ -243,21 +254,21 @@ impl<'a> Gen<'a> {
         let mut cases = Vec::new();
         for (k, (_, params, body)) in functions.iter().enumerate() {
             // local names are unique only within a definition
-            self.natives.clear();
+            self.go_types.clear();
             self.held.clear();
             let tail = Tail {
                 members: members.clone(),
                 current: k,
                 vars: vars.clone(),
                 binds: binds(params),
-                natives: vec![None; vars.len()],
+                types: vec![None; vars.len()],
                 state: Some("state"),
             };
             let (stmts, ()) = self.block(|g| g.iteration(params, &vars, body, tail));
             let stmts = a.concat(stmts).nest(a, INDENT);
             cases.push(statement(a, docvec![a, "case ", k, ":", stmts]));
         }
-        self.natives.clear();
+        self.go_types.clear();
         self.held.clear();
         self.fiber = None;
         self.context = None;
@@ -293,21 +304,15 @@ impl<'a> Gen<'a> {
             return false;
         };
         let tail = self.tail.as_ref().expect("a jump is inside a loop");
-        let (vars, binds, natives) = (tail.vars.clone(), tail.binds.clone(), tail.natives.clone());
+        let (vars, binds, tail_types) = (tail.vars.clone(), tail.binds.clone(), tail.types.clone());
         let state = tail.state.filter(|_| j != tail.current);
         // a parameter passed on unchanged keeps its variable
         let changed: Vec<usize> = (0..args.len())
             .filter(|&i| !passed_on(&args, &binds, i))
             .collect();
-        let values = self.ordered(&changed.iter().map(|&i| args[i]).collect::<Vec<_>>());
-        let values: Vec<Code<'a>> = changed
-            .iter()
-            .zip(values)
-            .map(|(&i, v)| match natives[i] {
-                Some(n) => self.unboxed(args[i], v, n),
-                None => v,
-            })
-            .collect();
+        let changed_exprs: Vec<&Expr> = changed.iter().map(|&i| args[i]).collect();
+        let wants: Vec<Option<GoType>> = changed.iter().map(|&i| tail_types[i].clone()).collect();
+        let values = self.ordered_into(&changed_exprs, &wants);
         if !changed.is_empty() {
             let a = self.a;
             let targets = a.join(changed.iter().map(|&i| a.text(vars[i])), a.text(", "));
@@ -333,13 +338,13 @@ impl<'a> Gen<'a> {
     /// jump: the left one decides first.
     pub(super) fn tail_logic(&mut self, op: BinOp, lhs: &Expr, rhs: &Expr) {
         let a = self.a;
-        let l = self.expr(lhs);
+        let l = self.expr_bool(lhs);
         let (not, value) = if op == BinOp::And {
             ("!", "false")
         } else {
             ("", "true")
         };
-        let test = docvec![a, not, self.unboxed(lhs, l, Native::Bool).doc];
+        let test = docvec![a, not, l.doc];
         self.emit(docvec![
             a,
             "if ",

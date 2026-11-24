@@ -14,6 +14,7 @@ use crate::numeric;
 use crate::source;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::syntax::literal::split_number_suffix;
 use crate::types::lang::Lang;
 
 /// The body of a function the checker types, given the type of its first
@@ -901,11 +902,18 @@ impl<'c> Checker<'c> {
 }
 
 impl Checker<'_> {
-    /// The type of a number literal: of any numeric type, a `Float` one when
-    /// it has a fraction.
+    /// The type of a number literal: a concrete numeric type when suffixed
+    /// (`i8`, `u64`, `f32`, …), otherwise any numeric type, a floating one
+    /// when it has a fraction.
     pub fn number(&mut self, node: &Node, text: &str) -> Type {
         let span = self.span(node);
-        if numeric::is_integer_literal(text) {
+        if let Some(num) = split_number_suffix(text).1 {
+            let fractional = num.fractional();
+            let value = (!fractional)
+                .then(|| numeric::integer_value(text))
+                .flatten();
+            self.suffixed_number_literal(span, num, value, fractional, false)
+        } else if numeric::is_integer_literal(text) {
             self.number_literal(span, numeric::integer_value(text), false, false)
         } else {
             self.number_literal(span, None, true, false)

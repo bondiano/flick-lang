@@ -2,7 +2,9 @@
 
 use std::f64::consts::PI;
 
-use flick_ir::memory::{BigIntIntrinsic, DebugIntrinsic, FloatIntrinsic, IntIntrinsic};
+use flick_ir::memory::{
+    BigIntIntrinsic, DebugIntrinsic, FixedWidthIntrinsic, FloatIntrinsic, IntIntrinsic,
+};
 use flick_ir::{Arith, Foreign, ForeignMode, Num};
 
 use super::expr_builder::ExprBuilder;
@@ -22,8 +24,11 @@ impl Lower<'_> {
         if value.mode != ForeignMode::Pure || value.dicts != 0 || !has_standard_shape(value) {
             return None;
         }
-        let from = value.binding.from.as_deref();
-        let bind = value.binding.name.as_str();
+        let (from, bind) = match &value.binding {
+            flick_ir::Binding::Module { from, name } => (Some(from.as_str()), name.as_str()),
+            flick_ir::Binding::Global { name } => (None, name.as_str()),
+            flick_ir::Binding::Inline(_) => return None,
+        };
         // Zero-argument Float constants (`Math.PI`, `Infinity`, `NaN`).
         if from.is_none() && value.arity == 0 && value.stages.is_empty() {
             let constant = match bind {
@@ -79,6 +84,38 @@ fn scalar_intrinsic(from: Option<&str>, bind: &str, stages: usize) -> Option<Int
         (Some("flick:rt"), "shiftRightUnsignedInt") => {
             Intrinsic::Int(IntIntrinsic::ShiftRightUnsigned)
         }
+        (Some("flick:rt"), "showInt64") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ShowInt64),
+        (Some("flick:rt"), "showUInt64") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ShowUInt64),
+        (Some("flick:rt"), "toInt8") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToInt8),
+        (Some("flick:rt"), "toInt16") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToInt16),
+        (Some("flick:rt"), "toInt32") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToInt32),
+        (Some("flick:rt"), "toInt64") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToInt64),
+        (Some("flick:rt"), "toUInt8") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToUInt8),
+        (Some("flick:rt"), "toUInt16") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToUInt16),
+        (Some("flick:rt"), "toUInt32") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToUInt32),
+        (Some("flick:rt"), "toUInt64") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToUInt64),
+        (Some("flick:rt"), "toFloat32") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToFloat32),
+        (Some("flick:rt"), "toFloat64") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToFloat64),
+        (Some("flick:rt"), "toBigInt") => Intrinsic::FixedWidth(FixedWidthIntrinsic::ToBigInt),
+        (Some("flick:rt"), "int64BitAnd") => {
+            Intrinsic::FixedWidth(FixedWidthIntrinsic::Int64BitAnd)
+        }
+        (Some("flick:rt"), "int64BitOr") => Intrinsic::FixedWidth(FixedWidthIntrinsic::Int64BitOr),
+        (Some("flick:rt"), "int64BitXor") => {
+            Intrinsic::FixedWidth(FixedWidthIntrinsic::Int64BitXor)
+        }
+        (Some("flick:rt"), "int64BitNot") => {
+            Intrinsic::FixedWidth(FixedWidthIntrinsic::Int64BitNot)
+        }
+        (Some("flick:rt"), "int64ShiftLeft") => {
+            Intrinsic::FixedWidth(FixedWidthIntrinsic::Int64ShiftLeft)
+        }
+        (Some("flick:rt"), "int64ShiftRight") => {
+            Intrinsic::FixedWidth(FixedWidthIntrinsic::Int64ShiftRight)
+        }
+        (Some("flick:rt"), "int64ShiftRightUnsigned") => {
+            Intrinsic::FixedWidth(FixedWidthIntrinsic::Int64ShiftRightUnsigned)
+        }
         (None, "Number.isNaN") => Intrinsic::Float(FloatIntrinsic::IsNaN),
         (None, "Number.isFinite") => Intrinsic::Float(FloatIntrinsic::IsFinite),
         (None, "Number.isInteger") => Intrinsic::Float(FloatIntrinsic::IsInteger),
@@ -119,10 +156,26 @@ fn scalar_lit(b: &ExprBuilder, num: Num, one: bool) -> Expr {
     match (num, one) {
         (Num::Float, false) => b.float(0.0),
         (Num::Float, true) => b.float(1.0),
+        (Num::Float32, false) => b.at(flick_ir::ExprKind::Lit(Lit::Float32(0.0))),
+        (Num::Float32, true) => b.at(flick_ir::ExprKind::Lit(Lit::Float32(1.0))),
         (Num::BigInt, false) => b.bigint("0"),
         (Num::BigInt, true) => b.bigint("1"),
         (Num::Int, false) => b.int(0),
         (Num::Int, true) => b.int(1),
+        (Num::Int8, false) => b.at(flick_ir::ExprKind::Lit(Lit::Int8(0))),
+        (Num::Int8, true) => b.at(flick_ir::ExprKind::Lit(Lit::Int8(1))),
+        (Num::Int16, false) => b.at(flick_ir::ExprKind::Lit(Lit::Int16(0))),
+        (Num::Int16, true) => b.at(flick_ir::ExprKind::Lit(Lit::Int16(1))),
+        (Num::Int64, false) => b.at(flick_ir::ExprKind::Lit(Lit::Int64(0))),
+        (Num::Int64, true) => b.at(flick_ir::ExprKind::Lit(Lit::Int64(1))),
+        (Num::UInt8, false) => b.at(flick_ir::ExprKind::Lit(Lit::UInt8(0))),
+        (Num::UInt8, true) => b.at(flick_ir::ExprKind::Lit(Lit::UInt8(1))),
+        (Num::UInt16, false) => b.at(flick_ir::ExprKind::Lit(Lit::UInt16(0))),
+        (Num::UInt16, true) => b.at(flick_ir::ExprKind::Lit(Lit::UInt16(1))),
+        (Num::UInt32, false) => b.at(flick_ir::ExprKind::Lit(Lit::UInt32(0))),
+        (Num::UInt32, true) => b.at(flick_ir::ExprKind::Lit(Lit::UInt32(1))),
+        (Num::UInt64, false) => b.at(flick_ir::ExprKind::Lit(Lit::UInt64(0))),
+        (Num::UInt64, true) => b.at(flick_ir::ExprKind::Lit(Lit::UInt64(1))),
     }
 }
 

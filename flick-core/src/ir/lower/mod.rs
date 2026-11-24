@@ -17,6 +17,7 @@ mod derived;
 mod do_notation;
 mod enums;
 mod expr;
+mod foreign;
 mod generic;
 mod handle;
 mod holes;
@@ -107,10 +108,12 @@ fn lower_inner<'a>(
     }
     if lower.diagnostics.is_empty() {
         let records = mem::take(&mut lower.records);
+        let preambles = mem::take(&mut lower.preambles);
         Ok((
             Module {
                 name: module.name.to_owned(),
                 items,
+                preambles,
                 types: lower.ir_type_decls(),
                 labels: typing.labelled.clone(),
                 initialization: flick_ir::Initialization::default(),
@@ -143,6 +146,7 @@ impl<'a> Lower<'a> {
             entry_owners: HashMap::new(),
             hole_params: HashMap::new(),
             records: BTreeMap::new(),
+            preambles: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
             collecting_binders: None,
             #[cfg(not(target_arch = "wasm32"))]
@@ -188,6 +192,8 @@ struct Lower<'a> {
     /// The constructors over a record written in their declaration, with
     /// its labels (`Module::records`).
     records: BTreeMap<String, Vec<String>>,
+    /// Inline foreign module preambles (`foreign module inline "..."`).
+    preambles: Vec<flick_ir::InlineCode>,
     /// Active pattern binder-type collector for [`Self::pattern_typed`].
     #[cfg(not(target_arch = "wasm32"))]
     collecting_binders: Option<Vec<(String, TypeRef)>>,
@@ -345,6 +351,11 @@ impl Lower<'_> {
                     .flat_map(Node::nodes)
                 {
                     self.item(member, items);
+                }
+            }
+            K::ForeignPreamble => {
+                if let Some(preamble) = self.foreign_preamble(decl) {
+                    self.preambles.push(preamble);
                 }
             }
             K::ForeignDecl => {

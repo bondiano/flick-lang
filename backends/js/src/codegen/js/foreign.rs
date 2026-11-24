@@ -13,18 +13,13 @@ use crate::codegen::Options;
 use crate::effects::owned;
 use crate::effects::{belongs_to, bindings};
 use crate::effects::{effect_specifier, requires_adapter, selected_on_kernel};
-use crate::ir::Copies;
-use crate::ir::{Foreign, ForeignMode, Item, ItemKind};
+use crate::ir::{Binding, Copies, Foreign, ForeignMode, Item, ItemKind};
 use flick_pretty::docvec;
 
 /// What crosses `f` as a copy: an import outside the runtime may change
 /// Flick data in place (`docs/formal/ts-holes.md#31-flick-data-is-copied-at-the-foreign-boundary`).
 fn copies(f: &Foreign) -> Option<&Copies> {
-    let trusted = f
-        .binding
-        .from
-        .as_deref()
-        .is_some_and(trusted_runtime_package);
+    let trusted = f.binding.from().is_some_and(trusted_runtime_package);
     (!trusted && f.adapter.copies.any()).then_some(&f.adapter.copies)
 }
 
@@ -47,8 +42,20 @@ fn contains_eff(shape: &Shape) -> bool {
 impl<'d> Gen<'_, 'd> {
     /// The import used by this binding and whether its value crosses to Effect.
     fn foreign_target(&mut self, f: &Foreign) -> (String, bool) {
-        let Some(module) = &f.binding.from else {
-            return (format!("globalThis.{}", f.binding.name), false);
+        let (module, export) = match &f.binding {
+            Binding::Global { name } => return (format!("globalThis.{name}"), false),
+            Binding::Inline(inline) => {
+                let alias = format!("$f_{}", f.name);
+                self.inline_foreign
+                    .push((alias.clone(), inline.code.clone()));
+                let bridged = self.kernel
+                    && (f.mode == ForeignMode::Effect
+                        || (self.options.effect_bridge.available()
+                            && (f.adapter.shapes.iter().any(contains_eff)
+                                || contains_eff(&f.adapter.result_shape))));
+                return (alias, bridged);
+            }
+            Binding::Module { from, name } => (from, name),
         };
         let alias = format!("$f_{}", f.name);
         let spec = self.options.foreign(self.module, module);
@@ -57,13 +64,12 @@ impl<'d> Gen<'_, 'd> {
             let mut bridged = false;
             if self.kernel
                 && !self.options.effect_bridge.available()
-                && requires_adapter(&spec, &f.binding.name, f.mode == ForeignMode::Effect)
+                && requires_adapter(&spec, export, f.mode == ForeignMode::Effect)
             {
                 // Build validation rejects reachable uses. Unused members of a
                 // mixed built-in module must not import an unavailable adapter.
                 let message = serde_json::to_string(&format!(
-                    "`{spec}` `{}` requires the optional `{}` adapter",
-                    f.binding.name,
+                    "`{spec}` `{export}` requires the optional `{}` adapter",
                     bindings::ADAPTER_PREFIX
                 ))
                 .expect("a diagnostic string serializes");
@@ -77,9 +83,7 @@ impl<'d> Gen<'_, 'd> {
                 };
                 return (missing, false);
             }
-            if self.kernel
-                && !selected_on_kernel(&spec, &f.binding.name, self.options.effect_bridge)
-            {
+            if self.kernel && !selected_on_kernel(&spec, export, self.options.effect_bridge) {
                 spec = effect_specifier(module);
                 bridged = true;
             }
@@ -93,8 +97,7 @@ impl<'d> Gen<'_, 'd> {
                     || contains_eff(&f.adapter.result_shape));
             (spec, bridged)
         };
-        self.foreign
-            .push((spec, f.binding.name.clone(), alias.clone()));
+        self.foreign.push((spec, export.clone(), alias.clone()));
         (alias, bridged)
     }
 
@@ -222,6 +225,9 @@ impl<'d> Gen<'_, 'd> {
         let a = self.a;
         let info = &f.adapter;
         let copies = copies(f);
+        let receiver = info.has_word("this");
+        let cancel = info.has_word_arg("cancel", "signal");
+        let variadic = info.has_word("variadic");
         let mut args: Vec<Js<'d>> = dicts.iter().map(|d| self.leaf(d)).collect();
         for (i, param) in params.iter().take(f.arity).enumerate() {
             let copy = copies.is_some_and(|c| c.args.get(i) == Some(&true));
@@ -265,13 +271,13 @@ impl<'d> Gen<'_, 'd> {
                             );
                             self.callback(host, n, callback.as_ref())
                         }
-                        None if info.variadic && i + 1 == f.arity => self.spread(host),
+                        None if variadic && i + 1 == f.arity => self.spread(host),
                         None => host,
                     }
                 }
-                _ if info.receiver && i == 0 => self.copied(copy, value),
+                _ if receiver && i == 0 => self.copied(copy, value),
                 Some(n) => self.callback(value, n, callback.as_ref()),
-                None if info.variadic && i + 1 == f.arity => {
+                None if variadic && i + 1 == f.arity => {
                     let value = self.copied(copy, value);
                     self.spread(value)
                 }
@@ -279,10 +285,10 @@ impl<'d> Gen<'_, 'd> {
             };
             args.push(arg);
         }
-        if info.cancel {
+        if cancel {
             args.push(self.leaf("$signal"));
         }
-        if info.receiver && !args.is_empty() {
+        if receiver && !args.is_empty() {
             let receiver = args.remove(dicts.len());
             let rest: Vec<Js<'d>> = [receiver].into_iter().chain(args).collect();
             call(a, self.leaf(&format!("{target}.call")), &rest)
@@ -356,14 +362,14 @@ impl<'d> Gen<'_, 'd> {
 pub(super) fn plain(f: &Foreign) -> bool {
     let info = &f.adapter;
     f.mode == ForeignMode::Pure
-        && f.binding.from.is_some()
+        && !matches!(f.binding, Binding::Global { .. })
         && f.dicts == 0
         && f.catch.is_none()
         && !f.stages.is_empty()
         && f.stages.iter().all(|&runtime| !runtime)
         && f.arity == f.stages.len()
         && f.taken() == f.arity
-        && !(info.receiver || info.cancel || info.variadic)
+        && info.words.is_empty()
         && info.optional.is_empty()
         && info.callbacks.iter().all(|c| matches!(c, None | Some(1)))
         && !(info.result.nullable || info.result.unit)
@@ -382,18 +388,27 @@ pub(super) fn plain_foreigns(
         .filter_map(|item| match &item.kind {
             ItemKind::Foreign(f) if plain(f) => {
                 if options.rt {
-                    let source = f.binding.from.as_deref()?;
-                    let spec = options.foreign(module, source);
                     let data = f.adapter.shapes.iter().all(Shape::is_data)
                         && f.adapter.result_shape.is_data();
-                    // the runtime's own exports take every value as it is
-                    if !(data || belongs_to(&spec, bindings::OWNED_PREFIX))
-                        || belongs_to(&spec, bindings::ADAPTER_PREFIX)
-                        || (!options.effect_bridge.available()
-                            && requires_adapter(&spec, &f.binding.name, false))
-                        || !selected_on_kernel(&spec, &f.binding.name, options.effect_bridge)
-                    {
-                        return None;
+                    match &f.binding {
+                        Binding::Module { from, name } => {
+                            let spec = options.foreign(module, from);
+                            // the runtime's own exports take every value as it is
+                            if !(data || belongs_to(&spec, bindings::OWNED_PREFIX))
+                                || belongs_to(&spec, bindings::ADAPTER_PREFIX)
+                                || (!options.effect_bridge.available()
+                                    && requires_adapter(&spec, name, false))
+                                || !selected_on_kernel(&spec, name, options.effect_bridge)
+                            {
+                                return None;
+                            }
+                        }
+                        Binding::Inline(_) => {
+                            if !data {
+                                return None;
+                            }
+                        }
+                        Binding::Global { .. } => return None,
                     }
                 }
                 Some((f.name.clone(), (f.stages.len(), format!("$f_{}", f.name))))

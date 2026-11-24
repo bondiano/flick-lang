@@ -177,6 +177,14 @@ impl Heap {
         execution: usize,
         lazy: &LazyHandle,
     ) -> Result<&'a mut Option<LazyState>, Error> {
+        self.lazy_slot_mut(execution, lazy).map(|(state, _)| state)
+    }
+
+    fn lazy_slot_mut<'a>(
+        &'a mut self,
+        execution: usize,
+        lazy: &LazyHandle,
+    ) -> Result<(&'a mut Option<LazyState>, Option<usize>), Error> {
         if lazy.execution != execution {
             return Err(Error::ForeignLazy);
         }
@@ -191,6 +199,7 @@ impl Heap {
         let object = slot.object.as_mut().ok_or(Error::ClosedLazy)?;
         let Data::Lazy {
             execution: owner,
+            local_owner,
             state,
         } = &mut object.data
         else {
@@ -199,7 +208,7 @@ impl Heap {
         if *owner != execution {
             return Err(Error::ForeignLazy);
         }
-        Ok(state)
+        Ok((state, *local_owner))
     }
 
     fn iterator_state_mut<'a>(
@@ -279,7 +288,15 @@ impl Heap {
             Lit::Unit => Value::Unit,
             Lit::Bool(value) => Value::Bool(*value),
             Lit::Int(value) => Value::Int(*value),
+            Lit::Int8(value) => Value::Int8(*value),
+            Lit::Int16(value) => Value::Int16(*value),
+            Lit::Int64(value) => Value::Int64(*value),
+            Lit::UInt8(value) => Value::UInt8(*value),
+            Lit::UInt16(value) => Value::UInt16(*value),
+            Lit::UInt32(value) => Value::UInt32(*value),
+            Lit::UInt64(value) => Value::UInt64(*value),
             Lit::Float(value) => Value::Float(*value),
+            Lit::Float32(value) => Value::Float32(*value),
             Lit::String(value) => self.allocate(Data::String(value.clone())),
             Lit::BigInt(value) => self.allocate(Data::BigInt(value.clone())),
         })

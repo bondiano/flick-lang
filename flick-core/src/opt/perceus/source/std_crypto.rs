@@ -17,10 +17,10 @@ impl Lower<'_> {
         if value.dicts != 0 || value.mode != ForeignMode::Effect || !has_standard_shape(value) {
             return None;
         }
-        if value.binding.from.as_deref()? != "flick:Crypto" {
+        if value.binding.from()? != "flick:Crypto" {
             return None;
         }
-        let bind = value.binding.name.as_str();
+        let bind = value.binding.export_name().unwrap_or("");
         let stages = value.stages.len();
         if bind == "flickDigest" && stages == 2 {
             return Some(self.intrinsic(

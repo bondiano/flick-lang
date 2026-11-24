@@ -1113,34 +1113,62 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "ALIAS",
-              "content": {
-                "type": "CHOICE",
-                "members": [
-                  {
-                    "type": "STRING",
-                    "value": "pure"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": "pure"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "sync"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "async"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "effect"
+                      },
+                      {
+                        "type": "STRING",
+                        "value": "blocked"
+                      }
+                    ]
                   },
-                  {
-                    "type": "STRING",
-                    "value": "sync"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "async"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "effect"
-                  },
-                  {
-                    "type": "STRING",
-                    "value": "blocked"
-                  }
-                ]
-              },
-              "named": true,
-              "value": "keyword"
+                  "named": true,
+                  "value": "keyword"
+                },
+                {
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "ALIAS",
+                      "content": {
+                        "type": "STRING",
+                        "value": "module"
+                      },
+                      "named": true,
+                      "value": "keyword"
+                    },
+                    {
+                      "type": "ALIAS",
+                      "content": {
+                        "type": "STRING",
+                        "value": "inline"
+                      },
+                      "named": true,
+                      "value": "keyword"
+                    }
+                  ]
+                }
+              ]
             },
             {
               "type": "BLANK"
@@ -1167,8 +1195,17 @@
             {
               "type": "ALIAS",
               "content": {
-                "type": "STRING",
-                "value": "global"
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "STRING",
+                    "value": "global"
+                  },
+                  {
+                    "type": "STRING",
+                    "value": "inline"
+                  }
+                ]
               },
               "named": true,
               "value": "keyword"
@@ -1575,19 +1612,23 @@
         "members": [
           {
             "type": "PATTERN",
-            "value": "0[xX][0-9a-fA-F_]+n?"
+            "value": "0[xX][0-9a-fA-F_]+(n|[iu](8|16|32|64))?"
           },
           {
             "type": "PATTERN",
-            "value": "0[oO][0-7_]+n?"
+            "value": "0[oO][0-7_]+(n|[iu](8|16|32|64))?"
           },
           {
             "type": "PATTERN",
-            "value": "0[bB][01_]+n?"
+            "value": "0[bB][01_]+(n|[iu](8|16|32|64))?"
           },
           {
             "type": "PATTERN",
-            "value": "[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9_]+)?n?"
+            "value": "[0-9][0-9_]*(\\.[0-9][0-9_]*([eE][+-]?[0-9_]+)?|[eE][+-]?[0-9_]+)(f32)?"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[0-9][0-9_]*(n|[iu](8|16|32|64)|f32)?"
           }
         ]
       }
@@ -1825,6 +1866,9 @@
     ],
     [
       "_fixture"
+    ],
+    [
+      "_foreign"
     ],
     [
       "_await_signature",

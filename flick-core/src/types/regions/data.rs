@@ -13,9 +13,17 @@ use crate::types::lang::Lang;
 use crate::types::ty::{Norm, Type};
 
 /// The primitive types, which hold no captures.
-const SCALARS: [Lang; 7] = [
+const SCALARS: [Lang; 15] = [
     Lang::Int,
+    Lang::Int8,
+    Lang::Int16,
+    Lang::Int64,
+    Lang::UInt8,
+    Lang::UInt16,
+    Lang::UInt32,
+    Lang::UInt64,
     Lang::Float,
+    Lang::Float32,
     Lang::BigInt,
     Lang::String,
     Lang::Bool,

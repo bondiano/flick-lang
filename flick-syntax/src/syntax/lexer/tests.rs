@@ -29,25 +29,63 @@ fn kinds(text: &str) -> (Vec<(SyntaxKind, &str)>, Vec<String>) {
 #[test]
 fn numbers_follow_js_grammar_without_dot_forms() {
     for ok in [
-        "0", "42", "1_000", "1.5", "1e-3", "2E+10", "0x1F", "0o17", "0b1010", "0xFF_FF", "10n",
-        "0n", "0x1Fn", "0.5",
+        "0",
+        "42",
+        "1_000",
+        "1.5",
+        "1e-3",
+        "2E+10",
+        "0x1F",
+        "0o17",
+        "0b1010",
+        "0xFF_FF",
+        "10n",
+        "0n",
+        "0x1Fn",
+        "0.5",
+        "0i8",
+        "127i8",
+        "32767i16",
+        "42i32",
+        "9223372036854775807i64",
+        "255u8",
+        "65535u16",
+        "4294967295u32",
+        "18446744073709551615u64",
+        "0xFFu8",
+        "0b1010_0101i8",
+        "0o77_77u16",
+        "0x1f32",
+        "1f32",
+        "1.5f32",
+        "1e-3f32",
+        "1_000.25f32",
     ] {
         let (tokens, errors) = kinds(ok);
         assert!(errors.is_empty(), "{ok}: {errors:?}");
         assert_eq!(tokens.len(), 1, "{ok}");
     }
     assert_eq!(kinds("10n").0[0].0, K::BigInt);
+    assert_eq!(kinds("0xFFu8").0[0].0, K::Number);
+    assert_eq!(kinds("1.5f32").0[0].0, K::Number);
     for (bad, at) in [
         ("010", "010"),
         ("1__0", "_"),
         ("1_", "_"),
         ("1._5", "1."),
         ("1.5n", "1.5n"),
+        ("1.5i32", "1.5i32"),
+        ("1e3u8", "1e3u8"),
+        ("0b10f32", "0b10f32"),
+        ("0o10f32", "0o10f32"),
         ("1e", "1e"),
         ("0x", "0x"),
         ("5.", "5."),
         (".5", ".5"),
         ("12abc", "abc"),
+        ("12i7", "i7"),
+        ("12f64", "f64"),
+        ("12u8x", "u8x"),
         ("0_1", "0_1"),
     ] {
         let (tokens, errors) = kinds(bad);

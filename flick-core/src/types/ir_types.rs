@@ -402,7 +402,8 @@ mod tests {
     use crate::source::SourceMap;
     use crate::syntax;
     use crate::types::{
-        Limits, Options, StaticContext, Thresholds, Watched, builtin_env, checker_in,
+        ForeignBackendSpec, Limits, Options, StaticContext, Thresholds, Watched, builtin_env,
+        checker_in,
     };
 
     #[test]
@@ -428,6 +429,8 @@ mod tests {
             thresholds: Thresholds::default(),
             watched: Watched::none(),
             stages_by_class: false,
+            foreign_backend: ForeignBackendSpec::default_js(),
+            validate_foreign_metadata: true,
         };
         let mut checker = checker_in(
             &module,

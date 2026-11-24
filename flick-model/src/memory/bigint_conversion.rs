@@ -13,11 +13,40 @@ pub(super) fn run(heap: &mut Heap, input: &Value, fuel: &mut u64) -> Result<Valu
             charge(fuel, 11)?;
             value.to_string()
         }
+        Value::Int8(value) => {
+            charge(fuel, 4)?;
+            value.to_string()
+        }
+        Value::Int16(value) => {
+            charge(fuel, 6)?;
+            value.to_string()
+        }
+        Value::Int64(value) => {
+            charge(fuel, 20)?;
+            value.to_string()
+        }
+        Value::UInt8(value) => {
+            charge(fuel, 3)?;
+            value.to_string()
+        }
+        Value::UInt16(value) => {
+            charge(fuel, 5)?;
+            value.to_string()
+        }
+        Value::UInt32(value) => {
+            charge(fuel, 10)?;
+            value.to_string()
+        }
+        Value::UInt64(value) => {
+            charge(fuel, 20)?;
+            value.to_string()
+        }
         Value::Bool(value) => {
             charge(fuel, 1)?;
             if *value { "1".into() } else { "0".into() }
         }
         Value::Float(value) => number(*value, fuel)?,
+        Value::Float32(value) => number(f64::from(*value), fuel)?,
         Value::Unit => return Err(Error::BigIntUndefined),
         Value::Object(token) => match &heap.object(token.id)?.data {
             Data::BigInt(_) => return heap.dup(input),

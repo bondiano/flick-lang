@@ -9,6 +9,14 @@ bool Type Prelude.Bool
 int Type Prelude.Int
 float Type Prelude.Float
 bigint Type Prelude.BigInt
+int8 Type Prelude.Int8
+int16 Type Prelude.Int16
+int64 Type Prelude.Int64
+uint8 Type Prelude.UInt8
+uint16 Type Prelude.UInt16
+uint32 Type Prelude.UInt32
+uint64 Type Prelude.UInt64
+float32 Type Prelude.Float32
 string Type Prelude.String
 unknown Type Prelude.Unknown
 js_value Type Prelude.JsValue
@@ -115,6 +123,7 @@ ge Value Numeric.ge
 from_result Value Prelude.from_result
 lazy_make Value Prelude.lazy_make
 await_eff Value Prelude.await_eff
+lazy_make_local Value Prelude.lazy_make_local
 lazy_force Value Prelude.lazy_force
 lazy_done Value Prelude.lazy_done
 lazy_read Value Prelude.lazy_read

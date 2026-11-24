@@ -26,7 +26,9 @@ use crate::logic::{Def, Program, Ty};
 use crate::resolve::{self, NO_GENERATED, module_syntax};
 use crate::source::{SourceMap, Span};
 use crate::syntax;
-use crate::types::{Limits, Options, Thresholds, Typing, Watched, builtins_of, check_typed};
+use crate::types::{
+    ForeignBackendSpec, Limits, Options, Thresholds, Typing, Watched, builtins_of, check_typed,
+};
 
 type InstanceEntry = (InstanceInfo, Vec<(String, Expr)>);
 
@@ -143,8 +145,8 @@ impl FakeProgram {
                     name: name.into(),
                     source_name: None,
                     mode: ForeignMode::Pure,
-                    binding: Binding {
-                        from: Some("flick:rt".into()),
+                    binding: Binding::Module {
+                        from: "flick:rt".into(),
                         name: name.into(),
                     },
                     stages: vec![false],
@@ -223,6 +225,8 @@ fn check_and_lower(path: &str, source: &str) -> (Typing, flick_ir::Module) {
         thresholds: Thresholds::default(),
         watched: &watched,
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     let (diags, typing) = check_typed(&module, &imported, builtins, options, &mut iface);
     let errors: Vec<_> = diags

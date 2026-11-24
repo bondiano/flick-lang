@@ -10,6 +10,8 @@
 //! - O2a: after `let y = lazy_force l`, a force of the same `l` is `y`: the
 //!   first force returned only once the cell was done, and a done cell
 //!   stays done (L2);
+//! - O3: a `let l = lazy_make t` whose cell does not escape its creating
+//!   fiber/scope becomes `lazy_make_local t`, an unsynchronized cell;
 //! - O4: a pure, loop-invariant `lazy_make (task e)` (or `lazy_done v`)
 //!   inside a loop hoists before the loop, so iterations share one cell.
 
@@ -22,9 +24,11 @@ use crate::ir::{Expr, ExprKind, Lit, Pat, Stmt};
 use flick_ir::{IrType, Lang, TypeRef};
 
 mod hoist;
+mod local;
 mod purity;
 
 pub use hoist::hoist;
+pub use local::localize;
 
 /// Whether `e` names the lang item `item`.
 pub(super) fn is(e: &Expr, item: Lang, lang: &Known<'_>) -> bool {

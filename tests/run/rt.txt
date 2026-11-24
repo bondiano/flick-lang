@@ -13,6 +13,7 @@
 ../rt/wake_chain
 bootstrap/app_fail
 codegen/bigints
+codegen/fixed_width
 bootstrap/debug
 bootstrap/hello
 bootstrap/inline_declarations
@@ -397,6 +398,8 @@ runtime/suspended_std
 runtime/lazy_let
 runtime/lazy_let_state
 runtime/lazy_opt
+runtime/lazy_local
+runtime/lazy_local_concurrent
 effect/result_blocks
 runtime/result_block_causes
 ../rt/result_control_unwind

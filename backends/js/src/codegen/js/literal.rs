@@ -11,6 +11,16 @@ impl<'d> Gen<'_, 'd> {
         match lit {
             Lit::Int(n) if *n < 0 => self.negative(&n.to_string()),
             Lit::Int(n) => self.leaf(&n.to_string()),
+            Lit::Int8(n) if *n < 0 => self.negative(&n.to_string()),
+            Lit::Int8(n) => self.leaf(&n.to_string()),
+            Lit::Int16(n) if *n < 0 => self.negative(&n.to_string()),
+            Lit::Int16(n) => self.leaf(&n.to_string()),
+            Lit::Int64(n) if *n < 0 => self.negative(&format!("{n}n")),
+            Lit::Int64(n) => self.leaf(&format!("{n}n")),
+            Lit::UInt8(n) => self.leaf(&n.to_string()),
+            Lit::UInt16(n) => self.leaf(&n.to_string()),
+            Lit::UInt32(n) => self.leaf(&n.to_string()),
+            Lit::UInt64(n) => self.leaf(&format!("{n}n")),
             // JS globals, never shadowed: generated code reserves both names
             Lit::Float(x) if x.is_nan() => self.leaf("NaN"),
             Lit::Float(x) => {
@@ -18,6 +28,19 @@ impl<'d> Gen<'_, 'd> {
                     "Infinity".to_owned()
                 } else {
                     numeric::float_text(*x)
+                };
+                if x.is_sign_negative() {
+                    self.negative(&format!("-{text}"))
+                } else {
+                    self.leaf(&text)
+                }
+            }
+            Lit::Float32(x) if x.is_nan() => self.leaf("NaN"),
+            Lit::Float32(x) => {
+                let text = if x.is_infinite() {
+                    "Infinity".to_owned()
+                } else {
+                    numeric::float_text(f64::from(*x))
                 };
                 if x.is_sign_negative() {
                     self.negative(&format!("-{text}"))

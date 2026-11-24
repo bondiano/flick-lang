@@ -115,7 +115,6 @@ mod variance;
 mod watched;
 pub mod wire;
 
-use crate::numeric::NumLang;
 pub use crate::syntax::structure::Thresholds;
 pub use applicative_do::{and_keys, group_key, pure_argument};
 pub use bindings::{LetParts, let_parts, signature_name};
@@ -141,7 +140,10 @@ pub use env::{
     Abi, EnumLit, Form, Fundep, Instance, JsClass, ModuleNominalKind, ModuleRequirement,
     ModuleSignature, Rep, TypeDef,
 };
-pub use ffi::{PURE_OVER_CAPABILITY, keeps_for_owner};
+pub use ffi::{
+    AdapterArgKind, AdapterArgSpec, AdapterWordSpec, CORE_FOREIGN_META, CoreForeignMeta,
+    ForeignBackendSpec, PURE_OVER_CAPABILITY, TypeFormAttrSpec, core_foreign_meta, keeps_for_owner,
+};
 pub use gadt::branch::dict_local;
 pub use gadt::scheme::{built, is_indexed, written_dicts};
 pub use generalize::without_value_captures;

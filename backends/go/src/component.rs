@@ -9,9 +9,10 @@ mod optimize;
 mod templates;
 
 use flick_backend::{
-    Abi, Backend, BackendId, BuildRequest, BuildResult, Descriptor, Diagnostic, Environment,
-    EnvironmentServices, Inputs, Mode, NamedRange, OptionDescriptor, Parameter, Profile, Severity,
-    TagAxis, TargetSupport, ValueKind, Verb, VersionRange, command,
+    Abi, AdapterArg, AdapterArgKind, AdapterWord, Backend, BackendId, BuildRequest, BuildResult,
+    Descriptor, Diagnostic, Environment, EnvironmentServices, Inputs, Mode, NamedRange,
+    OptionDescriptor, Parameter, Profile, Severity, TagAxis, TargetSupport, TypeFormAttribute,
+    ValueKind, Verb, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -66,7 +67,7 @@ impl Backend for Go {
                 version: "0.1.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.14.0", "0.15.0"),
+            ir: range("0.17.0", "0.18.0"),
             language: range("0.1.0", "0.2.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
@@ -115,6 +116,33 @@ impl Backend for Go {
                 },
                 services: vec!["Database".into(), "Db".into(), "Server".into()],
             }],
+            foreign_adapters: vec![
+                AdapterWord {
+                    name: "this".into(),
+                    args: vec![],
+                    repeatable: false,
+                    doc: "Pass the first argument as the receiver of a Go method call (`flickrt.CallMethod`).".into(),
+                },
+                AdapterWord {
+                    name: "cancel".into(),
+                    args: vec![AdapterArg {
+                        name: "kind".into(),
+                        kind: AdapterArgKind::Keyword(vec!["context".into(), "signal".into()]),
+                    }],
+                    repeatable: false,
+                    doc: "Receive cancellation via `flickrt.Context` on an `Async` foreign call (`cancel context`; `cancel signal` is accepted for portable bindings).".into(),
+                },
+                AdapterWord {
+                    name: "variadic".into(),
+                    args: vec![],
+                    repeatable: false,
+                    doc: "Spread the last argument (a `List a`) into Go variadic arguments.".into(),
+                },
+            ],
+            type_form_attributes: vec![TypeFormAttribute {
+                name: "go".into(),
+                doc: "Declare the Go type form of a foreign `type` or `service` (`@go \"...\"`, `@go from \"pkg\" \"Name\"`, or `@go none`).".into(),
+            }],
         }
     }
 
@@ -123,7 +151,8 @@ impl Backend for Go {
         request: &BuildRequest,
         inputs: &mut dyn Inputs,
     ) -> Result<TargetSupport, Vec<Diagnostic>> {
-        data::Data::read(request, inputs)?;
+        let data = data::Data::read(request, inputs)?;
+        data.check(request)?;
         Ok(TargetSupport {
             capabilities: vec![],
         })
@@ -135,6 +164,7 @@ impl Backend for Go {
         inputs: &mut dyn Inputs,
     ) -> Result<BuildResult, Vec<Diagnostic>> {
         let data = data::Data::read(request, inputs)?;
+        data.check(request)?;
         emit::generate(request, &data)
     }
 }

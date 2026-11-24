@@ -1,3 +1,5 @@
+// Standalone single-file checking entry point.
+
 /// A file checked on its own takes the path of a module of a project run,
 /// while resolving only built-in imports.
 pub(crate) fn check_file(
@@ -69,6 +71,9 @@ fn check_file_with(
         .as_ref()
         .map_or(sources.get(file).text.as_str(), |e| e.text.as_str());
     modules[0].collect_contract_names(text, &mut all_contracted);
+    let env_ctx = super::environment::EnvironmentContext::standalone();
+    #[cfg(not(target_arch = "wasm32"))]
+    let package_when = BTreeMap::new();
     let checking = Checking {
         modules: &modules,
         sources,
@@ -76,6 +81,11 @@ fn check_file_with(
         from_packages: &from_packages,
         project: None,
         stages_by_class: false,
+        env_ctx: &env_ctx,
+        #[cfg(not(target_arch = "wasm32"))]
+        package_when: &package_when,
+        #[cfg(not(target_arch = "wasm32"))]
+        own_package_when: None,
         lower: false,
         lowered: &[],
         proving: prove_contracts,

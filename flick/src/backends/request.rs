@@ -6,9 +6,9 @@ use std::collections::BTreeMap;
 use std::env;
 
 use flick_backend::{
-    Abi, BackendPin, BuildRequest, Descriptor, Entry, Environment, Input, InputKind, Mode,
-    ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile, RootHandler, Source, Symbol,
-    TargetRequest,
+    Abi, BackendPin, BuildRequest, Descriptor, Entry, Environment, InlineForeign, Input, InputKind,
+    Mode, ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile, RootHandler, Source, Span,
+    Symbol, TargetRequest,
 };
 use std::collections::HashSet;
 
@@ -91,6 +91,41 @@ pub(super) fn program(
     (program, files.into_inner())
 }
 
+pub(super) fn collect_inline_foreign(program: &Program) -> Vec<InlineForeign> {
+    let mut out = Vec::new();
+    for module in &program.modules {
+        for preamble in &module.preambles {
+            out.push(InlineForeign {
+                module: module.name.clone(),
+                name: None,
+                code: preamble.code.clone(),
+                span: Span {
+                    file: preamble.span.file.index(),
+                    start: preamble.span.start,
+                    end: preamble.span.end,
+                },
+            });
+        }
+        for item in &module.items {
+            if let flick_ir::ItemKind::Foreign(foreign) = &item.kind
+                && let flick_ir::Binding::Inline(inline) = &foreign.binding
+            {
+                out.push(InlineForeign {
+                    module: module.name.clone(),
+                    name: Some(foreign.name.clone()),
+                    code: inline.code.clone(),
+                    span: Span {
+                        file: inline.span.file.index(),
+                        start: inline.span.start,
+                        end: inline.span.end,
+                    },
+                });
+            }
+        }
+    }
+    out
+}
+
 impl Prepared {
     pub(super) fn new(
         host: &FsHost,
@@ -124,6 +159,7 @@ impl Prepared {
             &pruned
         };
         let (program, files) = program(sources, compilation, output.stages_by_class);
+        let inline_foreign = collect_inline_foreign(&program);
         let mut data = Self {
             request: BuildRequest {
                 target: target_request,
@@ -155,6 +191,7 @@ impl Prepared {
                     })
                     .collect(),
                 foreign: vec![],
+                inline_foreign,
                 projections: vec![],
                 package_targets: vec![],
                 root_handlers: vec![],

@@ -4,6 +4,7 @@
 
 mod actions;
 mod complete;
+mod complete_foreign;
 mod enrich;
 mod expect;
 mod fields;
@@ -439,6 +440,8 @@ mod companion_tests;
 mod contract_hover_tests;
 #[cfg(test)]
 mod enum_hover_tests;
+#[cfg(all(test, feature = "native-project"))]
+mod foreign_meta_tests;
 #[cfg(test)]
 mod gadt_hover_tests;
 #[cfg(test)]

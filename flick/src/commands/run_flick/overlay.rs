@@ -10,7 +10,10 @@ use flick_core::diagnostics::Diagnostic;
 use flick_core::plugin::{Expander, reach::Outside};
 use flick_core::project::config::BackendEnvironment;
 use flick_core::project::target::Wanted;
-use flick_core::project::{self, BackendTags, Foreign, Host, Project};
+use flick_core::project::{
+    self, BackendTags, Compilation, Foreign, Host, Project, ResolvedEnvironment,
+};
+use flick_core::source::SourceMap;
 
 use crate::sources::FsHost;
 
@@ -101,5 +104,17 @@ impl Host for OverlayHost<'_> {
 
     fn loads_backends(&self) -> bool {
         self.base.loads_backends()
+    }
+
+    fn check_target(
+        &self,
+        project: &Project,
+        compilation: &Compilation,
+        sources: &SourceMap,
+        environment: &ResolvedEnvironment,
+        stages_by_class: bool,
+    ) -> Vec<Diagnostic> {
+        self.base
+            .check_target(project, compilation, sources, environment, stages_by_class)
     }
 }

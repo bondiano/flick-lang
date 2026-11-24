@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 use super::{
     ArbitraryIntrinsic, AsyncIntrinsic, BigDecimalIntrinsic, BigIntIntrinsic, BytesIntrinsic,
     ConfigIntrinsic, CronIntrinsic, CryptoIntrinsic, DateTimeIntrinsic, DebugIntrinsic,
-    DurationIntrinsic, FloatIntrinsic, GenIntrinsic, GraphIntrinsic, HashIntrinsic, IntIntrinsic,
-    JsonIntrinsic, JsonSchemaIntrinsic, LayerIntrinsic, ListIntrinsic, OutcomeIntrinsic,
-    PathIntrinsic, RecordIntrinsic, RegExpIntrinsic, SchemaIntrinsic, StringIntrinsic,
+    DurationIntrinsic, FixedWidthIntrinsic, FloatIntrinsic, GenIntrinsic, GraphIntrinsic,
+    HashIntrinsic, IntIntrinsic, JsonIntrinsic, JsonSchemaIntrinsic, LayerIntrinsic, ListIntrinsic,
+    OutcomeIntrinsic, PathIntrinsic, RecordIntrinsic, RegExpIntrinsic, SchemaIntrinsic,
+    StringIntrinsic,
 };
 
 /// Platform-independent operations whose host bindings have a known
@@ -72,6 +73,8 @@ pub enum Intrinsic {
     ListRange,
     /// Allocates a single-flight `Lazy r e a` cell from a delayed task.
     LazyMake,
+    /// Allocates an unsynchronized fiber-local `Lazy r e a` cell (O3) from a delayed task.
+    LazyMakeLocal,
     /// Forces a `Lazy r e a` cell once, caching Ok/Err and dropping the task on completion.
     LazyForce,
     /// Registers a LIFO `Eff r none Unit` finalizer on the current owner.
@@ -103,6 +106,8 @@ pub enum Intrinsic {
     ExitHasInterrupts,
     /// Pure `Int` primitives (`packages/core/src/Int.fl`).
     Int(IntIntrinsic),
+    /// Pure fixed-width integer and binary32 float primitives (`flick:rt`).
+    FixedWidth(FixedWidthIntrinsic),
     /// Pure `Float` / `Math` / `Number` primitives (`packages/core/src/Float.fl`).
     Float(FloatIntrinsic),
     /// Pure `BigInt` primitives (`packages/std/src/BigInt.fl`).

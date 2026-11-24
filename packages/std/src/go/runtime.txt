@@ -203,9 +203,30 @@ refSet RefSet
 refModify *RefModify
 awaitEff *Run
 lazyMake LazyMake
+lazyMakeLocal LazyMakeLocal
 lazyForce *LazyForce
 lazyDone LazyDone
 stringFromNumber StringFromNumber
+showInt64 ShowInt64(int64) string
+showUInt64 ShowUInt64(uint64) string
+toInt8 ToInt8
+toInt16 ToInt16
+toInt32 ToInt32
+toInt64 ToInt64
+toUInt8 ToUInt8
+toUInt16 ToUInt16
+toUInt32 ToUInt32
+toUInt64 ToUInt64
+toFloat32 ToFloat32
+toFloat64 ToFloat64
+toBigInt ToBigInt
+int64BitAnd Int64BitAnd(int64, int64) int64
+int64BitOr Int64BitOr(int64, int64) int64
+int64BitXor Int64BitXor(int64, int64) int64
+int64BitNot Int64BitNot(int64) int64
+int64ShiftLeft Int64ShiftLeft(int64, int32) int64
+int64ShiftRight Int64ShiftRight(int64, int32) int64
+int64ShiftRightUnsigned Int64ShiftRightUnsigned(int64, int32) int64
 intParse IntParse
 intFromFloat IntFromFloat
 intTruncate IntTruncate(float64) int32

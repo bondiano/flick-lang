@@ -22,6 +22,7 @@ fn is_metered_primitive(kind: Intrinsic) -> bool {
             | Intrinsic::ExitIsFailure
             | Intrinsic::ExitHasInterrupts
             | Intrinsic::Int(_)
+            | Intrinsic::FixedWidth(_)
             | Intrinsic::Float(_)
             | Intrinsic::BigInt(_)
             | Intrinsic::String(_)

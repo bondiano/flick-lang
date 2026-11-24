@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { type Exit, type OpInstall, type Run, currentCtx, die, fail, fork, handle, hasInterrupts, operation, raise, service } from "../src/rt/kernel.ts";
-import { lazyForce, lazyMake } from "../src/rt/effect/Lazy.ts";
+import { lazyForce, lazyMake, lazyMakeLocal } from "../src/rt/effect/Lazy.ts";
 import { root, sleep } from "./rt-support.ts";
 
 /** A fiber of `task` and how it ends. */
@@ -108,4 +108,93 @@ test("the initializer runs with the handlers of the fiber that forces it", async
   const cell = lazyMake(() => ask(undefined));
   const exit = await root(() => handle([[Ask, arms]], () => lazyForce(cell), undefined, undefined));
   assert.equal(exit.value, "forcer");
+});
+
+test("lazyMakeLocal caches values, typed failures, and defects and releases task on Pending -> Running", async () => {
+  let runs = 0;
+  let taskDuringRun: unknown = "unset";
+  const okCell = lazyMakeLocal(function* (): Run {
+    runs++;
+    taskDuringRun = okCell.task;
+    yield sleep(0);
+    return 42;
+  });
+  assert.notEqual(okCell.task, undefined);
+  assert.equal((await root(() => lazyForce(okCell))).value, 42);
+  assert.equal(taskDuringRun, undefined);
+  assert.equal(okCell.task, undefined);
+  assert.equal((await root(() => lazyForce(okCell))).value, 42);
+  assert.equal(runs, 1);
+
+  let failRuns = 0;
+  const error = { message: "local-failed" };
+  const failCell = lazyMakeLocal(function* (): Run {
+    failRuns++;
+    yield sleep(0);
+    return raise(fail(error));
+  });
+  assert.deepEqual((await root(() => lazyForce(failCell))).cause, fail(error));
+  assert.deepEqual((await root(() => lazyForce(failCell))).cause, fail(error));
+  assert.equal(failRuns, 1);
+  assert.equal(failCell.task, undefined);
+
+  let dieRuns = 0;
+  const dieCell = lazyMakeLocal(function* (): Run {
+    dieRuns++;
+    yield sleep(0);
+    return raise(die("local-boom"));
+  });
+  assert.deepEqual((await root(() => lazyForce(dieCell))).cause, die("local-boom"));
+  assert.deepEqual((await root(() => lazyForce(dieCell))).cause, die("local-boom"));
+  assert.equal(dieRuns, 1);
+  assert.equal(dieCell.task, undefined);
+});
+
+test("lazyMakeLocal self-force is a cached defect (R9(e))", async () => {
+  let runs = 0;
+  const cell = lazyMakeLocal(function* (): Run {
+    runs++;
+    return yield lazyForce(cell);
+  });
+  assert.equal(message(await root(() => lazyForce(cell))), "lazy forced during its own initialization");
+  assert.equal(message(await root(() => lazyForce(cell))), "lazy forced during its own initialization");
+  assert.equal(runs, 1);
+  assert.equal(cell.task, undefined);
+});
+
+test("lazyMakeLocal resets to Pending on interruption and on handler abort", async () => {
+  let intRuns = 0;
+  const intCell = lazyMakeLocal(function* (): Run {
+    const run = ++intRuns;
+    yield sleep(20);
+    return run;
+  });
+  const owner = start(() => lazyForce(intCell));
+  await later(5);
+  owner.fiber.interrupt(99);
+  const ownerExit = await owner.exit;
+  assert.ok(ownerExit.cause !== undefined && hasInterrupts(ownerExit.cause));
+  assert.notEqual(intCell.task, undefined);
+  assert.equal((await root(() => lazyForce(intCell))).value, 2);
+  assert.equal((await root(() => lazyForce(intCell))).value, 2);
+  assert.equal(intRuns, 2);
+  assert.equal(intCell.task, undefined);
+
+  const Stop = service("Test.LocalLazyStop");
+  const stop = operation(Stop, "stop", 1) as (s: string) => unknown;
+  const stopArms: ReadonlyArray<OpInstall> = [["stop", (s: unknown) => s, "abort", 0, 1]];
+  let abortRuns = 0;
+  const abortCell = lazyMakeLocal(function* (): Run {
+    const run = ++abortRuns;
+    if (run === 1) return yield stop("stopped");
+    return 77;
+  });
+  const first = await root(() => handle([[Stop, stopArms]], () => lazyForce(abortCell), undefined, undefined));
+  assert.equal(first.value, "stopped");
+  assert.notEqual(abortCell.task, undefined);
+  const second = await root(() => handle([[Stop, stopArms]], () => lazyForce(abortCell), undefined, undefined));
+  assert.equal(second.value, 77);
+  assert.equal((await root(() => lazyForce(abortCell))).value, 77);
+  assert.equal(abortRuns, 2);
+  assert.equal(abortCell.task, undefined);
 });

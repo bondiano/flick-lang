@@ -135,10 +135,19 @@ pub fn js_parts(
         .map(|(phase, items)| {
             let physical =
                 phase.map_or_else(|| module.name.clone(), |id| prefix_key(&module.name, id));
+            let needs_preambles = phase.is_none()
+                || items
+                    .iter()
+                    .any(|item| matches!(&item.kind, ItemKind::Foreign(f) if f.binding.inline().is_some()));
             let part = Module {
                 name: module.name.clone(),
                 types: module.types.clone(),
                 items,
+                preambles: if needs_preambles {
+                    module.preambles.clone()
+                } else {
+                    Vec::new()
+                },
                 labels: module.labels.clone(),
                 initialization: module.initialization.clone(),
                 records: module.records.clone(),

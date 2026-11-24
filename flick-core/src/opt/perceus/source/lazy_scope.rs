@@ -7,10 +7,9 @@ use super::{Code, Env, Intrinsic, Local, Lower, LowerError, Operation, Span};
 
 pub(super) fn has_standard_shape(value: &Foreign) -> bool {
     value.catch.is_none()
-        && !value.adapter.receiver
-        && !value.adapter.cancel
+        && value.adapter.words.is_empty()
         && value.adapter.optional.is_empty()
-        && !value.adapter.variadic
+        && value.adapter.owned.is_empty()
         && !value.adapter.result.nullable
 }
 
@@ -24,18 +23,22 @@ impl Lower<'_> {
         if !has_standard_shape(value) {
             return None;
         }
-        let from = value.binding.from.as_deref()?;
-        let name = value.binding.name.as_str();
+        let from = value.binding.from()?;
+        let name = value.binding.export_name().unwrap_or("");
         match (from, name, value.mode, value.dicts, value.arity) {
             ("flick:rt", "awaitEff", ForeignMode::Effect, 0, 1) => {
                 let b = ExprBuilder::new(span, "$awaitEff");
                 let function = b.lam(&["task"], b.await_(b.loc("task")));
                 Some(self.expr(&function, &Env::new(), block))
             }
-            // `Prelude.lazy_make : Detached r => (Eff r e a)^c ->{} Lazy r e a`
-            // (`Detached` is an erased marker class with 0 runtime dictionaries.)
+            // `Prelude.lazy_make : NoControl r => (Eff r e a)^c ->{} Lazy r e a`
+            // (`NoControl` is an erased marker class with 0 runtime dictionaries.)
             ("flick:rt", "lazyMake", ForeignMode::Effect, 0, 1) => {
                 Some(self.intrinsic(Intrinsic::LazyMake, false, vec![], block, span))
+            }
+            // `Prelude.lazy_make_local : NoControl r => (Eff r e a)^c ->{} Lazy r e a`
+            ("flick:rt", "lazyMakeLocal", ForeignMode::Effect, 0, 1) => {
+                Some(self.intrinsic(Intrinsic::LazyMakeLocal, false, vec![], block, span))
             }
             // `Prelude.lazy_force` / `Prelude.lazy_read`
             ("flick:rt", "lazyForce", ForeignMode::Effect, 0, 1) => {

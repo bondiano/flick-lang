@@ -1,6 +1,8 @@
 //! Backend package selection at the common build boundary.
 
 #[cfg(feature = "wasm-backends")]
+mod check_target;
+#[cfg(feature = "wasm-backends")]
 mod component;
 #[cfg(feature = "wasm-backends")]
 mod execute;
@@ -21,6 +23,8 @@ mod runtimes;
 mod scaffold;
 #[cfg(feature = "wasm-backends")]
 mod tools;
+#[cfg(feature = "wasm-backends")]
+pub(crate) use check_target::check_target_for_project;
 #[cfg(feature = "wasm-backends")]
 pub(crate) use component::Package;
 #[cfg(feature = "wasm-backends")]

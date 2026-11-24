@@ -29,7 +29,7 @@ use super::ty::Type;
 use super::unify::Unified;
 use crate::iface::{Entity, Namespace};
 use crate::logic::RULES;
-use crate::numeric::{Num, NumLang};
+use crate::numeric::Num;
 use crate::source::Span;
 use solve::{bare, fields};
 

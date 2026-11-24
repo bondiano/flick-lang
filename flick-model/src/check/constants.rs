@@ -232,7 +232,10 @@ fn num(n: Num) -> Type {
 }
 
 /// The types `<`, `<=`, `>`, `>=` order (§1.5).
-const ORDERED: [&str; 4] = ["Int", "Float", "BigInt", "String"];
+const ORDERED: [&str; 12] = [
+    "Int", "Int8", "Int16", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Float32",
+    "BigInt", "String",
+];
 
 impl Checker<'_> {
     /// An operand of an ordering comparison: one of `ORDERED`, `Int` when

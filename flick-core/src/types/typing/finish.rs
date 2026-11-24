@@ -40,6 +40,8 @@ impl Checker<'_> {
         #[cfg(not(target_arch = "wasm32"))]
         if !self.skip_ir_types {
             self.finish_ir_types(&mut typing, context.ir_lookup);
+        } else if !typing.foreigns.is_empty() {
+            self.finish_foreign_ir_types(&mut typing, context.ir_lookup);
         }
         #[cfg(feature = "ide")]
         {

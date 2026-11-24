@@ -102,6 +102,8 @@ fn consumer(interface: &Interface, text: &str) -> Vec<Diagnostic> {
             thresholds: types::Thresholds::default(),
             watched: types::Watched::none(),
             stages_by_class: false,
+            foreign_backend: types::ForeignBackendSpec::default_js(),
+            validate_foreign_metadata: true,
         },
         &mut checked,
     ));

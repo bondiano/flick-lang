@@ -43,6 +43,7 @@ pub mod memory_language;
 pub mod memory_layer_merge;
 pub mod memory_layers;
 pub mod memory_lexical_owners;
+pub mod memory_literals;
 pub mod memory_m2_arenas;
 pub mod memory_m2_host_bridge;
 pub mod memory_m2_signals;

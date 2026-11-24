@@ -461,8 +461,8 @@ fn dict_numeric_type(dict: &Dict, lang: &Known<'_>) -> Option<TypeRef> {
         return None;
     };
     let suffix = name.rsplit(' ').next()?;
-    for role in [Lang::Int, Lang::Float, Lang::BigInt] {
-        if let Some((module, ty_name)) = lang.get(role)
+    for num in Num::ALL {
+        if let Some((module, ty_name)) = lang.get(num.lang())
             && ty_name == suffix
         {
             return Some(TypeRef::new(IrType::Named {
@@ -490,14 +490,9 @@ pub(super) fn numeric_method(
         .into_iter()
         .find(|&m| lang.get(m).is_some_and(|(_, n)| n == name))?;
     let suffix = instance.rsplit(' ').next()?;
-    let number = [
-        (Num::Int, Lang::Int),
-        (Num::Float, Lang::Float),
-        (Num::BigInt, Lang::BigInt),
-    ]
-    .into_iter()
-    .find(|(_, role)| lang.get(*role).is_some_and(|(_, n)| n == suffix))?
-    .0;
+    let number = Num::ALL
+        .into_iter()
+        .find(|num| lang.get(num.lang()).is_some_and(|(_, n)| n == suffix))?;
     Some((number, method))
 }
 
@@ -538,15 +533,30 @@ pub(super) fn binary(method: Lang, num: Num) -> Option<BinOp> {
 }
 
 /// `from_int` or `from_float` of a literal, as a literal of the type.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss,
+    reason = "from_int wraps for fixed-width integers and rounds once for Float32"
+)]
 fn literal(num: Num, arg: &Expr) -> Option<ExprKind> {
     let ExprKind::Lit(lit) = &arg.kind else {
         return None;
     };
     Some(ExprKind::Lit(match (num, lit) {
         (Num::Int, Lit::Int(n)) => Lit::Int(*n),
+        (Num::Int8, Lit::Int(n)) => Lit::Int8(*n as i8),
+        (Num::Int16, Lit::Int(n)) => Lit::Int16(*n as i16),
+        (Num::Int64, Lit::Int(n)) => Lit::Int64(i64::from(*n)),
+        (Num::UInt8, Lit::Int(n)) => Lit::UInt8(*n as u8),
+        (Num::UInt16, Lit::Int(n)) => Lit::UInt16(*n as u16),
+        (Num::UInt32, Lit::Int(n)) => Lit::UInt32(*n as u32),
+        (Num::UInt64, Lit::Int(n)) => Lit::UInt64(i64::from(*n) as u64),
         (Num::Float, Lit::Int(n)) => Lit::Float((*n).into()),
+        (Num::Float32, Lit::Int(n)) => Lit::Float32(*n as f32),
         (Num::BigInt, Lit::Int(n)) => Lit::BigInt(n.to_string()),
         (Num::Float, Lit::Float(x)) => Lit::Float(*x),
+        (Num::Float32, Lit::Float(x)) => Lit::Float32(*x as f32),
         _ => return None,
     }))
 }

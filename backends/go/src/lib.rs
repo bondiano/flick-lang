@@ -3,6 +3,8 @@
 //! an executable of.
 
 pub mod codegen;
+pub mod foreign_meta;
+pub mod inline;
 
 #[cfg(feature = "component")]
 mod component;

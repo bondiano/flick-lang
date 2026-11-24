@@ -7,8 +7,7 @@ use crate::{
 use flick_ir::{Adapter, Constructor, Copies, Foreign, ForeignMode, Rep, ResultAdapter, Shape};
 
 fn supports(value: &Foreign) -> bool {
-    value.binding.from.as_deref() == Some("flick:rt")
-        && value.binding.name == "resultMap2"
+    value.binding.module_export() == Some(("flick:rt", "resultMap2"))
         && value.mode == ForeignMode::Pure
         && value.arity == 3
         && value.dicts == 0
@@ -16,10 +15,8 @@ fn supports(value: &Foreign) -> bool {
         && value.catch.is_none()
         && value.adapter
             == Adapter {
-                receiver: false,
-                cancel: false,
                 optional: vec![],
-                variadic: false,
+                owned: vec![],
                 result: ResultAdapter {
                     nullable: false,
                     unit: false,
@@ -36,6 +33,7 @@ fn supports(value: &Foreign) -> bool {
                     Shape::Result(Box::new(Shape::Data), Box::new(Shape::Data)),
                 ],
                 result_shape: Shape::Result(Box::new(Shape::Data), Box::new(Shape::Data)),
+                words: vec![],
             }
 }
 
@@ -131,8 +129,18 @@ mod tests {
     type Mutation = Box<dyn Fn(&mut Foreign)>;
     fn mutations() -> Vec<Mutation> {
         let mut changes: Vec<Mutation> = vec![
-            Box::new(|v| v.binding.from = None),
-            Box::new(|v| v.binding.name.push('!')),
+            Box::new(|v| {
+                v.binding = flick_ir::Binding::Global {
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            }),
+            Box::new(|v| {
+                if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                    &mut v.binding
+                {
+                    name.push('!');
+                }
+            }),
             Box::new(|v| v.mode = ForeignMode::Sync),
             Box::new(|v| v.mode = ForeignMode::Async),
             Box::new(|v| v.mode = ForeignMode::Effect),
@@ -148,10 +156,28 @@ mod tests {
                     Span::new(FileId::new(0), 0, 0),
                 ));
             }),
-            Box::new(|v| v.adapter.receiver = true),
-            Box::new(|v| v.adapter.cancel = true),
+            Box::new(|v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "this".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            }),
+            Box::new(|v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "cancel".into(),
+                    args: vec![flick_ir::AdapterArg::Word("signal".into())],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            }),
             Box::new(|v| v.adapter.optional.push(0)),
-            Box::new(|v| v.adapter.variadic = true),
+            Box::new(|v| {
+                v.adapter.words.push(flick_ir::BackendAdapter {
+                    name: "variadic".into(),
+                    args: vec![],
+                    span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+                });
+            }),
             Box::new(|v| v.adapter.result.nullable = true),
             Box::new(|v| v.adapter.result.unit = true),
             Box::new(|v| v.adapter.callbacks.clear()),

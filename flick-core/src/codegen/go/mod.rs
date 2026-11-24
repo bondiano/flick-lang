@@ -14,9 +14,13 @@ mod foreign_tests;
 #[cfg(test)]
 mod loops_tests;
 #[cfg(test)]
+mod option_tests;
+#[cfg(test)]
 mod own_tests;
 #[cfg(test)]
 mod perform_tests;
+#[cfg(test)]
+mod scalar_fields_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]

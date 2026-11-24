@@ -235,7 +235,47 @@ func RemFloat(a, b float64) float64 { return math.Mod(a, b) }
 // EqFloat is `==` on Floats: NaN equals NaN, as Flick's equality has it.
 func EqFloat(a, b float64) bool { return a == b || a != a && b != b }
 
+// EqualFloat is structural float equality: SameValue when strictZero is true,
+// SameValueZero otherwise.
+func EqualFloat(a, b float64, strictZero bool) bool {
+	if strictZero {
+		return NumberSameValue(a, b)
+	}
+	return a == b || a != a && b != b
+}
+
 func AsInt(v Value) int32     { return v.(int32) }
 func AsFloat(v Value) float64 { return v.(float64) }
 func AsBool(v Value) bool     { return v.(bool) }
 func AsString(v Value) string { return v.(string) }
+
+// FieldInt, FieldFloat, FieldBool and FieldString unbox a constructor field at
+// a dynamic value boundary. A nil argument yields the zero value because
+// `tagOf` calls a constructor value with nil arguments to read its tag.
+func FieldInt(v Value) int32 {
+	if v == nil {
+		return 0
+	}
+	return v.(int32)
+}
+
+func FieldFloat(v Value) float64 {
+	if v == nil {
+		return 0
+	}
+	return v.(float64)
+}
+
+func FieldBool(v Value) bool {
+	if v == nil {
+		return false
+	}
+	return v.(bool)
+}
+
+func FieldString(v Value) string {
+	if v == nil {
+		return ""
+	}
+	return v.(string)
+}

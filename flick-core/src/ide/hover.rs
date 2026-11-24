@@ -19,6 +19,7 @@ mod attributes_tests;
 pub(super) mod companions;
 mod defer;
 mod exposing;
+mod foreign;
 mod keywords;
 mod kinds;
 mod operators;
@@ -189,6 +190,9 @@ impl Ide<'_> {
     /// Markdown for the symbol at `offset`, and the range it covers.
     pub fn hover(&self, file: FileId, offset: u32) -> Option<(String, (u32, u32))> {
         if let Some(hover) = self.attribute_hover(file, offset) {
+            return Some(hover);
+        }
+        if let Some(hover) = self.foreign_meta_hover(file, offset) {
             return Some(hover);
         }
         if let Some(hover) = self.kind_hover(file, offset) {

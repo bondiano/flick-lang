@@ -175,8 +175,11 @@ impl Expr {
 }
 
 impl Module {
-    /// Calls `f` on the span of every item and expression.
+    /// Calls `f` on the span of every item, preamble, and expression.
     pub fn each_span_mut(&mut self, f: &mut dyn FnMut(&mut Span)) {
+        for preamble in &mut self.preambles {
+            f(&mut preamble.span);
+        }
         for item in &mut self.items {
             f(&mut item.span);
             match &mut item.kind {
@@ -189,6 +192,12 @@ impl Module {
                     }
                 }
                 ItemKind::Foreign(foreign) => {
+                    if let crate::Binding::Inline(inline) = &mut foreign.binding {
+                        f(&mut inline.span);
+                    }
+                    for word in &mut foreign.adapter.words {
+                        f(&mut word.span);
+                    }
                     if let Some(catch) = &mut foreign.catch {
                         catch.each_span_mut(f);
                     }

@@ -10,11 +10,13 @@ use flick_ir::{
 
 pub const TEXT: &str = "let main () = ()\n";
 
+#[allow(clippy::too_many_lines)]
 pub fn request() -> BuildRequest {
     let span = flick_ir::Span::new(FileId::new(0), 0, 16);
     let module = Module {
         name: "App".into(),
         types: vec![],
+        preambles: vec![],
         items: vec![Item {
             kind: ItemKind::Value {
                 name: "main".into(),
@@ -97,6 +99,7 @@ pub fn request() -> BuildRequest {
         }],
         test_roots: vec![],
         foreign: vec![],
+        inline_foreign: vec![],
         projections: vec![],
         package_targets: vec![],
         root_handlers: vec![],
@@ -120,7 +123,7 @@ pub fn descriptor() -> Descriptor {
     Descriptor {
         identity: request().backend.identity,
         backend_api: range("0.1.0", "0.2.0"),
-        ir: range("0.14.0", "0.15.0"),
+        ir: range("0.17.0", "0.18.0"),
         language: range("0.1.0", "0.2.0"),
         runtime_abis: vec![NamedRange {
             name: "flickrt".into(),
@@ -140,6 +143,8 @@ pub fn descriptor() -> Descriptor {
         foreign_extension: None,
         foreign_suffixes: vec![],
         handled_services: vec![],
+        foreign_adapters: vec![],
+        type_form_attributes: vec![],
     }
 }
 

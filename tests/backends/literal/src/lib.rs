@@ -2,6 +2,7 @@
 //! The same implementation is exercised natively and as a component.
 
 mod commands;
+mod foreign;
 mod launches;
 mod packages;
 mod steps;
@@ -87,6 +88,14 @@ fn is_inspect(request: &BuildRequest) -> bool {
         .options
         .iter()
         .any(|o| o.key == "command" && o.value == "inspect")
+}
+
+fn is_check(request: &BuildRequest) -> bool {
+    request
+        .target
+        .options
+        .iter()
+        .any(|o| o.key == "command" && o.value == "check")
 }
 
 fn selected(request: &BuildRequest, module: &str) -> bool {
@@ -182,7 +191,7 @@ impl Backend for Literal {
                 version: "1.0.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.14.0", "0.15.0"),
+            ir: range("0.17.0", "0.18.0"),
             language: range("0.1.0", "0.2.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
@@ -224,13 +233,15 @@ impl Backend for Literal {
                 },
                 services: vec!["Database".into(), "Db".into(), "Server".into()],
             }],
+            foreign_adapters: foreign::foreign_adapters(),
+            type_form_attributes: foreign::type_form_attributes(),
         }
     }
 
     fn check_target(
         &self,
         request: &BuildRequest,
-        _: &mut dyn Inputs,
+        inputs: &mut dyn Inputs,
     ) -> Result<TargetSupport, Vec<Diagnostic>> {
         if case(request) == "refuse-warning" {
             let mut refusal = diagnostic("intentional warning-only refusal", None);
@@ -242,13 +253,19 @@ impl Backend for Literal {
         }
         let program =
             Program::from_cbor(&request.program).map_err(|e| diagnostic(&e.to_string(), None))?;
+        foreign::validate_foreigns(&program, request, inputs)?;
+        if is_check(request) {
+            return Ok(TargetSupport {
+                capabilities: self.describe().capabilities,
+            });
+        }
         if case(request) == "typed-ir" {
             typed_ir::validate_program(&program, request)?;
             return Ok(TargetSupport {
                 capabilities: self.describe().capabilities,
             });
         }
-        if request.target.host_package.is_none() && case(request) != "env" {
+        if request.target.host_package.is_none() && !matches!(case(request), "env" | "foreign") {
             for module in &program.modules {
                 if !request
                     .modules
@@ -386,6 +403,9 @@ fn apply_case_artifacts(
         }
         "path" => artifacts[0].path = "../outside.js".into(),
         "duplicate" => artifacts.push(artifacts[0].clone()),
+        "foreign" if !request.inline_foreign.is_empty() => {
+            artifacts.push(foreign::inline_report(request));
+        }
         _ => {}
     }
     Ok(())

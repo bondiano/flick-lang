@@ -5,7 +5,6 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io;
-use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -57,9 +56,10 @@ use crate::iface::{
 use crate::ir;
 use crate::plugin::EditorBlock;
 use crate::plugin::expansion::Expansion;
-use crate::resolve::{self, Interface, ModuleSyntax};
+use crate::resolve::{Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
-use crate::syntax::{self, Parse};
+use crate::syntax::Parse;
+#[cfg(feature = "ide")]
 use crate::types;
 use files::expected_name;
 use precompiled::Precompiled;
@@ -138,6 +138,8 @@ struct Output {
     fresh: Vec<Fresh>,
     #[cfg(feature = "ide")]
     analyzed: Vec<Analyzed>,
+    #[cfg(feature = "ide")]
+    foreign_backend: types::ForeignBackendSpec,
 }
 
 struct Loader<'a> {
@@ -148,6 +150,12 @@ struct Loader<'a> {
     project: Option<&'a Project>,
     /// The mode every module of the run and the built-in modules are checked in.
     stages_by_class: bool,
+    /// Resolved environment context, including active and known backend foreign metadata.
+    env_ctx: &'a environment::EnvironmentContext,
+    #[cfg(not(target_arch = "wasm32"))]
+    package_when: &'a BTreeMap<String, String>,
+    #[cfg(not(target_arch = "wasm32"))]
+    own_package_when: Option<&'a str>,
     #[cfg(feature = "native-project")]
     packages: Packages,
     modules: Vec<Loaded>,
@@ -263,6 +271,8 @@ fn run_in(
     // a selected target or environment also needs IR for reachable-use preflight
     let check_only = matches!(mode, Mode::Check | Mode::Prove);
     let lower_packages_only = check_only && saved.is_some() && !environment_preflight;
+    #[cfg(feature = "ide")]
+    let ide_foreign_backend = env_ctx.foreign_backend.clone();
     let mut loader = Loader {
         expression_serial: 0,
         expressions_active: BTreeSet::new(),
@@ -270,6 +280,11 @@ fn run_in(
         sources,
         project,
         stages_by_class,
+        env_ctx: &env_ctx,
+        #[cfg(not(target_arch = "wasm32"))]
+        package_when: &package_when,
+        #[cfg(not(target_arch = "wasm32"))]
+        own_package_when: own_package_when.as_ref().map(|(_, cond)| cond.as_str()),
         #[cfg(feature = "native-project")]
         packages,
         modules: Vec::new(),
@@ -352,6 +367,7 @@ fn run_in(
                         ir::Module {
                             name: m.name.clone(),
                             items: Vec::new(),
+                            preambles: Vec::new(),
                             labels: BTreeMap::new(),
                             initialization: flick_ir::Initialization::default(),
                             types: Vec::new(),
@@ -434,47 +450,7 @@ fn run_in(
         fresh,
         #[cfg(feature = "ide")]
         analyzed,
-    }
-}
-
-impl Loader<'_> {
-    /// The interfaces of the built-in modules, in the mode of this run.
-    fn builtins(&self) -> &'static [Interface] {
-        types::builtins_of(self.stages_by_class)
-    }
-
-    /// The diagnostics of the run without the warnings it does not report:
-    /// those the project allows, and those of source packages, whose
-    /// dependent does not answer for them.
-    fn reported(&mut self) -> Vec<Diagnostic> {
-        let package_files: Vec<FileId> = self
-            .modules
-            .iter()
-            .filter(|m| matches!(m.root, Root::Package(_)))
-            .map(|m| m.file)
-            .collect();
-        let allowed = self.project.map(|p| &p.config.allow);
-        let mut diagnostics = mem::take(&mut self.diagnostics);
-        diagnostics.retain(|d| {
-            d.severity != Severity::Warning
-                || (d.span.is_none_or(|s| !package_files.contains(&s.file))
-                    && allowed.is_none_or(|a| !a.contains(&d.code)))
-        });
-        diagnostics
-    }
-
-    /// The parse of a module, from an earlier run while its text stays the same.
-    fn parsed(&mut self, path: &Path, file: FileId) -> (Arc<Parse>, Arc<ModuleSyntax>) {
-        let text = &self.sources.get(file).text;
-        if let Some(found) = self.cache.as_ref().and_then(|c| c.parsed(path, file, text)) {
-            return found;
-        }
-        let parse = Arc::new(syntax::parse(text, file).into_module());
-        let module = Arc::new(resolve::module_syntax(&parse.tree, text, file));
-        if let Some(cache) = &mut self.cache {
-            let parsed = (parse.clone(), module.clone());
-            cache.keep_parsed(path, file, text, parsed);
-        }
-        (parse, module)
+        #[cfg(feature = "ide")]
+        foreign_backend: ide_foreign_backend,
     }
 }

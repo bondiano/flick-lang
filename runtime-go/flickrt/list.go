@@ -69,8 +69,8 @@ func ListFilter(fb *Fiber, p, xs Value) Value {
 func ListFilterMap(fb *Fiber, f, xs Value) Value {
 	out := []Value{}
 	for _, x := range List(xs) {
-		if o := Apply(fb, f, x).(*Data); o.Tag == "Some" {
-			out = append(out, o.Fields()[0])
+		if o := Apply(fb, f, x); IsSome(o) {
+			out = append(out, UnwrapSome(o))
 		}
 	}
 	return out
@@ -97,9 +97,8 @@ func ListMap2(fb *Fiber, f, xs, ys Value) Value {
 }
 
 func OptionMap2(fb *Fiber, f, x, y Value) Value {
-	a, b := x.(*Data), y.(*Data)
-	if a.Tag == "Some" && b.Tag == "Some" {
-		return Some(Apply2(fb, f, a.Fields()[0], b.Fields()[0]))
+	if IsSome(x) && IsSome(y) {
+		return Some(Apply2(fb, f, UnwrapSome(x), UnwrapSome(y)))
 	}
 	return None
 }

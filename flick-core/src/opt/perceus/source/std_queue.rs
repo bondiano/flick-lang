@@ -26,11 +26,15 @@ impl Lower<'_> {
         if value.dicts != 0 || value.mode != ForeignMode::Effect || !has_standard_shape(value) {
             return None;
         }
-        if value.binding.from.as_deref()? != "flick:Queue" {
+        if value.binding.from()? != "flick:Queue" {
             return None;
         }
         let b = ExprBuilder::new(span, "$q");
-        let expr = queue_template(&b, value.binding.name.as_str(), value.stages.len())?;
+        let expr = queue_template(
+            &b,
+            value.binding.export_name().unwrap_or(""),
+            value.stages.len(),
+        )?;
         Some(self.expr(&expr, &Env::new(), block))
     }
 }

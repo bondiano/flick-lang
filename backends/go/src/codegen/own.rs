@@ -20,10 +20,12 @@
 //! modules and declared, in Go, once.
 
 use std::collections::{BTreeMap, HashMap};
-use std::fmt::Write;
+use std::fmt::{self, Write};
 
+use flick_backend_support::Known;
 use flick_pretty::{Document, docvec};
 
+use super::arith::Native;
 use super::layout::{Code, call};
 use super::{Gen, names};
 use flick_ir::{Constructor, Rep};
@@ -34,10 +36,28 @@ use flick_ir::{Expr, ExprKind, Module};
 pub(super) enum Held {
     /// No fields: a zero-size value `T{}`.
     Zero,
-    /// So many fields, each a value.
-    Fields(usize),
+    /// Fields in declaration order: `Some(native)` is stored unboxed in its
+    /// Go scalar type; `None` stays `flickrt.Value`. When every slot is `None`,
+    /// the struct keeps `[N]flickrt.Value` for zero-copy `Fields()`.
+    Fields(Vec<Option<Native>>),
     /// One field: a record of these labels, which lies in the value.
     Record(Vec<String>),
+}
+
+impl Held {
+    /// Whether this constructor unboxes at least one field into a native Go
+    /// scalar type (`int32`, `float64`, `bool`, or `string`).
+    pub(super) fn has_scalars(&self) -> bool {
+        matches!(self, Held::Fields(slots) if slots.iter().any(Option::is_some))
+    }
+
+    /// The native Go scalar type of field `i`, if it is unboxed.
+    pub(super) fn field_native(&self, i: usize) -> Option<Native> {
+        match self {
+            Held::Fields(slots) => slots.get(i).copied().flatten(),
+            Held::Zero | Held::Record(_) => None,
+        }
+    }
 }
 
 /// The Go types a module's code names, each with its tag and its fields.
@@ -46,6 +66,31 @@ pub(super) type Owned = BTreeMap<String, (String, Held)>;
 /// The constructors declared over a record, by module and name, with the
 /// labels of the record in canonical sorted order.
 pub(super) type Records = HashMap<(String, String), Vec<String>>;
+
+/// Declaration-site scalar eligibility of each constructor's fields, keyed by
+/// `(module, type_name, constructor_name)`. Derived from `Module.types` so
+/// polymorphic fields remain `None` (`flickrt.Value`) across all uses.
+pub(super) type CtorFields = HashMap<(String, String, String), Vec<Option<Native>>>;
+
+pub(super) fn fields(modules: &[&Module], lang: &Known) -> CtorFields {
+    let mut out = CtorFields::new();
+    for m in modules {
+        for decl in &m.types {
+            for ctor in &decl.constructors {
+                let slots: Vec<Option<Native>> = ctor
+                    .fields
+                    .iter()
+                    .map(|ty| Native::of(lang, Some(ty)))
+                    .collect();
+                out.insert(
+                    (m.name.clone(), decl.name.clone(), ctor.name.clone()),
+                    slots,
+                );
+            }
+        }
+    }
+    out
+}
 
 pub(super) fn records(modules: &[&Module]) -> Records {
     let of = |m: &Module| {
@@ -60,30 +105,44 @@ pub(super) fn records(modules: &[&Module]) -> Records {
 }
 
 impl<'a> Gen<'a> {
+    /// How `c` holds its fields when it has a Go type of its own, without
+    /// registering the type in `self.owned`.
+    pub(super) fn own_held(&self, c: &Constructor) -> Option<Held> {
+        let own = self.input.own_module(&c.module).is_some();
+        if c.rep != Rep::Tagged || c.dicts > 0 || !own {
+            return None;
+        }
+        if c.arity == 0 {
+            return Some(Held::Zero);
+        }
+        let labels = self
+            .records
+            .and_then(|records| records.get(&(c.module.clone(), c.name.clone())));
+        if let Some(labels) = labels
+            && c.arity == 1
+            && !labels.is_empty()
+        {
+            return Some(Held::Record(labels.clone()));
+        }
+        let slots = self
+            .fields
+            .and_then(|fields| fields.get(&(c.module.clone(), c.ty.clone(), c.name.clone())))
+            .filter(|slots| slots.len() == c.arity)
+            .cloned()
+            .unwrap_or_else(|| vec![None; c.arity]);
+        Some(Held::Fields(slots))
+    }
+
     /// The Go type of the values of `c` and how it holds their fields, when
     /// they have a type of their own: a tagged constructor of a module of
     /// the program that holds no dictionary. A constructor of a built-in
     /// module, or one that holds a dictionary, stays a `*flickrt.Data`.
     pub(super) fn own_type(&mut self, c: &Constructor) -> Option<(String, Held)> {
-        let own = self.input.own_module(&c.module).is_some();
-        if c.rep != Rep::Tagged || c.dicts > 0 || !own {
-            return None;
-        }
+        let held = self.own_held(c)?;
         let ty = names::own_type(&c.module, &c.name);
-        if let Some((_, held)) = self.owned.get(&ty) {
-            return Some((ty, held.clone()));
+        if let Some((_, existing)) = self.owned.get(&ty) {
+            return Some((ty, existing.clone()));
         }
-        let held = if c.arity == 0 {
-            Held::Zero
-        } else {
-            let labels = self
-                .records
-                .and_then(|records| records.get(&(c.module.clone(), c.name.clone())));
-            match labels {
-                Some(labels) if c.arity == 1 && !labels.is_empty() => Held::Record(labels.clone()),
-                _ => Held::Fields(c.arity),
-            }
-        };
         let tag = names::string(&self.tag(c));
         self.owned.insert(ty.clone(), (tag, held.clone()));
         Some((ty, held))
@@ -197,24 +256,31 @@ pub(super) fn file(types: &Owned) -> String {
         }
         let n = match held {
             Held::Zero => unreachable!("handled above"),
-            Held::Fields(n) => *n,
+            Held::Fields(slots) => slots.len(),
             Held::Record(labels) => labels.len(),
         };
-        let params: Vec<String> = (0..n).map(|i| format!("f{i}")).collect();
-        let params = params.join(", ");
         let (make, of) = (make(ty), of(ty));
         let _ = match held {
             Held::Zero => unreachable!("handled above"),
-            Held::Fields(_) => write!(
-                go,
-                "\ntype {ty} struct{{ f [{n}]flickrt.Value }}\n\n\
-                 func (p *{ty}) Fields() []flickrt.Value {{ return p.f[:] }}\n\n\
-                 func {make}({params} flickrt.Value) flickrt.Value {{\n\
-                 \treturn &{ty}{{[{n}]flickrt.Value{{{params}}}}}\n}}\n\n\
-                 var _ = flickrt.Owned({tag}, func(f []flickrt.Value) flickrt.Value {{\n\
-                 \treturn &{ty}{{[{n}]flickrt.Value(f)}}\n}})\n",
-            ),
+            Held::Fields(slots) if slots.iter().any(Option::is_some) => {
+                write_scalar_struct(&mut go, ty, tag, &make, slots)
+            }
+            Held::Fields(_) => {
+                let params: Vec<String> = (0..n).map(|i| format!("f{i}")).collect();
+                let params = params.join(", ");
+                write!(
+                    go,
+                    "\ntype {ty} struct{{ f [{n}]flickrt.Value }}\n\n\
+                     func (p *{ty}) Fields() []flickrt.Value {{ return p.f[:] }}\n\n\
+                     func {make}({params} flickrt.Value) flickrt.Value {{\n\
+                     \treturn &{ty}{{[{n}]flickrt.Value{{{params}}}}}\n}}\n\n\
+                     var _ = flickrt.Owned({tag}, func(f []flickrt.Value) flickrt.Value {{\n\
+                     \treturn &{ty}{{[{n}]flickrt.Value(f)}}\n}})\n",
+                )
+            }
             Held::Record(labels) => {
+                let params: Vec<String> = (0..n).map(|i| format!("f{i}")).collect();
+                let params = params.join(", ");
                 let labels: Vec<String> = labels.iter().map(|l| names::string(l)).collect();
                 let labels = labels.join(", ");
                 write!(
@@ -240,4 +306,101 @@ pub(super) fn file(types: &Owned) -> String {
         );
     }
     go
+}
+
+/// Struct field packing order: pointer-bearing fields first to minimize Go GC
+/// `ptrdata`, then scalar fields by descending alignment (`8`, `4`, `2`, `1` bytes).
+fn layout_rank(slot: Option<Native>) -> u8 {
+    match slot {
+        None => 0,
+        Some(Native::String) => 1,
+        Some(Native::Float | Native::Int64 | Native::UInt64) => 2,
+        Some(Native::Int | Native::UInt32 | Native::Float32) => 3,
+        Some(Native::Int16 | Native::UInt16) => 4,
+        Some(Native::Int8 | Native::UInt8 | Native::Bool) => 5,
+    }
+}
+
+fn write_scalar_struct(
+    go: &mut String,
+    ty: &str,
+    tag: &str,
+    make: &str,
+    slots: &[Option<Native>],
+) -> fmt::Result {
+    let mut order: Vec<usize> = (0..slots.len()).collect();
+    order.sort_by_key(|&i| (layout_rank(slots[i]), i));
+    writeln!(go, "\ntype {ty} struct {{")?;
+    for i in order {
+        let go_ty = slots[i].map_or("flickrt.Value", Native::go);
+        writeln!(go, "\tf{i} {go_ty}")?;
+    }
+    writeln!(go, "}}")?;
+
+    let fields_list: Vec<String> = (0..slots.len()).map(|i| format!("p.f{i}")).collect();
+    writeln!(
+        go,
+        "\nfunc (p *{ty}) Fields() []flickrt.Value {{ return []flickrt.Value{{{}}} }}",
+        fields_list.join(", ")
+    )?;
+
+    let params: Vec<String> = slots
+        .iter()
+        .enumerate()
+        .map(|(i, slot)| format!("f{i} {}", slot.map_or("flickrt.Value", Native::go)))
+        .collect();
+    let inits: Vec<String> = (0..slots.len()).map(|i| format!("f{i}: f{i}")).collect();
+    writeln!(
+        go,
+        "\nfunc {make}({}) flickrt.Value {{\n\treturn &{ty}{{{}}}\n}}",
+        params.join(", "),
+        inits.join(", ")
+    )?;
+
+    let eqs: Vec<String> = slots
+        .iter()
+        .enumerate()
+        .map(|(i, slot)| match slot {
+            Some(Native::Float) => format!("flickrt.EqualFloat(p.f{i}, q.f{i}, strictZero)"),
+            Some(Native::Float32) => {
+                format!("flickrt.EqualFloat(float64(p.f{i}), float64(q.f{i}), strictZero)")
+            }
+            Some(
+                Native::Int
+                | Native::Int8
+                | Native::Int16
+                | Native::Int64
+                | Native::UInt8
+                | Native::UInt16
+                | Native::UInt32
+                | Native::UInt64
+                | Native::Bool
+                | Native::String,
+            ) => format!("p.f{i} == q.f{i}"),
+            None => format!("flickrt.EqualWith(p.f{i}, q.f{i}, strictZero)"),
+        })
+        .collect();
+    writeln!(
+        go,
+        "\nfunc (p *{ty}) EqualConstructed(other flickrt.Value, strictZero bool) (bool, bool) {{\n\
+         \tq, ok := other.(*{ty})\n\
+         \tif !ok {{\n\t\treturn false, false\n\t}}\n\
+         \treturn {}, true\n}}",
+        eqs.join(" && ")
+    )?;
+
+    let owned_inits: Vec<String> = slots
+        .iter()
+        .enumerate()
+        .map(|(i, slot)| match slot {
+            Some(native) => format!("f{i}: flickrt.As{}(f[{i}])", native.name()),
+            None => format!("f{i}: f[{i}]"),
+        })
+        .collect();
+    writeln!(
+        go,
+        "\nvar _ = flickrt.Owned({tag}, func(f []flickrt.Value) flickrt.Value {{\n\
+         \treturn &{ty}{{{}}}\n}})",
+        owned_inits.join(", ")
+    )
 }

@@ -1,30 +1,36 @@
 //! Expressions and statements. A Go expression is returned; statements it
 //! needs go into the current statement list before it.
 
-use std::mem;
-
-use flick_backend_support::loops;
-
 use flick_pretty::{Document, docvec};
 
 use super::arith::Native;
-use super::closures::poly;
+use super::go_type::{GoType, Typed, Want};
 use super::layout::{Code, call, if_else, list, statement};
 use super::{Gen, names};
-use flick_backend_support::tail::{Callee, Target};
-use flick_ir::{BinOp, Expr, ExprKind, Lit, Pat, Stage, Stmt};
-use flick_ir::{EnumLit, Lift};
+use flick_ir::{Arm, BinOp, EnumLit, Expr, ExprKind, Lift, Lit, Stage};
 
 /// A literal as Go: numbers typed as the runtime holds them.
 pub(super) fn literal(lit: &Lit) -> String {
     match lit {
         Lit::Int(n) => format!("int32({n})"),
+        Lit::Int8(n) => format!("int8({n})"),
+        Lit::Int16(n) => format!("int16({n})"),
+        Lit::Int64(n) => format!("int64({n})"),
+        Lit::UInt8(n) => format!("uint8({n})"),
+        Lit::UInt16(n) => format!("uint16({n})"),
+        Lit::UInt32(n) => format!("uint32({n})"),
+        Lit::UInt64(n) => format!("uint64({n})"),
         Lit::Float(x) if x.is_nan() => "flickrt.NaN".to_owned(),
         Lit::Float(x) if x.is_infinite() && *x > 0.0 => "flickrt.Inf".to_owned(),
         Lit::Float(x) if x.is_infinite() => "flickrt.NegInf".to_owned(),
         Lit::Float(x) if *x == 0.0 && x.is_sign_negative() => "flickrt.NegZero".to_owned(),
         // Rust's shortest digits read back to the same float in Go
         Lit::Float(x) => format!("float64({x:e})"),
+        Lit::Float32(x) if x.is_nan() => "flickrt.NaN32".to_owned(),
+        Lit::Float32(x) if x.is_infinite() && *x > 0.0 => "flickrt.Inf32".to_owned(),
+        Lit::Float32(x) if x.is_infinite() => "flickrt.NegInf32".to_owned(),
+        Lit::Float32(x) if *x == 0.0 && x.is_sign_negative() => "flickrt.NegZero32".to_owned(),
+        Lit::Float32(x) => format!("float32({x:e})"),
         Lit::BigInt(n) => format!("flickrt.BigLit({})", names::string(n)),
         Lit::String(s) => names::string(s),
         Lit::Bool(b) => b.to_string(),
@@ -55,45 +61,56 @@ pub(super) fn lift(how: &Lift) -> String {
 }
 
 impl<'a> Gen<'a> {
-    /// Compiles expressions that are evaluated in order: an operand whose
-    /// code needs statements makes the operands before it variables first.
-    /// Go orders the calls of an expression but not the reads of variables
-    /// between them: an operand is a variable of its own, evaluated first,
-    /// when it may run code and a later one reads a `let mut` variable, or
-    /// it reads one and a later one may run code.
+    /// Compiles expressions in order for erased `flickrt.Value` positions.
     pub(super) fn ordered(&mut self, exprs: &[&Expr]) -> Vec<Code<'a>> {
+        let wants = vec![None; exprs.len()];
+        self.ordered_into(exprs, &wants)
+    }
+
+    /// Compiles expressions in order, each into its requested `GoType` (`None`
+    /// means erased `flickrt.Value`). An operand whose code needs statements
+    /// spills earlier non-atomic operands into temporaries of their exact Go type.
+    pub(super) fn ordered_into(
+        &mut self,
+        exprs: &[&Expr],
+        wants: &[Option<GoType>],
+    ) -> Vec<Code<'a>> {
         let a = self.a;
-        let mut out: Vec<Code<'a>> = Vec::new();
+        let mut out: Vec<Typed<'a>> = Vec::new();
         let reads: Vec<bool> = exprs.iter().map(|e| reads_variable(e)).collect();
         for (i, e) in exprs.iter().enumerate() {
             let mark = self.buf.len();
-            let mut go = self.expr(e);
+            let want = wants.get(i).and_then(Option::as_ref);
+            let mut go = self.eval(e, Want::of(want));
             let later = (i + 1..exprs.len())
                 .any(|j| (!plain(e) && reads[j]) || (reads[i] && !plain(exprs[j])));
-            if later && !go.atomic {
+            if later && !go.code.atomic {
                 let t = self.temp();
-                let ty = self.native(e).map_or("flickrt.Value", Native::go);
-                self.emit(docvec![a, "var ", t, " ", ty, " = ", go]);
-                go = self.code(t);
+                let ty = self.go_type_name(go.ty.as_ref());
+                self.emit(docvec![a, "var ", t, " ", ty, " = ", go.code]);
+                go.code = self.code(t);
             }
             if self.buf.len() > mark {
                 let mut spills = Vec::new();
-                for (prev, before) in out.iter_mut().zip(exprs) {
-                    if !prev.atomic {
+                for prev in &mut out {
+                    if !prev.code.atomic {
                         let t = self.temp();
-                        let ty = self.native(before).map_or("flickrt.Value", Native::go);
-                        spills.push(statement(a, docvec![a, "var ", t, " ", ty, " = ", *prev]));
-                        *prev = self.code(t);
+                        let ty = self.go_type_name(prev.ty.as_ref());
+                        spills.push(statement(
+                            a,
+                            docvec![a, "var ", t, " ", ty, " = ", prev.code],
+                        ));
+                        prev.code = self.code(t);
                     }
                 }
                 self.buf.splice(mark..mark, spills);
             }
             out.push(go);
         }
-        out
+        out.into_iter().map(|t| t.code).collect()
     }
 
-    /// `go` as a variable unless it is atomic.
+    /// `go` as a `flickrt.Value` variable unless it is atomic.
     pub(super) fn spill(&mut self, go: Code<'a>) -> Code<'a> {
         if go.atomic {
             return go;
@@ -103,95 +120,125 @@ impl<'a> Gen<'a> {
         self.code(t)
     }
 
-    /// Declares the local `name` as `value`, Go code of type `native`.
-    pub(super) fn bind_native(&mut self, name: &str, value: Code<'a>, native: Native) {
-        let l = self.a.alloc_str(&names::local(name));
-        self.emit(docvec![self.a, "var ", l, " ", native.go(), " = ", value]);
-        self.emit(docvec![self.a, "_ = ", l]);
-        self.natives.insert(name.to_owned(), native);
-    }
-
-    /// Declares the local `name` as `value`.
+    /// Declares the local `name` as an erased `flickrt.Value`.
     pub(super) fn bind(&mut self, name: &str, value: Code<'a>) {
-        self.natives.remove(name);
-        let l = self.a.alloc_str(&names::local(name));
-        self.emit(docvec![self.a, "var ", l, " flickrt.Value = ", value]);
-        self.emit(docvec![self.a, "_ = ", l]);
+        self.bind_typed(name, value, None);
     }
 
-    fn loop_expr(&mut self, e: &Expr) -> Code<'a> {
+    /// Compiles `e` to an expression valid as `flickrt.Value` (never an
+    /// unconverted typed `Option`).
+    pub(super) fn expr(&mut self, e: &Expr) -> Code<'a> {
+        self.eval(e, Want::Value).code
+    }
+
+    /// Compiles `e` in its natural typed Go representation.
+    pub(super) fn expr_typed(&mut self, e: &Expr) -> Typed<'a> {
+        self.eval(e, Want::Any)
+    }
+
+    /// Compiles `e` into the exact requested Go type (`None` means erased
+    /// `flickrt.Value`).
+    pub(super) fn expr_into(&mut self, e: &Expr, want: Option<&GoType>) -> Code<'a> {
+        self.eval(e, Want::of(want)).code
+    }
+
+    /// Compiles `e` as a Go `bool`.
+    pub(super) fn expr_bool(&mut self, e: &Expr) -> Code<'a> {
+        self.expr_into(e, Some(&GoType::Scalar(Native::Bool)))
+    }
+
+    /// Evaluates `e` honoring `want`:
+    /// - `Want::Value` guarantees the returned `Typed.ty` is never `Some(GoType::Opt(_))`.
+    /// - `Want::Any` preserves the natural Go representation (scalars and typed `Option`).
+    /// - `Want::Exact(gt)` guarantees the returned code has Go type `gt`.
+    pub(super) fn eval(&mut self, e: &Expr, want: Want<'_>) -> Typed<'a> {
         let a = self.a;
-        match &e.kind {
-            ExprKind::ControlLoop {
-                id,
-                condition,
-                body,
-                iterable,
-            } => {
-                let lowered = loops::lower(
-                    self.input.lang,
-                    id,
-                    condition.as_deref(),
-                    body,
-                    *iterable,
-                    e.span,
-                );
-                self.expr(&lowered)
+        let raw = match &e.kind {
+            ExprKind::Block(stmts, result) => {
+                for stmt in stmts {
+                    self.stmt(stmt);
+                }
+                return self.eval(result, want);
             }
-            ExprKind::LoopExit { .. } => unreachable!("loop exits are lowered with their loop"),
-            ExprKind::Loop { condition, body } => {
-                let (stmts, ()) = self.block(|g| {
-                    let c = g.expr(condition);
-                    let c = g.unboxed(condition, c, Native::Bool).doc;
-                    g.emit(docvec![
-                        a,
-                        "if !",
-                        c,
-                        " ",
-                        super::layout::single(a, "break")
-                    ]);
-                    g.discard(body);
-                });
-                self.emit(docvec![a, "for ", super::layout::block(a, stmts)]);
-                self.unit()
+            ExprKind::If(cond, then, other) => return self.if_expr(cond, then, other, want),
+            ExprKind::Match(scrutinee, arms) => return self.match_expr(e, scrutinee, arms, want),
+            ExprKind::Con(_) | ExprKind::App { .. } => self.app_typed(e, want),
+            ExprKind::Dicts(inner, _) if matches!(inner.kind, ExprKind::Con(_)) => {
+                self.app_typed(e, want)
             }
-            _ => unreachable!("loop expression"),
+            ExprKind::Lit(lit) => {
+                let ty = match lit {
+                    Lit::Int(_) => Some(GoType::Scalar(Native::Int)),
+                    Lit::Int8(_) => Some(GoType::Scalar(Native::Int8)),
+                    Lit::Int16(_) => Some(GoType::Scalar(Native::Int16)),
+                    Lit::Int64(_) => Some(GoType::Scalar(Native::Int64)),
+                    Lit::UInt8(_) => Some(GoType::Scalar(Native::UInt8)),
+                    Lit::UInt16(_) => Some(GoType::Scalar(Native::UInt16)),
+                    Lit::UInt32(_) => Some(GoType::Scalar(Native::UInt32)),
+                    Lit::UInt64(_) => Some(GoType::Scalar(Native::UInt64)),
+                    Lit::Float(x) if Native::is_native_float_lit(*x) => {
+                        Some(GoType::Scalar(Native::Float))
+                    }
+                    Lit::Float32(x) if Native::is_native_float32_lit(*x) => {
+                        Some(GoType::Scalar(Native::Float32))
+                    }
+                    Lit::String(_) => Some(GoType::Scalar(Native::String)),
+                    Lit::Bool(_) => Some(GoType::Scalar(Native::Bool)),
+                    _ => None,
+                };
+                Typed {
+                    code: self.lit(lit),
+                    ty,
+                }
+            }
+            ExprKind::Local(name) => Typed {
+                code: self.code(&names::local(name)),
+                ty: self.go_types.get(name).cloned(),
+            },
+            // not atomic: an operand after it that assigns it is ordered after the read
+            ExprKind::Var(name) => Typed {
+                code: Code::from(a.text(a.alloc_str(&names::local(name)))),
+                ty: self.go_types.get(name).cloned(),
+            },
+            ExprKind::Binary(op, lhs, rhs) => self.binary(*op, lhs, rhs),
+            ExprKind::Not(inner) => Typed {
+                code: docvec![a, "!", self.expr_bool(inner).doc].into(),
+                ty: Some(GoType::Scalar(Native::Bool)),
+            },
+            ExprKind::Unwrap(inner) => self.unwrap(inner),
+            ExprKind::Neg(num, inner) => self.neg(*num, inner),
+            _ => Typed {
+                code: self.erased_expr(e),
+                ty: None,
+            },
+        };
+        match want {
+            Want::Any => raw,
+            Want::Value => match raw.ty {
+                Some(GoType::Opt(_)) => Typed {
+                    code: self.to_value(raw),
+                    ty: None,
+                },
+                _ => raw,
+            },
+            Want::Exact(gt) => Typed {
+                code: self.coerce(raw, Some(gt)),
+                ty: Some(gt.clone()),
+            },
         }
     }
 
-    pub(super) fn expr(&mut self, e: &Expr) -> Code<'a> {
+    fn erased_expr(&mut self, e: &Expr) -> Code<'a> {
         let a = self.a;
         match &e.kind {
             ExprKind::ControlLoop { .. } | ExprKind::LoopExit { .. } | ExprKind::Loop { .. } => {
                 self.loop_expr(e)
             }
-            ExprKind::Lit(lit) => self.lit(lit),
-            ExprKind::Local(name) => self.code(&names::local(name)),
-            // not atomic: an operand after it that assigns it is ordered after the read
-            ExprKind::Var(name) => Code::from(a.text(a.alloc_str(&names::local(name)))),
             ExprKind::Global { module, name, .. } => self.global_value(module, name, Vec::new()),
             ExprKind::Method { dict, name, .. } => self.method(dict, name),
-            ExprKind::Con(_) | ExprKind::App { .. } => self.app(e),
-            // Constructor evidence is stored after ordinary fields, even for a
-            // nullary GADT; constructing first would pass Data to Inst as Poly.
-            ExprKind::Dicts(inner, _) if matches!(inner.kind, ExprKind::Con(_)) => self.app(e),
             ExprKind::Dicts(inner, dicts) => self.given(inner, dicts),
             ExprKind::Abstract(shown, inner) => self.abstraction(shown, inner),
             ExprKind::Lambda { params, body } => self.lambda(params, body, None),
-            ExprKind::Block(stmts, result) => {
-                for stmt in stmts {
-                    self.stmt(stmt);
-                }
-                self.expr(result)
-            }
-            ExprKind::If(cond, then, other) => self.if_expr(e, cond, then, other),
-            ExprKind::Match(scrutinee, arms) => {
-                let s = self.expr(scrutinee);
-                let s = self.spill(s);
-                let r = self.result(e);
-                self.arms(s.doc, arms, Some(r));
-                self.code(r)
-            }
             ExprKind::Tuple(items) | ExprKind::List(items) => {
                 let items: Vec<&Expr> = items.iter().collect();
                 let items = self.ordered(&items).into_iter().map(|item| item.doc);
@@ -205,15 +252,8 @@ impl<'a> Gen<'a> {
             }
             ExprKind::Update(base, fields) => self.record(Some(base), fields),
             ExprKind::Field(record, label) => self.field(record, label),
-            ExprKind::Binary(op, lhs, rhs) => self.binary(*op, lhs, rhs),
-            ExprKind::Not(inner) => {
-                let v = self.expr(inner);
-                docvec![a, "!", self.unboxed(inner, v, Native::Bool).doc].into()
-            }
-            ExprKind::Unwrap(inner) => self.unwrap(inner),
-            ExprKind::Neg(num, inner) => self.neg(*num, inner),
             ExprKind::Ignore(inner) => {
-                let v = self.expr(inner);
+                let v = self.expr_typed(inner).code;
                 // a result read by nothing: Go refuses a variable nobody reads
                 self.emit(docvec![a, "_ = ", v]);
                 self.unit()
@@ -255,32 +295,71 @@ impl<'a> Gen<'a> {
             ExprKind::WithOwnerEvidence(owner, inner) => self.with_owner_evidence(owner, inner),
             ExprKind::Within(owner, inner) => self.within(owner, inner),
             ExprKind::Handle(h) => self.handle(h),
+            _ => unreachable!("handled in eval"),
         }
     }
 
-    /// Declares the variable of the result of `e`, an `if` or a `match`:
-    /// of the Go type every branch has, when they have one, so that a number
-    /// is not made a value on the way from a branch to what uses it.
-    fn result(&mut self, e: &Expr) -> &'a str {
+    fn if_expr(&mut self, cond: &Expr, then: &Expr, other: &Expr, want: Want<'_>) -> Typed<'a> {
+        let a = self.a;
+        let test = self.expr_bool(cond).doc;
+        let (mut then_stmts, then_val) = self.block(|g| g.eval(then, want));
+        let (mut other_stmts, other_val) = self.block(|g| g.eval(other, want));
+        let r_ty = match want {
+            Want::Exact(gt) => Some(gt.clone()),
+            Want::Value => match (&then_val.ty, &other_val.ty) {
+                (Some(GoType::Scalar(x)), Some(GoType::Scalar(y))) if x == y => {
+                    Some(GoType::Scalar(*x))
+                }
+                _ => None,
+            },
+            Want::Any => {
+                if then_val.ty == other_val.ty {
+                    then_val.ty.clone()
+                } else {
+                    None
+                }
+            }
+        };
         let r = self.temp();
-        let ty = self.native(e).map_or("flickrt.Value", Native::go);
-        self.emit(docvec![self.a, "var ", r, " ", ty]);
-        r
+        let go_ty = self.go_type_name(r_ty.as_ref());
+        self.emit(docvec![a, "var ", r, " ", go_ty]);
+        let then_code = self.coerce(then_val, r_ty.as_ref());
+        let other_code = self.coerce(other_val, r_ty.as_ref());
+        then_stmts.push(statement(a, docvec![a, r, " = ", then_code]));
+        other_stmts.push(statement(a, docvec![a, r, " = ", other_code]));
+        self.emit(if_else(a, test, then_stmts, other_stmts));
+        Typed {
+            code: self.code(r),
+            ty: r_ty,
+        }
     }
 
-    fn if_expr(&mut self, e: &Expr, cond: &Expr, then: &Expr, other: &Expr) -> Code<'a> {
-        let a = self.a;
-        let test = self.expr(cond);
-        let test = self.unboxed(cond, test, Native::Bool).doc;
-        // the branches are compiled after the variable is declared, and
-        // nothing they bind is a branch itself: the type is known before
-        let r = self.result(e);
-        let (mut then_stmts, then_value) = self.block(|g| g.expr(then));
-        let (mut other_stmts, other_value) = self.block(|g| g.expr(other));
-        then_stmts.push(statement(a, docvec![a, r, " = ", then_value]));
-        other_stmts.push(statement(a, docvec![a, r, " = ", other_value]));
-        self.emit(if_else(a, test, then_stmts, other_stmts));
-        self.code(r)
+    fn match_expr(
+        &mut self,
+        e: &Expr,
+        scrutinee: &Expr,
+        arms: &[Arm],
+        want: Want<'_>,
+    ) -> Typed<'a> {
+        let s = self.expr_typed(scrutinee);
+        let s = self.spill_typed(s);
+        let r_ty = match want {
+            Want::Exact(gt) => Some(gt.clone()),
+            Want::Value => match self.match_go_type(e, s.ty.as_ref(), arms, &[]) {
+                Some(GoType::Scalar(n)) => Some(GoType::Scalar(n)),
+                _ => None,
+            },
+            Want::Any => self.match_go_type(e, s.ty.as_ref(), arms, &[]),
+        };
+        let r = self.temp();
+        let go_ty = self.go_type_name(r_ty.as_ref());
+        self.emit(docvec![self.a, "var ", r, " ", go_ty]);
+        let target = (r, r_ty.clone());
+        self.arms(s.code.doc, s.ty.as_ref(), arms, Some(&target));
+        Typed {
+            code: self.code(r),
+            ty: r_ty,
+        }
     }
 
     /// Emits `e` in tail position: its value is returned.
@@ -293,16 +372,15 @@ impl<'a> Gen<'a> {
                 self.tail_expr(result);
             }
             ExprKind::If(cond, then, other) => {
-                let test = self.expr(cond);
-                let test = self.unboxed(cond, test, Native::Bool).doc;
+                let test = self.expr_bool(cond).doc;
                 let (then, ()) = self.block(|g| g.tail_expr(then));
                 let (other, ()) = self.block(|g| g.tail_expr(other));
                 self.emit(if_else(self.a, test, then, other));
             }
             ExprKind::Match(scrutinee, arms) => {
-                let s = self.expr(scrutinee);
-                let s = self.spill(s);
-                self.arms(s.doc, arms, None);
+                let s = self.expr_typed(scrutinee);
+                let s = self.spill_typed(s);
+                self.arms(s.code.doc, s.ty.as_ref(), arms, None);
             }
             ExprKind::Binary(op @ (BinOp::And | BinOp::Or), lhs, rhs) if self.jumps_in(rhs) => {
                 self.tail_logic(*op, lhs, rhs);
@@ -310,12 +388,8 @@ impl<'a> Gen<'a> {
             _ if self.jump(e) => {}
             _ => {
                 self.line(e.span);
-                let v = self.expr(e);
-                // in the Go type the function returns, when it has one
-                let v = match self.returns {
-                    Some(native) => self.unboxed(e, v, native),
-                    None => v,
-                };
+                let ret = self.returns.clone();
+                let v = self.expr_into(e, ret.as_ref());
                 self.emit(docvec![self.a, "return ", v]);
             }
         }
@@ -332,111 +406,6 @@ impl<'a> Gen<'a> {
             .zip(values)
             .map(|((label, _), v)| docvec![self.a, self.string(label), ", ", v])
             .collect()
-    }
-
-    pub(super) fn stmt(&mut self, stmt: &Stmt) {
-        let a = self.a;
-        let (Stmt::Let { value: e, .. }
-        | Stmt::Var { value: e, .. }
-        | Stmt::Assign(_, e)
-        | Stmt::Expr(e)
-        | Stmt::Fun { value: e, .. }) = stmt;
-        self.line(e.span);
-        match stmt {
-            Stmt::Let {
-                pat: Pat::Bind(name),
-                value,
-                ..
-            } => {
-                let v = self.expr(value);
-                match self.native(value) {
-                    Some(n) => self.bind_native(name, v, n),
-                    None => self.bind(name, v),
-                }
-            }
-            Stmt::Let {
-                pat: Pat::Wild,
-                value,
-                ..
-            } => {
-                let v = self.expr(value);
-                self.emit(docvec![a, "_ = ", v]);
-            }
-            Stmt::Var { name, value, .. } => {
-                let v = self.expr(value);
-                // a variable has one type, so a scalar one is unboxed where it is
-                // declared and where it is assigned, not boxed on every assignment
-                match self
-                    .native(value)
-                    .or_else(|| Native::of(self.input.lang, value.ty.as_deref()))
-                {
-                    Some(n) => {
-                        let v = self.unboxed(value, v, n);
-                        self.bind_native(name, v, n);
-                    }
-                    None => self.bind(name, v),
-                }
-            }
-            Stmt::Assign(name, value) => {
-                let v = self.expr(value);
-                let v = match self.natives.get(name).copied() {
-                    Some(n) => self.unboxed(value, v, n),
-                    None => v,
-                };
-                let l = a.alloc_str(&names::local(name));
-                self.emit(docvec![a, l, " = ", v]);
-            }
-            Stmt::Let { pat, value, .. } => {
-                let v = self.expr(value);
-                let v = self.spill(v);
-                self.destructure(pat, v.doc);
-            }
-            Stmt::Fun {
-                name,
-                rec,
-                dicts,
-                value,
-                ..
-            } => {
-                let l = a.alloc_str(&names::local(name));
-                // declared first: a recursive function refers to itself
-                self.emit(docvec![a, "var ", l, " flickrt.Value"]);
-                self.emit(docvec![a, "_ = ", l]);
-                let mark = self.givens.len();
-                let ds = self.bind_givens(dicts);
-                let target = rec.then(|| Target {
-                    callee: Callee::Local(name.clone()),
-                    dicts: dicts.clone(),
-                });
-                let saved = (!ds.is_empty()).then(|| {
-                    (
-                        self.tail.take(),
-                        mem::replace(&mut self.generator, false),
-                        self.fiber.take(),
-                        self.context.replace("fb"),
-                    )
-                });
-                let (stmts, v) = self.block(|g| match &value.kind {
-                    ExprKind::Lambda { params, body } => g.lambda(params, body, target),
-                    _ => g.expr(value),
-                });
-                if let Some(saved) = saved {
-                    (self.tail, self.generator, self.fiber, self.context) = saved;
-                }
-                self.givens.truncate(mark);
-                if ds.is_empty() {
-                    self.buf.extend(stmts);
-                    self.emit(docvec![a, l, " = ", v]);
-                } else {
-                    self.emit(docvec![a, l, " = ", poly(a, &ds, stmts, v)]);
-                }
-            }
-            Stmt::Expr(e) => {
-                let v = self.expr(e);
-                // a result read by nothing: Go refuses a variable nobody reads
-                self.emit(docvec![a, "_ = ", v]);
-            }
-        }
     }
 }
 

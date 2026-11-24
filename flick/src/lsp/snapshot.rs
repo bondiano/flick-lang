@@ -21,6 +21,7 @@ use flick_core::project::config::BackendEnvironment;
 use flick_core::project::target::Wanted;
 use flick_core::project::{
     self, Analysis, Analyzed, BackendTags, Compilation, Host, ModuleCache, Project,
+    ResolvedEnvironment,
 };
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{resolve, syntax, types};
@@ -123,6 +124,24 @@ impl Host for Overlay<'_> {
 
     fn backend_tags(&self, project: &Project) -> Vec<BackendTags> {
         options::project_backend_tags(project, true)
+    }
+
+    #[cfg(feature = "wasm-backends")]
+    fn check_target(
+        &self,
+        project: &Project,
+        compilation: &Compilation,
+        sources: &SourceMap,
+        environment: &ResolvedEnvironment,
+        stages_by_class: bool,
+    ) -> Vec<Diagnostic> {
+        backends::check_target_for_project(
+            project,
+            compilation,
+            sources,
+            environment,
+            stages_by_class,
+        )
     }
 }
 
@@ -325,6 +344,8 @@ pub(super) fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
         thresholds: types::Thresholds::default(),
         watched: types::Watched::none(),
         stages_by_class: false,
+        foreign_backend: types::ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     let (checked, typing) =
         types::check_builtin_typed(&module, &imported, dependencies, options, &mut interface);
@@ -346,6 +367,7 @@ pub(super) fn analyze_builtin(path: &Path, index: usize) -> Snapshot {
             }],
             compilation: Compilation::default(),
             diagnostics,
+            foreign_backend: types::ForeignBackendSpec::js(),
         },
         sources,
         root: path.parent().expect("source directory").to_path_buf(),

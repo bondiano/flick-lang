@@ -316,7 +316,15 @@ impl Checker<'_> {
             Const::Number(n) => Some(Literal::Number(n.to_bits())),
             Const::String(s) => Some(Literal::Text(s)),
             Const::Bool(b) => Some(Literal::Bool(b)),
-            Const::BigInt(_) => None,
+            Const::BigInt(_)
+            | Const::Float32(_)
+            | Const::Int8(_)
+            | Const::Int16(_)
+            | Const::Int64(_)
+            | Const::UInt8(_)
+            | Const::UInt16(_)
+            | Const::UInt32(_)
+            | Const::UInt64(_) => None,
         }
     }
 

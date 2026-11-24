@@ -1,0 +1,378 @@
+// Independently expected boundary tests for all fixed-width integer types
+// (Int8, Int16, Int32/Int, Int64, UInt8/Byte, UInt16, UInt32, UInt64) and
+// IEEE 754 binary32 Float32 across JS, Go, and Flick's own runtime.
+module Language.FixedWidth exposing (tests)
+
+import Byte
+import EqHash
+import Float32
+import HashMap
+import Int16
+import Int32
+import Int64
+import Int8
+import Numeric exposing (Floating, Integer, Numeric)
+import UInt16
+import UInt32
+import UInt64
+import UInt8
+
+as_int : Int -> Int
+let as_int x = x
+
+as_u8 : UInt8 -> UInt8
+let as_u8 x = x
+
+is_err : Result a b -> Bool
+let is_err r =
+  match r with
+  | Err _ -> true
+  | Ok _ -> false
+
+add_num : Numeric a => a -> a -> a
+let add_num a b = a + b
+
+sub_num : Numeric a => a -> a -> a
+let sub_num a b = a - b
+
+mul_num : Numeric a => a -> a -> a
+let mul_num a b = a * b
+
+neg_num : Numeric a => a -> a
+let neg_num a = -a
+
+div_int : Integer a => a -> a -> a
+let div_int a b = a / b
+
+rem_int : Integer a => a -> a -> a
+let rem_int a b = a % b
+
+pow_num : Numeric a => a -> a -> a
+let pow_num a b = a ** b
+
+half_float : Floating a => a -> a
+let half_float x = x / 2.0
+
+tests : List Test.Test
+let tests = [
+  Test.test "type aliases Int32 == Int and Byte == UInt8" (fun () ->
+    let a : Int32 = 42i32
+    let c : Byte = 0xFFu8
+    Test.equal (42, 255u8, 7986, Byte.max_value, Int32.max_value) (
+      as_int a,
+      as_u8 c,
+      0x1f32,
+      255u8,
+      2147483647,
+    )
+  ),
+  Test.test "Int8 and Int16 wrapping arithmetic, negation, division, remainder" (fun () ->
+    Test.equal (-128i8, 127i8, -128i8, 0i8, -128i8, 0i8, -3i8, -1i8, 1i8, 0i8, 0i8) (
+      add_num 127i8 1i8,
+      sub_num (-128i8) 1i8,
+      neg_num (-128i8),
+      mul_num 16i8 16i8,
+      div_int (-128i8) (-1i8),
+      rem_int (-128i8) (-1i8),
+      div_int (-7i8) 2i8,
+      rem_int (-7i8) 2i8,
+      rem_int 7i8 (-2i8),
+      div_int 7i8 0i8,
+      rem_int 7i8 0i8,
+    )
+  ),
+  Test.test "Int16 boundaries and wrapping" (fun () ->
+    Test.equal (-32768i16, 32767i16, -32768i16, -32768i16, 0i16, -3i16, -1i16, 0i16, 0i16) (
+      add_num 32767i16 1i16,
+      sub_num (-32768i16) 1i16,
+      neg_num (-32768i16),
+      div_int (-32768i16) (-1i16),
+      rem_int (-32768i16) (-1i16),
+      div_int (-7i16) 2i16,
+      rem_int (-7i16) 2i16,
+      div_int 5i16 0i16,
+      rem_int 5i16 0i16,
+    )
+  ),
+  Test.test "Int64 boundaries, wrapping, and 64-bit exponentiation" (fun () ->
+    Test.equal
+      (
+        -9223372036854775808i64,
+        9223372036854775807i64,
+        -9223372036854775808i64,
+        -9223372036854775808i64,
+        0i64,
+        -3i64,
+        -1i64,
+        0i64,
+        0i64,
+        -1i64,
+        1i64,
+        0i64,
+      )
+      (
+        add_num Int64.max_value 1i64,
+        sub_num Int64.min_value 1i64,
+        neg_num Int64.min_value,
+        div_int Int64.min_value (-1i64),
+        rem_int Int64.min_value (-1i64),
+        div_int (-7i64) 2i64,
+        rem_int (-7i64) 2i64,
+        div_int 9i64 0i64,
+        rem_int 9i64 0i64,
+        pow_num (-1i64) 4294967297i64,
+        pow_num (-1i64) (-4i64),
+        pow_num 2i64 (-1i64),
+      )
+  ),
+  Test.test "unsigned wrapping, negation, exact 32-bit multiply, and 64-bit pow" (fun () ->
+    Test.equal
+      (
+        0u8,
+        255u8,
+        255u8,
+        0u16,
+        65535u16,
+        0u32,
+        1u32,
+        0u32,
+        0u64,
+        18446744073709551615u64,
+        0u64,
+        9223372036854775808u64,
+      )
+      (
+        add_num 255u8 1u8,
+        sub_num 0u8 1u8,
+        neg_num 1u8,
+        add_num 65535u16 1u16,
+        neg_num 1u16,
+        add_num 4294967295u32 1u32,
+        mul_num 4294967295u32 4294967295u32,
+        mul_num 65536u32 65536u32,
+        add_num UInt64.max_value 1u64,
+        neg_num 1u64,
+        pow_num 2u64 4294967296u64,
+        pow_num 2u64 63u64,
+      )
+  ),
+  Test.test "unsigned comparisons and division/remainder near max" (fun () ->
+    Test.equal (true, true, 127u8, 0u8, 2147483647u32, 0u32, 9223372036854775807u64, 5u64, 0u64) (
+      255u8 > 0u8,
+      18446744073709551615u64 > 9223372036854775808u64,
+      div_int 255u8 2u8,
+      div_int 255u8 0u8,
+      div_int 4294967295u32 2u32,
+      rem_int 4294967295u32 0u32,
+      div_int UInt64.max_value 2u64,
+      rem_int UInt64.max_value 10u64,
+      div_int UInt64.max_value 0u64,
+    )
+  ),
+  Test.test "bitwise ops and shift count masking across all widths" (fun () ->
+    Test.equal
+      (
+        1i8,
+        -128i8,
+        -1i8,
+        1i8,
+        255u8,
+        1u8,
+        1i16,
+        65535u16,
+        1u32,
+        -9223372036854775808i64,
+        1i64,
+        -1i64,
+        1i64,
+        1u64,
+        18446744073709551615u64,
+      )
+      (
+        Int8.shift_left 1i8 8,
+        Int8.shift_left 1i8 (-1),
+        Int8.shift_right (-128i8) 7,
+        Int8.shift_right_unsigned (-128i8) 7,
+        UInt8.bit_not 0u8,
+        UInt8.shift_right 128u8 7,
+        Int16.shift_right_unsigned (-32768i16) 15,
+        UInt16.bit_not 0u16,
+        UInt32.shift_right 0x8000_0000u32 31,
+        Int64.shift_left 1i64 63,
+        Int64.shift_left 1i64 64,
+        Int64.shift_right Int64.min_value 63,
+        Int64.shift_right_unsigned Int64.min_value 63,
+        UInt64.shift_right 9223372036854775808u64 63,
+        UInt64.bit_not 0u64,
+      )
+  ),
+  Test.test "checked arithmetic reports overflow, underflow, and division by zero" (fun () ->
+    Test.equal (true, true, true, true, Ok (-127i8), true, true, true, Ok 100u64) (
+      is_err (Int8.checked_add 127i8 1i8),
+      is_err (Int8.checked_div (-128i8) (-1i8)),
+      is_err (Int64.checked_div Int64.min_value (-1i64)),
+      is_err (Int64.checked_mul Int64.max_value 2i64),
+      Int8.checked_add (-128i8) 1i8,
+      is_err (UInt8.checked_sub 0u8 1u8),
+      is_err (UInt64.checked_add UInt64.max_value 1u64),
+      is_err (UInt64.divide 10u64 0u64),
+      UInt64.checked_mul 10u64 10u64,
+    )
+  ),
+  Test.test
+    "Float32 precision, subnormals, signed zero, infinity, NaN, SameValueZero, total Ord"
+    (fun () ->
+      let sub = Float32.min_positive / 2.0f32
+      let underflow = Float32.min_positive / 16777216.0f32
+      let inf = Float32.max_value * 2.0f32
+      let neg_zero = -0.0f32
+      let other_nan = 0.0f32 / 0.0f32
+      Test.equal
+        (
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false,
+          true,
+          LT,
+          EQ,
+          LT,
+          EQ,
+          GT,
+          1.5f32,
+        )
+        (
+          16777217.0f32 == 16777216.0f32,
+          add_num 16777216.0f32 1.0f32 == 16777216.0f32,
+          add_num 16777216.0f32 2.0f32 == 16777218.0f32,
+          sub > 0.0f32,
+          underflow == 0.0f32,
+          Float32.is_infinite inf,
+          1.0f32 / neg_zero == Float32.neg_infinity,
+          neg_zero == 0.0f32,
+          Float32.same_value 0.0f32 neg_zero,
+          Float32.nan == other_nan,
+          Float32.strict_equal Float32.nan other_nan,
+          Float32.same_value Float32.nan other_nan,
+          compare Float32.neg_infinity (-1.0f32),
+          compare neg_zero 0.0f32,
+          compare Float32.infinity Float32.nan,
+          compare Float32.nan other_nan,
+          compare Float32.nan Float32.infinity,
+          half_float 3.0f32,
+        )
+    ),
+  Test.test "Float32.min, max, between, and clamp follow Ord with NaN greatest" (fun () ->
+    let nan = Float32.nan
+    let bounds = { minimum = 0.0f32; maximum = 10.0f32 }
+    let nan_hi = { minimum = 0.0f32; maximum = nan }
+    Test.equal (1.0f32, 1.0f32, true, true, 10.0f32, 0.0f32, 5.0f32, true, false, true) (
+      Float32.min 1.0f32 nan,
+      Float32.min nan 1.0f32,
+      Float32.is_nan (Float32.max 1.0f32 nan),
+      Float32.is_nan (Float32.max nan 1.0f32),
+      Float32.clamp bounds nan,
+      Float32.clamp bounds (-5.0f32),
+      Float32.clamp bounds 5.0f32,
+      Float32.between nan_hi 5.0f32,
+      Float32.between bounds nan,
+      Float32.between nan_hi nan,
+    )
+  ),
+  Test.test
+    "Float32.from_bigint performs single rounding without double-rounding via binary64"
+    (fun () ->
+      // 2^54 + 2^30 + 1 = 18014399583223809 is strictly above the binary32 midpoint
+      // between 2^54 and 2^54 + 2^31, so single rounding gives 2^54 + 2^31 = 18014400656965632.
+      Test.equal (16777216.0f32, 16777220.0f32, 18014400656965632.0f32, Float32.infinity) (
+        Float32.from_bigint 16777217n,
+        Float32.from_bigint 16777219n,
+        Float32.from_bigint 18014399583223809n,
+        Float32.from_bigint (10n ** 50n),
+      )
+    ),
+  Test.test "explicit checked, wrapping, saturating, and lossless Into conversions" (fun () ->
+    let widened_i64 : Int64 = into (-128i8)
+    let widened_big : BigInt = into UInt64.max_value
+    let widened_f64 : Float = into 1.25f32
+    Test.equal
+      (
+        Some 127i8,
+        None,
+        -128i8,
+        127i8,
+        -128i8,
+        None,
+        255u8,
+        0u8,
+        None,
+        Int64.min_value,
+        Int64.max_value,
+        0u64,
+        UInt64.max_value,
+        -128i64,
+        18446744073709551615n,
+        1.25,
+      )
+      (
+        Int8.from_int 127,
+        Int8.from_int 128,
+        Int8.wrapping_from_int 128,
+        Int8.saturating_from_int 1000,
+        Int8.saturating_from_int (-1000),
+        UInt8.from_int8 (-1i8),
+        UInt8.wrapping_from_int8 (-1i8),
+        UInt8.saturating_from_int8 (-1i8),
+        Int64.from_uint64 9223372036854775808u64,
+        Int64.wrapping_from_uint64 9223372036854775808u64,
+        Int64.saturating_from_uint64 9223372036854775808u64,
+        UInt64.saturating_from_float (0.0 / 0.0),
+        UInt64.saturating_from_float 1e30,
+        widened_i64,
+        widened_big,
+        widened_f64,
+      )
+  ),
+  Test.test "Show, Display, parse, and HashMap keys for fixed-width types" (fun () ->
+    let u32_map = HashMap.from_list EqHash.canonical [(4000000000u32, "big"), (1u32, "one")]
+    let i64_map =
+      HashMap.from_list EqHash.canonical [(Int64.min_value, "min"), (Int64.max_value, "max")]
+    let f32_map = HashMap.from_list EqHash.canonical [(-0.0f32, "zero"), (Float32.nan, "nan")]
+    Test.equal
+      (
+        "-9223372036854775808",
+        "18446744073709551615",
+        Some Int64.min_value,
+        None,
+        Some "big",
+        Some "min",
+        Some "zero",
+        Some "nan",
+      )
+      (
+        show Int64.min_value,
+        display UInt64.max_value,
+        Int64.parse "-9223372036854775808",
+        UInt8.parse "256",
+        HashMap.get 4000000000u32 u32_map,
+        HashMap.get Int64.min_value i64_map,
+        HashMap.get 0.0f32 f32_map,
+        HashMap.get Float32.nan f32_map,
+      )
+  ),
+  Test.effect_test
+    "unsafe_div by zero defects cleanly on fixed-width ints"
+    (task {
+      let outcome =
+        Effect.exit (task { UInt64.unsafe_div 10u64 (UInt64.wrapping_from_int (List.length [])) })
+      let died = Exit.match_ (fun _ -> false) Cause.has_dies outcome
+      Test.check (Test.equal true died)
+    }),
+]

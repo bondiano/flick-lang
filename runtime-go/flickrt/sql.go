@@ -395,12 +395,11 @@ func sqlArgs(fb *Fiber, q *sqlQuery) []*string {
 			v = q.values.Get(name)
 		}
 		if p.Get("nullable").(bool) {
-			o, ok := v.(*Data)
-			if !ok || o.Tag != "Some" {
+			if !IsSome(v) {
 				out = append(out, nil)
 				continue
 			}
-			v = o.Fields()[0]
+			v = UnwrapSome(v)
 		}
 		text, problem := encodeColumn(fb, columnOf(q.template, p), v)
 		if problem != "" {

@@ -1,0 +1,195 @@
+/// Operations and explicit conversions on `Int64`, the 64-bit signed integers
+/// (`-9223372036854775808..=9223372036854775807`). Operators wrap around; `/`
+/// and `%` by zero yield `0`.
+module Int64 exposing (..)
+
+import BigInt
+
+min_value : Int64
+let min_value = -9223372036854775808i64
+
+max_value : Int64
+let max_value = 9223372036854775807i64
+
+min_bigint : BigInt
+let min_bigint = -9223372036854775808n
+
+max_bigint : BigInt
+let max_bigint = 9223372036854775807n
+
+to_string : Int64 -> String
+let to_string n = display n
+
+parse : String -> Option Int64
+let parse s = Option.bind from_bigint (BigInt.parse s)
+
+to_float : Int64 -> Float
+foreign pure to_float from "flick:rt" "toFloat64"
+
+to_float32 : Int64 -> Float32
+foreign pure to_float32 from "flick:rt" "toFloat32"
+
+to_bigint : Int64 -> BigInt
+foreign pure to_bigint from "flick:rt" "toBigInt"
+
+from_int8 : Int8 -> Int64
+let from_int8 n = into n
+
+from_int16 : Int16 -> Int64
+let from_int16 n = into n
+
+from_int : Int -> Int64
+let from_int n = into n
+
+from_int32 : Int32 -> Int64
+let from_int32 n = into n
+
+from_uint8 : UInt8 -> Int64
+let from_uint8 n = into n
+
+from_uint16 : UInt16 -> Int64
+let from_uint16 n = into n
+
+from_uint32 : UInt32 -> Int64
+let from_uint32 n = into n
+
+wrapping_from_uint64 : UInt64 -> Int64
+foreign pure wrapping_from_uint64 from "flick:rt" "toInt64"
+
+wrapping_from_bigint : BigInt -> Int64
+foreign pure wrapping_from_bigint from "flick:rt" "toInt64"
+
+from_bigint : BigInt -> Option Int64
+let from_bigint n = if n < min_bigint || n > max_bigint then None else Some (wrapping_from_bigint n)
+
+from_uint64 : UInt64 -> Option Int64
+let from_uint64 n = if n > 9223372036854775807u64 then None else Some (wrapping_from_uint64 n)
+
+from_float : Float -> Option Int64
+let from_float x = Option.bind from_bigint (BigInt.from_number x)
+
+from_float32 : Float32 -> Option Int64
+let from_float32 x = from_float (into x)
+
+saturating_from_bigint : BigInt -> Int64
+let saturating_from_bigint n =
+  if n < min_bigint then min_value else if n > max_bigint then max_value else wrapping_from_bigint n
+
+saturating_from_uint64 : UInt64 -> Int64
+let saturating_from_uint64 n =
+  if n > 9223372036854775807u64 then max_value else wrapping_from_uint64 n
+
+saturating_from_float : Float -> Int64
+let saturating_from_float x =
+  if Float.is_nan x then
+    0i64
+  else if x <= -9223372036854775808.0 then
+    min_value
+  else if x >= 9223372036854775808.0 then
+    max_value
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> saturating_from_bigint n
+    | None -> 0i64
+
+saturating_from_float32 : Float32 -> Int64
+let saturating_from_float32 x = saturating_from_float (into x)
+
+truncate : Float -> Int64
+let truncate x =
+  if not (Float.is_finite x) then
+    0i64
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> wrapping_from_bigint n
+    | None -> 0i64
+
+/// `abs min_value` wraps around to `min_value`.
+abs : Int64 -> Int64
+let abs x = if x < 0i64 then -x else x
+
+min : Int64 -> Int64 -> Int64
+let min a b = if a <= b then a else b
+
+max : Int64 -> Int64 -> Int64
+let max a b = if a >= b then a else b
+
+checked_add : Int64 -> Int64 -> Result Int.ArithmeticError Int64
+let checked_add a b =
+  let r = a + b
+  if (b > 0i64 && r < a) || (b < 0i64 && r > a) then
+    Err (Int.ArithmeticError "Int64.checked_add: overflow")
+  else
+    Ok r
+
+checked_sub : Int64 -> Int64 -> Result Int.ArithmeticError Int64
+let checked_sub a b =
+  let r = a - b
+  if (b > 0i64 && r > a) || (b < 0i64 && r < a) then
+    Err (Int.ArithmeticError "Int64.checked_sub: overflow")
+  else
+    Ok r
+
+checked_mul : Int64 -> Int64 -> Result Int.ArithmeticError Int64
+let checked_mul a b =
+  let p = to_bigint a * to_bigint b
+  if p < min_bigint || p > max_bigint then
+    Err (Int.ArithmeticError "Int64.checked_mul: overflow")
+  else
+    Ok (a * b)
+
+checked_div : Int64 -> Int64 -> Result Int.ArithmeticError Int64
+let checked_div a b =
+  if b == 0i64 then
+    Err (Int.ArithmeticError "Int64.checked_div: division by zero")
+  else if a == min_value && b == -1i64 then
+    Err (Int.ArithmeticError "Int64.checked_div: overflow")
+  else
+    Ok (a / b)
+
+checked_rem : Int64 -> Int64 -> Result Int.ArithmeticError Int64
+let checked_rem a b =
+  if b == 0i64 then Err (Int.ArithmeticError "Int64.checked_rem: division by zero") else Ok (a % b)
+
+divide : Int64 -> Int64 -> Result Int.ArithmeticError Int64
+let divide a b = checked_div a b
+
+remainder : Int64 -> Int64 -> Result Int.ArithmeticError Int64
+let remainder a b = checked_rem a b
+
+unsafe_div : Int64 -> Int64 -> Int64
+let unsafe_div a b =
+  if b == 0i64 then
+    let _ = Int.unsafe_div 1 0
+    0i64
+  else
+    a / b
+
+unsafe_rem : Int64 -> Int64 -> Int64
+let unsafe_rem a b =
+  if b == 0i64 then
+    let _ = Int.unsafe_rem 1 0
+    0i64
+  else
+    a % b
+
+bit_and : Int64 -> Int64 -> Int64
+foreign pure bit_and from "flick:rt" "int64BitAnd"
+
+bit_or : Int64 -> Int64 -> Int64
+foreign pure bit_or from "flick:rt" "int64BitOr"
+
+bit_xor : Int64 -> Int64 -> Int64
+foreign pure bit_xor from "flick:rt" "int64BitXor"
+
+bit_not : Int64 -> Int64
+foreign pure bit_not from "flick:rt" "int64BitNot"
+
+shift_left : Int64 -> Int -> Int64
+foreign pure shift_left from "flick:rt" "int64ShiftLeft"
+
+shift_right : Int64 -> Int -> Int64
+foreign pure shift_right from "flick:rt" "int64ShiftRight"
+
+shift_right_unsigned : Int64 -> Int -> Int64
+foreign pure shift_right_unsigned from "flick:rt" "int64ShiftRightUnsigned"

@@ -21,10 +21,10 @@ impl Lower<'_> {
         if value.dicts != 0 || !has_standard_shape(value) {
             return None;
         }
-        if value.binding.from.as_deref()? != "flick:ConfigProvider" {
+        if value.binding.from()? != "flick:ConfigProvider" {
             return None;
         }
-        let bind = value.binding.name.as_str();
+        let bind = value.binding.export_name().unwrap_or("");
         let stages = value.stages.len();
         let b = ExprBuilder::new(span, "$cp");
         let expr = prov_template(&b, bind, value.mode, stages)?;

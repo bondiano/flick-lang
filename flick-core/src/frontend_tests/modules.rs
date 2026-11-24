@@ -1,6 +1,7 @@
 use super::parse_ok;
 use crate::diagnostics::codes;
 use crate::source::SourceMap;
+use crate::types::ForeignBackendSpec;
 use crate::types::{Limits, Options, Thresholds, Watched};
 use crate::{iface, resolve, types};
 
@@ -73,6 +74,8 @@ fn checked_module_contract_is_preserved_in_its_interface() {
         thresholds: Thresholds::default(),
         watched,
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     let diagnostics = types::check(
         &module,
@@ -180,6 +183,8 @@ fn manifest_class_name_can_be_used_by_later_dictionary_requirement() {
         thresholds: types::Thresholds::default(),
         watched,
         stages_by_class: false,
+        foreign_backend: ForeignBackendSpec::default_js(),
+        validate_foreign_metadata: true,
     };
     let checked = types::check(
         &module,

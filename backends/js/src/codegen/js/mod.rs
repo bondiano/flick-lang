@@ -113,12 +113,31 @@ pub(crate) fn js_at(
     if !header.is_empty() {
         sections.push(lines(a, header));
     }
+    for preamble in &module.preambles {
+        if !preamble.code.trim().is_empty() {
+            sections.push(raw_lines(a, &preamble.code));
+        }
+    }
     sections.extend(
         typed
             .iter()
             .flat_map(|t| &t.declarations)
             .map(|d| text(a, d)),
     );
+    for (alias, code) in &g.inline_foreign {
+        let annot = if options.typescript() { ": any" } else { "" };
+        sections.push(docvec![
+            a,
+            "const ",
+            a.alloc_str(alias),
+            annot,
+            " = (",
+            a.line(),
+            raw_lines(a, code),
+            a.line(),
+            ");"
+        ]);
+    }
     sections.extend(body);
     let mut code = a.join(sections, a.lines(2));
     // a module exposing what it imports: JS consumers find it here too
@@ -158,6 +177,14 @@ fn text<'d>(a: &'d DocumentArena<'d>, lines: &str) -> Document<'d> {
     a.text(a.alloc_str(lines.trim_end_matches('\n')))
 }
 
+/// Multi-line raw foreign code emitted line-by-line via `a.line()` so source
+/// map line numbers stay exact without adding indentation.
+fn raw_lines<'d>(a: &'d DocumentArena<'d>, code: &str) -> Document<'d> {
+    let trimmed = code.trim_end_matches('\n');
+    let lines = trimmed.split('\n').map(|line| a.text(a.alloc_str(line)));
+    a.join(lines, a.line()).set_nesting(a, 0)
+}
+
 impl<'a, 'd> Gen<'a, 'd> {
     fn new(module: &'a Module, options: &'a Options<'a>, a: &'d DocumentArena<'d>) -> Self {
         let calls = kernel::calls(options.rt);
@@ -174,6 +201,7 @@ impl<'a, 'd> Gen<'a, 'd> {
             names: HashMap::new(),
             imports: BTreeSet::new(),
             foreign: Vec::new(),
+            inline_foreign: Vec::new(),
             runtime: false,
             effect: false,
             kernel: options.rt,
@@ -306,6 +334,8 @@ struct Gen<'a, 'd> {
     imports: BTreeSet<String>,
     /// Foreign imports: specifier, export, alias.
     foreign: Vec<(String, String, String)>,
+    /// Inline foreign bindings: module-level constant alias and JS expression.
+    inline_foreign: Vec<(String, String)>,
     runtime: bool,
     effect: bool,
     kernel: bool,

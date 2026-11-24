@@ -1,0 +1,82 @@
+module App.FixedWidthFail exposing (..)
+
+i8_hi : Int8
+let i8_hi = 128i8
+
+i8_lo : Int8
+let i8_lo = -129i8
+
+i16_hi : Int16
+let i16_hi = 32768i16
+
+i16_lo : Int16
+let i16_lo = -32769i16
+
+i32_hi : Int32
+let i32_hi = 2147483648i32
+
+i32_lo : Int32
+let i32_lo = -2147483649i32
+
+i64_hi : Int64
+let i64_hi = 9223372036854775808i64
+
+i64_lo : Int64
+let i64_lo = -9223372036854775809i64
+
+u8_hi : UInt8
+let u8_hi = 256u8
+
+u8_neg : UInt8
+let u8_neg = -1u8
+
+u16_hi : UInt16
+let u16_hi = 65536u16
+
+u32_hi : UInt32
+let u32_hi = 4294967296u32
+
+u64_hi : UInt64
+let u64_hi = 18446744073709551616u64
+
+no_widen_implicit : Int16
+let no_widen_implicit = 1i8
+
+no_sign_implicit : UInt8
+let no_sign_implicit = 1i8
+
+no_float_implicit : Float
+let no_float_implicit = 1.0f32
+
+no_mixed_arith : Int8
+let no_mixed_arith = 1i8 + 1i16
+
+no_narrow_into : Int16 -> Int8
+let no_narrow_into x = into x
+
+no_silent_f32_default : Float
+let no_silent_f32_default = into 0.1
+
+no_silent_i8_default : Int16
+let no_silent_i8_default = into 200
+
+//~ FLICK-T003 @4:13-4:18 this number does not fit in `Int8`
+//~ FLICK-T003 @7:14-7:19 this number does not fit in `Int8`
+//~ FLICK-T003 @10:14-10:22 this number does not fit in `Int16`
+//~ FLICK-T003 @13:15-13:23 this number does not fit in `Int16`
+//~ FLICK-T003 @16:14-16:27 this number does not fit in `Int`
+//~ FLICK-T003 @19:15-19:28 this number does not fit in `Int`
+//~ FLICK-T003 @22:14-22:36 this number does not fit in `Int64`
+//~ FLICK-T003 @25:15-25:37 this number does not fit in `Int64`
+//~ FLICK-T003 @28:13-28:18 this number does not fit in `UInt8`
+//~ FLICK-T003 @31:15-31:18 this number does not fit in `UInt8`
+//~ FLICK-T003 @34:14-34:22 this number does not fit in `UInt16`
+//~ FLICK-T003 @37:14-37:27 this number does not fit in `UInt32`
+//~ FLICK-T003 @40:14-40:37 this number does not fit in `UInt64`
+//~ FLICK-T003 @43:25-43:28 expected `Int16`, found `Int8`
+//~ FLICK-T003 @46:24-46:27 expected `UInt8`, found `Int8`
+//~ FLICK-T003 @49:25-49:31 expected `Float`, found `Float32`
+//~ FLICK-T003 @52:28-52:32 expected `Int8`, found `Int16`
+//~ FLICK-C001 @55:24-55:28 no instance for `Into Int16 Int8`
+//~ FLICK-C001 @58:29-58:33 no instance for `Into Float Float`
+//~ FLICK-C001 @61:28-61:32 no instance for `Into Int Int16`

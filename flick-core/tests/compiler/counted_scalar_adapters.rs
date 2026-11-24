@@ -8,9 +8,24 @@ use flick_ir::{ForeignMode, Shape};
 type Mutation = Box<dyn Fn(&mut Foreign)>;
 fn mutations(arity: usize) -> Vec<Mutation> {
     let mut rejections: Vec<Mutation> = vec![
-        Box::new(|v| v.binding.from = None),
-        Box::new(|v| v.binding.from = Some("other".into())),
-        Box::new(|v| v.binding.name.push('!')),
+        Box::new(|v| {
+            v.binding = flick_ir::Binding::Global {
+                name: v.binding.export_name().unwrap_or("").to_owned(),
+            };
+        }),
+        Box::new(|v| {
+            v.binding = flick_ir::Binding::Module {
+                from: "other".into(),
+                name: v.binding.export_name().unwrap_or("").to_owned(),
+            };
+        }),
+        Box::new(|v| {
+            if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                &mut v.binding
+            {
+                name.push('!');
+            }
+        }),
         Box::new(|v| v.mode = ForeignMode::Sync),
         Box::new(|v| v.mode = ForeignMode::Async),
         Box::new(|v| v.mode = ForeignMode::Effect),
@@ -25,10 +40,28 @@ fn mutations(arity: usize) -> Vec<Mutation> {
                 Span::new(FileId::new(0), 0, 0),
             ));
         }),
-        Box::new(|v| v.adapter.receiver = true),
-        Box::new(|v| v.adapter.cancel = true),
+        Box::new(|v| {
+            v.adapter.words.push(flick_ir::BackendAdapter {
+                name: "this".into(),
+                args: vec![],
+                span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+            });
+        }),
+        Box::new(|v| {
+            v.adapter.words.push(flick_ir::BackendAdapter {
+                name: "cancel".into(),
+                args: vec![flick_ir::AdapterArg::Word("signal".into())],
+                span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+            });
+        }),
         Box::new(|v| v.adapter.optional.push(0)),
-        Box::new(|v| v.adapter.variadic = true),
+        Box::new(|v| {
+            v.adapter.words.push(flick_ir::BackendAdapter {
+                name: "variadic".into(),
+                args: vec![],
+                span: flick_ir::Span::new(flick_ir::FileId::new(0), 0, 0),
+            });
+        }),
         Box::new(|v| v.adapter.result.nullable = true),
         Box::new(|v| v.adapter.result.unit = true),
         Box::new(|v| v.adapter.callbacks.clear()),
@@ -63,17 +96,16 @@ fn all_canonical_number_and_minmax_bindings_require_the_complete_exact_adapter()
             let ItemKind::Foreign(original) = &item.kind else {
                 continue;
             };
-            if !((original.binding.from.is_none() && original.binding.name == "Number")
-                || (original.binding.from.as_deref() == Some("flick:Number")
-                    && matches!(original.binding.name.as_str(), "min" | "max")))
+            if !(original.binding.global_name() == Some("Number")
+                || matches!(
+                    original.binding.module_export(),
+                    Some(("flick:Number", "min" | "max"))
+                ))
             {
                 continue;
             }
-            seen.push((
-                module.name.as_str(),
-                original.name.as_str(),
-                original.binding.name.as_str(),
-            ));
+            let bind_name = original.binding.export_name().unwrap_or("");
+            seen.push((module.name.as_str(), original.name.as_str(), bind_name));
             let entry = memory::Name::new(&module.name, &original.name);
             let program = perceus::lower_with_declarations(
                 [module],
@@ -102,7 +134,7 @@ fn all_canonical_number_and_minmax_bindings_require_the_complete_exact_adapter()
                 mutate(value);
                 let mut copied_input = original.clone();
                 copied_input.adapter.copies.args[0] = true;
-                if original.binding.from.is_none() && *value == copied_input {
+                if original.binding.global_name().is_some() && *value == copied_input {
                     // Identity-copy is an audited variant ONLY after the exact
                     // checked numeric-domain proof. It does not relax any
                     // other metadata field or the no-evidence entry point.
@@ -133,8 +165,7 @@ fn all_canonical_number_and_minmax_bindings_require_the_complete_exact_adapter()
                     failure
                         .to_string()
                         .starts_with("memory lowering does not yet support foreign binding"),
-                    "{} mutation{mutation_index}: {failure}",
-                    original.binding.name
+                    "{bind_name} mutation{mutation_index}: {failure}"
                 );
                 assert!(
                     failure.to_string().contains(&format!("at {:?}", item.span)),
@@ -169,9 +200,11 @@ fn no_evidence_entrypoint_does_not_guess_scalar_domains_from_builtin_names() {
             let ItemKind::Foreign(value) = &item.kind else {
                 continue;
             };
-            if (value.binding.from.is_none() && value.binding.name == "Number")
-                || (value.binding.from.as_deref() == Some("flick:Number")
-                    && matches!(value.binding.name.as_str(), "min" | "max"))
+            if value.binding.global_name() == Some("Number")
+                || matches!(
+                    value.binding.module_export(),
+                    Some(("flick:Number", "min" | "max"))
+                )
             {
                 let entry = memory::Name::new(&module.name, &value.name);
                 let error =

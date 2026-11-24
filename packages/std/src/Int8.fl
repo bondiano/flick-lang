@@ -1,0 +1,242 @@
+/// Operations and explicit conversions on `Int8`, the 8-bit signed integers
+/// (`-128..=127`). Operators wrap around; `/` and `%` by zero yield `0`.
+module Int8 exposing (..)
+
+import BigInt
+
+min_value : Int8
+let min_value = -128i8
+
+max_value : Int8
+let max_value = 127i8
+
+min_bigint : BigInt
+let min_bigint = -128n
+
+max_bigint : BigInt
+let max_bigint = 127n
+
+to_string : Int8 -> String
+let to_string n = display n
+
+parse : String -> Option Int8
+let parse s = Option.bind from_bigint (BigInt.parse s)
+
+to_float : Int8 -> Float
+foreign pure to_float from "flick:rt" "toFloat64"
+
+to_float32 : Int8 -> Float32
+foreign pure to_float32 from "flick:rt" "toFloat32"
+
+to_bigint : Int8 -> BigInt
+foreign pure to_bigint from "flick:rt" "toBigInt"
+
+to_int : Int8 -> Int
+foreign pure to_int from "flick:rt" "toInt32"
+
+wrapping_from_int16 : Int16 -> Int8
+foreign pure wrapping_from_int16 from "flick:rt" "toInt8"
+
+wrapping_from_int : Int -> Int8
+foreign pure wrapping_from_int from "flick:rt" "toInt8"
+
+wrapping_from_int32 : Int32 -> Int8
+let wrapping_from_int32 n = wrapping_from_int n
+
+wrapping_from_int64 : Int64 -> Int8
+foreign pure wrapping_from_int64 from "flick:rt" "toInt8"
+
+wrapping_from_uint8 : UInt8 -> Int8
+foreign pure wrapping_from_uint8 from "flick:rt" "toInt8"
+
+wrapping_from_uint16 : UInt16 -> Int8
+foreign pure wrapping_from_uint16 from "flick:rt" "toInt8"
+
+wrapping_from_uint32 : UInt32 -> Int8
+foreign pure wrapping_from_uint32 from "flick:rt" "toInt8"
+
+wrapping_from_uint64 : UInt64 -> Int8
+foreign pure wrapping_from_uint64 from "flick:rt" "toInt8"
+
+wrapping_from_bigint : BigInt -> Int8
+foreign pure wrapping_from_bigint from "flick:rt" "toInt8"
+
+from_bigint : BigInt -> Option Int8
+let from_bigint n = if n < min_bigint || n > max_bigint then None else Some (wrapping_from_bigint n)
+
+from_int16 : Int16 -> Option Int8
+let from_int16 n = if n < -128i16 || n > 127i16 then None else Some (wrapping_from_int16 n)
+
+from_int : Int -> Option Int8
+let from_int n = if n < -128 || n > 127 then None else Some (wrapping_from_int n)
+
+from_int32 : Int32 -> Option Int8
+let from_int32 n = from_int n
+
+from_int64 : Int64 -> Option Int8
+let from_int64 n = if n < -128i64 || n > 127i64 then None else Some (wrapping_from_int64 n)
+
+from_uint8 : UInt8 -> Option Int8
+let from_uint8 n = if n > 127u8 then None else Some (wrapping_from_uint8 n)
+
+from_uint16 : UInt16 -> Option Int8
+let from_uint16 n = if n > 127u16 then None else Some (wrapping_from_uint16 n)
+
+from_uint32 : UInt32 -> Option Int8
+let from_uint32 n = if n > 127u32 then None else Some (wrapping_from_uint32 n)
+
+from_uint64 : UInt64 -> Option Int8
+let from_uint64 n = if n > 127u64 then None else Some (wrapping_from_uint64 n)
+
+from_float : Float -> Option Int8
+let from_float x = Option.bind from_bigint (BigInt.from_number x)
+
+from_float32 : Float32 -> Option Int8
+let from_float32 x = from_float (into x)
+
+saturating_from_bigint : BigInt -> Int8
+let saturating_from_bigint n =
+  if n < min_bigint then min_value else if n > max_bigint then max_value else wrapping_from_bigint n
+
+saturating_from_int16 : Int16 -> Int8
+let saturating_from_int16 n =
+  if n < -128i16 then min_value else if n > 127i16 then max_value else wrapping_from_int16 n
+
+saturating_from_int : Int -> Int8
+let saturating_from_int n =
+  if n < -128 then min_value else if n > 127 then max_value else wrapping_from_int n
+
+saturating_from_int32 : Int32 -> Int8
+let saturating_from_int32 n = saturating_from_int n
+
+saturating_from_int64 : Int64 -> Int8
+let saturating_from_int64 n =
+  if n < -128i64 then min_value else if n > 127i64 then max_value else wrapping_from_int64 n
+
+saturating_from_uint8 : UInt8 -> Int8
+let saturating_from_uint8 n = if n > 127u8 then max_value else wrapping_from_uint8 n
+
+saturating_from_uint16 : UInt16 -> Int8
+let saturating_from_uint16 n = if n > 127u16 then max_value else wrapping_from_uint16 n
+
+saturating_from_uint32 : UInt32 -> Int8
+let saturating_from_uint32 n = if n > 127u32 then max_value else wrapping_from_uint32 n
+
+saturating_from_uint64 : UInt64 -> Int8
+let saturating_from_uint64 n = if n > 127u64 then max_value else wrapping_from_uint64 n
+
+saturating_from_float : Float -> Int8
+let saturating_from_float x =
+  if Float.is_nan x then
+    0i8
+  else if x <= -128.0 then
+    min_value
+  else if x >= 127.0 then
+    max_value
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> saturating_from_bigint n
+    | None -> 0i8
+
+saturating_from_float32 : Float32 -> Int8
+let saturating_from_float32 x = saturating_from_float (into x)
+
+truncate : Float -> Int8
+let truncate x =
+  if not (Float.is_finite x) then
+    0i8
+  else
+    match BigInt.from_number (Float.trunc x) with
+    | Some n -> wrapping_from_bigint n
+    | None -> 0i8
+
+/// `abs min_value` wraps around to `min_value`.
+abs : Int8 -> Int8
+let abs x = if x < 0i8 then -x else x
+
+min : Int8 -> Int8 -> Int8
+let min a b = if a <= b then a else b
+
+max : Int8 -> Int8 -> Int8
+let max a b = if a >= b then a else b
+
+checked_add : Int8 -> Int8 -> Result Int.ArithmeticError Int8
+let checked_add a b =
+  let r = a + b
+  if (b > 0i8 && r < a) || (b < 0i8 && r > a) then
+    Err (Int.ArithmeticError "Int8.checked_add: overflow")
+  else
+    Ok r
+
+checked_sub : Int8 -> Int8 -> Result Int.ArithmeticError Int8
+let checked_sub a b =
+  let r = a - b
+  if (b > 0i8 && r > a) || (b < 0i8 && r < a) then
+    Err (Int.ArithmeticError "Int8.checked_sub: overflow")
+  else
+    Ok r
+
+checked_mul : Int8 -> Int8 -> Result Int.ArithmeticError Int8
+let checked_mul a b =
+  let p = to_int a * to_int b
+  if p < -128 || p > 127 then
+    Err (Int.ArithmeticError "Int8.checked_mul: overflow")
+  else
+    Ok (wrapping_from_int p)
+
+checked_div : Int8 -> Int8 -> Result Int.ArithmeticError Int8
+let checked_div a b =
+  if b == 0i8 then
+    Err (Int.ArithmeticError "Int8.checked_div: division by zero")
+  else if a == min_value && b == -1i8 then
+    Err (Int.ArithmeticError "Int8.checked_div: overflow")
+  else
+    Ok (a / b)
+
+checked_rem : Int8 -> Int8 -> Result Int.ArithmeticError Int8
+let checked_rem a b =
+  if b == 0i8 then Err (Int.ArithmeticError "Int8.checked_rem: division by zero") else Ok (a % b)
+
+divide : Int8 -> Int8 -> Result Int.ArithmeticError Int8
+let divide a b = checked_div a b
+
+remainder : Int8 -> Int8 -> Result Int.ArithmeticError Int8
+let remainder a b = checked_rem a b
+
+unsafe_div : Int8 -> Int8 -> Int8
+let unsafe_div a b =
+  if b == 0i8 then
+    let _ = Int.unsafe_div 1 0
+    0i8
+  else
+    a / b
+
+unsafe_rem : Int8 -> Int8 -> Int8
+let unsafe_rem a b =
+  if b == 0i8 then
+    let _ = Int.unsafe_rem 1 0
+    0i8
+  else
+    a % b
+
+bit_and : Int8 -> Int8 -> Int8
+let bit_and a b = wrapping_from_int (Int.bit_and (to_int a) (to_int b))
+
+bit_or : Int8 -> Int8 -> Int8
+let bit_or a b = wrapping_from_int (Int.bit_or (to_int a) (to_int b))
+
+bit_xor : Int8 -> Int8 -> Int8
+let bit_xor a b = wrapping_from_int (Int.bit_xor (to_int a) (to_int b))
+
+bit_not : Int8 -> Int8
+let bit_not a = wrapping_from_int (Int.bit_not (to_int a))
+
+shift_left : Int8 -> Int -> Int8
+let shift_left a n = wrapping_from_int (Int.shift_left (to_int a) (Int.bit_and n 7))
+
+shift_right : Int8 -> Int -> Int8
+let shift_right a n = wrapping_from_int (Int.shift_right (to_int a) (Int.bit_and n 7))
+
+shift_right_unsigned : Int8 -> Int -> Int8
+let shift_right_unsigned a n =
+  wrapping_from_int (Int.shift_right_unsigned (Int.bit_and (to_int a) 255) (Int.bit_and n 7))

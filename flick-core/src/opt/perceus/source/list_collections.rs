@@ -33,7 +33,7 @@ enum Collection {
 }
 
 fn kind(value: &Foreign) -> Option<Collection> {
-    match value.binding.name.as_str() {
+    match value.binding.export_name().unwrap_or("") {
         "listMap" => Some(Collection::Map),
         "listMap2" => Some(Collection::Map2),
         "listFlatMap" => Some(Collection::FlatMap),
@@ -92,10 +92,8 @@ fn adapter(kind: Collection, map_variant: usize) -> Adapter {
         }
     }
     Adapter {
-        receiver: false,
-        cancel: false,
         optional: vec![],
-        variadic: false,
+        owned: vec![],
         result: ResultAdapter {
             nullable: false,
             unit: false,
@@ -108,6 +106,7 @@ fn adapter(kind: Collection, map_variant: usize) -> Adapter {
         },
         shapes: vec![Shape::Data; arity],
         result_shape: Shape::Data,
+        words: vec![],
     }
 }
 
@@ -124,7 +123,7 @@ fn supports(value: &Foreign, kind: Collection) -> bool {
     } else {
         2
     };
-    value.binding.from.as_deref() == Some("flick:rt")
+    value.binding.from() == Some("flick:rt")
         && value.mode == ForeignMode::Pure
         && value.dicts == 0
         && value.arity == arity

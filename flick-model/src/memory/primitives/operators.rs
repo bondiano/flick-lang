@@ -27,10 +27,6 @@ fn bigint_binary(
     Ok(heap.allocate(Data::BigInt(text)))
 }
 
-#[expect(
-    clippy::float_cmp,
-    reason = "language primitive equality uses exact IEEE comparisons"
-)]
 pub(super) fn binary(
     heap: &mut Heap,
     op: BinOp,
@@ -40,30 +36,7 @@ pub(super) fn binary(
     heap.admit_ordinary(left)?;
     heap.admit_ordinary(right)?;
     Ok(match op {
-        BinOp::Arith(op, Num::Int) => {
-            let (Value::Int(a), Value::Int(b)) = (left, right) else {
-                return Err(unsupported("Int arithmetic type mismatch"));
-            };
-            Value::Int(int_arith(op, *a, *b))
-        }
-        BinOp::Arith(op, Num::Float) => {
-            let (Value::Float(a), Value::Float(b)) = (left, right) else {
-                return Err(unsupported("Float arithmetic type mismatch"));
-            };
-            Value::Float(match op {
-                Arith::Add => a + b,
-                Arith::Sub => a - b,
-                Arith::Mul => a * b,
-                Arith::Div => a / b,
-                Arith::Rem => a % b,
-                Arith::Pow if b.is_nan() || a.abs() == 1.0 && b.is_infinite() => f64::NAN,
-                Arith::Pow => a.powf(*b),
-            })
-        }
-        BinOp::Arith(op, Num::BigInt) => {
-            // Standalone execute deliberately has no fuel or automatic cleanup.
-            return bigint_binary(heap, op, left, right, |_| Ok(()));
-        }
+        BinOp::Arith(op, num) => return arith_binary(heap, op, num, left, right),
         BinOp::Eq | BinOp::NotEq => Value::Bool(equal(heap, left, right)? == (op == BinOp::Eq)),
         BinOp::Same | BinOp::NotSame => {
             Value::Bool(same_primitive(heap, left, right)? == (op == BinOp::Same))
@@ -100,6 +73,7 @@ pub(super) fn binary(
 fn same_primitive(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Error> {
     match (left, right) {
         (Value::Float(a), Value::Float(b)) => Ok(a == b),
+        (Value::Float32(a), Value::Float32(b)) => Ok(a == b),
         (Value::Object(a), Value::Object(b)) => {
             match (&heap.object(a.id)?.data, &heap.object(b.id)?.data) {
                 (Data::ServiceTag { .. }, Data::ServiceTag { .. }) => Ok(a.id == b.id),
@@ -190,7 +164,15 @@ fn list_concat(heap: &mut Heap, left: &Value, right: &Value) -> Result<Value, Er
 fn order(heap: &Heap, left: &Value, right: &Value) -> Result<Option<Ordering>, Error> {
     Ok(match (left, right) {
         (Value::Int(a), Value::Int(b)) => Some(a.cmp(b)),
+        (Value::Int8(a), Value::Int8(b)) => Some(a.cmp(b)),
+        (Value::Int16(a), Value::Int16(b)) => Some(a.cmp(b)),
+        (Value::Int64(a), Value::Int64(b)) => Some(a.cmp(b)),
+        (Value::UInt8(a), Value::UInt8(b)) => Some(a.cmp(b)),
+        (Value::UInt16(a), Value::UInt16(b)) => Some(a.cmp(b)),
+        (Value::UInt32(a), Value::UInt32(b)) => Some(a.cmp(b)),
+        (Value::UInt64(a), Value::UInt64(b)) => Some(a.cmp(b)),
         (Value::Float(a), Value::Float(b)) => a.partial_cmp(b),
+        (Value::Float32(a), Value::Float32(b)) => a.partial_cmp(b),
         (Value::Bool(a), Value::Bool(b)) => Some(a.cmp(b)),
         (Value::Object(a), Value::Object(b)) => {
             match (&heap.object(a.id)?.data, &heap.object(b.id)?.data) {
@@ -363,7 +345,21 @@ fn equal_with(heap: &Heap, left: &Value, right: &Value, strict_zero: bool) -> Re
             (Value::Unit, Value::Unit) => true,
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Int(a), Value::Int(b)) => a == b,
+            (Value::Int8(a), Value::Int8(b)) => a == b,
+            (Value::Int16(a), Value::Int16(b)) => a == b,
+            (Value::Int64(a), Value::Int64(b)) => a == b,
+            (Value::UInt8(a), Value::UInt8(b)) => a == b,
+            (Value::UInt16(a), Value::UInt16(b)) => a == b,
+            (Value::UInt32(a), Value::UInt32(b)) => a == b,
+            (Value::UInt64(a), Value::UInt64(b)) => a == b,
             (Value::Float(a), Value::Float(b)) => {
+                if strict_zero {
+                    a.to_bits() == b.to_bits() || a.is_nan() && b.is_nan()
+                } else {
+                    a == b || a.is_nan() && b.is_nan()
+                }
+            }
+            (Value::Float32(a), Value::Float32(b)) => {
                 if strict_zero {
                     a.to_bits() == b.to_bits() || a.is_nan() && b.is_nan()
                 } else {

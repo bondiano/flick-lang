@@ -23,11 +23,15 @@ impl Lower<'_> {
         if value.dicts != 0 || value.mode != ForeignMode::Effect || !has_standard_shape(value) {
             return None;
         }
-        if value.binding.from.as_deref()? != "flick:Cache" {
+        if value.binding.from()? != "flick:Cache" {
             return None;
         }
         let b = ExprBuilder::new(span, "$ca");
-        let expr = cache_template(&b, value.binding.name.as_str(), value.stages.len())?;
+        let expr = cache_template(
+            &b,
+            value.binding.export_name().unwrap_or(""),
+            value.stages.len(),
+        )?;
         Some(self.lower_with_manual_scope(&expr, "$ca", block, span))
     }
 }

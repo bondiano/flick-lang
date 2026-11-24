@@ -16,6 +16,10 @@ func Equals(a, b Value) bool { return equalValues(a, b, false) }
 // structurally without observing storage identity or written field order.
 func SameValue(a, b Value) bool { return equalValues(a, b, true) }
 
+// EqualWith compares two Flick values structurally under SameValue when
+// strictZero is true, or SameValueZero otherwise.
+func EqualWith(a, b Value, strictZero bool) bool { return equalValues(a, b, strictZero) }
+
 func equalValues(a, b Value, strictZero bool) bool {
 	switch x := a.(type) {
 	case float64:
@@ -25,6 +29,15 @@ func equalValues(a, b Value, strictZero bool) bool {
 		}
 		if strictZero {
 			return NumberSameValue(x, y)
+		}
+		return x == y || (x != x && y != y)
+	case float32:
+		y, ok := b.(float32)
+		if !ok {
+			return false
+		}
+		if strictZero {
+			return NumberSameValue(float64(x), float64(y))
 		}
 		return x == y || (x != x && y != y)
 	case *big.Int:
@@ -84,12 +97,17 @@ func equalValues(a, b Value, strictZero bool) bool {
 	case Fn, Fn2, Fn3, Poly:
 		// functions compare by identity on the JS target; Go cannot compare them
 		return false
-	case int32, string, bool, UnitType:
+	case int8, int16, int32, int64, uint8, uint16, uint32, uint64, string, bool, UnitType:
 		return a == b
 	default:
 		// a constructor value of a Go type of its own, asked last: a number
 		// or a string never gets here
 		if x, ok := a.(Constructed); ok {
+			if eq, ok := x.(ConstructedEqual); ok {
+				if equal, same := eq.EqualConstructed(b, strictZero); same {
+					return equal
+				}
+			}
 			return sameConstructedValues(x, b, strictZero)
 		}
 		return a == b
@@ -140,11 +158,124 @@ func ordering(c int) Value {
 // UTF-16 code units.
 func Compare(a, b Value) Value { return ordering(compare(a, b)) }
 
+// CompareInt, CompareFloat, CompareBool and CompareString are the typed total
+// order comparisons for unboxed scalar values, matching Compare without boxing.
+func CompareInt(a, b int32) Value {
+	if a < b {
+		return LT
+	}
+	if a > b {
+		return GT
+	}
+	return EQ
+}
+
+func CompareFloat(a, b float64) Value {
+	xn, yn := math.IsNaN(a), math.IsNaN(b)
+	if xn || yn {
+		return ordering(boolInt(xn) - boolInt(yn))
+	}
+	if a < b {
+		return LT
+	}
+	if a > b {
+		return GT
+	}
+	return EQ
+}
+
+func CompareBool(a, b bool) Value {
+	if a == b {
+		return EQ
+	}
+	if !a {
+		return LT
+	}
+	return GT
+}
+
+func CompareString(a, b string) Value { return ordering(CompareStrings(a, b)) }
+
 func compare(a, b Value) int {
 	switch x := a.(type) {
+	case int8:
+		y := b.(int8)
+		switch {
+		case x < y:
+			return -1
+		case x > y:
+			return 1
+		}
+		return 0
+	case int16:
+		y := b.(int16)
+		switch {
+		case x < y:
+			return -1
+		case x > y:
+			return 1
+		}
+		return 0
 	case int32:
 		y := b.(int32)
 		switch {
+		case x < y:
+			return -1
+		case x > y:
+			return 1
+		}
+		return 0
+	case int64:
+		y := b.(int64)
+		switch {
+		case x < y:
+			return -1
+		case x > y:
+			return 1
+		}
+		return 0
+	case uint8:
+		y := b.(uint8)
+		switch {
+		case x < y:
+			return -1
+		case x > y:
+			return 1
+		}
+		return 0
+	case uint16:
+		y := b.(uint16)
+		switch {
+		case x < y:
+			return -1
+		case x > y:
+			return 1
+		}
+		return 0
+	case uint32:
+		y := b.(uint32)
+		switch {
+		case x < y:
+			return -1
+		case x > y:
+			return 1
+		}
+		return 0
+	case uint64:
+		y := b.(uint64)
+		switch {
+		case x < y:
+			return -1
+		case x > y:
+			return 1
+		}
+		return 0
+	case float32:
+		y := b.(float32)
+		xn, yn := math.IsNaN(float64(x)), math.IsNaN(float64(y))
+		switch {
+		case xn || yn:
+			return boolInt(xn) - boolInt(yn)
 		case x < y:
 			return -1
 		case x > y:
@@ -188,11 +319,14 @@ func Gt(a, b Value) bool { return ordered(a, b) && compare(a, b) > 0 }
 func Ge(a, b Value) bool { return ordered(a, b) && compare(a, b) >= 0 }
 
 func ordered(a, b Value) bool {
-	x, ok := a.(float64)
-	if !ok {
+	switch x := a.(type) {
+	case float64:
+		return !math.IsNaN(x) && !math.IsNaN(b.(float64))
+	case float32:
+		return !math.IsNaN(float64(x)) && !math.IsNaN(float64(b.(float32)))
+	default:
 		return true
 	}
-	return !math.IsNaN(x) && !math.IsNaN(b.(float64))
 }
 
 // combine folds a hash into another, as Flick's list and derived hashes do.
@@ -201,6 +335,18 @@ func combine(h, x int32) int32 { return h*31 + x }
 // Hash is `hash` of a primitive, computed as on the JS target, which hash
 // collections order their elements by.
 func Hash(a Value) Value { return hash(a) }
+
+// HashInt, HashFloat, HashBool and HashString compute primitive hashes without
+// boxing scalar arguments or results.
+func HashInt(x int32) int32     { return optimize(x) }
+func HashFloat(x float64) int32 { return hashNumber(x) }
+func HashBool(x bool) int32 {
+	if x {
+		return hashTrue
+	}
+	return hashFalse
+}
+func HashString(s string) int32 { return hashString(s) }
 
 func optimize(n int32) int32 { return n&-0x40000001 | int32(uint32(n)>>1)&0x40000000 }
 
@@ -256,8 +402,24 @@ var (
 
 func hash(a Value) int32 {
 	switch x := a.(type) {
+	case int8:
+		return optimize(int32(x))
+	case int16:
+		return optimize(int32(x))
 	case int32:
 		return optimize(x)
+	case int64:
+		return hashString(strconv.FormatInt(x, 10))
+	case uint8:
+		return optimize(int32(x))
+	case uint16:
+		return optimize(int32(x))
+	case uint32:
+		return hashNumber(float64(x))
+	case uint64:
+		return hashString(strconv.FormatUint(x, 10))
+	case float32:
+		return hashNumber(float64(x))
 	case float64:
 		return hashNumber(x)
 	case string:
@@ -327,8 +489,24 @@ func Show(a Value) Value {
 		return x.String() + "n"
 	case *Data:
 		return ConstructorName(x.Tag)
+	case int8:
+		return strconv.FormatInt(int64(x), 10)
+	case int16:
+		return strconv.FormatInt(int64(x), 10)
 	case int32:
 		return strconv.Itoa(int(x))
+	case int64:
+		return strconv.FormatInt(x, 10)
+	case uint8:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint16:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint32:
+		return strconv.FormatUint(uint64(x), 10)
+	case uint64:
+		return strconv.FormatUint(x, 10)
+	case float32:
+		return ShowNumber(float64(x))
 	case float64:
 		return ShowNumber(x)
 	case bool:
@@ -343,6 +521,18 @@ func Show(a Value) Value {
 	}
 	return "[object Object]"
 }
+
+// ShowInt, ShowFloat, ShowBool and ShowString format unboxed scalar values
+// without boxing arguments or results.
+func ShowInt(x int32) string     { return strconv.Itoa(int(x)) }
+func ShowFloat(x float64) string { return ShowNumber(x) }
+func ShowBool(x bool) string {
+	if x {
+		return "true"
+	}
+	return "false"
+}
+func ShowString(s string) string { return QuoteJSON(s) }
 
 // ListEquals, ListCompare, ListHash and ListShow are the instances of
 // lists, given those of the elements.

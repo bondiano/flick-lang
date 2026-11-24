@@ -8,6 +8,7 @@ use super::{
 };
 use crate::diagnostics::codes;
 use crate::logic::{DOMAIN_V2, Data, Ty, omega};
+use crate::source::SourceMap;
 
 #[test]
 fn prove_consume_certified_and_rejects_tampered_certificates() {
@@ -327,4 +328,28 @@ fn prove_unary_neg_overflow_and_guarded_success() {
         .push((tcmp(IntCmpOp::Gt, tvar("x"), tint(INT_MIN)), span_at(1, 2)));
     prove_contract(&neg_spec, &neg_body, &data, &prog, &verified, &l)
         .expect("guarded -x should be certified");
+}
+
+#[test]
+fn fixed_width_arithmetic_in_a_contract_is_refused() {
+    let source = r"module Main exposing (add)
+
+add : Int8 -> Int8 -> Int8
+let add x y
+where
+  ensure (fun _ -> true)
+=
+  x + y
+";
+    let mut sources = SourceMap::default();
+    let file = sources.add("/Main.fl", source);
+    let found = crate::prove(&sources, file);
+    let refused: Vec<_> = found.iter().filter(|d| d.code == codes::T082).collect();
+    assert!(!refused.is_empty(), "{found:?}");
+    assert!(
+        refused
+            .iter()
+            .any(|d| d.message.contains("`Int8` arithmetic")),
+        "{found:?}"
+    );
 }

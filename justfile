@@ -338,7 +338,7 @@ wasm:
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
-    test $(wc -c < $wasm) -le 4600000 # reason: syntax ergonomics (#790-#794, #824): 4.5 MB left <8 KB headroom on main; allow 4.6 MB
+    test $(wc -c < $wasm) -le 4750000 # reason: fixed-width numeric types (#678): 10 embedded stdlib modules (~70 KB raw source) + compiler/IR/JS support grew flick_wasm.wasm by ~95 KB (4.595 → 4.690 MB after wasm-opt; <5 KB headroom on main)
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm

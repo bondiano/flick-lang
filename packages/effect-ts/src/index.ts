@@ -27,10 +27,11 @@ export {
   provideHost,
 } from "./runner/host.ts";
 export * from "./layer.ts";
-export { lazyDone, lazyForce, lazyMake } from "./effect/Lazy.ts";
+export { lazyDone, lazyForce, lazyMake, lazyMakeLocal } from "./effect/Lazy.ts";
 export * from "./owner.ts";
 export { arenaAlloc, arenaGet } from "@flick-lang/runtime/core/Arena";
 export * from "@flick-lang/runtime/core/bytes";
+export * from "@flick-lang/runtime/core/fixed_width";
 export * from "./form.ts";
 export * from "./race.ts";
 export * from "./route.ts";

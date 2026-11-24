@@ -82,7 +82,10 @@ macro_rules! wit_conversions {
             OptionDescriptor { parameter, default, implicit_value, choices, verbs }
             OptionValue { key, value }
             EnvironmentServices { environment, services }
-            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, tags, axes, profiles, modes, capabilities, options, launch_runtimes, host_tools, projections, stages_by_class_option, foreign_extension, foreign_suffixes, handled_services }
+            AdapterArg { name, kind }
+            AdapterWord { name, args, repeatable, doc }
+            TypeFormAttribute { name, doc }
+            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, tags, axes, profiles, modes, capabilities, options, launch_runtimes, host_tools, projections, stages_by_class_option, foreign_extension, foreign_suffixes, handled_services, foreign_adapters, type_form_attributes }
             TargetRequest { backend_api, ir_version, language_version, runtime_abis, environment, tags, host_package, profile, mode, required_capabilities, options }
             TargetSupport { capabilities }
             Span { file, start, end }
@@ -93,10 +96,11 @@ macro_rules! wit_conversions {
             Symbol { module, name }
             Entry { name, symbol, runner }
             ForeignBinding { module, specifier, resolved, abi, inputs }
+            InlineForeign { module, name, code, span }
             Projection { module, schema, input }
             PackageTarget { package, environments }
             RootHandler { environment, service, handler }
-            BuildRequest { target, backend, program, module_root, modules, sources, entries, test_roots, foreign, projections, package_targets, root_handlers, inputs, toolchains, runtime_dependencies, declared_dependencies }
+            BuildRequest { target, backend, program, module_root, modules, sources, entries, test_roots, foreign, inline_foreign, projections, package_targets, root_handlers, inputs, toolchains, runtime_dependencies, declared_dependencies }
             Artifact { id, path, kind, bytes }
             Toolchain { id, version, sha256 }
             StepOutput { id, path, kind }
@@ -121,6 +125,30 @@ macro_rules! wit_conversions {
             ArtifactKind { Source, SourceMap, Declaration, Object, Executable, Resource, Metadata }
             LaunchKind { Run, Test }
             InputError { Undeclared, Unavailable, DigestMismatch }
+            }
+            impl ToWire for $crate::AdapterArgKind {
+                type Wire = w::AdapterArgKind;
+                fn to_wire(&self) -> Self::Wire {
+                    match self {
+                        Self::Keyword(choices) => w::AdapterArgKind::Keyword(choices.to_wire()),
+                        Self::ParamIndex => w::AdapterArgKind::ParamIndex,
+                        Self::Uint => w::AdapterArgKind::Uint,
+                        Self::Text => w::AdapterArgKind::Text,
+                        Self::Word => w::AdapterArgKind::Word,
+                    }
+                }
+            }
+            impl IntoNative for w::AdapterArgKind {
+                type Native = $crate::AdapterArgKind;
+                fn into_native(self) -> Self::Native {
+                    match self {
+                        Self::Keyword(choices) => $crate::AdapterArgKind::Keyword(choices.into_native()),
+                        Self::ParamIndex => $crate::AdapterArgKind::ParamIndex,
+                        Self::Uint => $crate::AdapterArgKind::Uint,
+                        Self::Text => $crate::AdapterArgKind::Text,
+                        Self::Word => $crate::AdapterArgKind::Word,
+                    }
+                }
             }
             impl ToWire for $crate::InputRef {
                 type Wire = w::InputRef;

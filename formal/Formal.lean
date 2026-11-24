@@ -106,6 +106,7 @@ import Formal.SettleRHead
 import Formal.SettleStep
 import Formal.Refine
 import Formal.Refine.Numbers
+import Formal.FixedWidth
 import Formal.Proofs.CheckSound
 import Formal.Proofs.Examples
 import Formal.RecordHandler

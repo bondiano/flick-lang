@@ -43,21 +43,31 @@ impl Ide<'_> {
         } else {
             (token.start, token.end)
         };
-        let description = match name.text(text) {
+        let attr_name = name.text(text);
+        let backend_attr = self.analysis.foreign_backend.type_form_attribute(attr_name);
+        let owned_desc;
+        let description = match attr_name {
             "maker" if on_name => MAKER,
             "cell" if on_name => CELL,
             "implicit" if on_name => IMPLICIT,
             "derive" => DERIVE,
-            "ts" => TS,
             "label" => LABEL,
             "owner" if on_name => OWNER,
             "sync" => SYNC,
             "when" => WHEN,
             "lang" if on_name || Lang::from_name(token.text(text)).is_some() => LANG,
-            _ => return None,
+            "ts" if backend_attr.is_some() => TS,
+            _ => {
+                let spec = backend_attr?;
+                owned_desc = format!(
+                    "{}\n\nBackend type-form attribute (`{}`).",
+                    spec.doc, self.analysis.foreign_backend.backend_id
+                );
+                owned_desc.as_str()
+            }
         };
-        let mut code = format!("@{}", name.text(text));
-        if matches!(name.text(text), "ts" | "when") {
+        let mut code = format!("@{attr_name}");
+        if attr_name == "when" || backend_attr.is_some() {
             // its arguments are strings too: the attribute as written
             let (start, end) = attribute.range();
             text[start as usize..end as usize]

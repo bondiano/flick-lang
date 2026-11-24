@@ -240,12 +240,11 @@ func TestHashMapOverwritesKeyUnconditionallyAndPreservesNegZero(t *testing.T) {
 	negZero := math.Copysign(0, -1)
 	zm := HashMapInsert(nil, "z", negZero, HashMapInsert(nil, "z", float64(0), HashMapWith(strW)))
 	got := HashMapGet(nil, "z", zm)
-	opt, ok := got.(*Data)
-	if !ok || opt.Tag != "Some" {
+	if !IsSome(got) {
 		t.Fatalf("expected Some(-0.0), got %#v", got)
 	}
-	if f, ok := opt.in[0].(float64); !ok || f != 0 || !math.Signbit(f) {
-		t.Errorf("HashMapInsert conflated -0.0 with 0.0: got %#v (signbit=%v)", opt.in[0], ok && math.Signbit(f))
+	if f, ok := UnwrapSome(got).(float64); !ok || f != 0 || !math.Signbit(f) {
+		t.Errorf("HashMapInsert conflated -0.0 with 0.0: got %#v (signbit=%v)", UnwrapSome(got), ok && math.Signbit(f))
 	}
 }
 
@@ -403,11 +402,11 @@ func TestTxHashMapOverwritesKeyUnconditionallyAndPreservesNegZero(t *testing.T) 
 	negZero := math.Copysign(0, -1)
 	zm := TxHashMapMake(fb, strW, []Value{[]Value{"z", float64(0)}})
 	TxHashMapSet(fb, "z", negZero, zm)
-	opt, ok := TxHashMapGet(fb, "z", zm).(*Data)
-	if !ok || opt.Tag != "Some" {
-		t.Fatalf("expected Some(-0.0), got %#v", opt)
+	gotTx := TxHashMapGet(fb, "z", zm)
+	if !IsSome(gotTx) {
+		t.Fatalf("expected Some(-0.0), got %#v", gotTx)
 	}
-	if f, ok := opt.in[0].(float64); !ok || f != 0 || !math.Signbit(f) {
-		t.Errorf("TxHashMapSet conflated -0.0 with 0.0: got %#v", opt.in[0])
+	if f, ok := UnwrapSome(gotTx).(float64); !ok || f != 0 || !math.Signbit(f) {
+		t.Errorf("TxHashMapSet conflated -0.0 with 0.0: got %#v", UnwrapSome(gotTx))
 	}
 }

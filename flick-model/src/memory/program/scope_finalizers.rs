@@ -2,10 +2,12 @@
 impl<'p> Machine<'p, '_> {
     fn control_intrinsic(&mut self, kind: Intrinsic, binding: Local) -> Result<bool, Error> {
         match kind {
-            Intrinsic::LazyMake => {
+            Intrinsic::LazyMake | Intrinsic::LazyMakeLocal => {
                 let task = self.scratch.pop().expect("lazy task");
+                let local_owner = matches!(kind, Intrinsic::LazyMakeLocal).then_some(self.active_fiber);
                 let root = self.heap.allocate(Data::Lazy {
                     execution: self.execution,
+                    local_owner,
                     state: Some(LazyState::Pending(task)),
                 });
                 let id = root.object_id().expect("lazy allocation");
@@ -95,6 +97,77 @@ impl<'p> Machine<'p, '_> {
         Ok(true)
     }
 
+    /// Conservatively reports whether an enclosing frame can recover from an
+    /// interrupt-bearing cause, trigger a discard, or execute user code after
+    /// unwinding/discarding a `LazyComplete` frame. Keep this match exhaustive
+    /// so every new `Destination` variant is classified explicitly.
+    fn destination_can_reset_local(&self, dest: &Destination<'p>) -> bool {
+        match dest {
+            Destination::Handle { activation, .. } => self
+                .activations
+                .get(activation)
+                .is_none_or(|act| act.errors.is_some() || !act.operations.is_empty()),
+            // `CloseScope` returns `true` unconditionally because the lazy
+            // initializer itself may register `defer`/finalizers or children on
+            // the enclosing scope owner before unwinding.
+            Destination::Catch { .. }
+            | Destination::CaptureExit { .. }
+            | Destination::CatchDefect { .. }
+            | Destination::CatchCause { .. }
+            | Destination::EnsuringFinish { .. }
+            | Destination::OnExitDecide { .. }
+            | Destination::BracketRelease { .. }
+            | Destination::CloseScope { .. }
+            | Destination::ClosingScope { .. }
+            | Destination::LayerRun { .. }
+            | Destination::LayerBuildFinish { .. }
+            | Destination::ForeignLayerBuildFinish { .. }
+            | Destination::HostSyncCallback { .. }
+            | Destination::Discontinue { .. }
+            | Destination::Invocation(_)
+            | Destination::DiscardCleanupDone { .. }
+            | Destination::OnExitDiscardRunFin { .. }
+            | Destination::BracketFinish { .. }
+            | Destination::EnsuringDone { .. }
+            | Destination::OnExitRunFin { .. }
+            | Destination::OnExitFinish { .. } => true,
+            Destination::RestoreMask { next, .. }
+            | Destination::WithServices { next, .. }
+            | Destination::CachedComplete { next, .. } => self.destination_can_reset_local(next),
+            Destination::Top
+            | Destination::Bind(_)
+            | Destination::Initialize { .. }
+            | Destination::Modify { .. }
+            | Destination::FunctionBoundary { .. }
+            | Destination::Loop { .. }
+            | Destination::GenerateStrict { .. }
+            | Destination::GeneratorStep { .. }
+            | Destination::LazyComplete { .. }
+            | Destination::AcquireRegister { .. }
+            | Destination::BracketUse { .. }
+            | Destination::RestoreOwner { .. }
+            | Destination::RestoreOwnerEvidence { .. }
+            | Destination::RestoreFiberRef { .. }
+            | Destination::RestoreEnvRefs { .. }
+            | Destination::RestoreRandom { .. }
+            | Destination::ProvideContext { .. }
+            | Destination::OrDie { .. }
+            | Destination::TimedFinish { .. }
+            | Destination::RecoverySelection { .. }
+            | Destination::RecoveryHelper { .. }
+            | Destination::RecoveryBody { .. }
+            | Destination::RaiseFromCatch
+            | Destination::HostApplyChain { .. }
+            | Destination::DiscardFinalizer => false,
+        }
+    }
+
+    fn has_local_reset_frame(&self) -> bool {
+        self.frames
+            .iter()
+            .any(|frame| self.destination_can_reset_local(&frame.destination))
+    }
+
     fn lazy_force(&mut self, binding: Local) -> Result<(), Error> {
         enum LazyAction {
             Return(Value),
@@ -111,8 +184,9 @@ impl<'p> Machine<'p, '_> {
         };
         self.release_operands()?;
         let active = self.active_fiber;
+        let has_reset_frame = self.has_local_reset_frame();
         let action = {
-            let slot = self.heap.lazy_state_mut(self.execution, &handle)?;
+            let (slot, local_owner) = self.heap.lazy_slot_mut(self.execution, &handle)?;
             match slot {
                 Some(LazyState::DoneOk(value)) => {
                     let rep = value.representation();
@@ -128,16 +202,33 @@ impl<'p> Machine<'p, '_> {
                     }
                     LazyAction::Wait
                 }
+                Some(LazyState::RunningLocal { .. }) => {
+                    return Err(Error::LazyCycle);
+                }
                 Some(LazyState::Pending(_)) => {
                     let Some(LazyState::Pending(task)) = slot.take() else {
                         unreachable!()
                     };
-                    let rep = task.representation();
-                    *slot = Some(LazyState::Running {
-                        task,
-                        owner: active,
-                    });
-                    LazyAction::Start(self.heap.dup(&rep)?)
+                    if let Some(creator) = local_owner {
+                        if active != creator || has_reset_frame {
+                            let rep = task.representation();
+                            *slot = Some(LazyState::RunningLocal { task: Some(task) });
+                            LazyAction::Start(self.heap.dup(&rep)?)
+                        } else {
+                            // O3 Perceus: move the task out on Pending -> Running
+                            // so the task and its captures are owned uniquely and
+                            // reclaimed immediately instead of kept alive by the cell.
+                            *slot = Some(LazyState::RunningLocal { task: None });
+                            LazyAction::Start(task)
+                        }
+                    } else {
+                        let rep = task.representation();
+                        *slot = Some(LazyState::Running {
+                            task,
+                            owner: active,
+                        });
+                        LazyAction::Start(self.heap.dup(&rep)?)
+                    }
                 }
                 None => return Err(Error::ClosedLazy),
             }

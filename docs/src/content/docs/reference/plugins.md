@@ -498,7 +498,7 @@ modules but with where they declare each lang item, after the checks of
 effects pass it and before the build optimizes
 it, in `flick build`, `run` and `test`, never in `flick check` or the editor.
 Its `transform` gives the program the build compiles instead. The compiler
-checks it for form and type consistency (`0.14.0`): the version of the IR,
+checks it for form and type consistency (`0.17.0`): the version of the IR,
 every module of the build and no other, the lang items as it got them, every
 local bound where it is used, every global of a module there is, every span of
 a file the build read, well-formed IR types and type argument counts, and

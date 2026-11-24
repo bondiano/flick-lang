@@ -9,6 +9,8 @@ use flick_model::run;
 
 use crate::causes;
 
+mod local_lazy;
+
 fn compile_counted(text: &str, release: bool, entry: &Name) -> Program {
     let modules = run::compile_source(text).expect("source checks");
     let ir: Vec<_> = modules

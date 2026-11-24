@@ -161,3 +161,151 @@ fn malformed_option_descriptors_are_rejected() {
         assert!(validate_options(&bad_desc).is_err(), "{case}");
     }
 }
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn foreign_metadata_descriptors_are_validated_in_handshake() {
+    let mut desc = descriptor();
+    desc.foreign_adapters = vec![
+        AdapterWord {
+            name: "method".into(),
+            args: vec![],
+            repeatable: false,
+            doc: "Call with receiver".into(),
+        },
+        AdapterWord {
+            name: "callback".into(),
+            args: vec![
+                AdapterArg {
+                    name: "fn".into(),
+                    kind: AdapterArgKind::ParamIndex,
+                },
+                AdapterArg {
+                    name: "data".into(),
+                    kind: AdapterArgKind::Keyword(vec!["data".into()]),
+                },
+                AdapterArg {
+                    name: "user_data".into(),
+                    kind: AdapterArgKind::ParamIndex,
+                },
+            ],
+            repeatable: true,
+            doc: "Pair callback with userdata parameter".into(),
+        },
+    ];
+    desc.type_form_attributes = vec![TypeFormAttribute {
+        name: "c".into(),
+        doc: "C foreign type form".into(),
+    }];
+    assert_eq!(validate_foreign_metadata(&desc), Ok(()));
+    let req = request();
+    assert_eq!(handshake(&req.backend, &desc, &req.target), Ok(()));
+
+    for case in [
+        "bad-word-name",
+        "hyphen-word-name",
+        "core-word-collision",
+        "dup-word",
+        "empty-arg-name",
+        "empty-keyword-choices",
+        "dup-keyword-choice",
+        "bad-attr-name",
+        "core-attr-collision",
+        "dup-attr",
+    ] {
+        let mut bad = descriptor();
+        match case {
+            "bad-word-name" => {
+                bad.foreign_adapters.push(AdapterWord {
+                    name: "Method".into(),
+                    args: vec![],
+                    repeatable: false,
+                    doc: String::new(),
+                });
+            }
+            "hyphen-word-name" => {
+                bad.foreign_adapters.push(AdapterWord {
+                    name: "cancel-signal".into(),
+                    args: vec![],
+                    repeatable: false,
+                    doc: String::new(),
+                });
+            }
+            "core-word-collision" => {
+                bad.foreign_adapters.push(AdapterWord {
+                    name: "arity".into(),
+                    args: vec![],
+                    repeatable: false,
+                    doc: String::new(),
+                });
+            }
+            "dup-word" => {
+                let w = AdapterWord {
+                    name: "this".into(),
+                    args: vec![],
+                    repeatable: false,
+                    doc: String::new(),
+                };
+                bad.foreign_adapters = vec![w.clone(), w];
+            }
+            "empty-arg-name" => {
+                bad.foreign_adapters.push(AdapterWord {
+                    name: "results".into(),
+                    args: vec![AdapterArg {
+                        name: String::new(),
+                        kind: AdapterArgKind::Uint,
+                    }],
+                    repeatable: false,
+                    doc: String::new(),
+                });
+            }
+            "empty-keyword-choices" => {
+                bad.foreign_adapters.push(AdapterWord {
+                    name: "cancel".into(),
+                    args: vec![AdapterArg {
+                        name: "kind".into(),
+                        kind: AdapterArgKind::Keyword(vec![]),
+                    }],
+                    repeatable: false,
+                    doc: String::new(),
+                });
+            }
+            "dup-keyword-choice" => {
+                bad.foreign_adapters.push(AdapterWord {
+                    name: "cancel".into(),
+                    args: vec![AdapterArg {
+                        name: "kind".into(),
+                        kind: AdapterArgKind::Keyword(vec!["signal".into(), "signal".into()]),
+                    }],
+                    repeatable: false,
+                    doc: String::new(),
+                });
+            }
+            "bad-attr-name" => {
+                bad.type_form_attributes.push(TypeFormAttribute {
+                    name: "TS".into(),
+                    doc: String::new(),
+                });
+            }
+            "core-attr-collision" => {
+                bad.type_form_attributes.push(TypeFormAttribute {
+                    name: "when".into(),
+                    doc: String::new(),
+                });
+            }
+            "dup-attr" => {
+                let a = TypeFormAttribute {
+                    name: "ts".into(),
+                    doc: String::new(),
+                };
+                bad.type_form_attributes = vec![a.clone(), a];
+            }
+            _ => unreachable!(),
+        }
+        assert!(validate_foreign_metadata(&bad).is_err(), "{case}");
+        assert!(
+            handshake(&req.backend, &bad, &req.target).is_err(),
+            "{case}"
+        );
+    }
+}

@@ -1,0 +1,18 @@
+module App.FixedWidthSuffix exposing (..)
+
+bad_float_int_suffix : Int8
+let bad_float_int_suffix = 1.5i8
+
+bad_exp_int_suffix : UInt32
+let bad_exp_int_suffix = 1e3u32
+
+bad_bin_float_suffix : Float32
+let bad_bin_float_suffix = 0b10f32
+
+bad_oct_float_suffix : Float32
+let bad_oct_float_suffix = 0o10f32
+
+//~ FLICK-S006 @4:28-4:33
+//~ FLICK-S006 @7:26-7:32
+//~ FLICK-S006 @10:28-10:35
+//~ FLICK-S006 @13:28-13:35

@@ -137,7 +137,15 @@ impl Checker<'_> {
         let Type::Con { module, name } = t.spine().0 else {
             return None;
         };
-        if t.is_lang(Lang::Int) || t.is_lang(Lang::Float) {
+        if t.is_lang(Lang::Int)
+            || t.is_lang(Lang::Int8)
+            || t.is_lang(Lang::Int16)
+            || t.is_lang(Lang::UInt8)
+            || t.is_lang(Lang::UInt16)
+            || t.is_lang(Lang::UInt32)
+            || t.is_lang(Lang::Float)
+            || t.is_lang(Lang::Float32)
+        {
             return Some(JsClass::Number);
         }
         if t.is_lang(Lang::String) {
@@ -146,7 +154,7 @@ impl Checker<'_> {
         if t.is_lang(Lang::Bool) {
             return Some(JsClass::Boolean);
         }
-        if t.is_lang(Lang::BigInt) {
+        if t.is_lang(Lang::BigInt) || t.is_lang(Lang::Int64) || t.is_lang(Lang::UInt64) {
             return Some(JsClass::Bigint);
         }
         if t.spine().0.is_lang(Lang::List) {

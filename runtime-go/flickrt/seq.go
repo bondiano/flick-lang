@@ -96,12 +96,12 @@ func SeqCycle(xs Value) Value {
 
 func SeqUnfold(f, s Value) Value {
 	return seq(func(fb *Fiber, yield func(Value) bool) {
-		for o := Apply(fb, f, s).(*Data); o.Tag == "Some"; {
-			pair := o.Fields()[0].([]Value)
+		for o := Apply(fb, f, s); IsSome(o); {
+			pair := UnwrapSome(o).([]Value)
 			if !yield(pair[0]) {
 				return
 			}
-			o = Apply(fb, f, pair[1]).(*Data)
+			o = Apply(fb, f, pair[1])
 		}
 	})
 }
@@ -158,7 +158,7 @@ func SeqFilter(p, xs Value) Value {
 func SeqFilterMap(f, xs Value) Value {
 	return seq(func(fb *Fiber, yield func(Value) bool) {
 		for x := range Iter(fb, xs) {
-			if o := Apply(fb, f, x).(*Data); o.Tag == "Some" && !yield(o.Fields()[0]) {
+			if o := Apply(fb, f, x); IsSome(o) && !yield(UnwrapSome(o)) {
 				return
 			}
 		}

@@ -367,3 +367,31 @@ Names are snake case; the subject comes last, so `task |> Effect.retry
 schedule` reads in order: `arity 1` calls Effect's data-last form, which
 returns the function of the subject. Records that cross to Effect keep its
 field names (`elapsedSincePrevious`).
+
+## Go runtime (`flickrt`)
+
+Compiled Go programs import `flick.app/flickrt` (`runtime-go/flickrt/`). On the
+erased `flickrt.Value` representation, `Option` keeps the JS target's tagged
+`*flickrt.Data` form (`"None"` and `"Some"` with one payload field), preserving
+every nesting level (`None`, `Some None`, `Some (Some 1)`). All runtime readers
+inspect erased `Option` values through the centralized helpers `flickrt.IsNone`,
+`flickrt.IsSome`, and `flickrt.UnwrapSome` rather than matching `"Some"` or
+`"None"` tags directly; generic `TagOf`, `Fields`, and `ConstructorName`
+retain their tagged meaning on erased values.
+
+On typed Go paths, `flick/go` avoids `*flickrt.Data` allocation by using
+by-value `flickrt` option types chosen from the concrete payload type:
+
+| Layout | Go type | When used |
+| - | - | - |
+| Boolean sentinel | `flickrt.OptBool` (`uint8`: `0` = `None`, `1` = `Some false`, `2` = `Some true`) | `Option Bool` |
+| Non-nil reference sentinel | `flickrt.OptRef` (`struct{ val flickrt.Value }`, `nil` = `None`) | non-`Option` payloads guaranteed non-nil (tuples, records, functions, `List`, `BigInt`, `Result`, non-unboxed ADTs) |
+| Presence flag | `flickrt.Opt[T]` (`struct{ Val T; Ok bool }`) | `Int`, `Float`, `String`, `Unknown`/opaque payloads, and nested `Option (Option U)` |
+
+Conversion helpers (`BoxOptInt`, `BoxOptFloat`, `BoxOptString`, `BoxOptBool`,
+`BoxOptRef`, `BoxOptValue`, generic `BoxOpt`, and their `AsOpt*` / `UnboxOpt`
+inverses) translate between typed layouts and erased `*flickrt.Data` at
+polymorphic calls, generic runtime observations, and `flickrt.Value` Go FFI
+boundaries. Typed structural equality uses direct Go `==` where `SameValueZero`
+coincides (`OptBool`, `Opt[int32]`, `Opt[string]`, and nested combinations of
+them) and `EqOptFloat`, `EqOptRef`, `EqOptValue`, or `EqOpt` otherwise.

@@ -65,6 +65,7 @@ pub(super) fn make_module(name: &str, types: Vec<TypeDecl>) -> Module {
         name: name.to_owned(),
         items: Vec::new(),
         types,
+        preambles: Vec::new(),
         labels: BTreeMap::new(),
         initialization: Initialization::default(),
         records: BTreeMap::new(),
