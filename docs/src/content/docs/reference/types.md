@@ -135,6 +135,27 @@ label given twice in a record type, literal, update or pattern is
 `FLICK-T014`. Field expressions in record literals and updates evaluate in
 source order.
 
+An accessor `.name` is the function `fun r -> r.name` (see
+[Syntax](../syntax/#expressions)), and its type is that of the explicit
+function: `{ name : a | r } -> a`, open in the other fields, and
+`.address.city` is `{ address : { city : a | r1 } | r2 } -> a`. Applied where
+it is written, as `.city address` or `address |> .city`, it takes the type of
+its record from the argument, so a polymorphic field is read at an instance;
+passed to a function, as in `List.map .address.city users`, it takes it from
+the other arguments, and a field the record lacks is reported at its step. A
+local `let get = .value` is generic, as a local `fun` is, and a top-level one
+needs a signature (`FLICK-T004`). An accessor reads no field of an opaque type
+outside its module, and a field that holds a function is read, not called.
+
+```flick
+type alias User = { name : String; address : { city : String } }
+
+cities : List User -> List String
+let cities users =
+  let get = .address.city
+  List.map get users
+```
+
 Values of data types, structural records and tuples have no observable storage
 identity, and the written order of a record's labels is not observable: every
 operation that inspects labels or encodes structural records uses the canonical

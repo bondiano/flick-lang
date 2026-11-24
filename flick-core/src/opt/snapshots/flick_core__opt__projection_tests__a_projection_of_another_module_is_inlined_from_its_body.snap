@@ -1,0 +1,19 @@
+---
+source: flick-core/src/opt/projection_tests.rs
+assertion_line: 203
+expression: js
+---
+import * as $m_Lib from "./Lib.js";
+import * as $m_List from "./List.js";
+
+export const one = (u) => u.address.city;
+
+export const all = (users) => {
+  const $t1 = [];
+  for (const $elem2 of users) {
+    $t1.push($elem2.address.city);
+  }
+  return $t1;
+};
+
+export const labels = (users) => $m_List.map($m_Lib.label)(users);

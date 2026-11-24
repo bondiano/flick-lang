@@ -343,7 +343,7 @@ wasm:
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
-    test $(wc -c < $wasm) -le 4760000 # reason: function contracts (#816): contract type-checking metadata, T087–T089 explanations and require/ensure hover in the playground (4.745 → 4.753 MB); verification is gated out by the contracts feature
+    test $(wc -c < $wasm) -le 4800000 # reason: field accessors (#788): accessor parsing, typing, diagnostics and IDE queries in the playground (4.766 MB with them); 4.8 MB leaves room for the rest of #788
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm

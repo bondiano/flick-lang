@@ -6,6 +6,29 @@ break programs.
 
 ## Unreleased
 
+- **Field accessors.** `.name` is the function `fun r -> r.name`, and
+  `.address.city` reads a path of fields: `List.map .address.city users`,
+  `user |> .name`, `.name user`, or bound to a name. Its type is that of the
+  explicit function, `{ name : a | r } -> a`; a local one is generic, a
+  top-level one needs a signature. `f .name` applies `f` to an accessor;
+  `user .name` is `FLICK-T003` with a fix that glues it into `user.name`, and
+  `.email?` explains that `?` applies to the accessor. In release builds a
+  projection of up to eight fields, an accessor or the same
+  `fun r -> r.a.b`, known where it is used is inlined as its reads, and the
+  built-in `List.map` of one is a loop over the list without a call per
+  element; a `map` of your own stays a call. The editor completes the
+  fields of a path, also of `.address.` in `List.map .address. users` from
+  the list, shows each step's field on hover, marks labels as properties,
+  rewrites `fun x -> x.a.b` into `.a.b` and back, and renames a field only
+  when every use is proven to read that field, refusing otherwise.
+
+- **A function applied where it is written takes its argument's type.**
+  In `(fun h -> h ()) say` and `say |> fun h -> h ()` the parameter `h`
+  has the type of `say`, as in `let h = say`: an effectful callback fits,
+  a polymorphic field of a record argument is read at an instance, and a
+  field the argument lacks is reported where the body reads it. A function
+  bound to a name first still takes its parameter's type from its body.
+
 ## 0.2.0 — 2026-11-24
 
 The second public release. Before 1.0 a minor release may break programs:

@@ -76,7 +76,9 @@ impl Checker<'_> {
     /// (App): `φ₁ ⊔ φ₂ ⊔ φ`. A callee of unknown type is a pure arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`).
     /// A constructor with all its fields is (Con).
     pub(in crate::check) fn app(&mut self, f: &Term, a: &Term) -> Check<Type> {
-        if let (true, Term::Lam(x, body)) = (self.config, f) {
+        if let Term::Lam(x, body) = f
+            && self.redex_of(x, body)
+        {
             return self.redex(x, body, a, None);
         }
         let mut args = vec![a];
@@ -104,7 +106,9 @@ impl Checker<'_> {
         // the spine is one call
         self.call(|c| {
             let (t, rest) = match head {
-                Term::Lam(x, body) if c.config => (c.redex(x, body, args[0], None)?, &args[1..]),
+                Term::Lam(x, body) if c.redex_of(x, body) => {
+                    (c.redex(x, body, args[0], None)?, &args[1..])
+                }
                 _ => (c.infer(head)?, &args[..]),
             };
             rest.iter().try_fold(t, |t, a| c.apply(&t, a))

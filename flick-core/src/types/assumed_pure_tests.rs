@@ -84,7 +84,7 @@ fn check_modules(modules: &[(&str, &str, &str)]) -> Vec<Diagnostic> {
 #[test]
 fn a_callback_taken_for_pure_is_annotated() {
     let head = "service Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\n";
-    let before = format!("{head}let apply () = (fun h -> h ()) say\n");
+    let before = format!("{head}let apply () =\n  let run = fun h -> h ()\n  run say\n");
     assert_eq!(
         t003_message(&format!("{HEAD}{before}")),
         "expected `Unit -> _`, found `Unit ->{Log} Unit`"
@@ -92,7 +92,9 @@ fn a_callback_taken_for_pure_is_annotated() {
     assert_fix(
         &before,
         "FLICK-T003",
-        &format!("{head}let apply () = (fun (h : Unit ->{{Log}} Unit) -> h ()) say\n"),
+        &format!(
+            "{head}let apply () =\n  let run = fun (h : Unit ->{{Log}} Unit) -> h ()\n  run say\n"
+        ),
     );
 }
 
@@ -200,7 +202,6 @@ fn a_callback_applied_through_another_function_is_annotated() {
         fixed(&mapped, "FLICK-T003"),
         Some(mapped.replace("fun k ->", "fun (k : Unit ->{Log} Unit) ->"))
     );
-    assert_annotated(&format!("{unrelated}  (fun k -> k ()) say\n"), "k");
 }
 
 /// A diagnostic inferred through an external callee leaves the assumption

@@ -4,13 +4,12 @@
 
 use std::mem;
 
-use super::sugar_lints::unparen;
+use super::call_args::applied_where_written;
 use super::ty::Type;
 use super::typing::{Ref, range};
 use super::{Checker, Domain, Local, Operator};
-use crate::consteval;
 use crate::diagnostics::suggest::closest;
-use crate::diagnostics::{Diagnostic, Edit, Severity, codes};
+use crate::diagnostics::{Diagnostic, codes};
 use crate::iface::Namespace;
 use crate::source::Span;
 use crate::syntax::cst::Node;
@@ -182,18 +181,30 @@ impl Checker<'_> {
         ty
     }
 
-    /// `FLICK-T003` on a callee of type `ty` given `args`, which are still
-    /// checked.
-    fn not_a_function(&mut self, ty: &Type, span: Span, args: &[&Node]) -> Type {
+    /// `FLICK-T003` on a callee of type `ty` given `args[i..]`, which are
+    /// still checked; `head` takes the arguments before them.
+    fn not_a_function(
+        &mut self,
+        ty: &Type,
+        span: Span,
+        (head, args, i): (&Node, &[&Node], usize),
+    ) -> Type {
         let shown = self.show(ty);
-        self.error(
+        let mut diagnostic = Diagnostic::error(
             codes::T003,
-            span,
             format!(
                 "this is not a function: it has type `{shown}`, so it cannot take another argument"
             ),
+            span,
         );
-        for arg in args {
+        // `user .name`: the accessor was meant as a field of the value before it
+        let accessors = super::detached::leading_accessors(&args[i..]);
+        if !accessors.is_empty() {
+            let value = (i == 0).then_some(head);
+            diagnostic.fixes.push(self.detached_fix(value, &accessors));
+        }
+        self.diagnostic(diagnostic);
+        for arg in &args[i..] {
             self.infer(arg);
         }
         Type::Error
@@ -219,9 +230,36 @@ impl Checker<'_> {
         args: &[&Node],
         defaults: &mut Vec<(Type, usize)>,
     ) -> Type {
+        // a pipeline around this application checks the accessors it leaves
+        // once it has applied it: `users |> List.map .address.town`
+        let piped = self.piped_late.take();
+        let mut late = Vec::new();
+        let ty = self.apply_each(head, args, defaults, &mut late);
+        match piped {
+            Some(_) => self.piped_late = Some(late),
+            None => self.check_late(head, args, late),
+        }
+        ty
+    }
+
+    fn apply_each(
+        &mut self,
+        head: &Node,
+        args: &[&Node],
+        defaults: &mut Vec<(Type, usize)>,
+        late: &mut Vec<(usize, Type)>,
+    ) -> Type {
         let since = self.diagnostics.len();
         // a local `forall v. τ^v -> σ` keeps its argument out of its result
         let parametric = self.local_parametric(head);
+        // `.email user`, `(fun r -> r.id) p`: a function applied where it is
+        // written takes the type of its parameter from the argument, inferred
+        // first, as `let r = user` would give it
+        let mut first = (!args.is_empty() && applied_where_written(head)).then(|| {
+            let argument = self.infer(args[0]);
+            self.given_param = Some(argument.clone());
+            argument
+        });
         let mut ty = self.infer(head);
         let mut unknown = Vec::new();
         let mut params = Vec::new();
@@ -233,7 +271,10 @@ impl Checker<'_> {
         let end = args.last().map_or(head.range().1, |last| last.range().1);
         for (i, arg) in args.iter().enumerate() {
             let span = Span::new(self.file, head.range().0, arg.range().1);
-            if let Some(gathered) = self.gather(head, &ty, &args[i..], (i, end)) {
+            let checked = first.take();
+            if checked.is_none()
+                && let Some(gathered) = self.gather(head, &ty, &args[i..], (i, end))
+            {
                 ty = gathered;
                 break;
             }
@@ -243,42 +284,21 @@ impl Checker<'_> {
                     effects,
                     result,
                 } => {
-                    let calls = self.cx.stage.calls;
-                    let since = self.diagnostics.len();
-                    // a task acquiring into a region a later argument names
-                    // waits for it (`docs/formal/regions.md#scope-region-of-a-task-argument-is-resolved-after-the-call`)
-                    let eff = self.eff_parts(&param).is_some();
-                    let defer = eff
-                        || self
-                            .arrow_stages(&param)
-                            .contains(&super::ty::Stage::Runtime);
-                    let outer = defer.then(|| self.cx.regions.defaults.replace(Vec::new()));
-                    // a runtime call for a parameter marked `~` is passed unstarted
-                    let argument = self.meeting_parameter(head, i, &param, |c| {
-                        if eff && marked.contains(&i) && c.runs_now(arg) {
-                            c.suspended_arg(arg, &param)
-                        } else {
-                            c.check_value(arg, &param)
+                    let argument = match checked {
+                        Some(argument) => argument,
+                        None if watched.is_none() && self.late_accessor(arg, &param) => {
+                            late.push((i, (*param).clone()));
+                            (*param).clone()
                         }
-                    });
-                    if let Some(outer) = outer {
-                        let mine = mem::replace(&mut self.cx.regions.defaults, outer);
-                        defaults.extend(mine.unwrap_or_default());
-                    }
-                    self.explain_argument(since, head, i, &param);
-                    if watched.is_some() {
-                        let folded = consteval::eval(arg, self.text);
-                        let lambda = unparen(arg).kind == K::FunExpr;
-                        given.push((self.span(arg), argument.clone(), folded, lambda));
-                    }
-                    if eff {
-                        if self.cx.stage.calls > calls {
-                            self.early_argument(head, arg);
-                        }
-                        // the rows the `Eff` needs are lower bounds of the parameter's: grown
-                        // now, before the result's rows unify as if they could be smaller
-                        self.grow();
-                    }
+                        None => self.argument(
+                            head,
+                            (arg, i),
+                            &param,
+                            defaults,
+                            &mut given,
+                            (watched.is_some(), &marked),
+                        ),
+                    };
                     if let Some(e) = effects {
                         self.call_effects(&self.live_call(&ty, &e), span);
                     }
@@ -287,7 +307,7 @@ impl Checker<'_> {
                     ty = self.application_result(result, &ty, &argument, parametric && i == 0);
                 }
                 Type::Error => {
-                    let inferred = self.infer(arg);
+                    let inferred = checked.unwrap_or_else(|| self.infer(arg));
                     unknown.push(inferred);
                 }
                 meta @ Type::Meta(_) => {
@@ -295,13 +315,18 @@ impl Checker<'_> {
                     let arrow = Type::pure_fun(param.clone(), result.clone());
                     // a number literal's variable stands for a number only
                     if self.unify(&meta, &arrow).is_err() {
-                        return self.not_a_function(&meta, span, &args[i..]);
+                        return self.not_a_function(&meta, span, (head, args, i));
                     }
                     self.assume_pure(head, &arrow);
-                    self.check(arg, &param);
+                    match checked {
+                        Some(argument) => {
+                            self.expect(&argument, &param, self.span(arg));
+                        }
+                        None => self.check(arg, &param),
+                    }
                     ty = result;
                 }
-                other => return self.not_a_function(&other, span, &args[i..]),
+                other => return self.not_a_function(&other, span, (head, args, i)),
             }
         }
         // a call that gave all but its children has none
@@ -325,32 +350,6 @@ impl Checker<'_> {
             self.merge_conflicts(first, second, span);
         }
         ty
-    }
-
-    /// A runtime call in an argument runs before the function it is passed
-    /// to; a function that takes an `Eff` wants the computation unstarted.
-    fn early_argument(&mut self, head: &Node, arg: &Node) {
-        let span = self.span(arg);
-        let name = self.text_of(head);
-        self.diagnostics.push(
-            Diagnostic::new(
-                codes::E003,
-                Severity::Warning,
-                format!(
-                    "this argument runs a runtime call before `{name}` is applied, although `{name}` takes an `Eff` to run itself"
-                ),
-            )
-            .with_span(span).with_fix(|| ("pass the computation unstarted with `task { … }`", vec![
-                Edit {
-                    span: Span::new(span.file, span.start, span.start),
-                    replacement: "task { ".to_owned(),
-                },
-                Edit {
-                    span: Span::new(span.file, span.end, span.end),
-                    replacement: " }".to_owned(),
-                },
-            ])),
-        );
     }
 
     /// `head` names the value `name` of the built-in module `module`.

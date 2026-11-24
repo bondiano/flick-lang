@@ -1,11 +1,13 @@
 // Types other modules see only through this module's interface.
-module App.Domain exposing (User, UserId, Shape(..), Box, new_id, first, wrap, Users)
+module App.Domain exposing (User, UserId, Session, Shape(..), Box, new_id, first, wrap, Users)
 
 opaque type alias UserId = String
 
 // inside its module an opaque alias is its representation
 new_id : String -> UserId
 let new_id raw = raw
+
+opaque type alias Session = { token : String }
 
 type alias User = { id : UserId; name : String }
 

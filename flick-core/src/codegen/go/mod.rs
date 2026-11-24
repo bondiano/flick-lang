@@ -22,6 +22,8 @@ mod perform_tests;
 #[cfg(test)]
 mod record_tests;
 #[cfg(test)]
+mod projection_tests;
+#[cfg(test)]
 mod scalar_fields_tests;
 #[cfg(test)]
 mod tests;

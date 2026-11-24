@@ -46,14 +46,13 @@ let partial e =
 
 unknown : Expr a -> Int
 let unknown e =
-  (fun x ->
+  let f = fun x ->
     match x with
     | IntLit n -> n
     //~ FLICK-T057 @51:7-51:15 the type of the matched value is
     | _ -> 0
-  )
-    e
-//~ FLICK-T055 @53:7-53:8 `_` stands for `BoolLit`, `Lit` of `Expr`:
+  // typed where it is written, `f` has no argument to learn from
+  f e
 
 untouchable : Ty a -> a -> String
 let untouchable t x =
@@ -61,7 +60,7 @@ let untouchable t x =
     (
       match t with
       | TInt -> x
-      //~ FLICK-T057 @63:17-63:18 expected `_`, found `Int`: a type from
+      //~ FLICK-T057 @62:17-62:18 expected `_`, found `Int`: a type from
       | TStr -> 0
     )
 
@@ -70,7 +69,7 @@ let escape box =
   let inside =
     match box with
     | Box x -> x
-  //~ FLICK-T007 @72:16-72:17 expected `_`, found `b`: the type variable
+  //~ FLICK-T007 @71:16-71:17 expected `_`, found `b`: the type variable
   ignore inside
   0
 
@@ -78,12 +77,12 @@ regions : Same r s -> Int
 let regions same =
   match same with
   | Same -> 0
-//~ FLICK-T058 @80:5-80:9 matching this constructor would mean that two
+//~ FLICK-T058 @79:5-79:9 matching this constructor would mean that two
 
 in_let : Box -> Int
 let in_let box =
   let Box _ = box
-  //~ FLICK-T058 @85:7-85:12 this constructor hides or refines a type,
+  //~ FLICK-T058 @84:7-84:12 this constructor hides or refines a type,
   0
 
 dead : Ty Int -> Int
@@ -91,7 +90,7 @@ let dead t =
   match t with
   | TInt -> 1
   | TStr -> 2
-//~ FLICK-T010 @93:5-93:9 this arm is never reached: no value
+//~ FLICK-T010 @92:5-92:9 this arm is never reached: no value
 
 type Tagged a =
   | IsNat : Tagged Int
@@ -101,7 +100,7 @@ half : Tagged a -> Tagged a -> Bool
 let half x y =
   match (x, y) with
   | (IsNat, IsNat) -> true
-//~ FLICK-T009 @102:3-102:15 `match` does not cover every value: `(IsBool, _)`
+//~ FLICK-T009 @101:3-101:15 `match` does not cover every value: `(IsBool, _)`
 
 mixed : Tagged a -> Tagged a -> Bool
 let mixed x y =
@@ -109,7 +108,7 @@ let mixed x y =
   | (IsNat, IsNat) -> true
   | (IsBool, IsBool) -> true
   | (IsNat, IsBool) -> false
-//~ FLICK-T010 @111:5-111:20 this arm is never reached: no value
+//~ FLICK-T010 @110:5-110:20 this arm is never reached: no value
 
 /// `a` and `b` may be different types, so a mixed pair is built.
 unrelated : Tagged a -> Tagged b -> Bool
@@ -117,7 +116,7 @@ let unrelated x y =
   match (x, y) with
   | (IsNat, IsNat) -> true
   | (IsBool, IsBool) -> false
-//~ FLICK-T009 @117:3-117:15 `match` does not cover every value: `(IsNat, IsBool)`
+//~ FLICK-T009 @116:3-116:15 `match` does not cover every value: `(IsNat, IsBool)`
 
 /// A type the constructor hides is not followed.
 type Packed =
@@ -128,4 +127,17 @@ let hidden p =
   match p with
   | Packed IsNat IsNat -> true
   | Packed IsBool IsBool -> false
-//~ FLICK-T009 @128:3-128:10 `match` does not cover every value: `Packed IsNat IsBool`
+//~ FLICK-T009 @127:3-127:10 `match` does not cover every value: `Packed IsNat IsBool`
+
+// applied where it is written, the function takes the type of the matched
+// value from its argument: then the branch refines a type from outside it
+applied : Expr a -> Int
+let applied e =
+  (fun x ->
+    match x with
+    | IntLit n -> n
+    | _ -> 0
+  )
+    e
+//~ FLICK-T057 @138:19-138:20 expected `_`, found `Int`: a type from outside this branch would become `Int`
+//~ FLICK-T055 @139:7-139:8 `_` stands for `BoolLit`, `Lit` of `Expr`:

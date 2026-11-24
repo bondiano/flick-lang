@@ -11,6 +11,7 @@ use std::collections::HashMap;
 use super::Generics;
 use super::devirt::built;
 use super::known::{chooses, ends_in_data};
+use super::project::path;
 use super::specialize::Generic;
 use super::types::subst_types;
 use super::walk::{rename, respan, size};
@@ -48,7 +49,9 @@ pub type Candidates = HashMap<String, Inlined>;
 /// The small functions of the built-in modules, as `generics` gives them,
 /// each asked for once. Those of the program's other modules stay calls:
 /// a body there may be written to be shared, as a `match` that is longer
-/// than its call.
+/// than its call. A projection, of any module of the build, is a path of
+/// field reads no longer than [`DEPTH`](super::project::DEPTH), which is
+/// inlined as a small body is.
 pub struct Foreign<'a> {
     generics: Generics<'a>,
     builtin: &'a dyn Fn(&str) -> bool,
@@ -71,16 +74,18 @@ impl<'a> Foreign<'a> {
     /// plain pure code no bigger than `budget`, with a `match` only when
     /// `choosing`: small, it is inlined at every call, as that makes the
     /// module no bigger; one that chooses what it gives is bigger than its
-    /// call, and inlined only where that spares an object.
-    fn body(&self, module: &str, name: &str, choosing: bool) -> Option<Inlined> {
+    /// call, and inlined only where that spares an object. Not `choosing`,
+    /// a projection of any module of the build.
+    pub(super) fn body(&self, module: &str, name: &str, choosing: bool) -> Option<Inlined> {
         let cache = if choosing { &self.shaped } else { &self.found };
         let key = (module.to_owned(), name.to_owned());
         if let Some(found) = cache.borrow().get(&key) {
             return found.clone();
         }
         let budget = if choosing { SHAPED } else { SMALL };
+        let builtin = (self.builtin)(module);
         let mut found = None;
-        if (self.builtin)(module)
+        if (builtin || !choosing)
             && let Some(Generic {
                 type_params,
                 dicts,
@@ -92,9 +97,11 @@ impl<'a> Foreign<'a> {
             && params
                 .iter()
                 .all(|p| p.stage == Stage::Pure && simple(&p.pat))
-            && size(&body) <= budget
-            && plain(&body, choosing)
-            && !calls(&body, module, name)
+            && ((builtin
+                && size(&body) <= budget
+                && plain(&body, choosing)
+                && !calls(&body, module, name))
+                || (!choosing && path(&params, &body).is_some()))
         {
             found = Some((type_params, params, *body));
         }
@@ -103,8 +110,8 @@ impl<'a> Foreign<'a> {
     }
 }
 
-/// Small functions, and private ones used once: inlining them makes the
-/// module no bigger.
+/// Small functions, projections, and private ones used once: inlining them
+/// makes the module no bigger.
 pub fn candidates(module: &str, items: &[Item], exported: &dyn Fn(&str) -> bool) -> Candidates {
     let mut refs = HashMap::new();
     for item in items {
@@ -125,6 +132,7 @@ pub fn candidates(module: &str, items: &[Item], exported: &dyn Fn(&str) -> bool)
                         .iter()
                         .all(|p| p.stage == Stage::Pure && simple(&p.pat))
                         && (size(body) <= SMALL
+                            || path(params, body).is_some()
                             || (size(body) <= ONCE
                                 && !exported(name)
                                 && refs.get(name.as_str()) == Some(&1)))

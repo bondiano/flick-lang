@@ -333,17 +333,23 @@ impl Ide<'_> {
                     .collect();
             }
         }
-        let Some((_, ty)) = m
-            .typing
-            .types
-            .iter()
-            .filter(|(r, _)| r.1 == offset)
-            .min_by_key(|(r, _)| r.1 - r.0)
-        else {
+        // the record a step of a path reads, or a bare `.` that starts an
+        // accessor, whose place expects a function of a record
+        let receiver = self.receiver_at_dot(m, offset).or_else(|| {
+            let ty = m
+                .typing
+                .types
+                .iter()
+                .filter(|(r, _)| r.1 == offset)
+                .min_by_key(|(r, _)| r.1 - r.0)
+                .map(|(_, ty)| ty.clone());
+            ty.or_else(|| self.expected_parameter(file, offset))
+        });
+        let Some(ty) = receiver else {
             return Vec::new();
         };
         let mut fields = Vec::new();
-        self.record_fields(file, ty, &mut fields, 0);
+        self.record_fields(file, &ty, &mut fields, 0);
         fields
             .into_iter()
             .map(|(label, t)| item(&label, CompletionKind::Field, Some(show_type(&t))))

@@ -1,0 +1,17 @@
+---
+source: flick-core/src/opt/projection_tests.rs
+assertion_line: 44
+expression: js
+---
+export const direct = (u) => u.address.city;
+
+export const piped = (u) => u.address.city;
+
+export const explicit = (u) => u.address.city;
+
+export const fetched = (fetch) => {
+  const $x = fetch(undefined);
+  return $x.address.city;
+};
+
+export const deep = (r) => r.a.b.c;

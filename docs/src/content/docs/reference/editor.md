@@ -20,17 +20,17 @@ on-disk version for dependent requests.
 | - | - |
 | diagnostics | exactly those of `flick check`, with their `FLICK-` codes, at UTF-16 positions, published when a document is opened, changed or saved; help lines follow the message, related spans (where an expected type came from) are `relatedInformation`, unused code is tagged `Unnecessary` |
 | `textDocument/hover` | source signatures and `///` documentation for public and private values, at declarations and uses; module documentation on qualifiers such as `Sql`; inferred locals and values, SQL aliases, columns and parameters, on a keyword that opens an expression (`task`, `scope`, `match`, `fun` …) the type of the whole expression, on `await` and `ignore` the type of the operand (see [keywords in the editor](../syntax/#in-the-editor)); on `|>` and `<|` the value after the step, on `>>` and `<<` the function the composition makes, each with what the operator does; declarations distinguish `type error` from `service` |
-| `textDocument/definition` | across modules; module qualifiers lead to their module header, members to their declaration; built-ins open as real read-only `.fl` files; installed packages use their published `.fl`, else `.iface`; companions lead to their type, class methods at a known instance to that instance |
-| `textDocument/references` | every occurrence in the project and, for a name of a workspace member, in the members that depend on it by path |
-| `textDocument/rename` | the project's own values, types, constructors, class methods and locals, in `.fl` sources only, and in the members of the workspace that depend on the project; names of built-in modules and packages and service operations have no exact mapping and are refused |
-| `textDocument/completion` | items carry their `///` documentation and a snippet of a function's parameters, sorted locals first and, where the place expects something, [what fits it](#completion-order) before the rest; a value of a module the file does not import is offered as `Module.name` (built-ins need no import, a project module gets its `import` added); record fields after `x.`, module exports or service operations after `M.`, otherwise names in scope; SQL blocks offer tables, aliases, columns, parameters, clauses and functions; `sql table` columns offer the SQL types of the project's dialect, then the modifiers that are not written yet and do not conflict, after `as` Flick types and after `via` the codecs in scope whose type instantiates to the column's `PureCodec`, imported ones also as `Module.codec` |
+| `textDocument/definition` | across modules; module qualifiers lead to their module header, members to their declaration; built-ins open as real read-only `.fl` files; installed packages use their published `.fl`, else `.iface`; companions lead to their type, class methods at a known instance to that instance; a field label leads to the field of the record type alias its record is, a label of a record no alias is shown to be to each record type with its fields |
+| `textDocument/references` | every occurrence in the project and, for a name of a workspace member, in the members that depend on it by path; of a field, its declaration and each label of a record shown to be its alias (see [fields](#record-fields)) |
+| `textDocument/rename` | the project's own values, types, constructors, class methods, locals and fields of record type aliases ([fields](#record-fields)), in `.fl` sources only, and in the members of the workspace that depend on the project; names of built-in modules and packages and service operations have no exact mapping and are refused |
+| `textDocument/completion` | items carry their `///` documentation and a snippet of a function's parameters, sorted locals first and, where the place expects something, [what fits it](#completion-order) before the rest; a value of a module the file does not import is offered as `Module.name` (built-ins need no import, a project module gets its `import` added); record fields after `x.` and after each `.` of an accessor `.a.b`, its label written or not, of the record its place gives (a later argument, as in `List.map .address. users`, a pipeline or an annotation), module exports or service operations after `M.`, otherwise names in scope; SQL blocks offer tables, aliases, columns, parameters, clauses and functions; `sql table` columns offer the SQL types of the project's dialect, then the modifiers that are not written yet and do not conflict, after `as` Flick types and after `via` the codecs in scope whose type instantiates to the column's `PureCodec`, imported ones also as `Module.codec` |
 | `textDocument/codeAction` | quick fixes of diagnostics that carry an edit: the closest name for a misspelt one, removing unused imports and definitions, exporting one unused top-level value, importing a missing class, `_` for an unused variable, the missing arms of a `match`, a `todo` definition of a missing function, the inferred type for a type hole; on `FLICK-T004` it inserts the inferred signature `name : T` right above the `let`, at its indentation, with effect rows, type variables, class constraints and names qualified as the module's imports allow; a binding the checker rejected gets none |
-| `textDocument/codeAction` (refactors) | add the signature of a `let` value; pattern match on a variable that is a block's result; qualify an imported name at every use, or drop a qualifier and import the name; extract the selected expression into a `let`; inline a local `let` into its uses |
+| `textDocument/codeAction` (refactors) | add the signature of a `let` value; pattern match on a variable that is a block's result; qualify an imported name at every use, or drop a qualifier and import the name; extract the selected expression into a `let`; inline a local `let` into its uses; write `fun x -> x.a.b` as the accessor `.a.b`, when the parameter is a bare name read only as the path's root and no comment is inside, and an accessor as a function whose parameter no name in scope has |
 | `textDocument/formatting` | `flick fmt` |
 | `textDocument/documentSymbol`, `workspace/symbol` | declarations, with constructors and methods under their type or class; workspace symbols match the letters of the query in order, over every member of the workspace |
 | `textDocument/signatureHelp` | in a call `f a b`, the signature of `f` with the argument being written marked |
 | `textDocument/typeDefinition` | the declaration of the type of the expression under the cursor |
-| `textDocument/semanticTokens/full` | what each name is: module, type, constructor, function, variable, method or parameter |
+| `textDocument/semanticTokens/full` | what each name is: module, type, constructor, function, variable, method, parameter or field label (`property`); an accessor's `.` is no module path |
 | `textDocument/foldingRange` | declarations, `match`, records, lists, embedded blocks and the run of imports |
 | `textDocument/inlayHint` | the type of each `let` without a signature, a local function or an instance method among them, and of each stage of a pipeline written over several lines |
 
@@ -42,6 +42,26 @@ unmapped generated implementations, explicit `C.dictionary` records, packed
 module fields or static module contracts/arguments without an exact mapping
 refuse the rename, including
 in dependent workspace members.
+
+### Record fields
+
+Records are structural: equal labels relate two records in no way. A field
+label belongs to the field of a record type alias where the checker typed
+its record as that alias (a projection, an accessor step, a literal checked
+against it, an update, a pattern) or where the record is read from a field
+the alias declares with another alias, as `city` of `user.address.city`.
+References and rename follow only that evidence. A rename edits the
+declaration and every such label in one workspace edit, or refuses with the
+place that stops it and edits nothing: a label of a record not shown to be
+one alias that may be this one (a row-polymorphic helper, a record passed
+through a generic function as in `List.map .name users`, an alias of another
+module's record), a record type written with the same fields, a foreign
+declaration, `@native` override or derived `Schema` that reaches the alias,
+`Record.label` of the label, a pattern `{ name }` that also binds it, a new
+name that is already a field or takes another place among the labels (which
+order comparisons and shown text), and analysis errors. Hover on a label
+shows the field's type, its `///` documentation and its alias; on an
+accessor, its function type.
 
 Hover resolves source bindings, not just the public export list. Private
 helpers such as a view or an error reporter show their written signatures

@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: f84dbb580a593109
+source_hash: 063879f8cf2f5234
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -331,7 +331,7 @@ false in when for yield do break continue
 | 9 | префиксные `-`, `not`, `await`, `ignore`, `echo` | — |
 | 9½ | `>>`, `<<` | `>>` левая, `<<` правая; не смешиваются: `f >> g << h` — ошибка |
 | 10 | применение функции `f x y` | левая |
-| 11 | `.field`, `Module.name`, постфиксный `?` | левая |
+| 11 | `.field`, `Module.name`, постфиксный `?`; функция-поле `.a.b` — один атом | левая |
 
 `-x ** 2` означает `-(x ** 2)`; `-a * b` означает `(-a) * b`; `await f x`
 означает `await (f x)`; `0..n - 1` — это `0..(n - 1)`, а `i < 0..n` сравнивает с диапазоном.
@@ -721,6 +721,8 @@ application = postfix { argument }
 argument    = "_" | postfix                     // не больше одной `_` на вызов
 postfix     = atom { "." name | "?" }           // без пробела перед ними
 atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
+            | accessor
+accessor    = "." name { "." name }             // без пробелов внутри
             | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
             | "(" expr "," expr { "," expr } ")" | "[" [expr { "," expr } [","]] "]"
             | "{" "}" | "{" field "=" block { ";" | line break … } "}"
@@ -798,6 +800,33 @@ let wrapped name = name |> label "[" _ "]"
 
 wrapped_right : String -> String
 let wrapped_right name = label "[" _ "]" <| name
+```
+
+Точка прямо перед именем, когда перед ней нет значения, у которого это
+было бы полем, начинает функцию-поле (accessor): `.name` — это функция
+`fun r -> r.name`, а `.address.city` читает поля по очереди,
+`fun r -> r.address.city`. Точки и имена пути пишутся без пробелов. Такая
+функция — обычное значение: аргумент (`List.map .address.city users`), конец
+конвейера (`user |> .name`), немедленное применение (`.name user`), имя или
+элемент списка. `f .name` применяет `f` к функции-полю, а `f.name` читает
+поле `f`; `user .name` применяет `user` к ней, и ошибка на этом предлагает
+склеить их в `user.name`. Путь содержит только чтения полей: `.age + 1`
+складывает функцию с числом, поэтому пишите `fun u -> u.age + 1`, а `.email?`
+применяет `?` к функции-полю, поэтому пишите `user.email?` или
+`fun u -> u.email?`. Шаг без имени, как в `.address. users`, — это
+`FLICK-S007` на его точке. У параметра нет собственного имени: его не
+показывают ни подсказка, ни автодополнение, ни переименование. Как
+типизируется функция-поле, описано в разделе [Записи](../types/#записи).
+
+```flick
+type alias Address = { city : String }
+type alias User = { name : String; address : Address }
+
+cities : List User -> List String
+let cities users = List.map .address.city users
+
+name_of : User -> String
+let name_of user = user |> .name
 ```
 
 `if` — выражение; без `else` оно имеет тип `Unit`, как и его ветвь `then` (на `else ()` выдаётся предупреждение `FLICK-T028`). Ветвь в фигурных скобках содержит инструкции: `if a > b then { low = b; high = a }`. `ignore e` отбрасывает
