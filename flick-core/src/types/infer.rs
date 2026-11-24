@@ -322,6 +322,8 @@ impl<'c> Checker<'c> {
             let actual = self.record(node, Some(&row));
             self.expect(&actual, expected, self.span(node));
         }
+        #[cfg(feature = "ide")]
+        self.note_literal(node, expected);
     }
 
     /// The body of a polymorphic type with rigid variables, its class
