@@ -123,6 +123,7 @@ fn settling_data_does_not_expand_a_recursive_method_function() {
             dicts: Vec::new(),
             dict_constraints: Vec::new(),
             body: method.clone(),
+            projection: None,
         })
     };
     let table = ir::lang_items();

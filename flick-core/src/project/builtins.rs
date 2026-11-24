@@ -132,7 +132,7 @@ fn lower_builtins(stages_by_class: bool) -> (BuiltinModules, Vec<Arc<Interface>>
         );
         for (module, interface) in bundle.modules.iter_mut().zip(&interfaces) {
             assert_eq!(module.name, interface.module, "a module and its interface");
-            module.exports = ir::exports(&module.name, interface);
+            module.exports = ir::exports(module, interface);
         }
     });
     debug!(

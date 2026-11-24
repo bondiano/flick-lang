@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+- **Projection summaries in the IR.** An exported value that reads a path
+  of fields of its argument, as `let city = .address.city` does, carries a
+  versioned summary of that path and its types in its module's exports.
+  Another module of the program inlines the reads from the summary alone,
+  and a use whose summary is missing or of another version stays a call.
+
 - **Field accessors.** `.name` is the function `fun r -> r.name`, and
   `.address.city` reads a path of fields: `List.map .address.city users`,
   `user |> .name`, `.name user`, or bound to a name. Its type is that of the

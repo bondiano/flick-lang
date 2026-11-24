@@ -55,7 +55,7 @@ fn lower_go(text: &str) -> Module {
     diagnostics.retain(|d| d.severity == Severity::Error);
     assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let mut lowered = ir::lower(&module, &typing).expect("lowers");
-    lowered.exports = ir::exports(module_name, &interface);
+    lowered.exports = ir::exports(&lowered, &interface);
     lowered
 }
 

@@ -1,21 +1,30 @@
 //! The exports of a module as its IR gives them to the backend: its own
-//! values, with the stages of a Sync one, and what it exports of others.
+//! values, with the stages of a Sync one and the summary of a projection,
+//! and what it exports of others.
 
-use flick_ir::{Exported, Exports, Namespace as IrNamespace, Reexport};
+use flick_ir::{
+    Exported, Exports, ItemKind, Module, Namespace as IrNamespace, Projection, Reexport,
+};
 
 use crate::iface::{Decl, Interface, Namespace};
 use crate::types::Type;
 
-/// The exports `interface` lists for `module`.
-pub fn exports(module: &str, interface: &Interface) -> Exports {
+/// The exports `interface` lists for `module`, whose code tells which of
+/// its values are projections.
+pub fn exports(module: &Module, interface: &Interface) -> Exports {
     let mut out = Exports::default();
     for export in &interface.exports {
         let entity = &export.entity;
-        if entity.module == module {
+        if entity.module == module.name {
             if entity.namespace == Namespace::Value {
                 let sync = export.scheme.as_ref().and_then(sync_stages);
                 let name = entity.name.clone();
-                out.values.push(Exported { name, sync });
+                let projection = projection(module, &name);
+                out.values.push(Exported {
+                    name,
+                    sync,
+                    projection,
+                });
             }
             continue;
         }
@@ -32,6 +41,21 @@ pub fn exports(module: &str, interface: &Interface) -> Exports {
         });
     }
     out
+}
+
+/// The summary of the value `name` of `module` when it is a projection
+/// that takes no dictionaries, which other modules read in place of a call.
+fn projection(module: &Module, name: &str) -> Option<Projection> {
+    module.items.iter().find_map(|item| match &item.kind {
+        ItemKind::Value {
+            name: n,
+            type_params,
+            dicts,
+            body,
+            ..
+        } if n == name && dicts.is_empty() => Projection::of(type_params, body),
+        _ => None,
+    })
 }
 
 /// The supplied arrows of an exported value whose last stage is Sync.
@@ -79,6 +103,7 @@ mod tests {
         let value = |name: &str, sync| Exported {
             name: name.to_owned(),
             sync,
+            projection: None,
         };
         // only a function whose last stage is Sync counts its arrows; what
         // the module keeps to itself is not listed
@@ -100,5 +125,34 @@ mod tests {
                 name: "Enum".to_owned(),
             }]
         );
+    }
+
+    /// An exported projection, the accessor or the explicit `fun` alike,
+    /// carries its summary; a function that computes, or a projection the
+    /// module keeps to itself, does not.
+    #[test]
+    fn an_exported_projection_carries_its_summary() {
+        let text = "module App exposing (User, city, also, label)\n\n\
+                    type alias User = { name : String; address : { city : String } }\n\n\
+                    city : User -> String\nlet city = .address.city\n\n\
+                    also : User -> String\nlet also = fun u -> u.address.city\n\n\
+                    label : User -> String\nlet label u = u.name ++ \"!\"\n\n\
+                    hidden : User -> String\nlet hidden = .name\n";
+        let exports = lower_text("App", text).expect("lowers").exports;
+        let summary = |name: &str| {
+            let value = exports.values.iter().find(|e| e.name == name);
+            value.expect("exported").projection.clone()
+        };
+        for name in ["city", "also"] {
+            let summary = summary(name).expect("a projection");
+            assert_eq!(summary.version, flick_ir::PROJECTION_VERSION);
+            assert_eq!(summary.path, ["address", "city"], "{name}");
+            assert!(
+                summary.param.is_some() && summary.result.is_some(),
+                "{summary:?}"
+            );
+        }
+        assert_eq!(summary("label"), None);
+        assert!(exports.values.iter().all(|e| e.name != "hidden"));
     }
 }

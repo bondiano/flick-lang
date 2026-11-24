@@ -8,12 +8,15 @@
 //!   function that has its name, is a strict `for` over the list whose
 //!   element is the reads of each element, without a call per element.
 //!
-//! A projection of the module or of another module of the build is known
-//! by its body, which the build gives with the program; a value whose body
-//! is not given stays a call. The code of a module then depends on bodies
-//! of other modules: a build that keeps generated code keys it on every
-//! source of the program and on the backend that optimized it, never on
-//! interfaces alone, as the build cache of `flick` does. The argument is
+//! A projection of the module, or of a built-in module, is known by its
+//! body. One of another module of the program is known only by the
+//! projection summary that module exports for it (`flick_ir::Projection`),
+//! in a version this crate reads; without one, the use stays a call, and a
+//! body is never taken for a projection by its shape or name. The code of a
+//! module then depends on those summaries: a build that keeps generated
+//! code keys it on every source of the program and on the backend that
+//! optimized it, never on interfaces alone, as the build cache of `flick`
+//! does. The argument is
 //! evaluated once and first, and each field is read once per use, as the
 //! call would: a field of a foreign value may be a getter, so reads are
 //! neither repeated nor dropped.
@@ -26,43 +29,9 @@ use crate::Known;
 use crate::ir::{Expr, ExprKind, Lit, Param, Pat, Stage, Stmt};
 use flick_ir::{IrType, Lang, Span, TypeRef};
 
-/// The longest path of fields a projection may read to be inlined at every
-/// use. Each step is one field read: no call, branch or allocation, and
-/// about the size of the call it replaces, so a site grows by at most this
-/// many reads however many sites name it. Eight covers records nested as
-/// deeply as programs write them; a longer path stays a call, under the
-/// ordinary budgets.
-pub(super) const DEPTH: usize = 8;
-
-/// The labels a projection of `params` and `body` reads, the first one
-/// read first: one pure parameter that binds a name, and a body of 1 to
-/// [`DEPTH`] field reads over it, with nothing else (no dictionaries, `o?`,
-/// calls, branches or captures).
-pub(super) fn path(params: &[Param], body: &Expr) -> Option<Vec<String>> {
-    let [param] = params else {
-        return None;
-    };
-    let Pat::Bind(x) = &param.pat else {
-        return None;
-    };
-    if param.stage != Stage::Pure {
-        return None;
-    }
-    let mut labels = Vec::new();
-    let mut at = body;
-    while let ExprKind::Field(inner, label) = &at.kind {
-        if labels.len() == DEPTH {
-            return None;
-        }
-        labels.push(label.clone());
-        at = inner;
-    }
-    let reads_param = matches!(&at.kind, ExprKind::Local(l) if l == x);
-    (reads_param && !labels.is_empty()).then(|| {
-        labels.reverse();
-        labels
-    })
-}
+/// The classifier and its bound are those of the IR's projection
+/// summaries, so a module and its summary agree on what a projection is.
+pub(super) use flick_ir::projection_path as path;
 
 /// [`path`] of a lambda.
 fn lambda_path(f: &Expr) -> Option<Vec<String>> {

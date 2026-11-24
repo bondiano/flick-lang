@@ -395,7 +395,7 @@ fn run_in(
         // the code of a module with a loaded test companion exports to it all
         // it declares; a build never loads a companion, nor makes this code
         let interface = loader.privates.get(&c.name).unwrap_or(&c.interface);
-        c.ir.exports = ir::exports(&c.name, interface);
+        c.ir.exports = ir::exports(&c.ir, interface);
     }
     // a module's package names the tags of its constructors: its source
     // package, else the project's
