@@ -222,7 +222,9 @@ fn out_of_table_go_types_fail_with_f013_and_legacy_sibling_go_keeps_working() {
         assert!(stderr.contains("FLICK-F013"), "{name}: {stderr}");
         assert!(stderr.contains(expected_reason), "{name}: {stderr}");
         assert!(
-            stderr.contains(&format!("App/Main.fl:{line_no}:")),
+            stderr
+                .replace('\\', "/")
+                .contains(&format!("App/Main.fl:{line_no}:")),
             "{name}: {stderr}"
         );
     }
