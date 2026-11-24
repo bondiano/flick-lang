@@ -121,7 +121,7 @@ theorem Ty.reach_ren (ξ : Atom → Atom) (t : Ty) (a : Atom) :
   | arrow x φ y C ihx _ ihy =>
     simp only [Ty.ren, Ty.reach, Caps.substT, ihx, ihy]
     exact exists_or3
-  | ref t ih | rnm _ t ih | rless _ t ih | errors t ih | hnd t ih | owner t ih =>
+  | ref t ih | funcRef t ih | rnm _ t ih | rless _ t ih | errors t ih | hnd t ih | owner t ih =>
     simp only [Ty.ren, Ty.reach, ih]
   | tapp f x ihf ihx | rcons _ f x ihf ihx | run f x ihf ihx =>
     simp only [Ty.ren, Ty.reach, ihf, ihx]
@@ -180,7 +180,7 @@ theorem Ty.reach_substT (σ : Atom → Ty) (t : Ty) (a : Atom) :
   | arrow x φ y C ihx _ ihy =>
     simp only [Ty.substT, Ty.reach, Caps.substT, ihx, ihy]
     exact exists_or3
-  | ref t ih | rnm _ t ih | rless _ t ih | errors t ih | hnd t ih | owner t ih =>
+  | ref t ih | funcRef t ih | rnm _ t ih | rless _ t ih | errors t ih | hnd t ih | owner t ih =>
     simp only [Ty.substT, Ty.reach, ih]
   | tapp f x ihf ihx | rcons _ f x ihf ihx | run f x ihf ihx =>
     simp only [Ty.substT, Ty.reach, ihf, ihx]
@@ -353,6 +353,7 @@ theorem Ty.Equiv.substT {a b : Ty} (h : Ty.Equiv a b) (σ : Atom → Ty) :
   | trans _ _ ih₁ ih₂ => exact .trans (ih₁ σ) (ih₂ σ)
   | arrow _ hφ _ ih₁ ih₂ ih₃ => exact .arrow (ih₁ σ) (hφ.substS (ih₂ σ)) (ih₃ σ)
   | ref _ ih => exact .ref (ih σ)
+  | funcRef _ ih => exact .funcRef (ih σ)
   | tapp _ _ ih₁ ih₂ => exact .tapp (ih₁ σ) (ih₂ σ)
   | rcons _ _ ih₁ ih₂ => exact .rcons (ih₁ σ) (ih₂ σ)
   | eff _ _ _ ih₁ ih₂ ih₃ => exact .eff (ih₁ σ) (ih₂ σ) (ih₃ σ)

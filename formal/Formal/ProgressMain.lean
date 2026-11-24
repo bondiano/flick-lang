@@ -68,6 +68,7 @@ theorem progress {Λ μ root} (hroot : RootTy S root) :
     exact step (Step.glob (E := []) OkE.nil hv)
   | scope => intros; exact step (Step.ofR .scope)
   | errVal _ _ _ ih => intro hμ hΓ _ _ hJ; cases hJ; exact ih hμ hΓ rfl
+  | funcRef _ _ ih => intro hμ hΓ _ _ hJ; cases hJ; exact ih hμ hΓ rfl
   | allI hv => intros; exact .inl hv
   | anil => intro _ _ _ _ hJ; cases hJ
   | acons => intro _ _ _ _ hJ; cases hJ

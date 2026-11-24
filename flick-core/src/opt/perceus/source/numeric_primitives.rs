@@ -1,4 +1,5 @@
 //! Exact compare/hash and unsafe Int adapters, not arbitrary FFI erasure.
+use super::kept_for_call;
 use flick_ir::{Adapter, Arith, Copies, Foreign, ForeignMode, Lit, Num, ResultAdapter, Shape};
 
 #[path = "scalar.rs"]
@@ -431,7 +432,7 @@ fn supports(value: &Foreign, arity: usize, copies_args: bool, copies_result: boo
         && value.arity == arity
         && value.stages == vec![false; arity]
         && value.catch.is_none()
-        && value.adapter
+        && kept_for_call(&value.adapter)
             == Adapter {
                 optional: vec![],
                 owned: vec![],
@@ -448,5 +449,6 @@ fn supports(value: &Foreign, arity: usize, copies_args: bool, copies_result: boo
                 shapes: vec![Shape::Data; arity],
                 result_shape: Shape::Data,
                 words: vec![],
+                retention: None,
             }
 }

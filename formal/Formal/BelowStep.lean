@@ -66,6 +66,7 @@ theorem PHead.has {e e' : Tm} (h : PHead e e') {s : Site} (hs : e'.Has s) : e.Ha
     simp only [Tm.Has] at hs ⊢; grind
   | tryVal => exact .inl hs
   | intEq => cases hs
+  | funcRef => exact .inr hs
 
 /-- The terms of a configuration write only regions that exist. -/
 structure CfgBelow (Λ : List Rgn) (μ : List Tm) (e : Tm) : Prop where

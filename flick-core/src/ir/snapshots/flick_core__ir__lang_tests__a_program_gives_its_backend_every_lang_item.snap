@@ -31,6 +31,7 @@ form Type Prelude.Form
 pure_codec Type Prelude.PureCodec
 eff Type Prelude.Eff
 lazy Type Prelude.Lazy
+func_ref Type Prelude.FuncRef
 layer Type Prelude.Layer
 codec Type Prelude.Codec
 errors Type Prelude.Errors

@@ -1,0 +1,29 @@
+---
+title: "FLICK-F015"
+---
+
+A `FuncRef (a -> b)` refers to a function without captures, which a host
+without closures takes as a plain function pointer. Where a `FuncRef` is
+expected, the value must be the name of a top-level function or a lambda
+that captures nothing. A captured local, a partial application, a local
+function, a class method and a function that takes class dictionaries at
+its type all need an environment at run time, and are refused. A class
+dictionary the lambda uses from the function around it counts as a capture.
+
+```flick fail F015
+apply : FuncRef (Int -> Int) -> Int -> Int
+let apply r x = FuncRef.fun r x
+
+shift : Int -> Int -> Int
+let shift by x = apply (fun n -> n + by) x
+```
+
+Pass what the function needs as an argument, or write it at the top level:
+
+```flick
+apply : FuncRef (Int -> Int -> Int) -> Int -> Int -> Int
+let apply r by x = FuncRef.fun r by x
+
+shift : Int -> Int -> Int
+let shift by x = apply (fun step n -> n + step) by x
+```

@@ -22,9 +22,10 @@ inductive Ty.UnaryHead
   | ref
   | hnd
   | owner
+  | funcRef
 
 def Ty.unaryArg : Ty.UnaryHead → Ty → Option Ty
-  | .ref, .ref a | .hnd, .hnd a | .owner, .owner a => some a
+  | .ref, .ref a | .hnd, .hnd a | .owner, .owner a | .funcRef, .funcRef a => some a
   | _, _ => none
 
 theorem Ty.RowForm.unaryArg {r : Ty} (h : r.RowForm) (head : Ty.UnaryHead) :
@@ -37,7 +38,7 @@ theorem Ty.Equiv.unaryArg {a b : Ty} (h : Ty.Equiv a b) (head : Ty.UnaryHead) :
   | refl => cases Ty.unaryArg head _ <;> constructor; exact .refl
   | symm _ ih => exact option_symm ih
   | trans _ _ ih₁ ih₂ => exact option_trans ih₁ ih₂
-  | ref h | hnd h | owner h => cases head <;> first | exact .some h | exact .none
+  | ref h | hnd h | owner h | funcRef h => cases head <;> first | exact .some h | exact .none
   | run_idem r hr | run_nil r hr | rless_none r hr =>
     rw [hr.unaryArg head]
     cases head <;> exact .none

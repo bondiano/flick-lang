@@ -21,6 +21,10 @@ private theorem Typ.frameCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro r F t φ hctx hterm hjudge hr hok
     cases hjudge
     exact (ih r F _ _ hctx hterm rfl hr hok).errVal hU hE
+  | funcRef _ _ ih =>
+    intro r F t φ hctx hterm hjudge hr hok
+    cases hjudge
+    exact (ih r F _ _ hctx hterm rfl hr hok).funcRef
   | allI hv =>
     intro r F t φ _ hterm _ hr _
     rw [hterm] at hv

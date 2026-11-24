@@ -55,6 +55,7 @@ def Ty.elide (K : Caps) : Ty → Caps → Ty
   | .eff r e t C, H => .eff (.run r (.caps H)) e (t.elide K Caps.none) C
   | .all k t, H => .all k (t.elide (Caps.under k K) (Caps.under k H))
   | .ref t, _ => .ref (t.elide K Caps.none)
+  | .funcRef t, _ => .funcRef (t.elide K Caps.none)
   | .rnm N args, _ => .rnm N (args.elide K Caps.none)
   | .run left right, _ => .run (left.elide K Caps.none) (right.elide K Caps.none)
   | .rless gone r, _ => .rless gone (r.elide K Caps.none)
@@ -68,7 +69,7 @@ def Ty.elide (K : Caps) : Ty → Caps → Ty
 /-- A type that writes no `bare`. -/
 def Ty.noBare : Ty → Bool
   | .arrow a _ b _ => a.noBare && b.noBare
-  | .ref t | .eff _ _ t _ | .hnd t | .owner t | .dict _ t | .all _ t
+  | .ref t | .funcRef t | .eff _ _ t _ | .hnd t | .owner t | .dict _ t | .all _ t
   | .rnm _ t | .rless _ t | .lazy _ _ t _ | .lazyCell _ _ t _ => t.noBare
   | .tapp f a | .rcons _ f a | .run f a | .rt f a => f.noBare && a.noBare
   | .bare => false
@@ -89,7 +90,7 @@ theorem Ty.reach_le_elide : ∀ (K : Caps) (t : Ty) (H : Caps), Caps.Sub t.reach
     simp only [Ty.elide, Ty.reach] at hx ⊢; exact hx.imp_left (Ty.reach_le_elide K t _ x)
   | K, .all k t, H => fun x hx => by
     simp only [Ty.elide, Ty.reach] at hx ⊢; exact Ty.reach_le_elide _ t _ _ hx
-  | K, .ref t, _ | K, .rnm _ t, _ | K, .rless _ t, _ => fun x hx => by
+  | K, .ref t, _ | K, .funcRef t, _ | K, .rnm _ t, _ | K, .rless _ t, _ => fun x hx => by
     simp only [Ty.elide, Ty.reach] at hx ⊢; exact Ty.reach_le_elide K t _ x hx
   | K, .tapp f a, H => fun x hx => by
     by_cases ha : a = .bare
@@ -117,7 +118,7 @@ theorem Ty.reach_elide : ∀ (K : Caps) (t : Ty) (H : Caps), t.noBare = true →
   | K, .eff r e t C, H, h => by
     funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide K t _ h]
   | K, .all k t, H, h => by funext x; simp only [Ty.elide, Ty.reach, Ty.reach_elide _ t _ h]
-  | K, .ref t, _, h | K, .rnm _ t, _, h | K, .rless _ t, _, h => by
+  | K, .ref t, _, h | K, .funcRef t, _, h | K, .rnm _ t, _, h | K, .rless _ t, _, h => by
     simp only [Ty.elide, Ty.reach, Ty.reach_elide K t _ h]
   | K, .tapp f a, H, h => by
     simp only [Ty.noBare, Bool.and_eq_true] at h
@@ -204,6 +205,7 @@ theorem Const.ty_kept {S : Sig} {Θ : Facts} {c : Const} {ι : CArg} {K : Caps}
       cases n <;> simp [Ty.asRow, Row.ofCaps, Ty.reach, Caps.none] at h) .inr), fun _ h => h⟩
       .refl fun x hx => hx
   | intEq => exact .arrow .refl (.arrow .refl (.fix fun _ => rfl))
+  | funcRefFun => exact .arrow (by simp only [Ty.elide, hk]; exact .refl) (.fix hk)
   | scopeRun =>
     refine .arrow ?_ (.fix hk)
     simp only [Ty.elide, Caps.under_none, hup, Ty.useS]

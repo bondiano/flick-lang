@@ -213,7 +213,7 @@ fn a_wasm_ir_plugin_rewrite_reaches_a_fixture_backend_with_valid_types() {
         let report_text = fs::read_to_string(root.join("app/dist/typed-ir-report.json"))
             .expect("typed-ir-report.json");
         let report: Value = serde_json::from_str(&report_text).expect("valid report json");
-        assert_eq!(report["ir_version"], "0.17.0");
+        assert_eq!(report["ir_version"], "0.18.0");
         assert_eq!(report["optimized"], profile == "release");
 
         let module = &report["modules"]["Fixture.TypedIr"];

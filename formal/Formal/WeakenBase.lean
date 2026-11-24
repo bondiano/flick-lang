@@ -164,4 +164,8 @@ theorem Typ.frees {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : ∀ i, e.Free i → 
     · exact ih₁ i h
   | _ => intro i h; (try simp only [Tm.Free] at h) <;> grind
 
+/-- A term typed in the empty context names no local. -/
+theorem Typ.closed_nil {Ψ Θ e J} (h : Typ S Ψ Θ [] e J) : e.Closed :=
+  fun i hi => absurd (h.frees i hi) (Nat.not_lt_zero _)
+
 end Flick

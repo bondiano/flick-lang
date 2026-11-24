@@ -17,6 +17,7 @@ private theorem not_alts_expr {S : Sig} {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) 
   induction h with
   | conv _ _ ih => intro t φ hJ ha; cases hJ; exact ih _ _ rfl ha
   | errVal _ _ _ ih => intro t φ hJ ha; cases hJ; exact ih _ _ rfl ha
+  | funcRef _ _ ih => intro t φ hJ ha; cases hJ; exact ih _ _ rfl ha
   | allI hv => intro t φ _ ha; cases hv <;> simp [IsAlts] at ha
   | _ => intro t φ hJ ha; cases hJ <;> simp [IsAlts] at ha
 
@@ -204,6 +205,13 @@ theorem phead_sim (hC : BClosed B) (hV : BNoVal B) (hA : BNoAlts B) (hP : BPlain
     cases h with
     | base hb => exact .inl hb
     | hdone h₁ => exact .inr ⟨_, .hdoneVal (Cg.value hV hv h₁).1, h₁⟩
+  | funcRef hv =>
+    cases h with
+    | base hb => exact .inl hb
+    | app h₁ h₂ =>
+      cases h₁ with
+      | base hb => exact (nb hb .const).elim
+      | const => exact .inr ⟨_, .funcRef (Cg.value hV hv h₂).1, h₂⟩
   | intEq =>
     cases h with
     | base hb => exact .inl hb

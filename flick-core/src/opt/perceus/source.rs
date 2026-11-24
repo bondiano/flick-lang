@@ -136,7 +136,7 @@ mod tests;
 use std::collections::{BTreeMap, BTreeSet};
 use std::{error, fmt};
 
-use flick_ir::{Constructor, Dict, Foreign, ForeignMode, InstanceInfo, Shape};
+use flick_ir::{Adapter, Constructor, Dict, Foreign, ForeignMode, InstanceInfo, Retention, Shape};
 
 use crate::iface::Interface;
 use crate::ir::memory::{
@@ -565,4 +565,15 @@ fn dictionary(value: &Dict, span: Span) -> Result<Expr, LowerError> {
         }
     };
     Ok(Expr::new(kind, span))
+}
+
+/// `adapter` as the contracts of known runtime bindings compare it:
+/// `retention call` keeps nothing past the call, as a bare callback without
+/// the line does, so a binding means the same with it or without.
+fn kept_for_call(adapter: &Adapter) -> Adapter {
+    let mut adapter = adapter.clone();
+    if adapter.retention == Some(Retention::Call) {
+        adapter.retention = None;
+    }
+    adapter
 }

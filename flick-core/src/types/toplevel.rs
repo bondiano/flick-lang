@@ -136,6 +136,7 @@ impl<'a> Checker<'a> {
         self.labelled(&decls);
         self.recursion();
         self.unknown_types();
+        self.func_ref_dictionaries();
     }
 
     /// Pairs signatures with the definitions right below them and makes

@@ -24,6 +24,7 @@ bootstrap/inline_pack_nominals
 bootstrap/packed_module
 bootstrap/stderr
 codegen/abi
+codegen/func_ref
 codegen/accessor_fields
 codegen/accessors
 codegen/accessor_projections

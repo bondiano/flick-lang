@@ -209,7 +209,7 @@ private theorem Typ.drec_dict {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     obtain ⟨U', hU', hle⟩ := hT.dict_left
     cases hU'
     exact ⟨_, _, _, rfl, hle, hc, hl, hr, hn⟩
-  | allI | errVal => intro c r c' U φ _ hJ; cases hJ
+  | allI | errVal | funcRef => intro c r c' U φ _ hJ; cases hJ
   | _ => intro c r c' U φ hv _; cases hv
 
 /-- L1 for dictionaries. -/
@@ -217,7 +217,7 @@ theorem canonical_dict {Ψ Θ Γ v c U φ} (hv : Value v) (h : Typ S Ψ Θ Γ v 
     ∃ r k fs us, v = .drec c r ∧ LeLive S (.dict c (Ty.spine us)) (.dict c U) ∧
       S.dict c = some (k, fs) ∧ us.length = k ∧
       Typ S Ψ Θ Γ r (.dfs (fs.map fun f => (f.1, f.2.substT (instT us)))) ∧ r.NoIns := by
-  have hk := h.vkind hv rfl (by simp [Ty.isAll])
+  have hk := h.vkind hv rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
   cases hv with
   | drec =>
     obtain ⟨k, fs, us, hC, hu, hc, hl, hr, hn⟩ := h.drec_dict _ _ c _ _ rfl rfl

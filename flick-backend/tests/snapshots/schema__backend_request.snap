@@ -63,7 +63,7 @@ expression: "serde_json::to_string_pretty(&request).expect(\"JSON\")"
       "platform": "node"
     },
     "host_package": null,
-    "ir_version": "0.17.0",
+    "ir_version": "0.18.0",
     "language_version": "0.2.0",
     "mode": "WholeProgram",
     "options": [],

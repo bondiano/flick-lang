@@ -174,6 +174,15 @@ theorem FrameTy.errVal {Ψ Θ F r U φ E ε} (h : FrameTy S Ψ Θ F r U φ) (hU 
   refine .errVal (hb σ hσ X r' h') (Ty.hd_substT σ hU) ?_
   rw [← Row.err_substT, ← Row.substT_asRow]; exact hE.substT σ
 
+/-- (FuncRef-In) of the result leaves the hole and its stage relation unchanged: what fills
+the hole is closed, as every term typed in the empty context. -/
+theorem FrameTy.funcRef {Ψ Θ F r t φ} (h : FrameTy S Ψ Θ F r t φ) :
+    FrameTy S Ψ Θ F r (.funcRef t) φ := by
+  obtain ⟨k, Θ', t', φ', ht, hr, hf, hb, hi⟩ := h
+  refine ⟨k, Θ', t', φ', ht, hr, hf, fun σ hσ X r' h' => ?_, hi⟩
+  have h₁ := hb σ hσ X r' h'
+  exact .funcRef h₁ h₁.closed_nil
+
 /-- A frame that handles `E` in its hole: the hole may also need `E`, and obligations about
 it. -/
 theorem FRel.installs {F : Frame} {E : Name} {A : TyClass → Prop} {φ₀ φ : Stage} {r ε : Row}

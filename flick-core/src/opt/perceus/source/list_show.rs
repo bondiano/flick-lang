@@ -1,5 +1,6 @@
 //! Exact known listShow adapter, implemented as closed Flick IR.
 
+use super::kept_for_call;
 use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 
 use crate::ir::{Arm, BinOp, Expr, ExprKind, Lit, Param, Pat, Stage, Stmt};
@@ -14,7 +15,7 @@ pub(super) fn supports(value: &Foreign) -> bool {
         && value.arity == 2
         && value.stages == [false, false]
         && value.catch.is_none()
-        && value.adapter
+        && kept_for_call(&value.adapter)
             == Adapter {
                 optional: vec![],
                 owned: vec![],
@@ -31,6 +32,7 @@ pub(super) fn supports(value: &Foreign) -> bool {
                 shapes: vec![Shape::Data, Shape::Data],
                 result_shape: Shape::Data,
                 words: vec![],
+                retention: None,
             }
 }
 
@@ -175,6 +177,7 @@ mod tests {
             shapes: vec![Shape::Data, Shape::Data],
             result_shape: Shape::Data,
             words: vec![],
+            retention: None,
         }
     }
     #[test]

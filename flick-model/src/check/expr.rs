@@ -11,6 +11,7 @@ use super::dicts::at_args;
 use super::generalize::own_regions;
 use super::regions::live_stage;
 use super::{Check, Checker, error};
+use crate::subst::free_vars;
 use crate::syntax::{Const, Head, Lit, Name, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
@@ -58,6 +59,57 @@ pub(super) fn mono(t: Type) -> Scheme {
         body: t,
         outlives: Vec::new(),
     }
+}
+
+impl Checker<'_> {
+    /// `e` against `full`, resolved to `expected`, by none of the forms of
+    /// `check`: (FuncRef-In) against a `FuncRef`, else what `e` infers fits.
+    /// Kept out of `check`, whose frame every nested term adds to the stack.
+    #[inline(never)]
+    pub(super) fn check_inferred(&mut self, e: &Term, expected: &Type, full: &Type) -> Check<()> {
+        if let Type::App(h, f) = expected
+            && **h == prelude("FuncRef")
+        {
+            return self.check_func_ref(e, f, full);
+        }
+        let t = self.infer(e)?;
+        self.fit(e, &t, full)
+    }
+
+    /// (FuncRef-In): a term that names no local is a value of `FuncRef f`
+    /// when it is one of `f`; as the checker, this one takes a λ, a
+    /// top-level value, a constructor or an operation. A term of type
+    /// `FuncRef f` already passes as it is.
+    fn check_func_ref(&mut self, e: &Term, f: &Type, full: &Type) -> Check<()> {
+        if matches!(e, Term::Lam(..) | Term::Fix(..)) && func_ref(e) {
+            return self.check(e, f);
+        }
+        let t = self.infer(e)?;
+        if matches!(self.resolve(&t), Type::App(h, _) if *h == prelude("FuncRef")) {
+            return self.fit(e, &t, full);
+        }
+        if func_ref(e) {
+            return self.fit(e, &t, f);
+        }
+        if matches!(self.resolve(&t), Type::Fun(..) | Type::Forall(_)) {
+            return error(
+                "FuncRef-In",
+                "a `FuncRef` is a λ or a top-level value that names no local",
+            );
+        }
+        self.fit(e, &t, full)
+    }
+}
+
+/// Whether `e` is a function the checker takes as a `FuncRef`: a λ, a
+/// top-level value, a constructor or an operation, with no free variable.
+fn func_ref(e: &Term) -> bool {
+    let form = match e {
+        Term::Lam(..) | Term::Fix(..) | Term::Global(_) => true,
+        Term::Apply(Head::Con(_) | Head::Const(_), args) => args.is_empty(),
+        _ => false,
+    };
+    form && free_vars(e).is_empty()
 }
 
 fn lit(l: &Lit) -> Type {

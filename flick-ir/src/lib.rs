@@ -30,7 +30,7 @@ pub use expr::{
 };
 pub use foreign::{
     Adapter, AdapterArg, BackendAdapter, Binding, Copies, Foreign, ForeignMode, InlineCode,
-    ResultAdapter, Shape,
+    ResultAdapter, Retention, Shape,
 };
 pub use handler::{Handled, Handler, OpArm};
 pub use instance::{GenericInfo, InstanceInfo, default_method};

@@ -42,6 +42,8 @@ const CORE_VALUE_LANG_ITEMS: &[Lang] = &[
     Lang::List,
     Lang::Option,
     Lang::Result,
+    // a host function pointer, never an opaque handle
+    Lang::FuncRef,
 ];
 
 /// Returns true for compiler/runtime-internal bindings (`from "flick:..."`)

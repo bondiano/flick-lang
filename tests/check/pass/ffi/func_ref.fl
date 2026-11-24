@@ -1,0 +1,63 @@
+// `FuncRef`: where one is expected, a top-level function or a lambda that
+// captures nothing is one; a `FuncRef` value passes on as it is, and
+// `FuncRef.fun` calls it.
+module App.FuncRefPass exposing (..)
+
+increment : Int -> Int
+let increment n = n + 1
+
+describe : Show a => a -> String
+let describe value = "<" ++ show value ++ ">"
+
+/// A host function that keeps nothing of its comparison past the call.
+sort_by : FuncRef (Int -> Int -> Int) -> List Int ->{} List Int
+foreign sort_by from "./sort.mjs" "sortBy"
+
+apply : FuncRef (Int -> Int) -> Int -> Int
+let apply r x = FuncRef.fun r x
+
+top : FuncRef (Int -> Int)
+let top = increment
+
+lambda : FuncRef (Int -> Int)
+let lambda = fun n -> n * 2
+
+poly : FuncRef (a -> a)
+let poly = identity
+
+constructor : FuncRef (Int -> Option Int)
+let constructor = Some
+
+// a dictionary of an instance is no capture; inside the lambda, `describe`
+// takes it at each call
+shown : FuncRef (Int -> String)
+let shown = fun n -> describe n
+
+branches : Bool -> FuncRef (Int -> Int)
+let branches flag = if flag then increment else (fun n -> n - 1)
+
+// what the lambda binds itself, its parameters and its inner lambdas', it
+// does not capture
+nested : Int -> Int
+let nested x =
+  apply
+    (fun n ->
+      let m = n + 1
+      (fun k -> k * m) 2
+    )
+    x
+
+passes_on : FuncRef (Int -> Int) -> Int
+let passes_on r = apply r 1
+
+uses_top : Int -> Int
+let uses_top x = apply (fun n -> increment (apply top n)) x
+
+// a constrained function may still pass a closed lambda
+constrained : Show a => a -> Int
+let constrained value =
+  let _ = show value
+  apply (fun n -> n + 1) 0
+
+sorted : List Int ->{} List Int
+let sorted xs = sort_by (fun a b -> a - b) xs
