@@ -1,0 +1,5 @@
+// The kernel's conformance tests live in the test root; `flick run` only says so.
+module Kernel.Main exposing (main)
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () = Platform.stdout_line "run `flick test --target js` or `flick test --target go`"

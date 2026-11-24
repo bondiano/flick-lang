@@ -118,6 +118,24 @@ fn options() -> Vec<OptionDescriptor> {
     ]
 }
 
+/// The ABIs of what the emitted code runs on: Flick's runtime and the
+/// primitive kernel.
+fn runtime_abis() -> Vec<NamedRange> {
+    [
+        ("flickrt", "0.2.0", "0.3.0"),
+        ("flick.kernel", "0.1.0", "0.2.0"),
+    ]
+    .into_iter()
+    .map(|(name, minimum, maximum)| NamedRange {
+        name: name.into(),
+        versions: VersionRange {
+            minimum: minimum.into(),
+            maximum_exclusive: maximum.into(),
+        },
+    })
+    .collect()
+}
+
 impl Backend for Javascript {
     fn package_files(&self) -> Vec<String> {
         packages::files()
@@ -215,10 +233,7 @@ impl Backend for Javascript {
             backend_api: range("0.1.0", "0.2.0"),
             ir: range("0.17.0", "0.18.0"),
             language: range("0.2.0", "0.3.0"),
-            runtime_abis: vec![NamedRange {
-                name: "flickrt".into(),
-                versions: range("0.2.0", "0.3.0"),
-            }],
+            runtime_abis: runtime_abis(),
             environments: ["node", "browser", "bun", "cloudflare"]
                 .into_iter()
                 .map(|platform| Environment {

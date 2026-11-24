@@ -1,0 +1,33 @@
+// The record rows of the kernel: a field read, added or removed by its
+// label, a record projected onto a narrower type or merged with one that
+// has other labels, and the labels of a record in sorted order.
+module Kernel.Records exposing (tests)
+
+id : Record.Label "id"
+let id = Record.label
+
+name : Record.Label "name"
+let name = Record.label
+
+tests : List Test.Test
+let tests = [
+  Test.test "get by a label" (fun () ->
+    Test.equal "Ada" (Record.get name { name = "Ada"; age = 36 })
+  ),
+  Test.test "extend adds a field" (fun () ->
+    Test.is_true "extend" (Record.extend id 7 { name = "Ada" } == { id = 7; name = "Ada" })
+  ),
+  Test.test "remove drops one" (fun () ->
+    Test.is_true "remove" (Record.remove name { id = 7; name = "Ada" } == { id = 7 })
+  ),
+  Test.test "project keeps the fields of the narrower type" (fun () ->
+    let small : { name : String } = Record.project { name = "Ada"; age = 36 }
+    Test.is_true "project" (small == { name = "Ada" })
+  ),
+  Test.test "merge_disjoint" (fun () ->
+    Test.is_true "merge" (Record.merge_disjoint { a = 1 } { b = "x" } == { a = 1; b = "x" })
+  ),
+  Test.test "labels are sorted" (fun () ->
+    Test.is_true "labels" (Record.labels { b = 1; c = 2; a = 3 } == ["a", "b", "c"])
+  ),
+]

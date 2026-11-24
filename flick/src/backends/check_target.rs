@@ -7,7 +7,7 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use flick_backend::{
-    Abi, Backend, BackendPin, BuildRequest, CHECK_TARGET_CAPABILITY, DeclaredInputs, Entry,
+    Backend, BackendPin, BuildRequest, CHECK_TARGET_CAPABILITY, DeclaredInputs, Entry,
     Environment, Input, InputKind, Mode, ModuleInput, ModuleRole, OptionValue, Profile, Source,
     Symbol, TargetRequest, sha256,
 };
@@ -18,7 +18,7 @@ use flick_core::source::{FileId, SourceMap, Span};
 use flick_ir::{ItemKind, Program};
 
 use super::foreign::{load, selected_bytes};
-use super::options;
+use super::{options, request};
 use crate::toolchain;
 
 /// Runs a non-official/pinned backend component's `check-target` export during
@@ -178,10 +178,7 @@ fn build_check_request(
             backend_api: flick_backend::VERSION.into(),
             ir_version: flick_ir::VERSION.into(),
             language_version: "0.1.0".into(),
-            runtime_abis: vec![Abi {
-                name: "flickrt".into(),
-                version: "0.1.0".into(),
-            }],
+            runtime_abis: request::runtime_abis("0.1.0"),
             environment: Environment {
                 backend: environment.backend.clone(),
                 platform: environment.platform.clone(),
