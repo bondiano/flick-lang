@@ -382,3 +382,54 @@ fn record_field_agrees_only_with_matching_single_field_closed_record() {
     assert!(!check(field_int.clone(), rec_two).is_empty());
     assert!(!check(field_int, rec_open).is_empty());
 }
+
+#[test]
+fn func_ref_agrees_only_with_the_function_it_refers_to() {
+    use crate::{Lang, LangItem, Namespace};
+
+    let files = BTreeSet::from([FileId::new(0)]);
+    let span = Span::new(FileId::new(0), 0, 0);
+    let mut t = TypeInterner::new();
+    let int = t.named("Prelude", "Int", Vec::new());
+    let str_ty = t.named("Prelude", "String", Vec::new());
+    let int_fn = t.fun(int.clone(), Stage::Pure, int.clone());
+    let str_fn = t.fun(int, Stage::Pure, str_ty);
+    let func_ref = t.named("Prelude", "FuncRef", vec![int_fn.clone()]);
+
+    // `let f (r : declared) = r`, given `r` typed `actual` where it is used
+    let mut check = |declared: crate::TypeRef, actual: crate::TypeRef| {
+        let mut p = program(at(ExprKind::Lit(Lit::Unit)));
+        p.lang.push(LangItem {
+            lang: Lang::FuncRef.name().into(),
+            module: "Prelude".into(),
+            namespace: Namespace::Type,
+            name: "FuncRef".into(),
+        });
+        let ItemKind::Value { ty, body, .. } = &mut p.modules[0].items[0].kind else {
+            unreachable!()
+        };
+        *ty = Some(t.fun(declared.clone(), Stage::Pure, declared.clone()));
+        *body = Expr::with_ty(
+            ExprKind::Lambda {
+                params: vec![Param {
+                    pat: Pat::Bind("r".into()),
+                    stage: Stage::Pure,
+                    ty: Some(declared.clone()),
+                    binder_types: vec![("r".into(), declared.clone())],
+                }],
+                body: Box::new(Expr::with_ty(
+                    ExprKind::Local("r".into()),
+                    span,
+                    Some(actual),
+                )),
+            },
+            span,
+            Some(t.fun(declared.clone(), Stage::Pure, declared)),
+        );
+        validate(&p, &|_| false, &files)
+    };
+
+    assert!(check(func_ref.clone(), int_fn.clone()).is_empty());
+    assert!(check(int_fn, func_ref.clone()).is_empty());
+    assert!(!check(func_ref, str_fn).is_empty());
+}

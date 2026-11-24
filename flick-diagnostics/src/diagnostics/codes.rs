@@ -217,6 +217,7 @@ codes! {
     F012 = Ffi 12, "ambiguous native override";
     F013 = Ffi 13, "foreign binding type not in backend value ABI";
     F014 = Ffi 14, "foreign ABI version mismatch";
+    F015 = Ffi 15, "`FuncRef` value is not a function without captures";
     D001 = Schema 1, "type has no Schema witness";
     D002 = Schema 2, "codec misses a field";
     D003 = Schema 3, "codec gives a field twice";

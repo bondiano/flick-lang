@@ -37,6 +37,7 @@ fn canonical_adapter(arity: usize, result_copies: bool, result_shape: Shape) -> 
         shapes: vec![Shape::Data; arity],
         result_shape,
         words: Vec::new(),
+        retention: None,
     }
 }
 

@@ -14,7 +14,7 @@ import, and a local definition of the same name hides them.
 | Type | Kind |
 | - | - |
 | `Unit`, `Never`, `Bool`, `Int`, `Int8`, `Int16`, `Int32` (= `Int`), `Int64`, `UInt8`, `Byte` (= `UInt8`), `UInt16`, `UInt32`, `UInt64`, `Float`, `Float32`, `BigInt`, `String`, `Unknown`, `JsValue`, `Ordering`, `Ui` | `Type` |
-| `List`, `Seq`, `Option`, `Ref`, `Redacted`, `Schema`, `Url`, `Form` | `Type -> Type` |
+| `List`, `Seq`, `Option`, `Ref`, `Redacted`, `Schema`, `Url`, `Form`, `FuncRef` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
 | `Scope` (a service) | `Region -> Service` |
@@ -33,6 +33,14 @@ are used qualified without an import: `Ref.make`, `Ref.get`, `Ref.set`,
 primitives of `Record`, and `Fiber.spawn` with the types `Fiber.Owner`,
 `Fiber.Fiber` and `Failure` ([regions.md](../regions/)). The classes `Eq`, `Ord`, `Hash`, `Show`, `Display`, `Into`,
 `Functor`, `Applicative`, `Monad` and the others of [classes.md](../classes/#classes) are in `Prelude` too.
+
+`FuncRef (a -> b)` refers to a function without captures, for a host that
+takes a plain function pointer ([ffi.md](../ffi/#functions-without-captures-and-trampolines)).
+Where one is expected, the value is checked against `a -> b`, and it must be
+the name of a top-level function that takes no class dictionary at its type
+or a lambda that uses no local and no class dictionary of the code around
+it; anything else is `FLICK-F015`. `FuncRef.fun r` calls it, and at run time
+it is the function itself.
 
 ## Kinds
 

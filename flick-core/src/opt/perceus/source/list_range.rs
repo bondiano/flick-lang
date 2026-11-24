@@ -1,4 +1,5 @@
 //! Exact checked Int ranges via O(n) `Intrinsic::ListRange`.
+use super::kept_for_call;
 use super::{Code, Intrinsic, Local, Lower, LowerError, Name, Span, unsupported};
 use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 pub(super) fn is_binding(value: &Foreign) -> bool {
@@ -11,7 +12,7 @@ fn supports(value: &Foreign) -> bool {
         && value.dicts == 0
         && value.stages == [false, false]
         && value.catch.is_none()
-        && value.adapter
+        && kept_for_call(&value.adapter)
             == Adapter {
                 optional: vec![],
                 owned: vec![],
@@ -28,6 +29,7 @@ fn supports(value: &Foreign) -> bool {
                 shapes: vec![Shape::Data, Shape::Data],
                 result_shape: Shape::Data,
                 words: vec![],
+                retention: None,
             }
 }
 impl Lower<'_> {

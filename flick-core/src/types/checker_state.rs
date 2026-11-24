@@ -70,6 +70,8 @@ struct Checker<'a> {
     /// The fields of the record literals around the value being checked,
     /// outermost first: where a nested record's field is missing.
     field_path: Vec<String>,
+    /// The `FuncRef`s whose dictionaries are checked once the module is solved.
+    func_refs: Vec<func_ref::FuncRefSite>,
     /// Each `_` written in a type, and the variable that stands for it.
     holes: Vec<(Span, Type, bool)>,
     /// Whether the type being converted may have holes.

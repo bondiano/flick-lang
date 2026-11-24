@@ -58,6 +58,10 @@ impl Validator<'_> {
     pub(super) fn check_lambda(&mut self, params: &[Param], body: &Expr, lam_ty: Option<&TypeRef>) {
         let Some(lam_ty) = lam_ty else { return };
         let mut cur: &IrType = lam_ty;
+        // a lambda the checker accepted as a `FuncRef` may be annotated so
+        if let Some([f]) = self.types.is_lang_named(cur, Lang::FuncRef) {
+            cur = f;
+        }
         for (i, p) in params.iter().enumerate() {
             match cur {
                 IrType::Fun {

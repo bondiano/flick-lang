@@ -26,7 +26,7 @@ use crate::ty::wire::{
 use crate::{FileId, LangItem, Module};
 
 /// The version of the IR this crate reads and writes.
-pub const VERSION: &str = "0.17.0";
+pub const VERSION: &str = "0.18.0";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Program {

@@ -9,6 +9,8 @@ use flick_backend::{
 use flick_backend_support::inline_span::map_byte_range;
 use flick_ir::{AdapterArg as IrAdapterArg, FileId, Foreign, ItemKind, Program};
 
+use crate::diagnostic;
+
 pub(crate) const ABI_NAME: &str = "test.literal-ffi";
 pub(crate) const ABI_VERSION: &str = "0.1.0";
 
@@ -41,6 +43,7 @@ pub(crate) fn value_abi() -> ValueAbi {
             row("float", "Float", "double", AbiConversion::None, AbiDirection::Both, "IEEE 754 binary64"),
             row("string", "String", "const char *", AbiConversion::View, AbiDirection::Both, "Borrowed UTF-8 string view"),
             row("function", "a -> b", "void (*)(...)", AbiConversion::None, AbiDirection::In, "Inbound callback function pointer"),
+            row("func_ref", "FuncRef (a -> b)", "void (*)(...)", AbiConversion::None, AbiDirection::In, "Function pointer without captures; needs no userdata"),
         ],
         unsupported: vec![
             ValueAbiRefusal {
@@ -286,7 +289,49 @@ pub(crate) fn validate_foreigns(
     }
 }
 
-pub(crate) fn inline_report(request: &BuildRequest) -> Artifact {
+/// The reports of the `foreign` case: of the adapters and of inline code.
+pub(crate) fn reports(
+    request: &BuildRequest,
+    artifacts: &mut Vec<Artifact>,
+) -> Result<(), Vec<Diagnostic>> {
+    let program =
+        Program::from_cbor(&request.program).map_err(|e| diagnostic(&e.to_string(), None))?;
+    artifacts.extend(adapter_report(&program, request));
+    if !request.inline_foreign.is_empty() {
+        artifacts.push(inline_report(request));
+    }
+    Ok(())
+}
+
+/// What the backend receives of each foreign binding of the program's own
+/// modules: the host arity of each callback, the adapter words, such as
+/// `callback i data j`, and the retention of what the host keeps.
+fn adapter_report(program: &Program, request: &BuildRequest) -> Option<Artifact> {
+    let own =
+        |name: &str| (request.modules.iter()).any(|m| m.name == name && m.role == ModuleRole::Own);
+    let entries: Vec<_> = (program.modules.iter())
+        .filter(|module| own(&module.name))
+        .flat_map(|module| module.items.iter().map(move |item| (module, item)))
+        .filter_map(|(module, item)| match &item.kind {
+            ItemKind::Foreign(foreign) => Some(serde_json::json!({
+                "module": module.name,
+                "name": foreign.name,
+                "callbacks": foreign.adapter.callbacks,
+                "words": foreign.adapter.words,
+                "retention": foreign.adapter.retention,
+            })),
+            _ => None,
+        })
+        .collect();
+    (!entries.is_empty()).then(|| Artifact {
+        id: "foreign-adapters".into(),
+        path: "foreign-adapters.json".into(),
+        kind: ArtifactKind::Metadata,
+        bytes: serde_json::to_vec_pretty(&entries).expect("adapter report serializes"),
+    })
+}
+
+fn inline_report(request: &BuildRequest) -> Artifact {
     let entries: Vec<_> = request
         .inline_foreign
         .iter()

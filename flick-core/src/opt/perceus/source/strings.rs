@@ -1,4 +1,5 @@
 //! Exact pure string adapters, never generic host-adapter erasure.
+use super::kept_for_call;
 use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 
 use super::Intrinsic;
@@ -19,7 +20,7 @@ fn supports_join(value: &Foreign) -> bool {
         && value.arity == 2
         && value.stages == [false, false]
         && value.catch.is_none()
-        && value.adapter
+        && kept_for_call(&value.adapter)
             == Adapter {
                 optional: vec![],
                 owned: vec![],
@@ -36,6 +37,7 @@ fn supports_join(value: &Foreign) -> bool {
                 shapes: vec![Shape::Data, Shape::Data],
                 result_shape: Shape::Data,
                 words: vec![],
+                retention: None,
             }
 }
 
@@ -122,7 +124,7 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
         && value.arity == 1
         && value.stages == vec![false; kind.arity()]
         && value.catch.is_none()
-        && value.adapter
+        && kept_for_call(&value.adapter)
             == Adapter {
                 optional: vec![],
                 owned: vec![],
@@ -139,6 +141,7 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
                 shapes: vec![Shape::Data],
                 result_shape: Shape::Data,
                 words: vec![],
+                retention: None,
             })
     .then_some(kind)
 }

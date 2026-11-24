@@ -6,6 +6,7 @@
 //! field is pinned below, never treated as a generic FFI exemption. Materialized
 //! tails and `ListConcat` are a quadratic-copy baseline; this makes no linear-time
 //! or FBIP claim.
+use super::kept_for_call;
 use flick_ir::{
     Adapter, Arith, Constructor, Copies, Foreign, ForeignMode, Num, Rep, ResultAdapter, Shape,
 };
@@ -107,6 +108,7 @@ fn adapter(kind: Collection, map_variant: usize) -> Adapter {
         shapes: vec![Shape::Data; arity],
         result_shape: Shape::Data,
         words: vec![],
+        retention: None,
     }
 }
 
@@ -134,7 +136,7 @@ fn supports(value: &Foreign, kind: Collection) -> bool {
             Collection::FlatMap => 2,
             _ => 1,
         })
-            .any(|variant| value.adapter == adapter(kind, variant))
+            .any(|variant| kept_for_call(&value.adapter) == adapter(kind, variant))
 }
 
 pub(super) fn expression(value: &Foreign, span: Span) -> Option<Expr> {

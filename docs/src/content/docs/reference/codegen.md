@@ -308,6 +308,7 @@ the `flick/js` backend descriptor:
 | `layer` | `Layer ri e ro` | `Layer.Layer<RO, E, RI>` | `none` | `both` | Native Effect `Layer` representation of the pinned Effect version |
 | `exit` | `Exit e a` | `Exit.Exit<A, E>` | `none` | `both` | Native Effect `Exit` representation of the pinned Effect version |
 | `failure` | `Failure e` | `Cause.Cause<E>` | `none` | `both` | Native Effect `Cause` representation of the pinned Effect version |
+| `func_ref` | `FuncRef (a -> b)` | `(a, …) => b` | `none` | `both` | The function itself, without captures; adapted to JS arity as a callback is |
 | `function` | `a -> b, a ->{r; e} b` | `(a, …) => b` | `none` | `both` | Callbacks adapted to JS arity across four families: pure, Effect, Promise, scoped event |
 
 Records and user-defined ADTs have no stable layout and are not in this table. On this backend they may still cross bindings as deep-copied plain JS objects / tagged objects (`_tag` = `Name#hash`, fields `_0`, `_1`, …); `unboxed type` and `untagged type` declare explicit representations.
@@ -703,14 +704,14 @@ in `flick.toml`, or `--allow-tool go` for a file built outside a project
 (`FLICK-P029` otherwise). It is built without cgo by default, so no C compiler is
 needed either; pass `--cgo` (or `[target.go] cgo = true`) to build with `CGO_ENABLED=1`.
 
-## Portable IR (0.17.0)
+## Portable IR (0.18.0)
 
-Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.17.0"`),
-checked against the `ir` version range (`[0.17.0, 0.18.0)`) in its descriptor.
+Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.18.0"`),
+checked against the `ir` version range (`[0.18.0, 0.19.0)`) in its descriptor.
 Alongside values, stages, dictionaries, lang items, inline foreign preambles and
 bindings (`Module.preambles`, `Binding::Inline`), backend-declared foreign
-adapter words (`Foreign.adapter.{words, owned}`), and fixed-width numeric types
-(`Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`), IR `0.17.0` carries the
+adapter words and contract metadata (`Foreign.adapter.{words, owned, callbacks, retention}`), and fixed-width numeric types
+(`Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`), IR `0.18.0` carries the
 layout-relevant types the checker inferred so layout-aware and monomorphizing
 backends can lay out values by value without calling back into the checker:
 

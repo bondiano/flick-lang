@@ -1,6 +1,6 @@
 ---
 title: "Кинды и типы"
-source_hash: d54c99d170cd1669
+source_hash: 370a23ee050809df
 ---
 
 После разрешения имён компилятор проверяет типы в каждом модуле без
@@ -18,7 +18,7 @@ source_hash: d54c99d170cd1669
 | Тип | Кинд |
 | - | - |
 | `Unit`, `Never`, `Bool`, `Int`, `Int8`, `Int16`, `Int32` (= `Int`), `Int64`, `UInt8`, `Byte` (= `UInt8`), `UInt16`, `UInt32`, `UInt64`, `Float`, `Float32`, `BigInt`, `String`, `Unknown`, `JsValue`, `Ordering`, `Ui` | `Type` |
-| `List`, `Seq`, `Option`, `Ref`, `Redacted`, `Schema`, `Url`, `Form` | `Type -> Type` |
+| `List`, `Seq`, `Option`, `Ref`, `Redacted`, `Schema`, `Url`, `Form`, `FuncRef` | `Type -> Type` |
 | `Result`, `PureCodec` | `Type -> Type -> Type` |
 | `ServiceTag`, `ServiceImpl` | `ServiceRow -> Type` |
 | `Scope` (сервис) | `Region -> Service` |
@@ -38,6 +38,14 @@ source_hash: d54c99d170cd1669
 и `Fiber.spawn` с типами `Fiber.Owner`, `Fiber.Fiber` и `Failure`
 ([регионы](../regions/)). Классы `Eq`, `Ord`, `Hash`, `Show`, `Display`, `Into`,
 `Functor`, `Applicative`, `Monad` и остальные из раздела [классы](../classes/#классы) тоже объявлены в `Prelude`.
+
+`FuncRef (a -> b)` ссылается на функцию без захвата для хоста, который
+принимает обычный указатель на функцию ([внешние функции](../ffi/#функции-без-захвата-и-трамплины)).
+Там, где он ожидается, значение проверяется против `a -> b` и должно быть
+именем функции верхнего уровня, которой при её типе не нужны словари классов,
+или лямбдой, которая не использует ни локальных переменных, ни словарей
+классов окружающего кода; всё остальное — `FLICK-F015`. `FuncRef.fun r`
+вызывает её, а во время выполнения это сама функция.
 
 ## Кинды
 

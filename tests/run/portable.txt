@@ -208,6 +208,7 @@ stdlib/effect/filesystem_node
 stdlib/effect/platform
 stdlib/effect/console
 codegen/abi
+codegen/func_ref
 stdlib/effect/config
 stdlib/effect/filesystem
 stdlib/effect/stream_platform
