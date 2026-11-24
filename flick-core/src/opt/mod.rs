@@ -92,6 +92,8 @@ mod lazy_local_tests;
 #[cfg(test)]
 mod lazy_tests;
 #[cfg(test)]
+mod projection_tests;
+#[cfg(test)]
 mod tests;
 
 #[cfg(test)]
