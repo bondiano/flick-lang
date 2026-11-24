@@ -19,6 +19,7 @@ mod effects;
 mod expr;
 mod foreign;
 mod generate;
+mod go_type;
 mod handle;
 mod input;
 mod inspect;
@@ -30,8 +31,10 @@ mod names;
 mod once;
 mod own;
 mod pattern;
+mod predict;
 mod runtime;
 mod shape;
+mod stmt;
 mod typed;
 
 pub use foreign::{Bindings, is_relative};
@@ -89,18 +92,19 @@ pub struct Output {
 pub fn go(input: &Input) -> Output {
     let modules: Vec<&Module> = input.own.iter().chain(input.builtins).copied().collect();
     let modules = &modules[..];
+    let decls = go_type::type_decls(modules);
     let index = reach::index(modules);
     // main.go's documents
     let a = &DocumentArena::new();
     if input.test || !input.suites.is_empty() {
         let start = tests_start(a, input.suites);
-        return compile(input, modules, &index, a, start, input.suites);
+        return compile(input, modules, &decls, &index, a, start, input.suites);
     }
     let main: Key = (input.entry.to_owned(), "main".to_owned());
     let mut diagnostics = Vec::new();
     let main_shape = index
         .get(&main)
-        .map(|&(m, i)| shape(input, &modules[m].name, &modules[m].items[i].kind));
+        .map(|&(m, i)| shape(input, &decls, &modules[m].name, &modules[m].items[i].kind));
     let Some(Shape::Func {
         dicts: 0,
         params: 1,
@@ -121,7 +125,15 @@ pub fn go(input: &Input) -> Output {
     let unit = a.text("flickrt.Unit");
     let start = call(a, names::func(&main.0, &main.1), [fb, unit]);
     let entry = input.entry.to_owned();
-    compile(input, modules, &index, a, start, slice::from_ref(&entry))
+    compile(
+        input,
+        modules,
+        &decls,
+        &index,
+        a,
+        start,
+        slice::from_ref(&entry),
+    )
 }
 
 /// What a test program runs: `flickrt.RunTests` on the `tests` of each suite.
@@ -142,6 +154,7 @@ fn tests_start<'a>(a: &'a DocumentArena<'a>, suites: &[String]) -> Document<'a> 
 fn compile<'a>(
     input: &Input,
     modules: &[&Module],
+    decls: &go_type::TypeDecls<'_>,
     index: &HashMap<Key, (usize, usize)>,
     a: &'a DocumentArena<'a>,
     start: Document<'a>,
@@ -166,10 +179,10 @@ fn compile<'a>(
     for &(m, i) in &reached {
         let item = &modules[m].items[i];
         for name in reach::defined(item) {
-            let held = shape(input, &modules[m].name, &item.kind);
+            let held = shape(input, decls, &modules[m].name, &item.kind);
             shapes.insert((modules[m].name.clone(), name), held);
         }
-        shapes.extend(direct::shapes(input, &modules[m].name, &item.kind));
+        shapes.extend(direct::shapes(input, decls, &modules[m].name, &item.kind));
     }
     let reached_items = reached
         .iter()
@@ -198,6 +211,7 @@ fn compile<'a>(
         g.settled = Some(&settled);
         g.records = Some(&records);
         g.fields = Some(&fields);
+        g.decls = Some(decls);
         g.item_initializers = item_initializers;
         let order = item_order(module, &items, index);
         let code = g.module(module, &order);
@@ -214,7 +228,7 @@ fn compile<'a>(
     let inits: Vec<_> = if item_initializers {
         initialization_order(modules, index, &reached)
             .into_iter()
-            .filter(|&(m, i)| has_initializer(input, &modules[m].items[i].kind))
+            .filter(|&(m, i)| has_initializer(input, decls, &modules[m].items[i].kind))
             .map(|(m, i)| statement(a, docvec![a, names::item_init(&modules[m].name, i), "()"]))
             .collect()
     } else {
@@ -244,10 +258,10 @@ fn compile<'a>(
     }
 }
 
-fn has_initializer(input: &Input, item: &ItemKind) -> bool {
+fn has_initializer(input: &Input, decls: &go_type::TypeDecls<'_>, item: &ItemKind) -> bool {
     match item {
         // the shape of a value does not depend on its module
-        ItemKind::Value { .. } => matches!(shape(input, "", item), Shape::Var),
+        ItemKind::Value { .. } => matches!(shape(input, decls, "", item), Shape::Var),
         ItemKind::Instance { info, .. } => info.context.is_empty(),
         ItemKind::Destructure { .. } => true,
         ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => false,
@@ -389,20 +403,22 @@ struct Gen<'a> {
     /// The Go files the module's foreign bindings call, by name.
     sources: BTreeMap<String, String>,
     /// The locals of the definition being emitted whose Go type is not
-    /// `flickrt.Value`.
-    natives: HashMap<String, arith::Native>,
+    /// `flickrt.Value` (native scalars or typed `Option` layouts).
+    go_types: HashMap<String, go_type::GoType>,
     /// What the module makes once, each a package variable (`once.rs`).
     once: Vec<String>,
     /// The instances whose dictionary is the same whoever builds it.
     settled: Option<&'a HashSet<Key>>,
     /// The Go type the function being emitted returns, when not a value.
-    returns: Option<arith::Native>,
+    returns: Option<go_type::GoType>,
     /// The Go types of constructors the module's code names.
     owned: own::Owned,
     /// The constructors of the program declared over a record.
     records: Option<&'a own::Records>,
     /// Declaration-site scalar field eligibility for program constructors.
     fields: Option<&'a own::CtorFields>,
+    /// Type declarations across all modules, for typed `Option` layout selection.
+    decls: Option<&'a go_type::TypeDecls<'a>>,
     /// The locals of the definition being emitted bound to the record that
     /// lies in a value of a constructor, with its labels in their places.
     held: HashMap<String, Vec<String>>,
@@ -435,13 +451,14 @@ impl<'a> Gen<'a> {
             groups: Vec::new(),
             grouped: HashMap::new(),
             sources: BTreeMap::new(),
-            natives: HashMap::new(),
+            go_types: HashMap::new(),
             once: Vec::new(),
             settled: None,
             returns: None,
             owned: own::Owned::new(),
             records: None,
             fields: None,
+            decls: None,
             held: HashMap::new(),
         }
     }
@@ -489,7 +506,7 @@ impl<'a> Gen<'a> {
     fn shape_of(&self, module: &str, name: &str) -> Shape {
         self.shapes
             .get(&(module.to_owned(), name.to_owned()))
-            .copied()
+            .cloned()
             .unwrap_or(Shape::Var)
     }
 

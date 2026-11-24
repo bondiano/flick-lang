@@ -14,6 +14,8 @@ mod foreign_tests;
 #[cfg(test)]
 mod loops_tests;
 #[cfg(test)]
+mod option_tests;
+#[cfg(test)]
 mod own_tests;
 #[cfg(test)]
 mod perform_tests;

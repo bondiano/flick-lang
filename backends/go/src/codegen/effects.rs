@@ -6,6 +6,7 @@ use std::mem;
 use flick_pretty::{Document, Documentable, docvec};
 
 use super::closures::Call;
+use super::go_type::{GoType, Typed};
 use super::layout::{Code, block, call, single, statement};
 use super::{Gen, names};
 use flick_ir::{Arm, Expr, Stage};
@@ -103,12 +104,14 @@ impl<'a> Gen<'a> {
             mem::replace(&mut self.generator, false),
             self.fiber.replace("fb"),
             self.context.replace("fb"),
+            self.returns.take(),
         );
         let err = self.temp();
         let (mut stmts, ()) = self.block(|g| {
             for arm in arms {
                 g.arm(
                     a.text(err),
+                    None,
                     &arm.pat,
                     arm.guard.as_ref(),
                     &arm.body,
@@ -119,7 +122,13 @@ impl<'a> Gen<'a> {
                 );
             }
         });
-        (self.tail, self.generator, self.fiber, self.context) = saved;
+        (
+            self.tail,
+            self.generator,
+            self.fiber,
+            self.context,
+            self.returns,
+        ) = saved;
         stmts.push(statement(a, "return flickrt.Unmatched"));
         docvec![
             a,
@@ -131,19 +140,41 @@ impl<'a> Gen<'a> {
     }
 
     /// `o?`: the value of the `Some`, after returning a `None` at once.
-    pub(super) fn unwrap(&mut self, option: &Expr) -> Code<'a> {
+    pub(super) fn unwrap(&mut self, option: &Expr) -> Typed<'a> {
         let a = self.a;
-        let v = self.expr(option);
-        let v = self.spill(v);
+        let o = self.expr_typed(option);
+        let o = self.spill_typed(o);
         // in a lazy `for` a `None` ends the sequence, as a JS generator's return does
         let ret = if self.generator {
             a.text("return")
         } else {
-            docvec![a, "return ", v]
+            match &self.returns {
+                Some(GoType::Opt(r)) => docvec![a, "return ", r.none_code(a)],
+                None => a.text("return flickrt.None"),
+                Some(GoType::Scalar(_)) => {
+                    unreachable!("`?` only appears in Option-returning functions")
+                }
+            }
         };
-        let none = call(a, "flickrt.IsTag", [v.doc, a.text("\"None\"")]);
-        self.emit(docvec![a, "if ", none, " ", single(a, ret)]);
-        call(a, "flickrt.Get", [v.doc, a.text("0")]).into()
+        match o.ty {
+            Some(GoType::Opt(repr)) => {
+                let none = repr.is_none_doc(a, o.code.doc);
+                self.emit(docvec![a, "if ", none, " ", single(a, ret)]);
+                Typed {
+                    code: repr.unwrap_doc(a, o.code.doc).into(),
+                    ty: repr.payload_go_type(),
+                }
+            }
+            None => {
+                let none = call(a, "flickrt.IsNone", [o.code.doc]);
+                self.emit(docvec![a, "if ", none, " ", single(a, ret)]);
+                Typed {
+                    code: call(a, "flickrt.UnwrapSome", [o.code.doc]).into(),
+                    ty: None,
+                }
+            }
+            Some(GoType::Scalar(_)) => unreachable!("`?` only unwraps Option"),
+        }
     }
 
     /// `S.op`: a function of its arguments up to its first effectful stage.

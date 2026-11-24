@@ -8,7 +8,6 @@ use std::{iter, mem};
 use flick_pretty::docvec;
 
 use super::Gen;
-use super::arith::Native;
 use super::layout::{Code, block, call, if_else, single, statement};
 use flick_ir::{Expr, ExprKind, Lit, Pat};
 
@@ -48,6 +47,7 @@ impl<'a> Gen<'a> {
             mem::replace(&mut self.generator, true),
             self.fiber.take(),
             self.context.replace("fb"),
+            self.returns.take(),
         );
         let (mut stmts, ()) = self.block(|g| g.discard(body));
         (
@@ -56,6 +56,7 @@ impl<'a> Gen<'a> {
             self.generator,
             self.fiber,
             self.context,
+            self.returns,
         ) = saved;
         if let Some((n, count)) = limit {
             let none = call(a, "flickrt.CountOf", [n.doc]);
@@ -94,11 +95,10 @@ impl<'a> Gen<'a> {
                             g.bind(name, g.code(var));
                             g.discard(body);
                         }
-                        _ => g.arm(a.text(var), pat, None, body, Self::discard),
+                        _ => g.arm(a.text(var), None, pat, None, body, Self::discard),
                     }
                     if let Some(stop) = stop {
-                        let go = g.expr(stop);
-                        let stop = g.unboxed(stop, go, Native::Bool).doc;
+                        let stop = g.expr_bool(stop).doc;
                         g.emit(docvec![a, "if ", stop, " ", single(a, "break")]);
                     }
                 });
@@ -108,8 +108,7 @@ impl<'a> Gen<'a> {
                 let range = call(a, "flickrt.Iter", [self.context(), s.doc]);
                 let loop_ = docvec![a, "for ", var, " := range ", range, " ", body];
                 if let Some(stop) = stop {
-                    let go = self.expr(stop);
-                    let stop = self.unboxed(stop, go, Native::Bool).doc;
+                    let stop = self.expr_bool(stop).doc;
                     self.emit(docvec![
                         a,
                         "if !",
@@ -140,8 +139,7 @@ impl<'a> Gen<'a> {
                 }
             }
             ExprKind::If(cond, then, other) => {
-                let test = self.expr(cond);
-                let test = self.unboxed(cond, test, Native::Bool).doc;
+                let test = self.expr_bool(cond).doc;
                 let (then, ()) = self.block(|g| g.discard(then));
                 let (other, ()) = self.block(|g| g.discard(other));
                 self.emit(if_else(a, test, then, other));

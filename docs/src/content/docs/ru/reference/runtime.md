@@ -1,6 +1,6 @@
 ---
 title: "Среда выполнения и адаптер Effect"
-source_hash: 7d922d242e92a78c
+source_hash: 7e9217d18e54e8ef
 ---
 
 По умолчанию скомпилированный код импортирует `@flick-lang/runtime/rt` —
@@ -392,3 +392,32 @@ schedule` можно читать слева направо. Указание `a
 Effect с основным аргументом в конце: сначала он принимает расписание
 и возвращает функцию от основного аргумента. В записях, передаваемых
 в Effect, сохраняются его имена полей (`elapsedSincePrevious`).
+
+## Go-рантайм (`flickrt`)
+
+Скомпилированные Go-программы импортируют `flick.app/flickrt` (`runtime-go/flickrt/`).
+В стёртом представлении `flickrt.Value` тип `Option` сохраняет помеченную форму
+`*flickrt.Data` JS-target (`"None"` и `"Some"` с одним полем нагрузки),
+сохраняя каждый уровень вложенности (`None`, `Some None`, `Some (Some 1)`).
+Все потребители рантайма читают стёртые значения `Option` через централизованные
+помощники `flickrt.IsNone`, `flickrt.IsSome` и `flickrt.UnwrapSome`, а не
+сравнивают теги `"Some"` или `"None"` напрямую; обобщённые `TagOf`, `Fields` и
+`ConstructorName` сохраняют свой смысл на стёртых значениях.
+
+На типизированных путях Go бэкенд `flick/go` избегает аллокации `*flickrt.Data`,
+используя типы-значения `flickrt`, выбранные по конкретному типу нагрузки:
+
+| Раскладка | Тип Go | Когда применяется |
+| - | - | - |
+| Булев сентинел | `flickrt.OptBool` (`uint8`: `0` = `None`, `1` = `Some false`, `2` = `Some true`) | `Option Bool` |
+| Сентинел ненулевой ссылки | `flickrt.OptRef` (`struct{ val flickrt.Value }`, `nil` = `None`) | не-`Option` нагрузки, гарантированно отличные от `nil` (кортежи, записи, функции, `List`, `BigInt`, `Result`, не-`unboxed` ADT) |
+| Флаг присутствия | `flickrt.Opt[T]` (`struct{ Val T; Ok bool }`) | `Int`, `Float`, `String`, `Unknown`/непрозрачные типы и вложенный `Option (Option U)` |
+
+Функции преобразования (`BoxOptInt`, `BoxOptFloat`, `BoxOptString`, `BoxOptBool`,
+`BoxOptRef`, `BoxOptValue`, обобщённая `BoxOpt`, а также обратные `AsOpt*` /
+`UnboxOpt`) переводят между типизированными раскладками и стёртым `*flickrt.Data`
+на границах полиморфных вызовов, обобщённых наблюдателей рантайма и Go FFI
+через `flickrt.Value`. Типизированное структурное равенство использует прямое
+сравнение `==` в Go там, где оно совпадает с `SameValueZero` (`OptBool`,
+`Opt[int32]`, `Opt[string]` и их вложенные комбинации), а в остальных случаях —
+`EqOptFloat`, `EqOptRef`, `EqOptValue` или `EqOpt`.

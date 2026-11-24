@@ -185,10 +185,10 @@ func (t *taggedOption) decode(fb *Fiber, in Value) (Value, []issue) {
 }
 
 func (t *taggedOption) encode(fb *Fiber, v Value) (Value, []issue) {
-	if !isSome(v) {
+	if !IsSome(v) {
 		return Rec("_tag", "None"), nil
 	}
-	e, issues := t.item.encode(fb, value(v))
+	e, issues := t.item.encode(fb, UnwrapSome(v))
 	if issues != nil {
 		return nil, under("value", issues)
 	}

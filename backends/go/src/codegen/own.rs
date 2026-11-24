@@ -29,7 +29,7 @@ use super::arith::Native;
 use super::layout::{Code, call};
 use super::{Gen, names};
 use flick_ir::{Constructor, Rep};
-use flick_ir::{Expr, ExprKind, Module, Pat};
+use flick_ir::{Expr, ExprKind, Module};
 
 /// How a value of a constructor with a Go type of its own holds its fields.
 #[derive(Clone, PartialEq, Eq)]
@@ -146,71 +146,6 @@ impl<'a> Gen<'a> {
         let tag = names::string(&self.tag(c));
         self.owned.insert(ty.clone(), (tag, held.clone()));
         Some((ty, held))
-    }
-
-    /// Bindings of `pat` that are guaranteed to be extracted with a native Go
-    /// scalar type across every branch of `pat`.
-    pub(super) fn pat_natives<'p>(&self, pat: &'p Pat) -> Vec<(&'p str, Native)> {
-        fn collect<'p>(
-            g: &Gen<'_>,
-            pat: &'p Pat,
-            native: Option<Native>,
-            out: &mut Vec<(&'p str, Native)>,
-        ) {
-            match pat {
-                Pat::Wild | Pat::Lit(_) => {}
-                Pat::Bind(name) => {
-                    if let Some(n) = native {
-                        out.push((name.as_str(), n));
-                    }
-                }
-                Pat::Tuple(items) => {
-                    for item in items {
-                        collect(g, item, None, out);
-                    }
-                }
-                Pat::List(items, rest) => {
-                    for item in items {
-                        collect(g, item, None, out);
-                    }
-                    if let Some(rest) = rest {
-                        collect(g, rest, None, out);
-                    }
-                }
-                Pat::Record(fields) => {
-                    for (_, p) in fields {
-                        collect(g, p, None, out);
-                    }
-                }
-                Pat::Con(c, args) => {
-                    let held = (c.rep == Rep::Tagged)
-                        .then(|| g.own_held(c))
-                        .flatten()
-                        .filter(Held::has_scalars);
-                    for (i, arg) in args.iter().enumerate() {
-                        let slot = held.as_ref().and_then(|h| h.field_native(i));
-                        collect(g, arg, slot, out);
-                    }
-                }
-                Pat::Or(alts) => {
-                    let mut iter = alts.iter();
-                    let Some(first) = iter.next() else {
-                        return;
-                    };
-                    let mut common = Vec::new();
-                    collect(g, first, native, &mut common);
-                    for alt in iter {
-                        let mut other = Vec::new();
-                        collect(g, alt, native, &mut other);
-                        common.retain(|pair| other.contains(pair));
-                    }
-                    out.extend(common);
-                }
-            }
-        }
-        let mut out = Vec::new();
-        collect(self, pat, None, &mut out);
-        out
     }
 
     /// The field `label` of `record`. A local bound to the record that lies

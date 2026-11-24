@@ -30,13 +30,6 @@ func update(r Value, f func(Value) (Value, Value, bool)) Value {
 	return out
 }
 
-func some(o Value) (Value, bool) {
-	if d := o.(*Data); d.Tag == "Some" {
-		return d.Fields()[0], true
-	}
-	return nil, false
-}
-
 func SyncRefGet(_ *Fiber, r Value) Value {
 	return update(r, func(a Value) (Value, Value, bool) { return a, nil, false })
 }

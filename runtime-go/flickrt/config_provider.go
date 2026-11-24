@@ -78,8 +78,8 @@ var (
 )
 
 func optionString(o Value) *string {
-	if d := o.(*Data); d.Tag == "Some" {
-		s := d.Fields()[0].(string)
+	if IsSome(o) {
+		s := UnwrapSome(o).(string)
 		return &s
 	}
 	return nil
@@ -100,11 +100,10 @@ func ConfigProviderMake(load Value) Value {
 			}
 			panic(&Failure{cause})
 		}
-		found := out.(*Data)
-		if found.Tag != "Some" {
+		if !IsSome(out) {
 			return nil, nil
 		}
-		n := found.Fields()[0].(*Data)
+		n := UnwrapSome(out).(*Data)
 		switch n.Tag {
 		case valueNodeTag:
 			return valueNode(n.Fields()[0].(string)), nil

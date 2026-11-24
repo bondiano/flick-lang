@@ -451,7 +451,8 @@ Values have the representation of the JS target, in Go terms:
 | a tuple, a `List` | `[]flickrt.Value`; `[x, ...rest]` shares the storage of the list |
 | a record | `*flickrt.Record`, its labels in canonical sorted order (JS array-index keys ascending, then UTF-16 code-unit order — matching `Record.labels` and the JS target), copied by `{ r with … }` |
 | a constructor | `*flickrt.Data` with the tag of the JS target; `Fields()` is its fields, up to two of them held in the value itself |
-| a tagged constructor without retained dictionaries, of a type the program declares | a Go type of its own: `*T_Module__Name` holding the fields when it has fields, or a zero-size value type `T_Module__Name` (`struct{}`) constructed as `T_Module__Name{}` with no allocation when it has none. Fields declared with a concrete scalar type (`Int`, `Float`, `Bool`, `String`) are stored unboxed (`int32`, `float64`, `bool`, `string`), packed with pointer-bearing fields first; polymorphic and non-scalar fields stay `flickrt.Value`. A `match` asks Go for the type (`Is_T_Module__Name`), compares no tag, and reads unboxed scalar fields directly without boxing; derived `Eq`, `Ord`, `Hash`, `Show`, and `==` operate directly on those typed fields. The runtime reads any constructor value as `flickrt.Constructed` (`TagName()`, `Fields()`) and builds one with `flickrt.Construct(tag, fields...)`; a constructor of a built-in module (`Option`, `Ordering`, …) and one holding a dictionary stay `*flickrt.Data` |
+| a tagged constructor without retained dictionaries, of a type the program declares | a Go type of its own: `*T_Module__Name` holding the fields when it has fields, or a zero-size value type `T_Module__Name` (`struct{}`) constructed as `T_Module__Name{}` with no allocation when it has none. Fields declared with a concrete scalar type (`Int`, `Float`, `Bool`, `String`) are stored unboxed (`int32`, `float64`, `bool`, `string`), packed with pointer-bearing fields first; polymorphic and non-scalar fields stay `flickrt.Value`. A `match` asks Go for the type (`Is_T_Module__Name`), compares no tag, and reads unboxed scalar fields directly without boxing; derived `Eq`, `Ord`, `Hash`, `Show`, and `==` operate directly on those typed fields. The runtime reads any constructor value as `flickrt.Constructed` (`TagName()`, `Fields()`) and builds one with `flickrt.Construct(tag, fields...)`; a constructor of a built-in module (`Ordering`, erased `Option`, …) and one holding a dictionary stay `*flickrt.Data` |
+| a concrete `Option T` on a typed Go path | an allocation-free by-value Go representation chosen from `T`: `flickrt.OptBool` (`uint8` sentinel: `0` = `None`, `1` = `Some false`, `2` = `Some true`) for `Option Bool`; `flickrt.OptRef` (`struct{ val flickrt.Value }` with `nil` sentinel for `None`) when the non-`Option` payload is guaranteed non-nil (tuples, records, functions, `List`, `BigInt`, `Result`, non-unboxed ADTs); `flickrt.Opt[T]` (`{ Val T; Ok bool }` presence flag) for `Int`, `Float`, `String`, `Unknown`/opaque payloads, and every nested `Option (Option U)` so `Some None` and deeper nestings stay distinct. Polymorphic `Option a` stays tagged `*flickrt.Data`, and erased boundaries (polymorphic calls, generic runtime observers, `flickrt.Value` Go FFI) convert to and from the tagged `"Some"` / `"None"` `*flickrt.Data` form |
 | a constructor declared over a record, `Node { left : Tree; key : Int }` | the record lies in the value of the constructor: one object, and the record a `match` binds is a `*flickrt.Record` pointing into it. Its labels are in canonical sorted order, whatever order the declaration or literal writes them in (field expressions still evaluate in source order); a record given whole (`Node r`) is copied in |
 | a function | `func(*flickrt.Fiber, flickrt.Value) flickrt.Value` per stage; one of two or three arguments whose stages before the last are pure is `flickrt.Fn2` or `flickrt.Fn3`, which takes them at once |
 | a dictionary | `*flickrt.Dict`; superclasses and default methods made on first use |
@@ -512,11 +513,15 @@ so an unsorted `to_list` prints the same on both targets.
 
 A top-level function is a Go function of its execution fiber, dictionaries
 and all its parameters; a full application calls it, and a partial one or a
-use as a value makes a function of values around it. A parameter that is an
-`Int`, a `Float`, a `Bool` or a `String`, and a result that is one, has its
-Go type there (`func F(fb *flickrt.Fiber, n int32) int32`), so a number
-passed to a known function or returned by it is no `flickrt.Value` made for
-the call. The tail calls that are loops on the JS
+use as a value makes a function of values around it. A parameter that is an `Int`, a `Float`, a `Bool`, a `String`, or an eligible
+concrete `Option T`, and a result that is one, has its typed Go representation
+there (`func F(fb *flickrt.Fiber, n int32) flickrt.Opt[int32]`), so a scalar or
+concrete `Option` passed to a known function, matched, unwrapped with `?`,
+compared with `==`, stored in a `let mut`, or carried across a self tail loop
+adds no `flickrt.Value` or `*flickrt.Data` allocation; converting to or from
+erased `*flickrt.Data` happens only when crossing into polymorphic code,
+closures returning `flickrt.Value`, generic runtime helpers, or `flickrt.Value`
+FFI. The tail calls that are loops on the JS
 target (see [Recursion](#recursion-stack-safety-is-not-the-whole-cost))
 are loops in Go too: a self call is a `for` that assigns the next arguments
 and continues, and a group of functions calling each other is one Go
@@ -685,8 +690,10 @@ type arguments match the parameters of their declaration, and that type
 annotations used for layout agree with the terms they describe (constructor
 operands, binders, calls and results). Backends and transforms may still use an
 erased representation where optional annotations are omitted (`None` or empty
-lists) and the erased path stays valid. The official `flick/js` and `flick/go`
-backends ignore the new compound type fields beyond bare type-constructor names.
+lists) and the erased path stays valid. The official `flick/js` backend ignores the new compound type fields beyond bare
+type-constructor names; `flick/go` reads compound `Option T` types and
+`Module.types` declarations to choose allocation-free typed `Option` layouts
+without calling back into the checker.
 
 ## Shared data layouts
 

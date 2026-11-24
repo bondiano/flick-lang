@@ -34,8 +34,8 @@ func (c *console) log(text string)  { c.line(c.out, text) }
 func (c *console) warn(text string) { c.line(c.err, text) }
 
 func (c *console) group(options Value) {
-	if label, ok := record(options).Get("label").(*Data); ok && label.Tag == "Some" {
-		c.log(label.Fields()[0].(string))
+	if label := record(options).Get("label"); IsSome(label) {
+		c.log(UnwrapSome(label).(string))
 	}
 	c.mu.Lock()
 	c.indent += "  "

@@ -6,13 +6,16 @@ use flick_backend_support::reach::{self, Key};
 use flick_ir::Module;
 use flick_pretty::DocumentArena;
 
-use super::{Gen, Input, Output, Unsupported, dedup, direct, item_order, names, own, shape};
+use super::{
+    Gen, Input, Output, Unsupported, dedup, direct, go_type, item_order, names, own, shape,
+};
 
 /// Compiles one module for `flick inspect --emit output --target go`, without
 /// requiring a `main` entry or running `go build`.
 pub fn go_module(input: &Input, module_name: &str) -> Output {
     let modules: Vec<&Module> = input.own.iter().chain(input.builtins).copied().collect();
     let modules = &modules[..];
+    let decls = go_type::type_decls(modules);
     let index = reach::index(modules);
     let Some((m, module)) = modules
         .iter()
@@ -50,10 +53,10 @@ pub fn go_module(input: &Input, module_name: &str) -> Output {
     for &(mi, ii) in &reached {
         let item = &modules[mi].items[ii];
         for name in reach::defined(item) {
-            let held = shape::shape(input, &modules[mi].name, &item.kind);
+            let held = shape::shape(input, &decls, &modules[mi].name, &item.kind);
             shapes.insert((modules[mi].name.clone(), name), held);
         }
-        shapes.extend(direct::shapes(input, &modules[mi].name, &item.kind));
+        shapes.extend(direct::shapes(input, &decls, &modules[mi].name, &item.kind));
     }
     let reached_items = reached
         .iter()
@@ -68,6 +71,7 @@ pub fn go_module(input: &Input, module_name: &str) -> Output {
     g.settled = Some(&settled);
     g.records = Some(&records);
     g.fields = Some(&fields);
+    g.decls = Some(&decls);
     g.item_initializers = item_initializers;
     let order = item_order(module, &items, &index);
     let code = g.module(module, &order);

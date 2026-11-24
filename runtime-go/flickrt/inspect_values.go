@@ -97,12 +97,15 @@ func formatSpaced(v Value, space int) string {
 		case *Duration:
 			return x.String()
 		case *Data:
-			wrapped := map[string]string{"Some": "some", "Success": "success", "Failure": "failure"}
 			switch {
-			case x.Tag == "None":
+			case IsNone(x):
 				return "none()"
-			case wrapped[x.Tag] != "":
-				return wrapped[x.Tag] + "(" + formatSpaced(x.Fields()[0], 0) + ")"
+			case IsSome(x):
+				return "some(" + formatSpaced(UnwrapSome(x), 0) + ")"
+			case x.Tag == "Success":
+				return "success(" + formatSpaced(x.Fields()[0], 0) + ")"
+			case x.Tag == "Failure":
+				return "failure(" + formatSpaced(x.Fields()[0], 0) + ")"
 			}
 			keys, vals := []string{"_tag"}, []Value{x.Tag}
 			for i, f := range x.Fields() {

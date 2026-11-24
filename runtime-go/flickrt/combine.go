@@ -100,11 +100,10 @@ func OptionCombinerFailFast(c Value) Value {
 }
 
 func failFast(fb *Fiber, f func(*Fiber, Value, Value) Value, a, b Value) Value {
-	x, y := a.(*Data), b.(*Data)
-	if x.Tag == "None" || y.Tag == "None" {
+	if IsNone(a) || IsNone(b) {
 		return None
 	}
-	return Some(f(fb, x.Fields()[0], y.Fields()[0]))
+	return Some(f(fb, UnwrapSome(a), UnwrapSome(b)))
 }
 
 // StructCombiner combines records field by field in canonical UTF-16 label order.
@@ -214,14 +213,13 @@ func ListReducerConcat() Value {
 func OptionReducer(c Value) Value {
 	f := comb(c).combine
 	return reducer(func(fb *Fiber, a, b Value) Value {
-		x, y := a.(*Data), b.(*Data)
 		switch {
-		case x.Tag == "None":
+		case IsNone(a):
 			return b
-		case y.Tag == "None":
+		case IsNone(b):
 			return a
 		}
-		return Some(f(fb, x.Fields()[0], y.Fields()[0]))
+		return Some(f(fb, UnwrapSome(a), UnwrapSome(b)))
 	}, None)
 }
 

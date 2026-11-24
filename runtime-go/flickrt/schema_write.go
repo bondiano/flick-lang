@@ -53,12 +53,11 @@ func (w *wire) write(fb *Fiber, b *strings.Builder, v Value) []issue {
 		}
 		b.WriteByte(']')
 	case kindOption:
-		o := v.(*Data)
-		if o.Tag != "Some" {
+		if !IsSome(v) {
 			b.WriteString("null")
 			return nil
 		}
-		return s.item.jsonOf().(*wire).write(fb, b, o.Fields()[0])
+		return s.item.jsonOf().(*wire).write(fb, b, UnwrapSome(v))
 	case kindRecord:
 		if s.pos != nil {
 			return w.writeEncoded(fb, b, v)

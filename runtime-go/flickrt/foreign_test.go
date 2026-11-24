@@ -83,7 +83,7 @@ func TestFromNullable(t *testing.T) {
 		t.Fatalf("expected None for empty OptVal, got %v", got)
 	}
 	some := FromNullable("hello")
-	if d, ok := some.(*Data); !ok || d.Tag != "Some" || d.in[0] != "hello" {
+	if !IsSome(some) || UnwrapSome(some) != "hello" {
 		t.Fatalf("expected Some(hello), got %v", some)
 	}
 }

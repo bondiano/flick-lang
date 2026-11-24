@@ -51,11 +51,51 @@ func (d *Data) Fields() []Value {
 }
 
 // Option and Result have the tags of the JS runtime's native values.
-var None Value = &Data{Tag: "None"}
+var (
+	noneData       = &Data{Tag: "None"}
+	None     Value = noneData
+)
 
 func Some(v Value) Value { return &Data{Tag: "Some", n: 1, in: [2]Value{v}} }
 func Ok(v Value) Value   { return &Data{Tag: "Success", n: 1, in: [2]Value{v}} }
 func Err(v Value) Value  { return &Data{Tag: "Failure", n: 1, in: [2]Value{v}} }
+
+// IsNone reports whether an erased Flick value is Option's None.
+func IsNone(v Value) bool {
+	d, ok := v.(*Data)
+	return ok && (d == noneData || (d.Tag == "None" && d.n == 0 && d.more == nil))
+}
+
+// IsSome reports whether an erased Flick value is Option's Some.
+func IsSome(v Value) bool {
+	d, ok := v.(*Data)
+	return ok && d.Tag == "Some" && ((d.more == nil && d.n == 1) || len(d.more) == 1)
+}
+
+// UnwrapSome extracts the payload of an erased Option's Some value.
+func UnwrapSome(v Value) Value {
+	d, ok := v.(*Data)
+	if !ok || d.Tag != "Some" {
+		panic(Defect{"expected Some"})
+	}
+	if d.more != nil {
+		if len(d.more) == 1 {
+			return d.more[0]
+		}
+		panic(Defect{"expected Some"})
+	}
+	if d.n != 1 {
+		panic(Defect{"expected Some"})
+	}
+	return d.in[0]
+}
+
+func some(v Value) (Value, bool) {
+	if IsSome(v) {
+		return UnwrapSome(v), true
+	}
+	return nil, false
+}
 
 // Ordering values, tagged as the compiler tags Prelude's constructors.
 var (
