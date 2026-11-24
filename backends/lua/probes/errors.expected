@@ -1,0 +1,12 @@
+false	boom
+false	boom	true
+false	boom
+false	string	42
+false	true
+2
+false	nil
+false	handled x
+true	1	2
+false	error in error handling
+false	attempt to index local 'x' (a nil value)
+false	attempt to compare two table values

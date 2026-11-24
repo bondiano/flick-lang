@@ -208,6 +208,15 @@ that call. Descriptor capabilities and the preflight response must agree.
 Structural IR validation does not establish semantic equivalence; official
 backends also require the language conformance corpus.
 
+`flick check` and the editor call the `check-target` of a pinned backend
+other than `flick/js` and `flick/go` with `command = "check"`, the project's
+modules (without built-in bodies) and its entries. They do so for a project
+with foreign items, and for every project when the descriptor declares the
+capability `flick.check-target` at version `0.1.0` (`CHECK_TARGET_CAPABILITY`
+of `flick-backend`), read from the store's descriptor cache by digest. The
+official components check in-process instead. `flick/lua` declares it: see
+[Lua host profiles](lua-profiles.md).
+
 ## Output boundary
 
 A `BuildResult` contains binary artifacts, diagnostics, runtime dependencies,

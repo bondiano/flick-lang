@@ -80,6 +80,9 @@ IDE analysis and `flick build`:
   `FLICK-E020` at the requiring expression; local `provide` handlers discharge
   the requirement.
 
+The preview component `flick/lua` adds `lua/wow-retail`, `lua/wow-forever` and
+`lua/love`, each a pinned [host profile](lua-profiles.md).
+
 `TargetRequest` carries the resolved active `tags` and optional `host-package`,
 and `BuildRequest` carries `package_targets` and std `root_handlers` for the
 selected environment. Host tool availability remains `FLICK-P015` / `FLICK-P029`.

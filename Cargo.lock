@@ -707,6 +707,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "flick-backend-lua"
+version = "0.1.0"
+dependencies = [
+ "flick-backend",
+ "flick-ir",
+ "toml 1.1.8+spec-1.1.0",
+]
+
+[[package]]
 name = "flick-backend-support"
 version = "0.1.0"
 dependencies = [

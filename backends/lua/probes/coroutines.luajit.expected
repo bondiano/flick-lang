@@ -1,0 +1,6 @@
+plain	suspended	true yielded
+pcall	suspended	true yielded
+metamethod	suspended	true yielded
+sort comparator	dead	false attempt to yield across C-call boundary
+error	dead	false inside
+true

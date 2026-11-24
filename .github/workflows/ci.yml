@@ -347,6 +347,55 @@ jobs:
             cargo machete --version
           '
 
+  # the Lua profile probes on the hosts the flake pins: Lua 5.1.5, LuaJIT 2.1
+  # with the JIT on and off, LÖVE 11.5 headless. A pull request runs them
+  # when it changes the Lua backend, the flake or this workflow; a push to
+  # main, the nightly run and a release always do
+  lua-probes:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Whether the Lua backend changed
+        id: lua
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.base_ref || '' }}
+        run: |
+          changed=true
+          if [ -n "$BASE" ] && git fetch --depth=1 origin "$BASE" &&
+            git diff --quiet FETCH_HEAD HEAD -- backends/lua flake.nix flake.lock just/backends.just .github/workflows/ci.yml; then
+            changed=false
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v7
+        if: steps.lua.outputs.changed == 'true'
+        with:
+          node-version-file: .tool-versions
+      - uses: taiki-e/install-action@v2
+        if: steps.lua.outputs.changed == 'true'
+        with:
+          tool: just@1.59.0
+      - uses: cachix/install-nix-action@3dc140bfc76c49fbd4dd958429132e3746bcb086 # v31
+        if: steps.lua.outputs.changed == 'true'
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      # both Lua packages install a `lua`: name each host exactly
+      - name: Install the pinned Lua hosts
+        if: steps.lua.outputs.changed == 'true'
+        run: |
+          lua=$(nix build --no-link --print-out-paths .#lua5_1)
+          luajit=$(nix build --no-link --print-out-paths .#luajit)
+          love=$(nix build --no-link --print-out-paths .#love)
+          {
+            echo "LUA51=$lua/bin/lua"
+            echo "LUAC=$lua/bin/luac"
+            echo "LUAJIT=$luajit/bin/luajit"
+            echo "LOVE=$love/bin/love"
+          } >> "$GITHUB_ENV"
+      - if: steps.lua.outputs.changed == 'true'
+        run: just lua-probes
+
   # the reference model of λFlick (flick-model) against tests/run/model.txt,
   # every pass fixture and docs example, the counted Host/FFI bridge suites,
   # and the model properties on generated programs
