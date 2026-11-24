@@ -19,16 +19,19 @@ pub(super) fn accessor(p: &mut Parser) -> K {
     loop {
         let step = p.start();
         let dot = p.raw();
-        p.bump();
-        let named = p.raw().kind == K::Ident && p.raw().start == dot.end;
-        if named {
-            p.bump();
-        } else {
+        let named = accessor_ahead(p);
+        // reported on its own dot: an error remembered at the next token
+        // would hide that of the statement starting there
+        if !named {
             p.error_at(
                 codes::S007,
                 p.span(dot.start, dot.end),
                 "expected a field name right after `.`".into(),
             );
+        }
+        p.bump();
+        if named {
+            p.bump();
         }
         p.complete(step, K::AccessorStep);
         if !(named && p.at(K::Dot) && p.adjacent()) {

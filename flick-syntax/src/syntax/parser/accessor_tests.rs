@@ -85,6 +85,16 @@ fn a_missing_label_is_a_local_error() {
     assert_eq!(errors("let a = .5"), ["FLICK-S006 .5"]);
 }
 
+/// The error of an unfinished step stays at its own dot, so the statement
+/// after it still reports its own syntax error.
+#[test]
+fn an_unfinished_step_keeps_the_next_error() {
+    assert_eq!(
+        errors("let f =\n  .address.\n  .\n"),
+        ["FLICK-S007 .", "FLICK-S007 ."]
+    );
+}
+
 #[test]
 fn a_line_starting_with_an_accessor_is_a_statement_of_its_own() {
     let tree = sexp("let f user =\n  user\n  .name\n");
@@ -92,4 +102,12 @@ fn a_line_starting_with_an_accessor_is_a_statement_of_its_own() {
         tree.contains("(Block (NameExpr user) (AccessorExpr (AccessorStep . name)))"),
         "{tree}"
     );
+}
+
+/// Foreign metadata takes words and values, not accessors: `.x` there is
+/// an error, as it was before accessors.
+#[test]
+fn foreign_metadata_takes_no_accessor() {
+    let src = "foreign read from \"./fs.js\" \"read\"\n  arity .x\n";
+    assert_eq!(errors(src), ["FLICK-S007 ."]);
 }
