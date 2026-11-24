@@ -14,7 +14,7 @@ func wellFormed(v flickrt.Value) bool {
 		return utf8.ValidString(x)
 	case flickrt.Constructed:
 		return all(x.Fields())
-	case *flickrt.Record:
+	case flickrt.RecordView:
 		return all(flickrt.RecordValues(x).([]flickrt.Value))
 	case []flickrt.Value:
 		return all(x)

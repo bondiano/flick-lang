@@ -394,15 +394,15 @@ func stringify(b *strings.Builder, v Value) {
 			stringify(b, e)
 		}
 		b.WriteByte(']')
-	case *Record:
+	case RecordView:
 		b.WriteByte('{')
-		for i, k := range x.keys {
+		for i, k := range x.Keys() {
 			if i > 0 {
 				b.WriteByte(',')
 			}
 			quoteTo(b, k)
 			b.WriteByte(':')
-			stringify(b, x.vals[i])
+			stringify(b, x.At(i))
 		}
 		b.WriteByte('}')
 	default:
@@ -431,7 +431,7 @@ func describeInput(in Value) string {
 		return "bigint"
 	case []Value:
 		return "an array"
-	case *Record, Constructed:
+	case RecordView, Constructed:
 		return "an object"
 	case Fn, Fn2, Fn3, Poly:
 		return "function"

@@ -3,7 +3,9 @@
 use flick_backend_support::Known;
 use flick_ir::{Constraint, IrType, Lang, LangItem, Namespace, TypeDecl, TypeRef};
 
-use super::go_type::{OptPayload, OptRepr, TypeDecls};
+use super::arith::Native;
+use super::go_type::{GoType, OptPayload, OptRepr, TypeDecls};
+use super::record::RecordShape;
 
 fn lang_type(role: Lang, name: &str) -> LangItem {
     LangItem {
@@ -166,4 +168,113 @@ fn record_field_option_matches_record_ref_sentinel() {
         OptRepr::of(&lang, &decls, Some(&opt_of(opt_of(field_int)))),
         OptRepr::of(&lang, &decls, Some(&opt_of(opt_of(rec_ty))))
     );
+}
+
+#[test]
+fn record_shape_canonical_order_and_substitution_invariance() {
+    let items = [
+        lang_type(Lang::Int, "Int"),
+        lang_type(Lang::Float, "Float"),
+        lang_type(Lang::Bool, "Bool"),
+        lang_type(Lang::String, "String"),
+        lang_type(Lang::List, "List"),
+    ];
+    let lang = Known::of(&items);
+    let alias_decl = TypeDecl {
+        name: "UserId".into(),
+        params: vec![],
+        error: false,
+        alias: Some(TypeRef::new(IrType::Named {
+            module: "Prelude".into(),
+            name: "Int".into(),
+            args: vec![],
+        })),
+        constructors: vec![],
+    };
+    let mut decls = TypeDecls::new();
+    decls.insert(("App".into(), "UserId".into()), &alias_decl);
+
+    let int_ty = TypeRef::new(IrType::Named {
+        module: "Prelude".into(),
+        name: "Int".into(),
+        args: vec![],
+    });
+    let float_ty = TypeRef::new(IrType::Named {
+        module: "Prelude".into(),
+        name: "Float".into(),
+        args: vec![],
+    });
+    let list_poly = TypeRef::new(IrType::Named {
+        module: "Prelude".into(),
+        name: "List".into(),
+        args: vec![TypeRef::new(IrType::Var("a".into()))],
+    });
+
+    // Empty closed record gets R_empty.
+    let empty = IrType::Record {
+        fields: vec![],
+        tail: None,
+    };
+    let empty_shape = RecordShape::of(&lang, &decls, Some(&empty)).expect("empty closed record");
+    assert_eq!(empty_shape.go_type(), "R_empty");
+    assert!(empty_shape.is_go_comparable());
+
+    // Canonical label order: array indices numerically ascending, then UTF-16 order.
+    let canonical = IrType::Record {
+        fields: vec![
+            ("b".into(), int_ty.clone()),
+            ("10".into(), float_ty.clone()),
+            ("2".into(), list_poly),
+            ("a".into(), int_ty.clone()),
+        ],
+        tail: None,
+    };
+    let shape = RecordShape::of(&lang, &decls, Some(&canonical)).expect("closed record shape");
+    assert_eq!(
+        shape.fields,
+        vec![
+            ("2".into(), None),
+            ("10".into(), Some(Native::Float)),
+            ("a".into(), Some(Native::Int)),
+            ("b".into(), Some(Native::Int)),
+        ]
+    );
+    assert!(!shape.is_go_comparable());
+
+    // Open-row records stay erased.
+    let open = IrType::Record {
+        fields: vec![("x".into(), int_ty.clone())],
+        tail: Some("r".into()),
+    };
+    assert_eq!(RecordShape::of(&lang, &decls, Some(&open)), None);
+
+    // Records with polymorphic, higher-rank, or opaque-alias fields stay erased.
+    for field_ty in [
+        IrType::Var("a".into()),
+        IrType::Named {
+            module: "App".into(),
+            name: "UserId".into(),
+            args: vec![],
+        },
+        IrType::Forall {
+            vars: vec!["a".into()],
+            constraints: vec![],
+            body: int_ty.clone(),
+        },
+    ] {
+        let rec = IrType::Record {
+            fields: vec![("x".into(), TypeRef::new(field_ty))],
+            tail: None,
+        };
+        assert_eq!(RecordShape::of(&lang, &decls, Some(&rec)), None);
+        assert_eq!(GoType::of(&lang, &decls, Some(&rec)), None);
+    }
+
+    // All non-float scalar closed record is directly Go-comparable.
+    let int_pair = IrType::Record {
+        fields: vec![("x".into(), int_ty.clone()), ("y".into(), int_ty)],
+        tail: None,
+    };
+    let pair_shape = RecordShape::of(&lang, &decls, Some(&int_pair)).expect("int pair shape");
+    assert!(pair_shape.is_go_comparable());
 }

@@ -59,7 +59,7 @@ var (
 )
 
 func cookieOf(v Value) Cookie { return v.(Cookie) }
-func jarOf(v Value) *Record   { return v.(*Record) }
+func jarOf(v Value) *Record   { return record(v) }
 
 func (c *Cookie) attributes() *cookieOptions {
 	if c.options != optionsSet {

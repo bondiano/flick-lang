@@ -132,7 +132,7 @@ type partWaiter struct {
 }
 
 func PartitionedMake(_ *Fiber, options Value) Value {
-	n := max(0, int(options.(*Record).Get("permits").(int32)))
+	n := max(0, int(AsRecord(options).Get("permits").(int32)))
 	return &Partitioned{max: n, total: n, waiters: map[int][]*partWaiter{}}
 }
 

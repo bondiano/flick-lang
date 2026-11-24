@@ -115,7 +115,7 @@ impl<'a> Gen<'a> {
         let result = match looping {
             None => {
                 let (stmts, heads) = self.block(|g| {
-                    let heads = g.bind_params(params);
+                    let heads = g.bind_params(params, types);
                     for (i, p) in params.iter().enumerate() {
                         // a parameter of a Go type is that type from the start
                         if let Pat::Bind(name) = &p.pat {
@@ -141,11 +141,14 @@ impl<'a> Gen<'a> {
                 let loop_types: Vec<Option<GoType>> = params
                     .iter()
                     .map(|p| {
-                        matches!(p.pat, Pat::Bind(_))
+                        matches!(p.pat, Pat::Bind(_) | Pat::Record(_))
                             .then(|| self.go_type_of(p.ty.as_deref()))
                             .flatten()
                     })
                     .collect();
+                for ty in loop_types.iter().flatten() {
+                    self.register_go_type(ty);
+                }
                 let tail = Tail {
                     members: vec![(target, params.len())],
                     current: 0,
@@ -194,7 +197,7 @@ impl<'a> Gen<'a> {
             match &p.pat {
                 Pat::Bind(n) => self.bind_typed(n, self.code(var), go_ty.clone()),
                 Pat::Wild | Pat::Lit(Lit::Unit) => {}
-                pat => self.destructure(pat, self.a.text(var), None),
+                pat => self.destructure(pat, self.a.text(var), go_ty.clone()),
             }
         }
         self.tail = Some(tail);
@@ -255,7 +258,6 @@ impl<'a> Gen<'a> {
         for (k, (_, params, body)) in functions.iter().enumerate() {
             // local names are unique only within a definition
             self.go_types.clear();
-            self.held.clear();
             let tail = Tail {
                 members: members.clone(),
                 current: k,
@@ -269,7 +271,6 @@ impl<'a> Gen<'a> {
             cases.push(statement(a, docvec![a, "case ", k, ":", stmts]));
         }
         self.go_types.clear();
-        self.held.clear();
         self.fiber = None;
         self.context = None;
         let mut heads = vec!["fb *flickrt.Fiber".to_owned(), "state int".to_owned()];

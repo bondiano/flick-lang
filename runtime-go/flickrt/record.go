@@ -6,6 +6,25 @@ import (
 	"strconv"
 )
 
+// RecordView is the read-only record interface implemented by *Record and
+// every compiler-generated closed record struct. Open-row code and the
+// runtime read record fields through it without depending on concrete layout.
+type RecordView interface {
+	Get(k string) Value
+	Lookup(k string) (Value, bool)
+	Keys() []string
+	Len() int
+	At(i int) Value
+}
+
+// RecordEqual is an optional fast path for structural equality between two
+// values of the same generated closed-record struct type, avoiding boxing
+// scalar fields through RecordView methods.
+type RecordEqual interface {
+	RecordView
+	EqualRecord(other Value, strictZero bool) (equal bool, sameType bool)
+}
+
 // Record is a record value: its labels in the order JS keeps an object's
 // keys (integer-like ones first, ascending, then the others as added), so
 // what lists them lists them as the JS target does. It is never mutated
@@ -13,6 +32,53 @@ import (
 type Record struct {
 	keys []string
 	vals []Value
+}
+
+func (r *Record) Lookup(k string) (Value, bool) {
+	if i := r.index(k); i >= 0 {
+		return r.vals[i], true
+	}
+	return nil, false
+}
+
+func (r *Record) Keys() []string { return r.keys }
+func (r *Record) Len() int       { return len(r.keys) }
+func (r *Record) At(i int) Value { return r.vals[i] }
+
+// AsRecord asserts that v implements RecordView.
+func AsRecord(v Value) RecordView { return v.(RecordView) }
+
+// materializeRecord copies a non-*Record RecordView into a fresh *Record.
+func materializeRecord(rv RecordView) *Record {
+	if r, ok := rv.(*Record); ok {
+		return r
+	}
+	keys := rv.Keys()
+	out := newRecord(len(keys))
+	for i, k := range keys {
+		out.keys = append(out.keys, k)
+		out.vals = append(out.vals, rv.At(i))
+	}
+	return out
+}
+
+// copiedView returns a fresh *Record holding the same entries as v.
+func copiedView(v Value) *Record {
+	if r, ok := v.(*Record); ok {
+		return r.copied()
+	}
+	return materializeRecord(v.(RecordView))
+}
+
+// asRecord returns v as a *Record if v implements RecordView.
+func asRecord(v Value) (*Record, bool) {
+	if r, ok := v.(*Record); ok {
+		return r, true
+	}
+	if rv, ok := v.(RecordView); ok {
+		return materializeRecord(rv), true
+	}
+	return nil, false
 }
 
 // arrayIndex is whether `k` is a key JS orders as an array index.
@@ -202,7 +268,12 @@ func Rec(fields ...Value) Value {
 	return r
 }
 
-func record(v Value) *Record { return v.(*Record) }
+func record(v Value) *Record {
+	if r, ok := v.(*Record); ok {
+		return r
+	}
+	return materializeRecord(v.(RecordView))
+}
 
 // Get is the value of a label.
 func (r *Record) Get(k string) Value {
@@ -214,26 +285,30 @@ func (r *Record) Get(k string) Value {
 
 // Update is a copy of a record with some fields replaced or added.
 func Update(base Value, fields Value) Value {
-	b, f := record(base), record(fields)
+	b := copiedView(base)
+	f := AsRecord(fields)
 	// fields the record has replace their values in a copy of it, with no
 	// room for more labels and no search for where a new one goes
-	replaced := b.copied()
-	for i, k := range f.keys {
+	replaced := b
+	for i, k := range f.Keys() {
 		at := b.index(k)
 		if at < 0 {
 			replaced = nil
 			break
 		}
-		replaced.vals[at] = f.vals[i]
+		replaced.vals[at] = f.At(i)
 	}
 	if replaced != nil {
 		return replaced
 	}
-	out := newRecord(len(b.keys) + len(f.keys))
-	out.keys = append(out.keys, b.keys...)
-	out.vals = append(out.vals, b.vals...)
-	for i, k := range f.keys {
-		out.put(k, f.vals[i])
+	src := AsRecord(base)
+	out := newRecord(src.Len() + f.Len())
+	for i, k := range src.Keys() {
+		out.keys = append(out.keys, k)
+		out.vals = append(out.vals, src.At(i))
+	}
+	for i, k := range f.Keys() {
+		out.put(k, f.At(i))
 	}
 	return out
 }
@@ -242,14 +317,13 @@ func Update(base Value, fields Value) Value {
 // never made: `vals` are the values of the shape's labels as `Shaped` takes
 // them.
 func With(base Value, s *Shape, vals ...Value) Value {
-	b := record(base)
-	out := b.copied()
+	out := copiedView(base)
 	for i, v := range vals {
 		k := i
 		if s.pos != nil {
 			k = s.pos[i]
 		}
-		at := b.index(s.keys[k])
+		at := out.index(s.keys[k])
 		if at < 0 {
 			// a label the record has not: where it goes is the update's to find
 			return Update(base, Shaped(s, vals...))
@@ -261,17 +335,23 @@ func With(base Value, s *Shape, vals ...Value) Value {
 
 // sortedKeys is the labels of a record in UTF-16 order.
 func sortedKeys(r *Record) []string {
-	keys := append([]string{}, r.keys...)
+	return sortedViewKeys(r)
+}
+
+// sortedViewKeys is the labels of a RecordView in UTF-16 order.
+func sortedViewKeys(r RecordView) []string {
+	keys := append([]string{}, r.Keys()...)
 	sort.Slice(keys, func(i, j int) bool { return CompareStrings(keys[i], keys[j]) < 0 })
 	return keys
 }
 
 // RecordToEntries is the label and value of each field, in key order.
 func RecordToEntries(r Value) Value {
-	x := record(r)
-	out := make([]Value, len(x.keys))
-	for i, k := range x.keys {
-		out[i] = []Value{k, x.vals[i]}
+	x := AsRecord(r)
+	keys := x.Keys()
+	out := make([]Value, len(keys))
+	for i, k := range keys {
+		out[i] = []Value{k, x.At(i)}
 	}
 	return out
 }
@@ -351,7 +431,7 @@ func (r *Record) Over(s *Shape, vals []Value) { r.keys, r.vals = s.keys, vals }
 // FieldAt is the value at place `i` of a record whose labels are known to
 // be in the order of a shape: the record that lies in a value of a
 // constructor, which generated code reads by place.
-func FieldAt(r Value, i int) Value { return r.(*Record).vals[i] }
+func FieldAt(r Value, i int) Value { return r.(RecordView).At(i) }
 
 // Values fills `into` with the values the labels of `s` have in the record
 // `from`, in the order a record of the shape keeps them.
@@ -361,13 +441,19 @@ func (s *Shape) Values(from Value, into []Value) {
 		// its tag (`tagOf`)
 		return
 	}
-	r := record(from)
-	if len(r.keys) == len(s.keys) && (len(s.keys) == 0 || &r.keys[0] == &s.keys[0]) {
-		// a record of this very shape
-		copy(into, r.vals)
+	if r, ok := from.(*Record); ok {
+		if len(r.keys) == len(s.keys) && (len(s.keys) == 0 || &r.keys[0] == &s.keys[0]) {
+			// a record of this very shape
+			copy(into, r.vals)
+			return
+		}
+		for i, k := range s.keys {
+			into[i] = r.Get(k)
+		}
 		return
 	}
+	rv := AsRecord(from)
 	for i, k := range s.keys {
-		into[i] = r.Get(k)
+		into[i] = rv.Get(k)
 	}
 }

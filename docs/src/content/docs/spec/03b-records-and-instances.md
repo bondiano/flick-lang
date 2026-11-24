@@ -1,6 +1,6 @@
 ---
 title: "Records and instances"
-source_hash: 7a43bc952a5d1f09
+source_hash: dd28d6631bdede0f
 ---
 
 ## Record structurality
@@ -35,7 +35,7 @@ Two transparent aliases of one shape are one type and do not get different globa
 
 For different domain semantics, a nominal wrapper is introduced. An alternative comparison without a new type is an explicit `EqHash` witness, which a `HashSet` or `HashMap` keeps as part of its type ([hash collections](../../reference/stdlib/#hash-collections)).
 
-At the FFI boundary, a structural record is a plain JS object with exactly its fields (on the Go target, a `*flickrt.Record`) in canonical sorted label order: JS array-index keys first in ascending numeric order, then all remaining labels in UTF-16 code-unit order (pure `Record.labels` order for Flick identifier labels). Flick data crosses a foreign binding as a copy, so JS cannot change a Flick value it was given ([FFI](../../reference/ffi/#js-values)). Untrusted input becomes a record only by decoding through a schema or codec, which refuses keys it does not name unless the codec goes through `ignore_extra_fields` ([schemas](../../reference/schema/)). `Json` values and `Record.ReadonlyRecord` dictionaries are separate key-value maps with their own insertion/wire ordering rules: `Codec.json` encodes structural records in canonical order and decodes any JSON key order into a canonical record, while a `codec` block preserves its declared wire key order on encoding and canonicalizes the decoded record.
+At the FFI boundary, a structural record is a plain JS object with exactly its fields (on the Go target, a `flickrt.RecordView`: a closed-shape struct or `*flickrt.Record`) in canonical sorted label order: JS array-index keys first in ascending numeric order, then all remaining labels in UTF-16 code-unit order (pure `Record.labels` order for Flick identifier labels). Flick data crosses a foreign binding as a copy, so JS cannot change a Flick value it was given ([FFI](../../reference/ffi/#js-values)). Untrusted input becomes a record only by decoding through a schema or codec, which refuses keys it does not name unless the codec goes through `ignore_extra_fields` ([schemas](../../reference/schema/)). `Json` values and `Record.ReadonlyRecord` dictionaries are separate key-value maps with their own insertion/wire ordering rules: `Codec.json` encodes structural records in canonical order and decodes any JSON key order into a canonical record, while a `codec` block preserves its declared wire key order on encoding and canonicalizes the decoded record.
 
 ## Classes and dependencies between types
 

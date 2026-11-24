@@ -64,6 +64,10 @@ impl Types {
         self.0.as_ref()?.params.get(i)?.as_ref()
     }
 
+    pub(super) fn param_len(&self) -> usize {
+        self.0.as_ref().map_or(0, |s| s.params.len())
+    }
+
     /// Whether the function has a parameter or a result of a typed Go
     /// representation, so that it is not itself a function of values.
     pub(super) fn any(&self) -> bool {
@@ -116,7 +120,7 @@ pub(super) fn function(
     let param_types: Vec<Option<GoType>> = params
         .iter()
         .map(|p| match p.pat {
-            Pat::Bind(_) => GoType::of(input.lang, decls, p.ty.as_deref()),
+            Pat::Bind(_) | Pat::Record(_) => GoType::of(input.lang, decls, p.ty.as_deref()),
             _ => None,
         })
         .collect();

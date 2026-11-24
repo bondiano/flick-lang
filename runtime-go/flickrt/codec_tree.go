@@ -148,7 +148,7 @@ func decodeTree(fb *Fiber, s *Schema, in Value) (Value, []issue) {
 		}
 		return out, nil
 	}
-	obj, ok := in.(*Record)
+	obj, ok := in.(RecordView)
 	if !ok {
 		return nil, expected("a record", in)
 	}
@@ -191,7 +191,7 @@ func encodeTree(s *Schema, v Value) Value {
 		}
 		return out
 	case kindRecord:
-		r := v.(*Record)
+		r := AsRecord(v)
 		out := make([]Value, len(s.labels))
 		for i, l := range s.labels {
 			out[i] = encodeTree(s.items[i], r.Get(l))
@@ -366,15 +366,15 @@ func bracketEntries(tree Value) []Value {
 					add(key+"["+strconv.Itoa(i)+"]", e)
 				}
 			}
-		case *Record:
-			for i, k := range x.keys {
-				add(key+"["+k+"]", x.vals[i])
+		case RecordView:
+			for i, k := range x.Keys() {
+				add(key+"["+k+"]", x.At(i))
 			}
 		}
 	}
-	if r, ok := tree.(*Record); ok {
-		for i, k := range r.keys {
-			add(k, r.vals[i])
+	if r, ok := tree.(RecordView); ok {
+		for i, k := range r.Keys() {
+			add(k, r.At(i))
 		}
 	}
 	return out

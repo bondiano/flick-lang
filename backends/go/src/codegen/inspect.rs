@@ -63,7 +63,7 @@ pub fn go_module(input: &Input, module_name: &str) -> Output {
         .map(|&(mi, ii)| (&*modules[mi].name, &modules[mi].items[ii]));
     let settled = shape::settled(reached_items, &shapes);
     let item_initializers = modules.iter().any(|m| !m.initialization.is_empty());
-    let records = own::records(modules);
+    let records = own::records(modules, input.lang);
     let fields = own::fields(input.own, input.lang);
     let items: Vec<usize> = (0..module.items.len()).collect();
     let arena = DocumentArena::new();

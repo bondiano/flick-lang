@@ -44,7 +44,7 @@ func (p *jsonRpcParser) decode(data []byte) ([]Value, error) {
 func (p *jsonRpcParser) decodeRaw(doc Value) []Value {
 	xs, isBatch := doc.([]Value)
 	if !isBatch {
-		if r, ok := doc.(*Record); ok {
+		if r, ok := asRecord(doc); ok {
 			return []Value{decodeJsonRpcMessage(r)}
 		}
 		return nil
@@ -52,7 +52,7 @@ func (p *jsonRpcParser) decodeRaw(doc Value) []Value {
 	batch := &jsonRpcBatch{responses: map[string]Value{}}
 	var out []Value
 	for _, x := range xs {
-		r, ok := x.(*Record)
+		r, ok := asRecord(x)
 		if !ok {
 			continue
 		}
@@ -252,7 +252,7 @@ func encodeJsonRpcMessage(m Value) Value {
 			}
 		}
 		code, message := Value(0.0), Value(nil)
-		if obj, ok := failed.(*Record); ok && truthy(failed) {
+		if obj, ok := failed.(RecordView); ok && truthy(failed) {
 			if c := recordField(obj, "code"); c != nil {
 				code = rpcNumberOf(c)
 			}

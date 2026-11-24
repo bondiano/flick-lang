@@ -10,13 +10,14 @@ import "strings"
 // apiStrings is the fields of an encoded record as strings; null and
 // absent fields are left out, other values written as JSON.
 func apiStrings(encoded Value) []Value {
-	r, ok := encoded.(*Record)
+	r, ok := encoded.(RecordView)
 	if !ok {
 		return []Value{}
 	}
-	out := make([]Value, 0, len(r.keys))
-	for i, k := range r.keys {
-		switch v := r.vals[i].(type) {
+	keys := r.Keys()
+	out := make([]Value, 0, len(keys))
+	for i, k := range keys {
+		switch v := r.At(i).(type) {
 		case string:
 			out = append(out, []Value{k, v})
 		default:

@@ -32,7 +32,7 @@ var (
 )
 
 func PromptFile(options Value) Value {
-	o := options.(*Record)
+	o := AsRecord(options)
 	opts := &promptFileOptions{kind: "file", message: promptOr(o.Get("message"), "Choose a file"),
 		starting: promptOr(o.Get("startingPath"), ""), initial: promptOr(o.Get("default"), ""),
 		perPage: promptMaxPerPage(o.Get("maxPerPage")), filter: o.Get("filter")}
@@ -231,7 +231,7 @@ func (o *promptFileOptions) process(c *promptCtx, input, state Value) promptActi
 	s := state.(promptFileState)
 	name, ctrl := promptKeyName(input)
 	typed := func() promptAction {
-		text := promptOr(input.(*Record).Get("input"), "")
+		text := promptOr(AsRecord(input).Get("input"), "")
 		if text == "" {
 			return promptBeep
 		}

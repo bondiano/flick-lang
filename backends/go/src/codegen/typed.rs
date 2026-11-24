@@ -109,7 +109,7 @@ impl<'a> Gen<'a> {
     pub(super) fn to_value(&self, t: Typed<'a>) -> Code<'a> {
         match t.ty {
             Some(GoType::Opt(r)) => r.box_doc(self.a, t.code.doc).into(),
-            Some(GoType::Scalar(_)) | None => t.code,
+            Some(GoType::Scalar(_) | GoType::Record(_)) | None => t.code,
         }
     }
 
@@ -131,6 +131,9 @@ impl<'a> Gen<'a> {
         if t.code.atomic {
             return t;
         }
+        if let Some(gt) = &t.ty {
+            self.register_go_type(gt);
+        }
         let temp = self.temp();
         let go_ty = self.go_type_name(t.ty.as_ref());
         self.emit(docvec![self.a, "var ", temp, " ", go_ty, " = ", t.code]);
@@ -142,6 +145,9 @@ impl<'a> Gen<'a> {
 
     /// Declares the local `name` with `value` and its optional typed Go type.
     pub(super) fn bind_typed(&mut self, name: &str, value: Code<'a>, ty: Option<GoType>) {
+        if let Some(gt) = &ty {
+            self.register_go_type(gt);
+        }
         let l = self.a.alloc_str(&names::local(name));
         let go_ty = self.go_type_name(ty.as_ref());
         self.emit(docvec![self.a, "var ", l, " ", go_ty, " = ", value]);
@@ -160,7 +166,7 @@ impl<'a> Gen<'a> {
         match want {
             Want::Exact(GoType::Opt(r)) => Some(r.clone()),
             Want::Any => self.opt_repr_of(e.ty.as_deref()),
-            Want::Value | Want::Exact(GoType::Scalar(_)) => None,
+            Want::Value | Want::Exact(GoType::Scalar(_) | GoType::Record(_)) => None,
         }
     }
 
@@ -211,10 +217,16 @@ impl<'a> Gen<'a> {
         let last = total - 1;
         if let ExprKind::Con(c) = &head.kind
             && c.arity == total
-            && let Some(own::Held::Fields(slots)) = self.own_held(c)
-            && slots.iter().any(Option::is_some)
         {
-            return slots.get(last).copied().flatten().map(GoType::Scalar);
+            match self.own_held(c) {
+                Some(own::Held::Fields(slots)) if slots.iter().any(Option::is_some) => {
+                    return slots.get(last).copied().flatten().map(GoType::Scalar);
+                }
+                Some(own::Held::Record(shape)) if last == 0 => {
+                    return Some(GoType::Record(shape));
+                }
+                _ => {}
+            }
         }
         if let Some(m) = self.scalar_method_head(head)
             && total == m.arity()
@@ -343,6 +355,7 @@ impl<'a> Gen<'a> {
         e: &Expr,
     ) -> Typed<'a> {
         let a = self.a;
+        self.register_types(&types);
         let dicts = all.len() - params;
         // the Go types of a binding are written in a table: they must be
         // those of the types the checker gave the call

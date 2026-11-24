@@ -106,9 +106,20 @@ impl<'a> Gen<'a> {
                 }
             }
             Pat::Record(fields) => {
+                let shape = match &subject_ty {
+                    Some(GoType::Record(s)) => Some(s.clone()),
+                    _ => None,
+                };
                 for (label, p) in fields {
-                    let field = call(a, "flickrt.Field", [subject, self.string(label)]);
-                    self.test(p, field, None, t);
+                    if let Some(ref shape) = shape
+                        && let Some(place) = shape.index_of(label)
+                    {
+                        let field = docvec![a, subject, ".f", place];
+                        self.test(p, field, shape.field_go_type(place), t);
+                    } else {
+                        let field = call(a, "flickrt.Field", [subject, self.string(label)]);
+                        self.test(p, field, None, t);
+                    }
                 }
             }
             Pat::Con(c, args) if c.rep != Rep::Tagged => {
@@ -164,8 +175,14 @@ impl<'a> Gen<'a> {
                 }
             }
             Pat::Record(fields) => {
-                for (_, p) in fields {
-                    self.collect_or_lets(p, None, out);
+                for (label, p) in fields {
+                    let slot = match subject_ty {
+                        Some(GoType::Record(shape)) => {
+                            shape.index_of(label).and_then(|i| shape.field_go_type(i))
+                        }
+                        _ => None,
+                    };
+                    self.collect_or_lets(p, slot.as_ref(), out);
                 }
             }
             Pat::Con(c, args) if c.rep != Rep::Tagged => {
@@ -189,13 +206,24 @@ impl<'a> Gen<'a> {
                     }
                     return;
                 }
-                let held = self.own_held(c).filter(own::Held::has_scalars);
-                for (i, arg) in args.iter().enumerate() {
-                    let slot = held
-                        .as_ref()
-                        .and_then(|h| h.field_native(i))
-                        .map(GoType::Scalar);
-                    self.collect_or_lets(arg, slot.as_ref(), out);
+                match self.own_held(c) {
+                    Some(own::Held::Record(shape)) => {
+                        if let Some(arg) = args.first() {
+                            let rec_ty = GoType::Record(shape);
+                            self.collect_or_lets(arg, Some(&rec_ty), out);
+                        }
+                    }
+                    Some(held) if held.has_scalars() => {
+                        for (i, arg) in args.iter().enumerate() {
+                            let slot = held.field_native(i).map(GoType::Scalar);
+                            self.collect_or_lets(arg, slot.as_ref(), out);
+                        }
+                    }
+                    _ => {
+                        for arg in args {
+                            self.collect_or_lets(arg, None, out);
+                        }
+                    }
                 }
             }
             Pat::Or(alts) => {
@@ -244,10 +272,6 @@ impl<'a> Gen<'a> {
             } else {
                 conjunction(a, inner.conds)
             };
-            for (_, l, _, _) in &inner.binds {
-                // bound by one alternative or another: what it is bound to is not known
-                self.held.remove(*l);
-            }
             let assigns = inner.binds.into_iter().map(|(_, l, p, path_ty)| {
                 let target_ty = targets
                     .iter()
@@ -322,35 +346,19 @@ impl<'a> Gen<'a> {
             }
             let ty = a.alloc_str(&ty);
             let field = |i: usize| docvec![a, subject, ".(*", ty, ").f[", i, "]"];
-            let places = match (&held, args) {
-                (own::Held::Record(labels), [Pat::Record(fields)]) => {
-                    let place = |(label, _): &(String, Pat)| labels.iter().position(|l| l == label);
-                    fields.iter().map(place).collect::<Option<Vec<usize>>>()
+            match (held, args) {
+                (own::Held::Record(shape), [arg]) => {
+                    self.register_shape(&shape);
+                    let record = docvec![a, subject, ".(*", ty, ").rec"];
+                    self.test(arg, record, Some(GoType::Record(shape)), t);
                 }
-                _ => None,
-            };
-            match (held, args, places) {
-                // the record lies in the value: a label is a place in it
-                (_, [Pat::Record(fields)], Some(places)) => {
-                    for ((_, p), place) in fields.iter().zip(places) {
-                        self.test(p, field(place), None, t);
-                    }
-                }
-                (own::Held::Record(labels), [arg], _) => {
-                    if let Pat::Bind(name) = arg {
-                        // read by place where the name is read by label
-                        self.held.insert(names::local(name), labels);
-                    }
-                    let record = docvec![a, "flickrt.Value(&", subject, ".(*", ty, ").rec)"];
-                    self.test(arg, record, None, t);
-                }
-                (own::Held::Fields(slots), args, _) if slots.iter().any(Option::is_some) => {
+                (own::Held::Fields(slots), args) if slots.iter().any(Option::is_some) => {
                     for (i, arg) in args.iter().enumerate() {
                         let path = docvec![a, subject, ".(*", ty, ").f", i];
                         self.test(arg, path, slots[i].map(GoType::Scalar), t);
                     }
                 }
-                (_, args, _) => {
+                (_, args) => {
                     for (i, arg) in args.iter().enumerate() {
                         self.test(arg, field(i), None, t);
                     }
@@ -373,6 +381,9 @@ impl<'a> Gen<'a> {
 
     fn declare_lets(&mut self, lets: &[(&'a str, &'a str, Option<GoType>)]) {
         for (raw, local, go_ty) in lets {
+            if let Some(gt) = go_ty {
+                self.register_go_type(gt);
+            }
             let ty_name = self.go_type_name(go_ty.as_ref());
             self.emit(docvec![self.a, "var ", *local, " ", ty_name]);
             self.emit(docvec![self.a, "_ = ", *local]);

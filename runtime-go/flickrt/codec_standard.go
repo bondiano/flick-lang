@@ -24,15 +24,23 @@ func inertProblem(in Value) []issue {
 	}
 	walk = func(v Value, path string) []issue {
 		switch x := v.(type) {
-		case *Record:
-			return enter(x, path, func() []issue {
-				for i, k := range x.keys {
-					if p := walk(x.vals[i], atPath(path, k)); p != nil {
-						return p
+		case RecordView:
+			if ptr, ok := x.(*Record); ok {
+				return enter(ptr, path, func() []issue {
+					for i, k := range ptr.keys {
+						if p := walk(ptr.vals[i], atPath(path, k)); p != nil {
+							return p
+						}
 					}
+					return nil
+				})
+			}
+			for i, k := range x.Keys() {
+				if p := walk(x.At(i), atPath(path, k)); p != nil {
+					return p
 				}
-				return nil
-			})
+			}
+			return nil
 		case []Value:
 			if len(x) == 0 {
 				return nil

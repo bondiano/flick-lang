@@ -94,6 +94,9 @@ impl<'a> Gen<'a> {
             for name in order {
                 let local = a.alloc_str(&names::local(name));
                 let ty = w.shared_types[name].clone();
+                if let Some(gt) = &ty {
+                    self.register_go_type(gt);
+                }
                 let go_ty = self.go_type_name(ty.as_ref());
                 out.push(statement(a, docvec![a, "var ", local, " ", go_ty]));
                 out.push(statement(a, docvec![a, "_ = ", local]));
@@ -263,12 +266,6 @@ impl<'a> Gen<'a> {
                 continue;
             }
             let prev = self.go_types.get(*name).cloned();
-            if place_ty.is_none()
-                && let Some(labels) = self.held_record(w, *place)
-            {
-                // read by place where the name is read by label
-                self.held.insert(local.to_owned(), labels);
-            }
             self.bind_typed(name, path.into(), place_ty);
             saved.push(((*name).to_owned(), prev));
         }
@@ -280,33 +277,29 @@ impl<'a> Gen<'a> {
         let Some((from, step)) = &w.graph.places[place] else {
             return w.scrutinee_ty.clone();
         };
-        let Step::Field(c, i) = step else {
-            return None;
-        };
-        if let Some(GoType::Opt(repr)) = self.place_type(w, *from) {
-            return (self.opt_con(c) == Some(OptCon::Some) && *i == 0)
-                .then(|| repr.payload_go_type())
-                .flatten();
-        }
-        let held = self.own_held(c)?;
-        held.has_scalars()
-            .then(|| held.field_native(*i))
-            .flatten()
-            .map(GoType::Scalar)
-    }
-
-    /// The labels of the record that lies in a value of its constructor,
-    /// when `place` is that record.
-    fn held_record(&mut self, w: &Walk<'_, 'a>, place: Place) -> Option<Vec<String>> {
-        let Some((from, Step::Field(c, 0))) = &w.graph.places[place] else {
-            return None;
-        };
-        if self.place_type(w, *from).is_some() {
-            return None;
-        }
-        match self.own_type(c) {
-            Some((_, own::Held::Record(labels))) => Some(labels),
-            _ => None,
+        match step {
+            Step::Field(c, i) => {
+                if let Some(GoType::Opt(repr)) = self.place_type(w, *from) {
+                    return (self.opt_con(c) == Some(OptCon::Some) && *i == 0)
+                        .then(|| repr.payload_go_type())
+                        .flatten();
+                }
+                let held = self.own_held(c)?;
+                match held {
+                    own::Held::Record(shape) if *i == 0 => Some(GoType::Record(shape)),
+                    own::Held::Fields(_) if held.has_scalars() => {
+                        held.field_native(*i).map(GoType::Scalar)
+                    }
+                    _ => None,
+                }
+            }
+            Step::Label(label) => match self.place_type(w, *from) {
+                Some(GoType::Record(shape)) => {
+                    shape.index_of(label).and_then(|i| shape.field_go_type(i))
+                }
+                _ => None,
+            },
+            Step::Item(_) | Step::Rest(_) => None,
         }
     }
 
@@ -335,8 +328,9 @@ impl<'a> Gen<'a> {
                                 own::Held::Zero => {
                                     unreachable!("a zero-size constructor has no fields")
                                 }
-                                own::Held::Record(_) => {
-                                    docvec![a, "flickrt.Value(&", of, ".(*", ty, ").rec)"]
+                                own::Held::Record(shape) => {
+                                    self.register_shape(&shape);
+                                    docvec![a, of, ".(*", ty, ").rec"]
                                 }
                                 own::Held::Fields(ref slots)
                                     if slots.iter().any(Option::is_some) =>
@@ -364,20 +358,17 @@ impl<'a> Gen<'a> {
         go
     }
 
-    /// The Go of the field `label` of the record at `record`: a place in a
-    /// value of its constructor when the record lies in one.
+    /// The Go of the field `label` of the record at `record`: a direct field
+    /// read when `record` has a closed record Go struct type.
     fn label(&mut self, w: &mut Walk<'_, 'a>, record: Place, label: &str) -> Document<'a> {
         let a = self.a;
-        if let Some((value, Step::Field(c, 0))) = w.graph.places[record]
-            && self.place_type(w, value).is_none()
-            && let Some((ty, own::Held::Record(labels))) = self.own_type(c)
-            && let Some(at) = labels.iter().position(|l| l == label)
-        {
-            let of = self.place(w, value);
-            let ty = a.alloc_str(&ty);
-            return docvec![a, of, ".(*", ty, ").f[", at, "]"];
-        }
         let of = self.place(w, record);
+        if let Some(GoType::Record(shape)) = self.place_type(w, record)
+            && let Some(at) = shape.index_of(label)
+        {
+            self.register_shape(&shape);
+            return docvec![a, of, ".f", at];
+        }
         call(a, "flickrt.Field", [of, self.string(label)])
     }
 

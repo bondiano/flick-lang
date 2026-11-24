@@ -136,13 +136,13 @@ fn a_bigint_literal_and_a_builtin_nullary_constructor_are_made_once() {
 #[test]
 fn the_labels_of_a_record_literal_are_placed_once() {
     let go = app("module App exposing (main)\n\n\
-         type alias Point = { x : Int; y : Int }\n\n\
-         point : Int -> Point\nlet point n = { y = n; x = n + 1 }\n\n\
-         moved : Point -> Point\nlet moved p = { x = p.y; y = p.x }\n\n\
-         raised : Point -> Point\nlet raised p = { p with y = p.y + 1 }\n\n\
+         pair_rev : a -> a -> { x : a; y : a }\nlet pair_rev a b = { y = a; x = b }\n\n\
+         swap : { x : a; y : a } -> { x : a; y : a }\nlet swap p = { x = p.y; y = p.x }\n\n\
+         replace_y : a -> { x : a; y : a } -> { x : a; y : a }\nlet replace_y v p = { p with y = v }\n\n\
          main : Unit ->{Host.Console; AppError} Unit\n\
-         let main () = Platform.stdout_line (show (raised (moved (point 1))).x)\n");
-    // two literals of the same labels in opposite written orders share one canonical shape
+         let main () = Platform.stdout_line (show (replace_y 3 (swap (pair_rev 1 2))).x)\n");
+    // Polymorphic records stay erased; two literals of the same labels in opposite
+    // written orders share one canonical ShapeOf.
     assert_eq!(
         go.matches("flickrt.ShapeOf(\"x\", \"y\")").count(),
         1,
@@ -150,8 +150,8 @@ fn the_labels_of_a_record_literal_are_placed_once() {
     );
     assert_eq!(go.matches("flickrt.Shaped(K_App__").count(), 2, "{go}");
     assert!(!go.contains("flickrt.Rec("), "{go}");
-    // the new values of a record go into its copy: no record of them is made
-    assert!(go.contains("flickrt.With(\n\t\tl_p,\n\t\tK_App__"), "{go}");
+    // the new values of an erased record go into its copy: no record of them is made
+    assert!(go.contains("flickrt.With(l_p, K_App__"), "{go}");
     assert!(!go.contains("flickrt.Update("), "{go}");
 }
 

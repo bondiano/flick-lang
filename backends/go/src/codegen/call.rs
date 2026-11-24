@@ -88,6 +88,7 @@ impl<'a> Gen<'a> {
                 effects,
                 types,
             } if dicts.len() == n => {
+                self.register_types(&types);
                 let f = names::func(module, name);
                 // a function of values is a value as it is; one that takes
                 // or gives a Go type is wrapped in one that converts them
@@ -124,6 +125,7 @@ impl<'a> Gen<'a> {
                 effects,
                 types,
             } => {
+                self.register_types(&types);
                 let given: Vec<Code<'a>> = (0..n).map(|i| self.code(&format!("ds[{i}]"))).collect();
                 let f = names::func(module, name);
                 let inner = if params == 0 {
@@ -159,7 +161,7 @@ struct AppTarget<'a> {
     given: Vec<Code<'a>>,
     arity: usize,
     effects: u64,
-    typed_con: Option<(&'a str, Vec<Option<super::arith::Native>>)>,
+    typed_con: Option<(&'a str, Vec<Option<GoType>>)>,
     scalar_method: Option<super::typed::ScalarMethod>,
 }
 
@@ -174,7 +176,7 @@ impl<'a> AppTarget<'a> {
             return None;
         }
         if let Some((_, slots)) = &self.typed_con {
-            slots.get(index).copied().flatten().map(GoType::Scalar)
+            slots.get(index).cloned().flatten()
         } else if let Some(m) = self.scalar_method {
             (index < m.arity()).then_some(GoType::Scalar(m.scalar()))
         } else if let Some((_, types, params)) = typed {
@@ -195,10 +197,20 @@ impl<'a> Gen<'a> {
         let (make, given, arity, effects): (Call<'a>, Vec<Code<'a>>, usize, u64) = match &head.kind
         {
             ExprKind::Con(c) => {
-                if let Some((ty, own::Held::Fields(slots))) = self.own_type(c)
-                    && slots.iter().any(Option::is_some)
-                {
-                    typed_con = Some((a.alloc_str(&own::make(&ty)), slots));
+                match self.own_type(c) {
+                    Some((ty, own::Held::Fields(slots))) if slots.iter().any(Option::is_some) => {
+                        typed_con = Some((
+                            a.alloc_str(&own::make(&ty)),
+                            slots.into_iter().map(|s| s.map(GoType::Scalar)).collect(),
+                        ));
+                    }
+                    Some((ty, own::Held::Record(shape))) => {
+                        typed_con = Some((
+                            a.alloc_str(&own::make(&ty)),
+                            vec![Some(GoType::Record(shape))],
+                        ));
+                    }
+                    _ => {}
                 }
                 (self.construct(c, Vec::new()), Vec::new(), c.arity, 0)
             }
@@ -271,12 +283,6 @@ impl<'a> Gen<'a> {
     pub(super) fn app_typed(&mut self, e: &Expr, want: Want<'_>) -> Typed<'a> {
         if let Some(opt) = self.try_opt_con(e, want) {
             return opt;
-        }
-        if let Some(made) = self.over_record(e) {
-            return Typed {
-                code: made,
-                ty: None,
-            };
         }
         let a = self.a;
         let mut head = e;
@@ -406,6 +412,7 @@ impl<'a> Gen<'a> {
     ) -> (Call<'a>, Vec<Code<'a>>, usize, u64) {
         self.reads(module);
         if let Some((params, effects, types)) = self.direct_shape(module, name, dicts.len()) {
+            self.register_types(&types);
             let f = names::func(module, name);
             let make = callee(self.a, &f, dicts.len(), types);
             (make, dicts, params, effects)

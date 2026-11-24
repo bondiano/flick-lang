@@ -243,13 +243,14 @@ type promptDateState struct {
 }
 
 func PromptDate(options Value) Value {
-	o := options.(*Record)
+	o := AsRecord(options)
 	message, mask := o.Get("message").(string), promptOr(o.Get("dateMask"), "YYYY-MM-DD HH:mm:ss")
 	locales := promptDefaultLocales
 	if l, ok := some(o.Get("locales")); ok {
+		lr := AsRecord(l)
 		names := func(field string) []string {
 			var out []string
-			for _, v := range List(l.(*Record).Get(field)) {
+			for _, v := range List(lr.Get(field)) {
 				out = append(out, v.(string))
 			}
 			return out
@@ -340,7 +341,7 @@ func PromptDate(options Value) Value {
 				}
 				return promptSubmit(value)
 			}
-			typed := promptOr(input.(*Record).Get("input"), "")
+			typed := promptOr(AsRecord(input).Get("input"), "")
 			if !strings.ContainsAny(typed, "0123456789") {
 				return promptBeep
 			}

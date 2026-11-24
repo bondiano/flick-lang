@@ -8,13 +8,9 @@
 //! and builds one, where it decodes or generates, through `flickrt.Owned`.
 //!
 //! A constructor declared over a record, `Node { left : Tree; key : Int }`,
-//! holds that record in its value: the header of a `flickrt.Record` over
-//! the values beside it, so the record a `match` binds is a pointer into
-//! the value and one object is made, not a constructor and a record. The
-//! value keeps its list of one field too, for the runtime to read with no
-//! list made at every question. Its
-//! labels are in the order of the declaration, whatever order a literal
-//! writes them in.
+//! holds the closed record shape's Go struct directly by value inside its
+//! constructor struct, so scalar fields stay unboxed and only one object is
+//! allocated for the constructor value.
 //!
 //! The types are one file of the program: a constructor is used in many
 //! modules and declared, in Go, once.
@@ -23,13 +19,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::fmt::{self, Write};
 
 use flick_backend_support::Known;
-use flick_pretty::{Document, docvec};
 
 use super::arith::Native;
-use super::layout::{Code, call};
+use super::record::{RecordShape, equal_with_expr, layout_rank};
 use super::{Gen, names};
-use flick_ir::{Constructor, Rep};
-use flick_ir::{Expr, ExprKind, Module};
+use flick_ir::{Constructor, Module, Rep};
 
 /// How a value of a constructor with a Go type of its own holds its fields.
 #[derive(Clone, PartialEq, Eq)]
@@ -40,8 +34,8 @@ pub(super) enum Held {
     /// Go scalar type; `None` stays `flickrt.Value`. When every slot is `None`,
     /// the struct keeps `[N]flickrt.Value` for zero-copy `Fields()`.
     Fields(Vec<Option<Native>>),
-    /// One field: a record of these labels, which lies in the value.
-    Record(Vec<String>),
+    /// One field: a closed record held by value as its Go struct `R_...`.
+    Record(RecordShape),
 }
 
 impl Held {
@@ -64,8 +58,8 @@ impl Held {
 pub(super) type Owned = BTreeMap<String, (String, Held)>;
 
 /// The constructors declared over a record, by module and name, with the
-/// labels of the record in canonical sorted order.
-pub(super) type Records = HashMap<(String, String), Vec<String>>;
+/// closed record shape they hold by value.
+pub(super) type Records = HashMap<(String, String), RecordShape>;
 
 /// Declaration-site scalar eligibility of each constructor's fields, keyed by
 /// `(module, type_name, constructor_name)`. Derived from `Module.types` so
@@ -92,19 +86,29 @@ pub(super) fn fields(modules: &[&Module], lang: &Known) -> CtorFields {
     out
 }
 
-pub(super) fn records(modules: &[&Module]) -> Records {
-    let of = |m: &Module| {
-        let named = |(c, labels): (&String, &Vec<String>)| {
-            let mut sorted = labels.clone();
-            sorted.sort_by(|a, b| super::once::canonical_key_cmp(a, b));
-            ((m.name.clone(), c.clone()), sorted)
-        };
-        m.records.iter().map(named).collect::<Vec<_>>()
-    };
-    modules.iter().flat_map(|m| of(m)).collect()
+pub(super) fn records(modules: &[&Module], lang: &Known) -> Records {
+    let mut out = Records::new();
+    for m in modules {
+        for decl in &m.types {
+            for ctor in &decl.constructors {
+                if let [field_ty] = ctor.fields.as_slice()
+                    && let Some(shape) = RecordShape::for_ctor_record(lang, field_ty)
+                {
+                    out.insert((m.name.clone(), ctor.name.clone()), shape);
+                }
+            }
+        }
+        for (c, labels) in &m.records {
+            if !labels.is_empty() {
+                out.entry((m.name.clone(), c.clone()))
+                    .or_insert_with(|| RecordShape::from_labels(labels));
+            }
+        }
+    }
+    out
 }
 
-impl<'a> Gen<'a> {
+impl Gen<'_> {
     /// How `c` holds its fields when it has a Go type of its own, without
     /// registering the type in `self.owned`.
     pub(super) fn own_held(&self, c: &Constructor) -> Option<Held> {
@@ -115,14 +119,13 @@ impl<'a> Gen<'a> {
         if c.arity == 0 {
             return Some(Held::Zero);
         }
-        let labels = self
+        let shape = self
             .records
             .and_then(|records| records.get(&(c.module.clone(), c.name.clone())));
-        if let Some(labels) = labels
+        if let Some(shape) = shape
             && c.arity == 1
-            && !labels.is_empty()
         {
-            return Some(Held::Record(labels.clone()));
+            return Some(Held::Record(shape.clone()));
         }
         let slots = self
             .fields
@@ -134,91 +137,24 @@ impl<'a> Gen<'a> {
     }
 
     /// The Go type of the values of `c` and how it holds their fields, when
-    /// they have a type of their own: a tagged constructor of a module of
+    /// they have a type of its own: a tagged constructor of a module of
     /// the program that holds no dictionary. A constructor of a built-in
     /// module, or one that holds a dictionary, stays a `*flickrt.Data`.
     pub(super) fn own_type(&mut self, c: &Constructor) -> Option<(String, Held)> {
         let held = self.own_held(c)?;
         let ty = names::own_type(&c.module, &c.name);
         if let Some((_, existing)) = self.owned.get(&ty) {
+            if let Held::Record(shape) = existing {
+                self.record_shapes.insert(shape.clone());
+            }
             return Some((ty, existing.clone()));
+        }
+        if let Held::Record(ref shape) = held {
+            self.record_shapes.insert(shape.clone());
         }
         let tag = names::string(&self.tag(c));
         self.owned.insert(ty.clone(), (tag, held.clone()));
         Some((ty, held))
-    }
-
-    /// The field `label` of `record`. A local bound to the record that lies
-    /// in a value of a constructor has its labels in the order declared, so
-    /// the field is read by its place; any other record by its label.
-    pub(super) fn field(&mut self, record: &Expr, label: &str) -> Code<'a> {
-        let a = self.a;
-        let r = self.expr(record);
-        let held = match &record.kind {
-            ExprKind::Local(name) => self.held.get(&names::local(name)),
-            _ => None,
-        };
-        match held.and_then(|labels| labels.iter().position(|l| l == label)) {
-            Some(place) => call(a, "flickrt.FieldAt", [r.doc, docvec![a, place]]).into(),
-            None if label == "_tag" => call(a, "flickrt.TagField", [r.doc]).into(),
-            None => call(a, "flickrt.Field", [r.doc, self.string(label)]).into(),
-        }
-    }
-
-    /// A constructor over a record that lies in its value, applied where
-    /// that record is written: the values of a literal go to their places
-    /// in the value, and `{ r with … }` is a copy of `r` in a new value
-    /// with those places set. No record apart from the value is made.
-    pub(super) fn over_record(&mut self, e: &Expr) -> Option<Code<'a>> {
-        let ExprKind::App { func, arg, .. } = &e.kind else {
-            return None;
-        };
-        let ExprKind::Con(c) = &func.kind else {
-            return None;
-        };
-        let (ty, Held::Record(labels)) = self.own_type(c)? else {
-            return None;
-        };
-        let a = self.a;
-        let places = |fields: &[(String, Expr)]| -> Option<Vec<usize>> {
-            let place = |(label, _): &(String, Expr)| labels.iter().position(|l| l == label);
-            fields.iter().map(place).collect()
-        };
-        match &arg.kind {
-            ExprKind::Record(fields) => {
-                let places = places(fields)?;
-                let mut written = places.clone();
-                written.sort_unstable();
-                if written.iter().copied().ne(0..labels.len()) {
-                    // a label written twice, or not every label
-                    return None;
-                }
-                let values: Vec<&Expr> = fields.iter().map(|(_, v)| v).collect();
-                let mut go = self.ordered(&values);
-                if places.iter().copied().ne(0..labels.len()) {
-                    // written in another order than declared: evaluated as written
-                    go = go.into_iter().map(|v| self.spill(v)).collect();
-                }
-                let mut sorted: Vec<(usize, Document<'a>)> =
-                    places.into_iter().zip(go.iter().map(|v| v.doc)).collect();
-                sorted.sort_unstable_by_key(|(place, _)| *place);
-                let args = sorted.into_iter().map(|(_, v)| v);
-                Some(call(a, a.alloc_str(&make(&ty)), args).into())
-            }
-            ExprKind::Update(base, fields) => {
-                let places = places(fields)?;
-                let mut all: Vec<&Expr> = vec![base];
-                all.extend(fields.iter().map(|(_, v)| v));
-                let mut go = self.ordered(&all).into_iter();
-                let copy = a.alloc_str(&format!("With_{ty}"));
-                let mut made = call(a, copy, go.next().map(|base| base.doc));
-                for (v, place) in go.zip(places) {
-                    made = docvec![a, made, ".Set(", place, ", ", v.doc, ")"];
-                }
-                Some(docvec![a, "flickrt.Value(", made, ")"].into())
-            }
-            _ => None,
-        }
     }
 }
 
@@ -254,18 +190,14 @@ pub(super) fn file(types: &Owned) -> String {
             );
             continue;
         }
-        let n = match held {
-            Held::Zero => unreachable!("handled above"),
-            Held::Fields(slots) => slots.len(),
-            Held::Record(labels) => labels.len(),
-        };
         let (make, of) = (make(ty), of(ty));
         let _ = match held {
             Held::Zero => unreachable!("handled above"),
             Held::Fields(slots) if slots.iter().any(Option::is_some) => {
                 write_scalar_struct(&mut go, ty, tag, &make, slots)
             }
-            Held::Fields(_) => {
+            Held::Fields(slots) => {
+                let n = slots.len();
                 let params: Vec<String> = (0..n).map(|i| format!("f{i}")).collect();
                 let params = params.join(", ");
                 write!(
@@ -278,26 +210,7 @@ pub(super) fn file(types: &Owned) -> String {
                      \treturn &{ty}{{[{n}]flickrt.Value(f)}}\n}})\n",
                 )
             }
-            Held::Record(labels) => {
-                let params: Vec<String> = (0..n).map(|i| format!("f{i}")).collect();
-                let params = params.join(", ");
-                let labels: Vec<String> = labels.iter().map(|l| names::string(l)).collect();
-                let labels = labels.join(", ");
-                write!(
-                    go,
-                    "\ntype {ty} struct {{\n\trec  flickrt.Record\n\tf    [{n}]flickrt.Value\n\tself [1]flickrt.Value\n}}\n\n\
-                     var S_{ty} = flickrt.ShapeOf({labels})\n\n\
-                     func (p *{ty}) Fields() []flickrt.Value {{ return p.self[:] }}\n\n\
-                     func {make}({params} flickrt.Value) flickrt.Value {{\n\
-                     \tp := &{ty}{{f: [{n}]flickrt.Value{{{params}}}}}\n\
-                     \tp.rec.Over(S_{ty}, p.f[:])\n\tp.self[0] = &p.rec\n\treturn p\n}}\n\n\
-                     func With_{ty}(r flickrt.Value) *{ty} {{\n\tp := &{ty}{{}}\n\
-                     \tS_{ty}.Values(r, p.f[:])\n\tp.rec.Over(S_{ty}, p.f[:])\n\tp.self[0] = &p.rec\n\treturn p\n}}\n\n\
-                     func (p *{ty}) Set(i int, v flickrt.Value) *{ty} {{\n\tp.f[i] = v\n\treturn p\n}}\n\n\
-                     func {of}(r flickrt.Value) flickrt.Value {{ return With_{ty}(r) }}\n\n\
-                     var _ = flickrt.Owned({tag}, func(f []flickrt.Value) flickrt.Value {{ return {of}(f[0]) }})\n",
-                )
-            }
+            Held::Record(shape) => write_record_ctor(&mut go, ty, tag, &make, &of, shape),
         };
         let _ = write!(
             go,
@@ -308,17 +221,37 @@ pub(super) fn file(types: &Owned) -> String {
     go
 }
 
-/// Struct field packing order: pointer-bearing fields first to minimize Go GC
-/// `ptrdata`, then scalar fields by descending alignment (`8`, `4`, `2`, `1` bytes).
-fn layout_rank(slot: Option<Native>) -> u8 {
-    match slot {
-        None => 0,
-        Some(Native::String) => 1,
-        Some(Native::Float | Native::Int64 | Native::UInt64) => 2,
-        Some(Native::Int | Native::UInt32 | Native::Float32) => 3,
-        Some(Native::Int16 | Native::UInt16) => 4,
-        Some(Native::Int8 | Native::UInt8 | Native::Bool) => 5,
-    }
+fn write_record_ctor(
+    go: &mut String,
+    ty: &str,
+    tag: &str,
+    make: &str,
+    of: &str,
+    shape: &RecordShape,
+) -> fmt::Result {
+    let rec_ty = shape.go_type();
+    let as_fn = shape.unbox_fn();
+    let eqs: Vec<String> = shape
+        .fields
+        .iter()
+        .enumerate()
+        .map(|(i, (_, slot))| {
+            equal_with_expr(&format!("p.rec.f{i}"), &format!("q.rec.f{i}"), *slot)
+        })
+        .collect();
+    write!(
+        go,
+        "\ntype {ty} struct {{\n\trec {rec_ty}\n}}\n\n\
+         func (p *{ty}) Fields() []flickrt.Value {{ return []flickrt.Value{{p.rec}} }}\n\n\
+         func {make}(rec {rec_ty}) flickrt.Value {{\n\treturn &{ty}{{rec: rec}}\n}}\n\n\
+         func {of}(r flickrt.Value) flickrt.Value {{\n\treturn &{ty}{{rec: {as_fn}(r)}}\n}}\n\n\
+         func (p *{ty}) EqualConstructed(other flickrt.Value, strictZero bool) (bool, bool) {{\n\
+         \tq, ok := other.(*{ty})\n\
+         \tif !ok {{\n\t\treturn false, false\n\t}}\n\
+         \treturn {}, true\n}}\n\n\
+         var _ = flickrt.Owned({tag}, func(f []flickrt.Value) flickrt.Value {{ return {of}(f[0]) }})\n",
+        eqs.join(" && ")
+    )
 }
 
 fn write_scalar_struct(
@@ -360,25 +293,7 @@ fn write_scalar_struct(
     let eqs: Vec<String> = slots
         .iter()
         .enumerate()
-        .map(|(i, slot)| match slot {
-            Some(Native::Float) => format!("flickrt.EqualFloat(p.f{i}, q.f{i}, strictZero)"),
-            Some(Native::Float32) => {
-                format!("flickrt.EqualFloat(float64(p.f{i}), float64(q.f{i}), strictZero)")
-            }
-            Some(
-                Native::Int
-                | Native::Int8
-                | Native::Int16
-                | Native::Int64
-                | Native::UInt8
-                | Native::UInt16
-                | Native::UInt32
-                | Native::UInt64
-                | Native::Bool
-                | Native::String,
-            ) => format!("p.f{i} == q.f{i}"),
-            None => format!("flickrt.EqualWith(p.f{i}, q.f{i}, strictZero)"),
-        })
+        .map(|(i, slot)| equal_with_expr(&format!("p.f{i}"), &format!("q.f{i}"), *slot))
         .collect();
     writeln!(
         go,

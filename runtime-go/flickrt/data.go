@@ -69,17 +69,19 @@ func equalValues(a, b Value, strictZero bool) bool {
 		}
 		return true
 	case *Record:
-		y, ok := b.(*Record)
-		if !ok || len(x.keys) != len(y.keys) {
-			return false
-		}
-		for i, k := range x.keys {
-			j := y.index(k)
-			if j < 0 || !equalValues(x.vals[i], y.vals[j], strictZero) {
+		if y, ok := b.(*Record); ok {
+			if len(x.keys) != len(y.keys) {
 				return false
 			}
+			for i, k := range x.keys {
+				j := y.index(k)
+				if j < 0 || !equalValues(x.vals[i], y.vals[j], strictZero) {
+					return false
+				}
+			}
+			return true
 		}
-		return true
+		return equalRecordViews(x, b, strictZero)
 	case *Decimal:
 		y, ok := b.(*Decimal)
 		return ok && decCompare(x, y) == 0
@@ -100,8 +102,8 @@ func equalValues(a, b Value, strictZero bool) bool {
 	case int8, int16, int32, int64, uint8, uint16, uint32, uint64, string, bool, UnitType:
 		return a == b
 	default:
-		// a constructor value of a Go type of its own, asked last: a number
-		// or a string never gets here
+		// a constructor value or closed record of a Go type of its own, asked
+		// last: a number or a string never gets here
 		if x, ok := a.(Constructed); ok {
 			if eq, ok := x.(ConstructedEqual); ok {
 				if equal, same := eq.EqualConstructed(b, strictZero); same {
@@ -110,8 +112,32 @@ func equalValues(a, b Value, strictZero bool) bool {
 			}
 			return sameConstructedValues(x, b, strictZero)
 		}
+		if x, ok := a.(RecordView); ok {
+			if eq, ok := x.(RecordEqual); ok {
+				if equal, same := eq.EqualRecord(b, strictZero); same {
+					return equal
+				}
+			}
+			return equalRecordViews(x, b, strictZero)
+		}
 		return a == b
 	}
+}
+
+// equalRecordViews compares any two RecordView values structurally without
+// depending on their concrete Go types or field storage order.
+func equalRecordViews(x RecordView, b Value, strictZero bool) bool {
+	y, ok := b.(RecordView)
+	if !ok || x.Len() != y.Len() {
+		return false
+	}
+	for i, k := range x.Keys() {
+		yv, found := y.Lookup(k)
+		if !found || !equalValues(x.At(i), yv, strictZero) {
+			return false
+		}
+	}
+	return true
 }
 
 // sameConstructedValues is `equalValues` of a constructor value and any value,
@@ -135,9 +161,19 @@ func sameConstructedValues(x Constructed, b Value, strictZero bool) bool {
 
 // Same is `===` on values whose identity is their equality.
 func Same(a, b Value) bool {
-	if x, ok := a.(*big.Int); ok {
+	switch x := a.(type) {
+	case *big.Int:
 		y, ok := b.(*big.Int)
 		return ok && x.Cmp(y) == 0
+	case *Record:
+		y, ok := b.(*Record)
+		return ok && x == y
+	case RecordView:
+		// Value-type closed record structs have no reference identity and may
+		// hold uncomparable fields (`[]Value`, `Fn`, ...), so raw `a == b` panics.
+		return false
+	case []Value, Fn, Fn2, Fn3, Poly:
+		return false
 	}
 	return a == b
 }
@@ -445,6 +481,12 @@ func hash(a Value) int32 {
 		h := int32(12289)
 		for i, k := range x.keys {
 			h ^= effectCombine(hashString(k), hash(x.vals[i]))
+		}
+		return optimize(h)
+	case RecordView:
+		h := int32(12289)
+		for i, k := range x.Keys() {
+			h ^= effectCombine(hashString(k), hash(x.At(i)))
 		}
 		return optimize(h)
 	case Constructed:

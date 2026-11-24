@@ -4,8 +4,16 @@
 module Language.Records exposing (tests)
 
 type alias Point = { x : Int; y : Int }
+  deriving Schema
+
+type alias Vec2 = { x : Float; y : Float }
+  deriving Schema
 
 type alias User = { name : String; age : Int; tags : List String }
+  deriving Schema
+
+type BoxedRec = EmptyBox | Boxed { w : Int; h : Int; name : String }
+  deriving Eq, Ord, Hash, Show, Schema
 
 move : Int -> Point -> Point
 let move dx p = { p with x = p.x + dx }
@@ -19,6 +27,31 @@ let rename name user = { user with name = name }
 
 nested : Int -> { outer : { inner : Int; keep : String }; n : Int }
 let nested n = { outer = { inner = n; keep = "k" }; n = n }
+
+open_x : { x : a | r } -> a
+let open_x r = r.x
+
+open_bump_x : { x : Int | r } -> { x : Int | r }
+let open_bump_x r = { r with x = r.x + 1 }
+
+encode_json_text : Schema a -> a -> String
+let encode_json_text s value =
+  match Codec.encode_result (Codec.json s) value with
+  | Ok j -> Json.stringify j
+  | Err _ -> "encode-error"
+
+decode_json_val : Schema a -> String -> Result SchemaError a
+let decode_json_val s text =
+  match Json.parse text with
+  | Ok j -> Codec.decode_result (Codec.json s) j
+  | Err err -> Err err
+
+sum_point : Point -> Int
+let sum_point { x; y } = x + y
+
+step_vec_loop : Int -> Vec2 -> Vec2
+let rec step_vec_loop n acc =
+  if n <= 0 then acc else step_vec_loop (n - 1) { acc with x = acc.x + 0.5; y = acc.y + 1.0 }
 
 tests : List Test.Test
 let tests = [
@@ -60,5 +93,107 @@ let tests = [
     Test.equal
       "(1, \"a\", (true, None))"
       (show ((move 1 { x = 0; y = 0 }).x, "a", (true, (None : Option Int))))
+  ),
+  Test.test "open-row reads and updates on literals, updates, and decoded records" (fun () ->
+    let lit : Point = { x = 4; y = 9 }
+    let upd : Point = move 3 lit
+    let dec =
+      match decode_json_val Point.schema "{\"y\":9,\"x\":4}" with
+      | Ok p -> p
+      | Err _ -> { x = -1; y = -1 }
+    let extended = { x = 10; y = 20; z = "extra" }
+    Test.all [
+      Test.equal 4 (open_x lit),
+      Test.equal 7 (open_x upd),
+      Test.equal 4 (open_x dec),
+      Test.equal 10 (open_x extended),
+      Test.equal 5 (open_bump_x lit).x,
+      Test.equal 8 (open_bump_x upd).x,
+      Test.equal 5 (open_bump_x dec).x,
+      Test.equal "extra" (open_bump_x extended).z,
+      Test.equal true (lit == dec),
+      Test.equal "{ x = 4, y = 9 }" (show dec),
+      Test.equal EQ (compare lit dec),
+      Test.equal (hash lit) (hash dec),
+    ]
+  ),
+  Test.test "codecs, NaN/-0 equality, show, and compare on closed float records" (fun () ->
+    let v : Vec2 = { y = 2.5; x = 1.25 }
+    let u : Vec2 = { v with x = 3.25 }
+    let encoded = encode_json_text Vec2.schema v
+    let decoded =
+      match decode_json_val Vec2.schema encoded with
+      | Ok p -> p
+      | Err _ -> { x = -1.0; y = -1.0 }
+    let nan = 0.0 / 0.0
+    let pos_zero = 0.0
+    let neg_zero = -0.0
+    Test.all [
+      Test.equal "{\"x\":1.25,\"y\":2.5}" encoded,
+      Test.equal v decoded,
+      Test.equal "{ x = 1.25, y = 2.5 }" (show decoded),
+      Test.equal LT (compare v u),
+      Test.equal (hash v) (hash decoded),
+      Test.equal true ({ x = nan; y = pos_zero } == { x = nan; y = neg_zero }),
+    ]
+  ),
+  Test.property
+    "Schema.arbitrary of closed float record round-trips through open-row, codecs, show, eq, and hash"
+    (Schema.arbitrary Vec2.schema)
+    (fun p ->
+      let round = decode_json_val Vec2.schema (encode_json_text Vec2.schema p)
+      let ok =
+        open_x p == p.x
+          && match round with
+          | Ok q -> q == p && show q == show p && hash q == hash p && compare q p == EQ
+          | Err _ -> false
+      Test.is_true (show p) ok
+    ),
+  Test.test "source-order evaluation for closed literals and updates" (fun () ->
+    let mut log = ""
+    let lit : Point = {
+      y =
+        log = log ++ "y"
+        2
+      x =
+        log = log ++ "x"
+        1
+    }
+    let upd = {
+      (
+        match () with
+        | () ->
+          log = log ++ "|b"
+          lit
+      ) with
+      y =
+        log = log ++ "Y"
+        20
+      x =
+        log = log ++ "X"
+        10
+    }
+    Test.all [
+      Test.equal "yx|bYX" log,
+      Test.equal { x = 1; y = 2 } lit,
+      Test.equal { x = 10; y = 20 } upd,
+    ]
+  ),
+  Test.test "constructors over closed records, destructuring, and tail loops" (fun () ->
+    let b = Boxed { name = "box"; h = 3; w = 4 }
+    let b2 =
+      match b with
+      | EmptyBox -> EmptyBox
+      | Boxed r -> Boxed { r with h = r.h + 2 }
+    let b_rt = decode_json_val BoxedRec.schema (encode_json_text BoxedRec.schema b)
+    let walked = step_vec_loop 4 { x = 1.0; y = 2.0 }
+    Test.all [
+      Test.equal "Boxed { h = 3, name = \"box\", w = 4 }" (show b),
+      Test.equal "Boxed { h = 5, name = \"box\", w = 4 }" (show b2),
+      Test.equal (Ok b) b_rt,
+      Test.equal 13 (sum_point { y = 9; x = 4 }),
+      Test.equal { x = 3.0; y = 6.0 } walked,
+      Test.equal true ({} == {}),
+    ]
   ),
 ]

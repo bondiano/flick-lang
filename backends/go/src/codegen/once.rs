@@ -73,7 +73,11 @@ impl<'a> Gen<'a> {
     /// Structural record literals evaluate field expressions in source order
     /// and construct their shape in canonical label order so permutations share
     /// one shape and written order is not observable.
-    pub(super) fn record(&mut self, base: Option<&Expr>, fields: &[(String, Expr)]) -> Code<'a> {
+    pub(super) fn record_erased(
+        &mut self,
+        base: Option<&Expr>,
+        fields: &[(String, Expr)],
+    ) -> Code<'a> {
         let a = self.a;
         let mut all: Vec<&Expr> = base.into_iter().collect();
         all.extend(fields.iter().map(|(_, v)| v));

@@ -252,20 +252,20 @@ func writeIndented(b *strings.Builder, v Value, line string) {
 			writeIndented(b, e, inner)
 		}
 		b.WriteString(line + "]")
-	case *Record:
-		if len(x.keys) == 0 {
+	case RecordView:
+		if x.Len() == 0 {
 			b.WriteString("{}")
 			return
 		}
 		b.WriteByte('{')
-		for i, k := range x.keys {
+		for i, k := range x.Keys() {
 			if i > 0 {
 				b.WriteByte(',')
 			}
 			b.WriteString(inner)
 			quoteTo(b, k)
 			b.WriteString(": ")
-			writeIndented(b, x.vals[i], inner)
+			writeIndented(b, x.At(i), inner)
 		}
 		b.WriteString(line + "}")
 	default:

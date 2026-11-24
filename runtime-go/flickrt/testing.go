@@ -266,8 +266,13 @@ func previewJSON(v Value) (string, bool) {
 			}
 		}
 		return "[" + strings.Join(parts, ",") + "]", true
-	case *Record:
-		return previewObject(x.keys, x.vals), true
+	case RecordView:
+		keys := x.Keys()
+		vals := make([]Value, len(keys))
+		for i := range keys {
+			vals[i] = x.At(i)
+		}
+		return previewObject(keys, vals), true
 	case *Data:
 		switch {
 		case IsNone(x):

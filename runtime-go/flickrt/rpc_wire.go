@@ -150,7 +150,7 @@ func (b *binaryParser) encode(msgs []Value, _ bool) []byte {
 // The messages, in the key order of Effect's encoded messages.
 
 func msgTag(m Value) string {
-	if r, ok := m.(*Record); ok {
+	if r, ok := m.(RecordView); ok {
 		if t, ok := recordField(r, "_tag").(string); ok {
 			return t
 		}
@@ -159,7 +159,7 @@ func msgTag(m Value) string {
 }
 
 func msgField(m Value, k string) Value {
-	if r, ok := m.(*Record); ok {
+	if r, ok := m.(RecordView); ok {
 		return recordField(r, k)
 	}
 	return nil
@@ -213,7 +213,7 @@ func wireDefectText(tree Value) string {
 	switch x := tree.(type) {
 	case string:
 		return x
-	case *Record:
+	case RecordView:
 		name, _ := recordField(x, "name").(string)
 		message, _ := recordField(x, "message").(string)
 		if name == "" {

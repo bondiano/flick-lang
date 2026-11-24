@@ -124,8 +124,8 @@ func promptProcessService(tty *promptProcessTty) *Record {
 	return Rec(
 		"read_key", Fn(func(_ *Fiber, _ Value) Value {
 			return Eff(func(fb *Fiber) Value {
-				input := tty.read(fb).(*Record)
-				key := input.Get("key").(*Record)
+				input := AsRecord(tty.read(fb))
+				key := AsRecord(input.Get("key"))
 				if name := key.Get("name"); key.Get("ctrl").(bool) && (name == "c" || name == "d") {
 					return Fail(promptQuit)
 				}

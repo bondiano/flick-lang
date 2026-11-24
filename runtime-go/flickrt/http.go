@@ -32,7 +32,7 @@ type HttpServer struct {
 }
 
 func HttpServe(fb *Fiber, options, handler Value) Value {
-	o := options.(*Record)
+	o := AsRecord(options)
 	host, port := o.Get("host").(string), int(o.Get("port").(float64))
 	listener, err := net.Listen("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 	if err != nil {

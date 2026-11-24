@@ -321,7 +321,11 @@ func DatabaseTransaction(fb *Fiber, body Value) Value {
 	if !ok {
 		panic(Defect{"Service not found: " + databaseKey})
 	}
-	d, ok := databases.Load(impl)
+	rec, isRec := impl.(*Record)
+	if !isRec {
+		panic(Defect{"Error: this `Database` runs no transactions"})
+	}
+	d, ok := databases.Load(rec)
 	if !ok {
 		panic(Defect{"Error: this `Database` runs no transactions"})
 	}

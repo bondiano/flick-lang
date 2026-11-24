@@ -135,9 +135,8 @@ fn concrete_option_layouts_choose_sentinel_or_flag_and_preserve_nesting() {
         "{go}"
     );
     assert!(
-        go.contains(
-            "func F_App__opt_rec(fb *flickrt.Fiber, l_ok bool, l_r flickrt.Value) flickrt.OptRef"
-        ),
+        go.contains("func F_App__opt_rec(fb *flickrt.Fiber, l_ok bool, l_r R_x_")
+            && go.contains(") flickrt.OptRef"),
         "{go}"
     );
     assert!(go.contains("flickrt.SomeRef("), "{go}");

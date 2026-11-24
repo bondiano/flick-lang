@@ -18,7 +18,7 @@ func promptChoices(v Value) []promptChoice {
 	list := List(v)
 	out := make([]promptChoice, len(list))
 	for i, c := range list {
-		r := c.(*Record)
+		r := AsRecord(c)
 		out[i] = promptChoice{r.Get("title").(string), promptOr(r.Get("description"), ""), r.Get("value"), r.Get("disabled").(bool), r.Get("selected").(bool)}
 	}
 	return out
@@ -125,14 +125,14 @@ func promptSubmitted(t *promptTheme, header string, ok bool, answer string) stri
 }
 
 func promptKeyName(input Value) (string, bool) {
-	key := input.(*Record).Get("key").(*Record)
+	key := AsRecord(AsRecord(input).Get("key"))
 	return key.Get("name").(string), key.Get("ctrl").(bool)
 }
 
 // Select.
 
 func PromptSelect(options Value) Value {
-	o := options.(*Record)
+	o := AsRecord(options)
 	message, choices, perPage := o.Get("message"), promptChoices(o.Get("choices")), promptMaxPerPage(o.Get("maxPerPage"))
 	initial := promptSelectInitial(choices)
 	lines := func(t *promptTheme, state int, plain bool) string {
@@ -200,7 +200,7 @@ type promptAutoState struct {
 }
 
 func PromptAutoComplete(options Value) Value {
-	o := options.(*Record)
+	o := AsRecord(options)
 	message, choices, perPage := o.Get("message").(string), promptChoices(o.Get("choices")), promptMaxPerPage(o.Get("maxPerPage"))
 	label, placeholder := promptOr(o.Get("filterLabel"), "filter"), promptOr(o.Get("filterPlaceholder"), "type to filter")
 	empty := promptOr(o.Get("emptyMessage"), "No matches")
@@ -317,7 +317,7 @@ func PromptAutoComplete(options Value) Value {
 				}
 				return promptSubmit(choices[s.index].value)
 			}
-			typed := promptOr(input.(*Record).Get("input"), "")
+			typed := promptOr(AsRecord(input).Get("input"), "")
 			if typed == "" {
 				return promptBeep
 			}

@@ -76,7 +76,7 @@ func createsResource(id Value) bool {
 
 // mapObject is the object of `f` of each value, nil when `v` is not one.
 func mapObject(v Value, f func(item Value, key string) Value) *Record {
-	r, ok := v.(*Record)
+	r, ok := asRecord(v)
 	if !ok {
 		return nil
 	}
@@ -217,7 +217,7 @@ func (cx *convContext) schemaArray(v Value, sourceKey, targetKey string) Value {
 }
 
 func (cx *convContext) schemaMap(v Value, sourceKey, targetKey string) Value {
-	if _, ok := v.(*Record); !ok {
+	if _, ok := v.(RecordView); !ok {
 		return v
 	}
 	return mapObject(v, func(item Value, key string) Value {
@@ -242,7 +242,7 @@ func newConverter(adapter func(*Record, *convContext) *Record) *converter {
 func (c *converter) convert(root Value, sourcePath, targetPath []string) Value {
 	if len(sourcePath) == 0 && c.trackIds {
 		c.rootURI = rootResourceURI
-		if r, ok := root.(*Record); ok {
+		if r, ok := asRecord(root); ok {
 			if uri, ok := resolveResourceURI(c.resourceID(r), rootResourceURI); ok {
 				c.rootURI = uri
 			}
@@ -295,7 +295,7 @@ func (c *converter) loop(node Value, sourcePath, targetPath []string, scope *res
 		}
 		return b
 	}
-	r, ok := node.(*Record)
+	r, ok := asRecord(node)
 	if !ok {
 		return node
 	}
@@ -342,7 +342,7 @@ func convertSubschemaKeyword(out *Record, key string, v Value, cx *convContext, 
 func transformSchema(node Value, f func(schema *Record, inEmbedded bool)) Value {
 	var walk func(node Value, inherited, isRoot bool) Value
 	walk = func(node Value, inherited, isRoot bool) Value {
-		r, ok := node.(*Record)
+		r, ok := asRecord(node)
 		if !ok {
 			return node
 		}
