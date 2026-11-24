@@ -26,6 +26,7 @@ fn inspect(
     lines: &[&[u32]],
     lang: &Known,
 ) -> Result<BuildResult, Vec<Diagnostic>> {
+    let sources: Vec<&str> = data.sources.iter().map(String::as_str).collect();
     let module = data
         .inspect_module
         .as_deref()
@@ -40,6 +41,7 @@ fn inspect(
             test: false,
             paths,
             lines,
+            sources: &sources,
             foreign: &data.foreign,
             bindings: &data.bindings,
             lang,
@@ -101,6 +103,7 @@ pub(super) fn generate(
     if data.command == Command::Inspect {
         return inspect(request, data, &own, &builtins, &paths, &lines, &lang);
     }
+    let sources: Vec<&str> = data.sources.iter().map(String::as_str).collect();
     let programs: Vec<(&str, &str)> = if data.command == Command::Test {
         vec![(TEST, "")]
     } else {
@@ -144,6 +147,7 @@ pub(super) fn generate(
             test: data.command == Command::Test,
             paths: &paths,
             lines: &lines,
+            sources: &sources,
             foreign: &data.foreign,
             bindings: &data.bindings,
             lang: &lang,

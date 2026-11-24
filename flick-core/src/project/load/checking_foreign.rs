@@ -32,6 +32,7 @@ impl Checking<'_> {
     /// even when other items in the same module have errors.
     fn validate_official_foreign_adapters(
         foreign_backend: &types::ForeignBackendSpec,
+        module: &resolve::Module<'_>,
         typing: &types::Typing,
         checked: &mut Vec<Diagnostic>,
     ) {
@@ -41,18 +42,34 @@ impl Checking<'_> {
         }
         let mut entries: Vec<_> = typing.foreigns.iter().collect();
         entries.sort_by_key(|(range, _)| *range);
-        for (_, info) in entries {
+        for (range, info) in entries {
             if info.adapter.words.is_empty() {
                 continue;
             }
+            let is_inline = module
+                .tree
+                .nodes()
+                .find(|n| n.kind == K::ForeignDecl && n.range() == *range)
+                .and_then(|n| n.nodes().find(|c| c.kind == K::ForeignSource))
+                .is_some_and(|src| {
+                    src.child_tokens()
+                        .any(|t| t.kind == K::Ident && t.text(module.text) == "inline")
+                });
+            let binding = if is_inline {
+                flick_ir::Binding::Inline(flick_ir::InlineCode {
+                    code: String::new(),
+                    span: Span::new(module.file, range.0, range.1),
+                })
+            } else {
+                flick_ir::Binding::Global {
+                    name: String::new(),
+                }
+            };
             let view = flick_ir::Foreign {
                 name: String::new(),
                 source_name: None,
                 mode: info.mode,
-                binding: flick_ir::Binding {
-                    from: None,
-                    name: String::new(),
-                },
+                binding,
                 stages: info.stages.clone(),
                 dicts: info.dicts,
                 arity: info.js_arity(),
@@ -98,6 +115,75 @@ impl Checking<'_> {
                     }
                 }
                 _ => {}
+            }
+        }
+    }
+
+    /// Runs the official JS/Go backend's inline foreign validator in-process
+    /// over `foreign module inline` preambles and `from inline` bindings so
+    /// `flick check`, LSP, and the browser playground report span-mapped
+    /// `FLICK-F011` diagnostics directly.
+    fn validate_official_inline_foreign(
+        foreign_backend: &types::ForeignBackendSpec,
+        module: &resolve::Module<'_>,
+        checked: &mut Vec<Diagnostic>,
+    ) {
+        let backend_id = foreign_backend.backend_id.as_str();
+        if !matches!(backend_id, "flick/js" | "flick/go") {
+            return;
+        }
+        for decl in module.tree.nodes() {
+            if decl.kind == K::ForeignPreamble {
+                let Some(tok) = decl.child_tokens().find(|t| t.kind == K::String) else {
+                    continue;
+                };
+                let code = string_value(tok.text(module.text));
+                let span = Span::new(module.file, tok.start, tok.end);
+                let found = match backend_id {
+                    "flick/js" => js_inline::validate_preamble(&code, span, module.text),
+                    #[cfg(feature = "native-project")]
+                    "flick/go" => go_inline::validate_preamble(&code, span, module.text).map(|d| {
+                        js_foreign_meta::ForeignDiagnostic {
+                            code: d.code,
+                            message: d.message,
+                            span: d.span,
+                        }
+                    }),
+                    _ => None,
+                };
+                if let Some(d) = found {
+                    checked.push(Diagnostic::error(codes::F011, d.message, d.span));
+                }
+            } else if decl.kind == K::ForeignDecl {
+                let Some(source) = decl.nodes().find(|n| n.kind == K::ForeignSource) else {
+                    continue;
+                };
+                let is_inline = source
+                    .child_tokens()
+                    .any(|t| t.kind == K::Ident && t.text(module.text) == "inline");
+                if !is_inline {
+                    continue;
+                }
+                let Some(tok) = source.child_tokens().find(|t| t.kind == K::String) else {
+                    continue;
+                };
+                let code = string_value(tok.text(module.text));
+                let span = Span::new(module.file, tok.start, tok.end);
+                let found = match backend_id {
+                    "flick/js" => js_inline::validate_binding(&code, span, module.text),
+                    #[cfg(feature = "native-project")]
+                    "flick/go" => go_inline::validate_binding(&code, span, module.text).map(|d| {
+                        js_foreign_meta::ForeignDiagnostic {
+                            code: d.code,
+                            message: d.message,
+                            span: d.span,
+                        }
+                    }),
+                    _ => None,
+                };
+                if let Some(d) = found {
+                    checked.push(Diagnostic::error(codes::F011, d.message, d.span));
+                }
             }
         }
     }

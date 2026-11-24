@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: dd01252a7c829be5
+source_hash: 5ece4fa0bf742bc3
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -139,8 +139,8 @@ false in when for yield do break continue
   ним (см. [генерацию кода](../codegen/));
 - `pack` и `unpack` перед модулем и `as`, а `exists` перед именем и `:` в
   типе (см. [упакованные модули](../modules/#упакованные-модули-и-экзистенциальные-результаты));
-- режимы внешних функций `pure`, `effect`, `blocked` и источник
-  `global`;
+- режимы внешних функций `pure`, `effect`, `blocked`, источники `global` и
+  `inline` после `from`, а также `inline` после `foreign module`;
 - метаданные внешних функций: слова ядра контракта (`arity`, `catch`,
   `retention`, `nullable`, `optional`, `reviewed`, `owned`) и слова адаптеров,
   объявленные активным бэкендом (например, `this`, `cancel`, `variadic` в
@@ -488,7 +488,8 @@ members     = block of: signature | let | type_decl
 class_members = block of: signature | let | type_decl | law
 law         = "law" name { atom_pattern | premise } "where" goal
 contract    = block of: "require" expr | "ensure" expr   // one entry inline
-foreign     = "foreign" [mode] name "from" ("global" String | String String) [metadata]
+foreign     = "foreign" [mode] name "from" ("global" String | "inline" String | String String) [metadata]
+            | "foreign" "module" "inline" String
             | "foreign" "blocked" name String
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }

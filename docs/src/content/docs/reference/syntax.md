@@ -126,8 +126,8 @@ Contextual words are ordinary names everywhere except in one position:
   (see [code generation](../codegen/));
 - `pack` and `unpack` before a module and `as`, and `exists` before a name
   and `:` in a type (see [packed modules](../modules/#packed-modules-and-existential-results));
-- foreign modes `pure`, `effect`, `blocked` and the source
-  `global`;
+- foreign modes `pure`, `effect`, `blocked`, the sources `global` and `inline`
+  after `from`, and `inline` after `foreign module`;
 - foreign metadata: core contract words (`arity`, `catch`, `retention`,
   `nullable`, `optional`, `reviewed`, `owned`) plus adapter words declared by
   the active backend (such as `this`, `cancel`, `variadic` on `flick/js` and
@@ -465,7 +465,8 @@ members     = block of: signature | let | type_decl
 class_members = block of: signature | let | type_decl | law
 law         = "law" name { atom_pattern | premise } "where" goal
 contract    = block of: "require" expr | "ensure" expr   // one entry inline
-foreign     = "foreign" [mode] name "from" ("global" String | String String) [metadata]
+foreign     = "foreign" [mode] name "from" ("global" String | "inline" String | String String) [metadata]
+            | "foreign" "module" "inline" String
             | "foreign" "blocked" name String
 mode        = "pure" | "effect"
 metadata    = indented lines: meta_name { atom }

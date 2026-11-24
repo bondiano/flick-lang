@@ -73,6 +73,7 @@ fn merge_inline_lowering(
             }
             parent_ir.types.push(decl);
         }
+        parent_ir.preambles.extend(child_ir.preambles);
         parent_ir
             .items
             .extend(child_ir.items.into_iter().map(|mut item| {

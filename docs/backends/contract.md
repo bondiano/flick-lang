@@ -16,7 +16,7 @@ language that implements this world.
 This is an initial 0.x contract and validation library. It does not freeze
 IR 1.0 or complete every semantic prerequisite of R3a. Ordinary JS/TS and Go
 `build/run/dev/test/inspect` select the distributed `flick/js` or `flick/go`
-component by default. The portable IR is 0.16.0. The official
+component by default. The portable IR is 0.17.0. The official
 JS and Go emitters live in `backends/js` and `backends/go`, independently of
 `flick-core`. The contract probe exercises both with IR
 and plain data without `Compilation` or `Settings`. The distributed components
@@ -76,6 +76,7 @@ A `BuildRequest` carries these independent facts:
 | Sources | Same order as `Program.files`; UTF-8 content input and byte line index |
 | Entry/test roots and runners | Explicit symbols and entry names |
 | Foreign bindings | Resolved specifier, ABI and declared content inputs |
+| Inline foreign code | Module preambles (`name: none`) and inline binding expressions (`name: some(...)`) with exact source spans in `BuildRequest.inline-foreign` |
 | Checker projections | Module, named schema/version and content input |
 | Package targets and root handlers | Environments rather than backend names alone |
 | Remaining dependencies | Content-addressed resources and lockfiles in the input manifest |
@@ -94,23 +95,27 @@ entry, test and root-handler module references stay inside the closed graph.
 Every item and nested expression span must fit the supplied UTF-8 source.
 Source aliases share one retained input buffer and line index during validation.
 
-In IR 0.16.0, `Program` carries fixed-width numeric types (`Int8`, `Int16`,
+In IR 0.17.0, `Program` carries fixed-width numeric types (`Int8`, `Int16`,
 `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`) as first-class `Lang`,
-`Num`, and `Lit` variants alongside the checker's layout-relevant types (`IrType`:
+`Num`, and `Lit` variants alongside inline foreign bindings and preambles and the
+checker's layout-relevant types (`IrType`:
 named type applications, type variables, staged functions, tuples, closed and
 open record rows, higher-rank `forall` schemes and packed-module existentials)
 shared behind `Arc` in memory and interned in a top-level `types` table on the
 wire. Each module records its data, error and opaque-alias type declarations
-(`Module.types`), constructor field types (`ConstructorDecl` and
+(`Module.types`), inline foreign preambles (`Module.preambles`: `Vec<InlineCode>`),
+constructor field types (`ConstructorDecl` and
 `Constructor.{fields, type_args}` including record labels and GADT existentials,
 constraints and result indices), binder types (`let`, parameters, pattern
 variables, `Var`, `Each`), function result types, and instantiation `type_args`
 on polymorphic globals, constructors and methods. Each `ItemKind::Foreign`
-declaration carries core contract metadata (`nullable`, `optional`, `retention`,
-`owned`, `callbacks`) alongside backend-declared adapter words (`Adapter.words`:
-`BackendAdapter { name, args, span }`) validated by the active backend in
-`check-target` (including during `flick check` and editor analysis with
-`command = "check"`) and `generate`. Effect, service and region
+declaration carries its binding (`Binding::Module`, `Binding::Global`, or
+`Binding::Inline(InlineCode)`) and core contract metadata (`nullable`, `optional`,
+`retention`, `owned`, `callbacks`) alongside backend-declared adapter words
+(`Adapter.words`: `BackendAdapter { name, args, span }`) validated by the active
+backend in `check-target` (including during `flick check` and editor analysis with
+`command = "check"`) and `generate`. Backends validate inline foreign text and
+map syntax errors back to the `.fl` source span with `FLICK-F011`. Effect, service and region
 rows are omitted because no value layout depends on them. `flick_ir::validate`
 checks type well-formedness, type argument counts and annotation agreement
 with the terms they describe, while permitting erased paths where optional type

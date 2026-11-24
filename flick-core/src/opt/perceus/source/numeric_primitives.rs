@@ -310,7 +310,7 @@ impl Lower<'_> {
 }
 
 pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
-    let kind = match value.binding.name.as_str() {
+    let kind = match value.binding.export_name().unwrap_or("") {
         "compare" => Intrinsic::PrimitiveCompare,
         "hash" => Intrinsic::PrimitiveHash,
         "intUnsafeDiv" => Intrinsic::IntUnsafeDiv,
@@ -339,7 +339,7 @@ pub(super) fn equality_expression(value: &Foreign, span: Span) -> Option<Expr> {
             })
             .collect()
     };
-    if value.binding.name == "equals" && supports(value, 2, true, false) {
+    if value.binding.export_name() == Some("equals") && supports(value, 2, true, false) {
         let left = "$primitiveEquals.left";
         let right = "$primitiveEquals.right";
         return Some(at(ExprKind::Lambda {
@@ -351,7 +351,8 @@ pub(super) fn equality_expression(value: &Foreign, span: Span) -> Option<Expr> {
             ))),
         }));
     }
-    if value.binding.name == "numberStrictEqual" && supports(value, 2, false, false) {
+    if value.binding.export_name() == Some("numberStrictEqual") && supports(value, 2, false, false)
+    {
         let left = "$strictEq.left";
         let right = "$strictEq.right";
         return Some(at(ExprKind::Lambda {
@@ -363,7 +364,7 @@ pub(super) fn equality_expression(value: &Foreign, span: Span) -> Option<Expr> {
             ))),
         }));
     }
-    if value.binding.name == "numberSameValue" && supports(value, 2, false, false) {
+    if value.binding.export_name() == Some("numberSameValue") && supports(value, 2, false, false) {
         // Object.is(a, b): if a === b then (a !== 0.0 || 1.0 / a === 1.0 / b) else (a !== a && b !== b)
         let left = "$sameVal.left";
         let right = "$sameVal.right";
@@ -424,7 +425,7 @@ fn supports(value: &Foreign, arity: usize, copies_args: bool, copies_result: boo
     // These exact host operations read immutable values and return only a
     // primitive or a closed Ordering constructor. No mutable value escapes;
     // this discharges their written defensive-copy adapter, not other FFI.
-    value.binding.from.as_deref() == Some("flick:rt")
+    value.binding.from() == Some("flick:rt")
         && value.mode == ForeignMode::Pure
         && value.dicts == 0
         && value.arity == arity

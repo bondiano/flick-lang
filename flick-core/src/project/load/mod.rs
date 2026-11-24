@@ -443,6 +443,7 @@ fn run_in(
                         ir::Module {
                             name: m.name.clone(),
                             items: Vec::new(),
+                            preambles: Vec::new(),
                             labels: BTreeMap::new(),
                             initialization: flick_ir::Initialization::default(),
                             types: Vec::new(),

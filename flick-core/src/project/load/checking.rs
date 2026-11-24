@@ -11,8 +11,8 @@ use std::slice;
 use std::sync::Arc;
 
 #[cfg(feature = "native-project")]
-use flick_backend_go::foreign_meta as go_foreign_meta;
-use flick_backend_js::foreign_meta as js_foreign_meta;
+use flick_backend_go::{foreign_meta as go_foreign_meta, inline as go_inline};
+use flick_backend_js::{foreign_meta as js_foreign_meta, inline as js_inline};
 #[cfg(feature = "native-project")]
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -44,105 +44,10 @@ use crate::resolve::{Header, Import, Item, ItemKind};
 use crate::source::Span;
 use crate::source::{FileId, SourceMap};
 use crate::syntax::cst::{Element, Node};
-use crate::syntax::{Parse, kind::SyntaxKind as K};
+use crate::syntax::{Parse, kind::SyntaxKind as K, literal::string_value};
 use crate::types;
 
-/// A file checked on its own takes the path of a module of a project run,
-/// while resolving only built-in imports.
-pub(crate) fn check_file(
-    sources: &SourceMap,
-    file: FileId,
-    parse: Parse,
-    syntax: ModuleSyntax,
-    expansion: Option<Expansion>,
-    mut derived: Vec<Diagnostic>,
-) -> Vec<Diagnostic> {
-    let name = syntax
-        .header
-        .as_ref()
-        .map_or(String::new(), |h| h.name.clone());
-    let loaded = Loaded {
-        path: PathBuf::from(&sources.get(file).path),
-        file,
-        root: Root::Other(None),
-        parse: Arc::new(parse),
-        syntax: Arc::new(syntax),
-        name: name.clone(),
-        expansion: expansion.map(Arc::new),
-        editing: Vec::new(),
-        loader: None,
-        virtual_of: None,
-        member_of: None,
-        scope_of: None,
-    };
-    let modules = [loaded];
-    let mut by_name = BTreeMap::new();
-    by_name.insert(name, 0);
-    let from_packages = BTreeMap::new();
-    let precompiled = Precompiled::default();
-    let watched = types::Watched::new(first_party::WATCH);
-    let watching = first_party::plugin(first_party::PACKAGE).map(|plugin| Watching {
-        package: first_party::PACKAGE.to_owned(),
-        plugin,
-        watched: types::Watched::new(first_party::WATCH),
-    });
-    let watching: Vec<_> = watching.into_iter().collect();
-    let env_ctx = super::environment::EnvironmentContext::standalone();
-    #[cfg(not(target_arch = "wasm32"))]
-    let package_when = BTreeMap::new();
-    let checking = Checking {
-        modules: &modules,
-        sources,
-        by_name: &by_name,
-        from_packages: &from_packages,
-        project: None,
-        stages_by_class: false,
-        env_ctx: &env_ctx,
-        #[cfg(not(target_arch = "wasm32"))]
-        package_when: &package_when,
-        #[cfg(not(target_arch = "wasm32"))]
-        own_package_when: None,
-        lower: false,
-        lowered: &[],
-        proving: false,
-        cached_ir: CachedIr::Dropped,
-        lower_packages_only: false,
-        precompiled: &precompiled,
-        cache: None,
-        watching: &watching,
-        watched: &watched,
-        privates: &BTreeMap::new(),
-    };
-    let builtin = |name: &str| {
-        types::builtins()
-            .iter()
-            .find(|i| i.module == name && !i.private)
-            .cloned()
-    };
-    let mut diagnostics = checking.check(&modules[0], &builtin, &builtin).diagnostics;
-    diagnostics.append(&mut derived);
-    super::environment::validate_standalone_when(
-        &modules[0].syntax,
-        sources.get(file),
-        &mut diagnostics,
-    );
-    // a lone file has no package, so no private module of one is its own
-    for import in &modules[0].syntax.imports {
-        let private = |i: &Interface| i.module == import.module && i.private;
-        if types::builtins().iter().any(private) {
-            diagnostics.push(Diagnostic::error(
-                codes::R017,
-                format!(
-                    "module `{}` is private to its package; import its public facade instead",
-                    import.module
-                ),
-                import.span,
-            ));
-        }
-    }
-    Diagnostic::sort_by_span(&mut diagnostics);
-    diagnostics
-}
+include!("checking_file.rs");
 
 mod graph;
 

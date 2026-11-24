@@ -146,13 +146,13 @@ impl Lower<'_> {
         } else if let Some(result) = self.adapted_foreign(value, name, span, block) {
             return result;
         }
-        if value.binding.from.as_deref() == Some("flick:rt") && value.binding.name == "listShow" {
+        if value.binding.module_export() == Some(("flick:rt", "listShow")) {
             if !list_show::supports(value) {
                 return Err(unsupported("listShow ownership adapter", span));
             }
             return self.expr(&list_show::expression(span), &Env::new(), block);
         }
-        if value.binding.from.as_deref() == Some("flick:rt") && value.binding.name == "fromResult" {
+        if value.binding.module_export() == Some(("flick:rt", "fromResult")) {
             if !failures::supports(value) {
                 return Err(unsupported("fromResult ownership adapter", span));
             }
@@ -167,10 +167,7 @@ impl Lower<'_> {
             Some(kind) => kind,
             None => {
                 return Err(unsupported(
-                    format!(
-                        "foreign binding {:?}:{}",
-                        value.binding.from, value.binding.name
-                    ),
+                    format!("foreign binding {:?}", value.binding),
                     span,
                 ));
             }

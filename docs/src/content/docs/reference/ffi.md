@@ -39,6 +39,49 @@ foreign read_text from "./fs.js" "readText"
 `foreign sync` and `foreign async` are the words of before: `FLICK-F001`,
 whose fix removes the word and gives a promise's row its `Async`.
 
+## Inline foreign code
+
+Small host adapters can live directly inside a `.fl` module without a separate
+companion file. Use `from inline` with any non-interpolated string literal
+(`"..."`, multi-line `"""..."""`, or raw `r#"..."#`) for a single binding, and
+`foreign module inline` for top-level declarations shared across the module's
+inline bindings:
+
+```flick
+foreign module inline """
+  const SCALE = 2;
+  function scaled(x) {
+    return x * SCALE;
+  }
+  """
+
+cos : Float -> Float
+foreign pure cos from inline "(d) => Math.cos(d)"
+
+double_it : Float -> Float
+foreign pure double_it from inline """
+  (d) => scaled(d)
+  """
+```
+
+The compiler core treats inline text as opaque and carries it with its exact
+source span in IR and `BuildRequest.inline-foreign`. `flick fmt` preserves
+inline string literals byte for byte. Each backend validates and places inline
+code according to its target language:
+
+- **`flick/js`**: emits each `foreign module inline` preamble at module top
+  level and each `from inline` binding as a module-level constant wrapped by
+  the binding's normal adapters and boundary copies.
+- **`flick/go`**: hoists and deduplicates `import` declarations from `foreign
+  module inline` preambles, places preamble declarations at package scope, and
+  invokes `from inline` expressions with the Go foreign calling convention
+  (`func(fb *flickrt.Fiber, a0 flickrt.Value) flickrt.Value`, or
+  `func(ctx flickrt.Context, ...)` for `Async`).
+
+Syntax errors discovered by the backend inside an inline binding or module
+preamble are reported as `FLICK-F011` and mapped back to the exact line and
+span inside the `.fl` string literal.
+
 ## Metadata
 
 Metadata lines below a `foreign` declaration split into **core contract words**

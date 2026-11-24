@@ -265,6 +265,9 @@ syntax_kinds! {
         Fundep,
         Members,
         ForeignDecl,
+        /// `foreign module inline "…"`: host-language preamble shared by the
+        /// module's foreign bindings.
+        ForeignPreamble,
         ForeignSource,
         ForeignMeta,
         MetaItem,

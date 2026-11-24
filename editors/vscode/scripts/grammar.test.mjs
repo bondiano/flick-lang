@@ -221,6 +221,13 @@ test("contextual effect, sql, and control keywords receive expected TextMate sco
   assert.ok(scopesFor("  let Some x = m else 0", "let").includes("keyword.other.flick"));
   assert.ok(scopesFor("  let Some x = m else 0", "else").includes("keyword.control.flick"));
   assert.ok(scopesFor("  let [first, ...rest] = xs else []", "else").includes("keyword.control.flick"));
+  assert.ok(scopesFor('foreign pure cos from inline "(d) => Math.cos(d)"', "inline").includes("keyword.other.flick"));
+  assert.ok(scopesFor('foreign pure cos from inline "(d) => Math.cos(d)"', "cos").includes("entity.name.function.flick"));
+  assert.ok(scopesFor('foreign pure cos from inline "(d) => Math.cos(d)"', '"(d) => Math.cos(d)"').includes("string.quoted.double.flick"));
+  assert.ok(scopesFor('foreign module inline "const k = 1;"', "foreign").includes("keyword.other.flick"));
+  assert.ok(scopesFor('foreign module inline "const k = 1;"', "module").includes("keyword.other.flick"));
+  assert.ok(scopesFor('foreign module inline "const k = 1;"', "inline").includes("keyword.other.flick"));
+  assert.ok(scopesFor('foreign module inline "const k = 1;"', '"const k = 1;"').includes("string.quoted.double.flick"));
 });
 
 test("await keeps its control scope except in method names", () => {
@@ -300,6 +307,7 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
     ["catch : Int -> Int", "catch"],
     ['foreign pure catch from "./x.js" "catch"', "catch"],
     ["let catch_all = 1", "catch_all"],
+    ["let inline = 1", "inline"],
   ];
 
   for (const [line, word] of nonKeywordCases) {

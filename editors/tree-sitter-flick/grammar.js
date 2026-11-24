@@ -27,7 +27,7 @@ module.exports = grammar({
 
   conflicts: $ => [
     [$._loop, $.identifier], [$._defer, $.identifier], [$._result, $.identifier], [$._while, $.identifier], [$._case, $.identifier], [$._hook, $.identifier],
-    [$._fixture, $.identifier], [$._case], [$._fixture],
+    [$._fixture, $.identifier], [$._case], [$._fixture], [$._foreign],
     [$._await_signature, $.keyword], [$._await_definition, $.keyword],
   ],
 
@@ -115,12 +115,16 @@ module.exports = grammar({
 
     keyword: _ => choice(...KEYWORDS),
 
-    // the mode after `foreign` and `global` after `from` are keywords only there
+    // the mode after `foreign`, `module inline` after `foreign`, and
+    // `global`/`inline` after `from` are keywords only there
     _foreign: $ => seq(
       alias('foreign', $.keyword),
-      optional(alias(choice('pure', 'sync', 'async', 'effect', 'blocked'), $.keyword)),
+      optional(choice(
+        alias(choice('pure', 'sync', 'async', 'effect', 'blocked'), $.keyword),
+        seq(alias('module', $.keyword), alias('inline', $.keyword)),
+      )),
     ),
-    _from: $ => seq(alias('from', $.keyword), optional(alias('global', $.keyword))),
+    _from: $ => seq(alias('from', $.keyword), optional(alias(choice('global', 'inline'), $.keyword))),
     // `component name` declares a component; elsewhere the word is a name
     _component: $ => seq(alias('component', $.keyword), $.identifier),
     // `plugin head` in an import's `exposing`, and `server fn`

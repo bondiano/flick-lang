@@ -8,8 +8,7 @@ use crate::source::Span;
 /// Only this known pure host adapter is discharged by ordinary language
 /// ownership. No arbitrary callback/copy/Effect bridge is silently erased.
 pub(super) fn supports(value: &Foreign) -> bool {
-    value.binding.from.as_deref() == Some("flick:rt")
-        && value.binding.name == "listShow"
+    value.binding.module_export() == Some(("flick:rt", "listShow"))
         && value.mode == ForeignMode::Pure
         && value.dicts == 0
         && value.arity == 2
@@ -202,8 +201,18 @@ mod tests {
     }
     fn changes() -> Vec<fn(&mut Foreign)> {
         vec![
-            |f| f.binding.from = None,
-            |f| f.binding.name = "listShowOther".into(),
+            |f| {
+                f.binding = flick_ir::Binding::Global {
+                    name: f.binding.export_name().unwrap_or("").to_owned(),
+                }
+            },
+            |f| {
+                if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                    &mut f.binding
+                {
+                    *name = "listShowOther".into();
+                }
+            },
             |f| f.mode = ForeignMode::Sync,
             |f| f.dicts = 1,
             |f| f.arity = 1,

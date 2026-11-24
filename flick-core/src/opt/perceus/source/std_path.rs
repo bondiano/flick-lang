@@ -17,11 +17,11 @@ impl Lower<'_> {
         if value.dicts != 0 || !has_standard_shape(value) || value.mode != ForeignMode::Pure {
             return None;
         }
-        let from = value.binding.from.as_deref()?;
+        let from = value.binding.from()?;
         if from != "flick:Path" {
             return None;
         }
-        let bind = value.binding.name.as_str();
+        let bind = value.binding.export_name().unwrap_or("");
         if value.stages.len() != 1 || !matches!(bind, "flickLayer" | "flickNode") {
             return None;
         }

@@ -2,10 +2,11 @@
 //! `test/literal` fixture backend.
 
 use flick_backend::{
-    AdapterArg, AdapterArgKind, AdapterWord, BuildRequest, Diagnostic, ModuleRole, Severity, Span,
-    TypeFormAttribute,
+    AdapterArg, AdapterArgKind, AdapterWord, Artifact, ArtifactKind, BuildRequest, Diagnostic,
+    Inputs, ModuleRole, Severity, Span, TypeFormAttribute,
 };
-use flick_ir::{AdapterArg as IrAdapterArg, Foreign, ItemKind, Program};
+use flick_backend_support::inline_span::map_byte_range;
+use flick_ir::{AdapterArg as IrAdapterArg, FileId, Foreign, ItemKind, Program};
 
 pub(crate) fn foreign_adapters() -> Vec<AdapterWord> {
     vec![
@@ -153,6 +154,7 @@ fn validate_foreign(foreign: &Foreign, diagnostics: &mut Vec<Diagnostic>) {
 pub(crate) fn validate_foreigns(
     program: &Program,
     request: &BuildRequest,
+    inputs: &mut dyn Inputs,
 ) -> Result<(), Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
     for module in &program.modules {
@@ -169,9 +171,59 @@ pub(crate) fn validate_foreigns(
             }
         }
     }
+    for entry in &request.inline_foreign {
+        if let Some(pos) = entry.code.find("SYNTAX_ERROR") {
+            let source = request
+                .sources
+                .get(entry.span.file as usize)
+                .and_then(|s| inputs.read(&s.input).ok())
+                .and_then(|bytes| String::from_utf8(bytes).ok())
+                .unwrap_or_default();
+            let ir_span = flick_ir::Span::new(
+                FileId::new(entry.span.file),
+                entry.span.start,
+                entry.span.end,
+            );
+            let mapped = if source.is_empty() {
+                ir_span
+            } else {
+                map_byte_range(&source, ir_span, pos, pos + "SYNTAX_ERROR".len())
+            };
+            diagnostics.push(foreign_error(
+                "F011",
+                "invalid inline foreign code in literal backend",
+                mapped,
+            ));
+        }
+    }
     if diagnostics.is_empty() {
         Ok(())
     } else {
         Err(diagnostics)
+    }
+}
+
+pub(crate) fn inline_report(request: &BuildRequest) -> Artifact {
+    let entries: Vec<_> = request
+        .inline_foreign
+        .iter()
+        .map(|entry| {
+            serde_json::json!({
+                "module": entry.module,
+                "name": entry.name,
+                "code": entry.code,
+                "span": {
+                    "file": entry.span.file,
+                    "start": entry.span.start,
+                    "end": entry.span.end,
+                }
+            })
+        })
+        .collect();
+    Artifact {
+        id: "inline-foreign".into(),
+        path: "inline-foreign.json".into(),
+        kind: ArtifactKind::Metadata,
+        bytes: serde_json::to_vec_pretty(&entries).expect("inline report serializes"),
     }
 }

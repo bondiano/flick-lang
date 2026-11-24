@@ -175,6 +175,7 @@ fn live_builtin_native_primitives_match_js_and_go_contracts() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn live_builtin_native_primitives_reject_foreign_mutations() {
     use crate::build::builtin_modules;
     use crate::ir::{Expr, ExprKind, ItemKind, Lit};
@@ -200,9 +201,24 @@ fn live_builtin_native_primitives_reject_foreign_mutations() {
             let _ = f.stages.pop();
         },
         |f| f.stages.push(false),
-        |f| f.binding.from = None,
-        |f| f.binding.from = Some("./alt.mjs".into()),
-        |f| f.binding.name.push('!'),
+        |f| {
+            f.binding = flick_ir::Binding::Global {
+                name: f.binding.export_name().unwrap_or("").to_owned(),
+            };
+        },
+        |f| {
+            f.binding = flick_ir::Binding::Module {
+                from: "./alt.mjs".into(),
+                name: f.binding.export_name().unwrap_or("").to_owned(),
+            };
+        },
+        |f| {
+            if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                &mut f.binding
+            {
+                name.push('!');
+            }
+        },
         |f| {
             f.catch = Some(Expr::new(
                 ExprKind::Lit(Lit::Unit),
@@ -501,6 +517,7 @@ let main () =
         test: false,
         paths: &BTreeMap::new(),
         lines: &[],
+        sources: &[],
         foreign: &BTreeMap::new(),
         bindings: go_bindings,
         lang: &known,

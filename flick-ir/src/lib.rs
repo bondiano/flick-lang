@@ -29,8 +29,8 @@ pub use expr::{
     Module, Param, Pat, Prefix, Reexport, Stmt, operation_arity,
 };
 pub use foreign::{
-    Adapter, AdapterArg, BackendAdapter, Binding, Copies, Foreign, ForeignMode, ResultAdapter,
-    Shape,
+    Adapter, AdapterArg, BackendAdapter, Binding, Copies, Foreign, ForeignMode, InlineCode,
+    ResultAdapter, Shape,
 };
 pub use handler::{Handled, Handler, OpArm};
 pub use instance::{GenericInfo, InstanceInfo, default_method};

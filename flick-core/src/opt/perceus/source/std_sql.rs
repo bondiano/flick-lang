@@ -15,13 +15,13 @@ impl Lower<'_> {
         span: Span,
         block: &mut Code,
     ) -> Option<Result<Local, LowerError>> {
-        if value.binding.from.as_deref() != Some("flick:sql")
+        if value.binding.from() != Some("flick:sql")
             || value.mode != ForeignMode::Pure
             || value.dicts != 0
         {
             return None;
         }
-        let bind = value.binding.name.as_str();
+        let bind = value.binding.export_name().unwrap_or("");
         let stages = value.stages.len();
         let b = ExprBuilder::new(span, "$sql");
 

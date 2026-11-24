@@ -45,7 +45,7 @@ pub(crate) fn foreign_files(
             let ItemKind::Foreign(foreign) = &item.kind else {
                 continue;
             };
-            let Some(spec) = foreign.binding.from.as_deref() else {
+            let Some(spec) = foreign.binding.from() else {
                 continue;
             };
             let Some(path) = compilation.shipped_foreign(&module.name, spec) else {

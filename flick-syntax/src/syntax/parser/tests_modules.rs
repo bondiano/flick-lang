@@ -126,3 +126,32 @@ fn module_contract_can_require_nested_modules_and_parameterized_modules() {
     let source = "type module Library =\n  module Make : Factory\n  module Keys : KeyPolicy\n";
     assert!(errors(source).is_empty(), "{:?}", errors(source));
 }
+
+#[test]
+fn foreign_inline_bindings_and_module_preambles_parse() {
+    let single = "foreign cos from inline \"(d) => Math.cos(d)\"\n";
+    assert_eq!(
+        sexp(single),
+        "(ForeignDecl foreign cos (ForeignSource from inline \"(d) => Math.cos(d)\"))"
+    );
+
+    let mode_and_meta = "foreign pure cos from inline \"\"\"\n  (d) => Math.cos(d)\n  \"\"\"\n  variadic\n";
+    let tree = sexp(mode_and_meta);
+    assert!(tree.contains("(ForeignDecl foreign pure cos (ForeignSource from inline"), "{tree}");
+    assert!(tree.contains("(ForeignMeta (MetaItem variadic))"), "{tree}");
+
+    let raw = "foreign f from inline r#\"(x) => \"hi\"\"#\n";
+    assert!(errors(raw).is_empty(), "{:?}", errors(raw));
+
+    let named_module = "foreign module from \"./m.js\" \"m\"\n";
+    assert!(errors(named_module).is_empty(), "{:?}", errors(named_module));
+
+    let preamble = "foreign module inline \"\"\"\n  const k = 1;\n  \"\"\"\n";
+    let tree = sexp(preamble);
+    assert!(tree.starts_with("(ForeignPreamble foreign module inline "), "{tree}");
+
+    assert!(!errors("foreign module global \"x\"\n").is_empty());
+    assert!(!errors("foreign f from inline 123\n").is_empty());
+    assert!(!errors("foreign f from inline \"a\\{x}\"\n").is_empty());
+    assert!(!errors("foreign module inline \"a\\{x}\"\n").is_empty());
+}

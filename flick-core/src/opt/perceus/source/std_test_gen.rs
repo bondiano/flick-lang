@@ -22,11 +22,11 @@ impl Lower<'_> {
         if value.mode != ForeignMode::Pure || !has_standard_shape(value) {
             return None;
         }
-        let from = value.binding.from.as_deref()?;
+        let from = value.binding.from()?;
         if from != "flick:rt" {
             return None;
         }
-        let bind = value.binding.name.as_str();
+        let bind = value.binding.export_name().unwrap_or("");
         let stages = value.stages.len();
         let b = ExprBuilder::new(span, "$tg");
 

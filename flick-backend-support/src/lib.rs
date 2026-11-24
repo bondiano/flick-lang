@@ -5,6 +5,7 @@ mod bridge;
 pub mod bridge_select;
 pub mod effects;
 pub mod exports;
+pub mod inline_span;
 mod lang;
 pub mod loops;
 pub mod names;

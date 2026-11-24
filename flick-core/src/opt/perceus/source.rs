@@ -439,47 +439,38 @@ include!("source/branch_lowering.rs");
 
 fn foreign_intrinsic(value: &Foreign) -> Option<Intrinsic> {
     use Intrinsic::Host;
-    match (
-        value.binding.from.as_deref(),
-        value.binding.name.as_str(),
-        value.mode,
-    ) {
-        (Some("flick:rt"), "stdoutLine", ForeignMode::Sync) => Some(Intrinsic::PrintLine),
-        (Some("flick:rt"), "stderrLine", ForeignMode::Sync) => {
-            Some(Host(HostPrimitive::StderrLine))
-        }
-        (Some("flick:rt"), "stdoutWrite", ForeignMode::Sync) => {
-            Some(Host(HostPrimitive::StdoutWrite))
-        }
-        (Some("flick:rt"), "platformEnv", ForeignMode::Sync) => Some(Host(HostPrimitive::Env)),
-        (Some("flick:rt"), "platformVars", ForeignMode::Sync) => Some(Host(HostPrimitive::Vars)),
-        (Some("flick:rt"), "platformArgs", ForeignMode::Sync) => Some(Host(HostPrimitive::Args)),
-        (Some("flick:Clock"), "flickCurrentTimeMillis", ForeignMode::Effect) => {
+    let (from, name) = value.binding.module_export()?;
+    match (from, name, value.mode) {
+        ("flick:rt", "stdoutLine", ForeignMode::Sync) => Some(Intrinsic::PrintLine),
+        ("flick:rt", "stderrLine", ForeignMode::Sync) => Some(Host(HostPrimitive::StderrLine)),
+        ("flick:rt", "stdoutWrite", ForeignMode::Sync) => Some(Host(HostPrimitive::StdoutWrite)),
+        ("flick:rt", "platformEnv", ForeignMode::Sync) => Some(Host(HostPrimitive::Env)),
+        ("flick:rt", "platformVars", ForeignMode::Sync) => Some(Host(HostPrimitive::Vars)),
+        ("flick:rt", "platformArgs", ForeignMode::Sync) => Some(Host(HostPrimitive::Args)),
+        ("flick:Clock", "flickCurrentTimeMillis", ForeignMode::Effect) => {
             Some(Host(HostPrimitive::CurrentTimeMillis))
         }
-        (Some("flick:Clock"), "flickCurrentTimeNanos", ForeignMode::Effect) => {
+        ("flick:Clock", "flickCurrentTimeNanos", ForeignMode::Effect) => {
             Some(Host(HostPrimitive::CurrentTimeNanos))
         }
-        (Some("flick:Clock"), "flickMonotonicTimeNanos", ForeignMode::Effect) => {
+        ("flick:Clock", "flickMonotonicTimeNanos", ForeignMode::Effect) => {
             Some(Host(HostPrimitive::MonotonicTimeNanos))
         }
-        (Some("flick:Random"), "flickNext", ForeignMode::Effect) => {
-            Some(Host(HostPrimitive::RandomNext))
-        }
-        (Some("flick:rt"), "processSpawn", ForeignMode::Effect) => {
+        ("flick:Random", "flickNext", ForeignMode::Effect) => Some(Host(HostPrimitive::RandomNext)),
+        ("flick:rt", "processSpawn", ForeignMode::Effect) => {
             Some(Host(HostPrimitive::ProcessSpawn))
         }
-        (Some("flick:rt"), "show", ForeignMode::Pure) => Some(Intrinsic::Show),
-        (Some("flick:rt"), "refMake", ForeignMode::Sync) => Some(Intrinsic::RefMake),
-        (Some("flick:rt"), "refGet", ForeignMode::Sync) => Some(Intrinsic::RefGet),
-        (Some("flick:rt"), "refSet", ForeignMode::Sync) => Some(Intrinsic::RefSet),
-        (Some("flick:rt"), "refModify", ForeignMode::Sync) => Some(Intrinsic::RefModify),
-        (Some("flick:rt"), "refSame", ForeignMode::Pure) => Some(Intrinsic::RefSame),
-        (Some("flick:rt"), "scopeRun", ForeignMode::Effect) => Some(Intrinsic::ScopeRun),
-        (Some("flick:rt"), "scopeCurrent", ForeignMode::Effect) => Some(Intrinsic::ScopeCurrent),
-        (Some("flick:rt"), "arenaMake", ForeignMode::Effect) => Some(Intrinsic::ArenaMake),
-        (Some("flick:rt"), "arenaAlloc", ForeignMode::Sync) => Some(Intrinsic::ArenaAlloc),
-        (Some("flick:rt"), "arenaGet", ForeignMode::Sync) => Some(Intrinsic::ArenaGet),
+        ("flick:rt", "show", ForeignMode::Pure) => Some(Intrinsic::Show),
+        ("flick:rt", "refMake", ForeignMode::Sync) => Some(Intrinsic::RefMake),
+        ("flick:rt", "refGet", ForeignMode::Sync) => Some(Intrinsic::RefGet),
+        ("flick:rt", "refSet", ForeignMode::Sync) => Some(Intrinsic::RefSet),
+        ("flick:rt", "refModify", ForeignMode::Sync) => Some(Intrinsic::RefModify),
+        ("flick:rt", "refSame", ForeignMode::Pure) => Some(Intrinsic::RefSame),
+        ("flick:rt", "scopeRun", ForeignMode::Effect) => Some(Intrinsic::ScopeRun),
+        ("flick:rt", "scopeCurrent", ForeignMode::Effect) => Some(Intrinsic::ScopeCurrent),
+        ("flick:rt", "arenaMake", ForeignMode::Effect) => Some(Intrinsic::ArenaMake),
+        ("flick:rt", "arenaAlloc", ForeignMode::Sync) => Some(Intrinsic::ArenaAlloc),
+        ("flick:rt", "arenaGet", ForeignMode::Sync) => Some(Intrinsic::ArenaGet),
         _ => None,
     }
 }

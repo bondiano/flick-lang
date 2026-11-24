@@ -9,63 +9,14 @@ use flick_ir::{IrType, TypeInterner};
 use flick_ir::{Lift, TypeRef};
 
 use super::Lower;
-use crate::effects::key;
-use crate::ir::{Binding, Expr, Foreign, Param, Pat};
-use crate::syntax::cst::{Node, foreign_words};
-use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::literal;
+use crate::ir::{Expr, Param, Pat};
+use crate::syntax::cst::Node;
 use crate::types::Range;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::types::lang;
 use crate::types::lang::Lang;
 
 impl Lower<'_> {
-    pub(super) fn foreign(&mut self, decl: &Node) -> Option<Foreign> {
-        let name = foreign_words(decl).1?.text(self.text).to_owned();
-        let source = decl.nodes().find(|n| n.kind == K::ForeignSource)?;
-        let strings: Vec<String> = source
-            .child_tokens()
-            .filter(|t| t.kind == K::String)
-            .map(|t| literal::string_value(t.text(self.text)))
-            .collect();
-        let (module, export) = match &strings[..] {
-            [export] => (None, export.clone()),
-            [module, export] => (Some(module.clone()), export.clone()),
-            _ => return None,
-        };
-        let info = self
-            .typing
-            .foreigns
-            .get(&decl.range())
-            .cloned()
-            .unwrap_or_default();
-        let catch = info.catch.and_then(|at| {
-            let node = decl
-                .nodes()
-                .filter(|n| n.kind == K::ForeignMeta)
-                .flat_map(Node::nodes)
-                .flat_map(Node::nodes)
-                .find(|n| n.range() == at)?;
-            Some(self.expr(node))
-        });
-        let (type_params, _, ty) = self.ir_top_scheme(&name);
-        Some(Foreign {
-            source_name: None,
-            name,
-            mode: info.mode,
-            binding: Binding {
-                from: module.map(|spec| key(&spec).into_owned()),
-                name: export,
-            },
-            stages: info.stages.clone(),
-            dicts: info.dicts,
-            arity: info.js_arity(),
-            adapter: info.adapter,
-            catch,
-            type_params,
-            ty,
-        })
-    }
     /// Interned IR type recorded by the checker at `key`, if available.
     #[cfg_attr(target_arch = "wasm32", allow(clippy::unused_self))]
     pub(super) fn ir_type(&self, key: Range) -> Option<TypeRef> {

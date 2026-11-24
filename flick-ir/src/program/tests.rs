@@ -27,6 +27,7 @@ fn program(x: f64) -> Program {
         name: "App".to_owned(),
         items: vec![item],
         types: Vec::new(),
+        preambles: Vec::new(),
         labels: BTreeMap::default(),
         initialization: crate::Initialization::default(),
         records: BTreeMap::default(),
@@ -182,9 +183,10 @@ fn a_reader_takes_only_its_own_minor_version_before_1_0() {
     assert!(!compatible("0.13.0"));
     assert!(!compatible("0.14.0"));
     assert!(!compatible("0.15.0"));
+    assert!(!compatible("0.16.0"));
     let mut p = program(1.0);
-    p.ir_version = "0.17.0".to_owned();
-    let found = "0.17.0".to_owned();
+    p.ir_version = "0.18.0".to_owned();
+    let found = "0.18.0".to_owned();
     assert_eq!(
         Program::from_json(&p.to_json()),
         Err(Error::Version { found })
@@ -195,12 +197,14 @@ fn a_reader_takes_only_its_own_minor_version_before_1_0() {
 fn foreign_adapter_words_round_trip_and_remap_spans() {
     let decl_span = Span::new(FileId::new(9), 0, 20);
     let word_span = Span::new(FileId::new(9), 10, 19);
+    let preamble_span = Span::new(FileId::new(9), 1, 8);
+    let inline_span = Span::new(FileId::new(9), 25, 42);
     let foreign = crate::Foreign {
         name: "call".into(),
         source_name: None,
         mode: crate::ForeignMode::Pure,
-        binding: crate::Binding {
-            from: Some("./host".into()),
+        binding: crate::Binding::Module {
+            from: "./host".into(),
             name: "call".into(),
         },
         stages: vec![false, false],
@@ -223,13 +227,39 @@ fn foreign_adapter_words_round_trip_and_remap_spans() {
         type_params: Vec::new(),
         ty: None,
     };
+    let inline_foreign = crate::Foreign {
+        name: "cos".into(),
+        source_name: None,
+        mode: crate::ForeignMode::Pure,
+        binding: crate::Binding::Inline(crate::InlineCode {
+            code: "(d) => Math.cos(d)".into(),
+            span: inline_span,
+        }),
+        stages: vec![false],
+        dicts: 0,
+        arity: 1,
+        adapter: crate::Adapter::default(),
+        catch: None,
+        type_params: Vec::new(),
+        ty: None,
+    };
     let module = Module {
         name: "App".into(),
-        items: vec![Item {
-            kind: ItemKind::Foreign(foreign),
-            span: decl_span,
-        }],
+        items: vec![
+            Item {
+                kind: ItemKind::Foreign(foreign),
+                span: decl_span,
+            },
+            Item {
+                kind: ItemKind::Foreign(inline_foreign),
+                span: inline_span,
+            },
+        ],
         types: Vec::new(),
+        preambles: vec![crate::InlineCode {
+            code: "const K = 2;".into(),
+            span: preamble_span,
+        }],
         labels: BTreeMap::default(),
         initialization: crate::Initialization::default(),
         records: BTreeMap::default(),
@@ -240,10 +270,21 @@ fn foreign_adapter_words_round_trip_and_remap_spans() {
         format!("file{}.fl", f.index())
     });
     assert_eq!(p.files, ["file9.fl"]);
+    assert_eq!(
+        p.modules[0].preambles[0].span,
+        Span::new(FileId::new(0), 1, 8)
+    );
     let ItemKind::Foreign(f) = &p.modules[0].items[0].kind else {
         unreachable!();
     };
     assert_eq!(f.adapter.words[0].span, Span::new(FileId::new(0), 10, 19));
+    let ItemKind::Foreign(inline_f) = &p.modules[0].items[1].kind else {
+        unreachable!();
+    };
+    assert_eq!(
+        inline_f.binding.inline().expect("inline").span,
+        Span::new(FileId::new(0), 25, 42)
+    );
     assert_eq!(Program::from_json(&p.to_json()), Ok(p.clone()));
     #[cfg(feature = "cbor")]
     assert_eq!(Program::from_cbor(&p.to_cbor()), Ok(p));

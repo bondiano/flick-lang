@@ -17,7 +17,10 @@ fn actual_numeric_adapters_match_the_complete_declared_contract() {
                 continue;
             };
             if module.name == "Instances"
-                && matches!(value.binding.name.as_str(), "compare" | "hash" | "equals")
+                && matches!(
+                    value.binding.export_name().unwrap_or(""),
+                    "compare" | "hash" | "equals"
+                )
             {
                 count += 1;
                 assert!(
@@ -40,7 +43,7 @@ fn actual_numeric_adapters_match_the_complete_declared_contract() {
                     assert!(
                         matches!(lower([&changed], &entry), Err(LowerError::Unsupported { span, .. }) if span == item.span),
                         "{} mutation{index}",
-                        value.binding.name
+                        value.binding.export_name().unwrap_or("")
                     );
                 }
             }
@@ -53,9 +56,24 @@ type Mutation = Box<dyn Fn(&mut Foreign)>;
 
 fn mutations(arity: usize) -> Vec<Mutation> {
     let mut out: Vec<Mutation> = vec![
-        Box::new(|v| v.binding.from = None),
-        Box::new(|v| v.binding.from = Some("other".into())),
-        Box::new(|v| v.binding.name.push('!')),
+        Box::new(|v| {
+            v.binding = flick_ir::Binding::Global {
+                name: v.binding.export_name().unwrap_or("").to_owned(),
+            }
+        }),
+        Box::new(|v| {
+            v.binding = flick_ir::Binding::Module {
+                from: "other".into(),
+                name: v.binding.export_name().unwrap_or("").to_owned(),
+            }
+        }),
+        Box::new(|v| {
+            if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                &mut v.binding
+            {
+                name.push('!');
+            }
+        }),
         Box::new(|v| v.mode = ForeignMode::Sync),
         Box::new(|v| v.mode = ForeignMode::Async),
         Box::new(|v| v.mode = ForeignMode::Effect),

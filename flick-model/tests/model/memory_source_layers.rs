@@ -254,7 +254,7 @@ fn unknown_layer_adapters_reject_before_execution_or_heap_changes() {
             .find(|module| {
                 module.items.iter().any(|item| {
                     matches!(&item.kind,
-                ItemKind::Foreign(value) if value.binding.name == binding)
+                ItemKind::Foreign(value) if value.binding.export_name() == Some(binding))
                 })
             })
             .expect("live builtin");
@@ -263,7 +263,7 @@ fn unknown_layer_adapters_reject_before_execution_or_heap_changes() {
             .items
             .iter_mut()
             .find_map(|item| match &mut item.kind {
-                ItemKind::Foreign(value) if value.binding.name == binding => {
+                ItemKind::Foreign(value) if value.binding.export_name() == Some(binding) => {
                     value.adapter.words.push(BackendAdapter {
                         name: "cancel".into(),
                         args: vec![AdapterArg::Word("signal".into())],

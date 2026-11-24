@@ -22,7 +22,7 @@ impl Kind {
     }
 }
 fn kind(value: &Foreign) -> Option<Kind> {
-    match value.binding.name.as_str() {
+    match value.binding.export_name().unwrap_or("") {
         "succeed" => Some(Kind::Succeed),
         "mapEff" => Some(Kind::Map),
         "flatMapEff" => Some(Kind::FlatMap),
@@ -75,7 +75,7 @@ fn adapter(kind: Kind) -> Adapter {
     }
 }
 fn supports(value: &Foreign, kind: Kind) -> bool {
-    value.binding.from.as_deref() == Some("flick:rt")
+    value.binding.from() == Some("flick:rt")
         && value.mode == ForeignMode::Pure
         && value.arity == kind.arity()
         && value.dicts == 0
@@ -168,10 +168,21 @@ mod tests {
     };
     use flick_ir::{ForeignMode, Shape};
     type Mutation = Box<dyn Fn(&mut Foreign)>;
+    #[allow(clippy::too_many_lines)]
     fn mutations(original: &Foreign) -> Vec<Mutation> {
         let mut edits: Vec<Mutation> = vec![
-            Box::new(|v| v.binding.from = None),
-            Box::new(|v| v.binding.name.push('!')),
+            Box::new(|v| {
+                v.binding = flick_ir::Binding::Global {
+                    name: v.binding.export_name().unwrap_or("").to_owned(),
+                }
+            }),
+            Box::new(|v| {
+                if let flick_ir::Binding::Module { name, .. } | flick_ir::Binding::Global { name } =
+                    &mut v.binding
+                {
+                    name.push('!');
+                }
+            }),
             Box::new(|v| v.mode = ForeignMode::Sync),
             Box::new(|v| v.mode = ForeignMode::Async),
             Box::new(|v| v.mode = ForeignMode::Effect),
@@ -239,7 +250,7 @@ mod tests {
                 v.adapter.shapes[index] = Shape::Option(Box::new(Shape::Data));
             }));
         }
-        if original.binding.name == "flatMapEff" {
+        if original.binding.export_name() == Some("flatMapEff") {
             for mode in 0..4 {
                 edits.push(Box::new(move |v| {
                     let Shape::Fun {
@@ -279,7 +290,7 @@ mod tests {
                 continue;
             };
             let Some(kind) = kind(original) else { continue };
-            seen.push(original.binding.name.clone());
+            seen.push(original.binding.export_name().unwrap_or("").to_owned());
             assert!(supports(original, kind), "{original:#?}");
             assert_eq!(original.adapter, adapter(kind));
             let entry = memory::Name::new("Instances", &original.name);
@@ -287,7 +298,7 @@ mod tests {
             let edits = mutations(original);
             eprintln!(
                 "{} {} rejected ABI mutations",
-                original.binding.name,
+                original.binding.export_name().unwrap_or(""),
                 edits.len()
             );
             for (number, edit) in edits.into_iter().enumerate() {

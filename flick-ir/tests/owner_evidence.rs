@@ -53,6 +53,7 @@ fn program(body: Expr) -> Program {
                 },
             }],
             types: vec![],
+            preambles: vec![],
             labels: BTreeMap::default(),
             initialization: flick_ir::Initialization::default(),
             records: BTreeMap::default(),

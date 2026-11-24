@@ -175,8 +175,7 @@ impl ReviewedPrimitives {
         Self::build(modules, is_builtin, lang, &|module, foreign, prim| {
             let override_spec = foreign
                 .binding
-                .from
-                .as_deref()
+                .from()
                 .and_then(|spec| resolved_spec(module, spec));
             js_target_allows(foreign, prim, rt, bridge, override_spec)
         })
@@ -204,11 +203,11 @@ pub fn js_target_allows(
     bridge: EffectBridge,
     override_spec: Option<&str>,
 ) -> bool {
-    let Some(from) = foreign.binding.from.as_deref() else {
+    let Some((from, export)) = foreign.binding.module_export() else {
         return false;
     };
     let (expected_from, expected_export) = prim.binding();
-    if from != expected_from || foreign.binding.name != expected_export {
+    if from != expected_from || export != expected_export {
         return false;
     }
     if rt {
@@ -356,8 +355,7 @@ fn classify_builtin_foreign(
     }
     let (bit, prim) = slot_of(module, &foreign.name, is_instances)?;
     let (expected_from, expected_export) = prim.binding();
-    if foreign.binding.from.as_deref() != Some(expected_from)
-        || foreign.binding.name != expected_export
+    if foreign.binding.module_export() != Some((expected_from, expected_export))
         || !has_required_roles(prim, module, lang)
     {
         return None;

@@ -65,10 +65,9 @@ pub fn validate_request(
     if !problems.is_empty() {
         return Err(format!("invalid backend IR: {}", problems.join("; ")));
     }
-    validate_source_spans(
-        &program,
-        &texts.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
-    )?;
+    let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
+    validate_source_spans(&program, &text_refs)?;
+    sources::validate_inline_spans(request, &text_refs)?;
     match (&request.target.mode, &request.module_root) {
         (Mode::WholeProgram, None) => {}
         (Mode::PerModule, Some(root)) if program.modules.iter().any(|m| m.name == *root) => {}
@@ -107,6 +106,20 @@ fn side_data(
                 .any(|i| manifest.get(i.as_str()) != Some(&InputKind::Foreign))
         {
             return Err("foreign binding references an undeclared foreign input".into());
+        }
+    }
+    for inline in &request.inline_foreign {
+        if !modules.contains_key(inline.module.as_str()) {
+            return Err("inline foreign entry references an unknown module".into());
+        }
+        if let Some(name) = &inline.name {
+            string(name, limits)?;
+            if name.is_empty() {
+                return Err("empty inline foreign binding name".into());
+            }
+        }
+        if inline.code.contains('\0') {
+            return Err("inline foreign code contains NUL".into());
         }
     }
     let mut runtimes = BTreeSet::new();

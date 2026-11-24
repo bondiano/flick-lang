@@ -23,13 +23,13 @@ impl Lower<'_> {
         if value.dicts != 0 || !has_standard_shape(value) {
             return None;
         }
-        if value.binding.from.as_deref()? != "flick:Tracer" {
+        if value.binding.from()? != "flick:Tracer" {
             return None;
         }
         let b = ExprBuilder::new(span, "$tr");
         let expr = tracer_template(
             &b,
-            value.binding.name.as_str(),
+            value.binding.export_name().unwrap_or(""),
             value.mode,
             value.stages.len(),
         )?;

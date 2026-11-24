@@ -110,6 +110,7 @@ pub(super) fn empty_module(name: &str, items: Vec<Item>) -> Module {
     Module {
         name: name.to_owned(),
         types: Vec::new(),
+        preambles: Vec::new(),
         items,
         labels: BTreeMap::new(),
         initialization: Initialization::default(),

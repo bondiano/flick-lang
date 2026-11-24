@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Arith, Constraint, Constructor, Dict, Foreign, Handler, InstanceInfo, Lift, Namespace, Num,
-    Span, Stage, TypeDecl, TypeRef,
+    Arith, Constraint, Constructor, Dict, Foreign, Handler, InlineCode, InstanceInfo, Lift,
+    Namespace, Num, Span, Stage, TypeDecl, TypeRef,
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -19,6 +19,10 @@ pub struct Module {
     /// Data, error and nominal type declarations of this module.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub types: Vec<TypeDecl>,
+    /// Host-language preambles (`foreign module inline "…"`) shared by the
+    /// module's foreign bindings, in source order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub preambles: Vec<InlineCode>,
     /// The top-level values debugging tools know by `Module.name`.
     pub labels: BTreeMap<String, Label>,
     #[serde(default, skip_serializing_if = "Initialization::is_empty")]

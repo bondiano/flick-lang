@@ -209,6 +209,7 @@ codes! {
     F008 = Ffi 8, "cannot import the declarations of a package";
     F009 = Ffi 9, "pure foreign function over a scope's capability";
     F010 = Ffi 10, "retention owner needs the std package";
+    F011 = Ffi 11, "invalid inline foreign code";
     D001 = Schema 1, "type has no Schema witness";
     D002 = Schema 2, "codec misses a field";
     D003 = Schema 3, "codec gives a field twice";

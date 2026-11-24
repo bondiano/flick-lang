@@ -51,8 +51,8 @@ pub(super) fn detect_families(sources: &BTreeMap<Name, &Item>, roots: &[&Name]) 
         };
         match &item.kind {
             ItemKind::Foreign(f) => {
-                if let Some(from) = f.binding.from.as_deref() {
-                    mark_family_triggers(&mut families, from, &f.binding.name);
+                if let Some((from, export)) = f.binding.module_export() {
+                    mark_family_triggers(&mut families, from, export);
                 }
                 if let Some(catch_expr) = &f.catch {
                     collect_expr_globals(catch_expr, &mut stack);
@@ -206,11 +206,18 @@ impl Lower<'_> {
             || (vec![WireHint::Any; value.arity], WireHint::Any),
             |decls| decls.foreign_wire_hints(&source, value.arity, taken),
         );
+        let (from, export_name) = match &value.binding {
+            flick_ir::Binding::Module { from, name } => (Some(from.clone()), name.clone()),
+            flick_ir::Binding::Global { name } => (None, name.clone()),
+            flick_ir::Binding::Inline(_) => {
+                return Err(super::unsupported("inline foreign binding", span));
+            }
+        };
         let spec = ForeignCallSpec {
             module: name.module.clone(),
             source_dir: self.module_dirs.get(&name.module).cloned(),
-            from: value.binding.from.clone(),
-            name: value.binding.name.clone(),
+            from,
+            name: export_name,
             mode: value.mode,
             dicts: value.dicts,
             arity: value.arity,

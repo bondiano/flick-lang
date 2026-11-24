@@ -24,11 +24,15 @@ impl Lower<'_> {
         if value.dicts != 0 || value.mode != ForeignMode::Effect || !has_standard_shape(value) {
             return None;
         }
-        if value.binding.from.as_deref()? != "flick:Pool" {
+        if value.binding.from()? != "flick:Pool" {
             return None;
         }
         let b = ExprBuilder::new(span, "$pl");
-        let expr = pool_template(&b, value.binding.name.as_str(), value.stages.len())?;
+        let expr = pool_template(
+            &b,
+            value.binding.export_name().unwrap_or(""),
+            value.stages.len(),
+        )?;
         Some(self.lower_with_manual_scope(&expr, "$pl", block, span))
     }
 }

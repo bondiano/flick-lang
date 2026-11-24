@@ -12,7 +12,7 @@ fn original_scoped_foreign_alias_keeps_raw_activation_inside_callable() {
         .expect("raw host item");
     assert_ne!(raw.name, "acquire");
     assert_eq!(raw.source_name.as_deref(), Some("acquire"));
-    assert_eq!(raw.binding.name, "arenaMake");
+    assert_eq!(raw.binding.export_name(), Some("arenaMake"));
     assert_eq!(raw.arity, 1);
     let ir = print(&module);
     let wrapper = ir
