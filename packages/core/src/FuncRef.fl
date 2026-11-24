@@ -1,0 +1,9 @@
+/// Functions without captures, which a host without closures takes as a
+/// plain function pointer. Where a `FuncRef` is expected, a top-level
+/// function or a lambda that captures nothing is one.
+module FuncRef exposing (..)
+
+/// The function `r` refers to: of `FuncRef (a -> b)`, an `a -> b`. It is
+/// `r` itself at run time.
+fun : FuncRef f -> f
+foreign pure fun from "flick:rt" "identity"

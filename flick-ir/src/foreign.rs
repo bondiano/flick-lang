@@ -152,6 +152,10 @@ pub struct Adapter {
     /// For each argument: the number of arguments of the function of the
     /// host a callback is adapted to.
     pub callbacks: Vec<Option<usize>>,
+    /// `retention`: how long the host keeps what the arguments hold, such as
+    /// the environment of a callback; none when the signature needs no line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retention: Option<Retention>,
     pub copies: Copies,
     /// What the Effect bridge converts, for each parameter and the result.
     #[serde(default)]
@@ -187,6 +191,16 @@ impl Adapter {
                 && matches!(word.args.as_slice(), [AdapterArg::Word(actual)] if actual == arg)
         })
     }
+}
+
+/// What a foreign function keeps of its arguments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Retention {
+    /// Nothing beyond what its result's type shows: kept for the call.
+    Call,
+    /// Until the owner of the region it was given closes, then released.
+    Owner,
 }
 
 /// The part of a type that must change when a value crosses the Effect bridge.

@@ -164,6 +164,20 @@ fn types_agree_env(
     if let Some((x, y)) = record_field_pair(types, a, b) {
         return types_agree_env(types, x, y, renames, allow_var_refinement, true, unfold);
     }
+    // a `FuncRef` is the function it refers to, which the checker accepted
+    // where the reference is expected
+    match (
+        types.is_lang_named(a, Lang::FuncRef),
+        types.is_lang_named(b, Lang::FuncRef),
+    ) {
+        (Some([f]), None) => {
+            return types_agree_env(types, f, b, renames, allow_var_refinement, in_data, unfold);
+        }
+        (None, Some([f])) => {
+            return types_agree_env(types, a, f, renames, allow_var_refinement, in_data, unfold);
+        }
+        _ => {}
+    }
     if matches!(a, IrType::Forall { .. }) && !matches!(b, IrType::Forall { .. }) {
         let (vars, inner) = peel_forall(a);
         return matches_scheme(types, inner, &vars, b, allow_var_refinement, in_data);

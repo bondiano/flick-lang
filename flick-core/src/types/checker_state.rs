@@ -70,6 +70,8 @@ struct Checker<'a> {
     /// The fields of the record literals around the value being checked,
     /// outermost first: where a nested record's field is missing.
     field_path: Vec<String>,
+    /// The `FuncRef`s whose dictionaries are checked once the module is solved.
+    func_refs: Vec<func_ref::FuncRefSite>,
     /// The type of the first parameter of a function inferred where it is
     /// applied (`.email user`, `(fun r -> r.id) p`): its argument, checked
     /// first, gave it. The function opened next takes it.

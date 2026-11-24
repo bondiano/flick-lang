@@ -1,5 +1,6 @@
 //! The exact rank-two Option bridge, discharged by closed ordinary Flick code.
 //! No callback or data is exported to a host: copy bits are not erased for FFI.
+use super::kept_for_call;
 use crate::{
     ir::{Arm, Expr, ExprKind, Param, Pat, Stage},
     source::Span,
@@ -13,7 +14,7 @@ fn supports(value: &Foreign) -> bool {
         && value.dicts == 0
         && value.stages == [false, false, false]
         && value.catch.is_none()
-        && value.adapter
+        && kept_for_call(&value.adapter)
             == Adapter {
                 optional: vec![],
                 owned: vec![],
@@ -34,6 +35,7 @@ fn supports(value: &Foreign) -> bool {
                 ],
                 result_shape: Shape::Option(Box::new(Shape::Data)),
                 words: vec![],
+                retention: None,
             }
 }
 

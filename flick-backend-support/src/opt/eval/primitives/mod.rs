@@ -324,6 +324,7 @@ fn has_expected_adapter(a: &Adapter, foreign_arity: usize, prim: NativePrimitive
         matches!(a.result_shape, Shape::Data)
     };
     a.words.is_empty()
+        && a.retention.is_none()
         && a.optional.is_empty()
         && a.owned.is_empty()
         && !a.result.nullable

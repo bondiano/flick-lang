@@ -10,7 +10,7 @@ variable {S : Sig}
 
 theorem Typ.glob_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ g T φ, e = .glob g → J = .ex T φ →
-      ∃ s ts, S.glob g = some s ∧ ts.length = s.k ∧ s.Holds Θ ts ∧ LeOut S (s.inst ts) T := by
+      ∃ s ts, S.glob g = some s ∧ ts.length = s.k ∧ s.Holds Θ ts ∧ LeOut S (.glob g) (s.inst ts) T := by
   induction h with
   | conv _ he ih =>
     intro g T φ hv hJ; cases hJ
@@ -21,6 +21,10 @@ theorem Typ.glob_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro g T φ hv hJ; cases hJ
     obtain ⟨s, ts, hg, hl, hH, ht⟩ := ih g _ _ hv rfl
     exact ⟨s, ts, hg, hl, hH, ht.errIn hU hE⟩
+  | funcRef _ hcl ih =>
+    intro g T φ hv hJ; cases hJ
+    obtain ⟨s, ts, hg, hl, hH, ht⟩ := ih g _ _ hv rfl
+    exact ⟨s, ts, hg, hl, hH, .funcRef (hv ▸ hcl) ht⟩
   | allI hv => intro g T φ he _; cases he; cases hv
   | _ => intro g T φ hv _; cases hv
 

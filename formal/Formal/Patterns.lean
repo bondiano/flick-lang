@@ -130,7 +130,7 @@ theorem SpW.adt {Z : Ty} {T : Name} (h : SpW S Z (.adt T)) : Z = .adt T := by
 /-- The final type of a typed constructor spine is its type at an instance. -/
 theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     Value v → ∀ {K k ts T X φ}, v.head = .ctor K → S.ctor K = some (k, ts, T) →
-      J = .ex X φ → X.kind ≠ 7 → ¬ X.isAll →
+      J = .ex X φ → X.kind ≠ 7 ∧ X.kind ≠ 17 → ¬ X.isAll →
         ∃ us, us.length = k ∧ ∃ ws, X.res = Ty.tcon T ws ∧
           S.Vary T ((S.res K).map (Ty.substT (instT us))) ws := by
   induction h with
@@ -157,6 +157,7 @@ theorem Typ.spine_res {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
       exact ⟨us, hl, ws', hr', hw.trans hw'⟩
     | constApp => simp [Tm.head] at hK
   | errVal => intro _ _ _ _ _ _ _ _ _ hJ hk; cases hJ; simp [Ty.kind] at hk
+  | funcRef => intro _ _ _ _ _ _ _ _ _ hJ hk; cases hJ; simp [Ty.kind] at hk
   | allI => intro _ _ _ _ _ _ _ _ _ hJ _ hA; cases hJ; exact (hA trivial).elim
   | _ => intro hv _ _ _ _ _ _ hK; cases hv <;> simp [Tm.head] at hK
 
@@ -183,7 +184,7 @@ theorem PatTy.spine {fl p t Δ} (hp : PatTy S fl p t Δ) (hf : fl = false) :
 the type `T`, and the pattern's bindings, given how the pattern types a match (`ih`). -/
 theorem PatTy.err_match {Ψ Θ Γ p T Δ v δ ε} (hp : PatTy S false p (.adt T) Δ)
     (ih : ∀ {v δ t'}, Value v → Typ S Ψ Θ Γ v (.ex t' .pure) → matchP p v = some δ →
-      (false = true → t' = .adt T) → (false = false → t'.kind ≠ 7 ∧ ResBelow S t' (.adt T)) →
+      (false = true → t' = .adt T) → (false = false → (t'.kind ≠ 7 ∧ t'.kind ≠ 17) ∧ ResBelow S t' (.adt T)) →
       (∃ Z, LeLive S Z t' ∧ SpW S Z (.adt T)) ∧ Inst S Ψ Θ Γ δ Δ)
     (hvv : Value v) (hv : Typ S Ψ Θ Γ v (.ex (.errors ε) .pure)) (hm : matchP p v = some δ) :
     Inst S Ψ Θ Γ δ Δ ∧ Typ S Ψ Θ Γ v (.ex (.adt T) .pure) := by
@@ -191,7 +192,7 @@ theorem PatTy.err_match {Ψ Θ Γ p T Δ v δ ε} (hp : PatTy S false p (.adt T)
   obtain ⟨K', k', ts', T', us, hS', hk', hr, hm'⟩ := hp.spine rfl
   rw [hm' v δ hm] at hK; cases hK
   rw [hS] at hS'; cases hS'
-  have hU7 : U.kind ≠ 7 := by rw [Ty.kind_of_hd hU]; decide
+  have hU7 : U.kind ≠ 7 ∧ U.kind ≠ 17 := by rw [Ty.kind_of_hd hU]; decide
   obtain ⟨_, _, ws, hr', hw⟩ := hv'.spine_res hvv (hm' v δ hm) hS rfl hU7 (Ty.not_all_of_hd hU)
   -- an error's constructor builds the error type itself
   obtain ⟨hnil, rfl⟩ := Ty.tcon_eq_adt hr.symm
@@ -208,7 +209,7 @@ theorem PatTy.err_match {Ψ Θ Γ p T Δ v δ ε} (hp : PatTy S false p (.adt T)
 the pattern is below the type of the value, at the same instance. -/
 theorem PatTy.typ_match {Ψ Θ Γ fl p t Δ} (hp : PatTy S fl p t Δ) :
     ∀ {v δ t'}, Value v → Typ S Ψ Θ Γ v (.ex t' .pure) → matchP p v = some δ →
-      (fl = true → t' = t) → (fl = false → t'.kind ≠ 7 ∧ ResBelow S t' t) →
+      (fl = true → t' = t) → (fl = false → (t'.kind ≠ 7 ∧ t'.kind ≠ 17) ∧ ResBelow S t' t) →
       (∃ Z, LeLive S Z t' ∧ SpW S Z t) ∧ Inst S Ψ Θ Γ δ Δ := by
   induction hp with
   | conv _ he ih =>

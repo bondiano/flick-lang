@@ -36,6 +36,7 @@ theorem Ty.Equiv.asRow {a b : Ty} (h : Ty.Equiv a b) : a.asRow = b.asRow := by
   | trans _ _ ih₁ ih₂ => exact ih₁.trans ih₂
   | arrow h₁ h₂ h₃ => exact congrArg Row.ofCaps (Ty.Equiv.arrow h₁ h₂ h₃).reach
   | ref h => exact congrArg Row.ofCaps (Ty.Equiv.ref h).reach
+  | funcRef h => exact congrArg Row.ofCaps (Ty.Equiv.funcRef h).reach
   | tapp h₁ h₂ => exact congrArg Row.ofCaps (Ty.Equiv.tapp h₁ h₂).reach
   | rcons h₁ h₂ => exact congrArg Row.ofCaps (Ty.Equiv.rcons h₁ h₂).reach
   | eff h₁ h₂ h₃ => exact congrArg Row.ofCaps (Ty.Equiv.eff h₁ h₂ h₃).reach

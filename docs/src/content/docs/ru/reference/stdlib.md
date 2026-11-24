@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 2518f69e49908231
+source_hash: 35fbe09a8a92fc20
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -61,6 +61,7 @@ source_hash: 2518f69e49908231
 | `Float` | `strict_equal` (`===`), `same_value` (`Object.is`), округление, `parse`, `is_nan`, `is_finite`, … |
 | `BigInt` | преобразования и проверяемые `divide`, `remainder` |
 | `Ref` | `make`, `get`, `set`, `modify` и `same` для проверки идентичности; без `Eq` и `Hash` |
+| `FuncRef` | `fun` — функция, на которую ссылается `FuncRef`: функция без захвата для хоста, который принимает обычный указатель на функцию (см. [внешние функции](../ffi/#функции-без-захвата-и-трамплины)) |
 | `Redacted` | эффектные `make`, `reveal`; `show` выводит `<redacted>` |
 | `BigDecimal` | десятичные числа: `from_string`, точные `add`, `subtract`, проверяемые `multiply`, `divide_to_scale` |
 | `Duration` | длительности: проверяемые `nanos`, `millis`, `seconds`, `minutes`; для неограниченной длительности — явное `infinity` |

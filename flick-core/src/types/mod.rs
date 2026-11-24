@@ -46,6 +46,7 @@ mod exhaust;
 mod exports;
 mod facts;
 mod ffi;
+mod func_ref;
 mod gadt;
 mod generalize;
 pub mod handle;
@@ -388,6 +389,7 @@ fn checker_in<'a>(
         root: None,
         calls: Vec::new(),
         field_path: Vec::new(),
+        func_refs: Vec::new(),
         given_param: None,
         piped_late: None,
         holes: Vec::new(),

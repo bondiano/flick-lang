@@ -105,6 +105,7 @@ theorem Typ.context_equiv {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | raise _ hφ ih => intro _ _ hn hΨ hΓ; exact .raise (ih hn hΨ hΓ) hφ
   | raiseAdt _ hU hφ ih => intro _ _ hn hΨ hΓ; exact .raiseAdt (ih hn hΨ hΓ) hU hφ
   | errVal _ hU hε ih => intro _ _ hn hΨ hΓ; exact .errVal (ih hn hΨ hΓ) hU hε
+  | funcRef _ hc ih => intro _ _ hn hΨ hΓ; exact .funcRef (ih hn hΨ hΓ) hc
   | tryR _ _ hφ hs ihe iha =>
     intro _ _ hn hΨ hΓ
     exact .tryR (ihe (hn.sub Or.inl) hΨ hΓ) (iha (hn.sub Or.inr) hΨ hΓ) hφ hs

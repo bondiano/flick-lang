@@ -17,6 +17,7 @@ inductive Ty.SameForm : Ty → Ty → Prop
   | arrow {a a' b b' φ φ' C} : Ty.Equiv a a' → Ty.Equiv φ φ' → Ty.Equiv b b' →
       Ty.SameForm (.arrow a φ b C) (.arrow a' φ' b' C)
   | ref {a b} : Ty.Equiv a b → Ty.SameForm (.ref a) (.ref b)
+  | funcRef {a b} : Ty.Equiv a b → Ty.SameForm (.funcRef a) (.funcRef b)
   | adt (N) : Ty.SameForm (.adt N) (.adt N)
   | tapp {f f' a a'} : Ty.Equiv f f' → Ty.Equiv a a' → Ty.SameForm (.tapp f a) (.tapp f' a')
   | rnil : Ty.SameForm .rnil .rnil
@@ -47,6 +48,7 @@ theorem Ty.SameForm.refl (t : Ty) : t.SameForm t := by
   | base b => exact .base b
   | arrow => exact .arrow .refl .refl .refl
   | ref => exact .ref .refl
+  | funcRef => exact .funcRef .refl
   | adt N => exact .adt N
   | tapp => exact .tapp .refl .refl
   | rnil => exact .rnil
@@ -69,6 +71,7 @@ theorem Ty.SameForm.symm {a b : Ty} (h : a.SameForm b) : b.SameForm a := by
   | rows ha hb => exact .rows hb ha
   | arrow ha hφ hb => exact .arrow ha.symm hφ.symm hb.symm
   | ref h => exact .ref h.symm
+  | funcRef h => exact .funcRef h.symm
   | tapp hf ha => exact .tapp hf.symm ha.symm
   | rcons ha hr => exact .rcons ha.symm hr.symm
   | eff h₁ h₂ h₃ => exact .eff h₁.symm h₂.symm h₃.symm
@@ -93,6 +96,9 @@ theorem Ty.SameForm.trans {a b c : Ty} (h : a.SameForm b) (h' : b.SameForm c) :
   | ref h => cases h' with
     | rows h _ => cases h
     | ref h' => exact .ref (h.trans h')
+  | funcRef h => cases h' with
+    | rows h _ => cases h
+    | funcRef h' => exact .funcRef (h.trans h')
   | tapp hf ha => cases h' with
     | rows h _ => cases h
     | tapp hf' ha' => exact .tapp (hf.trans hf') (ha.trans ha')
@@ -141,6 +147,7 @@ theorem Ty.Equiv.form {a b : Ty} (h : Ty.Equiv a b) : a.SameForm b := by
   | trans _ _ ih₁ ih₂ => exact ih₁.trans ih₂
   | arrow ha hφ hb => exact .arrow ha hφ hb
   | ref h => exact .ref h
+  | funcRef h => exact .funcRef h
   | tapp hf ha => exact .tapp hf ha
   | rcons ha hr => exact .rcons ha hr
   | eff h₁ h₂ h₃ => exact .eff h₁ h₂ h₃
@@ -181,6 +188,12 @@ theorem Ty.Equiv.errors_right {a : Ty} {e} (h : Ty.Equiv a (.errors e)) :
   cases h.form with
   | rows _ hr => cases hr
   | errors he => exact ⟨_, rfl, he⟩
+
+theorem Ty.Equiv.funcRef_right {a : Ty} {t} (h : Ty.Equiv a (.funcRef t)) :
+    ∃ t', a = .funcRef t' ∧ Ty.Equiv t' t := by
+  cases h.form with
+  | rows _ hr => cases hr
+  | funcRef he => exact ⟨_, rfl, he⟩
 
 theorem Ty.Equiv.hnd_rg_right {a : Ty} {p} (h : Ty.Equiv a (.hnd (.rg p))) :
     a = .hnd (.rg p) := by

@@ -63,6 +63,7 @@ change needs.
 | [Fixed-width numeric types in IR `0.16.0`](#fixed-width-numeric-types-in-ir-0160) | no | — |
 | [Inline foreign bindings and module preambles (`0.17.0`)](#inline-foreign-bindings-and-module-preambles-0170) | no | `FLICK-F011` |
 | [Versioned backend value ABI tables](#versioned-backend-value-abi-tables) | no | `FLICK-F013`, `FLICK-F014` |
+| [`FuncRef` and callback retention in IR `0.18.0`](#funcref-and-callback-retention-in-ir-0180) | no | `FLICK-F015`, `FLICK-F013` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -813,3 +814,22 @@ direction. Packages may declare `[package.abi]` in `flick.toml`, and
 mismatches report `FLICK-F014` rather than issuing a silent foreign call.
 Existing JS FFI programs require no source changes; third-party backend
 components should rebuild against the updated `flick-backend` WIT world.
+
+## `FuncRef` and callback retention in IR `0.18.0`
+
+`Prelude` declares `FuncRef (a -> b)`, a function without captures, and the
+core module `FuncRef` gives `FuncRef.fun`. Where a `FuncRef` is expected, the
+value must be a top-level function or a lambda that captures nothing;
+anything else is `FLICK-F015` ([ffi.md](../../reference/ffi/#functions-without-captures-and-trampolines)).
+A module that declares its own `FuncRef` type or module hides the built-in
+one, as with any name of `Prelude`.
+
+The portable IR moves from `0.17.0` to `0.18.0`: `flick_ir::Adapter` gains
+`retention: Option<Retention>` (`call` or `owner`), so a backend that
+generates callback trampolines from `callback i data j` knows how long to
+keep their environment. `func_ref` is a value-ABI lang item without an
+opaque fallback: a backend whose table has no `func_ref` row refuses a
+`FuncRef` in a foreign signature with `FLICK-F013`; `flick/js` maps it to
+the function itself. Backend components and `ir`-hook plugins must rebuild
+against `flick-ir` `0.18.0` and update their descriptor `ir` range to
+`[0.18.0, 0.19.0)`.

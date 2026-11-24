@@ -50,6 +50,8 @@ const FORMS: &[(Lang, usize, Option<Pair>, Imports)] = &[
         &[],
     ),
     (Lang::Seq, 1, Some(("Iterable<{0}>", "Iterable<{0}>")), &[]),
+    // the function itself
+    (Lang::FuncRef, 1, Some(("{0}", "{0}")), &[]),
     (Lang::Errors, 1, Some(("{0:row}", "{0:row}")), &[]),
     (
         Lang::Ui,

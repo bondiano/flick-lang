@@ -223,6 +223,8 @@ fn lang_role_primitive(role: &str) -> Option<Primitive> {
             | Lang::ServiceImpl
             | Lang::Exit
             | Lang::Failure => Some(Primitive::Pointer),
+            // the function itself, laid out as an arrow's value is
+            Lang::FuncRef => Some(Primitive::Closure),
             _ => None,
         };
     }

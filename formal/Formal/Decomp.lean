@@ -80,7 +80,7 @@ theorem PHead.redex {e e' : Tm} (h : PHead e e') : Redex e := by
   cases h <;> cases F <;> simp only [Frame.plug, Frame.ok, reduceCtorEq, Tm.app.injEq,
     Tm.let_.injEq, Tm.match_.injEq, Tm.proj.injEq, Tm.update.injEq, Tm.try_.injEq] at ha hF <;>
     first
-    | (obtain ⟨rfl, -⟩ := ha; first | assumption | exact .lam | exact .fix)
+    | (obtain ⟨rfl, -⟩ := ha; first | assumption | exact .lam | exact .fix | exact .const)
     | (obtain ⟨-, rfl⟩ := ha; first | assumption)
     | (obtain ⟨-, -, rfl⟩ := ha; assumption)
     | (obtain ⟨-, rfl, -⟩ := ha; assumption)

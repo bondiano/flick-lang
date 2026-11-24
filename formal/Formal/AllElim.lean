@@ -70,7 +70,7 @@ private theorem Typ.constResult {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     cases he
     exact ht.not_all hy
   | perform => intro c a ψ t C φ hc hArity _; cases hc; simp [Const.arity] at hArity
-  | allI | errVal => intro c a ψ t C φ _ _ hJ; cases hJ
+  | allI | errVal | funcRef => intro c a ψ t C φ _ _ hJ; cases hJ
   | _ => intro c a ψ t C φ hc _ _; cases hc
 
 private theorem Typ.allInvCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
@@ -145,6 +145,7 @@ private theorem Typ.instVarCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     exact .var hi hus (fun _ _ h => (hc _ _ h).elim) LeLiveI.refl
   | allI hv => intro j k t φ us hj _ _; cases hj; cases hv
   | errVal => intro j k t φ us _ hJ _; cases hJ
+  | funcRef => intro j k t φ us _ hJ _; cases hJ
   | _ => intro j k t φ us hj _ _; cases hj
 
 /-- One instance of a binder. -/

@@ -66,7 +66,8 @@ inductive OpClass
 
 /-- Constants of Γ₀ (core.md §1.5, regions.md §1.5). The typing rule instantiates
 their types (`CArg`); `open_` acquires a capability `H ϱ`, `op` uses one; `intEq`
-compares two `Int`s. `scopeRun` is `Scope.run`, a `scope` whose body is its argument. -/
+compares two `Int`s. `scopeRun` is `Scope.run`, a `scope` whose body is its argument.
+`funcRefFun` is `FuncRef.fun`. -/
 inductive Const
   | refMake
   | refGet
@@ -78,6 +79,8 @@ inductive Const
   | intEq
   | scopeRun
   | perform (E o : Name) (c : OpClass)
+  /-- `FuncRef.fun`: the function a `FuncRef τ` refers to, the value itself. -/
+  | funcRefFun
 
 def Const.arity : Const → Nat
   | .refSet | .addFin | .spawn | .intEq => 2
