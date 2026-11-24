@@ -330,6 +330,7 @@ pub fn observe_proofs(
                 &program,
                 &lemmas,
                 Some((&mut evidence, &recording.aliases)),
+                None,
             );
             save_lemma(checked, lowered, &mut lemmas);
         }
@@ -427,12 +428,9 @@ fn prove_each(
                 lemmas,
                 #[cfg(not(target_arch = "wasm32"))]
                 candidate_scope,
+                #[cfg(not(target_arch = "wasm32"))]
+                lints.as_deref_mut().map(|lints| (lints, &mut out)),
             );
-            #[cfg(not(target_arch = "wasm32"))]
-            if let (Some(lints), Ok(verified)) = (&mut lints, &checked) {
-                lints.premises(lowered.at, &mut out);
-                lints.steps(&verified.certificate, &mut out);
-            }
             if let Some(failure) = save_lemma(checked, lowered, lemmas) {
                 out.push(
                     failure
@@ -449,12 +447,6 @@ fn prove_each(
     out
 }
 
-struct Verified {
-    statement: logic::Statement,
-    #[cfg(not(target_arch = "wasm32"))]
-    certificate: logic::Cert,
-}
-
 fn verify(
     lowered: &LoweredProof,
     info: &ProofInfo,
@@ -464,7 +456,11 @@ fn verify(
         &mut ProofEvidence,
         &logic::LemmaAliases,
     )>,
-) -> Result<Verified, Failure> {
+    #[cfg(not(target_arch = "wasm32"))] lints: Option<(
+        &mut lints::Lints<'_>,
+        &mut Vec<Diagnostic>,
+    )>,
+) -> Result<logic::Statement, Failure> {
     let checked = statement(lowered, info).and_then(|statement| {
         let body = lowered.body.as_ref().ok_or_else(|| {
             Failure::Refused(logic::Refused {
@@ -490,11 +486,12 @@ fn verify(
         }
         #[cfg(target_arch = "wasm32")]
         logic::prove(&statement, &cert, &info.data, program, lemmas)?;
-        Ok(Verified {
-            statement,
-            #[cfg(not(target_arch = "wasm32"))]
-            certificate: cert,
-        })
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some((lints, out)) = lints {
+            lints.premises(lowered.at, out);
+            lints.steps(&cert, out);
+        }
+        Ok(statement)
     });
     #[cfg(not(target_arch = "wasm32"))]
     if let Some((evidence, aliases)) = evidence {
@@ -516,12 +513,12 @@ fn verify(
 }
 
 fn save_lemma(
-    checked: Result<Verified, Failure>,
+    checked: Result<logic::Statement, Failure>,
     lowered: &LoweredProof,
     lemmas: &mut Vec<logic::Lemma>,
 ) -> Option<Failure> {
     match checked {
-        Ok(Verified { statement, .. }) => {
+        Ok(statement) => {
             lemmas.push(logic::Lemma {
                 statement,
                 order: (lowered.params.iter())
