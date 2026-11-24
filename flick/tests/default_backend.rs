@@ -76,7 +76,7 @@ fn release_profile_defaults_to_the_official_component() {
         .expect("ordinary release builds execute the component");
     let manifest: Manifest = ciborium::from_reader(&bytes[..]).expect("launch manifest");
     assert_eq!(manifest.backend.identity.id, "flick/js");
-    assert_eq!(manifest.backend.identity.version, "0.1.0");
+    assert_eq!(manifest.backend.identity.version, "0.2.0");
     let component = fs::read(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../backends/js/package/component.wasm"

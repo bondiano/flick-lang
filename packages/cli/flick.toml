@@ -2,8 +2,8 @@ schema-version = 1
 
 [package]
 name = "cli"
-version = "0.1.0"
-flick = ">=0.1, <0.2"
+version = "0.2.0"
+flick = ">=0.2, <0.3"
 
 [project]
 kind = "lib"

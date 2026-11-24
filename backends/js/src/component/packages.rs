@@ -150,7 +150,7 @@ pub(super) fn packages(
     }
 
     if let Some(mode) = option("check-runtime") {
-        let compiler = option("compiler").unwrap_or("0.1.0");
+        let compiler = option("compiler").unwrap_or("0.2.0");
         let rt = match mode {
             "rt" => true,
             "effect" => false,

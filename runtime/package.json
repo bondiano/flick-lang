@@ -1,6 +1,6 @@
 {
   "name": "@flick-lang/runtime",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Flick-owned runtime, independent of Effect",
   "license": "MIT",
   "repository": {

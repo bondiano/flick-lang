@@ -1,10 +1,10 @@
 {
   "dependencies": {
-    "@flick-lang/runtime": "0.1.0",
-    "@flick-lang/effect-ts": "0.1.0"
+    "@flick-lang/runtime": "0.2.0",
+    "@flick-lang/effect-ts": "0.2.0"
   },
   "flick": {
-    "compiler": "0.1.0"
+    "compiler": "0.2.0"
   },
   "name": "typed-interpreter",
   "packageManager": "pnpm@12.16.1",

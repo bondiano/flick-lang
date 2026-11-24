@@ -6,6 +6,12 @@ break programs.
 
 ## Unreleased
 
+## 0.2.0 — 2026-11-24
+
+The second public release: the changes below, then
+[CHANGELOG-0.2-2.md](CHANGELOG-0.2-2.md) and
+[CHANGELOG-0.2-1.md](CHANGELOG-0.2-1.md).
+
 - **A local function without a signature is generic.** `let same x = x`
   and `let get = fun r -> r.value` inside a function are generalized as
   `let f = (fun …)` already was, so each use may give them other types. A

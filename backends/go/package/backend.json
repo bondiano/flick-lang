@@ -1,9 +1,9 @@
 {
   "identity": {
     "id": "flick/go",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
-  "sha256": "d988549b57af7fe0105fc056948d5f390780219d92638467f4ab7e621597549e",
+  "sha256": "07caeb09b89f5adfb02473894d9b0ca9b2224227118f28f71566f281eb3a8a4d",
   "backend_api": {
     "minimum": "0.1.0",
     "maximum_exclusive": "0.2.0"

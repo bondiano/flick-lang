@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 
 /** The compiler has loaded and checked the first example, and the editor has opened. */
 export const ready = async (page: Page): Promise<void> => {
-  await expect(page.locator(".fp-status")).toContainText("0.1.0", { timeout: 60_000 });
+  await expect(page.locator(".fp-status")).toContainText("0.2.0", { timeout: 60_000 });
   await expect(page.locator(".fp-cm .cm-content")).toBeVisible();
 };
 

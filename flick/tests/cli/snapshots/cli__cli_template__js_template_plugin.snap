@@ -96,10 +96,10 @@ target = "js"
 === package.json ===
 {
   "dependencies": {
-    "@flick-lang/runtime": "0.1.0"
+    "@flick-lang/runtime": "0.2.0"
   },
   "flick": {
-    "compiler": "0.1.0"
+    "compiler": "0.2.0"
   },
   "name": "demo",
   "packageManager": "pnpm@12.16.1",
@@ -125,10 +125,10 @@ crate-type = ["cdylib", "rlib"]
 guest = ["flick-plugin/guest"]
 
 [dependencies]
-flick-plugin = { git = "https://github.com/bondiano/flick-lang", tag = "v0.1.0" }
+flick-plugin = { git = "https://github.com/bondiano/flick-lang", tag = "v0.2.0" }
 
 [dev-dependencies]
-flick-core = { git = "https://github.com/bondiano/flick-lang", tag = "v0.1.0" }
+flick-core = { git = "https://github.com/bondiano/flick-lang", tag = "v0.2.0" }
 === plugin/src/lib.rs ===
 //! The plugin of demo: `tagged "name" { value }` stands for the record
 //! `{ tag = "name"; value = value }`, a `Tagged.Tagged`.

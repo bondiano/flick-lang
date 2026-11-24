@@ -1,9 +1,9 @@
 {
   "identity": {
     "id": "flick/js",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
-  "sha256": "ef30c76e851e17769fbeb06aba0bc6fb6ba23dfd393e2fb43323f875959c58e9",
+  "sha256": "70aac462443d3fb79928f1b72ecc264cd063d238b71c434045ce6345522dd51e",
   "backend_api": {
     "minimum": "0.1.0",
     "maximum_exclusive": "0.2.0"

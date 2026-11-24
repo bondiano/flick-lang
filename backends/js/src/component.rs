@@ -209,14 +209,14 @@ impl Backend for Javascript {
         Descriptor {
             identity: BackendId {
                 id: "flick/js".into(),
-                version: "0.1.0".into(),
+                version: "0.2.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
             ir: range("0.17.0", "0.18.0"),
-            language: range("0.1.0", "0.2.0"),
+            language: range("0.2.0", "0.3.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
-                versions: range("0.1.0", "0.2.0"),
+                versions: range("0.2.0", "0.3.0"),
             }],
             environments: ["node", "browser", "bun", "cloudflare"]
                 .into_iter()

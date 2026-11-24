@@ -66,10 +66,10 @@ target = "js"
 === package.json ===
 {
   "dependencies": {
-    "@flick-lang/runtime": "0.1.0"
+    "@flick-lang/runtime": "0.2.0"
   },
   "flick": {
-    "compiler": "0.1.0"
+    "compiler": "0.2.0"
   },
   "name": "demo",
   "packageManager": "pnpm@12.16.1",
