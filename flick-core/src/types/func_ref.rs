@@ -41,11 +41,23 @@ impl Checker<'_> {
         }
     }
 
-    /// `node` where `expected`, a `FuncRef` of `fn_ty`, is expected. Kept
-    /// out of `check_value`, whose frame every nested expression adds to the
-    /// stack.
+    /// Whether `node` is checked as a `FuncRef` against `target`: a block,
+    /// an `if` and a `match` pass the expected type on to what they give.
+    /// This and `check_func_ref` keep their locals out of `check_value`,
+    /// whose frame every nested expression adds to the stack.
     #[inline(never)]
-    pub(super) fn check_func_ref(&mut self, node: &Node, fn_ty: &Type, expected: &Type) -> Type {
+    pub(super) fn expects_func_ref(&self, node: &Node, target: &Type) -> bool {
+        !matches!(node.kind, K::Block | K::IfExpr | K::MatchExpr)
+            && self.func_ref_parts(target).is_some()
+    }
+
+    /// `node` where `expected`, whose head normal form `target` is a
+    /// `FuncRef`, is expected.
+    #[inline(never)]
+    pub(super) fn check_func_ref(&mut self, node: &Node, target: &Type, expected: &Type) -> Type {
+        let fn_ty = &self
+            .func_ref_parts(target)
+            .expect("`expects_func_ref` saw a `FuncRef`");
         let mut node = node;
         while node.kind == K::ParenExpr {
             let Some(inner) = node.nodes().next() else {

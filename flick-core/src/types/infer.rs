@@ -67,10 +67,8 @@ impl<'c> Checker<'c> {
         if let Type::Forall { .. } = target {
             return self.check_forall(node, expected, &target, captures);
         }
-        if !matches!(node.kind, K::Block | K::IfExpr | K::MatchExpr)
-            && let Some(fn_ty) = self.func_ref_parts(&target)
-        {
-            return self.check_func_ref(node, &fn_ty, expected);
+        if self.expects_func_ref(node, &target) {
+            return self.check_func_ref(node, &target, expected);
         }
         let children: Vec<&Node> = node.nodes().collect();
         let mut actual_type = None;
