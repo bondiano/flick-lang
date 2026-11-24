@@ -1,8 +1,15 @@
 impl Checking<'_> {
+    #[cfg(feature = "contracts")]
     fn proves_contracts(&self, loaded: &Loaded) -> bool {
         self.prove_contracts
             && loaded.has_contracts()
             && self.selected.is_none_or(|s| s.contains(&loaded.path))
+    }
+
+    #[cfg(not(feature = "contracts"))]
+    fn proves_contracts(&self, _: &Loaded) -> bool {
+        let _ = (self.prove_contracts, self.selected);
+        false
     }
 
     fn lowers(&self, loaded: &Loaded) -> bool {
@@ -238,6 +245,7 @@ impl Checking<'_> {
             stages_by_class: self.stages_by_class,
             foreign_backend: &foreign_backend,
             validate_foreign_metadata: self.env_ctx.validate_foreign_metadata,
+            native_overrides: Some(self.env_ctx.native_overrides()),
         };
         let mut diagnostics = loaded.parse.diagnostics.clone();
         let resolved_cleanly = !resolved.iter().any(|d| d.severity == Severity::Error);
@@ -310,13 +318,7 @@ impl Checking<'_> {
             ));
         }
         if self.env_ctx.validate_foreign_metadata {
-            Self::validate_official_foreign_adapters(
-                &foreign_backend,
-                &module,
-                &typing,
-                &mut checked,
-            );
-            Self::validate_official_inline_foreign(&foreign_backend, &module, &mut checked);
+            self.validate_official_foreigns(&foreign_backend, &module, &typing, &mut checked);
         }
         self.watched_calls(loaded, &typing, &mut checked);
         let checked = types::beside_syntax_errors(tree, checked);

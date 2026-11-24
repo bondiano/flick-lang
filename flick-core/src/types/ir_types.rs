@@ -431,6 +431,7 @@ mod tests {
             stages_by_class: false,
             foreign_backend: ForeignBackendSpec::default_js(),
             validate_foreign_metadata: true,
+            native_overrides: None,
         };
         let mut checker = checker_in(
             &module,

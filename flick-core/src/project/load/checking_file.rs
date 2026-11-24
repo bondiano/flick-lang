@@ -65,12 +65,16 @@ fn check_file_with(
         watched: types::Watched::new(first_party::WATCH),
     });
     let watching: Vec<_> = watching.into_iter().collect();
+    #[cfg_attr(not(feature = "contracts"), expect(unused_mut))]
     let mut all_contracted = HashSet::new();
-    let text = modules[0]
-        .expansion
-        .as_ref()
-        .map_or(sources.get(file).text.as_str(), |e| e.text.as_str());
-    modules[0].collect_contract_names(text, &mut all_contracted);
+    #[cfg(feature = "contracts")]
+    {
+        let text = modules[0]
+            .expansion
+            .as_ref()
+            .map_or(sources.get(file).text.as_str(), |e| e.text.as_str());
+        modules[0].collect_contract_names(text, &mut all_contracted);
+    }
     let env_ctx = super::environment::EnvironmentContext::standalone();
     #[cfg(not(target_arch = "wasm32"))]
     let package_when = BTreeMap::new();

@@ -69,6 +69,10 @@ pub struct RunArguments {
     #[arg(long, value_enum)]
     pub profile: Option<ProfileArgument>,
 
+    /// Ignore `@native` overrides and lower Flick fallback bodies (for conformance testing).
+    #[arg(long)]
+    pub no_native_overrides: bool,
+
     /// Backend-declared options parsed from the command line.
     #[arg(skip)]
     pub backend_options: BTreeMap<String, Vec<String>>,
@@ -246,6 +250,10 @@ pub struct InspectArguments {
     /// project.
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
+
+    /// Ignore `@native` overrides and lower Flick fallback bodies (for conformance testing).
+    #[arg(long)]
+    pub no_native_overrides: bool,
 
     /// Backend-declared options parsed from the command line.
     #[arg(skip)]

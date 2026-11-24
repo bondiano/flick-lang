@@ -172,13 +172,26 @@ impl<'a> Printer<'a> {
         let Element::Node(body) = &n.children[block] else {
             unreachable!("a node position")
         };
-        let doc = self.body(head, Value::Block(body), body.range().1, &[]);
+        let first_override = node_position(n, K::NativeOverride);
+        let tail_end = first_override.unwrap_or(n.children.len());
+        let overrides: Vec<&'a Node> = n.nodes().filter(|c| c.kind == K::NativeOverride).collect();
+        let body_end = overrides
+            .first()
+            .map_or_else(|| body.range().1, |o| o.range().0);
+        let doc = self.body(head, Value::Block(body), body_end, &[]);
         // `as "message"` of `let assert` ends the body's last line
-        let rest = self.elements(n, &n.children[block + 1..]);
-        if rest.is_empty() {
+        let rest = self.elements(n, &n.children[block + 1..tail_end]);
+        let doc = if rest.is_empty() {
             doc
         } else {
             docvec![a, doc, " ", rest]
+        };
+        if overrides.is_empty() {
+            doc
+        } else {
+            let items = self.items(&overrides, n.range().1, None, &mut |p, m| p.node(m));
+            let lines = docvec![a, a.line(), self.join_lines(&items)].nest(a, INDENT);
+            docvec![a, doc, lines].force_break(a)
         }
     }
 

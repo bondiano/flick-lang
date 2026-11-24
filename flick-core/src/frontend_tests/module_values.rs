@@ -79,6 +79,7 @@ fn pack_lowers_to_a_record_of_public_values() {
         stages_by_class: false,
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
+        native_overrides: None,
     };
     let (checked, typing) = types::check_typed(
         &module,
@@ -211,6 +212,7 @@ fn static_module_contract_preserves_abstract_class_and_service_shapes() {
         stages_by_class: false,
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
+        native_overrides: None,
     };
     let diagnostics = types::check(
         &module,

@@ -122,25 +122,31 @@ impl Checker<'_> {
         self.settle_operators();
         self.solve_rows();
         self.solve_classes(true);
-        let mut data = logic::Data::new();
-        let params = param_types
-            .iter()
-            .map(|p| self.contract_logic_type(p, &mut data))
-            .collect();
-        let result = self.contract_logic_type(&ty, &mut data);
-        self.contract_constructors_named(decl, &mut data);
-        let recursive = in_rec_group || decl.has_token(K::RecKw);
-        self.typing.contracts.push(ContractInfo {
-            name: entity.name,
-            at: decl.range(),
-            contract: contract.range(),
-            has_dicts,
-            has_effects,
-            recursive,
-            params,
-            result,
-            data,
-        });
+        // only the verifier reads what a contract settles
+        #[cfg(feature = "contracts")]
+        {
+            let mut data = logic::Data::new();
+            let params = param_types
+                .iter()
+                .map(|p| self.contract_logic_type(p, &mut data))
+                .collect();
+            let result = self.contract_logic_type(&ty, &mut data);
+            self.contract_constructors_named(decl, &mut data);
+            let recursive = in_rec_group || decl.has_token(K::RecKw);
+            self.typing.contracts.push(ContractInfo {
+                name: entity.name,
+                at: decl.range(),
+                contract: contract.range(),
+                has_dicts,
+                has_effects,
+                recursive,
+                params,
+                result,
+                data,
+            });
+        }
+        #[cfg(not(feature = "contracts"))]
+        let _ = (in_rec_group, has_dicts, has_effects, param_types, entity);
         self.cx = outer;
         (self.store.level, self.classes.wanted, self.classes.givens) = saved;
     }

@@ -21,6 +21,7 @@ pub fn check(
         src,
         file,
         allow_trailing_attribute,
+        top_level: true,
         errors: Vec::new(),
     };
     v.walk(tree, Place::Plain);
@@ -31,6 +32,9 @@ struct Validator<'a> {
     src: &'a str,
     file: FileId,
     allow_trailing_attribute: bool,
+    /// Whether the current container holds top-level module declarations
+    /// (`SourceFile`, or `Members` of a top-level `InlineModuleDecl` / `RecGroup`).
+    top_level: bool,
     errors: Vec<Diagnostic>,
 }
 
@@ -100,7 +104,17 @@ impl Validator<'_> {
                 (K::AssignStmt | K::RecordField | K::ProofDecl, K::Block) => Place::ValueBlock,
                 _ => Place::Plain,
             };
+            let outer_top = self.top_level;
+            self.top_level = outer_top
+                && matches!(
+                    (node.kind, child.kind),
+                    (
+                        K::SourceFile | K::Members,
+                        K::InlineModuleDecl | K::RecGroup
+                    ) | (K::InlineModuleDecl | K::RecGroup, K::Members)
+                );
             self.walk(child, inner);
+            self.top_level = outer_top;
         }
     }
 
@@ -149,6 +163,7 @@ impl Validator<'_> {
                 self.mutable(child, node.kind == K::Block, place);
                 self.lazy(child, node.kind == K::Block, place);
             }
+            super::validate_native::check(self.file, child, self.top_level, &mut self.errors);
         }
         if child.kind == K::DeferStmt {
             super::validate_defer::check(

@@ -243,13 +243,6 @@ fn run_in(
         .collect();
     #[cfg(not(feature = "native-project"))]
     let libraries = Vec::new();
-    #[cfg(feature = "native-project")]
-    let precompiled = project
-        .zip(saved)
-        .map(|(p, saved)| Precompiled::new(&packages, p, saved, stages_by_class))
-        .unwrap_or_default();
-    #[cfg(not(feature = "native-project"))]
-    let precompiled = Precompiled::default();
     #[cfg(not(target_arch = "wasm32"))]
     let environment_preflight = project.is_some_and(|p| p.config.has_selected_target())
         || target_override.is_some_and(|o| o.target.is_some() || !o.options.is_empty());
@@ -267,6 +260,13 @@ fn run_in(
         sources,
         &mut diagnostics,
     );
+    #[cfg(feature = "native-project")]
+    let precompiled = project
+        .zip(saved)
+        .map(|(p, saved)| Precompiled::new(&packages, p, saved, stages_by_class))
+        .unwrap_or_default();
+    #[cfg(not(feature = "native-project"))]
+    let precompiled = Precompiled::default();
     // a check lowers the modules of source packages only to save them;
     // a selected target or environment also needs IR for reachable-use preflight
     let check_only = matches!(mode, Mode::Check | Mode::Prove);

@@ -218,6 +218,10 @@ pub struct BuildArguments {
     #[arg(long)]
     pub watch: bool,
 
+    /// Ignore `@native` overrides and lower Flick fallback bodies (for conformance testing).
+    #[arg(long)]
+    pub no_native_overrides: bool,
+
     /// Backend-declared options parsed from the command line.
     #[arg(skip)]
     pub backend_options: BTreeMap<String, Vec<String>>,
@@ -312,6 +316,10 @@ pub struct TestArguments {
     /// Target backend; by default `build.target` of the project.
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
+
+    /// Ignore `@native` overrides and lower Flick fallback bodies (for conformance testing).
+    #[arg(long)]
+    pub no_native_overrides: bool,
 
     /// Backend-declared options parsed from the command line.
     #[arg(skip)]

@@ -22,6 +22,25 @@ impl Parser<'_> {
         item: fn(&mut Self),
         glue: fn(&Self) -> bool,
     ) {
+        self.body_with(kind, item, glue, |_| false);
+    }
+
+    pub(super) fn body_stop(
+        &mut self,
+        kind: SyntaxKind,
+        item: fn(&mut Self),
+        stop: fn(&Self) -> bool,
+    ) {
+        self.body_with(kind, item, |_| false, stop);
+    }
+
+    fn body_with(
+        &mut self,
+        kind: SyntaxKind,
+        item: fn(&mut Self),
+        glue: fn(&Self) -> bool,
+        stop: fn(&Self) -> bool,
+    ) {
         let m = self.start();
         if self.sep().is_some() {
             let span = self.here_span();
@@ -32,7 +51,7 @@ impl Parser<'_> {
             );
         } else if self.raw().line_start {
             self.push(Ctx::Aligned { col: self.col() });
-            self.items(item, false, glue);
+            self.items_with_stop(item, false, glue, stop);
             self.pop();
         } else {
             // a line at the column of an enclosing mid-line block is its next item

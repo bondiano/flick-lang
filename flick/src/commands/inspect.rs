@@ -157,19 +157,28 @@ pub fn inspect(options: &InspectArguments, explicit: Option<&str>) -> Outcome {
         None
     };
     let allow_backends = options.emit == Representation::Output;
-    let override_cfg = target.as_ref().map(|t| {
-        let mut cfg = target_override(
-            &t.backend,
-            &t.choice,
-            t.target_overridden,
-            &t.resolved,
-            t.stages_by_class,
-            false,
-            Vec::new(),
-        );
-        cfg.skip_backend_check_target = true;
-        cfg
-    });
+    let override_cfg = target
+        .as_ref()
+        .map(|t| {
+            let mut cfg = target_override(
+                &t.backend,
+                &t.choice,
+                t.target_overridden,
+                &t.resolved,
+                t.stages_by_class,
+                false,
+                Vec::new(),
+            );
+            cfg.skip_backend_check_target = true;
+            cfg.disable_native_overrides = options.no_native_overrides;
+            cfg
+        })
+        .or_else(|| {
+            options.no_native_overrides.then(|| TargetOverride {
+                disable_native_overrides: true,
+                ..TargetOverride::default()
+            })
+        });
     let mut checked = match compile_with_extra(explicit, &[], override_cfg.as_ref(), allow_backends)
     {
         Ok(c) => c,

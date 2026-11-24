@@ -62,6 +62,7 @@ impl Loaded {
     /// A module with at least one function contract (`where require/ensure`),
     /// on a top-level `let`, inside a `rec { ... }` group, or in an inline
     /// module.
+    #[cfg(feature = "contracts")]
     fn has_contracts(&self) -> bool {
         use crate::syntax::cst::Node;
         use crate::syntax::kind::SyntaxKind as K;
@@ -93,7 +94,8 @@ impl Loaded {
     /// contract in this module (including `rec { ... }` groups and inline
     /// modules), so cross-module callers never unfold a contracted callee's
     /// body as an uncontracted helper.
-    fn collect_contract_names(&self, text: &str, out: &mut HashSet<(String, String)>) {
+    #[cfg(feature = "contracts")]
+    pub(super) fn collect_contract_names(&self, text: &str, out: &mut HashSet<(String, String)>) {
         use crate::syntax::cst::Node;
         use crate::syntax::kind::SyntaxKind as K;
         fn walk(
@@ -162,7 +164,14 @@ impl Loaded {
 impl Loader<'_> {
     /// Whether this run is in `Mode::Prove` and at least one selected root
     /// module declares a contract.
-    fn has_selected_contracts(&self) -> bool {
+    #[cfg(not(feature = "contracts"))]
+    #[expect(clippy::unused_self, reason = "the signature of the capability")]
+    pub(super) fn has_selected_contracts(&self) -> bool {
+        false
+    }
+
+    #[cfg(feature = "contracts")]
+    pub(super) fn has_selected_contracts(&self) -> bool {
         self.prove_contracts
             && self
                 .modules
@@ -175,6 +184,7 @@ impl Loader<'_> {
     /// lowers them.
     fn size_lowered(&mut self) {
         self.all_contracted.clear();
+        #[cfg(feature = "contracts")]
         for m in &self.modules {
             let text = m
                 .expansion

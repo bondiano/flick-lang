@@ -60,6 +60,7 @@ pub(crate) fn check_text_with(
         stages_by_class: false,
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
+        native_overrides: None,
     };
     let (more, typing) = types::check_typed(&module, &builtin, builtins, options, &mut interface);
     diagnostics.extend(parse.diagnostics);

@@ -147,6 +147,20 @@ fn prefix(p: &mut Parser) -> Option<Done> {
         K::MatchKw => Some(match_expr(p)),
         K::TryKw => Some(try_expr(p)),
         K::IfKw => Some(if_expr(p)),
+        K::Bang => {
+            let span = p.here_span();
+            p.error_at(
+                codes::S010,
+                span,
+                "Flick uses `not` instead of `!` for boolean negation".into(),
+            );
+            let m = p.start();
+            p.bump();
+            if at_operand_start(p) {
+                expr_bp(p, PREFIX_OPERAND);
+            }
+            Some(p.complete(m, K::Error))
+        }
         K::Lt if is_jsx(p) => Some(not_in_v1(
             p,
             "Flick has no JSX `<…>`: build UI with `ui { … }` or `Ui` functions",

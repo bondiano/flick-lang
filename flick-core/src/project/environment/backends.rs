@@ -3,10 +3,13 @@
 
 use std::collections::BTreeSet;
 
-use super::{BackendAxis, BackendTags, EnvironmentContext, TargetOverride};
+use super::{BackendAxis, BackendTags, EnvironmentContext, ResolvedEnvironment, TargetOverride};
 use crate::project::Project;
+use crate::project::config::HostConfig;
 use crate::syntax::when;
-use crate::types::ForeignBackendSpec;
+use crate::types::{
+    AxisTagModel, BackendTagModel, ForeignBackendSpec, HostTagModel, NativeOverrideEnv,
+};
 
 /// Built-in metadata for the official `flick/js` and `flick/go` backends.
 /// Must stay in sync with `backends/js/src/component.rs` and `backends/go/src/component.rs`.
@@ -121,13 +124,19 @@ pub(super) fn upsert_backend(backends: &mut Vec<BackendTags>, extra: BackendTags
 impl EnvironmentContext {
     /// Context for checking a standalone file outside a project.
     pub(in crate::project) fn standalone() -> Self {
+        let backends = official_backends();
+        let mut vocabulary = BTreeSet::new();
+        for b in &backends {
+            vocabulary.extend(b.full_vocabulary());
+        }
         Self {
-            vocabulary: BTreeSet::new(),
+            vocabulary,
             validate_tags: true,
             resolved: None,
             foreign_backend: ForeignBackendSpec::js(),
             validate_foreign_metadata: true,
-            backends: official_backends(),
+            backends,
+            native_overrides: NativeOverrideEnv::official_js(),
         }
     }
 
@@ -163,5 +172,83 @@ impl EnvironmentContext {
             }
         }
         self.foreign_backend.clone()
+    }
+}
+
+/// Builds the Layer-2 [`NativeOverrideEnv`] from resolved backend/host metadata.
+pub(super) fn build_native_override_env(
+    vocabulary: &BTreeSet<String>,
+    validate_tags: bool,
+    backends: &[BackendTags],
+    hosts: &[(Option<String>, &HostConfig)],
+    resolved: Option<&ResolvedEnvironment>,
+    foreign_backend: &ForeignBackendSpec,
+    target_override: Option<&TargetOverride>,
+) -> NativeOverrideEnv {
+    let backend_models: Vec<BackendTagModel> = backends
+        .iter()
+        .map(|b| BackendTagModel {
+            id: b.id.clone(),
+            short: b.short.clone(),
+            tags: b.tags.clone(),
+            axes: b
+                .axes
+                .iter()
+                .map(|a| AxisTagModel {
+                    tags: a.tags.clone(),
+                    default: a.default.clone(),
+                    exclusive: a.exclusive,
+                })
+                .collect(),
+            builtin_hosts: b.environments.iter().map(|(_, p)| p.clone()).collect(),
+            foreign_spec: b.foreign_spec(),
+        })
+        .collect();
+    let host_models: Vec<HostTagModel> = hosts
+        .iter()
+        .map(|(_, h)| HostTagModel {
+            name: h.name.clone(),
+            backend: h.backend.clone(),
+            requires: h.requires.as_ref().map(|(c, _)| c.clone()),
+            tags: h.tags.iter().map(|(t, _)| t.clone()).collect(),
+        })
+        .collect();
+    let (active_tags, active_backend_id) = if let Some(env) = resolved {
+        (Some(env.tags.clone()), Some(env.backend_id.clone()))
+    } else if !validate_tags {
+        (None, None)
+    } else if let Some(backend) = backends.iter().find(|b| b.id == foreign_backend.backend_id) {
+        let mut tags: BTreeSet<String> = backend.tags.iter().cloned().collect();
+        for axis in &backend.axes {
+            if backend.id == "flick/js" && axis.name == "runtime" {
+                let chosen = match target_override.and_then(|o| o.rt) {
+                    Some(true) => "rt",
+                    Some(false) => "effect",
+                    None => axis.default.as_deref().unwrap_or("rt"),
+                };
+                tags.insert(chosen.to_owned());
+            } else if backend.id == "flick/js" && axis.name == "adapter" {
+                if target_override.and_then(|o| o.effect_adapter) == Some(true) {
+                    tags.insert("effect-adapter".to_owned());
+                }
+            } else if let Some(def) = &axis.default {
+                tags.insert(def.clone());
+            }
+        }
+        if let Some((_, platform)) = backend.environments.first() {
+            tags.insert(platform.clone());
+        }
+        (Some(tags), Some(backend.id.clone()))
+    } else {
+        (None, None)
+    };
+    NativeOverrideEnv {
+        vocabulary: vocabulary.clone(),
+        validate_tags,
+        backends: backend_models,
+        hosts: host_models,
+        active_tags,
+        active_backend_id,
+        disable_native_overrides: target_override.is_some_and(|o| o.disable_native_overrides),
     }
 }

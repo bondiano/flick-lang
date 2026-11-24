@@ -154,8 +154,16 @@ pub(super) fn shape(input: &Input, decls: &TypeDecls, module: &str, kind: &ItemK
                     effects: effects(
                         (0..params).map(|i| f.stages.get(i).copied().unwrap_or(false)),
                     ),
-                    // those the table of bindings gives its Go function
-                    types: input.bindings.types(module, f),
+                    // those the table of bindings gives its Go function, or inferred
+                    // native scalar types for qualified Go package globals
+                    types: {
+                        let from_table = input.bindings.types(module, f);
+                        if from_table.any() {
+                            from_table
+                        } else {
+                            super::foreign_global::go_global_types(input.lang, f, params)
+                        }
+                    },
                 }
             }
         }

@@ -20,6 +20,7 @@ impl Checker<'_> {
 
     /// `t`, solved, as a type of `PureTotalV2` contracts: refuses `Float` and
     /// non-ADT nominal types other than `Int`, `Bool`, and `Unit`.
+    #[cfg(feature = "contracts")]
     pub(super) fn contract_logic_type(&mut self, t: &Type, data: &mut logic::Data) -> Ty {
         let t = self.zonk(t);
         self.contract_logic_of(&t, data)
@@ -77,6 +78,7 @@ impl Checker<'_> {
         }
     }
 
+    #[cfg(feature = "contracts")]
     fn contract_logic_of(&mut self, t: &Type, data: &mut logic::Data) -> Ty {
         let t = self.whnf(t);
         match &t {
@@ -277,6 +279,7 @@ impl Checker<'_> {
                 self.declare_data_with(&module, &name, data, contracts);
                 Ty::Data { module, name, args }
             }
+            #[cfg(feature = "contracts")]
             other if contracts => self.contract_logic_of(other, data),
             other => self.logic_of(other, data),
         }
@@ -288,6 +291,7 @@ impl Checker<'_> {
     }
 
     /// The data types of the constructors a contracted declaration names.
+    #[cfg(feature = "contracts")]
     pub(super) fn contract_constructors_named(&mut self, decl: &Node, data: &mut logic::Data) {
         self.constructors_named_with(decl, data, true);
     }

@@ -254,6 +254,7 @@ pub fn build_into_generation_for(
             labels: None,
             watch: false,
             inputs: false,
+            no_native_overrides: options.no_native_overrides,
             backend_options: options.backend_options.clone(),
         },
         project: Some(project.root.to_string_lossy().into_owned()),

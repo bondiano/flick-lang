@@ -32,6 +32,9 @@ mod go;
 #[path = "backends/go_option.rs"]
 mod go_option;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/native_overrides.rs"]
+mod native_overrides;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/review.rs"]
 mod review;
 #[cfg(all(feature = "wasm-backends", unix))]

@@ -45,6 +45,7 @@ fn check_all(modules: &[(&str, &str)]) -> (Vec<Diagnostic>, Vec<Dict>) {
             stages_by_class: false,
             foreign_backend: ForeignBackendSpec::default_js(),
             validate_foreign_metadata: true,
+            native_overrides: None,
         };
         let (more, evidence) =
             check_with_evidence(&module, &imported, builtins(), options, &mut interface);
