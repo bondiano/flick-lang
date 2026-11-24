@@ -20,6 +20,9 @@ mod expr;
 mod foreign;
 mod foreign_global;
 mod foreign_inline;
+mod foreign_pkg;
+mod foreign_pkg_conv;
+mod foreign_pkg_spec;
 mod generate;
 mod go_type;
 #[cfg(test)]
@@ -47,7 +50,9 @@ pub use foreign::{Bindings, is_relative};
 pub use input::Input;
 pub use inspect::go_module;
 pub use main_file::OPTIONAL;
-pub use runtime::{GO_MOD, GO_SUM, PACKAGES, Package, RUNTIME, go_mod};
+pub use runtime::{
+    GO_MOD, GO_SUM, PACKAGES, Package, RUNTIME, go_mod, go_mod_with_deps, merge_go_sum,
+};
 pub use shape::Types;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -91,6 +96,8 @@ pub struct Output {
     /// The optional packages the program reaches (`main_file::OPTIONAL`), whose
     /// modules its Go module then requires.
     pub packages: Vec<&'static str>,
+    /// Extra Go package import paths emitted across all compiled modules.
+    pub go_imports: BTreeSet<String>,
 }
 
 /// Compiles the program that runs `main` of `input.entry`, or the tests
@@ -125,6 +132,7 @@ pub fn go(input: &Input) -> Output {
             files: Vec::new(),
             diagnostics,
             packages: Vec::new(),
+            go_imports: BTreeSet::new(),
         };
     };
     let fb = a.text("fb");
@@ -207,6 +215,7 @@ fn compile<'a>(
     let item_initializers = modules.iter().any(|m| !m.initialization.is_empty());
     let mut files = Vec::new();
     let mut sources = BTreeMap::new();
+    let mut go_imports = BTreeSet::new();
     // the modules each module's initialization reads
     let mut deps: HashMap<String, BTreeSet<String>> = HashMap::new();
     let mut seen = HashSet::new();
@@ -241,6 +250,7 @@ fn compile<'a>(
         owned.extend(g.owned);
         record_shapes.extend(g.record_shapes);
         sources.extend(g.sources);
+        go_imports.extend(g.go_imports.into_keys());
         files.push((names::file(&module.name), code));
     }
     for (_, held) in owned.values() {
@@ -284,6 +294,7 @@ fn compile<'a>(
         files,
         diagnostics,
         packages,
+        go_imports,
     }
 }
 

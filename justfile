@@ -129,9 +129,10 @@ go-oracles mode="":
 # Go runtime and the language tests; CI runs the parts as jobs side by side
 e2e: e2e-js e2e-tests e2e-cases go-test language
 
-# The go target without Node, as CI's go jobs run it: portable cases, the go executable, a non-ASCII path
+# Go target without Node (CI go jobs)
 e2e-go:
     FLICK_E2E_GO_ONLY=1 cargo test --profile e2e -p flick --test e2e --test go_main --test unicode_path -- --ignored run_cases exit_codes_follow_the_outcome_and_signals run_and_test_use_the_go_executable a_project_builds_runs_and_tests_under_a_non_ascii_path
+    cargo test --profile e2e -p flick --test go_direct_ffi -- --ignored
 
 # The compiler in the `e2e` profile, built as a dependency of its own tests:
 # their dev-dependencies turn on features of the compiler's crates, so a plain

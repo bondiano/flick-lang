@@ -6,13 +6,15 @@ mod emit;
 #[cfg(feature = "guest")]
 mod guest;
 mod optimize;
+mod packages;
 mod templates;
+mod value_abi;
 
 use flick_backend::{
     Abi, AdapterArg, AdapterArgKind, AdapterWord, Backend, BackendId, BuildRequest, BuildResult,
     Descriptor, Diagnostic, Environment, EnvironmentServices, Inputs, Mode, NamedRange,
-    OptionDescriptor, Parameter, Profile, Severity, TagAxis, TargetSupport, TypeFormAttribute,
-    ValueKind, Verb, VersionRange, command,
+    OptionDescriptor, OptionValue, Packages, Parameter, Profile, ProjectFile, Severity, TagAxis,
+    TargetSupport, TypeFormAttribute, ValueKind, Verb, VersionRange, command,
 };
 
 /// The same implementation serves the component and development parity tests.
@@ -143,8 +145,21 @@ impl Backend for Go {
                 name: "go".into(),
                 doc: "Declare the Go type form of a foreign `type` or `service` (`@go \"...\"`, `@go from \"pkg\" \"Name\"`, or `@go none`).".into(),
             }],
-            value_abi: None,
+            value_abi: Some(value_abi::table()),
         }
+    }
+
+    fn package_files(&self) -> Vec<String> {
+        packages::files()
+    }
+
+    fn packages(
+        &self,
+        files: &[ProjectFile],
+        dependencies: &[command::Dependency],
+        options: &[OptionValue],
+    ) -> Packages {
+        packages::packages(files, dependencies, options)
     }
 
     fn check_target(

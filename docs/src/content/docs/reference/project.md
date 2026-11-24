@@ -317,7 +317,7 @@ flick = ">=0.1, <0.2"
 ```
 
 The optional `[package.abi]` table maps a backend value-ABI identifier (such as
-`"flick.javascript-ffi"`) to an exact semver version or semver requirement
+`"flick.javascript-ffi"` or `"flick.go-ffi"`) to an exact semver version or semver requirement
 (`">=0.1.0, <0.2.0"`). During `flick check`, IDE analysis, and `flick build`,
 every active package (the root package and any dependency whose `[package] when`
 condition holds) has its matching entry checked against the active backend's
@@ -442,8 +442,23 @@ than change `package.json`.
 
 A js build without them fails with `FLICK-P034`, which says to run
 `flick install`; a build for go ignores `[target.js.dependencies]` and needs
-neither Node nor pnpm. Two packages must name one target dependency with the
-same text, and the backend's manifest (such as `package.json`) with it, or the
+neither Node nor pnpm.
+
+For `flick/go`, entries under `[target.go.dependencies]` declare Go module
+paths pinned to canonical semantic versions (`vMAJOR.MINOR.PATCH`):
+
+```toml
+[target.go.dependencies]
+"github.com/google/uuid" = "v1.6.0"
+```
+
+`flick/go` validates each module path and version (`FLICK-P032`), checks for
+conflicts across packages and against any root `go.mod` (`FLICK-P040`), writes
+the required modules into the generated program's `go.mod`, and generates (or
+merges from a root `go.sum`) the program's `go.sum` during the Go build.
+
+Two packages must name one target dependency with the
+same text, and the backend's manifest (such as `package.json` or `go.mod`) with it, or the
 build and `flick install` report `FLICK-P040`. The old `[js.dependencies]`
 table is removed and fails with `FLICK-P057`.
 

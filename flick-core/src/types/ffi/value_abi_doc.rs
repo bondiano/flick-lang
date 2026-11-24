@@ -13,8 +13,30 @@ pub enum DocLocale {
 }
 
 const JS_ABI_NAME: &str = "flick.javascript-ffi";
+const GO_ABI_NAME: &str = "flick.go-ffi";
 
 fn ru_notes<'a>(abi_name: &str, entry: &'a ValueAbiEntrySpec) -> &'a str {
+    if abi_name == GO_ABI_NAME {
+        return match entry.key.as_str() {
+            "unit" => {
+                "Нет параметра Go при `arity 0` или нет возвращаемого значения Go (один `error` с `catch`); успешный результат во Flick — `()`"
+            }
+            "bool" => "Примитив Go `bool`",
+            "int" => "Знаковое 32-битное целое Go `int32`",
+            "float" => "Число Go `float64` (IEEE 754 binary64)",
+            "string" => "Значение Go `string`",
+            "bytes" => {
+                "Копия среза Go `[]byte`; изменения на стороне хоста не затрагивают неизменяемый `Bytes` Flick"
+            }
+            "list" => {
+                "Копия среза Go `[]T` с рекурсивным преобразованием элементов; изменения на стороне хоста не затрагивают `List` Flick"
+            }
+            "option" => {
+                "Указатель Go `*T`, когда `nil` однозначно означает `None` (параметры, элементы срезов и возвраты с `nullable`); флаг наличия `(T, bool)` / `struct{ Val T; Ok bool }` для возвратов с проверкой, вложенных `Option` и непрозрачных значений; завершающий `error` отображается через `catch`, а `Async` передаёт первым аргументом `context.Context` с отменой при прерывании"
+            }
+            _ => &entry.notes,
+        };
+    }
     if abi_name != JS_ABI_NAME {
         return &entry.notes;
     }

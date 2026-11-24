@@ -1,7 +1,8 @@
 //! A Go module per program, with the runtime beside it, and the host step
 //! that builds its executable.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+use std::path::Path;
 
 use flick_backend::{
     Artifact, ArtifactKind, BuildRequest, BuildResult, Diagnostic, InputRef, Launch, LaunchKind,
@@ -12,7 +13,9 @@ use flick_ir::Module;
 
 use super::data::{Command, Data};
 use super::{failure, optimize};
-use crate::codegen::{self, GO_SUM, Input, PACKAGES, Package, RUNTIME, Unsupported, go_mod};
+use crate::codegen::{
+    self, GO_SUM, Input, PACKAGES, Package, RUNTIME, Unsupported, go_mod_with_deps, merge_go_sum,
+};
 
 /// The name of the program that runs a project's tests.
 const TEST: &str = "test";
@@ -153,7 +156,15 @@ pub(super) fn generate(
             lang: &lang,
         });
         unsupported.extend(output.diagnostics);
-        add(&mut result, data, go, name, output.files, &output.packages);
+        add(
+            &mut result,
+            data,
+            go,
+            name,
+            output.files,
+            &output.packages,
+            &output.go_imports,
+        );
     }
     if unsupported.is_empty() {
         Ok(result)
@@ -171,16 +182,44 @@ fn add(
     name: &str,
     code: Vec<(String, String)>,
     reached: &[&str],
+    go_imports: &BTreeSet<String>,
 ) {
     let dir = format!("go/{name}");
     let packages: Vec<&Package> = (PACKAGES.iter())
         .filter(|p| reached.contains(&p.name))
         .collect();
-    let mut files = vec![("go.mod".to_owned(), go_mod(&packages))];
-    // the modules of a package go build downloads once; go.sum pins them
-    if !packages.is_empty() {
-        files.push(("go.sum".to_owned(), GO_SUM.to_owned()));
-    }
+    let uses_go_deps = data.go_deps.keys().any(|dep| {
+        let prefix = format!("{dep}/");
+        go_imports
+            .iter()
+            .any(|imp| imp == dep || imp.starts_with(&prefix))
+            || code.iter().any(|(path, text)| {
+                Path::new(path)
+                    .extension()
+                    .is_some_and(|ext| ext.eq_ignore_ascii_case("go"))
+                    && (text.contains(&format!("\"{dep}\""))
+                        || text.contains(&format!("\"{prefix}")))
+            })
+    });
+    let mut files = vec![(
+        "go.mod".to_owned(),
+        go_mod_with_deps(&packages, &data.go_deps),
+    )];
+    let capture_generated_go_sum = if let Some(proj_sum) = data.project_go_sum.as_deref() {
+        if let Some(merged) = merge_go_sum((!packages.is_empty()).then_some(GO_SUM), Some(proj_sum))
+        {
+            files.push(("go.sum".to_owned(), merged));
+        }
+        false
+    } else if uses_go_deps {
+        // `go build -mod=mod` generates `go.sum` for imported `[target.go.dependencies]`.
+        true
+    } else {
+        if !packages.is_empty() {
+            files.push(("go.sum".to_owned(), GO_SUM.to_owned()));
+        }
+        false
+    };
     let package_files = packages.iter().flat_map(|p| p.files);
     files.extend(package_files.map(|(p, c)| ((*p).to_owned(), (*c).to_owned())));
     files.extend(code);
@@ -201,6 +240,18 @@ fn add(
         key: key.into(),
         value: value.into(),
     };
+    let mut outputs = vec![StepOutput {
+        id: format!("exe:{name}"),
+        path: executable,
+        kind: ArtifactKind::Executable,
+    }];
+    if capture_generated_go_sum {
+        outputs.push(StepOutput {
+            id: format!("gosum:{name}"),
+            path: format!("{dir}/go.sum"),
+            kind: ArtifactKind::Source,
+        });
+    }
     // -trimpath keeps the build directory out of Go's cache keys and the binary
     result.steps.push(ToolchainStep {
         id: format!("build:{name}"),
@@ -209,20 +260,16 @@ fn add(
         arguments: ["build", "-C", &dir, "-trimpath", "-buildvcs=false", "-o"]
             .into_iter()
             .map(str::to_owned)
-            .chain([format!("../../{executable}"), ".".to_owned()])
+            .chain([format!("../../{}", outputs[0].path), ".".to_owned()])
             .collect(),
-        // only optional packages need modules, which go downloads once
+        // only optional packages and declared Go modules download once
         environment: vec![
             env("GOFLAGS", "-mod=mod"),
             env("GOTOOLCHAIN", "local"),
             env("CGO_ENABLED", if data.cgo { "1" } else { "0" }),
         ],
         inputs,
-        outputs: vec![StepOutput {
-            id: format!("exe:{name}"),
-            path: executable,
-            kind: ArtifactKind::Executable,
-        }],
+        outputs,
     });
     result.launches.push(Launch {
         name: name.to_owned(),

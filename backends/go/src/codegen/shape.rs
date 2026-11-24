@@ -165,7 +165,7 @@ pub(super) fn shape(input: &Input, decls: &TypeDecls, module: &str, kind: &ItemK
                         if from_table.any() {
                             from_table
                         } else {
-                            super::foreign_global::go_global_types(input.lang, f, params)
+                            super::foreign_pkg::direct_go_types(input.lang, decls, f, params)
                         }
                     },
                 }

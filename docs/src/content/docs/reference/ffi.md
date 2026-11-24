@@ -93,7 +93,7 @@ contributed by the active package backend's descriptor.
 | Metadata | Meaning |
 | - | - |
 | `arity n` | `n` positional foreign arguments, adapting `n` stages; `arity 0` takes the `()` of a first `Unit` parameter and calls the host without arguments, after evaluating that argument |
-| `catch f` | a throw, panic, or rejection becomes the typed error `f value`, with `f : JsValue -> E` and `E` in the error row; `E` may hold no capability of a scope (`FLICK-F003`) |
+| `catch f` | a throw, panic, rejection, or trailing Go `error` becomes the typed error `f value`, where `f` takes the backend's host `catch` type (`JsValue -> E` on `flick/js`, `String -> E` on `flick/go`) and `E` is in the error row; `E` may hold no capability of a scope (`FLICK-F003`) |
 | `retention call` / `retention owner` | what the host keeps of an argument that may hold a scope's capabilities: nothing past the call, or until the owner of the region closes |
 | `nullable` | the result is `Option a`: `null` and `undefined` (or host absent values) become `None` |
 | `optional i` | argument `i` (from 0) is `Option a`: `None` is passed as absent (`undefined` on JS) |
@@ -220,6 +220,27 @@ Rendered directly from the `flick/js` backend descriptor:
 Records and user-defined ADTs have no stable layout and are not in this table. On this backend they may still cross bindings as deep-copied plain JS objects / tagged objects (`_tag` = `Name#hash`, fields `_0`, `_1`, …); `unboxed type` and `untagged type` declare explicit representations.
 <!-- value-abi:flick/js:en:end -->
 
+### `flick/go` value ABI
+
+Rendered directly from the `flick/go` backend descriptor:
+
+<!-- value-abi:flick/go:en:start -->
+**ABI:** `flick.go-ffi@0.1.0` · **Opaque fallback:** `flickrt.Value` · **Host `catch` type:** `error` (lang item `string`)
+
+| Key | Flick | Host | Conversion | Direction | Notes |
+| - | - | - | - | - | - |
+| `unit` | `Unit` | `()` | `none` | `both` | No Go parameter with `arity 0`, or no Go return value (bare `error` with `catch`); a successful Flick result is `()` |
+| `bool` | `Bool` | `bool` | `none` | `both` | Go `bool` primitive |
+| `int` | `Int` | `int32` | `none` | `both` | Go signed 32-bit integer `int32` |
+| `float` | `Float` | `float64` | `none` | `both` | Go IEEE 754 binary64 `float64` |
+| `string` | `String` | `string` | `none` | `both` | Go `string` value |
+| `bytes` | `Bytes` | `[]byte` | `copy` | `both` | Freshly copied Go `[]byte` slice; host mutations never alias immutable Flick `Bytes` |
+| `list` | `List a` | `[]T` | `copy` | `both` | Freshly copied Go slice `[]T` with recursive element conversion; host mutations never alias Flick `List` |
+| `option` | `Option a` | `*T or (T, bool)` | `copy` | `both` | Go pointer `*T` when `nil` unambiguously represents `None` (parameters, slice elements, and `nullable` returns); presence flag `(T, bool)` / `struct{ Val T; Ok bool }` for comma-ok returns, nested `Option`, and opaque payloads; trailing `error` maps via `catch` and `Async` passes a leading `context.Context` cancelled on interruption |
+
+Records and user-defined ADTs have no stable layout and are not in this table; direct bindings refuse them unless wrapped in an opaque nominal handle.
+<!-- value-abi:flick/go:en:end -->
+
 ## JS values
 
 `JsValue` is any JS value as foreign code gives it. `Js.snapshot` copies
@@ -313,11 +334,45 @@ debug and release profiles.
 
 ## The go target
 
-On the go target, a qualified Go package global such as `"math.Hypot"` or
-`"strings.HasPrefix"` imports its Go package automatically and calls the
-exported Go symbol directly with unboxed Go scalar types when the signature uses
-scalar types. A binding to a module of the program — a relative path,
-`./timers.mjs` — calls the Go function of the same name in `timers.go`
+On the go target, a non-relative package binding such as `foreign hypot from "math" "Hypot"`
+(or a qualified Go package global such as `"math.Hypot"` or `"strings.HasPrefix"`) adds the Go
+package import to the generated module and emits typed Go conversions from the
+[`flick/go` value ABI table](#flickgo-value-abi) automatically:
+
+```flick
+hypot : Float -> Float -> Float
+foreign pure hypot from "math" "Hypot"
+
+to_upper : String -> String
+foreign pure to_upper from "strings" "ToUpper"
+
+cut_prefix : String -> String -> Option String
+foreign pure cut_prefix from "strings" "CutPrefix"
+```
+
+- **Scalars and copies:** `Int` (`int32`), `Float` (`float64`), `Bool` (`bool`), and `String`
+  (`string`) pass directly in their Go types; `Bytes` (`[]byte`) and `List a` (`[]T`) are copied
+  across the boundary so host mutations never alias Flick values.
+- **`Option a`:** passes as a Go pointer `*T` where `nil` unambiguously represents `None`
+  (parameters, slice elements, and `nullable` returns), and uses a presence flag `(T, bool)` (for
+  comma-ok Go returns such as `os.LookupEnv` and `strings.CutPrefix`) or `struct{ Val T; Ok bool }`
+  when `Option` is nested or wraps an opaque handle so `None`, `Some None`, and `Some (Some x)`
+  never collapse.
+- **Errors and cancellation:** `catch f` (with `f : String -> E`) adapts a trailing Go `error`
+  return — `(T, error)`, or bare `error` when returning `Unit` — into a typed Flick failure; an
+  `Async` binding passes a leading `context.Context` that is cancelled when the Flick fiber is
+  interrupted while the innermost owner waits for the call to return.
+- **Third-party Go modules:** packages declare external Go modules under
+  `[target.go.dependencies]` in `flick.toml` (for example `"github.com/google/uuid" = "v1.6.0"`),
+  and `flick/go` generates the program's `go.mod` and `go.sum` automatically (see
+  [Target packages of a library](../project/#target-packages-of-a-library)).
+- **Types outside the table:** direct Go package bindings reject types outside the
+  `flick.go-ffi` table (`BigInt`, records, ADTs, tuples, callbacks, `Result`, `JsValue`, etc.) at
+  the binding span with `FLICK-F013` and the backend's refusal reason.
+
+A binding to a module of the program — a relative path,
+`./timers.mjs` — or a `from inline` binding keeps the `flickrt.Value` escape hatch for types
+outside the table. A relative path calls the Go function of the same name in `timers.go`
 beside it, which the build copies into the Go module; without that file the
 binding is `FLICK-P012`, naming the file to add. The file is `package main`
 and imports `flick.app/flickrt`. Its functions take and return

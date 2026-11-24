@@ -1,5 +1,7 @@
 //! The Go runtime, written beside every program at `flickrt/`.
 
+use std::collections::{BTreeMap, BTreeSet};
+
 /// The runtime's files: name and contents, every `.go` file of
 /// `runtime-go/flickrt` but its tests (`build.rs`).
 pub const RUNTIME: &[(&str, &str)] = include!(concat!(env!("OUT_DIR"), "/go_runtime.rs"));
@@ -23,16 +25,21 @@ pub const PACKAGES: &[Package] = include!(concat!(env!("OUT_DIR"), "/go_packages
 pub const GO_MOD: &str = include_str!("../../../../runtime-go/go.mod");
 pub const GO_SUM: &str = include_str!("../../../../runtime-go/go.sum");
 
-/// The `go.mod` of a program with `packages`: the runtime's, requiring only
-/// the modules of those packages, so a program without one builds offline
-/// and a package's version skew never makes Go load the others.
+/// The `go.mod` of a program with optional runtime `packages` alone.
 pub fn go_mod(packages: &[&Package]) -> String {
-    if packages.is_empty() {
+    go_mod_with_deps(packages, &BTreeMap::new())
+}
+
+/// The `go.mod` of a program with optional runtime `packages` and declared
+/// `[target.go.dependencies]` (`extra_deps`). Without either, emits an offline
+/// zero-requirement `go 1.23` module.
+pub fn go_mod_with_deps(packages: &[&Package], extra_deps: &BTreeMap<String, String>) -> String {
+    if packages.is_empty() && extra_deps.is_empty() {
         return "module flick.app\n\ngo 1.23\n".to_owned();
     }
     let needed: Vec<&str> = packages.iter().flat_map(|p| p.modules.lines()).collect();
     let mut header = String::new();
-    let mut requires = String::new();
+    let mut requires: BTreeMap<String, String> = BTreeMap::new();
     let mut block = false;
     for line in GO_MOD.lines() {
         let line = line.trim();
@@ -51,15 +58,51 @@ pub fn go_mod(packages: &[&Package]) -> String {
             }
             continue;
         };
-        if require
-            .split_whitespace()
-            .next()
-            .is_some_and(|m| needed.contains(&m))
+        if let Some((module, rest)) = require.split_once(char::is_whitespace)
+            && needed.contains(&module)
         {
-            requires.push('\t');
-            requires.push_str(require);
-            requires.push('\n');
+            requires.insert(module.to_owned(), rest.trim().to_owned());
         }
     }
-    format!("{header}require (\n{requires})\n")
+    if header.is_empty() {
+        "module flick.app\n\ngo 1.23\n\n".clone_into(&mut header);
+    }
+    for (module, version) in extra_deps {
+        requires.insert(module.clone(), version.clone());
+    }
+    if requires.is_empty() {
+        return "module flick.app\n\ngo 1.23\n".to_owned();
+    }
+    let mut body = String::new();
+    for (module, version) in requires {
+        body.push('\t');
+        body.push_str(&module);
+        body.push(' ');
+        body.push_str(&version);
+        body.push('\n');
+    }
+    format!("{header}require (\n{body})\n")
+}
+
+/// Merges optional runtime and project `go.sum` contents deterministically,
+/// deduplicating lines in sorted order.
+pub fn merge_go_sum(runtime_sum: Option<&str>, project_sum: Option<&str>) -> Option<String> {
+    let mut lines = BTreeSet::new();
+    for text in [runtime_sum, project_sum].into_iter().flatten() {
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() {
+                lines.insert(trimmed.to_owned());
+            }
+        }
+    }
+    if lines.is_empty() {
+        return None;
+    }
+    let mut out = String::new();
+    for line in lines {
+        out.push_str(&line);
+        out.push('\n');
+    }
+    Some(out)
 }

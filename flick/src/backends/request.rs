@@ -33,6 +33,8 @@ mod assets_tests;
 #[cfg(test)]
 mod component_tests;
 mod go;
+#[cfg(test)]
+mod go_tests;
 mod javascript;
 mod javascript_facts;
 #[cfg(test)]

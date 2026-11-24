@@ -10,7 +10,9 @@ use std::sync::OnceLock;
 use super::{Artifact, Settings, builtin_modules, optimized_with_primitives, specifier};
 use crate::codegen::Known;
 pub use crate::codegen::go::go_mod;
-use crate::codegen::go::{self, Bindings, GO_SUM, Input, PACKAGES, Package, RUNTIME, Unsupported};
+use crate::codegen::go::{
+    self, Bindings, GO_SUM, Input, PACKAGES, Package, RUNTIME, Unsupported, go_mod_with_deps,
+};
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::ir::{self, ItemKind};
 use crate::project::{Compilation, normalize};
@@ -125,9 +127,15 @@ pub fn emit(
             .iter()
             .filter(|p| output.packages.contains(&p.name))
             .collect();
+        let go_deps: BTreeMap<String, String> = compilation
+            .target_dependencies
+            .iter()
+            .filter(|d| d.target == "go")
+            .map(|d| (d.name.clone(), d.version.clone()))
+            .collect();
         out.push(Artifact {
             path: format!("{dir}/go.mod"),
-            contents: go_mod(&packages),
+            contents: go_mod_with_deps(&packages, &go_deps),
         });
         // the modules of a package go build downloads once; go.sum pins them
         if !packages.is_empty() {

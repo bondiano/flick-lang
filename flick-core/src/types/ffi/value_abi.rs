@@ -17,7 +17,7 @@ use crate::syntax::literal;
 use crate::types::env::{Abi, EnumLit, Form};
 use crate::types::lang::{self, Lang};
 use crate::types::ty::{Stage, Type};
-use crate::types::typing::ForeignInfo;
+use crate::types::typing::{ForeignInfo, Range};
 
 /// Built-in value and data lang items that require an explicit entry in a
 /// backend's value-ABI table rather than falling back to `opaque_type`.
@@ -57,6 +57,38 @@ pub(super) fn is_runtime_internal_foreign(decl: &Node, text: &str) -> bool {
         .child_tokens()
         .find(|t| t.kind == K::String)
         .is_some_and(|tok| literal::string_value(tok.text(text)).starts_with("flick:"))
+}
+
+/// Returns true for Go `flickrt.Value` escape hatches: sibling `.go` files
+/// bound via relative module specifiers (`./`, `../`) and `inline` Go code.
+/// Direct Go package bindings (`from "math" "Hypot"`) and Go globals
+/// (`from global "math.Hypot"`, `@native "math.Hypot"`) return false and are
+/// validated against `flick.go-ffi`.
+fn is_go_value_escape_hatch(owner: &Node, text: &str) -> bool {
+    let Some(source) = owner.nodes().find(|n| n.kind == K::ForeignSource) else {
+        return false;
+    };
+    let kind_word = source
+        .child_tokens()
+        .find(|t| t.kind == K::Ident)
+        .map(|t| t.text(text));
+    if kind_word == Some("inline") {
+        return true;
+    }
+    if kind_word.is_some() {
+        return false;
+    }
+    let mut strings = source.child_tokens().filter(|t| t.kind == K::String);
+    let Some(first) = strings.next() else {
+        return false;
+    };
+    // Only two-string `from "./x.mjs" "sym"` (or `@native "./x.mjs" "sym"`) is
+    // a relative sibling file; a single-string `@native "math.Hypot"` is a global.
+    if strings.next().is_none() {
+        return false;
+    }
+    let spec = literal::string_value(first.text(text));
+    spec.starts_with("./") || spec.starts_with("../")
 }
 
 /// Returns the `Lang` item corresponding to `module.name`, if any.
@@ -390,6 +422,34 @@ impl AbiCheck<'_, '_> {
 }
 
 impl Checker<'_> {
+    /// Resolves the active backend spec and source owner (`ForeignDecl` or
+    /// selected `NativeOverride`) and runs [`Self::check_foreign_value_abi`].
+    pub(super) fn check_pending_foreign_value_abi(
+        &mut self,
+        decl: &Node,
+        override_range: Option<Range>,
+        info: &ForeignInfo,
+        params: &[Type],
+        body: &Type,
+        span: Span,
+    ) {
+        let (spec, source_owner) = if let Some(ov_range) = override_range {
+            let ov = decl
+                .nodes()
+                .find(|n| n.kind == K::NativeOverride && n.range() == ov_range);
+            (
+                self.options
+                    .native_env()
+                    .active_backend_spec(self.options.foreign_backend)
+                    .clone(),
+                ov,
+            )
+        } else {
+            (self.options.foreign_backend.clone(), Some(decl))
+        };
+        self.check_foreign_value_abi(source_owner, info, params, body, &spec, span);
+    }
+
     /// Checks every parameter and result of a direct foreign binding (or
     /// selected `@native` override) against `spec.value_abi`, emitting
     /// `FLICK-F013` with the backend's refusal reason at `span`.
@@ -406,6 +466,11 @@ impl Checker<'_> {
             return;
         }
         if foreign_decl.is_some_and(|decl| is_runtime_internal_foreign(decl, self.text)) {
+            return;
+        }
+        if spec.backend_id == "flick/go"
+            && foreign_decl.is_some_and(|decl| is_go_value_escape_hatch(decl, self.text))
+        {
             return;
         }
         let Some(table) = spec.value_abi.as_ref() else {

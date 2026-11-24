@@ -213,7 +213,7 @@ impl ForeignBackendSpec {
             "Spread the last argument (a `List a`) into Go variadic arguments.",
             "go",
             "Declare the Go type form of a foreign `type` or `service` (`@go \"...\"`, `@go from \"pkg\" \"Name\"`, or `@go none`).",
-            None,
+            Some(ValueAbiSpec::go()),
         )
     }
 

@@ -202,9 +202,13 @@ impl<'a> Gen<'a> {
             f.source_name.as_deref().unwrap_or(&f.name),
             &f.binding,
         ) else {
-            if let Some((spec, export)) = f.binding.module_export().filter(|(m, _)| is_relative(m))
-            {
-                return self.local(f, spec, export, span);
+            if let Some((spec, export)) = f.binding.module_export() {
+                if is_relative(spec) {
+                    return self.local(f, spec, export, span);
+                }
+                if !spec.starts_with("flick:") {
+                    return self.package_foreign(f, spec, export, span);
+                }
             }
             if let IrBinding::Global { name } = &f.binding
                 && let Some(doc) = self.global_foreign(f, name, span)

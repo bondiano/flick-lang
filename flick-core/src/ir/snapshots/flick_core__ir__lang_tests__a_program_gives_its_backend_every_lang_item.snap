@@ -18,6 +18,7 @@ uint32 Type Prelude.UInt32
 uint64 Type Prelude.UInt64
 float32 Type Prelude.Float32
 string Type Prelude.String
+bytes Type Bytes.Bytes
 unknown Type Prelude.Unknown
 js_value Type Prelude.JsValue
 list Type Prelude.List
