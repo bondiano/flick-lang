@@ -319,6 +319,21 @@ test("word boundaries prevent spurious keyword matches on partial identifiers an
   }
 });
 
+test("the labels of an accessor are members, keywords included, and its dots operators", () => {
+  const line = "let c = List.map .address.city users";
+  for (const word of ["address", "city"]) {
+    assert.ok(scopesFor(line, word).includes("variable.other.member.flick"), word);
+  }
+  const dot = line.indexOf(".address");
+  const covering = tokenizeLine(line).find((t) => t.start <= dot && dot < t.end);
+  assert.ok(covering.scopes.includes("keyword.operator.flick"), JSON.stringify(covering));
+  assert.ok(scopesFor("let n = user |> .name", "name").includes("variable.other.member.flick"));
+  for (const word of ["echo", "todo"]) {
+    const scopes = scopesFor(`let x = List.map .${word} logs`, word);
+    assert.ok(scopes.includes("variable.other.member.flick"), `${word}: ${JSON.stringify(scopes)}`);
+  }
+});
+
 test("an effect row begins only where `{` touches `->`, as the compiler reads it", () => {
   const begin = new RegExp(grammar.repository["effect-row"].begin);
   assert.ok(begin.test("f : A ->{Log; E} B"));

@@ -11,6 +11,9 @@ use flick_core::ide::{Ide, TOKEN_TYPES};
 use crate::{Session, byte_offset, utf16_offset};
 
 #[cfg(test)]
+#[path = "field_tests.rs"]
+mod field_tests;
+#[cfg(test)]
 #[path = "ide_tests.rs"]
 mod ide_tests;
 

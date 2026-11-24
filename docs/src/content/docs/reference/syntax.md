@@ -317,7 +317,7 @@ There are no user-defined operators. From weakest to strongest:
 | 9 | prefix `-`, `not`, `await`, `ignore`, `echo` | — |
 | 9½ | `>>`, `<<` | `>>` left, `<<` right; they do not mix: `f >> g << h` is an error |
 | 10 | function application `f x y` | left |
-| 11 | `.field`, `Module.name`, postfix `?` | left |
+| 11 | `.field`, `Module.name`, postfix `?`; an accessor `.a.b` is one atom | left |
 
 `-x ** 2` is `-(x ** 2)`; `-a * b` is `(-a) * b`; `await f x` is
 `await (f x)`; `0..n - 1` is `0..(n - 1)`, and `i < 0..n` compares with the range.
@@ -691,6 +691,8 @@ application = postfix { argument }
 argument    = "_" | postfix                     // at most one `_` per application
 postfix     = atom { "." name | "?" }           // no space before either
 atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
+            | accessor
+accessor    = "." name { "." name }             // no space inside
             | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
             | "(" expr "," expr { "," expr } ")" | "[" [expr { "," expr } [","]] "]"
             | "{" "}" | "{" field "=" block { ";" | line break … } "}"
@@ -767,6 +769,32 @@ let wrapped name = name |> label "[" _ "]"
 
 wrapped_right : String -> String
 let wrapped_right name = label "[" _ "]" <| name
+```
+
+A `.` right before a name, where no value stands before it to have that
+field, starts an accessor: `.name` is the function `fun r -> r.name`, and
+`.address.city` reads the fields in turn, `fun r -> r.address.city`. The dots
+and names of a path are written without spaces. An accessor is a value like
+any function: an argument (`List.map .address.city users`), the end of a
+pipeline (`user |> .name`), applied at once (`.name user`), bound to a name or
+kept in a list. `f .name` applies `f` to the accessor, while `f.name` reads a
+field of `f`; `user .name` applies `user` to it, and the error on that offers
+to glue them into `user.name`. A path holds field reads only: `.age + 1` adds
+a number to a function, so write `fun u -> u.age + 1`, and `.email?` applies
+`?` to the accessor, so write `user.email?` or `fun u -> u.email?`. A step
+without its name, as in `.address. users`, is `FLICK-S007` at its dot. Its
+parameter has no name of its own: no hover, completion or rename shows one.
+How an accessor is typed is in [Records](../types/#records).
+
+```flick
+type alias Address = { city : String }
+type alias User = { name : String; address : Address }
+
+cities : List User -> List String
+let cities users = List.map .address.city users
+
+name_of : User -> String
+let name_of user = user |> .name
 ```
 
 `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). A branch in braces holds statements: `if a > b then { low = b; high = a }`. `ignore e` discards a non-`Unit`

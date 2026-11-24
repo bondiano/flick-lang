@@ -1,0 +1,159 @@
+module App.Accessors exposing (..)
+
+type alias Address = { city : String }
+
+type alias User = { name : String; age : Int; address : Address }
+
+email : User -> String
+let email = .email
+//          ^^^^^^ FLICK-T003 `User` has no field `email`
+
+town : User -> String
+let town = .address.town
+//                 ^^^^^ FLICK-T003 `Address` has no field `town`
+
+typo : User -> String
+let typo = .nmae
+//         ^^^^^ FLICK-T003 `User` has no field `nmae`
+
+// applied where it is written, a function takes the type of its argument:
+// the field is missing at its step
+late : User -> String
+let late user = .email user
+//              ^^^^^^ FLICK-T003 `User` has no field `email`
+
+// the last field is the value of the function
+age_text : User -> String
+let age_text = .age
+//              ^^^ FLICK-T003 expected `String`, found `Int`
+
+let get_name = .name
+
+// an accessor is a function, not a field of an argument to come
+older : User -> Int
+let older user = .age + 1
+//               ^^^^^^^^ FLICK-T003 expected `Int`, found `{ age : _ | _ } -> _`
+//                      ^ FLICK-T003 expected `{ age : _ | _ } -> _`, found `Int`
+
+// `?` applies to the accessor, a function, not to the field it reads
+tried : User -> String
+let tried = .name?
+//          ^^^^^^ FLICK-T003 `?` applies to the accessor `.name`, a function, not to the field it reads: an accessor only reads fields; to apply `?` to the field, read it explicitly: `x.name?` or `fun x -> x.name?`
+
+type alias Contact = { email : Option String; home : { email : Option String } }
+
+questioned : Contact -> Option String
+let questioned contact =
+  let mapped = List.map .email? [contact]
+//                      ^^^^^^^ FLICK-T003 `?` applies to the accessor `.email`, a function, not to the field it reads
+  let piped = contact |> .email?
+//                       ^^^^^^^ FLICK-T003 `?` applies to the accessor `.email`
+  let applied = .email? contact
+//              ^^^^^^^ FLICK-T003 `?` applies to the accessor `.email`
+  let wrapped = (.email)?
+//              ^^^^^^^^^ FLICK-T003 `?` applies to the accessor `.email`
+  let nested = .home.email?
+//             ^^^^^^^^^^^^ FLICK-T003 `?` applies to the accessor `.home.email`, a function, not to the field it reads: an accessor only reads fields; to apply `?` to the field, read it explicitly: `x.home.email?` or `fun x -> x.home.email?`
+  contact.email
+
+// a field is read with no space after its record: `user.name`
+spaced : User -> String
+let spaced user =
+  user
+  .name
+//~ FLICK-T011 @62:3-62:7 has type `User` and would be discarded
+//~ FLICK-T003 @63:3-63:8 expected `String`, found a function
+
+// after a `let`, the accessor is meant as a field of its value
+spaced_let : User -> String
+let spaced_let user =
+  let n = user
+  .name
+  n
+//~ FLICK-T011 @71:3-71:8 has type `{ name : _ | _ } -> _` and would be discarded
+//~ FLICK-T003 @72:3-72:4 expected `String`, found `User`
+
+spaced_last : User -> String
+let spaced_last user =
+  let n = user
+  .name
+//~ FLICK-T003 @79:3-79:8 expected `String`, found a function
+
+// with more indent, the value is applied to the accessor
+indented : User -> String
+let indented user =
+  user
+    .name
+//~ FLICK-T003 @85:3-86:10 this is not a function: it has type `{ address : Address; age : Int; name : String }`
+
+one_line : User -> String
+let one_line user = user .name
+//                  ^^^^^^^^^^ FLICK-T003 this is not a function
+
+two_steps : User -> String
+let two_steps user = user .address .city
+//                   ^^^^^^^^^^^^^ FLICK-T003 this is not a function
+
+// glued after an application, the accessor would read its last argument
+first : List User -> String
+let first users = List.head users .name
+//                ^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 this is not a function: it has type `Option { address : Address; age : Int; name : String }`, so it cannot take another argument: `.name` here starts a separate accessor, a function; to read the field, write it right after the value, with no space or line break
+
+// a comment between them is kept
+commented : User -> String
+let commented user =
+  user
+  // the name
+  .name
+//~ FLICK-T011 @105:3-105:7 only `Unit` may be dropped: `.name` here starts a separate accessor, a function; to read the field, write it right after the value: `user.name`
+//~ FLICK-T003 @107:3-107:8 expected `String`, found a function
+
+in_ui : User -> Ui
+let in_ui user = ui {
+  text user
+    .name
+}
+//~ FLICK-T003 @113:3-114:10 this is not a function: it has type `Ui`, so it cannot take another argument: `.name` here starts a separate accessor, a function; to read the field, write it right after the value, with no space or line break
+//~ FLICK-T003 @113:8-113:12 expected `String`, found `User`
+
+wrapped : User -> String
+let wrapped user = (.email) user
+//                  ^^^^^^ FLICK-T003 `User` has no field `email`
+
+late_piped : User -> String
+let late_piped user = user |> .email
+//                            ^^^^^^ FLICK-T003 `User` has no field `email`
+
+late_nested : User -> String
+let late_nested user = .address.town user
+//                             ^^^^^ FLICK-T003 `Address` has no field `town`
+
+// a later argument gives the type of an accessor passed to a function
+late_mapped : List User -> List String
+let late_mapped users = List.map .address.town users
+//                                       ^^^^^ FLICK-T003 `Address` has no field `town`
+
+late_mapped_piped : List User -> List String
+let late_mapped_piped users = users |> List.map .address.town
+//                                                      ^^^^^ FLICK-T003 `Address` has no field `town`
+
+late_lambda : User -> String
+let late_lambda user = (fun r -> r.email) user
+//                               ^^^^^^^ FLICK-T003 `User` has no field `email`
+
+late_lambda_piped : User -> String
+let late_lambda_piped user = user |> fun r -> r.email
+//                                            ^^^^^^^ FLICK-T003 `User` has no field `email`
+
+// a named accessor has its type before its argument, as any function
+late_named : User -> String
+let late_named user =
+  let get = .email
+  get user
+//    ^^^^ FLICK-T003 expected `{ email : _ | _ }`, found `User`: field `email` is missing
+
+// a lambda passed to a function is checked where it is written
+late_lambda_mapped : List User -> List String
+let late_lambda_mapped users = List.map (fun u -> u.address.town) users
+//                                                                ^^^^^ FLICK-T003 field `town` is missing
+//~ FLICK-T004 @30:1-30:21 function `get_name` needs a signature right above its `let`

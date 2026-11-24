@@ -1,0 +1,25 @@
+// `List.map` of a three-field accessor over a list of nested records:
+// 4 000 000 paths read in all, over lists of the size given (100 000 by
+// default).
+module App.Main exposing (main)
+
+type alias Row = { a : { b : { c : Int } } }
+
+total : Int
+let total = 4000000
+
+sum : List Int -> Int
+let sum xs = List.fold_left (fun acc x -> (acc + x) % 1000003) 0 xs
+
+rounds : List Row -> Int -> Int -> Int
+let rec rounds rows left acc =
+  if left == 0 then
+    acc
+  else
+    rounds rows (left - 1) ((acc * 31 + sum (List.map .a.b.c rows)) % 1000003)
+
+main : Unit ->{Host.Arguments, Host.Console; AppError} Unit
+let main () =
+  let size = Option.with_default 100000 (Option.bind Int.parse (List.head (Platform.args ())))
+  let rows = List.map (fun i -> { a = { b = { c = i } } }) (List.range 0 size)
+  Platform.stdout_line (show (rounds rows (total / size) 0))

@@ -1,0 +1,16 @@
+---
+source: flick-core/src/opt/projection_tests.rs
+assertion_line: 59
+expression: js
+---
+import * as $m_String from "./String.js";
+
+export const sugar = (a) => (b) => a.address.zip + b.address.zip | 0;
+
+export const explicit = (a) => (b) => a.address.zip + b.address.zip | 0;
+
+export const generic = 3 + $m_String.length("four") | 0;
+
+export const eight = ($x) => $x.a.b.c.d.e.f.g.h;
+
+export const deep_eight = (r) => r.a.b.c.d.e.f.g.h + r.a.b.c.d.e.f.g.h | 0;

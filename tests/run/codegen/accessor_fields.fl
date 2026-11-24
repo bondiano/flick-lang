@@ -1,0 +1,28 @@
+// An accessor reads a field of any type: a constrained polymorphic field is
+// read at the instance each use needs, through one step or several, as the
+// explicit `fun r -> r.render` reads it; a field holding a runtime function
+// is read, and runs only when that function is called.
+module App.Main exposing (main)
+
+type alias Shower = { render : forall a. Show a => a -> String }
+
+type alias Holder = { inner : Shower }
+
+type alias Logger = { log : String ->{Host.Console} Unit }
+
+shower : Shower
+let shower = { render = fun x -> "<" ++ show x ++ ">" }
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let holder = { inner = shower }
+  Platform.stdout_line ((.render shower) 1)
+  Platform.stdout_line ((.render shower) "a")
+  Platform.stdout_line ((.inner.render holder) [1, 2])
+  Platform.stdout_line ((holder |> .inner.render) true)
+  Platform.stdout_line (((fun r -> r.inner.render) holder) 2.5)
+  let logger = { log = fun line -> Platform.stdout_line ("log: " ++ line) }
+  let log = .log logger
+  Platform.stdout_line "read"
+  log "once"
+  (logger |> .log) "twice"

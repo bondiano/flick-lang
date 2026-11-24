@@ -181,7 +181,9 @@ impl Checker<'_> {
             (Term::With(..) | Term::Handle(..) | Term::Inside(..), _) => {
                 self.runtime_form(e, Some(&full)).map(drop)
             }
-            (Term::App(f, a), _) if self.config && matches!(&**f, Term::Lam(..)) => {
+            (Term::App(f, a), _)
+                if matches!(&**f, Term::Lam(x, body) if self.redex_of(x, body)) =>
+            {
                 let Term::Lam(x, body) = &**f else {
                     unreachable!("a λ, matched above")
                 };

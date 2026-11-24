@@ -81,6 +81,11 @@ impl Ide<'_> {
                 class,
                 name,
             } => self.proof_definition(module, class.as_deref(), name),
+            Symbol::Field {
+                module,
+                record,
+                label,
+            } => self.field_declaration(module, record, label),
             Symbol::Operation {
                 module,
                 service,

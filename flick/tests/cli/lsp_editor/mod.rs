@@ -5,6 +5,7 @@ mod cli;
 mod completion;
 mod features;
 mod ffi;
+mod fields;
 mod foreign;
 mod manifests;
 mod mutable;

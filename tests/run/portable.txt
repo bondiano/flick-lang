@@ -23,6 +23,10 @@ codegen/closures
 codegen/counted_failures
 codegen/counted_patterns
 codegen/composition
+codegen/accessor_fields
+codegen/accessors
+codegen/accessor_projections
+codegen/accessor_shapes
 codegen/composition_method
 codegen/deep_recursion
 codegen/defaults

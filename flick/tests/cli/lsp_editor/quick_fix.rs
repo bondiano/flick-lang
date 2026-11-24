@@ -299,7 +299,7 @@ fn redundant_annotation_quick_fix_removes_it() {
 /// annotates a callback taken for a pure function is offered, not preferred.
 #[test]
 fn a_captured_variable_offers_a_ref_and_an_unsafe_fix_is_not_preferred() {
-    let initial = "module App.Main exposing (run, apply)\n\nrun : Unit ->{} Int\nlet run () =\n  let mut count = 1\n  count = count + 1\n  let later = task { count }\n  await later\n\nservice Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\nlet apply () = (fun h -> h ()) say\n";
+    let initial = "module App.Main exposing (run, apply)\n\nrun : Unit ->{} Int\nlet run () =\n  let mut count = 1\n  count = count + 1\n  let later = task { count }\n  await later\n\nservice Log =\n  info : String ->{} Unit\n\nsay : Unit ->{Log} Unit\nlet say () = Log.info \"hi\"\n\napply : Unit ->{Log} Unit\nlet apply () =\n  let run = fun h -> h ()\n  run say\n";
     let dir = project(
         "lsp_unsafe_actions",
         &[("flick.toml", LIB), ("src/App/Main.fl", initial)],

@@ -1,4 +1,5 @@
-// Records have named fields, `with` makes a changed copy, `[for …]` builds a list.
+// Records have named fields, `with` makes a changed copy, `[for …]` builds a
+// list, and `.title` is the function that reads a field.
 module Main exposing (main)
 
 type alias Book = { title : String; pages : Int; read : Bool }
@@ -14,4 +15,5 @@ let main () =
   ]
   let left = [for b <- shelf; if not b.read yield b.pages]
   Platform.stdout_line "left to read: \{List.fold_left (fun a b -> a + b) 0 left}"
+  Platform.stdout_line (show (List.map .title shelf))
   Platform.stdout_line (show (List.map finish shelf))

@@ -1,0 +1,71 @@
+// `.a.b` is a pure function that reads a path of fields of its argument, as
+// `fun r -> r.a.b` does.
+module App.Accessors exposing (..)
+
+type alias Address = { city : String; zip : Int }
+
+type alias User = { name : String; address : Address }
+
+// at the top level an accessor has a signature, as any function value
+get_city : User -> String
+let get_city = .address.city
+
+cities : List User -> List String
+let cities users = List.map .address.city users
+
+piped : User -> String
+let piped user = user |> .address.city
+
+applied : User -> String
+let applied user = .address.city user
+
+local : User -> String
+let local user =
+  let get = .address.city
+  get user
+
+// the list gives the type, whichever side of the pipeline it is on
+piped_map : List User -> List String
+let piped_map users = users |> List.map .address.city
+
+// a local accessor is generic over the type of the field; over the other
+// fields of the record too, which `records_tests.rs` of the checker shows:
+// the model takes records as exact
+values : Unit ->{} (Int, String, Bool)
+let values () =
+  let get = .value
+  (get { value = 1 }, get { value = "a" }, get { value = true })
+
+// any record with the field will do
+zips : User -> { zip : String } -> (Int, String)
+let zips user other = (.address.zip user, .zip other)
+
+getters : List (User -> String)
+let getters = [.name, .address.city]
+
+type alias Handler = { run : Int -> Int }
+
+// a field that holds a function is read, not called
+runner : Handler -> (Int -> Int)
+let runner handler = .run handler
+
+called : Handler -> Int
+let called handler = (.run handler) 1
+
+held : { get : User -> String }
+let held = { get = .address.city }
+
+type alias Log = { echo : String; todo : Bool }
+
+// the debugging keywords label fields, as in `log.echo`
+echoes : List Log -> (List String, Bool)
+let echoes logs = (List.map .echo logs, .log.todo { log = { echo = "a"; todo = true } })
+
+made : (Unit -> Log) -> String
+let made make = (make ()).echo
+
+// a local accessor is generic over the other fields of a record too
+others : Unit ->{} (Int, Bool)
+let others () =
+  let get = .value
+  (get { value = 1 }, get { value = true; other = 2 })

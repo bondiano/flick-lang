@@ -610,7 +610,8 @@ pub(super) fn meta_item(p: &mut Parser) {
         } else {
             p.bump();
         }
-        while expr::at_arg_start(p) {
+        // metadata takes words and values; an accessor is no metadata
+        while expr::at_arg_start(p) && !p.at(K::Dot) {
             expr::postfix(p);
         }
     } else {

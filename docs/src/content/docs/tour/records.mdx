@@ -1,6 +1,6 @@
 ---
 title: Records
-description: Named fields, a changed copy with `with`, and a list built with `for`.
+description: Named fields, a function that reads one, a changed copy with `with`, and a list built with `for`.
 tableOfContents: false
 ---
 
@@ -10,6 +10,10 @@ import TourLesson from "../../../components/TourLesson.astro";
 
 A record holds named fields. `type alias Book = { … }` names its type. A
 value gives each field with `=`, and `book.title` reads one.
+
+`.title` alone is a function that reads the field: `List.map .title shelf`
+lists the titles, as `List.map (fun b -> b.title) shelf` would. A path reads
+fields in turn: `.author.name`.
 
 A record does not change. `{ book with read = true }` makes a copy with one
 field replaced.
