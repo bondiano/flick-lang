@@ -320,3 +320,65 @@ fn rejects_erased_literal_type_mismatch_in_bindings_blocks_if_and_match() {
     );
     assert!(!validate(&program(bad_match), &|_| false, &files).is_empty());
 }
+
+#[test]
+fn record_field_agrees_only_with_matching_single_field_closed_record() {
+    use crate::{Lang, LangItem, Namespace};
+
+    let files = BTreeSet::from([FileId::new(0)]);
+    let span = Span::new(FileId::new(0), 0, 0);
+    let mut t = TypeInterner::new();
+    let int = t.named("Prelude", "Int", Vec::new());
+    let str_ty = t.named("Prelude", "String", Vec::new());
+    let field_int = t.named("Record", "Field", vec![int.clone()]);
+    let rec_int = t.record(vec![("x".into(), int.clone())], None);
+    let rec_str = t.record(vec![("x".into(), str_ty)], None);
+    let rec_two = t.record(
+        vec![("x".into(), int.clone()), ("y".into(), int.clone())],
+        None,
+    );
+    let rec_open = t.record(vec![("x".into(), int)], Some("r".into()));
+
+    let mut check = |declared: crate::TypeRef, actual: crate::TypeRef| {
+        let mut p = program(Expr::with_ty(
+            ExprKind::Local("x".into()),
+            span,
+            Some(actual.clone()),
+        ));
+        p.lang.push(LangItem {
+            lang: Lang::Field.name().into(),
+            module: "Record".into(),
+            namespace: Namespace::Type,
+            name: "Field".into(),
+        });
+        let ItemKind::Value { ty, body, .. } = &mut p.modules[0].items[0].kind else {
+            unreachable!()
+        };
+        *ty = Some(t.fun(declared.clone(), Stage::Pure, declared));
+        let lam_ty = t.fun(actual.clone(), Stage::Pure, actual.clone());
+        *body = Expr::with_ty(
+            ExprKind::Lambda {
+                params: vec![Param {
+                    pat: Pat::Bind("x".into()),
+                    stage: Stage::Pure,
+                    ty: Some(actual.clone()),
+                    binder_types: vec![("x".into(), actual.clone())],
+                }],
+                body: Box::new(Expr::with_ty(
+                    ExprKind::Local("x".into()),
+                    span,
+                    Some(actual),
+                )),
+            },
+            span,
+            Some(lam_ty),
+        );
+        validate(&p, &|_| false, &files)
+    };
+
+    assert!(check(field_int.clone(), rec_int.clone()).is_empty());
+    assert!(check(rec_int, field_int.clone()).is_empty());
+    assert!(!check(field_int.clone(), rec_str).is_empty());
+    assert!(!check(field_int.clone(), rec_two).is_empty());
+    assert!(!check(field_int, rec_open).is_empty());
+}

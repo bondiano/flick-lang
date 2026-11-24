@@ -6,7 +6,6 @@ use std::iter;
 use flick_ir::{Binding, Constructor, Dict, InstanceInfo, Rep, STRUCTURAL, default_method};
 use flick_pretty::{Document, docvec};
 
-use super::arith::Native;
 use super::layout::{
     Code, block, call, closure, list, named_again, print, signature, statement, typed_signature,
 };
@@ -104,38 +103,47 @@ impl<'a> Gen<'a> {
     fn item(&mut self, item: &Item, decls: &mut Decls<'a>, init: &mut Vec<Document<'a>>) {
         let a = self.a;
         // local names are unique only within a definition
-        self.natives.clear();
+        self.go_types.clear();
         self.held.clear();
         // whether the declaration made now holds a `//line` directive
         let lines = self.lines;
         match &item.kind {
             ItemKind::Value {
                 name, dicts, body, ..
-            } => match super::shape(self.input, self.module, &item.kind) {
-                Shape::Var => {
-                    let var = a.alloc_str(&names::var(self.module, name));
-                    decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
-                    let (mut stmts, v) = self.block(|g| g.expr(body));
-                    stmts.push(statement(a, docvec![a, var, " = ", v]));
-                    init.push(statement(a, block(a, stmts)));
+            } => {
+                let empty = super::go_type::TypeDecls::new();
+                let type_decls = self.decls.unwrap_or(&empty);
+                match super::shape(self.input, type_decls, self.module, &item.kind) {
+                    Shape::Var => {
+                        let var = a.alloc_str(&names::var(self.module, name));
+                        decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
+                        let (mut stmts, v) = self.block(|g| g.expr(body));
+                        stmts.push(statement(a, docvec![a, var, " = ", v]));
+                        init.push(statement(a, block(a, stmts)));
+                    }
+                    Shape::Func { .. } => {
+                        let decl = self.function(name, dicts, body);
+                        decls.push((decl, self.lines > lines));
+                    }
                 }
-                Shape::Func { .. } => {
-                    let decl = self.function(name, dicts, body);
-                    decls.push((decl, self.lines > lines));
-                }
-            },
+            }
             ItemKind::Destructure { pattern, body, .. } => {
                 let mut binders = Vec::new();
                 pattern.binders(&mut binders);
                 let (mut stmts, ()) = self.block(|g| {
-                    let v = g.expr(body);
-                    let v = g.spill(v);
-                    g.destructure(pattern, v.doc);
+                    let v = g.expr_typed(body);
+                    let v = g.spill_typed(v);
+                    g.destructure(pattern, v.code.doc, v.ty);
                 });
                 for b in binders {
                     let var = a.alloc_str(&names::var(self.module, b));
                     decls.push((docvec![a, "var ", var, " flickrt.Value"], false));
-                    stmts.push(statement(a, docvec![a, var, " = ", names::local(b)]));
+                    let local = a.text(a.alloc_str(&names::local(b)));
+                    let val = match self.go_types.get(b) {
+                        Some(gt) => gt.box_if_needed(a, local),
+                        None => local,
+                    };
+                    stmts.push(statement(a, docvec![a, var, " = ", val]));
                 }
                 init.push(statement(a, block(a, stmts)));
             }
@@ -191,7 +199,7 @@ impl<'a> Gen<'a> {
         let mut heads = self.bind_givens(dicts);
         let stmts = match &body.kind {
             ExprKind::Lambda { params, body } => {
-                if let Some((bound, go)) = self.group_call(name, params, types.result()) {
+                if let Some((bound, go)) = self.group_call(name, params, &types) {
                     heads.extend(bound);
                     vec![go]
                 } else {
@@ -199,7 +207,7 @@ impl<'a> Gen<'a> {
                         callee: Callee::Global(format!("{}.{name}", self.module)),
                         dicts: dicts.to_vec(),
                     };
-                    let (bound, stmts) = self.function_body(params, body, Some(target), types);
+                    let (bound, stmts) = self.function_body(params, body, Some(target), &types);
                     heads.extend(bound);
                     stmts
                 }
@@ -209,8 +217,8 @@ impl<'a> Gen<'a> {
         self.givens.clear();
         self.fiber = None;
         self.context = None;
-        let params = typed_signature(&heads, dicts.len(), types);
-        let result = types.result().map_or("flickrt.Value", Native::go);
+        let params = typed_signature(&heads, dicts.len(), &types);
+        let result = self.go_type_name(types.result());
         docvec![
             a,
             "func ",
@@ -298,7 +306,7 @@ impl<'a> Gen<'a> {
             args: info.context.iter().cloned().map(Dict::Given).collect(),
         };
         for (name, value) in methods {
-            self.natives.clear();
+            self.go_types.clear();
             self.held.clear();
             let v = self.method_entry(&this, name, value);
             self.emit(call(a, "d.Set", [self.string(name), v]));

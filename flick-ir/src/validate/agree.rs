@@ -106,6 +106,26 @@ pub(super) fn unfold_opaque_alias(types: &TypeIndex<'_>, ty: &IrType) -> Option<
     Some(body.substitute(&subst, &mut interner))
 }
 
+fn record_field_pair<'a>(
+    types: &TypeIndex<'_>,
+    a: &'a IrType,
+    b: &'a IrType,
+) -> Option<(&'a IrType, &'a IrType)> {
+    if let Some([elem]) = types.is_lang_named(a, Lang::Field)
+        && let IrType::Record { fields, tail: None } = b
+        && let [(_, field_ty)] = fields.as_slice()
+    {
+        return Some((elem, field_ty));
+    }
+    if let IrType::Record { fields, tail: None } = a
+        && let [(_, field_ty)] = fields.as_slice()
+        && let Some([elem]) = types.is_lang_named(b, Lang::Field)
+    {
+        return Some((field_ty, elem));
+    }
+    None
+}
+
 fn peel_forall(mut ty: &IrType) -> (Vec<String>, &IrType) {
     let mut vars = Vec::new();
     while let IrType::Forall { vars: vs, body, .. } = ty {
@@ -140,6 +160,9 @@ fn types_agree_env(
         || (types.is_lang_con(b, Lang::ServiceImpl) && matches!(a, IrType::Record { .. }))
     {
         return true;
+    }
+    if let Some((x, y)) = record_field_pair(types, a, b) {
+        return types_agree_env(types, x, y, renames, allow_var_refinement, true, unfold);
     }
     if matches!(a, IrType::Forall { .. }) && !matches!(b, IrType::Forall { .. }) {
         let (vars, inner) = peel_forall(a);
@@ -394,6 +417,9 @@ fn match_scheme_rec<'a>(
     }
     if allow_var_refinement && matches!(actual, IrType::Var(_)) {
         return true;
+    }
+    if let Some((x, y)) = record_field_pair(types, scheme, actual) {
+        return match_scheme_rec(types, x, params, y, subst, allow_var_refinement, true);
     }
     match (scheme, actual) {
         (

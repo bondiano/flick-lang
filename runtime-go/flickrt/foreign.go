@@ -71,26 +71,21 @@ func (o OptVal) OrNil() Value {
 
 // ToOptVal converts a Flick Option (Some/None) or raw value to an OptVal.
 func ToOptVal(v Value) OptVal {
-	if v == nil || v == None {
+	if v == nil || IsNone(v) {
 		return OptVal{Has: false, Val: nil}
 	}
 	if opt, ok := v.(OptVal); ok {
 		return opt
 	}
-	if d, ok := v.(*Data); ok {
-		if d.Tag == "Some" {
-			return OptVal{Has: true, Val: d.in[0]}
-		}
-		if d.Tag == "None" {
-			return OptVal{Has: false, Val: nil}
-		}
+	if IsSome(v) {
+		return OptVal{Has: true, Val: UnwrapSome(v)}
 	}
 	return OptVal{Has: true, Val: v}
 }
 
 // FromNullable converts nil or an empty OptVal/None to None, and other values to Some(v).
 func FromNullable(v Value) Value {
-	if v == nil || v == None {
+	if v == nil || IsNone(v) {
 		return None
 	}
 	if opt, ok := v.(OptVal); ok {
@@ -98,9 +93,6 @@ func FromNullable(v Value) Value {
 			return None
 		}
 		return Some(opt.Val)
-	}
-	if d, ok := v.(*Data); ok && d.Tag == "None" {
-		return None
 	}
 	return Some(v)
 }

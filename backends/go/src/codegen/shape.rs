@@ -2,16 +2,17 @@
 //! dictionary whoever builds it.
 
 use std::collections::{HashMap, HashSet};
-use std::iter;
+use std::sync::Arc;
 
 use super::Input;
 use super::arith::Native;
+use super::go_type::{GoType, TypeDecls};
 use flick_backend_support::reach::Key;
 use flick_ir::{Dict, InstanceInfo, default_method};
 use flick_ir::{Expr, ExprKind, Item, ItemKind, Param, Pat, Stage};
 
 /// How a top-level name is held in Go.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) enum Shape {
     /// A variable assigned at initialization.
     Var,
@@ -26,44 +27,47 @@ pub(super) enum Shape {
     },
 }
 
-/// The parameters and the result of a function that are of Go's own types,
-/// in four bits each, the result first: a number passed to a function or
-/// returned by it is then no value made for the call. A function of more
-/// parameters than 31 slots hold has none.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct Types(u128);
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TypedSig {
+    result: Option<GoType>,
+    params: Vec<Option<GoType>>,
+}
+
+/// The parameters and the result of a function that are of Go's own typed
+/// representations (scalars or allocation-free `Option` layouts): a value
+/// passed to or returned by the function is not boxed into `flickrt.Value`
+/// for the call.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Types(Option<Arc<TypedSig>>);
 
 impl Types {
-    pub(super) fn of(result: Option<Native>, params: &[Option<Native>]) -> Types {
-        if params.len() > 31 {
-            return Types(0);
+    pub(super) fn of(result: Option<GoType>, params: &[Option<GoType>]) -> Types {
+        if result.is_none() && params.iter().all(Option::is_none) {
+            return Types(None);
         }
-        let code = |n: &Option<Native>| {
-            n.and_then(|n| Native::ALL.iter().position(|&m| m == n))
-                .map_or(0, |at| at as u128 + 1)
-        };
-        let slots = iter::once(&result).chain(params).enumerate();
-        Types(slots.fold(0, |bits, (i, n)| bits | code(n) << (4 * i)))
+        Types(Some(Arc::new(TypedSig {
+            result,
+            params: params.to_vec(),
+        })))
     }
 
-    fn slot(self, i: usize) -> Option<Native> {
-        let shift = u32::try_from(4 * i).ok();
-        let code = shift.and_then(|s| self.0.checked_shr(s)).unwrap_or(0) & 15;
-        (code > 0).then(|| Native::ALL[code as usize - 1])
+    pub(super) fn of_natives(result: Option<Native>, params: &[Option<Native>]) -> Types {
+        let params: Vec<Option<GoType>> = params.iter().map(|p| p.map(GoType::Scalar)).collect();
+        Types::of(result.map(GoType::Scalar), &params)
     }
 
-    pub(super) fn result(self) -> Option<Native> {
-        self.slot(0)
+    pub(super) fn result(&self) -> Option<&GoType> {
+        self.0.as_ref()?.result.as_ref()
     }
 
-    pub(super) fn param(self, i: usize) -> Option<Native> {
-        self.slot(i + 1)
+    pub(super) fn param(&self, i: usize) -> Option<&GoType> {
+        self.0.as_ref()?.params.get(i)?.as_ref()
     }
 
-    /// Whether the function has a parameter or a result of a Go type, so
-    /// that it is not itself a function of values.
-    pub(super) fn any(self) -> bool {
-        self.0 != 0
+    /// Whether the function has a parameter or a result of a typed Go
+    /// representation, so that it is not itself a function of values.
+    pub(super) fn any(&self) -> bool {
+        self.0.is_some()
     }
 }
 
@@ -87,8 +91,8 @@ impl Shape {
     }
 
     /// Whether the function's last language stage runs effects.
-    pub(super) fn effectful(self) -> bool {
-        matches!(self, Shape::Func { params, effects, .. } if params > 0 && effects >> (params - 1) & 1 == 1)
+    pub(super) fn effectful(&self) -> bool {
+        matches!(self, Shape::Func { params, effects, .. } if *params > 0 && effects >> (*params - 1) & 1 == 1)
     }
 }
 
@@ -102,11 +106,17 @@ fn effects(stages: impl IntoIterator<Item = bool>) -> u64 {
 
 /// The shape of a Go function taking `dicts` dictionaries, then `params`,
 /// and computing `body`.
-pub(super) fn function(input: &Input, dicts: usize, params: &[Param], body: &Expr) -> Shape {
-    let natives: Vec<Option<Native>> = params
+pub(super) fn function(
+    input: &Input,
+    decls: &TypeDecls,
+    dicts: usize,
+    params: &[Param],
+    body: &Expr,
+) -> Shape {
+    let param_types: Vec<Option<GoType>> = params
         .iter()
         .map(|p| match p.pat {
-            Pat::Bind(_) => Native::of(input.lang, p.ty.as_deref()),
+            Pat::Bind(_) => GoType::of(input.lang, decls, p.ty.as_deref()),
             _ => None,
         })
         .collect();
@@ -114,14 +124,17 @@ pub(super) fn function(input: &Input, dicts: usize, params: &[Param], body: &Exp
         dicts,
         params: params.len(),
         effects: effects(params.iter().map(|p| p.stage != Stage::Pure)),
-        types: Types::of(Native::of(input.lang, body.ty.as_deref()), &natives),
+        types: Types::of(
+            GoType::of(input.lang, decls, body.ty.as_deref()),
+            &param_types,
+        ),
     }
 }
 
-pub(super) fn shape(input: &Input, module: &str, kind: &ItemKind) -> Shape {
+pub(super) fn shape(input: &Input, decls: &TypeDecls, module: &str, kind: &ItemKind) -> Shape {
     match kind {
         ItemKind::Value { dicts, body, .. } => match &body.kind {
-            ExprKind::Lambda { params, body } => function(input, dicts.len(), params, body),
+            ExprKind::Lambda { params, body } => function(input, decls, dicts.len(), params, body),
             _ if dicts.is_empty() => Shape::Var,
             _ => Shape::Func {
                 dicts: dicts.len(),

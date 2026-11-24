@@ -8,11 +8,10 @@ import (
 
 // option is `Some n` as its digits, or "None".
 func option(v Value) string {
-	d := v.(*Data)
-	if d.Tag == "None" {
+	if IsNone(v) {
 		return "None"
 	}
-	return d.Fields()[0].(*big.Int).String()
+	return UnwrapSome(v).(*big.Int).String()
 }
 
 // `BigInt.from_number`, `parse`, `to_string` and `to_number` as the JS
@@ -42,29 +41,17 @@ func TestBigIntConversions(t *testing.T) {
 
 func optionInt(t *testing.T, v Value) (int32, bool) {
 	t.Helper()
-	d, ok := v.(*Data)
+	if IsNone(v) {
+		return 0, false
+	}
+	if !IsSome(v) {
+		t.Fatalf("expected Option, got %T (%v)", v, v)
+	}
+	n, ok := UnwrapSome(v).(int32)
 	if !ok {
-		t.Fatalf("expected *Data Option, got %T (%v)", v, v)
+		t.Fatalf("Some payload had type %T (%v), want int32", UnwrapSome(v), UnwrapSome(v))
 	}
-	switch d.Tag {
-	case "None":
-		if len(d.Fields()) != 0 {
-			t.Fatalf("None had %d fields", len(d.Fields()))
-		}
-		return 0, false
-	case "Some":
-		if len(d.Fields()) != 1 {
-			t.Fatalf("Some had %d fields", len(d.Fields()))
-		}
-		n, ok := d.Fields()[0].(int32)
-		if !ok {
-			t.Fatalf("Some payload had type %T (%v), want int32", d.Fields()[0], d.Fields()[0])
-		}
-		return n, true
-	default:
-		t.Fatalf("unexpected Option tag %q", d.Tag)
-		return 0, false
-	}
+	return n, true
 }
 
 func TestIntParse(t *testing.T) {

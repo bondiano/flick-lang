@@ -158,7 +158,7 @@ func step2Effect(f Value) func(fb *Fiber, s, x Value) Value {
 
 func always(*Fiber, Value) bool { return true }
 
-func isNone(_ *Fiber, s Value) bool { return s.(*Data).Tag == "None" }
+func isNone(_ *Fiber, s Value) bool { return IsNone(s) }
 
 func SinkFold(initial, cont, f Value) Value {
 	return sinkFold(lazy(initial), holds(cont), step2Effect(f))

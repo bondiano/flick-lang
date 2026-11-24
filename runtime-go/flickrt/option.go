@@ -5,20 +5,20 @@ package flickrt
 
 func opt(v Value) *Data { return v.(*Data) }
 
-func isSome(v Value) bool { return opt(v).Tag == "Some" }
+func isSome(v Value) bool { return IsSome(v) }
 func isOk(v Value) bool   { return opt(v).Tag == "Success" }
 func value(v Value) Value { return opt(v).Fields()[0] }
 
 func OptionProductMany(xs, self Value) Value {
-	if !isSome(self) {
+	if !IsSome(self) {
 		return None
 	}
-	out := []Value{value(self)}
+	out := []Value{UnwrapSome(self)}
 	for _, o := range List(xs) {
-		if !isSome(o) {
+		if !IsSome(o) {
 			return None
 		}
-		out = append(out, value(o))
+		out = append(out, UnwrapSome(o))
 	}
 	return Some(out)
 }
@@ -96,17 +96,17 @@ func ResultOrElse(fb *Fiber, f, r Value) Value {
 func ResultSucceedSome(a Value) Value { return Ok(Some(a)) }
 
 func ResultTransposeOption(fb *Fiber, o Value) Value {
-	if !isSome(o) {
+	if !IsSome(o) {
 		return ResultSucceedNone
 	}
 	return ResultTransposeMapOption(fb, Fn(func(_ *Fiber, v Value) Value { return Identity(v) }), o)
 }
 
 func ResultTransposeMapOption(fb *Fiber, f, o Value) Value {
-	if !isSome(o) {
+	if !IsSome(o) {
 		return ResultSucceedNone
 	}
-	if r := Apply(fb, f, value(o)); isOk(r) {
+	if r := Apply(fb, f, UnwrapSome(o)); isOk(r) {
 		return Ok(Some(value(r)))
 	} else {
 		return r

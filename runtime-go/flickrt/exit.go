@@ -54,8 +54,8 @@ func (e *Exit) outcome() Value {
 // interruption is the interruption by fiber `id`; 0 is no fiber.
 func interruption(id Value) *Cause {
 	var fiber int64
-	if o := id.(*Data); o.Tag == "Some" {
-		fiber = int64(o.Fields()[0].(float64))
+	if IsSome(id) {
+		fiber = int64(UnwrapSome(id).(float64))
 	}
 	return &Cause{kind: causeInterrupt, fiber: fiber}
 }

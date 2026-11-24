@@ -12,8 +12,8 @@ use std::collections::HashMap;
 
 use flick_pretty::{Document, Documentable, docvec};
 
-use super::arith::Native;
 use super::expr::enum_literal;
+use super::go_type::{GoType, OptCon, Typed};
 use super::layout::{block, call, statement};
 use super::{Gen, names, own};
 use flick_backend_support::decision::{self, Graph, Node, NodeId, Place, Step, Test};
@@ -26,10 +26,14 @@ struct Walk<'g, 'a> {
     arms: &'g [Arm],
     /// The Go of each place, once written.
     places: Vec<Option<Document<'a>>>,
+    /// The typed Go representation of place 0 (the scrutinee), if any.
+    scrutinee_ty: Option<GoType>,
     /// The label of the body of each arm reached from several branches.
     labels: Vec<Option<&'a str>>,
-    /// The result variable and its native Go type, if any.
-    result: Option<(&'a str, Option<Native>)>,
+    /// Agreed Go types of variables bound by shared arms (`goto`).
+    shared_types: HashMap<&'g str, Option<GoType>>,
+    /// The result variable and its typed Go type, if any.
+    result: Option<(&'a str, Option<GoType>)>,
 }
 
 impl<'a> Gen<'a> {
@@ -38,8 +42,9 @@ impl<'a> Gen<'a> {
     pub(super) fn decide(
         &mut self,
         subject: Document<'a>,
+        subject_ty: Option<&GoType>,
         arms: &[Arm],
-        result: Option<(&'a str, Option<Native>)>,
+        result: Option<&(&'a str, Option<GoType>)>,
     ) -> bool {
         let Some(graph) = decision::build(arms) else {
             return false;
@@ -53,50 +58,51 @@ impl<'a> Gen<'a> {
             graph: &graph,
             arms,
             places: vec![None; graph.places.len()],
+            scrutinee_ty: subject_ty.cloned(),
             labels,
-            result,
+            shared_types: HashMap::new(),
+            result: result.cloned(),
         };
         w.places[0] = Some(subject);
         let shared = w.labels.iter().any(Option::is_some);
         let mut out = Vec::new();
-        let saved_natives = self.natives.clone();
+        let saved_types = self.go_types.clone();
         if shared {
             // the names of an arm gone to, assigned by each branch that goes there;
-            // keep a native Go type when every branch reaching the arm agrees on it
+            // keep a typed Go type when every branch reaching the arm agrees on it
             let mut order: Vec<&str> = Vec::new();
-            let mut shared_natives: HashMap<&str, Option<Native>> = HashMap::new();
             for node in &graph.nodes {
                 if let Node::Guard { arm, binds, .. } | Node::Leaf { arm, binds } = node
                     && w.labels[*arm].is_some()
                 {
                     for &(name, place) in binds {
-                        let native = self.place_native(&w, place);
-                        shared_natives
+                        let place_ty = self.place_type(&w, place);
+                        w.shared_types
                             .entry(name)
                             .and_modify(|slot| {
-                                if *slot != native {
+                                if *slot != place_ty {
                                     *slot = None;
                                 }
                             })
                             .or_insert_with(|| {
                                 order.push(name);
-                                native
+                                place_ty
                             });
                     }
                 }
             }
             for name in order {
                 let local = a.alloc_str(&names::local(name));
-                let native = shared_natives[name];
-                let go_ty = native.map_or("flickrt.Value", Native::go);
+                let ty = w.shared_types[name].clone();
+                let go_ty = self.go_type_name(ty.as_ref());
                 out.push(statement(a, docvec![a, "var ", local, " ", go_ty]));
                 out.push(statement(a, docvec![a, "_ = ", local]));
-                match native {
-                    Some(n) => {
-                        self.natives.insert(name.to_owned(), n);
+                match ty {
+                    Some(gt) => {
+                        self.go_types.insert(name.to_owned(), gt);
                     }
                     None => {
-                        self.natives.remove(name);
+                        self.go_types.remove(name);
                     }
                 }
             }
@@ -104,7 +110,7 @@ impl<'a> Gen<'a> {
             out.push(statement(a, block(a, tests)));
             for (arm, label) in arms.iter().zip(&w.labels) {
                 if let Some(label) = label {
-                    let (body, ()) = self.block(|g| g.arm_body(&arm.body, result));
+                    let (body, ()) = self.block(|g| g.arm_body(&arm.body, result.cloned()));
                     out.push(statement(a, docvec![a, *label, ": ", block(a, body)]));
                 }
             }
@@ -112,7 +118,7 @@ impl<'a> Gen<'a> {
             let (tests, ()) = self.block(|g| g.node(&mut w, graph.root, None));
             out.extend(tests);
         }
-        self.natives = saved_natives;
+        self.go_types = saved_types;
         if result.is_some() {
             self.emit(docvec![a, "for ", block(a, out)]);
         } else {
@@ -126,14 +132,10 @@ impl<'a> Gen<'a> {
 
     /// The body of an arm: its value in `result`, leaving the loop of the
     /// `match`, or returned.
-    pub(super) fn arm_body(&mut self, body: &Expr, result: Option<(&'a str, Option<Native>)>) {
+    pub(super) fn arm_body(&mut self, body: &Expr, result: Option<(&'a str, Option<GoType>)>) {
         match result {
             Some((r, want)) => {
-                let v = self.expr(body);
-                let v = match want {
-                    Some(n) => self.unboxed(body, v, n),
-                    None => v,
-                };
+                let v = self.expr_into(body, want.as_ref());
                 self.emit(docvec![self.a, r, " = ", v]);
                 self.emit("break");
             }
@@ -142,8 +144,8 @@ impl<'a> Gen<'a> {
     }
 
     /// The statement of a value no arm matches.
-    fn fail(&mut self, result: Option<(&'a str, Option<Native>)>) {
-        self.emit(match (result, self.returns) {
+    fn fail(&mut self, result: Option<&(&'a str, Option<GoType>)>) {
+        self.emit(match (result, &self.returns) {
             (Some(_), _) => "flickrt.NoMatch()",
             (None, Some(_)) => "panic(flickrt.NoMatch())",
             (None, None) => "return flickrt.NoMatch()",
@@ -181,25 +183,33 @@ impl<'a> Gen<'a> {
                 binds,
                 otherwise,
             } => {
-                let added = self.bind_arm(w, *arm, binds);
+                let saved = self.bind_arm(w, *arm, binds);
                 let guard = w.arms[*arm].guard.as_ref().expect("a guarded arm");
-                let c = self.expr(guard);
-                let test = self.unboxed(guard, c, Native::Bool).doc;
+                let test = self.expr_bool(guard).doc;
                 let (then, ()) = self.block(|g| g.enter(w, *arm));
                 self.emit(docvec![a, "if ", test, " ", block(a, then)]);
-                for name in added {
-                    self.natives.remove(&name);
-                }
+                self.restore_go_types(saved);
                 self.node(w, *otherwise, fall);
             }
             Node::Leaf { arm, binds } => {
-                let added = self.bind_arm(w, *arm, binds);
+                let saved = self.bind_arm(w, *arm, binds);
                 self.enter(w, *arm);
-                for name in added {
-                    self.natives.remove(&name);
+                self.restore_go_types(saved);
+            }
+            Node::Fail => self.fail(w.result.as_ref()),
+        }
+    }
+
+    fn restore_go_types(&mut self, saved: Vec<(String, Option<GoType>)>) {
+        for (name, prev) in saved.into_iter().rev() {
+            match prev {
+                Some(gt) => {
+                    self.go_types.insert(name, gt);
+                }
+                None => {
+                    self.go_types.remove(&name);
                 }
             }
-            Node::Fail => self.fail(w.result),
         }
     }
 
@@ -221,58 +231,79 @@ impl<'a> Gen<'a> {
     fn enter(&mut self, w: &Walk<'_, 'a>, arm: usize) {
         match w.labels[arm] {
             Some(label) => self.emit(docvec![self.a, "goto ", label]),
-            None => self.arm_body(&w.arms[arm].body, w.result),
+            None => self.arm_body(&w.arms[arm].body, w.result.clone()),
         }
     }
 
     /// Binds the names of `arm` to their places: declared where its body
-    /// is, assigned when it is gone to. Returns native locals inserted into
-    /// `self.natives` for this non-shared arm so the caller can drop them on exit.
+    /// is, assigned when it is gone to. Returns previous `go_types` entries
+    /// for non-shared bindings so the caller can restore them on exit.
     fn bind_arm(
         &mut self,
         w: &mut Walk<'_, 'a>,
         arm: usize,
         binds: &[(&str, Place)],
-    ) -> Vec<String> {
+    ) -> Vec<(String, Option<GoType>)> {
         let a = self.a;
-        let mut added = Vec::new();
+        let mut saved = Vec::new();
         for (name, place) in binds {
             let path = self.place(w, *place);
+            let place_ty = self.place_type(w, *place);
             let local = a.alloc_str(&names::local(name));
             if w.labels[arm].is_some() {
-                self.emit(docvec![a, local, " = ", path]);
+                let target_ty = w.shared_types.get(*name).and_then(Option::as_ref);
+                let value = self.coerce(
+                    Typed {
+                        code: path.into(),
+                        ty: place_ty,
+                    },
+                    target_ty,
+                );
+                self.emit(docvec![a, local, " = ", value]);
                 continue;
             }
-            if let Some(native) = self.place_native(w, *place) {
-                self.bind_native(name, path.into(), native);
-                added.push((*name).to_owned());
-                continue;
-            }
-            if let Some(labels) = self.held_record(w, *place) {
+            let prev = self.go_types.get(*name).cloned();
+            if place_ty.is_none()
+                && let Some(labels) = self.held_record(w, *place)
+            {
                 // read by place where the name is read by label
                 self.held.insert(local.to_owned(), labels);
             }
-            self.bind(name, path.into());
+            self.bind_typed(name, path.into(), place_ty);
+            saved.push(((*name).to_owned(), prev));
         }
-        added
+        saved
     }
 
-    /// The native Go scalar type of `place`, when it reads an unboxed scalar
-    /// field of an owned constructor.
-    fn place_native(&self, w: &Walk<'_, 'a>, place: Place) -> Option<Native> {
-        let Some((_, Step::Field(c, i))) = &w.graph.places[place] else {
+    /// The typed Go representation of `place`, if it is not erased `flickrt.Value`.
+    fn place_type(&self, w: &Walk<'_, 'a>, place: Place) -> Option<GoType> {
+        let Some((from, step)) = &w.graph.places[place] else {
+            return w.scrutinee_ty.clone();
+        };
+        let Step::Field(c, i) = step else {
             return None;
         };
+        if let Some(GoType::Opt(repr)) = self.place_type(w, *from) {
+            return (self.opt_con(c) == Some(OptCon::Some) && *i == 0)
+                .then(|| repr.payload_go_type())
+                .flatten();
+        }
         let held = self.own_held(c)?;
-        held.has_scalars().then(|| held.field_native(*i)).flatten()
+        held.has_scalars()
+            .then(|| held.field_native(*i))
+            .flatten()
+            .map(GoType::Scalar)
     }
 
     /// The labels of the record that lies in a value of its constructor,
     /// when `place` is that record.
     fn held_record(&mut self, w: &Walk<'_, 'a>, place: Place) -> Option<Vec<String>> {
-        let Some((_, Step::Field(c, 0))) = &w.graph.places[place] else {
+        let Some((from, Step::Field(c, 0))) = &w.graph.places[place] else {
             return None;
         };
+        if self.place_type(w, *from).is_some() {
+            return None;
+        }
         match self.own_type(c) {
             Some((_, own::Held::Record(labels))) => Some(labels),
             _ => None,
@@ -289,23 +320,34 @@ impl<'a> Gen<'a> {
         let go = match &step {
             Step::Field(c, i) => {
                 let of = self.place(w, from);
-                match self.own_type(c) {
-                    Some((ty, held)) => {
-                        let ty = a.alloc_str(&ty);
-                        match held {
-                            own::Held::Zero => {
-                                unreachable!("a zero-size constructor has no fields")
+                if let Some(GoType::Opt(repr)) = self.place_type(w, from)
+                    && self.opt_con(c) == Some(OptCon::Some)
+                    && *i == 0
+                {
+                    repr.unwrap_doc(a, of)
+                } else if self.opt_con(c) == Some(OptCon::Some) && *i == 0 {
+                    call(a, "flickrt.UnwrapSome", [of])
+                } else {
+                    match self.own_type(c) {
+                        Some((ty, held)) => {
+                            let ty = a.alloc_str(&ty);
+                            match held {
+                                own::Held::Zero => {
+                                    unreachable!("a zero-size constructor has no fields")
+                                }
+                                own::Held::Record(_) => {
+                                    docvec![a, "flickrt.Value(&", of, ".(*", ty, ").rec)"]
+                                }
+                                own::Held::Fields(ref slots)
+                                    if slots.iter().any(Option::is_some) =>
+                                {
+                                    docvec![a, of, ".(*", ty, ").f", *i]
+                                }
+                                own::Held::Fields(_) => docvec![a, of, ".(*", ty, ").f[", *i, "]"],
                             }
-                            own::Held::Record(_) => {
-                                docvec![a, "flickrt.Value(&", of, ".(*", ty, ").rec)"]
-                            }
-                            own::Held::Fields(ref slots) if slots.iter().any(Option::is_some) => {
-                                docvec![a, of, ".(*", ty, ").f", *i]
-                            }
-                            own::Held::Fields(_) => docvec![a, of, ".(*", ty, ").f[", *i, "]"],
                         }
+                        None => call(a, "flickrt.Get", [of, i.to_doc(a)]),
                     }
-                    None => call(a, "flickrt.Get", [of, i.to_doc(a)]),
                 }
             }
             Step::Item(i) => {
@@ -327,6 +369,7 @@ impl<'a> Gen<'a> {
     fn label(&mut self, w: &mut Walk<'_, 'a>, record: Place, label: &str) -> Document<'a> {
         let a = self.a;
         if let Some((value, Step::Field(c, 0))) = w.graph.places[record]
+            && self.place_type(w, value).is_none()
             && let Some((ty, own::Held::Record(labels))) = self.own_type(c)
             && let Some(at) = labels.iter().position(|l| l == label)
         {
@@ -344,6 +387,19 @@ impl<'a> Gen<'a> {
         let subject = self.place(w, place);
         match test {
             Test::Tag(c) => {
+                if let Some(GoType::Opt(repr)) = self.place_type(w, place) {
+                    return match self.opt_con(c) {
+                        Some(OptCon::Some) => repr.is_some_doc(a, subject),
+                        Some(OptCon::None) => repr.is_none_doc(a, subject),
+                        None => unreachable!("Option value tested with non-Option constructor"),
+                    };
+                }
+                if let Some(opt_con) = self.opt_con(c) {
+                    return match opt_con {
+                        OptCon::Some => call(a, "flickrt.IsSome", [subject]),
+                        OptCon::None => call(a, "flickrt.IsNone", [subject]),
+                    };
+                }
                 if let Some((ty, _)) = self.own_type(c) {
                     // a Go type of its own, which is its tag
                     return call(a, a.alloc_str(&own::test(&ty)), [subject]);
@@ -378,7 +434,8 @@ impl<'a> Gen<'a> {
                 call(a, "flickrt.Same", [subject, lit])
             }
             Test::Lit(lit) => {
-                let lit_doc = self.pattern_lit(lit, self.place_native(w, place));
+                let lit_doc =
+                    self.pattern_lit(lit, self.place_type(w, place).and_then(|gt| gt.as_scalar()));
                 docvec![a, "(", subject, " == ", lit_doc, ")"]
             }
             Test::Len { n, rest } => {

@@ -133,11 +133,11 @@ func modifyAt(fb *Fiber, t *table, k Value, h int32, f Value) *table {
 	if v, ok := t.get(fb, k, h); ok {
 		before = Some(v)
 	}
-	after := Apply(fb, f, before).(*Data)
+	after := Apply(fb, f, before)
 	switch {
-	case after.Tag == "Some":
-		return t.set(fb, k, after.Fields()[0], h, false)
-	case before != None:
+	case IsSome(after):
+		return t.set(fb, k, UnwrapSome(after), h, false)
+	case !IsNone(before):
 		return t.remove(fb, k)
 	}
 	return t
@@ -213,9 +213,8 @@ func HashMapFilter(fb *Fiber, f, m Value) Value {
 
 func HashMapCompact(m Value) Value {
 	return mapOf(mapped(hmap(m), func(e entry) (Value, bool) {
-		o := e.value.(*Data)
-		if o.Tag == "Some" {
-			return o.Fields()[0], true
+		if IsSome(e.value) {
+			return UnwrapSome(e.value), true
 		}
 		return nil, false
 	}))

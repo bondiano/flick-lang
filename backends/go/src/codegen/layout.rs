@@ -13,7 +13,7 @@ use flick_pretty::{
     Document, DocumentArena, Documentable, Indentation, NextBreakFitsMode, Position, docvec,
 };
 
-use super::arith::Native;
+use super::go_type::GoType;
 use super::shape::Types;
 
 /// The columns of one level of nesting, written as a tab.
@@ -194,13 +194,16 @@ pub(super) fn signature<S: Borrow<str>>(names: &[S]) -> String {
 /// The parameter list of a Go function taking the hidden fiber, `dicts`
 /// dictionaries, then parameters of `types`: each of the Go type it has
 /// there, a `Value` when it has none.
-pub(super) fn typed_signature(names: &[&str], dicts: usize, types: Types) -> String {
+pub(super) fn typed_signature(names: &[&str], dicts: usize, types: &Types) -> String {
     if !types.any() {
         return signature(names);
     }
     let params = names.iter().enumerate().map(|(i, name)| {
-        let native = i.checked_sub(dicts).and_then(|p| types.param(p));
-        format!(", {name} {}", native.map_or("flickrt.Value", Native::go))
+        let ty = i
+            .checked_sub(dicts)
+            .and_then(|p| types.param(p))
+            .map_or_else(|| "flickrt.Value".to_owned(), GoType::go_type);
+        format!(", {name} {ty}")
     });
     format!("fb *flickrt.Fiber{}", params.collect::<String>())
 }

@@ -22,6 +22,7 @@
 
 use flick_pretty::{Document, docvec};
 
+use super::go_type::TypeDecls;
 use super::layout::{Code, block, call, statement};
 use super::shape::{self, Shape};
 use super::{Gen, Input, names};
@@ -56,7 +57,12 @@ pub(super) fn methods(kind: &ItemKind) -> Vec<(&str, &Expr)> {
 /// The shapes of the methods of `kind`, an item of `module`, by their
 /// top-level names: a function of the context's dictionaries and its
 /// parameters, or a variable.
-pub(super) fn shapes(input: &Input, module: &str, kind: &ItemKind) -> Vec<(Key, Shape)> {
+pub(super) fn shapes(
+    input: &Input,
+    decls: &TypeDecls,
+    module: &str,
+    kind: &ItemKind,
+) -> Vec<(Key, Shape)> {
     let ItemKind::Instance { info, .. } = kind else {
         return Vec::new();
     };
@@ -66,7 +72,7 @@ pub(super) fn shapes(input: &Input, module: &str, kind: &ItemKind) -> Vec<(Key, 
             let key = (module.to_owned(), name(&info.name, method));
             let shape = match &code.kind {
                 ExprKind::Lambda { params, body } => {
-                    shape::function(input, info.context.len(), params, body).of_values()
+                    shape::function(input, decls, info.context.len(), params, body).of_values()
                 }
                 _ => Shape::Var,
             };
@@ -170,7 +176,7 @@ impl<'a> Gen<'a> {
                 }
                 Some(Shape::Func { .. }) => {
                     // local names are unique only within a definition
-                    self.natives.clear();
+                    self.go_types.clear();
                     self.held.clear();
                     let lines = self.lines;
                     let decl = self.function(&name, &info.context, code);

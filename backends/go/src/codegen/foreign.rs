@@ -9,6 +9,7 @@ use flick_backend_support::opt::eval::NativePrimitive;
 use flick_pretty::{Document, Documentable, docvec};
 
 use super::arith::Native;
+use super::go_type::GoType;
 use super::layout::{call, closure, list, signature, single, typed_signature};
 use super::shape::Types;
 use super::{Gen, names};
@@ -27,7 +28,7 @@ fn typed(go: &str) -> (&str, Types) {
         .expect("the result after the parameters");
     let native = |ty: &str| Some(Native::named(ty.trim()).expect("a Go type of a scalar"));
     let params: Vec<Option<Native>> = params.split(',').map(native).collect();
-    (name, Types::of(native(result), &params))
+    (name, Types::of_natives(native(result), &params))
 }
 
 /// The Go functions of `flickrt` that the tables of the implicit packages
@@ -104,7 +105,7 @@ impl Bindings {
         export: &str,
     ) -> Option<(&str, Types)> {
         self.binding(module, name, from, export)
-            .map(|binding| (binding.target.as_str(), binding.types))
+            .map(|binding| (binding.target.as_str(), binding.types.clone()))
     }
 
     fn binding(
@@ -150,7 +151,7 @@ impl Bindings {
             f.source_name.as_deref().unwrap_or(&f.name),
             &f.binding,
         )
-        .map_or_else(Types::default, |binding| binding.types)
+        .map_or_else(Types::default, |binding| binding.types.clone())
     }
 
     /// Validates that `f` of `module` resolves in this Go binding table to the
@@ -219,7 +220,7 @@ impl<'a> Gen<'a> {
             ));
             return None;
         };
-        let (target, types) = (bound.target.as_str(), bound.types);
+        let (target, types) = (bound.target.as_str(), bound.types.clone());
         // `*` marks a runtime function that takes the fiber first
         let (target, wants_fiber) = match target.strip_prefix('*') {
             Some(t) => (t, true),
@@ -241,23 +242,29 @@ impl<'a> Gen<'a> {
         let go = call(a, target, args.into_iter().map(|arg| arg.to_doc(a)));
         // a function of Go's own types is given and gives them as they are
         let heads: Vec<&str> = heads.iter().map(String::as_str).collect();
-        let result = types.result().map_or("flickrt.Value", Native::go);
-        Some(self.wrapper(f, typed_signature(&heads, f.dicts, types), result, go))
+        let result = types
+            .result()
+            .map_or_else(|| "flickrt.Value".to_owned(), GoType::go_type);
+        Some(self.wrapper(f, typed_signature(&heads, f.dicts, &types), &result, go))
     }
 
     /// The Go function of the binding `f` taking `params` and returning
     /// `go`, a `result`.
-    fn wrapper(
-        &self,
-        f: &Foreign,
-        params: String,
-        result: &'static str,
-        go: Document<'a>,
-    ) -> Document<'a> {
+    fn wrapper(&self, f: &Foreign, params: String, result: &str, go: Document<'a>) -> Document<'a> {
         let a = self.a;
         let name = names::func(self.module, &f.name);
         let body = single(a, docvec![a, "return ", go]);
-        docvec![a, "func ", name, "(", params, ") ", result, " ", body]
+        docvec![
+            a,
+            "func ",
+            name,
+            "(",
+            params,
+            ") ",
+            a.alloc_str(result),
+            " ",
+            body
+        ]
     }
 }
 
