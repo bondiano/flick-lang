@@ -29,8 +29,9 @@ queries. `flick`, `flick-wasm`, `flick-model` and `flick-backend` link it.
   `docs/src/error-translations/<CODE>.md`, then
   `node docs/scripts/errors.mjs --write`. Never reuse a number; mark a
   retired code in its explanation.
-- Gate disk, Go and source-map code by `native-project` and editor code
-  by `ide` ([features](../CONTRIBUTING.md#cargo-features)); without
+- Gate disk, Go and source-map code by `native-project`, editor code by
+  `ide` and contract verification by `contracts`
+  ([features](../CONTRIBUTING.md#cargo-features)); without
   `native-project`, read files through `project::Host`.
 - Add an integration suite as a file in `tests/compiler/` plus a
   `pub mod` line in its `main.rs`.

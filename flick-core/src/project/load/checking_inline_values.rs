@@ -1,4 +1,5 @@
 impl Checking<'_> {
+    #[allow(clippy::too_many_lines)]
     fn check_inline(
         &self,
         loaded: &Loaded,
@@ -12,7 +13,8 @@ impl Checking<'_> {
         let Some(units) = inline_units(loaded, tree, index, inline, text) else {
             return Self::module_template(loaded);
         };
-        let prefix_output = self.check(&units.prefix, lookup, contracts);
+        let prefix_checking = Checking { prove_contracts: false, ..*self };
+        let prefix_output = prefix_checking.check(&units.prefix, lookup, contracts);
         let child = &units.child;
         let child_module = resolve::Module {
             name: &child.name,
@@ -107,6 +109,7 @@ impl Checking<'_> {
             .diagnostics
             .extend(resolve::import_warnings(&source_module, lookup));
         output.diagnostics.extend(child_output.diagnostics.clone());
+        output.contracts.extend(child_output.contracts.clone());
         merge_inline_lowering(&mut output, &mut child_output, loaded, &units);
         output
     }

@@ -25,16 +25,16 @@ pub enum Outcome {
     Unknown,
 }
 
-/// The Omega test of `hyps` over `vars` variables, in at most `budget`
-/// derivations.
-pub fn decide(hyps: &[Linear], vars: usize, budget: u32) -> Outcome {
+/// The Omega test of `hyps` over `vars` variables, spending from `budget`
+/// derivations and leaving the remaining allowance in `*budget`.
+pub fn decide_budgeted(hyps: &[Linear], vars: usize, budget: &mut u32) -> Outcome {
     let mut search = Search {
         facts: hyps.to_vec(),
         vars,
-        budget,
+        budget: *budget,
     };
     let active = (0..hyps.len()).collect();
-    match search.solve(active) {
+    let outcome = match search.solve(active) {
         Ok(Res::Refuted(p)) => Outcome::Refuted(p),
         Ok(Res::Model(mut m)) => {
             m.truncate(vars);
@@ -47,7 +47,15 @@ pub fn decide(hyps: &[Linear], vars: usize, budget: u32) -> Outcome {
             }
         }
         Err(Stop) => Outcome::Unknown,
-    }
+    };
+    *budget = search.budget;
+    outcome
+}
+
+/// The Omega test of `hyps` over `vars` variables, in at most `budget`
+/// derivations.
+pub fn decide(hyps: &[Linear], vars: usize, mut budget: u32) -> Outcome {
+    decide_budgeted(hyps, vars, &mut budget)
 }
 
 struct Search {

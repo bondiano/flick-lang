@@ -8,7 +8,32 @@ pub(crate) fn check_file(
     parse: Parse,
     syntax: ModuleSyntax,
     expansion: Option<Expansion>,
+    derived: Vec<Diagnostic>,
+) -> Vec<Diagnostic> {
+    check_file_with(sources, file, parse, syntax, expansion, derived, false)
+}
+
+/// [`check_file`], also proving any function contracts in `PureTotalV2`.
+#[cfg(feature = "contracts")]
+pub(crate) fn prove_file(
+    sources: &SourceMap,
+    file: FileId,
+    parse: Parse,
+    syntax: ModuleSyntax,
+    expansion: Option<Expansion>,
+    derived: Vec<Diagnostic>,
+) -> Vec<Diagnostic> {
+    check_file_with(sources, file, parse, syntax, expansion, derived, true)
+}
+
+fn check_file_with(
+    sources: &SourceMap,
+    file: FileId,
+    parse: Parse,
+    syntax: ModuleSyntax,
+    expansion: Option<Expansion>,
     mut derived: Vec<Diagnostic>,
+    prove_contracts: bool,
 ) -> Vec<Diagnostic> {
     let name = syntax
         .header
@@ -40,6 +65,16 @@ pub(crate) fn check_file(
         watched: types::Watched::new(first_party::WATCH),
     });
     let watching: Vec<_> = watching.into_iter().collect();
+    #[cfg_attr(not(feature = "contracts"), expect(unused_mut))]
+    let mut all_contracted = HashSet::new();
+    #[cfg(feature = "contracts")]
+    {
+        let text = modules[0]
+            .expansion
+            .as_ref()
+            .map_or(sources.get(file).text.as_str(), |e| e.text.as_str());
+        modules[0].collect_contract_names(text, &mut all_contracted);
+    }
     let env_ctx = super::environment::EnvironmentContext::standalone();
     #[cfg(not(target_arch = "wasm32"))]
     let package_when = BTreeMap::new();
@@ -57,7 +92,11 @@ pub(crate) fn check_file(
         own_package_when: None,
         lower: false,
         lowered: &[],
-        proving: false,
+        proving: prove_contracts,
+        prove_contracts,
+        selected: None,
+        all_contracted: &all_contracted,
+        verified_contracts: &[],
         cached_ir: CachedIr::Dropped,
         lower_packages_only: false,
         precompiled: &precompiled,

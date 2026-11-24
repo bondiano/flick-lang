@@ -25,7 +25,7 @@ pub struct CommandArguments {
 pub enum Commands {
     /// Check Flick source files and report diagnostics.
     Check(CheckArguments),
-    /// Check the proofs of the project's proof root, with the code they name.
+    /// Verify proof modules and function contracts, with the code they name.
     Prove(ProveArguments),
     /// Compile the project, or the given files, with the selected target backend.
     Build(BuildArguments),
@@ -170,8 +170,9 @@ pub struct CheckArguments {
 
 #[derive(Args)]
 pub struct ProveArguments {
-    /// Proof modules or directories to check, with everything they import;
-    /// by default the project's proof root (`project.proof-dir`).
+    /// Files or directories to verify, with everything they import; by default
+    /// the project's proof root (`project.proof-dir`) and any source or test
+    /// modules declaring contracts or proofs.
     pub paths: Vec<String>,
 
     /// Check again whenever a source file changes.

@@ -261,3 +261,36 @@ fn an_explicit_build_package_qualifies_tags_without_project_discovery() {
         );
     }
 }
+
+/// A contract type-checks in every build and no build proves one while
+/// checking; only a build with the capability that proves contracts can.
+#[test]
+fn a_false_contract_checks_in_every_build_and_is_proved_only_with_its_capability() {
+    let source = r"module Main exposing (consume)
+
+consume : Int -> Int -> Int
+let consume available used
+where
+  require (0 <= used && used <= available)
+  ensure (fun remaining -> 0 <= remaining && remaining + used == available)
+=
+  available
+";
+    let mut sources = SourceMap::default();
+    let file = sources.add("/Main.fl", source);
+    let checked = flick_core::check(&sources, file);
+    assert!(
+        checked.iter().all(|d| d.severity != Severity::Error),
+        "checking never proves a contract: {checked:?}"
+    );
+    #[cfg(feature = "contracts")]
+    {
+        let proved = flick_core::prove(&sources, file);
+        let errors: Vec<&Diagnostic> = proved
+            .iter()
+            .filter(|d| d.severity == Severity::Error)
+            .collect();
+        assert_eq!(errors.len(), 1, "{proved:?}");
+        assert_eq!(errors[0].code, codes::T087, "{proved:?}");
+    }
+}

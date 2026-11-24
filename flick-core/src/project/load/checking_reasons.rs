@@ -142,7 +142,7 @@ impl Checking<'_> {
             validate_foreign_metadata: self.env_ctx.validate_foreign_metadata,
             #[cfg(not(target_arch = "wasm32"))]
             native_overrides: self.env_ctx.native_overrides().clone(),
-            lower: self.lower,
+            lower: self.lowers(loaded),
             cached_ir: self.cached_ir,
             imports: loaded
                 .syntax

@@ -3,7 +3,7 @@
 //! mapping, name collisions and import cycles, then resolves each module
 //! against the interfaces of its imports.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -32,6 +32,8 @@ mod unknown;
 
 pub use checking::ModuleCache;
 pub(crate) use checking::check_file;
+#[cfg(feature = "contracts")]
+pub(crate) use checking::prove_file;
 #[cfg(feature = "native-project")]
 pub use checking::{ModuleStore, SavedModule};
 pub use entry::{MainKind, host_services, main_kind};
@@ -120,6 +122,8 @@ struct Virtual {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Check,
+    /// Like [`Mode::Check`], also verifying contracts in selected roots.
+    Prove,
     /// Also lowers every module to the IR when nothing has errors.
     Compile,
     #[cfg(feature = "ide")]
@@ -176,6 +180,16 @@ struct Loader<'a> {
     /// What a test companion sees of its module, by the module's name: all
     /// it declares. Only a run that loads the companion makes one.
     privates: BTreeMap<String, Interface>,
+    /// Whether this run verifies contracts (`Mode::Prove`).
+    prove_contracts: bool,
+    /// Normalized root paths selected for this run (used to narrow contract
+    /// verification to selected modules in `flick prove <path>`).
+    selected_roots: HashSet<PathBuf>,
+    /// Every `(module, name)` declared with a `where` contract across all
+    /// loaded modules in this run.
+    all_contracted: HashSet<(String, String)>,
+    /// Verified contracts produced per module during this run.
+    verified_contracts: Vec<Vec<ir::ProvenContract>>,
 }
 
 /// A module's IR and what the reference model reads of it.
@@ -183,102 +197,7 @@ type Lowered = (ir::Module, Arc<Interface>, Vec<ir::Proven>);
 
 use output::compiled;
 
-/// Checks `roots` (absolute `.fl` paths) and their transitive imports.
-pub fn check(
-    host: &dyn Host,
-    sources: &mut SourceMap,
-    project: Option<&Project>,
-    roots: &[PathBuf],
-) -> Vec<Diagnostic> {
-    run(host, sources, project, roots, Mode::Check, None, None).diagnostics
-}
-
-/// [`check`], taking the modules of source packages `packages` saved and
-/// giving those to save; a command that checks again and again keeps what
-/// it checked in `cache`.
-pub fn check_with(
-    host: &dyn Host,
-    sources: &mut SourceMap,
-    project: Option<&Project>,
-    roots: &[PathBuf],
-    packages: Option<&PackageCache>,
-    cache: Option<&mut ModuleCache>,
-) -> (Vec<Diagnostic>, Vec<Fresh>) {
-    let output = run(host, sources, project, roots, Mode::Check, cache, packages);
-    (output.diagnostics, output.fresh)
-}
-
-/// [`check`], also lowering every module to the IR when nothing has errors.
-pub fn compile(
-    host: &dyn Host,
-    sources: &mut SourceMap,
-    project: Option<&Project>,
-    roots: &[PathBuf],
-) -> (Vec<Diagnostic>, Compilation) {
-    let Output {
-        diagnostics,
-        compilation,
-        ..
-    } = run(host, sources, project, roots, Mode::Compile, None, None);
-    (diagnostics, compilation)
-}
-
-/// [`compile`], taking the modules of source packages `packages` saved and
-/// giving those to save; `rt` overrides whether stages follow class derivation
-/// (`Some(true)` for RT, `Some(false)` for Effect/Go, `None` for the project
-/// default); a command that builds again and again keeps what it compiled in
-/// `cache`.
-pub fn compile_with(
-    host: &dyn Host,
-    sources: &mut SourceMap,
-    project: Option<&Project>,
-    roots: &[PathBuf],
-    packages: Option<&PackageCache>,
-    rt: Option<bool>,
-    cache: Option<&mut ModuleCache>,
-) -> (Vec<Diagnostic>, Compilation, Vec<Fresh>) {
-    let target = rt.map(|rt| TargetOverride {
-        rt: Some(rt),
-        ..TargetOverride::default()
-    });
-    compile_for(
-        host,
-        sources,
-        project,
-        roots,
-        packages,
-        target.as_ref(),
-        cache,
-    )
-}
-
-/// [`compile_with`], parameterized by a target/option override (from CLI
-/// `--target`, resolved backend options, loaded descriptor tags, or test mode).
-pub fn compile_for(
-    host: &dyn Host,
-    sources: &mut SourceMap,
-    project: Option<&Project>,
-    roots: &[PathBuf],
-    packages: Option<&PackageCache>,
-    target: Option<&TargetOverride>,
-    cache: Option<&mut ModuleCache>,
-) -> (Vec<Diagnostic>, Compilation, Vec<Fresh>) {
-    let mode = Mode::Compile;
-    let output = run_in(host, sources, project, roots, mode, cache, packages, target);
-    (output.diagnostics, output.compilation, output.fresh)
-}
-
-fn run(
-    host: &dyn Host,
-    sources: &mut SourceMap,
-    project: Option<&Project>,
-    roots: &[PathBuf],
-    mode: Mode,
-    cache: Option<&mut ModuleCache>,
-    saved: Option<&PackageCache>,
-) -> Output {
-    run_in(host, sources, project, roots, mode, cache, saved, None)
-}
+include!("entry_points.rs");
 
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn run_in(
@@ -350,7 +269,8 @@ fn run_in(
     let precompiled = Precompiled::default();
     // a check lowers the modules of source packages only to save them;
     // a selected target or environment also needs IR for reachable-use preflight
-    let lower_packages_only = mode == Mode::Check && saved.is_some() && !environment_preflight;
+    let check_only = matches!(mode, Mode::Check | Mode::Prove);
+    let lower_packages_only = check_only && saved.is_some() && !environment_preflight;
     #[cfg(feature = "ide")]
     let ide_foreign_backend = env_ctx.foreign_backend.clone();
     let mut loader = Loader {
@@ -371,8 +291,7 @@ fn run_in(
         by_name: BTreeMap::new(),
         from_packages: BTreeMap::new(),
         diagnostics,
-        lowered: (mode != Mode::Check || lower_packages_only || environment_preflight)
-            .then(Vec::new),
+        lowered: (!check_only || lower_packages_only || environment_preflight).then(Vec::new),
         lower_packages_only,
         precompiled,
         #[cfg(feature = "ide")]
@@ -380,6 +299,10 @@ fn run_in(
         cache,
         watchers: plugins::Watchers::default(),
         privates: BTreeMap::new(),
+        prove_contracts: mode == Mode::Prove,
+        selected_roots: HashSet::new(),
+        all_contracted: HashSet::new(),
+        verified_contracts: Vec::new(),
     };
     let mut roots: Vec<(Root, PathBuf)> = roots
         .iter()
@@ -387,6 +310,7 @@ fn run_in(
         .collect();
     roots.sort();
     roots.dedup();
+    loader.selected_roots = roots.iter().map(|(_, path)| path.clone()).collect();
     for (_, path) in roots {
         if let Err(err) = loader.load(&path) {
             let message = format!("cannot read `{}`: {err}", loader.host.display(&path));
@@ -462,7 +386,7 @@ fn run_in(
     };
     let fresh = loader.finish_packages(
         &mut compiled,
-        mode != Mode::Check || environment_preflight,
+        !check_only || environment_preflight,
         saved.is_some() && !failed,
     );
     #[cfg(not(target_arch = "wasm32"))]

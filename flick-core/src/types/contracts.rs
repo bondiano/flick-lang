@@ -8,20 +8,61 @@ use std::mem;
 use super::Checker;
 use super::lang::Lang;
 use super::ty::Type;
+use super::typing::{Range, passes_dictionary};
 use crate::iface::{Entity, Namespace};
+use crate::logic;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
+/// What the checker settled of one function's contract.
+#[derive(Debug, Clone)]
+pub struct ContractInfo {
+    pub name: String,
+    /// Source range of the `LetDecl`.
+    pub at: Range,
+    /// Source range of the `Contract` node.
+    pub contract: Range,
+    /// True if the function's scheme has class constraints passing dictionaries.
+    pub has_dicts: bool,
+    /// True if any arrow of the function carries an effect row (`Sync`/`Runtime`).
+    pub has_effects: bool,
+    /// True if the function is syntactic `let rec` or inside `rec { ... }`.
+    pub recursive: bool,
+    /// Parameter types in order, lowered to `logic::Ty`.
+    pub params: Vec<logic::Ty>,
+    /// Result type after applying `params`, lowered to `logic::Ty`.
+    pub result: logic::Ty,
+    /// Data types referenced in signature, contract, and body.
+    pub data: logic::Data,
+}
+
 impl Checker<'_> {
     pub(super) fn check_contracts(&mut self, decls: &[&Node]) {
-        for decl in decls.iter().filter(|d| d.kind == K::LetDecl) {
-            if let Some(contract) = decl.nodes().find(|n| n.kind == K::Contract) {
-                self.check_contract(decl, contract);
+        for decl in decls {
+            match decl.kind {
+                K::LetDecl => {
+                    if let Some(contract) = decl.nodes().find(|n| n.kind == K::Contract) {
+                        self.check_contract(decl, contract, false);
+                    }
+                }
+                K::RecGroup => {
+                    for member in decl
+                        .nodes()
+                        .filter(|n| n.kind == K::Members)
+                        .flat_map(Node::nodes)
+                        .filter(|n| n.kind == K::LetDecl)
+                    {
+                        if let Some(contract) = member.nodes().find(|n| n.kind == K::Contract) {
+                            self.check_contract(member, contract, true);
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     }
 
-    fn check_contract(&mut self, decl: &Node, contract: &Node) {
+    fn check_contract(&mut self, decl: &Node, contract: &Node, in_rec_group: bool) {
         let Some(name) = decl.nodes().find(|n| n.kind == K::VarPat) else {
             return;
         };
@@ -39,22 +80,32 @@ impl Checker<'_> {
             mem::take(&mut self.classes.wanted),
             mem::take(&mut self.classes.givens),
         );
-        self.cx.proof = Some(decl.range());
+        // Leave `self.cx.proof = None` so proof rules (`refl`, `symm`, ...) and
+        // imported proof lemmas cannot resolve inside contract expressions.
         let (mut ty, _, givens) = self.skolemize(&scheme);
+        let has_dicts = givens.iter().any(passes_dictionary);
         self.classes.givens.extend(givens);
         // the parameters at the types of the scheme, in order
+        let mut param_types = Vec::new();
+        let mut has_effects = false;
         for param in decl
             .nodes()
             .filter(|n| n.kind == K::Params)
             .flat_map(Node::nodes)
         {
             let Type::Fun {
-                param: p, result, ..
-            } = bare(self.store.resolve(&ty))
+                param: p,
+                effects,
+                result,
+            } = self.whnf(&ty)
             else {
                 break;
             };
+            if effects.is_some() {
+                has_effects = true;
+            }
             self.bind_pattern(param, &p);
+            param_types.push(*p);
             ty = *result;
         }
         let bool_ = Type::lang(Lang::Bool);
@@ -71,15 +122,32 @@ impl Checker<'_> {
         self.settle_operators();
         self.solve_rows();
         self.solve_classes(true);
+        // only the verifier reads what a contract settles
+        #[cfg(feature = "contracts")]
+        {
+            let mut data = logic::Data::new();
+            let params = param_types
+                .iter()
+                .map(|p| self.contract_logic_type(p, &mut data))
+                .collect();
+            let result = self.contract_logic_type(&ty, &mut data);
+            self.contract_constructors_named(decl, &mut data);
+            let recursive = in_rec_group || decl.has_token(K::RecKw);
+            self.typing.contracts.push(ContractInfo {
+                name: entity.name,
+                at: decl.range(),
+                contract: contract.range(),
+                has_dicts,
+                has_effects,
+                recursive,
+                params,
+                result,
+                data,
+            });
+        }
+        #[cfg(not(feature = "contracts"))]
+        let _ = (in_rec_group, has_dicts, has_effects, param_types, entity);
         self.cx = outer;
         (self.store.level, self.classes.wanted, self.classes.givens) = saved;
     }
-}
-
-/// `t` without the captures and bounds around it.
-fn bare(mut t: Type) -> Type {
-    while let Type::Bounded { ty, .. } | Type::Captured { ty, .. } = t {
-        t = *ty;
-    }
-    t
 }

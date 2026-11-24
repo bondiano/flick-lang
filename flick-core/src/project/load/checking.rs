@@ -232,13 +232,21 @@ impl Loader<'_> {
             #[cfg(not(target_arch = "wasm32"))]
             own_package_when: self.own_package_when,
             lowered: self.lowered.as_deref().unwrap_or(&[]),
-            proving: self.modules.iter().any(Loaded::has_proofs),
-            // a failed import leaves names unresolved, and the build fails anyway
+            proving: self.modules.iter().any(Loaded::has_proofs) || self.has_selected_contracts(),
+            prove_contracts: self.prove_contracts,
+            selected: self.prove_contracts.then_some(&self.selected_roots),
+            all_contracted: &self.all_contracted,
+            verified_contracts: &self.verified_contracts,
+            // a failed import leaves names unresolved, and the build fails anyway;
+            // during proving, clean helper modules still lower so one failed
+            // contract does not cascade spurious `T082` into unrelated modules
             lower: self.lowered.is_some()
-                && !self
-                    .diagnostics
-                    .iter()
-                    .any(|d| d.severity == Severity::Error),
+                && (self.prove_contracts
+                    || self.modules.iter().any(Loaded::has_proofs)
+                    || !self
+                        .diagnostics
+                        .iter()
+                        .any(|d| d.severity == Severity::Error)),
             // an editor's run drops IR unless a selected target/environment needs
             // it for reachable-use preflight (which needs no IR types); a check
             // or build keeps full typed IR
@@ -277,6 +285,9 @@ impl Loader<'_> {
                 .insert(self.modules[i].path.clone(), (key, output.clone()));
         }
         self.diagnostics.extend(output.diagnostics);
+        if i < self.verified_contracts.len() {
+            self.verified_contracts[i] = output.contracts;
+        }
         if let (Some(lowered), Some(ir)) = (&mut self.lowered, output.ir) {
             lowered[i] = Some((Arc::unwrap_or_clone(ir), output.declarations, output.proofs));
         }
@@ -337,8 +348,17 @@ struct Checking<'a> {
     lower: bool,
     /// The IR of the modules checked before this level, which proofs read.
     lowered: &'a [Option<Lowered>],
-    /// The run has proofs: its modules keep their IR for them.
+    /// The run has proofs or selected contracts: its modules keep their IR for them.
     proving: bool,
+    /// Whether this run verifies contracts (`Mode::Prove` / `prove_file`).
+    prove_contracts: bool,
+    /// When `Some`, only modules whose normalized path is in this set have
+    /// their contracts verified.
+    selected: Option<&'a HashSet<PathBuf>>,
+    /// Every `(module, name)` declared with a contract across all loaded modules.
+    all_contracted: &'a HashSet<(String, String)>,
+    /// Verified contracts produced per module earlier in this run.
+    verified_contracts: &'a [Vec<ir::ProvenContract>],
     cached_ir: CachedIr,
     lower_packages_only: bool,
     precompiled: &'a Precompiled,
@@ -420,6 +440,8 @@ struct Output {
     declarations: Arc<Interface>,
     /// The proofs it declares, which a proof of an importer replays.
     proofs: Vec<ir::Proven>,
+    /// The verified contracts certified for this module in this run.
+    contracts: Vec<ir::ProvenContract>,
 }
 
 /// What importers see of a module: all of a clean one; of one with errors,

@@ -2,6 +2,8 @@
 //! each goal and the proof's body, with the parameters in scope. The
 //! module's own IR has none of them; a proof runs nowhere.
 
+use std::collections::HashSet;
+
 use super::{Expr, ExprKind, Item, ItemKind, Lit, Lower, Module};
 use crate::diagnostics::Diagnostic;
 use crate::logic::{self, Failure};
@@ -183,14 +185,18 @@ impl Lower<'_> {
 /// settled of it.
 pub type Proven = (LoweredProof, ProofInfo);
 
-/// What a proof reads: the built-in modules, the IR of the modules of the
-/// run, and the proofs of its proof modules.
+/// What a proof or contract check reads: the built-in modules, the IR of the
+/// modules of the run, the proofs of its proof modules, every contracted
+/// function declared in the run, and the verified contract summaries of
+/// modules checked before this one.
 pub struct Run<'p> {
     pub builtins: &'p dyn Fn() -> &'static [Module],
     /// The laws of the built-in classes.
     pub builtin_laws: &'p dyn Fn() -> &'static [Proven],
     pub project: &'p dyn Fn(&str) -> Option<&'p Module>,
     pub proven: &'p dyn Fn(&str) -> Option<&'p [Proven]>,
+    pub all_contracted: &'p HashSet<(String, String)>,
+    pub contracts: &'p dyn Fn(&str) -> &'p [super::contracts::ProvenContract],
 }
 
 /// Each proof of `module`, which checked without errors, checked: what
@@ -400,12 +406,12 @@ fn statement(lowered: &LoweredProof, info: &ProofInfo) -> Result<logic::Statemen
     Ok(statement)
 }
 
-/// The compiled modules a proof reads definitions from.
-struct Modules<'a, 'p: 'a> {
-    own: Option<&'a Module>,
+/// The compiled modules a proof or contract reads definitions from.
+pub(super) struct Modules<'a, 'p: 'a> {
+    pub(super) own: Option<&'a Module>,
     /// The modules of the run checked before this one.
-    project: &'a dyn Fn(&str) -> Option<&'p Module>,
-    builtins: &'static [Module],
+    pub(super) project: &'a dyn Fn(&str) -> Option<&'p Module>,
+    pub(super) builtins: &'static [Module],
 }
 
 impl<'a> Modules<'a, '_> {

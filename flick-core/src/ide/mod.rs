@@ -437,6 +437,8 @@ mod block_locals_tests;
 #[cfg(test)]
 mod companion_tests;
 #[cfg(test)]
+mod contract_hover_tests;
+#[cfg(test)]
 mod enum_hover_tests;
 #[cfg(all(test, feature = "native-project"))]
 mod foreign_meta_tests;

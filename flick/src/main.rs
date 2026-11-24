@@ -1,5 +1,6 @@
 use std::env;
 use std::ffi::OsString;
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
@@ -35,15 +36,14 @@ mod timings;
 mod toolchain;
 mod workspace;
 
-/// Runs `command` again after every change of the project's files.
-fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
-    let paths = commands::watched(global);
+/// Runs `command` again after every change of `paths`.
+fn watch_paths(command: &impl Command, global: &GlobalArguments, paths: &[PathBuf]) -> ExitCode {
     loop {
-        let before = commands::settled_snapshot(&paths);
+        let before = commands::settled_snapshot(paths);
         run_command(command, global);
         timings::report(global);
         // once a build has used a backend, a signal cancels it instead of ending `flick`
-        while !child::interrupted() && commands::watch_snapshot(&paths) == before {
+        while !child::interrupted() && commands::watch_snapshot(paths) == before {
             thread::sleep(Duration::from_millis(200));
         }
         if child::interrupted() {
@@ -51,6 +51,12 @@ fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
         }
         report::log(global, "a file changed: running again");
     }
+}
+
+/// Runs `command` again after every change of the project's files.
+fn watch(command: &impl Command, global: &GlobalArguments) -> ExitCode {
+    let paths = commands::watched(global);
+    watch_paths(command, global, &paths)
 }
 
 /// The dependency verb of a CLI command.
@@ -182,7 +188,8 @@ fn run(args: CommandArguments, raw_argv: &[OsString]) -> ExitCode {
 }
 
 /// Runs the command on its project.
-/// `flick prove`: `flick check` of the proof root, or of the paths given.
+/// `flick prove`: verify proof modules and function contracts of the project,
+/// or of the paths given.
 fn prove(options: &ProveArguments, global: &GlobalArguments) -> ExitCode {
     let Some(paths) = commands::proof_paths(&options.paths, global.project.as_deref()) else {
         return ExitCode::SUCCESS;
@@ -194,9 +201,10 @@ fn prove(options: &ProveArguments, global: &GlobalArguments) -> ExitCode {
         only: Vec::new(),
     };
     let watching = options.watch;
-    let command = CheckCommand::new(options, global.project.clone());
+    let command = CheckCommand::prove(options, global.project.clone());
     if watching {
-        watch(&command, global)
+        let watched = commands::watched_with_proofs(global);
+        watch_paths(&command, global, &watched)
     } else {
         run_command(&command, global)
     }

@@ -94,13 +94,13 @@ lean:
 # Check each capability independently, without workspace feature unification
 feature-check:
     cargo clippy -p flick-core --all-targets --no-default-features -- -D warnings
-    for feature in native-project ide; do cargo clippy -p flick-core --all-targets --no-default-features --features "$feature" -- -D warnings || exit $?; done
+    for feature in native-project ide contracts; do cargo clippy -p flick-core --all-targets --no-default-features --features "$feature" -- -D warnings || exit $?; done
     cargo clippy -p flick-ffi --all-targets --no-default-features -- -D warnings
 
 # Exercise minimal and independently enabled compiler capabilities
 feature-test:
     cargo test -p flick-core --no-default-features --features embedded-std --lib --test features
-    for feature in native-project ide; do cargo test -p flick-core --no-default-features --test features --features "embedded-std,$feature" || exit $?; done
+    for feature in native-project ide contracts; do cargo test -p flick-core --no-default-features --test features --features "embedded-std,$feature" || exit $?; done
     cargo test -p flick-ffi --no-default-features
 
 # The Go runtime of the go target: vet and its unit tests.
@@ -338,7 +338,7 @@ wasm:
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
-    test $(wc -c < $wasm) -le 4750000 # reason: fixed-width numeric types (#678): 10 embedded stdlib modules (~70 KB raw source) + compiler/IR/JS support grew flick_wasm.wasm by ~95 KB (4.595 → 4.690 MB after wasm-opt; <5 KB headroom on main)
+    test $(wc -c < $wasm) -le 4760000 # reason: function contracts (#816): contract type-checking metadata, T087–T089 explanations and require/ensure hover in the playground (4.745 → 4.753 MB); verification is gated out by the contracts feature
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm

@@ -268,7 +268,7 @@ fn apart(t: &Ty, keep: &[String]) -> Ty {
             args: args.iter().map(|a| apart(a, keep)).collect(),
         },
         Ty::Fun(a, b) => Ty::Fun(Box::new(apart(a, keep)), Box::new(apart(b, keep))),
-        Ty::Rigid(_) | Ty::Bool | Ty::Refused(_) => t.clone(),
+        Ty::Rigid(_) | Ty::Bool | Ty::Int | Ty::Refused(_) => t.clone(),
     }
 }
 
@@ -299,7 +299,7 @@ fn renames(ours: &Ty, theirs: &Ty, renaming: &mut Vec<(String, String)>) -> bool
         (Ty::Fun(param, result), Ty::Fun(other_param, other_result)) => {
             renames(param, other_param, renaming) && renames(result, other_result, renaming)
         }
-        (Ty::Bool, Ty::Bool) => true,
+        (Ty::Bool, Ty::Bool) | (Ty::Int, Ty::Int) => true,
         _ => false,
     }
 }

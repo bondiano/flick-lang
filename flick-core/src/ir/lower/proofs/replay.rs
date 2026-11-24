@@ -83,16 +83,20 @@ mod tests {
     /// change to either fails this until it is written again.
     #[test]
     fn the_option_laws_replay_in_lean() {
+        use std::collections::HashSet;
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
         let laws =
             fs::read_to_string(root.join("packages/core/proofs/Laws/Option.fl")).expect("the laws");
         let mut sources = types::builtin_sources().to_vec();
         sources.push(("Laws.Option", laws.as_str()));
+        let no_contracts = HashSet::new();
         let run = Run {
             builtins: &|| builtin_modules_of(false),
             builtin_laws: &|| builtin_laws(false),
             project: &|_| None,
             proven: &|_| None,
+            all_contracted: &no_contracts,
+            contracts: &|_| &[],
         };
         let mut replay = None;
         types::check_each(&sources, false, |module, typing| {

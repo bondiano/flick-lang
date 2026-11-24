@@ -33,6 +33,8 @@ pub use config::Config;
 pub use environment::official_backends;
 pub use environment::{BackendAxis, BackendTags, ResolvedEnvironment, TargetOverride};
 pub(crate) use load::check_file;
+#[cfg(feature = "contracts")]
+pub(crate) use load::prove_file;
 #[cfg(feature = "ide")]
 pub use load::{Analysis, Analyzed, analysis_fingerprint, analyze, analyze_rt, analyze_with};
 pub use load::{
@@ -42,6 +44,8 @@ pub use load::{
 };
 #[cfg(feature = "native-project")]
 pub use load::{ModuleStore, SavedModule};
+#[cfg(feature = "contracts")]
+pub use load::{prove, prove_with};
 #[cfg(feature = "native-project")]
 pub use packages::{library_dir, project_name};
 

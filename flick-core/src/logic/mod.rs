@@ -5,6 +5,8 @@
 
 mod cert;
 mod check;
+#[cfg(feature = "contracts")]
+pub mod contract;
 mod defs;
 mod eval;
 #[cfg(test)]
@@ -25,6 +27,8 @@ pub use term::{Ctor, Def, LEMMAS, Literal, Pat, RULES, Refused, TUPLES, Term, te
 
 /// The domain every statement is about, and the version of its checker.
 pub const DOMAIN: &str = "PureTotalV1";
+/// The contract domain extending `PureTotalV1` with linear `Int` arithmetic.
+pub const DOMAIN_V2: &str = "PureTotalV2";
 pub const CHECKER: u32 = 1;
 
 /// The module of a class's parameter applied in a law, `f a`: a type the
@@ -37,6 +41,7 @@ pub enum Ty {
     /// A type variable of the statement: any type of the domain.
     Rigid(String),
     Bool,
+    Int,
     /// A data type, or a base type without constructors, applied.
     Data {
         module: String,
@@ -58,6 +63,7 @@ impl fmt::Display for Ty {
         match self {
             Ty::Rigid(a) => write!(f, "{a}"),
             Ty::Bool => write!(f, "Bool"),
+            Ty::Int => write!(f, "Int"),
             Ty::Data { name, args, .. } => {
                 write!(f, "{name}")?;
                 args.iter().try_for_each(|a| write!(f, " {}", atom(a)))
@@ -115,7 +121,7 @@ impl Ty {
                 Box::new(a.instantiate(params, args)),
                 Box::new(b.instantiate(params, args)),
             ),
-            Ty::Bool | Ty::Refused(_) => self.clone(),
+            Ty::Bool | Ty::Int | Ty::Refused(_) => self.clone(),
         }
     }
 }

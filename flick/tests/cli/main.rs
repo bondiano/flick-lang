@@ -47,6 +47,8 @@ pub mod package_ts;
 pub mod project_check;
 pub mod prove_bundles;
 pub mod prove_command;
+pub mod prove_contracts;
+pub mod prove_contracts_extra;
 pub mod rpc_cross;
 pub mod rpc_rt;
 pub mod rt_stages;

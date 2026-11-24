@@ -100,6 +100,18 @@ pub(super) struct Precompiled {
 }
 
 impl Precompiled {
+    /// The lowered IR of a saved source-package module, if any.
+    #[cfg_attr(not(feature = "native-project"), allow(clippy::unused_self))]
+    pub(super) fn ir(&self, name: &str) -> Option<&ir::Module> {
+        #[cfg(feature = "native-project")]
+        return self.saved.get(name).map(|(_, module)| &module.ir);
+        #[cfg(not(feature = "native-project"))]
+        {
+            let _ = name;
+            None
+        }
+    }
+
     /// The libraries of `packages` with their keys and saved modules. A
     /// library's key covers the compiler, what checking reads of the
     /// configuration of the project, its sources and the keys of the
