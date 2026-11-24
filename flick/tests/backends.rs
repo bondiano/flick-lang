@@ -35,6 +35,9 @@ mod go_option;
 #[path = "backends/go_record.rs"]
 mod go_record;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/lua_profiles.rs"]
+mod lua_profiles;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/native_overrides.rs"]
 mod native_overrides;
 #[cfg(feature = "wasm-backends")]

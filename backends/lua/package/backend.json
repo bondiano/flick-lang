@@ -1,0 +1,15 @@
+{
+  "identity": {
+    "id": "flick/lua",
+    "version": "0.1.0"
+  },
+  "sha256": "88c31085e546cacfaa6ee56dd193121f197c3c25f61336315236a60f565a0828",
+  "backend_api": {
+    "minimum": "0.1.0",
+    "maximum_exclusive": "0.2.0"
+  },
+  "ir": {
+    "minimum": "0.17.0",
+    "maximum_exclusive": "0.18.0"
+  }
+}

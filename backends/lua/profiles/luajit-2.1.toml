@@ -1,0 +1,173 @@
+# LuaJIT 2.1: the `luajit` dialect, Lua 5.1 with `bit`, `jit` and `ffi`.
+# JIT and FFI are separate capabilities; with the JIT off the interpreter
+# runs the same probes to the same results. Each fact carries `doc`, a
+# pinned source, or `exec`, a probe of backends/lua/probes that ran on
+# `host` on `date`.
+schema = 1
+id = "luajit-2.1"
+kind = "dialect"
+title = "LuaJIT 2.1"
+product = "LuaJIT"
+version = "2.1.1785763465"
+build = "nixpkgs 0bb2eedc20e4739f29e8045034f2828ad7054f8f luajit"
+source = "https://github.com/LuaJIT/LuaJIT/tree/1edc3e52b67eaf6ce5f809be8e17d6862594b8bc"
+api = "api/luajit-2.1.txt"
+status = "executed"
+
+[[fact]]
+name = "dialects"
+value = ["lua51", "luajit"]
+doc = "https://github.com/LuaJIT/LuaJIT/blob/1edc3e52b67eaf6ce5f809be8e17d6862594b8bc/doc/extensions.html"
+
+[[fact]]
+name = "number"
+value = "double"
+exec = "numbers"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "integers"
+value = "none without FFI: integers are doubles, exact while |n| <= 2^53; FFI int64_t/uint64_t are exact"
+exec = "extensions"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "integer-division"
+value = "/ divides as doubles; % floors; 5 / 0 = inf, 5 % 0 = nan, no error"
+exec = "numbers"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "number-format"
+value = "%.14g"
+exec = "format"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "nan-spelling"
+value = "nan"
+exec = "format"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "negative-zero-literal"
+value = "-0.0 stays -0"
+exec = "format"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "strings"
+value = "8-bit clean byte strings; # counts bytes"
+exec = "strings"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "format-embedded-nul"
+value = "string.format %s keeps an embedded NUL; %q writes \\0"
+exec = "strings"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "bit"
+value = true
+exec = "extensions"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "jit"
+value = true
+exec = "extensions"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "jit-off"
+value = "-joff runs every probe to the expectations of the JIT"
+exec = "numbers"
+host = "LuaJIT 2.1.1785763465 -joff"
+date = "2026-11-24"
+
+[[fact]]
+name = "ffi"
+value = true
+exec = "extensions"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "require"
+value = true
+exec = "extensions"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "removed-compat"
+value = ["math.mod", "string.gfind"]
+exec = "api"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "multiple-returns"
+value = "as Lua 5.1"
+exec = "returns"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "errors"
+value = "as Lua 5.1"
+exec = "errors"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "yield-across-pcall"
+value = true
+exec = "coroutines"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "yield-across-metamethod"
+value = true
+exec = "coroutines"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"
+
+[[fact]]
+name = "max-locals"
+value = 200
+doc = "https://github.com/LuaJIT/LuaJIT/blob/1edc3e52b67eaf6ce5f809be8e17d6862594b8bc/src/lj_def.h#L68"
+
+[[fact]]
+name = "max-upvalues"
+value = 60
+doc = "https://github.com/LuaJIT/LuaJIT/blob/1edc3e52b67eaf6ce5f809be8e17d6862594b8bc/src/lj_def.h#L69"
+
+[[fact]]
+name = "max-constants"
+value = 65536
+doc = "https://github.com/LuaJIT/LuaJIT/blob/1edc3e52b67eaf6ce5f809be8e17d6862594b8bc/src/lj_parse.c#L1504-L1505"
+
+[[fact]]
+name = "max-registers"
+value = 250
+doc = "https://github.com/LuaJIT/LuaJIT/blob/1edc3e52b67eaf6ce5f809be8e17d6862594b8bc/src/lj_def.h#L67"
+
+[[fact]]
+name = "limits-observed"
+value = "201 locals, 61 upvalues, 65537 constants of a kind and a call of 247 arguments fail to compile"
+exec = "limits"
+host = "LuaJIT 2.1.1785763465"
+date = "2026-11-24"

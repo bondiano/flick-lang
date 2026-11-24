@@ -1,0 +1,121 @@
+# World of Warcraft: Forever, client 1.60.1.71037: a separate game with
+# vanilla-era content on the mainline addon API, with Midnight's secret
+# values. No client runs here: every fact is documentation evidence (`doc`,
+# a pinned source read on 2026-11-24), and validation on the live client
+# blocks a release.
+schema = 1
+id = "wow-forever"
+kind = "host"
+environment = "lua/wow-forever"
+title = "World of Warcraft: Forever"
+product = "World of Warcraft: Forever"
+version = "1.60.1"
+build = "1.60.1.71037"
+interface = 16001
+source = "https://github.com/Gethe/wow-ui-source/tree/734f065329cff4992835b01a84f210a297db91b6"
+api = "api/wow-forever.txt"
+status = "documentation"
+blockers = [
+  "no live client run: the probes and the generated FlickProbes addon have not executed on 1.60.1.71037",
+  "the number type, VM limits and the absence of require are inferred from Lua 5.1 and from omission, not stated by Blizzard",
+]
+
+[[fact]]
+name = "client"
+value = "1.60.1.71037"
+doc = "https://github.com/Gethe/wow-ui-source/blob/734f065329cff4992835b01a84f210a297db91b6/version.txt"
+
+[[fact]]
+name = "release"
+value = "announced 2026-09-12, released 2026-11-04"
+doc = "https://warcraft.wiki.gg/index.php?oldid=6989758"
+
+[[fact]]
+name = "announcement"
+value = "World of Warcraft: Forever"
+doc = "https://worldofwarcraft.blizzard.com/en-us/news/24302093"
+
+[[fact]]
+name = "interface"
+value = 16001
+doc = "https://warcraft.wiki.gg/index.php?oldid=6919762"
+
+[[fact]]
+name = "mainline-api"
+value = "shares the mainline UI architecture and most 12.1.5 APIs; Midnight's addon disarmament and secrets are active"
+doc = "https://warcraft.wiki.gg/index.php?oldid=6921728"
+
+[[fact]]
+name = "toc-suffix"
+value = "_Forever, an alias of _Camelot; the family suffix is _Mainline"
+doc = "https://warcraft.wiki.gg/index.php?oldid=6919762"
+
+[[fact]]
+name = "api-snapshot"
+value = "the functions of Blizzard_APIDocumentationGenerated and the Lua environment of wow-lua.txt"
+doc = "https://github.com/Gethe/wow-ui-source/tree/734f065329cff4992835b01a84f210a297db91b6/Interface/AddOns/Blizzard_APIDocumentationGenerated"
+
+[[fact]]
+name = "dialects"
+value = ["lua51"]
+doc = "https://warcraft.wiki.gg/index.php?oldid=6879939"
+
+[[fact]]
+name = "number"
+value = "double, as Lua 5.1; no Blizzard source states it"
+doc = "https://warcraft.wiki.gg/index.php?oldid=6688896"
+
+[[fact]]
+name = "jit"
+value = false
+doc = "https://warcraft.wiki.gg/index.php?oldid=6879939"
+
+[[fact]]
+name = "ffi"
+value = false
+doc = "https://warcraft.wiki.gg/index.php?oldid=6879939"
+
+[[fact]]
+name = "bit"
+value = true
+doc = "https://warcraft.wiki.gg/index.php?oldid=6879939"
+
+[[fact]]
+name = "require"
+value = false
+doc = "https://warcraft.wiki.gg/index.php?oldid=6879939"
+
+[[fact]]
+name = "import"
+value = "import(name) returns an already loaded module and loads no file"
+doc = "https://warcraft.wiki.gg/index.php?oldid=6904622"
+
+[[fact]]
+name = "loader"
+value = "the files of the addon's .toc, in order, each a chunk receiving (addonName, addonTable) as ..."
+doc = "https://warcraft.wiki.gg/index.php?oldid=6964875"
+
+[[fact]]
+name = "callbacks"
+value = "after the files run and saved variables load, ADDON_LOADED(addonName), then PLAYER_LOGIN"
+doc = "https://warcraft.wiki.gg/index.php?oldid=6794291"
+
+[[fact]]
+name = "suspension"
+value = false
+doc = "../../../docs/backends/lua-profiles.md#the-synchronous-wow-slice"
+
+[[fact]]
+name = "secret-values"
+value = "as Retail: arithmetic, comparison, #, indexing, calls and use as a table key of a secret raise an error on tainted paths"
+doc = "https://warcraft.wiki.gg/index.php?oldid=6884508"
+
+[[fact]]
+name = "secret-tests"
+value = ["issecretvalue", "canaccessvalue", "issecrettable", "canaccesstable", "canaccesssecrets", "canaccessallvalues", "hasanysecretvalues", "scrubsecretvalues", "secretwrap", "secretunwrap", "dropsecretaccess"]
+doc = "https://github.com/Gethe/wow-ui-source/blob/734f065329cff4992835b01a84f210a297db91b6/Interface/AddOns/Blizzard_APIDocumentationGenerated/FrameScriptDocumentation.lua"
+
+[[fact]]
+name = "vm-limits"
+value = "those of Lua 5.1: 200 locals, 60 upvalues, 262143 constants, 250 registers; unverified on the client"
+doc = "https://www.lua.org/source/5.1/luaconf.h.html#LUAI_MAXVARS"

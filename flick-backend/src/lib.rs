@@ -24,6 +24,11 @@ pub use value_abi::validate_value_abi;
 /// The version of the component contract, independent of the portable IR.
 pub const VERSION: &str = "0.1.0";
 
+/// A descriptor capability (version `0.1.0`): the backend's `check-target`
+/// judges whole programs, so `flick check` and the editor run it for every
+/// project, not only for one with foreign items.
+pub const CHECK_TARGET_CAPABILITY: &str = "flick.check-target";
+
 // Generate the native records from the WIT itself, so the two cannot drift.
 #[allow(clippy::all, clippy::pedantic, missing_docs)]
 #[doc(hidden)]

@@ -1,0 +1,154 @@
+# Lua 5.1.5 (PUC-Rio): the `lua51` dialect, the portable source every
+# profile keeps to. Each fact carries `doc`, a pinned source, or `exec`, a
+# probe of backends/lua/probes that ran on `host` on `date`.
+schema = 1
+id = "lua-5.1"
+kind = "dialect"
+title = "Lua 5.1.5"
+product = "PUC-Rio Lua"
+version = "5.1.5"
+build = "nixpkgs 0bb2eedc20e4739f29e8045034f2828ad7054f8f lua5_1"
+source = "https://www.lua.org/ftp/lua-5.1.5.tar.gz"
+api = "api/lua-5.1.txt"
+status = "executed"
+
+[[fact]]
+name = "dialects"
+value = ["lua51"]
+doc = "https://www.lua.org/manual/5.1/manual.html#8"
+
+[[fact]]
+name = "number"
+value = "double"
+doc = "https://www.lua.org/source/5.1/luaconf.h.html#LUA_NUMBER"
+
+[[fact]]
+name = "integers"
+value = "none: integers are doubles, exact while |n| <= 2^53"
+exec = "numbers"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "integer-division"
+value = "/ divides as doubles; % floors; 5 / 0 = inf, 5 % 0 = nan, no error"
+exec = "numbers"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "number-format"
+value = "%.14g"
+doc = "https://www.lua.org/source/5.1/luaconf.h.html#LUA_NUMBER_FMT"
+
+[[fact]]
+name = "nan-spelling"
+value = "-nan for 0/0 (the C library's spelling)"
+exec = "format"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "negative-zero-literal"
+value = "-0.0 shares the constant of an equal 0 in the same function and becomes +0"
+exec = "format"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "strings"
+value = "8-bit clean byte strings; # counts bytes"
+doc = "https://www.lua.org/manual/5.1/manual.html#2.2"
+
+[[fact]]
+name = "format-embedded-nul"
+value = "string.format %s stops at an embedded NUL; %q writes \\000"
+exec = "strings"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "bit"
+value = false
+exec = "extensions"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "jit"
+value = false
+exec = "extensions"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "ffi"
+value = false
+exec = "extensions"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "libraries"
+value = ["base", "coroutine", "debug", "io", "math", "os", "package", "string", "table"]
+doc = "https://www.lua.org/manual/5.1/manual.html#5"
+
+[[fact]]
+name = "require"
+value = true
+doc = "https://www.lua.org/manual/5.1/manual.html#pdf-require"
+
+[[fact]]
+name = "multiple-returns"
+value = "only the last expression of a list expands; (f()) is one value; select('#') counts trailing nils"
+exec = "returns"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "errors"
+value = "error adds a position to string and number messages at level 1; xpcall reports a failing handler as 'error in error handling'"
+exec = "errors"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "yield-across-pcall"
+value = false
+exec = "coroutines"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "yield-across-metamethod"
+value = false
+exec = "coroutines"
+host = "Lua 5.1.5"
+date = "2026-11-24"
+
+[[fact]]
+name = "max-locals"
+value = 200
+doc = "https://www.lua.org/source/5.1/luaconf.h.html#LUAI_MAXVARS"
+
+[[fact]]
+name = "max-upvalues"
+value = 60
+doc = "https://www.lua.org/source/5.1/luaconf.h.html#LUAI_MAXUPVALUES"
+
+[[fact]]
+name = "max-constants"
+value = 262143
+doc = "https://www.lua.org/source/5.1/lopcodes.h.html#MAXARG_Bx"
+
+[[fact]]
+name = "max-registers"
+value = 250
+doc = "https://www.lua.org/source/5.1/llimits.h.html#MAXSTACK"
+
+[[fact]]
+name = "limits-observed"
+value = "201 locals, 61 upvalues, 262144 constants and a call of 248 arguments fail to compile; the constant overflow escapes loadstring as an error"
+exec = "limits"
+host = "Lua 5.1.5"
+date = "2026-11-24"

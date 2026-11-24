@@ -1,13 +1,15 @@
 //! Backend `check-target` execution during `flick check` and LSP analysis so
 //! non-official/pinned backends validate their own foreign adapter words at
-//! exact source spans without waiting for `flick build`.
+//! exact source spans without waiting for `flick build`. A backend that
+//! declares `CHECK_TARGET_CAPABILITY` checks every project this way.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 
 use flick_backend::{
-    Abi, Backend, BackendPin, BuildRequest, DeclaredInputs, Environment, Input, InputKind, Mode,
-    ModuleInput, ModuleRole, OptionValue, Profile, Source, TargetRequest, sha256,
+    Abi, Backend, BackendPin, BuildRequest, CHECK_TARGET_CAPABILITY, DeclaredInputs, Entry,
+    Environment, Input, InputKind, Mode, ModuleInput, ModuleRole, OptionValue, Profile, Source,
+    Symbol, TargetRequest, sha256,
 };
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir;
@@ -25,6 +27,8 @@ use crate::toolchain;
 ///
 /// Official `flick/js` and `flick/go` foreign adapters are validated in-process
 /// by `flick-core` to keep `flick check` and LSP latency free of WASM startup.
+/// A project without foreign items loads its backend only when the cached
+/// descriptor declares `CHECK_TARGET_CAPABILITY`.
 pub(crate) fn check_target_for_project(
     project: &Project,
     compilation: &Compilation,
@@ -47,7 +51,7 @@ pub(crate) fn check_target_for_project(
                     .iter()
                     .any(|item| matches!(item.kind, ItemKind::Foreign(_))))
     });
-    if !has_foreign {
+    if !has_foreign && !checks_every_program(project, environment) {
         return Vec::new();
     }
     let Some((pin, bytes)) = selected_bytes(project, Some(&environment.backend_id)) else {
@@ -75,6 +79,31 @@ pub(crate) fn check_target_for_project(
             .map(|d| map_check_diagnostic(d, &pin.identity.id, &files, sources))
             .collect(),
     }
+}
+
+/// Whether the selected backend's descriptor asks for `check-target` on
+/// every program; the descriptor comes from the store's cache by digest.
+fn checks_every_program(project: &Project, environment: &ResolvedEnvironment) -> bool {
+    options::descriptor_for_target(project, Some(&environment.backend_id)).is_some_and(|d| {
+        d.capabilities
+            .iter()
+            .any(|c| c.name == CHECK_TARGET_CAPABILITY && c.version == "0.1.0")
+    })
+}
+
+/// The entries of the project whose modules the check compiled.
+fn entries(project: &Project, compiled: &Compilation) -> Vec<Entry> {
+    (project.config.entries.iter())
+        .filter(|e| compiled.modules.iter().any(|m| m.name == e.module))
+        .map(|e| Entry {
+            name: e.name.clone(),
+            symbol: Symbol {
+                module: e.module.clone(),
+                name: "main".into(),
+            },
+            runner: e.runner.as_ref().map(|r| r.0.clone()),
+        })
+        .collect()
 }
 
 fn build_check_request(
@@ -169,7 +198,7 @@ fn build_check_request(
         module_root: None,
         modules,
         sources: req_sources,
-        entries: Vec::new(),
+        entries: entries(project, &pruned),
         test_roots: Vec::new(),
         foreign: Vec::new(),
         inline_foreign,

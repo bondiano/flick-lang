@@ -4,7 +4,8 @@
   # Usage:
   #   nix build .#flick              # ./result/bin/flick
   #   nix profile install .#flick
-  #   nix develop                    # toolchain, node, pnpm, go, just, Binaryen
+  #   nix develop                    # toolchain, node, pnpm, go, just, Binaryen,
+  #                                  # and the Lua hosts of `just lua-probes`
   #
   # On NixOS, add the package without the flake:
   #   nixpkgs.overlays = [ inputs.flick.overlays.default ];
@@ -76,7 +77,7 @@
         in
         {
           inherit flick;
-          binaryen = pkgs.binaryen;
+          inherit (pkgs) binaryen lua5_1 luajit love;
           default = flick;
         }
       );
@@ -116,6 +117,11 @@
               cargo-nextest
               binaryen
               jq
+              # the hosts the Lua profiles pin; both Lua packages install a
+              # `lua`, and the first, Lua 5.1.5, wins on PATH
+              lua5_1
+              luajit
+              love
             ]
             # a sampling profiler for the compiler: `perf record -e cpu-clock:u`
             ++ lib.optionals stdenv.hostPlatform.isLinux [ perf ];

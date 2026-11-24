@@ -1,0 +1,11 @@
+locals	200	ok
+locals	201	main function has more than 200 local variables
+upvalues	60	ok
+upvalues	61	function at line 1 has more than 60 upvalues
+constants	65536	ok
+constants	65537	ok
+constants	262143	ok
+constants	262144	constant table overflow
+arguments	246	ok
+arguments	247	ok
+arguments	248	function or expression too complex near '<eof>'
