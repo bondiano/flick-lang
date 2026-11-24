@@ -252,6 +252,7 @@ pub enum Failure {
 }
 
 impl Failure {
+    #[must_use]
     pub fn with_related(self, span: Span, message: impl Into<String>) -> Self {
         Self::Related {
             failure: Box::new(self),

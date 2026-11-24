@@ -4,6 +4,7 @@
 //! no cycle. Recursion, foreign code, a context or anything else the domain
 //! refuses keeps a definition, and every statement naming it, out.
 
+use std::iter::once;
 use std::rc::Rc;
 
 use flick_ir::{Dict, Expr, InstanceInfo, Item, ItemKind};
@@ -98,12 +99,11 @@ impl Admitting<'_> {
                 let chain: Vec<_> = self
                     .path
                     .iter()
-                    .chain(std::iter::once(d))
+                    .chain(once(d))
                     .map(|def| format!("`{}`", def.shown()))
                     .collect();
-                failure
-                    .why
-                    .push_str(&format!("; dependency chain {}", chain.join(" → ")));
+                failure.why.push_str("; dependency chain ");
+                failure.why.push_str(&chain.join(" → "));
             }
             failure
         })?;
