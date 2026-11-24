@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     Arith, Constraint, Constructor, Dict, Foreign, Handler, InlineCode, InstanceInfo, Lift,
-    Namespace, Num, Span, Stage, TypeDecl, TypeRef,
+    Namespace, Num, Projection, Span, Stage, TypeDecl, TypeRef,
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -57,12 +57,15 @@ impl Exports {
     }
 }
 
-/// An exported value of a module itself: its name, and the arrows a call
-/// supplies when its last stage is Sync.
+/// An exported value of a module itself: its name, the arrows a call
+/// supplies when its last stage is Sync, and the fields it reads when it
+/// is a projection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Exported {
     pub name: String,
     pub sync: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projection: Option<Projection>,
 }
 
 /// An entity of another module that a module exports.

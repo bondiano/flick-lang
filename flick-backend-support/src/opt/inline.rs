@@ -16,7 +16,7 @@ use super::specialize::Generic;
 use super::types::subst_types;
 use super::walk::{rename, respan, size};
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Param, Pat, Stage, Stmt};
-use flick_ir::TypeRef;
+use flick_ir::{FileId, Projection, Span, TypeRef};
 
 /// The size budget of a body inlined at every use, in IR nodes: no bigger
 /// than the call it replaces, give or take.
@@ -75,7 +75,8 @@ impl<'a> Foreign<'a> {
     /// `choosing`: small, it is inlined at every call, as that makes the
     /// module no bigger; one that chooses what it gives is bigger than its
     /// call, and inlined only where that spares an object. Not `choosing`,
-    /// a projection of any module of the build.
+    /// a projection: of a built-in module by its body, of another module of
+    /// the program by the summary its module exports, never by its body.
     pub(super) fn body(&self, module: &str, name: &str, choosing: bool) -> Option<Inlined> {
         let cache = if choosing { &self.shaped } else { &self.found };
         let key = (module.to_owned(), name.to_owned());
@@ -84,30 +85,57 @@ impl<'a> Foreign<'a> {
         }
         let budget = if choosing { SHAPED } else { SMALL };
         let builtin = (self.builtin)(module);
-        let mut found = None;
-        if (builtin || !choosing)
-            && let Some(Generic {
+        let found = match (self.generics)(module, name) {
+            Some(Generic {
                 type_params,
                 dicts,
                 body,
                 ..
-            }) = (self.generics)(module, name)
-            && let ExprKind::Lambda { params, body } = body.kind
-            && dicts.is_empty()
-            && params
-                .iter()
-                .all(|p| p.stage == Stage::Pure && simple(&p.pat))
-            && ((builtin
-                && size(&body) <= budget
-                && plain(&body, choosing)
-                && !calls(&body, module, name))
-                || (!choosing && path(&params, &body).is_some()))
-        {
-            found = Some((type_params, params, *body));
-        }
+            }) if builtin => match body.kind {
+                ExprKind::Lambda { params, body }
+                    if dicts.is_empty()
+                        && (params.iter()).all(|p| p.stage == Stage::Pure && simple(&p.pat))
+                        && ((size(&body) <= budget
+                            && plain(&body, choosing)
+                            && !calls(&body, module, name))
+                            || (!choosing && path(&params, &body).is_some())) =>
+                {
+                    Some((type_params, params, *body))
+                }
+                _ => None,
+            },
+            Some(Generic {
+                projection: Some(summary),
+                ..
+            }) if !choosing => Some(summarized(&summary)),
+            _ => None,
+        };
         cache.borrow_mut().insert(key, found.clone());
         found
     }
+}
+
+/// The function a projection summary describes: `fun $read -> $read.l₁.…`,
+/// typed as the summary says.
+fn summarized(summary: &Projection) -> Inlined {
+    let span = Span::new(FileId::new(0), 0, 0);
+    let x = "$read".to_owned();
+    let mut body = Expr::new(ExprKind::Local(x.clone()), span);
+    body.ty.clone_from(&summary.param);
+    for label in &summary.path {
+        body = Expr::new(ExprKind::Field(Box::new(body), label.clone()), span);
+    }
+    body.ty.clone_from(&summary.result);
+    let binder_types = (summary.param.clone())
+        .map(|t| vec![(x.clone(), t)])
+        .unwrap_or_default();
+    let param = Param {
+        pat: Pat::Bind(x),
+        stage: Stage::Pure,
+        ty: summary.param.clone(),
+        binder_types,
+    };
+    (summary.type_params.clone(), vec![param], body)
 }
 
 /// Small functions, projections, and private ones used once: inlining them

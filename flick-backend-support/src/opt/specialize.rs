@@ -13,7 +13,7 @@ use crate::ir::{BinOp, Expr, ExprKind, Item, ItemKind, Lit, Module};
 use crate::numeric::{Arith, Num};
 #[cfg(feature = "typed-ir")]
 use flick_ir::IrType;
-use flick_ir::{Constraint, Dict, Lang, Span, TypeRef};
+use flick_ir::{Constraint, Dict, Lang, Projection, Span, TypeRef};
 
 use super::Generics;
 use crate::Known;
@@ -43,6 +43,9 @@ pub struct Generic {
     pub dicts: Vec<String>,
     pub dict_constraints: Vec<Constraint>,
     pub body: Expr,
+    /// The projection summary its module exports for it, in a version
+    /// this crate reads.
+    pub projection: Option<Projection>,
 }
 
 /// A copy still to make, for `dicts`, named `copy`; one of another module
@@ -87,6 +90,7 @@ pub(super) fn specialize_with_types(
                     dicts: dicts.clone(),
                     dict_constraints: dict_constraints.clone(),
                     body: body.clone(),
+                    projection: None,
                 },
             )),
             _ => None,
@@ -213,11 +217,16 @@ pub fn names_only(module: &Module, name: &str, exported: &dyn Fn(&str) -> bool) 
             reachable &= *m != module.name || exported(name);
         }
     });
+    let projection = (module.exports.values.iter())
+        .find(|e| e.name == name)
+        .and_then(|e| e.projection.clone())
+        .filter(Projection::readable);
     reachable.then(|| Generic {
         type_params: type_params.to_vec(),
         dicts: dicts.to_vec(),
         dict_constraints: dict_constraints.to_vec(),
         body: body.clone(),
+        projection,
     })
 }
 

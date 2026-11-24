@@ -10,6 +10,7 @@ use crate::codegen::{EffectBridge, Known, Labels, Options, js};
 use crate::ir::lang_items;
 use crate::ir::tests::{check_text, check_text_with};
 use crate::types::builtins;
+use flick_ir::{Module, PROJECTION_VERSION};
 
 const RECORDS: &str = "type alias Address = { city : String; zip : Int }\n\n\
     type alias User = { name : String; address : Address }\n\n";
@@ -167,7 +168,14 @@ fn another_map_or_function_stays_a_call() {
 /// which is not built in: its exported bodies are given as a build gives
 /// them, with the program.
 fn with_lib(lib: &str, app: &str) -> String {
-    let (lib_ir, lib_interface) = check_text("Lib", lib).expect("lib lowers");
+    with_lib_edited(lib, app, |_| {})
+}
+
+/// [`with_lib`] with the IR of `Lib` changed by `edit` first, as a build
+/// could hand it over.
+fn with_lib_edited(lib: &str, app: &str, edit: impl FnOnce(&mut Module)) -> String {
+    let (mut lib_ir, lib_interface) = check_text("Lib", lib).expect("lib lowers");
+    edit(&mut lib_ir);
     let mut interfaces = builtins().to_vec();
     interfaces.push(lib_interface.clone());
     let (mut ir, interface) = check_text_with("App", app, &interfaces).expect("app lowers");
@@ -219,10 +227,10 @@ const LIB: &str = "module Lib exposing (Address, User, city, label)\n\n\
     label : User -> String\nlet label u = u.name ++ \" of \" ++ u.address.city\n";
 
 /// An exported projection of another module of the build is read where it
-/// is used, from the body the build gives; a function there that is no
-/// projection stays a call, as before.
+/// is used, from the summary its module exports; a function there that is
+/// no projection stays a call, as before.
 #[test]
-fn a_projection_of_another_module_is_inlined_from_its_body() {
+fn a_projection_of_another_module_is_inlined_from_its_summary() {
     let js = with_lib(
         LIB,
         "module App exposing (one, all, labels)\n\n\
@@ -232,4 +240,27 @@ fn a_projection_of_another_module_is_inlined_from_its_body() {
          labels : List User -> List String\nlet labels users = List.map Lib.label users\n",
     );
     insta::assert_snapshot!(js);
+}
+
+const USES: &str = "module App exposing (one)\n\n\
+    import Lib exposing (User)\n\n\
+    one : User -> String\nlet one u = Lib.city u\n";
+
+/// Without a summary in a version this compiler reads, the body of another
+/// module is not taken for a projection: the use stays a call.
+#[test]
+fn a_projection_of_another_module_without_a_readable_summary_stays_a_call() {
+    let read = with_lib(LIB, USES);
+    assert!(read.contains("u.address.city"), "{read}");
+    let none = with_lib_edited(LIB, USES, |lib| {
+        let city = (lib.exports.values.iter_mut()).find(|e| e.name == "city");
+        let summary = city.expect("exported").projection.as_mut();
+        summary.expect("summarized").version = PROJECTION_VERSION + 1;
+    });
+    assert!(none.contains("$m_Lib.city"), "{none}");
+    let none = with_lib_edited(LIB, USES, |lib| {
+        let city = (lib.exports.values.iter_mut()).find(|e| e.name == "city");
+        city.expect("exported").projection = None;
+    });
+    assert!(none.contains("$m_Lib.city"), "{none}");
 }

@@ -16,6 +16,7 @@ mod num;
 mod op;
 mod order;
 mod program;
+mod projection;
 mod span;
 mod stage;
 mod ty;
@@ -42,6 +43,7 @@ pub use order::{
     utf16_sorted_indices,
 };
 pub use program::{Error, Program, VERSION};
+pub use projection::{PROJECTION_DEPTH, PROJECTION_VERSION, Projection, projection_path};
 pub use span::{FileId, Span};
 pub use stage::{Lift, Stage};
 pub use ty::{Constraint, IrType, TypeInterner, TypeRef};

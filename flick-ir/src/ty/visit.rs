@@ -6,6 +6,18 @@ use crate::{Constructor, Expr, ExprKind, ItemKind, Module, Pat, Stmt};
 impl Module {
     /// Calls `f` on every [`TypeRef`] stored in this module, in deterministic order.
     pub fn each_type_ref<'a>(&'a self, f: &mut dyn FnMut(&'a TypeRef)) {
+        for summary in self
+            .exports
+            .values
+            .iter()
+            .filter_map(|e| e.projection.as_ref())
+        {
+            summary
+                .param
+                .iter()
+                .chain(&summary.result)
+                .for_each(&mut *f);
+        }
         for decl in &self.types {
             if let Some(alias) = &decl.alias {
                 f(alias);
@@ -219,6 +231,13 @@ fn each_pat<'a>(pat: &'a Pat, f: &mut dyn FnMut(&'a TypeRef)) {
 impl Module {
     /// Calls `f` mutably on every [`TypeRef`] stored in this module.
     pub fn each_type_ref_mut(&mut self, f: &mut dyn FnMut(&mut TypeRef)) {
+        for summary in (self.exports.values.iter_mut()).filter_map(|e| e.projection.as_mut()) {
+            summary
+                .param
+                .iter_mut()
+                .chain(&mut summary.result)
+                .for_each(&mut *f);
+        }
         for decl in &mut self.types {
             if let Some(alias) = &mut decl.alias {
                 f(alias);
