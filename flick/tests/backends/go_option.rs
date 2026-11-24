@@ -10,7 +10,7 @@ use super::common::{flick_in, project};
 
 const ALLOC_FLICK: &str = r#"module App exposing (main)
 
-type Mark = Mark Int
+type Mark = Mark Int (Option Mark)
 
 opt_int_step : Bool -> Int -> Int
 let opt_int_step ok n =
@@ -31,7 +31,7 @@ opt_ref_step : Bool -> Mark -> Int
 let opt_ref_step ok m =
   let o : Option Mark = if ok then Some m else None
   match o with
-  | Some (Mark n) -> n + 1
+  | Some (Mark n _) -> n + 1
   | None -> 0
 
 opt_nested_step : Int -> Int -> Int
@@ -52,7 +52,7 @@ make_opt_ref : Mark -> Option Mark
 let make_opt_ref m = Some m
 
 make_mark : Int -> Mark
-let make_mark n = Mark n
+let make_mark n = Mark n None
 
 main : Unit ->{Host.Console} Unit
 let main () =

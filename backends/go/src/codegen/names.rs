@@ -50,6 +50,16 @@ pub fn own_type(module: &str, constructor: &str) -> String {
     top("T", module, constructor)
 }
 
+/// The Go value struct type of a non-parameterized closed ADT.
+pub fn adt_type(module: &str, name: &str) -> String {
+    top("A", module, name)
+}
+
+/// The Go value struct type of a concrete instantiation of a parameterized closed ADT.
+pub fn adt_inst_type(module: &str, name: &str, hash: u64) -> String {
+    format!("{}__{hash:016x}", top("AI", module, name))
+}
+
 /// The package variable of a value a module makes once.
 pub fn once(module: &str, index: usize) -> String {
     top("K", module, &index.to_string())

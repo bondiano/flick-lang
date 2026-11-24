@@ -7,25 +7,23 @@ use std::fmt::{self, Write};
 
 use super::arith::Native;
 use super::names;
-use super::record::{RecordShape, equal_with_expr, layout_rank};
+use super::record::{RecordShape, RecordSlot, equal_with_expr};
 
-fn eq_expr(lhs: &str, rhs: &str, slot: Option<Native>) -> String {
+fn eq_expr(lhs: &str, rhs: &str, slot: &RecordSlot) -> String {
     match slot {
-        Some(Native::Float) => format!("flickrt.EqFloat({lhs}, {rhs})"),
-        Some(Native::Float32) => format!("flickrt.EqFloat32({lhs}, {rhs})"),
-        Some(
-            Native::Int
-            | Native::Int8
-            | Native::Int16
-            | Native::Int64
-            | Native::UInt8
-            | Native::UInt16
-            | Native::UInt32
-            | Native::UInt64
-            | Native::Bool
-            | Native::String,
-        ) => format!("{lhs} == {rhs}"),
-        None => format!("flickrt.Equals({lhs}, {rhs})"),
+        RecordSlot::Scalar(Native::Float) => format!("flickrt.EqFloat({lhs}, {rhs})"),
+        RecordSlot::Scalar(Native::Float32) => format!("flickrt.EqFloat32({lhs}, {rhs})"),
+        RecordSlot::Scalar(_) => format!("{lhs} == {rhs}"),
+        RecordSlot::Adt(a) if a.is_go_comparable() => format!("{lhs} == {rhs}"),
+        RecordSlot::Adt(a) => format!("{}({lhs}, {rhs})", a.eq_fn()),
+        RecordSlot::Value => format!("flickrt.Equals({lhs}, {rhs})"),
+    }
+}
+
+fn view_field_expr(i: usize, slot: &RecordSlot) -> String {
+    match slot {
+        RecordSlot::Adt(a) => format!("{}(r.f{i})", a.box_fn()),
+        RecordSlot::Scalar(_) | RecordSlot::Value => format!("r.f{i}"),
     }
 }
 
@@ -62,27 +60,34 @@ fn write_shape(go: &mut String, shape: &RecordShape) -> fmt::Result {
     }
 
     let mut order: Vec<usize> = (0..shape.fields.len()).collect();
-    order.sort_by_key(|&i| (layout_rank(shape.fields[i].1), i));
+    order.sort_by_key(|&i| (shape.fields[i].1.layout_rank(), i));
     writeln!(go, "\ntype {ty} struct {{")?;
     for i in order {
-        let go_ty = shape.fields[i].1.map_or("flickrt.Value", Native::go);
+        let go_ty = shape.fields[i].1.go_type();
         writeln!(go, "\tf{i} {go_ty}")?;
     }
     writeln!(go, "}}")?;
 
     let quoted: Vec<String> = shape.fields.iter().map(|(l, _)| names::string(l)).collect();
     writeln!(go, "\nvar {keys_var} = []string{{{}}}", quoted.join(", "))?;
-    write_view_methods(go, &ty, &keys_var, &quoted)?;
+    write_view_methods(go, shape, &ty, &keys_var, &quoted)?;
     write_eq_and_adapter(go, shape, &ty, &as_fn, &quoted)
 }
 
-fn write_view_methods(go: &mut String, ty: &str, keys_var: &str, quoted: &[String]) -> fmt::Result {
+fn write_view_methods(
+    go: &mut String,
+    shape: &RecordShape,
+    ty: &str,
+    keys_var: &str,
+    quoted: &[String],
+) -> fmt::Result {
     writeln!(
         go,
         "\nfunc (r {ty}) Get(k string) flickrt.Value {{\n\tswitch k {{"
     )?;
     for (i, q) in quoted.iter().enumerate() {
-        writeln!(go, "\tcase {q}:\n\t\treturn r.f{i}")?;
+        let val = view_field_expr(i, &shape.fields[i].1);
+        writeln!(go, "\tcase {q}:\n\t\treturn {val}")?;
     }
     writeln!(go, "\t}}\n\treturn nil\n}}")?;
 
@@ -91,7 +96,8 @@ fn write_view_methods(go: &mut String, ty: &str, keys_var: &str, quoted: &[Strin
         "\nfunc (r {ty}) Lookup(k string) (flickrt.Value, bool) {{\n\tswitch k {{"
     )?;
     for (i, q) in quoted.iter().enumerate() {
-        writeln!(go, "\tcase {q}:\n\t\treturn r.f{i}, true")?;
+        let val = view_field_expr(i, &shape.fields[i].1);
+        writeln!(go, "\tcase {q}:\n\t\treturn {val}, true")?;
     }
     writeln!(go, "\t}}\n\treturn nil, false\n}}")?;
 
@@ -103,7 +109,8 @@ fn write_view_methods(go: &mut String, ty: &str, keys_var: &str, quoted: &[Strin
         "\nfunc (r {ty}) At(i int) flickrt.Value {{\n\tswitch i {{"
     )?;
     for i in 0..quoted.len() {
-        writeln!(go, "\tcase {i}:\n\t\treturn r.f{i}")?;
+        let val = view_field_expr(i, &shape.fields[i].1);
+        writeln!(go, "\tcase {i}:\n\t\treturn {val}")?;
     }
     writeln!(go, "\t}}\n\treturn nil\n}}")
 }
@@ -119,7 +126,7 @@ fn write_eq_and_adapter(
         .fields
         .iter()
         .enumerate()
-        .map(|(i, (_, slot))| equal_with_expr(&format!("r.f{i}"), &format!("q.f{i}"), *slot))
+        .map(|(i, (_, slot))| equal_with_expr(&format!("r.f{i}"), &format!("q.f{i}"), slot))
         .collect();
     writeln!(
         go,
@@ -136,7 +143,7 @@ fn write_eq_and_adapter(
             .fields
             .iter()
             .enumerate()
-            .map(|(i, (_, slot))| eq_expr(&format!("a.f{i}"), &format!("b.f{i}"), *slot))
+            .map(|(i, (_, slot))| eq_expr(&format!("a.f{i}"), &format!("b.f{i}"), slot))
             .collect();
         writeln!(
             go,
@@ -155,8 +162,11 @@ fn write_eq_and_adapter(
     )?;
     for (i, ((_, slot), q)) in shape.fields.iter().zip(quoted).enumerate() {
         match slot {
-            Some(native) => writeln!(go, "\t\tf{i}: flickrt.Field{}(rv.Get({q})),", native.name())?,
-            None => writeln!(go, "\t\tf{i}: rv.Get({q}),")?,
+            RecordSlot::Scalar(native) => {
+                writeln!(go, "\t\tf{i}: flickrt.Field{}(rv.Get({q})),", native.name())?;
+            }
+            RecordSlot::Adt(adt) => writeln!(go, "\t\tf{i}: {}(rv.Get({q})),", adt.unbox_fn())?,
+            RecordSlot::Value => writeln!(go, "\t\tf{i}: rv.Get({q}),")?,
         }
     }
     writeln!(go, "\t}}\n}}")

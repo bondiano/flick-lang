@@ -279,10 +279,18 @@ impl<'a> Gen<'a> {
         };
         match step {
             Step::Field(c, i) => {
-                if let Some(GoType::Opt(repr)) = self.place_type(w, *from) {
-                    return (self.opt_con(c) == Some(OptCon::Some) && *i == 0)
-                        .then(|| repr.payload_go_type())
-                        .flatten();
+                match self.place_type(w, *from) {
+                    Some(GoType::Opt(repr)) => {
+                        return (self.opt_con(c) == Some(OptCon::Some) && *i == 0)
+                            .then(|| repr.payload_go_type())
+                            .flatten();
+                    }
+                    Some(GoType::Adt(shape)) => {
+                        return shape
+                            .variant_index(c)
+                            .and_then(|vi| shape.field_go_type(vi, *i));
+                    }
+                    _ => {}
                 }
                 let held = self.own_held(c)?;
                 match held {
@@ -318,6 +326,14 @@ impl<'a> Gen<'a> {
                     && *i == 0
                 {
                     repr.unwrap_doc(a, of)
+                } else if let Some(GoType::Adt(shape)) = self.place_type(w, from)
+                    && let Some(vi) = shape.variant_index(c)
+                {
+                    self.register_adt(&shape);
+                    match shape.slot_index(vi, *i) {
+                        Some(pool) => docvec![a, of, ".f", pool],
+                        None => self.unit().doc,
+                    }
                 } else if self.opt_con(c) == Some(OptCon::Some) && *i == 0 {
                     call(a, "flickrt.UnwrapSome", [of])
                 } else {
@@ -383,6 +399,16 @@ impl<'a> Gen<'a> {
                         Some(OptCon::Some) => repr.is_some_doc(a, subject),
                         Some(OptCon::None) => repr.is_none_doc(a, subject),
                         None => unreachable!("Option value tested with non-Option constructor"),
+                    };
+                }
+                if let Some(GoType::Adt(shape)) = self.place_type(w, place)
+                    && let Some(vi) = shape.variant_index(c)
+                {
+                    self.register_adt(&shape);
+                    return if shape.has_discriminant() {
+                        docvec![a, "(", subject, ".tag == ", vi, ")"]
+                    } else {
+                        a.text("true")
                     };
                 }
                 if let Some(opt_con) = self.opt_con(c) {

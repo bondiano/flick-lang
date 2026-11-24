@@ -12,11 +12,13 @@ const WEIGHT: &str = "module App exposing (main)\n\n\
 #[test]
 fn a_method_of_a_known_instance_is_a_function_called_directly() {
     let go = app(&format!(
-        "{WEIGHT}main : Unit ->{{Host.Console; AppError}} Unit\n\
-         let main () = Platform.stdout_line (show (weight Green) ++ show Red ++ show LT)\n"
+        "{WEIGHT}type Chain = End | Step Chain\n  deriving Show\n\n\
+         main : Unit ->{{Host.Console; AppError}} Unit\n\
+         let main () = Platform.stdout_line (show (weight Green) ++ show Red ++ show (Step End) ++ show LT)\n"
     ));
-    // a method written in the instance, a derived one, a non-scalar core one,
-    // and a scalar core one lowered straight to its typed runtime helper
+    // a method written in the instance, a derived one on an erased ADT, a
+    // derived one on a by-value closed ADT, a non-scalar core one, and a
+    // scalar core one lowered straight to its typed runtime helper
     let written = "F_App__Weight_x20_Color_x24_weight";
     assert!(
         go.contains(&format!(
@@ -28,8 +30,14 @@ fn a_method_of_a_known_instance_is_a_function_called_directly() {
         go.contains(&format!("{written}(fb, flickrt.Value(T_App__Green{{}}))")),
         "{go}"
     );
+    // by-value closed ADT derived `Show` lowers directly to its typed helper
+    assert!(go.contains("Show_A_App__Color(A_App__Color{})"), "{go}");
+    // recursive (erased) ADT derived `Show` calls its direct Go function
+    let flat = go.replace(char::is_whitespace, "");
     assert!(
-        go.contains("F_App__Show_x20_Color_x24_show(fb, flickrt.Value(T_App__Red{}))"),
+        flat.contains(
+            "F_App__Show_x20_Chain_x24_show(fb,New_T_App__Step(flickrt.Value(T_App__End{}))"
+        ),
         "{go}"
     );
     // non-scalar core instance method still calls its direct Go function
@@ -38,7 +46,6 @@ fn a_method_of_a_known_instance_is_a_function_called_directly() {
         "{go}"
     );
     // scalar `Show Int` lowers directly to `flickrt.ShowInt` without reboxing
-    let flat = go.replace(char::is_whitespace, "");
     assert!(
         flat.contains("flickrt.ShowInt(flickrt.AsInt(F_App__Weight"),
         "{go}"

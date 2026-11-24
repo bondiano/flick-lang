@@ -155,9 +155,10 @@ impl GoAbiType {
         {
             return None;
         }
-        let Some(decl) = decls.get(&(module.to_owned(), name.to_owned())) else {
+        let Some(info) = decls.get(&(module.to_owned(), name.to_owned())) else {
             return Some(Self::Opaque);
         };
+        let decl = info.decl;
         if let Some(alias) = &decl.alias {
             let instantiated = subst_params(alias, &decl.params, args);
             return Self::classify(lang, decls, &instantiated, depth + 1);
@@ -312,8 +313,8 @@ pub(super) fn flick_to_go<'a>(
             ),
         },
         GoAbiType::Opaque => match flick_ty {
-            Some(GoType::Opt(repr)) => repr.box_doc(a, doc),
-            _ => doc,
+            Some(gt) => gt.box_if_needed(a, doc),
+            None => doc,
         },
     }
 }

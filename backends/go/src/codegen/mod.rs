@@ -10,6 +10,11 @@
 //! Only what `main` reaches is compiled; a construct the target cannot run
 //! yet is a diagnostic, never a runtime stub.
 
+mod adt;
+mod adt_derive;
+mod adt_emit;
+mod adt_gen;
+mod adt_ops_emit;
 mod arith;
 mod call;
 mod closures;
@@ -36,11 +41,14 @@ mod loops;
 mod main_file;
 mod names;
 mod once;
+mod opt_repr;
+mod order;
 mod own;
 mod pattern;
 mod predict;
 mod record;
 mod record_emit;
+mod record_expr;
 mod runtime;
 mod shape;
 mod stmt;
@@ -63,10 +71,10 @@ use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
 use flick_backend_support::reach;
 use flick_backend_support::suites::suite_name;
-use flick_ir::Span;
-use flick_ir::{ItemKind, Module};
+use flick_ir::{Module, Span};
 use layout::{Code, block, call, directive, list, statement};
 use main_file::{dedup, initialization_order, item_order, module_inits};
+use order::{collect_shapes, has_initializer};
 use reach::Key;
 use shape::{Shape, shape};
 
@@ -106,7 +114,7 @@ pub struct Output {
 pub fn go(input: &Input) -> Output {
     let modules: Vec<&Module> = input.own.iter().chain(input.builtins).copied().collect();
     let modules = &modules[..];
-    let decls = go_type::type_decls(modules);
+    let decls = go_type::type_decls(input.own, input.builtins);
     let index = reach::index(modules);
     // main.go's documents
     let a = &DocumentArena::new();
@@ -164,24 +172,6 @@ fn tests_start<'a>(a: &'a DocumentArena<'a>, suites: &[String]) -> Document<'a> 
     call(a, "flickrt.RunTests", [a.text("fb"), suites])
 }
 
-fn collect_shapes(
-    input: &Input,
-    modules: &[&Module],
-    decls: &go_type::TypeDecls<'_>,
-    reached: &HashSet<(usize, usize)>,
-) -> HashMap<Key, Shape> {
-    let mut shapes = HashMap::new();
-    for &(m, i) in reached {
-        let item = &modules[m].items[i];
-        for name in reach::defined(item) {
-            let held = shape(input, decls, &modules[m].name, &item.kind);
-            shapes.insert((modules[m].name.clone(), name), held);
-        }
-        shapes.extend(direct::shapes(input, decls, &modules[m].name, &item.kind));
-    }
-    shapes
-}
-
 /// The program of the items `roots` reach, whose `main.go`, of documents
 /// of `a`, initializes the modules of `roots` and runs `start`.
 fn compile<'a>(
@@ -194,15 +184,7 @@ fn compile<'a>(
     roots: &[String],
 ) -> Output {
     let mut diagnostics = Vec::new();
-    let keys: Vec<Key> = if !input.test && input.suites.is_empty() {
-        vec![(input.entry.to_owned(), "main".to_owned())]
-    } else {
-        roots
-            .iter()
-            .map(|m| (m.clone(), "tests".to_owned()))
-            .collect()
-    };
-    let (reached, missing) = reach::reachable(modules, index, &keys);
+    let (reached, missing) = reach::reachable(modules, index, &root_keys(input, roots));
     for module in missing {
         diagnostics.push(Unsupported::new(format!(
             "the module `{module}` of a package is not available on the go target yet"
@@ -213,6 +195,7 @@ fn compile<'a>(
         .iter()
         .map(|&(m, i)| (&*modules[m].name, &modules[m].items[i]));
     let settled = shape::settled(reached_items, &shapes);
+    let derived = adt_derive::derived_instances(modules, input.lang);
     let item_initializers = modules.iter().any(|m| !m.initialization.is_empty());
     let mut files = Vec::new();
     let mut sources = BTreeMap::new();
@@ -220,10 +203,11 @@ fn compile<'a>(
     // the modules each module's initialization reads
     let mut deps: HashMap<String, BTreeSet<String>> = HashMap::new();
     let mut seen = HashSet::new();
-    let (mut owned, mut record_shapes, records, fields) = (
+    let (mut owned, mut record_shapes, mut adt_shapes, records, fields) = (
         own::Owned::new(),
         BTreeSet::new(),
-        own::records(modules, input.lang),
+        BTreeMap::<adt::AdtShape, adt::AdtOps>::new(),
+        own::records(modules, input.lang, decls),
         own::fields(input.own, input.lang),
     );
     for (m, module) in modules.iter().enumerate() {
@@ -239,6 +223,7 @@ fn compile<'a>(
         g.records = Some(&records);
         g.fields = Some(&fields);
         g.decls = Some(decls);
+        g.derived = Some(&derived);
         g.item_initializers = item_initializers;
         let order = item_order(module, &items, index);
         let code = g.module(module, &order);
@@ -250,6 +235,9 @@ fn compile<'a>(
         deps.insert(module.name.clone(), g.modules);
         owned.extend(g.owned);
         record_shapes.extend(g.record_shapes);
+        for (shape, ops) in g.adt_shapes {
+            adt_shapes.entry(shape).or_default().merge(ops);
+        }
         sources.extend(g.sources);
         go_imports.extend(g.go_imports.into_keys());
         files.push((names::file(&module.name), code));
@@ -273,8 +261,11 @@ fn compile<'a>(
         run,
         files,
         sources,
-        &owned,
+        owned,
         record_shapes,
+        adt_shapes,
+        &records,
+        &fields,
         diagnostics,
         go_imports,
     )
@@ -288,16 +279,14 @@ fn finish_output<'a>(
     run: Document<'a>,
     mut files: Vec<(String, String)>,
     sources: BTreeMap<String, String>,
-    owned: &own::Owned,
+    mut owned: own::Owned,
     mut record_shapes: BTreeSet<record::RecordShape>,
+    mut adt_shapes: BTreeMap<adt::AdtShape, adt::AdtOps>,
+    records: &own::Records,
+    fields: &own::CtorFields,
     mut diagnostics: Vec<Unsupported>,
     mut go_imports: BTreeSet<String>,
 ) -> Output {
-    for (_, held) in owned.values() {
-        if let own::Held::Record(shape) = held {
-            record_shapes.insert(shape.clone());
-        }
-    }
     let packages = main_file::packages(modules, reached);
     let zones = main_file::zones(modules, reached);
     files.push((
@@ -308,15 +297,14 @@ fn finish_output<'a>(
         go_imports.extend(imported_packages(text));
     }
     files.extend(sources);
-    if !owned.is_empty() {
-        files.push(("own_types.go".to_owned(), own::file(owned)));
-    }
-    if !record_shapes.is_empty() {
-        files.push((
-            "record_types.go".to_owned(),
-            record_emit::file(&record_shapes),
-        ));
-    }
+    emit_type_files(
+        &mut files,
+        &mut owned,
+        &mut record_shapes,
+        &mut adt_shapes,
+        records,
+        fields,
+    );
     dedup(&mut diagnostics);
     Output {
         files,
@@ -356,16 +344,42 @@ fn main_run_call<'a>(
     )
 }
 
-fn has_initializer(input: &Input, decls: &go_type::TypeDecls<'_>, item: &ItemKind) -> bool {
-    match item {
-        // the shape of a value does not depend on its module
-        ItemKind::Value { .. } => matches!(shape(input, decls, "", item), Shape::Var),
-        ItemKind::Instance { info, .. } => info.context.is_empty(),
-        ItemKind::Destructure { .. } => true,
-        ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => false,
+fn root_keys(input: &Input, roots: &[String]) -> Vec<Key> {
+    if !input.test && input.suites.is_empty() {
+        vec![(input.entry.to_owned(), "main".to_owned())]
+    } else {
+        roots
+            .iter()
+            .map(|m| (m.clone(), "tests".to_owned()))
+            .collect()
     }
 }
 
+fn emit_type_files(
+    files: &mut Vec<(String, String)>,
+    owned: &mut own::Owned,
+    record_shapes: &mut BTreeSet<record::RecordShape>,
+    adt_shapes: &mut BTreeMap<adt::AdtShape, adt::AdtOps>,
+    records: &own::Records,
+    fields: &own::CtorFields,
+) {
+    order::close_shapes(adt_shapes, record_shapes, owned, records, fields);
+    if !owned.is_empty() {
+        files.push(("own_types.go".to_owned(), own::file(owned)));
+    }
+    if !record_shapes.is_empty() {
+        files.push((
+            "record_types.go".to_owned(),
+            record_emit::file(record_shapes),
+        ));
+    }
+    if !adt_shapes.is_empty() {
+        files.push((
+            "adt_types.go".to_owned(),
+            adt_emit::file(adt_shapes, records, fields),
+        ));
+    }
+}
 /// The code generator of one module, building documents in `a`.
 struct Gen<'a> {
     a: &'a DocumentArena<'a>,
@@ -416,10 +430,14 @@ struct Gen<'a> {
     records: Option<&'a own::Records>,
     /// Declaration-site scalar field eligibility for program constructors.
     fields: Option<&'a own::CtorFields>,
-    /// Type declarations across all modules, for typed `Option` and record layout selection.
+    /// Type declarations across all modules, for typed `Option`, record, and ADT layout selection.
     decls: Option<&'a go_type::TypeDecls<'a>>,
+    /// Derived `Eq`/`Ord`/`Hash`/`Show` instances across all modules.
+    derived: Option<&'a adt_derive::DerivedInstances>,
     /// Closed record shapes referenced by the module's generated Go code.
     record_shapes: BTreeSet<record::RecordShape>,
+    /// Closed ADT shapes referenced by the module's generated Go code and requested helpers.
+    adt_shapes: BTreeMap<adt::AdtShape, adt::AdtOps>,
     /// Extra Go package imports collected while emitting qualified global bindings:
     /// `import_path -> local package identifier`.
     go_imports: BTreeMap<String, String>,
@@ -464,7 +482,9 @@ impl<'a> Gen<'a> {
             records: None,
             fields: None,
             decls: None,
+            derived: None,
             record_shapes: BTreeSet::new(),
+            adt_shapes: BTreeMap::new(),
             go_imports: BTreeMap::new(),
             go_import_idents: HashSet::new(),
             go_extra_imports: Vec::new(),

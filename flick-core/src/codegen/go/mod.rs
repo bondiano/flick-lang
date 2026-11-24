@@ -4,6 +4,8 @@
 pub use flick_backend_go::codegen::*;
 
 #[cfg(test)]
+mod adt_tests;
+#[cfg(test)]
 mod compose_tests;
 #[cfg(test)]
 mod decide_tests;

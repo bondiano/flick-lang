@@ -124,7 +124,7 @@ fn concrete_option_layouts_choose_sentinel_or_flag_and_preserve_nesting() {
     assert!(go.contains("flickrt.OptBoolNone"), "{go}");
     assert!(
         go.contains(
-            "func F_App__opt_adt(fb *flickrt.Fiber, l_ok bool, l_b flickrt.Value) flickrt.OptRef"
+            "func F_App__opt_adt(fb *flickrt.Fiber, l_ok bool, l_b A_App__Boxed) flickrt.OptRef"
         ),
         "{go}"
     );
@@ -154,7 +154,7 @@ fn concrete_option_layouts_choose_sentinel_or_flag_and_preserve_nesting() {
         "{go}"
     );
     assert!(
-        go.contains("func F_App__opt_nested_adt(fb *flickrt.Fiber, l_n int32, l_b flickrt.Value) flickrt.Opt[flickrt.OptRef]"),
+        go.contains("func F_App__opt_nested_adt(fb *flickrt.Fiber, l_n int32, l_b A_App__Boxed) flickrt.Opt[flickrt.OptRef]"),
         "{go}"
     );
 

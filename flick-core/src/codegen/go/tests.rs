@@ -108,9 +108,9 @@ fn a_while_nothing_leaves_is_a_plain_loop_over_variables_of_their_go_type() {
 }
 
 const ONCE: &str = "module App exposing (main)\n\n\
-type Mark = Low | High Int\n\n\
+type Mark = Low | High (List Int)\n\n\
 scale : BigInt -> BigInt\nlet scale n =\n  match n with\n  | 0n -> 10n\n  | _ -> n * 10n\n\n\
-pick : Bool -> Mark\nlet pick high = if high then High 1 else Low\n\n\
+pick : Bool -> Mark\nlet pick high = if high then High [1] else Low\n\n\
 label : Mark -> String\nlet label mark =\n  match mark with\n  | Low -> \"low\"\n  | High _ -> \"high\"\n\n\
 missing : Bool -> a -> Option a\nlet missing ok x = if ok then Some x else None\n\n\
 main : Unit ->{Host.Console; AppError} Unit\n\

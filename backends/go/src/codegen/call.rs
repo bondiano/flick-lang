@@ -6,13 +6,15 @@ use std::iter;
 
 use flick_pretty::Document;
 
+use super::adt::AdtShape;
+use super::adt_derive::AdtMethod;
 use super::closures::{Call, at_once, callee, curried, quiet, returning};
 use super::expr::enum_literal;
 use super::go_type::{GoType, Typed, Want};
 use super::layout::{Code, call, closure};
 use super::shape::Types;
 use super::{Gen, Shape, names, own};
-use flick_ir::{Constructor, Expr, ExprKind, Rep, Stage, operation_arity};
+use flick_ir::{Constructor, Expr, ExprKind, IrType, Rep, Stage, operation_arity};
 
 impl<'a> Gen<'a> {
     /// Builds a value of the constructor `c` from its fields, holding the
@@ -161,8 +163,10 @@ struct AppTarget<'a> {
     given: Vec<Code<'a>>,
     arity: usize,
     effects: u64,
+    adt_con: Option<(AdtShape, usize)>,
     typed_con: Option<(&'a str, Vec<Option<GoType>>)>,
     scalar_method: Option<super::typed::ScalarMethod>,
+    adt_method: Option<AdtMethod>,
 }
 
 impl<'a> AppTarget<'a> {
@@ -175,10 +179,14 @@ impl<'a> AppTarget<'a> {
         if total_args < self.arity {
             return None;
         }
-        if let Some((_, slots)) = &self.typed_con {
+        if let Some((shape, vi)) = &self.adt_con {
+            shape.field_go_type(*vi, index)
+        } else if let Some((_, slots)) = &self.typed_con {
             slots.get(index).cloned().flatten()
         } else if let Some(m) = self.scalar_method {
             (index < m.arity()).then_some(GoType::Scalar(m.scalar()))
+        } else if let Some(m) = &self.adt_method {
+            (index < m.arity()).then(|| GoType::Adt(m.shape().clone()))
         } else if let Some((_, types, params)) = typed {
             (index < *params)
                 .then(|| types.param(index).cloned())
@@ -190,30 +198,67 @@ impl<'a> AppTarget<'a> {
 }
 
 impl<'a> Gen<'a> {
-    fn app_target(&mut self, head: &Expr, total_args: usize) -> AppTarget<'a> {
+    fn con_target(
+        &mut self,
+        c: &Constructor,
+        total_args: usize,
+        e_ty: Option<&IrType>,
+        want: Want<'_>,
+    ) -> AppTarget<'a> {
+        if c.arity == total_args
+            && let Some((shape, vi)) = self.adt_con_target(c, e_ty, want)
+        {
+            return AppTarget {
+                make: Box::new(|_, _: &[Code<'a>]| unreachable!("full by-value ADT constructor")),
+                given: Vec::new(),
+                arity: c.arity,
+                effects: 0,
+                adt_con: Some((shape, vi)),
+                typed_con: None,
+                scalar_method: None,
+                adt_method: None,
+            };
+        }
         let a = self.a;
-        let mut typed_con = None;
+        let typed_con = match self.own_type(c) {
+            Some((ty, own::Held::Fields(slots))) if slots.iter().any(Option::is_some) => Some((
+                a.alloc_str(&own::make(&ty)),
+                slots.into_iter().map(|s| s.map(GoType::Scalar)).collect(),
+            )),
+            Some((ty, own::Held::Record(shape))) => Some((
+                a.alloc_str(&own::make(&ty)),
+                vec![Some(GoType::Record(shape))],
+            )),
+            _ => None,
+        };
+        AppTarget {
+            make: self.construct(c, Vec::new()),
+            given: Vec::new(),
+            arity: c.arity,
+            effects: 0,
+            adt_con: None,
+            typed_con,
+            scalar_method: None,
+            adt_method: None,
+        }
+    }
+
+    fn app_target(
+        &mut self,
+        head: &Expr,
+        total_args: usize,
+        first_arg: Option<&Expr>,
+        first_ty: Option<&GoType>,
+        e_ty: Option<&IrType>,
+        want: Want<'_>,
+    ) -> AppTarget<'a> {
+        if let ExprKind::Con(c) = &head.kind {
+            return self.con_target(c, total_args, e_ty, want);
+        }
         let mut scalar_method = None;
+        let mut adt_method = None;
         let (make, given, arity, effects): (Call<'a>, Vec<Code<'a>>, usize, u64) = match &head.kind
         {
-            ExprKind::Con(c) => {
-                match self.own_type(c) {
-                    Some((ty, own::Held::Fields(slots))) if slots.iter().any(Option::is_some) => {
-                        typed_con = Some((
-                            a.alloc_str(&own::make(&ty)),
-                            slots.into_iter().map(|s| s.map(GoType::Scalar)).collect(),
-                        ));
-                    }
-                    Some((ty, own::Held::Record(shape))) => {
-                        typed_con = Some((
-                            a.alloc_str(&own::make(&ty)),
-                            vec![Some(GoType::Record(shape))],
-                        ));
-                    }
-                    _ => {}
-                }
-                (self.construct(c, Vec::new()), Vec::new(), c.arity, 0)
-            }
             // a constructor of a GADT with the dictionaries its value holds
             ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Con(_)) => {
                 let ExprKind::Con(c) = &inner.kind else {
@@ -236,11 +281,24 @@ impl<'a> Gen<'a> {
                 (self.perform(service, name), Vec::new(), arity, 0)
             }
             ExprKind::Dicts(inner, dicts) if matches!(inner.kind, ExprKind::Global { .. }) => {
-                let ExprKind::Global { module, name, .. } = &inner.kind else {
-                    unreachable!("a global, as the guard tested");
-                };
-                let dicts: Vec<Code<'a>> = dicts.iter().map(|d| self.dict(d)).collect();
-                self.direct(module, name, dicts)
+                if let Some(m) = self.adt_method_head(head, first_arg, first_ty)
+                    && total_args >= m.arity()
+                {
+                    let arity = m.arity();
+                    adt_method = Some(m);
+                    (
+                        Box::new(|_, _: &[Code<'a>]| unreachable!("full ADT Ord comparison")),
+                        Vec::new(),
+                        arity,
+                        0,
+                    )
+                } else {
+                    let ExprKind::Global { module, name, .. } = &inner.kind else {
+                        unreachable!("a global, as the guard tested");
+                    };
+                    let dicts: Vec<Code<'a>> = dicts.iter().map(|d| self.dict(d)).collect();
+                    self.direct(module, name, dicts)
+                }
             }
             ExprKind::Method { .. }
                 if self
@@ -253,6 +311,23 @@ impl<'a> Gen<'a> {
                     Box::new(|_, _: &[Code<'a>]| unreachable!("full scalar method call")),
                     Vec::new(),
                     m.arity(),
+                    0,
+                )
+            }
+            ExprKind::Method { .. }
+                if self
+                    .adt_method_head(head, first_arg, first_ty)
+                    .is_some_and(|m| total_args >= m.arity()) =>
+            {
+                let m = self
+                    .adt_method_head(head, first_arg, first_ty)
+                    .expect("tested by the guard");
+                let arity = m.arity();
+                adt_method = Some(m);
+                (
+                    Box::new(|_, _: &[Code<'a>]| unreachable!("full ADT derived method call")),
+                    Vec::new(),
+                    arity,
                     0,
                 )
             }
@@ -272,8 +347,10 @@ impl<'a> Gen<'a> {
             given,
             arity,
             effects,
-            typed_con,
+            adt_con: None,
+            typed_con: None,
             scalar_method,
+            adt_method,
         }
     }
 
@@ -294,14 +371,20 @@ impl<'a> Gen<'a> {
             stage,
         } = &e.kind
         {
-            let first_want = self.piped_arg_want(func);
+            let first_want = self.piped_arg_want(func, arg, e.ty.as_deref(), want);
             let v = self.eval(arg, Want::of(first_want.as_ref()));
             first = Some((self.spill_typed(v), *stage));
             head = func;
         }
         let (head, args) = head.spine();
         let total_args = args.len() + usize::from(first.is_some());
-        let target = self.app_target(head, total_args);
+        let first_arg = args.first().map(|(a, _)| *a);
+        let first_ty = if args.is_empty() {
+            first.as_ref().and_then(|(v, _)| v.ty.as_ref())
+        } else {
+            None
+        };
+        let target = self.app_target(head, total_args, first_arg, first_ty, e.ty.as_deref(), want);
         let typed = self.typed_head(head).filter(|(_, types, _)| types.any());
         let exprs: Vec<&Expr> = args.iter().map(|(arg, _)| *arg).collect();
         let wants: Vec<Option<GoType>> = (0..exprs.len())
@@ -348,10 +431,14 @@ impl<'a> Gen<'a> {
             .into_iter()
             .chain(values.into_iter().map(|(v, _)| v))
             .collect();
-        let v = if let Some((make, _)) = target.typed_con {
+        let v = if let Some((shape, vi)) = target.adt_con {
+            self.adt_con_call(&shape, vi, &all)
+        } else if let Some((make, _)) = target.typed_con {
             self.typed_con_call(make, &all)
         } else if let Some(method) = target.scalar_method {
             self.scalar_method_call(method, &all)
+        } else if let Some(method) = target.adt_method {
+            self.adt_method_call(&method, &all)
         } else if let Some(typed) = typed {
             self.typed_call(typed, &all, &exprs, e)
         } else {

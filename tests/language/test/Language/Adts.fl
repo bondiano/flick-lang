@@ -29,6 +29,48 @@ type Tagged a = Tagged Int a
 
 type Choice a = NumVal Int | PolyVal a
 
+type Status = Pending | Active Int | Failed String
+  deriving Eq, Ord, Hash, Show, Schema
+
+type alias Job = { id : Int; shape : Shape; status : Status; outcome : Result String Int }
+
+type Envelope = Direct Status | Checked (Result String Int) | Nested (Option Int) Suit
+  deriving Eq, Ord, Hash, Show
+
+make_status : Int -> Status
+let make_status n = if n == 0 then Pending else if n > 0 then Active n else Failed "neg"
+
+make_outcome : Int -> Result String Int
+let make_outcome n = if n >= 0 then Ok (n * 3) else Err "neg"
+
+score_job : Job -> Int
+let score_job j =
+  let s =
+    match j.status with
+    | Pending -> 0
+    | Active n -> n
+    | Failed _ -> -1
+  let o =
+    match j.outcome with
+    | Ok v -> v
+    | Err _ -> -2
+  j.id + area j.shape + s + o
+
+sum_statuses : Int -> Status -> Int
+let rec sum_statuses n acc =
+  if n <= 0 then
+    match acc with
+    | Pending -> 0
+    | Active v -> v
+    | Failed _ -> -1
+  else
+    let next =
+      match acc with
+      | Pending -> Active n
+      | Active v -> Active (v + n)
+      | Failed e -> Failed e
+    sum_statuses (n - 1) next
+
 extract_choice : Choice Int -> Int
 let extract_choice c =
   match c with
@@ -185,4 +227,74 @@ let tests = [
       ],
     ]
   ),
+  Test.test
+    "closed ADTs and concrete Result in aggregates, cross-module calls, derived ops, and codecs"
+    (fun () ->
+      let nan = 0.0 / 0.0
+      let neg_zero = -1.0 * 0.0
+      let job1 : Job = {
+        id = 10
+        shape = Rect 3 4
+        status = make_status 5
+        outcome = make_outcome 2
+      }
+      let job2 : Job = {
+        id = 1
+        shape = Dot
+        status = make_status (-1)
+        outcome = make_outcome (-1)
+      }
+      let mut cur : Status = Pending
+      cur = Active 9
+      let ok_f1 : Result Float Int = Err 0.0
+      let ok_f2 : Result Float Int = Err neg_zero
+      let nan_f1 : Result Float Int = Err nan
+      let nan_f2 : Result Float Int = Err nan
+      let env_a = Direct (Active 4)
+      let env_b = Checked (Ok 4)
+      let env_c = Nested (Some 2) Spades
+      let rmap =
+        HashMap.insert
+          (Ok 7 : Result String Int)
+          "ok7"
+          (HashMap.insert (Err "e" : Result String Int) "erre" HashMap.empty)
+      let codec = Codec.json Status.schema
+      let roundtrip_status = fun s ->
+        match Codec.encode_result codec s with
+        | Ok j ->
+          match Json.parse (Json.stringify j) with
+          | Ok u ->
+            match Codec.decode_result codec u with
+            | Ok out -> Some out
+            | Err _ -> None
+          | Err _ -> None
+        | Err _ -> None
+      Test.all [
+        Test.equal 33 (score_job job1),
+        Test.equal (-2) (score_job job2),
+        Test.equal (Active 9) cur,
+        Test.equal 15 (sum_statuses 5 Pending),
+        Test.equal true (ok_f1 == ok_f2),
+        Test.equal true (nan_f1 == nan_f2),
+        Test.equal true (eq ok_f1 ok_f2),
+        Test.equal true (eq nan_f1 nan_f2),
+        Test.equal EQ (compare ok_f1 ok_f2),
+        Test.equal true ((Err "z" : Result String Int) < Ok 0),
+        Test.equal LT (compare (Err "z" : Result String Int) (Ok 0)),
+        Test.equal (hash 7) (hash (Ok 7 : Result String Int)),
+        Test.equal (1 + hash "e") (hash (Err "e" : Result String Int)),
+        Test.equal (Some "ok7") (HashMap.get (Ok 7 : Result String Int) rmap),
+        Test.equal (Some "erre") (HashMap.get (Err "e" : Result String Int) rmap),
+        Test.equal "Ok 7" (show (Ok 7 : Result String Int)),
+        Test.equal "Err \"e\"" (show (Err "e" : Result String Int)),
+        Test.equal "Direct (Active 4)" (show env_a),
+        Test.equal "Checked (Ok 4)" (show env_b),
+        Test.equal "Nested (Some 2) Spades" (show env_c),
+        Test.equal true (env_a < env_b),
+        Test.equal true (env_b < env_c),
+        Test.equal (Some Pending) (roundtrip_status Pending),
+        Test.equal (Some (Active 42)) (roundtrip_status (Active 42)),
+        Test.equal (Some (Failed "oops")) (roundtrip_status (Failed "oops")),
+      ]
+    ),
 ]
