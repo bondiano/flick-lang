@@ -20,6 +20,8 @@ mod expr;
 mod foreign;
 mod generate;
 mod go_type;
+#[cfg(test)]
+mod go_type_tests;
 mod handle;
 mod input;
 mod inspect;

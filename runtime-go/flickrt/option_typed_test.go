@@ -232,6 +232,22 @@ func TestTypedOptionNestingAndErasedHelpers(t *testing.T) {
 		t.Fatalf("OptRef None round-trip failed: %#v", got)
 	}
 
+	// Non-nil empty `more` slice on `&Data{Tag: "None"}` must behave identically
+	// to `more == nil && n == 0` across IsNone, IsSome, and AsOpt* helpers.
+	noneEmptyMore := &Data{Tag: "None", more: []Value{}}
+	if !IsNone(noneEmptyMore) || IsSome(noneEmptyMore) {
+		t.Fatalf("expected IsNone=true, IsSome=false for empty-more None")
+	}
+	if !AsOptInt(noneEmptyMore).IsNone() || !AsOptRef(noneEmptyMore).IsNone() || !AsOptBool(noneEmptyMore).IsNone() {
+		t.Fatalf("AsOpt* must recognize empty-more None")
+	}
+	if IsNone(&Data{Tag: "None", more: []Value{int32(1)}}) {
+		t.Fatal("None with non-empty more must not satisfy IsNone")
+	}
+	if IsNone(&Data{Tag: "None", n: 1, in: [2]Value{int32(1)}}) {
+		t.Fatal("None with inline field must not satisfy IsNone")
+	}
+
 	// Float equality semantics on Opt[float64]: NaN == NaN, -0.0 == +0.0.
 	if !EqOptFloat(SomeOpt(math.NaN()), SomeOpt(math.NaN())) {
 		t.Fatal("EqOptFloat must treat Some(NaN) == Some(NaN)")

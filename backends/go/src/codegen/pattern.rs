@@ -19,6 +19,10 @@ struct Test<'a> {
     /// Locals an or-pattern assigns inside its test, declared before it:
     /// `(raw_name, local_name, agreed_go_type)`.
     lets: Vec<(&'a str, &'a str, Option<GoType>)>,
+    /// When inside an enclosing `Pat::Or`, the final merged `GoType` of every
+    /// binder declared for that `Pat::Or` so nested `Pat::Or`s coerce directly
+    /// into the outer variable's declared Go type.
+    or_targets: Option<Vec<(&'a str, Option<GoType>)>>,
 }
 
 fn merge_let<'a>(
@@ -128,6 +132,80 @@ impl<'a> Gen<'a> {
         }
     }
 
+    /// Pre-pass over an outermost `Pat::Or` (recursing into nested `Pat::Or`s
+    /// and constructor subpatterns) to compute the final agreed `GoType` for
+    /// every binder declared before the or-pattern runs.
+    fn collect_or_lets(
+        &self,
+        pat: &Pat,
+        subject_ty: Option<&GoType>,
+        out: &mut Vec<(&'a str, &'a str, Option<GoType>)>,
+    ) {
+        let a = self.a;
+        match pat {
+            Pat::Wild | Pat::Lit(_) => {}
+            Pat::Bind(name) => merge_let(
+                out,
+                a.alloc_str(name),
+                a.alloc_str(&names::local(name)),
+                subject_ty.cloned(),
+            ),
+            Pat::Tuple(items) => {
+                for item in items {
+                    self.collect_or_lets(item, None, out);
+                }
+            }
+            Pat::List(items, rest) => {
+                for item in items {
+                    self.collect_or_lets(item, None, out);
+                }
+                if let Some(rest) = rest {
+                    self.collect_or_lets(rest, None, out);
+                }
+            }
+            Pat::Record(fields) => {
+                for (_, p) in fields {
+                    self.collect_or_lets(p, None, out);
+                }
+            }
+            Pat::Con(c, args) if c.rep != Rep::Tagged => {
+                for arg in args {
+                    self.collect_or_lets(arg, None, out);
+                }
+            }
+            Pat::Con(c, args) => {
+                if let Some(GoType::Opt(repr)) = subject_ty {
+                    if self.opt_con(c) == Some(OptCon::Some)
+                        && let Some(arg) = args.first()
+                    {
+                        let inner = repr.payload_go_type();
+                        self.collect_or_lets(arg, inner.as_ref(), out);
+                    }
+                    return;
+                }
+                if self.opt_con(c).is_some() {
+                    if let Some(arg) = args.first() {
+                        self.collect_or_lets(arg, None, out);
+                    }
+                    return;
+                }
+                let held = self.own_held(c).filter(own::Held::has_scalars);
+                for (i, arg) in args.iter().enumerate() {
+                    let slot = held
+                        .as_ref()
+                        .and_then(|h| h.field_native(i))
+                        .map(GoType::Scalar);
+                    self.collect_or_lets(arg, slot.as_ref(), out);
+                }
+            }
+            Pat::Or(alts) => {
+                for alt in alts {
+                    self.collect_or_lets(alt, subject_ty, out);
+                }
+            }
+        }
+    }
+
     fn test_or(
         &mut self,
         alternatives: &[Pat],
@@ -136,35 +214,45 @@ impl<'a> Gen<'a> {
         t: &mut Test<'a>,
     ) {
         let a = self.a;
-        // Collect every alternative first so mixed GoTypes agree before
-        // emitting assignments (boxing typed Option to Value if needed).
-        let mut inners = Vec::with_capacity(alternatives.len());
+        // At the outermost `Pat::Or`, resolve the final agreed GoType across
+        // every nested alternative before emitting any inner assignment so
+        // inner `Pat::Or` closures coerce directly into the declared variable.
+        let targets: Vec<(&'a str, Option<GoType>)> = if let Some(outer) = &t.or_targets {
+            outer.clone()
+        } else {
+            let mut merged = Vec::new();
+            for alt in alternatives {
+                self.collect_or_lets(alt, subject_ty, &mut merged);
+            }
+            for (raw, local, go_ty) in &merged {
+                merge_let(&mut t.lets, raw, local, go_ty.clone());
+            }
+            merged
+                .into_iter()
+                .map(|(_, local, go_ty)| (local, go_ty))
+                .collect()
+        };
+        let mut tests = Vec::with_capacity(alternatives.len());
         for alt in alternatives {
-            let mut inner = Test::default();
+            let mut inner = Test {
+                or_targets: Some(targets.clone()),
+                ..Test::default()
+            };
             self.test(alt, subject, subject_ty.cloned(), &mut inner);
-            for (raw, local, _, go_ty) in &inner.binds {
-                // bound by one alternative or another: what it is bound to is not known
-                self.held.remove(*local);
-                merge_let(&mut t.lets, raw, local, go_ty.clone());
-            }
-            for (raw, local, go_ty) in &inner.lets {
-                merge_let(&mut t.lets, raw, local, go_ty.clone());
-            }
-            inners.push(inner);
-        }
-        let mut tests = Vec::with_capacity(inners.len());
-        for inner in inners {
             let cond = if inner.conds.is_empty() {
                 a.text("true")
             } else {
                 conjunction(a, inner.conds)
             };
+            for (_, l, _, _) in &inner.binds {
+                // bound by one alternative or another: what it is bound to is not known
+                self.held.remove(*l);
+            }
             let assigns = inner.binds.into_iter().map(|(_, l, p, path_ty)| {
-                let target_ty = t
-                    .lets
+                let target_ty = targets
                     .iter()
-                    .find(|(_, local, _)| *local == l)
-                    .and_then(|(_, _, ty)| ty.as_ref());
+                    .find(|(local, _)| *local == l)
+                    .and_then(|(_, ty)| ty.as_ref());
                 let value = self.coerce(
                     Typed {
                         code: p.into(),

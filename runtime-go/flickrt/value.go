@@ -63,7 +63,7 @@ func Err(v Value) Value  { return &Data{Tag: "Failure", n: 1, in: [2]Value{v}} }
 // IsNone reports whether an erased Flick value is Option's None.
 func IsNone(v Value) bool {
 	d, ok := v.(*Data)
-	return ok && (d == noneData || (d.Tag == "None" && d.n == 0 && d.more == nil))
+	return ok && (d == noneData || (d.Tag == "None" && ((d.more == nil && d.n == 0) || (d.more != nil && len(d.more) == 0))))
 }
 
 // IsSome reports whether an erased Flick value is Option's Some.

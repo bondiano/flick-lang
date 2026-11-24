@@ -156,10 +156,16 @@ impl OptRepr {
     fn for_payload(lang: &Known, decls: &TypeDecls, payload: &IrType) -> Option<OptRepr> {
         match payload {
             IrType::Var(_) | IrType::App { .. } | IrType::Exists { .. } => None,
-            IrType::Tuple(_)
-            | IrType::Record { .. }
-            | IrType::Fun { .. }
-            | IrType::Forall { .. } => Some(OptRepr::RefSentinel),
+            // Only constrained higher-rank values are wrapped in `*flickrt.Poly`
+            // at runtime; an unconstrained `Forall` holds its body directly (which
+            // may be `nil`, e.g. `forall a. Unknown`) and can agree with its
+            // instantiated body under higher-rank instantiation.
+            IrType::Forall { constraints, .. } => {
+                (!constraints.is_empty()).then_some(OptRepr::RefSentinel)
+            }
+            IrType::Tuple(_) | IrType::Record { .. } | IrType::Fun { .. } => {
+                Some(OptRepr::RefSentinel)
+            }
             IrType::Named { module, name, args } => {
                 if lang.is(Lang::Option, module, name) {
                     if args.len() != 1 {
@@ -167,6 +173,20 @@ impl OptRepr {
                     }
                     let inner = Self::for_payload(lang, decls, &args[0])?;
                     return Some(OptRepr::Flag(OptPayload::Nested(Box::new(inner))));
+                }
+                // `Errors` agrees with error ADTs/`Never` and `ServiceImpl` agrees
+                // with records; keep them erased so equivalent types never get
+                // conflicting typed `Option` layouts.
+                if lang.is(Lang::Errors, module, name) || lang.is(Lang::ServiceImpl, module, name) {
+                    return None;
+                }
+                // An `opaque type alias` unifies transparently with its target
+                // inside its defining module; stay erased to preserve substitution
+                // invariance and handle recursive aliases without unfolding.
+                if let Some(decl) = decls.get(&(module.clone(), name.clone()))
+                    && decl.alias.is_some()
+                {
+                    return None;
                 }
                 if args.is_empty() {
                     if lang.is(Lang::Int, module, name) {
@@ -192,7 +212,6 @@ impl OptRepr {
                     return Some(OptRepr::RefSentinel);
                 }
                 if let Some(decl) = decls.get(&(module.clone(), name.clone()))
-                    && decl.alias.is_none()
                     && !decl.constructors.is_empty()
                     && decl.constructors.iter().all(|c| c.rep != Rep::Unboxed)
                 {

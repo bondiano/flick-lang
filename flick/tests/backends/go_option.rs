@@ -246,3 +246,113 @@ fn erased_observer_and_ffi_roundtrip_distinguish_option_nesting() {
     );
     assert_eq!(String::from_utf8_lossy(&run.stdout), expected);
 }
+
+const EDGE_CASES_FLICK: &str = r#"module App exposing (main)
+
+opaque type alias UserId = String
+opaque type alias Id a = a
+opaque type alias MaybeInt = Option Int
+opaque type alias Stream = Option (Float, Stream)
+
+type Node = Wrap (Option Node)
+
+nil_unknown : Unit -> Unknown
+foreign pure nil_unknown from "./nil_unk.mjs" "nilUnknown"
+
+read_uid : Option UserId -> String
+let read_uid o =
+  match o with
+  | Some s -> s
+  | None -> "none"
+
+read_str : Option String -> String
+let read_str o =
+  match o with
+  | Some s -> s
+  | None -> "none"
+
+read_id : Option (Id Int) -> Int
+let read_id o =
+  match o with
+  | Some n -> n
+  | None -> 0
+
+read_maybe : Option MaybeInt -> Int
+let read_maybe o =
+  match o with
+  | Some (Some n) -> n
+  | Some None -> -1
+  | None -> -2
+
+read_stream : Option Stream -> Float
+let read_stream o =
+  match o with
+  | Some (Some (x, _)) -> x
+  | _ -> 0.0
+
+read_unknown : Option Unknown -> String
+let read_unknown o =
+  match o with
+  | Some _ -> "some"
+  | None -> "none"
+
+nested_or : Option Node -> Option Node
+let nested_or o =
+  let (Some (Wrap x) | (x | x)) = o
+  x
+
+describe_node : Option Node -> String
+let describe_node o =
+  match o with
+  | None -> "none"
+  | Some (Wrap None) -> "wrap(none)"
+  | Some (Wrap (Some _)) -> "wrap(some)"
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let s : Option String = Some "alice"
+  let uid : Option UserId = Some "bob"
+  let oi : Option Int = Some 11
+  let mi : Option (Option Int) = Some (Some 42)
+  let st : Option Stream = Some (Some (2.5, None))
+  let nil_u : Option Unknown = Some (nil_unknown ())
+  let lines = [
+    "uid:" ++ read_uid s ++ "|" ++ read_str uid,
+    "id:" ++ show (read_id oi) ++ "|maybe:" ++ show (read_maybe mi) ++ "|stream:" ++ show (read_stream st),
+    "unk_nil:" ++ read_unknown nil_u ++ "|" ++ read_unknown None,
+    "nested_or:" ++ describe_node (nested_or None) ++ "|" ++ describe_node (nested_or (Some (Wrap None))) ++ "|" ++ describe_node (nested_or (Some (Wrap (Some (Wrap None))))),
+  ]
+  Platform.stdout_line (String.join "\n" lines)
+"#;
+
+const NIL_UNK_GO: &str = r#"package main
+
+import "flick.app/flickrt"
+
+func nilUnknown(_ *flickrt.Fiber, _ flickrt.Value) flickrt.Value {
+	return nil
+}
+"#;
+
+#[test]
+#[ignore = "requires Go"]
+fn opaque_alias_nil_unknown_and_nested_or_run_cleanly_on_go() {
+    let config = format!("{CONFIG}[tools]\n\"flick/go\" = [\"go\"]\n");
+    let root = project(
+        "go_option_edge_cases",
+        &[
+            ("flick.toml", &config),
+            ("src/App.fl", EDGE_CASES_FLICK),
+            ("src/nil_unk.go", NIL_UNK_GO),
+        ],
+    );
+    let run = flick_in(&root, &["run", "--target", "go", "--offline"]);
+    assert!(run.status.success(), "{run:?}");
+    let expected = concat!(
+        "uid:alice|bob\n",
+        "id:11|maybe:42|stream:2.5\n",
+        "unk_nil:some|none\n",
+        "nested_or:none|none|wrap(none)\n",
+    );
+    assert_eq!(String::from_utf8_lossy(&run.stdout), expected);
+}

@@ -380,3 +380,184 @@ let main () = Platform.stdout_line (show (use_opt (List.length (Platform.args ()
         "release-optimized Go should keep concrete Option unboxed:\n{go_src}"
     );
 }
+
+const ALIAS_AND_ERRORS_SRC: &str = r#"module App exposing (main)
+
+opaque type alias UserId = String
+opaque type alias Id a = a
+opaque type alias MaybeInt = Option Int
+opaque type alias Stream = Option (Float, Stream)
+
+type error Boom = Boom String
+  deriving Show
+type error Bam = Bam Int
+  deriving Show
+
+service Tick =
+  now : Unit ->{} Int
+
+read_uid : Option UserId -> String
+let read_uid u =
+  match u with
+  | Some s -> s
+  | None -> "none"
+
+read_str : Option String -> String
+let read_str s =
+  match s with
+  | Some v -> v
+  | None -> "none"
+
+read_id_poly : Option (Id a) -> a -> a
+let read_id_poly o fallback =
+  match o with
+  | Some x -> x
+  | None -> fallback
+
+read_id_int : Option (Id Int) -> Int
+let read_id_int o =
+  match o with
+  | Some n -> n
+  | None -> 0
+
+read_maybe : Option MaybeInt -> Int
+let read_maybe o =
+  match o with
+  | Some (Some n) -> n
+  | Some None -> -1
+  | None -> -2
+
+read_stream : Option Stream -> Float
+let read_stream o =
+  match o with
+  | Some (Some (x, _)) -> x
+  | _ -> 0.0
+
+read_err : Option (Errors {Boom, Bam}) -> Bool
+let read_err o =
+  match o with
+  | Some _ -> true
+  | None -> false
+
+read_err_single : Option (Errors {Boom}) -> Bool
+let read_err_single o =
+  match o with
+  | Some _ -> true
+  | None -> false
+
+read_svc : ServiceTag r -> Option (ServiceImpl r) -> Bool
+let read_svc _ o =
+  match o with
+  | Some _ -> true
+  | None -> false
+
+read_svc_concrete : Option Tick.Impl -> Bool
+let read_svc_concrete o =
+  match o with
+  | Some _ -> true
+  | None -> false
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let s : Option String = Some "alice"
+  let uid : Option UserId = Some "bob"
+  let oi : Option Int = Some 7
+  let idi : Option (Id Int) = Some 8
+  let mi : Option (Option Int) = Some (Some 9)
+  let st : Option Stream = Some (Some (1.5, None))
+  let be : Option Boom = Some (Boom "oops")
+  let errs : Option (Errors {Boom, Bam}) = None
+  let sv : Option { now : Unit ->{} Int } = Some { now = fun () -> 1 }
+  let _ = (read_uid s, read_str uid, read_id_poly idi 0, read_id_int oi, read_maybe mi, read_stream st)
+  let _ = (read_err errs, read_err_single be, read_svc Tick sv, read_svc_concrete sv)
+  Platform.stdout_line "ok"
+"#;
+
+#[test]
+fn opaque_alias_errors_and_service_impl_options_stay_erased() {
+    let out = build(ALIAS_AND_ERRORS_SRC);
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+    let go = file(&out.files, "m_App.go");
+
+    // Opaque aliases, Errors, and ServiceImpl stay erased `flickrt.Value`.
+    for name in [
+        "read_uid",
+        "read_id_poly",
+        "read_id_int",
+        "read_maybe",
+        "read_stream",
+        "read_err",
+        "read_svc",
+    ] {
+        let sig = format!("func F_App__{name}(fb *flickrt.Fiber, ");
+        let start = go
+            .find(&sig)
+            .unwrap_or_else(|| panic!("missing {sig}\n{go}"));
+        let line = &go[start..go[start..].find('\n').unwrap_or(go.len() - start) + start];
+        assert!(
+            line.contains("flickrt.Value)"),
+            "expected erased Option parameter for `{name}`, got: {line}"
+        );
+    }
+}
+
+#[test]
+fn nested_or_pattern_boxes_typed_option_when_outer_or_widens_to_value() {
+    let out = build(
+        r#"module App exposing (main)
+
+type Node = Wrap (Option Node)
+
+direct_nested_or : Option Node -> Option Node
+let direct_nested_or o =
+  let (Some (Wrap x) | (x | x)) = o
+  x
+
+deep_nested_or : Option Node -> Option Node
+let deep_nested_or o =
+  let ((Some (Wrap x) | (x | x)) | x) = o
+  x
+
+match_nested_or : Option (Option Node) -> Option Node
+let match_nested_or o =
+  match o with
+  | Some (Some (Wrap x)) | Some (x | x) -> x
+  | None -> None
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let _ = direct_nested_or None
+  let _ = deep_nested_or None
+  let _ = match_nested_or (Some None)
+  Platform.stdout_line "ok"
+"#,
+    );
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+    let go = file(&out.files, "m_App.go");
+
+    let fn_body = |name: &str| {
+        let start = go
+            .find(&format!("func F_App__{name}("))
+            .unwrap_or_else(|| panic!("missing F_App__{name}:\n{go}"));
+        let rest = &go[start..];
+        let end = rest.find("\n\nfunc ").unwrap_or(rest.len());
+        &rest[..end]
+    };
+
+    for name in ["direct_nested_or", "deep_nested_or"] {
+        let body = fn_body(name);
+        assert!(body.contains("var l_x flickrt.Value"), "{body}");
+        assert!(body.contains("l_x = flickrt.BoxOptRef(l_o)"), "{body}");
+        assert!(
+            !body.contains("l_x = l_o;"),
+            "inner Pat::Or leaked unboxed OptRef into flickrt.Value in `{name}`:\n{body}"
+        );
+    }
+
+    let matched = fn_body("match_nested_or");
+    assert!(matched.contains("var l_x flickrt.Value"), "{matched}");
+    assert!(
+        matched.contains("l_x = flickrt.BoxOptRef(l_o.Val)"),
+        "{matched}"
+    );
+}
