@@ -291,6 +291,13 @@ impl Lower<'_> {
             .stages
             .get(&node.range())
             .and_then(|s| s.first());
+        // the last read has the type of the accessor's result
+        if value.ty.is_none()
+            && let Some(flick_ir::IrType::Fun { result, .. }) =
+                self.ir_type(node.range()).as_deref()
+        {
+            value.ty = Some(result.clone());
+        }
         let body = self.adapted(result, value);
         let ty = self.ir_type(param);
         let binder_types = (ty.clone())

@@ -77,6 +77,7 @@ impl<'a> Lookup<'a> {
                             dicts: dicts.clone(),
                             dict_constraints: dict_constraints.clone(),
                             body: body.clone(),
+                            projection: None,
                         },
                     );
                 }

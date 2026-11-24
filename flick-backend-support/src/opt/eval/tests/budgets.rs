@@ -560,6 +560,7 @@ fn external_polymorphic_preload_is_deterministic_at_cap() {
             dicts: vec![],
             dict_constraints: Vec::new(),
             body: lam(&["n"], local("n")),
+            projection: None,
         })
     };
     let lookup = devirt::Lookup::new(&module, &generics, &known);
