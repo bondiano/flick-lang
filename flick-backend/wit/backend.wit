@@ -69,6 +69,36 @@ interface types {
         name: string,
         doc: string,
     }
+    /// How a value crosses a foreign boundary under a backend's value ABI.
+    enum abi-conversion { none, copy, view }
+    /// Which direction(s) a value-ABI entry is valid in at a foreign boundary.
+    enum abi-direction { %in, out, both }
+    /// One entry in a backend's versioned value-ABI table, keyed by lang item
+    /// or structural type constructor (`tuple`, `function`).
+    record value-abi-entry {
+        key: string,
+        flick-type: string,
+        host-type: string,
+        conversion: abi-conversion,
+        direction: abi-direction,
+        notes: string,
+    }
+    /// An explicit backend refusal reason for a non-opaque type key outside `entries`.
+    record value-abi-refusal {
+        key: string,
+        reason: string,
+    }
+    /// Versioned value-ABI table published by a backend descriptor.
+    record value-abi {
+        abi: abi,
+        opaque-type: string,
+        catch-error-type: string,
+        catch-lang-item: option<string>,
+        entries: list<value-abi-entry>,
+        unsupported: list<value-abi-refusal>,
+        fallback-reason: string,
+        admits-copied-data: bool,
+    }
     record descriptor {
         identity: backend-id,
         backend-api: version-range,
@@ -101,6 +131,8 @@ interface types {
         foreign-adapters: list<adapter-word>,
         /// Backend-owned type-form attributes accepted on `type` and `service` declarations.
         type-form-attributes: list<type-form-attribute>,
+        /// Versioned value-ABI table published by this backend, if any.
+        value-abi: option<value-abi>,
     }
     /// Available before IR generation; the host checks descriptor ranges
     /// first, then asks the backend for target-specific refusals.

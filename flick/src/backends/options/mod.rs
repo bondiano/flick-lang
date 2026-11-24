@@ -15,13 +15,19 @@ use std::fmt::Write as _;
 
 #[cfg(feature = "wasm-backends")]
 use flick_backend::OptionValue;
-use flick_backend::{AdapterArgKind as WireArgKind, Descriptor, OptionDescriptor, Verb};
+use flick_backend::{
+    AbiConversion as WireConversion, AbiDirection as WireDirection, AdapterArgKind as WireArgKind,
+    Descriptor, OptionDescriptor, Verb,
+};
 use flick_core::diagnostics::{Diagnostic, Severity, codes, suggest};
 use flick_core::project::config::BackendPackage;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::config::TargetValue;
 use flick_core::project::{BackendAxis, BackendTags, Project};
-use flick_core::types::{AdapterArgKind, AdapterArgSpec, AdapterWordSpec, TypeFormAttrSpec};
+use flick_core::types::{
+    AbiConversion, AbiDirection, AdapterArgKind, AdapterArgSpec, AdapterWordSpec, TypeFormAttrSpec,
+    ValueAbiEntrySpec, ValueAbiId, ValueAbiRefusalSpec, ValueAbiSpec,
+};
 
 #[cfg(feature = "wasm-backends")]
 pub(crate) use cache::{
@@ -90,6 +96,45 @@ pub(crate) fn descriptor_tags(descriptor: &Descriptor) -> BackendTags {
                 doc: a.doc.clone(),
             })
             .collect(),
+        value_abi: descriptor.value_abi.as_ref().map(|v| ValueAbiSpec {
+            abi: ValueAbiId {
+                name: v.abi.name.clone(),
+                version: v.abi.version.clone(),
+            },
+            opaque_type: v.opaque_type.clone(),
+            catch_error_type: v.catch_error_type.clone(),
+            catch_lang_item: v.catch_lang_item.clone(),
+            entries: v
+                .entries
+                .iter()
+                .map(|e| ValueAbiEntrySpec {
+                    key: e.key.clone(),
+                    flick_type: e.flick_type.clone(),
+                    host_type: e.host_type.clone(),
+                    conversion: match e.conversion {
+                        WireConversion::None => AbiConversion::None,
+                        WireConversion::Copy => AbiConversion::Copy,
+                        WireConversion::View => AbiConversion::View,
+                    },
+                    direction: match e.direction {
+                        WireDirection::In => AbiDirection::In,
+                        WireDirection::Out => AbiDirection::Out,
+                        WireDirection::Both => AbiDirection::Both,
+                    },
+                    notes: e.notes.clone(),
+                })
+                .collect(),
+            unsupported: v
+                .unsupported
+                .iter()
+                .map(|u| ValueAbiRefusalSpec {
+                    key: u.key.clone(),
+                    reason: u.reason.clone(),
+                })
+                .collect(),
+            fallback_reason: v.fallback_reason.clone(),
+            admits_copied_data: v.admits_copied_data,
+        }),
     }
 }
 

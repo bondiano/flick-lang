@@ -19,6 +19,7 @@ fn text_backend() -> ForeignBackendSpec {
             doc: "Target symbol name.".into(),
         }],
         type_form_attributes: Vec::new(),
+        value_abi: None,
     }
 }
 

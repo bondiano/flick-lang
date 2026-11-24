@@ -14,6 +14,7 @@ mod optimize;
 mod pack;
 mod packages;
 mod templates;
+mod value_abi;
 
 use flick_backend::{
     Abi, AdapterArg, AdapterArgKind, AdapterWord, Backend, BackendId, BuildRequest, BuildResult,
@@ -299,6 +300,7 @@ impl Backend for Javascript {
                 name: "ts".into(),
                 doc: "Declare the TypeScript form of a foreign `type` or `service` (`@ts \"...\"`, `@ts from \"pkg\" \"Name\"`, or `@ts none`).".into(),
             }],
+            value_abi: Some(value_abi::table()),
         }
     }
 

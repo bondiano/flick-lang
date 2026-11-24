@@ -6,9 +6,9 @@ use std::collections::BTreeMap;
 use std::env;
 
 use flick_backend::{
-    Abi, BackendPin, BuildRequest, Descriptor, Entry, Environment, InlineForeign, Input, InputKind,
-    Mode, ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile, RootHandler, Source, Span,
-    Symbol, TargetRequest,
+    Abi, BackendPin, BuildRequest, Descriptor, Entry, Environment, ForeignBinding, InlineForeign,
+    Input, InputKind, Mode, ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile,
+    RootHandler, Source, Span, Symbol, TargetRequest,
 };
 use std::collections::HashSet;
 
@@ -312,12 +312,37 @@ impl Prepared {
         }
         let wants = |name: &str| descriptor.projections.iter().any(|p| p.name == name);
         if wants("flick.go") {
-            self.go(host, project, compilation, output);
+            self.go(host, project, compilation, output, descriptor);
         }
         if wants("flick.javascript") || wants("flick.typescript") {
-            self.javascript(host, project, compilation, output, &interfaces);
+            self.javascript(host, project, compilation, output, &interfaces, descriptor);
+        } else if !wants("flick.go")
+            && let Some(value_abi) = &descriptor.value_abi
+        {
+            self.generic_foreign_bindings(compilation, &value_abi.abi);
         }
         Ok(())
+    }
+
+    fn generic_foreign_bindings(&mut self, compilation: &Compilation, abi: &Abi) {
+        let mut seen = HashSet::new();
+        for module in &compilation.modules {
+            for item in &module.ir.items {
+                if let flick_ir::ItemKind::Foreign(foreign) = &item.kind
+                    && let flick_ir::Binding::Module { from, .. } = &foreign.binding
+                    && !from.starts_with("flick:")
+                    && seen.insert((module.name.as_str(), from.as_str()))
+                {
+                    self.request.foreign.push(ForeignBinding {
+                        module: module.name.clone(),
+                        specifier: from.clone(),
+                        resolved: from.clone(),
+                        abi: abi.clone(),
+                        inputs: Vec::new(),
+                    });
+                }
+            }
+        }
     }
 
     fn input(&mut self, id: String, kind: InputKind, bytes: Vec<u8>) -> String {

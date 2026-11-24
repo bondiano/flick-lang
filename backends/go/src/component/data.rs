@@ -79,8 +79,11 @@ impl Data {
                 != ("flick.go-ffi", "0.1.0")
             {
                 return Err(failure(
-                    "P012",
-                    format!("unsupported foreign ABI {}", binding.abi.name),
+                    "F014",
+                    format!(
+                        "foreign binding ABI mismatch for `{}` in `{}`: expected `flick.go-ffi@0.1.0`, got `{}@{}`",
+                        binding.specifier, binding.module, binding.abi.name, binding.abi.version
+                    ),
                 ));
             }
             let [input] = binding.inputs.as_slice() else {

@@ -143,6 +143,7 @@ impl Backend for Go {
                 name: "go".into(),
                 doc: "Declare the Go type form of a foreign `type` or `service` (`@go \"...\"`, `@go from \"pkg\" \"Name\"`, or `@go none`).".into(),
             }],
+            value_abi: None,
         }
     }
 

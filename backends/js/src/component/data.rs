@@ -1,6 +1,6 @@
 //! Decode only declared plain inputs, without compiler objects or callbacks.
 
-use super::failure;
+use super::{failure, value_abi};
 use crate::codegen::{EffectBridge, Labels, Resolved, ts::Typed};
 use crate::{foreign_meta, inline};
 use flick_backend::{
@@ -391,8 +391,23 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
 fn foreign_bindings(request: &BuildRequest) -> Result<Vec<Resolved>, Vec<Diagnostic>> {
     let mut foreign = Vec::new();
     for binding in &request.foreign {
-        if binding.abi.name != "flick.javascript-ffi" || binding.abi.version != "0.1.0" {
-            return Err(failure("unsupported foreign binding ABI"));
+        if binding.abi.name != value_abi::ABI_NAME || binding.abi.version != value_abi::ABI_VERSION
+        {
+            return Err(vec![Diagnostic {
+                code: "F014".into(),
+                severity: Severity::Error,
+                message: format!(
+                    "foreign binding ABI mismatch for `{}` in `{}`: expected `{}@{}`, got `{}@{}`",
+                    binding.specifier,
+                    binding.module,
+                    value_abi::ABI_NAME,
+                    value_abi::ABI_VERSION,
+                    binding.abi.name,
+                    binding.abi.version
+                ),
+                span: None,
+                notes: vec![],
+            }]);
         }
         foreign.push(Resolved {
             module: binding.module.clone(),

@@ -41,7 +41,7 @@ Each backend declares its own CLI and `[target.<name>]` options in
 `implicit-value`, `choices`, `verbs`), along with target metadata
 (`launch-runtimes`, `host-tools`, `projections`,
 `stages-by-class-option`, `foreign-extension`, `foreign-suffixes`,
-`handled-services`, `foreign-adapters`, and `type-form-attributes`), cached by component digest in
+`handled-services`, `foreign-adapters`, `type-form-attributes`, and `value-abi`), cached by component digest in
 `<store>/descriptors/<sha256>.cbor` so `--help` never reaches the network.
 `foreign-adapters` (`adapter-word`: `name`, `args`, `repeatable`, `doc`) and
 `type-form-attributes` (`type-form-attribute`: `name`, `doc`) let each backend
@@ -51,6 +51,21 @@ and foreign type-form attributes (such as `@ts` or `@go`) without hardcoding
 them in the compiler core; the handshake rejects collisions with core contract
 words (`arity`, `catch`, `retention`, `nullable`, `optional`, `reviewed`,
 `owned`) or core compiler attributes.
+`value-abi` (`value-abi`: `abi`, `opaque-type`, `catch-error-type`,
+`catch-lang-item`, `entries` of `value-abi-entry` with `conversion`
+(`none`/`copy`/`view`) and `direction` (`in`/`out`/`both`), `unsupported` of
+`value-abi-refusal`, `fallback-reason`, and `admits-copied-data`) lets each
+backend publish its versioned value-ABI table keyed by lang item and structural
+type constructor (`tuple`, `function`). The handshake (`validate_value_abi`)
+rejects malformed semver versions, duplicate or unknown keys, and `"record"` /
+`"adt"` entries (records and ADTs have no stable layout across backends). The
+type checker validates every direct `foreign` declaration and selected `@native`
+override against `descriptor.value-abi`, refusing unsupported types or
+directions with `FLICK-F013` and surfacing the backend's reason at the binding
+span while admitting opaque nominal handles through `opaque-type`. Package
+manifests (`[package.abi]`) and `BuildRequest.foreign` (`foreign-binding.abi`)
+carry the ABI identifier and version; any mismatch between package/request and
+backend reports `FLICK-F014` rather than silently issuing a foreign call.
 Resolved active options arrive in `TargetRequest.options` as `option.<name>`
 entries alongside `command` (`check`, `build`, `run`, `dev`, `test` or `inspect`) and,
 for `inspect`, `inspect.module`. `BuildRequest.declared-dependencies` carries

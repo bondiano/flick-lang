@@ -236,6 +236,7 @@ impl Backend for Literal {
             }],
             foreign_adapters: foreign::foreign_adapters(),
             type_form_attributes: foreign::type_form_attributes(),
+            value_abi: Some(foreign::value_abi()),
         }
     }
 
@@ -353,6 +354,7 @@ impl Backend for Literal {
                 .read(&source.input)
                 .map_err(|_| diagnostic("source input is unavailable", None))?;
         }
+        foreign::validate_foreign_abis(request)?;
         let mut artifacts = module_artifacts(request)?;
         if is_inspect(request) {
             return Ok(BuildResult {

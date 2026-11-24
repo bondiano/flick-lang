@@ -314,6 +314,7 @@ pub fn handshake(
     validate_tags(descriptor)?;
     validate_options(descriptor)?;
     validate_foreign_metadata(descriptor)?;
+    crate::validate_value_abi(descriptor)?;
     for (name, range, version) in [
         ("backend API", &descriptor.backend_api, &request.backend_api),
         ("IR", &descriptor.ir, &request.ir_version),

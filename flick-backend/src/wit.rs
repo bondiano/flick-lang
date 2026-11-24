@@ -85,7 +85,10 @@ macro_rules! wit_conversions {
             AdapterArg { name, kind }
             AdapterWord { name, args, repeatable, doc }
             TypeFormAttribute { name, doc }
-            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, tags, axes, profiles, modes, capabilities, options, launch_runtimes, host_tools, projections, stages_by_class_option, foreign_extension, foreign_suffixes, handled_services, foreign_adapters, type_form_attributes }
+            ValueAbiEntry { key, flick_type, host_type, conversion, direction, notes }
+            ValueAbiRefusal { key, reason }
+            ValueAbi { abi, opaque_type, catch_error_type, catch_lang_item, entries, unsupported, fallback_reason, admits_copied_data }
+            Descriptor { identity, backend_api, ir, language, runtime_abis, environments, tags, axes, profiles, modes, capabilities, options, launch_runtimes, host_tools, projections, stages_by_class_option, foreign_extension, foreign_suffixes, handled_services, foreign_adapters, type_form_attributes, value_abi }
             TargetRequest { backend_api, ir_version, language_version, runtime_abis, environment, tags, host_package, profile, mode, required_capabilities, options }
             TargetSupport { capabilities }
             Span { file, start, end }
@@ -119,6 +122,8 @@ macro_rules! wit_conversions {
             Mode { PerModule, WholeProgram }
             Verb { Build, Run, Dev, Test, Inspect }
             ValueKind { Flag, Text, Path }
+            AbiConversion { None, Copy, View }
+            AbiDirection { In, Out, Both }
             Severity { Error, Warning, Note }
             InputKind { Source, Foreign, Interface, TargetFacts, Resource, Lockfile }
             ModuleRole { Own, Builtin, External }

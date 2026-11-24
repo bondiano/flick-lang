@@ -110,6 +110,43 @@ interface types {
     doc: string,
   }
 
+  enum abi-conversion {
+    none,
+    copy,
+    view,
+  }
+
+  enum abi-direction {
+    in,
+    out,
+    both,
+  }
+
+  record value-abi-entry {
+    key: string,
+    flick-type: string,
+    host-type: string,
+    conversion: abi-conversion,
+    direction: abi-direction,
+    notes: string,
+  }
+
+  record value-abi-refusal {
+    key: string,
+    reason: string,
+  }
+
+  record value-abi {
+    abi: abi,
+    opaque-type: string,
+    catch-error-type: string,
+    catch-lang-item: option<string>,
+    entries: list<value-abi-entry>,
+    unsupported: list<value-abi-refusal>,
+    fallback-reason: string,
+    admits-copied-data: bool,
+  }
+
   record descriptor {
     identity: backend-id,
     backend-api: version-range,
@@ -132,6 +169,7 @@ interface types {
     handled-services: list<environment-services>,
     foreign-adapters: list<adapter-word>,
     type-form-attributes: list<type-form-attribute>,
+    value-abi: option<value-abi>,
   }
 
   record target-request {

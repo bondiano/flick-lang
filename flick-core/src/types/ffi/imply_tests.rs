@@ -34,6 +34,7 @@ fn custom_env(active: &[&str]) -> NativeOverrideEnv {
             backend_id: "test/literal".into(),
             adapters: Vec::new(),
             type_form_attributes: Vec::new(),
+            value_abi: None,
         },
     });
     env.hosts.push(HostTagModel {
