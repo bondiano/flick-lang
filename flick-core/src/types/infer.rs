@@ -67,6 +67,9 @@ impl<'c> Checker<'c> {
         if let Type::Forall { .. } = target {
             return self.check_forall(node, expected, &target, captures);
         }
+        if self.expects_func_ref(node, &target) {
+            return self.check_func_ref(node, &target, expected);
+        }
         let children: Vec<&Node> = node.nodes().collect();
         let mut actual_type = None;
         match (node.kind, &target) {

@@ -48,6 +48,7 @@ Checker: `kinds.rs`, `convert/kinds.rs`, `convert/rows.rs` `Checker::row`, `row_
     | τ →φ τ                      arrow of stage φ
     | Eff ρ ρ τ                   computation: services, errors, result
     | Ref τ
+    | FuncRef τ                   a function without captures: (FuncRef-In) of §2.3
     | {ℓ₁ : τ₁, …, ℓₙ : τₙ | ρ}    exact record; closed without a tail
     | Errors ρ                    the errors of a row as a type
     | S.Impl                      implementation record of service S
@@ -171,12 +172,14 @@ Ref.make        : ∀α. α →R⟨none;none⟩ Ref α
 Ref.get         : ∀α. Ref α →R⟨none;none⟩ α
 Ref.set         : ∀α. Ref α →P α →R⟨none;none⟩ Unit
 raise           : ∀ε α. Errors ε →R⟨none;ε⟩ α
+FuncRef.fun     : ∀α. FuncRef α →P α
 <, <=, >, >=    : ∀α. α →P α →P Bool                       α ∈ {Int, Float, BigInt, String}
 ```
 
 Where the constants come from:
 
 - `Ref.*`, `from_result`: the types from `builtins/Ref.fl` and `builtins/Prelude.fl` with captures erased.
+- `FuncRef.fun`: the module `FuncRef` of `packages/core`, a binding to the runtime's identity; its step is `FuncRef.fun v →ₚ v` (§3.3).
 - Order comparisons are checked by `settle.rs` `settle_operators` after inference: an unknown `α` becomes `Int`, a rigid one requires `Ord α`, anything else is `FLICK-T003` (see [order comparison on functions](#order-comparison-on-functions)).
 
 Constructors:
@@ -403,6 +406,22 @@ Checker:
 
 Checker: `debug.rs` `todo` (warning `FLICK-T022`).
 
+A term that names no local is a term of the functions without captures of its type, (FuncRef-In), which `FuncRef.fun` of §1.5 undoes:
+
+```text
+Γ ⊢ e : τ ! φ    fv(e) = ∅
+──────────────────────────── (FuncRef-In)
+Γ ⊢ e : FuncRef τ ! φ
+```
+
+- `fv(e)` are the local variables of `e`. A top-level value of §2.6 is no local of a term it is used in: the model writes it `Global`, Lean `glob`, so `fv` does not count it. A dictionary of the code around (§1.6) is a variable of its λ, and a function with class constraints takes its dictionaries as arguments: a λ that uses one is not closed, nor is a constrained top-level function at an instance, which is `f d̄`.
+- The rule types any such term, as (Errors-In) does, and changes no value: a `FuncRef τ` is the function itself, and `FuncRef.fun v` steps to `v`. A host without closures takes it as a function pointer: it holds no environment, since a substitution for the locals around leaves a term without free variables as it is.
+- It is not a subtyping `τ ≤ FuncRef τ`, so it does not reach under a type: `List τ` is no `List (FuncRef τ)`. ⌈FuncRef τ⌉ = ⌈τ⌉, as for a nominal type of `regions.md` §2.1.
+- Checker: where a term is checked against `FuncRef τ`, it is checked against `τ` (`types/func_ref.rs` `check_func_ref`, from `infer.rs` `check_value`); a term of type `FuncRef τ` already passes as it is. Of the terms the rule types, the checker takes the forms a backend can point at: a λ, the name of a top-level value, a constructor or an operation; a dictionary is known only once the module is solved, and one passed within the term is checked then (`func_ref_dictionaries`). Anything else is `FLICK-F015`: a captured local, a partial application, a local function, a class method, a function with class constraints at its type, a type that is not a function.
+- Model: `check/expr/inference.rs` `check` with `check/expr.rs` `func_ref`, the forms of the checker; a function-typed term of another form is rejected by (FuncRef-In).
+
+(FuncRef-In) is `Typ.funcRef` (`formal/Formal/Rules.lean`), whose premise is `Tm.Closed` (`formal/Formal/Closed.lean`), and `FuncRef τ` is `Ty.funcRef`, reaching what `τ` reaches. As for (Errors-In), the steps of progress and preservation go through it to the rule below: `LeOut` (`formal/Formal/ErrorsIn.lean`) also records a `FuncRef` of the term a rule types, which names no local, and `LeOut.typ` builds the rule again at that type: in a configuration every term is typed in the empty context and so is closed (`Typ.closed_nil`, `formal/Formal/WeakenBase.lean`), and a renaming or a substitution leaves a closed term as it is (`Tm.Closed.rename`, `Tm.Closed.subst`), which keeps the rule under weakening and (Subst). `FrameTy.funcRef` (`formal/Formal/FrameTy.lean`) keeps it on a frame. The inversions of a value's form exclude it by its kind (`Ty.kind`, 17), as they exclude (Errors-In): `Typ.vkind`, `Typ.shape`, `Typ.lamCore` and the others. `FuncRef.fun` is the constant `funcRefFun` with `FuncRef.fun v →ₚ v` (`PHead.funcRef`, `formal/Formal/Semantics.lean`); its value is one of the function's type, as (FuncRef-In) typed it (`Typ.funcRef_val`, `formal/Formal/CanonForms.lean`), which preservation uses (`formal/Formal/PresPure.lean`).
+
 ### 2.4 Patterns and exhaustiveness
 
 ```text
@@ -609,6 +628,7 @@ match v with p when g → e | ā   →ₚ  match g[δ] with True → e[δ] | Fal
                                                                    if match(p, v) = δ
                                 →ₚ  match v with ā                 otherwise
 try v with ā                    →ₚ  v
+FuncRef.fun v                   →ₚ  v
 ```
 
 ```text

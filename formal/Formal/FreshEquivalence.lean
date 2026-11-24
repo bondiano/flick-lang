@@ -26,6 +26,12 @@ theorem Ty.YFMod.ref {n : Nat} {a : Ty} (h : (Ty.ref a).YFMod n) : a.YFMod n := 
   | rows hr _ => cases hr
   | ref ha => exact ha
 
+theorem Ty.YFMod.funcRef {n : Nat} {a : Ty} (h : (Ty.funcRef a).YFMod n) : a.YFMod n := by
+  unfold Ty.YFMod at h ⊢
+  cases h.form with
+  | rows hr _ => cases hr
+  | funcRef ha => exact ha
+
 /-- An error of a row fixed by `kill n` is fixed by it: the row's elements are what `kill n`
 makes of them, which it fixes. -/
 theorem Ty.YFMod.of_err {n : Nat} {ε U : Ty} {E : Name} (h : (Ty.errors ε).YFMod n)

@@ -1,5 +1,6 @@
 //! Exact cold task bridges, implemented only with ordinary Task/Await code.
 //! Arguments remain language values; no host export or generic FFI exemption.
+use super::kept_for_call;
 use crate::{
     ir::{Expr, ExprKind, Param, Pat, Stage, Stmt},
     source::Span,
@@ -72,6 +73,7 @@ fn adapter(kind: Kind) -> Adapter {
         shapes,
         result_shape: task_shape(),
         words: vec![],
+        retention: None,
     }
 }
 fn supports(value: &Foreign, kind: Kind) -> bool {
@@ -81,7 +83,7 @@ fn supports(value: &Foreign, kind: Kind) -> bool {
         && value.dicts == 0
         && value.stages == vec![false; kind.arity()]
         && value.catch.is_none()
-        && value.adapter == adapter(kind)
+        && kept_for_call(&value.adapter) == adapter(kind)
 }
 pub(super) fn expression(value: &Foreign, span: Span) -> Option<Expr> {
     let kind = kind(value)?;
@@ -159,7 +161,7 @@ impl Builder {
 
 #[cfg(test)]
 mod tests {
-    use super::{Builder, Kind, adapter, expression, kind, supports};
+    use super::{Builder, Kind, adapter, expression, kept_for_call, kind, supports};
     use crate::{
         build,
         ir::{Expr, ExprKind, Foreign, ItemKind, Lit, Stage, Stmt, memory},
@@ -183,6 +185,7 @@ mod tests {
                     name.push('!');
                 }
             }),
+            Box::new(|v| v.adapter.retention = Some(flick_ir::Retention::Owner)),
             Box::new(|v| v.mode = ForeignMode::Sync),
             Box::new(|v| v.mode = ForeignMode::Async),
             Box::new(|v| v.mode = ForeignMode::Effect),
@@ -292,7 +295,7 @@ mod tests {
             let Some(kind) = kind(original) else { continue };
             seen.push(original.binding.export_name().unwrap_or("").to_owned());
             assert!(supports(original, kind), "{original:#?}");
-            assert_eq!(original.adapter, adapter(kind));
+            assert_eq!(kept_for_call(&original.adapter), adapter(kind));
             let entry = memory::Name::new("Instances", &original.name);
             assert!(lower([module], &entry).is_ok());
             let edits = mutations(original);

@@ -87,6 +87,9 @@ theorem PHead.settle {r r' : Tm} (hh : PHead r r') (h : r.SettleLin) :
     have h₁ := hv.noSettle h.1
     exact ⟨Tm.SettleLin.of_noSettle h₁, fun l => by simp [Tm.settleCount, h₁ l, h.2 l]⟩
   | intEq => exact ⟨trivial, fun _ => rfl⟩
+  | @funcRef v hv =>
+    have h₁ := hv.noSettle h.2.1
+    exact ⟨Tm.SettleLin.of_noSettle h₁, fun l => by simp [Tm.settleCount, h₁ l]⟩
   | hwithVal hv =>
     have h₁ := hv.noSettle h.2.2
     exact ⟨⟨Tm.SettleLin.of_noSettle h.2.1, Tm.SettleLin.of_noSettle h₁, .inl h₁⟩,

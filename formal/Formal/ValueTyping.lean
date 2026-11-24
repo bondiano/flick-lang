@@ -23,7 +23,7 @@ theorem Typ.loc_ref {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       obtain ⟨u, hu, heu⟩ := ih l _ _ hl rfl
       exact ⟨u, hu, heu.trans ha.symm⟩
   | loc hl => intro l a φ hv hJ; cases hv; cases hJ; exact ⟨_, hl, .refl⟩
-  | allI | errVal | lazyLoc => intro l a φ _ hJ; cases hJ
+  | allI | errVal | funcRef | lazyLoc => intro l a φ _ hJ; cases hJ
   | _ => intro l a φ hv _; cases hv
 
 /-- The location of a lazy cell: the store gives the cell the type of the lazy. -/
@@ -38,7 +38,7 @@ theorem Typ.loc_lazy {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     obtain ⟨r', ε', u', hu', hr', hε', heu⟩ := ih l _ _ _ _ _ hl rfl
     exact ⟨r', ε', u', hu', hr'.trans hr.symm, hε'.trans hε.symm, heu.trans hu.symm⟩
   | lazyLoc hl => intro l r ε t C φ hv hJ; cases hv; cases hJ; exact ⟨_, _, _, hl, .refl, .refl, .refl⟩
-  | allI | errVal | loc => intro l r ε t C φ _ hJ; cases hJ
+  | allI | errVal | funcRef | loc => intro l r ε t C φ _ hJ; cases hJ
   | _ => intro l r ε t C φ hv _; cases hv
 
 theorem Typ.task_eff {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
@@ -59,7 +59,7 @@ theorem Typ.task_eff {Ψ Θ Γ v J} (h : Typ S Ψ Θ Γ v J) :
     obtain ⟨_, _, _, _, hh, huse, ht, -⟩ := hT.eff_left
     cases hh
     exact ⟨_, _, he, Stage.le_trans hψ huse, ht⟩
-  | allI | errVal => intro e r ε t C φ _ hJ; cases hJ
+  | allI | errVal | funcRef => intro e r ε t C φ _ hJ; cases hJ
   | _ => intro e r ε t C φ hv _; cases hv
 
 theorem Typ.own_owner {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
@@ -73,7 +73,7 @@ theorem Typ.own_owner {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       rw [ih p _ _ hv rfl] at hs
       exact hs.rg_right
   | own => intro p s φ hv hJ; cases hv; cases hJ; rfl
-  | allI | errVal => intro p s φ _ hJ; cases hJ
+  | allI | errVal | funcRef => intro p s φ _ hJ; cases hJ
   | _ => intro p s φ hv _; cases hv
 
 theorem Typ.cap_hnd {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
@@ -87,7 +87,7 @@ theorem Typ.cap_hnd {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       rw [ih p _ _ hv rfl] at hs
       exact hs.rg_right
   | cap => intro p s φ hv hJ; cases hv; cases hJ; rfl
-  | allI | errVal => intro p s φ _ hJ; cases hJ
+  | allI | errVal | funcRef => intro p s φ _ hJ; cases hJ
   | _ => intro p s φ hv _; cases hv
 
 end Flick

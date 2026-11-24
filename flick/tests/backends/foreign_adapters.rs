@@ -2,8 +2,9 @@
 //! exercises `test/literal` (a third-party WASM backend component) declaring
 //! brand-new adapter words (`callback <fn> data <user_data>`, `method`) and
 //! type-form attribute (`@literal`), verifying valid bindings, exact-span
-//! misuse reporting in both `flick check` and `flick build`, and cross-backend
-//! isolation against `flick/js` and `flick/go`.
+//! misuse reporting in both `flick check` and `flick build`, the adapter
+//! words, callbacks and `retention` the backend receives through the IR, and
+//! cross-backend isolation against `flick/js` and `flick/go`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -160,6 +161,69 @@ let main () = ()
         }
     }
 
+    fs::remove_dir_all(&root).expect("cleanup");
+}
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn fixture_backend_receives_callback_data_words_and_retention_through_the_ir() {
+    let source = "\
+module App exposing (Handle, register, sort_with, main)
+
+@literal \"MyHandle\"
+type Handle
+
+register : (Int -> Unit) -> Handle ->{} Unit
+foreign register from \"./native.c\" \"register_cb\"
+  arity 2
+  callback 0 data 1
+  retention call
+
+sort_with : FuncRef (Int -> Int -> Int) -> Handle ->{} Unit
+foreign sort_with from \"./native.c\" \"sort_with\"
+  arity 2
+
+main : Unit -> Unit
+let main () = ()
+";
+    let root = literal_project("backend_foreign_adapter_retention", source);
+    let built = flick_in(&root, &["build", "--offline"]);
+    assert!(built.status.success(), "build failed: {built:?}");
+    let report: Value = serde_json::from_str(
+        &fs::read_to_string(root.join("dist/foreign-adapters.json"))
+            .expect("foreign-adapters.json"),
+    )
+    .expect("valid json");
+    let entries = report.as_array().expect("entries array");
+    let entry = |name: &str| {
+        entries
+            .iter()
+            .find(|e| e["name"] == name)
+            .unwrap_or_else(|| panic!("no `{name}` in {report}"))
+    };
+    let register = entry("register");
+    assert_eq!(
+        register["callbacks"],
+        serde_json::json!([1, null]),
+        "{report}"
+    );
+    assert_eq!(register["retention"], "call", "{report}");
+    let word = &register["words"][0];
+    assert_eq!(word["name"], "callback", "{report}");
+    assert_eq!(
+        word["args"],
+        serde_json::json!([{ "Int": 0 }, { "Word": "data" }, { "Int": 1 }]),
+        "{report}"
+    );
+    // a `FuncRef` reaches the backend as a callback of the host's arity,
+    // with no environment to keep
+    let sort_with = entry("sort_with");
+    assert_eq!(
+        sort_with["callbacks"],
+        serde_json::json!([2, null]),
+        "{report}"
+    );
+    assert!(sort_with["retention"].is_null(), "{report}");
     fs::remove_dir_all(&root).expect("cleanup");
 }
 

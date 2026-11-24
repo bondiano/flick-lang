@@ -94,6 +94,10 @@ const GO_UNSUPPORTED: &[(&str, &str)] = &[
         "direct Go bindings do not adapt higher-order callback parameters or function results; use a sibling `.go` file or `from inline` with `flickrt.Value`",
     ),
     (
+        "func_ref",
+        "direct Go bindings do not adapt callback parameters, `FuncRef` included; use a sibling `.go` file or `from inline` with `flickrt.Value`",
+    ),
+    (
         "result",
         "direct Go bindings map trailing Go `error` via `catch` rather than `Result e a`; use `catch` or a sibling `.go` file with `flickrt.Value`",
     ),

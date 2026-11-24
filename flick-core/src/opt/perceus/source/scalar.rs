@@ -1,5 +1,6 @@
 //! Exact scalar host contracts; unknown globals and Number exports stay unsupported.
 use super::Intrinsic;
+use super::kept_for_call;
 use crate::{
     ir::{BinOp, Expr, ExprKind, Param, Pat, Stage},
     source::Span,
@@ -35,7 +36,7 @@ pub(super) fn candidate(value: &Foreign) -> Option<Intrinsic> {
         && value.arity == 1
         && value.stages == vec![false; kind.arity()]
         && value.catch.is_none()
-        && value.adapter
+        && kept_for_call(&value.adapter)
             == Adapter {
                 optional: vec![],
                 owned: vec![],
@@ -52,6 +53,7 @@ pub(super) fn candidate(value: &Foreign) -> Option<Intrinsic> {
                 shapes: vec![Shape::Data],
                 result_shape: Shape::Data,
                 words: vec![],
+                retention: None,
             })
     .then_some(kind)
 }

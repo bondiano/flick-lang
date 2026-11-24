@@ -76,6 +76,12 @@ type Eff (r : ServiceRow) (e : ErrorRow) a
 /// that forces it; every later `await` gets the same outcome: its value, its
 /// typed failure or its defect. `lazy { … }` builds one.
 type Lazy (r : ServiceRow) (e : ErrorRow) a
+@lang func_ref
+/// A function without captures: a top-level function, or a lambda that uses
+/// no local and no class dictionary of the code around it. Where a `FuncRef`
+/// is expected, such a function is one; `FuncRef.fun` calls it. It is the
+/// function itself, and a host without closures takes it as a plain pointer.
+type FuncRef f
 @lang layer
 type Layer (ri : ServiceRow) (e : ErrorRow) (ro : ServiceRow)
 @lang codec

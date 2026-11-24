@@ -19,7 +19,7 @@ theorem Typ.app_arrow {Ψ Θ Γ f x a ψ t C φ}
   h.app_type f x _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
 
 private theorem Typ.lamCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
-    ∀ b T φ, e = .lam b → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
+    ∀ b T φ, e = .lam b → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 ∧ T.kind ≠ 17 →
       ∃ A χ u D, Typ S Ψ Θ (.mono A :: Γ) b (.ex u (Stage.use χ.asStage D)) ∧
         b.NoIns ∧ LeLive S (.arrow A χ u D) T := by
   induction h with
@@ -30,7 +30,8 @@ private theorem Typ.lamCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     exact ⟨A, χ, u, D, hb, hn, ht.trans (.equiv he)⟩
   | lam hb hn ht => intro b T φ hc hJ _ _; cases hc; cases hJ; exact ⟨_, _, _, _, hb, hn, ht⟩
   | allI => intro b T φ _ hJ hA _; cases hJ; exact (hA trivial).elim
-  | errVal => intro b T φ _ hJ _ hk; cases hJ; exact (hk rfl).elim
+  | errVal => intro b T φ _ hJ _ hk; cases hJ; exact (hk.1 rfl).elim
+  | funcRef => intro b T φ _ hJ _ hk; cases hJ; exact (hk.2 rfl).elim
   | _ => intro b T φ hc _ _ _; cases hc
 
 theorem Typ.lam_arrow {Ψ Θ Γ b a ψ t C φ}
@@ -40,7 +41,7 @@ theorem Typ.lam_arrow {Ψ Θ Γ b a ψ t C φ}
   h.lamCore b _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
 
 private theorem Typ.fixCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
-    ∀ b T φ, e = .fix b → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
+    ∀ b T φ, e = .fix b → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 ∧ T.kind ≠ 17 →
       ∃ A χ u D, Typ S Ψ Θ (.mono A :: .mono (.arrow A χ u D) :: Γ) b (.ex u (Stage.use χ.asStage D)) ∧
         b.NoIns ∧ LeLive S (.arrow A χ u D) T := by
   induction h with
@@ -51,7 +52,8 @@ private theorem Typ.fixCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     exact ⟨A, χ, u, D, hb, hn, ht.trans (.equiv he)⟩
   | fix hb hn ht => intro b T φ hc hJ _ _; cases hc; cases hJ; exact ⟨_, _, _, _, hb, hn, ht⟩
   | allI => intro b T φ _ hJ hA _; cases hJ; exact (hA trivial).elim
-  | errVal => intro b T φ _ hJ _ hk; cases hJ; exact (hk rfl).elim
+  | errVal => intro b T φ _ hJ _ hk; cases hJ; exact (hk.1 rfl).elim
+  | funcRef => intro b T φ _ hJ _ hk; cases hJ; exact (hk.2 rfl).elim
   | _ => intro b T φ hc _ _ _; cases hc
 
 theorem Typ.fix_arrow {Ψ Θ Γ b a ψ t C φ}
@@ -61,7 +63,7 @@ theorem Typ.fix_arrow {Ψ Θ Γ b a ψ t C φ}
   h.fixCore b _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
 
 private theorem Typ.constCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
-    ∀ c T φ, e = .const c → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
+    ∀ c T φ, e = .const c → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 ∧ T.kind ≠ 17 →
       (∀ E o cl, c ≠ .perform E o cl) →
       ∃ ι, c.ok Θ ι ∧ LeLive S (c.ty ι) T := by
   induction h with
@@ -73,7 +75,8 @@ private theorem Typ.constCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | const hi ht => intro c T φ hc hJ _ _ _; cases hc; cases hJ; exact ⟨_, hi, ht⟩
   | perform => intro c T φ hc _ _ _ hn; cases hc; exact (hn _ _ _ rfl).elim
   | allI => intro c T φ _ hJ hA _ _; cases hJ; exact (hA trivial).elim
-  | errVal => intro c T φ _ hJ _ hk _; cases hJ; exact (hk rfl).elim
+  | errVal => intro c T φ _ hJ _ hk _; cases hJ; exact (hk.1 rfl).elim
+  | funcRef => intro c T φ _ hJ _ hk _; cases hJ; exact (hk.2 rfl).elim
   | _ => intro c T φ hc _ _ _ _; cases hc
 
 theorem Typ.const_arrow {Ψ Θ Γ c a ψ t C φ}
@@ -83,7 +86,7 @@ theorem Typ.const_arrow {Ψ Θ Γ c a ψ t C φ}
   h.constCore c _ φ rfl rfl (by simp [Ty.isAll]) (by simp [Ty.kind]) hn
 
 private theorem Typ.performCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
-    ∀ E o cl T φ, e = .const (.perform E o cl) → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
+    ∀ E o cl T φ, e = .const (.perform E o cl) → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 ∧ T.kind ≠ 17 →
       ∃ us a b u, us.length = S.arity E ∧ S.op E o = some (cl, a, b) ∧
         LeLive S (.arrow (a.substT (instT us)) (.rt (.rnm E (Ty.tcon E us)) .cnil)
           (if cl = .abort then u else b.substT (instT us)) Caps.none) T := by
@@ -97,7 +100,8 @@ private theorem Typ.performCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro E o cl T φ hc hJ _ _; cases hc; cases hJ; exact ⟨_, _, _, _, hus, hop, ht⟩
   | const hi _ => intro E o cl T φ hc _ _ _; cases hc; exact hi.elim
   | allI => intro E o cl T φ _ hJ hA _; cases hJ; exact (hA trivial).elim
-  | errVal => intro E o cl T φ _ hJ _ hk; cases hJ; exact (hk rfl).elim
+  | errVal => intro E o cl T φ _ hJ _ hk; cases hJ; exact (hk.1 rfl).elim
+  | funcRef => intro E o cl T φ _ hJ _ hk; cases hJ; exact (hk.2 rfl).elim
   | _ => intro E o cl T φ hc _ _ _; cases hc
 
 theorem Typ.perform_arrow {Ψ Θ Γ E o cl a ψ t C φ}
@@ -119,7 +123,7 @@ theorem Typ.const_witness {Ψ Θ Γ c a ψ t C φ}
     exact ⟨ι, ht⟩
 
 private theorem Typ.kontCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
-    ∀ p ℓ T φ, e = .kont p ℓ → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
+    ∀ p ℓ T φ, e = .kont p ℓ → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 ∧ T.kind ≠ 17 →
       ∃ b ψ t C, Ψ[ℓ]? = some (.arrow b ψ t C) ∧
         C (.r p) ∧ LeLive S (.arrow b ψ t C) T := by
   induction h with
@@ -130,7 +134,8 @@ private theorem Typ.kontCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     exact ⟨b, ψ, t, C, hl, hp, ht.trans (.equiv he)⟩
   | kont hl hp ht => intro p ℓ T φ hc hJ _ _; cases hc; cases hJ; exact ⟨_, _, _, _, hl, hp, ht⟩
   | allI => intro p ℓ T φ _ hJ hA _; cases hJ; exact (hA trivial).elim
-  | errVal => intro p ℓ T φ _ hJ _ hk; cases hJ; exact (hk rfl).elim
+  | errVal => intro p ℓ T φ _ hJ _ hk; cases hJ; exact (hk.1 rfl).elim
+  | funcRef => intro p ℓ T φ _ hJ _ hk; cases hJ; exact (hk.2 rfl).elim
   | _ => intro p ℓ T φ hc _ _ _; cases hc
 
 theorem Typ.kont_arrow {Ψ Θ Γ p ℓ a ψ t C φ}

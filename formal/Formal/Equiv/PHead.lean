@@ -131,6 +131,10 @@ theorem phead_sim {r r' r₂ : Tm} (hh : PHead r r') (h : Sim W .top r r₂)
     obtain ⟨c', a', rfl, h₃, h₄⟩ := h₁.inv_app
     rw [h₂.inv_lit, h₃.inv_const, h₄.inv_lit]
     exact ⟨W, μ, _, _, RJ.refl _ _, .intEq, .lit⟩
+  | @funcRef v hv =>
+    obtain ⟨f', v', rfl, h₁, h₂⟩ := h.inv_app
+    rw [h₁.inv_const]
+    exact ⟨W, μ, _, _, RJ.refl _ _, .funcRef (h₂.top_value rfl hv), h₂.lower⟩
   | @hwithVal v p ℓ E rf al hv =>
     obtain ⟨ℓ', k, al', r', e', rfl, hl, hal, hr, h₁⟩ := h.inv_hwith
     obtain ⟨W₁, μ₁', v', r₁, hv', s₁⟩ := vcu_frame h₁ rfl hv μ hst (F := .hwith p ℓ' E al' r') trivial

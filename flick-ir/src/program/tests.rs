@@ -184,9 +184,10 @@ fn a_reader_takes_only_its_own_minor_version_before_1_0() {
     assert!(!compatible("0.14.0"));
     assert!(!compatible("0.15.0"));
     assert!(!compatible("0.16.0"));
+    assert!(!compatible("0.17.0"));
     let mut p = program(1.0);
-    p.ir_version = "0.18.0".to_owned();
-    let found = "0.18.0".to_owned();
+    p.ir_version = "0.19.0".to_owned();
+    let found = "0.19.0".to_owned();
     assert_eq!(
         Program::from_json(&p.to_json()),
         Err(Error::Version { found })
@@ -221,6 +222,8 @@ fn foreign_adapter_words_round_trip_and_remap_spans() {
                 ],
                 span: word_span,
             }],
+            callbacks: vec![Some(1), None],
+            retention: Some(crate::Retention::Owner),
             ..crate::Adapter::default()
         },
         catch: None,

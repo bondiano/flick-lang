@@ -16,7 +16,7 @@ language that implements this world.
 This is an initial 0.x contract and validation library. It does not freeze
 IR 1.0 or complete every semantic prerequisite of R3a. Ordinary JS/TS and Go
 `build/run/dev/test/inspect` select the distributed `flick/js` or `flick/go`
-component by default. The portable IR is 0.17.0. The official
+component by default. The portable IR is 0.18.0. The official
 JS and Go emitters live in `backends/js` and `backends/go`, independently of
 `flick-core`. The contract probe exercises both with IR
 and plain data without `Compilation` or `Settings`. The distributed components
@@ -115,7 +115,7 @@ entry, test and root-handler module references stay inside the closed graph.
 Every item and nested expression span must fit the supplied UTF-8 source.
 Source aliases share one retained input buffer and line index during validation.
 
-In IR 0.17.0, `Program` carries fixed-width numeric types (`Int8`, `Int16`,
+In IR 0.18.0, `Program` carries fixed-width numeric types (`Int8`, `Int16`,
 `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`) as first-class `Lang`,
 `Num`, and `Lit` variants alongside inline foreign bindings and preambles and the
 checker's layout-relevant types (`IrType`:
@@ -131,7 +131,8 @@ variables, `Var`, `Each`), function result types, and instantiation `type_args`
 on polymorphic globals, constructors and methods. Each `ItemKind::Foreign`
 declaration carries its binding (`Binding::Module`, `Binding::Global`, or
 `Binding::Inline(InlineCode)`) and core contract metadata (`nullable`, `optional`,
-`retention`, `owned`, `callbacks`) alongside backend-declared adapter words
+`owned`, `callbacks`, and since 0.18.0 `retention`: `call`, `owner`, or absent
+when the signature needs no line) alongside backend-declared adapter words
 (`Adapter.words`: `BackendAdapter { name, args, span }`) validated by the active
 backend in `check-target` (including during `flick check` and editor analysis with
 `command = "check"`) and `generate`. Backends validate inline foreign text and

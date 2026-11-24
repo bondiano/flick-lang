@@ -1,5 +1,6 @@
 //! Exact typed Result bridge and try-only closure lowering.
 
+use super::kept_for_call;
 use flick_ir::{Adapter, Arm, Copies, Foreign, ForeignMode, Handler, ResultAdapter, Shape};
 
 use super::{
@@ -14,7 +15,7 @@ pub(super) fn supports(value: &Foreign) -> bool {
         && value.dicts == 0
         && value.stages == [true]
         && value.catch.is_none()
-        && value.adapter
+        && kept_for_call(&value.adapter)
             == Adapter {
                 optional: vec![],
                 owned: vec![],
@@ -31,6 +32,7 @@ pub(super) fn supports(value: &Foreign) -> bool {
                 shapes: vec![Shape::Result(Box::new(Shape::Data), Box::new(Shape::Data))],
                 result_shape: Shape::Data,
                 words: vec![],
+                retention: None,
             }
 }
 

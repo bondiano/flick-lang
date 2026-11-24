@@ -1,4 +1,5 @@
 //! Exact nonreturning native App.fail bridge; its payload is an ordinary record.
+use super::kept_for_call;
 use super::{Code, Intrinsic, Local, Lower, LowerError, Name, Operation, Span, unsupported};
 use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 
@@ -13,7 +14,7 @@ pub(super) fn supports(value: &Foreign) -> bool {
         && value.dicts == 0
         && value.stages == [true]
         && value.catch.is_none()
-        && value.adapter
+        && kept_for_call(&value.adapter)
             == Adapter {
                 optional: vec![],
                 owned: vec![],
@@ -30,6 +31,7 @@ pub(super) fn supports(value: &Foreign) -> bool {
                 shapes: vec![Shape::Data],
                 result_shape: Shape::Data,
                 words: vec![],
+                retention: None,
             }
 }
 

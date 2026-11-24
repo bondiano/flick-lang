@@ -27,38 +27,39 @@ def VKind (e : Tm) (k : Nat) : Prop :=
   | _ => True
 
 theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T φ}, J = .ex T φ →
-    ¬ T.isAll → VKind e T.kind := by
+    ¬ T.isAll → T.kind ≠ 17 → VKind e T.kind := by
   induction h with
   | conv _ he ih =>
-    intro hv _ _ hJ hA; cases hJ
+    intro hv _ _ hJ hA hk; cases hJ
     rw [← he.kind]
-    exact ih hv rfl (fun h => hA (he.isAll.mp h))
-  | allI => intro _ _ _ hJ h; cases hJ; exact (h trivial).elim
-  | lam _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
-  | fix _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
-  | task _ _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
-  | cap => intro _ _ _ hJ _; cases hJ; rfl
-  | own => intro _ _ _ hJ _; cases hJ; rfl
-  | lit => intro _ _ _ hJ _; cases hJ; rfl
-  | loc => intro _ _ _ hJ _; cases hJ; exact .inl rfl
-  | lazyLoc => intro _ _ _ hJ _; cases hJ; exact .inr rfl
-  | rnil => intro _ _ _ hJ _; cases hJ; rfl
-  | rcons => intro _ _ _ hJ _; cases hJ; rfl
-  | drec _ _ _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
+    exact ih hv rfl (fun h => hA (he.isAll.mp h)) (by rw [he.kind]; exact hk)
+  | allI => intro _ _ _ hJ h _; cases hJ; exact (h trivial).elim
+  | funcRef => intro _ _ _ hJ _ hk; cases hJ; exact (hk rfl).elim
+  | lam _ _ hT => intro _ _ _ hJ _ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
+  | fix _ _ hT => intro _ _ _ hJ _ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
+  | task _ _ _ hT => intro _ _ _ hJ _ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
+  | cap => intro _ _ _ hJ _ _; cases hJ; rfl
+  | own => intro _ _ _ hJ _ _; cases hJ; rfl
+  | lit => intro _ _ _ hJ _ _; cases hJ; rfl
+  | loc => intro _ _ _ hJ _ _; cases hJ; exact .inl rfl
+  | lazyLoc => intro _ _ _ hJ _ _; cases hJ; exact .inr rfl
+  | rnil => intro _ _ _ hJ _ _; cases hJ; rfl
+  | rcons => intro _ _ _ hJ _ _; cases hJ; rfl
+  | drec _ _ _ _ hT => intro _ _ _ hJ _ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
   | const _ hT =>
-    intro _ _ _ hJ _; cases hJ
+    intro _ _ _ hJ _ _; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind, Const.ty_kind _ _]
   | perform _ _ hT =>
-    intro _ _ _ hJ _; cases hJ
+    intro _ _ _ hJ _ _; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
-  | kont _ _ hT => intro _ _ _ hJ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
+  | kont _ _ hT => intro _ _ _ hJ _ _; cases hJ; simp only [VKind, Tm.head]; rw [← hT.kind]; rfl
   | ctor _ _ _ hT =>
-    intro _ _ _ hJ _; cases hJ
+    intro _ _ _ hJ _ _; cases hJ
     simp only [VKind, Tm.head]; rw [← hT.kind]; unfold Sig.ctorTyR
     rcases Ty.arrows_kind _ _ _ with h | h <;> rw [h] <;> simp
   | errVal _ hU _ ih =>
-    intro hv _ _ hJ _; cases hJ
-    have ih' := ih hv rfl (Ty.not_all_of_hd hU)
+    intro hv _ _ hJ _ _; cases hJ
+    have ih' := ih hv rfl (Ty.not_all_of_hd hU) (by rw [Ty.kind_of_hd hU]; decide)
     rw [Ty.kind_of_hd hU] at ih'
     revert ih'
     simp only [VKind, Ty.kind]
@@ -67,11 +68,11 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     · intro h; cases h
     all_goals simp
   | app hf ha hψ hT _ _ =>
-    intro hv _ _ hJ hA; cases hJ
+    intro hv _ _ hJ hA hk; cases hJ
     have hs := (Typ.app hf ha hψ hT).shape hv rfl
     cases hv with
     | ctorApp _ hK _ =>
-      rcases hs.2 _ hK hA with ⟨U, us, hU, hs'⟩ | ⟨_, _, _, h', -⟩
+      rcases hs.2 _ hK hA hk with ⟨U, us, hU, hs'⟩ | ⟨_, _, _, h', -⟩
       · obtain ⟨K', _, _, T₀, ts', _, _, rfl⟩ := hs'.false_arrows
         have := Ty.arrows_kind (ts'.map (Ty.substT (instT us))) T₀
           ((S.res K').map (Ty.substT (instT us)))
@@ -79,15 +80,15 @@ theorem Typ.vkind {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
         simp only [VKind, Tm.head, hK]; rw [← hU.kind]; omega
       · rw [h']; simp [VKind, Tm.head, hK, Ty.kind]
     | constApp hc _ =>
-      simp [VKind, Tm.head, (Typ.app hf ha hψ hT).constApp_kind hc hA]
-  | _ => intro hv _ _ hJ _; cases hJ <;> cases hv
+      simp [VKind, Tm.head, (Typ.app hf ha hψ hT).constApp_kind hc hA hk]
+  | _ => intro hv _ _ hJ _ _; cases hJ <;> cases hv
 
 /-- L1 for functions. -/
 theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.arrow a ψ t C) φ)) :
     (∃ b, v = .lam b) ∨ (∃ f, v = .fix f) ∨ (∃ K, v.head = .ctor K) ∨ (∃ c, v = .const c) ∨
       (∃ c w, v = .app (.const c) w ∧ c.arity = 2 ∧ Value w) ∨ ∃ p ℓ, v = .kont p ℓ := by
-  have hk := h.vkind hv rfl (by simp [Ty.isAll])
+  have hk := h.vkind hv rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
   cases hv with
   | lam => exact .inl ⟨_, rfl⟩
   | fix => exact .inr (.inl ⟨_, rfl⟩)
@@ -103,7 +104,7 @@ theorem canonical_arrow {Ψ Θ Γ v a ψ t C φ} (hv : Value v)
 /-- L1 for references. -/
 theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.ref t) φ)) :
     ∃ l u, v = .loc l ∧ Ψ[l]? = some u ∧ Ty.Equiv u t := by
-  have hk := h.vkind hv rfl (by simp [Ty.isAll])
+  have hk := h.vkind hv rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
   cases hv with
   | loc =>
     obtain ⟨u, hu, he⟩ := h.loc_ref _ _ _ rfl rfl
@@ -113,12 +114,56 @@ theorem canonical_ref {Ψ Θ Γ v t φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.e
     simp [VKind, Tm.head, Ty.kind] at hk
   | _ => simp [VKind, Tm.head, Ty.kind] at hk
 
+/-- L1 for functions without captures: a value of `FuncRef u` is a value of `u`, as
+(FuncRef-In) typed it; no other rule gives a value that type. -/
+theorem Typ.funcRef_val {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
+    Value e → ∀ {u φ}, J = .ex (.funcRef u) φ → Typ S Ψ Θ Γ e (.ex u φ) := by
+  induction h with
+  | conv _ he ih =>
+    intro hv u φ hJ; cases hJ
+    obtain ⟨u', rfl, hu⟩ := he.funcRef_right
+    exact (ih hv rfl).conv hu
+  | funcRef ht _ => intro _ u φ hJ; cases hJ; exact ht
+  | lam _ _ hT | fix _ _ hT | task _ _ _ hT | perform _ _ hT | kont _ _ hT | drec _ _ _ _ hT =>
+    intro _ u φ hJ; cases hJ; have := hT.kind; simp [Ty.kind] at this
+  | const _ hT =>
+    intro _ u φ hJ; cases hJ; have := hT.kind; rw [Const.ty_kind] at this; simp [Ty.kind] at this
+  | ctor _ _ _ hT =>
+    intro _ u φ hJ; cases hJ; have := hT.kind; unfold Sig.ctorTyR at this
+    rcases Ty.arrows_kind _ _ _ with h | h <;> rw [h] at this <;> simp [Ty.kind] at this
+  | app hf _ _ hT _ _ =>
+    intro hv u φ hJ; cases hJ
+    exfalso
+    have hk : _ = 17 := hT.kind
+    cases hv with
+    | ctorApp hvf hK _ =>
+      rcases (hf.shape hvf rfl).2 _ hK (by simp [Ty.isAll]) (by simp [Ty.kind]) with
+        ⟨U, us, hU, hs⟩ | ⟨_, _, _, h, _⟩
+      · obtain ⟨_, _, _, T₀, ts', _, _, rfl⟩ := hs.false_arrows
+        cases ts' with
+        | nil =>
+          simp only [Ty.arrows, Ty.tcon_substT] at hU
+          have := hU.kind
+          rw [Ty.tcon_kind] at this; cases this
+        | cons g ts'' =>
+          simp only [Ty.arrows, Ty.substT, Caps.none_substT] at hU
+          obtain ⟨_, _, _, _, he, _, _, lt, -⟩ := hU.arrow_left
+          cases he
+          have := lt.kind
+          rw [hk, Ty.arrows_substT, Ty.tcon_substT] at this
+          rcases Ty.arrows_kind _ _ _ with h | h <;> rw [h] at this <;> cases this
+      · cases h
+    | constApp hc _ =>
+      have := hf.constArrow_kind _ _ _ _ _ _ rfl hc rfl
+      omega
+  | _ => intro hv u φ hJ; cases hJ <;> cases hv
+
 /-- L1 for lazies. -/
 theorem canonical_lazy {Ψ Θ Γ v r ε t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.lazy r ε t C) φ)) :
     ∃ l r' ε' u, v = .loc l ∧ Ψ[l]? = some (.lazyCell r' ε' u C) ∧ Ty.Equiv r' r ∧
       Ty.Equiv ε' ε ∧ Ty.Equiv u t := by
-  have hk := h.vkind hv rfl (by simp [Ty.isAll])
+  have hk := h.vkind hv rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
   cases hv with
   | loc =>
     obtain ⟨r', ε', u, hu, hr, hε, he⟩ := h.loc_lazy _ _ _ _ _ _ rfl rfl
@@ -130,7 +175,7 @@ theorem canonical_lazy {Ψ Θ Γ v r ε t C φ} (hv : Value v)
 /-- No value has the type the store gives a lazy cell. -/
 theorem Typ.value_not_cell {Ψ Θ Γ v r ε t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.lazyCell r ε t C) φ)) : False := by
-  have hk := h.vkind hv rfl (by simp [Ty.isAll])
+  have hk := h.vkind hv rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
   cases hv with
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
   | _ => simp [VKind, Tm.head, Ty.kind] at hk
@@ -140,7 +185,7 @@ theorem canonical_eff {Ψ Θ Γ v r ε t C φ} (hv : Value v)
     (h : Typ S Ψ Θ Γ v (.ex (.eff r ε t C) φ)) :
     ∃ e t₀ ψ, v = .task e ∧ Typ S Ψ Θ Γ e (.ex t₀ ψ) ∧ ψ.le (Stage.use (.rt r.asRow ε.asRow) C) ∧
       LeLive S t₀ t := by
-  have hk := h.vkind hv rfl (by simp [Ty.isAll])
+  have hk := h.vkind hv rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
   cases hv with
   | task =>
     obtain ⟨t₀, ψ, he, hψ, hT⟩ := h.task_eff _ _ _ _ _ _ rfl rfl
@@ -173,7 +218,7 @@ theorem canonical_int {Ψ Θ Γ v φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex 
 /-- L1 for owners. -/
 theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.owner s) φ)) :
     ∃ p, v = .own p ∧ s = .rg p := by
-  have hk := h.vkind hv rfl (by simp [Ty.isAll])
+  have hk := h.vkind hv rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
   cases hv with
   | own => exact ⟨_, rfl, h.own_owner _ _ _ rfl rfl⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
@@ -184,7 +229,7 @@ theorem canonical_owner {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (
 /-- L1 for capabilities. -/
 theorem canonical_hnd {Ψ Θ Γ v s φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.hnd s) φ)) :
     ∃ p, v = .cap p ∧ s = .rg p := by
-  have hk := h.vkind hv rfl (by simp [Ty.isAll])
+  have hk := h.vkind hv rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
   cases hv with
   | cap => exact ⟨_, rfl, h.cap_hnd _ _ _ rfl rfl⟩
   | ctorApp _ hf _ => simp [VKind, Tm.head, hf, Ty.kind] at hk
@@ -219,8 +264,8 @@ type whose `⌈·⌉` is within the atoms of `ε`. -/
 theorem canonical_errors {Ψ Θ Γ v ε φ} (hv : Value v) (h : Typ S Ψ Θ Γ v (.ex (.errors ε) φ)) :
     ∃ K k ts T U, v.head = .ctor K ∧ S.ctor K = some (k, ts, T) ∧ ε.asRow (.nm T U.classOf) ∧
       U.hd = .adt T ∧ Typ S Ψ Θ Γ v (.ex U .pure) ∧ Row.Sub (Row.err T U) ε.asRow := by
-  have hk := h.vkind hv rfl (by simp [Ty.isAll])
-  have hs := (h.shape hv rfl).2
+  have hk := h.vkind hv rfl (by simp [Ty.isAll]) (by simp [Ty.kind])
+  have hs := fun K hK hA => (h.shape hv rfl).2 K hK hA (by simp [Ty.kind])
   obtain ⟨K, hK⟩ : ∃ K, v.head = .ctor K := by
     cases hv with
     | ctor => exact ⟨_, rfl⟩

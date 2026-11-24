@@ -31,6 +31,7 @@ inductive Ty.Equiv : Ty → Ty → Prop
   | arrow {a a' b b' φ φ' C} : Ty.Equiv a a' → Ty.Equiv φ φ' → Ty.Equiv b b' →
       Ty.Equiv (.arrow a φ b C) (.arrow a' φ' b' C)
   | ref {a b} : Ty.Equiv a b → Ty.Equiv (.ref a) (.ref b)
+  | funcRef {a b} : Ty.Equiv a b → Ty.Equiv (.funcRef a) (.funcRef b)
   | tapp {f f' a a'} : Ty.Equiv f f' → Ty.Equiv a a' → Ty.Equiv (.tapp f a) (.tapp f' a')
   | rcons {l a a' r r'} : Ty.Equiv a a' → Ty.Equiv r r' →
       Ty.Equiv (.rcons l a r) (.rcons l a' r')

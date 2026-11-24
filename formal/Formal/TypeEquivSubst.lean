@@ -37,6 +37,7 @@ theorem Ty.substT_equiv (t : Ty) {σ σ' : Atom → Ty} (h : ∀ a, Ty.Equiv (σ
     · exact ihφ h
     · exact .refl
   | ref a ih => exact .ref (ih h)
+  | funcRef a ih => exact .funcRef (ih h)
   | tapp f a ihf iha => exact .tapp (ihf h) (iha h)
   | rcons l a r iha ihr => exact .rcons (iha h) (ihr h)
   | eff r e t C ihr ihe iht =>

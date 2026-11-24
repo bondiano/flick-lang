@@ -36,6 +36,7 @@ theorem PHead.asc {r r' : Tm} {n : Nat} (hh : PHead r r') (h : r.Asc n) : r'.Asc
     subst ha
     exact (asc_of_plug hole_not_value hA h.1).1.fill (va hv h.2 _)
   | hdoneVal hv => exact va hv h n
+  | funcRef _ => exact h.2.1
   | _ =>
     apply plain
     simp only [Tm.Asc] at h

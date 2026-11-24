@@ -148,6 +148,8 @@ impl Checker<'_> {
             _ if head.is_lang(Lang::PureCodec) || head.is_lang(Lang::Codec) => Shape::Codec,
             _ if head.is_lang(Lang::Exit) => Shape::Exit,
             _ if head.is_lang(Lang::Failure) => Shape::Failure,
+            // a `FuncRef` is the function it refers to
+            [f] if head.is_lang(Lang::FuncRef) => self.shape(f, depth),
             [item] if head.is_lang(Lang::List) => around(inner(item), Shape::List),
             [item] if head.is_lang(Lang::Option) => Shape::Option(Box::new(inner(item))),
             [error, success] if head.is_lang(Lang::Result) => {

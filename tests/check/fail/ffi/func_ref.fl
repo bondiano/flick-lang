@@ -1,0 +1,50 @@
+module App.FuncRefFail exposing (..)
+
+apply : FuncRef (Int -> Int) -> Int -> Int
+let apply r x = FuncRef.fun r x
+
+add : Int -> Int -> Int
+let add a b = a + b
+
+describe : Show a => a -> String
+let describe value = show value
+
+show_ref : FuncRef (Int -> String) -> String
+let show_ref r = FuncRef.fun r 1
+
+captured : Int -> Int
+let captured by = apply (fun n -> n + by) 1
+//                                    ^^ FLICK-F015 the lambda captures `by`
+
+partial : Int
+let partial = apply (add 1) 2
+//                   ^^^^^ FLICK-F015 as a partial application does
+
+local_function : Int -> Int
+let local_function by =
+  let step n = n + by
+  apply step 1
+//      ^^^^ FLICK-F015 `step` is a local
+
+constrained_name : String
+let constrained_name = show_ref describe
+//                              ^^^^^^^^ FLICK-F015 `describe` takes class dictionaries
+
+method : String
+let method = show_ref show
+//                    ^^^^ FLICK-F015 `show` is a class method
+
+show_any : FuncRef (a -> String) -> a -> String
+let show_any r value = FuncRef.fun r value
+
+dictionary : Show a => a -> String
+let dictionary value = show_any (fun x -> show x) value
+//                                        ^^^^ FLICK-F015 the dictionary of `Show a`
+
+not_a_function : FuncRef Int
+let not_a_function = 1
+//                   ^ FLICK-F015 not to `Int`
+
+constrained_lambda : FuncRef (forall a. Show a => a -> String)
+let constrained_lambda = fun x -> show x
+//                       ^^^^^^^^^^^^^^^ FLICK-F015 takes class dictionaries

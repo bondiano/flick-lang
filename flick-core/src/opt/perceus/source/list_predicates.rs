@@ -1,6 +1,7 @@
 //! Pure array observers: an explicit shallow array ABI normalizer feeds the
 //! closed ordinary-code loops. No input/callback crosses into host code.
 //! Materialized tails retain the collection templates' quadratic baseline.
+use super::kept_for_call;
 use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 
 use super::{Arith, BinOp, Builder, Expr, ExprKind, Lit, Num, Span};
@@ -37,6 +38,7 @@ fn adapter(observer: Observer, copied_input: bool) -> Adapter {
             callbacks: callback_copies,
         },
         words: vec![],
+        retention: None,
     }
 }
 
@@ -53,7 +55,7 @@ pub(super) fn expression(value: &Foreign, span: Span) -> Option<Expr> {
         || value.dicts != 0
         || value.stages != vec![false; arity]
         || value.catch.is_some()
-        || !(value.adapter == adapter(observer, true)
+        || !(kept_for_call(&value.adapter) == adapter(observer, true)
             || (observer == Observer::Length && value.adapter == adapter(observer, false)))
     {
         return None;

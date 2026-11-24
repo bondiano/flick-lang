@@ -88,6 +88,8 @@ lang_items! {
     PureCodec = "pure_codec",
     Eff = "eff",
     Lazy = "lazy",
+    // a function without captures, which a host may take as a plain pointer
+    FuncRef = "func_ref",
     Layer = "layer",
     Codec = "codec",
     Errors = "errors",

@@ -12,7 +12,7 @@ namespace Flick
 variable {S : Sig}
 
 theorem Typ.ctor_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
-    ∀ K T φ, e = .ctor K → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
+    ∀ K T φ, e = .ctor K → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 ∧ T.kind ≠ 17 →
       ∃ k ts N us, S.ctor K = some (k, ts, N) ∧ us.length = k ∧
         Sig.Holds ts N (S.res K) us ∧ LeLive S (Sig.ctorTyR ts N (S.res K) us) T := by
   induction h with
@@ -25,11 +25,12 @@ theorem Typ.ctor_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro K T φ hv hJ _ _; cases hv; cases hJ
     exact ⟨_, _, _, _, hK, hu, hH, hT⟩
   | allI => intro K T φ _ hJ hA _; cases hJ; exact (hA trivial).elim
-  | errVal => intro K T φ _ hJ _ hk; cases hJ; exact (hk rfl).elim
+  | errVal => intro K T φ _ hJ _ hk; cases hJ; exact (hk.1 rfl).elim
+  | funcRef => intro K T φ _ hJ _ hk; cases hJ; exact (hk.2 rfl).elim
   | _ => intro K T φ hv _ _ _; cases hv
 
 theorem Typ.app_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
-    ∀ f x T φ, e = .app f x → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 →
+    ∀ f x T φ, e = .app f x → J = .ex T φ → ¬ T.isAll → T.kind ≠ 7 ∧ T.kind ≠ 17 →
       ∃ a ψ t C, Typ S Ψ Θ Γ f (.ex (.arrow a ψ t C) φ) ∧
         Typ S Ψ Θ Γ x (.ex a φ) ∧ (Stage.use ψ.asStage C).le φ ∧ LeLive S t T := by
   induction h with
@@ -42,7 +43,8 @@ theorem Typ.app_type {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro f x T φ hv hJ _ _; cases hv; cases hJ
     exact ⟨_, _, _, _, hf, hx, hφ, ht⟩
   | allI => intro f x T φ _ hJ hA _; cases hJ; exact (hA trivial).elim
-  | errVal => intro f x T φ _ hJ _ hk; cases hJ; exact (hk rfl).elim
+  | errVal => intro f x T φ _ hJ _ hk; cases hJ; exact (hk.1 rfl).elim
+  | funcRef => intro f x T φ _ hJ _ hk; cases hJ; exact (hk.2 rfl).elim
   | _ => intro f x T φ hv _ _ _; cases hv
 
 /-- A running application cannot acquire the value-only polymorphic wrapper; its result goes
@@ -50,7 +52,7 @@ through (Conv) and (Errors-In) to the type it is given (`LeOut`). -/
 theorem Typ.app_nonvalue {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     ∀ f x T φ, e = .app f x → J = .ex T φ → ¬ Value (.app f x) →
       ∃ a ψ t C, Typ S Ψ Θ Γ f (.ex (.arrow a ψ t C) φ) ∧
-        Typ S Ψ Θ Γ x (.ex a φ) ∧ (Stage.use ψ.asStage C).le φ ∧ LeOut S t T := by
+        Typ S Ψ Θ Γ x (.ex a φ) ∧ (Stage.use ψ.asStage C).le φ ∧ LeOut S (.app f x) t T := by
   induction h with
   | conv _ he ih =>
     intro f x T φ hv hJ hn; cases hJ
@@ -63,6 +65,10 @@ theorem Typ.app_nonvalue {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro f x T φ hv hJ hn; cases hJ
     obtain ⟨a, ψ, t, C, hf, hx, hφ, ht⟩ := ih f x _ _ hv rfl hn
     exact ⟨a, ψ, t, C, hf, hx, hφ, ht.errIn hU hE⟩
+  | funcRef _ hcl ih =>
+    intro f x T φ hv hJ hn; cases hJ
+    obtain ⟨a, ψ, t, C, hf, hx, hφ, ht⟩ := ih f x _ _ hv rfl hn
+    exact ⟨a, ψ, t, C, hf, hx, hφ, .funcRef (hv ▸ hcl) ht⟩
   | allI hv => intro f x T φ he _ hn; cases he; exact (hn hv).elim
   | _ => intro f x T φ hv _ _; cases hv
 

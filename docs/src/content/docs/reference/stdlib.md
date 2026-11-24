@@ -58,6 +58,7 @@ instance matrix and complexity bounds.
 | `Float` | `strict_equal` (`===`), `same_value` (`Object.is`), rounding, `parse`, `is_nan`, `is_finite`, … |
 | `BigInt` | conversions and checked `divide`, `remainder` |
 | `Ref` | `make`, `get`, `set`, `modify`, and `same` for identity; no `Eq` or `Hash` |
+| `FuncRef` | `fun`, the function a `FuncRef` refers to, a function without captures for a host that takes a plain function pointer (see [ffi.md](../ffi/#functions-without-captures-and-trampolines)) |
 | `Redacted` | `make`, `reveal` (runtime); `show` prints `<redacted>` |
 | `BigDecimal` | decimal numbers: `from_string`, exact `add`, `subtract`, checked `multiply`, `divide_to_scale` |
 | `Duration` | lengths of time: checked `nanos`, `millis`, `seconds`, `minutes`, explicit `infinity` |

@@ -211,6 +211,7 @@ theorem Typ.spine_notAll {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     · exact .inr (he.res.isAll ▸ ha)
   | allI => intro _ _ _ _ _ hJ; cases hJ; exact .inl trivial
   | errVal => intro _ _ _ _ _ hJ; cases hJ; exact .inr (by simp [Ty.res, Ty.isAll])
+  | funcRef => intro _ _ _ _ _ hJ; cases hJ; exact .inr (by simp [Ty.res, Ty.isAll])
   | ctor hK hk hH hT =>
     intro _ _ _ _ _ hJ; cases hJ
     refine .inr (LeLive.not_all hT.res ?_)
@@ -243,6 +244,7 @@ theorem Typ.noIns {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → e.NoIns 
       · exact ih₁ hv₁ h
       · exact ih₂ hv₂ h
   | errVal _ _ _ ih => exact ih
+  | funcRef _ _ ih => exact ih
   | allI hv _ ih => intro _; exact ih hv
   | app _ _ _ _ ih₁ ih₂ =>
     intro hv
