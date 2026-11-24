@@ -3,8 +3,8 @@
 //! labels and on a whole accessor, and an accessor's hidden parameter,
 //! which no query shows.
 
-use super::{Ide, Symbol};
 use super::tests::{Fixture, fixture_of};
+use super::{Ide, Symbol, TOKEN_TYPES};
 use crate::diagnostics::Severity;
 use crate::source::FileId;
 use crate::syntax::kind::SyntaxKind as K;
@@ -244,5 +244,47 @@ fn an_unfinished_step_keeps_the_rest_of_the_module() {
     assert_eq!(
         ide.hover(f.file("App.Main"), names).expect("hover").0,
         "```flick\nnames : List String\n```"
+    );
+}
+
+/// The tokens of `needle` in `MAIN`: each word and what it is.
+fn tokens_of(needle: &str) -> Vec<(String, &'static str)> {
+    let f = main(MAIN);
+    let start = f.at("App.Main", needle, 0);
+    let end = start + u32::try_from(needle.len()).expect("small");
+    (f.ide().semantic_tokens(f.file("App.Main")).into_iter())
+        .filter(|(s, e, _)| start <= *s && *e <= end)
+        .map(|(s, e, kind)| (MAIN[s as usize..e as usize].to_owned(), TOKEN_TYPES[kind as usize]))
+        .collect()
+}
+
+#[test]
+fn labels_are_properties_and_an_accessor_no_module_path() {
+    let words = |items: &[(&str, &'static str)]| -> Vec<(String, &'static str)> {
+        items.iter().map(|(w, k)| ((*w).to_owned(), *k)).collect()
+    };
+    assert_eq!(
+        tokens_of("List.map .address.city users"),
+        words(&[
+            ("List", "namespace"),
+            ("map", "function"),
+            ("address", "property"),
+            ("city", "property"),
+            ("users", "variable"),
+        ])
+    );
+    assert_eq!(
+        tokens_of("first |> .name"),
+        words(&[("first", "variable"), ("name", "property")])
+    );
+    assert_eq!(
+        tokens_of("type alias User = { name : String; address : Address }"),
+        words(&[
+            ("User", "type"),
+            ("name", "property"),
+            ("String", "type"),
+            ("address", "property"),
+            ("Address", "type"),
+        ])
     );
 }
