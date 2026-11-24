@@ -2,8 +2,9 @@
 //! reads. Records are structural, so equal labels relate two records in no
 //! way: a label belongs to an alias only where the checker typed its record
 //! as that alias (a projection, an accessor step, a literal, an update, a
-//! pattern) or where the alias writes it. Navigation, references and
-//! renaming follow only that evidence.
+//! pattern), where its record is read from a field a shown alias declares
+//! with that alias, or where the alias writes it. Navigation, references
+//! and renaming follow only that evidence.
 
 use super::hints::strip;
 use super::{Ide, Location, Symbol, tree};

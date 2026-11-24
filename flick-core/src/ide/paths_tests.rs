@@ -160,6 +160,11 @@ fn a_label_being_written_completes_the_fields_of_its_receiver() {
 fn an_annotation_gives_the_record_of_a_bare_dot() {
     let text = format!("{MAIN}\npick : User -> String\nlet pick = .\n");
     assert_eq!(completed(&text, "pick = .", 7), pairs(&USER));
+    let text = MAIN.replace(
+        "let get = .name",
+        "let f : User -> String = .\n  let get = .name",
+    );
+    assert_eq!(completed(&text, "String = .", 9), pairs(&USER));
 }
 
 #[test]
