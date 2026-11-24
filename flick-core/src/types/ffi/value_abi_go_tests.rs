@@ -146,6 +146,11 @@ fn go_value_abi_refuses_out_of_table_types_at_span_with_table_reason() {
             "higher-order callback",
         ),
         (
+            "func_ref",
+            "module Probe exposing (f)\nf : FuncRef (Int -> Int) -> Int\nforeign pure f from \"example.com/p\" \"F\"\n",
+            "`FuncRef` included",
+        ),
+        (
             "result",
             "module Probe exposing (f)\nf : String -> Result String Int\nforeign pure f from \"example.com/p\" \"F\"\n",
             "trailing Go `error` via `catch`",

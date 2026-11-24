@@ -3,13 +3,13 @@
     "id": "flick/js",
     "version": "0.2.0"
   },
-  "sha256": "5131b3f581d54276de40d83bf5d0ee84fa059cf1965d14c9ebcc3b77be34eb73",
+  "sha256": "d22a5da5c19e1b5e0924c920134a9cadaf35a94d17e2ec75ede9020aa55c1be4",
   "backend_api": {
     "minimum": "0.1.0",
     "maximum_exclusive": "0.2.0"
   },
   "ir": {
-    "minimum": "0.17.0",
-    "maximum_exclusive": "0.18.0"
+    "minimum": "0.18.0",
+    "maximum_exclusive": "0.19.0"
   }
 }
