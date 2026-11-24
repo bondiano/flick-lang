@@ -64,6 +64,7 @@ fn go_test_descriptor() -> Descriptor {
         }],
         foreign_adapters: vec![],
         type_form_attributes: vec![],
+        value_abi: None,
     }
 }
 

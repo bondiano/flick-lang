@@ -2,11 +2,68 @@
 //! `test/literal` fixture backend.
 
 use flick_backend::{
-    AdapterArg, AdapterArgKind, AdapterWord, Artifact, ArtifactKind, BuildRequest, Diagnostic,
-    Inputs, ModuleRole, Severity, Span, TypeFormAttribute,
+    Abi, AbiConversion, AbiDirection, AdapterArg, AdapterArgKind, AdapterWord, Artifact,
+    ArtifactKind, BuildRequest, Diagnostic, Inputs, ModuleRole, Severity, Span, TypeFormAttribute,
+    ValueAbi, ValueAbiEntry, ValueAbiRefusal,
 };
 use flick_backend_support::inline_span::map_byte_range;
 use flick_ir::{AdapterArg as IrAdapterArg, FileId, Foreign, ItemKind, Program};
+
+pub(crate) const ABI_NAME: &str = "test.literal-ffi";
+pub(crate) const ABI_VERSION: &str = "0.1.0";
+
+pub(crate) fn value_abi() -> ValueAbi {
+    let row = |key: &str,
+               flick_type: &str,
+               host_type: &str,
+               conversion: AbiConversion,
+               direction: AbiDirection,
+               notes: &str| ValueAbiEntry {
+        key: key.into(),
+        flick_type: flick_type.into(),
+        host_type: host_type.into(),
+        conversion,
+        direction,
+        notes: notes.into(),
+    };
+    ValueAbi {
+        abi: Abi {
+            name: ABI_NAME.into(),
+            version: ABI_VERSION.into(),
+        },
+        opaque_type: "void *".into(),
+        catch_error_type: "const char *".into(),
+        catch_lang_item: Some("string".into()),
+        entries: vec![
+            row("unit", "Unit", "void", AbiConversion::None, AbiDirection::Both, "No value; returns void"),
+            row("bool", "Bool", "bool", AbiConversion::None, AbiDirection::Both, "C99 boolean"),
+            row("int", "Int", "int32_t", AbiConversion::None, AbiDirection::Both, "32-bit signed integer"),
+            row("float", "Float", "double", AbiConversion::None, AbiDirection::Both, "IEEE 754 binary64"),
+            row("string", "String", "const char *", AbiConversion::View, AbiDirection::Both, "Borrowed UTF-8 string view"),
+            row("function", "a -> b", "void (*)(...)", AbiConversion::None, AbiDirection::In, "Inbound callback function pointer"),
+        ],
+        unsupported: vec![
+            ValueAbiRefusal {
+                key: "bigint".into(),
+                reason: "literal backend has no direct arbitrary-precision integer ABI; convert to Int or Float or pass an opaque handle".into(),
+            },
+            ValueAbiRefusal {
+                key: "list".into(),
+                reason: "literal backend does not marshal Flick lists directly; pass an opaque handle or copy through an adapter".into(),
+            },
+            ValueAbiRefusal {
+                key: "record".into(),
+                reason: "records have no stable ABI layout in the literal backend; pass scalar fields or an opaque handle".into(),
+            },
+            ValueAbiRefusal {
+                key: "adt".into(),
+                reason: "user-defined ADTs have no stable ABI layout in the literal backend; expose an opaque handle instead".into(),
+            },
+        ],
+        fallback_reason: "type is outside the test.literal-ffi direct value ABI table; pass an opaque handle instead".into(),
+        admits_copied_data: false,
+    }
+}
 
 pub(crate) fn foreign_adapters() -> Vec<AdapterWord> {
     vec![
@@ -157,6 +214,20 @@ pub(crate) fn validate_foreigns(
     inputs: &mut dyn Inputs,
 ) -> Result<(), Vec<Diagnostic>> {
     let mut diagnostics = Vec::new();
+    for binding in &request.foreign {
+        if binding.abi.name != ABI_NAME || binding.abi.version != ABI_VERSION {
+            diagnostics.push(Diagnostic {
+                code: "F014".into(),
+                severity: Severity::Error,
+                message: format!(
+                    "foreign binding ABI mismatch for `{}` in `{}`: expected `{ABI_NAME}@{ABI_VERSION}`, got `{}@{}`",
+                    binding.specifier, binding.module, binding.abi.name, binding.abi.version
+                ),
+                span: None,
+                notes: vec![],
+            });
+        }
+    }
     for module in &program.modules {
         if !request
             .modules

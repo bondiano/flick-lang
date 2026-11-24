@@ -5,7 +5,7 @@
 use std::fs;
 use std::path::Path;
 
-use flick_backend::{Abi, ForeignBinding, GoProjection, InputKind, Projection};
+use flick_backend::{Abi, Descriptor, ForeignBinding, GoProjection, InputKind, Projection};
 use flick_core::build::go::{foreign_files, line_path};
 use flick_core::codegen::EffectBridge;
 use flick_core::iface::{Interface, Namespace};
@@ -49,7 +49,15 @@ impl Prepared {
         project: Option<&Project>,
         compilation: &Compilation,
         output: &BuildPlan,
+        descriptor: &Descriptor,
     ) {
+        let binding_abi = descriptor.value_abi.as_ref().map_or_else(
+            || Abi {
+                name: "flick.go-ffi".into(),
+                version: "0.1.0".into(),
+            },
+            |v| v.abi.clone(),
+        );
         with_settings(
             host,
             project,
@@ -91,10 +99,7 @@ impl Prepared {
                         module,
                         specifier,
                         resolved,
-                        abi: Abi {
-                            name: "flick.go-ffi".into(),
-                            version: "0.1.0".into(),
-                        },
+                        abi: binding_abi.clone(),
                         inputs: vec![input],
                     });
                 }

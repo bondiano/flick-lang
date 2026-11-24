@@ -147,6 +147,10 @@ pub struct Package {
     /// `when = "<cond>"`: environment tag condition required to use any module
     /// of this package.
     pub when: Option<(String, Span)>,
+    /// `abi = { "flick.javascript-ffi" = "^0.1.0" }` (or `[package.abi]`):
+    /// semver requirements on backend value-ABI versions this package targets.
+    #[cfg(feature = "native-project")]
+    pub abi: BTreeMap<String, (String, Span)>,
     pub span: Span,
 }
 

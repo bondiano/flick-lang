@@ -271,6 +271,48 @@ innermost owner waits for it to settle even after an interruption (see
 resolved against the source file. `global` names a global, as in
 `foreign now from global "Date.now"`.
 
+### Value ABI (`flick/js`)
+
+Direct `foreign` bindings and `@native` overrides are checked against the
+versioned value-ABI table published by `flick/js` (`FLICK-F013` for unsupported
+types or directions, `FLICK-F014` for ABI version mismatches). Rendered from
+the `flick/js` backend descriptor:
+
+<!-- value-abi:flick/js:en:start -->
+**ABI:** `flick.javascript-ffi@0.1.0` · **Opaque fallback:** `unknown` · **Host `catch` type:** `unknown` (lang item `js_value`)
+
+| Key | Flick | Host | Conversion | Direction | Notes |
+| - | - | - | - | - | - |
+| `unit` | `Unit` | `undefined` | `none` | `both` | JS `undefined`; a successful foreign result of type `Unit` is `()` whatever JS returns |
+| `bool` | `Bool` | `boolean` | `none` | `both` | JS `boolean` primitive |
+| `int` | `Int` | `number` | `none` | `both` | JS `number` kept in 32-bit signed integer range (`Int32`) |
+| `float` | `Float` | `number` | `none` | `both` | JS IEEE 754 binary64 `number` |
+| `bigint` | `BigInt` | `bigint` | `none` | `both` | JS arbitrary-precision `bigint` |
+| `int8` | `Int8` | `number` | `none` | `both` | JS `number` masked/sign-extended to signed 8-bit integer |
+| `int16` | `Int16` | `number` | `none` | `both` | JS `number` masked/sign-extended to signed 16-bit integer |
+| `int64` | `Int64` | `bigint` | `none` | `both` | JS `bigint` wrapped to signed 64-bit integer |
+| `uint8` | `UInt8 (Byte)` | `number` | `none` | `both` | JS `number` masked to unsigned 8-bit integer |
+| `uint16` | `UInt16` | `number` | `none` | `both` | JS `number` masked to unsigned 16-bit integer |
+| `uint32` | `UInt32` | `number` | `none` | `both` | JS `number` masked to unsigned 32-bit integer |
+| `uint64` | `UInt64` | `bigint` | `none` | `both` | JS `bigint` wrapped to unsigned 64-bit integer |
+| `float32` | `Float32` | `number` | `none` | `both` | JS `number` rounded to IEEE 754 binary32 |
+| `string` | `String` | `string` | `none` | `both` | JS UTF-16 `string` primitive |
+| `never` | `Never` | `never` | `none` | `both` | Uninhabited bottom type |
+| `js_value` | `JsValue` | `unknown` | `none` | `both` | Opaque `JsValue` passed as-is until a checked snapshot |
+| `unknown` | `Unknown` | `unknown` | `copy` | `both` | Inert immutable Flick value; deep-copied across the boundary |
+| `tuple` | `(a, b, …)` | `readonly [A, B, …]` | `copy` | `both` | Dense JS array of fixed length; deep-copied across the boundary |
+| `list` | `List a` | `ReadonlyArray<A>` | `copy` | `both` | Dense JS array with an immutable source API; deep-copied across the boundary |
+| `option` | `Option a` | `Option.Option<A>` | `copy` | `both` | Native Effect `Option`; `nullable` reads `null`/`undefined` as `None` and `optional i` passes `None` as `undefined` |
+| `result` | `Result e a` | `Result.Result<A, E>` | `copy` | `both` | Native Effect `Result` representation of the pinned Effect version |
+| `eff` | `Eff r e a` | `Effect.Effect<A, E, R>` | `none` | `both` | Native Effect `Effect` representation of the pinned Effect version |
+| `layer` | `Layer ri e ro` | `Layer.Layer<RO, E, RI>` | `none` | `both` | Native Effect `Layer` representation of the pinned Effect version |
+| `exit` | `Exit e a` | `Exit.Exit<A, E>` | `none` | `both` | Native Effect `Exit` representation of the pinned Effect version |
+| `failure` | `Failure e` | `Cause.Cause<E>` | `none` | `both` | Native Effect `Cause` representation of the pinned Effect version |
+| `function` | `a -> b, a ->{r; e} b` | `(a, …) => b` | `none` | `both` | Callbacks adapted to JS arity across four families: pure, Effect, Promise, scoped event |
+
+Records and user-defined ADTs have no stable layout and are not in this table. On this backend they may still cross bindings as deep-copied plain JS objects / tagged objects (`_tag` = `Name#hash`, fields `_0`, `_1`, …); `unboxed type` and `untagged type` declare explicit representations.
+<!-- value-abi:flick/js:en:end -->
+
 ## Source maps
 
 Each module has a version 3 source map. Definitions, statements, calls,

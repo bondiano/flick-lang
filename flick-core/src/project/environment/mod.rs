@@ -1,21 +1,25 @@
 //! Environment resolution, backend tag axes, host packages, and condition tag
-//! vocabulary validation (`FLICK-P059`, `FLICK-P065`, `FLICK-P066`).
+//! vocabulary validation (`FLICK-P059`, `FLICK-P065`, `FLICK-P066`, `FLICK-F014`).
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
 
+#[cfg(feature = "native-project")]
+mod abi;
 #[cfg(not(target_arch = "wasm32"))]
 mod backends;
 #[cfg(not(target_arch = "wasm32"))]
 mod select;
+mod types;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use backends::official_backends;
 #[cfg(not(target_arch = "wasm32"))]
 use backends::{select_foreign_backend, upsert_backend};
+pub use types::{BackendAxis, BackendTags, ResolvedEnvironment, TargetOverride};
 
 #[cfg(not(target_arch = "wasm32"))]
-use super::config::{BackendEnvironment, HostConfig};
+use super::config::HostConfig;
 #[cfg(feature = "native-project")]
 use super::packages::Packages;
 #[cfg(feature = "native-project")]
@@ -25,155 +29,9 @@ use crate::diagnostics::{Diagnostic, Severity, codes, suggest};
 use crate::resolve::ModuleSyntax;
 use crate::source::{SourceFile, SourceMap, Span};
 use crate::syntax::when;
-use crate::types::{AdapterWordSpec, ForeignBackendSpec, NativeOverrideEnv, TypeFormAttrSpec};
+use crate::types::{ForeignBackendSpec, NativeOverrideEnv};
 #[cfg(not(target_arch = "wasm32"))]
 use select::resolve_selected;
-
-/// One selectable tag axis published by a backend descriptor.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BackendAxis {
-    pub name: String,
-    pub tags: Vec<String>,
-    pub default: Option<String>,
-    pub exclusive: bool,
-}
-
-/// Environment tags, axes, built-in hosts, and foreign metadata vocabulary
-/// published by a backend.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct BackendTags {
-    /// Full backend id, e.g. `"flick/js"`, `"flick/go"`, `"test/literal"`.
-    pub id: String,
-    /// Short target name, e.g. `"js"`, `"go"`, `"literal"`.
-    pub short: String,
-    /// Always-on backend tags, e.g. `["js"]`, `["go"]`, `["literal"]`.
-    pub tags: Vec<String>,
-    /// Selectable tag axes.
-    pub axes: Vec<BackendAxis>,
-    /// Built-in `(backend, host)` environment pairs published by the backend.
-    pub environments: Vec<(String, String)>,
-    /// Backend-declared foreign adapter words.
-    pub foreign_adapters: Vec<AdapterWordSpec>,
-    /// Backend-declared foreign type-form attributes (such as `@ts`, `@go`).
-    pub type_form_attributes: Vec<TypeFormAttrSpec>,
-}
-
-impl BackendTags {
-    /// Converts this backend's foreign adapter words and type-form attributes
-    /// into a [`ForeignBackendSpec`] for type checking and IDE queries.
-    pub fn foreign_spec(&self) -> ForeignBackendSpec {
-        ForeignBackendSpec {
-            backend_id: self.id.clone(),
-            adapters: self.foreign_adapters.clone(),
-            type_form_attributes: self.type_form_attributes.clone(),
-        }
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl BackendTags {
-    /// Whether `name` refers to this backend by short name, full id, or base tag.
-    pub fn matches_name(&self, name: &str) -> bool {
-        self.short == name || self.id == name || self.tags.iter().any(|t| t == name)
-    }
-
-    /// Tags owned directly by this backend (base tags + axis tags, excluding host tags).
-    pub fn backend_vocabulary(&self) -> BTreeSet<String> {
-        let mut out = BTreeSet::new();
-        out.extend(self.tags.iter().cloned());
-        for axis in &self.axes {
-            out.extend(axis.tags.iter().cloned());
-        }
-        out
-    }
-
-    /// All tags this backend contributes to the combined vocabulary (including built-in host names).
-    pub fn full_vocabulary(&self) -> BTreeSet<String> {
-        let mut out = self.backend_vocabulary();
-        for (_, platform) in &self.environments {
-            out.insert(platform.clone());
-        }
-        out
-    }
-}
-
-/// CLI or build-time override of the target backend and its resolved options.
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "one per target override flag"
-)]
-#[derive(Debug, Clone, Default)]
-pub struct TargetOverride {
-    /// Selected backend short name or id (e.g. `"js"`, `"go"`, `"literal"`).
-    pub target: Option<String>,
-    /// True when `--target` selected a different backend than the project default.
-    pub target_overridden: bool,
-    /// Descriptor tags of the loaded backend component, when already loaded by the host.
-    pub backend: Option<BackendTags>,
-    /// Resolved backend options (`name -> values`).
-    pub options: BTreeMap<String, Vec<String>>,
-    /// Explicit JS runtime override (`Some(true)` = `rt`, `Some(false)` = `effect`).
-    pub rt: Option<bool>,
-    /// Explicit UI renderer override (`--ui` or `[target.js] ui`).
-    pub ui: Option<String>,
-    /// Explicit Effect-adapter availability override (when the caller already computed it).
-    pub effect_adapter: Option<bool>,
-    /// True during `flick test` so reachability checks test suites rather than app entries.
-    pub for_tests: bool,
-    /// Specific test file paths selected for `flick test`, if any.
-    pub test_paths: Vec<PathBuf>,
-    /// Skip invoking `Host::check_target` during `check_environment` when the
-    /// caller (`flick build`, `flick test`, `flick inspect --emit output`) runs
-    /// backend `check-target` itself during artifact generation.
-    pub skip_backend_check_target: bool,
-    /// Disable `@native` override lowering (`--no-native-overrides`) so functions run
-    /// their Flick fallback body for conformance testing while still validating overrides.
-    pub disable_native_overrides: bool,
-}
-
-/// Concrete environment resolved for checking, IDE analysis, or building.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ResolvedEnvironment {
-    pub backend_id: String,
-    pub backend: String,
-    pub platform: String,
-    pub host_package: Option<String>,
-    /// Active environment tags (backend tags + active axis tags + active host tags).
-    pub tags: BTreeSet<String>,
-    /// True when `[build] environment` was explicitly set (enables `FLICK-E020` gated-service checks).
-    pub explicit_environment: bool,
-    /// Custom UI renderer specifier (`[target.js] ui` or `--ui`), if configured.
-    pub ui: Option<String>,
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl ResolvedEnvironment {
-    /// Pair representation `(backend, platform)` for legacy APIs and diagnostics.
-    pub fn pair(&self) -> BackendEnvironment {
-        BackendEnvironment {
-            backend: self.backend.clone(),
-            platform: self.platform.clone(),
-        }
-    }
-
-    /// Active tags formatted for diagnostic messages.
-    pub fn format_tags(&self) -> String {
-        if self.tags.is_empty() {
-            "none".to_owned()
-        } else {
-            self.tags
-                .iter()
-                .map(|t| format!("`{t}`"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        }
-    }
-
-    /// Evaluates a parsed `when` condition string against this environment's active tags.
-    pub fn matches(&self, condition: &str) -> bool {
-        when::parse(condition).is_ok_and(|expr| expr.eval(&|tag| self.tags.contains(tag)))
-    }
-}
 
 /// Result of resolving a project's environment and building its tag vocabulary.
 #[cfg(not(target_arch = "wasm32"))]
@@ -532,6 +390,16 @@ pub(super) fn resolve(
             &foreign_backend,
             target_override,
         );
+        #[cfg(feature = "native-project")]
+        if validate_foreign_metadata {
+            abi::check_package_abis(
+                project,
+                packages,
+                native_overrides.active_tags.as_ref(),
+                &foreign_backend,
+                diagnostics,
+            );
+        }
         return EnvironmentContext {
             vocabulary,
             validate_tags: true,
@@ -562,6 +430,16 @@ pub(super) fn resolve(
         &foreign_backend,
         target_override,
     );
+    #[cfg(feature = "native-project")]
+    if validate_foreign_metadata && resolved.is_some() {
+        abi::check_package_abis(
+            project,
+            packages,
+            native_overrides.active_tags.as_ref(),
+            &foreign_backend,
+            diagnostics,
+        );
+    }
 
     EnvironmentContext {
         vocabulary,

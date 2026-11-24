@@ -236,6 +236,7 @@ impl Backend for Literal {
             }],
             foreign_adapters: foreign::foreign_adapters(),
             type_form_attributes: foreign::type_form_attributes(),
+            value_abi: Some(foreign::value_abi()),
         }
     }
 

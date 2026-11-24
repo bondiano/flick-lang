@@ -62,6 +62,7 @@ change needs.
 | [Backends declare foreign adapter metadata (`0.15.0`)](#backends-declare-foreign-adapter-metadata-0150) | no | `FLICK-S011`, `FLICK-S014` |
 | [Fixed-width numeric types in IR `0.16.0`](#fixed-width-numeric-types-in-ir-0160) | no | — |
 | [Inline foreign bindings and module preambles (`0.17.0`)](#inline-foreign-bindings-and-module-preambles-0170) | no | `FLICK-F011` |
+| [Versioned backend value ABI tables](#versioned-backend-value-abi-tables) | no | `FLICK-F013`, `FLICK-F014` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -793,3 +794,22 @@ and map syntax errors back to the `.fl` source span as `FLICK-F011`.
 Backend components and `ir`-hook plugins must rebuild against `flick-ir`
 `0.17.0` and `flick-backend` and update their descriptor `ir` range to
 `[0.17.0, 0.18.0)`. Existing Flick sources require no changes.
+
+## Versioned backend value ABI tables
+
+The `flick:backend` WIT `descriptor` now includes an optional versioned
+`value-abi` table keyed by lang item and structural type constructor (`tuple`,
+`function`), recording host type, conversion (`none`, `copy`, `view`),
+direction (`in`, `out`, `both`), opaque fallback type, and host `catch` error
+type. `flick/js` publishes `flick.javascript-ffi@0.1.0` directly from backend
+data, and English and Russian FFI and backend documentation render the official
+table from that descriptor.
+
+The type checker validates direct `foreign` declarations and selected `@native`
+overrides against the active backend's `value-abi` table, reporting `FLICK-F013`
+with the backend's refusal reason when a binding uses an unsupported type or
+direction. Packages may declare `[package.abi]` in `flick.toml`, and
+`BuildRequest.foreign` carries the active ABI identifier and version; version
+mismatches report `FLICK-F014` rather than issuing a silent foreign call.
+Existing JS FFI programs require no source changes; third-party backend
+components should rebuild against the updated `flick-backend` WIT world.

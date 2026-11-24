@@ -214,6 +214,8 @@ codes! {
     F010 = Ffi 10, "retention owner needs the std package";
     F011 = Ffi 11, "invalid inline foreign code";
     F012 = Ffi 12, "ambiguous native override";
+    F013 = Ffi 13, "foreign binding type not in backend value ABI";
+    F014 = Ffi 14, "foreign ABI version mismatch";
     D001 = Schema 1, "type has no Schema witness";
     D002 = Schema 2, "codec misses a field";
     D003 = Schema 3, "codec gives a field twice";

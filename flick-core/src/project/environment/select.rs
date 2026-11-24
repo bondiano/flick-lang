@@ -295,6 +295,7 @@ fn select_backend(
             environments: Vec::new(),
             foreign_adapters: Vec::new(),
             type_form_attributes: Vec::new(),
+            value_abi: None,
         });
     }
     #[cfg(feature = "native-project")]

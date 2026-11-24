@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: e6426c3833535914
+source_hash: eb11fbb890d70b79
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -245,20 +245,44 @@ On the Go target (`[build] target = "go"`) a binding to a module of the program,
 
 ## Value representation and callbacks
 
-| Source value | ABI |
-| - | - |
-| Unit | JS `undefined`; a successful foreign result of type `Unit` is `()` whatever JS returns |
-| Int, Float, BigInt, Bool, String | The corresponding JS primitives; `Int` is a number kept in 32 bits |
-| Tuple | A dense JS array of fixed length |
-| List | A dense JS array with an immutable source API |
-| Record | A plain JS object with the exact set of own data fields |
-| User-defined ADT | An object with `_tag` = `Name#hash`, where hash is the high 48 bits of the 64-bit FNV-1a of the qualified constructor id; the payload is in `_0`, `_1` and so on |
-| Nominal wrapper | A tagged object by default; `unboxed type` declares the representation as its field, `untagged type` as fields distinguishable by JS type |
-| Native Effect types | `Option`, `Result` and the other Effect types in the native representation of the pinned Effect version |
-| Unknown input from JS | An opaque `JsValue` until a checked snapshot |
-| Nullable/optional | `nullable` reads a `null` or `undefined` result as `None`; `optional i` passes `None` as `undefined` |
-| Methods | `this`, arity, evaluation order and listener identity are preserved |
-| Callbacks | Four families: pure, Effect, Promise, scoped event |
+The value ABI table is published by the `flick/js` backend descriptor and checked by the compiler for every direct `foreign` declaration and selected `@native` override (`FLICK-F013` for an unsupported type or direction, `FLICK-F014` for an ABI version mismatch):
+
+<!-- value-abi:flick/js:en:start -->
+**ABI:** `flick.javascript-ffi@0.1.0` · **Opaque fallback:** `unknown` · **Host `catch` type:** `unknown` (lang item `js_value`)
+
+| Key | Flick | Host | Conversion | Direction | Notes |
+| - | - | - | - | - | - |
+| `unit` | `Unit` | `undefined` | `none` | `both` | JS `undefined`; a successful foreign result of type `Unit` is `()` whatever JS returns |
+| `bool` | `Bool` | `boolean` | `none` | `both` | JS `boolean` primitive |
+| `int` | `Int` | `number` | `none` | `both` | JS `number` kept in 32-bit signed integer range (`Int32`) |
+| `float` | `Float` | `number` | `none` | `both` | JS IEEE 754 binary64 `number` |
+| `bigint` | `BigInt` | `bigint` | `none` | `both` | JS arbitrary-precision `bigint` |
+| `int8` | `Int8` | `number` | `none` | `both` | JS `number` masked/sign-extended to signed 8-bit integer |
+| `int16` | `Int16` | `number` | `none` | `both` | JS `number` masked/sign-extended to signed 16-bit integer |
+| `int64` | `Int64` | `bigint` | `none` | `both` | JS `bigint` wrapped to signed 64-bit integer |
+| `uint8` | `UInt8 (Byte)` | `number` | `none` | `both` | JS `number` masked to unsigned 8-bit integer |
+| `uint16` | `UInt16` | `number` | `none` | `both` | JS `number` masked to unsigned 16-bit integer |
+| `uint32` | `UInt32` | `number` | `none` | `both` | JS `number` masked to unsigned 32-bit integer |
+| `uint64` | `UInt64` | `bigint` | `none` | `both` | JS `bigint` wrapped to unsigned 64-bit integer |
+| `float32` | `Float32` | `number` | `none` | `both` | JS `number` rounded to IEEE 754 binary32 |
+| `string` | `String` | `string` | `none` | `both` | JS UTF-16 `string` primitive |
+| `never` | `Never` | `never` | `none` | `both` | Uninhabited bottom type |
+| `js_value` | `JsValue` | `unknown` | `none` | `both` | Opaque `JsValue` passed as-is until a checked snapshot |
+| `unknown` | `Unknown` | `unknown` | `copy` | `both` | Inert immutable Flick value; deep-copied across the boundary |
+| `tuple` | `(a, b, …)` | `readonly [A, B, …]` | `copy` | `both` | Dense JS array of fixed length; deep-copied across the boundary |
+| `list` | `List a` | `ReadonlyArray<A>` | `copy` | `both` | Dense JS array with an immutable source API; deep-copied across the boundary |
+| `option` | `Option a` | `Option.Option<A>` | `copy` | `both` | Native Effect `Option`; `nullable` reads `null`/`undefined` as `None` and `optional i` passes `None` as `undefined` |
+| `result` | `Result e a` | `Result.Result<A, E>` | `copy` | `both` | Native Effect `Result` representation of the pinned Effect version |
+| `eff` | `Eff r e a` | `Effect.Effect<A, E, R>` | `none` | `both` | Native Effect `Effect` representation of the pinned Effect version |
+| `layer` | `Layer ri e ro` | `Layer.Layer<RO, E, RI>` | `none` | `both` | Native Effect `Layer` representation of the pinned Effect version |
+| `exit` | `Exit e a` | `Exit.Exit<A, E>` | `none` | `both` | Native Effect `Exit` representation of the pinned Effect version |
+| `failure` | `Failure e` | `Cause.Cause<E>` | `none` | `both` | Native Effect `Cause` representation of the pinned Effect version |
+| `function` | `a -> b, a ->{r; e} b` | `(a, …) => b` | `none` | `both` | Callbacks adapted to JS arity across four families: pure, Effect, Promise, scoped event |
+
+Records and user-defined ADTs have no stable layout and are not in this table. On this backend they may still cross bindings as deep-copied plain JS objects / tagged objects (`_tag` = `Name#hash`, fields `_0`, `_1`, …); `unboxed type` and `untagged type` declare explicit representations.
+<!-- value-abi:flick/js:en:end -->
+
+Opaque nominal handles (`type Handle`) and opaque aliases pass unchanged through the backend's opaque fallback (`unknown` in JS). Methods preserve `this`, arity, evaluation order, and listener identity. For nullable and optional values, `nullable` reads a `null` or `undefined` result as `None`, and `optional i` passes `None` as `undefined`.
 
 The FFI supports fixed uncurried calls, `this`, optional arguments and a variadic tail taken from a `List`. Flick's currying is preserved. The constructor id includes the package, module, type and constructor and is recorded in `.iface` next to the tag; `_tag` carries the constructor name and the hash of this id, so identity is not reduced to a single name. Immutable data is copied at the boundary: every binding outside `@flick-lang/effect-ts` and `@flick-lang/runtime` gets and gives lists, tuples, records and constructed values as copies, its callbacks included. Primitives, `JsValue`, opaque types and functions pass as they are.
 

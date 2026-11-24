@@ -119,6 +119,7 @@ Errors in the configuration exit with code `2`:
 | an unknown `[build] target`, `[build] environment` backend, or `--target` name | `FLICK-P059` |
 | an unknown or unsupported `--template` for `new` or `init` | `FLICK-P060` |
 | an unknown host in `[build] environment`, a duplicate `[host]` declaration, or an unmet `[host] requires` condition | `FLICK-P065` |
+| a `[package.abi]` version requirement incompatible with the active backend's published value ABI | `FLICK-F014` |
 | a `schema-version` other than `1`, or none | `FLICK-P006` |
 | `kind = "app"` without `entry` or `entries`, or with an empty `entries` | `FLICK-P007` |
 | both `entry` and `entries`, or an entry name that is not one | `FLICK-P005` |
@@ -308,7 +309,18 @@ build it, the last a semver requirement:
 name = "text"
 version = "1.0.0"
 flick = ">=0.1, <0.2"
+
+[package.abi]
+"flick.javascript-ffi" = "0.1.0"
 ```
+
+The optional `[package.abi]` table maps a backend value-ABI identifier (such as
+`"flick.javascript-ffi"`) to an exact semver version or semver requirement
+(`">=0.1.0, <0.2.0"`). During `flick check`, IDE analysis, and `flick build`,
+every active package (the root package and any dependency whose `[package] when`
+condition holds) has its matching entry checked against the active backend's
+published `descriptor.value-abi`; an incompatible version fails with
+`FLICK-F014` at the manifest entry instead of issuing a silent foreign call.
 
 A library that provides a plugin names its WebAssembly component, a path
 inside the library (see [plugins.md](../plugins/)):

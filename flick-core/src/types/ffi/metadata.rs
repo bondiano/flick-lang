@@ -118,7 +118,7 @@ impl Checker<'_> {
                 },
                 "catch" => match args.first() {
                     Some(mapping) if !pure => {
-                        let error = self.infer_catch_mapping(mapping);
+                        let error = self.infer_catch_mapping(mapping, spec);
                         pending
                             .catch
                             .push((item.clone(), (*mapping).clone(), error));

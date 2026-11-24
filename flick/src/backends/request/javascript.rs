@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use super::{BuildPlan, Compilation, FsHost, Prepared, Project};
 use crate::artifact::Artifact;
 use crate::commands::build::settings::with_settings;
-use flick_backend::{Abi, InputKind, OptionValue};
+use flick_backend::{Abi, Descriptor, InputKind, OptionValue};
 use flick_backend::{
     ForeignBinding, Projection, TypescriptFile, TypescriptModuleProjection, TypescriptProjection,
 };
@@ -28,7 +28,15 @@ impl Prepared {
         compilation: &Compilation,
         output: &BuildPlan,
         interfaces: &BTreeMap<&str, Interface>,
+        descriptor: &Descriptor,
     ) {
+        let binding_abi = descriptor.value_abi.as_ref().map_or_else(
+            || Abi {
+                name: "flick.javascript-ffi".into(),
+                version: "0.1.0".into(),
+            },
+            |v| v.abi.clone(),
+        );
         let assets = self.foreign_assets(compilation);
         if self
             .diagnostics
@@ -107,10 +115,7 @@ impl Prepared {
                             module: r.module,
                             specifier: r.spec,
                             resolved: r.specifier,
-                            abi: Abi {
-                                name: "flick.javascript-ffi".into(),
-                                version: "0.1.0".into(),
-                            },
+                            abi: binding_abi.clone(),
                             inputs,
                         }
                     }));

@@ -5,6 +5,7 @@ impl Checker<'_> {
         let mut aliases = HashSet::new();
         let mut observe = |module: &str, name: &str| {
             aliases.insert((module.to_owned(), name.to_owned()));
+            true
         };
         let mut head = self
             .borrowed_head_observing(ty, false, &mut observe)
