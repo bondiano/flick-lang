@@ -59,6 +59,8 @@ use graph::parallel;
 /// the same.
 #[derive(Default)]
 pub struct ModuleCache {
+    #[cfg(not(target_arch = "wasm32"))]
+    proof_search: Option<(PathBuf, types::ProofSearchRequest)>,
     entries: HashMap<PathBuf, (Key, Output)>,
     /// What plugins gave in the last run, by the key of each call.
     #[cfg(feature = "native-project")]
@@ -90,6 +92,25 @@ type ContractView = (
 );
 
 impl ModuleCache {
+    /// A private analysis cache for one explicitly requested proof search.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn for_proof_search(path: PathBuf, request: types::ProofSearchRequest) -> Self {
+        Self {
+            proof_search: Some((path, request)),
+            ..Self::default()
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn proof_search(&self, path: &Path) -> Option<&types::ProofSearchRequest> {
+        let (target, request) = self.proof_search.as_ref()?;
+        (target == path
+            || path
+                .canonicalize()
+                .is_ok_and(|canonical| canonical == *target))
+        .then_some(request)
+    }
+
     /// A cache of one run that takes the modules `store` kept and gives it
     /// those it checks.
     #[cfg(feature = "native-project")]
