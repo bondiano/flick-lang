@@ -733,11 +733,12 @@ test("Proof Goals follows the active cursor and distinguishes pending verificati
   t.mock.timers.tick(100);
   const inside = client.requests.at(-1);
   assert.deepEqual(inside.params.position, { line: 3, character: 9 });
-  inside.resolve(proofReply(inside, 2, 1));
+  inside.resolve(proofReply(inside, 2, 1, { verificationSteps: 0 }));
   await Promise.resolve();
   assert.deepEqual(view.items().slice(0, 3).map(({ label, description }) => [label, description]), [
     ["back", "Checked"], ["Declared goal", "y = x"], ["Goal", "x = y"],
   ]);
+  assert.equal(view.items().find(({ label }) => label === "Verification steps").description, "0");
   assert.equal(view.children("Binders")[0].description, "Bool");
   assert.equal(view.children("Premises")[0].description, "x = y");
   assert.equal(view.children("Branch substitutions")[0].description, "Some x");
