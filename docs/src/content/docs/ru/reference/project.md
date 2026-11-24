@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: 9a79adaf1e62c185
+source_hash: 5c1b458530d5b9eb
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -89,12 +89,16 @@ max-params = 5
 | - | - | - |
 | `target.js.typescript` | логическое значение; генерировать `.ts` вместо `.js` | `false` |
 | `target.js.declarations` | логическое значение; генерировать публичные объявления TypeScript `.d.ts` | `false` |
+| `target.js.kind` | `"app"` или `"library"`; `"library"` собирает артефакты библиотеки для хоста (`index.js`, `index.cjs` или `index.iife.js`) и `index.d.ts` по функциям с `@export "name"` без точек входа приложения | `"app"` |
+| `target.js.format` | `"esm"`, `"cjs"` или `"iife"`; формат вывода библиотеки (`cjs` и `iife` требуют `kind = "library"`) | `"esm"` |
+| `target.js.global-name` | допустимый идентификатор JavaScript; глобальная переменная для `format = "iife"` | `"FlickLib"` |
 | `target.js.promise-facade` | логическое значение; генерировать Promise-фасады `A/B.promise.js` | `false` |
 | `target.js.schema-aot` | логическое значение; компилировать чистые кодеки заранее в раннерах входов (требует `"node"` в `[tools]` или `--allow-tool node` вне проекта) | `false` |
 | `target.js.runtime` | `"rt"` на собственной среде Flick или `"effect"` через адаптер Effect; библиотека, от которой зависит проект, компилируется с `runtime` проекта | `"rt"` |
 | `target.js.devtools` | логическое значение (`true` = `"ws://localhost:34437"`) или строка WebSocket URL для `run` / `dev` | выкл. |
 | `target.js.ui` | спецификатор модуля, который рисует и монтирует представления вместо React (экспортирует все имена, которые `Ui` и `Action` берут из `@flick-lang/effect-ts/ui` и `@flick-lang/effect-ts/ui/react`; относительный путь — от корня проекта) | React |
 | `target.go.cgo` | логическое значение; включить cgo (`CGO_ENABLED=1`) при сборке исполняемых файлов Go | `false` |
+| `target.go.kind` | `"app"` или `"library"` (режим `"library"` объявлен, но пока отклоняется `flick/go` с `FLICK-P012`) | `"app"` |
 
 `flick new` берёт файлы шаблона у выбранного целевого бэкенда (`--target js` по умолчанию создаёт проект на RT с `[tools] "flick/js" = ["pnpm"]`, зависимостью от `@flick-lang/runtime` и без Effect; `--target go` создаёт проект под Go с `[build] target = "go"`, `[tools] "flick/go" = ["go"]` и без `package.json`) либо у стороннего пакета через `--from`. Передайте `--runtime rt` командам `build`, `run`, `dev`, `test` или `inspect`, чтобы выбрать RT для одного вызова в проекте на Effect. Если проекту нужен адаптер Effect, явно задайте `[target.js] runtime = "effect"` и добавьте зависимость `@flick-lang/effect-ts`.
 

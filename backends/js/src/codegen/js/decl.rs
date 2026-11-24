@@ -6,7 +6,7 @@ use std::mem;
 use flick_pretty::{Document, docvec};
 
 use super::doc::{After, Before, Form, Head, Js, Stmt, array, call, text_flags};
-use super::{Gen, names};
+use super::{Gen, ModuleFormat, names};
 use flick_ir::Dict;
 #[cfg(feature = "source-maps")]
 use flick_ir::Span;
@@ -136,6 +136,40 @@ impl<'d> Gen<'_, 'd> {
         .with((super::doc::stmt_flags(stmts) & !super::doc::YIELDS) | super::doc::MULTILINE)
     }
 
+    /// Export target object for CJS (`exports`) and IIFE (`$exp`), or `None` for ESM.
+    pub(super) fn export_target(&self) -> Option<&'static str> {
+        match self.format {
+            ModuleFormat::Esm => None,
+            ModuleFormat::Cjs => Some("exports"),
+            ModuleFormat::Iife => Some("$exp"),
+        }
+    }
+
+    /// Exports a statement that declares `name` in the active module format.
+    pub(super) fn export_stmt(&self, name: &str, stmt: Stmt<'d>) -> Stmt<'d> {
+        let a = self.a;
+        match self.export_target() {
+            None => Stmt {
+                doc: docvec![a, "export ", stmt.doc],
+                ..stmt
+            },
+            Some(target) => Stmt {
+                doc: docvec![
+                    a,
+                    stmt.doc,
+                    a.line(),
+                    target,
+                    ".",
+                    a.alloc_str(name),
+                    " = ",
+                    a.alloc_str(name),
+                    ";"
+                ],
+                ..stmt
+            },
+        }
+    }
+
     /// An exported `const`: in TypeScript with its projected type.
     pub(super) fn export(&self, name: &str, value: Js<'d>) -> Stmt<'d> {
         self.export_marked(name, None, value)
@@ -161,16 +195,35 @@ impl<'d> Gen<'_, 'd> {
         let value = self.pure(value);
         let ty = self.annotation(name);
         let mark = mark.unwrap_or_else(|| a.empty());
-        let doc = docvec![
-            a,
-            "export const ",
-            mark,
-            a.alloc_str(name),
-            ty,
-            " = ",
-            value.at(a, Before::Assign, After::Semicolon),
-            ";"
-        ];
+        let doc = match self.export_target() {
+            None => docvec![
+                a,
+                "export const ",
+                mark,
+                a.alloc_str(name),
+                ty,
+                " = ",
+                value.at(a, Before::Assign, After::Semicolon),
+                ";"
+            ],
+            Some(target) => docvec![
+                a,
+                "const ",
+                mark,
+                a.alloc_str(name),
+                ty,
+                " = ",
+                value.at(a, Before::Assign, After::Semicolon),
+                ";",
+                a.line(),
+                target,
+                ".",
+                a.alloc_str(name),
+                " = ",
+                a.alloc_str(name),
+                ";"
+            ],
+        };
         Stmt::new(doc, value.flags | text_flags(name))
     }
 

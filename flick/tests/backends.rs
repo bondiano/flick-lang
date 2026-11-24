@@ -41,6 +41,12 @@ mod go_record;
 #[path = "backends/kernel.rs"]
 mod kernel;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/library_exports.rs"]
+mod library_exports;
+#[cfg(feature = "wasm-backends")]
+#[path = "backends/library_exports_diag.rs"]
+mod library_exports_diag;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/lua_profiles.rs"]
 mod lua_profiles;
 #[cfg(feature = "wasm-backends")]

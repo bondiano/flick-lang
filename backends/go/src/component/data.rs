@@ -9,7 +9,7 @@ use flick_ir::Program;
 
 use super::{failure, value_abi};
 use crate::codegen::{Bindings, is_relative};
-use crate::{foreign_meta, inline};
+use crate::{exports, foreign_meta, inline};
 
 /// The Go binding tables of the implicit packages: resource inputs whose id
 /// starts so, one table each.
@@ -18,6 +18,12 @@ pub(super) const BINDINGS: &str = "go/bindings/";
 pub(super) const GO_DEPENDENCIES: &str = "go/dependencies";
 /// Optional project-level `go.sum` lockfile.
 pub(super) const GO_SUM_INPUT: &str = "go/go.sum";
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum BuildKind {
+    App,
+    Library,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Command {
@@ -45,6 +51,8 @@ pub(super) struct Data {
     pub windows: bool,
     /// Enable cgo (`CGO_ENABLED=1`).
     pub cgo: bool,
+    /// Build artifact kind (`app` or `library`).
+    pub kind: BuildKind,
     /// Module selected for `inspect --emit output`.
     pub inspect_module: Option<String>,
     /// Third-party Go modules declared via `[target.go.dependencies]`.
@@ -132,7 +140,7 @@ impl Data {
             deps: go_deps,
             go_sum: project_go_sum,
         } = read_go_deps_and_sum(request, inputs)?;
-        let (command, windows, cgo, inspect_module) = options(request)?;
+        let parsed = options(request)?;
         Ok(Self {
             program,
             facts,
@@ -142,10 +150,11 @@ impl Data {
             sources,
             foreign,
             bindings: Bindings::parse(tables.iter().map(String::as_str)),
-            command,
-            windows,
-            cgo,
-            inspect_module,
+            command: parsed.command,
+            windows: parsed.windows,
+            cgo: parsed.cgo,
+            kind: parsed.kind,
+            inspect_module: parsed.inspect_module,
             go_deps,
             project_go_sum,
         })
@@ -158,7 +167,7 @@ impl Data {
             .filter(|m| m.role == ModuleRole::Own)
             .map(|m| m.name.as_str())
             .collect();
-        let mut foreign_diagnostics: Vec<Diagnostic> =
+        let mut diagnostics: Vec<Diagnostic> =
             foreign_meta::validate_program(&self.program, &own_modules)
                 .into_iter()
                 .chain(inline::validate_program(
@@ -178,24 +187,32 @@ impl Data {
                     notes: vec![],
                 })
                 .collect();
-        if !foreign_diagnostics.is_empty() {
-            foreign_diagnostics.sort_by_key(|d| {
+        diagnostics.extend(exports::validate_request(&self.program, &request.exports));
+        if !diagnostics.is_empty() {
+            diagnostics.sort_by_key(|d| {
                 d.span
                     .as_ref()
                     .map_or((u32::MAX, u32::MAX, u32::MAX), |s| (s.file, s.start, s.end))
             });
-            return Err(foreign_diagnostics);
+            return Err(diagnostics);
         }
         Ok(())
     }
 }
 
-fn options(
-    request: &BuildRequest,
-) -> Result<(Command, bool, bool, Option<String>), Vec<Diagnostic>> {
+struct ParsedOptions {
+    command: Command,
+    windows: bool,
+    cgo: bool,
+    kind: BuildKind,
+    inspect_module: Option<String>,
+}
+
+fn options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnostic>> {
     let mut command = None;
     let mut windows = None;
     let mut cgo = None;
+    let mut kind = None;
     let mut inspect_module = None;
     for option in &request.target.options {
         let duplicate = match option.key.as_str() {
@@ -226,6 +243,16 @@ fn options(
                 };
                 cgo.replace(value).is_some()
             }
+            "option.kind" => {
+                let value = match option.value.as_str() {
+                    "app" => BuildKind::App,
+                    "library" => BuildKind::Library,
+                    other => {
+                        return Err(failure("P012", format!("unknown Go build kind `{other}`")));
+                    }
+                };
+                kind.replace(value).is_some()
+            }
             other => {
                 return Err(failure(
                     "P012",
@@ -240,12 +267,13 @@ fn options(
             ));
         }
     }
-    Ok((
-        command.unwrap_or(Command::Build),
-        windows.unwrap_or(false),
-        cgo.unwrap_or(false),
+    Ok(ParsedOptions {
+        command: command.unwrap_or(Command::Build),
+        windows: windows.unwrap_or(false),
+        cgo: cgo.unwrap_or(false),
+        kind: kind.unwrap_or(BuildKind::App),
         inspect_module,
-    ))
+    })
 }
 
 struct GoDepInputs {

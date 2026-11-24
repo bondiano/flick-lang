@@ -8,8 +8,8 @@ pub mod sourcemap;
 pub mod ts;
 
 pub use flick_backend_support::{EffectBridge, Known, exports, loops, names, order, tail};
-pub use js::{direct_methods, exported_worker, js, relative};
-pub use lexical::{RuntimeLayout, js_parts, prefix_key};
+pub use js::{ModuleFormat, direct_methods, exported_worker, js, js_with_format, relative};
+pub use lexical::{RuntimeLayout, js_parts, js_parts_with_format, prefix_key};
 pub use names::{ident, instance as instance_export, qualified_id, tag};
 
 use std::collections::{BTreeMap, HashMap, HashSet};

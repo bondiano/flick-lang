@@ -410,6 +410,35 @@ module App.Server exposing (start)
     (identifier)))
 
 ==================
+Host export attribute
+==================
+
+@export "addNumbers"
+add : Int -> Int -> Int
+let add a b = a + b
+
+---
+
+(source_file
+  (attribute)
+  (string)
+  (identifier)
+  (operator)
+  (constructor)
+  (operator)
+  (constructor)
+  (operator)
+  (constructor)
+  (keyword)
+  (identifier)
+  (identifier)
+  (identifier)
+  (operator)
+  (identifier)
+  (operator)
+  (identifier))
+
+==================
 Plugins
 ==================
 

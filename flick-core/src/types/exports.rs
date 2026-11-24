@@ -7,6 +7,8 @@ use super::env::{Abi, Form, ModuleSignature, TypeDef};
 use super::regions;
 use super::services::Operation;
 use super::ty::Type;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::doc;
 use crate::iface::{self, Decl, Entity, Export, Interface, Namespace};
 use crate::syntax::ts_mark;
 
@@ -263,6 +265,8 @@ impl Checker<'_> {
             module: self.env.module.clone(),
             exports,
             instances: self.env.own_instances().cloned().collect(),
+            #[cfg(not(target_arch = "wasm32"))]
+            docs: doc::comments(self.text).into_iter().collect(),
             ..Interface::default()
         }
     }

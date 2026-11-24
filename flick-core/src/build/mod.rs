@@ -217,6 +217,7 @@ pub(super) fn optimized_with_primitives(
     let mut ir = module.ir.clone();
     let exported = |name: &str| {
         module.interface.exports_value(name)
+            || module.ir.exports.host.iter().any(|h| h.name == name)
             || module
                 .ir
                 .initialization

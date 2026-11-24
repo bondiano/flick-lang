@@ -3,6 +3,7 @@
 //! an executable of.
 
 pub mod codegen;
+pub mod exports;
 pub mod foreign_meta;
 pub mod inline;
 

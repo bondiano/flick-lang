@@ -2,6 +2,7 @@
 //! The same implementation is exercised natively and as a component.
 
 mod commands;
+mod exports;
 mod fallback;
 mod foreign;
 mod kernel;
@@ -193,7 +194,7 @@ impl Backend for Literal {
                 version: "1.0.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.18.0", "0.19.0"),
+            ir: range("0.19.0", "0.20.0"),
             language: range("0.2.0", "0.3.0"),
             runtime_abis: vec![
                 NamedRange {
@@ -263,7 +264,11 @@ impl Backend for Literal {
         let program =
             Program::from_cbor(&request.program).map_err(|e| diagnostic(&e.to_string(), None))?;
         foreign::validate_foreigns(&program, request, inputs)?;
-        if is_check(request) {
+        exports::validate_exports(&program, request)?;
+        if is_check(request)
+            || exports::is_library(request)
+            || matches!(case(request), "exports" | "library")
+        {
             return Ok(TargetSupport {
                 capabilities: self.describe().capabilities,
             });
@@ -386,7 +391,11 @@ impl Backend for Literal {
         });
         apply_case_artifacts(request, &mut artifacts)?;
         let diagnostics = case_diagnostics(request);
-        let mut launches = launches::run(request, &mut artifacts);
+        let mut launches = if exports::is_library(request) {
+            Vec::new()
+        } else {
+            launches::run(request, &mut artifacts)
+        };
         let runtime_dependencies = tests::runner(request, &mut artifacts, &mut launches);
         Ok(BuildResult {
             steps: steps::steps(request, case(request), &artifacts),
@@ -426,6 +435,24 @@ fn apply_case_artifacts(
         "path" => artifacts[0].path = "../outside.js".into(),
         "duplicate" => artifacts.push(artifacts[0].clone()),
         "foreign" => foreign::reports(request, artifacts)?,
+        "exports" | "library" => {
+            let program = Program::from_cbor(&request.program)
+                .map_err(|e| diagnostic(&e.to_string(), None))?;
+            exports::validate_exports(&program, request)?;
+            artifacts.push(exports::exports_report(request));
+            if let Some(header) = exports::header_artifact(&program, request)? {
+                artifacts.push(header);
+            }
+        }
+        _ if exports::is_library(request) => {
+            let program = Program::from_cbor(&request.program)
+                .map_err(|e| diagnostic(&e.to_string(), None))?;
+            exports::validate_exports(&program, request)?;
+            artifacts.push(exports::exports_report(request));
+            if let Some(header) = exports::header_artifact(&program, request)? {
+                artifacts.push(header);
+            }
+        }
         _ => {}
     }
     Ok(())

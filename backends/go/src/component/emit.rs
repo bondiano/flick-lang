@@ -10,7 +10,7 @@ use flick_backend::{
 use flick_backend_support::Known;
 use flick_ir::Module;
 
-use super::data::{Command, Data};
+use super::data::{BuildKind, Command, Data};
 use super::{failure, optimize};
 use crate::codegen::{
     self, GO_SUM, Input, PACKAGES, Package, RUNTIME, Unsupported, go_mod_with_deps, merge_go_sum,
@@ -104,6 +104,12 @@ pub(super) fn generate(
     let lines: Vec<&[u32]> = data.lines.iter().map(Vec::as_slice).collect();
     if data.command == Command::Inspect {
         return inspect(request, data, &own, &builtins, &paths, &lines, &lang);
+    }
+    if data.kind == BuildKind::Library {
+        return Err(failure(
+            "P012",
+            "Go library artifacts (`[target.go] kind = \"library\"`) are not implemented yet",
+        ));
     }
     let sources: Vec<&str> = data.sources.iter().map(String::as_str).collect();
     let programs: Vec<(&str, &str)> = if data.command == Command::Test {
@@ -308,6 +314,7 @@ mod tests {
             command: Command::Build,
             windows: false,
             cgo: false,
+            kind: BuildKind::App,
             inspect_module: None,
             go_deps: go_deps
                 .iter()

@@ -175,10 +175,13 @@ impl Expr {
 }
 
 impl Module {
-    /// Calls `f` on the span of every item, preamble, and expression.
+    /// Calls `f` on the span of every item, preamble, host export, and expression.
     pub fn each_span_mut(&mut self, f: &mut dyn FnMut(&mut Span)) {
         for preamble in &mut self.preambles {
             f(&mut preamble.span);
+        }
+        for export in &mut self.exports.host {
+            f(&mut export.span);
         }
         for item in &mut self.items {
             f(&mut item.span);

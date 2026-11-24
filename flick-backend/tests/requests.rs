@@ -1,7 +1,8 @@
 mod common;
 
 use flick_backend::{
-    Abi, InlineForeign, InputKind, Limits, Mode, ModuleRole, Projection, Span, validate_request,
+    Abi, HeaderRequest, HostExport, InlineForeign, InputKind, Limits, Mode, ModuleRole, Projection,
+    Span, Symbol, validate_request,
 };
 
 #[test]
@@ -61,7 +62,7 @@ fn incomplete_graphs_and_inconsistent_source_metadata_are_rejected() {
                 input: "missing".into(),
             }),
             "external-interface" => request.modules[0].role = ModuleRole::External,
-            "ir" => request.target.ir_version = "0.19.0".into(),
+            "ir" => request.target.ir_version = "0.20.0".into(),
             "ir-old" => request.target.ir_version = "0.15.0".into(),
             "api" => request.target.backend_api = "0.2.0".into(),
             "pin" => request.backend.sha256 = "missing".into(),
@@ -144,6 +145,125 @@ fn inline_foreign_entries_are_validated() {
             },
             _ => unreachable!(),
         });
+        assert!(
+            validate_request(&bad, &mut common::inputs(&bad), Limits::default()).is_err(),
+            "{case}"
+        );
+    }
+}
+
+#[test]
+fn valid_host_exports_and_header_requests_are_accepted() {
+    let mut request = common::request();
+    request.exports.push(HostExport {
+        name: "runMain".into(),
+        symbol: Symbol {
+            module: "App".into(),
+            name: "main".into(),
+        },
+        span: Span {
+            file: 0,
+            start: 0,
+            end: 5,
+        },
+    });
+    request.headers = Some(HeaderRequest {
+        enabled: true,
+        format: Some("d.ts".into()),
+    });
+    validate_request(&request, &mut common::inputs(&request), Limits::default())
+        .expect("valid host export and header request");
+
+    // Empty export name is allowed at the protocol layer so the backend reports
+    // invalid host names at the attribute span.
+    let mut empty_host_name = common::request();
+    empty_host_name.exports.push(HostExport {
+        name: String::new(),
+        symbol: Symbol {
+            module: "App".into(),
+            name: "main".into(),
+        },
+        span: Span {
+            file: 0,
+            start: 0,
+            end: 5,
+        },
+    });
+    validate_request(
+        &empty_host_name,
+        &mut common::inputs(&empty_host_name),
+        Limits::default(),
+    )
+    .expect("empty host export name passed to backend for diagnostic");
+}
+
+#[test]
+fn invalid_host_exports_and_header_requests_are_rejected() {
+    for case in [
+        "unknown-module",
+        "empty-symbol",
+        "nul-name",
+        "bad-span",
+        "empty-format",
+    ] {
+        let mut bad = common::request();
+        match case {
+            "unknown-module" => bad.exports.push(HostExport {
+                name: "ok".into(),
+                symbol: Symbol {
+                    module: "Unknown".into(),
+                    name: "main".into(),
+                },
+                span: Span {
+                    file: 0,
+                    start: 0,
+                    end: 5,
+                },
+            }),
+            "empty-symbol" => bad.exports.push(HostExport {
+                name: "ok".into(),
+                symbol: Symbol {
+                    module: "App".into(),
+                    name: String::new(),
+                },
+                span: Span {
+                    file: 0,
+                    start: 0,
+                    end: 5,
+                },
+            }),
+            "nul-name" => bad.exports.push(HostExport {
+                name: "a\0b".into(),
+                symbol: Symbol {
+                    module: "App".into(),
+                    name: "main".into(),
+                },
+                span: Span {
+                    file: 0,
+                    start: 0,
+                    end: 5,
+                },
+            }),
+            "bad-span" => bad.exports.push(HostExport {
+                name: "ok".into(),
+                symbol: Symbol {
+                    module: "App".into(),
+                    name: "main".into(),
+                },
+                span: Span {
+                    file: 0,
+                    start: 0,
+                    end: 9999,
+                },
+            }),
+            "empty-format" => {
+                bad.headers = Some(HeaderRequest {
+                    enabled: true,
+                    format: Some(String::new()),
+                });
+            }
+            _ => unreachable!(),
+        }
         assert!(
             validate_request(&bad, &mut common::inputs(&bad), Limits::default()).is_err(),
             "{case}"

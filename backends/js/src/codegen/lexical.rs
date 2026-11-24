@@ -1,7 +1,7 @@
 //! Runtime placement is separate from nominal ownership. A lexical prefix
 //! has its own physical ESM file, while tags, services and types keep the
 //! defining Flick module's identity.
-use super::{Options, Output, names};
+use super::{ModuleFormat, Options, Output, names};
 use crate::ir::{Item, ItemKind, Module};
 use flick_backend_support::reach;
 use std::collections::{BTreeMap, HashMap};
@@ -106,12 +106,25 @@ pub fn js_parts(
     options: &Options,
     layout: &RuntimeLayout,
 ) -> Vec<(String, Output)> {
+    js_parts_with_format(module, options, layout, ModuleFormat::Esm)
+}
+
+pub fn js_parts_with_format(
+    module: &Module,
+    options: &Options,
+    layout: &RuntimeLayout,
+    format: ModuleFormat,
+) -> Vec<(String, Output)> {
     if module.initialization.prefixes.is_empty() {
         return vec![(
             module.name.clone(),
-            super::js::js_at(module, options, &module.name, &|owner, symbol| {
-                layout.location(owner, symbol)
-            }),
+            super::js::js_at_with_format(
+                module,
+                options,
+                &module.name,
+                &|owner, symbol| layout.location(owner, symbol),
+                format,
+            ),
         )];
     }
     let mut own = RuntimeLayout::default();
@@ -154,15 +167,33 @@ pub fn js_parts(
                 package: module.package.clone(),
                 exports: module.exports.clone(),
             };
-            let mut output = super::js::js_at(&part, options, &physical, &location);
+            let mut output = super::js::js_at_with_format(&part, options, &physical, &location, format);
             if phase.is_none() {
                 let here = options.path(&module.name);
                 for prefix in &prefixes {
-                    let _ = writeln!(
-                        output.code,
-                        "export * from {};",
-                        names::string(&super::relative(&here, &options.path(prefix)))
-                    );
+                    match format {
+                        ModuleFormat::Esm => {
+                            let _ = writeln!(
+                                output.code,
+                                "export * from {};",
+                                names::string(&super::relative(&here, &options.path(prefix)))
+                            );
+                        }
+                        ModuleFormat::Cjs => {
+                            let _ = writeln!(
+                                output.code,
+                                "Object.assign(exports, require({}));",
+                                names::string(&super::relative(&here, &options.path(prefix)))
+                            );
+                        }
+                        ModuleFormat::Iife => {
+                            let _ = writeln!(
+                                output.code,
+                                "Object.assign($exp, $req({}));",
+                                names::string(prefix)
+                            );
+                        }
+                    }
                 }
                 output.imports.extend(prefixes.clone());
             }

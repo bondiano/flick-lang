@@ -72,5 +72,10 @@ pub(super) fn roots(
             return Err("root handler references a module outside the graph".into());
         }
     }
+    for export in &request.exports {
+        if !modules.contains_key(export.symbol.module.as_str()) {
+            return Err("host export references a module outside the graph".into());
+        }
+    }
     Ok(())
 }

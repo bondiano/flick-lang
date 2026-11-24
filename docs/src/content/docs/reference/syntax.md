@@ -598,6 +598,7 @@ type Gauge = Gauge Float
 | `@derive` | a class | a plugin derives it: that of the class's package, or of the package named, `@derive std` | [deriving](../classes/#deriving) |
 | `@ts` (and backend type-form attributes such as `@go`) | a type or a service | backend-declared foreign type form, `none`, or `import` of a type of a package | [the form of a type](../codegen/#the-form-of-a-type) |
 | `@native` | indented after a top-level `let` body | environment-conditional native binding override over the Flick fallback body | [native overrides](../ffi/#native-overrides) |
+| `@export "name"` | a top-level `let` function | exports the function to host callers under `"name"`; validated by the target backend | [host exports and libraries](../codegen/#host-exports-and-libraries) |
 | `@stores` | a type without constructors or a body | its values keep the functions they are given | [qualifiers](../regions/#qualifiers) |
 | `@label` | a type | its top-level values carry their names where the program runs; the kind, `@label atom`, says which builds keep them | [observability](../observability/#ui-actions-and-atom-writes) |
 | `@cell`, `@maker`, `@owner` | a type; a value; a service | each value of the type holds one value; the value makes an atom, an action or a view; the service's handler owns what is made under it | [checks of calls](../plugins/#checks-of-calls) |

@@ -98,10 +98,20 @@ impl<'d> Gen<'_, 'd> {
                 let t = self.temp();
                 let mut out = vec![self.constant(&t, value)];
                 let (binds, ()) = self.block(|g| g.destructure(pattern, &t));
-                out.extend(binds.into_iter().map(|b| Stmt {
-                    doc: docvec![self.a, "export ", b.doc],
-                    ..b
-                }));
+                if let Some(target) = self.export_target() {
+                    out.extend(binds);
+                    let mut bound = Vec::new();
+                    pattern.binders(&mut bound);
+                    for name in bound {
+                        let id = names::ident(name);
+                        out.push(self.line(&format!("{target}.{id} = {id};")));
+                    }
+                } else {
+                    out.extend(binds.into_iter().map(|b| Stmt {
+                        doc: docvec![self.a, "export ", b.doc],
+                        ..b
+                    }));
+                }
                 out
             }
             ItemKind::Foreign(f) => self.foreign(f),
@@ -111,15 +121,19 @@ impl<'d> Gen<'_, 'd> {
                 let service = self.rt("service");
                 // a tag is a value of its key alone, so a bundle drops one nothing uses
                 let value = self.pure(call(a, service, &[self.string(key)]));
-                let doc = docvec![
-                    a,
-                    "export const ",
-                    names::service(name),
-                    " = ",
-                    value.at(a, Before::Assign, After::Semicolon),
-                    ";"
-                ];
-                vec![Stmt::new(doc, value.flags)]
+                let svc = names::service(name);
+                let stmt = Stmt::new(
+                    docvec![
+                        a,
+                        "const ",
+                        a.alloc_str(&svc),
+                        " = ",
+                        value.at(a, Before::Assign, After::Semicolon),
+                        ";"
+                    ],
+                    value.flags,
+                );
+                vec![self.export_stmt(&svc, stmt)]
             }
             ItemKind::Instance { info, methods } => self.instance(info, methods),
         }
@@ -305,16 +319,8 @@ impl<'d> Gen<'_, 'd> {
         } else {
             self.lambda_of(&params, body)
         };
-        methods_first.push(self.exported(self.constant(&id, value)));
+        methods_first.push(self.export_stmt(&id, self.constant(&id, value)));
         methods_first
-    }
-
-    /// `export stmt`.
-    fn exported(&self, stmt: Stmt<'d>) -> Stmt<'d> {
-        Stmt {
-            doc: docvec![self.a, "export ", stmt.doc],
-            ..stmt
-        }
     }
 
     /// A derived instance; `supers` are the getters of its superclasses.

@@ -257,6 +257,17 @@ interface types {
     runner: option<string>,
   }
 
+  record host-export {
+    name: string,
+    symbol: symbol,
+    span: span,
+  }
+
+  record header-request {
+    enabled: bool,
+    format: option<string>,
+  }
+
   record foreign-binding {
     module: string,
     specifier: string,
@@ -399,6 +410,8 @@ interface types {
     toolchains: list<toolchain>,
     runtime-dependencies: list<runtime-dependency>,
     declared-dependencies: option<list<string>>,
+    exports: list<host-export>,
+    headers: option<header-request>,
   }
 
   record project-file {

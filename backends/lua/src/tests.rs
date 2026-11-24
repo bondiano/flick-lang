@@ -279,6 +279,8 @@ fn request(platform: &str, tags: &[&str], items: Vec<Item>) -> BuildRequest {
         toolchains: vec![],
         runtime_dependencies: vec![],
         declared_dependencies: None,
+        exports: vec![],
+        headers: None,
     }
 }
 

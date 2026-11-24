@@ -68,6 +68,7 @@ pub fn validate_request(
     let text_refs: Vec<&str> = texts.iter().map(|s| s.as_str()).collect();
     validate_source_spans(&program, &text_refs)?;
     sources::validate_inline_spans(request, &text_refs)?;
+    sources::validate_export_spans(request, &text_refs)?;
     match (&request.target.mode, &request.module_root) {
         (Mode::WholeProgram, None) => {}
         (Mode::PerModule, Some(root)) if program.modules.iter().any(|m| m.name == *root) => {}
@@ -127,6 +128,24 @@ fn side_data(
         runtime_dependency(dependency, limits)?;
         if !runtimes.insert(&dependency.package) {
             return Err("duplicate backend runtime dependency".into());
+        }
+    }
+    for export in &request.exports {
+        if !modules.contains_key(export.symbol.module.as_str()) {
+            return Err("host export references an unknown module".into());
+        }
+        string(&export.name, limits)?;
+        string(&export.symbol.name, limits)?;
+        if export.symbol.name.is_empty() {
+            return Err("empty host export symbol name".into());
+        }
+    }
+    if let Some(headers) = &request.headers
+        && let Some(format) = &headers.format
+    {
+        string(format, limits)?;
+        if format.is_empty() {
+            return Err("empty header projection format".into());
         }
     }
     if let Some(declared) = &request.declared_dependencies {

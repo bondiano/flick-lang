@@ -2,7 +2,7 @@
 
 use super::{failure, value_abi};
 use crate::codegen::{EffectBridge, Labels, Resolved, ts::Typed};
-use crate::{foreign_meta, inline};
+use crate::{exports, foreign_meta, inline};
 use flick_backend::{
     BuildRequest, Diagnostic, Inputs, JavascriptProjection, ModuleRole, Severity, Span,
     TypescriptModuleProjection, validate_source_spans,
@@ -11,6 +11,19 @@ use flick_backend_support::bridge_select;
 use flick_ir::{Expr, ExprKind, OpClass, Program};
 use std::collections::{BTreeMap, BTreeSet};
 use std::iter;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum BuildKind {
+    App,
+    Library,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum LibraryFormat {
+    Esm,
+    Cjs,
+    Iife,
+}
 
 #[allow(
     clippy::struct_excessive_bools,
@@ -33,6 +46,9 @@ pub(super) struct Data {
     pub check: bool,
     pub devtools: Option<String>,
     pub labels: Labels,
+    pub kind: BuildKind,
+    pub format: LibraryFormat,
+    pub global_name: Option<String>,
     pub bridge: EffectBridge,
 }
 
@@ -127,6 +143,9 @@ impl Data {
             check: parsed.check,
             devtools: parsed.devtools,
             labels: parsed.labels,
+            kind: parsed.kind,
+            format: parsed.format,
+            global_name: parsed.global_name,
             bridge,
         })
     }
@@ -187,6 +206,10 @@ impl Data {
         )
         .map_err(failure)?;
         self.check_foreign(request)?;
+        let export_diagnostics = exports::validate_request(&self.program, &request.exports);
+        if !export_diagnostics.is_empty() {
+            return Err(export_diagnostics);
+        }
         if self.check {
             return Ok(());
         }
@@ -284,6 +307,9 @@ struct ParsedOptions {
     check: bool,
     devtools: Option<String>,
     labels: Labels,
+    kind: BuildKind,
+    format: LibraryFormat,
+    global_name: Option<String>,
 }
 
 fn select_bridge(request: &BuildRequest, program: &Program, rt: bool) -> EffectBridge {
@@ -341,6 +367,7 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
     let _promise_facade = flag("option.promise-facade")?;
     let schema_aot = flag("option.schema-aot")?;
     let devtools = option("option.devtools").map(str::to_owned);
+    let (kind, format, global_name) = parse_library_options(request, typescript)?;
     let labels = match option("labels") {
         Some("all") => Labels::All,
         Some("components") => Labels::Components,
@@ -362,6 +389,9 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
                     | "option.runtime"
                     | "option.devtools"
                     | "option.ui"
+                    | "option.kind"
+                    | "option.format"
+                    | "option.global-name"
             )
         {
             return Err(failure(format!(
@@ -385,7 +415,59 @@ fn runtime_options(request: &BuildRequest) -> Result<ParsedOptions, Vec<Diagnost
         check,
         devtools,
         labels,
+        kind,
+        format,
+        global_name,
     })
+}
+
+fn parse_library_options(
+    request: &BuildRequest,
+    typescript: bool,
+) -> Result<(BuildKind, LibraryFormat, Option<String>), Vec<Diagnostic>> {
+    let option = |key: &str| {
+        request
+            .target
+            .options
+            .iter()
+            .find(|o| o.key == key)
+            .map(|o| o.value.as_str())
+    };
+    let kind = match option("option.kind") {
+        None | Some("app") => BuildKind::App,
+        Some("library") => BuildKind::Library,
+        Some(other) => return Err(failure(format!("unknown JS build kind `{other}`"))),
+    };
+    let format = match option("option.format") {
+        None | Some("esm") => LibraryFormat::Esm,
+        Some("cjs") => LibraryFormat::Cjs,
+        Some("iife") => LibraryFormat::Iife,
+        Some(other) => return Err(failure(format!("unknown JS library format `{other}`"))),
+    };
+    let global_name = option("option.global-name").map(str::to_owned);
+    if kind != BuildKind::Library && format != LibraryFormat::Esm {
+        return Err(failure(
+            "JS option `format` (`cjs`/`iife`) requires `[target.js] kind = \"library\"`",
+        ));
+    }
+    if let Some(name) = &global_name {
+        if format != LibraryFormat::Iife {
+            return Err(failure(
+                "JS option `global-name` requires `[target.js] format = \"iife\"`",
+            ));
+        }
+        if !exports::is_valid_js_ident(name) {
+            return Err(failure(format!(
+                "invalid JavaScript identifier `{name}` for option `global-name`"
+            )));
+        }
+    }
+    if typescript && format != LibraryFormat::Esm {
+        return Err(failure(
+            "`typescript = true` is only supported with `format = \"esm\"`",
+        ));
+    }
+    Ok((kind, format, global_name))
 }
 
 fn foreign_bindings(request: &BuildRequest) -> Result<Vec<Resolved>, Vec<Diagnostic>> {

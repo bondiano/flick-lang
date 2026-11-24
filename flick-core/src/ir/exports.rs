@@ -2,6 +2,8 @@
 //! values, with the stages of a Sync one and the summary of a projection,
 //! and what it exports of others.
 
+use std::mem;
+
 use flick_ir::{
     Exported, Exports, ItemKind, Module, Namespace as IrNamespace, Projection, Reexport,
 };
@@ -13,6 +15,22 @@ use crate::types::Type;
 /// its values are projections.
 pub fn exports(module: &Module, interface: &Interface) -> Exports {
     let mut out = Exports::default();
+    fill_exports_into(&mut out, module, interface);
+    out
+}
+
+/// Populates `module.exports.values` and `module.exports.reexports` from
+/// `interface` while preserving any `@export "name"` entries already lowered
+/// into `module.exports.host`.
+pub fn fill_exports(module: &mut Module, interface: &Interface) {
+    let mut out = mem::take(&mut module.exports);
+    fill_exports_into(&mut out, module, interface);
+    module.exports = out;
+}
+
+fn fill_exports_into(out: &mut Exports, module: &Module, interface: &Interface) {
+    out.values.clear();
+    out.reexports.clear();
     for export in &interface.exports {
         let entity = &export.entity;
         if entity.module == module.name {
@@ -40,7 +58,6 @@ pub fn exports(module: &Module, interface: &Interface) -> Exports {
             name: entity.name.clone(),
         });
     }
-    out
 }
 
 /// The summary of the value `name` of `module` when it is a projection

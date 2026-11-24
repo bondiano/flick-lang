@@ -68,6 +68,12 @@ fn key(label: &str) -> String {
 
 mod declare;
 mod dts;
+#[cfg(not(target_arch = "wasm32"))]
+mod library;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod library_tests;
 pub mod stages;
 
 pub use dts::{Facade, declaration_file, facade_files, jsdoc};
+#[cfg(not(target_arch = "wasm32"))]
+pub use library::{HostExportSpec, RefusedExport, library_declaration_file};

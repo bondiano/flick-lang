@@ -83,6 +83,7 @@ pub(super) fn required_launches(
     output: &BuildPlan,
     require_runs: bool,
 ) -> Result<(), String> {
+    let require_runs = require_runs && output.options.get("kind") != Some("library");
     for (name, kind) in output
         .entries
         .iter()

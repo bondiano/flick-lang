@@ -12,12 +12,12 @@ use flick_backend::{
     ForeignBinding, Projection, TypescriptFile, TypescriptModuleProjection, TypescriptProjection,
 };
 use flick_core::build::{Artifact as FrontendArtifact, Backend, Settings};
-use flick_core::codegen::ts::Typing;
+use flick_core::codegen::ts::{HostExportSpec, Typing, library_declaration_file};
 use flick_core::codegen::{EffectBridge, Resolved};
-use flick_core::diagnostics::Diagnostic;
-use flick_core::diagnostics::Severity;
+use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface::Interface;
 use flick_core::ir;
+use flick_core::source::Span;
 use flick_core::{build, codegen, types};
 
 impl Prepared {
@@ -45,16 +45,7 @@ impl Prepared {
         {
             return;
         }
-        let effect_bridge = if self
-            .request
-            .declared_dependencies
-            .as_ref()
-            .is_none_or(|deps| deps.iter().any(|d| d == "@flick-lang/effect-ts"))
-        {
-            EffectBridge::Available
-        } else {
-            EffectBridge::Absent
-        };
+        let effect_bridge = self.effect_bridge();
         with_settings(
             host,
             project,
@@ -77,50 +68,98 @@ impl Prepared {
                 self.javascript_facts(compilation, settings, interfaces, &entries);
                 let resolved =
                     RefCell::new(build::javascript_foreign_inputs(compilation, settings));
-                let projected =
-                    if output.typescript || output.extras.dts || output.extras.promise_facade {
-                        self.frontend_files(compilation, settings, interfaces, &resolved)
-                    } else {
-                        Frontend::default()
-                    };
+                let is_library = output.options.get("kind") == Some("library");
+                let wants_library_headers =
+                    is_library && self.request.headers.as_ref().is_some_and(|h| h.enabled);
+                let iife_global = (is_library && output.options.get("format") == Some("iife"))
+                    .then(|| output.options.get("global-name").unwrap_or("FlickLib"));
+                let projected = if output.typescript
+                    || output.extras.dts
+                    || output.extras.promise_facade
+                    || wants_library_headers
+                {
+                    self.frontend_files(
+                        compilation,
+                        settings,
+                        interfaces,
+                        &resolved,
+                        wants_library_headers,
+                        iife_global,
+                    )
+                } else {
+                    Frontend::default()
+                };
                 self.shared
                     .extend(projected.shared.into_iter().map(Artifact::from));
                 self.diagnostics.extend(projected.diagnostics);
-                for (module, projection) in projected.typescript {
-                    let mut bytes = Vec::new();
-                    ciborium::into_writer(&projection, &mut bytes).expect("plain TS projection");
-                    let input = self.input(
-                        format!("typescript/{module}"),
-                        InputKind::TargetFacts,
-                        bytes,
-                    );
-                    self.request.projections.push(Projection {
-                        module,
-                        schema: Abi {
-                            name: "flick.typescript".into(),
-                            version: "0.2.0".into(),
-                        },
-                        input,
-                    });
-                }
-                self.request
-                    .foreign
-                    .extend(resolved.into_inner().into_iter().map(|r| {
-                        let inputs = if compilation.library_of(&r.module).is_some() {
-                            assets.clone()
-                        } else {
-                            vec![]
-                        };
-                        ForeignBinding {
-                            module: r.module,
-                            specifier: r.spec,
-                            resolved: r.specifier,
-                            abi: binding_abi.clone(),
-                            inputs,
-                        }
-                    }));
+                self.attach_typescript_projections(projected.typescript);
+                self.attach_foreign_bindings(
+                    compilation,
+                    resolved.into_inner(),
+                    &binding_abi,
+                    &assets,
+                );
             },
         );
+    }
+
+    fn effect_bridge(&self) -> EffectBridge {
+        if self
+            .request
+            .declared_dependencies
+            .as_ref()
+            .is_none_or(|deps| deps.iter().any(|d| d == "@flick-lang/effect-ts"))
+        {
+            EffectBridge::Available
+        } else {
+            EffectBridge::Absent
+        }
+    }
+
+    fn attach_typescript_projections(
+        &mut self,
+        projections: Vec<(String, TypescriptModuleProjection)>,
+    ) {
+        for (module, projection) in projections {
+            let mut bytes = Vec::new();
+            ciborium::into_writer(&projection, &mut bytes).expect("plain TS projection");
+            let input = self.input(
+                format!("typescript/{module}"),
+                InputKind::TargetFacts,
+                bytes,
+            );
+            self.request.projections.push(Projection {
+                module,
+                schema: Abi {
+                    name: "flick.typescript".into(),
+                    version: "0.2.0".into(),
+                },
+                input,
+            });
+        }
+    }
+
+    fn attach_foreign_bindings(
+        &mut self,
+        compilation: &Compilation,
+        resolved: Vec<Resolved>,
+        binding_abi: &Abi,
+        assets: &[String],
+    ) {
+        self.request.foreign.extend(resolved.into_iter().map(|r| {
+            let inputs = if compilation.library_of(&r.module).is_some() {
+                assets.to_vec()
+            } else {
+                vec![]
+            };
+            ForeignBinding {
+                module: r.module,
+                specifier: r.spec,
+                resolved: r.specifier,
+                abi: binding_abi.clone(),
+                inputs,
+            }
+        }));
     }
     fn frontend_files(
         &self,
@@ -128,6 +167,8 @@ impl Prepared {
         settings: &Settings<'_>,
         interfaces: &BTreeMap<&str, Interface>,
         resolved: &RefCell<Vec<Resolved>>,
+        wants_library_headers: bool,
+        iife_global: Option<&str>,
     ) -> Frontend {
         let rt = settings.backend == Backend::Rt;
         let mut projected = Frontend::default();
@@ -175,6 +216,12 @@ impl Prepared {
             path: &path,
             rt,
         };
+        let library_needs_module_dts = if wants_library_headers {
+            self.project_library_headers(compilation, &typing, iife_global, &mut projected)
+        } else {
+            false
+        };
+        let emit_module_dts = settings.extras.dts || library_needs_module_dts;
         let own = compilation.modules.iter().map(|m| &m.ir);
         for module in own.chain(build::builtin_modules_of(rt)) {
             if !seen.insert(module.name.clone()) {
@@ -186,23 +233,84 @@ impl Prepared {
                     .push((module.name.clone(), typescript(module, &typing)));
             }
             let own = interfaces.contains_key(module.name.as_str());
-            if (settings.extras.dts || (own && settings.extras.promise_facade))
+            if (emit_module_dts || (own && settings.extras.promise_facade))
                 && let Some(interface) = (typing.interface)(&module.name)
             {
                 let (files, issues) = build::javascript_shared_files(
                     &module.name,
                     &interface,
                     &typing,
-                    settings.extras.dts,
+                    emit_module_dts,
                     own && settings.extras.promise_facade,
                 );
                 projected.shared.extend(files);
-                if own {
+                if own && settings.extras.dts {
                     projected.diagnostics.extend(issues);
                 }
             }
         }
         projected
+    }
+
+    fn project_library_headers(
+        &self,
+        compilation: &Compilation,
+        typing: &Typing<'_>,
+        iife_global: Option<&str>,
+        projected: &mut Frontend,
+    ) -> bool {
+        let declarations = |m: &str| {
+            compilation
+                .modules
+                .iter()
+                .find(|c| c.name == m)
+                .map(|c| (*c.declarations).clone())
+        };
+        let specs: Vec<HostExportSpec<'_>> = self
+            .request
+            .exports
+            .iter()
+            .map(|export| HostExportSpec {
+                export_name: export.name.as_str(),
+                module: export.symbol.module.as_str(),
+                symbol: export.symbol.name.as_str(),
+                span: Span::new(
+                    self.files[export.span.file as usize],
+                    export.span.start,
+                    export.span.end,
+                ),
+            })
+            .collect();
+        let index_import = |m: &str| codegen::relative("index.d.ts", &(typing.path)(m));
+        let (dts, used, refused) = library_declaration_file(
+            &specs,
+            typing.interface,
+            &declarations,
+            typing.package,
+            &index_import,
+            typing.foreign,
+            typing.rt,
+            iife_global,
+        );
+        if refused.is_empty() {
+            projected.shared.push(FrontendArtifact {
+                path: "index.d.ts".into(),
+                contents: dts,
+            });
+            !used.is_empty()
+        } else {
+            for r in refused {
+                projected.diagnostics.push(Diagnostic::error(
+                    codes::F004,
+                    format!(
+                        "`@export \"{}\"` (`{}.{}`) has no TypeScript form: {}",
+                        r.export_name, r.module, r.symbol, r.reason
+                    ),
+                    r.span,
+                ));
+            }
+            false
+        }
     }
 }
 

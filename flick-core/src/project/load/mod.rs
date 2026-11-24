@@ -267,6 +267,24 @@ fn run_in(
         .unwrap_or_default();
     #[cfg(not(feature = "native-project"))]
     let precompiled = Precompiled::default();
+    #[cfg(feature = "native-project")]
+    let library_target = target_override
+        .and_then(|o| {
+            o.options
+                .get("kind")
+                .and_then(|v| v.last())
+                .map(String::as_str)
+        })
+        .or_else(|| {
+            let p = project?;
+            let target = target_override
+                .and_then(|o| o.target.as_deref())
+                .unwrap_or_else(|| p.config.default_target());
+            p.config.target_option(target, "kind")
+        })
+        == Some("library");
+    #[cfg(not(feature = "native-project"))]
+    let library_target = false;
     // a check lowers the modules of source packages only to save them;
     // a selected target or environment also needs IR for reachable-use preflight
     let check_only = matches!(mode, Mode::Check | Mode::Prove);
@@ -321,6 +339,11 @@ fn run_in(
     let edges = loader.load_imports();
     loader.import_cycles(&edges);
     loader.expand_plugins();
+    #[cfg(not(target_arch = "wasm32"))]
+    if loader.lowered.is_none() && has_own_export_attrs(&loader.modules, loader.sources) {
+        loader.lowered = Some(Vec::new());
+        loader.lower_packages_only = false;
+    }
     loader.size_lowered();
     let interfaces = loader.resolve_all(&edges);
     if let Some(cache) = &mut loader.cache {
@@ -346,7 +369,7 @@ fn run_in(
             environment::validate_module_when(cond, None, None, &env_ctx, &mut loader.diagnostics);
         }
     }
-    loader.check_entry(&interfaces);
+    loader.check_entry(&interfaces, library_target);
     let failed = loader
         .diagnostics
         .iter()
@@ -395,7 +418,7 @@ fn run_in(
         // the code of a module with a loaded test companion exports to it all
         // it declares; a build never loads a companion, nor makes this code
         let interface = loader.privates.get(&c.name).unwrap_or(&c.interface);
-        c.ir.exports = ir::exports(&c.ir, interface);
+        ir::fill_exports(&mut c.ir, interface);
     }
     // a module's package names the tags of its constructors: its source
     // package, else the project's
@@ -411,6 +434,8 @@ fn run_in(
     #[cfg(feature = "ide")]
     let analyzed = loader.ide.take().unwrap_or_default();
     drop(loader);
+    #[cfg(not(target_arch = "wasm32"))]
+    let fallback_backend_id = env_ctx.foreign_backend.backend_id.clone();
     let compilation = Compilation {
         modules: compiled,
         libraries,
@@ -431,10 +456,15 @@ fn run_in(
             project,
             target_override,
             stages_by_class,
+            library_target,
             resolved,
             sources,
             &mut diagnostics,
         );
+    } else if !target_override.is_some_and(|o| o.skip_backend_check_target)
+        && !diagnostics.iter().any(|d| d.severity == Severity::Error)
+    {
+        target::validate_official_exports(&compilation, &fallback_backend_id, &mut diagnostics);
     }
     // by path, not by load order, which follows the order of imports
     diagnostics.sort_by_cached_key(|d| {
@@ -453,4 +483,24 @@ fn run_in(
         #[cfg(feature = "ide")]
         foreign_backend: ide_foreign_backend,
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn has_own_export_attrs(modules: &[Loaded], sources: &SourceMap) -> bool {
+    use crate::syntax::{cst::Node, export_attr, kind::SyntaxKind as K};
+    modules.iter().any(|m| {
+        if !matches!(m.root, Root::Source | Root::Other(_)) {
+            return false;
+        }
+        let text = &sources.get(m.file).text;
+        m.parse.tree.nodes().any(|n| match n.kind {
+            K::Attribute => export_attr::is_export(n, text),
+            K::RecGroup => n
+                .nodes()
+                .filter(|c| c.kind == K::Members)
+                .flat_map(Node::nodes)
+                .any(|c| c.kind == K::Attribute && export_attr::is_export(c, text)),
+            _ => false,
+        })
+    })
 }

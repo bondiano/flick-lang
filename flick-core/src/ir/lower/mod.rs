@@ -109,6 +109,18 @@ fn lower_inner<'a>(
     if lower.diagnostics.is_empty() {
         let records = mem::take(&mut lower.records);
         let preambles = mem::take(&mut lower.preambles);
+        let host = typing
+            .host_exports
+            .iter()
+            .filter(|export| {
+                items.iter().any(|item| match &item.kind {
+                    ItemKind::Value { name, .. } => name == &export.name,
+                    ItemKind::Foreign(f) => f.name == export.name,
+                    _ => false,
+                })
+            })
+            .cloned()
+            .collect();
         Ok((
             Module {
                 name: module.name.to_owned(),
@@ -119,7 +131,10 @@ fn lower_inner<'a>(
                 initialization: flick_ir::Initialization::default(),
                 records,
                 package: None,
-                exports: flick_ir::Exports::default(),
+                exports: flick_ir::Exports {
+                    host,
+                    ..flick_ir::Exports::default()
+                },
             },
             lower,
         ))

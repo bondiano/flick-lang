@@ -8,6 +8,7 @@ mod ffi;
 #[cfg(feature = "guest")]
 mod guest;
 mod launch;
+mod library;
 mod manifest;
 mod mapper;
 mod optimize;
@@ -55,7 +56,7 @@ fn options() -> Vec<OptionDescriptor> {
         choices: vec![],
         verbs,
     };
-    vec![
+    let mut all = vec![
         flag(
             "typescript",
             "Emit TypeScript (.ts) instead of JavaScript (.js).",
@@ -114,6 +115,55 @@ fn options() -> Vec<OptionDescriptor> {
             implicit_value: None,
             choices: vec![],
             verbs: vec![Verb::Build, Verb::Run, Verb::Dev, Verb::Test],
+        },
+    ];
+    all.extend(library_options());
+    all
+}
+
+fn library_options() -> [OptionDescriptor; 3] {
+    [
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "kind".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "Artifact kind: application (app) or host library (library).".into(),
+            },
+            default: Some("app".into()),
+            implicit_value: None,
+            choices: vec!["app".into(), "library".into()],
+            verbs: vec![Verb::Build],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "format".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "JavaScript library format when `kind = \"library\"`: esm, cjs, or iife."
+                    .into(),
+            },
+            default: Some("esm".into()),
+            implicit_value: None,
+            choices: vec!["esm".into(), "cjs".into(), "iife".into()],
+            verbs: vec![Verb::Build],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "global-name".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help:
+                    "Global identifier assigned by an `iife` library bundle (default `FlickLib`)."
+                        .into(),
+            },
+            default: None,
+            implicit_value: None,
+            choices: vec![],
+            verbs: vec![Verb::Build],
         },
     ]
 }
@@ -231,7 +281,7 @@ impl Backend for Javascript {
                 version: "0.2.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.18.0", "0.19.0"),
+            ir: range("0.19.0", "0.20.0"),
             language: range("0.2.0", "0.3.0"),
             runtime_abis: runtime_abis(),
             environments: ["node", "browser", "bun", "cloudflare"]

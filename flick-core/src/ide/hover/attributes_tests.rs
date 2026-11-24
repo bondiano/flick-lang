@@ -208,3 +208,23 @@ fn attribute_hover_explains_when_condition_on_module() {
     assert!(markdown.contains("FLICK-P064"), "{markdown}");
     assert_eq!(range, (cond, cond + 16));
 }
+
+#[test]
+fn attribute_hover_explains_export_host_name() {
+    let source = "module App.Main exposing (add)\n\n@export \"addNumbers\"\nadd : Int -> Int -> Int\nlet add a b = a + b\n";
+    let f = fixture_of(&[("src/App/Main.fl", source)]);
+    let ide = f.ide();
+    let file = f.file("App.Main");
+    let start = u32::try_from(source.find("@export").expect("@export")).expect("small");
+    let (markdown, range) = ide.hover(file, start + 1).expect("@export");
+    assert!(
+        markdown.contains("```flick\n@export \"addNumbers\"\n```"),
+        "{markdown}"
+    );
+    assert!(markdown.contains("validates the host name"), "{markdown}");
+    assert_eq!(range, (start, start + 7));
+    let name = u32::try_from(source.find("\"addNumbers\"").expect("name")).expect("small");
+    let (markdown, range) = ide.hover(file, name + 2).expect("name");
+    assert!(markdown.contains("validates the host name"), "{markdown}");
+    assert_eq!(range, (name, name + 12));
+}

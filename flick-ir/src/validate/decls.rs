@@ -125,6 +125,20 @@ impl Validator<'_> {
         for preamble in &module.preambles {
             self.span(preamble.span);
         }
+        for export in &module.exports.host {
+            self.span(export.span);
+            let exists = module.items.iter().any(|item| match &item.kind {
+                ItemKind::Value { name, .. } => name == &export.name,
+                ItemKind::Foreign(f) => f.name == export.name,
+                _ => false,
+            });
+            if !exists {
+                self.problems.push(format!(
+                    "`{}` host export `{}` names missing value `{}`",
+                    module.name, export.export_name, export.name
+                ));
+            }
+        }
         let mut seen = BTreeSet::new();
         for decl in &module.types {
             if !seen.insert(decl.name.as_str()) {

@@ -3,9 +3,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::{env, fs};
 
-use crate::diagnostics::Diagnostic;
-use crate::diagnostics::Severity;
-use crate::diagnostics::codes;
+use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::Interface;
 use crate::plugin::derive::builtin_expansion;
 use crate::resolve::{self, Module};
@@ -71,7 +69,7 @@ pub(crate) fn check_text_with(
         return Err(diagnostics);
     }
     let mut lowered = super::lower(&module, &typing)?;
-    lowered.exports = super::exports(&lowered, &interface);
+    super::fill_exports(&mut lowered, &interface);
     Ok((lowered, interface))
 }
 

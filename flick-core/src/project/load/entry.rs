@@ -107,7 +107,10 @@ pub fn main_kind(t: &Type) -> Result<MainKind, String> {
 impl Loader<'_> {
     /// Each entry of an app is a source module that exports `main`, its own
     /// or re-exported, of a type a runner can start.
-    pub(super) fn check_entry(&mut self, interfaces: &[Option<Interface>]) {
+    pub(super) fn check_entry(&mut self, interfaces: &[Option<Interface>], library_target: bool) {
+        if library_target {
+            return;
+        }
         let Some(project) = self.project.filter(|p| p.config.kind == Kind::App) else {
             return;
         };
