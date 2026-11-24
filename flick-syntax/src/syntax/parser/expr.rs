@@ -306,7 +306,8 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::Underscore => true,
         K::LazyKw => p.nth(1) == K::LBrace,
         K::LBrace => !p.no_brace,
-        K::Dot => accessor::accessor_ahead(p),
+        // a dot alone too: an unfinished accessor
+        K::Dot => true,
         _ => false,
     }
 }
@@ -418,7 +419,7 @@ pub(super) fn atom(p: &mut Parser) -> Option<Done> {
             con_path(p);
             K::NameExpr
         }
-        K::Dot if accessor::accessor_ahead(p) => accessor::accessor(p),
+        K::Dot => accessor::accessor(p),
         K::Number | K::BigInt | K::String | K::TrueKw | K::FalseKw => {
             p.bump();
             K::Literal

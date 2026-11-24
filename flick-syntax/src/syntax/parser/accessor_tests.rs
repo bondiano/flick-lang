@@ -85,6 +85,21 @@ fn a_missing_label_is_a_local_error() {
     assert_eq!(errors("let a = .5"), ["FLICK-S006 .5"]);
 }
 
+/// A dot alone is an accessor whose first step has no name yet: the error
+/// is at the dot, and the words after it stay arguments, so an editor can
+/// complete there.
+#[test]
+fn a_bare_dot_is_an_unfinished_accessor() {
+    let src = "let c = List.map . users\nlet d = 1";
+    assert_eq!(errors(src), ["FLICK-S007 ."]);
+    assert_eq!(
+        shape(src),
+        "(LetDecl let (VarPat c) = (Block (AppExpr (NameExpr List . map) (AccessorExpr \
+         (AccessorStep .)) (NameExpr users))))\n\
+         (LetDecl let (VarPat d) = (Block (Literal 1)))"
+    );
+}
+
 /// The error of an unfinished step stays at its own dot, so the statement
 /// after it still reports its own syntax error.
 #[test]

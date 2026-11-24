@@ -142,6 +142,14 @@ fn a_later_argument_gives_the_record_of_an_unfinished_path() {
     assert_eq!(completed(&text, ".address. users", 8), pairs(&ADDRESS));
 }
 
+/// A dot alone, given to `List.map` before the list, completes the fields
+/// of the list's elements.
+#[test]
+fn a_later_argument_gives_the_record_of_a_bare_dot() {
+    let text = MAIN.replace("List.map .address.city users ++", "List.map . users ++");
+    assert_eq!(completed(&text, ". users", 0), pairs(&USER));
+}
+
 #[test]
 fn a_pipeline_gives_the_record_of_its_last_step() {
     let text = MAIN.replace("users |> List.map get", "users |> List.map .address.");

@@ -6,7 +6,7 @@ use crate::syntax::kind::SyntaxKind as K;
 
 /// Whether an accessor `.label` starts at the current `.`: a name follows it
 /// without a space. A `.` right after a value was already read as its field.
-pub(super) fn accessor_ahead(p: &Parser) -> bool {
+fn accessor_ahead(p: &Parser) -> bool {
     let dot = p.raw();
     let next = p.toks[(p.pos + 1).min(p.toks.len() - 1)];
     dot.kind == K::Dot && next.kind == K::Ident && next.start == dot.end
