@@ -2,7 +2,7 @@
 // replies and notifications in, matched by the caller.
 import { spawn } from "node:child_process";
 
-export const connect = (binary) => {
+export const connect = (binary, { onNotification } = {}) => {
   const server = spawn(binary, ["lsp", "--stdio"], { stdio: ["pipe", "pipe", "ignore"] });
   let buffer = Buffer.alloc(0);
   const waiting = [];
@@ -15,6 +15,7 @@ export const connect = (binary) => {
       if (buffer.length < end + 4 + length) return;
       const message = JSON.parse(buffer.subarray(end + 4, end + 4 + length).toString());
       buffer = buffer.subarray(end + 4 + length);
+      if (message.method && message.id === undefined) onNotification?.(message);
       const i = waiting.findIndex((w) => w.matches(message));
       if (i >= 0) waiting.splice(i, 1)[0].resolve(message);
     }
@@ -25,12 +26,13 @@ export const connect = (binary) => {
   };
   const expect = (matches) => new Promise((resolve) => waiting.push({ matches, resolve }));
   let id = 0;
-  const request = (method, params) => {
+  const startRequest = (method, params) => {
     const current = ++id;
     const reply = expect((m) => m.id === current);
     send({ id: current, method, params });
-    return reply;
+    return { id: current, reply };
   };
+  const request = (method, params) => startRequest(method, params).reply;
   const diagnostics = (uri) => expect((m) => m.method === "textDocument/publishDiagnostics" && m.params.uri === uri);
-  return { server, send, expect, request, diagnostics };
+  return { server, send, expect, request, startRequest, diagnostics };
 };

@@ -1,0 +1,6 @@
+module Bench.Chain exposing (..)
+
+import Bench.Lemmas as Lemmas
+import Bench.Steps exposing (twice)
+
+proof twice_shared (f : a -> a) (x : a) where equal (twice f x) (f (f x)) = Lemmas.unfold_twice f x

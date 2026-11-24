@@ -324,6 +324,51 @@ proof rebuilt (v : Option a) where equal (match v with | None -> None | Some x -
 }
 
 #[test]
+fn proof_cost_and_exhaustion_point_to_the_failing_step() {
+    use std::fmt::Write as _;
+
+    let mut text = String::from(
+        "module App.Main exposing (..)\n\ndouble0 : (a -> a) -> a -> a\nlet double0 f x = f (f x)\n",
+    );
+    for i in 1..16 {
+        let previous = i - 1;
+        writeln!(text, "double{i} : (a -> a) -> a -> a").expect("write signature into the fixture");
+        writeln!(
+            text,
+            "let double{i} f x = double{previous} f (double{previous} f x)"
+        )
+        .expect("write definition into the fixture");
+    }
+    text.push_str("\nproof costly where equal true (double15 (fun x -> x) true) = symm refl\n");
+    let dir = project(
+        "lsp_proof_cost",
+        &[("flick.toml", LIB), ("proofs/App/Main.fl", &text)],
+    );
+    let main = uri(&dir.join("proofs/App/Main.fl"));
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": {
+            "uri": main, "languageId": "flick", "version": 1, "text": text,
+        } }),
+    );
+    let diagnostics = lsp.diagnostics(&main);
+    assert_eq!(codes(&diagnostics), ["FLICK-T084"]);
+    let step = text.rfind("refl").expect("inner proof step");
+    let range = json!({ "start": position(&text, step), "end": position(&text, step + 4) });
+    assert_eq!(diagnostics[0]["range"], range);
+    let at_header = text.find("proof costly").expect("proof declaration");
+    let header = goal_at(&mut lsp, &main, &text, at_header)["proof"].clone();
+    let inner = goal_at(&mut lsp, &main, &text, step)["proof"].clone();
+    assert_eq!(header["status"], "budget-exhausted", "{header}");
+    assert_eq!(header["failureRange"], range);
+    assert_eq!(header["verificationSteps"], 200_000);
+    assert_eq!(header["normalizationSteps"], Value::Null);
+    assert_eq!(inner["verificationSteps"], header["verificationSteps"]);
+    lsp.close();
+}
+
+#[test]
 fn proof_goal_revisions_cover_dependencies_and_closed_documents() {
     let source =
         "module App.Steps exposing (..)\ntwice : (a -> a) -> a -> a\nlet twice f x = f (f x)\n";

@@ -188,6 +188,8 @@ obligations for its laws, including inherited laws.
 reports checked proofs, blocked verification and exhausted proof budgets. When
 the checker locates a failing step, the view shows its line and column. It
 refreshes after unsaved edits to the proof and the definitions it uses.
+**Verification steps** counts normalization during certificate checking. For a
+`lawful` bundle it totals the checks of the individual fields.
 
 Proof completion marks a term **Closes the goal** when the proof checker has
 verified it at the cursor. For example, with `h : x = y` and goal `y = x`,

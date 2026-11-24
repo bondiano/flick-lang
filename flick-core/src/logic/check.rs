@@ -90,14 +90,21 @@ impl GoalOrigin {
     }
 }
 
+#[derive(Default)]
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) struct Observation<'a> {
+    pub trace: Option<&'a mut Vec<ProofStep>>,
+    pub aliases: Option<&'a LemmaAliases>,
+    pub cost: Option<&'a mut Option<u64>>,
+}
+
 pub(super) fn prove(
     statement: &Statement,
     proof: &Cert,
     data: &Data,
     program: &dyn Program,
     lemmas: &[Lemma],
-    #[cfg(not(target_arch = "wasm32"))] trace: Option<&mut Vec<ProofStep>>,
-    #[cfg(not(target_arch = "wasm32"))] aliases: Option<&LemmaAliases>,
+    #[cfg(not(target_arch = "wasm32"))] observation: Observation<'_>,
 ) -> Result<(), Failure> {
     let defs = admit_certificate(statement, proof, program, lemmas)?;
     let mut checker = Checker {
@@ -111,16 +118,24 @@ pub(super) fn prove(
         steps: STEPS,
         fresh: 0,
         #[cfg(not(target_arch = "wasm32"))]
-        trace: trace.map(Trace::new),
+        trace: observation.trace.map(Trace::new),
         #[cfg(not(target_arch = "wasm32"))]
         observing: false,
         #[cfg(not(target_arch = "wasm32"))]
-        suggestions: aliases.map(|aliases| suggest::Candidates::new(program, aliases)),
+        suggestions: observation
+            .aliases
+            .map(|aliases| suggest::Candidates::new(program, aliases)),
         #[cfg(not(target_arch = "wasm32"))]
         probing: false,
         #[cfg(not(target_arch = "wasm32"))]
         capture: None,
     };
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(cost) = observation.cost {
+        let result = checker.statement(statement, proof);
+        *cost = Some(STEPS - checker.steps);
+        return result;
+    }
     checker.statement(statement, proof)
 }
 

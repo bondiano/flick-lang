@@ -42,6 +42,9 @@ pub struct ProofEvidence {
     pub at: Range,
     pub status: ProofStatus,
     pub failure: Option<Span>,
+    /// Normalization spent by certificate verification for this declaration.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub verification_steps: Option<u64>,
     pub steps: Vec<logic::ProofStep>,
     /// Checked terms at the declaration goal, including when the body is empty.
     pub header_suggestions: Vec<String>,
@@ -83,6 +86,8 @@ pub struct LawObligation {
     pub status: ProofStatus,
     pub statement: Option<String>,
     pub range: Option<Range>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub verification_steps: Option<u64>,
     /// Checked lemma names for this law of exactly the selected instance.
     pub suggestions: Vec<String>,
 }

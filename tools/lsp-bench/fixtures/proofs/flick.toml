@@ -1,0 +1,4 @@
+schema-version = 1
+
+[project]
+kind = "lib"

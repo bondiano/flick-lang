@@ -135,6 +135,11 @@ pub(super) fn check_bundle(
             .first()
             .map_or(ProofStatus::Checked, ProofStatus::of_failure);
         evidence.failure = diagnostics.first().and_then(|d| d.span);
+        evidence.verification_steps = evidence
+            .obligations
+            .iter()
+            .filter_map(|obligation| obligation.verification_steps)
+            .reduce(|sum, steps| sum + steps);
         if let Some(s) = search {
             evidence.search = Some(s.result.unwrap_or_else(|| empty_search(&s.request)));
         }
@@ -245,6 +250,8 @@ impl Checking<'_, '_> {
         });
         #[cfg(not(target_arch = "wasm32"))]
         let mut shown = None;
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut verification_steps = None;
         let result = if let Some(field) = field {
             self.law(
                 law,
@@ -252,7 +259,7 @@ impl Checking<'_, '_> {
                 dict,
                 field,
                 #[cfg(not(target_arch = "wasm32"))]
-                &mut shown,
+                (&mut shown, &mut verification_steps),
             )
         } else {
             #[cfg(not(target_arch = "wasm32"))]
@@ -293,6 +300,7 @@ impl Checking<'_, '_> {
                     .map_or(ProofStatus::Checked, ProofStatus::of_failure),
                 statement: shown,
                 range: field.map(|f| (f.span.start, f.span.end)),
+                verification_steps,
                 suggestions,
             });
         }
@@ -337,7 +345,7 @@ impl Checking<'_, '_> {
         bundle: &Bundle,
         dict: &Dict,
         field: &Field,
-        #[cfg(not(target_arch = "wasm32"))] shown: &mut Option<String>,
+        #[cfg(not(target_arch = "wasm32"))] (shown, cost): (&mut Option<String>, &mut Option<u64>),
     ) -> Result<(), Failure> {
         let statement = self.law_statement(proved, bundle, dict)?;
         #[cfg(not(target_arch = "wasm32"))]
@@ -358,6 +366,10 @@ impl Checking<'_, '_> {
         };
         let cert = law_certificate(proved, &statement, lemma, field.span, field.value.span)?;
         let data = self.law_data(proved);
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.obligations.is_some() {
+            return logic::prove_counted(&statement, &cert, &data, self.program, self.lemmas, cost);
+        }
         logic::prove(&statement, &cert, &data, self.program, self.lemmas)
     }
 
