@@ -1,0 +1,93 @@
+// The control kernel as std reaches it: a timer (`Effect.sleep`), a wait
+// that only an interruption ends (`Effect.never`), a turn of the scheduler
+// (`Effect.yield_now`), and the host's event loop, which keeps `main`
+// running while a fiber waits on a timer. Each line follows from the
+// control kernel of the reference (reference/kernel.md) and R1-R3 of
+// docs/formal/runtime.md: an interrupted fiber's timer stops with it.
+module App.Main exposing (main)
+
+say : String ->{Host.Console} Unit
+let say line = Platform.stdout_line line
+
+nap : Float ->{Async} Unit
+let nap millis =
+  match Duration.millis millis with
+  | Ok d -> Effect.sleep d
+  | Err _ -> ()
+
+quiet : Failure e ->{} Unit
+let quiet _ = ()
+
+/// How a fiber ended: `succeeded`, or the reasons of its failure, `I` for
+/// an interruption.
+ended : Exit e a -> String
+let ended ex =
+  match Exit.failure ex with
+  | Some f ->
+    show (List.map (fun r -> if Cause.is_interrupt_reason r then "I" else "F") (Cause.reasons f))
+  | None -> "succeeded"
+
+/// Appends `name` to `log`.
+note : Ref (List String) -> String ->{} Unit
+let note log name = Ref.modify log (fun xs -> ((), xs ++ [name]))
+
+main : Unit ->{Host.Console, Host.Clock, Async} Unit
+let main () =
+  Effect.sleep Duration.zero
+  Effect.yield_now ()
+  say "a zero delay and a yield return"
+  let log : Ref (List String) = Ref.make []
+  scope owner {
+    let slow =
+      Fiber.spawn
+        owner
+        quiet
+        (task {
+          nap 300
+          note log "slow"
+        })
+    let fast =
+      Fiber.spawn
+        owner
+        quiet
+        (task {
+          nap 5
+          note log "fast"
+        })
+    ignore (Fiber.await_all [slow, fast])
+  }
+  say ("timers fire by delay: " ++ String.join ", " (Ref.get log))
+  let waits = scope owner {
+    let waiting = Fiber.spawn owner quiet (task { (Effect.never () : Unit) })
+    Effect.yield_now ()
+    Fiber.interrupt waiting
+    Fiber.await_all [waiting]
+  }
+  say ("a wait for nothing ends by interruption: " ++ String.join ", " (List.map ended waits))
+  let start = Clock.monotonic_time_nanos ()
+  let sleeps = scope owner {
+    let sleeper =
+      Fiber.spawn
+        owner
+        quiet
+        (task {
+          nap 60000
+          say "late"
+        })
+    Fiber.interrupt sleeper
+    Fiber.await_all [sleeper]
+  }
+  let waited = (Clock.monotonic_time_nanos () - start) / 1000000n
+  say ("an interrupted sleep: " ++ String.join ", " (List.map ended sleeps))
+  say ("its timer stopped with it: " ++ show (waited < 10000n))
+  let winner =
+    race_first
+      (task {
+        Effect.sleep Duration.infinity
+        "infinite"
+      })
+      (task {
+        nap 5
+        "finite"
+      })
+  say ("an infinite delay never ends: " ++ winner)

@@ -1,0 +1,45 @@
+// The mutable cells of the kernel: `Ref.make`, `get`, `set`, `modify` and
+// `same`. A cell is its own identity; `modify` is one step that no other
+// fiber observes half done (R7 of docs/formal/runtime.md, which
+// tests/run/runtime/ref_linearizable checks across fibers).
+module Kernel.Cells exposing (tests)
+
+tests : List Test.Test
+let tests = [
+  Test.effect_test
+    "get reads what make stored"
+    (task {
+      let cell = Ref.make "start"
+      Test.check (Test.equal "start" (Ref.get cell))
+    }),
+  Test.effect_test
+    "set replaces the value"
+    (task {
+      let cell = Ref.make 1
+      Ref.set cell 2
+      Test.check (Test.equal 2 (Ref.get cell))
+    }),
+  Test.effect_test
+    "modify returns the result and stores the new value"
+    (task {
+      let cell = Ref.make 10
+      let old = Ref.modify cell (fun n -> (n, n * 2))
+      let now = Ref.get cell
+      Test.check (Test.is_true "modify" (old == 10 && now == 20))
+    }),
+  Test.effect_test
+    "a cell is the same only as itself"
+    (task {
+      let a = Ref.make 0
+      let b = Ref.make 0
+      Test.check (Test.is_true "same" (Ref.same a a && not (Ref.same a b)))
+    }),
+  Test.effect_test
+    "a closure sees later writes"
+    (task {
+      let cell = Ref.make 0
+      let read = fun () -> Ref.get cell
+      Ref.set cell 5
+      Test.check (Test.equal 5 (read ()))
+    }),
+]

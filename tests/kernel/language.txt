@@ -1,0 +1,12 @@
+# The modules of tests/language/test/Language that pin kernel primitives
+# too. `just kernel` runs them in release as well (`just language` runs them
+# in debug), and the fixture backend's `kernel` case runs each of their
+# tests that reaches only the kernel and that its evaluator can run.
+BigInts
+Equality
+FixedWidth
+Floats
+Ints
+NumericBoundaries
+Show
+Strings

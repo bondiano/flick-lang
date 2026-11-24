@@ -1,0 +1,6 @@
+a zero delay and a yield return
+timers fire by delay: fast, slow
+a wait for nothing ends by interruption: ["I"]
+an interrupted sleep: ["I"]
+its timer stopped with it: true
+an infinite delay never ends: finite
