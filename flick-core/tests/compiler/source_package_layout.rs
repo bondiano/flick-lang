@@ -21,7 +21,8 @@ fn standard_library_sources_have_one_dependency_ordered_package_owner() {
             "http",
             "rpc",
             "observability",
-            "cli"
+            "cli",
+            "js"
         ]
     );
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../packages");
@@ -35,6 +36,9 @@ fn standard_library_sources_have_one_dependency_ordered_package_owner() {
         ("rpc", "Config"),
         ("observability", "Prometheus"),
         ("cli", "Cli"),
+        ("js", "Js"),
+        ("js", "Js.Array"),
+        ("js", "JsError"),
     ];
     let mut all = BTreeSet::new();
     for name in IMPLICIT_PACKAGES {

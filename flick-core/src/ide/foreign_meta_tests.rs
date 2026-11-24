@@ -130,6 +130,7 @@ fn literal_backend_tags() -> BackendTags {
             name: "literal".into(),
             doc: "Declare the literal-backend foreign type form.".into(),
         }],
+        value_abi: None,
     }
 }
 

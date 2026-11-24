@@ -7,6 +7,9 @@ use std::sync::OnceLock;
 #[cfg(feature = "native-project")]
 use serde::{Deserialize, Serialize};
 
+#[cfg(not(target_arch = "wasm32"))]
+use super::value_abi_spec::ValueAbiSpec;
+
 /// Expected shape of one positional argument after a backend-declared foreign
 /// adapter word. Mirrors `flick:backend/types.adapter-arg-kind`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,6 +117,8 @@ pub struct ForeignBackendSpec {
     pub backend_id: String,
     pub adapters: Vec<AdapterWordSpec>,
     pub type_form_attributes: Vec<TypeFormAttrSpec>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub value_abi: Option<ValueAbiSpec>,
 }
 
 impl ForeignBackendSpec {
@@ -129,6 +134,7 @@ impl ForeignBackendSpec {
             .find(|attr| attr.name == name)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn builtin(
         backend_id: &str,
         this_doc: &str,
@@ -137,6 +143,7 @@ impl ForeignBackendSpec {
         variadic_doc: &str,
         attr_name: &str,
         attr_doc: &str,
+        #[cfg(not(target_arch = "wasm32"))] value_abi: Option<ValueAbiSpec>,
     ) -> Self {
         Self {
             backend_id: backend_id.to_owned(),
@@ -169,11 +176,13 @@ impl ForeignBackendSpec {
                 name: attr_name.to_owned(),
                 doc: attr_doc.to_owned(),
             }],
+            #[cfg(not(target_arch = "wasm32"))]
+            value_abi,
         }
     }
 
-    /// The official `flick/js` backend's foreign adapter words and `@ts` attribute.
-    /// Must stay in sync with `backends/js/src/component.rs`.
+    /// The official `flick/js` backend's foreign adapter words, `@ts` attribute,
+    /// and versioned value-ABI table. Must stay in sync with `backends/js/src/component.rs`.
     pub fn js() -> Self {
         Self::builtin(
             "flick/js",
@@ -183,6 +192,8 @@ impl ForeignBackendSpec {
             "Spread the last argument (a `List a`) into the JavaScript call.",
             "ts",
             "Declare the TypeScript form of a foreign `type` or `service` (`@ts \"...\"`, `@ts from \"pkg\" \"Name\"`, or `@ts none`).",
+            #[cfg(not(target_arch = "wasm32"))]
+            Some(ValueAbiSpec::js()),
         )
     }
 
@@ -202,6 +213,7 @@ impl ForeignBackendSpec {
             "Spread the last argument (a `List a`) into Go variadic arguments.",
             "go",
             "Declare the Go type form of a foreign `type` or `service` (`@go \"...\"`, `@go from \"pkg\" \"Name\"`, or `@go none`).",
+            None,
         )
     }
 

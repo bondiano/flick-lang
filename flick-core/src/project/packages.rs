@@ -5,6 +5,7 @@
 //! Packages of a target backend's ecosystem that ship Flick sources are
 //! reported through [`Host::foreign`].
 
+use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
 
 use super::config::{self, Dependency, HostConfig, Kind, Source, TargetDependency};
@@ -39,6 +40,8 @@ struct Package {
     watch: Vec<String>,
     /// Package-level `[package] when = "<cond>"`, if declared.
     when: Option<(String, Span)>,
+    /// Package-level `[package] abi` semver requirements, if declared.
+    abi: BTreeMap<String, (String, Span)>,
     /// Host declaration `[host]`, if this package defines a host environment.
     host: Option<HostConfig>,
 }
@@ -115,6 +118,7 @@ impl Packages {
                 hooks: Vec::new(),
                 watch: Vec::new(),
                 when: None,
+                abi: BTreeMap::new(),
                 host: None,
             });
         }
@@ -187,6 +191,20 @@ impl Packages {
         self.packages.iter().filter_map(|p| {
             let (cond, span) = p.when.as_ref()?;
             Some((p.name.as_str(), cond.as_str(), *span))
+        })
+    }
+
+    /// Each dependency package that declares `[package] abi` requirements,
+    /// along with its optional `[package] when` condition.
+    pub fn package_abi(
+        &self,
+    ) -> impl Iterator<Item = (&str, &BTreeMap<String, (String, Span)>, Option<&str>)> {
+        self.packages.iter().filter(|p| !p.abi.is_empty()).map(|p| {
+            (
+                p.name.as_str(),
+                &p.abi,
+                p.when.as_ref().map(|(c, _)| c.as_str()),
+            )
         })
     }
 
@@ -401,6 +419,10 @@ impl Libraries<'_> {
             hooks: (library.package.as_ref()).map_or_else(Vec::new, |p| p.hooks.clone()),
             watch: (library.package.as_ref()).map_or_else(Vec::new, |p| p.watch.clone()),
             when: library.package.as_ref().and_then(|p| p.when.clone()),
+            abi: library
+                .package
+                .as_ref()
+                .map_or_else(BTreeMap::new, |p| p.abi.clone()),
             host: library.host,
         });
         Some((at, library.dependencies))

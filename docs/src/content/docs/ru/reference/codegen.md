@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: 02a7d3baa151722f
+source_hash: 221a809f314c22b6
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -293,6 +293,48 @@ rec {
 ждёт завершения промиса даже после прерывания (см. [среду выполнения](../runtime/)).
 Относительный путь модуля разрешается относительно исходного файла.
 Режим `global` указывает глобальное значение, как в `foreign now from global "Date.now"`.
+
+### ABI значений (`flick/js`)
+
+Прямые привязки `foreign` и переопределения `@native` сверяются с
+версионированной таблицей ABI значений, публикуемой `flick/js` (`FLICK-F013`
+для неподдерживаемых типов или направлений, `FLICK-F014` при несовпадении
+версии ABI). Построено из дескриптора бэкенда `flick/js`:
+
+<!-- value-abi:flick/js:ru:start -->
+**ABI:** `flick.javascript-ffi@0.1.0` · **Непрозрачный вариант:** `unknown` · **Тип хоста для `catch`:** `unknown` (lang item `js_value`)
+
+| Ключ | Flick | Хост | Преобразование | Направление | Примечания |
+| - | - | - | - | - | - |
+| `unit` | `Unit` | `undefined` | `none` | `both` | JS `undefined`; успешный внешний результат типа `Unit` — `()`, что бы ни вернул JS |
+| `bool` | `Bool` | `boolean` | `none` | `both` | Примитив JS `boolean` |
+| `int` | `Int` | `number` | `none` | `both` | Число JS `number`, хранимое в диапазоне знакового 32-битного целого (`Int32`) |
+| `float` | `Float` | `number` | `none` | `both` | Число JS `number` (IEEE 754 binary64) |
+| `bigint` | `BigInt` | `bigint` | `none` | `both` | JS `bigint` произвольной точности |
+| `int8` | `Int8` | `number` | `none` | `both` | Число JS `number`, приведённое к знаковому 8-битному целому |
+| `int16` | `Int16` | `number` | `none` | `both` | Число JS `number`, приведённое к знаковому 16-битному целому |
+| `int64` | `Int64` | `bigint` | `none` | `both` | JS `bigint`, обёрнутое по модулю знакового 64-битного целого |
+| `uint8` | `UInt8 (Byte)` | `number` | `none` | `both` | Число JS `number`, приведённое к беззнаковому 8-битному целому |
+| `uint16` | `UInt16` | `number` | `none` | `both` | Число JS `number`, приведённое к беззнаковому 16-битному целому |
+| `uint32` | `UInt32` | `number` | `none` | `both` | Число JS `number`, приведённое к беззнаковому 32-битному целому |
+| `uint64` | `UInt64` | `bigint` | `none` | `both` | JS `bigint`, обёрнутое по модулю беззнакового 64-битного целого |
+| `float32` | `Float32` | `number` | `none` | `both` | Число JS `number`, округлённое к IEEE 754 binary32 |
+| `string` | `String` | `string` | `none` | `both` | Примитив JS `string` (UTF-16) |
+| `never` | `Never` | `never` | `none` | `both` | Пустой тип без значений |
+| `js_value` | `JsValue` | `unknown` | `none` | `both` | Непрозрачный `JsValue`, передаётся как есть до снимка с проверкой |
+| `unknown` | `Unknown` | `unknown` | `copy` | `both` | Инертное неизменяемое значение Flick; копируется на границе |
+| `tuple` | `(a, b, …)` | `readonly [A, B, …]` | `copy` | `both` | Плотный JS-массив фиксированной длины; копируется на границе |
+| `list` | `List a` | `ReadonlyArray<A>` | `copy` | `both` | Плотный JS-массив с неизменяемым API языка; копируется на границе |
+| `option` | `Option a` | `Option.Option<A>` | `copy` | `both` | Нативный `Option` Effect; `nullable` читает `null`/`undefined` как `None`, а `optional i` передаёт `None` как `undefined` |
+| `result` | `Result e a` | `Result.Result<A, E>` | `copy` | `both` | Нативное представление `Result` закреплённой версии Effect |
+| `eff` | `Eff r e a` | `Effect.Effect<A, E, R>` | `none` | `both` | Нативное представление `Effect` закреплённой версии Effect |
+| `layer` | `Layer ri e ro` | `Layer.Layer<RO, E, RI>` | `none` | `both` | Нативное представление `Layer` закреплённой версии Effect |
+| `exit` | `Exit e a` | `Exit.Exit<A, E>` | `none` | `both` | Нативное представление `Exit` закреплённой версии Effect |
+| `failure` | `Failure e` | `Cause.Cause<E>` | `none` | `both` | Нативное представление `Cause` закреплённой версии Effect |
+| `function` | `a -> b, a ->{r; e} b` | `(a, …) => b` | `none` | `both` | Функции обратного вызова с адаптацией арности JS; четыре семейства: чистые, Effect, Promise и обработчики событий области |
+
+Записи и пользовательские ADT не имеют стабильной раскладки и в эту таблицу не входят. В этом бэкенде они по-прежнему могут проходить через привязки с глубоким копированием как обычные JS-объекты / объекты с тегом (`_tag` = `Имя#hash`, поля `_0`, `_1`, …); `unboxed type` и `untagged type` объявляют явное представление.
+<!-- value-abi:flick/js:ru:end -->
 
 ## Карты исходного кода
 

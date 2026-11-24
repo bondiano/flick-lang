@@ -1,0 +1,9 @@
+schema-version = 1
+
+[package]
+name = "js"
+version = "0.2.0"
+flick = ">=0.2, <0.3"
+
+[project]
+kind = "lib"

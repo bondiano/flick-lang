@@ -75,12 +75,12 @@ impl Checker<'_> {
     /// [`Self::qualified_head`] without the copy of a type that does not
     /// reduce, which is most of what the capture summaries ask about.
     pub fn borrowed_head<'a>(&'a self, t: &'a Type) -> Cow<'a, Type> {
-        self.borrowed_head_observing(t, false, &mut |_, _| {})
+        self.borrowed_head_observing(t, false, &mut |_, _| true)
     }
 
     /// [`Self::witness_head`] without the copy of a type that does not reduce.
     pub(in crate::types) fn borrowed_witness_head<'a>(&'a self, ty: &'a Type) -> Cow<'a, Type> {
-        self.borrowed_head_observing(ty, true, &mut |_, _| {})
+        self.borrowed_head_observing(ty, true, &mut |_, _| true)
     }
 
     /// Ordinary head reduction, retaining opaque identities and qualifiers at
@@ -89,11 +89,40 @@ impl Checker<'_> {
         self.borrowed_witness_head(ty).into_owned()
     }
 
+    /// Like [`Self::whnf_captured`], but stops expanding any alias already in
+    /// `stop_at` (or already expanded along this head chain) and returns the
+    /// newly expanded `(module, name)` alias pairs.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub(in crate::types) fn whnf_captured_stopping_at(
+        &self,
+        t: &Type,
+        stop_at: &HashSet<(String, String)>,
+    ) -> (Type, Vec<(String, String)>) {
+        let mut entered = Vec::new();
+        let mut should_expand = |module: &str, name: &str| {
+            let id = (module.to_owned(), name.to_owned());
+            if stop_at.contains(&id) || entered.contains(&id) {
+                return false;
+            }
+            entered.push(id);
+            true
+        };
+        let mut t = self
+            .borrowed_head_observing(t, false, &mut should_expand)
+            .into_owned();
+        while let Type::Captured { ty, .. } | Type::Bounded { ty, .. } = t {
+            t = self
+                .borrowed_head_observing(&ty, false, &mut should_expand)
+                .into_owned();
+        }
+        (t, entered)
+    }
+
     fn borrowed_head_observing<'a>(
         &'a self,
         t: &'a Type,
         stop_at_opaque: bool,
-        observe: &mut impl FnMut(&str, &str),
+        should_expand: &mut impl FnMut(&str, &str) -> bool,
     ) -> Cow<'a, Type> {
         let mut t = self.store.head(t);
         for _ in 0..64 {
@@ -125,7 +154,9 @@ impl Checker<'_> {
             if args.len() < params.len() || (stop_at_opaque && *opaque) {
                 break;
             }
-            observe(module, name);
+            if !should_expand(module, name) {
+                break;
+            }
             let subst: Vec<(String, Type)> = params
                 .iter()
                 .cloned()

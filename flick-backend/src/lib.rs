@@ -9,6 +9,7 @@ pub mod host;
 mod inputs;
 mod request;
 mod validate;
+mod value_abi;
 mod wit;
 
 pub use driver::{Failure, Generated, generate};
@@ -18,6 +19,7 @@ pub use request::{validate_request, validate_source_spans};
 pub use validate::{
     Limits, Policy, validate_output_paths, validate_result, validate_serialized_size,
 };
+pub use value_abi::validate_value_abi;
 
 /// The version of the component contract, independent of the portable IR.
 pub const VERSION: &str = "0.1.0";

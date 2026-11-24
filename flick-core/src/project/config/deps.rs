@@ -40,6 +40,8 @@ pub(super) struct RawPackage {
     #[serde(default)]
     watch: Vec<String>,
     when: Option<Spanned<String>>,
+    #[serde(default)]
+    abi: BTreeMap<Spanned<String>, Spanned<String>>,
 }
 
 #[derive(Deserialize)]
@@ -122,6 +124,7 @@ pub(super) fn package(
         hooks,
         watch,
         when: raw_when,
+        abi: raw_abi,
     } = raw.into_inner();
     let error = |message: String| Diagnostic::error(codes::P032, message, at);
     semver::Version::parse(&version).map_err(|e| {
@@ -197,6 +200,7 @@ pub(super) fn package(
         }
         None => None,
     };
+    let abi = parse_package_abi(raw_abi, span)?;
     Ok(Package {
         name,
         version,
@@ -206,8 +210,56 @@ pub(super) fn package(
         hooks,
         watch,
         when: when_cond,
+        abi,
         span: at,
     })
+}
+
+fn parse_package_abi(
+    raw_abi: BTreeMap<Spanned<String>, Spanned<String>>,
+    span: &dyn Fn(ops::Range<usize>) -> Span,
+) -> Result<BTreeMap<String, (String, Span)>, Diagnostic> {
+    let mut abi = BTreeMap::new();
+    for (abi_name, raw_req) in raw_abi {
+        let name_span = span(abi_name.span());
+        let abi_name = abi_name.into_inner();
+        if !is_abi_name(&abi_name) {
+            return Err(Diagnostic::error(
+                codes::P032,
+                format!(
+                    "`[package.abi]` key `{abi_name}` is not a valid ABI name: use lowercase ASCII letters, digits, `.`, `-`, or `_`"
+                ),
+                name_span,
+            ));
+        }
+        let req_span = span(raw_req.span());
+        let req = raw_req.into_inner();
+        semver::VersionReq::parse(&req).map_err(|e| {
+            Diagnostic::error(
+                codes::P032,
+                format!(
+                    "`[package.abi]` `{abi_name} = \"{req}\"` is not a version requirement: {e}"
+                ),
+                req_span,
+            )
+        })?;
+        abi.insert(abi_name, (req, req_span));
+    }
+    Ok(abi)
+}
+
+fn is_abi_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    let Some(first) = bytes.next() else {
+        return false;
+    };
+    first.is_ascii_lowercase()
+        && !name.ends_with('.')
+        && !name.ends_with('-')
+        && !name.contains("..")
+        && bytes.all(|b| {
+            b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'.' | b'-' | b'_')
+        })
 }
 
 /// `[host]`: a host environment package for a backend.

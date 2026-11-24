@@ -46,6 +46,9 @@ mod templates;
 #[cfg(feature = "wasm-backends")]
 #[path = "backends/typed_ir.rs"]
 mod typed_ir;
+#[cfg(feature = "wasm-backends")]
+#[path = "backends/value_abi.rs"]
+mod value_abi;
 
 use std::fs;
 #[cfg(feature = "wasm-backends")]

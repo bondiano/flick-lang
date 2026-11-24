@@ -3,8 +3,7 @@ title: "Standard library"
 ---
 
 The standard library is Flick code over the runtime adapter (see [Higher-order functions and collection traversal](../../spec/04-higher-order/), [Schema and standard data types](../../spec/07-schema/), [Compiler CLI](../cli/)).
-Its modules are organized across eight implicit packages (`std`, `stream`,
-`process`, `ui`, `http`, `rpc`, `observability`, `cli`): a program names them
+Its modules are organized into implicit source packages. A program names them
 qualified without an import (`List.map`, `Ref.make`), or imports names from them
 like from any module (`import File exposing (FileSystem, OpenError)`). The
 Prelude is seen by every module without qualification. A service or type of
@@ -15,6 +14,8 @@ Signatures the specification gives are declared word for word;
 `flick-core/tests/stdlib_signatures.rs` checks it.
 
 [Generated package API](../../api/) lists the public signatures, doc comments and source links from `flick doc --std`.
+
+For `Js.Array` and `JsError`, see [JavaScript interop](../ffi/).
 
 ## Prelude
 
@@ -51,7 +52,6 @@ instance matrix and complexity bounds.
 | `Route` | URLs of a type that derives `Url`: `print` and `parse`; `Atom.route` holds the current page (see [Routes](../route/)) |
 | `NonEmpty` | lists with at least one element |
 | `Chunk` | sequences for repeated concatenation |
-| `Js.Array` | mutable JS arrays, behind runtime operations; lists are copied in and out |
 | `String` | `split`, `join`, `slice`, `index_of`, `to_number`, … over UTF-16 code units |
 | `Markdown` | `to_html`: the everyday CommonMark subset (headings, paragraphs, lists, quotes, fenced code, rules, `code`, strong, emphasis, links) into HTML in which every text is escaped and links go only to `http`, `https`, `mailto` and relative URLs, so a script in the source stays text; `escape` |
 | `Int` | `to_float`, `from_float`, `truncate`, `parse`, bitwise `bit_*` and `shift_*`, checked `checked_add`, `checked_div`, … returning `Result ArithmeticError Int`, and `unsafe_div`, `unsafe_rem` |
@@ -78,7 +78,6 @@ instance matrix and complexity bounds.
 | `Rpc` | typed remote procedure calls — procedures with codecs, groups, servers and clients over HTTP, WebSocket, TCP and standard streams, see [rpc.md](../rpc/) |
 | `Metric`, `Tracer` | metrics of the program's registry and spans around its tasks, see [observability.md](../observability/) |
 | `Otlp`, `Prometheus`, `DevTools` | where spans, log records and metrics go: an OTLP collector, a Prometheus route, the Effect DevTools, see [observability.md](../observability/) |
-| `JsError` | `JsError.from_js`, the error of a foreign throw or rejection, see [ffi.md](../ffi/) |
 | `Fiber`, `Failure`, `Exit`, `RawCause` | children of a scope and outcomes |
 | `Test`, `Gen` | tests and generators, see below |
 | `Schedule` | schedules for `Effect.repeat` and `Effect.retry`: `recurs`, `spaced`, `exponential`, `fibonacci`, `up_to`, `while`, `tap`, … |

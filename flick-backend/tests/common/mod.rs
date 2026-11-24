@@ -145,6 +145,7 @@ pub fn descriptor() -> Descriptor {
         handled_services: vec![],
         foreign_adapters: vec![],
         type_form_attributes: vec![],
+        value_abi: None,
     }
 }
 

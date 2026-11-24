@@ -351,14 +351,15 @@ fn record(project: &Project, entry: &LockedBackend) -> Result<(), Diagnostic> {
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
     use std::path::Path;
+    use std::{env, fs};
 
     use flick_backend::Backend;
     use flick_backend::host::{Budget, WasmBackend};
     use flick_core::project::official_backends;
+    use flick_core::types::{DocLocale, render_value_abi_markdown, replace_value_abi_block};
 
-    use super::{IDS, checkout};
+    use super::{IDS, JS, checkout};
     use crate::backends::options;
     use crate::component;
 
@@ -378,6 +379,10 @@ mod tests {
             assert!(flick_backend::validate_tags(&descriptor).is_ok(), "{id}");
             assert!(
                 flick_backend::validate_foreign_metadata(&descriptor).is_ok(),
+                "{id}"
+            );
+            assert!(
+                flick_backend::validate_value_abi(&descriptor).is_ok(),
                 "{id}"
             );
             let from_core = core_official
@@ -403,6 +408,79 @@ mod tests {
                     listed[key]["maximum_exclusive"],
                     range.maximum_exclusive.as_str(),
                     "{id} {key}"
+                );
+            }
+        }
+    }
+
+    /// Official English and Russian FFI and backend documentation tables must
+    /// match what the shipped backend component publishes in `descriptor.value-abi`.
+    /// Run with `FLICK_UPDATE_ABI_DOCS=1` to rewrite the rendered blocks in place.
+    #[test]
+    fn official_value_abi_tables_match_rendered_docs() {
+        let (pin, bytes) = checkout(JS).expect("this checkout's flick/js component");
+        let engine = component::engine().expect("an engine");
+        let cancel = component::cancellation().expect("a cancellation").clone();
+        let backend =
+            WasmBackend::load_with_cancellation(engine, pin, &bytes, Budget::default(), cancel)
+                .expect("flick/js component loads");
+        let descriptor = backend.describe();
+        let tags = options::descriptor_tags(&descriptor);
+        let table = tags
+            .value_abi
+            .as_ref()
+            .expect("flick/js publishes a value ABI table");
+        let en = render_value_abi_markdown(table, DocLocale::En);
+        let ru = render_value_abi_markdown(table, DocLocale::Ru);
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("repo root");
+        let update = env::var_os("FLICK_UPDATE_ABI_DOCS").is_some();
+        let targets = [
+            (
+                "docs/src/content/docs/spec/06-typescript-and-ffi.md",
+                "flick/js:en",
+                &en,
+            ),
+            (
+                "docs/src/content/docs/ru/spec/06-typescript-and-ffi.md",
+                "flick/js:ru",
+                &ru,
+            ),
+            ("docs/src/content/docs/reference/ffi.md", "flick/js:en", &en),
+            (
+                "docs/src/content/docs/ru/reference/ffi.md",
+                "flick/js:ru",
+                &ru,
+            ),
+            (
+                "docs/src/content/docs/reference/codegen.md",
+                "flick/js:en",
+                &en,
+            ),
+            (
+                "docs/src/content/docs/ru/reference/codegen.md",
+                "flick/js:ru",
+                &ru,
+            ),
+        ];
+        for (rel, marker, rendered) in targets {
+            let path = root.join(rel);
+            let actual =
+                fs::read_to_string(&path).unwrap_or_else(|e| panic!("failed to read {rel}: {e}"));
+            let expected = replace_value_abi_block(&actual, marker, rendered)
+                .unwrap_or_else(|| panic!("{rel} is missing value-abi markers for `{marker}`"));
+            if update {
+                if actual != expected {
+                    fs::write(&path, &expected)
+                        .unwrap_or_else(|e| panic!("failed to write {rel}: {e}"));
+                }
+            } else {
+                assert_eq!(
+                    actual, expected,
+                    "{rel} value-abi block `{marker}` drifted from flick/js descriptor; \
+                     run `FLICK_UPDATE_ABI_DOCS=1 cargo test -p flick --bin flick official_value_abi_tables_match_rendered_docs` \
+                     and restamp translations with `node docs/scripts/parity.mjs --stamp ...`"
                 );
             }
         }
