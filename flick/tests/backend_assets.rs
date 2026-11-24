@@ -53,7 +53,7 @@ impl Scratch {
     fn index(&self, change: impl FnOnce(&mut serde_json::Value)) {
         let mut entry = json!({
             "id": "flick/js",
-            "version": "0.1.0",
+            "version": "0.2.0",
             "sha256": hex(&component()),
             "url": self.dir.join("index/component.wasm"),
             "backend_api": { "minimum": "0.1.0", "maximum_exclusive": "0.2.0" },
@@ -93,7 +93,7 @@ fn a_fresh_project_pins_the_backend_once_and_then_builds_offline() {
     let sha = hex(&component());
     assert!(
         s.lock().contains(&format!(
-            "[[backend]]\nid = \"flick/js\"\nversion = \"0.1.0\"\nsha256 = \"{sha}\""
+            "[[backend]]\nid = \"flick/js\"\nversion = \"0.2.0\"\nsha256 = \"{sha}\""
         )),
         "{}",
         s.lock()
@@ -179,14 +179,14 @@ fn install_pins_the_backend_locked_refuses_without_one_and_update_moves_it() {
 
     let out = s.flick("store", &["install"]);
     assert!(out.status.success(), "{}", stderr(&out));
-    assert!(s.lock().contains("version = \"0.1.0\""), "{}", s.lock());
+    assert!(s.lock().contains("version = \"0.2.0\""), "{}", s.lock());
     let out = s.flick("store", &["install", "--locked"]);
     assert!(out.status.success(), "{}", stderr(&out));
 
     // a newer release in the index: install keeps the pin, update moves it
     s.index(|e| e["version"] = json!("0.1.1"));
     assert!(s.flick("store", &["install"]).status.success());
-    assert!(s.lock().contains("version = \"0.1.0\""), "{}", s.lock());
+    assert!(s.lock().contains("version = \"0.2.0\""), "{}", s.lock());
     let out = s.flick("store", &["update"]);
     assert!(out.status.success(), "{}", stderr(&out));
     assert!(s.lock().contains("version = \"0.1.1\""), "{}", s.lock());
@@ -369,7 +369,7 @@ fn non_backend_commands_never_fetch_or_load_backends() {
     fs::write(
         pinned_dir.join("flick.toml"),
         format!(
-            "{LIB}\n[build.backend]\nid = \"flick/js\"\nversion = \"0.1.0\"\nsha256 = \"{sha}\"\ncomponent = \"custom.wasm\"\n"
+            "{LIB}\n[build.backend]\nid = \"flick/js\"\nversion = \"0.2.0\"\nsha256 = \"{sha}\"\ncomponent = \"custom.wasm\"\n"
         ),
     )
     .expect("pinned config");
@@ -407,7 +407,7 @@ fn new_from_backends_index_pins_backend_in_lock_and_builds_offline() {
     let lock = fs::read_to_string(lib.join("flick.lock")).expect("flick.lock written");
     assert!(
         lock.contains(&format!(
-            "[[backend]]\nid = \"flick/js\"\nversion = \"0.1.0\"\nsha256 = \"{sha}\""
+            "[[backend]]\nid = \"flick/js\"\nversion = \"0.2.0\"\nsha256 = \"{sha}\""
         )),
         "{lock}"
     );

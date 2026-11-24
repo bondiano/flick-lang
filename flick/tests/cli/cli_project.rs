@@ -45,8 +45,8 @@ fn new_creates_a_project_and_init_refuses_before_writing() {
     let manifest = fs::read_to_string(dir.join("demo/package.json")).expect("manifest");
     for pin in [
         "\"pnpm@",
-        "\"@flick-lang/runtime\": \"0.1.0\"",
-        "\"compiler\": \"0.1.0\"",
+        "\"@flick-lang/runtime\": \"0.2.0\"",
+        "\"compiler\": \"0.2.0\"",
     ] {
         assert!(manifest.contains(pin), "{pin} in {manifest}");
     }

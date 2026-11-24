@@ -94,7 +94,7 @@ fn prepare_fixture(
         BackendPin {
             identity: BackendId {
                 id: "flick/js".into(),
-                version: "0.1.0".into(),
+                version: "0.2.0".into(),
             },
             sha256: flick_backend::sha256(b"native parity"),
         },
@@ -127,7 +127,7 @@ fn official_js_component_emits_deep_owner_policies_with_its_default_budget() {
     let pin = BackendPin {
         identity: BackendId {
             id: "flick/js".into(),
-            version: "0.1.0".into(),
+            version: "0.2.0".into(),
         },
         sha256: sha256.clone(),
     };

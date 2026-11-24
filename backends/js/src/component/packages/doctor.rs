@@ -9,7 +9,7 @@ use super::super::dependencies::PNPM;
 use super::{Known, dir, installed_file, installed_version, resolve};
 
 /// The runtime package ABI version this backend targets.
-pub(super) const RUNTIME: &str = "0.1.0";
+pub(super) const RUNTIME: &str = "0.2.0";
 /// The package `effect` mode loads beside the runtime.
 pub(super) const ADAPTER: &str = "@flick-lang/effect-ts";
 /// Minimum Node.js version reported by `flick doctor`.
@@ -284,7 +284,7 @@ pub(super) fn doctor_package_diagnostics(
     let compiler = options
         .iter()
         .find(|o| o.key == "compiler")
-        .map_or("0.1.0", |o| o.value.as_str());
+        .map_or("0.2.0", |o| o.value.as_str());
     let mut lines = Vec::new();
     doctor_project_lines(known, compiler, boundary, &mut lines);
     lines

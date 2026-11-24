@@ -237,7 +237,7 @@ fn literal_abi_mismatch_request(
         target: TargetRequest {
             backend_api: flick_backend::VERSION.into(),
             ir_version: flick_ir::VERSION.into(),
-            language_version: "0.1.0".into(),
+            language_version: "0.2.0".into(),
             runtime_abis: vec![],
             environment: Environment {
                 backend: "js".into(),

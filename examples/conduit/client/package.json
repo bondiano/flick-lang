@@ -20,6 +20,6 @@
     "@playwright/test": "1.64.1"
   },
   "flick": {
-    "compiler": "0.1.0"
+    "compiler": "0.2.0"
   }
 }

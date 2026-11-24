@@ -448,7 +448,7 @@ fn official_js_component_builds_runs_and_tests_with_independent_results() {
     fs::write(root.join("backend.wasm"), &bytes).expect("component");
     let config = pinned()
         .replace("test/literal", "flick/js")
-        .replace("1.0.0", "0.1.0")
+        .replace("1.0.0", "0.2.0")
         .replace(&"a".repeat(64), &flick_backend::sha256(&bytes));
     fs::write(root.join("flick.toml"), config).expect("pin");
     for profile in ["debug", "release"] {

@@ -53,11 +53,11 @@ fn an_incompatible_effect_blocks_build_and_run() {
             ("src/App/Main.fl", MAIN),
             (
                 "node_modules/@flick-lang/runtime/package.json",
-                "{ \"name\": \"@flick-lang/runtime\", \"version\": \"0.1.0\" }",
+                "{ \"name\": \"@flick-lang/runtime\", \"version\": \"0.2.0\" }",
             ),
             (
                 "node_modules/@flick-lang/effect-ts/package.json",
-                r#"{"version":"0.1.0","dependencies":{"effect":"4.1.2"}}"#,
+                r#"{"version":"0.2.0","dependencies":{"effect":"4.1.2"}}"#,
             ),
             (
                 "node_modules/@flick-lang/effect-ts/node_modules/effect/package.json",
@@ -93,7 +93,7 @@ fn the_installed_runtime_and_effect_are_in_the_cache_key() {
     fs::create_dir_all(&runtime).expect("dir");
     fs::write(
         runtime.join("package.json"),
-        "{ \"name\": \"@flick-lang/runtime\", \"version\": \"0.1.0\" }",
+        "{ \"name\": \"@flick-lang/runtime\", \"version\": \"0.2.0\" }",
     )
     .expect("write");
     build();
@@ -101,12 +101,12 @@ fn the_installed_runtime_and_effect_are_in_the_cache_key() {
     fs::create_dir_all(adapter.join("node_modules/effect")).expect("dir");
     fs::write(
         adapter.join("package.json"),
-        "{ \"name\": \"@flick-lang/effect-ts\", \"version\": \"0.1.0\" }",
+        "{ \"name\": \"@flick-lang/effect-ts\", \"version\": \"0.2.0\" }",
     )
     .expect("write");
     fs::write(
         adapter.join("package.json"),
-        r#"{"version":"0.1.0","dependencies":{"effect":"4.1.2"}}"#,
+        r#"{"version":"0.2.0","dependencies":{"effect":"4.1.2"}}"#,
     )
     .expect("write");
     fs::write(

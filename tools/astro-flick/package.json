@@ -1,6 +1,6 @@
 {
   "name": "@flick-lang/astro",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Flick modules in Astro and Vite: `import { main } from \"./App.fl\"` compiles with `flick build`",
   "license": "MIT",
   "repository": {

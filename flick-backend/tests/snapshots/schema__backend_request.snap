@@ -64,7 +64,7 @@ expression: "serde_json::to_string_pretty(&request).expect(\"JSON\")"
     },
     "host_package": null,
     "ir_version": "0.17.0",
-    "language_version": "0.1.0",
+    "language_version": "0.2.0",
     "mode": "WholeProgram",
     "options": [],
     "profile": "Debug",
@@ -72,7 +72,7 @@ expression: "serde_json::to_string_pretty(&request).expect(\"JSON\")"
     "runtime_abis": [
       {
         "name": "flickrt",
-        "version": "0.1.0"
+        "version": "0.2.0"
       }
     ],
     "tags": []

@@ -67,7 +67,7 @@ pub(super) fn supported(item: &Item, request: &BuildRequest) -> bool {
         && request
             .runtime_dependencies
             .iter()
-            .any(|r| r.package == "@flick-lang/runtime" && r.version == "0.1.0")
+            .any(|r| r.package == "@flick-lang/runtime" && r.version == "0.2.0")
         && matches!(&item.kind, ItemKind::Value { name, dicts, body, .. } if name == "tests" && dicts.is_empty() && expression(body).is_some())
 }
 

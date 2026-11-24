@@ -2,7 +2,7 @@
 
 use flick_backend::command::{self, File, Plan, TemplateDescriptor, TemplateRequest};
 
-const RUNTIME: &str = "0.1.0";
+const RUNTIME: &str = "0.2.0";
 const PNPM: &str = "12.16.1";
 const REACT: &str = "19.3.1";
 const VITE: &str = "8.3.5";

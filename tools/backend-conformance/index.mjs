@@ -19,8 +19,9 @@ for (const dir of ["src", "test"]) {
 const bytes = readFileSync(component);
 writeFileSync(join(project, "backend.wasm"), bytes);
 const digest = createHash("sha256").update(bytes).digest("hex");
+const { identity } = JSON.parse(readFileSync(join(root, "backends/js/package/backend.json"), "utf8"));
 const configuration = readFileSync(join(root, "tests/language/flick.toml"), "utf8");
-writeFileSync(join(project, "flick.toml"), `${configuration}\n[build.backend]\nid = "flick/js"\nversion = "0.1.0"\nsha256 = "${digest}"\ncomponent = "backend.wasm"\n`);
+writeFileSync(join(project, "flick.toml"), `${configuration}\n[build.backend]\nid = "${identity.id}"\nversion = "${identity.version}"\nsha256 = "${digest}"\ncomponent = "backend.wasm"\n`);
 let baseline;
 for (const runtime of ["effect", "rt"]) {
   for (const profile of ["debug", "release"]) {
@@ -41,7 +42,7 @@ for (const runtime of ["effect", "rt"]) {
     else baseline = report;
     // The shared component driver publishes this manifest for its chosen launch.
     assert.ok(readFileSync(join(project, ".flick/test/.flick-backend.cbor")).length > 0);
-    console.log(`${label}: ${report.tests.length} assertions passed through flick/js@0.1.0#${digest}`);
+    console.log(`${label}: ${report.tests.length} assertions passed through ${identity.id}@${identity.version}#${digest}`);
   }
 }
 console.log(`Artifacts: ${project}`);
