@@ -120,6 +120,16 @@ func FlagToOptRef[T any](v T, ok bool, conv func(T) Value) OptRef {
 	return SomeRef(conv(v))
 }
 
+func StructToOptRef[T any](o struct {
+	Val T
+	Ok  bool
+}, conv func(T) Value) OptRef {
+	if !o.Ok {
+		return NoneRef
+	}
+	return SomeRef(conv(o.Val))
+}
+
 func OptValueToPtr[T any](o Opt[Value], conv func(Value) T) *T {
 	if !o.Ok {
 		return nil
@@ -277,6 +287,14 @@ func NullableToOptValue(v Value) Opt[Value] {
 		return Opt[Value]{}
 	}
 	return Opt[Value]{Val: v, Ok: true}
+}
+
+// NullableToOptRef converts a nullable Go handle directly to OptRef.
+func NullableToOptRef(v Value) OptRef {
+	if IsNil(v) {
+		return NoneRef
+	}
+	return SomeRef(v)
 }
 
 func failCaught(fb *Fiber, catchFn Value, recovered any) Value {

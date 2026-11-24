@@ -175,6 +175,11 @@ fn go_value_abi_refuses_out_of_table_types_at_span_with_table_reason() {
             "module Probe exposing (f)\nf : { x : Int } -> Int\nforeign pure f from global \"example.Fn\"\n",
             "no stable Go struct layout",
         ),
+        (
+            "untagged_union_adt",
+            "module Probe exposing (f)\nuntagged type Key = ByNum Float | ByName String\nf : Key -> String\nforeign pure f from \"example.com/p\" \"F\"\n",
+            "no stable Go layout",
+        ),
     ];
     for (label, source, expected) in cases {
         let diags = check_go(source);
@@ -194,6 +199,23 @@ fn go_value_abi_refuses_out_of_table_types_at_span_with_table_reason() {
             "{label}: expected span at foreign decl, got `{slice}`"
         );
     }
+}
+
+#[test]
+fn go_value_abi_admits_literal_enums_and_rejects_untagged_unions() {
+    let ok = r#"module Probe exposing (..)
+
+untagged type Mode = Fast = 1 | Slow = 2
+untagged type Method = Get = "GET" | Post = "POST"
+
+use_mode : Mode -> Method -> Int
+foreign pure use_mode from "example.com/p" "UseMode"
+"#;
+    let diags = check_go(ok);
+    assert!(
+        diags.is_empty(),
+        "literal enums must remain accepted on flick/go: {diags:?}"
+    );
 }
 
 #[test]

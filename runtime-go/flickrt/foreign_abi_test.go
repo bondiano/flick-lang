@@ -118,6 +118,29 @@ func TestOptionPointerAndNestedFlagPreservation(t *testing.T) {
 	if got := FromNullableGo(&val); !IsSome(got) {
 		t.Fatalf("FromNullableGo(&val) must be Some")
 	}
+	if got := NullableToOptRef(nil); got != NoneRef {
+		t.Fatalf("NullableToOptRef(nil) must be NoneRef")
+	}
+	if got := NullableToOptRef(typedNil); got != NoneRef {
+		t.Fatalf("NullableToOptRef(typedNil) must be NoneRef")
+	}
+	if got := NullableToOptRef(&val); got == NoneRef || got.val != &val {
+		t.Fatalf("NullableToOptRef(&val) = %+v", got)
+	}
+	absent := struct {
+		Val Value
+		Ok  bool
+	}{}
+	present := struct {
+		Val Value
+		Ok  bool
+	}{Val: &val, Ok: true}
+	if got := StructToOptRef(absent, IdentityValue); got != NoneRef {
+		t.Fatalf("StructToOptRef(absent) must be NoneRef")
+	}
+	if got := StructToOptRef(present, IdentityValue); got == NoneRef || got.val != &val {
+		t.Fatalf("StructToOptRef(present) = %+v", got)
+	}
 }
 
 func TestForeignAsyncCatchSuccessErrorAndCancellation(t *testing.T) {

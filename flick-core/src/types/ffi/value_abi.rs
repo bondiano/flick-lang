@@ -327,14 +327,20 @@ impl AbiCheck<'_, '_> {
                 constructors,
                 abi: Abi::Untagged(_),
             } => {
-                let id = (module.to_owned(), name.to_owned());
-                if self.visited_types.insert(id.clone()) {
-                    for ctor in constructors {
-                        if let Some(field) = self.instantiated_single_field(module, ctor, args) {
-                            self.check(&field, direction, depth + 1);
+                if self.table.admits_copied_data {
+                    let id = (module.to_owned(), name.to_owned());
+                    if self.visited_types.insert(id.clone()) {
+                        for ctor in constructors {
+                            if let Some(field) = self.instantiated_single_field(module, ctor, args)
+                            {
+                                self.check(&field, direction, depth + 1);
+                            }
                         }
+                        self.visited_types.remove(&id);
                     }
-                    self.visited_types.remove(&id);
+                } else {
+                    let reason = self.table.refusal_reason("adt").to_owned();
+                    self.refuse(ty, direction, &reason);
                 }
             }
             Form::Adt {

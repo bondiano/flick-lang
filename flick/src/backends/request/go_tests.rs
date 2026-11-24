@@ -26,21 +26,21 @@ fn temp_dir(name: &str) -> PathBuf {
 }
 
 fn go_descriptor() -> Descriptor {
-    let range = || VersionRange {
-        minimum: "0.1.0".into(),
-        maximum_exclusive: "0.2.0".into(),
+    let range = |minimum: &str, maximum: &str| VersionRange {
+        minimum: minimum.into(),
+        maximum_exclusive: maximum.into(),
     };
     Descriptor {
         identity: BackendId {
             id: "flick/go".into(),
-            version: "0.1.0".into(),
+            version: "0.2.0".into(),
         },
-        backend_api: range(),
-        ir: range(),
-        language: range(),
+        backend_api: range("0.1.0", "0.2.0"),
+        ir: range("0.17.0", "0.18.0"),
+        language: range("0.2.0", "0.3.0"),
         runtime_abis: vec![NamedRange {
             name: "flickrt".into(),
-            versions: range(),
+            versions: range("0.2.0", "0.3.0"),
         }],
         environments: vec![Environment {
             backend: "go".into(),

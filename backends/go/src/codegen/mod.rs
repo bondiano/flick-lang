@@ -58,6 +58,7 @@ pub use shape::Types;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::{mem, slice};
 
+use crate::inline::imported_packages;
 use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
 use flick_backend_support::order::post_order;
@@ -279,6 +280,9 @@ fn compile<'a>(
         "main.go".to_owned(),
         main_file::main_go(a, run, &packages, zones),
     ));
+    for text in sources.values() {
+        go_imports.extend(imported_packages(text));
+    }
     files.extend(sources);
     if !owned.is_empty() {
         files.push(("own_types.go".to_owned(), own::file(&owned)));

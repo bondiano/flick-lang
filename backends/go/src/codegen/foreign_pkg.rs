@@ -303,6 +303,9 @@ impl<'a> Gen<'a> {
             }
             ReturnShape::NullableOpaque => {
                 let converted = match want_result {
+                    Some(GoType::Opt(OptRepr::RefSentinel)) => {
+                        call(a, "flickrt.NullableToOptRef", [go_call])
+                    }
                     Some(GoType::Opt(OptRepr::Flag(OptPayload::Value))) => {
                         call(a, "flickrt.NullableToOptValue", [go_call])
                     }

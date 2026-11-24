@@ -395,6 +395,14 @@ pub(super) fn go_to_flick<'a>(
         GoAbiType::OptionFlag(inner) => {
             let inner_go = a.alloc_str(&inner.go_type());
             match want {
+                Some(GoType::Opt(OptRepr::RefSentinel)) => {
+                    let conv = go_to_erased_fn(a, inner);
+                    call(
+                        a,
+                        docvec![a, "flickrt.StructToOptRef[", inner_go, "]"],
+                        [doc, conv],
+                    )
+                }
                 Some(GoType::Opt(OptRepr::Flag(OptPayload::Nested(inner_repr)))) => {
                     let inner_opt = a.alloc_str(&inner_repr.go_type());
                     let nested_type = GoType::Opt((**inner_repr).clone());

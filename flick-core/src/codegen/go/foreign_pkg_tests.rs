@@ -243,3 +243,42 @@ let main () = a 1 + b 2 + c 3
     assert!(go.contains("beta.Run(a0)"), "{go}");
     assert!(go.contains("type_0.Check(a0)"), "{go}");
 }
+
+#[test]
+fn direct_go_non_nil_lang_opaque_nullable_and_nested_options() {
+    let (_, go) = emit_go(
+        r#"module App exposing (main)
+
+maybe_json : Bool -> Option Json
+foreign pure maybe_json from "example.com/pkg/abi" "MaybeJson"
+  nullable
+
+nested_json : Option (Option Json) -> Option (Option Json)
+foreign pure nested_json from "example.com/pkg/abi" "NestedJson"
+
+main : Unit -> Option (Option Json)
+let main () =
+  let _ = maybe_json true
+  nested_json (Some None)
+"#,
+    );
+    assert!(
+        go.contains("func F_App__maybe_json(fb *flickrt.Fiber, a0 bool) flickrt.OptRef"),
+        "{go}"
+    );
+    assert!(
+        go.contains("flickrt.NullableToOptRef(abi.MaybeJson(a0))"),
+        "{go}"
+    );
+    assert!(
+        go.contains(
+            "func F_App__nested_json(fb *flickrt.Fiber, a0 flickrt.Opt[flickrt.OptRef]) flickrt.Opt[flickrt.OptRef]"
+        ),
+        "{go}"
+    );
+    assert!(go.contains("flickrt.OptRefToFlag("), "{go}");
+    assert!(
+        go.contains("flickrt.StructToOptRef[flickrt.Value]("),
+        "{go}"
+    );
+}

@@ -2,7 +2,6 @@
 //! that builds its executable.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
 
 use flick_backend::{
     Artifact, ArtifactKind, BuildRequest, BuildResult, Diagnostic, InputRef, Launch, LaunchKind,
@@ -193,32 +192,22 @@ fn add(
         go_imports
             .iter()
             .any(|imp| imp == dep || imp.starts_with(&prefix))
-            || code.iter().any(|(path, text)| {
-                Path::new(path)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("go"))
-                    && (text.contains(&format!("\"{dep}\""))
-                        || text.contains(&format!("\"{prefix}")))
-            })
     });
     let mut files = vec![(
         "go.mod".to_owned(),
         go_mod_with_deps(&packages, &data.go_deps),
     )];
-    let capture_generated_go_sum = if let Some(proj_sum) = data.project_go_sum.as_deref() {
-        if let Some(merged) = merge_go_sum((!packages.is_empty()).then_some(GO_SUM), Some(proj_sum))
-        {
-            files.push(("go.sum".to_owned(), merged));
-        }
+    let seed_sum = merge_go_sum(
+        (!packages.is_empty()).then_some(GO_SUM),
+        data.project_go_sum.as_deref(),
+    );
+    let capture_generated_go_sum = if let Some(sum) = seed_sum {
+        files.push(("go.sum".to_owned(), sum));
         false
-    } else if uses_go_deps {
-        // `go build -mod=mod` generates `go.sum` for imported `[target.go.dependencies]`.
-        true
     } else {
-        if !packages.is_empty() {
-            files.push(("go.sum".to_owned(), GO_SUM.to_owned()));
-        }
-        false
+        // `go build -mod=mod` generates `go.sum` when imported `[target.go.dependencies]`
+        // are present and no runtime or project `go.sum` was seeded.
+        uses_go_deps
     };
     let package_files = packages.iter().flat_map(|p| p.files);
     files.extend(package_files.map(|(p, c)| ((*p).to_owned(), (*c).to_owned())));
@@ -297,5 +286,128 @@ fn diagnostic(unsupported: Unsupported) -> Diagnostic {
             end: s.end,
         }),
         notes: vec![],
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{iter, str};
+
+    use super::*;
+    use crate::codegen::Bindings;
+    use flick_ir::Program;
+
+    fn test_data(go_deps: &[(&str, &str)], project_go_sum: Option<&str>) -> Data {
+        Data {
+            program: Program::new("test", vec![], vec![], &|_| String::new()),
+            facts: BTreeMap::new(),
+            lines: vec![],
+            sources: vec![],
+            foreign: BTreeMap::new(),
+            bindings: Bindings::parse(iter::empty()),
+            command: Command::Build,
+            windows: false,
+            cgo: false,
+            inspect_module: None,
+            go_deps: go_deps
+                .iter()
+                .map(|&(k, v)| (k.to_owned(), v.to_owned()))
+                .collect(),
+            project_go_sum: project_go_sum.map(str::to_owned),
+        }
+    }
+
+    fn test_go_tool() -> Toolchain {
+        Toolchain {
+            id: "go".into(),
+            version: "1.23.0".into(),
+            sha256: "0".repeat(64),
+        }
+    }
+
+    fn run_add(
+        data: &Data,
+        code: Vec<(String, String)>,
+        reached: &[&str],
+        go_imports: &[&str],
+    ) -> BuildResult {
+        let mut result = BuildResult {
+            artifacts: vec![],
+            steps: vec![],
+            runtime_dependencies: vec![],
+            launches: vec![],
+            diagnostics: vec![],
+        };
+        let imports: BTreeSet<String> = go_imports.iter().map(|&s| s.to_owned()).collect();
+        add(
+            &mut result,
+            data,
+            &test_go_tool(),
+            "main",
+            code,
+            reached,
+            &imports,
+        );
+        result
+    }
+
+    #[test]
+    fn unimported_dep_string_literal_does_not_declare_go_sum_step_output() {
+        let data = test_data(&[("example.com/pkg", "v1.0.0")], None);
+        let code = vec![(
+            "m_App.go".to_owned(),
+            "package main\nvar s = \"example.com/pkg\"\n".to_owned(),
+        )];
+        let res = run_add(&data, code, &[], &[]);
+        assert!(
+            !res.steps[0]
+                .outputs
+                .iter()
+                .any(|o| o.path.ends_with("go.sum")),
+            "unimported string literal must not declare go.sum StepOutput: {:?}",
+            res.steps[0].outputs
+        );
+    }
+
+    #[test]
+    fn imported_dep_without_runtime_packages_declares_go_sum_step_output() {
+        let data = test_data(&[("example.com/pkg", "v1.0.0")], None);
+        let res = run_add(&data, vec![], &[], &["example.com/pkg"]);
+        assert!(
+            res.steps[0]
+                .outputs
+                .iter()
+                .any(|o| o.path == "go/main/go.sum"),
+            "expected go/main/go.sum StepOutput: {:?}",
+            res.steps[0].outputs
+        );
+        assert!(
+            !res.artifacts.iter().any(|a| a.path == "go/main/go.sum"),
+            "go/main/go.sum must not collide with artifacts"
+        );
+    }
+
+    #[test]
+    fn optional_runtime_package_with_go_deps_preserves_pinned_runtime_go_sum() {
+        let pkg_name = PACKAGES.first().expect("optional runtime package").name;
+        let data = test_data(&[("example.com/pkg", "v1.0.0")], None);
+        let res = run_add(&data, vec![], &[pkg_name], &["example.com/pkg"]);
+        let sum_artifact = res
+            .artifacts
+            .iter()
+            .find(|a| a.path == "go/main/go.sum")
+            .expect("pinned runtime GO_SUM artifact must be preserved");
+        let text = str::from_utf8(&sum_artifact.bytes).expect("utf-8 go.sum");
+        assert!(
+            text.contains("h1:"),
+            "expected pinned runtime checksums in go.sum: {text}"
+        );
+        assert!(
+            !res.steps[0]
+                .outputs
+                .iter()
+                .any(|o| o.path == "go/main/go.sum"),
+            "go/main/go.sum must not be duplicated in StepOutput"
+        );
     }
 }
