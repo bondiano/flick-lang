@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use flick_ir::Lit;
 
-use super::{Checker, invalid};
+use super::{Checker, GoalOrigin, invalid};
 use crate::logic::eval::Value;
 use crate::logic::term::{Literal, Pat};
 use crate::logic::{Cert, Equation, Failure, Ty};
@@ -18,6 +18,7 @@ impl Checker<'_> {
         v: &Rc<str>,
         arms: &[(Pat, Cert)],
         span: Span,
+        origin: GoalOrigin,
     ) -> Result<(), Failure> {
         let Some((_, ty)) = self.vars.iter().rev().find(|(n, _)| n == v).cloned() else {
             return invalid(span, format!("`{v}` is no variable of the statement"));
@@ -58,8 +59,10 @@ impl Checker<'_> {
             let (index, binders) = self.arm(pat, &cases, &covered, proof.span)?;
             let Some(index) = index else {
                 // a variable or `_`: every case not covered yet, with `v` as it is
+                let reachable = covered.iter().any(|covered| !covered);
                 covered.fill(true);
-                self.check(goal, proof)?;
+                let origin = if reachable { origin } else { GoalOrigin::Step };
+                self.check(goal, proof, origin)?;
                 continue;
             };
             covered[index] = true;
@@ -75,7 +78,7 @@ impl Checker<'_> {
                 _ => unreachable!("an arm of a case is a constructor or a literal"),
             };
             self.refined.push((v.clone(), value));
-            let result = self.check(goal, proof);
+            let result = self.check(goal, proof, origin);
             self.refined.pop();
             self.vars.truncate(mark);
             result?;

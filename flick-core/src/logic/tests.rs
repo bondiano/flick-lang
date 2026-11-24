@@ -111,14 +111,14 @@ fn equal(params: Vec<(&str, Ty)>, ty: Ty, left: Term, right: Term) -> Statement 
     }
 }
 
-fn code(found: &Result<(), Failure>) -> &'static str {
+fn code(found: &Result<(), Failure>) -> String {
     match found {
-        Ok(()) => "ok",
-        Err(Failure::Disproved { .. }) => "T080",
-        Err(Failure::Unproved { .. }) => "T081",
-        Err(Failure::Refused(_)) => "T082",
-        Err(Failure::Invalid { .. }) => "T083",
-        Err(Failure::Exhausted { .. }) => "T084",
+        Ok(()) => "ok".into(),
+        Err(failure) => failure
+            .diagnostic("")
+            .code
+            .to_string()
+            .replace("FLICK-", ""),
     }
 }
 
@@ -272,6 +272,20 @@ fn different_values_are_disproved() {
 }
 
 #[test]
+fn mismatch_under_an_unverified_premise_does_not_refute_the_statement() {
+    let boolean = |value| Term::Lit(Literal(Lit::Bool(value)));
+    let mut goal = equal(vec![], Ty::Bool, boolean(true), boolean(false));
+    let Goal::Equal(equation) = &goal.goal else {
+        unreachable!()
+    };
+    goal.premises.push(("h".into(), equation.clone()));
+    let failure =
+        prove(&goal, &refl(), &data(), &Nothing, &[]).expect_err("refl has unequal sides");
+    assert!(matches!(failure.cause(), Failure::StepMismatch { .. }));
+    assert!(prove(&goal, &cert(Rule::Fact("h".into())), &data(), &Nothing, &[]).is_ok());
+}
+
+#[test]
 fn trans_needs_both_of_its_steps() {
     let ty = option(rigid("a"));
     let goal = equal(
@@ -288,7 +302,7 @@ fn trans_needs_both_of_its_steps() {
     ));
     assert_eq!(code(&prove(&goal, &good, &data(), &Nothing, &[])), "ok");
     let wrong = cert(Rule::Trans(none(), Box::new(refl()), Box::new(refl())));
-    assert_eq!(code(&prove(&goal, &wrong, &data(), &Nothing, &[])), "T080");
+    assert_eq!(code(&prove(&goal, &wrong, &data(), &Nothing, &[])), "T090");
 }
 
 #[test]

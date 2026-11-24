@@ -1,4 +1,5 @@
 use super::*;
+use crate::prove_command::{STEP_PROOFS, proof_step_diagnostic};
 
 const PORTS: &str = "module App.Ports exposing (Port)\n\
 refined type Port = Float where fun n -> n > 0 && n < 65536\n";
@@ -8,6 +9,69 @@ fn codes(diagnostics: &[Value]) -> Vec<String> {
         .iter()
         .map(|d| d["code"].as_str().unwrap_or_default().to_owned())
         .collect()
+}
+
+#[test]
+fn a_failed_proof_step_reports_its_obligation_and_related_ranges() {
+    let dir = project(
+        "lsp_failed_obligation",
+        &[("flick.toml", LIB), ("proofs/App/Laws.fl", STEP_PROOFS)],
+    );
+    let uri = uri(&dir.join("proofs/App/Laws.fl"));
+    let mut lsp = Lsp::start(&dir);
+    lsp.notify(
+        "textDocument/didOpen",
+        &json!({ "textDocument": {
+            "uri": uri, "languageId": "flick", "version": 1, "text": STEP_PROOFS,
+        } }),
+    );
+    let diagnostics = lsp.diagnostics(&uri);
+    assert_eq!(diagnostics.len(), 3, "{diagnostics:?}");
+    let offset = |needle: &str| STEP_PROOFS.find(needle).expect("fixture text");
+    for (name, obligation, argument) in [
+        ("wrong_step", "true = false", "trans false "),
+        ("wrong_premise", "false = true", "given false "),
+    ] {
+        let d = proof_step_diagnostic(&diagnostics, name);
+        let start = offset(argument) + argument.len();
+        assert_eq!(d["code"], "FLICK-T090", "{d}");
+        assert_eq!(
+            d["range"],
+            json!({ "start": position(STEP_PROOFS, start), "end": position(STEP_PROOFS, start + 4) })
+        );
+        assert!(
+            d["message"].as_str().expect("message").contains(obligation),
+            "{d}"
+        );
+        let related = d["relatedInformation"]
+            .as_array()
+            .expect("related locations");
+        let points_to = |declaration: &str| {
+            let start = position(STEP_PROOFS, offset(declaration));
+            related
+                .iter()
+                .any(|r| r["location"]["uri"] == uri && r["location"]["range"]["start"] == start)
+        };
+        assert!(points_to(&format!("proof {name}")), "{d}");
+        if name == "wrong_premise" {
+            assert!(points_to("proof given"), "{d}");
+        }
+    }
+    assert_eq!(
+        proof_step_diagnostic(&diagnostics, "refuted")["code"],
+        "FLICK-T080"
+    );
+
+    let fixed = STEP_PROOFS
+        .replace("trans false refl refl", "refl")
+        .replace("given false refl", "refl");
+    lsp.notify(
+        "textDocument/didChange",
+        &json!({ "textDocument": { "uri": uri, "version": 2 },
+            "contentChanges": [{ "text": fixed }] }),
+    );
+    assert_eq!(codes(&lsp.diagnostics(&uri)), ["FLICK-T080"]);
+    lsp.close();
 }
 
 #[test]

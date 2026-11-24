@@ -152,7 +152,7 @@ codes! {
     T077 = Types 77, "cannot prove the check of a type with an invariant";
     T078 = Types 78, "the check of a type with an invariant fails for this value";
     T079 = Types 79, "`T.prove` or a constructor with an invariant not applied to its argument";
-    T080 = Types 80, "a proof's two sides are different values";
+    T080 = Types 80, "a proof statement's two sides are different";
     T081 = Types 81, "a proof does not close its goal";
     T082 = Types 82, "a proof's statement is outside its domain";
     T083 = Types 83, "a proof is no valid certificate";
@@ -162,6 +162,7 @@ codes! {
     T087 = Types 87, "a contract's postcondition is not established";
     T088 = Types 88, "a call's precondition is not established";
     T089 = Types 89, "an `Int` operation may leave the range of `Int`";
+    T090 = Types 90, "a proof step requires an equality between different sides";
     E001 = Effects 1, "runtime call in a pure position";
     E002 = Effects 2, "services or errors not allowed by the bound";
     E003 = Effects 3, "argument runs before the function that takes an Eff";

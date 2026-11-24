@@ -30,6 +30,33 @@ struct Checker<'a> {
     fresh: u32,
 }
 
+/// A distinct pair only refutes a declaration while it still represents
+/// its stated goal at a possible input, with no unverified premises.
+#[derive(Clone, Copy)]
+enum GoalOrigin {
+    Statement,
+    Step,
+}
+
+impl GoalOrigin {
+    fn mismatch(self, span: Span, left: String, right: String, kind: &'static str) -> Failure {
+        match self {
+            Self::Statement => Failure::Disproved {
+                span,
+                left,
+                right,
+                kind,
+            },
+            Self::Step => Failure::StepMismatch {
+                span,
+                left,
+                right,
+                kind,
+            },
+        }
+    }
+}
+
 pub(super) fn prove(
     statement: &Statement,
     proof: &Cert,
@@ -84,10 +111,15 @@ pub(super) fn prove(
         checker.admit_equation(eq, statement.span)?;
         checker.facts.push((h.clone(), eq.clone()));
     }
+    let origin = if statement.premises.is_empty() {
+        GoalOrigin::Statement
+    } else {
+        GoalOrigin::Step
+    };
     match &statement.goal {
         Goal::Equal(eq) => {
             checker.admit_equation(eq, statement.span)?;
-            checker.check(eq, proof)
+            checker.check(eq, proof, origin)
         }
         Goal::SameType(a, b) => {
             checker.admit(a, statement.span)?;
@@ -103,11 +135,7 @@ pub(super) fn prove(
             }
             let (left, right) = (a.to_string(), b.to_string());
             Err(if different_heads(a, b) {
-                Failure::Disproved {
-                    span: proof.span,
-                    left,
-                    right,
-                }
+                origin.mismatch(proof.span, left, right, "types")
             } else {
                 Failure::Unproved {
                     span: proof.span,
@@ -239,36 +267,60 @@ impl Checker<'_> {
         })
     }
 
-    /// `ok` when `a` and `b` have the same normal form.
-    fn same(
+    /// Checks an equality obligation by normalization.
+    fn check_equality(
         &mut self,
         a: &Term,
         b: &Term,
         span: Span,
-        note: Option<String>,
+        origin: GoalOrigin,
     ) -> Result<(), Failure> {
         let (l, r) = (self.nf(a, span)?, self.nf(b, span)?);
         if l == r {
             return Ok(());
         }
         let (left, right) = (show(&l), show(&r));
-        Err(if note.is_none() && distinct(&l, &r) {
-            Failure::Disproved { span, left, right }
+        Err(if distinct(&l, &r) {
+            origin.mismatch(span, left, right, "values")
         } else {
             Failure::Unproved {
                 span,
                 left,
                 right,
-                note,
+                note: None,
             }
         })
     }
 
-    fn check(&mut self, goal: &Equation, cert: &Cert) -> Result<(), Failure> {
+    /// Checks that a supplied equation is the required one, in the same
+    /// order and budget as normalization of its two sides.
+    fn match_equation(
+        &mut self,
+        provided: &Equation,
+        goal: &Equation,
+        span: Span,
+        describe: impl FnOnce(&Self) -> String,
+    ) -> Result<(), Failure> {
+        for (supplied, expected) in [(&provided.left, &goal.left), (&provided.right, &goal.right)] {
+            let supplied = self.nf(supplied, span)?;
+            let expected = self.nf(expected, span)?;
+            if supplied != expected {
+                return Err(Failure::Unproved {
+                    span,
+                    left: self.show_term(&goal.left),
+                    right: self.show_term(&goal.right),
+                    note: Some(describe(self)),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    fn check(&mut self, goal: &Equation, cert: &Cert, origin: GoalOrigin) -> Result<(), Failure> {
         let span = cert.span;
         match &cert.kind {
-            Rule::Refl => self.same(&goal.left, &goal.right, span, None),
-            Rule::Symm(p) => self.check(&goal.swapped(), p),
+            Rule::Refl => self.check_equality(&goal.left, &goal.right, span, origin),
+            Rule::Symm(p) => self.check(&goal.swapped(), p, origin),
             Rule::Trans(m, p, q) => {
                 self.admit_term(m, span)?;
                 let to = |left: &Term, right: &Term| Equation {
@@ -276,18 +328,22 @@ impl Checker<'_> {
                     left: left.clone(),
                     right: right.clone(),
                 };
-                self.check(&to(&goal.left, m), p)?;
-                self.check(&to(m, &goal.right), q)
+                self.check(&to(&goal.left, m), p, GoalOrigin::Step)?;
+                self.check(&to(m, &goal.right), q, GoalOrigin::Step)
             }
             Rule::Cong(x, e, p) => {
                 self.admit_term(e, span)?;
                 let eq = self.synth(p)?;
                 let at =
                     |side: &Term| Term::Let(x.clone(), Rc::new(side.clone()), Rc::new(e.clone()));
-                let note =
-                    || Some("`cong` gives the context applied to both sides of its proof".into());
-                self.same(&at(&eq.left), &goal.left, span, note())?;
-                self.same(&at(&eq.right), &goal.right, span, note())
+                let provided = Equation {
+                    ty: goal.ty.clone(),
+                    left: at(&eq.left),
+                    right: at(&eq.right),
+                };
+                self.match_equation(&provided, goal, span, |checker| {
+                    format!("`cong` supplies `{}`", checker.show_equation(&provided))
+                })
             }
             Rule::Funext(x, p) => {
                 let Ty::Fun(a, b) = &goal.ty else {
@@ -307,40 +363,36 @@ impl Checker<'_> {
                     left: applied(&goal.left),
                     right: applied(&goal.right),
                 };
-                let result = self.check(&eq, p);
+                let result = self.check(&eq, p, origin);
                 self.vars.truncate(mark);
                 result
             }
-            Rule::Case(v, arms) => self.case(goal, v, arms, span),
+            Rule::Case(v, arms) => self.case(goal, v, arms, span, origin),
             Rule::Fact(h) => {
                 let eq = self.fact(h, span)?;
-                let note = Some(format!(
-                    "`{h}` proves `{} = {}`",
-                    self.show_term(&eq.left),
-                    self.show_term(&eq.right)
-                ));
-                self.same(&eq.left, &goal.left, span, note.clone())?;
-                self.same(&eq.right, &goal.right, span, note)
+                self.match_equation(&eq, goal, span, |checker| {
+                    format!("`{h}` proves `{}`", checker.show_equation(&eq))
+                })
             }
             Rule::Lemma(name, args) => {
-                let eq = self.lemma(name, args, span)?;
+                let (eq, lemma_span) = self.lemma(name, args, span)?;
                 // its instance is the goal itself, definitions folded
                 let unfold = mem::replace(&mut self.unfold, false);
-                let note = Some(format!(
-                    "`{name}` proves `{} = {}` of exactly the definitions it names",
-                    self.show_term(&eq.left),
-                    self.show_term(&eq.right)
-                ));
-                let result = self
-                    .same(&eq.left, &goal.left, span, note.clone())
-                    .and_then(|()| self.same(&eq.right, &goal.right, span, note));
+                let result = self.match_equation(&eq, goal, span, |checker| {
+                    format!(
+                        "`{name}` proves `{}` of exactly the definitions it names",
+                        checker.show_equation(&eq)
+                    )
+                });
                 self.unfold = unfold;
-                result
+                result.map_err(|failure| {
+                    failure.with_related(lemma_span, format!("`{name}` is declared here"))
+                })
             }
             Rule::Let(h, p, rest) => {
                 let eq = self.synth(p)?;
                 self.facts.push((h.clone(), eq));
-                let result = self.check(goal, rest);
+                let result = self.check(goal, rest, origin);
                 self.facts.pop();
                 result
             }
@@ -351,12 +403,12 @@ impl Checker<'_> {
     fn synth(&mut self, cert: &Cert) -> Result<Equation, Failure> {
         match &cert.kind {
             Rule::Fact(h) => self.fact(h, cert.span),
-            Rule::Lemma(name, args) => self.lemma(name, args, cert.span),
+            Rule::Lemma(name, args) => self.lemma(name, args, cert.span).map(|(eq, _)| eq),
             Rule::Symm(p) => Ok(self.synth(p)?.swapped()),
-            Rule::Trans(middle, first, second) => {
-                let (first, second) = (self.synth(first)?, self.synth(second)?);
-                self.same(&first.right, middle, cert.span, None)?;
-                self.same(middle, &second.left, cert.span, None)?;
+            Rule::Trans(middle, p, q) => {
+                let (first, second) = (self.synth(p)?, self.synth(q)?);
+                self.check_equality(&first.right, middle, p.span, GoalOrigin::Step)?;
+                self.check_equality(middle, &second.left, q.span, GoalOrigin::Step)?;
                 Ok(Equation {
                     ty: first.ty,
                     left: first.left,
@@ -373,7 +425,7 @@ impl Checker<'_> {
     /// What lemma `name` proves of `args`, once its premises are proved of
     /// them: each side applied to the values, so that they are bound apart
     /// from the names of this proof.
-    fn lemma(&mut self, name: &str, args: &[Arg], span: Span) -> Result<Equation, Failure> {
+    fn lemma(&mut self, name: &str, args: &[Arg], span: Span) -> Result<(Equation, Span), Failure> {
         let Some(lemma) = self.lemmas.iter().find(|l| l.statement.name == name) else {
             return invalid(
                 span,
@@ -411,6 +463,7 @@ impl Checker<'_> {
             right: at(&eq.right),
         };
         let (premises, conclusion) = (lemma.statement.premises.clone(), instance(conclusion));
+        let lemma_span = lemma.statement.span;
         let proofs = (lemma.order.iter().zip(args)).filter_map(|((x, _), a)| match a {
             Arg::Proof(p) => Some((x, p)),
             Arg::Value(_) => None,
@@ -424,9 +477,12 @@ impl Checker<'_> {
                 span,
                 why: format!("`{h}` is no premise of `{name}`"),
             })?;
-            self.check(&eq, proof)?;
+            self.check(&eq, proof, GoalOrigin::Step)
+                .map_err(|failure| {
+                    failure.with_related(lemma_span, format!("premise `{h}` of `{name}`"))
+                })?;
         }
-        Ok(conclusion)
+        Ok((conclusion, lemma_span))
     }
 
     fn fact(&self, h: &str, span: Span) -> Result<Equation, Failure> {
@@ -451,6 +507,14 @@ impl Checker<'_> {
 }
 
 impl Checker<'_> {
+    fn show_equation(&self, equation: &Equation) -> String {
+        format!(
+            "{} = {}",
+            self.show_term(&equation.left),
+            self.show_term(&equation.right)
+        )
+    }
+
     fn show_term(&self, t: &Term) -> String {
         let mut machine = Machine::new(&self.refined, &self.defs, STEPS);
         machine.unfold = self.unfold;
