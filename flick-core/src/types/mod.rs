@@ -24,6 +24,7 @@ mod bindings;
 mod braced_branch;
 mod builtin_sources;
 mod builtins;
+mod call_args;
 mod calls;
 mod cells;
 pub(crate) mod children;
@@ -33,6 +34,7 @@ mod comprehension;
 mod convert;
 mod debug;
 mod decls;
+mod detached;
 mod display;
 mod do_notation;
 mod effects;
@@ -158,6 +160,7 @@ pub use proof_bundles::record;
 pub use proof_decls::{Bundle, GoalSyntax, GoalType, Law, ProofInfo, goal_syntax};
 pub use question::Question;
 pub use ranges::range_list;
+pub use records::accessor_keys;
 pub use schemas::companion_name;
 pub(crate) use services::impl_def;
 pub use services::{OpClass, Operation};
@@ -380,6 +383,8 @@ fn checker_in<'a>(
         root: None,
         calls: Vec::new(),
         field_path: Vec::new(),
+        given_param: None,
+        piped_late: None,
         holes: Vec::new(),
         hole_ok: false,
         control_effects: HashSet::new(),

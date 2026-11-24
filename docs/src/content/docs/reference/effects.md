@@ -155,10 +155,12 @@ The checker relates `none` to the rest as follows:
   must be equal: `List (Eff {Log} none Unit)` is not a
   `List (Eff {Log, Clock} none Unit)` (`FLICK-T003`).
 - A parameter of unknown type applied to an argument is taken as a pure
-  function, so `(fun h -> h ()) f` with an effectful `f` is `FLICK-T003`.
-  An effectful callback gets its type from the expected type or from a
-  signature. The error points at `h` and offers to annotate it,
-  `fun (h : Unit ->{Log} Unit) -> h ()`.
+  function, so `let run = fun h -> h ()` followed by `run f` with an
+  effectful `f` is `FLICK-T003`. An effectful callback gets its type from
+  the expected type, from a signature, or from the argument when the
+  function is applied where it is written: `(fun h -> h ()) f` and
+  `f |> fun h -> h ()` are fine. The error points at `h` and offers to
+  annotate it, `fun (h : Unit ->{Log} Unit) -> h ()`.
 - A row the constraints leave unknown at the end of a declaration becomes
   `none`: an inferred function that calls no service gets an empty service
   row, not a free row variable.

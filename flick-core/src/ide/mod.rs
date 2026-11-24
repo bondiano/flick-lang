@@ -433,6 +433,8 @@ fn entity(module: &str, namespace: Namespace, name: &str) -> Symbol {
     })
 }
 #[cfg(test)]
+mod accessor_tests;
+#[cfg(test)]
 mod block_locals_tests;
 #[cfg(test)]
 mod companion_tests;

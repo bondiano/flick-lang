@@ -3,7 +3,7 @@
 use super::conditional::if_expr;
 use super::control::{control_expr, defer_stmt, is_defer_head, while_ahead};
 use super::handlers::{catch_expr, match_expr, try_expr};
-use super::{Ctx, Done, K, Parser, decl, pattern, plugin, types};
+use super::{Ctx, Done, K, Parser, accessor, decl, pattern, plugin, types};
 use crate::diagnostics::codes;
 use crate::syntax::heads::OPEN;
 
@@ -306,6 +306,7 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::Underscore => true,
         K::LazyKw => p.nth(1) == K::LBrace,
         K::LBrace => !p.no_brace,
+        K::Dot => accessor::accessor_ahead(p),
         _ => false,
     }
 }
@@ -417,6 +418,7 @@ pub(super) fn atom(p: &mut Parser) -> Option<Done> {
             con_path(p);
             K::NameExpr
         }
+        K::Dot if accessor::accessor_ahead(p) => accessor::accessor(p),
         K::Number | K::BigInt | K::String | K::TrueKw | K::FalseKw => {
             p.bump();
             K::Literal

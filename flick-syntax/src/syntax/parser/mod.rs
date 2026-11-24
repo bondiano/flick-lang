@@ -9,6 +9,7 @@
 //! The parser emits start/token/finish events; [`build`] turns them into the
 //! lossless tree, attaching trivia between nodes.
 
+mod accessor;
 mod build;
 mod conditional;
 mod contracts;
@@ -586,6 +587,8 @@ impl<'t> Parser<'t> {
     }
 }
 
+#[cfg(test)]
+mod accessor_tests;
 #[cfg(test)]
 mod arrow_tests;
 #[cfg(test)]
