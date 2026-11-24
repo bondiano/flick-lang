@@ -303,11 +303,11 @@ pub(super) fn at_arg_start(p: &Parser) -> bool {
         | K::TodoKw
         | K::ScopeKw
         | K::ProvideKw
-        | K::Underscore => true,
+        | K::Underscore
+        // an accessor, even a dot alone
+        | K::Dot => true,
         K::LazyKw => p.nth(1) == K::LBrace,
         K::LBrace => !p.no_brace,
-        // a dot alone too: an unfinished accessor
-        K::Dot => true,
         _ => false,
     }
 }
