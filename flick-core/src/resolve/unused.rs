@@ -1,6 +1,8 @@
 //! Imports nothing uses, and local names nothing refers to.
 
 use std::collections::BTreeSet;
+#[cfg(not(target_arch = "wasm32"))]
+use std::collections::HashSet;
 
 use flick_backend_support::suites::companion_of;
 
@@ -58,6 +60,37 @@ pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnos
             (message, vec![edit])
         })
     })
+}
+
+/// Premise binders unused in the proof, its goal and later premises.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn unused_proof_premises(
+    module: &Module,
+    proof: &Node,
+    used: &HashSet<(u32, u32)>,
+) -> Vec<Diagnostic> {
+    proof
+        .nodes()
+        .filter(|n| n.kind == K::Params)
+        .flat_map(Node::nodes)
+        .filter(|n| n.kind == K::Premise)
+        .flat_map(Node::nodes)
+        .filter(|n| n.kind == K::VarPat)
+        .flat_map(Node::child_tokens)
+        .filter(|t| t.kind == K::Ident && t.end <= module.generated)
+        .filter_map(|t| {
+            let name = t.text(module.text);
+            if used.contains(&(t.start, t.end)) || name.starts_with('_') {
+                return None;
+            }
+            let span = Span::new(module.file, t.start, t.end);
+            Some(warning(
+                codes::T092,
+                format!("premise `{name}` is never used"),
+                span,
+            ))
+        })
+        .collect()
 }
 
 fn packed_paths(node: &Node, text: &str, out: &mut Vec<String>) {

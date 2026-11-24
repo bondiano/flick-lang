@@ -77,6 +77,7 @@ fn library(sources: &mut SourceMap) -> Project {
             sql_dialect: Default::default(),
             allow: Vec::new(),
             no_let_assert: false,
+            unused_proof_premises: false,
             thresholds: Thresholds::default(),
             #[cfg(feature = "native-project")]
             plugins: BTreeMap::new(),

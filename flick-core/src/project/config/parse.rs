@@ -62,6 +62,8 @@ struct RawLint {
     allow: Vec<Spanned<String>>,
     #[serde(default)]
     no_let_assert: bool,
+    #[serde(default)]
+    unused_proof_premises: bool,
     max_function_lines: Option<Spanned<i64>>,
     max_nesting: Option<Spanned<i64>>,
     max_complexity: Option<Spanned<i64>>,
@@ -369,6 +371,7 @@ fn config(
         sql_dialect,
         allow,
         no_let_assert: lint.no_let_assert,
+        unused_proof_premises: lint.unused_proof_premises,
         thresholds,
         plugins,
         tools: raw.tools.map(Spanned::into_inner).unwrap_or_default(),

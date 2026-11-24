@@ -300,13 +300,7 @@ impl Checking<'_, '_> {
             let why = format!("`{name}` is no proof checked before this one");
             return Err(invalid(field.span, why));
         };
-        let cert =
-            law_certificate(proved, &statement, lemma, field.value.span).map_err(|failure| {
-                match failure {
-                    Failure::Invalid { why, .. } => invalid(field.span, why),
-                    other => other,
-                }
-            })?;
+        let cert = law_certificate(proved, &statement, lemma, field.span, field.value.span)?;
         let data = self.law_data(proved);
         logic::prove(&statement, &cert, &data, self.program, self.lemmas)
     }
@@ -346,7 +340,7 @@ impl Checking<'_, '_> {
                 slice::from_ref(name)
             };
             self.attempts -= 1;
-            let Ok(cert) = law_certificate(proved, &statement, lemma, self.span) else {
+            let Ok(cert) = law_certificate(proved, &statement, lemma, self.span, self.span) else {
                 continue;
             };
             if logic::check_candidate(
@@ -398,43 +392,34 @@ fn law_certificate(
     proved: &Proven,
     statement: &Statement,
     lemma: &Lemma,
+    field: Span,
     span: Span,
 ) -> Result<Cert, Failure> {
     let (law, info) = proved;
     let name = &lemma.statement.name;
-    let types: Vec<&Ty> = statement.params.iter().map(|(_, t)| t).collect();
-    let theirs: Vec<&Ty> = lemma.statement.params.iter().map(|(_, t)| t).collect();
-    // the lemma is about values of exactly the law's types: its
-    // parameters, premises and equation, up to a renaming
+    // The parameters, premises and equation agree up to a renaming shared by all three.
     let mut renaming = Vec::new();
-    let equations = |s: &logic::Statement| -> Vec<Ty> {
-        let goal = match &s.goal {
-            logic::Goal::Equal(e) => Some(e.ty.clone()),
-            logic::Goal::SameType(..) => None,
-        };
-        (s.premises.iter().map(|(_, e)| e.ty.clone()))
-            .chain(goal)
-            .collect()
-    };
-    let (ours, others) = (equations(statement), equations(&lemma.statement));
+    let (our_count, ours) = equation_types(statement);
+    let (their_count, theirs) = equation_types(&lemma.statement);
     let fits = lemma
         .order
         .iter()
         .map(|(_, p)| *p)
         .eq(law.premise.iter().copied())
-        && types.len() == theirs.len()
-        && types
+        && statement.params.len() == lemma.statement.params.len()
+        && statement
+            .params
             .iter()
-            .zip(&theirs)
-            .all(|(a, b)| renames(b, a, &mut renaming))
-        && ours.len() == others.len()
-        && (ours.iter().zip(&others)).all(|(a, b)| renames(b, a, &mut renaming));
+            .zip(&lemma.statement.params)
+            .all(|((_, ours), (_, theirs))| renames(theirs, ours, &mut renaming))
+        && our_count == their_count
+        && ours.zip(theirs).all(|(a, b)| renames(b, a, &mut renaming));
     if !fits {
         let why = format!(
             "`{name}` is not stated over the parameters of the law `{}`",
             info.name
         );
-        return Err(invalid(span, why));
+        return Err(invalid(field, why));
     }
     let args = (law.params.iter())
         .zip(&law.premise)
@@ -454,6 +439,16 @@ fn law_certificate(
         kind: Rule::Lemma(name.as_str().into(), args),
         span,
     })
+}
+
+fn equation_types(statement: &Statement) -> (usize, impl Iterator<Item = &Ty>) {
+    let goal = match &statement.goal {
+        logic::Goal::Equal(e) => Some(&e.ty),
+        logic::Goal::SameType(..) => None,
+    };
+    let count = statement.premises.len() + usize::from(goal.is_some());
+    let types = statement.premises.iter().map(|(_, e)| &e.ty).chain(goal);
+    (count, types)
 }
 
 /// `d` with the given dictionary it stands on replaced by `dict`.
@@ -484,14 +479,15 @@ fn apart(t: &Ty, keep: &[String]) -> Ty {
 }
 
 /// Whether `ours` is `theirs` with its rigid variables renamed one to one.
-fn renames(ours: &Ty, theirs: &Ty, renaming: &mut Vec<(String, String)>) -> bool {
+fn renames<'a>(ours: &'a Ty, theirs: &'a Ty, renaming: &mut Vec<(&'a str, &'a str)>) -> bool {
     match (ours, theirs) {
         (Ty::Rigid(mine), Ty::Rigid(other)) => {
-            if let Some((was, is)) = (renaming.iter()).find(|(was, is)| was == mine || is == other)
+            if let Some((was, is)) =
+                (renaming.iter()).find(|(was, is)| *was == mine || *is == other)
             {
-                return was == mine && is == other;
+                return *was == mine && *is == other;
             }
-            renaming.push((mine.clone(), other.clone()));
+            renaming.push((mine, other));
             true
         }
         (

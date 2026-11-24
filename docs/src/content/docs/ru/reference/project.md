@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: 253972420b9861ac
+source_hash: c2cd91c79c454728
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -38,6 +38,7 @@ dialect = "postgresql"
 [lint]
 allow = ["FLICK-T021"]
 no-let-assert = false
+unused-proof-premises = false
 max-function-lines = 60
 max-nesting = 4
 max-complexity = 10
@@ -64,6 +65,7 @@ max-params = 5
 | `sql.dialect` | диалект SQL для `sql table` и `sql { … }` (см. [запросы SQL](../sql/)): `"postgresql"`; `"mysql"`, `"sqlite"`, `"clickhouse"` и `"oracle"` распознаются, но пока не поддерживаются | `"postgresql"` |
 | `lint.allow` | коды предупреждений, о которых не сообщается, например `"FLICK-T021"`; ошибки отключить нельзя | `[]` |
 | `lint.no-let-assert` | `true` делает каждый `let assert` ошибкой (`FLICK-T027`) в `flick check`, `build`, `test` и в редакторе | `false` |
+| `lint.unused-proof-premises` | `true` включает предупреждение о неиспользуемых посылках проверенных доказательств (`FLICK-T092`) в `flick prove` и редакторе | `false` |
 | `lint.max-function-lines` | сколько строк может занимать тело функции, дальше — `FLICK-T036` | `60` |
 | `lint.max-nesting` | насколько глубоко вкладываются `if`, `match`, `fun`, `do`, `task` и `for`, дальше — `FLICK-T037` | `4` |
 | `lint.max-complexity` | сколько ветвлений может быть в функции (цикломатическая сложность), дальше — `FLICK-T038` | `10` |
