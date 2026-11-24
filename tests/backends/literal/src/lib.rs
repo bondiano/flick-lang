@@ -193,10 +193,10 @@ impl Backend for Literal {
             },
             backend_api: range("0.1.0", "0.2.0"),
             ir: range("0.17.0", "0.18.0"),
-            language: range("0.1.0", "0.2.0"),
+            language: range("0.2.0", "0.3.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
-                versions: range("0.1.0", "0.2.0"),
+                versions: range("0.2.0", "0.3.0"),
             }],
             environments: vec![Environment {
                 backend: "js".into(),
