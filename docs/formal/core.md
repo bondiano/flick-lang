@@ -162,6 +162,7 @@ The reduction is specified normatively in `elaboration.md`. This table gives the
 | `x \|> f`, `f <\| x`, operators | `f x`, constants |
 | `f >> g` | `let f′ = f in let g′ = g in λx. g′ (f′ x)`, with fresh `f′`, `g′` of monomorphic types, as λ binds them; a chain `f >> g >> h` is one `λx. h′ (g′ (f′ x))` |
 | `g << f` | `let g′ = g in let f′ = f in λx. g′ (f′ x)`: the operands bound left to right, as written |
+| Accessor `.ℓ₁.….ℓₙ` | `λx. x.ℓ₁.….ℓₙ`, with a fresh `x` no source names; `.ℓ₁.….ℓₙ v` and `v \|> .ℓ₁.….ℓₙ` are that λ applied to `v`, typed with `v` first (see [a callee of unknown type is a pure arrow](#a-callee-of-unknown-type-is-a-pure-arrow)) |
 
 ### 1.5 Constants Γ₀
 
