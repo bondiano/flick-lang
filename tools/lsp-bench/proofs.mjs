@@ -150,12 +150,17 @@ async function latency(run, { main, dependency, optionLaws }, opts) {
     return readyCase(mainVersion);
   });
   const initial = opened.value;
-  assert.ok(initial.proof.normalizationSteps > 0, "case split must be checked by the verifier");
+  assert.ok(initial.proof.verificationSteps > 0, "case split must be checked by the verifier");
+  assert.equal(initial.proof.verificationSteps, initial.proof.normalizationSteps);
   run.opened(optionLaws);
   const bundle = await run.ready(optionLaws, position(optionLaws.text, "lawful Monad Option"), state(1, "option"));
   assert.ok(bundle.proof.obligations.some(({ law, path, status }) =>
     law === "identity" && path.includes("Functor") && status === "checked"),
   "Option workload must verify an inherited Functor law");
+  assert.equal(bundle.proof.verificationSteps, bundle.proof.obligations.reduce((total, field) => {
+    assert.ok(Number.isInteger(field.verificationSteps), `a checked field has its own verification cost: ${field.law}`);
+    return total + field.verificationSteps;
+  }, 0));
   run.closed(optionLaws);
   await readyCase(mainVersion);
 
@@ -273,7 +278,7 @@ async function latency(run, { main, dependency, optionLaws }, opts) {
   assert.equal(afterClose.proof, null);
   return {
     firstProofOpenMs: opened.milliseconds,
-    normalizationSteps: { rebuild: initial.proof.normalizationSteps },
+    verificationSteps: { rebuild: initial.proof.verificationSteps, option: bundle.proof.verificationSteps },
     searchChecks,
     timingsMs: measurements,
   };

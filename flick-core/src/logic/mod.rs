@@ -370,9 +370,30 @@ pub fn prove(
         program,
         lemmas,
         #[cfg(not(target_arch = "wasm32"))]
-        None,
-        #[cfg(not(target_arch = "wasm32"))]
-        None,
+        check::Observation::default(),
+    )
+}
+
+/// Checks a certificate and measures normalization, without rendering a trace.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn prove_counted(
+    statement: &Statement,
+    proof: &Cert,
+    data: &Data,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+    cost: &mut Option<u64>,
+) -> Result<(), Failure> {
+    check::prove(
+        statement,
+        proof,
+        data,
+        program,
+        lemmas,
+        check::Observation {
+            cost: Some(cost),
+            ..Default::default()
+        },
     )
 }
 
@@ -386,7 +407,17 @@ pub fn prove_traced(
     lemmas: &[Lemma],
     steps: &mut Vec<ProofStep>,
 ) -> Result<(), Failure> {
-    check::prove(statement, proof, data, program, lemmas, Some(steps), None)
+    check::prove(
+        statement,
+        proof,
+        data,
+        program,
+        lemmas,
+        check::Observation {
+            trace: Some(steps),
+            ..Default::default()
+        },
+    )
 }
 
 /// Observes goals in an incomplete body with definitions folded. The editor
@@ -420,8 +451,11 @@ pub fn prove_with_suggestions(
         data,
         program,
         lemmas,
-        Some(steps),
-        Some(aliases),
+        check::Observation {
+            trace: Some(steps),
+            aliases: Some(aliases),
+            ..Default::default()
+        },
     )
 }
 

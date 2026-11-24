@@ -15,6 +15,9 @@ function proofRows(proof) {
   if (proof.goal) rows.push({ label: "Goal", detail: proof.goal });
   if (proof.class) rows.push({ label: "Class", detail: proof.class });
   if (proof.instance) rows.push({ label: "Instance", detail: proof.instance });
+  if (Number.isInteger(proof.verificationSteps)) {
+    rows.push({ label: "Verification steps", detail: String(proof.verificationSteps) });
+  }
   if (proof.failureRange) {
     const { line, character } = proof.failureRange.start;
     rows.push({ label: "Failed step", detail: `Line ${line + 1}, column ${character + 1}` });

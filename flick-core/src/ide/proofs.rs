@@ -51,6 +51,8 @@ pub struct ProofView<'a> {
     pub instance: Option<&'a str>,
     pub obligations: &'a [LawObligation],
     pub normalization_steps: Option<u64>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub verification_steps: Option<u64>,
 }
 
 impl Ide<'_> {
@@ -149,6 +151,8 @@ impl Ide<'_> {
             instance: evidence.and_then(|e| e.instance.as_deref()),
             obligations,
             normalization_steps: step.map(|s| s.normalization_steps),
+            #[cfg(not(target_arch = "wasm32"))]
+            verification_steps: evidence.and_then(|e| e.verification_steps),
         })
     }
 }

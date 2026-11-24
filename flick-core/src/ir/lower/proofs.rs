@@ -524,6 +524,7 @@ fn verify(
     });
     #[cfg(not(target_arch = "wasm32"))]
     if let Some((evidence, aliases)) = evidence {
+        evidence.verification_steps = evidence.steps.first().map(|step| step.normalization_steps);
         match &checked {
             Ok(_) => {
                 evidence.status = ProofStatus::Checked;

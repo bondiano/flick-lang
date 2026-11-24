@@ -86,6 +86,7 @@ impl<'a> Recording<'a> {
             at: lowered.at,
             status: ProofStatus::Open,
             failure: None,
+            verification_steps: None,
             steps: Vec::new(),
             header_suggestions: Vec::new(),
             search: None,
