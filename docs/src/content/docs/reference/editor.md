@@ -97,6 +97,25 @@ them as library sources, without adding them to the application's project.
 Both `textDocument/prepareRename` and `textDocument/rename` reject these
 read-only documents rather than returning edits to the cached source.
 
+### Proof hover and navigation
+
+Hover over a `proof` or `law` declaration to see its statement and any `///`
+documentation. A proof shows its verification status and a law names its
+class. Both appear in the document outline and workspace symbols.
+
+Inside a proof, hover explains the goal form and shows the obligation at the
+cursor. For `trans`, the two proof arguments show the equalities on either
+side of the middle term. A `match` branch shows the substitution for its
+scrutinee. The hover also describes `refl`, `symm`, `cong`, `funext`, local
+facts introduced by `let`, and premises. An unfinished body can still show
+the goal and facts available at the cursor.
+
+Hover over a lemma application to see the original statement, instantiated
+premises and the obligation at the use. Go to Definition and Find References
+use the lemma's declaration, including when the application uses an import alias. In a
+`lawful` bundle, hover shows the selected instance and the law obligations
+under their superclass paths.
+
 ### Completion order
 
 Completion lists the names that fit their place first and the others after

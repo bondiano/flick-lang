@@ -1,9 +1,11 @@
 //! Explanations of proof-specific syntax, using the active checker obligation.
 
 use std::fmt::Write as _;
+use std::ptr;
 
 use super::super::{Ide, ProofView, Symbol, proof_symbols::proof_name, tree};
 use crate::doc;
+use crate::logic::ProofStep;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::{source::FileId, types::Range};
@@ -27,11 +29,15 @@ impl Ide<'_> {
         let range = (token.start, token.end);
         let written = token.text(text);
         let view = self.proof_at(file, offset)?;
+        let steps = module
+            .typing
+            .proof_evidence
+            .iter()
+            .find(|evidence| evidence.at == decl.range())
+            .map_or(&[][..], |evidence| evidence.steps.as_slice());
         if matches!(token.kind, K::ProofKw | K::LawKw) || proof_name(decl) == Some(token) {
             let mut shown = signature(decl, text);
-            if let Some(parent) = path.get(at - 1)
-                && let Some(docs) = doc::leading_doc(parent, decl, text)
-            {
+            if let Some(docs) = declaration_docs(&path[..=at], text) {
                 let _ = write!(shown, "\n\n{docs}");
             }
             if let Some(class) = view.class {
@@ -41,6 +47,13 @@ impl Ide<'_> {
             }
             return Some((with_context(shown, &view), range));
         }
+        let site = Site {
+            path: &path[at..],
+            text,
+            offset,
+            token,
+            steps,
+        };
         if let Some((
             Symbol::Proof {
                 module,
@@ -59,17 +72,14 @@ impl Ide<'_> {
             if let Some(docs) = doc::leading_doc(&source.tree, statement, &source.text) {
                 let _ = write!(shown, "\n\n{docs}");
             }
-            if let Some(arguments) = arguments(&path[at..], range, text) {
-                let _ = write!(shown, "\n\nArguments here · {arguments}.");
+            if let Some(apply) = application(site.path, range) {
+                application_details(&mut shown, apply, statement, &source.text, &site);
             }
-            return Some((with_context(shown, &view), name_range));
+            return Some((
+                with_context(append_note(shown, site.bundle(&view).as_deref()), &view),
+                name_range,
+            ));
         }
-        let site = Site {
-            path: &path[at..],
-            text,
-            offset,
-            token,
-        };
         let note = site.note(&view);
         let ordinary = self
             .symbol_hover(file, offset)
@@ -105,15 +115,19 @@ struct Site<'a> {
     text: &'a str,
     offset: u32,
     token: Token,
+    steps: &'a [ProofStep],
 }
 
 impl Site<'_> {
     fn note(&self, view: &ProofView<'_>) -> Option<String> {
         self.bundle(view)
-            .or_else(|| self.goal())
-            .or_else(|| self.rule())
-            .or_else(|| self.structure())
-            .map(str::to_owned)
+            .or_else(|| self.let_binding())
+            .or_else(|| {
+                self.goal()
+                    .or_else(|| self.rule())
+                    .or_else(|| self.structure())
+                    .map(str::to_owned)
+            })
     }
 
     fn goal(&self) -> Option<&'static str> {
@@ -167,39 +181,153 @@ impl Site<'_> {
         })
     }
 
-    fn bundle(&self, view: &ProofView<'_>) -> Option<&'static str> {
+    fn let_binding(&self) -> Option<String> {
+        let index = self.path.iter().rposition(|node| node.kind == K::LetDecl)?;
+        let declaration = self.path[index];
+        let block = self.path.get(index.checked_sub(1)?)?;
+        let binder = declaration.nodes().find(|node| node.kind == K::VarPat)?;
+        let binding = binder.child_tokens().find(|token| token.kind == K::Ident)?;
+        if self.token != binding && self.token.kind != K::LetKw {
+            return None;
+        }
+        let before = self
+            .steps
+            .iter()
+            .find(|step| inside(declaration.range(), step))?;
+        let after = self
+            .steps
+            .iter()
+            .find(|step| step.span.start >= declaration.range().1 && inside(block.range(), step))?;
+        // The check of the rest of this block starts with the previous scope
+        // plus the equation synthesized for this binder.
+        let [(name, equation)] = after.premises.strip_prefix(before.premises.as_slice())? else {
+            return None;
+        };
+        if name != binding.text(self.text) {
+            return None;
+        }
+        Some(format!(
+            "A proof `let` introduces a local fact.\n\n**{name}** · `{equation}`"
+        ))
+    }
+
+    fn bundle(&self, view: &ProofView<'_>) -> Option<String> {
         view.instance.as_ref()?;
-        if view
+        if let Some(law) = view
             .obligations
             .iter()
-            .any(|law| law.range.is_some_and(|at| contains(at, self.offset)))
+            .find(|law| law.range.is_some_and(|at| contains(at, self.offset)))
         {
-            return Some("This lemma must prove the instantiated law of the selected instance.");
+            let path = law
+                .path
+                .iter()
+                .map(String::as_str)
+                .chain([law.law.as_str()])
+                .collect::<Vec<_>>()
+                .join(".");
+            return Some(format!(
+                "This lemma must prove the instantiated law `{path}` of the selected instance."
+            ));
         }
-        self.path.iter().rev().find_map(|node| match node.kind {
-            K::RecordField => Some("A superclass path groups the obligations of that superclass."),
-            K::LawfulGoal if self.token.text(self.text) != "lawful" => {
-                Some("The law bundle uses the dictionary selected for this class and type.")
+        let fields = self
+            .path
+            .iter()
+            .filter(|node| node.kind == K::RecordField)
+            .filter_map(|node| {
+                node.child_tokens()
+                    .find(|token| matches!(token.kind, K::Ident | K::Con))
+            })
+            .map(|token| token.text(self.text))
+            .collect::<Vec<_>>();
+        if !fields.is_empty() {
+            let path = fields.join(".");
+            if view.obligations.iter().any(|law| {
+                fields.len() <= law.path.len()
+                    && law
+                        .path
+                        .iter()
+                        .zip(&fields)
+                        .all(|(expected, written)| expected == written)
+            }) {
+                return Some(format!(
+                    "The superclass path `{path}` groups its law obligations."
+                ));
             }
-            _ => None,
-        })
+            return Some(format!(
+                "`{path}` has no corresponding law or superclass here."
+            ));
+        }
+        (self.token.text(self.text) != "lawful"
+            && self.path.iter().any(|node| node.kind == K::LawfulGoal))
+        .then(|| "The law bundle uses the dictionary selected for this class and type.".to_owned())
     }
 }
 
-fn arguments(path: &[&Node], range: Range, text: &str) -> Option<String> {
-    let apply = path.iter().rev().find(|node| {
+fn application<'a>(path: &[&'a Node], range: Range) -> Option<&'a Node> {
+    path.iter().rev().copied().find(|node| {
         node.kind == K::AppExpr
             && node
                 .nodes()
                 .next()
                 .is_some_and(|head| contains(head.range(), range.0))
-    })?;
-    let args = apply
-        .nodes()
-        .skip(1)
-        .map(|arg| format!("`{}`", arg.text(text).trim()))
+    })
+}
+
+fn application_details(
+    shown: &mut String,
+    apply: &Node,
+    statement: &Node,
+    source: &str,
+    site: &Site<'_>,
+) {
+    let args: Vec<_> = apply.nodes().skip(1).collect();
+    let written = args
+        .iter()
+        .map(|arg| format!("`{}`", arg.text(site.text).trim()))
         .collect::<Vec<_>>();
-    (!args.is_empty()).then(|| args.join(", "))
+    if !written.is_empty() {
+        let _ = write!(shown, "\n\nArguments here · {}.", written.join(", "));
+    }
+    let params = statement
+        .nodes()
+        .filter(|node| node.kind == K::Params)
+        .flat_map(Node::nodes);
+    for (param, arg) in params
+        .zip(args)
+        .filter(|(param, _)| param.kind == K::Premise)
+    {
+        let name = param
+            .nodes()
+            .find(|node| node.kind == K::VarPat)
+            .and_then(|node| tree::name_of(node, K::Ident, source));
+        let obligation = site
+            .steps
+            .iter()
+            .filter(|step| inside(arg.range(), step))
+            .max_by_key(|step| step.span.end - step.span.start);
+        if let (Some(name), Some(obligation)) = (name, obligation) {
+            let _ = write!(shown, "\n\nPremise `{name}` here · `{}`", obligation.goal);
+        }
+    }
+}
+
+fn declaration_docs(path: &[&Node], text: &str) -> Option<String> {
+    let [ancestors @ .., parent, declaration] = path else {
+        return None;
+    };
+    doc::leading_doc(parent, declaration, text).or_else(|| {
+        let class = ancestors.last()?;
+        // For the first law, the leading comment can precede Members itself.
+        if parent.kind == K::Members && ptr::eq(parent.nodes().next()?, *declaration) {
+            doc::leading_doc(class, parent, text)
+        } else {
+            None
+        }
+    })
+}
+
+fn inside((start, end): Range, step: &ProofStep) -> bool {
+    start <= step.span.start && step.span.end <= end
 }
 
 fn contains((start, end): Range, offset: u32) -> bool {
