@@ -415,6 +415,14 @@ impl Typing {
         self.pending_dicts.iter().map(|(at, _, _)| *at).collect()
     }
 
+    /// The dictionaries passed within `range`, each with where it is.
+    pub(super) fn dictionaries_in(&self, range: Range) -> impl Iterator<Item = (Range, &Dict)> {
+        let (start, end) = range;
+        (self.pending_dicts.iter())
+            .filter(move |(at, _, _)| at.0 >= start && at.1 <= end)
+            .map(|(at, _, dict)| (*at, dict))
+    }
+
     pub(crate) fn pending_foreign_diagnostics(&self) -> Vec<Diagnostic> {
         self.pending_foreigns
             .iter()

@@ -132,6 +132,8 @@ const NON_NIL_LANG: &[Lang] = &[
     Lang::PureCodec,
     Lang::Eff,
     Lang::Lazy,
+    // the function itself, as an arrow's value is
+    Lang::FuncRef,
     Lang::Layer,
     Lang::Codec,
     Lang::Result,

@@ -158,6 +158,47 @@ resources are released. An event that finds the queue full
 every failure of the handler. The handler never runs inside the event
 source's call.
 
+### Functions without captures and trampolines
+
+A host without closures, such as C or core WebAssembly, takes a function
+pointer, usually with a `void*` argument for its data. A backend for such a
+host adapts a Flick callback with a trampoline. Its adapter words
+`callback i data j` mark argument `i` as the function pointer and argument
+`j` as its environment, and the backend generates the trampoline
+`(void* env, args…)` that calls the closure. The `retention` line says how
+long the environment lives: `retention call` keeps it for the call;
+`retention owner` keeps it until the owner of the region closes, then
+releases it. The backend receives the words, the host arity of each callback
+and the retention through the IR (`Adapter.words`, `Adapter.callbacks`,
+`Adapter.retention`).
+
+Some functions take no data argument: `qsort`, a `dlsym` result, a JIT entry
+point. For them, `FuncRef (a -> b)` is a function without captures. Where a
+`FuncRef` is expected, the value is checked against `a -> b`, and it must be
+the name of a top-level function that takes no class dictionary at its type,
+or a lambda that uses no local and no class dictionary of the code around
+it. A captured local, a partial application, a local function, a class
+method or a constrained function is `FLICK-F015` at its span. A value that
+is a `FuncRef` already passes on as it is, and `FuncRef.fun r` calls one:
+
+```flick
+compare_ints : Int -> Int -> Int
+let compare_ints a b = a - b
+
+sort_with : FuncRef (Int -> Int -> Int) -> List Int ->{} List Int
+foreign sort_with from "./sort.mjs" "sortWith"
+
+ascending : List Int ->{} List Int
+let ascending xs = sort_with compare_ints xs
+
+descending : List Int ->{} List Int
+let descending xs = sort_with (fun a b -> b - a) xs
+```
+
+On JS and Go a `FuncRef` is the function itself, adapted to the host's arity
+as a callback is: `sortWith` gets `(a, b) => …`. A C or wasm backend maps it
+to a plain function pointer or a wasm `funcref`.
+
 ## Value ABI
 
 Each backend component may publish a versioned value-ABI table in its WIT
@@ -215,6 +256,7 @@ Rendered directly from the `flick/js` backend descriptor:
 | `layer` | `Layer ri e ro` | `Layer.Layer<RO, E, RI>` | `none` | `both` | Native Effect `Layer` representation of the pinned Effect version |
 | `exit` | `Exit e a` | `Exit.Exit<A, E>` | `none` | `both` | Native Effect `Exit` representation of the pinned Effect version |
 | `failure` | `Failure e` | `Cause.Cause<E>` | `none` | `both` | Native Effect `Cause` representation of the pinned Effect version |
+| `func_ref` | `FuncRef (a -> b)` | `(a, …) => b` | `none` | `both` | The function itself, without captures; adapted to JS arity as a callback is |
 | `function` | `a -> b, a ->{r; e} b` | `(a, …) => b` | `none` | `both` | Callbacks adapted to JS arity across four families: pure, Effect, Promise, scoped event |
 
 Records and user-defined ADTs have no stable layout and are not in this table. On this backend they may still cross bindings as deep-copied plain JS objects / tagged objects (`_tag` = `Name#hash`, fields `_0`, `_1`, …); `unboxed type` and `untagged type` declare explicit representations.

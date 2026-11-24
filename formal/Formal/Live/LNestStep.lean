@@ -19,6 +19,7 @@ theorem PHead.noInsF {r r' : Tm} {A : Nat → Prop} (hh : PHead r r') (h : r.Fw 
     | exact ⟨vn ‹_› h.1, h.2.2⟩
     | exact ⟨h.2.2.1, h.2.2.2⟩
     | exact vn ‹_› h
+    | (rename_i hv; exact ⟨id, vn hv h.2.1⟩)
     | exact ⟨vn ‹_› h.1, vn ‹_› h.2.1⟩
     | exact ⟨h.2.2, vn ‹_› h.2.1⟩
     | (have h3 := h.2.2; simp only [Tm.NoIns, Tm.Has, not_or] at h3; exact ⟨vn ‹_› h.1, h3⟩)

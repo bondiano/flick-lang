@@ -600,3 +600,6 @@ when = \"js\"
         );
     }
 }
+
+#[path = "value_abi_func_ref_tests.rs"]
+mod func_ref;

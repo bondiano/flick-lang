@@ -1,0 +1,30 @@
+// A `FuncRef` crosses to the host as the function itself, adapted to the
+// host's arity as a callback is: a top-level function, a lambda that
+// captures nothing, and a top-level `FuncRef`; `FuncRef.fun` calls one.
+module App.Main exposing (main)
+
+increment : Int -> Int
+let increment n = n + 1
+
+add : Int -> Int -> Int
+let add a b = a + b
+
+square : FuncRef (Int -> Int)
+let square = fun n -> n * n
+
+/// `f (f x)`, the host calling `f`.
+twice : FuncRef (Int -> Int) -> Int -> Int
+foreign pure twice from "./func_ref.mjs" "twice"
+
+/// `f a b`, the host calling `f` with both arguments at once.
+combine : FuncRef (Int -> Int -> Int) -> Int -> Int -> Int
+foreign pure combine from "./func_ref.mjs" "combine"
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  Platform.stdout_line (show (twice increment 1))
+  Platform.stdout_line (show (twice (fun n -> n * 3) 2))
+  Platform.stdout_line (show (twice square 3))
+  Platform.stdout_line (show (combine add 2 3))
+  Platform.stdout_line (show (combine (fun a b -> a * 10 + b) 4 5))
+  Platform.stdout_line (show (FuncRef.fun square 7))

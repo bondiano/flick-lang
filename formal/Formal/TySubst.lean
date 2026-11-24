@@ -110,6 +110,7 @@ theorem Typ.substT {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro σ hσ
     refine .errVal (ih σ hσ) (Ty.hd_substT σ hU) ?_
     rw [← Row.err_substT, ← Row.substT_asRow]; exact hE.substT σ
+  | funcRef _ hc ih => intro σ hσ; exact .funcRef (ih σ hσ) hc
   | tryR _ _ hφ hs ih₁ ih₂ =>
     intro σ hσ
     have h₁ := ih₁ σ (hσ.sub fun _ h => .inl h)

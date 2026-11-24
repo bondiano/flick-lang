@@ -51,6 +51,7 @@ use crate::syntax::cst::{Node, Token, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
 use crate::types::lang::{self, Lang};
+pub use flick_ir::Retention;
 use flick_ir::{AdapterArg, BackendAdapter, Copies, ForeignMode};
 
 /// Pure foreign functions over a capability whose answer does not depend on
@@ -66,15 +67,6 @@ pub const PURE_OVER_CAPABILITY: &[(&str, &str)] = &[
     ("Http.Server", "address"),
 ];
 
-/// What a foreign function keeps of its arguments.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Retention {
-    /// Nothing beyond what its result's type shows.
-    Call,
-    /// Until the owner of the region it was given closes.
-    Owner,
-}
-
 impl Checker<'_> {
     /// Checks the metadata of the foreign declaration `decl` of type
     /// `scheme` and records its calling convention.
@@ -83,6 +75,7 @@ impl Checker<'_> {
         self.typing.pending_foreigns.push(pending);
     }
 
+    #[allow(clippy::too_many_lines)]
     fn finalized_foreign_info(&mut self, mut pending: PendingForeign, scheme: &Type) {
         let decl = pending.decl.clone();
         let decl = &decl;
@@ -141,6 +134,7 @@ impl Checker<'_> {
             .call_result(&body, arity)
             .is_some_and(|r| r.is_lang(Lang::Unit));
         info.adapter.callbacks = self.foreign_callbacks(&params, arity);
+        info.adapter.retention = retention;
         info.adapter.copies = self.copies(&params, &body, arity, &info.adapter.callbacks);
         info.adapter.shapes = self.param_shapes(&params, arity);
         info.adapter.result_shape = self
@@ -248,7 +242,7 @@ impl Checker<'_> {
             .take(arity)
             .map(|param| {
                 // A stage that runs gives its value, not more arguments to take.
-                let stages = self.arrow_stages(param);
+                let stages = self.arrow_stages(&self.callback_type(param));
                 let n = stages
                     .iter()
                     .position(|stage| *stage != Stage::Pure)
@@ -262,6 +256,12 @@ impl Checker<'_> {
 include!("ffi/metadata.rs");
 
 impl Checker<'_> {
+    /// The function a parameter of a foreign function passes: a `FuncRef`
+    /// crosses as the function it refers to.
+    fn callback_type(&self, param: &Type) -> Type {
+        self.func_ref_parts(param).unwrap_or_else(|| param.clone())
+    }
+
     /// What a curried function type returns after its last arrow.
     fn result_of(&self, ty: &Type) -> Type {
         let mut ty = ty.clone();
@@ -293,6 +293,7 @@ impl Checker<'_> {
         callbacks: &[Option<usize>],
     ) -> Copies {
         let callback = |p: &Type, n: usize| {
+            let p = &self.callback_type(p);
             let args = self
                 .params_of(p)
                 .iter()

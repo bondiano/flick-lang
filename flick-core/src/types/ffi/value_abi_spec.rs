@@ -304,6 +304,14 @@ const JS_ENTRIES: &[(&str, &str, &str, AbiConversion, AbiDirection, &str)] = &[
         "Native Effect `Cause` representation of the pinned Effect version",
     ),
     (
+        "func_ref",
+        "FuncRef (a -> b)",
+        "(a, …) => b",
+        AbiConversion::None,
+        AbiDirection::Both,
+        "The function itself, without captures; adapted to JS arity as a callback is",
+    ),
+    (
         "function",
         "a -> b, a ->{r; e} b",
         "(a, …) => b",

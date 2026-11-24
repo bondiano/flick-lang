@@ -186,3 +186,4 @@ fn eff(t: Type) -> Type {
 include!("tests/expressions.rs");
 include!("tests/effects_patterns.rs");
 include!("tests/bounds_provenance.rs");
+include!("tests/func_ref.rs");

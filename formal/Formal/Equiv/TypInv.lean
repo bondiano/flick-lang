@@ -23,6 +23,7 @@ theorem _root_.Flick.Typ.not_alts {Ψ : List Ty} {Θ : Facts} {Γ : List Scheme}
   | conv _ _ ih => exact fun _ _ _ => ih _ _ rfl
   | allI hv => exact fun _ _ _ ha => by cases hv <;> simp [IsAlts] at ha
   | errVal _ _ _ ih => exact fun _ _ _ => ih _ _ rfl
+  | funcRef _ _ ih => exact fun _ _ _ => ih _ _ rfl
   | _ => first | (intro _ _ hj; cases hj; done) | (intro _ _ _ ha; simp [IsAlts] at ha)
 
 /-- The arm of a handler holds its body parked at a hole. -/
@@ -33,6 +34,7 @@ theorem _root_.Flick.Typ.hctl_parked {Ψ : List Ty} {Θ : Facts} {Γ : List Sche
   | conv _ _ ih => exact ih he
   | allI _ _ ih => exact ih he
   | errVal _ _ _ ih => exact ih he
+  | funcRef _ _ ih => exact ih he
   | hctl => cases he; exact ⟨_, ‹OkE _›, ‹_ = plug _ _›⟩
   | _ => cases he
 
@@ -44,6 +46,7 @@ theorem _root_.Flick.Typ.hres_parked {Ψ : List Ty} {Θ : Facts} {Γ : List Sche
   | conv _ _ ih => exact ih he
   | allI _ _ ih => exact ih he
   | errVal _ _ _ ih => exact ih he
+  | funcRef _ _ ih => exact ih he
   | hres => cases he; exact ⟨_, ‹OkE _›, ‹_ = plug _ _›⟩
   | _ => cases he
 
@@ -55,6 +58,7 @@ theorem _root_.Flick.Typ.hkarm_parked {Ψ : List Ty} {Θ : Facts} {Γ : List Sch
   | conv _ _ ih => exact ih he
   | allI _ _ ih => exact ih he
   | errVal _ _ _ ih => exact ih he
+  | funcRef _ _ ih => exact ih he
   | hkarm => cases he; exact ⟨_, ‹OkE _›, ‹_ = plug _ _›⟩
   | _ => cases he
 

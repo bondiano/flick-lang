@@ -224,6 +224,7 @@ def Const.ty : Const → CArg → Ty
         (.rtob (.run (.caps (Ty.tvar 0).reach) r) (.tvar 0) (ι.e.up 1))
         (ι.t.up 1) (ι.C.substT (shiftV 1))))
       (.rt ι.r ι.e) ι.t Caps.none
+  | .funcRefFun, ι => .arrow (.funcRef ι.t) .pure ι.t Caps.none
   -- an operation is typed by (Perform) at the arguments of its effect, never by (Const)
   | .perform E _ _, _ => .arrow (.base .unit) (.rt (.rnm E (.adt E)) .cnil) (.base .unit) Caps.none
 

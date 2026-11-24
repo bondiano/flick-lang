@@ -1,5 +1,6 @@
 //! Exact cold task bridges, implemented only with ordinary Task/Await code.
 //! Arguments remain language values; no host export or generic FFI exemption.
+use super::kept_for_call;
 use crate::{
     ir::{Expr, ExprKind, Param, Pat, Stage, Stmt},
     source::Span,
@@ -72,6 +73,7 @@ fn adapter(kind: Kind) -> Adapter {
         shapes,
         result_shape: task_shape(),
         words: vec![],
+        retention: None,
     }
 }
 fn supports(value: &Foreign, kind: Kind) -> bool {
@@ -81,7 +83,7 @@ fn supports(value: &Foreign, kind: Kind) -> bool {
         && value.dicts == 0
         && value.stages == vec![false; kind.arity()]
         && value.catch.is_none()
-        && value.adapter == adapter(kind)
+        && kept_for_call(&value.adapter) == adapter(kind)
 }
 pub(super) fn expression(value: &Foreign, span: Span) -> Option<Expr> {
     let kind = kind(value)?;

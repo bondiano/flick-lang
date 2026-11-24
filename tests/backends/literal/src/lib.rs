@@ -192,7 +192,7 @@ impl Backend for Literal {
                 version: "1.0.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.17.0", "0.18.0"),
+            ir: range("0.18.0", "0.19.0"),
             language: range("0.2.0", "0.3.0"),
             runtime_abis: vec![NamedRange {
                 name: "flickrt".into(),
@@ -412,9 +412,7 @@ fn apply_case_artifacts(
         }
         "path" => artifacts[0].path = "../outside.js".into(),
         "duplicate" => artifacts.push(artifacts[0].clone()),
-        "foreign" if !request.inline_foreign.is_empty() => {
-            artifacts.push(foreign::inline_report(request));
-        }
+        "foreign" => foreign::reports(request, artifacts)?,
         _ => {}
     }
     Ok(())

@@ -65,7 +65,9 @@ impl Checker<'_> {
             self.typing.names.get(&unparen(head).range()),
             Some(Ref::Method { .. })
         );
-        if !passes || constructor || mentioned || method {
+        // where a `FuncRef` is expected, the function may need what the `fun` does not
+        let func_ref = self.is_func_ref_lambda(fun);
+        if !passes || constructor || mentioned || method || func_ref {
             return;
         }
         let function = if rest.is_empty() {

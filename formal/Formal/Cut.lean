@@ -129,6 +129,7 @@ theorem Typ.cut {Ψ Θ₁ Γ e J} (h : Typ S Ψ Θ₁ Γ e J) : ∀ {Θ₂}, Ent
   | raise _ hφ ih => intro _ hΘ; exact .raise (ih hΘ) hφ
   | raiseAdt _ hU hφ ih => intro _ hΘ; exact .raiseAdt (ih hΘ) hU hφ
   | errVal _ hU hE ih => intro _ hΘ; exact .errVal (ih hΘ) hU hE
+  | funcRef _ hc ih => intro _ hΘ; exact .funcRef (ih hΘ) hc
   | tryR _ _ hφ hs ih₁ ih₂ => intro _ hΘ; exact .tryR (ih₁ hΘ) (ih₂ hΘ) hφ hs
   | tryP _ _ ih₁ ih₂ => intro _ hΘ; exact .tryP (ih₁ hΘ) (ih₂ hΘ)
   | handle hv _ hU hE _ hc ha hφ ih₁ ih₂ =>

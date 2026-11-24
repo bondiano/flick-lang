@@ -99,7 +99,7 @@ fn fixture_backend_reads_full_ir_types_in_debug_and_release() {
         let report_text = fs::read_to_string(root.join("dist/typed-ir-report.json"))
             .expect("typed-ir-report.json");
         let report: Value = serde_json::from_str(&report_text).expect("valid json");
-        assert_eq!(report["ir_version"], "0.17.0");
+        assert_eq!(report["ir_version"], "0.18.0");
         let is_release = profile == "release";
         assert_eq!(report["profile"], profile);
         assert_eq!(report["optimized"], is_release);

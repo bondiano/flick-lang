@@ -71,6 +71,10 @@ theorem phead_rev {S : Sig} {r r₂ r₂' : Tm} (hs : Sim W .top r r₂) (hr : R
     obtain ⟨f₁, y, rfl, hf₁, hy⟩ := hf.rinv_app
     rw [hf₁.top_const_rev rfl, hy.rinv_lit, hx.rinv_lit]
     exact ⟨_, .intEq⟩
+  | funcRef =>
+    obtain ⟨f, a, rfl, hf, -⟩ := hs.rinv_app
+    rw [hf.top_const_rev rfl]
+    exact ⟨_, .funcRef (Redex.app hr rfl).2⟩
   | hwithVal =>
     obtain ⟨ℓ, k, al, rr, e, rfl, -⟩ := hs.rinv_hwith
     exact ⟨_, .hwithVal (hr.2 (.hwith _ _ _ _ _) e trivial rfl)⟩

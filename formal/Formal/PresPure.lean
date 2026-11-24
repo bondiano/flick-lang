@@ -54,6 +54,10 @@ private theorem Typ.pureStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | errVal _ hU hE ih =>
     intro t φ e' hΓ hJ hh; cases hJ
     exact (ih _ _ e' hΓ rfl hh).errVal hU hE
+  | funcRef _ _ ih =>
+    intro t φ e' hΓ hJ hh; cases hJ
+    have h' := ih _ _ e' hΓ rfl hh
+    exact .funcRef h' h'.closed_nil
   | allI hv =>
     intro _ _ _ _ _ hh
     exact (hh.not_value hv).elim
@@ -84,6 +88,12 @@ private theorem Typ.pureStepCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       obtain rfl := LeLive.eq_base_left lt'
       obtain rfl := LeLive.eq_base_left hT
       exact .lit
+    | funcRef hv =>
+      obtain ⟨_, _, hT''⟩ := hf.const_arrow (by intro E o cl h; cases h)
+      obtain ⟨_, _, _, _, h, la, _, lt, -⟩ := LeLive.arrow_left hT''
+      cases h
+      have h₁ := (ha.valueAny hv .pure).sub (J' := .ex (.funcRef _) .pure) ⟨la, Stage.le_refl _⟩
+      exact (h₁.funcRef_val hv rfl).sub ⟨lt.trans hT, Stage.pure_le _⟩
   | let_ h₁ h₂ =>
     intro t φ e' hΓ hJ hh
     cases hΓ; cases hJ

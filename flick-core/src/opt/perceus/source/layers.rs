@@ -1,4 +1,5 @@
 //! Exact constant-Layer adapters; no generic host-copy erasure.
+use super::kept_for_call;
 use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 
 use super::Intrinsic;
@@ -68,7 +69,7 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
     // mutable host boundary. Neither callback nor implementation is rewritten.
     (value.mode == mode
         && value.stages == stages
-        && value.adapter
+        && kept_for_call(&value.adapter)
             == Adapter {
                 optional: vec![],
                 owned: vec![],
@@ -81,6 +82,7 @@ pub(super) fn intrinsic(value: &Foreign) -> Option<Intrinsic> {
                 shapes,
                 result_shape,
                 words: vec![],
+                retention: None,
             })
     .then_some(kind)
 }

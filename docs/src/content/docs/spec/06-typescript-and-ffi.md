@@ -1,6 +1,6 @@
 ---
 title: "TypeScript generation and the FFI boundary"
-source_hash: eb11fbb890d70b79
+source_hash: 3a04f1e2dab0a41e
 ---
 
 The examples of generated code below are the output of the debug profile, the reference lowering; [Code generation](../../reference/codegen/) describes it in full.
@@ -277,6 +277,7 @@ The value ABI table is published by the `flick/js` backend descriptor and checke
 | `layer` | `Layer ri e ro` | `Layer.Layer<RO, E, RI>` | `none` | `both` | Native Effect `Layer` representation of the pinned Effect version |
 | `exit` | `Exit e a` | `Exit.Exit<A, E>` | `none` | `both` | Native Effect `Exit` representation of the pinned Effect version |
 | `failure` | `Failure e` | `Cause.Cause<E>` | `none` | `both` | Native Effect `Cause` representation of the pinned Effect version |
+| `func_ref` | `FuncRef (a -> b)` | `(a, …) => b` | `none` | `both` | The function itself, without captures; adapted to JS arity as a callback is |
 | `function` | `a -> b, a ->{r; e} b` | `(a, …) => b` | `none` | `both` | Callbacks adapted to JS arity across four families: pure, Effect, Promise, scoped event |
 
 Records and user-defined ADTs have no stable layout and are not in this table. On this backend they may still cross bindings as deep-copied plain JS objects / tagged objects (`_tag` = `Name#hash`, fields `_0`, `_1`, …); `unboxed type` and `untagged type` declare explicit representations.

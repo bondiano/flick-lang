@@ -46,6 +46,7 @@ theorem PHead.caught {r r' : Tm} {n : Nat} {H : Nat → Prop} (hh : PHead r r') 
     simp only [Tm.Caught] at h ⊢
     exact caught_plug.mpr ⟨(caught_plug.mp h.1).1, Tm.Caught.noIns (vn hv ha.2)⟩
   | hdoneVal hv => exact h
+  | funcRef hv => exact Tm.Caught.noIns (vn hv ha.2.1)
   | _ =>
     apply plain
     simp only [Tm.Asc] at ha

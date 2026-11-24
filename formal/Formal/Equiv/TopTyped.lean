@@ -45,6 +45,11 @@ theorem _root_.Flick.Typ.lazy_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     obtain ⟨_, _, he', hφ⟩ := ih he
     cases he'
     exact ⟨_, _, rfl, hφ⟩
+  | funcRef _ _ ih =>
+    intro _ he
+    obtain ⟨_, _, he', hφ⟩ := ih he
+    cases he'
+    exact ⟨_, _, rfl, hφ⟩
   | conv _ _ ih =>
     intro _ he
     obtain ⟨_, _, he', hφ⟩ := ih he
@@ -69,6 +74,11 @@ theorem _root_.Flick.Typ.let_lazy_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) 
     obtain ⟨_, _, he', hφ⟩ := ih he
     cases he'
     exact ⟨_, _, rfl, hφ⟩
+  | funcRef _ _ ih =>
+    intro _ _ he
+    obtain ⟨_, _, he', hφ⟩ := ih he
+    cases he'
+    exact ⟨_, _, rfl, hφ⟩
   | conv _ _ ih =>
     intro _ _ he
     obtain ⟨_, _, he', hφ⟩ := ih he
@@ -83,6 +93,11 @@ theorem _root_.Flick.Typ.force_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     intro _ _; exact ⟨_, _, rfl, Stage.none_le (Stage.use_rt_le_ne_pure hφ)⟩
   | allI hv => intro _ he; subst he; cases hv
   | errVal _ _ _ ih =>
+    intro _ he
+    obtain ⟨_, _, he', hφ⟩ := ih he
+    cases he'
+    exact ⟨_, _, rfl, hφ⟩
+  | funcRef _ _ ih =>
     intro _ he
     obtain ⟨_, _, he', hφ⟩ := ih he
     cases he'
@@ -111,6 +126,11 @@ theorem _root_.Flick.Typ.let_force_stage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J)
     obtain ⟨_, _, he', hφ⟩ := ih he
     cases he'
     exact ⟨_, _, rfl, hφ⟩
+  | funcRef _ _ ih =>
+    intro _ _ he
+    obtain ⟨_, _, he', hφ⟩ := ih he
+    cases he'
+    exact ⟨_, _, rfl, hφ⟩
   | conv _ _ ih =>
     intro _ _ he
     obtain ⟨_, _, he', hφ⟩ := ih he
@@ -133,6 +153,7 @@ theorem noLzTop_aux {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | allI _ h₁ ih => exact fun _ {_} _ => ih h₁ (fun _ => rfl)
   | conv h₁ _ ih => exact fun _ {_} hx => ih h₁ hx
   | errVal h₁ _ _ ih => exact fun _ {_} hx => ih h₁ hx
+  | funcRef h₁ _ ih => exact fun _ {_} hx => ih h₁ hx
   | _ =>
     intro hty x hx hz
     cases hz
@@ -166,6 +187,9 @@ private theorem match_head_vals {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | errVal _ _ _ ih =>
     intro v p b rest δ t φ hΓ hJ hv hm he
     cases hJ; exact ih hΓ rfl hv hm he
+  | funcRef _ _ ih =>
+    intro v p b rest δ t φ hΓ hJ hv hm he
+    cases hJ; exact ih hΓ rfl hv hm he
   | allI hv' =>
     intro _ _ _ _ _ _ _ _ _ _ _ he
     rcases he with rfl | ⟨_, rfl⟩ | rfl | ⟨_, rfl⟩ <;> cases hv'
@@ -177,7 +201,7 @@ private theorem match_head_vals {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       cases hA with
       | acons hp _ _ => exact (hp.inst hv (h₁.valueAny hv _) hm).values
       | aref hK hU hn _ _ hpA _ _ =>
-        have hU7 : ts₀.kind ≠ 7 := by rw [Ty.kind_of_hd hU]; decide
+        have hU7 : ts₀.kind ≠ 7 ∧ ts₀.kind ≠ 17 := by rw [Ty.kind_of_hd hU]; decide
         obtain ⟨us₀, hk₀, ⟨ws, hr, hw⟩, hus⟩ :=
           (h₁.valueAny hv .pure).spine_match hv (matchP_spine_head hm) hK rfl hU7
             (Ty.not_all_of_hd hU)
@@ -230,6 +254,7 @@ private theorem settle_not_pure_aux {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   induction h with
   | conv _ _ ih => intro _ _ _ hΓ he hJ; cases hJ; exact ih hΓ he rfl
   | errVal _ _ _ ih => intro _ _ _ hΓ he hJ; cases hJ; exact ih hΓ he rfl
+  | funcRef _ _ ih => intro _ _ _ hΓ he hJ; cases hJ; exact ih hΓ he rfl
   | allI hv => intro _ _ _ _ he _; subst he; cases hv
   | settle _ _ _ hφ _ => intro _ _ _ _ _ hJ; cases hJ; exact Stage.use_rt_le_ne_pure hφ rfl
   | _ => intro _ _ _ _ he _; cases he

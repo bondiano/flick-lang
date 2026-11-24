@@ -162,13 +162,14 @@ theorem SpineShp.equiv {Ψ Θ Γ e a b φ} (h : SpineShp S Ψ Θ Γ e a φ)
     exact .inr ⟨ε', E, U, rfl, hU, hs, ht, by rw [hε.asRow]; exact hr⟩
 
 theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T φ}, J = .ex T φ →
-    Shp S true T e ∧ (∀ K, e.head = .ctor K → ¬ T.isAll → SpineShp S Ψ Θ Γ e T φ) := by
+    Shp S true T e ∧
+      (∀ K, e.head = .ctor K → ¬ T.isAll → T.kind ≠ 17 → SpineShp S Ψ Θ Γ e T φ) := by
   induction h with
   | conv _ he ih =>
     intro hv _ _ hJ; cases hJ
     obtain ⟨hs, hsp⟩ := ih hv rfl
-    exact ⟨hs.equiv he, fun K hK hA =>
-      (hsp K hK (fun h => hA (he.isAll.mp h))).equiv he⟩
+    exact ⟨hs.equiv he, fun K hK hA hk =>
+      (hsp K hK (fun h => hA (he.isAll.mp h)) (by rw [he.kind]; exact hk)).equiv he⟩
   | lam _ _ hT | fix _ _ hT | task _ _ _ hT | perform _ _ hT | kont _ _ hT | drec _ _ _ _ hT =>
     intro _ _ _ hJ; cases hJ
     exact ⟨.hidden (hT.opaque (by simp [Ty.Opaque, Ty.hd])), by simp [Tm.head]⟩
@@ -188,19 +189,23 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
     intro _ _ _ hJ; cases hJ
     have hh := Shp.head (S := S) hK
     exact ⟨hh.full_of (by rw [Shp.ctor_instR]; exact hT),
-      fun _ _ _ => .inl ⟨_, _, by rw [Shp.ctor_instR]; exact hT, hh⟩⟩
+      fun _ _ _ _ => .inl ⟨_, _, by rw [Shp.ctor_instR]; exact hT, hh⟩⟩
   | allI =>
     intro _ _ _ hJ; cases hJ
     exact ⟨.hidden (by simp [Ty.Opaque, Ty.hd]), fun _ _ h => (h trivial).elim⟩
   | errVal h' hU hE ih =>
     intro hv _ _ hJ; cases hJ
     refine ⟨.err (ih hv rfl).1 hU ⟨_, hE _ (.inl rfl)⟩,
-      fun K hK _ => .inr ⟨_, _, _, rfl, hU, (ih hv rfl).1, h', hE⟩⟩
+      fun K hK _ _ => .inr ⟨_, _, _, rfl, hU, (ih hv rfl).1, h', hE⟩⟩
+  | funcRef =>
+    intro _ _ _ hJ; cases hJ
+    exact ⟨.hidden (by simp [Ty.Opaque, Ty.hd]), fun _ _ _ hk => (hk rfl).elim⟩
   | app hf _ _ hT ih₁ ih₂ =>
     intro hv _ _ hJ; cases hJ
     cases hv with
     | ctorApp hvf hK hve =>
-      rcases (ih₁ hvf rfl).2 _ hK (by simp [Ty.isAll]) with ⟨U, us, hU, hs⟩ | ⟨_, _, _, h, _⟩
+      rcases (ih₁ hvf rfl).2 _ hK (by simp [Ty.isAll]) (by simp [Ty.kind]) with
+        ⟨U, us, hU, hs⟩ | ⟨_, _, _, h, _⟩
       · obtain ⟨_, _, _, T₀, ts', _, _, hU'⟩ := hs.false_arrows
         subst hU'
         cases ts' with
@@ -214,7 +219,8 @@ theorem Typ.shape {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) : Value e → ∀ {T �
           cases he
           have hfield : Shp S true g _ := Shp.of_substT (Shp.le la (ih₂ hve rfl).1)
           have hs' : Shp S false _ _ := .app hs hfield
-          refine ⟨hs'.full_of (us := us) (lt.trans hT), fun _ _ _ => .inl ⟨_, us, lt.trans hT, hs'⟩⟩
+          refine ⟨hs'.full_of (us := us) (lt.trans hT),
+            fun _ _ _ _ => .inl ⟨_, us, lt.trans hT, hs'⟩⟩
       · cases h
     | constApp hc _ =>
       refine ⟨.hidden (Ty.opaque_of_kind ?_), by simp [Tm.head]⟩
