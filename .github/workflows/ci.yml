@@ -188,6 +188,8 @@ jobs:
           node-version-file: .tool-versions
           cache: pnpm
       - run: just e2e-tests
+      # the primitive kernel's suite; e2e-js is near its time limit
+      - run: just kernel
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:

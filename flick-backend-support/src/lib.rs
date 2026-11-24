@@ -6,6 +6,7 @@ pub mod bridge_select;
 pub mod effects;
 pub mod exports;
 pub mod inline_span;
+pub mod kernel;
 mod lang;
 pub mod loops;
 pub mod names;

@@ -344,3 +344,4 @@ runtime/lazy_local_concurrent
 effect/result_blocks
 runtime/result_block_causes
 codegen/bounded_eval
+runtime/control_kernel

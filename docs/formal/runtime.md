@@ -585,6 +585,7 @@ Each law below names the cases that exercise it, under `tests/run/runtime/` unle
 | R6 | `shared_layer`, `stdlib/effect/shared_layer_merged` | both | trace for build and release counts; output for at most one build and for the release after consumers. The projection of the merged case is not compared: see below |
 | R7 | `ref_linearizable`, `handoff` | both; only Go takes steps at once | output: by its consequences (each ticket once, each fiber's tickets in order, no half-done transfer seen, a cell unchanged by a dying `modify`). Not a check of the history itself |
 | R8 | `cause_laws`, `cause_lists`, `closing_causes`; `cause_test.go` for (Seq=Par) | both | output |
+| R1, R3 for the control kernel's timer and wait | `control_kernel` (a delay that is not positive, timers by delay, `never` ended by an interruption, the timer of an interrupted sleep stopped, an infinite delay losing a race) | both | output |
 | C0 | `closed_owner` | both | trace (`refuse`, the phase), output |
 | C1 | `closing_hooks`; a hook added during C1 or C3: `group_in_closing` | both; `group_in_closing` passes on Go and is a [known gap on JS](#js-a-group-made-while-its-owner-closes-runs-nothing) | output: hooks are not traced, only the place of the phase |
 | C1, a failing hook; a hook added during C4 | not checked by a case: the hooks a Flick program adds (group stops, listener detaches) do not fail, and only a foreign callback can add one in C4. Unit tests: `packages/effect-ts/test/scope.test.ts`, `owner_test.go` (a hook added during C4) | | not on a run of a program |

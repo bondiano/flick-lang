@@ -7,7 +7,23 @@ use std::path::{Path, PathBuf};
 fn main() -> io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     let output = PathBuf::from(env::var_os("OUT_DIR").expect("Cargo supplies OUT_DIR"));
-    binding_policy(&output)
+    binding_policy(&output)?;
+    kernel_version(&output)
+}
+
+/// The version the kernel manifest states, which the handshake names.
+fn kernel_version(output: &Path) -> io::Result<()> {
+    let path = "src/kernel/manifest.txt";
+    println!("cargo:rerun-if-changed={path}");
+    let text = fs::read_to_string(path)?;
+    let version = text
+        .lines()
+        .find_map(|line| line.strip_prefix("version "))
+        .ok_or_else(|| io::Error::other("the kernel manifest states no version"))?;
+    fs::write(
+        output.join("kernel.rs"),
+        format!("pub const VERSION: &str = {:?};\n", version.trim()),
+    )
 }
 
 /// Compile package-owned binding metadata; the compiler has no module tables.

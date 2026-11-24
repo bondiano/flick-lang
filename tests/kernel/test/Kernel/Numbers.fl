@@ -1,0 +1,213 @@
+// The numeric primitives of the kernel: conversions between the numeric
+// types, text, bits and shifts. Operands come in through `same`, so the
+// runtime computes them, not the compiler. Each expected value follows
+// from IEEE 754, two's complement and docs/backends/numeric-policy.md.
+// Arithmetic operators are pinned by tests/language (Ints, Floats,
+// FixedWidth, NumericBoundaries, BigInts).
+module Kernel.Numbers exposing (tests)
+
+same : a -> a
+let same x = x
+
+tests : List Test.Test
+let tests = [
+  Test.group "to Float and BigInt" [
+    Test.test "Int to Float is exact" (fun () ->
+      Test.equal (-2147483648.0) (Int.to_float (same (-2147483648)))
+    ),
+    Test.test "BigInt to Float rounds to nearest even" (fun () ->
+      Test.equal 9007199254740992.0 (BigInt.to_number (same 9007199254740993n))
+    ),
+    Test.test "BigInt to Float ties go to the even neighbour above" (fun () ->
+      Test.equal 9007199254740996.0 (BigInt.to_number (same 9007199254740995n))
+    ),
+    Test.test "Int to BigInt" (fun () ->
+      Test.is_true "into" ((into (same (-2147483648)) : BigInt) == -2147483648n)
+    ),
+    Test.test "BigInt to text" (fun () ->
+      Test.equal "-1267650600228229401496703205376" (BigInt.to_string (same (-(2n ** 100n))))
+    ),
+    Test.test "a whole Float to BigInt" (fun () ->
+      Test.is_true "1e20" (BigInt.from_number (same 1e20) == Some 100000000000000000000n)
+    ),
+    Test.test "-0 to BigInt is 0" (fun () ->
+      Test.is_true "-0" (BigInt.from_number (same (-0.0)) == Some 0n)
+    ),
+    Test.test "a fraction, NaN or an infinity is no BigInt" (fun () ->
+      Test.is_true
+        "none"
+        (BigInt.from_number (same 0.5) == None
+          && BigInt.from_number (same (0.0 / 0.0)) == None
+          && BigInt.from_number (same (1.0 / 0.0)) == None)
+    ),
+  ],
+  Test.group "to Int" [
+    Test.test "truncates toward zero" (fun () -> Test.equal (-7) (Int.truncate (same (-7.9)))),
+    Test.test "wraps into 32 bits" (fun () ->
+      Test.equal (-2147483648) (Int.truncate (same 2147483648.5))
+    ),
+    Test.test "2^32 + 1 wraps to 1" (fun () -> Test.equal 1 (Int.truncate (same 4294967297.0))),
+    Test.test "NaN is 0" (fun () -> Test.equal 0 (Int.truncate (same (0.0 / 0.0)))),
+    Test.test "an infinity is 0" (fun () -> Test.equal 0 (Int.truncate (same (-1.0 / 0.0)))),
+  ],
+  Test.group "fixed width" [
+    Test.test "Int to Int8 wraps" (fun () ->
+      Test.equal (-128i8) (Int8.wrapping_from_int (same 128))
+    ),
+    Test.test "Int to UInt8 wraps" (fun () ->
+      Test.equal 255u8 (UInt8.wrapping_from_int (same (-1)))
+    ),
+    Test.test "Int to Int16 wraps" (fun () ->
+      Test.equal (-32768i16) (Int16.wrapping_from_int (same 32768))
+    ),
+    Test.test "Int to UInt16 wraps" (fun () ->
+      Test.equal 0u16 (UInt16.wrapping_from_int (same 65536))
+    ),
+    Test.test "Int to UInt32 wraps" (fun () ->
+      Test.equal 4294967295u32 (UInt32.wrapping_from_int (same (-1)))
+    ),
+    Test.test "Int to UInt64 wraps" (fun () ->
+      Test.equal 18446744073709551615u64 (UInt64.wrapping_from_int (same (-1)))
+    ),
+    Test.test "UInt64 to Int64 wraps" (fun () ->
+      Test.equal (-1i64) (Int64.wrapping_from_uint64 (same 18446744073709551615u64))
+    ),
+    Test.test "BigInt to Int8 wraps" (fun () ->
+      Test.equal 44i8 (Int8.wrapping_from_bigint (same 300n))
+    ),
+    Test.test "Int8 to BigInt" (fun () ->
+      Test.is_true "-128" (Int8.to_bigint (same (-128i8)) == -128n)
+    ),
+    Test.test "UInt64 to BigInt" (fun () ->
+      Test.is_true "max" (UInt64.to_bigint (same 18446744073709551615u64) == 18446744073709551615n)
+    ),
+    Test.test "Float to Float32 rounds once" (fun () ->
+      Test.equal "0.10000000149011612" (show (Float32.to_float (Float32.from_float (same 0.1))))
+    ),
+    Test.test "Int to Float32 rounds to nearest even" (fun () ->
+      Test.equal 16777216.0 (Float32.to_float (Float32.from_int (same 16777217)))
+    ),
+    Test.test "Int64 shows without a suffix" (fun () ->
+      Test.equal "-9223372036854775808" (show (same (-9223372036854775808i64)))
+    ),
+    Test.test "UInt64 shows without a suffix" (fun () ->
+      Test.equal "18446744073709551615" (show (same 18446744073709551615u64))
+    ),
+  ],
+  Test.group "Int bits" [
+    Test.test "xor with -1" (fun () ->
+      Test.equal (-252645136) (Int.bit_xor (same (-1)) 0x0F0F0F0F)
+    ),
+    Test.test "and" (fun () -> Test.equal 0x0F000F00 (Int.bit_and (same 0x0F0F0F0F) 0x7F007F00)),
+    Test.test "or" (fun () -> Test.equal (-1) (Int.bit_or (same 0x0F0F0F0F) (-252645136))),
+    Test.test "a negative count is masked to 31" (fun () ->
+      Test.equal (-2147483648) (Int.shift_left (same 1) (-1))
+    ),
+    Test.test "right shift of -1 by 31 keeps the sign" (fun () ->
+      Test.equal (-1) (Int.shift_right (same (-1)) 31)
+    ),
+    Test.test "unsigned shift of min by 31" (fun () ->
+      Test.equal 1 (Int.shift_right_unsigned (same (-2147483648)) 31)
+    ),
+    Test.test "unsigned shift by 0 reads the bits back as an Int" (fun () ->
+      Test.equal (-1) (Int.shift_right_unsigned (same (-1)) 0)
+    ),
+  ],
+  Test.group "Int64 bits" [
+    Test.test "shift left by 63" (fun () ->
+      Test.equal (-9223372036854775808i64) (Int64.shift_left (same 1i64) 63)
+    ),
+    Test.test "the count is masked to 6 bits" (fun () ->
+      Test.equal 1i64 (Int64.shift_left (same 1i64) 64)
+    ),
+    Test.test "right shift keeps the sign" (fun () ->
+      Test.equal (-1i64) (Int64.shift_right (same (-9223372036854775808i64)) 63)
+    ),
+    Test.test "unsigned right shift fills with zeros" (fun () ->
+      Test.equal 1i64 (Int64.shift_right_unsigned (same (-9223372036854775808i64)) 63)
+    ),
+    Test.test "not" (fun () -> Test.equal (-1i64) (Int64.bit_not (same 0i64))),
+    Test.test "and, or, xor" (fun () ->
+      Test.is_true
+        "bits"
+        (Int64.bit_and (same 0xFF00i64) 0x0FF0i64 == 0x0F00i64
+          && Int64.bit_or (same 0xFF00i64) 0x0FF0i64 == 0xFFF0i64
+          && Int64.bit_xor (same 0xFF00i64) 0x0FF0i64 == 0xF0F0i64)
+    ),
+  ],
+  Test.group "Float" [
+    Test.test "floor of -0.5" (fun () -> Test.equal (-1.0) (Float.floor (same (-0.5)))),
+    Test.test "floor keeps -0" (fun () -> Test.equal "-0" (show (Float.floor (same (-0.0))))),
+    Test.test "floor of NaN" (fun () -> Test.equal "NaN" (show (Float.floor (same (0.0 / 0.0))))),
+    Test.test "sqrt of 2" (fun () ->
+      Test.equal "1.4142135623730951" (show (Float.sqrt (same 2.0)))
+    ),
+    Test.test "sqrt of -0 is -0" (fun () -> Test.equal "-0" (show (Float.sqrt (same (-0.0))))),
+    Test.test "sqrt of -1 is NaN" (fun () -> Test.equal "NaN" (show (Float.sqrt (same (-1.0))))),
+    Test.test "sqrt of Infinity" (fun () ->
+      Test.equal "Infinity" (show (Float.sqrt (same (1.0 / 0.0))))
+    ),
+  ],
+  Test.group "show thresholds" [
+    Test.test "1e20 has no exponent" (fun () ->
+      Test.equal "100000000000000000000" (show (same 1e20))
+    ),
+    Test.test "1e21 has one" (fun () -> Test.equal "1e+21" (show (same 1e21))),
+    Test.test "0.000001 has none" (fun () -> Test.equal "0.000001" (show (same 0.000001))),
+    Test.test "1e-7 has one" (fun () -> Test.equal "1e-7" (show (same 1e-7))),
+    Test.test "the least subnormal" (fun () -> Test.equal "5e-324" (show (same 5e-324))),
+    Test.test "the greatest finite" (fun () ->
+      Test.equal "1.7976931348623157e+308" (show (same 1.7976931348623157e308))
+    ),
+    Test.test "shortest digits that read back" (fun () ->
+      Test.equal "123456789.12345679" (show (same 123456789.123456789))
+    ),
+    Test.test "-0" (fun () -> Test.equal "-0" (show (same (-0.0)))),
+    Test.test "the infinities" (fun () -> Test.equal "-Infinity" (show (same (-1.0 / 0.0)))),
+  ],
+  Test.group "text" [
+    Test.test "Int.to_string of min" (fun () ->
+      Test.equal "-2147483648" (Int.to_string (same (-2147483648)))
+    ),
+    Test.test "Float.to_string keeps -0" (fun () ->
+      Test.equal "-0" (Float.to_string (same (-0.0)))
+    ),
+    Test.test "Float.to_string with an exponent" (fun () ->
+      Test.equal "-1.5e-7" (Float.to_string (same (-1.5e-7)))
+    ),
+    Test.test "to_number reads hexadecimal" (fun () ->
+      Test.is_true "0x1F" (String.to_number (same " 0x1F ") == Some 31.0)
+    ),
+    Test.test "to_number reads binary and octal" (fun () ->
+      Test.is_true
+        "0b, 0o"
+        (String.to_number (same "0b101") == Some 5.0 && String.to_number (same "0o17") == Some 15.0)
+    ),
+    Test.test "to_number trims JS white space" (fun () ->
+      Test.is_true "trim" (String.to_number (same "\u{A0}7\u{FEFF}\n") == Some 7.0)
+    ),
+    Test.test "to_number of a fraction without digits on one side" (fun () ->
+      Test.is_true
+        ".5, 5."
+        (String.to_number (same ".5") == Some 0.5 && String.to_number (same "5.") == Some 5.0)
+    ),
+    Test.test "to_number overflows to Infinity" (fun () ->
+      Test.equal "Infinity" (show (Option.with_default 0.0 (String.to_number (same "1e400"))))
+    ),
+    Test.test "to_number of Infinity" (fun () ->
+      Test.equal "-Infinity" (show (Option.with_default 0.0 (String.to_number (same "-Infinity"))))
+    ),
+    Test.test "to_number of NaN is NaN" (fun () ->
+      Test.equal "NaN" (show (Option.with_default 0.0 (String.to_number (same "NaN"))))
+    ),
+    Test.test "to_number refuses blank and malformed text" (fun () ->
+      Test.is_true
+        "none"
+        (String.to_number (same "") == None
+          && String.to_number (same "  ") == None
+          && String.to_number (same "1_000") == None
+          && String.to_number (same "inf") == None
+          && String.to_number (same "12px") == None)
+    ),
+  ],
+]
