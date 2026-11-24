@@ -3,8 +3,6 @@
 use std::mem;
 use std::rc::Rc;
 
-#[cfg(not(target_arch = "wasm32"))]
-use super::LemmaAliases;
 use super::defs::{Admitted, Program, admit};
 use super::eval::{Env, Machine, Nf, STEPS, Stop, Value, distinct};
 use super::show::show;
@@ -12,9 +10,13 @@ use super::term::{Pat, Refused, TUPLES, Term};
 #[cfg(not(target_arch = "wasm32"))]
 use super::trace::{ProofStep, Trace};
 use super::{Arg, Cert, Data, Equation, Failure, Goal, Lemma, Rule, Statement, Ty};
+#[cfg(not(target_arch = "wasm32"))]
+use super::{LemmaAliases, ProofSearchRequest, ProofSearchResult, ProofSearchStatus};
 use crate::source::Span;
 
 mod cases;
+#[cfg(not(target_arch = "wasm32"))]
+mod search;
 #[cfg(not(target_arch = "wasm32"))]
 mod suggest;
 
@@ -42,6 +44,8 @@ struct Checker<'a> {
     suggestions: Option<suggest::Candidates<'a>>,
     #[cfg(not(target_arch = "wasm32"))]
     probing: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    capture: Option<search::Capture<'a>>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -114,8 +118,18 @@ pub(super) fn prove(
         suggestions: aliases.map(|aliases| suggest::Candidates::new(program, aliases)),
         #[cfg(not(target_arch = "wasm32"))]
         probing: false,
+        #[cfg(not(target_arch = "wasm32"))]
+        capture: None,
     };
     checker.statement(statement, proof)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Probe {
+    Accepted,
+    Rejected,
+    Exhausted,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -127,12 +141,12 @@ pub(super) fn probe(
     lemmas: &[Lemma],
     refined: &[(Rc<str>, Value)],
     remaining: &mut u64,
-) -> bool {
+) -> Probe {
     if *remaining == 0 {
-        return false;
+        return Probe::Exhausted;
     }
     let Ok(defs) = admit_certificate(statement, proof, program, lemmas) else {
-        return false;
+        return Probe::Rejected;
     };
     let mut kernel = Checker {
         data,
@@ -148,10 +162,16 @@ pub(super) fn probe(
         observing: false,
         suggestions: None,
         probing: true,
+        #[cfg(not(target_arch = "wasm32"))]
+        capture: None,
     };
-    let accepted = kernel.statement(statement, proof).is_ok();
+    let checked = kernel.statement(statement, proof);
     *remaining = kernel.steps;
-    accepted
+    match checked {
+        Ok(()) => Probe::Accepted,
+        Err(failure) if matches!(failure.cause(), Failure::Exhausted { .. }) => Probe::Exhausted,
+        Err(_) => Probe::Rejected,
+    }
 }
 
 fn admit_certificate(
@@ -266,6 +286,8 @@ pub(super) fn observe(
         suggestions: suggestions
             .map(|(program, aliases)| suggest::Candidates::new(program, aliases)),
         probing: false,
+        #[cfg(not(target_arch = "wasm32"))]
+        capture: None,
     };
     match &statement.goal {
         Goal::Equal(eq) => {
@@ -275,6 +297,75 @@ pub(super) fn observe(
             checker.record(proof.span, Err((a, b)), Site::Expected);
         }
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn search_proof(
+    statement: &Statement,
+    proof: Option<&Cert>,
+    data: &Data,
+    program: &dyn Program,
+    lemmas: &[Lemma],
+    aliases: &LemmaAliases,
+    request: &ProofSearchRequest,
+) -> ProofSearchResult {
+    let admitted =
+        proof.and_then(|proof| admit_certificate(statement, proof, program, lemmas).ok());
+    let unfold = admitted.is_some();
+    let mut checker = Checker {
+        data,
+        defs: admitted.unwrap_or_default(),
+        lemmas,
+        unfold,
+        vars: statement.params.clone(),
+        refined: Vec::new(),
+        facts: statement.premises.clone(),
+        steps: STEPS,
+        fresh: 0,
+        trace: None,
+        observing: true,
+        suggestions: None,
+        probing: true,
+        capture: Some(search::Capture::new(request)),
+    };
+    if let Some(proof) = proof {
+        match &statement.goal {
+            Goal::Equal(eq) => {
+                let _ = checker.check(eq, proof, GoalOrigin::Step);
+            }
+            Goal::SameType(a, b) => {
+                checker.record(proof.span, Err((a, b)), Site::Expected);
+            }
+        }
+    }
+    if request.is_cancelled() {
+        return ProofSearchResult::empty(ProofSearchStatus::Cancelled);
+    }
+    let selected = checker.capture.take().and_then(|capture| capture.selected);
+    let (goal, span, synthesizing) = if let Some(selected) = selected {
+        checker.vars = selected.vars;
+        checker.facts = selected.facts;
+        checker.refined = selected.refined;
+        (selected.goal, Some(selected.span), selected.synthesizing)
+    } else if proof.is_none_or(|body| request.offset <= body.span.start) {
+        checker.vars.clone_from(&statement.params);
+        checker.facts.clone_from(&statement.premises);
+        checker.refined.clear();
+        (statement.goal.clone(), None, false)
+    } else {
+        return ProofSearchResult::empty(ProofSearchStatus::NoCandidate);
+    };
+    let goal = match &goal {
+        Goal::Equal(eq) => Ok(eq),
+        Goal::SameType(a, b) => Err((a, b)),
+    };
+    suggest::Candidates::explicit(program, aliases, &request.cancelled).search(
+        &checker,
+        goal,
+        span,
+        statement.span,
+        synthesizing,
+    )
 }
 
 /// Types whose outermost constructors differ.
@@ -483,6 +574,10 @@ impl Checker<'_> {
         goal: Result<&Equation, (&Ty, &Ty)>,
         site: Site,
     ) -> Option<usize> {
+        if let Some(mut capture) = self.capture.take() {
+            capture.record(self, span, goal, site);
+            self.capture = Some(capture);
+        }
         let mut trace = self.trace.take()?;
         let i = trace.record(span, goal, &self.vars, &self.facts, &self.refined);
         if !matches!(site, Site::Scope)
@@ -503,8 +598,15 @@ impl Checker<'_> {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn check(&mut self, goal: &Equation, cert: &Cert, origin: GoalOrigin) -> Result<(), Failure> {
+        if self
+            .capture
+            .as_ref()
+            .is_some_and(search::Capture::is_cancelled)
+        {
+            return invalid(cert.span, "proof search was cancelled");
+        }
         let from = self.steps;
-        let recorded = if self.trace.is_none() {
+        let recorded = if self.trace.is_none() && self.capture.is_none() {
             None
         } else if matches!(cert.kind, Rule::Let(..)) {
             let mut rest = cert;

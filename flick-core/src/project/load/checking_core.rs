@@ -376,12 +376,14 @@ impl Checking<'_> {
                 },
             };
             #[cfg(not(target_arch = "wasm32"))]
-            let search = self.cache.and_then(|cache| cache.proof_search(&loaded.path));
-            #[cfg(not(target_arch = "wasm32"))]
-            let search = self.cache.and_then(|cache| cache.proof_search(&loaded.path));
+            let search = self
+                .cache
+                .and_then(|cache| cache.proof_search(&loaded.path));
             if clean {
                 let (found, proven) = ir::check_proofs(
-                    &module, &typing, &run,
+                    &module,
+                    &typing,
+                    &run,
                     #[cfg(not(target_arch = "wasm32"))]
                     evidence.take(),
                     #[cfg(not(target_arch = "wasm32"))]
@@ -485,7 +487,6 @@ impl Checking<'_> {
             contracts: verified_contracts,
         }
     }
-
 }
 
 /// Takes where `imported` declares the names `interface` re-exports.

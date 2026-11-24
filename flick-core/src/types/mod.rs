@@ -115,6 +115,8 @@ mod variance;
 mod watched;
 pub mod wire;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::logic::{ProofSearchRequest, ProofSearchResult, ProofSearchStatus};
 pub use crate::syntax::structure::Thresholds;
 pub use applicative_do::{and_keys, group_key, pure_argument};
 pub use bindings::{LetParts, let_parts, signature_name};
