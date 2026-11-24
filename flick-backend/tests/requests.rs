@@ -61,7 +61,7 @@ fn incomplete_graphs_and_inconsistent_source_metadata_are_rejected() {
                 input: "missing".into(),
             }),
             "external-interface" => request.modules[0].role = ModuleRole::External,
-            "ir" => request.target.ir_version = "0.17.0".into(),
+            "ir" => request.target.ir_version = "0.18.0".into(),
             "ir-old" => request.target.ir_version = "0.15.0".into(),
             "api" => request.target.backend_api = "0.2.0".into(),
             "pin" => request.backend.sha256 = "missing".into(),
