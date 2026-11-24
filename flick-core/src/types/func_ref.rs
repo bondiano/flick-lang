@@ -41,7 +41,10 @@ impl Checker<'_> {
         }
     }
 
-    /// `node` where `expected`, a `FuncRef` of `fn_ty`, is expected.
+    /// `node` where `expected`, a `FuncRef` of `fn_ty`, is expected. Kept
+    /// out of `check_value`, whose frame every nested expression adds to the
+    /// stack.
+    #[inline(never)]
     pub(super) fn check_func_ref(&mut self, node: &Node, fn_ty: &Type, expected: &Type) -> Type {
         let mut node = node;
         while node.kind == K::ParenExpr {

@@ -197,12 +197,8 @@ impl Checker<'_> {
                 self.check(x, &Type::Captured(Rc::new(task), held))?;
                 self.perform(&Stage::Runtime(r, x_rows))
             }
-            // (FuncRef-In), after the forms that pass the expected type on
-            (_, Type::App(h, f)) if **h == prelude("FuncRef") => self.check_func_ref(e, f, &full),
-            _ => {
-                let t = self.infer(e)?;
-                self.fit(e, &t, &full)
-            }
+            // (FuncRef-In) and (Sub), after the forms that pass the expected type on
+            _ => self.check_inferred(e, &expected, &full),
         }
     }
 

@@ -62,6 +62,20 @@ pub(super) fn mono(t: Type) -> Scheme {
 }
 
 impl Checker<'_> {
+    /// `e` against `full`, resolved to `expected`, by none of the forms of
+    /// `check`: (FuncRef-In) against a `FuncRef`, else what `e` infers fits.
+    /// Kept out of `check`, whose frame every nested term adds to the stack.
+    #[inline(never)]
+    pub(super) fn check_inferred(&mut self, e: &Term, expected: &Type, full: &Type) -> Check<()> {
+        if let Type::App(h, f) = expected
+            && **h == prelude("FuncRef")
+        {
+            return self.check_func_ref(e, f, full);
+        }
+        let t = self.infer(e)?;
+        self.fit(e, &t, full)
+    }
+
     /// (FuncRef-In): a term that names no local is a value of `FuncRef f`
     /// when it is one of `f`; as the checker, this one takes a λ, a
     /// top-level value, a constructor or an operation. A term of type
