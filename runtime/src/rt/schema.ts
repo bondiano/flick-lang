@@ -185,7 +185,7 @@ export const schemaRecordOf = (fields: ReadonlyArray<readonly [string, Witness]>
       if (!Object.hasOwn(v, name)) return err(schemaError(at(path, name), "a missing key"));
       const r = item.decodeAt(v[name], at(path, name));
       if (r._tag === "Failure") return r;
-      Object.defineProperty(out, name, { value: r.success, enumerable: true, writable: true, configurable: true });
+      assign(out, name, r.success);
     }
     for (const name of Object.keys(v)) if (!sorted.some(([label]) => label === name))
       return err(schemaError(at(path, name), "an unknown key"));
@@ -197,7 +197,7 @@ export const schemaRecordOf = (fields: ReadonlyArray<readonly [string, Witness]>
       if (!Object.hasOwn(v, name)) return err(schemaError(at(path, name), "a missing key"));
       const r = item.encodeAt(v[name], at(path, name));
       if (r._tag === "Failure") return r;
-      Object.defineProperty(out, name, { value: r.success, enumerable: true, writable: true, configurable: true });
+      assign(out, name, r.success);
     }
     return ok(out);
   }, undefined, { kind: "record", fields: sorted });
@@ -315,6 +315,11 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 const map = <A, B>(r: Result<A, SchemaError>, f: (v: A) => B): Result<B, SchemaError> =>
   r._tag === "Success" ? ok(f(r.success)) : r;
+/** Sets an own property, `__proto__` too; assignment is much faster than defineProperty. */
+const assign = <A>(record: Record<string, A>, key: string, item: A): void => {
+  if (key === "__proto__") Object.defineProperty(record, key, { value: item, writable: true, enumerable: true, configurable: true });
+  else record[key] = item;
+};
 
 const inertProblem = (input: unknown): SchemaIssue | undefined => {
   const active = new Set<object>();
