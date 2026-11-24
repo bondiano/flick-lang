@@ -120,7 +120,8 @@ impl Projection<'_> {
                 if exported.len() < constructors.len() {
                     return Ok(Some(brand(&generics)));
                 }
-                self.variants(name, &exported, abi.is_tagged()).map(Some)
+                self.variants(name, &kinds, &exported, abi.is_tagged())
+                    .map(Some)
             }
             (Form::Nominal { literals, .. }, _) if !literals.is_empty() => {
                 Ok(Some(self.enumeration(name, literals, false)))
@@ -133,7 +134,7 @@ impl Projection<'_> {
                 if constructors.is_empty() {
                     return Ok(Some(brand(&generics)));
                 }
-                self.variants(name, &constructors, true).map(Some)
+                self.variants(name, &kinds, &constructors, true).map(Some)
             }
             (Form::Class { .. }, _) | (_, Decl::Class) => {
                 self.class(interface, name, &kinds).map(Some)
@@ -143,11 +144,15 @@ impl Projection<'_> {
     }
 
     /// `export type T<A> = { readonly _tag: "…"; readonly _0: A } | …`; an
-    /// `unboxed` or `untagged` type is the union of its fields. A constructor
-    /// of a GADT is a case of every instance: TypeScript has no refinement.
+    /// `unboxed` or `untagged` type is the union of its fields. A tagged GADT
+    /// case whose result fixes a parameter to a closed type with a TypeScript
+    /// form is a case only of the instances that admit that type, and a
+    /// phantom of the parameters keeps such instances apart; other indices
+    /// are not checked.
     fn variants(
         &self,
         name: &str,
+        kinds: &[Kind],
         constructors: &[&Export],
         tagged: bool,
     ) -> Result<String, String> {
@@ -177,6 +182,7 @@ impl Projection<'_> {
             (0..arity).map(|i| format!("T{i}")).collect()
         };
         let mut cases = Vec::new();
+        let mut guarded = false;
         for (c, scheme) in constructors.iter().zip(&schemes) {
             let (vars, ty) = split(scheme);
             let args: Vec<Type> = built(&ty).spine().1.into_iter().cloned().collect();
@@ -212,13 +218,34 @@ impl Projection<'_> {
                     .enumerate()
                     .map(|(i, f)| format!("readonly _{i}: {f}")),
             );
-            cases.push(format!("{{ {} }}", parts.join("; ")));
+            let case = format!("{{ {} }}", parts.join("; "));
+            // the parameters this case fixes; one without a TypeScript form is left unchecked
+            let (fixed, of): (Vec<String>, Vec<&str>) = (args.iter().zip(&params).zip(kinds))
+                .filter(|((a, _), k)| **k == Kind::Type && closed(a))
+                .filter_map(|((a, p), _)| Some((self.ty(a, &scope).ok()?, p.as_str())))
+                .unzip();
+            if fixed.is_empty() {
+                cases.push(case);
+            } else {
+                guarded = true;
+                cases.push(format!(
+                    "([{}] extends [{}] ? {case} : never)",
+                    fixed.join(", "),
+                    of.join(", ")
+                ));
+            }
         }
-        Ok(format!(
-            "export type {name}{} = {};",
-            type_args(&params),
-            cases.join(" | ")
-        ))
+        let union = cases.join(" | ");
+        let body = if guarded {
+            // without it, an instance with only pass-through cases would pass for any other
+            format!(
+                "{{ readonly \"~flick/params\"?: [{}] }} & ({union})",
+                params.join(", ")
+            )
+        } else {
+            union
+        };
+        Ok(format!("export type {name}{} = {body};", type_args(&params)))
     }
 
     /// A class as the record of its dictionary: methods and superclass getters.
@@ -355,6 +382,13 @@ fn scope_of(vars: &[Binder], indexed: Option<(&[Type], &[String])>) -> Vars {
             (b.name.clone(), ts)
         })
         .collect()
+}
+
+/// Whether `t` has no type variable.
+fn closed(t: &Type) -> bool {
+    let mut open = false;
+    t.visit(&mut |c| open |= matches!(c, Type::Var(_) | Type::Meta(_) | Type::Skolem(_)));
+    !open
 }
 
 /// Whether a type alias of `kind`, given its parameters, is a row.

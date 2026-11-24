@@ -114,8 +114,9 @@ fn existential_module_value_is_exported_as_unknown() {
     assert_eq!(projection.value(&ty), Ok("unknown".to_owned()));
 }
 
-/// A case per constructor, over the type's parameters; a hidden type is
-/// `unknown`, and a held dictionary is no field.
+/// A case per constructor, over the type's parameters; one whose result
+/// fixes a parameter is guarded by it, a hidden type is `unknown`, and a
+/// held dictionary is no field.
 #[test]
 fn a_gadt_is_a_union_of_its_cases_without_dictionaries() {
     let out = project(
@@ -125,8 +126,8 @@ fn a_gadt_is_a_union_of_its_cases_without_dictionaries() {
          type Showable =\n  | Show b => Showable b : Showable\n",
     );
     insta::assert_snapshot!(out, @r#"
-    export type Expr<A> = { readonly _tag: "IntLit#662280bfd5ca"; readonly _0: number } | { readonly _tag: "If#7415f24a3923"; readonly _0: Expr<boolean>; readonly _1: Expr<A>; readonly _2: Expr<A> } | { readonly _tag: "Apply#cfce91e23371"; readonly _0: Expr<(arg: unknown) => A>; readonly _1: Expr<unknown> } | { readonly _tag: "Lit#90f2c71f30bd"; readonly _0: A };
-    export type Ty<T0> = { readonly _tag: "TInt#7ba8d1aef192" } | { readonly _tag: "TStr#9bbfbdae731e" };
+    export type Expr<A> = { readonly "~flick/params"?: [A] } & (([number] extends [A] ? { readonly _tag: "IntLit#662280bfd5ca"; readonly _0: number } : never) | { readonly _tag: "If#7415f24a3923"; readonly _0: Expr<boolean>; readonly _1: Expr<A>; readonly _2: Expr<A> } | { readonly _tag: "Apply#cfce91e23371"; readonly _0: Expr<(arg: unknown) => A>; readonly _1: Expr<unknown> } | { readonly _tag: "Lit#90f2c71f30bd"; readonly _0: A });
+    export type Ty<T0> = { readonly "~flick/params"?: [T0] } & (([number] extends [T0] ? { readonly _tag: "TInt#7ba8d1aef192" } : never) | ([string] extends [T0] ? { readonly _tag: "TStr#9bbfbdae731e" } : never));
     export type Showable = { readonly _tag: "Showable#a990c444ac9c"; readonly _0: unknown };
     "#);
 }
