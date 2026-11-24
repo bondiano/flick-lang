@@ -61,12 +61,12 @@ use std::{mem, slice};
 use crate::inline::imported_packages;
 use flick_pretty::{Document, DocumentArena, Documentable, docvec};
 
-use flick_backend_support::order::post_order;
 use flick_backend_support::reach;
 use flick_backend_support::suites::suite_name;
 use flick_ir::Span;
 use flick_ir::{ItemKind, Module};
 use layout::{Code, block, call, directive, list, statement};
+use main_file::{dedup, initialization_order, item_order, module_inits};
 use reach::Key;
 use shape::{Shape, shape};
 
@@ -254,28 +254,52 @@ fn compile<'a>(
         go_imports.extend(g.go_imports.into_keys());
         files.push((names::file(&module.name), code));
     }
+    let run = main_run_call(
+        a,
+        input,
+        modules,
+        decls,
+        index,
+        &reached,
+        item_initializers,
+        roots,
+        &deps,
+        start,
+    );
+    finish_output(
+        a,
+        modules,
+        &reached,
+        run,
+        files,
+        sources,
+        &owned,
+        record_shapes,
+        diagnostics,
+        go_imports,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn finish_output<'a>(
+    a: &'a DocumentArena<'a>,
+    modules: &[&Module],
+    reached: &HashSet<(usize, usize)>,
+    run: Document<'a>,
+    mut files: Vec<(String, String)>,
+    sources: BTreeMap<String, String>,
+    owned: &own::Owned,
+    mut record_shapes: BTreeSet<record::RecordShape>,
+    mut diagnostics: Vec<Unsupported>,
+    mut go_imports: BTreeSet<String>,
+) -> Output {
     for (_, held) in owned.values() {
         if let own::Held::Record(shape) = held {
             record_shapes.insert(shape.clone());
         }
     }
-    let inits: Vec<_> = if item_initializers {
-        initialization_order(modules, index, &reached)
-            .into_iter()
-            .filter(|&(m, i)| has_initializer(input, decls, &modules[m].items[i].kind))
-            .map(|(m, i)| statement(a, docvec![a, names::item_init(&modules[m].name, i), "()"]))
-            .collect()
-    } else {
-        module_inits(a, roots, &deps)
-    };
-    let run = block(a, inits.into_iter().chain([statement(a, start)]));
-    let run = call(
-        a,
-        "flickrt.Main",
-        [docvec![a, "func(fb *flickrt.Fiber) ", run]],
-    );
-    let packages = main_file::packages(modules, &reached);
-    let zones = main_file::zones(modules, &reached);
+    let packages = main_file::packages(modules, reached);
+    let zones = main_file::zones(modules, reached);
     files.push((
         "main.go".to_owned(),
         main_file::main_go(a, run, &packages, zones),
@@ -285,7 +309,7 @@ fn compile<'a>(
     }
     files.extend(sources);
     if !owned.is_empty() {
-        files.push(("own_types.go".to_owned(), own::file(&owned)));
+        files.push(("own_types.go".to_owned(), own::file(owned)));
     }
     if !record_shapes.is_empty() {
         files.push((
@@ -302,6 +326,36 @@ fn compile<'a>(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn main_run_call<'a>(
+    a: &'a DocumentArena<'a>,
+    input: &Input,
+    modules: &[&Module],
+    decls: &go_type::TypeDecls<'_>,
+    index: &HashMap<Key, (usize, usize)>,
+    reached: &HashSet<(usize, usize)>,
+    item_initializers: bool,
+    roots: &[String],
+    deps: &HashMap<String, BTreeSet<String>>,
+    start: Document<'a>,
+) -> Document<'a> {
+    let inits: Vec<_> = if item_initializers {
+        initialization_order(modules, index, reached)
+            .into_iter()
+            .filter(|&(m, i)| has_initializer(input, decls, &modules[m].items[i].kind))
+            .map(|(m, i)| statement(a, docvec![a, names::item_init(&modules[m].name, i), "()"]))
+            .collect()
+    } else {
+        module_inits(a, roots, deps)
+    };
+    let run = block(a, inits.into_iter().chain([statement(a, start)]));
+    call(
+        a,
+        "flickrt.Main",
+        [docvec![a, "func(fb *flickrt.Fiber) ", run]],
+    )
+}
+
 fn has_initializer(input: &Input, decls: &go_type::TypeDecls<'_>, item: &ItemKind) -> bool {
     match item {
         // the shape of a value does not depend on its module
@@ -310,105 +364,6 @@ fn has_initializer(input: &Input, decls: &go_type::TypeDecls<'_>, item: &ItemKin
         ItemKind::Destructure { .. } => true,
         ItemKind::Foreign(_) | ItemKind::Constructor(_) | ItemKind::Service { .. } => false,
     }
-}
-
-/// Lexical module references may form a module-level cycle while their
-/// value-initialization graph is acyclic. Schedule that graph directly.
-fn initialization_order(
-    modules: &[&Module],
-    index: &HashMap<Key, (usize, usize)>,
-    reached: &HashSet<(usize, usize)>,
-) -> Vec<(usize, usize)> {
-    fn visit(
-        at: (usize, usize),
-        modules: &[&Module],
-        index: &HashMap<Key, (usize, usize)>,
-        reached: &HashSet<(usize, usize)>,
-        seen: &mut HashSet<(usize, usize)>,
-        out: &mut Vec<(usize, usize)>,
-    ) {
-        if !seen.insert(at) {
-            return;
-        }
-        let mut used = Vec::new();
-        reach::uses(&modules[at.0].items[at.1], &mut used);
-        for key in used {
-            if let Some(&next) = index.get(&key)
-                && reached.contains(&next)
-            {
-                visit(next, modules, index, reached, seen, out);
-            }
-        }
-        out.push(at);
-    }
-    let mut items: Vec<_> = reached.iter().copied().collect();
-    items.sort_unstable();
-    let mut seen = HashSet::new();
-    let mut out = Vec::new();
-    for at in items {
-        visit(at, modules, index, reached, &mut seen, &mut out);
-    }
-    out
-}
-
-/// The modules in an order where each one's initialization runs after
-/// that of the modules it reads.
-/// The calls initializing the modules `roots` read, each after those it
-/// reads.
-fn module_inits<'a>(
-    a: &'a DocumentArena<'a>,
-    roots: &[String],
-    deps: &HashMap<String, BTreeSet<String>>,
-) -> Vec<Document<'a>> {
-    let mut order = Vec::new();
-    let mut visited = HashSet::new();
-    for root in roots {
-        init_order(root, deps, &mut visited, &mut order);
-    }
-    order
-        .iter()
-        .filter(|m| deps.contains_key(*m))
-        .map(|m| statement(a, docvec![a, names::init(m), "()"]))
-        .collect()
-}
-
-fn init_order(
-    module: &str,
-    deps: &HashMap<String, BTreeSet<String>>,
-    visited: &mut HashSet<String>,
-    out: &mut Vec<String>,
-) {
-    if !visited.insert(module.to_owned()) {
-        return;
-    }
-    for dep in deps.get(module).into_iter().flatten() {
-        init_order(dep, deps, visited, out);
-    }
-    out.push(module.to_owned());
-}
-
-/// The reached items of a module in an order where everything an item uses
-/// in the module is initialized first.
-fn item_order(
-    module: &Module,
-    items: &[usize],
-    index: &HashMap<Key, (usize, usize)>,
-) -> Vec<usize> {
-    let mut uses = |i: usize| {
-        let mut used = Vec::new();
-        reach::uses(&module.items[i], &mut used);
-        (used.iter())
-            .filter(|(m, _)| *m == module.name)
-            .filter_map(|key| index.get(key).map(|&(_, j)| j))
-            .collect()
-    };
-    post_order(module.items.len(), items.iter().copied(), &mut uses)
-}
-
-/// The same message at the same place once.
-fn dedup(diagnostics: &mut Vec<Unsupported>) {
-    let mut seen = HashSet::new();
-    diagnostics.retain(|d| seen.insert(format!("{:?}{}", d.span, d.message)));
 }
 
 /// The code generator of one module, building documents in `a`.
