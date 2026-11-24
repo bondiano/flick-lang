@@ -14,7 +14,9 @@ TypeScript adapter. Ownership and `FLICK_STD_PATH` are in
   it imports; `import` every non-core module a module uses.
 - A `foreign … from "flick:M"` needs its JS export under `effect-ts/src/`
   and a line in `src/go/*.txt` naming a `runtime-go/flickrt` function, or
-  a reasoned entry in `flick-core/src/codegen/go/js_only.txt`.
+  a reasoned entry in `flick-core/src/codegen/go/js_only.txt`. Every
+  binding also needs its class in
+  `flick-backend-support/src/kernel/manifest.txt`.
 - Mark a built-in the compiler or a backend must recognize with
   `@lang <role>` (`flick-ir/src/lang.rs`); target forms belong in backends.
 - Keep signatures the spec states word for word as in

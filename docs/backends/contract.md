@@ -66,6 +66,11 @@ span while admitting opaque nominal handles through `opaque-type`. Package
 manifests (`[package.abi]`) and `BuildRequest.foreign` (`foreign-binding.abi`)
 carry the ABI identifier and version; any mismatch between package/request and
 backend reports `FLICK-F014` rather than silently issuing a foreign call.
+`TargetRequest.runtime-abis` names `flickrt` and the primitive kernel,
+`flick.kernel` at the version of `flick-backend-support/src/kernel/manifest.txt`;
+a descriptor declares the `runtime-abis` ranges it implements, and the
+handshake refuses a request outside them before `check-target`
+([the primitive kernel](../src/content/docs/reference/kernel.md)).
 Resolved active options arrive in `TargetRequest.options` as `option.<name>`
 entries alongside `command` (`check`, `build`, `run`, `dev`, `test` or `inspect`) and,
 for `inspect`, `inspect.module`. `BuildRequest.declared-dependencies` carries

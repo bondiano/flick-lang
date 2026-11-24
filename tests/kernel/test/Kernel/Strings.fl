@@ -1,0 +1,144 @@
+// The string primitives of the kernel: a string is a sequence of UTF-16
+// code units, and every index counts them, as in JavaScript. A scalar
+// outside the BMP is two units, slicing may split it, and the halves are
+// lone surrogates that join back into it. UTF-8 is what bytes in and out
+// of a host carry. Operands come in through `same`, so the runtime
+// computes them, not the compiler.
+module Kernel.Strings exposing (tests)
+
+same : a -> a
+let same x = x
+
+/// "a", U+1F30D EARTH GLOBE EUROPE-AFRICA, "b": four units.
+earth : String
+let earth = "a\u{1F30D}b"
+
+/// The high surrogate of U+1F30D, alone.
+high : String
+let high = String.slice 1 2 earth
+
+/// Its low surrogate, alone.
+low : String
+let low = String.slice 2 3 earth
+
+tests : List Test.Test
+let tests = [
+  Test.group "length" [
+    Test.test "ASCII" (fun () -> Test.equal 6 (String.length (same "kernel"))),
+    Test.test "Cyrillic is one unit a letter" (fun () ->
+      Test.equal 4 (String.length (same "ядро"))
+    ),
+    Test.test "a supplementary scalar is two" (fun () ->
+      Test.equal 2 (String.length (same "\u{1F30D}"))
+    ),
+    Test.test "NUL is a unit like any other" (fun () ->
+      Test.equal 3 (String.length (same "a\u{0}b"))
+    ),
+    Test.test "a lone surrogate is one" (fun () -> Test.equal 1 (String.length high)),
+    Test.test "empty" (fun () -> Test.equal 0 (String.length (same ""))),
+  ],
+  Test.group "code units" [
+    Test.test "of a Cyrillic letter" (fun () ->
+      Test.is_true "я" (String.char_code_at 0 (same "я") == Some 1103)
+    ),
+    Test.test "of the halves of a pair" (fun () ->
+      Test.is_true
+        "pair"
+        (String.char_code_at 1 earth == Some 55356 && String.char_code_at 2 earth == Some 57101)
+    ),
+    Test.test "of NUL" (fun () ->
+      Test.is_true "NUL" (String.char_code_at 1 (same "a\u{0}b") == Some 0)
+    ),
+    Test.test "past the end" (fun () -> Test.is_true "end" (String.char_code_at 4 earth == None)),
+    Test.test "before the start" (fun () ->
+      Test.is_true "start" (String.char_code_at (-1) earth == None)
+    ),
+  ],
+  Test.group "slices" [
+    Test.test "by unit" (fun () -> Test.equal "др" (String.slice 1 3 (same "ядро"))),
+    Test.test "a negative index counts from the end" (fun () ->
+      Test.equal "ро" (String.slice (-2) 4 (same "ядро"))
+    ),
+    Test.test "a reversed range is empty" (fun () -> Test.equal "" (String.slice 3 1 (same "abc"))),
+    Test.test "an index past the end is the end" (fun () ->
+      Test.equal "ab" (String.slice 0 99 (same "ab"))
+    ),
+    Test.test "keeps NUL" (fun () -> Test.equal "\u{0}" (String.slice 1 2 (same "a\u{0}b"))),
+    Test.test "a split pair has the code unit of each half" (fun () ->
+      Test.is_true
+        "halves"
+        (String.char_code_at 0 high == Some 55356 && String.char_code_at 0 low == Some 57101)
+    ),
+    Test.test "the halves join back" (fun () -> Test.equal "\u{1F30D}" (high ++ low)),
+    Test.test "the halves in the other order are two lone surrogates" (fun () ->
+      Test.equal 2 (String.length (low ++ high))
+    ),
+  ],
+  Test.group "searches return unit indices" [
+    Test.test "index_of a Cyrillic letter" (fun () ->
+      Test.is_true "р" (String.index_of "р" (same "ядро") == Some 2)
+    ),
+    Test.test "index_of after a pair" (fun () ->
+      Test.is_true "b" (String.index_of "b" earth == Some 3)
+    ),
+    Test.test "index_of a lone surrogate" (fun () ->
+      Test.is_true "low" (String.index_of low earth == Some 2)
+    ),
+    Test.test "index_of NUL" (fun () ->
+      Test.is_true "NUL" (String.index_of "\u{0}" (same "a\u{0}b") == Some 1)
+    ),
+    Test.test "index_of the empty string" (fun () ->
+      Test.is_true "empty" (String.index_of "" earth == Some 0)
+    ),
+    Test.test "index_of what is not there" (fun () ->
+      Test.is_true "none" (String.index_of "z" earth == None)
+    ),
+    Test.test "last_index_of" (fun () ->
+      Test.is_true "a" (String.last_index_of "a" (same "banana") == Some 5)
+    ),
+    Test.test "last_index_of after a pair" (fun () ->
+      Test.is_true "b" (String.last_index_of "b" (same "b\u{1F30D}b") == Some 3)
+    ),
+    Test.test "last_index_of the empty string is the length" (fun () ->
+      Test.is_true "empty" (String.last_index_of "" earth == Some 4)
+    ),
+    Test.test "last_index_of what is not there" (fun () ->
+      Test.is_true "none" (String.last_index_of "z" earth == None)
+    ),
+  ],
+  Test.group "UTF-8" [
+    Test.test "encodes ASCII, NUL, Cyrillic and a supplementary scalar" (fun () ->
+      Test.is_true
+        "bytes"
+        (Bytes.to_list (Bytes.encode_utf8 (same "a\u{0}я\u{1F30D}"))
+          == [97, 0, 209, 143, 240, 159, 140, 141])
+    ),
+    Test.test "a lone surrogate encodes as U+FFFD" (fun () ->
+      Test.is_true "replacement" (Bytes.to_list (Bytes.encode_utf8 high) == [239, 191, 189])
+    ),
+    Test.test "decodes what it encodes" (fun () ->
+      Test.is_true
+        "round trip"
+        (Bytes.decode_utf8 (Bytes.encode_utf8 (same "я\u{0}\u{1F30D}")) == Some "я\u{0}\u{1F30D}")
+    ),
+    Test.test "keeps a byte order mark" (fun () ->
+      Test.is_true
+        "BOM"
+        (Result.map Bytes.decode_utf8 (Bytes.from_list (same [239, 187, 191, 97]))
+          == Ok (Some "\u{FEFF}a"))
+    ),
+    Test.test "refuses invalid bytes, an overlong form and an encoded surrogate" (fun () ->
+      Test.is_true
+        "invalid"
+        (Result.map Bytes.decode_utf8 (Bytes.from_list (same [255])) == Ok None
+          && Result.map Bytes.decode_utf8 (Bytes.from_list (same [192, 128])) == Ok None
+          && Result.map Bytes.decode_utf8 (Bytes.from_list (same [237, 160, 128])) == Ok None)
+    ),
+    Test.test "from_list names the first value outside 0..255" (fun () ->
+      Test.is_true
+        "range"
+        (Result.map Bytes.to_list (Bytes.from_list (same [1, 256, -1]))
+          == Err (Bytes.ByteOutOfRange 1 256))
+    ),
+  ],
+]

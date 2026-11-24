@@ -26,6 +26,7 @@ ciborium = "0.2.2"
 flate2 = "1.1.1"
 flick-core = { path = "../flick-core", features = ["ide", "commands"] }
 flick-backend = { path = "../flick-backend" }
+flick-backend-support = { path = "../flick-backend-support", default-features = false }
 flick-ir = { path = "../flick-ir", features = ["json", "cbor"] }
 flick-plugin = { path = "../flick-plugin" }
 wasmtime = { workspace = true, optional = true }

@@ -73,6 +73,10 @@ expression: "serde_json::to_string_pretty(&request).expect(\"JSON\")"
       {
         "name": "flickrt",
         "version": "0.2.0"
+      },
+      {
+        "name": "flick.kernel",
+        "version": "0.1.0"
       }
     ],
     "tags": []
