@@ -111,6 +111,17 @@ impl Ide<'_> {
         None
     }
 
+    /// Whether the caret is in an ordinary expression within a proof.
+    pub fn ordinary_value_in_proof(&self, file: FileId, at: u32) -> bool {
+        let Some(module) = self.module(file) else {
+            return false;
+        };
+        let text = self.text(file);
+        declaration_at(&module.tree, text, at).is_some_and(|decl| {
+            self.ordinary_proof_slot(module, &tree::path_to(decl, at), text, at)
+        })
+    }
+
     fn ordinary_proof_slot(&self, module: &Analyzed, path: &[&Node], text: &str, at: u32) -> bool {
         if let Some(split) = path.iter().rev().find(|node| node.kind == K::MatchExpr)
             && split

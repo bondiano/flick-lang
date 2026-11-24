@@ -170,7 +170,7 @@ impl Server {
                         request: Some(job.request),
                         cancelled,
                         thread,
-                    })
+                    });
                 }
                 Err(err) => self.send(&protocol::error(
                     &job.request.id,

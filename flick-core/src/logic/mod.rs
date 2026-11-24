@@ -502,7 +502,10 @@ pub fn search_proof(
     if request.is_cancelled() {
         return ProofSearchResult::empty(ProofSearchStatus::Cancelled);
     }
-    let proof = body.map(|expr| cert::recover(expr, lemmas));
+    // The parser can recover a missing body as an empty, source-less block.
+    let proof = body
+        .filter(|expr| (expr.span.start, expr.span.end) != (0, 0))
+        .map(|expr| cert::recover(expr, lemmas));
     check::search_proof(
         statement,
         proof.as_ref(),

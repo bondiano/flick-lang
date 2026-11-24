@@ -12,6 +12,7 @@ use std::time::Instant;
 
 #[cfg(feature = "wasm-backends")]
 use flick_core::diagnostics::Diagnostic;
+use flick_core::ide::Ide;
 use flick_core::plugin::Expander;
 use flick_core::plugin::reach::Outside;
 #[cfg(feature = "wasm-backends")]
@@ -353,7 +354,14 @@ pub(super) fn search_proof(
     if cancelled.load(Ordering::Relaxed) {
         return ProofSearchResult::empty("cancelled");
     }
+    let ide = Ide {
+        analysis: &snapshot.analysis,
+        sources: &snapshot.sources,
+    };
     let result = snapshot.file(path).and_then(|file| {
+        if ide.ordinary_value_in_proof(file, offset) {
+            return None;
+        }
         snapshot
             .analysis
             .by_file(file)?
@@ -382,18 +390,29 @@ pub(super) fn search_proof(
     let range = result
         .span
         .map_or((offset, offset), |span| (span.start, span.end));
-    let range = search_range(decl, offset, range);
-    let suggestions = range.map_or_else(Vec::new, |range| {
+    let range = search_range(decl, text, offset, range);
+    let suggestions = range.map_or_else(Vec::new, |(range, nested)| {
+        let prefix = if range.0 == range.1 {
+            let before = &text[..range.0 as usize];
+            let line = before.rsplit_once('\n').map_or(before, |(_, line)| line);
+            if line.ends_with('=') {
+                " "
+            } else if line.is_empty() {
+                "  "
+            } else {
+                ""
+            }
+        } else {
+            ""
+        };
         result
             .suggestions
             .iter()
             .map(|term| {
-                let need_space = range.0 == range.1
-                    && text
-                        .get(..range.0 as usize)
-                        .is_some_and(|prefix| prefix.ends_with('='));
-                let text = if need_space {
-                    format!(" {term}")
+                let text = if !prefix.is_empty() {
+                    format!("{prefix}{term}")
+                } else if nested && term.contains(char::is_whitespace) {
+                    format!("({term})")
                 } else {
                     term.clone()
                 };
@@ -432,13 +451,23 @@ fn search_declaration<'a>(tree: &'a Node, text: &str, at: u32) -> Option<&'a Nod
     .then_some(decl)
 }
 
-fn search_range(decl: &Node, at: u32, (start, end): (u32, u32)) -> Option<(u32, u32)> {
+/// The edit range and whether it belongs to a term inside the body. An
+/// application inserted as an argument needs parentheses to stay one term.
+fn search_range(
+    decl: &Node,
+    text: &str,
+    at: u32,
+    (start, end): (u32, u32),
+) -> Option<((u32, u32), bool)> {
     let body = decl.nodes().find(|node| node.kind == K::Block);
     if let Some(body) = body.filter(|body| body.nodes().next().is_some()) {
         let (from, to) = body.range();
-        (from <= start && start <= at && at <= end && end <= to).then_some((start, end))
+        (from <= start && start <= at && at <= end && end <= to)
+            .then_some(((start, end), (start, end) != (from, to)))
     } else {
-        Some((at, at))
+        let equal = decl.child_tokens().find(|token| token.kind == K::Eq)?;
+        let gap = text.get(equal.end as usize..at as usize)?;
+        gap.trim().is_empty().then_some(((at, at), false))
     }
 }
 
