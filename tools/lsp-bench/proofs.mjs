@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { cpSync, createReadStream, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { cpus, tmpdir } from "node:os";
+import { cpus, release, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
@@ -388,6 +388,7 @@ try {
   const result = await measure(binary, project(join(directory, "baseline")), directory, opts);
   console.log(JSON.stringify({
     platform: process.platform,
+    osRelease: release(),
     arch: process.arch,
     cpu: cpus()[0]?.model,
     node: process.version,

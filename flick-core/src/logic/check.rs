@@ -130,12 +130,13 @@ pub(super) fn prove(
         #[cfg(not(target_arch = "wasm32"))]
         capture: None,
     };
-    let result = checker.statement(statement, proof);
     #[cfg(not(target_arch = "wasm32"))]
     if let Some(cost) = observation.cost {
+        let result = checker.statement(statement, proof);
         *cost = Some(STEPS - checker.steps);
+        return result;
     }
-    result
+    checker.statement(statement, proof)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
