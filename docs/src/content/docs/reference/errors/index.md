@@ -4,7 +4,7 @@ title: "Compiler errors"
 
 Every compiler code has an explanation and an example. Plugin codes belong to their packages and are explained with `flick explain <package>/<code>`.
 
-168 of the 281 codes have an example, 195 blocks in all: 34 report the code of their page, 147 are programs that check, and 14 are fragments the compiler cannot check, each with its reason in the repository (`docs/error-examples.txt`). The other 113 show a configuration or a shape instead.
+169 of the 282 codes have an example, 196 blocks in all: 34 report the code of their page, 148 are programs that check, and 14 are fragments the compiler cannot check, each with its reason in the repository (`docs/error-examples.txt`). The other 113 show a configuration or a shape instead.
 
 ## Syntax
 
@@ -201,6 +201,7 @@ Every compiler code has an explanation and an example. Plugin codes belong to th
 - [FLICK-F009](./flick-f009/)
 - [FLICK-F010](./flick-f010/)
 - [FLICK-F011](./flick-f011/)
+- [FLICK-F012](./flick-f012/)
 
 ## Schema
 

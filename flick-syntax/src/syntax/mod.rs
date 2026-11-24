@@ -18,6 +18,7 @@ mod validate;
 mod validate_attrs;
 mod validate_defer;
 mod validate_let_else;
+mod validate_native;
 pub mod when;
 
 pub use parser::{

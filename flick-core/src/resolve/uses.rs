@@ -33,6 +33,7 @@ pub(super) struct Unused {
     pub written: bool,
 }
 
+mod modules;
 mod proofs;
 
 pub(super) fn references(module: &Module) -> (Vec<Reference>, Vec<Unused>) {
@@ -138,6 +139,7 @@ impl Walker<'_> {
                 return;
             }
             K::ImportDecl => return,
+            K::NativeOverride => return self.native_override(node),
             K::BinExpr => {
                 // down a chain of operators in a loop: its left operand, then the others
                 let (spine, left) = node.left_spine();
@@ -228,103 +230,25 @@ impl Walker<'_> {
         self.release(mark);
     }
 
-    fn module_parameterized(&mut self, node: &Node) {
-        let mark = self.locals.len();
-        let modules = self.module_locals.len();
-        for parameter in node
+    fn native_override(&mut self, node: &Node) {
+        // Only `catch <fn>` inside metadata carries a Flick value expression;
+        // `when` tags and adapter keyword arguments (such as `signal`) are not names.
+        for item in node
             .nodes()
-            .filter(|n| n.kind == K::ModuleParamGroup)
+            .filter(|n| n.kind == K::ForeignMeta)
             .flat_map(Node::nodes)
+            .filter(|n| n.kind == K::MetaItem)
         {
-            for signature in parameter.nodes() {
-                self.walk(signature);
-            }
-            if let Some(name) = parameter.child_tokens().find(|t| t.kind == K::Con) {
-                self.module_locals.push(name.text(self.text));
-            }
-        }
-        for result in node.nodes().filter(|n| n.kind == K::ModuleResult) {
-            self.walk(result);
-        }
-        if let Some(body) = node.nodes().find(|n| {
-            matches!(
-                n.kind,
-                K::Members
-                    | K::ModuleApplyExpr
-                    | K::ModuleParamExpr
-                    | K::ModuleParenExpr
-                    | K::ModuleAnnotExpr
-            ) || (node.kind == K::ModuleParamExpr && n.kind == K::ModulePath)
-        }) {
-            for declaration in body.nodes().filter(|_| body.kind == K::Members) {
-                if declaration.kind == K::ImportDecl {
-                    let qualifier = declaration
-                        .child_tokens()
-                        .find(|t| t.kind == K::Con)
-                        .or_else(|| {
-                            declaration
-                                .nodes()
-                                .find(|n| n.kind == K::ModulePath)
-                                .and_then(|p| p.child_tokens().find(|t| t.kind == K::Con))
-                        });
-                    if let Some(qualifier) = qualifier {
-                        self.module_locals.push(qualifier.text(self.text));
-                    }
-                    continue;
-                }
-                let names = declaration
-                    .child_tokens()
-                    .filter(|t| matches!(t.kind, K::Ident | K::Con));
-                self.locals.extend(names.map(|t| Local {
-                    name: t.text(self.text),
-                    generated: t.start >= self.generated,
-                    binder: None,
-                    mutable: None,
-                    mut_fix: false,
-                    used: false,
-                }));
-                if let Some(pattern) = declaration.nodes().find(|n| is_pattern(n.kind)) {
-                    let mut names = Vec::new();
-                    binders(pattern, &mut names);
-                    self.locals.extend(names.into_iter().map(|t| Local {
-                        name: t.text(self.text),
-                        generated: t.start >= self.generated,
-                        binder: None,
-                        mutable: None,
-                        mut_fix: false,
-                        used: false,
-                    }));
-                }
-            }
-            self.walk(body);
-        }
-        self.module_locals.truncate(modules);
-        self.locals.truncate(mark);
-    }
-
-    fn module_signature(&mut self, node: &Node) {
-        let mark = self.module_locals.len();
-        let mut parts = node.nodes();
-        if let Some(input) = parts.next() {
-            if input.kind == K::ModuleSignatureParen
-                && input.nodes().all(|n| n.kind == K::ModuleSignatureBinder)
+            if item
+                .child_tokens()
+                .find(|t| t.kind == K::Ident)
+                .is_some_and(|t| t.text(self.text) == "catch")
             {
-                for binder in input.nodes() {
-                    for signature in binder.nodes() {
-                        self.walk(signature);
-                    }
-                    if let Some(name) = binder.child_tokens().find(|t| t.kind == K::Con) {
-                        self.module_locals.push(name.text(self.text));
-                    }
+                for arg in item.nodes() {
+                    self.walk(arg);
                 }
-            } else {
-                self.walk(input);
             }
         }
-        for result in parts {
-            self.walk(result);
-        }
-        self.module_locals.truncate(mark);
     }
 
     /// The statements of a block: a `let` scopes over those after it.

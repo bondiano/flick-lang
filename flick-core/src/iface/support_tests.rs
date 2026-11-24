@@ -211,6 +211,7 @@ fn consumer(interface: &Interface, text: &str) -> Vec<Diagnostic> {
             stages_by_class: false,
             foreign_backend: ForeignBackendSpec::default_js(),
             validate_foreign_metadata: true,
+            native_overrides: None,
         },
         &mut checked,
     ));

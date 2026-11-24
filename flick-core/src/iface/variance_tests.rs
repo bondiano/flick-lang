@@ -37,6 +37,7 @@ pub(super) fn check_module_with(
         stages_by_class: false,
         foreign_backend: ForeignBackendSpec::default_js(),
         validate_foreign_metadata: true,
+        native_overrides: None,
     };
     diagnostics.extend(types::check(
         &module,

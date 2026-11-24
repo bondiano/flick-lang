@@ -50,6 +50,14 @@ impl<'a> Gen<'a> {
                 if !seen_imports.insert((spec.alias.clone(), spec.path.clone())) {
                     continue;
                 }
+                let pkg_ident = spec
+                    .alias
+                    .as_deref()
+                    .unwrap_or_else(|| spec.path.rsplit('/').next().unwrap_or(&spec.path));
+                self.go_imports
+                    .entry(spec.path.clone())
+                    .or_insert_with(|| pkg_ident.to_owned());
+                self.go_import_idents.insert(pkg_ident.to_owned());
                 let path_lit = names::string(&spec.path);
                 let doc = match spec.alias {
                     Some(alias) => docvec![

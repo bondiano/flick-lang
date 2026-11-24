@@ -18,6 +18,7 @@ mod direct;
 mod effects;
 mod expr;
 mod foreign;
+mod foreign_global;
 mod foreign_inline;
 mod generate;
 mod go_type;
@@ -425,6 +426,13 @@ struct Gen<'a> {
     /// The locals of the definition being emitted bound to the record that
     /// lies in a value of a constructor, with its labels in their places.
     held: HashMap<String, Vec<String>>,
+    /// Extra Go package imports collected while emitting qualified global bindings:
+    /// `import_path -> local package identifier`.
+    go_imports: BTreeMap<String, String>,
+    /// Package identifiers already claimed by imports in this Go file.
+    go_import_idents: HashSet<String>,
+    /// Ordered `(optional_alias, import_path)` declarations added during emission.
+    go_extra_imports: Vec<(Option<String>, String)>,
 }
 
 impl<'a> Gen<'a> {
@@ -463,6 +471,9 @@ impl<'a> Gen<'a> {
             fields: None,
             decls: None,
             held: HashMap::new(),
+            go_imports: BTreeMap::new(),
+            go_import_idents: HashSet::new(),
+            go_extra_imports: Vec::new(),
         }
     }
 

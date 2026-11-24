@@ -140,8 +140,10 @@ pub use env::{
     ModuleSignature, Rep, TypeDef,
 };
 pub use ffi::{
-    AdapterArgKind, AdapterArgSpec, AdapterWordSpec, CORE_FOREIGN_META, CoreForeignMeta,
-    ForeignBackendSpec, PURE_OVER_CAPABILITY, TypeFormAttrSpec, core_foreign_meta, keeps_for_owner,
+    AdapterArgKind, AdapterArgSpec, AdapterWordSpec, AxisTagModel, BackendTagModel,
+    CORE_FOREIGN_META, CoreForeignMeta, ForeignBackendSpec, HostTagModel, NativeOverrideEnv,
+    NativeOverrideInfo, OverrideSelection, PURE_OVER_CAPABILITY, TypeFormAttrSpec,
+    core_foreign_meta, keeps_for_owner,
 };
 pub use gadt::branch::dict_local;
 pub use gadt::scheme::{built, is_indexed, written_dicts};

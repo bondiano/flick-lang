@@ -1,0 +1,32 @@
+module NativeOverridesPass exposing (hypot, abs_f, scaled, with_meta)
+
+import Float
+
+// Global shorthand, explicit global, inline, and overlapping implication (`js && rt` => `js`)
+hypot : Float -> Float -> Float
+let hypot a b = Float.sqrt (a * a + b * b)
+  @native "Math.hypot" when js
+  @native global "math.Hypot" when go
+
+abs_f : Float -> Float
+let abs_f x = if x < 0.0 then -x else x
+  @native "Math.abs" when js
+  @native inline "(x) => Math.abs(x)" when js && rt
+  @native "math.Abs" when go
+
+scaled : Float -> Float
+let scaled x =
+  let doubled = x * 2.0
+  doubled + 1.0
+  @native inline "(x) => x * 2 + 1" when js
+  @native inline "func(fb *flickrt.Fiber, x flickrt.Value) flickrt.Value { return flickrt.AsFloat(x)*2 + 1 }" when go
+
+with_meta : List Int -> Int
+let with_meta xs =
+  match xs with
+  | [] -> 0
+  | [x, ..._] -> x
+  @native "./custom.mjs" "first" when js
+    variadic
+  @native "./custom.mjs" "first" when go
+    variadic

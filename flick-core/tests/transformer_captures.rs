@@ -49,6 +49,7 @@ fn check(text: &str, imported: &[Interface]) -> (Interface, Vec<Diagnostic>) {
             stages_by_class: false,
             foreign_backend: types::ForeignBackendSpec::default_js(),
             validate_foreign_metadata: true,
+            native_overrides: None,
         },
         &mut interface,
     ));

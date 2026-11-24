@@ -22,23 +22,33 @@ impl<'a> Printer<'a> {
             unreachable!("node positions")
         };
         let head = self.elements(n, &n.children[..at]);
+        let overrides: Vec<&'a Node> = n.nodes().filter(|c| c.kind == K::NativeOverride).collect();
+        let body_end = overrides
+            .first()
+            .map_or_else(|| body.range().1, |o| o.range().0);
         let entries = nodes(contract);
-        if let [entry] = entries.as_slice()
+        let doc = if let [entry] = entries.as_slice()
             && !self.comments.any_before(entry.range().1)
         {
             let entry = self.node(entry);
             let goal = docvec![a, "where ", entry, " ="];
-            let goal = self.body(goal, Value::Block(body), body.range().1, &[]);
-            return docvec![a, head, " ", goal].group(a);
+            let goal = self.body(goal, Value::Block(body), body_end, &[]);
+            docvec![a, head, " ", goal].group(a)
+        } else {
+            // the entries as statements are, with the comments between them
+            let items = self.items(&entries, contract.range().1, None, &mut |p, e| p.node(e));
+            let entries = docvec![a, a.line(), self.join_lines(&items)].nest(a, INDENT);
+            let statements = nodes(body);
+            let items = self.items(&statements, body_end, Some(';'), &mut |p, s| p.statement(s));
+            let body = docvec![a, a.line(), self.join_lines(&items)].nest(a, INDENT);
+            docvec![a, head, a.line(), "where", entries, a.line(), "=", body].force_break(a)
+        };
+        if overrides.is_empty() {
+            doc
+        } else {
+            let items = self.items(&overrides, n.range().1, None, &mut |p, m| p.node(m));
+            let lines = docvec![a, a.line(), self.join_lines(&items)].nest(a, INDENT);
+            docvec![a, doc, lines].force_break(a)
         }
-        // the entries as statements are, with the comments between them
-        let items = self.items(&entries, contract.range().1, None, &mut |p, e| p.node(e));
-        let entries = docvec![a, a.line(), self.join_lines(&items)].nest(a, INDENT);
-        let statements = nodes(body);
-        let items = self.items(&statements, body.range().1, Some(';'), &mut |p, s| {
-            p.statement(s)
-        });
-        let body = docvec![a, a.line(), self.join_lines(&items)].nest(a, INDENT);
-        docvec![a, head, a.line(), "where", entries, a.line(), "=", body].force_break(a)
     }
 }

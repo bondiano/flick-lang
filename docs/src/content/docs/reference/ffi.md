@@ -195,9 +195,58 @@ emits keys in canonical order, and decoding any JSON object key order produces
 a canonical structural record; `codec` blocks keep their declared wire key
 order on encoding and canonicalize the decoded structural record.
 
+## Native overrides
+
+A top-level function with a Flick body and paired signature may carry one or more
+indented `@native` override clauses naming host implementations for specific
+environments:
+
+```flick
+# import Float
+#
+hypot : Float -> Float -> Float
+let hypot a b = Float.sqrt (a * a + b * b)
+  @native "Math.hypot" when js
+  @native "math.Hypot" when go
+```
+
+The binding target uses the same forms as `foreign … from` — a global shorthand
+(`"Math.hypot"` or `global "Math.hypot"`), a module export
+(`"./math.mjs" "hypot"`), or inline host code (`inline "(a, b) => Math.hypot(a, b)"`).
+The contract (types, stages, purity vs. `Async`/runtime mode, and default arity)
+comes from the function's signature, and backend-declared adapter words or
+metadata lines (`this`, `cancel signal`, `variadic`, `arity`, `nullable`,
+`optional`, `catch`, `retention`, `owned`) may follow indented under the
+`@native` line under the rules above.
+
+The Flick body is always type-checked and defines the function's semantics. When
+no `@native` clause matches the active environment (for instance on a target
+without an override), the compiler lowers the Flick fallback body.
+
+When multiple `@native` clauses match the active environment, Flick computes
+implication over the finite environment tag vocabulary (backends, axes, and
+hosts): the matching clause whose `when` condition implies every other matching
+clause wins (for example `bun` implies `js`, `js && rt` implies `js`, and `cgo`
+implies `go`). If two most-specific matching clauses neither imply one another
+(or are logically equivalent), compilation fails with `FLICK-F012` naming both
+lines. Unknown environment tags in a `when` condition report `FLICK-P066`.
+
+**Trust boundary and conformance.** A `@native` binding is a promise of
+observational equivalence with the Flick body (results, errors, and effects);
+the compiler does not verify equivalence statically. In release builds the
+optimizer treats an overridden function as opaque and never inlines or folds
+away the override. Pass `--no-native-overrides` to `flick build`, `flick run`,
+`flick test`, or `flick inspect` to lower the Flick fallback bodies instead of
+the overrides while still validating all override conditions and metadata — this
+lets test suites check conformance between overrides and fallback bodies in both
+debug and release profiles.
+
 ## The go target
 
-On the go target a binding to a module of the program — a relative path,
+On the go target, a qualified Go package global such as `"math.Hypot"` or
+`"strings.HasPrefix"` imports its Go package automatically and calls the
+exported Go symbol directly with unboxed Go scalar types when the signature uses
+scalar types. A binding to a module of the program — a relative path,
 `./timers.mjs` — calls the Go function of the same name in `timers.go`
 beside it, which the build copies into the Go module; without that file the
 binding is `FLICK-P012`, naming the file to add. The file is `package main`

@@ -4,6 +4,7 @@ use std::{fmt, mem};
 
 use super::{Checker, ForeignInfo, ForeignMode, Node, Retention, Span, Type, codes};
 use crate::diagnostics::Diagnostic;
+use crate::types::typing::Range;
 
 pub(in crate::types) struct PendingForeign {
     pub(super) decl: Node,
@@ -15,6 +16,8 @@ pub(in crate::types) struct PendingForeign {
     pub(super) span: Span,
     pub(super) name: String,
     pub(super) unknown: Option<Diagnostic>,
+    /// Set for a selected `@native` override: `(override_range, backend_id, enabled)`.
+    pub(super) native_override: Option<(Range, String, bool)>,
 }
 
 impl fmt::Debug for PendingForeign {

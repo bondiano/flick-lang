@@ -312,6 +312,7 @@ mod tests {
                 labels: None,
                 inputs: false,
                 watch: false,
+                no_native_overrides: false,
                 backend_options: BTreeMap::new(),
             },
             Some(root.to_string_lossy().into_owned()),

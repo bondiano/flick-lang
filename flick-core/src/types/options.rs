@@ -1,7 +1,7 @@
 //! What checking a module is given besides the module and its imports: the
 //! bounds of instance resolution and the settings of the project.
 
-use super::{Dict, ForeignBackendSpec, Type, Watched};
+use super::{Dict, ForeignBackendSpec, NativeOverrideEnv, Type, Watched};
 use crate::resolve::Interface;
 use crate::syntax::structure::Thresholds;
 
@@ -45,6 +45,18 @@ pub struct Options<'a> {
     /// attributes (`FLICK-S014`) should be rejected against `foreign_backend`.
     /// False only when a frontend-only host cannot load an uncached custom backend.
     pub validate_foreign_metadata: bool,
+    /// Environment vocabulary, world model, and active tags for `@native` overrides.
+    /// `None` uses [`NativeOverrideEnv::default_js`].
+    pub native_overrides: Option<&'a NativeOverrideEnv>,
+}
+
+impl<'a> Options<'a> {
+    pub fn native_env(&self) -> &'a NativeOverrideEnv {
+        match self.native_overrides {
+            Some(env) => env,
+            None => NativeOverrideEnv::default_js(),
+        }
+    }
 }
 
 /// Unsealed module interface lookup used during IR type lowering.

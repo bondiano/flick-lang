@@ -168,7 +168,7 @@ fn let_rest(p: &mut Parser, m: super::Marker, assert: bool, method: bool) {
         super::contracts::contract(p);
     }
     if p.expect(K::Eq) {
-        p.body(K::Block, expr::stmt);
+        p.body_stop(K::Block, expr::stmt, super::native::at_aligned_native);
     }
     if p.at(K::AsKw) {
         if !assert {
@@ -185,6 +185,7 @@ fn let_rest(p: &mut Parser, m: super::Marker, assert: bool, method: bool) {
             p.expect(K::String);
         }
     }
+    super::native::overrides(p);
     p.complete(m, K::LetDecl);
 }
 
@@ -601,7 +602,7 @@ fn foreign_decl(p: &mut Parser) {
     p.complete(m, K::ForeignDecl);
 }
 
-fn meta_item(p: &mut Parser) {
+pub(super) fn meta_item(p: &mut Parser) {
     let m = p.start();
     if p.at(K::Ident) || p.at(K::CatchKw) {
         if p.at(K::CatchKw) {

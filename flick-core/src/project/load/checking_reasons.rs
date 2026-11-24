@@ -84,15 +84,16 @@ impl Key {
     /// the imports in the order of the key's.
     fn differs<'a>(&self, current: &Key, imports: impl Iterator<Item = &'a str>) -> Vec<String> {
         let mut labels = Vec::new();
+        #[cfg(not(target_arch = "wasm32"))]
+        let env_changed = self.foreign_backend != current.foreign_backend
+            || self.validate_foreign_metadata != current.validate_foreign_metadata
+            || self.native_overrides != current.native_overrides;
+        #[cfg(target_arch = "wasm32")]
+        let env_changed = false;
         let flags = [
             (self.file != current.file, "file"),
             (self.text != current.text, "source"),
-            (
-                self.config != current.config
-                    || self.foreign_backend != current.foreign_backend
-                    || self.validate_foreign_metadata != current.validate_foreign_metadata,
-                "config",
-            ),
+            (self.config != current.config || env_changed, "config"),
             (
                 self.lower != current.lower || self.cached_ir != current.cached_ir,
                 "mode",
@@ -135,8 +136,12 @@ impl Checking<'_> {
             // the code of its blocks too, which other modules' blocks change
             text: self.text_of(loaded).to_owned(),
             config: self.project.map(|p| p.config.clone()),
+            #[cfg(not(target_arch = "wasm32"))]
             foreign_backend: self.foreign_backend_for(loaded),
+            #[cfg(not(target_arch = "wasm32"))]
             validate_foreign_metadata: self.env_ctx.validate_foreign_metadata,
+            #[cfg(not(target_arch = "wasm32"))]
+            native_overrides: self.env_ctx.native_overrides().clone(),
             lower: self.lower,
             cached_ir: self.cached_ir,
             imports: loaded

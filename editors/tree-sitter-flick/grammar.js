@@ -11,7 +11,7 @@ const KEYWORDS = [
 ];
 
 const OPERATORS = [
-  '...', '..<', '..', '->', '<-', '=>', '==', '|>', '<|', '>>', '<<', '||', '&&', '!=', '<=', '>=', '++', '**',
+  '...', '..<', '..', '->', '<-', '=>', '==', '|>', '<|', '>>', '<<', '||', '&&', '!=', '!', '<=', '>=', '++', '**',
   ',', ';', ':', '.', '=', '|', '<', '>', '+', '-', '*', '/', '%', '^', '?', '~',
 ];
 
@@ -47,6 +47,7 @@ module.exports = grammar({
       $._await_signature,
       $._await_definition,
       alias($._proof, $.keyword),
+      $._native,
       $.attribute,
       $.label,
       $._foreign,
@@ -125,6 +126,7 @@ module.exports = grammar({
       )),
     ),
     _from: $ => seq(alias('from', $.keyword), optional(alias(choice('global', 'inline'), $.keyword))),
+    _native: $ => seq(alias('@native', $.attribute), optional(alias(choice('global', 'inline'), $.keyword))),
     // `component name` declares a component; elsewhere the word is a name
     _component: $ => seq(alias('component', $.keyword), $.identifier),
     // `plugin head` in an import's `exposing`, and `server fn`

@@ -44,7 +44,7 @@ use crate::resolve::{Header, Import, Item, ItemKind};
 use crate::source::Span;
 use crate::source::{FileId, SourceMap};
 use crate::syntax::cst::{Element, Node};
-use crate::syntax::{Parse, kind::SyntaxKind as K, literal::string_value};
+use crate::syntax::{Parse, kind::SyntaxKind as K, literal::string_value, when};
 use crate::types;
 
 include!("checking_file.rs");
@@ -143,8 +143,12 @@ struct Key {
     text: String,
     /// The effective configuration, including programmatically supplied values.
     config: Option<Config>,
+    #[cfg(not(target_arch = "wasm32"))]
     foreign_backend: types::ForeignBackendSpec,
+    #[cfg(not(target_arch = "wasm32"))]
     validate_foreign_metadata: bool,
+    #[cfg(not(target_arch = "wasm32"))]
+    native_overrides: types::NativeOverrideEnv,
     lower: bool,
     /// An editor's entry, without the IR, is none a build reads.
     cached_ir: CachedIr,
