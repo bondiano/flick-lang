@@ -161,7 +161,7 @@ impl Builder {
 
 #[cfg(test)]
 mod tests {
-    use super::{Builder, Kind, adapter, expression, kind, supports};
+    use super::{Builder, Kind, adapter, expression, kept_for_call, kind, supports};
     use crate::{
         build,
         ir::{Expr, ExprKind, Foreign, ItemKind, Lit, Stage, Stmt, memory},
@@ -185,6 +185,7 @@ mod tests {
                     name.push('!');
                 }
             }),
+            Box::new(|v| v.adapter.retention = Some(flick_ir::Retention::Owner)),
             Box::new(|v| v.mode = ForeignMode::Sync),
             Box::new(|v| v.mode = ForeignMode::Async),
             Box::new(|v| v.mode = ForeignMode::Effect),
@@ -294,7 +295,7 @@ mod tests {
             let Some(kind) = kind(original) else { continue };
             seen.push(original.binding.export_name().unwrap_or("").to_owned());
             assert!(supports(original, kind), "{original:#?}");
-            assert_eq!(original.adapter, adapter(kind));
+            assert_eq!(kept_for_call(&original.adapter), adapter(kind));
             let entry = memory::Name::new("Instances", &original.name);
             assert!(lower([module], &entry).is_ok());
             let edits = mutations(original);
