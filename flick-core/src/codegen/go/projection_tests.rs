@@ -61,8 +61,14 @@ fn the_builtin_map_of_a_projection_is_a_loop_without_a_callback() {
     assert_eq!(go.matches("F_List__map(").count(), 1, "{go}");
     assert_eq!(go.matches("flickrt.Fn(").count(), 1, "{go}");
     assert!(go.contains("return F_List__map(fb, flickrt.Fn("), "{go}");
-    // `cities` and `zips` loop over their lists, reading two fields of each
-    assert_eq!(go.matches("for ").count(), 2, "{go}");
+    // `cities` and `zips` loop over the slices of their lists, with room for
+    // every element made first, reading two fields of each
+    assert_eq!(go.matches("for _, ").count(), 2, "{go}");
+    assert_eq!(
+        go.matches(" := make([]flickrt.Value, 0, len(flickrt.List(").count(),
+        2,
+        "{go}"
+    );
     assert!(
         go.contains("flickrt.Field(flickrt.Field(l__x24_elem2, \"address\"), \"zip\")"),
         "{go}"

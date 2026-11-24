@@ -9,7 +9,7 @@ use flick_pretty::docvec;
 
 use super::Gen;
 use super::layout::{Code, block, call, if_else, single, statement};
-use flick_ir::{Expr, ExprKind, Lit, Pat};
+use flick_ir::{Expr, ExprKind, IrType, Lang, Lit, Pat};
 
 /// Where the elements of the `for` being emitted go.
 #[derive(Clone, Copy)]
@@ -23,10 +23,29 @@ pub(super) enum Collector<'a> {
 impl<'a> Gen<'a> {
     /// The list a strict `for` with the clauses `body` builds.
     pub(super) fn strict(&mut self, body: &Expr) -> Code<'a> {
+        let a = self.a;
         let out = self.temp();
-        self.emit(docvec![self.a, out, " := []flickrt.Value{}"]);
         let saved = self.collector.replace(Collector::List(out));
-        self.discard(body);
+        match &body.kind {
+            // one element for each of a list: room for all of them at once
+            ExprKind::Each {
+                pat,
+                source,
+                body: element,
+                stop: None,
+                ..
+            } if matches!(element.kind, ExprKind::Yield(_)) && self.is_list(source) => {
+                let s = self.expr(source);
+                let s = self.spill(s);
+                let len = call(a, "len", [call(a, "flickrt.List", [s.doc])]);
+                self.emit(docvec![a, out, " := make([]flickrt.Value, 0, ", len, ")"]);
+                self.each(pat, s, true, element, None);
+            }
+            _ => {
+                self.emit(docvec![a, out, " := []flickrt.Value{}"]);
+                self.discard(body);
+            }
+        }
         self.collector = saved;
         self.code(out)
     }
@@ -74,6 +93,57 @@ impl<'a> Gen<'a> {
         call(a, "flickrt.Seq", [f]).into()
     }
 
+    /// The loop of an `Each` over the evaluated source `s`, a `List` when
+    /// `list`: a list is a slice, which a loop ranges over without a call
+    /// per element.
+    fn each(&mut self, pat: &Pat, s: Code<'a>, list: bool, body: &Expr, stop: Option<&Expr>) {
+        let a = self.a;
+        let var = self.temp();
+        let (inner, ()) = self.block(|g| {
+            match pat {
+                Pat::Bind(name) => {
+                    g.bind(name, g.code(var));
+                    g.discard(body);
+                }
+                _ => g.arm(a.text(var), None, pat, None, body, Self::discard),
+            }
+            if let Some(stop) = stop {
+                let stop = g.expr_bool(stop).doc;
+                g.emit(docvec![a, "if ", stop, " ", single(a, "break")]);
+            }
+        });
+        // a pattern that ignores the element leaves the variable unused
+        let used = statement(a, docvec![a, "_ = ", var]);
+        let body = block(a, iter::once(used).chain(inner));
+        let loop_ = if list {
+            let range = call(a, "flickrt.List", [s.doc]);
+            docvec![a, "for _, ", var, " := range ", range, " ", body]
+        } else {
+            let range = call(a, "flickrt.Iter", [self.context(), s.doc]);
+            docvec![a, "for ", var, " := range ", range, " ", body]
+        };
+        if let Some(stop) = stop {
+            let stop = self.expr_bool(stop).doc;
+            self.emit(docvec![
+                a,
+                "if !",
+                stop,
+                " ",
+                block(a, [statement(a, loop_)])
+            ]);
+        } else {
+            self.emit(loop_);
+        }
+    }
+
+    /// Whether `e` is known to be a `List`, by its type.
+    fn is_list(&self, e: &Expr) -> bool {
+        matches!(
+            e.ty.as_deref(),
+            Some(IrType::Named { module, name, .. }) if self.input.lang.is(Lang::List, module, name)
+        )
+    }
+
     /// Emits `e` for what it does: the loops, guards and elements of a
     /// strict `for`.
     pub(super) fn discard(&mut self, e: &Expr) {
@@ -88,37 +158,7 @@ impl<'a> Gen<'a> {
             } => {
                 let s = self.expr(source);
                 let s = if stop.is_some() { self.spill(s) } else { s };
-                let var = self.temp();
-                let (inner, ()) = self.block(|g| {
-                    match pat {
-                        Pat::Bind(name) => {
-                            g.bind(name, g.code(var));
-                            g.discard(body);
-                        }
-                        _ => g.arm(a.text(var), None, pat, None, body, Self::discard),
-                    }
-                    if let Some(stop) = stop {
-                        let stop = g.expr_bool(stop).doc;
-                        g.emit(docvec![a, "if ", stop, " ", single(a, "break")]);
-                    }
-                });
-                // a pattern that ignores the element leaves the variable unused
-                let used = statement(a, docvec![a, "_ = ", var]);
-                let body = block(a, iter::once(used).chain(inner));
-                let range = call(a, "flickrt.Iter", [self.context(), s.doc]);
-                let loop_ = docvec![a, "for ", var, " := range ", range, " ", body];
-                if let Some(stop) = stop {
-                    let stop = self.expr_bool(stop).doc;
-                    self.emit(docvec![
-                        a,
-                        "if !",
-                        stop,
-                        " ",
-                        block(a, [statement(a, loop_)])
-                    ]);
-                } else {
-                    self.emit(loop_);
-                }
+                self.each(pat, s, self.is_list(source), body, stop.as_deref());
             }
             ExprKind::Yield(value) => {
                 let v = self.expr(value);
