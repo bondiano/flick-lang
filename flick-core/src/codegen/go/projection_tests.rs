@@ -65,7 +65,8 @@ fn the_builtin_map_of_a_projection_is_a_loop_without_a_callback() {
     // every element made first, reading two fields of each
     assert_eq!(go.matches("for _, ").count(), 2, "{go}");
     assert_eq!(
-        go.matches(" := make([]flickrt.Value, 0, len(flickrt.List(").count(),
+        go.matches(" := make([]flickrt.Value, 0, len(flickrt.List(")
+            .count(),
         2,
         "{go}"
     );
