@@ -5,10 +5,10 @@
 import RouteBend from "../RouteBend.astro";
 import Icon from "../Icon.astro";
 import { lineOf } from "../lines.ts";
-import { inlineCode, texts } from "./copy.ts";
+import { texts } from "./copy.ts";
 
-interface Props { locale: string; prefix: string; repository: string; style: string; from: number; to: number }
-const { locale, prefix, repository, style, from, to } = Astro.props;
+interface Props { locale: string; prefix: string; style: string; from: number; to: number }
+const { locale, prefix, style, from, to } = Astro.props;
 const text = texts(locale);
 
 // In the sidebar's order, so each takes its section's colour.
@@ -16,7 +16,7 @@ const lines = [
   { name: text("Tour", "Тур"), href: "/tour/", body: text("Flick one idea at a time, with a program to run beside each one.", "Короткие уроки с программами, которые запускаются прямо в браузере.") },
   { name: text("Course", "Курс"), href: "/course/", body: text("Exercises that check your answer, three or four a lesson.", "Упражнения с проверкой ответа, по три или четыре на урок.") },
   { name: text("Get started", "Начало работы"), href: "/start/", body: text("Install Flick and build a first program, step by step.", "Установите Flick и соберите первую программу, шаг за шагом.") },
-  { name: text("Handbook", "Руководство"), href: "/handbook/designing-with-effects/", body: text("Design a program with effects, write a typed DSL, upgrade to 0.2.", "Проектирование с эффектами, свой типизированный DSL, переход на 0.2.") },
+  { name: text("Handbook", "Руководство"), href: "/handbook/designing-with-effects/", body: text("Design a program with effects, and write a typed DSL of your own.", "Проектирование с эффектами и свой типизированный DSL.") },
   { name: text("Reference", "Справочник"), href: "/reference/syntax/", body: text("Syntax, types, effects, and every block and command.", "Синтаксис, типы, эффекты, все блоки и команды.") },
 ];
 
@@ -38,11 +38,7 @@ const width = (lines.length - 1) * PITCH;
   <div class="depot-head">
     <h2 id="depot-title">{text("End of the line. Change here for the docs", "Конечная. Пересадка на документацию")}</h2>
     <p class="stop-lead">{text("That was the overview. Each line below goes deeper, and you can get off at any station.", "Это был обзор. Каждая линия ниже ведёт глубже, и сойти можно на любой станции.")}</p>
-    <p class="stop-text">
-      <span set:html={inlineCode(text("Flick 0.2 is an alpha: before 1.0 a minor release may break programs, and `flick check --fix` rewrites most of what changes.", "Flick 0.2 — альфа-версия: до 1.0 минорный релиз может ломать программы, а `flick check --fix` переписывает большую часть изменений."))} />
-      {" "}<a href={`${repository}/blob/main/CHANGELOG.md`}>{text("What changed in 0.2", "Что изменилось в 0.2")}</a>
-      {" · "}<a href={`${prefix}/handbook/upgrading/`}>{text("Upgrading from 0.1", "Переход с 0.1")}</a>
-    </p>
+    <p class="stop-text">{text("Flick is young and still growing. New stations open as the language does, so the journey goes on past this page.", "Flick ещё молод и продолжает расти. Новые станции открываются вместе с языком, так что путешествие не заканчивается на этой странице.")}</p>
   </div>
   <svg class="depot-map" style={`--width: ${width}`} viewBox={`-24 -24 ${width + 48} ${HEIGHT + 24}`} aria-hidden="true" focusable="false">
     {lines.map((_, k) => <path style={lineOf(k)} d={k === 0 ? `M0 -24V${HEIGHT}` : branch(k)} />)}
@@ -56,8 +52,4 @@ const width = (lines.length - 1) * PITCH;
       </a>
     </li>)}
   </ul>
-  <div class="hero-actions">
-    <a class="action action-primary" href={`${prefix}/play/`}>{text("Open playground", "Открыть песочницу")} <Icon name="arrow" size={20} /></a>
-    <a class="action" href={`${prefix}/start/why/`}>{text("Why Flick, in full", "Зачем Flick, подробно")}</a>
-  </div>
 </section>

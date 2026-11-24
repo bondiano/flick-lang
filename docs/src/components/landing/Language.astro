@@ -17,8 +17,8 @@ const tiles = [
 ---
 <section class="stop" style={style} aria-labelledby="language-title">
   <RouteBend from={from} to={to} />
-  <h2 id="language-title">{text("The rest is plain code", "Остальное — обычный код")} <span class="stop-new">{text("New in 0.2", "Новое в 0.2")}</span></h2>
-  <p class="stop-lead">{text("The signature is strict, so the body can be simple. Flick 0.2 adds the forms you reach for every day, and each of them still keeps to the signature.", "Сигнатура строгая, поэтому тело функции может быть простым. В Flick 0.2 появились привычные конструкции, и каждая из них по-прежнему соблюдает сигнатуру.")}</p>
+  <h2 id="language-title">{text("The rest is plain code", "Остальное — обычный код")}</h2>
+  <p class="stop-lead">{text("The signature is strict, so the body can be simple: the forms you reach for every day are here, and each of them still keeps to the signature.", "Сигнатура строгая, поэтому тело функции может быть простым: привычные конструкции на месте, и каждая из них соблюдает сигнатуру.")}</p>
   <div class="tiles">
     {tiles.map(({ title, body }, part) => <article>
       <h3>{title}</h3>
@@ -26,5 +26,5 @@ const tiles = [
       <Sample name="language" part={part} />
     </article>)}
   </div>
-  <p class="stop-text" set:html={inlineCode(text("Also new: `defer` and `errdefer`, `lazy { … }`, `result { … }`, holes in strings, `Int8` to `UInt64` and `Float32`, and `deriving Generic`.", "Ещё в 0.2: `defer` и `errdefer`, `lazy { … }`, `result { … }`, подстановки в строках, целые от `Int8` до `UInt64`, `Float32` и `deriving Generic`."))} />
+  <p class="stop-text" set:html={inlineCode(text("Also in the language: `defer` and `errdefer`, `lazy { … }`, `result { … }`, holes in strings, `Int8` to `UInt64` and `Float32`, and `deriving Generic`.", "А ещё в языке: `defer` и `errdefer`, `lazy { … }`, `result { … }`, подстановки в строках, целые от `Int8` до `UInt64`, `Float32` и `deriving Generic`."))} />
 </section>

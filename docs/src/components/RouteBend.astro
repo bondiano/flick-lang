@@ -11,4 +11,4 @@ const right = to > from;
 const x = (value: number) => right ? value : dx - value;
 const d = `M${x(0)} 0Q${x(0)} 16 ${x(11.3)} 27.3L${x(dx - 11.3)} ${h - 27.3}Q${x(dx)} ${h - 16} ${x(dx)} ${h}`;
 ---
-{dx > 0 && <svg class:list={["route-bend", right ? "route-bend-right" : "route-bend-left"]} style={`--dx: ${dx}`} viewBox={`0 0 ${dx} ${h}`} aria-hidden="true" focusable="false"><path d={d} /></svg>}
+{dx > 0 && <svg class:list={["route-bend", right ? "route-bend-right" : "route-bend-left"]} style={`--from: ${from}`} viewBox={`0 0 ${dx} ${h}`} aria-hidden="true" focusable="false"><path d={d} /></svg>}
