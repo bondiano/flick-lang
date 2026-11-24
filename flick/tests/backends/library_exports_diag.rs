@@ -311,3 +311,100 @@ fn fixture_backend_rejects_invalid_and_unprojectable_c_header_exports() {
         }
     }
 }
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn plain_lib_check_without_target_validates_default_js_exports() {
+    const PLAIN_LIB_TOML: &str = "\
+schema-version = 1
+[project]
+kind = \"lib\"
+";
+
+    // Invalid, generic, and constrained exports in a plain `[project] kind = "lib"`
+    // project without `[target.js]` or `[build]` (exercises `saved.is_some()` with
+    // `environment_preflight == false`, on both cold and warm caches).
+    for (label, decl, attr, needle) in [
+        (
+            "invalid",
+            "@export \"123bad\"\nf : Int -> Int\nlet f x = x + 1\n",
+            "@export \"123bad\"",
+            "non-reserved JavaScript identifier",
+        ),
+        (
+            "generic",
+            "@export \"polyId\"\nid_fn : a -> a\nlet id_fn x = x\n",
+            "@export \"polyId\"",
+            "generic",
+        ),
+        (
+            "constrained",
+            "@export \"showVal\"\nshow_val : Show a => a -> String\nlet show_val x = show x\n",
+            "@export \"showVal\"",
+            "dictionaries",
+        ),
+    ] {
+        let source = format!("module App.Plain exposing (..)\n// π offset\n\n{decl}");
+        let root = project(
+            &format!("export_plain_lib_check_{label}"),
+            &[
+                ("flick.toml", PLAIN_LIB_TOML),
+                ("src/App/Plain.fl", &source),
+            ],
+        );
+        for pass in ["cold", "warm"] {
+            let out = flick_in(&root, &["check", "--offline", "--diagnostics", "json"]);
+            assert_eq!(out.status.code(), Some(1), "{label} {pass}: {out:?}");
+            let diags = parse_diagnostics(&out.stderr);
+            let diag = diags
+                .iter()
+                .find(|d| d["code"] == "FLICK-P012")
+                .unwrap_or_else(|| panic!("{label} {pass}: expected P012 in {diags:?}"));
+            assert!(
+                diag["message"].as_str().unwrap_or("").contains(needle),
+                "{label} {pass}: {diag}"
+            );
+            assert_eq!(span_slice(&source, diag), attr);
+        }
+    }
+
+    // Duplicate `@export` across two modules in a plain lib project.
+    let mod_a = "\
+module App.A exposing (a)
+
+@export \"sharedName\"
+a : Int -> Int
+let a x = x + 1
+";
+    let mod_b = "\
+module App.B exposing (b)
+// π preserves UTF-8 byte offsets
+
+@export \"sharedName\"
+b : Int -> Int
+let b x = x + 2
+";
+    let dup_root = project(
+        "export_plain_lib_check_duplicate",
+        &[
+            ("flick.toml", PLAIN_LIB_TOML),
+            ("src/App/A.fl", mod_a),
+            ("src/App/B.fl", mod_b),
+        ],
+    );
+    for pass in ["cold", "warm"] {
+        let out = flick_in(&dup_root, &["check", "--offline", "--diagnostics", "json"]);
+        assert_eq!(out.status.code(), Some(1), "dup {pass}: {out:?}");
+        let diags = parse_diagnostics(&out.stderr);
+        let diag = diags
+            .iter()
+            .find(|d| d["code"] == "FLICK-P012")
+            .unwrap_or_else(|| panic!("dup {pass}: expected P012 in {diags:?}"));
+        assert!(
+            diag["message"].as_str().unwrap_or("").contains("duplicate"),
+            "dup {pass}: {diag}"
+        );
+        assert_eq!(diag["path"], "src/App/B.fl");
+        assert_eq!(span_slice(mod_b, diag), "@export \"sharedName\"");
+    }
+}

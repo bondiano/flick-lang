@@ -340,8 +340,10 @@ fn run_in(
     loader.import_cycles(&edges);
     loader.expand_plugins();
     #[cfg(not(target_arch = "wasm32"))]
-    if loader.lowered.is_none() && has_own_export_attrs(&loader.modules, loader.sources) {
-        loader.lowered = Some(Vec::new());
+    if (loader.lowered.is_none() || loader.lower_packages_only)
+        && has_own_export_attrs(&loader.modules, loader.sources)
+    {
+        loader.lowered.get_or_insert_with(Vec::new);
         loader.lower_packages_only = false;
     }
     loader.size_lowered();

@@ -61,7 +61,7 @@ impl Checker<'_> {
                     };
                     let entity = self.env.entity(Namespace::Value, &name);
                     let ty = self.env.value(&entity).cloned().map(|t| self.zonk(&t));
-                    let ok = ty.as_ref().is_some_and(is_function_or_error);
+                    let ok = ty.as_ref().is_some_and(|t| self.is_function_or_error(t));
                     for attr in attrs {
                         let span = Span::new(self.file, attr.span.0, attr.span.1);
                         if ok {
@@ -105,15 +105,15 @@ impl Checker<'_> {
             }
         }
     }
-}
-
-fn is_function_or_error(mut ty: &Type) -> bool {
-    loop {
-        match ty {
-            Type::Forall { body, .. } => ty = body,
-            Type::Captured { ty: inner, .. } | Type::Bounded { ty: inner, .. } => ty = inner,
-            Type::Fun { .. } | Type::Error | Type::Meta(_) => return true,
-            _ => return false,
+    fn is_function_or_error(&self, ty: &Type) -> bool {
+        let mut current = self.whnf(ty);
+        for _ in 0..64 {
+            match current {
+                Type::Forall { body, .. } => current = self.whnf(&body),
+                Type::Fun { .. } | Type::Error | Type::Meta(_) => return true,
+                _ => return false,
+            }
         }
+        false
     }
 }

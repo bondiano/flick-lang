@@ -98,6 +98,7 @@ format = \"esm\"
         assert_eq!(pkg["type"], "module");
         assert_eq!(pkg["main"], "./index.js");
         assert_eq!(pkg["types"], "./index.d.ts");
+        assert_eq!(pkg["sideEffects"], false);
         let esm_out = run_node(
             &dist,
             &[
@@ -142,6 +143,7 @@ format = \"cjs\"
         assert_eq!(pkg["type"], "commonjs");
         assert_eq!(pkg["main"], "./index.cjs");
         assert_eq!(pkg["types"], "./index.d.ts");
+        assert_eq!(pkg["sideEffects"], false);
         let cjs_out = run_node(
             &dist,
             &[
@@ -182,6 +184,12 @@ global-name = \"MyMath\"
         let dts = fs::read_to_string(dist.join("index.d.ts")).expect("iife dts");
         assert!(dts.contains("declare global {"), "{dts}");
         assert!(dts.contains("var MyMath: {"), "{dts}");
+        let pkg: Value =
+            serde_json::from_str(&fs::read_to_string(dist.join("package.json")).expect("pkg"))
+                .expect("json");
+        assert_eq!(pkg["main"], "./index.iife.js");
+        assert_eq!(pkg["types"], "./index.d.ts");
+        assert_eq!(pkg["sideEffects"], serde_json::json!(["./index.iife.js"]));
         let iife_out = run_node(
             &dist,
             &[

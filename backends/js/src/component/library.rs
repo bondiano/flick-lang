@@ -477,12 +477,12 @@ fn library_package_json(format: LibraryFormat, entry_path: &str, has_headers: bo
                 serde_json::json!({
                     "main": entry_rel,
                     "types": "./index.d.ts",
-                    "sideEffects": false,
+                    "sideEffects": [entry_rel],
                 })
             } else {
                 serde_json::json!({
                     "main": entry_rel,
-                    "sideEffects": false,
+                    "sideEffects": [entry_rel],
                 })
             }
         }

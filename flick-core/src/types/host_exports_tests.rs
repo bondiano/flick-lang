@@ -102,3 +102,52 @@ foreign pure ext from \"./ext.mjs\" \"ext\"
         .expect("S014 on foreign declaration");
     assert!(err.message.contains("not a `foreign`"), "{err:?}");
 }
+
+#[test]
+fn unfolds_transparent_type_aliases_when_checking_export_function_type() {
+    let valid = "\
+module Demo exposing (inc, to_str, id_fn)
+
+type alias Unary = Int -> Int
+type alias Fn a b = a -> b
+
+@export \"inc\"
+inc : Unary
+let inc x = x + 1
+
+@export \"toStr\"
+to_str : Fn Int String
+let to_str n = show n
+
+@export \"polyId\"
+id_fn : Fn a a
+let id_fn x = x
+";
+    let ir = lower_text("Demo", valid).expect("function aliases should pass checker");
+    let got: Vec<(&str, &str)> = ir
+        .exports
+        .host
+        .iter()
+        .map(|e| (e.name.as_str(), e.export_name.as_str()))
+        .collect();
+    assert_eq!(
+        got,
+        vec![("inc", "inc"), ("to_str", "toStr"), ("id_fn", "polyId")]
+    );
+
+    let non_fn_alias = "\
+module Demo exposing (count)
+
+type alias Count = Int
+
+@export \"count\"
+count : Count
+let count = 1
+";
+    let diags = check_diags(non_fn_alias);
+    let err = diags
+        .iter()
+        .find(|d| d.severity == Severity::Error && d.code == codes::S014)
+        .expect("S014 on non-function type alias");
+    assert!(err.message.contains("top-level function"), "{err:?}");
+}
