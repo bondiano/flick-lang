@@ -96,6 +96,9 @@ inductive Ty
   /-- The type the store gives a lazy cell of `Lazy ρ ε τ` (lazy.md §3): no value has it, so
   a lazy cell is never a `Ref` cell. -/
   | lazyCell (r e : Ty) (t : Ty) (C : Caps)
+  /-- `FuncRef τ` (core.md §2.3 (FuncRef-In)): a function without captures, a value of `τ`
+  typed by a term that names no local. It reaches what `τ` reaches. -/
+  | funcRef (t : Ty)
 
 /-- A stage term. In the stage position of an arrow anything else is no stage: it reads as
 `pure` (`Ty.asStage`) and a substitution leaves it as it is, so that what an arrow's stage
@@ -119,7 +122,7 @@ def Ty.reach : Ty → Caps
   | .run left right => fun a => left.reach a ∨ right.reach a
   | .rless _ r => r.reach
   | .arrow a _ b C => fun x => a.reach x ∨ b.reach x ∨ C x
-  | .ref t => t.reach
+  | .ref t | .funcRef t => t.reach
   | .tapp f a => fun x => f.reach x ∨ a.reach x
   | .rcons _ t r => fun x => t.reach x ∨ r.reach x
   | .eff _ _ t C => fun x => t.reach x ∨ C x
@@ -174,6 +177,7 @@ def Ty.ren (ξ : Atom → Atom) : Ty → Ty
   | .bare => .bare
   | .lazy r e t C => .lazy (r.ren ξ) (e.ren ξ) (t.ren ξ) (C.substT fun a => (ξ a).ty)
   | .lazyCell r e t C => .lazyCell (r.ren ξ) (e.ren ξ) (t.ren ξ) (C.substT fun a => (ξ a).ty)
+  | .funcRef t => .funcRef (t.ren ξ)
 
 /-- The renaming `i ↦ i + k` as a substitution; run-time regions stay. -/
 def shiftV (k : Nat) : Atom → Ty
@@ -218,6 +222,7 @@ def Ty.substT (σ : Atom → Ty) : Ty → Ty
   | .bare => .bare
   | .lazy r e t C => .lazy (r.substT σ) (e.substT σ) (t.substT σ) (C.substT σ)
   | .lazyCell r e t C => .lazyCell (r.substT σ) (e.substT σ) (t.substT σ) (C.substT σ)
+  | .funcRef t => .funcRef (t.substT σ)
 
 /-- An arrow's stage after a substitution. -/
 abbrev Ty.substS (σ : Atom → Ty) (φ : Ty) : Ty := if φ.isStage then φ.substT σ else φ

@@ -201,9 +201,7 @@ impl DerefMut for DeferredHold {
 
 /// The types whose values hold nothing of their arguments: a witness
 /// describes values of its type, holding none of them.
-pub(super) const HOLD_NOTHING: [Lang; 7] = [
-    // a function without captures holds nothing
-    Lang::FuncRef,
+pub(super) const HOLD_NOTHING: [Lang; 6] = [
     Lang::Layer,
     Lang::ServiceTag,
     Lang::ServiceImpl,

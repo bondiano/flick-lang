@@ -76,6 +76,7 @@ theorem Shp.of_substT {σ : Atom → Ty} :
       exact .errOpen ⟨b, G', hb⟩
     | adt _ _ hT => simp [Ty.hd] at hT
   | .tvar _, _, _ | .rg _, _, _ | .caps _, _, _ | .arrow .., _, _ | .ref _, _, _
+  | .funcRef _, _, _
   | .eff .., _, _ | .hnd _, _, _
   | .owner _, _, _ | .dict .., _, _ | .all .., _, _ | .bare, _, _ | .lazy .., _, _
   | .lazyCell .., _, _ =>

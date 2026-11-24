@@ -34,7 +34,7 @@ private theorem Typ.fieldCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     split at hw
     · simp_all
     · next hne => simp only [hne, if_false] at hR; exact ih _ _ _ _ _ rfl hw hR
-  | allI | errVal => intro R φ l w t hJ _ hR; cases hJ; simp [Ty.field] at hR
+  | allI | errVal | funcRef => intro R φ l w t hJ _ hR; cases hJ; simp [Ty.field] at hR
   | drec _ _ _ _ hT =>
     intro R φ l w t hJ _ hR; cases hJ
     obtain ⟨_, rfl, _⟩ := hT.dict_left; simp [Ty.field] at hR
@@ -59,7 +59,7 @@ private theorem Typ.valueFieldCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
       split at hw
       · cases hw; exact hv₁
       · next hne => simp only [hne, if_false] at hR; exact ih hv₂ _ _ _ _ _ rfl hw hR
-  | allI | errVal => intro _ R φ l w t hJ _ hR; cases hJ; simp [Ty.field] at hR
+  | allI | errVal | funcRef => intro _ R φ l w t hJ _ hR; cases hJ; simp [Ty.field] at hR
   | drec _ _ _ _ hT =>
     intro _ R φ l w t hJ _ hR; cases hJ
     obtain ⟨_, rfl, _⟩ := hT.dict_left; simp [Ty.field] at hR
@@ -87,7 +87,7 @@ private theorem Typ.setFieldCore {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
     · simp_all only [if_false]
       obtain ⟨r', hr', rfl⟩ := Option.map_eq_some_iff.mp hv
       exact .rcons hRec hl he (ih _ _ _ _ _ _ rfl hw hr' hR)
-  | allI | errVal => intro R φ l w t v' hJ _ _ hR; cases hJ; simp [Ty.field] at hR
+  | allI | errVal | funcRef => intro R φ l w t v' hJ _ _ hR; cases hJ; simp [Ty.field] at hR
   | _ => intro R φ l w t v' hJ _ hv _; cases hJ <;> simp [Tm.setField] at hv
 
 theorem setField_typ {Ψ Θ Γ l w t φ} (hw : Typ S Ψ Θ Γ w (.ex t φ))

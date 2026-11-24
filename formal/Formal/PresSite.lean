@@ -97,6 +97,9 @@ private theorem Typ.runtimeStage {Ψ Θ Γ e J} (h : Typ S Ψ Θ Γ e J) :
   | errVal _ _ _ ih =>
     intro Λ μ Λ' μ' e' t hΓ hJ hh; cases hJ
     exact ih Λ μ Λ' μ' e' _ hΓ rfl hh
+  | funcRef _ _ ih =>
+    intro Λ μ Λ' μ' e' t hΓ hJ hh; cases hJ
+    exact ih Λ μ Λ' μ' e' _ hΓ rfl hh
   | allI hv => intro _ _ _ _ _ _ _ _ hh; exact hh.not_value hv
   | app hf hx hψ hT =>
     intro Λ μ Λ' μ' e' t hΓ hJ hh; cases hΓ; cases hJ
@@ -176,7 +179,9 @@ theorem fin_not_value {c : Const} {w₁ w₂ : Tm} (hc : c = .addFin ∨ c = .sp
 theorem fin_unit {Ψ Θ c p w T φ} (h : Typ S Ψ Θ [] (.app (.app (.const c) (.own p)) w) (.ex T φ))
     (hc : c = .addFin ∨ c = .spawn) : Typ S Ψ Θ [] (.lit .unit) (.ex T φ) := by
   obtain ⟨_, _, _, _, hf, _, _, hT⟩ := h.app_nonvalue _ _ _ _ rfl rfl (fin_not_value hc)
-  refine hT.typ fun _ hT => ?_
+  refine hT.typ fun _ hT₀ => ?_
+  clear hT
+  have hT := hT₀
   obtain ⟨_, _, _, _, hc', _, _, hT₁⟩ := hf.app_arrow
   obtain ⟨_, hT'⟩ := hc'.const_witness fun _ _ _ h => by rcases hc with rfl | rfl <;> cases h
   rcases hc with rfl | rfl <;>
@@ -257,7 +262,9 @@ theorem root_field {root Ψ Θ Ef o w f c v t φ} (hroot : RootTy S root) (hr₀
     (h : Typ S Ψ Θ [] (.app (.const (.perform Ef o c)) v) (.ex t φ)) :
     Typ S Ψ Θ [] (.app f v) (.ex t φ) := by
   obtain ⟨_, _, _, _, hf', hx, hψ, hT⟩ := h.app_nonvalue _ _ _ _ rfl rfl perform_not_value
-  refine hT.typ fun _ hT => ?_
+  refine hT.typ fun _ hT₀ => ?_
+  clear hT
+  have hT := hT₀
   obtain ⟨us, _, _, _, hus, hop, hT'⟩ := hf'.perform_arrow
   obtain ⟨hwv, hwt⟩ := hroot.svc _ _ hr₀
   have hne : S.impl Ef ≠ .errors .cnil := fun he => by

@@ -26,6 +26,7 @@ def Ty.kind : Ty → Nat
   | .all .. => 14
   | .lazy .. => 15
   | .lazyCell .. => 16
+  | .funcRef _ => 17
 
 theorem Ty.tcon_kind' (T : Name) (us : List Ty) : (Ty.tcon T us).kind = 3 := by
   have : ∀ (us : List Ty) (f : Ty), f.kind = 3 → (us.foldl .tapp f).kind = 3 := by

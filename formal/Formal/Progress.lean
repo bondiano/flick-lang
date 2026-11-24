@@ -76,6 +76,7 @@ theorem app_progress {Ψ Θ Λ μ root f e a ψ t C φ} (hμ : μ.length = Ψ.le
         exact .inr (.perform (.inl ⟨[], _, _, _, _, _, _, OkE.nil, hve, rfl, hop, fun _ h => (by cases h),
           hra, _, Stage.le_svc hrow _ (.inl rfl)⟩))
     | scopeRun => exact step (Step.ofR (.scopeRun hve))
+    | funcRefFun => exact step (Step.ofP (.funcRef hve))
     | refMake => exact step (Step.ofR (.refMake hve))
     | refGet =>
       obtain ⟨_, _, hT'⟩ := hf.const_arrow (by intro E o cl h; cases h)

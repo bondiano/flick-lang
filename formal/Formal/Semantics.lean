@@ -43,6 +43,8 @@ inductive PHead : Tm → Tm → Prop
   | guardNo : Value v → matchP p v = none → PHead (.match_ v (.aguard p g b r)) (.match_ v r)
   | tryVal : Value v → PHead (.try_ v A) v
   | intEq : PHead (.app (.app (.const .intEq) (.lit (.int a))) (.lit (.int b))) (.lit (.bool (a == b)))
+  -- `FuncRef.fun v`: the function is the value itself
+  | funcRef : Value v → PHead (.app (.const .funcRefFun) v) v
   -- the value of the body of a handler goes to its `return` function
   | hwithVal {al : Tm} : Value v → PHead (.hwith p ℓ E al r v) (.app r v)
   -- the value of a `tail` arm resumes the body under the handler

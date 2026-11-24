@@ -2,6 +2,7 @@ import Formal.EvalCtx
 import Formal.RuleRows
 import Formal.Live.Mode
 import Formal.Judgment
+import Formal.Closed
 
 /-!
 # Typing rules of λFlick (core.md §2.3, §3.6; regions.md §2.3–§2.5, §3.4)
@@ -104,6 +105,9 @@ inductive Typ : List Ty → Facts → List Scheme → Tm → J → Prop
   /-- (Errors-In): a term of an error `E` is a term of the errors of a row that holds `E`. -/
   | errVal : Typ Ψ Θ Γ e (.ex U φ) → U.hd = .adt E → Row.Sub (Row.err E U) ε.asRow →
       Typ Ψ Θ Γ e (.ex (.errors ε) φ)
+  /-- (FuncRef-In): a term that names no local is a term of the functions without captures
+  of its type; the value is the same. -/
+  | funcRef : Typ Ψ Θ Γ e (.ex t φ) → e.Closed → Typ Ψ Θ Γ e (.ex (.funcRef t) φ)
   /-- An arm that catches a name catches it at every argument (`Row.nameClose`). -/
   | tryR : Typ Ψ Θ Γ e (.ex t (.rt r ε₀.asRow)) → Typ Ψ Θ Γ A (.halts ε₀ H t φ) →
       (Stage.rt r ε').le φ → Row.Sub ε₀.asRow (Row.union H.nameClose (ε'.back H)) →
