@@ -3,6 +3,7 @@
 
 use std::fmt::Write;
 
+use super::provenance::{alias_record, declared_field};
 use super::{Ide, Location, tree};
 use crate::doc;
 use crate::iface::Namespace;
@@ -35,42 +36,71 @@ impl Ide<'_> {
         }
         let (range, fields, declared) = self.field_at(file, offset)?;
         let label = &self.text(file)[range.0 as usize..range.1 as usize];
+        // of several records with these fields none is shown as the one
+        let declared = match &declared[..] {
+            [one] => Some(one),
+            _ => None,
+        };
         let ty = fields
             .iter()
             .find(|(l, _)| l == label)
             .map(|(_, t)| show_type(t))
-            .or_else(|| declared.as_ref().map(|d| d.written.clone()))?;
-        Some((describe(label, &ty, declared.as_ref()), range))
+            .or_else(|| declared.map(|d| d.written.clone()))?;
+        Some((describe(label, &ty, declared), range))
     }
 
-    /// Where the field label at `offset` is declared: its record type's field.
-    pub fn field_definition(&self, file: FileId, offset: u32) -> Option<Location> {
-        let declared = self.field_at(file, offset)?.2?;
-        let (start, end) = declared.label;
-        Some(Location {
-            target: self.source(&declared.module)?.target,
-            start,
-            end,
-        })
+    /// Where the field label at `offset` is declared: the field of the alias
+    /// its record is, or, when the checker does not type its record as one,
+    /// each record type with its fields.
+    pub fn field_definitions(&self, file: FileId, offset: u32) -> Vec<Location> {
+        let Some((_, _, declared)) = self.field_at(file, offset) else {
+            return Vec::new();
+        };
+        declared
+            .into_iter()
+            .filter_map(|d| {
+                Some(Location {
+                    target: self.source(&d.module)?.target,
+                    start: d.label.0,
+                    end: d.label.1,
+                })
+            })
+            .collect()
     }
 
     /// The field label at `offset`: its range, its record's fields and
-    /// where it is written.
+    /// where it is written, by the alias its record is or else by its
+    /// fields.
     #[allow(clippy::type_complexity)]
     fn field_at(
         &self,
         file: FileId,
         offset: u32,
-    ) -> Option<((u32, u32), Vec<(String, Type)>, Option<Declared>)> {
+    ) -> Option<((u32, u32), Vec<(String, Type)>, Vec<Declared>)> {
         let m = self.module(file)?;
         let (range, record) = tree::innermost(m.typing.fields.iter(), offset)?;
         let label = &self.text(file)[range.0 as usize..range.1 as usize];
         let mut fields = Vec::new();
         self.record_fields(file, record, &mut fields, 0);
-        let mut labels: Vec<&str> = fields.iter().map(|(l, _)| l.as_str()).collect();
-        labels.sort_unstable();
-        let declared = self.field_of(file, offset, record, label, &labels);
+        let declared = if let Ok((module, name)) = self.owner_at(m, range, record, label) {
+            self.declared_in(&module, &name, label).into_iter().collect()
+        } else {
+            let mut labels: Vec<&str> = fields.iter().map(|(l, _)| l.as_str()).collect();
+            labels.sort_unstable();
+            self.field_of(file, offset, record, label, &labels)
+        };
         Some((range, fields, declared))
+    }
+
+    /// The field `label` the alias `name` of `module` writes.
+    fn declared_in(&self, module: &str, name: &str, label: &str) -> Option<Declared> {
+        let source = self.source(module)?;
+        let decl = (source.tree.nodes()).find(|d| {
+            d.kind == K::TypeDecl && tree::name_of(d, K::Con, &source.text) == Some(name)
+        })?;
+        let record = alias_record(decl)?;
+        let field = declared_field(&source.tree, &source.text, name, label)?;
+        Some(written(module, &[decl, record, field], field, &source.text))
     }
 
     /// A field in a record type as written: `{ name : String }`.
@@ -156,14 +186,20 @@ impl Ide<'_> {
         record: &Type,
         label: &str,
         labels: &[&str],
-    ) -> Option<Declared> {
-        let m = self.module(file)?;
+    ) -> Vec<Declared> {
+        let Some(m) = self.module(file) else {
+            return Vec::new();
+        };
         if let (Type::Con { module, name }, _) = record.spine() {
-            let source = self.source(module)?;
+            let Some(source) = self.source(module) else {
+                return Vec::new();
+            };
             let decl = source.tree.nodes().find(|d| {
                 d.kind == K::TypeDecl && tree::name_of(d, K::Con, &source.text) == Some(name)
-            })?;
-            return find_field(module, decl, label, labels, &source.text);
+            });
+            return (decl.and_then(|decl| find_field(module, decl, label, labels, &source.text)))
+                .into_iter()
+                .collect();
         }
         // `div { class_name = … }`: the record of the function applied
         let path = tree::path_to(&m.tree, offset);
@@ -183,33 +219,34 @@ impl Ide<'_> {
             })
             && let Some(found) = find_field(&module, sig, label, labels, &source.text)
         {
-            return Some(found);
+            return vec![found];
         }
-        // shortcut: matches records by their labels, so two records with the
-        // same labels may be confused; record the origin in the checker if so
-        let mut modules = vec![m.name.clone()];
-        for r in m.typing.names.values() {
-            if let Ref::Value { module, .. } = r
-                && !modules.contains(module)
-            {
-                modules.push(module.clone());
+        // records with these labels: each is a candidate, none is evidence
+        let mut found = Vec::new();
+        for m in &self.analysis.modules {
+            let text = self.text(m.file);
+            for decl in m.tree.nodes() {
+                found.extend(find_field(&m.name, decl, label, labels, text));
             }
         }
-        let mut best: Option<Declared> = None;
-        for module in &modules {
+        let mut others: Vec<&String> = Vec::new();
+        for r in m.typing.names.values() {
+            if let Ref::Value { module, .. } = r
+                && self.analysis.module(module).is_none()
+                && !others.contains(&module)
+            {
+                others.push(module);
+            }
+        }
+        for module in others {
             let Some(source) = self.source(module) else {
                 continue;
             };
             for decl in source.tree.nodes() {
-                if let Some(found) = find_field(module, decl, label, labels, &source.text) {
-                    if found.doc.is_some() {
-                        return Some(found);
-                    }
-                    best.get_or_insert(found);
-                }
+                found.extend(find_field(module, decl, label, labels, &source.text));
             }
         }
-        best
+        found
     }
 }
 

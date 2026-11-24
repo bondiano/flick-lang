@@ -145,14 +145,17 @@ impl Server {
             "textDocument/typeDefinition" => ide
                 .type_definition(file, offset)
                 .map_or(Ok(Value::Null), |l| location(snapshot, &l)),
-            "textDocument/definition" => ide
-                .field_definition(file, offset)
-                .or_else(|| foreign::definition(snapshot, file, offset))
-                .or_else(|| {
-                    ide.symbol_at(file, offset)
-                        .and_then(|(symbol, _)| ide.definition(&symbol))
-                })
-                .map_or(Ok(Value::Null), |l| location(snapshot, &l)),
+            "textDocument/definition" => {
+                // a label of a record no alias is shown to be leads to each
+                // record type with its fields
+                let fields = ide.field_definitions(file, offset);
+                if fields.len() > 1 {
+                    let found: Result<Vec<Value>, _> =
+                        fields.iter().map(|l| location(snapshot, l)).collect();
+                    return found.map(Value::Array);
+                }
+                definition(snapshot, &ide, file, offset, fields.into_iter().next())
+            }
             "textDocument/prepareRename" => {
                 let (_, (s, e), _) = ide
                     .renamable(file, offset)
@@ -267,6 +270,24 @@ impl Server {
         tracing::debug!(items = items.len(), dotted, "completion ready");
         Ok(Value::Array(items))
     }
+}
+
+/// `textDocument/definition` of what is at `offset` when it is not several
+/// fields: `field`, a foreign declaration's meta or the symbol's declaration.
+fn definition(
+    snapshot: &Snapshot,
+    ide: &Ide,
+    file: FileId,
+    offset: u32,
+    field: Option<Location>,
+) -> Reply {
+    field
+        .or_else(|| foreign::definition(snapshot, file, offset))
+        .or_else(|| {
+            ide.symbol_at(file, offset)
+                .and_then(|(symbol, _)| ide.definition(&symbol))
+        })
+        .map_or(Ok(Value::Null), |l| location(snapshot, &l))
 }
 
 /// An LSP location of a declaration.
