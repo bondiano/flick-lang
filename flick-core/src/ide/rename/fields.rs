@@ -15,7 +15,7 @@ use crate::project::Analyzed;
 use crate::source::FileId;
 use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::{Elem, Type};
+use crate::types::{Elem, Ref, Type};
 
 impl Ide<'_> {
     /// The declaration of the field `label` of `module.record`, then each
@@ -174,6 +174,22 @@ impl Ide<'_> {
             ));
         }
         let text = self.text(m.file);
+        if let Some(at) = spelled(&m.tree, text, label) {
+            return Some(format!(
+                "the type at {} names it by its spelling",
+                self.place(m.file, at)
+            ));
+        }
+        // the row primitives relate fields by their labels, whatever records they take
+        let primitive = (m.typing.names.iter()).find(|(_, r)| {
+            matches!(r, Ref::Value { module, .. } | Ref::Method { module, .. } if module == "Record")
+        });
+        if let Some((at, _)) = primitive {
+            return Some(format!(
+                "`Record` at {} reads fields by their labels",
+                self.place(m.file, at.0)
+            ));
+        }
         let own_body = (m.name == owner.0)
             .then(|| {
                 m.tree.nodes().find(|d| {
@@ -319,6 +335,20 @@ fn pun(tree: Option<&Node>, start: u32) -> bool {
         path.last()
             .is_some_and(|n| n.kind == K::RecordPatField && n.nodes().next().is_none())
     })
+}
+
+/// The start of a label written as a type, `"name"` in `Record.Lacks "name" r`.
+fn spelled(root: &Node, text: &str, label: &str) -> Option<u32> {
+    if root.kind == K::NameType
+        && let Some(t) = root.child_tokens().find(|t| t.kind == K::String)
+        && t.text(text)
+            .strip_prefix('"')
+            .and_then(|t| t.strip_suffix('"'))
+            == Some(label)
+    {
+        return Some(t.start);
+    }
+    root.nodes().find_map(|n| spelled(n, text, label))
 }
 
 /// Whether a type declaration derives `Schema`.

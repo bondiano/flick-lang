@@ -95,20 +95,21 @@ impl Ide<'_> {
         file: FileId,
         offset: u32,
     ) -> Result<(Symbol, (u32, u32), bool), String> {
-        // a label whose record is not shown to be one alias names no field
-        if let Some(label) = self.label_at(file, offset)
-            && let Err(why) = label.owner
-        {
-            return Err(format!(
-                "cannot rename `{}`: {}; it may not be one declaration's field",
-                label.name,
-                why.reason()
-            ));
-        }
-        let (symbol, range) = self
+        let found = self
             .method_at(file, offset)?
-            .or_else(|| self.symbol_at(file, offset))
-            .ok_or("nothing to rename here")?;
+            .or_else(|| self.symbol_at(file, offset));
+        let Some((symbol, range)) = found else {
+            // a label whose record is not shown to be one alias names no field
+            let unproven =
+                (self.label_at(file, offset)).and_then(|l| Some((l.owner.err()?, l.name)));
+            return Err(match unproven {
+                Some((why, name)) => format!(
+                    "cannot rename `{name}`: {}; it may not be one declaration's field",
+                    why.reason()
+                ),
+                None => "nothing to rename here".into(),
+            });
+        };
         let capital = match &symbol {
             Symbol::Local { .. } => false,
             Symbol::Entity(e) => {

@@ -188,3 +188,26 @@ fn a_native_override_refuses() {
         ),
     );
 }
+
+/// The row primitives and a label written as a type name fields by their
+/// spelling, not by a record's alias.
+#[test]
+fn a_label_named_by_its_spelling_refuses() {
+    let main = format!("{MAIN}\nlacks : Record.Lacks \"name\" r => r -> Int\nlet lacks _ = 1\n");
+    refused(
+        &main,
+        &format!(
+            "the type at src/App/Main.fl:{} names it by its spelling",
+            line(&main, "lacks :")
+        ),
+    );
+    let main =
+        format!("{MAIN}\njust : User -> {{ name : String }}\nlet just u = Record.project u\n");
+    refused(
+        &main,
+        &format!(
+            "`Record` at src/App/Main.fl:{} reads fields by their labels",
+            line(&main, "Record.project")
+        ),
+    );
+}
