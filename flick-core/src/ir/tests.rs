@@ -71,7 +71,7 @@ pub(crate) fn check_text_with(
         return Err(diagnostics);
     }
     let mut lowered = super::lower(&module, &typing)?;
-    lowered.exports = super::exports(module_name, &interface);
+    lowered.exports = super::exports(&lowered, &interface);
     Ok((lowered, interface))
 }
 

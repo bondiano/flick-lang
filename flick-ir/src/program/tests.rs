@@ -487,6 +487,7 @@ fn the_exports_of_a_module_survive_both_forms_as_a_reader_is_told() {
     let value = |name: &str, sync| crate::Exported {
         name: name.to_owned(),
         sync,
+        projection: None,
     };
     p.modules[0].exports = crate::Exports {
         values: vec![value("parse", Some(2)), value("x", None)],
