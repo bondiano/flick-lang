@@ -1,0 +1,9 @@
+module Main exposing (hypot)
+
+import Float
+
+// show
+hypot : Float -> Float -> Float
+let hypot a b = Float.sqrt (a * a + b * b)
+  @native "Math.hypot" when js
+  @native "math.Hypot" when go

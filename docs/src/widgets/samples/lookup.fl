@@ -1,4 +1,4 @@
-module Lookup exposing (lookup)
+module Main exposing (lookup)
 
 import JsError exposing (JsError)
 

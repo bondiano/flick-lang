@@ -14,9 +14,9 @@ export const replaceSource = async (page: Page, source: string): Promise<void> =
   await page.keyboard.insertText(source);
 };
 
-/** Moves the pointer onto the first `word` in the editor's line that holds `line`. */
-export const hoverWord = async (page: Page, line: string, word: string): Promise<void> => {
-  const box = await page.locator(".cm-line", { hasText: line }).first().evaluate((element, word) => {
+/** The middle of the first `word` in the first line that holds `line`: of the editor, or of `lines`. */
+export const wordAt = (page: Page, line: string, word: string, lines = ".cm-line"): Promise<{ x: number; y: number }> =>
+  page.locator(lines, { hasText: line }).first().evaluate((element, word) => {
     const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
       const at = node.textContent?.indexOf(word) ?? -1;
@@ -29,5 +29,9 @@ export const hoverWord = async (page: Page, line: string, word: string): Promise
     }
     throw new Error(`no ${word} in the line`);
   }, word);
+
+/** Moves the pointer onto the first `word` in the editor's line that holds `line`, or in one of `lines`. */
+export const hoverWord = async (page: Page, line: string, word: string, lines?: string): Promise<void> => {
+  const box = await wordAt(page, line, word, lines);
   await page.mouse.move(box.x, box.y);
 };

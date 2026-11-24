@@ -1,0 +1,52 @@
+module Main exposing (digits, counted, eval, build_user)
+
+type InputError = MissingName | MissingEmail
+
+type alias RawInput = { name : Option String; email : Option String; host : Option String }
+
+type alias User = { name : String; email : String; host : String }
+
+// show
+digits : Int -> Int
+let digits n =
+  let mut left = n
+  let mut count = 1
+  while left >= 10 do {
+    left = left / 10
+    count = count + 1
+  }
+  count
+
+// show
+effect Ask =
+  ask : String ->{} Int
+
+total : Unit ->{Ask} Int
+let total () = Ask.ask "apples" + Ask.ask "pears"
+
+counted : Unit ->{} Int
+let counted () =
+  try total () with
+  | Ask.ask "apples" -> 3
+  | Ask.ask _ -> 4
+
+// show
+type Expr a =
+  | Num Int : Expr Int
+  | Less (Expr Int) (Expr Int) : Expr Bool
+  | If (Expr Bool) (Expr a) (Expr a) : Expr a
+
+eval : forall a. Expr a -> a
+let rec eval e =
+  match e with
+  | Num n -> n
+  | Less x y -> eval x < eval y
+  | If c t f -> if eval c then eval t else eval f
+
+// show
+build_user : RawInput -> Result InputError User
+let build_user raw =
+  let Some name = raw.name else Err MissingName
+  let Some email = raw.email else Err MissingEmail
+  let host = raw.host orelse "localhost"
+  Ok { name = name; email = email; host = host }

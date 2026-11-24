@@ -1,0 +1,30 @@
+---
+// The forms around the signature, each a part of the checked sample `language.fl`.
+import RouteBend from "../RouteBend.astro";
+import Sample from "./Sample.astro";
+import { inlineCode, texts } from "./copy.ts";
+
+interface Props { locale: string; style: string; from: number; to: number }
+const { locale, style, from, to } = Astro.props;
+const text = texts(locale);
+
+const tiles = [
+  { title: text("Local state, pure outside", "Локальное состояние, чистое снаружи"), body: text("`let mut`, `while`, `for` and labelled `break`. `digits` changes its own variables and is still `Int -> Int`.", "`let mut`, `while`, `for` и `break` с меткой. `digits` меняет свои переменные, но остаётся `Int -> Int`.") },
+  { title: text("Effects you handle yourself", "Свои эффекты"), body: text("An `effect` declares operations, and `try … with` decides what each one does. `Ask` stays in the row until it is handled.", "`effect` объявляет операции, а `try … with` решает, что делает каждая из них. `Ask` остаётся в строке эффектов, пока его не обработают.") },
+  { title: text("Types that know their shape", "Типы, которые знают свою форму"), body: text("Each constructor of a GADT says which type it builds, so `eval` gives an `Int` for `Num` and a `Bool` for `Less`, with no casts.", "Каждый конструктор GADT называет тип, который строит, поэтому `eval` возвращает `Int` для `Num` и `Bool` для `Less`, без приведения типов.") },
+  { title: text("No null", "Без null"), body: text("A missing value is an `Option`. `let … else` leaves the block when the pattern does not match, and `orelse` computes its fallback only on `None`.", "Отсутствующее значение — это `Option`. `let … else` завершает блок, если образец не совпал, а `orelse` вычисляет запасное значение только для `None`.") },
+];
+---
+<section class="stop" style={style} aria-labelledby="language-title">
+  <RouteBend from={from} to={to} />
+  <h2 id="language-title">{text("The rest is plain code", "Остальное — обычный код")} <span class="stop-new">{text("New in 0.2", "Новое в 0.2")}</span></h2>
+  <p class="stop-lead">{text("The signature is strict, so the body can be simple. Flick 0.2 adds the forms you reach for every day, and each of them still keeps to the signature.", "Сигнатура строгая, поэтому тело функции может быть простым. В Flick 0.2 появились привычные конструкции, и каждая из них по-прежнему соблюдает сигнатуру.")}</p>
+  <div class="tiles">
+    {tiles.map(({ title, body }, part) => <article>
+      <h3>{title}</h3>
+      <p set:html={inlineCode(body)} />
+      <Sample name="language" part={part} />
+    </article>)}
+  </div>
+  <p class="stop-text" set:html={inlineCode(text("Also new: `defer` and `errdefer`, `lazy { … }`, `result { … }`, holes in strings, `Int8` to `UInt64` and `Float32`, and `deriving Generic`.", "Ещё в 0.2: `defer` и `errdefer`, `lazy { … }`, `result { … }`, подстановки в строках, целые от `Int8` до `UInt64`, `Float32` и `deriving Generic`."))} />
+</section>

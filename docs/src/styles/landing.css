@@ -123,19 +123,6 @@
 .stop-link { display: inline-flex; align-items: center; gap: 0.5rem; justify-self: start; min-height: 44px; font-weight: 600; font-size: 1.05rem; color: var(--sl-color-text-accent); text-decoration: none; }
 .stop-link:hover { text-decoration: underline; }
 
-/* The last section: the line is laid up to today's station, and the track beyond it is planned,
-   dashed, with stations not built yet. */
-.stop-next { padding-bottom: 4rem; }
-.stop-next::before { display: none; }
-.next-built { position: relative; display: grid; gap: 1.25rem; }
-.next-built::before { content: ''; position: absolute; top: calc(var(--rail-top) - var(--pad-top)); bottom: calc(-1.25rem - 0.72rem); left: calc(var(--rail-x) - var(--pad-left) - var(--rail) / 2); width: var(--rail); background: var(--flick-line-violet); }
-.next-stops { display: grid; gap: 1.25rem; max-width: 38rem; margin: 0; padding: 0; list-style: none; }
-.next-stops li { position: relative; display: grid; gap: 0.3rem; }
-.next-stops li:not(:last-child)::before { content: ''; position: absolute; top: 0.72rem; bottom: calc(-1.25rem - 0.72rem); left: calc(var(--rail-x) - var(--pad-left) - var(--rail) / 2); width: var(--rail); background: repeating-linear-gradient(to bottom, var(--flick-line-violet) 0 0.5rem, transparent 0.5rem 0.9rem); }
-.next-stops li::after { content: ''; position: absolute; top: 0.72rem; left: calc(var(--rail-x) - var(--pad-left)); translate: -50% -50%; width: 1.15rem; height: 1.15rem; border: 4px solid var(--flick-line-violet); border-radius: 50%; background: var(--sl-color-bg); }
-.next-stops h3 { margin: 0; font-size: 1.2rem; }
-.next-stops p { font-size: 1.0625rem; line-height: 1.5; }
-.stop-next .hero-actions { margin-top: 1.25rem; }
 
 /* Code on the page: one line in focus, the rest quiet. */
 .code-panel { min-width: 0; border: 1px solid var(--sl-color-hairline); background: var(--flick-editor-bg); }

@@ -368,16 +368,6 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
   font-family: var(--sl-font);
   white-space: normal;
 }
-.fp-hover :is(p, pre, ul, ol, blockquote, h1, h2, h3, h4, h5, h6) { margin: 0; }
-.fp-hover > * + * { margin-top: 0.625rem; }
-.fp-hover :is(pre, code) { font-family: var(--__sl-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: inherit; }
-.fp-hover pre { padding: 0; background: transparent; color: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
-.fp-hover :not(pre) > code { padding: 0.08em 0.25em; background: var(--fp-surface); }
-.fp-hover :is(ul, ol) { padding-left: 1.25rem; }
-.fp-hover li + li { margin-top: 0.25rem; }
-.fp-hover blockquote { padding-left: 0.75rem; border-left: 1px solid var(--fp-rule); color: var(--sl-color-gray-2); }
-.fp-hover :is(h1, h2, h3, h4, h5, h6) { font-size: 1em; font-weight: 600; }
-.fp-hover a { color: var(--sl-color-text-accent); text-decoration: underline; text-underline-offset: 0.15em; }
 .fp-cm .cm-diagnostic + .cm-diagnostic { border-top: 1px solid var(--fp-rule); }
 .fp-cm .cm-diagnosticSource { margin-top: 0.375rem; color: var(--sl-color-gray-3); font-size: 0.75rem; opacity: 1; }
 .fp-cm .cm-diagnostic-error .cm-diagnosticSource { color: var(--flick-error); }
@@ -404,12 +394,6 @@ main:has(#flick-playground):not(:has(.tour-lesson)) .sl-container { max-width: n
 .fp-cm .cm-completionDetail { margin-left: 1rem; color: var(--sl-color-gray-3); font-style: normal; }
 .fp-cm .cm-completionIcon { display: none; }
 
-.fp .fp-token-comment { color: var(--sl-color-gray-3); }
-.fp .fp-token-keyword { color: var(--sl-color-accent-high); }
-.fp .fp-token-string { color: var(--flick-success); }
-.fp .fp-token-invalid { color: var(--flick-error); }
-.fp .fp-token-needs { color: var(--flick-line-cobalt); }
-.fp .fp-token-fails { color: var(--flick-line-coral-ink); }
 
 .fp-generated-code {
   flex: 1 1 auto;

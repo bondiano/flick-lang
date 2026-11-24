@@ -1,0 +1,53 @@
+---
+// Backends are components too, and each brings the hosts it runs on.
+import RouteBend from "../RouteBend.astro";
+import Icon from "../Icon.astro";
+import Sample from "./Sample.astro";
+import { highlight } from "../highlight.ts";
+import { inlineCode, texts } from "./copy.ts";
+
+interface Props { locale: string; prefix: string; style: string; from: number; to: number }
+const { locale, prefix, style, from, to } = Astro.props;
+const text = texts(locale);
+
+const manifest = text(
+  "[build]\ntarget = \"go\"              # or --target js\nenvironment = \"go/native\"  # or js/node, js/bun, …\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[target.go]\ncgo = true                 # declared by flick/go",
+  "[build]\ntarget = \"go\"              # или --target js\nenvironment = \"go/native\"  # или js/node, js/bun, …\n\n[tools]\n\"flick/go\" = [\"go\"]\n\n[target.go]\ncgo = true                 # опция flick/go",
+);
+---
+<section class="stop" style={style} aria-labelledby="targets-title">
+  <RouteBend from={from} to={to} />
+  <h2 id="targets-title">{text("Backends and hosts are plugins too", "Бэкенды и хосты — тоже плагины")} <span class="stop-new">{text("New in 0.2", "Новое в 0.2")}</span></h2>
+  <div class="split">
+    <div class="split-text">
+      <p class="stop-lead" set:html={inlineCode(text("`flick/js` and `flick/go` are WebAssembly components as well. `--target` picks one, and `flick.lock` pins it by hash. A backend reads the checked program and the inputs its request lists, nothing else: no files of its own, no clock, no network.", "`flick/js` и `flick/go` — тоже компоненты WebAssembly. `--target` выбирает бэкенд, а `flick.lock` закрепляет его по хешу. Бэкенд читает проверенную программу и входные данные из своего запроса, и больше ничего: ни своих файлов, ни часов, ни сети."))} />
+      <p class="stop-text" set:html={inlineCode(text("Each backend declares its own options, templates and commands: `flick build --target go --help` lists them, and `[target.go]` keeps them in `flick.toml`. Another backend plugs in the same way, pinned with `[build.backend]`.", "Каждый бэкенд сам объявляет свои опции, шаблоны и команды: `flick build --target go --help` их покажет, а `[target.go]` сохранит в `flick.toml`. Сторонний бэкенд подключается так же и закрепляется через `[build.backend]`."))} />
+    </div>
+    <svg class="seam-map" viewBox="0 0 460 170" role="img" aria-label={text("The checked program goes to the flick/js backend, for Node, the browser, Bun and Cloudflare, or to the flick/go backend, for native programs", "Проверенная программа идёт в бэкенд flick/js — для Node, браузера, Bun и Cloudflare — или в бэкенд flick/go — для нативных программ")}>
+      <path d="M28 85H94Q110 85 121.3 73.7L154.7 40.3Q166 29 182 29H300" />
+      <path d="M94 85Q110 85 121.3 96.3L154.7 129.7Q166 141 182 141H300" />
+      <circle class="map-station" cx="28" cy="85" r="20" />
+      <circle class="map-station" cx="300" cy="29" r="17" />
+      <circle class="map-station" cx="300" cy="141" r="17" />
+      <text x="8" y="130">IR</text>
+      <text x="328" y="27">flick/js</text>
+      <text class="map-prose" x="328" y="47">{text("Node, browser,", "Node, браузер,")}</text>
+      <text class="map-prose" x="328" y="65">Bun, Cloudflare</text>
+      <text x="328" y="139">flick/go</text>
+      <text class="map-prose" x="328" y="159">{text("native programs", "нативный код")}</text>
+    </svg>
+  </div>
+  <h3>{text("Where it runs", "Где работает программа")}</h3>
+  <div class="split">
+    <div class="split-text">
+      <p class="stop-text" set:html={inlineCode(text("On JavaScript, effects run on Flick's own small runtime; the Effect adapter is an option, `runtime = \"effect\"`. What a host gives, the console, the clock, randomness, the environment, the arguments and child processes, is a `Host` service that the signature names, and a test swaps it like any other.", "В JavaScript эффекты работают на собственном небольшом рантайме Flick, а адаптер Effect подключается опцией `runtime = \"effect\"`. То, что даёт хост, — консоль, часы, случайные числа, окружение, аргументы и дочерние процессы — это сервисы `Host`, которые называет сигнатура, и тест подменяет их, как любые другие."))} />
+      <Sample name="native" />
+      <p class="stop-text" set:html={inlineCode(text("`@native` gives a function a host's own implementation on one target, over a Flick body that every other target uses. `@when \"js && !browser\"` keeps a whole module to the hosts it can run on.", "`@native` даёт функции собственную реализацию хоста для одной цели поверх тела на Flick, которое используют остальные цели. `@when \"js && !browser\"` ограничивает целый модуль хостами, где он может работать."))} />
+    </div>
+    <div class="code-panel" set:html={highlight(manifest, "toml")} />
+  </div>
+  <div class="stop-links">
+    <a class="stop-link" href={`${prefix}/reference/cli/`}>{text("Targets and backend options", "Цели и опции бэкендов")} <Icon name="arrow" size={18} /></a>
+    <a class="stop-link" href={`${prefix}/reference/project/`}>{text("Hosts, environments and conditions", "Хосты, окружения и условия")} <Icon name="arrow" size={18} /></a>
+  </div>
+</section>
