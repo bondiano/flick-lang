@@ -118,6 +118,47 @@ func (r viewTagged) Keys() []string { return []string{"_tag"} }
 func (r viewTagged) Len() int       { return 1 }
 func (r viewTagged) At(int) Value   { return r.f0 }
 
+// viewFunc holds a closure (`Fn`, uncomparable in Go) to verify Same/identical never panic.
+type viewFunc struct {
+	f0 Value
+	f1 int32
+}
+
+var viewFuncKeys = []string{"cb", "id"}
+
+func (r viewFunc) Get(k string) Value {
+	switch k {
+	case "cb":
+		return r.f0
+	case "id":
+		return r.f1
+	}
+	return nil
+}
+
+func (r viewFunc) Lookup(k string) (Value, bool) {
+	switch k {
+	case "cb":
+		return r.f0, true
+	case "id":
+		return r.f1, true
+	}
+	return nil, false
+}
+
+func (r viewFunc) Keys() []string { return viewFuncKeys }
+func (r viewFunc) Len() int       { return 2 }
+
+func (r viewFunc) At(i int) Value {
+	switch i {
+	case 0:
+		return r.f0
+	case 1:
+		return r.f1
+	}
+	return nil
+}
+
 func TestRecordViewFieldEqualityHashAndStructural(t *testing.T) {
 	p := viewPoint{f0: 1.5, f1: 2.5}
 	pSame := viewPoint{f0: 1.5, f1: 2.5}
@@ -268,5 +309,51 @@ func TestRecordViewMutationsRecordOpsSchemaCodecAndInert(t *testing.T) {
 	e := &env{key: "test.svc", v: svc}
 	if got := e.operation("test.svc", "_tag"); got != "svc" {
 		t.Errorf("env.operation on RecordView = %v, want svc", got)
+	}
+}
+
+func TestRecordViewSameAndIdenticalDoNotPanicOnUncomparableFields(t *testing.T) {
+	r1 := Rec("items", []Value{int32(1)}, "tag", "a")
+	r2 := Rec("items", []Value{int32(1)}, "tag", "a")
+	u1 := viewUncomparable{f0: []Value{int32(1), int32(2)}, f1: "a"}
+	u2 := viewUncomparable{f0: []Value{int32(1), int32(2)}, f1: "a"}
+	fn := Fn(func(_ *Fiber, v Value) Value { return v })
+	f1 := viewFunc{f0: fn, f1: 7}
+	f2 := viewFunc{f0: fn, f1: 7}
+	p1 := viewPoint{f0: 1.5, f1: 2.5}
+	p2 := viewPoint{f0: 1.5, f1: 2.5}
+
+	// `*Record` keeps pointer identity in both Same and identical.
+	if !Same(r1, r1) || Same(r1, r2) {
+		t.Errorf("Same on *Record broke pointer identity")
+	}
+	if !identical(r1, r1) || identical(r1, r2) {
+		t.Errorf("identical on *Record broke pointer identity")
+	}
+
+	// Value-type RecordView structs (including slice-bearing and Fn-bearing ones)
+	// must never panic in Same, identical, or non-grouped resolver key lookup.
+	res := &resolver{}
+	for _, pair := range [][2]Value{
+		{u1, u1},
+		{u1, u2},
+		{u1, r1},
+		{r1, u1},
+		{f1, f1},
+		{f1, f2},
+		{f1, r1},
+		{p1, p2},
+		{int32(1), u1},
+		{u1, int32(1)},
+	} {
+		if Same(pair[0], pair[1]) {
+			t.Errorf("Same(%T, %T) = true, want false", pair[0], pair[1])
+		}
+		if identical(pair[0], pair[1]) {
+			t.Errorf("identical(%T, %T) = true, want false", pair[0], pair[1])
+		}
+		if res.sameKey(pair[0], pair[1]) {
+			t.Errorf("resolver.sameKey(%T, %T) = true, want false", pair[0], pair[1])
+		}
 	}
 }

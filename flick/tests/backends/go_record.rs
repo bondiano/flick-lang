@@ -231,6 +231,17 @@ let read_uid_rec r = r.id
 read_field : Record.Field "x" Int -> Int
 let read_field r = r.x
 
+make_flag : Bool -> { x : Bool }
+let make_flag flag =
+  let b = flag
+  { x = b }
+
+cond_block : Bool -> Int
+let cond_block flag =
+  let a = if (do { let b = flag; { x = b } }).x then 10 else 20
+  let c = if not (make_flag flag).x then 1 else 2
+  a + c
+
 main : Unit ->{Host.Console} Unit
 let main () =
   let lit : Point = { x = 1.5; y = 2.5 }
@@ -280,7 +291,7 @@ let main () =
     "order:" ++ lit_log ++ ":" ++ show lit_p ++ "|" ++ upd_log ++ ":" ++ show upd_p,
     "ctor:" ++ read_box b1 ++ "|" ++ read_box b2 ++ "|" ++ read_wrap w1,
     "ffi:" ++ go_read_view lit ++ "|" ++ show (go_roundtrip lit == lit),
-    "misc:" ++ show opt_x ++ "|" ++ show (read_uid_rec uid_r) ++ "|" ++ show (read_field fld) ++ "|" ++ show empty,
+    "misc:" ++ show opt_x ++ "|" ++ show (read_uid_rec uid_r) ++ "|" ++ show (read_field fld) ++ "|" ++ show empty ++ "|" ++ show (cond_block true) ++ "|" ++ show (cond_block false),
   ]
   Platform.stdout_line (String.join "\n" lines)
 "##;
@@ -375,7 +386,7 @@ fn closed_record_open_row_codecs_eval_order_ctors_and_ffi_run_cleanly() {
             "order:yx:{ x = 1.5, y = 2.5 }|byx:{ x = 8, y = 9 }\n",
             "ctor:r:12|r:16|hi#2\n",
             "ffi:len=2,keys=[x y],x=1.5,y=2.5|true\n",
-            "misc:1.5|99|77|{  }\n",
+            "misc:1.5|99|77|{  }|12|21\n",
         );
         assert_eq!(
             String::from_utf8_lossy(&run.stdout),

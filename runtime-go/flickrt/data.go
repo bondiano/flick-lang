@@ -161,9 +161,19 @@ func sameConstructedValues(x Constructed, b Value, strictZero bool) bool {
 
 // Same is `===` on values whose identity is their equality.
 func Same(a, b Value) bool {
-	if x, ok := a.(*big.Int); ok {
+	switch x := a.(type) {
+	case *big.Int:
 		y, ok := b.(*big.Int)
 		return ok && x.Cmp(y) == 0
+	case *Record:
+		y, ok := b.(*Record)
+		return ok && x == y
+	case RecordView:
+		// Value-type closed record structs have no reference identity and may
+		// hold uncomparable fields (`[]Value`, `Fn`, ...), so raw `a == b` panics.
+		return false
+	case []Value, Fn, Fn2, Fn3, Poly:
+		return false
 	}
 	return a == b
 }

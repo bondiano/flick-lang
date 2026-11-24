@@ -237,3 +237,80 @@ let main () =
     assert!(!code.contains("flickrt.Shaped("), "{code}");
     assert!(!code.contains("flickrt.Field("), "{code}");
 }
+
+#[test]
+fn block_yielding_record_literal_in_condition_is_parenthesized() {
+    let source = r"module App exposing (main)
+
+make_box : Bool -> { x : Bool }
+let make_box a =
+  let b = a
+  { x = b }
+
+cond_do : Bool -> Int
+let cond_do flag =
+  if (do { let a = flag; { x = a } }).x then 1 else 2
+
+neg_do : Bool -> Int
+let neg_do flag =
+  if not (do { let a = flag; { x = a } }).x then 3 else 4
+
+cond_inlined : Bool -> Int
+let cond_inlined flag =
+  if (make_box flag).x then 5 else 6
+
+guard_do : Int -> Int
+let guard_do n =
+  match n with
+  | k when (do { let a = k > 0; { x = a } }).x -> k
+  | _ -> 0
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (show (cond_do true, neg_do false, cond_inlined true, guard_do 5))
+";
+    // Check debug output (`do` blocks lower directly to `ExprKind::Block(..., Record)`).
+    let debug = build(source);
+    assert!(debug.diagnostics.is_empty(), "{:?}", debug.diagnostics);
+    let debug_go = file(&debug.files, "m_App.go");
+    assert!(
+        debug_go.contains("if (R_x_"),
+        "expected parenthesized composite literal in `if` condition:\n{debug_go}"
+    );
+    assert!(
+        debug_go.contains("if !(R_x_"),
+        "expected parenthesized composite literal in negated `if` condition:\n{debug_go}"
+    );
+    assert!(
+        !debug_go.contains("if R_x_") && !debug_go.contains("if !R_x_"),
+        "bare composite literal in Go `if` header is a parse error:\n{debug_go}"
+    );
+
+    // Check release-optimized IR (where `make_box` inlines into `Block(..., Record)`).
+    let mut app = lower_text("App", source).expect("lowers");
+    let exported = |name: &str| name == "main";
+    opt::optimize(&mut app, &exported, &|_, _| None, &|_, _| None);
+    let builtins: Vec<&Module> = builtin_modules().iter().collect();
+    let items = lang_items();
+    let lang = Known::of(&items);
+    let foreign = BTreeMap::new();
+    let release = go(&Input {
+        own: &[&app],
+        builtins: &builtins,
+        entry: "App",
+        test: false,
+        suites: &[],
+        lang: &lang,
+        bindings: bindings(),
+        foreign: &foreign,
+        paths: &BTreeMap::new(),
+        lines: &[],
+        sources: &[],
+    });
+    assert!(release.diagnostics.is_empty(), "{:?}", release.diagnostics);
+    let release_go = file(&release.files, "m_App.go");
+    assert!(
+        !release_go.contains("if R_x_") && !release_go.contains("if !R_x_"),
+        "bare composite literal in release Go `if` header is a parse error:\n{release_go}"
+    );
+}

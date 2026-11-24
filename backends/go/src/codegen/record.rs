@@ -448,8 +448,10 @@ impl<'a> Gen<'a> {
             && let Some(place) = shape.index_of(label)
         {
             self.register_shape(shape);
-            // Parenthesize composite literals so `if ({ x = true }).x {` stays valid Go.
-            let recv = if matches!(record.kind, ExprKind::Record(_)) {
+            // Parenthesize composite literals (including through blocks and empty
+            // updates) so `if (let a = true; { x = a }).x` emits valid Go
+            // `if (R_x_...{f0: l_a}).f0 {`.
+            let recv = if yields_composite_literal(record) {
                 docvec![a, "(", r.code.doc, ")"]
             } else {
                 r.code.doc
@@ -469,5 +471,16 @@ impl<'a> Gen<'a> {
             call(a, "flickrt.Field", [v.doc, self.string(label)]).into()
         };
         Typed { code, ty: None }
+    }
+}
+
+/// Whether `e` can evaluate directly to a Go composite literal `R_...{...}`
+/// without being spilled into a temporary variable.
+fn yields_composite_literal(e: &Expr) -> bool {
+    match &e.kind {
+        ExprKind::Record(_) => true,
+        ExprKind::Block(_, result) => yields_composite_literal(result),
+        ExprKind::Update(base, fields) if fields.is_empty() => yields_composite_literal(base),
+        _ => false,
     }
 }
