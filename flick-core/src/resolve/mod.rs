@@ -17,6 +17,7 @@ pub use syntax::{
 };
 #[cfg(feature = "ide")]
 pub(crate) use unused::item_removal;
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) use unused::unused_proof_premises;
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) use uses::Reference as SyntaxReference;

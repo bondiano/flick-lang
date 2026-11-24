@@ -1,6 +1,8 @@
 //! Imports nothing uses, and local names nothing refers to.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
+#[cfg(not(target_arch = "wasm32"))]
+use std::collections::HashSet;
 
 use flick_backend_support::suites::companion_of;
 
@@ -61,6 +63,7 @@ pub(super) fn unused_locals(unused: Vec<Unused>) -> impl Iterator<Item = Diagnos
 }
 
 /// Premise binders unused in the proof, its goal and later premises.
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) fn unused_proof_premises(
     module: &Module,
     proof: &Node,
