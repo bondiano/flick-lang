@@ -108,6 +108,28 @@ fn the_builtin_map_of_a_projection_reads_each_element_in_a_loop() {
     insta::assert_snapshot!(js);
 }
 
+/// Over no element a strict `for` reads nothing: it is the empty list, of
+/// the element type a loop over `[]` would lose in TypeScript.
+#[test]
+fn a_projection_mapped_over_an_empty_list_is_the_empty_list() {
+    let js = app(
+        "mapped, written",
+        "mapped : List String
+let mapped =
+  let nobody : List User = []
+  List.map .address.city nobody
+
+\
+         written : List String
+let written =
+  let nobody : List User = []
+  [for u <- nobody yield u.name]
+",
+    );
+    assert!(js.contains("export const mapped = [];"), "{js}");
+    assert!(js.contains("export const written = [];"), "{js}");
+}
+
 /// A function that is not the built-in `List.map`, whatever its name, and
 /// a function that is no projection stay calls.
 #[test]
