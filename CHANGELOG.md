@@ -6,6 +6,16 @@ break programs.
 
 ## Unreleased
 
+- **Field accessors.** `.name` is the function `fun r -> r.name`, and
+  `.address.city` reads a path of fields: `List.map .address.city users`,
+  `user |> .name`, `.name user`, or bound to a name. Its type is that of the
+  explicit function, `{ name : a | r } -> a`; a local one is generic, a
+  top-level one needs a signature. `f .name` applies `f` to an accessor;
+  `user .name` is `FLICK-T003` with a fix that glues it into `user.name`, and
+  `.email?` explains that `?` applies to the accessor. In release builds an
+  accessor applied at once reads the fields directly, and `List.map` of one
+  traverses the list without a call per element.
+
 - **A function applied where it is written takes its argument's type.**
   In `(fun h -> h ()) say` and `say |> fun h -> h ()` the parameter `h`
   has the type of `say`, as in `let h = say`: an effectful callback fits,
