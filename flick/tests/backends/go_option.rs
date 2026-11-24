@@ -308,6 +308,27 @@ let describe_node o =
   | Some (Wrap None) -> "wrap(none)"
   | Some (Wrap (Some _)) -> "wrap(some)"
 
+read_field : Option (Record.Field "x" Int) -> Int
+let read_field o =
+  match o with
+  | Some r -> r.x
+  | None -> 0
+
+read_rec : Option { x : Int } -> Int
+let read_rec o =
+  match o with
+  | Some r -> r.x
+  | None -> 0
+
+make_field : Int -> Option (Record.Field "x" Int)
+let make_field n = Some { x = n }
+
+read_field_poly : Record.HasField l (Record.Field l a) a => Record.Label l -> Option (Record.Field l a) -> a -> a
+let read_field_poly lbl o fallback =
+  match o with
+  | Some r -> Record.get lbl r
+  | None -> fallback
+
 main : Unit ->{Host.Console} Unit
 let main () =
   let s : Option String = Some "alice"
@@ -316,11 +337,16 @@ let main () =
   let mi : Option (Option Int) = Some (Some 42)
   let st : Option Stream = Some (Some (2.5, None))
   let nil_u : Option Unknown = Some (nil_unknown ())
+  let rec_opt : Option { x : Int } = Some { x = 10 }
+  let fld_opt : Option (Record.Field "x" Int) = Some { x = 20 }
+  let from_fn : Option { x : Int } = make_field 30
+  let lbl = (Record.label : Record.Label "x")
   let lines = [
     "uid:" ++ read_uid s ++ "|" ++ read_str uid,
     "id:" ++ show (read_id oi) ++ "|maybe:" ++ show (read_maybe mi) ++ "|stream:" ++ show (read_stream st),
     "unk_nil:" ++ read_unknown nil_u ++ "|" ++ read_unknown None,
     "nested_or:" ++ describe_node (nested_or None) ++ "|" ++ describe_node (nested_or (Some (Wrap None))) ++ "|" ++ describe_node (nested_or (Some (Wrap (Some (Wrap None))))),
+    "field:" ++ show (read_field rec_opt) ++ "|" ++ show (read_rec fld_opt) ++ "|" ++ show (read_rec from_fn) ++ "|" ++ show (read_field_poly lbl rec_opt 0) ++ "|" ++ show (read_field_poly lbl fld_opt 0) ++ "|" ++ show (read_field None),
   ]
   Platform.stdout_line (String.join "\n" lines)
 "#;
@@ -353,6 +379,7 @@ fn opaque_alias_nil_unknown_and_nested_or_run_cleanly_on_go() {
         "id:11|maybe:42|stream:2.5\n",
         "unk_nil:some|none\n",
         "nested_or:none|none|wrap(none)\n",
+        "field:10|20|30|10|20|0\n",
     );
     assert_eq!(String::from_utf8_lossy(&run.stdout), expected);
 }

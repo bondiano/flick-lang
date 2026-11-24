@@ -3,7 +3,7 @@
 use flick_backend_support::Known;
 use flick_ir::{Constraint, IrType, Lang, LangItem, Namespace, TypeDecl, TypeRef};
 
-use super::go_type::{OptRepr, TypeDecls};
+use super::go_type::{OptPayload, OptRepr, TypeDecls};
 
 fn lang_type(role: Lang, name: &str) -> LangItem {
     LangItem {
@@ -107,4 +107,63 @@ fn unconstrained_forall_errors_service_impl_and_opaque_alias_stay_erased() {
     ] {
         assert_eq!(OptRepr::of(&lang, &decls, Some(&opt_of(erased))), None);
     }
+}
+
+#[test]
+fn record_field_option_matches_record_ref_sentinel() {
+    let items = [
+        lang_type(Lang::Option, "Option"),
+        lang_type(Lang::Int, "Int"),
+        LangItem {
+            lang: Lang::Field.name().into(),
+            module: "Record".into(),
+            namespace: Namespace::Type,
+            name: "Field".into(),
+        },
+    ];
+    let lang = Known::of(&items);
+    let decls = TypeDecls::new();
+
+    let int_ty = IrType::Named {
+        module: "Prelude".into(),
+        name: "Int".into(),
+        args: vec![],
+    };
+    let rec_ty = IrType::Record {
+        fields: vec![("x".into(), TypeRef::new(int_ty.clone()))],
+        tail: None,
+    };
+    let field_int = IrType::Named {
+        module: "Record".into(),
+        name: "Field".into(),
+        args: vec![TypeRef::new(int_ty)],
+    };
+    let field_poly = IrType::Named {
+        module: "Record".into(),
+        name: "Field".into(),
+        args: vec![TypeRef::new(IrType::Var("a".into()))],
+    };
+
+    assert_eq!(
+        OptRepr::of(&lang, &decls, Some(&opt_of(rec_ty.clone()))),
+        Some(OptRepr::RefSentinel)
+    );
+    assert_eq!(
+        OptRepr::of(&lang, &decls, Some(&opt_of(field_int.clone()))),
+        Some(OptRepr::RefSentinel)
+    );
+    assert_eq!(
+        OptRepr::of(&lang, &decls, Some(&opt_of(field_poly.clone()))),
+        Some(OptRepr::RefSentinel)
+    );
+    assert_eq!(
+        OptRepr::of(&lang, &decls, Some(&opt_of(opt_of(field_poly)))),
+        Some(OptRepr::Flag(OptPayload::Nested(Box::new(
+            OptRepr::RefSentinel
+        ))))
+    );
+    assert_eq!(
+        OptRepr::of(&lang, &decls, Some(&opt_of(opt_of(field_int)))),
+        OptRepr::of(&lang, &decls, Some(&opt_of(opt_of(rec_ty))))
+    );
 }

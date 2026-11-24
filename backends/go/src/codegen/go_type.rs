@@ -120,6 +120,9 @@ const NON_NIL_LANG: &[Lang] = &[
     Lang::List,
     Lang::Seq,
     Lang::Ref,
+    // `Record.Field l a` projects to `{ l : a }` (`IrType::Record`) during
+    // unification and is always a non-nil `*flickrt.Record` at runtime.
+    Lang::Field,
     Lang::Schema,
     Lang::Url,
     Lang::PureCodec,

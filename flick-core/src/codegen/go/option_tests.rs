@@ -561,3 +561,63 @@ let main () =
         "{matched}"
     );
 }
+
+#[test]
+fn record_field_option_unifies_with_record_option_as_opt_ref() {
+    let out = build(
+        r#"module App exposing (main)
+
+read_field : Option (Record.Field "x" Int) -> Int
+let read_field o =
+  match o with
+  | Some r -> r.x
+  | None -> 0
+
+read_rec : Option { x : Int } -> Int
+let read_rec o =
+  match o with
+  | Some r -> r.x
+  | None -> 0
+
+make_field : Int -> Option (Record.Field "x" Int)
+let make_field n = Some { x = n }
+
+read_field_poly : Record.HasField l (Record.Field l a) a => Record.Label l -> Option (Record.Field l a) -> a -> a
+let read_field_poly lbl o fallback =
+  match o with
+  | Some r -> Record.get lbl r
+  | None -> fallback
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let r : Option { x : Int } = Some { x = 10 }
+  let f : Option (Record.Field "x" Int) = Some { x = 20 }
+  let from_fn : Option { x : Int } = make_field 30
+  let a = read_field r
+  let b = read_rec f
+  let c = read_rec from_fn
+  let d = read_field_poly (Record.label : Record.Label "x") r 0
+  let e = read_field_poly (Record.label : Record.Label "x") f 0
+  Platform.stdout_line (show (a, b, c, d, e))
+"#,
+    );
+    assert!(out.diagnostics.is_empty(), "{:?}", out.diagnostics);
+    let go = file(&out.files, "m_App.go");
+
+    assert!(
+        go.contains("func F_App__read_field(fb *flickrt.Fiber, l_o flickrt.OptRef) int32"),
+        "{go}"
+    );
+    assert!(
+        go.contains("func F_App__read_rec(fb *flickrt.Fiber, l_o flickrt.OptRef) int32"),
+        "{go}"
+    );
+    assert!(
+        go.contains("func F_App__make_field(fb *flickrt.Fiber, l_n int32) flickrt.OptRef"),
+        "{go}"
+    );
+    assert!(
+        go.contains("func F_App__read_field_poly(") && go.contains("l_o flickrt.OptRef"),
+        "{go}"
+    );
+}
