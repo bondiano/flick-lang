@@ -21,7 +21,9 @@ pub use flick_ir::{
     Module, OpArm, Param, Pat, Rep, ResultAdapter, Shape, Stage, Stmt, TypeDecl, TypeInterner,
     TypeName, TypeRef, memory, operation_arity,
 };
-pub use lower::contracts::{LoweredContract, ProvenContract, check_contracts, lower_contracts};
+#[cfg(feature = "contracts")]
+pub use lower::contracts::{LoweredContract, lower_contracts};
+pub use lower::contracts::{ProvenContract, check_contracts};
 pub use lower::lower;
 #[cfg(not(target_arch = "wasm32"))]
 pub use lower::lower_with_local_schemes;

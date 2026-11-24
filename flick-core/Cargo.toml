@@ -12,12 +12,15 @@ publish.workspace = true
 workspace = true
 
 [features]
-default = ["ide", "native-project"]
+default = ["contracts", "ide", "native-project"]
 # editor queries, projections and the metadata they keep
 ide = []
 # projects on disk: manifests, installed packages, published artifacts,
 # source maps and the docs of the built-in sources
 native-project = ["dep:flick-backend-go", "dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-support/native-project", "flick-ffi/native-project"]
+# verification of function contracts in `PureTotalV2`, which `flick prove`
+# is the only caller of; off in browser builds
+contracts = []
 # std in the binary, for a host with no packages: the playground
 embedded-std = []
 # first-party contributed commands (`std`'s `schema export`); off in browser builds

@@ -5,6 +5,7 @@
 
 mod cert;
 mod check;
+#[cfg(feature = "contracts")]
 pub mod contract;
 mod defs;
 mod eval;

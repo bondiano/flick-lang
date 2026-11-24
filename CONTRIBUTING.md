@@ -72,6 +72,7 @@ capabilities with `--no-default-features --features <names>`.
 | - | - |
 | `ide` | Editor queries, projections and retained editor metadata. |
 | `native-project` | Project discovery, TOML/FFI-policy parsing, installed packages, disk-cache contracts and pnpm adapters; published `.iface`, `package.json` and publication fingerprints; source maps; documentation comments in the built-in sources. Activates `toml`, `semver` and `sha2`. |
+| `contracts` | Verification of function contracts in `PureTotalV2`: `flick prove` and `project::prove`. Type checking of `require`/`ensure` stays without it. |
 | `embedded-std` | The implicit source packages inside the binary, for a host without packages. |
 
 Shared in-memory project/configuration types, `Host`-backed source loading,

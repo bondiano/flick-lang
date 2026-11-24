@@ -12,6 +12,7 @@ pub(crate) fn check_file(
 }
 
 /// [`check_file`], also proving any function contracts in `PureTotalV2`.
+#[cfg(feature = "contracts")]
 pub(crate) fn prove_file(
     sources: &SourceMap,
     file: FileId,

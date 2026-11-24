@@ -32,9 +32,11 @@ mod target;
 mod unknown;
 
 pub use checking::ModuleCache;
+pub(crate) use checking::check_file;
+#[cfg(feature = "contracts")]
+pub(crate) use checking::prove_file;
 #[cfg(feature = "native-project")]
 pub use checking::{ModuleStore, SavedModule};
-pub(crate) use checking::{check_file, prove_file};
 pub use entry::{MainKind, host_services, main_kind};
 pub use format_plugins::FormatPlugins;
 #[cfg(feature = "ide")]

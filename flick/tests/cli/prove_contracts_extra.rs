@@ -383,14 +383,14 @@ let tests =
     for (file, contents) in [
         ("flick.toml", LIB),
         ("src/App/Inventory.fl", CONSUME_BAD),
-        ("tests/Test/Inventory.fl", suite),
+        ("test/Test/Inventory.fl", suite),
     ] {
         let path = dir.join(file);
         fs::create_dir_all(path.parent().expect("parent")).expect("dir");
         fs::write(path, contents).expect("write");
     }
 
-    let tested = flick_in(&dir, &["test", "--rt"]);
+    let tested = flick_in(&dir, &["test", "--runtime", "rt", "--reporter", "json"]);
     assert_eq!(
         tested.status.code(),
         Some(0),
@@ -398,4 +398,11 @@ let tests =
         String::from_utf8_lossy(&tested.stdout),
         String::from_utf8_lossy(&tested.stderr)
     );
+    let report: Value = serde_json::from_slice(&tested.stdout).expect("test report");
+    let tests = report["tests"].as_array().expect("tests");
+    assert_eq!(tests.len(), 1, "{report}");
+    assert_eq!(tests[0]["status"], "passed", "{report}");
+    let proved = flick_in(&dir, &["prove"]);
+    assert_eq!(proved.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&proved.stderr).contains("FLICK-T087"));
 }

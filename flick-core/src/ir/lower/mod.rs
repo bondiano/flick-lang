@@ -6,6 +6,10 @@
 mod abstraction;
 mod applicative_do;
 mod comprehension;
+#[cfg(feature = "contracts")]
+pub mod contracts;
+#[cfg(not(feature = "contracts"))]
+#[path = "contracts_absent.rs"]
 pub mod contracts;
 mod debug;
 mod defer;

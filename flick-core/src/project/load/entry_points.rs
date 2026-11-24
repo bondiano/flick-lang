@@ -25,6 +25,7 @@ pub fn check_with(
 
 /// Checks `roots` (absolute `.fl` paths) and their transitive imports, also
 /// verifying proofs and every contract declared in `roots`.
+#[cfg(feature = "contracts")]
 pub fn prove(
     host: &dyn Host,
     sources: &mut SourceMap,
@@ -36,6 +37,7 @@ pub fn prove(
 
 /// [`prove`], reusing saved package modules and `cache` for non-proved modules
 /// while always re-proving proof and contracted modules.
+#[cfg(feature = "contracts")]
 pub fn prove_with(
     host: &dyn Host,
     sources: &mut SourceMap,

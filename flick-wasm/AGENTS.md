@@ -15,8 +15,9 @@ a `Session` per edited module, plus `format`, `explain` and
 - Results are JSON strings: update the types in the playground workers in
   the same change as their shape.
 - The core is built with `embedded-std` and `ide` only: no file system,
-  Go backend or source maps. Workspace builds unify the full feature set,
-  so build this package on its own
+  Go backend, source maps or contract verification (the playground has no
+  `flick prove`; `require`/`ensure` still type-check). Workspace builds
+  unify the full feature set, so build this package on its own
   ([Cargo features](../CONTRIBUTING.md#cargo-features)).
 - The playground compiles for Flick's own runtime as `flick build --rt`
   does; `flick/tests/cli/wasm_demo.rs` pins that parity.

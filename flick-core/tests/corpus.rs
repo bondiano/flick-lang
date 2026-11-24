@@ -368,7 +368,17 @@ fn checked(page: &str, block: &Block, counts: &mut Counts, failures: &mut Vec<St
             .iter()
             .any(|code| matches!(short(code), "T087" | "T088" | "T089"));
     let diagnostics = if prove {
-        flick_core::prove(&sources, file)
+        #[cfg(feature = "contracts")]
+        {
+            flick_core::prove(&sources, file)
+        }
+        #[cfg(not(feature = "contracts"))]
+        {
+            failures.push(format!(
+                "{page}:{line}: this example requires the `contracts` Cargo feature"
+            ));
+            return;
+        }
     } else {
         flick_core::check(&sources, file)
     };
