@@ -1,0 +1,4 @@
+module Bench.Steps exposing (twice)
+
+twice : (a -> a) -> a -> a
+let twice f x = f (f x)

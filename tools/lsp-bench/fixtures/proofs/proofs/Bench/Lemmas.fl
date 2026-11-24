@@ -1,0 +1,5 @@
+module Bench.Lemmas exposing (..)
+
+import Bench.Steps exposing (twice)
+
+proof unfold_twice (f : a -> a) (x : a) where equal (twice f x) (f (f x)) = refl

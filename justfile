@@ -206,6 +206,11 @@ lsp-bench file="examples/mtl/src/Mtl/StateT.fl" +positions="22:5":
     cargo build --release -p flick
     node tools/lsp-bench/index.mjs target/release/flick {{file}} {{positions}}
 
+# Measure proof editing over stdio and soak repeated proof-project edits
+lsp-proof-bench samples="30" cycles="100":
+    cargo build --release -p flick
+    node tools/lsp-bench/proofs.mjs --samples {{samples}} --cycles {{cycles}} target/release/flick
+
 # The performance baseline: corpus check time, hover latency, load-server throughput and Go binary size,
 # written to target/perf.json and held to tools/perf/budgets.json
 perf:

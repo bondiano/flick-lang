@@ -1,0 +1,23 @@
+module Bench.Main exposing (..)
+
+import Bench.Chain as Chain
+import Bench.Steps exposing (twice)
+import Laws.Option as Options
+
+proof use_twice (f : a -> a) (x : a) where equal (twice f x) (f (f x)) = Chain.twice_shared f x
+
+proof use_option (v : Option a) where equal (map identity v) v = Options.map_identity v
+
+proof rebuild (v : Option a)
+where equal
+  (
+    match v with
+    | None -> None
+    | Some x -> Some x
+  )
+  v =
+  match v with
+  | None -> refl
+  | Some value -> refl
+
+proof backwards (x : Bool) (y : Bool) (h : equal x y) where equal y x = symm h

@@ -2,7 +2,7 @@
 // replies and notifications in, matched by the caller.
 import { spawn } from "node:child_process";
 
-export const connect = (binary) => {
+export const connect = (binary, { onNotification } = {}) => {
   const server = spawn(binary, ["lsp", "--stdio"], { stdio: ["pipe", "pipe", "ignore"] });
   let buffer = Buffer.alloc(0);
   const waiting = [];
@@ -15,6 +15,7 @@ export const connect = (binary) => {
       if (buffer.length < end + 4 + length) return;
       const message = JSON.parse(buffer.subarray(end + 4, end + 4 + length).toString());
       buffer = buffer.subarray(end + 4 + length);
+      if (message.method && message.id === undefined) onNotification?.(message);
       const i = waiting.findIndex((w) => w.matches(message));
       if (i >= 0) waiting.splice(i, 1)[0].resolve(message);
     }
