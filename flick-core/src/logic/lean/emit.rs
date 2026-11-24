@@ -155,6 +155,7 @@ impl Tx<'_> {
         facts: &[Rc<str>],
     ) -> Result<String, String> {
         Ok(match &c.kind {
+            #[cfg(not(target_arch = "wasm32"))]
             Rule::Hole(_) => return Err("an incomplete certificate cannot be replayed".into()),
             Rule::Refl => ".refl".into(),
             Rule::Symm(p) => format!("(.symm {})", self.cert(p, ctx, facts)?),

@@ -62,6 +62,7 @@ pub struct Location {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Symbol {
     Entity(Entity),
+    #[cfg(not(target_arch = "wasm32"))]
     /// A proof declaration, or the law of a class.
     Proof {
         module: String,
@@ -116,6 +117,7 @@ impl<'a> Ide<'a> {
     pub fn symbol_at(&self, file: FileId, offset: u32) -> Option<(Symbol, (u32, u32))> {
         let m = self.module(file)?;
         let text = self.text(file);
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(symbol) = self.proof_symbol_at(file, offset) {
             return Some(symbol);
         }
@@ -142,6 +144,7 @@ impl<'a> Ide<'a> {
                     Symbol::Local { file, binder, name }
                 }
                 Ref::PackedField { .. } => return None,
+                #[cfg(not(target_arch = "wasm32"))]
                 Ref::Value { module, name } if proof_symbols::is_lemma(module) => {
                     proof_symbols::lemma_symbol(&m.name, name)
                 }

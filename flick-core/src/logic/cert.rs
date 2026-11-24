@@ -18,6 +18,7 @@ pub struct Cert {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Rule {
     /// An incomplete or malformed expression encountered by editor recovery.
+    #[cfg(not(target_arch = "wasm32"))]
     Hole(Box<Failure>),
     Refl,
     Symm(Box<Cert>),
@@ -53,14 +54,15 @@ fn invalid<T>(span: Span, why: impl Into<String>) -> Result<T, Failure> {
 
 /// The certificate the body `e` of a proof spells.
 pub fn cert(e: &Expr, lemmas: &[Lemma]) -> Result<Cert, Failure> {
-    read(e, lemmas, false)
+    read::<false>(e, lemmas)
 }
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(super) fn recover(e: &Expr, lemmas: &[Lemma]) -> Cert {
-    read(e, lemmas, true).unwrap_or_else(|why| hole(e, why))
+    read::<true>(e, lemmas).unwrap_or_else(|why| hole(e, why))
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn hole(e: &Expr, why: Failure) -> Cert {
     Cert {
         kind: Rule::Hole(Box::new(why)),
@@ -68,14 +70,14 @@ fn hole(e: &Expr, why: Failure) -> Cert {
     }
 }
 
-fn read(e: &Expr, lemmas: &[Lemma], recover: bool) -> Result<Cert, Failure> {
+fn read<const RECOVER: bool>(e: &Expr, lemmas: &[Lemma]) -> Result<Cert, Failure> {
     let child = |e: &Expr| {
-        let found = read(e, lemmas, recover);
-        if recover {
-            Ok(found.unwrap_or_else(|why| hole(e, why)))
-        } else {
-            found
+        let found = read::<RECOVER>(e, lemmas);
+        #[cfg(not(target_arch = "wasm32"))]
+        if RECOVER {
+            return Ok(found.unwrap_or_else(|why| hole(e, why)));
         }
+        found
     };
     let span = e.span;
     let kind = match &e.kind {
@@ -89,26 +91,27 @@ fn read(e: &Expr, lemmas: &[Lemma], recover: bool) -> Result<Cert, Failure> {
             };
             let mut branches = Vec::with_capacity(arms.len());
             for a in arms {
-                if a.guard.is_some() && !recover {
+                if a.guard.is_some() && !RECOVER {
                     return invalid(a.body.span, "an arm of a proof has no guard");
                 }
                 let pattern = match pat(&a.pat, a.body.span).map_err(Failure::Refused) {
                     Ok(pattern) => pattern,
-                    Err(_) if recover => continue,
+                    Err(_) if RECOVER => continue,
                     Err(why) => return Err(why),
                 };
-                let proof = if a.guard.is_some() {
-                    hole(
+                #[cfg(not(target_arch = "wasm32"))]
+                if RECOVER && a.guard.is_some() {
+                    let proof = hole(
                         &a.body,
                         Failure::Invalid {
                             span: a.body.span,
                             why: "an arm of a proof has no guard".into(),
                         },
-                    )
-                } else {
-                    child(&a.body)?
-                };
-                branches.push((pattern, proof));
+                    );
+                    branches.push((pattern, proof));
+                    continue;
+                }
+                branches.push((pattern, child(&a.body)?));
             }
             Rule::Case(v.as_str().into(), branches)
         }
@@ -252,14 +255,18 @@ impl Cert {
                 q.lemmas(out);
             }
             Rule::Case(_, arms) => arms.iter().for_each(|(_, p)| p.lemmas(out)),
-            Rule::Hole(_) | Rule::Refl | Rule::Fact(_) => {}
+            #[cfg(not(target_arch = "wasm32"))]
+            Rule::Hole(_) => {}
+            Rule::Refl | Rule::Fact(_) => {}
         }
     }
 
     /// The terms the certificate writes: what its rules name too.
     pub fn terms<'a>(&'a self, out: &mut Vec<&'a Term>) {
         match &self.kind {
-            Rule::Hole(_) | Rule::Refl | Rule::Fact(_) => {}
+            #[cfg(not(target_arch = "wasm32"))]
+            Rule::Hole(_) => {}
+            Rule::Refl | Rule::Fact(_) => {}
             Rule::Symm(p) | Rule::Funext(_, p) => p.terms(out),
             Rule::Trans(m, p, q) => {
                 out.push(m);

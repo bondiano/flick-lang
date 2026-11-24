@@ -1,9 +1,12 @@
 //! Source identities shared by hover, definitions and references in proofs.
 
+#[cfg(not(target_arch = "wasm32"))]
 use super::{Ide, Location, Symbol, tree};
+#[cfg(not(target_arch = "wasm32"))]
 use crate::logic;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::project::Analyzed;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
@@ -23,6 +26,7 @@ pub(super) fn laws(class: &Node) -> impl Iterator<Item = &Node> {
         .filter(|node| node.kind == K::LawDecl)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn lemma_symbol(module: &str, name: &str) -> Symbol {
     let (module, name) = name.rsplit_once('.').unwrap_or((module, name));
     Symbol::Proof {
@@ -32,6 +36,7 @@ pub(super) fn lemma_symbol(module: &str, name: &str) -> Symbol {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Ide<'_> {
     pub(super) fn proof_symbol_at(
         &self,
@@ -48,7 +53,6 @@ impl Ide<'_> {
             .iter()
             .rev()
             .find(|node| matches!(node.kind, K::ProofDecl | K::LawDecl))?;
-        #[cfg(not(target_arch = "wasm32"))]
         if let Some(field) = Self::law_field_at(module, decl, &path, offset) {
             return Some(field);
         }
@@ -70,7 +74,6 @@ impl Ide<'_> {
         })
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn law_field_at(
         module: &Analyzed,
         decl: &Node,
@@ -101,7 +104,6 @@ impl Ide<'_> {
         ))
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     pub(super) fn law_references(
         &self,
         module: &str,
@@ -167,6 +169,7 @@ fn law_key(field: &Node) -> Option<Token> {
 }
 
 /// Internal proof names are identities, even when a source alias was used.
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn is_lemma(module: &str) -> bool {
     module == logic::LEMMAS
 }

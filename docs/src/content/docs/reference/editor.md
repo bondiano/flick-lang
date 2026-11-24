@@ -116,6 +116,9 @@ use the lemma's declaration, including when the application uses an import alias
 `lawful` bundle, hover shows the selected instance and the law obligations
 under their superclass paths.
 
+The browser playground shows the written proof statement, goal form and
+types of the goal's operands.
+
 ### Completion order
 
 Completion lists the names that fit their place first and the others after

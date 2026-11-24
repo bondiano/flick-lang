@@ -3,29 +3,28 @@
 use std::fmt::Write as _;
 use std::ptr;
 
-use super::super::{Ide, ProofView, Symbol, proof_symbols::proof_name, tree};
+#[cfg(target_arch = "wasm32")]
+use super::super::proofs::show_goal;
+use super::super::{Ide, proof_symbols::proof_name, tree};
+#[cfg(not(target_arch = "wasm32"))]
+use super::super::{ProofView, Symbol};
 use crate::doc;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::logic::ProofStep;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::{source::FileId, types::Range};
 
 impl Ide<'_> {
+    #[cfg(not(target_arch = "wasm32"))]
     pub(super) fn proof_hover(&self, file: FileId, offset: u32) -> Option<(String, Range)> {
         let module = self.module(file)?;
         if module.typing.proofs.is_empty() && module.typing.laws.is_empty() {
             return None;
         }
         let text = self.text(file);
-        let path = tree::path_to(&module.tree, offset);
-        let at = path
-            .iter()
-            .rposition(|node| matches!(node.kind, K::ProofDecl | K::LawDecl))?;
+        let (path, at, token) = proof_site(&module.tree, offset)?;
         let decl = path[at];
-        let token = path[at..]
-            .iter()
-            .rev()
-            .find_map(|node| token_at(node, offset))?;
         let range = (token.start, token.end);
         let written = token.text(text);
         let view = self.proof_at(file, offset)?;
@@ -108,8 +107,55 @@ impl Ide<'_> {
             (None, None) => None,
         }
     }
+
+    #[cfg(target_arch = "wasm32")]
+    pub(super) fn proof_hover(&self, file: FileId, offset: u32) -> Option<(String, Range)> {
+        let module = self.module(file)?;
+        if module.typing.proofs.is_empty() && module.typing.laws.is_empty() {
+            return None;
+        }
+        let text = self.text(file);
+        let (path, at, token) = proof_site(&module.tree, offset)?;
+        let declaration = path[at];
+        let range = (token.start, token.end);
+        if matches!(token.kind, K::ProofKw | K::LawKw) || proof_name(declaration) == Some(token) {
+            let mut shown = signature(declaration, text);
+            if let Some(docs) = declaration_docs(&path[..=at], text) {
+                let _ = write!(shown, "\n\n{docs}");
+            }
+            return Some((shown, range));
+        }
+        // The browser analysis retains the statement and ordinary types.
+        // Checker traces and imported proof replay belong to the native editor.
+        let goal = path[at..]
+            .iter()
+            .rev()
+            .copied()
+            .find(|node| is_goal(node))?;
+        let (mut shown, range) = match goal_note(goal, token, text) {
+            Some(note) => (note.to_owned(), range),
+            None => self.symbol_hover(file, offset)?,
+        };
+        if let Some(goal) = show_goal(goal, text) {
+            let _ = write!(shown, "\n\n**Goal** · `{goal}`");
+        }
+        Some((shown, range))
+    }
 }
 
+fn proof_site(root: &Node, offset: u32) -> Option<(Vec<&Node>, usize, Token)> {
+    let path = tree::path_to(root, offset);
+    let at = path
+        .iter()
+        .rposition(|node| matches!(node.kind, K::ProofDecl | K::LawDecl))?;
+    let token = path[at..]
+        .iter()
+        .rev()
+        .find_map(|node| token_at(node, offset))?;
+    Some((path, at, token))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 struct Site<'a> {
     path: &'a [&'a Node],
     text: &'a str,
@@ -118,6 +164,7 @@ struct Site<'a> {
     steps: &'a [ProofStep],
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl Site<'_> {
     fn note(&self, view: &ProofView<'_>) -> Option<String> {
         self.bundle(view)
@@ -131,22 +178,8 @@ impl Site<'_> {
     }
 
     fn goal(&self) -> Option<&'static str> {
-        let goal = self
-            .path
-            .iter()
-            .rev()
-            .find(|node| matches!(node.kind, K::Goal | K::SameTypeGoal | K::LawfulGoal))?;
-        let first = goal.tokens().into_iter().find(|t| !t.kind.is_trivia())?;
-        if self.token != first {
-            return None;
-        }
-        match first.text(self.text) {
-            "equal" => Some("Value equality. The two terms must denote the same value."),
-            "holds" => Some("A Boolean proposition that must equal `true`."),
-            "same_type" => Some("Type equality. Both types must be the same after elaboration."),
-            "lawful" => Some("Certifies the laws of the selected instance and its superclasses."),
-            _ => None,
-        }
+        let goal = self.path.iter().rev().find(|node| is_goal(node))?;
+        goal_note(goal, self.token, self.text)
     }
 
     fn rule(&self) -> Option<&'static str> {
@@ -263,6 +296,24 @@ impl Site<'_> {
     }
 }
 
+fn is_goal(node: &Node) -> bool {
+    matches!(node.kind, K::Goal | K::SameTypeGoal | K::LawfulGoal)
+}
+
+fn goal_note(goal: &Node, token: Token, text: &str) -> Option<&'static str> {
+    if token.start != goal.range().0 {
+        return None;
+    }
+    match token.text(text) {
+        "equal" => Some("Value equality. The two terms must denote the same value."),
+        "holds" => Some("A Boolean proposition that must equal `true`."),
+        "same_type" => Some("Type equality. Both types must be the same after elaboration."),
+        "lawful" => Some("Certifies the laws of the selected instance and its superclasses."),
+        _ => None,
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 fn application<'a>(path: &[&'a Node], range: Range) -> Option<&'a Node> {
     path.iter().rev().copied().find(|node| {
         node.kind == K::AppExpr
@@ -273,6 +324,7 @@ fn application<'a>(path: &[&'a Node], range: Range) -> Option<&'a Node> {
     })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn application_details(
     shown: &mut String,
     apply: &Node,
@@ -326,10 +378,12 @@ fn declaration_docs(path: &[&Node], text: &str) -> Option<String> {
     })
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn inside((start, end): Range, step: &ProofStep) -> bool {
     start <= step.span.start && step.span.end <= end
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn contains((start, end): Range, offset: u32) -> bool {
     start <= offset && offset <= end
 }
@@ -350,6 +404,7 @@ fn signature(node: &Node, text: &str) -> String {
     format!("```flick\n{}\n```", header.trim())
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn status(view: &ProofView<'_>) -> &'static str {
     use crate::types::ProofStatus;
     match view.status {
@@ -360,6 +415,7 @@ fn status(view: &ProofView<'_>) -> &'static str {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn append_note(mut shown: String, note: Option<&str>) -> String {
     if let Some(note) = note {
         let _ = write!(shown, "\n\n{note}");
@@ -367,6 +423,7 @@ fn append_note(mut shown: String, note: Option<&str>) -> String {
     shown
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn with_context(mut shown: String, view: &ProofView<'_>) -> String {
     if let Some(goal) = &view.goal {
         let _ = write!(shown, "\n\n**Goal** · `{goal}`");
@@ -397,6 +454,7 @@ fn with_context(mut shown: String, view: &ProofView<'_>) -> String {
     shown
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn rule(name: &str, argument: Option<usize>) -> Option<&'static str> {
     match (name, argument) {
         ("refl", None) => Some("Reflexivity. The two sides must normalize to the same term."),

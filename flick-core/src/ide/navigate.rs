@@ -75,6 +75,7 @@ impl Ide<'_> {
                 end: binder.1,
             }),
             Symbol::Entity(entity) => self.entity_definition(entity),
+            #[cfg(not(target_arch = "wasm32"))]
             Symbol::Proof {
                 module,
                 class,

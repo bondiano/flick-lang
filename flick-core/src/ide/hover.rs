@@ -249,6 +249,7 @@ impl Ide<'_> {
                 });
                 (local_code(name, &m.typing.shown(at, ty), mutable), None)
             }
+            #[cfg(not(target_arch = "wasm32"))]
             Symbol::Proof { .. } => return None,
             Symbol::Entity(e) => {
                 let interface = self.interface(&e.module)?;
