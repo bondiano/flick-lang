@@ -161,7 +161,6 @@ jobs:
           if-no-files-found: error
       - run: just go-test
       - run: just language
-      - run: just kernel
       - run: just bundle-size >> "$GITHUB_STEP_SUMMARY"
 
   # the e2e suites of the compiler but the cases of tests/run
@@ -189,6 +188,8 @@ jobs:
           node-version-file: .tool-versions
           cache: pnpm
       - run: just e2e-tests
+      # the primitive kernel's suite; e2e-js is near its time limit
+      - run: just kernel
       - uses: actions/upload-artifact@v7
         if: ${{ !cancelled() }}
         with:
