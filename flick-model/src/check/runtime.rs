@@ -16,7 +16,7 @@ use crate::decls::Decls;
 use crate::eval::Lambda;
 use crate::eval::regions::{Finalizer, reach, region_name};
 use crate::subst::any;
-use crate::syntax::{Const, Env, Path, Term};
+use crate::syntax::{Const, Env, Pat, Path, Term};
 use crate::types::{Kind, Row, Scheme, Stage, Type, Var};
 
 /// `·;Ψ;Λ ⊢ e : τ ! φ` for some `Ψ` with `⊢ μ : Ψ`, and `⊢ Λ`: a
@@ -213,10 +213,20 @@ impl Checker<'_> {
         Ok(row)
     }
 
-    /// (App) on a redex `(λx. e) v` of a configuration: `x` takes the type
-    /// of `v`, as the binder whose signature the substitution dropped gave
-    /// it. Inferring the λ first would take a parameter it applies for a
-    /// pure arrow (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`), which the source did not.
+    /// Whether `(λx. e) v` is checked as a redex, `v` first: always in a
+    /// configuration, and in a program when the λ is written where it is
+    /// applied and takes its argument by a name or `_`. A parameter that is
+    /// a pattern takes its type from the λ, as in flick-core.
+    pub(super) fn redex_of(&self, x: &str, body: &Term) -> bool {
+        self.config || !matches_pattern(x, body)
+    }
+
+    /// (App) on a redex `(λx. e) v`: `x` takes the type of `v`, as the
+    /// binder whose signature the substitution dropped gave it in a
+    /// configuration, or as `let x = v` would in a program. Inferring the λ
+    /// first would take a parameter it applies for a pure arrow
+    /// (`docs/formal/core.md#a-callee-of-unknown-type-is-a-pure-arrow`), and
+    /// a polymorphic field of `x` at no instance.
     pub(super) fn redex(
         &mut self,
         x: &str,
@@ -236,5 +246,17 @@ impl Checker<'_> {
         let r = r?;
         self.perform(&inner)?;
         Ok(r)
+    }
+}
+
+/// Whether `λx. e` is the translation of a λ whose parameter is a pattern:
+/// `λx. match x with | p -> e` with `p` neither `_` nor a name.
+fn matches_pattern(x: &str, body: &Term) -> bool {
+    match body {
+        Term::Match(scrutinee, arms) => {
+            matches!(&**scrutinee, Term::Var(v) if &**v == x)
+                && matches!(&arms[..], [arm] if !matches!(arm.pat, Pat::Wild | Pat::Var(_)))
+        }
+        _ => false,
     }
 }

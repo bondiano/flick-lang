@@ -1,7 +1,5 @@
 // A function applied where it is written takes the type of its first
-// parameter from its argument, as `let r = argument` would give it. (An
-// effectful callback taken so, `(fun h -> h ()) say`, is a case of
-// `assumed_pure_tests.rs` of the checker: the model takes `h` for pure.)
+// parameter from its argument, as `let r = argument` would give it.
 module App.AppliedWhereWritten exposing (..)
 
 type alias Poly = { id : forall a. a -> a }
@@ -12,3 +10,16 @@ let fields p = (.id p 1, (p |> .id) "a")
 
 lambdas : Poly -> (Int, String)
 let lambdas p = ((fun r -> r.id) p 1, (p |> fun r -> r.id) "a")
+
+service Log =
+  info : String ->{} Unit
+
+say : Unit ->{Log} Unit
+let say () = Log.info "hi"
+
+// an effectful callback fits, and its call is the caller's
+callbacks : Unit ->{Log} Unit
+let callbacks () =
+  (fun h -> h ()) say
+  say |> fun h -> h ()
+  (fun h _ -> h ()) say 1
