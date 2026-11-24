@@ -58,7 +58,7 @@ const rows = [];
 for (const name of programs) {
   const source = join(here, `${name}.fl`);
   for (const target of ["js", "go"]) {
-    const extra = target === "js" ? ["--runtime", "effect"] : [];
+    const extra = target === "js" ? ["--runtime", "effect"] : ["--allow-tool", "go"];
     run(flick, ["build", source, "--target", target, ...extra, "--profile", "release", "--out-dir", join(out, target, name)]);
   }
   const js = time("node", [join(out, "js", name, "flick-main.js")]);

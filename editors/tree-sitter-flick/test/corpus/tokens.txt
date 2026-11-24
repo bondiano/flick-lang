@@ -644,6 +644,31 @@ let y = r.orelse
   (member))
 
 ==================
+Field accessors
+==================
+
+let c = List.map .address.city users
+let n = user |> .name
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (operator)
+  (constructor)
+  (member)
+  (member)
+  (member)
+  (identifier)
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (operator)
+  (member))
+
+==================
 Postfix catch
 ==================
 

@@ -5,6 +5,7 @@ use super::*;
 use crate::source::SourceMap;
 use flick_test_support::files as fixture_files;
 
+mod accessors;
 mod decl;
 mod holes;
 mod layout;

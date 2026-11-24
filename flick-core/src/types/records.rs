@@ -1,13 +1,29 @@
-//! Record expressions: literals, field access and `{ r with f = v }`.
+//! Record expressions: literals, field access, accessors `.a.b` and
+//! `{ r with f = v }`.
 
 use super::Checker;
 use super::env::Form;
 use super::ty::{Row, Type};
+use super::typing::Range;
 use crate::diagnostics::suggest::closest;
 use crate::diagnostics::{Diagnostic, codes};
-use crate::syntax::cst::Node;
+use crate::source::Span;
+use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Elem;
+
+/// The keys of an accessor's parameter and of the value of its body, as
+/// the keys of its closure's own: its first `.` and its last token, the
+/// label of its last step. No expression spans a token alone, not even an
+/// accessor of one step.
+pub fn accessor_keys(node: &Node) -> (Range, Range) {
+    let mut tokens = (node.nodes())
+        .flat_map(Node::child_tokens)
+        .filter(|t| !t.kind.is_trivia());
+    let first = tokens.next();
+    let key = |t: Option<Token>| t.map_or(node.range(), |t| (t.start, t.end));
+    (key(first), key(tokens.last().or(first)))
+}
 
 impl Checker<'_> {
     /// The type of a field of a record whose fields are already known,
@@ -62,14 +78,21 @@ impl Checker<'_> {
         let Some(label) = node.child_tokens().find(|t| t.kind == K::Ident) else {
             return Type::Error;
         };
+        self.field_of(&record, label, self.span(node))
+    }
+
+    /// The type of the field `label` of a value of type `record`, read at
+    /// `at`: a polymorphic field is instantiated there, and a missing one
+    /// reported there.
+    fn field_of(&mut self, record: &Type, label: Token, at: Span) -> Type {
         let label_span = self.token_span(label);
         let label = label.text(self.text).to_owned();
         #[cfg(feature = "ide")]
-        self.note_field(label_span, &record);
+        self.note_field(label_span, record);
         // a polymorphic field (`S.Impl`, a dictionary) is used at an instance,
         // with the dictionaries of its constraints, like a name
-        if let Some(field) = self.known_field(&record, &label) {
-            return self.instantiate(&field, self.span(node));
+        if let Some(field) = self.known_field(record, &label) {
+            return self.instantiate(&field, at);
         }
         let field = self.fresh();
         let rest = self.fresh();
@@ -78,22 +101,68 @@ impl Checker<'_> {
             tail: Some(Box::new(rest)),
             ..Row::default()
         });
-        if self.unify(&self.whnf(&record), &shape).is_err() {
-            let shown = self.show(&record);
+        if self.unify(&self.whnf(record), &shape).is_err() {
+            let shown = self.show(record);
             self.diagnostics.push(
-                Diagnostic::error(
-                    codes::T003,
-                    format!("`{shown}` has no field `{label}`"),
-                    self.span(node),
-                )
-                .did_you_mean(label_span, || {
-                    let labels = self.labels(&record);
-                    closest(&label, labels.iter().map(String::as_str)).map(str::to_owned)
-                }),
+                Diagnostic::error(codes::T003, format!("`{shown}` has no field `{label}`"), at)
+                    .did_you_mean(label_span, || {
+                        let labels = self.labels(record);
+                        closest(&label, labels.iter().map(String::as_str)).map(str::to_owned)
+                    }),
             );
             return Type::Error;
         }
-        self.instantiate(&field, self.span(node))
+        self.instantiate(&field, at)
+    }
+
+    /// `.a.b`, checked against `expected` when it is known: the function
+    /// `fun r -> r.a.b` with a parameter no one can name. Each step reads
+    /// the field of the value before it, the first one of the parameter.
+    pub(super) fn accessor(&mut self, node: &Node, expected: Option<&Type>) -> Type {
+        let steps: Vec<&Node> = (node.nodes())
+            .filter(|n| n.kind == K::AccessorStep)
+            .collect();
+        let (param, result) = accessor_keys(node);
+        let at = Span::new(self.file, result.0, result.1);
+        let mut body = |c: &mut Self, x: Option<&Type>, rest: Option<Type>| {
+            let mut value = x.cloned().unwrap_or(Type::Error);
+            c.note_value(param, &value);
+            for step in &steps {
+                // the parser reported a step without its label
+                let Some(label) = step.child_tokens().find(|t| t.kind == K::Ident) else {
+                    value = Type::Error;
+                    break;
+                };
+                value = c.field_of(&value, label, c.span(step));
+            }
+            match rest {
+                Some(rest) => {
+                    c.expect(&value, &rest, at);
+                    rest
+                }
+                None => value,
+            }
+        };
+        let ty = self.function_typed(&[None], &mut body, expected, node);
+        // an editor shows the whole path's type there, and the first step's
+        // receiver is its parameter, also while that step has no label yet
+        #[cfg(feature = "ide")]
+        self.note_type(self.span(node), &ty);
+        ty
+    }
+
+    /// The labels of the literal `node` checked against `expected`, noted
+    /// with that type as it is written, an alias too: the declaration an
+    /// editor relates them to.
+    #[cfg(feature = "ide")]
+    pub(super) fn note_literal(&mut self, node: &Node, expected: &Type) {
+        for field in node.nodes().filter(|n| n.kind == K::RecordField) {
+            if let Some(label) =
+                (field.child_tokens()).find(|t| matches!(t.kind, K::Ident | K::Con))
+            {
+                self.note_field(self.token_span(label), expected);
+            }
+        }
     }
 
     /// A record literal; `expected` gives the types of fields it mentions.
@@ -193,3 +262,7 @@ impl Checker<'_> {
         record
     }
 }
+
+#[cfg(test)]
+#[path = "records_tests.rs"]
+mod tests;

@@ -111,7 +111,10 @@ impl Checker<'_> {
         tail: Option<Tail<'_, Self>>,
     ) -> Type {
         let statements: Vec<&Node> = node.nodes().collect();
-        self.check_statements(&statements, node.range().1, expected, tail)
+        let since = self.diagnostics.len();
+        let ty = self.check_statements(&statements, node.range().1, expected, tail);
+        self.detached_statements(&statements, since);
+        ty
     }
 
     fn check_statements(

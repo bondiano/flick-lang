@@ -1,0 +1,25 @@
+fetch piped
+London
+fetch applied
+Wilmslow
+fetch explicit
+Grace
+fetch named
+London
+fetch local
+5
+fetch first
+fetch second
+fetch third
+["London", "Wilmslow", "Arlington"]
+["Arlington", "Wilmslow", "London"]
+[1, 2, 3]
+everyone
+["Ada", "Alan", "Grace"]
+everyone
+[3, 1]
+["Alan", "Grace"]
+["Ada", "Alan", "Grace"]
+[10, 20, 30]
+["Ada!", "Alan!", "Grace!"]
+[]

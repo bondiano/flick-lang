@@ -64,6 +64,27 @@ impl<'a> Ide<'a> {
     }
 }
 
+impl Ide<'_> {
+    /// The record a function expected at the bare `.` at `offset` takes: the
+    /// parameter of the accessor that `.` starts, as in `let f : User -> String = .`.
+    pub(super) fn expected_parameter(&self, file: FileId, offset: u32) -> Option<Type> {
+        let bytes = self.sources.get(file).text.as_bytes();
+        let at = offset as usize;
+        let bare = at == 0
+            || bytes
+                .get(at - 1)
+                .is_some_and(|b| b.is_ascii_whitespace() || b"([{,".contains(b));
+        if bytes.get(at) != Some(&b'.') || !bare {
+            return None;
+        }
+        let expected = self.expected(file, offset)?;
+        expected.types.iter().find_map(|t| match strip(t) {
+            Type::Fun { param, .. } => Some((**param).clone()),
+            _ => None,
+        })
+    }
+}
+
 impl Expected<'_> {
     /// How far a candidate of `kind` and type `ty` goes back: 0 when it
     /// fits, as a value, applied to some of its arguments or, in a pattern,

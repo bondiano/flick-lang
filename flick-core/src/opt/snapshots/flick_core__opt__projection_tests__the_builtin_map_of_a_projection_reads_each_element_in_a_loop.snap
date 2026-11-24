@@ -1,0 +1,56 @@
+---
+source: flick-core/src/opt/projection_tests.rs
+assertion_line: 106
+expression: js
+---
+export const sugar = (users) => {
+  const $t1 = [];
+  for (const $elem1 of users) {
+    $t1.push($elem1.address.city);
+  }
+  return $t1;
+};
+
+export const explicit = (users) => {
+  const $t2 = [];
+  for (const $elem2 of users) {
+    $t2.push($elem2.address.city);
+  }
+  return $t2;
+};
+
+export const piped = (users) => {
+  const $t3 = [];
+  for (const $elem3 of users) {
+    $t3.push($elem3.address.city);
+  }
+  return $t3;
+};
+
+export const local = (users) => {
+  const $t4 = [];
+  for (const $elem4 of users) {
+    $t4.push($elem4.address.zip);
+  }
+  return $t4;
+};
+
+export const get_city = ($x) => $x.address.city;
+
+export const named = (users) => {
+  const $t5 = [];
+  for (const $elem5 of users) {
+    $t5.push($elem5.address.city);
+  }
+  return $t5;
+};
+
+export const over_for = (users) => {
+  const $t6 = [];
+  for (const u of users) {
+    if (u.address.zip > 1) {
+      $t6.push(u.address.city);
+    }
+  }
+  return $t6;
+};

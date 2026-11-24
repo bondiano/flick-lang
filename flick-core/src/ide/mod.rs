@@ -13,11 +13,13 @@ mod hints;
 mod hover;
 mod locals;
 mod navigate;
+mod paths;
 mod plugins;
 #[cfg(not(target_arch = "wasm32"))]
 mod proof_complete;
 mod proof_symbols;
 mod proofs;
+mod provenance;
 mod rename;
 mod scope;
 mod symbols;
@@ -90,6 +92,13 @@ pub enum Symbol {
         file: FileId,
         binder: (u32, u32),
         name: String,
+    },
+    /// The field `label` of the record type alias `record` of `module`: a
+    /// label whose record the checker typed as that alias.
+    Field {
+        module: String,
+        record: String,
+        label: String,
     },
 }
 
@@ -194,7 +203,8 @@ impl<'a> Ide<'a> {
                 .map_or(range, |t| (t.start, t.end));
             return Some((entity(module, Namespace::Type, name), at));
         }
-        self.declared_at(m, file, offset)
+        self.field_symbol_at(file, offset)
+            .or_else(|| self.declared_at(m, file, offset))
     }
 
     /// A name of a plugin's code at the user's word it stands for, as
@@ -453,6 +463,10 @@ fn entity(module: &str, namespace: Namespace, name: &str) -> Symbol {
     })
 }
 #[cfg(test)]
+mod accessor_tests;
+#[cfg(test)]
+mod accessor_types_tests;
+#[cfg(test)]
 mod block_locals_tests;
 #[cfg(test)]
 mod companion_tests;
@@ -460,6 +474,10 @@ mod companion_tests;
 mod contract_hover_tests;
 #[cfg(test)]
 mod enum_hover_tests;
+#[cfg(test)]
+mod field_references_tests;
+#[cfg(test)]
+mod field_rename_refusal_tests;
 #[cfg(all(test, feature = "native-project"))]
 mod foreign_meta_tests;
 #[cfg(test)]
@@ -476,6 +494,8 @@ mod let_else_tests;
 mod migration_tests;
 #[cfg(test)]
 mod operator_hover_tests;
+#[cfg(test)]
+mod paths_tests;
 #[cfg(test)]
 mod pattern_tests;
 #[cfg(test)]

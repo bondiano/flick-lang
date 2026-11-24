@@ -70,22 +70,20 @@ fn a_field_leads_to_its_declaration() {
     let declared = f.at("App.Main", "age", 0);
     // an access, a literal, an update and a pattern
     for nth in 1..5 {
-        let at = ide
-            .field_definition(file, f.at("App.Main", "age", nth) + 1)
-            .unwrap_or_else(|| panic!("age {nth}"));
         assert_eq!(
-            at,
-            Location {
+            ide.field_definitions(file, f.at("App.Main", "age", nth) + 1),
+            [Location {
                 target: Target::File(file),
                 start: declared,
                 end: declared + 3
-            }
+            }],
+            "age {nth}"
         );
     }
     for (label, module) in [("class_name", "Ui"), ("maximum", "Check")] {
-        let at = ide
-            .field_definition(file, f.at("App.Main", label, 0) + 1)
-            .unwrap_or_else(|| panic!("{label}"));
+        let [at] = &ide.field_definitions(file, f.at("App.Main", label, 0) + 1)[..] else {
+            panic!("{label}");
+        };
         assert_eq!(at.target, Target::Builtin(module.into()), "{label}");
         let text = builtin_sources()
             .iter()

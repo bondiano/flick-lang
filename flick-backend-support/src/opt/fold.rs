@@ -1,7 +1,8 @@
 //! Literal expressions evaluated when the program compiles, with the JS
-//! semantics of [`consteval`](crate::consteval) bit for bit, and branches of
-//! constant conditions chosen. A result that is not certain to match JS, or
-//! that JS would throw, stays a run-time computation.
+//! semantics of [`consteval`](crate::consteval) bit for bit, branches of
+//! constant conditions chosen, and a strict `for` over `[]` made the empty
+//! list. A result that is not certain to match JS, or that JS would throw,
+//! stays a run-time computation.
 
 use std::fmt::Write as _;
 
@@ -86,6 +87,19 @@ pub fn fold(e: &mut Expr, lang: &Known<'_>, preserve_types: bool) -> bool {
             }
             _ => None,
         },
+        // a strict `for` over an empty list literal runs nothing: it is the
+        // empty list, which keeps the element type a loop would lose
+        ExprKind::Generate {
+            strict: true,
+            limit: None,
+            body,
+            ..
+        } if matches!(&body.kind, ExprKind::Each { stop: None, source, .. }
+            if matches!(&source.kind, ExprKind::List(items) if items.is_empty())) =>
+        {
+            e.kind = ExprKind::List(Vec::new());
+            return true;
+        }
         _ => None,
     };
     let num = match &e.kind {

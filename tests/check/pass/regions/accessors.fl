@@ -1,0 +1,48 @@
+// An accessor holds nothing itself, and what it reads from a field that
+// holds a region is free to be used inside that region's scope.
+module App.Accessors exposing (..)
+
+type alias Path = String
+
+type File (s : Region)
+
+type error OpenError = OpenError Path
+
+type error ReadError = ReadError Path
+
+service FileSystem =
+  open_scoped : forall s. Path ->{Scope s; OpenError} File s
+  read_all : forall s. File s ->{; ReadError} String
+
+free : a^{} -> Unit
+let free _ = ()
+
+unheld : Path ->{FileSystem; OpenError, ReadError} String
+let unheld path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { file = file }
+  free .file
+  free (.file >> String.length)
+  FileSystem.read_all h.file
+}
+
+inside : Path ->{FileSystem; OpenError, ReadError} String
+let inside path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { file = file }
+  FileSystem.read_all (.file h)
+}
+
+piped : Path ->{FileSystem; OpenError, ReadError} Int
+let piped path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { file = file }
+  h |> .file |> FileSystem.read_all |> String.length
+}
+
+mapped : Path ->{FileSystem; OpenError} Int
+let mapped path = scope {
+  let file = FileSystem.open_scoped path
+  let h = { read = fun () -> FileSystem.read_all file }
+  List.length (List.map .read [h])
+}

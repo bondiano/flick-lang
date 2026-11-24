@@ -1,0 +1,54 @@
+// A projection does what its call does, applied or mapped: the root of a
+// path is evaluated once and before the reads, a list once, its elements
+// read in order, and a projection a closure captures reads the record it
+// is given.
+module App.Main exposing (main)
+
+type alias Address = { city : String; zip : Int }
+
+type alias User = { name : String; address : Address }
+
+city : User -> String
+let city = .address.city
+
+user : String -> String -> Int -> User
+let user name town zip = { name = name; address = { city = town; zip = zip } }
+
+/// `u`, after printing that it was asked for.
+fetch : String -> User ->{Host.Console} User
+let fetch tag u =
+  Platform.stdout_line ("fetch " ++ tag)
+  u
+
+/// `users`, after printing that they were asked for.
+everyone : List User ->{Host.Console} List User
+let everyone users =
+  Platform.stdout_line "everyone"
+  users
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let ada = user "Ada" "London" 1
+  let alan = user "Alan" "Wilmslow" 2
+  let grace = user "Grace" "Arlington" 3
+  Platform.stdout_line (fetch "piped" ada |> .address.city)
+  Platform.stdout_line (.address.city (fetch "applied" alan))
+  Platform.stdout_line ((fun u -> u.name) (fetch "explicit" grace))
+  Platform.stdout_line (city (fetch "named" ada))
+  let zip = .address.zip
+  Platform.stdout_line (show (zip (fetch "local" alan) + zip grace))
+  let users = [fetch "first" ada, fetch "second" alan, fetch "third" grace]
+  Platform.stdout_line (show (List.map .address.city users))
+  Platform.stdout_line (show (List.map city [grace, alan, ada]))
+  Platform.stdout_line (show (List.map zip users))
+  Platform.stdout_line (show (everyone users |> List.map .name))
+  Platform.stdout_line (show (List.map (fun u -> u.address.zip) (everyone [grace, ada])))
+  Platform.stdout_line (show (List.map .name [for u <- users if zip u > 1 yield u]))
+  let names = fun () -> List.map .name users
+  let read = fun u -> zip u * 10
+  let with_suffix = fun suffix -> List.map (fun u -> u.name ++ suffix) users
+  Platform.stdout_line (show (names ()))
+  Platform.stdout_line (show (List.map read users))
+  Platform.stdout_line (show (with_suffix "!"))
+  let nobody : List User = []
+  Platform.stdout_line (show (List.map .address.city nobody))

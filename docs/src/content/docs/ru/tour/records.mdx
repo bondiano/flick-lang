@@ -1,8 +1,8 @@
 ---
 title: Записи
-description: Именованные поля, копия записи с изменённым полем через `with` и построение списка через `for`.
+description: Именованные поля, функция, которая читает поле, копия записи с изменённым полем через `with` и построение списка через `for`.
 tableOfContents: false
-source_hash: 45305d3bda02365c
+source_hash: 86fce4a5adfd118b
 ---
 
 import TourLesson from "../../../../components/TourLesson.astro";
@@ -12,6 +12,11 @@ import TourLesson from "../../../../components/TourLesson.astro";
 Запись содержит именованные поля. `type alias Book = { … }` задаёт имя
 для типа записи. При создании записи значения полей указывают через `=`.
 Выражение `book.title` возвращает значение поля `title`.
+
+Само по себе `.title` — функция, которая читает это поле:
+`List.map .title shelf` возвращает список названий, как
+`List.map (fun b -> b.title) shelf`. Путь читает поля по очереди:
+`.author.name`.
 
 Записи неизменяемы. `{ book with read = true }` создаёт копию записи
 `book`, в которой значение поля `read` заменено на `true`.

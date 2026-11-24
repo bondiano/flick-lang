@@ -162,6 +162,7 @@ The reduction is specified normatively in `elaboration.md`. This table gives the
 | `x \|> f`, `f <\| x`, operators | `f x`, constants |
 | `f >> g` | `let f′ = f in let g′ = g in λx. g′ (f′ x)`, with fresh `f′`, `g′` of monomorphic types, as λ binds them; a chain `f >> g >> h` is one `λx. h′ (g′ (f′ x))` |
 | `g << f` | `let g′ = g in let f′ = f in λx. g′ (f′ x)`: the operands bound left to right, as written |
+| Accessor `.ℓ₁.….ℓₙ` | `λx. x.ℓ₁.….ℓₙ`, with a fresh `x` no source names; `.ℓ₁.….ℓₙ v` and `v \|> .ℓ₁.….ℓₙ` are that λ applied to `v`, typed with `v` first (see [a callee of unknown type is a pure arrow](#a-callee-of-unknown-type-is-a-pure-arrow)) |
 
 ### 1.5 Constants Γ₀
 
@@ -964,9 +965,9 @@ let poke () =
 
 ### A callee of unknown type is a pure arrow
 
-- Divergence: `(fun h -> h ()) f` with `f : Unit ->{Log} Unit` is `FLICK-T003` "expected `Unit -> _`".
+- Divergence: `let run = fun h -> h ()` followed by `run f` with `f : Unit ->{Log} Unit` is `FLICK-T003` "expected `Unit -> _`".
 - In the model (App) admits any `φ`, but `λh. h ()` has no principal type: `(Unit →P τ) →P τ` and `(Unit →R⟨r;ε⟩ τ) →R⟨r;ε⟩ τ` are incomparable, and the core has no stage variables.
-- Resolution (spec): `reference/effects.md` states that a parameter of unknown type applied to an argument is treated as a pure function; an effectful callback gets its type from the expected type or from a signature.
+- Resolution (spec): `reference/effects.md` states that a parameter of unknown type applied to an argument is treated as a pure function; an effectful callback gets its type from the expected type, from a signature, or from the argument when the function is applied where it is written. The checker infers that argument first, so `(fun h -> h ()) f` and `f |> fun h -> h ()` type `h` as `f` and check, as `let h = f in h ()` does; so does the parameter of an accessor `.a.b` applied where it is written (`call_args.rs` `applied_where_written`). The order of checking changes, not the typing rules: the program is typed as a derivation of (App) with `φ` the stage of `f`. The reference model's checker infers the argument of such a redex first too (`redex_of` and `redex` in `flick-model/src/check/runtime.rs`; a λ whose parameter is a pattern is still inferred before its argument, in both), so the case is a pass fixture (`tests/check/pass/types/applied_where_written.fl`).
 
 ### Only arrows and `Eff` have subtyping
 

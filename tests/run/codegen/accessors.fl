@@ -1,0 +1,32 @@
+// `.a.b` reads a path of fields: passed to `List.map`, at the end of a
+// pipeline, applied at once, bound to a name and kept in a list.
+module App.Main exposing (main)
+
+type alias Address = { city : String; zip : Int }
+
+type alias User = { name : String; address : Address }
+
+type alias Handler = { run : Int -> Int }
+
+get_city : User -> String
+let get_city = .address.city
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let ada = { name = "Ada"; address = { city = "London"; zip = 1 } }
+  let alan = { name = "Alan"; address = { city = "Wilmslow"; zip = 2 } }
+  let users = [ada, alan]
+  Platform.stdout_line (show (List.map .address.city users))
+  Platform.stdout_line (show (users |> List.map .name))
+  Platform.stdout_line (.address.city ada)
+  Platform.stdout_line (alan |> .name)
+  Platform.stdout_line (get_city alan)
+  let get_zip = .address.zip
+  Platform.stdout_line (show (get_zip ada + get_zip alan))
+  let value = .value
+  Platform.stdout_line (show (value { value = 3 }))
+  Platform.stdout_line (value { value = "four" })
+  let getters = [.name, .address.city, get_city]
+  Platform.stdout_line (show (List.map (fun get -> get alan) getters))
+  let handler = { run = fun n -> n * 10 }
+  Platform.stdout_line (show ((.run handler) 5))

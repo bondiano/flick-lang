@@ -83,6 +83,9 @@ impl<'c> Checker<'c> {
             (K::BinExpr, _) if super::pipes::composes(node) => {
                 self.compose(node, Some(expected));
             }
+            (K::AccessorExpr, _) => {
+                self.accessor(node, Some(expected));
+            }
             (K::BinExpr, _) if node.has_token(K::OrElse) => {
                 self.orelse(node, &children, Some(expected));
             }
@@ -319,6 +322,8 @@ impl<'c> Checker<'c> {
             let actual = self.record(node, Some(&row));
             self.expect(&actual, expected, self.span(node));
         }
+        #[cfg(feature = "ide")]
+        self.note_literal(node, expected);
     }
 
     /// The body of a polymorphic type with rigid variables, its class
@@ -387,6 +392,7 @@ impl<'c> Checker<'c> {
                 ty
             }
             K::FieldExpr => self.field(node, children[0]),
+            K::AccessorExpr => self.accessor(node, None),
             K::QuestionExpr => self.question(node, children[0]),
             K::AppExpr if super::holes::has_hole(node) => self.apply_hole(node, None),
             K::AppExpr => {
@@ -638,6 +644,7 @@ impl<'c> Checker<'c> {
         // the arrow the expected type gives the last stage
         let mut last = None;
         let level = self.store.level;
+        let mut given = self.given_param.take();
         for param in params {
             let target = rest.as_ref().map(|t| self.whnf(t));
             let known = rest.clone().filter(|t| {
@@ -678,8 +685,10 @@ impl<'c> Checker<'c> {
                     rest = Some(Type::Error);
                     (Type::Error, None)
                 }
-                None => (self.fresh(), None),
+                None => (given.take().unwrap_or_else(|| self.fresh()), None),
             };
+            // only the first parameter is given
+            given = None;
             if let Some(param) = param {
                 let pat = self.bind_pattern(param, &ty);
                 self.irrefutable(&pat, &ty, param, None);

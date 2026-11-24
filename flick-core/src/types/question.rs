@@ -4,10 +4,12 @@
 //! value of `Some`, and `None` returns `None` from the function at once.
 
 use super::Checker;
+use super::sugar_lints::unparen;
 use super::ty::Type;
 use super::typing::range;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::syntax::cst::Node;
+use crate::syntax::kind::SyntaxKind;
 use crate::types::lang::Lang;
 
 /// What a `?` does, by the operand it takes.
@@ -98,6 +100,21 @@ impl Checker<'_> {
                 value
             }
             _ if resolved == Type::Error => Type::Error,
+            // `.email?` reads as the field, but the accessor is the operand
+            _ if unparen(operand).kind == SyntaxKind::AccessorExpr => {
+                let path = self.text_of(unparen(operand));
+                let message = format!(
+                    "`?` applies to the accessor `{path}`, a function, not to the field it reads"
+                );
+                // a lambda would move the early return, so there is no fix
+                let help = format!(
+                    "an accessor only reads fields; to apply `?` to the field, read it explicitly: `x{path}?` or `fun x -> x{path}?`"
+                );
+                self.diagnostics.push(
+                    Diagnostic::error(codes::T003, message, span).with_fix(|| (help, Vec::new())),
+                );
+                Type::Error
+            }
             _ => {
                 let shown = self.show(&ty);
                 self.error(
