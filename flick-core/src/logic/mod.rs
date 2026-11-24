@@ -351,10 +351,19 @@ pub fn prove(
     program: &dyn Program,
     lemmas: &[Lemma],
 ) -> Result<(), Failure> {
-    check::prove(statement, proof, data, program, lemmas, None)
+    check::prove(
+        statement,
+        proof,
+        data,
+        program,
+        lemmas,
+        #[cfg(not(target_arch = "wasm32"))]
+        None,
+    )
 }
 
 /// Checks a certificate and records the context used for each visited step.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn prove_traced(
     statement: &Statement,
     proof: &Cert,
@@ -368,6 +377,7 @@ pub fn prove_traced(
 
 /// Observes goals in an incomplete body with definitions folded. The editor
 /// can show these goals even before the body yields a checkable certificate.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn observe(
     statement: &Statement,
     body: &flick_ir::Expr,

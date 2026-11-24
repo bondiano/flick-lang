@@ -5,19 +5,22 @@
 use std::collections::HashSet;
 
 use super::{Expr, ExprKind, Item, ItemKind, Lit, Lower, Module};
-use crate::diagnostics::{Diagnostic, Severity};
+use crate::diagnostics::Diagnostic;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::diagnostics::Severity;
 use crate::logic::{self, Failure};
 use crate::resolve;
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::record as record_of;
-use crate::types::{
-    GoalSyntax, GoalType, ProofEvidence, ProofInfo, ProofStatus, Range, Typing, goal_syntax,
-};
+use crate::types::{GoalSyntax, GoalType, ProofInfo, Range, Typing, goal_syntax};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::types::{ProofEvidence, ProofStatus};
 use flick_ir::{Dict, InstanceInfo};
 
 mod bundles;
+#[cfg(not(target_arch = "wasm32"))]
 mod evidence;
 #[cfg(test)]
 mod replay;
@@ -208,7 +211,7 @@ pub fn check_proofs(
     module: &resolve::Module,
     typing: &Typing,
     run: &Run,
-    evidence: Option<&mut Vec<ProofEvidence>>,
+    #[cfg(not(target_arch = "wasm32"))] evidence: Option<&mut Vec<ProofEvidence>>,
 ) -> (Vec<Diagnostic>, Vec<Proven>) {
     if typing.proofs.is_empty() && typing.laws.is_empty() {
         return (Vec::new(), Vec::new());
@@ -227,14 +230,23 @@ pub fn check_proofs(
     };
     let mut lemmas = imported_lemmas(&proofs, run, 0);
     let of = |m: &str, c: &str| class_laws(run, module.name, &laws, m, c);
+    #[cfg(not(target_arch = "wasm32"))]
     let mut evidence = evidence.map(|out| evidence::Recording::new(module, run, out));
-    let diagnostics = prove_each(&proofs, &program, &mut lemmas, Some(&of), evidence.as_mut());
+    let diagnostics = prove_each(
+        &proofs,
+        &program,
+        &mut lemmas,
+        Some(&of),
+        #[cfg(not(target_arch = "wasm32"))]
+        evidence.as_mut(),
+    );
     proofs.extend(laws);
     (diagnostics, proofs)
 }
 
 /// Observes a module with syntax or typing errors for editors. Only complete,
 /// independently checked certificates can contribute facts to later drafts.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn observe_proofs(
     module: &resolve::Module,
     typing: &Typing,
@@ -243,7 +255,10 @@ pub fn observe_proofs(
     out: &mut Vec<ProofEvidence>,
 ) {
     let recording = evidence::Recording::new(module, run, out);
-    let proofs = paired(lower_proofs(module, typing), &typing.proofs);
+    let proofs = paired(
+        evidence::lower_drafts(module, typing, diagnostics),
+        &typing.proofs,
+    );
     let laws = laws_of(module, typing);
     let of = |m: &str, c: &str| class_laws(run, module.name, &laws, m, c);
     let program = Modules {
@@ -326,7 +341,7 @@ fn prove_each(
     program: &dyn logic::Program,
     lemmas: &mut Vec<logic::Lemma>,
     laws: Option<bundles::Laws<'_, '_>>,
-    mut recording: Option<&mut evidence::Recording<'_>>,
+    #[cfg(not(target_arch = "wasm32"))] mut recording: Option<&mut evidence::Recording<'_>>,
 ) -> Vec<Diagnostic> {
     let mut out = Vec::new();
     for proven in proofs {
@@ -334,6 +349,7 @@ fn prove_each(
         if info.class.is_some() {
             continue;
         }
+        #[cfg(not(target_arch = "wasm32"))]
         let mut evidence = recording.as_ref().map(|r| r.begin(lowered, lemmas));
         if let GoalType::Lawful(bundle) = &info.goal {
             // A bundle is no lemma: an importer has nothing to replay of it.
@@ -344,11 +360,19 @@ fn prove_each(
                     laws,
                     program,
                     lemmas,
+                    #[cfg(not(target_arch = "wasm32"))]
                     evidence.as_mut(),
                 ));
             }
         } else {
-            let checked = verify(lowered, info, program, lemmas, evidence.as_mut());
+            let checked = verify(
+                lowered,
+                info,
+                program,
+                lemmas,
+                #[cfg(not(target_arch = "wasm32"))]
+                evidence.as_mut(),
+            );
             if let Some(failure) = save_lemma(checked, lowered, lemmas) {
                 out.push(
                     failure
@@ -357,6 +381,7 @@ fn prove_each(
                 );
             }
         }
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some((recording, evidence)) = recording.as_mut().zip(evidence) {
             recording.out.push(evidence);
         }
@@ -369,7 +394,7 @@ fn verify(
     info: &ProofInfo,
     program: &dyn logic::Program,
     lemmas: &[logic::Lemma],
-    mut evidence: Option<&mut ProofEvidence>,
+    #[cfg(not(target_arch = "wasm32"))] mut evidence: Option<&mut ProofEvidence>,
 ) -> Result<logic::Statement, Failure> {
     let checked = statement(lowered, info).and_then(|statement| {
         let body = lowered.body.as_ref().ok_or_else(|| {
@@ -379,14 +404,18 @@ fn verify(
             })
         })?;
         let cert = logic::cert(body, lemmas)?;
+        #[cfg(not(target_arch = "wasm32"))]
         match &mut evidence {
             Some(e) => {
                 logic::prove_traced(&statement, &cert, &info.data, program, lemmas, &mut e.steps)?;
             }
             None => logic::prove(&statement, &cert, &info.data, program, lemmas)?,
         }
+        #[cfg(target_arch = "wasm32")]
+        logic::prove(&statement, &cert, &info.data, program, lemmas)?;
         Ok(statement)
     });
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(evidence) = evidence {
         match &checked {
             Ok(_) => evidence.status = ProofStatus::Checked,
@@ -452,7 +481,14 @@ fn replay_lemmas(modules: &[String], run: &Run, depth: u32) -> Vec<logic::Lemma>
         let mut lemmas = imported_lemmas(proofs, run, depth + 1);
         let imported = lemmas.len();
         // the module's own diagnostics are its own check's to report
-        let _ = prove_each(proofs, &program, &mut lemmas, None, None);
+        let _ = prove_each(
+            proofs,
+            &program,
+            &mut lemmas,
+            None,
+            #[cfg(not(target_arch = "wasm32"))]
+            None,
+        );
         out.extend(lemmas.drain(imported..).map(|mut l| {
             l.statement.name = format!("{name}.{}", l.statement.name);
             l

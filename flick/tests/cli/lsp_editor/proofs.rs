@@ -325,11 +325,12 @@ proof rebuilt (v : Option a) where equal (match v with | None -> None | Some x -
 
 #[test]
 fn proof_goal_revisions_cover_dependencies_and_closed_documents() {
-    let source = "module App.Steps exposing (..)\nlet pick (x : Bool) (y : Bool) = x\n";
+    let source =
+        "module App.Steps exposing (..)\ntwice : (a -> a) -> a -> a\nlet twice f x = f (f x)\n";
     let text = concat!(
         "module App.Laws exposing (..)\n",
-        "import App.Steps exposing (pick)\n",
-        "proof chosen (x : Bool) (y : Bool) where equal (pick x y) x = refl\n",
+        "import App.Steps exposing (twice)\n",
+        "proof chosen (f : a -> a) (x : a) where equal (twice f x) (f (f x)) = refl\n",
         "proof draft where equal /* 🥝 */ true true =\n",
     );
     let dir = project(
@@ -353,12 +354,13 @@ fn proof_goal_revisions_cover_dependencies_and_closed_documents() {
     };
     let proved = text.replace("true true =\n", "true true = refl\n");
     open(&mut lsp, &laws, &proved);
-    assert!(lsp.diagnostics(&laws).is_empty());
+    let diagnostics = lsp.diagnostics(&laws);
+    assert!(diagnostics.is_empty(), "{diagnostics:?}");
     let at = proved.find("refl").expect("certificate");
     let first = goal_at(&mut lsp, &laws, &proved, at);
     assert_eq!(first["proof"]["status"], "checked", "{first}");
 
-    open(&mut lsp, &dep, &source.replace("= x", "= y"));
+    open(&mut lsp, &dep, &source.replace("f (f x)", "f x"));
     let after_edit = goal_at(&mut lsp, &laws, &proved, at);
     assert!(after_edit["generation"].as_u64() > first["generation"].as_u64());
     let changed = if after_edit["pending"] == true {

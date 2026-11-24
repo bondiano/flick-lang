@@ -87,22 +87,7 @@ pub fn serve() -> ExitCode {
         pid = process::id(),
         "language server started"
     );
-    let mut server = Server {
-        docs: HashMap::new(),
-        versions: HashMap::new(),
-        proof_watch: false,
-        snapshots: HashMap::new(),
-        latest: None,
-        caches: Caches::new(),
-        published: HashMap::new(),
-        out: Box::new(io::stdout()),
-        registered: None,
-        requests: 0,
-        worker: Worker::new(),
-        pending: HashMap::new(),
-        generation: 0,
-        deferred: Vec::new(),
-    };
+    let mut server = Server::new(Box::new(io::stdout()));
     // the protocol reader has its own thread: waiting for the editor's next
     // message does not stop a finished analysis from being published
     let (messages, input) = mpsc::channel::<io::Result<Option<Value>>>();
@@ -190,6 +175,25 @@ pub fn serve() -> ExitCode {
 }
 
 impl Server {
+    fn new(out: Box<dyn Write>) -> Self {
+        Self {
+            docs: HashMap::new(),
+            versions: HashMap::new(),
+            proof_watch: false,
+            snapshots: HashMap::new(),
+            latest: None,
+            caches: Caches::new(),
+            published: HashMap::new(),
+            out,
+            registered: None,
+            requests: 0,
+            worker: Worker::new(),
+            pending: HashMap::new(),
+            generation: 0,
+            deferred: Vec::new(),
+        }
+    }
+
     /// Runs `f`; a panic in it, which the hook has logged, is `None`, and
     /// the analyses it may have left half-built are dropped, so the next
     /// message analyzes anew instead of the editor losing the server.
@@ -254,13 +258,12 @@ impl Server {
                 self.input_changed(&path);
                 // the closed text is gone: analyze an open document of its
                 // project instead, so the disk view is what gets published
-                match self.open_in(&context) {
-                    Some(open) => self.refresh(&open),
-                    None => {
-                        self.clear(&context);
-                        self.generation += 1;
-                        self.proof_state_changed();
-                    }
+                if let Some(open) = self.open_in(&context) {
+                    self.refresh(&open);
+                } else {
+                    self.clear(&context);
+                    self.generation += 1;
+                    self.proof_state_changed();
                 }
                 return;
             }

@@ -56,6 +56,7 @@ pub fn cert(e: &Expr, lemmas: &[Lemma]) -> Result<Cert, Failure> {
     read(e, lemmas, false)
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn recover(e: &Expr, lemmas: &[Lemma]) -> Cert {
     read(e, lemmas, true).unwrap_or_else(|why| hole(e, why))
 }

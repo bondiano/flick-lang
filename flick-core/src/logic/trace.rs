@@ -5,7 +5,9 @@ use std::rc::Rc;
 
 use super::defs::Admitted;
 use super::eval::{Env, Machine, Stop, Value};
-use super::show::{show, source_name};
+use super::show::show;
+#[cfg(not(target_arch = "wasm32"))]
+use super::show::source_name;
 use super::{Equation, Goal, Ty};
 use crate::source::Span;
 
@@ -40,11 +42,13 @@ pub(super) fn same_type(a: &Ty, b: &Ty) -> String {
     format!("same_type ({a}) ({b})")
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) struct Trace<'a> {
     pub steps: &'a mut Vec<ProofStep>,
     remaining: u64,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl<'a> Trace<'a> {
     pub fn new(steps: &'a mut Vec<ProofStep>) -> Self {
         Self {
@@ -110,6 +114,7 @@ impl<'a> Terms<'a> {
         format!("{left} = {right}")
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     fn value(&mut self, value: Value) -> String {
         self.read(|_| Ok(value))
     }

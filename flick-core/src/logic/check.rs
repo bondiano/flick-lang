@@ -7,6 +7,7 @@ use super::defs::{Admitted, Program, admit};
 use super::eval::{Env, Machine, Nf, STEPS, Stop, Value, distinct};
 use super::show::show;
 use super::term::{Pat, Refused, TUPLES, Term};
+#[cfg(not(target_arch = "wasm32"))]
 use super::trace::{ProofStep, Trace};
 use super::{Arg, Cert, Data, Equation, Failure, Goal, Lemma, Rule, Statement, Ty};
 use crate::source::Span;
@@ -29,7 +30,9 @@ struct Checker<'a> {
     facts: Vec<(Rc<str>, Equation)>,
     steps: u64,
     fresh: u32,
+    #[cfg(not(target_arch = "wasm32"))]
     trace: Option<Trace<'a>>,
+    #[cfg(not(target_arch = "wasm32"))]
     observing: bool,
 }
 
@@ -66,7 +69,7 @@ pub(super) fn prove(
     data: &Data,
     program: &dyn Program,
     lemmas: &[Lemma],
-    trace: Option<&mut Vec<ProofStep>>,
+    #[cfg(not(target_arch = "wasm32"))] trace: Option<&mut Vec<ProofStep>>,
 ) -> Result<(), Failure> {
     let mut terms: Vec<&Term> = statement
         .premises
@@ -106,7 +109,9 @@ pub(super) fn prove(
         facts: Vec::new(),
         steps: STEPS,
         fresh: 0,
+        #[cfg(not(target_arch = "wasm32"))]
         trace: trace.map(Trace::new),
+        #[cfg(not(target_arch = "wasm32"))]
         observing: false,
     };
     for (x, ty) in &statement.params {
@@ -128,6 +133,7 @@ pub(super) fn prove(
             checker.check(eq, proof, origin)
         }
         Goal::SameType(a, b) => {
+            #[cfg(not(target_arch = "wasm32"))]
             checker.record(proof.span, Err((a, b)));
             checker.admit(a, statement.span)?;
             checker.admit(b, statement.span)?;
@@ -155,6 +161,7 @@ pub(super) fn prove(
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn observe(
     statement: &Statement,
     proof: &Cert,
@@ -353,12 +360,31 @@ impl Checker<'_> {
         Ok(())
     }
 
+    #[cfg_attr(target_arch = "wasm32", allow(clippy::unused_self))]
+    fn is_observing(&self) -> bool {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            self.observing
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            false
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn record(&mut self, span: Span, goal: Result<&Equation, (&Ty, &Ty)>) -> Option<usize> {
         self.trace
             .as_mut()
             .map(|trace| trace.record(span, goal, &self.vars, &self.facts, &self.refined))
     }
 
+    #[cfg(target_arch = "wasm32")]
+    fn check(&mut self, goal: &Equation, cert: &Cert, origin: GoalOrigin) -> Result<(), Failure> {
+        self.check_rule(goal, cert, origin)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn check(&mut self, goal: &Equation, cert: &Cert, origin: GoalOrigin) -> Result<(), Failure> {
         let from = self.steps;
         let recorded = self.record(cert.span, Ok(goal));
@@ -390,7 +416,7 @@ impl Checker<'_> {
                     right: right.clone(),
                 };
                 let first = self.check(&to(&goal.left, m), p, GoalOrigin::Step);
-                if !self.observing {
+                if !self.is_observing() {
                     first?;
                     return self.check(&to(m, &goal.right), q, GoalOrigin::Step);
                 }
@@ -458,7 +484,7 @@ impl Checker<'_> {
             Rule::Let(h, p, rest) => {
                 let eq = match self.synth(p) {
                     Ok(eq) => eq,
-                    Err(why) if self.observing => {
+                    Err(why) if self.is_observing() => {
                         let _ = self.check(goal, rest, origin);
                         return Err(why);
                     }
@@ -473,6 +499,12 @@ impl Checker<'_> {
     }
 
     /// The equation a proof proves, where it can be read off the proof.
+    #[cfg(target_arch = "wasm32")]
+    fn synth(&mut self, cert: &Cert) -> Result<Equation, Failure> {
+        self.synth_rule(cert)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn synth(&mut self, cert: &Cert) -> Result<Equation, Failure> {
         let from = self.steps;
         let eq = self.synth_rule(cert)?;
@@ -568,7 +600,7 @@ impl Checker<'_> {
                 failure.with_related(lemma_span, format!("premise `{h}` of `{name}`"))
             });
             if let Err(why) = result {
-                if !self.observing {
+                if !self.is_observing() {
                     return Err(why);
                 }
                 failure.get_or_insert(why);

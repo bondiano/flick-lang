@@ -232,10 +232,8 @@ impl Loader<'_> {
             #[cfg(not(target_arch = "wasm32"))]
             own_package_when: self.own_package_when,
             lowered: self.lowered.as_deref().unwrap_or(&[]),
-            #[cfg(feature = "ide")]
-            // The native goal view consumes kernel traces. Browser queries
-            // still have the typed declaration and source context.
-            observe_proofs: cfg!(not(target_arch = "wasm32")) && self.ide.is_some(),
+            #[cfg(all(feature = "ide", not(target_arch = "wasm32")))]
+            observe_proofs: self.ide.is_some(),
             proving: self.modules.iter().any(Loaded::has_proofs) || self.has_selected_contracts(),
             prove_contracts: self.prove_contracts,
             selected: self.prove_contracts.then_some(&self.selected_roots),
@@ -352,7 +350,7 @@ struct Checking<'a> {
     lower: bool,
     /// The IR of the modules checked before this level, which proofs read.
     lowered: &'a [Option<Lowered>],
-    #[cfg(feature = "ide")]
+    #[cfg(all(feature = "ide", not(target_arch = "wasm32")))]
     observe_proofs: bool,
     /// The run has proofs or selected contracts: its modules keep their IR for them.
     proving: bool,

@@ -7,22 +7,7 @@ use serde_json::json;
 /// A server under test: it records what it writes and owns no worker of its
 /// own start.
 fn server(out: Box<dyn Write>) -> Server {
-    Server {
-        docs: HashMap::new(),
-        versions: HashMap::new(),
-        proof_watch: false,
-        snapshots: HashMap::new(),
-        latest: None,
-        caches: Caches::new(),
-        published: HashMap::new(),
-        out,
-        registered: None,
-        requests: 0,
-        worker: Worker::new(),
-        pending: HashMap::new(),
-        generation: 0,
-        deferred: Vec::new(),
-    }
+    Server::new(out)
 }
 
 /// Waits for the analyses the server queued and publishes them, as the loop does.

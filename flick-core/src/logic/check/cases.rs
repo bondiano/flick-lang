@@ -61,7 +61,7 @@ impl Checker<'_> {
             let result = self.check_arm(goal, v, &cases, &mut covered, arm, origin);
             self.vars.truncate(mark);
             if let Err(why) = result {
-                if !self.observing {
+                if !self.is_observing() {
                     return Err(why);
                 }
                 failure.get_or_insert(why);

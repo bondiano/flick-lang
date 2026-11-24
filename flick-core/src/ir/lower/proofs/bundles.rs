@@ -12,7 +12,9 @@ use super::{Field, Proven, statement};
 use crate::diagnostics::Diagnostic;
 use crate::logic::{self, Arg, Cert, Failure, Rule, Term, Ty};
 use crate::source::Span;
-use crate::types::{Bundle, GoalType, LawObligation, ProofEvidence, ProofStatus};
+use crate::types::{Bundle, GoalType};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::types::{LawObligation, ProofEvidence, ProofStatus};
 
 /// The laws of a class, by its module and name; `None` where its module's
 /// laws are not available to the run.
@@ -29,10 +31,11 @@ pub(super) fn check_bundle(
     laws: Laws<'_, '_>,
     program: &dyn logic::Program,
     lemmas: &[logic::Lemma],
-    mut evidence: Option<&mut ProofEvidence>,
+    #[cfg(not(target_arch = "wasm32"))] mut evidence: Option<&mut ProofEvidence>,
 ) -> Vec<Diagnostic> {
     let Some(subject) = &lowered.subject else {
         let why = "its constraint resolved to no dictionary".into();
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(evidence) = evidence {
             evidence.status = ProofStatus::Blocked;
             evidence.failure = Some(lowered.span);
@@ -48,6 +51,7 @@ pub(super) fn check_bundle(
         program,
         lemmas,
         out: Vec::new(),
+        #[cfg(not(target_arch = "wasm32"))]
         obligations: evidence.as_mut().map(|e| &mut e.obligations),
     };
     checking.class(bundle, subject, &mut Vec::new());
@@ -57,6 +61,7 @@ pub(super) fn check_bundle(
         out.push(invalid(field.span, why));
     }
     let diagnostics: Vec<_> = out.iter().map(|f| f.diagnostic(&info.name)).collect();
+    #[cfg(not(target_arch = "wasm32"))]
     if let Some(evidence) = evidence {
         evidence.status = out
             .first()
@@ -66,6 +71,7 @@ pub(super) fn check_bundle(
     diagnostics
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 pub(super) fn observe_bundle(
     proof: &Proven,
     bundle: &Bundle,
@@ -89,6 +95,7 @@ struct Checking<'a, 'p> {
     program: &'a dyn logic::Program,
     lemmas: &'a [logic::Lemma],
     out: Vec<Failure>,
+    #[cfg(not(target_arch = "wasm32"))]
     obligations: Option<&'a mut Vec<LawObligation>>,
 }
 
@@ -148,10 +155,19 @@ impl Checking<'_, '_> {
             self.used[i] = true;
             &self.fields[i]
         });
+        #[cfg(not(target_arch = "wasm32"))]
         let mut shown = None;
         let result = if let Some(field) = field {
-            self.law(law, bundle, dict, field, &mut shown)
+            self.law(
+                law,
+                bundle,
+                dict,
+                field,
+                #[cfg(not(target_arch = "wasm32"))]
+                &mut shown,
+            )
         } else {
+            #[cfg(not(target_arch = "wasm32"))]
             if self.obligations.is_some() {
                 shown = self
                     .law_statement(law, bundle, dict)
@@ -166,6 +182,7 @@ impl Checking<'_, '_> {
                 ),
             ))
         };
+        #[cfg(not(target_arch = "wasm32"))]
         if let Some(obligations) = &mut self.obligations {
             obligations.push(LawObligation {
                 path: path.to_vec(),
@@ -220,10 +237,11 @@ impl Checking<'_, '_> {
         bundle: &Bundle,
         dict: &Dict,
         field: &Field,
-        shown: &mut Option<String>,
+        #[cfg(not(target_arch = "wasm32"))] shown: &mut Option<String>,
     ) -> Result<(), Failure> {
         let (law, info) = proved;
         let statement = self.law_statement(proved, bundle, dict)?;
+        #[cfg(not(target_arch = "wasm32"))]
         if self.obligations.is_some() {
             *shown = Some(logic::show_goal(&statement.goal));
         }

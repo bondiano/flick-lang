@@ -58,6 +58,7 @@ pub enum ProofStatus {
     BudgetExhausted,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl ProofStatus {
     pub(crate) fn of_failure(failure: &logic::Failure) -> Self {
         match failure.cause() {
