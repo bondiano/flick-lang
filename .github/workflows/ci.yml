@@ -161,6 +161,7 @@ jobs:
           if-no-files-found: error
       - run: just go-test
       - run: just language
+      - run: just kernel
       - run: just bundle-size >> "$GITHUB_STEP_SUMMARY"
 
   # the e2e suites of the compiler but the cases of tests/run

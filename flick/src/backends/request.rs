@@ -12,6 +12,7 @@ use flick_backend::{
 };
 use std::collections::HashSet;
 
+use flick_backend_support::kernel;
 use flick_core::build;
 use flick_core::codegen;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -545,10 +546,7 @@ fn target(
             backend_api: flick_backend::VERSION.into(),
             ir_version: flick_ir::VERSION.into(),
             language_version: toolchain::COMPILER.into(),
-            runtime_abis: vec![Abi {
-                name: "flickrt".into(),
-                version: toolchain::RUNTIME.into(),
-            }],
+            runtime_abis: runtime_abis(toolchain::RUNTIME),
             environment,
             tags,
             host_package,
@@ -563,4 +561,19 @@ fn target(
         },
         module_root,
     )
+}
+
+/// The runtime ABIs a request names: Flick's runtime at `runtime`, and the
+/// primitive kernel.
+pub(super) fn runtime_abis(runtime: &str) -> Vec<Abi> {
+    vec![
+        Abi {
+            name: "flickrt".into(),
+            version: runtime.into(),
+        },
+        Abi {
+            name: kernel::ABI.into(),
+            version: kernel::VERSION.into(),
+        },
+    ]
 }

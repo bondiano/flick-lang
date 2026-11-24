@@ -7,6 +7,7 @@
 //! probes ([`MAX_EXTERNAL_PROBES`]).
 
 use std::collections::{HashMap, HashSet};
+use std::hash::{BuildHasherDefault, DefaultHasher};
 use std::mem;
 
 use flick_ir::{Dict, Expr, ExprKind, ItemKind, Module};
@@ -29,7 +30,8 @@ pub(super) const MAX_EXTERNAL_PROBES: usize = 1_024;
 /// (`"m\0<module>\0<instance>\0<method>"`).
 #[derive(Debug, Default)]
 pub struct DefTable {
-    defs: HashMap<String, (Vec<String>, Expr)>,
+    // fixed keys: a backend component may have no source of randomness
+    defs: HashMap<String, (Vec<String>, Expr), BuildHasherDefault<DefaultHasher>>,
 }
 
 /// Joins `parts` with `'\0'` into a compact composite key.

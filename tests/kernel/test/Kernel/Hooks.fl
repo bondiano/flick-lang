@@ -1,0 +1,86 @@
+// The hooks of the built-in classes on primitive values: `eq` is
+// SameValueZero on floats, `compare` is total with NaN last and orders
+// strings by UTF-16 code units, `hash` agrees with `eq`, and `show` writes
+// values as a JS literal would. A backend's runtime derives the instances
+// of records and tuples from them. Operands come in through `same`, so the
+// runtime computes them, not the compiler.
+module Kernel.Hooks exposing (tests)
+
+same : a -> a
+let same x = x
+
+nan : Unit -> Float
+let nan () = same 0.0 / 0.0
+
+infinity : Unit -> Float
+let infinity () = same 1.0 / 0.0
+
+/// U+1F30D built from its two halves.
+rejoined : Unit -> String
+let rejoined () = String.slice 0 1 "\u{1F30D}" ++ String.slice 1 2 "\u{1F30D}"
+
+tests : List Test.Test
+let tests = [
+  Test.group "eq" [
+    Test.test "NaN equals itself" (fun () -> Test.is_true "NaN" (eq (nan ()) (nan ()))),
+    Test.test "-0 equals 0" (fun () -> Test.is_true "-0" (eq (same (-0.0)) 0.0)),
+    Test.test "a rejoined pair equals the scalar" (fun () ->
+      Test.is_true "pair" (eq (rejoined ()) "\u{1F30D}")
+    ),
+    Test.test "NUL is part of the string" (fun () ->
+      Test.is_true "NUL" (not (eq (same "a\u{0}") "a"))
+    ),
+    Test.test "BigInt" (fun () -> Test.is_true "BigInt" (not (eq (same 1n) 2n))),
+    Test.test "Int64" (fun () -> Test.is_true "Int64" (eq (same (-1i64)) (-1i64))),
+  ],
+  Test.group "compare" [
+    Test.test "Int" (fun () -> Test.equal LT (compare (same (-1)) 0)),
+    Test.test "NaN is above Infinity" (fun () -> Test.equal GT (compare (nan ()) (infinity ()))),
+    Test.test "-Infinity is below NaN" (fun () ->
+      Test.equal LT (compare (-(infinity ())) (nan ()))
+    ),
+    Test.test "NaN is equal to NaN" (fun () -> Test.equal EQ (compare (nan ()) (nan ()))),
+    Test.test "-0 and 0 are equal" (fun () -> Test.equal EQ (compare (same (-0.0)) 0.0)),
+    Test.test "strings by code units, not code points" (fun () ->
+      Test.equal GT (compare (same "\u{FF61}") "\u{1F600}")
+    ),
+    Test.test "uppercase before lowercase" (fun () -> Test.equal LT (compare (same "Z") "a")),
+    Test.test "a prefix first" (fun () -> Test.equal LT (compare (same "ab") "abc")),
+    Test.test "Cyrillic after ASCII" (fun () -> Test.equal GT (compare (same "я") "z")),
+    Test.test "BigInt" (fun () -> Test.equal LT (compare (same (-10n)) 2n)),
+    Test.test "UInt64 above the range of Int64" (fun () ->
+      Test.equal GT (compare (same 18446744073709551615u64) 1u64)
+    ),
+    Test.test "false before true" (fun () -> Test.equal LT (compare (same false) true)),
+  ],
+  Test.group "hash agrees with eq" [
+    Test.test "-0 and 0" (fun () -> Test.equal (hash 0.0) (hash (same (-0.0)))),
+    Test.test "NaN" (fun () -> Test.equal (hash (nan ())) (hash (nan ()))),
+    Test.test "a string built in two pieces" (fun () ->
+      Test.equal (hash "kernel") (hash (same "ker" ++ "nel"))
+    ),
+    Test.test "a rejoined pair" (fun () -> Test.equal (hash "\u{1F30D}") (hash (rejoined ()))),
+    Test.test "BigInt" (fun () ->
+      Test.equal (hash 12345678901234567890n) (hash (same 12345678901234567890n))
+    ),
+  ],
+  Test.group "show" [
+    Test.test "Bool" (fun () -> Test.equal "true" (show (same true))),
+    Test.test "Int" (fun () -> Test.equal "-7" (show (same (-7)))),
+    Test.test "BigInt has its suffix" (fun () -> Test.equal "-1n" (show (same (-1n)))),
+    Test.test "Float" (fun () -> Test.equal "1.5" (show (same 1.5))),
+    Test.test "Ordering" (fun () -> Test.equal "GT" (show (compare (same 2) 1))),
+    Test.test "a string is quoted and escaped" (fun () ->
+      Test.equal "\"q\\\"\\\\\\n\\t\"" (show (same "q\"\\\n\t"))
+    ),
+    Test.test "control characters as \\u" (fun () ->
+      Test.equal "\"\\u0000\\u001f\"" (show (same "\u{0}\u{1F}"))
+    ),
+    Test.test "non-ASCII stays" (fun () ->
+      Test.equal "\"ядро\u{1F30D}\"" (show (same "ядро\u{1F30D}"))
+    ),
+    Test.test "a lone surrogate is escaped" (fun () ->
+      Test.equal "\"\\ud83c\"" (show (String.slice 0 1 (same "\u{1F30D}")))
+    ),
+  ],
+]
