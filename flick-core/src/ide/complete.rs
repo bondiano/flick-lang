@@ -156,6 +156,10 @@ impl Ide<'_> {
         if !dotted && let Some(items) = self.foreign_meta_complete(file, offset) {
             return items;
         }
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(items) = self.proof_completion(file, offset, dotted) {
+            return items;
+        }
         let mut items = if dotted {
             self.after_dot(file, offset)
         } else {

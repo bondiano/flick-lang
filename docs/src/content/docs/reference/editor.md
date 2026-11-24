@@ -189,6 +189,14 @@ reports checked proofs, blocked verification and exhausted proof budgets. When
 the checker locates a failing step, the view shows its line and column. It
 refreshes after unsaved edits to the proof and the definitions it uses.
 
+Proof completion marks a term **Closes the goal** when the proof checker has
+verified it at the cursor. For example, with `h : x = y` and goal `y = x`,
+it can insert `symm h`. Structural completions such as `funext` leave
+obligations for you to fill. Signature help identifies value arguments and
+proof arguments. In a `lawful` bundle, completion offers law names and checked
+lemmas for the selected instance. **Add missing law fields** adds placeholders
+for missing laws and superclass records while preserving written entries.
+
 ## Zed
 
 The extension first uses `lsp.flick.binary.path`, if set, then `flick` on

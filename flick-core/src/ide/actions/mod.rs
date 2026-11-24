@@ -30,6 +30,8 @@ impl Ide<'_> {
     /// The rewrites offered for the range `start..end` of `file`.
     pub fn actions(&self, file: FileId, start: u32, end: u32) -> Vec<Action> {
         let mut out: Vec<Action> = Vec::new();
+        #[cfg(not(target_arch = "wasm32"))]
+        out.extend(self.scaffold_laws(file, start));
         out.extend(self.add_signature(file, start));
         out.extend(self.infer_todo_signature(file, start));
         out.extend(self.import_class(file, start));
