@@ -139,6 +139,12 @@ impl Lowering<'_> {
         };
         let (params, result) = ty.fun_stages();
         let taken = f.taken();
+        if taken == 0 {
+            return Err(
+                "a foreign value, not a function, needs the Lua value ABI, which is not \
+                        implemented",
+            );
+        }
         if params.len() != taken || params.iter().any(|(_, s)| *s != Stage::Pure) {
             return Err("its stages need the Lua runtime, which is not implemented");
         }

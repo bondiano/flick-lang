@@ -41,6 +41,7 @@ function version(command, args, pattern) {
 
 const versions = {
   lua51: version(lua51, ["-v"], /^Lua 5\.1\.5 /),
+  luac: version(luac, ["-v"], /^Lua 5\.1\.5 /),
   luajit: version(luajit, ["-v"], /^LuaJIT 2\.1\./),
   love: version(love, ["--version"], /^LOVE 11\.5 /),
 };
@@ -136,7 +137,7 @@ function located(stderr, dist) {
   if (!at) return `unlocated: ${lines[0]}`;
   const chunk = at[1];
   const file = join(dist, `${chunk}.map`);
-  if (!existsSync(file)) return `no map for ${chunk}: ${first}`;
+  if (!existsSync(file)) return `no map for ${chunk}: ${at[0]}`;
   const flickSource = source(JSON.parse(readFileSync(file, "utf8")), Number(at[2]));
   return `${flickSource ?? `${chunk}:${at[2]} unmapped`}: ${at[3]}`;
 }

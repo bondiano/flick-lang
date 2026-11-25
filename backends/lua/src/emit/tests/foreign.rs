@@ -134,7 +134,19 @@ fn what_crosses_beyond_scalars_needs_the_value_abi() {
         ),
         value("c", app(use_("log", 50), string("x"))),
     ];
+    let mut pi = host("pi", "math.pi", named("Float"), 0, 60);
+    if let ItemKind::Foreign(f) = &mut pi.kind {
+        f.stages = vec![];
+    }
+    let mut items = items;
+    items.push(pi);
     let found = refusals("lua51", items);
+    assert!(
+        found
+            .iter()
+            .any(|(m, s)| m.contains("a foreign value, not a function") && *s == (60, 61)),
+        "{found:#?}"
+    );
     let at_use = |start| found.iter().find(|(_, s)| *s == (start, start + 3));
     let message = |start| at_use(start).map_or("", |(m, _)| m.as_str());
     assert!(message(30).contains("a result other than"), "{found:#?}");
