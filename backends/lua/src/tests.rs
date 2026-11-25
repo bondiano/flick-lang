@@ -17,7 +17,7 @@ use flick_ir::{
 use toml::{Table, Value};
 
 use super::Lua;
-use crate::profiles::PROFILES;
+use crate::profiles::{DIALECTS, PROFILES};
 
 fn root() -> &'static Path {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -98,6 +98,53 @@ fn the_profile_table_is_what_the_profile_files_record() {
                 .join(table["api"].as_str().expect("api")),
         );
         assert_eq!(api.expect("snapshot"), p.api, "{}", p.id);
+    }
+}
+
+#[test]
+fn the_dialect_table_is_what_the_dialect_files_record() {
+    for d in DIALECTS {
+        let table = profile(d.id);
+        assert_eq!(table["kind"].as_str(), Some("dialect"), "{}", d.id);
+        let facts = facts(&table);
+        let dialects = facts["dialects"].as_array().expect("dialects");
+        assert!(
+            dialects.iter().any(|t| t.as_str() == Some(d.tag)),
+            "{}",
+            d.id
+        );
+        for (name, value) in [
+            ("max-locals", d.max_locals),
+            ("max-upvalues", d.max_upvalues),
+            ("max-constants", d.max_constants),
+            ("max-registers", d.max_registers),
+        ] {
+            let found = facts[name]
+                .as_integer()
+                .and_then(|n| usize::try_from(n).ok());
+            assert_eq!(found, Some(value), "{} {name}", d.id);
+        }
+        // a call after one local fails at this many arguments
+        let observed = facts["limits-observed"].as_str().expect("observed limits");
+        let arguments = d.max_registers - 1 - d.call_slots;
+        assert!(
+            observed.contains(&format!("a call of {arguments} arguments")),
+            "{}: {observed}",
+            d.id
+        );
+        assert_eq!(
+            observed.contains("of a kind"),
+            d.constants_by_kind,
+            "{}",
+            d.id
+        );
+        let zero = facts["negative-zero-literal"].as_str().expect("-0.0");
+        assert_eq!(
+            zero.contains("stays -0"),
+            d.negative_zero,
+            "{}: {zero}",
+            d.id
+        );
     }
 }
 

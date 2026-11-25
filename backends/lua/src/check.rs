@@ -86,11 +86,7 @@ impl Rules<'_> {
     }
 
     fn dialect(&self) -> &'static str {
-        if self.has("luajit") {
-            "luajit"
-        } else {
-            "lua51"
-        }
+        profiles::dialect(self.tags).tag
     }
 
     /// The dialect and capabilities the environment selects.
