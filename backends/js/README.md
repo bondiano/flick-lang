@@ -5,10 +5,10 @@ This crate owns the Rust JavaScript/TypeScript emitter. It consumes portable
 TypeScript projections. It does not depend on `flick-core`, `Compilation`,
 `Settings`, a checker, or project/filesystem lookups.
 
-`flick-backend-support` supplies the helpers actually shared with Go and the
-frontend. `codegen::RuntimeLayout` places physical lexical files, while
-`codegen::sourcemap` encodes version 3 maps from supplied source paths and
-UTF-16 positions. Enable `source-maps` for mappings and map encoding.
+`flick-backend-support` supplies the helpers actually shared with Go, Lua and
+the frontend; its `sourcemap` encodes version 3 maps from supplied source
+paths and UTF-16 positions. `codegen::RuntimeLayout` places physical lexical
+files. Enable `source-maps` for the mappings of the emitted code.
 
 The native development adapter is `flick-core::codegen`; frontend type rules,
 `.iface`, `.d.ts` and Promise facades remain shared. The public backend ABI is

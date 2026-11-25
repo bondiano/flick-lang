@@ -6,11 +6,12 @@ and TypeScript, see its [README](js/README.md)) and `go` (one Go module per
 entry, with `runtime-go` embedded). They read portable `flick_ir` and the
 host's projections, never `flick-core`.
 `lua` is a preview component of the same world, not official: it pins the
-host profiles of `lua/profiles/` and checks programs against them, and its
-`generate` writes a chunk per reached module through its emitter,
-`lua/src/emit/`, which lowers the pure core of the IR to structured Lua and
-checks the dialect's VM limits. `lua/kernel.txt` says what it does with each
-`flick:` binding. See [Lua host profiles](../docs/backends/lua-profiles.md).
+host profiles of `lua/profiles/` and checks programs against them. Its
+emitter, `lua/src/emit/`, lowers the pure core of the IR to structured Lua
+and checks the dialect's VM limits; `generate` writes a chunk per reached
+module, and on LÖVE a `main.lua` that loads them. `lua/kernel.txt` says
+what it does with each `flick:` binding. See
+[Lua host profiles](../docs/backends/lua-profiles.md).
 
 ## Layout
 

@@ -195,6 +195,7 @@ fn a_vm_limit_and_lexical_prefixes_are_refused_at_the_source() {
     let found = Lua
         .generate(&request, &mut Texts)
         .expect_err("over the limit");
+    assert_eq!(found.len(), 1, "{found:#?}");
     let span = found[0].span.as_ref().expect("a span");
     assert_eq!(
         (span.file, span.start, span.end),
