@@ -38,7 +38,7 @@ let answer subject =
                 if release {
                     build::optimized(&modules, module, false)
                 } else {
-                    module.ir.clone()
+                    (*module.ir).clone()
                 }
             })
             .collect();
@@ -97,7 +97,7 @@ fn join_preserves_empty_singleton_unicode_and_argument_order() {
                 if release {
                     build::optimized(&modules, module, false)
                 } else {
-                    module.ir.clone()
+                    (*module.ir).clone()
                 }
             })
             .collect();
@@ -126,7 +126,7 @@ fn join_fuel_prefixes_preserve_escaped_shared_separator() {
                 if release {
                     build::optimized(&modules, module, false)
                 } else {
-                    module.ir.clone()
+                    (*module.ir).clone()
                 }
             })
             .collect();

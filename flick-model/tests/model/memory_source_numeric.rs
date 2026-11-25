@@ -66,7 +66,7 @@ fn check(text: &str, expected: &str) {
                 if release {
                     build::optimized(&modules, module, false)
                 } else {
-                    module.ir.clone()
+                    (*module.ir).clone()
                 }
             })
             .collect();

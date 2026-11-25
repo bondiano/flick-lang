@@ -24,7 +24,7 @@ fn program(source: &str, name: &str, release: bool) -> Program {
             if release {
                 build::optimized(&modules, m, false)
             } else {
-                m.ir.clone()
+                (*m.ir).clone()
             }
         })
         .collect();

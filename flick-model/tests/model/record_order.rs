@@ -146,7 +146,7 @@ main : Unit -> { a : Int; z : Int }
 let main () = { z = 1; a = 2 }
 ";
     let modules = run::compile_source(source).expect("source compiles");
-    let ir: Vec<_> = modules.iter().map(|m| m.ir.clone()).collect();
+    let ir: Vec<_> = modules.iter().map(|m| (*m.ir).clone()).collect();
     let entry = MemName::new("App.Main", "main");
     let program = perceus::lower_with_declarations(
         ir.iter().chain(build::builtin_modules()),

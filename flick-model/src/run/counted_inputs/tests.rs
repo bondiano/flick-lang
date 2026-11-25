@@ -174,7 +174,7 @@ fn disjoint_app_failure_fallback_is_retained_without_mutating_the_checked_root()
         .expect("builtin failure declaration");
     assert!(app.exports.contains(fail));
     assert_eq!(checked[0].declarations, snapshot);
-    let explicit_ir = vec![checked[0].ir.clone()];
+    let explicit_ir = vec![(*checked[0].ir).clone()];
     let resolved = modules(&explicit_ir);
     let builtin = build::builtin_modules()
         .iter()
@@ -190,7 +190,7 @@ fn disjoint_app_failure_fallback_is_retained_without_mutating_the_checked_root()
             .iter()
             .any(|module| module.name == "App" && module.items.contains(fail))
     );
-    assert_eq!(checked[0].ir, explicit_ir[0]);
+    assert_eq!(*checked[0].ir, explicit_ir[0]);
 }
 
 #[test]

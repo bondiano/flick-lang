@@ -270,7 +270,7 @@ fn a_block_stands_for_the_code_its_plugin_gives() {
     // every span of the IR is in the module's own text, where source maps
     // and runtime errors point
     let len = u32::try_from(main.len()).expect("short");
-    let mut ir = module.ir.clone();
+    let mut ir = (*module.ir).clone();
     ir.each_span_mut(&mut |s| assert!(s.end <= len, "{s:?} past {len}"));
 }
 

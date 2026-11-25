@@ -75,7 +75,7 @@ fn programs(name: &str) -> (Name, [memory::Program; 2]) {
                 if release {
                     build::optimized(&modules, m, false)
                 } else {
-                    m.ir.clone()
+                    (*m.ir).clone()
                 }
             })
             .collect();

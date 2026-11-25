@@ -89,7 +89,7 @@ fn foreign_programs(source: &str, module: &str, name: &str) -> (Name, [Program; 
                 if release {
                     build::optimized(&modules, module, false)
                 } else {
-                    module.ir.clone()
+                    (*module.ir).clone()
                 }
             })
             .collect();
@@ -279,7 +279,7 @@ fn indistinguishable_non_numeric_number_domains_reject_at_lowering_not_runtime()
                 if release {
                     build::optimized(&modules, module, false)
                 } else {
-                    module.ir.clone()
+                    (*module.ir).clone()
                 }
             })
             .collect();

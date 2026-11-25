@@ -20,7 +20,7 @@ fn compile_counted(text: &str, release: bool, entry: &Name) -> Program {
             if release {
                 build::optimized(&modules, module, false)
             } else {
-                module.ir.clone()
+                (*module.ir).clone()
             }
         })
         .collect();

@@ -101,7 +101,7 @@ fn compile_with(host: &dyn Host, roots: &[path::PathBuf]) -> Result<Vec<Compiled
 pub fn program(modules: &[Compiled]) -> Program {
     let builtins: &[ir::Module] = build::builtin_modules();
     let decls = decls(modules);
-    translate::program_with_decls(modules.iter().map(|m| &m.ir).chain(builtins), &decls)
+    translate::program_with_decls(modules.iter().map(|m| &*m.ir).chain(builtins), &decls)
 }
 
 /// What the checker knows of `modules` and the built-in modules.
@@ -118,7 +118,7 @@ pub fn decls(modules: &[Compiled]) -> Decls {
     // explicit IR metadata; generated names are never decoded or guessed.
     for module in modules
         .iter()
-        .map(|m| &m.ir)
+        .map(|m| &*m.ir)
         .chain(build::builtin_modules())
     {
         for item in &module.items {
@@ -395,7 +395,7 @@ fn counted_program_inner(
             if release {
                 build::optimized(modules, module, false)
             } else {
-                module.ir.clone()
+                (*module.ir).clone()
             }
         })
         .collect();

@@ -90,7 +90,7 @@ pub struct Compiled {
     pub package: Option<String>,
     /// The modules it imports.
     pub imports: Vec<String>,
-    pub ir: ir::Module,
+    pub ir: Arc<ir::Module>,
     /// Every top-level entity with its type, for the reference model.
     pub declarations: Arc<Interface>,
     pub interface: Interface,

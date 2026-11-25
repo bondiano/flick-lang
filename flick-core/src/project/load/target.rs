@@ -131,7 +131,7 @@ pub(super) fn validate_official_exports(
         .modules
         .iter()
         .filter(|m| m.package.is_none() && compilation.module_available(&m.name))
-        .map(|m| &m.ir)
+        .map(|m| &*m.ir)
         .collect();
     if own.iter().all(|m| m.exports.host.is_empty()) {
         return;

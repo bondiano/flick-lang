@@ -21,7 +21,7 @@ fn program(source: &str, entry: &Name, release: bool) -> Program {
             if release {
                 build::optimized(&modules, m, false)
             } else {
-                m.ir.clone()
+                (*m.ir).clone()
             }
         })
         .collect();
@@ -95,7 +95,7 @@ fn checked_non_string_inputs_fail_closed() {
                     if release {
                         build::optimized(&modules, m, false)
                     } else {
-                        m.ir.clone()
+                        (*m.ir).clone()
                     }
                 })
                 .collect();

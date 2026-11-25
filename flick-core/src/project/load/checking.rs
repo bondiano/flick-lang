@@ -148,6 +148,28 @@ impl ModuleCache {
             .map(|(_, _, parsed)| parsed.clone())
     }
 
+    /// Applies `edit` to `ir`, the run's IR of the module at `path`. When
+    /// `cache` keeps that same IR, it is edited in place, not copied, and
+    /// the cache keeps the edited one; `edit` must then leave IR it already
+    /// edited as it is, so a later run that reuses it sees the same IR.
+    pub(super) fn edit_ir(
+        cache: Option<&mut Self>,
+        path: &Path,
+        ir: &mut Arc<ir::Module>,
+        edit: impl FnOnce(&mut ir::Module),
+    ) {
+        let kept = (cache.and_then(|cache| cache.entries.get_mut(path)))
+            .map(|(_, output)| &mut output.ir)
+            .filter(|kept| kept.as_ref().is_some_and(|kept| Arc::ptr_eq(kept, ir)));
+        let Some(kept) = kept else {
+            return edit(Arc::make_mut(ir));
+        };
+        // the cache's reference goes first, so `make_mut` finds `ir` unshared
+        *kept = None;
+        edit(Arc::make_mut(ir));
+        *kept = Some(Arc::clone(ir));
+    }
+
     pub(super) fn keep_parsed(&mut self, path: &Path, file: FileId, text: &str, parsed: Parsed) {
         #[cfg(feature = "native-project")]
         if self.store.is_some() {
@@ -312,7 +334,7 @@ impl Loader<'_> {
             self.verified_contracts[i] = output.contracts;
         }
         if let (Some(lowered), Some(ir)) = (&mut self.lowered, output.ir) {
-            lowered[i] = Some((Arc::unwrap_or_clone(ir), output.declarations, output.proofs));
+            lowered[i] = Some((ir, output.declarations, output.proofs));
         }
         #[cfg(feature = "ide")]
         if let Some(ide) = &mut self.ide

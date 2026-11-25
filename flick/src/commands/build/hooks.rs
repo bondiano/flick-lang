@@ -4,6 +4,7 @@
 //! gets the files `flick build` writes and gives what it writes instead.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::Arc;
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::lang_items;
@@ -35,7 +36,7 @@ pub(crate) fn ir(
     }
     let mut files = BTreeSet::new();
     for m in &compilation.modules {
-        m.ir.clone().each_span_mut(&mut |s| {
+        (*m.ir).clone().each_span_mut(&mut |s| {
             files.insert(s.file);
         });
     }
@@ -54,7 +55,11 @@ pub(crate) fn ir(
             ir_version: VERSION.into(),
             compiler: format!("flick {}", toolchain::COMPILER),
             files: Vec::new(),
-            modules: compilation.modules.iter().map(|m| m.ir.clone()).collect(),
+            modules: compilation
+                .modules
+                .iter()
+                .map(|m| (*m.ir).clone())
+                .collect(),
             lang: lang_items(),
         };
         let written = match plugin.transform(&given.to_cbor()) {
@@ -95,7 +100,7 @@ pub(crate) fn ir(
                         .collect();
                     for m in &mut compilation.modules {
                         if let Some(rewritten) = by_name.remove(&m.ir.name) {
-                            m.ir = rewritten;
+                            m.ir = Arc::new(rewritten);
                         }
                     }
                 }

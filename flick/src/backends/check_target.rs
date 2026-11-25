@@ -117,7 +117,7 @@ fn build_check_request(
 ) -> (BuildRequest, Vec<FileId>, BTreeMap<String, Vec<u8>>) {
     let pruned = compilation.prune_for_environment(sources, stages_by_class);
     let files = RefCell::new(Vec::new());
-    let ir_modules: Vec<_> = pruned.modules.iter().map(|m| m.ir.clone()).collect();
+    let ir_modules: Vec<_> = pruned.modules.iter().map(|m| (*m.ir).clone()).collect();
     let program = Program::new(
         &format!("flick {}", toolchain::COMPILER),
         ir_modules,

@@ -89,7 +89,7 @@ pub fn emit(
             if let Some(prims) = primitives.as_ref() {
                 optimized_with_primitives(modules, module, false, prims)
             } else {
-                module.ir.clone()
+                (*module.ir).clone()
             }
         })
         .collect();

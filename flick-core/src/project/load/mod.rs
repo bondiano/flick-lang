@@ -193,7 +193,7 @@ struct Loader<'a> {
 }
 
 /// A module's IR and what the reference model reads of it.
-type Lowered = (ir::Module, Arc<Interface>, Vec<ir::Proven>);
+type Lowered = (Arc<ir::Module>, Arc<Interface>, Vec<ir::Proven>);
 
 use output::compiled;
 
@@ -389,7 +389,7 @@ fn run_in(
                 let lowered = lowered.or_else(|| {
                     interface.parameterized.as_ref()?;
                     Some((
-                        ir::Module {
+                        Arc::new(ir::Module {
                             name: m.name.clone(),
                             items: Vec::new(),
                             preambles: Vec::new(),
@@ -399,7 +399,7 @@ fn run_in(
                             records: BTreeMap::new(),
                             package: None,
                             exports: flick_ir::Exports::default(),
-                        },
+                        }),
                         Arc::new(interface.clone()),
                         Vec::new(),
                     ))
@@ -420,7 +420,12 @@ fn run_in(
         // the code of a module with a loaded test companion exports to it all
         // it declares; a build never loads a companion, nor makes this code
         let interface = loader.privates.get(&c.name).unwrap_or(&c.interface);
-        ir::fill_exports(&mut c.ir, interface);
+        let mut exports = ir::exports(&c.ir, interface);
+        exports.host.clone_from(&c.ir.exports.host);
+        if exports != c.ir.exports {
+            let cache = loader.cache.as_deref_mut();
+            ModuleCache::edit_ir(cache, &c.path, &mut c.ir, |ir| ir.exports = exports);
+        }
     }
     // a module's package names the tags of its constructors: its source
     // package, else the project's
@@ -429,7 +434,11 @@ fn run_in(
         let own = project.filter(|_| !compiled.is_empty());
         let own = own.and_then(|p| project_name(host, p));
         for c in &mut compiled {
-            c.ir.package = c.package.clone().or_else(|| own.clone());
+            let package = c.package.clone().or_else(|| own.clone());
+            if package != c.ir.package {
+                let cache = loader.cache.as_deref_mut();
+                ModuleCache::edit_ir(cache, &c.path, &mut c.ir, |ir| ir.package = package);
+            }
         }
     }
     let mut diagnostics = loader.reported();

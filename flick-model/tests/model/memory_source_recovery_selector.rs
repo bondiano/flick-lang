@@ -65,7 +65,7 @@ let choose value seed =
                     if release {
                         build::optimized(&modules, module, false)
                     } else {
-                        module.ir.clone()
+                        (*module.ir).clone()
                     }
                 })
                 .collect();

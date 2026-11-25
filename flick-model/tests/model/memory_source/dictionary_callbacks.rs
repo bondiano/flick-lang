@@ -105,7 +105,7 @@ let answer () =
   list_show render values ++ " | " ++ list_show render [] ++ " | " ++ list_show render values
 "#;
     let modules = run::compile_source(text).expect("ordinary pure source checks");
-    let mut ir: Vec<_> = modules.iter().map(|module| module.ir.clone()).collect();
+    let mut ir: Vec<_> = modules.iter().map(|module| (*module.ir).clone()).collect();
     let callback = ir
         .iter_mut()
         .flat_map(|module| &mut module.items)

@@ -222,7 +222,7 @@ impl Prepared {
             false
         };
         let emit_module_dts = settings.extras.dts || library_needs_module_dts;
-        let own = compilation.modules.iter().map(|m| &m.ir);
+        let own = compilation.modules.iter().map(|m| &*m.ir);
         for module in own.chain(build::builtin_modules_of(rt)) {
             if !seen.insert(module.name.clone()) {
                 continue;

@@ -120,7 +120,7 @@ pub(crate) fn check(
     let modules: Vec<&Module> = compilation
         .modules
         .iter()
-        .map(|module| &module.ir)
+        .map(|module| &*module.ir)
         .chain(builtins_ir.iter())
         .collect();
     let index = reach::index(&modules);

@@ -43,7 +43,7 @@ fn native_program(compilation: &Compilation, sources: &SourceMap, output: &Build
             if output.release {
                 build::optimized(modules, m, output.stages_by_class)
             } else {
-                m.ir.clone()
+                (*m.ir).clone()
             }
         })
         .collect();
