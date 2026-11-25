@@ -13,7 +13,7 @@
 //!   spares an object, and a `match` goes to where its data is known, so a
 //!   value built only to be taken apart is not built;
 //! - [`fold`]: literal expressions with exact JS semantics, constant branches;
-//! - [`shape`]: `List.length` and `List.get` of a list literal;
+//! - [`shape`]: `List.length`, `List.get` and field reads of literals;
 //! - alias and constant propagation, and moving a pure value that cannot
 //!   throw to its one use;
 //! - [`fuse`]: `Seq` and `List` combinators of a `for` run in its loop;
@@ -240,7 +240,7 @@ fn optimize_inner(
                     if !(inlined
                         | known::branches(body, &mut fresh)
                         | devirt::named_scrutinees(body, &mut fresh, lang, preserve_types)
-                        | shape::lists(body, &mut fresh, primitives, preserve_types))
+                        | shape::shapes(body, &mut fresh, primitives, preserve_types))
                     {
                         break;
                     }

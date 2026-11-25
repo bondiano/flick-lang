@@ -96,6 +96,8 @@ mod list_shape_tests;
 #[cfg(test)]
 mod projection_tests;
 #[cfg(test)]
+mod record_shape_tests;
+#[cfg(test)]
 mod shape_tests;
 #[cfg(test)]
 mod tests;
