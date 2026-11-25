@@ -363,7 +363,7 @@ impl Checking<'_> {
                 builtin_laws: &|| builtin_laws(stages),
                 project: &|name| {
                     lowered(name)
-                        .map(|(ir, _, _)| ir)
+                        .map(|(ir, _, _)| &**ir)
                         .or_else(|| self.precompiled.ir(name))
                 },
                 proven: &|name| lowered(name).map(|(_, _, p)| p.as_slice()),

@@ -264,7 +264,10 @@ fn key_of(
 /// `compiled`, checked from `text`, to save, unless its IR has spans in
 /// another file.
 fn cached(compiled: &Compiled, dir: &Path, text: &str) -> Option<CachedModule> {
-    let mut ir = compiled.ir.clone();
+    let mut ir = (*compiled.ir).clone();
+    // saved as lowered: a module a cache kept has its exports and package
+    // filled by the run before, which every run that loads it fills again
+    (ir.exports.values, ir.exports.reexports, ir.package) = Default::default();
     let mut own = true;
     ir.each_span_mut(&mut |span| {
         own &= span.file == compiled.file;
@@ -432,7 +435,7 @@ impl Loader<'_> {
                 test: false,
                 package: Some(package.clone()),
                 imports: module.imports.clone(),
-                ir,
+                ir: Arc::new(ir),
                 declarations: module.declarations.clone(),
                 interface: module.interface.clone(),
                 expansion: None,

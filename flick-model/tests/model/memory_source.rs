@@ -20,7 +20,7 @@ fn source_program(text: &str, release: bool, entry: &Name) -> memory::Program {
             if release {
                 build::optimized(&modules, module, false)
             } else {
-                module.ir.clone()
+                (*module.ir).clone()
             }
         })
         .collect();

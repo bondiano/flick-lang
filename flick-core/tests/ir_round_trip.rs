@@ -63,7 +63,7 @@ fn compiled(project: Option<&project::Project>, roots: &[PathBuf], what: &str) -
         return 0;
     }
     let compiled = &compilation.modules;
-    let modules: Vec<ir::Module> = compiled.iter().map(|m| m.ir.clone()).collect();
+    let modules: Vec<ir::Module> = compiled.iter().map(|m| (*m.ir).clone()).collect();
     let optimized: Vec<ir::Module> = compiled
         .iter()
         .map(|m| build::optimized(compiled, m, false))

@@ -73,7 +73,11 @@ pub(super) fn program(
             )
         })
         .collect();
-    let mut modules: Vec<_> = compilation.modules.iter().map(|m| m.ir.clone()).collect();
+    let mut modules: Vec<_> = compilation
+        .modules
+        .iter()
+        .map(|m| (*m.ir).clone())
+        .collect();
     for builtin in &builtins.modules {
         if compilation.modules.iter().any(|m| m.name == builtin.name) {
             continue;

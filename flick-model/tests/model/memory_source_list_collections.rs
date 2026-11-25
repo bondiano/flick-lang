@@ -106,7 +106,7 @@ fn checked_collections_use_callbacks_not_payloads() {
                 if release {
                     build::optimized(&modules, m, false)
                 } else {
-                    m.ir.clone()
+                    (*m.ir).clone()
                 }
             })
             .collect();
@@ -136,7 +136,7 @@ fn program(name: &str, release: bool) -> (Program, Name) {
             if release {
                 build::optimized(&modules, m, false)
             } else {
-                m.ir.clone()
+                (*m.ir).clone()
             }
         })
         .collect();

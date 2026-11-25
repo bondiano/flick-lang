@@ -1,7 +1,7 @@
 /// What a run in `mode` says that a person reads, an importer is checked
 /// against and a build emits: the diagnostics with their places, and each
 /// module's interface with the IR a compilation lowered it to.
-type Said = (Vec<String>, BTreeMap<String, (Interface, Option<ir::Module>)>);
+type Said = (Vec<String>, BTreeMap<String, (Interface, Option<Arc<ir::Module>>)>);
 
 fn said(host: &Memory, mode: Mode, cache: Option<&mut ModuleCache>) -> Said {
     said_in(host, mode, cache, 0, |_| {})
@@ -166,6 +166,30 @@ fn a_cache_kept_through_a_session_of_edits_changes_nothing_a_run_says() {
         assert_eq!(stored_count(&taken) > taken_before, mode != Mode::Analyze);
         // a compilation with a cache still gives every module it lowered
         assert_eq!(compiled > 0, mode == Mode::Compile);
+    }
+}
+
+/// A build that reuses its modules gives them the IR the cache keeps, with
+/// their exports and package as the run before finished them, not copies:
+/// also beside a refined type, whose companion every other module's IR is
+/// relocated to.
+#[test]
+fn reused_modules_share_their_finished_ir_with_the_cache() {
+    const BASE: &str = "module A.Base exposing (Small, x)\nrefined type Small = Float where fun n -> n >= 0\nx : Float\nlet x = 1\n";
+    const USE: &str = "module A.Use exposing (y)\nimport A.Base exposing (x)\ny : Float\nlet y = x + 1\n";
+    let host = Memory(BTreeMap::from([
+        (PathBuf::from("/p/src/A/Base.fl"), BASE.to_owned()),
+        (PathBuf::from("/p/src/A/Use.fl"), USE.to_owned()),
+    ]));
+    let mut cache = ModuleCache::default();
+    let first = said(&host, Mode::Compile, Some(&mut cache)).1;
+    let second = said(&host, Mode::Compile, Some(&mut cache)).1;
+    assert_eq!(second, said(&host, Mode::Compile, None).1);
+    for name in ["A.Base", "A.Use"] {
+        let ir = |said: &BTreeMap<String, (_, Option<_>)>| said[name].1.clone().expect("lowered");
+        let (first, second): (Arc<ir::Module>, _) = (ir(&first), ir(&second));
+        assert!(!first.exports.values.is_empty(), "{name}: the run filled its exports");
+        assert!(Arc::ptr_eq(&first, &second), "{name}: one IR, not a copy");
     }
 }
 

@@ -62,7 +62,7 @@ fn programs(source: &str, name: &str) -> (Name, [Program; 2]) {
                 if release {
                     build::optimized(&modules, module, false)
                 } else {
-                    module.ir.clone()
+                    (*module.ir).clone()
                 }
             })
             .collect();
@@ -231,7 +231,7 @@ fn every_prefix_through_multidomain_results_cold_closures_and_specific_faults_re
 fn identical_abi_does_not_prove_wrong_results_unknown_inputs_or_missing_declarations() {
     let modules =
         run::compile_source(SOURCE).expect("all foreign source signatures remain accepted");
-    let ir: Vec<_> = modules.iter().map(|module| &module.ir).collect();
+    let ir: Vec<_> = modules.iter().map(|module| &*module.ir).collect();
     for name in [
         "bad_result",
         "unknown",
@@ -319,7 +319,7 @@ fn deep_opaque_aliases_discharge_both_copy_bits_after_both_domain_proofs() {
 fn only_explicit_source_name_provenance_restores_a_generated_foreign_identity() {
     let modules = run::compile_source(SOURCE).expect("checked source identity");
     for source_name in [Some("int_value"), None, Some("missing")] {
-        let mut ir: Vec<_> = modules.iter().map(|module| module.ir.clone()).collect();
+        let mut ir: Vec<_> = modules.iter().map(|module| (*module.ir).clone()).collect();
         let foreign = ir
             .iter_mut()
             .flat_map(|module| &mut module.items)

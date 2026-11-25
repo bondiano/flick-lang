@@ -16,6 +16,7 @@ use flick_model::{
     memory::{Heap, ProgramOutcome, Value, execute_program_outcome},
     run,
 };
+use std::sync::Arc;
 use std::{fmt::Write as _, path::Path};
 
 fn unresolved_kind(kind: &Kind) -> Option<u32> {
@@ -111,7 +112,7 @@ fn lower(
             if release {
                 build::optimized(modules, module, false)
             } else {
-                module.ir.clone()
+                (*module.ir).clone()
             }
         })
         .collect();

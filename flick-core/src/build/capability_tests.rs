@@ -47,7 +47,7 @@ fn diagnostics_with_ui(
             test: false,
             package: None,
             imports: vec![],
-            ir,
+            ir: Arc::new(ir),
             declarations: Arc::new(interface.clone()),
             interface,
             expansion: None,

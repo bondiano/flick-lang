@@ -62,7 +62,7 @@ fn diagnostics(text: &str, pair: &str, app: bool) -> Vec<Diagnostic> {
             test: false,
             package: None,
             imports: vec![],
-            ir,
+            ir: Arc::new(ir),
             declarations: Arc::new(interface.clone()),
             interface,
             expansion: None,

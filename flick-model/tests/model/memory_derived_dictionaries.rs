@@ -36,7 +36,7 @@ fn recursive_derivation_keeps_constructor_order_hash_and_parentheses() {
                 if release {
                     build::optimized(&modules, module, false)
                 } else {
-                    module.ir.clone()
+                    (*module.ir).clone()
                 }
             })
             .collect();
@@ -69,7 +69,7 @@ fn program(text: &str, module: &str, name: &str, release: bool) -> (Program, Nam
             if release {
                 build::optimized(&modules, module, false)
             } else {
-                module.ir.clone()
+                (*module.ir).clone()
             }
         })
         .collect();

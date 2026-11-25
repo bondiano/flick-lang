@@ -5,7 +5,7 @@ fn no_evidence_path_fails_closed_but_arbitrary_numeric_names_use_checked_schemes
     let failure = perceus::lower(
         modules
             .iter()
-            .map(|module| &module.ir)
+            .map(|module| &*module.ir)
             .chain(build::builtin_modules()),
         &entry,
     )

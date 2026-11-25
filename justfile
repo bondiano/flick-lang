@@ -344,7 +344,7 @@ wasm:
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
-    test $(wc -c < $wasm) -le 4830000 # reason: field accessors (#788): accessor parsing, typing, diagnostics and IDE queries in the playground (4.766 MB with them); ordered guarded matches over known shapes in the release optimizer the playground runs (4.806 MB with them, 4.798 MB before); optional field steps (#789): path typing and lowering, the nested-Option codec rule, completion, hover and rewrites (+16 KB: 4.824 MB with them, 4.808 MB before)
+    test $(wc -c < $wasm) -le 4830000 # reason: field accessors (#788): accessor parsing, typing, diagnostics and IDE queries in the playground (4.766 MB with them); ordered guarded matches over known shapes in the release optimizer the playground runs (4.806 MB with them, 4.798 MB before); optional field steps (#789): path typing and lowering, the nested-Option codec rule, completion, hover and rewrites (+16 KB: 4.824 MB with them, 4.808 MB before); reused modules sharing their IR with the editor's module cache (#966, +4 KB)
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm

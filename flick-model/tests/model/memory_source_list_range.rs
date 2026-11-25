@@ -24,7 +24,7 @@ fn program(source: &str, name: &str, release: bool) -> Program {
             if release {
                 build::optimized(&modules, m, false)
             } else {
-                m.ir.clone()
+                (*m.ir).clone()
             }
         })
         .collect();
@@ -374,7 +374,7 @@ fn identical_data_abi_requires_actual_int_inputs_and_exact_list_int_output() {
                     if release {
                         build::optimized(&modules, m, false)
                     } else {
-                        m.ir.clone()
+                        (*m.ir).clone()
                     }
                 })
                 .collect();

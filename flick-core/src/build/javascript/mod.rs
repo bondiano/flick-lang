@@ -116,7 +116,7 @@ pub fn emit(
     let mut out = Vec::new();
     #[cfg(feature = "native-project")]
     out.push(package_json(settings));
-    let layout = codegen::RuntimeLayout::new(compilation.modules.iter().map(|m| &m.ir));
+    let layout = codegen::RuntimeLayout::new(compilation.modules.iter().map(|m| &*m.ir));
     let ctx = Context {
         layout: &layout,
         modules: &compilation.modules,
@@ -218,7 +218,7 @@ fn resolved(
     by_class: bool,
     foreign: &dyn Fn(&str, &str) -> String,
 ) -> Vec<Resolved> {
-    let own = compilation.modules.iter().map(|c| &c.ir);
+    let own = compilation.modules.iter().map(|c| &*c.ir);
     let mut out: Vec<Resolved> = Vec::new();
     for module in own.chain(builtin_modules_of(by_class)) {
         for item in &module.items {
@@ -260,7 +260,7 @@ pub fn foreign_inputs(compilation: &Compilation, settings: &Settings) -> Vec<Res
             foreign_specifier(settings, &path, module, spec)
         }
     };
-    let own = compilation.modules.iter().map(|m| &m.ir);
+    let own = compilation.modules.iter().map(|m| &*m.ir);
     let mut out: Vec<Resolved> = Vec::new();
     for module in own.chain(builtin_modules_of(settings.backend == Backend::Rt)) {
         for item in &module.items {

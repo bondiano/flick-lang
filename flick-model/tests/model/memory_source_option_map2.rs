@@ -30,7 +30,7 @@ fn program(source: &str, name: &str, release: bool) -> Program {
             if release {
                 build::optimized(&modules, module, false)
             } else {
-                module.ir.clone()
+                (*module.ir).clone()
             }
         })
         .collect();

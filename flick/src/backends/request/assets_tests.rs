@@ -7,6 +7,7 @@ use flick_backend_js::Javascript;
 use flick_core::diagnostics::{Severity, codes};
 use flick_core::project::config;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::{fs, io};
 
 struct Overlay {
@@ -53,7 +54,9 @@ fn library_outputs(missing: bool, typescript: bool, extras: build::Extras) -> Pr
     );
     for module in &mut compilation.modules {
         module.package = Some("fixture-library".into());
-        module.ir.package.clone_from(&module.package);
+        Arc::make_mut(&mut module.ir)
+            .package
+            .clone_from(&module.package);
     }
     compilation.libraries.push(("fixture-library".into(), dir));
     let output = BuildPlan {

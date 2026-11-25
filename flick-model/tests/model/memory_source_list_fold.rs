@@ -60,7 +60,7 @@ fn programs(name: &str) -> (Name, [Program; 2]) {
                 if release {
                     build::optimized(&modules, module, false)
                 } else {
-                    module.ir.clone()
+                    (*module.ir).clone()
                 }
             })
             .collect();

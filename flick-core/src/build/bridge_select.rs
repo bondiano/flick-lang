@@ -13,7 +13,7 @@ pub fn select(
     runners: &[(String, String)],
 ) -> EffectBridge {
     select_modules_with_roots(
-        compilation.modules.iter().map(|module| &module.ir),
+        compilation.modules.iter().map(|module| &*module.ir),
         available,
         runners
             .iter()

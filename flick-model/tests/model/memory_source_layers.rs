@@ -1,4 +1,5 @@
 //! Independent source expectations for counted constant Layer provision.
+use std::sync::Arc;
 use std::{fs, path::Path};
 
 use flick_core::build;
@@ -111,7 +112,7 @@ fn programs(text: &str, module: &str, name: &str) -> (Name, [memory::Program; 2]
                 if release {
                     build::optimized(&modules, module, false)
                 } else {
-                    module.ir.clone()
+                    (*module.ir).clone()
                 }
             })
             .collect();
@@ -317,7 +318,7 @@ let answer () = provide Read outer {
         let mut modules = run::compile_source(text).expect("well-typed source before corruption");
         let body = modules
             .iter_mut()
-            .flat_map(|module| &mut module.ir.items)
+            .flat_map(|module| &mut Arc::make_mut(&mut module.ir).items)
             .find_map(|item| match &mut item.kind {
                 ItemKind::Value { name, body, .. } if name == "broken" => Some(body),
                 _ => None,
@@ -335,7 +336,7 @@ let answer () = provide Read outer {
                     if release {
                         build::optimized(&modules, module, false)
                     } else {
-                        module.ir.clone()
+                        (*module.ir).clone()
                     }
                 })
                 .collect();

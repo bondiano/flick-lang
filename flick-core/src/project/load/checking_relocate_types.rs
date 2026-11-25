@@ -207,11 +207,27 @@ pub(super) fn relocate_inline_importers(compiled: &mut [super::Compiled]) {
         return;
     }
     relocations.sort_by(|a, b| b.0.len().cmp(&a.0.len()).then_with(|| a.cmp(b)));
-    for (child, parent, local) in &relocations {
-        for module in compiled.iter_mut() {
-            if &module.name != parent {
-                relocate_ir(&mut module.ir, child, parent, local);
+    for module in compiled.iter_mut() {
+        if relocations.iter().all(|(_, parent, _)| *parent == module.name) {
+            continue;
+        }
+        let relocate = |ir: &mut ir::Module| {
+            for (child, parent, local) in &relocations {
+                if &module.name != parent {
+                    relocate_ir(ir, child, parent, local);
+                }
             }
+        };
+        if let Some(ir) = Arc::get_mut(&mut module.ir) {
+            relocate(ir);
+            continue;
+        }
+        // a module cache keeps this IR too, and relocation seldom changes a
+        // module: one copy at a time tells, and the IR stays shared otherwise
+        let mut ir = (*module.ir).clone();
+        relocate(&mut ir);
+        if ir != *module.ir {
+            module.ir = Arc::new(ir);
         }
     }
 }

@@ -4,8 +4,7 @@ fn raw_foreign_names_require_explicit_source_provenance_and_never_prefix_decodin
     let declarations = facts(&original);
     for provenance in [None, Some("missing"), Some("text_only"), Some("convert")] {
         let mut modules = run::compile_source(BASIC).expect("same checked declarations");
-        let declaration = modules[0]
-            .ir
+        let declaration = Arc::make_mut(&mut modules[0].ir)
             .items
             .iter_mut()
             .find_map(|item| match &mut item.kind {
@@ -150,7 +149,7 @@ foreign pure choose from "flick:Number" "{operation}"
         for provenance in [None, Some("missing"), Some("choose")] {
             let mut modules = run::compile_source(&source).expect("valid selection source");
             let declarations = facts(&modules);
-            for item in &mut modules[0].ir.items {
+            for item in &mut Arc::make_mut(&mut modules[0].ir).items {
                 if let ItemKind::Foreign(value) = &mut item.kind {
                     value.name = "$opaque_generated_selection".into();
                     value.source_name = provenance.map(str::to_owned);

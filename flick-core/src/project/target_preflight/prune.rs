@@ -6,6 +6,7 @@
 //! backends never emit unavailable modules or top-level static imports to them.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use flick_ir::Namespace as IrNamespace;
 
@@ -295,30 +296,27 @@ fn prune_module(
     tainted_items: &HashSet<(String, usize)>,
 ) {
     let mod_name = module.name.clone();
+    let ir = Arc::make_mut(&mut module.ir);
     let mut idx = 0usize;
-    module.ir.items.retain(|_| {
+    ir.items.retain(|_| {
         let keep = !tainted_items.contains(&(mod_name.clone(), idx));
         idx += 1;
         keep
     });
     if !unavailable.is_empty() || !tainted_keys.is_empty() {
-        for item in &mut module.ir.items {
+        for item in &mut ir.items {
             strip_tainted_dead_locals(item, unavailable, tainted_keys);
         }
     }
     module.imports.retain(|imp| !unavailable.contains(imp));
-    module
-        .ir
-        .labels
+    ir.labels
         .retain(|name, _| !tainted_keys.contains(&(mod_name.clone(), name.clone())));
-    for prefix in &mut module.ir.initialization.prefixes {
+    for prefix in &mut ir.initialization.prefixes {
         prefix
             .bindings
             .retain(|name| !tainted_keys.contains(&(mod_name.clone(), name.clone())));
     }
-    module
-        .ir
-        .initialization
+    ir.initialization
         .prefixes
         .retain(|p| !p.bindings.is_empty());
 
@@ -337,12 +335,10 @@ fn prune_module(
         }
         true
     });
-    module
-        .ir
-        .exports
+    ir.exports
         .values
         .retain(|e| !tainted_keys.contains(&(mod_name.clone(), e.name.clone())));
-    module.ir.exports.reexports.retain(|re| {
+    ir.exports.reexports.retain(|re| {
         if unavailable.contains(&re.module) {
             return false;
         }
