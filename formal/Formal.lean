@@ -98,6 +98,7 @@ import Formal.Effects
 import Formal.LetMut
 import Formal.LetMut.Lazy
 import Formal.LetMut.LazyWitness
+import Formal.LetMut.LazyOnce
 import Formal.Generalization
 import Formal.Lazy
 import Formal.Settle

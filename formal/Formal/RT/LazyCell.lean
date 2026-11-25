@@ -272,6 +272,34 @@ theorem R9_again {e₀ : T} {s s' : LSt T V} {J J' : List (LEv V)} (h : LReach e
   cases h.got hev hg
   exact R9b hr
 
+/-- **O3, of the protocol** (lazy.md §6): a cell that only the fiber `f` forces runs its attempts
+in `f` and never has a waiter. No step waits or leaves, and every settle and reset hands its
+outcome to no waiter, so the synchronization of R9 is never exercised: a cell without it takes
+the same steps. -/
+theorem R9_owner {e₀ : T} {s : LSt T V} {J : List (LEv V)} {f : Nat} (h : LReach e₀ s J)
+    (hf : ∀ ev ∈ J, ∀ g, ev.forces g → g = f) :
+    (∀ π n W e, s = .running π n W e → π = f ∧ W = []) ∧
+      ∀ ev ∈ J, ∀ g, ev ≠ .wait g ∧ ev ≠ .leave g := by
+  revert hf
+  induction h with
+  | init => exact fun _ => ⟨fun _ _ _ _ h => (nomatch h), fun _ h => (nomatch h)⟩
+  | @step _ _ J₀ _ _ hs ih =>
+    intro hf
+    obtain ⟨ih₁, ih₂⟩ := ih fun ev' h' => hf ev' (List.mem_cons_of_mem _ h')
+    have hev := hf _ List.mem_cons_self
+    have rest : ∀ {ev : LEv V}, (∀ g, ev ≠ .wait g ∧ ev ≠ .leave g) →
+        ∀ ev' ∈ ev :: J₀, ∀ g, ev' ≠ .wait g ∧ ev' ≠ .leave g := by
+      intro ev hn ev' hm g
+      rcases List.mem_cons.mp hm with rfl | hm
+      · exact hn g
+      · exact ih₂ ev' hm g
+    cases hs with
+    | start => exact ⟨fun π n W e h => by cases h; exact ⟨hev _ rfl, rfl⟩, rest fun _ => ⟨nofun, nofun⟩⟩
+    | wait hπ _ => exact absurd ((ih₁ _ _ _ _ rfl).1 ▸ hev _ rfl) hπ
+    | self => exact ⟨fun π n W e h => by cases h; exact ih₁ _ _ _ _ rfl, rest fun _ => ⟨nofun, nofun⟩⟩
+    | hit | settle _ | reset => exact ⟨fun π n W e h => (nomatch h), rest fun _ => ⟨nofun, nofun⟩⟩
+    | leave hW => cases (ih₁ _ _ _ _ rfl).2; cases hW
+
 /-- **R9 (single flight).** In every interleaving of the steps of a lazy cell: (a) at most one
 attempt runs, the one of the running state, and the attempts run one after another, numbered
 from 1; (b) a settled cell stays settled and every later force gets its outcome, as did the

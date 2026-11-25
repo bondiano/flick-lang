@@ -4,7 +4,8 @@
 // where it is made runs its task once, there; an `await` after the first one
 // gives what the first gave; a pure loop-invariant lazy hoisted out of a loop
 // gives the same value each iteration, while an impure or loop-variant lazy
-// still runs per iteration.
+// still runs per iteration; a `let lazy` awaited once runs its value there,
+// and one whose `await` is not reached never runs it.
 module App.Main exposing (main)
 
 counted : Ref Int -> Int ->{} Int
@@ -44,6 +45,11 @@ let main () =
   let twice = fun () -> await again
   Platform.stdout_line "\{kept} \{await five + await five} \{direct}"
   Platform.stdout_line "\{first + await again + twice ()}"
+  let lazy once = counted runs 5
+  let lazy skipped = counted runs 6
+  let picked = if kept > 0 then await once else 0
+  let unpicked = if kept < 0 then await skipped else 1
+  Platform.stdout_line "\{picked} \{unpicked}"
   Platform.stdout_line "runs: \{Ref.get runs}"
 
   // O4: pure loop-invariant lazies hoisted out of while, for, let rec, nested, branch, direct
