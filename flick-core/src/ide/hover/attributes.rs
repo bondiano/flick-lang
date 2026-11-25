@@ -19,6 +19,7 @@ const OWNER: &str = "Marks a service whose handler owns what is made under it: a
 const SYNC: &str = "Marks a service whose operations run at once, without a runtime: a stage that needs only such services and has no errors is Sync. `@sync reader` marks one that only reads, which a stage lends to code that runs later, as the clauses of a `for`. Used in built-in modules only; elsewhere the mark has no effect. Belongs before a service declaration.";
 const IMPLICIT: &str = "Opts an instance into automatic conversion between two distinct ground nominal types when the expected type is known. The class must have two parameters and one pure method of type `a -> b`; the instance must have no context or type variables. Exactly one visible instance must match; conversions do not chain. Takes no argument and belongs before an instance declaration.";
 const WHEN: &str = "Restricts the module to environments whose active backend and host tags satisfy the boolean condition (`&&`, `||`, `!`, and parentheses), for example `@when \"js && !browser\"`. Unused imports of the module are allowed in other environments; reachable uses report `FLICK-P064`. Belongs before the module header.";
+const EXPORT: &str = "Exports a top-level function to the host under an explicit name, for example `@export \"addNumbers\"`. The target backend validates the host name, enforces uniqueness across the package, and rejects generic or dictionary-taking functions.";
 const NATIVE: &str = "Attaches a target-specific native binding override to a top-level Flick function while keeping the Flick body as its reference semantics and fallback. When multiple `@native` clauses match the active environment, the one whose `when` condition implies every other matching clause wins; incomparable or equivalent matching pairs report `FLICK-F012`.";
 
 impl Ide<'_> {
@@ -72,6 +73,7 @@ impl Ide<'_> {
             "owner" if on_name => OWNER,
             "sync" => SYNC,
             "when" => WHEN,
+            "export" => EXPORT,
             "lang" if on_name || Lang::from_name(token.text(text)).is_some() => LANG,
             "ts" if backend_attr.is_some() => TS,
             _ => {
@@ -84,7 +86,7 @@ impl Ide<'_> {
             }
         };
         let mut code = format!("@{attr_name}");
-        if attr_name == "when" || backend_attr.is_some() {
+        if attr_name == "when" || attr_name == "export" || backend_attr.is_some() {
             // its arguments are strings too: the attribute as written
             let (start, end) = attribute.range();
             text[start as usize..end as usize]

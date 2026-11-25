@@ -219,11 +219,16 @@ impl Command for BuildCommand {
                 diagnostics: vec![problem],
             };
         }
+        let is_library = resolved.get("kind") == Some("library");
         let cached_plan = project.as_ref().map(|p| {
             self.plan(
                 &host,
                 Some(p),
-                self.entries(p),
+                if is_library {
+                    Vec::new()
+                } else {
+                    self.entries(p)
+                },
                 &backend,
                 &choice,
                 target_overridden,
@@ -289,18 +294,22 @@ impl Command for BuildCommand {
             };
         }
         let modules = &compilation.modules;
-        let entries = match &project {
-            Some(p) => self.entries(p),
-            None if self.entry.is_some() => self.entries_given(),
-            // files built alone: the one of them that exports `main`
-            None => {
-                let mains: Vec<&Compiled> = modules
-                    .iter()
-                    .filter(|m| roots.contains(&m.path) && m.interface.exports_value("main"))
-                    .collect();
-                match mains[..] {
-                    [only] => vec![(MAIN_ENTRY.to_owned(), only.name.clone())],
-                    _ => Vec::new(),
+        let entries = if is_library {
+            Vec::new()
+        } else {
+            match &project {
+                Some(p) => self.entries(p),
+                None if self.entry.is_some() => self.entries_given(),
+                // files built alone: the one of them that exports `main`
+                None => {
+                    let mains: Vec<&Compiled> = modules
+                        .iter()
+                        .filter(|m| roots.contains(&m.path) && m.interface.exports_value("main"))
+                        .collect();
+                    match mains[..] {
+                        [only] => vec![(MAIN_ENTRY.to_owned(), only.name.clone())],
+                        _ => Vec::new(),
+                    }
                 }
             }
         };

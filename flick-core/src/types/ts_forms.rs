@@ -16,7 +16,7 @@ use crate::syntax::ts_mark::{self, Mark};
 
 const CORE_ATTRS_BEFORE_BACKEND: &[&str] =
     &["lang", "derive", "maker", "cell", "label", "owner", "sync"];
-const CORE_ATTRS_AFTER_BACKEND: &[&str] = &["stores", "implicit", "when"];
+const CORE_ATTRS_AFTER_BACKEND: &[&str] = &["stores", "implicit", "when", "export"];
 
 fn is_core_attribute(name: &str) -> bool {
     CORE_ATTRS_BEFORE_BACKEND.contains(&name)

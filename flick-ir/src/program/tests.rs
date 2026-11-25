@@ -185,9 +185,10 @@ fn a_reader_takes_only_its_own_minor_version_before_1_0() {
     assert!(!compatible("0.15.0"));
     assert!(!compatible("0.16.0"));
     assert!(!compatible("0.17.0"));
+    assert!(!compatible("0.18.0"));
     let mut p = program(1.0);
-    p.ir_version = "0.19.0".to_owned();
-    let found = "0.19.0".to_owned();
+    p.ir_version = "0.20.0".to_owned();
+    let found = "0.20.0".to_owned();
     assert_eq!(
         Program::from_json(&p.to_json()),
         Err(Error::Version { found })
@@ -499,6 +500,11 @@ fn the_exports_of_a_module_survive_both_forms_as_a_reader_is_told() {
             namespace: Namespace::Type,
             name: "Url".to_owned(),
         }],
+        host: vec![crate::HostExport {
+            name: "parse".to_owned(),
+            export_name: "parseUrl".to_owned(),
+            span: Span::new(FileId::new(0), 0, 18),
+        }],
     };
     let written: serde_json::Value = serde_json::from_str(&p.to_json()).expect("JSON");
     assert_eq!(
@@ -506,6 +512,11 @@ fn the_exports_of_a_module_survive_both_forms_as_a_reader_is_told() {
         serde_json::json!({
             "values": [{ "name": "parse", "sync": 2 }, { "name": "x", "sync": null }],
             "reexports": [{ "module": "Http.Url", "namespace": "type", "name": "Url" }],
+            "host": [{
+                "name": "parse",
+                "export_name": "parseUrl",
+                "span": { "file": 0, "start": 0, "end": 18 }
+            }],
         })
     );
     assert_eq!(Program::from_json(&p.to_json()), Ok(p.clone()));

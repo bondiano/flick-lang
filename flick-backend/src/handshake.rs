@@ -55,6 +55,7 @@ const CORE_FOREIGN_WORDS: &[&str] = &[
 
 const CORE_ATTRIBUTES: &[&str] = &[
     "lang", "derive", "maker", "cell", "label", "owner", "sync", "stores", "implicit", "when",
+    "export",
 ];
 
 /// Validate the foreign adapter words and type-form attributes a backend

@@ -2,6 +2,8 @@
 //! Component integration uses the separate `flick:backend` contract.
 
 pub mod codegen;
+#[cfg(any(feature = "component", not(target_arch = "wasm32")))]
+pub mod exports;
 pub mod foreign_meta;
 pub mod inline;
 

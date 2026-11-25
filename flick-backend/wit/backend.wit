@@ -185,6 +185,17 @@ interface types {
     }
     record symbol { module: string, name: string }
     record entry { name: string, symbol: symbol, runner: option<string> }
+    /// A top-level function exported under a host name via `@export "name"`.
+    record host-export {
+        name: string,
+        symbol: symbol,
+        span: span,
+    }
+    /// Request for a backend-projected host header (modeled after `.d.ts`).
+    record header-request {
+        enabled: bool,
+        format: option<string>,
+    }
     record foreign-binding {
         module: string,
         specifier: string,
@@ -264,6 +275,10 @@ interface types {
         /// project manifest and `[target.<name>.dependencies]` closure;
         /// `none` outside a project.
         declared-dependencies: option<list<string>>,
+        /// Host-named exports (`@export "name"`) across own modules of the build.
+        exports: list<host-export>,
+        /// Header projection request for library/declaration artifacts.
+        headers: option<header-request>,
     }
     enum artifact-kind { source, source-map, declaration, object, executable, %resource, metadata }
     record artifact {

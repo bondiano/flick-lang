@@ -110,6 +110,10 @@ pub fn located_comments(text: &str) -> HashMap<String, DocComment> {
             offset += raw.len();
             continue;
         }
+        if trimmed.starts_with('@') {
+            offset += raw.len();
+            continue;
+        }
         let name = declared(line).or_else(|| variant(line));
         if !pending.is_empty()
             && let Some(name) = name.or_else(|| adjacent.then(|| defined(line)).flatten())
@@ -137,6 +141,9 @@ pub fn comments(text: &str) -> HashMap<String, String> {
         if let Some(doc) = line.trim_start().strip_prefix("///") {
             pending.push(doc.strip_prefix(' ').unwrap_or(doc));
             adjacent = true;
+            continue;
+        }
+        if line.trim_start().starts_with('@') {
             continue;
         }
         let name = declared(line).or_else(|| variant(line));

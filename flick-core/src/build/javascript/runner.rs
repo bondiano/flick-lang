@@ -7,7 +7,9 @@ use crate::iface::Namespace;
 use crate::project::{Compiled, MainKind, host_services, main_kind};
 use crate::source::Span;
 
-use super::super::{Artifact, Settings, runner_file, schema_aot_file};
+#[cfg(not(target_arch = "wasm32"))]
+use super::super::schema_aot_file;
+use super::super::{Artifact, Settings, runner_file};
 use flick_backend_js::codegen::runner::{Start, runner};
 
 /// Shared frontend classification for a generated entry launcher.
@@ -81,15 +83,30 @@ pub(super) fn entry_runners(
             .find(|(name, _)| *name == entry.name)
             .map(|(_, runner)| runner.as_str());
         let file = runner_file(&entry.name, settings.typescript);
+        #[cfg(not(target_arch = "wasm32"))]
         let aot = settings
             .extras
             .schema_aot
             .then(|| schema_aot_file(&entry.name));
+        #[cfg(target_arch = "wasm32")]
+        let aot: Option<String> = None;
+        #[cfg(not(target_arch = "wasm32"))]
         let start = match started_by {
             Some(module) => Start::Run(codegen::relative(&file, &path(module))),
             None if entry.pure => Start::Call,
             None if settings.backend == Backend::Rt => Start::RunMainRt(entry.host),
             None => Start::RunMain(entry.host),
+        };
+        #[cfg(target_arch = "wasm32")]
+        let start = {
+            let _ = started_by;
+            if entry.pure {
+                Start::Call
+            } else if settings.backend == Backend::Rt {
+                Start::RunMainRt(entry.host)
+            } else {
+                Start::RunMain(entry.host)
+            }
         };
         let contents = runner(
             &codegen::relative(&file, &path(&entry.defining)),

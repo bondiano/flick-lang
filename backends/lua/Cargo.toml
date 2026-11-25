@@ -17,7 +17,7 @@ crate-type = ["cdylib", "rlib"]
 # What the component's descriptor accepts; a test keeps the two equal.
 [package.metadata.flick]
 backend-api = { minimum = "0.1.0", maximum-exclusive = "0.2.0" }
-ir = { minimum = "0.18.0", maximum-exclusive = "0.19.0" }
+ir = { minimum = "0.19.0", maximum-exclusive = "0.20.0" }
 
 [features]
 guest = []

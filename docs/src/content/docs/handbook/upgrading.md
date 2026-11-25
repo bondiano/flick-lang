@@ -64,6 +64,7 @@ change needs.
 | [Inline foreign bindings and module preambles (`0.17.0`)](#inline-foreign-bindings-and-module-preambles-0170) | no | `FLICK-F011` |
 | [Versioned backend value ABI tables](#versioned-backend-value-abi-tables) | no | `FLICK-F013`, `FLICK-F014` |
 | [`FuncRef` and callback retention in IR `0.18.0`](#funcref-and-callback-retention-in-ir-0180) | no | `FLICK-F015`, `FLICK-F013` |
+| [Host exports and library build artifacts (`0.19.0`)](#host-exports-and-library-build-artifacts-0190) | no | `FLICK-F004`, `FLICK-P012`, `FLICK-S014` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -833,3 +834,19 @@ opaque fallback: a backend whose table has no `func_ref` row refuses a
 the function itself. Backend components and `ir`-hook plugins must rebuild
 against `flick-ir` `0.18.0` and update their descriptor `ir` range to
 `[0.18.0, 0.19.0)`.
+
+## Host exports and library build artifacts (`0.19.0`)
+
+The portable IR moves from `0.18.0` to `0.19.0` to carry neutral `@export "name"`
+host exports (`Module.exports.host`: `Vec<HostExport>`), and the `flick:backend`
+WIT `build-request` gains `exports: list<host-export>` and
+`headers: option<header-request>`. Backends validate exported host names,
+package-wide uniqueness, and monomorphic non-dictionary exportability at the
+`@export` span (`FLICK-P012`) and project library headers strictly (reporting
+unexpressible exports as `FLICK-F004`). `flick/js` supports
+`[target.js] kind = "library"` with `format = "esm" | "cjs" | "iife"`, optional
+`global-name`, and `index.d.ts` emission.
+
+Backend components and `ir`-hook plugins must rebuild against `flick-ir`
+`0.19.0` and `flick-backend` and update their descriptor `ir` range to
+`[0.19.0, 0.20.0)`. Existing Flick sources require no changes.

@@ -2,15 +2,21 @@
 
 use flick_pretty::Document;
 
+#[cfg(feature = "component")]
+use super::ModuleFormat;
 use super::{Gen, RUNTIME, names, relative};
 use crate::effects::bindings;
 
 impl<'d> Gen<'_, 'd> {
     /// The import lines of the module at `here`.
     pub(super) fn imports_of(&self, here: &str) -> Vec<Document<'d>> {
+        let runtime = self.options.foreign(self.module, RUNTIME);
+        #[cfg(feature = "component")]
+        if self.format != ModuleFormat::Esm {
+            return self.imports_of_non_esm(here, &runtime);
+        }
         let mut lines = Vec::new();
         let mut line = |text: String| lines.push(self.a.text(self.a.alloc_str(&text)));
-        let runtime = self.options.foreign(self.module, RUNTIME);
         if self.effect {
             line(format!("import {{ Effect }} from \"{runtime}\";"));
         }
@@ -79,6 +85,64 @@ impl<'d> Gen<'_, 'd> {
             let from = names::string(&relative(here, &target));
             line(format!("import * as {} from {from};", bound(&alias)));
             untyped(&mut line, &alias);
+        }
+        lines
+    }
+
+    #[cfg(feature = "component")]
+    fn imports_of_non_esm(&self, here: &str, runtime: &str) -> Vec<Document<'d>> {
+        let mut lines = Vec::new();
+        let mut line = |text: String| lines.push(self.a.text(self.a.alloc_str(&text)));
+        let req = if self.format == ModuleFormat::Cjs {
+            "require"
+        } else {
+            "$req"
+        };
+        if self.format == ModuleFormat::Cjs {
+            line("\"use strict\";".to_owned());
+        }
+        if self.effect {
+            line(format!(
+                "const {{ Effect }} = {req}({});",
+                names::string(runtime)
+            ));
+        }
+        if self.runtime {
+            line(format!("const $rt = {req}({});", names::string(runtime)));
+        }
+        let mut namespaces: Vec<&str> = Vec::new();
+        for (source, export, alias) in &self.foreign {
+            let at = namespaces
+                .iter()
+                .position(|s| s == source)
+                .unwrap_or_else(|| {
+                    namespaces.push(source);
+                    line(format!(
+                        "const $n{} = {req}({});",
+                        namespaces.len() - 1,
+                        names::string(source)
+                    ));
+                    namespaces.len() - 1
+                });
+            let member = if names::is_property(export) {
+                format!(".{export}")
+            } else {
+                format!("[{}]", names::string(export))
+            };
+            line(format!("const {alias} = $n{at}{member};"));
+        }
+        for imported in &self.imports {
+            let alias = self
+                .aliases
+                .get(imported)
+                .cloned()
+                .unwrap_or_else(|| names::module_alias(imported, 'm'));
+            let spec = if self.format == ModuleFormat::Cjs {
+                relative(here, &self.options.path(imported))
+            } else {
+                imported.clone()
+            };
+            line(format!("const {alias} = {req}({});", names::string(&spec)));
         }
         lines
     }

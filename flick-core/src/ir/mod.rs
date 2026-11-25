@@ -14,7 +14,7 @@ mod print;
 #[cfg(any(not(target_arch = "wasm32"), feature = "native-project"))]
 pub(crate) use flick_backend_support::reach;
 
-pub use exports::exports;
+pub use exports::{exports, fill_exports};
 pub use flick_ir::{
     Adapter, AdapterArg, Arm, BackendAdapter, BinOp, Binding, Constraint, ConstructorDecl, Copies,
     EnumLit, Expr, ExprKind, Foreign, ForeignMode, Handled, Handler, IrType, Item, ItemKind,

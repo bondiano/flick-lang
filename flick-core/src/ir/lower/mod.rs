@@ -109,6 +109,7 @@ fn lower_inner<'a>(
     if lower.diagnostics.is_empty() {
         let records = mem::take(&mut lower.records);
         let preambles = mem::take(&mut lower.preambles);
+        let exports = super::exports::host_exports(typing, &items);
         Ok((
             Module {
                 name: module.name.to_owned(),
@@ -119,7 +120,7 @@ fn lower_inner<'a>(
                 initialization: flick_ir::Initialization::default(),
                 records,
                 package: None,
-                exports: flick_ir::Exports::default(),
+                exports,
             },
             lower,
         ))

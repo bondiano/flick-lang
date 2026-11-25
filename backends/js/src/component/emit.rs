@@ -1,6 +1,9 @@
 //! Target generation consumes the reference program and explicit projections.
 
-use super::{data::Data, failure, launch, optimize, selected};
+use super::{
+    data::{BuildKind, Data},
+    failure, launch, library, optimize, selected,
+};
 use crate::codegen::{self, Known, Options, RuntimeLayout};
 use flick_backend::{
     Artifact, ArtifactKind, BuildRequest, BuildResult, Diagnostic, InputRef, ModuleRole, Profile,
@@ -48,6 +51,9 @@ pub(super) fn generate(
             .any(|m| m.name == name && m.role == ModuleRole::Own)
     };
     let layout = RuntimeLayout::new(data.program.modules.iter().filter(|m| own(&m.name)));
+    if data.kind == BuildKind::Library && !data.inspect {
+        return library::generate(request, data, &options, &builtins, &own, &layout, &lang);
+    }
     let mut artifacts = Vec::new();
     let mut pending: Vec<_> = request
         .entries
@@ -209,7 +215,17 @@ fn mapped(
     output: &codegen::Output,
     artifacts: &mut Vec<Artifact>,
 ) {
-    let file = &facts.output;
+    mapped_with_path(request, data, facts, &facts.output, output, artifacts);
+}
+
+pub(super) fn mapped_with_path(
+    request: &BuildRequest,
+    data: &Data,
+    facts: &flick_backend::JavascriptFile,
+    file: &str,
+    output: &codegen::Output,
+    artifacts: &mut Vec<Artifact>,
+) {
     let base = file.rsplit('/').next().unwrap_or(file);
     let source_path = |id: flick_ir::FileId| facts.source_paths[id.index() as usize].clone();
     let position = |span: flick_ir::Span| {
@@ -227,7 +243,7 @@ fn mapped(
     };
     let map = codegen::sourcemap::source_map(base, output, &source_path, &position);
     artifacts.push(artifact(
-        file.clone(),
+        file.to_owned(),
         ArtifactKind::Source,
         format!("{}//# sourceMappingURL={base}.map\n", output.code),
     ));

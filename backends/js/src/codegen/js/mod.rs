@@ -55,6 +55,9 @@ pub use release::{direct_methods, exported_worker};
 use crate::effects::bindings;
 use flick_ir::Namespace;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+#[cfg(feature = "component")]
+use std::fmt::Write as _;
+#[cfg(any(feature = "component", not(target_arch = "wasm32")))]
 use std::mem;
 
 #[cfg(feature = "source-maps")]
@@ -72,19 +75,63 @@ use flick_ir::Span;
 
 const RUNTIME: &str = bindings::ADAPTER_PREFIX;
 
+#[cfg(feature = "component")]
+/// Module emission format for JavaScript modules.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ModuleFormat {
+    #[default]
+    Esm,
+    Cjs,
+    Iife,
+}
+
 /// Compiles `module` to ESM (or TypeScript, see [`Options::typescript`]).
 pub fn js(module: &Module, options: &Options) -> Output {
+    #[cfg(feature = "component")]
+    return js_with_format(module, options, ModuleFormat::Esm);
+    #[cfg(not(feature = "component"))]
     js_at(module, options, &module.name, &|_, _| None)
 }
 
+#[cfg(feature = "component")]
+/// Compiles `module` in the requested JavaScript module format (`esm`, `cjs`, or `iife`).
+pub fn js_with_format(module: &Module, options: &Options, format: ModuleFormat) -> Output {
+    js_at_with_format(module, options, &module.name, &|_, _| None, format)
+}
+
+#[cfg(not(feature = "component"))]
 pub(crate) fn js_at(
     module: &Module,
     options: &Options,
     physical: &str,
     location: &dyn Fn(&str, &str) -> Option<String>,
 ) -> Output {
+    js_at_inner(module, options, physical, location)
+}
+
+#[cfg(feature = "component")]
+pub(crate) fn js_at_with_format(
+    module: &Module,
+    options: &Options,
+    physical: &str,
+    location: &dyn Fn(&str, &str) -> Option<String>,
+    format: ModuleFormat,
+) -> Output {
+    js_at_inner(module, options, physical, location, format)
+}
+
+fn js_at_inner(
+    module: &Module,
+    options: &Options,
+    physical: &str,
+    location: &dyn Fn(&str, &str) -> Option<String>,
+    #[cfg(feature = "component")] format: ModuleFormat,
+) -> Output {
     let arena = DocumentArena::new();
     let a = &arena;
+    #[cfg(feature = "component")]
+    let mut g = Gen::new(module, options, a, format);
+    #[cfg(not(feature = "component"))]
     let mut g = Gen::new(module, options, a);
     g.physical = physical;
     g.location = location;
@@ -93,15 +140,18 @@ pub(crate) fn js_at(
         // the wrapper of a Sync export is the runtime's
         g.runtime |= !g.sync_exports.is_empty();
     }
+    #[cfg(any(feature = "component", not(target_arch = "wasm32")))]
     let mut typed = options
         .typescript
         .and_then(|modules| modules.get(physical))
         .cloned();
+    #[cfg(any(feature = "component", not(target_arch = "wasm32")))]
     if let Some(typed) = &mut typed {
         g.annotations = mem::take(&mut typed.annotations);
     }
     let body = g.items(&module.items);
     let mut header = Vec::new();
+    #[cfg(any(feature = "component", not(target_arch = "wasm32")))]
     if let Some(typed) = &typed
         && !typed.imports.is_empty()
     {
@@ -118,6 +168,7 @@ pub(crate) fn js_at(
             sections.push(raw_lines(a, &preamble.code));
         }
     }
+    #[cfg(any(feature = "component", not(target_arch = "wasm32")))]
     sections.extend(
         typed
             .iter()
@@ -143,12 +194,10 @@ pub(crate) fn js_at(
     // a module exposing what it imports: JS consumers find it here too
     let mut barrel = Vec::new();
     if physical == module.name && !options.builtins.contains(&module.name.as_str()) {
-        let path = |m: &str| relative(&here, &options.path(m));
-        let entities: Vec<(&str, Namespace, &str)> = (module.exports.reexports.iter())
-            .filter(|r| r.namespace != Namespace::Type || options.typescript())
-            .map(|r| (r.module.as_str(), r.namespace, r.name.as_str()))
-            .collect();
-        let (lines, modules) = reexports(&entities, &path);
+        #[cfg(feature = "component")]
+        let (lines, modules) = module_reexports(module, options, &here, format);
+        #[cfg(not(feature = "component"))]
+        let (lines, modules) = module_reexports(module, options, &here);
         if !lines.is_empty() {
             code = docvec![a, code, a.line(), text(a, &lines)];
         }
@@ -164,6 +213,7 @@ pub(crate) fn js_at(
         &g.names,
     );
     output.imports = g.imports.into_iter().collect();
+    #[cfg(any(feature = "component", not(target_arch = "wasm32")))]
     output
         .imports
         .extend(typed.into_iter().flat_map(|t| t.modules));
@@ -177,6 +227,68 @@ fn text<'d>(a: &'d DocumentArena<'d>, lines: &str) -> Document<'d> {
     a.text(a.alloc_str(lines.trim_end_matches('\n')))
 }
 
+fn module_reexports(
+    module: &Module,
+    options: &Options,
+    here: &str,
+    #[cfg(feature = "component")] format: ModuleFormat,
+) -> (String, Vec<String>) {
+    #[cfg(feature = "component")]
+    if format != ModuleFormat::Esm {
+        return module_reexports_non_esm(module, options, here, format);
+    }
+    let path = |m: &str| relative(here, &options.path(m));
+    let entities: Vec<(&str, Namespace, &str)> = (module.exports.reexports.iter())
+        .filter(|r| r.namespace != Namespace::Type || options.typescript())
+        .map(|r| (r.module.as_str(), r.namespace, r.name.as_str()))
+        .collect();
+    reexports(&entities, &path)
+}
+
+#[cfg(feature = "component")]
+fn module_reexports_non_esm(
+    module: &Module,
+    options: &Options,
+    here: &str,
+    format: ModuleFormat,
+) -> (String, Vec<String>) {
+    let target = if format == ModuleFormat::Cjs {
+        "exports"
+    } else {
+        "$exp"
+    };
+    let req = if format == ModuleFormat::Cjs {
+        "require"
+    } else {
+        "$req"
+    };
+    let mut by_mod: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+    for r in &module.exports.reexports {
+        if r.namespace == Namespace::Type {
+            continue;
+        }
+        by_mod
+            .entry(r.module.as_str())
+            .or_default()
+            .push(names::ident(&r.name));
+    }
+    let mut out = String::new();
+    let mut modules = Vec::new();
+    for (i, (m, ids)) in by_mod.into_iter().enumerate() {
+        let spec = if format == ModuleFormat::Cjs {
+            relative(here, &options.path(m))
+        } else {
+            m.to_owned()
+        };
+        let _ = writeln!(out, "const $re{i} = {req}({});", names::string(&spec));
+        for id in ids {
+            let _ = writeln!(out, "{target}.{id} = $re{i}.{id};");
+        }
+        modules.push(m.to_owned());
+    }
+    (out, modules)
+}
+
 /// Multi-line raw foreign code emitted line-by-line via `a.line()` so source
 /// map line numbers stay exact without adding indentation.
 fn raw_lines<'d>(a: &'d DocumentArena<'d>, code: &str) -> Document<'d> {
@@ -186,7 +298,12 @@ fn raw_lines<'d>(a: &'d DocumentArena<'d>, code: &str) -> Document<'d> {
 }
 
 impl<'a, 'd> Gen<'a, 'd> {
-    fn new(module: &'a Module, options: &'a Options<'a>, a: &'d DocumentArena<'d>) -> Self {
+    fn new(
+        module: &'a Module,
+        options: &'a Options<'a>,
+        a: &'d DocumentArena<'d>,
+        #[cfg(feature = "component")] format: ModuleFormat,
+    ) -> Self {
         let calls = kernel::calls(options.rt);
         let groups = group::groups(&module.name, &module.items, calls);
         let grouped = group::grouped(&module.name, &module.items, &groups, calls);
@@ -196,6 +313,8 @@ impl<'a, 'd> Gen<'a, 'd> {
             physical: &module.name,
             location: &|_, _| None,
             options,
+            #[cfg(feature = "component")]
+            format,
             labels: &module.labels,
             #[cfg(feature = "source-maps")]
             names: HashMap::new(),
@@ -221,11 +340,17 @@ impl<'a, 'd> Gen<'a, 'd> {
             views: HashMap::new(),
             vars: HashSet::new(),
             rests: HashMap::new(),
+            #[cfg(any(feature = "component", not(target_arch = "wasm32")))]
             annotations: HashMap::new(),
             sync_exports: HashMap::new(),
             workers: if options.release {
                 let exported = |name: &str| {
+                    #[cfg(any(feature = "component", not(target_arch = "wasm32")))]
+                    let is_host = module.exports.host.iter().any(|h| h.name == name);
+                    #[cfg(not(any(feature = "component", not(target_arch = "wasm32"))))]
+                    let is_host = false;
                     module.exports.values.iter().any(|v| v.name == name)
+                        || is_host
                         || module
                             .initialization
                             .prefixes
@@ -325,6 +450,8 @@ struct Gen<'a, 'd> {
     physical: &'a str,
     location: &'a dyn Fn(&str, &str) -> Option<String>,
     options: &'a Options<'a>,
+    #[cfg(feature = "component")]
+    format: ModuleFormat,
     /// The module's labelled top-level values (see [`Gen::labelled`]).
     labels: &'a BTreeMap<String, Label>,
     #[cfg(feature = "source-maps")]
@@ -385,6 +512,7 @@ struct Gen<'a, 'd> {
     /// The constructors of the module, which a module alias must not shadow.
     constructors: Vec<String>,
     /// TypeScript types of the exported values, by their JS name.
+    #[cfg(any(feature = "component", not(target_arch = "wasm32")))]
     annotations: HashMap<String, String>,
     /// Exported functions whose last stage is Sync, by their JS name, with
     /// how many arguments reach it.

@@ -333,6 +333,15 @@ impl Config {
         "js"
     }
 
+    /// A string option declared under `[target.<target>]`, if present.
+    #[cfg(feature = "native-project")]
+    pub fn target_option(&self, target: &str, key: &str) -> Option<&str> {
+        match &self.targets.get(target)?.get(key)?.value {
+            TargetValue::String(s) => Some(s.as_str()),
+            _ => None,
+        }
+    }
+
     /// Whether `flick.toml` explicitly selects a target, backend, environment,
     /// or target option table (so `flick check` and IDE runs perform
     /// reachable-use environment preflight).

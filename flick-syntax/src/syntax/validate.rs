@@ -139,14 +139,21 @@ impl Validator<'_> {
                 .nodes()
                 .take(index)
                 .any(|n| n.kind == K::Attribute && when::is_when(n, self.src));
+            let placement = if self.top_level {
+                super::validate_attrs::Placement::TopLevel {
+                    before_module_header,
+                    duplicate_when,
+                }
+            } else {
+                super::validate_attrs::Placement::Nested
+            };
             super::validate_attrs::check(
                 self.src,
                 self.file,
                 self.allow_trailing_attribute,
+                placement,
                 child,
                 next,
-                before_module_header,
-                duplicate_when,
                 &mut self.errors,
             );
         }

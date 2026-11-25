@@ -6,8 +6,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    Arith, Constraint, Constructor, Dict, Foreign, Handler, InlineCode, InstanceInfo, Lift,
-    Namespace, Num, Projection, Span, Stage, TypeDecl, TypeRef,
+    Arith, Constraint, Constructor, Dict, Exports, Foreign, Handler, InlineCode, InstanceInfo,
+    Lift, Num, Span, Stage, TypeDecl, TypeRef,
 };
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -39,41 +39,6 @@ pub struct Module {
     /// What the module exports, as its interface says.
     #[serde(default, skip_serializing_if = "Exports::is_empty")]
     pub exports: Exports,
-}
-
-/// The exports of a module: its own values, which other modules and the
-/// host call, and what it exports of other modules.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Exports {
-    /// The exported values of the module itself.
-    pub values: Vec<Exported>,
-    /// The entities of other modules the module exports.
-    pub reexports: Vec<Reexport>,
-}
-
-impl Exports {
-    pub fn is_empty(&self) -> bool {
-        self.values.is_empty() && self.reexports.is_empty()
-    }
-}
-
-/// An exported value of a module itself: its name, the arrows a call
-/// supplies when its last stage is Sync, and the fields it reads when it
-/// is a projection.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Exported {
-    pub name: String,
-    pub sync: Option<usize>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub projection: Option<Projection>,
-}
-
-/// An entity of another module that a module exports.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Reexport {
-    pub module: String,
-    pub namespace: Namespace,
-    pub name: String,
 }
 
 /// Lexical source prefixes keep canonical entity owners while the backends

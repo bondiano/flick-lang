@@ -284,6 +284,8 @@ fn literal_abi_mismatch_request(
         projections: vec![],
         package_targets: vec![],
         declared_dependencies: None,
+        exports: vec![],
+        headers: None,
         runtime_dependencies: vec![],
         toolchains: vec![],
         inputs: vec![Input {

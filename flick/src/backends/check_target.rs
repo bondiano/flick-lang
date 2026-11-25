@@ -42,16 +42,17 @@ pub(crate) fn check_target_for_project(
     ) {
         return Vec::new();
     }
-    let has_foreign = compilation.modules.iter().any(|m| {
+    let has_foreign_or_exports = compilation.modules.iter().any(|m| {
         m.package.is_none()
             && compilation.module_available(&m.name)
             && (!m.ir.preambles.is_empty()
+                || !m.ir.exports.host.is_empty()
                 || m.ir
                     .items
                     .iter()
                     .any(|item| matches!(item.kind, ItemKind::Foreign(_))))
     });
-    if !has_foreign && !checks_every_program(project, environment) {
+    if !has_foreign_or_exports && !checks_every_program(project, environment) {
         return Vec::new();
     }
     let Some((pin, bytes)) = selected_bytes(project, Some(&environment.backend_id)) else {
@@ -128,26 +129,8 @@ fn build_check_request(
     );
     let files = files.into_inner();
     let inline_foreign = super::request::collect_inline_foreign(&program);
-    let mut input_bytes: BTreeMap<String, Vec<u8>> = BTreeMap::new();
-    let mut inputs = Vec::new();
-    let mut req_sources = Vec::new();
-    for (i, name) in program.files.iter().enumerate() {
-        let file = sources.get(files[i]);
-        let id = format!("source/{i}");
-        let raw = file.text.as_bytes().to_vec();
-        inputs.push(Input {
-            id: id.clone(),
-            kind: InputKind::Source,
-            sha256: sha256(&raw),
-            size: u64::try_from(raw.len()).unwrap_or(u64::MAX),
-        });
-        input_bytes.insert(id.clone(), raw);
-        req_sources.push(Source {
-            name: name.clone(),
-            input: id,
-            line_starts: file.line_starts().to_vec(),
-        });
-    }
+    let exports = super::request::collect_own_host_exports(&program, &pruned);
+    let (inputs, req_sources, input_bytes) = source_inputs(&program, &files, sources);
     let modules = pruned
         .modules
         .iter()
@@ -173,6 +156,7 @@ fn build_check_request(
         project,
         Some(&environment.backend_id),
     ));
+    let headers = super::request::check_header_request(&req_options, &environment.backend_id);
     let request = BuildRequest {
         target: TargetRequest {
             backend_api: flick_backend::VERSION.into(),
@@ -206,8 +190,38 @@ fn build_check_request(
         toolchains: Vec::new(),
         runtime_dependencies: Vec::new(),
         declared_dependencies: None,
+        exports,
+        headers,
     };
     (request, files, input_bytes)
+}
+
+fn source_inputs(
+    program: &Program,
+    files: &[FileId],
+    sources: &SourceMap,
+) -> (Vec<Input>, Vec<Source>, BTreeMap<String, Vec<u8>>) {
+    let mut input_bytes = BTreeMap::new();
+    let mut inputs = Vec::new();
+    let mut req_sources = Vec::new();
+    for (i, name) in program.files.iter().enumerate() {
+        let file = sources.get(files[i]);
+        let id = format!("source/{i}");
+        let raw = file.text.as_bytes().to_vec();
+        inputs.push(Input {
+            id: id.clone(),
+            kind: InputKind::Source,
+            sha256: sha256(&raw),
+            size: u64::try_from(raw.len()).unwrap_or(u64::MAX),
+        });
+        input_bytes.insert(id.clone(), raw);
+        req_sources.push(Source {
+            name: name.clone(),
+            input: id,
+            line_starts: file.line_starts().to_vec(),
+        });
+    }
+    (inputs, req_sources, input_bytes)
 }
 
 fn map_check_diagnostic(

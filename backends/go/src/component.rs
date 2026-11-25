@@ -31,6 +31,37 @@ pub(super) fn failure(code: &str, message: impl Into<String>) -> Vec<Diagnostic>
     }]
 }
 
+fn go_options() -> Vec<OptionDescriptor> {
+    vec![
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "cgo".into(),
+                kind: ValueKind::Flag,
+                multiple: false,
+                required: false,
+                help: "Enable cgo (sets CGO_ENABLED=1 instead of CGO_ENABLED=0).".into(),
+            },
+            default: Some("false".into()),
+            implicit_value: None,
+            choices: vec![],
+            verbs: vec![Verb::Build, Verb::Run, Verb::Dev, Verb::Test],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "kind".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "Artifact kind: application (app) or host library (library).".into(),
+            },
+            default: Some("app".into()),
+            implicit_value: None,
+            choices: vec!["app".into(), "library".into()],
+            verbs: vec![Verb::Build],
+        },
+    ]
+}
+
 impl Backend for Go {
     fn commands(&self) -> Vec<command::Descriptor> {
         vec![doctor::descriptor()]
@@ -69,7 +100,7 @@ impl Backend for Go {
                 version: "0.2.0".into(),
             },
             backend_api: range("0.1.0", "0.2.0"),
-            ir: range("0.18.0", "0.19.0"),
+            ir: range("0.19.0", "0.20.0"),
             language: range("0.2.0", "0.3.0"),
             runtime_abis: vec![
                 NamedRange {
@@ -95,19 +126,7 @@ impl Backend for Go {
             profiles: vec![Profile::Debug, Profile::Release],
             modes: vec![Mode::WholeProgram],
             capabilities: vec![],
-            options: vec![OptionDescriptor {
-                parameter: Parameter {
-                    name: "cgo".into(),
-                    kind: ValueKind::Flag,
-                    multiple: false,
-                    required: false,
-                    help: "Enable cgo (sets CGO_ENABLED=1 instead of CGO_ENABLED=0).".into(),
-                },
-                default: Some("false".into()),
-                implicit_value: None,
-                choices: vec![],
-                verbs: vec![Verb::Build, Verb::Run, Verb::Dev, Verb::Test],
-            }],
+            options: go_options(),
             launch_runtimes: vec![],
             host_tools: vec!["go".into()],
             projections: vec![Abi {

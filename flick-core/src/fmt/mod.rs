@@ -79,6 +79,8 @@ mod comments;
 mod conditional;
 mod contract;
 mod decl;
+#[cfg(test)]
+mod export_tests;
 mod expr;
 pub(crate) mod foralls;
 mod handlers;

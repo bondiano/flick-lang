@@ -18,9 +18,37 @@ impl Preflight<'_> {
         }
         if !options.entries.is_empty() {
             self.seed_app_roots(options.entries, options.runners, options.by_class);
+            self.seed_host_export_roots();
             return;
         }
         self.seed_library_roots();
+        self.seed_host_export_roots();
+    }
+
+    fn seed_host_export_roots(&mut self) {
+        let exports: Vec<(String, String, Span)> = self
+            .compilation
+            .modules
+            .iter()
+            .filter(|m| m.package.is_none() && !m.test)
+            .filter(|m| self.module_unavailable(&m.name).is_none())
+            .flat_map(|m| {
+                m.ir.exports
+                    .host
+                    .iter()
+                    .map(|e| (m.name.clone(), e.name.clone(), e.span))
+            })
+            .collect();
+        for (mod_name, sym, span) in exports {
+            let root = self.add_node(format!("{mod_name}.{sym}"), None);
+            self.mark_loaded(&mod_name, root);
+            self.queue.push_back(WorkItem {
+                key: (mod_name, sym),
+                origin: Some(span),
+                node: root,
+                covered: 0,
+            });
+        }
     }
 
     fn seed_test_roots(&mut self, test_paths: &[PathBuf]) {

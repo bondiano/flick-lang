@@ -20,7 +20,13 @@ pub(super) fn exports(request: &BuildRequest, data: &Data) -> Exports {
     for module in &data.program.modules {
         let facts = &data.facts[&module.name];
         for (name, arity) in module.items.iter().filter_map(codegen::exported_worker) {
-            if facts.exports.iter().any(|e| e == name) {
+            if facts.exports.iter().any(|e| e == name)
+                || module.exports.host.iter().any(|h| h.name == name)
+                || request
+                    .exports
+                    .iter()
+                    .any(|e| e.symbol.module == module.name && e.symbol.name == name)
+            {
                 exports.0.insert((module.name.clone(), name.into()), arity);
             }
         }
@@ -69,6 +75,11 @@ pub(super) fn module(
     let mut result = module.clone();
     let exported = |name: &str| {
         data.facts[&module.name].exports.iter().any(|e| e == name)
+            || module.exports.host.iter().any(|h| h.name == name)
+            || request
+                .exports
+                .iter()
+                .any(|e| e.symbol.module == module.name && e.symbol.name == name)
             || module
                 .initialization
                 .prefixes

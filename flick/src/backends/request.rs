@@ -2,7 +2,7 @@
 //! objects and callbacks stop at this host boundary.
 
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::env;
 
 use flick_backend::{
@@ -10,7 +10,6 @@ use flick_backend::{
     Input, InputKind, Mode, ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile,
     RootHandler, Source, Span, Symbol, TargetRequest,
 };
-use std::collections::HashSet;
 
 use flick_backend_support::kernel;
 use flick_core::build;
@@ -33,6 +32,7 @@ mod assets;
 mod assets_tests;
 #[cfg(test)]
 mod component_tests;
+mod exports;
 mod go;
 #[cfg(test)]
 mod go_tests;
@@ -42,6 +42,8 @@ mod javascript_facts;
 mod projection_tests;
 #[cfg(test)]
 mod tests;
+
+pub(super) use exports::{check_header_request, collect_own_host_exports};
 
 pub(super) struct Prepared {
     pub request: BuildRequest,
@@ -163,6 +165,8 @@ impl Prepared {
         };
         let (program, files) = program(sources, compilation, output.stages_by_class);
         let inline_foreign = collect_inline_foreign(&program);
+        let host_exports = exports::collect_own_host_exports(&program, compilation);
+        let headers = exports::header_request(output, descriptor);
         let mut data = Self {
             request: BuildRequest {
                 target: target_request,
@@ -171,20 +175,7 @@ impl Prepared {
                 module_root,
                 modules: vec![],
                 sources: vec![],
-                entries: output
-                    .entries
-                    .iter()
-                    .map(|(name, module)| Entry {
-                        name: name.clone(),
-                        symbol: Symbol {
-                            module: module.clone(),
-                            name: "main".into(),
-                        },
-                        runner: project
-                            .and_then(|p| p.config.entries.iter().find(|e| e.name == *name))
-                            .and_then(|e| e.runner.as_ref().map(|r| r.0.clone())),
-                    })
-                    .collect(),
+                entries: request_entries(output, project),
                 test_roots: output
                     .suites
                     .iter()
@@ -202,6 +193,8 @@ impl Prepared {
                 toolchains: vec![],
                 runtime_dependencies: vec![],
                 declared_dependencies,
+                exports: host_exports,
+                headers,
             },
             bytes: BTreeMap::new(),
             files,
@@ -470,6 +463,23 @@ fn javascript_preflight(
         );
     }
     diagnostics
+}
+
+fn request_entries(output: &BuildPlan, project: Option<&Project>) -> Vec<Entry> {
+    output
+        .entries
+        .iter()
+        .map(|(name, module)| Entry {
+            name: name.clone(),
+            symbol: Symbol {
+                module: module.clone(),
+                name: "main".into(),
+            },
+            runner: project
+                .and_then(|p| p.config.entries.iter().find(|e| e.name == *name))
+                .and_then(|e| e.runner.as_ref().map(|r| r.0.clone())),
+        })
+        .collect()
 }
 
 fn target(

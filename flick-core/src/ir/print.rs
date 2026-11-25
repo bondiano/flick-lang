@@ -13,6 +13,10 @@ pub fn print(module: &Module) -> String {
     for preamble in &module.preambles {
         let _ = writeln!(out, "foreign module inline {:?}", preamble.code);
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    for export in &module.exports.host {
+        let _ = writeln!(out, "export {:?} = {}", export.export_name, export.name);
+    }
     for item in &module.items {
         let line = match &item.kind {
             ItemKind::Value {

@@ -73,6 +73,11 @@ pub fn validate_source_spans(program: &Program, texts: &[&str]) -> Result<(), St
                 return Err("backend IR span is outside its source or splits UTF-8".into());
             }
         }
+        for export in &module.exports.host {
+            if !valid(export.span, texts) {
+                return Err("backend IR span is outside its source or splits UTF-8".into());
+            }
+        }
         for item in &module.items {
             let mut checked = valid(item.span, texts);
             if let ItemKind::Foreign(foreign) = &item.kind {
@@ -102,6 +107,21 @@ pub(super) fn validate_inline_spans(request: &BuildRequest, texts: &[&str]) -> R
         );
         if !valid(span, texts) {
             return Err("inline foreign span is outside its source or splits UTF-8".into());
+        }
+    }
+    Ok(())
+}
+
+/// Check every `exports` entry's `@export` attribute span against its UTF-8 source.
+pub(super) fn validate_export_spans(request: &BuildRequest, texts: &[&str]) -> Result<(), String> {
+    for export in &request.exports {
+        let span = Span::new(
+            FileId::new(export.span.file),
+            export.span.start,
+            export.span.end,
+        );
+        if !valid(span, texts) {
+            return Err("host export span is outside its source or splits UTF-8".into());
         }
     }
     Ok(())

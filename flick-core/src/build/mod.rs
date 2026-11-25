@@ -216,7 +216,12 @@ pub(super) fn optimized_with_primitives(
 ) -> ir::Module {
     let mut ir = module.ir.clone();
     let exported = |name: &str| {
+        #[cfg(not(target_arch = "wasm32"))]
+        let is_host = module.ir.exports.host.iter().any(|h| h.name == name);
+        #[cfg(target_arch = "wasm32")]
+        let is_host = false;
         module.interface.exports_value(name)
+            || is_host
             || module
                 .ir
                 .initialization

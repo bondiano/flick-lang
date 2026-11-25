@@ -16,7 +16,7 @@ language that implements this world.
 This is an initial 0.x contract and validation library. It does not freeze
 IR 1.0 or complete every semantic prerequisite of R3a. Ordinary JS/TS and Go
 `build/run/dev/test/inspect` select the distributed `flick/js` or `flick/go`
-component by default. The portable IR is 0.18.0. The official
+component by default. The portable IR is 0.19.0. The official
 JS and Go emitters live in `backends/js` and `backends/go`, independently of
 `flick-core`. The contract probe exercises both with IR
 and plain data without `Compilation` or `Settings`. The distributed components
@@ -97,6 +97,8 @@ A `BuildRequest` carries these independent facts:
 | Entry/test roots and runners | Explicit symbols and entry names |
 | Foreign bindings | Resolved specifier, ABI and declared content inputs |
 | Inline foreign code | Module preambles (`name: none`) and inline binding expressions (`name: some(...)`) with exact source spans in `BuildRequest.inline-foreign` |
+| Host exports | Top-level `@export "name"` entries (`host-export`: host `name`, `symbol`, and attribute `span`) in `BuildRequest.exports` |
+| Header projection | Optional `header-request` (`enabled`, optional `format`) in `BuildRequest.headers` |
 | Checker projections | Module, named schema/version and content input |
 | Package targets and root handlers | Environments rather than backend names alone |
 | Remaining dependencies | Content-addressed resources and lockfiles in the input manifest |
@@ -115,7 +117,9 @@ entry, test and root-handler module references stay inside the closed graph.
 Every item and nested expression span must fit the supplied UTF-8 source.
 Source aliases share one retained input buffer and line index during validation.
 
-In IR 0.18.0, `Program` carries fixed-width numeric types (`Int8`, `Int16`,
+In IR 0.19.0, `Program` carries host-named exports (`Module.exports.host`:
+`Vec<HostExport>` for `@export "name"` on top-level functions, also surfaced on
+`BuildRequest.exports` alongside `BuildRequest.headers`), fixed-width numeric types (`Int8`, `Int16`,
 `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`) as first-class `Lang`,
 `Num`, and `Lit` variants alongside inline foreign bindings and preambles and the
 checker's layout-relevant types (`IrType`:

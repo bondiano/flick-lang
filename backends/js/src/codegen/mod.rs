@@ -8,7 +8,11 @@ pub mod sourcemap;
 pub mod ts;
 
 pub use flick_backend_support::{EffectBridge, Known, exports, loops, names, order, tail};
+#[cfg(feature = "component")]
+pub use js::{ModuleFormat, js_with_format};
 pub use js::{direct_methods, exported_worker, js, relative};
+#[cfg(feature = "component")]
+pub use lexical::js_parts_with_format;
 pub use lexical::{RuntimeLayout, js_parts, prefix_key};
 pub use names::{ident, instance as instance_export, qualified_id, tag};
 
@@ -71,8 +75,20 @@ pub struct Options<'a> {
 }
 
 impl Options<'_> {
+    #[inline]
+    #[cfg_attr(
+        all(target_arch = "wasm32", not(feature = "component")),
+        allow(clippy::unused_self)
+    )]
     pub(crate) fn typescript(&self) -> bool {
-        self.typescript.is_some()
+        #[cfg(all(target_arch = "wasm32", not(feature = "component")))]
+        {
+            false
+        }
+        #[cfg(not(all(target_arch = "wasm32", not(feature = "component"))))]
+        {
+            self.typescript.is_some()
+        }
     }
 
     /// The output path of a module, relative to the output directory:

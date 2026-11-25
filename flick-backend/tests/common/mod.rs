@@ -118,6 +118,8 @@ pub fn request() -> BuildRequest {
         toolchains: vec![toolchain()],
         runtime_dependencies: vec![],
         declared_dependencies: None,
+        exports: vec![],
+        headers: None,
     }
 }
 
@@ -129,7 +131,7 @@ pub fn descriptor() -> Descriptor {
     Descriptor {
         identity: request().backend.identity,
         backend_api: range("0.1.0", "0.2.0"),
-        ir: range("0.18.0", "0.19.0"),
+        ir: range("0.19.0", "0.20.0"),
         language: range("0.2.0", "0.3.0"),
         runtime_abis: vec![
             NamedRange {

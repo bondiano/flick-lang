@@ -5,6 +5,7 @@
 pub mod bridge_plan;
 mod data;
 mod dict;
+mod exports;
 mod expr;
 mod float;
 mod foreign;
@@ -25,9 +26,10 @@ mod visit;
 
 pub use data::{Constructor, ConstructorDecl, EnumLit, JsClass, Rep, TypeDecl, TypeName};
 pub use dict::Dict;
+pub use exports::{Exported, Exports, HostExport, Reexport};
 pub use expr::{
-    Arm, BinOp, Exported, Exports, Expr, ExprKind, Initialization, Item, ItemKind, Label, Lit,
-    Module, Param, Pat, Prefix, Reexport, Stmt, operation_arity,
+    Arm, BinOp, Expr, ExprKind, Initialization, Item, ItemKind, Label, Lit, Module, Param, Pat,
+    Prefix, Stmt, operation_arity,
 };
 pub use foreign::{
     Adapter, AdapterArg, BackendAdapter, Binding, Copies, Foreign, ForeignMode, InlineCode,

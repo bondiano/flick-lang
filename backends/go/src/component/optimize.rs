@@ -35,6 +35,11 @@ pub(super) fn module(
     let exports = |owner: &str| data.facts.get(owner).map(|f| f.exports.as_slice());
     let exported = |name: &str| {
         exports(&module.name).is_some_and(|e| e.iter().any(|e| e == name))
+            || module.exports.host.iter().any(|h| h.name == name)
+            || request
+                .exports
+                .iter()
+                .any(|e| e.symbol.module == module.name && e.symbol.name == name)
             || (module.initialization.prefixes.iter()).any(|p| p.bindings.iter().any(|n| n == name))
     };
     let generics = |owner: &str, name: &str| {

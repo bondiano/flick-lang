@@ -57,7 +57,7 @@ impl Scratch {
             "sha256": hex(&component()),
             "url": self.dir.join("index/component.wasm"),
             "backend_api": { "minimum": "0.1.0", "maximum_exclusive": "0.2.0" },
-            "ir": { "minimum": "0.18.0", "maximum_exclusive": "0.19.0" },
+            "ir": { "minimum": "0.19.0", "maximum_exclusive": "0.20.0" },
         });
         change(&mut entry);
         let index = json!({ "backends": [entry] });

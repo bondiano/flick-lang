@@ -1,9 +1,8 @@
-//! The options the fixture declares: its case, a banner, and the tags of
-//! its axes.
+//! Option descriptors for the `test/literal` fixture backend.
 
 use flick_backend::{OptionDescriptor, Parameter, ValueKind, Verb};
 
-pub(super) fn literal_options() -> Vec<OptionDescriptor> {
+pub(crate) fn literal_options() -> Vec<OptionDescriptor> {
     vec![
         OptionDescriptor {
             parameter: Parameter {
@@ -30,6 +29,32 @@ pub(super) fn literal_options() -> Vec<OptionDescriptor> {
             implicit_value: None,
             choices: vec![],
             verbs: vec![Verb::Build, Verb::Inspect],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "kind".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "Artifact kind: application (app) or host library (library).".into(),
+            },
+            default: Some("app".into()),
+            implicit_value: None,
+            choices: vec!["app".into(), "library".into()],
+            verbs: vec![Verb::Build],
+        },
+        OptionDescriptor {
+            parameter: Parameter {
+                name: "headers".into(),
+                kind: ValueKind::Text,
+                multiple: false,
+                required: false,
+                help: "Request projected host header declarations (boolean or format name).".into(),
+            },
+            default: None,
+            implicit_value: Some("c".into()),
+            choices: vec![],
+            verbs: vec![Verb::Build],
         },
         OptionDescriptor {
             parameter: Parameter {

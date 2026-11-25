@@ -421,6 +421,49 @@ is annotated `any`: the source types live in the Flick checker and its
 `tsc --noEmit` with `strict`, `allowImportingTsExtensions` and
 `module: nodenext`. `@flick-lang/effect-ts` ships `index.d.ts` for it.
 
+## Host exports and libraries
+
+`@export "name"` on a top-level `let` function publishes that function to host
+callers under `"name"`, independently of its Flick name or module `exposing`
+list:
+
+```flick
+@export "addNumbers"
+add : Int -> Int -> Int
+let add a b = a + b
+```
+
+The attribute itself is target-neutral. The active target backend validates each
+exported host name (a non-reserved JavaScript identifier on `flick/js`, a
+non-reserved C/Go identifier on `flick/go`), enforces package-wide uniqueness,
+and rejects unexportable functions (generic functions or functions taking class
+dictionaries) at the `@export` span (`FLICK-P012`) in both `flick check` and
+`flick build`. Placing `@export` on a non-function `let`, destructuring,
+`foreign` declaration, or non-top-level binding is `FLICK-S014`.
+
+Setting `[target.<name>] kind = "library"` in `flick.toml` builds host-consumable
+library artifacts without requiring app entry points:
+
+```toml
+[project]
+kind = "lib"
+
+[target.js]
+kind = "library"
+format = "esm"          # "esm" (default), "cjs", or "iife"
+# global-name = "MyLib" # optional, for format = "iife" (default: "FlickLib")
+```
+
+On `flick/js`, `format = "esm"` writes `index.js`, `format = "cjs"` writes
+`index.cjs` (with CommonJS modules), and `format = "iife"` writes a bundled
+`index.iife.js` attaching the exported object to `globalThis.<global-name>`.
+Each format also writes a matching `package.json` and projects `index.d.ts`
+(including `declare global` for `iife`). Headers follow the same strict
+projection rule as `--declarations`: any `@export` whose type cannot be stated
+faithfully is reported as `FLICK-F004` at the `@export` span rather than
+weakened to `any`. The export list and header projection request travel over the
+WIT contract (`BuildRequest.exports` and `BuildRequest.headers`).
+
 ## Release profile
 
 `--profile release` (or `build.profile = "release"`; `flick test` takes the
@@ -733,14 +776,15 @@ mismatches). Sibling `.go` files and `from inline` bindings keep the
 Records and user-defined ADTs have no stable layout and are not in this table; direct bindings refuse them unless wrapped in an opaque nominal handle.
 <!-- value-abi:flick/go:en:end -->
 
-## Portable IR (0.18.0)
+## Portable IR (0.19.0)
 
-Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.18.0"`),
-checked against the `ir` version range (`[0.18.0, 0.19.0)`) in its descriptor.
-Alongside values, stages, dictionaries, lang items, inline foreign preambles and
+Every backend component receives a versioned `flick_ir::Program` (`ir_version = "0.19.0"`),
+checked against the `ir` version range (`[0.19.0, 0.20.0)`) in its descriptor.
+Alongside values, stages, dictionaries, lang items, host-named exports
+(`Module.exports.host`), inline foreign preambles and
 bindings (`Module.preambles`, `Binding::Inline`), backend-declared foreign
 adapter words and contract metadata (`Foreign.adapter.{words, owned, callbacks, retention}`), and fixed-width numeric types
-(`Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`), IR `0.18.0` carries the
+(`Int8`, `Int16`, `Int64`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `Float32`), IR `0.19.0` carries the
 layout-relevant types the checker inferred so layout-aware and monomorphizing
 backends can lay out values by value without calling back into the checker:
 

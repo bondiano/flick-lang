@@ -134,6 +134,7 @@ impl<'a> Checker<'a> {
         self.servers(&decls);
         self.tagged_references(&decls);
         self.labelled(&decls);
+        self.check_host_exports(&decls);
         self.recursion();
         self.unknown_types();
         self.func_ref_dictionaries();
@@ -147,9 +148,7 @@ impl<'a> Checker<'a> {
             match decl.kind {
                 K::LetDecl => {
                     // a misplaced signature is reported once and still used
-                    let sig = i
-                        .checked_sub(1)
-                        .map(|j| decls[j])
+                    let sig = prev_non_attr(decls, i)
                         .filter(|s| s.kind == K::Signature && self.pairs(s, decl))
                         .or_else(|| self.misplaced(decls, decl));
                     let own = decl.has_token(K::RecKw).then(|| {
@@ -162,9 +161,7 @@ impl<'a> Checker<'a> {
                     self.add_item(decl, sig, own);
                 }
                 K::ForeignDecl => {
-                    let sig = i
-                        .checked_sub(1)
-                        .map(|j| decls[j])
+                    let sig = prev_non_attr(decls, i)
                         .filter(|s| s.kind == K::Signature && self.pairs(s, decl))
                         .or_else(|| self.misplaced(decls, decl));
                     let blocked = foreign_words(decl)
@@ -181,9 +178,10 @@ impl<'a> Checker<'a> {
                     self.add_item(decl, sig, None);
                 }
                 K::Signature => {
-                    let next = decls.get(i + 1).filter(|d| self.pairs(decl, d));
+                    let following = next_non_attr(decls, i);
+                    let next = following.filter(|d| self.pairs(decl, d));
                     // a block below that gave no code is reported already
-                    let block = decls.get(i + 1).is_some_and(|d| d.kind == K::PluginDecl);
+                    let block = following.is_some_and(|d| d.kind == K::PluginDecl);
                     if next.is_none() && !block {
                         self.orphan_signature(decl, decls);
                     }
@@ -198,9 +196,7 @@ impl<'a> Checker<'a> {
                     for (j, member) in members.iter().enumerate() {
                         match member.kind {
                             K::LetDecl => {
-                                let sig = j
-                                    .checked_sub(1)
-                                    .map(|k| members[k])
+                                let sig = prev_non_attr(&members, j)
                                     .filter(|s| s.kind == K::Signature && self.pairs(s, member));
                                 if sig.is_none()
                                     && member.nodes().any(|n| n.kind == K::NativeOverride)
@@ -210,7 +206,8 @@ impl<'a> Checker<'a> {
                                 self.add_item(member, sig, Some(group));
                             }
                             K::Signature
-                                if !members.get(j + 1).is_some_and(|d| self.pairs(member, d)) =>
+                                if !next_non_attr(&members, j)
+                                    .is_some_and(|d| self.pairs(member, d)) =>
                             {
                                 self.orphan_signature(member, &members);
                             }
@@ -239,7 +236,7 @@ impl<'a> Checker<'a> {
     /// A signature of `decl` that is not right above it.
     fn misplaced(&self, decls: &[&'a Node], decl: &Node) -> Option<&'a Node> {
         decls.iter().enumerate().find_map(|(i, s)| {
-            let paired = decls.get(i + 1).is_some_and(|d| self.pairs(s, d));
+            let paired = next_non_attr(decls, i).is_some_and(|d| self.pairs(s, d));
             (s.kind == K::Signature && self.pairs(s, decl) && !paired).then_some(*s)
         })
     }
@@ -452,4 +449,19 @@ impl<'a> Checker<'a> {
 
 pub(super) fn foreign_name<'t>(decl: &Node, text: &'t str) -> Option<&'t str> {
     foreign_words(decl).1.map(|t| t.text(text))
+}
+
+fn prev_non_attr<'a>(decls: &[&'a Node], i: usize) -> Option<&'a Node> {
+    decls[..i]
+        .iter()
+        .rev()
+        .copied()
+        .find(|n| n.kind != K::Attribute)
+}
+
+pub(super) fn next_non_attr<'a>(decls: &[&'a Node], i: usize) -> Option<&'a Node> {
+    decls[i + 1..]
+        .iter()
+        .copied()
+        .find(|n| n.kind != K::Attribute)
 }

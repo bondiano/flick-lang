@@ -52,6 +52,9 @@ mod generalize;
 pub mod handle;
 mod handlers;
 mod holes;
+mod host_exports;
+#[cfg(test)]
+mod host_exports_tests;
 mod infer;
 mod instances;
 mod interpolation;
