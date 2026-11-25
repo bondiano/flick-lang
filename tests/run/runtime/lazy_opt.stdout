@@ -1,5 +1,6 @@
 3 10 42
 24
-runs: 2
+10 1
+runs: 3
 hoist: 33 27 48 40 0 12 36
-stay: 18 13 runs: 5
+stay: 18 13 runs: 6

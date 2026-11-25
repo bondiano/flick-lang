@@ -19,8 +19,8 @@
 //! - [`fuse`]: `Seq` and `List` combinators of a `for` run in its loop;
 //! - [`lazy`]: lazy cells a program need not make: one nothing reads, one of
 //!   a value, made done, and one forced where it is made; a force of a cell an
-//!   earlier force left done; and a pure, loop-invariant lazy hoisted out of a
-//!   loop;
+//!   earlier force left done; a pure, loop-invariant lazy hoisted out of a
+//!   loop; and no state for a `let lazy` read once;
 //! - [`sroa`]: temporary records and tuples split into their parts;
 //! - dead code: unused pure bindings and private top-level values.
 //!
@@ -330,6 +330,7 @@ fn pass(e: &mut Expr, arity: Arity, lang: &crate::Known<'_>, preserve_types: boo
         changed |= known::scrutinees(stmts, result);
         changed |= lazy::unnamed(stmts, result, lang);
         changed |= lazy::forced_again(stmts, result, lang);
+        changed |= lazy::state_once(stmts, result);
         changed |= flatten(stmts, result);
         changed |= sroa::split(stmts, result);
         changed |= propagate(stmts, result, arity);

@@ -1,0 +1,24 @@
+/// The exchange as a service: it takes commands as the lines traders send
+/// and answers with what the book did. Only the sequencer submits, so the
+/// book changes one command at a time.
+module App.Exchange exposing (Exchange, layer)
+
+import Book.Book as Book exposing (Book)
+import Book.Feed as Feed exposing (Malformed)
+import Book.Order exposing (Event)
+
+service Exchange =
+  submit : String ->{; Malformed} List Event
+  book : Unit ->{} Book
+
+/// The exchange over the book in `book`, which it leaves there after each
+/// command.
+layer : Ref Book -> Layer none none {Exchange}
+let layer book =
+  Layer.succeed Exchange {
+    submit = fun line ->
+      let (next, events) = Book.step (Feed.decode line) (Ref.get book)
+      Ref.set book next
+      events
+    book = fun () -> Ref.get book
+  }

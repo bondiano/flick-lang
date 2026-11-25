@@ -105,6 +105,7 @@ fn every_program_and_fixture_round_trips() {
 fn every_example_project_round_trips() {
     let examples = [
         "cli-tool",
+        "exchange",
         "first-slice",
         "hom-repository",
         "mtl",

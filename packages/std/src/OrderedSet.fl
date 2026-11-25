@@ -1,0 +1,105 @@
+/// A persistent set of elements in the order of `Ord a`, with ranges of
+/// elements.
+///
+/// Two elements are equivalent when `compare` gives `EQ`, and a set holds one
+/// of them: a later insertion replaces an earlier equivalent element. Every
+/// operation leaves the set it is given as it was. The set is an
+/// `OrderedMap a Unit`, with its costs: `size` in `O(1)`; `member`, `insert`,
+/// `remove`, `min` and `max` in `O(log n)`; `to_seq` and `range` in ascending
+/// order, `range` reaching its lower bound in `O(log n)` without reading the
+/// elements before it.
+///
+/// Sets are `Eq` when they hold equal elements in the same order, `Foldable`
+/// in ascending order, `Collections.Sized`, `Collections.ToSeq` in ascending
+/// order, and with `Ord a` `Collections.Member`.
+module OrderedSet exposing (
+  OrderedSet,
+  empty,
+  size,
+  member,
+  insert,
+  remove,
+  min,
+  max,
+  to_seq,
+  from_seq,
+  range,
+  valid,
+)
+
+import OrderedMap
+
+/// A set of elements `a`.
+opaque type OrderedSet a = OrderedSet (OrderedMap.OrderedMap a Unit)
+
+/// The set without elements.
+empty : OrderedSet a
+let empty = OrderedSet OrderedMap.empty
+
+/// The number of elements, in `O(1)`.
+size : OrderedSet a -> Int
+let size (OrderedSet map) = OrderedMap.size map
+
+/// Whether the set holds an element equivalent to `value`, in `O(log n)`.
+member : Ord a => a -> OrderedSet a -> Bool
+let member value (OrderedSet map) = Option.is_some (OrderedMap.get value map)
+
+/// The set with `value`, in `O(log n)`; it replaces an equivalent element.
+insert : Ord a => a -> OrderedSet a -> OrderedSet a
+let insert value (OrderedSet map) = OrderedSet (OrderedMap.insert value () map)
+
+/// The set without an element equivalent to `value`, in `O(log n)`; the same
+/// elements when there is none.
+remove : Ord a => a -> OrderedSet a -> OrderedSet a
+let remove value (OrderedSet map) = OrderedSet (OrderedMap.remove value map)
+
+/// The least element, or `None` when the set is empty, in `O(log n)`.
+min : OrderedSet a -> Option a
+let min (OrderedSet map) = Option.map (fun (value, _) -> value) (OrderedMap.min map)
+
+/// The greatest element, or `None` when the set is empty, in `O(log n)`.
+max : OrderedSet a -> Option a
+let max (OrderedSet map) = Option.map (fun (value, _) -> value) (OrderedMap.max map)
+
+/// The elements in ascending order, as a lazy, restartable sequence:
+/// `O(log n)` to start, then `O(1)` amortized for each element taken.
+to_seq : (OrderedSet a)^d -> (Seq a)^d
+let to_seq (OrderedSet map) = Seq.map (fun (value, _) -> value) (OrderedMap.to_seq map)
+
+/// The set of the elements of a sequence, such as a `for`, consumed once in
+/// order without a temporary list. Takes `O(n log n)`.
+from_seq : Ord a => (Seq a)^d -> OrderedSet a
+let from_seq values = Seq.fold (fun set value -> insert value set) empty values
+
+/// The elements from `minimum` to `maximum`, both included, in ascending
+/// order, as a lazy, restartable sequence: `O(log n + m)` for `m` elements,
+/// without reading the elements before `minimum`. A range whose `minimum`
+/// comes after its `maximum` is empty.
+range : Ord a => { minimum : a; maximum : a } -> (OrderedSet a)^d -> (Seq a)^d
+let range bounds (OrderedSet map) = Seq.map (fun (value, _) -> value) (OrderedMap.range bounds map)
+
+/// Whether the set keeps the representation `OrderedMap.valid` checks; for
+/// tests and debugging, in `O(n)`.
+valid : Ord a => OrderedSet a -> Bool
+let valid (OrderedSet map) = OrderedMap.valid map
+
+/// Whether two sets hold equal elements in the same order.
+same : Eq a => OrderedSet a -> OrderedSet a -> Bool
+let same left right =
+  size left == size right && Seq.all (fun (x, y) -> x == y) (Seq.zip (to_seq left) (to_seq right))
+
+/// Sets are equal when they hold equal elements in the same order.
+instance Eq a => Eq (OrderedSet a) =
+  let eq left right = same left right
+
+instance Foldable OrderedSet =
+  let fold f init set = Seq.fold f init (to_seq set)
+
+instance Collections.ToSeq (OrderedSet a) a =
+  let to_seq set = to_seq set
+
+instance Collections.Sized (OrderedSet a) =
+  let size set = size set
+
+instance Ord a => Collections.Member (OrderedSet a) a =
+  let member value set = member value set

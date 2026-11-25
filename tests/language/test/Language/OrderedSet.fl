@@ -1,0 +1,140 @@
+// The persistent ordered set: ascending traversal, one of equal elements,
+// membership, removal, inclusive ranges, restartable sequences and old
+// versions, checked by `OrderedSet.valid` and against a sorted list without
+// duplicates.
+module Language.OrderedSet exposing (tests)
+
+type alias Set = OrderedSet.OrderedSet Int
+
+/// The set of the elements, inserted in order.
+set_of : List Int -> Set
+let set_of xs = List.fold_left (fun s x -> OrderedSet.insert x s) OrderedSet.empty xs
+
+/// The elements in traversal order.
+listed : OrderedSet.OrderedSet a -> List a
+let listed s = Seq.to_list (OrderedSet.to_seq s)
+
+/// The elements from `low` to `high`.
+ranged : Int -> Int -> Set -> List Int
+let ranged low high s = Seq.to_list (OrderedSet.range { minimum = low; maximum = high } s)
+
+/// Runs operations on the set: `0` and `1` insert the element, `2` removes
+/// it and `3` tests membership. Gives the membership answers, whether every
+/// set on the way was valid, and the elements left.
+run_set : List (Int, Int) -> (List Bool, Bool, List Int)
+let run_set ops =
+  let (left, ok, answers) =
+    List.fold_left
+      (fun (s, ok, acc) (op, x) ->
+        let next =
+          if op <= 1 then OrderedSet.insert x s else if op == 2 then OrderedSet.remove x s else s
+        let shown = if op == 3 then [OrderedSet.member x s] else []
+        (next, ok && OrderedSet.valid next, acc ++ shown)
+      )
+      (OrderedSet.empty, true, [])
+      ops
+  (answers, ok, listed left)
+
+/// The same operations on a sorted list without duplicates.
+run_model : List (Int, Int) -> (List Bool, Bool, List Int)
+let run_model ops =
+  let (left, answers) =
+    List.fold_left
+      (fun (xs, acc) (op, x) ->
+        let next =
+          if op <= 1 then
+            List.sort ([x] ++ List.filter (fun y -> y != x) xs)
+          else if op == 2 then
+            List.filter (fun y -> y != x) xs
+          else
+            xs
+        let shown = if op == 3 then [List.contains x xs] else []
+        (next, acc ++ shown)
+      )
+      ([], [])
+      ops
+  (answers, true, left)
+
+tests : List Test.Test
+let tests = [
+  Test.group "ordered set" [
+    Test.test "elements come out ascending, each once" (fun () ->
+      let s = set_of [3, 1, 2, 3, 1, 5]
+      let words = OrderedSet.from_seq (Seq.of_list ["b", "a", "b", "", "ab"])
+      Test.all [
+        Test.equal ([1, 2, 3, 5], 4, true) (listed s, OrderedSet.size s, OrderedSet.valid s),
+        Test.equal (["", "a", "ab", "b"], 4) (listed words, OrderedSet.size words),
+      ]
+    ),
+    Test.test "membership and removal of present and absent elements" (fun () ->
+      let s = set_of [1, 3, 5]
+      let e : Set = OrderedSet.empty
+      Test.equal ([true, false, false, false], [1, 5], [1, 3, 5], [], true) (
+        [
+          OrderedSet.member 3 s,
+          OrderedSet.member 2 s,
+          OrderedSet.member 6 s,
+          OrderedSet.member 1 e,
+        ],
+        listed (OrderedSet.remove 3 s),
+        listed (OrderedSet.remove 4 s),
+        listed (OrderedSet.remove 1 e),
+        OrderedSet.valid (OrderedSet.remove 3 s) && OrderedSet.valid (OrderedSet.remove 4 s),
+      )
+    ),
+    Test.test "ranges include both bounds and nothing outside them" (fun () ->
+      let s = set_of [30, 10, 50, 20, 40]
+      let e : Set = OrderedSet.empty
+      Test.equal [[20, 30, 40], [20, 30, 40], [10], [50], [30], [], [], [], [], []] [
+        ranged 20 40 s,
+        ranged 11 49 s,
+        ranged (-5) 10 s,
+        ranged 50 99 s,
+        ranged 30 30 s,
+        ranged 21 29 s,
+        ranged 40 20 s,
+        ranged 0 9 s,
+        ranged 51 99 s,
+        ranged 0 99 e,
+      ]
+    ),
+    Test.test "traversal restarts and old versions stay as they were" (fun () ->
+      let base = set_of [2, 1, 3]
+      let seq = OrderedSet.to_seq base
+      let added = OrderedSet.insert 0 base
+      let removed = OrderedSet.remove 2 base
+      Test.equal ([1, 2, 3], [1], [1, 2, 3], [0, 1, 2, 3], [1, 3], [1, 2, 3]) (
+        Seq.to_list seq,
+        Seq.to_list (Seq.take 1 seq),
+        Seq.to_list seq,
+        listed added,
+        listed removed,
+        listed base,
+      )
+    ),
+    Test.test "the least and greatest elements" (fun () ->
+      let s = set_of [5, 1, 9, 3]
+      let e : Set = OrderedSet.empty
+      Test.equal [None, None, Some 1, Some 9, Some 3, Some 5] [
+        OrderedSet.min e,
+        OrderedSet.max e,
+        OrderedSet.min s,
+        OrderedSet.max s,
+        OrderedSet.min (OrderedSet.remove 1 s),
+        OrderedSet.max (OrderedSet.remove 9 s),
+      ]
+    ),
+    Test.test "sets are equal when they hold the same elements" (fun () ->
+      Test.equal [true, true, false, false] [
+        eq (set_of [1, 2, 3]) (set_of [3, 2, 1, 2]),
+        eq (OrderedSet.remove 2 (set_of [1, 2])) (set_of [1]),
+        eq (set_of [1]) (set_of [1, 2]),
+        eq (set_of [1]) (set_of [2]),
+      ]
+    ),
+    Test.property
+      "random operations agree with a sorted list without duplicates"
+      (Gen.list 80 (Gen.pair (Gen.int 0 3) (Gen.int 0 20)))
+      (fun ops -> Test.equal (run_model ops) (run_set ops)),
+  ],
+]

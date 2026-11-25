@@ -27,6 +27,8 @@ flate2 = "1.1.1"
 flick-core = { path = "../flick-core", features = ["ide", "commands"] }
 flick-backend = { path = "../flick-backend" }
 flick-backend-support = { path = "../flick-backend-support", default-features = false }
+# the official JS backend of these sources answers the editor in process
+flick-backend-js = { path = "../backends/js", features = ["component"] }
 flick-ir = { path = "../flick-ir", features = ["json", "cbor"] }
 flick-plugin = { path = "../flick-plugin" }
 wasmtime = { workspace = true, optional = true }
@@ -45,7 +47,7 @@ ureq = "2.12.1"
 rustix = { version = "1.1.6", features = ["fs", "process", "termios"] }
 
 [dev-dependencies]
-flick-backend-js = { path = "../backends/js", features = ["component"] }
+flick-backend-go = { path = "../backends/go", features = ["component"] }
 flick-test-support = { path = "../flick-test-support" }
 flick-model = { path = "../flick-model" }
 flick-wasm = { path = "../flick-wasm" }

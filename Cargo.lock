@@ -635,6 +635,7 @@ dependencies = [
  "clap",
  "flate2",
  "flick-backend",
+ "flick-backend-go",
  "flick-backend-js",
  "flick-backend-support",
  "flick-core",

@@ -18,26 +18,13 @@ use flick_core::project::{Foreign, ForeignPackage, Project, store};
 use flick_core::source::{FileId, Span};
 
 use super::options::{self, TargetChoice};
-use super::{official, packages, runtimes};
+use super::{native, official, packages, runtimes};
 use crate::{cache, component, saved, toolchain};
 
 pub(crate) fn foreign(project: &Project) -> Foreign {
-    let Some((pin, bytes)) = selected_bytes(project, None) else {
+    let Some(backend) = packages_backend(project) else {
         return Foreign::default();
     };
-    // the backend's patterns, kept by its digest: a project with none of
-    // those files needs no backend loaded
-    if let Some(patterns) = cached(&pin.sha256)
-        && !packages::any_match(&project.root, &patterns)
-    {
-        return Foreign::default();
-    }
-    let Some(backend) = load(&pin, &bytes) else {
-        return Foreign::default();
-    };
-    if package_patterns(&pin, &backend).is_none() {
-        return Foreign::default();
-    }
     let options = [
         OptionValue {
             key: "root".into(),
@@ -393,6 +380,47 @@ fn selected_choice(project: &Project, target_override: Option<&str>) -> Option<T
     options::resolve_target(target_override, Some(project))
         .ok()
         .map(|(choice, _)| choice)
+}
+
+/// The backend that reports the packages of `project`: the official one
+/// built from these sources in process, any other as its component; `None`
+/// without one, or when the project has none of the files its packages are in.
+fn packages_backend(project: &Project) -> Option<Arc<dyn Backend>> {
+    let pin = selected_pin(project, None)?;
+    // the backend's patterns, kept by its digest: a project with none of
+    // those files needs no backend loaded
+    if let Some(patterns) = cached(&pin.sha256)
+        && !packages::any_match(&project.root, &patterns)
+    {
+        return None;
+    }
+    if let Some(own) = native::backend(&pin) {
+        keep(&pin.sha256, &own.package_files());
+        return Some(own);
+    }
+    let (pin, bytes) = selected_bytes(project, None)?;
+    let backend = load(&pin, &bytes)?;
+    package_patterns(&pin, &backend)?;
+    Some(backend)
+}
+
+/// The pin of the component `project` selects, read without its bytes: the
+/// pin [`selected_bytes`] would find them of.
+fn selected_pin(project: &Project, target_override: Option<&str>) -> Option<BackendPin> {
+    match selected_choice(project, target_override)? {
+        TargetChoice::Pinned { package, .. } => project
+            .root
+            .join(&package.component)
+            .is_file()
+            .then(|| BackendPin {
+                identity: BackendId {
+                    id: package.id.clone(),
+                    version: package.version.clone(),
+                },
+                sha256: package.sha256.clone(),
+            }),
+        TargetChoice::Official { id, .. } => official::local_pin(id, Some(project)),
+    }
 }
 
 /// The component `project` selects and its pin, without the network.

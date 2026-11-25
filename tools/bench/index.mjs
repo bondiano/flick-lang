@@ -1,8 +1,9 @@
 // Benchmarks of the JS and the go target, as gleam's benchmark/: each
-// `tools/bench/*.fl` is built in release for both, run `runs` times after
-// one warm-up, and timed as a whole process (the go target has no clock a
-// program could read), so `startup` is the part of every row that is only
-// starting. Both targets must print the same checksum.
+// `tools/bench/*.fl`, and each example project of `projects`, is built in
+// release for both, run `runs` times after one warm-up, and timed as a
+// whole process (the go target has no clock a program could read), so
+// `startup` is the part of every row that is only starting. Both targets
+// must print the same checksum.
 //
 //   node tools/bench/index.mjs target/debug/flick [runs]
 import { spawnSync } from "node:child_process";
@@ -54,15 +55,23 @@ const programs = readdirSync(here)
   .map((f) => basename(f, ".fl"))
   .sort((a, b) => (a === "startup" ? -1 : b === "startup" ? 1 : a.localeCompare(b)));
 
+// Example projects timed after the programs, run with `args`; a project
+// grants `go` in its own `[tools]`.
+const projects = [{ name: "exchange", dir: join(here, "../../examples/exchange"), args: ["run"] }];
+
+const jobs = [
+  ...programs.map((name) => ({ name, input: [join(here, `${name}.fl`)], go: ["--allow-tool", "go"], args: [] })),
+  ...projects.map(({ name, dir, args }) => ({ name, input: ["--project", dir], go: [], args })),
+];
+
 const rows = [];
-for (const name of programs) {
-  const source = join(here, `${name}.fl`);
+for (const { name, input, go: goFlags, args } of jobs) {
   for (const target of ["js", "go"]) {
-    const extra = target === "js" ? ["--runtime", "effect"] : ["--allow-tool", "go"];
-    run(flick, ["build", source, "--target", target, ...extra, "--profile", "release", "--out-dir", join(out, target, name)]);
+    const extra = target === "js" ? ["--runtime", "effect"] : goFlags;
+    run(flick, ["build", ...input, "--target", target, ...extra, "--profile", "release", "--out-dir", join(out, target, name)]);
   }
-  const js = time("node", [join(out, "js", name, "flick-main.js")]);
-  const go = time(join(out, "go", name, exe), []);
+  const js = time("node", [join(out, "js", name, "flick-main.js"), ...args]);
+  const go = time(join(out, "go", name, exe), args);
   if (js.output !== go.output) throw new Error(`${name}: js printed ${js.output}, go printed ${go.output}`);
   rows.push(`| ${name} | ${js.ms.toFixed(0)} | ${go.ms.toFixed(0)} | ${(go.ms / js.ms).toFixed(2)} |`);
 }

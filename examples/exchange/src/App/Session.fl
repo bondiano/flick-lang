@@ -1,0 +1,76 @@
+/// A trading session: traders send their commands at once, as JSON lines
+/// over one queue, and a sequencer puts them back in order and submits them
+/// to the exchange. The commands come from `Book.Feed`, so a session, and
+/// what it ends with, is the same in every run and on every target.
+module App.Session exposing (Settings, run)
+
+import App.Exchange exposing (Exchange, layer)
+import Book.Book as Book exposing (Book)
+import Book.Feed as Feed exposing (Malformed(..))
+import Book.Tally as Tally exposing (Tally)
+import PriorityQueue exposing (PriorityQueue)
+import Queue exposing (Queue)
+
+/// How many commands, and how many traders send them.
+type alias Settings = { orders : Int; traders : Int }
+
+/// A line on its way to the sequencer, with its command's number.
+type alias Line = (Int, String)
+
+/// What the sequencer calls after each command: the number of commands
+/// submitted and the tally so far.
+type alias Progress = Int -> Tally ->{Exchange, Async, Host.Console} Unit
+
+/// Trader `t` sends the commands numbered `t` modulo the traders, in order.
+trade : Settings -> Queue none Line -> Int ->{Async; SchemaError} Unit
+let trade settings queue t =
+  let mut seq = t
+  while seq < settings.orders do
+    ignore (Queue.offer (seq, Feed.encode (Feed.command seq)) queue)
+    seq = seq + settings.traders
+
+/// The tally after submitting one line.
+submit : String -> Tally ->{Exchange} Tally
+let submit line tally =
+  try Tally.add (Exchange.submit line) tally with
+  | Malformed _ -> Tally.malformed tally
+
+/// Takes the lines off the queue as they come, holds each until those
+/// before it have been submitted, and submits them all in order.
+sequence : Settings -> Queue none Line -> Progress ->{Exchange, Async, Host.Console} Tally
+let sequence settings queue progress =
+  let mut held = PriorityQueue.empty
+  let mut next = 0
+  let mut tally = Tally.empty
+  while next < settings.orders do
+    let assert Some (seq, line) = Queue.take queue as "the queue ended before the last command"
+    held = PriorityQueue.push seq line held
+    let mut ready = true
+    while ready do
+      match PriorityQueue.pop held with
+      | Some ((first, line), rest) when first == next ->
+        held = rest
+        tally = submit line tally
+        next = next + 1
+        progress next tally
+      | _ -> ready = false
+  tally
+
+/// Runs a session from an empty book: the tally and the book it ends with.
+run : Settings -> Progress ->{Async, Host.Console; AppError} (Tally, Book)
+let run settings progress =
+  let book = Ref.make Book.empty
+  let queue = Queue.bounded 1024
+  let senders = List.map (fun t -> task { trade settings queue t }) (List.range 0 settings.traders)
+  let tally =
+    try
+      provide (layer book) {
+        let (_, tally) =
+          parallel
+            (task { parallel_all settings.traders senders })
+            (task { sequence settings queue progress })
+        tally
+      }
+    with
+    | SchemaError issues -> App.fail "cannot encode a command: \{show issues}"
+  (tally, Ref.get book)

@@ -1,6 +1,6 @@
 ---
 title: "Классы типов для коллекций"
-source_hash: d71a40b17c765a95
+source_hash: 8ac4cec85bbde4cf
 ---
 
 Flick разделяет общие операции над коллекциями на два уровня, полностью
@@ -57,9 +57,9 @@ Collections (модуль ядра, открытые классы возможн
   требующие конечности — например `Collections.size`, `Collections.to_list` или
   `Collections.member` — на этапе проверки типов.
 - **`Functor` для словарей — только при сохранении ключей и свидетельства.**
-  `HashMap w k` и `Trie` реализуют `Functor`, `Foldable` и `Traversable` над
-  значениями, сохраняя ключи, идентичность свидетельства `w` и порядок обхода.
-  У `HashSet w` (и планируемого `OrderedSet`) намеренно нет `Functor` и
+  `HashMap w k`, `Trie` и `OrderedMap k` реализуют `Functor`, `Foldable` и
+  `Traversable` над значениями, сохраняя ключи, идентичность свидетельства `w`
+  и порядок обхода. У `HashSet w` (и `OrderedSet`) намеренно нет `Functor` и
   `Traversable`: преобразование элементов множества может менять равенство и
   склеивать элементы, а также требует явного целевого свидетельства
   (`HashSet.map`).
@@ -100,8 +100,8 @@ let check_to_seq xs = Collections.to_seq xs
   может покинуть её пределы.
 - **Согласованность порядка с `Foldable`:** если у `f` есть и `Foldable f`, и
   `ToSeq (f a) a`, то `fold step init xs == Seq.fold step init (to_seq xs)`;
-  для словарей, отображающих значения (`HashMap w k`, `Trie`, планируемый
-  `OrderedMap k`), выполняется
+  для словарей, отображающих значения (`HashMap w k`, `Trie`, `OrderedMap k`),
+  выполняется
   `fold step init m == Seq.fold (fun acc (_, v) -> step acc v) init (to_seq m)`.
 
 ### `Collections.Sized c`
@@ -168,7 +168,7 @@ let check_to_seq xs = Collections.to_seq xs
 Суперкласс: `Sized c` (исключает потенциально бесконечный `Seq`).
 
 Экземпляры со своим свидетельством равенства или порядка (`HashSet w a`,
-планируемый `OrderedSet a`) переопределяют `member` напрямую и не требуют
+`OrderedSet a`) переопределяют `member` напрямую и не требуют
 канонического `Eq a`. Конечные последовательности с `ToSeq` и `Eq a` могут
 либо дать собственную быструю проверку, либо унаследовать реализацию по
 умолчанию с ранним выходом.
@@ -196,9 +196,7 @@ let check_to_seq xs = Collections.to_seq xs
 
 ## Матрица классов и экземпляров
 
-Поставляемые коллекции реализованы в `core` и `std`. Планируемые коллекции
-(`OrderedMap` и `OrderedSet`, задача `#735`) включены, чтобы показать их место
-в той же иерархии.
+Поставляемые коллекции реализованы в `core` и `std`.
 
 | Коллекция | Элемент / запись (`ToSeq`) | `Functor` | `Foldable` | `Traversable` | `Semigroup` | `Monoid` | `Iterable` | `ToSeq` | `Sized` | `Indexed` | `Keyed` | `Member` |
 | - | - | - | - | - | - | - | - | - | - | - | - | - |
@@ -212,8 +210,8 @@ let check_to_seq xs = Collections.to_seq xs
 | `Trie v` | `(String, v)` | Да | Да | Да | Да | Да | Нет | Да | Да | Нет | `(String, v)` | Нет |
 | `Bytes` | `Int` (`0..255`) | Нет | Нет | Нет | Да | Да | Нет | Да | Да | Да | Нет | Да (`Int`) |
 | `PriorityQueue p a` | `(p, a)` | Нет | Нет | Нет | `Ord p =>` | `Ord p =>` | Нет | `Ord p =>` | Да | Нет | Нет | Нет |
-| *`OrderedMap k v` (#735)* | `(k, v)` | `OrderedMap k` | `OrderedMap k` | `OrderedMap k` | Да | `Ord k =>` | Нет | Да | Да | Нет | `(k, v)` | Нет |
-| *`OrderedSet a` (#735)* | `a` | **Нет** | Да | Нет | Да | `Ord a =>` | Нет | Да | Да | Нет | Нет | Да (`Ord`) |
+| `OrderedMap k v` | `(k, v)` | `OrderedMap k` | `OrderedMap k` | `OrderedMap k` | Нет | Нет | Нет | Да | Да | Нет | `Ord k =>` | Нет |
+| `OrderedSet a` | `a` | **Нет** | Да | Нет | Нет | Нет | Нет | Да | Да | Нет | Нет | `Ord a =>` |
 
 `List`, `Seq`, `NonEmpty` и `Chunk` также реализуют `Applicative` и `Monad`
 (а `List`, `Seq` и `Chunk` — `Alternative`).
@@ -231,14 +229,24 @@ let check_to_seq xs = Collections.to_seq xs
 | `Trie v` | возрастающий порядок UTF-16 ключей | `O(1) + O(k * L)` | `O(1)` | `lookup` `O(L)` | `O(m * L)`, правый выигрывает | `O(n)` / `O(n * L)` |
 | `Bytes` | по индексу байта `0 .. n-1` | `O(1) + O(k)` | `O(1)` | `at` `O(1)`, `member` `O(n)` (`O(1)` вне `0..255`) | `O(n + m)` | — |
 | `PriorityQueue p a` | возрастающий `Ord p`, порядок вставки при равных приоритетах | `O(1) + O(k log n)` | `O(1)` | — | `O(m + log n)`, левый первым | — |
-| *`OrderedMap k v` (#735)* | возрастающий `Ord k` | `O(log n) + O(k)` | `O(1)` | `lookup` `O(log n)` | `O(m log(n + m))`, правый выигрывает | `O(n)` / `O(n log n)` |
-| *`OrderedSet a` (#735)* | возрастающий `Ord a` | `O(log n) + O(k)` | `O(1)` | `member` `O(log n)` | `O(m log(n + m))` | `fold` `O(n)` |
+| `OrderedMap k v` | возрастающий `Ord k` | `O(log n) + O(k)` | `O(1)` | `lookup` `O(log n)` | — | `O(n)` |
+| `OrderedSet a` | возрастающий `Ord a` | `O(log n) + O(k)` | `O(1)` | `member` `O(log n)` | — | `fold` `O(n)` |
 
 `PriorityQueue` выполняет `peek` за `O(1)`, а `push` и `pop` — за `O(log n)` в
 худшем случае, в том числе на старых версиях. `combine q1 q2` перенумеровывает
 `m` пар `q2` после пар `q1`, поэтому при равных приоритетах первыми выходят
 пары `q1`. Две очереди равны по `Eq`, когда выдают одни и те же пары в одном
 порядке.
+
+`OrderedMap` и `OrderedSet` — деревья, сбалансированные по весу: `insert`,
+`remove`, `min` и `max` выполняются за `O(log n)`, в том числе на старых
+версиях, которые обновление оставляет как были. Ключи эквивалентны, когда
+`compare` даёт `EQ`, и более поздняя запись заменяет раннюю вместе с ключом.
+`range { minimum; maximum }` выдаёт записи с ключами от `minimum` до `maximum`
+включительно в порядке возрастания: до `minimum` он доходит за `O(log n)`, не
+читая ключи перед ним, поэтому `m` записей занимают `O(log n + m)`, а диапазон,
+у которого `minimum` идёт после `maximum`, пуст. `valid` проверяет
+представление для тестов и отладки.
 
 ### Эффекты, короткое замыкание и захваты
 
@@ -270,7 +278,7 @@ let check_to_seq xs = Collections.to_seq xs
 ```flick
 import Collections exposing (Keyed(..), Member(..), Sized(..), ToSeq(..))
 
-// Works on any Keyed collection (HashMap with any witness, Trie, future OrderedMap).
+// Works on any Keyed collection (HashMap with any witness, Trie, OrderedMap).
 present_values : Keyed c String Int => List String -> c -> List (String, Int)
 let present_values keys m = Seq.to_list (Collections.lookup_all keys m)
 

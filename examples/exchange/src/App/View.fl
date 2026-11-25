@@ -1,0 +1,105 @@
+/// What a session shows: the report `run` prints when it ends, and the
+/// screens of `watch`, which redraw the book in place with ANSI escapes.
+module App.View exposing (Row(..), report, ladder, frame)
+
+import App.Session exposing (Settings)
+import Book.Book as Book exposing (Book)
+import Book.Order exposing (Side(..))
+import Book.Tally as Tally exposing (Tally)
+
+/// How many price levels of each side the ladder shows.
+depth : Int
+let depth = 8
+
+show_price : Option Int -> String
+let show_price price = Option.with_default "none" (Option.map show price)
+
+/// The traders of a session, counted.
+traders : Settings -> String
+let traders settings = if settings.traders == 1 then "1 trader" else "\{settings.traders} traders"
+
+/// The report of a finished session.
+report : Settings -> Tally -> Book -> List String
+let report settings tally book =
+  ["\{settings.orders} commands from \{traders settings}"]
+    ++ Tally.lines tally
+    ++ [
+      "best bid \{show_price (Book.best_bid book)}, best ask \{show_price (Book.best_ask book)}",
+      "resting \{List.length (Book.resting Buy book)} bids, \{List.length (Book.resting Sell book)} asks",
+    ]
+
+/// A row of the ladder: a price level of a side with its quantity, or the
+/// gap between the best ask and the best bid.
+type Row = Level Side Int Int | Spread (Option Int)
+  deriving Eq, Show
+
+/// The ladder of the book, top down: the best asks, highest first, the
+/// spread, then the best bids, highest first.
+ladder : Book -> List Row
+let ladder book =
+  let asks = List.map (fun (price, qty) -> Level Sell price qty) (Book.levels depth Sell book)
+  let bids = List.map (fun (price, qty) -> Level Buy price qty) (Book.levels depth Buy book)
+  let gap =
+    match (Book.best_bid book, Book.best_ask book) with
+    | (Some bid, Some ask) -> Some (ask - bid)
+    | _ -> None
+  List.reverse asks ++ [Spread gap] ++ bids
+
+/// An ANSI control sequence.
+control : String -> String
+let control code = "\u{1b}[" ++ code
+
+/// The text in the graphic style `code`, which ends with it.
+paint : String -> String -> String
+let paint code text = control code ++ text ++ control "0m"
+
+right : Int -> String -> String
+let right width text = String.pad_start width " " text
+
+/// A bar of `qty` out of `widest`, at most 24 cells long.
+bar : Int -> Int -> String
+let bar widest qty = String.repeat (if widest == 0 then 0 else (qty * 24 + widest - 1) / widest) "█"
+
+row_line : Int -> Row -> String
+let row_line widest row =
+  match row with
+  | Level Sell price qty ->
+    paint "31m" "ask \{right 6 (show price)} \{right 6 (show qty)}  \{bar widest qty}"
+  | Level Buy price qty ->
+    paint "32m" "bid \{right 6 (show price)} \{right 6 (show qty)}  \{bar widest qty}"
+  | Spread gap -> paint "2m" "─── spread \{show_price gap} ───"
+
+/// How far the session is, as a bar 30 cells long and a percentage.
+progress : Int -> Int -> String
+let progress done total =
+  let filled = if total == 0 then 30 else done * 30 / total
+  let percent = if total == 0 then 100 else done * 100 / total
+  "\{String.repeat filled "█"}\{String.repeat (30 - filled) "░"} \{right 3 (show percent)}%"
+
+/// A screen of `watch`: the cursor goes home, each line is cleared to its
+/// end and what was below the last line is cleared, so the screen does not
+/// flicker.
+frame : Settings -> Int -> Tally -> Book -> String
+let frame settings done tally book =
+  let rows = ladder book
+  let widest =
+    List.fold_left
+      (fun most row ->
+        match row with
+        | Level _ _ qty -> Int.max most qty
+        | Spread _ -> most
+      )
+      0
+      rows
+  let lines =
+    [
+      paint "1m" "exchange: \{done} of \{settings.orders} commands from \{traders settings}",
+      progress done settings.orders,
+      "",
+    ]
+      ++ Tally.lines tally
+      ++ [""]
+      ++ List.map (row_line widest) rows
+  control "H"
+    ++ String.join "" (List.map (fun line -> "  \{line}\{control "K"}\n") lines)
+    ++ control "J"

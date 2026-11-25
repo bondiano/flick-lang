@@ -440,3 +440,77 @@ fn crafted_patterns_cannot_walk_to_system_home_or_escalate_from_supplied_dirs() 
 
     fs::remove_dir_all(base).expect("cleanup");
 }
+
+/// The official JS backend built from these sources answers in process as
+/// its component does: the same packages, runtime pins and inputs, so the
+/// editor may ask it without loading the component.
+#[test]
+fn the_backend_in_process_reports_as_its_component() {
+    let root = env::temp_dir().join(format!("flick-packages-native-{}", process::id()));
+    let _ = fs::remove_dir_all(&root);
+    let modules = root.join("node_modules");
+    write(
+        &root.join("package.json"),
+        r#"{"name":"app","version":"0.3.0","dependencies":{"left":"1","missing":"2"},"devDependencies":{"lib":"1"}}"#,
+    );
+    write(
+        &modules.join("@flick-lang/runtime/package.json"),
+        r#"{"name":"@flick-lang/runtime","version":"0.1.0"}"#,
+    );
+    write(
+        &modules.join("@flick-lang/runtime/dist/index.js"),
+        "runtime",
+    );
+    write(
+        &modules.join("left/package.json"),
+        r#"{"name":"left","version":"1.0.0"}"#,
+    );
+    write(
+        &modules.join("lib/package.json"),
+        r#"{"name":"lib","version":"1.2.0","flick":{"source-dir":"src"}}"#,
+    );
+    write(
+        &modules.join("lib/src/Lib.fl"),
+        "module Lib exposing (..)\n",
+    );
+    let real = super::canonical_slashed(&root);
+    let component = js();
+    for runtime in [None, Some("rt"), Some("effect")] {
+        let mut options = vec![OptionValue {
+            key: "root".into(),
+            value: real.clone(),
+        }];
+        match runtime {
+            Some(runtime) => options.push(OptionValue {
+                key: "option.runtime".into(),
+                value: runtime.into(),
+            }),
+            None => options.push(OptionValue {
+                key: "skip-runtime".into(),
+                value: "true".into(),
+            }),
+        }
+        let native = report(&flick_backend_js::Javascript, &root, &[], &options).expect("native");
+        let wasm = report(&*component, &root, &[], &options).expect("component");
+        assert_eq!(
+            (native.name, native.version, native.declared),
+            (wasm.name, wasm.version, wasm.declared),
+            "{runtime:?}"
+        );
+        assert_eq!(
+            format!("{:?}", native.sources),
+            format!("{:?}", wasm.sources)
+        );
+        assert_eq!(native.runtime, wasm.runtime, "{runtime:?}");
+        assert_eq!(native.inputs, wasm.inputs, "{runtime:?}");
+        assert_eq!(
+            format!("{:?}", native.diagnostics),
+            format!("{:?}", wasm.diagnostics)
+        );
+    }
+    assert_eq!(
+        flick_backend_js::Javascript.package_files(),
+        component.try_package_files().expect("patterns")
+    );
+    fs::remove_dir_all(root).expect("cleanup");
+}
