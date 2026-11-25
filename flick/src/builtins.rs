@@ -9,7 +9,7 @@ use std::sync::OnceLock;
 use std::time::Instant;
 use std::{fs, thread};
 
-use flick_core::build::{self, BuiltinModules, BuiltinSource, BuiltinStore};
+use flick_core::build::{self, BuiltinModules, BuiltinPreflight, BuiltinSource, BuiltinStore};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::iface::{IFACE_VERSION, Interface};
 use flick_core::ir;
@@ -135,7 +135,32 @@ pub fn keep_modules() {
     build::keep_builtin_modules(BuiltinStore {
         load: saved_modules,
         save: save_modules,
+        load_preflight: saved_preflight,
+        save_preflight,
     });
+}
+
+/// What environment preflight reads of the lowered built-in modules, beside
+/// them: an editor reads this instead of the whole bundle.
+fn preflight_path(stages_by_class: bool) -> Option<PathBuf> {
+    let (dir, _, name) = location(stages_by_class)?;
+    Some(dir.join(name).with_extension("preflight.cbor"))
+}
+
+fn saved_preflight(stages_by_class: bool) -> Option<BuiltinPreflight> {
+    let bytes = fs::read(preflight_path(stages_by_class)?).ok()?;
+    ciborium::from_reader(&bytes[..]).ok()
+}
+
+/// A failure to save only means the next preflight reads the bundle again.
+fn save_preflight(stages_by_class: bool, preflight: &BuiltinPreflight) {
+    let Some(path) = preflight_path(stages_by_class) else {
+        return;
+    };
+    let mut bytes = Vec::new();
+    if ciborium::into_writer(preflight, &mut bytes).is_ok() {
+        let _ = saved::write(&path, &bytes);
+    }
 }
 
 fn modules_path(stages_by_class: bool) -> Option<PathBuf> {

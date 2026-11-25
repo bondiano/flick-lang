@@ -109,14 +109,18 @@ pub fn std_root_handlers(
 
 /// Whether only the Effect adapter implements `foreign`, with the UI renderer `ui`.
 pub(crate) fn needs_adapter(foreign: &Foreign, ui: Option<&str>) -> bool {
-    let Some((from, export)) = foreign.binding.module_export() else {
-        return false;
-    };
+    (foreign.binding.module_export()).is_some_and(|(from, export)| {
+        needs_adapter_of(from, export, foreign.mode == ForeignMode::Effect, ui)
+    })
+}
+
+/// [`needs_adapter`] of a binding to `export` of `from`, an `Eff` when `effect`.
+pub(super) fn needs_adapter_of(from: &str, export: &str, effect: bool, ui: Option<&str>) -> bool {
     let from = ui
         .filter(|_| bindings::UI_RENDERER.contains(&from))
         .unwrap_or(from);
     let native = effects::rt_specifier(from).unwrap_or_else(|| effects::effect_specifier(from));
-    effects::requires_adapter(&native, export, foreign.mode == ForeignMode::Effect)
+    effects::requires_adapter(&native, export, effect)
 }
 
 pub(super) fn scan_item_gated_services(

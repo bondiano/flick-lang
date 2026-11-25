@@ -6,6 +6,8 @@ use tracing::debug;
 
 use crate::clock::{micros, timed};
 use crate::iface::Interface;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::project::target_preflight::BuiltinPreflight;
 use crate::source::FileId;
 use crate::{ir, types};
 
@@ -30,8 +32,9 @@ pub fn builtin_modules_of(stages_by_class: bool) -> &'static [ir::Module] {
     &builtin_bundle_of(stages_by_class).modules
 }
 
+static MODULES: [OnceLock<BuiltinModules>; 2] = [OnceLock::new(), OnceLock::new()];
+
 pub fn builtin_bundle_of(stages_by_class: bool) -> &'static BuiltinModules {
-    static MODULES: [OnceLock<BuiltinModules>; 2] = [OnceLock::new(), OnceLock::new()];
     MODULES[usize::from(stages_by_class)].get_or_init(|| {
         let store = BUILTIN_STORE.get();
         if let Some(kept) = store.and_then(|store| (store.load)(stages_by_class)) {
@@ -48,11 +51,37 @@ pub fn builtin_bundle_of(stages_by_class: bool) -> &'static BuiltinModules {
     })
 }
 
+/// What environment preflight reads of the built-in modules. A loaded bundle
+/// is read as it is; otherwise the summary a host kept spares loading the
+/// whole lowered standard library, which an editor otherwise holds for good.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn builtin_preflight_of(stages_by_class: bool) -> &'static BuiltinPreflight {
+    static KEPT: [OnceLock<BuiltinPreflight>; 2] = [OnceLock::new(), OnceLock::new()];
+    KEPT[usize::from(stages_by_class)].get_or_init(|| {
+        let store = BUILTIN_STORE.get();
+        if MODULES[usize::from(stages_by_class)].get().is_none()
+            && let Some(kept) = store.and_then(|store| (store.load_preflight)(stages_by_class))
+        {
+            return kept;
+        }
+        let made = BuiltinPreflight::of(builtin_modules_of(stages_by_class));
+        if let Some(store) = store {
+            (store.save_preflight)(stages_by_class, &made);
+        }
+        made
+    })
+}
+
 /// A host cache preserves the complete bundle for the same compiler,
-/// sources and checking mode. A legacy IR-only cache must be regenerated.
+/// sources and checking mode, and what preflight reads of it. A legacy
+/// IR-only cache must be regenerated.
 pub struct BuiltinStore {
     pub load: fn(bool) -> Option<BuiltinModules>,
     pub save: fn(bool, &BuiltinModules),
+    #[cfg(not(target_arch = "wasm32"))]
+    pub load_preflight: fn(bool) -> Option<BuiltinPreflight>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub save_preflight: fn(bool, &BuiltinPreflight),
 }
 
 static BUILTIN_STORE: OnceLock<BuiltinStore> = OnceLock::new();

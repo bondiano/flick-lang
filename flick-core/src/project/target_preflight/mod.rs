@@ -6,6 +6,7 @@
 //! reachability from their entries, runners, and loaded initializers; libraries
 //! check their active public exports; test runs check their active test suites.
 
+mod builtin;
 mod facades;
 mod gated;
 mod locals;
@@ -25,7 +26,9 @@ pub use gated::{
 pub(crate) use prune::{prune_compilation, prune_compilation_for_env};
 use refs::{Reference, collect_item_references, initialization_refs, module_reexports};
 
-use super::builtins::builtin_modules_of;
+pub use builtin::BuiltinPreflight;
+
+use super::builtins::builtin_preflight_of;
 use super::environment::ResolvedEnvironment;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::effects::bindings;
@@ -84,6 +87,9 @@ struct Preflight<'a> {
     handles: Option<HandlesService<'a>>,
     modules: Vec<&'a Module>,
     index: HashMap<reach::Key, (usize, usize)>,
+    /// The built-in modules, read apart from their IR.
+    builtins: &'a BuiltinPreflight,
+    seen_builtins: HashSet<usize>,
     module_conditions: HashMap<String, Option<String>>,
     /// Package name and `[package] when` condition for each module in `compilation`.
     package_conditions: HashMap<String, (String, String)>,
@@ -116,13 +122,7 @@ pub(crate) fn check(
     env: &ResolvedEnvironment,
     diagnostics: &mut Vec<Diagnostic>,
 ) {
-    let builtins_ir = builtin_modules_of(options.by_class);
-    let modules: Vec<&Module> = compilation
-        .modules
-        .iter()
-        .map(|module| &*module.ir)
-        .chain(builtins_ir.iter())
-        .collect();
+    let modules: Vec<&Module> = compilation.modules.iter().map(|m| &*m.ir).collect();
     let index = reach::index(&modules);
 
     let mut module_conditions = HashMap::new();
@@ -152,6 +152,8 @@ pub(crate) fn check(
         handles: options.handles,
         modules,
         index,
+        builtins: builtin_preflight_of(options.by_class),
+        seen_builtins: HashSet::new(),
         module_conditions,
         package_conditions,
         by_class: options.by_class,
@@ -389,7 +391,12 @@ impl Preflight<'_> {
     }
 
     fn display_key(&self, key: &reach::Key) -> Option<String> {
-        if let Some(&at) = self.index.get(key)
+        // a built-in item of a key comes before a user one, as in one index
+        if let Some(at) = self.builtins.find(key) {
+            if let Some(name) = self.builtins.foreign_name(at) {
+                return Some(format!("{}.{name}", key.0));
+            }
+        } else if let Some(&at) = self.index.get(key)
             && let ItemKind::Foreign(foreign) = &self.modules[at.0].items[at.1].kind
         {
             let name = foreign.source_name.as_deref().unwrap_or(&foreign.name);
@@ -401,16 +408,43 @@ impl Preflight<'_> {
         Some(format!("{}.{}", key.0, key.1))
     }
 
+    /// A reached built-in item: its uses, unless it is a foreign binding only
+    /// the Effect adapter implements.
+    fn visit_builtin(&mut self, at: usize, work: &WorkItem) {
+        if !self.seen_builtins.insert(at) {
+            return;
+        }
+        if self.check_adapter && self.builtins.needs_adapter(at, self.env.ui.as_deref()) {
+            let item = self
+                .builtins
+                .foreign_name(at)
+                .unwrap_or_default()
+                .to_owned();
+            let leaf = format!("{}.{item}", work.key.0);
+            let reason = Unavailable::EffectAdapter {
+                module: work.key.0.clone(),
+                item,
+            };
+            self.report_unavailable(&reason, work.origin, work.node, Some(&leaf));
+            return;
+        }
+        for r in self.builtins.uses(at, work.origin, work.covered) {
+            self.enqueue_reference(r, work.node);
+        }
+    }
+
     fn run(&mut self) {
         while let Some(work) = self.queue.pop_front() {
+            if let Some(at) = self.builtins.find(&work.key) {
+                self.visit_builtin(at, &work);
+                continue;
+            }
             let Some(&at) = self.index.get(&work.key) else {
                 continue;
             };
-            let is_user_module = at.0 < self.compilation.modules.len();
             let first_visit = self.seen.insert(at);
-            let check_e020 = is_user_module
-                && self.env.explicit_environment
-                && self.seen_e020.insert((at, work.covered));
+            let check_e020 =
+                self.env.explicit_environment && self.seen_e020.insert((at, work.covered));
             if !first_visit && !check_e020 {
                 continue;
             }
@@ -451,8 +485,8 @@ impl Preflight<'_> {
             }
 
             let mut refs = Vec::new();
-            collect_item_references(item, is_user_module, work.origin, work.covered, &mut refs);
-            if first_visit && is_user_module {
+            collect_item_references(item, true, work.origin, work.covered, &mut refs);
+            if first_visit {
                 let item_ref = &self.compilation.modules[at.0].ir.items[at.1];
                 let mod_facades = self.facades_of(at.0);
                 for facade_use in item_facade_uses(&mod_facades, item_ref) {
