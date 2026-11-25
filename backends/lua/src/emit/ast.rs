@@ -44,6 +44,13 @@ pub enum Results {
     /// Exactly one, as every Flick function does.
     One,
     /// Any number, as a host function may.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "calls of host functions construct it, with the value ABI"
+        )
+    )]
     Any,
 }
 
@@ -87,12 +94,24 @@ pub enum BinOp {
     Ge,
     Eq,
     Ne,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the operators the kernel owns construct it")
+    )]
     Concat,
     Add,
     Sub,
     Mul,
     Div,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the operators the kernel owns construct it")
+    )]
     Mod,
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "the operators the kernel owns construct it")
+    )]
     Pow,
 }
 
@@ -118,6 +137,8 @@ pub struct Stmt {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StmtKind {
+    /// `local a, b = ...`: the names of a chunk's arguments.
+    Args(Vec<Name>),
     /// `local name = value`, or `local name` without one.
     Local(Name, Option<Expr>),
     /// `local function name(params) … end`, which sees itself.

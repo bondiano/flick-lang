@@ -13,8 +13,11 @@ one kind of evidence:
   that ran on the named host on the named date.
 
 `flick/lua` is a pinned, non-official backend component. It describes the
-environments and checks programs against their profile. It does not
-generate code yet: `flick build` refuses with `P012` and writes nothing.
+environments, checks programs against their profile and generates the pure
+core of a program as Lua chunks: one per reached module, each with a source
+map, defined into a private namespace each chunk takes as its second
+argument (see `backends/lua/src/emit/build.rs`). Everything else, the kernel
+above all, is refused with `P012` at its source.
 
 ## Profiles
 
@@ -97,10 +100,10 @@ client defines; a missing global needs its source added to `wow-lua.txt`.
   `ADDON_LOADED` callback of both WoW profiles are inferred from documentation
   and from Lua 5.1. Each profile lists this under `blockers`, and support for
   a WoW profile cannot be claimed until a live client runs the probes.
-- **Code generation.** The component refuses `generate`. The kernel, the
-  value ABI and the host runtime are separate work; until they exist, every
-  reachable binding of Flick's own kernel (`flick:` specifiers) is refused on
-  every profile.
+- **Code generation.** The component generates only the pure core. The
+  kernel, the value ABI and the host runtime are separate work; until they
+  exist, every reachable binding of Flick's own kernel (`flick:` specifiers,
+  each a row of `backends/lua/kernel.txt`) is refused on every profile.
 
 ## The synchronous WoW slice
 
@@ -109,14 +112,17 @@ events and timers), and each callback runs to completion. The WoW
 profiles therefore refuse reachable asynchronous suspension: `await`, an
 `async` foreign function and the kernel bindings of the standard library
 that suspend a fiber (`Effect.sleep`, `Effect.never`, `Effect.yield_now`,
-the joins of `Fiber` and `Deferred.await`). LÖVE has coroutines that yield
+the joins of `Fiber` and `Deferred.await`), each marked `suspends` in
+`backends/lua/kernel.txt`. LÖVE has coroutines that yield
 across `pcall`, so its profile keeps suspension open for a later runtime.
 
 ## What `check-target` refuses
 
-The component's `check-target` walks the IR from each entry's `main` (or
-from a library's exports), following globals and dictionaries, and the
-eager values of each own module it reaches. A fact found in a built-in
+The component's `check-target` walks the IR from each entry's `main`, test
+root and host export (or from a library's exports), following globals,
+dictionaries and the superclasses and defaults of the instances it reaches,
+and the eager values of each own module it reaches. `generate` emits what
+the same walk reaches. A fact found in a built-in
 module is reported at the own expression that reached it, with a note of
 the global it went through. Every refusal is `P012`:
 

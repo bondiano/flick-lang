@@ -19,14 +19,15 @@
 //! - An expression takes the registers its parts are evaluated into: a call
 //!   its callee's (and on `LuaJIT` the frame link's), then one per argument
 //!   after those of the arguments before; a table constructor at most fifty
-//!   pending items. With the locals in scope they stay below `max_registers`.
+//!   pending items; `and` and `or` one register for both operands. With the
+//!   locals in scope they stay below `max_registers`.
 
 use std::collections::BTreeSet;
 
 use flick_ir::Span;
 
 use super::Refusal;
-use super::ast::{Block, Expr, ExprKind, Field, Function, LastKind, Name, Stmt, StmtKind};
+use super::ast::{BinOp, Block, Expr, ExprKind, Field, Function, LastKind, Name, Stmt, StmtKind};
 use crate::profiles::Dialect;
 
 /// The items of a table constructor Lua 5.1 holds in registers before it
@@ -205,6 +206,11 @@ impl<'a> Counter<'a> {
     fn stmt(&mut self, stmt: &'a Stmt) {
         let span = stmt.span;
         match &stmt.kind {
+            StmtKind::Args(names) => {
+                for name in names {
+                    self.declare(name.as_str(), span);
+                }
+            }
             StmtKind::Local(name, value) => {
                 if let Some(value) = value {
                     self.eval(value, span);
@@ -387,6 +393,8 @@ impl<'a> Counter<'a> {
                 }
                 need
             }
+            // the left operand is tested and its register reused by the right
+            ExprKind::Binary(BinOp::And | BinOp::Or, l, r) => self.regs(l).max(self.regs(r)),
             ExprKind::Binary(_, l, r) => self.regs(l).max(1 + self.regs(r)),
             ExprKind::Unary(_, inner) => self.regs(inner),
         }

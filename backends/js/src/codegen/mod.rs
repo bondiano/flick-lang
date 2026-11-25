@@ -3,8 +3,6 @@
 mod js;
 mod lexical;
 pub mod runner;
-#[cfg(feature = "source-maps")]
-pub mod sourcemap;
 pub mod ts;
 
 pub use flick_backend_support::{EffectBridge, Known, exports, loops, names, order, tail};

@@ -196,16 +196,16 @@ fn every_fact_carries_its_evidence() {
     }
 }
 
-fn span(start: u32, end: u32) -> Span {
+pub(crate) fn span(start: u32, end: u32) -> Span {
     Span::new(FileId::new(0), start, end)
 }
 
-fn expr(kind: ExprKind, start: u32, end: u32) -> Expr {
+pub(crate) fn expr(kind: ExprKind, start: u32, end: u32) -> Expr {
     Expr::new(kind, span(start, end))
 }
 
 /// `let name () = body`.
-fn function(name: &str, body: Expr) -> Item {
+pub(crate) fn function(name: &str, body: Expr) -> Item {
     let at = body.span;
     Item {
         kind: ItemKind::Value {
@@ -253,8 +253,22 @@ fn foreign_global(name: &str, global: &str) -> Item {
 }
 
 fn request(platform: &str, tags: &[&str], items: Vec<Item>) -> BuildRequest {
-    let module = Module {
+    let module = module("App", items);
+    let program = Program::new("test", vec![module], vec![], &|_| "App.fl".into());
+    let own = vec![ModuleInput {
         name: "App".into(),
+        role: ModuleRole::Own,
+        package: None,
+        output: "App.lua".into(),
+        interface: None,
+    }];
+    build_request(platform, tags, &program, own)
+}
+
+/// A module of `items`.
+pub(crate) fn module(name: &str, items: Vec<Item>) -> Module {
+    Module {
+        name: name.into(),
         items,
         types: vec![],
         preambles: vec![],
@@ -263,8 +277,16 @@ fn request(platform: &str, tags: &[&str], items: Vec<Item>) -> BuildRequest {
         records: BTreeMap::new(),
         package: None,
         exports: Exports::default(),
-    };
-    let program = Program::new("test", vec![module], vec![], &|_| "App.fl".into());
+    }
+}
+
+/// The request to build `program`, of `modules`, whose entry is `App.main`.
+pub(crate) fn build_request(
+    platform: &str,
+    tags: &[&str],
+    program: &Program,
+    modules: Vec<ModuleInput>,
+) -> BuildRequest {
     BuildRequest {
         target: TargetRequest {
             backend_api: "0.1.0".into(),
@@ -300,13 +322,7 @@ fn request(platform: &str, tags: &[&str], items: Vec<Item>) -> BuildRequest {
         },
         program: program.to_cbor(),
         module_root: None,
-        modules: vec![ModuleInput {
-            name: "App".into(),
-            role: ModuleRole::Own,
-            package: None,
-            output: "App.lua".into(),
-            interface: None,
-        }],
+        modules,
         sources: vec![],
         entries: vec![Entry {
             name: "main".into(),
@@ -354,7 +370,7 @@ fn big_product() -> Expr {
 
 fn messages(request: &BuildRequest) -> Vec<(String, Option<(u32, u32)>)> {
     match super::check::check(request) {
-        Ok(()) => vec![],
+        Ok(_) => vec![],
         Err(found) => found
             .into_iter()
             .map(|d| (d.message, d.span.map(|s| (s.start, s.end))))
@@ -464,25 +480,101 @@ fn a_reachable_global_must_be_in_the_api_snapshot() {
     assert!(jit[0].0.contains("needs `jit`"), "{jit:?}");
 }
 
+fn foreign_kernel(name: &str, from: &str, export: &str) -> Item {
+    let mut item = foreign_global(name, "unused");
+    if let ItemKind::Foreign(foreign) = &mut item.kind {
+        foreign.binding = Binding::Module {
+            from: from.into(),
+            name: export.into(),
+        };
+    }
+    item
+}
+
 #[test]
-fn generation_is_refused_after_a_clean_check() {
-    let clean = request(
+fn whether_a_kernel_binding_suspends_is_the_kernel_tables() {
+    let program = |platform| {
+        request(
+            platform,
+            &["lua", "lua51"],
+            vec![
+                function("main", global("pause", 8, 13)),
+                foreign_kernel("pause", "flick:Effect", "sleep"),
+                function("other", global("now", 20, 23)),
+                foreign_kernel("now", "flick:Clock", "now"),
+            ],
+        )
+    };
+    let wow = messages(&program("wow-retail"));
+    assert_eq!(wow.len(), 1, "{wow:?}");
+    assert!(
+        wow[0]
+            .0
+            .contains("asynchronous suspension (`App.pause`) is not available"),
+        "{wow:?}"
+    );
+    assert_eq!(wow[0].1, Some((8, 13)));
+    let love = messages(&program("love"));
+    assert!(
+        love[0]
+            .0
+            .contains("the Lua primitive kernel is not implemented"),
+        "{love:?}"
+    );
+}
+
+#[test]
+fn generation_writes_the_chunks_of_a_clean_check() {
+    let clean = |platform| {
+        request(
+            platform,
+            &["lua", "lua51"],
+            vec![function("main", expr(ExprKind::Lit(Lit::Unit), 0, 2))],
+        )
+    };
+    let built = Lua
+        .generate(&clean("love"), &mut NoInputs)
+        .expect("generated");
+    let paths: Vec<&str> = built.artifacts.iter().map(|a| a.path.as_str()).collect();
+    assert_eq!(paths, ["App.lua", "App.lua.map", "main.lua"]);
+    let text = |i: usize| String::from_utf8(built.artifacts[i].bytes.clone()).expect("UTF-8");
+    assert_eq!(
+        text(0),
+        "local _, ns = ...\nlocal M = {}\nns.App = M\nM.main = function(_)\n  return true\nend\n"
+    );
+    assert_eq!(
+        text(2),
+        "local ns = {}\nassert(love.filesystem.load(\"App.lua\"))(nil, ns)\n"
+    );
+    // WoW loads the files its `.toc` lists: no `main.lua`
+    let wow = Lua
+        .generate(&clean("wow-retail"), &mut NoInputs)
+        .expect("generated");
+    let paths: Vec<&str> = wow.artifacts.iter().map(|a| a.path.as_str()).collect();
+    assert_eq!(paths, ["App.lua", "App.lua.map"]);
+    let again = Lua
+        .generate(&clean("wow-retail"), &mut NoInputs)
+        .expect("generated");
+    assert_eq!(
+        wow.artifacts, again.artifacts,
+        "a rebuild writes the same bytes"
+    );
+}
+
+#[test]
+fn malformed_ir_is_refused_and_generates_nothing() {
+    let mut bad = request(
         "love",
         &["lua", "lua51"],
         vec![function("main", expr(ExprKind::Lit(Lit::Unit), 0, 2))],
     );
-    let refused = Lua
-        .generate(&clean, &mut NoInputs)
-        .expect_err("no generation");
-    assert!(
-        refused[0]
-            .message
-            .contains("code generation is not implemented yet"),
-        "{refused:?}"
-    );
+    bad.program = b"not the CBOR of a program".to_vec();
+    let refused = Lua.generate(&bad, &mut NoInputs).expect_err("refused");
+    assert_eq!(refused.len(), 1, "{refused:?}");
+    assert_eq!(refused[0].code, "P012");
 }
 
-struct NoInputs;
+pub(crate) struct NoInputs;
 impl Inputs for NoInputs {
     fn read(&mut self, _: &str) -> Result<Vec<u8>, InputError> {
         Err(InputError::Undeclared)

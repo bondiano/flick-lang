@@ -6,7 +6,7 @@ use flick_ir::{ExprKind, Lit};
 
 use super::super::Refusal;
 use super::super::ast::{
-    Block, Expr, ExprKind as Lua, Field, Function, LastKind, Name, Stmt, StmtKind,
+    BinOp, Block, Expr, ExprKind as Lua, Field, Function, LastKind, Name, Stmt, StmtKind,
 };
 use super::super::limits::check;
 use super::{at, block, emit, ex, int, lambda, let_, local, refusals, sp, value, value_at};
@@ -52,6 +52,21 @@ fn a_call_fits_its_frame_as_the_probe_measured() {
     assert!(over[0].message.contains("250 registers"), "{over:#?}");
     assert_eq!(chunk(call_of(246), "luajit"), vec![]);
     assert_eq!(chunk(call_of(247), "luajit").len(), 1);
+}
+
+#[test]
+fn a_chain_of_and_takes_one_register() {
+    // `local a0 … a198`, then `return a0 and (a1 and (… and a198))`
+    let mut stmts: Vec<Stmt> = (0..199)
+        .map(|i| stmt(StmtKind::Local(name(&format!("a{i}")), None)))
+        .collect();
+    let chain = (0..199)
+        .rev()
+        .map(|i| Expr::name(&name(&format!("a{i}")), sp(0, 0)))
+        .reduce(|r, l| Expr::binary(BinOp::And, l, r, sp(0, 0)))
+        .expect("a chain");
+    stmts.push(stmt(StmtKind::Local(name("all"), Some(chain))));
+    assert_eq!(chunk(stmts, "lua51"), vec![]);
 }
 
 #[test]

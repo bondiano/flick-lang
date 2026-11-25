@@ -2,7 +2,7 @@
 
 use super::Output;
 use crate::source::{FileId, SourceMap};
-use flick_backend_js::codegen::sourcemap;
+use flick_backend_support::sourcemap;
 
 /// The `.map` JSON for `output`, using the shared source table's UTF-16 positions.
 pub fn source_map(
@@ -11,7 +11,7 @@ pub fn source_map(
     sources: &SourceMap,
     source_path: &dyn Fn(FileId) -> String,
 ) -> String {
-    sourcemap::source_map(file, output, source_path, &|span| {
+    sourcemap::source_map(file, &output.mappings, source_path, &|span| {
         let source = sources.get(span.file);
         let (line, byte_col) = source.line_col(span.start);
         let start = (span.start - byte_col) as usize;

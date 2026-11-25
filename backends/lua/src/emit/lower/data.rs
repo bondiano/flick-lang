@@ -95,7 +95,7 @@ impl<'p> Lowering<'p> {
                 let what = format!("`{module}.{}`", f.source_name.as_ref().unwrap_or(&f.name));
                 let why = match &f.binding {
                     Binding::Module { from, .. } if from.starts_with("flick:") => {
-                        "the Lua primitive kernel has no row for it"
+                        "the Lua kernel table refuses it: the Lua primitive kernel is not implemented"
                     }
                     _ => "foreign functions need the Lua value ABI, which is not implemented",
                 };

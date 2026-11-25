@@ -146,8 +146,7 @@ fn a_kernel_binding_is_refused_at_its_use() {
     let found = refusals("lua51", vec![value("main", use_), foreign]);
     message_at(
         &found,
-        "`App.now` is not available on the lua/love target yet: the Lua primitive kernel has no \
-         row for it",
+        "`App.now` is not available on the lua/love target yet: the Lua kernel table refuses it",
         (30, 33),
     );
     message_at(&found, "the foreign function `App.now`", (40, 50));

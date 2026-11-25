@@ -1,17 +1,11 @@
-//! The Lua backend: the host profiles of `profiles/` and a `check-target`
+//! The Lua backend: the host profiles of `profiles/`, a `check-target`
 //! that refuses what a selected profile cannot run, at the source of the
-//! reachable use. It generates no code yet, and says so.
+//! reachable use, and a `generate` that writes the chunks of the pure core
+//! of a program ([`emit`]).
 
 mod check;
-// `generate` lowers through it once it assembles the chunks of a program
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the emitter is exercised by its tests until `generate` uses it"
-    )
-)]
 mod emit;
+mod kernel;
 mod profiles;
 mod reach;
 
@@ -137,7 +131,10 @@ impl Backend for Lua {
                     "Allow the LuaJIT FFI, which keeps Int64 and UInt64 exact (needs `dialect = \"luajit\"`).",
                 ),
             ],
-            launch_runtimes: vec![],
+            // a Lua program runs in its host, WoW or LÖVE, which `flick run`
+            // does not start: the host has no `lua` runtime, so a build
+            // needs no launch and a run is refused before it starts
+            launch_runtimes: vec!["lua".into()],
             host_tools: vec![],
             projections: vec![],
             stages_by_class_option: None,
@@ -166,14 +163,20 @@ impl Backend for Lua {
         request: &BuildRequest,
         inputs: &mut dyn Inputs,
     ) -> Result<BuildResult, Vec<Diagnostic>> {
-        self.check_target(request, inputs)?;
-        Err(vec![refusal(
-            "code generation is not implemented yet on the lua target: `flick check` checks a \
-             program against its Lua profile, and nothing is written"
-                .into(),
-            None,
-            vec![],
-        )])
+        let (program, reached) = check::check(request)?;
+        let name = format!("lua/{}", request.target.environment.platform);
+        let target = emit::Target {
+            name: &name,
+            dialect: profiles::dialect(&request.target.tags),
+        };
+        let artifacts = emit::build(&program, request, &reached, &target, inputs)?;
+        Ok(BuildResult {
+            artifacts,
+            steps: vec![],
+            runtime_dependencies: vec![],
+            launches: vec![],
+            diagnostics: vec![],
+        })
     }
 }
 

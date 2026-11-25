@@ -9,7 +9,8 @@
 //! Parentheses follow Lua 5.1's operator priorities (`lparser.c`): an
 //! operand is in parentheses only where it would otherwise parse
 //! differently, and an object called or indexed only when it is not a name,
-//! an index or a call.
+//! an index or a call. A chain of `and` or of `or` needs none, whichever way
+//! it nests: both are associative.
 
 use std::fmt::Write as _;
 
@@ -197,6 +198,10 @@ impl<'d> Printer<'d> {
         let a = self.a;
         let mark = self.mark(stmt.span);
         let doc = match &stmt.kind {
+            StmtKind::Args(names) => {
+                let names = names.iter().map(|n| self.text(n.as_str()));
+                docvec![a, "local ", a.join(names, a.text(", ")), " = ..."]
+            }
             StmtKind::Local(name, None) => docvec![a, "local ", self.text(name.as_str())],
             StmtKind::Local(name, Some(value)) => {
                 docvec![
@@ -401,7 +406,11 @@ impl<'d> Printer<'d> {
                     ExprKind::Unary(..) => left > UNARY,
                     _ => false,
                 };
+                // `and` and `or` are associative: a chain nests no deeper
                 let r = match &rhs.kind {
+                    ExprKind::Binary(inner, ..) if inner == op => {
+                        !matches!(op, BinOp::And | BinOp::Or) && priority(*inner).0 <= right
+                    }
                     ExprKind::Binary(inner, ..) => priority(*inner).0 <= right,
                     _ => false,
                 };
