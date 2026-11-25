@@ -159,8 +159,9 @@ fn is_forbidden_ancestor(dir: &Path, home: Option<&Path>, temp: Option<&Path>) -
 
 /// Computes the highest ancestor directory that package discovery may walk up
 /// to from `dir`: the nearest enclosing `.git` root, or the outermost enclosing
-/// Flick workspace / package-store root strictly below `$HOME`, `temp_dir()`,
-/// and system roots. Defaults to `dir` itself when no enclosing workspace exists.
+/// Flick project or workspace (a `flick.toml`) / package-store root strictly
+/// below `$HOME`, `temp_dir()`, and system roots. Defaults to `dir` itself when
+/// no enclosing project exists.
 pub(super) fn ancestor_ceiling(dir: &Path, top_dirs: &[String]) -> PathBuf {
     let home = user_home_dir();
     let temp = Some(PathBuf::from(canonical_slashed(&env::temp_dir())));
@@ -172,10 +173,9 @@ pub(super) fn ancestor_ceiling(dir: &Path, top_dirs: &[String]) -> PathBuf {
         if anc.join(".git").exists() {
             return anc.to_path_buf();
         }
-        let manifest = anc.join("flick.toml");
-        if manifest.is_file()
-            && fs::read_to_string(&manifest).is_ok_and(|text| text.contains("[workspace]"))
-        {
+        // A project outside any repository still bounds its own build and
+        // launch directories, such as `.flick/run`.
+        if anc.join("flick.toml").is_file() {
             workspace = Some(anc.to_path_buf());
         }
     }

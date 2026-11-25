@@ -413,4 +413,60 @@ mod tests {
         assert!(error.contains("runtime dependency"), "{error}");
         fs::remove_dir_all(root).expect("cleanup");
     }
+
+    /// `flick run` and `flick test` launch from a directory under `.flick` of
+    /// a project with no `.git` ancestor: its runtime is still found in the
+    /// project's own `node_modules`.
+    #[test]
+    fn a_launch_below_a_standalone_project_finds_its_runtime() {
+        let project = env::temp_dir().join(format!("flick-launch-standalone-{}", process::id()));
+        let _ = fs::remove_dir_all(&project);
+        fs::create_dir_all(&project).expect("project");
+        fs::write(project.join("flick.toml"), "[package]\nname = \"app\"\n").expect("manifest");
+        let kernel = project.join("node_modules/@flick-lang/runtime");
+        fs::create_dir_all(kernel.join("dist")).expect("runtime");
+        fs::write(
+            kernel.join("package.json"),
+            r#"{"name":"@flick-lang/runtime","version":"0.1.0"}"#,
+        )
+        .expect("runtime manifest");
+        fs::write(kernel.join("dist/index.js"), "runtime").expect("runtime");
+        let pin = BackendPin {
+            identity: BackendId {
+                id: "test/standalone".into(),
+                version: "1.0.0".into(),
+            },
+            sha256: sha256(b"component"),
+        };
+        runtimes::loaded(&pin, &packages::tests::js());
+        let result = BuildResult {
+            artifacts: vec![flick_backend::Artifact {
+                id: "main".into(),
+                path: "entry".into(),
+                kind: flick_backend::ArtifactKind::Executable,
+                bytes: vec![],
+            }],
+            steps: vec![],
+            runtime_dependencies: installed_rt(&project),
+            launches: vec![Launch {
+                name: "main".into(),
+                kind: LaunchKind::Run,
+                artifact: "main".into(),
+                runtime: None,
+                runtime_arguments: vec![],
+                arguments: vec![],
+                environment: vec![],
+            }],
+            diagnostics: vec![],
+        };
+        let manifest = artifact(&pin, &result).expect("manifest");
+        for generation in [project.join(".flick/run/1-1"), project.join(".flick/test")] {
+            fs::create_dir_all(&generation).expect("generation");
+            fs::write(generation.join(FILE), &manifest.contents).expect("launch metadata");
+            if let Err(error) = command(&generation, &pin, LaunchKind::Run, "main") {
+                panic!("{}: {error}", generation.display());
+            }
+        }
+        fs::remove_dir_all(project).expect("cleanup");
+    }
 }
