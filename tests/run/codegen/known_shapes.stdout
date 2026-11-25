@@ -1,0 +1,25 @@
+note on true
+note off false
+big and true
+some 11
+some 3
+note big true
+big and true
+note big false
+some 11
+note small true
+some 3
+note same false
+same
+big 36
+36 not 3
+some -1
+none false
+accept 3
+accepted
+accept 3
+rejected 3
+safe
+head 9 then [2, 3]
+five and true
+positive

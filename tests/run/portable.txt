@@ -345,4 +345,5 @@ runtime/lazy_local_concurrent
 effect/result_blocks
 runtime/result_block_causes
 codegen/bounded_eval
+codegen/known_shapes
 runtime/control_kernel
