@@ -32,8 +32,8 @@ For `Js.Array` and `JsError`, see [JavaScript interop](../ffi/).
 | `Failure`, `Exit`, `RawCause`, `CauseReport` | opaque outcomes |
 
 `Option`, `Result`, `List`, `Seq`, `NonEmpty`, `Chunk`, `NonEmptyChunk`,
-`HashMap`, `HashSet`, `Trie`, `Bytes` and `Eff r e` have instances of the
-Prelude and `Collections` classes whose laws they satisfy; see
+`HashMap`, `HashSet`, `Trie`, `PriorityQueue`, `Bytes` and `Eff r e` have
+instances of the Prelude and `Collections` classes whose laws they satisfy; see
 [collection type classes](../collections/) for the full hierarchy, laws,
 instance matrix and complexity bounds.
 
@@ -115,6 +115,7 @@ For example, `Clock` is in `std`, `Stream` in `stream`, and `HttpApi` in `http`:
 | `Combiner`, `Reducer` | ways to combine two values, and with a start value to fold a list |
 | `Optic` | lenses, prisms and other optics that read a part of a structure and rebuild it |
 | `Graph`, `Trie`, `HashRing` | immutable graphs with their algorithms, maps from string keys with prefix queries, consistent hashing onto weighted nodes |
+| `PriorityQueue` | an immutable priority queue for pure algorithms: the least priority first, equal priorities in insertion order |
 | `JsonPatch`, `JsonPointer` | the differences between two JSON values (RFC 6902) and JSON Pointers (RFC 6901) |
 | `Net` | network addresses and DNS records as JSON |
 | `Terminal`, `PlatformError` | the terminal as a service, and how the platform services fail |

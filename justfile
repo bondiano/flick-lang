@@ -344,7 +344,7 @@ wasm:
     node tools/wasm-dedup/index.mjs target/wasm32-unknown-unknown/release/flick_wasm.wasm
     @wasm=target/wasm32-unknown-unknown/release/flick_wasm.wasm; \
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
-    test $(wc -c < $wasm) -le 4810000 # reason: field accessors (#788): accessor parsing, typing, diagnostics and IDE queries in the playground (4.766 MB with them); ordered guarded matches over known shapes in the release optimizer the playground runs (4.806 MB with them, 4.798 MB before)
+    test $(wc -c < $wasm) -le 4815000 # reason: field accessors (#788): accessor parsing, typing, diagnostics and IDE queries in the playground (4.766 MB with them); ordered guarded matches over known shapes in the release optimizer the playground runs (4.806 MB with them, 4.798 MB before); the std module PriorityQueue (#736), whose source the playground embeds (4,814,134 bytes with it, 4,809,798 before)
 
 # Build the playground's compiler: the wasm module and its JS bindings
 docs-wasm: wasm
