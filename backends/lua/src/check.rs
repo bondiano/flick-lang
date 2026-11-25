@@ -5,33 +5,20 @@
 use flick_backend::{BuildRequest, Diagnostic, Span};
 use flick_ir::{Binding, Foreign, ForeignMode, Program};
 
+use crate::kernel::{self, Table};
 use crate::profiles::{self, HostProfile, PROFILES};
-use crate::reach::{self, Fact, Wide};
+use crate::reach::{self, Fact, Reached, Wide};
 use crate::refusal;
-
-/// The kernel bindings of the standard library that suspend the fiber.
-// shortcut: listed by hand from the std sources; read them from the Lua
-// kernel's binding table once there is one
-const SUSPENDING: &[(&str, &[&str])] = &[
-    ("flick:Deferred", &["await"]),
-    (
-        "flick:Effect",
-        &["sleep", "flickNever", "flickYieldNow", "yieldNowWith"],
-    ),
-    (
-        "flick:Fiber",
-        &["flickAwait", "flickAwaitAll", "flickJoinAll"],
-    ),
-    ("flick:rt", &["fiberJoin"]),
-];
 
 struct Rules<'a> {
     profile: &'static HostProfile,
     target: String,
     tags: &'a [String],
+    kernel: Table<'static>,
 }
 
-pub(crate) fn check(request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
+/// Checks `request` against its profile; the program and what it reaches.
+pub(crate) fn check(request: &BuildRequest) -> Result<(Program, Reached), Vec<Diagnostic>> {
     let platform = request.target.environment.platform.as_str();
     let Some(profile) = profiles::find(platform) else {
         let known: Vec<String> = PROFILES
@@ -51,6 +38,7 @@ pub(crate) fn check(request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
         profile,
         target: format!("lua/{platform}"),
         tags: &request.target.tags,
+        kernel: kernel::table(),
     };
     let mut errors = rules.selection();
     if !errors.is_empty() {
@@ -58,7 +46,7 @@ pub(crate) fn check(request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
     }
     let program = Program::from_cbor(&request.program)
         .map_err(|e| vec![refusal(e.to_string(), None, vec![])])?;
-    reach::walk(&program, request, &mut |fact, site| {
+    let reached = reach::walk(&program, request, &mut |fact, site| {
         let Some(message) = rules.refuse(&fact) else {
             return;
         };
@@ -74,7 +62,7 @@ pub(crate) fn check(request: &BuildRequest) -> Result<(), Vec<Diagnostic>> {
         errors.push(refusal(message, Some(span), notes.into_iter().collect()));
     });
     if errors.is_empty() {
-        return Ok(());
+        return Ok((program, reached));
     }
     errors.sort_by_key(|d| d.span.as_ref().map(|s| (s.file, s.start, s.end)));
     Err(errors)
@@ -169,10 +157,8 @@ impl Rules<'_> {
         match &foreign.binding {
             Binding::Inline(_) => None,
             Binding::Module { from, name } if from.starts_with("flick:") => {
-                let suspends = SUSPENDING
-                    .iter()
-                    .any(|(m, names)| m == from && names.contains(&name.as_str()));
-                if suspends && !profile.suspension {
+                let row = self.kernel.row(from, name);
+                if row.is_some_and(|r| r.suspends) && !profile.suspension {
                     return self.suspension(&what);
                 }
                 Some(format!(

@@ -1,0 +1,227 @@
+# The Lua kernel table: for each binding of Flick's own kernel (each
+# `flick:` specifier of flick-backend-support/src/kernel/manifest.txt), what
+# the Lua target does with it, and whether calling it suspends the fiber.
+#
+# `[specifier] status` gives every export of a specifier its row; a line
+# `export status` below it gives one export a row of its own. Every kernel
+# primitive of the manifest has a line of its own, and so does every
+# export that suspends. A test keeps the table equal to the manifest.
+#
+#   refused   the Lua target refuses it with P012 wherever it is reached
+#   suspends  (after the status) a call suspends the fiber until it resumes
+#
+# No row is implemented yet: the Lua primitive kernel does not exist.
+
+[flick:Arbitrary] refused
+[flick:Array] refused
+[flick:BigDecimal] refused
+[flick:BigInt] refused
+[flick:Boolean] refused
+[flick:ByteSize] refused
+[flick:Cache] refused
+[flick:Cause] refused
+[flick:Channel] refused
+[flick:ChannelSchema] refused
+[flick:ChildProcess] refused
+[flick:Chunk] refused
+[flick:cli] refused
+[flick:Clock] refused
+[flick:Combiner] refused
+[flick:Config] refused
+[flick:ConfigProvider] refused
+[flick:Context] refused
+[flick:Cron] refused
+[flick:Crypto] refused
+[flick:DateTime] refused
+[flick:Deferred] refused
+await refused suspends
+[flick:devtools/DevTools] refused
+[flick:devtools/DevToolsNode] refused
+[flick:Differ] refused
+[flick:Duration] refused
+[flick:Effect] refused
+sleep refused suspends
+flickNever refused suspends
+flickYieldNow refused suspends
+yieldNowWith refused suspends
+[flick:ErrorReporter] refused
+[flick:ExecutionPlan] refused
+[flick:Exit] refused
+[flick:Fiber] refused
+flickAwait refused suspends
+flickAwaitAll refused suspends
+flickJoinAll refused suspends
+[flick:FiberHandle] refused
+[flick:FiberMap] refused
+[flick:FiberSet] refused
+[flick:FileSystem] refused
+[flick:Filter] refused
+[flick:Formatter] refused
+[flick:Function] refused
+[flick:Graph] refused
+[flick:Hash] refused
+[flick:HashMap] refused
+[flick:HashSet] refused
+[flick:http-api/HttpApi] refused
+[flick:http/Cookies] refused
+[flick:http/Etag] refused
+[flick:http/FetchHttpClient] refused
+[flick:http/Headers] refused
+[flick:http/HttpBody] refused
+[flick:http/HttpClient] refused
+[flick:http/HttpClientRequest] refused
+[flick:http/HttpClientResponse] refused
+[flick:http/HttpMiddleware] refused
+[flick:http/HttpPlatform] refused
+[flick:http/HttpRouter] refused
+[flick:http/HttpServer] refused
+[flick:http/HttpServerRequest] refused
+[flick:http/HttpServerResponse] refused
+[flick:http/HttpStaticServer] refused
+[flick:http/HttpTraceContext] refused
+[flick:http/Mime] refused
+[flick:http/Multipart] refused
+[flick:http/Url] refused
+[flick:http/UrlParams] refused
+[flick:Inspectable] refused
+[flick:Iterable] refused
+[flick:JsonPatch] refused
+[flick:JsonPointer] refused
+[flick:JsonSchema] refused
+[flick:Latch] refused
+[flick:Layer] refused
+[flick:LayerMap] refused
+[flick:LayerRef] refused
+[flick:Logger] refused
+[flick:LogLevel] refused
+[flick:Metric] refused
+[flick:Net] refused
+[flick:Number] refused
+[flick:observability/Otlp] refused
+[flick:observability/PrometheusMetrics] refused
+[flick:Option] refused
+[flick:PartitionedSemaphore] refused
+[flick:Path] refused
+[flick:Pool] refused
+[flick:Predicate] refused
+[flick:PubSub] refused
+[flick:Queue] refused
+[flick:Random] refused
+[flick:RcMap] refused
+[flick:RcRef] refused
+[flick:reactivity/AsyncResult] refused
+[flick:reactivity/Atom] refused
+[flick:Record] refused
+[flick:Redacted] refused
+[flick:Reducer] refused
+[flick:References] refused
+[flick:RegExp] refused
+[flick:Request] refused
+[flick:RequestResolver] refused
+[flick:Resource] refused
+[flick:Result] refused
+[flick:rpc/Rpc] refused
+[flick:rpc/RpcNode] refused
+[flick:rt] refused
+equals refused
+compare refused
+hash refused
+show refused
+stringFromNumber refused
+stringToNumber refused
+showInt64 refused
+showUInt64 refused
+intTruncate refused
+bigintFromNumber refused
+toInt8 refused
+toInt16 refused
+toInt32 refused
+toInt64 refused
+toUInt8 refused
+toUInt16 refused
+toUInt32 refused
+toUInt64 refused
+toBigInt refused
+toFloat32 refused
+toFloat64 refused
+bitAnd refused
+bitOr refused
+bitXor refused
+bitNot refused
+shiftLeft refused
+shiftRight refused
+shiftRightUnsignedInt refused
+int64BitAnd refused
+int64BitOr refused
+int64BitXor refused
+int64BitNot refused
+int64ShiftLeft refused
+int64ShiftRight refused
+int64ShiftRightUnsigned refused
+bytesFromList refused
+bytesToList refused
+bytesEncodeUtf8 refused
+bytesDecodeUtf8 refused
+listLength refused
+listGet refused
+listInitialize refused
+refMake refused
+refGet refused
+refSet refused
+refModify refused
+refSame refused
+recordLabel refused
+recordGet refused
+recordExtend refused
+recordRemove refused
+recordProject refused
+recordMergeDisjoint refused
+recordLabels refused
+fiberJoin refused suspends
+[flick:runner/browser] refused
+[flick:runner/cloudflare] refused
+[flick:runner/node] refused
+[flick:Schedule] refused
+[flick:Scheduler] refused
+[flick:Schema] refused
+[flick:SchemaHttp] refused
+[flick:Scope] refused
+[flick:ScopedCache] refused
+[flick:ScopedRef] refused
+[flick:Semaphore] refused
+[flick:server/Functions] refused
+[flick:server/FunctionsNode] refused
+[flick:Sink] refused
+[flick:sql] refused
+[flick:Stdio] refused
+[flick:Stream] refused
+[flick:String] refused
+length refused
+charCodeAt refused
+slice refused
+indexOf refused
+lastIndexOf refused
+[flick:Struct] refused
+[flick:SubscriptionRef] refused
+[flick:SynchronizedRef] refused
+[flick:Terminal] refused
+[flick:Tracer] refused
+[flick:Tuple] refused
+[flick:Tx] refused
+[flick:TxChunk] refused
+[flick:TxDeferred] refused
+[flick:TxHashMap] refused
+[flick:TxHashSet] refused
+[flick:TxPriorityQueue] refused
+[flick:TxPubSub] refused
+[flick:TxQueue] refused
+[flick:TxReentrantLock] refused
+[flick:TxRef] refused
+[flick:TxSemaphore] refused
+[flick:TxSubscriptionRef] refused
+[flick:ui] refused
+[flick:ui/html] refused
+[flick:ui/react] refused
+[flick:ui/server] refused
+[flick:ui/tracing] refused
+[flick:Version] refused

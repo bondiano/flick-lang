@@ -1,7 +1,9 @@
 //! The Lua backend component checks a program against the profile its
 //! environment selects: what the program reaches, at its source, before
-//! any output; and it writes no code.
+//! any output. Then it writes a Lua chunk per reached module, the same at
+//! each build, or refuses what it cannot generate and keeps the old output.
 
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -127,22 +129,157 @@ fn a_profile_the_backend_does_not_know_is_refused() {
     }
 }
 
+const SHAPES: &str = "module App exposing (main)\n\n\
+    type Shape = Circle Float | Square Float\n\n\
+    area : Shape -> Float\nlet area s =\n  match s with\n  | Circle r -> r * r\n  | Square a -> a * a\n\n\
+    main : Unit -> Unit\nlet main () = if area (Circle 2.0) > 1.0 then ()\n";
+
+/// Every file of `dist`, by its path there.
+fn dist(root: &Path) -> Vec<(String, Vec<u8>)> {
+    fn walk(dir: &Path, base: &Path, out: &mut Vec<(String, Vec<u8>)>) {
+        for entry in fs::read_dir(dir).expect("a directory").flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                walk(&path, base, out);
+            } else {
+                let name = path.strip_prefix(base).expect("in dist");
+                let name = name.to_string_lossy().replace('\\', "/");
+                out.push((name, fs::read(&path).expect("a file")));
+            }
+        }
+    }
+    let mut out = Vec::new();
+    walk(&root.join("dist"), &root.join("dist"), &mut out);
+    out.sort();
+    out
+}
+
+fn chunk(root: &Path) -> String {
+    fs::read_to_string(root.join("dist/App.lua")).expect("the chunk of App")
+}
+
 #[test]
 #[ignore = "requires just wasm-backends"]
-fn generation_is_refused_and_writes_nothing() {
-    let root = lua_project("lua_profile_generate", "lua/wow-retail", UNREACHED, &[]);
-    assert!(flick_in(&root, &["check", "--offline"]).status.success());
+fn a_build_writes_a_chunk_per_module_and_a_rebuild_is_identical() {
+    let root = lua_project("lua_profile_generate", "lua/wow-retail", SHAPES, &[]);
+    let out = flick_in(&root, &["build", "--offline"]);
+    assert!(out.status.success(), "{out:?}");
+    let first = dist(&root);
+    let paths: Vec<&str> = first.iter().map(|(p, _)| p.as_str()).collect();
+    assert!(
+        paths.contains(&"App.lua") && paths.contains(&"App.lua.map"),
+        "{paths:?}"
+    );
+    // WoW loads the files its `.toc` lists: no loader, and no other target
+    assert!(
+        !paths.iter().any(|p| {
+            Path::new(p)
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("js"))
+                || *p == "main.lua"
+        }),
+        "{paths:?}"
+    );
+    let app = chunk(&root);
+    assert!(
+        app.starts_with("local _, ns = ...\nlocal M = {}\nns.App = M\n"),
+        "{app}"
+    );
+    assert!(app.contains("M.area = function(s)"), "{app}");
+    let map = fs::read_to_string(root.join("dist/App.lua.map")).expect("the map");
+    assert!(map.contains(r#""sources":["src/App.fl"]"#), "{map}");
+    // a build that generates again writes the same bytes
+    assert!(flick_in(&root, &["clean", "--cache"]).status.success());
+    let again = flick_in(&root, &["build", "--offline"]);
+    assert!(again.status.success(), "{again:?}");
+    assert_eq!(dist(&root), first);
+    // LÖVE starts `main.lua`, which loads the chunks in order
+    let love = lua_project("lua_profile_love", "lua/love", SHAPES, &[]);
+    assert!(flick_in(&love, &["build", "--offline"]).status.success());
+    let main = fs::read_to_string(love.join("dist/main.lua")).expect("the loader");
+    assert_eq!(
+        main,
+        "local ns = {}\nassert(love.filesystem.load(\"App.lua\"))(nil, ns)\n"
+    );
+}
+
+/// `wide` with `n` locals besides its parameter, all of them used.
+fn wide(n: usize) -> String {
+    let mut lets = String::new();
+    for i in 0..n {
+        let _ = writeln!(lets, "  let x{i} = {i} == {i}");
+    }
+    let all: Vec<String> = (0..n).map(|i| format!("x{i}")).collect();
+    format!(
+        "module App exposing (main)\n\nwide : Unit -> Bool\nlet wide () =\n{lets}  {}\n\n\
+         main : Unit -> Unit\nlet main () = if wide () then ()\n",
+        all.join(" && ")
+    )
+}
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn what_cannot_be_generated_is_refused_at_its_source_and_keeps_the_output() {
+    let root = lua_project("lua_profile_keep", "lua/wow-retail", SHAPES, &[]);
+    assert!(flick_in(&root, &["build", "--offline"]).status.success());
+    let before = dist(&root);
+    let sum =
+        "module App exposing (main)\n\nmain : Unit -> Unit\nlet main () = if 1 + 2 == 3 then ()\n";
+    let limit = wide(200);
+    // one past the 200 locals of Lua 5.1, at the local that is one too many
+    for (source, message, at) in [
+        (
+            sum,
+            "`+` of integers is not available on the lua/wow-retail target",
+            "1 + 2",
+        ),
+        (limit.as_str(), "201 locals in scope at once", "199 == 199"),
+    ] {
+        fs::write(root.join("src/App.fl"), source).expect("source");
+        let out = flick_in(&root, &["build", "--diagnostics", "json", "--offline"]);
+        assert_eq!(out.status.code(), Some(1), "{out:?}");
+        let found = diagnostics(&out.stderr, "FLICK-P012");
+        let refused = (found.iter())
+            .find(|d| d["message"].as_str().is_some_and(|m| m.contains(message)))
+            .unwrap_or_else(|| panic!("{}", String::from_utf8_lossy(&out.stderr)));
+        assert_eq!(slice(refused, source), at);
+        assert_eq!(dist(&root), before, "the earlier output stays");
+    }
+    // at the limit the program is generated
+    fs::write(root.join("src/App.fl"), wide(199)).expect("source");
+    assert!(flick_in(&root, &["build", "--offline"]).status.success());
+    // and a refused first build writes nothing at all
+    let fresh = lua_project("lua_profile_fresh", "lua/wow-retail", sum, &[]);
+    let out = flick_in(&fresh, &["build", "--diagnostics", "json", "--offline"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert!(
+        !diagnostics(&out.stderr, "FLICK-P012").is_empty(),
+        "{out:?}"
+    );
+    assert!(!fresh.join("dist").exists(), "nothing is written");
+}
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn a_dialect_the_host_does_not_run_is_refused_not_replaced() {
+    let root = lua_project("lua_profile_dialect", "lua/wow-retail", SHAPES, &[]);
+    assert!(flick_in(&root, &["build", "--offline"]).status.success());
+    let before = dist(&root);
+    let pinned = fs::read_to_string(root.join("flick.toml")).expect("config");
+    let luajit = pinned.replace("[build]", "[target.lua]\ndialect = \"luajit\"\n\n[build]");
+    fs::write(root.join("flick.toml"), luajit).expect("config");
     let out = flick_in(&root, &["build", "--diagnostics", "json", "--offline"]);
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     let found = diagnostics(&out.stderr, "FLICK-P012");
     assert!(
-        found.iter().any(|d| d["message"]
-            .as_str()
-            .is_some_and(|m| m.contains("code generation is not implemented yet"))),
+        found.iter().any(|d| d["message"].as_str().is_some_and(|m| {
+            m.contains("the dialect `luajit` is not available on the lua/wow-retail target")
+        })),
         "{}",
         String::from_utf8_lossy(&out.stderr)
     );
-    assert!(!root.join("dist").exists(), "nothing is written");
+    // neither Lua 5.1 nor JS stands in for it
+    assert_eq!(dist(&root), before);
 }
 
 #[test]

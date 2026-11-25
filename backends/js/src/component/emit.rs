@@ -9,6 +9,7 @@ use flick_backend::{
     Artifact, ArtifactKind, BuildRequest, BuildResult, Diagnostic, InputRef, ModuleRole, Profile,
     StepOutput, ToolchainStep,
 };
+use flick_backend_support::sourcemap;
 use flick_ir::Module;
 use std::collections::HashSet;
 
@@ -241,7 +242,7 @@ pub(super) fn mapped_with_path(
             text[start..span.start as usize].encode_utf16().count(),
         )
     };
-    let map = codegen::sourcemap::source_map(base, output, &source_path, &position);
+    let map = sourcemap::source_map(base, &output.mappings, &source_path, &position);
     artifacts.push(artifact(
         file.to_owned(),
         ArtifactKind::Source,

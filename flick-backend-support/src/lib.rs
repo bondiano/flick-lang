@@ -12,6 +12,7 @@ pub mod loops;
 pub mod names;
 pub mod order;
 pub mod reach;
+pub mod sourcemap;
 pub mod suites;
 pub mod tail;
 

@@ -6,22 +6,22 @@
 //!    VM, refusing what it would not load;
 //! 3. [`print`] writes deterministic text and the Flick span of each line.
 //!
-//! Every refusal is `P012` at the Flick source of what is refused.
+//! Every refusal is `P012` at the Flick source of what is refused; in a
+//! built-in module, at the project's expression that reached it.
 
 mod ast;
+mod build;
 mod limits;
 mod lower;
 mod names;
 mod print;
 
 use flick_backend::{Diagnostic, Span as SourceSpan};
-use flick_ir::{FileId, Program, Span};
+use flick_ir::Span;
 
 use crate::profiles::Dialect;
 use crate::refusal;
-use ast::Block;
-use lower::Lowering;
-pub(crate) use print::Printed;
+pub(crate) use build::build;
 
 /// What the target cannot run or load, at its Flick source.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,35 +47,6 @@ impl Refusal {
 pub(crate) struct Target<'a> {
     pub name: &'a str,
     pub dialect: &'static Dialect,
-}
-
-/// The definitions of the items `items` of module `module`, in that order,
-/// as the text of one chunk; or everything in them the target refuses.
-pub(crate) fn chunk(
-    program: &Program,
-    module: usize,
-    items: &[usize],
-    target: &Target<'_>,
-) -> Result<Printed, Vec<Refusal>> {
-    let mut lowering = Lowering::new(program, target);
-    let mut block = Block::default();
-    for &item in items {
-        for stmt in lowering.item(module, item) {
-            block.push(stmt);
-        }
-    }
-    let refused = lowering.refusals();
-    if !refused.is_empty() {
-        return Err(refused.to_vec());
-    }
-    let span = (items.first()).map_or(Span::new(FileId::new(0), 0, 0), |&i| {
-        program.modules[module].items[i].span
-    });
-    let over = limits::check(&block, span, target.dialect);
-    if !over.is_empty() {
-        return Err(over);
-    }
-    Ok(print::chunk(&block))
 }
 
 #[cfg(test)]

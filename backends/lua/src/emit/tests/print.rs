@@ -90,6 +90,15 @@ fn operands_are_in_parentheses_only_where_lua_needs_them() {
             bin(BinOp::Or, n("a"), bin(BinOp::And, n("b"), n("c"))),
             "a or b and c",
         ),
+        // associative: a chain nested either way reads the same
+        (
+            bin(BinOp::And, n("a"), bin(BinOp::And, n("b"), n("c"))),
+            "a and b and c",
+        ),
+        (
+            bin(BinOp::Or, bin(BinOp::Or, n("a"), n("b")), n("c")),
+            "a or b or c",
+        ),
         (
             bin(BinOp::Eq, bin(BinOp::Lt, n("a"), n("b")), n("c")),
             "a < b == c",

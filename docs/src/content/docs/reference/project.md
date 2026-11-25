@@ -151,12 +151,19 @@ compiler: pin its `package/component.wasm` in `[build.backend]`. It publishes
 tag `lua`, exclusive axis `dialect` (`lua51` default, `luajit`), additive axis
 `capabilities` (`jit` and `ffi`, each needing `dialect = "luajit"`), and hosts
 `wow-retail`, `wow-forever` and `love`, each pinned to one client or release.
-It generates no code yet. `flick check` and the editor check the project's
-modules against the selected host and report what they reach but the host
-cannot run, such as `BigInt`, `Int64` without `ffi`, suspension on WoW or a
-global outside the host's API, with `FLICK-P012` at the use. `flick build`
-also follows the built-in modules, reports what they need at the project's
-call, then stops with `FLICK-P012` and writes nothing.
+`flick check` and the editor check the project's modules against the
+selected host and report what they reach but the host cannot run, such as
+`BigInt`, `Int64` without `ffi`, suspension on WoW or a global outside the
+host's API, with `FLICK-P012` at the use. `flick build` writes a Lua chunk
+for each module the program reaches, `App/Util.lua` for a project module and
+`_flick/List.lua` for a built-in one, each with a version 3 `.map` from its
+lines to the Flick source. Each chunk starts with `local _, ns = ...` and
+puts its module's values into the namespace it is given second, as WoW
+gives each file of an addon; on LÖVE, `main.lua` loads the chunks in order.
+Only the pure core generates so far: effects, foreign functions, generators
+and the arithmetic and string operators whose exact results need the Lua
+kernel stop the build with `FLICK-P012` at the project's code, and so does a
+function over the VM's limits. A refused build keeps the previous output.
 
 A library (`kind = "lib"`) may also declare `[host]` to define a named host environment `<backend>/<name>` and contribute extra tags when selected:
 

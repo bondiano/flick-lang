@@ -1,17 +1,22 @@
 //! What a program reaches from its roots: the facts of the IR a Lua profile
-//! may refuse, each at the source the program reached it from.
+//! may refuse, each at the source the program reached it from, and the
+//! items code generation emits.
 //!
-//! A root is an entry's `main`, a test root, or, without either, every
-//! export of an own module. A reference into a module that is not the
-//! request's own (a built-in one) is blamed on the own expression that left
-//! own code, so its facts point at the user's source. An own module that is
-//! reached initializes its eager top-level values too.
+//! A root is an entry's `main`, a test root, a host export, or, without an
+//! entry or a test root, every export of an own module. A reference into a
+//! module that is not the request's own (a built-in one) is blamed on the
+//! own expression that left own code, so its facts point at the user's
+//! source. An own module that is reached initializes its eager top-level
+//! values too, and a reached instance reaches its superclasses and the
+//! class defaults it takes.
 
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet};
 
 use flick_backend::{BuildRequest, ModuleRole};
 use flick_ir::{
-    BinOp, Dict, Expr, ExprKind, Foreign, IrType, ItemKind, Lit, Namespace, Num, Program, Span,
+    BinOp, Dict, Expr, ExprKind, Foreign, InstanceInfo, IrType, ItemKind, Lit, Namespace, Num,
+    Program, Span, default_method,
 };
 
 /// A numeric type no Lua number holds exactly.
@@ -60,11 +65,17 @@ pub(crate) struct Site {
     pub via: Option<String>,
 }
 
-#[derive(Clone)]
-struct Blame {
-    span: Span,
-    via: String,
+/// The own expression a reached item of a built-in module is blamed on,
+/// and the global the walk went through.
+#[derive(Clone, Debug)]
+pub(crate) struct Blame {
+    pub span: Span,
+    pub via: String,
 }
+
+/// Every reached item, by module and item index, with the blame it was
+/// first reached with: `None` for one reached from own code directly.
+pub(crate) type Reached = BTreeMap<(usize, usize), Option<Blame>>;
 
 struct Walker<'p, 'f> {
     program: &'p Program,
@@ -75,7 +86,7 @@ struct Walker<'p, 'f> {
     instances: BTreeMap<(&'p str, &'p str), (usize, usize)>,
     /// The type of each wide numeric lang item.
     types: BTreeMap<(&'p str, &'p str), Wide>,
-    seen: BTreeSet<(usize, usize)>,
+    seen: Reached,
     started: BTreeSet<usize>,
     queue: Vec<(usize, usize, Option<Blame>)>,
     report: &'f mut dyn FnMut(Fact<'p>, Site),
@@ -85,7 +96,7 @@ pub(crate) fn walk<'p>(
     program: &'p Program,
     request: &'p BuildRequest,
     report: &mut dyn FnMut(Fact<'p>, Site),
-) {
+) -> Reached {
     let mut w = Walker {
         program,
         own: (request.modules.iter())
@@ -95,7 +106,7 @@ pub(crate) fn walk<'p>(
         values: BTreeMap::new(),
         instances: BTreeMap::new(),
         types: BTreeMap::new(),
-        seen: BTreeSet::new(),
+        seen: BTreeMap::new(),
         started: BTreeSet::new(),
         queue: Vec::new(),
         report,
@@ -145,6 +156,8 @@ pub(crate) fn walk<'p>(
                 .map(|s| (s.module.as_str(), s.name.as_str())),
         )
         .collect();
+    let exported =
+        (request.exports.iter()).map(|e| (e.symbol.module.as_str(), e.symbol.name.as_str()));
     if roots.is_empty() {
         roots = (program.modules.iter())
             .filter(|m| w.own.contains(m.name.as_str()))
@@ -156,6 +169,7 @@ pub(crate) fn walk<'p>(
             })
             .collect();
     }
+    roots.extend(exported);
     for (module, name) in roots {
         if let Some(&(mi, ii)) = w.values.get(&(module, name)) {
             w.enqueue(mi, ii, None);
@@ -163,14 +177,38 @@ pub(crate) fn walk<'p>(
         }
     }
     while let Some((mi, ii, blame)) = w.queue.pop() {
-        program.modules[mi].items[ii].each_body(&mut |body| w.expr(body, blame.as_ref()));
+        let item = &program.modules[mi].items[ii];
+        item.each_body(&mut |body| w.expr(body, blame.as_ref()));
+        if let ItemKind::Instance { info, .. } = &item.kind {
+            w.instance(info, item.span, blame.as_ref());
+        }
     }
+    w.seen
 }
 
 impl<'p> Walker<'p, '_> {
     fn enqueue(&mut self, mi: usize, ii: usize, blame: Option<Blame>) {
-        if self.seen.insert((mi, ii)) {
+        if let Entry::Vacant(seen) = self.seen.entry((mi, ii)) {
+            seen.insert(blame.clone());
             self.queue.push((mi, ii, blame));
+        }
+    }
+
+    /// What an instance's dictionary is built from besides its methods:
+    /// its superclasses, the dictionaries its derived methods and its
+    /// defaults take, and the class's default methods.
+    fn instance(&mut self, info: &'p InstanceInfo, span: Span, blame: Option<&Blame>) {
+        let derived = info.derived.iter().flat_map(|(fields, _)| fields);
+        let extra = info.defaults.iter().flat_map(|(_, _, extra)| extra);
+        for dict in (info.supers.iter().map(|(_, d)| d))
+            .chain(derived)
+            .chain(extra)
+        {
+            self.dict(dict, span, blame);
+        }
+        let (module, class) = &info.class;
+        for (name, _, _) in &info.defaults {
+            self.global(module, &default_method(class, name), span, blame);
         }
     }
 

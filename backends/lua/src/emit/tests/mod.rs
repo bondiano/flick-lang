@@ -2,6 +2,7 @@
 //! IR programs, refusals and VM limits. Each expected text follows from
 //! Lua 5.1's rules and the representation `lower` documents, not from a run.
 
+mod build;
 mod limits;
 mod lower;
 mod print;
@@ -16,8 +17,12 @@ use flick_ir::{
     TypeRef,
 };
 
+use super::ast::Block;
+use super::limits::check;
+use super::lower::Lowering;
 use super::names::GLOBALS;
-use super::{Printed, Refusal, Target, chunk};
+use super::print::{self as printer, Printed};
+use super::{Refusal, Target};
 use crate::profiles::{DIALECTS, PROFILES};
 
 pub(super) fn sp(start: u32, end: u32) -> Span {
@@ -237,6 +242,36 @@ pub(super) fn program(items: Vec<Item>) -> Program {
             lang("string", Namespace::Type, "String"),
         ],
     }
+}
+
+/// The definitions of the items `items` of module `module`, in that order,
+/// as the text of one chunk without its prologue; or everything in them
+/// the target refuses.
+fn chunk(
+    program: &Program,
+    module: usize,
+    items: &[usize],
+    target: &Target<'_>,
+) -> Result<Printed, Vec<Refusal>> {
+    let mut lowering = Lowering::new(program, target);
+    let mut block = Block::default();
+    for &item in items {
+        for stmt in lowering.item(module, item) {
+            block.push(stmt);
+        }
+    }
+    let refused = lowering.refusals();
+    if !refused.is_empty() {
+        return Err(refused.to_vec());
+    }
+    let span = (items.first()).map_or(Span::new(FileId::new(0), 0, 0), |&i| {
+        program.modules[module].items[i].span
+    });
+    let over = check(&block, span, target.dialect);
+    if !over.is_empty() {
+        return Err(over);
+    }
+    Ok(printer::chunk(&block))
 }
 
 /// Every item of `App` as one chunk for the dialect `dialect`.

@@ -45,7 +45,7 @@ impl Lowering<'_> {
                 let what = format!("the foreign function `{}.{}`", self.module, f.name);
                 let why = match &f.binding {
                     Binding::Module { from, .. } if from.starts_with("flick:") => {
-                        "the Lua primitive kernel has no row for it"
+                        "the Lua kernel table refuses it: the Lua primitive kernel is not implemented"
                     }
                     _ => "foreign functions need the Lua value ABI, which is not implemented",
                 };
