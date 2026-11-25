@@ -77,6 +77,8 @@ Function
 Trie
 HashRing
 PriorityQueue
+OrderedMap
+OrderedSet
 Graph.Types
 Graph.Build
 Graph.Query

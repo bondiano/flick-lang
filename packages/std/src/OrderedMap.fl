@@ -1,0 +1,329 @@
+/// A persistent map from keys in the order of `Ord k`, with ranges of keys.
+///
+/// Two keys are equivalent when `compare` gives `EQ`. A map holds one binding
+/// for equivalent keys: a later binding replaces an earlier one, key and
+/// value. Every operation leaves the map it is given as it was, so an old
+/// version can be used again at the same cost.
+///
+/// The map is a weight-balanced tree (delta 3, ratio 2) that stores the size
+/// of each subtree: `size` takes `O(1)`, and `get`, `insert`, `remove`, `min`
+/// and `max` take `O(log n)`. `to_seq` gives the bindings in ascending key
+/// order: `O(log n)` to start, then `O(1)` amortized and `O(log n)` at worst
+/// for each binding taken. `range` reaches its lower bound in `O(log n)`
+/// without reading the keys before it and reads on in the same way.
+///
+/// Maps are `Eq` when they hold equal bindings in the same key order,
+/// `Collections.Sized`, `Collections.ToSeq` in ascending key order, and with
+/// `Ord k` `Collections.Keyed`. `Functor`, `Foldable` and `Traversable` reach
+/// the values in ascending key order and keep the keys and the shape of the
+/// tree, so they need no `Ord k`.
+module OrderedMap exposing (
+  OrderedMap,
+  empty,
+  size,
+  get,
+  insert,
+  remove,
+  min,
+  max,
+  to_seq,
+  from_seq,
+  range,
+  valid,
+)
+
+/// A map from keys `k` to values `v`: a leaf, or a node with its binding, the
+/// keys before it on the left, those after it on the right, and the number of
+/// bindings it holds.
+opaque type OrderedMap k v =
+  | Leaf
+  | Node { size : Int; key : k; value : v; left : OrderedMap k v; right : OrderedMap k v }
+
+/// The map without bindings.
+empty : OrderedMap k v
+let empty = Leaf
+
+/// The number of bindings, in `O(1)`.
+size : OrderedMap k v -> Int
+let size tree =
+  match tree with
+  | Leaf -> 0
+  | Node n -> n.size
+
+/// The node of a binding over two subtrees, with its size.
+node : k -> v -> OrderedMap k v -> OrderedMap k v -> OrderedMap k v
+let node key value left right =
+  Node { size = size left + size right + 1; key = key; value = value; left = left; right = right }
+
+/// The node of a binding over `left` and a `right` holding more than three
+/// times as many bindings, rotated to the left: once when the inner subtree
+/// of `right` holds less than twice its outer one, otherwise twice. `right`
+/// then has at least two bindings, so neither leaf case occurs.
+rotated_left : k -> v -> OrderedMap k v -> OrderedMap k v -> OrderedMap k v
+let rotated_left key value left right =
+  match right with
+  | Leaf -> node key value left right
+  | Node r ->
+    if size r.left < 2 * size r.right then
+      node r.key r.value (node key value left r.left) r.right
+    else
+      match r.left with
+      | Leaf -> node key value left right
+      | Node i ->
+        node i.key i.value (node key value left i.left) (node r.key r.value i.right r.right)
+
+/// The mirror of `rotated_left`, for a `left` that holds more than three
+/// times as many bindings as `right`.
+rotated_right : k -> v -> OrderedMap k v -> OrderedMap k v -> OrderedMap k v
+let rotated_right key value left right =
+  match left with
+  | Leaf -> node key value left right
+  | Node l ->
+    if size l.right < 2 * size l.left then
+      node l.key l.value l.left (node key value l.right right)
+    else
+      match l.right with
+      | Leaf -> node key value left right
+      | Node i ->
+        node i.key i.value (node l.key l.value l.left i.left) (node key value i.right right)
+
+/// The node of a binding over two balanced subtrees, one of which has just
+/// gained or lost a binding, rotated so that neither side holds more than
+/// three times the other unless both hold at most one binding together.
+balanced : k -> v -> OrderedMap k v -> OrderedMap k v -> OrderedMap k v
+let balanced key value left right =
+  let l = size left
+  let r = size right
+  if l + r <= 1 then
+    node key value left right
+  else if r > 3 * l then
+    rotated_left key value left right
+  else if l > 3 * r then
+    rotated_right key value left right
+  else
+    node key value left right
+
+/// The value bound to a key equivalent to `key`, if any, in `O(log n)`.
+get : Ord k => k -> OrderedMap k v -> Option v
+let rec get key tree =
+  match tree with
+  | Leaf -> None
+  | Node n ->
+    match compare key n.key with
+    | LT -> get key n.left
+    | GT -> get key n.right
+    | EQ -> Some n.value
+
+/// The map with `key` bound to `value`, in `O(log n)`. The binding of an
+/// equivalent key is replaced, key and value.
+insert : Ord k => k -> v -> OrderedMap k v -> OrderedMap k v
+let rec insert key value tree =
+  match tree with
+  | Leaf -> node key value Leaf Leaf
+  | Node n ->
+    match compare key n.key with
+    | LT -> balanced n.key n.value (insert key value n.left) n.right
+    | GT -> balanced n.key n.value n.left (insert key value n.right)
+    | EQ -> Node { n with key = key; value = value }
+
+/// The least binding of the node of `key` over `left` and `right`, and the
+/// rest of that node, balanced.
+least_of : k -> v -> OrderedMap k v -> OrderedMap k v -> (k, v, OrderedMap k v)
+let rec least_of key value left right =
+  match left with
+  | Leaf -> (key, value, right)
+  | Node l ->
+    let (k, v, rest) = least_of l.key l.value l.left l.right
+    (k, v, balanced key value rest right)
+
+/// The greatest binding of the node of `key` over `left` and `right`, and
+/// the rest of that node, balanced.
+greatest_of : k -> v -> OrderedMap k v -> OrderedMap k v -> (k, v, OrderedMap k v)
+let rec greatest_of key value left right =
+  match right with
+  | Leaf -> (key, value, left)
+  | Node r ->
+    let (k, v, rest) = greatest_of r.key r.value r.left r.right
+    (k, v, balanced key value left rest)
+
+/// Two balanced subtrees whose keys are all before and all after a removed
+/// binding, joined around the nearest binding of the larger one.
+glued : OrderedMap k v -> OrderedMap k v -> OrderedMap k v
+let glued left right =
+  match (left, right) with
+  | (Leaf, _) -> right
+  | (_, Leaf) -> left
+  | (Node l, Node r) ->
+    if l.size > r.size then
+      let (key, value, rest) = greatest_of l.key l.value l.left l.right
+      balanced key value rest right
+    else
+      let (key, value, rest) = least_of r.key r.value r.left r.right
+      balanced key value left rest
+
+/// The map without the binding of a key equivalent to `key`, in `O(log n)`;
+/// the same bindings when there is none.
+remove : Ord k => k -> OrderedMap k v -> OrderedMap k v
+let rec remove key tree =
+  match tree with
+  | Leaf -> Leaf
+  | Node n ->
+    match compare key n.key with
+    | LT -> balanced n.key n.value (remove key n.left) n.right
+    | GT -> balanced n.key n.value n.left (remove key n.right)
+    | EQ -> glued n.left n.right
+
+/// The binding of the least key, or `None` when the map is empty, in
+/// `O(log n)`.
+min : OrderedMap k v -> Option (k, v)
+let rec min tree =
+  match tree with
+  | Leaf -> None
+  | Node n ->
+    match n.left with
+    | Leaf -> Some (n.key, n.value)
+    | Node _ -> min n.left
+
+/// The binding of the greatest key, or `None` when the map is empty, in
+/// `O(log n)`.
+max : OrderedMap k v -> Option (k, v)
+let rec max tree =
+  match tree with
+  | Leaf -> None
+  | Node n ->
+    match n.right with
+    | Leaf -> Some (n.key, n.value)
+    | Node _ -> max n.right
+
+/// The bindings still to come in ascending order: each frame holds a binding
+/// and the subtree of the keys after it, and the frames below it come later.
+type Path k v = Done | Next k v (OrderedMap k v) (Path k v)
+
+/// `path` with the left spine of `tree` on top, its least key first.
+descended : OrderedMap k v -> Path k v -> Path k v
+let rec descended tree path =
+  match tree with
+  | Leaf -> path
+  | Node n -> descended n.left (Next n.key n.value n.right path)
+
+/// The next binding on `path` and the path after it.
+step : Path k v -> Option ((k, v), Path k v)
+let step path =
+  match path with
+  | Done -> None
+  | Next key value right rest -> Some ((key, value), descended right rest)
+
+/// The bindings in ascending key order, as a lazy, restartable sequence:
+/// `O(log n)` to start, then `O(1)` amortized for each binding taken.
+to_seq : (OrderedMap k v)^d -> (Seq (k, v))^d
+let to_seq tree = Seq.unfold step (descended tree Done)
+
+/// The map of the pairs of a sequence, such as a `for` that yields them,
+/// consumed once in order without a temporary list; a later pair replaces an
+/// earlier one of an equivalent key. Takes `O(n log n)`.
+from_seq : Ord k => (Seq (k, v))^d -> OrderedMap k v
+let from_seq pairs = Seq.fold (fun tree (key, value) -> insert key value tree) Leaf pairs
+
+/// `path` with the bindings of `tree` whose keys are not before `minimum`
+/// on top, found along one way down the tree.
+from_bound : Ord k => k -> OrderedMap k v -> Path k v -> Path k v
+let rec from_bound minimum tree path =
+  match tree with
+  | Leaf -> path
+  | Node n ->
+    if compare n.key minimum == LT then
+      from_bound minimum n.right path
+    else
+      from_bound minimum n.left (Next n.key n.value n.right path)
+
+/// The bindings whose keys lie from `minimum` to `maximum`, both included, in
+/// ascending order, as a lazy, restartable sequence. It reaches `minimum` in
+/// `O(log n)` without reading the keys before it and stops at the first key
+/// after `maximum`: `O(log n + m)` for `m` bindings. A range whose `minimum`
+/// comes after its `maximum` is empty.
+range : Ord k => { minimum : k; maximum : k } -> (OrderedMap k v)^d -> (Seq (k, v))^d
+let range bounds tree =
+  Seq.unfold
+    (fun path -> Option.filter (fun ((key, _), _) -> compare key bounds.maximum != GT) (step path))
+    (from_bound bounds.minimum tree Done)
+
+/// Whether every node stores its size and neither side of a node holds more
+/// than three times the other, unless both hold at most one binding together.
+shaped : OrderedMap k v -> Bool
+let rec shaped tree =
+  match tree with
+  | Leaf -> true
+  | Node n ->
+    let l = size n.left
+    let r = size n.right
+    n.size == l + r + 1
+      && (l + r <= 1 || (l <= 3 * r && r <= 3 * l))
+      && shaped n.left
+      && shaped n.right
+
+/// Whether the map keeps its representation: keys strictly ascending by
+/// `Ord k`, the stored sizes right and the weight balance kept. Every map
+/// the operations of this module give is valid; this is for tests and
+/// debugging, in `O(n)`.
+valid : Ord k => OrderedMap k v -> Bool
+let valid tree =
+  shaped tree
+    && Seq.all
+      (fun ((a, _), (b, _)) -> compare a b == LT)
+      (Seq.zip (to_seq tree) (Seq.drop 1 (to_seq tree)))
+
+/// Each value mapped by `f`, with the keys and the shape of the tree kept.
+mapped : (v^u -> b)^c -> (OrderedMap k v)^d -> (OrderedMap k b)^(c + d)
+let rec mapped f tree =
+  match tree with
+  | Leaf -> Leaf
+  | Node n ->
+    Node {
+      size = n.size
+      key = n.key
+      value = f n.value
+      left = mapped f n.left
+      right = mapped f n.right
+    }
+
+/// Each value mapped by `f` in ascending key order, with the keys and the
+/// shape of the tree kept.
+traversed : (a ->{r; e} b)^c -> OrderedMap k a ->{r; e} OrderedMap k b
+let rec traversed f tree =
+  match tree with
+  | Leaf -> Leaf
+  | Node n ->
+    let left = traversed f n.left
+    let value = f n.value
+    let right = traversed f n.right
+    Node { size = n.size; key = n.key; value = value; left = left; right = right }
+
+/// Whether two maps hold equal bindings in the same key order.
+same : (Eq k, Eq v) => OrderedMap k v -> OrderedMap k v -> Bool
+let same left right =
+  size left == size right
+    && Seq.all
+      (fun ((k1, v1), (k2, v2)) -> k1 == k2 && v1 == v2)
+      (Seq.zip (to_seq left) (to_seq right))
+
+/// Maps are equal when they hold equal bindings in the same key order.
+instance (Eq k, Eq v) => Eq (OrderedMap k v) =
+  let eq left right = same left right
+
+instance Functor (OrderedMap k) =
+  let map f tree = mapped f tree
+
+instance Foldable (OrderedMap k) =
+  let fold f init tree = Seq.fold (fun acc (_, value) -> f acc value) init (to_seq tree)
+
+instance Traversable (OrderedMap k) =
+  let traverse f tree = traversed f tree
+
+instance Collections.ToSeq (OrderedMap k v) (k, v) =
+  let to_seq tree = to_seq tree
+
+instance Collections.Sized (OrderedMap k v) =
+  let size tree = size tree
+
+instance Ord k => Collections.Keyed (OrderedMap k v) k v =
+  let lookup key tree = get key tree

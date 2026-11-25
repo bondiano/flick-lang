@@ -83,7 +83,11 @@ let tests = [
           "b"
           (PriorityQueue.push 1 "a" (PriorityQueue.push 2 "c" PriorityQueue.empty))
       let pq_empty : PriorityQueue.PriorityQueue Int String = PriorityQueue.empty
-      Test.equal [true, true, true, true, true, true, true, true, true, true, true, true, true] [
+      let om = OrderedMap.from_seq (Seq.of_list [("b", 2), ("a", 1), ("c", 3)])
+      let om_empty : OrderedMap.OrderedMap String Int = OrderedMap.empty
+      let os = OrderedSet.from_seq (Seq.of_list [3, 1, 2])
+      let os_empty : OrderedSet.OrderedSet Int = OrderedSet.empty
+      Test.equal (List.repeat 17 true) [
         sized_to_seq_laws ([] : List Int),
         sized_to_seq_laws [1, 2, 3],
         sized_to_seq_laws (NonEmpty.cons 1 [2, 3]),
@@ -97,6 +101,10 @@ let tests = [
         sized_to_seq_laws tr,
         sized_to_seq_laws pq,
         sized_to_seq_laws pq_empty,
+        sized_to_seq_laws om,
+        sized_to_seq_laws om_empty,
+        sized_to_seq_laws os,
+        sized_to_seq_laws os_empty,
       ]
     ),
     Test.test "ToSeq restartability and first law hold for Seq" (fun () ->
@@ -122,14 +130,17 @@ let tests = [
         indexed_laws (bytes_of [10, 20, 30]),
       ]
     ),
-    Test.test "Keyed and Functor-Keyed coherence laws hold for HashMap and Trie" (fun () ->
+    Test.test "Keyed and Functor-Keyed coherence laws hold for every shipped map" (fun () ->
       let hm = HashMap.from_list EqHash.canonical [("a", 1), ("b", 2), ("c", 3)]
       let hm_empty : HashMap.HashMap EqHash.Canonical String Int = HashMap.empty
       let tr = Trie.from_list [("", 0), ("a", 1), ("b", 2)]
       let tr_empty : Trie.Trie Int = Trie.empty
+      let om = OrderedMap.from_seq (Seq.of_list [("b", 2), ("", 0), ("a", 1)])
+      let om_empty : OrderedMap.OrderedMap String Int = OrderedMap.empty
       let f = fun n -> n * 10
       let hm_mapped = map f hm
       let tr_mapped = map f tr
+      let om_mapped = map f om
       let functor_keyed_ok =
         size hm_mapped == size hm
           && lookup "b" hm_mapped == Option.map f (lookup "b" hm)
@@ -137,16 +148,22 @@ let tests = [
           && size tr_mapped == size tr
           && lookup "" tr_mapped == Option.map f (lookup "" tr)
           && lookup "z" tr_mapped == None
-      Test.equal [true, true, true, true, true] [
+          && size om_mapped == size om
+          && lookup "a" om_mapped == Option.map f (lookup "a" om)
+          && lookup "z" om_mapped == None
+          && OrderedMap.valid om_mapped
+      Test.equal [true, true, true, true, true, true, true] [
         keyed_laws "missing" hm,
         keyed_laws "missing" hm_empty,
         keyed_laws "missing" tr,
         keyed_laws "missing" tr_empty,
+        keyed_laws "missing" om,
+        keyed_laws "missing" om_empty,
         functor_keyed_ok,
       ]
     ),
     Test.test "Member laws hold for every shipped member collection" (fun () ->
-      Test.equal [true, true, true, true, true, true, true, true, true] [
+      Test.equal (List.repeat 11 true) [
         member_laws ([] : List Int),
         member_laws [1, 2, 3],
         member_laws (NonEmpty.cons 1 [2, 3]),
@@ -155,6 +172,8 @@ let tests = [
         member_laws (Chunk.make 1 [2, 3]),
         member_laws (HashSet.empty : HashSet.HashSet EqHash.Canonical Int),
         member_laws (HashSet.from_list EqHash.canonical [1, 2, 3]),
+        member_laws (OrderedSet.empty : OrderedSet.OrderedSet Int),
+        member_laws (OrderedSet.from_seq (Seq.of_list [3, 1, 2])),
         member_laws (bytes_of [1, 2, 3])
           && not (member (-1) (bytes_of [1, 2, 3]))
           && not (member 256 (bytes_of [1, 2, 3])),
@@ -167,7 +186,7 @@ let tests = [
         let h = fun n -> n - 2
         Seq.to_list (map identity s) == Seq.to_list s
           && Seq.to_list (map (fun x -> g (h x)) s) == Seq.to_list (map g (map h s))
-      Test.equal [true, true, true, true, true, true, true] [
+      Test.equal [true, true, true, true, true, true, true, true] [
         functor_laws [1, 2, 3],
         seq_ok,
         functor_laws (NonEmpty.cons 1 [2, 3]),
@@ -175,6 +194,7 @@ let tests = [
         functor_laws (Chunk.make 1 [2, 3]),
         functor_laws (HashMap.from_list EqHash.canonical [("a", 1), ("b", 2)]),
         functor_laws (Trie.from_list [("", 0), ("a", 1), ("b", 2)]),
+        functor_laws (OrderedMap.from_seq (Seq.of_list [("b", 2), ("a", 1), ("c", 3)])),
       ]
     ),
     Test.test
@@ -190,7 +210,11 @@ let tests = [
             == List.map (fun (_, v) -> v) (Seq.to_list (to_seq hm))
         let hs_order = fold (fun acc x -> acc ++ [x]) [] hs == Seq.to_list (to_seq hs)
         let tr_order = fold (fun acc v -> acc ++ [v]) [] tr == [1, 2, 3]
-        Test.equal [true, true, true, true, true, true, true, true, true, true, true, true] [
+        let om = OrderedMap.from_seq (Seq.of_list [("c", 3), ("a", 1), ("b", 2)])
+        let os = OrderedSet.from_seq (Seq.of_list [3, 1, 2])
+        let om_order = fold (fun acc v -> acc ++ [v]) [] om == [1, 2, 3]
+        let os_order = fold (fun acc x -> acc ++ [x]) [] os == [1, 2, 3]
+        Test.equal (List.repeat 16 true) [
           foldable_laws [1, 2, 3],
           foldable_laws (Seq.range 1 4),
           foldable_laws (NonEmpty.cons 1 [2, 3]),
@@ -199,10 +223,14 @@ let tests = [
           foldable_laws hm,
           foldable_laws hs,
           foldable_laws tr,
+          foldable_laws om,
+          foldable_laws os,
           seq_order,
           hm_order,
           hs_order,
           tr_order,
+          om_order,
+          os_order,
         ]
       ),
     Test.effect_test
@@ -214,6 +242,7 @@ let tests = [
         let nech = Chunk.make 1 [2, 3]
         let hm = HashMap.from_list EqHash.canonical [("a", 1), ("b", 2)]
         let tr = Trie.from_list [("b", 2), ("a", 1)]
+        let om = OrderedMap.from_seq (Seq.of_list [("c", 3), ("a", 1), ("b", 2)])
         let log = Ref.make ([] : List Int)
         let record_id = fun n ->
           Ref.modify log (fun xs -> ((), xs ++ [n]))
@@ -224,16 +253,30 @@ let tests = [
         let nech2 = traverse record_id nech
         let hm2 = traverse record_id hm
         let tr2 = traverse record_id tr
+        let before_om = List.length (Ref.get log)
+        let om2 = traverse record_id om
         Test.check
-          (Test.equal (true, true, true, true, true, true, [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]) (
-            eq l2 l,
-            eq ne2 ne,
-            eq ch2 ch,
-            eq nech2 nech,
-            eq hm2 hm,
-            eq tr2 tr,
-            List.take 12 (Ref.get log),
-          ))
+          (Test.equal
+            (
+              true,
+              true,
+              true,
+              true,
+              true,
+              true,
+              [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3],
+              (true, [1, 2, 3]),
+            )
+            (
+              eq l2 l,
+              eq ne2 ne,
+              eq ch2 ch,
+              eq nech2 nech,
+              eq hm2 hm,
+              eq tr2 tr,
+              List.take 12 (Ref.get log),
+              (eq om2 om && OrderedMap.valid om2, List.drop before_om (Ref.get log)),
+            ))
       }),
     Test.test "Semigroup and Monoid laws hold for every shipped collection" (fun () ->
       let s1 = Seq.of_list [1]

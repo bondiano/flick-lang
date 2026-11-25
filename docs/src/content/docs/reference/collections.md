@@ -56,11 +56,12 @@ Collections (core module, open capability classes over c : Type)
   that require finiteness — such as `Collections.size`, `Collections.to_list`,
   or `Collections.member` — at compile time.
 - **`Functor` on maps only where keys and witness are preserved.**
-  `HashMap w k` and `Trie` implement `Functor`, `Foldable`, and `Traversable`
-  over their values while keeping keys, witness identity `w`, and traversal
-  order unchanged. `HashSet w` (and planned `OrderedSet`) intentionally omits
-  `Functor` and `Traversable`: mapping set elements can change equality and
-  collapse entries, and requires an explicit target witness (`HashSet.map`).
+  `HashMap w k`, `Trie`, and `OrderedMap k` implement `Functor`, `Foldable`,
+  and `Traversable` over their values while keeping keys, witness identity
+  `w`, and traversal order unchanged. `HashSet w` (and `OrderedSet`)
+  intentionally omits `Functor` and `Traversable`: mapping set elements can
+  change equality and collapse entries, and requires an explicit target
+  witness (`HashSet.map`).
 - **`Semigroup` versus `Monoid`.** Non-empty collections (`NonEmpty`,
   `NonEmptyChunk`) implement `Semigroup` without `Monoid`. Witness-carrying
   hash collections (`HashMap w k v`, `HashSet w a`) implement `Semigroup` for
@@ -96,7 +97,7 @@ Laws:
   returned `(Seq a)^d`, so a scoped sequence cannot escape its `scope`.
 - **Order agreement with `Foldable`:** when `f` has both `Foldable f` and
   `ToSeq (f a) a`, `fold step init xs == Seq.fold step init (to_seq xs)`; for
-  value-mapped maps (`HashMap w k`, `Trie`, planned `OrderedMap k`),
+  value-mapped maps (`HashMap w k`, `Trie`, `OrderedMap k`),
   `fold step init m == Seq.fold (fun acc (_, v) -> step acc v) init (to_seq m)`.
 
 ### `Collections.Sized c`
@@ -161,7 +162,7 @@ Laws:
 
 Superclass: `Sized c` (excludes potentially infinite `Seq`).
 
-Instances with their own equality or ordering witness (`HashSet w a`, planned
+Instances with their own equality or ordering witness (`HashSet w a`,
 `OrderedSet a`) override `member` directly and need no canonical `Eq a`.
 Finite sequence types with `ToSeq` and `Eq a` can either override with a
 native search or inherit the short-circuiting default.
@@ -189,9 +190,7 @@ Laws:
 
 ## Class-to-instance matrix
 
-Shipped collections are implemented in `core` and `std`. Planned collections
-(`OrderedMap` and `OrderedSet`, tracked in issue `#735`) are included to show
-how they fit the same hierarchy.
+Shipped collections are implemented in `core` and `std`.
 
 | Collection | Element / Entry (`ToSeq`) | `Functor` | `Foldable` | `Traversable` | `Semigroup` | `Monoid` | `Iterable` | `ToSeq` | `Sized` | `Indexed` | `Keyed` | `Member` |
 | - | - | - | - | - | - | - | - | - | - | - | - | - |
@@ -205,8 +204,8 @@ how they fit the same hierarchy.
 | `Trie v` | `(String, v)` | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | No | `(String, v)` | No |
 | `Bytes` | `Int` (`0..255`) | No | No | No | Yes | Yes | No | Yes | Yes | Yes | No | Yes (`Int`) |
 | `PriorityQueue p a` | `(p, a)` | No | No | No | `Ord p =>` | `Ord p =>` | No | `Ord p =>` | Yes | No | No | No |
-| *`OrderedMap k v` (#735)* | `(k, v)` | `OrderedMap k` | `OrderedMap k` | `OrderedMap k` | Yes | `Ord k =>` | No | Yes | Yes | No | `(k, v)` | No |
-| *`OrderedSet a` (#735)* | `a` | **No** | Yes | No | Yes | `Ord a =>` | No | Yes | Yes | No | No | Yes (`Ord`) |
+| `OrderedMap k v` | `(k, v)` | `OrderedMap k` | `OrderedMap k` | `OrderedMap k` | No | No | No | Yes | Yes | No | `Ord k =>` | No |
+| `OrderedSet a` | `a` | **No** | Yes | No | No | No | No | Yes | Yes | No | No | `Ord a =>` |
 
 `List`, `Seq`, `NonEmpty`, and `Chunk` also implement `Applicative` and
 `Monad` (and `List`, `Seq`, and `Chunk` implement `Alternative`).
@@ -224,14 +223,24 @@ how they fit the same hierarchy.
 | `Trie v` | ascending UTF-16 key order | `O(1) + O(k * L)` | `O(1)` | `lookup` `O(L)` | `O(m * L)` right-biased | `O(n)` / `O(n * L)` |
 | `Bytes` | byte index `0 .. n-1` | `O(1) + O(k)` | `O(1)` | `at` `O(1)`, `member` `O(n)` (`O(1)` outside `0..255`) | `O(n + m)` | — |
 | `PriorityQueue p a` | ascending `Ord p`, insertion order on equal priorities | `O(1) + O(k log n)` | `O(1)` | — | `O(m + log n)` left-first | — |
-| *`OrderedMap k v` (#735)* | ascending `Ord k` | `O(log n) + O(k)` | `O(1)` | `lookup` `O(log n)` | `O(m log(n + m))` right-biased | `O(n)` / `O(n log n)` |
-| *`OrderedSet a` (#735)* | ascending `Ord a` | `O(log n) + O(k)` | `O(1)` | `member` `O(log n)` | `O(m log(n + m))` | `fold` `O(n)` |
+| `OrderedMap k v` | ascending `Ord k` | `O(log n) + O(k)` | `O(1)` | `lookup` `O(log n)` | — | `O(n)` |
+| `OrderedSet a` | ascending `Ord a` | `O(log n) + O(k)` | `O(1)` | `member` `O(log n)` | — | `fold` `O(n)` |
 
 `PriorityQueue` gives `peek` in `O(1)`, and `push` and `pop` in `O(log n)` in
 the worst case, also on old versions. `combine q1 q2` renumbers the `m` pairs
 of `q2` after those of `q1`, so on equal priorities the pairs of `q1` leave
 first. Two queues are equal by `Eq` when they give the same pairs in the same
 order.
+
+`OrderedMap` and `OrderedSet` are weight-balanced trees: `insert`, `remove`,
+`min` and `max` take `O(log n)`, also on old versions, which an update leaves
+as they were. Keys are equivalent when `compare` gives `EQ`, and a later
+binding replaces an earlier one, key and value. `range { minimum; maximum }`
+gives the bindings with keys from `minimum` to `maximum`, both included, in
+ascending order: it reaches `minimum` in `O(log n)` without reading the keys
+before it, so `m` bindings take `O(log n + m)`, and a range whose `minimum`
+comes after its `maximum` is empty. `valid` checks the representation, for
+tests and debugging.
 
 ### Effects, short-circuiting, and captures
 
@@ -263,7 +272,7 @@ capabilities they need:
 ```flick
 import Collections exposing (Keyed(..), Member(..), Sized(..), ToSeq(..))
 
-// Works on any Keyed collection (HashMap with any witness, Trie, future OrderedMap).
+// Works on any Keyed collection (HashMap with any witness, Trie, OrderedMap).
 present_values : Keyed c String Int => List String -> c -> List (String, Int)
 let present_values keys m = Seq.to_list (Collections.lookup_all keys m)
 
