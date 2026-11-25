@@ -48,25 +48,45 @@ fn target(e: &Expr, x: &str) -> bool {
     matches!(&e.kind, ExprKind::Match(s, _) if matches!(&s.kind, ExprKind::Var(v) if v == x))
 }
 
-/// Statements that run before the read: no branch or scope of them assigns,
-/// as the translation of `LetMut` binds every variable again after one. A
-/// direct assignment of another variable is a `set`.
+/// What a statement evaluates.
+fn value(s: &Stmt) -> &Expr {
+    match s {
+        Stmt::Let { value, .. }
+        | Stmt::Var { value, .. }
+        | Stmt::Assign(_, value)
+        | Stmt::Expr(value)
+        | Stmt::Fun { value, .. } => value,
+    }
+}
+
+fn value_mut(s: &mut Stmt) -> &mut Expr {
+    match s {
+        Stmt::Let { value, .. }
+        | Stmt::Var { value, .. }
+        | Stmt::Assign(_, value)
+        | Stmt::Expr(value)
+        | Stmt::Fun { value, .. } => value,
+    }
+}
+
+/// Statements that run before the read: none assigns `x`, and no branch or
+/// scope of them assigns, as the translation of `LetMut` binds every variable
+/// again after one. A direct assignment of another variable is a `set`.
 fn before(stmts: &[Stmt], x: &str) -> bool {
-    stmts.iter().all(|s| match s {
-        Stmt::Assign(v, value) => v != x && !assigns(value),
-        Stmt::Let { value: v, .. }
-        | Stmt::Var { value: v, .. }
-        | Stmt::Expr(v)
-        | Stmt::Fun { value: v, .. } => !assigns(v),
-    })
+    stmts
+        .iter()
+        .all(|s| !matches!(s, Stmt::Assign(v, _) if v == x) && !assigns(value(s)))
 }
 
 /// The one read of `x` in `e` is its `match`, which runs at most once each
-/// time `e` does: no loop, function, task or handler is around it, and nothing
-/// that runs before it in `e` assigns in a branch or a scope.
+/// time `e` does and holds the one assignment of `x`: no loop, function,
+/// task or handler but a `try` is around it, and nothing that runs before it
+/// in `e` assigns in a branch or a scope.
 fn once(e: &Expr, x: &str) -> bool {
     if target(e, x) {
-        return true;
+        let (mut reads, mut sets) = (0, 0);
+        count(e, x, &mut reads, &mut sets);
+        return sets == 1;
     }
     match &e.kind {
         ExprKind::Block(stmts, result) => once_block(stmts, result, x),
@@ -102,57 +122,35 @@ fn once(e: &Expr, x: &str) -> bool {
 /// `once` of a block: the statement that reads `x`, or its value, after
 /// statements that do not assign in a branch or a scope.
 fn once_block(stmts: &[Stmt], result: &Expr, x: &str) -> bool {
-    let reading = stmts.iter().position(|s| match s {
-        Stmt::Let { value: v, .. }
-        | Stmt::Var { value: v, .. }
-        | Stmt::Assign(_, v)
-        | Stmt::Expr(v)
-        | Stmt::Fun { value: v, .. } => reads(v, x) > 0,
-    });
-    match reading {
+    match stmts.iter().position(|s| reads(value(s), x) > 0) {
         Some(i) => {
             before(&stmts[..i], x)
                 && match &stmts[i] {
-                    Stmt::Let { value: v, .. } | Stmt::Var { value: v, .. } | Stmt::Expr(v) => {
-                        once(v, x)
-                    }
                     Stmt::Assign(..) | Stmt::Fun { .. } => false,
+                    s => once(value(s), x),
                 }
         }
         None => before(stmts, x) && once(result, x),
     }
 }
 
-/// Each statement's value and the block's, in order.
-fn each_part<'e>(stmts: &'e [Stmt], result: &'e Expr, f: &mut dyn FnMut(&'e Expr)) {
-    for stmt in stmts {
-        match stmt {
-            Stmt::Let { value: v, .. }
-            | Stmt::Var { value: v, .. }
-            | Stmt::Assign(_, v)
-            | Stmt::Expr(v)
-            | Stmt::Fun { value: v, .. } => f(v),
-        }
-    }
-    f(result);
-}
-
 /// The read of `x` becomes `state`, and its assignment the evaluation of
 /// what it assigned.
 fn rewrite(e: &mut Expr, x: &str, state: &Expr) {
-    if let ExprKind::Match(s, _) = &mut e.kind
-        && matches!(&s.kind, ExprKind::Var(v) if v == x)
-    {
-        **s = state.clone();
-    }
-    if let ExprKind::Block(stmts, _) = &mut e.kind {
-        for stmt in stmts.iter_mut() {
-            if let Stmt::Assign(v, value) = stmt
-                && v == x
-            {
-                *stmt = Stmt::Expr(mem::replace(value, state.clone()));
+    match &mut e.kind {
+        ExprKind::Match(s, _) if matches!(&s.kind, ExprKind::Var(v) if v == x) => {
+            **s = state.clone();
+        }
+        ExprKind::Block(stmts, _) => {
+            for stmt in stmts.iter_mut() {
+                if let Stmt::Assign(v, value) = stmt
+                    && v == x
+                {
+                    *stmt = Stmt::Expr(mem::replace(value, state.clone()));
+                }
             }
         }
+        _ => {}
     }
     e.each_child_mut(&mut |c| rewrite(c, x, state));
 }
@@ -177,21 +175,17 @@ pub fn state_once(stmts: &mut Vec<Stmt>, result: &mut Expr) -> bool {
             i += 1;
             continue;
         }
-        let (rest, value) = (&stmts[i + 1..], &*result);
-        let (mut reads, mut sets, mut inside) = (0, 0, 0);
+        let rest = &stmts[i + 1..];
+        let mut reads = 0;
         // assignments directly in the block are counted here, the others by `count`
-        sets += rest
+        let mut sets = rest
             .iter()
             .filter(|s| matches!(s, Stmt::Assign(v, _) if v == x))
             .count();
-        each_part(rest, value, &mut |v| {
-            count(v, x, &mut reads, &mut sets);
-            find(v, x, &mut |m| {
-                let mut r = 0;
-                count(m, x, &mut r, &mut inside);
-            });
-        });
-        if !(reads == 1 && sets == 1 && inside == 1 && once_block(rest, value, x)) {
+        for e in rest.iter().map(value).chain([&*result]) {
+            count(e, x, &mut reads, &mut sets);
+        }
+        if !(reads == 1 && sets == 1 && once_block(rest, result, x)) {
             i += 1;
             continue;
         }
@@ -204,24 +198,10 @@ pub fn state_once(stmts: &mut Vec<Stmt>, result: &mut Expr) -> bool {
             unreachable!("a variable was found at {i}")
         };
         for stmt in &mut stmts[i..] {
-            match stmt {
-                Stmt::Let { value: v, .. }
-                | Stmt::Var { value: v, .. }
-                | Stmt::Assign(_, v)
-                | Stmt::Expr(v)
-                | Stmt::Fun { value: v, .. } => rewrite(v, &x, &state),
-            }
+            rewrite(value_mut(stmt), &x, &state);
         }
         rewrite(result, &x, &state);
         changed = true;
     }
     changed
-}
-
-/// Calls `f` on the `match` on `x` in `e`.
-fn find<'e>(e: &'e Expr, x: &str, f: &mut dyn FnMut(&'e Expr)) {
-    if target(e, x) {
-        f(e);
-    }
-    e.each_child(&mut |c| find(c, x, f));
 }
