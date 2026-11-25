@@ -39,18 +39,17 @@ macro_rules! lang_items {
 
         impl Lang {
             pub const ALL: &[Lang] = &[$(Lang::$item,)*];
+            const NAMES: &[&str] = &[$($name,)*];
 
             pub fn name(self) -> &'static str {
-                match self {
-                    $(Lang::$item => $name,)*
-                }
+                Self::NAMES[self as usize]
             }
 
             pub fn from_name(name: &str) -> Option<Lang> {
-                match name {
-                    $($name => Some(Lang::$item),)*
-                    _ => None,
-                }
+                Self::NAMES
+                    .iter()
+                    .position(|&candidate| candidate == name)
+                    .map(|index| Self::ALL[index])
             }
         }
     };

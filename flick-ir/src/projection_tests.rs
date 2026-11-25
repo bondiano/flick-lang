@@ -116,6 +116,7 @@ fn a_summary_survives_both_forms_and_its_absence_reads_as_none() {
             },
         ],
         reexports: Vec::new(),
+        host: Vec::new(),
     };
     let program = Program::new("flick test", vec![module(exports)], Vec::new(), &|_| {
         "file.fl".to_owned()

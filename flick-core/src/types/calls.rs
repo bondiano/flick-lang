@@ -255,11 +255,7 @@ impl Checker<'_> {
         // `.email user`, `(fun r -> r.id) p`: a function applied where it is
         // written takes the type of its parameter from the argument, inferred
         // first, as `let r = user` would give it
-        let mut first = (!args.is_empty() && applied_where_written(head)).then(|| {
-            let argument = self.infer(args[0]);
-            self.given_param = Some(argument.clone());
-            argument
-        });
+        let mut first = self.apply_written_first(head, args);
         let mut ty = self.infer(head);
         let mut unknown = Vec::new();
         let mut params = Vec::new();
@@ -311,20 +307,10 @@ impl Checker<'_> {
                     unknown.push(inferred);
                 }
                 meta @ Type::Meta(_) => {
-                    let (param, result) = (self.fresh(), self.fresh());
-                    let arrow = Type::pure_fun(param.clone(), result.clone());
-                    // a number literal's variable stands for a number only
-                    if self.unify(&meta, &arrow).is_err() {
-                        return self.not_a_function(&meta, span, (head, args, i));
+                    match self.apply_meta(head, args, i, span, &meta, checked) {
+                        Ok(result) => ty = result,
+                        Err(err) => return err,
                     }
-                    self.assume_pure(head, &arrow);
-                    match checked {
-                        Some(argument) => {
-                            self.expect(&argument, &param, self.span(arg));
-                        }
-                        None => self.check(arg, &param),
-                    }
-                    ty = result;
                 }
                 other => return self.not_a_function(&other, span, (head, args, i)),
             }
@@ -335,21 +321,74 @@ impl Checker<'_> {
         {
             ty = gathered;
         }
+        self.finish_apply(since, head, args, &unknown, &params, watched, given);
+        ty
+    }
+
+    #[cfg_attr(target_arch = "wasm32", inline)]
+    #[cfg_attr(not(target_arch = "wasm32"), inline(never))]
+    fn apply_written_first(&mut self, head: &Node, args: &[&Node]) -> Option<Type> {
+        (!args.is_empty() && applied_where_written(head)).then(|| {
+            let argument = self.infer(args[0]);
+            self.given_param = Some(argument.clone());
+            argument
+        })
+    }
+
+    #[cfg_attr(target_arch = "wasm32", inline)]
+    #[cfg_attr(not(target_arch = "wasm32"), inline(never))]
+    fn apply_meta(
+        &mut self,
+        head: &Node,
+        args: &[&Node],
+        i: usize,
+        span: Span,
+        meta: &Type,
+        checked: Option<Type>,
+    ) -> Result<Type, Type> {
+        let (param, result) = (self.fresh(), self.fresh());
+        let arrow = Type::pure_fun(param.clone(), result.clone());
+        // a number literal's variable stands for a number only
+        if self.unify(meta, &arrow).is_err() {
+            return Err(self.not_a_function(meta, span, (head, args, i)));
+        }
+        self.assume_pure(head, &arrow);
+        match checked {
+            Some(argument) => {
+                self.expect(&argument, &param, self.span(args[i]));
+            }
+            None => self.check(args[i], &param),
+        }
+        Ok(result)
+    }
+
+    #[cfg_attr(target_arch = "wasm32", inline)]
+    #[cfg_attr(not(target_arch = "wasm32"), inline(never))]
+    #[allow(clippy::too_many_arguments)]
+    fn finish_apply(
+        &mut self,
+        since: usize,
+        head: &Node,
+        args: &[&Node],
+        unknown: &[Type],
+        params: &[Type],
+        watched: Option<(String, String)>,
+        given: Vec<super::facts::Given>,
+    ) {
         if unknown.len() == args.len() && head.kind == K::NameExpr {
-            self.stub_fix(since, head, args, &unknown);
+            self.stub_fix(since, head, args, unknown);
         }
         if let Some((module, name)) = watched {
             let span = Span::new(self.file, head.range().0, head.range().1);
             self.watched_call(&module, &name, span, given);
         }
         self.note_construction(head, args);
-        if let [first, second] = &params[..]
+        if let [first, second] = params
             && self.is_builtin(head, Lang::LayerMerge)
         {
             let span = Span::new(self.file, head.range().0, args[1].range().1);
             self.merge_conflicts(first, second, span);
         }
-        ty
     }
 
     /// `head` names the value `name` of the built-in module `module`.

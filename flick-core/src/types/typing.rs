@@ -155,6 +155,7 @@ pub struct Typing {
     /// The top-level atoms, views and actions, which debugging tools know
     /// by `Module.name`.
     pub labelled: BTreeMap<String, Label>,
+    #[cfg(not(target_arch = "wasm32"))]
     /// Top-level functions marked with `@export "name"` for host export.
     pub host_exports: Vec<flick_ir::HostExport>,
     /// The top-level functions that make an atom, an action or a view, each

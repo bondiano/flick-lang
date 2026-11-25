@@ -1,7 +1,9 @@
 //! Runtime placement is separate from nominal ownership. A lexical prefix
 //! has its own physical ESM file, while tags, services and types keep the
 //! defining Flick module's identity.
-use super::{ModuleFormat, Options, Output, names};
+#[cfg(feature = "component")]
+use super::ModuleFormat;
+use super::{Options, Output, names};
 use crate::ir::{Item, ItemKind, Module};
 use flick_backend_support::reach;
 use std::collections::{BTreeMap, HashMap};
@@ -106,26 +108,42 @@ pub fn js_parts(
     options: &Options,
     layout: &RuntimeLayout,
 ) -> Vec<(String, Output)> {
-    js_parts_with_format(module, options, layout, ModuleFormat::Esm)
+    #[cfg(feature = "component")]
+    return js_parts_with_format(module, options, layout, ModuleFormat::Esm);
+    #[cfg(not(feature = "component"))]
+    js_parts_inner(module, options, layout)
 }
 
+#[cfg(feature = "component")]
 pub fn js_parts_with_format(
     module: &Module,
     options: &Options,
     layout: &RuntimeLayout,
     format: ModuleFormat,
 ) -> Vec<(String, Output)> {
+    js_parts_inner(module, options, layout, format)
+}
+
+fn js_parts_inner(
+    module: &Module,
+    options: &Options,
+    layout: &RuntimeLayout,
+    #[cfg(feature = "component")] format: ModuleFormat,
+) -> Vec<(String, Output)> {
     if module.initialization.prefixes.is_empty() {
-        return vec![(
-            module.name.clone(),
-            super::js::js_at_with_format(
-                module,
-                options,
-                &module.name,
-                &|owner, symbol| layout.location(owner, symbol),
-                format,
-            ),
-        )];
+        #[cfg(feature = "component")]
+        let out = super::js::js_at_with_format(
+            module,
+            options,
+            &module.name,
+            &|owner, symbol| layout.location(owner, symbol),
+            format,
+        );
+        #[cfg(not(feature = "component"))]
+        let out = super::js::js_at(module, options, &module.name, &|owner, symbol| {
+            layout.location(owner, symbol)
+        });
+        return vec![(module.name.clone(), out)];
     }
     let mut own = RuntimeLayout::default();
     own.add(module);
@@ -167,37 +185,67 @@ pub fn js_parts_with_format(
                 package: module.package.clone(),
                 exports: module.exports.clone(),
             };
-            let mut output = super::js::js_at_with_format(&part, options, &physical, &location, format);
+            #[cfg(feature = "component")]
+            let mut output =
+                super::js::js_at_with_format(&part, options, &physical, &location, format);
+            #[cfg(not(feature = "component"))]
+            let mut output = super::js::js_at(&part, options, &physical, &location);
             if phase.is_none() {
                 let here = options.path(&module.name);
-                for prefix in &prefixes {
-                    match format {
-                        ModuleFormat::Esm => {
-                            let _ = writeln!(
-                                output.code,
-                                "export * from {};",
-                                names::string(&super::relative(&here, &options.path(prefix)))
-                            );
-                        }
-                        ModuleFormat::Cjs => {
-                            let _ = writeln!(
-                                output.code,
-                                "Object.assign(exports, require({}));",
-                                names::string(&super::relative(&here, &options.path(prefix)))
-                            );
-                        }
-                        ModuleFormat::Iife => {
-                            let _ = writeln!(
-                                output.code,
-                                "Object.assign($exp, $req({}));",
-                                names::string(prefix)
-                            );
-                        }
-                    }
-                }
-                output.imports.extend(prefixes.clone());
+                emit_prefix_reexports(
+                    &mut output,
+                    options,
+                    &here,
+                    &prefixes,
+                    #[cfg(feature = "component")]
+                    format,
+                );
             }
             (physical, output)
         })
         .collect()
+}
+
+fn emit_prefix_reexports(
+    output: &mut Output,
+    options: &Options,
+    here: &str,
+    prefixes: &[String],
+    #[cfg(feature = "component")] format: ModuleFormat,
+) {
+    for prefix in prefixes {
+        #[cfg(feature = "component")]
+        match format {
+            ModuleFormat::Esm => {
+                let _ = writeln!(
+                    output.code,
+                    "export * from {};",
+                    names::string(&super::relative(here, &options.path(prefix)))
+                );
+            }
+            ModuleFormat::Cjs => {
+                let _ = writeln!(
+                    output.code,
+                    "Object.assign(exports, require({}));",
+                    names::string(&super::relative(here, &options.path(prefix)))
+                );
+            }
+            ModuleFormat::Iife => {
+                let _ = writeln!(
+                    output.code,
+                    "Object.assign($exp, $req({}));",
+                    names::string(prefix)
+                );
+            }
+        }
+        #[cfg(not(feature = "component"))]
+        {
+            let _ = writeln!(
+                output.code,
+                "export * from {};",
+                names::string(&super::relative(here, &options.path(prefix)))
+            );
+        }
+    }
+    output.imports.extend(prefixes.iter().cloned());
 }

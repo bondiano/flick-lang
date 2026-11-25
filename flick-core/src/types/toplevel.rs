@@ -459,7 +459,7 @@ fn prev_non_attr<'a>(decls: &[&'a Node], i: usize) -> Option<&'a Node> {
         .find(|n| n.kind != K::Attribute)
 }
 
-fn next_non_attr<'a>(decls: &[&'a Node], i: usize) -> Option<&'a Node> {
+pub(super) fn next_non_attr<'a>(decls: &[&'a Node], i: usize) -> Option<&'a Node> {
     decls[i + 1..]
         .iter()
         .copied()

@@ -26,11 +26,12 @@ pub fn is_export(node: &Node, text: &str) -> bool {
         .is_some_and(|t| t.text(text) == TAG)
 }
 
-/// Reads an `@export "<name>"` attribute node.
+/// Reads the raw string token of an `@export "<name>"` attribute without
+/// decoding escapes or allocating.
 ///
 /// Returns `None` if `node` is not an `@export` attribute, or `Some(Err(..))`
 /// if its argument is missing, non-string, or followed by extra arguments.
-pub fn read(node: &Node, text: &str) -> Option<Result<ExportAttr, String>> {
+pub fn read_raw<'a>(node: &Node, text: &'a str) -> Option<Result<&'a str, &'static str>> {
     let mut tokens = node
         .child_tokens()
         .filter(|t| matches!(t.kind, K::Ident | K::String));
@@ -38,15 +39,22 @@ pub fn read(node: &Node, text: &str) -> Option<Result<ExportAttr, String>> {
     if head.kind != K::Ident || head.text(text) != TAG {
         return None;
     }
-    let rest: Vec<_> = tokens.collect();
-    let [arg] = rest.as_slice() else {
-        return Some(Err(USAGE.to_owned()));
+    let Some(arg) = tokens.next() else {
+        return Some(Err(USAGE));
     };
-    if arg.kind != K::String {
-        return Some(Err(USAGE.to_owned()));
+    if arg.kind != K::String || tokens.next().is_some() {
+        return Some(Err(USAGE));
     }
-    Some(Ok(ExportAttr {
-        name: string_value(arg.text(text)),
+    Some(Ok(arg.text(text)))
+}
+
+/// Reads an `@export "<name>"` attribute node.
+///
+/// Returns `None` if `node` is not an `@export` attribute, or `Some(Err(..))`
+/// if its argument is missing, non-string, or followed by extra arguments.
+pub fn read(node: &Node, text: &str) -> Option<Result<ExportAttr, &'static str>> {
+    Some(read_raw(node, text)?.map(|raw| ExportAttr {
+        name: string_value(raw),
         span: node.range(),
     }))
 }

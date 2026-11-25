@@ -55,8 +55,8 @@ pub(super) fn check(
     let next = before.map(|n| n.kind);
     let words: Vec<Token> = node.child_tokens().filter(|t| t.kind == K::Ident).collect();
     let message = match &words[..] {
-        [name, ..] if name.text(src) == "export" => match export_attr::read(node, src) {
-            Some(Err(why)) => why,
+        [name, ..] if name.text(src) == "export" => match export_attr::read_raw(node, src) {
+            Some(Err(why)) => why.to_owned(),
             _ if !top_level => "`@export` belongs before a top-level function".to_owned(),
             _ if matches!(next, Some(K::Signature | K::LetDecl))
                 || (next.is_none() && allow_trailing_attribute) =>

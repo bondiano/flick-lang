@@ -2,13 +2,16 @@
 
 use flick_pretty::Document;
 
-use super::{Gen, ModuleFormat, RUNTIME, names, relative};
+#[cfg(feature = "component")]
+use super::ModuleFormat;
+use super::{Gen, RUNTIME, names, relative};
 use crate::effects::bindings;
 
 impl<'d> Gen<'_, 'd> {
     /// The import lines of the module at `here`.
     pub(super) fn imports_of(&self, here: &str) -> Vec<Document<'d>> {
         let runtime = self.options.foreign(self.module, RUNTIME);
+        #[cfg(feature = "component")]
         if self.format != ModuleFormat::Esm {
             return self.imports_of_non_esm(here, &runtime);
         }
@@ -86,6 +89,7 @@ impl<'d> Gen<'_, 'd> {
         lines
     }
 
+    #[cfg(feature = "component")]
     fn imports_of_non_esm(&self, here: &str, runtime: &str) -> Vec<Document<'d>> {
         let mut lines = Vec::new();
         let mut line = |text: String| lines.push(self.a.text(self.a.alloc_str(&text)));

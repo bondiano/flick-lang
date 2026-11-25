@@ -53,7 +53,7 @@ impl Checking<'_> {
         let mut entries: Vec<_> = typing.foreigns.iter().collect();
         entries.sort_by_key(|(range, _)| *range);
         let backend_id = foreign_backend.backend_id.as_str();
-        if matches!(backend_id, "flick/js" | "flick/go") {
+        if is_checked_official_backend(backend_id) {
             for (range, info) in entries {
                 if info.adapter.words.is_empty() {
                     continue;
@@ -74,9 +74,7 @@ impl Checking<'_> {
             }
         }
         for (_, ov) in &typing.native_overrides {
-            if ov.info.adapter.words.is_empty()
-                || !matches!(ov.backend_id.as_str(), "flick/js" | "flick/go")
-            {
+            if ov.info.adapter.words.is_empty() || !is_checked_official_backend(&ov.backend_id) {
                 continue;
             }
             let mut is_inline = false;
@@ -179,7 +177,7 @@ impl Checking<'_> {
         checked: &mut Vec<Diagnostic>,
     ) {
         let backend_id = foreign_backend.backend_id.as_str();
-        if matches!(backend_id, "flick/js" | "flick/go") {
+        if is_checked_official_backend(backend_id) {
             for decl in module.tree.nodes() {
                 if decl.kind == K::ForeignPreamble {
                     let Some(tok) = decl.child_tokens().find(|t| t.kind == K::String) else {
@@ -213,7 +211,7 @@ impl Checking<'_> {
                     .unique_backend_for(&expr)
                     .map(|s| s.backend_id.as_str())
             });
-            if let Some(id @ ("flick/js" | "flick/go")) = target_backend {
+            if let Some(id) = target_backend.filter(|id| is_checked_official_backend(id)) {
                 Self::check_inline_source(id, ov, module, checked);
             }
         });
@@ -275,6 +273,17 @@ impl Checking<'_> {
         if let Some(d) = found {
             checked.push(Diagnostic::error(codes::F011, d.message, d.span));
         }
+    }
+}
+
+fn is_checked_official_backend(id: &str) -> bool {
+    #[cfg(feature = "native-project")]
+    {
+        matches!(id, "flick/js" | "flick/go")
+    }
+    #[cfg(not(feature = "native-project"))]
+    {
+        id == "flick/js"
     }
 }
 

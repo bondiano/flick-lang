@@ -5,8 +5,10 @@ use std::mem;
 
 use flick_pretty::{Document, docvec};
 
+#[cfg(feature = "component")]
+use super::ModuleFormat;
 use super::doc::{After, Before, Form, Head, Js, Stmt, array, call, text_flags};
-use super::{Gen, ModuleFormat, names};
+use super::{Gen, names};
 use flick_ir::Dict;
 #[cfg(feature = "source-maps")]
 use flick_ir::Span;
@@ -136,6 +138,7 @@ impl<'d> Gen<'_, 'd> {
         .with((super::doc::stmt_flags(stmts) & !super::doc::YIELDS) | super::doc::MULTILINE)
     }
 
+    #[cfg(feature = "component")]
     /// Export target object for CJS (`exports`) and IIFE (`$exp`), or `None` for ESM.
     pub(super) fn export_target(&self) -> Option<&'static str> {
         match self.format {
@@ -148,12 +151,9 @@ impl<'d> Gen<'_, 'd> {
     /// Exports a statement that declares `name` in the active module format.
     pub(super) fn export_stmt(&self, name: &str, stmt: Stmt<'d>) -> Stmt<'d> {
         let a = self.a;
-        match self.export_target() {
-            None => Stmt {
-                doc: docvec![a, "export ", stmt.doc],
-                ..stmt
-            },
-            Some(target) => Stmt {
+        #[cfg(feature = "component")]
+        if let Some(target) = self.export_target() {
+            return Stmt {
                 doc: docvec![
                     a,
                     stmt.doc,
@@ -166,7 +166,13 @@ impl<'d> Gen<'_, 'd> {
                     ";"
                 ],
                 ..stmt
-            },
+            };
+        }
+        #[cfg(not(feature = "component"))]
+        let _ = name;
+        Stmt {
+            doc: docvec![a, "export ", stmt.doc],
+            ..stmt
         }
     }
 
@@ -195,18 +201,9 @@ impl<'d> Gen<'_, 'd> {
         let value = self.pure(value);
         let ty = self.annotation(name);
         let mark = mark.unwrap_or_else(|| a.empty());
-        let doc = match self.export_target() {
-            None => docvec![
-                a,
-                "export const ",
-                mark,
-                a.alloc_str(name),
-                ty,
-                " = ",
-                value.at(a, Before::Assign, After::Semicolon),
-                ";"
-            ],
-            Some(target) => docvec![
+        #[cfg(feature = "component")]
+        if let Some(target) = self.export_target() {
+            let doc = docvec![
                 a,
                 "const ",
                 mark,
@@ -222,8 +219,19 @@ impl<'d> Gen<'_, 'd> {
                 " = ",
                 a.alloc_str(name),
                 ";"
-            ],
-        };
+            ];
+            return Stmt::new(doc, value.flags | text_flags(name));
+        }
+        let doc = docvec![
+            a,
+            "export const ",
+            mark,
+            a.alloc_str(name),
+            ty,
+            " = ",
+            value.at(a, Before::Assign, After::Semicolon),
+            ";"
+        ];
         Stmt::new(doc, value.flags | text_flags(name))
     }
 
@@ -245,6 +253,7 @@ impl<'d> Gen<'_, 'd> {
 
     /// The type an exported constant is declared with.
     fn annotation(&self, name: &str) -> Document<'d> {
+        #[cfg(any(feature = "component", not(target_arch = "wasm32")))]
         if let Some(ty) = self.annotations.get(name) {
             return docvec![self.a, ": ", self.a.alloc_str(ty)];
         }

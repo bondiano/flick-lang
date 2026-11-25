@@ -2,35 +2,20 @@
 //! values, with the stages of a Sync one and the summary of a projection,
 //! and what it exports of others.
 
+#[cfg(not(target_arch = "wasm32"))]
 use std::mem;
 
 use flick_ir::{
-    Exported, Exports, ItemKind, Module, Namespace as IrNamespace, Projection, Reexport,
+    Exported, Exports, Item, ItemKind, Module, Namespace as IrNamespace, Projection, Reexport,
 };
 
 use crate::iface::{Decl, Interface, Namespace};
-use crate::types::Type;
+use crate::types::{Type, Typing};
 
 /// The exports `interface` lists for `module`, whose code tells which of
 /// its values are projections.
 pub fn exports(module: &Module, interface: &Interface) -> Exports {
     let mut out = Exports::default();
-    fill_exports_into(&mut out, module, interface);
-    out
-}
-
-/// Populates `module.exports.values` and `module.exports.reexports` from
-/// `interface` while preserving any `@export "name"` entries already lowered
-/// into `module.exports.host`.
-pub fn fill_exports(module: &mut Module, interface: &Interface) {
-    let mut out = mem::take(&mut module.exports);
-    fill_exports_into(&mut out, module, interface);
-    module.exports = out;
-}
-
-fn fill_exports_into(out: &mut Exports, module: &Module, interface: &Interface) {
-    out.values.clear();
-    out.reexports.clear();
     for export in &interface.exports {
         let entity = &export.entity;
         if entity.module == module.name {
@@ -57,6 +42,52 @@ fn fill_exports_into(out: &mut Exports, module: &Module, interface: &Interface) 
             namespace,
             name: entity.name.clone(),
         });
+    }
+    out
+}
+
+/// Populates `module.exports.values` and `module.exports.reexports` from
+/// `interface` while preserving any `@export "name"` entries already lowered
+/// into `module.exports.host`.
+#[inline]
+pub fn fill_exports(module: &mut Module, interface: &Interface) {
+    #[cfg(not(target_arch = "wasm32"))]
+    let mut out = exports(module, interface);
+    #[cfg(target_arch = "wasm32")]
+    let out = exports(module, interface);
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        out.host = mem::take(&mut module.exports.host);
+    }
+    module.exports = out;
+}
+
+/// Builds the initial `Exports` table for a lowered module, keeping only
+/// `@export "name"` entries whose binding exists in `items`.
+pub(super) fn host_exports(typing: &Typing, items: &[Item]) -> Exports {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let host = typing
+            .host_exports
+            .iter()
+            .filter(|export| {
+                items.iter().any(|item| match &item.kind {
+                    ItemKind::Value { name, .. } => name == &export.name,
+                    ItemKind::Foreign(f) => f.name == export.name,
+                    _ => false,
+                })
+            })
+            .cloned()
+            .collect();
+        Exports {
+            host,
+            ..Exports::default()
+        }
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let _ = (typing, items);
+        Exports::default()
     }
 }
 
