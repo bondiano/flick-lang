@@ -164,6 +164,45 @@ let cities users =
   List.map get users
 ```
 
+An optional step `.?name` (see [Syntax](../syntax/#expressions)) alone is
+`Option { name : a | r } -> Option a`, the type of
+`fun v -> match v with | None -> None | Some r -> Some r.name`. A path runs
+on the value it has read so far, unwrapped: a plain step needs a record, an
+optional step an `Option` of a record. A path with at least one optional step
+wraps its last value in one `Some`, and a `None` at any of its steps is the
+`None` of the whole path. The type of the last field is kept whole, never
+flattened: below, `maybe_user |> .?address.?city` is `Option (Option String)`,
+with `city : Option (Option String)` it would be
+`Option (Option (Option String))`, and with `city : String` it is
+`Option String`. Whether a path is an `Option` depends on its `.?`, not on its
+last field. The compiler writes the path as the `match`es it means, reading
+the root once and nothing after a `None`. A step takes off only an `Option`,
+one per `.?`: it does not look into a `Result`, an `Eff`, a `Lazy` or a
+foreign null, and does not test at run time for a field the type lacks. A
+plain `.city` of an `Option Address` is `FLICK-T003` "`Option Address` is an
+`Option`, which has no field `city`", whose help offers `.?city` or handling
+the `None` first; `.?name` of a `User` is "`.?name` reads a field of an
+`Option`, but this has type `User`"; `.?city` of an `Option (Option Address)`
+names the `Option Address` that is left. The `Some` of a path is typed as the
+constructor applied in that `match`, with its capture bound, so a local
+`let get = .?value` without a signature is not generic, as the `fun` it
+stands for is not: give it a signature to use it at two record types.
+
+```flick
+type alias Address = { city : Option String }
+type alias User = { address : Option Address }
+
+city : Option User -> Option (Option String)
+let city maybe_user = maybe_user |> .?address.?city
+```
+
+| `maybe_user` | `city maybe_user` |
+| - | - |
+| `None` | `None` |
+| `Some { address = None }` | `None` |
+| `Some { address = Some { city = None } }` | `Some None` |
+| `Some { address = Some { city = Some "Novosibirsk" } }` | `Some (Some "Novosibirsk")` |
+
 Values of data types, structural records and tuples have no observable storage
 identity, and the written order of a record's labels is not observable: every
 operation that inspects labels or encodes structural records uses the canonical

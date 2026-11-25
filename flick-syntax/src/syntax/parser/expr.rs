@@ -324,35 +324,13 @@ fn argument(p: &mut Parser, has_hole: &mut bool) -> Option<Done> {
     let m = p.start();
     p.bump();
     let name = p.complete(m, K::NameExpr);
-    accesses(p, name)
+    accessor::accesses(p, name)
 }
 
 /// An atom followed by `.field` accesses and `?`, written without spaces.
 pub(super) fn postfix(p: &mut Parser) -> Option<Done> {
     let lhs = atom(p)?;
-    accesses(p, lhs)
-}
-
-/// `lhs` followed by `.field` accesses and `?`.
-fn accesses(p: &mut Parser, mut lhs: Done) -> Option<Done> {
-    loop {
-        if p.at(K::Dot) && p.adjacent() {
-            let m = p.precede(lhs);
-            p.bump();
-            if p.at_record_label() && p.adjacent() {
-                p.bump_as(K::Ident);
-            } else {
-                p.expect(K::Ident);
-            }
-            lhs = p.complete(m, K::FieldExpr);
-        } else if p.at(K::Question) && p.adjacent() {
-            let m = p.precede(lhs);
-            p.bump();
-            lhs = p.complete(m, K::QuestionExpr);
-        } else {
-            return Some(lhs);
-        }
-    }
+    accessor::accesses(p, lhs)
 }
 
 /// Whether `.Name` or `.name` directly continues a qualified path.

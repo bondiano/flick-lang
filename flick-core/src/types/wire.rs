@@ -15,7 +15,7 @@ use crate::iface::{Entity, Namespace};
 use crate::source::Span;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::types::lang;
+use crate::types::lang::{self, Lang};
 
 /// The codec a use of `wire_codec` stands for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -123,12 +123,47 @@ impl Checker<'_> {
             name: super::companion_name(name, "schema"),
         };
         if self.env.value(&schema).is_some() {
+            if let Some(merged) = self.merged_option(ty) {
+                let merged = self.show(&merged);
+                return Err(format!(
+                    "the JSON codec of `{shown}`'s schema writes `None` and `Some None` of `{merged}` alike as `null`: name a `PureCodec Json` of it after it in its module that keeps them apart, as `Codec.tagged_option` does"
+                ));
+            }
             return Ok(WireCodec::Schema {
                 module,
                 ty: (*name).to_owned(),
             });
         }
         Err(no_codec())
+    }
+
+    /// An `Option (Option a)` in the type the codec `codec` is of: the JSON
+    /// codec of a schema writes its `None` and `Some None` alike as `null`.
+    fn merged_option(&self, codec: &Type) -> Option<Type> {
+        let (_, args) = codec.spine();
+        let mut pending = vec![(*args.last()?).clone()];
+        // shortcut: a data type's constructors are not searched, only the
+        // records, tuples and type arguments of the type itself; search
+        // them once a derived constructor schema carries a nested `Option`
+        for _ in 0..256 {
+            let ty = self.whnf(&pending.pop()?);
+            let (head, items) = ty.spine();
+            if let [item] = items[..]
+                && self.whnf(head).is_lang(Lang::Option)
+            {
+                let item = self.whnf(item);
+                let (inner, of) = item.spine();
+                if of.len() == 1 && self.whnf(inner).is_lang(Lang::Option) {
+                    return Some(ty.clone());
+                }
+            }
+            match &ty {
+                Type::Record(row) => pending.extend(row.entries.iter().map(|(_, t)| t.clone())),
+                Type::Tuple(parts) => pending.extend(parts.iter().cloned()),
+                _ => pending.extend(items.into_iter().cloned()),
+            }
+        }
+        None
     }
 
     /// The uses of `wire_codec` outside an annotation.

@@ -12,7 +12,9 @@ use crate::iface::Namespace;
 use crate::project::Analyzed;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
+use crate::syntax::fields;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::{self, Lang};
 use crate::types::{Form, Type};
 
 /// A record type alias, by its module and name.
@@ -137,7 +139,22 @@ impl Ide<'_> {
         };
         let declaring = self.analysis.module(&module)?;
         let field = declared_field(&declaring.tree, self.text(declaring.file), &alias, name)?;
-        let written = field.nodes().next().filter(|t| t.kind == K::NameType)?;
+        let written = field.nodes().next()?;
+        let written = match written.kind {
+            K::NameType => written,
+            // an optional step reads inside the `Option` the field is declared as
+            K::AppType if optional_at(&m.tree, range) => {
+                let mut parts = written.nodes();
+                let (head, item) = (parts.next()?, parts.next()?);
+                let option = lang::item(Lang::Option);
+                let named = declaring.typing.type_names.get(&head.range());
+                (named == Some(&(option.module.clone(), option.name.clone()))
+                    && item.kind == K::NameType
+                    && parts.next().is_none())
+                .then_some(item)?
+            }
+            _ => return None,
+        };
         let (module, name) = declaring.typing.type_names.get(&written.range())?;
         let declared = Type::Con {
             module: module.clone(),
@@ -263,6 +280,12 @@ pub(super) fn field_label(field: &Node) -> Option<(u32, u32)> {
 
 /// The label of the field read just before the label at `range`: of the
 /// projection its own reads a field of, or of the accessor step before it.
+/// Whether the step whose label is at `range` is optional, `.?label`.
+fn optional_at(root: &Node, range: (u32, u32)) -> bool {
+    (tree::path_to(root, range.0).last())
+        .is_some_and(|n| field_label(n) == Some(range) && fields::is_optional(n))
+}
+
 fn previous_label(root: &Node, range: (u32, u32)) -> Option<(u32, u32)> {
     let path = tree::path_to(root, range.0);
     let (node, parent) = match &path[..] {

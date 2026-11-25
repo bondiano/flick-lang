@@ -75,6 +75,7 @@ mod makers;
 mod module_contract;
 mod module_signature;
 mod mutation;
+mod optional_paths;
 mod options;
 pub(crate) use module_signature::normalize_module_interface;
 mod static_modules;

@@ -2,7 +2,7 @@
 title: Записи
 description: Именованные поля, функция, которая читает поле, копия записи с изменённым полем через `with` и построение списка через `for`.
 tableOfContents: false
-source_hash: 86fce4a5adfd118b
+source_hash: b03dcb10a1398589
 ---
 
 import TourLesson from "../../../../components/TourLesson.astro";
@@ -16,7 +16,8 @@ import TourLesson from "../../../../components/TourLesson.astro";
 Само по себе `.title` — функция, которая читает это поле:
 `List.map .title shelf` возвращает список названий, как
 `List.map (fun b -> b.title) shelf`. Путь читает поля по очереди:
-`.author.name`.
+`.author.name`. Шаг `.?` читает поле `Option`: `book.series.?name` даёт
+`None`, если у книги нет серии, и `Some` с названием в остальных случаях.
 
 Записи неизменяемы. `{ book with read = true }` создаёт копию записи
 `book`, в которой значение поля `read` заменено на `true`.

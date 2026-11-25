@@ -343,7 +343,13 @@ impl Ide<'_> {
                 .filter(|(r, _)| r.1 == offset)
                 .min_by_key(|(r, _)| r.1 - r.0)
                 .map(|(_, ty)| ty.clone());
-            ty.or_else(|| self.expected_parameter(file, offset))
+            let ty = ty.or_else(|| self.expected_parameter(file, offset));
+            // a bare `.?` starts an accessor reading inside an `Option`
+            if text[offset as usize..].starts_with(".?") {
+                ty.as_ref().and_then(super::paths::option_item)
+            } else {
+                ty
+            }
         });
         let Some(ty) = receiver else {
             return Vec::new();

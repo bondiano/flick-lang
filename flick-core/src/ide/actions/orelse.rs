@@ -182,7 +182,7 @@ impl Ide<'_> {
         })
     }
 
-    fn has_error_in(&self, file: FileId, (start, end): (u32, u32)) -> bool {
+    pub(super) fn has_error_in(&self, file: FileId, (start, end): (u32, u32)) -> bool {
         self.analysis.diagnostics.iter().any(|d| {
             d.severity == Severity::Error
                 && d.span
@@ -193,7 +193,7 @@ impl Ide<'_> {
     /// Prefix for `Some` / `None` in expanded `match`: empty when Prelude's
     /// constructors are unshadowed, `"Option."` when shadowed locally or via
     /// another import while `Option` stays available, or `None` if unsafe.
-    fn option_constructor_prefix(
+    pub(super) fn option_constructor_prefix(
         &self,
         m: &Analyzed,
         text: &str,
@@ -227,7 +227,7 @@ impl Ide<'_> {
     }
 }
 
-fn has_error(node: &Node) -> bool {
+pub(super) fn has_error(node: &Node) -> bool {
     node.kind == K::Error || node.nodes().any(has_error)
 }
 
@@ -295,7 +295,7 @@ fn fresh_binder(m: &Analyzed, text: &str, file: FileId, at: u32, lhs: &Node, rhs
         .unwrap_or_else(|| "value".to_owned())
 }
 
-fn collect_idents(node: &Node, text: &str, out: &mut HashSet<String>) {
+pub(super) fn collect_idents(node: &Node, text: &str, out: &mut HashSet<String>) {
     for token in node.child_tokens() {
         if token.kind == K::Ident {
             out.insert(token.text(text).to_owned());
@@ -306,7 +306,7 @@ fn collect_idents(node: &Node, text: &str, out: &mut HashSet<String>) {
     }
 }
 
-fn has_comment(slice: &str) -> bool {
+pub(super) fn has_comment(slice: &str) -> bool {
     slice.contains("//") || slice.contains("/*")
 }
 

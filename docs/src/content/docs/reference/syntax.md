@@ -317,7 +317,7 @@ There are no user-defined operators. From weakest to strongest:
 | 9 | prefix `-`, `not`, `await`, `ignore`, `echo` | — |
 | 9½ | `>>`, `<<` | `>>` left, `<<` right; they do not mix: `f >> g << h` is an error |
 | 10 | function application `f x y` | left |
-| 11 | `.field`, `Module.name`, postfix `?`; an accessor `.a.b` is one atom | left |
+| 11 | `.field`, `.?field`, `Module.name`, postfix `?`; an accessor `.a.b` or `.a.?b` is one atom | left |
 
 `-x ** 2` is `-(x ** 2)`; `-a * b` is `(-a) * b`; `await f x` is
 `await (f x)`; `0..n - 1` is `0..(n - 1)`, and `i < 0..n` compares with the range.
@@ -690,10 +690,10 @@ handler_arm = arm | "|" "return" or_pattern "->" block
             // an operation's arm is `| E.op p… -> …`, a pattern whose path ends in a name
 application = postfix { argument }
 argument    = "_" | postfix                     // at most one `_` per application
-postfix     = atom { "." name | "?" }           // no space before either
+postfix     = atom { step | "?" }               // no space before either
+step        = "." name | ".?" name              // no space inside
 atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | accessor
-accessor    = "." name { "." name }             // no space inside
             | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
             | "(" expr "," expr { "," expr } ")" | "[" [expr { "," expr } [","]] "]"
             | "{" "}" | "{" field "=" block { ";" | line break … } "}"
@@ -706,6 +706,7 @@ accessor    = "." name { "." name }             // no space inside
                                             // a head an import exposes as `plugin head`, with an
                                             // argument or a body; `cli` with its body
 head_arg    = name | Con | Number | String | "." | "(" { token } ")"   // on the head's line
+accessor    = step { step }                     // no space inside
 do_stmt     = bind { "and" bind } | "if" expr | statement
 bind        = or_pattern "<-" expr
 clause_list = for_clause { ";" | line break | before "if" … for_clause }
@@ -796,6 +797,35 @@ let cities users = List.map .address.city users
 
 name_of : User -> String
 let name_of user = user |> .name
+```
+
+A step written `.?name` is optional: it reads a field of the `Option` right
+before it. On `Some r` it reads `r.name` and the path goes on; on `None` the
+whole path is `None`, and no step after it is read. Rooted or an accessor, the
+path means the same: `user.address.?city`, `user |> .address.?city`,
+`maybe_user |> .?address.?city`. A path with an optional step is the `Option`
+of what its last step reads, wrapped once however many `.?` it has (see
+[Records](../types/#records)). Each `.?` takes off one `Option`, and a plain
+step after it reads inside its `Some`: `.address.?street.name`. The root is
+evaluated once, and a `None` ends only the path: the next statement runs. A
+path ends at the parenthesis around a value, at a binding, an application and
+a new `|>`: `(maybe_user.?address).?city` and
+`maybe_user |> .?address |> .?city` read `city` of an `Option Address` that
+one `.?` left, and are `FLICK-T003`. Parentheses around the accessor itself,
+as in `(.?address.?city)`, change nothing inside it. `value?.field` is the
+postfix `?` followed by a plain field, so a `None` returns from the function;
+`value.?field` returns from nothing and is an `Option`. A `?` after a path
+applies to its result: `value.?field?` is `(value.?field)?`.
+
+```flick
+type alias Address = { city : Option String }
+type alias User = { name : String; address : Option Address }
+
+city : Option User -> Option (Option String)
+let city maybe_user = maybe_user |> .?address.?city
+
+city_of : User -> Option (Option String)
+let city_of user = user.address.?city
 ```
 
 `if` is an expression; without `else` it is `Unit`, and so must be its `then` branch (an `else ()` gets the warning `FLICK-T028`). A branch in braces holds statements: `if a > b then { low = b; high = a }`. `ignore e` discards a non-`Unit`

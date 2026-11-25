@@ -63,6 +63,7 @@ module.exports = grammar({
       $.keyword,
       $.boolean,
       $.member,
+      $._optional_member,
       $.identifier,
       $.constructor,
       $.number,
@@ -109,7 +110,7 @@ module.exports = grammar({
     )),
     _condition_token: $ => choice(
       $.parens, $.brackets, $.braces, $.label, $.identifier, $.constructor, $.boolean,
-      $.number, $.string, $.raw_string, $.multiline_string, $.member,
+      $.number, $.string, $.raw_string, $.multiline_string, $.member, $._optional_member,
       alias(choice(...KEYWORDS.filter(k => !['do', 'let', 'module', 'import', 'type', 'service', 'class', 'instance'].includes(k))), $.keyword),
       alias(choice(...OPERATORS.filter(k => ![',', ';', '='].includes(k))), $.operator),
     ),
@@ -142,6 +143,11 @@ module.exports = grammar({
 
     // `.name` is a field or module member even when it spells a keyword
     member: _ => token(seq('.', /[a-z_][A-Za-z0-9_]*/)),
+    // `.?name`, an optional step: `.?` is an operator, the name right after it a member
+    _optional_member: $ => seq(
+      alias('.?', $.operator),
+      alias(token.immediate(/[a-z_][A-Za-z0-9_]*/), $.member),
+    ),
 
     _identifier: _ => /[a-z_][A-Za-z0-9_]*/,
     identifier: $ => choice(

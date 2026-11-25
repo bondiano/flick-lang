@@ -10,6 +10,7 @@ mod foreign;
 mod manifests;
 mod mutable;
 mod operators;
+mod optional_fields;
 mod privacy;
 mod proof_completion;
 mod proof_hover;

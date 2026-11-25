@@ -164,6 +164,7 @@ The reduction is specified normatively in `elaboration.md`. This table gives the
 | `f >> g` | `let f′ = f in let g′ = g in λx. g′ (f′ x)`, with fresh `f′`, `g′` of monomorphic types, as λ binds them; a chain `f >> g >> h` is one `λx. h′ (g′ (f′ x))` |
 | `g << f` | `let g′ = g in let f′ = f in λx. g′ (f′ x)`: the operands bound left to right, as written |
 | Accessor `.ℓ₁.….ℓₙ` | `λx. x.ℓ₁.….ℓₙ`, with a fresh `x` no source names; `.ℓ₁.….ℓₙ v` and `v \|> .ℓ₁.….ℓₙ` are that λ applied to `v`, typed with `v` first (see [a callee of unknown type is a pure arrow](#a-callee-of-unknown-type-is-a-pure-arrow)) |
+| Path `e s₁…sₙ` of steps `sᵢ` = `.ℓ` or `.?ℓ`, at least one `.?ℓ` | `⟦e; s₁…sₙ⟧`, where `⟦v; ε⟧ = Some v`, `⟦v; .ℓ s⟧ = ⟦v.ℓ; s⟧` and `⟦v; .?ℓ s⟧ = match v with None → None \| Some r → ⟦r.ℓ; s⟧` with a fresh `r`: each `v` is used once, so `e` is evaluated once and nothing after a `None`; an accessor with such steps is `λx. ⟦x; s₁…sₙ⟧`, as the row above. The compiler lowers a path to these `match`es (`ir/lower/fields.rs`), so the model, Lean and the backends see only existing forms, and Lean is unaffected |
 
 ### 1.5 Constants Γ₀
 

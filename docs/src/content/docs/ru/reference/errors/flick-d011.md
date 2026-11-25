@@ -1,6 +1,6 @@
 ---
 title: "FLICK-D011"
-source_hash: "c64ca6f1e98b6f08"
+source_hash: "2ea7db0d95b07e07"
 ---
 
 Часть или результат успешного выполнения endpoint-а записи, который наследует `HttpApi`, не имеет кодека. Его типу необходим один из следующих вариантов: значение с именем, соответствующим ему в snake_case в его модуле, которое является `PureCodec Json` этого типа (`credentials` для `Credentials`), `T.json` уточнённого типа, `String.json` встроенного типа или `deriving Schema`, чей JSON-кодек декодирует этот тип. Значение с таким именем, но другого типа, не является кодеком для него.
@@ -9,4 +9,17 @@ source_hash: "c64ca6f1e98b6f08"
 type alias Credentials = { authorization : Option String }
   deriving Schema
 // was: a record without `deriving Schema` and no `credentials`
+```
+
+JSON-кодек схемы записывает `None` и `Some None` одинаково, как `null`, поэтому тип, в котором есть `Option (Option a)`, не получает кодек из своей схемы: значение, названное по типу, должно различать их, как это делает `Codec.tagged_option`.
+
+```flick
+type alias Patch = { bio : Option (Option String) }
+  deriving Schema
+
+patch : PureCodec Json Patch
+let patch = codec Patch.schema {
+  bio = field "bio" (Codec.tagged_option (Codec.tagged_option String.json))
+}
+// was: `Patch` with its schema alone
 ```
