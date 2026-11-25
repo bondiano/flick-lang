@@ -1,4 +1,4 @@
-module App exposing (main, counted, found, parity)
+module App exposing (main, counted, found, parity, empty, evens)
 
 say : String -> Unit
 foreign pure say from global "print"
@@ -38,6 +38,10 @@ let counted = say_float (count ["a", "b", "c", "d"])
 let found = say (last ["x", "y", "z"])
 
 let parity = say (if even ["a", "b", "c"] then "even" else "odd")
+
+let empty = say (last [])
+
+let evens = say (if even ["a", "b"] then "even" else "odd")
 
 main : Unit -> Unit
 let main () = ()
