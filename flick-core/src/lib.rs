@@ -28,6 +28,7 @@ pub mod plugin;
 pub mod project;
 #[cfg(feature = "ide")]
 pub mod projection;
+pub mod repl;
 pub mod resolve;
 pub mod types;
 

@@ -21,7 +21,7 @@ const LAYERS: &[&[&str]] = &[
     ],
     &["ir", "opt", "codegen", "effects"],
     &["project"],
-    &["build", "projection"],
+    &["build", "projection", "repl"],
     &["ide"],
 ];
 
