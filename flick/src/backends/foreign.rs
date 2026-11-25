@@ -35,7 +35,9 @@ pub(crate) fn foreign(project: &Project) -> Foreign {
     let Some(backend) = load(&pin, &bytes) else {
         return Foreign::default();
     };
-    keep(&pin.sha256, &backend.package_files());
+    if package_patterns(&pin, &backend).is_none() {
+        return Foreign::default();
+    }
     let options = [
         OptionValue {
             key: "root".into(),
@@ -143,8 +145,9 @@ pub(crate) fn package_inputs(
     let Some(backend) = load(&pin, &bytes) else {
         return Vec::new();
     };
-    let patterns = backend.package_files();
-    keep(&pin.sha256, &patterns);
+    let Some(patterns) = package_patterns(&pin, &backend) else {
+        return Vec::new();
+    };
     if patterns.is_empty() {
         return Vec::new();
     }
@@ -200,8 +203,9 @@ pub(crate) fn package_dirs(project: &Project) -> Vec<String> {
         let Some(backend) = load(&pin, &bytes) else {
             return Vec::new();
         };
-        let patterns = backend.package_files();
-        keep(&pin.sha256, &patterns);
+        let Some(patterns) = package_patterns(&pin, &backend) else {
+            return Vec::new();
+        };
         patterns
     };
     packages::top_dirs(&patterns)
@@ -441,9 +445,20 @@ fn cached(sha256: &str) -> Option<Vec<String>> {
     serde_json::from_slice(&fs::read(patterns_path(sha256)?).ok()?).ok()
 }
 
+/// The package file patterns of `backend`, kept by its digest only when it
+/// answered: a failed call is not an answer that it reads no files.
+fn package_patterns(pin: &BackendPin, backend: &WasmBackend) -> Option<Vec<String>> {
+    let patterns = backend.try_package_files().ok()?;
+    keep(&pin.sha256, &patterns);
+    Some(patterns)
+}
+
 fn keep(sha256: &str, patterns: &[String]) {
     if let (Some(path), Ok(bytes)) = (patterns_path(sha256), serde_json::to_vec(patterns)) {
         let _ = path.parent().map(fs::create_dir_all);
         let _ = saved::write(&path, &bytes);
     }
 }
+
+#[cfg(test)]
+mod tests;
