@@ -73,7 +73,9 @@ impl Loader<'_> {
             return Ok(None);
         }
         let bytes = self.host.read(path)?;
-        let (file, utf8) = self.sources.add_bytes(self.host.display(path), bytes);
+        // a map kept across runs gives an unchanged module its id again, which
+        // the module cache needs to reuse it
+        let (file, utf8) = self.sources.intern_bytes(self.host.display(path), bytes);
         self.diagnostics.extend(utf8);
         let loader = self.loader_of(path);
         let mut root = self.root_of(path);

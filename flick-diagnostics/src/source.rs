@@ -93,6 +93,24 @@ impl SourceMap {
         }
     }
 
+    /// [`SourceMap::add_bytes`], or the file added last under `path` when it
+    /// holds exactly `bytes`: a map kept across runs gives an unchanged
+    /// file the id it had, so what was checked under that id can be reused.
+    pub fn intern_bytes(
+        &mut self,
+        path: impl Into<String>,
+        bytes: Vec<u8>,
+    ) -> (FileId, Option<Diagnostic>) {
+        let path = path.into();
+        let same = (self.files.iter().enumerate().rev())
+            .find(|(_, f)| f.path == path)
+            .filter(|(_, f)| f.text.as_bytes() == bytes.as_slice());
+        match same {
+            Some((index, _)) => (FileId::new(offset(index)), None),
+            None => self.add_bytes(path, bytes),
+        }
+    }
+
     pub fn get(&self, id: FileId) -> &SourceFile {
         &self.files[id.index() as usize]
     }
@@ -158,5 +176,26 @@ mod tests {
 
         let (_, diag) = map.add_bytes("ok.fl", b"fine".to_vec());
         assert!(diag.is_none());
+    }
+
+    #[test]
+    fn an_unchanged_file_keeps_its_id_and_a_changed_one_gets_a_new_one() {
+        let mut map = SourceMap::default();
+        let (a, _) = map.intern_bytes("a.fl", b"one".to_vec());
+        let (b, _) = map.intern_bytes("b.fl", b"two".to_vec());
+        assert_eq!(map.intern_bytes("a.fl", b"one".to_vec()).0, a);
+        let (edited, _) = map.intern_bytes("a.fl", b"one!".to_vec());
+        assert_ne!(edited, a);
+        assert_eq!(map.get(edited).text, "one!");
+        // the newest file of a path is the one compared
+        let (back, _) = map.intern_bytes("a.fl", b"one".to_vec());
+        assert_ne!(back, a);
+        assert_eq!(map.intern_bytes("b.fl", b"two".to_vec()).0, b);
+        // invalid UTF-8 is stored lossily, so it is never the same file
+        let (bad, diag) = map.intern_bytes("c.fl", b"\xff".to_vec());
+        assert!(diag.is_some());
+        let (again, diag) = map.intern_bytes("c.fl", b"\xff".to_vec());
+        assert!(diag.is_some());
+        assert_ne!(again, bad);
     }
 }
