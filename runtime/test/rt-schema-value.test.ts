@@ -3,9 +3,25 @@ import { test } from "node:test";
 import { err, none, ok, some } from "../src/core/data.ts";
 import {
   schemaAdtOf, schemaCase, schemaError, schemaLazyOf, schemaList,
-  schemaNumber, schemaOption, schemaRecordOf, schemaRefinedOf, schemaResult,
+  schemaInt, schemaNumber, schemaOption, schemaRecordOf, schemaRefinedOf, schemaResult,
   schemaString, schemaTupleOf, schemaValidate,
 } from "../src/rt/schema.ts";
+
+test("record schemas decode and encode a `__proto__` field as an own data field", () => {
+  const record = schemaRecordOf([["name", schemaString], ["__proto__", schemaRecordOf([["x", schemaInt]])]]);
+  const input: unknown = JSON.parse('{"name":"a","__proto__":{"x":1}}');
+  for (const result of [record.decode(input), record.encode(input)]) {
+    assert.equal(result._tag, "Success");
+    const out = result._tag === "Success" ? result.success : undefined;
+    assert.ok(typeof out === "object" && out !== null);
+    assert.equal(Object.getPrototypeOf(out), Object.prototype);
+    assert.deepEqual(Object.keys(out), ["__proto__", "name"]);
+    assert.deepEqual(Object.getOwnPropertyDescriptor(out, "__proto__"),
+      { value: { x: 1 }, writable: true, enumerable: true, configurable: true });
+    assert.deepEqual(Object.getOwnPropertyDescriptor(out, "name"),
+      { value: "a", writable: true, enumerable: true, configurable: true });
+  }
+});
 
 test("composite runtime witnesses accept non-finite Floats while their JSON encoders reject them", () => {
   const number = schemaLazyOf("Number", () => schemaNumber);
