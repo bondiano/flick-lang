@@ -20,6 +20,12 @@ lua-component: (backend-component "lua")
 lua-probes:
     node backends/lua/probes/run.mjs
 
+# The Lua fixtures, built through the committed component with the e2e
+# compiler and run on the same pinned hosts; an error is checked at the
+# Flick line its chunk's source map gives.
+lua-run: e2e-compiler
+    node backends/lua/fixtures/run.mjs {{flick}}
+
 # Update the component `name` distributed with every compiler binary;
 # CI only checks that a rebuild reproduces it.
 update-component name: (backend-component name)

@@ -115,10 +115,12 @@ fn a_module_loads_after_the_modules_it_uses() {
             "_flick/List.lua",
             "_flick/List.lua.map",
             "App.lua",
-            "App.lua.map"
+            "App.lua.map",
+            "chunks.txt"
         ]
     );
     let text = |i: usize| String::from_utf8(built.artifacts[i].bytes.clone()).expect("UTF-8");
+    assert_eq!(text(4), "_flick/List.lua\nApp.lua\n", "the load order");
     assert_eq!(
         text(0),
         "local _, ns = ...\nlocal M = {}\nns.List = M\nM.id = function(x)\n  return x\nend\n"

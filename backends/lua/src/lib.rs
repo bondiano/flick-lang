@@ -130,11 +130,17 @@ impl Backend for Lua {
                     &[],
                     "Allow the LuaJIT FFI, which keeps Int64 and UInt64 exact (needs `dialect = \"luajit\"`).",
                 ),
+                // what the build is, as on the other targets: a Lua program
+                // is loaded by its host, so it has no launch to run
+                option(
+                    "kind",
+                    ValueKind::Text,
+                    "library",
+                    &["library"],
+                    "Artifact kind: a host library (library), which World of Warcraft or LÖVE loads and calls.",
+                ),
             ],
-            // launches would run on a `lua` runtime, which the host has no
-            // tool for: a Lua program runs in WoW or LÖVE. So a build needs
-            // no launch, and `flick run` is refused before it starts
-            launch_runtimes: vec!["lua".into()],
+            launch_runtimes: vec![],
             host_tools: vec![],
             projections: vec![],
             stages_by_class_option: None,
@@ -163,8 +169,11 @@ impl Backend for Lua {
         request: &BuildRequest,
         inputs: &mut dyn Inputs,
     ) -> Result<BuildResult, Vec<Diagnostic>> {
-        let (program, reached) = check::check(request)?;
         let name = format!("lua/{}", request.target.environment.platform);
+        if let Some(refused) = unlaunched(request, &name) {
+            return Err(vec![refused]);
+        }
+        let (program, reached) = check::check(request)?;
         let target = emit::Target {
             name: &name,
             dialect: profiles::dialect(&request.target.tags),
@@ -178,6 +187,24 @@ impl Backend for Lua {
             diagnostics: vec![],
         })
     }
+}
+
+/// The refusal of a command that would run the program: its host runs it.
+fn unlaunched(request: &BuildRequest, target: &str) -> Option<Diagnostic> {
+    let command = (request.target.options.iter())
+        .find(|o| o.key == "command")
+        .map(|o| o.value.as_str())?;
+    if !matches!(command, "run" | "test" | "dev") {
+        return None;
+    }
+    Some(refusal(
+        format!(
+            "`flick {command}` is not available on the {target} target yet: a Lua program runs \
+             in its host, World of Warcraft or LÖVE, which loads the chunks `flick build` writes"
+        ),
+        None,
+        vec![],
+    ))
 }
 
 #[cfg(feature = "guest")]

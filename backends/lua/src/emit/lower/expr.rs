@@ -274,6 +274,9 @@ impl Lowering<'_> {
         if let Some(built) = self.constructed(e) {
             return built;
         }
+        if let Some(called) = self.host_application(e) {
+            return called;
+        }
         let (f, a) = if *arg_first {
             let mut values = self.ordered(&[arg, func]);
             let f = values.pop().expect("two operands");

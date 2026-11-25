@@ -1,0 +1,11 @@
+module Lib exposing (shout, ready)
+
+import Base
+
+say : String -> Unit
+foreign pure say from global "print"
+
+let ready = say "Lib initializes"
+
+shout : String -> String
+let shout w = if w == Base.word then "BASE" else w

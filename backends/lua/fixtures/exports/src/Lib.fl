@@ -1,0 +1,15 @@
+module Lib exposing (Shape(..), area, describe)
+
+type Shape = Circle Float | Rect Float Float
+
+area : Shape -> Float
+let area s =
+  match s with
+  | Circle r -> 3.0 * r * r
+  | Rect w h -> w * h
+
+describe : Shape -> String
+let describe s =
+  match s with
+  | Circle _ -> "circle"
+  | Rect _ _ -> "rect"

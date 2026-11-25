@@ -5,7 +5,7 @@ use std::iter;
 
 use flick_backend_support::names::{instance, tag};
 use flick_ir::{
-    Binding, Constructor, Dict, Expr as IrExpr, ExprKind as Ir, ItemKind, Lang, Rep, Span, Stage,
+    Constructor, Dict, Expr as IrExpr, ExprKind as Ir, ItemKind, Lang, Rep, Span, Stage,
 };
 
 use super::super::ast::{Block, Expr, ExprKind, Field, Function, LastKind, Name, Stmt, StmtKind};
@@ -92,14 +92,10 @@ impl<'p> Lowering<'p> {
     pub(super) fn global(&mut self, module: &str, name: &str, span: Span) -> Expr {
         match self.items.get(&(module, name)) {
             Some(ItemKind::Foreign(f)) => {
-                let what = format!("`{module}.{}`", f.source_name.as_ref().unwrap_or(&f.name));
-                let why = match &f.binding {
-                    Binding::Module { from, .. } if from.starts_with("flick:") => {
-                        "the Lua kernel table refuses it: the Lua primitive kernel is not implemented"
-                    }
-                    _ => "foreign functions need the Lua value ABI, which is not implemented",
-                };
-                return self.unsupported(span, &what, why);
+                if let Err(why) = self.host_function(f) {
+                    let what = format!("`{module}.{}`", f.source_name.as_ref().unwrap_or(&f.name));
+                    return self.unsupported(span, &what, why);
+                }
             }
             Some(ItemKind::Service { .. }) => {
                 return self.unsupported(span, &format!("the service `{module}.{name}`"), RUNTIME);

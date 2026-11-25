@@ -1,0 +1,14 @@
+module App exposing (main, first, second)
+
+import Base
+import Lib
+
+say : String -> Unit
+foreign pure say from global "print"
+
+let first = say "App initializes"
+
+let second = say (Lib.shout Base.word)
+
+main : Unit -> Unit
+let main () = ()

@@ -1,0 +1,16 @@
+module App exposing (main, before, boom, after)
+
+say : String -> Unit
+foreign pure say from global "print"
+
+fail : String -> Unit
+foreign pure fail from global "error"
+
+let before = say "before the failure"
+
+let boom = fail "initialization failed"
+
+let after = say "never printed"
+
+main : Unit -> Unit
+let main () = ()

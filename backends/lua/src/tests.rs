@@ -7,8 +7,8 @@ use std::path::Path;
 
 use flick_backend::{
     Abi, Backend, BackendId, BackendPin, BuildRequest, Entry, Environment, InputError, Inputs,
-    Mode, ModuleInput, ModuleRole, Profile, Symbol, TargetRequest, validate_foreign_metadata,
-    validate_options, validate_tags, validate_value_abi,
+    Mode, ModuleInput, ModuleRole, OptionValue, Profile, Symbol, TargetRequest,
+    validate_foreign_metadata, validate_options, validate_tags, validate_value_abi,
 };
 use flick_ir::{
     Adapter, Arith, BinOp, Binding, Exports, Expr, ExprKind, FileId, Foreign, ForeignMode,
@@ -537,14 +537,14 @@ fn generation_writes_the_chunks_of_a_clean_check() {
         .generate(&clean("love"), &mut NoInputs)
         .expect("generated");
     let paths: Vec<&str> = built.artifacts.iter().map(|a| a.path.as_str()).collect();
-    assert_eq!(paths, ["App.lua", "App.lua.map", "main.lua"]);
+    assert_eq!(paths, ["App.lua", "App.lua.map", "chunks.txt", "main.lua"]);
     let text = |i: usize| String::from_utf8(built.artifacts[i].bytes.clone()).expect("UTF-8");
     assert_eq!(
         text(0),
         "local _, ns = ...\nlocal M = {}\nns.App = M\nM.main = function(_)\n  return true\nend\n"
     );
     assert_eq!(
-        text(2),
+        text(3),
         "local ns = {}\nassert(love.filesystem.load(\"App.lua\"))(nil, ns)\n"
     );
     // WoW loads the files its `.toc` lists: no `main.lua`
@@ -552,7 +552,7 @@ fn generation_writes_the_chunks_of_a_clean_check() {
         .generate(&clean("wow-retail"), &mut NoInputs)
         .expect("generated");
     let paths: Vec<&str> = wow.artifacts.iter().map(|a| a.path.as_str()).collect();
-    assert_eq!(paths, ["App.lua", "App.lua.map"]);
+    assert_eq!(paths, ["App.lua", "App.lua.map", "chunks.txt"]);
     let again = Lua
         .generate(&clean("wow-retail"), &mut NoInputs)
         .expect("generated");
@@ -560,6 +560,29 @@ fn generation_writes_the_chunks_of_a_clean_check() {
         wow.artifacts, again.artifacts,
         "a rebuild writes the same bytes"
     );
+}
+
+#[test]
+fn a_command_that_would_run_the_program_is_refused() {
+    for command in ["run", "test", "dev"] {
+        let mut clean = request(
+            "wow-retail",
+            &["lua", "lua51"],
+            vec![function("main", expr(ExprKind::Lit(Lit::Unit), 0, 2))],
+        );
+        clean.target.options.push(OptionValue {
+            key: "command".into(),
+            value: command.into(),
+        });
+        let refused = Lua.generate(&clean, &mut NoInputs).expect_err("refused");
+        assert_eq!(refused.len(), 1, "{refused:?}");
+        assert_eq!(refused[0].code, "P012");
+        let expected = format!(
+            "`flick {command}` is not available on the lua/wow-retail target yet: a Lua program \
+             runs in its host, World of Warcraft or LÖVE"
+        );
+        assert!(refused[0].message.contains(&expected), "{refused:?}");
+    }
 }
 
 #[test]

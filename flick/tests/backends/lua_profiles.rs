@@ -186,6 +186,8 @@ fn a_build_writes_a_chunk_per_module_and_a_rebuild_is_identical() {
         "{app}"
     );
     assert!(app.contains("M.area = function(s)"), "{app}");
+    let order = fs::read_to_string(root.join("dist/chunks.txt")).expect("the load order");
+    assert_eq!(order, "App.lua\n");
     let map = fs::read_to_string(root.join("dist/App.lua.map")).expect("the map");
     assert!(map.contains(r#""sources":["src/App.fl"]"#), "{map}");
     // a build that generates again writes the same bytes
@@ -257,6 +259,30 @@ fn what_cannot_be_generated_is_refused_at_its_source_and_keeps_the_output() {
         "{out:?}"
     );
     assert!(!fresh.join("dist").exists(), "nothing is written");
+}
+
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn run_and_test_are_refused_because_the_host_runs_the_program() {
+    let root = lua_project("lua_profile_run", "lua/love", SHAPES, &[]);
+    for verb in ["run", "test"] {
+        let out = flick_in(&root, &[verb, "--diagnostics", "json", "--offline"]);
+        assert_eq!(out.status.code(), Some(1), "{verb}: {out:?}");
+        let found = diagnostics(&out.stderr, "FLICK-P012");
+        let expected = format!(
+            "`flick {verb}` is not available on the lua/love target yet: a Lua program runs in \
+             its host, World of Warcraft or LÖVE"
+        );
+        assert!(
+            found
+                .iter()
+                .any(|d| d["message"].as_str().is_some_and(|m| m.contains(&expected))),
+            "{verb}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        // the runtime is not what is missing
+        assert!(!String::from_utf8_lossy(&out.stderr).contains("runtime on PATH"));
+    }
 }
 
 #[test]

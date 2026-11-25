@@ -350,12 +350,14 @@ jobs:
           '
 
   # the Lua profile probes on the hosts the flake pins: Lua 5.1.5, LuaJIT 2.1
-  # with the JIT on and off, LÖVE 11.5 headless. A pull request runs them
-  # when it changes the Lua backend, the flake or this workflow; a push to
-  # main, the nightly run and a release always do
+  # with the JIT on and off, LÖVE 11.5 headless; then the Lua fixtures, built
+  # through the committed component and run there. A pull request runs them
+  # when it changes the Lua backend, what its component links or its host
+  # drives, the flake or this workflow; a push to main, the nightly run and a
+  # release always do
   lua-probes:
     runs-on: ubuntu-26.04
-    timeout-minutes: 15
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
       - name: Whether the Lua backend changed
@@ -365,7 +367,7 @@ jobs:
         run: |
           changed=true
           if [ -n "$BASE" ] && git fetch --depth=1 origin "$BASE" &&
-            git diff --quiet FETCH_HEAD HEAD -- backends/lua flake.nix flake.lock just/backends.just .github/workflows/ci.yml; then
+            git diff --quiet FETCH_HEAD HEAD -- backends/lua flick-backend-support/src flick-backend flick-ir flick-pretty flick/src/backends flake.nix flake.lock justfile just/backends.just .github/workflows/ci.yml; then
             changed=false
           fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
@@ -397,6 +399,12 @@ jobs:
           } >> "$GITHUB_ENV"
       - if: steps.lua.outputs.changed == 'true'
         run: just lua-probes
+      - if: steps.lua.outputs.changed == 'true'
+        run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        if: steps.lua.outputs.changed == 'true'
+      - if: steps.lua.outputs.changed == 'true'
+        run: just lua-run
 
   # the reference model of λFlick (flick-model) against tests/run/model.txt,
   # every pass fixture and docs example, the counted Host/FFI bridge suites,
