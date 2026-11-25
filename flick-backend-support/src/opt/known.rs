@@ -306,28 +306,47 @@ fn moved(
     });
 }
 
-/// Binds each part of the construction `data` that is not a name or a
-/// literal to a local of its own, in the order the parts are written.
-fn name_parts(data: &mut Expr, fresh: &mut usize, parts: &mut Vec<Stmt>) {
-    let ExprKind::App { func, arg, .. } = &mut data.kind else {
-        return;
-    };
-    name_parts(func, fresh, parts);
-    if matches!(
-        arg.kind,
-        ExprKind::Lit(_) | ExprKind::Local(_) | ExprKind::Con(_)
-    ) {
-        return;
+/// Binds each part of the construction `data` that is neither a name, a
+/// literal nor data itself to a local of its own, in the order the parts
+/// are evaluated.
+pub(super) fn name_parts(data: &mut Expr, fresh: &mut usize, parts: &mut Vec<Stmt>) {
+    match &mut data.kind {
+        ExprKind::App { func, arg, .. } => {
+            name_parts(func, fresh, parts);
+            name_part(arg, fresh, parts);
+        }
+        ExprKind::Tuple(items) | ExprKind::List(items) => {
+            for item in items {
+                name_part(item, fresh, parts);
+            }
+        }
+        ExprKind::Record(fields) => {
+            for (_, v) in fields {
+                name_part(v, fresh, parts);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn name_part(part: &mut Expr, fresh: &mut usize, parts: &mut Vec<Stmt>) {
+    match part.kind {
+        ExprKind::Lit(_) | ExprKind::Local(_) | ExprKind::Con(_) => return,
+        ExprKind::Tuple(_) | ExprKind::List(_) | ExprKind::Record(_) => {
+            return name_parts(part, fresh, parts);
+        }
+        ExprKind::App { .. } if applied(part).is_some() => return name_parts(part, fresh, parts),
+        _ => {}
     }
     *fresh += 1;
     let name = format!("$p{fresh}");
-    let ty = arg.ty.clone();
-    let local = Expr::with_ty(ExprKind::Local(name.clone()), arg.span, ty.clone());
+    let ty = part.ty.clone();
+    let local = Expr::with_ty(ExprKind::Local(name.clone()), part.span, ty.clone());
     let bt = ty.map(|t| vec![(name.clone(), t)]).unwrap_or_default();
     parts.push(Stmt::let_typed(
         Pat::Bind(name),
         bt,
-        mem::replace(&mut **arg, local),
+        mem::replace(part, local),
     ));
 }
 

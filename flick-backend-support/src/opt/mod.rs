@@ -235,7 +235,10 @@ fn optimize_inner(
                 for _ in 0..STEPS {
                     let inlined =
                         inline::shaped(body, &foreign, &mut fresh, &mut Vec::new(), preserve_types);
-                    if !(inlined | known::branches(body, &mut fresh)) {
+                    if !(inlined
+                        | known::branches(body, &mut fresh)
+                        | devirt::named_scrutinees(body, &mut fresh, lang, preserve_types))
+                    {
                         break;
                     }
                     simplify_with(body, &arities, lang, preserve_types);
@@ -316,7 +319,7 @@ fn pass(e: &mut Expr, arity: Arity, lang: &crate::Known<'_>, preserve_types: boo
     changed |= specialize::operator(e, lang, preserve_types)
         | fold::fold(e, lang, preserve_types)
         | beta::beta(e, preserve_types)
-        | devirt::known_match(e, preserve_types)
+        | devirt::known_match(e, lang, preserve_types)
         | lazy::cells(e, lang);
     changed |= known::named_again(e);
     if let ExprKind::Block(stmts, result) = &mut e.kind {

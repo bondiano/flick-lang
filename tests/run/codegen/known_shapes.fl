@@ -1,0 +1,146 @@
+// Ordered guarded matches of data only some parts of which are known: the
+// arms are tried in source order, a guard runs only where its arm's pattern
+// matches, and an observable part of the data runs once, where it is written.
+module App.Main exposing (main)
+
+note : String -> Bool ->{Host.Console} Bool
+let note label value =
+  Platform.stdout_line ("note " ++ label ++ " " ++ show value)
+  value
+
+accept : Int -> Int ->{Host.Console} Bool
+let accept n limit =
+  Platform.stdout_line ("accept " ++ show n)
+  n > limit
+
+big : Bool -> String
+let big flag =
+  let pick = fun pair ->
+    match pair with
+    | (Some n, Ok true) when n > 10 -> "big and true"
+    | (Some n, Ok _) -> "some " ++ show n
+    | (None, Err e) -> "error " ++ e
+    | (_, Err _) -> "some error"
+    | (None, Ok b) -> "none " ++ show b
+  pick (Some 11, Ok flag)
+
+small : Bool -> String
+let small flag =
+  let pick = fun pair ->
+    match pair with
+    | (Some n, Ok true) when n > 10 -> "big and true"
+    | (Some n, Ok _) -> "some " ++ show n
+    | (None, Err e) -> "error " ++ e
+    | (_, Err _) -> "some error"
+    | (None, Ok b) -> "none " ++ show b
+  pick (Some 3, Ok flag)
+
+strict_big : Bool ->{Host.Console} String
+let strict_big flag =
+  let pick = fun pair ->
+    match pair with
+    | (Some n, Ok true) when n > 10 -> "big and true"
+    | (Some n, Ok _) -> "some " ++ show n
+    | (None, Err e) -> "error " ++ e
+    | (_, Err _) -> "some error"
+    | (None, Ok b) -> "none " ++ show b
+  pick (Some 11, Ok (note "big" flag))
+
+strict_small : Bool ->{Host.Console} String
+let strict_small flag =
+  let pick = fun pair ->
+    match pair with
+    | (Some n, Ok true) when n > 10 -> "big and true"
+    | (Some n, Ok _) -> "some " ++ show n
+    | (None, Err e) -> "error " ++ e
+    | (_, Err _) -> "some error"
+    | (None, Ok b) -> "none " ++ show b
+  pick (Some 3, Ok (note "small" flag))
+
+same : Bool ->{Host.Console} String
+let same flag =
+  match (Some 11, Ok (note "same" flag)) with
+  | (Some n, Ok true) when n > 10 -> "same"
+  | (Some _, Ok _) -> "same"
+  | _ -> "other"
+
+shadowed : Int -> Bool -> String
+let shadowed n flag =
+  match (Some 36, Ok flag) with
+  | (Some n, Ok true) when n > 10 -> "big " ++ show n
+  | (Some k, Ok _) -> show k ++ " not " ++ show n
+  | (None, _) -> "none"
+  | (_, Err _) -> "error"
+
+negative : Bool -> String
+let negative flag =
+  match (Some (-1), Ok flag) with
+  | (Some n, Ok true) when n > 10 -> "big and true"
+  | (Some n, Ok _) -> "some " ++ show n
+  | _ -> "other"
+
+nothing : Bool -> String
+let nothing flag =
+  match (None, Ok flag) with
+  | (Some n, Ok true) when n > 10 -> "big and true"
+  | (Some n, Ok _) -> "some " ++ show n
+  | (None, Err e) -> "error " ++ e
+  | (_, Err _) -> "some error"
+  | (None, Ok b) -> "none " ++ show b
+
+guarded : Int ->{Host.Console} String
+let guarded limit =
+  match (Some 3, limit) with
+  | (None, _) -> "none"
+  | (Some n, l) when accept n l -> "accepted"
+  | (Some n, _) -> "rejected " ++ show n
+
+throwing : Bool -> String
+let throwing flag =
+  match (Some 0, flag) with
+  | (Some n, true) when Int.unsafe_div 10 n > 1 -> "divided"
+  | _ -> "safe"
+
+tail : Int -> String
+let tail x =
+  match [x, 2, 3] with
+  | [_, ...rest] when (
+    match rest with
+    | [] -> true
+    | _ -> false
+  ) ->
+    "short"
+  | [_, _] -> "two"
+  | [_, b, ..._] when b > 5 -> "big second"
+  | [a, ...rest] -> "head " ++ show a ++ " then " ++ show rest
+  | [] -> "empty"
+
+priority : Bool -> String
+let priority flag =
+  match (Some 5, flag) with
+  | (Some 4, _) -> "four"
+  | (Some 5, true) | (Some 6, true) -> "five and true"
+  | (Some n, _) when n > 0 -> "positive"
+  | _ -> "other"
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let on = note "on" true
+  let off = note "off" false
+  Platform.stdout_line (big on)
+  Platform.stdout_line (big off)
+  Platform.stdout_line (small on)
+  Platform.stdout_line (strict_big on)
+  Platform.stdout_line (strict_big off)
+  Platform.stdout_line (strict_small on)
+  Platform.stdout_line (same off)
+  Platform.stdout_line (shadowed 3 on)
+  Platform.stdout_line (shadowed 3 off)
+  Platform.stdout_line (negative on)
+  Platform.stdout_line (nothing off)
+  Platform.stdout_line (guarded 1)
+  Platform.stdout_line (guarded 5)
+  Platform.stdout_line (throwing off)
+  Platform.stdout_line (tail 9)
+  Platform.stdout_line (priority on)
+  Platform.stdout_line (priority off)

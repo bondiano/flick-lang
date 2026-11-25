@@ -10,8 +10,9 @@ use std::collections::HashMap;
 use std::mem;
 
 use super::Generics;
+use super::known::name_parts;
 use super::specialize::{Generic, instantiate};
-use super::types::{match_type, subst_types};
+use super::types::{filter_binder_types, match_type, subst_types};
 use super::walk::{applied, rename, respan, size};
 use crate::ir::{Arm, Expr, ExprKind, ItemKind, Lit, Module, Pat, Stmt};
 use flick_ir::{Dict, Span, TypeRef, default_method};
