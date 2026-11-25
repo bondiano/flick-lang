@@ -12,7 +12,7 @@ use crate::ir::tests::check_text;
 use crate::types;
 use flick_backend_support::opt as portable;
 
-fn emit_js_with_reviewed_primitives(
+pub(super) fn emit_js_with_reviewed_primitives(
     text: &str,
     config: &portable::eval::EvalConfig,
 ) -> (String, portable::eval::EvalCounters) {
@@ -81,6 +81,8 @@ fn expected_live_primitives()
             "text_contains",
             NativePrimitive::StringContains,
         ),
+        ("List.Core", "length", NativePrimitive::ListLength),
+        ("List.Core", "get", NativePrimitive::ListGet),
     ]
 }
 
@@ -110,12 +112,20 @@ fn live_builtin_native_primitives_match_js_and_go_contracts() {
                     Some(want),
                     "rt={rt} bridge={bridge:?}: {module}.{name}"
                 );
+                // list primitives are folded over known lists, not evaluated
+                let listed = module == "List.Core";
                 assert_eq!(
                     prims.arity(module, name, &known),
-                    Some(want.arity()),
+                    (!listed).then_some(want.arity()),
+                    "rt={rt} bridge={bridge:?}: {module}.{name}"
+                );
+                assert_eq!(
+                    prims.list_primitive(module, name),
+                    listed.then_some(want),
                     "rt={rt} bridge={bridge:?}: {module}.{name}"
                 );
             }
+            assert!(prims.option_constructors().is_some());
             for &(module, name) in &[
                 ("Int", "unsafe_div"),
                 ("Int", "to_string"),
@@ -250,7 +260,11 @@ fn live_builtin_native_primitives_reject_foreign_mutations() {
         |f| f.adapter.result.nullable = true,
         |f| f.adapter.result.unit = true,
         |f| f.adapter.callbacks[0] = Some(1),
-        |f| f.adapter.copies.args[0] = true,
+        |f| f.adapter.copies.args[0] = !f.adapter.copies.args[0],
+        |f| {
+            let last = f.adapter.copies.args.last_mut().expect("an argument");
+            *last = !*last;
+        },
         |f| f.adapter.copies.result = !f.adapter.copies.result,
         |f| f.adapter.copies.callbacks[0] = Some((vec![], false)),
         |f| f.adapter.shapes[0] = Shape::Layer,

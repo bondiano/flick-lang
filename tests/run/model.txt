@@ -121,3 +121,4 @@ schema/prove
 schema/prove_imported
 codegen/bounded_eval
 codegen/known_shapes
+codegen/known_lists

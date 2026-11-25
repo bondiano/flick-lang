@@ -13,6 +13,7 @@
 //!   spares an object, and a `match` goes to where its data is known, so a
 //!   value built only to be taken apart is not built;
 //! - [`fold`]: literal expressions with exact JS semantics, constant branches;
+//! - [`shape`]: `List.length` and `List.get` of a list literal;
 //! - alias and constant propagation, and moving a pure value that cannot
 //!   throw to its one use;
 //! - [`fuse`]: `Seq` and `List` combinators of a `for` run in its loop;
@@ -41,6 +42,7 @@ mod lazy;
 #[cfg(feature = "native-project")]
 mod legacy_bare;
 mod project;
+mod shape;
 mod specialize;
 mod sroa;
 pub mod tuple_match;
@@ -237,7 +239,8 @@ fn optimize_inner(
                         inline::shaped(body, &foreign, &mut fresh, &mut Vec::new(), preserve_types);
                     if !(inlined
                         | known::branches(body, &mut fresh)
-                        | devirt::named_scrutinees(body, &mut fresh, lang, preserve_types))
+                        | devirt::named_scrutinees(body, &mut fresh, lang, preserve_types)
+                        | shape::lists(body, &mut fresh, primitives, preserve_types))
                     {
                         break;
                     }

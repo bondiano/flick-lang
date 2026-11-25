@@ -17,7 +17,7 @@ pub mod value;
 #[cfg(test)]
 mod tests;
 
-use flick_ir::Expr;
+use flick_ir::{Constructor, Expr};
 
 use crate::Known;
 pub use defs::DefTable;
@@ -229,6 +229,17 @@ pub trait PrimitiveEval {
         lang: &Known<'_>,
         budget: &mut EvalBudget,
     ) -> PrimitiveOutcome<'a>;
+
+    /// The reviewed `List.length` or `List.get` that `(module, name)` is,
+    /// which the folds of list literals apply instead of the evaluator.
+    fn list_primitive(&self, _module: &str, _name: &str) -> Option<NativePrimitive> {
+        None
+    }
+
+    /// The validated `Some` and `None` an `Option` is built of.
+    fn option_constructors(&self) -> Option<(&Constructor, &Constructor)> {
+        None
+    }
 }
 
 /// Default primitive hook that declines all foreign primitives, preserving
