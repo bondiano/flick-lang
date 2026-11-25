@@ -272,6 +272,13 @@ impl WasmBackend {
         .map(commands::template_descriptors)
     }
 
+    /// The project files the component reads to report its packages,
+    /// surfacing a failed call (a trap, an exhausted budget or a
+    /// cancellation) rather than an empty answer.
+    pub fn try_package_files(&self) -> Result<Vec<String>, String> {
+        self.command_call(&self.cancellation, |i, store| i.call_package_files(store))
+    }
+
     /// One request of a session, which `cancel` alone can stop.
     pub fn handle_cancellable(
         &self,
@@ -338,8 +345,7 @@ impl Backend for WasmBackend {
     }
 
     fn package_files(&self) -> Vec<String> {
-        self.command_call(&self.cancellation, |i, store| i.call_package_files(store))
-            .unwrap_or_default()
+        self.try_package_files().unwrap_or_default()
     }
 
     fn packages(
