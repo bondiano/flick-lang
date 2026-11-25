@@ -54,7 +54,7 @@ fn ir(decls: &str, name: &str) -> String {
 }
 
 /// The declaration of `name` in `js`, up to the blank line after it.
-fn decl<'a>(js: &'a str, name: &str) -> &'a str {
+pub(super) fn decl<'a>(js: &'a str, name: &str) -> &'a str {
     let start = format!("export const {name} = ");
     let at = js
         .find(&start)
@@ -147,20 +147,26 @@ headed : Int ->{Host.Console} Option Int\nlet headed x = List.head [note 6, x]\n
 
 #[test]
 fn a_folded_option_is_typed_by_its_element() {
-    use std::collections::BTreeSet;
-
-    use crate::types;
-    use flick_ir::Program;
-
-    let text = format!(
+    let printed = validated(&format!(
         "{HEAD}type alias Mon = {{ name : String; hp : Int }}\n\n\
          named : String -> Option String\nlet named s = List.get 1 [\"a\", s]\n\n\
          nameless : String -> Option String\nlet nameless s = List.get 2 [\"a\", s]\n\n\
          mon : String ->{{Host.Console}} Option Mon\n\
          let mon n = List.head [{{ name = n; hp = note 2 }}]\n\n\
          any : a -> Option a\nlet any x = List.get 0 [x]\n"
-    );
-    let (mut module, interface) = check_text("App", &text).expect("lowers");
+    ));
+    assert!(!printed.contains("List.Core.get"), "{printed}");
+}
+
+/// The printed IR of `text` optimized with the reviewed JS primitives,
+/// after the IR validator accepted it.
+pub(super) fn validated(text: &str) -> String {
+    use std::collections::BTreeSet;
+
+    use crate::types;
+    use flick_ir::Program;
+
+    let (mut module, interface) = check_text("App", text).expect("lowers");
     super::optimize_with_primitives(
         &mut module,
         &|name: &str| interface.exports_value(name),
@@ -169,7 +175,6 @@ fn a_folded_option_is_typed_by_its_element() {
         &js_prims(),
     );
     let printed = print(&module);
-    assert!(!printed.contains("List.Core.get"), "{printed}");
     let builtin = |m: &str| types::builtins().iter().any(|b| b.module == m);
     let mut files = BTreeSet::new();
     module.clone().each_span_mut(&mut |s| {
@@ -184,6 +189,7 @@ fn a_folded_option_is_typed_by_its_element() {
     };
     let problems = flick_ir::validate(&program, &builtin, &files);
     assert!(problems.is_empty(), "{problems:#?}\n{printed}");
+    printed
 }
 
 #[test]
@@ -214,16 +220,22 @@ fn option_constructors_stay_validated_for_get_without_int_parse() {
 /// prints `shown`.
 #[cfg(feature = "native-project")]
 fn go_main(decls: &str, shown: &str) -> String {
+    go_of(&format!(
+        "{HEAD}{decls}\nmain : Unit ->{{Host.Console; AppError}} Unit\nlet main () = Platform.stdout_line ({shown})\n"
+    ))
+}
+
+/// The Go of the module `App` written in `text`, optimized with the
+/// reviewed Go primitives.
+#[cfg(feature = "native-project")]
+pub(super) fn go_of(text: &str) -> String {
     use std::collections::BTreeMap;
 
     use crate::build::go::bindings;
     use crate::codegen::go;
     use crate::ir::Module;
 
-    let text = format!(
-        "{HEAD}{decls}\nmain : Unit ->{{Host.Console; AppError}} Unit\nlet main () = Platform.stdout_line ({shown})\n"
-    );
-    let (mut ir, interface) = check_text("App", &text).expect("lowers");
+    let (mut ir, interface) = check_text("App", text).expect("lowers");
     let table = lang_items();
     let known = Known::of(&table);
     let go_bindings = bindings();
@@ -259,7 +271,7 @@ fn go_main(decls: &str, shown: &str) -> String {
 
 /// The Go function of `name` in `go`, up to the next function.
 #[cfg(feature = "native-project")]
-fn go_fn<'a>(go: &'a str, name: &str) -> &'a str {
+pub(super) fn go_fn<'a>(go: &'a str, name: &str) -> &'a str {
     let at = go
         .find(&format!("func F_App__{name}("))
         .unwrap_or_else(|| panic!("no {name} in\n{go}"));

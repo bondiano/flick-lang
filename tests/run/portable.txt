@@ -347,4 +347,5 @@ runtime/result_block_causes
 codegen/bounded_eval
 codegen/known_shapes
 codegen/known_lists
+codegen/known_projections
 runtime/control_kernel
