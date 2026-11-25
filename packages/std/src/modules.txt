@@ -76,6 +76,7 @@ Filter
 Function
 Trie
 HashRing
+PriorityQueue
 Graph.Types
 Graph.Build
 Graph.Query

@@ -190,8 +190,8 @@ Laws:
 ## Class-to-instance matrix
 
 Shipped collections are implemented in `core` and `std`. Planned collections
-(`OrderedMap`, `OrderedSet`, `PriorityQueue`, tracked in issues `#735` and
-`#736`) are included to show how they fit the same hierarchy.
+(`OrderedMap` and `OrderedSet`, tracked in issue `#735`) are included to show
+how they fit the same hierarchy.
 
 | Collection | Element / Entry (`ToSeq`) | `Functor` | `Foldable` | `Traversable` | `Semigroup` | `Monoid` | `Iterable` | `ToSeq` | `Sized` | `Indexed` | `Keyed` | `Member` |
 | - | - | - | - | - | - | - | - | - | - | - | - | - |
@@ -204,9 +204,9 @@ Shipped collections are implemented in `core` and `std`. Planned collections
 | `HashSet w a` | `a` | **No** | `HashSet w` | No | Yes | `Hash a =>` (`Canonical`) | No | Yes | Yes | No | No | Yes (witness) |
 | `Trie v` | `(String, v)` | Yes | Yes | Yes | Yes | Yes | No | Yes | Yes | No | `(String, v)` | No |
 | `Bytes` | `Int` (`0..255`) | No | No | No | Yes | Yes | No | Yes | Yes | Yes | No | Yes (`Int`) |
+| `PriorityQueue p a` | `(p, a)` | No | No | No | `Ord p =>` | `Ord p =>` | No | `Ord p =>` | Yes | No | No | No |
 | *`OrderedMap k v` (#735)* | `(k, v)` | `OrderedMap k` | `OrderedMap k` | `OrderedMap k` | Yes | `Ord k =>` | No | Yes | Yes | No | `(k, v)` | No |
 | *`OrderedSet a` (#735)* | `a` | **No** | Yes | No | Yes | `Ord a =>` | No | Yes | Yes | No | No | Yes (`Ord`) |
-| *`PriorityQueue p a` (#736)* | `(p, a)` | `PriorityQueue p` | `PriorityQueue p` | No | Yes | `Ord p =>` | No | Yes | Yes | No | No | No |
 
 `List`, `Seq`, `NonEmpty`, and `Chunk` also implement `Applicative` and
 `Monad` (and `List`, `Seq`, and `Chunk` implement `Alternative`).
@@ -223,9 +223,15 @@ Shipped collections are implemented in `core` and `std`. Planned collections
 | `HashSet w a` | 5-bit HAMT hash order (low to high), insertion order on collisions | `O(1) + O(k)` | `O(1)` | `member` `O(1)` avg | `O(m)` | `fold` `O(n)` |
 | `Trie v` | ascending UTF-16 key order | `O(1) + O(k * L)` | `O(1)` | `lookup` `O(L)` | `O(m * L)` right-biased | `O(n)` / `O(n * L)` |
 | `Bytes` | byte index `0 .. n-1` | `O(1) + O(k)` | `O(1)` | `at` `O(1)`, `member` `O(n)` (`O(1)` outside `0..255`) | `O(n + m)` | — |
+| `PriorityQueue p a` | ascending `Ord p`, insertion order on equal priorities | `O(1) + O(k log n)` | `O(1)` | — | `O(m + log n)` left-first | — |
 | *`OrderedMap k v` (#735)* | ascending `Ord k` | `O(log n) + O(k)` | `O(1)` | `lookup` `O(log n)` | `O(m log(n + m))` right-biased | `O(n)` / `O(n log n)` |
 | *`OrderedSet a` (#735)* | ascending `Ord a` | `O(log n) + O(k)` | `O(1)` | `member` `O(log n)` | `O(m log(n + m))` | `fold` `O(n)` |
-| *`PriorityQueue p a` (#736)* | ascending `Ord p`, FIFO on equal priorities | `O(1) + O(k log n)` | `O(1)` | — | `O(log(n + m))` | `map` `O(n)`, `fold` `O(n log n)` |
+
+`PriorityQueue` gives `peek` in `O(1)`, and `push` and `pop` in `O(log n)` in
+the worst case, also on old versions. `combine q1 q2` renumbers the `m` pairs
+of `q2` after those of `q1`, so on equal priorities the pairs of `q1` leave
+first. Two queues are equal by `Eq` when they give the same pairs in the same
+order.
 
 ### Effects, short-circuiting, and captures
 

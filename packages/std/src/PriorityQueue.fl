@@ -1,0 +1,201 @@
+/// An immutable priority queue of payloads by priority, for pure algorithms
+/// such as shortest paths.
+///
+/// The pair with the least priority by `Ord p` leaves first, and pairs of
+/// equal priority leave in the order they were pushed. Duplicates are kept,
+/// and payloads need no ordering. Every operation leaves the queue it is
+/// given as it was, so an old version can be used again at the same cost.
+///
+/// The queue is a leftist heap ordered by priority, then insertion number:
+/// `peek`, `size` and `is_empty` take `O(1)`, `push` and `pop` `O(log n)` in
+/// the worst case, also on old versions.
+///
+/// With `Ord p`, queues are `Eq` when they give the same pairs in the same
+/// order, `Collections.ToSeq` in that order, and a `Monoid`: `combine q1 q2`
+/// lets the pairs of `q1` leave first on equal priorities and takes
+/// `O(m + log n)` for the `m` pairs of `q2`, which it renumbers after those of
+/// `q1`. Every queue is `Collections.Sized`.
+module PriorityQueue exposing (
+  PriorityQueue,
+  empty,
+  is_empty,
+  size,
+  push,
+  peek,
+  pop,
+  to_seq,
+  to_list,
+)
+
+/// A leftist heap: no node leaves after its children, and the right spine
+/// below each node, `rank` nodes long, is no longer than the left one.
+type Heap p a =
+  | Leaf
+  | Node { rank : Int; priority : p; order : Int; value : a; left : Heap p a; right : Heap p a }
+
+/// A queue of payloads `a` by priorities `p`. Insertion numbers are `Int`, so
+/// equal priorities keep their order for 2^31 pushes into one history.
+opaque type PriorityQueue p a = PriorityQueue { heap : Heap p a; next : Int; size : Int }
+
+/// The length of the right spine of a heap.
+rank : Heap p a -> Int
+let rank heap =
+  match heap with
+  | Leaf -> 0
+  | Node n -> n.rank
+
+/// Whether the pair of priority `p1` pushed as number `o1` leaves before the
+/// one of `p2` pushed as `o2`.
+before : Ord p => p -> Int -> p -> Int -> Bool
+let before p1 o1 p2 o2 =
+  match compare p1 p2 with
+  | LT -> true
+  | GT -> false
+  | EQ -> o1 < o2
+
+/// The node with `child` as its right heap, the heap of higher rank kept on
+/// the left.
+joined : Heap p a -> Heap p a -> Heap p a
+let joined node child =
+  match node with
+  | Leaf -> child
+  | Node n ->
+    if rank n.left >= rank child then
+      Node { n with rank = rank child + 1; right = child }
+    else
+      Node { n with rank = rank n.left + 1; left = child; right = n.left }
+
+/// The heap of the pairs of both, merged along their right spines.
+merge : Ord p => Heap p a -> Heap p a -> Heap p a
+let rec merge h1 h2 =
+  match (h1, h2) with
+  | (Leaf, _) -> h2
+  | (_, Leaf) -> h1
+  | (Node a, Node b) ->
+    if before a.priority a.order b.priority b.order then
+      joined h1 (merge a.right h2)
+    else
+      joined h2 (merge h1 b.right)
+
+/// Where a renumbering is: below the left heap of a node whose right heap is
+/// still to go, or below the right heap with the left one done.
+type Path p a =
+  | Top
+  | LeftOf Int p Int a (Heap p a) (Path p a)
+  | RightOf Int p Int a (Heap p a) (Path p a)
+
+rec {
+  /// `heap` with `by` added to every insertion number, then put in place on
+  /// `path`. A left spine can be as long as the queue, so the walk keeps its
+  /// way back in a `Path` instead of on the call stack.
+  descend : Int -> Heap p a -> Path p a -> Heap p a
+  let descend by heap path =
+    match heap with
+    | Leaf -> ascend by Leaf path
+    | Node n -> descend by n.left (LeftOf n.rank n.priority (n.order + by) n.value n.right path)
+
+  /// The renumbered heap `made` put in place on `path`.
+  ascend : Int -> Heap p a -> Path p a -> Heap p a
+  let ascend by made path =
+    match path with
+    | Top -> made
+    | LeftOf rank priority order value right up ->
+      descend by right (RightOf rank priority order value made up)
+    | RightOf rank priority order value left up ->
+      ascend
+        by
+        (Node {
+          rank = rank
+          priority = priority
+          order = order
+          value = value
+          left = left
+          right = made
+        })
+        up
+}
+
+/// The queue without pairs.
+empty : PriorityQueue p a
+let empty = PriorityQueue { heap = Leaf; next = 0; size = 0 }
+
+/// Whether the queue has no pairs, in `O(1)`.
+is_empty : PriorityQueue p a -> Bool
+let is_empty (PriorityQueue queue) = queue.size == 0
+
+/// The number of pairs, in `O(1)`.
+size : PriorityQueue p a -> Int
+let size (PriorityQueue queue) = queue.size
+
+/// The queue with `value` at `priority`, after the pairs of equal priority
+/// already there, in `O(log n)`.
+push : Ord p => p -> a -> PriorityQueue p a -> PriorityQueue p a
+let push priority value (PriorityQueue queue) =
+  let single =
+    Node {
+      rank = 1
+      priority = priority
+      order = queue.next
+      value = value
+      left = Leaf
+      right = Leaf
+    }
+  PriorityQueue { heap = merge queue.heap single; next = queue.next + 1; size = queue.size + 1 }
+
+/// The pair that leaves next, with the least priority, or `None` when the
+/// queue is empty, in `O(1)`.
+peek : PriorityQueue p a -> Option (p, a)
+let peek (PriorityQueue queue) =
+  match queue.heap with
+  | Leaf -> None
+  | Node n -> Some (n.priority, n.value)
+
+/// The pair that leaves next and the queue without it, or `None` when the
+/// queue is empty, in `O(log n)`.
+pop : Ord p => PriorityQueue p a -> Option ((p, a), PriorityQueue p a)
+let pop (PriorityQueue queue) =
+  match queue.heap with
+  | Leaf -> None
+  | Node n ->
+    Some (
+      (n.priority, n.value),
+      PriorityQueue { queue with heap = merge n.left n.right; size = queue.size - 1 },
+    )
+
+/// The pairs in the order they leave, as a lazy sequence: `O(1)` to start
+/// and `O(log n)` for each pair taken.
+to_seq : Ord p => (PriorityQueue p a)^d -> (Seq (p, a))^d
+let to_seq queue = Seq.unfold pop queue
+
+/// The pairs in the order they leave, in `O(n log n)`.
+to_list : Ord p => PriorityQueue p a -> List (p, a)
+let to_list queue = Seq.to_list (to_seq queue)
+
+/// Whether two queues give the same pairs in the same order.
+same : (Ord p, Eq a) => PriorityQueue p a -> PriorityQueue p a -> Bool
+let same left right = size left == size right && to_list left == to_list right
+
+/// Queues are equal when they give the same pairs in the same order.
+instance (Ord p, Eq a) => Eq (PriorityQueue p a) =
+  let eq left right = same left right
+
+/// The pairs of both queues; on equal priorities those of the left queue
+/// leave first. Takes `O(m + log n)` for a right queue of `m` pairs, which
+/// are renumbered after the left ones.
+instance Ord p => Semigroup (PriorityQueue p a) =
+  let combine (PriorityQueue left) (PriorityQueue right) =
+    PriorityQueue {
+      heap = merge left.heap (descend left.next right.heap Top)
+      next = left.next + right.next
+      size = left.size + right.size
+    }
+
+instance Ord p => Monoid (PriorityQueue p a) =
+  let empty = empty
+
+instance Ord p => Collections.ToSeq (PriorityQueue p a) (p, a) =
+  let to_seq queue = to_seq queue
+
+instance Collections.Sized (PriorityQueue p a) =
+  let size queue = size queue
+  let is_empty queue = is_empty queue
