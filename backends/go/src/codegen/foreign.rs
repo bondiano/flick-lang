@@ -164,6 +164,8 @@ impl Bindings {
             NativePrimitive::StringStartsWith => "flickrt.StartsWith",
             NativePrimitive::StringContains => "flickrt.Includes",
             NativePrimitive::StringEndsWith => "flickrt.EndsWith",
+            NativePrimitive::ListLength => "flickrt.ListLength",
+            NativePrimitive::ListGet => "flickrt.ListGet",
         };
         let Some(binding) = self.binding_of(
             module,

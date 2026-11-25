@@ -94,6 +94,7 @@ natives! {
     RT, "listCompare", 3 => show::list_compare;
     RT, "listMap", 2 => list_map;
     RT, "listLength", 1 => list_length;
+    RT, "listGet", 2 => list_get;
     RT, "listFlatMap", 2 => list_flat_map;
     RT, "listFold", 3 => list_fold;
     RT, "listMap2", 3 => list_map2;
@@ -335,6 +336,18 @@ fn list_length(args: &[Term], _: &mut String) -> Result<Term, String> {
     Ok(Term::Lit(Lit::Int(
         values.iter().fold(0_i32, |n, _| n.wrapping_add(1)),
     )))
+}
+
+/// `Some` of the element at the index, or `None` out of range.
+fn list_get(args: &[Term], _: &mut String) -> Result<Term, String> {
+    let Term::Lit(Lit::Int(i)) = &args[0] else {
+        return Err(format!("{args:?}"));
+    };
+    let values = list(&args[1])?;
+    Ok(match usize::try_from(*i).ok().and_then(|i| values.get(i)) {
+        Some(x) => data(prelude("Option", "Some", 1), vec![x.clone()]),
+        None => data(prelude("Option", "None", 0), Vec::new()),
+    })
 }
 
 /// JS `===`: `NaN` differs from itself, `0` equals `-0`.

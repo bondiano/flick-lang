@@ -33,16 +33,23 @@ pub enum NativePrimitive {
     StringContains,
     /// `String.ends_with` (`flick:String` `"endsWith"`, `arity 1`).
     StringEndsWith,
+    /// `List.length : List a -> Int` (`flick:rt` `"listLength"`).
+    ListLength,
+    /// `List.get : Int -> List a -> Option a` (`flick:rt` `"listGet"`).
+    ListGet,
 }
 
 impl NativePrimitive {
     /// Pure Flick call arity (number of curried arguments).
     pub const fn arity(self) -> usize {
         match self {
-            NativePrimitive::IntParse | NativePrimitive::StringLength => 1,
+            NativePrimitive::IntParse
+            | NativePrimitive::StringLength
+            | NativePrimitive::ListLength => 1,
             NativePrimitive::StringStartsWith
             | NativePrimitive::StringContains
-            | NativePrimitive::StringEndsWith => 2,
+            | NativePrimitive::StringEndsWith
+            | NativePrimitive::ListGet => 2,
             NativePrimitive::StringSlice => 3,
         }
     }
@@ -56,28 +63,43 @@ impl NativePrimitive {
             NativePrimitive::StringStartsWith => ("flick:String", "startsWith"),
             NativePrimitive::StringContains => ("flick:String", "includes"),
             NativePrimitive::StringEndsWith => ("flick:String", "endsWith"),
+            NativePrimitive::ListLength => ("flick:rt", "listLength"),
+            NativePrimitive::ListGet => ("flick:rt", "listGet"),
         }
     }
 
     const fn foreign_arity(self) -> usize {
-        if matches!(self, NativePrimitive::StringSlice) {
+        if matches!(
+            self,
+            NativePrimitive::StringSlice | NativePrimitive::ListGet
+        ) {
             2
         } else {
             1
         }
     }
+
+    const fn of_list(self) -> bool {
+        matches!(self, NativePrimitive::ListLength | NativePrimitive::ListGet)
+    }
+
+    const fn optional(self) -> bool {
+        matches!(self, NativePrimitive::IntParse | NativePrimitive::ListGet)
+    }
 }
 
-const BIT_INT_PARSE: u8 = 1 << 0;
-const BIT_STR_LEN: u8 = 1 << 1;
-const BIT_STR_SLICE: u8 = 1 << 2;
-const BIT_STR_STARTS: u8 = 1 << 3;
-const BIT_STR_CONTAINS: u8 = 1 << 4;
-const BIT_STR_ENDS: u8 = 1 << 5;
-const BIT_INST_STARTS: u8 = 1 << 6;
-const BIT_INST_CONTAINS: u8 = 1 << 7;
+const BIT_INT_PARSE: u16 = 1 << 0;
+const BIT_STR_LEN: u16 = 1 << 1;
+const BIT_STR_SLICE: u16 = 1 << 2;
+const BIT_STR_STARTS: u16 = 1 << 3;
+const BIT_STR_CONTAINS: u16 = 1 << 4;
+const BIT_STR_ENDS: u16 = 1 << 5;
+const BIT_INST_STARTS: u16 = 1 << 6;
+const BIT_INST_CONTAINS: u16 = 1 << 7;
+const BIT_LIST_LEN: u16 = 1 << 8;
+const BIT_LIST_GET: u16 = 1 << 9;
 
-fn slot_of(module: &str, name: &str, is_instances: bool) -> Option<(u8, NativePrimitive)> {
+fn slot_of(module: &str, name: &str, is_instances: bool) -> Option<(u16, NativePrimitive)> {
     match (module, name) {
         ("Int", "parse") => Some((BIT_INT_PARSE, NativePrimitive::IntParse)),
         ("String", "length") => Some((BIT_STR_LEN, NativePrimitive::StringLength)),
@@ -85,6 +107,8 @@ fn slot_of(module: &str, name: &str, is_instances: bool) -> Option<(u8, NativePr
         ("String", "starts_with") => Some((BIT_STR_STARTS, NativePrimitive::StringStartsWith)),
         ("String", "contains") => Some((BIT_STR_CONTAINS, NativePrimitive::StringContains)),
         ("String", "ends_with") => Some((BIT_STR_ENDS, NativePrimitive::StringEndsWith)),
+        ("List.Core", "length") => Some((BIT_LIST_LEN, NativePrimitive::ListLength)),
+        ("List.Core", "get") => Some((BIT_LIST_GET, NativePrimitive::ListGet)),
         (_, "text_starts_with") if is_instances => {
             Some((BIT_INST_STARTS, NativePrimitive::StringStartsWith))
         }
@@ -98,11 +122,11 @@ fn slot_of(module: &str, name: &str, is_instances: bool) -> Option<(u8, NativePr
 /// Target-validated table of reviewed native primitives built from a program's
 /// declared built-in IR modules.
 ///
-/// Stored as a compact bitmask over the 8 audited built-in declarations so the
+/// Stored as a compact bitmask over the 10 audited built-in declarations so the
 /// browser WASM compiler incurs no entry-vector or string-table overhead.
 #[derive(Clone, Default)]
 pub struct ReviewedPrimitives {
-    bits: u8,
+    bits: u16,
     instances_module: Option<Rc<str>>,
     option: Option<(Rc<Constructor>, Rc<Constructor>)>,
 }
@@ -121,7 +145,7 @@ impl ReviewedPrimitives {
     ) -> Self {
         let option = resolve_option_constructors(modules, is_builtin, lang);
         let instances_mod = lang.get(Lang::Instances).map(|(m, _)| m);
-        let mut bits = 0_u8;
+        let mut bits = 0_u16;
         let mut instances_module: Option<Rc<str>> = None;
 
         for module in modules {
@@ -129,7 +153,7 @@ impl ReviewedPrimitives {
                 continue;
             }
             let is_instances = instances_mod == Some(module.name.as_str());
-            if !is_instances && module.name != "Int" && module.name != "String" {
+            if !is_instances && !matches!(module.name.as_str(), "Int" | "String" | "List.Core") {
                 continue;
             }
             for item in &module.items {
@@ -142,7 +166,7 @@ impl ReviewedPrimitives {
                     continue;
                 };
                 if module_name_count(module, &foreign.name) != 1
-                    || (prim == NativePrimitive::IntParse && option.is_none())
+                    || (prim.optional() && option.is_none())
                     || !target_allows(&module.name, foreign, prim)
                 {
                     continue;
@@ -154,7 +178,9 @@ impl ReviewedPrimitives {
             }
         }
 
-        let option = ((bits & BIT_INT_PARSE) != 0).then_some(option).flatten();
+        let option = ((bits & (BIT_INT_PARSE | BIT_LIST_GET)) != 0)
+            .then_some(option)
+            .flatten();
         ReviewedPrimitives {
             bits,
             instances_module,
@@ -227,7 +253,9 @@ pub fn js_target_allows(
 impl PrimitiveEval for ReviewedPrimitives {
     fn arity(&self, module: &str, name: &str, lang: &Known<'_>) -> Option<usize> {
         let prim = self.lookup(module, name)?;
-        if !has_required_roles(prim, module, lang)
+        // list primitives fold over list literals: an evaluated `Option` is `Option Int`
+        if prim.of_list()
+            || !has_required_roles(prim, module, lang)
             || (prim == NativePrimitive::IntParse && self.option.is_none())
         {
             return None;
@@ -274,7 +302,18 @@ impl PrimitiveEval for ReviewedPrimitives {
             NativePrimitive::StringEndsWith => {
                 eval_string_pred(StringPred::EndsWith, &args[0], &args[1], budget)
             }
+            NativePrimitive::ListLength | NativePrimitive::ListGet => {
+                PrimitiveOutcome::Stop(StopReason::UnknownOp)
+            }
         }
+    }
+
+    fn list_primitive(&self, module: &str, name: &str) -> Option<NativePrimitive> {
+        self.lookup(module, name).filter(|p| p.of_list())
+    }
+
+    fn option_constructors(&self) -> Option<(&Constructor, &Constructor)> {
+        self.option.as_ref().map(|(some, none)| (&**some, &**none))
     }
 }
 
@@ -297,28 +336,31 @@ fn has_required_roles(prim: NativePrimitive, module: &str, lang: &Known<'_>) -> 
         return false;
     }
     let extra_ok = match prim {
-        NativePrimitive::IntParse => {
-            lang.get(Lang::Int).is_some()
-                && lang.get(Lang::Option).is_some()
-                && lang.get(Lang::Some).is_some()
-                && lang.get(Lang::None).is_some()
-        }
-        NativePrimitive::StringLength | NativePrimitive::StringSlice => {
-            lang.get(Lang::Int).is_some()
-        }
+        NativePrimitive::IntParse
+        | NativePrimitive::StringLength
+        | NativePrimitive::StringSlice => lang.get(Lang::Int).is_some(),
         NativePrimitive::StringStartsWith
         | NativePrimitive::StringContains
         | NativePrimitive::StringEndsWith => lang.get(Lang::Bool).is_some(),
+        NativePrimitive::ListLength | NativePrimitive::ListGet => {
+            lang.get(Lang::Int).is_some() && lang.get(Lang::List).is_some()
+        }
     };
+    let options_ok = !prim.optional()
+        || (lang.get(Lang::Option).is_some()
+            && lang.get(Lang::Some).is_some()
+            && lang.get(Lang::None).is_some());
     extra_ok
+        && options_ok
         && (module == "Int"
             || module == "String"
+            || module == "List.Core"
             || lang.get(Lang::Instances).is_some_and(|(m, _)| m == module))
 }
 
 fn has_expected_adapter(a: &Adapter, foreign_arity: usize, prim: NativePrimitive) -> bool {
-    let is_parse = prim == NativePrimitive::IntParse;
-    let result_shape_ok = if is_parse {
+    let optional = prim.optional();
+    let result_shape_ok = if optional {
         matches!(&a.result_shape, Shape::Option(inner) if matches!(**inner, Shape::Data))
     } else {
         matches!(a.result_shape, Shape::Data)
@@ -332,8 +374,10 @@ fn has_expected_adapter(a: &Adapter, foreign_arity: usize, prim: NativePrimitive
         && a.callbacks.len() == foreign_arity
         && a.callbacks.iter().all(Option::is_none)
         && a.copies.args.len() == foreign_arity
-        && a.copies.args.iter().all(|&c| !c)
-        && a.copies.result == is_parse
+        // the list argument, the last, is copied in
+        && (a.copies.args.iter().enumerate())
+            .all(|(i, &c)| c == (prim.of_list() && i + 1 == foreign_arity))
+        && a.copies.result == optional
         && a.copies.callbacks.len() == foreign_arity
         && a.copies.callbacks.iter().all(Option::is_none)
         && a.shapes.len() == foreign_arity
@@ -346,7 +390,7 @@ fn classify_builtin_foreign(
     is_instances: bool,
     foreign: &Foreign,
     lang: &Known<'_>,
-) -> Option<(u8, NativePrimitive)> {
+) -> Option<(u16, NativePrimitive)> {
     if foreign.source_name.is_some()
         || foreign.mode != ForeignMode::Pure
         || foreign.dicts != 0

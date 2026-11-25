@@ -22,7 +22,7 @@ codegen/fusion # `?` on an `Option`, a return from the function, has no λFlick 
 codegen/interpolation # runs in the model; not in portable.txt
 codegen/known_failure # no native for `unsafe_div` (flick:rt intUnsafeDiv)
 codegen/ints # no native for `checked_add` (flick:rt intCheckedAdd)
-codegen/let_assert # no native for `get` (flick:rt listGet)
+codegen/let_assert # no native for `assert_failed` (flick:rt flickAssert)
 codegen/pure_main # no native for `say` (global console.log)
 codegen/question # `?` on an `Option`, a return from the function, has no λFlick form
 codegen/record_ffi # no native for `dict_keys` (./record_ffi.mjs keysOf)

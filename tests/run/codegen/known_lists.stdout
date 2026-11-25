@@ -1,0 +1,22 @@
+note x 7
+2
+0
+Some 7
+None
+None
+None
+note a 1
+note c 3
+Some 7
+note d 4
+None
+note e 5
+2
+note f 6
+Some 6
+boom late
+note g 8
+boom mid
+(Some "sel", None, Some "sel")
+note hp 2
+sel 2

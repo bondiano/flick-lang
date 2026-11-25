@@ -1,0 +1,90 @@
+// List.length, List.get and List.head of a list literal are known in
+// release, while each element that is not data still runs once, where it is
+// written, whether it is selected or not, even when the result is None.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+type alias Mon = { name : String; hp : Int }
+
+note : String -> Int ->{Host.Console} Int
+let note label value =
+  Platform.stdout_line ("note " ++ label ++ " " ++ show value)
+  value
+
+boom : String ->{; Boom} Int
+let boom label = Fail.fail (Boom label)
+
+count : Int -> Int -> Int
+let count x y = List.length [x, y]
+
+nothing : Unit -> Int
+let nothing () = List.length []
+
+selected : Int -> Option Int
+let selected x = List.get 1 [10, x, 20]
+
+empty : Unit -> Option Int
+let empty () = List.get 0 []
+
+negative : Int -> Option Int
+let negative x = List.get (-1) [x, 2]
+
+beyond : Int -> Option Int
+let beyond x = List.get 2 [x, 2]
+
+traced : Int ->{Host.Console} Option Int
+let traced x = List.get 1 [note "a" 1, x, note "c" 3]
+
+missed : Int ->{Host.Console} Option Int
+let missed x = List.get 5 [note "d" 4, x]
+
+counted : Int ->{Host.Console} Int
+let counted x = List.length [x, note "e" 5]
+
+first : Int ->{Host.Console} Option Int
+let first x = List.head [note "f" 6, x]
+
+thrown : Int ->{} String
+let thrown x =
+  try show (List.get 0 [x, boom "late"]) with
+  | Boom label -> "boom " ++ label
+
+thrown_between : Int ->{Host.Console} String
+let thrown_between x =
+  try show (List.get 0 [x, note "g" 8, boom "mid", note "h" 9]) with
+  | Boom label -> "boom " ++ label
+
+named : String -> Option String
+let named s = List.get 1 ["a", s]
+
+nameless : String -> Option String
+let nameless s = List.get 2 ["a", s]
+
+second : String ->{Host.Console} Option Mon
+let second n = List.get 1 [{ name = "a"; hp = 1 }, { name = n; hp = note "hp" 2 }]
+
+shown : Option Mon -> String
+let shown m =
+  match m with
+  | Some { name; hp } -> name ++ " " ++ show hp
+  | None -> "none"
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let x = note "x" 7
+  Platform.stdout_line (show (count x 3))
+  Platform.stdout_line (show (nothing ()))
+  Platform.stdout_line (show (selected x))
+  Platform.stdout_line (show (empty ()))
+  Platform.stdout_line (show (negative x))
+  Platform.stdout_line (show (beyond x))
+  Platform.stdout_line (show (traced x))
+  Platform.stdout_line (show (missed x))
+  Platform.stdout_line (show (counted x))
+  Platform.stdout_line (show (first x))
+  Platform.stdout_line (thrown x)
+  Platform.stdout_line (thrown_between x)
+  let s = if x > 0 then "sel" else "other"
+  Platform.stdout_line (show (named s, nameless s, List.head [s, "b"]))
+  Platform.stdout_line (shown (second s))
