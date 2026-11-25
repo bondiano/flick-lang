@@ -8,6 +8,8 @@ pub use crate::project::builtins::{
     BuiltinModules, BuiltinSource, BuiltinStore, builtin_bundle_of, builtin_declarations,
     builtin_modules, builtin_modules_of, keep_builtin_modules,
 };
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::project::target_preflight::BuiltinPreflight;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod capability_tests;
 #[cfg(feature = "native-project")]
