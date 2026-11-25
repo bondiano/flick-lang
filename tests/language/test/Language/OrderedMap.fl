@@ -1,0 +1,351 @@
+// The persistent ordered map: ascending traversal, replacement of equal
+// keys, removal, inclusive ranges, restartable sequences and old versions.
+// `OrderedMap.valid` checks the tree after every step, and random operations
+// are checked against a sorted association list.
+module Language.OrderedMap exposing (tests)
+
+type alias Map = OrderedMap.OrderedMap Int String
+
+/// The map with each pair inserted in order.
+map_of : List (Int, String) -> Map
+let map_of pairs = List.fold_left (fun m (k, v) -> OrderedMap.insert k v m) OrderedMap.empty pairs
+
+/// The bindings in traversal order.
+listed : OrderedMap.OrderedMap k v -> List (k, v)
+let listed m = Seq.to_list (OrderedMap.to_seq m)
+
+/// The bindings with keys from `low` to `high`.
+ranged : Int -> Int -> Map -> List (Int, String)
+let ranged low high m = Seq.to_list (OrderedMap.range { minimum = low; maximum = high } m)
+
+/// The keys `0 .. n - 1` in the order `order` picks: ascending, descending,
+/// from both ends inwards, or from the middle outwards.
+ordered_keys : Int -> Int -> List Int
+let ordered_keys order n =
+  let up = List.range 0 n
+  let inward =
+    List.flat_map
+      (fun i -> if i < n - 1 - i then [i, n - 1 - i] else if i == n - 1 - i then [i] else [])
+      up
+  if order == 0 then
+    up
+  else if order == 1 then
+    List.reverse up
+  else if order == 2 then
+    inward
+  else
+    List.reverse inward
+
+/// Inserts `keys` and then removes `gone` one at a time, starting from the
+/// empty map. Gives whether every map on the way was valid, and the bindings
+/// left.
+churn : List Int -> List Int -> (Bool, List (Int, Int))
+let churn keys gone =
+  let (grown, ok_in) =
+    List.fold_left
+      (fun (m, ok) k ->
+        let next = OrderedMap.insert k (k * 2) m
+        (next, ok && OrderedMap.valid next)
+      )
+      (OrderedMap.empty, true)
+      keys
+  let (left, ok) =
+    List.fold_left
+      (fun (m, ok) k ->
+        let next = OrderedMap.remove k m
+        (next, ok && OrderedMap.valid next)
+      )
+      (grown, ok_in)
+      gone
+  (ok, listed left)
+
+/// An operation and its key and width: `0` and `1` insert the key with the
+/// step's number as its value, `2` removes it, `3` looks it up, and `4` reads
+/// the range from the key to the key plus the width, reversed when the width
+/// is negative.
+type alias Op = (Int, (Int, Int))
+
+/// What a step shows: the bindings it gives, the size after it, and whether
+/// the map after it is valid.
+type alias Seen = (List (Int, Int), Int, Bool)
+
+/// Runs the operations on the map; gives what each step shows, the bindings
+/// left, and the least and greatest of them.
+run_map : List Op -> (List Seen, List (Int, Int), Option (Int, Int), Option (Int, Int))
+let run_map ops =
+  let (left, _, seen) =
+    List.fold_left
+      (fun (m, i, acc) (op, (key, width)) ->
+        let next =
+          if op <= 1 then
+            OrderedMap.insert key i m
+          else if op == 2 then
+            OrderedMap.remove key m
+          else
+            m
+        let shown =
+          if op == 3 then
+            match OrderedMap.get key m with
+            | Some v -> [(key, v)]
+            | None -> []
+          else if op == 4 then
+            Seq.to_list (OrderedMap.range { minimum = key; maximum = key + width } m)
+          else
+            []
+        (next, i + 1, [(shown, OrderedMap.size next, OrderedMap.valid next)] ++ acc)
+      )
+      (OrderedMap.empty, 0, [])
+      ops
+  (List.reverse seen, listed left, OrderedMap.min left, OrderedMap.max left)
+
+/// The same operations on a list of pairs kept sorted by key.
+run_model : List Op -> (List Seen, List (Int, Int), Option (Int, Int), Option (Int, Int))
+let run_model ops =
+  let (left, _, seen) =
+    List.fold_left
+      (fun (xs, i, acc) (op, (key, width)) ->
+        let others = List.filter (fun (k, _) -> k != key) xs
+        let next =
+          if op <= 1 then
+            List.sort_with (fun (k, _) -> k) ([(key, i)] ++ others)
+          else if op == 2 then
+            others
+          else
+            xs
+        let shown =
+          if op == 3 then
+            List.filter (fun (k, _) -> k == key) xs
+          else if op == 4 then
+            List.filter (fun (k, _) -> k >= key && k <= key + width) xs
+          else
+            []
+        (next, i + 1, [(shown, List.length next, true)] ++ acc)
+      )
+      ([], 0, [])
+      ops
+  (List.reverse seen, left, List.head left, List.last left)
+
+tests : List Test.Test
+let tests = [
+  Test.group "ordered map" [
+    Test.test "bindings come out in ascending key order" (fun () ->
+      let m = map_of [(5, "e"), (1, "a"), (3, "c"), (2, "b"), (4, "d")]
+      let words =
+        OrderedMap.from_seq (Seq.of_list [("b", 1), ("ab", 2), ("", 3), ("a", 4), ("B", 5)])
+      Test.all [
+        Test.equal [(1, "a"), (2, "b"), (3, "c"), (4, "d"), (5, "e")] (listed m),
+        Test.equal (5, true) (OrderedMap.size m, OrderedMap.valid m),
+        Test.equal
+          [(-2, "x"), (0, "y"), (7, "z")]
+          (listed (map_of [(7, "z"), (-2, "x"), (0, "y")])),
+        Test.equal [("", 3), ("B", 5), ("a", 4), ("ab", 2), ("b", 1)] (listed words),
+      ]
+    ),
+    Test.test "a later binding replaces an earlier one for an equal key" (fun () ->
+      let m = map_of [(2, "b"), (1, "a"), (2, "B"), (1, "A"), (2, "c")]
+      let built = OrderedMap.from_seq (Seq.of_list [(1, "x"), (2, "y"), (1, "z")])
+      Test.all [
+        Test.equal ([(1, "A"), (2, "c")], 2, true) (
+          listed m,
+          OrderedMap.size m,
+          OrderedMap.valid m,
+        ),
+        Test.equal ([(1, "z"), (2, "y")], 2) (listed built, OrderedMap.size built),
+        Test.equal (Some "c", Some "z") (OrderedMap.get 2 m, OrderedMap.get 1 built),
+      ]
+    ),
+    Test.test "absent keys are not found and removing them changes nothing" (fun () ->
+      let m = map_of [(1, "a"), (3, "c"), (5, "e")]
+      let e : Map = OrderedMap.empty
+      let kept = OrderedMap.remove 4 m
+      let still = OrderedMap.remove 1 e
+      Test.all [
+        Test.equal [None, None, None, None, Some "c"] [
+          OrderedMap.get 2 m,
+          OrderedMap.get 0 m,
+          OrderedMap.get 6 m,
+          OrderedMap.get 1 e,
+          OrderedMap.get 3 m,
+        ],
+        Test.equal (listed m, 3, true) (listed kept, OrderedMap.size kept, OrderedMap.valid kept),
+        Test.equal ([], 0, true) (listed still, OrderedMap.size still, OrderedMap.valid still),
+      ]
+    ),
+    Test.test "removing a key keeps the others in order" (fun () ->
+      let keys = [4, 2, 6, 1, 3, 5, 7]
+      let m = map_of (List.map (fun k -> (k, "v")) keys)
+      let each =
+        List.map
+          (fun k ->
+            let rest = OrderedMap.remove k m
+            (OrderedMap.get k rest, listed rest, OrderedMap.size rest, OrderedMap.valid rest)
+          )
+          (List.range 1 8)
+      let expected =
+        List.map
+          (fun k -> (
+            None,
+            List.map (fun j -> (j, "v")) (List.filter (fun j -> j != k) (List.range 1 8)),
+            6,
+            true,
+          ))
+          (List.range 1 8)
+      let emptied = List.fold_left (fun acc k -> OrderedMap.remove k acc) m keys
+      Test.all [
+        Test.equal expected each,
+        Test.equal ([], 0, true) (
+          listed emptied,
+          OrderedMap.size emptied,
+          OrderedMap.valid emptied,
+        ),
+      ]
+    ),
+    Test.test "ranges include both bounds and nothing outside them" (fun () ->
+      let m = map_of [(30, "c"), (10, "a"), (50, "e"), (20, "b"), (40, "d")]
+      let e : Map = OrderedMap.empty
+      Test.equal
+        [
+          [(20, "b"), (30, "c"), (40, "d")],
+          [(20, "b"), (30, "c"), (40, "d")],
+          [(30, "c")],
+          [(10, "a")],
+          [(50, "e")],
+          [(10, "a"), (20, "b"), (30, "c"), (40, "d"), (50, "e")],
+          [(10, "a")],
+          [],
+          [],
+          [],
+          [],
+          [],
+          [],
+        ]
+        [
+          ranged 20 40 m,
+          ranged 15 45 m,
+          ranged 30 30 m,
+          ranged 10 10 m,
+          ranged 50 50 m,
+          ranged (-100) 100 m,
+          ranged (-100) 10 m,
+          ranged 31 39 m,
+          ranged 40 20 m,
+          ranged 31 30 m,
+          ranged 0 9 m,
+          ranged 51 60 m,
+          ranged 0 100 e,
+        ]
+    ),
+    Test.test "traversal and ranges restart from the start" (fun () ->
+      let m = map_of [(3, "c"), (1, "a"), (2, "b"), (4, "d")]
+      let s = OrderedMap.to_seq m
+      let r = OrderedMap.range { minimum = 2; maximum = 3 } m
+      let all = [(1, "a"), (2, "b"), (3, "c"), (4, "d")]
+      Test.equal
+        (all, [(1, "a"), (2, "b")], all, [(2, "b"), (3, "c")], [(2, "b")], [(2, "b"), (3, "c")])
+        (
+          Seq.to_list s,
+          Seq.to_list (Seq.take 2 s),
+          Seq.to_list s,
+          Seq.to_list r,
+          Seq.to_list (Seq.take 1 r),
+          Seq.to_list r,
+        )
+    ),
+    Test.test "old versions stay as they were" (fun () ->
+      let base = map_of [(3, "c"), (1, "a"), (2, "b")]
+      let before = OrderedMap.to_seq base
+      let added = OrderedMap.insert 4 "d" base
+      let replaced = OrderedMap.insert 2 "B" base
+      let removed = OrderedMap.remove 1 base
+      let versions =
+        List.fold_left
+          (fun acc k ->
+            match List.head acc with
+            | Some m -> [OrderedMap.insert k k m] ++ acc
+            | None -> acc
+          )
+          [OrderedMap.empty]
+          (List.range 0 40)
+      let intact =
+        List.all
+          (fun (i, m) ->
+            OrderedMap.valid m && listed m == List.map (fun k -> (k, k)) (List.range 0 (40 - i))
+          )
+          (List.zip (List.range 0 41) versions)
+      Test.equal
+        (
+          [(1, "a"), (2, "b"), (3, "c")],
+          [(1, "a"), (2, "b"), (3, "c"), (4, "d")],
+          [(1, "a"), (2, "B"), (3, "c")],
+          [(2, "b"), (3, "c")],
+          [(2, "b")],
+          [(1, "a"), (2, "b"), (3, "c")],
+          true,
+        )
+        (
+          Seq.to_list before,
+          listed added,
+          listed replaced,
+          listed removed,
+          listed (OrderedMap.remove 3 removed),
+          listed base,
+          intact,
+        )
+    ),
+    Test.test "the least and greatest bindings" (fun () ->
+      let m = map_of [(5, "e"), (1, "a"), (9, "i"), (3, "c")]
+      let e : Map = OrderedMap.empty
+      let one = map_of [(7, "g")]
+      Test.equal
+        [
+          None,
+          None,
+          Some (1, "a"),
+          Some (9, "i"),
+          Some (3, "c"),
+          Some (5, "e"),
+          Some (7, "g"),
+          Some (7, "g"),
+        ]
+        [
+          OrderedMap.min e,
+          OrderedMap.max e,
+          OrderedMap.min m,
+          OrderedMap.max m,
+          OrderedMap.min (OrderedMap.remove 1 m),
+          OrderedMap.max (OrderedMap.remove 9 m),
+          OrderedMap.min one,
+          OrderedMap.max one,
+        ]
+    ),
+    Test.test "maps are equal when they hold the same bindings" (fun () ->
+      Test.equal [true, true, false, false, false] [
+        eq (map_of [(1, "a"), (2, "b"), (3, "c")]) (map_of [(3, "c"), (1, "a"), (2, "b")]),
+        eq (OrderedMap.remove 2 (map_of [(1, "a"), (2, "b")])) (map_of [(1, "a")]),
+        eq (map_of [(1, "a")]) (map_of [(1, "b")]),
+        eq (map_of [(1, "a")]) (map_of [(1, "a"), (2, "b")]),
+        eq (map_of [(1, "a")]) (map_of [(2, "a")]),
+      ]
+    ),
+    Test.test "long ascending and descending runs stay balanced" (fun () ->
+      Test.equal ((true, [(0, 0), (1, 2)]), (true, [(0, 0), (1, 2)]), (true, []), (true, [])) (
+        churn (ordered_keys 0 500) (List.range 2 500),
+        churn (ordered_keys 1 500) (List.reverse (List.range 2 500)),
+        churn (ordered_keys 0 500) (ordered_keys 1 500),
+        churn (ordered_keys 1 500) (ordered_keys 0 500),
+      )
+    ),
+    Test.property
+      "adversarial insertion and removal orders keep the tree valid"
+      (Gen.pair (Gen.pair (Gen.int 0 3) (Gen.int 0 3)) (Gen.int 0 60))
+      (fun ((into, out), n) ->
+        let gone = List.take (n / 2) (ordered_keys out n)
+        let left = List.filter (fun k -> not (List.contains k gone)) (List.range 0 n)
+        Test.equal (true, List.map (fun k -> (k, k * 2)) left) (churn (ordered_keys into n) gone)
+      ),
+    Test.property
+      "random operations agree with a sorted association list"
+      (Gen.list 80 (Gen.pair (Gen.int 0 4) (Gen.pair (Gen.int 0 24) (Gen.int (-3) 8))))
+      (fun ops -> Test.equal (run_model ops) (run_map ops)),
+  ],
+]
