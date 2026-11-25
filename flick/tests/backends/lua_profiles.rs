@@ -248,6 +248,15 @@ fn what_cannot_be_generated_is_refused_at_its_source_and_keeps_the_output() {
     // at the limit the program is generated
     fs::write(root.join("src/App.fl"), wide(199)).expect("source");
     assert!(flick_in(&root, &["build", "--offline"]).status.success());
+    // and a refused first build writes nothing at all
+    let fresh = lua_project("lua_profile_fresh", "lua/wow-retail", sum, &[]);
+    let out = flick_in(&fresh, &["build", "--diagnostics", "json", "--offline"]);
+    assert_eq!(out.status.code(), Some(1), "{out:?}");
+    assert!(
+        !diagnostics(&out.stderr, "FLICK-P012").is_empty(),
+        "{out:?}"
+    );
+    assert!(!fresh.join("dist").exists(), "nothing is written");
 }
 
 #[test]
