@@ -337,7 +337,7 @@ fn a_let_lazy_read_in_a_loop_keeps_its_state() {
     assert!(ir.contains("let mut x"), "{ir}");
 }
 
-/// O2b leaves a state read after a branch that assigns, as LetMut binds its
+/// O2b leaves a state read after a branch that assigns, as `LetMut` binds its
 /// variables again there.
 #[test]
 fn a_let_lazy_read_after_an_assigning_branch_keeps_its_state() {
