@@ -71,7 +71,9 @@ end
 const conf = "function love.conf(t)\n  t.window = false\nend\n";
 const game = `local failed = false
 function love.load()
-  local ok, err = pcall(assert(love.filesystem.load("flick-main.lua")))
+  local ok, err = pcall(function()
+    assert(love.filesystem.load("flick-main.lua"))()
+  end)
   if not ok then
     io.stderr:write(tostring(err), "\\n")
     failed = true
