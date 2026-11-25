@@ -11,6 +11,8 @@ mod foreign;
 #[cfg(feature = "wasm-backends")]
 pub(crate) mod launch;
 #[cfg(feature = "wasm-backends")]
+mod native;
+#[cfg(feature = "wasm-backends")]
 mod official;
 pub(crate) mod options;
 #[cfg(feature = "wasm-backends")]
