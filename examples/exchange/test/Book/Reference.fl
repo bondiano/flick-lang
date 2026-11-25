@@ -1,0 +1,112 @@
+/// A naive book to check `Book.Book` against: each side a list of its
+/// resting orders, best first, scanned and rebuilt on every command.
+module Book.Reference exposing (Model, empty, step, resting)
+
+import Book.Order exposing (Side(..), Price(..), Order, Command(..), Reason(..), Event(..))
+
+/// A resting order and what is left of it.
+type alias Entry = { id : Int; price : Int; qty : Int }
+
+type alias Model = { bids : List Entry; asks : List Entry }
+
+empty : Model
+let empty = { bids = []; asks = [] }
+
+/// `entry` after the entries that `ahead` keeps before it.
+insert : (Entry -> Bool) -> Entry -> List Entry -> List Entry
+let insert ahead entry entries =
+  let (before, after) = List.span ahead entries
+  before ++ [entry] ++ after
+
+/// Fills up to `qty` of `taker` from the best of `side` while `good` holds
+/// for its price: the quantity left, the side after and the events.
+fill : Int -> (Int -> Bool) -> Int -> List Entry -> List Event -> (Int, List Entry, List Event)
+let rec fill taker good qty side events =
+  match side with
+  | [maker, ...others] when qty > 0 && good maker.price ->
+    let filled = Int.min qty maker.qty
+    let events =
+      events ++ [Traded { taker = taker; maker = maker.id; price = maker.price; qty = filled }]
+    if filled == maker.qty then
+      fill taker good (qty - filled) others events
+    else
+      (0, [{ maker with qty = maker.qty - filled }] ++ others, events)
+  | _ -> (qty, side, events)
+
+holds : Int -> Model -> Option Entry
+let holds id model = List.find (fun e -> e.id == id) (model.bids ++ model.asks)
+
+cancel : Int -> Model -> (Model, List Event)
+let cancel id model =
+  match holds id model with
+  | Some entry ->
+    let others e = e.id != id
+    (
+      { bids = List.filter others model.bids; asks = List.filter others model.asks },
+      [Cancelled id entry.qty],
+    )
+  | None -> (model, [Refused id UnknownOrder])
+
+refusal : Model -> Order -> Option Reason
+let refusal model order =
+  match order.price with
+  | _ when order.qty <= 0 -> Some NonPositiveQuantity
+  | _ when Option.is_some (holds order.id model) -> Some DuplicateId
+  | Limit price when price <= 0 -> Some NonPositivePrice
+  | _ -> None
+
+/// Whether an order on `side` with `limit` takes a resting `price`.
+good : Side -> Price -> Int -> Bool
+let good side limit price =
+  match (side, limit) with
+  | (_, Market) -> true
+  | (Buy, Limit most) -> price <= most
+  | (Sell, Limit least) -> price >= least
+
+/// The own side after the unfilled `left` of `order` rests there, or is
+/// dropped.
+remainder : Order -> Int -> List Entry -> List Event -> (List Entry, List Event)
+let remainder order left own events =
+  match order.price with
+  | _ when left == 0 -> (own, events)
+  | Market -> (own, events ++ [Dropped order.id left])
+  | Limit price ->
+    let ahead e =
+      match order.side with
+      | Buy -> e.price >= price
+      | Sell -> e.price <= price
+    (insert ahead { id = order.id; price = price; qty = left } own, events ++ [Rested order.id])
+
+place : Order -> Model -> (Model, List Event)
+let place order model =
+  let takes = good order.side order.price
+  match order.side with
+  | Buy ->
+    let (left, asks, events) = fill order.id takes order.qty model.asks []
+    let (bids, events) = remainder order left model.bids events
+    ({ bids = bids; asks = asks }, events)
+  | Sell ->
+    let (left, bids, events) = fill order.id takes order.qty model.bids []
+    let (asks, events) = remainder order left model.asks events
+    ({ bids = bids; asks = asks }, events)
+
+/// The model after one command, and what happened.
+step : Command -> Model -> (Model, List Event)
+let step command model =
+  match command with
+  | Cancel id -> cancel id model
+  | Place order ->
+    match refusal model order with
+    | Some reason -> (model, [Refused order.id reason])
+    | None -> place order model
+
+/// The resting orders of a side as `(id, price, quantity)`, best first.
+resting : Side -> Model -> List (Int, Int, Int)
+let resting side model =
+  List.map
+    (fun e -> (e.id, e.price, e.qty))
+    (
+      match side with
+      | Buy -> model.bids
+      | Sell -> model.asks
+    )

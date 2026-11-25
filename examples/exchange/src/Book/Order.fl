@@ -1,0 +1,32 @@
+/// What reaches the book and what it answers: commands in, events out.
+module Book.Order exposing (Side(..), Price(..), Order, Command(..), Reason(..), Event(..))
+
+type Side = Buy | Sell
+  deriving Eq, Show, Schema
+
+/// A limit order rests at its price when it cannot fill at once; a market
+/// order takes what the other side has and drops the rest.
+type Price = Limit Int | Market
+  deriving Eq, Show, Schema
+
+type alias Order = {
+  id : Int
+  side : Side
+  price : Price
+  qty : Int
+} deriving Schema
+
+type Command = Place Order | Cancel Int
+  deriving Eq, Show, Schema
+
+/// Why the book refused a command.
+type Reason = NonPositiveQuantity | NonPositivePrice | DuplicateId | UnknownOrder
+  deriving Eq, Show
+
+type Event =
+  | Traded { taker : Int; maker : Int; price : Int; qty : Int }
+  | Rested Int
+  | Dropped Int Int
+  | Cancelled Int Int
+  | Refused Int Reason
+  deriving Eq, Show

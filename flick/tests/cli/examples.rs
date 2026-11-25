@@ -366,6 +366,19 @@ fn typed_interpreter_runs(emit: &str) {
     );
     success(&dir, &["test", "--target", emit, "--seed", "7"]);
     success(&dir, &["build", "--target", emit]);
+    let out = built_main(&dir, emit)
+        .output()
+        .expect("the interpreter runs");
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "3\n10\ntrue\ntype error: expected Int, found Bool\ntype error: expected Bool, found Int\n"
+    );
+}
+
+/// The `main` that `flick build` wrote to the project's `dist`, run in the
+/// project.
+fn built_main(dir: &Path, emit: &str) -> Command {
     let mut command = if emit == "go" {
         Command::new(dir.join("dist").join(executable("main")))
     } else {
@@ -373,13 +386,50 @@ fn typed_interpreter_runs(emit: &str) {
         node.arg(dir.join("dist").join(runner_path(false)));
         node
     };
-    let out = command
-        .current_dir(&dir)
+    command.current_dir(dir);
+    command
+}
+
+#[test]
+fn the_exchange_checks_and_is_formatted() {
+    let dir = common::example("exchange", "examples/exchange-check");
+    success(&dir, &["check", "--warnings-as-errors"]);
+    success(&dir, &["fmt", "--check"]);
+}
+
+#[test]
+#[ignore = "needs Node and the installed runtime"]
+fn the_exchange_session_prints_its_expected_report() {
+    exchange_runs("js");
+}
+
+#[test]
+#[ignore = "needs Go"]
+fn the_exchange_session_prints_its_expected_report_on_go() {
+    exchange_runs("go");
+}
+
+/// The tests, then a session of 5 000 commands: traders send them at once,
+/// so the same report on both targets shows that the sequencer restores
+/// their order.
+fn exchange_runs(emit: &str) {
+    let dir = common::example("exchange", &format!("examples/exchange-{emit}"));
+    success(&dir, &["test", "--target", emit, "--seed", "7"]);
+    success(&dir, &["build", "--target", emit]);
+    let out = built_main(&dir, emit)
+        .args(["run", "--orders", "5000"])
         .output()
-        .expect("the interpreter runs");
+        .expect("the session runs");
     assert!(out.status.success(), "{out:?}");
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout),
-        "3\n10\ntrue\ntype error: expected Int, found Bool\ntype error: expected Bool, found Int\n"
+    let expected = fs::read_to_string(dir.join("expected.stdout")).expect("expected.stdout");
+    assert_eq!(String::from_utf8_lossy(&out.stdout), expected);
+    let refused = built_main(&dir, emit)
+        .args(["run", "--traders", "0"])
+        .output()
+        .expect("the session starts");
+    assert!(!refused.status.success(), "{refused:?}");
+    assert!(
+        String::from_utf8_lossy(&refused.stderr).contains("--traders must be at least 1"),
+        "{refused:?}"
     );
 }

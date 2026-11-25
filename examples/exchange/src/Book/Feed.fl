@@ -1,0 +1,71 @@
+/// A stream of commands for the book, each a function of its number alone,
+/// so a run is the same on every target and every trader can make its own
+/// share; and the JSON lines the commands travel as.
+module Book.Feed exposing (Malformed(..), command, encode, decode)
+
+import Book.Order exposing (Side(..), Price(..), Command(..))
+
+/// A line that is not a command.
+type error Malformed = Malformed String
+  deriving Eq, Show
+
+/// The bits of `x` mixed: the finalizer of MurmurHash3, on the 32-bit
+/// wrapping `Int` (the two constants are `0x85ebca6b` and `0xc2b2ae35`).
+mix : Int -> Int
+let mix x =
+  let a = Int.bit_xor x (Int.shift_right_unsigned x 16) * -2048144789
+  let b = Int.bit_xor a (Int.shift_right_unsigned a 13) * -1028477387
+  Int.bit_xor b (Int.shift_right_unsigned b 16)
+
+/// The `k`th non-negative random number of the command `seq`.
+draw : Int -> Int -> Int
+let draw seq k = Int.bit_and (mix (seq * 8 + k)) 2147483647
+
+/// The middle price around command `seq`: it climbs from 900 to 1100 and
+/// back every 12 800 commands.
+mid : Int -> Int
+let mid seq =
+  let phase = seq / 32 % 400
+  900 + (if phase < 200 then phase else 400 - phase)
+
+/// The command numbered `seq`: in a hundred, about 15 cancel one of the
+/// last 200 commands, 7 are market orders and the rest limit orders near
+/// the middle price, some of them crossing it. One in a hundred has no
+/// quantity, which the book refuses.
+command : Int -> Command
+let command seq =
+  let roll = draw seq 0 % 100
+  if roll < 15 && seq > 0 then
+    Cancel (seq - 1 - draw seq 1 % Int.min seq 200)
+  else
+    let side = if draw seq 2 % 2 == 0 then Buy else Sell
+    let qty = if roll == 99 then 0 else 1 + draw seq 3 % 40
+    let offset = draw seq 4 % 16 - 4
+    let price =
+      if roll < 22 then
+        Market
+      else
+        match side with
+        | Buy -> Limit (mid seq - offset)
+        | Sell -> Limit (mid seq + offset)
+    Place { id = seq; side = side; price = price; qty = qty }
+
+wire : PureCodec Json Command
+let wire = Codec.json Command.schema
+
+/// The command as one line of JSON.
+encode : Command ->{; SchemaError} String
+let encode command =
+  match Codec.encode_result wire command with
+  | Ok json -> Json.stringify json
+  | Err problem -> Fail.fail problem
+
+/// The command a line of JSON holds.
+decode : String ->{; Malformed} Command
+let decode line =
+  match Json.parse line with
+  | Err _ -> Fail.fail (Malformed line)
+  | Ok input ->
+    match Codec.decode_result wire input with
+    | Ok command -> command
+    | Err _ -> Fail.fail (Malformed line)
