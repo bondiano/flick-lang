@@ -78,12 +78,13 @@ const WORD = /[\p{L}\p{N}_']+/u;
 const completions = async (context: CompletionContext): Promise<CompletionResult | null> => {
   const word = context.matchBefore(WORD);
   const from = word?.from ?? context.pos;
-  const dotted = context.state.sliceDoc(from - 1, from) === ".";
+  const optional = context.state.sliceDoc(from - 2, from) === ".?";
+  const dotted = optional || context.state.sliceDoc(from - 1, from) === ".";
   if (word === null && !dotted && !context.explicit) return null;
   const controller = new AbortController();
   context.addEventListener("abort", () => controller.abort(), { onDocChange: true });
   // as the language server does: the text as written, and after a `.` the dot is the place, so that a step of `.address.` reads its record
-  const at = dotted ? from - 1 : from;
+  const at = optional ? from - 2 : dotted ? from - 1 : from;
   const items = await complete(context.state.doc.toString(), at, dotted, controller.signal).catch(() => null);
   if (items === null || items.length === 0) return null;
   return {

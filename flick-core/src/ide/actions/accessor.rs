@@ -38,7 +38,7 @@ impl Ide<'_> {
         let written = &text[start as usize..end as usize];
         let steps = &text[root.range().1 as usize..read.range().1 as usize];
         let continuous = steps.starts_with('.')
-            && (steps.chars()).all(|c| c == '.' || c == '_' || c == '\'' || c.is_alphanumeric());
+            && (steps.chars()).all(|c| matches!(c, '.' | '?' | '_' | '\'') || c.is_alphanumeric());
         if param.kind != K::VarPat
             || read.kind != K::FieldExpr
             || root.kind != K::NameExpr

@@ -1,0 +1,19 @@
+let city = user.address.?city
+//                     ^ operator
+//                      ^ operator
+//                       ^ property
+let cities = List.map .address.?city users
+//                             ^ operator
+//                               ^ property
+let deep = maybe |> .?address.?echo
+//                  ^ operator
+//                    ^ property
+//                            ^ operator
+//                              ^ property
+let raised = user?.city
+//               ^ operator
+//                ^ property
+let last = user.?city?
+//                   ^ operator
+let range = 0..n
+//           ^ operator

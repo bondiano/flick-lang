@@ -220,14 +220,26 @@ impl Server {
         if in_comment_or_string(&text, cursor) {
             return Ok(json!([]));
         }
+        // `?` triggers completion only as the `.?` of an optional step
+        if text[..cursor].ends_with('?') && !text[..cursor].ends_with(".?") {
+            return Ok(json!([]));
+        }
         let word = text[..cursor]
             .char_indices()
             .rev()
             .take_while(|(_, c)| c.is_ascii_alphanumeric() || *c == '_')
             .last()
             .map_or(cursor, |(i, _)| i);
-        let dotted = text[..word].ends_with('.');
-        let offset = if dotted { word - 1 } else { word };
+        // the `.` of an optional step `.?` is the place, as a `.` alone is
+        let optional = text[..word].ends_with(".?");
+        let dotted = optional || text[..word].ends_with('.');
+        let offset = if optional {
+            word - 2
+        } else if dotted {
+            word - 1
+        } else {
+            word
+        };
         // the text of an open document is what its last change analyzed
         let snapshot = self.snapshot_for(&path);
         let Some(file) = snapshot.file(&path) else {
@@ -383,7 +395,7 @@ fn capabilities() -> Value {
             "documentHighlightProvider": true,
             "definitionProvider": true,
             "referencesProvider": true,
-            "completionProvider": { "triggerCharacters": ["."] },
+            "completionProvider": { "triggerCharacters": [".", "?"] },
             "renameProvider": { "prepareProvider": true },
             "codeActionProvider": {
                 "codeActionKinds": ["quickfix", "refactor.rewrite", "refactor.extract", "refactor.inline"],

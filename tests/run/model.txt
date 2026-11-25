@@ -31,6 +31,7 @@ codegen/accessor_fields
 codegen/accessors
 codegen/accessor_projections
 codegen/accessor_shapes
+codegen/optional_paths
 codegen/task_twice
 codegen/errors
 codegen/error_match

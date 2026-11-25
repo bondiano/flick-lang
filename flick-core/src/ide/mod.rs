@@ -495,6 +495,8 @@ mod migration_tests;
 #[cfg(test)]
 mod operator_hover_tests;
 #[cfg(test)]
+mod optional_paths_tests;
+#[cfg(test)]
 mod paths_tests;
 #[cfg(test)]
 mod pattern_tests;

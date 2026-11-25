@@ -27,6 +27,7 @@ codegen/accessor_fields
 codegen/accessors
 codegen/accessor_projections
 codegen/accessor_shapes
+codegen/optional_paths
 codegen/composition_method
 codegen/deep_recursion
 codegen/defaults

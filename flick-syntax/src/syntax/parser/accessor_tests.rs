@@ -126,3 +126,45 @@ fn foreign_metadata_takes_no_accessor() {
     let src = "foreign read from \"./fs.js\" \"read\"\n  arity .x\n";
     assert_eq!(errors(src), ["FLICK-S007 ."]);
 }
+
+/// `.?label` is one optional step: its `?` stays in the step, so `x.?f`
+/// and the propagation `x?.f` keep different trees.
+#[test]
+fn an_optional_step_keeps_its_question_mark() {
+    assert_eq!(
+        sexp("let c = .?address.?city"),
+        "(LetDecl let (VarPat c) = (Block (AccessorExpr (AccessorStep . ? address) \
+         (AccessorStep . ? city))))"
+    );
+    assert_eq!(
+        sexp("let c = user.address.?city.name"),
+        "(LetDecl let (VarPat c) = (Block (FieldExpr (FieldExpr (FieldExpr (NameExpr user) \
+         . address) . ? city) . name)))"
+    );
+    assert!(
+        sexp("let c = user?.city").contains("(FieldExpr (QuestionExpr (NameExpr user) ?) . city)")
+    );
+    // a `?` after a path is postfix and ends it
+    assert!(
+        sexp("let c = user.?city?")
+            .contains("(QuestionExpr (FieldExpr (NameExpr user) . ? city) ?)")
+    );
+    assert!(
+        sexp("let c = .?city?").contains("(QuestionExpr (AccessorExpr (AccessorStep . ? city)) ?)")
+    );
+    // a hole takes no field, optional or not
+    assert_eq!(errors("let c = List.map _.?city users"), ["FLICK-S018 _"]);
+}
+
+#[test]
+fn an_optional_step_needs_its_label_right_after() {
+    assert_eq!(errors("let a = .? city\nlet b = 1"), ["FLICK-S007 ."]);
+    assert_eq!(errors("let a = . ?city"), ["FLICK-S007 ."]);
+}
+
+/// `echo` and `todo` stay labels after `.?`, as after `.`.
+#[test]
+fn a_debugging_keyword_is_a_label_after_an_optional_dot() {
+    assert!(sexp("let a = .?echo").contains("(AccessorStep . ? echo)"));
+    assert!(sexp("let a = x.?todo").contains("(FieldExpr (NameExpr x) . ? todo)"));
+}

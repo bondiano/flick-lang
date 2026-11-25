@@ -1,0 +1,38 @@
+// `.?label` reads a field of an `Option`: a path with such a step is `None`
+// once a step finds `None`, and otherwise `Some` of its last field, whose
+// own `Option` stays whole. The root is read once, and a `None` ends only
+// the path.
+module App.Main exposing (main)
+
+type alias Address = { city : Option String; street : String }
+
+type alias User = { name : String; address : Option Address }
+
+type alias Deep = { inner : Option { value : Option (Option Int) } }
+
+city : Option User -> Option (Option String)
+let city maybe_user = maybe_user |> .?address.?city
+
+street : User -> Option String
+let street user = user.address.?street
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let nowhere : User = { name = "Ada"; address = None }
+  let unnamed = { name = "Alan"; address = Some { city = None; street = "Main" } }
+  let named = { name = "Grace"; address = Some { city = Some "Novosibirsk"; street = "Lenina" } }
+  Platform.stdout_line (show (city None))
+  Platform.stdout_line (show (city (Some nowhere)))
+  Platform.stdout_line (show (city (Some unnamed)))
+  Platform.stdout_line (show (city (Some named)))
+  Platform.stdout_line (show ((Some named).?address.?city))
+  Platform.stdout_line (show (street nowhere))
+  Platform.stdout_line (show (street named))
+  Platform.stdout_line (show (List.map .address.?street [nowhere, unnamed, named]))
+  let deep : Option Deep = Some { inner = Some { value = Some None } }
+  Platform.stdout_line (show (deep |> .?inner.?value))
+  let traced () =
+    Platform.stdout_line "root"
+    Some nowhere
+  Platform.stdout_line (show ((traced ()).?address.?city))
+  Platform.stdout_line "after"

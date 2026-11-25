@@ -136,5 +136,43 @@ let tests = [
         let r = { z = noted log "z" 1; a = noted log "a" 2 }
         Test.check (Test.equal (3, ["z", "a"]) (r.z + r.a, Ref.get log))
       }),
+    Test.effect_test
+      "an optional path reads its root once and no step after a None"
+      (task {
+        let log = Ref.make []
+        let root = fun (name : String) (city : Option (Option String)) ->
+          ignore (noted log name 0)
+          Some { address = Some { city = city } }
+        let found = (root "found" (Some (Some "Novosibirsk"))).?address.?city
+        let unnamed = (root "unnamed" (Some None)).?address.?city
+        let missing = (None : Option Pin).?address.?city
+        Test.check
+          (Test.equal
+            ((Some (Some (Some "Novosibirsk")), Some (Some None), None), ["found", "unnamed"])
+            ((found, unnamed, missing), Ref.get log))
+      }),
+  ],
+  Test.group "optional paths" [
+    Test.test "one Some for a whole path, the last field whole" (fun () ->
+      city : Option Pin -> Option (Option String)
+      let city = .?address.?city
+      at : Option String -> Option Pin
+      let at c = Some { address = Some { city = c } }
+      Test.equal [None, None, Some None, Some (Some "Novosibirsk")] [
+        city None,
+        city (Some { address = None }),
+        city (at None),
+        city (at (Some "Novosibirsk")),
+      ]
+    ),
+    Test.test "plain steps after an optional one read inside its Some" (fun () ->
+      let streets = List.map .address.?street.name
+      Test.equal
+        [None, Some "Lenina"]
+        (streets [{ address = None }, { address = Some { street = { name = "Lenina" } } }])
+    ),
   ],
 ]
+
+/// A user whose address and its city may be missing.
+type alias Pin = { address : Option { city : Option String } }

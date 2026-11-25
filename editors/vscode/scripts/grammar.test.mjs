@@ -337,6 +337,33 @@ test("the labels of an accessor are members, keywords included, and its dots ope
   }
 });
 
+test("an optional step `.?label` reads `.?` as an operator and its label as a member", () => {
+  const covering = (line, at) => tokenizeLine(line).find((t) => t.start <= at && at < t.end);
+  for (const line of ["let c = user.address.?city", "let c = .?address.?city", "let c = maybe |> .?address.?city", "let c = user.?city?"]) {
+    for (const word of ["address", "city"].filter((w) => line.includes(w))) {
+      assert.ok(scopesFor(line, word).includes("variable.other.member.flick"), `${word} in ${line}`);
+    }
+    const step = line.indexOf(".?");
+    for (const at of [step, step + 1]) {
+      assert.ok(covering(line, at).scopes.includes("keyword.operator.flick"), `${at} in ${line}`);
+    }
+  }
+  for (const word of ["echo", "todo"]) {
+    const scopes = scopesFor(`let x = List.map .?${word} logs`, word);
+    assert.ok(scopes.includes("variable.other.member.flick"), `${word}: ${JSON.stringify(scopes)}`);
+  }
+  // propagation then a field, and `?` after a path, stay as they were
+  const question = "let c = user?.city";
+  assert.ok(covering(question, question.indexOf("?")).scopes.includes("keyword.operator.flick"));
+  assert.ok(scopesFor(question, "city").includes("variable.other.member.flick"));
+  assert.ok(scopesFor(question, "user").includes("variable.other.flick"));
+  const trailing = "let c = user.?city?";
+  assert.ok(covering(trailing, trailing.length - 1).scopes.includes("keyword.operator.flick"));
+  // a range before `?` is still a range
+  const range = "let r = 0..?x";
+  assert.equal(covering(range, range.indexOf("..")).text, "..");
+});
+
 test("an effect row begins only where `{` touches `->`, as the compiler reads it", () => {
   const begin = new RegExp(grammar.repository["effect-row"].begin);
   assert.ok(begin.test("f : A ->{Log; E} B"));

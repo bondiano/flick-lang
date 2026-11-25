@@ -192,3 +192,14 @@ let accessors users =
   let ranged = (List.range 1 3, [0..5], 1.5)
   let labels = (List.map .echo logs, .log.todo, (make ()).echo, [0..echo 5])
   cities
+
+optional_steps : List User -> Option User -> Unit
+let optional_steps users maybe =
+  let cities = List.map .address.?city users
+  let city = maybe |> .?address.?city.name
+  let rooted = maybe.?address.?city
+  let ended = (maybe.?address)?
+  let propagated = maybe?.address
+  let postfix = maybe.?address?
+  let labels = (.?echo, maybe.?todo)
+  ()
