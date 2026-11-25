@@ -1,0 +1,145 @@
+module Book.PropertyTest exposing (tests)
+
+import Book.Book as Book exposing (Book)
+import Book.Order exposing (Side(..), Price(..), Command(..), Event(..))
+import Book.Reference as Reference
+
+/// A command as numbers: its kind, side, price and quantity. Few prices
+/// and small quantities make many crossings and many orders at one price.
+draw : Gen.Gen (Int, (Int, (Int, Int)))
+let draw = Gen.pair (Gen.int 0 9) (Gen.pair (Gen.int 0 1) (Gen.pair (Gen.int 1 8) (Gen.int 0 5)))
+
+/// The command numbered `id`: two in ten cancel an order up to 8 back,
+/// one is a market order, the rest are limit orders between 6 and 13.
+command : Int -> (Int, (Int, (Int, Int))) -> Command
+let command id (roll, (side, (price, qty))) =
+  let side = if side == 0 then Buy else Sell
+  if roll < 2 then
+    Cancel (id - price)
+  else if roll == 2 then
+    Place { id = id; side = side; price = Market; qty = qty }
+  else
+    Place { id = id; side = side; price = Limit (price + 5); qty = qty }
+
+commands : Gen.Gen (List Command)
+let commands = Gen.map (List.map_indexed command) (Gen.list 60 draw)
+
+/// Each command with the book after it and what it did.
+type alias Step = { command : Command; book : Book; events : List Event }
+
+steps : List Command -> List Step
+let steps commands =
+  let (_, all) =
+    List.fold_left
+      (fun (book, done) command ->
+        let (next, events) = Book.step command book
+        (next, done ++ [{ command = command; book = next; events = events }])
+      )
+      (Book.empty, [])
+      commands
+  all
+
+/// What each command did and both sides after it, as the naive model has it.
+model_trace : List Command -> List (List Event, List (Int, Int, Int), List (Int, Int, Int))
+let model_trace commands =
+  let (_, trace) =
+    List.fold_left
+      (fun (model, done) command ->
+        let (next, events) = Reference.step command model
+        (next, done ++ [(events, Reference.resting Buy next, Reference.resting Sell next)])
+      )
+      (Reference.empty, [])
+      commands
+  trace
+
+/// Whether the best bid is below the best ask, when both sides have one.
+uncrossed : Book -> Bool
+let uncrossed book =
+  match (Book.best_bid book, Book.best_ask book) with
+  | (Some bid, Some ask) -> bid < ask
+  | _ -> true
+
+/// The limit price of each order placed with one.
+limits : List Command -> List (Int, Int)
+let limits commands =
+  List.filter_map
+    (fun command ->
+      match command with
+      | Place { id; price = Limit price } -> Some (id, price)
+      | _ -> None
+    )
+    commands
+
+/// Whether each fill of the step is at its resting order's price and no
+/// worse than the limit of the order that took it.
+fair : List (Int, Int) -> Step -> Bool
+let fair prices step =
+  List.all
+    (fun event ->
+      match (event, step.command) with
+      | (Traded trade, Place order) ->
+        let at_maker =
+          List.find (fun (id, _) -> id == trade.maker) prices == Some (trade.maker, trade.price)
+        let in_limit =
+          match (order.side, order.price) with
+          | (_, Market) -> true
+          | (Buy, Limit most) -> trade.price <= most
+          | (Sell, Limit least) -> trade.price >= least
+        at_maker && in_limit
+      | _ -> true
+    )
+    step.events
+
+/// The quantity of order `id` that the events account for: filled on
+/// either side, dropped or cancelled.
+accounted : Int -> List Event -> Int
+let accounted id events =
+  List.sum
+    (List.map
+      (fun event ->
+        match event with
+        | Traded trade when trade.taker == id || trade.maker == id -> trade.qty
+        | Dropped dropped left when dropped == id -> left
+        | Cancelled cancelled left when cancelled == id -> left
+        | _ -> 0
+      )
+      events)
+
+/// Whether every order the book took is accounted for to the unit: what
+/// filled, dropped and was cancelled, and what still rests.
+kept : List Step -> Bool
+let kept all =
+  let events = List.flat_map (fun step -> step.events) all
+  let last = Option.with_default Book.empty (Option.map (fun step -> step.book) (List.last all))
+  let resting = Book.resting Buy last ++ Book.resting Sell last
+  let left id =
+    List.sum
+      (List.map (fun (_, _, qty) -> qty) (List.filter (fun (rest, _, _) -> rest == id) resting))
+  List.all
+    (fun step ->
+      match (step.command, step.events) with
+      | (Place _, [Refused _ _]) -> true
+      | (Place order, _) -> accounted order.id events + left order.id == order.qty
+      | _ -> true
+    )
+    all
+
+tests : List Test.Test
+let tests = [
+  Test.property "the book does what the naive book does" commands (fun commands ->
+    Test.equal
+      (model_trace commands)
+      (List.map
+        (fun step -> (step.events, Book.resting Buy step.book, Book.resting Sell step.book))
+        (steps commands))
+  ),
+  Test.property "the best bid stays below the best ask" commands (fun commands ->
+    Test.is_true "a crossed book" (List.all (fun step -> uncrossed step.book) (steps commands))
+  ),
+  Test.property "fills are at the resting price and within the limit" commands (fun commands ->
+    Test.is_true "an unfair fill" (List.all (fair (limits commands)) (steps commands))
+  ),
+  Test.property "every unit of an order is accounted for" commands (fun commands ->
+    Test.is_true "a lost or made-up unit" (kept (steps commands))
+  ),
+]

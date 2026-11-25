@@ -1,0 +1,73 @@
+/// What a run did, counted event by event, with a checksum of every event
+/// in order: two runs that print the same tally answered alike.
+module Book.Tally exposing (Tally, empty, add, malformed, lines)
+
+import Book.Order exposing (Event(..), Reason(..))
+
+type alias Tally = {
+  trades : Int
+  volume : Int
+  rested : Int
+  dropped : Int
+  cancelled : Int
+  refused : Int
+  malformed : Int
+  checksum : Int
+}
+
+empty : Tally
+let empty = {
+  trades = 0
+  volume = 0
+  rested = 0
+  dropped = 0
+  cancelled = 0
+  refused = 0
+  malformed = 0
+  checksum = 0
+}
+
+reason_code : Reason -> Int
+let reason_code reason =
+  match reason with
+  | NonPositiveQuantity -> 1
+  | NonPositivePrice -> 2
+  | DuplicateId -> 3
+  | UnknownOrder -> 4
+
+/// A number for the event, for the checksum.
+code : Event -> Int
+let code event =
+  match event with
+  | Traded trade -> trade.taker * 3 + trade.maker * 5 + trade.price * 7 + trade.qty
+  | Rested id -> id * 11 + 1
+  | Dropped id left -> id * 13 + left
+  | Cancelled id left -> id * 17 + left
+  | Refused id reason -> id * 19 + reason_code reason
+
+/// The tally after one event; the checksum wraps as `Int` does.
+count : Tally -> Event -> Tally
+let count tally event =
+  let tally = { tally with checksum = tally.checksum * 31 + code event }
+  match event with
+  | Traded trade -> { tally with trades = tally.trades + 1; volume = tally.volume + trade.qty }
+  | Rested _ -> { tally with rested = tally.rested + 1 }
+  | Dropped _ _ -> { tally with dropped = tally.dropped + 1 }
+  | Cancelled _ _ -> { tally with cancelled = tally.cancelled + 1 }
+  | Refused _ _ -> { tally with refused = tally.refused + 1 }
+
+/// The tally after the events of one command.
+add : List Event -> Tally -> Tally
+let add events tally = List.fold_left count tally events
+
+/// The tally after a line that was not a command.
+malformed : Tally -> Tally
+let malformed tally = { tally with malformed = tally.malformed + 1 }
+
+/// The tally as lines of text.
+lines : Tally -> List String
+let lines t = [
+  "trades \{t.trades}, volume \{t.volume}",
+  "rested \{t.rested}, dropped \{t.dropped}, cancelled \{t.cancelled}, refused \{t.refused}, malformed \{t.malformed}",
+  "checksum \{t.checksum}",
+]

@@ -1,0 +1,106 @@
+module Book.BookTest
+
+import Test exposing (expect, to)
+
+import Book.Book as Book exposing (Book)
+import Book.Order exposing (Side(..), Price(..), Command(..), Reason(..), Event(..))
+
+limit : Int -> Side -> Int -> Int -> Command
+let limit id side price qty = Place { id = id; side = side; price = Limit price; qty = qty }
+
+market : Int -> Side -> Int -> Command
+let market id side qty = Place { id = id; side = side; price = Market; qty = qty }
+
+trade : Int -> Int -> Int -> Int -> Event
+let trade taker maker price qty = Traded { taker = taker; maker = maker; price = price; qty = qty }
+
+/// The book after the commands, from an empty one, and the events of the
+/// last of them.
+replay : List Command -> (Book, List Event)
+let replay commands =
+  List.fold_left (fun (book, _) command -> Book.step command book) (Book.empty, []) commands
+
+last_events : List Command -> List Event
+let last_events commands =
+  let (_, events) = replay commands
+  events
+
+/// A name, the commands from an empty book, and the events of the last.
+rules : List (String, List Command, List Event)
+let rules = [
+  ("a limit that does not cross rests", [limit 1 Sell 10 5, limit 2 Buy 9 5], [Rested 2]),
+  (
+    "a fill is at the resting order's price",
+    [limit 1 Sell 10 5, limit 2 Buy 12 3],
+    [trade 2 1 10 3],
+  ),
+  (
+    "a partial fill rests what is left",
+    [limit 1 Sell 10 5, limit 2 Buy 11 8],
+    [trade 2 1 10 5, Rested 2],
+  ),
+  (
+    "a better price fills first",
+    [limit 1 Buy 10 1, limit 2 Buy 12 1, limit 3 Sell 9 2],
+    [trade 3 2 12 1, trade 3 1 10 1],
+  ),
+  (
+    "equal prices fill in arrival order",
+    [limit 1 Sell 10 2, limit 2 Sell 10 2, limit 3 Sell 9 1, market 4 Buy 4],
+    [trade 4 3 9 1, trade 4 1 10 2, trade 4 2 10 1],
+  ),
+  (
+    "a limit stops at its price",
+    [limit 1 Sell 10 2, limit 2 Sell 11 2, limit 3 Buy 10 3],
+    [trade 3 1 10 2, Rested 3],
+  ),
+  ("a market order against an empty side drops", [market 1 Buy 5], [Dropped 1 5]),
+  (
+    "a market order drops what it cannot fill",
+    [limit 1 Buy 10 2, market 2 Sell 5],
+    [trade 2 1 10 2, Dropped 2 3],
+  ),
+  (
+    "a cancel reports what was left",
+    [limit 1 Sell 10 5, limit 2 Buy 10 2, Cancel 1],
+    [Cancelled 1 3],
+  ),
+  ("a cancelled order does not fill", [limit 1 Sell 10 5, Cancel 1, market 2 Buy 3], [Dropped 2 3]),
+  (
+    "cancelling a filled order is refused",
+    [limit 1 Sell 10 5, limit 2 Buy 10 5, Cancel 1],
+    [Refused 1 UnknownOrder],
+  ),
+  ("cancelling an unknown order is refused", [Cancel 7], [Refused 7 UnknownOrder]),
+  ("an order without quantity is refused", [limit 1 Buy 10 0], [Refused 1 NonPositiveQuantity]),
+  ("a limit without a price is refused", [limit 1 Buy 0 3], [Refused 1 NonPositivePrice]),
+  (
+    "an id that is resting is refused",
+    [limit 1 Buy 10 3, limit 1 Sell 20 1],
+    [Refused 1 DuplicateId],
+  ),
+]
+
+suite "matching" {
+  test.each rules "{0}" (_, commands, events) { expect (last_events commands) |> to.equal events }
+}
+
+suite "the book" {
+  test "keeps each side best first" {
+    let (book, _) =
+      replay [limit 1 Buy 10 1, limit 2 Buy 12 2, limit 3 Sell 15 3, limit 4 Sell 14 4]
+    expect (Book.resting Buy book, Book.resting Sell book)
+    |> to.equal ([(2, 12, 2), (1, 10, 1)], [(4, 14, 4), (3, 15, 3)])
+  }
+
+  test "skips cancelled orders for the best prices" {
+    let (book, _) = replay [limit 1 Buy 12 1, limit 2 Buy 10 1, limit 3 Sell 14 1, Cancel 1]
+    expect (Book.best_bid book, Book.best_ask book) |> to.equal (Some 10, Some 14)
+  }
+
+  test "adds up the quantity at each price" {
+    let (book, _) =
+      replay [limit 1 Sell 11 2, limit 2 Sell 10 3, limit 3 Sell 11 4, limit 4 Sell 12 1]
+    expect (Book.levels 2 Sell book) |> to.equal [(10, 3), (11, 6)]
+  }
+}

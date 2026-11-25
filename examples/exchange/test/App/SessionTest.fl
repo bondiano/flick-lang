@@ -1,0 +1,72 @@
+module App.SessionTest
+
+import Test exposing (expect, to)
+
+import App.Session as Session
+import App.View as View exposing (Row(..))
+import Book.Book as Book exposing (Book)
+import Book.Feed as Feed exposing (Malformed(..))
+import Book.Order exposing (Side(..), Price(..), Command(..))
+import Book.Tally as Tally exposing (Tally)
+
+/// The first `n` commands of the feed applied one after another, with no
+/// traders and no queue.
+replayed : Int -> (Tally, Book)
+let replayed n =
+  List.fold_left
+    (fun (tally, book) seq ->
+      let (next, events) = Book.step (Feed.command seq) book
+      (Tally.add events tally, next)
+    )
+    (Tally.empty, Book.empty)
+    (List.range 0 n)
+
+/// A session of `n` commands from `traders`, as the tally and both sides
+/// of the book it ends with.
+session :
+  Int -> Int ->{Async, Host.Console; AppError} (Tally, List (Int, Int, Int), List (Int, Int, Int))
+let session n traders =
+  let (tally, book) = Session.run { orders = n; traders = traders } (fun _ _ -> ())
+  (tally, Book.resting Buy book, Book.resting Sell book)
+
+limit : Int -> Side -> Int -> Int -> Command
+let limit id side price qty = Place { id = id; side = side; price = Limit price; qty = qty }
+
+suite "a session" {
+  test.each [1, 3, 7] "with {0} traders ends as the commands in order" (traders) {
+    let (tally, book) = replayed 600
+    expect (session 600 traders) |> to.equal (tally, Book.resting Buy book, Book.resting Sell book)
+  }
+
+  test "of no commands leaves the book empty" {
+    expect (session 0 2) |> to.equal (Tally.empty, [], [])
+  }
+}
+
+suite "the wire" {
+  test "a command comes back as it was sent" {
+    let sent = List.map Feed.command (List.range 0 50) ++ [limit 9 Sell 10 0, Cancel (-3)]
+    let received = List.map_effect (fun command -> Feed.decode (Feed.encode command)) sent
+    expect received |> to.equal sent
+  }
+
+  test "a line that is not a command is malformed" {
+    expect (task { Feed.decode "{\"_tag\":\"Cancel\"}" })
+      |> to.fail_with (Malformed "{\"_tag\":\"Cancel\"}")
+  }
+}
+
+suite "the view" {
+  test "the ladder has the asks above the spread and the bids below" {
+    let (book, _) =
+      List.fold_left (fun (book, _) command -> Book.step command book) (Book.empty, []) [
+        limit 1 Sell 12 1,
+        limit 2 Sell 11 2,
+        limit 3 Buy 9 3,
+        limit 4 Buy 8 4,
+        limit 5 Buy 9 5,
+      ]
+    expect (View.ladder book)
+    |> to.equal [Level Sell 12 1, Level Sell 11 2, Spread (Some 2), Level Buy 9 8, Level Buy 8 4]
+  }
+}

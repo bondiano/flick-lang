@@ -1,0 +1,69 @@
+/// The command line: `run` prints the report of a session, `watch` redraws
+/// the book while one runs.
+module App.Main exposing (main)
+
+import App.Exchange exposing (Exchange)
+import App.Session as Session exposing (Settings)
+import App.View as View
+import Cli
+
+/// The settings, checked: a session needs a trader, and a number of
+/// commands that is not negative.
+settings : Int -> Int ->{; AppError} Settings
+let settings orders traders =
+  if orders < 0 then
+    App.fail "--orders cannot be negative"
+  else if traders < 1 then
+    App.fail "--traders must be at least 1"
+  else
+    ({ orders = orders; traders = traders })
+
+run_command : Cli.Command {Host.Console, Async} {AppError}
+let run_command = cli "run" {
+  description "Run a session and print what the book did"
+  /// How many commands the traders send
+  flag orders : Int = 200000
+  /// How many traders send them at once
+  flag traders : Int = 4
+  handle fun { orders; traders } ->
+    let session = settings orders traders
+    let (tally, book) = Session.run session (fun _ _ -> ())
+    for line <- View.report session tally book do Platform.stdout_line line
+}
+
+watch_command : Cli.Command {Host.Console, Async} {AppError}
+let watch_command = cli "watch" {
+  description "Run a session and redraw the book as it fills"
+  /// How many commands the traders send
+  flag orders : Int = 20000
+  /// How many traders send them at once
+  flag traders : Int = 4
+  /// Redraw after this many commands
+  flag every : Int = 200
+  /// Wait this many milliseconds after each redraw
+  flag pause : Int = 30
+  handle fun { orders; traders; every; pause } ->
+    let session = settings orders traders
+    let wait =
+      match Duration.millis (Int.to_float pause) with
+      | Ok wait when every > 0 && pause >= 0 -> wait
+      | _ -> App.fail "--every must be positive and --pause not negative"
+    let redraw done tally =
+      if done % every == 0 then
+        Platform.stdout_write (View.frame session done tally (Exchange.book ()))
+        Effect.sleep wait
+    let (tally, book) = Session.run session redraw
+    Platform.stdout_write (View.frame session orders tally book)
+}
+
+command : Cli.Command {Host.Console, Async} {AppError}
+let command = cli "exchange" {
+  description "A limit order book that traders fill at once"
+  subcommand run_command
+  subcommand watch_command
+}
+
+main : Unit ->{Host.Environment, Host.Arguments, Host.Console, Async; AppError} Unit
+let main () =
+  try Cli.run_version "0.1.0" command (Platform.args ()) with
+  | Cli.CliError message -> App.fail message

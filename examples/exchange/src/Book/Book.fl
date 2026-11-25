@@ -1,0 +1,198 @@
+/// A limit order book with price-time priority: one priority queue a side,
+/// the best price first and, at one price, the order that came first.
+module Book.Book exposing (Book, empty, step, best_bid, best_ask, resting, levels)
+
+import HashMap exposing (HashMap)
+import PriorityQueue exposing (PriorityQueue)
+import Book.Order exposing (Side(..), Price(..), Order, Command(..), Reason(..), Event(..))
+
+/// A bid's price, ordered so that the highest bid leaves its queue first.
+type BidPrice = BidPrice Int
+  deriving Eq
+
+instance Ord BidPrice =
+  let compare (BidPrice a) (BidPrice b) = compare b a
+
+/// An order at rest; what is left of it is in the book's `live` map.
+type alias Resting = { id : Int; price : Int }
+
+/// What is left of each resting order, by id.
+type alias Live = HashMap EqHash.Canonical Int Int
+
+/// A cancelled or filled order stays in its queue until it reaches the top,
+/// where `top` drops it: a priority queue can only take out its first pair.
+type Book =
+  | Book {
+    bids : PriorityQueue BidPrice Resting
+    asks : PriorityQueue Int Resting
+    live : Live
+  }
+
+/// What placing one order has changed so far: the live map and the events,
+/// in order.
+type alias Pass = { live : Live; events : List Event }
+
+empty : Book
+let empty = Book { bids = PriorityQueue.empty; asks = PriorityQueue.empty; live = HashMap.empty }
+
+/// The queue without its first pair.
+without_top : Ord p => PriorityQueue p a -> PriorityQueue p a
+let without_top queue =
+  match PriorityQueue.pop queue with
+  | Some (_, rest) -> rest
+  | None -> queue
+
+/// The queue rid of the dead orders on its top, and its first live order
+/// with what is left of it.
+top : Ord p => Live -> PriorityQueue p Resting -> (PriorityQueue p Resting, Option (Resting, Int))
+let rec top live queue =
+  match PriorityQueue.peek queue with
+  | None -> (queue, None)
+  | Some (_, order) ->
+    match HashMap.get order.id live with
+    | Some left -> (queue, Some (order, left))
+    | None -> top live (without_top queue)
+
+/// Fills up to `qty` of the order `taker` from `queue` while `crosses`
+/// holds for the best price there: the quantity left and the queue after.
+sweep :
+  Ord p =>
+  Int ->
+  (Int -> Bool) ->
+  Int ->
+  PriorityQueue p Resting ->
+  Pass ->
+  (Int, PriorityQueue p Resting, Pass)
+let rec sweep taker crosses qty queue pass =
+  if qty == 0 then
+    (0, queue, pass)
+  else
+    match top pass.live queue with
+    | (cleaned, Some (maker, left)) when crosses maker.price ->
+      let filled = Int.min qty left
+      let events =
+        pass.events
+          ++ [Traded { taker = taker; maker = maker.id; price = maker.price; qty = filled }]
+      if filled == left then
+        sweep taker crosses (qty - filled) (without_top cleaned) {
+          live = HashMap.remove maker.id pass.live
+          events = events
+        }
+      else
+        (0, cleaned, { live = HashMap.insert maker.id (left - filled) pass.live; events = events })
+    | (cleaned, _) -> (qty, cleaned, pass)
+
+/// Rests the unfilled `left` of a limit order in `queue`, at the priority
+/// its price has there; a market order drops it.
+rest :
+  Ord p =>
+  (Int -> p) -> Order -> Int -> PriorityQueue p Resting -> Pass -> (PriorityQueue p Resting, Pass)
+let rest priority order left queue pass =
+  if left == 0 then
+    (queue, pass)
+  else
+    match order.price with
+    | Limit price -> (
+      PriorityQueue.push (priority price) { id = order.id; price = price } queue,
+      { live = HashMap.insert order.id left pass.live; events = pass.events ++ [Rested order.id] },
+    )
+    | Market -> (queue, { pass with events = pass.events ++ [Dropped order.id left] })
+
+/// Whether a resting price is good enough for an order on `side` with
+/// `limit`.
+crosses : Side -> Price -> Int -> Bool
+let crosses side limit resting_price =
+  match (side, limit) with
+  | (_, Market) -> true
+  | (Buy, Limit price) -> resting_price <= price
+  | (Sell, Limit price) -> resting_price >= price
+
+place : Order -> Book -> (Book, List Event)
+let place order (Book book) =
+  let matches = crosses order.side order.price
+  let start = { live = book.live; events = [] }
+  match order.side with
+  | Buy ->
+    let (left, asks, filled) = sweep order.id matches order.qty book.asks start
+    let (bids, pass) = rest BidPrice order left book.bids filled
+    (Book { bids = bids; asks = asks; live = pass.live }, pass.events)
+  | Sell ->
+    let (left, bids, filled) = sweep order.id matches order.qty book.bids start
+    let (asks, pass) = rest identity order left book.asks filled
+    (Book { bids = bids; asks = asks; live = pass.live }, pass.events)
+
+/// Why the book refuses to place `order`, if it does.
+refusal : Live -> Order -> Option Reason
+let refusal live order =
+  if order.qty <= 0 then
+    Some NonPositiveQuantity
+  else if Option.is_some (HashMap.get order.id live) then
+    Some DuplicateId
+  else
+    match order.price with
+    | Limit price when price <= 0 -> Some NonPositivePrice
+    | _ -> None
+
+/// The book after one command, and what happened, in order.
+step : Command -> Book -> (Book, List Event)
+let step command (Book book) =
+  match command with
+  | Cancel id ->
+    match HashMap.get id book.live with
+    | Some left -> (Book { book with live = HashMap.remove id book.live }, [Cancelled id left])
+    | None -> (Book book, [Refused id UnknownOrder])
+  | Place order ->
+    match refusal book.live order with
+    | Some reason -> (Book book, [Refused order.id reason])
+    | None -> place order (Book book)
+
+/// The live orders of a queue, best first, as `(id, price, quantity)`.
+live_orders : Ord p => Live -> PriorityQueue p Resting -> List (Int, Int, Int)
+let live_orders live queue =
+  List.filter_map
+    (fun (_, order) ->
+      Option.map (fun left -> (order.id, order.price, left)) (HashMap.get order.id live)
+    )
+    (PriorityQueue.to_list queue)
+
+/// The resting orders of a side as `(id, price, quantity)`, best first.
+resting : Side -> Book -> List (Int, Int, Int)
+let resting side (Book book) =
+  match side with
+  | Buy -> live_orders book.live book.bids
+  | Sell -> live_orders book.live book.asks
+
+best_price : Ord p => Live -> PriorityQueue p Resting -> Option Int
+let best_price live queue =
+  match top live queue with
+  | (_, Some (order, _)) -> Some order.price
+  | (_, None) -> None
+
+/// The highest live bid.
+best_bid : Book -> Option Int
+let best_bid (Book book) = best_price book.live book.bids
+
+/// The lowest live ask.
+best_ask : Book -> Option Int
+let best_ask (Book book) = best_price book.live book.asks
+
+/// The price levels of a queue after `found`, newest level first, until
+/// there are `n` of them: each price with the quantity live there.
+gather : Ord p => Live -> Int -> PriorityQueue p Resting -> List (Int, Int) -> List (Int, Int)
+let rec gather live n queue found =
+  match top live queue with
+  | (_, None) -> found
+  | (cleaned, Some (order, left)) ->
+    match found with
+    | [(price, total), ...others] when price == order.price ->
+      gather live n (without_top cleaned) ([(price, total + left)] ++ others)
+    | _ when List.length found == n -> found
+    | _ -> gather live n (without_top cleaned) ([(order.price, left)] ++ found)
+
+/// The first `n` price levels of a side, best first: each price with the
+/// quantity resting there.
+levels : Int -> Side -> Book -> List (Int, Int)
+let levels n side (Book book) =
+  match side with
+  | Buy -> List.reverse (gather book.live n book.bids [])
+  | Sell -> List.reverse (gather book.live n book.asks [])
