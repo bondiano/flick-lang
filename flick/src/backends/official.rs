@@ -160,6 +160,19 @@ pub(super) fn known(id: &str, project: Option<&Project>) -> Option<BackendPin> {
         .map(|entry| pin_of(&entry))
 }
 
+/// The pin of the official backend `id` a local run takes, read without its
+/// component's bytes: a checkout's own, or the one `flick.lock` names.
+/// It is the pin [`local_bytes`] would find a component of.
+pub(super) fn local_pin(id: &str, project: Option<&Project>) -> Option<BackendPin> {
+    if let Some(pin) = checkout_pin(id) {
+        return Some(pin);
+    }
+    let entry = project.and_then(|p| lock_entry(p, id))?;
+    stored_path(&entry.sha256)
+        .is_some_and(|path| path.is_file())
+        .then(|| pin_of(&entry))
+}
+
 /// The component of the official backend `id` and its pin, from a checkout,
 /// `flick.lock` and the store, or the index; whatever the index gives is
 /// pinned in `flick.lock` of `project`.
@@ -228,6 +241,22 @@ fn pin_of(entry: &LockedBackend) -> BackendPin {
 /// directory, under `FLICK_BACKENDS_PATH`, or where this binary was built
 /// while that is still there. An index `FLICK_BACKENDS_INDEX` names wins.
 fn checkout(id: &str) -> Option<(BackendPin, Vec<u8>)> {
+    let package = checkout_root(id)?;
+    let pin = checkout_pin(id)?;
+    let bytes = fs::read(package.join("component.wasm")).ok()?;
+    Some((pin, bytes))
+}
+
+/// The pin of a checkout's own component of `id`, without its bytes.
+fn checkout_pin(id: &str) -> Option<BackendPin> {
+    let package = checkout_root(id)?;
+    let pin: BackendPin =
+        serde_json::from_slice(&fs::read(package.join("backend.json")).ok()?).ok()?;
+    (pin.identity.id == id && package.join("component.wasm").is_file()).then_some(pin)
+}
+
+/// The `package` directory of a checkout's own component of `id`.
+fn checkout_root(id: &str) -> Option<PathBuf> {
     if env::var_os("FLICK_BACKENDS_INDEX").is_some_and(|i| !i.is_empty()) {
         return None;
     }
@@ -248,11 +277,7 @@ fn checkout(id: &str) -> Option<(BackendPin, Vec<u8>)> {
             })
             .map(|root| root.join("backends").join(name))
     })?;
-    let package = dir.join("package");
-    let pin: BackendPin =
-        serde_json::from_slice(&fs::read(package.join("backend.json")).ok()?).ok()?;
-    let bytes = fs::read(package.join("component.wasm")).ok()?;
-    (pin.identity.id == id).then_some((pin, bytes))
+    Some(dir.join("package"))
 }
 
 fn lock_entry(project: &Project, id: &str) -> Option<LockedBackend> {
