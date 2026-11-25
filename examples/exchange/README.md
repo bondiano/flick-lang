@@ -49,7 +49,8 @@ resting 418 bids, 108 asks
 ```
 
 The checksum folds every event in the order the book produced them. Two
-runs with the same checksum gave the same answers to the same commands.
+runs with the same checksum almost certainly gave the same answers to the
+same commands: it is a 32-bit hash, not a proof.
 `--traders` changes how many traders send the commands, and only the
 first line of the report.
 
@@ -76,7 +77,10 @@ instance Ord BidPrice =
 A priority queue can only take out its first pair. A cancel or a fill
 removes the order from the `live` map. A dead order stays in its queue until
 it reaches the top, where the matching loop drops it. A partial fill keeps
-the order at the top and lowers its quantity in `live`.
+the order at the top and lowers its quantity in `live`. Each order rests
+under a ticket of its own, which `live` keeps with its quantity, so an id
+that is placed again after its order is gone does not bring back the old
+entry.
 
 ## Why the session is deterministic
 
@@ -98,7 +102,9 @@ this with 1, 3 and 7 traders against the same commands replayed one by one.
   - A market order drops what it cannot fill.
   - A cancel reports what was left.
   - A filled or unknown order cannot be cancelled.
-  - A command without quantity, without a price or with a resting id is refused.
+  - An id placed again after its order is gone rests at its new price and time.
+  - An order with no quantity, a limit price that is not positive, or the id
+    of a resting order is refused.
 - `test/Book/PropertyTest.fl`: properties on generated streams of up to 60
   commands, over few prices and small quantities:
   - each step gives the same events and leaves the same book as the naive book of

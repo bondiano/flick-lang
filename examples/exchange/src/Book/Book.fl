@@ -13,27 +13,42 @@ type BidPrice = BidPrice Int
 instance Ord BidPrice =
   let compare (BidPrice a) (BidPrice b) = compare b a
 
-/// An order at rest; what is left of it is in the book's `live` map.
-type alias Resting = { id : Int; price : Int }
+/// An order at rest, with the ticket it rested under; what is left of it
+/// is in the book's `live` map.
+type alias Resting = { id : Int; price : Int; ticket : Int }
+
+/// What is left of a resting order, and the ticket it rested under.
+type alias Left = { ticket : Int; qty : Int }
 
 /// What is left of each resting order, by id.
-type alias Live = HashMap EqHash.Canonical Int Int
+type alias Live = HashMap EqHash.Canonical Int Left
 
 /// A cancelled or filled order stays in its queue until it reaches the top,
 /// where `top` drops it: a priority queue can only take out its first pair.
+/// Each order rests under a ticket of its own, so when its id is placed
+/// again, the entry left in a queue does not pass for the new order.
 type Book =
   | Book {
     bids : PriorityQueue BidPrice Resting
     asks : PriorityQueue Int Resting
     live : Live
+    tickets : Int
   }
 
 /// What placing one order has changed so far: the live map and the events,
-/// in order.
-type alias Pass = { live : Live; events : List Event }
+/// in order, and the ticket the order rests under if it does.
+type alias Pass = { live : Live; events : List Event; ticket : Int }
 
 empty : Book
-let empty = Book { bids = PriorityQueue.empty; asks = PriorityQueue.empty; live = HashMap.empty }
+let empty =
+  Book { bids = PriorityQueue.empty; asks = PriorityQueue.empty; live = HashMap.empty; tickets = 0 }
+
+/// What is left of a queue's entry, if it is the live order of its id.
+left_of : Live -> Resting -> Option Int
+let left_of live order =
+  match HashMap.get order.id live with
+  | Some left when left.ticket == order.ticket -> Some left.qty
+  | _ -> None
 
 /// The queue without its first pair.
 without_top : Ord p => PriorityQueue p a -> PriorityQueue p a
@@ -49,7 +64,7 @@ let rec top live queue =
   match PriorityQueue.peek queue with
   | None -> (queue, None)
   | Some (_, order) ->
-    match HashMap.get order.id live with
+    match left_of live order with
     | Some left -> (queue, Some (order, left))
     | None -> top live (without_top queue)
 
@@ -75,11 +90,13 @@ let rec sweep taker crosses qty queue pass =
           ++ [Traded { taker = taker; maker = maker.id; price = maker.price; qty = filled }]
       if filled == left then
         sweep taker crosses (qty - filled) (without_top cleaned) {
+          pass with
           live = HashMap.remove maker.id pass.live
           events = events
         }
       else
-        (0, cleaned, { live = HashMap.insert maker.id (left - filled) pass.live; events = events })
+        let rest = { ticket = maker.ticket; qty = left - filled }
+        (0, cleaned, { pass with live = HashMap.insert maker.id rest pass.live; events = events })
     | (cleaned, _) -> (qty, cleaned, pass)
 
 /// Rests the unfilled `left` of a limit order in `queue`, at the priority
@@ -93,8 +110,15 @@ let rest priority order left queue pass =
   else
     match order.price with
     | Limit price -> (
-      PriorityQueue.push (priority price) { id = order.id; price = price } queue,
-      { live = HashMap.insert order.id left pass.live; events = pass.events ++ [Rested order.id] },
+      PriorityQueue.push
+        (priority price)
+        { id = order.id; price = price; ticket = pass.ticket }
+        queue,
+      {
+        pass with
+        live = HashMap.insert order.id { ticket = pass.ticket; qty = left } pass.live
+        events = pass.events ++ [Rested order.id]
+      },
     )
     | Market -> (queue, { pass with events = pass.events ++ [Dropped order.id left] })
 
@@ -110,16 +134,17 @@ let crosses side limit resting_price =
 place : Order -> Book -> (Book, List Event)
 let place order (Book book) =
   let matches = crosses order.side order.price
-  let start = { live = book.live; events = [] }
+  let start = { live = book.live; events = []; ticket = book.tickets }
+  let tickets = book.tickets + 1
   match order.side with
   | Buy ->
     let (left, asks, filled) = sweep order.id matches order.qty book.asks start
     let (bids, pass) = rest BidPrice order left book.bids filled
-    (Book { bids = bids; asks = asks; live = pass.live }, pass.events)
+    (Book { bids = bids; asks = asks; live = pass.live; tickets = tickets }, pass.events)
   | Sell ->
     let (left, bids, filled) = sweep order.id matches order.qty book.bids start
     let (asks, pass) = rest identity order left book.asks filled
-    (Book { bids = bids; asks = asks; live = pass.live }, pass.events)
+    (Book { bids = bids; asks = asks; live = pass.live; tickets = tickets }, pass.events)
 
 /// Why the book refuses to place `order`, if it does.
 refusal : Live -> Order -> Option Reason
@@ -139,7 +164,7 @@ let step command (Book book) =
   match command with
   | Cancel id ->
     match HashMap.get id book.live with
-    | Some left -> (Book { book with live = HashMap.remove id book.live }, [Cancelled id left])
+    | Some left -> (Book { book with live = HashMap.remove id book.live }, [Cancelled id left.qty])
     | None -> (Book book, [Refused id UnknownOrder])
   | Place order ->
     match refusal book.live order with
@@ -150,9 +175,7 @@ let step command (Book book) =
 live_orders : Ord p => Live -> PriorityQueue p Resting -> List (Int, Int, Int)
 let live_orders live queue =
   List.filter_map
-    (fun (_, order) ->
-      Option.map (fun left -> (order.id, order.price, left)) (HashMap.get order.id live)
-    )
+    (fun (_, order) -> Option.map (fun left -> (order.id, order.price, left)) (left_of live order))
     (PriorityQueue.to_list queue)
 
 /// The resting orders of a side as `(id, price, quantity)`, best first.

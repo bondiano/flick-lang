@@ -1,28 +1,53 @@
 module Book.PropertyTest exposing (tests)
 
 import Book.Book as Book exposing (Book)
-import Book.Order exposing (Side(..), Price(..), Command(..), Event(..))
+import HashMap exposing (HashMap)
+import Book.Order exposing (Side(..), Price(..), Order, Command(..), Event(..))
 import Book.Reference as Reference
 
 /// A command as numbers: its kind, side, price and quantity. Few prices
 /// and small quantities make many crossings and many orders at one price.
-draw : Gen.Gen (Int, (Int, (Int, Int)))
+draw : Gen.Gen Draw
 let draw = Gen.pair (Gen.int 0 9) (Gen.pair (Gen.int 0 1) (Gen.pair (Gen.int 1 8) (Gen.int 0 5)))
 
+/// A command as numbers, as `draw` makes them.
+type alias Draw = (Int, (Int, (Int, Int)))
+
 /// The command numbered `id`: two in ten cancel an order up to 8 back,
-/// one is a market order, the rest are limit orders between 6 and 13.
-command : Int -> (Int, (Int, (Int, Int))) -> Command
-let command id (roll, (side, (price, qty))) =
+/// one is a market order, one a limit order that takes `reused`, the id
+/// the latest cancel named, and the rest are limit orders of their own id.
+/// Limit prices are between 6 and 13.
+command : Int -> Int -> Draw -> Command
+let command id reused (roll, (side, (price, qty))) =
   let side = if side == 0 then Buy else Sell
   if roll < 2 then
     Cancel (id - price)
   else if roll == 2 then
     Place { id = id; side = side; price = Market; qty = qty }
+  else if roll == 9 then
+    Place { id = reused; side = side; price = Limit (price + 5); qty = qty }
   else
     Place { id = id; side = side; price = Limit (price + 5); qty = qty }
 
+/// The commands of the draws, numbered from 0.
+numbered : List Draw -> List Command
+let numbered draws =
+  let (_, _, all) =
+    List.fold_left
+      (fun (id, reused, done) draw ->
+        let next = command id reused draw
+        let reused =
+          match next with
+          | Cancel target -> target
+          | _ -> reused
+        (id + 1, reused, done ++ [next])
+      )
+      (0, 0, [])
+      draws
+  all
+
 commands : Gen.Gen (List Command)
-let commands = Gen.map (List.map_indexed command) (Gen.list 60 draw)
+let commands = Gen.map numbered (Gen.list 60 draw)
 
 /// Each command with the book after it and what it did.
 type alias Step = { command : Command; book : Book; events : List Event }
@@ -59,70 +84,107 @@ let uncrossed book =
   | (Some bid, Some ask) -> bid < ask
   | _ -> true
 
-/// The limit price of each order placed with one.
-limits : List Command -> List (Int, Int)
-let limits commands =
-  List.filter_map
-    (fun command ->
-      match command with
-      | Place { id; price = Limit price } -> Some (id, price)
-      | _ -> None
-    )
-    commands
+/// The order the step placed, when the book took it.
+taken : Step -> Option Order
+let taken step =
+  match (step.command, step.events) with
+  | (Place _, [Refused _ _]) -> None
+  | (Place order, _) -> Some order
+  | _ -> None
 
-/// Whether each fill of the step is at its resting order's price and no
+/// The limit price each id was last placed at.
+type alias Prices = HashMap EqHash.Canonical Int Int
+
+/// Whether a fill is at the price its resting order was placed at, and no
 /// worse than the limit of the order that took it.
-fair : List (Int, Int) -> Step -> Bool
-let fair prices step =
-  List.all
-    (fun event ->
-      match (event, step.command) with
-      | (Traded trade, Place order) ->
-        let at_maker =
-          List.find (fun (id, _) -> id == trade.maker) prices == Some (trade.maker, trade.price)
-        let in_limit =
-          match (order.side, order.price) with
-          | (_, Market) -> true
-          | (Buy, Limit most) -> trade.price <= most
-          | (Sell, Limit least) -> trade.price >= least
-        at_maker && in_limit
-      | _ -> true
-    )
-    step.events
+fair_fill : Prices -> Command -> Event -> Bool
+let fair_fill prices command event =
+  match (event, command) with
+  | (Traded trade, Place order) ->
+    let within =
+      match (order.side, order.price) with
+      | (_, Market) -> true
+      | (Buy, Limit most) -> trade.price <= most
+      | (Sell, Limit least) -> trade.price >= least
+    HashMap.get trade.maker prices == Some trade.price && within
+  | _ -> true
 
-/// The quantity of order `id` that the events account for: filled on
-/// either side, dropped or cancelled.
-accounted : Int -> List Event -> Int
-let accounted id events =
-  List.sum
-    (List.map
-      (fun event ->
-        match event with
-        | Traded trade when trade.taker == id || trade.maker == id -> trade.qty
-        | Dropped dropped left when dropped == id -> left
-        | Cancelled cancelled left when cancelled == id -> left
-        | _ -> 0
+/// Whether every fill is fair. An id may be placed again once its order is
+/// gone, so a resting order's price is the one of its id's latest placing.
+fair : List Step -> Bool
+let fair all =
+  let (_, ok) =
+    List.fold_left
+      (fun (prices, ok) step ->
+        let fills = List.all (fair_fill prices step.command) step.events
+        let prices =
+          match taken step with
+          | Some { id; price = Limit price } -> HashMap.insert id price prices
+          | _ -> prices
+        (prices, ok && fills)
       )
-      events)
+      (HashMap.empty, true)
+      all
+  ok
 
-/// Whether every order the book took is accounted for to the unit: what
-/// filled, dropped and was cancelled, and what still rests.
+/// A placing's quantity and what of it the events have accounted for.
+type alias Account = { qty : Int; seen : Int }
+
+type alias Accounts = HashMap EqHash.Canonical Int Account
+
+credit : Int -> Int -> Accounts -> Accounts
+let credit id n accounts = HashMap.modify id (fun a -> { a with seen = a.seen + n }) accounts
+
+/// The accounts after the events of one step: what filled on either side,
+/// dropped or was cancelled.
+credited : Accounts -> List Event -> Accounts
+let credited accounts events =
+  List.fold_left
+    (fun accounts event ->
+      match event with
+      | Traded trade -> credit trade.maker trade.qty (credit trade.taker trade.qty accounts)
+      | Dropped id left -> credit id left accounts
+      | Cancelled id left -> credit id left accounts
+      | _ -> accounts
+    )
+    accounts
+    events
+
+/// The accounts with a new placing opened, and whether the id's previous
+/// placing, if any, was accounted for in full: the book refuses an id that
+/// still rests, so that placing is over.
+opened : Accounts -> Order -> (Accounts, Bool)
+let opened accounts order =
+  let over =
+    match HashMap.get order.id accounts with
+    | Some account -> account.seen == account.qty
+    | None -> true
+  (HashMap.insert order.id { qty = order.qty; seen = 0 } accounts, over)
+
+/// Whether every unit of every placing is accounted for: what filled,
+/// dropped and was cancelled, and in the end what still rests.
 kept : List Step -> Bool
 let kept all =
-  let events = List.flat_map (fun step -> step.events) all
+  let (accounts, ok) =
+    List.fold_left
+      (fun (accounts, ok) step ->
+        let (accounts, over) =
+          match taken step with
+          | Some order -> opened accounts order
+          | None -> (accounts, true)
+        (credited accounts step.events, ok && over)
+      )
+      (HashMap.empty, true)
+      all
   let last = Option.with_default Book.empty (Option.map (fun step -> step.book) (List.last all))
   let resting = Book.resting Buy last ++ Book.resting Sell last
   let left id =
     List.sum
       (List.map (fun (_, _, qty) -> qty) (List.filter (fun (rest, _, _) -> rest == id) resting))
-  List.all
-    (fun step ->
-      match (step.command, step.events) with
-      | (Place _, [Refused _ _]) -> true
-      | (Place order, _) -> accounted order.id events + left order.id == order.qty
-      | _ -> true
-    )
-    all
+  ok
+    && List.all
+      (fun (id, account) -> account.seen + left id == account.qty)
+      (HashMap.to_list accounts)
 
 tests : List Test.Test
 let tests = [
@@ -137,7 +199,7 @@ let tests = [
     Test.is_true "a crossed book" (List.all (fun step -> uncrossed step.book) (steps commands))
   ),
   Test.property "fills are at the resting price and within the limit" commands (fun commands ->
-    Test.is_true "an unfair fill" (List.all (fair (limits commands)) (steps commands))
+    Test.is_true "an unfair fill" (fair (steps commands))
   ),
   Test.property "every unit of an order is accounted for" commands (fun commands ->
     Test.is_true "a lost or made-up unit" (kept (steps commands))

@@ -1,5 +1,6 @@
 /// What a run did, counted event by event, with a checksum of every event
-/// in order: two runs that print the same tally answered alike.
+/// in order: two runs that print the same tally almost certainly answered
+/// alike.
 module Book.Tally exposing (Tally, empty, add, malformed, lines)
 
 import Book.Order exposing (Event(..), Reason(..))

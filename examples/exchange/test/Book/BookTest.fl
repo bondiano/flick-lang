@@ -75,6 +75,16 @@ let rules = [
   ("an order without quantity is refused", [limit 1 Buy 10 0], [Refused 1 NonPositiveQuantity]),
   ("a limit without a price is refused", [limit 1 Buy 0 3], [Refused 1 NonPositivePrice]),
   (
+    "a cancelled id placed again rests at its new price",
+    [limit 1 Sell 10 2, Cancel 1, limit 1 Sell 12 4, market 2 Buy 1],
+    [trade 2 1 12 1],
+  ),
+  (
+    "a filled id placed again keeps its new place in time",
+    [limit 1 Buy 10 1, limit 2 Buy 10 1, limit 3 Sell 10 1, limit 1 Buy 10 1, market 4 Sell 2],
+    [trade 4 2 10 1, trade 4 1 10 1],
+  ),
+  (
     "an id that is resting is refused",
     [limit 1 Buy 10 3, limit 1 Sell 20 1],
     [Refused 1 DuplicateId],
@@ -96,6 +106,11 @@ suite "the book" {
   test "skips cancelled orders for the best prices" {
     let (book, _) = replay [limit 1 Buy 12 1, limit 2 Buy 10 1, limit 3 Sell 14 1, Cancel 1]
     expect (Book.best_bid book, Book.best_ask book) |> to.equal (Some 10, Some 14)
+  }
+
+  test "keeps an id placed again on its new side only" {
+    let (book, _) = replay [limit 1 Buy 10 2, limit 2 Buy 11 1, Cancel 1, limit 1 Sell 12 4]
+    expect (Book.resting Buy book, Book.resting Sell book) |> to.equal ([(2, 11, 1)], [(1, 12, 4)])
   }
 
   test "adds up the quantity at each price" {
