@@ -248,10 +248,12 @@ impl Lexer<'_> {
             .split_whitespace()
             .collect();
         // the debugging keywords stay usable as labels: `{ echo = … }`,
-        // `(make ()).echo` and the accessor `.echo`, but not after the dots
-        // of a range (`0..echo x`)
+        // `(make ()).echo`, the accessor `.echo` and the optional step
+        // `.?echo`, but not after the dots of a range (`0..echo x`)
         if matches!(word, "todo" | "echo") {
-            if start >= 1 && bytes[start - 1] == b'.' && (start == 1 || bytes[start - 2] != b'.') {
+            let dot =
+                |at: usize| at >= 1 && bytes[at - 1] == b'.' && (at == 1 || bytes[at - 2] != b'.');
+            if dot(start) || start >= 1 && bytes[start - 1] == b'?' && dot(start - 1) {
                 return true;
             }
             let rest = self.text[self.pos..].trim_start_matches(' ');

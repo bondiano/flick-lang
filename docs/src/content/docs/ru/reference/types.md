@@ -1,6 +1,6 @@
 ---
 title: "Кинды и типы"
-source_hash: a4e9300c2bd5b9a5
+source_hash: 1536481734a1f682
 ---
 
 После разрешения имён компилятор проверяет типы в каждом модуле без
@@ -179,6 +179,45 @@ let cities users =
   let get = .address.city
   List.map get users
 ```
+
+Необязательный шаг `.?name` (см. [Синтаксис](../syntax/#выражения)) сам по
+себе имеет тип `Option { name : a | r } -> Option a`, тип функции
+`fun v -> match v with | None -> None | Some r -> Some r.name`. Путь
+выполняется над уже прочитанным значением без обёртки: обычному шагу нужна
+запись, необязательному — `Option` записи. Путь хотя бы с одним
+необязательным шагом оборачивает последнее значение в один `Some`, а `None`
+на любом его шаге даёт `None` всего пути. Тип последнего поля сохраняется
+целиком и не сплющивается: ниже `maybe_user |> .?address.?city` имеет тип
+`Option (Option String)`, при `city : Option (Option String)` он был бы
+`Option (Option (Option String))`, а при `city : String` — `Option String`.
+Является ли путь `Option`, решают его `.?`, а не последнее поле. Компилятор
+записывает путь как `match`, которые он означает: корень читается один раз, а
+после `None` ничего не читается. Шаг снимает только `Option`, по одному на
+каждый `.?`: он не заглядывает в `Result`, `Eff`, `Lazy` или внешний null и не
+проверяет во время выполнения поле, которого нет в типе. Обычный `.city` у
+`Option Address` — это `FLICK-T003` «`Option Address` is an `Option`, which
+has no field `city`», и help предлагает `.?city` или сначала обработать
+`None`; `.?name` у `User` — «`.?name` reads a field of an `Option`, but this
+has type `User`»; `.?city` у `Option (Option Address)` называет оставшийся
+`Option Address`. `Some` пути типизируется как конструктор, применённый в этом
+`match`, со своей границей захвата, поэтому локальный `let get = .?value` без
+сигнатуры не обобщается, как и `fun`, которую он означает: чтобы применить его
+к записям двух типов, дайте ему сигнатуру.
+
+```flick
+type alias Address = { city : Option String }
+type alias User = { address : Option Address }
+
+city : Option User -> Option (Option String)
+let city maybe_user = maybe_user |> .?address.?city
+```
+
+| `maybe_user` | `city maybe_user` |
+| - | - |
+| `None` | `None` |
+| `Some { address = None }` | `None` |
+| `Some { address = Some { city = None } }` | `Some None` |
+| `Some { address = Some { city = Some "Новосибирск" } }` | `Some (Some "Новосибирск")` |
 
 Значения типов данных, структурных записей и кортежей не имеют наблюдаемой
 идентичности хранения, а порядок записи меток записи ненаблюдаем: любая

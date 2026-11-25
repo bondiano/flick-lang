@@ -1,6 +1,6 @@
 ---
 title: "Синтаксис"
-source_hash: c08f4433c6364dd9
+source_hash: 78b864a5e33b3ab2
 ---
 
 Здесь описан синтаксис исходного кода, который принимают `flick check`
@@ -331,7 +331,7 @@ false in when for yield do break continue
 | 9 | префиксные `-`, `not`, `await`, `ignore`, `echo` | — |
 | 9½ | `>>`, `<<` | `>>` левая, `<<` правая; не смешиваются: `f >> g << h` — ошибка |
 | 10 | применение функции `f x y` | левая |
-| 11 | `.field`, `Module.name`, постфиксный `?`; функция-поле `.a.b` — один атом | левая |
+| 11 | `.field`, `.?field`, `Module.name`, постфиксный `?`; функция-поле `.a.b` или `.a.?b` — один атом | левая |
 
 `-x ** 2` означает `-(x ** 2)`; `-a * b` означает `(-a) * b`; `await f x`
 означает `await (f x)`; `0..n - 1` — это `0..(n - 1)`, а `i < 0..n` сравнивает с диапазоном.
@@ -720,10 +720,10 @@ handler_arm = arm | "|" "return" or_pattern "->" block
             // ветка операции — `| E.op p… -> …`, образец, чей путь кончается именем
 application = postfix { argument }
 argument    = "_" | postfix                     // не больше одной `_` на вызов
-postfix     = atom { "." name | "?" }           // без пробела перед ними
+postfix     = atom { step | "?" }               // без пробела перед ними
+step        = "." name | ".?" name              // без пробелов внутри
 atom        = name | Con { "." Con } ["." name] | Float | BigInt | String
             | accessor
-accessor    = "." name { "." name }             // без пробелов внутри
             | "true" | "false" | "()" | "(" expr ")" | "(" expr ":" type ")"
             | "(" expr "," expr { "," expr } ")" | "[" [expr { "," expr } [","]] "]"
             | "{" "}" | "{" field "=" block { ";" | line break … } "}"
@@ -736,6 +736,7 @@ accessor    = "." name { "." name }             // без пробелов вн�
                                             // голова, которую импорт открывает как `plugin head`, с
                                             // аргументом или телом; `cli` с телом
 head_arg    = name | Con | Number | String | "." | "(" { token } ")"   // на строке головы
+accessor    = step { step }                     // без пробелов внутри
 do_stmt     = bind { "and" bind } | "if" expr | statement
 bind        = or_pattern "<-" expr
 clause_list = for_clause { ";" | line break | before "if" … for_clause }
@@ -828,6 +829,35 @@ let cities users = List.map .address.city users
 
 name_of : User -> String
 let name_of user = user |> .name
+```
+
+Шаг `.?name` необязательный: он читает поле `Option`, стоящего прямо перед
+ним. На `Some r` он читает `r.name`, и путь продолжается; на `None` весь путь
+даёт `None`, и следующие шаги не читаются. С корнем или как функция-поле путь
+означает одно и то же: `user.address.?city`, `user |> .address.?city`,
+`maybe_user |> .?address.?city`. Путь с необязательным шагом — это `Option`
+того, что читает его последний шаг, обёрнутое один раз, сколько бы `.?` в нём
+ни было (см. [Записи](../types/#записи)). Каждый `.?` снимает один `Option`,
+а обычный шаг после него читает внутри его `Some`: `.address.?street.name`.
+Корень вычисляется один раз, а `None` завершает только путь: следующая
+инструкция выполняется. Путь заканчивается на скобке вокруг значения, на
+привязке, применении и новом `|>`: `(maybe_user.?address).?city` и
+`maybe_user |> .?address |> .?city` читают `city` у `Option Address`, который
+оставил один `.?`, и это `FLICK-T003`. Скобки вокруг самой функции-поля, как в
+`(.?address.?city)`, ничего внутри неё не меняют. `value?.field` — это
+постфиксный `?` и затем обычное поле, поэтому `None` возвращается из функции;
+`value.?field` ниоткуда не возвращается и даёт `Option`. `?` после пути
+применяется к его результату: `value.?field?` — это `(value.?field)?`.
+
+```flick
+type alias Address = { city : Option String }
+type alias User = { name : String; address : Option Address }
+
+city : Option User -> Option (Option String)
+let city maybe_user = maybe_user |> .?address.?city
+
+city_of : User -> Option (Option String)
+let city_of user = user.address.?city
 ```
 
 `if` — выражение; без `else` оно имеет тип `Unit`, как и его ветвь `then` (на `else ()` выдаётся предупреждение `FLICK-T028`). Ветвь в фигурных скобках содержит инструкции: `if a > b then { low = b; high = a }`. `ignore e` отбрасывает

@@ -13,7 +13,9 @@ value gives each field with `=`, and `book.title` reads one.
 
 `.title` alone is a function that reads the field: `List.map .title shelf`
 lists the titles, as `List.map (fun b -> b.title) shelf` would. A path reads
-fields in turn: `.author.name`.
+fields in turn: `.author.name`. A step `.?` reads a field of an `Option`:
+`book.series.?name` is `None` when the book has no series, and `Some` of the
+name otherwise.
 
 A record does not change. `{ book with read = true }` makes a copy with one
 field replaced.

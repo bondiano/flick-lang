@@ -211,7 +211,10 @@ impl Ide<'_> {
         {
             return Some((format!("```flick\n{code}\n```\n\n{note}"), range));
         }
-        if let Some(hover) = self.operator_hover(file, offset) {
+        if let Some(hover) = self
+            .optional_step_hover(file, offset)
+            .or_else(|| self.operator_hover(file, offset))
+        {
             return Some(hover);
         }
         if let Some(hover) = self

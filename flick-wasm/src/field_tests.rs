@@ -107,3 +107,43 @@ fn field_paths_answer_as_the_native_queries() {
         json!([{ "from": units(accessor), "to": units(accessor + 13), "text": "(fun x -> x.address.city)" }])
     );
 }
+
+const OPTIONAL: &str = "module Main exposing (main)
+
+type alias Address = { city : Option String; zip : String }
+
+type alias User = { name : String; address : Option Address }
+
+/// «Привет» 🎉
+cities : List User -> List (Option (Option String))
+let cities users = List.map .address.? users
+
+city : User -> Option (Option String)
+let city user = user.address.?city
+
+main : Unit -> Unit
+let main () = ()
+";
+
+/// After `.?` the playground completes the record inside the `Option`, and
+/// `.?` is an operator, at UTF-16 offsets after non-ASCII text.
+#[test]
+fn optional_steps_answer_as_the_native_queries() {
+    let units = |at: usize| utf16_offset(OPTIONAL, u32::try_from(at).expect("small"));
+    let mut session = Session::new();
+    let _ = session.update(OPTIONAL);
+    let dot = OPTIONAL.find(".? users").expect("occurs");
+    let items = json(&session.complete(units(dot), true));
+    let labels: Vec<&str> = (items.as_array().expect("items").iter())
+        .filter_map(|i| i["label"].as_str())
+        .collect();
+    assert_eq!(labels, ["city", "zip"]);
+    let mark = OPTIONAL.find(".?city").expect("occurs");
+    let tokens = json(&session.semantic_tokens());
+    let operator = (tokens["tokens"].as_array().expect("tokens").iter()).any(|t| {
+        t["type"] == "operator"
+            && t["from"].as_u64() == Some(u64::from(units(mark)))
+            && t["to"].as_u64() == Some(u64::from(units(mark + 2)))
+    });
+    assert!(operator, "{tokens}");
+}

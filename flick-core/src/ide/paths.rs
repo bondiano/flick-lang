@@ -10,8 +10,19 @@ use super::{Ide, tree};
 use crate::project::Analyzed;
 use crate::source::FileId;
 use crate::syntax::cst::Node;
+use crate::syntax::fields;
 use crate::syntax::kind::SyntaxKind as K;
+use crate::types::lang::Lang;
 use crate::types::{Type, show_type};
+
+/// The item of an `Option` type: the record an optional step reads.
+pub(super) fn option_item(ty: &Type) -> Option<Type> {
+    let (head, args) = strip(ty).spine();
+    match args[..] {
+        [item] if head.is_lang(Lang::Option) => Some(item.clone()),
+        _ => None,
+    }
+}
 
 impl Ide<'_> {
     /// The type of the field `label` of a value of type `record`.
@@ -23,9 +34,19 @@ impl Ide<'_> {
 
     /// The type of the value a path's node gives, as far as the checker
     /// keeps it: a name, a projection or one in parentheses.
-    fn value_type(&self, m: &Analyzed, node: &Node) -> Option<Type> {
+    pub(super) fn value_type(&self, m: &Analyzed, node: &Node) -> Option<Type> {
         match node.kind {
-            K::ParenExpr => self.value_type(m, node.nodes().next()?),
+            K::ParenExpr => {
+                let inner = node.nodes().next()?;
+                let ty = self.value_type(m, inner)?;
+                // parentheses end a path, which an optional step makes an `Option`
+                let (_, steps) = fields::steps(inner);
+                if inner.kind == K::FieldExpr && steps.iter().any(|s| fields::is_optional(s)) {
+                    Some(Type::app(Type::lang(Lang::Option), ty))
+                } else {
+                    Some(ty)
+                }
+            }
             K::FieldExpr => {
                 let label = node.child_tokens().find(|t| t.kind == K::Ident)?;
                 let record = m.typing.fields.get(&(label.start, label.end))?;
@@ -38,6 +59,18 @@ impl Ide<'_> {
     /// The record each step of `accessor` reads a field of, in order: the
     /// accessor's parameter, then the field the step before it reads.
     pub(super) fn step_receivers(&self, m: &Analyzed, accessor: &Node) -> Vec<Option<Type>> {
+        (self.step_reads(m, accessor).into_iter())
+            .map(|(_, record)| record)
+            .collect()
+    }
+
+    /// For each step of `accessor`, the value before it and the record it
+    /// reads the field of: an optional step reads inside that value's `Option`.
+    pub(super) fn step_reads(
+        &self,
+        m: &Analyzed,
+        accessor: &Node,
+    ) -> Vec<(Option<Type>, Option<Type>)> {
         let text = self.text(m.file);
         let mut receiver = match m.typing.types.get(&accessor.range()).map(strip) {
             Some(Type::Fun { param, .. }) => Some((**param).clone()),
@@ -46,12 +79,16 @@ impl Ide<'_> {
         let mut out = Vec::new();
         for step in accessor.nodes().filter(|n| n.kind == K::AccessorStep) {
             let label = step.child_tokens().find(|t| t.kind == K::Ident);
+            let before = receiver.clone();
+            if fields::is_optional(step) {
+                receiver = receiver.as_ref().and_then(option_item);
+            }
             if let Some(label) = label
                 && let Some(record) = m.typing.fields.get(&(label.start, label.end))
             {
                 receiver = Some(record.clone());
             }
-            out.push(receiver.clone());
+            out.push((before, receiver.clone()));
             receiver = match (receiver, label) {
                 (Some(record), Some(label)) => self.field_type(m.file, &record, label.text(text)),
                 _ => None,
@@ -69,7 +106,14 @@ impl Ide<'_> {
         };
         for node in tree::path_to(&m.tree, offset).into_iter().rev() {
             match node.kind {
-                K::FieldExpr if dot_at(node) => return self.value_type(m, node.nodes().next()?),
+                K::FieldExpr if dot_at(node) => {
+                    let value = self.value_type(m, node.nodes().next()?);
+                    return if fields::is_optional(node) {
+                        value.as_ref().and_then(option_item)
+                    } else {
+                        value
+                    };
+                }
                 K::AccessorExpr => {
                     let at = node
                         .nodes()
@@ -102,6 +146,46 @@ impl Ide<'_> {
                 show_type(result)
             ),
             accessor.range(),
+        ))
+    }
+
+    /// Hover on the `.?` of an optional step: the `Option` it takes off, and
+    /// what a `None` there does.
+    pub(super) fn optional_step_hover(
+        &self,
+        file: FileId,
+        offset: u32,
+    ) -> Option<(String, (u32, u32))> {
+        let m = self.module(file)?;
+        let path = tree::path_to(&m.tree, offset);
+        let step = *path.last()?;
+        if !matches!(step.kind, K::FieldExpr | K::AccessorStep) {
+            return None;
+        }
+        let dot = step.child_tokens().find(|t| t.kind == K::Dot)?;
+        let mark = step.child_tokens().find(|t| t.kind == K::Question)?;
+        if !(dot.start <= offset && offset <= mark.end) {
+            return None;
+        }
+        let label = step.child_tokens().find(|t| t.kind == K::Ident);
+        let label_text = label.map_or("", |l| l.text(self.text(file)));
+        let record =
+            label.and_then(|l| Some(((l.start, l.end), m.typing.fields.get(&(l.start, l.end))?)));
+        // the record by the alias it is declared as, as a field's hover names it
+        let layer = match record {
+            Some((range, r)) => match self.owner_at(m, range, r, label_text) {
+                Ok((_, alias)) => format!("Option {alias}"),
+                Err(_) => show_type(&Type::app(Type::lang(Lang::Option), r.clone())),
+            },
+            None => "Option _".to_owned(),
+        };
+        Some((
+            format!(
+                "```flick\n.?{label_text} : {layer}\n```\n\nTakes one `Option` off: on `Some r` it reads `r.{label_text}`; \
+                 on `None` the whole path is `None`, and no step after it is read. The path is the `Option` \
+                 of its last field. Unlike `x?.{label_text}`, it never returns from the function."
+            ),
+            (dot.start, mark.end),
         ))
     }
 }

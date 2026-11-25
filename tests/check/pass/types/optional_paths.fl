@@ -1,0 +1,36 @@
+// `.?label` reads a field of an `Option`. A path with such a step is the
+// `Option` of its last field, whose own type stays whole; plain steps after
+// an optional one read from its `Some`.
+module App.OptionalPaths exposing (..)
+
+type alias Street = { name : String }
+
+type alias Address = { city : Option String; street : Street }
+
+type alias User = { name : String; address : Option Address }
+
+// a standalone step: `Option { label : a | fields } -> Option a`
+address : Option User -> Option (Option Address)
+let address = .?address
+
+city : Option User -> Option (Option String)
+let city = .?address.?city
+
+rooted : Option User -> Option (Option String)
+let rooted maybe_user = maybe_user.?address.?city
+
+piped : Option User -> Option (Option String)
+let piped maybe_user = maybe_user |> .?address.?city
+
+// the first step is plain: `user.address` is the `Option` read next
+street : User -> Option String
+let street user = user.address.?street.name
+
+streets : List User -> List (Option String)
+let streets users = List.map .address.?street.name users
+
+// an unannotated step finds its `Option` from what it reads
+local : Unit ->{} (Option Int, Option Int)
+let local () =
+  let get = .?value
+  (get (Some { value = 1 }), get None)

@@ -9,6 +9,7 @@ mod extract;
 mod import_class;
 mod let_else;
 mod match_on;
+mod optional_path;
 mod orelse;
 mod qualify;
 mod result_block;
@@ -50,6 +51,9 @@ impl Ide<'_> {
         out.extend(self.try_to_catch(file, start));
         out.extend(self.to_accessor(file, start));
         out.extend(self.to_function(file, start));
+        out.extend(self.expand_optional_path(file, start));
+        out.extend(self.to_optional_step(file, start));
+        out.extend(self.to_plain_step(file, start));
         out
     }
 }
@@ -87,6 +91,8 @@ fn to_u32(n: usize) -> u32 {
 
 #[cfg(test)]
 mod accessor_tests;
+#[cfg(test)]
+mod optional_path_tests;
 #[cfg(test)]
 mod orelse_tests;
 #[cfg(test)]

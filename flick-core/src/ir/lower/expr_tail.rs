@@ -386,7 +386,7 @@ impl Lower<'_> {
     }
 
     /// `value` with the lift and the conversion the checker placed at `key`.
-    fn adapted(&mut self, key: Range, value: Expr) -> Expr {
+    pub(super) fn adapted(&mut self, key: Range, value: Expr) -> Expr {
         let value = match self.typing.lifts.get(&key).cloned() {
             Some(lift) => {
                 let span = value.span;

@@ -9,6 +9,7 @@ use crate::diagnostics::suggest::closest;
 use crate::diagnostics::{Diagnostic, codes};
 use crate::source::Span;
 use crate::syntax::cst::{Node, Token};
+use crate::syntax::fields;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::Elem;
 
@@ -73,18 +74,26 @@ impl Checker<'_> {
         labels
     }
 
+    /// `target.label`. A path with an optional step, `user.?address.city`,
+    /// is checked as a whole from its outermost step: its root once, and
+    /// each step from the value before it.
     pub(super) fn field(&mut self, node: &Node, target: &Node) -> Type {
+        let (root, steps) = fields::steps(node);
+        if steps.iter().any(|s| fields::is_optional(s)) {
+            let Some(root) = root else {
+                return Type::Error;
+            };
+            let value = self.infer(root);
+            return self.read_steps(value, &steps);
+        }
         let record = self.infer(target);
-        let Some(label) = node.child_tokens().find(|t| t.kind == K::Ident) else {
-            return Type::Error;
-        };
-        self.field_of(&record, label, self.span(node))
+        self.read_steps(record, &[node])
     }
 
     /// The type of the field `label` of a value of type `record`, read at
     /// `at`: a polymorphic field is instantiated there, and a missing one
     /// reported there.
-    fn field_of(&mut self, record: &Type, label: Token, at: Span) -> Type {
+    pub(super) fn field_of(&mut self, record: &Type, label: Token, at: Span) -> Type {
         let label_span = self.token_span(label);
         let label = label.text(self.text).to_owned();
         #[cfg(feature = "ide")]
@@ -125,16 +134,9 @@ impl Checker<'_> {
         let (param, result) = accessor_keys(node);
         let at = Span::new(self.file, result.0, result.1);
         let mut body = |c: &mut Self, x: Option<&Type>, rest: Option<Type>| {
-            let mut value = x.cloned().unwrap_or(Type::Error);
+            let value = x.cloned().unwrap_or(Type::Error);
             c.note_value(param, &value);
-            for step in &steps {
-                // the parser reported a step without its label
-                let Some(label) = step.child_tokens().find(|t| t.kind == K::Ident) else {
-                    value = Type::Error;
-                    break;
-                };
-                value = c.field_of(&value, label, c.span(step));
-            }
+            let value = c.read_steps(value, &steps);
             match rest {
                 Some(rest) => {
                     c.expect(&value, &rest, at);

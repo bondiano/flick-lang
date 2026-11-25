@@ -4,6 +4,7 @@
 pub mod ast;
 pub mod cst;
 pub mod export_attr;
+pub mod fields;
 pub mod heads;
 pub mod kind;
 #[cfg(test)]

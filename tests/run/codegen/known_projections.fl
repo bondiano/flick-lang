@@ -1,0 +1,75 @@
+// A field read of a record literal, written there or given by an inlined
+// helper, is that field in release, while each other field that is not data
+// still runs once, where it is written, whether it is selected or not; a
+// consumer of the whole record still gets every field.
+module App.Main exposing (main)
+
+type error Boom = Boom String
+
+type alias Info = { name : String }
+
+type alias Slot = { info : Info }
+
+type alias Pokemon = { id : Int; name : String; types : List Slot }
+
+type alias Summary = { id : Int; name : String; types : List String }
+
+type alias Brief = { id : Int; name : String }
+
+note : String -> Int ->{Host.Console} Int
+let note label value =
+  Platform.stdout_line ("note " ++ label ++ " " ++ show value)
+  value
+
+boom : String ->{; Boom} Int
+let boom label = Fail.fail (Boom label)
+
+// The playground's `summarize`, used once here, so it is inlined.
+summarize : Pokemon -> Summary
+let summarize pokemon = {
+  id = pokemon.id
+  name = pokemon.name
+  types = List.map (fun item -> item.info.name) pokemon.types
+}
+
+// Small enough to be inlined at each full application; `List.map` takes it
+// as a function and gets every field.
+brief : Pokemon -> Brief
+let brief pokemon = { id = pokemon.id; name = pokemon.name }
+
+traced : Int ->{Host.Console} Int
+let traced x = { a = note "a" 1; b = x; c = note "c" 3 }.b
+
+chosen : Unit ->{Host.Console} Int
+let chosen () = { a = note "d" 4; b = note "e" 5; c = note "f" 6 }.b
+
+deep : Int ->{Host.Console} Int
+let deep x = { a = { b = note "g" 7; c = x }; d = note "h" 8 }.a.c
+
+thrown : Int ->{} String
+let thrown x =
+  try show ({ a = x; b = boom "late" }.a) with
+  | Boom label -> "boom " ++ label
+
+thrown_between : Int ->{Host.Console} String
+let thrown_between x =
+  try show ({ a = x; b = note "i" 9; c = boom "mid"; d = note "j" 10 }.a) with
+  | Boom label -> "boom " ++ label
+
+main : Unit ->{Host.Console; AppError} Unit
+let main () =
+  let x = note "x" 7
+  Platform.stdout_line (show (traced x))
+  Platform.stdout_line (show (chosen ()))
+  Platform.stdout_line (show (deep x))
+  Platform.stdout_line (thrown x)
+  Platform.stdout_line (thrown_between x)
+  let pikachu = { id = note "id" 25; name = "pikachu"; types = [{ info = { name = "electric" } }] }
+  let bulbasaur = {
+    id = 1
+    name = "bulbasaur"
+    types = [{ info = { name = "grass" } }, { info = { name = "poison" } }]
+  }
+  for t <- (summarize bulbasaur).types do Platform.stdout_line t
+  Platform.stdout_line ((brief pikachu).name)
+  for b <- List.map brief [pikachu, bulbasaur] do Platform.stdout_line (show b.id ++ " " ++ b.name)

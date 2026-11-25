@@ -1,0 +1,56 @@
+module App.OptionalPaths exposing (..)
+
+type alias Address = { city : Option String }
+
+type alias User = { name : String; address : Option Address }
+
+// a plain step takes no `Option` off
+city : User -> Option String
+let city user = user.address.city
+//                          ^^^^^ FLICK-T003 `Option Address` is an `Option`, which has no field `city`
+
+// a path ends at parentheses: the first path left `Option (Option Address)`,
+// and one step takes one `Option` off
+split : Option User -> Option (Option String)
+let split maybe_user = (maybe_user.?address).?city
+//                                          ^^^^^^ FLICK-T003 `.?city` takes one `Option` off, and `Option Address` is left
+
+// a pipeline ends a path too
+piped : Option User -> Option (Option String)
+let piped maybe_user = maybe_user |> .?address |> .?city
+//                                                ^^^^^^ FLICK-T003 `.?city` takes one `Option` off, and `Option Address` is left
+
+// `.?` reads only from an `Option`
+named : User -> Option String
+let named user = user.?name
+//                   ^^^^^^ FLICK-T003 `.?name` reads a field of an `Option`, but this has type `User`
+
+not_result : Result String User -> Option String
+let not_result r = r.?name
+//                  ^^^^^^ FLICK-T003 `.?name` reads a field of an `Option`, but this has type `Result String User`
+
+// the field is missing at its own step
+missing : Option User -> Option String
+let missing maybe_user = maybe_user.?email
+//                       ^^^^^^^^^^^^^^^^^ FLICK-T003 `User` has no field `email`
+
+// the path's type keeps the last field whole: no `Option` is flattened
+flat : Option User -> Option String
+let flat maybe_user = maybe_user.?address.?city
+//                    ^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `Option String`, found `Option (Option String)`
+
+// a postfix `?` after a path applies to its result: one `Option` of
+// `Option (Option Address)` is returned early, and `Option Address` is left
+first_city : Option User -> Option (Option String)
+let first_city maybe_user = (maybe_user.?address)?.city
+//                                                ^^^^^ FLICK-T003 `Option Address` is an `Option`, which has no field `city`
+
+// the `Some` of a path is a constructed value, as in the `match` it lowers
+// to: a local accessor with an optional step is not generic, as
+// `fun x -> match x with | Some r -> Some r.value | None -> None` is not
+twice : Unit ->{} (Option Int, Option String)
+let twice () =
+  let get = .?value
+  (get (Some { value = 1 }), get (Some { value = "a" }))
+//                           ^^^^^^^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `Option String`, found `Option Int`
+//                                ^^^^^^^^^^^^^^^^^^^^ FLICK-T003 expected `Option { value : Int | _ }`, found `Option { value : String }`

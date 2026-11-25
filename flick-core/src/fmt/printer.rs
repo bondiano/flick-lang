@@ -343,6 +343,8 @@ fn space((a, a_parent): (K, K), (b, b_parent): (K, K)) -> bool {
         | (K::LBrace, K::RBrace)
         | (K::Label, K::Colon) => false,
         (K::Dot, _) => matches!(a_parent, K::ForallType | K::ExistsType),
+        // the `?` of an optional step `.?label` touches its label
+        (K::Question, _) if matches!(a_parent, K::FieldExpr | K::AccessorStep) => false,
         (K::DotDot | K::DotDotLt, _) if a_parent == K::RangeExpr => false,
         (_, K::DotDot | K::DotDotLt) if b_parent == K::RangeExpr => false,
         (K::Arrow, K::LBrace) if b_parent == K::EffectAnnot => false,

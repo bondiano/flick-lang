@@ -1,0 +1,12 @@
+None
+None
+Some None
+Some (Some "Novosibirsk")
+Some (Some "Novosibirsk")
+None
+Some "Lenina"
+[None, Some "Main", Some "Lenina"]
+Some (Some None)
+root
+None
+after

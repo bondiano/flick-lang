@@ -698,6 +698,47 @@ let n = user |> .name
   (member))
 
 ==================
+Optional field steps
+==================
+
+let c = user.address.?city
+let d = List.map .?address.?echo users
+let e = user?.city
+let f = .name?
+
+---
+
+(source_file
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (member)
+  (operator)
+  (member)
+  (keyword)
+  (identifier)
+  (operator)
+  (constructor)
+  (member)
+  (operator)
+  (member)
+  (operator)
+  (member)
+  (identifier)
+  (keyword)
+  (identifier)
+  (operator)
+  (identifier)
+  (operator)
+  (member)
+  (keyword)
+  (identifier)
+  (operator)
+  (member)
+  (operator))
+
+==================
 Postfix catch
 ==================
 

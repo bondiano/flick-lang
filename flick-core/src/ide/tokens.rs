@@ -12,7 +12,7 @@ use crate::types::{Ref, Type};
 use flick_plugin::HighlightKind;
 
 /// The token types, in the order of the legend the server announces.
-pub const TOKEN_TYPES: [&str; 10] = [
+pub const TOKEN_TYPES: [&str; 11] = [
     "namespace",
     "type",
     "enumMember",
@@ -23,6 +23,7 @@ pub const TOKEN_TYPES: [&str; 10] = [
     "keyword",
     "macro",
     "property",
+    "operator",
 ];
 
 const NAMESPACE: u32 = 0;
@@ -38,6 +39,8 @@ const KEYWORD: u32 = 7;
 const MACRO: u32 = 8;
 /// A field label, of a record type or where a field is read or given.
 const PROPERTY: u32 = 9;
+/// The `.?` of an optional step.
+const OPERATOR: u32 = 10;
 
 /// Nodes worth folding when they span several lines.
 const FOLDED: [K; 20] = [
@@ -116,6 +119,7 @@ impl Ide<'_> {
                 .map(|&(start, end)| (start, end, PROPERTY)),
         );
         written_labels(&m.tree, &mut out);
+        optional_marks(&m.tree, &mut out);
         for b in &m.editing {
             let len = u32::try_from(b.block.text.len()).unwrap_or(u32::MAX);
             let found = (b.plugin.highlight(&b.block, &b.state))
@@ -189,6 +193,19 @@ fn binders(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
             out.push((t.start, t.end, PARAMETER));
         }
         binders(child, out);
+    }
+}
+
+/// The `.?` of each optional step, from its dot to its `?`.
+fn optional_marks(node: &Node, out: &mut Vec<(u32, u32, u32)>) {
+    for child in node.nodes() {
+        if matches!(child.kind, K::FieldExpr | K::AccessorStep)
+            && let Some(mark) = child.child_tokens().find(|t| t.kind == K::Question)
+            && let Some(dot) = child.child_tokens().find(|t| t.kind == K::Dot)
+        {
+            out.push((dot.start, mark.end, OPERATOR));
+        }
+        optional_marks(child, out);
     }
 }
 

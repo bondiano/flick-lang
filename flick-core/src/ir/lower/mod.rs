@@ -17,6 +17,7 @@ mod derived;
 mod do_notation;
 mod enums;
 mod expr;
+mod fields;
 mod foreign;
 mod generic;
 mod handle;
