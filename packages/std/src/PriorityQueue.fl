@@ -173,9 +173,13 @@ let to_seq queue = Seq.unfold pop queue
 to_list : Ord p => PriorityQueue p a -> List (p, a)
 let to_list queue = Seq.to_list (to_seq queue)
 
+/// Whether two queues give the same pairs in the same order.
+same : (Ord p, Eq a) => PriorityQueue p a -> PriorityQueue p a -> Bool
+let same left right = size left == size right && to_list left == to_list right
+
 /// Queues are equal when they give the same pairs in the same order.
 instance (Ord p, Eq a) => Eq (PriorityQueue p a) =
-  let eq left right = size left == size right && eq (to_list left) (to_list right)
+  let eq left right = same left right
 
 /// The pairs of both queues; on equal priorities those of the left queue
 /// leave first. Takes `O(m + log n)` for a right queue of `m` pairs, which
