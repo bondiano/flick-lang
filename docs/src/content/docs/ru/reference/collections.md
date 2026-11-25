@@ -1,6 +1,6 @@
 ---
 title: "Классы типов для коллекций"
-source_hash: cc856182157cc2dd
+source_hash: d71a40b17c765a95
 ---
 
 Flick разделяет общие операции над коллекциями на два уровня, полностью
@@ -197,8 +197,8 @@ let check_to_seq xs = Collections.to_seq xs
 ## Матрица классов и экземпляров
 
 Поставляемые коллекции реализованы в `core` и `std`. Планируемые коллекции
-(`OrderedMap`, `OrderedSet`, `PriorityQueue`, задачи `#735` и `#736`) включены,
-чтобы показать их место в той же иерархии.
+(`OrderedMap` и `OrderedSet`, задача `#735`) включены, чтобы показать их место
+в той же иерархии.
 
 | Коллекция | Элемент / запись (`ToSeq`) | `Functor` | `Foldable` | `Traversable` | `Semigroup` | `Monoid` | `Iterable` | `ToSeq` | `Sized` | `Indexed` | `Keyed` | `Member` |
 | - | - | - | - | - | - | - | - | - | - | - | - | - |
@@ -211,9 +211,9 @@ let check_to_seq xs = Collections.to_seq xs
 | `HashSet w a` | `a` | **Нет** | `HashSet w` | Нет | Да | `Hash a =>` (`Canonical`) | Нет | Да | Да | Нет | Нет | Да (свидетельство) |
 | `Trie v` | `(String, v)` | Да | Да | Да | Да | Да | Нет | Да | Да | Нет | `(String, v)` | Нет |
 | `Bytes` | `Int` (`0..255`) | Нет | Нет | Нет | Да | Да | Нет | Да | Да | Да | Нет | Да (`Int`) |
+| `PriorityQueue p a` | `(p, a)` | Нет | Нет | Нет | `Ord p =>` | `Ord p =>` | Нет | `Ord p =>` | Да | Нет | Нет | Нет |
 | *`OrderedMap k v` (#735)* | `(k, v)` | `OrderedMap k` | `OrderedMap k` | `OrderedMap k` | Да | `Ord k =>` | Нет | Да | Да | Нет | `(k, v)` | Нет |
 | *`OrderedSet a` (#735)* | `a` | **Нет** | Да | Нет | Да | `Ord a =>` | Нет | Да | Да | Нет | Нет | Да (`Ord`) |
-| *`PriorityQueue p a` (#736)* | `(p, a)` | `PriorityQueue p` | `PriorityQueue p` | Нет | Да | `Ord p =>` | Нет | Да | Да | Нет | Нет | Нет |
 
 `List`, `Seq`, `NonEmpty` и `Chunk` также реализуют `Applicative` и `Monad`
 (а `List`, `Seq` и `Chunk` — `Alternative`).
@@ -230,9 +230,15 @@ let check_to_seq xs = Collections.to_seq xs
 | `HashSet w a` | 5-битный HAMT от младших бит хеша, порядок вставки при коллизиях | `O(1) + O(k)` | `O(1)` | `member` `O(1)` в сред. | `O(m)` | `fold` `O(n)` |
 | `Trie v` | возрастающий порядок UTF-16 ключей | `O(1) + O(k * L)` | `O(1)` | `lookup` `O(L)` | `O(m * L)`, правый выигрывает | `O(n)` / `O(n * L)` |
 | `Bytes` | по индексу байта `0 .. n-1` | `O(1) + O(k)` | `O(1)` | `at` `O(1)`, `member` `O(n)` (`O(1)` вне `0..255`) | `O(n + m)` | — |
+| `PriorityQueue p a` | возрастающий `Ord p`, порядок вставки при равных приоритетах | `O(1) + O(k log n)` | `O(1)` | — | `O(m + log n)`, левый первым | — |
 | *`OrderedMap k v` (#735)* | возрастающий `Ord k` | `O(log n) + O(k)` | `O(1)` | `lookup` `O(log n)` | `O(m log(n + m))`, правый выигрывает | `O(n)` / `O(n log n)` |
 | *`OrderedSet a` (#735)* | возрастающий `Ord a` | `O(log n) + O(k)` | `O(1)` | `member` `O(log n)` | `O(m log(n + m))` | `fold` `O(n)` |
-| *`PriorityQueue p a` (#736)* | возрастающий `Ord p`, FIFO при равных приоритетах | `O(1) + O(k log n)` | `O(1)` | — | `O(log(n + m))` | `map` `O(n)`, `fold` `O(n log n)` |
+
+`PriorityQueue` выполняет `peek` за `O(1)`, а `push` и `pop` — за `O(log n)` в
+худшем случае, в том числе на старых версиях. `combine q1 q2` перенумеровывает
+`m` пар `q2` после пар `q1`, поэтому при равных приоритетах первыми выходят
+пары `q1`. Две очереди равны по `Eq`, когда выдают одни и те же пары в одном
+порядке.
 
 ### Эффекты, короткое замыкание и захваты
 

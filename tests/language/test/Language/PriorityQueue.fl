@@ -1,0 +1,190 @@
+// The pure priority queue: least priority first, equal priorities in
+// insertion order, old versions unchanged by later operations, checked
+// against a stable sorted list. `Language.PriorityQueuePaths` runs a
+// shortest-path search on it.
+module Language.PriorityQueue exposing (tests)
+
+type alias Queue = PriorityQueue.PriorityQueue Int String
+
+/// The queue with each pair pushed in order.
+queue_of : List (Int, String) -> Queue
+let queue_of pairs =
+  List.fold_left (fun q (p, a) -> PriorityQueue.push p a q) PriorityQueue.empty pairs
+
+/// The pairs repeated pops give, least first.
+drained : Ord p => PriorityQueue.PriorityQueue p a -> List (p, a)
+let rec drained q =
+  match PriorityQueue.pop q with
+  | Some (pair, rest) -> [pair] ++ drained rest
+  | None -> []
+
+/// The queue after one pop, or the queue itself when it is empty.
+popped : Queue -> Queue
+let popped q =
+  match PriorityQueue.pop q with
+  | Some (_, rest) -> rest
+  | None -> q
+
+/// What one operation shows: the pair it returns, if any, and the size after.
+type alias Seen = (Option (Int, Int), Int)
+
+/// Runs the operations on the queue: `0` to `2` push the priority with the
+/// step's index as the payload, `3` pops and `4` peeks. Gives what each step
+/// shows and the pairs left, least first.
+run_queue : List (Int, Int) -> (List Seen, List (Int, Int))
+let run_queue ops =
+  let (left, _, seen) =
+    List.fold_left
+      (fun (q, i, acc) (op, p) ->
+        if op <= 2 then
+          let next = PriorityQueue.push p i q
+          (next, i + 1, [(None, PriorityQueue.size next)] ++ acc)
+        else if op == 3 then
+          match PriorityQueue.pop q with
+          | Some (pair, rest) -> (rest, i + 1, [(Some pair, PriorityQueue.size rest)] ++ acc)
+          | None -> (q, i + 1, [(None, PriorityQueue.size q)] ++ acc)
+        else
+          (q, i + 1, [(PriorityQueue.peek q, PriorityQueue.size q)] ++ acc)
+      )
+      (PriorityQueue.empty, 0, [])
+      ops
+  (List.reverse seen, PriorityQueue.to_list left)
+
+/// The same operations on a list kept stably sorted by priority, so a pushed
+/// pair goes after the pairs of its priority already there.
+run_model : List (Int, Int) -> (List Seen, List (Int, Int))
+let run_model ops =
+  let (left, _, seen) =
+    List.fold_left
+      (fun (xs, i, acc) (op, p) ->
+        if op <= 2 then
+          let next = List.sort_with (fun (priority, _) -> priority) (xs ++ [(p, i)])
+          (next, i + 1, [(None, List.length next)] ++ acc)
+        else if op == 3 then
+          match xs with
+          | [first, ...rest] -> (rest, i + 1, [(Some first, List.length rest)] ++ acc)
+          | [] -> (xs, i + 1, [(None, 0)] ++ acc)
+        else
+          (xs, i + 1, [(List.head xs, List.length xs)] ++ acc)
+      )
+      ([], 0, [])
+      ops
+  (List.reverse seen, left)
+
+tests : List Test.Test
+let tests = [
+  Test.group "priority queue" [
+    Test.test "the least priority comes first" (fun () ->
+      let q = queue_of [(5, "e"), (1, "a"), (3, "c"), (2, "b"), (4, "d")]
+      Test.equal (Some (1, "a"), 5, false, [(1, "a"), (2, "b"), (3, "c"), (4, "d"), (5, "e")]) (
+        PriorityQueue.peek q,
+        PriorityQueue.size q,
+        PriorityQueue.is_empty q,
+        drained q,
+      )
+    ),
+    Test.test "equal priorities leave in insertion order" (fun () ->
+      let mixed = queue_of [(2, "x"), (1, "a"), (2, "y"), (1, "b"), (2, "z"), (1, "c")]
+      let same =
+        List.fold_left (fun q i -> PriorityQueue.push 0 i q) PriorityQueue.empty (List.range 0 20)
+      Test.equal ([(1, "a"), (1, "b"), (1, "c"), (2, "x"), (2, "y"), (2, "z")], List.range 0 20) (
+        drained mixed,
+        List.map (fun (_, i) -> i) (drained same),
+      )
+    ),
+    Test.test "duplicate pairs are all kept" (fun () ->
+      let q = queue_of [(1, "a"), (1, "a"), (0, "a"), (1, "a")]
+      Test.equal (4, [(0, "a"), (1, "a"), (1, "a"), (1, "a")]) (PriorityQueue.size q, drained q)
+    ),
+    Test.test "an empty queue has no next pair" (fun () ->
+      let e : Queue = PriorityQueue.empty
+      let emptied = popped (popped (queue_of [(1, "a"), (2, "b")]))
+      Test.equal (None, true, true, 0, None, true, true) (
+        PriorityQueue.peek e,
+        Option.is_none (PriorityQueue.pop e),
+        PriorityQueue.is_empty e,
+        PriorityQueue.size emptied,
+        PriorityQueue.peek emptied,
+        Option.is_none (PriorityQueue.pop emptied),
+        PriorityQueue.is_empty emptied,
+      )
+    ),
+    Test.test "old versions stay as they were" (fun () ->
+      let base = queue_of [(3, "c"), (1, "a"), (2, "b")]
+      let pushed = PriorityQueue.push 0 "z" base
+      let rest = popped base
+      let tied = PriorityQueue.push 1 "x" base
+      Test.equal
+        [
+          [(1, "a"), (2, "b"), (3, "c")],
+          [(0, "z"), (1, "a"), (2, "b"), (3, "c")],
+          [(2, "b"), (3, "c")],
+          [(1, "a"), (1, "x"), (2, "b"), (3, "c")],
+          [(2, "b"), (2, "w"), (3, "c")],
+          [(0, "y"), (1, "a"), (2, "b"), (3, "c")],
+          [(2, "b"), (3, "c")],
+          [(1, "a"), (2, "b"), (3, "c")],
+        ]
+        [
+          drained base,
+          drained pushed,
+          drained rest,
+          drained tied,
+          drained (PriorityQueue.push 2 "w" rest),
+          drained (PriorityQueue.push 0 "y" base),
+          drained (popped base),
+          drained base,
+        ]
+    ),
+    Test.test "combine puts the left queue first on ties" (fun () ->
+      let q1 = queue_of [(1, "a"), (2, "b")]
+      let q2 = queue_of [(1, "c"), (0, "d")]
+      let q3 = queue_of [(2, "e"), (1, "f")]
+      let e : Queue = empty
+      Test.equal
+        (
+          [(0, "d"), (1, "a"), (1, "c"), (2, "b")],
+          [(0, "d"), (1, "c"), (1, "a"), (2, "b")],
+          [(0, "d"), (1, "a"), (1, "c"), (1, "g"), (2, "b")],
+          [(0, "d"), (1, "c"), (2, "b"), (2, "h")],
+          (true, true, true, 4),
+        )
+        (
+          drained (combine q1 q2),
+          drained (combine q2 q1),
+          drained (PriorityQueue.push 1 "g" (combine q1 q2)),
+          drained (PriorityQueue.push 2 "h" (combine (popped q1) q2)),
+          (
+            eq (combine (combine q1 q2) q3) (combine q1 (combine q2 q3)),
+            eq (combine e q1) q1 && eq (combine q1 e) q1,
+            eq e (popped (popped q1)),
+            PriorityQueue.size (combine q1 q2),
+          ),
+        )
+    ),
+    Test.test "combine renumbers a heap deeper than the stack" (fun () ->
+      // Falling priorities make a left spine as long as the queue.
+      let long =
+        List.fold_left
+          (fun q i -> PriorityQueue.push (0 - i) i q)
+          PriorityQueue.empty
+          (List.range 0 20000)
+      let both = combine (PriorityQueue.push (-19999) (-1) PriorityQueue.empty) long
+      Test.equal (20001, [(-19999, -1), (-19999, 19999), (-19998, 19998)]) (
+        PriorityQueue.size both,
+        List.take 3 (PriorityQueue.to_list both),
+      )
+    ),
+    Test.test "equality compares the pairs in priority order" (fun () ->
+      Test.equal (true, false, false) (
+        eq (queue_of [(1, "a"), (2, "b")]) (popped (queue_of [(2, "b"), (0, "z"), (1, "a")])),
+        eq (queue_of [(1, "a"), (1, "b")]) (queue_of [(1, "b"), (1, "a")]),
+        eq (queue_of [(1, "a")]) (queue_of [(1, "a"), (1, "a")]),
+      )
+    ),
+    Test.property
+      "random operations agree with a stable sorted list"
+      (Gen.list 60 (Gen.pair (Gen.int 0 4) (Gen.int 0 9)))
+      (fun ops -> Test.equal (run_model ops) (run_queue ops)),
+  ],
+]
