@@ -77,7 +77,13 @@ let tests = [
       let hm = HashMap.from_list EqHash.canonical [("a", 1), ("b", 2), ("c", 3)]
       let hs = HashSet.from_list EqHash.canonical [1, 2, 3]
       let tr = Trie.from_list [("", 0), ("a", 1), ("ab", 2)]
-      Test.equal [true, true, true, true, true, true, true, true, true, true, true] [
+      let pq =
+        PriorityQueue.push
+          2
+          "b"
+          (PriorityQueue.push 1 "a" (PriorityQueue.push 2 "c" PriorityQueue.empty))
+      let pq_empty : PriorityQueue.PriorityQueue Int String = PriorityQueue.empty
+      Test.equal [true, true, true, true, true, true, true, true, true, true, true, true, true] [
         sized_to_seq_laws ([] : List Int),
         sized_to_seq_laws [1, 2, 3],
         sized_to_seq_laws (NonEmpty.cons 1 [2, 3]),
@@ -89,6 +95,8 @@ let tests = [
         sized_to_seq_laws hm,
         sized_to_seq_laws hs,
         sized_to_seq_laws tr,
+        sized_to_seq_laws pq,
+        sized_to_seq_laws pq_empty,
       ]
     ),
     Test.test "ToSeq restartability and first law hold for Seq" (fun () ->
@@ -245,11 +253,16 @@ let tests = [
       let t1 = Trie.from_list [("a", 1), ("b", 2)]
       let t2 = Trie.from_list [("b", 20), ("c", 3)]
       let t3 = Trie.from_list [("c", 30), ("d", 4)]
+      let p1 = PriorityQueue.push 1 "b" (PriorityQueue.push 1 "a" PriorityQueue.empty)
+      let p2 = PriorityQueue.push 0 "c" (PriorityQueue.push 1 "d" PriorityQueue.empty)
+      let p3 = PriorityQueue.push 1 "e" PriorityQueue.empty
       let b1 = bytes_of [1, 2]
       let b2 = bytes_of [3]
       let b3 = bytes_of [4, 5]
       Test.equal
         [
+          true,
+          true,
           true,
           true,
           true,
@@ -284,6 +297,8 @@ let tests = [
           monoid_laws t1,
           semigroup_laws b1 b2 b3,
           monoid_laws b1,
+          semigroup_laws p1 p2 p3,
+          monoid_laws p1,
         ]
     ),
     Test.test "Applicative, Monad, and Alternative laws hold for NonEmpty and Chunk" (fun () ->

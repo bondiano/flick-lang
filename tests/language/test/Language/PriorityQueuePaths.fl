@@ -1,0 +1,89 @@
+// A shortest-path search written with the pure priority queue gives the
+// costs of a Bellman-Ford search, which uses no queue, for every pair of
+// nodes.
+module Language.PriorityQueuePaths exposing (tests)
+
+/// The least cost from `source` to `target` along the edges, by Dijkstra's
+/// algorithm on the queue: a node is settled the first time it is popped.
+shortest : List (Int, Int, Float) -> Int -> Int -> Option Float
+let shortest edges source target =
+  go : PriorityQueue.PriorityQueue Float Int -> List Int -> Option Float
+  let rec go queue settled =
+    match PriorityQueue.pop queue with
+    | None -> None
+    | Some ((cost, node), rest) ->
+      if node == target then
+        Some cost
+      else if List.contains node settled then
+        go rest settled
+      else
+        let reached =
+          List.fold_left
+            (fun q (s, t, w) -> if s == node then PriorityQueue.push (cost + w) t q else q)
+            rest
+            edges
+        go reached ([node] ++ settled)
+  go (PriorityQueue.push 0.0 source PriorityQueue.empty) []
+
+/// The costs `dist` with the edge from `s` to `t` of weight `w` relaxed.
+relax : List (Option Float) -> (Int, Int, Float) -> List (Option Float)
+let relax dist (s, t, w) =
+  match (List.get s dist, List.get t dist) with
+  | (Some (Some d), Some None) -> List.set t (Some (d + w)) dist
+  | (Some (Some d), Some (Some e)) -> if d + w < e then List.set t (Some (d + w)) dist else dist
+  | _ -> dist
+
+/// The least cost from `source` to `target` among nodes `0 .. count - 1`,
+/// by Bellman-Ford: `count` rounds that relax every edge.
+relaxed : List (Int, Int, Float) -> Int -> Int -> Int -> Option Float
+let relaxed edges count source target =
+  let start = List.set source (Some 0.0) (List.repeat count None)
+  let costs =
+    List.fold_left (fun dist _ -> List.fold_left relax dist edges) start (List.range 0 count)
+  Option.with_default None (List.get target costs)
+
+/// Both costs for every pair of nodes `0 .. count - 1`.
+all_costs : Int -> List (Int, Int, Float) -> (List (Option Float), List (Option Float))
+let all_costs count edges =
+  let pairs =
+    List.flat_map (fun s -> List.map (fun t -> (s, t)) (List.range 0 count)) (List.range 0 count)
+  (
+    List.map (fun (s, t) -> relaxed edges count s t) pairs,
+    List.map (fun (s, t) -> shortest edges s t) pairs,
+  )
+
+tests : List Test.Test
+let tests = [
+  Test.group "priority queue paths" [
+    Test.test "Dijkstra on the queue finds Bellman-Ford's costs" (fun () ->
+      let roads = [(0, 1, 1.0), (1, 2, 2.0), (0, 2, 5.0), (2, 3, 1.0)]
+      let looped = [
+        (0, 1, 4.0),
+        (0, 2, 1.0),
+        (2, 1, 2.0),
+        (1, 3, 1.0),
+        (2, 3, 5.0),
+        (3, 0, 1.0),
+        (1, 1, 0.0),
+        (0, 1, 3.0),
+        (3, 4, 2.0),
+        (4, 5, 0.0),
+        (5, 3, 7.0),
+      ]
+      let flat = [(0, 1, 0.0), (1, 2, 0.0), (0, 2, 0.0), (2, 3, 2.0), (1, 3, 2.0)]
+      let (roads_oracle, roads_queue) = all_costs 4 roads
+      let (looped_oracle, looped_queue) = all_costs 6 looped
+      let (flat_oracle, flat_queue) = all_costs 5 flat
+      Test.all [
+        Test.equal roads_oracle roads_queue,
+        Test.equal looped_oracle looped_queue,
+        Test.equal flat_oracle flat_queue,
+        Test.equal (Some 4.0, Some 4.0, None) (
+          shortest roads 0 3,
+          shortest looped 0 3,
+          shortest flat 4 0,
+        ),
+      ]
+    ),
+  ],
+]
