@@ -70,3 +70,72 @@ impl HostProfile {
         self.api.lines().any(|line| line == name)
     }
 }
+
+/// A dialect a `dialect` tag selects, with the compile-time limits of its
+/// VM as `profiles/<id>.toml` records them; a test keeps the two equal.
+pub(crate) struct Dialect {
+    /// The tag of the `dialect` axis.
+    pub tag: &'static str,
+    /// The profile file, `profiles/<id>.toml`.
+    pub id: &'static str,
+    /// The VM, for messages.
+    pub title: &'static str,
+    /// The most locals a function has in scope at once (`max-locals`).
+    pub max_locals: usize,
+    /// The most upvalues one function captures (`max-upvalues`).
+    pub max_upvalues: usize,
+    /// The most constants of one function (`max-constants`): of every kind
+    /// together, or with `constants_by_kind` of each kind apart.
+    pub max_constants: usize,
+    /// Whether numbers and the other constants are counted apart, as
+    /// `LuaJIT` does (`limits-observed`).
+    pub constants_by_kind: bool,
+    /// A function's frame holds fewer registers than this (`max-registers`).
+    pub max_registers: usize,
+    /// The registers a call takes besides its arguments: the callee, and
+    /// on `LuaJIT` the frame link (`limits-observed`: a call after one local
+    /// fails at `max_registers - 1 - call_slots` arguments).
+    pub call_slots: usize,
+    /// Whether a `-0.0` literal keeps its sign (`negative-zero-literal`).
+    pub negative_zero: bool,
+}
+
+pub(crate) const DIALECTS: &[Dialect] = &[
+    Dialect {
+        tag: "lua51",
+        id: "lua-5.1",
+        title: "Lua 5.1.5",
+        max_locals: 200,
+        max_upvalues: 60,
+        max_constants: 262_143,
+        constants_by_kind: false,
+        max_registers: 250,
+        call_slots: 1,
+        negative_zero: false,
+    },
+    Dialect {
+        tag: "luajit",
+        id: "luajit-2.1",
+        title: "LuaJIT 2.1",
+        max_locals: 200,
+        max_upvalues: 60,
+        max_constants: 65_536,
+        constants_by_kind: true,
+        max_registers: 250,
+        call_slots: 2,
+        negative_zero: true,
+    },
+];
+
+/// The dialect of the tag `luajit`, or of `lua51` without it.
+pub(crate) fn dialect(tags: &[String]) -> &'static Dialect {
+    let tag = if tags.iter().any(|t| t == "luajit") {
+        "luajit"
+    } else {
+        "lua51"
+    };
+    DIALECTS
+        .iter()
+        .find(|d| d.tag == tag)
+        .unwrap_or(&DIALECTS[0])
+}

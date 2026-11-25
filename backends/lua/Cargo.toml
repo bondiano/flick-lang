@@ -24,7 +24,9 @@ guest = []
 
 [dependencies]
 flick-backend = { path = "../../flick-backend" }
+flick-backend-support = { path = "../../flick-backend-support", default-features = false }
 flick-ir = { path = "../../flick-ir", features = ["cbor"] }
+flick-pretty = { path = "../../flick-pretty" }
 
 [dev-dependencies]
 toml = "1.1.8"

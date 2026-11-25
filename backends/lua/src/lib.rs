@@ -3,6 +3,15 @@
 //! reachable use. It generates no code yet, and says so.
 
 mod check;
+// `generate` lowers through it once it assembles the chunks of a program
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the emitter is exercised by its tests until `generate` uses it"
+    )
+)]
+mod emit;
 mod profiles;
 mod reach;
 
