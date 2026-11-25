@@ -493,34 +493,35 @@ fn foreign_kernel(name: &str, from: &str, export: &str) -> Item {
 
 #[test]
 fn whether_a_kernel_binding_suspends_is_the_kernel_tables() {
+    let both = expr(
+        ExprKind::Tuple(vec![global("pause", 8, 13), global("now", 20, 23)]),
+        8,
+        23,
+    );
     let program = |platform| {
         request(
             platform,
             &["lua", "lua51"],
             vec![
-                function("main", global("pause", 8, 13)),
+                function("main", both.clone()),
                 foreign_kernel("pause", "flick:Effect", "sleep"),
-                function("other", global("now", 20, 23)),
                 foreign_kernel("now", "flick:Clock", "now"),
             ],
         )
     };
+    // a binding that suspends cannot run on WoW; one that returns is the kernel's
     let wow = messages(&program("wow-retail"));
-    assert_eq!(wow.len(), 1, "{wow:?}");
-    assert!(
-        wow[0]
-            .0
-            .contains("asynchronous suspension (`App.pause`) is not available"),
-        "{wow:?}"
-    );
+    let suspension = "asynchronous suspension (`App.pause`) is not available";
+    let kernel = "the Lua primitive kernel is not implemented";
+    assert_eq!(wow.len(), 2, "{wow:?}");
+    assert!(wow[0].0.contains(suspension), "{wow:?}");
     assert_eq!(wow[0].1, Some((8, 13)));
+    assert!(wow[1].0.contains(kernel), "{wow:?}");
+    assert_eq!(wow[1].1, Some((20, 23)));
+    // LÖVE can suspend: both are the kernel's
     let love = messages(&program("love"));
-    assert!(
-        love[0]
-            .0
-            .contains("the Lua primitive kernel is not implemented"),
-        "{love:?}"
-    );
+    assert_eq!(love.len(), 2, "{love:?}");
+    assert!(love.iter().all(|(m, _)| m.contains(kernel)), "{love:?}");
 }
 
 #[test]

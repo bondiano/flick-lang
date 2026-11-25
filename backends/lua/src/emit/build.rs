@@ -129,7 +129,10 @@ impl Plan<'_> {
 
     /// `refused` of module `m` as a diagnostic: at its own span in an own
     /// module, and in a built-in one at the own expression that reached
-    /// the item it is in.
+    /// the item it is in, or, for what belongs to the chunk rather than to
+    /// one item (a limit of its main function), the module's first item.
+    /// The walk blames every reached item of a built-in module, so the
+    /// diagnostic without a span is only a guard.
     fn locate(&self, m: usize, refused: Refusal) -> Diagnostic {
         let module = &self.program.modules[m];
         if !self.builtin.contains(module.name.as_str()) {

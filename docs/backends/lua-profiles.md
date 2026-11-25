@@ -17,7 +17,10 @@ environments, checks programs against their profile and generates the pure
 core of a program as Lua chunks: one per reached module, each with a source
 map, defined into a private namespace each chunk takes as its second
 argument (see `backends/lua/src/emit/build.rs`). Everything else, the kernel
-above all, is refused with `P012` at its source.
+above all, is refused with `P012` at its source, or for what a built-in
+module needs, at the project's expression that reached it. The rows of
+`backends/lua/kernel.txt` say, for each `flick:` binding, what the target
+does with it and whether it suspends.
 
 ## Profiles
 
@@ -102,8 +105,8 @@ client defines; a missing global needs its source added to `wow-lua.txt`.
   a WoW profile cannot be claimed until a live client runs the probes.
 - **Code generation.** The component generates only the pure core. The
   kernel, the value ABI and the host runtime are separate work; until they
-  exist, every reachable binding of Flick's own kernel (`flick:` specifiers,
-  each a row of `backends/lua/kernel.txt`) is refused on every profile.
+  exist, every reachable binding of Flick's own kernel (`flick:` specifiers)
+  is refused on every profile.
 
 ## The synchronous WoW slice
 

@@ -6,7 +6,8 @@
 //!    VM, refusing what it would not load;
 //! 3. [`print`] writes deterministic text and the Flick span of each line.
 //!
-//! Every refusal is `P012` at the Flick source of what is refused.
+//! Every refusal is `P012` at the Flick source of what is refused; in a
+//! built-in module, at the project's expression that reached it.
 
 mod ast;
 mod build;

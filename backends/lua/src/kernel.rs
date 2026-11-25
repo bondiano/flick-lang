@@ -123,6 +123,20 @@ mod tests {
                 "the kernel primitive `{export}` of `{specifier}` has no line in kernel.txt"
             );
         }
+        // and a line of its own is a kernel primitive's or a suspending binding's
+        for section in &table.sections {
+            for (export, row) in &section.exports {
+                let primitive = manifest
+                    .exports()
+                    .any(|(s, e, c)| s == section.specifier && e == *export && c == Class::Kernel);
+                assert!(
+                    primitive || row.suspends,
+                    "kernel.txt gives `{export}` of `{}` a line of its own, but it is no kernel \
+                     primitive and does not suspend",
+                    section.specifier
+                );
+            }
+        }
     }
 
     #[test]

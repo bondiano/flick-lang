@@ -131,9 +131,9 @@ impl Backend for Lua {
                     "Allow the LuaJIT FFI, which keeps Int64 and UInt64 exact (needs `dialect = \"luajit\"`).",
                 ),
             ],
-            // a Lua program runs in its host, WoW or LÖVE, which `flick run`
-            // does not start: the host has no `lua` runtime, so a build
-            // needs no launch and a run is refused before it starts
+            // launches would run on a `lua` runtime, which the host has no
+            // tool for: a Lua program runs in WoW or LÖVE. So a build needs
+            // no launch, and `flick run` is refused before it starts
             launch_runtimes: vec!["lua".into()],
             host_tools: vec![],
             projections: vec![],

@@ -137,7 +137,7 @@ pub struct Stmt {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StmtKind {
-    /// `local a, b = ...`: the names of a chunk's arguments.
+    /// `local a, b = ...`: one or more names for a chunk's arguments.
     Args(Vec<Name>),
     /// `local name = value`, or `local name` without one.
     Local(Name, Option<Expr>),
