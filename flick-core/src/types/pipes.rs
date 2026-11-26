@@ -184,8 +184,13 @@ impl Checker<'_> {
                 if let Some(e) = effects {
                     let (start, _) = lhs.range();
                     let (_, end) = rhs.range();
+                    let call_span = Span::new(self.file, start, end);
                     let e = self.live_call(&function, &e);
-                    self.call_effects(&e, Span::new(self.file, start, end));
+                    if let Some((callee, ro)) = self.layer_run_pipe_outputs(rhs, &param) {
+                        self.layer_run_call_effects(callee, &ro, &e, call_span, false);
+                    } else {
+                        self.call_effects(&e, call_span);
+                    }
                 }
                 let span = Span::new(self.file, lhs.range().0, rhs.range().1);
                 let result = self.instantiate(&result, span);

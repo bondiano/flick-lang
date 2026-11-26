@@ -1,0 +1,98 @@
+// E12 (#434): library-form `Scope.run` and `Layer.run` cannot replace core
+// `scope` and `provide` blocks because closures cross `let mut` (`FLICK-G005`),
+// loop `break`/`continue` (`FLICK-T071`), and lexical `defer` (`FLICK-G004`)
+// boundaries, and `Scope.run`'s rank-2 callback `forall s.` loses RG4 lexical
+// nesting (`Outlives`, `Fiber.Provided`, and outer-scope acquisition).
+module App.E12LibraryBlockers exposing (..)
+
+type File (s : Region)
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} File s
+  use : forall s. File s ->{} Unit
+
+service Greeter =
+  greet : String ->{} String
+
+report : Failure e ->{} Unit
+let report _ = ()
+
+touch : forall s. File s ->{} Unit
+let touch _ = ()
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+// --- 1. Closure blockers: outer `let mut` (`FLICK-G005`) ---
+
+scope_run_mut : Unit ->{} Int
+let scope_run_mut () =
+  let mut n = 0
+  Scope.run (fun _ -> n = n + 1)
+  n
+
+layer_run_mut : Unit ->{} Int
+let layer_run_mut () =
+  let mut n = 0
+  Layer.run greeter (fun () -> n = n + 1)
+  n
+
+// --- 2. Closure blockers: lexical `break` / `continue` (`FLICK-T071`) ---
+
+scope_run_break : Unit ->{} Int
+let scope_run_break () =
+  loop {
+    Scope.run (fun _ -> break 1)
+  }
+
+layer_run_continue : Unit ->{} Unit
+let layer_run_continue () =
+  loop {
+    Layer.run greeter (fun () -> continue)
+  }
+
+// --- 3. Closure blockers: lexical `defer` (`FLICK-G004`) ---
+
+scope_run_defer : Unit ->{} Unit
+let scope_run_defer () =
+  Scope.run (fun _ -> defer { () })
+
+layer_run_defer : Unit ->{} Unit
+let layer_run_defer () = scope {
+  Layer.run greeter (fun () -> defer { () })
+}
+
+// --- 4. `Scope.run` RG4 blockers: `Outlives`, `Fiber.Provided`, nested outer acquisition ---
+
+scope_run_outlives : String ->{Files} Unit
+let scope_run_outlives path = scope outer {
+  let f = Files.open_scoped path
+  Scope.run (fun inner -> ignore (Fiber.spawn inner report (task { touch f })))
+}
+
+scope_run_provided : Unit ->{} Unit
+let scope_run_provided () = provide greeter {
+  Scope.run (fun inner -> ignore (Fiber.spawn inner report (task { ignore (Greeter.greet "x") })))
+}
+
+scope_run_outer_acquire : String ->{Files} Unit
+let scope_run_outer_acquire path = scope outer {
+  open_outer : Unit ->{Files, Scope outer} File outer
+  let open_outer () = Files.open_scoped path
+  Scope.run (fun _ ->
+    let f = open_outer ()
+    Files.use f
+  )
+}
+
+//~ FLICK-G005 @31:23-31:24
+//~ FLICK-G005 @31:27-31:28
+//~ FLICK-G005 @37:32-37:33
+//~ FLICK-G005 @37:36-37:37
+//~ FLICK-T071 @45:25-45:32
+//~ FLICK-T071 @51:34-51:42
+//~ FLICK-G004 @58:23-58:28
+//~ FLICK-G004 @62:32-62:37
+//~ FLICK-G003 @70:35-70:46 the child holds region `outer`, which may end before its owner `s`
+//~ FLICK-G003 @75:35-75:46 this keeps work that uses `Greeter` until `s` closes
+//~ FLICK-T008 @83:13-83:26 expected `Scope s`, found `Scope outer`

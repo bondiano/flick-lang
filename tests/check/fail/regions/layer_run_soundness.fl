@@ -1,0 +1,96 @@
+// Direct `Layer.run` enforces the same provider-lifetime (`FLICK-G003`),
+// parameterized-instance (`FLICK-E019`), and region-install (`FLICK-G002`)
+// checks as `provide` (E12 / #434).
+module App.LayerRunSoundness exposing (..)
+
+type File (s : Region)
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} File s
+  use : forall s. File s ->{} Unit
+
+service Within (s : Region) =
+  get : Unit ->{} File s
+
+service Greeter =
+  greet : String ->{} String
+
+service Store a =
+  get : Unit ->{} a
+
+report : Failure e ->{} Unit
+let report _ = ()
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+ints : Layer none none {Store Int}
+let ints = Layer.succeed Store { get = fun () -> 42 }
+
+touched : Unit ->{Files, Within s} Unit
+let touched _ = Files.use (Within.get ())
+
+// 1a. `Layer.run` escaping `Fiber.Provided` via direct lambda
+leaked_child : Unit ->{} Unit
+let leaked_child () = scope outer {
+  Layer.run greeter (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") })))
+}
+
+// 1b. `Layer.run` escaping `Fiber.Provided` via `Scope.add_finalizer`
+leaked_finalizer : Unit ->{} Unit
+let leaked_finalizer () = scope {
+  Layer.run greeter (fun () -> Scope.add_finalizer (task { ignore (Greeter.greet "x") }))
+}
+
+// 1c. `Layer.run` escaping `Fiber.Provided` via pre-bound function variable
+leaked_fn : Unit ->{} Unit
+let leaked_fn () = scope outer {
+  let start () = ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") }))
+  Layer.run greeter start
+}
+
+// 1d. `Layer.run` shadowing an outer `Fiber.Provided` given
+leaked_shadowed : forall s. Fiber.Provided {Greeter} s => Fiber.Owner s ->{} Unit
+let leaked_shadowed owner =
+  Layer.run greeter (fun () -> ignore (Fiber.spawn owner report (task { ignore (Greeter.greet "x") })))
+
+// 1e. `Layer.run` escaping `Fiber.Provided` via pipe
+leaked_pipe : Unit ->{} Unit
+let leaked_pipe () = scope outer {
+  (fun () -> ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "x") }))) |> Layer.run greeter
+}
+
+// 2a. `Layer.run` parameterized instance overlap via lambda (`FLICK-E019`)
+answered_lambda : Layer none none {Store Int} -> Eff s none a ->{s} a
+let answered_lambda layer t = Layer.run layer (fun () -> await t)
+
+// 2b. `Layer.run` parameterized instance overlap via partial application (`FLICK-E019`)
+answered_partial : Layer none none {Store Int} -> (Unit ->{s} a) ->{s} a
+let answered_partial layer f =
+  let run_with = Layer.run layer
+  run_with f
+
+// 3a. `Layer.run` installing a region-indexed service outside its scope (`FLICK-G002`)
+installs_direct : (forall s. File s ->{} Layer none none {Within s}) -> String ->{Files} (Unit ->{Files} Unit)
+let installs_direct make_within path = scope {
+  let layer = make_within (Files.open_scoped path)
+  fun () -> Layer.run layer (fun () -> touched ())
+}
+
+// 3b. `Layer.run` partially applied with a region-indexed service escaping scope (`FLICK-G002`)
+installs_partial : (forall s. File s ->{} Layer none none {Within s}) -> String ->{Files} (Unit ->{Files} Unit)
+let installs_partial make_within path = scope {
+  let layer = make_within (Files.open_scoped path)
+  let run_with = Layer.run layer
+  fun () -> run_with (fun () -> touched ())
+}
+
+//~ FLICK-G003 @36:40-36:51 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @42:32-42:51 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @49:3-49:26 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @55:40-55:51 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-G003 @60:3-60:107 the `provide` that builds `Greeter` releases it earlier
+//~ FLICK-E019 @65:58-65:65 `s` may hold `Store` at other arguments
+//~ FLICK-E019 @71:12-71:13 `s` may hold `Store` at other arguments
+//~ FLICK-G002 @77:13-77:51 this uses region `s`
+//~ FLICK-G002 @85:13-85:44 this uses region `s`

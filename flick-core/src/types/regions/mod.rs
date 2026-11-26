@@ -69,6 +69,9 @@ pub struct State {
     pub nest: Vec<usize>,
     /// The `provide`s around it, innermost last.
     pub provides: Vec<Provide>,
+    /// When `Layer.run layer (fun () -> …)` checks its immediate callback, the
+    /// `provides` index that callback's stage runs inside.
+    pub immediate_provide: Option<usize>,
     /// `Fiber.Provided` constraints until their call has its arguments,
     /// and those whose row may still grow (`provided.rs`).
     pub provided: Vec<provided::Want>,

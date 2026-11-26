@@ -1,0 +1,164 @@
+// E12 (#434) & E15 (#438): core `scope`, `provide S impl`, and `provide layer`
+// support lexical control flow (`let mut`, `break`/`continue`, `defer`), RG4
+// lexical nesting (`Outlives`, `Fiber.Provided`, nested outer-scope acquisition,
+// region type annotations), and open-row residual subtraction (`{-Log | s}`).
+// Also pins valid `Layer.run` usages so soundness checks produce no false positives.
+module App.E12CoreBlocks exposing (..)
+
+type File (s : Region)
+
+service Files =
+  open_scoped : forall s. String ->{Scope s} File s
+  use : forall s. File s ->{} Unit
+
+service Within (s : Region) =
+  get : Unit ->{} File s
+
+service Log =
+  line : String ->{} Unit
+
+service Greeter =
+  greet : String ->{} String
+
+service Other =
+  ping : Unit ->{} Unit
+
+service Store a =
+  get : Unit ->{} a
+
+report : Failure e ->{} Unit
+let report _ = ()
+
+greeter : Layer none none {Greeter}
+let greeter = Layer.succeed Greeter { greet = fun name -> name }
+
+other : Layer none none {Other}
+let other = Layer.succeed Other { ping = fun () -> () }
+
+log_layer : Layer none none {Log}
+let log_layer = Layer.succeed Log { line = fun _ -> () }
+
+ints : Layer none none {Store Int}
+let ints = Layer.succeed Store { get = fun () -> 42 }
+
+touched : Unit ->{Files, Within s} Unit
+let touched _ = Files.use (Within.get ())
+
+// --- 1. Outer `let mut` across `scope`, `provide S impl`, and `provide layer` ---
+
+mut_in_core_blocks : Unit ->{} Int
+let mut_in_core_blocks () =
+  let mut total = 0
+  scope {
+    total = total + 1
+    provide Log ({ line = fun _ -> () }) {
+      Log.line "impl"
+      total = total + 2
+      provide greeter {
+        ignore (Greeter.greet "layer")
+        total = total + 4
+      }
+    }
+  }
+  total
+
+// --- 2. Lexical `break` and `continue` across `scope`, `provide S impl`, `provide layer` ---
+
+loop_control_in_core_blocks : Unit ->{} Int
+let loop_control_in_core_blocks () =
+  let mut i = 0
+  loop {
+    scope {
+      provide Log ({ line = fun _ -> () }) {
+        provide greeter {
+          i = i + 1
+          if i < 3 then continue
+          break i
+        }
+      }
+    }
+  }
+
+// --- 3. Lexical `defer` in `scope`, `provide S impl`, and `provide layer` ---
+
+defer_in_core_blocks : Unit ->{} Unit
+let defer_in_core_blocks () = provide greeter {
+  scope {
+    defer { ignore (Greeter.greet "scope-end") }
+    provide Log ({ line = fun _ -> () }) {
+      defer { ignore (Greeter.greet "impl-end") }
+      provide other {
+        Other.ping ()
+        defer { ignore (Greeter.greet "layer-end") }
+      }
+    }
+  }
+}
+
+// --- 4. RG4 `Outlives`, `Fiber.Provided`, nested outer-scope acquisition, region binder `s` ---
+
+rg4_nested_scope : String ->{Files} Unit
+let rg4_nested_scope path = provide greeter {
+  scope outer {
+    open_outer : Unit ->{Files, Scope outer} File outer
+    let open_outer () = Files.open_scoped path
+    let f = open_outer ()
+    scope inner {
+      let g = open_outer ()
+      Files.use g
+      ignore (Fiber.spawn inner report (task { Files.use f }))
+      ignore (Fiber.spawn inner report (task { ignore (Greeter.greet "ok") }))
+    }
+  }
+}
+
+// --- 5. E15 open-row residual `{-Log | s}` and generic `Eff (o + r)` ---
+
+quiet_provide : Layer none none {Log} -> Eff s none a ->{-Log | s} a
+let quiet_provide layer t = provide layer { await t }
+
+with_generic_provide : Layer none none o -> Eff (o + r) none a ->{r} a
+let with_generic_provide layer t = provide layer { await t }
+
+with_generic_layer_run : Layer none none o -> Eff (o + r) none a ->{r} a
+let with_generic_layer_run layer t = Layer.run layer (fun () -> await t)
+
+// --- 6. Valid `Layer.run` usages (must keep passing under soundness checks) ---
+
+layer_run_outer_service_child : Unit ->{} Unit
+let layer_run_outer_service_child () = provide greeter {
+  scope outer {
+    Layer.run other (fun () ->
+      Other.ping ()
+      ignore (Fiber.spawn outer report (task { ignore (Greeter.greet "outer") }))
+    )
+  }
+}
+
+layer_run_outer_service_finalizer : Unit ->{} Unit
+let layer_run_outer_service_finalizer () = provide greeter {
+  scope {
+    Layer.run other (fun () ->
+      Other.ping ()
+      Scope.add_finalizer (task { ignore (Greeter.greet "outer") })
+    )
+  }
+}
+
+layer_run_inner_scope_child : Unit ->{} Unit
+let layer_run_inner_scope_child () =
+  Layer.run greeter (fun () -> scope inner {
+    ignore (Fiber.spawn inner report (task { ignore (Greeter.greet "inner") }))
+  })
+
+layer_run_apart_store : Layer none none {Store Int} -> Eff {-Store | s} none a ->{s} a
+let layer_run_apart_store layer t = Layer.run layer (fun () -> await t)
+
+layer_run_named_store : Layer none none {Store Int} -> Eff {Store Int | s} none a ->{s} a
+let layer_run_named_store layer t = Layer.run layer (fun () -> await t)
+
+layer_run_within_live : (forall s. File s ->{} Layer none none {Within s}) -> String ->{Files} Unit
+let layer_run_within_live make_within path = scope {
+  let layer = make_within (Files.open_scoped path)
+  Layer.run layer (fun () -> touched ())
+}

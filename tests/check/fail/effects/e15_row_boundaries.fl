@@ -1,0 +1,15 @@
+// E12 (#434) & E15 (#438): open-row subtraction (`-S | r`) lets core `provide`
+// type residual rows such as `{-Log | s}`, whereas first-class `Layer.run` has
+// signature `Layer ri e ro -> (Unit ->{ro + r; e2} a) ->{ri + r; e + e2} a` and
+// cannot discharge `Log` from an abstract row variable `s` without a
+// row-variable subtraction constraint `r - ro` (which E15 explicitly declines
+// to add).
+module App.E15RowBoundaries exposing (..)
+
+service Log =
+  line : String ->{} Unit
+
+quiet_layer_run : Layer none none {Log} -> Eff s none a ->{-Log | s} a
+let quiet_layer_run layer t = Layer.run layer (fun () -> await t)
+
+//~ FLICK-E002 @13:31-13:66 the signature of `quiet_layer_run` does not allow service `Log`

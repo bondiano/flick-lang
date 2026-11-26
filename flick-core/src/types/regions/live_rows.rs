@@ -67,6 +67,25 @@ impl Checker<'_> {
         }
     }
 
+    /// `services` extended with `Live` for every region indexing a service in
+    /// `entries`, enforcing the same check as [`Self::live_install`] on a
+    /// first-class `Layer.run` call (including partial application).
+    pub(in crate::types) fn with_live_install<'t>(
+        &self,
+        services: &Type,
+        entries: impl IntoIterator<Item = &'t Type>,
+    ) -> Type {
+        let mut atoms = Norm::default();
+        for entry in entries {
+            merge(&mut atoms, self.indexed_live(entry));
+        }
+        if atoms.entries.is_empty() {
+            services.clone()
+        } else {
+            add_live(services, atoms)
+        }
+    }
+
     /// Unification of service rows: `Live` that one side has and the other,
     /// a closed row, lacks, is left out while it needs no region known yet,
     /// as of a cell's capacity a generic signature names. Its capture rows

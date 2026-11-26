@@ -257,6 +257,7 @@ impl Checker<'_> {
         // first, as `let r = user` would give it
         let mut first = self.apply_written_first(head, args);
         let mut ty = self.infer(head);
+        let layer_run_ro = self.layer_run_outputs(head, &ty);
         let mut unknown = Vec::new();
         let mut params = Vec::new();
         // the places a plugin watches: read before any argument, so an
@@ -280,6 +281,16 @@ impl Checker<'_> {
                     effects,
                     result,
                 } => {
+                    let entered_layer_run = i == 1
+                        && layer_run_ro.is_some()
+                        && super::handlers::is_immediate_thunk(arg);
+                    let body_provided = self.cx.regions.provided.len();
+                    let body_provided_late = self.cx.regions.provided_late.len();
+                    if entered_layer_run && let Some(ro) = layer_run_ro.as_ref() {
+                        self.enter_layer_run_provide(head, span, ro);
+                        self.cx.regions.immediate_provide =
+                            Some(self.cx.regions.provides.len() - 1);
+                    }
                     let argument = match checked {
                         Some(argument) => argument,
                         None if watched.is_none() && self.late_accessor(arg, &param) => {
@@ -295,12 +306,33 @@ impl Checker<'_> {
                             (watched.is_some(), &marked),
                         ),
                     };
-                    if let Some(e) = effects {
+                    if entered_layer_run {
+                        self.cx.regions.immediate_provide = None;
+                    }
+                    if let Some(ro) = layer_run_ro.as_ref().filter(|_| i == 1) {
+                        if !defaults.is_empty() {
+                            self.grow();
+                            let pending = mem::take(defaults);
+                            self.settle_defaults(pending);
+                        }
+                        self.settle_provided_since(body_provided, body_provided_late);
+                        if let Some(e) = effects {
+                            let live = self.live_call(&ty, &e);
+                            self.layer_run_call_effects(head, ro, &live, span, entered_layer_run);
+                        } else if entered_layer_run {
+                            self.leave_provide();
+                        }
+                    } else if let Some(e) = effects {
                         self.call_effects(&self.live_call(&ty, &e), span);
                     }
                     params.push(*param);
                     let result = self.instantiate(&result, span);
                     ty = self.application_result(result, &ty, &argument, parametric && i == 0);
+                    if i == 0
+                        && let Some(ro) = layer_run_ro.as_ref()
+                    {
+                        self.refine_layer_run_after_layer(ro, &mut ty);
+                    }
                 }
                 Type::Error => {
                     let inferred = checked.unwrap_or_else(|| self.infer(arg));
