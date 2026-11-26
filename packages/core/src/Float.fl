@@ -52,10 +52,7 @@ round : Float -> Float
 let round x =
   let f = floor x
   // the nearest integer, a tie toward +Infinity; `x - f` is exact where it decides
-  if f == x then x
-  else if x - f < 0.5 then f
-  else if f + 1.0 == 0.0 then x * 0.0
-  else f + 1.0
+  if f == x then x else if x - f < 0.5 then f else if f + 1.0 == 0.0 then x * 0.0 else f + 1.0
   @native "Math.round" when js || go
 
 trunc : Float -> Float
@@ -68,20 +65,28 @@ foreign pure sqrt from global "Math.sqrt"
 /// The lesser of two numbers by the order where NaN is least.
 min : Float -> Float -> Float
 let min that self =
-  if self == that || is_nan self then self
-  else if is_nan that then that
-  else if self < that then self
-  else that
+  if self == that || is_nan self then
+    self
+  else if is_nan that then
+    that
+  else if self < that then
+    self
+  else
+    that
   @native "flick:Number" "min" when js || go
     arity 1
 
 /// The greater of two numbers by the order where NaN is least.
 max : Float -> Float -> Float
 let max that self =
-  if self == that || is_nan that then self
-  else if is_nan self then that
-  else if self > that then self
-  else that
+  if self == that || is_nan that then
+    self
+  else if is_nan self then
+    that
+  else if self > that then
+    self
+  else
+    that
   @native "flick:Number" "max" when js || go
     arity 1
 
@@ -92,9 +97,12 @@ foreign pure to_string from "flick:rt" "stringFromNumber"
 /// included; blank and malformed text are `None`.
 parse : String -> Option Float
 let parse s =
-  if s == "NaN" then Some (0.0 / 0.0)
-  else if s == "Infinity" then Some (1.0 / 0.0)
-  else if s == "-Infinity" then Some (-1.0 / 0.0)
+  if s == "NaN" then
+    Some (0.0 / 0.0)
+  else if s == "Infinity" then
+    Some (1.0 / 0.0)
+  else if s == "-Infinity" then
+    Some (-1.0 / 0.0)
   else
     match String.to_number s with
     | Some n -> if is_nan n then None else Some n
