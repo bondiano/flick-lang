@@ -155,7 +155,7 @@ module Kernel.Beyond exposing (tests)
 tests : List Test.Test
 let tests = [
   Test.test \"length\" (fun () -> Test.equal 2 (String.length \"ab\")),
-  Test.test \"trim\" (fun () -> Test.equal \"a\" (String.trim \" a \")),
+  Test.test \"locale\" (fun () -> Test.equal \"A\" (String.to_locale_upper \"en\" \"a\")),
 ]
 ";
     let main = "module Kernel.Main exposing (main)\nmain : Unit -> Unit\nlet main () = ()\n";
@@ -178,13 +178,20 @@ let tests = [
         })
         .unwrap_or_else(|| panic!("no kernel diagnostic in {stderr}"));
     let message = diagnostic["message"].as_str().expect("message");
-    assert!(message.contains("Kernel.Beyond > trim"), "{message}");
-    assert!(message.contains("flick:String trim"), "{message}");
+    // the host's locale, which no kernel has
+    assert!(message.contains("Kernel.Beyond > locale"), "{message}");
+    assert!(
+        message.contains("flick:String toLocaleUpperCase"),
+        "{message}"
+    );
     assert!(!message.contains("length"), "{message}");
     let start =
         usize::try_from(diagnostic["range"]["start"].as_u64().expect("start")).expect("fits");
     let end = usize::try_from(diagnostic["range"]["end"].as_u64().expect("end")).expect("fits");
-    assert_eq!(&suite[start..end], "Test.equal \"a\" (String.trim \" a \")");
+    assert_eq!(
+        &suite[start..end],
+        "Test.equal \"A\" (String.to_locale_upper \"en\" \"a\")"
+    );
     assert!(!root.join(".flick/test/kernel-report.json").exists());
     fs::remove_dir_all(&root).expect("cleanup");
 }
