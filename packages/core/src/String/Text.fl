@@ -1,0 +1,182 @@
+/// The Flick bodies of the string functions that build lists or join many
+/// pieces, over the kernel's strings and arrays: `String` comes before
+/// `List`, so they bind the primitives they need here.
+private module String.Text exposing (
+  length_of,
+  unit_at,
+  part,
+  find_from,
+  item_at,
+  count_of,
+  build,
+  joined,
+  point_at,
+  second_half,
+  chars,
+  split,
+  replace_all,
+  repeat,
+  padding,
+)
+
+length_of : String -> Int
+foreign pure length_of from "flick:String" "length"
+
+unit_at : Int -> String -> Option Int
+foreign pure unit_at from "flick:String" "charCodeAt"
+  arity 1
+
+part : Int -> Int -> String -> String
+foreign pure part from "flick:String" "slice"
+  arity 2
+
+/// The first occurrence of `needle` at or after the unit `start`.
+find_from : String -> Int -> String -> Option Int
+let find_from needle start s =
+  match index_of needle (part start (length_of s) s) with
+  | Some at -> Some (at + start)
+  | None -> None
+
+index_of : String -> String -> Option Int
+foreign pure index_of from "flick:String" "indexOf"
+  arity 1
+
+item_at : Int -> List a -> Option a
+foreign pure item_at from "flick:rt" "listGet"
+
+count_of : List a -> Int
+foreign pure count_of from "flick:rt" "listLength"
+
+build : Int -> (Int -> a)^c -> List a
+foreign pure build from "flick:rt" "listInitialize"
+  retention call
+
+/// The texts joined, halving the range so each unit is copied `log n` times.
+joined : List String -> String
+let joined parts =
+  range : Int -> Int -> String
+  let rec range lo hi =
+    if hi - lo == 1 then
+      match item_at lo parts with
+      | Some text -> text
+      | None -> ""
+    else if lo >= hi then
+      ""
+    else
+      let mid = (lo + hi) / 2
+      range lo mid ++ range mid hi
+  range 0 (count_of parts)
+
+/// The code point at the unit `i` of `s` and its length in units: a pair
+/// of surrogates is one, a lone one stands for itself.
+point_at : String -> Int -> (Int, Int)
+let point_at s i =
+  match unit_at i s with
+  | Some c ->
+    if c >= 55296 && c <= 56319 then
+      match unit_at (i + 1) s with
+      | Some d ->
+        if d >= 56320 && d <= 57343 then ((c - 55296) * 1024 + d - 56320 + 65536, 2) else (c, 1)
+      | None -> (c, 1)
+    else
+      (c, 1)
+  | None -> (0, 0)
+
+/// Whether the unit `i` of `s` is the low half of a pair.
+second_half : String -> Int -> Bool
+let second_half s i =
+  match unit_at i s with
+  | Some d ->
+    if d >= 56320 && d <= 57343 && i > 0 then
+      match unit_at (i - 1) s with
+      | Some c -> c >= 55296 && c <= 56319
+      | None -> false
+    else
+      false
+  | None -> false
+
+/// JS's `Array.from`: the code points, a pair of surrogates as one string,
+/// a lone surrogate as its own; halving the string, never a pair.
+chars : String -> List String
+let chars s =
+  range : Int -> Int -> List String
+  let rec range lo hi =
+    if lo >= hi then
+      []
+    else if hi - lo <= 2 then
+      let (_, size) = point_at s lo
+      if lo + size >= hi then [part lo hi s] else [part lo (lo + 1) s, part (lo + 1) hi s]
+    else
+      let half = (lo + hi) / 2
+      let mid = if second_half s half then half + 1 else half
+      range lo mid ++ range mid hi
+  range 0 (length_of s)
+
+/// The units where `separator` occurs in `s`, left to right, apart.
+// shortcut: each occurrence copies the list so far, quadratic in their
+// number; a kernel builder of lists would make it linear
+occurrences : String -> String -> List Int
+let occurrences separator s =
+  let width = length_of separator
+  every : Int -> List Int -> List Int
+  let rec every start acc =
+    match find_from separator start s with
+    | Some at -> every (at + width) (acc ++ [at])
+    | None -> acc
+  every 0 []
+
+/// JS's `split` of a string separator; `"".split("")` is `[""]` here.
+split : String -> String -> List String
+let split separator s =
+  let n = length_of s
+  if separator == "" then
+    if n == 0 then [s] else build n (fun i -> part i (i + 1) s)
+  else
+    let at = occurrences separator s
+    let width = length_of separator
+    let k = count_of at
+    let start i =
+      if i == 0 then
+        0
+      else
+        match item_at (i - 1) at with
+        | Some p -> p + width
+        | None -> n
+    let stop i =
+      match item_at i at with
+      | Some p -> p
+      | None -> n
+    build (k + 1) (fun i -> part (start i) (stop i) s)
+
+/// JS's `replaceAll` of a string by a string, `$` taken as it is: an
+/// empty pattern before each unit and at the end.
+replace_all : String -> String -> String -> String
+let replace_all pattern replacement s =
+  let n = length_of s
+  if pattern == "" then
+    joined
+      (build (2 * n + 1) (fun i -> if i % 2 == 0 then replacement else part (i / 2) (i / 2 + 1) s))
+  else
+    let pieces = split pattern s
+    let k = count_of pieces
+    joined
+      (build (2 * k - 1) (fun i ->
+        if i % 2 == 1 then
+          replacement
+        else
+          match item_at (i / 2) pieces with
+          | Some text -> text
+          | None -> ""
+      ))
+
+/// `s` `n` times.
+repeat : Int -> String -> String
+let repeat n s = if n <= 0 then "" else joined (build n (fun _ -> s))
+
+/// The `fill` that pads `s` to `target` units, repeated and cut: JS's
+/// `padStart` and `padEnd` add it.
+padding : Int -> String -> String -> String
+let padding target fill s =
+  let missing = target - length_of s
+  let width = length_of fill
+  if missing <= 0 || width == 0 then "" else part 0 missing (repeat (missing / width + 1) fill)

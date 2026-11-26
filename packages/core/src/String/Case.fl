@@ -1,0 +1,171 @@
+/// Upper and lower case by the default Unicode rules, as JS's `toUpperCase`
+/// and `toLowerCase` give them over the kernel's strings: each code point
+/// by the tables of `String.CaseData`, a lone surrogate as it is, and a
+/// capital sigma at the end of a word as a final one.
+private module String.Case exposing (upper, lower)
+
+import String.CaseData
+import String.Text exposing (
+  length_of,
+  part,
+  item_at,
+  count_of,
+  build,
+  joined,
+  point_at,
+  second_half,
+)
+
+// `Bytes` comes after the core: what these two give and take stays opaque
+packed : List Int -> Result (Int, Int) bytes
+foreign pure packed from "flick:rt" "bytesFromList"
+
+decoded : bytes -> Option String
+foreign pure decoded from "flick:rt" "bytesDecodeUtf8"
+
+/// The text of the code point `cp`, through its UTF-8.
+text_of : Int -> String
+let text_of cp =
+  let bytes =
+    if cp < 128 then
+      [cp]
+    else if cp < 2048 then
+      [192 + cp / 64, 128 + cp % 64]
+    else if cp < 65536 then
+      [224 + cp / 4096, 128 + cp / 64 % 64, 128 + cp % 64]
+    else
+      [240 + cp / 262144, 128 + cp / 4096 % 64, 128 + cp / 64 % 64, 128 + cp % 64]
+  match packed bytes with
+  | Ok b ->
+    match decoded b with
+    | Some text -> text
+    | None -> ""
+  | Err _ -> ""
+
+/// The `i`th number of a table.
+at : Int -> List Int -> Int
+let at i table =
+  match item_at i table with
+  | Some n -> n
+  | None -> 0
+
+/// The code point a table of runs `[lo, hi, delta, step]` maps `cp` to.
+mapped : List Int -> Int -> Option Int
+let mapped runs cp =
+  // the last run that starts at most at `cp`, by bisection
+  search : Int -> Int -> Int
+  let rec search lo hi =
+    if hi - lo <= 1 then
+      lo
+    else
+      let mid = (lo + hi) / 2
+      if at (4 * mid) runs <= cp then search mid hi else search lo mid
+  let k = 4 * search 0 (count_of runs / 4)
+  let lo = at k runs
+  if lo <= cp && cp <= at (k + 1) runs && (cp - lo) % at (k + 3) runs == 0 then
+    Some (cp + at (k + 2) runs)
+  else
+    None
+
+/// The text a table of specials maps `cp` to.
+special : List (Int, String) -> Int -> Option String
+let special table cp =
+  search : Int -> Int -> Option String
+  let rec search lo hi =
+    if lo >= hi then
+      None
+    else
+      let mid = (lo + hi) / 2
+      match item_at mid table with
+      | Some (key, text) ->
+        if key == cp then Some text else if key < cp then search (mid + 1) hi else search lo mid
+      | None -> None
+  search 0 (count_of table)
+
+/// Whether `cp` is in a table of ranges `[lo, hi]`.
+within : List Int -> Int -> Bool
+let within ranges cp =
+  search : Int -> Int -> Bool
+  let rec search lo hi =
+    if lo >= hi then
+      false
+    else
+      let mid = (lo + hi) / 2
+      if cp < at (2 * mid) ranges then
+        search lo mid
+      else if cp > at (2 * mid + 1) ranges then
+        search (mid + 1) hi
+      else
+        true
+  search 0 (count_of ranges / 2)
+
+/// The code point that ends before the unit `i` of `s`, and where it starts.
+point_before : String -> Int -> (Int, Int)
+let point_before s i =
+  if second_half s (i - 1) then
+    let (cp, _) = point_at s (i - 2)
+    (cp, i - 2)
+  else
+    let (cp, _) = point_at s (i - 1)
+    (cp, i - 1)
+
+/// `s` with each code point mapped by `runs` and `specials`, a code point
+/// whose text `context` gives taken from it first.
+cased_by :
+  List Int -> List (Int, String) -> (String -> Int -> Int -> Option String) -> String -> String
+let cased_by runs specials context s =
+  let n = length_of s
+  let piece i =
+    if second_half s i then
+      ""
+    else
+      let (cp, size) = point_at s i
+      match context s i cp with
+      | Some text -> text
+      | None ->
+        match special specials cp with
+        | Some text -> text
+        | None ->
+          match mapped runs cp with
+          | Some m -> text_of m
+          | None -> part i (i + size) s
+  joined (build n piece)
+
+/// Whether a code point before the unit `i` of `s`, past the
+/// case-ignorable ones, is cased.
+cased_before : String -> Int -> Bool
+let rec cased_before s i =
+  if i <= 0 then
+    false
+  else
+    let (cp, start) = point_before s i
+    if within String.CaseData.ignorable cp then
+      cased_before s start
+    else
+      within String.CaseData.cased cp
+
+/// Whether a code point from the unit `i` of `s` on, past the
+/// case-ignorable ones, is cased.
+cased_after : String -> Int -> Bool
+let rec cased_after s i =
+  if i >= length_of s then
+    false
+  else
+    let (cp, size) = point_at s i
+    if within String.CaseData.ignorable cp then
+      cased_after s (i + size)
+    else
+      within String.CaseData.cased cp
+
+/// Upper case.
+upper : String -> String
+let upper s =
+  cased_by String.CaseData.upper_runs String.CaseData.upper_special (fun _ _ _ -> None) s
+
+/// Lower case: a capital sigma after a cased letter and before none is
+/// final, `ς`.
+lower : String -> String
+let lower s =
+  let sigma text i cp =
+    if cp == 931 && cased_before text i && not (cased_after text (i + 1)) then Some "ς" else None
+  cased_by String.CaseData.lower_runs String.CaseData.lower_special sigma s
