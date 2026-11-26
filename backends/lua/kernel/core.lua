@@ -446,3 +446,94 @@ end
 function K.flickAssert(message, value)
   error(message .. ": " .. debug(value), 0)
 end
+
+-- Structural instances
+
+-- The fields of a record or a tuple in the order their dictionaries come:
+-- a tuple's by position, a record's by its labels in UTF-16 order.
+local function fields(value)
+  if #value > 0 then
+    return value, nil
+  end
+  local labels = {}
+  for key in pairs(value) do
+    labels[#labels + 1] = key
+  end
+  sort(labels, function(a, b)
+    return K.compare_strings(a, b) < 0
+  end)
+  local out = {}
+  for i = 1, #labels do
+    out[i] = value[labels[i]]
+  end
+  return out, labels
+end
+
+-- The compiler-owned instance of class `name` for a record or a tuple:
+-- `dicts` are those of its fields, in the order `fields` gives them. `Ord`
+-- and `Hash` hold the `Eq` of the same fields, their superclass.
+local structural
+function structural(name, dicts)
+  local function with_eq(body)
+    local eqs = {}
+    for i = 1, #dicts do
+      eqs[i] = dicts[i]["$Eq"]
+    end
+    body["$Eq"] = structural("Eq", eqs)
+    return body
+  end
+  if name == "Eq" then
+    return {
+      eq = function(a)
+        return function(b)
+          local xs, ys = fields(a), fields(b)
+          for i = 1, #dicts do
+            if not dicts[i].eq(xs[i])(ys[i]) then
+              return false
+            end
+          end
+          return true
+        end
+      end,
+    }
+  elseif name == "Ord" then
+    return with_eq({
+      compare = function(a)
+        return function(b)
+          local xs, ys = fields(a), fields(b)
+          for i = 1, #dicts do
+            local o = dicts[i].compare(xs[i])(ys[i])
+            if not K.equals(o, K.EQ) then
+              return o
+            end
+          end
+          return K.EQ
+        end
+      end,
+    })
+  elseif name == "Hash" then
+    return with_eq({
+      hash = function(a)
+        local xs, h = fields(a), 11
+        for i = 1, #dicts do
+          h = K.add32(K.mul32(h, 31), dicts[i].hash(xs[i]))
+        end
+        return h
+      end,
+    })
+  end
+  return {
+    show = function(a)
+      local xs, labels = fields(a)
+      local shown = {}
+      for i = 1, #dicts do
+        shown[i] = labels and labels[i] .. " = " .. dicts[i].show(xs[i]) or dicts[i].show(xs[i])
+      end
+      if labels then
+        return "{ " .. concat(shown, ", ") .. " }"
+      end
+      return "(" .. concat(shown, ", ") .. ")"
+    end,
+  }
+end
+K.structural = structural

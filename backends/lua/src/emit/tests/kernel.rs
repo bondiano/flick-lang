@@ -130,6 +130,34 @@ fn record_get() -> Item {
     item
 }
 
+/// The instance of a class for a record or a tuple is the kernel's, over
+/// the instances of its fields.
+#[test]
+fn a_structural_instance_is_the_kernels_over_its_fields() {
+    let dict = flick_ir::Dict::Structural {
+        class: "Show".into(),
+        fields: vec![
+            flick_ir::Dict::Given("Show a".into()),
+            flick_ir::Dict::Given("Show b".into()),
+        ],
+    };
+    let shown = flick_ir::Expr::new(
+        flick_ir::ExprKind::Method {
+            dict,
+            name: "show".into(),
+            type_args: vec![],
+        },
+        sp(0, 1),
+    );
+    let body = flick_ir::Expr::new(
+        flick_ir::ExprKind::Abstract(vec!["Show a".into(), "Show b".into()], Box::new(shown)),
+        sp(0, 1),
+    );
+    let code = lua(vec![value("show_pair", body)]);
+    assert!(code.contains("K.structural(\"Show\", {"), "{code}");
+    assert!(code.contains("}).show"), "{code}");
+}
+
 #[test]
 fn a_kernel_function_takes_its_dictionaries_first() {
     let dict = flick_ir::Dict::Given("HasField".into());

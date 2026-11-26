@@ -173,6 +173,9 @@ representation of the program. Generated code calls `K` for:
 - `++` of lists, `List.length`, `List.get` and `List.initialize`, and the
   hooks `equals`, `compare`, `hash` (that of the JS and Go runtimes, bit for
   bit) and `show` (JS spelling, `-0` kept) of the primitive values;
+- the instances of `Eq`, `Ord`, `Hash` and `Show` for records and tuples,
+  `K.structural` over the instances of the fields, a record's by its labels
+  in UTF-16 order, as the JS runtime's `structural` derives them;
 - the record rows `Record.get`, `extend`, `remove`, `project`,
   `merge_disjoint` and `labels`, over a record's table of labels;
 - `Bytes`, a Lua string of its bytes: `Bytes.from_list`, `to_list`,
@@ -217,7 +220,9 @@ snapshot. The CI `lua-probes` job runs it.
 | `Language.BigInts` | pass (17 of 17), the same report as JS |
 | `Language.Floats` | pass (34 of 34), the same report as JS |
 | `Language.Ints` | pass (48 of 48 pure tests), the same report as JS; 1 effect test skipped |
+| `Language.Mutation` | pass (8 of 8 pure tests), the same report as JS; 3 effect tests skipped |
 | `Language.NumericBoundaries` | pass (10 of 10 pure tests), the same report as JS; 2 effect tests skipped |
+| `Language.Show` | pass (19 of 19 pure tests), the same report as JS; 1 effect test skipped |
 
 ## The synchronous WoW slice
 
