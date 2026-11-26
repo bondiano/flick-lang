@@ -1,0 +1,18 @@
+module App exposing (main)
+
+say : String -> Unit
+foreign pure say from global "print"
+
+char : Int -> String
+foreign pure char from global "string.char"
+
+// a byte the host gives that is not UTF-8 becomes U+FFFD, one code unit
+let replaced = say (show (char 255))
+
+let counted = say (show (String.length (char 255 ++ "a")))
+
+// what is UTF-8 stays as it is
+let kept = say (show (char 65))
+
+main : Unit -> Unit
+let main () = ()

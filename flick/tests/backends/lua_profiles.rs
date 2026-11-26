@@ -211,7 +211,8 @@ fn a_build_writes_a_chunk_per_module_and_a_rebuild_is_identical() {
 
 /// The chunks of the Lua kernel, in the order they load.
 const KERNEL: &str = "_flick/lua-kernel/core.lua\n_flick/lua-kernel/strings.lua\n\
-                      _flick/lua-kernel/lists.lua\n_flick/lua-kernel/lang.lua\n";
+                      _flick/lua-kernel/lists.lua\n_flick/lua-kernel/bytes.lua\n\
+                      _flick/lua-kernel/lang.lua\n";
 
 /// `wide` with `n` locals besides its parameter, all of them used.
 fn wide(n: usize) -> String {

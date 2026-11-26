@@ -22,6 +22,8 @@ use flick_ir::Span;
 use crate::profiles::Dialect;
 use crate::refusal;
 pub(crate) use build::{TEST_ENTRY, artifact_id, build};
+#[cfg(test)]
+pub(crate) use build::{kernel_paths, kernel_sources};
 
 /// What the target cannot run or load, at its Flick source.
 #[derive(Debug, Clone, PartialEq, Eq)]

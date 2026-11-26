@@ -23,6 +23,7 @@ use flick_ir::{
 use super::super::ast::{Block, Expr, ExprKind, Function, LastKind, Name, Results, StmtKind};
 use super::super::names::{KERNEL, MODULE, NAMESPACE, is_identifier};
 use super::Lowering;
+use super::ops::kernel_call;
 
 /// What a value crossing to or from the host is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,6 +48,10 @@ pub(super) struct HostFn<'f> {
     taken: usize,
     /// Whether its result is dropped.
     statement: bool,
+    /// Whether its result is a string, which comes from the host.
+    text_result: bool,
+    /// The arguments that are callbacks given a string by the host.
+    text_callbacks: Vec<usize>,
 }
 
 impl Lowering<'_> {
@@ -150,14 +155,22 @@ impl Lowering<'_> {
         if params.len() != taken || params.iter().any(|(_, s)| *s != Stage::Pure) {
             return Err("its stages need the Lua runtime, which is not implemented");
         }
-        for (param, _) in &params[..f.arity] {
+        let mut text_callbacks = Vec::new();
+        for (i, (param, _)) in params[..f.arity].iter().enumerate() {
             match self.host_type(param) {
                 Some(Host::Str | Host::Bool | Host::Int | Host::Float) => {}
-                Some(Host::Callback) if self.callback(param) => {}
+                Some(Host::Callback) if self.callback(param) => {
+                    if let IrType::Fun { param, .. } = &***param
+                        && self.host_type(param) == Some(Host::Str)
+                    {
+                        text_callbacks.push(i);
+                    }
+                }
                 _ => return Err(ABI_ARGS),
             }
         }
-        let statement = match self.host_type(result) {
+        let host = self.host_type(result);
+        let statement = match host {
             Some(Host::Unit | Host::Never) => true,
             Some(Host::Str | Host::Bool | Host::Float) => false,
             _ => return Err(ABI_RESULT),
@@ -167,6 +180,8 @@ impl Lowering<'_> {
             arity: f.arity,
             taken,
             statement,
+            text_result: host == Some(Host::Str),
+            text_callbacks,
         })
     }
 
@@ -194,21 +209,44 @@ impl Lowering<'_> {
             arity: taken,
             taken,
             statement: false,
+            text_result: false,
+            text_callbacks: Vec::new(),
         })
     }
 
     /// The call of `host` with `args`, the first `arity` of the Flick ones;
-    /// a dropped result is a statement, and the value is Unit.
+    /// a dropped result is a statement, and the value is Unit. A string the
+    /// host gives, as a result or to a callback, is made WTF-8 first: its
+    /// ill-formed UTF-8 as U+FFFD.
     fn host_call(&mut self, host: &HostFn<'_>, args: Vec<Expr>, span: Span) -> Expr {
         let mut callee = Expr::name(&Name::new(host.path[0].to_owned()), span);
         for segment in &host.path[1..] {
             callee = callee.field(segment);
         }
-        let args = args.into_iter().take(host.arity).collect();
+        let mut args: Vec<Expr> = args.into_iter().take(host.arity).collect();
+        for &i in &host.text_callbacks {
+            let callback = self.local("callback", args[i].clone());
+            let text = self.names.fresh("text");
+            let given = kernel_call("from_host", vec![Expr::name(&text, span)], span);
+            let mut body = Block::default();
+            body.end(
+                LastKind::Return(Expr::name(&callback, span).call(vec![given])),
+                span,
+            );
+            let wrapped = Function {
+                params: vec![text],
+                body,
+                span,
+            };
+            args[i] = Expr::new(ExprKind::Function(Box::new(wrapped)), span);
+        }
         let call = Expr::new(ExprKind::Call(Box::new(callee), args, Results::Any), span);
         if host.statement {
             self.push(StmtKind::Call(call), span);
             return Self::unit(span);
+        }
+        if host.text_result {
+            return kernel_call("from_host", vec![call], span);
         }
         call
     }

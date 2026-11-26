@@ -17,6 +17,7 @@ use flick_ir::{
 use toml::{Table, Value};
 
 use super::Lua;
+use crate::emit::kernel_paths;
 use crate::profiles::{DIALECTS, PROFILES};
 
 fn root() -> &'static Path {
@@ -537,36 +538,32 @@ fn generation_writes_the_chunks_of_a_clean_check() {
         .generate(&clean("love"), &mut NoInputs)
         .expect("generated");
     let paths: Vec<&str> = built.artifacts.iter().map(|a| a.path.as_str()).collect();
-    let kernel = [
-        "_flick/lua-kernel/core.lua",
-        "_flick/lua-kernel/strings.lua",
-        "_flick/lua-kernel/lists.lua",
-        "_flick/lua-kernel/lang.lua",
-    ];
-    assert_eq!(paths[..4], kernel);
+    let kernel = kernel_paths();
+    let k = kernel.len();
+    assert_eq!(paths[..k], kernel);
     assert_eq!(
-        paths[4..],
+        paths[k..],
         ["App.lua", "App.lua.map", "chunks.txt", "main.lua"]
     );
     let text = |i: usize| String::from_utf8(built.artifacts[i].bytes.clone()).expect("UTF-8");
     assert_eq!(
-        text(4),
+        text(k),
         "local _, ns = ...\nlocal K = ns.k\nlocal M = {}\nns.App = M\nM.main = function(_)\n  \
          return true\nend\n"
     );
     let mut main = String::from("local ns = {}\n");
-    for p in kernel.iter().chain(&["App.lua"]) {
+    for p in kernel.iter().map(String::as_str).chain(["App.lua"]) {
         main.push_str("assert(love.filesystem.load(\"");
         main.push_str(p);
         main.push_str("\"))(nil, ns)\n");
     }
-    assert_eq!(text(7), main);
+    assert_eq!(text(k + 3), main);
     // WoW loads the files its `.toc` lists: no `main.lua`
     let wow = Lua
         .generate(&clean("wow-retail"), &mut NoInputs)
         .expect("generated");
     let paths: Vec<&str> = wow.artifacts.iter().map(|a| a.path.as_str()).collect();
-    assert_eq!(paths[4..], ["App.lua", "App.lua.map", "chunks.txt"]);
+    assert_eq!(paths[k..], ["App.lua", "App.lua.map", "chunks.txt"]);
     let again = Lua
         .generate(&clean("wow-retail"), &mut NoInputs)
         .expect("generated");

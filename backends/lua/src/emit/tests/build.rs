@@ -8,6 +8,7 @@ use flick_ir::{Arith, BinOp, ExprKind, FileId, Initialization, Item, Lit, Prefix
 
 use super::{lambda, local, param, value_at};
 use crate::Lua;
+use crate::emit::kernel_paths;
 use crate::tests::{build_request, module};
 
 /// `src/App.fl`, whose `main` calls `List.<name> ()`.
@@ -109,13 +110,12 @@ fn a_module_loads_after_the_modules_it_uses() {
         .generate(&request("wow-retail", &program), &mut Texts)
         .expect("generated");
     let paths: Vec<&str> = built.artifacts.iter().map(|a| a.path.as_str()).collect();
+    let kernel = kernel_paths();
+    let k = kernel.len();
+    assert_eq!(paths[..k], kernel);
     assert_eq!(
-        paths,
+        paths[k..],
         [
-            "_flick/lua-kernel/core.lua",
-            "_flick/lua-kernel/strings.lua",
-            "_flick/lua-kernel/lists.lua",
-            "_flick/lua-kernel/lang.lua",
             "_flick/List.lua",
             "_flick/List.lua.map",
             "App.lua",
@@ -124,27 +124,35 @@ fn a_module_loads_after_the_modules_it_uses() {
         ]
     );
     let text = |i: usize| String::from_utf8(built.artifacts[i].bytes.clone()).expect("UTF-8");
+    let mut order = String::new();
+    for p in &kernel {
+        order.push_str(p);
+        order.push('\n');
+    }
     assert_eq!(
-        text(8),
-        "_flick/lua-kernel/core.lua\n_flick/lua-kernel/strings.lua\n_flick/lua-kernel/lists.lua\n\
-         _flick/lua-kernel/lang.lua\n_flick/List.lua\nApp.lua\n",
+        text(k + 4),
+        format!("{order}_flick/List.lua\nApp.lua\n"),
         "the load order: the kernel first"
     );
     // a program without the built-in constructors gives the kernel none
-    assert_eq!(text(3), "local _, ns = ...\nlocal K = ns.k\n");
     assert_eq!(
-        text(4),
+        text(k - 1),
+        "local _, ns = ...\nlocal K = ns.k\n",
+        "lang.lua"
+    );
+    assert_eq!(
+        text(k),
         "local _, ns = ...\nlocal K = ns.k\nlocal M = {}\nns.List = M\nM.id = function(x)\n  \
          return x\nend\n"
     );
     assert_eq!(
-        text(6),
+        text(k + 2),
         "local _, ns = ...\nlocal K = ns.k\nlocal M = {}\nns.App = M\nM.main = function(_)\n  \
          return ns.List.id(true)\nend\n"
     );
     // the prologue and the definition map to `main`, at line 1 column 0;
     // the return to `List.id ()`, 14 columns on
-    let map = text(7);
+    let map = text(k + 3);
     assert!(
         map.contains(r#""mappings":"AACA;AAAA;AAAA;AAAA;AAAA;AAAc""#),
         "{map}"

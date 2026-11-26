@@ -165,12 +165,14 @@ the order they load. Each chunk starts with `local _, ns = ...` and puts its
 module's values into the namespace it is given second, as WoW gives each
 file of an addon; on LÖVE, `main.lua` loads the chunks in that order. A
 top-level value is computed as its chunk loads. The kernel computes `Int`
-arithmetic, `==` of any value, and the order and `++` of strings, whose
-lengths and positions count UTF-16 code units as on the other targets; the
-built-in modules run their Flick bodies where no `@native` clause names Lua.
-A `foreign pure f from global "string.gsub"` is called directly when what it
-is given is a string, a boolean, a number or a function of one pure stage
-over those, and what it gives back a string, a boolean, a float or `Unit`.
+arithmetic, `==` of any value, the order and `++` of strings, whose
+lengths and positions count UTF-16 code units as on the other targets, and
+`Bytes`; the built-in modules run their Flick bodies where no `@native`
+clause names Lua. A `foreign pure f from global "string.gsub"` is called
+directly when what it is given is a string, a boolean, a number or a
+function of one pure stage over those, and what it gives back a string, a
+boolean, a float or `Unit`; a string the host gives keeps its UTF-8, and
+each ill-formed part of it becomes U+FFFD.
 Effects, other foreign functions, generators, what the kernel does not
 compute yet (the other integer widths, `Float32`, `%` and `**` of `Float`,
 `BigInt` and `Int64`) and a function over the VM's limits stop the build with

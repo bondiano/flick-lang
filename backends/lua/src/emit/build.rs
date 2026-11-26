@@ -57,6 +57,7 @@ const KERNEL_CHUNKS: &[(&str, &str)] = &[
     ("core", include_str!("../../kernel/core.lua")),
     ("strings", include_str!("../../kernel/strings.lua")),
     ("lists", include_str!("../../kernel/lists.lua")),
+    ("bytes", include_str!("../../kernel/bytes.lua")),
 ];
 
 /// The runner a test build loads after every chunk.
@@ -68,6 +69,22 @@ pub(crate) const TEST_ENTRY: &str = "_flick/run-tests.lua";
 /// The path of the kernel chunk `name`.
 fn kernel_path(name: &str) -> String {
     format!("{BUILTINS}/lua-kernel/{name}.lua")
+}
+
+/// The paths of the kernel's chunks, `lang.lua` last, as every build
+/// writes them first.
+#[cfg(test)]
+pub(crate) fn kernel_paths() -> Vec<String> {
+    (KERNEL_CHUNKS.iter().map(|&(name, _)| name))
+        .chain(["lang"])
+        .map(kernel_path)
+        .collect()
+}
+
+/// The sources of the kernel's own chunks.
+#[cfg(test)]
+pub(crate) fn kernel_sources() -> impl Iterator<Item = &'static str> {
+    KERNEL_CHUNKS.iter().map(|&(_, text)| text)
 }
 
 /// The path of the chunk of `module`.
