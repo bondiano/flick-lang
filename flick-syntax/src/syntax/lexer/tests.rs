@@ -215,6 +215,57 @@ fn left_pipe_and_composition_operators() {
     assert_eq!(shown("<<-"), [K::LtLt, K::Minus]);
     assert_eq!(shown("|>>"), [K::PipeGt, K::Gt]);
     assert_eq!(shown("< |"), [K::Lt, K::Pipe]);
+    assert_eq!(
+        shown(
+            "... ..< .. -> => == |> <| >> << || && != ! <= <- >= ++ ** ( ) [ ] { } , ; : . = | < > + - * / % ^ $ ? @ ~"
+        ),
+        [
+            K::DotDotDot,
+            K::DotDotLt,
+            K::DotDot,
+            K::Arrow,
+            K::FatArrow,
+            K::EqEq,
+            K::PipeGt,
+            K::LtPipe,
+            K::GtGt,
+            K::LtLt,
+            K::OrOr,
+            K::AndAnd,
+            K::NotEq,
+            K::Bang,
+            K::Le,
+            K::LArrow,
+            K::Ge,
+            K::PlusPlus,
+            K::StarStar,
+            K::LParen,
+            K::RParen,
+            K::LBracket,
+            K::RBracket,
+            K::LBrace,
+            K::RBrace,
+            K::Comma,
+            K::Semi,
+            K::Colon,
+            K::Dot,
+            K::Eq,
+            K::Pipe,
+            K::Lt,
+            K::Gt,
+            K::Plus,
+            K::Minus,
+            K::Star,
+            K::Slash,
+            K::Percent,
+            K::Caret,
+            K::Dollar,
+            K::Question,
+            K::At,
+            K::Tilde,
+        ]
+    );
+    assert_eq!(kinds("a & b").1, ["FLICK-S003 &"]);
 }
 
 #[test]
@@ -252,6 +303,11 @@ fn keyword_context_requires_whole_words_and_adjacent_qualifiers() {
         ("HashSet.with", "with", K::Ident),
         ("HashSet. with", "with", K::WithKw),
         ("let rec with = 1", "with", K::Ident),
+        ("let lazy mut with = 1", "with", K::Ident),
+        ("let lazy mut catch = 1", "catch", K::CatchKw),
+        ("x let with = 1", "with", K::WithKw),
+        ("foreign module inline \"x\"", "module", K::ModuleKw),
+        ("foreign module from \"x\" \"y\"", "module", K::Ident),
         ("foreign async with from", "with", K::Ident),
         ("foreign asynchronous with from", "with", K::WithKw),
         ("let assert x = value", "assert", K::AssertKw),
@@ -334,5 +390,33 @@ fn the_debugging_keywords_label_the_steps_of_an_accessor() {
             .find(|(_, text)| *text == word)
             .expect("word token");
         assert_eq!(*token, (expected, word), "{src}");
+    }
+}
+
+#[test]
+fn fln_literals_keywords_match_syntax_kind() {
+    use fln_literals::{Keyword, RESERVED_KEYWORDS};
+
+    use crate::syntax::kind::KEYWORDS;
+
+    let mut syntax_words: Vec<&str> = KEYWORDS.to_vec();
+    syntax_words.sort_unstable();
+    assert_eq!(syntax_words.as_slice(), RESERVED_KEYWORDS);
+    assert_eq!(Keyword::ALL.len(), RESERVED_KEYWORDS.len());
+
+    for &kw in Keyword::ALL {
+        let syntax = keyword(kw.as_str()).expect("reserved keyword recognized by flick-syntax");
+        assert_eq!(
+            kw.is_parser_record_label(),
+            syntax.is_record_label(),
+            "record label parity for `{}`",
+            kw.as_str()
+        );
+        assert_eq!(
+            kw.is_debug_label(),
+            matches!(syntax, K::EchoKw | K::TodoKw),
+            "debug label parity for `{}`",
+            kw.as_str()
+        );
     }
 }

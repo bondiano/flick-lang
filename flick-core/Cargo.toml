@@ -33,6 +33,7 @@ commands = ["flick-plugin/commands"]
 # the IR serializes
 [build-dependencies]
 flick-ir = { path = "../flick-ir" }
+fln-literals = { workspace = true }
 serde = { version = "1.0.229", features = ["derive"] }
 
 [dev-dependencies]
@@ -61,6 +62,7 @@ flick-plugin-test = { path = "../plugins/test" }
 flick-plugin-ui = { path = "../plugins/ui" }
 flick-pretty = { path = "../flick-pretty" }
 flick-syntax = { path = "../flick-syntax" }
+fln-literals = { workspace = true }
 semver = { version = "1.0.26", optional = true }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 serde_json = { workspace = true }

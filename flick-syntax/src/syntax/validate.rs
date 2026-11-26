@@ -4,6 +4,8 @@
 //! names, and no name is bound twice by one pattern or by the parameters of
 //! one function.
 
+use std::mem;
+
 use super::cst::{Node, Token};
 use super::kind::SyntaxKind as K;
 use super::patterns::{is_part, is_pattern};
@@ -23,6 +25,8 @@ pub fn check(
         allow_trailing_attribute,
         top_level: true,
         errors: Vec::new(),
+        names: Vec::new(),
+        bound: Vec::new(),
     };
     v.walk(tree, Place::Plain);
     v.errors
@@ -36,6 +40,10 @@ struct Validator<'a> {
     /// (`SourceFile`, or `Members` of a top-level `InlineModuleDecl` / `RecGroup`).
     top_level: bool,
     errors: Vec<Diagnostic>,
+    /// Reusable buffer of unique bound names in the current pattern group.
+    names: Vec<Token>,
+    /// Reusable buffer of names extracted from the current pattern.
+    bound: Vec<Token>,
 }
 
 /// What the statements of a block are.
@@ -52,20 +60,22 @@ pub(super) enum Place {
 
 impl Validator<'_> {
     fn walk(&mut self, node: &Node, place: Place) {
+        let mut let_has_params = false;
         match node.kind {
             K::MatchArm | K::BindStmt => {
                 if let Some(pattern) = node.nodes().find(|n| is_pattern(n.kind)) {
-                    self.group(&[pattern]);
+                    self.group_one(pattern);
                 }
             }
             K::FunExpr | K::Params => {
-                let params: Vec<&Node> = node.nodes().filter(|n| is_pattern(n.kind)).collect();
-                self.group(&params);
+                self.group_children(node);
             }
             // `let name params`: the name is not a pattern binding next to its params
-            K::LetDecl if !node.nodes().any(|n| n.kind == K::Params) => {
-                if let Some(pattern) = node.nodes().find(|n| is_pattern(n.kind)) {
-                    self.group(&[pattern]);
+            K::LetDecl => {
+                let_has_params = node.nodes().any(|n| n.kind == K::Params);
+                if !let_has_params && let Some(pattern) = node.nodes().find(|n| is_pattern(n.kind))
+                {
+                    self.group_one(pattern);
                 }
             }
             K::BinExpr => {
@@ -96,8 +106,7 @@ impl Validator<'_> {
                 (K::DoExpr, K::Block) => Place::Do,
                 (K::ForExpr, K::Block) if index == 0 => Place::For,
                 (K::LetDecl, K::Block)
-                    if !node.nodes().any(|n| n.kind == K::Params)
-                        && !super::validate_let_else::is_fallback(node, child) =>
+                    if !let_has_params && !super::validate_let_else::is_fallback(node, child) =>
                 {
                     Place::ValueBlock
                 }
@@ -272,43 +281,92 @@ impl Validator<'_> {
         ));
     }
 
-    /// Patterns whose bindings share one scope.
-    fn group(&mut self, patterns: &[&Node]) {
-        let mut names: Vec<Token> = Vec::new();
-        for pattern in patterns {
-            for name in self.bindings(pattern) {
-                let text = name.text(self.src);
-                if names.iter().any(|n| n.text(self.src) == text) {
-                    self.error(
-                        name.start,
-                        name.end,
-                        format!("`{text}` is bound more than once in the same pattern"),
-                    );
-                } else {
-                    names.push(name);
+    /// Single pattern scope (fast path for `VarPat` which cannot duplicate itself).
+    fn group_one(&mut self, pattern: &Node) {
+        if pattern.kind == K::VarPat {
+            return;
+        }
+        self.names.clear();
+        self.add_pattern_bindings(pattern);
+    }
+
+    /// Patterns of a `FunExpr` or `Params` node sharing one scope.
+    fn group_children(&mut self, parent: &Node) {
+        self.names.clear();
+        for pattern in parent.nodes() {
+            if is_pattern(pattern.kind) {
+                self.add_pattern_bindings(pattern);
+            }
+        }
+    }
+
+    fn add_pattern_bindings(&mut self, pattern: &Node) {
+        if pattern.kind == K::VarPat {
+            if let Some(name) = idents(pattern).next() {
+                self.record_binding(name);
+            }
+            return;
+        }
+        let mut bound = mem::take(&mut self.bound);
+        bound.clear();
+        self.collect_bindings(pattern, &mut bound);
+        for &name in &bound {
+            self.record_binding(name);
+        }
+        self.bound = bound;
+    }
+
+    fn record_binding(&mut self, name: Token) {
+        let text = name.text(self.src);
+        if self.names.iter().any(|n| n.text(self.src) == text) {
+            self.error(
+                name.start,
+                name.end,
+                format!("`{text}` is bound more than once in the same pattern"),
+            );
+        } else {
+            self.names.push(name);
+        }
+    }
+
+    /// Names bound by a pattern, in source order.
+    fn collect_bindings(&mut self, node: &Node, out: &mut Vec<Token>) {
+        match node.kind {
+            K::VarPat => {
+                if let Some(tok) = idents(node).next() {
+                    out.push(tok);
+                }
+            }
+            // `{ field }` binds `field`; `{ field = p }` binds what `p` binds
+            K::RecordPatField if !node.has_token(K::Eq) => {
+                if let Some(tok) = idents(node).next() {
+                    out.push(tok);
+                }
+            }
+            K::OrPat => {
+                let first = self.alternatives(node);
+                out.extend(first);
+            }
+            _ => {
+                for child in node.nodes() {
+                    if is_part(child.kind) {
+                        self.collect_bindings(child, out);
+                    }
                 }
             }
         }
     }
 
-    /// Names bound by a pattern, in source order.
-    fn bindings(&mut self, node: &Node) -> Vec<Token> {
-        match node.kind {
-            K::VarPat => idents(node).take(1).collect(),
-            // `{ field }` binds `field`; `{ field = p }` binds what `p` binds
-            K::RecordPatField if !node.has_token(K::Eq) => idents(node).take(1).collect(),
-            K::OrPat => self.alternatives(node),
-            _ => node
-                .nodes()
-                .filter(|n| is_part(n.kind))
-                .flat_map(|n| self.bindings(n))
-                .collect(),
-        }
-    }
-
     fn alternatives(&mut self, node: &Node) -> Vec<Token> {
         let alternatives: Vec<&Node> = node.nodes().collect();
-        let sets: Vec<Vec<Token>> = alternatives.iter().map(|a| self.bindings(a)).collect();
+        let sets: Vec<Vec<Token>> = alternatives
+            .iter()
+            .map(|a| {
+                let mut set = Vec::new();
+                self.collect_bindings(a, &mut set);
+                set
+            })
+            .collect();
         let first = sets.first().cloned().unwrap_or_default();
         for (alternative, set) in alternatives.iter().zip(&sets).skip(1) {
             let missing: Vec<&str> = sets

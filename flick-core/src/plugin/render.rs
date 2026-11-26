@@ -8,6 +8,7 @@ mod control;
 mod decl;
 
 use flick_plugin::{Arena, Expr, Field, Hole, HoleKind, Kind, NodeId, Pat, Place, Span, Ty};
+use fln_literals::{EscapeHexCase, write_escaped_string_with_case};
 
 pub use decl::DECL_PLACEHOLDER;
 
@@ -485,17 +486,7 @@ impl Printer<'_> {
 
     fn string(&mut self, text: &str) {
         self.push("\"");
-        for c in text.chars() {
-            match c {
-                '"' => self.push("\\\""),
-                '\\' => self.push("\\\\"),
-                '\n' => self.push("\\n"),
-                '\t' => self.push("\\t"),
-                '\r' => self.push("\\r"),
-                c if c.is_control() => self.push(&format!("\\u{{{:x}}}", u32::from(c))),
-                c => self.text.push(c),
-            }
-        }
+        let _ = write_escaped_string_with_case(text, EscapeHexCase::Lower, &mut self.text);
         self.push("\"");
     }
 

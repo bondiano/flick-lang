@@ -1,6 +1,100 @@
 //! Block, brace, and delimited layout combinators for [`Parser`].
 
-use super::{Ctx, K, Parser, SyntaxKind, codes};
+use super::{Ctx, K, Parser, RawToken, SyntaxKind, Tok, codes};
+
+#[inline]
+fn char_width(slice: &str) -> u32 {
+    if slice.is_ascii() {
+        u32::try_from(slice.len()).expect("columns fit in u32")
+    } else {
+        u32::try_from(slice.chars().count()).expect("columns fit in u32")
+    }
+}
+
+fn advance_multiline_col(slice: &str, col: &mut u32, line_has_token: &mut bool, is_trivia: bool) {
+    if let Some((_, tail)) = slice.rsplit_once('\n') {
+        *col = char_width(tail);
+        *line_has_token = !is_trivia;
+    } else {
+        *col += char_width(slice);
+    }
+}
+
+/// Drops trivia and computes each token's column and line-start facts.
+pub(super) fn collect_tokens(text: &str, raw: &[RawToken]) -> Vec<Tok> {
+    let mut toks = Vec::with_capacity(raw.len() / 2 + 1);
+    let mut col = 0_u32;
+    let mut line_has_token = false;
+    let mut indent = 0_u32;
+    for &t in raw {
+        let kind = t.kind;
+        match kind {
+            K::Newline => {
+                col = 0;
+                line_has_token = false;
+                continue;
+            }
+            K::Whitespace => {
+                col += t.end - t.start;
+                continue;
+            }
+            K::LineComment | K::DocComment => {
+                col += char_width(&text[t.start as usize..t.end as usize]);
+                continue;
+            }
+            K::BlockComment | K::Unknown => {
+                advance_multiline_col(
+                    &text[t.start as usize..t.end as usize],
+                    &mut col,
+                    &mut line_has_token,
+                    true,
+                );
+                continue;
+            }
+            _ => {}
+        }
+        let line_start = !line_has_token;
+        if line_start {
+            indent = col;
+        }
+        toks.push(Tok {
+            kind,
+            start: t.start,
+            end: t.end,
+            col,
+            line_start,
+            line_indent: indent,
+        });
+        line_has_token = true;
+        match kind {
+            K::String => {
+                let token = &text[t.start as usize..t.end as usize];
+                if token.as_bytes().contains(&b'\n') {
+                    advance_multiline_col(token, &mut col, &mut line_has_token, false);
+                } else {
+                    col += char_width(token);
+                }
+            }
+            K::StringStart | K::StringMid | K::StringEnd => {
+                col += char_width(&text[t.start as usize..t.end as usize]);
+            }
+            _ => {
+                // Identifiers, constructors, keywords, numbers, labels, and punctuation are single-line ASCII.
+                col += t.end - t.start;
+            }
+        }
+    }
+    let end = u32::try_from(text.len()).expect("source fits in u32");
+    toks.push(Tok {
+        kind: K::Eof,
+        start: end,
+        end,
+        col: 0,
+        line_start: true,
+        line_indent: 0,
+    });
+    toks
+}
 
 impl Parser<'_> {
     /// Whether a `catch` token starts a new line at the current aligned block

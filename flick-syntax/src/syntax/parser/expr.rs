@@ -266,7 +266,7 @@ fn app(p: &mut Parser) -> Option<Done> {
 fn at_children(p: &Parser) -> bool {
     p.line_children
         && p.raw().line_start
-        && !matches!(p.ctx.last(), Some((Ctx::Bracket, _)))
+        && !matches!(p.ctx.last(), Some((Ctx::Bracket, _, _)))
         && p.current() != K::Minus
         && at_operand_start(p)
 }

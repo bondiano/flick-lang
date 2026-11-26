@@ -9,6 +9,7 @@ use flick_plugin::command::{
     self, Descriptor, Diagnostic, File, FlickModule, Invocation, Parameter, Plan, RunFlickStep,
     Severity, Span, Step, Style, ValueKind,
 };
+use fln_literals::is_valid_module_name as is_module_name;
 use serde::{Deserialize, Serialize};
 
 use crate::source::FileId;
@@ -118,16 +119,6 @@ fn argument<'a>(invocation: &'a Invocation, name: &str) -> Option<&'a str> {
         .find(|a| a.name == name)
         .and_then(|a| a.values.first())
         .map(String::as_str)
-}
-
-fn is_con(part: &str) -> bool {
-    let mut chars = part.chars();
-    chars.next().is_some_and(|c| c.is_ascii_uppercase())
-        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
-fn is_module_name(name: &str) -> bool {
-    !name.is_empty() && name.split('.').all(is_con)
 }
 
 fn is_value_ident(name: &str) -> bool {

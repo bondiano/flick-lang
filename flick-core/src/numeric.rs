@@ -2,7 +2,6 @@
 //! what a type does from its kind, so another fixed-width type is one more
 //! variant here and one more form in each backend.
 
-use crate::syntax::literal;
 use crate::types::Type;
 use crate::types::lang::{self, Lang};
 
@@ -64,14 +63,7 @@ pub fn float_text(x: f64) -> String {
 
 /// Whether a number token is written as an integer: in a radix, or with
 /// neither a fraction nor an exponent nor a floating suffix (`f32`).
-pub fn is_integer_literal(text: &str) -> bool {
-    let (stem, suffix) = literal::split_number_suffix(text);
-    if suffix.is_some_and(Num::fractional) {
-        return false;
-    }
-    let digits: String = stem.chars().filter(|&c| c != '_').collect();
-    literal::radix(&digits).is_some() || digits.bytes().all(|b| b.is_ascii_digit())
-}
+pub use fln_literals::is_integer_literal;
 
 /// The value of a number token written as an integer (with any integer suffix
 /// stripped).

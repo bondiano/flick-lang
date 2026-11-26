@@ -25,6 +25,8 @@ must_use_candidate = "allow"
 module_name_repetitions = "allow"
 
 [workspace.dependencies]
+fln = { version = "0.1.1", default-features = false }
+fln-literals = "0.1.1"
 serde_json = "1.0.154"
 wasmtime = { version = "=48.0.8", default-features = false, features = ["runtime", "cranelift", "component-model", "std", "cache"] }
 

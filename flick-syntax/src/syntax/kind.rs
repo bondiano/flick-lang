@@ -33,7 +33,12 @@ macro_rules! syntax_kinds {
             }
         }
 
+        #[inline]
         pub fn keyword(text: &str) -> Option<SyntaxKind> {
+            let bytes = text.as_bytes();
+            if !(2..=8).contains(&bytes.len()) || !bytes[0].is_ascii_lowercase() {
+                return None;
+            }
             match text {
                 $($($word => Some(SyntaxKind::$kw),)?)*
                 _ => None,
