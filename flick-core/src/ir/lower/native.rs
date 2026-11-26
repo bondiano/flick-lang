@@ -3,7 +3,10 @@
 //! selects among them as the environment it targets does. The module's own
 //! IR lowers the clause the default environment selects.
 
-use flick_ir::{Item, ItemKind, Module};
+use std::collections::BTreeMap;
+use std::mem;
+
+use flick_ir::{Exports, Initialization, Item, ItemKind, Module};
 #[cfg(not(target_arch = "wasm32"))]
 use serde::{Deserialize, Serialize};
 
@@ -43,8 +46,21 @@ fn defined(item: &Item) -> Option<&str> {
 impl NativeAlternative {
     /// Calls `f` on the span of everything in the clauses and the body.
     pub fn each_span_mut(&mut self, f: &mut dyn FnMut(&mut flick_ir::Span)) {
-        for item in self.clauses.iter_mut().flatten().chain(&mut self.fallback) {
-            item.each_span_mut(f);
+        for items in self.clauses.iter_mut().chain([&mut self.fallback]) {
+            // the IR walks the spans of a module's items
+            let mut module = Module {
+                name: String::new(),
+                items: mem::take(items),
+                types: Vec::new(),
+                preambles: Vec::new(),
+                labels: BTreeMap::new(),
+                initialization: Initialization::default(),
+                records: BTreeMap::new(),
+                package: None,
+                exports: Exports::default(),
+            };
+            module.each_span_mut(f);
+            *items = module.items;
         }
     }
 
