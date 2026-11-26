@@ -110,6 +110,12 @@ function K.testPure(name, body)
   return { kind = "pure", name = name, body = body }
 end
 
+-- An effect test: the runner reports it skipped and never runs its task,
+-- which the backend does not generate.
+function K.testEffect(name)
+  return { kind = "effect", name = name }
+end
+
 function K.testGroup(name, tests)
   return { kind = "group", name = name, tests = tests }
 end

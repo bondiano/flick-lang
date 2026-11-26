@@ -183,8 +183,9 @@ kernel does not implement yet and a function over the VM's limits stop the build
 output. The host runs the program, so `flick run` and `flick dev` stop with
 `FLICK-P012`. On `lua/love`, `flick test` runs the pure tests on Lua 5.1.5
 or LuaJIT 2.1, whichever `[tools]` allows (`"flick/lua" = ["lua", "luajit"]`;
-LuaJIT when both are), and reports as on the other targets; no WoW client
-runs tests.
+LuaJIT when both are), and reports as on the other targets; it reports each
+effect test skipped, as `an effect test needs the Lua runtime`, without
+generating its task. No WoW client runs tests.
 
 A library (`kind = "lib"`) may also declare `[host]` to define a named host environment `<backend>/<name>` and contribute extra tags when selected:
 
