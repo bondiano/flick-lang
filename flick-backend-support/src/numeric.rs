@@ -3,16 +3,7 @@
 pub use flick_ir::{Arith, Num};
 
 /// The value of canonical IR `BigInt` digits, when it fits in 128 bits.
-pub fn bigint_digits_value(digits: &str) -> Option<i128> {
-    let radix = match digits.get(..2).map(str::to_ascii_lowercase).as_deref() {
-        Some("0x") => Some(16),
-        Some("0o") => Some(8),
-        Some("0b") => Some(2),
-        _ => None,
-    };
-    let (base, rest) = radix.map_or((10, digits), |base| (base, &digits[2..]));
-    i128::from_str_radix(rest, base).ok()
-}
+pub use fln_literals::bigint_digits_value;
 
 /// Wrapping binary exponentiation mod 2^64 (which also yields the exact low
 /// W bits mod 2^W for any W in {8, 16, 32, 64}).

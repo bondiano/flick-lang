@@ -20,5 +20,6 @@ commands = ["dep:flick-backend"]
 [dependencies]
 flick-backend = { path = "../flick-backend", optional = true }
 flick-plugin-macros = { path = "macros" }
+fln-literals = { workspace = true }
 serde = { version = "1.0.229", features = ["derive", "rc"] }
 wit-bindgen = { version = "0.63.0", optional = true }

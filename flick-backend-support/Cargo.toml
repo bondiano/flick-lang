@@ -24,6 +24,7 @@ serde_json = { workspace = true }
 
 [dependencies]
 flick-ir = { path = "../flick-ir" }
+fln-literals = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]

@@ -2,6 +2,8 @@
 //! included), so the tree built over them is lossless. Malformed literals still
 //! become one token plus a diagnostic, so the parser sees no cascade.
 
+use fln_literals::{CommentKind, scan_block_comment_recover, scan_line_comment};
+
 use super::kind::{SyntaxKind, keyword};
 use crate::diagnostics::{Code, Diagnostic, codes};
 use crate::source::{FileId, Span};
@@ -76,6 +78,21 @@ fn is_ident_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_'
 }
 
+fn push_error(
+    errors: &mut Vec<Diagnostic>,
+    file: FileId,
+    code: Code,
+    start: usize,
+    end: usize,
+    message: impl Into<String>,
+) {
+    errors.push(Diagnostic::error(
+        code,
+        message,
+        Span::new(file, offset(start), offset(end)),
+    ));
+}
+
 impl Lexer<'_> {
     fn peek(&self, n: usize) -> u8 {
         self.src.get(self.pos + n).copied().unwrap_or(0)
@@ -86,11 +103,7 @@ impl Lexer<'_> {
     }
 
     fn error(&mut self, code: Code, start: usize, end: usize, message: impl Into<String>) {
-        self.errors.push(Diagnostic::error(
-            code,
-            message,
-            Span::new(self.file, offset(start), offset(end)),
-        ));
+        push_error(&mut self.errors, self.file, code, start, end, message);
     }
 
     fn token(&mut self) -> SyntaxKind {
@@ -129,14 +142,12 @@ impl Lexer<'_> {
                 K::Newline
             }
             b'/' if self.peek(1) == b'/' => {
-                let doc = self.rest().starts_with("///") && !self.rest().starts_with("////");
-                while self.pos < self.src.len()
-                    && self.peek(0) != b'\n'
-                    && !self.rest().starts_with("\r\n")
-                {
-                    self.pos += self.rest().chars().next().map_or(1, char::len_utf8);
+                let (end, kind) = scan_line_comment(self.text, self.pos).expect("starts with //");
+                self.pos = end;
+                match kind {
+                    CommentKind::Doc => K::DocComment,
+                    CommentKind::Line | CommentKind::Block => K::LineComment,
                 }
-                if doc { K::DocComment } else { K::LineComment }
             }
             b'/' if self.peek(1) == b'*' => self.block_comment(),
             b'\'' if matches!(self.peek(1), b'a'..=b'z' | b'_') => {
@@ -151,17 +162,7 @@ impl Lexer<'_> {
             b'"' => self.string(),
             b'r' if self.raw_string_start().is_some() => self.raw_string(),
             b'0'..=b'9' => self.number(),
-            b'.' if self.peek(1).is_ascii_digit() => {
-                self.pos += 1;
-                self.number();
-                self.error(
-                    codes::S006,
-                    start,
-                    self.pos,
-                    "a number cannot start with `.`; write a leading `0`, e.g. `0.5`",
-                );
-                K::Number
-            }
+            b'.' if self.peek(1).is_ascii_digit() => self.number(),
             b'a'..=b'z' | b'A'..=b'Z' | b'_' => {
                 while is_ident_byte(self.peek(0))
                     || (self.generated && self.peek(0) == b'$' && is_ident_byte(self.peek(1)))
@@ -334,29 +335,18 @@ impl Lexer<'_> {
     }
 
     fn block_comment(&mut self) -> SyntaxKind {
-        let start = self.pos;
-        self.pos += 2;
-        let mut depth = 1;
-        while depth > 0 {
-            if self.pos >= self.src.len() {
-                self.error(
-                    codes::S004,
-                    start,
-                    start + 2,
-                    "unterminated block comment: missing `*/`",
-                );
-                break;
-            }
-            if self.rest().starts_with("/*") {
-                depth += 1;
-                self.pos += 2;
-            } else if self.rest().starts_with("*/") {
-                depth -= 1;
-                self.pos += 2;
-            } else {
-                self.pos += self.rest().chars().next().map_or(1, char::len_utf8);
-            }
-        }
+        let file = self.file;
+        let errors = &mut self.errors;
+        self.pos = scan_block_comment_recover(self.text, self.pos, |err| {
+            push_error(
+                errors,
+                file,
+                codes::S004,
+                err.start,
+                err.start + 2,
+                "unterminated block comment: missing `*/`",
+            );
+        });
         SyntaxKind::BlockComment
     }
 }

@@ -8,7 +8,6 @@ use std::str::Chars;
 use flick_ir::{Constructor, Expr, ExprKind, Param, Pat, Stmt};
 
 use super::{EvalBudget, StopReason};
-use crate::numeric;
 
 /// Accounting cost in bytes per slot in a composite value (tuple, list, constructor).
 pub(super) const SLOT_BYTES: u32 = 8;
@@ -266,16 +265,7 @@ impl<'a> DictEnv<'a> {
 }
 
 /// Parses canonical IR `BigInt` digits (including an optional leading `-`) into `i128`.
-pub(super) fn bigint_value(digits: &str) -> Option<i128> {
-    if let Some(rest) = digits.strip_prefix('-') {
-        if rest.starts_with('-') {
-            return None;
-        }
-        numeric::bigint_digits_value(rest)?.checked_neg()
-    } else {
-        numeric::bigint_digits_value(digits)
-    }
-}
+pub(super) use fln_literals::bigint_signed_digits_value as bigint_value;
 
 /// Outlined linear field lookup shared across record projection, equality,
 /// pattern matching, and dictionary method dispatch.

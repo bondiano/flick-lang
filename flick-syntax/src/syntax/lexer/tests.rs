@@ -336,3 +336,31 @@ fn the_debugging_keywords_label_the_steps_of_an_accessor() {
         assert_eq!(*token, (expected, word), "{src}");
     }
 }
+
+#[test]
+fn fln_literals_keywords_match_syntax_kind() {
+    use fln_literals::{Keyword, RESERVED_KEYWORDS};
+
+    use crate::syntax::kind::KEYWORDS;
+
+    let mut syntax_words: Vec<&str> = KEYWORDS.to_vec();
+    syntax_words.sort_unstable();
+    assert_eq!(syntax_words.as_slice(), RESERVED_KEYWORDS);
+    assert_eq!(Keyword::ALL.len(), RESERVED_KEYWORDS.len());
+
+    for &kw in Keyword::ALL {
+        let syntax = keyword(kw.as_str()).expect("reserved keyword recognized by flick-syntax");
+        assert_eq!(
+            kw.is_parser_record_label(),
+            syntax.is_record_label(),
+            "record label parity for `{}`",
+            kw.as_str()
+        );
+        assert_eq!(
+            kw.is_debug_label(),
+            matches!(syntax, K::EchoKw | K::TodoKw),
+            "debug label parity for `{}`",
+            kw.as_str()
+        );
+    }
+}

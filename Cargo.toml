@@ -25,6 +25,8 @@ must_use_candidate = "allow"
 module_name_repetitions = "allow"
 
 [workspace.dependencies]
+fln = { git = "https://github.com/bondiano/fln", rev = "83faab426eb0051a485c5985ef75bec13f26760a", default-features = false }
+fln-literals = { git = "https://github.com/bondiano/fln", rev = "83faab426eb0051a485c5985ef75bec13f26760a" }
 serde_json = "1.0.154"
 wasmtime = { version = "=48.0.8", default-features = false, features = ["runtime", "cranelift", "component-model", "std", "cache"] }
 

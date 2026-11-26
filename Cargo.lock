@@ -724,6 +724,7 @@ name = "flick-backend-support"
 version = "0.1.0"
 dependencies = [
  "flick-ir",
+ "fln-literals",
  "proptest",
  "serde_json",
 ]
@@ -756,6 +757,7 @@ dependencies = [
  "flick-syntax",
  "flick-test-pairs",
  "flick-test-support",
+ "fln-literals",
  "insta",
  "rustix",
  "semver",
@@ -835,6 +837,7 @@ version = "0.1.0"
 dependencies = [
  "flick-backend",
  "flick-plugin-macros",
+ "fln-literals",
  "serde",
  "wit-bindgen",
 ]
@@ -911,10 +914,12 @@ dependencies = [
 name = "flick-syntax"
 version = "0.1.0"
 dependencies = [
- "flick-backend-support",
  "flick-diagnostics",
  "flick-ir",
  "flick-plugin",
+ "fln",
+ "fln-literals",
+ "proptest",
  "serde_json",
 ]
 
@@ -961,6 +966,28 @@ dependencies = [
  "serde_json",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "fln"
+version = "0.1.0"
+source = "git+https://github.com/bondiano/fln?rev=83faab426eb0051a485c5985ef75bec13f26760a#83faab426eb0051a485c5985ef75bec13f26760a"
+dependencies = [
+ "fln-ast",
+ "fln-literals",
+]
+
+[[package]]
+name = "fln-ast"
+version = "0.1.0"
+source = "git+https://github.com/bondiano/fln?rev=83faab426eb0051a485c5985ef75bec13f26760a#83faab426eb0051a485c5985ef75bec13f26760a"
+dependencies = [
+ "fln-literals",
+]
+
+[[package]]
+name = "fln-literals"
+version = "0.1.0"
+source = "git+https://github.com/bondiano/fln?rev=83faab426eb0051a485c5985ef75bec13f26760a#83faab426eb0051a485c5985ef75bec13f26760a"
 
 [[package]]
 name = "fnv"

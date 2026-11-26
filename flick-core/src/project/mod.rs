@@ -28,6 +28,8 @@ pub mod workspace;
 use std::path::{Component, Path, PathBuf, is_separator};
 use std::sync::Arc;
 
+use fln_literals::is_valid_con;
+
 pub use config::Config;
 #[cfg(not(target_arch = "wasm32"))]
 pub use environment::official_backends;
@@ -329,7 +331,7 @@ pub fn module_name(relative: &Path) -> Option<String> {
     let parts: Option<Vec<&str>> = stem
         .components()
         .map(|c| match c {
-            Component::Normal(part) => part.to_str().filter(|p| is_con(p)),
+            Component::Normal(part) => part.to_str().filter(|p| is_valid_con(p)),
             _ => None,
         })
         .collect();
@@ -344,12 +346,4 @@ pub fn module_path(name: &str) -> PathBuf {
     path
 }
 
-pub fn is_module_name(name: &str) -> bool {
-    name.split('.').all(is_con)
-}
-
-fn is_con(part: &str) -> bool {
-    let mut chars = part.chars();
-    chars.next().is_some_and(|c| c.is_ascii_uppercase())
-        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
+pub use fln_literals::is_valid_module_name as is_module_name;

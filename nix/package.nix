@@ -30,7 +30,12 @@ rustPlatform.buildRustPackage {
       ]);
   };
 
-  cargoLock.lockFile = ../Cargo.lock;
+  cargoLock = {
+    lockFile = ../Cargo.lock;
+    outputHashes = {
+      "fln-literals-0.1.0" = "sha256-gKBc1NasRw8blCHrIH5Fp1i+NOWrZJ3nxnUJnVrqO3E=";
+    };
+  };
 
   # The workspace also holds the wasm bindings, the reference model and the
   # pretty printer; only the CLI is installed.
