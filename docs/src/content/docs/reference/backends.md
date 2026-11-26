@@ -151,6 +151,25 @@ world backend {
   An ungranted tool fails with `FLICK-P051` before any step executes. The host hashes the tool executable on `PATH`, rechecks its digest before every step, runs each step in a fresh isolated directory beside the output with a cleared environment, and reads back only declared regular-file outputs (`FLICK-P050`).
 - **Launch pins:** `BuildResult.launches` names runnable and test artifacts by artifact ID, optionally paired with a pinned `launch.runtime` (such as `node`) or `none` for a directly executable native binary. Launch runtimes declared in `descriptor.launch-runtimes` do not need a `[tools]` entry, but their executable version, SHA-256 digest and runtime dependency pins are rechecked before every launch.
 
+## Support and version matrix
+
+The portable backend delivery contract versions its surfaces independently (`0.x` contracts do not silently become `1.0`):
+
+| Surface | Current version | Compatibility rule |
+| - | - | - |
+| Backend WIT ABI (`flick:backend`) | `0.1.0` | Checked against `descriptor.backend-api` range during handshake. |
+| Portable IR (`flick-ir`) | `0.19.0` | Checked against `descriptor.ir` range; memory and UI metadata evolve independently of the WIT package version. |
+| Contributed commands (`flick:command`) | `0.1.0` | Shared between backends and plugins; plan validation runs before any step executes. |
+| Primitive kernel (`flick.kernel`) | `0.1.0` | Checked via `TargetRequest.runtime-abis`; verified by `just kernel` across targets. |
+
+| Consumer or adapter | Role | Delivery path | Supported modes | Environments |
+| - | - | - | - | - |
+| `flick/js@0.2.0` | Official JS/TS component | CLI Wasmtime host (default) & isolated browser worker (`backend.worker.ts`) | `whole-program` (`per-module` for `inspect`) | `js/node`, `js/browser`, `js/bun`, `js/cloudflare` |
+| `flick/go@0.2.0` | Official Go component | CLI Wasmtime host (default for `--target go`) | `whole-program` | `go/native` (`[tools] "flick/go" = ["go"]`) |
+| `flick/lua@0.1.0` | Preview component | Explicit `[build.backend]` pin | `whole-program` | `lua/love`, `lua/wow-retail`, `lua/wow-forever` |
+| Third-party component (`[build.backend]`) | External backend | CLI Wasmtime host (`inputs.read` only, pinned SHA-256) | `per-module` and/or `whole-program` as declared | Any `<backend>/<host>` declared by `describe` |
+| Native Rust `flick_backend::Backend` | Development & parity adapter | In-process Rust tests only (never a silent production fallback) | Matches component contract | Development/parity suites |
+
 ## Migration examples
 
 ### 1. Migrating legacy `[build]` and `[js]` settings to `[target.js]`
