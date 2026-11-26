@@ -108,6 +108,9 @@ func hostVars(fb *Fiber) Value { return Run(fb, Apply(fb, hostEnvironment(fb).Ge
 // Todo is `todo`: code not written yet fails when it runs.
 func Todo(message Value) Value { panic(Defect{"Error: " + message.(string)}) }
 
+// RaiseDefect is the kernel's defect: pure code that stops with `message`.
+func RaiseDefect(message Value) Value { panic(Defect{"Error: " + message.(string)}) }
+
 // Assert is a failing `let assert`: its place and message, and the value
 // it missed.
 func Assert(message, value Value) Value {

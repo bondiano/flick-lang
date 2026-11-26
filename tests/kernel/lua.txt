@@ -1,6 +1,7 @@
 # The modules of tests/kernel the Lua target runs (`just kernel-lua`), each
 # compared with its report on JS. Cells waits for the Lua runtime (#833).
 Arrays
+Defects
 Hooks
 Numbers
 Records

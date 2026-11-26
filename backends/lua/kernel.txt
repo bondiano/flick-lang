@@ -190,6 +190,8 @@ testGroup implemented
 testSkip implemented
 testOnly implemented
 testEffect implemented
+defect implemented
+flickAssert implemented
 [flick:runner/browser] refused
 [flick:runner/cloudflare] refused
 [flick:runner/node] refused

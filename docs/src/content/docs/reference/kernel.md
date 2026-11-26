@@ -48,8 +48,8 @@ a line `export class` below it gives one export another; a kernel export
 always has a line of its own. `cargo test -p flick-backend-support kernel`
 fails on a binding the manifest does not classify and on one it names that
 the standard library no longer binds, and prints the count of each class
-(with `-- --nocapture`). With kernel `0.1.0`, of the 3,084 pairs of 3,275
-declarations, 67 are `kernel`, 2,516 `flick`, 366 `host` and 135 `adapter`.
+(with `-- --nocapture`). With kernel `0.1.0`, of the 3,023 pairs of 3,216
+declarations, 69 are `kernel`, 2,453 `flick`, 366 `host` and 135 `adapter`.
 
 ## What a backend maps
 
@@ -129,6 +129,19 @@ element at an index (`None` outside, a negative index included), and
 whether two cells are one. `refModify` is one step that no other fiber sees
 half done, R7 of the
 [runtime contract](https://github.com/bondiano/flick-lang/blob/main/docs/formal/runtime.md).
+
+### Defects
+
+`defect`, which `Flick.Defect.defect` binds, stops pure code with a message:
+the nearest handler of defects receives the message as it is, as it
+receives what a foreign function throws, and code that does not reach the
+call does not stop. A function that promises a defect has a Flick body over
+it: `Int.unsafe_div` and `unsafe_rem` by zero, and `todo`. `flickAssert`, a
+failed `let assert`, stops with its message, `: ` and a rendering of the
+value the pattern missed; each backend chooses that rendering, for
+debugging. The kernel has no handler of defects, so `tests/kernel` checks
+only that a defect not reached does not stop, and `Language.Defects` of
+`tests/language` checks the message a handler receives.
 
 ### Record rows
 

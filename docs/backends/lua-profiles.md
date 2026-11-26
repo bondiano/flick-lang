@@ -176,6 +176,8 @@ representation of the program. Generated code calls `K` for:
   `merge_disjoint` and `labels`, over a record's table of labels;
 - `Bytes`, a Lua string of its bytes: `Bytes.from_list`, `to_list`,
   `encode_utf8` (a lone surrogate as U+FFFD) and `decode_utf8` (strict);
+- the kernel's defects: `defect` and a failed `let assert` stop with Lua's
+  `error` of the message alone, which a test reports as JS does;
 - `Test.test`, `group`, `skip` and `only`.
 
 A string the host gives, as a result or to a callback, is UTF-8 to the
@@ -203,6 +205,7 @@ snapshot. The CI `lua-probes` job runs it.
 | Kernel module | Lua 5.1, LuaJIT on and off |
 | - | - |
 | `Kernel.Arrays` | pass (11 of 11), the same report as JS |
+| `Kernel.Defects` | pass (1 of 1), the same report as JS |
 | `Kernel.Hooks` | pass (32 of 32), the same report as JS |
 | `Kernel.Numbers` | pass (67 of 67), the same report as JS |
 | `Kernel.Records` | pass (6 of 6), the same report as JS |
@@ -210,6 +213,7 @@ snapshot. The CI `lua-probes` job runs it.
 | `Language.BigInts` | pass (12 of 12), the same report as JS |
 | `Language.Floats` | pass (30 of 30), the same report as JS |
 | `Language.Ints` | pass (48 of 48 pure tests), the same report as JS; 1 effect test skipped |
+| `Language.NumericBoundaries` | pass (10 of 10 pure tests), the same report as JS; 2 effect tests skipped |
 
 ## The synchronous WoW slice
 

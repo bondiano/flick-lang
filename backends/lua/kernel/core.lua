@@ -15,6 +15,7 @@ local floor, fmod, frexp = math.floor, math.fmod, math.frexp
 local format, sub, gsub, match, rep = string.format, string.sub, string.gsub, string.match, string.rep
 local concat = table.concat
 local pairs, tonumber, tostring, type, error = pairs, tonumber, tostring, type, error
+local sort = table.sort
 
 local TWO30, TWO31, TWO32 = 1073741824, 2147483648, 4294967296
 
@@ -406,3 +407,42 @@ end
 
 -- `Int.to_string` and `Float.to_string`: as `show` writes a number.
 K.stringFromNumber = show_number
+
+-- Defects
+
+-- The kernel's defect: pure code that stops with `message`, which a test
+-- reports as it is.
+function K.defect(message)
+  error(message, 0)
+end
+
+-- A rendering of any value, for debugging: a primitive and a constructor's
+-- name as `show` writes them, then the fields of a structured value.
+local function debug(v)
+  if type(v) ~= "table" or (v.sign ~= nil and v._tag == nil) then
+    return K.show(v)
+  end
+  local parts, keys = {}, {}
+  for i = 1, #v do
+    parts[i] = debug(v[i])
+  end
+  for key in pairs(v) do
+    if type(key) == "string" and key ~= "_tag" and sub(key, 1, 1) ~= "$" then
+      keys[#keys + 1] = key
+    end
+  end
+  sort(keys)
+  for i = 1, #keys do
+    parts[#parts + 1] = keys[i] .. ": " .. debug(v[keys[i]])
+  end
+  local inner = concat(parts, ", ")
+  if v._tag then
+    return inner == "" and K.show(v) or K.show(v) .. " { " .. inner .. " }"
+  end
+  return #keys > 0 and "{ " .. inner .. " }" or "[" .. inner .. "]"
+end
+
+-- A failed `let assert`: its place and message, and the value it missed.
+function K.flickAssert(message, value)
+  error(message .. ": " .. debug(value), 0)
+end
