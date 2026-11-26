@@ -22,6 +22,22 @@ pub struct BuiltinSource {
 pub struct BuiltinModules {
     pub modules: Vec<ir::Module>,
     pub sources: Vec<BuiltinSource>,
+    /// The `@native` alternatives of each module, as many as `modules`: the
+    /// modules lower the clauses the default environment selects, and a
+    /// build selects again ([`BuiltinModules::module_for`]).
+    pub alternatives: Vec<Vec<ir::NativeAlternative>>,
+}
+
+impl BuiltinModules {
+    /// Module `i` as `env` selects its `@native` clauses; as the default
+    /// environment does without one.
+    pub fn module_for(&self, i: usize, env: Option<&types::NativeOverrideEnv>) -> ir::Module {
+        let mut module = self.modules[i].clone();
+        if let (Some(env), Some(alternatives)) = (env, self.alternatives.get(i)) {
+            ir::select_native(&mut module, alternatives, env);
+        }
+        module
+    }
 }
 
 pub fn builtin_modules() -> &'static [ir::Module] {
@@ -121,6 +137,7 @@ fn lower_builtins(stages_by_class: bool) -> (BuiltinModules, Vec<Arc<Interface>>
     let mut bundle = BuiltinModules {
         modules: vec![],
         sources: vec![],
+        alternatives: vec![],
     };
     let mut declarations = Vec::new();
     let ((), elapsed) = timed(|| {
@@ -136,13 +153,24 @@ fn lower_builtins(stages_by_class: bool) -> (BuiltinModules, Vec<Arc<Interface>>
                     ir::lower_with_local_schemes(module, typing).expect("built-in modules compile");
                 #[cfg(target_arch = "wasm32")]
                 let mut lowered = ir::lower(module, typing).expect("built-in modules compile");
-                lowered.each_span_mut(&mut |span| {
+                let mut relocate = |span: &mut flick_ir::Span| {
                     assert_eq!(
                         span.file, module.file,
                         "a built-in check has one source file"
                     );
                     span.file = file;
-                });
+                };
+                lowered.each_span_mut(&mut relocate);
+                // the browser compiler builds for the default environment alone
+                #[cfg(not(target_arch = "wasm32"))]
+                let mut alternatives =
+                    ir::native_alternatives(module, typing).expect("built-in modules compile");
+                #[cfg(target_arch = "wasm32")]
+                let mut alternatives: Vec<ir::NativeAlternative> = Vec::new();
+                for alternative in &mut alternatives {
+                    alternative.each_span_mut(&mut relocate);
+                }
+                bundle.alternatives.push(alternatives);
                 bundle.sources.push(BuiltinSource {
                     name: format!("<builtin>/{}.fl", module.name),
                     text: module.text.to_owned(),

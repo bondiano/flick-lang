@@ -365,7 +365,8 @@ fn check_reporting(
             stages_by_class,
             foreign_backend: super::ForeignBackendSpec::default_js(),
             validate_foreign_metadata: true,
-            native_overrides: None,
+            // every clause, for the selection of each build
+            native_overrides: Some(super::NativeOverrideEnv::builtins()),
         };
         let (checked, typing, _) = super::run_in(
             &module,

@@ -20,13 +20,17 @@ use crate::types::typing::Range;
 /// Selected `@native` override metadata for a top-level `let` declaration.
 #[derive(Debug, Clone)]
 pub struct NativeOverrideInfo {
-    /// Byte range of the selected `K::NativeOverride` CST node.
+    /// Byte range of the `K::NativeOverride` CST node: the selected one, or,
+    /// when the module is checked for every environment (the built-in ones),
+    /// any one of them.
     pub override_range: Range,
     /// Calling convention and adapter metadata derived from the signature and override lines.
     pub info: ForeignInfo,
     /// Backend id whose adapter rules validated this override (e.g. `"flick/js"`, `"flick/go"`).
     pub backend_id: String,
-    /// False when `--no-native-overrides` disabled override lowering (validation still ran).
+    /// Whether lowering emits it: false when `--no-native-overrides` disabled
+    /// override lowering (validation still ran), and for a clause the active
+    /// environment does not select.
     pub enabled: bool,
 }
 
@@ -100,27 +104,38 @@ impl Checker<'_> {
 
         // 3. Queue the selected override for full ForeignInfo finalization, and
         //    validate adapter metadata on inactive overrides whose condition uniquely
-        //    identifies a known backend.
+        //    identifies a known backend. Checked for every environment, each
+        //    clause is finalized, by the rules of the backend it names.
         let active_spec = env.active_backend_spec(self.options.foreign_backend);
+        let mut queued = false;
         for (idx, ((ov, _), expr)) in nodes_and_conds.iter().zip(&exprs).enumerate() {
-            if selected == Some(idx) {
+            let chosen = selected == Some(idx);
+            if chosen || (env.every_clause && scheme.is_some()) {
                 if let Some(scheme) = scheme {
+                    let spec = if chosen {
+                        active_spec
+                    } else {
+                        env.unique_backend_for(expr).unwrap_or(active_spec)
+                    };
                     let pending = self.read_native_meta(
                         decl,
                         ov,
                         &name,
                         scheme,
-                        active_spec,
-                        !env.disable_native_overrides,
+                        spec,
+                        chosen && !env.disable_native_overrides,
                     );
                     self.typing.pending_foreigns.push(pending);
-                    self.settle_operators();
+                    queued = true;
                 } else {
                     self.check_meta_words_with_spec(ov, active_spec);
                 }
             } else if let Some(spec) = env.unique_backend_for(expr) {
                 self.check_inactive_override_meta(ov, spec);
             }
+        }
+        if queued {
+            self.settle_operators();
         }
     }
 

@@ -256,5 +256,6 @@ pub(super) fn build_native_override_env(
         active_tags,
         active_backend_id,
         disable_native_overrides: target_override.is_some_and(|o| o.disable_native_overrides),
+        every_clause: false,
     }
 }

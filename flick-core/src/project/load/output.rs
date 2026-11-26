@@ -20,6 +20,8 @@ use crate::resolve::Interface;
 use crate::source::FileId;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::source::SourceMap;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::types::NativeOverrideEnv;
 
 /// The module `m` of the build, lowered.
 pub(super) fn compiled(
@@ -76,6 +78,12 @@ pub struct Compilation {
     /// was selected and resolved cleanly.
     #[cfg(not(target_arch = "wasm32"))]
     pub environment: Option<ResolvedEnvironment>,
+    /// The environment the `@native` clauses were selected in, by which a
+    /// build selects those of the built-in modules too. A project's load
+    /// always records it; `None` (a compilation made otherwise) keeps the
+    /// default selection their shared IR lowers.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub native_overrides: Option<NativeOverrideEnv>,
 }
 
 /// A module that checked cleanly, lowered to the IR.
