@@ -75,9 +75,15 @@ fn map_module_children(ty: &Type, f: &mut dyn FnMut(&Type) -> Type) -> Type {
                 && *old_key == format!("{module}.{name}")
             {
                 *key = Elem::Named(format!("{actual}.{member}"));
+            } else if matches!(
+                old_key,
+                Elem::Service(_) | Elem::Error(_) | Elem::Capture(_) | Elem::Provided(_)
+            ) {
+                *key = relabel_contract_elem(old_key, new);
             }
         }
         after.sort();
+        after.entries.dedup();
     }
     mapped
 }
@@ -501,6 +507,8 @@ impl ModuleSignature {
 
 #[cfg(test)]
 mod tests;
+
+include!("module_signature/relabel.rs");
 
 include!("module_signature/transform.rs");
 

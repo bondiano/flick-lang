@@ -105,7 +105,10 @@ pub(crate) fn check(contract: &TypeDef, actual: &Interface) -> Vec<Mismatch> {
     let normalizer = super::Store::default();
     let same = |expected: &Type, found: &Type| {
         api_diff::canonical_type(&normalizer.zonk(&expand_actual(
-            &substitute_type_kinds(&expected.substitute(&subst), &kinds),
+            &substitute_type_kinds(
+                &super::module_signature::substitute_contract_type(expected, &subst),
+                &kinds,
+            ),
             actual,
             32,
         ))) == api_diff::canonical_type(&normalizer.zonk(&expand_actual(found, actual, 32)))
@@ -277,7 +280,10 @@ pub(crate) fn local_dictionaries(
             };
             let export = actual.find(Namespace::Value, from)?;
             Some((
-                substitute_type_kinds(&head.substitute(&subst), &kinds),
+                substitute_type_kinds(
+                    &super::module_signature::substitute_contract_type(head, &subst),
+                    &kinds,
+                ),
                 super::Dict::Value {
                     module: export.entity.module.clone(),
                     name: export.entity.name.clone(),
@@ -352,7 +358,10 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
                         def.variance.clear();
                         def.form = manifest.as_ref().map_or(Form::NOMINAL, |ty| Form::Alias {
                             params: params.iter().map(|p| p.name.clone()).collect(),
-                            body: substitute_type_kinds(&ty.substitute(&subst), &kinds),
+                            body: substitute_type_kinds(
+                                &super::module_signature::substitute_contract_type(ty, &subst),
+                                &kinds,
+                            ),
                             opaque: false,
                         });
                     }
@@ -362,7 +371,10 @@ pub(crate) fn project(contract: &TypeDef, actual: &Interface) -> Interface {
             ModuleRequirement::Value { name, ty } => {
                 if let Some(export) = actual.find(Namespace::Value, name) {
                     let mut export = export.clone();
-                    export.scheme = Some(substitute_type_kinds(&ty.substitute(&subst), &kinds));
+                    export.scheme = Some(substitute_type_kinds(
+                        &super::module_signature::substitute_contract_type(ty, &subst),
+                        &kinds,
+                    ));
                     projected.exports.push(export);
                 }
             }

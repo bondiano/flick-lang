@@ -170,7 +170,7 @@ impl Printer<'_, '_> {
             Type::Row(row)
                 if row.entries.iter().all(|(l, _)| {
                     l.name().is_none_or(|name| name.contains('.'))
-                        && !matches!(l, Elem::Service(_) | Elem::Live | Elem::Provided(_))
+                        && !matches!(l, Elem::Live | Elem::Provided(_))
                 }) =>
             {
                 if row.entries.is_empty() && row.tail.is_none() {

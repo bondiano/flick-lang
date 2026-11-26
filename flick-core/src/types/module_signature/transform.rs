@@ -65,7 +65,9 @@ impl ModuleSignature {
                     if let R::Module { signature, .. } = requirement {
                         signature.substitute_outer_types(&subst);
                     } else {
-                        map_requirement_types(requirement, &mut |ty| ty.substitute(&subst));
+                        map_requirement_types(requirement, &mut |ty| {
+                            substitute_contract_type(ty, &subst)
+                        });
                     }
                 }
             }

@@ -53,7 +53,7 @@ fn relocate_ir(module: &mut ir::Module, child: &str, parent: &str, local: &str) 
                     to.expr(method);
                 }
             }
-            ir::ItemKind::Service { .. } => {}
+            ir::ItemKind::Service { key, .. } => to.key(key),
         }
     }
     // a walk a test cut short stands for a JSON form cut short the same way
@@ -334,6 +334,14 @@ fn relocate_value(value: &mut serde_json::Value, child: &str, parent: &str, loca
                 }
             }
             for (key, field) in fields.iter_mut() {
+                if key == "Service"
+                    && let serde_json::Value::Object(service) = field
+                    && let Some(service_key) = service.get_mut("key")
+                    && let Some(path) = service_key.as_str()
+                    && let Some(member) = path.strip_prefix(child).and_then(|s| s.strip_prefix('.'))
+                {
+                    *service_key = format!("{parent}.{local}${member}").into();
+                }
                 if matches!(key.as_str(), "effect" | "ServiceTag")
                     && let Some(path) = field.as_str()
                     && let Some(member) = path.strip_prefix(child).and_then(|s| s.strip_prefix('.'))

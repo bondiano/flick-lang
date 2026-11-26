@@ -204,14 +204,19 @@ impl Loader<'_> {
             }
         }
         if !self.by_name.contains_key(name)
+            && !self.from_packages.contains_key(name)
             && let Some((parent_name, _)) = name.rsplit_once('.')
         {
             let mut prefix = parent_name;
-            while !self.by_name.contains_key(prefix) {
+            while !self.by_name.contains_key(prefix) && !self.from_packages.contains_key(prefix) {
                 for dir in &dirs {
+                    #[cfg(feature = "native-project")]
+                    if self.use_saved(dir, prefix) {
+                        continue;
+                    }
                     let _ = self.load(&dir.join(module_path(prefix)));
                 }
-                if self.by_name.contains_key(prefix) {
+                if self.by_name.contains_key(prefix) || self.from_packages.contains_key(prefix) {
                     break;
                 }
                 let Some((parent, _)) = prefix.rsplit_once('.') else {

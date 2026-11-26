@@ -596,3 +596,5 @@ fn higher_order_signatures_survive_interface_serialization() {
 include!("ported_tests.rs");
 
 include!("tests/header_kinds.rs");
+
+include!("tests/relabel.rs");

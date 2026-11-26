@@ -122,7 +122,7 @@ impl ModuleSignature {
                         kind: Kind::arrows(params.iter().map(|p| p.kind.clone()), Kind::Type),
                         form: manifest.as_ref().map_or(Form::NOMINAL, |ty| Form::Alias {
                             params: params.iter().map(|p| p.name.clone()).collect(),
-                            body: ty.substitute(&subst),
+                            body: substitute_contract_type(ty, &subst),
                             opaque: false,
                         }),
                         variance: Vec::new(),
@@ -134,7 +134,7 @@ impl ModuleSignature {
                     Namespace::Value,
                     Decl::Let,
                     None,
-                    Some(ty.substitute(&subst)),
+                    Some(substitute_contract_type(ty, &subst)),
                 ),
                 R::Nominal {
                     name,
@@ -156,7 +156,7 @@ impl ModuleSignature {
                                 name: name.clone(),
                             },
                             decl: Decl::Method,
-                            scheme: Some(ty.substitute(&subst)),
+                            scheme: Some(substitute_contract_type(ty, &subst)),
                             definition: None,
                             parent: Some(entity.name.clone()),
                             blocked: None,
@@ -173,7 +173,9 @@ impl ModuleSignature {
                             Decl::Service
                         },
                         definition: definition.as_deref().cloned().map(|mut def| {
-                            map_definition_types(&mut def, &mut |ty| ty.substitute(&subst));
+                            map_definition_types(&mut def, &mut |ty| {
+                                substitute_contract_type(ty, &subst)
+                            });
                             def
                         }),
                         scheme: None,

@@ -92,6 +92,10 @@ include!("checking_tests_contracts.rs");
 #[cfg(all(feature = "ide", feature = "native-project"))]
 include!("checking_tests_packages.rs");
 #[cfg(feature = "ide")]
+mod checking_tests_provider_roles {
+    include!("checking_tests_provider_roles.rs");
+}
+#[cfg(feature = "ide")]
 #[test]
 fn private_builtin_cannot_be_imported_or_named_without_an_import() {
     use crate::diagnostics::codes;
