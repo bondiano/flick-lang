@@ -3,7 +3,7 @@
     "id": "flick/lua",
     "version": "0.1.0"
   },
-  "sha256": "eb25a11ed5f2fa2c7e6cb58da62b331656f2928217c33cb91a942574b449aec2",
+  "sha256": "9a6af1f9da9f7aaa3e675c1fa4d2f653052f9c2a66be01714304990a70923a15",
   "backend_api": {
     "minimum": "0.1.0",
     "maximum_exclusive": "0.2.0"
