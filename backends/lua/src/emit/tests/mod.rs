@@ -10,7 +10,7 @@ mod lower;
 mod print;
 mod refuse;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use flick_backend_support::names::tag;
 use flick_ir::{
@@ -256,7 +256,8 @@ fn chunk(
     items: &[usize],
     target: &Target<'_>,
 ) -> Result<Printed, Vec<Refusal>> {
-    let mut lowering = Lowering::new(program, target);
+    let builtin = BTreeSet::new();
+    let mut lowering = Lowering::new(program, target, &builtin);
     let mut block = Block::default();
     for &item in items {
         for stmt in lowering.item(module, item) {

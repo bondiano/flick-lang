@@ -60,10 +60,36 @@ fn kernel_op(op: BinOp) -> Option<&'static str> {
             Arith::Rem => "rem32",
             Arith::Pow => "pow32",
         },
+        BinOp::Arith(Arith::Rem, Num::Float) => "fmod",
+        BinOp::Arith(Arith::Pow, Num::Float) => "fpow",
         BinOp::Concat => "concat",
         BinOp::ListConcat => "list_concat",
         _ => return None,
     })
+}
+
+/// The number Lua 5.1 folds `e` into at compile time, if it does: its
+/// arithmetic of number constants, but for a division or modulo by zero
+/// and a NaN result (`constfolding` of `lcode.c`).
+fn folded(expr: &Expr) -> Option<f64> {
+    let value = match &expr.kind {
+        ExprKind::Number(text) => text.parse().ok()?,
+        ExprKind::Unary(UnOp::Neg, inner) => -folded(inner)?,
+        ExprKind::Binary(op, lhs, rhs) => {
+            let (left, right) = (folded(lhs)?, folded(rhs)?);
+            match op {
+                LuaOp::Add => left + right,
+                LuaOp::Sub => left - right,
+                LuaOp::Mul => left * right,
+                LuaOp::Div if right != 0.0 => left / right,
+                LuaOp::Mod if right != 0.0 => left - (left / right).floor() * right,
+                LuaOp::Pow => left.powf(right),
+                _ => return None,
+            }
+        }
+        _ => return None,
+    };
+    (!value.is_nan()).then_some(value)
 }
 
 /// `K.name(args…)`.
@@ -117,15 +143,8 @@ impl Lowering<'_> {
             let top = Self::number("1".to_owned(), x < 0.0, span);
             return Expr::binary(LuaOp::Div, top, one("0"), span);
         }
-        if x == 0.0 && x.is_sign_negative() && !self.dialect.negative_zero {
-            let message = format!(
-                "the literal `-0.0` is not available on the {} target with the dialect `{}` yet: \
-                 {} folds it into an equal `0` constant, and {UNCOMPUTED}",
-                self.target, self.dialect.tag, self.dialect.title
-            );
-            return self.refuse(span, message);
-        }
-        Self::number(float_text(x.abs()), x.is_sign_negative(), span)
+        let literal = Self::number(float_text(x.abs()), x.is_sign_negative(), span);
+        self.unfolded_zero(literal)
     }
 
     /// The literal an enum's constructor is.
@@ -246,7 +265,18 @@ impl Lowering<'_> {
         let mut values = self.ordered(&[lhs, rhs]).into_iter();
         let l = values.next().expect("two operands");
         let r = values.next().expect("two operands");
-        Expr::binary(lua, l, r, span)
+        self.unfolded_zero(Expr::binary(lua, l, r, span))
+    }
+
+    /// `e`, or where Lua 5.1 would fold it into the constant `-0`, the
+    /// kernel's `-0`: its compiler keeps one constant for `0` and `-0`, so
+    /// that one would stand for the other in the same function.
+    fn unfolded_zero(&self, e: Expr) -> Expr {
+        let negative_zero = |x: f64| x == 0.0 && x.is_sign_negative();
+        if self.dialect.negative_zero || !folded(&e).is_some_and(negative_zero) {
+            return e;
+        }
+        Expr::name(&Name::new(KERNEL.to_owned()), e.span).field("negzero")
     }
 
     /// `&&` and `||`: the right operand runs only when the left one does not
@@ -282,7 +312,7 @@ impl Lowering<'_> {
     pub(super) fn neg(&mut self, num: Num, inner: &IrExpr, span: Span) -> Expr {
         if matches!(num, Num::Float | Num::Float32) {
             let inner = self.expr(inner);
-            return Expr::unary(UnOp::Neg, inner, span);
+            return self.unfolded_zero(Expr::unary(UnOp::Neg, inner, span));
         }
         if num == Num::Int {
             let inner = self.expr(inner);

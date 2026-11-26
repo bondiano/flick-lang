@@ -212,7 +212,7 @@ fn a_build_writes_a_chunk_per_module_and_a_rebuild_is_identical() {
 /// The chunks of the Lua kernel, in the order they load.
 const KERNEL: &str = "_flick/lua-kernel/core.lua\n_flick/lua-kernel/strings.lua\n\
                       _flick/lua-kernel/lists.lua\n_flick/lua-kernel/bytes.lua\n\
-                      _flick/lua-kernel/lang.lua\n";
+                      _flick/lua-kernel/numbers.lua\n_flick/lua-kernel/lang.lua\n";
 
 /// `wide` with `n` locals besides its parameter, all of them used.
 fn wide(n: usize) -> String {
@@ -234,16 +234,17 @@ fn what_cannot_be_generated_is_refused_at_its_source_and_keeps_the_output() {
     let root = lua_project("lua_profile_keep", "lua/wow-retail", SHAPES, &[]);
     assert!(flick_in(&root, &["build", "--offline"]).status.success());
     let before = dist(&root);
-    // `**` of floats has special cases the Lua kernel does not compute yet
+    // the host's locale, which World of Warcraft does not give
     let sum = "module App exposing (main)\n\nmain : Unit -> Unit\n\
-               let main () = if 2.0 ** 3.0 == 8.0 then ()\n";
+               let main () = if String.to_locale_upper \"tr\" \"i\" == \"I\" then ()\n";
     let limit = wide(200);
     // one past the 200 locals of Lua 5.1, at the local that is one too many
     for (source, message, at) in [
         (
             sum,
-            "`**` of floats is not available on the lua/wow-retail target",
-            "2.0 ** 3.0",
+            "`String.to_locale_upper` (foreign `toLocaleUpperCase` from `flick:String`) is not \
+             available on the lua/wow-retail target",
+            "String.to_locale_upper",
         ),
         (limit.as_str(), "201 locals in scope at once", "199 == 199"),
     ] {

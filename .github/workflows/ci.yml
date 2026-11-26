@@ -368,7 +368,7 @@ jobs:
         run: |
           changed=true
           if [ -n "$BASE" ] && git fetch --depth=1 origin "$BASE" &&
-            git diff --quiet FETCH_HEAD HEAD -- backends/lua flick-backend-support/src flick-backend flick-ir flick-pretty flick/src/backends packages/core runtime pnpm-lock.yaml tests/kernel flake.nix flake.lock justfile just/backends.just .github/workflows/ci.yml; then
+            git diff --quiet FETCH_HEAD HEAD -- backends/lua flick-backend-support/src flick-backend flick-ir flick-pretty flick/src/backends packages/core runtime pnpm-lock.yaml tests/kernel tests/language flake.nix flake.lock justfile just/backends.just .github/workflows/ci.yml; then
             changed=false
           fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"

@@ -94,13 +94,62 @@ fn an_implemented_binding_takes_every_argument_at_once() {
     assert!(code.contains("K.listGet("), "{code}");
 }
 
+/// `foreign pure get from "flick:rt" "recordGet"`, of the constraint
+/// `HasField l r a`.
+fn record_get() -> Item {
+    let mut item = list_get();
+    if let ItemKind::Foreign(f) = &mut item.kind {
+        f.name = "field".into();
+        f.binding = Binding::Module {
+            from: "flick:rt".into(),
+            name: "recordGet".into(),
+        };
+        f.dicts = 1;
+    }
+    item
+}
+
+#[test]
+fn a_kernel_function_takes_its_dictionaries_first() {
+    let dict = flick_ir::Dict::Given("HasField".into());
+    let call = app(
+        app(
+            flick_ir::Expr::new(
+                flick_ir::ExprKind::Dicts(Box::new(global("App", "field")), vec![dict.clone()]),
+                sp(0, 1),
+            ),
+            local("label"),
+        ),
+        local("r"),
+    );
+    let body = flick_ir::Expr::new(
+        flick_ir::ExprKind::Abstract(vec!["HasField".into()], Box::new(call)),
+        sp(0, 1),
+    );
+    let code = lua(vec![
+        record_get(),
+        value("read", lambda(&["label", "r"], body)),
+    ]);
+    assert!(code.contains("K.recordGet("), "{code}");
+    assert!(code.contains(", label, r)"), "{code}");
+    // as a value, a function of the dictionaries, then of each argument
+    let code = lua(vec![record_get(), value("f", global("App", "field"))]);
+    assert!(code.contains("M.field = function(dict)"), "{code}");
+}
+
 #[test]
 fn the_kernel_defines_each_binding_its_table_implements() {
     let sources: Vec<&str> = kernel_sources().collect();
     let defined = |name: &str| {
-        sources.iter().any(|s| {
-            s.contains(&format!("function K.{name}("))
-                || s.lines().any(|l| l.starts_with(&format!("K.{name} =")))
+        sources.iter().any(|s| match name.split_once('.') {
+            // `K.Math = { floor = math.floor, … }`
+            Some((root, leaf)) => s.lines().any(|l| {
+                l.starts_with(&format!("K.{root} = {{")) && l.contains(&format!(" {leaf} = "))
+            }),
+            None => {
+                s.contains(&format!("function K.{name}("))
+                    || s.lines().any(|l| l.starts_with(&format!("K.{name} =")))
+            }
         })
     };
     let implemented = table().implemented();

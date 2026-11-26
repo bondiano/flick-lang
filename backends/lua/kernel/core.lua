@@ -198,6 +198,11 @@ function K.compare(a, b)
   return K.LT
 end
 
+-- `-0`, computed as the chunk runs: a constant `-0` of Lua 5.1 would be one
+-- with any `0` of the same function, so generated code reads this one.
+local zero = 0
+K.negzero = -zero
+
 -- The hash of the JS and Go runtimes, bit for bit (`runtime/src/rt/hash.ts`).
 
 local function optimize(n)

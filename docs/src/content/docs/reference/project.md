@@ -174,8 +174,7 @@ function of one pure stage over those, and what it gives back a string, a
 boolean, a float or `Unit`; a string the host gives keeps its UTF-8, and
 each ill-formed part of it becomes U+FFFD.
 Effects, other foreign functions, generators, what the kernel does not
-compute yet (the other integer widths, `Float32`, `%` and `**` of `Float`,
-`BigInt` and `Int64`) and a function over the VM's limits stop the build with
+compute yet (the other integer widths, `Float32`, `BigInt` and `Int64`) and a function over the VM's limits stop the build with
 `FLICK-P012` at the project's code. A refused build keeps the previous
 output. The host runs the program, so `flick run` and `flick dev` stop with
 `FLICK-P012`. On `lua/love`, `flick test` runs the pure tests on Lua 5.1.5

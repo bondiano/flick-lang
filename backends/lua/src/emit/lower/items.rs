@@ -41,7 +41,7 @@ impl Lowering<'_> {
                 self.define(&c.name, value, span);
             }
             ItemKind::Instance { info, methods } => self.instance(info, methods, span),
-            ItemKind::Foreign(f) => match self.host_function(f) {
+            ItemKind::Foreign(f) => match self.host_function(self.module, f) {
                 Ok(host) => {
                     let value = self.host_value(&host, span);
                     self.define(&f.name, value, span);

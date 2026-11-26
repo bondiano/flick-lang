@@ -149,6 +149,11 @@ representation of the program. Generated code calls `K` for:
 
 - `Int` arithmetic, which wraps to 32 bits, divides toward zero and gives
   `0` for a zero divisor, as the [numeric policy](numeric-policy.md) says;
+- `%` and `**` of `Float`, as JS computes them, and the JS globals of the
+  kernel the standard library binds, `Number`, `Math.floor` and
+  `Math.sqrt`; `String.to_number` reads JS's number syntax. On Lua 5.1,
+  whose compiler keeps one constant for `0` and `-0`, a `-0` that Lua would
+  fold into a constant is the kernel's `K.negzero`;
 - `==` of every value: SameValueZero on numbers, strings by their bytes and
   structured values by what they hold, skipping the dictionaries a tagged
   value holds at `$1`, …;
@@ -159,6 +164,8 @@ representation of the program. Generated code calls `K` for:
 - `++` of lists, `List.length`, `List.get` and `List.initialize`, and the
   hooks `equals`, `compare`, `hash` (that of the JS and Go runtimes, bit for
   bit) and `show` (JS spelling, `-0` kept) of the primitive values;
+- the record rows `Record.get`, `extend`, `remove`, `project`,
+  `merge_disjoint` and `labels`, over a record's table of labels;
 - `Bytes`, a Lua string of its bytes: `Bytes.from_list`, `to_list`,
   `encode_utf8` (a lone surrogate as U+FFFD) and `decode_utf8` (strict);
 - `Test.test`, `group`, `skip` and `only`.
@@ -176,16 +183,18 @@ runner `_flick/lua-kernel/runner.lua`, and runs `_flick/run-tests.lua` on
 Lua 5.1.5 or LuaJIT 2.1, whichever `[tools]` allows (LuaJIT when both are):
 the interpreters stand for LÖVE's Lua, and no WoW client runs tests. Its
 pure tests report as on the other targets; effect and property tests are
-refused. `just kernel-lua` runs the modules of `tests/kernel` that
-`tests/kernel/lua.txt` lists on Lua 5.1.5 and on LuaJIT with the JIT on and
-off, and requires each JSON report to equal the report of the same modules
-on JS; `luac -l` checks the globals each kernel chunk reads against every
+refused. `just kernel-lua` runs the modules of `tests/kernel` and of
+`tests/language` that their `lua.txt` lists on Lua 5.1.5 and on LuaJIT with
+the JIT on and off, and requires each JSON report to equal the report of the
+same modules on JS; `luac -l` checks the globals each kernel chunk reads against every
 snapshot. The CI `lua-probes` job runs it.
 
 | Kernel module | Lua 5.1, LuaJIT on and off |
 | - | - |
 | `Kernel.Arrays` | pass (11 of 11), the same report as JS |
+| `Kernel.Records` | pass (6 of 6), the same report as JS |
 | `Kernel.Strings` | pass (35 of 35), the same report as JS |
+| `Language.Floats` | pass (30 of 30), the same report as JS |
 
 ## The synchronous WoW slice
 

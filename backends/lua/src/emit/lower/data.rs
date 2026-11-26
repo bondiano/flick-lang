@@ -102,7 +102,7 @@ impl<'p> Lowering<'p> {
     pub(super) fn global(&mut self, module: &str, name: &str, span: Span) -> Expr {
         match self.items.get(&(module, name)) {
             Some(ItemKind::Foreign(f)) => {
-                if let Err(why) = self.host_function(f) {
+                if let Err(why) = self.host_function(module, f) {
                     let what = format!("`{module}.{}`", f.source_name.as_ref().unwrap_or(&f.name));
                     return self.unsupported(span, &what, why);
                 }
