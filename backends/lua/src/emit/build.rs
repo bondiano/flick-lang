@@ -59,6 +59,8 @@ const KERNEL_CHUNKS: &[(&str, &str)] = &[
     ("lists", include_str!("../../kernel/lists.lua")),
     ("bytes", include_str!("../../kernel/bytes.lua")),
     ("numbers", include_str!("../../kernel/numbers.lua")),
+    ("bigint", include_str!("../../kernel/bigint.lua")),
+    ("widths", include_str!("../../kernel/widths.lua")),
 ];
 
 /// The runner a test build loads after every chunk.

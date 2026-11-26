@@ -12,6 +12,7 @@ use flick_ir::{Constructor, JsClass, Lit, Pat, Rep, Span};
 use super::super::ast::{BinOp, Block, Expr, ExprKind, Name, Stmt, StmtKind, UnOp};
 use super::Lowering;
 use super::data::held_key;
+use super::ops::kernel_call;
 
 /// A part of the value a pattern matches.
 #[derive(Debug, Clone)]
@@ -112,11 +113,17 @@ impl Lowering<'_> {
                     "malformed IR: an enum test of a constructor".to_owned(),
                 ),
             },
-            Test::Lit(Lit::Float(_) | Lit::Float32(_)) => self.unsupported(
-                span,
-                "a float literal pattern",
-                "the Lua primitive kernel, which compares floats exactly, is not implemented",
-            ),
+            // the kernel's `==`: SameValueZero, and a `BigInt` value by its value
+            Test::Lit(
+                lit @ (Lit::Float(_)
+                | Lit::Float32(_)
+                | Lit::Int64(_)
+                | Lit::UInt64(_)
+                | Lit::BigInt(_)),
+            ) => {
+                let literal = self.literal(lit, span);
+                kernel_call("equals", vec![p, literal], span)
+            }
             Test::Lit(lit) => {
                 let literal = self.literal(lit, span);
                 eq(p, literal)

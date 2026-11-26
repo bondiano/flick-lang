@@ -5,14 +5,25 @@ local K = ns.k
 
 local floor, sqrt = math.floor, math.sqrt
 local byte, find, match, sub = string.byte, string.find, string.match, string.sub
-local ipairs, tonumber = ipairs, tonumber
+local ipairs, tonumber, type = ipairs, tonumber, type
 
--- The JS globals `Math.floor`, `Math.sqrt` and `Number` the standard
--- library binds: IEEE 754 on doubles, `-0` and NaN kept; an `Int` is a
--- double already.
+-- The JS globals of the kernel the standard library binds: `Math.floor`
+-- and `Math.sqrt`, IEEE 754 on doubles, `-0` and NaN kept; `Number`,
+-- `BigInt` and `String` between numbers and `BigInt` values.
 K.Math = { floor = floor, sqrt = sqrt }
+-- an `Int` exactly; a `BigInt` value rounded to the nearest double
 function K.Number(x)
+  if type(x) == "table" then
+    return K.big_to_number(x)
+  end
   return x
+end
+-- `into : Int -> BigInt`, exactly, and `BigInt.to_string`: decimal, no suffix
+function K.BigInt(x)
+  return K.big_of_int(x)
+end
+function K.String(x)
+  return K.big_decimal(x)
 end
 
 -- `x % y` of `Float`: the dividend's sign, NaN for a zero divisor or an

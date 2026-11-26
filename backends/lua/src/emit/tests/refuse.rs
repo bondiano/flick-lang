@@ -80,36 +80,25 @@ fn a_non_pure_stage_is_refused() {
 
 #[test]
 fn every_refusal_of_a_run_is_reported_in_order() {
-    let add = at(
-        ExprKind::Binary(
-            BinOp::Arith(Arith::Add, Num::Int8),
-            Box::new(int(1)),
-            Box::new(int(2)),
-        ),
-        1,
-        5,
-    );
-    let rem = at(
-        ExprKind::Binary(
-            BinOp::Arith(Arith::Rem, Num::Float32),
-            Box::new(float(1.0)),
-            Box::new(float(2.0)),
-        ),
-        6,
-        9,
-    );
-    let unknown = at(
-        ExprKind::Binary(BinOp::Lt, Box::new(local("p")), Box::new(local("q"))),
-        10,
-        12,
-    );
-    let tuple = ex(ExprKind::Tuple(vec![add, rem, unknown]));
+    // an order of values of no type the kernel compares
+    let order = |op, start, end| {
+        at(
+            ExprKind::Binary(op, Box::new(local("p")), Box::new(local("q"))),
+            start,
+            end,
+        )
+    };
+    let tuple = ex(ExprKind::Tuple(vec![
+        order(BinOp::Lt, 1, 5),
+        order(BinOp::Le, 6, 9),
+        order(BinOp::Gt, 10, 12),
+    ]));
     let found = refusals("lua51", vec![value("main", lambda(&["p", "q"], tuple))]);
     let spans: Vec<(u32, u32)> = found.iter().map(|(_, s)| *s).collect();
     assert_eq!(spans, vec![(1, 5), (6, 9), (10, 12)], "{found:#?}");
-    message_at(&found, "`+` of integers", (1, 5));
-    message_at(&found, "`%` of floats", (6, 9));
-    message_at(&found, "the operator `<`", (10, 12));
+    message_at(&found, "the operator `<`", (1, 5));
+    message_at(&found, "the operator `<=`", (6, 9));
+    message_at(&found, "the operator `>`", (10, 12));
     assert!(
         found
             .iter()
@@ -189,7 +178,7 @@ fn a_negative_zero_is_never_a_lua51_constant() {
 
 #[test]
 fn wide_literals_and_float_patterns_are_the_kernels() {
-    let wide = at(ExprKind::Lit(Lit::Int64(1)), 1, 3);
+    let wide = at(ExprKind::Lit(Lit::Int64(-16_777_217)), 1, 3);
     let pattern = at(
         ExprKind::Match(
             Box::new(local("x")),
@@ -201,13 +190,15 @@ fn wide_literals_and_float_patterns_are_the_kernels() {
         5,
         9,
     );
-    let found = refusals(
+    let code = emit(
         "lua51",
         vec![value("w", wide), value("p", lambda(&["x"], pattern))],
-    );
-    message_at(&found, "a 64-bit or big integer literal", (1, 3));
-    message_at(&found, "a float literal pattern", (5, 9));
-    // `Float32` rounds each result to 32 bits
+    )
+    .expect("lowered")
+    .code;
+    // a `BigInt` value of limbs of 24 bits, and SameValueZero on a float
+    assert!(code.contains("M.w = K.big(-1, 1, 1)"), "{code}");
+    assert!(code.contains("K.equals(x, 1.5)"), "{code}");
     let pow = at(
         ExprKind::Binary(
             BinOp::Arith(Arith::Pow, Num::Float32),
@@ -217,8 +208,10 @@ fn wide_literals_and_float_patterns_are_the_kernels() {
         4,
         8,
     );
-    let found = refusals("lua51", vec![value("e", lambda(&["y"], pow))]);
-    message_at(&found, "`**` of floats", (4, 8));
+    let code = emit("lua51", vec![value("e", lambda(&["y"], pow))])
+        .expect("lowered")
+        .code;
+    assert!(code.contains("return K.pow_f32(1, y)"), "{code}");
 }
 
 #[test]

@@ -33,8 +33,9 @@ enum Scalar {
     Float,
     Bool,
     String,
-    /// `Int64`, `UInt64`, `BigInt`, `Unit`.
-    Other,
+    /// `Int64`, `UInt64` or `BigInt`: a `BigInt` value of the kernel.
+    Wide,
+    Unit,
 }
 
 /// The shortest spelling of a finite, non-negative `x` that reads back as
@@ -49,23 +50,64 @@ fn float_text(x: f64) -> String {
     }
 }
 
+/// The suffix of the kernel's functions of a numeric type but `Int` and
+/// `Float`: `add_i8`, `neg_u64`, …
+fn width(num: Num) -> Option<&'static str> {
+    Some(match num {
+        Num::Int8 => "i8",
+        Num::Int16 => "i16",
+        Num::UInt8 => "u8",
+        Num::UInt16 => "u16",
+        Num::UInt32 => "u32",
+        Num::Float32 => "f32",
+        Num::Int64 => "i64",
+        Num::UInt64 => "u64",
+        Num::Int | Num::Float | Num::BigInt => return None,
+    })
+}
+
+fn arith_name(arith: Arith) -> &'static str {
+    match arith {
+        Arith::Add => "add",
+        Arith::Sub => "sub",
+        Arith::Mul => "mul",
+        Arith::Div => "div",
+        Arith::Rem => "rem",
+        Arith::Pow => "pow",
+    }
+}
+
 /// The function of the Lua kernel that computes `op` exactly, when one does.
-fn kernel_op(op: BinOp) -> Option<&'static str> {
+fn kernel_op(op: BinOp) -> Option<String> {
     Some(match op {
-        BinOp::Arith(arith, Num::Int) => match arith {
-            Arith::Add => "add32",
-            Arith::Sub => "sub32",
-            Arith::Mul => "mul32",
-            Arith::Div => "div32",
-            Arith::Rem => "rem32",
-            Arith::Pow => "pow32",
-        },
-        BinOp::Arith(Arith::Rem, Num::Float) => "fmod",
-        BinOp::Arith(Arith::Pow, Num::Float) => "fpow",
-        BinOp::Concat => "concat",
-        BinOp::ListConcat => "list_concat",
+        BinOp::Arith(arith, Num::Int) => format!("{}32", arith_name(arith)),
+        BinOp::Arith(Arith::Rem, Num::Float) => "fmod".to_owned(),
+        BinOp::Arith(Arith::Pow, Num::Float) => "fpow".to_owned(),
+        BinOp::Arith(arith, Num::BigInt) => format!("big_{}", arith_name(arith)),
+        BinOp::Arith(arith, num) => format!("{}_{}", arith_name(arith), width(num)?),
+        BinOp::Concat => "concat".to_owned(),
+        BinOp::ListConcat => "list_concat".to_owned(),
         _ => return None,
     })
+}
+
+/// The magnitude of a whole number of decimal digits, in limbs of 24 bits
+/// from the least, as the kernel's `BigInt` keeps it.
+fn limbs(digits: &str) -> Vec<u64> {
+    let mut out: Vec<u64> = Vec::new();
+    for d in digits.bytes().filter(u8::is_ascii_digit) {
+        let mut carry = u64::from(d - b'0');
+        for limb in &mut out {
+            let t = *limb * 10 + carry;
+            *limb = t % (1 << 24);
+            carry = t >> 24;
+        }
+        while carry > 0 {
+            out.push(carry % (1 << 24));
+            carry >>= 24;
+        }
+    }
+    out
 }
 
 /// The number Lua 5.1 folds `e` into at compile time, if it does: its
@@ -123,9 +165,9 @@ impl Lowering<'_> {
             Lit::UInt32(n) => Self::integer(i64::from(*n), span),
             Lit::Float(x) => self.float(*x, span),
             Lit::Float32(x) => self.float(f64::from(*x), span),
-            Lit::Int64(_) | Lit::UInt64(_) | Lit::BigInt(_) => {
-                self.unsupported(span, "a 64-bit or big integer literal", UNCOMPUTED)
-            }
+            Lit::Int64(n) => Self::wide(&n.to_string(), span),
+            Lit::UInt64(n) => Self::wide(&n.to_string(), span),
+            Lit::BigInt(text) => Self::wide(text, span),
             Lit::String(s) => Expr::str(s, span),
             Lit::Bool(b) => Expr::new(ExprKind::Bool(*b), span),
             Lit::Unit => Self::unit(span),
@@ -145,6 +187,33 @@ impl Lowering<'_> {
         }
         let literal = Self::number(float_text(x.abs()), x.is_sign_negative(), span);
         self.unfolded_zero(literal)
+    }
+
+    /// `K.big(sign, limbs…)`, the `BigInt` value of decimal digits.
+    fn wide(text: &str, span: Span) -> Expr {
+        let digits = limbs(text);
+        let sign = if digits.is_empty() {
+            "0"
+        } else if text.starts_with('-') {
+            "-1"
+        } else {
+            "1"
+        };
+        let magnitude = Expr::new(
+            ExprKind::Number(sign.trim_start_matches('-').to_owned()),
+            span,
+        );
+        let mut args = vec![if sign.starts_with('-') {
+            Expr::unary(UnOp::Neg, magnitude, span)
+        } else {
+            magnitude
+        }];
+        args.extend(
+            digits
+                .iter()
+                .map(|&l| Expr::new(ExprKind::Number(l.to_string()), span)),
+        );
+        kernel_call("big", args, span)
     }
 
     /// The literal an enum's constructor is.
@@ -168,7 +237,8 @@ impl Lowering<'_> {
                 Lit::Float(_) | Lit::Float32(_) => Scalar::Float,
                 Lit::Bool(_) => Scalar::Bool,
                 Lit::String(_) => Scalar::String,
-                Lit::Int64(_) | Lit::UInt64(_) | Lit::BigInt(_) | Lit::Unit => Scalar::Other,
+                Lit::Int64(_) | Lit::UInt64(_) | Lit::BigInt(_) => Scalar::Wide,
+                Lit::Unit => Scalar::Unit,
             });
         }
         let (module, name) = e.ty.as_deref()?.as_bare_con()?;
@@ -187,6 +257,8 @@ impl Lowering<'_> {
             Some(Scalar::Int)
         } else if is(Lang::Float) || is(Lang::Float32) {
             Some(Scalar::Float)
+        } else if is(Lang::Int64) || is(Lang::UInt64) || is(Lang::BigInt) {
+            Some(Scalar::Wide)
         } else if is(Lang::Bool) {
             Some(Scalar::Bool)
         } else if is(Lang::String) {
@@ -203,7 +275,24 @@ impl Lowering<'_> {
         let scalar = self.scalar(lhs).or_else(|| self.scalar(rhs));
         if let Some(name) = kernel_op(op) {
             let args = self.ordered(&[lhs, rhs]);
-            return kernel_call(name, args, span);
+            return kernel_call(&name, args, span);
+        }
+        let equality = matches!(op, BinOp::Eq | BinOp::NotEq | BinOp::Same | BinOp::NotSame);
+        // a `BigInt` value is a table: by its value, not its identity
+        if scalar == Some(Scalar::Wide) && !equality {
+            let compare = match op {
+                BinOp::Lt => Some(LuaOp::Lt),
+                BinOp::Le => Some(LuaOp::Le),
+                BinOp::Gt => Some(LuaOp::Gt),
+                BinOp::Ge => Some(LuaOp::Ge),
+                _ => None,
+            };
+            if let Some(compare) = compare {
+                let args = self.ordered(&[lhs, rhs]);
+                let order = kernel_call("big_compare", args, span);
+                let zero = Expr::new(ExprKind::Number("0".to_owned()), span);
+                return Expr::binary(compare, order, zero, span);
+            }
         }
         let ordering = match op {
             BinOp::Lt => Some(LuaOp::Lt),
@@ -213,12 +302,12 @@ impl Lowering<'_> {
             _ => None,
         };
         // structural, and SameValueZero on floats: the kernel's
-        if matches!(op, BinOp::Eq | BinOp::NotEq)
-            && matches!(scalar, None | Some(Scalar::Float | Scalar::Other))
-        {
+        let structural = matches!(op, BinOp::Eq | BinOp::NotEq)
+            && matches!(scalar, None | Some(Scalar::Float | Scalar::Unit));
+        if structural || (equality && scalar == Some(Scalar::Wide)) {
             let args = self.ordered(&[lhs, rhs]);
             let equal = kernel_call("equals", args, span);
-            return if op == BinOp::Eq {
+            return if matches!(op, BinOp::Eq | BinOp::Same) {
                 equal
             } else {
                 Expr::unary(UnOp::Not, equal, span)
@@ -251,7 +340,7 @@ impl Lowering<'_> {
         };
         let Some(lua) = lua else {
             let what = match (op, scalar) {
-                (BinOp::Eq | BinOp::NotEq, None | Some(Scalar::Other)) => {
+                (BinOp::Eq | BinOp::NotEq, None | Some(Scalar::Unit)) => {
                     format!("`{}` of a structured or unknown type", op.symbol())
                 }
                 (_, Some(Scalar::Int)) => format!("`{}` of integers", op.symbol()),
@@ -314,9 +403,14 @@ impl Lowering<'_> {
             let inner = self.expr(inner);
             return self.unfolded_zero(Expr::unary(UnOp::Neg, inner, span));
         }
-        if num == Num::Int {
+        let name = match num {
+            Num::Int => Some("neg32".to_owned()),
+            Num::BigInt => Some("big_neg".to_owned()),
+            _ => width(num).map(|w| format!("neg_{w}")),
+        };
+        if let Some(name) = name {
             let inner = self.expr(inner);
-            return kernel_call("neg32", vec![inner], span);
+            return kernel_call(&name, vec![inner], span);
         }
         self.unsupported(span, &format!("negation of `{num:?}`"), UNCOMPUTED)
     }

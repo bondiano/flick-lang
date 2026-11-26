@@ -40,8 +40,8 @@ restrictions and secret values apply to it
 
 The `dialect` axis (`lua51` by default, or `luajit`) and the capabilities
 `jit` and `ffi` are tags of `[target.lua]`. JIT and FFI are independent:
-each needs the `luajit` dialect and a host that has it. Without `ffi`,
-`Int64` and `UInt64` are refused rather than held in doubles.
+each needs the `luajit` dialect and a host that has it. `Int64`, `UInt64`
+and `BigInt` need neither: the kernel holds them exactly on every dialect.
 
 ## Probes
 
@@ -148,7 +148,15 @@ backend generates, gives it `Some`, `None` and `Ordering` in the
 representation of the program. Generated code calls `K` for:
 
 - `Int` arithmetic, which wraps to 32 bits, divides toward zero and gives
-  `0` for a zero divisor, as the [numeric policy](numeric-policy.md) says;
+  `0` for a zero divisor, as the [numeric policy](numeric-policy.md) says,
+  and that of `Int8`, `Int16`, `UInt8`, `UInt16` and `UInt32`, doubles
+  wrapped to their width; `Float32`, a double rounded to binary32 after each
+  operation; the bit operations and shifts, and the conversions between the
+  numeric types;
+- `BigInt`, a table of its sign and its magnitude's limbs of 24 bits, with
+  schoolbook multiplication and Knuth's division; `Int64` and `UInt64` are
+  `BigInt` values wrapped to 64 bits after each operation, as on JS, so
+  they need no `ffi` and round nowhere;
 - `%` and `**` of `Float`, as JS computes them, and the JS globals of the
   kernel the standard library binds, `Number`, `Math.floor` and
   `Math.sqrt`; `String.to_number` reads JS's number syntax. On Lua 5.1,
@@ -192,8 +200,11 @@ snapshot. The CI `lua-probes` job runs it.
 | Kernel module | Lua 5.1, LuaJIT on and off |
 | - | - |
 | `Kernel.Arrays` | pass (11 of 11), the same report as JS |
+| `Kernel.Hooks` | pass (32 of 32), the same report as JS |
+| `Kernel.Numbers` | pass (67 of 67), the same report as JS |
 | `Kernel.Records` | pass (6 of 6), the same report as JS |
 | `Kernel.Strings` | pass (35 of 35), the same report as JS |
+| `Language.BigInts` | pass (12 of 12), the same report as JS |
 | `Language.Floats` | pass (30 of 30), the same report as JS |
 
 ## The synchronous WoW slice
@@ -221,8 +232,6 @@ the global it went through. Every refusal is `P012`:
 | - | - |
 | the environment `lua/<p>` | `p` is not a profile of the component |
 | the dialect tag, `jit` or `ffi` | the host lacks it, or `jit`/`ffi` lacks the `luajit` dialect |
-| a `BigInt` literal, operator or foreign function of that type | always: the Lua kernel has no arbitrary-precision integers yet |
-| an `Int64` or `UInt64` literal, operator or foreign function | the `ffi` capability is off |
 | `await`, an `async` foreign function or a suspending kernel binding | the profile has no suspension (WoW) |
 | a `flick:` kernel binding | the Lua kernel does not implement it (`kernel.txt`) |
 | a module binding (`from "m"`) | the profile has no `require` (WoW), or `m` is `ffi` without `ffi` |
