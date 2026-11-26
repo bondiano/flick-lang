@@ -45,7 +45,7 @@ use crate::resolve::{Header, Import, Item, ItemKind};
 use crate::source::Span;
 use crate::source::{FileId, SourceMap};
 use crate::syntax::cst::{Element, Node};
-use crate::syntax::{Parse, kind::SyntaxKind as K, literal::string_value, when};
+use crate::syntax::{HeadCatalog, Parse, kind::SyntaxKind as K, literal::string_value, when};
 use crate::types;
 
 include!("checking_file.rs");
@@ -66,8 +66,8 @@ pub struct ModuleCache {
     /// What plugins gave in the last run, by the key of each call.
     #[cfg(feature = "native-project")]
     pub(super) plugins: HashMap<Vec<u8>, Vec<u8>>,
-    /// The parse of each module, and the file and the text it is of.
-    parses: HashMap<PathBuf, (FileId, String, Parsed)>,
+    /// The parse of each module, its file, text, and active head catalog.
+    parses: HashMap<PathBuf, (FileId, String, Arc<HeadCatalog>, Parsed)>,
     /// Where a host keeps modules between processes. A cache with one
     /// serves a single run and keeps nothing in memory: no later run of
     /// the process reads it.
@@ -141,12 +141,20 @@ impl ModuleCache {
         )
     }
 
-    /// The parse kept of `path`, if it is of this file and this text.
-    pub(super) fn parsed(&self, path: &Path, file: FileId, text: &str) -> Option<Parsed> {
+    /// The parse kept of `path`, if it is of this file, text, and head catalog.
+    pub(super) fn parsed(
+        &self,
+        path: &Path,
+        file: FileId,
+        text: &str,
+        catalog: &HeadCatalog,
+    ) -> Option<Parsed> {
         self.parses
             .get(path)
-            .filter(|(kept, kept_text, _)| *kept == file && kept_text == text)
-            .map(|(_, _, parsed)| parsed.clone())
+            .filter(|(kept, kept_text, kept_catalog, _)| {
+                *kept == file && kept_text == text && kept_catalog.as_ref() == catalog
+            })
+            .map(|(_, _, _, parsed)| parsed.clone())
     }
 
     /// Applies `edit` to `ir`, the run's IR of the module at `path`. When
@@ -171,12 +179,19 @@ impl ModuleCache {
         *kept = Some(Arc::clone(ir));
     }
 
-    pub(super) fn keep_parsed(&mut self, path: &Path, file: FileId, text: &str, parsed: Parsed) {
+    pub(super) fn keep_parsed(
+        &mut self,
+        path: &Path,
+        file: FileId,
+        text: &str,
+        catalog: Arc<HeadCatalog>,
+        parsed: Parsed,
+    ) {
         #[cfg(feature = "native-project")]
         if self.store.is_some() {
             return;
         }
-        let entry = (file, text.to_owned(), parsed);
+        let entry = (file, text.to_owned(), catalog, parsed);
         self.parses.insert(path.to_path_buf(), entry);
     }
 }

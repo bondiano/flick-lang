@@ -17,11 +17,28 @@ mod shown;
 mod table;
 
 use flick_plugin::{
-    Arena, Block, Compiler, Completion, Diagnostic, Fact, Hover, Piece, Plugin, Published,
+    Arena, Block, Compiler, Completion, Diagnostic, Fact, HeadSpec, Hover, Piece, Plugin,
+    PluginMetadata, Published,
 };
 use serde::{Deserialize, Serialize};
 
 pub struct Sql;
+
+/// Static metadata declared by the first-party SQL plugin.
+#[must_use]
+pub fn metadata() -> PluginMetadata {
+    PluginMetadata {
+        heads: vec![HeadSpec {
+            head: "sql".into(),
+            module: "Sql".into(),
+            declarations: vec!["table".into(), "migration".into()],
+            ..HeadSpec::default()
+        }],
+        watch: Vec::new(),
+        derives: Vec::new(),
+        own_codes: Vec::new(),
+    }
+}
 
 /// What the plugin learns from a group: the schema its migrations build,
 /// and the tables its `sql table` blocks declare.
@@ -41,6 +58,10 @@ impl Whole {
 pub const MISMATCH: &str = "Q011";
 
 impl Plugin for Sql {
+    fn metadata(&self) -> PluginMetadata {
+        metadata()
+    }
+
     fn collect(&self, blocks: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
         let whole = Whole {
             migrations: migration::collect(blocks),

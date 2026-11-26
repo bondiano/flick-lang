@@ -1,4 +1,4 @@
-package flick:plugin@0.4.0;
+package flick:plugin@0.5.0;
 
 /// What the compiler offers a plugin while it expands a block.
 interface compiler {

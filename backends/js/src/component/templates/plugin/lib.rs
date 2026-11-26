@@ -1,7 +1,9 @@
 //! The plugin of NAME: `tagged "name" { value }` stands for the record
 //! `{ tag = "name"; value = value }`, a `Tagged.Tagged`.
 
-use flick_plugin::{Arena, Block, Builder, Compiler, Diagnostic, Plugin, TokenKind, flick};
+use flick_plugin::{
+    Arena, Block, Builder, Compiler, Diagnostic, HeadSpec, Plugin, PluginMetadata, TokenKind, flick,
+};
 
 pub struct Tagged;
 
@@ -9,6 +11,17 @@ pub struct Tagged;
 flick_plugin::export!(Tagged);
 
 impl Plugin for Tagged {
+    fn metadata(&self) -> PluginMetadata {
+        PluginMetadata {
+            heads: vec![HeadSpec {
+                head: "tagged".into(),
+                module: "Tagged".into(),
+                ..HeadSpec::default()
+            }],
+            ..PluginMetadata::default()
+        }
+    }
+
     fn collect(&self, _: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
         Vec::new()
     }

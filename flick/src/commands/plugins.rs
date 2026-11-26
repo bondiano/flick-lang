@@ -59,7 +59,11 @@ pub fn plugins(global: &GlobalArguments) -> Outcome {
             diagnostics,
         };
     }
-    let heads: Vec<&str> = first_party::HEADS.iter().map(|(head, _)| *head).collect();
+    let heads: Vec<&str> = first_party::metadata()
+        .heads
+        .iter()
+        .map(|h| h.head.as_str())
+        .collect();
     let mut out = format!(
         "{}: linked into flick, blocks {}\n",
         first_party::PACKAGE,

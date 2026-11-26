@@ -13,13 +13,31 @@ mod read;
 mod shape;
 
 use flick_plugin::{
-    Arena, Block, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
-    Plugin,
+    Arena, Block, Compiler, Completion, DeriveTarget, Diagnostic, Fact, HeadSpec, Highlight, Hover,
+    Piece, Plugin, PluginMetadata,
 };
 
 pub struct Cli;
 
+/// Static metadata declared by the first-party CLI plugin.
+#[must_use]
+pub fn metadata() -> PluginMetadata {
+    PluginMetadata {
+        heads: vec![HeadSpec {
+            head: "cli".into(),
+            module: "Cli".into(),
+            ..HeadSpec::default()
+        }],
+        watch: Vec::new(),
+        derives: vec!["Cli.Value".into()],
+        own_codes: Vec::new(),
+    }
+}
+
 impl Plugin for Cli {
+    fn metadata(&self) -> PluginMetadata {
+        metadata()
+    }
     fn collect(&self, _: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
         Vec::new()
     }

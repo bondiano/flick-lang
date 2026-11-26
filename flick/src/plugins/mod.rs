@@ -31,7 +31,7 @@ use flick_core::plugin::source::BlockSource;
 use flick_core::plugin::{Expander, Failure};
 use flick_plugin::{
     Arena, Block, CallSite, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover, Piece,
-    Published,
+    PluginMetadata, Published,
 };
 
 pub use cache::{cached, save};
@@ -86,6 +86,10 @@ impl Traced {
 impl Expander for Traced {
     fn id(&self) -> &str {
         self.inner.id()
+    }
+
+    fn metadata(&self) -> Result<PluginMetadata, String> {
+        self.inner.metadata()
     }
 
     fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String> {

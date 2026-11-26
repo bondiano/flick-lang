@@ -2,13 +2,75 @@ use super::tests::{errors, sexp};
 use super::*;
 use crate::source::SourceMap;
 use crate::syntax::cst::Token;
+use crate::syntax::heads::{HeadCatalog, HeadRule};
 
 const IMPORT: &str = "import Pairs exposing (Pair, plugin pairs)\n\n";
+
+fn test_catalog() -> HeadCatalog {
+    HeadCatalog::new(vec![
+        HeadRule {
+            head: "cli".into(),
+            module: "Cli".into(),
+            implicit: true,
+            bare: false,
+            declarations: Vec::new(),
+            named: false,
+            top: false,
+            bracket_args: false,
+        },
+        HeadRule {
+            head: "server".into(),
+            module: "Server".into(),
+            implicit: true,
+            bare: true,
+            declarations: vec!["fn".into()],
+            named: false,
+            top: false,
+            bracket_args: false,
+        },
+        HeadRule {
+            head: "component".into(),
+            module: "Ui".into(),
+            implicit: true,
+            bare: false,
+            declarations: Vec::new(),
+            named: true,
+            top: false,
+            bracket_args: false,
+        },
+        HeadRule {
+            head: "suite".into(),
+            module: "Test".into(),
+            implicit: true,
+            bare: false,
+            declarations: Vec::new(),
+            named: false,
+            top: true,
+            bracket_args: true,
+        },
+        HeadRule {
+            head: "test".into(),
+            module: "Test".into(),
+            implicit: true,
+            bare: false,
+            declarations: Vec::new(),
+            named: false,
+            top: true,
+            bracket_args: true,
+        },
+    ])
+}
 
 fn parse_str(src: &str) -> Parse {
     let mut map = SourceMap::default();
     let file = map.add("t.fl", src);
-    parse(src, file)
+    parse_with_catalog(src, file, &test_catalog())
+}
+
+fn parse_with(src: &str, catalog: &HeadCatalog) -> Parse {
+    let mut map = SourceMap::default();
+    let file = map.add("t.fl", src);
+    parse_with_catalog(src, file, catalog)
 }
 
 /// The kinds of the nodes from the root down to the first `kind`.
@@ -259,23 +321,143 @@ fn a_line_that_goes_on_with_an_expression_is_no_child() {
 
 #[test]
 fn a_suite_and_a_test_are_blocks_only_where_a_top_level_declaration_starts() {
+    let cat = test_catalog();
+    let sexp_with = |src: &str| {
+        let parsed = parse_with(src, &cat);
+        assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+        super::tests::sexp_of(&parsed.tree, src)
+    };
     assert_eq!(
-        sexp("suite \"Users\" { test \"a\" {} }\ntest.skip \"b\" {}\n"),
+        sexp_with("suite \"Users\" { test \"a\" {} }\ntest.skip \"b\" {}\n"),
         "(PluginDecl suite \"Users\" { (Block test \"a\" { }) })\n\
          (PluginDecl test . skip \"b\" { (Block ) })"
     );
     // the rows of a `test.each` are a bracketed argument, kept as tokens
     assert_eq!(
-        sexp("test.each [(1, 2)] \"adds {0}\" (a, b) {}\n"),
+        sexp_with("test.each [(1, 2)] \"adds {0}\" (a, b) {}\n"),
         "(PluginDecl test . each [ (PluginArgs ( 1 , 2 )) ] \"adds {0}\" ( (PluginArgs a , b) ) { (Block ) })"
     );
     // a signature of a value of that name stays one, and the words stay names
     // in expressions, where `Test.test` and a local `test` are called
+    let expr_src = "test : String -> Int\nlet test name = 1\nlet a = test \"x\"\nlet b = Test.test \"x\" (fun () -> Test.Pass)\nlet c = suite \"y\" { x = 1 }\n";
+    let parsed = parse_with(expr_src, &cat);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    assert!(sexp_with("let c = suite \"y\" { x = 1 }\n").contains("RecordExpr"));
+    // without a catalog, `suite` is not treated as an implicit plugin head
     assert_eq!(
-        errors(
-            "test : String -> Int\nlet test name = 1\nlet a = test \"x\"\nlet b = Test.test \"x\" (fun () -> Test.Pass)\nlet c = suite \"y\" { x = 1 }\n"
-        ),
+        errors("let c = suite \"y\" { x = 1 }\n"),
         Vec::<String>::new()
     );
-    assert!(sexp("let c = suite \"y\" { x = 1 }\n").contains("RecordExpr"));
+    let _ = sexp;
+}
+
+#[test]
+fn external_head_rules_drive_top_bare_declarations_named_and_brackets() {
+    let cat = HeadCatalog::new(vec![
+        HeadRule {
+            head: "spec".into(),
+            module: "Spec".into(),
+            implicit: false,
+            bare: false,
+            declarations: Vec::new(),
+            named: false,
+            top: true,
+            bracket_args: true,
+        },
+        HeadRule {
+            head: "route".into(),
+            module: "Router".into(),
+            implicit: false,
+            bare: false,
+            declarations: vec!["group".into()],
+            named: false,
+            top: false,
+            bracket_args: false,
+        },
+        HeadRule {
+            head: "widget".into(),
+            module: "Widgets".into(),
+            implicit: false,
+            bare: false,
+            declarations: Vec::new(),
+            named: true,
+            top: false,
+            bracket_args: false,
+        },
+    ]);
+    let src = "import Spec exposing (plugin spec)\n\
+               import Router exposing (plugin route)\n\
+               import Widgets exposing (plugin widget)\n\
+               spec [1, 2] \"case\" { ok }\n\
+               route group api = 1\n\
+               widget counter x = x\n\
+               let a = spec \"call\" { x = 1 }\n\
+               let b = route \"/home\" { ok }\n\
+               let c = route plain_call\n";
+    let parsed = parse_with(src, &cat);
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    let decls: Vec<String> = parsed
+        .tree
+        .nodes()
+        .filter(|n| n.kind == K::PluginDecl)
+        .map(|n| text_of(src, n))
+        .collect();
+    assert_eq!(
+        decls,
+        [
+            "spec [1, 2] \"case\" { ok }",
+            "route group api = 1",
+            "widget counter x = x",
+        ]
+    );
+    let mut exprs = Vec::new();
+    collect(&parsed.tree, K::PluginExpr, &mut exprs);
+    let exprs: Vec<String> = exprs.into_iter().map(|n| text_of(src, n)).collect();
+    // `spec` is top-only so `let a = spec ...` is NOT a PluginExpr;
+    // `route` has bare=false so `route plain_call` is NOT a PluginExpr, only `route "/home" { ok }` is!
+    assert_eq!(exprs, ["route \"/home\" { ok }"]);
+}
+
+#[test]
+fn a_component_is_a_declaration_of_std_s_plugin() {
+    let parsed = parse_str("component label (p : P) = text p.name\n");
+    assert!(parsed.diagnostics.is_empty(), "{:?}", parsed.diagnostics);
+    assert_eq!(
+        super::tests::sexp_of(&parsed.tree, "component label (p : P) = text p.name\n"),
+        "(PluginDecl component label ( (PluginArgs p : P) ) (PluginRest = text p . name))"
+    );
+    let src = "component counter (p : P) =\n  let n = 1\n  show n\nlet x = 1\n";
+    let parsed2 = parse_str(src);
+    assert!(parsed2.diagnostics.is_empty(), "{:?}", parsed2.diagnostics);
+    assert_eq!(
+        super::tests::sexp_of(&parsed2.tree, src),
+        "(PluginDecl component counter ( (PluginArgs p : P) ) (PluginRest = let n = 1 show n))\n\
+         (LetDecl let (VarPat x) = (Block (Literal 1)))"
+    );
+    assert!(
+        parse_str("let render component setup = component setup\n")
+            .diagnostics
+            .is_empty()
+    );
+}
+
+#[test]
+fn a_server_fn_and_server_name_are_blocks_of_std_without_an_import() {
+    let s1 = "server fn place order = order\n";
+    let p1 = parse_str(s1);
+    assert!(p1.diagnostics.is_empty(), "{:?}", p1.diagnostics);
+    assert_eq!(
+        super::tests::sexp_of(&p1.tree, s1),
+        "(PluginDecl server fn place order (PluginRest = order))"
+    );
+    let s2 = "let x = [server place, server Api.place]\n";
+    let p2 = parse_str(s2);
+    assert!(p2.diagnostics.is_empty(), "{:?}", p2.diagnostics);
+    assert_eq!(
+        super::tests::sexp_of(&p2.tree, s2),
+        "(LetDecl let (VarPat x) = (Block (ListExpr [ (PluginExpr server place) , \
+         (PluginExpr server Api . place) ])))"
+    );
+    let src = "let f server fn = server\nlet g server = (server)\nlet h = call server double 21\n";
+    assert!(parse_str(src).diagnostics.is_empty());
 }

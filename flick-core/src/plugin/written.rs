@@ -1,9 +1,11 @@
 //! A type of the syntax tree as a plugin reads it: the parse the compiler
 //! already made, so a derive does not read the type's tokens again.
 
-use flick_plugin::{EffectRow, Hole, HoleKind, Span, Written, WrittenKind};
+use flick_plugin::{
+    ConstraintMeta, EffectRow, Hole, HoleKind, RecordField, Span, Written, WrittenKind,
+};
 
-use super::source::BlockSource;
+use super::source::{BlockSource, docs_above_item};
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 
@@ -11,8 +13,8 @@ use crate::syntax::kind::SyntaxKind as K;
 pub fn written(node: &Node, text: &str, origin: u32) -> Written {
     let (start, end) = node.range();
     let span = Span {
-        start: start - origin,
-        end: end - origin,
+        start: start.saturating_sub(origin),
+        end: end.saturating_sub(origin),
     };
     let children: Vec<&Node> = node.nodes().collect();
     let each = |nodes: &[&Node]| -> Vec<Written> {
@@ -47,15 +49,33 @@ pub fn written(node: &Node, text: &str, origin: u32) -> Written {
         K::TupleType => WrittenKind::Tuple(each(&children)),
         K::UnitType => WrittenKind::Unit,
         K::RecordType => {
-            let mut fields: Vec<(String, Written)> = (children.iter())
-                .filter(|n| n.kind == K::RecordTypeField)
-                .filter_map(|f| {
-                    let label = f.child_tokens().find(|t| t.kind == K::Ident)?.text(text);
-                    let ty = f.nodes().next()?;
-                    Some((label.to_owned(), written(ty, text, origin)))
-                })
-                .collect();
-            flick_ir::sort_by_utf16(&mut fields, |f| &f.0);
+            let mut fields: Vec<RecordField> = Vec::new();
+            let mut source_index = 0u32;
+            for f in children.iter().filter(|n| n.kind == K::RecordTypeField) {
+                let Some(label_tok) = f.child_tokens().find(|t| t.kind == K::Ident) else {
+                    continue;
+                };
+                let Some(ty) = f.nodes().next() else {
+                    continue;
+                };
+                let (f_start, f_end) = f.range();
+                fields.push(RecordField {
+                    name: label_tok.text(text).to_owned(),
+                    name_span: Span {
+                        start: label_tok.start.saturating_sub(origin),
+                        end: label_tok.end.saturating_sub(origin),
+                    },
+                    span: Span {
+                        start: f_start.saturating_sub(origin),
+                        end: f_end.saturating_sub(origin),
+                    },
+                    ty: written(ty, text, origin),
+                    docs: docs_above_item(text, f_start, false),
+                    source_index,
+                });
+                source_index += 1;
+            }
+            flick_ir::sort_by_utf16(&mut fields, |f| &f.name);
             WrittenKind::Record {
                 fields,
                 open: children.iter().any(|n| n.kind == K::RowTail),
@@ -79,10 +99,69 @@ pub fn written(node: &Node, text: &str, origin: u32) -> Written {
             Some(of) => WrittenKind::Captured(Box::new(written(of, text, origin))),
             None => WrittenKind::Other,
         },
-        K::ForallType | K::ConstrainedType => WrittenKind::Generic,
+        K::ForallType | K::ConstrainedType => forall_kind(node, text, origin),
         _ => WrittenKind::Other,
     };
     Written { kind, span }
+}
+
+/// Flattens leading `forall` and `=>` constraint layers into [`WrittenKind::Forall`].
+fn forall_kind(node: &Node, text: &str, origin: u32) -> WrittenKind {
+    let mut vars = Vec::new();
+    let mut constraints = Vec::new();
+    let mut cur = node;
+    loop {
+        match cur.kind {
+            K::ForallType => {
+                vars.extend(
+                    cur.child_tokens()
+                        .filter(|t| t.kind == K::Ident)
+                        .map(|t| t.text(text).to_owned()),
+                );
+                let Some(body) = cur.nodes().next() else {
+                    return WrittenKind::Other;
+                };
+                cur = body;
+            }
+            K::ConstrainedType => {
+                let parts: Vec<&Node> = cur.nodes().collect();
+                let [lhs, rhs] = parts[..] else {
+                    return WrittenKind::Other;
+                };
+                constraints.extend(constraints_of(lhs, text, origin));
+                cur = rhs;
+            }
+            _ => break,
+        }
+    }
+    WrittenKind::Forall {
+        vars,
+        constraints,
+        body: Box::new(written(cur, text, origin)),
+    }
+}
+
+/// Extracts class constraints from a `K::Context` node or the LHS of `=>`.
+pub(crate) fn constraints_of(node: &Node, text: &str, origin: u32) -> Vec<ConstraintMeta> {
+    match node.kind {
+        K::Context | K::TupleType | K::ParenType => node
+            .nodes()
+            .flat_map(|child| constraints_of(child, text, origin))
+            .collect(),
+        _ => {
+            let w = written(node, text, origin);
+            match w.kind {
+                WrittenKind::Con { name, args } | WrittenKind::Var { name, args } => {
+                    vec![ConstraintMeta {
+                        class: name,
+                        args,
+                        span: w.span,
+                    }]
+                }
+                _ => Vec::new(),
+            }
+        }
+    }
 }
 
 /// The type the user wrote at `span` of the block of `source`, as a derive
@@ -101,7 +180,8 @@ pub fn user_type(source: &BlockSource, span: Span) -> Written {
     )
 }
 
-/// A `NameType`: a constructor, maybe qualified, or a variable.
+/// A `NameType`: a constructor, maybe qualified, a variable, a type-level
+/// string literal, or `none`.
 fn named(node: &Node, text: &str, args: Vec<Written>) -> WrittenKind {
     let tokens: Vec<_> = node.child_tokens().collect();
     match &tokens[..] {
@@ -109,6 +189,10 @@ fn named(node: &Node, text: &str, args: Vec<Written>) -> WrittenKind {
             name: one.text(text).to_owned(),
             args,
         },
+        [one] if one.kind == K::String && args.is_empty() => {
+            WrittenKind::StringLit(flick_plugin::string_value(one.text(text)))
+        }
+        [one] if one.kind == K::NoneKw && args.is_empty() => WrittenKind::None,
         _ if !tokens.is_empty() && tokens.iter().all(|t| matches!(t.kind, K::Con | K::Dot)) => {
             WrittenKind::Con {
                 name: tokens.iter().map(|t| t.text(text)).collect(),
@@ -193,8 +277,10 @@ mod tests {
         let WrittenKind::Record { fields, open: true } = record.kind else {
             panic!("an open record: {record:?}")
         };
-        let labels: Vec<&str> = fields.iter().map(|(l, _)| l.as_str()).collect();
+        let labels: Vec<&str> = fields.iter().map(|f| f.name.as_str()).collect();
         assert_eq!(labels, ["a", "b"]);
+        assert_eq!(fields[0].source_index, 1);
+        assert_eq!(fields[1].source_index, 0);
         assert!(row.services_open && !row.errors_open);
         assert_eq!(row.errors.len(), 2);
         assert!(matches!(&row.errors[1].kind, WrittenKind::Con { name, .. } if name == "E.Bad"));
@@ -202,12 +288,42 @@ mod tests {
     }
 
     #[test]
-    fn a_generic_signature_is_no_type_a_derive_reads() {
-        assert_eq!(
-            of("forall a. Show a => a -> String").0.kind,
-            WrittenKind::Generic
+    fn forall_and_constrained_types_keep_vars_constraints_and_body() {
+        let WrittenKind::Forall {
+            vars,
+            constraints,
+            body,
+        } = of("forall a. Show a => a -> String").0.kind
+        else {
+            panic!("expected Forall");
+        };
+        assert_eq!(vars, ["a"]);
+        assert_eq!(constraints.len(), 1);
+        assert_eq!(constraints[0].class, "Show");
+        assert!(matches!(body.kind, WrittenKind::Arrow { .. }));
+
+        let WrittenKind::Forall {
+            vars, constraints, ..
+        } = of("Show a => a -> String").0.kind
+        else {
+            panic!("expected Forall");
+        };
+        assert!(vars.is_empty());
+        assert_eq!(constraints.len(), 1);
+        assert_eq!(constraints[0].class, "Show");
+    }
+
+    #[test]
+    fn type_level_string_and_none_preserve_structure() {
+        let WrittenKind::Con { name, args } = of("Record.Label \"email\"").0.kind else {
+            panic!("expected Con");
+        };
+        assert_eq!(name, "Record.Label");
+        assert!(
+            matches!(&args[..], [Written { kind: WrittenKind::StringLit(s), .. }] if s == "email")
         );
-        assert_eq!(of("Show a => a -> String").0.kind, WrittenKind::Generic);
+
+        assert_eq!(of("none").0.kind, WrittenKind::None);
     }
     #[test]
     fn grouped_heads_keep_all_type_arguments() {

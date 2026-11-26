@@ -9,6 +9,7 @@ use super::{Ctx, Done, K, Parser, decl, expr, pattern};
 use crate::diagnostics::Diagnostic;
 use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
+use crate::syntax::heads::HeadCatalog;
 use crate::syntax::lexer::RawToken;
 
 /// An expression or a type of the body and where it ends.
@@ -31,7 +32,18 @@ pub fn parse_expr_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, expr::expr, false)
+    parse_expr_at_with_catalog(text, file, tokens, heads, &HeadCatalog::EMPTY)
+}
+
+/// [`parse_expr_at`] with a plugin [`HeadCatalog`].
+pub fn parse_expr_at_with_catalog<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+    catalog: &'t HeadCatalog,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, catalog, expr::expr, false)
 }
 
 /// [`parse_expr_at`] for a body, as after the `=` of a `let`: one that
@@ -42,7 +54,18 @@ pub fn parse_body_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, body, false)
+    parse_body_at_with_catalog(text, file, tokens, heads, &HeadCatalog::EMPTY)
+}
+
+/// [`parse_body_at`] with a plugin [`HeadCatalog`].
+pub fn parse_body_at_with_catalog<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+    catalog: &'t HeadCatalog,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, catalog, body, false)
 }
 
 /// [`parse_body_at`] for a body whose calls take the lines under them as
@@ -53,7 +76,18 @@ pub fn parse_lines_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, lines, true)
+    parse_lines_at_with_catalog(text, file, tokens, heads, &HeadCatalog::EMPTY)
+}
+
+/// [`parse_lines_at`] with a plugin [`HeadCatalog`].
+pub fn parse_lines_at_with_catalog<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+    catalog: &'t HeadCatalog,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, catalog, lines, true)
 }
 
 /// [`body`], whose lines may also stand on the line of its head, separated
@@ -102,7 +136,18 @@ pub fn parse_type_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, type_, false)
+    parse_type_at_with_catalog(text, file, tokens, heads, &HeadCatalog::EMPTY)
+}
+
+/// [`parse_type_at`] with a plugin [`HeadCatalog`].
+pub fn parse_type_at_with_catalog<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+    catalog: &'t HeadCatalog,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, catalog, type_, false)
 }
 
 /// [`parse_expr_at`] for a pattern.
@@ -112,7 +157,18 @@ pub fn parse_pat_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
-    fragment(text, file, tokens, heads, pattern::pattern, false)
+    parse_pat_at_with_catalog(text, file, tokens, heads, &HeadCatalog::EMPTY)
+}
+
+/// [`parse_pat_at`] with a plugin [`HeadCatalog`].
+pub fn parse_pat_at_with_catalog<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+    catalog: &'t HeadCatalog,
+) -> Option<Fragment> {
+    fragment(text, file, tokens, heads, catalog, pattern::pattern, false)
 }
 
 /// The declaration `tokens` start with, its tree the declaration itself.
@@ -122,11 +178,23 @@ pub fn parse_decl_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
+    parse_decl_at_with_catalog(text, file, tokens, heads, &HeadCatalog::EMPTY)
+}
+
+/// [`parse_decl_at`] with a plugin [`HeadCatalog`].
+pub fn parse_decl_at_with_catalog<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+    catalog: &'t HeadCatalog,
+) -> Option<Fragment> {
     let mut found = fragment(
         text,
         file,
         tokens,
         heads,
+        catalog,
         |p| Some(decl::declaration(p)),
         false,
     )?;
@@ -142,11 +210,23 @@ pub fn parse_decls_at<'t>(
     tokens: &[Token],
     heads: Heads<'t>,
 ) -> Option<Fragment> {
+    parse_decls_at_with_catalog(text, file, tokens, heads, &HeadCatalog::EMPTY)
+}
+
+/// [`parse_decls_at`] with a plugin [`HeadCatalog`].
+pub fn parse_decls_at_with_catalog<'t>(
+    text: &'t str,
+    file: FileId,
+    tokens: &[Token],
+    heads: Heads<'t>,
+    catalog: &'t HeadCatalog,
+) -> Option<Fragment> {
     fragment(
         text,
         file,
         tokens,
         heads,
+        catalog,
         |p| Some(decl::declarations(p)),
         false,
     )
@@ -157,6 +237,7 @@ fn fragment<'t>(
     file: FileId,
     tokens: &[Token],
     heads: Heads<'t>,
+    catalog: &'t HeadCatalog,
     parse: fn(&mut Parser) -> Option<Done>,
     line_children: bool,
 ) -> Option<Fragment> {
@@ -170,7 +251,7 @@ fn fragment<'t>(
         })
         .collect();
     let last = raw.last()?.end;
-    let mut p = Parser::new(text, file, &raw);
+    let mut p = Parser::new(text, file, &raw, catalog);
     p.plugin_heads.extend(heads);
     p.line_children = line_children;
     place(&mut p, text, last);

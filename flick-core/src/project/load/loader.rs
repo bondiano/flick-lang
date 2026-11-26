@@ -37,17 +37,22 @@ impl Loader<'_> {
         diagnostics
     }
 
-    /// The parse of a module, from an earlier run while its text stays the same.
+    /// The parse of a module, from an earlier run while its text and head catalog stay the same.
     pub(super) fn parsed(&mut self, path: &Path, file: FileId) -> (Arc<Parse>, Arc<ModuleSyntax>) {
         let text = &self.sources.get(file).text;
-        if let Some(found) = self.cache.as_ref().and_then(|c| c.parsed(path, file, text)) {
+        if let Some(found) = self
+            .cache
+            .as_ref()
+            .and_then(|c| c.parsed(path, file, text, &self.head_catalog))
+        {
             return found;
         }
-        let parse = Arc::new(syntax::parse(text, file).into_module());
+        let parse =
+            Arc::new(syntax::parse_with_catalog(text, file, &self.head_catalog).into_module());
         let module = Arc::new(resolve::module_syntax(&parse.tree, text, file));
         if let Some(cache) = &mut self.cache {
             let parsed = (parse.clone(), module.clone());
-            cache.keep_parsed(path, file, text, parsed);
+            cache.keep_parsed(path, file, text, Arc::clone(&self.head_catalog), parsed);
         }
         (parse, module)
     }

@@ -107,6 +107,11 @@ impl Compiler for Imports {
 }
 
 #[doc(hidden)]
+pub fn metadata(plugin: &impl Plugin) -> types::PluginMetadata {
+    convert::to_metadata(&plugin.metadata())
+}
+
+#[doc(hidden)]
 pub fn collect(plugin: &impl Plugin, blocks: Vec<types::Block>) -> Vec<u8> {
     let blocks: Vec<_> = blocks.into_iter().map(convert::from_block).collect();
     plugin.collect(&blocks, &mut Imports)
@@ -331,6 +336,10 @@ macro_rules! export {
         }
 
         impl $crate::guest::bindings::Guest for FlickPluginComponent {
+            fn metadata() -> $crate::guest::bindings::flick::plugin::types::PluginMetadata {
+                $crate::guest::metadata(&$plugin)
+            }
+
             fn collect(
                 blocks: ::std::vec::Vec<$crate::guest::bindings::flick::plugin::types::Block>,
             ) -> ::std::vec::Vec<u8> {

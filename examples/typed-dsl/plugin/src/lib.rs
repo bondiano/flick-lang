@@ -1,6 +1,7 @@
 //! `validate { positive expression }` builds a typed, pure validation.
 use flick_plugin::{
-    Arena, Block, Builder, Compiler, Completion, Diagnostic, Fact, Hover, Plugin, Span, flick,
+    Arena, Block, Builder, Compiler, Completion, Diagnostic, Fact, HeadSpec, Hover, Plugin,
+    PluginMetadata, Span, flick,
 };
 
 pub struct Validate;
@@ -26,6 +27,17 @@ fn keyword(block: &Block) -> Result<Span, Vec<Diagnostic>> {
 }
 
 impl Plugin for Validate {
+    fn metadata(&self) -> PluginMetadata {
+        PluginMetadata {
+            heads: vec![HeadSpec {
+                head: "validate".into(),
+                module: "PositiveDsl".into(),
+                ..HeadSpec::default()
+            }],
+            ..PluginMetadata::default()
+        }
+    }
+
     fn collect(&self, _: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
         Vec::new()
     }

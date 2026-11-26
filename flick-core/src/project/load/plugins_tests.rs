@@ -18,6 +18,7 @@ mod derive;
 mod forms;
 mod invariants;
 mod loaded;
+mod metadata;
 mod names;
 mod nested;
 mod opened;
@@ -62,6 +63,10 @@ impl Expander for Counting {
 
     fn id(&self) -> &str {
         self.inner.id()
+    }
+
+    fn metadata(&self) -> Result<flick_plugin::PluginMetadata, String> {
+        self.inner.metadata()
     }
 
     fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String> {

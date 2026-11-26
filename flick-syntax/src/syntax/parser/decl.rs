@@ -261,7 +261,7 @@ fn variants(p: &mut Parser, refinable: bool) {
 /// parentheses.
 fn variant(p: &mut Parser, refinable: bool) {
     let m = p.start();
-    if p.at(K::At) {
+    while p.at(K::At) {
         attribute(p);
     }
     // `Show b => Showable b : Showable`, `(Eq a, Show a) => …`

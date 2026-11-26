@@ -14,6 +14,29 @@ pub struct Written {
     pub span: Span,
 }
 
+/// One field of a written record type.
+///
+/// Fields in [`WrittenKind::Record`] are stored in canonical UTF-16 label order
+/// for deterministic equality and caching; `source_index` records the 0-based
+/// declaration order in source.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RecordField {
+    pub name: String,
+    pub name_span: Span,
+    pub span: Span,
+    pub ty: Written,
+    pub docs: String,
+    pub source_index: u32,
+}
+
+/// A class constraint `C a b` in a `forall`, `=>` context, or GADT constructor.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ConstraintMeta {
+    pub class: String,
+    pub args: Vec<Written>,
+    pub span: Span,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum WrittenKind {
     /// A named type, maybe qualified (`Shapes.Shape`), and its arguments.
@@ -26,9 +49,9 @@ pub enum WrittenKind {
         name: String,
         args: Vec<Written>,
     },
-    /// A record, its fields by label; `open` with a row `| r`.
+    /// A record, its fields in canonical UTF-16 label order; `open` with a row `| r`.
     Record {
-        fields: Vec<(String, Written)>,
+        fields: Vec<RecordField>,
         open: bool,
     },
     Tuple(Vec<Written>),
@@ -41,8 +64,16 @@ pub enum WrittenKind {
     },
     /// A type with a capture qualifier, `t^c`: what it holds is a scope's.
     Captured(Box<Written>),
-    /// `forall a. …` or `C a => …`.
-    Generic,
+    /// `forall a. C a => T` or `C a => T`.
+    Forall {
+        vars: Vec<String>,
+        constraints: Vec<ConstraintMeta>,
+        body: Box<Written>,
+    },
+    /// A type-level string literal, as in `Record.Label "name"`.
+    StringLit(String),
+    /// The empty row/set keyword `none`.
+    None,
     /// A type no derive reads: a row, a union, a hole.
     Other,
 }
@@ -66,6 +97,23 @@ pub struct FlatWritten {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlatRecordField {
+    pub name: String,
+    pub name_span: Span,
+    pub span: Span,
+    pub ty: u32,
+    pub docs: String,
+    pub source_index: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlatConstraint {
+    pub class: String,
+    pub args: Vec<u32>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FlatKind {
     Con {
         name: String,
@@ -76,7 +124,7 @@ pub enum FlatKind {
         args: Vec<u32>,
     },
     Record {
-        fields: Vec<(String, u32)>,
+        fields: Vec<FlatRecordField>,
         open: bool,
     },
     Tuple(Vec<u32>),
@@ -87,7 +135,13 @@ pub enum FlatKind {
         row: Option<FlatRow>,
     },
     Captured(u32),
-    Generic,
+    Forall {
+        vars: Vec<String>,
+        constraints: Vec<FlatConstraint>,
+        body: u32,
+    },
+    StringLit(String),
+    None,
     Other,
 }
 
@@ -123,7 +177,14 @@ impl Written {
             },
             WrittenKind::Record { fields, open } => FlatKind::Record {
                 fields: (fields.iter())
-                    .map(|(label, t)| (label.clone(), t.push(out)))
+                    .map(|f| FlatRecordField {
+                        name: f.name.clone(),
+                        name_span: f.name_span,
+                        span: f.span,
+                        ty: f.ty.push(out),
+                        docs: f.docs.clone(),
+                        source_index: f.source_index,
+                    })
                     .collect(),
                 open: *open,
             },
@@ -141,7 +202,27 @@ impl Written {
                 FlatKind::Arrow { from, to, row }
             }
             WrittenKind::Captured(of) => FlatKind::Captured(of.push(out)),
-            WrittenKind::Generic => FlatKind::Generic,
+            WrittenKind::Forall {
+                vars,
+                constraints,
+                body,
+            } => {
+                let constraints = (constraints.iter())
+                    .map(|c| FlatConstraint {
+                        class: c.class.clone(),
+                        args: all(&c.args, out),
+                        span: c.span,
+                    })
+                    .collect();
+                let body = body.push(out);
+                FlatKind::Forall {
+                    vars: vars.clone(),
+                    constraints,
+                    body,
+                }
+            }
+            WrittenKind::StringLit(s) => FlatKind::StringLit(s.clone()),
+            WrittenKind::None => FlatKind::None,
             WrittenKind::Other => FlatKind::Other,
         };
         out.push(FlatWritten {
@@ -174,7 +255,16 @@ impl Written {
             },
             FlatKind::Record { fields, open } => WrittenKind::Record {
                 fields: (fields.iter())
-                    .map(|(label, id)| Some((label.clone(), one(*id)?)))
+                    .map(|f| {
+                        Some(RecordField {
+                            name: f.name.clone(),
+                            name_span: f.name_span,
+                            span: f.span,
+                            ty: one(f.ty)?,
+                            docs: f.docs.clone(),
+                            source_index: f.source_index,
+                        })
+                    })
                     .collect::<Option<_>>()?,
                 open: *open,
             },
@@ -194,7 +284,25 @@ impl Written {
                 },
             },
             FlatKind::Captured(of) => WrittenKind::Captured(Box::new(one(*of)?)),
-            FlatKind::Generic => WrittenKind::Generic,
+            FlatKind::Forall {
+                vars,
+                constraints,
+                body,
+            } => WrittenKind::Forall {
+                vars: vars.clone(),
+                constraints: (constraints.iter())
+                    .map(|c| {
+                        Some(ConstraintMeta {
+                            class: c.class.clone(),
+                            args: all(&c.args)?,
+                            span: c.span,
+                        })
+                    })
+                    .collect::<Option<_>>()?,
+                body: Box::new(one(*body)?),
+            },
+            FlatKind::StringLit(s) => WrittenKind::StringLit(s.clone()),
+            FlatKind::None => WrittenKind::None,
             FlatKind::Other => WrittenKind::Other,
         };
         Some(Written {
@@ -243,30 +351,70 @@ mod tests {
                 },
             )],
             services_open: false,
-            errors: vec![at(
-                15,
-                23,
-                WrittenKind::Con {
-                    name: "NotFound".into(),
-                    args: vec![],
-                },
-            )],
+            errors: vec![
+                at(
+                    15,
+                    23,
+                    WrittenKind::Con {
+                        name: "NotFound".into(),
+                        args: vec![],
+                    },
+                ),
+                at(24, 28, WrittenKind::None),
+            ],
             errors_open: true,
         };
+        let label = at(25, 31, WrittenKind::StringLit("name".into()));
         let arrow = at(
             0,
-            30,
-            WrittenKind::Arrow {
-                from: Box::new(list),
-                to: Box::new(at(
-                    25,
-                    30,
-                    WrittenKind::Record {
-                        fields: vec![("a".into(), int)],
-                        open: false,
+            40,
+            WrittenKind::Forall {
+                vars: vec!["a".into()],
+                constraints: vec![ConstraintMeta {
+                    class: "Show".into(),
+                    args: vec![at(
+                        10,
+                        11,
+                        WrittenKind::Var {
+                            name: "a".into(),
+                            args: vec![],
+                        },
+                    )],
+                    span: Span { start: 5, end: 11 },
+                }],
+                body: Box::new(at(
+                    15,
+                    40,
+                    WrittenKind::Arrow {
+                        from: Box::new(list),
+                        to: Box::new(at(
+                            25,
+                            40,
+                            WrittenKind::Record {
+                                fields: vec![
+                                    RecordField {
+                                        name: "a".into(),
+                                        name_span: Span { start: 27, end: 28 },
+                                        span: Span { start: 27, end: 34 },
+                                        ty: int,
+                                        docs: "field doc".into(),
+                                        source_index: 1,
+                                    },
+                                    RecordField {
+                                        name: "b".into(),
+                                        name_span: Span { start: 35, end: 36 },
+                                        span: Span { start: 35, end: 39 },
+                                        ty: label,
+                                        docs: String::new(),
+                                        source_index: 0,
+                                    },
+                                ],
+                                open: false,
+                            },
+                        )),
+                        row: Some(row),
                     },
                 )),
-                row: Some(row),
             },
         );
         let nodes = arrow.flatten();

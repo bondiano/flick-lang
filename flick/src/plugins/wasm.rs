@@ -96,6 +96,7 @@ fn read(package: &str, path: &Path) -> Result<Wasm, String> {
         id,
         bytes,
         compiled: OnceLock::new(),
+        metadata: OnceLock::new(),
     })
 }
 
@@ -117,6 +118,7 @@ struct Wasm {
     id: String,
     bytes: Vec<u8>,
     compiled: OnceLock<Result<(Component, Linker<State>), String>>,
+    metadata: OnceLock<Result<flick_plugin::PluginMetadata, String>>,
 }
 
 /// What a call of a plugin reaches: the block whose holes it asks for.
@@ -294,6 +296,17 @@ impl Wasm {
 impl Expander for Wasm {
     fn id(&self) -> &str {
         &self.id
+    }
+
+    fn metadata(&self) -> Result<flick_plugin::PluginMetadata, String> {
+        self.metadata
+            .get_or_init(|| {
+                let (result, _) = self.run(BlockSource::default(), |plugin, store| {
+                    plugin.call_metadata(store)
+                });
+                result.map(convert::from_metadata)
+            })
+            .clone()
     }
 
     fn collect(

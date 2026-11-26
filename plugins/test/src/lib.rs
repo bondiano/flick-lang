@@ -10,13 +10,45 @@ mod read;
 mod rows;
 mod state;
 
-use flick_plugin::{Arena, Block, Compiler, Diagnostic, Fact, Highlight, Hover, Piece, Plugin};
+use flick_plugin::{
+    Arena, Block, Compiler, Diagnostic, Fact, HeadSpec, Highlight, Hover, Piece, Plugin,
+    PluginMetadata,
+};
 
 use crate::read::Bodies;
 
 pub struct Test;
 
+/// Static metadata declared by the first-party test plugin.
+#[must_use]
+pub fn metadata() -> PluginMetadata {
+    PluginMetadata {
+        heads: vec![
+            HeadSpec {
+                head: "suite".into(),
+                module: "Test".into(),
+                top: true,
+                bracket_args: true,
+                ..HeadSpec::default()
+            },
+            HeadSpec {
+                head: "test".into(),
+                module: "Test".into(),
+                top: true,
+                bracket_args: true,
+                ..HeadSpec::default()
+            },
+        ],
+        watch: Vec::new(),
+        derives: Vec::new(),
+        own_codes: Vec::new(),
+    }
+}
+
 impl Plugin for Test {
+    fn metadata(&self) -> PluginMetadata {
+        metadata()
+    }
     fn collect(&self, blocks: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
         state::collect(blocks)
     }
@@ -49,8 +81,9 @@ impl Plugin for Test {
 }
 
 /// Whether `head` is one of this plugin's.
+#[must_use]
 pub fn owns(head: &str) -> bool {
-    read::WORDS.contains(&head)
+    metadata().heads.iter().any(|h| h.head == head)
 }
 
 #[cfg(test)]

@@ -3,10 +3,12 @@
 //! mapping, name collisions and import cycles, then resolves each module
 //! against the interfaces of its imports.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+
+use flick_plugin::PluginMetadata;
 
 mod checking;
 #[cfg(test)]
@@ -54,11 +56,11 @@ use crate::iface::{
     StaticCapture, StaticMember,
 };
 use crate::ir;
-use crate::plugin::EditorBlock;
 use crate::plugin::expansion::Expansion;
+use crate::plugin::{EditorBlock, Expander};
 use crate::resolve::{Interface, ModuleSyntax};
 use crate::source::{FileId, SourceMap, Span};
-use crate::syntax::Parse;
+use crate::syntax::{HeadCatalog, Parse, std_head_catalog_arc};
 #[cfg(feature = "ide")]
 use crate::types;
 use files::expected_name;
@@ -177,6 +179,12 @@ struct Loader<'a> {
     /// The plugins that watch names of the modules, each with the names its
     /// package declares; filled while the blocks expand.
     watchers: plugins::Watchers,
+    /// Combined parser head catalog (`std` + validated external plugin heads).
+    head_catalog: Arc<HeadCatalog>,
+    /// External plugins preloaded during metadata discovery.
+    preloaded_plugins: HashMap<String, Arc<dyn Expander>>,
+    /// Validated static metadata of loaded external plugins, by package name.
+    plugin_metadata: HashMap<String, PluginMetadata>,
     /// What a test companion sees of its module, by the module's name: all
     /// it declares. Only a run that loads the companion makes one.
     privates: BTreeMap<String, Interface>,
@@ -316,12 +324,16 @@ fn run_in(
         ide: (mode == Mode::Analyze).then(Vec::new),
         cache,
         watchers: plugins::Watchers::default(),
+        head_catalog: Arc::clone(std_head_catalog_arc()),
+        preloaded_plugins: HashMap::new(),
+        plugin_metadata: HashMap::new(),
         privates: BTreeMap::new(),
         prove_contracts: mode == Mode::Prove,
         selected_roots: HashSet::new(),
         all_contracted: HashSet::new(),
         verified_contracts: Vec::new(),
     };
+    loader.init_plugin_metadata();
     let mut roots: Vec<(Root, PathBuf)> = roots
         .iter()
         .map(|p| (loader.root_of(&normalize(p)), normalize(p)))

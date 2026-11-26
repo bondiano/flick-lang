@@ -99,7 +99,14 @@ fn without_parentheses(code: &str) -> &str {
 /// (the plugin's own code, without its package).
 pub fn expand(plugin: &impl Plugin, source: &str) -> Vec<Result<String, Vec<String>>> {
     let file = FileId::default();
-    let parse = syntax::parse(source, file);
+    let mut catalog = super::first_party::head_catalog().clone();
+    for spec in &plugin.metadata().heads {
+        if !catalog.is_implicit(&spec.head) {
+            catalog.push(syntax::HeadRule::from_spec(spec, false));
+        }
+    }
+    let catalog = Arc::new(catalog);
+    let parse = syntax::parse_with_catalog(source, file, &catalog);
     let mut nodes = Vec::new();
     blocks_under(&parse.tree, &mut nodes);
     let text: Arc<str> = Arc::from(source);
@@ -109,7 +116,10 @@ pub fn expand(plugin: &impl Plugin, source: &str) -> Vec<Result<String, Vec<Stri
     let mut sources: Vec<BlockSource> = (nodes.into_iter())
         .filter_map(|n| BlockSource::new(Arc::clone(&text), file, n, Arc::clone(&heads)))
         .filter(BlockSource::closed)
-        .map(|s| s.in_module(module, &parse.tree))
+        .map(|s| {
+            s.in_module(module, &parse.tree)
+                .with_catalog(Arc::clone(&catalog))
+        })
         .collect();
     let blocks: Vec<Block> = sources.iter().map(BlockSource::block).collect();
     let state = plugin.collect(&blocks, &mut BlockSource::default());

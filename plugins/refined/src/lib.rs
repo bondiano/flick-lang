@@ -3,10 +3,26 @@
 //! of `T`: the literals of an enum, one of the checks of `Checks`, or the
 //! syntax of the module's own predicate, interpreted here.
 
-use flick_plugin::{CallSite, Constant, Diagnostic, Refinement};
+use flick_plugin::{CallSite, Constant, Diagnostic, HeadSpec, PluginMetadata, Refinement};
 
 pub mod block;
 mod predicate;
+
+/// Static metadata declared by the first-party refined types plugin.
+#[must_use]
+pub fn metadata() -> PluginMetadata {
+    PluginMetadata {
+        heads: vec![HeadSpec {
+            head: "refined".into(),
+            module: "Checks".into(),
+            declarations: vec!["type".into()],
+            ..HeadSpec::default()
+        }],
+        watch: vec!["*.parse".into()],
+        derives: Vec::new(),
+        own_codes: vec!["D006".into()],
+    }
+}
 
 /// `D006` on each `T.parse c` whose constant never passes the check of `T`.
 pub fn check(calls: &[CallSite]) -> Vec<Diagnostic> {

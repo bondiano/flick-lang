@@ -3,6 +3,7 @@
 //! is read for the places that call one of their names, blocks or no
 //! blocks.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use super::{Loader, Plugins};
@@ -39,15 +40,30 @@ impl Watchers {
 
 impl Loader<'_> {
     /// The plugins that watch names of every module: std's, which the
-    /// compiler links in, and those of the packages whose manifest says
-    /// `watch`. A module without blocks gets them too.
+    /// compiler links in, those of packages whose manifest says `watch`, and
+    /// external plugins that declare `watch` in their `metadata()`. A module
+    /// without blocks gets them too.
     pub(super) fn watching(
         &self,
         plugins: &mut Plugins,
         diagnostics: &mut Vec<Diagnostic>,
     ) -> Vec<Watching> {
         let mut out: Vec<_> = linked(plugins, diagnostics).into_iter().collect();
+        let mut merged: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for (package, names) in self.watchers() {
+            merged.entry(package).or_default().extend(names);
+        }
+        for (package, meta) in &self.plugin_metadata {
+            if !meta.watch.is_empty() {
+                let entry = merged.entry(package.clone()).or_default();
+                for name in &meta.watch {
+                    if !entry.contains(name) {
+                        entry.push(name.clone());
+                    }
+                }
+            }
+        }
+        for (package, names) in merged {
             let watched = types::Watched::new(names.iter().map(String::as_str));
             match self.load_plugin(plugins, &package) {
                 Ok(plugin) => out.push(Watching {
@@ -83,7 +99,7 @@ impl Loader<'_> {
     }
 
     /// Where the manifest declares the dependency `package`.
-    fn dependency_span(&self, package: &str) -> Option<Span> {
+    pub(super) fn dependency_span(&self, package: &str) -> Option<Span> {
         let dependencies = &self.project?.config.dependencies;
         (dependencies.iter().find(|d| d.name == package)).map(|d| d.span)
     }
@@ -99,7 +115,7 @@ fn linked(plugins: &mut Plugins, diagnostics: &mut Vec<Diagnostic>) -> Option<Wa
         Ok(plugin) => Some(Watching {
             package: std.to_owned(),
             plugin: Arc::clone(plugin),
-            watched: types::Watched::new(first_party::WATCH),
+            watched: types::Watched::new(first_party::metadata().watch.iter().map(String::as_str)),
         }),
         Err(why) => {
             diagnostics.push(Diagnostic::new(

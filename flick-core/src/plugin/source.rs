@@ -4,13 +4,14 @@
 //! body, without arguments), and the user's expressions, types, patterns
 //! and declarations parsed where they stand.
 
+mod compiler;
+
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use flick_plugin::{
-    Block, Compiler, Completion, Hole, HoleKind, Namespace, Place, ReachError, Request, Response,
-    Signature, Span, Token as PluginToken, TokenKind, Written,
-};
+use flick_plugin::{Block, Hole, HoleKind, Place, Signature, Span, Token as PluginToken, Written};
+
+pub(crate) use compiler::{docs_above, docs_above_item, token_kind};
 
 use super::reach::Reach;
 use super::written::written;
@@ -19,8 +20,9 @@ use crate::source::FileId;
 use crate::syntax::cst::{Node, Token};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::{
-    Fragment, parse_body_at, parse_decl_at, parse_expr_at, parse_lines_at, parse_pat_at,
-    parse_type_at,
+    Fragment, HeadCatalog, parse_body_at_with_catalog, parse_decl_at_with_catalog,
+    parse_expr_at_with_catalog, parse_lines_at_with_catalog, parse_pat_at_with_catalog,
+    parse_type_at_with_catalog, std_head_catalog,
 };
 use crate::types::{is_type, let_parts, signature_name};
 
@@ -88,6 +90,8 @@ pub struct BlockSource {
     module: Arc<str>,
     /// The heads the module imports, which start blocks in the holes.
     heads: Arc<[String]>,
+    /// Data-driven plugin head catalog for parsing holes (`None` uses `std`'s).
+    catalog: Option<Arc<HeadCatalog>>,
     /// A declaration of another module, read by a derive: no span of it is
     /// a place of this module.
     foreign: bool,
@@ -144,6 +148,7 @@ impl BlockSource {
             signature: None,
             module: Arc::from(""),
             heads,
+            catalog: None,
             foreign: false,
             head: head.text(&text).to_owned(),
             head_at: head.start,
@@ -193,6 +198,7 @@ impl BlockSource {
             published: Arc::default(),
             in_scope: None,
             heads,
+            catalog: None,
             foreign: !holes,
             text,
         }
@@ -212,9 +218,31 @@ impl BlockSource {
             Arc::clone(&self.heads),
         )?;
         nested.module = Arc::clone(&self.module);
+        nested.catalog.clone_from(&self.catalog);
         nested.enums = Arc::clone(&self.enums);
         nested.published = Arc::clone(&self.published);
         Some(nested)
+    }
+
+    /// Sets the module path reported in [`Block::module`].
+    #[must_use]
+    pub fn with_module(mut self, module: &str) -> Self {
+        self.module = Arc::from(module);
+        self
+    }
+
+    /// Sets the [`HeadCatalog`] used when parsing holes inside this block.
+    #[must_use]
+    pub fn with_catalog(mut self, catalog: Arc<HeadCatalog>) -> Self {
+        self.catalog = Some(catalog);
+        self
+    }
+
+    fn active_catalog(&self) -> &HeadCatalog {
+        match self.catalog.as_deref() {
+            Some(catalog) => catalog,
+            None => std_head_catalog(),
+        }
     }
 
     /// The block, whose module sees the enums `enums`, written as it writes
@@ -395,7 +423,13 @@ impl BlockSource {
                 .copied()
                 .collect();
             let heads: Vec<&str> = self.heads.iter().map(String::as_str).collect();
-            let fragment = parse_type_at(&self.text, self.file, &tokens, &heads)?;
+            let fragment = parse_type_at_with_catalog(
+                &self.text,
+                self.file,
+                &tokens,
+                &heads,
+                self.active_catalog(),
+            )?;
             return (fragment.diagnostics.is_empty()
                 && fragment.tree.range().0 == start
                 && fragment.end == end)
@@ -463,15 +497,16 @@ impl BlockSource {
         let last = self.tokens.iter().rposition(|t| t.end <= to)? + 1;
         let tokens = self.tokens.get(first..last)?;
         let heads: Vec<&str> = self.heads.iter().map(String::as_str).collect();
+        let catalog = self.active_catalog();
         let parse = match kind {
-            HoleKind::Expr if body => parse_body_at,
-            HoleKind::Expr => parse_expr_at,
-            HoleKind::Ty => parse_type_at,
-            HoleKind::Pat => parse_pat_at,
-            HoleKind::Decl => parse_decl_at,
-            HoleKind::Lines => parse_lines_at,
+            HoleKind::Expr if body => parse_body_at_with_catalog,
+            HoleKind::Expr => parse_expr_at_with_catalog,
+            HoleKind::Ty => parse_type_at_with_catalog,
+            HoleKind::Pat => parse_pat_at_with_catalog,
+            HoleKind::Decl => parse_decl_at_with_catalog,
+            HoleKind::Lines => parse_lines_at_with_catalog,
         };
-        parse(&self.text, self.file, tokens, &heads)
+        parse(&self.text, self.file, tokens, &heads, catalog)
     }
 
     fn relative(&self, start: u32, end: u32) -> Span {
@@ -480,84 +515,4 @@ impl BlockSource {
             end: end - self.start,
         }
     }
-}
-
-impl Compiler for BlockSource {
-    fn parse_expr(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
-        self.parse(HoleKind::Expr, start, end)
-    }
-
-    fn parse_type(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
-        self.parse(HoleKind::Ty, start, end)
-    }
-
-    fn parse_pat(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
-        self.parse(HoleKind::Pat, start, end)
-    }
-
-    fn parse_decl(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
-        self.parse(HoleKind::Decl, start, end)
-    }
-
-    fn parse_body(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
-        self.parse_as(HoleKind::Expr, true, start, end)
-    }
-
-    fn parse_lines(&mut self, start: u32, end: u32) -> Result<Hole, flick_plugin::Diagnostic> {
-        self.parse(HoleKind::Lines, start, end)
-    }
-
-    fn read_file(&mut self, path: &str) -> Result<Vec<u8>, ReachError> {
-        self.reach.read_file(path)
-    }
-
-    fn env(&mut self, name: &str) -> Result<Option<String>, ReachError> {
-        self.reach.env(name)
-    }
-
-    fn fetch(&mut self, request: &Request) -> Result<Response, ReachError> {
-        self.reach.fetch(request)
-    }
-
-    fn literal_of(&mut self, name: &str) -> Option<String> {
-        let answer = self.enums.get(name).cloned();
-        self.reach.literal_of(name, answer)
-    }
-
-    fn published(&mut self, name: &str) -> Option<Vec<u8>> {
-        let answer = self.published.get(name).cloned();
-        self.reach.published(name, answer)
-    }
-
-    fn published_names(&mut self) -> Vec<String> {
-        let names: Vec<String> = self.published.keys().cloned().collect();
-        self.reach.published_names(names)
-    }
-
-    fn in_scope(&mut self, namespace: Namespace, fits: Option<&str>) -> Vec<Completion> {
-        (self.in_scope.as_ref()).map_or_else(Vec::new, |s| s.answer(namespace, fits))
-    }
-}
-
-pub(crate) fn token_kind(kind: K) -> TokenKind {
-    match kind {
-        K::Ident => TokenKind::Ident,
-        K::Con => TokenKind::Con,
-        K::Number | K::BigInt => TokenKind::Number,
-        K::String => TokenKind::String,
-        k if k.is_keyword() => TokenKind::Keyword,
-        _ => TokenKind::Punct,
-    }
-}
-
-/// The `///` lines right above the line of `offset`, each without `///`
-/// and one space.
-fn docs_above(text: &str, offset: u32) -> String {
-    let line = text[..offset as usize].rfind('\n').map_or(0, |i| i + 1);
-    let mut lines: Vec<&str> = (text[..line].lines().rev())
-        .map_while(|l| l.trim_start().strip_prefix("///"))
-        .map(|d| d.strip_prefix(' ').unwrap_or(d))
-        .collect();
-    lines.reverse();
-    lines.join("\n")
 }

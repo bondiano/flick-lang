@@ -5,7 +5,7 @@ use flick_backend::command;
 
 use crate::{
     Arena, Artifact, Block, CallSite, Compiler, Completion, DeriveTarget, Diagnostic, Fact,
-    Highlight, Hover, Piece, Published, Span, Structure,
+    Highlight, Hover, Piece, PluginMetadata, Published, Span, Structure,
 };
 
 /// A plugin: what it learns from all its blocks of a group, and the code
@@ -13,6 +13,11 @@ use crate::{
 /// project grants them to read, so the compiler caches each result while
 /// what its call read stays the same.
 pub trait Plugin {
+    /// Static metadata describing this plugin's block heads, watched names, and
+    /// derives.
+    fn metadata(&self) -> PluginMetadata {
+        PluginMetadata::default()
+    }
     /// What the plugin learns from `blocks`, the state each expansion
     /// gets; `compiler` reaches what the project grants, but parses no
     /// hole.

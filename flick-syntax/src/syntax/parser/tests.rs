@@ -5,6 +5,11 @@ use crate::syntax::cst::Element;
 /// Compact shape of the tree: node kinds and token texts, no trivia; nodes
 /// with one child are shown as `Kind:child` to keep expectations short.
 pub(super) fn sexp(src: &str) -> String {
+    let parsed = parse_ok(src);
+    sexp_of(&parsed.tree, src)
+}
+
+pub(super) fn sexp_of(tree: &Node, src: &str) -> String {
     fn walk(node: &Node, src: &str) -> String {
         let parts: Vec<String> = node
             .children
@@ -17,10 +22,7 @@ pub(super) fn sexp(src: &str) -> String {
             .collect();
         format!("({:?} {})", node.kind, parts.join(" "))
     }
-    let parsed = parse_ok(src);
-    parsed
-        .tree
-        .nodes()
+    tree.nodes()
         .map(|n| walk(n, src))
         .collect::<Vec<_>>()
         .join("\n")
@@ -376,7 +378,8 @@ fn token_columns_follow_unicode_crlf_and_multiline_tokens() {
         let file = sources.add("layout.fl", &text);
         let (raw, errors) = lex(&text, file);
         assert!(errors.is_empty(), "{errors:?}");
-        let parser = Parser::new(&text, file, &raw);
+        let catalog = HeadCatalog::EMPTY;
+        let parser = Parser::new(&text, file, &raw, &catalog);
         let layout: Vec<_> = parser
             .toks
             .iter()
@@ -423,45 +426,6 @@ fn unicode_comment_columns_preserve_record_layout() {
         );
         assert_eq!(parse_ok(&src).tree.text(&src), src);
     }
-}
-
-#[test]
-fn a_component_is_a_declaration_of_std_s_plugin() {
-    assert_eq!(
-        sexp("component label (p : P) = text p.name\n"),
-        "(PluginDecl component label ( (PluginArgs p : P) ) (PluginRest = text p . name))"
-    );
-    let src = "component counter (p : P) =\n  let n = 1\n  show n\nlet x = 1\n";
-    assert_eq!(
-        sexp(src),
-        "(PluginDecl component counter ( (PluginArgs p : P) ) (PluginRest = let n = 1 show n))\n\
-         (LetDecl let (VarPat x) = (Block (Literal 1)))"
-    );
-    // the word stays a name elsewhere
-    assert_eq!(
-        errors("let render component setup = component setup\n"),
-        Vec::<String>::new()
-    );
-}
-
-#[test]
-fn a_server_fn_and_server_name_are_blocks_of_std_without_an_import() {
-    assert_eq!(
-        sexp("server fn place order = order\n"),
-        "(PluginDecl server fn place order (PluginRest = order))"
-    );
-    assert_eq!(
-        sexp("let x = [server place, server Api.place]\n"),
-        "(LetDecl let (VarPat x) = (Block (ListExpr [ (PluginExpr server place) , \
-         (PluginExpr server Api . place) ])))"
-    );
-    // the word stays a name elsewhere
-    assert_eq!(
-        errors(
-            "let f server fn = server\nlet g server = (server)\nlet h = call server double 21\n"
-        ),
-        Vec::<String>::new()
-    );
 }
 
 #[test]

@@ -6,6 +6,16 @@ break programs.
 
 ## Unreleased
 
+- **Plugin protocol `0.5.0`: deterministic declaration metadata & plugin-declared
+  heads/watch.** `DeriveTarget`, `CaseTarget`, and `Written` carry visibility,
+  attributes, `///` documentation on types/variants/record fields, exact spans,
+  0-based `source_index` field order, GADT constraints/results, decoded enum
+  literals, and structured `Forall`/`StringLit`/`None` types. Plugins declare
+  their block `heads`, `watch` entries, and `derives` via `metadata()`, driving
+  a data-driven parser `HeadCatalog` and watcher registry for both `std` and
+  external WASM plugins. Components built for `0.4.0` are rejected with
+  `FLICK-P035` until rebuilt.
+
 - **Projection summaries in the IR.** An exported value that reads a path
   of fields of its argument, as `let city = .address.city` does, carries a
   versioned summary of that path and its types in its module's exports.

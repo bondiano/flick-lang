@@ -23,7 +23,11 @@ mod validate_let_else;
 mod validate_native;
 pub mod when;
 
+pub use heads::{HeadCatalog, HeadRule};
 pub use parser::{
-    Fragment, Heads, Parse, parse, parse_body_at, parse_decl_at, parse_decls_at, parse_expr_at,
-    parse_lines_at, parse_pat_at, parse_type_at, parse_with_heads,
+    Fragment, Heads, Parse, parse, parse_body_at, parse_body_at_with_catalog, parse_decl_at,
+    parse_decl_at_with_catalog, parse_decls_at, parse_decls_at_with_catalog, parse_expr_at,
+    parse_expr_at_with_catalog, parse_lines_at, parse_lines_at_with_catalog, parse_pat_at,
+    parse_pat_at_with_catalog, parse_type_at, parse_type_at_with_catalog, parse_with_catalog,
+    parse_with_heads, parse_with_heads_and_catalog,
 };

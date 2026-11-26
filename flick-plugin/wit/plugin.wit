@@ -1,8 +1,8 @@
-package flick:plugin@0.4.0;
+package flick:plugin@0.5.0;
 
 /// What a plugin and the compiler exchange.
 interface types {
-  use written.{written, written-node, written-kind, written-name, written-record, written-arrow, written-row};
+  use written.{written, written-span, written-node, written-kind, written-name, written-record-field, written-record, written-arrow, written-row, written-constraint, written-forall};
 
   /// A UTF-8 byte range in the body of a block.
   record span { start: u32, end: u32 }
@@ -332,14 +332,50 @@ interface types {
   record request { method: string, url: string, headers: list<tuple<string, string>>, body: list<u8> }
   record response { status: u16, body: list<u8> }
 
-  /// A constructor of a derive's target, the types of its fields and the
-  /// literal of an enum's constructor; whether, as a constructor of a GADT,
-  /// it names the type it builds (`refined`) or holds dictionaries
-  /// (`constrained`).
+  /// How much of a type declaration its module exports to callers.
+  enum visibility { public-constructors, opaque, private }
+
+  /// An `@name args...` attribute attached to a type or variant.
+  record attribute-meta { name: string, args: string, span: span }
+
+  /// A class constraint `C a b` attached to a variant or quantified type.
+  record constraint-meta { class: string, args: list<written>, span: span }
+
+  /// The decoded literal value of an enum constructor (`"GET"` or `-404`).
+  variant literal-value { %string(string), int(string) }
+
+  /// Syntactic classification of one block head declared by a plugin.
+  record head-spec {
+    head: string,
+    module: string,
+    bare: bool,
+    declarations: list<string>,
+    named: bool,
+    top: bool,
+    bracket-args: bool,
+  }
+
+  /// Static metadata declared by a plugin.
+  record plugin-metadata {
+    heads: list<head-spec>,
+    watch: list<string>,
+    derives: list<string>,
+    own-codes: list<string>,
+  }
+
+  /// A constructor of a derive's target, its spans, docs, attributes,
+  /// constraints, field types, optional GADT result type and enum literal.
   record case-target {
     name: string,
+    span: span,
+    name-span: span,
+    docs: string,
+    attributes: list<attribute-meta>,
+    constraints: list<constraint-meta>,
     fields: list<written>,
+    %result: option<written>,
     literal: option<span>,
+    literal-value: option<literal-value>,
     refined: bool,
     constrained: bool,
   }
@@ -351,7 +387,9 @@ interface types {
   record derive-target {
     decl: block,
     name: string,
+    name-span: span,
     params: list<string>,
+    param-spans: list<span>,
     /// The kind each parameter is written with, empty without one.
     kinds: list<string>,
     cases: list<case-target>,
@@ -361,13 +399,19 @@ interface types {
     modifiers: list<string>,
     /// The classes its `deriving` names, as written.
     deriving: list<string>,
+    deriving-spans: list<span>,
+    visibility: visibility,
+    attributes: list<attribute-meta>,
     local: bool,
   }
 }
 
 world plugin {
   import compiler;
-  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact, call-site, published, artifact, structure};
+  use types.{block, arena, diagnostic, completion, hover, highlight, piece, derive-target, fact, call-site, published, artifact, structure, plugin-metadata};
+
+  /// Static metadata describing this plugin's block heads, watched names and derives.
+  export metadata: func() -> plugin-metadata;
 
   /// What the plugin learns from all its blocks of a group, before any expands.
   export collect: func(blocks: list<block>) -> list<u8>;

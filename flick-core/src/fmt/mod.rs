@@ -65,13 +65,17 @@
 //! that holds a line comment where the layout has no place for it, is left
 //! as written. The whole file is compared again at the end.
 
+use std::sync::Arc;
+
 use flick_pretty::DocumentArena;
 
 use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::plugin::{first_party, metadata};
+use crate::resolve;
 use crate::source::FileId;
 use crate::syntax::cst::{Element, Node};
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::{parse, parse_with_heads};
+use crate::syntax::{HeadCatalog, HeadRule, parse, parse_with_catalog, parse_with_heads};
 
 mod binary;
 mod block;
@@ -123,20 +127,58 @@ pub fn format_with(
 /// The byte ranges of the declarations left as written.
 type Kept = Vec<(u32, u32)>;
 
+/// Builds a [`HeadCatalog`] extending `std`'s heads with any valid non-implicit
+/// head specs declared by external plugins imported in `tree`.
+fn format_catalog(
+    tree: &Node,
+    text: &str,
+    file: FileId,
+    plugin_of: PluginOf,
+) -> Option<Arc<HeadCatalog>> {
+    let syntax = resolve::module_syntax(tree, text, file);
+    let std_catalog = first_party::head_catalog();
+    let mut catalog = std_catalog.clone();
+    let mut added = false;
+    for head in syntax.heads().iter() {
+        let Some(plugin) = plugin_of(head) else {
+            continue;
+        };
+        let Ok(meta) = plugin.metadata() else {
+            continue;
+        };
+        if !metadata::validate(plugin.id(), &meta, std_catalog).is_empty() {
+            continue;
+        }
+        for spec in &meta.heads {
+            if !catalog.is_implicit(&spec.head) && catalog.get(&spec.head).is_none() {
+                catalog.push(HeadRule::from_spec(spec, false));
+                added = true;
+            }
+        }
+    }
+    added.then(|| Arc::new(catalog))
+}
+
 /// The formatted file, and the declarations left as written.
 fn format_reporting(
     text: &str,
     file: FileId,
     plugin_of: PluginOf,
 ) -> Result<(String, Kept), Vec<Diagnostic>> {
-    let mut parsed = parse(text, file);
+    let initial = parse(text, file);
+    let catalog = format_catalog(&initial.tree, text, file, plugin_of);
+    let mut parsed = match catalog.as_deref() {
+        Some(cat) => parse_with_catalog(text, file, cat),
+        None => initial,
+    };
     if !parsed.diagnostics.is_empty() {
         return Err(parsed.diagnostics);
     }
     // This syntax rewrite is narrower than AST normalization: explicit
     // `forall` changes polymorphic recursion and may shadow an outer variable.
     drop_redundant_foralls(&mut parsed.tree, text);
-    let (layouts, bodies, failed) = plugins::layouts(&parsed.tree, text, file, plugin_of);
+    let (layouts, bodies, failed) =
+        plugins::layouts(&parsed.tree, text, file, plugin_of, catalog.as_ref());
     // a plugin that failed leaves its block as written, and the file with it
     if !failed.is_empty() {
         return Err(failed);
@@ -151,7 +193,10 @@ fn format_reporting(
     let expected = program(&parsed.tree, text, &lines);
     drop_empty_rows(&mut parsed.tree);
     let (out, kept) = source_file(&parsed.tree, text, &layouts, &lines);
-    let again = parse(&out, file);
+    let again = match catalog.as_deref() {
+        Some(cat) => parse_with_catalog(&out, file, cat),
+        None => parse(&out, file),
+    };
     let same = again.diagnostics.is_empty()
         && program(&again.tree, &out, &lines) == expected
         && comments(&again.tree, &out) == comments(&parsed.tree, text);

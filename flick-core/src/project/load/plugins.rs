@@ -13,6 +13,7 @@ use flick_plugin::Block;
 mod derive;
 mod enums;
 mod groups;
+mod metadata;
 mod published;
 mod results;
 mod sink;
@@ -39,6 +40,9 @@ use crate::types;
 
 /// The plugin of each package a module imports, or why it does not load.
 type Plugins = HashMap<String, Result<Arc<dyn Expander>, String>>;
+
+/// Collected block state and reach inputs per `(group, package)`.
+pub(super) type GroupStates = HashMap<(String, String), (Vec<u8>, Vec<Used>)>;
 
 /// A group collected: its plugin's package, its members, their blocks,
 /// its state, its gate and what `collect` reached.
@@ -71,8 +75,13 @@ impl Loader<'_> {
     /// Expands the plugin blocks of every loaded module, in rounds: the
     /// blocks of the modules first, then those inside the user's code of
     /// the blocks the round before expanded, at most [`ROUNDS`] deep.
+    #[allow(clippy::too_many_lines)]
     pub(super) fn expand_plugins(&mut self) {
-        let mut plugins: Plugins = HashMap::new();
+        let mut plugins: Plugins = self
+            .preloaded_plugins
+            .iter()
+            .map(|(k, v)| (k.clone(), Ok(Arc::clone(v))))
+            .collect();
         let mut diagnostics = Vec::new();
         let mut round = Vec::new();
         let mut editing = Vec::new();
@@ -99,6 +108,7 @@ impl Loader<'_> {
         let mut results = Results::new(self.host, self.cache.as_deref_mut());
         let mut expanded = Vec::new();
         let mut publications = Publications::new();
+        let mut group_states = GroupStates::new();
         // the blocks of the modules, then those nested in 1 to ROUNDS blocks
         for _ in 0..=ROUNDS {
             if round.is_empty() {
@@ -108,6 +118,7 @@ impl Loader<'_> {
                 &plugins,
                 &mut results,
                 &mut publications,
+                &mut group_states,
                 &mut round,
                 &mut diagnostics,
                 &mut editing,
@@ -148,7 +159,13 @@ impl Loader<'_> {
             expanded.extend(mem::take(&mut round).into_iter().zip(rendered));
             round = next;
         }
-        let derived = self.derive_blocks(&expanded, &mut plugins, &mut results, &mut diagnostics);
+        let derived = self.derive_blocks(
+            &expanded,
+            &group_states,
+            &mut plugins,
+            &mut results,
+            &mut diagnostics,
+        );
         expanded.extend(derived);
         diagnostics.extend(round.iter().map(|f| {
             failure(
@@ -171,11 +188,13 @@ impl Loader<'_> {
     fn block_sources<'m>(&self, m: &'m Loaded) -> impl Fn(&Node) -> Option<BlockSource> + 'm {
         let shared: Arc<str> = Arc::from(self.sources.get(m.file).text.as_str());
         let imported = m.syntax.heads();
+        let catalog = Arc::clone(&self.head_catalog);
         let enums = Arc::new(self.enums_seen(m));
         move |node: &Node| {
             let source = BlockSource::new(Arc::clone(&shared), m.file, node, Arc::clone(&imported));
             source.map(|s| {
                 s.in_module(&m.name, &m.parse.tree)
+                    .with_catalog(Arc::clone(&catalog))
                     .with_enums(Arc::clone(&enums))
             })
         }
@@ -222,8 +241,9 @@ impl Loader<'_> {
         diagnostics: &mut Vec<Diagnostic>,
     ) -> HashMap<String, String> {
         let std = first_party::PACKAGE;
-        let mut heads: HashMap<String, String> = (first_party::HEADS.iter())
-            .map(|(head, _)| ((*head).to_owned(), std.to_owned()))
+        let mut heads: HashMap<String, String> = (first_party::head_catalog().rules().iter())
+            .filter(|r| r.implicit)
+            .map(|r| (r.head.clone(), std.to_owned()))
             .collect();
         plugins.entry(std.to_owned()).or_insert_with(|| {
             first_party::plugin(std).ok_or_else(|| format!("`{std}` has no linked plugin"))
@@ -276,7 +296,7 @@ impl Loader<'_> {
                     ));
                     continue;
                 }
-                if package != std && first_party::HEADS.iter().any(|(h, _)| *h == item.name) {
+                if package != std && first_party::head_catalog().is_implicit(&item.name) {
                     diagnostics.push(Diagnostic::error(
                         codes::P044,
                         format!(
@@ -307,6 +327,7 @@ impl Loader<'_> {
         plugins: &Plugins,
         results: &mut Results,
         publications: &mut Publications,
+        group_states: &mut GroupStates,
         found: &mut [Found],
         diagnostics: &mut Vec<Diagnostic>,
         editing: &mut Vec<(usize, EditorBlock)>,
@@ -317,6 +338,12 @@ impl Loader<'_> {
             let Some(Ok(plugin)) = plugins.get(&package) else {
                 continue;
             };
+            if let Some(&first_j) = members.first() {
+                let grp = group(&self.modules[found[first_j].module].root);
+                group_states
+                    .entry((grp, package.clone()))
+                    .or_insert_with(|| (state.clone(), collect_used.clone()));
+            }
             let theirs = publications.get(&package);
             let mut seen = HashMap::new();
             for &j in &members {

@@ -124,15 +124,17 @@ pub fn read(text: &str, written: &Written) -> Result<Ty, String> {
         },
         WrittenKind::Record { fields, open } => Ty::Record {
             fields: (fields.iter())
-                .map(|(label, t)| Ok((label.clone(), read(text, t)?)))
+                .map(|field| Ok((field.name.clone(), read(text, &field.ty)?)))
                 .collect::<Result<_, String>>()?,
             open: *open,
         },
         WrittenKind::Tuple(items) => Ty::Tuple(all(items)?),
         WrittenKind::Unit => Ty::Unit,
         // the rest of a function type does not matter
-        WrittenKind::Arrow { .. } | WrittenKind::Generic => Ty::Fun(as_written()),
+        WrittenKind::Arrow { .. } | WrittenKind::Forall { .. } => Ty::Fun(as_written()),
         WrittenKind::Captured(_) => Ty::Captured(as_written()),
-        WrittenKind::Other => return Err(format!("`{}` is not a type", as_written())),
+        WrittenKind::StringLit(_) | WrittenKind::None | WrittenKind::Other => {
+            return Err(format!("`{}` is not a type", as_written()));
+        }
     })
 }

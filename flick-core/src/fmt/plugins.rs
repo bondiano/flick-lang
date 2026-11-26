@@ -14,6 +14,7 @@ use crate::plugin::source::BlockSource;
 use crate::plugin::{Expander, blocks_under, first_party, head_token};
 use crate::resolve;
 use crate::source::{FileId, Span};
+use crate::syntax::HeadCatalog;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
 use crate::types::implicit_package_of;
@@ -54,12 +55,12 @@ pub(super) fn layouts<'t>(
     text: &'t str,
     file: FileId,
     plugin_of: PluginOf,
+    catalog: Option<&Arc<HeadCatalog>>,
 ) -> (Layouts, Vec<&'t str>, Vec<Diagnostic>) {
     let syntax = resolve::module_syntax(tree, text, file);
     // the module of a head: std's own, else the last import exposing it
     let module = |head: &str| {
-        let own = first_party::HEADS.iter().find(|(h, _)| *h == head);
-        own.map(|&(_, m)| m).or_else(|| {
+        first_party::head_catalog().module_of(head).or_else(|| {
             (syntax.imports.iter().rev())
                 .find(|i| i.plugins.iter().any(|p| p.name == head))
                 .map(|i| i.module.as_str())
@@ -81,10 +82,14 @@ pub(super) fn layouts<'t>(
         let Some(plugin) = head.and_then(|h| plugin(h.text(text))) else {
             continue;
         };
-        let Some(source) = BlockSource::new(Arc::clone(&shared), file, &node, Arc::clone(&heads))
+        let Some(mut source) =
+            BlockSource::new(Arc::clone(&shared), file, &node, Arc::clone(&heads))
         else {
             continue;
         };
+        if let Some(cat) = catalog {
+            source = source.with_catalog(Arc::clone(cat));
+        }
         let laid_out = layout(plugin.as_ref(), source, &node).unwrap_or_else(|why| {
             let (start, end) = node.range();
             let message = format!(

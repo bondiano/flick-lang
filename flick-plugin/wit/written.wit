@@ -1,4 +1,4 @@
-package flick:plugin@0.4.0;
+package flick:plugin@0.5.0;
 
 /// The types a declaration or a signature writes, as the compiler parsed
 /// them, for a derive to read without parsing tokens again.
@@ -6,6 +6,9 @@ interface written {
   /// A type as a declaration or a signature writes it: its nodes, each after
   /// the nodes it refers to by index, the last the type itself.
   type written = list<written-node>;
+
+  /// A UTF-8 byte range in the text that writes the type.
+  record written-span { start: u32, end: u32 }
 
   /// A node at `start`..`end` of the text that writes it.
   record written-node { kind: written-kind, start: u32, end: u32 }
@@ -23,14 +26,36 @@ interface written {
     arrow(written-arrow),
     /// A type with a capture qualifier, `t^c`.
     captured(u32),
-    /// `forall a. …` or `C a => …`.
-    generic,
+    /// `forall a. C a => T` or `C a => T`.
+    forall(written-forall),
+    /// A type-level string literal, as in `Record.Label "name"`.
+    string-lit(string),
+    /// The empty row/set keyword `none`.
+    none,
     /// A row, a union, a hole: what no derive reads.
     other,
   }
 
   record written-name { name: string, args: list<u32> }
-  record written-record { fields: list<tuple<string, u32>>, open: bool }
+
+  /// One field of a written record type, stored in canonical UTF-16 label order
+  /// with `source-index` recording 0-based declaration order.
+  record written-record-field {
+    name: string,
+    name-span: written-span,
+    span: written-span,
+    ty: u32,
+    docs: string,
+    source-index: u32,
+  }
+
+  record written-record { fields: list<written-record-field>, open: bool }
   record written-arrow { takes: u32, gives: u32, row: option<written-row> }
   record written-row { services: list<u32>, services-open: bool, errors: list<u32>, errors-open: bool }
+
+  /// A class constraint `C a b` in a `forall` or `=>` context.
+  record written-constraint { class: string, args: list<u32>, span: written-span }
+
+  /// A universally quantified and/or constrained type.
+  record written-forall { vars: list<string>, constraints: list<written-constraint>, body: u32 }
 }

@@ -177,6 +177,16 @@ impl Packages {
             .and_then(|p| p.plugin.as_deref())
     }
 
+    /// Dependency packages that may provide a compiler plugin (either via an
+    /// explicit `plugin = "..."` component path or via a library package in an
+    /// in-memory host).
+    pub fn plugin_candidates(&self) -> impl Iterator<Item = (&str, Option<&Path>)> {
+        self.packages
+            .iter()
+            .filter(|p| p.plugin.is_some() || p.library.is_some())
+            .map(|p| (p.name.as_str(), p.plugin.as_deref()))
+    }
+
     /// Declared dependencies missing from the backend's installed packages.
     pub fn missing(&self) -> Vec<&str> {
         self.packages

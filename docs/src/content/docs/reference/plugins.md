@@ -77,11 +77,16 @@ needs is imported by the user. Its names are its own:
 
 ## What a plugin gives
 
-A plugin is a WebAssembly component of the world `flick:plugin` in
+A plugin is a WebAssembly component of the world `flick:plugin` (`0.5.0`) in
 [`flick-plugin/wit/plugin.wit`](https://github.com/bondiano/flick-lang/blob/main/flick-plugin/wit/plugin.wit),
 or a Rust value of the `Plugin` trait of the `flick-plugin` crate linked
-into the compiler. It has three calls, all pure:
+into the compiler. It declares static metadata and expands blocks through pure calls:
 
+- `metadata()` returns `PluginMetadata`:
+  - `heads`: syntactic classification (`HeadSpec`) for each block head the plugin owns — its `module`, whether it may appear `bare` in expression position without `{ … }`, second-word `declarations` keywords (such as `fn` in `route fn`), `named` declarations (`widget banner = …`), `top`-level-only heads, and `bracket_args` (`[ … ]`). External heads still require `import M exposing (plugin head)`; once imported, the parser uses the declared `HeadSpec` identically across CLI, formatter, and LSP;
+  - `watch`: module values, services, or tags (`Module.name`, `*.name`, `Module.Service`, `@maker`, `@cell`) whose call sites are passed to `check-calls`, merged with any `[package] watch` entries in `flick.toml`;
+  - `derives`: qualified class names the plugin derives (such as `Meta.Codec`);
+  - `own_codes`: reserved for `std`'s compiler-owned diagnostic codes; external plugins declaring `own_codes`, colliding with `result` or `std` heads, conflicting with another plugin's syntax for the same head, or supplying malformed specs are rejected (`FLICK-P036` / `FLICK-P044`);
 - `collect(blocks)` learns from all its blocks of a group (the project's
   sources, its tests, or a package), in the order of their modules' names
   and places, and gives a state of bytes;
@@ -332,28 +337,41 @@ A type that names such a class in `deriving`, maybe with arguments
 (Shapes.Shape)` for a type of another module of the package, call
 `derive(target, class, args, module, state)` of the plugin:
 
-- `target` is the type's declaration, a block, and what it declares at spans
-  of it: its name, parameters, constructors with the types of their fields
-  and, of an enum, their literals, whether a constructor of a GADT names
-  the type it builds (`refined`) or holds dictionaries (`constrained`), the
-  type an alias stands for and, for a type over another whose constructor
-  is its declaration's alone, the type it wraps (`wraps`): the base of a
-  refined type, or the field of an `unboxed type` of a block whose
-  constructor only generated code can name. The values of such a type come
-  from its `T.parse` and are read by its `T.value`;
+- `target` is the type's declaration (`Block`, with `decl.module` and `decl.docs` skipping intervening `@attr` lines), plus deterministic declaration metadata at spans relative to `decl`:
+  - `name`, `name_span`, `params`, `param_spans`, token-normalized `kinds`, `modifiers`, `deriving`, `deriving_spans`, `visibility` (`PublicConstructors`, `Opaque`, or `Private`), and leading `attributes`;
+  - `cases`: each constructor's `name`, `span`, `name_span`, `docs`, `attributes`, existential/GADT `constraints`, `fields`, optional GADT `result`, `literal` span and decoded `literal_value` (`String` or `Int`), `refined`, and `constrained`;
+  - `alias` (the type a `type alias` stands for) and `wraps` (for a type over another whose constructor is its declaration's alone, such as a `refined type` or `unboxed type` whose constructor only generated code can name; its values come from `T.parse` and are read by `T.value`);
 - `class` is the class's full name, `Pairs.Arbitrary`;
 - `args` the `{ … }` after the class;
-- `module` every type the module declares.
+- `module` every type the module declares, with its visibility and metadata so a derive can check whether a field references a private or opaque type;
+- `state` is the plugin's collected block state for the module's group.
 
-The protocol gives each constructor field, alias and wrapped type as a
+The protocol gives each constructor field, alias, GADT result, and wrapped type as a
 `Written` tree with source spans; `Signature.ty` has the same representation.
-Read `Written.kind` (`Con`, `Var`, `Record`, `Tuple`, `Arrow` and the other
-variants) instead of parsing `Block.tokens` at a field's span. Parameter
-kinds are token-normalized strings, so `Type->Type` and `Type -> Type` are
-both `Type -> Type`. Spans remain relative to the declaration or signature
-for diagnostics and holes. Rebuild native plugins and WASM components with
-the matching SDK; a component built for another version is rejected with
-`FLICK-P035`.
+Read `Written.kind` (`Con`, `Var`, `Record`, `Tuple`, `Unit`, `Arrow`, `Captured`,
+`Forall` with `vars`/`constraints`/`body`, `StringLit`, `None`, `Other`) instead of
+re-parsing `Block.tokens`. Each field of `WrittenKind::Record` is a `RecordField`
+(`name`, `name_span`, `span`, `ty`, `docs`, `source_index`): fields are ordered
+canonically by UTF-16 label for deterministic caching while `source_index` preserves
+0-based source declaration order. Parameter kinds are token-normalized strings, so
+`Type->Type` and `Type -> Type` are both `Type -> Type`. Derive caching keys
+deterministically on all metadata fields (annotations, `///` docs, visibility,
+field types, module summary, state, and protocol version). Spans remain relative
+to the declaration or signature for diagnostics and holes. Rebuild native plugins
+and WASM components with `flick:plugin@0.5.0`; a component built for another
+version is rejected with `FLICK-P035`.
+
+This deterministic metadata is sufficient for third-party derives without exposing
+compiler internals (see [W5 #471](https://github.com/bondiano/flick-lang/issues/471)
+for the broader plugin/reflection roadmap):
+
+- **Configurable codec derive:** read field options (`rename`, `skip`, `default`) from
+  `args` and type attributes from `target.attributes`, emit field diagnostics at exact
+  `field.ty.span` / `field.span`, and inspect `target.visibility` plus `module` to refuse
+  leaking `Opaque` or `Private` types.
+- **CLI / form derive:** read `target.decl.docs`, `case.docs`, `case.attributes`,
+  `case.constraints`, and `field.docs`, sorting record fields by `field.source_index`
+  so generated `--flag` help and argument parsers follow the author's declaration order.
 
 The plugin gives declarations, an instance and what goes with it, which
 follow the type's declaration, or take the place of `deriving instance`.
@@ -378,7 +396,9 @@ which builds the component `plugin.wasm` the manifest names with
 `{ tag = "name"; value = value }`:
 
 ```rust
-use flick_plugin::{Arena, Block, Builder, Compiler, Diagnostic, Plugin, TokenKind, flick};
+use flick_plugin::{
+    Arena, Block, Builder, Compiler, Diagnostic, HeadSpec, Plugin, PluginMetadata, TokenKind, flick,
+};
 
 pub struct Tagged;
 
@@ -386,6 +406,17 @@ pub struct Tagged;
 flick_plugin::export!(Tagged);
 
 impl Plugin for Tagged {
+    fn metadata(&self) -> PluginMetadata {
+        PluginMetadata {
+            heads: vec![HeadSpec {
+                head: "tagged".into(),
+                module: "Tagged".into(),
+                ..HeadSpec::default()
+            }],
+            ..PluginMetadata::default()
+        }
+    }
+
     fn collect(&self, _: &[Block], _: &mut dyn Compiler) -> Vec<u8> {
         Vec::new()
     }

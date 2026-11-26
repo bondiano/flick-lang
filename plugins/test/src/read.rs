@@ -80,9 +80,6 @@ pub struct Fixture {
 /// The word that starts a fixture of a suite.
 pub const FIXTURE: &str = "fixture";
 
-/// The words that start a case, as the heads of the blocks.
-pub const WORDS: [&str; 2] = ["suite", "test"];
-
 /// The words that start a hook of a suite, as the functions of `Test`.
 pub const HOOKS: [&str; 4] = ["before_all", "before_each", "after_each", "after_all"];
 
@@ -370,7 +367,7 @@ fn fixture(block: &Block, tokens: &[Token], at: usize) -> Option<(Item, usize)> 
     }
     let starts = |t: &Token| {
         let w = block.text_of(t.span);
-        let item = WORDS.contains(&w) || HOOKS.contains(&w) || w == FIXTURE || w == ";";
+        let item = crate::owns(w) || HOOKS.contains(&w) || w == FIXTURE || w == ";";
         item && (w == ";" || before(block, t.span.start) == Some(b'\n'))
     };
     let end = (i + 2..tokens.len())
@@ -426,7 +423,7 @@ fn items(block: &Block, tokens: &[Token]) -> Result<Vec<Item>, Diagnostic> {
                     timeout: None,
                     each: None,
                 },
-                _ if WORDS.contains(&w) => header(block, after).filter(|h| {
+                _ if crate::owns(w) => header(block, after).filter(|h| {
                     (w == "suite" || h.parallel.is_none()) && (w == "test" || h.each.is_none())
                 })?,
                 _ => return None,

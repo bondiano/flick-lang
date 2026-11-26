@@ -19,11 +19,13 @@ mod facts;
 #[cfg(feature = "guest")]
 pub mod guest;
 mod literal;
+mod metadata;
 mod reach;
 mod splice;
 mod wit;
 mod wit_arena;
 mod wit_calls;
+mod wit_metadata;
 mod written;
 
 use serde::{Deserialize, Serialize};
@@ -41,15 +43,21 @@ pub use facts::{
 pub use flick_backend::command;
 pub use flick_plugin_macros::flick;
 pub use literal::{literal_text, string_value};
+pub use metadata::{
+    AttributeMeta, CaseTarget, DeriveTarget, HeadSpec, LiteralValue, PluginMetadata, Visibility,
+};
 pub use reach::{ReachError, Request, Response};
 #[doc(hidden)]
 pub use splice::__private;
 pub use splice::{Name, Splice, Wildcard};
-pub use written::{EffectRow, FlatKind, FlatRow, FlatWritten, Written, WrittenKind};
+pub use written::{
+    ConstraintMeta, EffectRow, FlatConstraint, FlatKind, FlatRecordField, FlatRow, FlatWritten,
+    RecordField, Written, WrittenKind,
+};
 
 /// The version of the interface, as `wit/plugin.wit` declares it. Caches of
 /// expansions key on it.
-pub const VERSION: &str = "0.4.0";
+pub const VERSION: &str = "0.5.0";
 
 /// A UTF-8 byte range in the body of a block.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -389,52 +397,6 @@ pub struct Completion {
     pub documentation: Option<String>,
     /// The text to insert, with `${1:placeholder}` stops.
     pub snippet: Option<String>,
-}
-
-/// A type a class's derive makes an instance for: its declaration as a
-/// block, a declaration of the module, and what it declares, at spans of
-/// that block. A type of another module (`deriving instance`) is not
-/// `local`: its spans are no holes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct DeriveTarget {
-    pub decl: Block,
-    /// Its name, qualified for a type of another module: `Other.Color`.
-    pub name: String,
-    pub params: Vec<String>,
-    /// The kind each parameter is written with, `Type -> Type` of
-    /// `(f : Type -> Type)`, empty without one.
-    pub kinds: Vec<String>,
-    /// Its constructors, qualified as its name is, with their fields' types.
-    pub cases: Vec<CaseTarget>,
-    /// The type a `type alias` stands for.
-    pub alias: Option<Written>,
-    /// The type its values are made of, for a type over another whose
-    /// constructor is its declaration's alone: a `refined type`, or an
-    /// `unboxed type` of a block with a constructor only generated code can
-    /// name. Its values come from `T.parse` and are read by `T.value`.
-    pub wraps: Option<Written>,
-    /// The words before its name: `type`, `alias`, `opaque`, `unboxed`,
-    /// `untagged`, `error`.
-    pub modifiers: Vec<String>,
-    /// The classes its `deriving` names, as written: `Schema`, `Cli.Value`.
-    pub deriving: Vec<String>,
-    pub local: bool,
-}
-
-/// A constructor of a derive's target, the types of its fields and the
-/// literal of an enum's constructor: `"GET"` of `Get = "GET"`. A
-/// constructor of a GADT names the type it builds (`refined`, as
-/// `| IntLit Int : Expr Int`) or holds dictionaries (`constrained`, as
-/// `| Show b => Showable b : Showable`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CaseTarget {
-    pub name: String,
-    pub fields: Vec<Written>,
-    pub literal: Option<Span>,
-    #[serde(default)]
-    pub refined: bool,
-    #[serde(default)]
-    pub constrained: bool,
 }
 
 /// A piece of the layout a plugin gives a block, from its first argument

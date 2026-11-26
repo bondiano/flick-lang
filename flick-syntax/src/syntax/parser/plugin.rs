@@ -5,12 +5,12 @@
 //! The arguments, the body and the rest of a declaration are kept as tokens
 //! for the plugin of `Sql`'s package to read. A head only the same
 //! file imports counts, so `f { a = 1 }` stays a call with a record wherever
-//! no import says so; the heads of std's plugin ([`HEADS`]) need no import
-//! where they start a block, before `{` or as a declaration, and stay names
-//! elsewhere.
+//! no import says so; implicit heads in the parser's [`HeadCatalog`] need no
+//! import where they start a block, before `{` or as a declaration, and stay
+//! names elsewhere.
 
 use super::{K, Parser, SyntaxKind};
-use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED, SIBLINGS, TOP};
+use crate::syntax::heads::SIBLINGS;
 
 /// Whether an exposed item `plugin head` starts here.
 pub(super) fn at_head(p: &Parser) -> bool {
@@ -27,16 +27,28 @@ pub(super) fn head(p: &mut Parser) {
 }
 
 /// Whether a plugin block starts here: a head an import exposed with its
-/// arguments on the same line, then `{ … }` or not; or one of the
-/// compiler's own heads with its arguments and `{ … }`, so that a value of
-/// that name elsewhere stays one, or before a name for one of [`BARE`].
+/// arguments on the same line, then `{ … }` or not; or an implicit head from
+/// the catalog with its arguments and `{ … }`, so that a value of that name
+/// elsewhere stays one, or before a name for a `bare` head.
 pub(super) fn at_block(p: &Parser) -> bool {
     let head = p.text_of(p.raw());
-    let imported = p.plugin_heads.contains(&head)
-        || BARE.contains(&head) && matches!(p.nth(1), K::Ident | K::Con);
-    if !imported && (!HEADS.iter().any(|(h, _)| *h == head) || TOP.contains(&head)) {
+    let rule = p.catalog.get(head);
+    let imported = p.plugin_heads.contains(&head);
+    let implicit = rule.is_some_and(|r| r.implicit);
+    if !imported && !implicit {
         return false;
     }
+    if rule.is_some_and(|r| r.top && (!r.implicit || !imported)) {
+        return false;
+    }
+    let bare_implicit =
+        implicit && rule.is_some_and(|r| r.bare) && matches!(p.nth(1), K::Ident | K::Con);
+    let allow_bodiless = match rule {
+        Some(r) if r.implicit => imported || bare_implicit,
+        Some(r) => imported && r.bare,
+        None => imported,
+    };
+    let brackets = rule.is_some_and(|r| r.bracket_args);
     let mut depth = 0u32;
     let mut arguments = 0usize;
     for i in p.pos + 1..p.toks.len() {
@@ -49,6 +61,11 @@ pub(super) fn at_block(p: &Parser) -> bool {
                 depth -= 1;
                 arguments += usize::from(depth == 0);
             }
+            K::LBracket if brackets => depth += 1,
+            K::RBracket if brackets && depth > 0 => {
+                depth -= 1;
+                arguments += usize::from(depth == 0);
+            }
             _ if depth > 0 => {}
             // where `{` ends the head, as after `provide`, it is not the body
             K::LBrace if !p.no_brace => return true,
@@ -56,7 +73,28 @@ pub(super) fn at_block(p: &Parser) -> bool {
             _ => break,
         }
     }
-    depth == 0 && arguments > 0 && imported
+    depth == 0 && arguments > 0 && allow_bodiless
+}
+
+/// Whether the current head's line reaches `{` across balanced head arguments.
+fn has_brace_on_line(p: &Parser, brackets: bool) -> bool {
+    let mut depth = 0u32;
+    for i in p.pos + 1..p.toks.len() {
+        if p.sep_at(i).is_some() {
+            break;
+        }
+        match p.toks[i].kind {
+            K::LParen => depth += 1,
+            K::RParen if depth > 0 => depth -= 1,
+            K::LBracket if brackets => depth += 1,
+            K::RBracket if brackets && depth > 0 => depth -= 1,
+            _ if depth > 0 => {}
+            K::LBrace => return true,
+            k if is_argument(k) => {}
+            _ => break,
+        }
+    }
+    false
 }
 
 /// A word, a name, a number or a string: an argument of a head, which
@@ -71,8 +109,9 @@ fn is_argument(kind: SyntaxKind) -> bool {
 /// `head args { … }` or `head args`, the arguments and the body kept as
 /// tokens.
 pub(super) fn block(p: &mut Parser) -> SyntaxKind {
+    let brackets = p.catalog.bracket_args(p.text_of(p.raw()));
     p.bump();
-    arguments(p, false);
+    arguments(p, brackets);
     if p.at(K::LBrace) && !p.no_brace {
         raw_braces(p);
     }
@@ -93,25 +132,41 @@ fn arguments(p: &mut Parser, brackets: bool) {
 }
 
 /// Whether a declaration of a plugin starts here: a head an import exposed
-/// at the start of a declaration, not its signature; one of
-/// [`DECLARATIONS`] before its word; one of [`NAMED`] before a name; or one
-/// of [`TOP`].
+/// at the start of a declaration, not its signature; or a catalog head
+/// matching its `declarations`, `named`, or `top` classification.
 pub(super) fn at_declaration(p: &Parser) -> bool {
+    if p.nth(1) == K::Colon {
+        return false;
+    }
     let head = p.text_of(p.raw());
-    let own = (DECLARATIONS.iter()).any(|(h, w)| *h == head && super::decl::word_at(p, 1, w))
-        || NAMED.contains(&head) && p.nth(1) == K::Ident
-        || TOP.contains(&head);
-    (p.plugin_heads.contains(&head) || own) && p.nth(1) != K::Colon
+    let imported = p.plugin_heads.contains(&head);
+    let Some(rule) = p.catalog.get(head) else {
+        return imported;
+    };
+    let classified = rule.top
+        || (rule.named && p.nth(1) == K::Ident)
+        || (rule.declarations.iter()).any(|w| super::decl::word_at(p, 1, w));
+    if rule.implicit {
+        imported || classified
+    } else {
+        if !imported {
+            return false;
+        }
+        if rule.top || rule.named || !rule.declarations.is_empty() {
+            classified || has_brace_on_line(p, rule.bracket_args)
+        } else {
+            true
+        }
+    }
 }
 
 /// `head args { … }`, or `head args` and the rest of the declaration up to
 /// the next one, all kept as tokens.
 pub(super) fn declaration(p: &mut Parser) {
     let m = p.start();
-    // the rows of a `test.each`, a list, may stand among a test block's arguments
-    let rows = TOP.contains(&p.text_of(p.raw()));
+    let brackets = p.catalog.bracket_args(p.text_of(p.raw()));
     p.bump();
-    arguments(p, rows);
+    arguments(p, brackets);
     if p.at(K::LBrace) {
         raw_braces(p);
         if !at_end(p) {

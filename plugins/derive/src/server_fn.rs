@@ -176,7 +176,7 @@ fn text(signature: &Signature, token: Token) -> &str {
 fn parts(signature: &Signature) -> Result<Parts, &'static str> {
     const NOT_A_FUNCTION: &str = "a server fn is a function: `P ->{r; e} S`";
     let whole = signature.ty.as_ref().ok_or(NOT_A_FUNCTION)?;
-    if whole.kind == WrittenKind::Generic {
+    if matches!(whole.kind, WrittenKind::Forall { .. }) {
         return Err("a server fn is not generic: its types cross the network");
     }
     // the parameters, and the row of each arrow

@@ -337,13 +337,13 @@ fuzz iterations="1000000":
 # tests that only a build with wasmtime has; the tests run in the `e2e`
 # profile, as an unoptimized wasmtime compiles a component slowly
 wasm-plugins: wasm-backends
-    cargo build -p flick-test-pairs -p flick-example-typed-dsl --features guest --target wasm32-wasip2 --release
-    cargo clippy -p flick-test-pairs -p flick-example-typed-dsl --features guest --target wasm32-wasip2 -- -D warnings
+    cargo build -p flick-test-pairs -p flick-test-meta -p flick-example-typed-dsl --features guest --target wasm32-wasip2 --release
+    cargo clippy -p flick-test-pairs -p flick-test-meta -p flick-example-typed-dsl --features guest --target wasm32-wasip2 -- -D warnings
     cargo clippy -p flick --features wasm-plugins --all-targets -- -D warnings
-    cargo test -p flick --profile e2e --features wasm-plugins --bin flick --test plugins
     pnpm install --frozen-lockfile
     pnpm -C runtime build
     pnpm -C packages/effect-ts build
+    cargo test -p flick --profile e2e --features wasm-plugins --bin flick --test plugins
     FLICK_BIN="$PWD/target/e2e/flick" node examples/typed-dsl/check.mjs
 
 # Build the wasm module the in-browser demo loads and hold it to its size budget.

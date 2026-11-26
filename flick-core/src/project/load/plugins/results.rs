@@ -12,7 +12,7 @@ use std::mem;
 
 use flick_plugin::{Arena, Block, DeriveTarget, Published};
 #[cfg(feature = "native-project")]
-use flick_plugin::{Place, VERSION};
+use flick_plugin::{Place, PluginMetadata, VERSION};
 
 #[cfg(feature = "native-project")]
 use serde::de::DeserializeOwned;
@@ -240,7 +240,9 @@ impl Results<'_> {
     ) -> Result<Arena, Failure> {
         #[cfg(feature = "native-project")]
         {
-            let summary = serde_json::to_vec(&(target, args, module)).unwrap_or_default();
+            let Ok(summary) = serde_json::to_vec(&(target, args, module)) else {
+                return plugin.derive(target, class, args, module, state, source);
+            };
             let key = key([
                 b"derive".as_slice(),
                 VERSION.as_bytes(),
@@ -256,6 +258,27 @@ impl Results<'_> {
         #[cfg(not(feature = "native-project"))]
         plugin.derive(target, class, args, module, state, source)
     }
+}
+
+/// Static metadata of `plugin`, cached by protocol version and plugin id so
+/// repeated builds do not compile a WASM component just to inspect metadata.
+#[cfg(feature = "native-project")]
+pub(super) fn metadata(host: &dyn Host, plugin: &dyn Expander) -> Result<PluginMetadata, String> {
+    let cache_key = key([
+        b"metadata".as_slice(),
+        VERSION.as_bytes(),
+        plugin.id().as_bytes(),
+    ]);
+    if let Some(bytes) = host.cached(&cache_key)
+        && let Ok(meta) = serde_json::from_slice::<PluginMetadata>(&bytes)
+    {
+        return Ok(meta);
+    }
+    let meta = plugin.metadata()?;
+    if let Ok(bytes) = serde_json::to_vec(&meta) {
+        host.save(&cache_key, &bytes);
+    }
+    Ok(meta)
 }
 
 /// The parts, each after its length, as one key.

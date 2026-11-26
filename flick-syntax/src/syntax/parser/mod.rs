@@ -34,11 +34,14 @@ use SyntaxKind as K;
 use build::{Event, build};
 
 pub use fragment::{
-    Fragment, Heads, parse_body_at, parse_decl_at, parse_decls_at, parse_expr_at, parse_lines_at,
-    parse_pat_at, parse_type_at,
+    Fragment, Heads, parse_body_at, parse_body_at_with_catalog, parse_decl_at,
+    parse_decl_at_with_catalog, parse_decls_at, parse_decls_at_with_catalog, parse_expr_at,
+    parse_expr_at_with_catalog, parse_lines_at, parse_lines_at_with_catalog, parse_pat_at,
+    parse_pat_at_with_catalog, parse_type_at, parse_type_at_with_catalog,
 };
 
 use super::cst::Node;
+use super::heads::HeadCatalog;
 use super::kind::{SyntaxKind, describe};
 use super::lexer::{RawToken, lex};
 use crate::diagnostics::{Diagnostic, codes};
@@ -50,23 +53,39 @@ pub struct Parse {
 }
 
 pub fn parse(text: &str, file: FileId) -> Parse {
-    parse_with_heads_mode(text, file, &[], false)
+    parse_with_heads_mode(text, file, &[], &HeadCatalog::EMPTY, false)
+}
+
+/// [`parse`] with a plugin [`HeadCatalog`].
+pub fn parse_with_catalog(text: &str, file: FileId, catalog: &HeadCatalog) -> Parse {
+    parse_with_heads_mode(text, file, &[], catalog, false)
 }
 
 /// [`parse`] of a part of a file whose imports expose the plugin heads
 /// `heads`, as a declaration the formatter laid out.
 pub fn parse_with_heads<'t>(text: &'t str, file: FileId, heads: Heads<'t>) -> Parse {
-    parse_with_heads_mode(text, file, heads, true)
+    parse_with_heads_mode(text, file, heads, &HeadCatalog::EMPTY, true)
+}
+
+/// [`parse_with_heads`] with a plugin [`HeadCatalog`].
+pub fn parse_with_heads_and_catalog<'t>(
+    text: &'t str,
+    file: FileId,
+    heads: Heads<'t>,
+    catalog: &'t HeadCatalog,
+) -> Parse {
+    parse_with_heads_mode(text, file, heads, catalog, true)
 }
 
 fn parse_with_heads_mode<'t>(
     text: &'t str,
     file: FileId,
     heads: Heads<'t>,
+    catalog: &'t HeadCatalog,
     allow_trailing_attribute: bool,
 ) -> Parse {
     let (raw, mut diagnostics) = lex(text, file);
-    let mut p = Parser::new(text, file, &raw);
+    let mut p = Parser::new(text, file, &raw, catalog);
     p.plugin_heads.extend(heads);
     decl::source_file(&mut p);
     diagnostics.append(&mut p.errors);
@@ -137,6 +156,8 @@ pub(crate) struct Parser<'t> {
     no_brace: bool,
     /// The heads of plugin blocks the imports so far exposed.
     plugin_heads: Vec<&'t str>,
+    /// Data-driven plugin head classification catalog.
+    catalog: &'t HeadCatalog,
     /// The lines under a call are its arguments, one each: a plugin asked
     /// for its body to be read so.
     line_children: bool,
@@ -161,7 +182,7 @@ fn continues(kind: SyntaxKind) -> bool {
 }
 
 impl<'t> Parser<'t> {
-    fn new(text: &'t str, file: FileId, raw: &[RawToken]) -> Self {
+    fn new(text: &'t str, file: FileId, raw: &[RawToken], catalog: &'t HeadCatalog) -> Self {
         let toks = layout::collect_tokens(text, raw);
         let event_cap = toks.len().saturating_mul(3);
         Parser {
@@ -177,6 +198,7 @@ impl<'t> Parser<'t> {
             failed: false,
             no_brace: false,
             plugin_heads: Vec::new(),
+            catalog,
             line_children: false,
             depth: 0,
         }

@@ -4,27 +4,28 @@
 //! `deriving instance`, its code in its place. A type the code of a block
 //! declares names its classes there, and the block is its declaration.
 
+mod call;
+
 use std::sync::Arc;
 
-use flick_plugin::{Block, DeriveTarget, Place};
+use flick_plugin::DeriveTarget;
 
 use super::super::{Loaded, Loader, Root};
-use super::{Found, Plugins, Results, failure, refusal};
-use crate::diagnostics::{Diagnostic, codes};
+use super::{Found, GroupStates, Plugins, Results};
+use crate::diagnostics::Diagnostic;
 #[cfg(feature = "native-project")]
 use crate::plugin::blocks_under;
-use crate::plugin::derive::{
-    Declared, Derived, Named, builtin_derived, derived_classes, named, target,
-};
-use crate::plugin::reach::Reach;
-use crate::plugin::render::{Rendered, render};
-use crate::plugin::source::{BlockSource, token_kind};
-use crate::plugin::{Expander, Failure, first_party};
-use crate::source::{FileId, Span};
+use crate::plugin::derive::{Derived, builtin_derived, derived_classes, named, target_in};
+use crate::plugin::render::Rendered;
+use crate::plugin::source::BlockSource;
+use crate::plugin::{Expander, first_party};
+use crate::resolve;
+use crate::source::FileId;
 use crate::syntax::cst::Node;
 use crate::syntax::kind::SyntaxKind as K;
-use crate::syntax::parse;
+use crate::syntax::parse_with_catalog;
 use crate::types::{self, is_type};
+use call::Call;
 
 impl Loaded {
     /// Whether the code of the module is its own text and, at most, what
@@ -47,6 +48,7 @@ impl Loader<'_> {
     pub(super) fn derive_blocks(
         &self,
         expanded: &[(Found, Option<Rendered>)],
+        group_states: &GroupStates,
         plugins: &mut Plugins,
         results: &mut Results,
         diagnostics: &mut Vec<Diagnostic>,
@@ -70,6 +72,7 @@ impl Loader<'_> {
             let text = &self.sources.get(m.file).text;
             let shared: Arc<str> = Arc::from(text.as_str());
             let heads = m.syntax.heads();
+            let enums = Arc::new(self.enums_seen(m));
             let declared: Vec<&Node> = (tree.nodes())
                 .filter(|n| matches!(n.kind, K::TypeDecl | K::ErrorDecl))
                 .collect();
@@ -81,8 +84,11 @@ impl Loader<'_> {
                         d,
                         Arc::clone(&heads),
                         true,
-                    );
-                    target(d, text, source.block(), None)
+                    )
+                    .with_module(&m.name)
+                    .with_catalog(Arc::clone(&self.head_catalog))
+                    .with_enums(Arc::clone(&enums));
+                    target_in(d, Some(tree), Some(&m.syntax), text, source.block(), None)
                 })
                 .collect();
             // the types the code of its blocks declares are the module's too
@@ -95,8 +101,10 @@ impl Loader<'_> {
                 loader: self,
                 module: i,
                 summary: &summary,
+                group_states,
                 shared: &shared,
                 heads: &heads,
+                enums: &enums,
             };
             for decl in tree.nodes() {
                 let (classes, keep) = match decl.kind {
@@ -158,12 +166,34 @@ impl Loader<'_> {
         Some((package, format!("{module}.{name}")))
     }
 
-    /// The classes `module` marks `@derive`, from its source.
-    // shortcut: a module only the package cache holds has no source here, so its classes derive nothing; read `@derive` from its interface when a cached package needs it
+    /// The classes `module` marks `@derive`, from its source, validated plugin
+    /// metadata, or built-in definitions.
     fn derived_of(&self, module: &str) -> Vec<Derived> {
         if let Some(&j) = self.by_name.get(module) {
             let m = &self.modules[j];
             return derived_classes(&m.parse.tree, &self.sources.get(m.file).text);
+        }
+        let mut from_meta = Vec::new();
+        for (package, meta) in &self.plugin_metadata {
+            for entry in &meta.derives {
+                if let Some((owner_mod, class)) = entry.rsplit_once('.')
+                    && owner_mod == module
+                {
+                    from_meta.push(Derived {
+                        class: class.to_owned(),
+                        package: Some(package.clone()),
+                    });
+                }
+            }
+        }
+        if !from_meta.is_empty() {
+            return from_meta;
+        }
+        if let Some((_, text)) = self.source_of(module)
+            && text.contains("@derive")
+        {
+            let tree = parse_with_catalog(&text, FileId::default(), &self.head_catalog).tree;
+            return derived_classes(&tree, &text);
         }
         builtin_derived(module).to_vec()
     }
@@ -218,9 +248,10 @@ impl Loader<'_> {
             .find(|i| i.qualifier() == qualifier)?;
         let (other, other_text) = self.source_of(&import.module)?;
         let shared: Arc<str> = Arc::from(other_text.as_str());
-        let tree = parse(&shared, m.file).tree;
+        let tree = parse_with_catalog(&shared, other, &self.head_catalog).tree;
+        let other_syntax = resolve::module_syntax(&tree, &shared, other);
         let declared = (tree.nodes()).find(|n| {
-            n.kind == K::TypeDecl
+            matches!(n.kind, K::TypeDecl | K::ErrorDecl)
                 && n.child_tokens()
                     .find(|t| t.kind == K::Con)
                     .map(|t| t.text(&shared))
@@ -232,8 +263,17 @@ impl Loader<'_> {
             declared,
             Arc::clone(heads),
             false,
-        );
-        let target = target(declared, &shared, source.block(), Some(&qualifier))?;
+        )
+        .with_module(&import.module)
+        .with_catalog(Arc::clone(&self.head_catalog));
+        let target = target_in(
+            declared,
+            Some(&tree),
+            Some(&other_syntax),
+            &shared,
+            source.block(),
+            Some(&qualifier),
+        )?;
         Some((target, source))
     }
 
@@ -251,262 +291,6 @@ impl Loader<'_> {
             .iter()
             .find(|(n, _)| *n == module)?;
         Some((FileId::default(), (*text).to_owned()))
-    }
-}
-
-/// One call of a derive.
-struct Job<'j> {
-    plugin: &'j dyn Expander,
-    target: &'j DeriveTarget,
-    class: &'j str,
-    args: Option<&'j Block>,
-}
-
-/// What every derive of a module shares.
-struct Call<'c, 'l> {
-    loader: &'c Loader<'l>,
-    module: usize,
-    summary: &'c [DeriveTarget],
-    shared: &'c Arc<str>,
-    heads: &'c Arc<[String]>,
-}
-
-impl Call<'_, '_> {
-    /// The block of `class` in the `deriving` of `decl`, kept before its code
-    /// when `keep`, and the code its plugin gives; `None` for a class no
-    /// plugin derives.
-    fn class(
-        &self,
-        decl: &Node,
-        class: &Named,
-        keep: bool,
-        plugins: &mut Plugins,
-        results: &mut Results,
-        diagnostics: &mut Vec<Diagnostic>,
-    ) -> Option<(Found, Option<Rendered>)> {
-        let loader = self.loader;
-        let m = &loader.modules[self.module];
-        let text = &loader.sources.get(m.file).text;
-        let at = Span::new(m.file, class.span.0, class.span.1);
-        let (package, qualified, plugin) = self.deriver(class, keep, plugins, diagnostics)?;
-        let (target, source) = if keep {
-            let source = BlockSource::declaration(
-                Arc::clone(self.shared),
-                m.file,
-                decl,
-                Arc::clone(self.heads),
-                true,
-            );
-            (target(decl, text, source.block(), None)?, source)
-        } else {
-            let Some(found) = loader.foreign(m, decl, self.heads) else {
-                let ty = decl.nodes().find(|n| is_type(n.kind)).and_then(first_name);
-                let (start, end) = ty.unwrap_or(decl).range();
-                let message = "`deriving instance` derives for a type declared by a module this one imports, as `Shapes.Shape`";
-                diagnostics.push(Diagnostic::error(
-                    codes::C013,
-                    message,
-                    Span::new(m.file, start, end),
-                ));
-                return None;
-            };
-            found
-        };
-        let args = class.args.map(|a| arguments(a, text, &class.name));
-        let found = Found {
-            module: self.module,
-            node: decl.clone(),
-            source,
-            package,
-            plugin_id: plugin.id().to_owned(),
-            keep,
-            whole: at,
-            declared: Vec::new(),
-        };
-        let job = Job {
-            plugin: plugin.as_ref(),
-            target: &target,
-            class: &qualified,
-            args: args.as_ref(),
-        };
-        Some(self.run(found, &job, results, diagnostics))
-    }
-
-    /// The package whose plugin derives `class`, the class's full name and
-    /// the plugin; `None` for a class no plugin derives, which only a
-    /// `deriving instance` (not `keep`) reports.
-    fn deriver(
-        &self,
-        class: &Named,
-        keep: bool,
-        plugins: &mut Plugins,
-        diagnostics: &mut Vec<Diagnostic>,
-    ) -> Option<(String, String, Arc<dyn Expander>)> {
-        let loader = self.loader;
-        let m = &loader.modules[self.module];
-        let at = Span::new(m.file, class.span.0, class.span.1);
-        let Some((package, qualified)) = loader.derive_of(m, &class.qualifier, &class.name) else {
-            if !keep {
-                let message = format!(
-                    "the class `{}` has no derive: `deriving instance` names a class marked `@derive`",
-                    class.name
-                );
-                diagnostics.push(Diagnostic::error(codes::C013, message, at));
-            }
-            return None;
-        };
-        if let Some(off) = loader.disabled(&package, &qualified, at) {
-            diagnostics.push(off);
-            return None;
-        }
-        match loader.load_plugin(plugins, &package) {
-            Ok(plugin) => Some((package, qualified, plugin)),
-            Err(why) => {
-                let message = format!("the plugin of package `{package}` cannot be loaded: {why}");
-                diagnostics.push(Diagnostic::error(codes::P035, message, at));
-                None
-            }
-        }
-    }
-
-    /// The code the plugin of `class` gives for `declared`, a type the code
-    /// of the block `block` declares: the block is its declaration, and the
-    /// code goes with the block's own.
-    fn declared(
-        &self,
-        block: &Found,
-        declared: &Declared,
-        class: &str,
-        plugins: &mut Plugins,
-        results: &mut Results,
-        diagnostics: &mut Vec<Diagnostic>,
-    ) -> Option<(Found, Option<Rendered>)> {
-        let (module, name) = class.rsplit_once('.').unwrap_or(("", class));
-        let written = Named {
-            qualifier: module.to_owned(),
-            name: name.to_owned(),
-            args: None,
-            span: (block.whole.start, block.whole.end),
-        };
-        let (package, qualified, plugin) = self.deriver(&written, true, plugins, diagnostics)?;
-        let target = match &declared.target {
-            Ok(target) => target,
-            Err(why) => {
-                diagnostics.push(failure(block, &package, why));
-                return None;
-            }
-        };
-        let m = &self.loader.modules[self.module];
-        let source = self.loader.block_sources(m)(&block.node)?;
-        let found = Found {
-            module: self.module,
-            node: block.node.clone(),
-            source,
-            package,
-            plugin_id: plugin.id().to_owned(),
-            keep: false,
-            whole: block.whole,
-            declared: Vec::new(),
-        };
-        let job = Job {
-            plugin: plugin.as_ref(),
-            target,
-            class: &qualified,
-            args: None,
-        };
-        Some(self.run(found, &job, results, diagnostics))
-    }
-
-    /// `job` for the block `found`, and the code it gave.
-    fn run(
-        &self,
-        mut found: Found,
-        job: &Job,
-        results: &mut Results,
-        diagnostics: &mut Vec<Diagnostic>,
-    ) -> (Found, Option<Rendered>) {
-        let package = found.package.clone();
-        let m = &self.loader.modules[self.module];
-        let gate = self.loader.gate(&package, &m.root);
-        let mut collecting = BlockSource::default();
-        collecting.reach = Reach::new(gate.clone());
-        found.source.reach = Reach::new(gate);
-        let collected = results.collect(job.plugin, &[], &mut collecting);
-        // what the host refused, whatever the plugin made of it
-        for (code, message) in collecting.reach.problems {
-            diagnostics.push(Diagnostic::error(code, message, found.whole));
-        }
-        let state = match collected {
-            Ok(state) => state,
-            Err(why) => {
-                diagnostics.push(failure(&found, &package, &format!("failed: {why}")));
-                return (found, None);
-            }
-        };
-        let made = results.derive(
-            job.plugin,
-            job.target,
-            job.class,
-            job.args,
-            self.summary,
-            &state,
-            &mut found.source,
-        );
-        found.source.reach.used.extend(collecting.reach.used);
-        for (code, message) in found.source.reach.problems.drain(..) {
-            diagnostics.push(Diagnostic::error(code, message, found.whole));
-        }
-        let rendered = match made {
-            Ok(arena) => {
-                let len = found.source.end() - found.source.start();
-                match render(&arena, len, Place::Declaration, &m.syntax.aliases()) {
-                    Ok(code) => Some(code),
-                    Err(why) => {
-                        let what = format!("gave code that is not valid: {why}");
-                        diagnostics.push(failure(&found, &package, &what));
-                        None
-                    }
-                }
-            }
-            Err(Failure::Refused(refused)) => {
-                if refused.is_empty() && found.source.diagnostics.is_empty() {
-                    diagnostics.push(failure(&found, &package, "derived nothing"));
-                }
-                diagnostics.extend(refused.iter().map(|d| refusal(&found, &package, d)));
-                None
-            }
-            Err(Failure::Broken(why)) => {
-                diagnostics.push(failure(&found, &package, &format!("failed: {why}")));
-                None
-            }
-        };
-        diagnostics.append(&mut found.source.diagnostics);
-        (found, rendered)
-    }
-}
-
-/// The `{ … }` of a class in `deriving`, as a block whose body is its text.
-fn arguments(node: &Node, text: &str, class: &str) -> Block {
-    let (start, end) = node.range();
-    let tokens = (node.tokens().into_iter())
-        .filter(|t| !t.kind.is_trivia())
-        .map(|t| flick_plugin::Token {
-            kind: token_kind(t.kind),
-            span: flick_plugin::Span {
-                start: t.start - start,
-                end: t.end - start,
-            },
-        })
-        .collect();
-    Block {
-        head: class.to_owned(),
-        text: text[start as usize..end as usize].to_owned(),
-        body: 0,
-        place: Place::Expression,
-        tokens,
-        docs: String::new(),
-        signature: None,
-        module: String::new(),
     }
 }
 

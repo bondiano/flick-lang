@@ -4,11 +4,13 @@
 
 mod declared;
 mod deriving;
+mod target;
 
 pub use declared::{Declared, declared};
 use deriving::Deriving;
+pub use target::{target, target_in};
 
-use flick_plugin::{Block, CaseTarget, DeriveTarget, Span as BlockSpan};
+use flick_plugin::{Block, DeriveTarget};
 
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, OnceLock};
@@ -16,7 +18,7 @@ use std::sync::{Arc, OnceLock};
 use super::expansion::{Expanded, Expansion};
 use super::render::render;
 use super::source::BlockSource;
-use super::written::{user_type, written};
+use super::written::user_type;
 use super::{EditorBlock, Expander, Failure, ROUNDS, blocks_under, first_party, placed};
 use crate::diagnostics::{Diagnostic, codes};
 use crate::resolve::ModuleSyntax;
@@ -80,95 +82,6 @@ pub fn derived_classes(tree: &Node, text: &str) -> Vec<Derived> {
         }
     }
     out
-}
-
-/// What `decl`, a `TypeDecl` read as `block`, declares, for a derive: its
-/// spans count from its start. `qualifier` names the module of a type of
-/// another module, which qualifies its names and makes no holes.
-pub fn target(
-    decl: &Node,
-    text: &str,
-    block: Block,
-    qualifier: Option<&str>,
-) -> Option<DeriveTarget> {
-    let start = decl.range().0;
-    let span = |n: &Node| {
-        let (s, e) = n.range();
-        BlockSpan {
-            start: s - start,
-            end: e - start,
-        }
-    };
-    let ty = |n: &Node| written(n, text, start);
-    let named = |name: &str| match qualifier {
-        Some(q) => format!("{q}.{name}"),
-        None => name.to_owned(),
-    };
-    let name = decl.child_tokens().find(|t| t.kind == K::Con)?.text(text);
-    let (params, kinds) = (decl.nodes())
-        .filter(|n| n.kind == K::TypeParam)
-        .filter_map(|p| {
-            let name = p.child_tokens().find(|t| t.kind == K::Ident)?.text(text);
-            // Canonical token spacing, independent of how the kind was written.
-            let kind = p.nodes().next().map_or_else(String::new, |k| {
-                k.tokens()
-                    .iter()
-                    .filter(|t| !t.kind.is_trivia())
-                    .map(|t| t.text(text))
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            });
-            Some((name.to_owned(), kind))
-        })
-        .unzip();
-    // the words before its name: `type`, `alias`, `opaque`, `unboxed`, `error`
-    let modifiers = (decl.child_tokens())
-        .take_while(|t| t.kind != K::Con)
-        .map(|t| t.text(text).to_owned())
-        .collect();
-    let deriving = (decl.nodes())
-        .filter(|n| n.kind == K::DerivingClause)
-        .flat_map(|clause| named_classes(clause, text))
-        .map(|n| {
-            if n.qualifier.is_empty() {
-                n.name
-            } else {
-                format!("{}.{}", n.qualifier, n.name)
-            }
-        })
-        .collect();
-    let cases = (decl.nodes())
-        .filter(|n| n.kind == K::Variant)
-        .filter_map(|v| {
-            let con = v.child_tokens().find(|t| t.kind == K::Con)?.text(text);
-            let fields = v.nodes().filter(|n| is_type(n.kind)).map(ty).collect();
-            Some(CaseTarget {
-                name: named(con),
-                fields,
-                literal: v.nodes().find(|n| n.kind == K::LitPat).map(span),
-                refined: v.nodes().any(|n| n.kind == K::VariantResult),
-                constrained: v.nodes().any(|n| n.kind == K::Context),
-            })
-        })
-        .collect();
-    let body = decl
-        .nodes()
-        .find(|n| is_type(n.kind) && n.kind != K::TypeParam);
-    let alias = decl
-        .child_tokens()
-        .any(|t| t.kind == K::Ident && t.text(text) == "alias");
-    Some(DeriveTarget {
-        decl: block,
-        name: named(name),
-        params,
-        kinds,
-        cases,
-        alias: body.filter(|_| alias).map(ty),
-        wraps: None,
-        modifiers,
-        deriving,
-        local: qualifier.is_none(),
-    })
 }
 
 /// A class a `deriving` names, its arguments and where it is written.
@@ -239,8 +152,9 @@ pub fn builtin_expansion(
     let mut summary: Vec<DeriveTarget> = (declared.iter())
         .filter_map(|d| {
             let source =
-                BlockSource::declaration(Arc::clone(&shared), file, d, Arc::clone(&heads), true);
-            target(d, text, source.block(), None)
+                BlockSource::declaration(Arc::clone(&shared), file, d, Arc::clone(&heads), true)
+                    .with_module(module);
+            target_in(d, Some(tree), Some(syntax), text, source.block(), None)
         })
         .collect();
     let mut blocks = Vec::new();
@@ -271,8 +185,11 @@ pub fn builtin_expansion(
         };
         for class in named(clause, text) {
             let source =
-                BlockSource::declaration(Arc::clone(&shared), file, decl, Arc::clone(&heads), true);
-            let Some(target) = target(decl, text, source.block(), None) else {
+                BlockSource::declaration(Arc::clone(&shared), file, decl, Arc::clone(&heads), true)
+                    .with_module(module);
+            let Some(target) =
+                target_in(decl, Some(tree), Some(syntax), text, source.block(), None)
+            else {
                 continue;
             };
             let of = (class.qualifier.as_str(), class.name.as_str());
@@ -362,11 +279,7 @@ fn std_blocks(
     let (heads, aliases) = (&syntax.heads(), syntax.aliases());
     let own = |n: &Node| {
         let head = super::head_token(n);
-        head.is_some_and(|h| {
-            first_party::HEADS
-                .iter()
-                .any(|(head, _)| *head == h.text(shared))
-        })
+        head.is_some_and(|h| first_party::head_catalog().is_implicit(h.text(shared)))
     };
     let unexpanded = |n: &Node, why: &str| {
         let (start, end) = n.range();

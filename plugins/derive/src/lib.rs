@@ -15,18 +15,45 @@ pub mod server_fn;
 mod ty;
 mod url;
 
-use flick_plugin::{Arena, Block, Builder, DeriveTarget, Diagnostic};
+use flick_plugin::{Arena, Block, Builder, DeriveTarget, Diagnostic, HeadSpec, PluginMetadata};
 
 use module::{Abi, Form, Module};
 use schema::{Fail, Gen};
 
-/// The classes these derives make: the full names `derive` is called with.
-pub const CLASSES: [&str; 4] = [
-    "Prelude.Schema",
-    "Prelude.Url",
-    "Prelude.Form",
-    "HttpApi.Derive.HttpApi",
-];
+/// Static metadata declared by the first-party derive/server/codec plugin.
+#[must_use]
+pub fn metadata() -> PluginMetadata {
+    PluginMetadata {
+        heads: vec![
+            HeadSpec {
+                head: "server".into(),
+                module: "Server".into(),
+                bare: true,
+                declarations: vec!["fn".into()],
+                ..HeadSpec::default()
+            },
+            HeadSpec {
+                head: "codec".into(),
+                module: "Codec".into(),
+                ..HeadSpec::default()
+            },
+        ],
+        watch: Vec::new(),
+        derives: vec![
+            "Prelude.Schema".into(),
+            "Prelude.Url".into(),
+            "Prelude.Form".into(),
+            "HttpApi.Derive.HttpApi".into(),
+        ],
+        own_codes: Vec::new(),
+    }
+}
+
+/// Whether `class` is one of the derives owned by this plugin.
+#[must_use]
+pub fn owns_derive(class: &str) -> bool {
+    metadata().derives.iter().any(|c| c == class)
+}
 
 /// The code `class` derives for `target`, a type of the module whose types
 /// are `module`, with the arguments of the `deriving`.

@@ -19,11 +19,12 @@ fn collect_inline_imports(node: &Node, text: &str, file: FileId, out: &mut Vec<I
 /// The value of a module of the test root that `flick test` runs.
 pub const TESTS: &str = "tests";
 
-/// `tests` at the head of the first top-level block of [`TOP`] under `tree`.
+/// `tests` at the head of the first top-level block of `std`'s `top` heads under `tree`.
 fn test_blocks(tree: &Node, text: &str, file: FileId) -> Option<Item> {
+    let catalog = first_party::head_catalog();
     let head = (tree.nodes().filter(|n| n.kind == K::PluginDecl))
         .filter_map(head_token)
-        .find(|head| TOP.contains(&head.text(text)))?;
+        .find(|head| catalog.is_top(head.text(text)))?;
     Some(Item {
         kind: ItemKind::Value,
         name: TESTS.to_owned(),
@@ -33,14 +34,15 @@ fn test_blocks(tree: &Node, text: &str, file: FileId) -> Option<Item> {
 
 /// The heads of std's plugin `imports` expose that a block under `tree`
 /// writes in a form the parser reads only after an import: an expression
-/// without `{`, other than [`BARE`] before a name, or one of [`TOP`]; or a
-/// declaration that is none of [`DECLARATIONS`] or [`TOP`]. The body of a
-/// block is not parsed yet, so a head written there counts too, whatever
+/// without `{`, other than a `bare` head before a name, or a `top` head; or a
+/// declaration that is none of `declarations`, `named`, or `top`. The body of
+/// a block is not parsed yet, so a head written there counts too, whatever
 /// its form: the import then stays.
 fn bodiless(tree: &Node, text: &str, imports: &[Import]) -> Vec<String> {
-    let implicit = |head: &str| HEADS.iter().any(|(h, _)| *h == head);
+    let catalog = first_party::head_catalog();
+    let implicit = |head: &str| catalog.is_implicit(head);
     let imported = |head: &str| (imports.iter()).any(|i| i.plugins.iter().any(|p| p.name == head));
-    if !HEADS.iter().any(|(h, _)| imported(h)) {
+    if !catalog.rules().iter().any(|r| r.implicit && imported(&r.head)) {
         return Vec::new();
     }
     let mut blocks = Vec::new();
@@ -56,15 +58,14 @@ fn bodiless(tree: &Node, text: &str, imports: &[Import]) -> Vec<String> {
         let next = words.next();
         let free = match block.kind {
             K::PluginExpr => {
-                !TOP.contains(&head) && block.nodes().any(|n| n.kind == K::Block)
-                    || BARE.contains(&head)
+                !catalog.is_top(head) && block.nodes().any(|n| n.kind == K::Block)
+                    || catalog.is_bare(head)
                         && next.is_some_and(|t| matches!(t.kind, K::Ident | K::Con))
             }
             _ => {
-                TOP.contains(&head)
-                    || next.is_some_and(|t| {
-                        (DECLARATIONS.iter()).any(|(h, w)| *h == head && *w == t.text(text))
-                    })
+                catalog.is_top(head)
+                    || (catalog.is_named(head) && next.is_some_and(|t| t.kind == K::Ident))
+                    || next.is_some_and(|t| catalog.is_declaration(head, t.text(text)))
             }
         };
         // a block in its body is read only as it expands, so any word of a head counts

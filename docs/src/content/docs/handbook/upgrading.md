@@ -65,6 +65,7 @@ change needs.
 | [Versioned backend value ABI tables](#versioned-backend-value-abi-tables) | no | `FLICK-F013`, `FLICK-F014` |
 | [`FuncRef` and callback retention in IR `0.18.0`](#funcref-and-callback-retention-in-ir-0180) | no | `FLICK-F015`, `FLICK-F013` |
 | [Host exports and library build artifacts (`0.19.0`)](#host-exports-and-library-build-artifacts-0190) | no | `FLICK-F004`, `FLICK-P012`, `FLICK-S014` |
+| [Plugin protocol `0.5.0`](#plugin-protocol-050) | no | `FLICK-P035`, `FLICK-P036`, `FLICK-P044` |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -850,3 +851,23 @@ unexpressible exports as `FLICK-F004`). `flick/js` supports
 Backend components and `ir`-hook plugins must rebuild against `flick-ir`
 `0.19.0` and `flick-backend` and update their descriptor `ir` range to
 `[0.19.0, 0.20.0)`. Existing Flick sources require no changes.
+
+## Plugin protocol `0.5.0`
+
+The `flick:plugin` component protocol moves from `0.4.0` to `0.5.0`:
+
+- Plugins export `metadata() -> plugin-metadata` (`Plugin::metadata` in Rust,
+  defaulting to empty metadata) declaring their block heads (`HeadSpec`),
+  watched names (`watch`), and derived classes (`derives`). The parser reads
+  both `std` and external plugin heads from a data-driven `HeadCatalog`,
+  rejecting invalid specs, external `own_codes`, or head conflicts
+  (`FLICK-P036`, `FLICK-P044`).
+- `DeriveTarget`, `CaseTarget`, and `Written` carry deterministic declaration
+  metadata: `name_span`, `param_spans`, `deriving_spans`, `visibility`,
+  `attributes`, variant `docs`/`attributes`/`constraints`/`result`/`literal_value`,
+  `RecordField` with `name_span`/`span`/`docs`/`source_index` (in canonical
+  UTF-16 label order), and structured `WrittenKind::Forall`, `StringLit`, and
+  `None`.
+- WASM plugin components built for `flick:plugin@0.4.0` are rejected with
+  `FLICK-P035` until rebuilt against `flick-plugin` (`0.5.0`). Existing Flick
+  programs require no source changes.

@@ -3,7 +3,9 @@
 //! of the module. The block is the declaration, and the fields of the type are the
 //! types the user wrote in it.
 
-use flick_plugin::{Arena, Block, CaseTarget, Decl, DeriveTarget, Kind, Span, Ty, Written};
+use flick_plugin::{
+    Arena, Block, CaseTarget, Decl, DeriveTarget, Kind, Span, Ty, Visibility, Written,
+};
 
 /// A type of a block's code and the classes it names.
 pub struct Declared {
@@ -42,8 +44,15 @@ pub fn declared(arena: &Arena, block: &Block, read: &dyn Fn(Span) -> Written) ->
                     let cases = (cases.iter().zip(fields))
                         .map(|(c, fields)| CaseTarget {
                             name: c.name.clone(),
+                            span: Span::default(),
+                            name_span: Span::default(),
+                            docs: String::new(),
+                            attributes: Vec::new(),
+                            constraints: Vec::new(),
                             fields,
+                            result: None,
                             literal: None,
+                            literal_value: None,
                             refined: false,
                             constrained: false,
                         })
@@ -51,7 +60,9 @@ pub fn declared(arena: &Arena, block: &Block, read: &dyn Fn(Span) -> Written) ->
                     DeriveTarget {
                         decl: block.clone(),
                         name: name.clone(),
+                        name_span: Span::default(),
                         params: params.clone(),
+                        param_spans: vec![Span::default(); params.len()],
                         kinds: vec![String::new(); params.len()],
                         cases,
                         alias: None,
@@ -62,6 +73,9 @@ pub fn declared(arena: &Arena, block: &Block, read: &dyn Fn(Span) -> Written) ->
                             vec!["type".into()]
                         },
                         deriving: deriving.clone(),
+                        deriving_spans: vec![Span::default(); deriving.len()],
+                        visibility: Visibility::PublicConstructors,
+                        attributes: Vec::new(),
                         local: true,
                     }
                 });

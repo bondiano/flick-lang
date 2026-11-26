@@ -756,6 +756,7 @@ dependencies = [
  "flick-plugin-ui",
  "flick-pretty",
  "flick-syntax",
+ "flick-test-meta",
  "flick-test-pairs",
  "flick-test-support",
  "fln-literals",
@@ -934,6 +935,13 @@ dependencies = [
  "flick-backend-support",
  "flick-ir",
  "serde_json",
+]
+
+[[package]]
+name = "flick-test-meta"
+version = "0.1.0"
+dependencies = [
+ "flick-plugin",
 ]
 
 [[package]]

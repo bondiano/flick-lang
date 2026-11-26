@@ -10,7 +10,7 @@ use std::sync::Arc;
 use flick_plugin::command;
 use flick_plugin::{
     Arena, Block, CallSite, Compiler, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover,
-    Piece, Plugin, Published,
+    Piece, Plugin, PluginMetadata, Published,
 };
 use flick_plugin_cli::Cli;
 use flick_plugin_derive::{codec, server_fn};
@@ -21,42 +21,23 @@ use flick_plugin_ui::{block as ui_block, calls, component};
 
 use super::{Expander, Native};
 use crate::implicit_packages::is_implicit_package;
-
-pub use crate::syntax::heads::{BARE, DECLARATIONS, HEADS, NAMED, TOP};
-
-/// The names whose places of call the plugin of std checks, as the `watch`
-/// of a package declares them. Every module is watched for them without a
-/// manifest, as every module has std's heads.
-pub const WATCH: [&str; 16] = [
-    "@cell",
-    "@maker",
-    "Atom.Read",
-    "Prelude.Setup",
-    "Ui.view",
-    "Ui.Event.exhaust",
-    "Ui.Event.latest",
-    "Ui.Event.queue",
-    "Ui.Event.concurrent",
-    "Action.queue",
-    "Action.concurrent",
-    "*.parse",
-    "Atom.serializable",
-    "Atom.serializable_family",
-    "Atom.serializable_task",
-    "Atom.serializable_result",
-];
-
-/// The codes std's plugin gives that are the compiler's own, not shown
-/// under its package: the checks that moved into it keep the code, the
-/// reference page and the `flick explain` text they had. Its other codes,
-/// such as `Q010`, stay `std/Q010`.
-pub const OWN_CODES: [&str; 12] = [
-    "U001", "U002", "U003", "U004", "U005", "U006", "U007", "D006", "E002", "T036", "T037", "T038",
-];
+use crate::syntax::{HeadCatalog, std_head_catalog, std_metadata};
 
 /// The logical owner of the plugin linked into the compiler. Its source
 /// modules may live in different implicit packages.
 pub const PACKAGE: &str = "std";
+
+/// Aggregated metadata of all first-party `std` plugins.
+#[must_use]
+pub fn metadata() -> &'static PluginMetadata {
+    std_metadata()
+}
+
+/// The parser [`HeadCatalog`] for `std`'s implicit plugin heads.
+#[must_use]
+pub fn head_catalog() -> &'static HeadCatalog {
+    std_head_catalog()
+}
 
 /// The standard-library source packages share the linked plugin's logical
 /// owner. A host-supplied extra package does not acquire it. Moving a module
@@ -93,10 +74,10 @@ struct Std;
 
 /// Whether `block` is a `cli` block.
 fn cli(block: &Block) -> bool {
-    !matches!(
-        block.head.as_str(),
-        "server" | "codec" | "sql" | "component" | "ui" | "refined"
-    ) && !test_head(&block.head)
+    flick_plugin_cli::metadata()
+        .heads
+        .iter()
+        .any(|h| h.head == block.head)
 }
 
 /// The state of `sql` and that of the tests, which follows it after a zero
@@ -110,6 +91,10 @@ fn split(state: &[u8]) -> (&[u8], &[u8]) {
 }
 
 impl Plugin for Std {
+    fn metadata(&self) -> PluginMetadata {
+        metadata().clone()
+    }
+
     // the state is the tables' and migrations' of `sql`, and the order of the
     // tests of each module: the others keep none
     fn collect(&self, blocks: &[Block], compiler: &mut dyn Compiler) -> Vec<u8> {
@@ -164,8 +149,8 @@ impl Plugin for Std {
         }
     }
 
-    // each takes the names of [`WATCH`] it owns: the event policies, and
-    // the `parse` of a refined type
+    // each takes the names it declared in `metadata().watch`: the event
+    // policies and atom/view checks, and the `parse` of a refined type
     fn check_calls(&self, calls: &[CallSite], _state: &[u8]) -> Vec<Diagnostic> {
         let mut found = calls::check(calls);
         found.extend(flick_plugin_refined::check(calls));
@@ -237,7 +222,7 @@ impl Plugin for Std {
         state: &[u8],
         compiler: &mut dyn Compiler,
     ) -> Result<Arena, Vec<Diagnostic>> {
-        if flick_plugin_derive::CLASSES.contains(&class) {
+        if flick_plugin_derive::owns_derive(class) {
             return flick_plugin_derive::derive(target, class, args, module);
         }
         Cli.derive(target, class, args, module, state, compiler)

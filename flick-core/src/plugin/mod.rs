@@ -7,6 +7,7 @@ pub mod calls;
 pub mod derive;
 pub mod expansion;
 pub mod first_party;
+pub mod metadata;
 pub mod reach;
 pub mod render;
 pub mod source;
@@ -19,7 +20,7 @@ use std::sync::Arc;
 
 use flick_plugin::{
     Arena, Artifact, Block, CallSite, Completion, DeriveTarget, Diagnostic, Fact, Highlight, Hover,
-    Piece, Plugin, Published,
+    Piece, Plugin, PluginMetadata, Published,
 };
 
 use source::{BlockSource, Seen};
@@ -33,6 +34,10 @@ use crate::syntax::kind::SyntaxKind as K;
 pub trait Expander: Send + Sync {
     /// What tells this plugin and its version apart, for caches.
     fn id(&self) -> &str;
+    /// Static metadata declared by the plugin.
+    fn metadata(&self) -> Result<PluginMetadata, String> {
+        Ok(PluginMetadata::default())
+    }
     /// What the plugin learns from all its blocks of a group; `source`
     /// reaches what the project grants.
     fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String>;
@@ -219,6 +224,10 @@ impl<P: Plugin> Native<P> {
 impl<P: Plugin + Send + Sync> Expander for Native<P> {
     fn id(&self) -> &str {
         &self.id
+    }
+
+    fn metadata(&self) -> Result<PluginMetadata, String> {
+        guarded(|| self.plugin.metadata())
     }
 
     fn collect(&self, blocks: &[Block], source: &mut BlockSource) -> Result<Vec<u8>, String> {
@@ -437,11 +446,11 @@ pub(crate) fn placed_call(d: &Diagnostic, package: &str, file: FileId) -> diagno
 }
 
 /// The code `code` of the plugin of `package`: the compiler's own code of
-/// that spelling for the checks of std's plugin that were the compiler's
-/// ([`first_party::OWN_CODES`]), else the plugin's under its package.
+/// that spelling for the checks of std's plugin that declare it in `own_codes`,
+/// else the plugin's under its package.
 fn code_of(package: &str, code: &str) -> Option<codes::Code> {
     if package == first_party::PACKAGE
-        && first_party::OWN_CODES.contains(&code)
+        && first_party::metadata().own_codes.iter().any(|c| c == code)
         && let Some(info) = codes::lookup(&format!("FLICK-{code}"))
     {
         return Some(info.code);

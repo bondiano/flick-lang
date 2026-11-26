@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::plugin::first_party::{BARE, DECLARATIONS, HEADS, TOP};
+use crate::plugin::first_party;
 use crate::plugin::{blocks_under, head_token};
 use crate::source::{FileId, Span};
 use crate::syntax::cst::{Element, Node};

@@ -26,6 +26,7 @@ pub(crate) fn prove_file(
     check_file_with(sources, file, parse, syntax, expansion, derived, true)
 }
 
+#[allow(clippy::too_many_lines)]
 fn check_file_with(
     sources: &SourceMap,
     file: FileId,
@@ -58,11 +59,12 @@ fn check_file_with(
     by_name.insert(name, 0);
     let from_packages = BTreeMap::new();
     let precompiled = Precompiled::default();
-    let watched = types::Watched::new(first_party::WATCH);
+    let std_watch = || first_party::metadata().watch.iter().map(String::as_str);
+    let watched = types::Watched::new(std_watch());
     let watching = first_party::plugin(first_party::PACKAGE).map(|plugin| Watching {
         package: first_party::PACKAGE.to_owned(),
         plugin,
-        watched: types::Watched::new(first_party::WATCH),
+        watched: types::Watched::new(std_watch()),
     });
     let watching: Vec<_> = watching.into_iter().collect();
     #[cfg_attr(not(feature = "contracts"), expect(unused_mut))]

@@ -4,7 +4,7 @@
 
 pub use flick_diagnostics::{diagnostics, source};
 pub use flick_ffi::ffi;
-pub use flick_syntax::syntax;
+pub mod syntax;
 
 pub mod api_diff;
 pub mod build;

@@ -5,7 +5,7 @@
 
 use flick_plugin::{Block, Place};
 
-use crate::read::{WORDS, name_of, structure};
+use crate::read::{name_of, structure};
 
 /// The bytes of a block in the state: three hashes.
 const ENTRY: usize = 24;
@@ -29,7 +29,7 @@ pub fn collect(blocks: &[Block]) -> Vec<u8> {
 
 /// Whether `block` is a suite or a test of the module, not of an expression.
 fn top(block: &Block) -> bool {
-    WORDS.contains(&block.head.as_str()) && block.place == Place::Declaration
+    crate::owns(&block.head) && block.place == Place::Declaration
 }
 
 /// Where `block` stands among the `count` blocks of its module, by `state`,
