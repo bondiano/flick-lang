@@ -13,6 +13,20 @@ use flick_ir::Namespace as IrNamespace;
 
 /// The declaration file of the module `projection` is for: its types and
 /// each exported value, and the exports refused with the reason.
+/// Whether `export` is a value of the module the file declares: not a
+/// method, and not a constructor of a type the JS backend has its own of,
+/// which is not in the backend's output.
+fn declared_value(projection: &Projection, interface: &Interface, export: &Export) -> bool {
+    let entity = &export.entity;
+    let parent = (export.parent.as_deref())
+        .and_then(|ty| interface.find(Namespace::Type, ty))
+        .and_then(|ty| ty.definition.as_ref());
+    matches!(entity.namespace, Namespace::Value | Namespace::Constructor)
+        && entity.module == projection.module
+        && export.decl != Decl::Method
+        && !(entity.namespace == Namespace::Constructor && parent.is_some_and(super::native_on_js))
+}
+
 pub fn declaration_file(
     projection: &Projection,
     interface: &Interface,
@@ -22,8 +36,7 @@ pub fn declaration_file(
     let mut values = Vec::new();
     for export in &interface.exports {
         let entity = &export.entity;
-        let value = matches!(entity.namespace, Namespace::Value | Namespace::Constructor);
-        if !value || entity.module != projection.module || export.decl == Decl::Method {
+        if !declared_value(projection, interface, export) {
             continue;
         }
         let Some(scheme) = &export.scheme else {

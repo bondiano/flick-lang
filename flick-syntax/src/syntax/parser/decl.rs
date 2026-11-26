@@ -242,6 +242,7 @@ fn type_decl(p: &mut Parser) {
                 variants(p, true);
             }
             deriving(p);
+            super::native::type_override(p);
         }
     }
     p.complete(m, K::TypeDecl);

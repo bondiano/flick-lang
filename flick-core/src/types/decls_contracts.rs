@@ -286,6 +286,7 @@ impl Checker<'_> {
                         derive: false,
                     },
                     variance: Vec::new(),
+                    native: None,
                 })),
                 methods,
             });
@@ -317,6 +318,7 @@ impl Checker<'_> {
                         effect: false,
                     },
                     variance: Vec::new(),
+                    native: None,
                 })),
                 methods: Vec::new(),
             });

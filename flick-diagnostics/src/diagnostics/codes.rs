@@ -220,6 +220,8 @@ codes! {
     F013 = Ffi 13, "foreign binding type not in backend value ABI";
     F014 = Ffi 14, "foreign ABI version mismatch";
     F015 = Ffi 15, "`FuncRef` value is not a function without captures";
+    F016 = Ffi 16, "native type without a representation";
+    F017 = Ffi 17, "representation of a native type outside a covering body";
     D001 = Schema 1, "type has no Schema witness";
     D002 = Schema 2, "codec misses a field";
     D003 = Schema 3, "codec gives a field twice";

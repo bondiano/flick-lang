@@ -11,6 +11,7 @@ fn support_learning_is_types_only_idempotent_and_conflict_atomic() {
         kind: Kind::Type,
         form: Form::NOMINAL,
         variance: Vec::new(),
+        native: None,
     };
     let entity = Entity {
         module: "Provider".into(),
@@ -82,6 +83,7 @@ fn alias_only_discovery_learns_external_types_and_real_service_companions_only()
                     opaque: false,
                 },
                 variance: Vec::new(),
+                native: None,
             }),
         )],
         ..Interface::default()
@@ -100,6 +102,7 @@ fn alias_only_discovery_learns_external_types_and_real_service_companions_only()
                         effect: true,
                     },
                     variance: Vec::new(),
+                    native: None,
                 }),
             ),
             export("External", "notImported", None),
@@ -149,6 +152,7 @@ fn same_tree_support_cannot_override_a_child_public_definition() {
             opaque: false,
         },
         variance: Vec::new(),
+        native: None,
     };
     let mut parent = Interface {
         module: "Provider".into(),
@@ -223,6 +227,7 @@ fn support_cannot_override_a_child_services_generated_implementation() {
                 kind: Kind::Type,
                 form: Form::NOMINAL,
                 variance: Vec::new(),
+                native: None,
             },
             owner_path: vec!["Child".into()],
         }],
@@ -246,6 +251,7 @@ fn support_cannot_override_a_child_services_generated_implementation() {
                         effect: true,
                     },
                     variance: Vec::new(),
+                    native: None,
                 }),
                 blocked: None,
                 at: None,
@@ -306,6 +312,7 @@ fn support_service_cannot_override_a_child_public_implementation() {
                     effect: true,
                 },
                 variance: Vec::new(),
+                native: None,
             },
             owner_path: vec!["Child".into()],
         }],
@@ -329,6 +336,7 @@ fn support_service_cannot_override_a_child_public_implementation() {
                         opaque: false,
                     },
                     variance: Vec::new(),
+                    native: None,
                 }),
                 blocked: None,
                 at: None,

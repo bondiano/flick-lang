@@ -35,6 +35,22 @@ pub struct TypeDef {
     /// absent signs conservatively as invariant.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub variance: Vec<Variance>,
+    /// The condition of a `type`'s `@native when …`: where it holds, the
+    /// type is the backend's own, and its values are not Flick data.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub native: Option<String>,
+}
+
+impl TypeDef {
+    /// A definition of `kind` and `form`, without variance or `@native`.
+    pub fn of(kind: Kind, form: Form) -> Self {
+        Self {
+            kind,
+            form,
+            variance: Vec::new(),
+            native: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

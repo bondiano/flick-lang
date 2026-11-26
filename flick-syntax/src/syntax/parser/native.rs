@@ -30,6 +30,30 @@ pub(super) fn overrides(p: &mut Parser) {
     }
 }
 
+/// Parses an indented `@native when <cond>` on a `type` declaration: where
+/// the condition holds the type is the backend's own, without its
+/// constructors, which are its Flick representation elsewhere.
+pub(super) fn type_override(p: &mut Parser) {
+    if !(p.sep().is_none() && p.raw().line_start && is_native_head(p)) {
+        return;
+    }
+    let m = p.start();
+    p.bump();
+    p.bump();
+    p.push(Ctx::Inline {
+        threshold: u32::MAX,
+    });
+    if p.at(K::String) || p.at_word("global") || p.at_word("inline") {
+        p.error_expected("`when`: the `@native` of a type names no binding, only where it holds");
+        foreign_source(p);
+    }
+    if p.expect(K::WhenKw) {
+        when_cond(p);
+    }
+    p.pop();
+    p.complete(m, K::NativeOverride);
+}
+
 fn override_clause(p: &mut Parser, clause_col: u32) {
     let m = p.start();
     // Consume `@` and `native` while still at the clause's line start.

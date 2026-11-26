@@ -332,6 +332,7 @@ impl ModuleSignature {
                 },
             },
             variance: Vec::new(),
+            native: None,
         }
     }
     pub fn from_interface(interface: &Interface) -> Self {

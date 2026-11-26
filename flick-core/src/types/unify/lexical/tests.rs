@@ -15,6 +15,7 @@ fn contract(checker: &mut Checker<'_>) {
                 }],
             },
             variance: Vec::new(),
+            native: None,
         },
     );
 }

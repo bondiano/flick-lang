@@ -40,3 +40,33 @@ let fetch url =
     let twice = format(&once, FileId::new(0)).expect("format twice");
     assert_eq!(twice, once);
 }
+
+/// The `@native when` of a type takes its own line, one level in, after
+/// `deriving`.
+#[test]
+fn formats_the_native_condition_of_a_type() {
+    let messy = "\
+module Demo exposing (Box, Handle)
+
+type Box a =
+  | Box a
+  deriving Eq
+     @native   when  js||go
+
+type Handle
+ @native  when js
+";
+    let expected = "\
+module Demo exposing (Box, Handle)
+
+type Box a = Box a
+  deriving Eq
+  @native when js || go
+
+type Handle
+  @native when js
+";
+    let once = format(messy, FileId::new(0)).expect("format once");
+    assert_eq!(once, expected);
+    assert_eq!(format(&once, FileId::new(0)).expect("format twice"), once);
+}

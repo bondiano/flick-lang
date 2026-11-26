@@ -21,9 +21,9 @@ fn paired_semantic_label_root_follows_late_solution_but_literal_twin_does_not() 
         )]));
         checker.env.define_type(
             "Literal",
-            TypeDef {
-                kind: Kind::Module,
-                form: Form::ModuleContract {
+            TypeDef::of(
+                Kind::Module,
+                Form::ModuleContract {
                     requirements: vec![R::Value {
                         name: "value".into(),
                         ty: Type::Record(Row {
@@ -33,8 +33,7 @@ fn paired_semantic_label_root_follows_late_solution_but_literal_twin_does_not() 
                         }),
                     }],
                 },
-                variance: Vec::new(),
-            },
+            ),
         );
         let literal_pair = checker
             .materialize_existential_witness(&Type::con("Probe", "Literal"), "Fields")
@@ -44,9 +43,9 @@ fn paired_semantic_label_root_follows_late_solution_but_literal_twin_does_not() 
             .expect("literal role registration");
         checker.env.define_type(
             "Dependent",
-            TypeDef {
-                kind: Kind::Module,
-                form: Form::ModuleContract {
+            TypeDef::of(
+                Kind::Module,
+                Form::ModuleContract {
                     requirements: vec![R::Value {
                         name: "value".into(),
                         ty: Type::Fun {
@@ -56,8 +55,7 @@ fn paired_semantic_label_root_follows_late_solution_but_literal_twin_does_not() 
                         },
                     }],
                 },
-                variance: Vec::new(),
-            },
+            ),
         );
         let b = checker
             .materialize_existential_witness(&Type::con("Probe", "Dependent"), "B")
@@ -95,15 +93,14 @@ fn paired_alignment_refreshes_late_completion_and_keeps_canonical_alias_reads_li
     test_checker::with_checker(|checker| {
         checker.env.define_type(
             "Alias",
-            TypeDef {
-                kind: Kind::Type,
-                form: Form::Alias {
+            TypeDef::of(
+                Kind::Type,
+                Form::Alias {
                     params: Vec::new(),
                     body: Type::Tuple(Vec::new()),
                     opaque: false,
                 },
-                variance: Vec::new(),
-            },
+            ),
         );
         define(
             checker,
@@ -133,15 +130,14 @@ fn paired_alignment_refreshes_late_completion_and_keeps_canonical_alias_reads_li
         )]));
         checker.env.define_type(
             "Alias",
-            TypeDef {
-                kind: Kind::Type,
-                form: Form::Alias {
+            TypeDef::of(
+                Kind::Type,
+                Form::Alias {
                     params: Vec::new(),
                     body: changed.clone(),
                     opaque: false,
                 },
-                variance: Vec::new(),
-            },
+            ),
         );
         let current = checker
             .validate_existential_witness(&a)
@@ -201,16 +197,15 @@ fn paired_late_descendants_are_in_the_live_scope_support_footprint() {
         );
         checker.env.define_type(
             "Dependent",
-            TypeDef {
-                kind: Kind::Module,
-                form: Form::ModuleContract {
+            TypeDef::of(
+                Kind::Module,
+                Form::ModuleContract {
                     requirements: vec![R::Value {
                         name: "value".into(),
                         ty: Type::con("A.Child", "T"),
                     }],
                 },
-                variance: Vec::new(),
-            },
+            ),
         );
         checker
             .validate_existential_witness(&a)
@@ -396,20 +391,20 @@ fn paired_external_constructor_kind_rejects_aborted_target_before_resolution() {
             kind,
             form: Form::NOMINAL,
             variance: Vec::new(),
+            native: None,
         };
         checker.env.define_type("Wrapper", wrapper(stale.clone()));
         checker.env.define_type(
             "Dependent",
-            TypeDef {
-                kind: Kind::Module,
-                form: Form::ModuleContract {
+            TypeDef::of(
+                Kind::Module,
+                Form::ModuleContract {
                     requirements: vec![R::Value {
                         name: "value".into(),
                         ty: Type::app(Type::con("Probe", "Wrapper"), Type::Tuple(Vec::new())),
                     }],
                 },
-                variance: Vec::new(),
-            },
+            ),
         );
         let dependent = checker
             .materialize_existential_witness(&Type::con("Probe", "Dependent"), "D")
@@ -461,24 +456,22 @@ fn paired_late_type_dependency_cannot_escape_a_thinned_telescope() {
             let root = checker.store.fresh_of(&Kind::Type);
             checker.env.define_type(
                 "Fixed",
-                TypeDef {
-                    kind: Kind::Type,
-                    form: Form::NOMINAL,
-                    variance: Vec::new(),
-                },
+                TypeDef::of(
+                    Kind::Type,
+                    Form::NOMINAL,
+                ),
             );
             checker.env.define_type(
                 "Dependent",
-                TypeDef {
-                    kind: Kind::Module,
-                    form: Form::ModuleContract {
+                TypeDef::of(
+                    Kind::Module,
+                    Form::ModuleContract {
                         requirements: vec![R::Value {
                             name: "value".into(),
                             ty: root.clone(),
                         }],
                     },
-                    variance: Vec::new(),
-                },
+                ),
             );
             let b = checker
                 .materialize_existential_witness(&Type::con("Probe", "Dependent"), "B")

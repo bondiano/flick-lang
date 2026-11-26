@@ -1,6 +1,7 @@
 //! Checking `@native "<binding>" when <cond>` overrides on top-level `let` definitions.
 
 use std::collections::BTreeSet;
+use std::slice;
 
 use flick_ir::ForeignMode;
 
@@ -34,7 +35,90 @@ pub struct NativeOverrideInfo {
     pub enabled: bool,
 }
 
+/// A `type` with `@native when <cond>`: the backend's own type where the
+/// condition holds, its constructors, its Flick representation, elsewhere.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepresentedType {
+    /// The condition, as written.
+    pub condition: String,
+    /// Whether it holds where the module is checked: the constructors are not
+    /// lowered, and only bodies that a clause covers there may name them.
+    pub native: bool,
+}
+
+/// The condition of the `@native when <cond>` of a `type` declaration.
+pub fn type_native_condition(decl: &Node, text: &str) -> Option<String> {
+    if decl.kind != K::TypeDecl {
+        return None;
+    }
+    let ov = decl.nodes().find(|n| n.kind == K::NativeOverride)?;
+    let cond = ov.nodes().find(|n| n.kind == K::WhenCond)?;
+    let (start, end) = cond.range();
+    Some(text[start as usize..end as usize].trim().to_owned())
+}
+
 impl Checker<'_> {
+    /// Whether a type's `@native when <cond>` holds where the module is
+    /// checked: the type is the backend's own there.
+    pub(in crate::types) fn native_holds(&self, condition: &str) -> bool {
+        let env = self.options.native_env();
+        !env.disable_native_overrides
+            && when::parse(condition).is_ok_and(|expr| {
+                matches!(
+                    env.select(slice::from_ref(&expr)),
+                    OverrideSelection::Selected(0)
+                )
+            })
+    }
+
+    /// Checks the `@native when <cond>` of a `type` declaration: its tags,
+    /// that the type has constructors to stand for it elsewhere (`FLICK-F016`),
+    /// and whether the condition holds where the module is checked.
+    pub(in crate::types) fn check_type_native(&mut self, decl: &Node) {
+        let Some(ov) = decl.nodes().find(|n| n.kind == K::NativeOverride) else {
+            return;
+        };
+        let Some(name) = decl
+            .child_tokens()
+            .find(|t| t.kind == K::Con)
+            .map(|t| t.text(self.text))
+        else {
+            return;
+        };
+        let Some(cond_node) = ov.nodes().find(|n| n.kind == K::WhenCond) else {
+            return;
+        };
+        let env = self.options.native_env();
+        let cond_span = self.span(cond_node);
+        let cond_text = &self.text[cond_span.start as usize..cond_span.end as usize];
+        let trimmed = cond_text.trim();
+        let trim_offset = cond_text.len() - cond_text.trim_start().len();
+        let Ok(expr) = when::parse(trimmed) else {
+            return;
+        };
+        if env.validate_tags {
+            self.validate_override_tags(trimmed, cond_span, trim_offset, &expr, &env.vocabulary);
+        }
+        if !decl.nodes().any(|n| n.kind == K::Variant) {
+            self.diagnostics.push(Diagnostic::error(
+                codes::F016,
+                format!(
+                    "`{name}` has `@native` but no constructors: they are its representation where \
+                     `{trimmed}` does not hold; give it some, or drop the `@native` of an opaque type"
+                ),
+                self.override_header_span(ov),
+            ));
+        }
+        let native = self.native_holds(trimmed);
+        self.typing.represented.insert(
+            name.to_owned(),
+            RepresentedType {
+                condition: trimmed.to_owned(),
+                native,
+            },
+        );
+    }
+
     /// Checks all `@native` overrides on top-level `decl`: validates `when` tag
     /// names (`FLICK-P066`), selects the unique strictly most-specific matching
     /// override (`FLICK-F012` on ambiguity), checks adapter metadata, and queues

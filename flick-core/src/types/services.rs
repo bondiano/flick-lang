@@ -51,6 +51,7 @@ pub fn impl_def(def: &TypeDef) -> Option<TypeDef> {
             opaque: false,
         },
         variance: Vec::new(),
+        native: None,
     })
 }
 

@@ -121,6 +121,10 @@ impl<'a> Checker<'a> {
                 self.check_native_overrides(decl, scheme.as_ref().map(|(s, _)| s));
             }
         }
+        for decl in decls.iter().filter(|d| d.kind == K::TypeDecl) {
+            self.check_type_native(decl);
+        }
+        self.check_represented_uses(&decls);
         self.record_atom_bindings(&decls);
         self.class_defaults(&decls);
         self.solve_rows();
