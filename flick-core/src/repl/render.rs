@@ -136,24 +136,32 @@ pub(super) fn imported<'e>(
 /// one even when it does not parse.
 pub(super) fn starts_declaration(input: &str, file: FileId) -> bool {
     let (tokens, _) = lex(input, file);
-    let mut kinds = tokens.iter().map(|t| t.kind).filter(|k| !k.is_trivia());
-    match kinds.next() {
-        Some(
-            K::ModuleKw
-            | K::ImportKw
-            | K::RecKw
-            | K::KindKw
-            | K::TypeKw
-            | K::OpaqueKw
-            | K::ServiceKw
-            | K::ClassKw
-            | K::InstanceKw
-            | K::DerivingKw
-            | K::ForeignKw
-            | K::At
-            | K::LetKw,
-        ) => true,
-        Some(K::Ident) => kinds.next() == Some(K::Colon),
+    let mut significant = tokens.iter().filter(|t| !t.kind.is_trivia());
+    let Some(first) = significant.next() else {
+        return false;
+    };
+    match first.kind {
+        K::ModuleKw
+        | K::ImportKw
+        | K::RecKw
+        | K::KindKw
+        | K::TypeKw
+        | K::OpaqueKw
+        | K::ServiceKw
+        | K::ClassKw
+        | K::InstanceKw
+        | K::DerivingKw
+        | K::ForeignKw
+        | K::At
+        | K::LetKw => true,
+        K::Ident => {
+            let next_kind = significant.next().map(|t| t.kind);
+            if next_kind == Some(K::Colon) {
+                return true;
+            }
+            let text = &input[first.start as usize..first.end as usize];
+            text == "effect" && next_kind == Some(K::Con)
+        }
         _ => false,
     }
 }
@@ -195,12 +203,62 @@ impl Layout {
     /// `let`. The block first binds `it` to `previous`, the module of the
     /// earlier `it`, so `it * 2` reads that one and not itself.
     pub(super) fn expression(head: &str, input: &str, previous: Option<&str>) -> Self {
+        Self::named_expression(head, "it", input, previous)
+    }
+
+    /// The expression `input` bound to `name`, optionally exposing `previous.it`.
+    pub(super) fn named_expression(
+        head: &str,
+        name: &str,
+        input: &str,
+        previous: Option<&str>,
+    ) -> Self {
+        let mut layout = Layout::default();
+        layout.generated(head);
+        layout.generated(&format!("let {name} =\n"));
+        if let Some(previous) = previous {
+            layout.generated(&format!("  let it = {previous}.it\n"));
+        }
+        let mut from = 0;
+        for line in input.split_inclusive('\n') {
+            let body = line.trim_end_matches(['\n', '\r']);
+            layout.generated("  ");
+            layout.input(body, from);
+            layout.generated("\n");
+            from += offset(line.len());
+        }
+        layout
+    }
+
+    /// An effectful expression `input` wrapped in `task { … }` as `it`, so
+    /// top-level runtime calls typecheck and can be auto-awaited by the evaluator.
+    pub(super) fn task_expression(head: &str, input: &str, previous: Option<&str>) -> Self {
         let mut layout = Layout::default();
         layout.generated(head);
         layout.generated("let it =\n");
         if let Some(previous) = previous {
             layout.generated(&format!("  let it = {previous}.it\n"));
         }
+        layout.generated("  task {\n");
+        let mut from = 0;
+        for line in input.split_inclusive('\n') {
+            let body = line.trim_end_matches(['\n', '\r']);
+            layout.generated("    ");
+            layout.input(body, from);
+            layout.generated("\n");
+            from += offset(line.len());
+        }
+        layout.generated("  }\n");
+        layout
+    }
+
+    /// Inline handler arms `| E.op ... -> ...` wrapped as a thunk handler function.
+    pub(super) fn handle_arms(head: &str, name: &str, input: &str) -> Self {
+        let mut layout = Layout::default();
+        layout.generated(head);
+        layout.generated(&format!(
+            "let {name} __repl_body =\n  try __repl_body () with\n"
+        ));
         let mut from = 0;
         for line in input.split_inclusive('\n') {
             let body = line.trim_end_matches(['\n', '\r']);

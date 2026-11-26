@@ -51,6 +51,7 @@ pub mod prove_command;
 pub mod prove_contracts;
 pub mod prove_contracts_extra;
 pub mod prove_lints;
+pub mod repl;
 pub mod rpc_cross;
 pub mod rpc_rt;
 pub mod rt_stages;

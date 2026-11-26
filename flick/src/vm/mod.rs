@@ -1,7 +1,7 @@
 //! Built-in in-process VM target (`--target vm`) on `flick_vm::{tier0, tier1}`.
 
 #[cfg(feature = "vm")]
-mod lower;
+pub(crate) mod lower;
 #[cfg(feature = "vm")]
 mod run;
 #[cfg(feature = "vm")]

@@ -1,6 +1,7 @@
 //! One counted execution: explicit frames, global roots and error unwinding.
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::{Duration, Instant};
 use std::{iter, mem};
 
@@ -672,6 +673,7 @@ struct Machine<'p, 'h> {
     host_mode: HostMode,
     bridge: Option<&'h mut HostBridge>,
     foreign: ForeignState<'p>,
+    external_interrupt: Option<Arc<AtomicBool>>,
 }
 
 include!("program/async_state.rs");
@@ -711,6 +713,7 @@ include!("program/manual_scope.rs");
 include!("program/layer_build.rs");
 include!("program/layer_merge.rs");
 include!("program/test_runner.rs");
+include!("program/session_hooks.rs");
 
 #[cfg(test)]
 mod tests {

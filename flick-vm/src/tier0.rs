@@ -34,6 +34,11 @@ pub use program::{
     execute_rooted_main_program_outcome_with_bridge, execute_rooted_main_program_outcome_with_host,
     execute_tests_program, execute_tests_program_with_bridge, execute_tests_program_with_host,
 };
+pub(crate) use program::{
+    SessionHandlerKind, SessionPersistentState, SessionRunSpec, SessionSyntheticCodes,
+    allocate_execution_id, build_session_layer_value, execute_session_step,
+    shutdown_persistent_state,
+};
 
 /// An allocation's identity includes its heap and generation. Recycled backing
 /// slots increment their generation, so a stale or foreign handle can never

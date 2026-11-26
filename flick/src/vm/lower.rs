@@ -12,13 +12,13 @@ use flick_core::project::{Compilation, Compiled};
 use flick_core::types::NativeOverrideEnv;
 
 /// A lowered memory-IR program and its optional `Host.live` root layer.
-pub(super) struct LoweredProgram {
-    pub(super) program: memory::Program,
-    pub(super) root: Option<MemoryName>,
+pub(crate) struct LoweredProgram {
+    pub(crate) program: memory::Program,
+    pub(crate) root: Option<MemoryName>,
 }
 
 /// Lowers `entries` (plus `Host.live` when present) from `compilation` to `flick_ir::memory::Program`.
-pub(super) fn lower(
+pub(crate) fn lower(
     compilation: &Compilation,
     entries: &[MemoryName],
     release: bool,

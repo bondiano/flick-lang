@@ -48,6 +48,7 @@ and [Contributed commands](../commands/)).
 | `doctor [--target <name>]` | checks the compiler, package store, git, plugins, and the selected target backend's environment and package checks |
 | `inspect <M> --emit ast\|typed-ir\|output\|iface\|variance\|mapping [--target <name>] [--no-native-overrides] [<backend options>]` | one representation of a module; `--emit output` asks the selected backend for the module's emitted code; `--emit iface` inspects the typed interface without loading any backend; `--emit variance` prints inferred parameter variances of exported types and classes (including installed packages and built-in modules, reporting unknown metadata as `inv (unknown)`) |
 | `lsp --stdio` | the [language server](../editor/#language-server); stdio is its only transport |
+| `repl [--target <name>] [--vm-tier <tier>]` | starts an interactive Flick REPL session on the in-process VM (`--target vm`, default); evaluates declarations and expressions with persistent bindings, `Host.live` services, auto-awaited `Eff` tasks, `SIGINT` interruption with scope finalization, and session commands (`:handle`, `:provide`, `:bg`, `:jobs`, `:kill`, `:quit`) |
 
 At the root of a workspace without `[project]`, `check`, `build`, `test`,
 `fmt` and `clean` without paths, and `install`, run on every member,
@@ -390,9 +391,10 @@ Removed legacy flags (`FLICK-P057`) for `flick/go`:
 Selected by `--target vm`, `[build] target = "vm"`, or `[build] environment = "vm/native"`.
 Runs compiled Flick programs and test suites directly in process on the built-in virtual machine without spawning `node` or `go`.
 
-- **Options (`[target.vm]`)**: `--vm-tier <tier>` (`run`, `test`; accepts `0`, `tier0`, `1`, or `tier1`, default `0`; also configurable via `[target.vm] tier = "0" | "tier0" | "1" | "tier1"` in `flick.toml`).
+- **Options (`[target.vm]`)**: `--vm-tier <tier>` (`run`, `test`, `repl`; accepts `0`, `tier0`, `1`, or `tier1`, default `0`; also configurable via `[target.vm] tier = "0" | "tier0" | "1" | "tier1"` in `flick.toml`).
 - **Running (`run`)**: executes a project entry (`flick run --target vm`) or a standalone source file (`flick run --target vm path/to/file.fl`) in process on the tier-0 reference VM (default) or the tier-1 register bytecode VM (`--vm-tier 1|tier1`), supporting `--profile debug` and `--profile release`. On tier 1, any reachable operation outside its pure synchronous subset fails with `FLICK-P012` naming the operation and its source span (no silent fallback to tier 0).
 - **Testing (`test`)**: executes project test suites in process (`flick test --target vm`), supporting `--filter`, `--list`, `--seed`, `--reporter human|json`, and `--profile`.
+- **Interactive REPL (`repl`)**: runs persistent REPL sessions in process (`flick repl`), supporting `Host.live` ambient services, auto-awaiting `Eff` tasks, `SIGINT` interruption with LIFO scope finalization, and session commands `:handle <expr>`, `:provide <expr>`, `:bg <expr>`, `:jobs`, `:kill <n>`, and `:quit`/`:q`.
 - **Current scope**: `flick build --target vm` (standalone VM images, tracked in `#988`), `flick dev --target vm`, and `flick inspect --emit output --target vm` are not supported yet and exit with `FLICK-P012`.
 - **Environment checks (`doctor`)**: reports the built-in VM availability and active tier without checking Node.js or Go.
 - **Cargo feature**: enabled by default in `flick` (`vm` feature); builds compiled with `--no-default-features` exclude the VM and report `FLICK-P013` when `--target vm` is selected.

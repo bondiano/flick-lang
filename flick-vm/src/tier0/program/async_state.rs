@@ -502,6 +502,7 @@ impl<'p, 'h> Machine<'p, 'h> {
             host_mode: HostMode::Deterministic,
             bridge: None,
             foreign: ForeignState::default(),
+            external_interrupt: None,
         }
     }
 }
