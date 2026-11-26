@@ -342,7 +342,7 @@ impl Lower<'_> {
                     self.current_item = format!("destructure {}..{}", span.start, span.end);
                 }
                 let body = self.definition(decl);
-                let (pattern, binder_types) = self.pattern_typed(pattern);
+                let (pattern, binder_types) = self.top_pattern_typed(pattern);
                 ItemKind::Destructure {
                     pattern,
                     binder_types,

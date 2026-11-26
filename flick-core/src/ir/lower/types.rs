@@ -3,6 +3,7 @@
 
 #[cfg(not(target_arch = "wasm32"))]
 use std::collections::HashMap;
+use std::mem;
 
 #[cfg(not(target_arch = "wasm32"))]
 use flick_ir::{IrType, TypeInterner};
@@ -139,6 +140,17 @@ impl Lower<'_> {
         {
             Vec::new()
         }
+    }
+
+    /// Lowers the pattern of a top-level `let` as [`Self::pattern_typed`]
+    /// does. Its variables are the module's values themselves, so each keeps
+    /// its source name, and the locals of the body before it took none.
+    pub(super) fn top_pattern_typed(&mut self, node: &Node) -> (Pat, Vec<(String, TypeRef)>) {
+        self.used.clear();
+        let values = mem::take(&mut self.values);
+        let lowered = self.pattern_typed(node);
+        self.values = values;
+        lowered
     }
 
     /// Lowers a pattern and returns `(pat, binder_types)` with the unique
