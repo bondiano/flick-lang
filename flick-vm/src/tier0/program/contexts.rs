@@ -1,54 +1,3 @@
-fn is_metered_primitive(kind: Intrinsic) -> bool {
-    matches!(
-        kind,
-        Intrinsic::ArrayToList
-            | Intrinsic::ListRange
-            | Intrinsic::PrimitiveCompare
-            | Intrinsic::PrimitiveHash
-            | Intrinsic::IntUnsafeDiv
-            | Intrinsic::IntUnsafeRem
-            | Intrinsic::NumberToFloat
-            | Intrinsic::ToBigInt
-            | Intrinsic::FloatMin
-            | Intrinsic::FloatMax
-            | Intrinsic::StringLength
-            | Intrinsic::RecordGet
-            | Intrinsic::RecordExtend
-            | Intrinsic::RecordRemove
-            | Intrinsic::RecordProject
-            | Intrinsic::RecordMergeDisjoint
-            | Intrinsic::RecordLabels
-            | Intrinsic::ExitIsSuccess
-            | Intrinsic::ExitIsFailure
-            | Intrinsic::ExitHasInterrupts
-            | Intrinsic::Int(_)
-            | Intrinsic::FixedWidth(_)
-            | Intrinsic::Float(_)
-            | Intrinsic::BigInt(_)
-            | Intrinsic::String(_)
-            | Intrinsic::List(_)
-            | Intrinsic::Record(_)
-            | Intrinsic::Debug(_)
-            | Intrinsic::Bytes(_)
-            | Intrinsic::Hash(_)
-            | Intrinsic::Json(_)
-            | Intrinsic::BigDecimal(_)
-            | Intrinsic::RegExp(_)
-            | Intrinsic::Duration(_)
-            | Intrinsic::Outcome(_)
-            | Intrinsic::Gen(_)
-            | Intrinsic::Schema(_)
-            | Intrinsic::JsonSchema(_)
-            | Intrinsic::Path(_)
-            | Intrinsic::DateTime(_)
-            | Intrinsic::Cron(_)
-            | Intrinsic::Graph(_)
-            | Intrinsic::Crypto(_)
-            | Intrinsic::Config(_)
-            | Intrinsic::Arbitrary(_)
-    )
-}
-
 impl Machine<'_, '_> {
     fn within(
         &mut self,
@@ -97,12 +46,12 @@ impl Machine<'_, '_> {
         if self.control_intrinsic(kind, binding)? {
             return Ok(());
         }
-        if is_metered_primitive(kind) {
+        if stdlib::is_metered_primitive(kind) {
             return self.metered_primitive(kind, binding);
         }
         match kind {
             Intrinsic::StringStartsWith | Intrinsic::StringIncludes => {
-                let value = primitives::string_predicate(
+                let value = stdlib::eval_string_predicate(
                     self.heap,
                     kind,
                     &self.scratch[0],
@@ -143,8 +92,8 @@ impl Machine<'_, '_> {
             | Intrinsic::RefSame
             | Intrinsic::RefModify => self.ref_intrinsic(kind, binding)?,
             Intrinsic::PrintLine | Intrinsic::Show => {
-                let value =
-                    primitives::intrinsic(self.heap, kind, &self.scratch[0], &mut self.stdout)?;
+                let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout);
+                let value = stdlib::eval_intrinsic(self.heap, kind, &self.scratch[0], &mut hooks)?;
                 self.primitive_result(binding, value)?;
             }
             Intrinsic::Host(primitive) => {
@@ -250,38 +199,24 @@ impl Machine<'_, '_> {
     }
 
     fn metered_primitive(&mut self, kind: Intrinsic, binding: Local) -> Result<(), Error> {
-        let value = primitives::metered_primitive(self.heap, kind, &self.scratch, &mut self.fuel)?;
+        let value = stdlib::eval_primitive(
+            self.heap,
+            kind,
+            &self.scratch,
+            &mut FuelCounter(&mut self.fuel),
+        )?;
         self.primitive_result(binding, value)
     }
 
     fn host_primitive(&mut self, primitive: HostPrimitive) -> Result<Value, Error> {
-        match primitive {
-            HostPrimitive::CurrentTimeMillis => {
-                #[expect(clippy::cast_precision_loss, reason = "virtual ms fits f64")]
-                let ms = (self.virtual_now_ns / 1_000_000) as f64;
-                return Ok(Value::Float(ms));
-            }
-            HostPrimitive::CurrentTimeNanos | HostPrimitive::MonotonicTimeNanos => {
-                return self
-                    .heap
-                    .literal(&Lit::BigInt(self.virtual_now_ns.to_string()));
-            }
-            HostPrimitive::RandomNext => {
-                if let Some(rng_id) = self.seeded_random
-                    && let Some(rng) = self.isaac_rngs.get_mut(&rng_id)
-                {
-                    return Ok(Value::Float(rng.next_f64()));
-                }
-            }
-            _ => {}
+        let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
+            .with_virtual_now_ns(self.virtual_now_ns);
+        if let Some(rng_id) = self.seeded_random
+            && let Some(rng) = self.isaac_rngs.get_mut(&rng_id)
+        {
+            hooks = hooks.with_seeded_rng(rng);
         }
-        primitives::intrinsic_with_host(
-            self.heap,
-            self.host_mode,
-            Intrinsic::Host(primitive),
-            &self.scratch[0],
-            &mut self.stdout,
-        )
+        stdlib::eval_host_primitive(self.heap, primitive, &self.scratch[0], &mut hooks)
     }
 
     fn unwrap_result(&mut self, binding: Local) -> Result<(), Error> {

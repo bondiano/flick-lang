@@ -1,7 +1,5 @@
 // Dynamic `Layer` build phase and `MemoMap` sharing (Stage 4A).
 
-const MEMO_REF_KEY: &str = "effect/Layer/CurrentMemoMap";
-
 enum MemoEntryState {
     Building {
         waiters: Vec<(usize, bool, LayerBuildTarget)>,
@@ -84,111 +82,11 @@ impl Machine<'_, '_> {
     }
 
     pub(super) fn layer_is_static(&self, layer: &Value) -> Result<bool, Error> {
-        let mut pending = vec![layer];
-        while let Some(v) = pending.pop() {
-            let Value::Object(tok) = v else {
-                return Err(Error::ExpectedLayer);
-            };
-            match &self.heap.object(tok.id)?.data {
-                Data::ForeignHandle { .. } => return Ok(false),
-                Data::Layer(data) => match data {
-                    LayerData::Succeed { .. } | LayerData::Empty | LayerData::Context(_) => {}
-                    LayerData::Merge { left, right } => pending.extend([left, right]),
-                    LayerData::Dynamic { .. }
-                    | LayerData::Fresh(_)
-                    | LayerData::MergeAll(_)
-                    | LayerData::OrDie(_) => return Ok(false),
-                },
-                _ => return Err(Error::ExpectedLayer),
-            }
-        }
-        Ok(true)
+        stdlib::runtime::layers::layer_is_static(self.heap, layer)
     }
 
     fn eval_static_layer_to_context(&mut self, layer: Value) -> Result<Value, Error> {
-        let mut map: BTreeMap<String, Value> = BTreeMap::new();
-        let mut stack = vec![layer];
-        while let Some(v) = stack.pop() {
-            let Value::Object(tok) = &v else {
-                self.heap.drop_value(v)?;
-                self.heap.drop_values(stack)?;
-                self.heap.drop_values(map.into_values().collect())?;
-                return Err(Error::ExpectedLayer);
-            };
-            let action = match &self.heap.object(tok.id)?.data {
-                Data::Layer(LayerData::Empty) => 0,
-                Data::Layer(LayerData::Succeed { .. }) => 1,
-                Data::Layer(LayerData::Context(_)) => 2,
-                Data::Layer(LayerData::Merge { .. }) => 3,
-                _ => {
-                    self.heap.drop_value(v)?;
-                    self.heap.drop_values(stack)?;
-                    self.heap.drop_values(map.into_values().collect())?;
-                    return Err(Error::ExpectedLayer);
-                }
-            };
-            match action {
-                0 => self.heap.drop_value(v)?,
-                1 => {
-                    let (key, imp_rep) = {
-                        let Data::Layer(LayerData::Succeed {
-                            tag,
-                            implementation,
-                        }) = &self.heap.object(tok.id)?.data
-                        else {
-                            unreachable!()
-                        };
-                        (
-                            self.service_tag_key(tag)?.to_owned(),
-                            implementation.representation(),
-                        )
-                    };
-                    let imp = self.heap.dup(&imp_rep)?;
-                    self.heap.drop_value(v)?;
-                    if let Some(old) = map.insert(key, imp) {
-                        self.heap.drop_value(old)?;
-                    }
-                }
-                2 => {
-                    let ctx_rep = {
-                        let Data::Layer(LayerData::Context(c)) = &self.heap.object(tok.id)?.data
-                        else {
-                            unreachable!()
-                        };
-                        c.representation()
-                    };
-                    let ctx_map = self.clone_context_map(&ctx_rep)?;
-                    self.heap.drop_value(v)?;
-                    for (k, imp) in ctx_map {
-                        if k == HOST_CTX_KEY
-                            && let Some(prev) = map.remove(HOST_CTX_KEY)
-                        {
-                            let combined = self.concat_host_context_lists(prev, imp)?;
-                            map.insert(k, combined);
-                        } else if let Some(old) = map.insert(k, imp) {
-                            self.heap.drop_value(old)?;
-                        }
-                    }
-                }
-                3 => {
-                    let (l_rep, r_rep) = {
-                        let Data::Layer(LayerData::Merge { left, right }) =
-                            &self.heap.object(tok.id)?.data
-                        else {
-                            unreachable!()
-                        };
-                        (left.representation(), right.representation())
-                    };
-                    let right = self.heap.dup(&r_rep)?;
-                    let left = self.heap.dup(&l_rep)?;
-                    self.heap.drop_value(v)?;
-                    stack.push(right);
-                    stack.push(left);
-                }
-                _ => unreachable!(),
-            }
-        }
-        Ok(self.heap.allocate(Data::Context(map)))
+        stdlib::runtime::layers::eval_static_layer_to_context(self.heap, layer)
     }
 
     pub(super) fn begin_dynamic_layer_run(
@@ -450,7 +348,7 @@ impl Machine<'_, '_> {
                     let mut cause = self.heap.dup_cause(c)?;
                     if or_die {
                         let conv =
-                            primitives::fails_to_dies_cause(self.heap, &cause, &mut self.fuel);
+                            primitives::fails_to_dies_cause(self.heap, &cause, &mut FuelCounter(&mut self.fuel));
                         self.heap.drop_cause(cause)?;
                         cause = conv?;
                     }

@@ -60,7 +60,7 @@ impl Heap {
     }
 
     /// Resolves either a flat `$list` or an O(1) `ListSlice` into `(backing_id, offset, len)`.
-    pub(super) fn list_view(&self, value: &Value) -> Result<(ObjectId, usize, usize), Error> {
+    pub(crate) fn list_view(&self, value: &Value) -> Result<(ObjectId, usize, usize), Error> {
         self.admit_ordinary(value)?;
         let Value::Object(token) = value else {
             return Err(Error::PatternKind("list"));
@@ -102,7 +102,7 @@ impl Heap {
         }
     }
 
-    pub(super) fn label_str(&self, value: &Value) -> Result<&str, Error> {
+    pub(crate) fn label_str(&self, value: &Value) -> Result<&str, Error> {
         self.admit_ordinary(value)?;
         let Value::Object(token) = value else {
             return Err(Error::ExpectedLabel);
@@ -416,7 +416,7 @@ impl Heap {
         }
     }
 
-    pub(super) fn utf16_units(&self, value: &Value) -> Result<Vec<u16>, Error> {
+    pub(crate) fn utf16_units(&self, value: &Value) -> Result<Vec<u16>, Error> {
         self.admit_ordinary(value)?;
         let Value::Object(id) = value else {
             return Err(Error::ExpectedString);
@@ -428,14 +428,14 @@ impl Heap {
         }
     }
 
-    pub(super) fn alloc_utf16(&mut self, units: Vec<u16>) -> Value {
+    pub(crate) fn alloc_utf16(&mut self, units: Vec<u16>) -> Value {
         match String::from_utf16(&units) {
             Ok(s) => self.allocate(Data::String(s)),
             Err(_) => self.allocate(Data::Utf16(units)),
         }
     }
 
-    pub(super) fn string_lossy(&self, value: &Value) -> Result<String, Error> {
+    pub(crate) fn string_lossy(&self, value: &Value) -> Result<String, Error> {
         self.admit_ordinary(value)?;
         let Value::Object(id) = value else {
             return Err(Error::ExpectedString);
@@ -449,7 +449,7 @@ impl Heap {
 
     /// The exact unbounded literal spelling; arithmetic is outside this
     /// memory interpreter, but its allocated payload is reference-counted.
-    pub(super) fn bytes(&self, value: &Value) -> Result<&[u8], Error> {
+    pub(crate) fn bytes(&self, value: &Value) -> Result<&[u8], Error> {
         self.admit_ordinary(value)?;
         let Value::Object(id) = value else {
             return Err(Error::PatternKind("bytes"));

@@ -201,6 +201,36 @@ lean`, 363 jobs) remain valid for their token projection; the Rust VM, Node
 worker, wire marshalling, host libraries, and cross-heap refcount symmetry are
 validated by tests rather than proved in Lean.
 
+### Tier-neutral shared primitive library (`flick-vm/src/stdlib/`)
+
+All pure stdlib primitives, Stage 4 pure context/layer/cooperative helpers,
+Stage 5 `HostMode` implementations, and the persistent Node `HostBridge` live
+in the tier-neutral module `flick_vm::stdlib` (`flick-vm/src/stdlib/`), outside
+`flick-vm/src/tier0/`. Callers invoke `eval_binary`, `eval_binary_slice`,
+`eval_not`, `eval_neg`, `eval_string_predicate`, `eval_primitive`,
+`eval_intrinsic`, and `eval_host_primitive` with caller-supplied accounting and
+host-environment hooks (`Accounting`, `HostEnv`, `VmHooks`):
+
+- `Accounting::charge_fuel` meters all primitive work before execution, and
+  `Accounting::record_allocation_delta` observes heap allocation/free deltas
+  per call.
+- `HostEnv` supplies `HostMode` (`Deterministic` vs `LiveOs`), stdout capture,
+  and optional virtual clock (`Clock`/`TestClock`) and seeded RNG
+  (`Random.with_seed`) overrides.
+- `tier0` contains no primitive implementations; it delegates every primitive,
+  host, and pure Stage 4 context/layer call to `flick_vm::stdlib` through
+  `FuelCounter` and `HostContext`, preserving its exact fuel, allocation, reuse,
+  and teardown counts unchanged.
+- `flick-vm/tests/kernel_primitives.rs` and
+  `flick-model/tests/model/memory_kernel.rs` (wired into `just kernel`) execute
+  the `#948` primitive kernel conformance suite (`tests/kernel/test/Kernel/*.fl`
+  and `tests/kernel/language.txt`) in debug and release against `flick_vm::stdlib`
+  as a third verified kernel implementation alongside JS and Go, with zero heap
+  leaks.
+- **Lean impact**: extracting the shared primitive library and hook boundary
+  introduces no IR, typing, effect, region, or ownership-semantics contract
+  change; all Lean proofs in `formal/` remain unaffected.
+
 ## 2. Owned tokens and objects
 
 An immediate value has no heap object. A string, arbitrary-sized integer or constructed value has
@@ -217,7 +247,7 @@ insufficient, because that count also includes existing internal edges.
 
 Audit result for data identity and record field order (issue #740):
 
-- **Value equality vs. object identity**: `flick-vm/src/tier0/primitives/operators.rs`
+- **Value equality vs. object identity**: `flick-vm/src/stdlib/primitives/operators.rs`
   (`equal`) compares `Data::Record` order-independently, skips GADT held
   dictionary suffixes, rejects `Value::Cell` (explicit `Ref.same` observes cell
   identity), and uses `seen.insert((a.id, b.id))` solely as an internal memo/cycle
@@ -227,7 +257,7 @@ Audit result for data identity and record field order (issue #740):
   lowers record literal field expressions into ANF locals in **source order**
   before sorting `Operation::Record { fields }` into canonical UTF-16 label
   order, so permutations of the same evaluated fields allocate the exact same
-  canonical `Data::Record` layout. `flick-vm/src/tier0/primitives/records.rs`
+  canonical `Data::Record` layout. `flick-vm/src/stdlib/primitives/records.rs`
   (`record_extend`, `record_remove`, `record_project`, `record_merge_disjoint`)
   canonicalizes structural records (JS array-index keys ascending, then UTF-16),
   and `schema_data.rs` uses UTF-16 order for sorted record/XML views. `Json`

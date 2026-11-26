@@ -24,7 +24,7 @@ impl<'p> Machine<'p, '_> {
         let prev = self.failure.take();
         let fid = usize::try_from(by).ok();
         let res =
-            primitives::strip_fail_and_add_interrupt(self.heap, prev.as_ref(), fid, &mut self.fuel);
+            primitives::strip_fail_and_add_interrupt(self.heap, prev.as_ref(), fid, &mut FuelCounter(&mut self.fuel));
         if let Some(p) = prev {
             self.heap.drop_cause(p)?;
         }
@@ -193,7 +193,7 @@ impl<'p> Machine<'p, '_> {
             Destination::ForeignLayerBuildFinish { or_die, target } => {
                 let mut cause = self.failure.take().expect("host layer build failure");
                 if or_die {
-                    let conv = primitives::fails_to_dies_cause(self.heap, &cause, &mut self.fuel);
+                    let conv = primitives::fails_to_dies_cause(self.heap, &cause, &mut FuelCounter(&mut self.fuel));
                     self.heap.drop_cause(cause)?;
                     cause = conv?;
                 }

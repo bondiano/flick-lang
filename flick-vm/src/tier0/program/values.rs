@@ -161,18 +161,28 @@ impl Machine<'_, '_> {
                 {
                     Value::Bool(eq == matches!(op, BinOp::Eq | BinOp::Same))
                 } else {
-                    primitives::binary_metered(self.heap, *op, &self.scratch, &mut self.fuel)?
+                    stdlib::eval_binary_slice(
+                        self.heap,
+                        *op,
+                        &self.scratch,
+                        &mut FuelCounter(&mut self.fuel),
+                    )?
                 };
                 self.primitive_result(binding, result)?;
             }
             Operation::Not(local) => {
                 self.stage([*local])?;
-                let result = primitives::not(&self.scratch[0])?;
+                let result = stdlib::eval_not(&self.scratch[0])?;
                 self.primitive_result(binding, result)?;
             }
             Operation::Neg { num, value } => {
                 self.stage([*value])?;
-                let result = primitives::neg(self.heap, *num, &self.scratch[0])?;
+                let result = stdlib::eval_neg(
+                    self.heap,
+                    *num,
+                    &self.scratch[0],
+                    &mut FuelCounter(&mut self.fuel),
+                )?;
                 self.primitive_result(binding, result)?;
             }
             Operation::Intrinsic { kind, args } => {

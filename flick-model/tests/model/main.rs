@@ -40,6 +40,7 @@ pub mod memory_failures;
 pub mod memory_handlers;
 pub mod memory_int_string_primitives;
 pub mod memory_inventory;
+pub mod memory_kernel;
 pub mod memory_language;
 pub mod memory_layer_merge;
 pub mod memory_layers;

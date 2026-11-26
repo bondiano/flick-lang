@@ -48,7 +48,7 @@ impl Heap {
         self.drop_values(vec![value])
     }
 
-    fn allocate(&mut self, data: Data) -> Value {
+    pub(crate) fn allocate(&mut self, data: Data) -> Value {
         self.stats.cells_allocated += usize::from(matches!(data, Data::Cell { .. }));
         self.stats.arenas_allocated += usize::from(matches!(data, Data::Arena { .. }));
         let (index, generation) = if let Some(index) = self.free_list.pop() {
@@ -80,7 +80,7 @@ impl Heap {
         Value::Object(ObjectToken { id })
     }
 
-    fn object(&self, id: ObjectId) -> Result<&Object, Error> {
+    pub(crate) fn object(&self, id: ObjectId) -> Result<&Object, Error> {
         if id.heap != self.identity {
             return Err(Error::InvalidObject(id));
         }
@@ -91,7 +91,7 @@ impl Heap {
             .ok_or(Error::InvalidObject(id))
     }
 
-    fn object_mut(&mut self, id: ObjectId) -> Result<&mut Object, Error> {
+    pub(crate) fn object_mut(&mut self, id: ObjectId) -> Result<&mut Object, Error> {
         if id.heap != self.identity {
             return Err(Error::InvalidObject(id));
         }
@@ -204,7 +204,7 @@ impl Heap {
         Ok(contents)
     }
 
-    fn admit_ordinary(&self, value: &Value) -> Result<(), Error> {
+    pub(crate) fn admit_ordinary(&self, value: &Value) -> Result<(), Error> {
         let mut pending = vec![value];
         while let Some(current) = pending.pop() {
             match current {
@@ -250,7 +250,10 @@ impl Heap {
         Ok(())
     }
 
-    fn admit_values<'a>(&self, values: impl IntoIterator<Item = &'a Value>) -> Result<(), Error> {
+    pub(crate) fn admit_values<'a>(
+        &self,
+        values: impl IntoIterator<Item = &'a Value>,
+    ) -> Result<(), Error> {
         for value in values {
             self.admit_ordinary(value)?;
         }
@@ -284,7 +287,7 @@ impl Heap {
         Ok(())
     }
 
-    fn drop_values(&mut self, mut pending: Vec<Value>) -> Result<(), Error> {
+    pub(crate) fn drop_values(&mut self, mut pending: Vec<Value>) -> Result<(), Error> {
         let mut failure = None;
         while let Some(value) = pending.pop() {
             match value {

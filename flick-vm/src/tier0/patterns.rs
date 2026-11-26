@@ -7,7 +7,8 @@ use std::mem;
 use flick_core::ir::{EnumLit, JsClass, Lit, Pat, Rep};
 
 pub(super) use super::record_update::update;
-use super::{Data, Error, Heap, ObjectId, ObjectToken, Value, charge, primitives, tagged_boundary};
+use super::{Data, Error, Heap, ObjectId, ObjectToken, Value, charge, tagged_boundary};
+use crate::stdlib::{FuelCounter, primitives as std_primitives};
 
 #[derive(Clone, Copy)]
 enum BasePlace {
@@ -558,7 +559,9 @@ fn literal_matches(
                 Ok(false)
             }
         }
-        (Lit::BigInt(left), _) => primitives::bigint_pattern_eq(left, heap.bigint(value)?, fuel),
+        (Lit::BigInt(left), _) => {
+            std_primitives::bigint_pattern_eq(left, heap.bigint(value)?, &mut FuelCounter(fuel))
+        }
         _ => Err(Error::PatternKind("matching literal type")),
     }
 }

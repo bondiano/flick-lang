@@ -264,7 +264,7 @@ impl<'p> Machine<'p, '_> {
         state.finalizer_failure = Some(match state.finalizer_failure.take() {
             None => cause,
             Some(prev) => {
-                let combined = primitives::concat_causes(self.heap, &prev, &cause, &mut self.fuel);
+                let combined = primitives::concat_causes(self.heap, &prev, &cause, &mut FuelCounter(&mut self.fuel));
                 self.heap.drop_cause(prev)?;
                 self.heap.drop_cause(cause)?;
                 match combined {
@@ -302,7 +302,7 @@ impl<'p> Machine<'p, '_> {
                         return Err(err);
                     }
                 };
-                let res = primitives::join_causes(self.heap, &cause, &int_c, &mut self.fuel);
+                let res = primitives::join_causes(self.heap, &cause, &int_c, &mut FuelCounter(&mut self.fuel));
                 self.heap.drop_cause(cause)?;
                 self.heap.drop_cause(int_c)?;
                 cause = res?;
@@ -330,7 +330,7 @@ impl<'p> Machine<'p, '_> {
                         None => cf,
                         Some(prev) => {
                             let comb =
-                                primitives::concat_causes(self.heap, &prev, &cf, &mut self.fuel);
+                                primitives::concat_causes(self.heap, &prev, &cf, &mut FuelCounter(&mut self.fuel));
                             self.heap.drop_cause(prev)?;
                             self.heap.drop_cause(cf)?;
                             match comb {
@@ -376,7 +376,7 @@ impl<'p> Machine<'p, '_> {
             ScopeOutcome::Failure(cause) => {
                 let joined = if let Some(fin_cause) = finalizer_failure {
                     let res =
-                        primitives::join_causes(self.heap, &cause, &fin_cause, &mut self.fuel);
+                        primitives::join_causes(self.heap, &cause, &fin_cause, &mut FuelCounter(&mut self.fuel));
                     self.heap.drop_cause(cause)?;
                     self.heap.drop_cause(fin_cause)?;
                     res?
@@ -410,7 +410,7 @@ impl<'p> Machine<'p, '_> {
         self.drain_transfer_next_roots(&mut discard.next, &mut roots);
         self.heap.drop_values(roots)?;
         let combined = if let Some(prev) = preserved {
-            let res = primitives::join_causes(self.heap, &prev, &fin_cause, &mut self.fuel);
+            let res = primitives::join_causes(self.heap, &prev, &fin_cause, &mut FuelCounter(&mut self.fuel));
             self.heap.drop_cause(prev)?;
             self.heap.drop_cause(fin_cause)?;
             match res {

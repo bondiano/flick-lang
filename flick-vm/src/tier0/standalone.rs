@@ -1,6 +1,6 @@
 /// Checks internal metadata before any semantic prefix slicing or suffix
 /// arithmetic. Destruction deliberately walks ALL physical fields instead.
-fn tagged_boundary(tag: &str, ordinary: usize, physical: usize) -> Result<(), Error> {
+pub(crate) fn tagged_boundary(tag: &str, ordinary: usize, physical: usize) -> Result<(), Error> {
     if ordinary > physical {
         return Err(Error::InvalidTaggedBoundary { ordinary, physical });
     }
@@ -428,19 +428,19 @@ fn operation(heap: &mut Heap, locals: &mut Locals, value: &Operation) -> Result<
         Operation::Binary { op, left, right } => {
             let left = take(locals, *left)?;
             let right = take(locals, *right)?;
-            let result = primitives::binary(heap, *op, &left, &right)?;
+            let result = eval_binary(heap, *op, &left, &right, &mut Unmetered)?;
             heap.drop_values(vec![left, right])?;
             Ok(result)
         }
         Operation::Not(local) => {
             let value = take(locals, *local)?;
-            let result = primitives::not(&value)?;
+            let result = eval_not(&value)?;
             heap.drop_value(value)?;
             Ok(result)
         }
         Operation::Neg { num, value } => {
             let value = take(locals, *value)?;
-            let result = primitives::neg(heap, *num, &value)?;
+            let result = eval_neg(heap, *num, &value, &mut Unmetered)?;
             heap.drop_value(value)?;
             Ok(result)
         }

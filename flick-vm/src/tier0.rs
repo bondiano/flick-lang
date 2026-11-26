@@ -16,15 +16,13 @@ use flick_core::ir::memory::{
 };
 use regex_automata::meta::Regex;
 
-mod causes;
+pub(crate) mod causes;
 pub use causes::{CauseToken, DefectClass, DefectCode, DefectSpec, LanguageExit, Reason};
 
-mod host_bridge;
-pub use host_bridge::HostBridge;
+pub use crate::stdlib::{DRAW, HostBridge, HostMode, MILLIS, MONOTONIC_NANOS, NANOS};
+use crate::stdlib::{Unmetered, eval_binary, eval_neg, eval_not};
 
 mod patterns;
-mod primitives;
-pub use primitives::{DRAW, HostMode, MILLIS, MONOTONIC_NANOS, NANOS};
 mod program;
 mod record_update;
 pub use program::{
@@ -66,7 +64,7 @@ pub struct ObjectId {
 /// ```
 #[derive(Debug, PartialEq, Eq)]
 pub struct ObjectToken {
-    id: ObjectId,
+    pub(crate) id: ObjectId,
 }
 
 /// A non-owning capability for a cell owned by one execution's root arena.
@@ -75,16 +73,16 @@ pub struct ObjectToken {
 /// execution machinery, and releasing a closed handle never reads storage.
 #[derive(Debug, PartialEq, Eq)]
 pub struct CellHandle {
-    id: ObjectId,
-    execution: usize,
+    pub(crate) id: ObjectId,
+    pub(crate) execution: usize,
 }
 
 /// Nonowning lexical owner identity; validated against one running machine.
 #[derive(Debug, PartialEq, Eq)]
 pub struct OwnerHandle {
-    heap: usize,
-    execution: usize,
-    index: usize,
+    pub(crate) heap: usize,
+    pub(crate) execution: usize,
+    pub(crate) index: usize,
 }
 
 /// Nonowning arena identity. Retention does not keep its storage alive.
@@ -194,7 +192,7 @@ impl Value {
 
     /// Copies representation, not ownership. Used only immediately before
     /// incrementing the reference count, or for immediate values.
-    fn representation(&self) -> Value {
+    pub(crate) fn representation(&self) -> Value {
         match self {
             Self::Unit => Self::Unit,
             Self::Bool(value) => Self::Bool(*value),

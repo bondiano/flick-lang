@@ -1,8 +1,5 @@
 // Cooperative single-threaded fiber contexts, spawn, park/yield, interrupt, and wake.
 
-const FIBER_QUANTUM: u32 = 256;
-const QUANTUM_VIRTUAL_NS: u64 = 1_000_000;
-
 struct FiberContext<'p> {
     current_owner: usize,
     current_evidence: Option<OwnerEvidence>,

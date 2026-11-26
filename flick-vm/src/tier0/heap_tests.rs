@@ -114,7 +114,8 @@ mod tests {
     }
     #[test]
     fn invalid_internal_boundaries_return_errors_without_slicing_or_losing_fields() {
-        use super::{patterns, primitives};
+        use super::patterns;
+        use crate::stdlib::{Unmetered, eval_binary};
         use flick_core::ir::{BinOp, Pat};
         let mut heap = Heap::new();
         let input = heap.allocate(Data::Tagged {
@@ -129,7 +130,7 @@ mod tests {
         };
         for op in [BinOp::Eq, BinOp::NotEq, BinOp::Same, BinOp::NotSame] {
             assert_eq!(
-                primitives::binary(&mut heap, op, &input, &input),
+                eval_binary(&mut heap, op, &input, &input, &mut Unmetered),
                 Err(expected())
             );
         }
@@ -162,7 +163,7 @@ mod tests {
             assert!(scratch.is_empty());
             if tag == "$list" {
                 assert_eq!(
-                    primitives::binary(&mut heap, BinOp::ListConcat, &input, &input),
+                    eval_binary(&mut heap, BinOp::ListConcat, &input, &input, &mut Unmetered),
                     Err(expected())
                 );
             }

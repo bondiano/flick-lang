@@ -172,10 +172,13 @@ kernel keeps the laws R1–R9 of the runtime contract.
 
 - `tests/kernel` holds a case for each primitive with an expected value
   derived from the contract, never from what another backend gives. `just
-  kernel` runs it on JS, on both runtimes, and as a Go executable, in debug
-  and release; then it runs in release the modules of `tests/language` that
+  kernel` runs it on JS, on both runtimes, as a Go executable, and on
+  `flick-vm`'s tier-neutral shared primitive library (`flick_vm::stdlib`), in
+  debug and release; then it runs the modules of `tests/language` that
   `tests/kernel/language.txt` lists, which pin more of the numeric and
-  string primitives and which `just language` runs in debug.
+  string primitives (`just language` runs them in debug; `just kernel` runs
+  them in release on JS and Go, and in both debug and release with zero-leak
+  checks on `flick-vm`).
 - The control kernel's cases are those of `tests/run/runtime`, which
   `just conformance` runs; `control_kernel` checks the delays, the order of
   timers, a wait that only an interruption ends and a cancelled timer.

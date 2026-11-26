@@ -7,7 +7,8 @@ mod aggregate_tests {
     use flick_core::ir::{BinOp, Lit, Pat, Rep};
     use flick_core::types::Constructor;
 
-    use super::{Error, Heap, ProgramOutcome, Value, execute, execute_program_outcome, patterns, primitives};
+    use super::{Error, Heap, ProgramOutcome, Value, execute, execute_program_outcome, patterns};
+    use crate::stdlib::{Unmetered, eval_binary};
 
     fn bind(binding: u32, value: Operation) -> Instruction {
         Instruction::Let { binding, value }
@@ -52,7 +53,7 @@ mod aggregate_tests {
         let leaf = heap.project(&projected, 0).expect("project int field");
         assert_eq!(leaf, Value::Int(10));
         assert_eq!(
-            primitives::binary(&mut heap, BinOp::Eq, &outer, &copy),
+            eval_binary(&mut heap, BinOp::Eq, &outer, &copy, &mut Unmetered),
             Ok(Value::Bool(true))
         );
 

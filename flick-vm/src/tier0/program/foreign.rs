@@ -4,7 +4,7 @@
 use flick_core::ir::memory::ForeignCallSpec;
 use serde_json::{Value as Json, json};
 
-use super::host_bridge::wire::{self, WireRegistrar};
+use crate::stdlib::host_bridge::wire::{self, WireRegistrar};
 
 struct PendingForeignCall<'p> {
     fiber: usize,

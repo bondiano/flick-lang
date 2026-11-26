@@ -1,8 +1,13 @@
 //! Complete providers retain caller evidence and own a real lexical scope.
-use super::{Destination, Invocation, InvocationEnd, Machine, OwnerState, ScopeOutcome};
-use crate::tier0::{Data, Error, Heap, LayerData, Value};
-use flick_core::ir::memory::{Intrinsic, Local};
 use std::mem;
+
+use flick_core::ir::memory::{Intrinsic, Local};
+
+use crate::stdlib::FuelCounter;
+use crate::stdlib::runtime::layers as std_layers;
+use crate::tier0::{Data, Error, Heap, Value};
+
+use super::{Destination, Invocation, InvocationEnd, Machine, OwnerState, ScopeOutcome};
 
 pub(super) enum MemoRestore {
     Unchanged,
@@ -20,32 +25,16 @@ impl<'p> Machine<'p, '_> {
     pub(super) fn layer_intrinsic(&mut self, kind: Intrinsic, binding: Local) -> Result<(), Error> {
         match kind {
             Intrinsic::LayerSucceed => {
-                let Value::Object(tag) = &self.scratch[0] else {
-                    return Err(Error::ExpectedServiceTag);
-                };
-                if !matches!(self.heap.object(tag.id)?.data, Data::ServiceTag { .. }) {
-                    return Err(Error::ExpectedServiceTag);
-                }
-                let mut inputs = mem::take(&mut self.scratch).into_iter();
-                let value = self.heap.allocate(Data::Layer(LayerData::Succeed {
-                    tag: inputs.next().expect("tag"),
-                    implementation: inputs.next().expect("implementation"),
-                }));
+                let value = std_layers::layer_succeed(self.heap, &mut self.scratch)?;
                 self.store(binding, value)?;
             }
             Intrinsic::LayerMerge => {
-                ensure_layer(self.heap, &self.scratch[0])?;
-                ensure_layer(self.heap, &self.scratch[1])?;
-                let mut inputs = mem::take(&mut self.scratch).into_iter();
-                let value = self.heap.allocate(Data::Layer(LayerData::Merge {
-                    left: inputs.next().expect("left layer"),
-                    right: inputs.next().expect("right layer"),
-                }));
+                let value = std_layers::layer_merge(self.heap, &mut self.scratch)?;
                 self.store(binding, value)?;
             }
             Intrinsic::LayerRun => {
-                ensure_layer(self.heap, &self.scratch[0])?;
-                if self.layer_is_static(&self.scratch[0])? {
+                std_layers::ensure_layer(self.heap, &self.scratch[0])?;
+                if std_layers::layer_is_static(self.heap, &self.scratch[0])? {
                     let id = self.handler_identity()?;
                     let previous = self.current_owner;
                     let owner = self.owners.len();
@@ -83,7 +72,15 @@ impl<'p> Machine<'p, '_> {
         effect: &str,
         fuel: &mut u64,
     ) -> Result<bool, Error> {
-        Ok(lookup_layer_service(heap, &provider.layer, effect, fuel)?.is_some())
+        Ok(
+            std_layers::lookup_layer_service(
+                heap,
+                &provider.layer,
+                effect,
+                &mut FuelCounter(fuel),
+            )?
+            .is_some(),
+        )
     }
 
     pub(super) fn invoke_provider(
@@ -93,11 +90,11 @@ impl<'p> Machine<'p, '_> {
         effect: &str,
         op: &str,
     ) -> Result<(), Error> {
-        let implementation = lookup_layer_service(
+        let implementation = std_layers::lookup_layer_service(
             self.heap,
             &self.providers[&id].layer,
             effect,
-            &mut self.fuel,
+            &mut FuelCounter(&mut self.fuel),
         )?
         .expect("selected provider service");
         let function = self.heap.named_field(implementation, op)?.representation();
@@ -143,7 +140,7 @@ impl<'p> Machine<'p, '_> {
     /// `Σ₀`: the layer the root global gave becomes a provider that no
     /// frame holds. It answers what no frame does until cleanup releases it.
     pub(super) fn install_root(&mut self) -> Result<(), Error> {
-        ensure_layer(self.heap, self.top.as_ref().expect("root layer"))?;
+        std_layers::ensure_layer(self.heap, self.top.as_ref().expect("root layer"))?;
         let id = self.handler_identity()?;
         let layer = self.top.take().expect("root layer");
         let owner = self.current_owner;
@@ -194,57 +191,11 @@ impl<'p> Machine<'p, '_> {
     }
 }
 
-fn ensure_layer(heap: &Heap, value: &Value) -> Result<(), Error> {
-    let Value::Object(value) = value else {
-        return Err(Error::ExpectedLayer);
-    };
-    match &heap.object(value.id)?.data {
-        Data::Layer(_) | Data::ForeignHandle { .. } => Ok(()),
-        _ => Err(Error::ExpectedLayer),
-    }
-}
-
 pub(super) fn lookup_layer_service<'a>(
     heap: &'a Heap,
     value: &'a Value,
     effect: &str,
     fuel: &mut u64,
 ) -> Result<Option<&'a Value>, Error> {
-    let mut pending = vec![value];
-    while let Some(cur) = pending.pop() {
-        *fuel = fuel.checked_sub(1).ok_or(Error::OutOfFuel)?;
-        let Value::Object(tok) = cur else {
-            return Err(Error::ExpectedLayer);
-        };
-        match &heap.object(tok.id)?.data {
-            Data::Context(map) => {
-                if let Some(imp) = map.get(effect) {
-                    return Ok(Some(imp));
-                }
-            }
-            Data::ForeignHandle { .. } | Data::Layer(LayerData::Empty) => {}
-            Data::Layer(LayerData::Context(ctx)) => pending.push(ctx),
-            Data::Layer(LayerData::Merge { left, right }) => {
-                // Native servicesOf processes left-to-right with replacement;
-                // searching right-first gives the same complete-provider key.
-                pending.extend([left, right]);
-            }
-            Data::Layer(LayerData::Succeed {
-                tag,
-                implementation,
-            }) => {
-                let Value::Object(tag) = tag else {
-                    return Err(Error::ExpectedServiceTag);
-                };
-                let Data::ServiceTag { key } = &heap.object(tag.id)?.data else {
-                    return Err(Error::ExpectedServiceTag);
-                };
-                if key == effect {
-                    return Ok(Some(implementation));
-                }
-            }
-            _ => return Err(Error::ExpectedLayer),
-        }
-    }
-    Ok(None)
+    std_layers::lookup_layer_service(heap, value, effect, &mut FuelCounter(fuel))
 }

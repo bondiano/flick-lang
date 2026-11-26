@@ -19,7 +19,17 @@ impl Machine<'_, '_> {
             | LayerIntrinsic::ContextMergeAll
             | LayerIntrinsic::ContextPick
             | LayerIntrinsic::ContextOmit
-            | LayerIntrinsic::ContextReference => self.context_pure_intrinsic(op, binding),
+            | LayerIntrinsic::ContextReference => {
+                match stdlib::runtime::context::eval_pure_context(self.heap, op, &mut self.scratch)?
+                {
+                    stdlib::runtime::context::ContextOutcome::Value(out) => {
+                        self.store(binding, out)
+                    }
+                    stdlib::runtime::context::ContextOutcome::Defect(spec) => {
+                        self.raise_defect(spec)
+                    }
+                }
+            }
             LayerIntrinsic::ContextRead => self.exec_context_read(binding),
             LayerIntrinsic::ContextWithReference => self.exec_context_with_ref(binding),
             LayerIntrinsic::LayerEmpty
@@ -71,40 +81,7 @@ impl Machine<'_, '_> {
     }
 
     fn layer_ctor_intrinsic(&mut self, op: LayerIntrinsic, binding: Local) -> Result<(), Error> {
-        let data = match op {
-            LayerIntrinsic::LayerEmpty => LayerData::Empty,
-            LayerIntrinsic::LayerSucceedContext => {
-                let ctx = self.scratch.pop().expect("context");
-                self.expect_context_map(&ctx)?;
-                LayerData::Context(ctx)
-            }
-            LayerIntrinsic::LayerFromBuild => {
-                let build = self.scratch.pop().expect("build fn");
-                let Value::Bool(memo) = self.scratch.pop().expect("memo bool") else {
-                    self.heap.drop_value(build)?;
-                    return Err(Error::ExpectedBoolean);
-                };
-                LayerData::Dynamic { memo, build }
-            }
-            LayerIntrinsic::LayerFresh => {
-                let inner = self.scratch.pop().expect("layer");
-                LayerData::Fresh(inner)
-            }
-            LayerIntrinsic::LayerOrDie => {
-                let inner = self.scratch.pop().expect("layer");
-                LayerData::OrDie(inner)
-            }
-            LayerIntrinsic::LayerMergeAll => {
-                let rest = self.scratch.pop().expect("rest layers");
-                let first = self.scratch.pop().expect("first layer");
-                let mut all = vec![first];
-                all.extend(self.clone_list_values(&rest)?);
-                self.heap.drop_value(rest)?;
-                LayerData::MergeAll(all)
-            }
-            _ => unreachable!("non-constructor layer intrinsic"),
-        };
-        let val = self.heap.allocate(Data::Layer(data));
+        let val = stdlib::runtime::layers::eval_layer_ctor(self.heap, op, &mut self.scratch)?;
         self.store(binding, val)
     }
 
@@ -261,71 +238,14 @@ impl Machine<'_, '_> {
     }
 
     fn service_tag_key(&self, val: &Value) -> Result<&str, Error> {
-        let Value::Object(tok) = val else {
-            return Err(Error::ExpectedServiceTag);
-        };
-        match &self.heap.object(tok.id)?.data {
-            Data::ServiceTag { key } | Data::ContextRef { key, .. } => Ok(key),
-            _ => Err(Error::ExpectedServiceTag),
-        }
+        stdlib::runtime::context::service_tag_key(self.heap, val)
     }
 
     fn expect_context_map(&self, val: &Value) -> Result<&BTreeMap<String, Value>, Error> {
-        let Value::Object(tok) = val else {
-            return Err(Error::ExpectedContext);
-        };
-        let Data::Context(map) = &self.heap.object(tok.id)?.data else {
-            return Err(Error::ExpectedContext);
-        };
-        Ok(map)
-    }
-
-    fn clone_context_map(&mut self, val: &Value) -> Result<BTreeMap<String, Value>, Error> {
-        let pairs: Vec<(String, Value)> = self
-            .expect_context_map(val)?
-            .iter()
-            .map(|(k, v)| (k.clone(), v.representation()))
-            .collect();
-        let mut out = BTreeMap::new();
-        for (k, rep) in pairs {
-            match self.heap.dup(&rep) {
-                Ok(v) => {
-                    out.insert(k, v);
-                }
-                Err(err) => {
-                    self.heap.drop_values(out.into_values().collect())?;
-                    return Err(err);
-                }
-            }
-        }
-        Ok(out)
+        stdlib::runtime::context::expect_context_map(self.heap, val)
     }
 
     pub(super) fn merge_context_values(&mut self, contexts: Vec<Value>) -> Result<Value, Error> {
-        let mut merged: BTreeMap<String, Value> = BTreeMap::new();
-        let mut iter = contexts.into_iter();
-        while let Some(ctx) = iter.next() {
-            let map = match self.clone_context_map(&ctx) {
-                Ok(m) => m,
-                Err(err) => {
-                    self.heap.drop_value(ctx)?;
-                    self.heap.drop_values(iter.collect())?;
-                    self.heap.drop_values(merged.into_values().collect())?;
-                    return Err(err);
-                }
-            };
-            self.heap.drop_value(ctx)?;
-            for (k, v) in map {
-                if k == HOST_CTX_KEY
-                    && let Some(prev) = merged.remove(HOST_CTX_KEY)
-                {
-                    let combined = self.concat_host_context_lists(prev, v)?;
-                    merged.insert(k, combined);
-                } else if let Some(old) = merged.insert(k, v) {
-                    self.heap.drop_value(old)?;
-                }
-            }
-        }
-        Ok(self.heap.allocate(Data::Context(merged)))
+        stdlib::runtime::context::merge_context_values(self.heap, contexts)
     }
 }

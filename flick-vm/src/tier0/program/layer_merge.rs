@@ -148,7 +148,7 @@ impl<'p> Machine<'p, '_> {
             for (wf, w_or_die, wt) in waiters {
                 let mut dup = self.heap.dup_cause(&cause)?;
                 if w_or_die {
-                    let conv = primitives::fails_to_dies_cause(self.heap, &dup, &mut self.fuel);
+                    let conv = primitives::fails_to_dies_cause(self.heap, &dup, &mut FuelCounter(&mut self.fuel));
                     self.heap.drop_cause(dup)?;
                     dup = match conv {
                         Ok(c) => c,
@@ -162,7 +162,7 @@ impl<'p> Machine<'p, '_> {
             }
         }
         if or_die {
-            let conv = primitives::fails_to_dies_cause(self.heap, &cause, &mut self.fuel);
+            let conv = primitives::fails_to_dies_cause(self.heap, &cause, &mut FuelCounter(&mut self.fuel));
             self.heap.drop_cause(cause)?;
             cause = conv?;
         }
@@ -221,7 +221,7 @@ impl<'p> Machine<'p, '_> {
                                 let conv = primitives::fails_to_dies_cause(
                                     self.heap,
                                     &dup,
-                                    &mut self.fuel,
+                                    &mut FuelCounter(&mut self.fuel),
                                 );
                                 self.heap.drop_cause(dup)?;
                                 dup = match conv {

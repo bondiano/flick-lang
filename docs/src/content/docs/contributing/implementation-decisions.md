@@ -46,7 +46,10 @@ directory, including pnpm links. `flick/src/toolchain.rs` retains the runtime
 ABI, pnpm and Node versions. RT-only builds do not inspect the adapter.
 `flick-wasm` runs the same core for the in-browser demo, `flick-model` is
 the reference model of the formal core (`docs/formal/`), and `flick-vm`
-(`tier0`) is the reference counted executor for the ownership IR
+splits a tier-neutral shared stdlib/runtime/host primitive library (`stdlib`,
+parameterized by caller-supplied fuel and allocation accounting hooks and
+verified as a third primitive-kernel implementation alongside JS and Go) from
+its reference-counted `tier0` executor for the ownership IR
 (`docs/formal/memory.md`).
 
 ## Decisions the specification leaves to the implementation
