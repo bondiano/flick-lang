@@ -770,11 +770,13 @@ typed primitives and event snapshots, or foreign React components through
 ## Atoms, not a TEA program
 
 The state of a Flick UI is in atoms: a view renders from the atoms it reads,
-and a handler is a supervised task that writes them. There is no
-`Msg → update` loop, and none is planned: what Elm puts in commands is a
-task of an action, run by the fibers, scopes and event policies that
-already exist. Sources that write atoms on their own, Elm's subscriptions,
-are among the [limitations](#limitations) below.
+and a handler is a supervised task that writes them. The shipped API has
+no `Msg → update` loop: what Elm puts in commands is a task of an action,
+run by the fibers, scopes and event policies that already exist. Sources
+that write atoms on their own, Elm's subscriptions, are among the
+[limitations](#limitations) below. The
+[proposed design](../../contributing/portable-ui-contract/) replaces atoms
+with a `Msg → update` loop in each component.
 
 ### Comparison with Elmish
 
