@@ -1,7 +1,45 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use super::{Limits, Policy, id, path, runtime_dependency, string};
-use crate::{ArtifactKind, BuildRequest, BuildResult, InputRef, LaunchKind, Toolchain};
+use crate::{
+    ArtifactKind, BuildRequest, BuildResult, InputRef, LaunchKind, Mode, ModuleRole, Toolchain,
+};
+
+fn validate_mode_and_unowned(
+    request: &BuildRequest,
+    limits: Limits,
+) -> Result<BTreeSet<String>, String> {
+    match (&request.target.mode, &request.module_root) {
+        (Mode::WholeProgram, None) => {}
+        (Mode::PerModule, Some(root))
+            if request
+                .modules
+                .iter()
+                .any(|m| m.name == *root && m.role == ModuleRole::Own) => {}
+        (Mode::WholeProgram, Some(_)) => {
+            return Err("whole-program mode cannot set a module root".into());
+        }
+        (Mode::PerModule, None) => {
+            return Err("per-module mode requires a module root".into());
+        }
+        (Mode::PerModule, Some(root)) => {
+            return Err(format!(
+                "per-module root `{root}` must name an own module in the graph"
+            ));
+        }
+    }
+    let mut unowned = BTreeSet::new();
+    for module in &request.modules {
+        let is_unowned = module.role == ModuleRole::External
+            || (request.target.mode == Mode::PerModule
+                && module.role == ModuleRole::Own
+                && request.module_root.as_deref() != Some(module.name.as_str()));
+        if is_unowned {
+            path::insert(&module.output, &mut unowned, limits)?;
+        }
+    }
+    Ok(unowned)
+}
 
 fn tool(tool: &Toolchain, request: &BuildRequest, policy: &Policy) -> Result<(), String> {
     if !policy.toolchains.contains(tool) || !request.toolchains.contains(tool) {
@@ -23,6 +61,7 @@ pub(super) fn validate(
     policy: &Policy,
 ) -> Result<Vec<usize>, String> {
     let limits = policy.limits;
+    let unowned = validate_mode_and_unowned(request, limits)?;
     if result.steps.len() > limits.steps {
         return Err("backend step count exceeds its limit".into());
     }
@@ -51,6 +90,7 @@ pub(super) fn validate(
     for artifact in &result.artifacts {
         id(&artifact.id, &mut ids, limits)?;
         path::insert(&artifact.path, &mut paths, limits)?;
+        path::check_unowned(&artifact.path, &unowned, limits)?;
         if artifact.bytes.len() > limits.artifact_bytes {
             return Err(format!(
                 "backend artifact `{}` exceeds its limit",
@@ -66,6 +106,7 @@ pub(super) fn validate(
         for output in &step.outputs {
             id(&output.id, &mut ids, limits)?;
             path::insert(&output.path, &mut paths, limits)?;
+            path::check_unowned(&output.path, &unowned, limits)?;
             artifacts.insert(output.id.as_str(), (Some(i), output.kind));
         }
         let mut env_names = BTreeSet::new();

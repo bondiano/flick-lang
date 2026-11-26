@@ -1,9 +1,10 @@
 mod common;
 
 use flick_backend::{
-    Abi, HeaderRequest, HostExport, InlineForeign, InputKind, Limits, Mode, ModuleRole, Projection,
-    Span, Symbol, validate_request,
+    Abi, DeclaredInputs, HeaderRequest, HostExport, InlineForeign, Input, InputKind, Limits, Mode,
+    ModuleInput, ModuleRole, Projection, Span, Symbol, sha256, validate_request,
 };
+use flick_ir::Program;
 
 #[test]
 fn a_complete_whole_program_request_is_accepted() {
@@ -14,14 +15,75 @@ fn a_complete_whole_program_request_is_accepted() {
 }
 
 #[test]
-fn per_module_mode_has_an_explicit_root_and_keeps_the_graph() {
+fn per_module_mode_has_an_explicit_own_root_and_whole_program_forbids_one() {
+    let mut whole_with_root = common::request();
+    whole_with_root.module_root = Some("App".into());
+    assert!(
+        validate_request(
+            &whole_with_root,
+            &mut common::inputs(&whole_with_root),
+            Limits::default()
+        )
+        .is_err(),
+        "whole-program mode must reject a module_root"
+    );
+
+    let iface = b"ext-iface";
     let mut request = common::request();
+    let mut program = Program::from_cbor(&request.program).expect("program");
+    let mut builtin = program.modules[0].clone();
+    builtin.name = "BuiltinMod".into();
+    builtin.package = None;
+    program.modules.push(builtin);
+    request.program = program.to_cbor();
+    request.modules.push(ModuleInput {
+        name: "BuiltinMod".into(),
+        role: ModuleRole::Builtin,
+        package: None,
+        output: "BuiltinMod.js".into(),
+        interface: None,
+    });
+    request.modules.push(ModuleInput {
+        name: "ExtMod".into(),
+        role: ModuleRole::External,
+        package: Some("ext".into()),
+        output: "ExtMod.js".into(),
+        interface: Some("iface/ExtMod".into()),
+    });
+    request.inputs.push(Input {
+        id: "iface/ExtMod".into(),
+        kind: InputKind::Interface,
+        sha256: sha256(iface),
+        size: iface.len() as u64,
+    });
+    let make_inputs = |req: &flick_backend::BuildRequest| {
+        DeclaredInputs::new(&req.inputs, |id| {
+            Some(if id == "iface/ExtMod" {
+                iface.to_vec()
+            } else {
+                common::TEXT.as_bytes().to_vec()
+            })
+        })
+        .expect("inputs")
+    };
+
     request.target.mode = Mode::PerModule;
-    assert!(validate_request(&request, &mut common::inputs(&request), Limits::default()).is_err());
+    assert!(
+        validate_request(&request, &mut make_inputs(&request), Limits::default()).is_err(),
+        "per-module mode without module_root"
+    );
+    for invalid_root in ["Unknown", "BuiltinMod", "ExtMod"] {
+        request.module_root = Some(invalid_root.into());
+        assert!(
+            validate_request(&request, &mut make_inputs(&request), Limits::default()).is_err(),
+            "per-module root `{invalid_root}` must be rejected"
+        );
+    }
     request.module_root = Some("App".into());
-    assert!(validate_request(&request, &mut common::inputs(&request), Limits::default()).is_ok());
-    request.module_root = Some("Unknown".into());
-    assert!(validate_request(&request, &mut common::inputs(&request), Limits::default()).is_err());
+    assert!(
+        validate_request(&request, &mut make_inputs(&request), Limits::default()).is_ok(),
+        "per-module mode with own root and builtin/external graph accepted"
+    );
 }
 
 #[test]

@@ -1,8 +1,9 @@
 mod common;
 
 use flick_backend::{
-    BuildRequest, DeclaredInputs, InputError, Inputs, Limits, Mode, RootHandler, Symbol, sha256,
-    validate_request,
+    Artifact, ArtifactKind, BuildRequest, BuildResult, DeclaredInputs, Input, InputError,
+    InputKind, Inputs, Limits, Mode, ModuleInput, ModuleRole, Policy, RootHandler, Symbol, sha256,
+    validate_request, validate_result,
 };
 use flick_ir::{ExprKind, FileId, ItemKind, Program, Span};
 
@@ -186,4 +187,182 @@ fn aliased_source_files_load_and_retain_each_input_once() {
     validate_request(&request, &mut inputs, Limits::default())
         .expect("same content under two source names");
     assert_eq!(inputs.calls, 1);
+}
+
+fn policy_for(req: &BuildRequest) -> Policy<'_> {
+    Policy {
+        toolchains: &req.toolchains,
+        environment: &[],
+        reserved_paths: &[],
+        limits: Limits::default(),
+        authorize_step: &common::authorize,
+        authorize_launch: &common::authorize_launch,
+    }
+}
+
+fn layout_request_with_external() -> BuildRequest {
+    let ext_iface = b"ext-iface";
+    let mut base = two_modules();
+    base.modules.push(ModuleInput {
+        name: "Ext".into(),
+        role: ModuleRole::External,
+        package: Some("ext".into()),
+        output: "Ext.js".into(),
+        interface: Some("iface/Ext".into()),
+    });
+    base.inputs.push(Input {
+        id: "iface/Ext".into(),
+        kind: InputKind::Interface,
+        sha256: sha256(ext_iface),
+        size: ext_iface.len() as u64,
+    });
+    base
+}
+
+fn layout_inputs(req: &BuildRequest) -> DeclaredInputs {
+    DeclaredInputs::new(&req.inputs, |id| {
+        Some(if id == "iface/Ext" {
+            b"ext-iface".to_vec()
+        } else {
+            common::TEXT.as_bytes().to_vec()
+        })
+    })
+    .expect("inputs")
+}
+
+#[test]
+fn per_module_results_enforce_declared_layout_ownership() {
+    let mut per_module = layout_request_with_external();
+    per_module.target.mode = Mode::PerModule;
+    per_module.module_root = Some("App".into());
+    let ok_result = BuildResult {
+        artifacts: vec![Artifact {
+            id: "module:App".into(),
+            path: "App.js".into(),
+            kind: ArtifactKind::Source,
+            bytes: b"export const main = () => undefined;\n".to_vec(),
+        }],
+        steps: vec![],
+        runtime_dependencies: vec![],
+        launches: vec![],
+        diagnostics: vec![],
+    };
+    assert_eq!(
+        validate_result(
+            &per_module,
+            &ok_result,
+            &policy_for(&per_module),
+            &mut layout_inputs(&per_module)
+        ),
+        Ok(vec![])
+    );
+    for forbidden in [
+        "Other.js",
+        "OTHER.JS",
+        "Other.js/child.js",
+        "Ext.js",
+        "EXT.JS",
+    ] {
+        let mut bad_result = ok_result.clone();
+        bad_result.artifacts.push(Artifact {
+            id: "stolen".into(),
+            path: forbidden.into(),
+            kind: ArtifactKind::Source,
+            bytes: b"// stolen\n".to_vec(),
+        });
+        let err = validate_result(
+            &per_module,
+            &bad_result,
+            &policy_for(&per_module),
+            &mut layout_inputs(&per_module),
+        )
+        .expect_err(forbidden);
+        assert!(err.contains("layout ownership"), "{forbidden}: {err}");
+    }
+    let mut step_stolen = ok_result.clone();
+    let mut step = common::step("steal", &[]);
+    step.inputs = vec![flick_backend::InputRef::Artifact("module:App".into())];
+    step.outputs[0].path = "Other.js".into();
+    step_stolen.steps.push(step);
+    let err = validate_result(
+        &per_module,
+        &step_stolen,
+        &policy_for(&per_module),
+        &mut layout_inputs(&per_module),
+    )
+    .expect_err("step output targeting sibling module");
+    assert!(err.contains("layout ownership"), "{err}");
+
+    let mut wrong_per = per_module;
+    wrong_per.module_root = Some("Ext".into());
+    assert!(
+        validate_result(
+            &wrong_per,
+            &ok_result,
+            &policy_for(&wrong_per),
+            &mut layout_inputs(&wrong_per)
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn whole_program_results_enforce_declared_layout_ownership() {
+    let base = layout_request_with_external();
+    let ok_result = BuildResult {
+        artifacts: vec![
+            Artifact {
+                id: "module:App".into(),
+                path: "App.js".into(),
+                kind: ArtifactKind::Source,
+                bytes: b"export const main = () => undefined;\n".to_vec(),
+            },
+            Artifact {
+                id: "module:Other".into(),
+                path: "Other.js".into(),
+                kind: ArtifactKind::Source,
+                bytes: b"export const helper = 1;\n".to_vec(),
+            },
+        ],
+        steps: vec![],
+        runtime_dependencies: vec![],
+        launches: vec![],
+        diagnostics: vec![],
+    };
+    assert_eq!(
+        validate_result(
+            &base,
+            &ok_result,
+            &policy_for(&base),
+            &mut layout_inputs(&base)
+        ),
+        Ok(vec![])
+    );
+    let mut whole_stolen_ext = ok_result.clone();
+    whole_stolen_ext.artifacts.push(Artifact {
+        id: "stolen-ext".into(),
+        path: "EXT.JS".into(),
+        kind: ArtifactKind::Source,
+        bytes: b"// stolen\n".to_vec(),
+    });
+    let err = validate_result(
+        &base,
+        &whole_stolen_ext,
+        &policy_for(&base),
+        &mut layout_inputs(&base),
+    )
+    .expect_err("whole-program artifact overwriting external module");
+    assert!(err.contains("layout ownership"), "{err}");
+
+    let mut wrong_whole = base;
+    wrong_whole.module_root = Some("App".into());
+    assert!(
+        validate_result(
+            &wrong_whole,
+            &ok_result,
+            &policy_for(&wrong_whole),
+            &mut layout_inputs(&wrong_whole)
+        )
+        .is_err()
+    );
 }
