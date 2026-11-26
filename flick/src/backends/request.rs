@@ -3,15 +3,15 @@
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashSet};
-use std::env;
+use std::time::Instant;
 
 use flick_backend::{
-    Abi, BackendPin, BuildRequest, Descriptor, Entry, Environment, ForeignBinding, Input,
-    InputKind, Mode, ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile, RootHandler,
-    Source, Symbol, TargetRequest,
+    Abi, BackendPin, BuildRequest, Descriptor, Entry, ForeignBinding, Input, InputKind,
+    ModuleInput, ModuleRole, PackageTarget, RootHandler, Source, Symbol,
 };
+#[cfg(test)]
+use flick_backend::{Mode, Profile};
 
-use flick_backend_support::kernel;
 use flick_core::build;
 use flick_core::codegen;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -22,9 +22,12 @@ use flick_core::{ir, types};
 use flick_ir::Program;
 
 use crate::artifact::Artifact;
+use crate::commands::build::BuildPlan;
+#[cfg(test)]
+use crate::commands::build::Purpose;
 use crate::commands::build::settings::with_settings;
-use crate::commands::build::{BuildPlan, Purpose};
 use crate::sources::FsHost;
+use crate::timings;
 use crate::toolchain;
 
 mod assets;
@@ -41,11 +44,14 @@ mod javascript;
 mod javascript_facts;
 #[cfg(test)]
 mod projection_tests;
+mod target;
 #[cfg(test)]
 mod tests;
 
 pub(super) use exports::{check_header_request, collect_own_host_exports};
 pub(super) use inline::collect_inline_foreign;
+pub(super) use target::runtime_abis;
+use target::target;
 
 pub(super) struct Prepared {
     pub request: BuildRequest,
@@ -104,6 +110,7 @@ pub(super) fn program(
 }
 
 impl Prepared {
+    #[allow(clippy::too_many_lines)]
     pub(super) fn new(
         host: &FsHost,
         sources: &mut SourceMap,
@@ -113,6 +120,8 @@ impl Prepared {
         pin: BackendPin,
         descriptor: &Descriptor,
     ) -> Self {
+        let timing = timings::enabled();
+        let t_preflight = timing.then(Instant::now);
         let package = project.and_then(|p| project::project_name(host, p));
         let (target_request, module_root) = target(project, compilation, output, descriptor);
         let declared_dependencies = declared_dependencies(host, project, compilation, output);
@@ -135,7 +144,21 @@ impl Prepared {
             pruned = compilation.prune_for_environment(sources, output.stages_by_class);
             &pruned
         };
+        if let Some(t) = t_preflight {
+            timings::phase("backend prepare: preflight & prune", t.elapsed());
+        }
+        let t_program = timing.then(Instant::now);
         let (program, files) = program(sources, compilation, output.stages_by_class);
+        if let Some(t) = t_program {
+            timings::phase("backend prepare: program build", t.elapsed());
+        }
+        let t_cbor = timing.then(Instant::now);
+        let program_cbor = program.to_cbor();
+        let program_bytes = u64::try_from(program_cbor.len()).unwrap_or(u64::MAX);
+        if let Some(t) = t_cbor {
+            timings::phase("backend prepare: program CBOR encode", t.elapsed());
+        }
+        let t_proj = timing.then(Instant::now);
         let inline_foreign = collect_inline_foreign(&program);
         let host_exports = exports::collect_own_host_exports(&program, compilation);
         let headers = exports::header_request(output, descriptor);
@@ -143,7 +166,7 @@ impl Prepared {
             request: BuildRequest {
                 target: target_request,
                 backend: pin,
-                program: program.to_cbor(),
+                program: program_cbor,
                 module_root,
                 modules: vec![],
                 sources: vec![],
@@ -200,6 +223,16 @@ impl Prepared {
                 data.diagnostics
                     .push(Diagnostic::new(codes::P010, Severity::Error, error));
             }
+        }
+        if let Some(t) = t_proj {
+            timings::phase("backend prepare: projections & inputs", t.elapsed());
+            let inputs_bytes: u64 = data
+                .request
+                .inputs
+                .iter()
+                .fold(0_u64, |acc, input| acc.saturating_add(input.size));
+            timings::bytes("program_bytes", program_bytes);
+            timings::bytes("inputs_bytes", inputs_bytes);
         }
 
         data
@@ -452,112 +485,4 @@ fn request_entries(output: &BuildPlan, project: Option<&Project>) -> Vec<Entry> 
                 .and_then(|e| e.runner.as_ref().map(|r| r.0.clone())),
         })
         .collect()
-}
-
-fn target(
-    project: Option<&Project>,
-    compilation: &Compilation,
-    output: &BuildPlan,
-    descriptor: &Descriptor,
-) -> (TargetRequest, Option<String>) {
-    let default_env = || {
-        descriptor
-            .environments
-            .first()
-            .cloned()
-            .unwrap_or_else(|| Environment {
-                backend: output.target.clone(),
-                platform: "default".into(),
-            })
-    };
-    let (environment, tags, host_package) = if let Some(resolved) = &compilation.environment {
-        (
-            Environment {
-                backend: resolved.backend.clone(),
-                platform: resolved.platform.clone(),
-            },
-            resolved.tags.iter().cloned().collect(),
-            resolved.host_package.clone(),
-        )
-    } else {
-        let env = project
-            .and_then(|p| p.config.build.environment.as_ref())
-            .filter(|e| !output.target_overridden || e.backend == output.target)
-            .map_or_else(default_env, |e| Environment {
-                backend: e.backend.clone(),
-                platform: e.platform.clone(),
-            });
-        (env, vec![], None)
-    };
-    let extras = output.extras;
-    let option = |key: &str, value: &str| OptionValue {
-        key: key.into(),
-        value: value.into(),
-    };
-    let command = option(
-        "command",
-        match output.purpose {
-            Purpose::Test => "test",
-            Purpose::Run => "run",
-            Purpose::Dev => "dev",
-            Purpose::Build => "build",
-            Purpose::Inspect => "inspect",
-        },
-    );
-    let mut options = vec![
-        command,
-        option("host.os", env::consts::OS),
-        option("labels", &format!("{:?}", extras.labels).to_lowercase()),
-    ];
-    options.extend(output.options.to_wire());
-
-    let (mode, module_root) = if output.purpose == Purpose::Inspect {
-        let supports_per_module = descriptor.modes.contains(&Mode::PerModule);
-        if supports_per_module {
-            (Mode::PerModule, output.inspect_module.clone())
-        } else {
-            if let Some(module) = &output.inspect_module {
-                options.push(option("inspect.module", module));
-            }
-            (Mode::WholeProgram, None)
-        }
-    } else {
-        (Mode::WholeProgram, None)
-    };
-
-    (
-        TargetRequest {
-            backend_api: flick_backend::VERSION.into(),
-            ir_version: flick_ir::VERSION.into(),
-            language_version: toolchain::COMPILER.into(),
-            runtime_abis: runtime_abis(toolchain::RUNTIME),
-            environment,
-            tags,
-            host_package,
-            profile: if output.release {
-                Profile::Release
-            } else {
-                Profile::Debug
-            },
-            mode,
-            required_capabilities: vec![],
-            options,
-        },
-        module_root,
-    )
-}
-
-/// The runtime ABIs a request names: Flick's runtime at `runtime`, and the
-/// primitive kernel.
-pub(super) fn runtime_abis(runtime: &str) -> Vec<Abi> {
-    vec![
-        Abi {
-            name: "flickrt".into(),
-            version: runtime.into(),
-        },
-        Abi {
-            name: kernel::ABI.into(),
-            version: kernel::VERSION.into(),
-        },
-    ]
 }

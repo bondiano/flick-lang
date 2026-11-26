@@ -184,6 +184,23 @@ pub(super) fn diagnostics(
     Ok(())
 }
 
+#[derive(Serialize)]
+struct ArtifactMeta<'a> {
+    id: &'a str,
+    path: &'a str,
+    kind: crate::ArtifactKind,
+    byte_len: usize,
+}
+
+#[derive(Serialize)]
+struct ResultMetadata<'a> {
+    artifacts: Vec<ArtifactMeta<'a>>,
+    steps: &'a [ToolchainStep],
+    runtime_dependencies: &'a [crate::RuntimeDependency],
+    launches: &'a [Launch],
+    diagnostics: &'a [Diagnostic],
+}
+
 /// Return the DAG's execution order. A failure rejects the entire result;
 /// callers must not execute steps or publish individual files before this.
 pub fn validate_result(
@@ -193,7 +210,34 @@ pub fn validate_result(
     inputs: &mut dyn Inputs,
 ) -> Result<Vec<usize>, String> {
     let limits = policy.limits;
-    ciborium::into_writer(result, Budget(limits.result_bytes))
+    let payload_bytes = result
+        .artifacts
+        .iter()
+        .try_fold(0_usize, |acc, artifact| {
+            acc.checked_add(artifact.bytes.len())
+        })
+        .ok_or("backend result exceeds its total output limit")?;
+    let remaining = limits
+        .result_bytes
+        .checked_sub(payload_bytes)
+        .ok_or("backend result exceeds its total output limit")?;
+    let metadata = ResultMetadata {
+        artifacts: result
+            .artifacts
+            .iter()
+            .map(|a| ArtifactMeta {
+                id: &a.id,
+                path: &a.path,
+                kind: a.kind,
+                byte_len: a.bytes.len(),
+            })
+            .collect(),
+        steps: &result.steps,
+        runtime_dependencies: &result.runtime_dependencies,
+        launches: &result.launches,
+        diagnostics: &result.diagnostics,
+    };
+    ciborium::into_writer(&metadata, Budget(remaining))
         .map_err(|_| "backend result exceeds its total output limit")?;
     diagnostics(request, &result.diagnostics, inputs, limits)?;
     if result

@@ -8,6 +8,7 @@ use std::io::Read;
 use std::mem;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::{Duration, Instant};
 
 use flick_backend::host::{Budget, WasmBackend};
 use flick_backend::{
@@ -27,7 +28,10 @@ use crate::commands::build::Purpose;
 use crate::commands::build::{BuildPlan, Emission};
 use crate::component;
 use crate::sources::FsHost;
-use support::{host_preflight, required_launches, reserved_outputs, standalone_files};
+use crate::timings;
+use support::{
+    host_preflight, record_stage_timings, required_launches, reserved_outputs, standalone_files,
+};
 
 pub(crate) struct Package {
     pin: BackendPin,
@@ -71,9 +75,13 @@ impl Package {
         bytes: &[u8],
         allowed: Option<&BTreeMap<String, Vec<String>>>,
     ) -> Result<Self, Diagnostic> {
+        let timing = timings::enabled();
+        let t_init = timing.then(Instant::now);
+        let mut cache_hit = false;
         let backend = if flick_backend::sha256(bytes) == pin.sha256
             && let Some(loaded) = runtimes::find(&pin)
         {
+            cache_hit = true;
             loaded
         } else {
             let loaded = Arc::new(
@@ -94,6 +102,15 @@ impl Package {
             runtimes::loaded(&pin, &loaded);
             loaded
         };
+        if let Some(t) = t_init {
+            let label = if cache_hit {
+                "backend component init (in-process cache hit)"
+            } else {
+                "backend component init (wasmtime load)"
+            };
+            timings::phase(label, t.elapsed());
+        }
+        let t_tools = timing.then(Instant::now);
         let descriptor = backend.describe();
         super::options::save_descriptor(&pin.sha256, &descriptor);
         // outside a project only `--allow-tool` grants a tool
@@ -112,6 +129,9 @@ impl Package {
             .into_iter()
             .filter_map(|id| Tool::find(id, None).ok())
             .collect();
+        if let Some(t) = t_tools {
+            timings::phase("backend component tools discovery", t.elapsed());
+        }
         Ok(Self {
             pin,
             root: root.to_path_buf(),
@@ -158,6 +178,7 @@ impl Package {
         diagnostics
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(crate) fn artifacts(
         &self,
         host: &FsHost,
@@ -166,6 +187,10 @@ impl Package {
         compilation: &Compilation,
         output: &BuildPlan,
     ) -> Emission {
+        let timing = timings::enabled();
+        let emission_start = timing.then(Instant::now);
+        let mut attributed = Duration::ZERO;
+        let t_preflight = timing.then(Instant::now);
         let diagnostics = self.preflight(project, compilation, output);
         if !diagnostics.is_empty() {
             return Emission {
@@ -174,6 +199,12 @@ impl Package {
             };
         }
         let descriptor = self.backend.describe();
+        if let Some(t) = t_preflight {
+            let d = t.elapsed();
+            attributed = attributed.saturating_add(d);
+            timings::phase("backend preflight & descriptor", d);
+        }
+        let t_prepare = timing.then(Instant::now);
         let mut prepared = Prepared::new(
             host,
             sources,
@@ -183,6 +214,11 @@ impl Package {
             self.pin.clone(),
             &descriptor,
         );
+        if let Some(t) = t_prepare {
+            let d = t.elapsed();
+            attributed = attributed.saturating_add(d);
+            timings::phase("backend prepare request", d);
+        }
         if prepared
             .diagnostics
             .iter()
@@ -193,6 +229,7 @@ impl Package {
                 diagnostics: prepared.diagnostics,
             };
         }
+        let t_runtime = timing.then(Instant::now);
         let wire_options = output.options.to_wire();
         prepared.request.runtime_dependencies = if output.purpose == Purpose::Inspect {
             Vec::new()
@@ -207,6 +244,11 @@ impl Package {
                 }
             }
         };
+        if let Some(t) = t_runtime {
+            let d = t.elapsed();
+            attributed = attributed.saturating_add(d);
+            timings::phase("backend runtime dependencies", d);
+        }
         prepared.request.toolchains = self.tools.iter().map(|t| t.pin.clone()).collect();
         let reserved = if output.purpose == Purpose::Inspect {
             Vec::new()
@@ -223,23 +265,53 @@ impl Package {
             authorize_launch: &tools::authorize_launch,
         };
         component::cancel_on_signals();
-        let mut emission = self.finish_generation(
+        let generation = if timing {
+            match flick_backend::generate_with_timings(
+                &*self.backend,
+                &prepared.request,
+                &policy,
+                |id| prepared.bytes.get(id).cloned(),
+                true,
+            ) {
+                Ok((generated, stages)) => {
+                    attributed = attributed.saturating_add(record_stage_timings(&stages));
+                    Ok(generated)
+                }
+                Err(err) => Err(err),
+            }
+        } else {
             flick_backend::generate(
                 &*self.backend,
                 &prepared.request,
                 &policy,
                 |id| prepared.bytes.get(id).cloned(),
                 true,
-            ),
+            )
+        };
+        let mut steps_dur = Duration::ZERO;
+        let mut emission = self.finish_generation(
+            generation,
             &mut prepared,
             output,
             &descriptor,
             project.is_some(),
+            &mut steps_dur,
         );
+        if timing {
+            attributed = attributed.saturating_add(steps_dur);
+            timings::phase("backend external tool steps", steps_dur);
+        }
         if project.is_none() && output.purpose != Purpose::Inspect {
             standalone_files(&mut emission);
         }
         emission.diagnostics.splice(0..0, prepared.diagnostics);
+        if let Some(start) = emission_start {
+            let total = start.elapsed();
+            timings::phase(
+                "backend emission residual",
+                total.saturating_sub(attributed),
+            );
+        }
         emission
     }
 
@@ -250,6 +322,7 @@ impl Package {
         output: &BuildPlan,
         descriptor: &flick_backend::Descriptor,
         in_project: bool,
+        steps_dur: &mut Duration,
     ) -> Emission {
         match result {
             Ok(generated) if output.purpose == Purpose::Inspect => {
@@ -267,9 +340,9 @@ impl Package {
                 }
             }
             Ok(generated) => {
-                if let Err(diagnostic) =
-                    self.outputs(&generated, prepared, output, descriptor, in_project)
-                {
+                if let Err(diagnostic) = self.outputs(
+                    &generated, prepared, output, descriptor, in_project, steps_dur,
+                ) {
                     return Emission {
                         artifacts: vec![],
                         diagnostics: vec![*diagnostic],
@@ -306,6 +379,7 @@ impl Package {
         output: &BuildPlan,
         descriptor: &flick_backend::Descriptor,
         in_project: bool,
+        steps_dur: &mut Duration,
     ) -> Result<(), Box<Diagnostic>> {
         let result = generated.result();
         let missing_runtime = descriptor
@@ -315,7 +389,7 @@ impl Package {
         let require_runs = !(output.purpose == Purpose::Build && missing_runtime);
         required_launches(result, output, require_runs).map_err(|why| Box::new(failure(why)))?;
         let manifest = launch::artifact(&self.pin, result).map_err(|why| Box::new(failure(why)))?;
-        let outputs = self.steps(generated, &prepared.bytes, output, in_project)?;
+        let outputs = self.steps(generated, &prepared.bytes, output, in_project, steps_dur)?;
         prepared.shared.push(manifest);
         (prepared.shared).extend(result.artifacts.iter().cloned().map(Artifact::from));
         prepared.shared.extend(outputs);
@@ -329,6 +403,7 @@ impl Package {
         sources: &BTreeMap<String, Vec<u8>>,
         output: &BuildPlan,
         in_project: bool,
+        steps_dur: &mut Duration,
     ) -> Result<Vec<Artifact>, Box<Diagnostic>> {
         let result = generated.result();
         let cancel = component::cancellation().map_err(|why| Box::new(failure(why)))?;
@@ -353,7 +428,8 @@ impl Package {
                 .with_fix(|| (hint, Vec::new())),
             ));
         }
-        execute::run(
+        let t_steps = timings::enabled().then(Instant::now);
+        let ran = execute::run(
             result,
             generated.execution_order(),
             sources,
@@ -361,8 +437,11 @@ impl Package {
             &self.tools,
             &output.out_dir,
             cancel,
-        )
-        .map_err(|failure| {
+        );
+        if let Some(t) = t_steps {
+            *steps_dur = t.elapsed();
+        }
+        ran.map_err(|failure| {
             let message = match failure {
                 execute::Failure::Cancelled => "the build was cancelled".to_owned(),
                 execute::Failure::Step(why) => why,

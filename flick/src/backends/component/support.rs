@@ -1,8 +1,10 @@
 //! Command contributor forwarding and host build policy helpers for a
 //! loaded backend component.
 
+use std::time::Duration;
+
 use flick_backend::host::runtime::Cancellation;
-use flick_backend::{Backend, command};
+use flick_backend::{Backend, StageTimings, command};
 use flick_core::build::go::FILES;
 use flick_core::diagnostics::Diagnostic;
 use flick_core::project::{Compilation, Project, target};
@@ -13,6 +15,7 @@ use super::Package;
 use crate::artifact::Artifact;
 use crate::commands::build::{BuildPlan, Emission, Purpose};
 use crate::commands::contributed::Contributor;
+use crate::timings;
 
 impl Contributor for Package {
     fn describe(&self) -> Result<Vec<command::Descriptor>, String> {
@@ -67,6 +70,37 @@ impl Contributor for Package {
     ) -> Result<command::Plan, Vec<command::Diagnostic>> {
         Backend::scaffold(&*self.backend, request)
     }
+}
+
+pub(super) fn record_stage_timings(stages: &StageTimings) -> Duration {
+    let mut attributed = Duration::ZERO;
+    for (label, duration) in [
+        ("backend handshake", stages.handshake),
+        ("backend host input snapshot", stages.input_snapshot),
+        (
+            "backend host request validation (decode #1)",
+            stages.request_validation,
+        ),
+        (
+            "backend check-target (guest decode #2)",
+            stages.check_target,
+        ),
+        (
+            "backend generate #1 (guest decode #3)",
+            stages.generate_first,
+        ),
+        ("backend result validation #1", stages.result_validation),
+        (
+            "backend determinism replay generate #2 (guest decode #4)",
+            stages.generate_replay,
+        ),
+        ("backend replay validation #2", stages.replay_validation),
+        ("backend cache key", stages.cache_key),
+    ] {
+        attributed = attributed.saturating_add(duration);
+        timings::phase(label, duration);
+    }
+    attributed
 }
 
 pub(super) fn reserved_outputs(prepared: &Prepared, project: Option<&Project>) -> Vec<String> {
