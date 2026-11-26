@@ -75,6 +75,9 @@ pub(crate) struct Lowering<'p> {
     hosts: BTreeSet<&'p str>,
     /// What the Lua kernel implements.
     kernel: Table<'static>,
+    /// The built-in modules, whose JS globals of the kernel are the Lua
+    /// kernel's.
+    builtin: &'p BTreeSet<&'p str>,
     /// The module of the item being lowered.
     module: &'p str,
     names: Namer,
@@ -90,7 +93,11 @@ pub(crate) struct Lowering<'p> {
 }
 
 impl<'p> Lowering<'p> {
-    pub(crate) fn new(program: &'p Program, target: &Target<'p>) -> Lowering<'p> {
+    pub(crate) fn new(
+        program: &'p Program,
+        target: &Target<'p>,
+        builtin: &'p BTreeSet<&'p str>,
+    ) -> Lowering<'p> {
         let mut items = BTreeMap::new();
         let mut constructors = BTreeMap::new();
         let mut packages = BTreeMap::new();
@@ -126,6 +133,7 @@ impl<'p> Lowering<'p> {
             packages,
             hosts,
             kernel: kernel::table(),
+            builtin,
             module: "",
             names: Namer::new(),
             vars: BTreeSet::new(),

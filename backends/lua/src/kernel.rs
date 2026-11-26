@@ -126,16 +126,16 @@ mod tests {
     fn the_table_names_every_specifier_and_primitive_of_the_kernel() {
         let manifest = manifest();
         let table = table();
-        let wanted: BTreeSet<&str> = (manifest.specifiers())
-            .filter(|s| s.starts_with("flick:"))
-            .collect();
+        // the JS globals of the kernel are `global`'s
+        let ours = |s: &str| s.starts_with("flick:") || s == "global";
+        let wanted: BTreeSet<&str> = manifest.specifiers().filter(|s| ours(s)).collect();
         let named: BTreeSet<&str> = table.sections.iter().map(|s| s.specifier).collect();
         assert_eq!(
             named, wanted,
-            "kernel.txt must have a section per `flick:` specifier"
+            "kernel.txt must have a section per `flick:` specifier and `global`"
         );
         for (specifier, export, class) in manifest.exports() {
-            if class != Class::Kernel || !specifier.starts_with("flick:") {
+            if class != Class::Kernel || !ours(specifier) {
                 continue;
             }
             let section = (table.sections.iter())

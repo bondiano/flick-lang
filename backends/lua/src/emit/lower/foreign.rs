@@ -15,6 +15,8 @@
 //! multiple results, methods, modules, `Sync` and effect modes) needs the
 //! Lua value ABI and is refused.
 
+use std::iter;
+
 use flick_ir::{
     Binding, Expr as IrExpr, ExprKind as Ir, Foreign, ForeignMode, IrType, ItemKind, Lang, Span,
     Stage,
@@ -37,6 +39,9 @@ enum Host {
     /// A function of one pure stage.
     Callback,
 }
+
+/// The specifier of the JS globals of the kernel in `kernel.txt`.
+const GLOBAL: &str = "global";
 
 /// How a host function is called.
 pub(super) struct HostFn<'f> {
@@ -108,7 +113,18 @@ impl Lowering<'_> {
     }
 
     /// How the foreign function `f` is called, or why it cannot be.
-    pub(super) fn host_function<'f>(&self, f: &'f Foreign) -> Result<HostFn<'f>, &'static str> {
+    pub(super) fn host_function<'f>(
+        &self,
+        module: &str,
+        f: &'f Foreign,
+    ) -> Result<HostFn<'f>, &'static str> {
+        // a JS global of the kernel a built-in module binds is the Lua kernel's
+        if let Binding::Global { name } = &f.binding
+            && self.builtin.contains(module)
+            && self.kernel.row(GLOBAL, name).is_some()
+        {
+            return self.kernel_function(f, GLOBAL, name);
+        }
         let Binding::Global { name } = &f.binding else {
             return match &f.binding {
                 Binding::Module { from, name } if from.starts_with("flick:") => {
@@ -209,7 +225,7 @@ impl Lowering<'_> {
             return Err("the Lua kernel implements it only as a pure function of its arguments");
         }
         Ok(HostFn {
-            path: vec![KERNEL, name],
+            path: iter::once(KERNEL).chain(name.split('.')).collect(),
             arity: f.dicts + taken,
             taken,
             statement: false,
@@ -283,7 +299,7 @@ impl Lowering<'_> {
         let Some(ItemKind::Foreign(f)) = item else {
             return None;
         };
-        let host = self.host_function(f).ok()?;
+        let host = self.host_function(module, f).ok()?;
         if args.len() != host.taken || dicts.len() != host.dicts {
             return None;
         }

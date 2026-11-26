@@ -141,9 +141,15 @@ fn a_kernel_function_takes_its_dictionaries_first() {
 fn the_kernel_defines_each_binding_its_table_implements() {
     let sources: Vec<&str> = kernel_sources().collect();
     let defined = |name: &str| {
-        sources.iter().any(|s| {
-            s.contains(&format!("function K.{name}("))
-                || s.lines().any(|l| l.starts_with(&format!("K.{name} =")))
+        sources.iter().any(|s| match name.split_once('.') {
+            // `K.Math = { floor = math.floor, … }`
+            Some((root, leaf)) => s.lines().any(|l| {
+                l.starts_with(&format!("K.{root} = {{")) && l.contains(&format!(" {leaf} = "))
+            }),
+            None => {
+                s.contains(&format!("function K.{name}("))
+                    || s.lines().any(|l| l.starts_with(&format!("K.{name} =")))
+            }
         })
     };
     let implemented = table().implemented();

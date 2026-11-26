@@ -22,44 +22,68 @@ nan : Float
 foreign pure nan from global "NaN"
 
 is_nan : Float -> Bool
-foreign pure is_nan from global "Number.isNaN"
+let is_nan x = not (x <= x)
+  @native "Number.isNaN" when js || go
 
 is_finite : Float -> Bool
-foreign pure is_finite from global "Number.isFinite"
+let is_finite x = x - x == 0.0
+  @native "Number.isFinite" when js || go
 
 is_integer : Float -> Bool
-foreign pure is_integer from global "Number.isInteger"
+let is_integer x = is_finite x && floor x == x
+  @native "Number.isInteger" when js || go
 
 is_safe_integer : Float -> Bool
-foreign pure is_safe_integer from global "Number.isSafeInteger"
+let is_safe_integer x = is_integer x && abs x <= 9007199254740991.0
+  @native "Number.isSafeInteger" when js || go
 
 abs : Float -> Float
-foreign pure abs from global "Math.abs"
+let abs x = if x < 0.0 then -x else if x == 0.0 then 0.0 else x
+  @native "Math.abs" when js || go
 
 floor : Float -> Float
 foreign pure floor from global "Math.floor"
 
 ceil : Float -> Float
-foreign pure ceil from global "Math.ceil"
+let ceil x = -(floor (-x))
+  @native "Math.ceil" when js || go
 
 round : Float -> Float
-foreign pure round from global "Math.round"
+let round x =
+  let f = floor x
+  // the nearest integer, a tie toward +Infinity; `x - f` is exact where it decides
+  if f == x then x
+  else if x - f < 0.5 then f
+  else if f + 1.0 == 0.0 then x * 0.0
+  else f + 1.0
+  @native "Math.round" when js || go
 
 trunc : Float -> Float
-foreign pure trunc from global "Math.trunc"
+let trunc x = if x < 0.0 then ceil x else floor x
+  @native "Math.trunc" when js || go
 
 sqrt : Float -> Float
 foreign pure sqrt from global "Math.sqrt"
 
 /// The lesser of two numbers by the order where NaN is least.
 min : Float -> Float -> Float
-foreign pure min from "flick:Number" "min"
-  arity 1
+let min that self =
+  if self == that || is_nan self then self
+  else if is_nan that then that
+  else if self < that then self
+  else that
+  @native "flick:Number" "min" when js || go
+    arity 1
 
 /// The greater of two numbers by the order where NaN is least.
 max : Float -> Float -> Float
-foreign pure max from "flick:Number" "max"
-  arity 1
+let max that self =
+  if self == that || is_nan that then self
+  else if is_nan self then that
+  else if self > that then self
+  else that
+  @native "flick:Number" "max" when js || go
+    arity 1
 
 to_string : Float -> String
 foreign pure to_string from "flick:rt" "stringFromNumber"
@@ -67,7 +91,15 @@ foreign pure to_string from "flick:rt" "stringFromNumber"
 /// The number the string spells in JS syntax, `"NaN"` and the infinities
 /// included; blank and malformed text are `None`.
 parse : String -> Option Float
-foreign pure parse from "flick:Number" "parse"
+let parse s =
+  if s == "NaN" then Some (0.0 / 0.0)
+  else if s == "Infinity" then Some (1.0 / 0.0)
+  else if s == "-Infinity" then Some (-1.0 / 0.0)
+  else
+    match String.to_number s with
+    | Some n -> if is_nan n then None else Some n
+    | None -> None
+  @native "flick:Number" "parse" when js || go
 
 /// `self + that`: `x |> Float.sum 1`.
 sum : Float -> Float -> Float
@@ -152,8 +184,11 @@ foreign pure next_pow2 from "flick:Number" "nextPow2"
 
 /// Rounded to `precision` decimal places: `3.14159 |> Float.round_to 2`.
 round_to : Float -> Float -> Float
-foreign pure round_to from "flick:Number" "round"
-  arity 1
+let round_to precision x =
+  let factor = 10.0 ** precision
+  round (x * factor) / factor
+  @native "flick:Number" "round" when js || go
+    arity 1
 
 /// `n` itself when it is a safe integer.
 safe_integer : Float -> Option Float

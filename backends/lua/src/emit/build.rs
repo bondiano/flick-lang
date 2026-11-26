@@ -58,6 +58,7 @@ const KERNEL_CHUNKS: &[(&str, &str)] = &[
     ("strings", include_str!("../../kernel/strings.lua")),
     ("lists", include_str!("../../kernel/lists.lua")),
     ("bytes", include_str!("../../kernel/bytes.lua")),
+    ("numbers", include_str!("../../kernel/numbers.lua")),
 ];
 
 /// The runner a test build loads after every chunk.
@@ -425,7 +426,7 @@ pub(crate) fn build(
         index,
     };
     let mut errors: Vec<Diagnostic> = Vec::new();
-    let mut lowering = Lowering::new(program, target);
+    let mut lowering = Lowering::new(program, target, &plan.builtin);
     let chunks: Vec<(String, Printed)> = (plan.modules(request).into_iter())
         .map(|m| chunk(&plan, m, &mut lowering, target, &mut errors))
         .collect();

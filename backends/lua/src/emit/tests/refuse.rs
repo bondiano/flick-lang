@@ -91,7 +91,7 @@ fn every_refusal_of_a_run_is_reported_in_order() {
     );
     let rem = at(
         ExprKind::Binary(
-            BinOp::Arith(Arith::Rem, Num::Float),
+            BinOp::Arith(Arith::Rem, Num::Float32),
             Box::new(float(1.0)),
             Box::new(float(2.0)),
         ),
@@ -158,16 +158,33 @@ fn a_kernel_binding_is_refused_at_its_use() {
 }
 
 #[test]
-fn a_negative_zero_literal_keeps_its_sign_only_on_luajit() {
+fn a_negative_zero_is_never_a_lua51_constant() {
     let zero = || vec![value("z", at(ExprKind::Lit(Lit::Float(-0.0)), 2, 6))];
-    let found = refusals("lua51", zero());
-    message_at(
-        &found,
-        "the literal `-0.0` is not available on the lua/love target with the dialect `lua51` yet",
-        (2, 6),
-    );
+    // Lua 5.1 keeps one constant for `0` and `-0`: the kernel's `-0` instead
+    let printed = emit("lua51", zero()).expect("lowered on Lua 5.1");
+    assert_eq!(printed.code, "M.z = K.negzero\n");
     let printed = emit("luajit", zero()).expect("lowered on LuaJIT");
     assert_eq!(printed.code, "M.z = -0\n");
+    // as is what Lua 5.1 would fold into one, and only that
+    let product = |r: f64| {
+        let mul = BinOp::Arith(Arith::Mul, Num::Float);
+        vec![value(
+            "p",
+            ex(ExprKind::Binary(
+                mul,
+                Box::new(float(0.0)),
+                Box::new(float(r)),
+            )),
+        )]
+    };
+    assert_eq!(
+        emit("lua51", product(-1.0)).expect("lowered").code,
+        "M.p = K.negzero\n"
+    );
+    assert_eq!(
+        emit("lua51", product(1.0)).expect("lowered").code,
+        "M.p = 0 * 1\n"
+    );
 }
 
 #[test]
@@ -190,10 +207,10 @@ fn wide_literals_and_float_patterns_are_the_kernels() {
     );
     message_at(&found, "a 64-bit or big integer literal", (1, 3));
     message_at(&found, "a float literal pattern", (5, 9));
-    // `**` of `Float` has its own special cases
+    // `Float32` rounds each result to 32 bits
     let pow = at(
         ExprKind::Binary(
-            BinOp::Arith(Arith::Pow, Num::Float),
+            BinOp::Arith(Arith::Pow, Num::Float32),
             Box::new(float(1.0)),
             Box::new(local("y")),
         ),

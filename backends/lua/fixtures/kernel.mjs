@@ -1,8 +1,9 @@
 // Runs the kernel's conformance suite, the modules of tests/kernel that
-// tests/kernel/lua.txt lists, with `flick test --target lua` on Lua 5.1.5
+// tests/kernel/lua.txt lists and those of tests/language that
+// tests/language/lua.txt lists, with `flick test --target lua` on Lua 5.1.5
 // and on LuaJIT 2.1 with the JIT on and off. Each JSON report must be the
-// report of the same modules on JS, whose expectations the suite writes
-// from the kernel's contract. Then `luac -l` lists the globals each kernel
+// report of the same modules on JS, whose expectations the suites write
+// from the contract. Then `luac -l` lists the globals each kernel
 // chunk reads: every one must be in the API snapshot of every profile.
 //
 // usage: node backends/lua/fixtures/kernel.mjs FLICK
@@ -16,7 +17,6 @@ import { fileURLToPath } from "node:url";
 const fixtures = dirname(fileURLToPath(import.meta.url));
 const lua = resolve(fixtures, "..");
 const root = resolve(lua, "../..");
-const suite = join(root, "tests/kernel");
 const out = join(root, "target/lua-kernel");
 const flick = process.argv[2] ? resolve(process.argv[2]) : join(root, "target/e2e/flick");
 const env = { ...process.env, FLICK_STD_PATH: process.env.FLICK_STD_PATH || join(root, "packages/std") };
@@ -54,17 +54,24 @@ version(lua51, /^Lua 5\.1\.5 /);
 version(luac, /^Lua 5\.1\.5 /);
 version(luajit, /^LuaJIT 2\.1\./);
 
-const modules = readFileSync(join(suite, "lua.txt"), "utf8")
-  .split("\n")
-  .map((line) => line.trim())
-  .filter((line) => line && !line.startsWith("#"))
-  .map((name) => `test/Kernel/${name}.fl`);
+/** A suite's directory and the test modules of its `lua.txt`. */
+const suites = [
+  ["tests/kernel", "Kernel"],
+  ["tests/language", "Language"],
+].map(([dir, prefix]) => ({
+  dir: join(root, dir),
+  modules: readFileSync(join(root, dir, "lua.txt"), "utf8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"))
+    .map((name) => `test/${prefix}/${name}.fl`),
+}));
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
-/** The JSON report of the suite's `modules` on `target` in `dir`. */
-function report(dir, target, path) {
+/** The JSON report of `modules` on `target` in `dir`. */
+function report(dir, modules, target, path) {
   const args = ["test", "--target", target, "--seed", "1", "--reporter", "json", ...modules];
   const result = run(flick, args, { cwd: dir, env: { ...env, PATH: path } });
   if (!result.stdout.startsWith("{")) {
@@ -73,8 +80,6 @@ function report(dir, target, path) {
   return result.stdout;
 }
 
-const expected = report(suite, "js", process.env.PATH);
-
 // each host alone in `[tools]`, first on PATH under the name flick looks for
 const hosts = [
   { name: "Lua 5.1.5", tool: "lua", run: lua51 },
@@ -82,20 +87,30 @@ const hosts = [
   { name: "LuaJIT 2.1 -joff", tool: "luajit", run: luajit, flags: "-joff" },
 ];
 let failed = 0;
-for (const host of hosts) {
-  const dir = join(out, host.name.replace(/[^A-Za-z0-9]+/g, "-"));
-  cpSync(suite, dir, { recursive: true, filter: (path) => !path.includes(`${suite}/.flick`) && !path.includes(`${suite}/dist`) });
-  const config = readFileSync(join(dir, "flick.toml"), "utf8").replace(/"flick\/lua" = \[[^\]]*\]/, `"flick/lua" = ["${host.tool}"]`);
-  writeFileSync(join(dir, "flick.toml"), config);
-  const bin = join(dir, ".bin");
-  mkdirSync(bin);
-  writeFileSync(join(bin, host.tool), `#!/bin/sh\nexec "${host.run}"${host.flags ? ` ${host.flags}` : ""} "$@"\n`);
-  chmodSync(join(bin, host.tool), 0o755);
-  const got = report(dir, "lua", `${bin}${delimiter}${process.env.PATH}`);
-  const passed = got === expected;
-  failed += passed ? 0 : 1;
-  console.log(`${passed ? "pass" : "FAIL"}  ${host.name}`);
-  if (!passed) console.log(`  expected ${expected}  got      ${got}`);
+for (const suite of suites) {
+  const expected = report(suite.dir, suite.modules, "js", process.env.PATH);
+  for (const host of hosts) {
+    const dir = join(out, `${suite.dir.split("/").pop()}-${host.name.replace(/[^A-Za-z0-9]+/g, "-")}`);
+    cpSync(suite.dir, dir, {
+      recursive: true,
+      filter: (path) => !path.includes(`${suite.dir}/.flick`) && !path.includes(`${suite.dir}/dist`),
+    });
+    const tool = `"flick/lua" = ["${host.tool}"]`;
+    const original = readFileSync(join(dir, "flick.toml"), "utf8");
+    const config = /"flick\/lua" = \[[^\]]*\]/.test(original)
+      ? original.replace(/"flick\/lua" = \[[^\]]*\]/, tool)
+      : original.replace("[tools]", `[tools]\n${tool}`);
+    writeFileSync(join(dir, "flick.toml"), config);
+    const bin = join(dir, ".bin");
+    mkdirSync(bin);
+    writeFileSync(join(bin, host.tool), `#!/bin/sh\nexec "${host.run}"${host.flags ? ` ${host.flags}` : ""} "$@"\n`);
+    chmodSync(join(bin, host.tool), 0o755);
+    const got = report(dir, suite.modules, "lua", `${bin}${delimiter}${process.env.PATH}`);
+    const passed = got === expected;
+    failed += passed ? 0 : 1;
+    console.log(`${passed ? "pass" : "FAIL"}  ${suite.modules.join(", ")} on ${host.name}`);
+    if (!passed) console.log(`  expected ${expected}  got      ${got}`);
+  }
 }
 
 // the globals each kernel chunk reads, but the runner's, which reads the
