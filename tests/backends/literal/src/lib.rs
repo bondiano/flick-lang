@@ -7,6 +7,7 @@ mod fallback;
 mod foreign;
 mod kernel;
 mod launches;
+mod layout_specialize;
 mod options;
 mod packages;
 mod steps;
@@ -68,6 +69,7 @@ fn case(request: &BuildRequest) -> &str {
                         "Fixture.Steps" => Some("steps"),
                         "Fixture.StepsEscape" => Some("steps-escape"),
                         "Fixture.TypedIr" => Some("typed-ir"),
+                        "Fixture.LayoutSpecialize" => Some("layout-specialize"),
                         _ => None,
                     })
                     .unwrap_or("")
@@ -275,6 +277,12 @@ impl Backend for Literal {
         }
         if case(request) == "typed-ir" {
             typed_ir::validate_program(&program, request)?;
+            return Ok(TargetSupport {
+                capabilities: self.describe().capabilities,
+            });
+        }
+        if case(request) == "layout-specialize" {
+            layout_specialize::check_target(&program, request)?;
             return Ok(TargetSupport {
                 capabilities: self.describe().capabilities,
             });
@@ -508,6 +516,13 @@ fn module_artifacts(request: &BuildRequest) -> Result<Vec<Artifact>, Vec<Diagnos
     } else {
         None
     };
+    let layout_spec = if case(request) == "layout-specialize" {
+        let program =
+            Program::from_cbor(&request.program).map_err(|e| diagnostic(&e.to_string(), None))?;
+        Some(layout_specialize::generate(&program, request)?)
+    } else {
+        None
+    };
     let mut out = Vec::new();
     for m in request
         .modules
@@ -521,7 +536,12 @@ fn module_artifacts(request: &BuildRequest) -> Result<Vec<Artifact>, Vec<Diagnos
         let suite = (kernel.iter())
             .flat_map(|(sources, _)| sources)
             .find(|(module, _)| *module == m.name);
+        let spec_src = (layout_spec.iter())
+            .flat_map(|(sources, _)| sources)
+            .find(|(module, _)| *module == m.name);
         if let Some((_, source)) = suite {
+            bytes.extend(source);
+        } else if let Some((_, source)) = spec_src {
             bytes.extend(source);
         } else if case(request) == "fallback" {
             bytes.extend(fallback::source(request, &m.name)?);
@@ -539,50 +559,9 @@ fn module_artifacts(request: &BuildRequest) -> Result<Vec<Artifact>, Vec<Diagnos
         });
     }
     out.extend(kernel.map(|(_, report)| report));
+    out.extend(layout_spec.map(|(_, report)| report));
     Ok(out)
 }
 
 #[cfg(feature = "guest")]
-mod guest {
-    use flick_backend::bindings::flick::backend::inputs;
-    use flick_backend::bindings::{Guest, export_component};
-    use flick_backend::command::Dependency;
-    use flick_backend::{
-        Backend, BuildRequest, BuildResult, Descriptor, Diagnostic, InputError, Inputs,
-        OptionValue, Packages, ProjectFile, TargetSupport,
-    };
-
-    use super::Literal;
-
-    struct Imports;
-    impl Inputs for Imports {
-        fn read(&mut self, id: &str) -> Result<Vec<u8>, InputError> {
-            inputs::read(id)
-        }
-    }
-
-    struct Component;
-    impl Guest for Component {
-        fn describe() -> Descriptor {
-            Literal.describe()
-        }
-        fn check_target(request: BuildRequest) -> Result<TargetSupport, Vec<Diagnostic>> {
-            Literal.check_target(&request, &mut Imports)
-        }
-        fn generate(request: BuildRequest) -> Result<BuildResult, Vec<Diagnostic>> {
-            Literal.generate(&request, &mut Imports)
-        }
-        fn package_files() -> Vec<String> {
-            Literal.package_files()
-        }
-        fn packages(
-            files: Vec<ProjectFile>,
-            dependencies: Vec<Dependency>,
-            options: Vec<OptionValue>,
-        ) -> Packages {
-            Literal.packages(&files, &dependencies, &options)
-        }
-    }
-    export_component!(Component);
-    flick_backend::export_commands!(Component, Literal);
-}
+mod guest;

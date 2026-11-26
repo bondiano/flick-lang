@@ -2,21 +2,25 @@
 
 use flick_backend::{OptionDescriptor, Parameter, ValueKind, Verb};
 
+fn text_option(name: &str, help: &str) -> OptionDescriptor {
+    OptionDescriptor {
+        parameter: Parameter {
+            name: name.into(),
+            kind: ValueKind::Text,
+            multiple: false,
+            required: false,
+            help: help.into(),
+        },
+        default: None,
+        implicit_value: None,
+        choices: vec![],
+        verbs: vec![Verb::Build, Verb::Run, Verb::Test],
+    }
+}
+
 pub(crate) fn literal_options() -> Vec<OptionDescriptor> {
     vec![
-        OptionDescriptor {
-            parameter: Parameter {
-                name: "case".into(),
-                kind: ValueKind::Text,
-                multiple: false,
-                required: false,
-                help: "Select a test fixture behavior.".into(),
-            },
-            default: None,
-            implicit_value: None,
-            choices: vec![],
-            verbs: vec![Verb::Build, Verb::Run, Verb::Test],
-        },
+        text_option("case", "Select a test fixture behavior."),
         OptionDescriptor {
             parameter: Parameter {
                 name: "banner".into(),
@@ -95,5 +99,13 @@ pub(crate) fn literal_options() -> Vec<OptionDescriptor> {
             choices: vec![],
             verbs: vec![Verb::Build, Verb::Run, Verb::Test],
         },
+        text_option(
+            "max-instances",
+            "Maximum specialization instances allowed in layout-specialize mode.",
+        ),
+        text_option(
+            "max-output-bytes",
+            "Maximum estimated specialized output bytes allowed in layout-specialize mode.",
+        ),
     ]
 }

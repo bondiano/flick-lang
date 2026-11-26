@@ -41,6 +41,9 @@ mod go_record;
 #[path = "backends/kernel.rs"]
 mod kernel;
 #[cfg(feature = "wasm-backends")]
+#[path = "backends/layout_specialize.rs"]
+mod layout_specialize;
+#[cfg(feature = "wasm-backends")]
 #[path = "backends/library_exports.rs"]
 mod library_exports;
 #[cfg(feature = "wasm-backends")]
