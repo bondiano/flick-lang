@@ -18,7 +18,8 @@ const KEYWORDS: &[&str] = &[
 pub(crate) const GLOBALS: &[&str] = &["pairs", "setmetatable", "type"];
 
 /// The table of the module being lowered, the private namespace that
-/// holds every module's table, and the Lua kernel's table, `ns.k`.
+/// holds every module's table, and the local each chunk keeps the Lua
+/// kernel's table `ns.k` in.
 pub(crate) const MODULE: &str = "M";
 pub(crate) const NAMESPACE: &str = "ns";
 pub(crate) const KERNEL: &str = "K";
