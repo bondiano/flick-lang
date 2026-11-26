@@ -1,5 +1,5 @@
 //! Traversal of direct children and source spans in evaluation order.
-use crate::{Dict, Expr, ExprKind, ItemKind, Module, Span, Stage, Stmt};
+use crate::{Dict, Expr, ExprKind, Item, ItemKind, Module, Span, Stage, Stmt};
 
 impl Expr {
     /// How often the expression reads the local `name`.
@@ -184,29 +184,36 @@ impl Module {
             f(&mut export.span);
         }
         for item in &mut self.items {
-            f(&mut item.span);
-            match &mut item.kind {
-                ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => {
+            item.each_span_mut(f);
+        }
+    }
+}
+
+impl Item {
+    /// Calls `f` on the span of the item and of everything in it.
+    pub fn each_span_mut(&mut self, f: &mut dyn FnMut(&mut Span)) {
+        f(&mut self.span);
+        match &mut self.kind {
+            ItemKind::Value { body, .. } | ItemKind::Destructure { body, .. } => {
+                body.each_span_mut(f);
+            }
+            ItemKind::Instance { methods, .. } => {
+                for (_, body) in methods {
                     body.each_span_mut(f);
                 }
-                ItemKind::Instance { methods, .. } => {
-                    for (_, body) in methods {
-                        body.each_span_mut(f);
-                    }
-                }
-                ItemKind::Foreign(foreign) => {
-                    if let crate::Binding::Inline(inline) = &mut foreign.binding {
-                        f(&mut inline.span);
-                    }
-                    for word in &mut foreign.adapter.words {
-                        f(&mut word.span);
-                    }
-                    if let Some(catch) = &mut foreign.catch {
-                        catch.each_span_mut(f);
-                    }
-                }
-                ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
             }
+            ItemKind::Foreign(foreign) => {
+                if let crate::Binding::Inline(inline) = &mut foreign.binding {
+                    f(&mut inline.span);
+                }
+                for word in &mut foreign.adapter.words {
+                    f(&mut word.span);
+                }
+                if let Some(catch) = &mut foreign.catch {
+                    catch.each_span_mut(f);
+                }
+            }
+            ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
         }
     }
 }

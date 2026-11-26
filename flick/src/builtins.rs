@@ -182,6 +182,7 @@ fn saved_modules(stages_by_class: bool) -> Option<BuiltinModules> {
 struct CachedModules {
     program: Program,
     sources: Vec<String>,
+    alternatives: Vec<Vec<ir::NativeAlternative>>,
 }
 
 impl CachedModules {
@@ -195,6 +196,7 @@ impl CachedModules {
                 lang: ir::lang_items(),
             },
             sources: bundle.sources.iter().map(|s| s.text.clone()).collect(),
+            alternatives: bundle.alternatives.clone(),
         }
     }
 
@@ -202,6 +204,7 @@ impl CachedModules {
         if self.program.ir_version != flick_ir::VERSION
             || self.program.compiler != toolchain::COMPILER
             || self.program.files.len() != self.sources.len()
+            || self.alternatives.len() != self.program.modules.len()
         {
             return None;
         }
@@ -218,6 +221,7 @@ impl CachedModules {
             }
         }
         Some(BuiltinModules {
+            alternatives: self.alternatives,
             modules: self.program.modules,
             sources: self
                 .program

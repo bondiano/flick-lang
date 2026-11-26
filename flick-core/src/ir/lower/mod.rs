@@ -29,6 +29,7 @@ mod literals;
 #[cfg(not(target_arch = "wasm32"))]
 mod local_schemes;
 mod loops;
+pub(crate) mod native;
 mod numeric;
 mod owner_descriptors;
 mod owners;
@@ -148,6 +149,7 @@ impl<'a> Lower<'a> {
             entry_owners: HashMap::new(),
             hole_params: HashMap::new(),
             records: BTreeMap::new(),
+            no_native: false,
             preambles: Vec::new(),
             #[cfg(not(target_arch = "wasm32"))]
             collecting_binders: None,
@@ -194,6 +196,9 @@ struct Lower<'a> {
     /// The constructors over a record written in their declaration, with
     /// its labels (`Module::records`).
     records: BTreeMap<String, Vec<String>>,
+    /// Whether a `let` lowers its Flick body even with an enabled `@native`
+    /// clause: the body of a built-in one's alternatives.
+    no_native: bool,
     /// Inline foreign module preambles (`foreign module inline "..."`).
     preambles: Vec<flick_ir::InlineCode>,
     /// Active pattern binder-type collector for [`Self::pattern_typed`].

@@ -6,9 +6,9 @@ use std::collections::{BTreeMap, HashSet};
 use std::env;
 
 use flick_backend::{
-    Abi, BackendPin, BuildRequest, Descriptor, Entry, Environment, ForeignBinding, InlineForeign,
-    Input, InputKind, Mode, ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile,
-    RootHandler, Source, Span, Symbol, TargetRequest,
+    Abi, BackendPin, BuildRequest, Descriptor, Entry, Environment, ForeignBinding, Input,
+    InputKind, Mode, ModuleInput, ModuleRole, OptionValue, PackageTarget, Profile, RootHandler,
+    Source, Symbol, TargetRequest,
 };
 
 use flick_backend_support::kernel;
@@ -36,6 +36,7 @@ mod exports;
 mod go;
 #[cfg(test)]
 mod go_tests;
+mod inline;
 mod javascript;
 mod javascript_facts;
 #[cfg(test)]
@@ -44,6 +45,7 @@ mod projection_tests;
 mod tests;
 
 pub(super) use exports::{check_header_request, collect_own_host_exports};
+pub(super) use inline::collect_inline_foreign;
 
 pub(super) struct Prepared {
     pub request: BuildRequest,
@@ -78,11 +80,12 @@ pub(super) fn program(
         .iter()
         .map(|m| (*m.ir).clone())
         .collect();
-    for builtin in &builtins.modules {
+    for (i, builtin) in builtins.modules.iter().enumerate() {
         if compilation.modules.iter().any(|m| m.name == builtin.name) {
             continue;
         }
-        let mut module = builtin.clone();
+        // its `@native` clauses as the build's environment selects them
+        let mut module = builtins.module_for(i, compilation.native_overrides.as_ref());
         module.each_span_mut(&mut |s| s.file = builtin_files[s.file.index() as usize]);
         modules.push(module);
     }
@@ -98,41 +101,6 @@ pub(super) fn program(
         },
     );
     (program, files.into_inner())
-}
-
-pub(super) fn collect_inline_foreign(program: &Program) -> Vec<InlineForeign> {
-    let mut out = Vec::new();
-    for module in &program.modules {
-        for preamble in &module.preambles {
-            out.push(InlineForeign {
-                module: module.name.clone(),
-                name: None,
-                code: preamble.code.clone(),
-                span: Span {
-                    file: preamble.span.file.index(),
-                    start: preamble.span.start,
-                    end: preamble.span.end,
-                },
-            });
-        }
-        for item in &module.items {
-            if let flick_ir::ItemKind::Foreign(foreign) = &item.kind
-                && let flick_ir::Binding::Inline(inline) = &foreign.binding
-            {
-                out.push(InlineForeign {
-                    module: module.name.clone(),
-                    name: Some(foreign.name.clone()),
-                    code: inline.code.clone(),
-                    span: Span {
-                        file: inline.span.file.index(),
-                        start: inline.span.start,
-                        end: inline.span.end,
-                    },
-                });
-            }
-        }
-    }
-    out
 }
 
 impl Prepared {

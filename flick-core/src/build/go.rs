@@ -94,6 +94,9 @@ pub fn emit(
         })
         .collect();
     let own: Vec<&ir::Module> = optimized.iter().collect();
+    // shortcut: the built-in modules as the default environment selects their
+    // `@native` clauses, which today bind the same on go; select them for the
+    // environment (`BuiltinModules::module_for`) once one binds go alone
     let builtins: Vec<&ir::Module> = builtin_modules()
         .iter()
         .filter(|m| is_builtin(&m.name))

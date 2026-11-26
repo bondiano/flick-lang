@@ -457,6 +457,8 @@ fn run_in(
         #[cfg(not(target_arch = "wasm32"))]
         own_package_when,
         #[cfg(not(target_arch = "wasm32"))]
+        native_overrides: Some(env_ctx.native_overrides().clone()),
+        #[cfg(not(target_arch = "wasm32"))]
         environment: env_ctx.resolved,
     };
     #[cfg(not(target_arch = "wasm32"))]

@@ -9,7 +9,7 @@ use crate::source::Span;
 use crate::syntax::cst::{Node, foreign_words};
 use crate::syntax::kind::SyntaxKind as K;
 use crate::syntax::literal;
-use crate::types::ForeignInfo;
+use crate::types::{ForeignInfo, NativeOverrideInfo};
 
 impl Lower<'_> {
     pub(super) fn foreign_preamble(&self, decl: &Node) -> Option<InlineCode> {
@@ -41,6 +41,9 @@ impl Lower<'_> {
         span: Span,
         items: &mut Vec<Item>,
     ) -> bool {
+        if self.no_native {
+            return false;
+        }
         let Some((_, selected)) = self
             .typing
             .native_overrides
@@ -50,6 +53,19 @@ impl Lower<'_> {
         else {
             return false;
         };
+        self.native_items(decl, name, span, selected, items)
+    }
+
+    /// The items of the `@native` clause `selected` of the top-level `let`
+    /// `decl`; `false` when it has none.
+    pub(super) fn native_items(
+        &mut self,
+        decl: &Node,
+        name: &str,
+        span: Span,
+        selected: NativeOverrideInfo,
+        items: &mut Vec<Item>,
+    ) -> bool {
         let Some(ov) = decl
             .nodes()
             .find(|n| n.kind == K::NativeOverride && n.range() == selected.override_range)

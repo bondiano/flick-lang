@@ -139,6 +139,79 @@ let main () =
     fs::remove_dir_all(&lit_root).expect("cleanup literal");
 }
 
+/// The kind of the item `name` of the built-in module `module` in the IR a
+/// build of `root` gave its backend: `Foreign` or `Value`.
+fn builtin_item_kind(root: &Path, module: &str, name: &str) -> String {
+    let ir = fs::read_to_string(root.join("dist/program.ir.json")).expect("program.ir.json");
+    let program: Value = serde_json::from_str(&ir).expect("IR JSON");
+    let items = (program["modules"].as_array().expect("modules").iter())
+        .find(|m| m["name"] == module)
+        .and_then(|m| m["items"].as_array())
+        .expect("the module's items");
+    items
+        .iter()
+        .find_map(|item| {
+            let (kind, body) = item["kind"].as_object()?.iter().next()?;
+            (body["name"] == name).then(|| kind.clone())
+        })
+        .unwrap_or_else(|| panic!("no item `{name}` in `{module}`"))
+}
+
+/// A built-in module's `@native` clauses are selected for each build: its IR
+/// is lowered once, for the default environment, and `List.map`'s clause
+/// `when js || go` must not bind it on a backend without those tags, nor
+/// under `--no-native-overrides`.
+#[test]
+#[ignore = "requires just wasm-backends"]
+fn a_built_in_native_clause_is_selected_for_the_build_environment() {
+    let source = "\
+module App exposing (main)
+
+main : Unit -> Unit
+let main () = ignore (List.map (fun x -> x + 1) [1, 2])
+";
+    let root = project(
+        "native_ov_builtin",
+        &[("flick.toml", CONFIG), ("src/App.fl", source)],
+    );
+    let build = |args: &[&str]| {
+        let mut all = vec!["build", "--offline", "--emit-ir", "json"];
+        all.extend_from_slice(args);
+        let built = flick_in(&root, &all);
+        assert!(
+            built.status.success(),
+            "build {args:?} failed: {}",
+            String::from_utf8_lossy(&built.stderr)
+        );
+        builtin_item_kind(&root, "List", "map")
+    };
+    assert_eq!(build(&["--target", "js"]), "Foreign");
+    assert_eq!(build(&["--target", "js", "--no-native-overrides"]), "Value");
+    fs::remove_dir_all(&root).expect("cleanup js");
+
+    // the fixture backend's environment has neither tag
+    let component = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../target/wasm32-wasip2/release/flick_test_backend.wasm");
+    let bytes = fs::read(component).expect("just wasm-backends builds flick_test_backend.wasm");
+    let config = format!(
+        "{}\n[target.literal]\ncase = \"fallback\"\n",
+        pinned().replace(&"a".repeat(64), &flick_backend::sha256(&bytes))
+    );
+    let root = project(
+        "native_ov_builtin_literal",
+        &[("flick.toml", &config), ("src/App.fl", source)],
+    );
+    fs::write(root.join("backend.wasm"), &bytes).expect("write backend.wasm");
+    let literal = flick_in(&root, &["build", "--offline", "--emit-ir", "json"]);
+    assert!(
+        literal.status.success(),
+        "literal build failed: {}",
+        String::from_utf8_lossy(&literal.stderr)
+    );
+    assert_eq!(builtin_item_kind(&root, "List", "map"), "Value");
+    fs::remove_dir_all(&root).expect("cleanup literal");
+}
+
 #[test]
 #[ignore = "requires just wasm-backends"]
 fn native_override_selects_by_implication_and_reports_ambiguous_pair_with_both_spans() {

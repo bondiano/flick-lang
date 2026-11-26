@@ -117,9 +117,18 @@ import List.Transform exposing (..)
 @lang list_map
 /// Applies a pure function to each element.
 map : (a -> b)^c -> List a -> List b
-foreign pure map from "flick:rt" "listMap"
-  arity 2
-  retention call
+let map f xs =
+  match xs with
+  | [] -> []
+  | [first, ..._] ->
+    initialize (length xs) (fun i ->
+      match get i xs with
+      | Some x -> f x
+      | None -> f first
+    )
+  @native "flick:rt" "listMap" when js || go
+    arity 2
+    retention call
 
 /// Runs a runtime function on each element, one after another from the
 /// first.

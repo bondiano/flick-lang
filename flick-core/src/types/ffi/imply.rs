@@ -67,6 +67,11 @@ pub struct NativeOverrideEnv {
     /// When true (`--no-native-overrides`), checking still validates overrides, but
     /// lowering emits the Flick fallback body instead of the native override.
     pub disable_native_overrides: bool,
+    /// Whether checking records every clause, not only the selected one: the
+    /// built-in modules are checked and lowered once for every environment,
+    /// and each build selects among their clauses again.
+    #[cfg_attr(feature = "native-project", serde(default))]
+    pub every_clause: bool,
 }
 
 /// Result of selecting among `@native` override conditions in the active environment.
@@ -122,6 +127,16 @@ impl NativeOverrideEnv {
         DEFAULT.get_or_init(Self::official_js)
     }
 
+    /// The environment the built-in modules are checked in: the default one,
+    /// whose selection their shared IR lowers, recording every clause.
+    pub fn builtins() -> &'static Self {
+        static BUILTINS: OnceLock<NativeOverrideEnv> = OnceLock::new();
+        BUILTINS.get_or_init(|| Self {
+            every_clause: true,
+            ..Self::official_js()
+        })
+    }
+
     /// Builds an environment with the official `flick/js` and `flick/go` models
     /// and default active tags `{js, rt, node}`.
     pub fn official_js() -> Self {
@@ -163,6 +178,7 @@ impl NativeOverrideEnv {
             active_tags: Some(active_tags),
             active_backend_id: Some("flick/js".to_owned()),
             disable_native_overrides: false,
+            every_clause: false,
         }
     }
 
