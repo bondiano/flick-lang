@@ -1,7 +1,7 @@
 //! Lowering of a checked module to the typed IR. The checker has already
 //! accepted the module, so every name has a recorded meaning; locals are
-//! renamed apart within each top-level definition, so a name never needs
-//! shadowing in the generated code.
+//! renamed apart within each top-level definition, and from the module's own
+//! top-level values, so a name never needs shadowing in the generated code.
 
 mod abstraction;
 mod applicative_do;
@@ -50,6 +50,7 @@ use super::{Expr, ExprKind, Item, ItemKind, Lit, Module, Param, Stage};
 use crate::diagnostics::{Diagnostic, codes};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::iface::LocalScheme;
+use crate::iface::Namespace;
 use crate::resolve;
 use crate::source::{FileId, Span};
 use crate::syntax::cst::Node;
@@ -140,6 +141,10 @@ impl<'a> Lower<'a> {
             typing,
             scope: Vec::new(),
             used: HashMap::new(),
+            values: (typing.declarations.exports.iter())
+                .filter(|e| e.entity.namespace == Namespace::Value)
+                .map(|e| e.entity.name.as_str())
+                .collect(),
             vars: HashSet::new(),
             loops: Vec::new(),
             consumed: HashSet::new(),
@@ -175,6 +180,9 @@ struct Lower<'a> {
     scope: Vec<Bound>,
     /// How often each source name was bound in the current definition.
     used: HashMap<String, u32>,
+    /// The module's own values, as bound once: a backend may write one and
+    /// a local under one plain name.
+    values: HashSet<&'a str>,
     /// The unique names of the `let mut` variables of the current
     /// definition: a read of one is `ExprKind::Var`.
     vars: HashSet<String>,
@@ -222,7 +230,8 @@ impl Lower<'_> {
 
     /// Binds a source name, written at `at`, to a fresh unique name.
     fn bind(&mut self, name: &str, at: u32) -> String {
-        let count = self.used.entry(name.to_owned()).or_insert(0);
+        let count = (self.used.entry(name.to_owned()))
+            .or_insert_with(|| u32::from(self.values.contains(name)));
         let unique = if *count == 0 {
             name.to_owned()
         } else {

@@ -87,6 +87,7 @@ codegen/recursion
 codegen/mutual_rec_arity
 codegen/class_variance
 codegen/repeated_superclass
+codegen/shadowed_globals
 codegen/stage_order
 codegen/strings_utf16
 codegen/task_twice
