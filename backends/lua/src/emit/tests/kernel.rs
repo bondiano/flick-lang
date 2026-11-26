@@ -94,6 +94,27 @@ fn an_implemented_binding_takes_every_argument_at_once() {
     assert!(code.contains("K.listGet("), "{code}");
 }
 
+/// An effect test is the kernel's `testEffect` of its name alone: the runner
+/// reports it skipped, so its task, here an order the kernel does not
+/// compute, is neither generated nor refused.
+#[test]
+fn an_effect_test_is_its_name_alone() {
+    let mut item = list_get();
+    if let ItemKind::Foreign(f) = &mut item.kind {
+        f.name = "effect_test".into();
+        f.binding = Binding::Module {
+            from: "flick:rt".into(),
+            name: "testEffect".into(),
+        };
+        f.arity = 2;
+    }
+    let task = lambda(&["a", "b"], binary(BinOp::Lt, local("a"), local("b")));
+    let call = app(app(global("App", "effect_test"), string("x")), task);
+    let code = lua(vec![item, value("t", call)]);
+    assert!(code.contains("K.testEffect(\"x\")"), "{code}");
+    assert!(!code.contains(" < "), "{code}");
+}
+
 /// `foreign pure get from "flick:rt" "recordGet"`, of the constraint
 /// `HasField l r a`.
 fn record_get() -> Item {

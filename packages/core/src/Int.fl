@@ -23,7 +23,23 @@ foreign pure to_string from "flick:rt" "stringFromNumber"
 /// more ASCII decimal digits, normalizes `-0` to `0`, and returns `None` for
 /// empty input, internal whitespace, other text, or numbers out of range.
 parse : String -> Option Int
-foreign pure parse from "flick:rt" "intParse"
+let parse s =
+  let text = String.trim s
+  let sign = String.char_code_at 0 text
+  let start = if sign == Some 43 || sign == Some 45 then 1 else 0
+  // ASCII digits from `i` to the end
+  digits : Int -> Bool
+  let rec digits i =
+    match String.char_code_at i text with
+    | Some c -> c >= 48 && c <= 57 && digits (i + 1)
+    | None -> true
+  if String.length text > start && digits start then
+    match String.to_number text with
+    | Some n -> from_float n
+    | None -> None
+  else
+    None
+  @native "flick:rt" "intParse" when js || go
 
 /// The same number as a `Float`; every `Int` is exact.
 to_float : Int -> Float
@@ -31,7 +47,12 @@ foreign pure to_float from global "Number"
 
 /// `n` when it is a whole number in the range of `Int`.
 from_float : Float -> Option Int
-foreign pure from_float from "flick:rt" "intFromFloat"
+let from_float n =
+  if n >= -2147483648.0 && n <= 2147483647.0 && to_float (truncate n) == n then
+    Some (truncate n)
+  else
+    None
+  @native "flick:rt" "intFromFloat" when js || go
 
 /// `n` with its fraction dropped, wrapped around into `Int`; NaN and the
 /// infinities are 0.
@@ -40,7 +61,8 @@ foreign pure truncate from "flick:rt" "intTruncate"
 
 /// `abs min_value` wraps around to `min_value`.
 abs : Int -> Int
-foreign pure abs from "flick:rt" "intAbs"
+let abs n = if n < 0 then -n else n
+  @native "flick:rt" "intAbs" when js || go
 
 min : Int -> Int -> Int
 let min a b = if a <= b then a else b
@@ -49,21 +71,45 @@ max : Int -> Int -> Int
 let max a b = if a >= b then a else b
 
 checked_add : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_add from "flick:rt" "intCheckedAdd"
+let checked_add a b =
+  let r = to_float a + to_float b
+  match from_float r with
+  | Some n -> Ok n
+  | None -> Err (ArithmeticError ("Int.checked_add: " ++ show r ++ " does not fit in Int"))
+  @native "flick:rt" "intCheckedAdd" when js || go
 
 checked_sub : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_sub from "flick:rt" "intCheckedSub"
+let checked_sub a b =
+  let r = to_float a - to_float b
+  match from_float r with
+  | Some n -> Ok n
+  | None -> Err (ArithmeticError ("Int.checked_sub: " ++ show r ++ " does not fit in Int"))
+  @native "flick:rt" "intCheckedSub" when js || go
 
 checked_mul : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_mul from "flick:rt" "intCheckedMul"
+let checked_mul a b =
+  let r = to_float a * to_float b
+  match from_float r with
+  | Some n -> Ok n
+  | None -> Err (ArithmeticError ("Int.checked_mul: " ++ show r ++ " does not fit in Int"))
+  @native "flick:rt" "intCheckedMul" when js || go
 
 /// Division dropping the fraction; division by zero and
 /// `min_value / -1` are errors.
 checked_div : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_div from "flick:rt" "intCheckedDiv"
+let checked_div a b =
+  if b == 0 then
+    Err (ArithmeticError "Int.checked_div: division by zero")
+  else if a == min_value && b == -1 then
+    Err (ArithmeticError "Int.checked_div: 2147483648 does not fit in Int")
+  else
+    Ok (a / b)
+  @native "flick:rt" "intCheckedDiv" when js || go
 
 checked_rem : Int -> Int -> Result ArithmeticError Int
-foreign pure checked_rem from "flick:rt" "intCheckedRem"
+let checked_rem a b =
+  if b == 0 then Err (ArithmeticError "Int.checked_rem: division by zero") else Ok (a % b)
+  @native "flick:rt" "intCheckedRem" when js || go
 
 /// `a / b`, a defect when `b` is 0.
 unsafe_div : Int -> Int -> Int

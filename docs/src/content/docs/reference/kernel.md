@@ -193,9 +193,11 @@ kernel keeps the laws R1–R9 of the runtime contract.
 
 - The Lua backend runs the modules of `tests/kernel` and `tests/language`
   that their `lua.txt` lists with `flick test --target lua` on Lua 5.1.5
-  and on LuaJIT 2.1 with the JIT on and off (`just kernel-lua`); each report
-  must equal the report of the same modules on JS. The list grows as the
-  Lua kernel does.
+  and on LuaJIT 2.1 with the JIT on and off (`just kernel-lua`); each test
+  must report as it does on the same modules on JS, but an effect test,
+  which the Lua runner reports skipped as `an effect test needs the Lua
+  runtime` until the Lua runtime runs it. The list grows as the Lua kernel
+  does.
 
 A new backend runs `flick test --target <backend>` in `tests/kernel` and the
 `tests/run/runtime` cases; both must pass before it declares `flick.kernel`.

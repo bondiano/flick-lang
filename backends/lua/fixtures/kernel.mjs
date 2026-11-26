@@ -3,12 +3,15 @@
 // tests/language/lua.txt lists, with `flick test --target lua` on Lua 5.1.5
 // and on LuaJIT 2.1 with the JIT on and off. Each JSON report must be the
 // report of the same modules on JS, whose expectations the suites write
-// from the contract. Then `luac -l` lists the globals each kernel
+// from the contract, but for the effect tests JS runs: until the Lua
+// runtime exists, the Lua runner reports each of them skipped, with the
+// one reason `EFFECT`. Then `luac -l` lists the globals each kernel
 // chunk reads: every one must be in the API snapshot of every profile.
 //
 // usage: node backends/lua/fixtures/kernel.mjs FLICK
 // Hosts come from PATH or LUA51, LUAJIT and LUAC; a host of another version
 // fails the run.
+import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { chmodSync, cpSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join, resolve } from "node:path";
@@ -80,6 +83,49 @@ function report(dir, modules, target, path) {
   return result.stdout;
 }
 
+// why the Lua runner skips an effect test JS runs (kernel/runner.lua)
+const EFFECT = "an effect test needs the Lua runtime";
+
+/**
+ * How the Lua report `got` differs from the JS report `expected`: each test
+ * by its name, and the order of those both run; and the effect tests Lua
+ * skipped.
+ */
+function compare(expected, got) {
+  const want = JSON.parse(expected);
+  const have = JSON.parse(got);
+  const differences = want.seed === have.seed ? [] : [`seed ${have.seed}, not ${want.seed}`];
+  const lua = new Map(have.tests.map((t) => [t.name, t]));
+  const effects = new Set();
+  for (const test of want.tests) {
+    const other = lua.get(test.name);
+    lua.delete(test.name);
+    if (other === undefined) differences.push(`${test.name}: not on Lua`);
+    else if (other.reason === EFFECT && test.status !== "skipped" && Object.keys(other).length === 3) {
+      effects.add(test.name);
+    } else if (JSON.stringify(other) !== JSON.stringify(test)) {
+      differences.push(`${test.name}: ${JSON.stringify(other)}, not ${JSON.stringify(test)}`);
+    }
+  }
+  for (const name of lua.keys()) differences.push(`${name}: not on JS`);
+  const order = (tests) => tests.filter((t) => !effects.has(t.name)).map((t) => t.name).join("\n");
+  if (order(want.tests) !== order(have.tests)) differences.push("the tests run in another order");
+  return { differences, effects: effects.size };
+}
+
+// the comparison itself: a named effect skip passes, nothing else does
+{
+  const js = (tests) => JSON.stringify({ seed: 1, passed: 2, failed: 0, tests });
+  const a = { name: "M > a", status: "passed" };
+  const e = { name: "M > e", status: "passed" };
+  const skip = { name: "M > e", status: "skipped", reason: EFFECT };
+  assert.deepEqual(compare(js([a, e]), js([a, skip])), { differences: [], effects: 1 });
+  assert.ok(compare(js([a, e]), js([a, { ...skip, reason: "other" }])).differences.length > 0);
+  assert.ok(compare(js([a, { ...e, status: "skipped" }]), js([a, skip])).differences.length > 0);
+  assert.ok(compare(js([a, e]), js([a])).differences.length > 0);
+  assert.ok(compare(js([a, e]), js([e, a])).differences.length > 0);
+}
+
 // each host alone in `[tools]`, first on PATH under the name flick looks for
 const hosts = [
   { name: "Lua 5.1.5", tool: "lua", run: lua51 },
@@ -106,10 +152,11 @@ for (const suite of suites) {
     writeFileSync(join(bin, host.tool), `#!/bin/sh\nexec "${host.run}"${host.flags ? ` ${host.flags}` : ""} "$@"\n`);
     chmodSync(join(bin, host.tool), 0o755);
     const got = report(dir, suite.modules, "lua", `${bin}${delimiter}${process.env.PATH}`);
-    const passed = got === expected;
-    failed += passed ? 0 : 1;
-    console.log(`${passed ? "pass" : "FAIL"}  ${suite.modules.join(", ")} on ${host.name}`);
-    if (!passed) console.log(`  expected ${expected}  got      ${got}`);
+    const { differences, effects } = compare(expected, got);
+    failed += differences.length > 0 ? 1 : 0;
+    const skipped = effects > 0 ? ` (${effects} effect test${effects === 1 ? "" : "s"} skipped)` : "";
+    console.log(`${differences.length > 0 ? "FAIL" : "pass"}  ${suite.modules.join(", ")} on ${host.name}${skipped}`);
+    for (const difference of differences) console.log(`  ${difference}`);
   }
 }
 
