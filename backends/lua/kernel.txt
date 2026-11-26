@@ -189,6 +189,7 @@ testPure implemented
 testGroup implemented
 testSkip implemented
 testOnly implemented
+testEffect implemented
 [flick:runner/browser] refused
 [flick:runner/cloudflare] refused
 [flick:runner/node] refused

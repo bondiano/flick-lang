@@ -1,25 +1,75 @@
 /// Operations on binary64 floating-point numbers beyond the operators. `==`
 /// is canonical equality: `NaN == NaN` and `0 == -0`.
-module Float exposing (..)
+module Float exposing (
+  strict_equal,
+  same_value,
+  pi,
+  infinity,
+  nan,
+  is_nan,
+  is_finite,
+  is_integer,
+  is_safe_integer,
+  abs,
+  floor,
+  ceil,
+  round,
+  trunc,
+  sqrt,
+  min,
+  max,
+  to_string,
+  parse,
+  sum,
+  subtract,
+  multiply,
+  divide,
+  remainder,
+  increment,
+  decrement,
+  sum_all,
+  multiply_all,
+  is_less_than,
+  is_less_than_or_equal_to,
+  is_greater_than,
+  is_greater_than_or_equal_to,
+  between,
+  clamp,
+  sign,
+  next_pow2,
+  round_to,
+  safe_integer,
+  json_finite,
+  json,
+)
 
 /// JS `===`: `NaN` differs from itself, `0` equals `-0`.
 strict_equal : Float -> Float -> Bool
-foreign pure strict_equal from "flick:rt" "numberStrictEqual"
+let strict_equal a b = a <= b && a >= b
+  @native "flick:rt" "numberStrictEqual" when js || go
 
 /// JS `Object.is`: `NaN` equals itself, `0` differs from `-0`.
 same_value : Float -> Float -> Bool
-foreign pure same_value from "flick:rt" "numberSameValue"
+let same_value a b = if a == b then a != 0.0 || 1.0 / a == 1.0 / b else false
+  @native "flick:rt" "numberSameValue" when js || go
 
 pi : Float
-foreign pure pi from global "Math.PI"
+let pi = 3.141592653589793
+  @native "Math.PI" when js || go
 
 @lang float_infinity
 infinity : Float
-foreign pure infinity from global "Infinity"
+let infinity = 1.0 / 0.0
+  @native "Infinity" when js || go
 
 @lang float_nan
 nan : Float
-foreign pure nan from global "NaN"
+let nan = 0.0 / 0.0
+  @native "NaN" when js || go
+
+/// The element at `i`, for the folds below: `List` comes after `Float`.
+element_at : Int -> List a -> Option a
+foreign pure element_at from "flick:rt" "listGet"
 
 is_nan : Float -> Bool
 let is_nan x = not (x <= x)
@@ -111,23 +161,27 @@ let parse s =
 
 /// `self + that`: `x |> Float.sum 1`.
 sum : Float -> Float -> Float
-foreign pure sum from "flick:Number" "sum"
-  arity 1
+let sum that self = self + that
+  @native "flick:Number" "sum" when js || go
+    arity 1
 
 /// `self - that`: `10 |> Float.subtract 3` is 7.
 subtract : Float -> Float -> Float
-foreign pure subtract from "flick:Number" "subtract"
-  arity 1
+let subtract that self = self - that
+  @native "flick:Number" "subtract" when js || go
+    arity 1
 
 /// `self * that`.
 multiply : Float -> Float -> Float
-foreign pure multiply from "flick:Number" "multiply"
-  arity 1
+let multiply that self = self * that
+  @native "flick:Number" "multiply" when js || go
+    arity 1
 
 /// `self / that`; `None` when `that` is 0: `10 |> Float.divide 4` is 2.5.
 divide : Float -> Float -> Option Float
-foreign pure divide from "flick:Number" "divide"
-  arity 1
+let divide that self = if that == 0.0 then None else Some (self / that)
+  @native "flick:Number" "divide" when js || go
+    arity 1
 
 /// The remainder of `self / divisor`, exact on decimals (`0.3 % 0.1` is 0);
 /// NaN for a zero or non-finite operand.
@@ -137,54 +191,81 @@ foreign pure remainder from "flick:Number" "remainder"
 
 /// `n + 1`.
 increment : Float -> Float
-foreign pure increment from "flick:Number" "increment"
+let increment n = n + 1.0
+  @native "flick:Number" "increment" when js || go
 
 /// `n - 1`.
 decrement : Float -> Float
-foreign pure decrement from "flick:Number" "decrement"
+let decrement n = n - 1.0
+  @native "flick:Number" "decrement" when js || go
 
 /// The sum of the list, 0 when it is empty.
 sum_all : List Float -> Float
-foreign pure sum_all from "flick:Number" "sumAll"
+let sum_all xs =
+  total : Float -> Int -> Float
+  let rec total out i =
+    match element_at i xs with
+    | Some n -> total (out + n) (i + 1)
+    | None -> out
+  total 0.0 0
+  @native "flick:Number" "sumAll" when js || go
 
 /// The product of the list, 1 when it is empty.
 multiply_all : List Float -> Float
-foreign pure multiply_all from "flick:Number" "multiplyAll"
+let multiply_all xs =
+  // a zero ends the product, so an infinity after it gives no NaN
+  product : Float -> Int -> Float
+  let rec product out i =
+    match element_at i xs with
+    | Some n -> if n == 0.0 then 0.0 else product (out * n) (i + 1)
+    | None -> out
+  product 1.0 0
+  @native "flick:Number" "multiplyAll" when js || go
 
 /// `self < that` by the order where NaN is least:
 /// `x |> Float.is_less_than 3`.
 is_less_than : Float -> Float -> Bool
-foreign pure is_less_than from "flick:Number" "isLessThan"
-  arity 1
+let is_less_than that self =
+  if is_nan self then not (is_nan that) else not (is_nan that) && self < that
+  @native "flick:Number" "isLessThan" when js || go
+    arity 1
 
 /// `self <= that` by the order where NaN is least.
 is_less_than_or_equal_to : Float -> Float -> Bool
-foreign pure is_less_than_or_equal_to from "flick:Number" "isLessThanOrEqualTo"
-  arity 1
+let is_less_than_or_equal_to that self =
+  if is_nan self then true else if is_nan that then false else self <= that
+  @native "flick:Number" "isLessThanOrEqualTo" when js || go
+    arity 1
 
 /// `self > that` by the order where NaN is least.
 is_greater_than : Float -> Float -> Bool
-foreign pure is_greater_than from "flick:Number" "isGreaterThan"
-  arity 1
+let is_greater_than that self = is_less_than self that
+  @native "flick:Number" "isGreaterThan" when js || go
+    arity 1
 
 /// `self >= that` by the order where NaN is least.
 is_greater_than_or_equal_to : Float -> Float -> Bool
-foreign pure is_greater_than_or_equal_to from "flick:Number" "isGreaterThanOrEqualTo"
-  arity 1
+let is_greater_than_or_equal_to that self = is_less_than_or_equal_to self that
+  @native "flick:Number" "isGreaterThanOrEqualTo" when js || go
+    arity 1
 
 /// Whether `self` lies within `minimum` and `maximum`, both included.
 between : { minimum : Float; maximum : Float } -> Float -> Bool
-foreign pure between from "flick:Number" "between"
-  arity 1
+let between bounds self =
+  is_greater_than_or_equal_to bounds.minimum self && is_less_than_or_equal_to bounds.maximum self
+  @native "flick:Number" "between" when js || go
+    arity 1
 
 /// `self` kept within `minimum` and `maximum`.
 clamp : { minimum : Float; maximum : Float } -> Float -> Float
-foreign pure clamp from "flick:Number" "clamp"
-  arity 1
+let clamp bounds self = min (max self bounds.minimum) bounds.maximum
+  @native "flick:Number" "clamp" when js || go
+    arity 1
 
 /// How `n` compares with 0; NaN is `LT`.
 sign : Float -> Ordering
-foreign pure sign from "flick:Number" "flickSign"
+let sign n = if n > 0.0 then GT else if n == 0.0 then EQ else LT
+  @native "flick:Number" "flickSign" when js || go
 
 /// The least power of two at least `n`, and at least 2.
 next_pow2 : Float -> Float
@@ -200,7 +281,8 @@ let round_to precision x =
 
 /// `n` itself when it is a safe integer.
 safe_integer : Float -> Option Float
-foreign pure safe_integer from "flick:rt" "numberSafeInteger"
+let safe_integer n = if is_safe_integer n then Some n else None
+  @native "flick:rt" "numberSafeInteger" when js || go
 
 /// A finite JSON number: `NaN` and the infinities are refused when decoding
 /// and when encoding.

@@ -190,11 +190,14 @@ body on Lua. On `lua/love`, `flick test` builds the test modules with the
 runner `_flick/lua-kernel/runner.lua`, and runs `_flick/run-tests.lua` on
 Lua 5.1.5 or LuaJIT 2.1, whichever `[tools]` allows (LuaJIT when both are):
 the interpreters stand for LÖVE's Lua, and no WoW client runs tests. Its
-pure tests report as on the other targets; effect and property tests are
-refused. `just kernel-lua` runs the modules of `tests/kernel` and of
-`tests/language` that their `lua.txt` lists on Lua 5.1.5 and on LuaJIT with
-the JIT on and off, and requires each JSON report to equal the report of the
-same modules on JS; `luac -l` checks the globals each kernel chunk reads against every
+pure tests report as on the other targets. An effect test is reported
+skipped, with the reason `an effect test needs the Lua runtime`, and its task
+is neither generated nor checked, until the Lua runtime (#833) runs it;
+property tests are refused. `just kernel-lua` runs the modules of
+`tests/kernel` and of `tests/language` that their `lua.txt` lists on Lua
+5.1.5 and on LuaJIT with the JIT on and off, and requires each test of the
+JSON report to report as on JS, but an effect test, which only that reason
+may skip; `luac -l` checks the globals each kernel chunk reads against every
 snapshot. The CI `lua-probes` job runs it.
 
 | Kernel module | Lua 5.1, LuaJIT on and off |
@@ -206,6 +209,7 @@ snapshot. The CI `lua-probes` job runs it.
 | `Kernel.Strings` | pass (35 of 35), the same report as JS |
 | `Language.BigInts` | pass (12 of 12), the same report as JS |
 | `Language.Floats` | pass (30 of 30), the same report as JS |
+| `Language.Ints` | pass (48 of 48 pure tests), the same report as JS; 1 effect test skipped |
 
 ## The synchronous WoW slice
 

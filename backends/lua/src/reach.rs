@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use flick_backend::{BuildRequest, ModuleRole};
 use flick_ir::{
-    Dict, Expr, ExprKind, Foreign, InstanceInfo, ItemKind, Program, Span, default_method,
+    Binding, Dict, Expr, ExprKind, Foreign, InstanceInfo, ItemKind, Program, Span, default_method,
 };
 
 pub(crate) enum Fact<'p> {
@@ -196,6 +196,13 @@ impl<'p> Walker<'p, '_> {
     }
 
     fn expr(&mut self, e: &'p Expr, blame: Option<&Blame>) {
+        if let Some((head, name)) = effect_test_parts(e)
+            && self.is_effect_test(head)
+        {
+            self.expr(head, blame);
+            self.expr(name, blame);
+            return;
+        }
         match &e.kind {
             ExprKind::Await(_) => self.fact(Fact::Await, e.span, blame),
             ExprKind::Global { module, name, .. } => self.global(module, name, e.span, blame),
@@ -208,6 +215,17 @@ impl<'p> Walker<'p, '_> {
             _ => {}
         }
         e.each_child(&mut |child| self.expr(child, blame));
+    }
+
+    /// Whether `head` names the kernel's `testEffect`.
+    fn is_effect_test(&self, head: &Expr) -> bool {
+        let ExprKind::Global { module, name, .. } = &head.kind else {
+            return false;
+        };
+        let Some(&(mi, ii)) = self.values.get(&(module.as_str(), name.as_str())) else {
+            return false;
+        };
+        matches!(&self.program.modules[mi].items[ii].kind, ItemKind::Foreign(f) if is_effect_test(f))
     }
 
     /// A reference to `module.name`: its item is reached, and a foreign
@@ -266,6 +284,29 @@ impl<'p> Walker<'p, '_> {
             | Dict::Error => {}
         }
     }
+}
+
+/// Whether `foreign` is the kernel's `testEffect`, whose task the Lua runner
+/// reports skipped until the Lua runtime exists.
+pub(crate) fn is_effect_test(foreign: &Foreign) -> bool {
+    matches!(&foreign.binding, Binding::Module { from, name } if from == "flick:rt" && name == "testEffect")
+}
+
+/// `f name task` applied in full: `f` and `name`. Of `testEffect`, only
+/// these are reached and generated, never the task.
+pub(crate) fn effect_test_parts(e: &Expr) -> Option<(&Expr, &Expr)> {
+    let ExprKind::App { func, .. } = &e.kind else {
+        return None;
+    };
+    let ExprKind::App {
+        func: head,
+        arg: name,
+        ..
+    } = &func.kind
+    else {
+        return None;
+    };
+    Some((head, name))
 }
 
 fn item_name(kind: &ItemKind) -> &str {

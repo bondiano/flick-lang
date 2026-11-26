@@ -79,8 +79,15 @@ local function result(t)
   return { status = "passed" }
 end
 
+-- Why the runner reports a selected effect test skipped: the Lua target has
+-- no runtime to run its task yet.
+local EFFECT = "an effect test needs the Lua runtime"
+
 local function json(r)
   local parts = { '{"name":', K.quote(r.name), ',"status":"', r.status, '"' }
+  if r.reason then
+    parts[#parts + 1] = ',"reason":' .. K.quote(r.reason)
+  end
   if r.kind then
     parts[#parts + 1] = ',"kind":"' .. r.kind .. '"'
   end
@@ -155,15 +162,20 @@ function K.run(suites, argv)
   local started = clock()
   local results, failed = {}, 0
   for i = 1, #selected do
-    local at = clock()
-    local r = result(selected[i].test)
-    r.name = selected[i].name
-    results[i] = r
-    if r.status == "failed" then
-      failed = failed + 1
-    end
-    if is_human then
-      write(human(r, i, #selected, (clock() - at) * 1000, color))
+    local t = selected[i]
+    if t.test.kind == "effect" then
+      skipped[#skipped + 1] = { name = t.name, status = "skipped", reason = EFFECT }
+    else
+      local at = clock()
+      local r = result(t.test)
+      r.name = t.name
+      results[#results + 1] = r
+      if r.status == "failed" then
+        failed = failed + 1
+      end
+      if is_human then
+        write(human(r, i, #selected, (clock() - at) * 1000, color))
+      end
     end
   end
   local passed = #results - failed
@@ -190,7 +202,8 @@ function K.run(suites, argv)
     write("\n")
   end
   for i = 1, #skipped do
-    write("  ", dim, "- ", skipped[i].name, "  (skipped)", reset, "\n")
+    local why = skipped[i].reason and ": " .. skipped[i].reason or ""
+    write("  ", dim, "- ", skipped[i].name, "  (skipped", why, ")", reset, "\n")
   end
   local also = #skipped > 0 and (" \194\183 " .. dim .. #skipped .. reset .. " skipped") or ""
   write("\n  Tests  ", passed_color, passed, reset, " passed \194\183 ", failed_color, failed, reset, " failed", also,

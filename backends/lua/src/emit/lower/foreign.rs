@@ -26,6 +26,7 @@ use super::super::ast::{Block, Expr, ExprKind, Function, LastKind, Name, Results
 use super::super::names::{KERNEL, MODULE, NAMESPACE, is_identifier};
 use super::Lowering;
 use super::ops::kernel_call;
+use crate::reach::is_effect_test;
 
 /// What a value crossing to or from the host is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -305,7 +306,12 @@ impl Lowering<'_> {
         }
         args.reverse();
         let mut values: Vec<Expr> = dicts.iter().map(|d| self.dict(d, e.span)).collect();
-        values.extend(self.ordered(&args));
+        if is_effect_test(f) {
+            // the runner reports an effect test skipped: its task is not generated
+            values.extend(self.ordered(&args[..1]));
+        } else {
+            values.extend(self.ordered(&args));
+        }
         Some(self.host_call(&host, values, e.span))
     }
 
