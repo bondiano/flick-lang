@@ -14,6 +14,7 @@ encoding, not on the checker or a project driver.
 | `decision` | JS, Go and Lua `match` decision graph |
 | `sourcemap` | JS and Lua version 3 source maps; the frontend's JS maps |
 | `layout` | Deterministic data layout computation (sizes, alignments, discriminants, niches, field offsets and automatic recursion indirection) for layout-aware backends |
+| `specialize` | Deterministic whole-program polymorphic specialization with boxed-cell fallback, explicit `Box`/`Unbox` boundaries, offset vs. label record access, dictionary preservation, and instantiation budgets for layout-aware backends (opt-in `specialize` feature) |
 | `opt` | JS component and native JS/Go release passes, with explicit lang items, visibility, generic bodies and arities |
 | `consteval`, `numeric` | Frontend literal facts/lints and shared backend folding/arithmetic |
 | generated binding tables | JS/Go emission and frontend runtime policy, from package-owned metadata |

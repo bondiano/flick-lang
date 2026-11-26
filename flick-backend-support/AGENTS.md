@@ -11,6 +11,11 @@ dependency boundary.
 - `src/layout/` — deterministic data layout computation (`LayoutEngine`,
   `PrimitiveTable`, niches, field packing, and finite two-phase recursion
   indirection) for layout-aware backends.
+- `src/specialize/` — deterministic whole-program polymorphic specialization
+  with uniform boxed-cell fallback (`specialize`, `SpecializeConfig`,
+  `SpecializedProgram`, `SpecializeStats`) for layout-aware backends, gated
+  behind the opt-in `specialize` feature so existing JS/Go/Lua components stay
+  unchanged until they opt in.
 - `src/opt/` — the portable release passes. `flick-core/src/opt/` is their
   compiler adapter and holds most of their tests and snapshots.
 - `build.rs` — generates the binding tables from

@@ -18,6 +18,10 @@ native-project = []
 # Enabled by default (including for WASM backend components); browser-only
 # `flick-wasm` disables it to stay within its bundle budget.
 typed-ir = []
+# Opt-in whole-program polymorphic specialization + boxed-cell fallback for
+# layout-aware backends; omitted from existing JS/Go/Lua components and browser
+# builds until a target backend opts in.
+specialize = []
 
 [build-dependencies]
 serde_json = { workspace = true }
