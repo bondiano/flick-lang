@@ -13,7 +13,8 @@
 //! - An own module's chunk is `App/Util.lua`, a built-in one's
 //!   `_flick/List.lua`, with `<chunk>.map` beside it: a version 3 map of
 //!   each line to the Flick node it starts with, whose sources are the
-//!   build's source names. On LÖVE, `main.lua` loads the chunks in order.
+//!   build's source names. `chunks.txt` lists the chunks in the order they
+//!   load, and on LÖVE, `main.lua` loads them in that order.
 //! - A refusal inside a built-in module is reported at the own expression
 //!   that reached it, as `check-target` reports what it finds there.
 
@@ -38,6 +39,9 @@ use crate::refusal;
 /// The directory of the chunks of built-in modules; a module's name starts
 /// with a capital, so no own chunk is in it.
 const BUILTINS: &str = "_flick";
+
+/// The chunks' paths in the order they load, one per line.
+const CHUNKS: &str = "chunks.txt";
 
 /// The path of the chunk of `module`.
 fn path(module: &str, builtin: bool) -> String {
@@ -360,13 +364,17 @@ pub(crate) fn build(
             source_map,
         ));
     }
+    let paths: Vec<String> = chunks.into_iter().map(|(path, _)| path).collect();
+    // the load order, for a host package's `.toc` or loader
+    let order = paths.iter().fold(String::new(), |mut order, path| {
+        order.push_str(path);
+        order.push('\n');
+        order
+    });
+    artifacts.push(artifact(CHUNKS.into(), ArtifactKind::Metadata, order));
     if target.name == "lua/love" {
-        let paths: Vec<String> = chunks.into_iter().map(|(path, _)| path).collect();
-        artifacts.push(artifact(
-            "main.lua".into(),
-            ArtifactKind::Source,
-            love_main(&paths),
-        ));
+        let main = love_main(&paths);
+        artifacts.push(artifact("main.lua".into(), ArtifactKind::Source, main));
     }
     Ok(artifacts)
 }

@@ -74,6 +74,11 @@ impl Namer {
         Name::new(text)
     }
 
+    /// Keeps `name` from every binding: a global the code reads.
+    pub fn reserve(&mut self, name: &str) {
+        self.used.insert(name.to_owned());
+    }
+
     /// The name of the IR local `local`, the same at every use.
     pub fn local(&mut self, local: &str) -> Name {
         if let Some(name) = self.locals.get(local) {

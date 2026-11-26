@@ -1,0 +1,21 @@
+module App exposing (main, replaced)
+
+say : String -> Unit
+foreign pure say from global "print"
+
+fail_with : String -> String
+foreign pure fail_with from global "error"
+
+gsub : String -> String -> (String -> String) -> String
+foreign pure gsub from global "string.gsub"
+
+check : String -> String
+let check c =
+  match c with
+  | "b" -> fail_with "b is not allowed"
+  | _ -> c
+
+let replaced = say (gsub "abc" "%w" check)
+
+main : Unit -> Unit
+let main () = ()

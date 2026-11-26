@@ -1,0 +1,17 @@
+module App exposing (main, upper, blanked)
+
+say : String -> Unit
+foreign pure say from global "print"
+
+gsub : String -> String -> (String -> String) -> String
+foreign pure gsub from global "string.gsub"
+
+pick : String -> String -> String
+let pick x c = if c == "b" then x else c
+
+let upper = say (gsub "abc" "%w" (fun c -> if c == "b" then "B" else c))
+
+let blanked = say (gsub "abcb" "%w" (pick "_"))
+
+main : Unit -> Unit
+let main () = ()

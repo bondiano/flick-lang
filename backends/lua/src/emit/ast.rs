@@ -44,13 +44,6 @@ pub enum Results {
     /// Exactly one, as every Flick function does.
     One,
     /// Any number, as a host function may.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "calls of host functions construct it, with the value ABI"
-        )
-    )]
     Any,
 }
 

@@ -76,6 +76,32 @@ does, including where it differs from Flick's contract. A kernel must
 guard every such difference; the [numeric policy](numeric-policy.md) states
 the results it must produce.
 
+## Fixtures
+
+`just lua-run` builds the fixtures of
+[`backends/lua/fixtures/`](../../backends/lua/fixtures/) with the e2e
+compiler through the committed `package/component.wasm`, for `lua/love` in
+both dialects and for both WoW profiles, and runs what each build writes on
+the pinned hosts. On plain Lua 5.1 and LuaJIT a loader shim reads
+`chunks.txt` and loads each chunk with `(nil, ns)`, as a `.toc` would; LÖVE
+runs the generated `main.lua` headless; for WoW, Lua 5.1's `luac -p` parses
+every chunk and the shim loads them, as no client runs here. Each fixture's
+`expected` output and `error` were written from Flick's semantics, not from
+a run. A Lua error names its chunk and line; the harness maps the line
+through the chunk's `.map` to the Flick file and line and compares that.
+Output goes through `foreign pure … from global "print"`.
+
+Results of 2026-11-25 (66 of 66 checks):
+
+| Fixture | Shows | `love`: Lua 5.1, LuaJIT on and off, LÖVE | `love` with `luajit`: LuaJIT on and off, LÖVE | WoW Retail and Forever: `luac -p`, Lua 5.1 |
+| - | - | - | - | - |
+| `recursion` | a recursive count over a list, a recursive `last`, mutual recursion in `rec { … }` | pass | pass | pass |
+| `init_order` | three modules initialize in dependency order: `Base`, then `Lib`, then `App` | pass | pass | pass |
+| `exports` | a type, its constructors and functions exported by one module and used by another | pass | pass | pass |
+| `callback` | a lambda and a partial application passed to `string.gsub`, which calls them | pass | pass | pass |
+| `init_error` | an error while a top-level value initializes, at `src/App.fl:11` | pass | pass | pass |
+| `callback_error` | an error inside a callback the host calls, at `src/App.fl:15` | pass | pass | pass |
+
 ## Evidence
 
 The executable profiles state no fact without a probe or a pinned source;
@@ -103,10 +129,12 @@ client defines; a missing global needs its source added to `wow-lua.txt`.
   `ADDON_LOADED` callback of both WoW profiles are inferred from documentation
   and from Lua 5.1. Each profile lists this under `blockers`, and support for
   a WoW profile cannot be claimed until a live client runs the probes.
-- **Code generation.** The component generates only the pure core. The
-  kernel, the value ABI and the host runtime are separate work; until they
-  exist, every reachable binding of Flick's own kernel (`flick:` specifiers)
-  is refused on every profile.
+- **Code generation.** The component generates only the pure core and
+  calls host globals with scalar values and one-stage callbacks. The kernel,
+  the value ABI and the host runtime are separate work; until they exist,
+  every reachable binding of Flick's own kernel (`flick:` specifiers) is
+  refused on every profile, and `flick run`, `flick test` and `flick dev`
+  are refused: the host runs the program.
 
 ## The synchronous WoW slice
 

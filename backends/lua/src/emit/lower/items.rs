@@ -1,7 +1,7 @@
 //! Top-level items, each the assignment of its value to the module's table.
 
 use flick_backend_support::names::instance;
-use flick_ir::{Binding, Expr as IrExpr, InstanceInfo, ItemKind, Span, default_method};
+use flick_ir::{Expr as IrExpr, InstanceInfo, ItemKind, Span, default_method};
 
 use super::super::ast::{BinOp, Block, Expr, ExprKind, Field, Function, LastKind, Name, StmtKind};
 use super::Lowering;
@@ -41,16 +41,16 @@ impl Lowering<'_> {
                 self.define(&c.name, value, span);
             }
             ItemKind::Instance { info, methods } => self.instance(info, methods, span),
-            ItemKind::Foreign(f) => {
-                let what = format!("the foreign function `{}.{}`", self.module, f.name);
-                let why = match &f.binding {
-                    Binding::Module { from, .. } if from.starts_with("flick:") => {
-                        "the Lua kernel table refuses it: the Lua primitive kernel is not implemented"
-                    }
-                    _ => "foreign functions need the Lua value ABI, which is not implemented",
-                };
-                self.unsupported(span, &what, why);
-            }
+            ItemKind::Foreign(f) => match self.host_function(f) {
+                Ok(host) => {
+                    let value = self.host_value(&host, span);
+                    self.define(&f.name, value, span);
+                }
+                Err(why) => {
+                    let what = format!("the foreign function `{}.{}`", self.module, f.name);
+                    self.unsupported(span, &what, why);
+                }
+            },
             ItemKind::Service { name, .. } => {
                 let what = format!("the service `{}.{name}`", self.module);
                 self.unsupported(

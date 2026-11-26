@@ -3,6 +3,7 @@
 //! Lua 5.1's rules and the representation `lower` documents, not from a run.
 
 mod build;
+mod foreign;
 mod limits;
 mod lower;
 mod print;
@@ -240,6 +241,7 @@ pub(super) fn program(items: Vec<Item>) -> Program {
             lang("option", Namespace::Type, "Option"),
             lang("some", Namespace::Constructor, "Some"),
             lang("string", Namespace::Type, "String"),
+            lang("unit", Namespace::Type, "Unit"),
         ],
     }
 }

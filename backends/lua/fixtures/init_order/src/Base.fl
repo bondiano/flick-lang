@@ -1,0 +1,9 @@
+module Base exposing (word, ready)
+
+say : String -> Unit
+foreign pure say from global "print"
+
+let ready = say "Base initializes"
+
+word : String
+let word = "base"

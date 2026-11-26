@@ -26,6 +26,7 @@
 mod data;
 mod decide;
 mod expr;
+mod foreign;
 mod items;
 mod ops;
 mod pattern;
@@ -67,6 +68,9 @@ pub(crate) struct Lowering<'p> {
     constructors: BTreeMap<(&'p str, &'p str), &'p Constructor>,
     /// The package of each module, which its constructors' tags name.
     packages: BTreeMap<&'p str, Option<&'p str>>,
+    /// The first name of each global path a foreign function binds, which
+    /// no local may shadow.
+    hosts: BTreeSet<&'p str>,
     /// The module of the item being lowered.
     module: &'p str,
     names: Namer,
@@ -86,6 +90,7 @@ impl<'p> Lowering<'p> {
         let mut items = BTreeMap::new();
         let mut constructors = BTreeMap::new();
         let mut packages = BTreeMap::new();
+        let mut hosts = BTreeSet::new();
         for module in &program.modules {
             let m = module.name.as_str();
             packages.insert(m, module.package.as_deref());
@@ -96,6 +101,9 @@ impl<'p> Lowering<'p> {
                     }
                     ItemKind::Foreign(f) => {
                         items.insert((m, f.name.as_str()), &item.kind);
+                        if let Some(path) = f.binding.global_name() {
+                            hosts.insert(path.split('.').next().unwrap_or(path));
+                        }
                     }
                     ItemKind::Constructor(c) => {
                         constructors.insert((m, c.name.as_str()), c);
@@ -112,6 +120,7 @@ impl<'p> Lowering<'p> {
             items,
             constructors,
             packages,
+            hosts,
             module: "",
             names: Namer::new(),
             vars: BTreeSet::new(),
@@ -128,6 +137,9 @@ impl<'p> Lowering<'p> {
         let m = &program.modules[module];
         self.module = &m.name;
         self.names = Namer::new();
+        for host in &self.hosts {
+            self.names.reserve(host);
+        }
         self.vars.clear();
         self.givens.clear();
         self.functions = 0;

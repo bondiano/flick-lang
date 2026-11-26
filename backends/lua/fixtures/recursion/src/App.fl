@@ -1,0 +1,47 @@
+module App exposing (main, counted, found, parity, empty, evens)
+
+say : String -> Unit
+foreign pure say from global "print"
+
+say_float : Float -> Unit
+foreign pure say_float from global "print"
+
+count : List String -> Float
+let rec count xs =
+  match xs with
+  | [] -> 0.0
+  | [_, ...rest] -> 1.0 + count rest
+
+last : List String -> String
+let rec last xs =
+  match xs with
+  | [x] -> x
+  | [_, ...rest] -> last rest
+  | [] -> "none"
+
+rec {
+  even : List String -> Bool
+  let even xs =
+    match xs with
+    | [] -> true
+    | [_, ...rest] -> odd rest
+
+  odd : List String -> Bool
+  let odd xs =
+    match xs with
+    | [] -> false
+    | [_, ...rest] -> even rest
+}
+
+let counted = say_float (count ["a", "b", "c", "d"])
+
+let found = say (last ["x", "y", "z"])
+
+let parity = say (if even ["a", "b", "c"] then "even" else "odd")
+
+let empty = say (last [])
+
+let evens = say (if even ["a", "b"] then "even" else "odd")
+
+main : Unit -> Unit
+let main () = ()
