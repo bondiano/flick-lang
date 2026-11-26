@@ -8,7 +8,8 @@
   "load.json.go.binary": {"budget": 10000000, "tolerance": 0.05},
   "load.ssr.rps": {"budget": 5200, "tolerance": 0.25, "runners": {
     "AMD EPYC 7763": {"budget": 3300, "reason": "nightlies on this CPU measure 3292-3340 req/s for the code that measures 5740 on a Xeon 6975P (11-13 to 11-17)"},
-    "AMD EPYC 9V74": {"budget": 4600, "reason": "nightlies on this CPU measure 4513-4706 req/s since the SSR fix of 4d1225ed7 (11-11 to 11-12)"}
+    "AMD EPYC 9V74": {"budget": 4600, "reason": "nightlies on this CPU measure 4513-4706 req/s since the SSR fix of 4d1225ed7 (11-11 to 11-12)"},
+    "Intel(R) Xeon(R) Platinum 8370C": {"budget": 3400, "reason": "nightlies on this CPU measure 3392-3432 req/s for the code that measures 5396 on a Xeon 6975P (11-25 to 11-26)"}
   }},
   "lsp.rss.peak": {"budget": 120, "tolerance": 0.25},
   "load.json.go.rss.peak": {"budget": 70, "tolerance": 0.25},
