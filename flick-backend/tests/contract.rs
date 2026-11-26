@@ -1,6 +1,8 @@
 mod common;
 #[path = "contract/launch.rs"]
 mod launch;
+#[path = "contract/timings.rs"]
+mod timings;
 
 use std::cell::Cell;
 

@@ -46,7 +46,21 @@ pub fn default_num(fractional: bool) -> Num {
         .unwrap_or(Num::Float)
 }
 
+#[cfg(feature = "native-js")]
 pub use flick_backend_js::numeric::float_text;
+
+#[cfg(not(feature = "native-js"))]
+/// The shorter of the plain and the exponent spelling of a finite `x`,
+/// without its sign; both read back as exactly `x`.
+pub fn float_text(x: f64) -> String {
+    let plain = format!("{}", x.abs());
+    let exponent = format!("{:e}", x.abs());
+    if exponent.len() < plain.len() {
+        exponent
+    } else {
+        plain
+    }
+}
 
 /// Whether a number token is written as an integer: in a radix, or with
 /// neither a fraction nor an exponent nor a floating suffix (`f32`).

@@ -10,14 +10,14 @@ pub use crate::project::builtins::{
 };
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::project::target_preflight::BuiltinPreflight;
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(all(test, not(target_arch = "wasm32"), feature = "native-js"))]
 mod capability_tests;
 #[cfg(feature = "native-project")]
 pub mod go;
 mod interfaces;
 mod javascript;
 mod paths;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod shadowed_tests;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod target_preflight;
@@ -27,6 +27,7 @@ pub(crate) use crate::effects::bindings;
 pub use abi::interface;
 pub use bridge_select::select as javascript_effect_bridge;
 pub use interfaces::published_interfaces;
+#[cfg(feature = "native-js")]
 pub use javascript::emit;
 pub use javascript::foreign_inputs as javascript_foreign_inputs;
 pub use javascript::foreign_specifier as javascript_foreign_specifier;

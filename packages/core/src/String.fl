@@ -37,7 +37,16 @@ foreign pure split from "flick:String" "split"
 
 /// The parts with the separator between them.
 join : String -> List String -> String
-foreign pure join from "flick:rt" "stringJoin"
+let join separator parts =
+  rest : String -> List String -> String
+  let rec rest text more =
+    match more with
+    | [part, ...others] -> rest (text ++ separator ++ part) others
+    | [] -> text
+  match parts with
+  | [first, ...others] -> rest first others
+  | [] -> ""
+  @native "flick:rt" "stringJoin" when js || go
 
 /// Whether `part` occurs in the string.
 contains : String -> String -> Bool
@@ -163,7 +172,22 @@ foreign pure replace_all from "flick:rt" "stringReplaceAll"
 
 /// The lines, without their line breaks (`\n` or `\r\n`).
 lines : String -> List String
-foreign pure lines from "flick:String" "flickLines"
+let lines text =
+  let count = length text
+  // a line ends at `\n`, `\r` or `\r\n`; the text's end ends no empty one
+  split : Int -> Int -> List String -> List String
+  let rec split start i out =
+    if i >= count then
+      if start < count then out ++ [slice start count text] else out
+    else
+      match char_code_at i text with
+      | Some 10 -> split (i + 1) (i + 1) (out ++ [slice start i text])
+      | Some 13 ->
+        let next = if char_code_at (i + 1) text == Some 10 then i + 2 else i + 1
+        split next next (out ++ [slice start i text])
+      | _ -> split start (i + 1) out
+  split 0 0 []
+  @native "flick:String" "flickLines" when js || go
 
 /// The lines, each with its line break.
 lines_with_separators : String -> List String

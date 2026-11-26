@@ -77,30 +77,30 @@ pub fn simplify(expr: &mut Expr) {
     portable::simplify(expr, &known);
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod compose_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod eval_primitives_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod eval_tests;
 #[cfg(test)]
 mod gadt_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod inline_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod lazy_local_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod lazy_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod list_shape_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod projection_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod record_shape_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod shape_tests;
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod tests;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod devirt_tests;

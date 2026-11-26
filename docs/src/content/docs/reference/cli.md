@@ -64,8 +64,9 @@ dependency of another version than the selected backend pins stops them with
 
 `build`, `run`, `dev`, `test`, `pack`, `doctor`, `inspect` and `doc` (when
 checking examples) take `--target <name>` to select which backend component
-runs (an official backend short name or the short name of a pinned
-`[build.backend]`). Without `--target`, the target comes from
+runs (an official backend short name, the short name of a pinned
+`[build.backend]`, or, in a project and with a compiler built from the
+repository, `lua` for its own `backends/lua` component). Without `--target`, the target comes from
 `[build.backend]`, then `[build] target`, then the backend prefix of
 `[build] environment`, and otherwise the default target backend (see
 [Plugin-contributed commands and backends](#plugin-contributed-commands-and-backends)).

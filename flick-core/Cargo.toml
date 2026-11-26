@@ -12,12 +12,15 @@ publish.workspace = true
 workspace = true
 
 [features]
-default = ["contracts", "ide", "native-project"]
+default = ["contracts", "ide", "native-js", "native-project"]
 # editor queries, projections and the metadata they keep
 ide = []
+# in-process JavaScript emitter, used by emitter unit tests and legacy native paths;
+# off in browser builds, which run the official `flick/js` WASM component instead
+native-js = ["dep:flick-backend-js"]
 # projects on disk: manifests, installed packages, published artifacts,
 # source maps and the docs of the built-in sources
-native-project = ["dep:flick-backend-go", "dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-support/native-project", "flick-ffi/native-project"]
+native-project = ["native-js", "dep:flick-backend-go", "dep:toml", "dep:semver", "dep:sha2", "flick-backend-js/source-maps", "flick-backend-support/native-project", "flick-ffi/native-project"]
 # verification of function contracts in `PureTotalV2`, which `flick prove`
 # is the only caller of; off in browser builds
 contracts = []
@@ -44,7 +47,7 @@ rustix = { version = "1.1.6", features = ["time"] }
 
 [dependencies]
 flick-backend-go = { path = "../backends/go", optional = true }
-flick-backend-js = { path = "../backends/js" }
+flick-backend-js = { path = "../backends/js", optional = true }
 flick-backend-support = { path = "../flick-backend-support", default-features = false }
 flick-diagnostics = { path = "../flick-diagnostics" }
 flick-ffi = { path = "../flick-ffi", default-features = false }

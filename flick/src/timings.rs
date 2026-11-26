@@ -7,6 +7,7 @@
 use std::fmt::{Debug, Write as _};
 use std::io::{self, Write as _};
 use std::mem;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -32,6 +33,8 @@ struct Records {
     stages: Vec<(String, Instant)>,
     /// Work measured inside the stages, in microseconds.
     phases: Vec<(String, u64)>,
+    /// Byte-count metrics collected inside stages.
+    metrics: Vec<(String, u64)>,
     /// Modules checked, in microseconds.
     modules: Vec<(String, u64)>,
     /// What the module cache did with each module, sorted by name.
@@ -39,9 +42,12 @@ struct Records {
     misses: Vec<String>,
 }
 
+static ENABLED: AtomicBool = AtomicBool::new(false);
+
 static RECORDS: Mutex<Records> = Mutex::new(Records {
     stages: Vec::new(),
     phases: Vec::new(),
+    metrics: Vec::new(),
     modules: Vec::new(),
     reasons: Vec::new(),
     misses: Vec::new(),
@@ -51,8 +57,14 @@ fn records() -> MutexGuard<'static, Records> {
     RECORDS.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+/// Whether `--timings` collection is active for this process.
+pub fn enabled() -> bool {
+    ENABLED.load(Ordering::Relaxed)
+}
+
 /// Starts collecting: the events below are recorded from now on.
 pub fn install() {
+    ENABLED.store(true, Ordering::Relaxed);
     records()
         .stages
         .push(("Starting".to_owned(), Instant::now()));
@@ -68,6 +80,11 @@ pub fn stage(label: &'static str) {
 /// Work inside a stage that took `elapsed`.
 pub fn phase(label: &str, elapsed: Duration) {
     debug!(micros = micros(elapsed), "{label}");
+}
+
+/// Byte size metric recorded during a stage when `--timings` is enabled.
+pub fn bytes(label: &str, count: u64) {
+    debug!(bytes = count, "{label}");
 }
 
 /// `duration` in whole microseconds, the unit of a timing event.
@@ -104,6 +121,11 @@ impl<S: Subscriber> Layer<S> for Collect {
                 micros: Some(micros),
                 ..
             } => records.phases.push((message, micros)),
+            Fields {
+                message: Some(message),
+                bytes: Some(bytes),
+                ..
+            } => records.metrics.push((message, bytes)),
             Fields { .. } => {}
         }
     }
@@ -118,12 +140,15 @@ struct Fields {
     reason: Option<String>,
     message: Option<String>,
     micros: Option<u64>,
+    bytes: Option<u64>,
 }
 
 impl Visit for Fields {
     fn record_u64(&mut self, field: &Field, value: u64) {
-        if field.name() == "micros" {
-            self.micros = Some(value);
+        match field.name() {
+            "micros" => self.micros = Some(value),
+            "bytes" => self.bytes = Some(value),
+            _ => {}
         }
     }
 
@@ -149,6 +174,7 @@ impl Visit for Fields {
 struct Report {
     stages: Vec<(String, u64)>,
     phases: Vec<(String, u64)>,
+    metrics: Vec<(String, u64)>,
     /// The slowest first.
     modules: Vec<(String, u64)>,
     reasons: Vec<(String, String)>,
@@ -171,6 +197,7 @@ impl Report {
         Self {
             stages,
             phases: records.phases,
+            metrics: records.metrics,
             modules,
             reasons: records.reasons,
             misses: records.misses,
@@ -187,6 +214,12 @@ impl Report {
         if !self.phases.is_empty() {
             out.push_str("Within them\n");
             self.phases.iter().for_each(|phase| line(&mut out, phase));
+        }
+        if !self.metrics.is_empty() {
+            out.push_str("Sizes\n");
+            for (label, bytes) in &self.metrics {
+                let _ = writeln!(out, "{bytes:>10} B   {label}");
+            }
         }
         if !self.modules.is_empty() {
             let _ = writeln!(out, "Slowest of {} modules checked", self.modules.len());
@@ -227,6 +260,9 @@ impl Report {
             "type": "timings",
             "stages": timed("label", &self.stages),
             "phases": timed("label", &self.phases),
+            "metrics": (self.metrics.iter())
+                .map(|(label, bytes)| json!({ "label": label, "bytes": bytes }))
+                .collect::<Vec<_>>(),
             "modules": timed("module", &self.modules),
             "module-cache": (self.reasons.iter())
                 .map(|(module, reason)| json!({ "module": module, "reason": reason }))
@@ -242,6 +278,7 @@ fn collected() -> Records {
     let empty = Records {
         stages: Vec::new(),
         phases: Vec::new(),
+        metrics: Vec::new(),
         modules: Vec::new(),
         reasons: Vec::new(),
         misses: Vec::new(),
@@ -293,6 +330,7 @@ mod tests {
                 ("Checking".to_owned(), at(2)),
             ],
             phases: vec![("built-in modules checked".to_owned(), 1500)],
+            metrics: Vec::new(),
             modules: vec![("A".to_owned(), 10), ("B".to_owned(), 4000)],
             reasons: vec![
                 ("A".to_owned(), "source".to_owned()),

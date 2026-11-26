@@ -4,6 +4,8 @@
 //! Checking budgets cover the target sizes (200 fields, 2000 lines);
 //! growth ratios catch quadratic behavior without a machine-specific syntax budget.
 
+#![cfg(feature = "native-js")]
+
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};

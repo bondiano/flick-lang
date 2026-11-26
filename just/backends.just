@@ -26,6 +26,14 @@ lua-probes:
 lua-run: e2e-compiler
     node backends/lua/fixtures/run.mjs {{flick}}
 
+# The kernel's conformance suite on Lua: the modules tests/kernel/lua.txt
+# lists, with `flick test --target lua` on Lua 5.1.5 and LuaJIT with the JIT
+# on and off, each report the same as on JS; and the globals the kernel
+# chunks read, which every profile must define.
+kernel-lua: e2e-compiler
+    pnpm -C runtime build
+    node backends/lua/fixtures/kernel.mjs {{flick}}
+
 # Update the component `name` distributed with every compiler binary;
 # CI only checks that a rebuild reproduces it.
 update-component name: (backend-component name)

@@ -4,6 +4,7 @@
 
 mod build;
 mod foreign;
+mod kernel;
 mod limits;
 mod lower;
 mod print;

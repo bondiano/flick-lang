@@ -79,11 +79,11 @@ entries alongside `command` (`check`, `build`, `run`, `dev`, `test` or `inspect`
 for `inspect`, `inspect.module`. `BuildRequest.declared-dependencies` carries
 the target package dependencies declared by the project so each backend derives
 internal runtime/bridge settings itself. Host tool execution (`flick/src/backends/tools.rs`,
-gated by `[tools]` grants) and atomic publication (`flick/src/publish.rs`) are
-integrated on the CLI; the browser component loader remains separate
-integration work. Accepting a graph in `validate_result` does not execute it
-or establish that a tool's arguments access only declared files; execution
-runs under the host tool adapter below.
+gated by `[tools]` grants), atomic publication (`flick/src/publish.rs`), and the
+browser component loader (`docs/src/playground/backend-component.ts` and
+`backend.worker.ts`) are integrated; accepting a graph in `validate_result` does
+not execute it or establish that a tool's arguments access only declared files;
+execution runs under the host tool adapter below.
 
 ## Input boundary
 
@@ -183,12 +183,15 @@ adapter. Source byte offsets and line starts remain in the source manifest;
 the component calculates UTF-16 columns from declared source bytes. These
 records add no checker or host-path lookup callback to the world.
 
-`backends/js` now implements the world through its `guest` feature. Its actual
+`backends/js` implements the world through its `guest` feature. Its actual
 component is built without WASI by `just js-component`. Native/WASM parity
 covers JS/TS and both profiles; explicit package selection exercises the
-common CLI. The component calculates release ABI and invokes the same
-portable optimizer with `Program.lang`. The browser component loader remains
-separate integration work.
+common CLI, and the browser playground runs the same pinned `component.wasm`
+through an isolated Web Worker (`docs/src/playground/backend.worker.ts`) with
+WebCrypto SHA-256 verification and `inputs.read`-only imports. The component
+calculates release ABI and invokes the same portable optimizer with
+`Program.lang`. See [measurements.md](measurements.md) for per-stage native
+component cache-hit and cache-miss attribution.
 
 `just js-component` remaps checkout, registry and standard-library source
 paths to canonical roots. The Rust root uses the pinned compiler's full
@@ -206,7 +209,15 @@ rather than receiving a JS-specific option from the host.
 `Launch` carries `runtime-arguments` (passed to the launch runtime before the
 artifact, such as `--enable-source-maps` or `--import` for DevTools) and
 `environment` variables, both authorized by host policy (`Policy::authorize_launch`)
-before acceptance and again before process launch.
+before acceptance and again before process launch. The site playground executes
+the same pinned `flick/js` component (`backends/js/package/component.wasm`) inside
+an isolated browser Web Worker (`docs/src/playground/backend.worker.ts`) via
+`docs/src/playground/backend-component.ts`, verifying the component SHA-256 via
+WebCrypto and enforcing the `inputs.read`-only import allowlist before
+instantiation, while `flick-wasm` stays decoupled from `flick-backend-js` on
+`wasm32` and validates `BuildResult` through `flick_backend::validate_result`.
+Real-project cache-hit and cache-miss stage attribution measurements are tracked
+in [measurements.md](measurements.md).
 
 `flick.javascript-ffi@0.1.0` foreign bindings carry original and host-resolved
 specifiers. Library files use the existing shipping checks, are retained as

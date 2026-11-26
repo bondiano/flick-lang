@@ -21,7 +21,7 @@ use flick_ir::{
 };
 
 use super::super::ast::{Block, Expr, ExprKind, Function, LastKind, Name, Results, StmtKind};
-use super::super::names::{MODULE, NAMESPACE, is_identifier};
+use super::super::names::{KERNEL, MODULE, NAMESPACE, is_identifier};
 use super::Lowering;
 
 /// What a value crossing to or from the host is.
@@ -102,15 +102,15 @@ impl Lowering<'_> {
     /// How the foreign function `f` is called, or why it cannot be.
     pub(super) fn host_function<'f>(&self, f: &'f Foreign) -> Result<HostFn<'f>, &'static str> {
         let Binding::Global { name } = &f.binding else {
-            return Err(match &f.binding {
-                Binding::Module { from, .. } if from.starts_with("flick:") => {
-                    "the Lua kernel table refuses it: the Lua primitive kernel is not implemented"
+            return match &f.binding {
+                Binding::Module { from, name } if from.starts_with("flick:") => {
+                    self.kernel_function(f, from, name)
                 }
-                _ => {
-                    "a foreign function of a module or of inline code needs the Lua value ABI, \
-                      which is not implemented"
-                }
-            });
+                _ => Err(
+                    "a foreign function of a module or of inline code needs the Lua value \
+                          ABI, which is not implemented",
+                ),
+            };
         };
         if f.mode != ForeignMode::Pure {
             return Err(
@@ -131,7 +131,9 @@ impl Lowering<'_> {
             );
         }
         let path: Vec<&str> = name.split('.').collect();
-        if !path.iter().all(|s| is_identifier(s)) || [MODULE, NAMESPACE, "_"].contains(&path[0]) {
+        if !path.iter().all(|s| is_identifier(s))
+            || [MODULE, NAMESPACE, KERNEL, "_"].contains(&path[0])
+        {
             return Err("its global path is not one generated Lua can name");
         }
         let Some(ty) = f.ty.as_deref() else {
@@ -165,6 +167,33 @@ impl Lowering<'_> {
             arity: f.arity,
             taken,
             statement,
+        })
+    }
+
+    /// How a binding of Flick's own kernel is called: `K.<export>` with
+    /// every Flick argument at once, in the values generated code holds, as
+    /// the table `kernel.txt` implements it.
+    fn kernel_function<'f>(
+        &self,
+        f: &'f Foreign,
+        from: &str,
+        name: &'f str,
+    ) -> Result<HostFn<'f>, &'static str> {
+        if !self.kernel.row(from, name).is_some_and(|r| r.implemented) {
+            return Err("the Lua kernel does not implement it");
+        }
+        // every argument at once, whatever JS's `arity` splits them into
+        let params = (f.ty.as_deref()).map(|ty| ty.fun_stages().0);
+        let taken = params.as_ref().map_or(0, Vec::len);
+        let pure = params.is_some_and(|ps| ps.iter().all(|(_, s)| *s == Stage::Pure));
+        if f.mode != ForeignMode::Pure || f.dicts > 0 || taken == 0 || !pure {
+            return Err("the Lua kernel implements it only as a pure function of its arguments");
+        }
+        Ok(HostFn {
+            path: vec![KERNEL, name],
+            arity: taken,
+            taken,
+            statement: false,
         })
     }
 

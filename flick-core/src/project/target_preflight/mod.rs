@@ -23,7 +23,9 @@ use gated::scan_item_gated_services;
 pub use gated::{
     gated_service, handled_services, handles, std_root_handlers, std_root_handlers_for,
 };
-pub(crate) use prune::{prune_compilation, prune_compilation_for_env};
+pub(crate) use prune::prune_compilation;
+#[cfg(feature = "native-js")]
+pub(crate) use prune::prune_compilation_for_env;
 use refs::{Reference, collect_item_references, initialization_refs, module_reexports};
 
 pub use builtin::BuiltinPreflight;

@@ -17,10 +17,12 @@ const KEYWORDS: &[&str] = &[
 /// defines them, as a test checks.
 pub(crate) const GLOBALS: &[&str] = &["pairs", "setmetatable", "type"];
 
-/// The table of the module being lowered and the private namespace that
-/// holds every module's table.
+/// The table of the module being lowered, the private namespace that
+/// holds every module's table, and the local each chunk keeps the Lua
+/// kernel's table `ns.k` in.
 pub(crate) const MODULE: &str = "M";
 pub(crate) const NAMESPACE: &str = "ns";
+pub(crate) const KERNEL: &str = "K";
 
 /// The name of what is never read: a parameter a pattern ignores.
 const UNUSED: &str = "_";
@@ -44,7 +46,7 @@ pub struct Namer {
 
 impl Namer {
     pub fn new() -> Namer {
-        let used = (GLOBALS.iter().chain(&[MODULE, NAMESPACE, UNUSED]))
+        let used = (GLOBALS.iter().chain(&[MODULE, NAMESPACE, KERNEL, UNUSED]))
             .map(|&n| n.to_owned())
             .collect();
         Namer {

@@ -147,31 +147,39 @@ Each backend component declares its base environment tags, selectable tag axes, 
 
 `flick/lua` is a preview backend for World of Warcraft addons and LÖVE games.
 It lives in the repository at `backends/lua` and is not distributed with the
-compiler: pin its `package/component.wasm` in `[build.backend]`. It publishes
-tag `lua`, exclusive axis `dialect` (`lua51` default, `luajit`), additive axis
-`capabilities` (`jit` and `ffi`, each needing `dialect = "luajit"`), and hosts
-`wow-retail`, `wow-forever` and `love`, each pinned to one client or release.
-`flick check` and the editor check the project's modules against the
-selected host and report what they reach but the host cannot run, such as
-`BigInt`, `Int64` without `ffi`, suspension on WoW or a global outside the
-host's API, with `FLICK-P012` at the use.
+compiler: pin its `package/component.wasm` in `[build.backend]`, or, with a
+compiler built from the repository, select it with `--target lua`. It
+publishes tag `lua`, exclusive axis `dialect` (`lua51` default, `luajit`),
+additive axis `capabilities` (`jit` and `ffi`, each needing
+`dialect = "luajit"`), and hosts `wow-retail`, `wow-forever` and `love`, each
+pinned to one client or release. `flick check` and the editor check the
+project's modules against the selected host and report what they reach but
+the host cannot run, such as `BigInt`, `Int64` without `ffi`, suspension on
+WoW or a global outside the host's API, with `FLICK-P012` at the use.
 
-`flick build` writes a Lua chunk for each module the program reaches:
-`App/Util.lua` for a project module and `_flick/List.lua` for a built-in
-one, each with a version 3 `.map` from its lines to the Flick source, and
-`chunks.txt`, the chunks in the order they load. Each chunk starts with
-`local _, ns = ...` and puts its module's values into the namespace it is
-given second, as WoW gives each file of an addon; on LÖVE, `main.lua` loads
-the chunks in that order. A top-level value is computed as its chunk loads.
-A `foreign pure f from global "string.gsub"` is called directly when what
-it is given is a string, a boolean, a number or a function of one pure stage
+`flick build` writes the Lua kernel's chunks, `_flick/lua-kernel/*.lua`, and
+a Lua chunk for each module the program reaches: `App/Util.lua` for a
+project module and `_flick/List.lua` for a built-in one, each with a version
+3 `.map` from its lines to the Flick source, and `chunks.txt`, the chunks in
+the order they load. Each chunk starts with `local _, ns = ...` and puts its
+module's values into the namespace it is given second, as WoW gives each
+file of an addon; on LÖVE, `main.lua` loads the chunks in that order. A
+top-level value is computed as its chunk loads. The kernel computes `Int`
+arithmetic, `==` of any value, and the order and `++` of strings, whose
+lengths and positions count UTF-16 code units as on the other targets; the
+built-in modules run their Flick bodies where no `@native` clause names Lua.
+A `foreign pure f from global "string.gsub"` is called directly when what it
+is given is a string, a boolean, a number or a function of one pure stage
 over those, and what it gives back a string, a boolean, a float or `Unit`.
-Only this pure core generates so far: effects, other foreign functions,
-generators and the arithmetic and string operators whose exact results need
-the Lua kernel stop the build with `FLICK-P012` at the project's code, and
-so does a function over the VM's limits. A refused build keeps the previous
-output. The host runs the program, so `flick run`, `flick test` and
-`flick dev` stop with `FLICK-P012`.
+Effects, other foreign functions, generators, what the kernel does not
+compute yet (the other integer widths, `Float32`, `%` and `**` of `Float`,
+`BigInt` and `Int64`) and a function over the VM's limits stop the build with
+`FLICK-P012` at the project's code. A refused build keeps the previous
+output. The host runs the program, so `flick run` and `flick dev` stop with
+`FLICK-P012`. On `lua/love`, `flick test` runs the pure tests on Lua 5.1.5
+or LuaJIT 2.1, whichever `[tools]` allows (`"flick/lua" = ["lua", "luajit"]`;
+LuaJIT when both are), and reports as on the other targets; no WoW client
+runs tests.
 
 A library (`kind = "lib"`) may also declare `[host]` to define a named host environment `<backend>/<name>` and contribute extra tags when selected:
 

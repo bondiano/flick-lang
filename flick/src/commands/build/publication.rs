@@ -1,6 +1,7 @@
 //! File validation and publication of the shared build driver.
 
 use std::path::Path;
+use std::time::Instant;
 use std::{fs, io};
 
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
@@ -10,6 +11,7 @@ use crate::artifact::{self, Artifact};
 use crate::cache;
 use crate::progress::Progress;
 use crate::publish;
+use crate::timings;
 
 /// Fresh and restored build/test outputs share stale ownership preflight and
 /// reconciliation. Run generations pass no root because their lease owns them.
@@ -63,8 +65,12 @@ fn publish(
         None => None,
     };
     progress.stage("Writing artifacts");
-    publish::commit(out_dir, artifacts, &removes, manifest)
-        .map_err(|e| failed(format!("cannot publish to `{}`: {e}", out_dir.display())))
+    let t_pub = timings::enabled().then(Instant::now);
+    let committed = publish::commit(out_dir, artifacts, &removes, manifest);
+    if let Some(t) = t_pub {
+        timings::phase("atomic output publication", t.elapsed());
+    }
+    committed.map_err(|e| failed(format!("cannot publish to `{}`: {e}", out_dir.display())))
 }
 
 pub fn write(path: &Path, contents: impl AsRef<[u8]>) -> io::Result<()> {

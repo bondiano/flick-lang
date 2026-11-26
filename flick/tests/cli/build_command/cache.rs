@@ -75,6 +75,44 @@ fn timings_name_the_phases_and_the_input_that_missed_the_cache() {
         "the last cached build differs in `input src/App/Main.fl`"
     );
     assert_eq!(timings["modules"][0]["module"], "App.Main");
+    let phases: Vec<&str> = timings["phases"]
+        .as_array()
+        .expect("phases")
+        .iter()
+        .filter_map(|p| p["label"].as_str())
+        .collect();
+    for expected in [
+        "backend component init (wasmtime load)",
+        "backend prepare: program CBOR encode",
+        "backend host input snapshot",
+        "backend host request validation (decode #1)",
+        "backend check-target (guest decode #2)",
+        "backend generate #1 (guest decode #3)",
+        "backend result validation #1",
+        "backend determinism replay generate #2 (guest decode #4)",
+        "backend replay validation #2",
+        "backend external tool steps",
+        "backend emission residual",
+        "atomic output publication",
+    ] {
+        assert!(
+            phases.contains(&expected),
+            "missing attributed phase `{expected}` in {phases:?}"
+        );
+    }
+    let metrics = timings["metrics"].as_array().expect("metrics");
+    assert!(
+        metrics
+            .iter()
+            .any(|m| m["label"] == "program_bytes" && m["bytes"].as_u64().unwrap_or(0) > 0),
+        "expected non-zero program_bytes in {metrics:?}"
+    );
+    assert!(
+        metrics
+            .iter()
+            .any(|m| m["label"] == "inputs_bytes" && m["bytes"].as_u64().unwrap_or(0) > 0),
+        "expected non-zero inputs_bytes in {metrics:?}"
+    );
 }
 
 #[test]
