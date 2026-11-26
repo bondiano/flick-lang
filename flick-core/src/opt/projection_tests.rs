@@ -151,7 +151,11 @@ fn another_map_or_function_stays_a_call() {
         "{js}"
     );
     let passed = definition(&js, "passed");
-    assert!(passed.contains("map(") && !passed.contains("for ("), "{js}");
+    // the parameter, renamed apart from the module's `map`
+    assert!(
+        passed.contains("map$1(") && !passed.contains("for ("),
+        "{js}"
+    );
     let functor = definition(&js, "functor");
     assert!(
         functor.contains(".map(") && !functor.contains("for ("),

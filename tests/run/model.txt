@@ -20,6 +20,7 @@ codegen/call_site
 codegen/eval_order
 codegen/local_functions
 codegen/local_generic
+codegen/shadowed_globals
 codegen/stage_order
 codegen/lift
 codegen/patterns

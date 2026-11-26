@@ -1,0 +1,29 @@
+// A local may use the module value it shadows: `let` is not recursive, so
+// its right side, and a function made before it, see the top-level value.
+module App.Main exposing (main)
+
+type error Missing = Missing
+
+size : Unit -> Int
+let size () = 3
+
+count : Unit ->{; Missing} Int
+let count () = 4
+
+scale : Int -> Int
+let scale n = n * 10
+
+width : Unit -> Int
+let width () = 5
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  let size = size ()
+  let count =
+    try count () with
+    | Missing -> 0
+  let twice = fun n -> scale (scale n)
+  let scale = twice 1
+  let later = fun () -> width ()
+  let width = 6
+  Platform.stdout_line (show [size, count, scale, width, later ()])
