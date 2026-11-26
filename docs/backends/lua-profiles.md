@@ -92,7 +92,7 @@ a run. A Lua error names its chunk and line; the harness maps the line
 through the chunk's `.map` to the Flick file and line and compares that.
 Output goes through `foreign pure … from global "print"`.
 
-Results of 2026-11-25 (66 of 66 checks):
+Results of 2026-11-26 (77 of 77 checks):
 
 | Fixture | Shows | `love`: Lua 5.1, LuaJIT on and off, LÖVE | `love` with `luajit`: LuaJIT on and off, LÖVE | WoW Retail and Forever: `luac -p`, Lua 5.1 |
 | - | - | - | - | - |
@@ -102,6 +102,7 @@ Results of 2026-11-25 (66 of 66 checks):
 | `callback` | a lambda and a partial application passed to `string.gsub`, which calls them | pass | pass | pass |
 | `init_error` | an error while a top-level value initializes, at `src/App.fl:11` | pass | pass | pass |
 | `callback_error` | an error inside a callback the host calls, at `src/App.fl:15` | pass | pass | pass |
+| `host_utf8` | a byte the host gives that is not UTF-8 becomes U+FFFD; UTF-8 stays as it is | pass | pass | pass |
 
 ## Evidence
 
@@ -158,7 +159,16 @@ representation of the program. Generated code calls `K` for:
 - `++` of lists, `List.length`, `List.get` and `List.initialize`, and the
   hooks `equals`, `compare`, `hash` (that of the JS and Go runtimes, bit for
   bit) and `show` (JS spelling, `-0` kept) of the primitive values;
+- `Bytes`, a Lua string of its bytes: `Bytes.from_list`, `to_list`,
+  `encode_utf8` (a lone surrogate as U+FFFD) and `decode_utf8` (strict);
 - `Test.test`, `group`, `skip` and `only`.
+
+A string the host gives, as a result or to a callback, is UTF-8 to the
+host and WTF-8 to Flick: the kernel's `from_host` keeps its UTF-8 and
+replaces each ill-formed part with U+FFFD, as `TextDecoder` does, so a
+string never holds bytes the kernel cannot read. A string goes to the host
+as it is; a lone surrogate in it, which UTF-8 cannot hold, reaches the host
+as its WTF-8 bytes.
 
 A built-in function whose `@native` clauses name JS and Go runs its Flick
 body on Lua. On `lua/love`, `flick test` builds the test modules with the
@@ -175,6 +185,7 @@ snapshot. The CI `lua-probes` job runs it.
 | Kernel module | Lua 5.1, LuaJIT on and off |
 | - | - |
 | `Kernel.Arrays` | pass (11 of 11), the same report as JS |
+| `Kernel.Strings` | pass (35 of 35), the same report as JS |
 
 ## The synchronous WoW slice
 

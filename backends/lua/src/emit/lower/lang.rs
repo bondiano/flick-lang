@@ -1,7 +1,7 @@
 //! The chunk `_flick/kernel/lang.lua`, which loads after the kernel's own
 //! chunks: the built-in constructors the kernel builds and reads, in the
-//! representation this program gives them. The kernel takes `Some` and
-//! `None` from their lang roles; the prelude's `Ordering` and the test
+//! representation this program gives them. The kernel takes `Some`, `None`,
+//! `Ok` and `Err` from their lang roles; the prelude's `Ordering` and the test
 //! runner's `Test.Assertion` have none, so they are found by name, as the JS
 //! and Go runtimes find them.
 
@@ -26,7 +26,13 @@ impl<'p> Lowering<'p> {
             let slot = Expr::name(&Name::new(KERNEL.to_owned()), span).field(field);
             stmts.push(Stmt::new(StmtKind::Assign(slot, value), span));
         };
-        for (lang, field) in [(Lang::Some, "some"), (Lang::None, "none")] {
+        let langs = [
+            (Lang::Some, "some"),
+            (Lang::None, "none"),
+            (Lang::Ok, "ok"),
+            (Lang::Err, "err"),
+        ];
+        for (lang, field) in langs {
             let found = (self.known.get(lang)).and_then(|key| self.constructors.get(&key).copied());
             if let Some(c) = found {
                 set(field, self.constructor(c, span));

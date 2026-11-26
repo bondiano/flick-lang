@@ -9,6 +9,7 @@ use flick_ir::{
 };
 
 use super::{app, binary, global, int, lambda, local, lua, sp, string, typed, value};
+use crate::emit::kernel_sources;
 use crate::kernel::table;
 
 #[test]
@@ -95,11 +96,7 @@ fn an_implemented_binding_takes_every_argument_at_once() {
 
 #[test]
 fn the_kernel_defines_each_binding_its_table_implements() {
-    let sources = [
-        include_str!("../../../kernel/core.lua"),
-        include_str!("../../../kernel/strings.lua"),
-        include_str!("../../../kernel/lists.lua"),
-    ];
+    let sources: Vec<&str> = kernel_sources().collect();
     let defined = |name: &str| {
         sources.iter().any(|s| {
             s.contains(&format!("function K.{name}("))

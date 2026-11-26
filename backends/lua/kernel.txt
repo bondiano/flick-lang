@@ -158,10 +158,10 @@ int64BitNot refused
 int64ShiftLeft refused
 int64ShiftRight refused
 int64ShiftRightUnsigned refused
-bytesFromList refused
-bytesToList refused
-bytesEncodeUtf8 refused
-bytesDecodeUtf8 refused
+bytesFromList implemented
+bytesToList implemented
+bytesEncodeUtf8 implemented
+bytesDecodeUtf8 implemented
 listLength implemented
 listGet implemented
 listInitialize implemented
