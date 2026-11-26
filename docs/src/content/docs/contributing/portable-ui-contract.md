@@ -195,7 +195,7 @@ The reference model executes the UI runtime: per-instance message delivery, comm
 
 - Folding `update` over a recorded log gives the recorded Models and command starts.
 - Every acquired resource is released exactly once on close, mismatch recovery or failed mount.
-- The policy invariants hold: an exhausted command has at most one run, `latest` has at most one run, and queues keep their bounds.
+- The policy invariants hold: `exhaust` and `latest` each have at most one run at a time, and `queue n` and `concurrent n` keep their bounds.
 - The consistency rule holds: hole updates give the same tree as a full view render.
 
 A model proof is not a proof of the compiler or the runtimes. Differential tests compare each runtime with the model.
