@@ -1,6 +1,6 @@
 ---
 title: "Генерация кода"
-source_hash: f5f9d4ffd28fcb98
+source_hash: 5d9fd43b82417fe3
 ---
 
 `flick build` компилирует каждый модуль в ES-модуль (см. [Генерация TypeScript и граница FFI](../../spec/06-typescript-and-ffi/), [Архитектура компилятора](../../contributing/implementation-decisions/#архитектура-компилятора)).
@@ -993,6 +993,13 @@ end }` задаёт непрерывный диапазон неиспользу
   канонические имена `SymbolId` используют упорядоченные `BTreeMap`/`BTreeSet`
   и детерминированный хеш FNV-1a, гарантируя побайтово одинаковый вывод между
   повторными запусками и при разном порядке модулей.
+- **Мост к IR памяти и проверка фикстурным бэкендом:** `flick-backend-support/src/layout/memory.rs`
+  выводит дескрипторы `ValueRep` и `CellLayout` общего IR памяти из вычисленных
+  `TypeLayout` для `perceus::lower_specialized` / `lower_roots_specialized`
+  (см. [Фаза M: память без GC](../../spec/05-errors-and-concurrency/#фаза-m-память-без-gc)),
+  а фикстурный WebAssembly-бэкенд `test/literal` в режиме `layout-specialize`
+  сквозным образом проверяет раскладки, пути без упаковки, формы отката,
+  диагностики бюджетов и паритет вывода с JS и Go.
 
 ## Поставка официального компонента (CLI и браузер)
 

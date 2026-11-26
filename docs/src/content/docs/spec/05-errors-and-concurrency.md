@@ -1,6 +1,6 @@
 ---
 title: "Errors, services, resources and concurrency"
-source_hash: c328156af0778a0a
+source_hash: 3aa472861d1b14a6
 ---
 
 ## Expected errors
@@ -422,6 +422,14 @@ In-place reuse is a semantically transparent optimization that never violates Fl
 - **Frame-limited reuse (`DropReuse`).** At a dead candidate's drop site, `DropReuse` immediately releases the old children of a unique object (restoring child uniqueness before recursive calls and preserving observable cleanup order) and retains only an empty 0-child reuse token in the frame (or an immediate null sentinel when shared or non-reusable). That token is consumed by the first compatible `Construct`/`ConstructWithDicts`/`Record` along each path, or dropped immediately via `Drop` on non-allocating branches, partial matches, guards, early typed errors, defects, handler signals (`abort`, `control` discontinuation), cancellation, and fuel cuts — with zero leaks and zero double-frees on every prefix.
 - **Observational equivalence.** Reused and non-reused execution on identical inputs produce the exact same independently expected values, output, and LIFO finalizer order.
 
+### Unboxed aggregates and fallback cells
+
+Monomorphic data values whose `#742` `TypeLayout` requires no cycle indirection or held GADT dictionaries lower automatically in `perceus::lower_specialized` / `lower_roots_specialized` as by-value aggregates (`ValueRep::Aggregate`), while recursive ADTs and GADT cells lower as typed heap cells (`ValueRep::Cell`) annotated with derived `CellLayout { capacity, align, ownership }` descriptors:
+
+- **Zero heap allocation for immediate aggregates.** An unboxed aggregate has no heap object header and is never a `DropReuse`/`Reuse` candidate (`Error::AggregateReuseCandidate` statically and dynamically). Copying or dropping an aggregate with only immediate fields performs zero heap `dup`/`drop` operations; nested inline aggregates recursively retain or drop only their boxed descendants (`String`, `List`, closures, heap cells).
+- **Typed-cell reuse compatibility.** Stage 2 FBIP reuse checks both physical field capacity and `CellLayout` compatibility statically (`CandidateShape::TaggedExact`) and dynamically, falling back to fresh allocation whenever two cells of equal arity differ in alignment or inline-vs-boxed field ownership.
+- **Explicit fallback cell crossings.** At `#743` polymorphic fallback boundaries (polymorphic recursion, higher-rank callbacks, packed modules, GADTs with held dictionaries, unspecialized open rows, polymorphic foreigns), source lowering automatically emits `BoxAggregate` (zero-dup reference transfer into a uniform `Data::BoxedAggregate` cell), `UnboxBorrow` (borrows the cell and retains boxed descendants), and `UnboxConsume` (moves the aggregate out and frees a unique cell without extra descendant `dup`/`drop`, or retains descendants before releasing a shared cell).
+
 ### Scoped arenas (`Arena s`)
 
 Module `Arena` provides `make`, `alloc`, and `get`: an arena strongly holds slot values until its owner closes, `Value s a` is a nonowning slot handle, and `get` returns an ordinary value with an independent lifetime. Work, settling foreign calls, and all LIFO finalizers finish before slots are released; an arena is not closed by an ordinary LIFO finalizer. Accessing `Arena s` storage after region close is rejected at the use (`FLICK-G002`/`FLICK-G003`), while retention without use is allowed under RG4; dropping a retained view never touches freed storage.
@@ -442,4 +450,4 @@ The acyclic reference-counting boundary and the policy for cycles through mutabl
 
 **Diagnostic and runtime reporting policy.** Well-typed `Ref` cycles are accepted with no compile-time diagnostic. Counted execution never disguises leaks at shutdown: `Heap::finish` strictly requires `live_objects == 0` and `allocations == frees` after explicit outcome release and root-arena teardown, and `cells_detached_on_teardown` separately reports `Ref` cells still holding heap objects at root-arena teardown. Acyclic corpus reclamation is measured separately from the `Ref` cycle suite.
 
-The counted reference model and Lean theorems (`Formal/MemoryPass.lean`, `Formal/MemoryInsert.lean`, `Formal/MemoryReuse.lean`, `Formal/MemoryArena.lean`, `Formal/MemoryScopes.lean`) check token balance, uniqueness/alias invariants, and arena ledgers; verified compiler extraction and native/Wasm codegen remain separate M4/W/N obligations (revision 2026-11-13). Exact ownership rules and measurements are recorded in the repository's `docs/formal/memory.md`.
+The counted reference model and Lean theorems (`Formal/MemoryPass.lean`, `Formal/MemoryInsert.lean`, `Formal/MemoryReuse.lean`, `Formal/MemoryAggregate.lean`, `Formal/MemoryArena.lean`, `Formal/MemoryScopes.lean`) check token balance, aggregate/fallback-cell ownership, uniqueness/alias invariants, and arena ledgers; verified compiler extraction and native/Wasm codegen remain separate M4/W/N obligations (revision 2026-11-13). Exact ownership rules and measurements are recorded in the repository's `docs/formal/memory.md`.

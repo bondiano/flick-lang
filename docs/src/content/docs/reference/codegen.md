@@ -941,6 +941,13 @@ uniform boxed cells (`DefMode::Fallback(FallbackReason)`):
   `SymbolId`s use ordered `BTreeMap`/`BTreeSet` structures and deterministic
   FNV-1a hashing, producing identical output across repeated runs and module
   orderings.
+- **Layout-to-memory bridge and fixture verification:** `flick-backend-support/src/layout/memory.rs`
+  derives shared memory-IR `ValueRep` and `CellLayout` descriptors from computed
+  `TypeLayout`s for `perceus::lower_specialized` / `lower_roots_specialized`
+  (see [Phase M: memory without GC](../../spec/05-errors-and-concurrency/#phase-m-memory-without-gc)),
+  and the `test/literal` WebAssembly fixture backend exercises whole-program
+  `layout-specialize` end-to-end across layouts, zero-boxing paths, fallback
+  forms, budget diagnostics, and cross-target parity with JS and Go.
 
 ## Official component delivery (CLI and browser)
 
