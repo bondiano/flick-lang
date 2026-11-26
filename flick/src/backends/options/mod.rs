@@ -240,12 +240,38 @@ fn resolve_named_target(name: &str, project: Option<&Project>) -> Result<TargetC
             id: OFFICIAL_GO,
             short: "go",
         }),
-        other => Err(unknown_target_diagnostic(other, project)),
+        other => {
+            checkout_target(other, project).ok_or_else(|| unknown_target_diagnostic(other, project))
+        }
     }
+}
+
+/// `lua`, for a project, when this compiler's checkout has the component:
+/// the project builds with it as if it pinned it.
+#[cfg(feature = "wasm-backends")]
+fn checkout_target(name: &str, project: Option<&Project>) -> Option<TargetChoice> {
+    use super::official::{CHECKOUT_LUA, checkout_package};
+    project?;
+    if name != short_name(CHECKOUT_LUA) && name != CHECKOUT_LUA {
+        return None;
+    }
+    let package = checkout_package(CHECKOUT_LUA)?;
+    Some(TargetChoice::Pinned {
+        short: short_name(&package.id).to_owned(),
+        package,
+    })
+}
+
+#[cfg(not(feature = "wasm-backends"))]
+fn checkout_target(_name: &str, _project: Option<&Project>) -> Option<TargetChoice> {
+    None
 }
 
 fn unknown_target_diagnostic(name: &str, project: Option<&Project>) -> Diagnostic {
     let mut known = vec!["js".to_owned(), "go".to_owned()];
+    if project.is_some() && checkout_target("lua", project).is_some() {
+        known.push("lua".to_owned());
+    }
     if let Some(package) = project.and_then(|p| p.config.build.backend.as_ref()) {
         let short = short_name(&package.id).to_owned();
         if !known.contains(&short) {

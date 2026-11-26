@@ -212,11 +212,12 @@ mod tests {
         assert_eq!(
             seen,
             BTreeSet::from([
+                ("Instances", "count_of"),
                 ("List.Core", "any"),
                 ("List.Core", "length"),
                 ("NonEmpty", "length")
             ])
         );
-        eprintln!("3 exact observer contracts, {rejected} rejected metadata mutations");
+        eprintln!("4 exact observer contracts, {rejected} rejected metadata mutations");
     }
 }

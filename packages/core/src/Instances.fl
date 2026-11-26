@@ -21,25 +21,69 @@ foreign pure show_int64 from "flick:rt" "showInt64"
 show_uint64 : UInt64 -> String
 foreign pure show_uint64 from "flick:rt" "showUInt64"
 
+item_at : Int -> List a -> Option a
+foreign pure item_at from "flick:rt" "listGet"
+
+count_of : List a -> Int
+foreign pure count_of from "flick:rt" "listLength"
+
+index_of : String -> String -> Option Int
+foreign pure index_of from "flick:String" "indexOf"
+  arity 1
+
 eq_list : (a -> a -> Bool) -> List a -> List a -> Bool
-foreign pure eq_list from "flick:rt" "listEquals"
+let eq_list eq xs ys =
+  same : Int -> Bool
+  let rec same i =
+    match (item_at i xs, item_at i ys) with
+    | (Some x, Some y) -> eq x y && same (i + 1)
+    | (None, None) -> true
+    | _ -> false
+  count_of xs == count_of ys && same 0
+  @native "flick:rt" "listEquals" when js || go
 
 compare_list : (a -> a -> Ordering) -> List a -> List a -> Ordering
-foreign pure compare_list from "flick:rt" "listCompare"
+let compare_list cmp xs ys =
+  order : Int -> Ordering
+  let rec order i =
+    match (item_at i xs, item_at i ys) with
+    | (Some x, Some y) ->
+      match cmp x y with
+      | EQ -> order (i + 1)
+      | other -> other
+    | _ -> compare_prim (count_of xs) (count_of ys)
+  order 0
+  @native "flick:rt" "listCompare" when js || go
 
 hash_list : (a -> Int) -> List a -> Int
-foreign pure hash_list from "flick:rt" "listHash"
+let hash_list h xs =
+  hashed : Int -> Int -> Int
+  let rec hashed i acc =
+    match item_at i xs with
+    | Some x -> hashed (i + 1) (acc * 31 + h x)
+    | None -> acc
+  hashed 0 7
+  @native "flick:rt" "listHash" when js || go
 
 show_list : (a -> String) -> List a -> String
-foreign pure show_list from "flick:rt" "listShow"
+let show_list s xs =
+  shown : Int -> String -> String
+  let rec shown i text =
+    match item_at i xs with
+    | Some x -> shown (i + 1) (text ++ (if i == 0 then "" else ", ") ++ s x)
+    | None -> text ++ "]"
+  shown 0 "["
+  @native "flick:rt" "listShow" when js || go
 
 text_contains : String -> String -> Bool
-foreign pure text_contains from "flick:String" "includes"
-  arity 1
+let text_contains part text = index_of part text != None
+  @native "flick:String" "includes" when js || go
+    arity 1
 
 text_starts_with : String -> String -> Bool
-foreign pure text_starts_with from "flick:String" "startsWith"
-  arity 1
+let text_starts_with prefix text = index_of prefix text == Some 0
+  @native "flick:String" "startsWith" when js || go
+    arity 1
 
 /// The shown argument of a constructor, in parentheses when it has a space
 /// and opens no bracket or string, as a derived `Show` writes it.

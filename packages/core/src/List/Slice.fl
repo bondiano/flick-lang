@@ -2,19 +2,25 @@
 /// the elements as they are.
 private module List.Slice exposing (..)
 
+import List.Core
+
 /// The empty list.
 empty : List a
 let empty = []
 
 /// The last `n` elements.
 take_right : Int -> List a -> List a
-foreign pure take_right from "flick:Array" "takeRight"
-  arity 1
+let take_right n xs =
+  let k = List.Core.within n xs
+  List.Core.picked k (fun i -> List.Core.length xs - k + i) xs
+  @native "flick:Array" "takeRight" when js || go
+    arity 1
 
 /// Every element but the last `n`.
 drop_right : Int -> List a -> List a
-foreign pure drop_right from "flick:Array" "dropRight"
-  arity 1
+let drop_right n xs = List.Core.picked (List.Core.length xs - List.Core.within n xs) (fun i -> i) xs
+  @native "flick:Array" "dropRight" when js || go
+    arity 1
 
 /// The longest prefix whose elements satisfy `p`.
 take_while : (a -> Bool)^c -> List a -> List a

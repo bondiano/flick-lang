@@ -11,6 +11,7 @@ use flick_ir::{Constructor, JsClass, Lit, Pat, Rep, Span};
 
 use super::super::ast::{BinOp, Block, Expr, ExprKind, Name, Stmt, StmtKind, UnOp};
 use super::Lowering;
+use super::data::held_key;
 
 /// A part of the value a pattern matches.
 #[derive(Debug, Clone)]
@@ -51,6 +52,9 @@ impl Lowering<'_> {
     pub(super) fn step(place: &Place, step: Step<'_>, span: Span) -> Place {
         let index = |e: &Expr, i: usize| e.clone().index(Expr::number(i, span));
         match (place, step) {
+            (Place::Value(p), Step::Field(c, i)) if i >= c.arity => {
+                Place::Value(p.clone().index(Expr::str(&held_key(i - c.arity), span)))
+            }
             (Place::Value(p), Step::Field(_, i) | Step::Item(i)) => Place::Value(index(p, i + 1)),
             (Place::Slice(l, k), Step::Item(i)) => Place::Value(index(l, k + i + 1)),
             (Place::Value(p), Step::Rest(n)) => Place::Slice(p.clone(), n),

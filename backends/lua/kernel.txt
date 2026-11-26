@@ -7,10 +7,10 @@
 # primitive of the manifest has a line of its own, and so does every
 # export that suspends. A test keeps the table equal to the manifest.
 #
-#   refused   the Lua target refuses it with P012 wherever it is reached
-#   suspends  (after the status) a call suspends the fiber until it resumes
-#
-# No row is implemented yet: the Lua primitive kernel does not exist.
+#   refused      the Lua target refuses it with P012 wherever it is reached
+#   suspends     (after `refused`) a call suspends the fiber until it resumes
+#   implemented  the Lua kernel (`kernel/*.lua`) implements it as `K.<export>`,
+#                which generated code calls with every argument at once
 
 [flick:Arbitrary] refused
 [flick:Array] refused
@@ -123,11 +123,11 @@ flickJoinAll refused suspends
 [flick:rpc/Rpc] refused
 [flick:rpc/RpcNode] refused
 [flick:rt] refused
-equals refused
-compare refused
-hash refused
-show refused
-stringFromNumber refused
+equals implemented
+compare implemented
+hash implemented
+show implemented
+stringFromNumber implemented
 stringToNumber refused
 showInt64 refused
 showUInt64 refused
@@ -162,9 +162,9 @@ bytesFromList refused
 bytesToList refused
 bytesEncodeUtf8 refused
 bytesDecodeUtf8 refused
-listLength refused
-listGet refused
-listInitialize refused
+listLength implemented
+listGet implemented
+listInitialize implemented
 refMake refused
 refGet refused
 refSet refused
@@ -178,6 +178,10 @@ recordProject refused
 recordMergeDisjoint refused
 recordLabels refused
 fiberJoin refused suspends
+testPure implemented
+testGroup implemented
+testSkip implemented
+testOnly implemented
 [flick:runner/browser] refused
 [flick:runner/cloudflare] refused
 [flick:runner/node] refused
@@ -196,11 +200,11 @@ fiberJoin refused suspends
 [flick:Stdio] refused
 [flick:Stream] refused
 [flick:String] refused
-length refused
-charCodeAt refused
-slice refused
-indexOf refused
-lastIndexOf refused
+length implemented
+charCodeAt implemented
+slice implemented
+indexOf implemented
+lastIndexOf implemented
 [flick:Struct] refused
 [flick:SubscriptionRef] refused
 [flick:SynchronizedRef] refused
