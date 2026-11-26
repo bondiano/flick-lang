@@ -23,6 +23,7 @@ BigInt kernel
 String kernel
 Math.floor kernel
 Math.sqrt kernel
+Math.log kernel
 [flick:Arbitrary] flick
 [flick:Array] flick
 [flick:BigDecimal] flick

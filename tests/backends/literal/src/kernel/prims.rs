@@ -13,7 +13,7 @@ use flick_backend_support::opt::eval::{
 use flick_backend_support::opt::js_number;
 
 use super::values::{
-    BITS, bits, convert, equal, float, from_units, hash, order, show, text, to_int32, to_number,
+    BITS, bits, convert, equal, float, from_units, hash, log, order, show, text, to_int32, to_number,
     units, whole_number,
 };
 use flick_ir::{Binding, Constructor, ItemKind, Lang, Program};
@@ -124,6 +124,7 @@ impl Kernel {
             ("global", "String", [Value::BigInt(n)]) => text(&n.to_string()),
             ("global", "Math.floor", [Value::Float(x)]) => Value::Float(x.floor()),
             ("global", "Math.sqrt", [Value::Float(x)]) => Value::Float(x.sqrt()),
+            ("global", "Math.log", [Value::Float(x)]) => Value::Float(log(*x)),
             ("flick:rt", "equals", [a, b]) => Value::Bool(equal(a, b)?),
             ("flick:rt", "compare", [a, b]) => {
                 let at = usize::try_from(order(a, b)? + 1).ok()?;

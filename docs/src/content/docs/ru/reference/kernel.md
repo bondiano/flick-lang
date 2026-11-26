@@ -1,6 +1,6 @@
 ---
 title: "Ядро примитивов"
-source_hash: 94e1dc3c67a717b0
+source_hash: d188820550df547e
 ---
 
 Ядро примитивов — это то, что каждый бэкенд реализует сам: операции
@@ -53,7 +53,7 @@ NamedRange { name: "flick.kernel".into(), versions: range("0.1.0", "0.2.0") }
 падает на привязке, которую манифест не классифицирует, и на той, которую
 он называет, хотя стандартная библиотека её больше не привязывает, и
 печатает число привязок каждого класса (с `-- --nocapture`). При ядре
-`0.1.0` из 3 023 пар в 3 216 объявлениях 69 относятся к `kernel`, 2 453 —
+`0.1.0` из 2 999 пар в 3 195 объявлениях 70 относятся к `kernel`, 2 428 —
 к `flick`, 366 — к `host` и 135 — к `adapter`.
 
 ## Что сопоставляет бэкенд
@@ -87,6 +87,7 @@ NamedRange { name: "flick.kernel".into(), versions: range("0.1.0", "0.2.0") }
 | `global BigInt` | `into : Int -> BigInt` | точно |
 | `global String` | `BigInt.to_string` | десятичные цифры, `-` у отрицательного числа, без суффикса |
 | `global Math.floor`, `Math.sqrt` | `Float.floor`, `Float.sqrt` | IEEE 754: `-0` остаётся `-0`, NaN остаётся NaN, `sqrt (-1)` — NaN |
+| `global Math.log` | `Float.log` | биты `__ieee754_log` из fdlibm, которые даёт `Math.log` в JS и не даёт `math.Log` в Go: `log 0` — `-Infinity`, у отрицательного числа — NaN |
 | `stringFromNumber` | `Int.to_string`, `Float.to_string` | `Int` — в десятичной записи; `Float` — так, как его пишет `show` |
 | `stringToNumber` | `String.to_number` | JS `Number` от текста без пробельных символов JS по краям: десятичная запись, `0x`, `0o`, `0b`, `Infinity`; пустой или некорректный текст — `None`, `NaN` — `Some NaN` |
 | `showInt64`, `showUInt64` | `show` у `Int64`, `UInt64` | в десятичной записи, без суффикса |

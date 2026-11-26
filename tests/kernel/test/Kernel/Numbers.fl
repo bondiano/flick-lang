@@ -1,7 +1,8 @@
 // The numeric primitives of the kernel: conversions between the numeric
 // types, text, bits and shifts. Operands come in through `same`, so the
 // runtime computes them, not the compiler. Each expected value follows
-// from IEEE 754, two's complement and docs/backends/numeric-policy.md.
+// from IEEE 754, two's complement and docs/backends/numeric-policy.md, and
+// a logarithm from fdlibm's `__ieee754_log`, whose bits JS's `Math.log` is.
 // Arithmetic operators are pinned by tests/language (Ints, Floats,
 // FixedWidth, NumericBoundaries, BigInts).
 module Kernel.Numbers exposing (tests)
@@ -143,6 +144,41 @@ let tests = [
       Test.equal "1.4142135623730951" (show (Float.sqrt (same 2.0)))
     ),
     Test.test "sqrt of -0 is -0" (fun () -> Test.equal "-0" (show (Float.sqrt (same (-0.0))))),
+    Test.test "log of 1 is 0" (fun () -> Test.equal "0" (show (Float.log (same 1.0)))),
+    Test.test "log of 2" (fun () -> Test.equal "0.6931471805599453" (show (Float.log (same 2.0)))),
+    Test.test "log of 10" (fun () -> Test.equal "2.302585092994046" (show (Float.log (same 10.0)))),
+    Test.test "log of 0.5" (fun () ->
+      Test.equal "-0.6931471805599453" (show (Float.log (same 0.5)))
+    ),
+    Test.test "log of 1.4, where fdlibm adds half f squared" (fun () ->
+      Test.equal "0.33647223662121284" (show (Float.log (same 1.4)))
+    ),
+    Test.test "log of 1.1" (fun () ->
+      Test.equal "0.09531017980432493" (show (Float.log (same 1.1)))
+    ),
+    Test.test "log next to 1" (fun () ->
+      Test.equal "4.7683704451632344e-7" (show (Float.log (same 1.0000004768371582)))
+    ),
+    Test.test "log of the least subnormal" (fun () ->
+      Test.equal "-744.4400719213812" (show (Float.log (same 5e-324)))
+    ),
+    Test.test "log of the greatest finite" (fun () ->
+      Test.equal "709.782712893384" (show (Float.log (same 1.7976931348623157e308)))
+    ),
+    Test.test "log of 0 is -Infinity" (fun () ->
+      Test.equal "-Infinity" (show (Float.log (same 0.0)))
+    ),
+    Test.test "log of -0 is -Infinity" (fun () ->
+      Test.equal "-Infinity" (show (Float.log (same (-0.0))))
+    ),
+    Test.test "log of -1 is NaN" (fun () -> Test.equal "NaN" (show (Float.log (same (-1.0))))),
+    Test.test "log of Infinity" (fun () ->
+      Test.equal "Infinity" (show (Float.log (same (1.0 / 0.0))))
+    ),
+    // fdlibm's bits, not the nearest: the ratio is just above 29
+    Test.test "log of 2^29 over log of 2" (fun () ->
+      Test.equal "29.000000000000004" (show (Float.log (same 536870912.0) / Float.log (same 2.0)))
+    ),
     Test.test "sqrt of -1 is NaN" (fun () -> Test.equal "NaN" (show (Float.sqrt (same (-1.0))))),
     Test.test "sqrt of Infinity" (fun () ->
       Test.equal "Infinity" (show (Float.sqrt (same (1.0 / 0.0))))

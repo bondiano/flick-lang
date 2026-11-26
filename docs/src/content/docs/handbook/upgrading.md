@@ -67,6 +67,7 @@ change needs.
 | [Host exports and library build artifacts (`0.19.0`)](#host-exports-and-library-build-artifacts-0190) | no | `FLICK-F004`, `FLICK-P012`, `FLICK-S014` |
 | [Plugin protocol `0.5.0`](#plugin-protocol-050) | no | `FLICK-P035`, `FLICK-P036`, `FLICK-P044` |
 | [The kernel's defects](#the-kernels-defects) | no | — |
+| [`Math.log` in the kernel, and an exact `Float.next_pow2`](#mathlog-in-the-kernel-and-an-exact-floatnext_pow2) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -886,3 +887,15 @@ render the value it missed.
 A third-party backend implements both; a program that reaches one it lacks is
 refused there. Flick sources need no change, unless a module of the project is
 named `Flick.Defect`.
+
+## `Math.log` in the kernel, and an exact `Float.next_pow2`
+
+The kernel has the JS global `Math.log`, which the new `Float.log` binds:
+the bits of fdlibm's `__ieee754_log`, which JS gives. Go's `math.Log`
+differs from them in about one case in a thousand, so the Go runtime has a
+port of fdlibm's function; a third-party backend implements it too.
+
+`Float.next_pow2` is the least power of two at least `n`, as it says: on the
+JS `rt` runtime and on Go it went through a ratio of logarithms, which made
+`next_pow2 536870912.0` (2^29) `1073741824.0`. It is `536870912.0` now, as on
+the `effect` runtime, and a negative `n` gives NaN everywhere.

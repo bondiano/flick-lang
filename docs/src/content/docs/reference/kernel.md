@@ -48,8 +48,8 @@ a line `export class` below it gives one export another; a kernel export
 always has a line of its own. `cargo test -p flick-backend-support kernel`
 fails on a binding the manifest does not classify and on one it names that
 the standard library no longer binds, and prints the count of each class
-(with `-- --nocapture`). With kernel `0.1.0`, of the 3,023 pairs of 3,216
-declarations, 69 are `kernel`, 2,453 `flick`, 366 `host` and 135 `adapter`.
+(with `-- --nocapture`). With kernel `0.1.0`, of the 2,999 pairs of 3,195
+declarations, 70 are `kernel`, 2,428 `flick`, 366 `host` and 135 `adapter`.
 
 ## What a backend maps
 
@@ -81,6 +81,7 @@ The bindings:
 | `global BigInt` | `into : Int -> BigInt` | exactly |
 | `global String` | `BigInt.to_string` | decimal digits, `-` for a negative number, no suffix |
 | `global Math.floor`, `Math.sqrt` | `Float.floor`, `Float.sqrt` | IEEE 754: `-0` stays `-0`, NaN stays NaN, `sqrt (-1)` is NaN |
+| `global Math.log` | `Float.log` | the bits of fdlibm's `__ieee754_log`, which JS's `Math.log` gives and Go's `math.Log` does not: `log 0` is `-Infinity`, a negative number gives NaN |
 | `stringFromNumber` | `Int.to_string`, `Float.to_string` | an `Int` in decimal; a `Float` as `show` writes it |
 | `stringToNumber` | `String.to_number` | JS `Number` of the text with JS white space trimmed: decimal, `0x`, `0o`, `0b`, `Infinity`; blank or malformed text is `None`, `NaN` is `Some NaN` |
 | `showInt64`, `showUInt64` | `show` of `Int64`, `UInt64` | decimal, without a suffix |

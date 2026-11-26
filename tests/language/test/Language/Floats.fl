@@ -138,4 +138,34 @@ let tests = [
       ]
     ),
   ],
+  Test.group "helpers" [
+    Test.test "remainder is exact on decimals" (fun () ->
+      Test.equal [0.0, 0.1, 0.3, -0.05, 1e-7] [
+        Float.remainder 0.1 0.3,
+        Float.remainder 0.2 0.7,
+        Float.remainder (-1.0) 0.3,
+        Float.remainder 0.1 (-0.35),
+        Float.remainder 1.5e-7 0.000001,
+      ]
+    ),
+    Test.test "remainder by zero or of a non-finite number is NaN" (fun () ->
+      Test.equal
+        "NaN NaN"
+        (show (Float.remainder 0.0 1.5) ++ " " ++ show (Float.remainder 2.0 (1.0 / 0.0)))
+    ),
+    // a ratio of logarithms makes 2^29 into 2^30; the least power is exact
+    Test.test "next_pow2 of a power of two is itself" (fun () ->
+      Test.equal [536870912.0, 4.0, 2.0, 2.0] [
+        Float.next_pow2 536870912.0,
+        Float.next_pow2 3.0,
+        Float.next_pow2 0.0,
+        Float.next_pow2 1.5,
+      ]
+    ),
+    Test.test "next_pow2 of NaN or a negative number is NaN" (fun () ->
+      Test.equal
+        "NaN NaN"
+        (show (Float.next_pow2 (0.0 / 0.0)) ++ " " ++ show (Float.next_pow2 (-1.0)))
+    ),
+  ],
 ]

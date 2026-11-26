@@ -56,4 +56,27 @@ let tests = [
       [-5n, 0n, 3n, 100000000000000000000n]
       (List.sort [3n, 100000000000000000000n, -5n, 0n])
   ),
+  Test.test "gcd and lcm" (fun () ->
+    Test.equal [6n, 12n, 0n] [BigInt.gcd 18n (-12n), BigInt.lcm 6n 4n, BigInt.lcm 0n 4n]
+  ),
+  Test.test "the floor of the square root" (fun () ->
+    Test.equal [Some 100000000000000000000n, None] [
+      BigInt.sqrt (10n ** 40n + 5n),
+      BigInt.sqrt (-1n),
+    ]
+  ),
+  Test.test "from_string reads as JS BigInt does" (fun () ->
+    Test.equal
+      [Some 31n, Some 12n, Some 5n, None, None, None, None]
+      (List.map BigInt.from_string [" 0x1F ", "+12", "0b101", "-0x10", "1e3", "", "1_000"])
+  ),
+  Test.test "safe numbers" (fun () ->
+    Test.equal [None, Some 9007199254740991.0] [
+      BigInt.to_safe_number 9007199254740992n,
+      BigInt.to_safe_number 9007199254740991n,
+    ]
+  ),
+  Test.test "safe floats" (fun () ->
+    Test.equal [None, Some 42n] [BigInt.from_safe_number 1.5, BigInt.from_safe_number 42.0]
+  ),
 ]

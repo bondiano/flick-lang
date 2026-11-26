@@ -203,6 +203,80 @@ func FloatCeil(x float64) float64  { return math.Ceil(x) }
 func FloatTrunc(x float64) float64 { return math.Trunc(x) }
 func FloatSqrt(x float64) float64  { return math.Sqrt(x) }
 
+// FloatLog is JS's `Math.log`: the natural logarithm as fdlibm's
+// `__ieee754_log` (e_log.c) computes it, which Go's math.Log does not do
+// bit for bit. Each product is converted explicitly, so that no
+// architecture fuses it into a multiply-add.
+func FloatLog(x float64) float64 {
+	const (
+		ln2Hi = 6.93147180369123816490e-01
+		ln2Lo = 1.90821492927058770002e-10
+		two54 = 1.80143985094819840000e+16
+		lg1   = 6.666666666666735130e-01
+		lg2   = 3.999999999940941908e-01
+		lg3   = 2.857142874366239149e-01
+		lg4   = 2.222219843214978396e-01
+		lg5   = 1.818357216161805012e-01
+		lg6   = 1.531383769920937332e-01
+		lg7   = 1.479819860511658591e-01
+	)
+	bits := math.Float64bits(x)
+	hx := int32(bits >> 32)
+	lx := uint32(bits)
+	k := int32(0)
+	if hx < 0x00100000 {
+		if (uint32(hx&0x7fffffff) | lx) == 0 {
+			return math.Inf(-1)
+		}
+		if hx < 0 {
+			return math.NaN()
+		}
+		k -= 54
+		x = float64(x * two54)
+		hx = int32(math.Float64bits(x) >> 32)
+	}
+	if hx >= 0x7ff00000 {
+		return x + x
+	}
+	k += (hx >> 20) - 1023
+	hx &= 0x000fffff
+	i := (hx + 0x95f64) & 0x100000
+	x = math.Float64frombits(uint64(uint32(hx|(i^0x3ff00000)))<<32 | math.Float64bits(x)&0xffffffff)
+	k += i >> 20
+	f := x - 1.0
+	dk := float64(k)
+	if (0x000fffff & (2 + hx)) < 3 {
+		if f == 0 {
+			if k == 0 {
+				return 0
+			}
+			return float64(dk*ln2Hi) + float64(dk*ln2Lo)
+		}
+		r := float64(float64(f*f) * (0.5 - float64(0.33333333333333333*f)))
+		if k == 0 {
+			return f - r
+		}
+		return float64(dk*ln2Hi) - ((r - float64(dk*ln2Lo)) - f)
+	}
+	s := f / (2.0 + f)
+	z := float64(s * s)
+	w := float64(z * z)
+	t1 := float64(w * (lg2 + float64(w*(lg4+float64(w*lg6)))))
+	t2 := float64(z * (lg1 + float64(w*(lg3+float64(w*(lg5+float64(w*lg7)))))))
+	r := t2 + t1
+	if ((hx - 0x6147a) | (0x6b851 - hx)) > 0 {
+		hfsq := float64(float64(0.5*f) * f)
+		if k == 0 {
+			return f - (hfsq - float64(s*(hfsq+r)))
+		}
+		return float64(dk*ln2Hi) - ((hfsq - (float64(s*(hfsq+r)) + float64(dk*ln2Lo))) - f)
+	}
+	if k == 0 {
+		return f - float64(s*(f-r))
+	}
+	return float64(dk*ln2Hi) - ((float64(s*(f-r)) - float64(dk*ln2Lo)) - f)
+}
+
 // FloatRound is JS `Math.round`: the nearest integer, halves up, and the
 // sign of zero kept. `x - floor(x)` is exact, so no half is misread.
 func FloatRound(f float64) float64 {

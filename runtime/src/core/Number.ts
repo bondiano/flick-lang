@@ -102,7 +102,13 @@ export const clamp =
 /** `Number.sign` as Flick's `Ordering`: how `n` compares with 0 by `order`, NaN `LT`. */
 export const flickSign = (n: number): Ordering => (n > 0 ? GT : n === 0 ? EQ : LT);
 
-export const nextPow2 = (n: number): number => Math.max(2 ** Math.ceil(Math.log(n) / Math.log(2)), 2);
+/** The least power of two at least `n` and at least 2, NaN for NaN or a negative `n`: exactly, as `Math.log(n) / Math.log(2)` is not. */
+export const nextPow2 = (n: number): number => {
+  if (Number.isNaN(n) || n < 0) return NaN;
+  let p = 2;
+  while (p < n) p *= 2;
+  return p;
+};
 
 export const round = /*#__PURE__*/ binary((self, precision) => {
   const factor = 10 ** precision;

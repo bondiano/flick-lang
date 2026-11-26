@@ -116,8 +116,18 @@ func NumberSign(n Value) Value {
 	return LT
 }
 
+// NumberNextPow2 is the least power of two at least n and at least 2, NaN
+// for NaN or a negative n: exactly, as a ratio of logarithms is not.
 func NumberNextPow2(n Value) Value {
-	return math.Max(math.Pow(2, math.Ceil(math.Log(n.(float64))/math.Log(2))), 2)
+	x := n.(float64)
+	if math.IsNaN(x) || x < 0 {
+		return math.NaN()
+	}
+	p := 2.0
+	for p < x {
+		p *= 2
+	}
+	return p
 }
 
 // NumberParse is JS `Number(s)` but blank is nothing, and the names of the

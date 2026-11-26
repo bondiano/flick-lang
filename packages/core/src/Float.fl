@@ -16,6 +16,7 @@ module Float exposing (
   round,
   trunc,
   sqrt,
+  log,
   min,
   max,
   to_string,
@@ -71,6 +72,19 @@ let nan = 0.0 / 0.0
 element_at : Int -> List a -> Option a
 foreign pure element_at from "flick:rt" "listGet"
 
+/// A whole number exactly, for `remainder`: `BigInt` comes after `Float`.
+whole_of : Float -> Option BigInt
+foreign pure whole_of from "flick:rt" "bigintFromNumber"
+
+/// The decimal digits of a `BigInt`, `-` before a negative one.
+digits_of : BigInt -> String
+foreign pure digits_of from global "String"
+
+/// `trunc` of a whole `Float` as an `Int`, for the exponents `remainder`
+/// reads.
+to_int : Float -> Int
+foreign pure to_int from "flick:rt" "intTruncate"
+
 is_nan : Float -> Bool
 let is_nan x = not (x <= x)
   @native "Number.isNaN" when js || go
@@ -111,6 +125,12 @@ let trunc x = if x < 0.0 then ceil x else floor x
 
 sqrt : Float -> Float
 foreign pure sqrt from global "Math.sqrt"
+
+/// The natural logarithm, as JS's `Math.log` gives it: fdlibm's, the same
+/// bits on every target; `log 0.0` is `-Infinity` and a negative number
+/// gives NaN.
+log : Float -> Float
+foreign pure log from global "Math.log"
 
 /// The lesser of two numbers by the order where NaN is least.
 min : Float -> Float -> Float
@@ -186,8 +206,73 @@ let divide that self = if that == 0.0 then None else Some (self / that)
 /// The remainder of `self / divisor`, exact on decimals (`0.3 % 0.1` is 0);
 /// NaN for a zero or non-finite operand.
 remainder : Float -> Float -> Float
-foreign pure remainder from "flick:Number" "remainder"
-  arity 1
+let remainder divisor self =
+  // `n` as `c × 10^e` with the digits JS writes `n` with: `toExponential`'s,
+  // which `show` writes too, of a number that is not whole, and the number
+  // itself of a whole one
+  scientific : Float -> (BigInt, Int)
+  let scientific n =
+    match whole_of n with
+    | Some whole -> (whole, 0)
+    | None ->
+      let text = show (abs n)
+      let e = String.index_of "e" text
+      let mantissa =
+        match e with
+        | Some at -> String.slice 0 at text
+        | None -> text
+      let point = String.index_of "." mantissa
+      let whole =
+        match point with
+        | Some at -> String.slice 0 at mantissa
+        | None -> mantissa
+      let fraction =
+        match point with
+        | Some at -> String.slice (at + 1) (String.length mantissa) mantissa
+        | None -> ""
+      zeros : Int -> Int
+      let rec zeros i =
+        match String.char_code_at i fraction with
+        | Some 48 -> zeros (i + 1)
+        | _ -> i
+      // the decimal exponent of the first significant digit
+      let first =
+        match e with
+        | Some at ->
+          match String.to_number (String.slice (at + 1) (String.length text) text) with
+          | Some x -> to_int x
+          | None -> 0
+        | None -> if whole == "0" then -1 - zeros 0 else String.length whole - 1
+      let digits =
+        if whole == "0" then
+          String.slice (zeros 0) (String.length fraction) fraction
+        else
+          whole ++ fraction
+      value : BigInt -> Int -> BigInt
+      let rec value acc i =
+        match String.char_code_at i digits with
+        | Some c -> value (acc * 10n + into (c - 48)) (i + 1)
+        | None -> acc
+      let coefficient = value 0n 0
+      (if n < 0.0 then -coefficient else coefficient, first - String.length digits + 1)
+  if not (is_finite self) || not (is_finite divisor) || divisor == 0.0 then
+    0.0 / 0.0
+  else if is_integer self && is_integer divisor then
+    self % divisor
+  else
+    let (sc, se) = scientific self
+    let (dc, de) = scientific divisor
+    let e = if se < de then se else de
+    let out = (sc * 10n ** into (se - e)) % (dc * 10n ** into (de - e))
+    if out == 0n then
+      if self < 0.0 || same_value self (-0.0) then -0.0 else 0.0
+    else
+      // `5e-324` is the least positive number: a remainder below it is not 0
+      match String.to_number (digits_of out ++ "e" ++ show e) with
+      | Some r -> if r == 0.0 then (if self < 0.0 then -5e-324 else 5e-324) else r
+      | None -> 0.0 / 0.0
+  @native "flick:Number" "remainder" when js || go
+    arity 1
 
 /// `n + 1`.
 increment : Float -> Float
@@ -267,9 +352,14 @@ sign : Float -> Ordering
 let sign n = if n > 0.0 then GT else if n == 0.0 then EQ else LT
   @native "flick:Number" "flickSign" when js || go
 
-/// The least power of two at least `n`, and at least 2.
+/// The least power of two at least `n`, and at least 2; NaN for NaN or a
+/// negative `n`.
 next_pow2 : Float -> Float
-foreign pure next_pow2 from "flick:Number" "nextPow2"
+let next_pow2 n =
+  up : Float -> Float
+  let rec up p = if p < n then up (p * 2.0) else p
+  if is_nan n || n < 0.0 then 0.0 / 0.0 else up 2.0
+  @native "flick:Number" "nextPow2" when js || go
 
 /// Rounded to `precision` decimal places: `3.14159 |> Float.round_to 2`.
 round_to : Float -> Float -> Float
