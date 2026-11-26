@@ -133,9 +133,27 @@ let timed layer work = quiet layer work
 Without `provide`, the body of `quiet` would need `Log` whenever `r` holds it,
 which the signature does not allow (`FLICK-E002`). Errors work the same after
 `;`, as in `->{; -NotFound | e}` over a `try` that handles `NotFound`.
-Taking a name out is the one way a signature keeps a service or an error out
-of a row variable; another constraint on open rows waits for a program this
-cannot express ([E15, #438](https://github.com/bondiano/flick-lang/issues/438)).
+Taking a name out is the only open-row exclusion mechanism in Flick
+([E15, #438](https://github.com/bondiano/flick-lang/issues/438), resolving the
+open-row design across [#188](https://github.com/bondiano/flick-lang/issues/188),
+[#306](https://github.com/bondiano/flick-lang/issues/306),
+[#352](https://github.com/bondiano/flick-lang/issues/352), and
+[#353](https://github.com/bondiano/flick-lang/issues/353)): Flick stays on
+name-wide subtraction (`{-S | r}`, `{; -E | e}`), row-union signatures (`o + r`),
+and parameterized-instance exclusion (`FLICK-E019`) without adding new open-row
+constraints. This expresses concrete service and error discharge over open rows
+in `provide` and `try`, generic `Eff (o + r)` combinators, and sound handling of
+parameterized services. Two library-abstraction boundaries intentionally remain
+outside it:
+
+- **Row-variable subtraction (`r - ro`).** First-class `Layer.run` has type
+  `Layer ri e ro -> (Unit ->{ro + r; e2} a) ->{ri + r; e + e2} a` and therefore
+  cannot type residual signatures such as
+  `Layer none none {Log} -> Eff s none a ->{-Log | s} a` (`FLICK-E002`), which
+  is one reason core `provide` remains built in ([E12, #434](https://github.com/bondiano/flick-lang/issues/434)).
+- **Abstract disjointness for generic `Layer.merge` wrappers.** `Layer.merge`
+  rejects overlapping concrete outputs (`FLICK-E004`), while generic wrappers
+  polymorphic in `o1` and `o2` carry no abstract disjointness predicate.
 
 A handler finds a service by its name, not by its arguments. `provide` of a
 layer or a record of `Store Int` answers every `Store` operation in its body,
@@ -191,6 +209,20 @@ needing `{Users, Log}` and `{NotFound}`, the block needs `{Config, Log}` and
 `Layer.merge a b` builds the services of both layers; two layers that build
 the same service are `FLICK-E004`. `Layer.override a b` merges them too and
 lets `b` replace what `a` builds.
+
+Both `provide layer { body }` and `provide S impl { body }` stay core language
+constructs rather than moving to `Layer.run` or a syntax plugin
+([E12, #434](https://github.com/bondiano/flick-lang/issues/434)): lowering
+`provide layer { body }` to `Layer.run layer (fun () -> body)` does not imply
+source typing equivalence. A `Layer.run` closure boundary cannot preserve outer
+`let mut` assignments (`FLICK-G005`), lexical loop `break`/`continue`
+(`FLICK-T071`), or lexical `defer`/`errdefer` binding (`FLICK-G004`), cannot
+discharge a service out of an abstract row variable (`{-Log | s}`,
+`FLICK-E002`), and `provide S impl` installs a record implementation directly
+without building a layer. Direct `Layer.run` calls enforce the same safety
+checks as `provide`: provider lifetime (`Fiber.Provided`, `FLICK-G003`),
+parameterized-instance exclusion (`FLICK-E019`), and live-region checks when
+installing region-indexed services (`FLICK-G002`).
 
 The services a `provide` builds end with it. Work an owner keeps until its
 scope closes (a child of `Fiber.spawn`, `FiberSet.run`, a finalizer of

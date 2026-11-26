@@ -159,7 +159,7 @@ The reduction is specified normatively in `elaboration.md`. This table gives the
 | `from_result r` | `match r with Err v → raise v \| Ok v → v` |
 | Operation `S.op` of a service | `perform_{S.op}`; a service is an effect whose operations are all `tail` (§3.7) |
 | `provide S impl { e }` | a handler of `S` whose arm for each operation `o` is `x → impl.o x` (§3.7, `T6c_tail`) |
-| `provide layer { e }` | the library's `Layer.run layer (fun () -> e)`: a known layer of `succeed` and `merge` means a chain of such handlers (`Layer` in [`runtime.md`](runtime.md)) |
+| `provide layer { e }` | lowers to `Layer.run layer (fun () -> e)`: a known layer of `succeed` and `merge` means a chain of such handlers (`Layer` in [`runtime.md`](runtime.md)). Lowering agreement does not prove source typing equivalence: core `provide` stays in the source language for lexical `let mut`/`break`/`continue`/`defer` and residual `{-S \| r}` subtraction (E12, E15), while direct `Layer.run` enforces the same `Fiber.Provided` (`FLICK-G003`), parameterized-instance (`FLICK-E019`), and `live_install` (`FLICK-G002`) checks |
 | `x \|> f`, `f <\| x`, operators | `f x`, constants |
 | `f >> g` | `let f′ = f in let g′ = g in λx. g′ (f′ x)`, with fresh `f′`, `g′` of monomorphic types, as λ binds them; a chain `f >> g >> h` is one `λx. h′ (g′ (f′ x))` |
 | `g << f` | `let g′ = g in let f′ = f in λx. g′ (f′ x)`: the operands bound left to right, as written |
@@ -398,7 +398,7 @@ Checker:
 - `handlers.rs` `try_expr`: the body is checked in a copy of the stage whose errors are `raised`. An `x`/`_` branch (function `catch_all`, also in parentheses and with an annotation) is checked against `Errors caught` with its own row `caught` and the constraint `raised ⊆ caught`: `caught` is the `ε_b` of the rule. An error branch covers its error when `!guarded && covers_all(pat)`. Then the constraint `raised ⊆ {handled | errors}` is added. A non-error pattern is `FLICK-E007`.
 - `exhaust.rs` `covers_all`.
 
-`provide` is no rule of the core: §1.4 lowers it to a handler, typed by (Handle-E) of §3.7. The checker keeps typing it (`handlers.rs` `provide`).
+`provide` is no rule of the core: §1.4 lowers it to a handler, typed by (Handle-E) of §3.7. The source checker keeps typing `provide` directly (`handlers/providing.rs` `provide`) so lexical control flow and residual `{-S | r}` subtraction work, and enforces the same `Provided`/`E019`/`live_install` checks on direct `Layer.run` calls (`calls.rs`, `pipes.rs`).
 
 ```text
 ──────────────────── (Todo)

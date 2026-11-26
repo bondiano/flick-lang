@@ -65,7 +65,7 @@ let keep path =
 Here `local` is released when the inner `scope` ends, and the file `keep`
 returns when the caller's scope does.
 
-`scope s { body }` stands for `Scope.run (fun s -> body)`. `Scope.run` takes a
+`scope s { body }` lowers to `Scope.run (fun s -> body)`. `Scope.run` takes a
 function polymorphic in the region, so a function can receive the body as a
 value:
 
@@ -73,6 +73,20 @@ value:
 with_region : (forall s. Fiber.Owner s ->{Scope s; none} String) ->{} String
 let with_region body = Scope.run body
 ```
+
+Lowering to `Scope.run` does not mean source typing equivalence, so `scope`
+stays a core language construct rather than moving to `Scope.run` or a syntax
+plugin ([E12, #434](https://github.com/bondiano/flick-lang/issues/434)). A
+first-class closure boundary cannot preserve:
+
+- assignments to an enclosing `let mut` variable (`FLICK-G005`), lexical loop
+  `break`/`continue` (`FLICK-T071`), or lexical `defer`/`errdefer` binding
+  (`FLICK-G004`);
+- lexical region nesting for a rank-2 `forall s.` callback: `Fiber.Outlives`
+  for outer resources (`FLICK-G003`), `Fiber.Provided` for outer providers
+  (`FLICK-G003`), nested acquisition into an enclosing `Scope outer` alongside
+  the inner `{Scope s | r}`, and binding `s` as a region type name inside the
+  body.
 
 ## Scoped arenas
 
