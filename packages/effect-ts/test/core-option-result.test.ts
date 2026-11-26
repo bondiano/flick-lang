@@ -68,7 +68,8 @@ const bound = (file: string, module: string): Array<string> => {
   const core = new URL(`../../../packages/core/src/${file}`, import.meta.url);
   const at = existsSync(core) ? core : new URL(`../../../packages/std/src/${file}`, import.meta.url);
   const text = readFileSync(at, "utf8");
-  const re = new RegExp(`foreign \\w+ \\w+ from "flick:${module}" "(\\w+)"`, "g");
+  // a `foreign` declaration, or an `@native` clause over a Flick body
+  const re = new RegExp(`(?:foreign \\w+ \\w+ from|@native) "flick:${module}" "(\\w+)"`, "g");
   return [...text.matchAll(re)].map((m) => m[1] ?? "").toSorted();
 };
 

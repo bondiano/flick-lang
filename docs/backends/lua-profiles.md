@@ -14,13 +14,14 @@ one kind of evidence:
 
 `flick/lua` is a pinned, non-official backend component. It describes the
 environments, checks programs against their profile and generates the pure
-core of a program as Lua chunks: one per reached module, each with a source
-map, defined into a private namespace each chunk takes as its second
-argument (see `backends/lua/src/emit/build.rs`). Everything else, the kernel
-above all, is refused with `P012` at its source, or for what a built-in
-module needs, at the project's expression that reached it. The rows of
-`backends/lua/kernel.txt` say, for each `flick:` binding, what the target
-does with it and whether it suspends.
+core of a program as Lua chunks: the Lua kernel's own chunks, then one per
+reached module, each with a source map, defined into a private namespace
+each chunk takes as its second argument (see
+`backends/lua/src/emit/build.rs`). Everything else is refused with `P012` at
+its source, or for what a built-in module needs, at the project's
+expression that reached it. The rows of `backends/lua/kernel.txt` say, for
+each `flick:` binding, whether the Lua kernel implements it and whether it
+suspends.
 
 ## Profiles
 
@@ -130,11 +131,50 @@ client defines; a missing global needs its source added to `wow-lua.txt`.
   and from Lua 5.1. Each profile lists this under `blockers`, and support for
   a WoW profile cannot be claimed until a live client runs the probes.
 - **Code generation.** The component generates only the pure core and
-  calls host globals with scalar values and one-stage callbacks. The kernel,
-  the value ABI and the host runtime are separate work; until they exist,
-  every reachable binding of Flick's own kernel (`flick:` specifiers) is
-  refused on every profile, and `flick run`, `flick test` and `flick dev`
+  calls host globals with scalar values and one-stage callbacks. The kernel
+  implements what [the kernel](#the-kernel-and-flick-test) lists; the rest
+  of it, the value ABI and the host runtime are separate work. Until they
+  exist, every other reachable binding of Flick's own kernel (`flick:`
+  specifiers) is refused on every profile, and `flick run` and `flick dev`
   are refused: the host runs the program.
+
+## The kernel and `flick test`
+
+The kernel is portable Lua 5.1, `backends/lua/kernel/*.lua`, without the
+`bit` library and reading only globals every API snapshot defines. Its
+chunks put the table `K` at `ns.k`; `_flick/lua-kernel/lang.lua`, which the
+backend generates, gives it `Some`, `None` and `Ordering` in the
+representation of the program. Generated code calls `K` for:
+
+- `Int` arithmetic, which wraps to 32 bits, divides toward zero and gives
+  `0` for a zero divisor, as the [numeric policy](numeric-policy.md) says;
+- `==` of every value: SameValueZero on numbers, strings by their bytes and
+  structured values by what they hold, skipping the dictionaries a tagged
+  value holds at `$1`, …;
+- strings, which are WTF-8 Lua strings: `++` joins the halves of a
+  surrogate pair, `<` and the hooks order them by UTF-16 code units, and
+  `String.length`, `char_code_at`, `slice`, `index_of` and `last_index_of`
+  count UTF-16 code units;
+- `++` of lists, `List.length`, `List.get` and `List.initialize`, and the
+  hooks `equals`, `compare`, `hash` (that of the JS and Go runtimes, bit for
+  bit) and `show` (JS spelling, `-0` kept) of the primitive values;
+- `Test.test`, `group`, `skip` and `only`.
+
+A built-in function whose `@native` clauses name JS and Go runs its Flick
+body on Lua. On `lua/love`, `flick test` builds the test modules with the
+runner `_flick/lua-kernel/runner.lua`, and runs `_flick/run-tests.lua` on
+Lua 5.1.5 or LuaJIT 2.1, whichever `[tools]` allows (LuaJIT when both are):
+the interpreters stand for LÖVE's Lua, and no WoW client runs tests. Its
+pure tests report as on the other targets; effect and property tests are
+refused. `just kernel-lua` runs the modules of `tests/kernel` that
+`tests/kernel/lua.txt` lists on Lua 5.1.5 and on LuaJIT with the JIT on and
+off, and requires each JSON report to equal the report of the same modules
+on JS; `luac -l` checks the globals each kernel chunk reads against every
+snapshot. The CI `lua-probes` job runs it.
+
+| Kernel module | Lua 5.1, LuaJIT on and off |
+| - | - |
+| `Kernel.Arrays` | pass (11 of 11), the same report as JS |
 
 ## The synchronous WoW slice
 
@@ -164,7 +204,7 @@ the global it went through. Every refusal is `P012`:
 | a `BigInt` literal, operator or foreign function of that type | always: the Lua kernel has no arbitrary-precision integers yet |
 | an `Int64` or `UInt64` literal, operator or foreign function | the `ffi` capability is off |
 | `await`, an `async` foreign function or a suspending kernel binding | the profile has no suspension (WoW) |
-| a `flick:` kernel binding | always: the Lua primitive kernel is not implemented |
+| a `flick:` kernel binding | the Lua kernel does not implement it (`kernel.txt`) |
 | a module binding (`from "m"`) | the profile has no `require` (WoW), or `m` is `ffi` without `ffi` |
 | a global binding (`from global "a.b"`) | the path is not in the profile's API snapshot, or its root (`bit`, `jit` on LÖVE) needs a tag that is off |
 

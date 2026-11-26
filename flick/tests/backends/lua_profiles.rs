@@ -182,12 +182,16 @@ fn a_build_writes_a_chunk_per_module_and_a_rebuild_is_identical() {
     );
     let app = chunk(&root);
     assert!(
-        app.starts_with("local _, ns = ...\nlocal M = {}\nns.App = M\n"),
+        app.starts_with("local _, ns = ...\nlocal K = ns.k\nlocal M = {}\nns.App = M\n"),
         "{app}"
     );
     assert!(app.contains("M.area = function(s)"), "{app}");
     let order = fs::read_to_string(root.join("dist/chunks.txt")).expect("the load order");
-    assert_eq!(order, "App.lua\n");
+    assert_eq!(
+        order,
+        format!("{KERNEL}App.lua\n"),
+        "the kernel loads first"
+    );
     let map = fs::read_to_string(root.join("dist/App.lua.map")).expect("the map");
     assert!(map.contains(r#""sources":["src/App.fl"]"#), "{map}");
     // a build that generates again writes the same bytes
@@ -199,11 +203,15 @@ fn a_build_writes_a_chunk_per_module_and_a_rebuild_is_identical() {
     let love = lua_project("lua_profile_love", "lua/love", SHAPES, &[]);
     assert!(flick_in(&love, &["build", "--offline"]).status.success());
     let main = fs::read_to_string(love.join("dist/main.lua")).expect("the loader");
-    assert_eq!(
-        main,
-        "local ns = {}\nassert(love.filesystem.load(\"App.lua\"))(nil, ns)\n"
-    );
+    let loads: Vec<String> = (KERNEL.lines().chain(["App.lua"]))
+        .map(|p| format!("assert(love.filesystem.load(\"{p}\"))(nil, ns)\n"))
+        .collect();
+    assert_eq!(main, format!("local ns = {{}}\n{}", loads.concat()));
 }
+
+/// The chunks of the Lua kernel, in the order they load.
+const KERNEL: &str = "_flick/lua-kernel/core.lua\n_flick/lua-kernel/strings.lua\n\
+                      _flick/lua-kernel/lists.lua\n_flick/lua-kernel/lang.lua\n";
 
 /// `wide` with `n` locals besides its parameter, all of them used.
 fn wide(n: usize) -> String {
@@ -225,15 +233,16 @@ fn what_cannot_be_generated_is_refused_at_its_source_and_keeps_the_output() {
     let root = lua_project("lua_profile_keep", "lua/wow-retail", SHAPES, &[]);
     assert!(flick_in(&root, &["build", "--offline"]).status.success());
     let before = dist(&root);
-    let sum =
-        "module App exposing (main)\n\nmain : Unit -> Unit\nlet main () = if 1 + 2 == 3 then ()\n";
+    // `**` of floats has special cases the Lua kernel does not compute yet
+    let sum = "module App exposing (main)\n\nmain : Unit -> Unit\n\
+               let main () = if 2.0 ** 3.0 == 8.0 then ()\n";
     let limit = wide(200);
     // one past the 200 locals of Lua 5.1, at the local that is one too many
     for (source, message, at) in [
         (
             sum,
-            "`+` of integers is not available on the lua/wow-retail target",
-            "1 + 2",
+            "`**` of floats is not available on the lua/wow-retail target",
+            "2.0 ** 3.0",
         ),
         (limit.as_str(), "201 locals in scope at once", "199 == 199"),
     ] {
@@ -261,22 +270,39 @@ fn what_cannot_be_generated_is_refused_at_its_source_and_keeps_the_output() {
     assert!(!fresh.join("dist").exists(), "nothing is written");
 }
 
+/// `flick run`, and `flick test` without an interpreter or on World of Warcraft.
 #[test]
 #[ignore = "requires just wasm-backends"]
-fn run_and_test_are_refused_because_the_host_runs_the_program() {
-    let root = lua_project("lua_profile_run", "lua/love", SHAPES, &[]);
-    for verb in ["run", "test"] {
-        let out = flick_in(&root, &[verb, "--diagnostics", "json", "--offline"]);
+fn run_is_refused_because_the_host_runs_the_program_and_test_needs_an_interpreter() {
+    let love = lua_project("lua_profile_run", "lua/love", SHAPES, &[]);
+    let wow = lua_project("lua_profile_test_wow", "lua/wow-retail", SHAPES, &[]);
+    for (root, verb, expected) in [
+        (
+            &love,
+            "run",
+            "`flick run` is not available on the lua/love target yet: a Lua program runs in its \
+             host, World of Warcraft or LÖVE",
+        ),
+        (
+            &love,
+            "test",
+            "`flick test` on the lua/love target with the dialect `lua51` needs `luajit` or `lua` \
+             on PATH, allowed by `[tools]` or `--allow-tool`",
+        ),
+        (
+            &wow,
+            "test",
+            "`flick test` is not available on the lua/wow-retail target yet: its tests run on a \
+             Lua interpreter as LÖVE's, and no World of Warcraft client runs them here",
+        ),
+    ] {
+        let out = flick_in(root, &[verb, "--diagnostics", "json", "--offline"]);
         assert_eq!(out.status.code(), Some(1), "{verb}: {out:?}");
         let found = diagnostics(&out.stderr, "FLICK-P012");
-        let expected = format!(
-            "`flick {verb}` is not available on the lua/love target yet: a Lua program runs in \
-             its host, World of Warcraft or LÖVE"
-        );
         assert!(
             found
                 .iter()
-                .any(|d| d["message"].as_str().is_some_and(|m| m.contains(&expected))),
+                .any(|d| d["message"].as_str().is_some_and(|m| m.contains(expected))),
             "{verb}: {}",
             String::from_utf8_lossy(&out.stderr)
         );

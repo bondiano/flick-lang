@@ -12,7 +12,7 @@ use flick_core::project::{Project, config, official_backends};
 use flick_core::source::SourceMap;
 
 use super::scan::scan_argv;
-use super::{resolve, resolve_target};
+use super::{TargetChoice, resolve, resolve_target};
 
 fn range() -> VersionRange {
     VersionRange {
@@ -266,6 +266,30 @@ fn unknown_target_fails_with_p059_and_suggests_closest() {
         "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\nenvironment = \"ruby/mri\"\n",
     );
     let err = resolve_target(None, Some(&bad_env)).expect_err("unknown env backend");
+    assert_eq!(err.code, codes::P059);
+}
+
+/// A compiler built from this checkout knows its pinned Lua component by
+/// name, for a project, without its being official.
+#[cfg(feature = "wasm-backends")]
+#[test]
+fn lua_resolves_to_the_checkouts_component_for_a_project() {
+    let project = project_from("schema-version = 1\n[project]\nkind = \"lib\"\n");
+    for name in ["lua", "flick/lua"] {
+        let (choice, overridden) = resolve_target(Some(name), Some(&project)).expect("lua");
+        let TargetChoice::Pinned { package, short } = &choice else {
+            panic!("{name}: {choice:?}");
+        };
+        assert_eq!((package.id.as_str(), short.as_str()), ("flick/lua", "lua"));
+        assert!(
+            package
+                .component
+                .ends_with("backends/lua/package/component.wasm")
+        );
+        assert!(overridden);
+    }
+    // a pin of the checkout serves a project alone
+    let err = resolve_target(Some("lua"), None).expect_err("no project");
     assert_eq!(err.code, codes::P059);
 }
 

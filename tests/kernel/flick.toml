@@ -13,3 +13,4 @@ target = "js"
 
 [tools]
 "flick/go" = ["go"]
+"flick/lua" = ["lua", "luajit"]

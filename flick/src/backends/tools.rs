@@ -15,6 +15,9 @@ struct Adapter {
     id: &'static str,
     /// The arguments that print its version.
     version: &'static [&'static str],
+    /// Whether the version may be on stderr, after what stdout has: Lua
+    /// 5.1 writes it there.
+    version_on_stderr: bool,
     parse: fn(&str) -> Option<String>,
     /// Variables a step inherits from the environment of `flick`.
     inherit: &'static [&'static str],
@@ -111,6 +114,7 @@ const ADAPTERS: &[Adapter] = &[
     Adapter {
         id: "node",
         version: &["--version"],
+        version_on_stderr: false,
         parse: |out| Some(out.trim().strip_prefix('v')?.to_owned()),
         inherit: &[],
         settable: &[],
@@ -122,6 +126,7 @@ const ADAPTERS: &[Adapter] = &[
         id: "go",
         // `go --version` is no flag of `go`
         version: &["version"],
+        version_on_stderr: false,
         parse: |out| {
             let version = out.split_whitespace().nth(2)?.strip_prefix("go")?;
             // Go before 1.21 names a first release `go1.20`
@@ -149,6 +154,7 @@ const ADAPTERS: &[Adapter] = &[
     Adapter {
         id: "pnpm",
         version: &["--version"],
+        version_on_stderr: false,
         parse: |out| {
             let version = out.trim();
             (!version.is_empty()).then(|| version.to_owned())
@@ -176,7 +182,47 @@ const ADAPTERS: &[Adapter] = &[
             ("COREPACK_DEFAULT_TO_LATEST", "0"),
         ],
     },
+    // the interpreters `flick test` runs a Lua test build on
+    Adapter {
+        id: "lua",
+        // `Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio`, on stderr
+        version: &["-v"],
+        version_on_stderr: true,
+        parse: |out| semver_after(out, "Lua "),
+        inherit: &[],
+        settable: &[],
+        launch_settable: &[],
+        validate_launch_args: no_launch_args,
+        fixed: &[],
+    },
+    Adapter {
+        id: "luajit",
+        // `LuaJIT 2.1.1785763465 -- Copyright (C) 2005-2026 Mike Pall.`
+        version: &["-v"],
+        version_on_stderr: false,
+        parse: |out| semver_after(out, "LuaJIT "),
+        inherit: &[],
+        settable: &[],
+        launch_settable: &[],
+        validate_launch_args: no_launch_args,
+        fixed: &[],
+    },
 ];
+
+/// The version `x.y.z` that follows `prefix` at the start of `out`.
+fn semver_after(out: &str, prefix: &str) -> Option<String> {
+    let version = out
+        .trim_start()
+        .strip_prefix(prefix)?
+        .split_whitespace()
+        .next()?;
+    let parts: Vec<&str> = version.split('.').collect();
+    (parts.len() == 3
+        && parts
+            .iter()
+            .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit())))
+    .then(|| version.to_owned())
+}
 
 pub(crate) struct Tool {
     pub pin: Toolchain,
@@ -236,8 +282,12 @@ impl Tool {
             query.env(name, value);
         }
         let output = query.output().map_err(|e| e.to_string())?;
+        let mut printed = output.stdout;
+        if adapter.version_on_stderr {
+            printed.extend_from_slice(&output.stderr);
+        }
         let version = (output.status.success())
-            .then(|| String::from_utf8(output.stdout).ok())
+            .then(|| String::from_utf8(printed).ok())
             .flatten()
             .and_then(|out| (adapter.parse)(&out))
             .ok_or_else(|| format!("cannot query the version of `{}`", adapter.id))?;

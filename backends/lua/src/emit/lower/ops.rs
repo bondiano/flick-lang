@@ -4,22 +4,25 @@
 //! - `and`, `or` and `not` on booleans, and `==` of values whose identity is
 //!   their equality, are Lua's own.
 //! - Integers are doubles holding integers, which compare exactly; integer
-//!   arithmetic wraps, divides and rounds as Lua's does not, so it is the
-//!   kernel's.
+//!   arithmetic wraps, divides and rounds as Lua's does not, so `Int`'s is
+//!   the kernel's (`K.add32`, …), and that of the other widths is refused.
 //! - `+`, `-`, `*` and `/` of `Float`, and its negation and comparisons, are
 //!   IEEE 754 operations on doubles in both. `==` of `Float` holds of NaN and
-//!   NaN in Flick, `%` truncates and `**` has its own special cases, so those
-//!   are the kernel's; so is all `Float32` arithmetic, which rounds to 32 bits.
-//! - Strings are equal when their bytes are; ordering and `++` depend on the
-//!   string representation, which is the kernel's.
+//!   NaN in Flick, so it is the kernel's, as is `==` of structured values;
+//!   `%` truncates and `**` has its own special cases, so those are refused,
+//!   as is all `Float32` arithmetic, which rounds to 32 bits.
+//! - Strings are WTF-8, equal when their bytes are; `++` joins the halves of
+//!   a surrogate pair and the order goes by UTF-16 code units, so both are
+//!   the kernel's (`K.concat`, `K.compare_strings`), as is `++` of lists.
 
 use flick_ir::{Arith, BinOp, EnumLit, Expr as IrExpr, ExprKind as Ir, Lang, Lit, Num, Span};
 
 use super::super::ast::{BinOp as LuaOp, Block, Expr, ExprKind, Name, Stmt, StmtKind, UnOp};
+use super::super::names::KERNEL;
 use super::Lowering;
 
-/// Why the operators the kernel owns are refused.
-const KERNEL: &str = "the Lua primitive kernel, which computes it exactly, is not implemented";
+/// Why an operator the kernel owns, which it does not compute yet, is refused.
+const UNCOMPUTED: &str = "the Lua kernel does not compute it exactly yet";
 
 /// What a scalar operand is, as far as the operators here care.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,6 +47,30 @@ fn float_text(x: f64) -> String {
     } else {
         plain
     }
+}
+
+/// The function of the Lua kernel that computes `op` exactly, when one does.
+fn kernel_op(op: BinOp) -> Option<&'static str> {
+    Some(match op {
+        BinOp::Arith(arith, Num::Int) => match arith {
+            Arith::Add => "add32",
+            Arith::Sub => "sub32",
+            Arith::Mul => "mul32",
+            Arith::Div => "div32",
+            Arith::Rem => "rem32",
+            Arith::Pow => "pow32",
+        },
+        BinOp::Concat => "concat",
+        BinOp::ListConcat => "list_concat",
+        _ => return None,
+    })
+}
+
+/// `K.name(args…)`.
+pub(super) fn kernel_call(name: &str, args: Vec<Expr>, span: Span) -> Expr {
+    Expr::name(&Name::new(KERNEL.to_owned()), span)
+        .field(name)
+        .call(args)
 }
 
 impl Lowering<'_> {
@@ -71,7 +98,7 @@ impl Lowering<'_> {
             Lit::Float(x) => self.float(*x, span),
             Lit::Float32(x) => self.float(f64::from(*x), span),
             Lit::Int64(_) | Lit::UInt64(_) | Lit::BigInt(_) => {
-                self.unsupported(span, "a 64-bit or big integer literal", KERNEL)
+                self.unsupported(span, "a 64-bit or big integer literal", UNCOMPUTED)
             }
             Lit::String(s) => Expr::str(s, span),
             Lit::Bool(b) => Expr::new(ExprKind::Bool(*b), span),
@@ -93,7 +120,7 @@ impl Lowering<'_> {
         if x == 0.0 && x.is_sign_negative() && !self.dialect.negative_zero {
             let message = format!(
                 "the literal `-0.0` is not available on the {} target with the dialect `{}` yet: \
-                 {} folds it into an equal `0` constant, and {KERNEL}",
+                 {} folds it into an equal `0` constant, and {UNCOMPUTED}",
                 self.target, self.dialect.tag, self.dialect.title
             );
             return self.refuse(span, message);
@@ -155,6 +182,35 @@ impl Lowering<'_> {
             return self.logical(op, lhs, rhs, span);
         }
         let scalar = self.scalar(lhs).or_else(|| self.scalar(rhs));
+        if let Some(name) = kernel_op(op) {
+            let args = self.ordered(&[lhs, rhs]);
+            return kernel_call(name, args, span);
+        }
+        let ordering = match op {
+            BinOp::Lt => Some(LuaOp::Lt),
+            BinOp::Le => Some(LuaOp::Le),
+            BinOp::Gt => Some(LuaOp::Gt),
+            BinOp::Ge => Some(LuaOp::Ge),
+            _ => None,
+        };
+        // structural, and SameValueZero on floats: the kernel's
+        if matches!(op, BinOp::Eq | BinOp::NotEq)
+            && matches!(scalar, None | Some(Scalar::Float | Scalar::Other))
+        {
+            let args = self.ordered(&[lhs, rhs]);
+            let equal = kernel_call("equals", args, span);
+            return if op == BinOp::Eq {
+                equal
+            } else {
+                Expr::unary(UnOp::Not, equal, span)
+            };
+        }
+        if let (Some(ordering), Some(Scalar::String)) = (ordering, scalar) {
+            let args = self.ordered(&[lhs, rhs]);
+            let order = kernel_call("compare_strings", args, span);
+            let zero = Expr::new(ExprKind::Number("0".to_owned()), span);
+            return Expr::binary(ordering, order, zero, span);
+        }
         let lua = match (op, scalar) {
             (BinOp::Same, _) | (BinOp::Eq, Some(Scalar::Int | Scalar::Bool | Scalar::String)) => {
                 Some(LuaOp::Eq)
@@ -176,7 +232,6 @@ impl Lowering<'_> {
         };
         let Some(lua) = lua else {
             let what = match (op, scalar) {
-                (BinOp::ListConcat, _) => "`++` of lists".to_owned(),
                 (BinOp::Eq | BinOp::NotEq, None | Some(Scalar::Other)) => {
                     format!("`{}` of a structured or unknown type", op.symbol())
                 }
@@ -186,7 +241,7 @@ impl Lowering<'_> {
                 (BinOp::Arith(_, num), _) => format!("`{}` of `{num:?}`", op.symbol()),
                 _ => format!("the operator `{}`", op.symbol()),
             };
-            return self.unsupported(span, &what, KERNEL);
+            return self.unsupported(span, &what, UNCOMPUTED);
         };
         let mut values = self.ordered(&[lhs, rhs]).into_iter();
         let l = values.next().expect("two operands");
@@ -223,12 +278,16 @@ impl Lowering<'_> {
         Expr::name(&result, span)
     }
 
-    /// `-inner`, where negation is exact.
+    /// `-inner`: of a float, Lua's; of an `Int`, the kernel's, which wraps.
     pub(super) fn neg(&mut self, num: Num, inner: &IrExpr, span: Span) -> Expr {
         if matches!(num, Num::Float | Num::Float32) {
             let inner = self.expr(inner);
             return Expr::unary(UnOp::Neg, inner, span);
         }
-        self.unsupported(span, &format!("negation of `{num:?}`"), KERNEL)
+        if num == Num::Int {
+            let inner = self.expr(inner);
+            return kernel_call("neg32", vec![inner], span);
+        }
+        self.unsupported(span, &format!("negation of `{num:?}`"), UNCOMPUTED)
     }
 }

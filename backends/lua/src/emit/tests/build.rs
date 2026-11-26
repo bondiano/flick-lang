@@ -112,6 +112,10 @@ fn a_module_loads_after_the_modules_it_uses() {
     assert_eq!(
         paths,
         [
+            "_flick/lua-kernel/core.lua",
+            "_flick/lua-kernel/strings.lua",
+            "_flick/lua-kernel/lists.lua",
+            "_flick/lua-kernel/lang.lua",
             "_flick/List.lua",
             "_flick/List.lua.map",
             "App.lua",
@@ -120,21 +124,29 @@ fn a_module_loads_after_the_modules_it_uses() {
         ]
     );
     let text = |i: usize| String::from_utf8(built.artifacts[i].bytes.clone()).expect("UTF-8");
-    assert_eq!(text(4), "_flick/List.lua\nApp.lua\n", "the load order");
     assert_eq!(
-        text(0),
-        "local _, ns = ...\nlocal M = {}\nns.List = M\nM.id = function(x)\n  return x\nend\n"
+        text(8),
+        "_flick/lua-kernel/core.lua\n_flick/lua-kernel/strings.lua\n_flick/lua-kernel/lists.lua\n\
+         _flick/lua-kernel/lang.lua\n_flick/List.lua\nApp.lua\n",
+        "the load order: the kernel first"
+    );
+    // a program without the built-in constructors gives the kernel none
+    assert_eq!(text(3), "local _, ns = ...\nlocal K = ns.k\n");
+    assert_eq!(
+        text(4),
+        "local _, ns = ...\nlocal K = ns.k\nlocal M = {}\nns.List = M\nM.id = function(x)\n  \
+         return x\nend\n"
     );
     assert_eq!(
-        text(2),
-        "local _, ns = ...\nlocal M = {}\nns.App = M\nM.main = function(_)\n  return \
-         ns.List.id(true)\nend\n"
+        text(6),
+        "local _, ns = ...\nlocal K = ns.k\nlocal M = {}\nns.App = M\nM.main = function(_)\n  \
+         return ns.List.id(true)\nend\n"
     );
     // the prologue and the definition map to `main`, at line 1 column 0;
     // the return to `List.id ()`, 14 columns on
-    let map = text(3);
+    let map = text(7);
     assert!(
-        map.contains(r#""mappings":"AACA;AAAA;AAAA;AAAA;AAAc""#),
+        map.contains(r#""mappings":"AACA;AAAA;AAAA;AAAA;AAAA;AAAc""#),
         "{map}"
     );
     assert!(map.contains(r#""sources":["src/App.fl"]"#), "{map}");
@@ -150,7 +162,7 @@ fn refused(program: &Program) -> Vec<Diagnostic> {
 fn a_refusal_in_a_built_in_module_is_reported_where_it_was_reached() {
     let sum = flick_ir::Expr::new(
         ExprKind::Binary(
-            BinOp::Arith(Arith::Add, flick_ir::Num::Int),
+            BinOp::Arith(Arith::Add, flick_ir::Num::Int8),
             Box::new(local("x")),
             Box::new(local("x")),
         ),
@@ -160,7 +172,7 @@ fn a_refusal_in_a_built_in_module_is_reported_where_it_was_reached() {
     let found = refused(&program("double", vec![double], vec![]));
     assert_eq!(found.len(), 1, "{found:#?}");
     assert_eq!(found[0].code, "P012");
-    assert!(found[0].message.contains("`+` of `Int`"), "{found:#?}");
+    assert!(found[0].message.contains("`+` of `Int8`"), "{found:#?}");
     let span = found[0].span.as_ref().expect("a span");
     assert_eq!((span.file, span.start, span.end), (0, 25, 32));
     assert_eq!(found[0].notes, ["reached through `List.double`"]);

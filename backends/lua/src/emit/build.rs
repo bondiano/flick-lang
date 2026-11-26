@@ -10,11 +10,18 @@
 //!   modules first; a cycle between modules is cut where it closes, so a
 //!   value one initializes may not read the other's yet, as on the Go
 //!   target. Per-item initialization (lexical module prefixes) is refused.
+//! - The Lua kernel loads first: its own chunks `_flick/lua-kernel/*.lua`, which
+//!   put the table `K` at `ns.k`, then `_flick/lua-kernel/lang.lua`, the
+//!   built-in constructors it builds in this program's representation. Each
+//!   module's chunk reads `local K = ns.k`.
 //! - An own module's chunk is `App/Util.lua`, a built-in one's
 //!   `_flick/List.lua`, with `<chunk>.map` beside it: a version 3 map of
 //!   each line to the Flick node it starts with, whose sources are the
 //!   build's source names. `chunks.txt` lists the chunks in the order they
 //!   load, and on LÖVE, `main.lua` loads them in that order.
+//! - A test build also writes the runner, `_flick/lua-kernel/runner.lua`, and
+//!   `_flick/run-tests.lua`, which an interpreter runs: it loads the chunks of
+//!   `chunks.txt` and the runner, and runs the tests of each test module.
 //! - A refusal inside a built-in module is reported at the own expression
 //!   that reached it, as `check-target` reports what it finds there.
 
@@ -30,7 +37,7 @@ use flick_ir::{FileId, Program, Span};
 
 use super::ast::{Block, Expr, ExprKind, Name, Stmt, StmtKind};
 use super::lower::Lowering;
-use super::names::{MODULE, NAMESPACE, Namer};
+use super::names::{KERNEL, MODULE, NAMESPACE, Namer};
 use super::print::{self, Printed};
 use super::{Refusal, Target, limits};
 use crate::reach::{Blame, Reached};
@@ -43,6 +50,26 @@ const BUILTINS: &str = "_flick";
 /// The chunks' paths in the order they load, one per line.
 const CHUNKS: &str = "chunks.txt";
 
+/// The Lua kernel's own chunks, in the order they load, under
+/// `_flick/lua-kernel/`: no module's chunk is there, or at the test entry,
+/// as no module's name has a `-`.
+const KERNEL_CHUNKS: &[(&str, &str)] = &[
+    ("core", include_str!("../../kernel/core.lua")),
+    ("strings", include_str!("../../kernel/strings.lua")),
+    ("lists", include_str!("../../kernel/lists.lua")),
+];
+
+/// The runner a test build loads after every chunk.
+const RUNNER: (&str, &str) = ("runner", include_str!("../../kernel/runner.lua"));
+
+/// The entry of a test build, which the interpreter runs.
+pub(crate) const TEST_ENTRY: &str = "_flick/run-tests.lua";
+
+/// The path of the kernel chunk `name`.
+fn kernel_path(name: &str) -> String {
+    format!("{BUILTINS}/lua-kernel/{name}.lua")
+}
+
 /// The path of the chunk of `module`.
 fn path(module: &str, builtin: bool) -> String {
     let file = format!("{}.lua", module.replace('.', "/"));
@@ -53,9 +80,14 @@ fn path(module: &str, builtin: bool) -> String {
     }
 }
 
+/// The id of the artifact at `path`.
+pub(crate) fn artifact_id(path: &str) -> String {
+    format!("lua:{path}")
+}
+
 fn artifact(path: String, kind: ArtifactKind, text: String) -> Artifact {
     Artifact {
-        id: format!("lua:{path}"),
+        id: artifact_id(&path),
         path,
         kind,
         bytes: text.into_bytes(),
@@ -169,21 +201,58 @@ impl Plan<'_> {
     }
 }
 
-/// `local _, ns = ...`, `local M = {}` and `ns["App"] = M`.
+/// `local _, ns = ...` and `local K = ns.k`.
+fn kernel_prologue(span: Span) -> Vec<Stmt> {
+    let (ns, k) = (
+        Name::new(NAMESPACE.to_owned()),
+        Name::new(KERNEL.to_owned()),
+    );
+    let table = Expr::name(&ns, span).field("k");
+    vec![
+        Stmt::new(StmtKind::Args(vec![Namer::unused(), ns]), span),
+        Stmt::new(StmtKind::Local(k, Some(table)), span),
+    ]
+}
+
+/// The kernel's prologue, `local M = {}` and `ns["App"] = M`.
 fn prologue(module: &str, span: Span) -> Vec<Stmt> {
     let (ns, m) = (
         Name::new(NAMESPACE.to_owned()),
         Name::new(MODULE.to_owned()),
     );
     let slot = Expr::name(&ns, span).index(Expr::str(module, span));
-    vec![
-        Stmt::new(StmtKind::Args(vec![Namer::unused(), ns]), span),
-        Stmt::new(
-            StmtKind::Local(m.clone(), Some(Expr::new(ExprKind::Table(vec![]), span))),
-            span,
-        ),
-        Stmt::new(StmtKind::Assign(slot, Expr::name(&m, span)), span),
-    ]
+    let mut stmts = kernel_prologue(span);
+    stmts.push(Stmt::new(
+        StmtKind::Local(m.clone(), Some(Expr::new(ExprKind::Table(vec![]), span))),
+        span,
+    ));
+    stmts.push(Stmt::new(
+        StmtKind::Assign(slot, Expr::name(&m, span)),
+        span,
+    ));
+    stmts
+}
+
+/// `_flick/run-tests.lua`: the chunks of `chunks.txt` loaded in order from the
+/// directory of the entry's parent, then the runner, which runs the tests
+/// of each of `suites` by the interpreter's arguments and gives the exit
+/// code. A suite is a module name, which needs no quoting in Lua.
+fn test_entry(suites: &[&str]) -> String {
+    let runs: Vec<String> = (suites.iter())
+        .map(|m| format!("{{ \"{m}\", ns[\"{m}\"].tests }}"))
+        .collect();
+    format!(
+        "-- `flick test` on a Lua interpreter: the chunks in order, then the runner\n\
+         local root = string.match(arg[0], \"^(.*)[/\\\\]_flick[/\\\\]run%-tests%.lua$\") or \".\"\n\
+         local ns = {{}}\n\
+         for path in io.lines(root .. \"/{CHUNKS}\") do\n\
+         \x20 assert(loadfile(root .. \"/\" .. path))(nil, ns)\n\
+         end\n\
+         assert(loadfile(root .. \"/{runner}\"))(nil, ns)\n\
+         os.exit(ns.k.run({{ {} }}, {{ ... }}))\n",
+        runs.join(", "),
+        runner = kernel_path(RUNNER.0),
+    )
 }
 
 /// LÖVE's `main.lua`: each chunk loaded in order, given the namespace; a
@@ -311,12 +380,14 @@ fn texts(
 }
 
 /// The artifacts of `program`, which `check-target` accepted with what it
-/// reaches; or what the target refuses of it.
+/// reaches; or what the target refuses of it. A test build runs the tests
+/// of `suites`, its test modules.
 pub(crate) fn build(
     program: &Program,
     request: &BuildRequest,
     reached: &Reached,
     target: &Target<'_>,
+    suites: Option<&[&str]>,
     inputs: &mut dyn Inputs,
 ) -> Result<Vec<Artifact>, Vec<Diagnostic>> {
     let mut index = BTreeMap::new();
@@ -341,6 +412,18 @@ pub(crate) fn build(
     let chunks: Vec<(String, Printed)> = (plan.modules(request).into_iter())
         .map(|m| chunk(&plan, m, &mut lowering, target, &mut errors))
         .collect();
+    let mark = lowering.refusals().len();
+    let lang = {
+        let span = Span::new(FileId::new(0), 0, 0);
+        let mut block = Block::default();
+        for stmt in kernel_prologue(span).into_iter().chain(lowering.lang(span)) {
+            block.push(stmt);
+        }
+        print::chunk(&block).code
+    };
+    // what the kernel's constructors refuse has no source
+    let refused = lowering.refusals()[mark..].iter();
+    errors.extend(refused.map(|r| refusal(r.message.clone(), None, vec![])));
     if !errors.is_empty() {
         let mut seen = BTreeSet::new();
         errors.retain(|d| {
@@ -350,7 +433,18 @@ pub(crate) fn build(
         return Err(errors);
     }
     let texts = texts(&chunks, request, inputs)?;
-    let mut artifacts = Vec::with_capacity(2 * chunks.len() + 1);
+    let mut artifacts = Vec::with_capacity(2 * chunks.len() + KERNEL_CHUNKS.len() + 4);
+    let mut paths = Vec::with_capacity(chunks.len() + KERNEL_CHUNKS.len() + 1);
+    for &(name, text) in KERNEL_CHUNKS {
+        paths.push(kernel_path(name));
+        artifacts.push(artifact(
+            kernel_path(name),
+            ArtifactKind::Source,
+            text.to_owned(),
+        ));
+    }
+    paths.push(kernel_path("lang"));
+    artifacts.push(artifact(kernel_path("lang"), ArtifactKind::Source, lang));
     for (path, printed) in &chunks {
         let source_map = map(path, printed, request, &texts);
         artifacts.push(artifact(
@@ -364,7 +458,7 @@ pub(crate) fn build(
             source_map,
         ));
     }
-    let paths: Vec<String> = chunks.into_iter().map(|(path, _)| path).collect();
+    paths.extend(chunks.into_iter().map(|(path, _)| path));
     // the load order, for a host package's `.toc` or loader
     let order = paths.iter().fold(String::new(), |mut order, path| {
         order.push_str(path);
@@ -375,6 +469,19 @@ pub(crate) fn build(
     if target.name == "lua/love" {
         let main = love_main(&paths);
         artifacts.push(artifact("main.lua".into(), ArtifactKind::Source, main));
+    }
+    if let Some(suites) = suites {
+        let (name, runner) = RUNNER;
+        artifacts.push(artifact(
+            kernel_path(name),
+            ArtifactKind::Source,
+            runner.to_owned(),
+        ));
+        artifacts.push(artifact(
+            TEST_ENTRY.into(),
+            ArtifactKind::Source,
+            test_entry(suites),
+        ));
     }
     Ok(artifacts)
 }

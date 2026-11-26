@@ -160,7 +160,10 @@ foreign pure initialize from "flick:rt" "listInitialize"
 
 /// The elements in reverse order.
 reverse : List a -> List a
-foreign pure reverse from "flick:rt" "listReverse"
+let reverse xs =
+  let n = length xs
+  picked n (fun i -> n - 1 - i) xs
+  @native "flick:rt" "listReverse" when js || go
 
 /// `append xs ys` is `xs ++ ys`: `ys |> append xs` puts `xs` in front.
 append : List a -> List a -> List a
@@ -172,11 +175,34 @@ foreign pure concat from "flick:rt" "listConcat"
 
 /// The first `n` elements.
 take : Int -> List a -> List a
-foreign pure take from "flick:rt" "listTake"
+let take n xs = picked (within n xs) (fun i -> i) xs
+  @native "flick:rt" "listTake" when js || go
 
 /// Every element but the first `n`.
 drop : Int -> List a -> List a
-foreign pure drop from "flick:rt" "listDrop"
+let drop n xs =
+  let k = within n xs
+  picked (length xs - k) (fun i -> i + k) xs
+  @native "flick:rt" "listDrop" when js || go
+
+/// `n` clamped into `0..length xs`.
+within : Int -> List a -> Int
+let within n xs =
+  let count = length xs
+  if n < 0 then 0 else if n > count then count else n
+
+/// `[xs[at 0], …, xs[at (n - 1)]]`, each index one of `xs`: the Flick body
+/// of the functions that copy elements by their position.
+picked : Int -> (Int -> Int) -> List a -> List a
+let picked n at xs =
+  match xs with
+  | [] -> []
+  | [first, ..._] ->
+    initialize n (fun i ->
+      match get (at i) xs with
+      | Some x -> x
+      | None -> first
+    )
 
 /// The elements from `start` up to `end`, as JS `slice`: it copies only them.
 slice : Int -> Int -> List a -> List a

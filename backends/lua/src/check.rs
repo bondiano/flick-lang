@@ -158,12 +158,15 @@ impl Rules<'_> {
             Binding::Inline(_) => None,
             Binding::Module { from, name } if from.starts_with("flick:") => {
                 let row = self.kernel.row(from, name);
+                if row.is_some_and(|r| r.implemented) {
+                    return None;
+                }
                 if row.is_some_and(|r| r.suspends) && !profile.suspension {
                     return self.suspension(&what);
                 }
                 Some(format!(
                     "{what} (foreign `{name}` from `{from}`) is not available on the {target} target \
-                     yet: the Lua primitive kernel is not implemented"
+                     yet: the Lua kernel does not implement it"
                 ))
             }
             Binding::Module { from, name } => {
