@@ -27,7 +27,8 @@ mod proofs;
 mod report;
 mod types;
 
-use std::{iter, mem};
+use std::mem;
+use std::num::NonZeroU32;
 
 use SyntaxKind as K;
 use build::{Event, build};
@@ -123,7 +124,8 @@ pub(crate) struct Parser<'t> {
     toks: Vec<Tok>,
     pos: usize,
     events: Vec<Event>,
-    ctx: Vec<(Ctx, bool)>,
+    /// Layout context stack: `(ctx, saved_no_brace, innermost_aligned_col)`.
+    ctx: Vec<(Ctx, bool, u32)>,
     /// Token whose `Sep::Next` the current block already consumed.
     sep_taken: Option<usize>,
     errors: Vec<Diagnostic>,
@@ -160,52 +162,15 @@ fn continues(kind: SyntaxKind) -> bool {
 
 impl<'t> Parser<'t> {
     fn new(text: &'t str, file: FileId, raw: &[RawToken]) -> Self {
-        let mut toks = Vec::new();
-        let mut col = 0;
-        let mut line_has_token = false;
-        let mut indent = 0;
-        for t in raw {
-            if !t.kind.is_trivia() {
-                let kind = t.kind;
-                let line_start = !line_has_token;
-                if line_start {
-                    indent = col;
-                }
-                toks.push(Tok {
-                    kind,
-                    start: t.start,
-                    end: t.end,
-                    col,
-                    line_start,
-                    line_indent: indent,
-                });
-                line_has_token = true;
-            }
-            let token = &text[t.start as usize..t.end as usize];
-            if let Some((_, tail)) = token.rsplit_once('\n') {
-                // A multi-line string still occupies its final line; trivia does not.
-                col = u32::try_from(tail.chars().count()).expect("columns fit in u32");
-                line_has_token = !t.kind.is_trivia();
-            } else {
-                col += u32::try_from(token.chars().count()).expect("columns fit in u32");
-            }
-        }
-        let end = u32::try_from(text.len()).expect("source fits in u32");
-        toks.push(Tok {
-            kind: K::Eof,
-            start: end,
-            end,
-            col: 0,
-            line_start: true,
-            line_indent: 0,
-        });
+        let toks = layout::collect_tokens(text, raw);
+        let event_cap = toks.len().saturating_mul(3);
         Parser {
             text,
             file,
             toks,
             pos: 0,
-            events: Vec::new(),
-            ctx: Vec::new(),
+            events: Vec::with_capacity(event_cap),
+            ctx: Vec::with_capacity(16),
             sep_taken: None,
             errors: Vec::new(),
             last_error_at: None,
@@ -234,10 +199,14 @@ impl<'t> Parser<'t> {
 
     fn sep_at(&self, i: usize) -> Option<Sep> {
         let t = self.toks[i];
+        // `Eof` always has `line_start == true`, so mid-line tokens fast-exit in one branch.
+        if !t.line_start {
+            return None;
+        }
         if t.kind == K::Eof {
             return Some(Sep::End);
         }
-        if !t.line_start || self.sep_taken == Some(i) {
+        if self.sep_taken == Some(i) {
             return None;
         }
         match self.ctx.last().map_or(Ctx::Aligned { col: 0 }, |c| c.0) {
@@ -252,14 +221,7 @@ impl<'t> Parser<'t> {
 
     /// Column of the innermost aligned block (the top level is column 0).
     fn aligned_col(&self) -> u32 {
-        self.ctx
-            .iter()
-            .rev()
-            .find_map(|c| match c.0 {
-                Ctx::Aligned { col } => Some(col),
-                _ => None,
-            })
-            .unwrap_or(0)
+        self.ctx.last().map_or(0, |c| c.2)
     }
 
     fn sep(&self) -> Option<Sep> {
@@ -267,7 +229,11 @@ impl<'t> Parser<'t> {
     }
 
     fn push(&mut self, ctx: Ctx) {
-        self.ctx.push((ctx, self.no_brace));
+        let aligned = match ctx {
+            Ctx::Aligned { col } => col,
+            Ctx::Inline { .. } | Ctx::Bracket => self.aligned_col(),
+        };
+        self.ctx.push((ctx, self.no_brace, aligned));
         self.no_brace = false;
     }
 
@@ -278,7 +244,7 @@ impl<'t> Parser<'t> {
     }
 
     fn pop(&mut self) {
-        let (_, no_brace) = self.ctx.pop().expect("balanced layout contexts");
+        let (_, no_brace, _) = self.ctx.pop().expect("balanced layout contexts");
         self.no_brace = no_brace;
     }
 
@@ -291,8 +257,9 @@ impl<'t> Parser<'t> {
 
     /// Kind of the `n`-th token ahead, or `LayoutSep` if a boundary comes first.
     fn nth(&self, n: usize) -> SyntaxKind {
+        let last = self.toks.len() - 1;
         for k in 0..=n {
-            let i = (self.pos + k).min(self.toks.len() - 1);
+            let i = (self.pos + k).min(last);
             if self.sep_at(i).is_some() {
                 return K::LayoutSep;
             }
@@ -304,7 +271,11 @@ impl<'t> Parser<'t> {
     }
 
     fn current(&self) -> SyntaxKind {
-        self.nth(0)
+        if self.sep_at(self.pos).is_some() {
+            K::LayoutSep
+        } else {
+            self.toks[self.pos].kind
+        }
     }
 
     fn at(&self, kind: SyntaxKind) -> bool {
@@ -419,8 +390,10 @@ impl<'t> Parser<'t> {
     /// Starts a node that will wrap the already completed `done`.
     fn precede(&mut self, done: Done) -> Marker {
         let m = self.start();
+        let target = NonZeroU32::new(u32::try_from(m.0).expect("event count fits in u32"))
+            .expect("precede marker always sits after index 0");
         if let Event::Start { forward_parent, .. } = &mut self.events[done.0] {
-            *forward_parent = Some(m.0);
+            *forward_parent = Some(target);
         }
         m
     }
@@ -453,40 +426,6 @@ impl<'t> Parser<'t> {
 
     fn in_brackets(&self) -> bool {
         !self.ctx.is_empty()
-    }
-
-    /// Reports an unexpected token after a complete statement, as an
-    /// indentation problem when it starts a line.
-    fn unexpected(&mut self) {
-        self.failed = false;
-        self.report_unexpected();
-    }
-
-    fn report_unexpected(&mut self) {
-        let t = self.raw();
-        if t.line_start {
-            let cols: Vec<String> = self
-                .ctx
-                .iter()
-                .filter_map(|c| match c.0 {
-                    Ctx::Aligned { col } => Some((col + 1).to_string()),
-                    _ => None,
-                })
-                .collect();
-            let message = format!(
-                "unexpected indentation: column {} continues nothing here; \
-                 statements of the enclosing blocks start at column {}",
-                t.col + 1,
-                iter::once("1".to_owned())
-                    .chain(cols)
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            );
-            self.error_at(codes::S009, self.span(t.start, t.end), message);
-        } else {
-            let message = format!("unexpected {}", self.found());
-            self.error_at(codes::S007, self.here_span(), message);
-        }
     }
 
     fn enter(&mut self) -> bool {

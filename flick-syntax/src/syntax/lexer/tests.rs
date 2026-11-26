@@ -215,6 +215,57 @@ fn left_pipe_and_composition_operators() {
     assert_eq!(shown("<<-"), [K::LtLt, K::Minus]);
     assert_eq!(shown("|>>"), [K::PipeGt, K::Gt]);
     assert_eq!(shown("< |"), [K::Lt, K::Pipe]);
+    assert_eq!(
+        shown(
+            "... ..< .. -> => == |> <| >> << || && != ! <= <- >= ++ ** ( ) [ ] { } , ; : . = | < > + - * / % ^ $ ? @ ~"
+        ),
+        [
+            K::DotDotDot,
+            K::DotDotLt,
+            K::DotDot,
+            K::Arrow,
+            K::FatArrow,
+            K::EqEq,
+            K::PipeGt,
+            K::LtPipe,
+            K::GtGt,
+            K::LtLt,
+            K::OrOr,
+            K::AndAnd,
+            K::NotEq,
+            K::Bang,
+            K::Le,
+            K::LArrow,
+            K::Ge,
+            K::PlusPlus,
+            K::StarStar,
+            K::LParen,
+            K::RParen,
+            K::LBracket,
+            K::RBracket,
+            K::LBrace,
+            K::RBrace,
+            K::Comma,
+            K::Semi,
+            K::Colon,
+            K::Dot,
+            K::Eq,
+            K::Pipe,
+            K::Lt,
+            K::Gt,
+            K::Plus,
+            K::Minus,
+            K::Star,
+            K::Slash,
+            K::Percent,
+            K::Caret,
+            K::Dollar,
+            K::Question,
+            K::At,
+            K::Tilde,
+        ]
+    );
+    assert_eq!(kinds("a & b").1, ["FLICK-S003 &"]);
 }
 
 #[test]
@@ -252,6 +303,11 @@ fn keyword_context_requires_whole_words_and_adjacent_qualifiers() {
         ("HashSet.with", "with", K::Ident),
         ("HashSet. with", "with", K::WithKw),
         ("let rec with = 1", "with", K::Ident),
+        ("let lazy mut with = 1", "with", K::Ident),
+        ("let lazy mut catch = 1", "catch", K::CatchKw),
+        ("x let with = 1", "with", K::WithKw),
+        ("foreign module inline \"x\"", "module", K::ModuleKw),
+        ("foreign module from \"x\" \"y\"", "module", K::Ident),
         ("foreign async with from", "with", K::Ident),
         ("foreign asynchronous with from", "with", K::WithKw),
         ("let assert x = value", "assert", K::AssertKw),

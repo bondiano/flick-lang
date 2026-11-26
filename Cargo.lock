@@ -969,8 +969,9 @@ dependencies = [
 
 [[package]]
 name = "fln"
-version = "0.1.0"
-source = "git+https://github.com/bondiano/fln?rev=83faab426eb0051a485c5985ef75bec13f26760a#83faab426eb0051a485c5985ef75bec13f26760a"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f28ad9c1035b1ad3febc6726733bd1ef3fd06b26df4b33f3b69ea0847951b978"
 dependencies = [
  "fln-ast",
  "fln-literals",
@@ -978,16 +979,18 @@ dependencies = [
 
 [[package]]
 name = "fln-ast"
-version = "0.1.0"
-source = "git+https://github.com/bondiano/fln?rev=83faab426eb0051a485c5985ef75bec13f26760a#83faab426eb0051a485c5985ef75bec13f26760a"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37e9a701d8e7d33604ce6a2fe0f118b8f0364878c69a56f0590b21201bfe8953"
 dependencies = [
  "fln-literals",
 ]
 
 [[package]]
 name = "fln-literals"
-version = "0.1.0"
-source = "git+https://github.com/bondiano/fln?rev=83faab426eb0051a485c5985ef75bec13f26760a#83faab426eb0051a485c5985ef75bec13f26760a"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0a34d8f01592fe7ad39c4d163cfbaa1b77dd5a331d33f0ea43499fb12f7c4e57"
 
 [[package]]
 name = "fnv"
