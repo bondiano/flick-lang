@@ -38,19 +38,15 @@ foreign pure split from "flick:String" "split"
 /// The parts with the separator between them.
 join : String -> List String -> String
 let join separator parts =
-  rest : Int -> String -> String
-  let rec rest i text =
-    match part_at i parts with
-    | Some part -> rest (i + 1) (text ++ separator ++ part)
-    | None -> text
-  match part_at 0 parts with
-  | Some first -> rest 1 first
-  | None -> ""
+  rest : String -> List String -> String
+  let rec rest text more =
+    match more with
+    | [part, ...others] -> rest (text ++ separator ++ part) others
+    | [] -> text
+  match parts with
+  | [first, ...others] -> rest first others
+  | [] -> ""
   @native "flick:rt" "stringJoin" when js || go
-
-/// The element at `index`, as `List.get`, which this module comes before.
-part_at : Int -> List String -> Option String
-foreign pure part_at from "flick:rt" "listGet"
 
 /// Whether `part` occurs in the string.
 contains : String -> String -> Bool

@@ -213,7 +213,8 @@ const builtin = (file: string): URL => {
 
 /** The JS names the `.fl` files bind from `flick:<module>`. */
 const bound = (files: ReadonlyArray<string>, module: string): Array<string> => {
-  const re = new RegExp(`foreign \\w+ \\w+ from "flick:${module}" "(\\w+)"`, "g");
+  // a `foreign` declaration, or an `@native` clause over a Flick body
+  const re = new RegExp(`(?:foreign \\w+ \\w+ from|@native) "flick:${module}" "(\\w+)"`, "g");
   const names = files.flatMap((f) => [...readFileSync(builtin(f), "utf8").matchAll(re)].map((m) => m[1] ?? ""));
   return [...new Set(names)].toSorted();
 };
