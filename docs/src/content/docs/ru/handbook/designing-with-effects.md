@@ -1,7 +1,7 @@
 ---
 title: Проектирование программы с эффектами
 description: Отделите логику предметной области от внешних вызовов, выберите реализации сервисов в точке входа и предоставьте тестовые реализации в тестах.
-source_hash: 579fad8139b85c01
+source_hash: 43fe09dc9d174624
 ---
 
 Поиск пользователя можно написать одной функцией: вызвать поиск из учебного
@@ -739,6 +739,76 @@ let tests = [
 строки, а порядок результатов проверяется отдельно. Проверка случайного
 порядка завершения сделала бы тест зависимым от планировщика, а не от
 контракта загрузки.
+
+## Различные роли провайдеров с одним интерфейсом
+
+Иногда одной программе нужны два независимых провайдера с одинаковым набором
+операций — например, основное хранилище и реплика для чтения. Один только
+`type alias` или параметр типа не создаёт двух разных провайдеров: разрешение
+сервисов сопоставляет слои по номинальному объявлению `service`, поэтому
+`Layer.merge` отклоняет два слоя одного и того же сервиса с ошибкой `FLICK-E004`.
+
+Вместо этого объявите `service` внутри параметризованного модуля и примените
+его один раз на каждую роль. Каждое именованное применение создаёт собственное
+номинальное тождество `Store`, поэтому обе роли можно объединять в боевом коде
+и независимо подменять в тестах:
+
+```flick
+module App.StorageRoles exposing (Primary, Replica, read_both, run_live, run_test)
+
+type module StoreConfig =
+  prefix : String
+
+type module StoreRole =
+  service Store =
+    get : String ->{} Option String
+  layer : Layer none none {Store}
+
+module PrimaryConfig exposing (prefix) =
+  prefix : String
+  let prefix = "primary"
+
+module ReplicaConfig exposing (prefix) =
+  prefix : String
+  let prefix = "replica"
+
+module MakeStore(C : StoreConfig) : StoreRole =
+  service Store =
+    get : String ->{} Option String
+
+  layer : Layer none none {Store}
+  let layer =
+    Layer.succeed Store {
+      get = fun key -> Some (C.prefix ++ ":" ++ key);
+    }
+
+module Primary = MakeStore(PrimaryConfig)
+module Replica = MakeStore(ReplicaConfig)
+
+read_both : String ->{Primary.Store, Replica.Store} (Option String, Option String)
+let read_both key = (Primary.Store.get key, Replica.Store.get key)
+
+run_live : String ->{} (Option String, Option String)
+let run_live key =
+  provide Layer.merge Primary.layer Replica.layer {
+    read_both key
+  }
+
+run_test : String ->{} (Option String, Option String)
+let run_test key =
+  let primary_fake = Layer.succeed Primary.Store { get = fun _ -> Some "stub-primary" }
+  let replica_fake = Layer.succeed Replica.Store { get = fun _ -> Some "stub-replica" }
+  provide Layer.merge primary_fake replica_fake {
+    read_both key
+  }
+```
+
+Поскольку `Primary.Store` и `Replica.Store` имеют разные номинальные тождества,
+пропущенный слой даёт `FLICK-E002`, повторное объединение одной роли —
+`FLICK-E004`, а передача `Primary.layer` вместо `Replica.Store` — `FLICK-T003`.
+Дополнительный синтаксис или изменения базовой модели эффектов не требуются —
+правила модулей описаны в разделе
+[Различные роли провайдеров](../../reference/modules/#различные-роли-провайдеров).
 
 ## Примените подход в своей программе
 

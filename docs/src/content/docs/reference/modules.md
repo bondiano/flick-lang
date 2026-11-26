@@ -361,6 +361,76 @@ The declarations `module A = …` and `module B = …` create the identities;
 imports preserve them. The documentation tests check these files together
 and require the last file to fail with `FLICK-T003`.
 
+### Distinct provider roles
+
+A program sometimes needs two independent providers with the same service
+shape — for example, a primary database and a read replica, or two caches.
+A `type alias` or an extra type argument alone does not create a distinct
+provider role: a transparent alias resolves to the same nominal service, so
+merging two layers for it is rejected with `FLICK-E004`.
+
+Instead, declare the `service` inside a parameterized module and instantiate
+it once per role. Because each named application creates a distinct nominal
+service identity, `Primary.Store` and `Replica.Store` coexist in one effect
+row and compose with `Layer.merge`:
+
+```flick
+module App.Stores exposing (Primary, Replica, read_both, run_both)
+
+type module StoreConfig =
+  prefix : String
+
+type module StoreRole =
+  service Store =
+    get : String ->{} Option String
+  layer : Layer none none {Store}
+
+module PrimaryConfig exposing (prefix) =
+  prefix : String
+  let prefix = "primary"
+
+module ReplicaConfig exposing (prefix) =
+  prefix : String
+  let prefix = "replica"
+
+module MakeStore(C : StoreConfig) : StoreRole =
+  service Store =
+    get : String ->{} Option String
+
+  layer : Layer none none {Store}
+  let layer =
+    Layer.succeed Store {
+      get = fun key -> Some (C.prefix ++ ":" ++ key);
+    }
+
+module Primary = MakeStore(PrimaryConfig)
+module Replica = MakeStore(ReplicaConfig)
+
+read_both : String ->{Primary.Store, Replica.Store} (Option String, Option String)
+let read_both key = (Primary.Store.get key, Replica.Store.get key)
+
+run_both : String ->{} (Option String, Option String)
+let run_both key =
+  provide Layer.merge Primary.layer Replica.layer {
+    read_both key
+  }
+```
+
+- `Layer.merge Primary.layer Replica.layer` succeeds because `Primary.Store`
+  and `Replica.Store` are distinct nominal services.
+- Merging the same role twice (`Layer.merge Primary.layer Primary.layer`) is
+  still rejected with `FLICK-E004`.
+- Providing only `Primary.layer` while calling `Replica.Store.get` fails with
+  `FLICK-E002`, and substituting `Primary.layer` where `Layer none none {Replica.Store}`
+  is expected fails with `FLICK-T003`.
+- Importing `App.Stores.Primary` from multiple modules preserves the same
+  identity, and TypeScript `.d.ts` output projects distinct branded service
+  interfaces for each role.
+
+This pattern uses Flick's existing generative parameterized modules and nominal
+services directly, without adding special syntax or changing the core effect
+model or Lean formalization.
+
 ## Higher-order module signatures
 
 Static expansion compares the active template and its module arguments, so a finite higher-order callback may revisit a template with different arguments. Repeating the same active application reports `FLICK-R006`. Expansion also stops at 64 active applications with `FLICK-R006`, including recursive definitions that keep producing fresh arguments. This is a compiler resource bound, not a termination proof.

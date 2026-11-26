@@ -1,6 +1,6 @@
 ---
 title: "Модули и имена"
-source_hash: 26143bc9555f712e
+source_hash: ec87fe6a5de228c0
 ---
 
 Каждый файл `.fl` — отдельный модуль.
@@ -369,6 +369,76 @@ let value = A.value
 Объявления `module A = …` и `module B = …` создают тождества типов,
 а импорты сохраняют их. Тесты документации проверяют эти файлы вместе
 и требуют от последнего файла ошибку `FLICK-T003`.
+
+### Различные роли провайдеров
+
+Программе иногда нужны два независимых провайдера с одинаковой формой сервиса —
+например, основная база данных и реплика для чтения, либо два кэша.
+Один только `type alias` или дополнительный аргумент типа не создаёт отдельной
+роли провайдера: прозрачный псевдоним раскрывается в тот же номинальный сервис,
+поэтому объединение двух его слоёв отклоняется с `FLICK-E004`.
+
+Вместо этого объявите `service` внутри параметризованного модуля и примените
+его один раз на каждую роль. Поскольку каждое именованное применение создаёт
+отдельное номинальное тождество сервиса, `Primary.Store` и `Replica.Store`
+сосуществуют в одной строке эффектов и объединяются через `Layer.merge`:
+
+```flick
+module App.Stores exposing (Primary, Replica, read_both, run_both)
+
+type module StoreConfig =
+  prefix : String
+
+type module StoreRole =
+  service Store =
+    get : String ->{} Option String
+  layer : Layer none none {Store}
+
+module PrimaryConfig exposing (prefix) =
+  prefix : String
+  let prefix = "primary"
+
+module ReplicaConfig exposing (prefix) =
+  prefix : String
+  let prefix = "replica"
+
+module MakeStore(C : StoreConfig) : StoreRole =
+  service Store =
+    get : String ->{} Option String
+
+  layer : Layer none none {Store}
+  let layer =
+    Layer.succeed Store {
+      get = fun key -> Some (C.prefix ++ ":" ++ key);
+    }
+
+module Primary = MakeStore(PrimaryConfig)
+module Replica = MakeStore(ReplicaConfig)
+
+read_both : String ->{Primary.Store, Replica.Store} (Option String, Option String)
+let read_both key = (Primary.Store.get key, Replica.Store.get key)
+
+run_both : String ->{} (Option String, Option String)
+let run_both key =
+  provide Layer.merge Primary.layer Replica.layer {
+    read_both key
+  }
+```
+
+- `Layer.merge Primary.layer Replica.layer` проходит успешно, потому что
+  `Primary.Store` и `Replica.Store` — разные номинальные сервисы.
+- Повторное объединение одной и той же роли (`Layer.merge Primary.layer Primary.layer`)
+  по-прежнему отклоняется с `FLICK-E004`.
+- Предоставление одного только `Primary.layer` при вызове `Replica.Store.get`
+  вызывает `FLICK-E002`, а подстановка `Primary.layer` вместо
+  `Layer none none {Replica.Store}` — `FLICK-T003`.
+- Импорт `App.Stores.Primary` из разных модулей сохраняет то же тождество,
+  а `.d.ts` для TypeScript выпускает раздельные брендированные интерфейсы
+  сервисов для каждой роли.
+
+Этот приём опирается напрямую на существующие генеративные параметризованные
+модули и номинальные сервисы Flick: он не требует нового синтаксиса и не меняет
+базовую модель эффектов или формализацию в Lean.
 
 ## Сигнатуры модулей высшего порядка
 

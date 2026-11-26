@@ -717,6 +717,76 @@ Notice that the log assertion for parallel work compares sorted lines.
 Asserting an incidental completion order would make the test depend on the
 scheduler rather than the lookup's contract.
 
+## Distinct provider roles for the same interface
+
+Sometimes one program needs two independent providers with the same operations,
+such as a primary store and a read replica. Adding a `type alias` or a type
+parameter alone does not create two distinct providers: service resolution keys
+each layer by its nominal `service` declaration, so `Layer.merge` rejects two
+layers for the same service with `FLICK-E004`.
+
+Instead, declare the `service` inside a parameterized module and instantiate it
+once per role. Each named instantiation defines its own nominal `Store`
+service, so both roles can be merged in production and replaced independently
+in tests:
+
+```flick
+module App.StorageRoles exposing (Primary, Replica, read_both, run_live, run_test)
+
+type module StoreConfig =
+  prefix : String
+
+type module StoreRole =
+  service Store =
+    get : String ->{} Option String
+  layer : Layer none none {Store}
+
+module PrimaryConfig exposing (prefix) =
+  prefix : String
+  let prefix = "primary"
+
+module ReplicaConfig exposing (prefix) =
+  prefix : String
+  let prefix = "replica"
+
+module MakeStore(C : StoreConfig) : StoreRole =
+  service Store =
+    get : String ->{} Option String
+
+  layer : Layer none none {Store}
+  let layer =
+    Layer.succeed Store {
+      get = fun key -> Some (C.prefix ++ ":" ++ key);
+    }
+
+module Primary = MakeStore(PrimaryConfig)
+module Replica = MakeStore(ReplicaConfig)
+
+read_both : String ->{Primary.Store, Replica.Store} (Option String, Option String)
+let read_both key = (Primary.Store.get key, Replica.Store.get key)
+
+run_live : String ->{} (Option String, Option String)
+let run_live key =
+  provide Layer.merge Primary.layer Replica.layer {
+    read_both key
+  }
+
+run_test : String ->{} (Option String, Option String)
+let run_test key =
+  let primary_fake = Layer.succeed Primary.Store { get = fun _ -> Some "stub-primary" }
+  let replica_fake = Layer.succeed Replica.Store { get = fun _ -> Some "stub-replica" }
+  provide Layer.merge primary_fake replica_fake {
+    read_both key
+  }
+```
+
+Because `Primary.Store` and `Replica.Store` are distinct nominal identities,
+forgetting one layer reports `FLICK-E002`, merging the same role twice reports
+`FLICK-E004`, and passing `Primary.layer` where `Replica.Store` is expected
+reports `FLICK-T003`. No extra syntax or core effect-model change is needed —
+see [distinct provider roles](../../reference/modules/#distinct-provider-roles)
+for the module rules.
+
 ## Apply the same design to your program
 
 When adding a feature, start with the values it transforms and keep that
