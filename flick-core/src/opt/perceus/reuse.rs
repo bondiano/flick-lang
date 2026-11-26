@@ -18,123 +18,10 @@ use std::collections::BTreeMap;
 use std::mem;
 
 use crate::ir::memory::{Block, Exit, Function, Instruction, Local, Operation, ValueRep};
-use crate::ir::{Pat, Rep};
 
-/// Static allocation/layout knowledge for a local, used only to avoid emitting
-/// unproductive `DropReuse` operations and to match capacities accurately.
-/// Runtime uniqueness and layout checks remain mandatory for soundness.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum CandidateShape {
-    /// Statically known non-reusable (immediate, string, closure, task, `$match`, etc.).
-    Never,
-    /// Tagged constructor/tuple/list with exact physical field count (`ordinary + dicts`).
-    TaggedExact(usize),
-    /// Tagged constructor/tuple with dynamically determined field count.
-    TaggedAny,
-    /// Record with exact field count.
-    RecordExact(usize),
-    /// Record with dynamically determined field count.
-    RecordAny,
-    /// Unknown shape; not speculatively converted to `DropReuse`.
-    Unknown,
-}
-
-impl CandidateShape {
-    pub(crate) fn matches_alloc(self, alloc: AllocShape) -> bool {
-        match (self, alloc) {
-            (Self::TaggedExact(cap), AllocShape::Tagged(needed))
-            | (Self::RecordExact(cap), AllocShape::Record(needed)) => cap == needed,
-            (Self::TaggedAny, AllocShape::Tagged(_)) | (Self::RecordAny, AllocShape::Record(_)) => {
-                true
-            }
-            _ => false,
-        }
-    }
-
-    fn refine(existing: Self, incoming: Self) -> Self {
-        match (existing, incoming) {
-            (Self::Never, _) | (_, Self::Never) => Self::Never,
-            (Self::TaggedExact(n), _) | (_, Self::TaggedExact(n)) => Self::TaggedExact(n),
-            (Self::RecordExact(n), _) | (_, Self::RecordExact(n)) => Self::RecordExact(n),
-            (Self::TaggedAny, _) | (_, Self::TaggedAny) => Self::TaggedAny,
-            (Self::RecordAny, _) | (_, Self::RecordAny) => Self::RecordAny,
-            (Self::Unknown, Self::Unknown) => Self::Unknown,
-        }
-    }
-
-    pub(crate) fn join(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::TaggedExact(a), Self::TaggedExact(b)) if a == b => Self::TaggedExact(a),
-            (Self::TaggedExact(_) | Self::TaggedAny, Self::TaggedExact(_) | Self::TaggedAny) => {
-                Self::TaggedAny
-            }
-            (Self::RecordExact(a), Self::RecordExact(b)) if a == b => Self::RecordExact(a),
-            (Self::RecordExact(_) | Self::RecordAny, Self::RecordExact(_) | Self::RecordAny) => {
-                Self::RecordAny
-            }
-            (Self::Never, Self::Never) => Self::Never,
-            _ => Self::Unknown,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum AllocShape {
-    Tagged(usize),
-    Record(usize),
-}
-
-pub(crate) fn pattern_shape(pat: &Pat) -> CandidateShape {
-    match pat {
-        Pat::Con(con, args) => match &con.rep {
-            Rep::Tagged => CandidateShape::TaggedExact(con.arity + con.dicts),
-            Rep::Literal(_) => CandidateShape::Never,
-            Rep::Unboxed | Rep::Typeof(_) if con.arity == 1 && con.dicts == 0 => {
-                args.first().map_or(CandidateShape::Unknown, pattern_shape)
-            }
-            _ => CandidateShape::Unknown,
-        },
-        Pat::Tuple(items) if items.is_empty() => CandidateShape::Never,
-        Pat::Tuple(items) | Pat::List(items, None) => CandidateShape::TaggedExact(items.len()),
-        Pat::List(_, Some(_)) | Pat::Wild | Pat::Bind(_) => CandidateShape::Unknown,
-        Pat::Record(_) => CandidateShape::RecordAny,
-        Pat::Lit(_) => CandidateShape::Never,
-        Pat::Or(alts) => {
-            let mut iter = alts.iter().map(pattern_shape);
-            let Some(first) = iter.next() else {
-                return CandidateShape::Unknown;
-            };
-            iter.fold(first, CandidateShape::join)
-        }
-    }
-}
-
-/// Computes the combined scrutinee shape across all arms of a `match` expression,
-/// allowing wildcard fallback arms to dynamically reuse ADT/record scrutinees
-/// without emitting speculative `DropReuse` on scalar/literal matches.
-pub(crate) fn arms_scrutinee_shape<'a>(pats: impl IntoIterator<Item = &'a Pat>) -> CandidateShape {
-    let mut acc: Option<CandidateShape> = None;
-    for pat in pats {
-        let shape = pattern_shape(pat);
-        if shape == CandidateShape::Unknown {
-            continue;
-        }
-        acc = Some(match acc {
-            None => shape,
-            Some(prev) => prev.join(shape),
-        });
-    }
-    match acc {
-        Some(CandidateShape::TaggedExact(_) | CandidateShape::TaggedAny) => {
-            CandidateShape::TaggedAny
-        }
-        Some(CandidateShape::RecordExact(_) | CandidateShape::RecordAny) => {
-            CandidateShape::RecordAny
-        }
-        Some(CandidateShape::Never) => CandidateShape::Never,
-        _ => CandidateShape::Unknown,
-    }
-}
+pub(crate) use super::reuse_shapes::{
+    AllocShape, CandidateShape, LayoutKnowledge, arms_scrutinee_shape, pattern_shape,
+};
 
 /// Applies frame-limited FBIP reuse to a validated memory-IR function, using
 /// optional parameter shape hints (for example, marking closure/task `self`
@@ -204,23 +91,33 @@ fn operation_result_shape(
         Operation::Construct {
             fields,
             rep: ValueRep::Cell,
+            layout,
             ..
         }
-        | Operation::Reuse { fields, .. } => CandidateShape::TaggedExact(fields.len()),
+        | Operation::Reuse { fields, layout, .. } => {
+            CandidateShape::TaggedExact(fields.len(), LayoutKnowledge::Known(layout.clone()))
+        }
         Operation::ConstructWithDicts {
             fields,
             dicts,
             rep: ValueRep::Cell,
+            layout,
             ..
         }
-        | Operation::ReuseWithDicts { fields, dicts, .. } => {
-            CandidateShape::TaggedExact(fields.len() + dicts.len())
-        }
+        | Operation::ReuseWithDicts {
+            fields,
+            dicts,
+            layout,
+            ..
+        } => CandidateShape::TaggedExact(
+            fields.len() + dicts.len(),
+            LayoutKnowledge::Known(layout.clone()),
+        ),
         Operation::Record { fields } | Operation::ReuseRecord { fields, .. } => {
             CandidateShape::RecordExact(fields.len())
         }
-        Operation::Update { object, .. } => match shapes.get(object).copied() {
-            Some(CandidateShape::RecordExact(n)) => CandidateShape::RecordExact(n),
+        Operation::Update { object, .. } => match shapes.get(object) {
+            Some(CandidateShape::RecordExact(n)) => CandidateShape::RecordExact(*n),
             _ => CandidateShape::RecordAny,
         },
         Operation::Construct {
@@ -260,14 +157,19 @@ fn alloc_shape(op: &Operation) -> Option<AllocShape> {
         Operation::Construct {
             fields,
             rep: ValueRep::Cell,
+            layout,
             ..
-        } => Some(AllocShape::Tagged(fields.len())),
+        } => Some(AllocShape::Tagged(fields.len(), layout.clone())),
         Operation::ConstructWithDicts {
             fields,
             dicts,
             rep: ValueRep::Cell,
+            layout,
             ..
-        } => Some(AllocShape::Tagged(fields.len() + dicts.len())),
+        } => Some(AllocShape::Tagged(
+            fields.len() + dicts.len(),
+            layout.clone(),
+        )),
         Operation::Record { fields } => Some(AllocShape::Record(fields.len())),
         _ => None,
     }
@@ -276,12 +178,12 @@ fn alloc_shape(op: &Operation) -> Option<AllocShape> {
 fn has_compatible_alloc_slice(
     instructions: &[Instruction],
     exit: &Exit,
-    shape: CandidateShape,
+    shape: &CandidateShape,
 ) -> bool {
     for instruction in instructions {
         if let Instruction::Let { value, .. } = instruction
             && let Some(alloc) = alloc_shape(value)
-            && shape.matches_alloc(alloc)
+            && shape.matches_alloc(&alloc)
         {
             return true;
         }
@@ -294,7 +196,7 @@ fn has_compatible_alloc_slice(
     }
 }
 
-fn has_compatible_alloc_block(block: &Block, shape: CandidateShape) -> bool {
+fn has_compatible_alloc_block(block: &Block, shape: &CandidateShape) -> bool {
     has_compatible_alloc_slice(&block.instructions, &block.exit, shape)
 }
 
@@ -305,12 +207,12 @@ fn pair_reuse_tail(
     instructions: &mut [Instruction],
     exit: &mut Exit,
     token: Local,
-    shape: CandidateShape,
+    shape: &CandidateShape,
 ) {
     for instruction in instructions.iter_mut() {
         if let Instruction::Let { value, .. } = instruction
             && let Some(alloc) = alloc_shape(value)
-            && shape.matches_alloc(alloc)
+            && shape.matches_alloc(&alloc)
         {
             rewrite_alloc_to_reuse(value, token);
             return;
@@ -338,11 +240,11 @@ fn pair_reuse_tail(
     }
 }
 
-fn pair_reuse_block(block: &mut Block, token: Local, shape: CandidateShape) {
+fn pair_reuse_block(block: &mut Block, token: Local, shape: &CandidateShape) {
     for instruction in &mut block.instructions {
         if let Instruction::Let { value, .. } = instruction
             && let Some(alloc) = alloc_shape(value)
-            && shape.matches_alloc(alloc)
+            && shape.matches_alloc(&alloc)
         {
             rewrite_alloc_to_reuse(value, token);
             return;
@@ -421,7 +323,7 @@ fn record_let_shapes(
         Operation::Field { object, field } if field != "_tag" => {
             let current = shapes
                 .get(object)
-                .copied()
+                .cloned()
                 .unwrap_or(CandidateShape::Unknown);
             shapes.insert(
                 *object,
@@ -432,14 +334,14 @@ fn record_let_shapes(
             if rep.is_aggregate() {
                 shapes.insert(*object, CandidateShape::Never);
             } else if *field == 0
-                && let Some(&(scrutinee, _)) = matches.get(object)
+                && let Some((scrutinee, _)) = matches.get(object)
             {
                 let _ = scrutinee;
                 match_conds.insert(binding, *object);
             } else if !matches.contains_key(object) {
                 let current = shapes
                     .get(object)
-                    .copied()
+                    .cloned()
                     .unwrap_or(CandidateShape::Unknown);
                 shapes.insert(
                     *object,
@@ -490,14 +392,14 @@ fn optimize_block(
                 let local = *local;
                 let shape = shapes
                     .get(&local)
-                    .copied()
+                    .cloned()
                     .unwrap_or(CandidateShape::Unknown);
                 let eligible = !matches!(shape, CandidateShape::Never | CandidateShape::Unknown);
                 if eligible
                     && has_compatible_alloc_slice(
                         &block.instructions[index + 1..],
                         &block.exit,
-                        shape,
+                        &shape,
                     )
                     && let Some(token) = *next_local
                 {
@@ -511,7 +413,7 @@ fn optimize_block(
                         &mut block.instructions[index + 1..],
                         &mut block.exit,
                         token,
-                        shape,
+                        &shape,
                     );
                 }
             }
@@ -527,14 +429,17 @@ fn optimize_block(
     {
         let mut then_shapes = shapes.clone();
         if let Some(matched) = match_conds.get(condition)
-            && let Some(&(scrutinee, pat_shape)) = matches.get(matched)
-            && pat_shape != CandidateShape::Unknown
+            && let Some((scrutinee, pat_shape)) = matches.get(matched)
+            && *pat_shape != CandidateShape::Unknown
         {
             let current = then_shapes
-                .get(&scrutinee)
-                .copied()
+                .get(scrutinee)
+                .cloned()
                 .unwrap_or(CandidateShape::Unknown);
-            then_shapes.insert(scrutinee, CandidateShape::refine(current, pat_shape));
+            then_shapes.insert(
+                *scrutinee,
+                CandidateShape::refine(current, pat_shape.clone()),
+            );
         }
         let mut else_shapes = shapes.clone();
         optimize_block(then_, &mut then_shapes, &matches, &match_conds, next_local);

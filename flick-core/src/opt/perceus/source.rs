@@ -7,7 +7,7 @@
 
 mod aggregates;
 mod app_fail;
-pub use aggregates::AggregatePolicy;
+pub use aggregates::{AggregatePolicy, FallbackTarget};
 mod core_lists;
 mod core_lists_array;
 mod core_lists_cb;
@@ -38,6 +38,8 @@ mod records;
 mod result_map2;
 mod scalar_context;
 mod seq;
+#[cfg(not(target_arch = "wasm32"))]
+mod specialize_bridge;
 mod std_arbitrary;
 mod std_arbitrary_entries;
 mod std_arbitrary_model;
@@ -139,7 +141,9 @@ mod tests;
 use std::collections::{BTreeMap, BTreeSet};
 use std::{error, fmt};
 
-use flick_ir::{Constructor, Dict, Foreign, InstanceInfo, Shape};
+#[cfg(not(target_arch = "wasm32"))]
+use flick_backend_support::specialize::SpecializedProgram;
+use flick_ir::{Constructor, Dict, Foreign, InstanceInfo, Shape, TypeRef};
 
 use crate::iface::Interface;
 use crate::ir::memory::{
@@ -305,6 +309,38 @@ pub fn lower_roots_with_declarations<'a>(
     )
 }
 
+/// Lowers a `#743` [`SpecializedProgram`](flick_backend_support::specialize::SpecializedProgram)
+/// together with its source [`Module`]s starting from `entry`, automatically
+/// deriving unboxed aggregate selections, typed-cell
+/// [`CellLayout`](crate::ir::memory::CellLayout) descriptors, and
+/// `BoxAggregate` / `UnboxBorrow` / `UnboxConsume` fallback boundaries from
+/// `#742` [`TypeLayout`](flick_backend_support::layout::TypeLayout)s.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn lower_specialized<'a>(
+    modules: &'a [Module],
+    specialized: &'a SpecializedProgram,
+    declarations: impl IntoIterator<Item = &'a Interface>,
+    entry: &Name,
+) -> Result<Program, LowerError> {
+    lower_roots_specialized(modules, specialized, declarations, &[entry])
+}
+
+/// Lowers a `#743` [`SpecializedProgram`](flick_backend_support::specialize::SpecializedProgram)
+/// for all `roots` with automatic `#742` layout selection and `#743` fallback
+/// boxing/unboxing.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn lower_roots_specialized<'a>(
+    modules: &'a [Module],
+    specialized: &'a SpecializedProgram,
+    declarations: impl IntoIterator<Item = &'a Interface>,
+    roots: &[&Name],
+) -> Result<Program, LowerError> {
+    let materialized = specialize_bridge::materialize_specialized_modules(modules, specialized);
+    let policy = AggregatePolicy::from_specialized(&materialized, specialized);
+    let decls: Vec<&Interface> = declarations.into_iter().collect();
+    lower_roots_with_aggregates(&materialized, decls, roots, policy)
+}
+
 /// [`lower_roots_with_declarations`] with an explicit [`AggregatePolicy`]
 /// selecting which constructors/types lower as unboxed by-value aggregates.
 pub fn lower_roots_with_aggregates<'a>(
@@ -416,6 +452,8 @@ fn lower_in<'a>(
         allow_foreign_bridge,
         enable_reuse,
         aggregates,
+        current_in_fallback: false,
+        higher_rank_locals: BTreeMap::new(),
         bridge_families,
         module_dirs,
         sources,
@@ -442,6 +480,8 @@ struct Lower<'a> {
     allow_foreign_bridge: bool,
     enable_reuse: bool,
     aggregates: AggregatePolicy,
+    current_in_fallback: bool,
+    higher_rank_locals: BTreeMap<String, FallbackTarget>,
     bridge_families: foreign_bridge::BridgeFamilies,
     module_dirs: BTreeMap<String, String>,
     sources: BTreeMap<Name, &'a Item>,

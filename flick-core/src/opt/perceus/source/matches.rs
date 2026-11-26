@@ -55,13 +55,28 @@ impl Lower<'_> {
         block: &mut Code,
         span: Span,
     ) -> Result<Local, LowerError> {
-        let scrutinee = self.expr(value, env, block)?;
-        self.matching_local(scrutinee, arms, env, block, span, MatchMode::Ordinary)
+        let scrutinee =
+            if let Some(unboxed) = self.try_fallback_boundary_call(value, env, block, true)? {
+                unboxed
+            } else {
+                self.expr(value, env, block)?
+            };
+        self.matching_local(
+            scrutinee,
+            value.ty.as_ref(),
+            arms,
+            env,
+            block,
+            span,
+            MatchMode::Ordinary,
+        )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn matching_local(
         &mut self,
         scrutinee: Local,
+        scrut_ty: Option<&flick_ir::TypeRef>,
         arms: &[Arm],
         env: &Env,
         block: &mut Code,
@@ -84,10 +99,10 @@ impl Lower<'_> {
             names: vec![],
             mode,
         };
-        let scrutinee_rep = if arms
-            .iter()
-            .any(|arm| self.aggregates.pattern_is_aggregate(&arm.pat))
-        {
+        let scrutinee_rep = if arms.iter().any(|arm| {
+            self.aggregates
+                .pattern_is_aggregate_in(&arm.pat, scrut_ty, self.current_in_fallback)
+        }) {
             ValueRep::Aggregate
         } else {
             ValueRep::Cell
@@ -113,7 +128,7 @@ impl Lower<'_> {
                 needed,
                 &bindings,
                 &suffix,
-                scrutinee_shape,
+                &scrutinee_shape,
                 scrutinee_rep,
                 span,
             )?;
@@ -128,7 +143,7 @@ impl Lower<'_> {
         needed: BTreeSet<String>,
         bindings: &[String],
         suffix: &Suffix,
-        scrutinee_shape: CandidateShape,
+        scrutinee_shape: &CandidateShape,
         scrutinee_rep: ValueRep,
         span: Span,
     ) -> Result<Suffix, LowerError> {
@@ -177,8 +192,8 @@ impl Lower<'_> {
         let fallback = suffix.call(0, &outer, &mut no, span)?;
         let code = self.reserve(span)?;
         let mut hints = BTreeMap::new();
-        if scrutinee_shape != CandidateShape::Unknown {
-            hints.insert(0, scrutinee_shape);
+        if *scrutinee_shape != CandidateShape::Unknown {
+            hints.insert(0, scrutinee_shape.clone());
         }
         self.finish_with_hints(
             code,

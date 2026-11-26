@@ -67,6 +67,9 @@ impl Lower<'_> {
                 if let Some(con) = saturated_constructor(expr) {
                     return self.saturated_constructor_expr(con, expr, env, block, span);
                 }
+                if let Some(local) = self.try_fallback_boundary_call(expr, env, block, false)? {
+                    return Ok(local);
+                }
                 let (function, argument) = if *arg_first {
                     let argument = self.expr(arg, env, block)?;
                     (self.expr(func, env, block)?, argument)
@@ -208,7 +211,9 @@ impl Lower<'_> {
                 }
                 Ok(function)
             }
-            ExprKind::Con(constructor) => self.constructor(constructor, vec![], block, span),
+            ExprKind::Con(constructor) => {
+                self.constructor(constructor, vec![], expr.ty.as_ref(), block, span)
+            }
             ExprKind::Ignore(value) => {
                 self.expr(value, env, block)?;
                 block.emit(Operation::Literal(Lit::Unit), span)
@@ -400,15 +405,27 @@ impl Lower<'_> {
             inside.insert(name.to_owned(), 0);
         }
         self.pattern(&first.pat, 1, &mut inside, &mut function, span)?;
+        let saved_hr = self.higher_rank_locals.clone();
+        if let Pat::Bind(param_name) = &first.pat {
+            if let Some(pty) = &first.ty
+                && let Some(target) = aggregates::FallbackTarget::from_higher_rank_type(pty)
+            {
+                self.higher_rank_locals.insert(param_name.clone(), target);
+            } else {
+                self.higher_rank_locals.remove(param_name);
+            }
+        }
         let saved_for = self.active_for_loop.take();
         let body_block = if rest.is_empty() {
             if loops::contains_direct_unwrap(body) {
                 let result = self.function_boundary(body, &inside, &mut function, span);
                 self.active_for_loop = saved_for;
+                self.higher_rank_locals = saved_hr;
                 function.finish(result?).body
             } else {
                 let result = self.expr_tail(body, &inside, function);
                 self.active_for_loop = saved_for;
+                self.higher_rank_locals = saved_hr;
                 result?
             }
         } else {
@@ -416,6 +433,7 @@ impl Lower<'_> {
             // must not remap its source name to their own inner self token.
             let result = self.lambda(rest, body, &inside, None, &mut function, span);
             self.active_for_loop = saved_for;
+            self.higher_rank_locals = saved_hr;
             function.finish(result?).body
         };
         self.finish_closure(

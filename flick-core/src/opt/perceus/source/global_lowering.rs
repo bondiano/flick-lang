@@ -53,33 +53,37 @@ impl Lower<'_> {
             initializer: code,
         });
         let mut block = Code::new(vec![]);
-        let value = match &item.kind {
+        let prev_in_fallback = self.current_in_fallback;
+        self.current_in_fallback = self.aggregates.is_fallback_function(&name.module, &name.name);
+        let value_result = match &item.kind {
             ItemKind::Value { dicts, body, .. } => {
                 if dicts.is_empty() {
                     if loops::contains_direct_unwrap(body) {
-                        self.function_boundary(body, &Env::new(), &mut block, item.span)?
+                        self.function_boundary(body, &Env::new(), &mut block, item.span)
                     } else {
-                        self.expr(body, &Env::new(), &mut block)?
+                        self.expr(body, &Env::new(), &mut block)
                     }
                 } else {
                     let body = Expr::new(
                         ExprKind::Abstract(dicts.clone(), Box::new(body.clone())),
                         body.span,
                     );
-                    self.expr(&body, &Env::new(), &mut block)?
+                    self.expr(&body, &Env::new(), &mut block)
                 }
             }
-            ItemKind::Foreign(value) => self.foreign(value, name, item.span, &mut block)?,
+            ItemKind::Foreign(value) => self.foreign(value, name, item.span, &mut block),
             ItemKind::Instance { info, methods } => {
-                self.instance(info, methods, &[], &mut block, item.span)?
+                self.instance(info, methods, &[], &mut block, item.span)
             }
             ItemKind::Destructure { pattern, body, .. } => {
-                self.global_destructure(name, pattern, body, item.span, &mut block)?
+                self.global_destructure(name, pattern, body, item.span, &mut block)
             }
             ItemKind::Constructor(_) | ItemKind::Service { .. } => {
                 unreachable!("only value definitions are indexed")
             }
         };
+        self.current_in_fallback = prev_in_fallback;
+        let value = value_result?;
         self.finish(code, &block.finish(value))
     }
 

@@ -113,6 +113,7 @@ impl Lower<'_> {
                 };
                 let fields = self.matching_local(
                     value,
+                    None,
                     &[arm],
                     &Env::new(),
                     block,
@@ -158,6 +159,7 @@ impl Lower<'_> {
         &mut self,
         constructor: &Constructor,
         arguments: Vec<Local>,
+        expr_ty: Option<&TypeRef>,
         block: &mut Code,
         span: Span,
     ) -> Result<Local, LowerError> {
@@ -189,13 +191,12 @@ impl Lower<'_> {
                 "{}.{}.{}",
                 constructor.module, constructor.ty, constructor.name
             );
-            let rep = if self.aggregates.is_aggregate_constructor(constructor) {
-                ValueRep::Aggregate
-            } else {
-                ValueRep::Cell
-            };
+            let rep = self
+                .aggregates
+                .constructor_rep(constructor, expr_ty, self.current_in_fallback);
             let layout = if rep.is_cell() {
-                self.aggregates.cell_layout(&tag)
+                self.aggregates
+                    .constructor_cell_layout(constructor, expr_ty, &tag)
             } else {
                 None
             };
@@ -231,7 +232,7 @@ impl Lower<'_> {
             )?);
         }
         inside.push(1);
-        let result = self.constructor(constructor, inside, &mut function, span)?;
+        let result = self.constructor(constructor, inside, expr_ty, &mut function, span)?;
         self.finish(code, &function.finish(result))?;
         block.emit(
             Operation::Closure {

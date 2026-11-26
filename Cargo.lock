@@ -824,7 +824,9 @@ dependencies = [
 name = "flick-model"
 version = "0.1.0"
 dependencies = [
+ "flick-backend-support",
  "flick-core",
+ "flick-ir",
  "flick-test-support",
  "flick-vm",
  "num-bigint",

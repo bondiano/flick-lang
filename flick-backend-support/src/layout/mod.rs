@@ -25,6 +25,7 @@ mod catalog;
 mod engine;
 mod indirection;
 mod inst_graph;
+pub mod memory;
 mod pack;
 mod primitives;
 mod types;
@@ -38,6 +39,7 @@ use std::fmt;
 use flick_ir::{Program, TypeRef};
 
 pub use engine::LayoutEngine;
+pub use memory::{cell_layout_of, value_rep_of, variant_cell_layout_of};
 pub use primitives::{Niche, Primitive, PrimitiveLayout, PrimitiveTable};
 pub use types::{
     DataLayout, DictFieldLayout, Discriminant, FieldLayout, FieldStorage, RecordFieldLayout,

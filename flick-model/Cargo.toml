@@ -18,6 +18,8 @@ num-bigint = "0.5.1"
 serde_json = { workspace = true }
 
 [dev-dependencies]
+flick-backend-support = { path = "../flick-backend-support", features = ["typed-ir", "specialize"] }
 flick-core = { path = "../flick-core", default-features = false, features = ["embedded-std", "native-js"] }
+flick-ir = { path = "../flick-ir" }
 flick-test-support = { path = "../flick-test-support" }
 proptest = { version = "1.12.0", default-features = false, features = ["std"] }

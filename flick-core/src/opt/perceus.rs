@@ -10,12 +10,16 @@ use std::{error, fmt};
 use crate::ir::memory::{self, Block, Exit, Function, Instruction, Local, Operation, ValueRep};
 
 mod reuse;
+mod reuse_shapes;
 mod source;
 pub use source::{
-    AggregatePolicy, LowerError, lower, lower_roots_with_aggregates, lower_roots_with_declarations,
-    lower_roots_with_declarations_without_reuse, lower_roots_with_foreign_bridge,
-    lower_with_aggregates, lower_with_declarations, lower_without_reuse,
+    AggregatePolicy, FallbackTarget, LowerError, lower, lower_roots_with_aggregates,
+    lower_roots_with_declarations, lower_roots_with_declarations_without_reuse,
+    lower_roots_with_foreign_bridge, lower_with_aggregates, lower_with_declarations,
+    lower_without_reuse,
 };
+#[cfg(not(target_arch = "wasm32"))]
+pub use source::{lower_roots_specialized, lower_specialized};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {

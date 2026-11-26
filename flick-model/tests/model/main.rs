@@ -86,6 +86,7 @@ pub mod memory_source_recovery_selector;
 pub mod memory_source_result_map2;
 pub mod memory_source_scalars;
 pub mod memory_source_strings;
+pub mod memory_specialize;
 pub mod memory_stage2;
 pub mod memory_stage2_sweeps;
 pub mod memory_stage3a;

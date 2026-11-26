@@ -105,6 +105,7 @@ impl Lower<'_> {
         }
         let result = self.matching_local(
             1,
+            None,
             errors,
             &inside,
             &mut function,
