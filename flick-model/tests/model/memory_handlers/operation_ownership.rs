@@ -1,3 +1,4 @@
+use flick_core::ir::memory::ValueRep;
 #[test]
 fn dictionaries_then_arguments_are_applied_as_owned_unary_stages() {
     let mut effects = handled(&[("right", 1)]);
@@ -51,6 +52,8 @@ fn dictionaries_then_arguments_are_applied_as_owned_unary_stages() {
                     Operation::Construct {
                         tag: "$tuple".into(),
                         fields: vec![2, 3, 1],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -219,7 +222,7 @@ fn capture(binding: Local, code: CodeId, captures: &[Local]) -> Instruction {
     )
 }
 fn project(binding: Local, object: Local, field: usize) -> Instruction {
-    bind(binding, Operation::Project { object, field })
+    bind(binding, Operation::Project { object, field, rep: ValueRep::Cell })
 }
 
 #[test]
@@ -246,6 +249,8 @@ fn every_fuel_cut_preserves_an_external_alias_of_a_parked_owned_capture() {
                     Operation::Construct {
                         tag: "$tuple".into(),
                         fields: vec![2, 4],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],

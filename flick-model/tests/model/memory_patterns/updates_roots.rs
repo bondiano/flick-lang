@@ -181,6 +181,8 @@ fn updates_do_not_mutate_original_records_retained_by_cells_or_arenas() {
                 Operation::Construct {
                     tag: "$tuple".into(),
                     fields: vec![7, 8],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
         ]);
@@ -290,6 +292,7 @@ fn borrowed_match_reuse_respects_whole_aliases_children_and_dead_results() {
                     Operation::Match {
                         object: 1,
                         pattern: Box::new(pattern),
+                        rep: ValueRep::Cell,
                     },
                 ),
                 bind(
@@ -297,6 +300,8 @@ fn borrowed_match_reuse_respects_whole_aliases_children_and_dead_results() {
                     Operation::Construct {
                         tag: "New".into(),
                         fields: vec![2],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -339,6 +344,7 @@ fn borrowed_match_reuse_respects_whole_aliases_children_and_dead_results() {
                 Operation::Match {
                     object: 1,
                     pattern: Box::new(bound("unused")),
+                    rep: ValueRep::Cell,
                 },
             ),
             bind(
@@ -346,6 +352,8 @@ fn borrowed_match_reuse_respects_whole_aliases_children_and_dead_results() {
                 Operation::Construct {
                     tag: "New".into(),
                     fields: vec![],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
         ],
@@ -366,11 +374,12 @@ fn borrowed_match_reuse_respects_whole_aliases_children_and_dead_results() {
 }
 #[test]
 fn match_update_and_failure_are_program_only_in_standalone_execution() {
-    use flick_model::memory::execute;
+    use flick_vm::tier0::execute;
     for operation in [
         Operation::Match {
             object: 0,
             pattern: Box::new(Pat::Wild),
+            rep: ValueRep::Cell,
         },
         Operation::Update {
             object: 0,

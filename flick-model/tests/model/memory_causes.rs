@@ -9,7 +9,7 @@ use flick_core::{
     numeric::{Arith, Num},
     opt::perceus,
 };
-use flick_model::memory::{
+use flick_vm::tier0::{
     DefectClass, DefectCode, Error, Heap, LanguageExit, ProgramOutcome, Reason, Value,
     execute_program_outcome,
 };

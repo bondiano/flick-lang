@@ -7,8 +7,8 @@ use flick_core::build;
 use flick_core::ir::Lit;
 use flick_core::ir::memory::{self, Name};
 use flick_core::opt::perceus;
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 
 fn program(text: &str, release: bool, entry: &Name) -> memory::Program {
     let modules = run::compile_source(text).expect("source checks");

@@ -5,22 +5,11 @@
 //! model observes stdout only, so what goes to stderr is dropped. The
 //! counted executor answers the same primitives with the same values.
 
+pub use flick_vm::tier0::{DRAW, MILLIS, MONOTONIC_NANOS, NANOS};
 use num_bigint::BigInt;
 
 use super::{data, prelude};
 use crate::syntax::{Lit, Term};
-
-/// The wall clock, in milliseconds since the epoch: 2025-06-15T17:46:40Z.
-pub const MILLIS: f64 = 1_750_000_000_000.0;
-
-/// The wall clock in nanoseconds, [`MILLIS`] exactly.
-pub const NANOS: i64 = 1_750_000_000_000_000_000;
-
-/// The monotonic clock, in nanoseconds.
-pub const MONOTONIC_NANOS: i64 = 0;
-
-/// Every draw of `Host.Random.next`, in [0, 1).
-pub const DRAW: f64 = 0.5;
 
 fn text(args: &[Term]) -> Result<&str, String> {
     match args {

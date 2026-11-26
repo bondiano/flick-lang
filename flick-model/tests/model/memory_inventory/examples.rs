@@ -11,13 +11,13 @@ use std::path::{Path, PathBuf};
 use flick_core::diagnostics::Severity;
 use flick_core::project::{self, Compiled};
 use flick_core::source::SourceMap;
-use flick_model::memory::{
-    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Value,
-    execute_tests_program_with_bridge,
-};
 use flick_model::run;
 use flick_model::syntax::Path as ModelPath;
 use flick_test_support::files as fixture_files;
+use flick_vm::tier0::{
+    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Value,
+    execute_tests_program_with_bridge,
+};
 
 use super::CorpusSummary;
 use super::helpers::FsHost;

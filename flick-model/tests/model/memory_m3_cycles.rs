@@ -15,8 +15,8 @@
 //!   untouched and drop cleanly afterward.
 
 use flick_core::ir::Lit;
-use flick_model::memory::{Error, Heap, ProgramOutcome, Stats, Value};
 use flick_model::run::{CountedMain, compile_source, counted_main, main_of};
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Stats, Value};
 
 mod raw_ir;
 

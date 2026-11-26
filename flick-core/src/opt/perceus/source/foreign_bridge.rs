@@ -285,7 +285,14 @@ impl Lower<'_> {
         let mut function = Code::new(vec![0, 1]);
         let mut inside = Vec::with_capacity(collected.len() + 1);
         for field in 0..collected.len() {
-            inside.push(function.emit(Operation::Project { object: 0, field }, span)?);
+            inside.push(function.emit(
+                Operation::Project {
+                    object: 0,
+                    field,
+                    rep: super::ValueRep::Cell,
+                },
+                span,
+            )?);
         }
         inside.push(1);
         let result = self.foreign_bridge_stage(value, spec, total, inside, &mut function, span)?;

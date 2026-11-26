@@ -1,3 +1,4 @@
+use flick_core::ir::memory::ValueRep;
 #[test]
 fn ordinary_selector_value_is_not_an_implicit_selected_body_result() {
     let mut heap = Heap::new();
@@ -162,12 +163,16 @@ fn forbidden_marker_edges() -> Vec<Operation> {
             object: 2,
             tag: "Box".into(),
             fields: vec![],
+            rep: ValueRep::Cell,
+            layout: None,
         },
         Operation::ReuseWithDicts {
             object: 2,
             tag: "Box".into(),
             fields: vec![],
             dicts: vec![],
+            rep: ValueRep::Cell,
+            layout: None,
         },
         Operation::ReuseRecord {
             object: 2,
@@ -188,11 +193,15 @@ fn forbidden_marker_edges() -> Vec<Operation> {
         Operation::Construct {
             tag: "Box".into(),
             fields: vec![2],
+            rep: ValueRep::Cell,
+            layout: None,
         },
         Operation::ConstructWithDicts {
             tag: "Box".into(),
             fields: vec![],
             dicts: vec![2],
+            rep: ValueRep::Cell,
+            layout: None,
         },
         Operation::Record {
             fields: vec![("value".into(), 2)],
@@ -221,6 +230,7 @@ fn forbidden_marker_operations() -> Vec<Operation> {
         Operation::Project {
             object: 2,
             field: 0,
+            rep: ValueRep::Cell,
         },
         Operation::Field {
             object: 2,
@@ -237,10 +247,12 @@ fn forbidden_marker_operations() -> Vec<Operation> {
         Operation::Match {
             object: 2,
             pattern: Box::new(Pat::Wild),
+            rep: ValueRep::Cell,
         },
         Operation::Match {
             object: 2,
             pattern: Box::new(Pat::Bind("bound".into())),
+            rep: ValueRep::Cell,
         },
         Operation::Call {
             code: 4,

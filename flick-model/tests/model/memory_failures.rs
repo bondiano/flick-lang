@@ -3,10 +3,12 @@ use crate::causes;
 use crate::recovery;
 use flick_core::ir::{
     Lit,
-    memory::{Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program},
+    memory::{
+        Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program, ValueRep,
+    },
 };
 use flick_core::opt::perceus;
-use flick_model::memory::{
+use flick_vm::tier0::{
     Error, Heap, ProgramOutcome, Value, execute, execute_program, execute_program_outcome,
 };
 
@@ -65,6 +67,8 @@ fn failure(caught: bool, malformed: bool) -> Program {
                     }
                     .into(),
                     fields: vec![4],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
             intrinsic(6, Intrinsic::FromResult, &[5]),

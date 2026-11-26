@@ -1,9 +1,7 @@
 //! Independent primitive total-order and rt/Go hash vectors through checked source.
 use flick_core::{build, ir::memory::Name, opt::perceus};
-use flick_model::{
-    memory::{Heap, Value, execute_program},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Heap, Value, execute_program};
 
 #[test]
 fn checked_total_compare_is_nan_last_and_preserves_partial_application() {

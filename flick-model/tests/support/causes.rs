@@ -1,7 +1,5 @@
 //! Outcome migration helpers: semantic expectations still require exact Die codes.
-use flick_model::memory::{
-    CauseToken, DefectClass, DefectCode, Error, Heap, ProgramOutcome, Reason,
-};
+use flick_vm::tier0::{CauseToken, DefectClass, DefectCode, Error, Heap, ProgramOutcome, Reason};
 
 fn inspect_defect(heap: &Heap, cause: &CauseToken) -> Result<Error, String> {
     let mut reasons = heap

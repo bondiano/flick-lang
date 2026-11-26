@@ -1,10 +1,12 @@
 //! Retired VM-minted arena capabilities fail in the language, not evaluator protocol.
 use flick_core::ir::{
     Lit,
-    memory::{Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program},
+    memory::{
+        Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program, ValueRep,
+    },
 };
 use flick_core::opt::perceus;
-use flick_model::memory::{
+use flick_vm::tier0::{
     DefectClass, DefectCode, Error, Heap, ObjectId, ProgramOutcome, Reason, execute_program,
     execute_program_outcome,
 };
@@ -61,6 +63,8 @@ fn boundary(case: &str) -> (Vec<Instruction>, u32, Function) {
                     Operation::Construct {
                         tag: "Payload".into(),
                         fields: vec![12],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
                 intrinsic(14, Intrinsic::ArenaAlloc, &[11, 13]),

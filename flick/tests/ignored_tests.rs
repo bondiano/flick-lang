@@ -142,7 +142,7 @@ fn runner(test: &Ignored) -> Runner {
             "flick",
             "a_generation_uses_the_successful_build_selection_after_config_changes",
         ) => Runner::Backends,
-        ("flick-model", _, _) => Runner::Model,
+        ("flick-model" | "flick-vm", _, _) => Runner::Model,
         ("flick-core", _, "dump" | "dump_explanations" | "write_fixes_of_built_in_signatures")
         | ("flick-pretty", _, "printing_time_grows_linearly") => Runner::Manual,
         _ => Runner::E2eTests,

@@ -160,6 +160,8 @@ fn nested_failure_drains_suspended_caller_values_and_callee_scratch() {
                     Operation::Construct {
                         tag: "Unreachable".into(),
                         fields: vec![1, 3],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -233,6 +235,8 @@ fn fuel_unwind_releases_values_retained_by_many_suspended_frames() {
                     Operation::Construct {
                         tag: "Unreachable".into(),
                         fields: vec![2, 3],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -288,6 +292,8 @@ fn closure_storage_is_never_reused_as_constructor_storage() {
                     Operation::Construct {
                         tag: "New".into(),
                         fields: vec![],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -318,6 +324,8 @@ fn closure_storage_is_never_reused_as_constructor_storage() {
         object: 2,
         tag: "New".into(),
         fields: vec![],
+        rep: ValueRep::Cell,
+        layout: None,
     };
     let mut heap = Heap::new();
     let ran = execute_program(

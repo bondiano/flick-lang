@@ -5,8 +5,8 @@
 use std::fs;
 use std::path::Path;
 
-use flick_model::memory::{Error, Heap, ProgramOutcome, Reason, Value};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Reason, Value};
 
 fn check_fixture(path: &Path, label: &str, fuel: u64) -> Result<(), String> {
     let expected = fs::read_to_string(path.with_extension("stdout"))

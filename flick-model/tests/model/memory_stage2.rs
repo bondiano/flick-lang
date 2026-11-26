@@ -6,9 +6,9 @@ use std::{env, fs};
 use flick_core::build;
 use flick_core::ir::memory::{Name, Program};
 use flick_core::opt::perceus;
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value, execute_program};
 use flick_model::run;
 use flick_test_support::entries;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program};
 
 use crate::causes;
 

@@ -2,10 +2,12 @@
 
 use flick_core::ir::{
     Lit,
-    memory::{Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program},
+    memory::{
+        Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program, ValueRep,
+    },
 };
 use flick_core::opt::perceus;
-use flick_model::memory::{Heap, ProgramOutcome, Value, execute_program, execute_program_outcome};
+use flick_vm::tier0::{Heap, ProgramOutcome, Value, execute_program, execute_program_outcome};
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }
@@ -30,6 +32,8 @@ pub(super) fn broken_cycle_raw_program() -> (Name, Program) {
                     Operation::Construct {
                         tag: "M.Ring.Ring".into(),
                         fields: vec![3, 2],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
                 bind(
@@ -97,6 +101,8 @@ fn broken_cycle_frees_old_payload_mid_execution_while_unbroken_retains_until_tea
                 Operation::Construct {
                     tag: "M.Ring.Ring".into(),
                     fields: vec![3, 2],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
             bind(
@@ -189,6 +195,8 @@ fn external_alias_stored_in_cyclic_ref_survives_teardown_untouched() {
                     Operation::Construct {
                         tag: "M.Ring.Ring".into(),
                         fields: vec![1, 3],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
                 bind(

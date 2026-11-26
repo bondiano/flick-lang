@@ -10,10 +10,8 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::{
-    memory::{Error, Heap, ProgramOutcome, Value, execute_program_outcome},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 
 const FUEL: u64 = 100_000;
 const SOURCE: &str = r#"module App.BigIntConversion exposing (int_value, bigint_value, bool_value, float_value, text_value, unit_value, bad_result, unknown, ref_value, js_value, list_value, all, cold)

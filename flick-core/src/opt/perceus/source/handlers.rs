@@ -1,7 +1,9 @@
 //! Delayed handler bodies and operation saturation through unary owned code.
 use flick_ir::{Handler, operation_arity};
 
-use super::{Code, Env, Local, Lower, LowerError, Operation, Param, Pat, Span, Stage, memory};
+use super::{
+    Code, Env, Local, Lower, LowerError, Operation, Param, Pat, Span, Stage, ValueRep, memory,
+};
 
 impl Lower<'_> {
     pub(super) fn handler(
@@ -93,7 +95,16 @@ impl Lower<'_> {
                 .ok_or(LowerError::Limit(span))?;
             let mut function = Code::new(vec![0, 1]);
             let mut captured = (0..count)
-                .map(|field| function.emit(Operation::Project { object: 0, field }, span))
+                .map(|field| {
+                    function.emit(
+                        Operation::Project {
+                            object: 0,
+                            field,
+                            rep: ValueRep::Cell,
+                        },
+                        span,
+                    )
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             captured.push(1);
             let value = if let Some(&next) = codes.get(stage + 1) {

@@ -95,6 +95,45 @@ impl DictionaryEntry {
     }
 }
 
+/// Target-independent representation of a memory-IR value.
+///
+/// `Cell` is a heap-allocated reference-counted cell (or immediate scalar).
+/// `Aggregate` is a flat by-value aggregate whose ownership is the multiset
+/// of its boxed fields (`0` for immediate aggregates) and which has no heap
+/// cell identity of its own, so it can never be a `DropReuse` or `Reuse*`
+/// candidate.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+pub enum ValueRep {
+    #[default]
+    Cell,
+    Aggregate,
+}
+
+impl ValueRep {
+    pub fn is_cell(&self) -> bool {
+        matches!(self, Self::Cell)
+    }
+
+    pub fn is_aggregate(&self) -> bool {
+        matches!(self, Self::Aggregate)
+    }
+}
+
+/// Target-independent heap-cell layout compatibility descriptor.
+///
+/// Distinguishes typed heap cells that share the same logical field count
+/// while having incompatible storage layouts (for example, different inline vs.
+/// boxed field shapes or alignment requirements) without committing to a
+/// specific target ABI.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct CellLayout {
+    pub capacity: usize,
+    pub align: u32,
+    pub ownership: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Operation {
     /// Strings and arbitrary-sized integers allocate; other literals are immediate.
@@ -103,6 +142,10 @@ pub enum Operation {
     Construct {
         tag: String,
         fields: Vec<Local>,
+        #[serde(default, skip_serializing_if = "ValueRep::is_cell")]
+        rep: ValueRep,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        layout: Option<CellLayout>,
     },
     /// Separate semantic payload from owned evidence. Physical projection
     /// order remains ordinary fields followed by dictionaries.
@@ -110,11 +153,17 @@ pub enum Operation {
         tag: String,
         fields: Vec<Local>,
         dicts: Vec<Local>,
+        #[serde(default, skip_serializing_if = "ValueRep::is_cell")]
+        rep: ValueRep,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        layout: Option<CellLayout>,
     },
     /// Borrows the object and returns a new owned token for its field.
     Project {
         object: Local,
         field: usize,
+        #[serde(default, skip_serializing_if = "ValueRep::is_cell")]
+        rep: ValueRep,
     },
     /// Canonical UTF-16 label order after source-order field evaluation.
     Record {
@@ -131,6 +180,8 @@ pub enum Operation {
     Match {
         object: Local,
         pattern: Box<Pat>,
+        #[serde(default, skip_serializing_if = "ValueRep::is_cell")]
+        rep: ValueRep,
     },
     /// Consumes the base and every replacement in written order, including
     /// duplicate labels. Produces a fresh record; the last duplicate wins.
@@ -203,19 +254,28 @@ pub enum Operation {
     DropReuse(Local),
     /// Consumes the candidate (or a `DropReuse` token) and fields. Reuses the
     /// candidate's storage only if it is unique and has the same tagged field
-    /// capacity. Otherwise drops it and allocates, with identical value semantics.
+    /// capacity and compatible layout. Otherwise drops it and allocates, with
+    /// identical value semantics.
     Reuse {
         object: Local,
         tag: String,
         fields: Vec<Local>,
+        #[serde(default, skip_serializing_if = "ValueRep::is_cell")]
+        rep: ValueRep,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        layout: Option<CellLayout>,
     },
-    /// Same physical-capacity/uniqueness check as Reuse, retaining the
+    /// Same physical-capacity/layout/uniqueness check as Reuse, retaining the
     /// explicit semantic payload/evidence boundary of the replacement.
     ReuseWithDicts {
         object: Local,
         tag: String,
         fields: Vec<Local>,
         dicts: Vec<Local>,
+        #[serde(default, skip_serializing_if = "ValueRep::is_cell")]
+        rep: ValueRep,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        layout: Option<CellLayout>,
     },
     /// Consumes the candidate (or a `DropReuse` token) and canonical record
     /// fields. Reuses the candidate's storage only if it is a unique record or
@@ -224,6 +284,24 @@ pub enum Operation {
     ReuseRecord {
         object: Local,
         fields: Vec<(String, Local)>,
+    },
+    /// Consumes an unboxed aggregate value and transfers its owned references
+    /// into a boxed fallback heap cell.
+    BoxAggregate {
+        value: Local,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        layout: Option<CellLayout>,
+    },
+    /// Borrows a boxed fallback cell and returns an owned aggregate copy,
+    /// retaining every boxed reference inside it without releasing the cell.
+    UnboxBorrow {
+        object: Local,
+    },
+    /// Consumes a boxed fallback cell and returns an owned aggregate: transfers
+    /// references without extra retains when unique, or retains references
+    /// before releasing the cell when shared.
+    UnboxConsume {
+        object: Local,
     },
     /// Installs operation arms around a delayed body called with Unit.
     /// Owns body, then operation functions in metadata order, then optional
@@ -359,5 +437,6 @@ mod tests {
     use super::*;
 
     include!("memory/validation_tests.rs");
+    include!("memory/aggregate_tests.rs");
     include!("memory/serialization_tests.rs");
 }

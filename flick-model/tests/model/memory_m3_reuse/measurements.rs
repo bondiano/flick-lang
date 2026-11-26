@@ -7,7 +7,7 @@
 //! 4. `Ref` cycles (with documented `cells_detached_on_teardown` outcomes).
 //!
 //! Execution engine for every runtime counter: `flick-model` counted VM
-//! (`flick-model/src/memory/`). Static reuse sites are counted directly on the
+//! (`flick-vm/src/tier0/`). Static reuse sites are counted directly on the
 //! `flick-core` Perceus-lowered memory IR (`Operation::Reuse* | Update`).
 //! Peak live bytes, physical target RSS, and target speed are explicitly
 //! `unmeasured` (no Wasm/Native RC codegen backend exists in M3).

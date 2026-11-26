@@ -13,9 +13,10 @@ traces and writes the generated Lean files of `formal/`.
   becomes `Term::Stuck`. `translate/lean.rs` writes the Prelude schemes.
 - `src/generate/`, `src/cert/` — well-typed program generator and the Lean
   certificates of its programs (`formal/FormalCert/`).
-- `src/memory/` — counted heap for the ownership IR; `src/rt/` — λRT trace
-  monitor (`examples/rt_trace.rs`); `src/modules.rs` — the executable
-  counterpart of `formal/Formal/HigherModules.lean`.
+- `src/rt/` — λRT trace monitor (`examples/rt_trace.rs`); `src/modules.rs` —
+  the executable counterpart of `formal/Formal/HigherModules.lean`. The
+  counted heap and ownership-IR executor live in `flick-vm` (`flick-vm/src/tier0/`),
+  exercised from `src/run.rs` and `tests/model/memory*.rs`.
 
 ## Rules
 

@@ -6,10 +6,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use flick_model::memory::{
+use flick_model::run::{compile, compile_files, counted_main_with_bridge, main_of};
+use flick_vm::tier0::{
     Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Reason, Value,
 };
-use flick_model::run::{compile, compile_files, counted_main_with_bridge, main_of};
 
 const FUEL: u64 = 10_000_000;
 

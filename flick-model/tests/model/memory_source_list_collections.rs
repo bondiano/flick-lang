@@ -8,9 +8,9 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::{
-    memory::{Error, Heap, ProgramOutcome, Value, execute_program, execute_program_outcome},
-    run,
+use flick_model::run;
+use flick_vm::tier0::{
+    Error, Heap, ProgramOutcome, Value, execute_program, execute_program_outcome,
 };
 
 const SOURCE: &str = r#"module App.Collections exposing (answer, boundary, cold, live, nominal, escaped, fault_map, fault_equal, fault_compare, fault_hash)

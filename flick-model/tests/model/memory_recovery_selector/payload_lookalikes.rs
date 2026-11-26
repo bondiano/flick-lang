@@ -66,6 +66,7 @@ fn same_payload_program(handler_errors: bool, ordinary_none: bool) -> Program {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 intrinsic(3, Intrinsic::Raise, &[2]),
@@ -94,11 +95,14 @@ fn same_payload_program(handler_errors: bool, ordinary_none: bool) -> Program {
         Operation::Construct {
             tag: "Prelude.Option.None".into(),
             fields: vec![],
+            rep: ValueRep::Cell,
+            layout: None,
         }
     } else {
         Operation::Project {
             object: 0,
             field: 0,
+            rep: ValueRep::Cell,
         }
     };
     program
@@ -185,6 +189,8 @@ fn lookalike_selector(kind: u8) -> Program {
                 Operation::Construct {
                     tag: "Prelude.Option.None".into(),
                     fields: vec![],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             )],
             2,
@@ -197,6 +203,8 @@ fn lookalike_selector(kind: u8) -> Program {
                     Operation::Construct {
                         tag: "Prelude.Option.Some".into(),
                         fields: vec![2],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -222,6 +230,8 @@ fn lookalike_selector(kind: u8) -> Program {
                     Operation::Construct {
                         tag: "RecoveryResult".into(),
                         fields: vec![2],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],

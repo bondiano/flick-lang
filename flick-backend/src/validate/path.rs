@@ -5,13 +5,8 @@ use unicode_normalization::UnicodeNormalization;
 
 use super::{Limits, string};
 
-/// A portable relative path, with no aliases on Windows or normalization
-/// aliases on macOS. Directory/file collisions are rejected as well.
-pub(crate) fn insert(
-    path: &str,
-    paths: &mut BTreeSet<String>,
-    limits: Limits,
-) -> Result<(), String> {
+/// Validate a portable relative path and return its canonical collision key.
+fn canonical_key(path: &str, limits: Limits) -> Result<String, String> {
     string(path, limits)?;
     if path.is_empty()
         || path
@@ -71,29 +66,72 @@ pub(crate) fn insert(
         .nfd()
         .filter(|c| !hfs_ignorable(*c))
         .collect();
-    let mut prefix = String::new();
     for part in key.split('/') {
         if part.is_empty() || matches!(part, "." | "..") {
             return Err(format!("invalid backend output path `{path}`"));
         }
+    }
+    Ok(key)
+}
+
+fn collides_with_file_prefix(key: &str, paths: &BTreeSet<String>) -> bool {
+    let mut prefix = String::new();
+    for part in key.split('/') {
         if !prefix.is_empty() {
             if paths.contains(&prefix) {
-                return Err(format!(
-                    "backend output path collides with a file: `{path}`"
-                ));
+                return true;
             }
             prefix.push('/');
         }
         prefix.push_str(part);
     }
-    if paths
-        .range(format!("{key}/")..)
-        .next()
-        .is_some_and(|p| p.starts_with(&format!("{key}/")))
-        || !paths.insert(key)
-    {
+    false
+}
+
+fn collides_with_entry_or_dir(key: &str, paths: &BTreeSet<String>) -> bool {
+    paths.contains(key)
+        || paths
+            .range(format!("{key}/")..)
+            .next()
+            .is_some_and(|p| p.starts_with(&format!("{key}/")))
+}
+
+/// A portable relative path, with no aliases on Windows or normalization
+/// aliases on macOS. Directory/file collisions are rejected as well.
+pub(crate) fn insert(
+    path: &str,
+    paths: &mut BTreeSet<String>,
+    limits: Limits,
+) -> Result<(), String> {
+    let key = canonical_key(path, limits)?;
+    if collides_with_file_prefix(&key, paths) {
+        return Err(format!(
+            "backend output path collides with a file: `{path}`"
+        ));
+    }
+    if collides_with_entry_or_dir(&key, paths) {
         return Err(format!(
             "duplicate or colliding backend output path `{path}`"
+        ));
+    }
+    paths.insert(key);
+    Ok(())
+}
+
+/// Reject an output path that equals, aliases, or collides as a file/directory
+/// prefix with an unowned module's declared layout path.
+pub(crate) fn check_unowned(
+    path: &str,
+    unowned: &BTreeSet<String>,
+    limits: Limits,
+) -> Result<(), String> {
+    if unowned.is_empty() {
+        return Ok(());
+    }
+    let key = canonical_key(path, limits)?;
+    if collides_with_file_prefix(&key, unowned) || collides_with_entry_or_dir(&key, unowned) {
+        return Err(format!(
+            "backend output path `{path}` violates declared module layout ownership"
         ));
     }
     Ok(())

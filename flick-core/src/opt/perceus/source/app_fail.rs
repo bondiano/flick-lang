@@ -1,6 +1,8 @@
 //! Exact nonreturning native App.fail bridge; its payload is an ordinary record.
 use super::kept_for_call;
-use super::{Code, Intrinsic, Local, Lower, LowerError, Name, Operation, Span, unsupported};
+use super::{
+    Code, Intrinsic, Local, Lower, LowerError, Name, Operation, Span, ValueRep, unsupported,
+};
 use flick_ir::{Adapter, Copies, Foreign, ForeignMode, ResultAdapter, Shape};
 
 pub(super) fn is_binding(value: &Foreign) -> bool {
@@ -65,6 +67,8 @@ impl Lower<'_> {
             Operation::Construct {
                 tag: "Prelude.Option.None".into(),
                 fields: vec![],
+                rep: ValueRep::Cell,
+                layout: None,
             },
             span,
         )?;
@@ -78,6 +82,8 @@ impl Lower<'_> {
             Operation::Construct {
                 tag: "Prelude.AppError.AppError".into(),
                 fields: vec![record],
+                rep: ValueRep::Cell,
+                layout: None,
             },
             span,
         )?;

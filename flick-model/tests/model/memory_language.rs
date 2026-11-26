@@ -8,9 +8,9 @@ use std::path::Path;
 use std::slice;
 
 use flick_core::ir::memory::Name as MemoryName;
-use flick_model::memory::{Heap, execute_tests_program};
 use flick_model::run;
 use flick_model::syntax::Path as ModelPath;
+use flick_vm::tier0::{Heap, execute_tests_program};
 
 const STAGE3_PURE_SUITES: &[&str] = &[
     "Adts",

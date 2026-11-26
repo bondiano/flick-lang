@@ -71,8 +71,21 @@ pub fn validate_request(
     sources::validate_export_spans(request, &text_refs)?;
     match (&request.target.mode, &request.module_root) {
         (Mode::WholeProgram, None) => {}
-        (Mode::PerModule, Some(root)) if program.modules.iter().any(|m| m.name == *root) => {}
-        _ => return Err("compilation mode has no valid module root".into()),
+        (Mode::PerModule, Some(root))
+            if modules
+                .get(root.as_str())
+                .is_some_and(|m| m.role == ModuleRole::Own) => {}
+        (Mode::WholeProgram, Some(_)) => {
+            return Err("whole-program mode cannot set a module root".into());
+        }
+        (Mode::PerModule, None) => {
+            return Err("per-module mode requires a module root".into());
+        }
+        (Mode::PerModule, Some(root)) => {
+            return Err(format!(
+                "per-module root `{root}` must name an own module in the graph"
+            ));
+        }
     }
     graph::roots(request, &modules)?;
     side_data(request, &manifest, &modules, limits)?;

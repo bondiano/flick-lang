@@ -4,11 +4,11 @@ use flick_core::ir::{
     Lit,
     memory::{
         Block, DictionaryEntry, Exit, Function, Global, Instruction, Intrinsic, Name, Operation,
-        Program,
+        Program, ValueRep,
     },
 };
 use flick_core::opt::perceus;
-use flick_model::memory::{
+use flick_vm::tier0::{
     Error, Heap, ProgramOutcome, Value, execute_program, execute_program_outcome,
 };
 
@@ -67,6 +67,8 @@ fn tuple(binding: u32, fields: &[u32]) -> Instruction {
         Operation::Construct {
             tag: "$tuple".into(),
             fields: fields.to_vec(),
+            rep: ValueRep::Cell,
+            layout: None,
         },
     )
 }
@@ -136,6 +138,7 @@ fn getters() -> Program {
                             Operation::Project {
                                 object: 0,
                                 field: 0,
+                                rep: ValueRep::Cell,
                             },
                         ),
                         method(3, 2, "value"),
@@ -341,6 +344,7 @@ fn bad_dictionary_entries_and_lookups_release_all_real_roots() {
             Operation::Project {
                 object: 3,
                 field: 0,
+                rep: ValueRep::Cell,
             },
             Error::ExpectedObject,
         ),
@@ -527,6 +531,7 @@ fn getters_use_lookup_context_not_construction_context_and_restore_absence() {
                             Operation::Project {
                                 object: 0,
                                 field: 0,
+                                rep: ValueRep::Cell,
                             },
                         ),
                         method(3, 2, "context"),

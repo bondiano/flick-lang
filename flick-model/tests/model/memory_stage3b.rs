@@ -5,8 +5,8 @@ use std::fs;
 use std::path::Path;
 
 use flick_core::ir::Lit;
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value};
 
 fn assert_fuel_prefix_zero_leaks(source: &str, expected_stdout: &str, max_steps: u64) {
     let modules = run::compile_source(source).expect("source checks");

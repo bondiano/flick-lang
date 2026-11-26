@@ -116,6 +116,18 @@ impl Lower<'_> {
                 } else {
                     "$list"
                 };
+                let rep = if matches!(expr.kind, ExprKind::Tuple(_))
+                    && self.aggregates.is_aggregate_tag("$tuple")
+                {
+                    ValueRep::Aggregate
+                } else {
+                    ValueRep::Cell
+                };
+                let layout = if rep.is_cell() {
+                    self.aggregates.cell_layout(tag)
+                } else {
+                    None
+                };
                 let fields = values
                     .iter()
                     .map(|value| self.expr(value, env, block))
@@ -124,6 +136,8 @@ impl Lower<'_> {
                     Operation::Construct {
                         tag: tag.into(),
                         fields,
+                        rep,
+                        layout,
                     },
                     span,
                 )
@@ -376,6 +390,7 @@ impl Lower<'_> {
                 Operation::Project {
                     object: 0,
                     field: index,
+                    rep: ValueRep::Cell,
                 },
                 span,
             )?;
@@ -429,7 +444,14 @@ impl Lower<'_> {
         let mut function = Code::new(vec![0, 1]);
         let mut inside = Env::new();
         for (field, name) in names.into_iter().enumerate() {
-            let value = function.emit(Operation::Project { object: 0, field }, span)?;
+            let value = function.emit(
+                Operation::Project {
+                    object: 0,
+                    field,
+                    rep: ValueRep::Cell,
+                },
+                span,
+            )?;
             inside.insert(name, value);
         }
         let saved_for = self.active_for_loop.take();
@@ -450,54 +472,5 @@ impl Lower<'_> {
             },
         )?;
         block.emit(Operation::Task { code, captures }, span)
-    }
-
-    fn within(
-        &mut self,
-        owner: &str,
-        call: &Expr,
-        env: &Env,
-        block: &mut Code,
-        span: Span,
-    ) -> Result<Local, LowerError> {
-        let owner = lookup(env, owner, span)?;
-        let names: Vec<_> = free(call).into_iter().collect();
-        let args = names
-            .iter()
-            .map(|name| lookup(env, name, span))
-            .collect::<Result<Vec<_>, _>>()?;
-        let params = (0..args.len())
-            .map(|index| u32::try_from(index).map_err(|_| LowerError::Limit(span)))
-            .collect::<Result<Vec<_>, _>>()?;
-        let inside = names.into_iter().zip(params.iter().copied()).collect();
-        let mut helper = Code::new(params);
-        let result = self.expr(call, &inside, &mut helper)?;
-        let code = self.reserve(span)?;
-        self.finish(code, &helper.finish(result))?;
-        block.emit(Operation::Within { owner, code, args }, span)
-    }
-
-    fn owner_evidence(
-        &mut self,
-        owner: Local,
-        call: &Expr,
-        env: &Env,
-        block: &mut Code,
-        span: Span,
-    ) -> Result<Local, LowerError> {
-        let names: Vec<_> = free(call).into_iter().collect();
-        let args = names
-            .iter()
-            .map(|name| lookup(env, name, span))
-            .collect::<Result<Vec<_>, _>>()?;
-        let params = (0..args.len())
-            .map(|index| u32::try_from(index).map_err(|_| LowerError::Limit(span)))
-            .collect::<Result<Vec<_>, _>>()?;
-        let inside = names.into_iter().zip(params.iter().copied()).collect();
-        let mut helper = Code::new(params);
-        let result = self.expr(call, &inside, &mut helper)?;
-        let code = self.reserve(span)?;
-        self.finish(code, &helper.finish(result))?;
-        block.emit(Operation::WithOwnerEvidence { owner, code, args }, span)
     }
 }

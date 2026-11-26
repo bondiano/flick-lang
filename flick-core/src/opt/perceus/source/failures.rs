@@ -5,7 +5,7 @@ use flick_ir::{Adapter, Arm, Copies, Foreign, ForeignMode, Handler, ResultAdapte
 
 use super::{
     Code, Env, Expr, ExprKind, Intrinsic, Local, Lower, LowerError, Operation, Param, Pat, Span,
-    Stage, free, lookup,
+    Stage, ValueRep, free, lookup,
 };
 
 pub(super) fn supports(value: &Foreign) -> bool {
@@ -93,7 +93,14 @@ impl Lower<'_> {
         let mut function = Code::new(vec![0, 1]);
         let mut inside = Env::new();
         for (field, name) in names.into_iter().enumerate() {
-            let value = function.emit(Operation::Project { object: 0, field }, span)?;
+            let value = function.emit(
+                Operation::Project {
+                    object: 0,
+                    field,
+                    rep: ValueRep::Cell,
+                },
+                span,
+            )?;
             inside.insert(name, value);
         }
         let result = self.matching_local(

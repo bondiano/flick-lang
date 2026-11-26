@@ -5,8 +5,8 @@ use flick_core::ir::{
     memory::{Name, Program},
 };
 use flick_core::{build, opt::perceus};
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 
 const RECURSIVE: &str = r#"module App.Derived exposing (answer)
 type Tree = Leaf | Node Tree Int Tree

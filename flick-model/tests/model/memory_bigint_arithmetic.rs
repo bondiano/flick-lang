@@ -3,12 +3,12 @@ use crate::causes;
 use flick_core::{
     ir::{
         BinOp, Lit,
-        memory::{Block, Exit, Function, Global, Instruction, Name, Operation, Program},
+        memory::{Block, Exit, Function, Global, Instruction, Name, Operation, Program, ValueRep},
     },
     numeric::{Arith, Num},
     opt::perceus,
 };
-use flick_model::memory::{Error, Heap, ProgramOutcome, execute_program_outcome};
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, execute_program_outcome};
 
 fn function(params: &[u32], instructions: Vec<Instruction>, result: u32) -> Function {
     perceus::insert(&Function {
@@ -70,6 +70,7 @@ fn program(op: Arith) -> Program {
                             Operation::Project {
                                 object: 0,
                                 field: 0,
+                                rep: ValueRep::Cell,
                             },
                         ),
                         bind(

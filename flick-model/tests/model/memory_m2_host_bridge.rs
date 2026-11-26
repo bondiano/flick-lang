@@ -6,8 +6,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
-use flick_model::memory::{Error, Heap, HostBridge, HostMode, ProgramOutcome, Value};
 use flick_model::run::{compile, counted_main_with_bridge, main_of};
+use flick_vm::tier0::{Error, Heap, HostBridge, HostMode, ProgramOutcome, Value};
 
 struct TempFixture {
     dir: PathBuf,

@@ -7,7 +7,7 @@ pub fn validate(function: &Function) -> Result<(), Error> {
     for &param in &function.params {
         bind(param, &mut tokens, &mut defined)?;
     }
-    check(&function.body, tokens, defined)
+    check(&function.body, tokens, defined, BTreeMap::new())
 }
 
 /// Checks every code body and symbol/arity edge, including unselected
@@ -116,6 +116,7 @@ fn check(
     block: &Block,
     mut tokens: BTreeMap<Local, usize>,
     mut defined: BTreeSet<Local>,
+    mut reps: BTreeMap<Local, ValueRep>,
 ) -> Result<(), Error> {
     for instruction in &block.instructions {
         match instruction {
@@ -126,7 +127,9 @@ fn check(
                 if let Operation::Match { pattern, .. } = value {
                     pattern_bindings(pattern)?;
                 }
-                if let Operation::ConstructWithDicts { tag, fields, dicts }
+                if let Operation::ConstructWithDicts {
+                    tag, fields, dicts, ..
+                }
                 | Operation::ReuseWithDicts {
                     tag, fields, dicts, ..
                 } = value
@@ -139,6 +142,33 @@ fn check(
                         return Err(Error::ReservedConstructorEvidence(tag.clone()));
                     }
                 }
+                match value {
+                    Operation::DropReuse(object) | Operation::ReuseRecord { object, .. }
+                        if reps.get(object) == Some(&ValueRep::Aggregate) =>
+                    {
+                        return Err(Error::AggregateReuseCandidate(*object));
+                    }
+                    Operation::Reuse { object, rep, .. }
+                    | Operation::ReuseWithDicts { object, rep, .. }
+                        if rep.is_aggregate()
+                            || reps.get(object) == Some(&ValueRep::Aggregate) =>
+                    {
+                        return Err(Error::AggregateReuseCandidate(*object));
+                    }
+                    Operation::Project {
+                        object,
+                        rep: ValueRep::Aggregate,
+                        ..
+                    }
+                    | Operation::Match {
+                        object,
+                        rep: ValueRep::Aggregate,
+                        ..
+                    } => {
+                        reps.entry(*object).or_insert(ValueRep::Aggregate);
+                    }
+                    _ => {}
+                }
                 if let Some(local) = value.borrowed()
                     && !tokens.contains_key(&local)
                 {
@@ -148,6 +178,9 @@ fn check(
                     take(local, &mut tokens)?;
                 }
                 bind(*binding, &mut tokens, &mut defined)?;
+                if let Some(rep) = value.result_rep() {
+                    reps.insert(*binding, rep);
+                }
             }
             Instruction::Dup(local) => {
                 *tokens.get_mut(local).ok_or(Error::NoToken(*local))? += 1;
@@ -170,8 +203,8 @@ fn check(
             else_,
         } => {
             take(*condition, &mut tokens)?;
-            check(then_, tokens.clone(), defined.clone())?;
-            check(else_, tokens, defined)
+            check(then_, tokens.clone(), defined.clone(), reps.clone())?;
+            check(else_, tokens, defined, reps)
         }
     }
 }

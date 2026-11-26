@@ -156,6 +156,7 @@ fn within_restores_selection_without_closing_selected_outer_storage() {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 bind(

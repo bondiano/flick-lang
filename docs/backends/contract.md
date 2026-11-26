@@ -13,16 +13,19 @@ language that implements this world.
 
 ## Status
 
-This is an initial 0.x contract and validation library. It does not freeze
-IR 1.0 or complete every semantic prerequisite of R3a. Ordinary JS/TS and Go
+This is an initial 0.x contract and validation library. It explicitly keeps
+`flick:backend@0.1.0` and portable IR `0.19.0` on `0.x` rather than freezing
+IR 1.0; see the [ABI and IR stability decision](stability.md) for the complete
+list of resolved and outstanding semantic prerequisites. Ordinary JS/TS and Go
 `build/run/dev/test/inspect` select the distributed `flick/js` or `flick/go`
-component by default. The portable IR is 0.19.0. The official
+component by default. The official
 JS and Go emitters live in `backends/js` and `backends/go`, independently of
-`flick-core`. The contract probe exercises both with IR
-and plain data without `Compilation` or `Settings`. The distributed components
-are checked against their Rust/WIT sources; real release-binary tests require
-component selection for build/run/test. The native trait remains a development
-and parity interface.
+`flick-core`, and `backends/lua` implements the same world as a preview
+component. The contract probes exercise both `PerModule` and `WholeProgram`
+modes with IR and plain data without `Compilation` or `Settings`. The
+distributed components are checked against their Rust/WIT sources; real
+release-binary tests require component selection for build/run/test. The native
+trait remains a development and parity interface.
 
 The optional `flick-backend/host` feature executes this world using the
 same Wasmtime configuration and compiled-code cache as the plugin host.
@@ -75,10 +78,12 @@ Resolved active options arrive in `TargetRequest.options` as `option.<name>`
 entries alongside `command` (`check`, `build`, `run`, `dev`, `test` or `inspect`) and,
 for `inspect`, `inspect.module`. `BuildRequest.declared-dependencies` carries
 the target package dependencies declared by the project so each backend derives
-internal runtime/bridge settings itself. The browser
-loader, atomic publication and generic tool execution adapters remain integration work.
-Accepting a graph here does not execute it or establish that a tool's arguments
-access only declared files.
+internal runtime/bridge settings itself. Host tool execution (`flick/src/backends/tools.rs`,
+gated by `[tools]` grants) and atomic publication (`flick/src/publish.rs`) are
+integrated on the CLI; the browser component loader remains separate
+integration work. Accepting a graph in `validate_result` does not execute it
+or establish that a tool's arguments access only declared files; execution
+runs under the host tool adapter below.
 
 ## Input boundary
 
@@ -112,8 +117,13 @@ cacheable under a key that would also describe the content once available.
 Runtime dependency pins require a package and a valid SHA-256 in both the
 request and result; request membership alone does not validate a pin.
 The complete module layout is checked for portable paths and collisions in
-both compilation modes. Module package ownership must match the IR, and
-entry, test and root-handler module references stay inside the closed graph.
+both compilation modes. In `PerModule` mode, `module_root` must be present and
+name an `Own` module in `request.modules`, and no artifact or step output may
+collide with another `Own` or `External` module's declared `output` path. In
+`WholeProgram` mode, `module_root` must be absent, and no artifact or step
+output may collide with an `External` module's declared `output` path. Module
+package ownership must match the IR, and entry, test, host-export and
+root-handler module references stay inside the closed graph.
 Every item and nested expression span must fit the supplied UTF-8 source.
 Source aliases share one retained input buffer and line index during validation.
 
@@ -210,7 +220,8 @@ Ordinary package imports remain imports; this does not yet provide complete
 npm dependency pinning or Go foreign inputs.
 
 Future changes to memory or execution semantics need a coordinated IR
-version, independently of this backend package version.
+version, independently of this backend package version; see
+[stability.md](stability.md).
 
 `check-target` receives the complete request, so unsupported operations can
 be refused with source spans before generation. Static handshake precedes
@@ -509,11 +520,13 @@ and invalid outputs. `just wasm-plugins` includes that recipe and verifies
 existing plugins against the shared host configuration.
 
 The canonical WIT and native request/result
-schemas have reviewable golden snapshots. Changes must review both the ABI
+schemas (for both `WholeProgram` and `PerModule` modes) have reviewable golden
+snapshots in `flick-backend/tests/schema.rs`. Changes must review both the ABI
 and schema differences, with an incompatible 0.x change requiring a new minor
 version once this contract is published. Binary round trips retain zero and
 non-UTF-8 bytes. Independent contract probes pin Unit's JS representation
-(`undefined`), its TS annotation, source-map metadata and Go's `flickrt.Unit`.
+(`undefined`), its TS annotation, source-map metadata, Go's `flickrt.Unit`,
+per-module dependency references, and layout ownership refusals.
 
 These checks establish the boundary's shape and validation behavior. They do
 not replace official-backend native/component parity, production selection tests,

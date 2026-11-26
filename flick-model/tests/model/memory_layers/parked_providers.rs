@@ -23,6 +23,7 @@ fn nested_constant_provider(callback: u32, text: &str) -> Function {
                 Operation::Project {
                     object: 0,
                     field: 0,
+                    rep: ValueRep::Cell,
                 },
             ),
             bind(3, Operation::ServiceTag("Service".into())),
@@ -90,6 +91,7 @@ fn nested_outer_functions() -> Vec<Function> {
                         Operation::Project {
                             object: 0,
                             field: 0,
+                            rep: ValueRep::Cell,
                         },
                     ),
                     captured(3, 6, &[2]),
@@ -110,6 +112,7 @@ fn nested_outer_functions() -> Vec<Function> {
                         Operation::Project {
                             object: 0,
                             field: 0,
+                            rep: ValueRep::Cell,
                         },
                     ),
                     captured(4, 7, &[3]),
@@ -123,6 +126,16 @@ fn nested_outer_functions() -> Vec<Function> {
     ]
 }
 fn nested_parked_providers(mode: &str) -> Program {
+    let project0 = |binding| {
+        bind(
+            binding,
+            Operation::Project {
+                object: 0,
+                field: 0,
+                rep: ValueRep::Cell,
+            },
+        )
+    };
     let mut fs = nested_outer_functions();
     fs.extend([
         nested_constant_provider(8, "inner"),
@@ -131,13 +144,7 @@ fn nested_parked_providers(mode: &str) -> Program {
             {
                 let mut ops = arena_marker(1);
                 ops.extend([
-                    bind(
-                        2,
-                        Operation::Project {
-                            object: 0,
-                            field: 0,
-                        },
-                    ),
+                    project0(2),
                     captured(3, 13, &[2]),
                     intrinsic(4, Intrinsic::ScopeRun, &[3]),
                 ]);
@@ -174,13 +181,7 @@ fn nested_parked_providers(mode: &str) -> Program {
                 let mut ops = vec![bind(2, Operation::Literal(Lit::Unit))];
                 ops.extend(arena_marker(2));
                 ops.extend([
-                    bind(
-                        3,
-                        Operation::Project {
-                            object: 0,
-                            field: 0,
-                        },
-                    ),
+                    project0(3),
                     bind(
                         4,
                         Operation::Within {
@@ -380,6 +381,7 @@ fn discarded_provider_in_modify_callback_never_commits() {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 closure(3, 3),

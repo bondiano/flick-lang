@@ -26,6 +26,7 @@ pub mod live_kept;
 pub mod live_scope;
 pub mod live_service_order;
 pub mod memory;
+pub mod memory_aggregates;
 pub mod memory_arena_defects;
 pub mod memory_arenas;
 pub mod memory_array_observers;

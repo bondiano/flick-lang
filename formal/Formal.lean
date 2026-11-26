@@ -210,6 +210,7 @@ import Formal.Memory
 import Formal.MemoryPass
 import Formal.MemoryInsert
 import Formal.MemoryReuse
+import Formal.MemoryAggregate
 import Formal.MemoryArena
 import Formal.MemoryScopes
 import Formal.RecordOrder

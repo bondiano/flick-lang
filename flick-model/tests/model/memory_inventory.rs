@@ -12,12 +12,12 @@ use std::{env, fs};
 use flick_core::diagnostics::Severity;
 use flick_core::project;
 use flick_core::source::SourceMap;
-use flick_model::memory::{
-    Error as MemoryError, ExecutionReport, Heap, HostBridge, HostMode, ProgramOutcome, Value,
-};
 use flick_model::run;
 use flick_model::syntax::Path as ModelPath;
 use flick_test_support::files as fixture_files;
+use flick_vm::tier0::{
+    Error as MemoryError, ExecutionReport, Heap, HostBridge, HostMode, ProgramOutcome, Value,
+};
 
 mod examples;
 mod helpers;

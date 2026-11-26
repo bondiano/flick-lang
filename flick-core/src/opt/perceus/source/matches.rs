@@ -6,7 +6,7 @@ use crate::ir::Arm;
 
 use super::{
     Block, CandidateShape, Code, CodeId, Env, Exit, Expr, Function, Intrinsic, Local, Lower,
-    LowerError, Operation, Param, Pat, Span, Stage, free, lookup, memory, reuse,
+    LowerError, Operation, Param, Pat, Span, Stage, ValueRep, free, lookup, memory, reuse,
 };
 
 #[derive(Clone, Copy)]
@@ -84,7 +84,19 @@ impl Lower<'_> {
             names: vec![],
             mode,
         };
-        let scrutinee_shape = reuse::arms_scrutinee_shape(arms.iter().map(|arm| &arm.pat));
+        let scrutinee_rep = if arms
+            .iter()
+            .any(|arm| self.aggregates.pattern_is_aggregate(&arm.pat))
+        {
+            ValueRep::Aggregate
+        } else {
+            ValueRep::Cell
+        };
+        let scrutinee_shape = if scrutinee_rep.is_aggregate() {
+            CandidateShape::Never
+        } else {
+            reuse::arms_scrutinee_shape(arms.iter().map(|arm| &arm.pat))
+        };
         for arm in arms.iter().rev() {
             let bindings = memory::pattern_bindings(&arm.pat)
                 .map_err(|error| LowerError::Pattern { error, span })?;
@@ -96,11 +108,20 @@ impl Lower<'_> {
                 needed.remove(name);
             }
             needed.extend(suffix.names.iter().cloned());
-            suffix = self.match_arm(arm, needed, &bindings, &suffix, scrutinee_shape, span)?;
+            suffix = self.match_arm(
+                arm,
+                needed,
+                &bindings,
+                &suffix,
+                scrutinee_shape,
+                scrutinee_rep,
+                span,
+            )?;
         }
         suffix.call(scrutinee, env, block, span)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn match_arm(
         &mut self,
         arm: &Arm,
@@ -108,6 +129,7 @@ impl Lower<'_> {
         bindings: &[String],
         suffix: &Suffix,
         scrutinee_shape: CandidateShape,
+        scrutinee_rep: ValueRep,
         span: Span,
     ) -> Result<Suffix, LowerError> {
         let names: Vec<_> = needed.into_iter().collect();
@@ -124,6 +146,7 @@ impl Lower<'_> {
             Operation::Match {
                 object: 0,
                 pattern: Box::new(arm.pat.clone()),
+                rep: scrutinee_rep,
             },
             span,
         )?;
@@ -131,6 +154,7 @@ impl Lower<'_> {
             Operation::Project {
                 object: matched,
                 field: 0,
+                rep: ValueRep::Cell,
             },
             span,
         )?;
@@ -142,6 +166,7 @@ impl Lower<'_> {
                 Operation::Project {
                     object: matched,
                     field,
+                    rep: ValueRep::Cell,
                 },
                 span,
             )?;

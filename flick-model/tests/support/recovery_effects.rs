@@ -4,7 +4,7 @@ use flick_core::{
         Lit,
         memory::{
             Block, Exit, Function, Global, HandlerEffect, HandlerOperation, Instruction, Intrinsic,
-            Name, Operation, Program,
+            Name, Operation, Program, ValueRep,
         },
     },
     opt::perceus,
@@ -243,6 +243,7 @@ pub fn tail_failure_outer_recovery(handler_errors: bool) -> Program {
                 Operation::Project {
                     object: 0,
                     field: 0,
+                    rep: ValueRep::Cell,
                 },
             )],
             2,

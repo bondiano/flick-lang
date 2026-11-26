@@ -1,8 +1,8 @@
 //! Exact primitive contracts on checked source, without substitution fallback.
 use crate::causes;
 use flick_core::ir::Lit;
-use flick_model::memory::{Error, Heap, ProgramOutcome};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome};
 use std::{fs, path::Path};
 
 fn success(source: &str, expected: &str) {

@@ -3,8 +3,8 @@
 //! is answered by `Host.live`, and a provider of `main` still wins.
 use std::{fs, path::Path};
 
-use flick_model::memory::{Heap, ProgramOutcome};
 use flick_model::run;
+use flick_vm::tier0::{Heap, ProgramOutcome};
 
 #[test]
 fn a_runner_less_main_gets_the_host_root_in_both_profiles() {

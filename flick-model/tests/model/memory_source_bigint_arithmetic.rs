@@ -7,10 +7,8 @@ use flick_core::{
     ir::{Lit, memory::Name},
     opt::perceus,
 };
-use flick_model::{
-    memory::{Error, Heap, ProgramOutcome, Value, execute_program_outcome},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 
 const INPUT: &str = "-123456789012345678901234567890";
 const SOURCE: &str = r#"module App.BigIntArithmetic exposing (answer, negative)

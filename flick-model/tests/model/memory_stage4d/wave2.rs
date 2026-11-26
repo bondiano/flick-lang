@@ -3,8 +3,8 @@
 
 use std::path::Path;
 
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value};
 
 use super::check_fixture;
 

@@ -7,7 +7,7 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 
 const FUEL: u64 = 100_000;
 const MAX_INTEGER: &str = concat!(

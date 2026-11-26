@@ -6,8 +6,8 @@ use flick_core::build;
 use flick_core::ir::memory::{self, Name};
 use flick_core::ir::{AdapterArg, BackendAdapter, Lit};
 use flick_core::opt::perceus;
-use flick_model::memory::{Error, Heap, ProgramOutcome, execute_program_outcome};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, execute_program_outcome};
 
 #[test]
 fn constant_layer_fixtures_execute_in_both_profiles() {
@@ -294,7 +294,7 @@ fn unknown_layer_adapters_reject_before_execution_or_heap_changes() {
 #[test]
 fn malformed_complete_provider_is_a_shadow_barrier_not_a_partial_handler() {
     use flick_core::ir::{ExprKind, ItemKind};
-    use flick_model::memory::Value;
+    use flick_vm::tier0::Value;
 
     let text = r#"module App.LayerBarrier exposing (answer)
 

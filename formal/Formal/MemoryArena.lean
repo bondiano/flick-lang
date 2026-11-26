@@ -3,7 +3,7 @@ import Std
 /-!
 # Root cell arena ownership ledger
 
-This abstracts `flick-model/src/memory.rs` and `memory/program.rs`: `RefMake`
+This abstracts `flick-vm/src/tier0.rs` and `tier0/program.rs`: `RefMake`
 allocates a `Data::Cell` object and keeps its sole private owner in
 `Machine.cells`; `CellHandle` is nonowning. Slots hold strong values.
 `RefGet` duplicates the current value, `RefSet` replaces before dropping,

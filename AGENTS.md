@@ -29,7 +29,7 @@ editing there, and follow it where it is more specific.
 | Browser compiler | `flick-wasm/` |
 | Standard library and plugins | `packages/`, `plugins/`, `flick-plugin/` |
 | JS and Go runtimes | `runtime/`, `runtime-go/` |
-| Reference model and proofs | `flick-model/`, `formal/`, `docs/formal/` |
+| Virtual machine and reference model | `flick-vm/`, `flick-model/`, `formal/`, `docs/formal/` |
 | Fixtures and integration tests | `tests/`, `flick-core/tests/`, `flick/tests/` |
 | Site and playground | `docs/src/`, `tools/astro-flick/` |
 | Editor grammars | `editors/` |

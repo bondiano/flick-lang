@@ -12,13 +12,13 @@ use std::{fs, io, process};
 use flick_core::diagnostics::Severity;
 use flick_core::project::{self, Compiled};
 use flick_core::source::SourceMap;
-use flick_model::memory::{
-    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Reason, Value,
-    execute_tests_program_with_bridge,
-};
 use flick_model::run::{compile, counted_main, counted_main_with_bridge, main_of};
 use flick_model::syntax::Path as ModelPath;
 use flick_test_support::files as fixture_files;
+use flick_vm::tier0::{
+    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Reason, Value,
+    execute_tests_program_with_bridge,
+};
 
 const FUEL: u64 = 20_000_000;
 
