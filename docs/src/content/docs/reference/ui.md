@@ -10,6 +10,9 @@ so a `Ui` carries no rows. Building one is pure: it runs no
 handler, reads no state and touches no DOM. `Ui.Dom.mount` renders it with
 React 19 (`react-dom/client`) and runs each event as a task.
 
+For the proposed renderer interfaces and their migration rules, see the
+[portable UI design](../../contributing/portable-ui-contract/).
+
 ```flick
 type alias SaveButtonProps c = {
   label : String
