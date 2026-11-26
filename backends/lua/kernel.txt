@@ -171,12 +171,12 @@ refSet refused
 refModify refused
 refSame refused
 recordLabel refused
-recordGet refused
-recordExtend refused
-recordRemove refused
-recordProject refused
-recordMergeDisjoint refused
-recordLabels refused
+recordGet implemented
+recordExtend implemented
+recordRemove implemented
+recordProject implemented
+recordMergeDisjoint implemented
+recordLabels implemented
 fiberJoin refused suspends
 testPure implemented
 testGroup implemented

@@ -159,6 +159,8 @@ representation of the program. Generated code calls `K` for:
 - `++` of lists, `List.length`, `List.get` and `List.initialize`, and the
   hooks `equals`, `compare`, `hash` (that of the JS and Go runtimes, bit for
   bit) and `show` (JS spelling, `-0` kept) of the primitive values;
+- the record rows `Record.get`, `extend`, `remove`, `project`,
+  `merge_disjoint` and `labels`, over a record's table of labels;
 - `Bytes`, a Lua string of its bytes: `Bytes.from_list`, `to_list`,
   `encode_utf8` (a lone surrogate as U+FFFD) and `decode_utf8` (strict);
 - `Test.test`, `group`, `skip` and `only`.
@@ -185,6 +187,7 @@ snapshot. The CI `lua-probes` job runs it.
 | Kernel module | Lua 5.1, LuaJIT on and off |
 | - | - |
 | `Kernel.Arrays` | pass (11 of 11), the same report as JS |
+| `Kernel.Records` | pass (6 of 6), the same report as JS |
 | `Kernel.Strings` | pass (35 of 35), the same report as JS |
 
 ## The synchronous WoW slice

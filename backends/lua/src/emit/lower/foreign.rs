@@ -52,6 +52,9 @@ pub(super) struct HostFn<'f> {
     text_result: bool,
     /// The arguments that are callbacks given a string by the host.
     text_callbacks: Vec<usize>,
+    /// The dictionaries a call takes before its arguments, of a kernel
+    /// function.
+    dicts: usize,
 }
 
 impl Lowering<'_> {
@@ -182,6 +185,7 @@ impl Lowering<'_> {
             statement,
             text_result: host == Some(Host::Str),
             text_callbacks,
+            dicts: 0,
         })
     }
 
@@ -201,16 +205,17 @@ impl Lowering<'_> {
         let params = (f.ty.as_deref()).map(|ty| ty.fun_stages().0);
         let taken = params.as_ref().map_or(0, Vec::len);
         let pure = params.is_some_and(|ps| ps.iter().all(|(_, s)| *s == Stage::Pure));
-        if f.mode != ForeignMode::Pure || f.dicts > 0 || taken == 0 || !pure {
+        if f.mode != ForeignMode::Pure || taken == 0 || !pure {
             return Err("the Lua kernel implements it only as a pure function of its arguments");
         }
         Ok(HostFn {
             path: vec![KERNEL, name],
-            arity: taken,
+            arity: f.dicts + taken,
             taken,
             statement: false,
             text_result: false,
             text_callbacks: Vec::new(),
+            dicts: f.dicts,
         })
     }
 
@@ -266,6 +271,11 @@ impl Lowering<'_> {
             args.push(&**arg);
             head = func;
         }
+        // a kernel function's dictionaries come first
+        let (head, dicts) = match &head.kind {
+            Ir::Dicts(inner, dicts) => (&**inner, dicts.as_slice()),
+            _ => (head, &[][..]),
+        };
         let Ir::Global { module, name, .. } = &head.kind else {
             return None;
         };
@@ -274,18 +284,23 @@ impl Lowering<'_> {
             return None;
         };
         let host = self.host_function(f).ok()?;
-        if args.len() != host.taken {
+        if args.len() != host.taken || dicts.len() != host.dicts {
             return None;
         }
         args.reverse();
-        let values = self.ordered(&args);
+        let mut values: Vec<Expr> = dicts.iter().map(|d| self.dict(d, e.span)).collect();
+        values.extend(self.ordered(&args));
         Some(self.host_call(&host, values, e.span))
     }
 
-    /// A foreign function as a value: a curried function calling the host.
+    /// A foreign function as a value: a curried function calling the host,
+    /// after a function of a kernel function's dictionaries.
     pub(super) fn host_value(&mut self, host: &HostFn<'_>, span: Span) -> Expr {
+        let dicts: Vec<Name> = (0..host.dicts).map(|_| self.names.fresh("dict")).collect();
         let params: Vec<Name> = (0..host.taken).map(|_| self.names.fresh("x")).collect();
-        let args = params.iter().map(|p| Expr::name(p, span)).collect();
+        let args = (dicts.iter().chain(&params))
+            .map(|p| Expr::name(p, span))
+            .collect();
         let body = self.function_body(|g| {
             let value = g.host_call(host, args, span);
             g.block.end(LastKind::Return(value), span);
@@ -303,6 +318,18 @@ impl Lowering<'_> {
             );
             f = Function {
                 params: vec![param.clone()],
+                body: outer,
+                span,
+            };
+        }
+        if !dicts.is_empty() {
+            let mut outer = Block::default();
+            outer.end(
+                LastKind::Return(Expr::new(ExprKind::Function(Box::new(f)), span)),
+                span,
+            );
+            f = Function {
+                params: dicts,
                 body: outer,
                 span,
             };
