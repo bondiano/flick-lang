@@ -60,6 +60,7 @@ fn projection_requires_a_live_receiver_and_returns_an_owned_token() {
         value: Operation::Project {
             object: 0,
             field: 0,
+            rep: ValueRep::Cell,
         },
     };
     let mut f = function(vec![projection.clone(), Instruction::Drop(1)]);

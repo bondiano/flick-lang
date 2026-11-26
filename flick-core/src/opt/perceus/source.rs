@@ -5,7 +5,9 @@
 //! the substitution model. Generated branch helpers are transparent code
 //! boundaries, not source-function return boundaries.
 
+mod aggregates;
 mod app_fail;
+pub use aggregates::AggregatePolicy;
 mod core_lists;
 mod core_lists_array;
 mod core_lists_cb;
@@ -22,6 +24,7 @@ mod failures;
 mod foreign_bridge;
 mod free;
 mod handlers;
+mod helpers;
 mod layers;
 mod lazy_scope;
 mod list_collections;
@@ -136,12 +139,12 @@ mod tests;
 use std::collections::{BTreeMap, BTreeSet};
 use std::{error, fmt};
 
-use flick_ir::{Adapter, Constructor, Dict, Foreign, ForeignMode, InstanceInfo, Retention, Shape};
+use flick_ir::{Constructor, Dict, Foreign, InstanceInfo, Shape};
 
 use crate::iface::Interface;
 use crate::ir::memory::{
     self, Block, CodeId, Exit, Function, Global, HostPrimitive, Instruction, Intrinsic, Local,
-    Name, Operation, Program,
+    Name, Operation, Program, ValueRep,
 };
 use crate::ir::{
     Arm, BinOp, Expr, ExprKind, ExprLang, Item, ItemKind, Lit, Module, Param, Pat, Stage, Stmt,
@@ -222,7 +225,34 @@ pub fn lower<'a>(
     modules: impl IntoIterator<Item = &'a Module>,
     entry: &Name,
 ) -> Result<Program, LowerError> {
-    lower_in(modules, &[entry], None, false, true, BTreeMap::new())
+    lower_in(
+        modules,
+        &[entry],
+        None,
+        false,
+        true,
+        BTreeMap::new(),
+        AggregatePolicy::default(),
+    )
+}
+
+/// Lowers the entry-reachable checked definitions using an explicit
+/// [`AggregatePolicy`] to lower selected constructors/types as unboxed
+/// by-value aggregates (`ValueRep::Aggregate`).
+pub fn lower_with_aggregates<'a>(
+    modules: impl IntoIterator<Item = &'a Module>,
+    entry: &Name,
+    aggregates: AggregatePolicy,
+) -> Result<Program, LowerError> {
+    lower_in(
+        modules,
+        &[entry],
+        None,
+        false,
+        true,
+        BTreeMap::new(),
+        aggregates,
+    )
 }
 
 /// Lowers the entry-reachable checked definitions with FBIP reuse disabled
@@ -232,7 +262,15 @@ pub fn lower_without_reuse<'a>(
     modules: impl IntoIterator<Item = &'a Module>,
     entry: &Name,
 ) -> Result<Program, LowerError> {
-    lower_in(modules, &[entry], None, false, false, BTreeMap::new())
+    lower_in(
+        modules,
+        &[entry],
+        None,
+        false,
+        false,
+        BTreeMap::new(),
+        AggregatePolicy::default(),
+    )
 }
 
 /// Adds matching checked compiler declaration facts, including private/open
@@ -263,6 +301,28 @@ pub fn lower_roots_with_declarations<'a>(
         false,
         true,
         BTreeMap::new(),
+        AggregatePolicy::default(),
+    )
+}
+
+/// [`lower_roots_with_declarations`] with an explicit [`AggregatePolicy`]
+/// selecting which constructors/types lower as unboxed by-value aggregates.
+pub fn lower_roots_with_aggregates<'a>(
+    modules: impl IntoIterator<Item = &'a Module>,
+    declarations: impl IntoIterator<Item = &'a Interface>,
+    roots: &[&Name],
+    aggregates: AggregatePolicy,
+) -> Result<Program, LowerError> {
+    let declarations =
+        scalar_context::ScalarContext::new(declarations).map_err(LowerError::Declarations)?;
+    lower_in(
+        modules,
+        roots,
+        Some(declarations),
+        false,
+        true,
+        BTreeMap::new(),
+        aggregates,
     )
 }
 
@@ -282,6 +342,7 @@ pub fn lower_roots_with_declarations_without_reuse<'a>(
         false,
         false,
         BTreeMap::new(),
+        AggregatePolicy::default(),
     )
 }
 
@@ -297,7 +358,15 @@ pub fn lower_roots_with_foreign_bridge<'a>(
 ) -> Result<Program, LowerError> {
     let declarations =
         scalar_context::ScalarContext::new(declarations).map_err(LowerError::Declarations)?;
-    lower_in(modules, roots, Some(declarations), true, true, module_dirs)
+    lower_in(
+        modules,
+        roots,
+        Some(declarations),
+        true,
+        true,
+        module_dirs,
+        AggregatePolicy::default(),
+    )
 }
 
 fn lower_in<'a>(
@@ -307,6 +376,7 @@ fn lower_in<'a>(
     allow_foreign_bridge: bool,
     enable_reuse: bool,
     module_dirs: BTreeMap<String, String>,
+    aggregates: AggregatePolicy,
 ) -> Result<Program, LowerError> {
     let mut sources = BTreeMap::new();
     for module in modules {
@@ -345,6 +415,7 @@ fn lower_in<'a>(
         declarations,
         allow_foreign_bridge,
         enable_reuse,
+        aggregates,
         bridge_families,
         module_dirs,
         sources,
@@ -370,6 +441,7 @@ struct Lower<'a> {
     declarations: Option<scalar_context::ScalarContext<'a>>,
     allow_foreign_bridge: bool,
     enable_reuse: bool,
+    aggregates: AggregatePolicy,
     bridge_families: foreign_bridge::BridgeFamilies,
     module_dirs: BTreeMap<String, String>,
     sources: BTreeMap<Name, &'a Item>,
@@ -432,148 +504,9 @@ impl Code {
     }
 }
 
+use helpers::{abstract_params, dictionary, foreign_intrinsic, kept_for_call, lookup};
 include!("source/global_lowering.rs");
 include!("source/expression_lowering.rs");
+include!("source/owner_lowering.rs");
 include!("source/constructor_lowering.rs");
 include!("source/branch_lowering.rs");
-
-fn foreign_intrinsic(value: &Foreign) -> Option<Intrinsic> {
-    use Intrinsic::Host;
-    let (from, name) = value.binding.module_export()?;
-    match (from, name, value.mode) {
-        ("flick:rt", "stdoutLine", ForeignMode::Sync) => Some(Intrinsic::PrintLine),
-        ("flick:rt", "stderrLine", ForeignMode::Sync) => Some(Host(HostPrimitive::StderrLine)),
-        ("flick:rt", "stdoutWrite", ForeignMode::Sync) => Some(Host(HostPrimitive::StdoutWrite)),
-        ("flick:rt", "platformEnv", ForeignMode::Sync) => Some(Host(HostPrimitive::Env)),
-        ("flick:rt", "platformVars", ForeignMode::Sync) => Some(Host(HostPrimitive::Vars)),
-        ("flick:rt", "platformArgs", ForeignMode::Sync) => Some(Host(HostPrimitive::Args)),
-        ("flick:Clock", "flickCurrentTimeMillis", ForeignMode::Effect) => {
-            Some(Host(HostPrimitive::CurrentTimeMillis))
-        }
-        ("flick:Clock", "flickCurrentTimeNanos", ForeignMode::Effect) => {
-            Some(Host(HostPrimitive::CurrentTimeNanos))
-        }
-        ("flick:Clock", "flickMonotonicTimeNanos", ForeignMode::Effect) => {
-            Some(Host(HostPrimitive::MonotonicTimeNanos))
-        }
-        ("flick:Random", "flickNext", ForeignMode::Effect) => Some(Host(HostPrimitive::RandomNext)),
-        ("flick:rt", "processSpawn", ForeignMode::Effect) => {
-            Some(Host(HostPrimitive::ProcessSpawn))
-        }
-        ("flick:rt", "show", ForeignMode::Pure) => Some(Intrinsic::Show),
-        ("flick:rt", "refMake", ForeignMode::Sync) => Some(Intrinsic::RefMake),
-        ("flick:rt", "refGet", ForeignMode::Sync) => Some(Intrinsic::RefGet),
-        ("flick:rt", "refSet", ForeignMode::Sync) => Some(Intrinsic::RefSet),
-        ("flick:rt", "refModify", ForeignMode::Sync) => Some(Intrinsic::RefModify),
-        ("flick:rt", "refSame", ForeignMode::Pure) => Some(Intrinsic::RefSame),
-        ("flick:rt", "scopeRun", ForeignMode::Effect) => Some(Intrinsic::ScopeRun),
-        ("flick:rt", "scopeCurrent", ForeignMode::Effect) => Some(Intrinsic::ScopeCurrent),
-        ("flick:rt", "arenaMake", ForeignMode::Effect) => Some(Intrinsic::ArenaMake),
-        ("flick:rt", "arenaAlloc", ForeignMode::Sync) => Some(Intrinsic::ArenaAlloc),
-        ("flick:rt", "arenaGet", ForeignMode::Sync) => Some(Intrinsic::ArenaGet),
-        _ => None,
-    }
-}
-
-fn lookup(env: &Env, name: &str, span: Span) -> Result<Local, LowerError> {
-    env.get(name)
-        .copied()
-        .ok_or_else(|| LowerError::UnboundLocal {
-            name: name.into(),
-            span,
-        })
-}
-
-fn abstract_params(names: &[String]) -> Vec<Param> {
-    names
-        .iter()
-        .map(|name| Param {
-            pat: Pat::Bind(given(name)),
-            stage: Stage::Pure,
-            ty: None,
-            binder_types: Vec::new(),
-        })
-        .collect()
-}
-
-fn dictionary(value: &Dict, span: Span) -> Result<Expr, LowerError> {
-    let kind = match value {
-        Dict::Given(name) => ExprKind::Local(given(name)),
-        Dict::Field(name) => ExprKind::Local(name.clone()),
-        Dict::Opened { binder, field } => ExprKind::Field(
-            Box::new(Expr::new(ExprKind::Local(binder.clone()), span)),
-            field.clone(),
-        ),
-        Dict::Value { module, name } => ExprKind::Global {
-            module: module.clone(),
-            name: name.clone(),
-            type_args: Vec::new(),
-        },
-        Dict::Instance { module, name, args } => {
-            let instance = Expr::new(
-                ExprKind::Global {
-                    module: module.clone(),
-                    name: format!("instance {name}"),
-                    type_args: Vec::new(),
-                },
-                span,
-            );
-            ExprKind::Dicts(Box::new(instance), args.clone())
-        }
-        Dict::Super { dict, class } => ExprKind::Method {
-            dict: (**dict).clone(),
-            name: format!("${class}"),
-            type_args: Vec::new(),
-        },
-        Dict::Site { place, definition } => ExprKind::Dictionary(vec![
-            (
-                "definition".into(),
-                Expr::new(ExprKind::Lit(Lit::String(definition.clone())), span),
-            ),
-            (
-                "place".into(),
-                Expr::new(ExprKind::Lit(Lit::String(place.clone())), span),
-            ),
-        ]),
-        Dict::Primitive { labels, .. } => ExprKind::List(
-            labels
-                .iter()
-                .map(|label| Expr::new(ExprKind::Lit(Lit::String(label.clone())), span))
-                .collect(),
-        ),
-        Dict::Structural { .. } => {
-            // A dictionary used as a value (for example a superclass) keeps
-            // the ordinary dictionary-application ABI. The direct lowering
-            // above constructs its implementation, not this identity closure.
-            let name = "$memory$dictionary";
-            let identity = Expr::new(
-                ExprKind::Lambda {
-                    params: vec![Param {
-                        pat: Pat::Bind(name.into()),
-                        stage: Stage::Pure,
-                        ty: None,
-                        binder_types: Vec::new(),
-                    }],
-                    body: Box::new(Expr::new(ExprKind::Local(name.into()), span)),
-                },
-                span,
-            );
-            ExprKind::Dicts(Box::new(identity), vec![value.clone()])
-        }
-        Dict::Error => {
-            return Err(unsupported("error dictionary", span));
-        }
-    };
-    Ok(Expr::new(kind, span))
-}
-
-/// `adapter` as the contracts of known runtime bindings compare it:
-/// `retention call` keeps nothing past the call, as a bare callback without
-/// the line does, so a binding means the same with it or without.
-fn kept_for_call(adapter: &Adapter) -> Adapter {
-    let mut adapter = adapter.clone();
-    if adapter.retention == Some(Retention::Call) {
-        adapter.retention = None;
-    }
-    adapter
-}

@@ -78,6 +78,27 @@ signature and golden certificates.
   dropping an unused `reuseToken` releases the exact slot cleanly
   (`drop_unused_reuseToken_clean`), and `cycle_break_vs_teardown` pins prompt
   old-payload release on `Ref` overwrite versus detach-all teardown retention.
+  `Formal/MemoryAggregate.lean` (`MemoryAggregate/Heap.lean`,
+  `MemoryAggregate/Pass.lean`) formalizes target-independent unboxed aggregates
+  (`ValueRep`, `CellLayout`, nested aggregate value trees, and `boxedTokens`):
+  `dupValue_adds_boxedTokens` / `dupValue_immediate_noop` and
+  `dropValue_subtracts_boxedTokens` / `dropValue_immediate_noop` prove that
+  aggregate `dup`/`drop` add/subtract `boxedTokens` and are exact no-ops on
+  immediate aggregates; `projectAgg_retains_field` and
+  `projectAgg_survives_parent_drop` prove borrowed aggregate projection retains
+  descendant tokens and survives dropping the parent aggregate;
+  `boxAggregate_conserves_tokens`, `unboxBorrow_retains_without_releasing`,
+  `unboxConsume_unique_transfers`, and
+  `unboxConsume_shared_retains_preserves_aliases` prove fallback-cell token
+  conservation and alias preservation;
+  `reuseTypedCell_incompatible_layout_fallback` and
+  `reuseTypedCell_compatible_in_place` prove `CellLayout`-checked typed-cell
+  reuse drops incompatible same-capacity candidates and allocates a fresh
+  replacement while preserving all other objects; and
+  `checkRepTokens_rejects_{explicit_agg_reuse,tracked_agg_reuse,agg_dropReuse}`,
+  `checkRepTokens_{sound,prefix_safe}`, and `annotateRep_{balanced,prefix_safe}`
+  prove representation-aware token checking and whole-block insertion reject
+  aggregate reuse candidates while preserving token balance and prefix safety.
   `Formal/MemoryArena.lean` additionally proves exact
   per-object owner/slot inventories for root-cell allocation, strong reads,
   replacement and detach-all close, including aliases and independent

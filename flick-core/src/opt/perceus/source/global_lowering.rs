@@ -74,64 +74,71 @@ impl Lower<'_> {
                 self.instance(info, methods, &[], &mut block, item.span)?
             }
             ItemKind::Destructure { pattern, body, .. } => {
-                let bindings = memory::pattern_bindings(pattern).map_err(|error| {
-                    LowerError::Pattern {
-                        error,
-                        span: item.span,
-                    }
-                })?;
-                let field = bindings
-                    .iter()
-                    .position(|bound| bound == &name.name)
-                    .ok_or_else(|| LowerError::UnknownGlobal {
-                        name: name.clone(),
-                        span: Some(item.span),
-                    })?;
-                let shared = Name::new(
-                    &name.module,
-                    &format!(
-                        "$destructure:{}:{}:{}",
-                        item.span.file.index(), item.span.start, item.span.end
-                    ),
-                );
-                if !self.initializers.contains_key(&shared) {
-                    let shared_code = self.reserve(item.span)?;
-                    self.initializers.insert(shared.clone(), shared_code);
-                    self.program.globals.push(Global {
-                        name: shared.clone(),
-                        initializer: shared_code,
-                    });
-                    let mut shared_block = Code::new(vec![]);
-                    let evaluated = self.expr(body, &Env::new(), &mut shared_block)?;
-                    let mut env = Env::new();
-                    self.pattern(pattern, evaluated, &mut env, &mut shared_block, item.span)?;
-                    let fields = bindings
-                        .iter()
-                        .map(|bound| lookup(&env, bound, item.span))
-                        .collect::<Result<Vec<_>, _>>()?;
-                    let packed = shared_block.emit(
-                        Operation::Construct {
-                            tag: "$tuple".into(),
-                            fields,
-                        },
-                        item.span,
-                    )?;
-                    self.finish(shared_code, &shared_block.finish(packed))?;
-                }
-                let tuple = block.emit(Operation::Global(shared), item.span)?;
-                block.emit(
-                    Operation::Project {
-                        object: tuple,
-                        field,
-                    },
-                    item.span,
-                )?
+                self.global_destructure(name, pattern, body, item.span, &mut block)?
             }
             ItemKind::Constructor(_) | ItemKind::Service { .. } => {
                 unreachable!("only value definitions are indexed")
             }
         };
         self.finish(code, &block.finish(value))
+    }
+
+    fn global_destructure(
+        &mut self,
+        name: &Name,
+        pattern: &Pat,
+        body: &Expr,
+        span: Span,
+        block: &mut Code,
+    ) -> Result<Local, LowerError> {
+        let bindings = memory::pattern_bindings(pattern)
+            .map_err(|error| LowerError::Pattern { error, span })?;
+        let field = bindings
+            .iter()
+            .position(|bound| bound == &name.name)
+            .ok_or_else(|| LowerError::UnknownGlobal {
+                name: name.clone(),
+                span: Some(span),
+            })?;
+        let shared = Name::new(
+            &name.module,
+            &format!("$destructure:{}:{}:{}", span.file.index(), span.start, span.end),
+        );
+        if !self.initializers.contains_key(&shared) {
+            let shared_code = self.reserve(span)?;
+            self.initializers.insert(shared.clone(), shared_code);
+            self.program.globals.push(Global {
+                name: shared.clone(),
+                initializer: shared_code,
+            });
+            let mut shared_block = Code::new(vec![]);
+            let evaluated = self.expr(body, &Env::new(), &mut shared_block)?;
+            let mut env = Env::new();
+            self.pattern(pattern, evaluated, &mut env, &mut shared_block, span)?;
+            let fields = bindings
+                .iter()
+                .map(|bound| lookup(&env, bound, span))
+                .collect::<Result<Vec<_>, _>>()?;
+            let packed = shared_block.emit(
+                Operation::Construct {
+                    tag: "$tuple".into(),
+                    fields,
+                    rep: ValueRep::Cell,
+                    layout: None,
+                },
+                span,
+            )?;
+            self.finish(shared_code, &shared_block.finish(packed))?;
+        }
+        let tuple = block.emit(Operation::Global(shared), span)?;
+        block.emit(
+            Operation::Project {
+                object: tuple,
+                field,
+                rep: ValueRep::Cell,
+            },
+            span,
+        )
     }
 
     fn foreign(
@@ -208,7 +215,14 @@ impl Lower<'_> {
         let mut function = Code::new(vec![0, 1]);
         let mut inside = Vec::new();
         for field in 0..arguments.len() {
-            inside.push(function.emit(Operation::Project { object: 0, field }, span)?);
+            inside.push(function.emit(
+                Operation::Project {
+                    object: 0,
+                    field,
+                    rep: ValueRep::Cell,
+                },
+                span,
+            )?);
         }
         inside.push(1);
         let result = self.intrinsic(kind, unit, inside, &mut function, span)?;

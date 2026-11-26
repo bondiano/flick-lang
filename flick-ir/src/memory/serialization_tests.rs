@@ -66,6 +66,7 @@ fn malformed_patterns_in_unselected_code_are_validated() {
                         value: Operation::Match {
                             object: 0,
                             pattern: Box::new(Pat::Or(vec![])),
+                            rep: ValueRep::Cell,
                         },
                     },
                     Instruction::Drop(0),
@@ -93,6 +94,7 @@ fn pattern_and_update_operations_round_trip() {
                 Pat::Tuple(vec![Pat::Bind("x".into()), Pat::Lit(Lit::Float(-0.0))]),
                 Pat::Tuple(vec![Pat::Lit(Lit::Float(f64::NAN)), Pat::Bind("x".into())]),
             ])),
+            rep: ValueRep::Cell,
         },
         Operation::Update {
             object: 1,
@@ -133,6 +135,7 @@ fn annotations_survive_their_serialized_forms() {
                     value: Operation::Project {
                         object: 1,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 },
                 Instruction::Drop(1),
@@ -142,6 +145,8 @@ fn annotations_survive_their_serialized_forms() {
                         object: 1,
                         tag: "Next".into(),
                         fields: vec![2],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 },
             ],
@@ -171,6 +176,8 @@ fn reserved_tags_reject_evidence_even_in_unselected_code() {
             tag: tag.into(),
             fields: vec![0],
             dicts: vec![1],
+            rep: ValueRep::Cell,
+            layout: None,
         };
         assert_eq!(value.consumed(), [0, 1]);
         let function = Function {
@@ -198,6 +205,8 @@ fn reserved_tags_reject_evidence_even_in_unselected_code() {
             tag: tag.into(),
             fields: vec![0, 1],
             dicts: vec![1, 0],
+            rep: ValueRep::Cell,
+            layout: None,
         };
         assert_eq!(value.consumed(), [0, 0, 1, 1, 0]);
         let value = Operation::ReuseWithDicts {
@@ -205,6 +214,8 @@ fn reserved_tags_reject_evidence_even_in_unselected_code() {
             tag: tag.into(),
             fields: vec![1],
             dicts: vec![2],
+            rep: ValueRep::Cell,
+            layout: None,
         };
         let function = Function {
             params: vec![0, 1, 2],
@@ -226,6 +237,8 @@ fn evidence_operations_round_trip_without_changing_old_wire_shapes() {
     let old = Operation::Construct {
         tag: "T".into(),
         fields: vec![0],
+        rep: ValueRep::Cell,
+        layout: None,
     };
     assert_eq!(
         serde_json::to_string(&old).expect("old construct"),
@@ -235,6 +248,8 @@ fn evidence_operations_round_trip_without_changing_old_wire_shapes() {
         object: 0,
         tag: "T".into(),
         fields: vec![1],
+        rep: ValueRep::Cell,
+        layout: None,
     };
     assert_eq!(
         serde_json::to_string(&old).expect("old reuse"),
@@ -245,12 +260,16 @@ fn evidence_operations_round_trip_without_changing_old_wire_shapes() {
             tag: "T".into(),
             fields: vec![0, 1],
             dicts: vec![2],
+            rep: ValueRep::Cell,
+            layout: None,
         },
         Operation::ReuseWithDicts {
             object: 3,
             tag: "T".into(),
             fields: vec![4],
             dicts: vec![5, 6],
+            rep: ValueRep::Cell,
+            layout: None,
         },
     ];
     let json = serde_json::to_string(&operations).expect("new operations");
@@ -456,4 +475,110 @@ fn fbip_drop_reuse_and_reuse_record_round_trip() {
         },
     ];
     round_trip_operations(&operations);
+}
+
+#[test]
+#[cfg(feature = "json")]
+fn aggregate_metadata_and_fallback_operations_round_trip() {
+    let layout_a = CellLayout {
+        capacity: 2,
+        align: 8,
+        ownership: "boxed,imm".into(),
+    };
+    let layout_b = CellLayout {
+        capacity: 2,
+        align: 16,
+        ownership: "boxed,boxed".into(),
+    };
+    let operations = vec![
+        Operation::Construct {
+            tag: "App.Pair.Pair".into(),
+            fields: vec![0, 1],
+            rep: ValueRep::Aggregate,
+            layout: None,
+        },
+        Operation::Construct {
+            tag: "App.CellA.CellA".into(),
+            fields: vec![0, 1],
+            rep: ValueRep::Cell,
+            layout: Some(layout_a.clone()),
+        },
+        Operation::ConstructWithDicts {
+            tag: "App.Constrained.Constrained".into(),
+            fields: vec![0],
+            dicts: vec![1],
+            rep: ValueRep::Aggregate,
+            layout: None,
+        },
+        Operation::Project {
+            object: 0,
+            field: 1,
+            rep: ValueRep::Aggregate,
+        },
+        Operation::Match {
+            object: 0,
+            pattern: Box::new(Pat::Wild),
+            rep: ValueRep::Aggregate,
+        },
+        Operation::Reuse {
+            object: 0,
+            tag: "App.CellB.CellB".into(),
+            fields: vec![1, 2],
+            rep: ValueRep::Cell,
+            layout: Some(layout_b.clone()),
+        },
+        Operation::ReuseWithDicts {
+            object: 0,
+            tag: "App.CellB.CellB".into(),
+            fields: vec![1],
+            dicts: vec![2],
+            rep: ValueRep::Cell,
+            layout: Some(layout_a.clone()),
+        },
+        Operation::BoxAggregate {
+            value: 3,
+            layout: Some(layout_b),
+        },
+        Operation::BoxAggregate {
+            value: 3,
+            layout: None,
+        },
+        Operation::UnboxBorrow { object: 4 },
+        Operation::UnboxConsume { object: 5 },
+    ];
+    round_trip_operations(&operations);
+
+    // Legacy JSON payloads without `rep` or `layout` default to `Cell` / `None`.
+    let legacy_construct: Operation =
+        serde_json::from_str(r#"{"Construct":{"tag":"T","fields":[0]}}"#)
+            .expect("legacy construct");
+    assert_eq!(
+        legacy_construct,
+        Operation::Construct {
+            tag: "T".into(),
+            fields: vec![0],
+            rep: ValueRep::Cell,
+            layout: None,
+        }
+    );
+    let legacy_project: Operation =
+        serde_json::from_str(r#"{"Project":{"object":0,"field":1}}"#).expect("legacy project");
+    assert_eq!(
+        legacy_project,
+        Operation::Project {
+            object: 0,
+            field: 1,
+            rep: ValueRep::Cell,
+        }
+    );
+    let legacy_match: Operation =
+        serde_json::from_str(r#"{"Match":{"object":0,"pattern":"Wild"}}"#).expect("legacy match");
+    assert_eq!(
+        legacy_match,
+        Operation::Match {
+            object: 0,
+            pattern: Box::new(Pat::Wild),
+            rep: ValueRep::Cell,
+        }
+    );
 }

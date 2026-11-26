@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use crate::ir::memory::{self, Block, Exit, Function, Instruction, Operation};
+    use crate::ir::memory::{self, Block, Exit, Function, Instruction, Operation, ValueRep};
     use crate::ir::{Lit, Pat};
 
     use super::{Error, copies, insert, insert_fbip, insert_without_reuse, optimize_reuse};
@@ -13,6 +13,16 @@ mod tests {
         Operation::Construct {
             tag: "Node".into(),
             fields: fields.to_vec(),
+            rep: ValueRep::Cell,
+            layout: None,
+        }
+    }
+
+    fn project(object: u32, field: usize) -> Operation {
+        Operation::Project {
+            object,
+            field,
+            rep: ValueRep::Cell,
         }
     }
 
@@ -43,41 +53,37 @@ mod tests {
 
     #[test]
     fn releases_a_borrowed_receiver_only_after_projecting_its_field() {
-        let project = Operation::Project {
-            object: 0,
-            field: 0,
-        };
-        let input = function(&[0], vec![let_(1, project.clone())], 1);
+        let proj = project(0, 0);
+        let input = function(&[0], vec![let_(1, proj.clone())], 1);
         let output = insert(&input).expect("ownership insertion");
         assert_eq!(
             output.body.instructions,
-            [let_(1, project), Instruction::Drop(0)]
+            [let_(1, proj), Instruction::Drop(0)]
         );
         assert_eq!(memory::validate(&output), Ok(()));
     }
 
     #[test]
     fn reuses_a_last_projected_receiver_in_the_next_constructor() {
-        let project = Operation::Project {
-            object: 0,
-            field: 0,
-        };
+        let proj = project(0, 0);
         let input = function(
             &[0],
-            vec![let_(1, project.clone()), let_(2, construct(&[1]))],
+            vec![let_(1, proj.clone()), let_(2, construct(&[1]))],
             2,
         );
         let output = insert(&input).expect("ownership insertion");
         assert_eq!(
             output.body.instructions,
             [
-                let_(1, project),
+                let_(1, proj),
                 let_(
                     2,
                     Operation::Reuse {
                         object: 0,
                         tag: "Node".into(),
-                        fields: vec![1]
+                        fields: vec![1],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     }
                 ),
             ]
@@ -119,13 +125,7 @@ mod tests {
         let input = function(
             &[0],
             vec![
-                let_(
-                    1,
-                    Operation::Project {
-                        object: 0,
-                        field: 0,
-                    },
-                ),
+                let_(1, project(0, 0)),
                 let_(2, construct(&[1])),
                 let_(3, construct(&[0, 2])),
             ],
@@ -147,13 +147,7 @@ mod tests {
         let input = function(
             &[0],
             vec![
-                let_(
-                    1,
-                    Operation::Project {
-                        object: 0,
-                        field: 0,
-                    },
-                ),
+                let_(1, project(0, 0)),
                 let_(2, Operation::Literal(Lit::Unit)),
                 let_(3, construct(&[1])),
             ],
@@ -187,7 +181,9 @@ mod tests {
                     Operation::Reuse {
                         object: 0,
                         tag: "Node".into(),
-                        fields: vec![]
+                        fields: vec![],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     }
                 )],
                 1
@@ -223,6 +219,7 @@ mod tests {
                     Operation::Match {
                         object: 0,
                         pattern: Box::new(pattern.clone()),
+                        rep: ValueRep::Cell,
                     },
                 ),
                 let_(2, construct(&[1])),
@@ -238,6 +235,7 @@ mod tests {
                     Operation::Match {
                         object: 0,
                         pattern: Box::new(pattern),
+                        rep: ValueRep::Cell,
                     }
                 ),
                 let_(
@@ -245,7 +243,9 @@ mod tests {
                     Operation::Reuse {
                         object: 0,
                         tag: "Node".into(),
-                        fields: vec![1]
+                        fields: vec![1],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     }
                 ),
             ]
@@ -264,6 +264,7 @@ mod tests {
                     Operation::Match {
                         object: 0,
                         pattern: Box::new(pattern.clone()),
+                        rep: ValueRep::Cell,
                     },
                 ),
                 let_(2, construct(&[])),
@@ -279,6 +280,7 @@ mod tests {
                     Operation::Match {
                         object: 0,
                         pattern: Box::new(pattern),
+                        rep: ValueRep::Cell,
                     }
                 ),
                 Instruction::Drop(1),
@@ -287,7 +289,9 @@ mod tests {
                     Operation::Reuse {
                         object: 0,
                         tag: "Node".into(),
-                        fields: vec![]
+                        fields: vec![],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     }
                 ),
             ]
@@ -340,6 +344,8 @@ mod tests {
                     tag: "Node".into(),
                     fields: vec![0, 0],
                     dicts: vec![0],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             )],
             1,
@@ -355,7 +361,9 @@ mod tests {
                     Operation::ConstructWithDicts {
                         tag: "Node".into(),
                         fields: vec![0, 0],
-                        dicts: vec![0]
+                        dicts: vec![0],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     }
                 )
             ]
@@ -363,19 +371,15 @@ mod tests {
         let output = insert(&function(
             &[0, 1],
             vec![
-                let_(
-                    2,
-                    Operation::Project {
-                        object: 0,
-                        field: 0,
-                    },
-                ),
+                let_(2, project(0, 0)),
                 let_(
                     3,
                     Operation::ConstructWithDicts {
                         tag: "Node".into(),
                         fields: vec![2],
                         dicts: vec![1],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -395,7 +399,9 @@ mod tests {
                         object: 0,
                         tag: "Node".into(),
                         fields: vec![1],
-                        dicts: vec![2]
+                        dicts: vec![2],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     }
                 )],
                 3
@@ -426,29 +432,14 @@ mod tests {
     fn insert_without_reuse_emits_zero_reuse_operations() {
         let input = function(
             &[0],
-            vec![
-                let_(
-                    1,
-                    Operation::Project {
-                        object: 0,
-                        field: 0,
-                    },
-                ),
-                let_(2, construct(&[1])),
-            ],
+            vec![let_(1, project(0, 0)), let_(2, construct(&[1]))],
             2,
         );
         let baseline = insert_without_reuse(&input).expect("baseline insertion");
         assert_eq!(
             baseline.body.instructions,
             [
-                let_(
-                    1,
-                    Operation::Project {
-                        object: 0,
-                        field: 0
-                    }
-                ),
+                let_(1, project(0, 0)),
                 Instruction::Drop(0),
                 let_(2, construct(&[1])),
             ]
@@ -462,13 +453,7 @@ mod tests {
         let across_work = function(
             &[0],
             vec![
-                let_(
-                    1,
-                    Operation::Project {
-                        object: 0,
-                        field: 0,
-                    },
-                ),
+                let_(1, project(0, 0)),
                 let_(2, Operation::Literal(Lit::Int(1))),
                 let_(3, construct(&[1])),
             ],
@@ -536,13 +521,7 @@ mod tests {
         let partial_branch = Function {
             params: vec![0, 1],
             body: Block {
-                instructions: vec![let_(
-                    2,
-                    Operation::Project {
-                        object: 0,
-                        field: 0,
-                    },
-                )],
+                instructions: vec![let_(2, project(0, 0))],
                 exit: Exit::Branch {
                     condition: 1,
                     then_: Box::new(Block {

@@ -5,7 +5,7 @@ use flick_ir::{Arith, Constructor, Foreign, ForeignMode, Num, Rep};
 use super::lazy_scope::has_standard_shape;
 use super::{
     Arm, BinOp, Block, Code, Env, Exit, Expr, ExprKind, Function, Intrinsic, Lit, Local, Lower,
-    LowerError, Operation, Param, Pat, Span, Stage, Stmt,
+    LowerError, Operation, Param, Pat, Span, Stage, Stmt, ValueRep,
 };
 
 impl Lower<'_> {
@@ -58,6 +58,7 @@ impl Lower<'_> {
                 Operation::Project {
                     object: 0,
                     field: 0,
+                    rep: ValueRep::Cell,
                 },
                 span,
             )?;
@@ -65,6 +66,7 @@ impl Lower<'_> {
                 Operation::Project {
                     object: 0,
                     field: 1,
+                    rep: ValueRep::Cell,
                 },
                 span,
             )?;
@@ -72,6 +74,7 @@ impl Lower<'_> {
                 Operation::Project {
                     object: 0,
                     field: 2,
+                    rep: ValueRep::Cell,
                 },
                 span,
             )?;
@@ -83,6 +86,7 @@ impl Lower<'_> {
                 Operation::Project {
                     object: 0,
                     field: 0,
+                    rep: ValueRep::Cell,
                 },
                 span,
             )?;
@@ -90,6 +94,7 @@ impl Lower<'_> {
                 Operation::Project {
                     object: 0,
                     field: 1,
+                    rep: ValueRep::Cell,
                 },
                 span,
             )?;
@@ -135,6 +140,7 @@ impl Lower<'_> {
             Operation::Match {
                 object: next,
                 pattern: Box::new(pattern),
+                rep: ValueRep::Cell,
             },
             span,
         )?;
@@ -142,6 +148,7 @@ impl Lower<'_> {
             Operation::Project {
                 object: matched,
                 field: 0,
+                rep: ValueRep::Cell,
             },
             span,
         )?;
@@ -170,6 +177,7 @@ impl Lower<'_> {
             Operation::Project {
                 object: ma,
                 field: 1,
+                rep: ValueRep::Cell,
             },
             span,
         )?;
@@ -180,6 +188,7 @@ impl Lower<'_> {
             Operation::Project {
                 object: mb,
                 field: 1,
+                rep: ValueRep::Cell,
             },
             span,
         )?;
@@ -203,6 +212,8 @@ impl Lower<'_> {
                 Operation::Construct {
                     tag: "$tuple".into(),
                     fields: vec![val_a, val_b],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
                 span,
             )?
@@ -255,7 +266,14 @@ impl Lower<'_> {
         let mut function = Code::new(vec![0, 1]);
         let mut inside = Vec::with_capacity(collected.len() + 1);
         for field in 0..collected.len() {
-            inside.push(function.emit(Operation::Project { object: 0, field }, span)?);
+            inside.push(function.emit(
+                Operation::Project {
+                    object: 0,
+                    field,
+                    rep: ValueRep::Cell,
+                },
+                span,
+            )?);
         }
         inside.push(1);
         let result = self.curried_generate_lazy(gen_code, arity, inside, &mut function, span)?;

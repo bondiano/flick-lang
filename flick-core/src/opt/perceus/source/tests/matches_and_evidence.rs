@@ -113,7 +113,9 @@ let answer () =
         .find_map(|instruction| match instruction {
             memory::Instruction::Let {
                 value:
-                    memory::Operation::ConstructWithDicts { tag, fields, dicts }
+                    memory::Operation::ConstructWithDicts {
+                        tag, fields, dicts, ..
+                    }
                     | memory::Operation::ReuseWithDicts {
                         tag, fields, dicts, ..
                     },
@@ -312,7 +314,9 @@ let answer () = Packed "payload" 42
         .find_map(|instruction| match instruction {
             memory::Instruction::Let {
                 value:
-                    memory::Operation::ConstructWithDicts { tag, fields, dicts }
+                    memory::Operation::ConstructWithDicts {
+                        tag, fields, dicts, ..
+                    }
                     | memory::Operation::ReuseWithDicts {
                         tag, fields, dicts, ..
                     },
@@ -335,7 +339,7 @@ let answer () = Packed "payload" 42
     let program = lower([&module], &memory::Name::new("App.Plain", "answer"))
         .expect("plain constructor lowering");
     assert!(program.functions.values().flat_map(|function| &function.body.instructions).any(|instruction| matches!(instruction,
-        memory::Instruction::Let { value: memory::Operation::Construct { tag, fields }, .. } if tag == "App.Plain.Plain.Plain" && fields.len() == 1)));
+        memory::Instruction::Let { value: memory::Operation::Construct { tag, fields, .. }, .. } if tag == "App.Plain.Plain.Plain" && fields.len() == 1)));
     // Partial constructor application still lowers through a curried closure adapter.
     let partial_mod = lower_text("App.PartialCon", "module App.PartialCon exposing (answer)\ntype Pair = Pair Int Int\nanswer : Int -> Pair\nlet answer = Pair 1\n").expect("partial constructor source");
     let partial_prog = lower([&partial_mod], &memory::Name::new("App.PartialCon", "answer"))

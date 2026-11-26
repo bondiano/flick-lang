@@ -6,7 +6,7 @@ use flick_ir::{Constructor, Rep};
 
 use super::{
     Block, Code, Env, Exit, Expr, ExprKind, Function, Intrinsic, Lit, Local, Lower, LowerError,
-    Operation, Pat, Span, free, lookup, memory,
+    Operation, Pat, Span, ValueRep, free, lookup, memory,
 };
 
 pub(super) fn contains_direct_unwrap(expr: &Expr) -> bool {
@@ -259,7 +259,14 @@ impl Lower<'_> {
         let mut function = Code::new(vec![0, 1]);
         let mut inside = Env::new();
         for (field, name) in names.into_iter().enumerate() {
-            let value = function.emit(Operation::Project { object: 0, field }, span)?;
+            let value = function.emit(
+                Operation::Project {
+                    object: 0,
+                    field,
+                    rep: ValueRep::Cell,
+                },
+                span,
+            )?;
             inside.insert(name, value);
         }
         let res = self.expr(body, &inside, &mut function);
@@ -390,6 +397,32 @@ impl Lower<'_> {
         )
     }
 
+    fn emit_match_and_flag(
+        code: &mut Code,
+        object: Local,
+        pattern: Pat,
+        rep: ValueRep,
+        span: Span,
+    ) -> Result<(Local, Local), LowerError> {
+        let matched = code.emit(
+            Operation::Match {
+                object,
+                pattern: Box::new(pattern),
+                rep,
+            },
+            span,
+        )?;
+        let flag = code.emit(
+            Operation::Project {
+                object: matched,
+                field: 0,
+                rep: ValueRep::Cell,
+            },
+            span,
+        )?;
+        Ok((matched, flag))
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn each_step_block(
         &mut self,
@@ -416,43 +449,25 @@ impl Lower<'_> {
             },
             vec![Pat::Bind("$each.elem".into())],
         );
-        let matched = step.emit(
-            Operation::Match {
-                object: next,
-                pattern: Box::new(some_pat),
-            },
-            span,
-        )?;
-        let is_some = step.emit(
-            Operation::Project {
-                object: matched,
-                field: 0,
-            },
-            span,
-        )?;
+        let (matched, is_some) =
+            Self::emit_match_and_flag(&mut step, next, some_pat, ValueRep::Cell, span)?;
 
         let mut on_some = step.successor();
         let elem = on_some.emit(
             Operation::Project {
                 object: matched,
                 field: 1,
+                rep: ValueRep::Cell,
             },
             span,
         )?;
-        let pat_matched = on_some.emit(
-            Operation::Match {
-                object: elem,
-                pattern: Box::new(pat.clone()),
-            },
-            span,
-        )?;
-        let pat_ok = on_some.emit(
-            Operation::Project {
-                object: pat_matched,
-                field: 0,
-            },
-            span,
-        )?;
+        let elem_rep = if self.aggregates.pattern_is_aggregate(pat) {
+            ValueRep::Aggregate
+        } else {
+            ValueRep::Cell
+        };
+        let (pat_matched, pat_ok) =
+            Self::emit_match_and_flag(&mut on_some, elem, pat.clone(), elem_rep, span)?;
         let mut on_pat_ok = on_some.successor();
         let mut body_env = inside.clone();
         for (idx, name) in bindings.iter().enumerate() {
@@ -461,6 +476,7 @@ impl Lower<'_> {
                 Operation::Project {
                     object: pat_matched,
                     field,
+                    rep: ValueRep::Cell,
                 },
                 span,
             )?;
