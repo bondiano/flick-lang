@@ -14,9 +14,20 @@ foreign effect each_effect from "flick:rt" "listEachEffect"
 
 /// Folds from the first element: `fold_left f init [a, b]` is `f (f init a) b`.
 fold_left : (b -> a -> b)^c -> b -> (List a -> b)^c
-foreign pure fold_left from "flick:rt" "listFold"
-  arity 3
-  retention call
+let fold_left f init xs =
+  let n = length xs
+  step : Int -> b -> b
+  let rec step i acc =
+    if i >= n then
+      acc
+    else
+      match get i xs with
+      | Some x -> step (i + 1) (f acc x)
+      | None -> acc
+  step 0 init
+  @native "flick:rt" "listFold" when js || go
+    arity 3
+    retention call
 
 /// Folds from the last element: `fold_right f init [a, b]` is `f a (f b init)`.
 fold_right : (a -> b -> b)^c -> b -> (List a -> b)^c
@@ -50,27 +61,50 @@ foreign pure flat_map from "flick:rt" "listFlatMap"
 
 /// The first element that satisfies `p`.
 find : (a -> Bool)^c -> List a -> Option a
-foreign pure find from "flick:rt" "listFind"
-  arity 2
-  retention call
+let find p xs =
+  match find_index p xs with
+  | Some i -> get i xs
+  | None -> None
+  @native "flick:rt" "listFind" when js || go
+    arity 2
+    retention call
 
 /// The index of the first element that satisfies `p`.
 find_index : (a -> Bool)^c -> List a -> Option Int
-foreign pure find_index from "flick:rt" "listFindIndex"
-  arity 2
-  retention call
+let find_index p xs =
+  let n = length xs
+  search : Int -> Option Int
+  let rec search i =
+    if i >= n then
+      None
+    else
+      match get i xs with
+      | Some x -> if p x then Some i else search (i + 1)
+      | None -> None
+  search 0
+  @native "flick:rt" "listFindIndex" when js || go
+    arity 2
+    retention call
 
 /// Whether some element satisfies `p`.
 any : (a -> Bool)^c -> List a -> Bool
-foreign pure any from "flick:rt" "listAny"
-  arity 2
-  retention call
+let any p xs =
+  match find_index p xs with
+  | Some _ -> true
+  | None -> false
+  @native "flick:rt" "listAny" when js || go
+    arity 2
+    retention call
 
 /// Whether every element satisfies `p`.
 all : (a -> Bool)^c -> List a -> Bool
-foreign pure all from "flick:rt" "listAll"
-  arity 2
-  retention call
+let all p xs =
+  match find_index (fun x -> not (p x)) xs with
+  | Some _ -> false
+  | None -> true
+  @native "flick:rt" "listAll" when js || go
+    arity 2
+    retention call
 
 /// The elements that satisfy `p`, and the others.
 partition : (a -> Bool)^c -> List a -> (List a, List a)
@@ -169,7 +203,13 @@ foreign pure get from "flick:rt" "listGet"
 
 /// The list with the element at `index` replaced; out of range, unchanged.
 set : Int -> a -> List a -> List a
-foreign pure set from "flick:rt" "listSet"
+let set i x xs =
+  initialize (length xs) (fun j ->
+    match get j xs with
+    | Some y -> if j == i then x else y
+    | None -> x
+  )
+  @native "flick:rt" "listSet" when js || go
 
 /// The first element.
 head : List a -> Option a
@@ -189,7 +229,9 @@ foreign pure repeat from "flick:rt" "listRepeat"
 
 /// `[from, from + 1, …]` below `until`.
 range : Int -> Int -> List Int
-foreign pure range from "flick:rt" "listRange"
+let range start until =
+  if until <= start then [] else initialize (until - start) (fun i -> start + i)
+  @native "flick:rt" "listRange" when js || go
 
 /// The list of `f 0`, …, `f (n - 1)`.
 initialize : Int -> (Int -> a)^c -> List a

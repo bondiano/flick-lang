@@ -3,8 +3,8 @@ import test from "node:test";
 import { validateReport } from "./report.mjs";
 
 const complete = () => ({
-  seed: 42, passed: 551, failed: 0,
-  tests: Array.from({ length: 551 }, (_, i) => ({ name: `assertion-${i}`, status: "passed" })),
+  seed: 42, passed: 569, failed: 0,
+  tests: Array.from({ length: 569 }, (_, i) => ({ name: `assertion-${i}`, status: "passed" })),
 });
 
 test("the complete independent corpus is accepted", () => {

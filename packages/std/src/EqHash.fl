@@ -3,7 +3,8 @@
 /// joined only when they share it.
 module EqHash exposing (..)
 
-type EqHash w a
+type EqHash w a = Witness (a -> a -> Bool) (a -> Int)
+  @native when js || go || vm
 
 /// The witness of the canonical `Eq` and `Hash` instances.
 type Canonical
@@ -11,8 +12,10 @@ type Canonical
 /// Calls `body` with a witness of a fresh identity made of `eq` and `hash`,
 /// which must agree: equal values have equal hashes.
 with : (a -> a -> Bool) -> (a -> Int) -> (forall w. EqHash w a -> b)^c -> b
-foreign pure with from "flick:rt" "eqHashWith"
-  retention call
+let with eq hash body = body (Witness eq hash)
+  @native "flick:rt" "eqHashWith" when js || go || vm
+    retention call
 
 canonical : Hash a => EqHash Canonical a
-foreign pure canonical from "flick:rt" "eqHashCanonical"
+let canonical = Witness (fun a b -> a == b) (fun a -> hash a)
+  @native "flick:rt" "eqHashCanonical" when js || go || vm

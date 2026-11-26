@@ -2,7 +2,10 @@
 # compared with its report on JS: those whose pure tests reach only what the
 # Lua kernel has (#831). Their effect tests wait for the Lua runtime (#833).
 BigInts
+Equality
+FixedWidth
 Floats
+HashTries
 Ints
 Mutation
 NumericBoundaries
