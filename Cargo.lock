@@ -643,6 +643,7 @@ dependencies = [
  "flick-model",
  "flick-plugin",
  "flick-test-support",
+ "flick-vm",
  "flick-wasm",
  "insta",
  "rustix",

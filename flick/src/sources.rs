@@ -15,9 +15,9 @@ use flick_core::project::Foreign;
 use flick_core::project::config::BackendEnvironment;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::target::Wanted;
-use flick_core::project::{
-    BackendTags, Compilation, Host, Project, ResolvedEnvironment, is_companion,
-};
+use flick_core::project::{BackendTags, Host, Project, is_companion};
+#[cfg(feature = "wasm-backends")]
+use flick_core::project::{Compilation, ResolvedEnvironment};
 use flick_core::source::{FileId, SourceMap};
 
 #[cfg(feature = "wasm-backends")]
@@ -50,6 +50,7 @@ impl FsHost {
 
     /// Directories the project's backend treats as installed package trees,
     /// returning none when backend loading is disabled on this host.
+    #[cfg_attr(not(feature = "wasm-backends"), allow(clippy::unused_self))]
     pub fn skip_dirs(&self, project: Option<&Project>) -> Vec<String> {
         #[cfg(feature = "wasm-backends")]
         if !self.load_backends {

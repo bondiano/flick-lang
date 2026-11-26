@@ -97,6 +97,7 @@ feature-check:
     cargo clippy -p flick-core --all-targets --no-default-features -- -D warnings
     for feature in native-js native-project ide contracts; do cargo clippy -p flick-core --all-targets --no-default-features --features "$feature" -- -D warnings || exit $?; done
     cargo clippy -p flick-ffi --all-targets --no-default-features -- -D warnings
+    cargo clippy -p flick --no-default-features -- -D warnings
 
 # Exercise minimal and independently enabled compiler capabilities
 feature-test:
@@ -193,6 +194,21 @@ language seed="42": e2e-compiler
 # The language tests as a Go executable alone, without Node, after `e2e-go` built the compiler
 language-go seed="42":
     cd tests/language && ../../target/e2e/flick test --target go --seed {{seed}}
+
+# The language tests of tests/language on the in-process VM compared against JS:
+# every language test that passes on js must pass on vm with zero gaps or skips
+language-vm seed="42": e2e-compiler
+    pnpm -C runtime build
+    pnpm -C packages/effect-ts build
+    cd tests/language && {{flick}} test --target js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
+    cd tests/language && {{flick}} test --target vm --seed {{seed}} --reporter json > ../../target/language-vm.txt || { cat ../../target/language-vm.txt; exit 1; }
+    diff -u target/language-js.txt target/language-vm.txt
+    cat target/language-vm.txt
+
+# The tests/run/model.txt corpus executed in process via `flick run --target vm`
+# in debug and release profiles with empty PATH (no node or go spawned)
+vm-cases: e2e-compiler
+    node tools/vm-cases/index.mjs {{flick}}
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size: e2e-compiler

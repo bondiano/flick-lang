@@ -1,5 +1,5 @@
 pub(crate) mod build;
-mod check;
+pub(crate) mod check;
 mod clean;
 #[cfg(test)]
 mod clean_tests;

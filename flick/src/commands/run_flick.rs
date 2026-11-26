@@ -214,9 +214,9 @@ pub(crate) fn run_compiled(
     #[cfg(not(feature = "wasm-backends"))]
     {
         let _ = (arguments, gen_dir, entry_name);
-        return Err(vec![backends::failure(
+        Err(vec![backends::failure(
             "running requires WebAssembly backend support",
-        )]);
+        )])
     }
 
     #[cfg(feature = "wasm-backends")]

@@ -12,12 +12,18 @@ publish.workspace = true
 workspace = true
 
 [features]
-default = ["wasm-backends"]
+default = ["wasm-backends", "vm"]
 # Direct Rust emission is an explicit development/parity option.
 native-backends-development = []
 # loads plugins built as WebAssembly components; release builds enable it
 wasm-plugins = ["wasm-backends"]
 wasm-backends = ["dep:wasmtime", "flick-backend/host"]
+# In-process virtual machine target (`--target vm`)
+vm = ["dep:flick-vm"]
+# Reserved VM capability sub-features for upcoming phases
+native-regions = []
+http = []
+ffi = []
 
 [dependencies]
 anstyle = "1.0.14"
@@ -31,6 +37,7 @@ flick-backend-support = { path = "../flick-backend-support", default-features = 
 flick-backend-js = { path = "../backends/js", features = ["component"] }
 flick-ir = { path = "../flick-ir", features = ["json", "cbor"] }
 flick-plugin = { path = "../flick-plugin" }
+flick-vm = { path = "../flick-vm", optional = true }
 wasmtime = { workspace = true, optional = true }
 serde_json = { workspace = true }
 serde = { version = "1.0.229", features = ["derive"] }

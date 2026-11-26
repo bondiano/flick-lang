@@ -30,8 +30,8 @@ use crate::artifact::resolve_root;
 use crate::backends;
 use crate::child::{self, Running};
 use crate::command::Command;
-use crate::report;
 use crate::sources::FsHost;
+use crate::{report, vm};
 
 /// The generations of a project.
 pub fn generations(root: &Path) -> PathBuf {
@@ -301,7 +301,7 @@ pub fn launch(
         backends::launch::command(generation.path(), pin, flick_backend::LaunchKind::Run, name)
     });
     #[cfg(not(feature = "wasm-backends"))]
-    let command: Option<Result<std::process::Command, String>> = None;
+    let command: Option<Result<process::Command, String>> = None;
     let mut command = match command {
         Some(Ok(command)) => command,
         Some(Err(why)) => {
@@ -378,6 +378,9 @@ pub fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
         && let Some(code) = super::script(name, &options.args, global)
     {
         return code;
+    }
+    if vm::is_vm_target(options.target.as_deref(), found.as_ref().ok()) {
+        return vm::run(options, global);
     }
     let project = match found {
         Ok(p) => p,

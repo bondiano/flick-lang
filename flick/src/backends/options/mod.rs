@@ -140,6 +140,7 @@ pub(crate) fn descriptor_tags(descriptor: &Descriptor) -> BackendTags {
 
 pub(crate) const OFFICIAL_JS: &str = "flick/js";
 pub(crate) const OFFICIAL_GO: &str = "flick/go";
+pub(crate) const OFFICIAL_VM: &str = "flick/vm";
 
 /// The short name of a backend id (`flick/js` -> `js`, `test/literal` -> `literal`).
 pub(crate) fn short_name(id: &str) -> &str {
@@ -153,6 +154,8 @@ pub(crate) enum TargetChoice {
         id: &'static str,
         short: &'static str,
     },
+    /// Built-in in-process virtual machine target (`flick/vm`).
+    Vm,
     Pinned {
         package: BackendPackage,
         short: String,
@@ -163,6 +166,7 @@ impl TargetChoice {
     pub(crate) fn id(&self) -> &str {
         match self {
             Self::Official { id, .. } => id,
+            Self::Vm => OFFICIAL_VM,
             Self::Pinned { package, .. } => &package.id,
         }
     }
@@ -170,8 +174,13 @@ impl TargetChoice {
     pub(crate) fn short(&self) -> &str {
         match self {
             Self::Official { short, .. } => short,
+            Self::Vm => "vm",
             Self::Pinned { short, .. } => short,
         }
+    }
+
+    pub(crate) fn is_vm(&self) -> bool {
+        matches!(self, Self::Vm)
     }
 
     #[cfg(test)]
@@ -240,6 +249,7 @@ fn resolve_named_target(name: &str, project: Option<&Project>) -> Result<TargetC
             id: OFFICIAL_GO,
             short: "go",
         }),
+        "vm" | OFFICIAL_VM => Ok(TargetChoice::Vm),
         other => {
             checkout_target(other, project).ok_or_else(|| unknown_target_diagnostic(other, project))
         }
@@ -268,7 +278,7 @@ fn checkout_target(_name: &str, _project: Option<&Project>) -> Option<TargetChoi
 }
 
 fn unknown_target_diagnostic(name: &str, project: Option<&Project>) -> Diagnostic {
-    let mut known = vec!["js".to_owned(), "go".to_owned()];
+    let mut known = vec!["js".to_owned(), "go".to_owned(), "vm".to_owned()];
     if project.is_some() && checkout_target("lua", project).is_some() {
         known.push("lua".to_owned());
     }
@@ -427,7 +437,8 @@ pub(crate) fn project_stages_by_class_cached(project: &Project) -> bool {
         ),
         TargetChoice::Official {
             id: OFFICIAL_GO, ..
-        } => false,
+        }
+        | TargetChoice::Vm => false,
         TargetChoice::Official { .. } | TargetChoice::Pinned { .. } => true,
     }
 }

@@ -83,6 +83,7 @@ pub fn phase(label: &str, elapsed: Duration) {
 }
 
 /// Byte size metric recorded during a stage when `--timings` is enabled.
+#[cfg_attr(not(feature = "wasm-backends"), allow(dead_code))]
 pub fn bytes(label: &str, count: u64) {
     debug!(bytes = count, "{label}");
 }

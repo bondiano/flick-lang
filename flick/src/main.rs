@@ -34,6 +34,7 @@ mod sources;
 mod stdlib;
 mod timings;
 mod toolchain;
+mod vm;
 mod workspace;
 
 /// Runs `command` again after every change of `paths`.

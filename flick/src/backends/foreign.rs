@@ -419,6 +419,7 @@ fn selected_pin(project: &Project, target_override: Option<&str>) -> Option<Back
                 },
                 sha256: package.sha256.clone(),
             }),
+        TargetChoice::Vm => None,
         TargetChoice::Official { id, .. } => official::local_pin(id, Some(project)),
     }
 }
@@ -447,6 +448,7 @@ pub(super) fn selected_bytes(
                 .ok()?;
             (bytes.len() <= limit).then_some((pin, bytes))
         }
+        TargetChoice::Vm => None,
         TargetChoice::Official { id, .. } => official::local_bytes(id, Some(project)),
     }
 }

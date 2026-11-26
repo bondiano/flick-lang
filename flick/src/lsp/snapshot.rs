@@ -18,12 +18,13 @@ use flick_core::plugin::reach::Outside;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::Foreign;
 #[cfg(feature = "wasm-backends")]
+use flick_core::project::ResolvedEnvironment;
+#[cfg(feature = "wasm-backends")]
 use flick_core::project::config::BackendEnvironment;
 #[cfg(feature = "wasm-backends")]
 use flick_core::project::target::Wanted;
 use flick_core::project::{
     self, Analysis, Analyzed, BackendTags, Compilation, Host, ModuleCache, Project,
-    ResolvedEnvironment,
 };
 use flick_core::source::{FileId, SourceMap};
 use flick_core::syntax::cst::Node;

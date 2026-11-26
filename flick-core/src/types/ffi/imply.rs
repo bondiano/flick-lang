@@ -104,6 +104,7 @@ const OFFICIAL_MODELS: &[BuiltinBackend] = &[
         &["node", "browser", "bun", "cloudflare"],
     ),
     ("flick/go", "go", &[(&["cgo"], None, false)], &["native"]),
+    ("flick/vm", "vm", &[], &["native"]),
 ];
 
 fn owned(items: &[&str]) -> Vec<String> {
@@ -154,10 +155,10 @@ impl NativeOverrideEnv {
                 });
             }
             extend_vocab(&mut vocabulary, builtin_hosts);
-            let foreign_spec = if short == "go" {
-                ForeignBackendSpec::go()
-            } else {
-                ForeignBackendSpec::js()
+            let foreign_spec = match short {
+                "go" => ForeignBackendSpec::go(),
+                "vm" => ForeignBackendSpec::vm(),
+                _ => ForeignBackendSpec::js(),
             };
             backends.push(BackendTagModel {
                 id: id.to_owned(),
@@ -316,6 +317,8 @@ impl NativeOverrideEnv {
                     }
                 }
                 true
+            } else if backend.short == "vm" {
+                visit(&["vm", "native"])
             } else {
                 visit(&["go", "native"]) && visit(&["go", "cgo", "native"])
             }

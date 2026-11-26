@@ -74,6 +74,8 @@ use std::fmt::Write as _;
 pub(crate) enum Selected {
     #[default]
     Native,
+    /// Built-in in-process virtual machine target (`flick/vm`).
+    Vm,
     #[cfg(feature = "wasm-backends")]
     Component(Arc<component::Package>),
 }
@@ -86,7 +88,7 @@ pub(crate) fn check_runtime(
 ) -> Option<Diagnostic> {
     let _ = project;
     match backend {
-        Selected::Native => {
+        Selected::Native | Selected::Vm => {
             let _ = resolved;
             None
         }
@@ -98,7 +100,7 @@ pub(crate) fn check_runtime(
 impl Selected {
     pub(crate) fn descriptor(&self) -> Option<flick_backend::Descriptor> {
         match self {
-            Self::Native => None,
+            Self::Native | Self::Vm => None,
             #[cfg(feature = "wasm-backends")]
             Self::Component(package) => Some(package.descriptor()),
         }
@@ -111,7 +113,7 @@ impl Selected {
         stages_by_class: bool,
     ) -> Option<Program> {
         match self {
-            Self::Native => {
+            Self::Native | Self::Vm => {
                 let _ = (sources, compilation, stages_by_class);
                 None
             }
@@ -153,6 +155,7 @@ impl Selected {
                     )))
                 }
             }
+            options::TargetChoice::Vm => Ok((Self::Vm, choice, overridden)),
             options::TargetChoice::Official { id, .. } => {
                 #[cfg(feature = "wasm-backends")]
                 {
@@ -183,6 +186,11 @@ impl Selected {
                 let project = project.expect("pinned target comes from a project");
                 component::Package::load(project, package)?
             }
+            options::TargetChoice::Vm => {
+                return Err(failure(
+                    "`flick/vm` is an in-process target, not a WebAssembly component",
+                ));
+            }
             options::TargetChoice::Official { id, .. } => {
                 let root = project.map_or(host.cwd.as_path(), |p| p.root.as_path());
                 let tools = project.map(|p| &p.config.tools);
@@ -195,7 +203,7 @@ impl Selected {
     #[cfg(feature = "wasm-backends")]
     pub(crate) fn pin(&self) -> Option<flick_backend::BackendPin> {
         match self {
-            Self::Native => None,
+            Self::Native | Self::Vm => None,
             #[cfg(feature = "wasm-backends")]
             Self::Component(package) => Some(package.pin()),
         }
@@ -203,7 +211,7 @@ impl Selected {
 
     pub(crate) fn run_paths(&self, files: &[Artifact]) -> Vec<(String, String)> {
         match self {
-            Self::Native => {
+            Self::Native | Self::Vm => {
                 let _ = files;
                 Vec::new()
             }
@@ -218,6 +226,10 @@ impl Selected {
                 let _ = resolved;
                 "native-baseline".into()
             }
+            Self::Vm => {
+                let _ = resolved;
+                "flick/vm".into()
+            }
             #[cfg(feature = "wasm-backends")]
             Self::Component(package) => package.cache_identity(&resolved.to_wire()),
         }
@@ -225,7 +237,7 @@ impl Selected {
 
     pub(crate) fn accepts_cached(&self, files: &[Artifact]) -> bool {
         match self {
-            Self::Native => !files.iter().any(|a| a.path == ".flick-backend.cbor"),
+            Self::Native | Self::Vm => !files.iter().any(|a| a.path == ".flick-backend.cbor"),
             #[cfg(feature = "wasm-backends")]
             Self::Component(package) => package.accepts_cached(files),
         }
@@ -243,7 +255,7 @@ pub(crate) fn pin_official(
 ) -> Result<(), Diagnostic> {
     let (choice, _) = options::resolve_target(None, Some(project))?;
     match choice {
-        options::TargetChoice::Pinned { .. } => Ok(()),
+        options::TargetChoice::Pinned { .. } | options::TargetChoice::Vm => Ok(()),
         options::TargetChoice::Official { id, .. } => {
             official::pin(project, id, update, locked, offline)
         }
@@ -257,6 +269,7 @@ pub(crate) fn selected_pin(project: &Project) -> Option<(String, String)> {
     let (choice, _) = options::resolve_target(None, Some(project)).ok()?;
     match choice {
         options::TargetChoice::Pinned { package, .. } => Some((package.id, package.sha256)),
+        options::TargetChoice::Vm => None,
         options::TargetChoice::Official { id, .. } => {
             official::known(id, Some(project)).map(|pin| (pin.identity.id, pin.sha256))
         }
@@ -271,6 +284,7 @@ pub(crate) fn contributor(project: &Project) -> Result<Arc<dyn Contributor>, Str
         Ok((Selected::Native, _, _)) => {
             Err("the native development backend adds no commands".into())
         }
+        Ok((Selected::Vm, _, _)) => Err("the built-in `vm` target adds no commands".into()),
         Err(diagnostic) => Err(diagnostic.message),
     }
 }
