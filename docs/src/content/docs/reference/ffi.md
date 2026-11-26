@@ -375,7 +375,7 @@ lets test suites check conformance between overrides and fallback bodies in both
 debug and release profiles.
 
 The standard library's overrides follow the same rules. Its modules are checked
-and lowered once for every build, so the compiler keeps each clause beside the
+and lowered once, for all builds, so the compiler keeps each clause beside the
 Flick body and selects among them again for the environment of each build: a
 backend that no clause names, and every build with `--no-native-overrides`,
 runs the Flick bodies.

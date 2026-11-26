@@ -79,8 +79,9 @@ pub struct Compilation {
     #[cfg(not(target_arch = "wasm32"))]
     pub environment: Option<ResolvedEnvironment>,
     /// The environment the `@native` clauses were selected in, by which a
-    /// build selects those of the built-in modules too; `None` for the
-    /// default one, which their shared IR lowers.
+    /// build selects those of the built-in modules too. A project's load
+    /// always records it; `None` (a compilation made otherwise) keeps the
+    /// default selection their shared IR lowers.
     #[cfg(not(target_arch = "wasm32"))]
     pub native_overrides: Option<NativeOverrideEnv>,
 }
