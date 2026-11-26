@@ -7,7 +7,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use flick_core::ir::Shape;
 use serde_json::{Value as Json, json};
 
-use crate::memory::{
+use crate::tier0::{
     Data, DictionaryValue, DurationData, Error, ExitData, Heap, ObjectId, TimeZoneData, Value,
     primitives,
 };

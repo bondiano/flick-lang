@@ -77,7 +77,7 @@ impl HostBridge {
     /// Spawns a fresh Node 24 worker process and completes the TCP handshake.
     pub fn new() -> Result<Self, Error> {
         let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let worker_path = manifest_dir.join("src/memory/host_bridge/worker.mjs");
+        let worker_path = manifest_dir.join("src/tier0/host_bridge/worker.mjs");
         let repo_root = manifest_dir
             .parent()
             .ok_or_else(|| Error::HostBridge("cannot resolve repo root".into()))?;

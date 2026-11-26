@@ -3,8 +3,8 @@ use std::fs;
 use std::path::Path;
 
 use flick_core::ir::Lit;
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value};
 
 #[test]
 fn module_level_list_and_opaque_box_transport_owner_without_reconstruction() {

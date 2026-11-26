@@ -3,7 +3,7 @@
 use flick_core::ir::Lit;
 use flick_core::ir::memory::{Block, Exit, Function, Instruction, Operation};
 use flick_core::opt::perceus;
-use flick_model::memory::{Error, Heap, Value, execute};
+use flick_vm::tier0::{Error, Heap, Value, execute};
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }

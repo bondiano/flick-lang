@@ -217,7 +217,7 @@ insufficient, because that count also includes existing internal edges.
 
 Audit result for data identity and record field order (issue #740):
 
-- **Value equality vs. object identity**: `flick-model/src/memory/primitives/operators.rs`
+- **Value equality vs. object identity**: `flick-vm/src/tier0/primitives/operators.rs`
   (`equal`) compares `Data::Record` order-independently, skips GADT held
   dictionary suffixes, rejects `Value::Cell` (explicit `Ref.same` observes cell
   identity), and uses `seen.insert((a.id, b.id))` solely as an internal memo/cycle
@@ -227,7 +227,7 @@ Audit result for data identity and record field order (issue #740):
   lowers record literal field expressions into ANF locals in **source order**
   before sorting `Operation::Record { fields }` into canonical UTF-16 label
   order, so permutations of the same evaluated fields allocate the exact same
-  canonical `Data::Record` layout. `flick-model/src/memory/primitives/records.rs`
+  canonical `Data::Record` layout. `flick-vm/src/tier0/primitives/records.rs`
   (`record_extend`, `record_remove`, `record_project`, `record_merge_disjoint`)
   canonicalizes structural records (JS array-index keys ascending, then UTF-16),
   and `schema_data.rs` uses UTF-16 order for sorted record/XML views. `Json`
@@ -806,7 +806,7 @@ above (24 measured profile rows total).
   (`Eligible attempts = reuses + reuse_fallbacks`, `Runtime reuses`,
   `Fallbacks`, `Baseline allocs`, `FBIP allocs`, `Base peak objs`,
   `FBIP peak objs`, and `Cells detached`) is measured directly by the
-  `flick-model` counted VM (`flick-model/src/memory/`).
+  `flick-vm` counted VM (`flick-vm/src/tier0/`).
 - **Explicitly `unmeasured` metrics:** Physical `Peak live bytes`, target-native
   Wasm/LLVM/Native heap allocation and RSS, wall-clock throughput/latency, and
   JS/Go host-GC runtime comparisons are explicitly `unmeasured` here (JS/Go

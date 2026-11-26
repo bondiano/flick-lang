@@ -11,7 +11,7 @@ check. The lowering that builds it lives in `flick-core/src/ir/`.
 - `src/visit.rs`, `src/validate.rs` — traversal, and the form check applied
   to what a plugin `transform` hook returns.
 - `src/memory/` — the ANF ownership IR: produced by
-  `flick-core/src/opt/perceus/`, run by `flick-model/src/memory/`; its
+  `flick-core/src/opt/perceus/`, run by `flick-vm/src/tier0/`; its
   contract is [docs/formal/memory.md](../docs/formal/memory.md).
 - `src/bridge_plan/` — standalone foreign-bridge metadata, outside
   `Program` and `.iface`.

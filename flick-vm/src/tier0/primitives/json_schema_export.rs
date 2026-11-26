@@ -9,7 +9,7 @@ use super::json_schema_jval::{
 };
 use super::list_ops::slice_reps;
 use super::{Error, Heap, Value, charge};
-use crate::memory::Data;
+use crate::tier0::Data;
 
 const INT32_MIN: f64 = -2_147_483_648.0;
 const INT32_MAX: f64 = 2_147_483_647.0;

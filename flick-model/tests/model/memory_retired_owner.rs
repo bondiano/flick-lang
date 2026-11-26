@@ -5,7 +5,7 @@ use flick_core::ir::{
     memory::{Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program},
 };
 use flick_core::opt::perceus;
-use flick_model::memory::{Error, Heap, Value, execute_program};
+use flick_vm::tier0::{Error, Heap, Value, execute_program};
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }

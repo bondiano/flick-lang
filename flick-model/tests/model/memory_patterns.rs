@@ -5,7 +5,7 @@ use flick_core::ir::memory::{
 use flick_core::ir::{BinOp, Lit, Pat};
 use flick_core::opt::perceus;
 use flick_core::types::{Constructor, Rep};
-use flick_model::memory::{Error, Heap, Value, execute_program};
+use flick_vm::tier0::{Error, Heap, Value, execute_program};
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }

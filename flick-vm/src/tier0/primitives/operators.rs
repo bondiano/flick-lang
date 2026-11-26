@@ -223,7 +223,7 @@ fn is_opaque_data(data: &Data) -> bool {
     )
 }
 
-pub(in crate::memory) fn values_equal(
+pub(in crate::tier0) fn values_equal(
     heap: &Heap,
     left: &Value,
     right: &Value,

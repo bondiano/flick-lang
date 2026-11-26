@@ -3,11 +3,11 @@
 
 use super::outcome_ops::{describe_defect, expect_cause_reasons};
 use super::{Data, DurationData, Error, Heap, Value, charge};
-use crate::memory::causes::{CauseToken, Reason, StoredReason};
+use crate::tier0::causes::{CauseToken, Reason, StoredReason};
 
 /// Bit-for-bit port of `runtime-go/flickrt/random.go` `isaac` (`ISAAC_CSPRNG`).
 #[derive(Clone, Debug)]
-pub(in crate::memory) struct IsaacRng {
+pub(in crate::tier0) struct IsaacRng {
     memory: [u32; 256],
     result: [u32; 256],
     accumulator: u32,
@@ -17,7 +17,7 @@ pub(in crate::memory) struct IsaacRng {
 }
 
 impl IsaacRng {
-    pub(in crate::memory) fn from_seed(seed: f64) -> Self {
+    pub(in crate::tier0) fn from_seed(seed: f64) -> Self {
         let mut r = Self {
             memory: [0; 256],
             result: [0; 256],
@@ -82,7 +82,7 @@ impl IsaacRng {
         clippy::cast_precision_loss,
         reason = "exact IEEE-754 53-bit double draw"
     )]
-    pub(in crate::memory) fn next_f64(&mut self) -> f64 {
+    pub(in crate::tier0) fn next_f64(&mut self) -> f64 {
         let hi = self.next_u32() & 0x1f_ffff;
         let lo = self.next_u32();
         (f64::from(hi) * 4_294_967_296.0 + f64::from(lo)) / ((1_u64 << 53) as f64)
@@ -130,10 +130,7 @@ fn js_uint32(x: f64) -> u32 {
 }
 
 /// Inert report matching `runtime-go/flickrt/failure.go:describeCause`.
-pub(in crate::memory) fn describe_cause_report(
-    heap: &Heap,
-    cause: &Value,
-) -> Result<String, Error> {
+pub(in crate::tier0) fn describe_cause_report(heap: &Heap, cause: &Value) -> Result<String, Error> {
     let reasons = expect_cause_reasons(heap, cause)?;
     let mut parts = Vec::with_capacity(reasons.len());
     for r in reasons {
@@ -216,7 +213,7 @@ fn inert_text(s: &str) -> String {
 }
 
 /// Strips all `Interrupt` reasons from a cause; returns `None` when nothing remains.
-pub(in crate::memory) fn without_interrupts_cause(
+pub(in crate::tier0) fn without_interrupts_cause(
     heap: &mut Heap,
     cause: &CauseToken,
     fuel: &mut u64,
@@ -239,7 +236,7 @@ pub(in crate::memory) fn without_interrupts_cause(
 }
 
 /// Turns every `Fail(v)` reason in `cause` into `Die(v)` (`Layer.or_die` / `Effect.or_die`).
-pub(in crate::memory) fn fails_to_dies_cause(
+pub(in crate::tier0) fn fails_to_dies_cause(
     heap: &mut Heap,
     cause: &CauseToken,
     fuel: &mut u64,
@@ -272,7 +269,7 @@ pub(in crate::memory) fn fails_to_dies_cause(
     clippy::cast_sign_loss,
     reason = "clamped finite positive millisecond duration to u64 nanoseconds"
 )]
-pub(in crate::memory) fn duration_sleep_nanos(
+pub(in crate::tier0) fn duration_sleep_nanos(
     heap: &Heap,
     val: &Value,
 ) -> Result<Option<u64>, Error> {

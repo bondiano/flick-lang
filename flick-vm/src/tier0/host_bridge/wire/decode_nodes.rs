@@ -8,8 +8,8 @@ use num_bigint::BigInt;
 use regex_automata::meta::Regex;
 use serde_json::Value as Json;
 
-use crate::memory::causes::{CauseData, StoredReason};
-use crate::memory::{
+use crate::tier0::causes::{CauseData, StoredReason};
+use crate::tier0::{
     Data, DateTimeData, DefectSpec, DurationData, Error, ExitData, Heap, OwnerHandle, TimeZoneData,
     Value,
 };

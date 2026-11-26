@@ -7,10 +7,8 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::{
-    memory::{Heap, Value, execute_program},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Heap, Value, execute_program};
 use std::panic::catch_unwind;
 const SOURCE: &str = r"module App.Range exposing (answer)
 answer : Unit -> List Int
@@ -115,7 +113,7 @@ fn assert_ints(heap: &Heap, value: &Value, expected: &[i32]) {
 }
 #[test]
 fn all_endpoint_prefixes_finish_without_overflow_or_collecting_external_roots() {
-    use flick_model::memory::{Error, ProgramOutcome, execute_program_outcome};
+    use flick_vm::tier0::{Error, ProgramOutcome, execute_program_outcome};
     for release in [false, true] {
         let p = program(CASES, "bounds", release);
         for (from, until) in [
@@ -174,7 +172,7 @@ fn all_endpoint_prefixes_finish_without_overflow_or_collecting_external_roots() 
 }
 #[test]
 fn arguments_are_eager_left_to_right_even_when_empty_and_defects_keep_their_order() {
-    use flick_model::memory::{Error, ProgramOutcome, execute_program_outcome};
+    use flick_vm::tier0::{Error, ProgramOutcome, execute_program_outcome};
     for release in [false, true] {
         for (name, expected_stdout, error) in [
             ("eager", "left\nright\n", None),
@@ -210,7 +208,7 @@ fn arguments_are_eager_left_to_right_even_when_empty_and_defects_keep_their_orde
 }
 #[test]
 fn partial_calls_and_source_closures_preserve_heap_capture_and_reference_identity() {
-    use flick_model::memory::{ProgramOutcome, execute_program_outcome};
+    use flick_vm::tier0::{ProgramOutcome, execute_program_outcome};
     for release in [false, true] {
         let p = program(CASES, "captured", release);
         for partial in [false, true] {
@@ -266,7 +264,7 @@ fn partial_calls_and_source_closures_preserve_heap_capture_and_reference_identit
 }
 #[test]
 fn range_composes_with_inert_closures_holding_retired_arena_views_at_every_prefix() {
-    use flick_model::memory::{Error, ProgramOutcome, execute_program_outcome};
+    use flick_vm::tier0::{Error, ProgramOutcome, execute_program_outcome};
     for release in [false, true] {
         let p = program(CASES, "holding", release);
         let mut completed = false;

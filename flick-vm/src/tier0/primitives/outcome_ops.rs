@@ -6,7 +6,7 @@ use flick_core::ir::memory::OutcomeIntrinsic;
 use super::cause_ops::{append_cause_reasons, drop_stored, run_cause};
 use super::list_ops::slice_reps;
 use super::{Data, Error, ExitData, Heap, Value, charge};
-use crate::memory::causes::{CauseData, Reason, StoredReason};
+use crate::tier0::causes::{CauseData, Reason, StoredReason};
 
 pub(super) fn run(
     heap: &mut Heap,
@@ -134,7 +134,7 @@ pub(super) fn decode_fiber_id(heap: &Heap, opt: &Value) -> Result<Option<usize>,
     }
 }
 
-pub(in crate::memory) fn describe_defect(heap: &Heap, val: &Value) -> Result<String, Error> {
+pub(in crate::tier0) fn describe_defect(heap: &Heap, val: &Value) -> Result<String, Error> {
     if let Value::Object(tok) = val {
         match &heap.object(tok.id)?.data {
             Data::Defect(spec) => return Ok(spec.message()),

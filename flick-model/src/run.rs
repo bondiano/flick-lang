@@ -16,13 +16,13 @@ use flick_core::{build, ir};
 use crate::check::check_program;
 use crate::decls::Decls;
 use crate::eval::{Machine, Outcome, Program};
-use crate::memory::{
+use crate::syntax::{Name, Path, Term};
+use crate::translate;
+use flick_vm::tier0::{
     Error as MemoryError, ExecutionReport, Heap, HostBridge, HostMode, ProgramOutcome, Stats,
     Value, execute_main_program_outcome_with_host, execute_main_with_bridge_and_inits,
     execute_rooted_main_program_outcome_with_host,
 };
-use crate::syntax::{Name, Path, Term};
-use crate::translate;
 
 mod counted_inputs;
 

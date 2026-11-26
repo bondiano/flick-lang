@@ -12,10 +12,8 @@ use flick_core::{
     project::Compiled,
     types::{Form, Kind, Type},
 };
-use flick_model::{
-    memory::{Heap, ProgramOutcome, Value, execute_program_outcome},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Heap, ProgramOutcome, Value, execute_program_outcome};
 use std::sync::Arc;
 use std::{fmt::Write as _, path::Path};
 

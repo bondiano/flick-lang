@@ -9,11 +9,9 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::{
-    memory::{
-        Error, Heap, ProgramOutcome, Value, execute_main_program_outcome, execute_program_outcome,
-    },
-    run,
+use flick_model::run;
+use flick_vm::tier0::{
+    Error, Heap, ProgramOutcome, Value, execute_main_program_outcome, execute_program_outcome,
 };
 
 const FUEL: u64 = 100_000;

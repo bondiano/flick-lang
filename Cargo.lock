@@ -821,15 +821,12 @@ dependencies = [
 name = "flick-model"
 version = "0.1.0"
 dependencies = [
- "base64",
  "flick-core",
  "flick-test-support",
+ "flick-vm",
  "num-bigint",
- "num-traits",
  "proptest",
- "regex-automata",
  "serde_json",
- "unicode-normalization",
 ]
 
 [[package]]
@@ -942,6 +939,19 @@ dependencies = [
 [[package]]
 name = "flick-test-support"
 version = "0.1.0"
+
+[[package]]
+name = "flick-vm"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "flick-core",
+ "num-bigint",
+ "num-traits",
+ "regex-automata",
+ "serde_json",
+ "unicode-normalization",
+]
 
 [[package]]
 name = "flick-wasm"

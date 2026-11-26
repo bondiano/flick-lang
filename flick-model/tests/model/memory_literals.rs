@@ -2,7 +2,7 @@
 
 use flick_core::ir::Lit;
 use flick_core::ir::memory::{Block, Exit, Function, Instruction, Operation};
-use flick_model::memory::{Heap, Value, execute};
+use flick_vm::tier0::{Heap, Value, execute};
 
 fn bind(binding: u32, value: Operation) -> Instruction {
     Instruction::Let { binding, value }

@@ -366,7 +366,7 @@ fn borrowed_match_reuse_respects_whole_aliases_children_and_dead_results() {
 }
 #[test]
 fn match_update_and_failure_are_program_only_in_standalone_execution() {
-    use flick_model::memory::execute;
+    use flick_vm::tier0::execute;
     for operation in [
         Operation::Match {
             object: 0,

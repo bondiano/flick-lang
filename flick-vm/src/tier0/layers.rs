@@ -1,6 +1,6 @@
 //! Complete providers retain caller evidence and own a real lexical scope.
 use super::{Destination, Invocation, InvocationEnd, Machine, OwnerState, ScopeOutcome};
-use crate::memory::{Data, Error, Heap, LayerData, Value};
+use crate::tier0::{Data, Error, Heap, LayerData, Value};
 use flick_core::ir::memory::{Intrinsic, Local};
 use std::mem;
 

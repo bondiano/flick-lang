@@ -230,10 +230,7 @@ mod recovery_integrity {
 mod recovery_timing {
     use super::*;
     pub(super) mod effects {
-        include!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/tests/support/recovery_effects.rs"
-        ));
+        include!("recovery_effects.rs");
     }
     use effects::selection_effects;
     #[test]

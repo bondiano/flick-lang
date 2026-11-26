@@ -7,7 +7,7 @@ use flick_core::ir::{
 };
 use flick_core::opt::perceus;
 use flick_core::types::{Constructor, Rep};
-use flick_model::memory::{
+use flick_vm::tier0::{
     Error, Heap, ObjectId, ProgramOutcome, Value, execute_program, execute_program_outcome,
 };
 

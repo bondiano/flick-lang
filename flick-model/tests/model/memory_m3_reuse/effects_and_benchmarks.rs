@@ -4,7 +4,7 @@ use flick_core::ir::{
     Lit, Pat,
     memory::{Block, Exit, Function, Global, Instruction, Name, Operation, Program},
 };
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value, execute, execute_program_outcome};
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute, execute_program_outcome};
 
 use super::{compare_fbip_vs_baseline, sweep_fuel_prefixes};
 

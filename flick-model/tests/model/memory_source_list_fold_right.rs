@@ -8,10 +8,8 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::{
-    memory::{Error, Heap, ProgramOutcome, execute_program_outcome},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, execute_program_outcome};
 
 const SOURCE: &str = r#"module App.FoldRight exposing (answer, cold, fault)
 spin : Unit -> a

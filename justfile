@@ -68,6 +68,7 @@ unit-flick part="":
 # cases against the reasons of tests/run/model_gaps*.txt, and the
 # model properties on generated programs (`PROPTEST_CASES` sets how many)
 model:
+    cargo test -p flick-vm -- --include-ignored
     cargo test -p flick-model -- --include-ignored
 
 # Regenerate formal/Formal/Elab/PreludeSchemes.lean and formal/Formal/Live/ElideSchemes.lean from the checker's Prelude

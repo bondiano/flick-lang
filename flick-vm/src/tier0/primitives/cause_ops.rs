@@ -7,12 +7,12 @@ use super::outcome_ops::{
     ReasonKind, cause_of_single, decode_fiber_id, expect_cause_reasons, expect_reason, matches_kind,
 };
 use super::{Data, Error, Heap, Value, charge};
-use crate::memory::causes::{CauseData, CauseToken, Reason, StoredReason};
+use crate::tier0::causes::{CauseData, CauseToken, Reason, StoredReason};
 
 #[path = "cause_ops/query.rs"]
 mod query;
 
-pub(in crate::memory) use query::first_defect_message;
+pub(in crate::tier0) use query::first_defect_message;
 
 pub(super) fn run_cause(
     heap: &mut Heap,
@@ -289,7 +289,7 @@ fn cause_combine(
     combine_cause_values(heap, self_val, that_val, true, fuel)
 }
 
-pub(in crate::memory) fn concat_causes(
+pub(in crate::tier0) fn concat_causes(
     heap: &mut Heap,
     left: &CauseToken,
     right: &CauseToken,
@@ -305,7 +305,7 @@ pub(in crate::memory) fn concat_causes(
     CauseToken::from_cause_value(heap, out)
 }
 
-pub(in crate::memory) fn join_causes(
+pub(in crate::tier0) fn join_causes(
     heap: &mut Heap,
     left: &CauseToken,
     right: &CauseToken,
@@ -323,7 +323,7 @@ pub(in crate::memory) fn join_causes(
 
 /// G7g (`docs/formal/runtime.md#an-interruption-that-skips-a-handler-erases-fail-effect`):
 /// drop every `Fail` reason from `prev` and append `Interrupt { fiber_id }` if absent.
-pub(in crate::memory) fn strip_fail_and_add_interrupt(
+pub(in crate::tier0) fn strip_fail_and_add_interrupt(
     heap: &mut Heap,
     prev: Option<&CauseToken>,
     fiber_id: Option<usize>,

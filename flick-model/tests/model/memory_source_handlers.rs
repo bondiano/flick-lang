@@ -6,8 +6,8 @@ use flick_core::build;
 use flick_core::ir::Lit;
 use flick_core::ir::memory::{self, Name};
 use flick_core::opt::perceus;
-use flick_model::memory::{Error, Heap, ProgramOutcome, execute_program_outcome};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, execute_program_outcome};
 
 const CAPTURES: &str = r#"module App.HandlerCaptures exposing (answer)
 

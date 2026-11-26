@@ -1,7 +1,7 @@
 //! Counted-memory capture reclamation, reset, and zero-leak sweeps for O3 local lazy cells.
 
 use flick_core::ir::memory::{Block, Exit, Instruction, Intrinsic, Name, Operation, Program};
-use flick_model::memory::{Error, Heap, ProgramOutcome, Reason, Value, execute_program_outcome};
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Reason, Value, execute_program_outcome};
 
 use crate::causes;
 

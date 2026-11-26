@@ -7,7 +7,7 @@ use flick_core::ir::Lit;
 use super::super::outcome_ops::{ReasonKind, describe_defect, expect_cause_reasons, matches_kind};
 use super::super::{Data, Error, Heap, ObjectId, Value, charge};
 use super::{drop_stored, snapshot_reasons};
-use crate::memory::causes::{CauseData, StoredReason};
+use crate::tier0::causes::{CauseData, StoredReason};
 
 pub(super) fn cause_find_reason(
     heap: &mut Heap,
@@ -212,7 +212,7 @@ pub(super) fn cause_replace_first_fail(
     Ok(heap.allocate(Data::Cause(CauseData::plain(out))))
 }
 
-pub(in crate::memory) fn first_defect_message(
+pub(in crate::tier0) fn first_defect_message(
     heap: &Heap,
     cause_id: ObjectId,
 ) -> Result<Option<String>, Error> {

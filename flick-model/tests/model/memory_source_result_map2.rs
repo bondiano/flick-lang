@@ -7,10 +7,8 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::{
-    memory::{Heap, Value, execute_program},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Heap, Value, execute_program};
 use std::panic::catch_unwind;
 const SOURCE: &str = r#"module App.Map2 exposing (answer)
 answer : Unit -> String
@@ -162,7 +160,7 @@ fn result_left_bias_cold_stages_eager_arguments_and_error_payload_identity() {
 }
 #[test]
 fn every_result_prefix_preserves_external_capture_and_payload_aliases() {
-    use flick_model::memory::{Error, ProgramOutcome, execute_program_outcome};
+    use flick_vm::tier0::{Error, ProgramOutcome, execute_program_outcome};
     for release in [false, true] {
         let p = program(CASES, "combine", release);
         for (left_ok, right_ok) in [(true, true), (true, false), (false, true), (false, false)] {
@@ -250,7 +248,7 @@ use crate::causes;
 
 #[test]
 fn callback_expression_is_eager_before_either_argument_even_on_the_empty_path() {
-    use flick_model::memory::{Error, execute_program_outcome};
+    use flick_vm::tier0::{Error, execute_program_outcome};
     for release in [false, true] {
         let p = program(CASES, "eager_f", release);
         let mut heap = Heap::new();

@@ -4,12 +4,12 @@ use super::{Data, Error, Heap, ObjectToken, Value, charge};
 /// An owned cause root. Diagnostic identities never construct ownership.
 ///
 /// ```compile_fail,E0277
-/// use flick_model::memory::CauseToken;
+/// use flick_vm::tier0::CauseToken;
 /// fn forge_duplicate(token: &CauseToken) -> CauseToken { Clone::clone(token) }
 /// ```
 ///
 /// ```compile_fail,E0451
-/// use flick_model::memory::CauseToken;
+/// use flick_vm::tier0::CauseToken;
 /// let _ = CauseToken { token: unreachable!() };
 /// ```
 #[derive(Debug, PartialEq, Eq)]
@@ -390,7 +390,7 @@ impl Heap {
         self.cause(&borrowed, fuel).map(Some)
     }
 
-    pub(crate) fn cause_error(&self, cause: &CauseToken) -> Result<Error, Error> {
+    pub fn cause_error(&self, cause: &CauseToken) -> Result<Error, Error> {
         Ok(match self.cause_data(cause)? {
             [StoredReason::Die(value)] => self.defect(value)?.legacy_error(),
             _ => Error::UnhandledFailure,

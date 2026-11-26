@@ -244,7 +244,7 @@ fn returned_task_cannot_rebind_code_or_closed_cell_storage_in_another_execution(
 
 #[test]
 fn main_function_returned_task_uses_same_live_cell_arena_until_await_finishes() {
-    use flick_model::memory::execute_main_program;
+    use flick_vm::tier0::execute_main_program;
     let p = program(vec![
         function(
             &[0, 1],
@@ -293,7 +293,7 @@ fn main_function_returned_task_uses_same_live_cell_arena_until_await_finishes() 
 
 #[test]
 fn direct_task_main_is_awaited_once() {
-    use flick_model::memory::execute_main_program;
+    use flick_vm::tier0::execute_main_program;
     let p = Program {
         functions: BTreeMap::from([
             (

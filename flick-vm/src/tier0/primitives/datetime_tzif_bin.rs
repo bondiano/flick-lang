@@ -172,10 +172,17 @@ pub(super) fn local_tzif() -> Option<TzifZone> {
 }
 
 fn read_tzif_file(id: &str) -> Option<Vec<u8>> {
+    if let Ok(dir) = env::var("TZDIR")
+        && !dir.is_empty()
+        && let Ok(bytes) = fs::read(format!("{dir}/{id}"))
+    {
+        return Some(bytes);
+    }
     let dirs = [
         "/usr/share/zoneinfo",
         "/var/db/timezone/zoneinfo",
         "/usr/lib/zoneinfo",
+        "/etc/zoneinfo",
     ];
     for dir in dirs {
         let path = format!("{dir}/{id}");

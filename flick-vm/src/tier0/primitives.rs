@@ -29,6 +29,7 @@ mod bigint_conversion;
 
 #[path = "host.rs"]
 mod host;
+pub use host::{DRAW, MILLIS, MONOTONIC_NANOS, NANOS};
 
 #[path = "primitives/int_ops.rs"]
 mod int_ops;

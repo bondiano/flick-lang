@@ -3,8 +3,8 @@
 use flick_core::ir::Shape;
 use serde_json::{Value as Json, json};
 
-use crate::memory::causes::{CauseData, StoredReason};
-use crate::memory::{Data, Error, Heap, LayerData, Value, primitives};
+use crate::tier0::causes::{CauseData, StoredReason};
+use crate::tier0::{Data, Error, Heap, LayerData, Value, primitives};
 
 use super::WireRegistrar;
 use super::encode_obj::encode_object;
@@ -74,7 +74,7 @@ pub(super) enum CauseReasonKind {
 }
 
 /// Encodes a borrowed Rust `Value` into a flat `{ "root": idx, "nodes": [...] }` payload.
-pub(in crate::memory) fn encode_value(
+pub(in crate::tier0) fn encode_value(
     heap: &mut Heap,
     execution: usize,
     value: &Value,
@@ -487,7 +487,7 @@ pub(super) fn encode_cause(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::memory::{CellHandle, ObjectId};
+    use crate::tier0::{CellHandle, ObjectId};
 
     struct NoopRegistrar;
 

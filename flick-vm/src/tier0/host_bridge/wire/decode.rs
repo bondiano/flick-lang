@@ -2,14 +2,14 @@
 
 use serde_json::Value as Json;
 
-use crate::memory::causes::{CauseData, StoredReason};
-use crate::memory::{CauseToken, Data, DefectSpec, Error, Heap, Value};
+use crate::tier0::causes::{CauseData, StoredReason};
+use crate::tier0::{CauseToken, Data, DefectSpec, Error, Heap, Value};
 
 use super::decode_nodes::build_decoded_node;
 
 /// Decodes a flat `{ "root": idx, "nodes": [...] }` payload iteratively.
 /// Any mid-decode error releases every partially allocated slot cleanly.
-pub(in crate::memory) fn decode_value(
+pub(in crate::tier0) fn decode_value(
     heap: &mut Heap,
     execution: usize,
     wire: &Json,
@@ -212,7 +212,7 @@ pub(super) fn take_child(
 }
 
 /// Decodes a `worker.mjs` `{ "reasons": [...] }` wire cause object into a `CauseToken`.
-pub(in crate::memory) fn decode_cause_wire(
+pub(in crate::tier0) fn decode_cause_wire(
     heap: &mut Heap,
     execution: usize,
     cause_json: &Json,

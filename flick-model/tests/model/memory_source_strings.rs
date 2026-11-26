@@ -5,9 +5,9 @@ use flick_core::{
     ir::{Lit, memory::Name},
     opt::perceus,
 };
-use flick_model::{
-    memory::{Error, Heap, ProgramOutcome, Value, execute_program, execute_program_outcome},
-    run,
+use flick_model::run;
+use flick_vm::tier0::{
+    Error, Heap, ProgramOutcome, Value, execute_program, execute_program_outcome,
 };
 
 #[test]

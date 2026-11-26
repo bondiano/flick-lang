@@ -8,7 +8,7 @@ use flick_core::ir::{
     },
 };
 use flick_core::opt::perceus;
-use flick_model::memory::{
+use flick_vm::tier0::{
     Error, Heap, ProgramOutcome, Value, execute_program, execute_program_outcome,
 };
 

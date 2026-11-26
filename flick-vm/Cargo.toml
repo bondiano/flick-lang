@@ -1,0 +1,21 @@
+[package]
+name = "flick-vm"
+description = "Reference counted virtual machine for Flick's ownership IR"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+base64 = "0.22.1"
+flick-core = { path = "../flick-core", default-features = false }
+num-bigint = "0.5.1"
+num-traits = "0.2.19"
+regex-automata = "0.4.18"
+serde_json = { workspace = true }
+unicode-normalization = "0.1.26"

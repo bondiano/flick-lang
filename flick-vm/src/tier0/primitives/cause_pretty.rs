@@ -7,7 +7,7 @@ use flick_core::opt::{js_number, json_string};
 
 use super::outcome_ops::{describe_defect, expect_cause_reasons};
 use super::{Data, Error, Heap, Value, charge};
-use crate::memory::causes::StoredReason;
+use crate::tier0::causes::StoredReason;
 
 const INTERRUPTED_MESSAGE: &str = "All fibers interrupted without error";
 

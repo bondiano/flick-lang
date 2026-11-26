@@ -8,8 +8,8 @@ use std::path::Path;
 use flick_core::build;
 use flick_core::ir::memory::Name;
 use flick_core::opt::perceus;
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value, execute_main_program_outcome};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_main_program_outcome};
 
 fn check_fixture(path: &Path, label: &str, fuel: u64) -> Result<(), String> {
     let expected = fs::read_to_string(path.with_extension("stdout"))

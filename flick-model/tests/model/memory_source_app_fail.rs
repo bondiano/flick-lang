@@ -7,10 +7,8 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::{
-    memory::{Error, Heap, ProgramOutcome, Value, execute_program_outcome},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 use std::panic::catch_unwind;
 
 fn program(source: &str, entry: &Name, release: bool) -> Program {

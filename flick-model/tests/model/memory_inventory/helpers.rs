@@ -10,7 +10,7 @@ use flick_core::codegen::EffectBridge;
 use flick_core::diagnostics::Severity;
 use flick_core::project;
 use flick_core::source::{FileId, SourceMap};
-use flick_model::memory::{Heap, ProgramOutcome, Reason};
+use flick_vm::tier0::{Heap, ProgramOutcome, Reason};
 
 pub(super) struct FsHost;
 

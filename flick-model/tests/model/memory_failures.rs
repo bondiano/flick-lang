@@ -6,7 +6,7 @@ use flick_core::ir::{
     memory::{Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program},
 };
 use flick_core::opt::perceus;
-use flick_model::memory::{
+use flick_vm::tier0::{
     Error, Heap, ProgramOutcome, Value, execute, execute_program, execute_program_outcome,
 };
 

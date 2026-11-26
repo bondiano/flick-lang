@@ -90,7 +90,7 @@ pub(super) fn compare_raw(av: &BigInt, as_: i64, bv: &BigInt, bs: i64) -> Result
     )
 }
 
-pub(in crate::memory) fn format_decimal(value: &BigInt, scale: i64) -> String {
+pub(in crate::tier0) fn format_decimal(value: &BigInt, scale: i64) -> String {
     let n = Dec {
         value: value.clone(),
         scale,

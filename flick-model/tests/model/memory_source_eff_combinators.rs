@@ -8,10 +8,8 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::{
-    memory::{Error, Heap, ProgramOutcome, Value, execute_program_outcome},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 const DECLARATIONS: &str = r#"pure_eff : a^c -> (Eff r e a)^c
 foreign pure pure_eff from "flick:rt" "succeed"
   retention call

@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::env;
 
-use flick_model::memory::Stats;
+use flick_vm::tier0::Stats;
 
 #[derive(Default)]
 pub(super) struct CorpusSummary {

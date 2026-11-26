@@ -7,10 +7,8 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::{
-    memory::{Heap, Value, execute_program},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Heap, Value, execute_program};
 use std::panic::catch_unwind;
 const SOURCE: &str = r#"module App.Map2 exposing (answer)
 answer : Unit -> List String
@@ -180,7 +178,7 @@ fn cartesian_multiplicity_cold_partial_calls_eager_arguments_and_reference_alias
 }
 #[test]
 fn every_cartesian_prefix_preserves_capture_and_both_payload_sides() {
-    use flick_model::memory::{Error, ProgramOutcome, execute_program_outcome};
+    use flick_vm::tier0::{Error, ProgramOutcome, execute_program_outcome};
     for release in [false, true] {
         let p = program(CASES, "combine", release);
         for (left_len, right_len) in [(0, 0), (0, 2), (2, 0), (2, 2)] {
@@ -243,7 +241,7 @@ fn every_cartesian_prefix_preserves_capture_and_both_payload_sides() {
 }
 #[test]
 fn every_callback_position_observes_left_outer_right_inner_order() {
-    use flick_model::memory::{Error, ProgramOutcome, execute_program_outcome};
+    use flick_vm::tier0::{Error, ProgramOutcome, execute_program_outcome};
     for release in [false, true] {
         let p = program(CASES, "order", release);
         for target in 0..4 {
@@ -272,7 +270,7 @@ fn every_callback_position_observes_left_outer_right_inner_order() {
 
 #[test]
 fn callback_expression_is_eager_before_either_argument_even_on_the_empty_path() {
-    use flick_model::memory::{Error, execute_program_outcome};
+    use flick_vm::tier0::{Error, execute_program_outcome};
     for release in [false, true] {
         let p = program(CASES, "eager_f", release);
         let mut heap = Heap::new();

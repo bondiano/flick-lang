@@ -4,10 +4,10 @@ use flick_core::ir::{
     Lit,
     memory::{Block, Exit, Instruction, Operation, Program},
 };
-use flick_model::memory::{Error, Heap, ProgramOutcome, Stats, Value};
 use flick_model::run::{
     CountedMain, compile_source, counted_main, counted_main_without_reuse, main_of,
 };
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Stats, Value};
 
 mod effects_and_benchmarks;
 mod measurements;

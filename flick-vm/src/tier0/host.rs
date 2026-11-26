@@ -1,7 +1,7 @@
 //! The host primitives of `Host.live` on the counted heap, supporting both
-//! the deterministic model host (`crate::native::host`) and live OS process
-//! environment (`HostMode::LiveOs`) for live corpus verification. The text
-//! an operation takes is borrowed; the machine releases it.
+//! the deterministic reference host and live OS process environment
+//! (`HostMode::LiveOs`) for live corpus verification. The text an operation
+//! takes is borrowed; the machine releases it.
 
 use std::env;
 
@@ -9,7 +9,18 @@ use flick_core::ir::Lit;
 use flick_core::ir::memory::HostPrimitive;
 
 use super::{Error, Heap, Value};
-use crate::native::host::{DRAW, MILLIS, MONOTONIC_NANOS, NANOS};
+
+/// The deterministic wall clock, in milliseconds since the epoch: 2025-06-15T17:46:40Z.
+pub const MILLIS: f64 = 1_750_000_000_000.0;
+
+/// The deterministic wall clock in nanoseconds, [`MILLIS`] exactly.
+pub const NANOS: i64 = 1_750_000_000_000_000_000;
+
+/// The deterministic monotonic clock, in nanoseconds.
+pub const MONOTONIC_NANOS: i64 = 0;
+
+/// Every deterministic draw of `Host.Random.next`, in [0, 1).
+pub const DRAW: f64 = 0.5;
 
 /// Selects how host environment primitives (`Platform.env`, `Platform.vars`,
 /// `Platform.args`) behave during counted execution.

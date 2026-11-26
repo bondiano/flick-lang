@@ -6,7 +6,7 @@ import Formal.MemoryArena
 This models `ArenaMake`, `ArenaAlloc`, `ArenaGet`, and the M2 owner lifecycle
 (`Open` -> `Closing` (children/pending work) -> `Finalizing` (LIFO finalizers,
 with late arena reads/allocations allowed) -> `Closed` (detach-all retirement))
-matching `flick-model/src/memory/program/owner_close.rs` and `scoped_values.rs`.
+matching `flick-vm/src/tier0/program/owner_close.rs` and `scoped_values.rs`.
 
 Each `Data::Arena { contents: Vec<Value> }` has ONE private Object owner, not
 one cell object per slot. Owner/Arena/View capabilities all map to the nonowning

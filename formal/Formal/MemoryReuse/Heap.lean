@@ -6,7 +6,7 @@ import Formal.MemoryArena
 
 Models an idealized counted heap of tagged constructors, records, and empty
 `reuseToken` slots with explicit per-object reference counts corresponding to
-`flick-model/src/memory/reuse.rs` and `flick-model/src/memory/patterns.rs`.
+`flick-vm/src/tier0/reuse.rs` and `flick-vm/src/tier0/patterns.rs`.
 
 **Scope limits:** Abstract model theorems; they do NOT prove verified Rust
 extraction, compiler/lowering equivalence, fuel metering, host-bridge FFI, or

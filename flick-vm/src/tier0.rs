@@ -22,7 +22,7 @@ pub use host_bridge::HostBridge;
 
 mod patterns;
 mod primitives;
-pub use primitives::HostMode;
+pub use primitives::{DRAW, HostMode, MILLIS, MONOTONIC_NANOS, NANOS};
 mod program;
 mod record_update;
 pub use program::{
@@ -49,7 +49,7 @@ pub struct ObjectId {
 /// type intentionally implements neither `Clone` nor `Copy`.
 ///
 /// ```compile_fail,E0451
-/// use flick_model::memory::{Heap, ObjectToken};
+/// use flick_vm::tier0::{Heap, ObjectToken};
 /// let mut heap = Heap::new();
 /// let value = heap.construct("Value", vec![]).unwrap();
 /// let id = value.object_id().unwrap();
@@ -57,7 +57,7 @@ pub struct ObjectId {
 /// ```
 ///
 /// ```compile_fail,E0277
-/// use flick_model::memory::{Heap, Value};
+/// use flick_vm::tier0::{Heap, Value};
 /// let mut heap = Heap::new();
 /// let Value::Object(token) = heap.construct("Value", vec![]).unwrap() else { unreachable!() };
 /// let _ = Clone::clone(&token);
@@ -128,7 +128,7 @@ pub struct IteratorHandle {
 /// forge a second child token for a reuse operation:
 ///
 /// ```compile_fail,E0308
-/// use flick_model::memory::{Heap, Value};
+/// use flick_vm::tier0::{Heap, Value};
 /// let mut heap = Heap::new();
 /// let child = heap.construct("Child", vec![]).unwrap();
 /// let child_id = child.object_id().unwrap();
@@ -256,10 +256,10 @@ pub struct Stats {
     pub arenas_freed: usize,
 }
 
-include!("memory/errors.rs");
-include!("memory/representation.rs");
-include!("memory/allocation.rs");
-include!("memory/ownership.rs");
-include!("memory/reuse.rs");
-include!("memory/standalone.rs");
-include!("memory/heap_tests.rs");
+include!("tier0/errors.rs");
+include!("tier0/representation.rs");
+include!("tier0/allocation.rs");
+include!("tier0/ownership.rs");
+include!("tier0/reuse.rs");
+include!("tier0/standalone.rs");
+include!("tier0/heap_tests.rs");

@@ -8,10 +8,8 @@ use flick_core::{
     },
     opt::perceus,
 };
-use flick_model::{
-    memory::{Error, Heap, ProgramOutcome, Value, execute_program_outcome},
-    run,
-};
+use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 const DECLARATIONS: &str = r#"flat_map_list : (forall v. a^v -> (List b)^(c + v))^c -> (List a)^d -> (List b)^(c + d)
 foreign pure flat_map_list from "flick:rt" "listFlatMap"
   arity 2

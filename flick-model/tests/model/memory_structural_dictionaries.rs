@@ -4,8 +4,8 @@ use flick_core::build;
 use flick_core::ir::Lit;
 use flick_core::ir::memory::{self, Name};
 use flick_core::opt::perceus;
-use flick_model::memory::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 use flick_model::run;
+use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
 
 const SOURCE: &str = r#"module App.Structural exposing (answer, super_equal, short_equal, short_compare)
 type Token = Token Bool String
