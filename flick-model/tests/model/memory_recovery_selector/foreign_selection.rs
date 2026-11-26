@@ -63,6 +63,7 @@ fn foreign_selection_programs() -> (Program, Program) {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 intrinsic(3, Intrinsic::Raise, &[2]),

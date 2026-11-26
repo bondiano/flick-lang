@@ -14,13 +14,14 @@ one kind of evidence:
 
 `flick/lua` is a pinned, non-official backend component. It describes the
 environments, checks programs against their profile and generates the pure
-core of a program as Lua chunks: one per reached module, each with a source
-map, defined into a private namespace each chunk takes as its second
-argument (see `backends/lua/src/emit/build.rs`). Everything else, the kernel
-above all, is refused with `P012` at its source, or for what a built-in
-module needs, at the project's expression that reached it. The rows of
-`backends/lua/kernel.txt` say, for each `flick:` binding, what the target
-does with it and whether it suspends.
+core of a program as Lua chunks: the Lua kernel's own chunks, then one per
+reached module, each with a source map, defined into a private namespace
+each chunk takes as its second argument (see
+`backends/lua/src/emit/build.rs`). Everything else is refused with `P012` at
+its source, or for what a built-in module needs, at the project's
+expression that reached it. The rows of `backends/lua/kernel.txt` say, for
+each `flick:` binding, whether the Lua kernel implements it and whether it
+suspends.
 
 ## Profiles
 
@@ -39,8 +40,8 @@ restrictions and secret values apply to it
 
 The `dialect` axis (`lua51` by default, or `luajit`) and the capabilities
 `jit` and `ffi` are tags of `[target.lua]`. JIT and FFI are independent:
-each needs the `luajit` dialect and a host that has it. Without `ffi`,
-`Int64` and `UInt64` are refused rather than held in doubles.
+each needs the `luajit` dialect and a host that has it. `Int64`, `UInt64`
+and `BigInt` need neither: the kernel holds them exactly on every dialect.
 
 ## Probes
 
@@ -91,7 +92,7 @@ a run. A Lua error names its chunk and line; the harness maps the line
 through the chunk's `.map` to the Flick file and line and compares that.
 Output goes through `foreign pure … from global "print"`.
 
-Results of 2026-11-25 (66 of 66 checks):
+Results of 2026-11-26 (77 of 77 checks):
 
 | Fixture | Shows | `love`: Lua 5.1, LuaJIT on and off, LÖVE | `love` with `luajit`: LuaJIT on and off, LÖVE | WoW Retail and Forever: `luac -p`, Lua 5.1 |
 | - | - | - | - | - |
@@ -101,6 +102,7 @@ Results of 2026-11-25 (66 of 66 checks):
 | `callback` | a lambda and a partial application passed to `string.gsub`, which calls them | pass | pass | pass |
 | `init_error` | an error while a top-level value initializes, at `src/App.fl:11` | pass | pass | pass |
 | `callback_error` | an error inside a callback the host calls, at `src/App.fl:15` | pass | pass | pass |
+| `host_utf8` | a byte the host gives that is not UTF-8 becomes U+FFFD; UTF-8 stays as it is | pass | pass | pass |
 
 ## Evidence
 
@@ -130,11 +132,80 @@ client defines; a missing global needs its source added to `wow-lua.txt`.
   and from Lua 5.1. Each profile lists this under `blockers`, and support for
   a WoW profile cannot be claimed until a live client runs the probes.
 - **Code generation.** The component generates only the pure core and
-  calls host globals with scalar values and one-stage callbacks. The kernel,
-  the value ABI and the host runtime are separate work; until they exist,
-  every reachable binding of Flick's own kernel (`flick:` specifiers) is
-  refused on every profile, and `flick run`, `flick test` and `flick dev`
+  calls host globals with scalar values and one-stage callbacks. The kernel
+  implements what [the kernel](#the-kernel-and-flick-test) lists; the rest
+  of it, the value ABI and the host runtime are separate work. Until they
+  exist, every other reachable binding of Flick's own kernel (`flick:`
+  specifiers) is refused on every profile, and `flick run` and `flick dev`
   are refused: the host runs the program.
+
+## The kernel and `flick test`
+
+The kernel is portable Lua 5.1, `backends/lua/kernel/*.lua`, without the
+`bit` library and reading only globals every API snapshot defines. Its
+chunks put the table `K` at `ns.k`; `_flick/lua-kernel/lang.lua`, which the
+backend generates, gives it `Some`, `None` and `Ordering` in the
+representation of the program. Generated code calls `K` for:
+
+- `Int` arithmetic, which wraps to 32 bits, divides toward zero and gives
+  `0` for a zero divisor, as the [numeric policy](numeric-policy.md) says,
+  and that of `Int8`, `Int16`, `UInt8`, `UInt16` and `UInt32`, doubles
+  wrapped to their width; `Float32`, a double rounded to binary32 after each
+  operation; the bit operations and shifts, and the conversions between the
+  numeric types;
+- `BigInt`, a table of its sign and its magnitude's limbs of 24 bits, with
+  schoolbook multiplication and Knuth's division; `Int64` and `UInt64` are
+  `BigInt` values wrapped to 64 bits after each operation, as on JS, so
+  they need no `ffi` and round nowhere;
+- `%` and `**` of `Float`, as JS computes them, and the JS globals of the
+  kernel the standard library binds, `Number`, `Math.floor` and
+  `Math.sqrt`; `String.to_number` reads JS's number syntax. On Lua 5.1,
+  whose compiler keeps one constant for `0` and `-0`, a `-0` that Lua would
+  fold into a constant is the kernel's `K.negzero`;
+- `==` of every value: SameValueZero on numbers, strings by their bytes and
+  structured values by what they hold, skipping the dictionaries a tagged
+  value holds at `$1`, …;
+- strings, which are WTF-8 Lua strings: `++` joins the halves of a
+  surrogate pair, `<` and the hooks order them by UTF-16 code units, and
+  `String.length`, `char_code_at`, `slice`, `index_of` and `last_index_of`
+  count UTF-16 code units;
+- `++` of lists, `List.length`, `List.get` and `List.initialize`, and the
+  hooks `equals`, `compare`, `hash` (that of the JS and Go runtimes, bit for
+  bit) and `show` (JS spelling, `-0` kept) of the primitive values;
+- the record rows `Record.get`, `extend`, `remove`, `project`,
+  `merge_disjoint` and `labels`, over a record's table of labels;
+- `Bytes`, a Lua string of its bytes: `Bytes.from_list`, `to_list`,
+  `encode_utf8` (a lone surrogate as U+FFFD) and `decode_utf8` (strict);
+- `Test.test`, `group`, `skip` and `only`.
+
+A string the host gives, as a result or to a callback, is UTF-8 to the
+host and WTF-8 to Flick: the kernel's `from_host` keeps its UTF-8 and
+replaces each ill-formed part with U+FFFD, as `TextDecoder` does, so a
+string never holds bytes the kernel cannot read. A string goes to the host
+as it is; a lone surrogate in it, which UTF-8 cannot hold, reaches the host
+as its WTF-8 bytes.
+
+A built-in function whose `@native` clauses name JS and Go runs its Flick
+body on Lua. On `lua/love`, `flick test` builds the test modules with the
+runner `_flick/lua-kernel/runner.lua`, and runs `_flick/run-tests.lua` on
+Lua 5.1.5 or LuaJIT 2.1, whichever `[tools]` allows (LuaJIT when both are):
+the interpreters stand for LÖVE's Lua, and no WoW client runs tests. Its
+pure tests report as on the other targets; effect and property tests are
+refused. `just kernel-lua` runs the modules of `tests/kernel` and of
+`tests/language` that their `lua.txt` lists on Lua 5.1.5 and on LuaJIT with
+the JIT on and off, and requires each JSON report to equal the report of the
+same modules on JS; `luac -l` checks the globals each kernel chunk reads against every
+snapshot. The CI `lua-probes` job runs it.
+
+| Kernel module | Lua 5.1, LuaJIT on and off |
+| - | - |
+| `Kernel.Arrays` | pass (11 of 11), the same report as JS |
+| `Kernel.Hooks` | pass (32 of 32), the same report as JS |
+| `Kernel.Numbers` | pass (67 of 67), the same report as JS |
+| `Kernel.Records` | pass (6 of 6), the same report as JS |
+| `Kernel.Strings` | pass (35 of 35), the same report as JS |
+| `Language.BigInts` | pass (12 of 12), the same report as JS |
+| `Language.Floats` | pass (30 of 30), the same report as JS |
 
 ## The synchronous WoW slice
 
@@ -161,10 +232,8 @@ the global it went through. Every refusal is `P012`:
 | - | - |
 | the environment `lua/<p>` | `p` is not a profile of the component |
 | the dialect tag, `jit` or `ffi` | the host lacks it, or `jit`/`ffi` lacks the `luajit` dialect |
-| a `BigInt` literal, operator or foreign function of that type | always: the Lua kernel has no arbitrary-precision integers yet |
-| an `Int64` or `UInt64` literal, operator or foreign function | the `ffi` capability is off |
 | `await`, an `async` foreign function or a suspending kernel binding | the profile has no suspension (WoW) |
-| a `flick:` kernel binding | always: the Lua primitive kernel is not implemented |
+| a `flick:` kernel binding | the Lua kernel does not implement it (`kernel.txt`) |
 | a module binding (`from "m"`) | the profile has no `require` (WoW), or `m` is `ffi` without `ffi` |
 | a global binding (`from global "a.b"`) | the path is not in the profile's API snapshot, or its root (`bit`, `jit` on LÖVE) needs a tag that is off |
 

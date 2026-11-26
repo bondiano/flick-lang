@@ -15,14 +15,17 @@
 //! multiple results, methods, modules, `Sync` and effect modes) needs the
 //! Lua value ABI and is refused.
 
+use std::iter;
+
 use flick_ir::{
     Binding, Expr as IrExpr, ExprKind as Ir, Foreign, ForeignMode, IrType, ItemKind, Lang, Span,
     Stage,
 };
 
 use super::super::ast::{Block, Expr, ExprKind, Function, LastKind, Name, Results, StmtKind};
-use super::super::names::{MODULE, NAMESPACE, is_identifier};
+use super::super::names::{KERNEL, MODULE, NAMESPACE, is_identifier};
 use super::Lowering;
+use super::ops::kernel_call;
 
 /// What a value crossing to or from the host is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,6 +40,9 @@ enum Host {
     Callback,
 }
 
+/// The specifier of the JS globals of the kernel in `kernel.txt`.
+const GLOBAL: &str = "global";
+
 /// How a host function is called.
 pub(super) struct HostFn<'f> {
     /// The global path, `string.gsub`.
@@ -47,6 +53,13 @@ pub(super) struct HostFn<'f> {
     taken: usize,
     /// Whether its result is dropped.
     statement: bool,
+    /// Whether its result is a string, which comes from the host.
+    text_result: bool,
+    /// The arguments that are callbacks given a string by the host.
+    text_callbacks: Vec<usize>,
+    /// The dictionaries a call takes before its arguments, of a kernel
+    /// function.
+    dicts: usize,
 }
 
 impl Lowering<'_> {
@@ -100,17 +113,28 @@ impl Lowering<'_> {
     }
 
     /// How the foreign function `f` is called, or why it cannot be.
-    pub(super) fn host_function<'f>(&self, f: &'f Foreign) -> Result<HostFn<'f>, &'static str> {
+    pub(super) fn host_function<'f>(
+        &self,
+        module: &str,
+        f: &'f Foreign,
+    ) -> Result<HostFn<'f>, &'static str> {
+        // a JS global of the kernel a built-in module binds is the Lua kernel's
+        if let Binding::Global { name } = &f.binding
+            && self.builtin.contains(module)
+            && self.kernel.row(GLOBAL, name).is_some()
+        {
+            return self.kernel_function(f, GLOBAL, name);
+        }
         let Binding::Global { name } = &f.binding else {
-            return Err(match &f.binding {
-                Binding::Module { from, .. } if from.starts_with("flick:") => {
-                    "the Lua kernel table refuses it: the Lua primitive kernel is not implemented"
+            return match &f.binding {
+                Binding::Module { from, name } if from.starts_with("flick:") => {
+                    self.kernel_function(f, from, name)
                 }
-                _ => {
-                    "a foreign function of a module or of inline code needs the Lua value ABI, \
-                      which is not implemented"
-                }
-            });
+                _ => Err(
+                    "a foreign function of a module or of inline code needs the Lua value \
+                          ABI, which is not implemented",
+                ),
+            };
         };
         if f.mode != ForeignMode::Pure {
             return Err(
@@ -131,7 +155,9 @@ impl Lowering<'_> {
             );
         }
         let path: Vec<&str> = name.split('.').collect();
-        if !path.iter().all(|s| is_identifier(s)) || [MODULE, NAMESPACE, "_"].contains(&path[0]) {
+        if !path.iter().all(|s| is_identifier(s))
+            || [MODULE, NAMESPACE, KERNEL, "_"].contains(&path[0])
+        {
             return Err("its global path is not one generated Lua can name");
         }
         let Some(ty) = f.ty.as_deref() else {
@@ -148,14 +174,22 @@ impl Lowering<'_> {
         if params.len() != taken || params.iter().any(|(_, s)| *s != Stage::Pure) {
             return Err("its stages need the Lua runtime, which is not implemented");
         }
-        for (param, _) in &params[..f.arity] {
+        let mut text_callbacks = Vec::new();
+        for (i, (param, _)) in params[..f.arity].iter().enumerate() {
             match self.host_type(param) {
                 Some(Host::Str | Host::Bool | Host::Int | Host::Float) => {}
-                Some(Host::Callback) if self.callback(param) => {}
+                Some(Host::Callback) if self.callback(param) => {
+                    if let IrType::Fun { param, .. } = &***param
+                        && self.host_type(param) == Some(Host::Str)
+                    {
+                        text_callbacks.push(i);
+                    }
+                }
                 _ => return Err(ABI_ARGS),
             }
         }
-        let statement = match self.host_type(result) {
+        let host = self.host_type(result);
+        let statement = match host {
             Some(Host::Unit | Host::Never) => true,
             Some(Host::Str | Host::Bool | Host::Float) => false,
             _ => return Err(ABI_RESULT),
@@ -165,21 +199,75 @@ impl Lowering<'_> {
             arity: f.arity,
             taken,
             statement,
+            text_result: host == Some(Host::Str),
+            text_callbacks,
+            dicts: 0,
+        })
+    }
+
+    /// How a binding of Flick's own kernel is called: `K.<export>` with
+    /// every Flick argument at once, in the values generated code holds, as
+    /// the table `kernel.txt` implements it.
+    fn kernel_function<'f>(
+        &self,
+        f: &'f Foreign,
+        from: &str,
+        name: &'f str,
+    ) -> Result<HostFn<'f>, &'static str> {
+        if !self.kernel.row(from, name).is_some_and(|r| r.implemented) {
+            return Err("the Lua kernel does not implement it");
+        }
+        // every argument at once, whatever JS's `arity` splits them into
+        let params = (f.ty.as_deref()).map(|ty| ty.fun_stages().0);
+        let taken = params.as_ref().map_or(0, Vec::len);
+        let pure = params.is_some_and(|ps| ps.iter().all(|(_, s)| *s == Stage::Pure));
+        if f.mode != ForeignMode::Pure || taken == 0 || !pure {
+            return Err("the Lua kernel implements it only as a pure function of its arguments");
+        }
+        Ok(HostFn {
+            path: iter::once(KERNEL).chain(name.split('.')).collect(),
+            arity: f.dicts + taken,
+            taken,
+            statement: false,
+            text_result: false,
+            text_callbacks: Vec::new(),
+            dicts: f.dicts,
         })
     }
 
     /// The call of `host` with `args`, the first `arity` of the Flick ones;
-    /// a dropped result is a statement, and the value is Unit.
+    /// a dropped result is a statement, and the value is Unit. A string the
+    /// host gives, as a result or to a callback, is made WTF-8 first: its
+    /// ill-formed UTF-8 as U+FFFD.
     fn host_call(&mut self, host: &HostFn<'_>, args: Vec<Expr>, span: Span) -> Expr {
         let mut callee = Expr::name(&Name::new(host.path[0].to_owned()), span);
         for segment in &host.path[1..] {
             callee = callee.field(segment);
         }
-        let args = args.into_iter().take(host.arity).collect();
+        let mut args: Vec<Expr> = args.into_iter().take(host.arity).collect();
+        for &i in &host.text_callbacks {
+            let callback = self.local("callback", args[i].clone());
+            let text = self.names.fresh("text");
+            let given = kernel_call("from_host", vec![Expr::name(&text, span)], span);
+            let mut body = Block::default();
+            body.end(
+                LastKind::Return(Expr::name(&callback, span).call(vec![given])),
+                span,
+            );
+            let wrapped = Function {
+                params: vec![text],
+                body,
+                span,
+            };
+            args[i] = Expr::new(ExprKind::Function(Box::new(wrapped)), span);
+        }
         let call = Expr::new(ExprKind::Call(Box::new(callee), args, Results::Any), span);
         if host.statement {
             self.push(StmtKind::Call(call), span);
             return Self::unit(span);
+        }
+        if host.text_result {
+            return kernel_call("from_host", vec![call], span);
         }
         call
     }
@@ -199,6 +287,11 @@ impl Lowering<'_> {
             args.push(&**arg);
             head = func;
         }
+        // a kernel function's dictionaries come first
+        let (head, dicts) = match &head.kind {
+            Ir::Dicts(inner, dicts) => (&**inner, dicts.as_slice()),
+            _ => (head, &[][..]),
+        };
         let Ir::Global { module, name, .. } = &head.kind else {
             return None;
         };
@@ -206,19 +299,24 @@ impl Lowering<'_> {
         let Some(ItemKind::Foreign(f)) = item else {
             return None;
         };
-        let host = self.host_function(f).ok()?;
-        if args.len() != host.taken {
+        let host = self.host_function(module, f).ok()?;
+        if args.len() != host.taken || dicts.len() != host.dicts {
             return None;
         }
         args.reverse();
-        let values = self.ordered(&args);
+        let mut values: Vec<Expr> = dicts.iter().map(|d| self.dict(d, e.span)).collect();
+        values.extend(self.ordered(&args));
         Some(self.host_call(&host, values, e.span))
     }
 
-    /// A foreign function as a value: a curried function calling the host.
+    /// A foreign function as a value: a curried function calling the host,
+    /// after a function of a kernel function's dictionaries.
     pub(super) fn host_value(&mut self, host: &HostFn<'_>, span: Span) -> Expr {
+        let dicts: Vec<Name> = (0..host.dicts).map(|_| self.names.fresh("dict")).collect();
         let params: Vec<Name> = (0..host.taken).map(|_| self.names.fresh("x")).collect();
-        let args = params.iter().map(|p| Expr::name(p, span)).collect();
+        let args = (dicts.iter().chain(&params))
+            .map(|p| Expr::name(p, span))
+            .collect();
         let body = self.function_body(|g| {
             let value = g.host_call(host, args, span);
             g.block.end(LastKind::Return(value), span);
@@ -236,6 +334,18 @@ impl Lowering<'_> {
             );
             f = Function {
                 params: vec![param.clone()],
+                body: outer,
+                span,
+            };
+        }
+        if !dicts.is_empty() {
+            let mut outer = Block::default();
+            outer.end(
+                LastKind::Return(Expr::new(ExprKind::Function(Box::new(f)), span)),
+                span,
+            );
+            f = Function {
+                params: dicts,
                 body: outer,
                 span,
             };

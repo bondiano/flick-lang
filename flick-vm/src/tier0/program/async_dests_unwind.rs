@@ -89,7 +89,7 @@ impl<'p> Machine<'p, '_> {
             }
             Destination::OrDie { .. } => {
                 let cause = self.failure.take().expect("or_die failure");
-                let converted = primitives::fails_to_dies_cause(self.heap, &cause, &mut self.fuel);
+                let converted = primitives::fails_to_dies_cause(self.heap, &cause, &mut FuelCounter(&mut self.fuel));
                 self.heap.drop_cause(cause)?;
                 self.failure = Some(converted?);
                 self.failure_elected = true;

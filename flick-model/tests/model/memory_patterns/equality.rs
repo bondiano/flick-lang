@@ -7,6 +7,7 @@ fn comparison(op: BinOp) -> Program {
                 Operation::Project {
                     object: 1,
                     field: 0,
+                    rep: ValueRep::Cell,
                 },
             ),
             bind(
@@ -14,6 +15,7 @@ fn comparison(op: BinOp) -> Program {
                 Operation::Project {
                     object: 1,
                     field: 1,
+                    rep: ValueRep::Cell,
                 },
             ),
             bind(
@@ -38,6 +40,18 @@ fn compare_values(heap: &mut Heap, op: BinOp, left: Value, right: Value, expecte
 }
 #[test]
 fn equality_ignores_owned_dictionary_closures_and_releases_every_capture() {
+    let packed = |binding, field, dict| {
+        bind(
+            binding,
+            Operation::ConstructWithDicts {
+                tag: "M.Packed.Packed".into(),
+                fields: vec![field],
+                dicts: vec![dict],
+                rep: ValueRep::Cell,
+                layout: None,
+            },
+        )
+    };
     for (op, same, expected) in [
         (BinOp::Eq, true, true),
         (BinOp::Eq, false, false),
@@ -61,14 +75,7 @@ fn equality_ignores_owned_dictionary_closures_and_releases_every_capture() {
                         fields: vec![("allow".into(), 3)],
                     },
                 ),
-                bind(
-                    5,
-                    Operation::ConstructWithDicts {
-                        tag: "M.Packed.Packed".into(),
-                        fields: vec![2],
-                        dicts: vec![4],
-                    },
-                ),
+                packed(5, 2, 4),
                 bind(6, Operation::Literal(Lit::Int(if same { 42 } else { 43 }))),
                 bind(
                     7,
@@ -83,14 +90,7 @@ fn equality_ignores_owned_dictionary_closures_and_releases_every_capture() {
                         fields: vec![("allow".into(), 7)],
                     },
                 ),
-                bind(
-                    9,
-                    Operation::ConstructWithDicts {
-                        tag: "M.Packed.Packed".into(),
-                        fields: vec![6],
-                        dicts: vec![8],
-                    },
-                ),
+                packed(9, 6, 8),
                 bind(
                     10,
                     Operation::Binary {
@@ -219,6 +219,8 @@ fn ordinary_closures_still_reject_equality_even_when_other_fields_are_evidence()
                     tag: "T.Box".into(),
                     fields: vec![2],
                     dicts: vec![3],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
             bind(
@@ -227,6 +229,8 @@ fn ordinary_closures_still_reject_equality_even_when_other_fields_are_evidence()
                     tag: "T.Box".into(),
                     fields: vec![2],
                     dicts: vec![3],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
             bind(

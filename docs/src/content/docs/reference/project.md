@@ -55,8 +55,8 @@ max-params = 5
 | `project.runner` | the module that starts each entry without a runner of its own: it exports `type alias Main`, the type `main` must have (`FLICK-P026` otherwise), and `run`, which takes `main` and whose result the runner exports as `default`; built in are `"Runner.Node"`, `"Runner.Browser"` and `"Runner.Cloudflare"`, a Worker whose `fetch` gives `main : Runner.Cloudflare.Fetch ->{Runner.Cloudflare.Env; AppError} Http.ServerResponse.ServerResponse` the request and the context (`wait_until`), and provides the bindings as the service `Env` (`Runner.Cloudflare.var`, `binding`) and the live browser services `Host.BrowserLive`; a runner may provide services this way, and `main` may need any of those its `Main` names; a package may provide another; without one, a pure `main` is called and an effect runs as on Node | — |
 | `build.out-dir` | base directory of artifacts; not the project's root, the directory of its sources or tests, or one above them (`FLICK-P028`, before anything is written) | `"dist"` |
 | `build.profile` | `"debug"` or `"release"` (see [codegen.md](../codegen/)); `--profile` of `build` and `test` overrides it | `"debug"` |
-| `build.target` | default target backend short name (`"js"`, `"go"`, or the short name of a pinned `[build.backend]`); overridden by `--target <name>` on `build`, `run`, `dev`, `test`, `pack` and `inspect`. On `"go"`, Go must be on `PATH` and allowed in `[tools]` as `"flick/go" = ["go"]` (`FLICK-P029`), reachable uses of JS-only modules (`Ui`, `Atom`, `Action`, `Form`, `Otlp`, `DevTools`, `Js`, `Reactivity.*`, the `Node`/`Browser`/`Cloudflare` runners) or other gated modules report `FLICK-P064` in `flick check`, the editor and `flick build` (unused imports do not fail), and constructs the go target does not compile yet are `FLICK-P012` (see [Go target](../codegen/#go-target)) | `"js"` (or the backend prefix of `build.environment`) |
-| `build.environment` | `<backend>/<host>` pair such as `"js/node"`, `"js/browser"`, `"js/bun"`, `"js/cloudflare"`, `"go/native"`, or a host provided by a `[host]` dependency package; resolves to the backend's active tags plus the host's tags. Unknown backends report `FLICK-P059`; unknown or incompatible hosts report `FLICK-P065`; unknown condition tags report `FLICK-P066`. `flick check`, the editor and `flick build` share reachable-use preflight: unavailable modules, packages or Effect-adapter bindings report `FLICK-P064` at the use site with the path from entry, and reachable gated effects without a root handler report `FLICK-E020`. Unused imports and unreachable functions do not fail; public library exports follow the export policy | the default environment of the selected backend |
+| `build.target` | default target backend short name (`"js"`, `"go"`, `"vm"`, or the short name of a pinned `[build.backend]`); overridden by `--target <name>` on `build`, `run`, `dev`, `test`, `pack` and `inspect`. On `"go"`, Go must be on `PATH` and allowed in `[tools]` as `"flick/go" = ["go"]` (`FLICK-P029`), reachable uses of JS-only modules (`Ui`, `Atom`, `Action`, `Form`, `Otlp`, `DevTools`, `Js`, `Reactivity.*`, the `Node`/`Browser`/`Cloudflare` runners) or other gated modules report `FLICK-P064` in `flick check`, the editor and `flick build` (unused imports do not fail), and constructs the go target does not compile yet are `FLICK-P012` (see [Go target](../codegen/#go-target)). On `"vm"`, `flick run` and `flick test` execute in process on the built-in tier-0 VM without Node or Go (`flick build --target vm` images are planned in `#988`) | `"js"` (or the backend prefix of `build.environment`) |
+| `build.environment` | `<backend>/<host>` pair such as `"js/node"`, `"js/browser"`, `"js/bun"`, `"js/cloudflare"`, `"go/native"`, `"vm/native"`, or a host provided by a `[host]` dependency package; resolves to the backend's active tags plus the host's tags. Unknown backends report `FLICK-P059`; unknown or incompatible hosts report `FLICK-P065`; unknown condition tags report `FLICK-P066`. `flick check`, the editor and `flick build` share reachable-use preflight: unavailable modules, packages or Effect-adapter bindings report `FLICK-P064` at the use site with the path from entry, and reachable gated effects without a root handler report `FLICK-E020`. Unused imports and unreachable functions do not fail; public library exports follow the export policy | the default environment of the selected backend |
 | `build.solver-steps` | instance resolution steps per definition | `100000` |
 | `build.solver-depth` | depth of nested class constraints | `256` |
 | `build.labels` | what a release build labels `Module.name` for debugging tools: `"all"` (the values of every type marked `@label`: atoms, views, actions), `"components"` (those of the kind `component`: views and actions) or `"none"`; debug labels all; `flick build --labels` overrides it | `"all"` |
@@ -97,6 +97,7 @@ virtual workspace root (`FLICK-P005`).
 | `target.js.ui` | module specifier rendering and mounting views in place of React (exports every name `Ui` and `Action` bind from `@flick-lang/effect-ts/ui` and `@flick-lang/effect-ts/ui/react`; relative paths are from the project root) | React |
 | `target.go.cgo` | boolean; enable cgo (`CGO_ENABLED=1`) when building Go executables | `false` |
 | `target.go.kind` | `"app"` or `"library"` (`"library"` is declared and currently refused by `flick/go` with `FLICK-P012`) | `"app"` |
+| `target.vm.tier` | `"0"` or `"tier0"`; execution tier for the in-process VM (`flick run` / `flick test`); overridden by `--vm-tier` | `"0"` |
 
 `flick new` takes its template files from the selected target backend (`--target js` by default creates an RT project with `[tools] "flick/js" = ["pnpm"]`, `@flick-lang/runtime` and no Effect dependency; `--target go` creates a Go project with `[build] target = "go"`, `[tools] "flick/go" = ["go"]`, and no `package.json`), or from a third-party package via `--from`. Pass `--runtime rt` to `build`, `run`, `dev`, `test` or `inspect` to select RT for one invocation of an Effect project. Set `[target.js] runtime = "effect"` explicitly when a project needs the Effect adapter and add `@flick-lang/effect-ts` to its dependencies.
 
@@ -143,35 +144,47 @@ Each backend component declares its base environment tags, selectable tag axes, 
 
 - `flick/js` publishes tag `js`, exclusive axis `runtime` (`rt` default, `effect`), additive axis `adapter` (`effect-adapter`, active when `@flick-lang/effect-ts` is in project dependencies), and built-in hosts `node`, `browser`, `bun`, and `cloudflare`.
 - `flick/go` publishes tag `go`, additive axis `cgo` (`cgo`, active with `[target.go] cgo = true`), and built-in host `native`.
+- `flick/vm` publishes tag `vm` and built-in host `native` (`vm/native`), allowing packages and modules to gate code with `when = "vm"` / `@when "vm"`.
 - Third-party backends can publish their own tags, axes, and hosts through the same descriptor schema.
 
 `flick/lua` is a preview backend for World of Warcraft addons and LÖVE games.
 It lives in the repository at `backends/lua` and is not distributed with the
-compiler: pin its `package/component.wasm` in `[build.backend]`. It publishes
-tag `lua`, exclusive axis `dialect` (`lua51` default, `luajit`), additive axis
-`capabilities` (`jit` and `ffi`, each needing `dialect = "luajit"`), and hosts
-`wow-retail`, `wow-forever` and `love`, each pinned to one client or release.
-`flick check` and the editor check the project's modules against the
-selected host and report what they reach but the host cannot run, such as
-`BigInt`, `Int64` without `ffi`, suspension on WoW or a global outside the
-host's API, with `FLICK-P012` at the use.
+compiler: pin its `package/component.wasm` in `[build.backend]`, or, with a
+compiler built from the repository, select it with `--target lua`. It
+publishes tag `lua`, exclusive axis `dialect` (`lua51` default, `luajit`),
+additive axis `capabilities` (`jit` and `ffi`, each needing
+`dialect = "luajit"`), and hosts `wow-retail`, `wow-forever` and `love`, each
+pinned to one client or release. `flick check` and the editor check the
+project's modules against the selected host and report what they reach but
+the host cannot run, such as suspension on WoW, a global outside the host's
+API or a binding the Lua kernel does not implement yet, with `FLICK-P012` at
+the use.
 
-`flick build` writes a Lua chunk for each module the program reaches:
-`App/Util.lua` for a project module and `_flick/List.lua` for a built-in
-one, each with a version 3 `.map` from its lines to the Flick source, and
-`chunks.txt`, the chunks in the order they load. Each chunk starts with
-`local _, ns = ...` and puts its module's values into the namespace it is
-given second, as WoW gives each file of an addon; on LÖVE, `main.lua` loads
-the chunks in that order. A top-level value is computed as its chunk loads.
-A `foreign pure f from global "string.gsub"` is called directly when what
-it is given is a string, a boolean, a number or a function of one pure stage
-over those, and what it gives back a string, a boolean, a float or `Unit`.
-Only this pure core generates so far: effects, other foreign functions,
-generators and the arithmetic and string operators whose exact results need
-the Lua kernel stop the build with `FLICK-P012` at the project's code, and
-so does a function over the VM's limits. A refused build keeps the previous
-output. The host runs the program, so `flick run`, `flick test` and
-`flick dev` stop with `FLICK-P012`.
+`flick build` writes the Lua kernel's chunks, `_flick/lua-kernel/*.lua`, and
+a Lua chunk for each module the program reaches: `App/Util.lua` for a
+project module and `_flick/List.lua` for a built-in one, each with a version
+3 `.map` from its lines to the Flick source, and `chunks.txt`, the chunks in
+the order they load. Each chunk starts with `local _, ns = ...` and puts its
+module's values into the namespace it is given second, as WoW gives each
+file of an addon; on LÖVE, `main.lua` loads the chunks in that order. A
+top-level value is computed as its chunk loads. The kernel computes the
+arithmetic of every numeric type exactly, `BigInt`, `Int64` and `UInt64` on
+every dialect included, `==` of any value, the order and `++` of strings, whose
+lengths and positions count UTF-16 code units as on the other targets, and
+`Bytes`; the built-in modules run their Flick bodies where no `@native`
+clause names Lua. A `foreign pure f from global "string.gsub"` is called
+directly when what it is given is a string, a boolean, a number or a
+function of one pure stage over those, and what it gives back a string, a
+boolean, a float or `Unit`; a string the host gives keeps its UTF-8, and
+each ill-formed part of it becomes U+FFFD.
+Effects, other foreign functions, generators, a kernel binding the Lua
+kernel does not implement yet and a function over the VM's limits stop the build with
+`FLICK-P012` at the project's code. A refused build keeps the previous
+output. The host runs the program, so `flick run` and `flick dev` stop with
+`FLICK-P012`. On `lua/love`, `flick test` runs the pure tests on Lua 5.1.5
+or LuaJIT 2.1, whichever `[tools]` allows (`"flick/lua" = ["lua", "luajit"]`;
+LuaJIT when both are), and reports as on the other targets; no WoW client
+runs tests.
 
 A library (`kind = "lib"`) may also declare `[host]` to define a named host environment `<backend>/<name>` and contribute extra tags when selected:
 
@@ -392,7 +405,7 @@ or `--path DIR`) adds one and `flick remove <name>` drops it.
 
 The official backend a project builds with when it pins none (`flick/js`,
 or `flick/go` with `[build] target = "go"` or `--target go`) is not part of the compiler either: it is a
-release asset. `flick new`, the first build, or `flick install` takes the newest release
+release asset (see [Backends](../backends/)). `flick new`, the first build, or `flick install` takes the newest release
 the compiler accepts from the backends index, keeps it in the package store
 and pins it in `flick.lock` under `[[backend]]`; later builds work offline.
 `flick update` moves the pin to a newer release. With `--offline` and no pin

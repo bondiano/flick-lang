@@ -1,7 +1,5 @@
 // Stage 4A owner, scope-closing, and machine initialization structures.
 
-const DEFAULT_VIRTUAL_NOW_NS: u64 = 1_750_000_000_000_000_000;
-
 #[derive(Clone, Copy, Debug)]
 enum LayerBuildTarget {
     Local(Local),

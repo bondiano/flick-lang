@@ -3,7 +3,7 @@ use crate::causes;
 use flick_core::{
     ir::{
         BinOp, Lit,
-        memory::{Block, Exit, Function, Global, Instruction, Name, Operation, Program},
+        memory::{Block, Exit, Function, Global, Instruction, Name, Operation, Program, ValueRep},
     },
     numeric::{Arith, Num},
     opt::perceus,
@@ -70,6 +70,7 @@ fn program(op: Arith) -> Program {
                             Operation::Project {
                                 object: 0,
                                 field: 0,
+                                rep: ValueRep::Cell,
                             },
                         ),
                         bind(

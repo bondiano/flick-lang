@@ -190,6 +190,7 @@ impl Machine<'_, '_> {
                 tag,
                 ordinary_fields,
                 fields,
+                ..
             } => (tag.as_str(), *ordinary_fields, fields.len()),
             _ => return Err(Error::ExpectedOption),
         };

@@ -64,11 +64,17 @@ impl Lower<'_> {
                 env.insert(name.clone(), value);
             }
             Pat::Tuple(items) => {
+                let rep = if !items.is_empty() && self.aggregates.is_aggregate_tag("$tuple") {
+                    ValueRep::Aggregate
+                } else {
+                    ValueRep::Cell
+                };
                 for (field, pattern) in items.iter().enumerate() {
                     let value = block.emit(
                         Operation::Project {
                             object: value,
                             field,
+                            rep,
                         },
                         span,
                     )?;
@@ -113,11 +119,17 @@ impl Lower<'_> {
                     span,
                     matches::MatchMode::Ordinary,
                 )?;
+                let rep = if !names.is_empty() && self.aggregates.is_aggregate_tag("$tuple") {
+                    ValueRep::Aggregate
+                } else {
+                    ValueRep::Cell
+                };
                 for (index, name) in names.into_iter().enumerate() {
                     let field = block.emit(
                         Operation::Project {
                             object: fields,
                             field: index,
+                            rep,
                         },
                         span,
                     )?;
@@ -177,10 +189,31 @@ impl Lower<'_> {
                 "{}.{}.{}",
                 constructor.module, constructor.ty, constructor.name
             );
-            let value = if constructor.dicts == 0 {
-                Operation::Construct { tag, fields }
+            let rep = if self.aggregates.is_aggregate_constructor(constructor) {
+                ValueRep::Aggregate
             } else {
-                Operation::ConstructWithDicts { tag, fields, dicts }
+                ValueRep::Cell
+            };
+            let layout = if rep.is_cell() {
+                self.aggregates.cell_layout(&tag)
+            } else {
+                None
+            };
+            let value = if constructor.dicts == 0 {
+                Operation::Construct {
+                    tag,
+                    fields,
+                    rep,
+                    layout,
+                }
+            } else {
+                Operation::ConstructWithDicts {
+                    tag,
+                    fields,
+                    dicts,
+                    rep,
+                    layout,
+                }
             };
             return block.emit(value, span);
         }
@@ -188,7 +221,14 @@ impl Lower<'_> {
         let mut function = Code::new(vec![0, 1]);
         let mut inside = Vec::new();
         for field in 0..arguments.len() {
-            inside.push(function.emit(Operation::Project { object: 0, field }, span)?);
+            inside.push(function.emit(
+                Operation::Project {
+                    object: 0,
+                    field,
+                    rep: ValueRep::Cell,
+                },
+                span,
+            )?);
         }
         inside.push(1);
         let result = self.constructor(constructor, inside, &mut function, span)?;

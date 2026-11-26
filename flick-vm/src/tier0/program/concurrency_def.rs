@@ -187,24 +187,7 @@ impl Machine<'_, '_> {
     }
 
     fn extract_exit_data(&mut self, val: Value) -> Result<ExitData, Error> {
-        let Value::Object(tok) = &val else {
-            self.heap.drop_value(val)?;
-            return Err(Error::ExpectedExit);
-        };
-        let copied = match &self.heap.object(tok.id)?.data {
-            Data::Exit(ExitData::Success(v)) => {
-                ExitData::Success(self.heap.dup(&v.representation())?)
-            }
-            Data::Exit(ExitData::Failure(v)) => {
-                ExitData::Failure(self.heap.dup(&v.representation())?)
-            }
-            _ => {
-                self.heap.drop_value(val)?;
-                return Err(Error::ExpectedExit);
-            }
-        };
-        self.heap.drop_value(val)?;
-        Ok(copied)
+        stdlib::runtime::coop::extract_exit_data(self.heap, val)
     }
 
     fn exec_test_clock_adjust(&mut self, binding: Local) -> Result<(), Error> {

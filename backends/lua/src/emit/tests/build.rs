@@ -4,10 +4,11 @@
 use flick_backend::{
     Backend, BuildRequest, Diagnostic, InputError, Inputs, ModuleInput, ModuleRole, Source,
 };
-use flick_ir::{Arith, BinOp, ExprKind, FileId, Initialization, Item, Lit, Prefix, Program, Span};
+use flick_ir::{BinOp, ExprKind, FileId, Initialization, Item, Lit, Prefix, Program, Span};
 
 use super::{lambda, local, param, value_at};
 use crate::Lua;
+use crate::emit::kernel_paths;
 use crate::tests::{build_request, module};
 
 /// `src/App.fl`, whose `main` calls `List.<name> ()`.
@@ -109,8 +110,11 @@ fn a_module_loads_after_the_modules_it_uses() {
         .generate(&request("wow-retail", &program), &mut Texts)
         .expect("generated");
     let paths: Vec<&str> = built.artifacts.iter().map(|a| a.path.as_str()).collect();
+    let kernel = kernel_paths();
+    let k = kernel.len();
+    assert_eq!(paths[..k], kernel);
     assert_eq!(
-        paths,
+        paths[k..],
         [
             "_flick/List.lua",
             "_flick/List.lua.map",
@@ -120,21 +124,37 @@ fn a_module_loads_after_the_modules_it_uses() {
         ]
     );
     let text = |i: usize| String::from_utf8(built.artifacts[i].bytes.clone()).expect("UTF-8");
-    assert_eq!(text(4), "_flick/List.lua\nApp.lua\n", "the load order");
+    let mut order = String::new();
+    for p in &kernel {
+        order.push_str(p);
+        order.push('\n');
+    }
     assert_eq!(
-        text(0),
-        "local _, ns = ...\nlocal M = {}\nns.List = M\nM.id = function(x)\n  return x\nend\n"
+        text(k + 4),
+        format!("{order}_flick/List.lua\nApp.lua\n"),
+        "the load order: the kernel first"
+    );
+    // a program without the built-in constructors gives the kernel none
+    assert_eq!(
+        text(k - 1),
+        "local _, ns = ...\nlocal K = ns.k\n",
+        "lang.lua"
     );
     assert_eq!(
-        text(2),
-        "local _, ns = ...\nlocal M = {}\nns.App = M\nM.main = function(_)\n  return \
-         ns.List.id(true)\nend\n"
+        text(k),
+        "local _, ns = ...\nlocal K = ns.k\nlocal M = {}\nns.List = M\nM.id = function(x)\n  \
+         return x\nend\n"
+    );
+    assert_eq!(
+        text(k + 2),
+        "local _, ns = ...\nlocal K = ns.k\nlocal M = {}\nns.App = M\nM.main = function(_)\n  \
+         return ns.List.id(true)\nend\n"
     );
     // the prologue and the definition map to `main`, at line 1 column 0;
     // the return to `List.id ()`, 14 columns on
-    let map = text(3);
+    let map = text(k + 3);
     assert!(
-        map.contains(r#""mappings":"AACA;AAAA;AAAA;AAAA;AAAc""#),
+        map.contains(r#""mappings":"AACA;AAAA;AAAA;AAAA;AAAA;AAAc""#),
         "{map}"
     );
     assert!(map.contains(r#""sources":["src/App.fl"]"#), "{map}");
@@ -148,19 +168,16 @@ fn refused(program: &Program) -> Vec<Diagnostic> {
 
 #[test]
 fn a_refusal_in_a_built_in_module_is_reported_where_it_was_reached() {
-    let sum = flick_ir::Expr::new(
-        ExprKind::Binary(
-            BinOp::Arith(Arith::Add, flick_ir::Num::Int),
-            Box::new(local("x")),
-            Box::new(local("x")),
-        ),
+    // an order of values of no type the kernel compares
+    let less = flick_ir::Expr::new(
+        ExprKind::Binary(BinOp::Lt, Box::new(local("x")), Box::new(local("x"))),
         at(1, 13, 18),
     );
-    let double = item(value_at("double", lambda(&["x"], sum), 0, 0), 1, 0, 20);
+    let double = item(value_at("double", lambda(&["x"], less), 0, 0), 1, 0, 20);
     let found = refused(&program("double", vec![double], vec![]));
     assert_eq!(found.len(), 1, "{found:#?}");
     assert_eq!(found[0].code, "P012");
-    assert!(found[0].message.contains("`+` of `Int`"), "{found:#?}");
+    assert!(found[0].message.contains("the operator `<`"), "{found:#?}");
     let span = found[0].span.as_ref().expect("a span");
     assert_eq!((span.file, span.start, span.end), (0, 25, 32));
     assert_eq!(found[0].notes, ["reached through `List.double`"]);

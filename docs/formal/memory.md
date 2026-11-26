@@ -12,8 +12,8 @@ are not evidence for this contract.
 | - | - | - |
 | M1: explicit ownership | Shared memory IR, Perceus insertion, exhaustive source expression lowering (`Destructure`, `let mut`, `loop`/`while`/`for` + labeled exits, `Option?`, strict/lazy comprehensions and `Seq.*`, `Record.*`, `Lazy`, `Scope`/`Resource` LIFO finalizers, one-shot `control` handlers with tail-resume and discontinuation, TCO, O(1) `ListSlice`/`ListRange`, generational counted heap, inline locals), Stage 3 pure/pure-effect stdlib counted lowering/primitives, Stage 4 cooperative single-threaded async/fiber/layer/STM/observability/config/arbitrary/streaming runtime (`Fiber`, `Deferred`, `FiberGroup`, `Layer` dynamic/memo/merge, `Context.Reference`, `Clock`/`TestClock`, `Schedule`/`ExecutionPlan`, `Latch`/`Semaphore`/`PartitionedSemaphore`, `Queue`/`PubSub`/`SynchronizedRef`/`SubscriptionRef`, `Cache`/`ScopedCache`/`Pool`/`RcRef`/`RcMap`/`LayerMap`/`LayerRef`, `Tx` STM, `Events`/`ErrorReporter`/`Tracer`/`Logger`/`Metric`/`Request`/`Crypto`, `Config`/`ConfigProvider`, `Arbitrary`, `Channel`/`Sink`/`Stream`), Stage 5 `HostMode::LiveOs`, pure `flick:sql`, and explicit opt-in counted Host/FFI bridge (`lower_roots_with_foreign_bridge`, `Operation::ForeignCall`, persistent Node `HostBridge` with 1-to-1 handle refcount symmetry and zero-live-handle teardown), owned outcomes, explicit source runners and live corpus inventory (`memory_inventory.rs` `--release` gate: **1,064/1,064** clean profiles across `tests/run`, `tests/rt`, `docs`, `tests/language`, and runnable `examples/`, plus generated `flick_model::generate` programs, with zero live Rust heap slots and zero live host handles) | M1 reference-model corpus gate complete; production backend RC codegen and physical reclamation remain in M2–M5 / Phase N |
 | M2: `Arena s` | Public `Arena.make/alloc/get`, by-use checker rules (`T4'`/`SafeUse` retention vs post-close `FLICK-G002`/`G003`), full counted C0–C6 owner close (children -> hooks -> C4 mirrored foreign settle -> LIFO C5 finalizers with late arena allocation -> exact-once detach-all retirement) across success, failure/recovery, cancellation/interruption, nested scopes, persistent contexts (`Context`, `Context.Reference`, dynamic/memo `Layer`), Signals (`tail` failure, `abort`, `control` resume & discontinue, partial layer build abort/discontinue), and HostBridge late async callbacks (`Js.promise_callback`, C4 callbacks); JS/Effect-TS/Go storage retirement after finalizers; Lean multi-phase lifecycle ledger (`Formal/MemoryScopes.lean` pinned in `Formal/Axioms.lean`); independent source (`arena_holding_contexts.fl`, `arena_after_close_captures.fl`), language (`Language.Arenas`), counted fuel-prefix (`memory_m2_arenas.rs`, `memory_m2_host_bridge.rs`, `memory_m2_signals.rs`), and JS/Effect-TS/Go runtime regressions; paired EN/RU user docs (`regions.md`) | M2 reference-model, checker, runtime, Lean ledger, and doc contract complete; production backend RC/arena codegen and physical native reclamation remain in M3–M5 / Phase N |
-| M3: FBIP and cycles | Two-stage Perceus FBIP reuse (`DropReuse`, `Reuse`, `ReuseWithDicts`, `ReuseRecord`, in-place unique `Update`), saturated constructor uncurrying, tail-branch lowering, `Error::ReuseTokenEscape` enforcement (program VM, standalone `execute(Function)`, and `Heap::dup`), measured 4-class baseline-vs-FBIP allocation/reuse/peak-object/cycle counts (`memory_m3_reuse/measurements.rs`), explicit `Ref` reference-cycle policy and `cells_detached_on_teardown` accounting (`memory_m3_cycles.rs`, `memory_inventory.rs`), Lean whole-block token-preservation and dynamic alias/cycle-break proofs (`Formal/MemoryReuse.lean`, pinned in `Formal/Axioms.lean`), and paired EN/RU docs (`spec/05-errors-and-concurrency.md`, `reference/regions.md`) | M3 reference-model, Perceus lowering, Lean proof, and doc contract complete; production backend RC/FBIP codegen and physical native reclamation remain in M4–M5 / Phase N |
-| M4: Lean | `Formal/MemoryInsert.lean`: whole-function token balance for the executable cached insertion projection, before output validation, with distinct parameters and every selected-path prefix; `Formal/MemoryReuse.lean`: whole-block token preservation and prefix safety of frame-limited `DropReuse`/`pairReuse` plus abstract counted-heap uniqueness, alias preservation, unused-token cleanup, and `Ref` cycle-break vs teardown theorems; `Formal/MemoryPass.lean`: independent token checking and computed live-in availability; `Formal/Memory.lean`: local arithmetic; `Formal/MemoryArena.lean` and `MemoryScopes.lean`: root inventories and selected-owner storage retirement (all pinned in `Formal/Axioms.lean`, zero `sorry`, standard axioms only) | Verified Rust correspondence, machine bounds, full VM operation/exception-unwind semantics, and physical reclamation remain outside these proofs |
+| M3: FBIP and cycles | Two-stage Perceus FBIP reuse (`DropReuse`, `Reuse`, `ReuseWithDicts`, `ReuseRecord`, in-place unique `Update`), abstract unboxed aggregate values (`ValueRep::{Cell, Aggregate}`, immediate aggregates with zero heap allocs/dups/drops, `BoxAggregate` / `UnboxBorrow` / `UnboxConsume` fallback cells, `CellLayout`-checked typed-cell `Reuse` compatibility, explicit `AggregatePolicy` lowering via `lower_with_aggregates` / `lower_roots_with_aggregates`, static + runtime `Error::AggregateReuseCandidate` rejection), saturated constructor uncurrying, tail-branch lowering, `Error::ReuseTokenEscape` enforcement (program VM, standalone `execute(Function)`, and `Heap::dup`), measured 4-class baseline-vs-FBIP allocation/reuse/peak-object/cycle counts (`memory_m3_reuse/measurements.rs`), explicit `Ref` reference-cycle policy and `cells_detached_on_teardown` accounting (`memory_m3_cycles.rs`, `memory_inventory.rs`), Lean whole-block token-preservation, dynamic alias/cycle-break, and aggregate/fallback-cell proofs (`Formal/MemoryReuse.lean`, `Formal/MemoryAggregate.lean`, pinned in `Formal/Axioms.lean`), and paired EN/RU docs (`spec/05-errors-and-concurrency.md`, `reference/regions.md`) | M3 reference-model, Perceus lowering, Lean proof, and doc contract complete; target-specific physical ABI layout, polymorphic specialization (`#743`), production backend RC/FBIP codegen, and physical native reclamation remain in M4–M5 / Phase N |
+| M4: Lean | `Formal/MemoryInsert.lean`: whole-function token balance for the executable cached insertion projection, before output validation, with distinct parameters and every selected-path prefix; `Formal/MemoryReuse.lean`: whole-block token preservation and prefix safety of frame-limited `DropReuse`/`pairReuse` plus abstract counted-heap uniqueness, alias preservation, unused-token cleanup, and `Ref` cycle-break vs teardown theorems; `Formal/MemoryAggregate.lean` (`MemoryAggregate/{Heap,RepCheck,RepInsert,Pass}.lean`): aggregate heap ownership (immediate-aggregate 0-alloc/0-dup/0-drop, recursive descendant retain/drop, `boxAggregate` reference transfer, `unboxBorrow` retain, unique vs shared `unboxConsume`, `CellLayout`-checked `reuseTypedCell` fallback, `dropReuse`/`reuse` rejection of aggregates) plus representation-aware static validation and Perceus insertion rejecting aggregate reuse candidates; `Formal/MemoryPass.lean`: independent token checking and computed live-in availability; `Formal/Memory.lean`: local arithmetic; `Formal/MemoryArena.lean` and `MemoryScopes.lean`: root inventories and selected-owner storage retirement (all pinned in `Formal/Axioms.lean`, zero `sorry`, standard axioms only) | Verified Rust correspondence, machine bounds, full VM operation/exception-unwind semantics, target-specific physical layout, and physical reclamation remain outside these proofs |
 | M5: Native split (2026-11-13) | Backend boundary below | Implementation belongs to phase N, not a replacement for M1–M4 |
 
 `run::run_main` and the existing `tests/run/model.txt` harness still use the
@@ -201,6 +201,36 @@ lean`, 363 jobs) remain valid for their token projection; the Rust VM, Node
 worker, wire marshalling, host libraries, and cross-heap refcount symmetry are
 validated by tests rather than proved in Lean.
 
+### Tier-neutral shared primitive library (`flick-vm/src/stdlib/`)
+
+All pure stdlib primitives, Stage 4 pure context/layer/cooperative helpers,
+Stage 5 `HostMode` implementations, and the persistent Node `HostBridge` live
+in the tier-neutral module `flick_vm::stdlib` (`flick-vm/src/stdlib/`), outside
+`flick-vm/src/tier0/`. Callers invoke `eval_binary`, `eval_binary_slice`,
+`eval_not`, `eval_neg`, `eval_string_predicate`, `eval_primitive`,
+`eval_intrinsic`, and `eval_host_primitive` with caller-supplied accounting and
+host-environment hooks (`Accounting`, `HostEnv`, `VmHooks`):
+
+- `Accounting::charge_fuel` meters all primitive work before execution, and
+  `Accounting::record_allocation_delta` observes heap allocation/free deltas
+  per call.
+- `HostEnv` supplies `HostMode` (`Deterministic` vs `LiveOs`), stdout capture,
+  and optional virtual clock (`Clock`/`TestClock`) and seeded RNG
+  (`Random.with_seed`) overrides.
+- `tier0` contains no primitive implementations; it delegates every primitive,
+  host, and pure Stage 4 context/layer call to `flick_vm::stdlib` through
+  `FuelCounter` and `HostContext`, preserving its exact fuel, allocation, reuse,
+  and teardown counts unchanged.
+- `flick-vm/tests/kernel_primitives.rs` and
+  `flick-model/tests/model/memory_kernel.rs` (wired into `just kernel`) execute
+  the `#948` primitive kernel conformance suite (`tests/kernel/test/Kernel/*.fl`
+  and `tests/kernel/language.txt`) in debug and release against `flick_vm::stdlib`
+  as a third verified kernel implementation alongside JS and Go, with zero heap
+  leaks.
+- **Lean impact**: extracting the shared primitive library and hook boundary
+  introduces no IR, typing, effect, region, or ownership-semantics contract
+  change; all Lean proofs in `formal/` remain unaffected.
+
 ## 2. Owned tokens and objects
 
 An immediate value has no heap object. A string, arbitrary-sized integer or constructed value has
@@ -217,7 +247,7 @@ insufficient, because that count also includes existing internal edges.
 
 Audit result for data identity and record field order (issue #740):
 
-- **Value equality vs. object identity**: `flick-vm/src/tier0/primitives/operators.rs`
+- **Value equality vs. object identity**: `flick-vm/src/stdlib/primitives/operators.rs`
   (`equal`) compares `Data::Record` order-independently, skips GADT held
   dictionary suffixes, rejects `Value::Cell` (explicit `Ref.same` observes cell
   identity), and uses `seen.insert((a.id, b.id))` solely as an internal memo/cycle
@@ -227,7 +257,7 @@ Audit result for data identity and record field order (issue #740):
   lowers record literal field expressions into ANF locals in **source order**
   before sorting `Operation::Record { fields }` into canonical UTF-16 label
   order, so permutations of the same evaluated fields allocate the exact same
-  canonical `Data::Record` layout. `flick-vm/src/tier0/primitives/records.rs`
+  canonical `Data::Record` layout. `flick-vm/src/stdlib/primitives/records.rs`
   (`record_extend`, `record_remove`, `record_project`, `record_merge_disjoint`)
   canonicalizes structural records (JS array-index keys ascending, then UTF-16),
   and `schema_data.rs` uses UTF-16 order for sorted record/XML views. `Json`
@@ -852,6 +882,74 @@ drop (`dropReuseHeap_unique_tagged`, `dropReuseHeap_shared_preserves_aliases`,
 all pinned in `Formal/Axioms.lean` with zero `sorry` and standard Lean axioms
 only. These are abstract model theorems, not verified Rust extraction or a proof
 of physical machine-memory reclamation.
+
+### Unboxed aggregate values and fallback cells (#744)
+
+The shared memory IR (`flick-ir/src/memory/`), Perceus passes
+(`flick-core/src/opt/perceus/`), and tier-0 counted executor
+(`flick-vm/src/tier0/`) distinguish boxed heap cells (`ValueRep::Cell`, default
+for wire compatibility) from by-value unboxed aggregates (`ValueRep::Aggregate`)
+without committing to a target-specific physical ABI layout:
+
+- **Unboxed aggregates (`Value::Aggregate`)**: own their ordinary fields and
+  optional dictionary-evidence suffix inline with no heap slot, no `ObjectId`,
+  and no reference-count header. `Dup` and `Drop` walk nested aggregates
+  iteratively and touch only boxed `Value::Object` descendants. An **immediate
+  aggregate** (containing only immediates or nested immediate aggregates)
+  performs zero heap allocations, zero heap `dup`s, and zero heap `drop`s.
+  `Project` and `Match` borrow an aggregate receiver directly without boxing or
+  requiring heap identity; projecting a nested aggregate retains its boxed
+  descendants before any parent drop.
+- **No aggregate reuse**: unboxed aggregates have no heap cell to recycle.
+  Perceus Stage 1 never defers an aggregate receiver for `Reuse`, Stage 2 never
+  converts an aggregate `Drop` into `DropReuse`, `memory::validate` rejects
+  aggregate reuse candidates statically (`Error::AggregateReuseCandidate`), and
+  `tier0` rejects runtime aggregate candidates in `DropReuse`, `Reuse`,
+  `ReuseWithDicts`, and `ReuseRecord` while releasing consumed operands cleanly.
+- **Fallback boxing and unboxing**: crossing a uniform or polymorphic cell
+  boundary uses three explicit operations:
+  - `BoxAggregate { value, layout }` consumes an aggregate and moves it into a
+    counted `Data::BoxedAggregate` fallback cell with zero extra descendant
+    `dup`s.
+  - `UnboxBorrow { object }` borrows a boxed fallback cell and returns an owned
+    aggregate copy, retaining its boxed descendants.
+  - `UnboxConsume { object }` consumes a boxed fallback cell: when uniquely
+    owned (`references == 1`), it moves the aggregate out and frees the cell
+    with zero extra descendant `dup`/`drop`; when shared (`references >= 2`), it
+    retains boxed descendants first and then decrements the cell's reference
+    count, leaving external aliases intact.
+- **Typed-cell `Reuse` layout compatibility**: heap cells (`Construct`,
+  `ConstructWithDicts`, `Reuse`, `ReuseWithDicts`, `BoxAggregate`) may carry an
+  optional target-independent `CellLayout { capacity, align, ownership }`.
+  `DropReuse` preserves that layout on `Data::ReuseToken`, and `Reuse*` reuses
+  in place only when the candidate is uniquely owned (`references == 1`),
+  matches total field capacity, **and** has a compatible `CellLayout`. Two typed
+  cells with the same field count and incompatible layouts fall back to dropping
+  the candidate and allocating a replacement (`stats.reuse_fallbacks += 1`).
+- **Explicit abstract lowering (`AggregatePolicy`)**:
+  `perceus::lower_with_aggregates` and `perceus::lower_roots_with_aggregates`
+  lower caller-selected types/constructors as `ValueRep::Aggregate` and attach
+  optional `CellLayout` descriptors to boxed cells, leaving default
+  `perceus::lower*` callers unchanged and independent of automatic polymorphic
+  specialization (`#743`).
+
+`Formal/MemoryAggregate.lean` (`Formal/MemoryAggregate/{Heap,RepCheck,RepInsert,Pass}.lean`)
+proves the abstract aggregate heap and representation-aware token-balance
+contract: immediate-aggregate zero-heap `dup`/`drop`
+(`dupVal_immediate_noop`, `dropVal_immediate_noop`), boxed-descendant retain and
+release (`dupVal_aggregate_retains_boxed`, `dropVal_aggregate_releases_boxed`),
+`boxAggregate` reference transfer (`boxAggregate_transfers_without_extra_dups`),
+`unboxBorrow` retain (`unboxBorrow_retains_descendants`), unique vs shared
+`unboxConsume` (`unboxConsume_unique_moves_without_extra_ops`,
+`unboxConsume_shared_preserves_aliases`), incompatible-layout `Reuse` fallback
+(`reuseTypedCell_incompatible_layout_falls_back`), aggregate reuse rejection
+(`dropReuse_rejects_aggregate`, `reuseTypedCell_rejects_aggregate`), and
+representation-aware Perceus insertion and validator soundness
+(`insert_aggregate_sound`, `checkRep_rejects_aggregate_reuse`,
+`insert_preserves_no_aggregate_reuse`), all pinned in `Formal/Axioms.lean` with
+zero `sorry` and standard Lean axioms only. Target-specific physical struct
+layout, polymorphic specialization (`#743`), backend codegen, and physical
+reclamation remain outside these abstract proofs.
 
 ## 4. Arena lifetime and by-use regions
 

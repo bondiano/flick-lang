@@ -98,6 +98,7 @@ impl Operation {
             | Self::Method { .. }
             | Self::Structure { .. }
             | Self::Match { .. }
+            | Self::UnboxBorrow { .. }
             | Self::Global(_)
             | Self::ServiceTag(_)
             | Self::Label(_) => Vec::new(),
@@ -111,7 +112,9 @@ impl Operation {
             | Self::Not(value)
             | Self::Neg { value, .. }
             | Self::Await(value)
-            | Self::DropReuse(value) => vec![*value],
+            | Self::DropReuse(value)
+            | Self::BoxAggregate { value, .. }
+            | Self::UnboxConsume { object: value } => vec![*value],
             Self::VarSet { var, value } => vec![*var, *value],
             Self::Loop { args, .. }
             | Self::FunctionBoundary { args, .. }
@@ -182,9 +185,64 @@ impl Operation {
             Self::Project { object, .. }
             | Self::Field { object, .. }
             | Self::Structure { object, .. }
-            | Self::Match { object, .. } => Some(*object),
+            | Self::Match { object, .. }
+            | Self::UnboxBorrow { object } => Some(*object),
             Self::Method { dictionary, .. } => Some(*dictionary),
             _ => None,
+        }
+    }
+
+    /// Returns the statically known value representation produced by this
+    /// operation, when determined solely by the operation itself.
+    pub fn result_rep(&self) -> Option<ValueRep> {
+        match self {
+            Self::Construct { rep, .. } | Self::ConstructWithDicts { rep, .. } => Some(*rep),
+            Self::UnboxBorrow { .. } | Self::UnboxConsume { .. } => Some(ValueRep::Aggregate),
+            Self::Literal(_)
+            | Self::Record { .. }
+            | Self::Match { .. }
+            | Self::Update { .. }
+            | Self::Closure { .. }
+            | Self::Task { .. }
+            | Self::ReadOwnerEvidence
+            | Self::Binary { .. }
+            | Self::Not(_)
+            | Self::Neg { .. }
+            | Self::DropReuse(_)
+            | Self::Reuse { .. }
+            | Self::ReuseWithDicts { .. }
+            | Self::ReuseRecord { .. }
+            | Self::BoxAggregate { .. }
+            | Self::ServiceTag(_)
+            | Self::Dictionary { .. }
+            | Self::Structure { .. }
+            | Self::RecoveryResult { .. }
+            | Self::VarMake(_)
+            | Self::GenerateStrict { .. }
+            | Self::GenerateLazy { .. }
+            | Self::SeqOpen(_)
+            | Self::Label(_) => Some(ValueRep::Cell),
+            Self::Project { .. }
+            | Self::Field { .. }
+            | Self::Await(_)
+            | Self::Apply { .. }
+            | Self::Call { .. }
+            | Self::Within { .. }
+            | Self::WithOwnerEvidence { .. }
+            | Self::Global(_)
+            | Self::Intrinsic { .. }
+            | Self::Handle { .. }
+            | Self::Perform { .. }
+            | Self::Method { .. }
+            | Self::VarGet(_)
+            | Self::VarSet { .. }
+            | Self::Loop { .. }
+            | Self::LoopExit { .. }
+            | Self::FunctionBoundary { .. }
+            | Self::UnwrapOption(_)
+            | Self::Yield(_)
+            | Self::SeqNext(_)
+            | Self::ForeignCall { .. } => None,
         }
     }
 }

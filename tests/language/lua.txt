@@ -1,0 +1,5 @@
+# The modules of tests/language the Lua target runs (`just kernel-lua`), each
+# compared with its report on JS: those whose tests are pure and whose
+# primitives the Lua kernel has (#831).
+BigInts
+Floats

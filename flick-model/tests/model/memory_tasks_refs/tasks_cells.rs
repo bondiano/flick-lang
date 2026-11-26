@@ -1,3 +1,4 @@
+use flick_core::ir::memory::ValueRep;
 #[test]
 fn task_body_is_delayed_and_replayed_with_shared_capture() {
     let p = program(vec![
@@ -20,6 +21,8 @@ fn task_body_is_delayed_and_replayed_with_shared_capture() {
                     Operation::Construct {
                         tag: "$tuple".into(),
                         fields: vec![5, 6],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -33,6 +36,7 @@ fn task_body_is_delayed_and_replayed_with_shared_capture() {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 intrinsic(3, Intrinsic::PrintLine, &[2]),
@@ -167,6 +171,8 @@ fn modify_returns_first_tuple_field_and_stores_second() {
                     Operation::Construct {
                         tag: "$tuple".into(),
                         fields: vec![4, 5],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -189,6 +195,8 @@ fn modify_returns_first_tuple_field_and_stores_second() {
                     Operation::Construct {
                         tag: "$tuple".into(),
                         fields: vec![1, 3],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -276,6 +284,7 @@ fn cyclic_program(mutual: bool, failure: bool, endless: bool) -> Program {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 intrinsic(3, Intrinsic::RefGet, &[2]),

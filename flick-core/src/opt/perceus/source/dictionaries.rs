@@ -3,7 +3,7 @@ use flick_ir::default_method;
 
 use super::{
     Code, Dict, Env, Expr, ExprKind, InstanceInfo, Local, Lower, LowerError, Operation, Param, Pat,
-    Span, Stage, abstract_params, dictionary, given, memory,
+    Span, Stage, ValueRep, abstract_params, dictionary, given, memory,
 };
 
 impl Lower<'_> {
@@ -19,7 +19,16 @@ impl Lower<'_> {
             let code = self.reserve(span)?;
             let mut function = Code::new(vec![0, 1]);
             let mut inside = (0..arguments.len())
-                .map(|field| function.emit(Operation::Project { object: 0, field }, span))
+                .map(|field| {
+                    function.emit(
+                        Operation::Project {
+                            object: 0,
+                            field,
+                            rep: ValueRep::Cell,
+                        },
+                        span,
+                    )
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             inside.push(1);
             let result = self.instance(info, methods, &inside, &mut function, span)?;

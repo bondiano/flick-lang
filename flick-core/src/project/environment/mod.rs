@@ -161,6 +161,7 @@ const OFFICIAL_TAGS: &[&str] = &[
     "native",
     "node",
     "rt",
+    "vm",
 ];
 
 #[cfg(not(target_arch = "wasm32"))]

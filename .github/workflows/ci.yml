@@ -351,7 +351,8 @@ jobs:
 
   # the Lua profile probes on the hosts the flake pins: Lua 5.1.5, LuaJIT 2.1
   # with the JIT on and off, LÖVE 11.5 headless; then the Lua fixtures, built
-  # through the committed component and run there. A pull request runs them
+  # through the committed component and run there, and the kernel's
+  # conformance suite with `flick test --target lua`. A pull request runs them
   # when it changes the Lua backend, what its component links or its host
   # drives, the flake or this workflow; a push to main, the nightly run and a
   # release always do
@@ -367,10 +368,13 @@ jobs:
         run: |
           changed=true
           if [ -n "$BASE" ] && git fetch --depth=1 origin "$BASE" &&
-            git diff --quiet FETCH_HEAD HEAD -- backends/lua flick-backend-support/src flick-backend flick-ir flick-pretty flick/src/backends flake.nix flake.lock justfile just/backends.just .github/workflows/ci.yml; then
+            git diff --quiet FETCH_HEAD HEAD -- backends/lua flick-backend-support/src flick-backend flick-ir flick-pretty flick/src/backends packages/core runtime pnpm-lock.yaml tests/kernel tests/language flake.nix flake.lock justfile just/backends.just .github/workflows/ci.yml; then
             changed=false
           fi
           echo "changed=$changed" >> "$GITHUB_OUTPUT"
+      # the kernel suite's reports on JS, which those on Lua must equal
+      - uses: pnpm/action-setup@v6
+        if: steps.lua.outputs.changed == 'true'
       - uses: actions/setup-node@v7
         if: steps.lua.outputs.changed == 'true'
         with:
@@ -405,6 +409,8 @@ jobs:
         if: steps.lua.outputs.changed == 'true'
       - if: steps.lua.outputs.changed == 'true'
         run: just lua-run
+      - if: steps.lua.outputs.changed == 'true'
+        run: pnpm install --frozen-lockfile && just kernel-lua
 
   # the reference model of λFlick (flick-model) against tests/run/model.txt,
   # every pass fixture and docs example, the counted Host/FFI bridge suites,

@@ -213,10 +213,21 @@ reference counting (see [Phase M: memory without GC](../../spec/05-errors-and-co
   contract and are not reclaimed automatically.
 - **Functional in-place (FBIP) reuse is invisible to aliases.** When a dead
   ADT constructor, tuple, or record is uniquely owned (`references == 1`) with
-  a compatible layout, counted execution may update its storage in place
-  (`DropReuse` / `Reuse` / `ReuseRecord` / `Update`). Whenever an external
-  alias exists (`references > 1`), execution falls back to fresh allocation and
-  the alias keeps its original value untouched.
+  a compatible layout (matching field count and abstract cell layout), counted
+  execution may update its storage in place (`DropReuse` / `Reuse` /
+  `ReuseRecord` / `Update`). Whenever an external alias exists
+  (`references > 1`) or two typed cells have incompatible layouts even at the
+  same field count, execution falls back to dropping the candidate and
+  allocating a replacement, leaving aliases untouched.
+- **Unboxed aggregates carry no heap cell.** In the memory IR and counted
+  model, value-type aggregates (`ValueRep::Aggregate`) store their fields
+  inline with no heap slot or reference count: immediate aggregates perform
+  zero heap allocations, `dup`s, or `drop`s, while nested aggregates retain
+  and release only their boxed descendants. Aggregates are never reuse
+  candidates; crossing a boxed cell boundary uses explicit `BoxAggregate`,
+  `UnboxBorrow`, and `UnboxConsume` fallback-cell transitions that preserve
+  shared aliases and transfer references without extra descendant copies when
+  unique.
 
 ```flick
 type Node = Node String (Ref (Option Node))

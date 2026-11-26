@@ -2,12 +2,14 @@
 //! profile, the dialect and capabilities are the host's, and what the
 //! program reaches exists there. Every refusal is `P012`.
 
-use flick_backend::{BuildRequest, Diagnostic, Span};
+use std::collections::BTreeSet;
+
+use flick_backend::{BuildRequest, Diagnostic, ModuleRole, Span};
 use flick_ir::{Binding, Foreign, ForeignMode, Program};
 
 use crate::kernel::{self, Table};
 use crate::profiles::{self, HostProfile, PROFILES};
-use crate::reach::{self, Fact, Reached, Wide};
+use crate::reach::{self, Fact, Reached};
 use crate::refusal;
 
 struct Rules<'a> {
@@ -15,6 +17,9 @@ struct Rules<'a> {
     target: String,
     tags: &'a [String],
     kernel: Table<'static>,
+    /// The built-in modules, whose JS globals of the kernel are the Lua
+    /// kernel's.
+    builtin: BTreeSet<&'a str>,
 }
 
 /// Checks `request` against its profile; the program and what it reaches.
@@ -39,6 +44,10 @@ pub(crate) fn check(request: &BuildRequest) -> Result<(Program, Reached), Vec<Di
         target: format!("lua/{platform}"),
         tags: &request.target.tags,
         kernel: kernel::table(),
+        builtin: (request.modules.iter())
+            .filter(|m| m.role == ModuleRole::Builtin)
+            .map(|m| m.name.as_str())
+            .collect(),
     };
     let mut errors = rules.selection();
     if !errors.is_empty() {
@@ -117,19 +126,7 @@ impl Rules<'_> {
 
     /// Why the profile cannot run a reached fact, if it cannot.
     fn refuse(&self, fact: &Fact) -> Option<String> {
-        let target = &self.target;
         match fact {
-            Fact::Number(Wide::BigInt) => Some(format!(
-                "`BigInt` is not available on the {target} target yet: the Lua kernel has no \
-                 arbitrary-precision integers"
-            )),
-            Fact::Number(wide) => (!self.has("ffi")).then(|| {
-                format!(
-                    "`{}` is not available on the {target} target without the `ffi` capability: \
-                     a Lua number is a double, which would round it",
-                    wide.name()
-                )
-            }),
             Fact::Await => self.suspension("`await`"),
             Fact::Foreign { module, foreign } => self.foreign(module, foreign),
         }
@@ -158,12 +155,15 @@ impl Rules<'_> {
             Binding::Inline(_) => None,
             Binding::Module { from, name } if from.starts_with("flick:") => {
                 let row = self.kernel.row(from, name);
+                if row.is_some_and(|r| r.implemented) {
+                    return None;
+                }
                 if row.is_some_and(|r| r.suspends) && !profile.suspension {
                     return self.suspension(&what);
                 }
                 Some(format!(
                     "{what} (foreign `{name}` from `{from}`) is not available on the {target} target \
-                     yet: the Lua primitive kernel is not implemented"
+                     yet: the Lua kernel does not implement it"
                 ))
             }
             Binding::Module { from, name } => {
@@ -181,6 +181,20 @@ impl Rules<'_> {
                 } else {
                     None
                 }
+            }
+            Binding::Global { name }
+                if self.builtin.contains(module) && self.kernel.row("global", name).is_some() =>
+            {
+                let implemented = self
+                    .kernel
+                    .row("global", name)
+                    .is_some_and(|r| r.implemented);
+                (!implemented).then(|| {
+                    format!(
+                        "{what} (the kernel's global `{name}`) is not available on the {target} \
+                         target yet: the Lua kernel does not implement it"
+                    )
+                })
             }
             Binding::Global { name } => {
                 let root = name.split('.').next().unwrap_or(name);

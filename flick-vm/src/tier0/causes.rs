@@ -1,5 +1,6 @@
 //! Immutable owned causes. Representation builders do not activate VM producers.
 use super::{Data, Error, Heap, ObjectToken, Value, charge};
+use crate::stdlib::{Fuel, FuelCounter, charge as charge_hooks};
 
 /// An owned cause root. Diagnostic identities never construct ownership.
 ///
@@ -18,15 +19,15 @@ pub struct CauseToken {
 }
 
 impl CauseToken {
-    pub(super) fn into_value(self) -> Value {
+    pub(crate) fn into_value(self) -> Value {
         Value::Object(self.token)
     }
 
-    pub(super) fn object_id(&self) -> super::ObjectId {
+    pub(crate) fn object_id(&self) -> super::ObjectId {
         self.token.id
     }
 
-    pub(super) fn from_cause_value(heap: &Heap, value: Value) -> Result<Self, Error> {
+    pub(crate) fn from_cause_value(heap: &Heap, value: Value) -> Result<Self, Error> {
         let Value::Object(token) = value else {
             return Err(Error::ExpectedCause);
         };
@@ -46,13 +47,13 @@ pub enum Reason<'a> {
 }
 
 #[derive(Debug)]
-pub(super) struct CauseData {
-    pub(super) reasons: Vec<StoredReason>,
-    pub(super) trace: Option<Value>,
+pub(crate) struct CauseData {
+    pub(crate) reasons: Vec<StoredReason>,
+    pub(crate) trace: Option<Value>,
 }
 
 impl CauseData {
-    pub(super) fn plain(reasons: Vec<StoredReason>) -> Self {
+    pub(crate) fn plain(reasons: Vec<StoredReason>) -> Self {
         Self {
             reasons,
             trace: None,
@@ -61,14 +62,14 @@ impl CauseData {
 }
 
 #[derive(Debug)]
-pub(super) enum StoredReason {
+pub(crate) enum StoredReason {
     Fail(Value),
     Die(Value),
     Interrupt { fiber_id: Option<usize> },
 }
 
 impl StoredReason {
-    pub(super) fn borrowed(&self) -> Reason<'_> {
+    pub(crate) fn borrowed(&self) -> Reason<'_> {
         match self {
             Self::Fail(value) => Reason::Fail(value),
             Self::Die(value) => Reason::Die(value),
@@ -78,7 +79,7 @@ impl StoredReason {
         }
     }
 
-    pub(super) fn into_value(self) -> Option<Value> {
+    pub(crate) fn into_value(self) -> Option<Value> {
         match self {
             Self::Fail(value) | Self::Die(value) => Some(value),
             Self::Interrupt { .. } => None,
@@ -138,7 +139,7 @@ impl DefectSpec {
         }
     }
 
-    pub(super) fn custom(msg: impl Into<String>) -> Self {
+    pub(crate) fn custom(msg: impl Into<String>) -> Self {
         Self {
             code: DefectCode::Assert(msg.into()),
         }
@@ -148,7 +149,7 @@ impl DefectSpec {
         &self.code
     }
 
-    pub(super) fn message(&self) -> String {
+    pub(crate) fn message(&self) -> String {
         match &self.code {
             DefectCode::NoMatch => "no matching pattern".into(),
             DefectCode::MissingHandler { effect, op } => {
@@ -251,7 +252,15 @@ impl Heap {
     /// Duplicates borrowed payloads in order. On partial failure every acquired
     /// duplicate is released; the caller's original tokens remain untouched.
     pub fn cause(&mut self, reasons: &[Reason<'_>], fuel: &mut u64) -> Result<CauseToken, Error> {
-        charge(fuel, reasons.len())?;
+        self.cause_metered(reasons, &mut FuelCounter(fuel))
+    }
+
+    pub(crate) fn cause_metered(
+        &mut self,
+        reasons: &[Reason<'_>],
+        fuel: Fuel<'_>,
+    ) -> Result<CauseToken, Error> {
+        charge_hooks(fuel, reasons.len())?;
         let mut stored = Vec::with_capacity(reasons.len());
         if let Err(error) = self.duplicate_reasons(reasons, fuel, &mut stored) {
             self.drop_values(
@@ -271,11 +280,11 @@ impl Heap {
     fn duplicate_reasons(
         &mut self,
         reasons: &[Reason<'_>],
-        fuel: &mut u64,
+        fuel: Fuel<'_>,
         stored: &mut Vec<StoredReason>,
     ) -> Result<(), Error> {
         for reason in reasons {
-            charge(fuel, 1)?;
+            charge_hooks(fuel, 1)?;
             let reason = match reason {
                 Reason::Fail(value) => {
                     self.admit_ordinary(value)?;
@@ -291,10 +300,10 @@ impl Heap {
             };
             stored.push(reason);
         }
-        charge(fuel, 1)
+        charge_hooks(fuel, 1)
     }
 
-    pub(super) fn cause_data(&self, cause: &CauseToken) -> Result<&[StoredReason], Error> {
+    pub(crate) fn cause_data(&self, cause: &CauseToken) -> Result<&[StoredReason], Error> {
         let Data::Cause(data) = &self.object(cause.token.id)?.data else {
             return Err(Error::ExpectedCause);
         };
@@ -312,7 +321,7 @@ impl Heap {
         self.dup_cause_id(cause.token.id)
     }
 
-    pub(super) fn dup_cause_id(&mut self, id: super::ObjectId) -> Result<CauseToken, Error> {
+    pub(crate) fn dup_cause_id(&mut self, id: super::ObjectId) -> Result<CauseToken, Error> {
         if !matches!(self.object(id)?.data, Data::Cause(_)) {
             return Err(Error::ExpectedCause);
         }

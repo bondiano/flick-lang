@@ -9,9 +9,10 @@ host's projections, never `flick-core`.
 host profiles of `lua/profiles/` and checks programs against them. Its
 emitter, `lua/src/emit/`, lowers the pure core of the IR to structured Lua
 and checks the dialect's VM limits; `generate` writes a chunk per reached
-module, `chunks.txt` in the order they load, and on LÖVE a `main.lua` that
-loads them. `lua/kernel.txt` says what it does with each `flick:` binding.
-See [Lua host profiles](../docs/backends/lua-profiles.md).
+module after the Lua kernel's chunks (`lua/kernel/*.lua`), `chunks.txt` in
+the order they load, and on LÖVE a `main.lua` that loads them.
+`lua/kernel.txt` says which `flick:` bindings the kernel implements. See
+[Lua host profiles](../docs/backends/lua-profiles.md).
 
 ## Layout
 
@@ -47,8 +48,10 @@ See [Lua host profiles](../docs/backends/lua-profiles.md).
 - Lua: `cargo test -p flick-backend-lua`, `just lua-probes` and
   `just lua-run` (both in `nix develop`: the probes, then the fixtures of
   `lua/fixtures/` built through the committed component and run on the
-  pinned hosts), `just check-component lua`, and the `lua_profiles` tests of
-  `just wasm-backends`. A change to the emitter needs `just update-component
-  lua` before `just lua-run` sees it.
+  pinned hosts), `just kernel-lua` (`tests/kernel` with `flick test
+  --target lua`, each report the same as JS's), `just check-component lua`,
+  and the `lua_profiles` tests of `just wasm-backends`. A change to the
+  emitter or the kernel needs `just update-component lua` before those see
+  it.
 - The "IR, lowering or optimization" row of the
   [validation matrix](../docs/agents/validation.md).

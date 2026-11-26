@@ -7,33 +7,44 @@ pub use module::source_path;
 mod runner;
 pub use runner::{EntryFacts, entry_facts};
 
+#[cfg(feature = "native-js")]
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
 use super::Backend;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(feature = "native-js", not(target_arch = "wasm32")))]
 use crate::codegen::ts::Typing;
-use crate::codegen::{self, EffectBridge, Known, Options, Resolved};
-use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::codegen::{self, Resolved};
+#[cfg(feature = "native-js")]
+use crate::codegen::{EffectBridge, Known, Options};
+use crate::diagnostics::Diagnostic;
+#[cfg(feature = "native-js")]
+use crate::diagnostics::{Severity, codes};
+#[cfg(feature = "native-js")]
 use crate::iface::Interface;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "native-js")]
+use crate::project::Compiled;
+#[cfg(all(feature = "native-js", not(target_arch = "wasm32")))]
 use crate::project::target_preflight::prune_compilation_for_env;
-use crate::project::{Compilation, Compiled, normalize};
+use crate::project::{Compilation, normalize};
 use crate::source::SourceMap;
 use crate::{ir, types};
+#[cfg(feature = "native-js")]
 use flick_backend_support::opt::eval::ReviewedPrimitives;
 
 #[cfg(feature = "native-project")]
 use super::runner_file;
-use super::{
-    Artifact, Settings, bindings, bridge_select, builtin_modules_of, effects, published_interfaces,
-    specifier,
-};
+#[cfg(feature = "native-js")]
+use super::{Artifact, bridge_select, published_interfaces};
+use super::{Settings, bindings, builtin_modules_of, effects, specifier};
+#[cfg(feature = "native-js")]
 use module::{compiled_module, declarations, dts_path};
+#[cfg(feature = "native-js")]
 use runner::entry_runners;
 
 /// The output of a compilation, and what it could not write: exports
 /// without a TypeScript form under `--emit-dts`.
+#[cfg(feature = "native-js")]
 pub fn emit(
     compilation: &Compilation,
     sources: &SourceMap,
@@ -144,6 +155,7 @@ pub fn emit(
     (out, diagnostics)
 }
 
+#[cfg(feature = "native-js")]
 fn interface_failure(
     mut diagnostics: Vec<Diagnostic>,
     error: String,
@@ -152,6 +164,7 @@ fn interface_failure(
     (Vec::new(), diagnostics)
 }
 
+#[cfg(feature = "native-js")]
 fn module_packages(modules: &[Compiled], default: Option<&str>) -> BTreeMap<String, String> {
     let mut packages = BTreeMap::new();
     for c in modules {
@@ -162,6 +175,7 @@ fn module_packages(modules: &[Compiled], default: Option<&str>) -> BTreeMap<Stri
     packages
 }
 
+#[cfg(feature = "native-js")]
 fn reviewed_primitives(
     modules: &[Compiled],
     by_class: bool,
@@ -198,7 +212,7 @@ pub fn preflight(
     let _ = (compilation, sources, settings, diagnostics);
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(feature = "native-js", not(target_arch = "wasm32")))]
 fn prune_for_settings(
     compilation: &Compilation,
     sources: &SourceMap,
@@ -212,6 +226,7 @@ fn prune_for_settings(
 /// modules that the build resolves, by module and specifier: one named
 /// relative to its module, shipped beside it, or the renderer `[build] ui`
 /// stands for. The JS backend resolves the others, a package's, itself.
+#[cfg(feature = "native-js")]
 fn resolved(
     compilation: &Compilation,
     settings: &Settings,
@@ -316,6 +331,7 @@ pub fn foreign_specifier(
 }
 
 /// The output of the program's own modules; what they import.
+#[cfg(feature = "native-js")]
 fn own_modules(
     ctx: &Context,
     compilation: &Compilation,
@@ -351,6 +367,7 @@ fn package_json(settings: &Settings) -> Artifact {
 
 /// Workers by module and value, and direct methods by module, instance
 /// and method.
+#[cfg(feature = "native-js")]
 type Exports = (
     HashMap<(String, String), usize>,
     HashSet<(String, String, String)>,
@@ -360,6 +377,7 @@ type Exports = (
 /// exports for a full application or a canonical method call in another
 /// module, from its reference lowering: the worker `name$n` of a value, as
 /// its `.iface` summaries say, and the constants of instance methods.
+#[cfg(feature = "native-js")]
 fn exports(
     release: bool,
     modules: &[Compiled],
@@ -394,6 +412,7 @@ fn exports(
 /// The built-in modules the build's modules import, directly or through
 /// one another. `.d.ts` files of other modules may name the types of any
 /// built-in module, so with them every built-in module is written.
+#[cfg(feature = "native-js")]
 fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
     let dts = ctx.settings.extras.dts;
     let mut pending = imports;
@@ -434,6 +453,7 @@ fn builtins(ctx: &Context, imports: Vec<String>, out: &mut Vec<Artifact>) {
 }
 
 /// What the compilation of every module shares.
+#[cfg(feature = "native-js")]
 struct Context<'a> {
     layout: &'a codegen::RuntimeLayout,
     modules: &'a [Compiled],
@@ -455,7 +475,7 @@ struct Context<'a> {
 /// `js` with the options of `module`'s code: in TypeScript they hold the
 /// types of its exports, projected here, for the modules the build writes
 /// and no others.
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(feature = "native-js", not(target_arch = "wasm32")))]
 fn typed_options<R>(ctx: &Context, module: &ir::Module, js: impl FnOnce(&Options) -> R) -> R {
     let typed = ctx.typing.map(|typing| typing.prepare(module));
     js(&Options {
@@ -464,7 +484,7 @@ fn typed_options<R>(ctx: &Context, module: &ir::Module, js: impl FnOnce(&Options
     })
 }
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(feature = "native-js", target_arch = "wasm32"))]
 fn typed_options<R>(ctx: &Context, _module: &ir::Module, js: impl FnOnce(&Options) -> R) -> R {
     js(ctx.options)
 }

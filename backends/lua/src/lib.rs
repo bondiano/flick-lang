@@ -11,8 +11,9 @@ mod reach;
 
 use flick_backend::{
     Backend, BackendId, BuildRequest, BuildResult, CHECK_TARGET_CAPABILITY, Capability, Descriptor,
-    Diagnostic, Environment, Inputs, Mode, NamedRange, OptionDescriptor, Parameter, Profile,
-    Severity, Span, TagAxis, TargetSupport, ValueKind, Verb, VersionRange,
+    Diagnostic, Environment, Inputs, Launch, LaunchKind, Mode, NamedRange, OptionDescriptor,
+    Parameter, Profile, Severity, Span, TagAxis, TargetSupport, Toolchain, ValueKind, Verb,
+    VersionRange,
 };
 
 use profiles::PROFILES;
@@ -141,7 +142,8 @@ impl Backend for Lua {
                 ),
             ],
             launch_runtimes: vec![],
-            host_tools: vec![],
+            // the interpreters `flick test` runs a test build on
+            host_tools: vec!["lua".into(), "luajit".into()],
             projections: vec![],
             stages_by_class_option: None,
             foreign_extension: None,
@@ -173,38 +175,111 @@ impl Backend for Lua {
         if let Some(refused) = unlaunched(request, &name) {
             return Err(vec![refused]);
         }
+        let dialect = profiles::dialect(&request.target.tags);
+        let runtime = match command(request) {
+            Some("test") => Some(interpreter(request, &name, dialect.tag)?),
+            _ => None,
+        };
         let (program, reached) = check::check(request)?;
         let target = emit::Target {
             name: &name,
-            dialect: profiles::dialect(&request.target.tags),
+            dialect,
         };
-        let artifacts = emit::build(&program, request, &reached, &target, inputs)?;
+        let suites: Vec<&str> = (request.test_roots.iter())
+            .map(|root| root.module.as_str())
+            .collect();
+        let tests = runtime.is_some().then_some(suites.as_slice());
+        let artifacts = emit::build(&program, request, &reached, &target, tests, inputs)?;
+        let launches = (runtime.into_iter())
+            .map(|runtime| Launch {
+                name: "test".into(),
+                kind: LaunchKind::Test,
+                artifact: emit::artifact_id(emit::TEST_ENTRY),
+                runtime: Some(runtime),
+                runtime_arguments: vec![],
+                arguments: vec![],
+                environment: vec![],
+            })
+            .collect();
         Ok(BuildResult {
             artifacts,
             steps: vec![],
             runtime_dependencies: vec![],
-            launches: vec![],
+            launches,
             diagnostics: vec![],
         })
     }
 }
 
-/// The refusal of a command that would run the program: its host runs it.
-fn unlaunched(request: &BuildRequest, target: &str) -> Option<Diagnostic> {
-    let command = (request.target.options.iter())
+/// The command the build is for, `build`, `run`, `test` or `dev`.
+fn command(request: &BuildRequest) -> Option<&str> {
+    (request.target.options.iter())
         .find(|o| o.key == "command")
-        .map(|o| o.value.as_str())?;
-    if !matches!(command, "run" | "test" | "dev") {
-        return None;
-    }
+        .map(|o| o.value.as_str())
+}
+
+/// The refusal of a command that would run the program: its host runs it.
+/// `flick test` runs the tests on a Lua interpreter instead of LÖVE, whose
+/// Lua it is; no World of Warcraft client runs here.
+fn unlaunched(request: &BuildRequest, target: &str) -> Option<Diagnostic> {
+    let command = command(request)?;
+    let why = match command {
+        "run" | "dev" => {
+            "a Lua program runs in its host, World of Warcraft or LÖVE, which loads the chunks \
+             `flick build` writes"
+        }
+        "test" if request.target.environment.platform != "love" => {
+            "its tests run on a Lua interpreter as LÖVE's, and no World of Warcraft client runs \
+             them here; test on `lua/love`"
+        }
+        _ => return None,
+    };
     Some(refusal(
-        format!(
-            "`flick {command}` is not available on the {target} target yet: a Lua program runs \
-             in its host, World of Warcraft or LÖVE, which loads the chunks `flick build` writes"
-        ),
+        format!("`flick {command}` is not available on the {target} target yet: {why}"),
         None,
         vec![],
     ))
+}
+
+/// The interpreter a test build runs on: `LuaJIT` 2.1 when the project allows
+/// it, otherwise Lua 5.1, which runs the dialect `lua51` only.
+fn interpreter(
+    request: &BuildRequest,
+    target: &str,
+    dialect: &str,
+) -> Result<Toolchain, Vec<Diagnostic>> {
+    let tool = |id: &str| request.toolchains.iter().find(|t| t.id == id);
+    let (found, series) = match (tool("luajit"), tool("lua")) {
+        (Some(luajit), _) => (luajit, "2.1."),
+        (None, Some(lua)) if dialect == "lua51" => (lua, "5.1."),
+        _ => {
+            let needs = if dialect == "lua51" {
+                "`luajit` or `lua`"
+            } else {
+                "`luajit`"
+            };
+            return Err(vec![refusal(
+                format!(
+                    "`flick test` on the {target} target with the dialect `{dialect}` needs {needs} \
+                     on PATH, allowed by `[tools]` or `--allow-tool`"
+                ),
+                None,
+                vec![],
+            )]);
+        }
+    };
+    if !found.version.starts_with(series) {
+        return Err(vec![refusal(
+            format!(
+                "`flick test` on the {target} target needs `{}` {series}x, the version its \
+                 profile pins, not {}",
+                found.id, found.version
+            ),
+            None,
+            vec![],
+        )]);
+    }
+    Ok(found.clone())
 }
 
 #[cfg(feature = "guest")]

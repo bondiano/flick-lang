@@ -24,9 +24,10 @@ use crate::command::{Command, Outcome};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
+use crate::vm;
 
 mod cached;
-pub(super) mod hooks;
+pub(crate) mod hooks;
 #[cfg(any(test, feature = "native-backends-development"))]
 mod js_artifacts;
 mod native;
@@ -172,6 +173,12 @@ impl Command for BuildCommand {
                     };
                 }
             };
+        if matches!(backend, Selected::Vm) {
+            return Outcome {
+                sources,
+                diagnostics: vec![vm::unsupported_build_diagnostic()],
+            };
+        }
         let descriptor = backend.descriptor();
         let resolved = match &descriptor {
             Some(descriptor) => match options::resolve(
@@ -581,6 +588,10 @@ pub fn artifacts(
 ) -> Emission {
     match &output.backend {
         Selected::Native => native::artifacts(host, sources, project, compilation, output),
+        Selected::Vm => Emission {
+            artifacts: Vec::new(),
+            diagnostics: vec![vm::unsupported_build_diagnostic()],
+        },
         #[cfg(feature = "wasm-backends")]
         Selected::Component(package) => {
             package.artifacts(host, sources, project, compilation, output)

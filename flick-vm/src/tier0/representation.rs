@@ -1,5 +1,5 @@
 #[derive(Debug)]
-enum LayerData {
+pub(crate) enum LayerData {
     Succeed { tag: Value, implementation: Value },
     // Strong graph edges: duplicate roots retain their independent tokens.
     Merge { left: Value, right: Value },
@@ -18,13 +18,13 @@ enum LayerData {
 }
 
 #[derive(Debug)]
-enum DictionaryValue {
+pub(crate) enum DictionaryValue {
     Value(Value),
     Getter(Value),
 }
 
 impl DictionaryValue {
-    fn value(&self) -> &Value {
+    pub(crate) fn value(&self) -> &Value {
         match self {
             Self::Value(value) | Self::Getter(value) => value,
         }
@@ -38,7 +38,7 @@ impl DictionaryValue {
 }
 
 #[derive(Debug)]
-enum LazyState {
+pub(crate) enum LazyState {
     Pending(Value),
     /// Retains the original task and owning fiber until completion so a
     /// defect/abort/signal restores Pending or hands off to waiters cleanly (`#626`).
@@ -59,7 +59,7 @@ enum LazyState {
 }
 
 #[derive(Debug)]
-enum SeqData {
+pub(crate) enum SeqData {
     FromList(Value),
     Generator {
         execution: usize,
@@ -70,7 +70,7 @@ enum SeqData {
 }
 
 #[derive(Debug)]
-enum IteratorState {
+pub(crate) enum IteratorState {
     List {
         backing: Value,
         next: usize,
@@ -83,13 +83,13 @@ enum IteratorState {
 }
 
 #[derive(Debug)]
-enum ExitData {
+pub(crate) enum ExitData {
     Success(Value),
     Failure(Value),
 }
 
 #[derive(Clone, Debug)]
-enum DurationData {
+pub(crate) enum DurationData {
     Millis(f64),
     Nanos(num_bigint::BigInt),
     Infinite,
@@ -97,7 +97,7 @@ enum DurationData {
 }
 
 #[derive(Clone, Debug)]
-enum TimeZoneData {
+pub(crate) enum TimeZoneData {
     Offset(f64),
     Named {
         id: String,
@@ -107,66 +107,73 @@ enum TimeZoneData {
 }
 
 #[derive(Clone, Debug)]
-struct DateTimeData {
-    ms: f64,
-    zone: Option<TimeZoneData>,
+pub(crate) struct DateTimeData {
+    pub(crate) ms: f64,
+    pub(crate) zone: Option<TimeZoneData>,
 }
 
 #[derive(Clone, Debug)]
-struct CronData {
-    tz: TimeZoneData,
-    fields: [Vec<i32>; 6],
-    and: bool,
-    first: [i32; 6],
-    last: [i32; 6],
-    next: [Vec<i32>; 6],
-    prev: [Vec<i32>; 6],
+pub(crate) struct CronData {
+    pub(crate) tz: TimeZoneData,
+    pub(crate) fields: [Vec<i32>; 6],
+    pub(crate) and: bool,
+    pub(crate) first: [i32; 6],
+    pub(crate) last: [i32; 6],
+    pub(crate) next: [Vec<i32>; 6],
+    pub(crate) prev: [Vec<i32>; 6],
 }
 
 #[derive(Debug)]
-struct GraphNode {
-    index: i32,
-    data: Value,
+pub(crate) struct GraphNode {
+    pub(crate) index: i32,
+    pub(crate) data: Value,
 }
 
 #[derive(Debug)]
-struct GraphEdge {
-    index: i32,
-    source: i32,
-    target: i32,
-    data: Value,
+pub(crate) struct GraphEdge {
+    pub(crate) index: i32,
+    pub(crate) source: i32,
+    pub(crate) target: i32,
+    pub(crate) data: Value,
 }
 
 #[derive(Debug)]
-struct GraphData {
-    directed: bool,
-    nodes: Vec<GraphNode>,
-    edges: Vec<GraphEdge>,
-    adj: BTreeMap<i32, Vec<i32>>,
-    radj: BTreeMap<i32, Vec<i32>>,
-    next_node: i32,
-    next_edge: i32,
+pub(crate) struct GraphData {
+    pub(crate) directed: bool,
+    pub(crate) nodes: Vec<GraphNode>,
+    pub(crate) edges: Vec<GraphEdge>,
+    pub(crate) adj: BTreeMap<i32, Vec<i32>>,
+    pub(crate) radj: BTreeMap<i32, Vec<i32>>,
+    pub(crate) next_node: i32,
+    pub(crate) next_edge: i32,
 }
 
 #[derive(Debug)]
-struct GraphWalkerData {
-    indices: Vec<Value>,
-    values: Vec<Value>,
+pub(crate) struct GraphWalkerData {
+    pub(crate) indices: Vec<Value>,
+    pub(crate) values: Vec<Value>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ReuseKind {
+pub(crate) enum ReuseKind {
     Tagged,
     Record,
 }
 
 #[derive(Debug)]
-enum Data {
+pub(crate) enum Data {
     /// Detached 0-child slot held by a frame-limited reuse token between
     /// `DropReuse` and a matching `Reuse`/`ReuseWithDicts`/`ReuseRecord` or `Drop`.
     ReuseToken {
         kind: ReuseKind,
         capacity: usize,
+        layout: Option<memory::CellLayout>,
+    },
+    /// Counted fallback cell owning an unboxed aggregate value across
+    /// polymorphic or uniform-representation boundaries.
+    BoxedAggregate {
+        layout: Option<memory::CellLayout>,
+        value: Box<Value>,
     },
     RecoveryResult {
         execution: usize,
@@ -206,6 +213,8 @@ enum Data {
         /// Physical storage owns ordinary prefix AND evidence suffix.
         ordinary_fields: usize,
         fields: Vec<Value>,
+        /// Optional target-independent cell layout for reuse compatibility.
+        layout: Option<memory::CellLayout>,
     },
     /// O(1) counted view over a flat `$list` `Data::Tagged` backing array.
     ListSlice {
@@ -326,9 +335,9 @@ enum Data {
 }
 
 #[derive(Debug)]
-struct Object {
+pub(crate) struct Object {
     references: usize,
-    data: Data,
+    pub(crate) data: Data,
 }
 
 #[derive(Debug)]
@@ -339,7 +348,7 @@ struct Slot {
 
 #[derive(Debug)]
 pub struct Heap {
-    identity: usize,
+    pub(crate) identity: usize,
     objects: Vec<Slot>,
     free_list: Vec<usize>,
     stats: Stats,

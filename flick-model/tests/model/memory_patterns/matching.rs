@@ -1,3 +1,4 @@
+use flick_core::ir::memory::ValueRep;
 #[test]
 fn whole_value_binding_retains_before_last_receiver_drop() {
     let p = program(function(
@@ -7,6 +8,7 @@ fn whole_value_binding_retains_before_last_receiver_drop() {
             Operation::Match {
                 object: 1,
                 pattern: Box::new(Pat::Bind("whole".into())),
+                rep: ValueRep::Cell,
             },
         )],
         2,
@@ -131,6 +133,7 @@ fn matcher(pattern: Pat) -> Program {
             Operation::Match {
                 object: 1,
                 pattern: Box::new(pattern),
+                rep: ValueRep::Cell,
             },
         )],
         2,

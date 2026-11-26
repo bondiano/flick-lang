@@ -1,6 +1,8 @@
 #![cfg(feature = "host")]
 
 mod common;
+#[path = "component_host/modes.rs"]
+mod modes;
 #[path = "component_host/preparation.rs"]
 mod preparation;
 

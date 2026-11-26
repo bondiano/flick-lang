@@ -79,7 +79,10 @@ end
 M.gsub = function(x)
   return function(x_2)
     return function(x_3)
-      return (string.gsub(x, x_2, x_3))
+      local callback = x_3
+      return K.from_host((string.gsub(x, x_2, function(text)
+        return callback(K.from_host(text))
+      end)))
     end
   end
 end
@@ -88,9 +91,12 @@ do
   M.shown = true
 end
 do
-  print((string.gsub(\"abc\", \"%w\", function(c)
+  local callback = function(c)
     return c
-  end)))
+  end
+  print(K.from_host((string.gsub(\"abc\", \"%w\", function(text)
+    return callback(K.from_host(text))
+  end))))
   M.doubled = true
 end
 M.echo = function(print_2)

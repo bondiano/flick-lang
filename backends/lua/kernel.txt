@@ -1,17 +1,24 @@
 # The Lua kernel table: for each binding of Flick's own kernel (each
-# `flick:` specifier of flick-backend-support/src/kernel/manifest.txt), what
-# the Lua target does with it, and whether calling it suspends the fiber.
+# `flick:` specifier of flick-backend-support/src/kernel/manifest.txt, and
+# the JS globals of `[global]` a built-in module binds), what the Lua target
+# does with it, and whether calling it suspends the fiber.
 #
 # `[specifier] status` gives every export of a specifier its row; a line
 # `export status` below it gives one export a row of its own. Every kernel
 # primitive of the manifest has a line of its own, and so does every
 # export that suspends. A test keeps the table equal to the manifest.
 #
-#   refused   the Lua target refuses it with P012 wherever it is reached
-#   suspends  (after the status) a call suspends the fiber until it resumes
-#
-# No row is implemented yet: the Lua primitive kernel does not exist.
+#   refused      the Lua target refuses it with P012 wherever it is reached
+#   suspends     (after `refused`) a call suspends the fiber until it resumes
+#   implemented  the Lua kernel (`kernel/*.lua`) implements it as `K.<export>`,
+#                which generated code calls with every argument at once
 
+[global] refused
+Number implemented
+BigInt implemented
+String implemented
+Math.floor implemented
+Math.sqrt implemented
 [flick:Arbitrary] refused
 [flick:Array] refused
 [flick:BigDecimal] refused
@@ -123,61 +130,65 @@ flickJoinAll refused suspends
 [flick:rpc/Rpc] refused
 [flick:rpc/RpcNode] refused
 [flick:rt] refused
-equals refused
-compare refused
-hash refused
-show refused
-stringFromNumber refused
-stringToNumber refused
-showInt64 refused
-showUInt64 refused
-intTruncate refused
-bigintFromNumber refused
-toInt8 refused
-toInt16 refused
-toInt32 refused
-toInt64 refused
-toUInt8 refused
-toUInt16 refused
-toUInt32 refused
-toUInt64 refused
-toBigInt refused
-toFloat32 refused
-toFloat64 refused
-bitAnd refused
-bitOr refused
-bitXor refused
-bitNot refused
-shiftLeft refused
-shiftRight refused
-shiftRightUnsignedInt refused
-int64BitAnd refused
-int64BitOr refused
-int64BitXor refused
-int64BitNot refused
-int64ShiftLeft refused
-int64ShiftRight refused
-int64ShiftRightUnsigned refused
-bytesFromList refused
-bytesToList refused
-bytesEncodeUtf8 refused
-bytesDecodeUtf8 refused
-listLength refused
-listGet refused
-listInitialize refused
+equals implemented
+compare implemented
+hash implemented
+show implemented
+stringFromNumber implemented
+stringToNumber implemented
+showInt64 implemented
+showUInt64 implemented
+intTruncate implemented
+bigintFromNumber implemented
+toInt8 implemented
+toInt16 implemented
+toInt32 implemented
+toInt64 implemented
+toUInt8 implemented
+toUInt16 implemented
+toUInt32 implemented
+toUInt64 implemented
+toBigInt implemented
+toFloat32 implemented
+toFloat64 implemented
+bitAnd implemented
+bitOr implemented
+bitXor implemented
+bitNot implemented
+shiftLeft implemented
+shiftRight implemented
+shiftRightUnsignedInt implemented
+int64BitAnd implemented
+int64BitOr implemented
+int64BitXor implemented
+int64BitNot implemented
+int64ShiftLeft implemented
+int64ShiftRight implemented
+int64ShiftRightUnsigned implemented
+bytesFromList implemented
+bytesToList implemented
+bytesEncodeUtf8 implemented
+bytesDecodeUtf8 implemented
+listLength implemented
+listGet implemented
+listInitialize implemented
 refMake refused
 refGet refused
 refSet refused
 refModify refused
 refSame refused
 recordLabel refused
-recordGet refused
-recordExtend refused
-recordRemove refused
-recordProject refused
-recordMergeDisjoint refused
-recordLabels refused
+recordGet implemented
+recordExtend implemented
+recordRemove implemented
+recordProject implemented
+recordMergeDisjoint implemented
+recordLabels implemented
 fiberJoin refused suspends
+testPure implemented
+testGroup implemented
+testSkip implemented
+testOnly implemented
 [flick:runner/browser] refused
 [flick:runner/cloudflare] refused
 [flick:runner/node] refused
@@ -196,11 +207,11 @@ fiberJoin refused suspends
 [flick:Stdio] refused
 [flick:Stream] refused
 [flick:String] refused
-length refused
-charCodeAt refused
-slice refused
-indexOf refused
-lastIndexOf refused
+length implemented
+charCodeAt implemented
+slice implemented
+indexOf implemented
+lastIndexOf implemented
 [flick:Struct] refused
 [flick:SubscriptionRef] refused
 [flick:SynchronizedRef] refused

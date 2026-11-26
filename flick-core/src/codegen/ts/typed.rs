@@ -6,12 +6,21 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 
 use super::Projection;
-use crate::codegen::{names, relative};
+use crate::codegen::{names, prefix_key, relative};
 use crate::iface::{Interface, Namespace};
 use crate::ir::Module;
-use flick_backend_js::codegen::prefix_key;
 
+#[cfg(feature = "native-js")]
 pub use flick_backend_js::codegen::ts::Typed;
+
+#[cfg(not(feature = "native-js"))]
+#[derive(Clone)]
+pub struct Typed {
+    pub declarations: Vec<String>,
+    pub annotations: HashMap<String, String>,
+    pub imports: String,
+    pub modules: Vec<String>,
+}
 
 /// Where the projection finds what it projects, as the build has it.
 pub struct Typing<'a> {

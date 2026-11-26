@@ -9,8 +9,9 @@ The [environment inventory](targets.md) records the Node, browser and Go
 boundaries. The [numeric review](numeric-policy.md) confirms the existing
 ordinary/checked/unsafe policy and identifies its independent boundary tests.
 The [GADT row contract](../formal/gadt-rows.md) records the E10 transition
-on top of E11 type congruence. This still does not freeze IR 1.0 or complete
-any of the missing component inputs below.
+on top of E11 type congruence. The [ABI and IR stability decision](stability.md)
+records why `flick:backend@0.1.0` and IR `0.19.0` remain `0.x` and lists every
+remaining semantic obligation before a `1.0.0` freeze.
 
 ## Data used by the existing build
 
@@ -76,14 +77,16 @@ component request explicitly remaps that bundle into the project's source
 table and supplies built-in bodies with `builtin` module metadata. The same
 declared source inputs govern validation, diagnostics and source maps.
 
-The CLI now prepares JavaScript foreign specifiers, library file inputs,
+The CLI prepares JavaScript foreign specifiers, library file inputs,
 runtime/bridge options and TypeScript physical-file projections using the
-native baseline's shared rules. `.d.ts` and Promise facades use one shared
-implementation and remain reserved host outputs. These inputs cover the
-current JS/TS component, which calculates release ABI and launchers from
-reference IR and versioned frontend facts. Complete dependency pins, default
-release selection, browser loading and atomic publication remain integration
-work. Go foreign inputs remain separate work.
+native baseline's shared rules, and supplies Go foreign `.go` inputs
+(`flick.go-ffi@0.1.0`) and `go/bindings/` resource tables for `flick/go`.
+`.d.ts` and Promise facades use one shared implementation and remain reserved
+host outputs. Ordinary CLI builds select the shipped `flick/js` or `flick/go`
+component by default, execute granted host tool steps under `[tools]`, and
+commit artifacts atomically via `flick/src/publish.rs`. Complete foreign
+dependency closure and the browser component loader remain open; see
+[stability.md](stability.md).
 
 ## Portable transformations and target representations
 
@@ -145,10 +148,11 @@ targets; agreement between two emitters is not an independent oracle.
 ## Validation scope
 
 The contract probes in `flick-backend/tests/consumers.rs` exercise JS/TS/maps
-and Go with IR and plain inputs, without constructing `Compilation` or
-`Settings`. They establish that initial boundary, not coverage of every item
-in the inventory above. The literal component tests prove native/component
-transport and independently expected Unit/binary output in both modes.
+and Go in both `PerModule` and `WholeProgram` modes with IR and plain inputs,
+without constructing `Compilation` or `Settings`. The literal component tests
+in `flick-backend/tests/component_host.rs` prove native/component transport,
+multi-module mode ownership, layout-ownership refusals, and independently
+expected Unit/binary output in both modes.
 
 For the bounded-host baseline at PR #356, `just check`, `just wasm-plugins` and all 98
 tests selected by `just e2e-tests` passed. That run is not the historical

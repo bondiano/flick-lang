@@ -15,40 +15,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use flick_backend::{BuildRequest, ModuleRole};
 use flick_ir::{
-    BinOp, Dict, Expr, ExprKind, Foreign, InstanceInfo, IrType, ItemKind, Lit, Namespace, Num,
-    Program, Span, default_method,
+    Dict, Expr, ExprKind, Foreign, InstanceInfo, ItemKind, Program, Span, default_method,
 };
 
-/// A numeric type no Lua number holds exactly.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub(crate) enum Wide {
-    BigInt,
-    Int64,
-    UInt64,
-}
-
-impl Wide {
-    pub fn name(self) -> &'static str {
-        match self {
-            Wide::BigInt => "BigInt",
-            Wide::Int64 => "Int64",
-            Wide::UInt64 => "UInt64",
-        }
-    }
-
-    fn of_num(num: Num) -> Option<Wide> {
-        match num {
-            Num::BigInt => Some(Wide::BigInt),
-            Num::Int64 => Some(Wide::Int64),
-            Num::UInt64 => Some(Wide::UInt64),
-            _ => None,
-        }
-    }
-}
-
 pub(crate) enum Fact<'p> {
-    /// A literal, an operator or a foreign function of the type.
-    Number(Wide),
     /// `await`, which suspends until a task settles.
     Await,
     /// A reference to a foreign function of `module`.
@@ -84,8 +54,6 @@ struct Walker<'p, 'f> {
     /// binder, and of an instance: its module and item index.
     values: BTreeMap<(&'p str, &'p str), (usize, usize)>,
     instances: BTreeMap<(&'p str, &'p str), (usize, usize)>,
-    /// The type of each wide numeric lang item.
-    types: BTreeMap<(&'p str, &'p str), Wide>,
     seen: Reached,
     started: BTreeSet<usize>,
     queue: Vec<(usize, usize, Option<Blame>)>,
@@ -105,7 +73,6 @@ pub(crate) fn walk<'p>(
             .collect(),
         values: BTreeMap::new(),
         instances: BTreeMap::new(),
-        types: BTreeMap::new(),
         seen: BTreeMap::new(),
         started: BTreeSet::new(),
         queue: Vec::new(),
@@ -133,18 +100,6 @@ pub(crate) fn walk<'p>(
                 }
                 ItemKind::Constructor(_) | ItemKind::Service { .. } => {}
             }
-        }
-    }
-    for item in &program.lang {
-        let wide = match item.lang.as_str() {
-            "bigint" => Wide::BigInt,
-            "int64" => Wide::Int64,
-            "uint64" => Wide::UInt64,
-            _ => continue,
-        };
-        if item.namespace == Namespace::Type {
-            w.types
-                .insert((item.module.as_str(), item.name.as_str()), wide);
         }
     }
     let mut roots: Vec<(&str, &str)> = (request.entries.iter())
@@ -241,18 +196,6 @@ impl<'p> Walker<'p, '_> {
     }
 
     fn expr(&mut self, e: &'p Expr, blame: Option<&Blame>) {
-        let number = match &e.kind {
-            ExprKind::Lit(Lit::BigInt(_)) => Some(Wide::BigInt),
-            ExprKind::Lit(Lit::Int64(_)) => Some(Wide::Int64),
-            ExprKind::Lit(Lit::UInt64(_)) => Some(Wide::UInt64),
-            ExprKind::Binary(BinOp::Arith(_, num), ..) | ExprKind::Neg(num, _) => {
-                Wide::of_num(*num)
-            }
-            _ => None,
-        };
-        if let Some(wide) = number {
-            self.fact(Fact::Number(wide), e.span, blame);
-        }
         match &e.kind {
             ExprKind::Await(_) => self.fact(Fact::Await, e.span, blame),
             ExprKind::Global { module, name, .. } => self.global(module, name, e.span, blame),
@@ -276,10 +219,6 @@ impl<'p> Walker<'p, '_> {
         let program = self.program;
         let target = &program.modules[mi];
         if let ItemKind::Foreign(foreign) = &target.items[ii].kind {
-            let wide = foreign.ty.as_deref().and_then(|ty| self.wide_type(ty));
-            if let Some(wide) = wide {
-                self.fact(Fact::Number(wide), span, blame);
-            }
             let module = target.name.as_str();
             self.fact(Fact::Foreign { module, foreign }, span, blame);
         }
@@ -326,22 +265,6 @@ impl<'p> Walker<'p, '_> {
             | Dict::Site { .. }
             | Dict::Error => {}
         }
-    }
-
-    /// The wide numeric type a foreign function's type mentions.
-    fn wide_type(&self, ty: &IrType) -> Option<Wide> {
-        if let IrType::Named { module, name, .. } = ty
-            && let Some(&wide) = self.types.get(&(module.as_str(), name.as_str()))
-        {
-            return Some(wide);
-        }
-        let mut found = None;
-        ty.each_child(&mut |child| {
-            if found.is_none() {
-                found = self.wide_type(child);
-            }
-        });
-        found
     }
 }
 

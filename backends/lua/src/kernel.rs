@@ -1,6 +1,8 @@
 //! The Lua kernel table, `kernel.txt`: what the Lua target does with each
 //! binding of Flick's own kernel (a `flick:` specifier), and whether a call
-//! of it suspends the fiber. `check-target` reads its facts here.
+//! of it suspends the fiber. `check-target` reads its facts here, and the
+//! lowering calls an implemented binding as `K.<export>`, a function of
+//! `kernel/*.lua`.
 
 /// The table this crate was built with.
 const TABLE: &str = include_str!("../kernel.txt");
@@ -8,6 +10,8 @@ const TABLE: &str = include_str!("../kernel.txt");
 /// What the Lua target does with a binding.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Row {
+    /// Whether the Lua kernel implements it, as `K.<export>`.
+    pub implemented: bool,
     /// Whether a call suspends the fiber until it resumes.
     pub suspends: bool,
 }
@@ -25,11 +29,20 @@ pub(crate) struct Table<'t> {
     sections: Vec<Section<'t>>,
 }
 
-/// A status and its flags: `refused`, then `suspends` or nothing.
+/// A status and its flags: `refused`, then `suspends` or nothing, or
+/// `implemented`.
 fn row(words: &[&str]) -> Option<Row> {
+    let refused = |suspends| Row {
+        implemented: false,
+        suspends,
+    };
     match words {
-        ["refused"] => Some(Row { suspends: false }),
-        ["refused", "suspends"] => Some(Row { suspends: true }),
+        ["refused"] => Some(refused(false)),
+        ["refused", "suspends"] => Some(refused(true)),
+        ["implemented"] => Some(Row {
+            implemented: true,
+            suspends: false,
+        }),
         _ => None,
     }
 }
@@ -50,7 +63,7 @@ impl<'t> Table<'t> {
                 return fail("expected a name and a status");
             };
             let Some(row) = row(status) else {
-                return fail("expected `refused`, then `suspends` or nothing");
+                return fail("expected `refused`, then `suspends` or nothing, or `implemented`");
             };
             if let Some(specifier) = head.strip_prefix('[').and_then(|h| h.strip_suffix(']')) {
                 if sections.iter().any(|s| s.specifier == specifier) {
@@ -72,6 +85,16 @@ impl<'t> Table<'t> {
             section.exports.push((head, row));
         }
         Ok(Table { sections })
+    }
+
+    /// The exports of every section that the Lua kernel implements.
+    #[cfg(test)]
+    pub fn implemented(&self) -> Vec<&'t str> {
+        (self.sections.iter())
+            .flat_map(|s| &s.exports)
+            .filter(|(_, row)| row.implemented)
+            .map(|&(name, _)| name)
+            .collect()
     }
 
     /// The row of `export` of `specifier`, or `None` when the table does
@@ -103,16 +126,16 @@ mod tests {
     fn the_table_names_every_specifier_and_primitive_of_the_kernel() {
         let manifest = manifest();
         let table = table();
-        let wanted: BTreeSet<&str> = (manifest.specifiers())
-            .filter(|s| s.starts_with("flick:"))
-            .collect();
+        // the JS globals of the kernel are `global`'s
+        let ours = |s: &str| s.starts_with("flick:") || s == "global";
+        let wanted: BTreeSet<&str> = manifest.specifiers().filter(|s| ours(s)).collect();
         let named: BTreeSet<&str> = table.sections.iter().map(|s| s.specifier).collect();
         assert_eq!(
             named, wanted,
-            "kernel.txt must have a section per `flick:` specifier"
+            "kernel.txt must have a section per `flick:` specifier and `global`"
         );
         for (specifier, export, class) in manifest.exports() {
-            if class != Class::Kernel || !specifier.starts_with("flick:") {
+            if class != Class::Kernel || !ours(specifier) {
                 continue;
             }
             let section = (table.sections.iter())
@@ -123,16 +146,17 @@ mod tests {
                 "the kernel primitive `{export}` of `{specifier}` has no line in kernel.txt"
             );
         }
-        // and a line of its own is a kernel primitive's or a suspending binding's
+        // and a line of its own is a kernel primitive's, a suspending
+        // binding's or one the Lua kernel implements
         for section in &table.sections {
             for (export, row) in &section.exports {
                 let primitive = manifest
                     .exports()
                     .any(|(s, e, c)| s == section.specifier && e == *export && c == Class::Kernel);
                 assert!(
-                    primitive || row.suspends,
+                    primitive || row.suspends || row.implemented,
                     "kernel.txt gives `{export}` of `{}` a line of its own, but it is no kernel \
-                     primitive and does not suspend",
+                     primitive, does not suspend and is not implemented",
                     section.specifier
                 );
             }
@@ -142,19 +166,32 @@ mod tests {
     #[test]
     fn an_export_has_its_own_row_or_its_specifiers() {
         let table = table();
-        let suspends = Some(Row { suspends: true });
-        let returns = Some(Row { suspends: false });
+        let suspends = Some(Row {
+            implemented: false,
+            suspends: true,
+        });
+        let returns = Some(Row {
+            implemented: false,
+            suspends: false,
+        });
+        let implemented = Some(Row {
+            implemented: true,
+            suspends: false,
+        });
         assert_eq!(table.row("flick:Effect", "sleep"), suspends);
         assert_eq!(table.row("flick:Deferred", "await"), suspends);
         assert_eq!(table.row("flick:rt", "fiberJoin"), suspends);
         assert_eq!(table.row("flick:Effect", "succeed"), returns);
+        assert_eq!(table.row("flick:rt", "listGet"), implemented);
+        assert_eq!(table.row("flick:String", "slice"), implemented);
         assert_eq!(table.row("flick:Unknown", "x"), None);
     }
 
     #[test]
     fn a_malformed_table_is_an_error() {
         for (text, why) in [
-            ("[flick:A] implemented\n", "expected `refused`"),
+            ("[flick:A] kernel\n", "expected `refused`"),
+            ("[flick:A] implemented suspends\n", "expected `refused`"),
             ("x refused\n", "an export before any specifier"),
             ("[flick:A] refused\n[flick:A] refused\n", "named twice"),
             (

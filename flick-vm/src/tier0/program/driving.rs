@@ -45,7 +45,7 @@ impl Machine<'_, '_> {
             acc = Some(match acc {
                 None => defect,
                 Some(prev) => {
-                    let res = primitives::join_causes(self.heap, &prev, &defect, &mut self.fuel);
+                    let res = primitives::join_causes(self.heap, &prev, &defect, &mut FuelCounter(&mut self.fuel));
                     self.heap.drop_cause(prev)?;
                     self.heap.drop_cause(defect)?;
                     res?

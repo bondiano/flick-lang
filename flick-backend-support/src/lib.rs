@@ -25,3 +25,5 @@ pub mod decision;
 pub mod layout;
 pub mod numeric;
 pub mod opt;
+#[cfg(any(feature = "specialize", test))]
+pub mod specialize;

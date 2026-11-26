@@ -65,6 +65,10 @@ pub struct RunArguments {
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
 
+    /// VM execution tier for `--target vm` (`0` or `tier0`; defaults to tier 0).
+    #[arg(long = "vm-tier", value_name = "TIER")]
+    pub vm_tier: Option<String>,
+
     /// `debug` or `release`; by default `build.profile` of the project.
     #[arg(long, value_enum)]
     pub profile: Option<ProfileArgument>,

@@ -7,10 +7,11 @@ use std::mem;
 use flick_core::ir::{EnumLit, JsClass, Lit, Pat, Rep};
 
 pub(super) use super::record_update::update;
-use super::{Data, Error, Heap, ObjectId, ObjectToken, Value, charge, primitives, tagged_boundary};
+use super::{Data, Error, Heap, ObjectId, ObjectToken, Value, charge, tagged_boundary};
+use crate::stdlib::{FuelCounter, primitives as std_primitives};
 
 #[derive(Clone, Copy)]
-enum Place {
+enum BasePlace {
     Root,
     Tagged {
         object: ObjectId,
@@ -25,6 +26,53 @@ enum Place {
         start: usize,
         end: usize,
     },
+}
+
+#[derive(Clone)]
+struct Place {
+    base: BasePlace,
+    agg_path: Vec<usize>,
+}
+
+impl Place {
+    const fn from_base(base: BasePlace) -> Self {
+        Self {
+            base,
+            agg_path: Vec::new(),
+        }
+    }
+
+    const fn root() -> Self {
+        Self::from_base(BasePlace::Root)
+    }
+
+    const fn tagged(object: ObjectId, index: usize) -> Self {
+        Self::from_base(BasePlace::Tagged { object, index })
+    }
+
+    const fn record(object: ObjectId, index: usize) -> Self {
+        Self::from_base(BasePlace::Record { object, index })
+    }
+
+    const fn tail(object: ObjectId, start: usize, end: usize) -> Self {
+        Self::from_base(BasePlace::Tail { object, start, end })
+    }
+
+    fn agg_child(&self, index: usize) -> Self {
+        let mut agg_path = Vec::with_capacity(self.agg_path.len() + 1);
+        agg_path.extend_from_slice(&self.agg_path);
+        agg_path.push(index);
+        Self {
+            base: self.base,
+            agg_path,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum TaggedSource {
+    Object(ObjectId),
+    Aggregate,
 }
 
 enum Work<'p> {
@@ -56,6 +104,7 @@ pub(super) fn execute(
             tag: "$match".into(),
             ordinary_fields: 1,
             fields: vec![Value::Bool(false)],
+            layout: None,
         }));
     };
     // Insertion sort charges each lexical comparison. This avoids an
@@ -80,13 +129,14 @@ pub(super) fn execute(
     }
     scratch.push(Value::Bool(true));
     for (_, place) in bindings {
-        materialize(heap, root, place, fuel, scratch)?;
+        materialize(heap, root, &place, fuel, scratch)?;
     }
     charge(fuel, 1)?;
     Ok(heap.allocate(Data::Tagged {
         tag: "$match".into(),
         ordinary_fields: scratch.len(),
         fields: mem::take(scratch),
+        layout: None,
     }))
 }
 
@@ -96,7 +146,7 @@ fn select<'p>(
     pattern: &'p Pat,
     fuel: &mut u64,
 ) -> Result<Option<Bindings<'p>>, Error> {
-    let mut work = vec![Work::Check(pattern, Place::Root)];
+    let mut work = vec![Work::Check(pattern, Place::root())];
     let mut choices = Vec::new();
     let mut bindings = Vec::new();
     while let Some(next) = work.pop() {
@@ -115,7 +165,7 @@ fn select<'p>(
                 choices.push(Choice {
                     alternatives,
                     next: 1,
-                    place,
+                    place: place.clone(),
                     work: work.len(),
                     bindings: bindings.len(),
                 });
@@ -123,7 +173,7 @@ fn select<'p>(
                 work.push(Work::Check(&alternatives[0], place));
                 true
             }
-            Work::Check(pattern, place) => check(heap, root, pattern, place, fuel, &mut work)?,
+            Work::Check(pattern, place) => check(heap, root, pattern, &place, fuel, &mut work)?,
         };
         if !matched && !retry(&mut choices, &mut work, &mut bindings, fuel)? {
             return Ok(None);
@@ -145,7 +195,7 @@ fn retry<'p>(
         if let Some(pattern) = choice.alternatives.get(choice.next) {
             choice.next += 1;
             work.push(Work::EndOr);
-            work.push(Work::Check(pattern, choice.place));
+            work.push(Work::Check(pattern, choice.place.clone()));
             return Ok(true);
         }
         choices.pop();
@@ -153,19 +203,19 @@ fn retry<'p>(
     Ok(false)
 }
 
-fn actual<'a>(heap: &'a Heap, root: &'a Value, place: Place) -> Result<&'a Value, Error> {
-    match place {
-        Place::Root => Ok(root),
-        Place::Tagged { object, index } => {
+fn actual<'a>(heap: &'a Heap, root: &'a Value, place: &Place) -> Result<&'a Value, Error> {
+    let mut current = match place.base {
+        BasePlace::Root => root,
+        BasePlace::Tagged { object, index } => {
             let Data::Tagged { fields, .. } = &heap.object(object)?.data else {
                 return Err(Error::ExpectedObject);
             };
             fields.get(index).ok_or(Error::MissingField {
                 object,
                 field: index,
-            })
+            })?
         }
-        Place::Record { object, index } => {
+        BasePlace::Record { object, index } => {
             let Data::Record(fields) = &heap.object(object)?.data else {
                 return Err(Error::ExpectedRecord);
             };
@@ -175,31 +225,62 @@ fn actual<'a>(heap: &'a Heap, root: &'a Value, place: Place) -> Result<&'a Value
                 .ok_or(Error::MissingField {
                     object,
                     field: index,
-                })
+                })?
         }
-        Place::Tail { .. } => Err(Error::PatternKind("non-list value")),
+        BasePlace::Tail { .. } => return Err(Error::PatternKind("non-list value")),
+    };
+    for &index in &place.agg_path {
+        let Value::Aggregate {
+            tag,
+            ordinary_fields,
+            fields,
+        } = current
+        else {
+            return Err(Error::ExpectedAggregate);
+        };
+        tagged_boundary(tag, *ordinary_fields, fields.len())?;
+        current = fields
+            .get(index)
+            .ok_or(Error::MissingAggregateField(index))?;
     }
+    Ok(current)
 }
 
 fn tagged<'a>(
     heap: &'a Heap,
     root: &'a Value,
-    place: Place,
+    place: &Place,
     kind: &'static str,
-) -> Result<(ObjectId, &'a str, &'a [Value]), Error> {
-    let Value::Object(token) = actual(heap, root, place)? else {
-        return Err(Error::PatternKind(kind));
-    };
-    let Data::Tagged {
-        tag,
-        ordinary_fields,
-        fields,
-    } = &heap.object(token.id)?.data
-    else {
-        return Err(Error::PatternKind(kind));
-    };
-    tagged_boundary(tag, *ordinary_fields, fields.len())?;
-    Ok((token.id, tag, fields))
+) -> Result<(TaggedSource, &'a str, usize, &'a [Value]), Error> {
+    match actual(heap, root, place)? {
+        Value::Object(token) => {
+            let Data::Tagged {
+                tag,
+                ordinary_fields,
+                fields,
+                ..
+            } = &heap.object(token.id)?.data
+            else {
+                return Err(Error::PatternKind(kind));
+            };
+            tagged_boundary(tag, *ordinary_fields, fields.len())?;
+            Ok((
+                TaggedSource::Object(token.id),
+                tag,
+                *ordinary_fields,
+                fields,
+            ))
+        }
+        Value::Aggregate {
+            tag,
+            ordinary_fields,
+            fields,
+        } => {
+            tagged_boundary(tag, *ordinary_fields, fields.len())?;
+            Ok((TaggedSource::Aggregate, tag, *ordinary_fields, fields))
+        }
+        _ => Err(Error::PatternKind(kind)),
+    }
 }
 
 #[expect(
@@ -210,7 +291,7 @@ fn check<'p>(
     heap: &Heap,
     root: &Value,
     pattern: &'p Pat,
-    place: Place,
+    place: &Place,
     fuel: &mut u64,
     work: &mut Vec<Work<'p>>,
 ) -> Result<bool, Error> {
@@ -221,12 +302,12 @@ fn check<'p>(
             _ => Err(Error::PatternKind("Unit")),
         },
         Pat::Tuple(items) => {
-            let (object, tag, fields) = tagged(heap, root, place, "tuple")?;
+            let (source, tag, _, fields) = tagged(heap, root, place, "tuple")?;
             if tag != "$tuple" {
                 return Err(Error::PatternKind("tuple"));
             }
             layout(items.len(), fields.len())?;
-            children(items, object, 0, fuel, work)?;
+            tagged_children(items, source, place, 0, fuel, work)?;
             Ok(true)
         }
         Pat::List(items, rest) => list(heap, root, items, rest.as_deref(), place, fuel, work),
@@ -243,7 +324,7 @@ fn check<'p>(
                 }
                 Rep::Unboxed if constructor.arity == 1 && constructor.dicts == 0 => {
                     layout(items.len(), 1)?;
-                    work.push(Work::Check(&items[0], place));
+                    work.push(Work::Check(&items[0], place.clone()));
                     return Ok(true);
                 }
                 Rep::Typeof(class) if constructor.arity == 1 && constructor.dicts == 0 => {
@@ -292,12 +373,12 @@ fn check<'p>(
                     if !matches {
                         return Ok(false);
                     }
-                    work.push(Work::Check(&items[0], place));
+                    work.push(Work::Check(&items[0], place.clone()));
                     return Ok(true);
                 }
                 _ => {}
             }
-            let (object, tag, fields) = tagged(heap, root, place, "constructor")?;
+            let (source, tag, ordinary_fields, fields) = tagged(heap, root, place, "constructor")?;
             charge(
                 fuel,
                 constructor
@@ -317,22 +398,16 @@ fn check<'p>(
                 return Ok(false);
             }
             layout(items.len(), fields.len())?;
-            let Data::Tagged {
-                ordinary_fields, ..
-            } = &heap.object(object)?.data
-            else {
-                unreachable!("validated tagged object")
-            };
             let actual_dicts = fields.len() - ordinary_fields;
-            if *ordinary_fields != constructor.arity || actual_dicts != constructor.dicts {
+            if ordinary_fields != constructor.arity || actual_dicts != constructor.dicts {
                 return Err(Error::PatternEvidenceLayout {
                     expected_fields: constructor.arity,
-                    actual_fields: *ordinary_fields,
+                    actual_fields: ordinary_fields,
                     expected_dicts: constructor.dicts,
                     actual_dicts,
                 });
             }
-            children(items, object, 0, fuel, work)?;
+            tagged_children(items, source, place, 0, fuel, work)?;
             Ok(true)
         }
         Pat::Wild | Pat::Bind(_) | Pat::Or(_) => unreachable!("selection-only forms"),
@@ -347,22 +422,21 @@ fn layout(expected: usize, actual: usize) -> Result<(), Error> {
     }
 }
 
-fn children<'p>(
+fn tagged_children<'p>(
     patterns: &'p [Pat],
-    object: ObjectId,
+    source: TaggedSource,
+    parent: &Place,
     start: usize,
     fuel: &mut u64,
     work: &mut Vec<Work<'p>>,
 ) -> Result<(), Error> {
     charge(fuel, patterns.len())?;
     work.extend(patterns.iter().enumerate().rev().map(|(index, pattern)| {
-        Work::Check(
-            pattern,
-            Place::Tagged {
-                object,
-                index: start + index,
-            },
-        )
+        let child = match source {
+            TaggedSource::Object(object) => Place::tagged(object, start + index),
+            TaggedSource::Aggregate => parent.agg_child(start + index),
+        };
+        Work::Check(pattern, child)
     }));
     Ok(())
 }
@@ -372,15 +446,18 @@ fn list<'p>(
     root: &Value,
     items: &'p [Pat],
     rest: Option<&'p Pat>,
-    place: Place,
+    place: &Place,
     fuel: &mut u64,
     work: &mut Vec<Work<'p>>,
 ) -> Result<bool, Error> {
-    let (object, start, end) = if let Place::Tail { object, start, end } = place {
+    let (object, start, end) = if place.agg_path.is_empty()
+        && let BasePlace::Tail { object, start, end } = place.base
+    {
         let Data::Tagged {
             tag,
             ordinary_fields,
             fields,
+            ..
         } = &heap.object(object)?.data
         else {
             return Err(Error::PatternKind("list"));
@@ -403,14 +480,17 @@ fn list<'p>(
         charge(fuel, 1)?;
         work.push(Work::Check(
             rest,
-            Place::Tail {
-                object,
-                start: start + items.len(),
-                end,
-            },
+            Place::tail(object, start + items.len(), end),
         ));
     }
-    children(items, object, start, fuel, work)?;
+    tagged_children(
+        items,
+        TaggedSource::Object(object),
+        place,
+        start,
+        fuel,
+        work,
+    )?;
     Ok(true)
 }
 
@@ -418,7 +498,7 @@ fn record<'p>(
     heap: &Heap,
     root: &Value,
     patterns: &'p [(String, Pat)],
-    place: Place,
+    place: &Place,
     fuel: &mut u64,
     work: &mut Vec<Work<'p>>,
 ) -> Result<bool, Error> {
@@ -441,13 +521,7 @@ fn record<'p>(
             }
         }
         let index = found.ok_or_else(|| Error::MissingNamedField(name.clone()))?;
-        work.push(Work::Check(
-            pattern,
-            Place::Record {
-                object: token.id,
-                index,
-            },
-        ));
+        work.push(Work::Check(pattern, Place::record(token.id, index)));
     }
     Ok(true)
 }
@@ -485,7 +559,9 @@ fn literal_matches(
                 Ok(false)
             }
         }
-        (Lit::BigInt(left), _) => primitives::bigint_pattern_eq(left, heap.bigint(value)?, fuel),
+        (Lit::BigInt(left), _) => {
+            std_primitives::bigint_pattern_eq(left, heap.bigint(value)?, &mut FuelCounter(fuel))
+        }
         _ => Err(Error::PatternKind("matching literal type")),
     }
 }
@@ -493,15 +569,18 @@ fn literal_matches(
 fn materialize(
     heap: &mut Heap,
     root: &Value,
-    place: Place,
+    place: &Place,
     fuel: &mut u64,
     scratch: &mut Vec<Value>,
 ) -> Result<(), Error> {
-    if let Place::Tail { object, start, end } = place {
+    if place.agg_path.is_empty()
+        && let BasePlace::Tail { object, start, end } = place.base
+    {
         let Data::Tagged {
             tag,
             ordinary_fields,
             fields,
+            ..
         } = &heap.object(object)?.data
         else {
             return Err(Error::PatternKind("list"));
@@ -517,6 +596,7 @@ fn materialize(
                 tag: "$list".into(),
                 ordinary_fields: 0,
                 fields: Vec::new(),
+                layout: None,
             })
         } else {
             let backing = heap.dup(&Value::Object(ObjectToken { id: object }))?;

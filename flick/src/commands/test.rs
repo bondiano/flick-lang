@@ -23,7 +23,7 @@ use crate::backends::{self, Selected};
 use crate::package_cache;
 use crate::progress::{Mode, Progress};
 use crate::sources::FsHost;
-use crate::{builtins, cache, child, report, sources, timings};
+use crate::{builtins, cache, child, report, sources, timings, vm};
 use flick_core::build::Extras;
 
 mod cached;
@@ -34,7 +34,22 @@ use runner::{Runner, runner_command, start};
 /// Where the test build goes, inside the project.
 const OUT_DIR: &str = ".flick/test";
 
+fn is_vm_test(options: &TestArguments, global: &GlobalArguments) -> bool {
+    if vm::is_vm_target(options.target.as_deref(), None) {
+        return true;
+    }
+    let host = FsHost::new();
+    let explicit = global.project.as_deref().map(Path::new);
+    let project = project::discover(&host, &mut SourceMap::default(), &host.cwd, explicit)
+        .ok()
+        .flatten();
+    vm::is_vm_target(options.target.as_deref(), project.as_ref())
+}
+
 pub fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCode {
+    if is_vm_test(options, global) {
+        return vm::test(options, global);
+    }
     if options.watch {
         return watch(options, global);
     }

@@ -159,55 +159,14 @@ impl Machine<'_, '_> {
     }
 
     fn clone_list_values(&mut self, list_val: &Value) -> Result<Vec<Value>, Error> {
-        let (backing_id, offset, len) = self.heap.list_view(list_val)?;
-        let reps: Vec<Value> = {
-            let Data::Tagged { fields, .. } = &self.heap.object(backing_id)?.data else {
-                unreachable!("list_view verified tagged list")
-            };
-            fields[offset..offset + len]
-                .iter()
-                .map(Value::representation)
-                .collect()
-        };
-        let mut out = Vec::with_capacity(reps.len());
-        for rep in reps {
-            match self.heap.dup(&rep) {
-                Ok(v) => out.push(v),
-                Err(err) => {
-                    self.heap.drop_values(out)?;
-                    return Err(err);
-                }
-            }
-        }
-        Ok(out)
+        stdlib::runtime::coop::clone_list_values(self.heap, list_val)
     }
 
     fn decode_opt_fiber_id(&self, val: &Value) -> Result<Option<u64>, Error> {
-        let Value::Object(tok) = val else {
-            return Err(Error::ExpectedOption);
-        };
-        let Data::Tagged { tag, fields, .. } = &self.heap.object(tok.id)?.data else {
-            return Err(Error::ExpectedOption);
-        };
-        if tag == "Prelude.Option.None" {
-            Ok(None)
-        } else if tag == "Prelude.Option.Some" && fields.len() == 1 {
-            Ok(Some(Self::decode_fiber_float(&fields[0])?))
-        } else {
-            Err(Error::ExpectedOption)
-        }
+        stdlib::runtime::coop::decode_opt_fiber_id(self.heap, val)
     }
 
     fn decode_fiber_float(val: &Value) -> Result<u64, Error> {
-        #[expect(
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss,
-            reason = "non-negative fiber id float"
-        )]
-        match val {
-            Value::Float(f) => Ok(f.max(0.0) as u64),
-            Value::Int(i) => Ok((*i).max(0) as u64),
-            _ => Err(Error::ExpectedFloat),
-        }
+        stdlib::runtime::coop::decode_fiber_float(val)
     }
 }

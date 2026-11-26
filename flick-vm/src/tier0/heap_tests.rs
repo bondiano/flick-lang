@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::{CellHandle, Data, Error, Heap, Lit, Value, execute};
-    use flick_core::ir::memory::{Block, Exit, Function, Instruction, Operation};
+    use flick_core::ir::memory::{Block, Exit, Function, Instruction, Operation, ValueRep};
 
     #[test]
     fn a_cached_zero_cannot_hide_an_occupied_allocation() {
@@ -73,6 +73,8 @@ mod tests {
                     value: Operation::Construct {
                         tag: "Pair".into(),
                         fields: vec![0, 1],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 }],
                 exit: Exit::Return(2),
@@ -112,13 +114,15 @@ mod tests {
     }
     #[test]
     fn invalid_internal_boundaries_return_errors_without_slicing_or_losing_fields() {
-        use super::{patterns, primitives};
+        use super::patterns;
+        use crate::stdlib::{Unmetered, eval_binary};
         use flick_core::ir::{BinOp, Pat};
         let mut heap = Heap::new();
         let input = heap.allocate(Data::Tagged {
             tag: "T.Box".into(),
             ordinary_fields: 2,
             fields: vec![Value::Int(1)],
+            layout: None,
         });
         let expected = || Error::InvalidTaggedBoundary {
             ordinary: 2,
@@ -126,7 +130,7 @@ mod tests {
         };
         for op in [BinOp::Eq, BinOp::NotEq, BinOp::Same, BinOp::NotSame] {
             assert_eq!(
-                primitives::binary(&mut heap, op, &input, &input),
+                eval_binary(&mut heap, op, &input, &input, &mut Unmetered),
                 Err(expected())
             );
         }
@@ -142,6 +146,7 @@ mod tests {
                 tag: tag.into(),
                 ordinary_fields: 1,
                 fields: vec![Value::Int(1), evidence],
+                layout: None,
             });
             let expected = || Error::ReservedConstructorEvidence(tag.into());
             assert_eq!(heap.field(&input, 0), Err(expected()));
@@ -158,7 +163,7 @@ mod tests {
             assert!(scratch.is_empty());
             if tag == "$list" {
                 assert_eq!(
-                    primitives::binary(&mut heap, BinOp::ListConcat, &input, &input),
+                    eval_binary(&mut heap, BinOp::ListConcat, &input, &input, &mut Unmetered),
                     Err(expected())
                 );
             }

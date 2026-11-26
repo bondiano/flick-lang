@@ -7,13 +7,14 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::{error, fmt};
 
-use crate::ir::memory::{self, Block, Exit, Function, Instruction, Local, Operation};
+use crate::ir::memory::{self, Block, Exit, Function, Instruction, Local, Operation, ValueRep};
 
 mod reuse;
 mod source;
 pub use source::{
-    LowerError, lower, lower_roots_with_declarations, lower_roots_with_declarations_without_reuse,
-    lower_roots_with_foreign_bridge, lower_with_declarations, lower_without_reuse,
+    AggregatePolicy, LowerError, lower, lower_roots_with_aggregates, lower_roots_with_declarations,
+    lower_roots_with_declarations_without_reuse, lower_roots_with_foreign_bridge,
+    lower_with_aggregates, lower_with_declarations, lower_without_reuse,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,6 +91,7 @@ fn insert_mode(function: &Function, immediate_reuse: bool) -> Result<Function, E
             &function.body,
             &analyze(&function.body),
             params,
+            BTreeSet::new(),
             immediate_reuse,
         ),
     };
@@ -206,39 +208,113 @@ fn trim(owned: &mut BTreeSet<Local>, live: &BTreeSet<Local>, instructions: &mut 
     });
 }
 
+fn apply_pending_reuse(pending: &mut Option<Local>, value: &Operation) -> Operation {
+    match (pending.take(), value) {
+        (
+            Some(object),
+            Operation::Construct {
+                tag,
+                fields,
+                rep: ValueRep::Cell,
+                layout,
+            },
+        ) => Operation::Reuse {
+            object,
+            tag: tag.clone(),
+            fields: fields.clone(),
+            rep: ValueRep::Cell,
+            layout: layout.clone(),
+        },
+        (
+            Some(object),
+            Operation::ConstructWithDicts {
+                tag,
+                fields,
+                dicts,
+                rep: ValueRep::Cell,
+                layout,
+            },
+        ) => Operation::ReuseWithDicts {
+            object,
+            tag: tag.clone(),
+            fields: fields.clone(),
+            dicts: dicts.clone(),
+            rep: ValueRep::Cell,
+            layout: layout.clone(),
+        },
+        (None, value) => value.clone(),
+        (Some(_), _) => unreachable!("only defer to an immediately following cell constructor"),
+    }
+}
+
+fn can_defer_borrow(
+    value: &Operation,
+    local: Local,
+    aggregates: &BTreeSet<Local>,
+    next: Option<&Instruction>,
+) -> bool {
+    !aggregates.contains(&local)
+        && !matches!(
+            value,
+            Operation::Project {
+                rep: ValueRep::Aggregate,
+                ..
+            } | Operation::Match {
+                rep: ValueRep::Aggregate,
+                ..
+            } | Operation::UnboxBorrow { .. }
+        )
+        && matches!(
+            next,
+            Some(Instruction::Let {
+                value: Operation::Construct {
+                    rep: ValueRep::Cell,
+                    ..
+                } | Operation::ConstructWithDicts {
+                    rep: ValueRep::Cell,
+                    ..
+                },
+                ..
+            })
+        )
+}
+
+fn record_aggregate_borrow(value: &Operation, aggregates: &mut BTreeSet<Local>) {
+    if let Operation::Project {
+        object,
+        rep: ValueRep::Aggregate,
+        ..
+    }
+    | Operation::Match {
+        object,
+        rep: ValueRep::Aggregate,
+        ..
+    } = value
+    {
+        aggregates.insert(*object);
+    }
+}
+
 fn annotate(
     block: &Block,
     liveness: &Liveness,
     mut owned: BTreeSet<Local>,
+    mut aggregates: BTreeSet<Local>,
     immediate_reuse: bool,
 ) -> Block {
     let mut instructions = Vec::new();
     trim(&mut owned, &liveness.entry, &mut instructions);
-    // A just-borrowed, dead receiver may survive exactly to the next
-    // constructor. No release is moved across arbitrary work or an edge.
+    // A just-borrowed, dead cell receiver may survive exactly to the next
+    // cell constructor. Aggregate receivers and aggregate constructions are
+    // never deferred into Reuse. No release is moved across arbitrary work or an edge.
     let mut pending = None;
     for (index, (instruction, after)) in block.instructions.iter().zip(&liveness.after).enumerate()
     {
         let Instruction::Let { binding, value } = instruction else {
             unreachable!("source validation rejects annotations");
         };
-        let value = match (pending.take(), value) {
-            (Some(object), Operation::Construct { tag, fields }) => Operation::Reuse {
-                object,
-                tag: tag.clone(),
-                fields: fields.clone(),
-            },
-            (Some(object), Operation::ConstructWithDicts { tag, fields, dicts }) => {
-                Operation::ReuseWithDicts {
-                    object,
-                    tag: tag.clone(),
-                    fields: fields.clone(),
-                    dicts: dicts.clone(),
-                }
-            }
-            (None, value) => value.clone(),
-            (Some(_), _) => unreachable!("only defer to an immediately following constructor"),
-        };
+        let value = apply_pending_reuse(&mut pending, value);
+        record_aggregate_borrow(&value, &mut aggregates);
         let mut consumed = BTreeMap::<Local, usize>::new();
         for local in value.consumed() {
             *consumed.entry(local).or_default() += 1;
@@ -252,6 +328,16 @@ fn annotate(
             }
         }
         let borrowed = value.borrowed();
+        let defer = borrowed.is_some_and(|local| {
+            immediate_reuse
+                && can_defer_borrow(
+                    &value,
+                    local,
+                    &aggregates,
+                    block.instructions.get(index + 1),
+                )
+        });
+        let result_is_aggregate = value.result_rep() == Some(ValueRep::Aggregate);
         instructions.push(Instruction::Let {
             binding: *binding,
             value,
@@ -259,20 +345,15 @@ fn annotate(
         if let Some(local) = borrowed
             && !after.contains(&local)
         {
-            if immediate_reuse
-                && matches!(
-                    block.instructions.get(index + 1),
-                    Some(Instruction::Let {
-                        value: Operation::Construct { .. } | Operation::ConstructWithDicts { .. },
-                        ..
-                    })
-                )
-            {
+            if defer {
                 pending = Some(local);
             } else {
                 instructions.push(Instruction::Drop(local));
                 owned.remove(&local);
             }
+        }
+        if result_is_aggregate {
+            aggregates.insert(*binding);
         }
         owned.insert(*binding);
         if !after.contains(binding) {
@@ -301,8 +382,20 @@ fn annotate(
             trim(&mut owned, &successors, &mut instructions);
             Exit::Branch {
                 condition: *condition,
-                then_: Box::new(annotate(then_, then_live, owned.clone(), immediate_reuse)),
-                else_: Box::new(annotate(else_, else_live, owned, immediate_reuse)),
+                then_: Box::new(annotate(
+                    then_,
+                    then_live,
+                    owned.clone(),
+                    aggregates.clone(),
+                    immediate_reuse,
+                )),
+                else_: Box::new(annotate(
+                    else_,
+                    else_live,
+                    owned,
+                    aggregates,
+                    immediate_reuse,
+                )),
             }
         }
     };
@@ -310,3 +403,4 @@ fn annotate(
 }
 
 include!("perceus/ownership_tests.rs");
+include!("perceus/aggregate_tests.rs");

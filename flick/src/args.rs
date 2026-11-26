@@ -317,6 +317,10 @@ pub struct TestArguments {
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
 
+    /// VM execution tier for `--target vm` (`0` or `tier0`; defaults to tier 0).
+    #[arg(long = "vm-tier", value_name = "TIER")]
+    pub vm_tier: Option<String>,
+
     /// Ignore `@native` overrides and lower Flick fallback bodies (for conformance testing).
     #[arg(long)]
     pub no_native_overrides: bool,

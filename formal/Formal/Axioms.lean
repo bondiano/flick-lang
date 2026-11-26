@@ -27,6 +27,7 @@ import Formal.RecordOrder
 import Formal.MemoryArena
 import Formal.MemoryScopes
 import Formal.MemoryReuse
+import Formal.MemoryAggregate
 
 /-!
 # The axioms of the main theorems
@@ -347,6 +348,82 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.Memory.Reuse.cycle_break_vs_teardown' depends on axioms: [propext, Quot.sound] -/
 #guard_msgs in
 #print axioms Flick.Memory.Reuse.cycle_break_vs_teardown
+
+/-- info: 'Flick.Memory.Aggregate.dupValue_adds_boxedTokens' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.dupValue_adds_boxedTokens
+
+/-- info: 'Flick.Memory.Aggregate.dupValue_immediate_noop' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.dupValue_immediate_noop
+
+/-- info: 'Flick.Memory.Aggregate.dropValue_subtracts_boxedTokens' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.dropValue_subtracts_boxedTokens
+
+/-- info: 'Flick.Memory.Aggregate.dropValue_immediate_noop' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.dropValue_immediate_noop
+
+/-- info: 'Flick.Memory.Aggregate.projectAgg_retains_field' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.projectAgg_retains_field
+
+/-- info: 'Flick.Memory.Aggregate.projectAgg_survives_parent_drop' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.projectAgg_survives_parent_drop
+
+/-- info: 'Flick.Memory.Aggregate.boxAggregate_conserves_tokens' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.boxAggregate_conserves_tokens
+
+/-- info: 'Flick.Memory.Aggregate.unboxBorrow_retains_without_releasing' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.unboxBorrow_retains_without_releasing
+
+/-- info: 'Flick.Memory.Aggregate.unboxConsume_unique_transfers' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.unboxConsume_unique_transfers
+
+/-- info: 'Flick.Memory.Aggregate.unboxConsume_shared_retains_preserves_aliases' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.unboxConsume_shared_retains_preserves_aliases
+
+/-- info: 'Flick.Memory.Aggregate.reuseTypedCell_incompatible_layout_fallback' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.reuseTypedCell_incompatible_layout_fallback
+
+/-- info: 'Flick.Memory.Aggregate.reuseTypedCell_compatible_in_place' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.reuseTypedCell_compatible_in_place
+
+/-- info: 'Flick.Memory.Aggregate.checkRepTokens_rejects_explicit_agg_reuse' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.checkRepTokens_rejects_explicit_agg_reuse
+
+/-- info: 'Flick.Memory.Aggregate.checkRepTokens_rejects_tracked_agg_reuse' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.checkRepTokens_rejects_tracked_agg_reuse
+
+/-- info: 'Flick.Memory.Aggregate.checkRepTokens_rejects_agg_dropReuse' depends on axioms: [propext] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.checkRepTokens_rejects_agg_dropReuse
+
+/-- info: 'Flick.Memory.Aggregate.checkRepTokens_sound' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.checkRepTokens_sound
+
+/-- info: 'Flick.Memory.Aggregate.checkRepTokens_prefix_safe' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.checkRepTokens_prefix_safe
+
+/-- info: 'Flick.Memory.Aggregate.annotateRep_balanced' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.annotateRep_balanced
+
+/-- info: 'Flick.Memory.Aggregate.annotateRep_prefix_safe' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.Memory.Aggregate.annotateRep_prefix_safe
 
 /-- info: 'Flick.FixedWidth.wrap_inRange' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs in

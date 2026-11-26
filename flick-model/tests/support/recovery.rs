@@ -1,7 +1,7 @@
 //! Test-only explicit selectors for raw MIR fixtures whose callbacks are bodies.
 //! This builds the new MIR protocol; the evaluator has no legacy return fallback.
 use flick_core::{
-    ir::memory::{Block, Exit, Function, Instruction, Operation, Program},
+    ir::memory::{Block, Exit, Function, Instruction, Operation, Program, ValueRep},
     opt::perceus,
 };
 
@@ -35,6 +35,7 @@ pub fn seal_bodies(program: &mut Program, codes: &[u32]) {
                         Operation::Project {
                             object: 0,
                             field: 0,
+                            rep: ValueRep::Cell,
                         },
                     ),
                     bind(
@@ -42,6 +43,7 @@ pub fn seal_bodies(program: &mut Program, codes: &[u32]) {
                         Operation::Project {
                             object: 0,
                             field: 1,
+                            rep: ValueRep::Cell,
                         },
                     ),
                     bind(

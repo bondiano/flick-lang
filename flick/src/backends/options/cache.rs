@@ -121,6 +121,7 @@ pub(super) fn descriptor_for(
             };
             (load_and_cache_descriptor(pin, &bytes), None)
         }
+        TargetChoice::Vm => (None, None),
         TargetChoice::Official { id, .. } => {
             let known_pin = official::known(id, project);
             if let Some(pin) = &known_pin
@@ -188,6 +189,7 @@ pub(crate) fn cached_descriptor_for_project(project: &Project) -> Option<Descrip
     let (choice, _) = super::resolve_target(None, Some(project)).ok()?;
     match choice {
         TargetChoice::Pinned { package, .. } => read_descriptor(&package.sha256),
+        TargetChoice::Vm => None,
         TargetChoice::Official { id, .. } => {
             if let Some(pin) = official::known(id, Some(project))
                 && let Some(cached) = read_descriptor(&pin.sha256)

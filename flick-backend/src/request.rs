@@ -71,16 +71,84 @@ pub fn validate_request(
     sources::validate_export_spans(request, &text_refs)?;
     match (&request.target.mode, &request.module_root) {
         (Mode::WholeProgram, None) => {}
-        (Mode::PerModule, Some(root)) if program.modules.iter().any(|m| m.name == *root) => {}
-        _ => return Err("compilation mode has no valid module root".into()),
+        (Mode::PerModule, Some(root))
+            if modules
+                .get(root.as_str())
+                .is_some_and(|m| m.role == ModuleRole::Own) => {}
+        (Mode::WholeProgram, Some(_)) => {
+            return Err("whole-program mode cannot set a module root".into());
+        }
+        (Mode::PerModule, None) => {
+            return Err("per-module mode requires a module root".into());
+        }
+        (Mode::PerModule, Some(root)) => {
+            return Err(format!(
+                "per-module root `{root}` must name an own module in the graph"
+            ));
+        }
     }
     graph::roots(request, &modules)?;
     side_data(request, &manifest, &modules, limits)?;
     Ok(program)
 }
 
+/// Serializes all metadata of a [`BuildRequest`] while accounting for the raw
+/// `program` byte slice in O(1), avoiding byte-by-byte CBOR integer encoding.
+#[derive(serde::Serialize)]
+pub(crate) struct RequestMetadata<'a> {
+    target: &'a crate::TargetRequest,
+    backend: &'a crate::BackendPin,
+    program_len: usize,
+    module_root: &'a Option<String>,
+    modules: &'a [ModuleInput],
+    sources: &'a [crate::Source],
+    entries: &'a [crate::Entry],
+    test_roots: &'a [crate::Symbol],
+    foreign: &'a [crate::ForeignBinding],
+    inline_foreign: &'a [crate::InlineForeign],
+    projections: &'a [crate::Projection],
+    package_targets: &'a [crate::PackageTarget],
+    root_handlers: &'a [crate::RootHandler],
+    inputs: &'a [crate::Input],
+    toolchains: &'a [crate::Toolchain],
+    runtime_dependencies: &'a [crate::RuntimeDependency],
+    declared_dependencies: &'a Option<Vec<String>>,
+    exports: &'a [crate::HostExport],
+    headers: &'a Option<crate::HeaderRequest>,
+}
+
+impl<'a> RequestMetadata<'a> {
+    pub(crate) fn of(request: &'a BuildRequest) -> Self {
+        Self {
+            target: &request.target,
+            backend: &request.backend,
+            program_len: request.program.len(),
+            module_root: &request.module_root,
+            modules: &request.modules,
+            sources: &request.sources,
+            entries: &request.entries,
+            test_roots: &request.test_roots,
+            foreign: &request.foreign,
+            inline_foreign: &request.inline_foreign,
+            projections: &request.projections,
+            package_targets: &request.package_targets,
+            root_handlers: &request.root_handlers,
+            inputs: &request.inputs,
+            toolchains: &request.toolchains,
+            runtime_dependencies: &request.runtime_dependencies,
+            declared_dependencies: &request.declared_dependencies,
+            exports: &request.exports,
+            headers: &request.headers,
+        }
+    }
+}
+
 pub(super) fn validate_size(request: &BuildRequest, limits: Limits) -> Result<(), String> {
-    ciborium::into_writer(request, Budget(limits.request_bytes))
+    let remaining = limits
+        .request_bytes
+        .checked_sub(request.program.len())
+        .ok_or_else(|| "backend request exceeds its total input limit".to_owned())?;
+    ciborium::into_writer(&RequestMetadata::of(request), Budget(remaining))
         .map_err(|_| "backend request exceeds its total input limit".into())
 }
 

@@ -881,3 +881,93 @@ computes a `TypeLayout` containing `size`, `align`, remaining `niche`, and
   recursion across modules) as `FieldStorage::Pointer`. Every recursive type
   gets a finite size, non-recursive types get no unnecessary pointers, and the
   result is deterministic across module and query order.
+
+## Polymorphic specialization and boxed fallback
+
+Layout-aware backends also share a deterministic whole-program specialization
+pass in `flick-backend-support/src/specialize/` (`specialize`,
+`SpecializeConfig`, `SpecializedProgram`), built on typed `flick_ir::Program`
+and `LayoutEngine`. Official `flick/js` and `flick/go` backends do not run this
+pass yet.
+
+### Monomorphization and zero-boxing paths
+
+Starting from entry roots, `specialize` monomorphizes reachable polymorphic
+functions, constructors, and class instances for each concrete type
+instantiation and records their `TypeLayout`s in `SpecializedProgram.layouts`.
+Specialized code never allocates boxed cells (`Box` / `Unbox` coercions are
+emitted only at boundaries with fallback code, polymorphic foreign bindings,
+runtime dictionaries, or existential/GADT payloads). Closed records read and
+update fields by concrete layout index and byte offset (`FieldOffset` /
+`UpdateOffset`), including open-row functions specialized to a concrete closed
+row.
+
+### Statically classified fallback forms
+
+Before instantiation begins, a whole-program static pass classifies definitions
+that cannot be monomorphized per type argument and compiles each once over
+uniform boxed cells (`DefMode::Fallback(FallbackReason)`):
+
+| Fallback form | `FallbackReason` | Runtime boundary representation |
+| - | - | - |
+| Polymorphic recursion against a `forall` signature (type-argument growth along a call-graph SCC cycle) | `PolymorphicRecursion` | Arguments boxed on entry, result unboxed on exit; never relies on hitting a budget |
+| Higher-rank callbacks (`IrType::Forall` with quantified type variables in parameter position) | `HigherRankCallback` | Callback compiled over uniform boxed cells; caller boxes arguments and unboxes results |
+| Packed modules (`Prelude.Module`) and existentials (`IrType::Exists`) | `PackedOrExistential` | Abstract/existential fields stored in boxed cells across `pack`/`unpack` |
+| GADT constructors holding class dictionaries or existential type variables | `GadtDictionary` | Existential fields stored boxed alongside trailing runtime dictionary pointers |
+| Polymorphic `foreign` bindings | `PolymorphicForeign` | Single uniform boxed-cell foreign entry; specialized callers box arguments and unbox results |
+| Open-row records whose row tail remains polymorphic across a fallback boundary | `OpenRowPolymorphic` | Boxed label-indexed record accessed via `FieldByLabel` / `UpdateByLabel` |
+
+### Dictionaries, budgets and determinism
+
+- **Dictionary preservation and precedence:** checked dictionary arguments and
+  their lexical precedence are preserved. A `Method` call becomes a direct call
+  (`CallDirect`) **only** when exact dictionary evidence is statically known
+  (`Dict::Instance` with all static context arguments, including superclass
+  chains). Dynamic `given` dictionaries, packed-module `Dict::Opened`
+  dictionaries, GADT `Dict::Field` dictionaries, named `Dict::Value`
+  dictionaries, and instances with dynamic context arguments remain runtime
+  dictionaries (`MethodCall`), preserving packed-module precedence over global
+  instances and keeping distinct local dictionaries separate at the same
+  concrete types.
+- **Budgets and build report:** `SpecializeConfig` enforces explicit
+  `max_instances` and optional `max_output_bytes` limits, returning
+  `SpecializeError::BudgetExceeded` naming the offending `(module, name)`
+  definition when pathological non-recursive or exponential instantiation
+  exceeds the budget. `SpecializeStats` reports specialized instances, fallback
+  definitions, polymorphic foreigns, `Box`/`Unbox` counts, direct vs. runtime
+  dictionary calls, offset vs. label field reads, per-definition instance
+  counts, and estimated output bytes.
+- **Determinism:** all maps, sets, worklist roots, layouts, and mangled
+  `SymbolId`s use ordered `BTreeMap`/`BTreeSet` structures and deterministic
+  FNV-1a hashing, producing identical output across repeated runs and module
+  orderings.
+
+## Official component delivery (CLI and browser)
+
+Both the CLI and the browser playground execute the same pinned `flick/js`
+WebAssembly component (`backends/js/package/component.wasm`, pinned by
+`backends/js/package/backend.json`) over the `flick:backend@0.1.0` WIT world:
+
+- **Minimal import surface:** the official JS component imports only
+  `flick:backend/inputs@0.1.0#read` (no WASI, filesystem, clock, network, or
+  process imports). External hosts — native Wasmtime embedders or browser Web
+  Workers — verify the component's SHA-256 against its pin before compiling,
+  reject any import outside `inputs.read`, and instantiate a fresh guest
+  instance per call so mutable linear memory never persists across calls.
+- **Browser host architecture:** the playground frontend (`flick-wasm`) builds
+  and type-checks in memory without statically linking `flick-backend-js`. On
+  emit, `prepare_emit` constructs the `BuildRequest` (CBOR `Program`,
+  `flick.javascript@0.1.0` projections, sources, and content-addressed input
+  manifest) and dispatches it to a dedicated isolated Web Worker
+  (`backend.worker.ts`) that lazily fetches and verifies `component.wasm`.
+  `finish_emit` validates the returned `BuildResult` via
+  `flick_backend::validate_result`, preserves shared `.d.ts` files and
+  `FLICK-F004` diagnostics, and maps guest diagnostics back to UTF-16 editor
+  positions. Any digest mismatch or undeclared input read is refused explicitly
+  with no silent fallback.
+- **Stage attribution:** running `flick build --timings` (or
+  `--timings --diagnostics json`) attributes backend component initialization,
+  request preparation and CBOR/input byte sizes (`program_bytes`,
+  `inputs_bytes`), host validation, `check-target`, first generation,
+  determinism replay, external tool steps, atomic publication, and residual
+  overhead separately.

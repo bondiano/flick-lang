@@ -402,3 +402,88 @@ let answer captured =
         "entry, source lambda, body, handler, two selectors plus two deferred bodies, terminal, and from_result initializer and adapter (saturated constructors lower directly)"
     );
 }
+
+#[test]
+fn lower_with_aggregates_emits_nested_inline_aggregates_without_aggregate_reuse() {
+    use super::{AggregatePolicy, lower_with_aggregates};
+    use std::collections::BTreeSet;
+
+    let text = r#"module App.Aggregates exposing (answer)
+type Inner = Inner String Int
+type Outer = Outer Inner Int
+
+answer : Unit -> String
+let answer () =
+  let inner = Inner ("hel" ++ "lo") 42
+  let outer = Outer inner 7
+  let projected =
+    match outer with
+    | Outer nested _ -> nested
+  match projected with
+  | Inner text _ -> text
+"#;
+    let module = lower_text("App.Aggregates", text).expect("checked nested aggregate source");
+
+    // Default lowering keeps everything as boxed cells.
+    let default_prog =
+        lower([&module], &memory::Name::new("App.Aggregates", "answer")).expect("default lower");
+    assert_eq!(memory::validate_program(&default_prog), Ok(()));
+    assert!(!default_prog.functions.values().any(|f| {
+        f.body.instructions.iter().any(|i| {
+            matches!(
+                i,
+                memory::Instruction::Let {
+                    value: memory::Operation::Construct {
+                        rep: memory::ValueRep::Aggregate,
+                        ..
+                    } | memory::Operation::Match {
+                        rep: memory::ValueRep::Aggregate,
+                        ..
+                    },
+                    ..
+                }
+            )
+        })
+    }));
+
+    // Explicit AggregatePolicy lowers Inner and Outer as unboxed aggregates with zero aggregate reuse.
+    let policy = AggregatePolicy {
+        types: BTreeSet::from(["App.Aggregates.Inner".into(), "App.Aggregates.Outer".into()]),
+        ..AggregatePolicy::default()
+    };
+    let agg_prog = lower_with_aggregates(
+        [&module],
+        &memory::Name::new("App.Aggregates", "answer"),
+        policy,
+    )
+    .expect("aggregate lower");
+    assert_eq!(memory::validate_program(&agg_prog), Ok(()));
+
+    let mut agg_constructs = 0usize;
+    let mut agg_matches = 0usize;
+    let mut reuse_ops = 0usize;
+    for func in agg_prog.functions.values() {
+        for inst in &func.body.instructions {
+            if let memory::Instruction::Let { value, .. } = inst {
+                match value {
+                    memory::Operation::Construct {
+                        rep: memory::ValueRep::Aggregate,
+                        ..
+                    } => agg_constructs += 1,
+                    memory::Operation::Match {
+                        rep: memory::ValueRep::Aggregate,
+                        ..
+                    } => agg_matches += 1,
+                    memory::Operation::DropReuse(_)
+                    | memory::Operation::Reuse { .. }
+                    | memory::Operation::ReuseWithDicts { .. }
+                    | memory::Operation::ReuseRecord { .. } => reuse_ops += 1,
+                    _ => {}
+                }
+            }
+        }
+    }
+    assert_eq!(agg_constructs, 2, "Inner and Outer lower as aggregates");
+    assert_eq!(agg_matches, 2, "both matches borrow aggregate scrutinees");
+    assert_eq!(reuse_ops, 0, "aggregates never emit DropReuse or Reuse");
+}

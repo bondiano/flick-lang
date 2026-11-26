@@ -17,7 +17,7 @@
 use std::collections::BTreeMap;
 use std::mem;
 
-use crate::ir::memory::{Block, Exit, Function, Instruction, Local, Operation};
+use crate::ir::memory::{Block, Exit, Function, Instruction, Local, Operation, ValueRep};
 use crate::ir::{Pat, Rep};
 
 /// Static allocation/layout knowledge for a local, used only to avoid emitting
@@ -201,10 +201,18 @@ fn operation_result_shape(
     shapes: &BTreeMap<Local, CandidateShape>,
 ) -> CandidateShape {
     match value {
-        Operation::Construct { fields, .. } | Operation::Reuse { fields, .. } => {
-            CandidateShape::TaggedExact(fields.len())
+        Operation::Construct {
+            fields,
+            rep: ValueRep::Cell,
+            ..
         }
-        Operation::ConstructWithDicts { fields, dicts, .. }
+        | Operation::Reuse { fields, .. } => CandidateShape::TaggedExact(fields.len()),
+        Operation::ConstructWithDicts {
+            fields,
+            dicts,
+            rep: ValueRep::Cell,
+            ..
+        }
         | Operation::ReuseWithDicts { fields, dicts, .. } => {
             CandidateShape::TaggedExact(fields.len() + dicts.len())
         }
@@ -215,7 +223,18 @@ fn operation_result_shape(
             Some(CandidateShape::RecordExact(n)) => CandidateShape::RecordExact(n),
             _ => CandidateShape::RecordAny,
         },
-        Operation::Literal(_)
+        Operation::Construct {
+            rep: ValueRep::Aggregate,
+            ..
+        }
+        | Operation::ConstructWithDicts {
+            rep: ValueRep::Aggregate,
+            ..
+        }
+        | Operation::BoxAggregate { .. }
+        | Operation::UnboxBorrow { .. }
+        | Operation::UnboxConsume { .. }
+        | Operation::Literal(_)
         | Operation::Closure { .. }
         | Operation::Task { .. }
         | Operation::Dictionary { .. }
@@ -238,10 +257,17 @@ fn operation_result_shape(
 
 fn alloc_shape(op: &Operation) -> Option<AllocShape> {
     match op {
-        Operation::Construct { fields, .. } => Some(AllocShape::Tagged(fields.len())),
-        Operation::ConstructWithDicts { fields, dicts, .. } => {
-            Some(AllocShape::Tagged(fields.len() + dicts.len()))
-        }
+        Operation::Construct {
+            fields,
+            rep: ValueRep::Cell,
+            ..
+        } => Some(AllocShape::Tagged(fields.len())),
+        Operation::ConstructWithDicts {
+            fields,
+            dicts,
+            rep: ValueRep::Cell,
+            ..
+        } => Some(AllocShape::Tagged(fields.len() + dicts.len())),
         Operation::Record { fields } => Some(AllocShape::Record(fields.len())),
         _ => None,
     }
@@ -350,16 +376,31 @@ fn pair_reuse_block(block: &mut Block, token: Local, shape: CandidateShape) {
 fn rewrite_alloc_to_reuse(value: &mut Operation, token: Local) {
     let old = mem::replace(value, Operation::ReadOwnerEvidence);
     *value = match old {
-        Operation::Construct { tag, fields } => Operation::Reuse {
+        Operation::Construct {
+            tag,
+            fields,
+            rep: ValueRep::Cell,
+            layout,
+        } => Operation::Reuse {
             object: token,
             tag,
             fields,
+            rep: ValueRep::Cell,
+            layout,
         },
-        Operation::ConstructWithDicts { tag, fields, dicts } => Operation::ReuseWithDicts {
+        Operation::ConstructWithDicts {
+            tag,
+            fields,
+            dicts,
+            rep: ValueRep::Cell,
+            layout,
+        } => Operation::ReuseWithDicts {
             object: token,
             tag,
             fields,
             dicts,
+            rep: ValueRep::Cell,
+            layout,
         },
         Operation::Record { fields } => Operation::ReuseRecord {
             object: token,
@@ -367,6 +408,67 @@ fn rewrite_alloc_to_reuse(value: &mut Operation, token: Local) {
         },
         other => other,
     };
+}
+
+fn record_let_shapes(
+    binding: Local,
+    value: &Operation,
+    shapes: &mut BTreeMap<Local, CandidateShape>,
+    matches: &mut BTreeMap<Local, (Local, CandidateShape)>,
+    match_conds: &mut BTreeMap<Local, Local>,
+) {
+    match value {
+        Operation::Field { object, field } if field != "_tag" => {
+            let current = shapes
+                .get(object)
+                .copied()
+                .unwrap_or(CandidateShape::Unknown);
+            shapes.insert(
+                *object,
+                CandidateShape::refine(current, CandidateShape::RecordAny),
+            );
+        }
+        Operation::Project { object, field, rep } => {
+            if rep.is_aggregate() {
+                shapes.insert(*object, CandidateShape::Never);
+            } else if *field == 0
+                && let Some(&(scrutinee, _)) = matches.get(object)
+            {
+                let _ = scrutinee;
+                match_conds.insert(binding, *object);
+            } else if !matches.contains_key(object) {
+                let current = shapes
+                    .get(object)
+                    .copied()
+                    .unwrap_or(CandidateShape::Unknown);
+                shapes.insert(
+                    *object,
+                    CandidateShape::refine(current, CandidateShape::TaggedAny),
+                );
+            }
+        }
+        Operation::Match {
+            object,
+            pattern,
+            rep,
+        } => {
+            if rep.is_aggregate() {
+                shapes.insert(*object, CandidateShape::Never);
+                matches.insert(binding, (*object, CandidateShape::Never));
+            } else {
+                matches.insert(binding, (*object, pattern_shape(pattern)));
+            }
+        }
+        Operation::BoxAggregate { value, .. } => {
+            shapes.insert(*value, CandidateShape::Never);
+        }
+        Operation::UnboxBorrow { object } | Operation::UnboxConsume { object } => {
+            shapes.insert(*object, CandidateShape::Never);
+        }
+        _ => {}
+    }
+    let result_shape = operation_result_shape(value, shapes);
+    shapes.insert(binding, result_shape);
 }
 
 fn optimize_block(
@@ -382,42 +484,7 @@ fn optimize_block(
     for index in 0..block.instructions.len() {
         match &block.instructions[index] {
             Instruction::Let { binding, value } => {
-                let binding = *binding;
-                match value {
-                    Operation::Field { object, field } if field != "_tag" => {
-                        let current = shapes
-                            .get(object)
-                            .copied()
-                            .unwrap_or(CandidateShape::Unknown);
-                        shapes.insert(
-                            *object,
-                            CandidateShape::refine(current, CandidateShape::RecordAny),
-                        );
-                    }
-                    Operation::Project { object, field } => {
-                        if *field == 0
-                            && let Some(&(scrutinee, _)) = matches.get(object)
-                        {
-                            let _ = scrutinee;
-                            match_conds.insert(binding, *object);
-                        } else if !matches.contains_key(object) {
-                            let current = shapes
-                                .get(object)
-                                .copied()
-                                .unwrap_or(CandidateShape::Unknown);
-                            shapes.insert(
-                                *object,
-                                CandidateShape::refine(current, CandidateShape::TaggedAny),
-                            );
-                        }
-                    }
-                    Operation::Match { object, pattern } => {
-                        matches.insert(binding, (*object, pattern_shape(pattern)));
-                    }
-                    _ => {}
-                }
-                let result_shape = operation_result_shape(value, shapes);
-                shapes.insert(binding, result_shape);
+                record_let_shapes(*binding, value, shapes, &mut matches, &mut match_conds);
             }
             Instruction::Drop(local) => {
                 let local = *local;

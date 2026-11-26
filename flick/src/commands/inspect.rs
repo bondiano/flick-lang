@@ -28,6 +28,7 @@ use crate::builtins as builtin_cache;
 use crate::command::Outcome;
 use crate::package_cache;
 use crate::sources::FsHost;
+use crate::vm;
 
 fn failure(sources: SourceMap, code: Code, message: String) -> Outcome {
     Outcome {
@@ -123,6 +124,12 @@ fn prepare_inspect_target(
                 diagnostics: vec![d],
             }
         })?;
+    if matches!(backend, Selected::Vm) {
+        return Err(Outcome {
+            sources,
+            diagnostics: vec![vm::unsupported_inspect_diagnostic()],
+        });
+    }
     let descriptor = backend.descriptor();
     let resolved = match &descriptor {
         Some(descriptor) => options::resolve(

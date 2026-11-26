@@ -14,6 +14,7 @@ pub enum Error {
     DuplicateBinding(Local),
     NoToken(Local),
     Leftover(Vec<(Local, usize)>),
+    AggregateReuseCandidate(Local),
     UnknownCode(CodeId),
     UnknownGlobal(Name),
     DuplicateGlobal(Name),
@@ -68,6 +69,9 @@ impl fmt::Display for Error {
             Self::DuplicateBinding(local) => write!(f, "memory local {local} is bound twice"),
             Self::NoToken(local) => write!(f, "memory local {local} has no owned token"),
             Self::Leftover(tokens) => write!(f, "unreleased memory tokens: {tokens:?}"),
+            Self::AggregateReuseCandidate(local) => {
+                write!(f, "aggregate memory local {local} cannot be a reuse candidate")
+            }
             Self::UnknownCode(code) => write!(f, "unknown memory code {code}"),
             Self::UnknownGlobal(name) => {
                 write!(f, "unknown memory global {}.{}", name.module, name.name)

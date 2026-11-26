@@ -13,6 +13,7 @@ pub mod consteval_node;
 pub mod counted_bigint_conversion;
 pub mod counted_int_string_adapters;
 pub mod counted_scalar_adapters;
+#[cfg(feature = "native-js")]
 pub mod implicit_imports;
 pub mod module_contract_publication;
 pub mod service_implementation_contracts;

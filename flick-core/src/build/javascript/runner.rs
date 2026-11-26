@@ -1,15 +1,20 @@
 //! Entry runners of the native JavaScript build.
 
+#[cfg(feature = "native-js")]
 use super::super::Backend;
+#[cfg(feature = "native-js")]
 use crate::codegen;
 use crate::diagnostics::{Diagnostic, Severity, codes};
 use crate::iface::Namespace;
 use crate::project::{Compiled, MainKind, host_services, main_kind};
 use crate::source::Span;
 
-#[cfg(not(target_arch = "wasm32"))]
+use super::super::Settings;
+#[cfg(all(feature = "native-js", not(target_arch = "wasm32")))]
 use super::super::schema_aot_file;
-use super::super::{Artifact, Settings, runner_file};
+#[cfg(feature = "native-js")]
+use super::super::{Artifact, runner_file};
+#[cfg(feature = "native-js")]
 use flick_backend_js::codegen::runner::{Start, runner};
 
 /// Shared frontend classification for a generated entry launcher.
@@ -69,6 +74,7 @@ pub fn entry_facts(
 }
 
 /// The runner of each entry, using the shared frontend classification.
+#[cfg(feature = "native-js")]
 pub(super) fn entry_runners(
     settings: &Settings,
     modules: &[Compiled],

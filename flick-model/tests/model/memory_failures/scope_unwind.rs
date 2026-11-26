@@ -33,6 +33,7 @@ fn failed_modify_does_not_commit_and_catch_can_read_original_cell() {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 bind(
@@ -194,6 +195,16 @@ fn unwinding_scope_closes_its_arena_before_dispatching_outer_catch() {
 
 #[test]
 fn selected_outer_owner_survives_inner_scope_failure() {
+    let project = |binding, object, field| {
+        bind(
+            binding,
+            Operation::Project {
+                object,
+                field,
+                rep: ValueRep::Cell,
+            },
+        )
+    };
     let mut p = program(vec![
         function(
             &[],
@@ -224,20 +235,8 @@ fn selected_outer_owner_survives_inner_scope_failure() {
         function(
             &[0, 1],
             vec![
-                bind(
-                    2,
-                    Operation::Project {
-                        object: 0,
-                        field: 0,
-                    },
-                ),
-                bind(
-                    3,
-                    Operation::Project {
-                        object: 0,
-                        field: 1,
-                    },
-                ),
+                project(2, 0, 0),
+                project(3, 0, 1),
                 bind(
                     4,
                     Operation::Closure {
@@ -252,20 +251,8 @@ fn selected_outer_owner_survives_inner_scope_failure() {
         function(
             &[0, 1],
             vec![
-                bind(
-                    2,
-                    Operation::Project {
-                        object: 0,
-                        field: 0,
-                    },
-                ),
-                bind(
-                    3,
-                    Operation::Project {
-                        object: 0,
-                        field: 1,
-                    },
-                ),
+                project(2, 0, 0),
+                project(3, 0, 1),
                 bind(
                     4,
                     Operation::Within {

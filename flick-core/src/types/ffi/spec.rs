@@ -217,6 +217,17 @@ impl ForeignBackendSpec {
         )
     }
 
+    /// The built-in `flick/vm` target's foreign metadata specification.
+    pub fn vm() -> Self {
+        Self {
+            backend_id: "flick/vm".to_owned(),
+            adapters: Vec::new(),
+            type_form_attributes: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            value_abi: None,
+        }
+    }
+
     /// Shared static reference to the default `flick/js` specification.
     pub fn default_js() -> &'static Self {
         static JS: OnceLock<ForeignBackendSpec> = OnceLock::new();

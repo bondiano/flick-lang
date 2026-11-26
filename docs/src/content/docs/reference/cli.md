@@ -31,9 +31,9 @@ and [Contributed commands](../commands/)).
 | `prove [paths] [--watch]` | verifies the proof modules of the proof root (`project.proof-dir`) and the function contracts (`where require ... ensure ...`) of the project's source and test modules, or of the files given, with the code they name; `check`, `build` and `test` type-check contracts without proving or lowering them and never read the proof root (see [the proof contract](https://github.com/bondiano/flick-lang/blob/main/docs/formal/proofs.md)) |
 | `build [paths] [--target <name>] [--profile] [--labels all\|components\|none] [--emit-ir[=json\|cbor]] [--out-dir] [--watch] [--no-native-overrides] [<backend options>]` | compiles the project with the selected target backend; target-specific flags are declared by the selected backend (see [Target and backend options](#target-and-backend-options)); `--emit-ir` adds `program.ir.json` (or `program.ir.cbor`): the IR the backend gets, optimized in a release build, with the version of the IR it is written in; `--no-native-overrides` lowers Flick fallback bodies instead of `@native` overrides for conformance testing; shows build phases on stderr, then the module count and entry runners, or error counts and locations; `--silent`/`--quiet` and `--diagnostics json` suppress progress and the summary |
 | `build [paths] --inputs` | prints a conservative JSON input inventory (`key`, `files`, `roots`, `modules`) without writing build artifacts or cache entries |
-| `run [name] [--target <name>] [--entry M] [--profile] [--no-native-overrides] [<backend options>] -- args` | builds with the selected target backend and runs the `main` of the entry `name` (the only one when left out); a `name` that is not an entry runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails, with `args` as their `"$@"`; a client entry (`target = "client"`) delegates to the selected backend's client runner (`FLICK-P067` if the backend has none) |
+| `run [name] [--target <name>] [--vm-tier <tier>] [--entry M] [--profile] [--no-native-overrides] [<backend options>] -- args` | builds with the selected target backend and runs the `main` of the entry `name` (the only one when left out), or with `--target vm` runs a project entry or standalone `.fl` file in process on the VM; a `name` that is not an entry runs a script of [`[scripts]`](../project/#scripts), its shell commands in order until one fails, with `args` as their `"$@"`; a client entry (`target = "client"`) delegates to the selected backend's client runner (`FLICK-P067` if the backend has none) |
 | `dev [name] [--target <name>] [--entry M] [--profile] [--no-native-overrides] [<backend options>] -- args` | rebuilds on changes and replaces the running app; in a project with several entries and none named, it runs every non-client entry and, if any entry has `target = "client"`, delegates the client runner to the selected backend |
-| `test [paths] [--target <name>] [--filter] [--list] [--forbid-only] [--jobs] [--seed] [--timeout] [--reporter human\|json] [--watch] [--profile] [--no-native-overrides] [<backend options>]` | runs the tests of the test root with the selected target backend (see [testing](../testing/)) |
+| `test [paths] [--target <name>] [--vm-tier <tier>] [--filter] [--list] [--forbid-only] [--jobs] [--seed] [--timeout] [--reporter human\|json] [--watch] [--profile] [--no-native-overrides] [<backend options>]` | runs the tests of the test root with the selected target backend (see [testing](../testing/)) |
 | `fmt [paths] [--check] [--stdin --stdin-filepath f]` | writes the canonical layout ([formatting](../syntax/#formatting)); without paths the source and test roots |
 | `clean [--cache]` | removes the build artifacts; `--cache` also the build cache |
 | `install [--locked]` | installs Flick `[dependencies]` from `flick.lock` and delegates target package installation to the selected backend; at a workspace root, each member's |
@@ -64,8 +64,9 @@ dependency of another version than the selected backend pins stops them with
 
 `build`, `run`, `dev`, `test`, `pack`, `doctor`, `inspect` and `doc` (when
 checking examples) take `--target <name>` to select which backend component
-runs (an official backend short name or the short name of a pinned
-`[build.backend]`). Without `--target`, the target comes from
+runs (an official backend short name, the short name of a pinned
+`[build.backend]`, or, in a project and with a compiler built from the
+repository, `lua` for its own `backends/lua` component). Without `--target`, the target comes from
 `[build.backend]`, then `[build] target`, then the backend prefix of
 `[build] environment`, and otherwise the default target backend (see
 [Plugin-contributed commands and backends](#plugin-contributed-commands-and-backends)).
@@ -383,3 +384,15 @@ Removed legacy flags (`FLICK-P057`) for `flick/go`:
 | Removed flag | Replacement |
 | - | - |
 | `build --emit go` / `test --emit go` | `--target go` (or `[build] target = "go"`) |
+
+### Built-in `flick/vm` target (`--target vm`)
+
+Selected by `--target vm`, `[build] target = "vm"`, or `[build] environment = "vm/native"`.
+Runs compiled Flick programs and test suites directly in process on the built-in virtual machine without spawning `node` or `go`.
+
+- **Options (`[target.vm]`)**: `--vm-tier <tier>` (`run`, `test`; accepts `0` or `tier0`, default `0`; also configurable via `[target.vm] tier = "0"` in `flick.toml`).
+- **Running (`run`)**: executes a project entry (`flick run --target vm`) or a standalone source file (`flick run --target vm path/to/file.fl`) in process on the tier-0 reference VM, supporting `--profile debug` and `--profile release`.
+- **Testing (`test`)**: executes project test suites in process (`flick test --target vm`), supporting `--filter`, `--list`, `--seed`, `--reporter human|json`, and `--profile`.
+- **Current scope**: `flick build --target vm` (standalone VM images, tracked in `#988`), `flick dev --target vm`, and `flick inspect --emit output --target vm` are not supported yet and exit with `FLICK-P012`.
+- **Environment checks (`doctor`)**: reports the built-in VM availability and active tier without checking Node.js or Go.
+- **Cargo feature**: enabled by default in `flick` (`vm` feature); builds compiled with `--no-default-features` exclude the VM and report `FLICK-P013` when `--target vm` is selected.

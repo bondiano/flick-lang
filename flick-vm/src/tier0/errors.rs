@@ -25,6 +25,10 @@ pub enum Error {
     ForeignRecoveryResult,
     RecoveryEscape,
     ReuseTokenEscape,
+    AggregateReuseCandidate,
+    ExpectedAggregate,
+    ExpectedBoxedAggregate,
+    MissingAggregateField(usize),
     RecoveryIdentityOverflow,
     UnhandledFailure,
     OutOfFuel,
@@ -203,6 +207,8 @@ impl Error {
             Self::ClosedArena => "arena is closed",
             Self::ExpectedRecord => "expected a named memory record",
             Self::ExpectedObject => "expected a tagged memory object",
+            Self::ExpectedAggregate => "expected an unboxed aggregate value",
+            Self::ExpectedBoxedAggregate => "expected a boxed aggregate fallback cell",
             Self::ExpectedString => "expected a memory string",
             Self::ExpectedBigInt => "expected a memory BigInt",
             Self::ExpectedBoolean => "expected an immediate Bool condition",
@@ -217,6 +223,7 @@ impl Error {
             Self::RecoveryOutsideSelection => "recovery result created outside executing selection",
             Self::RecoveryEscape => "recovery-selection result used as an ordinary value",
             Self::ReuseTokenEscape => "frame-limited reuse token used as an ordinary value",
+            Self::AggregateReuseCandidate => "unboxed aggregate value cannot be a reuse candidate",
             Self::RecoveryIdentityOverflow => "recovery identity overflow",
             Self::HandlerIdentityOverflow => "counted handler identity overflow",
             Self::IntDivisionByZero { remainder } => int_zero_message(*remainder),
@@ -319,6 +326,9 @@ impl Error {
             }
             Self::MissingField { object, field } => {
                 write!(f, "object {object:?} has no field {field}")
+            }
+            Self::MissingAggregateField(field) => {
+                write!(f, "aggregate value has no field {field}")
             }
             Self::MissingLoopTarget(id) => write!(f, "no enclosing loop `{id}` is active"),
             Self::Todo(msg) | Self::Assert(msg) => write!(f, "Error: {msg}"),

@@ -7,8 +7,8 @@ use std::path::Path;
 
 use flick_backend::{
     Abi, Backend, BackendId, BackendPin, BuildRequest, Entry, Environment, InputError, Inputs,
-    Mode, ModuleInput, ModuleRole, OptionValue, Profile, Symbol, TargetRequest,
-    validate_foreign_metadata, validate_options, validate_tags, validate_value_abi,
+    Mode, ModuleInput, ModuleRole, Profile, Symbol, TargetRequest, validate_foreign_metadata,
+    validate_options, validate_tags, validate_value_abi,
 };
 use flick_ir::{
     Adapter, Arith, BinOp, Binding, Exports, Expr, ExprKind, FileId, Foreign, ForeignMode,
@@ -17,6 +17,7 @@ use flick_ir::{
 use toml::{Table, Value};
 
 use super::Lua;
+use crate::emit::kernel_paths;
 use crate::profiles::{DIALECTS, PROFILES};
 
 fn root() -> &'static Path {
@@ -252,7 +253,7 @@ fn foreign_global(name: &str, global: &str) -> Item {
     }
 }
 
-fn request(platform: &str, tags: &[&str], items: Vec<Item>) -> BuildRequest {
+pub(crate) fn request(platform: &str, tags: &[&str], items: Vec<Item>) -> BuildRequest {
     let module = module("App", items);
     let program = Program::new("test", vec![module], vec![], &|_| "App.fl".into());
     let own = vec![ModuleInput {
@@ -378,49 +379,34 @@ fn messages(request: &BuildRequest) -> Vec<(String, Option<(u32, u32)>)> {
     }
 }
 
+/// The Lua kernel holds `BigInt`, `Int64` and `UInt64` exactly on every
+/// profile and dialect, without the `ffi` capability.
 #[test]
-fn a_reachable_big_integer_is_refused_where_it_is_and_an_unreachable_one_is_not() {
-    let unit = || expr(ExprKind::Lit(Lit::Unit), 0, 2);
-    let reached = request(
-        "love",
-        &["lua", "lua51"],
-        vec![function("main", big_product())],
-    );
-    let found = messages(&reached);
-    assert_eq!(found.len(), 1, "{found:?}");
-    assert!(
-        found[0]
-            .0
-            .contains("`BigInt` is not available on the lua/love target"),
-        "{found:?}"
-    );
-    assert_eq!(found[0].1, Some((20, 27)));
-    let unreached = request(
-        "love",
-        &["lua", "lua51"],
-        vec![function("main", unit()), function("unused", big_product())],
-    );
-    assert_eq!(messages(&unreached), vec![]);
-}
-
-#[test]
-fn a_wide_integer_needs_the_ffi_capability() {
+fn a_wide_integer_is_the_kernels_on_every_profile() {
     let literal = || expr(ExprKind::Lit(Lit::Int64(1)), 3, 5);
-    let without = messages(&request(
-        "love",
-        &["lua", "luajit"],
-        vec![function("main", literal())],
-    ));
-    assert!(
-        without[0].0.contains("without the `ffi` capability"),
-        "{without:?}"
-    );
-    let with = messages(&request(
-        "love",
-        &["lua", "luajit", "ffi"],
-        vec![function("main", literal())],
-    ));
-    assert_eq!(with, vec![]);
+    for platform in ["love", "wow-retail"] {
+        let big = request(
+            platform,
+            &["lua", "lua51"],
+            vec![function("main", big_product())],
+        );
+        assert_eq!(messages(&big), vec![], "{platform}");
+        let built = Lua.generate(&big, &mut NoInputs).expect("generated");
+        let app = (built.artifacts.iter())
+            .find(|a| a.path == "App.lua")
+            .expect("App.lua");
+        let text = String::from_utf8(app.bytes.clone()).expect("UTF-8");
+        assert!(
+            text.contains("K.big_mul(K.big(1, 2), K.big(1, 2))"),
+            "{text}"
+        );
+        let wide = request(
+            platform,
+            &["lua", "lua51"],
+            vec![function("main", literal())],
+        );
+        assert_eq!(messages(&wide), vec![], "{platform}");
+    }
 }
 
 #[test]
@@ -512,7 +498,7 @@ fn whether_a_kernel_binding_suspends_is_the_kernel_tables() {
     // a binding that suspends cannot run on WoW; one that returns is the kernel's
     let wow = messages(&program("wow-retail"));
     let suspension = "asynchronous suspension (`App.pause`) is not available";
-    let kernel = "the Lua primitive kernel is not implemented";
+    let kernel = "the Lua kernel does not implement it";
     assert_eq!(wow.len(), 2, "{wow:?}");
     assert!(wow[0].0.contains(suspension), "{wow:?}");
     assert_eq!(wow[0].1, Some((8, 13)));
@@ -537,22 +523,32 @@ fn generation_writes_the_chunks_of_a_clean_check() {
         .generate(&clean("love"), &mut NoInputs)
         .expect("generated");
     let paths: Vec<&str> = built.artifacts.iter().map(|a| a.path.as_str()).collect();
-    assert_eq!(paths, ["App.lua", "App.lua.map", "chunks.txt", "main.lua"]);
+    let kernel = kernel_paths();
+    let k = kernel.len();
+    assert_eq!(paths[..k], kernel);
+    assert_eq!(
+        paths[k..],
+        ["App.lua", "App.lua.map", "chunks.txt", "main.lua"]
+    );
     let text = |i: usize| String::from_utf8(built.artifacts[i].bytes.clone()).expect("UTF-8");
     assert_eq!(
-        text(0),
-        "local _, ns = ...\nlocal M = {}\nns.App = M\nM.main = function(_)\n  return true\nend\n"
+        text(k),
+        "local _, ns = ...\nlocal K = ns.k\nlocal M = {}\nns.App = M\nM.main = function(_)\n  \
+         return true\nend\n"
     );
-    assert_eq!(
-        text(3),
-        "local ns = {}\nassert(love.filesystem.load(\"App.lua\"))(nil, ns)\n"
-    );
+    let mut main = String::from("local ns = {}\n");
+    for p in kernel.iter().map(String::as_str).chain(["App.lua"]) {
+        main.push_str("assert(love.filesystem.load(\"");
+        main.push_str(p);
+        main.push_str("\"))(nil, ns)\n");
+    }
+    assert_eq!(text(k + 3), main);
     // WoW loads the files its `.toc` lists: no `main.lua`
     let wow = Lua
         .generate(&clean("wow-retail"), &mut NoInputs)
         .expect("generated");
     let paths: Vec<&str> = wow.artifacts.iter().map(|a| a.path.as_str()).collect();
-    assert_eq!(paths, ["App.lua", "App.lua.map", "chunks.txt"]);
+    assert_eq!(paths[k..], ["App.lua", "App.lua.map", "chunks.txt"]);
     let again = Lua
         .generate(&clean("wow-retail"), &mut NoInputs)
         .expect("generated");
@@ -560,29 +556,6 @@ fn generation_writes_the_chunks_of_a_clean_check() {
         wow.artifacts, again.artifacts,
         "a rebuild writes the same bytes"
     );
-}
-
-#[test]
-fn a_command_that_would_run_the_program_is_refused() {
-    for command in ["run", "test", "dev"] {
-        let mut clean = request(
-            "wow-retail",
-            &["lua", "lua51"],
-            vec![function("main", expr(ExprKind::Lit(Lit::Unit), 0, 2))],
-        );
-        clean.target.options.push(OptionValue {
-            key: "command".into(),
-            value: command.into(),
-        });
-        let refused = Lua.generate(&clean, &mut NoInputs).expect_err("refused");
-        assert_eq!(refused.len(), 1, "{refused:?}");
-        assert_eq!(refused[0].code, "P012");
-        let expected = format!(
-            "`flick {command}` is not available on the lua/wow-retail target yet: a Lua program \
-             runs in its host, World of Warcraft or LÖVE"
-        );
-        assert!(refused[0].message.contains(&expected), "{refused:?}");
-    }
 }
 
 #[test]
@@ -604,3 +577,5 @@ impl Inputs for NoInputs {
         Err(InputError::Undeclared)
     }
 }
+
+mod launch;

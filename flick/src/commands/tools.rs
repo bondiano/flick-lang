@@ -16,8 +16,8 @@ use crate::args::{DoctorArguments, ExplainArguments, GlobalArguments};
 use crate::backends::Selected;
 use crate::command::Outcome;
 use crate::sources::FsHost;
-use crate::stdlib;
 use crate::toolchain::COMPILER;
+use crate::{stdlib, vm};
 
 pub fn explain(options: &ExplainArguments) -> Outcome {
     if let Some((package, code)) = options.code.trim().split_once('/') {
@@ -175,6 +175,14 @@ fn doctor_backend(
     project: Option<&project::Project>,
     report: &mut DoctorReport,
 ) {
+    if (project.is_some() || options.target.is_some())
+        && vm::is_vm_target(options.target.as_deref(), project)
+    {
+        for (ok, what, detail) in vm::doctor_lines() {
+            report.line(ok, &what, &detail);
+        }
+        return;
+    }
     #[cfg(feature = "wasm-backends")]
     {
         if project.is_some() || options.target.is_some() {

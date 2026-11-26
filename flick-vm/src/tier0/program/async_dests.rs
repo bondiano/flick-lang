@@ -42,7 +42,7 @@ impl<'p> Machine<'p, '_> {
             }
             BracketOutcome::Failure(orig) => {
                 let joined = if let Some(secondary) = self.failure.take() {
-                    let res = primitives::join_causes(self.heap, &orig, &secondary, &mut self.fuel);
+                    let res = primitives::join_causes(self.heap, &orig, &secondary, &mut FuelCounter(&mut self.fuel));
                     self.heap.drop_cause(orig)?;
                     self.heap.drop_cause(secondary)?;
                     res?

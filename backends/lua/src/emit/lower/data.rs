@@ -11,6 +11,11 @@ use flick_ir::{
 use super::super::ast::{Block, Expr, ExprKind, Field, Function, LastKind, Name, Stmt, StmtKind};
 use super::{Lowering, RUNTIME};
 
+/// The key of the `i`th dictionary a tagged value holds.
+pub(super) fn held_key(i: usize) -> String {
+    format!("${}", i + 1)
+}
+
 impl<'p> Lowering<'p> {
     /// A constructor applied to all its fields, at pure stages in order.
     pub(super) fn constructed(&mut self, e: &IrExpr) -> Option<Expr> {
@@ -69,7 +74,12 @@ impl<'p> Lowering<'p> {
             Rep::Tagged => {
                 let fields: Vec<Name> = (0..c.arity).map(|_| self.names.fresh("f")).collect();
                 let dicts: Vec<Name> = (0..c.dicts).map(|_| self.names.fresh("dict")).collect();
-                let items = (fields.iter().chain(&dicts)).map(|n| Field::Item(Expr::name(n, span)));
+                // the held dictionaries apart, at `$1`, …, so that `==` skips them
+                let held = dicts
+                    .iter()
+                    .enumerate()
+                    .map(|(i, n)| Field::Pair(Expr::str(&held_key(i), span), Expr::name(n, span)));
+                let items = (fields.iter().map(|n| Field::Item(Expr::name(n, span)))).chain(held);
                 let mut value = self.tagged(c, items, span);
                 for field in fields.into_iter().rev() {
                     value = function(vec![field], value);
@@ -92,7 +102,7 @@ impl<'p> Lowering<'p> {
     pub(super) fn global(&mut self, module: &str, name: &str, span: Span) -> Expr {
         match self.items.get(&(module, name)) {
             Some(ItemKind::Foreign(f)) => {
-                if let Err(why) = self.host_function(f) {
+                if let Err(why) = self.host_function(module, f) {
                     let what = format!("`{module}.{}`", f.source_name.as_ref().unwrap_or(&f.name));
                     return self.unsupported(span, &what, why);
                 }

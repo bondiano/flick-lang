@@ -3,8 +3,6 @@
 
 use std::time::{Duration as StdDuration, Instant as StdInstant};
 
-const HOST_CTX_KEY: &str = "flick/bridge/HostContext";
-
 impl Machine<'_, '_> {
     /// Collects every constructor tag and built-in `@flick-lang/*` module specifier
     /// referenced anywhere in `self.program` so the Node worker can register FNV
@@ -48,36 +46,7 @@ impl Machine<'_, '_> {
     }
 
     fn wrap_host_context_handle(&mut self, handle: Value) -> Result<Value, Error> {
-        let list = self.heap.construct("$list", vec![handle])?;
-        let mut map = BTreeMap::new();
-        map.insert(HOST_CTX_KEY.to_owned(), list);
-        Ok(self.heap.allocate(Data::Context(map)))
-    }
-
-    fn concat_host_context_lists(&mut self, first: Value, second: Value) -> Result<Value, Error> {
-        let mut items = Vec::new();
-        for list in [first, second] {
-            let count = match self.heap.list_view(&list) {
-                Ok((_, _, c)) => c,
-                Err(err) => {
-                    let _ = self.heap.drop_value(list);
-                    let _ = self.heap.drop_values(items);
-                    return Err(err);
-                }
-            };
-            for i in 0..count {
-                match self.heap.project(&list, i) {
-                    Ok(v) => items.push(v),
-                    Err(err) => {
-                        let _ = self.heap.drop_value(list);
-                        let _ = self.heap.drop_values(items);
-                        return Err(err);
-                    }
-                }
-            }
-            self.heap.drop_value(list)?;
-        }
-        self.heap.construct("$list", items)
+        stdlib::runtime::coop::wrap_host_context_handle(self.heap, handle)
     }
 
     /// Encodes all active non-root service layers/contexts outermost-to-innermost so

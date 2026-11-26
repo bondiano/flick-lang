@@ -100,6 +100,40 @@ fn go_names_its_first_releases_without_a_patch() {
 }
 
 #[test]
+fn lua_interpreters_name_their_release() {
+    let lua = |out: &str| (adapter("lua").parse)(out);
+    let luajit = |out: &str| (adapter("luajit").parse)(out);
+    assert_eq!(
+        lua("Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio\n").as_deref(),
+        Some("5.1.5")
+    );
+    assert_eq!(
+        luajit("LuaJIT 2.1.1785763465 -- Copyright (C) 2005-2026 Mike Pall.\n").as_deref(),
+        Some("2.1.1785763465")
+    );
+    // LuaJIT's `lua` is not PUC-Rio Lua, and a release has three numbers
+    assert_eq!(lua("LuaJIT 2.1.1785763465 -- Copyright\n"), None);
+    assert_eq!(lua("Lua 5.1  Copyright\n"), None);
+    assert!(adapter("lua").version_on_stderr && !adapter("luajit").version_on_stderr);
+}
+
+#[cfg(unix)]
+#[test]
+fn lua_writes_its_version_to_stderr() {
+    let root = env::temp_dir().join(format!("flick-lua-version-{}", process::id()));
+    fs::create_dir_all(&root).expect("a directory");
+    let lua = root.join("lua");
+    script(
+        &lua,
+        b"#!/bin/sh\necho 'Lua 5.1.5  Copyright (C) 1994-2012 Lua.org, PUC-Rio' >&2\n",
+        0o755,
+    );
+    let tool = Tool::at_path("lua", &lua).expect("found");
+    assert_eq!(tool.pin.version, "5.1.5");
+    fs::remove_dir_all(root).expect("cleanup");
+}
+
+#[test]
 fn a_step_sets_only_the_variables_of_its_tool() {
     let step = |id: &str, key: &str| ToolchainStep {
         id: "build".into(),

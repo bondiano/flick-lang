@@ -328,11 +328,11 @@ impl Machine<'_, '_> {
         };
         let dup = self.heap.dup_cause(c)?;
         if *stopping {
-            let without = primitives::without_interrupts_cause(self.heap, &dup, &mut self.fuel);
+            let without = primitives::without_interrupts_cause(self.heap, &dup, &mut FuelCounter(&mut self.fuel));
             self.heap.drop_cause(dup)?;
             if let Some(rest) = without? {
                 if let Some(prev) = first_failure.take() {
-                    let joined = primitives::join_causes(self.heap, &prev, &rest, &mut self.fuel);
+                    let joined = primitives::join_causes(self.heap, &prev, &rest, &mut FuelCounter(&mut self.fuel));
                     self.heap.drop_cause(prev)?;
                     self.heap.drop_cause(rest)?;
                     let joined = joined?;
@@ -390,7 +390,7 @@ impl Machine<'_, '_> {
                 }
                 if or_die {
                     let converted =
-                        primitives::fails_to_dies_cause(self.heap, &cause, &mut self.fuel);
+                        primitives::fails_to_dies_cause(self.heap, &cause, &mut FuelCounter(&mut self.fuel));
                     self.heap.drop_cause(cause)?;
                     cause = converted?;
                 }

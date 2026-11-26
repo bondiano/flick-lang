@@ -28,7 +28,7 @@ use super::run::{Generation, build_into_generation_for, dev_entries, find_projec
 use super::test::{settled_snapshot, watch_snapshot, watched_roots};
 use crate::args::{GlobalArguments, RunArguments};
 use crate::child::{self, Running};
-use crate::{report, timings};
+use crate::{report, timings, vm};
 
 /// A running generation: a process per entry it started.
 struct Live {
@@ -73,6 +73,11 @@ pub fn dev(options: &RunArguments, global: &GlobalArguments) -> ExitCode {
             return report::exit_code(&diagnostics);
         }
     };
+    if vm::is_vm_target(options.target.as_deref(), Some(&project)) {
+        let diag = vm::unsupported_dev_diagnostic();
+        report::render(global, &SourceMap::default(), &[diag]);
+        return ExitCode::from(2);
+    }
     let names = match dev_entries(&project, options) {
         Ok(names) => names,
         Err(message) => {

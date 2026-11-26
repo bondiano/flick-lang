@@ -101,31 +101,11 @@ impl Machine<'_, '_> {
     }
 
     fn extract_opt_value(&mut self, opt: Value) -> Result<Option<Value>, Error> {
-        let Value::Object(tok) = &opt else {
-            self.heap.drop_value(opt)?;
-            return Err(Error::ExpectedOption);
-        };
-        let res = match &self.heap.object(tok.id)?.data {
-            Data::Tagged { tag, .. } if tag == "Prelude.Option.None" => None,
-            Data::Tagged { tag, fields, .. }
-                if tag == "Prelude.Option.Some" && fields.len() == 1 =>
-            {
-                Some(self.heap.dup(&fields[0].representation())?)
-            }
-            _ => {
-                self.heap.drop_value(opt)?;
-                return Err(Error::ExpectedOption);
-            }
-        };
-        self.heap.drop_value(opt)?;
-        Ok(res)
+        stdlib::runtime::coop::extract_opt_value(self.heap, opt)
     }
 
     fn record_bool_field(&self, rec: &Value, name: &str) -> bool {
-        self.heap
-            .named_field(rec, name)
-            .ok()
-            .is_some_and(|v| matches!(v, Value::Bool(true)))
+        stdlib::runtime::coop::record_bool_field(self.heap, rec, name)
     }
 
     fn make_interrupted_fiber_handle(&mut self) -> Result<Value, Error> {
@@ -151,7 +131,7 @@ impl Machine<'_, '_> {
             .filter_map(|(&eid, e)| e.key.as_ref().map(|k| (eid, k.representation())))
             .collect();
         for (eid, krep) in pairs {
-            if primitives::values_equal(self.heap, &krep, key, &mut self.fuel)? {
+            if primitives::values_equal(self.heap, &krep, key, &mut FuelCounter(&mut self.fuel))? {
                 return Ok(Some(eid));
             }
         }

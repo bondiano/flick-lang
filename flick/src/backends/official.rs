@@ -9,6 +9,7 @@ use std::{env, fs, process};
 
 use flick_backend::{BackendId, BackendPin, VersionRange};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+use flick_core::project::config::BackendPackage;
 use flick_core::project::lock::{LOCK_FILE, Lock, LockedBackend};
 use flick_core::project::{Project, store};
 use semver::Version;
@@ -245,6 +246,24 @@ fn checkout(id: &str) -> Option<(BackendPin, Vec<u8>)> {
     let pin = checkout_pin(id)?;
     let bytes = fs::read(package.join("component.wasm")).ok()?;
     Some((pin, bytes))
+}
+
+/// The pinned component a compiler built from a checkout of this repository
+/// also knows by its short name, from the checkout's `backends/lua`: not an
+/// official backend, and in no release index.
+pub(crate) const CHECKOUT_LUA: &str = "flick/lua";
+
+/// The checkout's own component `id`, as a project would pin it in
+/// `[build.backend]`, with the absolute path of its `component.wasm`.
+pub(crate) fn checkout_package(id: &str) -> Option<BackendPackage> {
+    let pin = checkout_pin(id)?;
+    let component = checkout_root(id)?.join("component.wasm");
+    Some(BackendPackage {
+        id: pin.identity.id,
+        version: pin.identity.version,
+        sha256: pin.sha256,
+        component: component.to_str()?.to_owned(),
+    })
 }
 
 /// The pin of a checkout's own component of `id`, without its bytes.

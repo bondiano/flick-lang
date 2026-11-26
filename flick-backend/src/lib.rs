@@ -13,6 +13,8 @@ mod value_abi;
 mod wit;
 
 pub use driver::{Failure, Generated, generate};
+#[cfg(not(target_arch = "wasm32"))]
+pub use driver::{StageTimings, generate_with_timings};
 pub use handshake::{handshake, validate_foreign_metadata, validate_options, validate_tags};
 pub use inputs::{DeclaredInputs, Inputs, sha256};
 pub use request::{validate_request, validate_source_spans};
@@ -275,10 +277,36 @@ pub trait Backend {
     }
 }
 
-/// Deterministic CBOR of a request, including the backend digest and all side
-/// input digests. Ordered WIT lists are significant, including options.
+/// Deterministic SHA-256 of a request, including the backend digest, inline
+/// program bytes, and all side-input digests. Ordered WIT lists are
+/// significant, including options. Streams directly into SHA-256 without
+/// encoding `request.program` byte-by-byte as a CBOR integer array.
 pub fn cache_key(request: &BuildRequest) -> String {
-    let mut bytes = Vec::new();
-    ciborium::into_writer(request, &mut bytes).expect("a build request serializes");
-    sha256(&bytes)
+    use sha2::{Digest, Sha256};
+    use std::io::{self, Write};
+
+    struct HashWriter(Sha256);
+    impl Write for HashWriter {
+        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+            self.0.update(buf);
+            Ok(buf.len())
+        }
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    let mut hasher = HashWriter(Sha256::new());
+    ciborium::into_writer(&request::RequestMetadata::of(request), &mut hasher)
+        .expect("a build request serializes");
+    hasher
+        .0
+        .update((request.program.len() as u64).to_le_bytes());
+    hasher.0.update(&request.program);
+    let digest = hasher.0.finalize();
+    digest.iter().fold(String::with_capacity(64), |mut out, b| {
+        use std::fmt::Write as _;
+        write!(out, "{b:02x}").expect("writing to a string");
+        out
+    })
 }

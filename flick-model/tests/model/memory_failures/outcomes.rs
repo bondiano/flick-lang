@@ -250,6 +250,8 @@ fn malformed_results_are_faults_not_typed_failures() {
                             tag: tag.into(),
                             fields,
                             dicts,
+                            rep: ValueRep::Cell,
+                            layout: None,
                         },
                     ),
                     intrinsic(3, Intrinsic::FromResult, &[2]),

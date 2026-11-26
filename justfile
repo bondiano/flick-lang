@@ -95,13 +95,14 @@ lean:
 # Check each capability independently, without workspace feature unification
 feature-check:
     cargo clippy -p flick-core --all-targets --no-default-features -- -D warnings
-    for feature in native-project ide contracts; do cargo clippy -p flick-core --all-targets --no-default-features --features "$feature" -- -D warnings || exit $?; done
+    for feature in native-js native-project ide contracts; do cargo clippy -p flick-core --all-targets --no-default-features --features "$feature" -- -D warnings || exit $?; done
     cargo clippy -p flick-ffi --all-targets --no-default-features -- -D warnings
+    cargo clippy -p flick --no-default-features -- -D warnings
 
 # Exercise minimal and independently enabled compiler capabilities
 feature-test:
     cargo test -p flick-core --no-default-features --features embedded-std --lib --test features
-    for feature in native-project ide contracts; do cargo test -p flick-core --no-default-features --test features --features "embedded-std,$feature" || exit $?; done
+    for feature in native-js native-project ide contracts; do cargo test -p flick-core --no-default-features --test features --features "embedded-std,$feature" || exit $?; done
     cargo test -p flick-ffi --no-default-features
 
 # The Go runtime of the go target: vet and its unit tests.
@@ -193,6 +194,21 @@ language seed="42": e2e-compiler
 # The language tests as a Go executable alone, without Node, after `e2e-go` built the compiler
 language-go seed="42":
     cd tests/language && ../../target/e2e/flick test --target go --seed {{seed}}
+
+# The language tests of tests/language on the in-process VM compared against JS:
+# every language test that passes on js must pass on vm with zero gaps or skips
+language-vm seed="42": e2e-compiler
+    pnpm -C runtime build
+    pnpm -C packages/effect-ts build
+    cd tests/language && {{flick}} test --target js --seed {{seed}} --reporter json > ../../target/language-js.txt || { cat ../../target/language-js.txt; exit 1; }
+    cd tests/language && {{flick}} test --target vm --seed {{seed}} --reporter json > ../../target/language-vm.txt || { cat ../../target/language-vm.txt; exit 1; }
+    diff -u target/language-js.txt target/language-vm.txt
+    cat target/language-vm.txt
+
+# The tests/run/model.txt corpus executed in process via `flick run --target vm`
+# in debug and release profiles with empty PATH (no node or go spawned)
+vm-cases: e2e-compiler
+    node tools/vm-cases/index.mjs {{flick}}
 
 # Bundle the tracked programs (release) with rolldown and hold them to their gzip budgets
 bundle-size: e2e-compiler
@@ -347,10 +363,12 @@ wasm:
     echo "flick_wasm.wasm: $(wc -c < $wasm) bytes, $(gzip -6c $wasm | wc -c) gzipped"; \
     test $(wc -c < $wasm) -le 4849000 # reason: field accessors (#788): accessor parsing, typing, diagnostics and IDE queries in the playground (4.766 MB with them); ordered guarded matches over known shapes in the release optimizer the playground runs (4.806 MB with them, 4.798 MB before); optional field steps (#789): path typing and lowering, the nested-Option codec rule, completion, hover and rewrites (+16 KB: 4.824 MB with them, 4.808 MB before); reused modules sharing their IR with the editor's module cache (#966, +4 KB); the std module PriorityQueue (#736), whose source the playground embeds (about 4.2 KB: 4,831,578 bytes with it); the std modules OrderedMap and OrderedSet (#735), whose sources the playground embeds (about 9.7 KB: 4,841,667 bytes with them); the `@native` clauses of the built-in modules selected for each build (#1095) and the Flick bodies of the list and string hooks the Lua target runs (#831), whose sources the playground embeds (about 3.6 KB: 4,848,036 bytes with them)
 
-# Build the playground's compiler: the wasm module and its JS bindings
+# Build the playground's compiler: the wasm module, its JS bindings, and the
+# pinned official JS backend component assets loaded lazily by backend.worker.ts
 docs-wasm: wasm
     cargo install wasm-bindgen-cli --version 0.2.130 --locked --root target/tools
     target/tools/bin/wasm-bindgen --target web --out-dir docs/src/playground/wasm target/wasm32-unknown-unknown/release/flick_wasm.wasm
+    cp backends/js/package/component.wasm backends/js/package/backend.json docs/src/playground/wasm/
 
 # Serve the documentation site; its playground is a Flick program
 docs-dev: docs-wasm

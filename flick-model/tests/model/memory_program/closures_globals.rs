@@ -1,3 +1,4 @@
+use flick_core::ir::memory::ValueRep;
 #[test]
 fn curried_closure_moves_its_capture_without_self_owning_edges() {
     let p = program(vec![
@@ -30,6 +31,7 @@ fn curried_closure_moves_its_capture_without_self_owning_edges() {
                 Operation::Project {
                     object: 0,
                     field: 0,
+                    rep: ValueRep::Cell,
                 },
             )],
             2,
@@ -186,6 +188,8 @@ fn captured_value_survives_two_calls_and_is_released_with_the_result() {
                     Operation::Construct {
                         tag: "$tuple".into(),
                         fields: vec![4, 6],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],
@@ -198,6 +202,7 @@ fn captured_value_survives_two_calls_and_is_released_with_the_result() {
                 Operation::Project {
                     object: 0,
                     field: 0,
+                    rep: ValueRep::Cell,
                 },
             )],
             2,
@@ -242,6 +247,7 @@ fn self_recursion_with_a_capture_uses_an_iterative_call_stack() {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 bind(3, Operation::Literal(Lit::Int(0))),

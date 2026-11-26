@@ -11,18 +11,18 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{error, fmt};
 
 use flick_core::ir::Lit;
-use flick_core::ir::memory::{self, Exit, Function, Instruction, Local, Operation};
+use flick_core::ir::memory::{
+    self, CellLayout, Exit, Function, Instruction, Local, Operation, ValueRep,
+};
 use regex_automata::meta::Regex;
 
-mod causes;
+pub(crate) mod causes;
 pub use causes::{CauseToken, DefectClass, DefectCode, DefectSpec, LanguageExit, Reason};
 
-mod host_bridge;
-pub use host_bridge::HostBridge;
+pub use crate::stdlib::{DRAW, HostBridge, HostMode, MILLIS, MONOTONIC_NANOS, NANOS};
+use crate::stdlib::{Unmetered, eval_binary, eval_neg, eval_not};
 
 mod patterns;
-mod primitives;
-pub use primitives::{DRAW, HostMode, MILLIS, MONOTONIC_NANOS, NANOS};
 mod program;
 mod record_update;
 pub use program::{
@@ -64,7 +64,7 @@ pub struct ObjectId {
 /// ```
 #[derive(Debug, PartialEq, Eq)]
 pub struct ObjectToken {
-    id: ObjectId,
+    pub(crate) id: ObjectId,
 }
 
 /// A non-owning capability for a cell owned by one execution's root arena.
@@ -73,16 +73,16 @@ pub struct ObjectToken {
 /// execution machinery, and releasing a closed handle never reads storage.
 #[derive(Debug, PartialEq, Eq)]
 pub struct CellHandle {
-    id: ObjectId,
-    execution: usize,
+    pub(crate) id: ObjectId,
+    pub(crate) execution: usize,
 }
 
 /// Nonowning lexical owner identity; validated against one running machine.
 #[derive(Debug, PartialEq, Eq)]
 pub struct OwnerHandle {
-    heap: usize,
-    execution: usize,
-    index: usize,
+    pub(crate) heap: usize,
+    pub(crate) execution: usize,
+    pub(crate) index: usize,
 }
 
 /// Nonowning arena identity. Retention does not keep its storage alive.
@@ -158,12 +158,23 @@ pub enum Value {
     Var(VarHandle),
     Lazy(LazyHandle),
     Iterator(IteratorHandle),
+    /// Unboxed aggregate value: no heap cell, no `ObjectId`, no refcount header.
+    /// Owns its ordinary fields and optional dictionary evidence suffix inline.
+    Aggregate {
+        tag: String,
+        ordinary_fields: usize,
+        fields: Vec<Value>,
+    },
     /// Immediate sentinel produced by `DropReuse` when the operand was shared
     /// or non-reusable; consumes zero heap storage and causes `Reuse*` to allocate.
     ReuseNull,
 }
 
 impl Value {
+    pub fn is_aggregate(&self) -> bool {
+        matches!(self, Self::Aggregate { .. })
+    }
+
     pub fn object_id(&self) -> Option<ObjectId> {
         match self {
             Self::Object(token) => Some(token.id),
@@ -181,7 +192,7 @@ impl Value {
 
     /// Copies representation, not ownership. Used only immediately before
     /// incrementing the reference count, or for immediate values.
-    fn representation(&self) -> Value {
+    pub(crate) fn representation(&self) -> Value {
         match self {
             Self::Unit => Self::Unit,
             Self::Bool(value) => Self::Bool(*value),
@@ -228,6 +239,15 @@ impl Value {
                 id: iterator.id,
                 execution: iterator.execution,
             }),
+            Self::Aggregate {
+                tag,
+                ordinary_fields,
+                fields,
+            } => Self::Aggregate {
+                tag: tag.clone(),
+                ordinary_fields: *ordinary_fields,
+                fields: fields.iter().map(Self::representation).collect(),
+            },
             Self::ReuseNull => Self::ReuseNull,
         }
     }
@@ -259,7 +279,10 @@ pub struct Stats {
 include!("tier0/errors.rs");
 include!("tier0/representation.rs");
 include!("tier0/allocation.rs");
+include!("tier0/aggregates.rs");
 include!("tier0/ownership.rs");
 include!("tier0/reuse.rs");
 include!("tier0/standalone.rs");
 include!("tier0/heap_tests.rs");
+#[cfg(test)]
+include!("tier0/aggregate_tests.rs");

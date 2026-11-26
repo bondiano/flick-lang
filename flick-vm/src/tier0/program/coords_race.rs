@@ -44,7 +44,7 @@ impl Machine<'_, '_> {
             *failures = Some(match failures.take() {
                 None => dup,
                 Some(prev) => {
-                    let cat = primitives::concat_causes(self.heap, &prev, &dup, &mut self.fuel);
+                    let cat = primitives::concat_causes(self.heap, &prev, &dup, &mut FuelCounter(&mut self.fuel));
                     self.heap.drop_cause(prev)?;
                     self.heap.drop_cause(dup)?;
                     cat?

@@ -2,7 +2,7 @@
 use flick_core::ir::Lit;
 use flick_core::ir::memory::{
     Block, Exit, Function, Global, HandlerEffect, HandlerOperation, Instruction, Intrinsic, Name,
-    Operation, Program,
+    Operation, Program, ValueRep,
 };
 use flick_core::opt::perceus;
 use flick_core::types::OpClass;
@@ -34,6 +34,17 @@ fn entry() -> Name {
     Name::new("Evidence", "main")
 }
 fn program() -> Program {
+    let tuple = |binding, fields| {
+        bind(
+            binding,
+            Operation::Construct {
+                tag: "$tuple".into(),
+                fields,
+                rep: ValueRep::Cell,
+                layout: None,
+            },
+        )
+    };
     let functions = vec![
         function(
             &[],
@@ -49,13 +60,7 @@ fn program() -> Program {
                 ),
                 intrinsic(3, Intrinsic::ScopeRun, &[2]),
                 bind(4, Operation::ReadOwnerEvidence),
-                bind(
-                    5,
-                    Operation::Construct {
-                        tag: "$tuple".into(),
-                        fields: vec![3, 4],
-                    },
-                ),
+                tuple(5, vec![3, 4]),
             ],
             5,
         ),
@@ -67,6 +72,7 @@ fn program() -> Program {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 bind(
@@ -96,13 +102,7 @@ fn program() -> Program {
                 bind(4, Operation::ReadOwnerEvidence),
                 bind(5, Operation::Literal(Lit::Unit)),
                 intrinsic(6, Intrinsic::ScopeCurrent, &[5]),
-                bind(
-                    7,
-                    Operation::Construct {
-                        tag: "$tuple".into(),
-                        fields: vec![1, 3, 4, 6],
-                    },
-                ),
+                tuple(7, vec![1, 3, 4, 6]),
             ],
             7,
         ),
@@ -112,13 +112,7 @@ fn program() -> Program {
                 bind(1, Operation::ReadOwnerEvidence),
                 bind(2, Operation::Literal(Lit::Unit)),
                 intrinsic(3, Intrinsic::ScopeCurrent, &[2]),
-                bind(
-                    4,
-                    Operation::Construct {
-                        tag: "$tuple".into(),
-                        fields: vec![1, 3],
-                    },
-                ),
+                tuple(4, vec![1, 3]),
             ],
             4,
         ),
@@ -252,6 +246,8 @@ fn handler_program(class: OpClass) -> Program {
                     Operation::Construct {
                         tag: "$tuple".into(),
                         fields: vec![1, 2, 4],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],

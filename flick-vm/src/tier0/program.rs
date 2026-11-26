@@ -15,7 +15,12 @@ use flick_core::ir::memory::{
 use super::{
     ArenaHandle, ArenaView, CellHandle, Data, Error, ExitData, Heap, HostBridge, HostMode,
     IteratorHandle, IteratorState, LayerData, LazyHandle, LazyState, Locals, ObjectId, ObjectToken,
-    OwnerHandle, SeqData, Value, VarHandle, patterns, peek, primitives, tagged_boundary, take,
+    OwnerHandle, SeqData, Value, VarHandle, patterns, peek, tagged_boundary, take,
+};
+use crate::stdlib::runtime::coop::{HOST_CTX_KEY, MEMO_REF_KEY};
+use crate::stdlib::{
+    self, DEFAULT_VIRTUAL_NOW_NS, FIBER_QUANTUM, FuelCounter, HostContext, QUANTUM_VIRTUAL_NS,
+    primitives,
 };
 
 #[path = "dictionaries.rs"]
@@ -690,7 +695,6 @@ include!("program/async_dests_unwind.rs");
 include!("program/fiber_groups.rs");
 include!("program/fiber_groups_stop.rs");
 include!("program/context_ops.rs");
-include!("program/context_pure.rs");
 include!("program/manual_scope.rs");
 include!("program/layer_build.rs");
 include!("program/layer_merge.rs");

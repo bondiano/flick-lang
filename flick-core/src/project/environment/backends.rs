@@ -11,11 +11,13 @@ use crate::types::{
     AxisTagModel, BackendTagModel, ForeignBackendSpec, HostTagModel, NativeOverrideEnv,
 };
 
-/// Built-in metadata for the official `flick/js` and `flick/go` backends.
-/// Must stay in sync with `backends/js/src/component.rs` and `backends/go/src/component.rs`.
+/// Built-in metadata for the official `flick/js`, `flick/go`, and `flick/vm` backends.
+/// `flick/js` and `flick/go` must stay in sync with `backends/js/src/component.rs`
+/// and `backends/go/src/component.rs`.
 pub fn official_backends() -> Vec<BackendTags> {
     let js = ForeignBackendSpec::js();
     let go = ForeignBackendSpec::go();
+    let vm = ForeignBackendSpec::vm();
     vec![
         BackendTags {
             id: "flick/js".into(),
@@ -61,6 +63,17 @@ pub fn official_backends() -> Vec<BackendTags> {
             type_form_attributes: go.type_form_attributes,
             #[cfg(not(target_arch = "wasm32"))]
             value_abi: go.value_abi,
+        },
+        BackendTags {
+            id: "flick/vm".into(),
+            short: "vm".into(),
+            tags: vec!["vm".into()],
+            axes: Vec::new(),
+            environments: vec![("vm".into(), "native".into())],
+            foreign_adapters: vm.adapters,
+            type_form_attributes: vm.type_form_attributes,
+            #[cfg(not(target_arch = "wasm32"))]
+            value_abi: vm.value_abi,
         },
     ]
 }

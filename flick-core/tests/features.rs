@@ -1,14 +1,22 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
+#[cfg(feature = "native-js")]
 use flick_core::build::{self, Artifact, Backend, Extras, Settings};
+#[cfg(feature = "native-js")]
 use flick_core::codegen::{self, EffectBridge};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
+#[cfg(feature = "native-js")]
 use flick_core::iface;
+#[cfg(feature = "native-js")]
 use flick_core::ir::ItemKind;
 use flick_core::project::{self, Compilation, Host};
-use flick_core::source::{FileId, SourceMap};
-use flick_core::types::{Kind, Type, implicit_go_bindings};
+#[cfg(feature = "native-js")]
+use flick_core::source::FileId;
+use flick_core::source::SourceMap;
+#[cfg(feature = "native-js")]
+use flick_core::types::implicit_go_bindings;
+use flick_core::types::{Kind, Type};
 
 struct Module<'a>(&'a str);
 
@@ -37,10 +45,12 @@ fn compile(source: &str) -> (Vec<Diagnostic>, SourceMap, Compilation) {
     (diagnostics, sources, compilation)
 }
 
+#[cfg(feature = "native-js")]
 fn source_path(_: FileId) -> String {
     "file:///Main.fl".to_owned()
 }
 
+#[cfg(feature = "native-js")]
 #[expect(
     clippy::unnecessary_wraps,
     reason = "the build settings require this shape"
@@ -49,6 +59,7 @@ fn source_dir(_: &str) -> Option<PathBuf> {
     Some(PathBuf::from("/"))
 }
 
+#[cfg(feature = "native-js")]
 fn settings(release: bool) -> Settings<'static> {
     Settings {
         package: None,
@@ -68,6 +79,7 @@ fn settings(release: bool) -> Settings<'static> {
     }
 }
 
+#[cfg(feature = "native-js")]
 fn emit(source: &str, settings: &Settings) -> (Vec<Artifact>, Vec<Diagnostic>) {
     let (diagnostics, sources, compilation) = compile(source);
     assert!(
@@ -77,8 +89,10 @@ fn emit(source: &str, settings: &Settings) -> (Vec<Artifact>, Vec<Diagnostic>) {
     build::emit(&compilation, &sources, settings)
 }
 
+#[cfg(feature = "native-js")]
 const MAIN: &str = "module Main exposing (answer)\nanswer : Int\nlet answer = 42\n";
 
+#[cfg(feature = "native-js")]
 #[test]
 fn optional_outputs_have_real_artifacts_only_when_enabled() {
     for release in [false, true] {
@@ -123,6 +137,7 @@ fn optional_outputs_have_real_artifacts_only_when_enabled() {
     }
 }
 
+#[cfg(feature = "native-js")]
 #[test]
 fn shared_browser_and_sql_programs_compile_without_server_modules() {
     let browser = "module Main exposing (view, fetch, main)\n\
@@ -172,6 +187,7 @@ fn server_fns_and_cli_blocks_are_plugins_of_std_in_every_build() {
     assert!(!missing, "{diagnostics:?}");
 }
 
+#[cfg(feature = "native-js")]
 #[test]
 fn typed_declarations_and_facades_do_not_require_native_artifact_publication() {
     let source = "module Main exposing (answer)\nanswer : Unit ->{} Int\nlet answer () = 42\n";
@@ -222,6 +238,7 @@ fn an_inferred_row_argument_takes_the_kind_of_its_parameter() {
     assert_eq!(kinds, [Kind::ServiceRow]);
 }
 
+#[cfg(feature = "native-js")]
 #[test]
 fn an_explicit_build_package_qualifies_tags_without_project_discovery() {
     let source = "module Main exposing (Token(..), token)\ntype Token = Token String\ntoken : Token\nlet token = Token \"x\"\n";

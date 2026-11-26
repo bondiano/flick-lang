@@ -80,9 +80,47 @@ foreign pure partition from "flick:rt" "listPartition"
 
 /// Sorts by `compare`, keeping equal elements in their order.
 sort_by : (a -> a -> Ordering)^c -> List a -> List a
-foreign pure sort_by from "flick:rt" "listSortBy"
-  arity 2
-  retention call
+let sort_by order xs =
+  let n = length xs
+  // each pass merges every two neighbouring sorted runs of `width`
+  pass : Int -> List a -> List a
+  let rec pass width ys =
+    if width >= n then
+      ys
+    else
+      below : Int -> Int -> Bool
+      let below p q =
+        match (get p ys, get q ys) with
+        | (Some x, Some y) -> order x y == LT
+        | _ -> false
+      // where the `k`th merged element is in `ys`: of the first `k - base`
+      // of a merge, `i` from the first run, found by bisection
+      source : Int -> Int
+      let source k =
+        let base = k - k % (2 * width)
+        let off = k - base
+        let first_count = if n - base < width then n - base else width
+        let rest = n - base - width
+        let second_count = if rest < 0 then 0 else if rest < width then rest else width
+        split : Int -> Int -> Int
+        let rec split lo hi =
+          if lo >= hi then
+            lo
+          else
+            let i = (lo + hi) / 2
+            if below (base + width + off - i - 1) (base + i) then split lo i else split (i + 1) hi
+        let low = if off > second_count then off - second_count else 0
+        let i = split low (if off < first_count then off else first_count)
+        let j = off - i
+        if i < first_count && (j >= second_count || not (below (base + width + j) (base + i))) then
+          base + i
+        else
+          base + width + j
+      pass (2 * width) (picked n source ys)
+  pass 1 xs
+  @native "flick:rt" "listSortBy" when js || go
+    arity 2
+    retention call
 
 /// Sorts by the total order of `Ord`, keeping equal elements in their order:
 /// numbers ascend with NaN last.
@@ -160,7 +198,10 @@ foreign pure initialize from "flick:rt" "listInitialize"
 
 /// The elements in reverse order.
 reverse : List a -> List a
-foreign pure reverse from "flick:rt" "listReverse"
+let reverse xs =
+  let n = length xs
+  picked n (fun i -> n - 1 - i) xs
+  @native "flick:rt" "listReverse" when js || go
 
 /// `append xs ys` is `xs ++ ys`: `ys |> append xs` puts `xs` in front.
 append : List a -> List a -> List a
@@ -172,11 +213,34 @@ foreign pure concat from "flick:rt" "listConcat"
 
 /// The first `n` elements.
 take : Int -> List a -> List a
-foreign pure take from "flick:rt" "listTake"
+let take n xs = picked (within n xs) (fun i -> i) xs
+  @native "flick:rt" "listTake" when js || go
 
 /// Every element but the first `n`.
 drop : Int -> List a -> List a
-foreign pure drop from "flick:rt" "listDrop"
+let drop n xs =
+  let k = within n xs
+  picked (length xs - k) (fun i -> i + k) xs
+  @native "flick:rt" "listDrop" when js || go
+
+/// `n` clamped into `0..length xs`.
+within : Int -> List a -> Int
+let within n xs =
+  let count = length xs
+  if n < 0 then 0 else if n > count then count else n
+
+/// `[xs[at 0], …, xs[at (n - 1)]]`, each index one of `xs`: the Flick body
+/// of the functions that copy elements by their position.
+picked : Int -> (Int -> Int) -> List a -> List a
+let picked n at xs =
+  match xs with
+  | [] -> []
+  | [first, ..._] ->
+    initialize n (fun i ->
+      match get (at i) xs with
+      | Some x -> x
+      | None -> first
+    )
 
 /// The elements from `start` up to `end`, as JS `slice`: it copies only them.
 slice : Int -> Int -> List a -> List a
