@@ -142,7 +142,12 @@ local function shr(a, n)
   return floor((a % TWO32) / 2 ^ n)
 end
 
-K.band, K.bxor, K.shr = band, bxor, shr
+local function bor(a, b)
+  a, b = a % TWO32, b % TWO32
+  return a + b - band(a, b)
+end
+
+K.band, K.bor, K.bxor, K.shr = band, bor, bxor, shr
 
 -- Hooks
 
@@ -185,6 +190,9 @@ function K.compare(a, b)
       return K.EQ
     end
     return a and K.GT or K.LT
+  elseif t == "table" then
+    local c = K.big_compare(a, b)
+    return c < 0 and K.LT or c > 0 and K.GT or K.EQ
   end
   if a < b then
     return K.LT
@@ -284,6 +292,9 @@ function K.hash(a)
     return hash_string(a)
   elseif t == "boolean" then
     return optimize(mix(hash_string(tostring(a))))
+  elseif t == "table" then
+    -- a `BigInt` value, by its decimal digits as JS hashes a bigint
+    return hash_string(K.big_decimal(a))
   end
   error("the Lua kernel hashes primitive values only")
 end
@@ -382,6 +393,13 @@ function K.show(a)
     return K.quote(a)
   elseif t == "boolean" then
     return a and "true" or "false"
+  elseif t == "table" then
+    local tag = a._tag
+    if tag then
+      -- a constructor by its name: `Circle` of `Circle#…`, `GT` of `Prelude.GT`
+      return match(tag, "^([^#]*)#") or match(tag, "([^.]*)$")
+    end
+    return K.big_decimal(a) .. "n"
   end
   error("the Lua kernel shows primitive values only")
 end

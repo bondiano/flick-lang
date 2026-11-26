@@ -154,8 +154,9 @@ additive axis `capabilities` (`jit` and `ffi`, each needing
 `dialect = "luajit"`), and hosts `wow-retail`, `wow-forever` and `love`, each
 pinned to one client or release. `flick check` and the editor check the
 project's modules against the selected host and report what they reach but
-the host cannot run, such as `BigInt`, `Int64` without `ffi`, suspension on
-WoW or a global outside the host's API, with `FLICK-P012` at the use.
+the host cannot run, such as suspension on WoW, a global outside the host's
+API or a binding the Lua kernel does not implement yet, with `FLICK-P012` at
+the use.
 
 `flick build` writes the Lua kernel's chunks, `_flick/lua-kernel/*.lua`, and
 a Lua chunk for each module the program reaches: `App/Util.lua` for a
@@ -164,8 +165,9 @@ project module and `_flick/List.lua` for a built-in one, each with a version
 the order they load. Each chunk starts with `local _, ns = ...` and puts its
 module's values into the namespace it is given second, as WoW gives each
 file of an addon; on LÖVE, `main.lua` loads the chunks in that order. A
-top-level value is computed as its chunk loads. The kernel computes `Int`
-arithmetic, `==` of any value, the order and `++` of strings, whose
+top-level value is computed as its chunk loads. The kernel computes the
+arithmetic of every numeric type exactly, `BigInt`, `Int64` and `UInt64` on
+every dialect included, `==` of any value, the order and `++` of strings, whose
 lengths and positions count UTF-16 code units as on the other targets, and
 `Bytes`; the built-in modules run their Flick bodies where no `@native`
 clause names Lua. A `foreign pure f from global "string.gsub"` is called
@@ -173,8 +175,8 @@ directly when what it is given is a string, a boolean, a number or a
 function of one pure stage over those, and what it gives back a string, a
 boolean, a float or `Unit`; a string the host gives keeps its UTF-8, and
 each ill-formed part of it becomes U+FFFD.
-Effects, other foreign functions, generators, what the kernel does not
-compute yet (the other integer widths, `Float32`, `BigInt` and `Int64`) and a function over the VM's limits stop the build with
+Effects, other foreign functions, generators, a kernel binding the Lua
+kernel does not implement yet and a function over the VM's limits stop the build with
 `FLICK-P012` at the project's code. A refused build keeps the previous
 output. The host runs the program, so `flick run` and `flick dev` stop with
 `FLICK-P012`. On `lua/love`, `flick test` runs the pure tests on Lua 5.1.5

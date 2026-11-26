@@ -9,7 +9,7 @@ use flick_ir::{Binding, Foreign, ForeignMode, Program};
 
 use crate::kernel::{self, Table};
 use crate::profiles::{self, HostProfile, PROFILES};
-use crate::reach::{self, Fact, Reached, Wide};
+use crate::reach::{self, Fact, Reached};
 use crate::refusal;
 
 struct Rules<'a> {
@@ -126,19 +126,7 @@ impl Rules<'_> {
 
     /// Why the profile cannot run a reached fact, if it cannot.
     fn refuse(&self, fact: &Fact) -> Option<String> {
-        let target = &self.target;
         match fact {
-            Fact::Number(Wide::BigInt) => Some(format!(
-                "`BigInt` is not available on the {target} target yet: the Lua kernel has no \
-                 arbitrary-precision integers"
-            )),
-            Fact::Number(wide) => (!self.has("ffi")).then(|| {
-                format!(
-                    "`{}` is not available on the {target} target without the `ffi` capability: \
-                     a Lua number is a double, which would round it",
-                    wide.name()
-                )
-            }),
             Fact::Await => self.suspension("`await`"),
             Fact::Foreign { module, foreign } => self.foreign(module, foreign),
         }

@@ -16,7 +16,18 @@ foreign pure to_string from global "String"
 
 /// The integer of optional sign and decimal digits, blanks around allowed.
 parse : String -> Option BigInt
-foreign pure parse from "flick:rt" "bigintParse"
+let parse s =
+  let text = String.trim s
+  let sign = String.char_code_at 0 text
+  let negative = sign == Some 45
+  let start = if negative || sign == Some 43 then 1 else 0
+  digits : Int -> BigInt -> Option BigInt
+  let rec digits i n =
+    match String.char_code_at i text with
+    | Some c -> if c >= 48 && c <= 57 then digits (i + 1) (n * 10n + into (c - 48)) else None
+    | None -> Some (if negative then -n else n)
+  if String.length text > start then digits start 0n else None
+  @native "flick:rt" "bigintParse" when js || go
 
 /// The absolute value.
 abs : BigInt -> BigInt
@@ -24,11 +35,13 @@ foreign pure abs from "flick:BigInt" "abs"
 
 /// Division rounding toward zero.
 divide : BigInt -> BigInt -> Result Int.ArithmeticError BigInt
-foreign pure divide from "flick:rt" "bigintDivide"
+let divide a b = if b == 0n then Err (Int.ArithmeticError "division by zero") else Ok (a / b)
+  @native "flick:rt" "bigintDivide" when js || go
 
 /// The remainder of division rounding toward zero, with the sign of the dividend.
 remainder : BigInt -> BigInt -> Result Int.ArithmeticError BigInt
-foreign pure remainder from "flick:rt" "bigintRemainder"
+let remainder a b = if b == 0n then Err (Int.ArithmeticError "division by zero") else Ok (a % b)
+  @native "flick:rt" "bigintRemainder" when js || go
 
 /// `self + that`: `x |> BigInt.sum 1n`.
 sum : BigInt -> BigInt -> BigInt

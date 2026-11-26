@@ -58,44 +58,22 @@ const REACHED: &str = "module App exposing (main)\n\n\
     big : Unit -> BigInt\nlet big () = 2n * 3n\n\n\
     main : Unit -> Unit\nlet main () = if big () == big () then () else ()\n";
 
-const UNREACHED: &str = "module App exposing (main)\n\n\
-    big : Unit -> BigInt\nlet big () = 2n * 3n\n\n\
-    main : Unit -> Unit\nlet main () = ()\n";
+const MINIMAL: &str = "module App exposing (main)\n\nmain : Unit -> Unit\nlet main () = ()\n";
 
+/// The Lua kernel holds a `BigInt` exactly on every profile, as a value of
+/// limbs of 24 bits.
 #[test]
 #[ignore = "requires just wasm-backends"]
-fn a_reachable_big_integer_is_refused_at_its_source() {
-    let root = lua_project("lua_profile_bigint", "lua/love", REACHED, &[]);
-    for verb in ["check", "build"] {
-        let out = flick_in(&root, &[verb, "--diagnostics", "json", "--offline"]);
-        assert_eq!(out.status.code(), Some(1), "{verb}: {out:?}");
-        let found = diagnostics(&out.stderr, "FLICK-P012");
-        let big = found
-            .iter()
-            .find(|d| {
-                d["message"]
-                    .as_str()
-                    .is_some_and(|m| m.contains("`BigInt` is not available"))
-            })
-            .unwrap_or_else(|| panic!("{verb}: {}", String::from_utf8_lossy(&out.stderr)));
-        assert!(
-            big["message"]
-                .as_str()
-                .is_some_and(|m| m.contains("lua/love")),
-            "{big}"
-        );
-        assert_eq!(slice(big, REACHED), "2n * 3n", "{verb}");
+fn a_big_integer_is_the_kernels_on_every_profile() {
+    for environment in ["lua/love", "lua/wow-retail"] {
+        let root = lua_project("lua_profile_bigint", environment, REACHED, &[]);
+        let out = flick_in(&root, &["build", "--diagnostics", "json", "--offline"]);
+        assert!(out.status.success(), "{environment}: {out:?}");
+        assert!(diagnostics(&out.stderr, "FLICK-P012").is_empty(), "{out:?}");
+        let app = chunk(&root);
+        assert!(app.contains("K.big_mul(K.big(1, 2), K.big(1, 3))"), "{app}");
+        assert!(app.contains("K.equals("), "{app}");
     }
-    assert!(!root.join("dist").exists(), "nothing is written");
-}
-
-#[test]
-#[ignore = "requires just wasm-backends"]
-fn an_unreachable_big_integer_passes_the_check() {
-    let root = lua_project("lua_profile_unreached", "lua/love", UNREACHED, &[]);
-    let out = flick_in(&root, &["check", "--diagnostics", "json", "--offline"]);
-    assert!(out.status.success(), "{out:?}");
-    assert!(diagnostics(&out.stderr, "FLICK-P012").is_empty(), "{out:?}");
 }
 
 #[test]
@@ -106,7 +84,7 @@ fn a_profile_the_backend_does_not_know_is_refused() {
     let root = lua_project(
         "lua_profile_unknown",
         "lua/love-12",
-        UNREACHED,
+        MINIMAL,
         &[
             ("hosts/love12/flick.toml", host),
             (
@@ -212,7 +190,8 @@ fn a_build_writes_a_chunk_per_module_and_a_rebuild_is_identical() {
 /// The chunks of the Lua kernel, in the order they load.
 const KERNEL: &str = "_flick/lua-kernel/core.lua\n_flick/lua-kernel/strings.lua\n\
                       _flick/lua-kernel/lists.lua\n_flick/lua-kernel/bytes.lua\n\
-                      _flick/lua-kernel/numbers.lua\n_flick/lua-kernel/lang.lua\n";
+                      _flick/lua-kernel/numbers.lua\n_flick/lua-kernel/bigint.lua\n\
+                      _flick/lua-kernel/widths.lua\n_flick/lua-kernel/lang.lua\n";
 
 /// `wide` with `n` locals besides its parameter, all of them used.
 fn wide(n: usize) -> String {
@@ -235,13 +214,13 @@ fn what_cannot_be_generated_is_refused_at_its_source_and_keeps_the_output() {
     assert!(flick_in(&root, &["build", "--offline"]).status.success());
     let before = dist(&root);
     // the host's locale, which World of Warcraft does not give
-    let sum = "module App exposing (main)\n\nmain : Unit -> Unit\n\
+    let locale = "module App exposing (main)\n\nmain : Unit -> Unit\n\
                let main () = if String.to_locale_upper \"tr\" \"i\" == \"I\" then ()\n";
     let limit = wide(200);
     // one past the 200 locals of Lua 5.1, at the local that is one too many
     for (source, message, at) in [
         (
-            sum,
+            locale,
             "`String.to_locale_upper` (foreign `toLocaleUpperCase` from `flick:String`) is not \
              available on the lua/wow-retail target",
             "String.to_locale_upper",
@@ -262,7 +241,7 @@ fn what_cannot_be_generated_is_refused_at_its_source_and_keeps_the_output() {
     fs::write(root.join("src/App.fl"), wide(199)).expect("source");
     assert!(flick_in(&root, &["build", "--offline"]).status.success());
     // and a refused first build writes nothing at all
-    let fresh = lua_project("lua_profile_fresh", "lua/wow-retail", sum, &[]);
+    let fresh = lua_project("lua_profile_fresh", "lua/wow-retail", locale, &[]);
     let out = flick_in(&fresh, &["build", "--diagnostics", "json", "--offline"]);
     assert_eq!(out.status.code(), Some(1), "{out:?}");
     assert!(

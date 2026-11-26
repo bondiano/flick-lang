@@ -379,49 +379,34 @@ fn messages(request: &BuildRequest) -> Vec<(String, Option<(u32, u32)>)> {
     }
 }
 
+/// The Lua kernel holds `BigInt`, `Int64` and `UInt64` exactly on every
+/// profile and dialect, without the `ffi` capability.
 #[test]
-fn a_reachable_big_integer_is_refused_where_it_is_and_an_unreachable_one_is_not() {
-    let unit = || expr(ExprKind::Lit(Lit::Unit), 0, 2);
-    let reached = request(
-        "love",
-        &["lua", "lua51"],
-        vec![function("main", big_product())],
-    );
-    let found = messages(&reached);
-    assert_eq!(found.len(), 1, "{found:?}");
-    assert!(
-        found[0]
-            .0
-            .contains("`BigInt` is not available on the lua/love target"),
-        "{found:?}"
-    );
-    assert_eq!(found[0].1, Some((20, 27)));
-    let unreached = request(
-        "love",
-        &["lua", "lua51"],
-        vec![function("main", unit()), function("unused", big_product())],
-    );
-    assert_eq!(messages(&unreached), vec![]);
-}
-
-#[test]
-fn a_wide_integer_needs_the_ffi_capability() {
+fn a_wide_integer_is_the_kernels_on_every_profile() {
     let literal = || expr(ExprKind::Lit(Lit::Int64(1)), 3, 5);
-    let without = messages(&request(
-        "love",
-        &["lua", "luajit"],
-        vec![function("main", literal())],
-    ));
-    assert!(
-        without[0].0.contains("without the `ffi` capability"),
-        "{without:?}"
-    );
-    let with = messages(&request(
-        "love",
-        &["lua", "luajit", "ffi"],
-        vec![function("main", literal())],
-    ));
-    assert_eq!(with, vec![]);
+    for platform in ["love", "wow-retail"] {
+        let big = request(
+            platform,
+            &["lua", "lua51"],
+            vec![function("main", big_product())],
+        );
+        assert_eq!(messages(&big), vec![], "{platform}");
+        let built = Lua.generate(&big, &mut NoInputs).expect("generated");
+        let app = (built.artifacts.iter())
+            .find(|a| a.path == "App.lua")
+            .expect("App.lua");
+        let text = String::from_utf8(app.bytes.clone()).expect("UTF-8");
+        assert!(
+            text.contains("K.big_mul(K.big(1, 2), K.big(1, 2))"),
+            "{text}"
+        );
+        let wide = request(
+            platform,
+            &["lua", "lua51"],
+            vec![function("main", literal())],
+        );
+        assert_eq!(messages(&wide), vec![], "{platform}");
+    }
 }
 
 #[test]

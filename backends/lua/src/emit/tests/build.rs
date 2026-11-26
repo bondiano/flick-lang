@@ -4,7 +4,7 @@
 use flick_backend::{
     Backend, BuildRequest, Diagnostic, InputError, Inputs, ModuleInput, ModuleRole, Source,
 };
-use flick_ir::{Arith, BinOp, ExprKind, FileId, Initialization, Item, Lit, Prefix, Program, Span};
+use flick_ir::{BinOp, ExprKind, FileId, Initialization, Item, Lit, Prefix, Program, Span};
 
 use super::{lambda, local, param, value_at};
 use crate::Lua;
@@ -168,19 +168,16 @@ fn refused(program: &Program) -> Vec<Diagnostic> {
 
 #[test]
 fn a_refusal_in_a_built_in_module_is_reported_where_it_was_reached() {
-    let sum = flick_ir::Expr::new(
-        ExprKind::Binary(
-            BinOp::Arith(Arith::Add, flick_ir::Num::Int8),
-            Box::new(local("x")),
-            Box::new(local("x")),
-        ),
+    // an order of values of no type the kernel compares
+    let less = flick_ir::Expr::new(
+        ExprKind::Binary(BinOp::Lt, Box::new(local("x")), Box::new(local("x"))),
         at(1, 13, 18),
     );
-    let double = item(value_at("double", lambda(&["x"], sum), 0, 0), 1, 0, 20);
+    let double = item(value_at("double", lambda(&["x"], less), 0, 0), 1, 0, 20);
     let found = refused(&program("double", vec![double], vec![]));
     assert_eq!(found.len(), 1, "{found:#?}");
     assert_eq!(found[0].code, "P012");
-    assert!(found[0].message.contains("`+` of `Int8`"), "{found:#?}");
+    assert!(found[0].message.contains("the operator `<`"), "{found:#?}");
     let span = found[0].span.as_ref().expect("a span");
     assert_eq!((span.file, span.start, span.end), (0, 25, 32));
     assert_eq!(found[0].notes, ["reached through `List.double`"]);

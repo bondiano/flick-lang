@@ -8,15 +8,58 @@ type NormalForm = NFC | NFD | NFKC | NFKD
 
 /// Without the whitespace at both ends.
 trim : String -> String
-foreign pure trim from "flick:String" "trim"
+let trim s = trim_end (trim_start s)
+  @native "flick:String" "trim" when js || go
 
 /// Without the whitespace at the start.
 trim_start : String -> String
-foreign pure trim_start from "flick:String" "trimStart"
+let trim_start s =
+  // the white space and line terminators of JS, all single code units
+  blank : Int -> Bool
+  let blank c =
+    (c >= 9 && c <= 13)
+      || c == 32
+      || c == 160
+      || c == 5760
+      || (c >= 8192 && c <= 8202)
+      || c == 8232
+      || c == 8233
+      || c == 8239
+      || c == 8287
+      || c == 12288
+      || c == 65279
+  first : Int -> Int
+  let rec first i =
+    match char_code_at i s with
+    | Some c -> if blank c then first (i + 1) else i
+    | None -> i
+  slice (first 0) (length s) s
+  @native "flick:String" "trimStart" when js || go
 
 /// Without the whitespace at the end.
 trim_end : String -> String
-foreign pure trim_end from "flick:String" "trimEnd"
+let trim_end s =
+  // the white space and line terminators of JS, all single code units
+  blank : Int -> Bool
+  let blank c =
+    (c >= 9 && c <= 13)
+      || c == 32
+      || c == 160
+      || c == 5760
+      || (c >= 8192 && c <= 8202)
+      || c == 8232
+      || c == 8233
+      || c == 8239
+      || c == 8287
+      || c == 12288
+      || c == 65279
+  kept : Int -> Int
+  let rec kept n =
+    match char_code_at (n - 1) s with
+    | Some c -> if blank c then kept (n - 1) else n
+    | None -> n
+  slice 0 (kept (length s)) s
+  @native "flick:String" "trimEnd" when js || go
 
 /// The number of UTF-16 code units, as JS `length`.
 length : String -> Int
