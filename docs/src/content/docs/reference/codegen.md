@@ -881,3 +881,33 @@ computes a `TypeLayout` containing `size`, `align`, remaining `niche`, and
   recursion across modules) as `FieldStorage::Pointer`. Every recursive type
   gets a finite size, non-recursive types get no unnecessary pointers, and the
   result is deterministic across module and query order.
+
+## Official component delivery (CLI and browser)
+
+Both the CLI and the browser playground execute the same pinned `flick/js`
+WebAssembly component (`backends/js/package/component.wasm`, pinned by
+`backends/js/package/backend.json`) over the `flick:backend@0.1.0` WIT world:
+
+- **Minimal import surface:** the official JS component imports only
+  `flick:backend/inputs@0.1.0#read` (no WASI, filesystem, clock, network, or
+  process imports). External hosts — native Wasmtime embedders or browser Web
+  Workers — verify the component's SHA-256 against its pin before compiling,
+  reject any import outside `inputs.read`, and instantiate a fresh guest
+  instance per call so mutable linear memory never persists across calls.
+- **Browser host architecture:** the playground frontend (`flick-wasm`) builds
+  and type-checks in memory without statically linking `flick-backend-js`. On
+  emit, `prepare_emit` constructs the `BuildRequest` (CBOR `Program`,
+  `flick.javascript@0.1.0` projections, sources, and content-addressed input
+  manifest) and dispatches it to a dedicated isolated Web Worker
+  (`backend.worker.ts`) that lazily fetches and verifies `component.wasm`.
+  `finish_emit` validates the returned `BuildResult` via
+  `flick_backend::validate_result`, preserves shared `.d.ts` files and
+  `FLICK-F004` diagnostics, and maps guest diagnostics back to UTF-16 editor
+  positions. Any digest mismatch or undeclared input read is refused explicitly
+  with no silent fallback.
+- **Stage attribution:** running `flick build --timings` (or
+  `--timings --diagnostics json`) attributes backend component initialization,
+  request preparation and CBOR/input byte sizes (`program_bytes`,
+  `inputs_bytes`), host validation, `check-target`, first generation,
+  determinism replay, external tool steps, atomic publication, and residual
+  overhead separately.

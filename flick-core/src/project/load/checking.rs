@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 #[cfg(feature = "native-project")]
 use flick_backend_go::{foreign_meta as go_foreign_meta, inline as go_inline};
+#[cfg(feature = "native-js")]
 use flick_backend_js::{foreign_meta as js_foreign_meta, inline as js_inline};
 #[cfg(feature = "native-project")]
 use serde::{Deserialize, Serialize};

@@ -4,8 +4,13 @@
 #[cfg(not(target_arch = "wasm32"))]
 use super::{Compilation, SourceMap};
 use super::{Host, Project};
+#[cfg(all(
+    not(target_arch = "wasm32"),
+    any(feature = "native-js", feature = "native-project")
+))]
+use crate::diagnostics::codes;
 #[cfg(not(target_arch = "wasm32"))]
-use crate::diagnostics::{Diagnostic, Severity, codes};
+use crate::diagnostics::{Diagnostic, Severity};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::ir::Module as IrModule;
 #[cfg(not(target_arch = "wasm32"))]
@@ -16,7 +21,7 @@ use crate::project::target_preflight::{self, CheckOptions, RunnerRef};
 use crate::source::Span;
 #[cfg(all(not(target_arch = "wasm32"), feature = "native-project"))]
 use flick_backend_go::exports as go_exports;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(not(target_arch = "wasm32"), feature = "native-js"))]
 use flick_backend_js::exports as js_exports;
 
 /// Check the resolved environment against the complete compiled program.
@@ -137,6 +142,7 @@ pub(super) fn validate_official_exports(
         return;
     }
     match backend_id {
+        #[cfg(feature = "native-js")]
         "flick/js" => {
             for diag in js_exports::validate_modules(own) {
                 let mut msg = diag.message;
@@ -158,7 +164,9 @@ pub(super) fn validate_official_exports(
                 diagnostics.push(Diagnostic::error(codes::P012, msg, diag.span));
             }
         }
-        _ => {}
+        _ => {
+            let _ = (own, diagnostics);
+        }
     }
 }
 

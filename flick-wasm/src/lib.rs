@@ -1,18 +1,24 @@
 //! JS interface to the Flick core for the playground on the site: one module,
-//! analysed once for each change, its diagnostics, its build, and what an
-//! editor asks of it, without Node or a file system. The built-in modules are
-//! compiled into the core, so the module may import them. Built for
-//! `wasm32-unknown-unknown` via wasm-bindgen.
+//! analysed once for each change, its diagnostics, its component build request
+//! and result validation, and what an editor asks of it, without Node or a file
+//! system. The built-in modules are compiled into the core, so the module may
+//! import them. Built for `wasm32-unknown-unknown` via wasm-bindgen.
+//!
+//! Code generation is decoupled from this module on `wasm32`: `prepare_emit`
+//! emits a verified `flick:backend@0.1.0` `BuildRequest` and content-addressed
+//! inputs for the pinned official `flick/js` component running in an isolated
+//! browser worker, and `finish_emit` validates the returned `BuildResult` and
+//! maps diagnostics back to UTF-16 editor positions.
 //!
 //! The core counts in UTF-8 bytes and an editor in UTF-16 units, so every
 //! position crosses this boundary as a UTF-16 offset.
 
-use std::cell::{Ref, RefCell};
+use std::cell::{RefCell, RefMut};
+use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use flick_core::build::{self, Backend, Extras, Settings};
-use flick_core::codegen::EffectBridge;
+use flick_core::build;
 use flick_core::diagnostics::render::json_events;
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::fmt;
@@ -21,9 +27,15 @@ use flick_core::project::config::Config;
 use flick_core::project::{self, Analysis, Host, ModuleCache, Project};
 use flick_core::source::{FileId, SourceMap};
 use serde_json::{Value, json};
-
-mod ide;
 use wasm_bindgen::prelude::*;
+
+mod component;
+mod ide;
+mod utf16;
+
+pub use utf16::{byte_offset, positions, utf16_offset};
+
+use component::{ComponentReply, PrepareReply, PreparedEmit};
 
 /// Version of the compiler in this build, e.g. `"0.1.0"`.
 #[wasm_bindgen]
@@ -45,6 +57,8 @@ pub struct Session {
     /// The analysis `emit` builds from: a cached editor run drops IR, so
     /// emission takes a cold run of the same text, kept until it changes.
     emitted: RefCell<Option<Box<Emitted>>>,
+    /// The most recent prepared `flick:backend@0.1.0` request awaiting `finish_emit`.
+    prepared: RefCell<Option<Box<PreparedEmit>>>,
 }
 
 /// A cold analysis of the text it is of, with the sources its file ids name.
@@ -77,6 +91,7 @@ impl Session {
             rt,
             cache,
             emitted: RefCell::new(None),
+            prepared: RefCell::new(None),
         }
     }
 
@@ -88,6 +103,7 @@ impl Session {
             source.clone_into(&mut self.text);
             self.sources = SourceMap::default();
             self.emitted = RefCell::new(None);
+            self.prepared = RefCell::new(None);
             let text = &self.text;
             let sources = &mut self.sources;
             let (rt, cache) = (&self.rt, &mut self.cache);
@@ -97,21 +113,112 @@ impl Session {
             .to_string()
     }
 
+    /// Prepares a `flick:backend@0.1.0` `BuildRequest` and declared input
+    /// manifest for the pinned official `flick/js` component.
+    ///
+    /// Returns either `{ "status": "done", "emitted": <Emitted> }` when the
+    /// frontend already failed, or `{ "status": "ready", "pin", "request",
+    /// "program_b64", "inputs" }` to dispatch to the isolated backend worker.
+    pub fn prepare_emit(&self, profile: &str, include_declarations: bool) -> String {
+        let mut emitted = self.emitted_mut();
+        let Emitted {
+            analysis, sources, ..
+        } = &mut *emitted;
+        match component::prepare(profile, include_declarations, analysis, sources) {
+            Ok(prepared) => {
+                let mut wire_request = prepared.request.clone();
+                let program_b64 = component::base64_encode(&wire_request.program);
+                wire_request.program.clear();
+                let inputs: BTreeMap<String, String> = prepared
+                    .inputs
+                    .iter()
+                    .map(|(k, v)| (k.clone(), component::base64_encode(v)))
+                    .collect();
+                let reply = PrepareReply::Ready {
+                    pin: prepared.request.backend.clone(),
+                    request: Box::new(wire_request),
+                    program_b64,
+                    inputs,
+                };
+                *self.prepared.borrow_mut() = Some(Box::new(prepared));
+                serde_json::to_string(&reply).expect("prepare reply serializes")
+            }
+            Err((diagnostics, dts_diagnostics)) => {
+                *self.prepared.borrow_mut() = None;
+                let mut out = Self::empty_output();
+                out["diagnostics"] = self.diagnostics(sources, &diagnostics);
+                out["dts_diagnostics"] = self.diagnostics(sources, &dts_diagnostics);
+                serde_json::to_string(&PrepareReply::Done { emitted: out })
+                    .expect("prepare error reply serializes")
+            }
+        }
+    }
+
+    /// Validates the `flick:backend@0.1.0` `BuildResult` (or error diagnostics)
+    /// returned by the isolated backend worker and builds the playground
+    /// `Emitted` JSON payload with UTF-16 editor positions.
+    pub fn finish_emit(
+        &self,
+        profile: &str,
+        include_declarations: bool,
+        result_json: &str,
+    ) -> String {
+        let prepared = self.prepared.borrow_mut().take();
+        let emitted = self.emitted_mut();
+        let sources = &emitted.sources;
+        let analysis = &emitted.analysis;
+        let Some(prepared) = prepared else {
+            let mut out = Self::empty_output();
+            let diag = Diagnostic::new(
+                codes::P013,
+                Severity::Error,
+                "finish_emit called without a matching prepare_emit",
+            );
+            out["diagnostics"] = self.diagnostics(sources, &[diag]);
+            out["dts_diagnostics"] = Value::Array(Vec::new());
+            return out.to_string();
+        };
+        if prepared.profile != profile || prepared.include_declarations != include_declarations {
+            let mut out = Self::empty_output();
+            let diag = Diagnostic::new(
+                codes::P013,
+                Severity::Error,
+                "finish_emit profile or declaration options differ from prepare_emit",
+            );
+            out["diagnostics"] = self.diagnostics(sources, &[diag]);
+            out["dts_diagnostics"] = Value::Array(Vec::new());
+            return out.to_string();
+        }
+        let reply: ComponentReply = match serde_json::from_str(result_json) {
+            Ok(reply) => reply,
+            Err(error) => ComponentReply::TransportError {
+                message: format!("invalid backend worker reply JSON: {error}"),
+            },
+        };
+        let (artifacts, diagnostics) = component::finish(&prepared, reply);
+        let mut out = if has_errors(&diagnostics) {
+            Self::empty_output()
+        } else {
+            Self::output(artifacts, include_declarations, analysis)
+        };
+        out["diagnostics"] = self.diagnostics(sources, &diagnostics);
+        out["dts_diagnostics"] = self.diagnostics(sources, &prepared.dts_diagnostics);
+        out.to_string()
+    }
+
     /// `{ "js", "dts", "files", "entry", "diagnostics", "dts_diagnostics" }`
     /// for the last analysed module as `flick build --profile <profile>
-    /// --emit-dts` writes it: its JS and `.d.ts`, every JS file with the
-    /// built-in modules and, when it exports `main`, the runner
-    /// `flick-main.js`, which is the entry. All but the diagnostics are
-    /// `null` when there are errors. What the `.d.ts` leaves out, `FLICK-F004`,
-    /// is apart: it says nothing about the program. A profile other than
-    /// `"release"` is `"debug"`.
+    /// --declarations` writes it. On native targets, drives the exact same
+    /// `prepare_emit` -> `flick/js` component contract -> `finish_emit` path.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn emit(&self, profile: &str) -> String {
-        self.emit_output(profile, false)
+        self.emit_via_component(profile, false)
     }
 
     /// The normal emit plus declaration files for resolving re-exported signatures.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn emit_declarations(&self, profile: &str) -> String {
-        self.emit_output(profile, true)
+        self.emit_via_component(profile, true)
     }
 
     /// `{ "text", "from", "to" }`: what hovering at the UTF-16 offset `at`
@@ -156,7 +263,7 @@ impl Session {
 
 impl Session {
     /// The cold analysis of the current text, made once for each revision.
-    fn emitted(&self) -> Ref<'_, Emitted> {
+    fn emitted_mut(&self) -> RefMut<'_, Emitted> {
         let stale = self
             .emitted
             .borrow()
@@ -172,32 +279,70 @@ impl Session {
             };
             *self.emitted.borrow_mut() = Some(Box::new(emitted));
         }
-        Ref::map(self.emitted.borrow(), |slot| {
-            slot.as_deref().expect("the analysis was just made")
+        RefMut::map(self.emitted.borrow_mut(), |slot| {
+            slot.as_deref_mut().expect("the analysis was just made")
         })
     }
 
-    fn emit_output(&self, profile: &str, include_declarations: bool) -> String {
-        let emitted = self.emitted();
-        let sources = &emitted.sources;
-        let analysis = &emitted.analysis;
-        let mut diagnostics = analysis.diagnostics.clone();
-        let mut declarations = Vec::new();
-        let mut out =
-            json!({ "js": null, "dts": null, "files": null, "entry": null, "tests": null });
-        if !has_errors(&diagnostics) {
-            let (artifacts, problems) = Self::artifacts(profile, analysis, sources);
-            let (left_out, problems): (Vec<_>, Vec<_>) =
-                problems.into_iter().partition(|d| d.code == codes::F004);
-            declarations = left_out;
-            diagnostics.extend(problems);
-            if !has_errors(&diagnostics) {
-                out = Self::output(artifacts, include_declarations, analysis);
-            }
+    #[cfg(not(target_arch = "wasm32"))]
+    fn emit_via_component(&self, profile: &str, include_declarations: bool) -> String {
+        let prepared_json = self.prepare_emit(profile, include_declarations);
+        let prepared_value: Value =
+            serde_json::from_str(&prepared_json).expect("prepare_emit returns valid JSON");
+        if prepared_value["status"] == "done" {
+            return prepared_value["emitted"].to_string();
         }
-        out["diagnostics"] = self.diagnostics(sources, &diagnostics);
-        out["dts_diagnostics"] = self.diagnostics(sources, &declarations);
-        out.to_string()
+        let backend = flick_backend_js::Javascript;
+        let descriptor = flick_backend::Backend::describe(&backend);
+        let reply = {
+            let prepared_ref = self.prepared.borrow();
+            let prepared = prepared_ref
+                .as_ref()
+                .expect("prepare_emit stored prepared state");
+            let reserved_paths: Vec<String> =
+                prepared.shared_dts.iter().map(|a| a.path.clone()).collect();
+            let deny_step = |_step: &flick_backend::ToolchainStep| {
+                Err("browser host executes no toolchain steps".to_owned())
+            };
+            let deny_launch = |_launch: &flick_backend::Launch| {
+                Err("browser host executes no native launches".to_owned())
+            };
+            let policy = flick_backend::Policy {
+                toolchains: &[],
+                environment: &[],
+                reserved_paths: &reserved_paths,
+                authorize_step: &deny_step,
+                authorize_launch: &deny_launch,
+                limits: flick_backend::Limits::default(),
+            };
+            match flick_backend::generate(
+                &backend,
+                &prepared.request,
+                &policy,
+                |id| prepared.inputs.get(id).cloned(),
+                false,
+            ) {
+                Ok(generated) => json!({
+                    "status": "ok",
+                    "descriptor": descriptor,
+                    "result": generated.result(),
+                }),
+                Err(flick_backend::Failure::Rejected(diagnostics)) => json!({
+                    "status": "err",
+                    "descriptor": descriptor,
+                    "diagnostics": diagnostics,
+                }),
+                Err(why) => json!({
+                    "status": "transport_error",
+                    "message": why.to_string(),
+                }),
+            }
+        };
+        self.finish_emit(profile, include_declarations, &reply.to_string())
+    }
+
+    fn empty_output() -> Value {
+        json!({ "js": null, "dts": null, "files": null, "entry": null, "tests": null })
     }
 
     fn file(&self) -> Option<FileId> {
@@ -206,44 +351,6 @@ impl Session {
             .iter()
             .find(|m| m.path == path())
             .map(|m| m.file)
-    }
-
-    fn artifacts(
-        profile: &str,
-        analysis: &Analysis,
-        sources: &SourceMap,
-    ) -> (Vec<build::Artifact>, Vec<Diagnostic>) {
-        let compilation = &analysis.compilation;
-        let module = compilation.modules.iter().find(|m| m.path == path());
-        // like `flick build` without a project: a module with `main` gets the runner
-        let entries: Vec<(String, String)> = module
-            .filter(|m| m.interface.exports_value("main"))
-            .map(|m| ("main".to_owned(), m.name.clone()))
-            .into_iter()
-            .collect();
-        let source_path = |_: FileId| format!("file://{}", path().display());
-        let source_dir = |_: &str| path().parent().map(Path::to_path_buf);
-        let settings = Settings {
-            package: None,
-            entries: &entries,
-            typescript: false,
-            release: profile == "release",
-            extras: Extras {
-                dts: true,
-                ..Extras::default()
-            },
-            source_path: &source_path,
-            source_dir: &source_dir,
-            out_dir: Path::new("/dist"),
-            root: None,
-            // like `flick build --rt` without a project: the adapter takes what RT lacks
-            backend: Backend::Rt,
-            effect_bridge: EffectBridge::Available,
-            ui: None,
-            runners: &[],
-            environment: None,
-        };
-        build::emit(compilation, sources, &settings)
     }
 
     fn output(
@@ -359,87 +466,6 @@ fn kind(kind: CompletionKind) -> &'static str {
         CompletionKind::Operation => "operation",
         CompletionKind::Keyword => "keyword",
     }
-}
-
-/// Rewrites each UTF-8 `range` in the module `text` of the diagnostic events
-/// `events`, theirs, their related notes' and their fixes' edits, to UTF-16
-/// offsets `from` and `to`; an event of the module also gets `at`, its
-/// `line:column` from 1. Ranges in the built-in modules stay as they are.
-pub fn positions(text: &str, events: &mut Value) {
-    let Some(events) = events.as_array_mut() else {
-        return;
-    };
-    for event in events {
-        let start = convert(text, event);
-        if let Some(start) = start {
-            event["at"] = Value::String(line_column(text, start));
-        }
-        for key in ["related", "fixes"] {
-            for item in event[key].as_array_mut().into_iter().flatten() {
-                convert(text, item);
-                for edit in item["edits"].as_array_mut().into_iter().flatten() {
-                    convert(text, edit);
-                }
-            }
-        }
-    }
-}
-
-/// [`positions`] for one object with `path` and `range`; the UTF-8 start of
-/// its range when it is in the module.
-fn convert(text: &str, located: &mut Value) -> Option<u32> {
-    if located["path"].as_str() != Some(DISPLAYED) {
-        return None;
-    }
-    let range = located.get("range")?;
-    let start = u32::try_from(range["start"].as_u64()?).ok()?;
-    let end = u32::try_from(range["end"].as_u64()?).ok()?;
-    located["from"] = json!(utf16_offset(text, start));
-    located["to"] = json!(utf16_offset(text, end));
-    Some(start)
-}
-
-/// The UTF-16 offset of the UTF-8 offset `byte` of `text`.
-#[must_use]
-pub fn utf16_offset(text: &str, byte: u32) -> u32 {
-    let byte = floor_boundary(text, byte as usize);
-    u32::try_from(text[..byte].encode_utf16().count()).unwrap_or(u32::MAX)
-}
-
-/// The UTF-8 offset of the UTF-16 offset `unit` of `text`; inside a
-/// surrogate pair, the start of its character.
-#[must_use]
-pub fn byte_offset(text: &str, unit: u32) -> u32 {
-    let mut units = 0;
-    for (i, c) in text.char_indices() {
-        units += c.len_utf16();
-        if units > unit as usize {
-            return u32::try_from(i).unwrap_or(u32::MAX);
-        }
-    }
-    u32::try_from(text.len()).unwrap_or(u32::MAX)
-}
-
-fn floor_boundary(text: &str, byte: usize) -> usize {
-    let mut byte = byte.min(text.len());
-    while !text.is_char_boundary(byte) {
-        byte -= 1;
-    }
-    byte
-}
-
-/// `line:column` from 1 of the UTF-8 offset `byte`, the column in UTF-16.
-fn line_column(text: &str, byte: u32) -> String {
-    let before = &text[..floor_boundary(text, byte as usize)];
-    let line = before.matches('\n').count() + 1;
-    let column = before
-        .rsplit('\n')
-        .next()
-        .unwrap_or("")
-        .encode_utf16()
-        .count()
-        + 1;
-    format!("{line}:{column}")
 }
 
 /// The in-memory project of the playground: one file at the root, staged for

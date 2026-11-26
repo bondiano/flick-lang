@@ -15,6 +15,14 @@ crate-type = ["cdylib", "rlib"]
 workspace = true
 
 [dependencies]
+ciborium = "0.2.2"
+flick-backend = { path = "../flick-backend" }
+flick-backend-support = { path = "../flick-backend-support", default-features = false }
 flick-core = { path = "../flick-core", default-features = false, features = ["embedded-std", "ide"] }
+flick-ir = { path = "../flick-ir", features = ["cbor"] }
+serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { workspace = true }
 wasm-bindgen = "0.2.130"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+flick-backend-js = { path = "../backends/js", features = ["component"] }

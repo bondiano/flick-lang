@@ -3,6 +3,7 @@
 #[cfg(feature = "native-project")]
 use std::path::Path;
 
+#[cfg(feature = "native-js")]
 use super::super::Backend;
 use crate::codegen;
 #[cfg(feature = "native-project")]
@@ -11,27 +12,33 @@ use crate::codegen::sourcemap;
 use crate::codegen::ts::{Facade, facade_files};
 use crate::codegen::ts::{Projection, Typing, declaration_file};
 use crate::diagnostics::{Diagnostic, Severity, codes};
+#[cfg(feature = "native-js")]
 use crate::effects;
 #[cfg(feature = "native-project")]
 use crate::iface;
 use crate::iface::Interface;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::iface::Namespace;
+#[cfg(feature = "native-js")]
 use crate::project::Compiled;
 #[cfg(feature = "native-project")]
 use crate::project::normalize;
 #[cfg(feature = "native-project")]
 use crate::source::FileId;
 
+use super::super::Artifact;
 #[cfg(feature = "native-project")]
 use super::super::Settings;
+#[cfg(feature = "native-js")]
+use super::super::optimized_with_primitives;
 #[cfg(feature = "native-project")]
 use super::super::specifier;
-use super::super::{Artifact, optimized_with_primitives};
+#[cfg(feature = "native-js")]
 use super::{Context, typed_options};
 
 /// The JS, source map, interface and, when asked, `.d.ts` and Promise
 /// façade of one module of the build.
+#[cfg(feature = "native-js")]
 #[cfg_attr(
     not(feature = "native-project"),
     allow(
@@ -91,6 +98,7 @@ pub(super) fn compiled_module(
     Ok(imports)
 }
 
+#[cfg(feature = "native-js")]
 fn write_js_output(
     ctx: &Context,
     file: &str,

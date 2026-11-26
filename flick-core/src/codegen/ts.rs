@@ -457,5 +457,5 @@ mod native;
 mod projections;
 mod typed;
 pub use typed::{Typed, Typing};
-#[cfg(test)]
+#[cfg(all(test, feature = "native-js"))]
 mod tests;

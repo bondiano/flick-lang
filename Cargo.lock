@@ -957,7 +957,13 @@ dependencies = [
 name = "flick-wasm"
 version = "0.2.0"
 dependencies = [
+ "ciborium",
+ "flick-backend",
+ "flick-backend-js",
+ "flick-backend-support",
  "flick-core",
+ "flick-ir",
+ "serde",
  "serde_json",
  "wasm-bindgen",
 ]

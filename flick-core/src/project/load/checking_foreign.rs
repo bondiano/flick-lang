@@ -126,6 +126,7 @@ impl Checking<'_> {
             ty: None,
         };
         match backend_id {
+            #[cfg(feature = "native-js")]
             "flick/js" => {
                 let mut found = Vec::new();
                 js_foreign_meta::validate_foreign(
@@ -161,7 +162,9 @@ impl Checking<'_> {
                     checked.push(Diagnostic::error(code, d.message, d.span));
                 }
             }
-            _ => {}
+            _ => {
+                let _ = (view, checked);
+            }
         }
     }
 
@@ -224,20 +227,22 @@ impl Checking<'_> {
         source: &str,
         checked: &mut Vec<Diagnostic>,
     ) {
-        let found = match backend_id {
-            "flick/js" => js_inline::validate_preamble(code, span, source),
+        let found: Option<(String, Span)> = match backend_id {
+            #[cfg(feature = "native-js")]
+            "flick/js" => {
+                js_inline::validate_preamble(code, span, source).map(|d| (d.message, d.span))
+            }
             #[cfg(feature = "native-project")]
-            "flick/go" => go_inline::validate_preamble(code, span, source).map(|d| {
-                js_foreign_meta::ForeignDiagnostic {
-                    code: d.code,
-                    message: d.message,
-                    span: d.span,
-                }
-            }),
-            _ => None,
+            "flick/go" => {
+                go_inline::validate_preamble(code, span, source).map(|d| (d.message, d.span))
+            }
+            _ => {
+                let _ = (code, span, source);
+                None
+            }
         };
-        if let Some(d) = found {
-            checked.push(Diagnostic::error(codes::F011, d.message, d.span));
+        if let Some((message, span)) = found {
+            checked.push(Diagnostic::error(codes::F011, message, span));
         }
     }
 
@@ -258,20 +263,22 @@ impl Checking<'_> {
         };
         let code = string_value(tok.text(module.text));
         let span = Span::new(module.file, tok.start, tok.end);
-        let found = match backend_id {
-            "flick/js" => js_inline::validate_binding(&code, span, module.text),
+        let found: Option<(String, Span)> = match backend_id {
+            #[cfg(feature = "native-js")]
+            "flick/js" => {
+                js_inline::validate_binding(&code, span, module.text).map(|d| (d.message, d.span))
+            }
             #[cfg(feature = "native-project")]
-            "flick/go" => go_inline::validate_binding(&code, span, module.text).map(|d| {
-                js_foreign_meta::ForeignDiagnostic {
-                    code: d.code,
-                    message: d.message,
-                    span: d.span,
-                }
-            }),
-            _ => None,
+            "flick/go" => {
+                go_inline::validate_binding(&code, span, module.text).map(|d| (d.message, d.span))
+            }
+            _ => {
+                let _ = (code, span);
+                None
+            }
         };
-        if let Some(d) = found {
-            checked.push(Diagnostic::error(codes::F011, d.message, d.span));
+        if let Some((message, span)) = found {
+            checked.push(Diagnostic::error(codes::F011, message, span));
         }
     }
 }
@@ -281,9 +288,14 @@ fn is_checked_official_backend(id: &str) -> bool {
     {
         matches!(id, "flick/js" | "flick/go")
     }
-    #[cfg(not(feature = "native-project"))]
+    #[cfg(all(feature = "native-js", not(feature = "native-project")))]
     {
         id == "flick/js"
+    }
+    #[cfg(not(feature = "native-js"))]
+    {
+        let _ = id;
+        false
     }
 }
 
