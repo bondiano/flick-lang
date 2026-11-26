@@ -81,7 +81,7 @@ export const sidebar = [
     label: "Tools",
     translations: { ru: "Инструменты" },
     items: [
-      ...["cli", "project", "plugins", "commands", "editor", "codegen", "kernel", "iface"].map(reference),
+      ...["cli", "project", "backends", "plugins", "commands", "editor", "codegen", "kernel", "iface"].map(reference),
       { slug: "contributing/testing" },
       { slug: "contributing/implementation-decisions" },
     ],

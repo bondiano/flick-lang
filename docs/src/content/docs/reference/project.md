@@ -392,7 +392,7 @@ or `--path DIR`) adds one and `flick remove <name>` drops it.
 
 The official backend a project builds with when it pins none (`flick/js`,
 or `flick/go` with `[build] target = "go"` or `--target go`) is not part of the compiler either: it is a
-release asset. `flick new`, the first build, or `flick install` takes the newest release
+release asset (see [Backends](../backends/)). `flick new`, the first build, or `flick install` takes the newest release
 the compiler accepts from the backends index, keeps it in the package store
 and pins it in `flick.lock` under `[[backend]]`; later builds work offline.
 `flick update` moves the pin to a newer release. With `--offline` and no pin
