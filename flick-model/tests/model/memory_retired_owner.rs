@@ -2,7 +2,9 @@
 use crate::recovery;
 use flick_core::ir::{
     Lit,
-    memory::{Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program},
+    memory::{
+        Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program, ValueRep,
+    },
 };
 use flick_core::opt::perceus;
 use flick_vm::tier0::{Error, Heap, Value, execute_program};
@@ -60,6 +62,8 @@ fn tuple(binding: u32, fields: &[u32]) -> Instruction {
         Operation::Construct {
             tag: "$tuple".into(),
             fields: fields.to_vec(),
+            rep: ValueRep::Cell,
+            layout: None,
         },
     )
 }
@@ -208,6 +212,7 @@ fn restoration_program(raise: bool, handler_errors: bool) -> Program {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 within(3, 2, 5, &[]),

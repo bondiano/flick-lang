@@ -114,11 +114,13 @@ fn same_primitive(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Erro
                         tag: a,
                         ordinary_fields: an,
                         fields: x,
+                        ..
                     },
                     Data::Tagged {
                         tag: b,
                         ordinary_fields: bn,
                         fields: y,
+                        ..
                     },
                 ) => {
                     tagged_boundary(a, *an, x.len())?;
@@ -130,6 +132,25 @@ fn same_primitive(heap: &Heap, left: &Value, right: &Value) -> Result<bool, Erro
                 }
                 _ => Err(unsupported("primitive equality of non-primitive objects")),
             }
+        }
+        (
+            Value::Aggregate {
+                tag: a,
+                ordinary_fields: an,
+                fields: x,
+            },
+            Value::Aggregate {
+                tag: b,
+                ordinary_fields: bn,
+                fields: y,
+            },
+        ) => {
+            tagged_boundary(a, *an, x.len())?;
+            tagged_boundary(b, *bn, y.len())?;
+            if *an != 0 || *bn != 0 {
+                return Err(unsupported("primitive equality of non-primitive objects"));
+            }
+            Ok(a == b)
         }
         _ => equal(heap, left, right),
     }
@@ -304,11 +325,13 @@ fn equal_objects<'a>(
                 tag: a_tag,
                 ordinary_fields: a_count,
                 fields: a,
+                ..
             },
             Data::Tagged {
                 tag: b_tag,
                 ordinary_fields: b_count,
                 fields: b,
+                ..
             },
         ) => {
             tagged_boundary(a_tag, *a_count, a.len())?;
@@ -319,6 +342,10 @@ fn equal_objects<'a>(
             } else {
                 Ok(false)
             }
+        }
+        (Data::BoxedAggregate { value: a, .. }, Data::BoxedAggregate { value: b, .. }) => {
+            pending.push((a, b));
+            Ok(true)
         }
         (Data::Record(a), Data::Record(b)) if a.len() == b.len() => {
             for (name, left) in a {
@@ -364,6 +391,27 @@ fn equal_with(heap: &Heap, left: &Value, right: &Value, strict_zero: bool) -> Re
                     a.to_bits() == b.to_bits() || a.is_nan() && b.is_nan()
                 } else {
                     a == b || a.is_nan() && b.is_nan()
+                }
+            }
+            (
+                Value::Aggregate {
+                    tag: a_tag,
+                    ordinary_fields: a_count,
+                    fields: a,
+                },
+                Value::Aggregate {
+                    tag: b_tag,
+                    ordinary_fields: b_count,
+                    fields: b,
+                },
+            ) => {
+                tagged_boundary(a_tag, *a_count, a.len())?;
+                tagged_boundary(b_tag, *b_count, b.len())?;
+                if a_tag == b_tag && a_count == b_count {
+                    pending.extend(a[..*a_count].iter().zip(&b[..*b_count]));
+                    true
+                } else {
+                    false
                 }
             }
             (Value::Object(a), Value::Object(b)) => {

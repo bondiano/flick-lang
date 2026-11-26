@@ -167,6 +167,7 @@ fn modify_rejects_a_reserved_tuple_evidence_suffix_before_committing() {
         tag: "$tuple".into(),
         ordinary_fields: 1,
         fields: vec![Value::Int(7), hidden],
+        layout: None,
     });
     assert_eq!(
         execute_program(

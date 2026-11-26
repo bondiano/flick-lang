@@ -1,7 +1,7 @@
 //! Scoped arenas own their slots independently of retained nonowning views.
 use flick_core::ir::Lit;
 use flick_core::ir::memory::{
-    Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program,
+    Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program, ValueRep,
 };
 use flick_core::opt::perceus;
 use flick_vm::tier0::{Error, Heap, execute_program};
@@ -151,7 +151,14 @@ fn selected_owner_program(field: usize) -> Program {
                     },
                 ),
                 intrinsic(3, Intrinsic::ScopeRun, &[2]),
-                bind(4, Operation::Project { object: 3, field }),
+                bind(
+                    4,
+                    Operation::Project {
+                        object: 3,
+                        field,
+                        rep: ValueRep::Cell,
+                    },
+                ),
                 intrinsic(5, Intrinsic::ArenaGet, &[4]),
             ],
             5,
@@ -164,6 +171,7 @@ fn selected_owner_program(field: usize) -> Program {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 bind(
@@ -183,6 +191,8 @@ fn selected_owner_program(field: usize) -> Program {
                     Operation::Construct {
                         tag: "$tuple".into(),
                         fields: vec![3, 7],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],

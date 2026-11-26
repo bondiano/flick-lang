@@ -3,6 +3,7 @@ use flick_core::ir::{
     Lit, Pat,
     memory::{
         Block, DictionaryEntry, Exit, Function, Global, Instruction, Name, Operation, Program,
+        ValueRep,
     },
 };
 use flick_core::opt::perceus;
@@ -92,11 +93,15 @@ fn constructor(dicts: bool, live: bool) -> Operation {
             tag: "M.Box.Box".into(),
             fields,
             dicts: vec![2],
+            rep: ValueRep::Cell,
+            layout: None,
         }
     } else {
         Operation::Construct {
             tag: "M.Box.Box".into(),
             fields,
+            rep: ValueRep::Cell,
+            layout: None,
         }
     }
 }
@@ -124,12 +129,16 @@ fn body(receiver: Receiver, count: usize, dicts: bool, live: bool) -> Function {
                 tag: "M.Box.Box".into(),
                 fields: vec![3],
                 dicts: vec![2],
+                rep: ValueRep::Cell,
+                layout: None,
             }
         } else {
             Operation::Reuse {
                 object: 1,
                 tag: "M.Box.Box".into(),
                 fields: vec![3],
+                rep: ValueRep::Cell,
+                layout: None,
             }
         },
     ));
@@ -228,6 +237,7 @@ fn check_layout(heap: &mut Heap, value: &Value, fields: usize, dicts: bool) {
                 Operation::Match {
                     object: 1,
                     pattern: Box::new(pattern),
+                    rep: ValueRep::Cell,
                 },
             )],
             3,

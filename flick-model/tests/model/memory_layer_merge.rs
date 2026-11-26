@@ -3,7 +3,10 @@ use crate::causes;
 use flick_core::{
     ir::{
         Lit,
-        memory::{Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program},
+        memory::{
+            Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program,
+            ValueRep,
+        },
     },
     opt::perceus,
 };
@@ -273,6 +276,8 @@ fn run_owner_program() -> Program {
         Operation::Construct {
             tag: "$tuple".into(),
             fields: vec![2, 11],
+            rep: ValueRep::Cell,
+            layout: None,
         },
     ));
     let perform_owner = |effect: &str| Operation::Perform {
@@ -292,6 +297,8 @@ fn run_owner_program() -> Program {
                 Operation::Construct {
                     tag: "$tuple".into(),
                     fields: vec![2, 3, 4],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
         ],

@@ -121,6 +121,7 @@ impl Machine<'_, '_> {
                     tag,
                     ordinary_fields,
                     fields,
+                    ..
                 } if tag == "$tuple" && *ordinary_fields == fields.len() => {
                     (Some(token.id), false, fields.len())
                 }

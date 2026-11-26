@@ -60,6 +60,7 @@ fn format_json(heap: &Heap, val: &Value) -> Result<String, Error> {
                 tag,
                 ordinary_fields,
                 fields,
+                ..
             } => {
                 if tag == "$list" || tag == "$tuple" {
                     let mut parts = Vec::with_capacity(*ordinary_fields);

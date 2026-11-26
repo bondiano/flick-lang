@@ -43,6 +43,8 @@ fn language_die_does_not_commit_a_pending_modify_result() {
                             Operation::Construct {
                                 tag: "$tuple".into(),
                                 fields: vec![1, 2],
+                                rep: memory::ValueRep::Cell,
+                                layout: None,
                             },
                         ),
                         intrinsic(4, Intrinsic::MatchFail, vec![]),

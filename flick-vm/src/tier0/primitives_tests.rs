@@ -13,6 +13,7 @@ fn invalid_array_layout_rejects_before_charging_or_reading_fields() {
                 tag: tag.into(),
                 ordinary_fields,
                 fields: vec![field],
+                layout: None,
             });
             let expected = if ordinary_fields == 0 {
                 Error::ReservedConstructorEvidence(tag.into())
@@ -49,6 +50,7 @@ fn failed_projection_releases_all_previously_retained_fields() {
         tag: "$tuple".into(),
         ordinary_fields: 2,
         fields: vec![first, stale],
+        layout: None,
     });
     assert_eq!(
         array_to_list(&mut heap, &input, &mut 100),

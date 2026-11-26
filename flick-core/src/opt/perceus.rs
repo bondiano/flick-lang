@@ -12,10 +12,9 @@ use crate::ir::memory::{self, Block, Exit, Function, Instruction, Local, Operati
 mod reuse;
 mod source;
 pub use source::{
-    AggregatePolicy, LowerError, lower, lower_roots_with_aggregates,
-    lower_roots_with_declarations, lower_roots_with_declarations_without_reuse,
-    lower_roots_with_foreign_bridge, lower_with_aggregates, lower_with_declarations,
-    lower_without_reuse,
+    AggregatePolicy, LowerError, lower, lower_roots_with_aggregates, lower_roots_with_declarations,
+    lower_roots_with_declarations_without_reuse, lower_roots_with_foreign_bridge,
+    lower_with_aggregates, lower_with_declarations, lower_without_reuse,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -331,7 +330,12 @@ fn annotate(
         let borrowed = value.borrowed();
         let defer = borrowed.is_some_and(|local| {
             immediate_reuse
-                && can_defer_borrow(&value, local, &aggregates, block.instructions.get(index + 1))
+                && can_defer_borrow(
+                    &value,
+                    local,
+                    &aggregates,
+                    block.instructions.get(index + 1),
+                )
         });
         let result_is_aggregate = value.result_rep() == Some(ValueRep::Aggregate);
         instructions.push(Instruction::Let {

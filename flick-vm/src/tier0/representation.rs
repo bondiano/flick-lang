@@ -167,6 +167,13 @@ enum Data {
     ReuseToken {
         kind: ReuseKind,
         capacity: usize,
+        layout: Option<memory::CellLayout>,
+    },
+    /// Counted fallback cell owning an unboxed aggregate value across
+    /// polymorphic or uniform-representation boundaries.
+    BoxedAggregate {
+        layout: Option<memory::CellLayout>,
+        value: Box<Value>,
     },
     RecoveryResult {
         execution: usize,
@@ -206,6 +213,8 @@ enum Data {
         /// Physical storage owns ordinary prefix AND evidence suffix.
         ordinary_fields: usize,
         fields: Vec<Value>,
+        /// Optional target-independent cell layout for reuse compatibility.
+        layout: Option<memory::CellLayout>,
     },
     /// O(1) counted view over a flat `$list` `Data::Tagged` backing array.
     ListSlice {

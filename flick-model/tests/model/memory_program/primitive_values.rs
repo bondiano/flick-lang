@@ -169,6 +169,8 @@ fn list_concatenation_retains_each_shared_field_before_releasing_inputs() {
                 Operation::Construct {
                     tag: "$list".into(),
                     fields: vec![0, 0],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
             bind(
@@ -241,6 +243,8 @@ fn tagged_nominal_tag_projection_returns_an_independent_owned_string() {
                 Operation::Construct {
                     tag: "Colors.Color.Red".into(),
                     fields: vec![],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
             bind(

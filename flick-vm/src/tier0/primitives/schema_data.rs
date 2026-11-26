@@ -43,6 +43,7 @@ pub(super) fn deconstruct_adt(
             tag,
             ordinary_fields,
             fields,
+            ..
         } if tag != "$list" && tag != "$tuple" => (
             tag.clone(),
             fields[..*ordinary_fields]

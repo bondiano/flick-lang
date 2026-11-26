@@ -103,6 +103,7 @@ pub(super) fn hash(heap: &Heap, value: &Value, fuel: &mut u64) -> Result<i32, Er
                 tag,
                 ordinary_fields,
                 fields,
+                ..
             } => {
                 tagged_boundary(tag, *ordinary_fields, fields.len())?;
                 if *ordinary_fields != 0

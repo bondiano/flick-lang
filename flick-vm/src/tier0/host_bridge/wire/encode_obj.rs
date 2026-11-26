@@ -54,6 +54,7 @@ pub(super) fn encode_object<'a>(
             tag,
             ordinary_fields,
             fields,
+            ..
         } => {
             let children: Vec<Value> = fields[..*ordinary_fields]
                 .iter()

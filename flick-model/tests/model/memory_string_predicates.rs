@@ -2,7 +2,9 @@
 use crate::causes;
 use flick_core::ir::{
     Lit,
-    memory::{Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program},
+    memory::{
+        Block, Exit, Function, Global, Instruction, Intrinsic, Name, Operation, Program, ValueRep,
+    },
 };
 use flick_core::opt::perceus;
 use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute_program_outcome};
@@ -57,6 +59,7 @@ fn program(kind: Intrinsic) -> Program {
                         Operation::Project {
                             object: 0,
                             field: 0,
+                            rep: ValueRep::Cell,
                         },
                     ),
                     bind(3, Operation::Literal(Lit::String("before".into()))),

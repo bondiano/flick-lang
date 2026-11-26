@@ -171,6 +171,7 @@ fn arena_die_unwind_program() -> Program {
                             Operation::Project {
                                 object: 0,
                                 field: 0,
+                                rep: memory::ValueRep::Cell,
                             },
                         ),
                         intrinsic(5, Intrinsic::ArenaGet, vec![4]),

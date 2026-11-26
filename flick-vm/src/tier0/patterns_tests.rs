@@ -75,6 +75,7 @@ fn deferred_tail_materialization_checks_reserved_collection_metadata() {
         tag: "$list".into(),
         ordinary_fields: 1,
         fields: vec![Value::Int(1), hidden],
+        layout: None,
     });
     let object = root.object_id().expect("list identity");
     let mut scratch = vec![];
@@ -82,11 +83,7 @@ fn deferred_tail_materialization_checks_reserved_collection_metadata() {
         materialize(
             &mut heap,
             &root,
-            Place::Tail {
-                object,
-                start: 0,
-                end: 2,
-            },
+            &Place::tail(object, 0, 2),
             &mut 1000,
             &mut scratch
         ),

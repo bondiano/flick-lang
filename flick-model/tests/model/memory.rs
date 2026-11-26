@@ -1,7 +1,7 @@
 //! Executes the shared memory annotations, not the source-corpus evaluator.
 
 use flick_core::ir::Lit;
-use flick_core::ir::memory::{Block, Exit, Function, Instruction, Operation};
+use flick_core::ir::memory::{Block, Exit, Function, Instruction, Operation, ValueRep};
 use flick_core::opt::perceus;
 use flick_vm::tier0::{Error, Heap, Value, execute};
 
@@ -32,6 +32,8 @@ fn shared_fields_have_real_counts_and_the_caller_releases_the_result() {
                 Operation::Construct {
                     tag: "Pair".into(),
                     fields: vec![0, 0],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
         ],
@@ -104,6 +106,8 @@ fn unique_same_capacity_reuse_keeps_the_allocation() {
                     object: 0,
                     tag: "New".into(),
                     fields: vec![1],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
         ],
@@ -133,6 +137,8 @@ fn aliased_candidate_falls_back_without_mutating_the_alias() {
                 object: 0,
                 tag: "New".into(),
                 fields: vec![],
+                rep: ValueRep::Cell,
+                layout: None,
             },
         )],
         1,
@@ -269,6 +275,7 @@ fn inserted_last_project_reuse_runs_without_an_extra_allocation() {
                 Operation::Project {
                     object: 0,
                     field: 0,
+                    rep: ValueRep::Cell,
                 },
             ),
             bind(
@@ -276,6 +283,8 @@ fn inserted_last_project_reuse_runs_without_an_extra_allocation() {
                 Operation::Construct {
                     tag: "New".into(),
                     fields: vec![1],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
         ],
@@ -312,6 +321,7 @@ fn inserted_reuse_with_aliased_parameters_preserves_the_old_value() {
                 Operation::Project {
                     object: 0,
                     field: 0,
+                    rep: ValueRep::Cell,
                 },
             ),
             bind(
@@ -319,6 +329,8 @@ fn inserted_reuse_with_aliased_parameters_preserves_the_old_value() {
                 Operation::Construct {
                     tag: "New".into(),
                     fields: vec![1, 3],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
         ],
@@ -357,6 +369,8 @@ fn inserted_nested_branches_and_repeated_fields_balance_on_all_paths() {
                 Operation::Construct {
                     tag: "Pair".into(),
                     fields: vec![2, 2],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             )],
             exit: Exit::Branch {

@@ -1,15 +1,45 @@
 impl Heap {
     pub fn dup(&mut self, value: &Value) -> Result<Value, Error> {
         self.admit_not_reuse_token(value)?;
-        if let Value::Object(id) = value {
-            let object = self.object_mut(id.id)?;
-            object.references = object
-                .references
-                .checked_add(1)
-                .ok_or(Error::ReferenceOverflow(id.id))?;
-            self.stats.dups += 1;
+        match value {
+            Value::Object(id) => {
+                let object = self.object_mut(id.id)?;
+                object.references = object
+                    .references
+                    .checked_add(1)
+                    .ok_or(Error::ReferenceOverflow(id.id))?;
+                self.stats.dups += 1;
+            }
+            Value::Aggregate { .. } => self.dup_aggregate_descendants(value)?,
+            _ => {}
         }
         Ok(value.representation())
+    }
+
+    fn dup_aggregate_descendants(&mut self, value: &Value) -> Result<(), Error> {
+        let mut counts = BTreeMap::new();
+        let mut pending = vec![value];
+        while let Some(current) = pending.pop() {
+            match current {
+                Value::Object(token) => {
+                    *counts.entry(token.id).or_insert(0usize) += 1;
+                }
+                Value::Aggregate { fields, .. } => pending.extend(fields.iter()),
+                _ => {}
+            }
+        }
+        for (&id, &delta) in &counts {
+            let object = self.object(id)?;
+            object
+                .references
+                .checked_add(delta)
+                .ok_or(Error::ReferenceOverflow(id))?;
+        }
+        for (id, delta) in counts {
+            self.object_mut(id)?.references += delta;
+            self.stats.dups += delta;
+        }
+        Ok(())
     }
 
     /// Releases one token and iteratively destroys any newly unreachable
@@ -175,19 +205,26 @@ impl Heap {
     }
 
     fn admit_ordinary(&self, value: &Value) -> Result<(), Error> {
-        match value {
-            Value::ReuseNull => return Err(Error::ReuseTokenEscape),
-            Value::Object(token) => match self.object(token.id)?.data {
-                Data::RecoveryResult { .. } => return Err(Error::RecoveryEscape),
-                Data::ReuseToken { .. } => return Err(Error::ReuseTokenEscape),
+        let mut pending = vec![value];
+        while let Some(current) = pending.pop() {
+            match current {
+                Value::ReuseNull => return Err(Error::ReuseTokenEscape),
+                Value::Object(token) => match self.object(token.id)?.data {
+                    Data::RecoveryResult { .. } => return Err(Error::RecoveryEscape),
+                    Data::ReuseToken { .. } => return Err(Error::ReuseTokenEscape),
+                    _ => {}
+                },
+                Value::Aggregate { fields, .. } => pending.extend(fields.iter()),
                 _ => {}
-            },
-            _ => {}
+            }
         }
         Ok(())
     }
 
     fn admit_reuse_candidate(&self, value: &Value) -> Result<(), Error> {
+        if matches!(value, Value::Aggregate { .. }) {
+            return Err(Error::AggregateReuseCandidate);
+        }
         if let Value::Object(token) = value
             && matches!(self.object(token.id)?.data, Data::RecoveryResult { .. })
         {
@@ -197,15 +234,20 @@ impl Heap {
     }
 
     fn admit_not_reuse_token(&self, value: &Value) -> Result<(), Error> {
-        match value {
-            Value::ReuseNull => Err(Error::ReuseTokenEscape),
-            Value::Object(token)
-                if matches!(self.object(token.id)?.data, Data::ReuseToken { .. }) =>
-            {
-                Err(Error::ReuseTokenEscape)
+        let mut pending = vec![value];
+        while let Some(current) = pending.pop() {
+            match current {
+                Value::ReuseNull => return Err(Error::ReuseTokenEscape),
+                Value::Object(token)
+                    if matches!(self.object(token.id)?.data, Data::ReuseToken { .. }) =>
+                {
+                    return Err(Error::ReuseTokenEscape);
+                }
+                Value::Aggregate { fields, .. } => pending.extend(fields.iter()),
+                _ => {}
             }
-            _ => Ok(()),
         }
+        Ok(())
     }
 
     fn admit_values<'a>(&self, values: impl IntoIterator<Item = &'a Value>) -> Result<(), Error> {
@@ -219,9 +261,14 @@ impl Heap {
     /// contains at least that many owned references.
     fn ensure_owned<'a>(&self, values: impl IntoIterator<Item = &'a Value>) -> Result<(), Error> {
         let mut required = BTreeMap::new();
-        for value in values {
-            if let Value::Object(id) = value {
-                *required.entry(id.id).or_insert(0) += 1;
+        let mut pending: Vec<&'a Value> = values.into_iter().collect();
+        while let Some(value) = pending.pop() {
+            match value {
+                Value::Object(id) => {
+                    *required.entry(id.id).or_insert(0) += 1;
+                }
+                Value::Aggregate { fields, .. } => pending.extend(fields.iter()),
+                _ => {}
             }
         }
         for (object, required) in required {
@@ -240,26 +287,30 @@ impl Heap {
     fn drop_values(&mut self, mut pending: Vec<Value>) -> Result<(), Error> {
         let mut failure = None;
         while let Some(value) = pending.pop() {
-            if let Value::Object(id) = value {
-                let object = match self.object_mut(id.id) {
-                    Ok(object) => object,
-                    Err(error) => {
-                        failure.get_or_insert(error);
-                        continue;
+            match value {
+                Value::Object(id) => {
+                    let object = match self.object_mut(id.id) {
+                        Ok(object) => object,
+                        Err(error) => {
+                            failure.get_or_insert(error);
+                            continue;
+                        }
+                    };
+                    object.references -= 1;
+                    let dead = object.references == 0;
+                    self.stats.drops += 1;
+                    if dead {
+                        let slot = &mut self.objects[id.id.index];
+                        let object = slot.object.take().expect("the released object exists");
+                        slot.generation = slot.generation.wrapping_add(1);
+                        self.free_list.push(id.id.index);
+                        self.stats.frees += 1;
+                        self.stats.live_objects -= 1;
+                        self.release_data(id.id, object.data, &mut pending);
                     }
-                };
-                object.references -= 1;
-                let dead = object.references == 0;
-                self.stats.drops += 1;
-                if dead {
-                    let slot = &mut self.objects[id.id.index];
-                    let object = slot.object.take().expect("the released object exists");
-                    slot.generation = slot.generation.wrapping_add(1);
-                    self.free_list.push(id.id.index);
-                    self.stats.frees += 1;
-                    self.stats.live_objects -= 1;
-                    self.release_data(id.id, object.data, &mut pending);
                 }
+                Value::Aggregate { fields, .. } => pending.extend(fields),
+                _ => {}
             }
         }
         failure.map_or(Ok(()), Err)
@@ -360,6 +411,7 @@ fn release_data_children(data: Data, pending: &mut Vec<Value>) {
         | Data::ExitTask(ExitData::Success(v) | ExitData::Failure(v))
         | Data::ContextRef { default_fn: v, .. }
         | Data::MaskedTask { task: v, .. } => pending.push(v),
+        Data::BoxedAggregate { value, .. } => pending.push(*value),
         Data::Lazy { state, .. } => release_lazy_state(state, pending),
         Data::Iterator { state, .. } => {
             if let IteratorState::List { backing, .. } = state {

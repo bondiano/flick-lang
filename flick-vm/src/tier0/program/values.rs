@@ -47,8 +47,12 @@ impl Machine<'_, '_> {
                 self.scratch.push(Value::Unit);
                 self.await_task(Destination::Bind(binding))?;
             }
-            Operation::Project { object, field } => self.project_value(binding, *object, *field)?,
-            Operation::Match { object, pattern } => {
+            Operation::Project { object, field, .. } => {
+                self.project_value(binding, *object, *field)?;
+            }
+            Operation::Match {
+                object, pattern, ..
+            } => {
                 self.match_value(binding, *object, pattern)?;
             }
             Operation::Update { object, fields } => {
@@ -75,31 +79,62 @@ impl Machine<'_, '_> {
                 )?;
             }
             Operation::Record { fields } => self.record(binding, fields)?,
-            Operation::Construct { tag, fields } => self.construct(binding, tag, fields, &[])?,
-            Operation::ConstructWithDicts { tag, fields, dicts } => {
-                self.construct(binding, tag, fields, dicts)?;
-            }
-            Operation::DropReuse(object) => self.drop_reuse(binding, *object)?,
-            Operation::Reuse {
-                object,
-                tag,
-                fields,
-            } => self.reuse(binding, *object, tag, fields, &[])?,
-            Operation::ReuseWithDicts {
-                object,
-                tag,
-                fields,
-                dicts,
-            } => self.reuse(binding, *object, tag, fields, dicts)?,
-            Operation::ReuseRecord { object, fields } => {
-                self.reuse_record(binding, *object, fields)?;
-            }
+            Operation::Construct { .. }
+            | Operation::ConstructWithDicts { .. }
+            | Operation::BoxAggregate { .. }
+            | Operation::UnboxBorrow { .. }
+            | Operation::UnboxConsume { .. }
+            | Operation::DropReuse(_)
+            | Operation::Reuse { .. }
+            | Operation::ReuseWithDicts { .. }
+            | Operation::ReuseRecord { .. } => self.data_operation(binding, operation)?,
             Operation::Binary { .. }
             | Operation::Not(_)
             | Operation::Neg { .. }
             | Operation::Intrinsic { .. } => self.primitive_operation(binding, operation)?,
         }
         Ok(())
+    }
+
+    fn data_operation(&mut self, binding: Local, operation: &Operation) -> Result<(), Error> {
+        match operation {
+            Operation::Construct {
+                tag,
+                fields,
+                rep,
+                layout,
+            } => self.construct(binding, tag, fields, &[], *rep, layout.clone()),
+            Operation::ConstructWithDicts {
+                tag,
+                fields,
+                dicts,
+                rep,
+                layout,
+            } => self.construct(binding, tag, fields, dicts, *rep, layout.clone()),
+            Operation::BoxAggregate { value, layout } => {
+                self.box_aggregate(binding, *value, layout.clone())
+            }
+            Operation::UnboxBorrow { object } => self.unbox_borrow(binding, *object),
+            Operation::UnboxConsume { object } => self.unbox_consume(binding, *object),
+            Operation::DropReuse(object) => self.drop_reuse(binding, *object),
+            Operation::Reuse {
+                object,
+                tag,
+                fields,
+                rep: _,
+                layout,
+            } => self.reuse(binding, *object, tag, fields, &[], layout.clone()),
+            Operation::ReuseWithDicts {
+                object,
+                tag,
+                fields,
+                dicts,
+                rep: _,
+                layout,
+            } => self.reuse(binding, *object, tag, fields, dicts, layout.clone()),
+            Operation::ReuseRecord { object, fields } => self.reuse_record(binding, *object, fields),
+            _ => unreachable!("non-data operation"),
+        }
     }
 
     fn field_operation(&mut self, binding: Local, object: Local, field: &str) -> Result<(), Error> {
@@ -152,7 +187,15 @@ impl Machine<'_, '_> {
     fn admit_operands(&self, operation: &Operation) -> Result<(), Error> {
         let locals = &self.frames.last().expect("operand caller").locals;
         match operation {
-            Operation::Reuse { object, fields, .. } => {
+            Operation::Reuse {
+                object,
+                fields,
+                rep,
+                ..
+            } => {
+                if rep.is_aggregate() {
+                    return Err(Error::AggregateReuseCandidate);
+                }
                 self.heap.admit_reuse_candidate(peek(locals, *object)?)?;
                 for local in fields {
                     self.heap.admit_ordinary(peek(locals, *local)?)?;
@@ -162,8 +205,12 @@ impl Machine<'_, '_> {
                 object,
                 fields,
                 dicts,
+                rep,
                 ..
             } => {
+                if rep.is_aggregate() {
+                    return Err(Error::AggregateReuseCandidate);
+                }
                 self.heap.admit_reuse_candidate(peek(locals, *object)?)?;
                 for local in fields.iter().chain(dicts) {
                     self.heap.admit_ordinary(peek(locals, *local)?)?;
@@ -225,13 +272,43 @@ impl Machine<'_, '_> {
         tag: &str,
         fields: &[Local],
         dicts: &[Local],
+        rep: super::ValueRep,
+        layout: Option<super::CellLayout>,
     ) -> Result<(), Error> {
         self.stage(fields.iter().chain(dicts).copied())?;
         let mut fields_owned = mem::take(&mut self.scratch);
         let dicts_owned = fields_owned.split_off(fields.len());
         let value = self
             .heap
-            .construct_with_dicts(tag, fields_owned, dicts_owned)?;
+            .construct_with_rep_and_layout(tag, fields_owned, dicts_owned, rep, layout)?;
+        self.store(binding, value)?;
+        Ok(())
+    }
+
+    fn box_aggregate(
+        &mut self,
+        binding: Local,
+        value: Local,
+        layout: Option<super::CellLayout>,
+    ) -> Result<(), Error> {
+        self.stage([value])?;
+        let aggregate = self.scratch.remove(0);
+        let boxed = self.heap.box_aggregate(aggregate, layout)?;
+        self.store(binding, boxed)?;
+        Ok(())
+    }
+
+    fn unbox_borrow(&mut self, binding: Local, object: Local) -> Result<(), Error> {
+        let receiver = peek(&self.frames.last().expect("unbox caller").locals, object)?;
+        let value = self.heap.unbox_borrow(receiver)?;
+        self.store(binding, value)?;
+        Ok(())
+    }
+
+    fn unbox_consume(&mut self, binding: Local, object: Local) -> Result<(), Error> {
+        self.stage([object])?;
+        let boxed = self.scratch.remove(0);
+        let value = self.heap.unbox_consume(boxed)?;
         self.store(binding, value)?;
         Ok(())
     }
@@ -251,6 +328,7 @@ impl Machine<'_, '_> {
         tag: &str,
         fields: &[Local],
         dicts: &[Local],
+        layout: Option<super::CellLayout>,
     ) -> Result<(), Error> {
         self.stage(iter::once(object).chain(fields.iter().chain(dicts).copied()))?;
         let candidate = self.scratch.remove(0);
@@ -258,7 +336,7 @@ impl Machine<'_, '_> {
         let dicts_owned = fields_owned.split_off(fields.len());
         let value = self
             .heap
-            .reuse_with_dicts(candidate, tag, fields_owned, dicts_owned)?;
+            .reuse_with_dicts_and_layout(candidate, tag, fields_owned, dicts_owned, layout)?;
         self.store(binding, value)?;
         Ok(())
     }

@@ -258,7 +258,15 @@ fn take(locals: &mut Locals, local: Local) -> Result<Value, Error> {
 
 fn admit_standalone_operands(heap: &Heap, locals: &Locals, value: &Operation) -> Result<(), Error> {
     match value {
-        Operation::Reuse { object, fields, .. } => {
+        Operation::Reuse {
+            object,
+            fields,
+            rep,
+            ..
+        } => {
+            if rep.is_aggregate() {
+                return Err(Error::AggregateReuseCandidate);
+            }
             heap.admit_reuse_candidate(peek(locals, *object)?)?;
             for local in fields {
                 heap.admit_ordinary(peek(locals, *local)?)?;
@@ -268,8 +276,12 @@ fn admit_standalone_operands(heap: &Heap, locals: &Locals, value: &Operation) ->
             object,
             fields,
             dicts,
+            rep,
             ..
         } => {
+            if rep.is_aggregate() {
+                return Err(Error::AggregateReuseCandidate);
+            }
             heap.admit_reuse_candidate(peek(locals, *object)?)?;
             for local in fields.iter().chain(dicts) {
                 heap.admit_ordinary(peek(locals, *local)?)?;
@@ -308,22 +320,33 @@ fn standalone_reuse_operation(
             object,
             tag,
             fields,
+            rep: _,
+            layout,
         } => {
             let candidate = take(locals, *object)?;
-            heap.reuse(candidate, tag, take_operands(locals, fields)?)
+            heap.reuse_with_dicts_and_layout(
+                candidate,
+                tag,
+                take_operands(locals, fields)?,
+                vec![],
+                layout.clone(),
+            )
         }
         Operation::ReuseWithDicts {
             object,
             tag,
             fields,
             dicts,
+            rep: _,
+            layout,
         } => {
             let candidate = take(locals, *object)?;
-            heap.reuse_with_dicts(
+            heap.reuse_with_dicts_and_layout(
                 candidate,
                 tag,
                 take_operands(locals, fields)?,
                 take_operands(locals, dicts)?,
+                layout.clone(),
             )
         }
         Operation::ReuseRecord { object, fields } => {
@@ -338,21 +361,62 @@ fn standalone_reuse_operation(
     }
 }
 
+fn standalone_aggregate_operation(
+    heap: &mut Heap,
+    locals: &mut Locals,
+    value: &Operation,
+) -> Result<Value, Error> {
+    match value {
+        Operation::Construct {
+            tag,
+            fields,
+            rep,
+            layout,
+        } => heap.construct_with_rep_and_layout(
+            tag,
+            take_operands(locals, fields)?,
+            vec![],
+            *rep,
+            layout.clone(),
+        ),
+        Operation::ConstructWithDicts {
+            tag,
+            fields,
+            dicts,
+            rep,
+            layout,
+        } => heap.construct_with_rep_and_layout(
+            tag,
+            take_operands(locals, fields)?,
+            take_operands(locals, dicts)?,
+            *rep,
+            layout.clone(),
+        ),
+        Operation::BoxAggregate { value, layout } => {
+            let aggregate = take(locals, *value)?;
+            heap.box_aggregate(aggregate, layout.clone())
+        }
+        Operation::UnboxBorrow { object } => heap.unbox_borrow(peek(locals, *object)?),
+        Operation::UnboxConsume { object } => {
+            let boxed = take(locals, *object)?;
+            heap.unbox_consume(boxed)
+        }
+        _ => unreachable!("non-aggregate operation"),
+    }
+}
+
 fn operation(heap: &mut Heap, locals: &mut Locals, value: &Operation) -> Result<Value, Error> {
     admit_standalone_operands(heap, locals, value)?;
     match value {
         Operation::ServiceTag(key) => heap.service_tag(key),
         Operation::Label(name) => Ok(heap.allocate(Data::Label(name.clone()))),
         Operation::Literal(literal) => heap.literal(literal),
-        Operation::Construct { tag, fields } => {
-            heap.construct(tag, take_operands(locals, fields)?)
-        }
-        Operation::ConstructWithDicts { tag, fields, dicts } => heap.construct_with_dicts(
-            tag,
-            take_operands(locals, fields)?,
-            take_operands(locals, dicts)?,
-        ),
-        Operation::Project { object, field } => heap.project(peek(locals, *object)?, *field),
+        Operation::Construct { .. }
+        | Operation::ConstructWithDicts { .. }
+        | Operation::BoxAggregate { .. }
+        | Operation::UnboxBorrow { .. }
+        | Operation::UnboxConsume { .. } => standalone_aggregate_operation(heap, locals, value),
+        Operation::Project { object, field, .. } => heap.project(peek(locals, *object)?, *field),
         Operation::Record { fields } => {
             let values = fields
                 .iter()

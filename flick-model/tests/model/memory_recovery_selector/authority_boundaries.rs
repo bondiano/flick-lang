@@ -41,6 +41,8 @@ fn sealed_marker_cannot_cross_any_ordinary_operand_or_owned_edge() {
             Operation::Construct {
                 tag: "placeholder".into(),
                 fields,
+                rep: ValueRep::Cell,
+                layout: None,
             }
         } else {
             operation.clone()

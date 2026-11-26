@@ -166,6 +166,7 @@ fn format_spaced(
                 tag,
                 ordinary_fields,
                 fields,
+                ..
             } => {
                 if tag == "$list" || tag == "$tuple" {
                     let vals: Vec<Value> = fields[..*ordinary_fields]

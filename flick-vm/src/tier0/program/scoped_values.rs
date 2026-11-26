@@ -107,6 +107,7 @@ impl Machine<'_, '_> {
             tag,
             ordinary_fields,
             fields,
+            ..
         } = &self.heap.object(token.id)?.data
         else {
             return Err(Error::ExpectedModifyPair);

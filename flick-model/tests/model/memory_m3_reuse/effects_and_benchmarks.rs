@@ -2,7 +2,7 @@
 
 use flick_core::ir::{
     Lit, Pat,
-    memory::{Block, Exit, Function, Global, Instruction, Name, Operation, Program},
+    memory::{Block, Exit, Function, Global, Instruction, Name, Operation, Program, ValueRep},
 };
 use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value, execute, execute_program_outcome};
 
@@ -234,6 +234,8 @@ fn escape_cases() -> Vec<(&'static str, Function)> {
                             Operation::Construct {
                                 tag: "M.Box.Box".into(),
                                 fields: vec![2],
+                                rep: ValueRep::Cell,
+                                layout: None,
                             },
                         ),
                     ],
@@ -254,6 +256,7 @@ fn escape_cases() -> Vec<(&'static str, Function)> {
                             Operation::Match {
                                 object: 2,
                                 pattern: Box::new(Pat::Wild),
+                                rep: ValueRep::Cell,
                             },
                         ),
                         Instruction::Drop(2),
@@ -383,6 +386,8 @@ fn standalone_escape_cases() -> Vec<(&'static str, Function)> {
                             Operation::Construct {
                                 tag: "M.Box.Box".into(),
                                 fields: vec![1],
+                                rep: ValueRep::Cell,
+                                layout: None,
                             },
                         ),
                     ],

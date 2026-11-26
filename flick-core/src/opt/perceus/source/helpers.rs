@@ -1,6 +1,9 @@
 use flick_ir::{Adapter, Dict, Foreign, ForeignMode, Retention};
 
-use super::{Env, Expr, ExprKind, HostPrimitive, Intrinsic, Lit, Local, LowerError, Param, Pat, Span, Stage, given, unsupported};
+use super::{
+    Env, Expr, ExprKind, HostPrimitive, Intrinsic, Lit, Local, LowerError, Param, Pat, Span, Stage,
+    given, unsupported,
+};
 
 pub(super) fn foreign_intrinsic(value: &Foreign) -> Option<Intrinsic> {
     use Intrinsic::Host;

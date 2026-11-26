@@ -136,6 +136,8 @@ fn cell_identity_is_stable_and_distinguishes_allocations() {
                 Operation::Construct {
                     tag: "$tuple".into(),
                     fields: vec![4, 5],
+                    rep: ValueRep::Cell,
+                    layout: None,
                 },
             ),
         ],
@@ -210,6 +212,7 @@ fn returned_task_cannot_rebind_code_or_closed_cell_storage_in_another_execution(
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 intrinsic(3, Intrinsic::RefGet, &[2]),
@@ -272,6 +275,7 @@ fn main_function_returned_task_uses_same_live_cell_arena_until_await_finishes() 
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 intrinsic(3, Intrinsic::RefGet, &[2]),
@@ -357,6 +361,7 @@ fn task_storage_cannot_be_reused_as_a_tagged_constructor() {
                 Operation::Project {
                     object: 0,
                     field: 0,
+                    rep: ValueRep::Cell,
                 },
             )],
             2,
@@ -407,6 +412,7 @@ fn modify_callback_type_error_cleans_retained_old_contents_and_callback_capture(
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 bind(3, Operation::Literal(Lit::Bool(true))),
@@ -456,6 +462,8 @@ fn reusing_a_cell_read_falls_back_and_preserves_the_cells_old_value() {
                         object: 3,
                         tag: "New".into(),
                         fields: vec![4],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
                 intrinsic(6, Intrinsic::RefGet, &[2]),
@@ -464,6 +472,8 @@ fn reusing_a_cell_read_falls_back_and_preserves_the_cells_old_value() {
                     Operation::Construct {
                         tag: "$tuple".into(),
                         fields: vec![5, 6],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],

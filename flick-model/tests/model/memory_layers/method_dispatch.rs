@@ -1,3 +1,4 @@
+use flick_core::ir::memory::ValueRep;
 #[test]
 fn provider_method_keeps_intervening_caller_handler_active() {
     let p = program(vec![
@@ -102,6 +103,7 @@ fn provider_invocation_stages_dictionaries_before_arguments() {
                     Operation::Project {
                         object: 0,
                         field: 0,
+                        rep: ValueRep::Cell,
                     },
                 ),
                 bind(
@@ -109,6 +111,8 @@ fn provider_invocation_stages_dictionaries_before_arguments() {
                     Operation::Construct {
                         tag: "Pair".into(),
                         fields: vec![2, 1],
+                        rep: ValueRep::Cell,
+                        layout: None,
                     },
                 ),
             ],

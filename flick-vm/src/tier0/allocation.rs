@@ -70,6 +70,7 @@ impl Heap {
                 tag,
                 ordinary_fields,
                 fields,
+                ..
             } if tag == "$list" => {
                 tagged_boundary(tag, *ordinary_fields, fields.len())?;
                 Ok((token.id, 0, fields.len()))
@@ -86,6 +87,7 @@ impl Heap {
                     tag,
                     ordinary_fields,
                     fields,
+                    ..
                 } = &self.object(backing_token.id)?.data
                 else {
                     return Err(Error::PatternKind("list"));
@@ -313,36 +315,19 @@ impl Heap {
     pub fn construct_with_dicts(
         &mut self,
         tag: &str,
-        mut fields: Vec<Value>,
+        fields: Vec<Value>,
         dicts: Vec<Value>,
     ) -> Result<Value, Error> {
-        self.ensure_owned(fields.iter().chain(&dicts))?;
-        if let Err(error) = self.admit_values(fields.iter().chain(&dicts)) {
-            fields.extend(dicts);
-            self.drop_values(fields)?;
-            return Err(error);
-        }
-        let ordinary_fields = fields.len();
-        let total = ordinary_fields
-            .checked_add(dicts.len())
-            .ok_or(Error::ConstructorFieldOverflow)?;
-        if let Err(error) = tagged_boundary(tag, ordinary_fields, total) {
-            fields.extend(dicts);
-            self.drop_values(fields)?;
-            return Err(error);
-        }
-        fields.extend(dicts);
-        Ok(self.allocate(Data::Tagged {
-            tag: tag.to_owned(),
-            ordinary_fields,
-            fields,
-        }))
+        self.construct_with_rep_and_layout(tag, fields, dicts, ValueRep::Cell, None)
     }
 
     /// Returns a borrowed field. An independently owned field token is
     /// obtained with [`Self::project`], not by copying its identity.
-    pub fn field<'a>(&'a self, value: &Value, field: usize) -> Result<&'a Value, Error> {
+    pub fn field<'a>(&'a self, value: &'a Value, field: usize) -> Result<&'a Value, Error> {
         self.admit_ordinary(value)?;
+        if matches!(value, Value::Aggregate { .. }) {
+            return aggregate_field(value, field);
+        }
         let Value::Object(id) = value else {
             return Err(Error::ExpectedObject);
         };
@@ -351,6 +336,7 @@ impl Heap {
                 tag,
                 ordinary_fields,
                 fields,
+                ..
             } => {
                 tagged_boundary(tag, *ordinary_fields, fields.len())?;
                 fields.get(field).ok_or(Error::MissingField {
@@ -396,8 +382,11 @@ impl Heap {
         }
     }
 
-    pub fn tag(&self, value: &Value) -> Result<&str, Error> {
+    pub fn tag<'a>(&'a self, value: &'a Value) -> Result<&'a str, Error> {
         self.admit_ordinary(value)?;
+        if matches!(value, Value::Aggregate { .. }) {
+            return aggregate_tag(value);
+        }
         let Value::Object(id) = value else {
             return Err(Error::ExpectedObject);
         };
@@ -406,6 +395,7 @@ impl Heap {
                 tag,
                 ordinary_fields,
                 fields,
+                ..
             } => {
                 tagged_boundary(tag, *ordinary_fields, fields.len())?;
                 Ok(tag)
@@ -531,12 +521,17 @@ impl Heap {
     /// nominal tag of a constructor. A record's own `_tag` is ordinary data.
     pub fn project_named(&mut self, value: &Value, field: &str) -> Result<Value, Error> {
         self.admit_ordinary(value)?;
+        if field == "_tag" && matches!(value, Value::Aggregate { .. }) {
+            let tag = aggregate_tag(value)?.to_owned();
+            return self.literal(&Lit::String(tag));
+        }
         if field == "_tag"
             && let Value::Object(token) = value
             && let Data::Tagged {
                 tag,
                 ordinary_fields,
                 fields,
+                ..
             } = &self.object(token.id)?.data
         {
             tagged_boundary(tag, *ordinary_fields, fields.len())?;

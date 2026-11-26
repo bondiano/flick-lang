@@ -9,6 +9,10 @@ impl Heap {
             self.drop_value(candidate)?;
             return Err(error);
         }
+        if matches!(candidate, Value::Aggregate { .. }) {
+            self.drop_value(candidate)?;
+            return Err(Error::AggregateReuseCandidate);
+        }
         if !self.reuse_enabled {
             self.drop_value(candidate)?;
             return Ok(Value::ReuseNull);
@@ -24,27 +28,32 @@ impl Heap {
                         tag,
                         ordinary_fields,
                         fields,
+                        layout,
                     } => {
                         if let Err(error) = tagged_boundary(tag, *ordinary_fields, fields.len()) {
                             self.drop_value(Value::Object(token))?;
                             return Err(error);
                         }
-                        Some((ReuseKind::Tagged, fields.len()))
+                        Some((ReuseKind::Tagged, fields.len(), layout.clone()))
                     }
-                    Data::Record(fields) => Some((ReuseKind::Record, fields.len())),
+                    Data::Record(fields) => Some((ReuseKind::Record, fields.len(), None)),
                     _ => None,
                 }
             } else {
                 None
             }
         };
-        let Some((kind, capacity)) = detach else {
+        let Some((kind, capacity, layout)) = detach else {
             self.drop_value(Value::Object(token))?;
             return Ok(Value::ReuseNull);
         };
         let old = mem::replace(
             &mut self.object_mut(token.id)?.data,
-            Data::ReuseToken { kind, capacity },
+            Data::ReuseToken {
+                kind,
+                capacity,
+                layout,
+            },
         );
         match old {
             Data::Tagged { fields, .. } => self.drop_values(fields)?,
@@ -64,7 +73,19 @@ impl Heap {
         tag: &str,
         fields: Vec<Value>,
     ) -> Result<Value, Error> {
-        self.reuse_with_dicts(candidate, tag, fields, vec![])
+        self.reuse_with_dicts_and_layout(candidate, tag, fields, vec![], None)
+    }
+
+    /// Reuses a unique tagged object or reuse token when field count AND
+    /// abstract `CellLayout` are compatible; otherwise drops and allocates.
+    pub fn reuse_with_layout(
+        &mut self,
+        candidate: Value,
+        tag: &str,
+        fields: Vec<Value>,
+        layout: Option<CellLayout>,
+    ) -> Result<Value, Error> {
+        self.reuse_with_dicts_and_layout(candidate, tag, fields, vec![], layout)
     }
 
     /// Reuses physical capacity, not the old semantic partition. Both
@@ -73,8 +94,21 @@ impl Heap {
         &mut self,
         candidate: Value,
         tag: &str,
+        fields: Vec<Value>,
+        dicts: Vec<Value>,
+    ) -> Result<Value, Error> {
+        self.reuse_with_dicts_and_layout(candidate, tag, fields, dicts, None)
+    }
+
+    /// Reuses physical capacity when unique, equal-sized, and layout-compatible.
+    /// Rejects `Value::Aggregate` candidates with [`Error::AggregateReuseCandidate`].
+    pub fn reuse_with_dicts_and_layout(
+        &mut self,
+        candidate: Value,
+        tag: &str,
         mut fields: Vec<Value>,
         dicts: Vec<Value>,
+        layout: Option<CellLayout>,
     ) -> Result<Value, Error> {
         self.ensure_owned(iter::once(&candidate).chain(&fields).chain(&dicts))?;
         if let Err(error) = self
@@ -97,7 +131,7 @@ impl Heap {
             return Err(error);
         }
         fields.extend(dicts);
-        let reusable = match self.can_reuse(&candidate, total) {
+        let reusable = match self.can_reuse(&candidate, total, layout.as_ref()) {
             Ok(reusable) => reusable,
             Err(error) => {
                 fields.push(candidate);
@@ -115,6 +149,7 @@ impl Heap {
                     tag: tag.to_owned(),
                     ordinary_fields,
                     fields,
+                    layout,
                 },
             );
             self.stats.reuses += 1;
@@ -129,6 +164,7 @@ impl Heap {
                 tag: tag.to_owned(),
                 ordinary_fields,
                 fields,
+                layout,
             }))
         }
     }
@@ -190,7 +226,12 @@ impl Heap {
         }
     }
 
-    fn can_reuse(&self, candidate: &Value, total: usize) -> Result<bool, Error> {
+    fn can_reuse(
+        &self,
+        candidate: &Value,
+        total: usize,
+        target_layout: Option<&CellLayout>,
+    ) -> Result<bool, Error> {
         if !self.reuse_enabled {
             return Ok(false);
         }
@@ -202,14 +243,18 @@ impl Heap {
             Data::ReuseToken {
                 kind: ReuseKind::Tagged,
                 capacity,
-            } => Ok(object.references == 1 && *capacity == total),
+                layout,
+            } => Ok(object.references == 1 && *capacity == total && layout.as_ref() == target_layout),
             Data::Tagged {
                 tag,
                 ordinary_fields,
                 fields,
+                layout,
             } => {
                 tagged_boundary(tag, *ordinary_fields, fields.len())?;
-                Ok(object.references == 1 && fields.len() == total)
+                Ok(object.references == 1
+                    && fields.len() == total
+                    && layout.as_ref() == target_layout)
             }
             _ => Ok(false),
         }
@@ -227,6 +272,7 @@ impl Heap {
             Data::ReuseToken {
                 kind: ReuseKind::Record,
                 capacity,
+                ..
             } => Ok(object.references == 1 && *capacity == field_count),
             Data::Record(fields) => Ok(object.references == 1 && fields.len() == field_count),
             _ => Ok(false),
