@@ -19,6 +19,7 @@ BigInt implemented
 String implemented
 Math.floor implemented
 Math.sqrt implemented
+Math.log implemented
 [flick:Arbitrary] refused
 [flick:Array] refused
 [flick:BigDecimal] refused

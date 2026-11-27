@@ -368,6 +368,24 @@ fn float_formatting_equality_and_ordering_boundaries() {
     .expect("kernel test value");
     assert_eq!(show_str(&mut heap, &sqrt_neg), "NaN");
 
+    // Math.log has the bits JS gives, and next_pow2 is exact at 2^29
+    let log_ten = eval_prim(
+        &mut heap,
+        Intrinsic::Float(FloatIntrinsic::Log),
+        &[Value::Float(10.0)],
+        &mut fuel,
+    )
+    .expect("kernel test value");
+    assert_eq!(show_str(&mut heap, &log_ten), "2.302585092994046");
+    let pow = eval_prim(
+        &mut heap,
+        Intrinsic::Float(FloatIntrinsic::NextPow2),
+        &[Value::Float(536_870_912.0)],
+        &mut fuel,
+    )
+    .expect("kernel test value");
+    assert_eq!(show_str(&mut heap, &pow), "536870912");
+
     heap.drop_value(cmp_nan_inf).expect("kernel test value");
     heap.finish().expect("zero heap leaks");
 }

@@ -18,6 +18,7 @@ ceil FloatCeil(float64) float64
 round FloatRound(float64) float64
 trunc FloatTrunc(float64) float64
 sqrt FloatSqrt(float64) float64
+log FloatLog(float64) float64
 
 [global Int]
 to_float IntToFloat(int32) float64

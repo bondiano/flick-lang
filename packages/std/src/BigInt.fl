@@ -31,7 +31,8 @@ let parse s =
 
 /// The absolute value.
 abs : BigInt -> BigInt
-foreign pure abs from "flick:BigInt" "abs"
+let abs n = if n < 0n then -n else n
+  @native "flick:BigInt" "abs" when js || go
 
 /// Division rounding toward zero.
 divide : BigInt -> BigInt -> Result Int.ArithmeticError BigInt
@@ -45,105 +46,186 @@ let remainder a b = if b == 0n then Err (Int.ArithmeticError "division by zero")
 
 /// `self + that`: `x |> BigInt.sum 1n`.
 sum : BigInt -> BigInt -> BigInt
-foreign pure sum from "flick:BigInt" "sum"
-  arity 1
+let sum that self = self + that
+  @native "flick:BigInt" "sum" when js || go
+    arity 1
 
 /// `self - that`.
 subtract : BigInt -> BigInt -> BigInt
-foreign pure subtract from "flick:BigInt" "subtract"
-  arity 1
+let subtract that self = self - that
+  @native "flick:BigInt" "subtract" when js || go
+    arity 1
 
 /// `self * that`.
 multiply : BigInt -> BigInt -> BigInt
-foreign pure multiply from "flick:BigInt" "multiply"
-  arity 1
+let multiply that self = self * that
+  @native "flick:BigInt" "multiply" when js || go
+    arity 1
 
 /// `n + 1n`.
 increment : BigInt -> BigInt
-foreign pure increment from "flick:BigInt" "increment"
+let increment n = n + 1n
+  @native "flick:BigInt" "increment" when js || go
 
 /// `n - 1n`.
 decrement : BigInt -> BigInt
-foreign pure decrement from "flick:BigInt" "decrement"
+let decrement n = n - 1n
+  @native "flick:BigInt" "decrement" when js || go
 
 /// The greatest common divisor, not negative.
 gcd : BigInt -> BigInt -> BigInt
-foreign pure gcd from "flick:BigInt" "gcd"
-  arity 1
+let gcd that self =
+  euclid : BigInt -> BigInt -> BigInt
+  let rec euclid a b = if b == 0n then a else euclid b (a % b)
+  euclid (abs self) (abs that)
+  @native "flick:BigInt" "gcd" when js || go
+    arity 1
 
 /// The least common multiple, not negative; 0 when either is 0.
 lcm : BigInt -> BigInt -> BigInt
-foreign pure lcm from "flick:BigInt" "lcm"
-  arity 1
+let lcm that self = if self == 0n || that == 0n then 0n else abs (self / gcd that self * that)
+  @native "flick:BigInt" "lcm" when js || go
+    arity 1
 
 /// The integer square root; `None` for a negative number.
 sqrt : BigInt -> Option BigInt
-foreign pure sqrt from "flick:BigInt" "sqrt"
+let sqrt n =
+  // Newton's steps down from n / 2, to the floor of the root
+  down : BigInt -> BigInt
+  let rec down guess = if guess * guess > n then down ((guess + n / guess) / 2n) else guess
+  if n < 0n then None else if n < 2n then Some n else Some (down (n / 2n))
+  @native "flick:BigInt" "sqrt" when js || go
 
 /// The sum of the list, 0 when it is empty.
 sum_all : List BigInt -> BigInt
-foreign pure sum_all from "flick:BigInt" "sumAll"
+let sum_all xs =
+  total : BigInt -> Int -> BigInt
+  let rec total out i =
+    match List.get i xs with
+    | Some n -> total (out + n) (i + 1)
+    | None -> out
+  total 0n 0
+  @native "flick:BigInt" "sumAll" when js || go
 
 /// The product of the list, 1 when it is empty.
 multiply_all : List BigInt -> BigInt
-foreign pure multiply_all from "flick:BigInt" "multiplyAll"
+let multiply_all xs =
+  product : BigInt -> Int -> BigInt
+  let rec product out i =
+    match List.get i xs with
+    | Some n -> product (out * n) (i + 1)
+    | None -> out
+  product 1n 0
+  @native "flick:BigInt" "multiplyAll" when js || go
 
 /// The lesser of the two.
 min : BigInt -> BigInt -> BigInt
-foreign pure min from "flick:BigInt" "min"
-  arity 1
+let min that self = if self < that then self else that
+  @native "flick:BigInt" "min" when js || go
+    arity 1
 
 /// The greater of the two.
 max : BigInt -> BigInt -> BigInt
-foreign pure max from "flick:BigInt" "max"
-  arity 1
+let max that self = if self > that then self else that
+  @native "flick:BigInt" "max" when js || go
+    arity 1
 
 /// `self < that`: `x |> BigInt.is_less_than 3n`.
 is_less_than : BigInt -> BigInt -> Bool
-foreign pure is_less_than from "flick:BigInt" "isLessThan"
-  arity 1
+let is_less_than that self = self < that
+  @native "flick:BigInt" "isLessThan" when js || go
+    arity 1
 
 /// `self <= that`.
 is_less_than_or_equal_to : BigInt -> BigInt -> Bool
-foreign pure is_less_than_or_equal_to from "flick:BigInt" "isLessThanOrEqualTo"
-  arity 1
+let is_less_than_or_equal_to that self = self <= that
+  @native "flick:BigInt" "isLessThanOrEqualTo" when js || go
+    arity 1
 
 /// `self > that`.
 is_greater_than : BigInt -> BigInt -> Bool
-foreign pure is_greater_than from "flick:BigInt" "isGreaterThan"
-  arity 1
+let is_greater_than that self = self > that
+  @native "flick:BigInt" "isGreaterThan" when js || go
+    arity 1
 
 /// `self >= that`.
 is_greater_than_or_equal_to : BigInt -> BigInt -> Bool
-foreign pure is_greater_than_or_equal_to from "flick:BigInt" "isGreaterThanOrEqualTo"
-  arity 1
+let is_greater_than_or_equal_to that self = self >= that
+  @native "flick:BigInt" "isGreaterThanOrEqualTo" when js || go
+    arity 1
 
 /// Whether `self` lies within `minimum` and `maximum`, both included.
 between : { minimum : BigInt; maximum : BigInt } -> BigInt -> Bool
-foreign pure between from "flick:BigInt" "between"
-  arity 1
+let between bounds self = self >= bounds.minimum && self <= bounds.maximum
+  @native "flick:BigInt" "between" when js || go
+    arity 1
 
 /// `self` kept within `minimum` and `maximum`.
 clamp : { minimum : BigInt; maximum : BigInt } -> BigInt -> BigInt
-foreign pure clamp from "flick:BigInt" "clamp"
-  arity 1
+let clamp bounds self =
+  if self < bounds.minimum then
+    bounds.minimum
+  else if self > bounds.maximum then
+    bounds.maximum
+  else
+    self
+  @native "flick:BigInt" "clamp" when js || go
+    arity 1
 
 /// The number, when the integer is a safe one.
 to_safe_number : BigInt -> Option Float
-foreign pure to_safe_number from "flick:BigInt" "toNumber"
+let to_safe_number n =
+  if n > 9007199254740991n || n < -9007199254740991n then None else Some (to_number n)
+  @native "flick:BigInt" "toNumber" when js || go
 
 /// The integer of a safe integer number.
 from_safe_number : Float -> Option BigInt
-foreign pure from_safe_number from "flick:BigInt" "fromNumber"
+let from_safe_number x = if Float.is_safe_integer x then from_number x else None
+  @native "flick:BigInt" "fromNumber" when js || go
 
 /// The integer JS `BigInt` reads from the string (`"12"`, `"0x1f"`); blank or
 /// malformed text is `None`.
 from_string : String -> Option BigInt
-foreign pure from_string from "flick:BigInt" "fromString"
+let from_string text =
+  let trimmed = String.trim text
+  // JS's `0x`, `0o` and `0b`, without a sign
+  let base =
+    match String.slice 0 2 trimmed with
+    | "0x" | "0X" -> 16
+    | "0o" | "0O" -> 8
+    | "0b" | "0B" -> 2
+    | _ -> 10
+  digit : Int -> Int
+  let digit c =
+    if c >= 48 && c <= 57 then
+      c - 48
+    else if c >= 97 && c <= 122 then
+      c - 87
+    else if c >= 65 && c <= 90 then
+      c - 55
+    else
+      99
+  value : BigInt -> Int -> Option BigInt
+  let rec value acc i =
+    match String.char_code_at i trimmed with
+    | Some c ->
+      let d = digit c
+      if d < base then value (acc * into base + into d) (i + 1) else None
+    | None -> Some acc
+  if trimmed == "" then
+    None
+  else if base == 10 then
+    parse trimmed
+  else if String.length trimmed > 2 then
+    value 0n 2
+  else
+    None
+  @native "flick:BigInt" "fromString" when js || go
 
 /// How `n` compares with 0.
 sign : BigInt -> Ordering
-foreign pure sign from "flick:BigInt" "flickSign"
+let sign n = if n < 0n then LT else if n > 0n then GT else EQ
+  @native "flick:BigInt" "flickSign" when js || go
 
 /// A BigInt as a JSON string of digits.
 json : PureCodec Json BigInt

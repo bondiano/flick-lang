@@ -37,6 +37,7 @@ pub mod eval;
 mod fold;
 mod fuse;
 mod inline;
+mod js_math;
 mod known;
 mod lazy;
 #[cfg(feature = "native-project")]
@@ -58,6 +59,7 @@ use std::{mem, ptr};
 
 use crate::ir::{Expr, ExprKind, Item, ItemKind, Lit, Module, Pat, Stmt};
 pub use fold::{js_number, json_string};
+pub use js_math::js_log;
 pub use specialize::{Generic, names_only};
 use walk::{droppable, each_strict_use, each_use, inert, partial};
 

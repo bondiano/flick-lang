@@ -158,8 +158,9 @@ representation of the program. Generated code calls `K` for:
   `BigInt` values wrapped to 64 bits after each operation, as on JS, so
   they need no `ffi` and round nowhere;
 - `%` and `**` of `Float`, as JS computes them, and the JS globals of the
-  kernel the standard library binds, `Number`, `Math.floor` and
-  `Math.sqrt`; `String.to_number` reads JS's number syntax. On Lua 5.1,
+  kernel the standard library binds, `Number`, `Math.floor`, `Math.sqrt`
+  and `Math.log`, a port of fdlibm's `__ieee754_log` that reads the high
+  word through `math.frexp`; `String.to_number` reads JS's number syntax. On Lua 5.1,
   whose compiler keeps one constant for `0` and `-0`, a `-0` that Lua would
   fold into a constant is the kernel's `K.negzero`;
 - `==` of every value: SameValueZero on numbers, strings by their bytes and
@@ -210,11 +211,11 @@ snapshot. The CI `lua-probes` job runs it.
 | `Kernel.Arrays` | pass (11 of 11), the same report as JS |
 | `Kernel.Defects` | pass (1 of 1), the same report as JS |
 | `Kernel.Hooks` | pass (32 of 32), the same report as JS |
-| `Kernel.Numbers` | pass (67 of 67), the same report as JS |
+| `Kernel.Numbers` | pass (81 of 81), the same report as JS |
 | `Kernel.Records` | pass (6 of 6), the same report as JS |
 | `Kernel.Strings` | pass (35 of 35), the same report as JS |
-| `Language.BigInts` | pass (12 of 12), the same report as JS |
-| `Language.Floats` | pass (30 of 30), the same report as JS |
+| `Language.BigInts` | pass (17 of 17), the same report as JS |
+| `Language.Floats` | pass (34 of 34), the same report as JS |
 | `Language.Ints` | pass (48 of 48 pure tests), the same report as JS; 1 effect test skipped |
 | `Language.NumericBoundaries` | pass (10 of 10 pure tests), the same report as JS; 2 effect tests skipped |
 

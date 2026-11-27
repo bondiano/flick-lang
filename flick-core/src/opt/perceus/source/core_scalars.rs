@@ -126,6 +126,7 @@ fn scalar_intrinsic(from: Option<&str>, bind: &str, stages: usize) -> Option<Int
         (None, "Math.round") => Intrinsic::Float(FloatIntrinsic::Round),
         (None, "Math.trunc") => Intrinsic::Float(FloatIntrinsic::Trunc),
         (None, "Math.sqrt") => Intrinsic::Float(FloatIntrinsic::Sqrt),
+        (None, "Math.log") => Intrinsic::Float(FloatIntrinsic::Log),
         (Some("flick:Number"), "parse") => Intrinsic::Float(FloatIntrinsic::Parse),
         (Some("flick:Number"), "remainder") => Intrinsic::Float(FloatIntrinsic::Remainder),
         (Some("flick:Number"), "nextPow2") => Intrinsic::Float(FloatIntrinsic::NextPow2),

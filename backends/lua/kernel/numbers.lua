@@ -3,14 +3,75 @@
 local _, ns = ...
 local K = ns.k
 
-local floor, sqrt = math.floor, math.sqrt
+local floor, frexp, sqrt = math.floor, math.frexp, math.sqrt
 local byte, find, match, sub = string.byte, string.find, string.match, string.sub
 local ipairs, tonumber, type = ipairs, tonumber, type
 
--- The JS globals of the kernel the standard library binds: `Math.floor`
--- and `Math.sqrt`, IEEE 754 on doubles, `-0` and NaN kept; `Number`,
--- `BigInt` and `String` between numbers and `BigInt` values.
-K.Math = { floor = floor, sqrt = sqrt }
+-- fdlibm's constants for `log`: ln 2 in two parts, and the coefficients of
+-- its polynomial.
+local LN2_HI, LN2_LO = 6.93147180369123816490e-01, 1.90821492927058770002e-10
+local LG1, LG2, LG3, LG4 = 6.666666666666735130e-01, 3.999999999940941908e-01, 2.857142874366239149e-01, 2.222219843214978396e-01
+local LG5, LG6, LG7 = 1.818357216161805012e-01, 1.531383769920937332e-01, 1.479819860511658591e-01
+
+-- `Math.log`: the natural logarithm as fdlibm's `__ieee754_log` (e_log.c)
+-- computes it, which is what JS gives. `frexp` stands for its reads of the
+-- high word: `hx`, the top 20 bits of the significand, and `k`, the exponent.
+local function log(x)
+  if x ~= x or x == 1 / 0 then
+    return x
+  elseif x < 0 then
+    return 0 / 0
+  elseif x == 0 then
+    return -1 / 0
+  end
+  local m, e = frexp(x)
+  local hx = floor((2 * m - 1) * 1048576)
+  local k = e - 1
+  -- x, or x / 2, into [sqrt(2)/2, sqrt(2))
+  if hx >= 0x6a09c then
+    x, k = m, k + 1
+  else
+    x = 2 * m
+  end
+  local f = x - 1
+  local dk = k
+  if hx == 0 or hx >= 0xffffe then
+    -- |f| < 2^-20
+    if f == 0 then
+      if k == 0 then
+        return 0
+      end
+      return dk * LN2_HI + dk * LN2_LO
+    end
+    local r = f * f * (0.5 - 0.33333333333333333 * f)
+    if k == 0 then
+      return f - r
+    end
+    return dk * LN2_HI - ((r - dk * LN2_LO) - f)
+  end
+  local s = f / (2 + f)
+  local z = s * s
+  local w = z * z
+  local t1 = w * (LG2 + w * (LG4 + w * LG6))
+  local t2 = z * (LG1 + w * (LG3 + w * (LG5 + w * LG7)))
+  local r = t2 + t1
+  if hx >= 0x6147a and hx <= 0x6b851 then
+    local hfsq = 0.5 * f * f
+    if k == 0 then
+      return f - (hfsq - s * (hfsq + r))
+    end
+    return dk * LN2_HI - ((hfsq - (s * (hfsq + r) + dk * LN2_LO)) - f)
+  end
+  if k == 0 then
+    return f - s * (f - r)
+  end
+  return dk * LN2_HI - ((s * (f - r) - dk * LN2_LO) - f)
+end
+
+-- The JS globals of the kernel the standard library binds: `Math.floor`,
+-- `Math.sqrt` and `Math.log`, IEEE 754 on doubles, `-0` and NaN kept;
+-- `Number`, `BigInt` and `String` between numbers and `BigInt` values.
+K.Math = { floor = floor, sqrt = sqrt, log = log }
 -- an `Int` exactly; a `BigInt` value rounded to the nearest double
 function K.Number(x)
   if type(x) == "table" then

@@ -97,6 +97,8 @@ pub enum FloatIntrinsic {
     StringToNumber,
     Remainder,
     RoundTo,
+    /// `Math.log`, with the bits JS gives.
+    Log,
 }
 
 impl FloatIntrinsic {
