@@ -1,0 +1,37 @@
+/// Port of `Control.Monad.Class.Choice` from Hackage's `monad-choice`:
+/// a computation `m` that resolves dependent choices described by `f`.
+module Choice.Class exposing (
+  MonadTrans(..),
+  MonadChoice(..),
+  ChoiceOptions(..),
+  choose_m,
+)
+
+import Choice.Choices exposing (Choices)
+import Choice.Choices as Choices
+
+class MonadTrans (t : (Type -> Type) -> Type -> Type) =
+  lift : forall c m a. Monad m => (m a)^c -> (t m a)^c
+
+/// A monad `m` capable of selecting a value of any type `a` from an `f a`,
+/// where later choices can depend on earlier results.
+class Monad m => MonadChoice (f : Type -> Type) (m : Type -> Type) =
+  choose : forall c a. (f a)^c -> (m a)^c
+
+/// Selects among options that are themselves monadic computations (`join . choose`).
+choose_m : MonadChoice f m => (f (m a))^c -> (m a)^c
+let choose_m actions = flat_map identity (choose actions)
+
+/// Containers that always hold at least one candidate option.
+/// Replaces Haskell's partial `Foldable` sampling with a total guarantee.
+class ChoiceOptions (f : Type -> Type) =
+  to_choices : forall c a. (f a)^c -> (Choices a)^c
+
+instance ChoiceOptions Choices =
+  let to_choices options = options
+
+instance MonadChoice Choices Choices =
+  let choose options = options
+
+instance ChoiceOptions f => MonadChoice f List =
+  let choose options = Choices.to_list (to_choices options)

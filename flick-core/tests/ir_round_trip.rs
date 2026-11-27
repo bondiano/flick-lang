@@ -108,6 +108,7 @@ fn every_example_project_round_trips() {
         "exchange",
         "first-slice",
         "hom-repository",
+        "monad-choice",
         "mtl",
         "observability",
         "typed-interpreter",

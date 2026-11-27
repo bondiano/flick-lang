@@ -1,0 +1,64 @@
+/// Port of `Control.Monad.Trans.Choice.Invariant` and `Control.Monad.Choice.Invariant`.
+///
+/// Represents `ChoiceT f m a` directly as a rank-2 CPS handler consumer:
+/// `(forall x. f x -> m x) -> m a`. Because `m` appears in both negative and
+/// positive positions, transforming `m` requires `invmap_choice_t` rather than `map_choice_t`.
+module Choice.Invariant exposing (
+  ChoiceT(..),
+  Choice,
+  run_choice_t,
+  invmap_choice_t,
+  low_map,
+  run_choice,
+)
+
+import Choice.Class exposing (MonadChoice(..), MonadTrans(..))
+import Choice.Identity as Identity exposing (Identity(..))
+
+type ChoiceT (f : Type -> Type) (m : Type -> Type) a =
+  | ChoiceT ((forall v x. (f x)^v -> (m x)^v) -> m a)
+
+type alias Choice f a = ChoiceT f Identity a
+
+run_choice_t : (forall v x. (f x)^v -> (m x)^v) -> (ChoiceT f m a)^d -> (m a)^d
+let run_choice_t chooser (ChoiceT k) = k chooser
+
+/// Invariant functor map over the base monad `m`: transforms chooser outputs `n ~> m`
+/// and final computation `m a -> n b`.
+invmap_choice_t :
+  (forall v x. (n x)^v -> (m x)^v) ->
+  ((m a)^v -> (n b)^(c + v))^c ->
+  (ChoiceT f m a)^d ->
+  (ChoiceT f n b)^(c + d)
+let invmap_choice_t from_target to_target action =
+  ChoiceT (fun chooser ->
+    to_target (run_choice_t (fun options -> from_target (chooser options)) action)
+  )
+
+/// Maps the outer `m a -> m b` result without descending into choices (`lowMap` in `monad-choice`).
+low_map : ((m a)^v -> (m b)^(c + v))^c -> (ChoiceT f m a)^d -> (ChoiceT f m b)^(c + d)
+let low_map f action = ChoiceT (fun chooser -> f (run_choice_t chooser action))
+
+run_choice : (forall v x. (f x)^v -> x^v) -> (Choice f a)^d -> a^d
+let run_choice selector action =
+  Identity.run (run_choice_t (fun options -> Identity (selector options)) action)
+
+instance Functor m => Functor (ChoiceT f m) =
+  let map f action = ChoiceT (fun chooser -> map f (run_choice_t chooser action))
+
+instance Applicative m => Applicative (ChoiceT f m) =
+  let pure value = ChoiceT (fun _ -> pure value)
+  let map2 f left right =
+    ChoiceT (fun chooser -> map2 f (run_choice_t chooser left) (run_choice_t chooser right))
+
+instance Monad m => Monad (ChoiceT f m) =
+  let flat_map f action =
+    ChoiceT (fun chooser ->
+      flat_map (fun value -> run_choice_t chooser (f value)) (run_choice_t chooser action)
+    )
+
+instance MonadTrans (ChoiceT f) =
+  let lift action = ChoiceT (fun _ -> action)
+
+instance Monad m => MonadChoice f (ChoiceT f m) =
+  let choose options = ChoiceT (fun chooser -> chooser options)

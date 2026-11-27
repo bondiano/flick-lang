@@ -1,0 +1,18 @@
+/// Pure base wrapper `Identity a`, used by `Choice f a = ChoiceT f Identity a`.
+module Choice.Identity exposing (Identity(..), run)
+
+type Identity a = Identity a
+  deriving Eq, Show
+
+run : (Identity a)^c -> a^c
+let run (Identity value) = value
+
+instance Functor Identity =
+  let map f (Identity value) = Identity (f value)
+
+instance Applicative Identity =
+  let pure value = Identity value
+  let map2 f (Identity left) (Identity right) = Identity (f left right)
+
+instance Monad Identity =
+  let flat_map f (Identity value) = f value

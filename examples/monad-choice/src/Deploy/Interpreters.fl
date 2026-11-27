@@ -1,0 +1,198 @@
+/// Five interpreters for the single `Deploy.Blueprint.blueprint` workflow:
+///
+/// 1. `enumerate` — exhaustive tree expansion via `Choice.Covariant` (`Choices`)
+/// 2. `enumerate_invariant` — exhaustive CPS run via `Choice.Invariant` (`Choices`)
+/// 3. `solve` — constraint search via `run_backtrackable_choice_m` + `StateT`
+/// 4. `sample_seeded` — reproducible sampling via `UniformRandom` + `Random.with_seed`
+/// 5. `interactive` — terminal menu wizard via `Cli.Prompt.select` on `Tty`
+/// plus `plan_generator` / `plan_arbitrary` for property-based testing.
+module Deploy.Interpreters exposing (
+  SolverStats,
+  enumerate,
+  enumerate_invariant,
+  solve,
+  sample_seeded,
+  interactive,
+  plan_generator,
+  plan_arbitrary,
+)
+
+import Arbitrary
+import Choice.Choices exposing (Choices)
+import Choice.Choices as Choices
+import Choice.Class exposing (choose)
+import Choice.Covariant as Covariant
+import Choice.Identity as Identity exposing (Identity)
+import Choice.Invariant as Invariant
+import Choice.Random as ChoiceRandom exposing (RollChoice, UniformRandom)
+import Choice.StateT as StateT exposing (StateT)
+import Cli.Prompt
+import Deploy.Blueprint as Blueprint
+import Deploy.Domain as Domain exposing (Constraints, ReleasePlan, Tier)
+import Deploy.Question as Question exposing (OptionItem, Question)
+import Check
+import Codec
+import Gen
+import Host
+import Random
+import Terminal
+
+type alias SolverStats = {
+  explored : Int
+  backtracks : Int
+}
+
+type alias CursorState = {
+  cursors : List Int
+  depth : Int
+  explored : Int
+  backtracks : Int
+}
+
+/// Every valid `ReleasePlan` for `tier`, expanded through `Choice.Covariant`.
+enumerate : Tier -> Choices ReleasePlan
+let enumerate tier =
+  tree : Covariant.Choice Question ReleasePlan
+  let tree = Blueprint.blueprint tier
+  Covariant.run_choice_m Question.values tree
+
+/// Every valid `ReleasePlan` for `tier`, expanded through `Choice.Invariant`.
+enumerate_invariant : Tier -> Choices ReleasePlan
+let enumerate_invariant tier =
+  action : Invariant.ChoiceT Question Choices ReleasePlan
+  let action = Blueprint.blueprint tier
+  Invariant.run_choice_t Question.values action
+
+advance_cursor : Int -> Int -> List Int -> List Int
+let advance_cursor depth next_index cursors =
+  let prefix = List.take depth cursors
+  prefix ++ [next_index]
+
+/// Stateful chooser for `run_backtrackable_choice_m`:
+/// returning `Some` descends one level; returning `None` resets the exhausted
+/// level and ascends to the parent `ChooseThenT` node.
+cursor_chooser : (List a)^c -> (StateT CursorState Identity (Option a))^c
+let cursor_chooser options =
+  nth_option : Int -> (List a)^c -> Option (a^c)
+  let rec nth_option idx items =
+    match items with
+    | [] -> None
+    | [head, ...rest] -> if idx <= 0 then Some head else nth_option (idx - 1) rest
+  do {
+    state <- StateT.get
+    let index = Option.with_default 0 (List.get state.depth state.cursors)
+    match nth_option index options with
+    | Some value -> do {
+      StateT.put {
+        cursors = advance_cursor state.depth (index + 1) state.cursors
+        depth = state.depth + 1
+        explored = state.explored + 1
+        backtracks = state.backtracks
+      }
+      pure (Some value)
+    }
+    | None -> do {
+      StateT.put {
+        cursors = List.take state.depth state.cursors
+        depth = state.depth - 1
+        explored = state.explored
+        backtracks = state.backtracks + 1
+      }
+      pure None
+    }
+  }
+
+/// Searches for the first `ReleasePlan` satisfying `constraints` using
+/// `Covariant.run_backtrackable_choice_m`.
+solve : Tier -> Constraints -> (Option ReleasePlan, SolverStats)
+let solve tier constraints =
+  base_tree : Covariant.Choice Question ReleasePlan
+  let base_tree = Blueprint.blueprint tier
+  list_tree : Covariant.Choice List ReleasePlan
+  let list_tree = Covariant.hoist_options (fun q -> Choices.to_list (Question.values q)) base_tree
+  guarded : Covariant.Choice List ReleasePlan
+  let guarded = do {
+    plan <- list_tree
+    _ <- if Domain.satisfies constraints plan then pure () else choose []
+    pure plan
+  }
+  let initial = { cursors = []; depth = 0; explored = 0; backtracks = 0 }
+  let search = Covariant.run_backtrackable_choice_m cursor_chooser guarded
+  let (found, final_state) = Identity.run (StateT.run search initial)
+  (found, { explored = final_state.explored; backtracks = final_state.backtracks })
+
+draw_one : Tier ->{Host.Random} ReleasePlan
+let draw_one tier =
+  sampled : UniformRandom (Eff {Host.Random} none) ReleasePlan
+  let sampled = Blueprint.blueprint tier
+  await (ChoiceRandom.colift sampled)
+
+draw_many : Int -> Tier ->{Host.Random} List ReleasePlan
+let rec draw_many remaining tier =
+  if remaining <= 0 then
+    []
+  else
+    let head = draw_one tier
+    [head] ++ draw_many (remaining - 1) tier
+
+/// Draws `count` plans reproducibly under `seed` via `UniformRandom`.
+sample_seeded : Float -> Int -> Tier ->{Host.Random} List ReleasePlan
+let sample_seeded seed count tier = Random.with_seed seed (task { draw_many count tier })
+
+to_select_choice : (OptionItem a)^c -> (Cli.Prompt.SelectChoice a)^c
+let to_select_choice item = {
+  title = item.label
+  value = item.value
+  description = Some item.detail
+  disabled = false
+  selected = false
+}
+
+prompt_chooser : (Question a)^c -> (Eff {Async, Cli.Prompt.Tty} {Terminal.QuitError} a)^c
+let prompt_chooser q = task {
+  let choices = map to_select_choice (Choices.to_list (Question.items q))
+  let select_prompt =
+    Cli.Prompt.select {
+      message = Some (Question.prompt q)
+      choices = choices
+      maxPerPage = Some 6
+    }
+  Cli.Prompt.run select_prompt
+}
+
+/// Runs `blueprint` interactively on `Cli.Prompt.Tty`: each menu depends on
+/// the user's previous answers.
+interactive : Tier ->{Async, Cli.Prompt.Tty; Terminal.QuitError} ReleasePlan
+let interactive tier =
+  tree : Covariant.Choice Question ReleasePlan
+  let tree = Blueprint.blueprint tier
+  await (Covariant.run_choice_m prompt_chooser tree)
+
+/// Turns `blueprint` into a `Gen ReleasePlan` for `Test.property`.
+plan_generator : Tier -> Gen.Gen ReleasePlan
+let plan_generator tier =
+  rolls_action : RollChoice ReleasePlan
+  let rolls_action = Blueprint.blueprint tier
+  Gen.map (fun rolls -> ChoiceRandom.eval_rolls rolls rolls_action) (Gen.list 4 (Gen.int 0 997))
+
+roll_codec : PureCodec Json Float
+let roll_codec =
+  Float.json_finite
+  |> Check.apply Check.int
+  |> Check.apply
+    (Check.between {
+      minimum = 0
+      maximum = 23
+      exclusiveMinimum = false
+      exclusiveMaximum = false
+    })
+
+/// Turns `blueprint` into an `Arbitrary ReleasePlan` with shrinking toward first options.
+plan_arbitrary : Tier -> Arbitrary.Arbitrary ReleasePlan
+let plan_arbitrary tier =
+  rolls_action : RollChoice ReleasePlan
+  let rolls_action = Blueprint.blueprint tier
+  let roll = Arbitrary.map Int.truncate (Arbitrary.from_schema (Codec.to_schema roll_codec))
+  Arbitrary.map
+    (fun (r0, r1, r2, r3) -> ChoiceRandom.eval_rolls [r0, r1, r2, r3] rolls_action)
+    (Arbitrary.zip4 roll roll roll roll)

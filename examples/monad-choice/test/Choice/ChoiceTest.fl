@@ -1,0 +1,126 @@
+/// Unit and effectful tests for `Choice.Class`, `Choice.Covariant`,
+/// `Choice.Invariant` and `Choice.StateT`.
+module Choice.ChoiceTest
+
+import Choice.Choices as Choices exposing (Choices(..))
+import Choice.Class exposing (MonadChoice(..), MonadTrans(..), choose_m)
+import Choice.Covariant as Covariant
+import Choice.Identity as Identity exposing (Identity(..))
+import Choice.Invariant as Invariant
+import Choice.StateT as StateT exposing (StateT)
+import Deploy.Blueprint as Blueprint
+import Test exposing (expect, to)
+
+step_chooser : (List a)^c -> (StateT (List Int, Int, Int) Identity (Option a))^c
+let step_chooser items =
+  nth : Int -> (List a)^c -> Option (a^c)
+  let rec nth idx xs =
+    match xs with
+    | [] -> None
+    | [head, ...rest] -> if idx <= 0 then Some head else nth (idx - 1) rest
+  do {
+    (cursors, depth, visits) <- StateT.get
+    let idx = Option.with_default 0 (List.get depth cursors)
+    match nth idx items with
+    | Some picked -> do {
+      StateT.put (List.take depth cursors ++ [idx + 1], depth + 1, visits + 1)
+      pure (Some picked)
+    }
+    | None -> do {
+      StateT.put (List.take depth cursors, depth - 1, visits)
+      pure None
+    }
+  }
+
+/// Variable-depth choice program: branch `"short"` makes 1 further choice,
+/// whereas branch `"deep"` makes 2 further choices before checking a guard.
+ragged_search : Int -> (Option (String, Int), Int)
+let ragged_search target =
+  program : Covariant.Choice List (String, Int)
+  let program = do {
+    mode <- choose ["short", "deep"]
+    total <-
+      if mode == "short" then
+        choose [10, 20]
+      else
+        do {
+          tens <- choose [30, 40]
+          ones <- choose [1, 2]
+          pure (tens + ones)
+        }
+    _ <- if total == target then pure () else choose []
+    pure (mode, total)
+  }
+  let (found, (_, _, visits)) =
+    Identity.run (StateT.run (Covariant.run_backtrackable_choice_m step_chooser program) ([], 0, 0))
+  (found, visits)
+
+suite "berry and combinators" {
+  test "berry from monad-choice README enumerates all 45 dependent names" {
+    let cov_berries : Choices String = Covariant.run_choice_m identity Blueprint.berry
+    let inv_berries : Choices String = Invariant.run_choice_t identity Blueprint.berry
+    let list = Choices.to_list cov_berries
+    expect (Choices.length cov_berries) |> to.equal 45
+    expect inv_berries |> to.equal cov_berries
+    expect (List.head list) |> to.equal (Some "redberry")
+    expect (List.get 1 list) |> to.equal (Some "sweetberry")
+    expect (List.get 2 list) |> to.equal (Some "red-sweetberry")
+    expect (List.get 44 list) |> to.equal (Some "black-bitterberry")
+  }
+
+  test "choose_m flattens a choice of dependent sub-computations" {
+    branched : Covariant.Choice Choices Int
+    let branched =
+      choose_m
+        (Choices (pure 100) [
+          map (fun x -> x + 1) (choose (Choices 10 [20])),
+        ])
+    expect (Choices.to_list (Covariant.run_choice_m identity branched)) |> to.equal [100, 11, 21]
+  }
+
+  test "StateT lifts MonadChoice while threading state across branches" {
+    stateful : StateT Int Choices Int
+    let stateful = do {
+      n <- choose (Choices 2 [5])
+      before <- StateT.get
+      StateT.put (before + n)
+      m <- choose (Choices 1 [10])
+      after <- StateT.get
+      pure (after * m)
+    }
+    expect (Choices.to_list (StateT.run stateful 100))
+    |> to.equal [(102, 102), (1020, 102), (105, 105), (1050, 105)]
+  }
+
+  test "run_backtrackable_choice_m handles variable-depth branches and exhaustion" {
+    let (hit_short, _) = ragged_search 20
+    let (hit_deep, _) = ragged_search 42
+    let (miss_all, visits) = ragged_search 999
+    expect hit_short |> to.equal (Some ("short", 20))
+    expect hit_deep |> to.equal (Some ("deep", 42))
+    expect miss_all |> to.equal None
+    // 2 modes + 2 short + 2 deep tens + 4 deep ones = 10 total options visited
+    expect visits |> to.equal 10
+  }
+
+  test "ChoiceT over Eff stays cold until run_choice_t awaits lifted effects" {
+    let log = Ref.make []
+    step : String -> Eff none none String
+    let step tag = task {
+      Ref.update log (fun items -> items ++ [tag])
+      tag
+    }
+    workflow : Covariant.ChoiceT Choices (Eff none none) String
+    let workflow = do {
+      prefix <- lift (step "init")
+      picked <- choose (Choices "a" ["b"])
+      suffix <- lift (step "done:\{picked}")
+      pure "\{prefix}->\{suffix}"
+    }
+    // Constructing the ChoiceT tree executes no Eff actions.
+    expect (Ref.get log) |> to.equal []
+    let out = await (Covariant.run_choice_t (fun cs -> pure (Choices.head cs)) workflow)
+    expect out |> to.equal "init->done:a"
+    expect (Ref.get log) |> to.equal ["init", "done:a"]
+  }
+}

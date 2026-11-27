@@ -1,0 +1,127 @@
+/// Port of `Control.Monad.Trans.Choice.Covariant` and `Control.Monad.Choice.Covariant`.
+///
+/// `ChoiceT f m a` is a GADT whose `LiftThenT` and `ChooseThenT` nodes hide
+/// the intermediate choice type `b` existentially. Because `m` appears only
+/// covariantly, `ChoiceT` supports `map_choice_t` and `run_backtrackable_choice_t`,
+/// and its `Functor`, `Applicative` and `Monad` instances need no constraints on `f` or `m`.
+module Choice.Covariant exposing (
+  ChoiceT(..),
+  Choice,
+  run_choice_t,
+  map_choice_t,
+  hoist_options,
+  run_backtrackable_choice_t,
+  run_choice,
+  run_choice_m,
+  run_backtrackable_choice_m,
+)
+
+import Choice.Class exposing (MonadChoice(..), MonadTrans(..))
+import Choice.Identity as Identity exposing (Identity(..))
+
+type ChoiceT (f : Type -> Type) (m : Type -> Type) a =
+  | FixedT a
+  | LiftThenT (m b) (b -> ChoiceT f m a) : ChoiceT f m a
+  | ChooseThenT (f b) (b -> ChoiceT f m a) : ChoiceT f m a
+
+type alias Choice f a = ChoiceT f Identity a
+
+instance Functor (ChoiceT f m) =
+  let rec map f step =
+    match step with
+    | FixedT value -> FixedT (f value)
+    | LiftThenT action next -> LiftThenT action (fun x -> map f (next x))
+    | ChooseThenT options next -> ChooseThenT options (fun x -> map f (next x))
+
+instance Applicative (ChoiceT f m) =
+  let pure value = FixedT value
+  let rec map2 f left right =
+    match left with
+    | FixedT a -> map (f a) right
+    | LiftThenT action next -> LiftThenT action (fun x -> map2 f (next x) right)
+    | ChooseThenT options next -> ChooseThenT options (fun x -> map2 f (next x) right)
+
+instance Monad (ChoiceT f m) =
+  let rec flat_map k step =
+    match step with
+    | FixedT value -> k value
+    | LiftThenT action next -> LiftThenT action (fun x -> flat_map k (next x))
+    | ChooseThenT options next -> ChooseThenT options (fun x -> flat_map k (next x))
+
+instance MonadTrans (ChoiceT f) =
+  let lift action = LiftThenT action pure
+
+instance MonadChoice f (ChoiceT f m) =
+  let choose options = ChooseThenT options pure
+
+/// Maps the underlying computation `m` covariantly (`forall x. m x -> n x`).
+map_choice_t :
+  forall c d f m n a.
+  (forall v x. (m x)^v -> (n x)^(c + v))^c -> (ChoiceT f m a)^d -> (ChoiceT f n a)^(c + d)
+let rec map_choice_t transform step =
+  match step with
+  | FixedT value -> FixedT value
+  | LiftThenT action next -> LiftThenT (transform action) (fun x -> map_choice_t transform (next x))
+  | ChooseThenT options next -> ChooseThenT options (fun x -> map_choice_t transform (next x))
+
+/// Maps the choice container `f` (`forall x. f x -> g x`), e.g. `Question ~> List`.
+hoist_options :
+  forall c d f g m a.
+  (forall v x. (f x)^v -> (g x)^(c + v))^c -> (ChoiceT f m a)^d -> (ChoiceT g m a)^(c + d)
+let rec hoist_options nat step =
+  match step with
+  | FixedT value -> FixedT value
+  | LiftThenT action next -> LiftThenT action (fun x -> hoist_options nat (next x))
+  | ChooseThenT options next -> ChooseThenT (nat options) (fun x -> hoist_options nat (next x))
+
+/// Resolves every choice node with a rank-2 `chooser`.
+run_choice_t :
+  forall c d f m a.
+  Monad m => (forall v x. (f x)^v -> (m x)^(c + v))^c -> (ChoiceT f m a)^d -> (m a)^(c + d)
+let rec run_choice_t chooser step =
+  match step with
+  | FixedT value -> pure value
+  | LiftThenT action next -> flat_map (fun x -> run_choice_t chooser (next x)) action
+  | ChooseThenT options next -> flat_map (fun x -> run_choice_t chooser (next x)) (chooser options)
+
+/// Variant of `run_choice_t` where returning `None` from `chooser` backtracks
+/// to the enclosing `ChooseThenT` node so a stateful chooser can try its next option.
+run_backtrackable_choice_t :
+  forall c d f m a.
+  Monad m =>
+  (forall v x. (f x)^v -> (m (Option x))^(c + v))^c -> (ChoiceT f m a)^d -> (m (Option a))^(c + d)
+let rec run_backtrackable_choice_t chooser step =
+  match step with
+  | FixedT value -> pure (Some value)
+  | LiftThenT action next -> flat_map (fun x -> run_backtrackable_choice_t chooser (next x)) action
+  | ChooseThenT options next ->
+    let try_branch value = do {
+      outcome <- run_backtrackable_choice_t chooser (next value)
+      match outcome with
+      | None -> run_backtrackable_choice_t chooser (ChooseThenT options next)
+      | Some result -> pure (Some result)
+    }
+    do {
+      picked <- chooser options
+      match picked with
+      | None -> pure None
+      | Some value -> try_branch value
+    }
+
+/// Resolves a pure `Choice f a` with a pure selector `forall x. f x -> x`.
+run_choice : (forall v x. (f x)^v -> x^(c + v))^c -> (Choice f a)^d -> a^(c + d)
+let run_choice selector tree =
+  Identity.run (run_choice_t (fun options -> Identity (selector options)) tree)
+
+/// Interprets a pure `Choice f a` into any target monad `m`.
+run_choice_m :
+  Monad m => (forall v x. (f x)^v -> (m x)^(c + v))^c -> (Choice f a)^d -> (m a)^(c + d)
+let run_choice_m chooser tree =
+  run_choice_t chooser (map_choice_t (fun step -> pure (Identity.run step)) tree)
+
+/// Runs a pure `Choice f a` with backtracking inside target monad `m`.
+run_backtrackable_choice_m :
+  Monad m =>
+  (forall v x. (f x)^v -> (m (Option x))^(c + v))^c -> (Choice f a)^d -> (m (Option a))^(c + d)
+let run_backtrackable_choice_m chooser tree =
+  run_backtrackable_choice_t chooser (map_choice_t (fun step -> pure (Identity.run step)) tree)

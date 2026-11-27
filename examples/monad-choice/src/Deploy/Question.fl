@@ -1,0 +1,72 @@
+/// Choice functor `Question a` carrying step metadata, labels and explanations
+/// alongside the non-empty `Choices` of candidate values.
+module Deploy.Question exposing (
+  OptionItem,
+  Question(..),
+  option,
+  question,
+  id,
+  prompt,
+  items,
+  values,
+)
+
+import Choice.Choices exposing (Choices(..))
+import Choice.Class exposing (ChoiceOptions(..))
+
+type alias OptionItem a = {
+  key : String
+  label : String
+  detail : String
+  value : a
+}
+
+type Question a =
+  | Question {
+    id : String
+    prompt : String
+    options : Choices (OptionItem a)
+  }
+
+option : String -> String -> String -> a -> OptionItem a
+let option key label detail value = {
+  key = key
+  label = label
+  detail = detail
+  value = value
+}
+
+question : String -> String -> OptionItem a -> List (OptionItem a) -> Question a
+let question step_id step_prompt first rest =
+  Question { id = step_id; prompt = step_prompt; options = Choices first rest }
+
+id : Question a -> String
+let id (Question q) = q.id
+
+prompt : Question a -> String
+let prompt (Question q) = q.prompt
+
+items : (Question a)^c -> (Choices (OptionItem a))^c
+let items (Question q) = q.options
+
+values : (Question a)^c -> (Choices a)^c
+let values (Question q) = map (fun item -> item.value) q.options
+
+map_item : (a^v -> b)^c -> (OptionItem a)^d -> (OptionItem b)^(c + d)
+let map_item f item = {
+  key = item.key
+  label = item.label
+  detail = item.detail
+  value = f item.value
+}
+
+instance Functor Question =
+  let map f (Question q) =
+    Question {
+      id = q.id
+      prompt = q.prompt
+      options = map (map_item f) q.options
+    }
+
+instance ChoiceOptions Question =
+  let to_choices q = values q

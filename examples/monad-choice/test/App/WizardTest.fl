@@ -1,0 +1,94 @@
+/// Interactive terminal wizard tests driving `Deploy.Interpreters.interactive`
+/// through a scripted `Cli.Prompt.Tty` service layer.
+module App.WizardTest
+
+import Choice.Choices as Choices
+import Cli.Prompt exposing (Tty)
+import Deploy.Domain exposing (
+  Cache(..),
+  ReleasePlan,
+  Rollout(..),
+  Storage(..),
+  Tier(..),
+  Topology(..),
+)
+import Deploy.Interpreters as Interpreters
+import Terminal
+import Test exposing (expect, to)
+
+press : String -> Terminal.UserInput
+let press name = {
+  input = None
+  key = { name = name; ctrl = false; meta = false; shift = false }
+}
+
+terminal : Ref (List Terminal.UserInput) -> Layer none none {Tty}
+let terminal script =
+  Layer.succeed Tty {
+    read_key = fun () ->
+      match List.head (Ref.get script) with
+      | Some key ->
+        Ref.update script (List.drop 1)
+        key
+      | None -> Fail.fail Terminal.QuitError
+    display = fun _ -> ()
+    columns = fun () -> 100
+    rows = fun () -> 30
+  }
+
+run_scripted : Tier -> List Terminal.UserInput ->{Async; Terminal.QuitError} ReleasePlan
+let run_scripted tier keys =
+  let script = Ref.make keys
+  provide (terminal script) { Interpreters.interactive tier }
+
+suite "wizard" {
+  test "pressing return at every prompt picks the first valid production plan" {
+    let keys = List.repeat 4 (press "return")
+    let chosen = run_scripted Production keys
+    let first_in_matrix = Choices.head (Interpreters.enumerate Production)
+    expect chosen |> to.equal first_in_matrix
+  }
+
+  test "dependent menus adapt to GlobalEdge + DistributedSql choices" {
+    // 1. Topology: down twice -> GlobalEdge (3 regions)
+    // 2. Storage: down once -> DistributedSql (3 regions)
+    // 3. Cache: DistributedSql offers [NoCache, GlobalValkey], so down once -> GlobalValkey
+    // 4. Rollout: down once -> BlueGreen
+    let keys = [
+      press "down",
+      press "down",
+      press "return",
+      press "down",
+      press "return",
+      press "down",
+      press "return",
+      press "down",
+      press "return",
+    ]
+    let chosen = run_scripted Production keys
+    expect chosen.topology |> to.equal (GlobalEdge { regions = 3 })
+    expect chosen.storage |> to.equal (DistributedSql { regions = 3 })
+    expect chosen.cache |> to.equal GlobalValkey
+    expect chosen.rollout |> to.equal BlueGreen
+    expect chosen.monthlyCostUsd |> to.equal 900
+    expect chosen.availabilityBps |> to.equal 9999
+  }
+
+  test "preview SingleNode + EmbeddedSqlite restricts rollout to Recreate" {
+    // 1. Topology: return -> SingleNode
+    // 2. Storage: return -> EmbeddedSqlite
+    // 3. Cache: down -> LocalMemory
+    // 4. Rollout: only Recreate is valid for SQLite
+    let keys = [press "return", press "return", press "down", press "return", press "return"]
+    let chosen = run_scripted Preview keys
+    expect chosen.topology |> to.equal SingleNode
+    expect chosen.storage |> to.equal EmbeddedSqlite
+    expect chosen.cache |> to.equal LocalMemory
+    expect chosen.rollout |> to.equal Recreate
+    expect chosen.zeroDowntime |> to.equal false
+  }
+
+  test "running out of keys aborts the wizard with Terminal.QuitError" {
+    expect (task { run_scripted Production [press "return"] }) |> to.fail_with Terminal.QuitError
+  }
+}

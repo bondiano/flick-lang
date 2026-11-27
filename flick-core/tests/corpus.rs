@@ -231,6 +231,8 @@ fn docs_examples_check() {
     pages.push(root().join("examples/typed-interpreter/README.md"));
     pages.push(root().join("examples/exchange/README.md"));
     pages.push(root().join("examples/exchange/README.ru.md"));
+    pages.push(root().join("examples/monad-choice/README.md"));
+    pages.push(root().join("examples/monad-choice/README.ru.md"));
     pages.sort();
     let exemptions = exemptions();
     let _ = types::builtins();

@@ -1,0 +1,90 @@
+/// Plain-text reports for the `matrix`, `solve`, `sample` and `wizard` commands.
+module App.View exposing (
+  format_plan_line,
+  matrix_report,
+  solve_success_report,
+  solve_failure_message,
+  sample_report,
+  wizard_report,
+)
+
+import Choice.Choices exposing (Choices)
+import Choice.Choices as Choices
+import Deploy.Domain as Domain exposing (Constraints, ReleasePlan, Tier)
+import Deploy.Interpreters exposing (SolverStats)
+
+downtime_tag : Bool -> String
+let downtime_tag zero_downtime = if zero_downtime then "zero-downtime" else "downtime-window"
+
+format_plan_line : Int -> ReleasePlan -> String
+let format_plan_line index plan =
+  let sla = Domain.format_sla plan.availabilityBps
+  let tag = downtime_tag plan.zeroDowntime
+  "  \{index}. \{plan.summary} | $\{plan.monthlyCostUsd}/mo | p95 \{plan.p95LatencyMs}ms | SLA \{sla} | \{tag}"
+
+indexed_lines : List ReleasePlan -> List String
+let indexed_lines plans =
+  let (_, lines) =
+    List.fold_left
+      (fun (idx, acc) plan -> (idx + 1, acc ++ [format_plan_line idx plan]))
+      (1, [])
+      plans
+  lines
+
+matrix_report : Tier -> Choices ReleasePlan -> List String
+let matrix_report tier plans =
+  let list = Choices.to_list plans
+  let costs = map (fun plan -> plan.monthlyCostUsd) plans
+  let min_cost = Choices.min_int costs
+  let max_cost = Choices.max_int costs
+  let zero_dt = List.length (List.filter (fun plan -> plan.zeroDowntime) list)
+  [
+    "Tier: \{Domain.tier_name tier} (\{Choices.length plans} valid release plans)",
+    "Cost range: $\{min_cost}..$\{max_cost}/mo; zero-downtime plans: \{zero_dt}",
+  ]
+    ++ indexed_lines list
+
+constraints_header : Tier -> Constraints -> String
+let constraints_header tier c =
+  let sla = Domain.format_sla c.minAvailabilityBps
+  let zd = if c.requireZeroDowntime then "required" else "optional"
+  "Constraints (\{Domain.tier_name tier}): budget <= $\{c.maxCostUsd}/mo, p95 <= \{c.maxLatencyMs}ms, SLA >= \{sla}, zero-downtime: \{zd}"
+
+plan_metrics : ReleasePlan -> String
+let plan_metrics plan =
+  let sla = Domain.format_sla plan.availabilityBps
+  let tag = downtime_tag plan.zeroDowntime
+  "$\{plan.monthlyCostUsd}/mo | p95 \{plan.p95LatencyMs}ms | SLA \{sla} | \{tag}"
+
+solve_success_report : Tier -> Constraints -> ReleasePlan -> SolverStats -> List String
+let solve_success_report tier constraints plan stats =
+  let metrics = plan_metrics plan
+  [
+    constraints_header tier constraints,
+    "Solver: explored \{stats.explored} choice steps, backtracked \{stats.backtracks} times",
+    "Selected: \{plan.summary}",
+    "Metrics: \{metrics}",
+  ]
+
+solve_failure_message : Tier -> Constraints -> SolverStats -> String
+let solve_failure_message tier constraints stats =
+  let tier_str = Domain.tier_name tier
+  let min_sla = Domain.format_sla constraints.minAvailabilityBps
+  let zd = show constraints.requireZeroDowntime
+  let bounds =
+    "max $\{constraints.maxCostUsd}/mo, p95 <= \{constraints.maxLatencyMs}ms, SLA >= \{min_sla}, zero-downtime=\{zd}"
+  "No \{tier_str} release plan satisfies constraints (\{bounds}) after \{stats.explored} choice steps and \{stats.backtracks} backtracks."
+
+sample_report : Tier -> Int -> List ReleasePlan -> List String
+let sample_report tier seed plans =
+  ["Sampled \{List.length plans} \{Domain.tier_name tier} plan(s) with seed \{seed}:"]
+    ++ indexed_lines plans
+
+wizard_report : ReleasePlan -> List String
+let wizard_report plan =
+  let tier_str = Domain.tier_name plan.tier
+  let metrics = plan_metrics plan
+  [
+    "Configured \{tier_str} release: \{plan.summary}",
+    "Estimated: \{metrics}",
+  ]

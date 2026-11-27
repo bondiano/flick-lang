@@ -1,0 +1,60 @@
+/// Matrix enumeration, `Arbitrary` shrinking and `UniformRandom` sampling tests for `Deploy.*`.
+module Deploy.DeployTest
+
+import Arbitrary
+import Choice.Choices as Choices
+import Deploy.Domain as Domain exposing (Tier(..))
+import Deploy.Interpreters as Interpreters
+import Test exposing (expect, to)
+
+checking : Arbitrary.CheckOptions
+let checking = {
+  runs = Some 100
+  size = None
+  maxDiscards = None
+  maxShrinks = None
+  seed = Some 19
+  replay = None
+}
+
+suite "matrix and sampling" {
+  test "Covariant and Invariant enumerate identical valid matrices for both tiers" {
+    let preview_cov = Interpreters.enumerate Preview
+    let preview_inv = Interpreters.enumerate_invariant Preview
+    let prod_cov = Interpreters.enumerate Production
+    let prod_inv = Interpreters.enumerate_invariant Production
+    expect (Choices.length preview_cov) |> to.equal 26
+    expect (Choices.length prod_cov) |> to.equal 48
+    expect preview_inv |> to.equal preview_cov
+    expect prod_inv |> to.equal prod_cov
+    expect (List.all Domain.valid_architecture (Choices.to_list preview_cov)) |> to.be_true
+    expect (List.all Domain.valid_architecture (Choices.to_list prod_cov)) |> to.be_true
+  }
+
+  test "Arbitrary-driven RollChoice passes 100 shrinking property runs" {
+    let prod_all = Choices.to_list (Interpreters.enumerate Production)
+    let outcome =
+      Arbitrary.check
+        checking
+        (fun plan -> Domain.valid_architecture plan && List.contains plan prod_all)
+        (Interpreters.plan_arbitrary Production)
+    match outcome with
+    | Arbitrary.Passed report -> expect report.runs |> to.equal 100
+    | failed ->
+      Test.check
+        (Test.Failed
+          (Option.with_default "Arbitrary check failed" (Arbitrary.format_check_failure failed)))
+  }
+
+  test "UniformRandom sampling is deterministic per seed and stays in the matrix" {
+    let prod_all = Choices.to_list (Interpreters.enumerate Production)
+    let first_run = Interpreters.sample_seeded 42.0 5 Production
+    let repeat_run = Interpreters.sample_seeded 42.0 5 Production
+    let other_seed = Interpreters.sample_seeded 99.0 5 Production
+    expect (List.length first_run) |> to.equal 5
+    expect repeat_run |> to.equal first_run
+    expect (first_run != other_seed) |> to.be_true
+    expect (List.all (fun p -> Domain.valid_architecture p && List.contains p prod_all) first_run)
+    |> to.be_true
+  }
+}

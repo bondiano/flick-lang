@@ -1,0 +1,94 @@
+/// Non-empty choice list `Choices a` (`Choices first rest`, corresponding to
+/// Haskell's `first :| rest` from `Data.List.NonEmpty`) with capture-preserving
+/// operations and `Functor` / `Applicative` / `Monad` instances.
+module Choice.Choices exposing (
+  Choices(..),
+  singleton,
+  cons,
+  head,
+  tail,
+  to_list,
+  length,
+  at_modulo,
+  min_int,
+  max_int,
+)
+
+type Choices a = Choices a (List a)
+  deriving Eq, Show
+
+singleton : a^c -> (Choices a)^c
+let singleton first = Choices first []
+
+cons : a^c -> (List a)^d -> (Choices a)^(c + d)
+let cons first rest = Choices first rest
+
+head : (Choices a)^c -> a^c
+let head (Choices first _) = first
+
+tail : (Choices a)^c -> (List a)^c
+let tail (Choices _ rest) = rest
+
+to_list : (Choices a)^c -> (List a)^c
+let to_list (Choices first rest) = [first] ++ rest
+
+length : (Choices a)^c -> Int
+let length (Choices _ rest) =
+  count : (List a)^c -> Int
+  let rec count items =
+    match items with
+    | [] -> 0
+    | [_, ...more] -> 1 + count more
+  1 + count rest
+
+nth_or : Int -> a^c -> (List a)^c -> a^c
+let rec nth_or index fallback items =
+  match items with
+  | [] -> fallback
+  | [item, ...more] -> if index <= 0 then item else nth_or (index - 1) fallback more
+
+/// Total selection wrapping any 32-bit `Int` into `[0, length choices)`.
+at_modulo : Int -> (Choices a)^c -> a^c
+let at_modulo roll choices =
+  let Choices first rest = choices
+  let len = length choices
+  let index = ((roll % len) + len) % len
+  if index == 0 then first else nth_or (index - 1) first rest
+
+min_int : Choices Int -> Int
+let min_int (Choices first rest) = List.fold_left Int.min first rest
+
+max_int : Choices Int -> Int
+let max_int (Choices first rest) = List.fold_left Int.max first rest
+
+append_lists : (List a)^c -> (List a)^d -> (List a)^(c + d)
+let rec append_lists left right =
+  match left with
+  | [] -> right
+  | [item, ...more] ->
+    let prefix : (List a)^(c + d) = [item]
+    prefix ++ append_lists more right
+
+append_choices : (Choices a)^c -> (Choices a)^d -> (Choices a)^(c + d)
+let append_choices (Choices first rest) right = Choices first (append_lists rest (to_list right))
+
+concat_map_list : (a^v -> (Choices b)^(c + v))^c -> (List a)^d -> (List b)^(c + d)
+let rec concat_map_list f items =
+  match items with
+  | [] -> []
+  | [item, ...more] -> append_lists (to_list (f item)) (concat_map_list f more)
+
+instance Functor Choices =
+  let map f (Choices first rest) = Choices (f first) (map f rest)
+
+instance Applicative Choices =
+  let pure value = Choices value []
+  let map2 f left right = flat_map (fun a -> map (f a) right) left
+
+instance Monad Choices =
+  let flat_map f (Choices first rest) =
+    let Choices out_first out_rest = f first
+    Choices out_first (append_lists out_rest (concat_map_list f rest))
+
+instance Semigroup (Choices a) =
+  let combine left right = append_choices left right

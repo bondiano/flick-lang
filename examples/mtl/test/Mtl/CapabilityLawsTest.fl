@@ -1,0 +1,122 @@
+module Mtl.CapabilityLawsTest exposing (tests)
+
+import Mtl.Classes exposing (..)
+import Mtl.Identity as Identity exposing (Identity)
+import Mtl.ReaderT as ReaderT exposing (ReaderT)
+import Mtl.StateT as StateT exposing (StateT)
+import Mtl.WriterT as WriterT exposing (WriterT)
+
+run_state : Float -> StateT Float Identity a -> (a, Float)
+let run_state initial action = Identity.run (StateT.run action initial)
+
+run_reader : Float -> ReaderT Float Identity a -> a
+let run_reader environment action = Identity.run (ReaderT.run action environment)
+
+run_writer : WriterT (List String) Identity a -> (a, List String)
+let run_writer action = Identity.run (WriterT.run action)
+
+laws : List Test.Test
+let laws = [
+  Test.property
+    "State get/get, put-back, put/get, final put and state coherence"
+    (Gen.pair
+      (Gen.map Int.to_float (Gen.int (0 - 20) 20))
+      (Gen.map Int.to_float (Gen.int (0 - 20) 20)))
+    (fun (initial, next) ->
+      twice : StateT Float Identity (Float, Float)
+      let twice = do {
+        first <- get
+        second <- get
+        pure (first, second)
+      }
+      once : StateT Float Identity (Float, Float)
+      let once = map (fun value -> (value, value)) get
+      put_back : StateT Float Identity Unit
+      let put_back = do {
+        before <- get
+        put before
+      }
+      put_get : StateT Float Identity Float
+      let put_get = do {
+        put next
+        get
+      }
+      put_value : StateT Float Identity Float
+      let put_value = do {
+        put next
+        pure next
+      }
+      last_put : StateT Float Identity Float
+      let last_put = do {
+        put initial
+        put next
+        get
+      }
+      combined : StateT Float Identity Float
+      let combined = state (fun before -> (before * 2, before + next))
+      expanded : StateT Float Identity Float
+      let expanded = do {
+        before <- get
+        put (before + next)
+        pure (before * 2)
+      }
+      Test.all [
+        Test.equal (run_state initial once) (run_state initial twice),
+        Test.equal ((), initial) (run_state initial put_back),
+        Test.equal (run_state initial put_value) (run_state initial put_get),
+        Test.equal (run_state initial put_get) (run_state initial last_put),
+        Test.equal (run_state initial expanded) (run_state initial combined),
+      ]
+    ),
+  Test.property
+    "Reader local identity/composition and reader coherence"
+    (Gen.map Int.to_float (Gen.int (0 - 20) 20))
+    (fun environment ->
+      action : ReaderT Float Identity Float
+      let action = reader (fun n -> n * 3 + 1)
+      let nested = local (fun n -> n + 10) (local (fun n -> n * 2) action)
+      let composed = local (fun n -> (n + 10) * 2) action
+      mapped : ReaderT Float Identity Float
+      let mapped = map (fun n -> n * 3 + 1) ask
+      Test.all [
+        Test.equal
+          (run_reader environment action)
+          (run_reader environment (local (fun n -> n) action)),
+        Test.equal (run_reader environment composed) (run_reader environment nested),
+        Test.equal (run_reader environment mapped) (run_reader environment action),
+      ]
+    ),
+  Test.property
+    "Writer empty/ordered tell and writer coherence"
+    (Gen.map Int.to_float (Gen.int (0 - 20) 20))
+    (fun value ->
+      quiet : WriterT (List String) Identity Float
+      let quiet = do {
+        tell []
+        pure value
+      }
+      ordered : WriterT (List String) Identity Float
+      let ordered = do {
+        tell ["a"]
+        tell ["b"]
+        pure value
+      }
+      together : WriterT (List String) Identity Float
+      let together = do {
+        tell ["a", "b"]
+        pure value
+      }
+      written : WriterT (List String) Identity Float
+      let written = writer (value, ["a", "b"])
+      Test.all [
+        Test.equal (value, []) (run_writer quiet),
+        Test.equal (value, ["a", "b"]) (run_writer ordered),
+        Test.equal (run_writer together) (run_writer ordered),
+        Test.equal (run_writer together) (run_writer written),
+        Test.equal ((value, ["a", "b"]), ["a", "b"]) (run_writer (listen written)),
+      ]
+    ),
+]
+
+tests : List Test.Test
+let tests = [Test.group "capability laws" laws]

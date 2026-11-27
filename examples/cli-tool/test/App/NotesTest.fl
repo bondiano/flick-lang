@@ -1,22 +1,27 @@
-module App.NotesTest exposing (tests)
+module App.NotesTest
 
 import App.Notes as Notes
+import Test exposing (expect, to)
 
-tests : List Test.Test
-let tests = [
-  Test.test "parse skips blank lines and trims" (fun () ->
-    Test.equal ["milk", "mom"] (Notes.parse "  milk \n\nmom\n")
-  ),
-  Test.test "render writes a line per note, parse reads it back" (fun () ->
-    Test.equal ["milk", "mom"] (Notes.parse (Notes.render ["milk", "mom"]))
-  ),
-  Test.test "remove counts from 1" (fun () ->
-    Test.equal (Some ["milk", "tea"]) (Notes.remove 2 ["milk", "mom", "tea"])
-  ),
-  Test.test "remove of a number outside the list is None" (fun () ->
-    Test.all [Test.equal None (Notes.remove 0 ["milk"]), Test.equal None (Notes.remove 2 ["milk"])]
-  ),
-  Test.test "listing numbers the notes" (fun () ->
-    Test.equal ["1. milk", "2. mom"] (Notes.listing ["milk", "mom"])
-  ),
-]
+suite "notes" {
+  test "parse skips blank lines and trims" {
+    expect (Notes.parse "  milk \n\nmom\n") |> to.equal ["milk", "mom"]
+  }
+
+  test "render writes a line per note, parse reads it back" {
+    expect (Notes.parse (Notes.render ["milk", "mom"])) |> to.equal ["milk", "mom"]
+  }
+
+  test "remove counts from 1" {
+    expect (Notes.remove 2 ["milk", "mom", "tea"]) |> to.equal (Some ["milk", "tea"])
+  }
+
+  test "remove of a number outside the list is None" {
+    expect (Notes.remove 0 ["milk"]) |> to.equal None
+    expect (Notes.remove 2 ["milk"]) |> to.equal None
+  }
+
+  test "listing numbers the notes" {
+    expect (Notes.listing ["milk", "mom"]) |> to.equal ["1. milk", "2. mom"]
+  }
+}
