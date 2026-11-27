@@ -9,6 +9,7 @@ use flick_ir::{
 };
 
 use super::super::ast::{Block, Expr, ExprKind, Field, Function, LastKind, Name, Stmt, StmtKind};
+use super::ops::kernel_call;
 use super::{Lowering, RUNTIME};
 
 /// The key of the `i`th dictionary a tagged value holds.
@@ -156,11 +157,15 @@ impl<'p> Lowering<'p> {
                 ),
                 span,
             ),
-            Dict::Structural { class, .. } => self.unsupported(
-                span,
-                &format!("the structural `{class}` of a record or tuple"),
-                "the Lua runtime that derives it is not implemented",
-            ),
+            // the kernel's instance over the dictionaries of the fields
+            Dict::Structural { class, fields } => {
+                let dicts = fields
+                    .iter()
+                    .map(|d| Field::Item(self.dict(d, span)))
+                    .collect();
+                let table = Expr::new(ExprKind::Table(dicts), span);
+                kernel_call("structural", vec![Expr::str(class, span), table], span)
+            }
             Dict::Error => self.refuse(span, "malformed IR: an unresolved dictionary".to_owned()),
         }
     }
