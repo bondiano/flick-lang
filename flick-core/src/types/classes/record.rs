@@ -93,7 +93,7 @@ impl Checker<'_> {
         let Type::Con { module, name } = target.spine().0 else {
             return None;
         };
-        let names = match &self.env.type_def(module, name)?.form {
+        let names = match self.env.type_def(module, name)?.typing() {
             Form::Adt { constructors, .. } => constructors.clone(),
             Form::Error => vec![name.clone()],
             _ => return None,

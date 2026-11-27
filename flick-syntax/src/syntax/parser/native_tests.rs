@@ -148,3 +148,32 @@ let hypot a b = a + b
         "{diags:?}"
     );
 }
+
+/// A `type` says where it is the backend's own with `@native when`, after its
+/// constructors and `deriving`; it names no binding.
+#[test]
+fn parses_the_native_condition_of_a_type() {
+    let src = "\
+type Box a =
+  | Box a
+  deriving Eq
+  @native when js || go
+";
+    let (tree, diags) = parse_src(src);
+    assert!(diags.is_empty(), "{diags:?}");
+    let decl = tree
+        .nodes()
+        .find(|n| n.kind == K::TypeDecl)
+        .expect("type decl");
+    let ov = decl
+        .nodes()
+        .find(|n| n.kind == K::NativeOverride)
+        .expect("override");
+    assert!(ov.nodes().any(|n| n.kind == K::WhenCond), "{ov:#?}");
+    assert!(!ov.nodes().any(|n| n.kind == K::ForeignSource), "{ov:#?}");
+    let (_, diags) = parse_src("type Box a =\n  | Box a\n  @native \"x\" when js\n");
+    assert!(
+        diags.iter().any(|d| d.contains("names no binding")),
+        "{diags:?}"
+    );
+}

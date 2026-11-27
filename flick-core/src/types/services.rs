@@ -51,6 +51,7 @@ pub fn impl_def(def: &TypeDef) -> Option<TypeDef> {
             opaque: false,
         },
         variance: Vec::new(),
+        native: None,
     })
 }
 
@@ -353,7 +354,7 @@ impl Checker<'_> {
             let key = (module.clone(), name.clone());
             if !seen.contains(&key) {
                 seen.push(key);
-                let inner = match self.env.type_def(module, name).map(|d| &d.form) {
+                let inner = match self.env.type_def(module, name).map(TypeDef::typing) {
                     Some(Form::Alias { params, body, .. }) => vec![
                         body.substitute(
                             &params

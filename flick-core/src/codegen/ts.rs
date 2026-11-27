@@ -459,3 +459,21 @@ mod typed;
 pub use typed::{Typed, Typing};
 #[cfg(all(test, feature = "native-js"))]
 mod tests;
+
+/// Whether the JS backend has its own type for `def`: its `@native when …`
+/// holds for JS, so its values are the backend's, not its constructors.
+fn native_on_js(def: &TypeDef) -> bool {
+    use std::slice;
+
+    use crate::syntax::when;
+    use crate::types::{NativeOverrideEnv, OverrideSelection};
+    def.native
+        .as_deref()
+        .and_then(|c| when::parse(c).ok())
+        .is_some_and(|expr| {
+            matches!(
+                NativeOverrideEnv::default_js().select(slice::from_ref(&expr)),
+                OverrideSelection::Selected(0)
+            )
+        })
+}

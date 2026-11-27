@@ -39,6 +39,7 @@ fn defined(item: &Item) -> Option<&str> {
     match &item.kind {
         ItemKind::Value { name, .. } => Some(name),
         ItemKind::Foreign(foreign) => Some(&foreign.name),
+        ItemKind::Constructor(constructor) => Some(&constructor.name),
         _ => None,
     }
 }
@@ -102,7 +103,13 @@ pub fn select_native(
             .filter_map(defined)
             .collect();
         let replaced = |item: &Item| defined(item).is_some_and(|n| names.contains(&n));
-        let Some(at) = module.items.iter().position(replaced) else {
+        // a native type lowers no items: its constructors go first, before
+        // any value that builds one
+        let at = if names.is_empty() {
+            0
+        } else if let Some(at) = module.items.iter().position(replaced) {
+            at
+        } else {
             continue;
         };
         module.items.retain(|item| !replaced(item));
@@ -129,7 +136,7 @@ pub fn native_alternatives(
             _ => {}
         }
     }
-    let mut alternatives = Vec::new();
+    let mut alternatives = represented_alternatives(module, typing);
     for decl in decls {
         // each with its condition, by index, in the order the check recorded them
         let clauses: Vec<_> = (typing.native_overrides.iter())
@@ -174,6 +181,32 @@ pub fn native_alternatives(
         });
     }
     Ok(alternatives)
+}
+
+/// The alternatives of each `type` with `@native when <cond>`: no items where
+/// the condition holds, its constructors elsewhere.
+fn represented_alternatives(module: &resolve::Module, typing: &Typing) -> Vec<NativeAlternative> {
+    let mut alternatives = Vec::new();
+    for decl in module.tree.nodes().filter(|n| n.kind == K::TypeDecl) {
+        let Some(name) = decl.child_tokens().find(|t| t.kind == K::Con) else {
+            continue;
+        };
+        let Some(represented) = typing.represented.get(name.text(module.text)) else {
+            continue;
+        };
+        let mut lower = Lower::new(module, typing);
+        lower.no_native = true;
+        let span = lower.span(decl);
+        let mut constructors = Vec::new();
+        lower.type_items(decl, span, &mut constructors);
+        alternatives.push(NativeAlternative {
+            conditions: vec![represented.condition.clone()],
+            clauses: vec![Vec::new()],
+            fallback: constructors,
+            lowered: represented.native.then_some(0),
+        });
+    }
+    alternatives
 }
 
 /// The `when` condition of the clause at `range` of `decl`.

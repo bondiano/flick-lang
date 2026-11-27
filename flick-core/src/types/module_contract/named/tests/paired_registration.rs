@@ -31,6 +31,7 @@ fn paired_registration_rejects_foreign_issued_and_stale_actual_without_scope_wri
                 kind: Kind::Symbol,
                 form: Form::NOMINAL,
                 variance: Vec::new(),
+                native: None,
             },
         );
         checker.env.module = module;
@@ -92,6 +93,7 @@ fn paired_actual_dependency_walk_distinguishes_record_tail_keys_from_error_label
                         }],
                     },
                     variance: Vec::new(),
+                    native: None,
                 },
             );
             let pair = checker
@@ -155,6 +157,7 @@ fn paired_copy_and_bound_transport_retain_actual_meta_carriers_and_live_support(
                     }],
                 },
                 variance: Vec::new(),
+                native: None,
             },
         );
         let b = checker
@@ -343,6 +346,7 @@ fn paired_late_kind_evidence_retries_without_default_or_stale_dependency_cache()
                 kind: Kind::arrow(role.clone(), Kind::Type),
                 form: Form::NOMINAL,
                 variance: Vec::new(),
+                native: None,
             },
         );
         checker.env.define_type(
@@ -362,6 +366,7 @@ fn paired_late_kind_evidence_retries_without_default_or_stale_dependency_cache()
                     }],
                 },
                 variance: Vec::new(),
+                native: None,
             },
         );
         let pair = checker

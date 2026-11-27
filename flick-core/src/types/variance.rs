@@ -148,7 +148,7 @@ impl Checker<'_> {
         let mut data_candidates: Vec<String> = Vec::new();
         let mut class_candidates: Vec<String> = Vec::new();
         for (name, def) in self.env.own_types() {
-            match def.form {
+            match def.typing() {
                 Form::Adt { .. } | Form::Error => data_candidates.push(name.to_owned()),
                 Form::Nominal { .. } if Type::con(&module, name).is_lang(Lang::List) => {
                     data_candidates.push(name.to_owned());
@@ -189,7 +189,7 @@ impl Checker<'_> {
         if kinds.is_empty() {
             return Vec::new();
         }
-        match &def.form {
+        match def.typing() {
             Form::Adt { .. } | Form::Error => {
                 if valid_exported_variance(&kinds, &def.variance).is_some() {
                     return def.variance.clone();
@@ -292,7 +292,7 @@ impl Checker<'_> {
         let def = self.env.type_def(module, name)?;
         let kinds: Vec<Kind> = param_kinds(&def.kind).into_iter().cloned().collect();
         let imported = module != &self.env.module;
-        match &def.form {
+        match def.typing() {
             Form::Adt { constructors, .. } => {
                 let ctors = constructors
                     .iter()
@@ -359,7 +359,7 @@ impl Checker<'_> {
             return false;
         }
         let key = (module.clone(), name.clone());
-        match &def.form {
+        match def.typing() {
             Form::Nominal { .. } => is_closed_scalar(t),
             Form::Adt { .. } | Form::Error if seen.contains(&key) => true,
             Form::Adt { .. } | Form::Error => {

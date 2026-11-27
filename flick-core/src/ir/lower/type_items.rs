@@ -32,6 +32,10 @@ impl Lower<'_> {
         let Some(ty) = self.token_text(decl, K::Con) else {
             return;
         };
+        // where the type is the backend's own, its values have no constructors
+        if !self.no_native && self.typing.represented.get(&ty).is_some_and(|r| r.native) {
+            return;
+        }
         let abi = self.typing.abis.get(&ty).cloned().unwrap_or_default();
         let mut constructors = Vec::new();
         for (i, variant) in decl.nodes().filter(|n| n.kind == K::Variant).enumerate() {

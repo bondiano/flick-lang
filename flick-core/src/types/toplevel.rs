@@ -121,6 +121,10 @@ impl<'a> Checker<'a> {
                 self.check_native_overrides(decl, scheme.as_ref().map(|(s, _)| s));
             }
         }
+        for decl in decls.iter().filter(|d| d.kind == K::TypeDecl) {
+            self.check_type_native(decl);
+        }
+        self.check_represented_uses(&decls);
         self.record_atom_bindings(&decls);
         self.class_defaults(&decls);
         self.solve_rows();
@@ -352,6 +356,12 @@ impl<'a> Checker<'a> {
             state: State::Waiting,
             rec: None,
         });
+    }
+
+    /// The top-level declaration whose text holds `span`, if any.
+    pub(super) fn decl_at(&self, span: Span) -> Option<&'a Node> {
+        let inside = |d: &Node| d.range().0 <= span.start && span.end <= d.range().1;
+        (self.top.items.iter()).map(|i| i.decl).find(|d| inside(d))
     }
 
     /// Checks an item, with its whole `rec` group, in a fresh context.

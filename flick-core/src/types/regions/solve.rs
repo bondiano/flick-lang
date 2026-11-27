@@ -286,7 +286,10 @@ impl Checker<'_> {
                 // a region never solved comes from an error reported already
                 .filter(|atom| !matches!(self.store.resolve(atom), Type::Meta(_)))
                 .collect();
-        if let Some(atom) = lacking.first() {
+        // a body that stands for a native type's binding is G4's to bound
+        let trusted =
+            || (hold.expected.as_ref()).is_some_and(|ty| self.covers_native(ty, hold.span));
+        if let Some(atom) = lacking.first().filter(|_| !trusted()) {
             self.report_hold(hold, atom, &bound);
         }
     }

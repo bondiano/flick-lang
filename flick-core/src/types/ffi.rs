@@ -8,6 +8,7 @@
 mod bridge_shape;
 pub(super) mod imply;
 mod native;
+mod represented;
 mod retention;
 pub(super) mod spec;
 #[cfg(not(target_arch = "wasm32"))]
@@ -19,7 +20,7 @@ pub(super) mod value_abi_spec;
 pub use imply::{
     AxisTagModel, BackendTagModel, HostTagModel, NativeOverrideEnv, OverrideSelection,
 };
-pub use native::NativeOverrideInfo;
+pub use native::{NativeOverrideInfo, RepresentedType, type_native_condition};
 pub use retention::keeps_for_owner;
 pub use spec::{
     AdapterArgKind, AdapterArgSpec, AdapterWordSpec, CORE_FOREIGN_META, CoreForeignMeta,
@@ -320,9 +321,17 @@ impl Checker<'_> {
             Type::App { head, .. } => self.holds_data(&head),
             Type::Forall { body, .. } => self.holds_data(&body),
             Type::Con { module, name } => {
+                let def = self.env.type_def(&module, &name);
+                // where a type is the backend's own, its values are the backend's
+                if def
+                    .and_then(|d| d.native.as_deref())
+                    .is_some_and(|c| self.native_holds(c))
+                {
+                    return false;
+                }
                 lang::is(Lang::List, &module, &name)
                     || matches!(
-                        self.env.type_def(&module, &name).map(|d| &d.form),
+                        def.map(|d| &d.form),
                         Some(Form::Adt { .. } | Form::Error | Form::Alias { .. })
                     )
             }
@@ -495,6 +504,9 @@ mod metadata_tests;
 #[cfg(test)]
 #[path = "ffi/pending_tests.rs"]
 mod pending_tests;
+#[cfg(test)]
+#[path = "ffi/represented_tests.rs"]
+mod represented_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 #[path = "ffi/value_abi_go_tests.rs"]
 mod value_abi_go_tests;

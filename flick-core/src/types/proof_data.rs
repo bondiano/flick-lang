@@ -2,7 +2,7 @@
 //! split: each with its constructors, and whether it names itself.
 
 use super::Checker;
-use super::env::Form;
+use super::env::{Form, TypeDef};
 use super::lang::Lang;
 use super::ty::Type;
 use super::typing::Ref;
@@ -119,7 +119,7 @@ impl Checker<'_> {
                     };
                 }
                 let is_adt = matches!(
-                    self.env.type_def(&module, &name).map(|d| &d.form),
+                    self.env.type_def(&module, &name).map(TypeDef::typing),
                     Some(Form::Adt { .. })
                 );
                 if !is_adt {
@@ -165,7 +165,7 @@ impl Checker<'_> {
             }
             return;
         }
-        let constructors = match self.env.type_def(module, name).map(|d| &d.form) {
+        let constructors = match self.env.type_def(module, name).map(TypeDef::typing) {
             Some(Form::Adt { constructors, .. }) => constructors.clone(),
             _ => Vec::new(),
         };
@@ -265,7 +265,7 @@ impl Checker<'_> {
                         };
                     }
                     let is_adt = matches!(
-                        self.env.type_def(&module, &name).map(|d| &d.form),
+                        self.env.type_def(&module, &name).map(TypeDef::typing),
                         Some(Form::Adt { .. })
                     );
                     if !is_adt {

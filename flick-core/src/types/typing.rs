@@ -171,6 +171,9 @@ pub struct Typing {
     pub foreigns: HashMap<Range, ForeignInfo>,
     /// Selected `@native` override on a top-level `let`, keyed by `K::LetDecl` range.
     pub native_overrides: Vec<(Range, super::ffi::NativeOverrideInfo)>,
+    /// Each `type` with `@native when …`, by name: the backend's own where
+    /// its condition holds, its constructors elsewhere.
+    pub represented: BTreeMap<String, super::ffi::RepresentedType>,
     /// Parsed/catch-typed original declarations with unfinished representation.
     pub(super) pending_foreigns: Vec<super::ffi::PendingForeign>,
     /// Instances declared or derived in this module.

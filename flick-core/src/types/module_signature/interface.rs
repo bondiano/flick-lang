@@ -126,6 +126,7 @@ impl ModuleSignature {
                             opaque: false,
                         }),
                         variance: Vec::new(),
+                        native: None,
                     }),
                     None,
                 ),

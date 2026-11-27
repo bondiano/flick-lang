@@ -380,6 +380,52 @@ Flick body and selects among them again for the environment of each build: a
 backend that no clause names, and every build with `--no-native-overrides`,
 runs the Flick bodies.
 
+### Native types
+
+An opaque type's values come from a backend's bindings, so no Flick body can
+make one. A `type` with constructors may say, with an indented `@native when`
+line, where it is the backend's own type: there it is opaque, its values are the
+backend's and its constructors are not generated; elsewhere its constructors are
+its Flick representation, which the Flick bodies of its functions build and
+match:
+
+```flick
+type Box a =
+  | Box a
+  @native when js || go
+
+make : a -> Box a
+let make x = Box x
+  @native "./box.mjs" "make" when js || go
+
+value : Box a -> a
+let value b =
+  match b with
+  | Box x -> x
+  @native "./box.mjs" "value" when js || go
+```
+
+The `@native` of a type names no binding. Only the Flick body of a definition
+whose `@native` clauses hold wherever the type's does, and the definitions local
+to it, may name its constructors: there a clause replaces the body wherever the
+type is the backend's own. Anything else that builds or matches them, a
+definition without `@native`, an instance method or a `deriving` clause, is
+`FLICK-F017`; a type with `@native` and no constructors is `FLICK-F016`. Where the
+type is the backend's own, its values cross a binding as an opaque type's do,
+without a copy, and its TypeScript declaration is a branded interface without
+its constructors. With `--no-native-overrides` every build uses the
+constructors and the bodies.
+
+Typing reads a native type as the type without constructors it is where its
+condition holds, on every target: its parameters are invariant, `===` does not
+decide its `==`, and it has no hidden storage, so a module types the same
+wherever it is built. The bodies that name its
+constructors stand for its bindings, and are held to what a binding promises of
+the regions its values keep (G4 of the
+[regions](https://github.com/bondiano/flick-lang/blob/main/docs/formal/regions.md)),
+not checked for them: what a body puts in a value of the type is not bounded by
+the type's qualifier.
+
 ## The go target
 
 On the go target, a non-relative package binding such as `foreign hypot from "math" "Hypot"`
