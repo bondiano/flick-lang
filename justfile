@@ -328,9 +328,10 @@ conduit-e2e:
     CARGO_TARGET_DIR=target/own cargo build -p flick
     cd examples/conduit && PATH="$PWD/../../target/own/debug:$PATH" ../../target/own/debug/flick run e2e
 
-# Mutation-fuzz the parser (the nightly CI job runs 1 000 000 inputs)
+# Mutation-fuzz the parser and VM verifiers (the nightly CI job runs 1 000 000 inputs)
 fuzz iterations="1000000":
     FLICK_FUZZ_ITERATIONS={{iterations}} cargo test --release -p flick-core --test fuzz
+    FLICK_FUZZ_ITERATIONS={{iterations}} cargo test --release -p flick-vm --test fuzz_vm
 
 # The test plugin built as a WebAssembly component, and the plugin tests of
 # the compiler with wasmtime, which release builds include, with the unit
