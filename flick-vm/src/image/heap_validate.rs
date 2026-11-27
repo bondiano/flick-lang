@@ -5,62 +5,83 @@ use std::collections::{BTreeMap, BTreeSet};
 use flick_core::ir::memory::{CodeId, Function};
 
 use super::ImageError;
+use super::heap_restore_extra::compile_regexp;
 use super::heap_types::{
-    HeapSnapshot, SnapDictValue, SnapExitData, SnapLayerData, SnapLazyState, SnapObject,
-    SnapSeqData, SnapStoredReason, SnapValue, host_resource_tag_kind,
+    HeapSnapshot, SnapDictValue, SnapDurationData, SnapExitData, SnapLayerData, SnapLazyState,
+    SnapObject, SnapSeqData, SnapStoredReason, SnapValue, host_resource_tag_kind,
 };
+
+/// Maximum nesting depth of inline `SnapValue::Aggregate` trees.
+const MAX_AGGREGATE_DEPTH: usize = 128;
 
 impl HeapSnapshot {
     /// Validates that every `SnapId` inside `val` is in bounds and targets the expected kind.
     pub(crate) fn validate_value_indices(&self, val: &SnapValue) -> Result<(), ImageError> {
         let len = self.objects.len();
-        match val {
-            SnapValue::Object(id) if (*id as usize) >= len => {
+        let mut stack: Vec<(&SnapValue, usize)> = vec![(val, 0)];
+        while let Some((current, depth)) = stack.pop() {
+            if depth > MAX_AGGREGATE_DEPTH {
                 return Err(ImageError::Corrupt(format!(
-                    "snapshot object id {id} out of range (len {len})"
+                    "aggregate nesting depth exceeds maximum ({MAX_AGGREGATE_DEPTH})"
                 )));
             }
-            SnapValue::Cell(id) => {
-                let node = self.objects.get(*id as usize).ok_or_else(|| {
-                    ImageError::Corrupt(format!("snapshot cell id {id} out of range (len {len})"))
-                })?;
-                if !matches!(node.data, SnapObject::Cell { .. }) {
+            match current {
+                SnapValue::Object(id) if (*id as usize) >= len => {
                     return Err(ImageError::Corrupt(format!(
-                        "snapshot cell id {id} does not point to a Cell object"
+                        "snapshot object id {id} out of range (len {len})"
                     )));
                 }
+                SnapValue::Cell(id) => {
+                    let node = self.objects.get(*id as usize).ok_or_else(|| {
+                        ImageError::Corrupt(format!(
+                            "snapshot cell id {id} out of range (len {len})"
+                        ))
+                    })?;
+                    if !matches!(node.data, SnapObject::Cell { .. }) {
+                        return Err(ImageError::Corrupt(format!(
+                            "snapshot cell id {id} does not point to a Cell object"
+                        )));
+                    }
+                }
+                SnapValue::Lazy(id) => {
+                    let node = self.objects.get(*id as usize).ok_or_else(|| {
+                        ImageError::Corrupt(format!(
+                            "snapshot lazy id {id} out of range (len {len})"
+                        ))
+                    })?;
+                    if !matches!(node.data, SnapObject::Lazy { .. }) {
+                        return Err(ImageError::Corrupt(format!(
+                            "snapshot lazy id {id} does not point to a Lazy object"
+                        )));
+                    }
+                }
+                SnapValue::Aggregate {
+                    tag,
+                    ordinary_fields,
+                    fields,
+                } => {
+                    if let Some(kind) = host_resource_tag_kind(tag) {
+                        return Err(ImageError::Corrupt(format!(
+                            "forged host resource tag `{tag}` ({kind}) in aggregate"
+                        )));
+                    }
+                    if *ordinary_fields > fields.len() {
+                        return Err(ImageError::Corrupt(format!(
+                            "aggregate `{tag}` ordinary_fields ({ordinary_fields}) exceeds field count ({})",
+                            fields.len()
+                        )));
+                    }
+                    if (*tag == "$list" || *tag == "$tuple") && *ordinary_fields != fields.len() {
+                        return Err(ImageError::Corrupt(format!(
+                            "reserved aggregate `{tag}` cannot carry dictionary evidence"
+                        )));
+                    }
+                    for field in fields {
+                        stack.push((field, depth + 1));
+                    }
+                }
+                _ => {}
             }
-            SnapValue::Lazy(id) => {
-                let node = self.objects.get(*id as usize).ok_or_else(|| {
-                    ImageError::Corrupt(format!("snapshot lazy id {id} out of range (len {len})"))
-                })?;
-                if !matches!(node.data, SnapObject::Lazy { .. }) {
-                    return Err(ImageError::Corrupt(format!(
-                        "snapshot lazy id {id} does not point to a Lazy object"
-                    )));
-                }
-            }
-            SnapValue::Aggregate {
-                tag,
-                ordinary_fields,
-                fields,
-            } => {
-                if let Some(kind) = host_resource_tag_kind(tag) {
-                    return Err(ImageError::Corrupt(format!(
-                        "forged host resource tag `{tag}` ({kind}) in aggregate"
-                    )));
-                }
-                if *ordinary_fields > fields.len() {
-                    return Err(ImageError::Corrupt(format!(
-                        "aggregate `{tag}` ordinary_fields ({ordinary_fields}) exceeds field count ({})",
-                        fields.len()
-                    )));
-                }
-                for field in fields {
-                    self.validate_value_indices(field)?;
-                }
-            }
-            _ => {}
         }
         Ok(())
     }
@@ -94,22 +115,12 @@ impl HeapSnapshot {
                 ordinary_fields,
                 fields,
                 ..
-            } => {
-                if let Some(kind) = host_resource_tag_kind(tag) {
-                    return Err(ImageError::Corrupt(format!(
-                        "forged host resource tag `{tag}` ({kind}) at object {idx}"
-                    )));
-                }
-                if *ordinary_fields > fields.len() {
-                    return Err(ImageError::Corrupt(format!(
-                        "object {idx} ordinary_fields ({ordinary_fields}) > len ({})",
-                        fields.len()
-                    )));
-                }
-                for f in fields {
-                    self.validate_value_indices(f)?;
-                }
-            }
+            } => self.validate_tagged(idx, tag, *ordinary_fields, fields),
+            SnapObject::ListSlice {
+                backing,
+                offset,
+                len,
+            } => self.validate_list_slice(idx, backing, *offset, *len),
             SnapObject::Record(fields) => {
                 let mut seen = BTreeSet::new();
                 for (name, val) in fields {
@@ -120,45 +131,148 @@ impl HeapSnapshot {
                     }
                     self.validate_value_indices(val)?;
                 }
+                Ok(())
             }
-            SnapObject::Closure { code, captures } | SnapObject::Task { code, captures } => {
-                if !functions.contains_key(code) {
+            SnapObject::Closure { code, captures }
+            | SnapObject::Task { code, captures }
+            | SnapObject::Seq(SnapSeqData::Generator { code, captures, .. }) => {
+                self.validate_callable(idx, *code, captures, functions)
+            }
+            SnapObject::BigDecimal { value, .. } => {
+                if num_bigint::BigInt::parse_bytes(value.as_bytes(), 10).is_none() {
                     return Err(ImageError::Corrupt(format!(
-                        "object {idx} references unknown CodeId {code}"
+                        "invalid BigDecimal value `{value}` at object {idx}"
                     )));
                 }
-                for c in captures {
-                    self.validate_value_indices(c)?;
-                }
+                Ok(())
             }
-            SnapObject::Seq(SnapSeqData::Generator { code, captures, .. }) => {
-                if !functions.contains_key(code) {
+            SnapObject::Duration(SnapDurationData::Nanos(s)) => {
+                if num_bigint::BigInt::parse_bytes(s.as_bytes(), 10).is_none() {
                     return Err(ImageError::Corrupt(format!(
-                        "generator {idx} references unknown CodeId {code}"
+                        "invalid Duration nanos `{s}` at object {idx}"
                     )));
                 }
-                for c in captures {
-                    self.validate_value_indices(c)?;
+                Ok(())
+            }
+            SnapObject::RegExp { pattern, flags, .. } => {
+                let _ = compile_regexp(pattern, flags)?;
+                Ok(())
+            }
+            SnapObject::GraphWalker { indices, values } => {
+                if indices.len() != values.len() {
+                    return Err(ImageError::Corrupt(format!(
+                        "GraphWalker {idx} indices len ({}) != values len ({})",
+                        indices.len(),
+                        values.len()
+                    )));
                 }
+                for v in indices.iter().chain(values.iter()) {
+                    self.validate_value_indices(v)?;
+                }
+                Ok(())
             }
             SnapObject::Lazy {
                 state: Some(SnapLazyState::DoneCause(cid)),
                 ..
-            } => {
-                let target = self.objects.get(*cid as usize).ok_or_else(|| {
-                    ImageError::Corrupt(format!("lazy {idx} cause id {cid} out of range"))
-                })?;
-                if !matches!(target.data, SnapObject::Cause { .. }) {
-                    return Err(ImageError::Corrupt(format!(
-                        "lazy {idx} cause id {cid} is not a Cause object"
-                    )));
-                }
-            }
+            } => self.validate_lazy_cause(idx, *cid),
             _ => {
                 for child in object_child_values(obj) {
                     self.validate_value_indices(child)?;
                 }
+                Ok(())
             }
+        }
+    }
+
+    fn validate_tagged(
+        &self,
+        idx: usize,
+        tag: &str,
+        ordinary_fields: usize,
+        fields: &[SnapValue],
+    ) -> Result<(), ImageError> {
+        if let Some(kind) = host_resource_tag_kind(tag) {
+            return Err(ImageError::Corrupt(format!(
+                "forged host resource tag `{tag}` ({kind}) at object {idx}"
+            )));
+        }
+        if ordinary_fields > fields.len() {
+            return Err(ImageError::Corrupt(format!(
+                "object {idx} ordinary_fields ({ordinary_fields}) > len ({})",
+                fields.len()
+            )));
+        }
+        if (tag == "$list" || tag == "$tuple") && ordinary_fields != fields.len() {
+            return Err(ImageError::Corrupt(format!(
+                "reserved constructor `{tag}` at object {idx} cannot carry dictionary evidence"
+            )));
+        }
+        for f in fields {
+            self.validate_value_indices(f)?;
+        }
+        Ok(())
+    }
+
+    fn validate_list_slice(
+        &self,
+        idx: usize,
+        backing: &SnapValue,
+        offset: usize,
+        len: usize,
+    ) -> Result<(), ImageError> {
+        self.validate_value_indices(backing)?;
+        let SnapValue::Object(backing_id) = backing else {
+            return Err(ImageError::Corrupt(format!(
+                "ListSlice at object {idx} backing is not an Object"
+            )));
+        };
+        let target = self.objects.get(*backing_id as usize).ok_or_else(|| {
+            ImageError::Corrupt(format!("ListSlice {idx} backing {backing_id} out of range"))
+        })?;
+        let SnapObject::Tagged { tag, fields, .. } = &target.data else {
+            return Err(ImageError::Corrupt(format!(
+                "ListSlice {idx} backing {backing_id} is not a Tagged $list"
+            )));
+        };
+        if tag != "$list" || offset.checked_add(len).is_none_or(|end| end > fields.len()) {
+            return Err(ImageError::Corrupt(format!(
+                "ListSlice {idx} range {offset}..+{len} exceeds backing $list len {}",
+                fields.len()
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_callable(
+        &self,
+        idx: usize,
+        code: CodeId,
+        captures: &[SnapValue],
+        functions: &BTreeMap<CodeId, Function>,
+    ) -> Result<(), ImageError> {
+        let func = functions.get(&code).ok_or_else(|| {
+            ImageError::Corrupt(format!("object {idx} references unknown CodeId {code}"))
+        })?;
+        if func.params.len() != 2 {
+            return Err(ImageError::Corrupt(format!(
+                "object {idx} code {code} expects {} params, must be 2",
+                func.params.len()
+            )));
+        }
+        for c in captures {
+            self.validate_value_indices(c)?;
+        }
+        Ok(())
+    }
+
+    fn validate_lazy_cause(&self, idx: usize, cid: u32) -> Result<(), ImageError> {
+        let target = self.objects.get(cid as usize).ok_or_else(|| {
+            ImageError::Corrupt(format!("lazy {idx} cause id {cid} out of range"))
+        })?;
+        if !matches!(target.data, SnapObject::Cause { .. }) {
+            return Err(ImageError::Corrupt(format!(
+                "lazy {idx} cause id {cid} is not a Cause object"
+            )));
         }
         Ok(())
     }
@@ -200,24 +314,25 @@ fn push_object_edges(
     stack: &mut Vec<(usize, bool)>,
     state: &[u8],
 ) -> Result<(), ImageError> {
-    match val {
-        SnapValue::Object(id) => {
-            let idx = *id as usize;
-            if state[idx] == 1 {
-                return Err(ImageError::Corrupt(format!(
-                    "non-cell cyclic reference involving snapshot object {idx}"
-                )));
+    let mut work = vec![val];
+    while let Some(current) = work.pop() {
+        match current {
+            SnapValue::Object(id) => {
+                let idx = *id as usize;
+                if state[idx] == 1 {
+                    return Err(ImageError::Corrupt(format!(
+                        "non-cell cyclic reference involving snapshot object {idx}"
+                    )));
+                }
+                if state[idx] == 0 {
+                    stack.push((idx, false));
+                }
             }
-            if state[idx] == 0 {
-                stack.push((idx, false));
+            SnapValue::Aggregate { fields, .. } => {
+                work.extend(fields.iter());
             }
+            _ => {}
         }
-        SnapValue::Aggregate { fields, .. } => {
-            for f in fields {
-                push_object_edges(f, stack, state)?;
-            }
-        }
-        _ => {}
     }
     Ok(())
 }

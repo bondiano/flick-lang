@@ -1,6 +1,7 @@
 //! Background job management (`:bg`, `:jobs`, `:kill`) for [`VmSession`].
 
 use std::collections::BTreeMap;
+use std::slice;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -10,6 +11,7 @@ use flick_core::ir::memory::{Name, Program};
 use super::format::{describe_cause, extract_unhandled_effect, is_interrupt_cause, render_value};
 use super::program::SessionProgram;
 use super::{HandlerKind, VmSession};
+use crate::sandbox::{SandboxConfig, check_program_capabilities};
 use crate::tier0::{
     Heap, HostMode, ProgramOutcome, SessionHandlerKind, SessionPersistentState, SessionRunSpec,
     Value, allocate_execution_id, build_session_layer_value, execute_session_step,
@@ -78,6 +80,7 @@ struct BgRunInput {
     handler_globals: Vec<(Name, SessionHandlerKind)>,
     fuel: u64,
     host_mode: HostMode,
+    sandbox: SandboxConfig,
     interrupt: Arc<AtomicBool>,
     shared: Arc<Mutex<JobShared>>,
 }
@@ -152,6 +155,12 @@ impl VmSession {
         root: Option<&Name>,
         label: String,
     ) -> Result<JobId, String> {
+        check_program_capabilities(
+            incoming,
+            Some(slice::from_ref(entry)),
+            self.sandbox.capabilities,
+        )
+        .map_err(|err| err.to_string())?;
         self.program.load(incoming);
         if let Some(err) = self.ensure_root_layer(root, None) {
             return Err(format!("failed to initialize host layer: {err:?}"));
@@ -176,6 +185,7 @@ impl VmSession {
                 .collect(),
             fuel: self.fuel,
             host_mode: self.host_mode,
+            sandbox: self.sandbox.clone(),
             interrupt: Arc::clone(&interrupt),
             shared: Arc::clone(&shared),
         };
@@ -284,6 +294,7 @@ fn execute_bg_job(
             host_mode: input.host_mode,
             external_interrupt: Some(Arc::clone(&input.interrupt)),
             synthetic_codes: codes,
+            sandbox: &input.sandbox,
         };
         let report = execute_session_step(heap, &input.program, execution, persistent, &spec);
         stdout.push_str(&report.stdout);
@@ -304,6 +315,7 @@ fn execute_bg_job(
             host_mode: input.host_mode,
             external_interrupt: Some(Arc::clone(&input.interrupt)),
             synthetic_codes: codes,
+            sandbox: &input.sandbox,
         };
         let report = build_session_layer_value(heap, &input.program, execution, persistent, &spec);
         stdout.push_str(&report.stdout);
@@ -324,6 +336,7 @@ fn execute_bg_job(
             host_mode: input.host_mode,
             external_interrupt: Some(Arc::clone(&input.interrupt)),
             synthetic_codes: codes,
+            sandbox: &input.sandbox,
         };
         let report = execute_session_step(heap, &input.program, execution, persistent, &spec);
         stdout.push_str(&report.stdout);
@@ -347,6 +360,7 @@ fn execute_bg_job(
         host_mode: input.host_mode,
         external_interrupt: Some(Arc::clone(&input.interrupt)),
         synthetic_codes: codes,
+        sandbox: &input.sandbox,
     };
     let report = execute_session_step(heap, &input.program, execution, persistent, &spec);
     stdout.push_str(&report.stdout);

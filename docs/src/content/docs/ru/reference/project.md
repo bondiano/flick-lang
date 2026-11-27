@@ -1,6 +1,6 @@
 ---
 title: "Проект"
-source_hash: 5c521ec87e8a71d2
+source_hash: 191d9b2f8a36672f
 ---
 
 Проект — каталог с `flick.toml` (см. [CLI компилятора](../cli/)).
@@ -99,7 +99,7 @@ max-params = 5
 | `target.js.ui` | спецификатор модуля, который рисует и монтирует представления вместо React (экспортирует все имена, которые `Ui` и `Action` берут из `@flick-lang/effect-ts/ui` и `@flick-lang/effect-ts/ui/react`; относительный путь — от корня проекта) | React |
 | `target.go.cgo` | логическое значение; включить cgo (`CGO_ENABLED=1`) при сборке исполняемых файлов Go | `false` |
 | `target.go.kind` | `"app"` или `"library"` (режим `"library"` объявлен, но пока отклоняется `flick/go` с `FLICK-P012`) | `"app"` |
-| `target.vm.tier` | `"0"`, `"tier0"`, `"1"` или `"tier1"`; уровень исполнения встроенной ВМ (`flick run` / `flick test` / `flick repl`; уровень 1 поддерживает синхронное исполнение, однократные обработчики эффектов, типизированное восстановление `try` и LIFO-финализаторы областей); переопределяется флагом `--vm-tier` | `"0"` |
+| `target.vm.tier` | `"0"`, `"tier0"`, `"1"` или `"tier1"`; уровень исполнения встроенной ВМ (`flick run` / `flick test` / `flick repl`; уровень 1 поддерживает синхронное исполнение, однократные обработчики эффектов, типизированное восстановление `try`, последовательности/генераторы, задачи, кооперативные файберы, динамические слои/контексты, арены и закрытие областей C0–C6); переопределяется флагом `--vm-tier` | `"0"` |
 
 `flick new` берёт файлы шаблона у выбранного целевого бэкенда (`--target js` по умолчанию создаёт проект на RT с `[tools] "flick/js" = ["pnpm"]`, зависимостью от `@flick-lang/runtime` и без Effect; `--target go` создаёт проект под Go с `[build] target = "go"`, `[tools] "flick/go" = ["go"]` и без `package.json`) либо у стороннего пакета через `--from`. Передайте `--runtime rt` командам `build`, `run`, `dev`, `test` или `inspect`, чтобы выбрать RT для одного вызова в проекте на Effect. Если проекту нужен адаптер Effect, явно задайте `[target.js] runtime = "effect"` и добавьте зависимость `@flick-lang/effect-ts`.
 
@@ -146,7 +146,7 @@ max-params = 5
 
 - `flick/js` публикует тег `js`, взаимоисключающую ось `runtime` (`rt` по умолчанию, `effect`), аддитивную ось `adapter` (`effect-adapter`, активен при наличии `@flick-lang/effect-ts` в зависимостях проекта) и встроенные хосты `node`, `browser`, `bun` и `cloudflare`.
 - `flick/go` публикует тег `go`, аддитивную ось `cgo` (`cgo`, активен при `[target.go] cgo = true`) и встроенный хост `native`.
-- `flick/vm` публикует тег `vm` и встроенный хост `native` (`vm/native`, также оформленный в пакете `packages/vm-host`), предоставляя нативные Rust-сервисы хоста `Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem` и `Process` и позволяя ограничивать пакеты и модули условиями `when = "vm"` / `@when "vm"`.
+- `flick/vm` публикует тег `vm` и встроенный хост `native` (`vm/native`, также оформленный в пакете `packages/vm-host`), предоставляя нативные Rust-сервисы хоста `Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem` и `Process` и позволяя ограничивать пакеты и модули условиями `when = "vm"` / `@when "vm"`. Встраиваемые сессии ВМ также поддерживают изоляцию по возможностям (`fs`, `net`, `process`, `env`, `clock`, `random`, `ffi`, `plugins`), лимиты ресурсов (`fuel`, `heap_bytes`, `wall_time_ms`, `max_stack_depth`) и верификацию образов и байткода до загрузки, единую для нативных и `wasm32`-хостов.
 - Сторонние бэкенды публикуют собственные теги, оси и хосты по той же схеме дескриптора.
 
 `flick/lua` — предварительная версия бэкенда для аддонов World of Warcraft и

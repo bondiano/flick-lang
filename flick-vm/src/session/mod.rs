@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::mem;
 
 use flick_core::iface::Interface;
-use flick_core::ir::memory::Name;
+use flick_core::ir::memory::{MemorySpan, Name};
 
 pub use format::render_value;
 pub use jobs::{JobId, JobInfo, JobStatus, KillOutcome};
@@ -27,6 +27,7 @@ pub(crate) use program::SessionProgram;
 use crate::image::{
     self, HeapInventory, ImageError, LoadReport, SaveSelection, UnloadReport, VmImage,
 };
+use crate::sandbox::{Capability, CapabilitySet, LimitKind, ResourceLimits, SandboxConfig};
 use crate::tier0::{
     Error, Heap, HostMode, SessionHandlerKind, SessionPersistentState, Value,
     allocate_execution_id, shutdown_persistent_state,
@@ -70,6 +71,17 @@ pub enum EvalOutcome {
     Interrupted {
         stdout: String,
     },
+    CapabilityDenied {
+        capability: Capability,
+        binding: String,
+        span: Option<MemorySpan>,
+        stdout: String,
+    },
+    LimitExceeded {
+        kind: LimitKind,
+        message: String,
+        stdout: String,
+    },
     Fault {
         message: String,
         stdout: String,
@@ -105,6 +117,7 @@ pub struct VmSession {
     jobs: JobTable,
     host_mode: HostMode,
     fuel: u64,
+    sandbox: SandboxConfig,
     shutdown_done: bool,
 }
 
@@ -115,13 +128,24 @@ impl Default for VmSession {
 }
 
 impl VmSession {
-    /// Creates a new live VM session using [`HostMode::LiveOs`].
+    /// Creates a new live VM session using [`HostMode::LiveOs`] and unrestricted capabilities.
     pub fn new() -> Self {
         Self::with_host_mode(HostMode::LiveOs)
     }
 
-    /// Creates a new live VM session with an explicit [`HostMode`].
+    /// Creates a new live VM session with an explicit [`HostMode`] and unrestricted capabilities.
     pub fn with_host_mode(host_mode: HostMode) -> Self {
+        Self::with_sandbox(host_mode, SandboxConfig::unrestricted())
+    }
+
+    /// Creates a sandboxed VM session using [`HostMode::LiveOs`] and `sandbox`.
+    pub fn sandboxed(sandbox: SandboxConfig) -> Self {
+        Self::with_sandbox(HostMode::LiveOs, sandbox)
+    }
+
+    /// Creates a live VM session with an explicit [`HostMode`] and [`SandboxConfig`].
+    pub fn with_sandbox(host_mode: HostMode, sandbox: SandboxConfig) -> Self {
+        let fuel = sandbox.limits.fuel.unwrap_or(u64::MAX);
         Self {
             heap: Heap::new(),
             execution: allocate_execution_id(),
@@ -136,9 +160,51 @@ impl VmSession {
             handlers: Vec::new(),
             jobs: JobTable::default(),
             host_mode,
-            fuel: u64::MAX,
+            fuel,
+            sandbox,
             shutdown_done: false,
         }
+    }
+
+    /// Returns the active [`SandboxConfig`] for this session.
+    #[must_use]
+    pub const fn sandbox(&self) -> &SandboxConfig {
+        &self.sandbox
+    }
+
+    /// Replaces the active [`SandboxConfig`] for subsequent evaluations and loads.
+    pub fn set_sandbox(&mut self, sandbox: SandboxConfig) {
+        self.fuel = sandbox.limits.fuel.unwrap_or(u64::MAX);
+        self.sandbox = sandbox;
+    }
+
+    /// Returns the granted [`CapabilitySet`] for this session.
+    #[must_use]
+    pub const fn capabilities(&self) -> CapabilitySet {
+        self.sandbox.capabilities
+    }
+
+    /// Updates the granted [`CapabilitySet`] for subsequent link and runtime checks.
+    pub fn set_capabilities(&mut self, capabilities: CapabilitySet) {
+        self.sandbox.capabilities = capabilities;
+    }
+
+    /// Returns the active [`ResourceLimits`] for this session.
+    #[must_use]
+    pub const fn limits(&self) -> &ResourceLimits {
+        &self.sandbox.limits
+    }
+
+    /// Updates the active [`ResourceLimits`] for subsequent evaluations.
+    pub fn set_limits(&mut self, limits: ResourceLimits) {
+        self.fuel = limits.fuel.unwrap_or(u64::MAX);
+        self.sandbox.limits = limits;
+    }
+
+    /// Returns the live accounted heap bytes in this session.
+    #[must_use]
+    pub const fn heap_live_bytes(&self) -> usize {
+        self.heap.live_bytes()
     }
 
     /// Registers the closed type [`Interface`] for a loaded module.

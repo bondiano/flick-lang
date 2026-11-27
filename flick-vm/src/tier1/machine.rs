@@ -1,23 +1,33 @@
 //! Tier-1 register bytecode virtual machine core, main loop, and leak-free cleanup.
 
 use std::collections::{BTreeMap, VecDeque};
-use std::mem;
 
 use flick_core::ir::memory::MemorySpan;
 
-use crate::stdlib::HostServices;
+use crate::stdlib::primitives::IsaacRng;
+use crate::stdlib::{DEFAULT_VIRTUAL_NOW_NS, FIBER_QUANTUM, HostServices};
 use crate::tier0::causes::StepFailure;
 use crate::tier0::{
-    CauseToken, Data, DefectSpec, Error, ExecutionReport, Heap, HostMode, LanguageExit,
-    ProgramOutcome, Reason, Value, program as tier0_program,
+    CauseToken, Data, Error, ExecutionReport, Heap, HostMode, LanguageExit, ObjectId,
+    ProgramOutcome, Value, program as tier0_program,
 };
 
-use super::machine_handlers::{Activation, CachedHandlerHit, CapturedSlot, Invocation, Segment};
-use super::machine_scopes::OwnerState;
-pub(super) use super::machine_state::{
-    End, Frame, GlobalState, LoopState, MainStage, RecoveryState, RegVal,
+use super::machine_coords::{CachedCellState, CoordState, DeferredState};
+use super::machine_fibers::{
+    FiberContext, FiberOutcome, FiberRecord, TestClockAdvance, TimerEntry,
 };
-use super::machine_unwind::{CapturedFrames, Discard};
+use super::machine_generators::GeneratorSlot;
+use super::machine_groups::FiberGroupState;
+use super::machine_handlers::{
+    Activation, CachedHandlerHit, CapturedSlot, InstalledOperation, Invocation, Segment,
+};
+use super::machine_layers::{LayerBuildTarget, PendingProvide, PendingProvideResult, Provider};
+use super::machine_layers_build::MemoMapState;
+use super::machine_scopes::{ClosingScopeState, OwnerState};
+pub(super) use super::machine_state::{
+    End, Frame, GlobalState, LoopState, MainStage, OwnerEvidence, RecoveryState, RegVal,
+};
+use super::machine_unwind::Discard;
 use super::opcode::{Instr, Prepared};
 
 pub(super) struct Machine<'p, 'h> {
@@ -27,10 +37,16 @@ pub(super) struct Machine<'p, 'h> {
     pub(super) frames: Vec<Frame>,
     pub(super) registers: Vec<Option<RegVal>>,
     pub(super) globals: Vec<GlobalState>,
+    pub(super) cells: Vec<Value>,
+    pub(super) lazies: Vec<Value>,
     pub(super) owners: Vec<OwnerState>,
     pub(super) current_owner: usize,
+    pub(super) current_evidence: Option<OwnerEvidence>,
     pub(super) mask_depth: usize,
     pub(super) activations: BTreeMap<usize, Activation>,
+    pub(super) providers: BTreeMap<usize, Provider>,
+    pub(super) generators: BTreeMap<usize, GeneratorSlot>,
+    pub(super) root: Option<usize>,
     pub(super) segments: BTreeMap<usize, Segment>,
     pub(super) continuations: BTreeMap<usize, CapturedSlot>,
     pub(super) invocations: BTreeMap<usize, Invocation>,
@@ -62,6 +78,44 @@ pub(super) struct Machine<'p, 'h> {
     pub(super) host_services: HostServices,
     pub(super) fuel: u64,
     pub(super) host_mode: HostMode,
+    // Cooperative single-threaded scheduler & async state.
+    pub(super) active_fiber: usize,
+    pub(super) next_fiber: usize,
+    pub(super) quantum: u32,
+    pub(super) parked_fibers: BTreeMap<usize, FiberContext>,
+    pub(super) fiber_table: BTreeMap<usize, FiberRecord>,
+    pub(super) run_queue: VecDeque<usize>,
+    pub(super) virtual_now_ns: u64,
+    pub(super) test_clock_mode: bool,
+    pub(super) test_clock_waiter: Option<TestClockAdvance>,
+    pub(super) timers: BTreeMap<(u64, usize), TimerEntry>,
+    pub(super) next_timer: usize,
+    pub(super) deferreds: BTreeMap<usize, DeferredState>,
+    pub(super) next_deferred: usize,
+    pub(super) coords: BTreeMap<usize, CoordState>,
+    pub(super) next_coord: usize,
+    pub(super) fiber_groups: BTreeMap<usize, FiberGroupState>,
+    pub(super) next_group: usize,
+    pub(super) memo_maps: BTreeMap<usize, MemoMapState>,
+    pub(super) next_memo: usize,
+    pub(super) cached_cells: BTreeMap<usize, CachedCellState>,
+    pub(super) next_cached: usize,
+    pub(super) isaac_rngs: BTreeMap<usize, IsaacRng>,
+    pub(super) next_rng: usize,
+    pub(super) closing_scopes: BTreeMap<usize, Box<ClosingScopeState>>,
+    pub(super) pending_provides: BTreeMap<usize, PendingProvide>,
+    pub(super) next_provide: usize,
+    pub(super) pending_resume_close: Option<usize>,
+    pub(super) pending_provide_result: Option<PendingProvideResult>,
+    pub(super) pending_layer_build: Option<(Value, usize, usize)>,
+    pub(super) inherited_services: Vec<Value>,
+    pub(super) inherited_tail_ops: Vec<InstalledOperation>,
+    pub(super) lazy_waiters: BTreeMap<ObjectId, Vec<(usize, usize)>>,
+    pub(super) fiber_refs: BTreeMap<String, Value>,
+    pub(super) interrupt_requested: Option<u64>,
+    pub(super) seeded_random: Option<usize>,
+    pub(super) root_defects: Vec<CauseToken>,
+    pub(super) runtime_fibers_started: u64,
 }
 
 pub(super) fn execute_prepared(
@@ -146,6 +200,15 @@ impl<'p, 'h> Machine<'p, 'h> {
         program_args: Vec<String>,
         main_protocol: bool,
     ) -> Self {
+        let main_stage = if !main_protocol {
+            MainStage::Done
+        } else if image.root.is_some() {
+            MainStage::Root { main: image.entry }
+        } else {
+            MainStage::Function
+        };
+        let mut fiber_table = BTreeMap::new();
+        fiber_table.insert(1, FiberRecord::root());
         Self {
             heap,
             image,
@@ -155,10 +218,16 @@ impl<'p, 'h> Machine<'p, 'h> {
             globals: (0..image.globals.len())
                 .map(|_| GlobalState::Empty)
                 .collect(),
+            cells: Vec::new(),
+            lazies: Vec::new(),
             owners: vec![OwnerState::default()],
             current_owner: 0,
+            current_evidence: None,
             mask_depth: 0,
             activations: BTreeMap::new(),
+            providers: BTreeMap::new(),
+            generators: BTreeMap::new(),
+            root: None,
             segments: BTreeMap::new(),
             continuations: BTreeMap::new(),
             invocations: BTreeMap::new(),
@@ -183,77 +252,118 @@ impl<'p, 'h> Machine<'p, 'h> {
             pending_handler: None,
             arguments: arguments.into(),
             top: None,
-            main_stage: if main_protocol {
-                MainStage::Function
-            } else {
-                MainStage::Done
-            },
+            main_stage,
             stdout: String::new(),
             stderr: String::new(),
             program_args,
             host_services: HostServices::new(),
             fuel,
             host_mode,
+            active_fiber: 1,
+            next_fiber: 2,
+            quantum: FIBER_QUANTUM,
+            parked_fibers: BTreeMap::new(),
+            fiber_table,
+            run_queue: VecDeque::new(),
+            virtual_now_ns: DEFAULT_VIRTUAL_NOW_NS,
+            test_clock_mode: false,
+            test_clock_waiter: None,
+            timers: BTreeMap::new(),
+            next_timer: 1,
+            deferreds: BTreeMap::new(),
+            next_deferred: 1,
+            coords: BTreeMap::new(),
+            next_coord: 1,
+            fiber_groups: BTreeMap::new(),
+            next_group: 1,
+            memo_maps: BTreeMap::new(),
+            next_memo: 1,
+            cached_cells: BTreeMap::new(),
+            next_cached: 1,
+            isaac_rngs: BTreeMap::new(),
+            next_rng: 1,
+            closing_scopes: BTreeMap::new(),
+            pending_provides: BTreeMap::new(),
+            next_provide: 1,
+            pending_resume_close: None,
+            pending_provide_result: None,
+            pending_layer_build: None,
+            inherited_services: Vec::new(),
+            inherited_tail_ops: Vec::new(),
+            lazy_waiters: BTreeMap::new(),
+            fiber_refs: BTreeMap::new(),
+            interrupt_requested: None,
+            seeded_random: None,
+            root_defects: Vec::new(),
+            runtime_fibers_started: 0,
         }
     }
 }
 
 impl Machine<'_, '_> {
     fn start_entry(&mut self) -> Result<(), Error> {
-        let entry = self.image.entry;
-        self.globals[entry] = GlobalState::Initializing;
-        self.push_call(
-            self.image.globals[entry],
-            [],
-            End::Global {
-                id: entry,
-                dst: usize::MAX,
-            },
-        )
-    }
-
-    fn finish(&mut self, result: Result<LanguageExit, Error>) -> ProgramOutcome {
-        let outcome = match result.and_then(|exit| self.report_exit(exit)) {
-            Ok(outcome) => outcome,
-            Err(error) => ProgramOutcome::Fault(error),
+        let start = if matches!(self.main_stage, MainStage::Root { .. }) {
+            self.image.root.expect("rooted image has root global")
+        } else {
+            self.image.entry
         };
-        if let Err(error) = self.cleanup() {
-            let _ = outcome.release(self.heap);
-            return ProgramOutcome::Fault(error);
-        }
-        outcome
+        self.start_global_top(start)
     }
 
-    fn report_exit(&mut self, exit: LanguageExit) -> Result<ProgramOutcome, Error> {
-        match exit {
-            LanguageExit::Success(value) => {
-                self.scratch.push(value);
-                self.heap
-                    .admit_ordinary(self.scratch.last().expect("success root"))?;
-                Ok(ProgramOutcome::Returned(
-                    self.scratch.pop().expect("ordinary success"),
-                ))
+    fn start_global_top(&mut self, id: usize) -> Result<(), Error> {
+        match &self.globals[id] {
+            GlobalState::Ready(reg) => {
+                let dup = match reg {
+                    RegVal::StaticClosure(code) => RegVal::StaticClosure(*code),
+                    RegVal::Value(val) => {
+                        self.heap.admit_ordinary(val)?;
+                        let rep = val.representation();
+                        RegVal::Value(self.heap.dup(&rep)?)
+                    }
+                };
+                self.top = Some(dup);
+                Ok(())
             }
-            LanguageExit::Failure(cause) => {
-                self.failure = Some(cause);
-                if self
-                    .heap
-                    .ordinary_failure(self.failure.as_ref().expect("failure root"))?
-                    .is_some()
-                {
-                    Ok(ProgramOutcome::Raised(self.take_failure_payload()?))
-                } else {
-                    Ok(ProgramOutcome::Failed(
-                        self.failure.take().expect("failure root"),
-                    ))
-                }
+            GlobalState::Initializing => {
+                Err(Error::GlobalCycle(self.image.global_names[id].clone()))
+            }
+            GlobalState::Empty => {
+                self.globals[id] = GlobalState::Initializing;
+                self.push_call(
+                    self.image.globals[id],
+                    [],
+                    End::Global {
+                        id,
+                        dst: usize::MAX,
+                    },
+                )
             }
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn run(&mut self) -> Result<LanguageExit, Error> {
         let image = self.image;
         loop {
+            if let Some(owner) = self.pending_resume_close.take() {
+                self.resume_owner_close(owner)?;
+                continue;
+            }
+            if let Some(res) = self.pending_provide_result.take() {
+                match res {
+                    PendingProvideResult::Ready(pid, ctx) => {
+                        self.complete_dynamic_provide_ok(pid, ctx)?;
+                    }
+                    PendingProvideResult::Failed(pid, cause) => {
+                        self.complete_dynamic_provide_err(pid, cause)?;
+                    }
+                }
+                continue;
+            }
+            if let Some((layer, memo_id, sub_owner)) = self.pending_layer_build.take() {
+                self.begin_build_layer(layer, memo_id, sub_owner, false, LayerBuildTarget::Top)?;
+                continue;
+            }
             if self.failure.is_some() && !self.failure_elected {
                 self.prepare_failure()?;
             }
@@ -264,7 +374,14 @@ impl Machine<'_, '_> {
                 && self.frames.is_empty()
             {
                 let cause = self.failure.take().expect("failure root");
-                return Ok(LanguageExit::Failure(cause));
+                if self.active_fiber != 1 {
+                    self.complete_child_fiber(FiberOutcome::Failure(cause))?;
+                    continue;
+                }
+                let final_cause = self
+                    .combine_root_defects(Some(cause))?
+                    .expect("root failure");
+                return Ok(LanguageExit::Failure(final_cause));
             }
             if self.discard.is_none()
                 && self.ready.is_none()
@@ -272,19 +389,46 @@ impl Machine<'_, '_> {
                 && self.arguments.is_empty()
                 && self.top.is_some()
             {
+                if self.active_fiber != 1 {
+                    let reg = self.top.take().expect("child fiber return");
+                    let val = self.materialize_reg(reg);
+                    self.complete_child_fiber(FiberOutcome::Success(val))?;
+                    continue;
+                }
                 if self.main_stage != MainStage::Done {
                     self.advance_main()?;
                     continue;
                 }
                 let reg = self.top.take().expect("completed top value");
                 let value = self.materialize_reg(reg);
+                if !self.root_defects.is_empty() {
+                    self.heap.drop_value(value)?;
+                    let cause = self.combine_root_defects(None)?.expect("root defects");
+                    return Ok(LanguageExit::Failure(cause));
+                }
                 return Ok(LanguageExit::Success(value));
+            }
+            if self.discard.is_none()
+                && self.ready.is_none()
+                && self.failure.is_none()
+                && self.frames.is_empty()
+                && self.top.is_none()
+            {
+                return Err(Error::UnsupportedOperation(
+                    "deadlock: no runnable fibers remain",
+                ));
             }
             if self.fuel == 0 {
                 return Err(Error::OutOfFuel);
             }
             self.fuel -= 1;
-
+            self.maybe_quantum_preempt()?;
+            if self.pending_resume_close.is_some()
+                || self.pending_provide_result.is_some()
+                || self.pending_layer_build.is_some()
+            {
+                continue;
+            }
             if self.discard.is_some() {
                 self.discard_step()?;
             } else if let Some(id) = self.ready.take() {
@@ -297,7 +441,7 @@ impl Machine<'_, '_> {
                     .pop_front()
                     .expect("top application has an argument");
                 self.apply_reg(callee, RegVal::Value(arg), End::Top, false)?;
-            } else {
+            } else if !self.frames.is_empty() {
                 let (code, pc) = {
                     let frame = self.frames.last_mut().expect("running frame");
                     let at = frame.pc;
@@ -322,248 +466,49 @@ impl Machine<'_, '_> {
     }
 
     fn advance_main(&mut self) -> Result<(), Error> {
-        self.main_stage = MainStage::Done;
-        let is_closure = match self.top.as_ref() {
-            Some(RegVal::StaticClosure(_)) => true,
-            Some(RegVal::Value(Value::Object(tok))) => {
+        if let MainStage::Root { main } = self.main_stage {
+            self.install_root()?;
+            self.main_stage = MainStage::Function;
+            return self.start_global_top(main);
+        }
+        let stage = self.main_stage;
+        self.main_stage = if stage == MainStage::Function {
+            MainStage::Task
+        } else {
+            MainStage::Done
+        };
+        let callable = match (self.top.as_ref(), stage) {
+            (Some(RegVal::StaticClosure(_)), MainStage::Function) => true,
+            (Some(RegVal::Value(Value::Object(tok))), MainStage::Function) => {
                 matches!(self.heap.object(tok.id)?.data, Data::Closure { .. })
             }
+            (Some(RegVal::Value(Value::Object(tok))), MainStage::Task) => matches!(
+                self.heap.object(tok.id)?.data,
+                Data::Task { .. }
+                    | Data::MaskedTask { .. }
+                    | Data::CachedRunTask { .. }
+                    | Data::CachedInvalidateTask { .. }
+                    | Data::ExitTask(_)
+            ),
             _ => false,
         };
-        if is_closure {
+        if callable {
             if self.fuel == 0 {
                 return Err(Error::OutOfFuel);
             }
             self.fuel -= 1;
-            let callee = self.top.take().expect("main closure");
-            self.apply_reg(callee, RegVal::Value(Value::Unit), End::Top, false)?;
-        }
-        Ok(())
-    }
-
-    pub(super) fn materialize_reg(&mut self, reg: RegVal) -> Value {
-        match reg {
-            RegVal::Value(val) => val,
-            RegVal::StaticClosure(code) => self.heap.allocate(Data::Closure {
-                execution: self.execution,
-                code: self.image.ir_codes[code],
-                captures: Vec::new(),
-            }),
-        }
-    }
-
-    pub(super) fn dup_reg(&mut self, reg: &RegVal) -> Result<RegVal, Error> {
-        match reg {
-            RegVal::StaticClosure(code) => Ok(RegVal::StaticClosure(*code)),
-            RegVal::Value(val) => {
-                let rep = val.representation();
-                Ok(RegVal::Value(self.heap.dup(&rep)?))
+            let callee = self.top.take().expect("main callable");
+            if stage == MainStage::Function {
+                self.apply_reg(callee, RegVal::Value(Value::Unit), End::Top, false)?;
+            } else {
+                self.await_task_reg(callee, End::Top)?;
             }
         }
-    }
-
-    pub(super) fn drop_reg(&mut self, reg: RegVal) -> Result<(), Error> {
-        match reg {
-            RegVal::StaticClosure(_) => Ok(()),
-            RegVal::Value(val) => self.heap.drop_value(val),
-        }
-    }
-
-    pub(super) fn reg_into_roots(reg: RegVal, roots: &mut Vec<Value>) {
-        if let RegVal::Value(val) = reg {
-            roots.push(val);
-        }
-    }
-
-    pub(super) fn take_reg(&mut self, slot: usize) -> Result<RegVal, Error> {
-        let index = self.frame().base + slot;
-        self.registers[index]
-            .take()
-            .ok_or(Error::NoToken(u32::try_from(slot).unwrap_or(u32::MAX)))
-    }
-
-    pub(super) fn take_value(&mut self, slot: usize) -> Result<Value, Error> {
-        let reg = self.take_reg(slot)?;
-        Ok(self.materialize_reg(reg))
-    }
-
-    pub(super) fn peek_reg(&self, slot: usize) -> Result<&RegVal, Error> {
-        let index = self.frame().base + slot;
-        self.registers[index]
-            .as_ref()
-            .ok_or(Error::NoToken(u32::try_from(slot).unwrap_or(u32::MAX)))
-    }
-
-    pub(super) fn peek_value(&self, slot: usize) -> Result<&Value, Error> {
-        match self.peek_reg(slot)? {
-            RegVal::Value(val) => Ok(val),
-            RegVal::StaticClosure(_) => Err(Error::ExpectedObject),
-        }
-    }
-
-    pub(super) fn store_reg(&mut self, slot: usize, reg: RegVal) -> Result<(), Error> {
-        if let RegVal::Value(val) = reg {
-            self.scratch.push(val);
-            self.heap
-                .admit_ordinary(self.scratch.last().expect("ordinary result"))?;
-            let val = self.scratch.pop().expect("admitted result");
-            self.store_raw(slot, RegVal::Value(val));
-        } else {
-            self.store_raw(slot, reg);
-        }
         Ok(())
     }
 
-    pub(super) fn store_raw(&mut self, slot: usize, reg: RegVal) {
-        let index = self.frame().base + slot;
-        debug_assert!(
-            self.registers[index].is_none(),
-            "store to occupied register {slot}"
-        );
-        self.registers[index] = Some(reg);
-    }
-
-    pub(super) fn frame(&self) -> &Frame {
-        self.frames.last().expect("running frame")
-    }
-
-    pub(super) fn frame_mut(&mut self) -> &mut Frame {
-        self.frames.last_mut().expect("running frame")
-    }
-
-    pub(super) fn release_operands(&mut self) -> Result<(), Error> {
-        self.heap.drop_values(mem::take(&mut self.scratch))
-    }
-
-    pub(super) fn stage_slots(&mut self, slots: &[usize]) -> Result<(), Error> {
-        for &slot in slots {
-            let val = self.take_value(slot)?;
-            self.scratch.push(val);
-        }
-        Ok(())
-    }
-
-    pub(super) fn raise_ordinary(&mut self) -> Result<(), Error> {
-        let payload = self.scratch.last().expect("staged typed payload");
-        let cause = self.heap.cause(&[Reason::Fail(payload)], &mut self.fuel)?;
-        self.failure = Some(cause);
-        self.failure_elected = false;
-        self.release_operands()
-    }
-
-    pub(super) fn raise_defect(&mut self, spec: DefectSpec) -> Result<(), Error> {
-        self.charge_fuel(1)?;
-        let defect = self.heap.allocate(Data::Defect(spec));
-        self.scratch.push(defect);
-        let payload = self.scratch.last().expect("staged defect");
-        let cause = self.heap.cause(&[Reason::Die(payload)], &mut self.fuel)?;
-        self.failure = Some(cause);
-        self.failure_elected = false;
-        self.release_operands()
-    }
-
-    pub(super) fn charge_fuel(&mut self, amount: usize) -> Result<(), Error> {
-        let cost = u64::try_from(amount).unwrap_or(u64::MAX);
-        self.fuel = self.fuel.checked_sub(cost).ok_or(Error::OutOfFuel)?;
-        Ok(())
-    }
-
-    pub(super) fn prepare_failure(&mut self) -> Result<(), Error> {
-        if self.failure_elected {
-            return Ok(());
-        }
-        let cause = self.failure.as_ref().expect("failure root");
-        if let Some(elected) = self.heap.elect_failure(cause, &mut self.fuel)? {
-            let original = self.failure.replace(elected).expect("original failure");
-            self.heap.drop_cause(original)?;
-        }
-        self.failure_elected = true;
-        Ok(())
-    }
-
-    pub(super) fn take_failure_payload(&mut self) -> Result<Value, Error> {
-        self.charge_fuel(1)?;
-        let rep = self
-            .heap
-            .ordinary_failure(self.failure.as_ref().expect("failure root"))?
-            .expect("singleton ordinary Fail")
-            .representation();
-        let dup = self.heap.dup(&rep)?;
-        self.pending = Some(RegVal::Value(dup));
-        self.heap
-            .drop_cause(self.failure.take().expect("failure root"))?;
-        let Some(RegVal::Value(val)) = self.pending.take() else {
-            unreachable!("staged payload value");
-        };
-        Ok(val)
-    }
-
-    pub(super) fn detach_frame_vars(&mut self, vars: Vec<Value>, roots: &mut Vec<Value>) {
-        for root in &vars {
-            if let Value::Object(token) = root
-                && let Ok(object) = self.heap.object_mut(token.id)
-                && let Data::Var { contents, .. } = &mut object.data
-            {
-                roots.extend(contents.take());
-            }
-        }
-        roots.extend(vars);
-    }
-
-    pub(super) fn drain_captured_roots(
-        &mut self,
-        captured: CapturedFrames,
-        roots: &mut Vec<Value>,
-    ) {
-        for reg in captured.registers.into_iter().flatten() {
-            Self::reg_into_roots(reg, roots);
-        }
-        for frame in captured.frames {
-            self.detach_frame_vars(frame.vars, roots);
-            self.drain_end_roots(frame.end, roots);
-        }
-    }
-
-    pub(super) fn cleanup(&mut self) -> Result<(), Error> {
-        let mut roots = mem::take(&mut self.scratch);
-        if let Some(reg) = self.pending.take() {
-            Self::reg_into_roots(reg, &mut roots);
-        }
-        if let Some(cause) = self.failure.take() {
-            roots.push(cause.into_value());
-        }
-        if let Some(reg) = self.pending_handler.take() {
-            Self::reg_into_roots(reg, &mut roots);
-        }
-        if let Some(reg) = self.top.take() {
-            Self::reg_into_roots(reg, &mut roots);
-        }
-        roots.extend(self.arguments.drain(..));
-        for reg in mem::take(&mut self.registers).into_iter().flatten() {
-            Self::reg_into_roots(reg, &mut roots);
-        }
-        for frame in mem::take(&mut self.frames) {
-            self.detach_frame_vars(frame.vars, &mut roots);
-            self.drain_end_roots(frame.end, &mut roots);
-        }
-        self.cleanup_handlers(&mut roots);
-        for state in mem::take(&mut self.recoveries).into_values() {
-            roots.push(state.original.into_value());
-        }
-        for global in mem::take(&mut self.globals) {
-            if let GlobalState::Ready(reg) = global {
-                Self::reg_into_roots(reg, &mut roots);
-            }
-        }
-        let mut owner_err = None;
-        for owner in (0..self.owners.len()).rev() {
-            if let Err(err) = self.close_owner(owner) {
-                owner_err.get_or_insert(err);
-            }
-        }
-        let released = self.heap.drop_values(roots);
-        let _ = self.heap.take_dropped_continuations(self.execution);
-        owner_err.map_or(released, Err)
+    pub(super) fn restore_evidence(&mut self) {
+        self.current_evidence = self.frames.last().and_then(|frame| frame.evidence);
     }
 
     fn step_at(&mut self, code: usize, pc: usize, instr: &Instr) -> Result<(), Error> {

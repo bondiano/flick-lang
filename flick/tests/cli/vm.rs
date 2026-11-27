@@ -466,13 +466,35 @@ fn run_tier1_executes_effects_and_reports_p012_with_span_for_unsupported() {
         );
     }
 
-    let unsupported = "\
+    let async_task = "\
 module App.Main exposing (main)
 
 main : Unit ->{Host.Console} Unit
 let main () =
   let n = await (task { 7 })
   Platform.stdout_line (show n)
+";
+    let task_dir = project(
+        "vm_tier1_task_await",
+        &[("flick.toml", APP), ("src/App/Main.fl", async_task)],
+    );
+    let task_out = flick_no_path(&task_dir, &["run", "--target", "vm", "--vm-tier", "tier1"]);
+    assert!(
+        task_out.status.success(),
+        "expected tier1 to execute task/await:\n{}",
+        stderr(&task_out)
+    );
+    assert_eq!(stdout(&task_out), "7\n");
+
+    let unsupported = "\
+module App.Main exposing (main)
+
+custom_ext : Int -> Int
+foreign pure custom_ext from \"custom:ext\" \"customExt\"
+
+main : Unit ->{Host.Console} Unit
+let main () =
+  Platform.stdout_line (show (custom_ext 1))
 ";
     let dir = project(
         "vm_tier1_unsupported_span",
@@ -481,13 +503,45 @@ let main () =
     let out = flick_no_path(&dir, &["run", "--target", "vm", "--vm-tier", "tier1"]);
     assert!(
         !out.status.success(),
-        "expected tier1 to reject Task: {out:?}"
+        "expected tier1 to reject unsupported foreign binding: {out:?}"
     );
     let err = stderr(&out);
     assert!(
-        err.contains("FLICK-P012") && err.contains("Task") && err.contains("src/App/Main.fl"),
-        "expected FLICK-P012 with operation name and source span, got:\n{err}"
+        err.contains("FLICK-P012") && err.contains("customExt"),
+        "expected FLICK-P012 naming customExt, got:\n{err}"
     );
+}
+
+#[test]
+fn run_tier1_executes_async_scopes_arenas_and_streams() {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    for rel in [
+        "tests/run/runtime/arena_scope.fl",
+        "tests/run/runtime/arena_layer_scope.fl",
+        "tests/run/runtime/arena_owner_list.fl",
+        "tests/run/runtime/closing_hooks.fl",
+        "tests/run/runtime/parallel.fl",
+        "tests/run/runtime/scope_close.fl",
+        "tests/run/runtime/abort_stops_children.fl",
+        "tests/run/stdlib/seq.fl",
+        "tests/run/stdlib/effect/stream_core.fl",
+        "tests/rt/defer_control.fl",
+    ] {
+        let path = repo.join(rel);
+        let expected = fs::read_to_string(path.with_extension("stdout"))
+            .unwrap_or_else(|e| panic!("read expected stdout for {rel}: {e}"));
+        let out = flick_no_path(&repo, &["run", "--target", "vm", "--vm-tier", "1", rel]);
+        assert!(
+            out.status.success(),
+            "{rel} (--vm-tier 1) failed:\n{}",
+            stderr(&out)
+        );
+        assert_eq!(
+            stdout(&out),
+            expected,
+            "{rel} (--vm-tier 1) stdout mismatch"
+        );
+    }
 }
 
 #[test]

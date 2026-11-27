@@ -378,6 +378,23 @@ impl VmReplEngine {
                 }
             }
             EvalOutcome::Interrupted { stdout } => EngineResponse::Interrupted { stdout },
+            EvalOutcome::CapabilityDenied {
+                capability,
+                binding,
+                span,
+                stdout,
+            } => {
+                let loc = span.map_or_else(String::new, |s| {
+                    format!(" (file {}, bytes {}..{})", s.file, s.start, s.end)
+                });
+                EngineResponse::Error {
+                    stdout,
+                    message: format!("capability `{capability}` denied for `{binding}`{loc}"),
+                }
+            }
+            EvalOutcome::LimitExceeded {
+                message, stdout, ..
+            } => EngineResponse::Error { stdout, message },
             EvalOutcome::Fault { message, stdout } => EngineResponse::Error {
                 stdout,
                 message: format!("runtime error: {message}"),

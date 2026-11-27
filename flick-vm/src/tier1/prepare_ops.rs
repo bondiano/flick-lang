@@ -178,17 +178,34 @@ impl Lowering<'_> {
                 ret,
                 errors,
             } => Ok(self.translate_handle(*body, effects, *ret, *errors, dst, tokens)),
-            Operation::Task { .. } => Err(unsupported(code, "Task", span)),
-            Operation::Await(_) => Err(unsupported(code, "Await", span)),
-            Operation::Within { .. } => Err(unsupported(code, "Within", span)),
-            Operation::WithOwnerEvidence { .. } => {
-                Err(unsupported(code, "WithOwnerEvidence", span))
-            }
-            Operation::GenerateStrict { .. } => Err(unsupported(code, "GenerateStrict", span)),
-            Operation::GenerateLazy { .. } => Err(unsupported(code, "GenerateLazy", span)),
-            Operation::Yield(_) => Err(unsupported(code, "Yield", span)),
-            Operation::SeqOpen(_) => Err(unsupported(code, "SeqOpen", span)),
-            Operation::SeqNext(_) => Err(unsupported(code, "SeqNext", span)),
+            Operation::Task {
+                code: fn_code,
+                captures,
+            } => Ok(self.translate_task(*fn_code, captures, dst, tokens)),
+            Operation::Await(task) => Ok(Self::translate_await(*task, dst, tokens)),
+            Operation::Within {
+                owner,
+                code: fn_code,
+                args,
+            } => Ok(self.translate_within(*owner, *fn_code, args, dst, tokens)),
+            Operation::WithOwnerEvidence {
+                owner,
+                code: fn_code,
+                args,
+            } => Ok(self.translate_with_owner_evidence(*owner, *fn_code, args, dst, tokens)),
+            Operation::GenerateStrict {
+                code: fn_code,
+                args,
+            } => Ok(self.translate_generate_strict(*fn_code, args, dst, tokens)),
+            Operation::GenerateLazy {
+                code: fn_code,
+                captures,
+                limit,
+                ..
+            } => Ok(self.translate_generate_lazy(*fn_code, captures, *limit, dst, tokens)),
+            Operation::Yield(value) => Ok(Self::translate_yield(*value, dst, tokens)),
+            Operation::SeqOpen(source) => Ok(Self::translate_seq_open(*source, dst, tokens)),
+            Operation::SeqNext(iterator) => Ok(Self::translate_seq_next(*iterator, dst, tokens)),
             Operation::ForeignCall { spec, .. } => Err(unsupported(
                 code,
                 format!("ForeignCall({})", spec.name),
@@ -336,6 +353,7 @@ impl Lowering<'_> {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     pub(super) fn translate_intrinsic(
         code: CodeId,
         kind: Intrinsic,
@@ -426,6 +444,49 @@ impl Lowering<'_> {
             (Intrinsic::Uninterruptible, [task]) => {
                 Ok(Self::translate_uninterruptible(*task, dst, tokens))
             }
+            (Intrinsic::RefMake, [src]) => Ok(Self::translate_ref_make(*src, dst, tokens)),
+            (Intrinsic::RefGet, [cell]) => Ok(Self::translate_ref_get(*cell, dst, tokens)),
+            (Intrinsic::RefSet, [cell, value]) => {
+                Ok(Self::translate_ref_set(*cell, *value, dst, tokens))
+            }
+            (Intrinsic::RefModify, [cell, func]) => {
+                Ok(Self::translate_ref_modify(*cell, *func, dst, tokens))
+            }
+            (Intrinsic::RefSame, [left, right]) => {
+                Ok(Self::translate_ref_same(*left, *right, dst, tokens))
+            }
+            (Intrinsic::ArenaMake, [unit]) => Ok(Self::translate_arena_make(*unit, dst, tokens)),
+            (Intrinsic::ArenaAlloc, [arena, value]) => {
+                Ok(Self::translate_arena_alloc(*arena, *value, dst, tokens))
+            }
+            (Intrinsic::ArenaGet, [view]) => Ok(Self::translate_arena_get(*view, dst, tokens)),
+            (Intrinsic::LazyMake, [task]) => {
+                Ok(Self::translate_lazy_make(*task, false, dst, tokens))
+            }
+            (Intrinsic::LazyMakeLocal, [task]) => {
+                Ok(Self::translate_lazy_make(*task, true, dst, tokens))
+            }
+            (Intrinsic::LazyForce, [lazy]) => Ok(Self::translate_lazy_force(*lazy, dst, tokens)),
+            (Intrinsic::SeqOfList, [list]) => Ok(Self::translate_seq_of_list(*list, dst, tokens)),
+            (Intrinsic::SeqToList, [seq]) => Ok(Self::translate_seq_to_list(*seq, dst, tokens)),
+            (Intrinsic::EffectExit, [task]) => Ok(Self::translate_effect_exit(*task, dst, tokens)),
+            (Intrinsic::EffectCatchDefect, [handler, task]) => Ok(
+                Self::translate_effect_catch_defect(*handler, *task, dst, tokens),
+            ),
+            (Intrinsic::LayerSucceed, [tag, implementation]) => Ok(Self::translate_layer_succeed(
+                *tag,
+                *implementation,
+                dst,
+                tokens,
+            )),
+            (Intrinsic::LayerMerge, [left, right]) => {
+                Ok(Self::translate_layer_merge(*left, *right, dst, tokens))
+            }
+            (Intrinsic::LayerRun, [layer, body]) => {
+                Ok(Self::translate_layer_run(*layer, *body, dst, tokens))
+            }
+            (Intrinsic::Async(op), _) => Ok(Self::translate_async_op(op, args, dst, tokens)),
+            (Intrinsic::Layer(op), _) => Ok(Self::translate_layer_op(op, args, dst, tokens)),
             _ => Err(unsupported(code, format!("Intrinsic::{kind:?}"), span)),
         }
     }

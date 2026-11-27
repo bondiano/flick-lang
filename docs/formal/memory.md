@@ -241,45 +241,48 @@ host-environment hooks (`Accounting`, `HostEnv`, `VmHooks`):
 
 ### Tier-1 register bytecode executor (`flick-vm/src/tier1/`)
 
-`flick_vm::tier1` compiles functions reachable from an entry global in
+`flick_vm::tier1` compiles functions reachable from an entry global (and
+optional `Σ₀` root service global via `prepare_rooted`) in
 `flick_ir::memory::Program` to a flat register bytecode with intra-block
 peephole fusion (`Compute`, `CompareBranch`, `ProjectOwned`, `MatchFlag`/
 `MatchBranch`, `ReadCell`/`WriteCell`/`UpdateCell`, `ReturnUnit`, and small
 static `TailCall`/`TailApply` frame reuse), compact captureless closures, and
 one dedicated `translate_*` function per IR operation (`prepare_ops.rs`,
-`prepare_ops_data.rs`, and `prepare_ops_handlers.rs`) to support direct
-per-operation refinement proofs (`#980`).
+`prepare_ops_data.rs`, `prepare_ops_handlers.rs`, and `prepare_ops_async.rs`)
+to support direct per-operation refinement proofs (`#980`).
 
 - **Shared primitive & heap boundary**: tier 1 executes directly over
-  `tier0::Heap` and delegates all binary operations, unary operations, and
-  standard-library intrinsics to `flick_vm::stdlib` without duplicating
-  primitives. `Heap::finish` verifies zero live slots on every normal,
-  raised, defect, and `OutOfFuel` outcome identically to tier 0.
-- **Effects, one-shot handlers, and LIFO unwinding**: tier 1 executes deep
-  one-shot `Handle`/`Perform` handlers across all operation classes
-  (`OpClass::Tail` without continuation capture, `OpClass::Abort` with frame
-  discard and LIFO scope finalizers before the abort arm, and
-  `OpClass::Control` with continuation capture, tail-resume frame reuse,
-  discontinuation on unused continuations, and `DefectCode::ResumeTwice`
-  carrying the preserved operation `MemorySpan` on a second `resume`), using
-  an epoch-invalidated handler lookup cache keyed by interned `(effect, op)`
-  ID. Unwinding through frames executes synchronous scope/resource finalizers
-  (`ScopeRun`, `ScopeCurrent`, `ScopeAddFinalizer`, `ScopeAddFinalizerExit`,
-  `ScopeAddClose`, `AcquireRelease`, `Bracket`, and `Uninterruptible`) once in
-  LIFO order across normal completion, typed failure, abort, and
-  discontinuation.
+  `tier0::Heap` and delegates all binary operations, unary operations,
+  cooperative/context/layer helpers, and standard-library intrinsics to
+  `flick_vm::stdlib` without duplicating primitives. `Heap::finish` verifies
+  zero live slots on every normal, raised, defect, and `OutOfFuel` outcome
+  identically to tier 0.
+- **Effects, one-shot handlers, sequences, fibers, layers, and C0–C6 scopes**:
+  tier 1 executes deep one-shot `Handle`/`Perform` handlers (`OpClass::Tail`,
+  `OpClass::Abort`, `OpClass::Control`, epoch-invalidated handler lookup cache
+  invalidated on provider/context boundaries and fiber switches), strict and
+  lazy sequences/generators (`GenerateStrict`, `GenerateLazy`, `Yield`,
+  `SeqOpen`, `SeqNext`, `SeqOfList`, `SeqToList` with frame-owned iterator
+  cleanup), `Task`/`Await`, single-threaded cooperative fibers with
+  instruction-batch preemption (`FIBER_QUANTUM`), `Deferred`, `FiberGroup`,
+  `Ref` cells (with atomic `Ref.modify`), shared/local `Lazy`, structured
+  concurrency (`race_first`, `race_success`, `timeout*`, `par_map`, `par_zip`,
+  `all`, `sleep`, `yield_now`, `TestClock`, `Random.with_seed`), dynamic
+  layers/contexts/`MemoMap` and `Host.live` rooted execution, and `Arena` /
+  `Within` / `WithOwnerEvidence` / manual scopes closing in exact C0–C6 order
+  (children, hooks, LIFO finalizers with captured services, and exact-once
+  arena retirement) across success, failure, cancellation, and nested scopes.
 - **Explicit unsupported-operation boundary (no silent fallback)**: any
-  reachable `Task`, `Await`, `Within`, `WithOwnerEvidence`, `GenerateStrict`/
-  `GenerateLazy`/`Yield`/`SeqOpen`/`SeqNext`, `ForeignCall`, or unsupported
-  async/fiber/layer/arena intrinsic fails `tier1::prepare` with
+  reachable `ForeignCall` or `Host(ProcessSpawn)` fails `tier1::prepare` with
   `PrepareError::Unsupported` naming the operation and its `MemorySpan` from
   `Program::op_spans`. The CLI renders this failure as `FLICK-P012` without
   falling back to tier 0.
-- **Lean impact**: adding per-instruction source spans, effect/handler
-  execution, and synchronous LIFO unwinding in `flick-vm/src/tier1/` does not
-  change typing, effects, regions, or the reference memory-IR ownership
-  semantics; existing Lean proofs in `formal/` remain unaffected (bytecode
-  translation refinement is tracked in `#980`).
+- **Lean impact**: extending `flick-vm/src/tier1/` to execute sequences,
+  tasks, cooperative fibers, layers, arenas, and C0–C6 scope closing adds no
+  new `Operation` or `Exit` form and does not change typing, effects, regions,
+  or the reference memory-IR ownership semantics; existing Lean proofs in
+  `formal/` remain unaffected (bytecode translation refinement is tracked in
+  `#980`).
 
 ### Per-module VM images and live module unloading (`flick-vm/src/image/`)
 
@@ -316,6 +319,53 @@ entries, and a sharing- and cycle-preserving heap snapshot (`HeapSnapshot`).
   add no new `Operation` or `Exit` form and do not alter typing, effects,
   regions, or ownership-IR semantics; all Lean proofs in `formal/` remain
   unaffected.
+
+### VM sandbox, resource limits, and verifier (`flick-vm/src/sandbox/`)
+
+`flick_vm::sandbox` enforces host-controlled capabilities, execution resource
+budgets, and pre-execution structural verification across VM sessions, `.fvm`
+images, and tier-1 register bytecode (`#992`):
+
+- **Capabilities (`Capability`, `CapabilitySet`)**: covers `fs`, `net`,
+  `process`, `env`, `clock`, `random`, `ffi`, and `plugins`. Pure computation
+  and console output (`Host.Console`, `PrintLine`, `StdoutWrite`, `StderrLine`)
+  are always allowed; `CapabilitySet::default_untrusted()` / `pure()` denies
+  all eight host capabilities. Linking a `.fvm` image or `VmSession` phrase
+  that reaches a denied capability fails before execution with
+  `SandboxError::CapabilityDenied { capability, binding, span }` carrying the
+  preserved `Program::op_spans` span. Denied operations reached dynamically
+  through `HostContext`/`VmHooks` or the host bridge unwind cleanly (running
+  LIFO scope finalizers with zero leaks) and surface as typed capability
+  denials without corrupting the session.
+- **Resource limits (`ResourceLimits`)**: host-owned `fuel`, `heap_bytes`,
+  `wall_time_ms` (via a pluggable `WallClock` trait defaulting to
+  `std::time::Instant` on native targets and an embedder clock on `wasm32`),
+  and `max_stack_depth`. Exceeding any limit triggers an uncatchable unwind
+  that runs registered scope finalizers in LIFO order under a bounded cleanup
+  grace budget, releases all frame roots with zero leaks, restores the session
+  heap baseline, and reports `Error::LimitExceeded(LimitKind)` /
+  `EvalOutcome::LimitExceeded` while leaving the `VmSession` intact for
+  subsequent evaluations.
+- **Verifier security boundary (`verify_bytecode`, `verify_image`)**: `#988`'s
+  `compiler_hash` and `memory_ir_hash` header digests are *compatibility*
+  checks only, **not** a security boundary. `verify_image` /
+  `verify_image_bytes` (with iterative CBOR depth/item budgeting before
+  deserialization) and `verify_bytecode` (checking function/code/global/tag/
+  dictionary-field/loop/operation indices, register and var slot bounds,
+  branch targets, terminators, call/closure/host-service arities, and handler
+  frame invariants) form the security boundary. Any future native/JIT region
+  compiles exclusively from `verify_bytecode`-verified bytecode under the
+  64 MiB `NATIVE_REGION_ARENA_LIMIT` arena cap.
+- **Fuzzing & native/wasm32 parity**: `flick-vm/tests/fuzz_vm.rs` (wired into
+  `just fuzz` alongside `flick-core --test fuzz`) tests a checked-in corpus of
+  malformed images and bytecode plus multi-threaded mutation fuzzing
+  (`FLICK_FUZZ_ITERATIONS`). All modules under `flick-vm/src/sandbox/` avoid
+  OS-only assumptions so browser `flick-vm-wasm` (`#997`) shares the exact
+  same capability, limit, and verifier behavior.
+- **Lean impact**: sandboxing, resource metering, and pre-execution bytecode/
+  image verification introduce no new `Operation` or `Exit` form and do not
+  change typing, effects, regions, or ownership-IR semantics; all Lean proofs
+  in `formal/` remain unaffected.
 
 ## 2. Owned tokens and objects
 

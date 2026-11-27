@@ -26,6 +26,7 @@ use super::{
     GlobalEntry, ImageError, ImageHash, ImageManifest, ModuleRecord, PreparedMetadata, VmImage,
     compiler_hash, memory_ir_hash,
 };
+use crate::sandbox::{MAX_IMAGE_BYTES, verify_cbor_budget, verify_image};
 
 /// Fixed 4-byte container magic header.
 pub const IMAGE_MAGIC: &[u8; 4] = b"FLKM";
@@ -56,6 +57,7 @@ pub(crate) fn cbor_encode<T: Serialize>(value: &T, label: &str) -> Result<Vec<u8
 }
 
 fn cbor_decode<T: DeserializeOwned>(slice: &[u8], label: &str) -> Result<T, ImageError> {
+    verify_cbor_budget(slice, label)?;
     let mut cursor = Cursor::new(slice);
     let value: T = ciborium::from_reader(&mut cursor)
         .map_err(|err| ImageError::Corrupt(format!("failed to decode {label} section: {err}")))?;
@@ -129,6 +131,12 @@ pub(crate) fn encode(image: &VmImage) -> Result<Vec<u8>, ImageError> {
 
 /// Decodes and structurally validates a `FLKM` binary container.
 pub(crate) fn decode(bytes: &[u8]) -> Result<VmImage, ImageError> {
+    if bytes.len() > MAX_IMAGE_BYTES {
+        return Err(ImageError::Corrupt(format!(
+            "VM image size {} exceeds maximum {MAX_IMAGE_BYTES} bytes",
+            bytes.len(),
+        )));
+    }
     let (found_compiler, found_ir, section_count) = parse_header(bytes)?;
     let slices = parse_section_directory(bytes, section_count)?;
 
@@ -158,7 +166,7 @@ pub(crate) fn decode(bytes: &[u8]) -> Result<VmImage, ImageError> {
         &heap,
     )?;
 
-    Ok(VmImage {
+    let image = VmImage {
         compiler_hash: found_compiler,
         memory_ir_hash: found_ir,
         manifest,
@@ -167,7 +175,9 @@ pub(crate) fn decode(bytes: &[u8]) -> Result<VmImage, ImageError> {
         prepared,
         globals,
         heap,
-    })
+    };
+    verify_image(&image)?;
+    Ok(image)
 }
 
 fn parse_header(bytes: &[u8]) -> Result<(ImageHash, ImageHash, u32), ImageError> {

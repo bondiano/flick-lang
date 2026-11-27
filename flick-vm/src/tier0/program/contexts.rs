@@ -216,7 +216,8 @@ impl Machine<'_, '_> {
         let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
             .with_stderr(&mut self.stderr)
             .with_program_args(&self.program_args)
-            .with_host_services(&mut self.host_services);
+            .with_host_services(&mut self.host_services)
+            .with_capabilities(self.sandbox.capabilities);
         if self.host_mode == HostMode::Deterministic || self.test_clock_mode {
             hooks = hooks.with_virtual_now_ns(self.virtual_now_ns);
         }
@@ -232,7 +233,8 @@ impl Machine<'_, '_> {
         let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
             .with_stderr(&mut self.stderr)
             .with_program_args(&self.program_args)
-            .with_host_services(&mut self.host_services);
+            .with_host_services(&mut self.host_services)
+            .with_capabilities(self.sandbox.capabilities);
         if self.host_mode == HostMode::Deterministic || self.test_clock_mode {
             hooks = hooks.with_virtual_now_ns(self.virtual_now_ns);
         }

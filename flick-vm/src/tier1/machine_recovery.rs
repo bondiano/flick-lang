@@ -189,9 +189,12 @@ impl Machine<'_, '_> {
         for reg in self.registers.drain(frame.base..).flatten() {
             Self::reg_into_roots(reg, &mut roots);
         }
-        self.detach_frame_vars(mem::take(&mut frame.vars), &mut roots);
         self.heap.drop_values(roots)?;
-        self.fail_end(frame.end)
+        let gen_frames = self.release_frame_resources(&mut frame)?;
+        self.restore_evidence();
+        self.fail_end(frame.end)?;
+        self.queue_discard_frames(gen_frames);
+        Ok(())
     }
 
     pub(super) fn fail_end(&mut self, end: End) -> Result<(), Error> {
@@ -203,16 +206,26 @@ impl Machine<'_, '_> {
             }
             End::Invocation(id) => self.invocation_failed(id),
             End::Try { selector, dst } => {
+                if self.skip_interrupted_handler()? {
+                    return self.drop_reg(selector);
+                }
                 self.pending_handler = Some(selector);
                 self.begin_recovery(dst)
             }
             End::RecoverySelection { id } => self.abandon_recovery(id),
-            End::RecoveryBody { owner, .. } => {
+            End::RecoveryBody {
+                owner, evidence, ..
+            } => {
                 self.current_owner = owner;
+                self.current_evidence = evidence;
                 Ok(())
             }
             End::Global { id, .. } => {
                 self.globals[id] = GlobalState::Empty;
+                Ok(())
+            }
+            End::Modify { cell, .. } => {
+                let _ = cell;
                 Ok(())
             }
             End::Loop(state) => {
@@ -222,6 +235,12 @@ impl Machine<'_, '_> {
                 }
                 self.heap.drop_values(arg_roots)
             }
+            End::GenerateStrict { items, .. } => self.heap.drop_values(items),
+            End::GeneratorStep { gen_id, .. } => {
+                self.unwind_lazy_generator(gen_id);
+                Ok(())
+            }
+            End::LazyComplete { lazy, .. } => self.unwind_lazy(&lazy),
             End::Top
             | End::Store(_)
             | End::FunctionBoundary { .. }
@@ -257,6 +276,7 @@ impl Machine<'_, '_> {
                 original: self.failure.take().expect("eligible whole cause"),
                 dst,
                 owner: self.current_owner,
+                evidence: self.current_evidence,
             },
         );
         self.charge_fuel(1)?;
@@ -276,6 +296,7 @@ impl Machine<'_, '_> {
             .remove(&id)
             .ok_or(Error::ForeignRecoveryResult)?;
         self.current_owner = state.owner;
+        self.current_evidence = state.evidence;
         self.heap.drop_cause(state.original)
     }
 
@@ -385,6 +406,7 @@ impl Machine<'_, '_> {
             .remove(&id)
             .ok_or(Error::ForeignRecoveryResult)?;
         self.current_owner = state.owner;
+        self.current_evidence = state.evidence;
         if let Some(body) = self.scratch.pop() {
             self.heap.drop_cause(state.original)?;
             self.apply_reg(
@@ -393,6 +415,7 @@ impl Machine<'_, '_> {
                 End::RecoveryBody {
                     dst: state.dst,
                     owner: state.owner,
+                    evidence: state.evidence,
                 },
                 false,
             )

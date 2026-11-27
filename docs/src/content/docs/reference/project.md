@@ -97,7 +97,7 @@ virtual workspace root (`FLICK-P005`).
 | `target.js.ui` | module specifier rendering and mounting views in place of React (exports every name `Ui` and `Action` bind from `@flick-lang/effect-ts/ui` and `@flick-lang/effect-ts/ui/react`; relative paths are from the project root) | React |
 | `target.go.cgo` | boolean; enable cgo (`CGO_ENABLED=1`) when building Go executables | `false` |
 | `target.go.kind` | `"app"` or `"library"` (`"library"` is declared and currently refused by `flick/go` with `FLICK-P012`) | `"app"` |
-| `target.vm.tier` | `"0"`, `"tier0"`, `"1"`, or `"tier1"`; execution tier for the in-process VM (`flick run` / `flick test` / `flick repl`; tier 1 supports synchronous execution, one-shot effect handlers, typed `try` recovery, and LIFO scope finalizers); overridden by `--vm-tier` | `"0"` |
+| `target.vm.tier` | `"0"`, `"tier0"`, `"1"`, or `"tier1"`; execution tier for the in-process VM (`flick run` / `flick test` / `flick repl`; tier 1 supports synchronous execution, one-shot effect handlers, typed `try` recovery, sequences/generators, tasks, cooperative fibers, dynamic layers/contexts, arenas, and C0–C6 scope closing); overridden by `--vm-tier` | `"0"` |
 
 `flick new` takes its template files from the selected target backend (`--target js` by default creates an RT project with `[tools] "flick/js" = ["pnpm"]`, `@flick-lang/runtime` and no Effect dependency; `--target go` creates a Go project with `[build] target = "go"`, `[tools] "flick/go" = ["go"]`, and no `package.json`), or from a third-party package via `--from`. Pass `--runtime rt` to `build`, `run`, `dev`, `test` or `inspect` to select RT for one invocation of an Effect project. Set `[target.js] runtime = "effect"` explicitly when a project needs the Effect adapter and add `@flick-lang/effect-ts` to its dependencies.
 
@@ -144,7 +144,7 @@ Each backend component declares its base environment tags, selectable tag axes, 
 
 - `flick/js` publishes tag `js`, exclusive axis `runtime` (`rt` default, `effect`), additive axis `adapter` (`effect-adapter`, active when `@flick-lang/effect-ts` is in project dependencies), and built-in hosts `node`, `browser`, `bun`, and `cloudflare`.
 - `flick/go` publishes tag `go`, additive axis `cgo` (`cgo`, active with `[target.go] cgo = true`), and built-in host `native`.
-- `flick/vm` publishes tag `vm` and built-in host `native` (`vm/native`, also packaged in `packages/vm-host`), providing native Rust `Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem`, and `Process` host services and allowing packages and modules to gate code with `when = "vm"` / `@when "vm"`.
+- `flick/vm` publishes tag `vm` and built-in host `native` (`vm/native`, also packaged in `packages/vm-host`), providing native Rust `Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem`, and `Process` host services and allowing packages and modules to gate code with `when = "vm"` / `@when "vm"`. Embedded VM sessions also support capability sandboxing (`fs`, `net`, `process`, `env`, `clock`, `random`, `ffi`, `plugins`), bounded resource budgets (`fuel`, `heap_bytes`, `wall_time_ms`, `max_stack_depth`), and pre-load image/bytecode verification shared across native and `wasm32` hosts.
 - Third-party backends can publish their own tags, axes, and hosts through the same descriptor schema.
 
 `flick/lua` is a preview backend for World of Warcraft addons and LÖVE games.

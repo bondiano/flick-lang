@@ -137,7 +137,7 @@ impl DefectSpec {
         }
     }
 
-    pub(super) fn arena_closed() -> Self {
+    pub(crate) fn arena_closed() -> Self {
         Self {
             code: DefectCode::ArenaClosed,
             span: None,

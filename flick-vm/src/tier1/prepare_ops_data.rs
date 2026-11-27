@@ -358,7 +358,7 @@ impl Lowering<'_> {
     }
 
     pub(super) fn translate_read_owner_evidence(dst: usize) -> Instr {
-        Instr::NoOwner { dst }
+        Instr::ReadOwnerEvidence { dst }
     }
 
     pub(super) fn translate_recovery_result(

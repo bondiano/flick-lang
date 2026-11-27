@@ -4,7 +4,8 @@ use std::collections::BTreeMap;
 use std::{error, fmt};
 
 use flick_core::ir::memory::{
-    self, CellLayout, CodeId, HostServiceIntrinsic, Intrinsic, MemorySpan, Name, ValueRep,
+    self, AsyncIntrinsic, CellLayout, CodeId, HostServiceIntrinsic, Intrinsic, LayerIntrinsic,
+    MemorySpan, Name, ValueRep,
 };
 use flick_core::ir::{BinOp, Pat};
 use flick_core::numeric::Num;
@@ -54,6 +55,7 @@ pub struct Prepared {
     pub(crate) globals: Vec<usize>,
     pub(crate) global_names: Vec<Name>,
     pub(crate) entry: usize,
+    pub(crate) root: Option<usize>,
     pub(crate) tags: Vec<String>,
     pub(crate) dictionary_fields: Vec<String>,
     pub(crate) loops: Vec<String>,
@@ -172,7 +174,7 @@ pub(crate) enum Instr {
         dst: usize,
         key: String,
     },
-    NoOwner {
+    ReadOwnerEvidence {
         dst: usize,
     },
     Dup {
@@ -443,6 +445,137 @@ pub(crate) enum Instr {
     Uninterruptible {
         dst: usize,
         task: usize,
+    },
+    Task {
+        dst: usize,
+        code: usize,
+        captures: Vec<usize>,
+    },
+    Await {
+        dst: usize,
+        task: usize,
+    },
+    Within {
+        dst: usize,
+        owner: usize,
+        code: usize,
+        args: Vec<usize>,
+    },
+    WithOwnerEvidence {
+        dst: usize,
+        owner: usize,
+        code: usize,
+        args: Vec<usize>,
+    },
+    GenerateStrict {
+        dst: usize,
+        code: usize,
+        args: Vec<usize>,
+    },
+    GenerateLazy {
+        dst: usize,
+        code: usize,
+        captures: Vec<usize>,
+        limit: Option<usize>,
+    },
+    Yield {
+        dst: usize,
+        value: usize,
+    },
+    SeqOpen {
+        dst: usize,
+        source: usize,
+    },
+    SeqNext {
+        dst: usize,
+        iterator: usize,
+    },
+    SeqOfList {
+        dst: usize,
+        list: usize,
+    },
+    SeqToList {
+        dst: usize,
+        seq: usize,
+    },
+    RefMake {
+        dst: usize,
+        src: usize,
+    },
+    RefGet {
+        dst: usize,
+        cell: usize,
+    },
+    RefSet {
+        dst: usize,
+        cell: usize,
+        value: usize,
+    },
+    RefModify {
+        dst: usize,
+        cell: usize,
+        func: usize,
+    },
+    RefSame {
+        dst: usize,
+        left: usize,
+        right: usize,
+    },
+    ArenaMake {
+        dst: usize,
+        unit: usize,
+    },
+    ArenaAlloc {
+        dst: usize,
+        arena: usize,
+        value: usize,
+    },
+    ArenaGet {
+        dst: usize,
+        view: usize,
+    },
+    LazyMake {
+        dst: usize,
+        task: usize,
+        local: bool,
+    },
+    LazyForce {
+        dst: usize,
+        lazy: usize,
+    },
+    EffectExit {
+        dst: usize,
+        task: usize,
+    },
+    EffectCatchDefect {
+        dst: usize,
+        handler: usize,
+        task: usize,
+    },
+    LayerSucceed {
+        dst: usize,
+        tag: usize,
+        implementation: usize,
+    },
+    LayerMerge {
+        dst: usize,
+        left: usize,
+        right: usize,
+    },
+    LayerRun {
+        dst: usize,
+        layer: usize,
+        body: usize,
+    },
+    AsyncOp {
+        dst: usize,
+        op: AsyncIntrinsic,
+        args: Vec<usize>,
+    },
+    LayerOp {
+        dst: usize,
+        op: LayerIntrinsic,
+        args: Vec<usize>,
     },
     Recovery {
         dst: usize,

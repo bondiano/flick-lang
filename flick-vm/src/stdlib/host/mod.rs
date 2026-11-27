@@ -23,6 +23,9 @@ use std::time::Instant;
 
 use flick_core::ir::memory::{HostPrimitive, HostServiceIntrinsic};
 
+use crate::sandbox::{
+    required_capability_for_host_primitive, required_capability_for_host_service,
+};
 use crate::tier0::{Error, Heap, Value};
 
 use super::hooks::VmHooks;
@@ -118,6 +121,14 @@ pub(crate) fn run_with_hooks(
     value: &Value,
     hooks: &mut dyn VmHooks,
 ) -> Result<Value, Error> {
+    if let Some((capability, binding)) = required_capability_for_host_primitive(primitive)
+        && !hooks.capabilities().contains(capability)
+    {
+        return Err(Error::CapabilityDenied {
+            capability,
+            binding: binding.to_owned(),
+        });
+    }
     match primitive {
         HostPrimitive::StderrLine => console::stderr_line(heap, value, hooks),
         HostPrimitive::StdoutWrite => console::stdout_write(heap, value, hooks),
@@ -146,6 +157,14 @@ pub(crate) fn run_service_with_hooks(
 ) -> Result<Value, Error> {
     use HostServiceIntrinsic as H;
     heap.admit_values(args)?;
+    if let Some((capability, binding)) = required_capability_for_host_service(op)
+        && !hooks.capabilities().contains(capability)
+    {
+        return Err(Error::CapabilityDenied {
+            capability,
+            binding,
+        });
+    }
     match op {
         H::ProcessMake
         | H::ProcessSetCwd
