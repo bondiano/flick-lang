@@ -1,0 +1,183 @@
+// Hash maps and sets keep what a hash trie keeps wherever it is a Flick
+// value: many keys, keys whose hashes share fragments or are equal, and
+// removals that empty a node. Only orders a map promises are compared:
+// the entries of one hash in the order they came.
+module Language.HashTries exposing (tests)
+
+import EqHash
+import HashMap
+import HashSet
+
+/// The keys `0 .. n - 1`, each bound to its square.
+squares : Int -> HashMap.HashMap EqHash.Canonical Int Int
+let squares n = HashMap.from_list EqHash.canonical (List.initialize n (fun i -> (i, i * i)))
+
+/// Whether every key below `n` the predicate keeps is bound to its square,
+/// and none of the others is bound.
+bound : (Int -> Bool) -> Int -> HashMap.HashMap EqHash.Canonical Int Int -> Bool
+let bound kept n m =
+  List.all
+    (fun i -> if kept i then HashMap.get i m == Some (i * i) else not (HashMap.has i m))
+    (List.range 0 n)
+
+/// The entries of `m` by key.
+sorted : HashMap.HashMap w Int String -> List (Int, String)
+let sorted m = List.sort_by (fun (a, _) (b, _) -> compare a b) (HashMap.to_list m)
+
+tests : List Test.Test
+let tests = [
+  Test.group "many keys" [
+    Test.test "each of 700 keys is found" (fun () ->
+      let m = squares 700
+      Test.all [
+        Test.equal 700 (HashMap.size m),
+        Test.is_true "found" (bound (fun _ -> true) 700 m),
+      ]
+    ),
+    Test.test "removing every other key keeps the rest" (fun () ->
+      let m =
+        List.fold_left (fun acc i -> HashMap.remove (2 * i) acc) (squares 700) (List.range 0 350)
+      Test.all [
+        Test.equal 350 (HashMap.size m),
+        Test.is_true "odd" (bound (fun i -> i % 2 == 1) 700 m),
+      ]
+    ),
+    Test.test "removing every key empties the map" (fun () ->
+      let m = List.fold_left (fun acc i -> HashMap.remove i acc) (squares 300) (List.range 0 300)
+      Test.all [
+        Test.equal 0 (HashMap.size m),
+        Test.is_true "empty" (HashMap.is_empty m),
+      ]
+    ),
+    Test.test "a key absent from a map leaves it as it was" (fun () ->
+      Test.is_true "same" (eq (squares 40) (HashMap.remove 41 (squares 40)))
+    ),
+    Test.test "maps of one content are equal in any order of insertion" (fun () ->
+      let backwards =
+        List.fold_left
+          (fun acc i -> HashMap.insert i (i * i) acc)
+          HashMap.empty
+          (List.range 0 200 |> List.reverse)
+      Test.is_true "equal" (eq (squares 200) backwards)
+    ),
+  ],
+  Test.group "shared fragments" [
+    Test.test "hashes that differ only in their high bits" (fun () ->
+      EqHash.with (fun a b -> a == b) (fun k -> Int.shift_left k 25) (fun w ->
+        let m = HashMap.from_list w (List.map (fun k -> (k, Int.to_string k)) (List.range 0 100))
+        let gone = List.fold_left (fun acc k -> HashMap.remove k acc) m (List.range 0 60)
+        Test.all [
+          Test.equal 100 (HashMap.size m),
+          Test.equal (Some "77") (HashMap.get 77 gone),
+          Test.equal None (HashMap.get 12 gone),
+          Test.equal (List.map (fun k -> (k, Int.to_string k)) (List.range 60 100)) (sorted gone),
+        ]
+      )
+    ),
+    Test.test "a negative hash" (fun () ->
+      EqHash.with (fun a b -> a == b) (fun k -> -k - 1) (fun w ->
+        let m = HashMap.from_list w [(1, "a"), (2, "b"), (3, "c")]
+        Test.equal [(1, "a"), (2, "b"), (3, "c")] (sorted m)
+      )
+    ),
+  ],
+  Test.group "one hash" [
+    Test.test "entries keep the order they came in" (fun () ->
+      EqHash.with (fun a b -> a == b) (fun _ -> 7) (fun w ->
+        let m = HashMap.from_list w [(3, "c"), (1, "a"), (2, "b")]
+        Test.equal [(3, "c"), (1, "a"), (2, "b")] (HashMap.to_list m)
+      )
+    ),
+    Test.test "a new value keeps the place of its key" (fun () ->
+      EqHash.with (fun a b -> a == b) (fun _ -> 7) (fun w ->
+        let m = HashMap.from_list w [(3, "c"), (1, "a"), (2, "b")] |> HashMap.insert 1 "A"
+        Test.equal [(3, "c"), (1, "A"), (2, "b")] (HashMap.to_list m)
+      )
+    ),
+    Test.test "removing one leaves the others in order" (fun () ->
+      EqHash.with (fun a b -> a == b) (fun _ -> 7) (fun w ->
+        let m = HashMap.from_list w [(3, "c"), (1, "a"), (2, "b")] |> HashMap.remove 1
+        Test.all [
+          Test.equal [(3, "c"), (2, "b")] (HashMap.to_list m),
+          Test.equal 2 (HashMap.size m),
+        ]
+      )
+    ),
+    Test.test "a set keeps the element it has" (fun () ->
+      EqHash.with (fun a b -> a % 10 == b % 10) (fun a -> a % 10) (fun w ->
+        let set = HashSet.from_list w [12, 3, 22, 13]
+        Test.equal [3, 12] (List.sort (HashSet.to_list set))
+      )
+    ),
+    Test.test "a map takes the key it is given" (fun () ->
+      EqHash.with (fun a b -> a % 10 == b % 10) (fun a -> a % 10) (fun w ->
+        let m = HashMap.from_list w [(12, "x"), (22, "y")]
+        Test.equal [(22, "y")] (HashMap.to_list m)
+      )
+    ),
+  ],
+  Test.group "operations" [
+    Test.test "map, filter, filter_map and compact" (fun () ->
+      let m = HashMap.from_list EqHash.canonical [(1, "a"), (2, "bb"), (3, "ccc")]
+      let lengths = HashMap.map (fun v _ -> String.length v) m
+      let odd = HashMap.filter (fun _ k -> k % 2 == 1) m
+      let short = HashMap.filter_map (fun v _ -> if String.length v < 3 then Ok v else Err ()) m
+      let present = HashMap.compact (HashMap.map (fun v k -> if k == 2 then None else Some v) m)
+      Test.all [
+        Test.equal (Some 3) (HashMap.get 3 lengths),
+        Test.equal [(1, "a"), (3, "ccc")] (sorted odd),
+        Test.equal [(1, "a"), (2, "bb")] (sorted short),
+        Test.equal [(1, "a"), (3, "ccc")] (sorted present),
+      ]
+    ),
+    Test.test "union takes the second's value" (fun () ->
+      let a = HashMap.from_list EqHash.canonical [(1, "a"), (2, "b")]
+      let b = HashMap.from_list EqHash.canonical [(2, "B"), (3, "C")]
+      Test.equal [(1, "a"), (2, "B"), (3, "C")] (sorted (HashMap.union a b))
+    ),
+    Test.test "flat_map joins the maps" (fun () ->
+      let m = HashMap.from_list EqHash.canonical [(1, "a"), (2, "b")]
+      let doubled =
+        HashMap.flat_map
+          (fun v k -> HashMap.from_list EqHash.canonical [(k, v), (k * 10, v ++ v)])
+          m
+      Test.equal [(1, "a"), (2, "b"), (10, "aa"), (20, "bb")] (sorted doubled)
+    ),
+    Test.test "modify_at, modify and the hash variants" (fun () ->
+      let m = HashMap.from_list EqHash.canonical [(1, "a"), (2, "b")]
+      let added = HashMap.modify_at 3 (fun _ -> Some "c") m
+      let dropped = HashMap.modify_at 1 (fun _ -> None) m
+      let upper = HashMap.modify 2 (fun v -> v ++ "!") m
+      let hashed = HashMap.modify_hash 4 (hash 4) (fun _ -> Some "d") m
+      Test.all [
+        Test.equal [(1, "a"), (2, "b"), (3, "c")] (sorted added),
+        Test.equal [(2, "b")] (sorted dropped),
+        Test.equal (Some "b!") (HashMap.get 2 upper),
+        Test.equal (Some "d") (HashMap.get_hash 4 (hash 4) hashed),
+        Test.is_true "has_hash" (HashMap.has_hash 4 (hash 4) hashed),
+      ]
+    ),
+    Test.test "reduce, some, every and find_first" (fun () ->
+      let m = squares 10
+      Test.all [
+        Test.equal 285 (HashMap.reduce 0 (fun acc v _ -> acc + v) m),
+        Test.is_true "some" (HashMap.some (fun v _ -> v == 81) m),
+        Test.is_true "every" (HashMap.every (fun v k -> v == k * k) m),
+        Test.equal (Some (9, 81)) (HashMap.find_first (fun v _ -> v == 81) m),
+      ]
+    ),
+    Test.test "set algebra" (fun () ->
+      let a = HashSet.from_list EqHash.canonical (List.range 0 50)
+      let b = HashSet.from_list EqHash.canonical (List.range 25 75)
+      Test.all [
+        Test.equal (List.range 25 50) (List.sort (HashSet.to_list (HashSet.intersection b a))),
+        Test.equal (List.range 0 25) (List.sort (HashSet.to_list (HashSet.difference b a))),
+        Test.equal 75 (HashSet.size (HashSet.union a b)),
+        Test.is_true "subset" (HashSet.is_subset a (HashSet.intersection b a)),
+        Test.equal
+          [0, 1]
+          (List.sort (HashSet.to_list (HashSet.map EqHash.canonical (fun x -> x % 2) a))),
+      ]
+    ),
+  ],
+]

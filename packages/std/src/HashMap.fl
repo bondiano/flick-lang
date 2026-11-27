@@ -2,51 +2,116 @@
 module HashMap exposing (..)
 
 import EqHash
+import HashMap.Trie as Trie
 
 /// A map from keys `k` to values `v` under the witness `w` of its keys.
-type HashMap w k v
+type HashMap w k v = MapTrie (EqHash.EqHash w k) (Trie.Node k v) Int
+  @native when js || go || vm
 
 /// The empty map of the witness.
 with : EqHash.EqHash w k -> HashMap w k v
-foreign pure with from "flick:rt" "hashMapWith"
+let with witness = MapTrie witness Trie.Empty 0
+  @native "flick:rt" "hashMapWith" when js || go || vm
 
 /// The empty map of the canonical instances.
 empty : Hash k => HashMap EqHash.Canonical k v
-foreign pure empty from "flick:rt" "hashMapEmpty"
+let empty = MapTrie EqHash.canonical Trie.Empty 0
+  @native "flick:rt" "hashMapEmpty" when js || go || vm
 
 /// The map with `key` bound to `value`.
 insert : k -> v -> HashMap w k v -> HashMap w k v
-foreign pure insert from "flick:rt" "hashMapInsert"
+let insert key value m =
+  match m with
+  | MapTrie witness root size ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let (next, n) = Trie.add eq false (hash key) key value (root, size)
+      MapTrie witness next n
+  @native "flick:rt" "hashMapInsert" when js || go || vm
 
 /// The map without `key`.
 remove : k -> HashMap w k v -> HashMap w k v
-foreign pure remove from "flick:rt" "hashMapRemove"
+let remove key m =
+  match m with
+  | MapTrie witness root size ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let (next, n) = Trie.delete eq key (hash key) (root, size)
+      MapTrie witness next n
+  @native "flick:rt" "hashMapRemove" when js || go || vm
 
 /// The value of `key`, if the map has it.
 get : k -> HashMap w k v -> Option v
-foreign pure get from "flick:rt" "hashMapGet"
+let get key m =
+  match m with
+  | MapTrie witness root _ ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      match Trie.find eq key (hash key) root with
+      | Some (_, value) -> Some value
+      | None -> None
+  @native "flick:rt" "hashMapGet" when js || go || vm
 
 /// The number of entries.
 size : HashMap w k v -> Int
-foreign pure size from "flick:rt" "hashMapSize"
+let size m =
+  match m with
+  | MapTrie _ _ size -> size
+  @native "flick:rt" "hashMapSize" when js || go || vm
 
 /// The entries, in no particular order.
 to_list : HashMap w k v -> List (k, v)
-foreign pure to_list from "flick:rt" "hashMapToList"
+let to_list m =
+  match m with
+  | MapTrie _ root _ -> Trie.entries root
+  @native "flick:rt" "hashMapToList" when js || go || vm
 
 /// The entries of both maps, the second's value for a key both have; their
 /// witness must be the same.
 union : HashMap w k v -> HashMap w k v -> HashMap w k v
-foreign pure union from "flick:rt" "hashMapUnion"
+let union left right =
+  match left with
+  | MapTrie witness root size ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      match right with
+      | MapTrie _ other_root _ ->
+        let (next, n) =
+          Trie.fold
+            (fun acc key value -> Trie.add eq false (hash key) key value acc)
+            (root, size)
+            other_root
+        MapTrie witness next n
+  @native "flick:rt" "hashMapUnion" when js || go || vm
 
 /// The same entries under another witness of the keys.
 rehash : EqHash.EqHash x k -> HashMap w k v -> HashMap x k v
-foreign pure rehash from "flick:rt" "hashMapRehash"
+let rehash witness m =
+  match witness with
+  | EqHash.Witness eq hash ->
+    match m with
+    | MapTrie _ other_root _ ->
+      let (next, n) =
+        Trie.fold
+          (fun acc key value -> Trie.add eq false (hash key) key value acc)
+          (Trie.Empty, 0)
+          other_root
+      MapTrie witness next n
+  @native "flick:rt" "hashMapRehash" when js || go || vm
 
 /// The map of the entries under the witness; a later entry for a key
 /// replaces an earlier one.
 from_list : EqHash.EqHash w k -> List (k, v) -> HashMap w k v
-foreign pure from_list from "flick:HashMap" "flickFromList"
+let from_list witness entries =
+  match witness with
+  | EqHash.Witness eq hash ->
+    let (root, size) =
+      List.fold_left
+        (fun acc (key, value) -> Trie.add eq false (hash key) key value acc)
+        (Trie.Empty, 0)
+        entries
+    MapTrie witness root size
+  @native "flick:HashMap" "flickFromList" when js || go || vm
 
 /// The map of the pairs of a sequence, such as a `for` that yields them,
 /// consumed once in order without a temporary list:
@@ -61,113 +126,296 @@ foreign pure to_seq from "flick:rt" "hashMapToSeq"
 
 /// Whether the map has no entries.
 is_empty : HashMap w k v -> Bool
-foreign pure is_empty from "flick:HashMap" "flickIsEmpty"
+let is_empty m =
+  match m with
+  | MapTrie _ _ size -> size == 0
+  @native "flick:HashMap" "flickIsEmpty" when js || go || vm
 
 /// Whether the map has `key`.
 has : k -> HashMap w k v -> Bool
-foreign pure has from "flick:HashMap" "flickHas"
+let has key m =
+  match m with
+  | MapTrie witness root _ ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      match Trie.find eq key (hash key) root with
+      | Some _ -> true
+      | None -> false
+  @native "flick:HashMap" "flickHas" when js || go || vm
 
 /// `get` with the key's hash already computed by the map's witness; another
 /// hash finds nothing.
 get_hash : k -> Int -> HashMap w k v -> Option v
-foreign pure get_hash from "flick:HashMap" "flickGetHash"
+let get_hash key key_hash m =
+  match m with
+  | MapTrie witness root _ ->
+    match witness with
+    | EqHash.Witness eq _ ->
+      match Trie.find eq key key_hash root with
+      | Some (_, value) -> Some value
+      | None -> None
+  @native "flick:HashMap" "flickGetHash" when js || go || vm
 
 /// `has` with the key's hash already computed by the map's witness.
 has_hash : k -> Int -> HashMap w k v -> Bool
-foreign pure has_hash from "flick:HashMap" "flickHasHash"
+let has_hash key key_hash m =
+  match m with
+  | MapTrie witness root _ ->
+    match witness with
+    | EqHash.Witness eq _ ->
+      match Trie.find eq key key_hash root with
+      | Some _ -> true
+      | None -> false
+  @native "flick:HashMap" "flickHasHash" when js || go || vm
 
 /// Whether some entry satisfies `f value key`.
 has_by : (v -> k -> Bool)^c -> HashMap w k v -> Bool
-foreign pure has_by from "flick:HashMap" "flickHasBy"
-  arity 2
-  retention call
+let has_by f m =
+  match m with
+  | MapTrie _ root _ ->
+    match Trie.first (fun key value -> f value key) root with
+    | Some _ -> true
+    | None -> false
+  @native "flick:HashMap" "flickHasBy" when js || go || vm
+    arity 2
+    retention call
 
 /// The keys, in no particular order.
 keys : HashMap w k v -> List k
-foreign pure keys from "flick:HashMap" "flickKeys"
+let keys m =
+  match m with
+  | MapTrie _ root _ -> List.map (fun (key, _) -> key) (Trie.entries root)
+  @native "flick:HashMap" "flickKeys" when js || go || vm
 
 /// The values, in no particular order.
 values : HashMap w k v -> List v
-foreign pure values from "flick:HashMap" "flickValues"
+let values m =
+  match m with
+  | MapTrie _ root _ -> List.map (fun (_, value) -> value) (Trie.entries root)
+  @native "flick:HashMap" "flickValues" when js || go || vm
 
 /// The map with the entry of `key` decided by `f`: it gets the current value,
 /// if any, and `None` removes the key.
 modify_at : k -> (Option v -> Option v)^c -> (HashMap w k v -> HashMap w k v)^c
-foreign pure modify_at from "flick:HashMap" "flickModifyAt"
-  arity 3
-  retention call
+let modify_at key f m =
+  match m with
+  | MapTrie witness root size ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let current =
+        match Trie.find eq key (hash key) root with
+        | Some (_, value) -> Some value
+        | None -> None
+      let (next, n) =
+        match f current with
+        | Some value -> Trie.add eq false (hash key) key value (root, size)
+        | None -> Trie.delete eq key (hash key) (root, size)
+      MapTrie witness next n
+  @native "flick:HashMap" "flickModifyAt" when js || go || vm
+    arity 3
+    retention call
 
 /// `modify_at` with the key's hash already computed by the map's witness.
 modify_hash : k -> Int -> (Option v -> Option v)^c -> (HashMap w k v -> HashMap w k v)^c
-foreign pure modify_hash from "flick:HashMap" "flickModifyHash"
-  arity 4
-  retention call
+let modify_hash key key_hash f m =
+  match m with
+  | MapTrie witness root size ->
+    match witness with
+    | EqHash.Witness eq _ ->
+      let current =
+        match Trie.find eq key key_hash root with
+        | Some (_, value) -> Some value
+        | None -> None
+      let (next, n) =
+        match f current with
+        | Some value -> Trie.add eq false key_hash key value (root, size)
+        | None -> Trie.delete eq key key_hash (root, size)
+      MapTrie witness next n
+  @native "flick:HashMap" "flickModifyHash" when js || go || vm
+    arity 4
+    retention call
 
 /// The map with the value of `key` replaced by `f value`, if it has the key.
 modify : k -> (v -> v)^c -> (HashMap w k v -> HashMap w k v)^c
-foreign pure modify from "flick:HashMap" "flickModify"
-  arity 3
-  retention call
+let modify key f m =
+  match m with
+  | MapTrie witness root size ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      match Trie.find eq key (hash key) root with
+      | Some (_, value) ->
+        let (next, n) = Trie.add eq false (hash key) key (f value) (root, size)
+        MapTrie witness next n
+      | None -> m
+  @native "flick:HashMap" "flickModify" when js || go || vm
+    arity 3
+    retention call
 
 /// The map without any of the keys.
 remove_many : List k -> HashMap w k v -> HashMap w k v
-foreign pure remove_many from "flick:HashMap" "flickRemoveMany"
+let remove_many keys m =
+  match m with
+  | MapTrie witness root size ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let (next, n) =
+        List.fold_left (fun acc key -> Trie.delete eq key (hash key) acc) (root, size) keys
+      MapTrie witness next n
+  @native "flick:HashMap" "flickRemoveMany" when js || go || vm
 
 /// The map with each entry inserted in order.
 insert_many : List (k, v) -> HashMap w k v -> HashMap w k v
-foreign pure insert_many from "flick:HashMap" "flickSetMany"
+let insert_many entries m =
+  match m with
+  | MapTrie witness root size ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let (next, n) =
+        List.fold_left
+          (fun acc (key, value) -> Trie.add eq false (hash key) key value acc)
+          (root, size)
+          entries
+      MapTrie witness next n
+  @native "flick:HashMap" "flickSetMany" when js || go || vm
 
 /// Each value mapped by `f value key`.
 map : (v -> k -> b)^c -> HashMap w k v -> HashMap w k b
-foreign pure map from "flick:HashMap" "flickMap"
-  arity 2
-  retention call
+let map f m =
+  match m with
+  | MapTrie witness root _ ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let (next, n) =
+        Trie.fold
+          (fun acc key value -> Trie.add eq false (hash key) key (f value key) acc)
+          (Trie.Empty, 0)
+          root
+      MapTrie witness next n
+  @native "flick:HashMap" "flickMap" when js || go || vm
+    arity 2
+    retention call
 
 /// The union of the maps `f value key` gives for each entry.
 flat_map : (v -> k -> HashMap w k b)^c -> HashMap w k v -> HashMap w k b
-foreign pure flat_map from "flick:HashMap" "flickFlatMap"
-  arity 2
-  retention call
+let flat_map f m =
+  match m with
+  | MapTrie witness root _ ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let (next, n) =
+        Trie.fold
+          (fun acc key value ->
+            match f value key with
+            | MapTrie _ inner _ ->
+              Trie.fold (fun into k v -> Trie.add eq false (hash k) k v into) acc inner
+          )
+          (Trie.Empty, 0)
+          root
+      MapTrie witness next n
+  @native "flick:HashMap" "flickFlatMap" when js || go || vm
+    arity 2
+    retention call
 
 /// Folds the entries in no particular order: `f acc value key`.
 reduce : z -> (z -> v -> k -> z)^c -> (HashMap w k v -> z)^c
-foreign pure reduce from "flick:HashMap" "flickReduce"
-  arity 3
-  retention call
+let reduce zero f m =
+  match m with
+  | MapTrie _ root _ -> Trie.fold (fun acc key value -> f acc value key) zero root
+  @native "flick:HashMap" "flickReduce" when js || go || vm
+    arity 3
+    retention call
 
 /// The entries for which `f value key` holds.
 filter : (v -> k -> Bool)^c -> HashMap w k v -> HashMap w k v
-foreign pure filter from "flick:HashMap" "flickFilter"
-  arity 2
-  retention call
+let filter f m =
+  match m with
+  | MapTrie witness root _ ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let (next, n) =
+        Trie.fold
+          (fun acc key value ->
+            if f value key then Trie.add eq false (hash key) key value acc else acc
+          )
+          (Trie.Empty, 0)
+          root
+      MapTrie witness next n
+  @native "flick:HashMap" "flickFilter" when js || go || vm
+    arity 2
+    retention call
 
 /// The entries whose value is `Some`, unwrapped.
 compact : HashMap w k (Option v) -> HashMap w k v
-foreign pure compact from "flick:HashMap" "flickCompact"
+let compact m =
+  match m with
+  | MapTrie witness root _ ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let (next, n) =
+        Trie.fold
+          (fun acc key value ->
+            match value with
+            | Some present -> Trie.add eq false (hash key) key present acc
+            | None -> acc
+          )
+          (Trie.Empty, 0)
+          root
+      MapTrie witness next n
+  @native "flick:HashMap" "flickCompact" when js || go || vm
 
 /// The entries `f value key` keeps with `Ok`, mapped to its value.
 filter_map : (v -> k -> Result x b)^c -> HashMap w k v -> HashMap w k b
-foreign pure filter_map from "flick:HashMap" "flickFilterMap"
-  arity 2
-  retention call
+let filter_map f m =
+  match m with
+  | MapTrie witness root _ ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let (next, n) =
+        Trie.fold
+          (fun acc key value ->
+            match f value key with
+            | Ok kept -> Trie.add eq false (hash key) key kept acc
+            | Err _ -> acc
+          )
+          (Trie.Empty, 0)
+          root
+      MapTrie witness next n
+  @native "flick:HashMap" "flickFilterMap" when js || go || vm
+    arity 2
+    retention call
 
 /// Some entry for which `f value key` holds, if any.
 find_first : (v -> k -> Bool)^c -> HashMap w k v -> Option (k, v)
-foreign pure find_first from "flick:HashMap" "flickFindFirst"
-  arity 2
-  retention call
+let find_first f m =
+  match m with
+  | MapTrie _ root _ -> Trie.first (fun key value -> f value key) root
+  @native "flick:HashMap" "flickFindFirst" when js || go || vm
+    arity 2
+    retention call
 
 /// Whether `f value key` holds for some entry.
 some : (v -> k -> Bool)^c -> HashMap w k v -> Bool
-foreign pure some from "flick:HashMap" "flickSome"
-  arity 2
-  retention call
+let some f m =
+  match m with
+  | MapTrie _ root _ ->
+    match Trie.first (fun key value -> f value key) root with
+    | Some _ -> true
+    | None -> false
+  @native "flick:HashMap" "flickSome" when js || go || vm
+    arity 2
+    retention call
 
 /// Whether `f value key` holds for every entry.
 every : (v -> k -> Bool)^c -> HashMap w k v -> Bool
-foreign pure every from "flick:HashMap" "flickEvery"
-  arity 2
-  retention call
+let every f m =
+  match m with
+  | MapTrie _ root _ ->
+    match Trie.first (fun key value -> not (f value key)) root with
+    | Some _ -> false
+    | None -> true
+  @native "flick:HashMap" "flickEvery" when js || go || vm
+    arity 2
+    retention call
 
 /// Runs `f value key` on each entry, in no particular order.
 for_each : (v -> k ->{r; e} Unit)^c -> HashMap w k v ->{r; e} Unit
@@ -180,9 +428,20 @@ json :
 foreign pure json from "flick:Schema" "flickHashMapJson"
 
 map_values_held : (v^u -> k -> b)^c -> (HashMap w k v)^d -> (HashMap w k b)^(c + d)
-foreign pure map_values_held from "flick:HashMap" "flickMap"
-  arity 2
-  retention call
+let map_values_held f m =
+  match m with
+  | MapTrie witness root _ ->
+    match witness with
+    | EqHash.Witness eq hash ->
+      let (next, n) =
+        Trie.fold
+          (fun acc key value -> Trie.add eq false (hash key) key (f value key) acc)
+          (Trie.Empty, 0)
+          root
+      MapTrie witness next n
+  @native "flick:HashMap" "flickMap" when js || go || vm
+    arity 2
+    retention call
 
 to_seq_held : (HashMap w k v)^d -> (Seq (k, v))^d
 foreign pure to_seq_held from "flick:rt" "hashMapToSeq"

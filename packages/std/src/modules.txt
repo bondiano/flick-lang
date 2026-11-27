@@ -25,6 +25,7 @@ Redacted
 BigDecimal
 Duration
 EqHash
+HashMap.Trie
 HashSet
 HashMap
 Loop

@@ -4,18 +4,34 @@ use std::path::{Path, PathBuf};
 
 use super::{Class, MANIFEST, Manifest, VERSION, manifest};
 
-/// The `(specifier, export)` pair a `foreign` line binds, `global` for a
-/// JS global; `None` for a line that is no `foreign` declaration.
+/// The `(specifier, export)` pair a `foreign` line or an `@native` clause
+/// binds, `global` for a JS global; `None` for a line that binds nothing,
+/// such as a type's `@native when …`.
 fn binding(line: &str) -> Option<Result<(String, String), String>> {
     let line = line.trim_start();
-    if !line.starts_with("foreign ") {
-        return None;
-    }
     let quoted = |s: &str| -> Option<(String, usize)> {
         let rest = s.strip_prefix('"')?;
         let end = rest.find('"')?;
         Some((rest[..end].to_owned(), end + 2))
     };
+    if let Some(clause) = line.strip_prefix("@native ") {
+        let bound = clause.split(" when ").next().unwrap_or(clause).trim();
+        if bound.is_empty() || bound.starts_with("when") {
+            return None;
+        }
+        let parsed = match bound.strip_prefix("global ") {
+            Some(name) => quoted(name).map(|(name, _)| ("global".to_owned(), name)),
+            None => quoted(bound).map(|(first, used)| match quoted(bound[used..].trim_start()) {
+                Some((export, _)) => (first, export),
+                // one name is a JS global
+                None => ("global".to_owned(), first),
+            }),
+        };
+        return Some(parsed.ok_or_else(|| format!("cannot read the binding of `{line}`")));
+    }
+    if !line.starts_with("foreign ") {
+        return None;
+    }
     let parsed = line.rsplit_once(" from ").and_then(|(_, from)| {
         if let Some(name) = from.strip_prefix("global ") {
             return Some(("global".to_owned(), quoted(name)?.0));
@@ -189,4 +205,23 @@ fn foreign_lines_are_read_by_specifier_and_export() {
         Some(Ok(("flick:rt".into(), "seqFrom".into())))
     );
     assert_eq!(binding("let foreign_name = 1"), None);
+}
+
+#[test]
+fn a_native_clause_binds_as_a_foreign_line_does() {
+    let bound = |line| binding(line).and_then(Result::ok);
+    let pair = |s: &str, e: &str| Some((s.to_owned(), e.to_owned()));
+    assert_eq!(
+        bound("  @native \"flick:rt\" \"listFold\" when js || go"),
+        pair("flick:rt", "listFold")
+    );
+    assert_eq!(
+        bound("  @native \"Number.isNaN\" when js"),
+        pair("global", "Number.isNaN")
+    );
+    assert_eq!(
+        bound("  @native global \"math.Hypot\" when go"),
+        pair("global", "math.Hypot")
+    );
+    assert_eq!(bound("  @native when js || go"), None);
 }

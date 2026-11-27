@@ -1,0 +1,171 @@
+/// The hash trie of `HashMap` and `HashSet` where a backend has none of its
+/// own: the JS runtime's, node for node, so that a walk visits the entries
+/// in the same order.
+private module HashMap.Trie exposing (..)
+
+/// A node of the trie. A leaf holds the entries whose keys have its hash,
+/// in the order they came; a branch, the children of the 5-bit fragments
+/// its bitmap has, in fragment order.
+type Node k v = Empty | Leaf Int (List (k, v)) | Branch Int (List (Node k v))
+
+/// The fragment of `hash` at `shift`.
+frag : Int -> Int -> Int
+let frag hash shift = Int.bit_and (Int.shift_right_unsigned hash shift) 31
+
+/// The number of bits set.
+popcount : Int -> Int
+let popcount n =
+  let pairs = n - Int.bit_and (Int.shift_right_unsigned n 1) 0x55555555
+  let nibbles =
+    Int.bit_and pairs 0x33333333 + Int.bit_and (Int.shift_right_unsigned pairs 2) 0x33333333
+  let bytes = Int.bit_and (nibbles + Int.shift_right_unsigned nibbles 4) 0x0f0f0f0f
+  Int.shift_right_unsigned (bytes * 0x01010101) 24
+
+/// The index of the child of fragment `f` among a branch's children.
+slot : Int -> Int -> Int
+let slot bitmap f = popcount (Int.bit_and bitmap (Int.shift_left 1 f - 1))
+
+/// The child at `i`.
+child : Int -> List (Node k v) -> Node k v
+let child i children =
+  match List.get i children with
+  | Some node -> node
+  | None -> Empty
+
+/// The entry of `key`, of hash `hash`, by the equality `eq`.
+find : (k -> (k -> Bool)^c)^c -> k -> Int -> Node k v -> Option (k, v)
+let find eq key hash node =
+  find_at : Int -> Node k v -> Option (k, v)
+  let rec find_at shift node =
+    match node with
+    | Empty -> None
+    | Leaf h entries -> if h == hash then List.find (fun (k, _) -> eq k key) entries else None
+    | Branch bitmap children ->
+      let f = frag hash shift
+      if Int.bit_and bitmap (Int.shift_left 1 f) == 0 then
+        None
+      else
+        find_at (shift + 5) (child (slot bitmap f) children)
+  find_at 0 node
+
+/// The node with the entry, and whether its key is new. Of a key the node
+/// has, `keep` keeps the entry it has; otherwise the new one replaces it.
+insert : (k -> (k -> Bool)^c)^c -> Bool -> Int -> k -> v -> Node k v -> (Node k v, Bool)
+let insert eq keep hash key value node =
+  let entry = (key, value)
+  insert_at : Int -> Node k v -> (Node k v, Bool)
+  let rec insert_at shift node =
+    match node with
+    | Empty -> (Leaf hash [entry], true)
+    | Leaf h entries ->
+      if h == hash then
+        match List.find_index (fun (k, _) -> eq k key) entries with
+        | Some i -> (if keep then node else Leaf h (List.set i entry entries), false)
+        | None -> (Leaf h (entries ++ [entry]), true)
+      else
+        let f1 = frag h shift
+        let f2 = frag hash shift
+        if f1 == f2 then
+          let (kid, added) = insert_at (shift + 5) node
+          (Branch (Int.shift_left 1 f1) [kid], added)
+        else
+          let leaf = Leaf hash [entry]
+          let bitmap = Int.bit_or (Int.shift_left 1 f1) (Int.shift_left 1 f2)
+          (Branch bitmap (if f1 < f2 then [node, leaf] else [leaf, node]), true)
+    | Branch bitmap children ->
+      let f = frag hash shift
+      let bit = Int.shift_left 1 f
+      let i = slot bitmap f
+      if Int.bit_and bitmap bit == 0 then
+        let leaf = Leaf hash [entry]
+        (
+          Branch (Int.bit_or bitmap bit) (List.take i children ++ [leaf] ++ List.drop i children),
+          true,
+        )
+      else
+        let (kid, added) = insert_at (shift + 5) (child i children)
+        (Branch bitmap (List.set i kid children), added)
+  insert_at 0 node
+
+/// The node without the entry of `key`, and whether it had one.
+remove : (k -> (k -> Bool)^c)^c -> k -> Int -> Node k v -> (Node k v, Bool)
+let remove eq key hash node =
+  remove_at : Int -> Node k v -> (Node k v, Bool)
+  let rec remove_at shift node =
+    match node with
+    | Empty -> (Empty, false)
+    | Leaf h entries ->
+      if h != hash then
+        (node, false)
+      else
+        match List.find_index (fun (k, _) -> eq k key) entries with
+        | None -> (node, false)
+        | Some i ->
+          let rest = List.take i entries ++ List.drop (i + 1) entries
+          (if List.length entries == 1 then Empty else Leaf h rest, true)
+    | Branch bitmap children ->
+      let f = frag hash shift
+      let bit = Int.shift_left 1 f
+      let i = slot bitmap f
+      if Int.bit_and bitmap bit == 0 then
+        (node, false)
+      else
+        match remove_at (shift + 5) (child i children) with
+        | (_, false) -> (node, false)
+        | (Empty, true) -> (without bitmap bit i children, true)
+        | (kid, true) -> (Branch bitmap (List.set i kid children), true)
+  remove_at 0 node
+
+/// A branch without the child `i` of the fragment `bit`: none when it was
+/// the only one, the other when that is a leaf.
+without : Int -> Int -> Int -> List (Node k v) -> Node k v
+let without bitmap bit i children =
+  let rest = List.take i children ++ List.drop (i + 1) children
+  match rest with
+  | [] -> Empty
+  | [Leaf h entries] -> Leaf h entries
+  | _ -> Branch (Int.bit_and bitmap (Int.bit_not bit)) rest
+
+/// Folds the entries in the order of a walk.
+fold : (z -> k -> v -> z)^c -> z -> Node k v -> z
+let rec fold f z node =
+  match node with
+  | Empty -> z
+  | Leaf _ entries -> List.fold_left (fun acc (k, v) -> f acc k v) z entries
+  | Branch _ children -> List.fold_left (fun acc kid -> fold f acc kid) z children
+
+/// The first entry of a walk for which `p` holds; `p` sees none after it.
+first : (k -> v -> Bool)^c -> Node k v -> Option (k, v)
+let rec first p node =
+  match node with
+  | Empty -> None
+  | Leaf _ entries -> List.find (fun (k, v) -> p k v) entries
+  | Branch _ children ->
+    List.fold_left
+      (fun found kid ->
+        match found with
+        | Some _ -> found
+        | None -> first p kid
+      )
+      None
+      children
+
+/// The entries in the order of a walk.
+entries : Node k v -> List (k, v)
+let rec entries node =
+  match node with
+  | Empty -> []
+  | Leaf _ found -> found
+  | Branch _ children -> List.fold_left (fun found kid -> found ++ entries kid) [] children
+
+/// `insert` into a root and its size: the root and size with the entry.
+add : (k -> (k -> Bool)^c)^c -> Bool -> Int -> k -> v -> (Node k v, Int) -> (Node k v, Int)
+let add eq keep hash key value (root, size) =
+  let (next, added) = insert eq keep hash key value root
+  (next, if added then size + 1 else size)
+
+/// `remove` from a root and its size: the root and size without the entry.
+delete : (k -> (k -> Bool)^c)^c -> k -> Int -> (Node k v, Int) -> (Node k v, Int)
+let delete eq key hash (root, size) =
+  let (next, removed) = remove eq key hash root
+  if removed then (next, size - 1) else (root, size)
