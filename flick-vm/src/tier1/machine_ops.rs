@@ -117,8 +117,20 @@ impl Machine<'_, '_> {
             }
             Instr::HostIntrinsic { dst, kind, src } => {
                 self.stage_slots(&[*src])?;
-                let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout);
+                let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
+                    .with_stderr(&mut self.stderr)
+                    .with_program_args(&self.program_args)
+                    .with_host_services(&mut self.host_services);
                 let res = stdlib::eval_intrinsic(self.heap, *kind, &self.scratch[0], &mut hooks)?;
+                self.finish_primitive(*dst, res)?;
+            }
+            Instr::HostService { dst, op, args } => {
+                self.stage_slots(args)?;
+                let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
+                    .with_stderr(&mut self.stderr)
+                    .with_program_args(&self.program_args)
+                    .with_host_services(&mut self.host_services);
+                let res = stdlib::eval_host_service(self.heap, *op, &self.scratch, &mut hooks)?;
                 self.finish_primitive(*dst, res)?;
             }
             Instr::Construct {

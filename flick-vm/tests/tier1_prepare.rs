@@ -7,13 +7,14 @@ use std::path::{Path, PathBuf};
 
 use flick_core::diagnostics::Severity;
 use flick_core::ir::memory::{
-    Block, Exit, Function, Global, Instruction, MemorySpan, Name, Operation, Program, ValueRep,
+    Block, Exit, Function, Global, HostPrimitive, HostServiceIntrinsic, Instruction, Intrinsic,
+    MemorySpan, Name, Operation, Program, ValueRep,
 };
 use flick_core::ir::{Lit, Pat};
 use flick_core::opt::perceus;
 use flick_core::source::{FileId, SourceMap};
 use flick_core::{build, project};
-use flick_vm::tier0::{Error, Heap, ProgramOutcome, Value};
+use flick_vm::tier0::{self, Error, Heap, HostMode, ProgramOutcome, Value};
 use flick_vm::tier1::{self, PrepareError};
 
 fn main_name() -> Name {
@@ -304,4 +305,107 @@ fn flag_only_match_allocates_zero_heap_cells() {
     assert_eq!(heap.stats().allocations, 0);
     heap.drop_value(exec.value).expect("drop");
     heap.finish().expect("zero leaks");
+}
+
+#[test]
+fn tier1_executes_host_service_stderr_and_args_with_zero_leaks() {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR").to_owned();
+    let program = single_op_program(
+        vec![
+            let_op(0, Operation::Literal(Lit::String("t1-err".to_owned()))),
+            let_op(
+                1,
+                Operation::Intrinsic {
+                    kind: Intrinsic::Host(HostPrimitive::StderrLine),
+                    args: vec![0],
+                },
+            ),
+            let_op(2, Operation::Literal(Lit::Unit)),
+            let_op(
+                3,
+                Operation::Intrinsic {
+                    kind: Intrinsic::Host(HostPrimitive::Args),
+                    args: vec![2],
+                },
+            ),
+            let_op(
+                4,
+                Operation::Project {
+                    object: 3,
+                    field: 0,
+                    rep: ValueRep::Cell,
+                },
+            ),
+            let_op(
+                5,
+                Operation::Intrinsic {
+                    kind: Intrinsic::PrintLine,
+                    args: vec![4],
+                },
+            ),
+            let_op(6, Operation::Literal(Lit::String(manifest_dir))),
+            let_op(
+                7,
+                Operation::Intrinsic {
+                    kind: Intrinsic::HostService(HostServiceIntrinsic::FsExists),
+                    args: vec![6],
+                },
+            ),
+            let_op(
+                8,
+                Operation::Project {
+                    object: 7,
+                    field: 0,
+                    rep: ValueRep::Cell,
+                },
+            ),
+            let_op(
+                9,
+                Operation::Intrinsic {
+                    kind: Intrinsic::Show,
+                    args: vec![8],
+                },
+            ),
+            let_op(
+                10,
+                Operation::Intrinsic {
+                    kind: Intrinsic::PrintLine,
+                    args: vec![9],
+                },
+            ),
+        ],
+        10,
+    );
+    let args = vec!["alpha".to_owned(), "beta".to_owned()];
+
+    let mut heap0 = Heap::new();
+    let r0 = tier0::execute_main_program_outcome_with_args(
+        &mut heap0,
+        &program,
+        &main_name(),
+        10_000,
+        HostMode::LiveOs,
+        args.clone(),
+    );
+    let mut heap1 = Heap::new();
+    let r1 = tier1::execute_main_program_outcome_with_args(
+        &mut heap1,
+        &program,
+        &main_name(),
+        10_000,
+        HostMode::LiveOs,
+        args,
+    )
+    .expect("tier1 prepares host services");
+
+    assert_eq!(r0.stdout, r1.stdout);
+    assert_eq!(r0.stderr, r1.stderr);
+    assert_eq!(r1.stderr, "t1-err\n");
+    assert_eq!(r1.stdout, "alpha\ntrue\n");
+    assert!(matches!(r0.outcome, ProgramOutcome::Returned(Value::Unit)));
+    assert!(matches!(r1.outcome, ProgramOutcome::Returned(Value::Unit)));
+    r0.outcome.release(&mut heap0).expect("release tier0");
+    heap0.finish().expect("zero leaks tier0");
+    r1.outcome.release(&mut heap1).expect("release tier1");
+    heap1.finish().expect("zero leaks tier1");
 }

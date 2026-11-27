@@ -95,9 +95,31 @@ pub fn execute_main_program_outcome_with_host(
     fuel: u64,
     host_mode: HostMode,
 ) -> Result<ExecutionReport, PrepareError> {
+    execute_main_program_outcome_with_args(heap, program, entry, fuel, host_mode, Vec::new())
+}
+
+/// Prepares `program` for `entry` and runs the `main` protocol under `host_mode`
+/// with forwarded CLI `program_args`.
+///
+/// # Errors
+/// Returns [`PrepareError`] if `program` fails tier-1 preparation.
+pub fn execute_main_program_outcome_with_args(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    fuel: u64,
+    host_mode: HostMode,
+    program_args: Vec<String>,
+) -> Result<ExecutionReport, PrepareError> {
     let image = prepare(program, entry)?;
-    Ok(execute_prepared_main_outcome_with_host(
-        heap, &image, fuel, host_mode,
+    Ok(machine::execute_prepared(
+        heap,
+        &image,
+        Vec::new(),
+        fuel,
+        host_mode,
+        program_args,
+        true,
     ))
 }
 
@@ -124,7 +146,7 @@ pub fn execute_prepared_outcome(
     fuel: u64,
     host_mode: HostMode,
 ) -> ExecutionReport {
-    machine::execute_prepared(heap, image, arguments, fuel, host_mode, false)
+    machine::execute_prepared(heap, image, arguments, fuel, host_mode, Vec::new(), false)
 }
 
 /// Executes an already prepared tier-1 [`Prepared`] image using the `main`
@@ -135,7 +157,7 @@ pub fn execute_prepared_main_outcome_with_host(
     fuel: u64,
     host_mode: HostMode,
 ) -> ExecutionReport {
-    machine::execute_prepared(heap, image, Vec::new(), fuel, host_mode, true)
+    machine::execute_prepared(heap, image, Vec::new(), fuel, host_mode, Vec::new(), true)
 }
 
 fn success_only(heap: &mut Heap, report: ExecutionReport) -> Result<Executed, Error> {

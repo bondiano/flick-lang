@@ -3,6 +3,7 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::mem;
 
+use crate::stdlib::HostServices;
 use crate::tier0::causes::StepFailure;
 use crate::tier0::{
     CauseToken, Data, DefectSpec, Error, ExecutionReport, Heap, HostMode, LanguageExit,
@@ -81,6 +82,9 @@ pub(super) struct Machine<'p, 'h> {
     pub(super) top: Option<RegVal>,
     pub(super) main_stage: MainStage,
     pub(super) stdout: String,
+    pub(super) stderr: String,
+    pub(super) program_args: Vec<String>,
+    pub(super) host_services: HostServices,
     pub(super) fuel: u64,
     pub(super) host_mode: HostMode,
 }
@@ -91,12 +95,14 @@ pub(super) fn execute_prepared(
     arguments: Vec<Value>,
     fuel: u64,
     host_mode: HostMode,
+    program_args: Vec<String>,
     main_protocol: bool,
 ) -> ExecutionReport {
     if let Err(error) = heap.ensure_owned(&arguments) {
         return ExecutionReport {
             outcome: ProgramOutcome::Fault(error),
             stdout: String::new(),
+            stderr: String::new(),
         };
     }
     if let Err(error) = heap.admit_values(&arguments) {
@@ -104,6 +110,7 @@ pub(super) fn execute_prepared(
         return ExecutionReport {
             outcome: ProgramOutcome::Fault(error),
             stdout: String::new(),
+            stderr: String::new(),
         };
     }
     let mut machine = Machine {
@@ -130,6 +137,9 @@ pub(super) fn execute_prepared(
             MainStage::Done
         },
         stdout: String::new(),
+        stderr: String::new(),
+        program_args,
+        host_services: HostServices::new(),
         fuel,
         host_mode,
     };
@@ -138,6 +148,7 @@ pub(super) fn execute_prepared(
     ExecutionReport {
         outcome,
         stdout: machine.stdout,
+        stderr: machine.stderr,
     }
 }
 

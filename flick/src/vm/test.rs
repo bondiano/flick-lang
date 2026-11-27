@@ -10,7 +10,7 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::memory::Name as MemoryName;
 use flick_core::project;
 use flick_core::source::SourceMap;
-use flick_vm::tier0::{Heap, TestCaseResult, execute_tests_program};
+use flick_vm::tier0::{Heap, HostMode, TestCaseResult, execute_tests_program_with_host};
 
 use super::{VmTier, lower, resolve_tier, target_override};
 use crate::args::{Color, GlobalArguments, Reporter, TestArguments};
@@ -185,7 +185,7 @@ fn execute_suites(
     let mut raw_results: Vec<TestCaseResult> = Vec::new();
     for entry in entries {
         let mut heap = Heap::new();
-        let results = match execute_tests_program(
+        let results = match execute_tests_program_with_host(
             &mut heap,
             &lowered.program,
             entry,
@@ -193,6 +193,7 @@ fn execute_suites(
             seed_i32,
             u64::MAX,
             &[],
+            HostMode::LiveOs,
         ) {
             Ok(results) => results,
             Err(err) => {

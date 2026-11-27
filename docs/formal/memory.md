@@ -214,9 +214,16 @@ host-environment hooks (`Accounting`, `HostEnv`, `VmHooks`):
 - `Accounting::charge_fuel` meters all primitive work before execution, and
   `Accounting::record_allocation_delta` observes heap allocation/free deltas
   per call.
-- `HostEnv` supplies `HostMode` (`Deterministic` vs `LiveOs`), stdout capture,
+- `HostEnv` supplies `HostMode` (`Deterministic` vs `LiveOs`), stdout/stderr
+  capture, forwarded CLI program arguments, live [`HostServices`] (open files,
+  scoped temp paths, child processes, monotonic clock anchor, OS-seeded PRNG),
   and optional virtual clock (`Clock`/`TestClock`) and seeded RNG
-  (`Random.with_seed`) overrides.
+  (`Random.with_seed`) overrides. Native Rust host services (`HostServiceIntrinsic`
+  in `flick-vm/src/stdlib/host/`) back `Console`, `Clock`, `Random`,
+  `Environment`, `Arguments`, `File`, `FileSystem`, and `ChildProcess` without
+  Node `HostBridge`, registering scoped cleanup via `AcquireRelease` so every
+  VM tier shares the same implementation and exact `PlatformError` / `File`
+  OS error mapping.
 - `tier0` contains no primitive implementations; it delegates every primitive,
   host, and pure Stage 4 context/layer call to `flick_vm::stdlib` through
   `FuelCounter` and `HostContext`, preserving its exact fuel, allocation, reuse,
@@ -227,9 +234,10 @@ host-environment hooks (`Accounting`, `HostEnv`, `VmHooks`):
   and `tests/kernel/language.txt`) in debug and release against `flick_vm::stdlib`
   as a third verified kernel implementation alongside JS and Go, with zero heap
   leaks.
-- **Lean impact**: extracting the shared primitive library and hook boundary
-  introduces no IR, typing, effect, region, or ownership-semantics contract
-  change; all Lean proofs in `formal/` remain unaffected.
+- **Lean impact**: extracting the shared primitive library and adding consuming
+  `HostServiceIntrinsic` variants introduces no new `Operation` or `Exit` form
+  and no typing, effect, region, or ownership-semantics contract change; all
+  Lean proofs in `formal/` remain unaffected.
 
 ### Tier-1 register bytecode executor (`flick-vm/src/tier1/`)
 

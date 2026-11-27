@@ -375,6 +375,11 @@ impl Lowering<'_> {
                 kind,
                 src: tokens.take(*src),
             }),
+            (Intrinsic::HostService(op), _) => Ok(Instr::HostService {
+                dst,
+                op,
+                args: tokens.take_all(args),
+            }),
             (Intrinsic::MatchFail, []) => Ok(Instr::MatchFail),
             (Intrinsic::FromResult, [src]) => Ok(Instr::FromResult {
                 dst,

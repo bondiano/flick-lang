@@ -3,7 +3,7 @@
 
 use crate::tier0::{Error, Heap};
 
-use super::host::HostMode;
+use super::host::{HostMode, HostServices};
 use super::primitives::IsaacRng;
 
 /// Fuel and allocation accounting hook supplied by any VM tier calling into
@@ -32,14 +32,31 @@ pub trait HostEnv {
     /// Appends text to the execution's standard output stream.
     fn write_stdout(&mut self, text: &str);
 
+    /// Appends text to the execution's standard error stream.
+    /// Defaults to a no-op for deterministic model runs.
+    fn write_stderr(&mut self, _text: &str) {}
+
+    /// Program CLI arguments forwarded after `--`.
+    fn program_args(&self) -> &[String] {
+        &[]
+    }
+
+    /// Mutable access to live OS host service resources (files, temp paths,
+    /// child processes, monotonic start, OS PRNG).
+    fn host_services(&mut self) -> Option<&mut HostServices> {
+        None
+    }
+
     /// Optional virtual wall/monotonic clock time in nanoseconds (`Clock`/`TestClock`).
-    /// Returning `None` falls back to [`HostMode`]'s fixed deterministic clock.
+    /// Returning `None` falls back to [`HostMode`]'s fixed deterministic clock
+    /// (or real OS time in [`HostMode::LiveOs`]).
     fn virtual_now_ns(&self) -> Option<u64> {
         None
     }
 
     /// Optional next draw in `[0, 1)` from an active seeded RNG (`Random.with_seed`).
-    /// Returning `None` falls back to [`super::DRAW`].
+    /// Returning `None` falls back to [`super::DRAW`] (or live OS randomness in
+    /// [`HostMode::LiveOs`]).
     fn next_seeded_random(&mut self) -> Option<f64> {
         None
     }
@@ -131,13 +148,17 @@ impl Accounting for CountingHooks<'_> {
 }
 
 /// Default [`VmHooks`] implementation bundling a fuel counter, [`HostMode`],
-/// stdout buffer, optional virtual clock, and optional seeded RNG.
+/// stdout/stderr buffers, CLI program arguments, optional virtual clock,
+/// optional seeded RNG, and optional live [`HostServices`].
 pub struct HostContext<'a> {
     fuel: &'a mut u64,
     host_mode: HostMode,
     stdout: &'a mut String,
+    stderr: Option<&'a mut String>,
+    program_args: &'a [String],
     virtual_now_ns: Option<u64>,
     seeded_rng: Option<&'a mut IsaacRng>,
+    host_services: Option<&'a mut HostServices>,
 }
 
 impl<'a> HostContext<'a> {
@@ -146,9 +167,30 @@ impl<'a> HostContext<'a> {
             fuel,
             host_mode,
             stdout,
+            stderr: None,
+            program_args: &[],
             virtual_now_ns: None,
             seeded_rng: None,
+            host_services: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_stderr(mut self, stderr: &'a mut String) -> Self {
+        self.stderr = Some(stderr);
+        self
+    }
+
+    #[must_use]
+    pub fn with_program_args(mut self, args: &'a [String]) -> Self {
+        self.program_args = args;
+        self
+    }
+
+    #[must_use]
+    pub fn with_host_services(mut self, services: &'a mut HostServices) -> Self {
+        self.host_services = Some(services);
+        self
     }
 
     #[must_use]
@@ -176,6 +218,20 @@ impl HostEnv for HostContext<'_> {
 
     fn write_stdout(&mut self, text: &str) {
         self.stdout.push_str(text);
+    }
+
+    fn write_stderr(&mut self, text: &str) {
+        if let Some(stderr) = self.stderr.as_deref_mut() {
+            stderr.push_str(text);
+        }
+    }
+
+    fn program_args(&self) -> &[String] {
+        self.program_args
+    }
+
+    fn host_services(&mut self) -> Option<&mut HostServices> {
+        self.host_services.as_deref_mut()
     }
 
     fn virtual_now_ns(&self) -> Option<u64> {

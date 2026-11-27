@@ -144,7 +144,7 @@ Each backend component declares its base environment tags, selectable tag axes, 
 
 - `flick/js` publishes tag `js`, exclusive axis `runtime` (`rt` default, `effect`), additive axis `adapter` (`effect-adapter`, active when `@flick-lang/effect-ts` is in project dependencies), and built-in hosts `node`, `browser`, `bun`, and `cloudflare`.
 - `flick/go` publishes tag `go`, additive axis `cgo` (`cgo`, active with `[target.go] cgo = true`), and built-in host `native`.
-- `flick/vm` publishes tag `vm` and built-in host `native` (`vm/native`), allowing packages and modules to gate code with `when = "vm"` / `@when "vm"`.
+- `flick/vm` publishes tag `vm` and built-in host `native` (`vm/native`, also packaged in `packages/vm-host`), providing native Rust `Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem`, and `Process` host services and allowing packages and modules to gate code with `when = "vm"` / `@when "vm"`.
 - Third-party backends can publish their own tags, axes, and hosts through the same descriptor schema.
 
 `flick/lua` is a preview backend for World of Warcraft addons and LÖVE games.

@@ -9,9 +9,10 @@ use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::memory::Name as MemoryName;
 use flick_core::project::{self, Compiled, Project};
 use flick_core::source::{FileId, SourceMap, Span};
+use flick_vm::stdlib::{format_uncaught_cause, format_uncaught_raised};
 use flick_vm::tier0::{
-    ExecutionReport, Heap, HostMode, ProgramOutcome, Reason,
-    execute_main_program_outcome_with_host, execute_rooted_main_program_outcome_with_host,
+    ExecutionReport, Heap, HostMode, ProgramOutcome, execute_main_program_outcome_with_args,
+    execute_rooted_main_program_outcome_with_args,
 };
 use flick_vm::tier1;
 
@@ -209,8 +210,8 @@ pub(super) fn run(options: &RunArguments, global: &GlobalArguments) -> ExitCode 
         }
     };
     match tier {
-        VmTier::Tier0 => execute_tier0(&lowered, &entry),
-        VmTier::Tier1 => execute_tier1(&lowered, &entry, &sources, global),
+        VmTier::Tier0 => execute_tier0(&lowered, &entry, options.args.clone()),
+        VmTier::Tier1 => execute_tier1(&lowered, &entry, options.args.clone(), &sources, global),
     }
 }
 
@@ -251,23 +252,29 @@ fn find_entry_module(
     }
 }
 
-fn execute_tier0(lowered: &lower::LoweredProgram, entry: &MemoryName) -> ExitCode {
+fn execute_tier0(
+    lowered: &lower::LoweredProgram,
+    entry: &MemoryName,
+    program_args: Vec<String>,
+) -> ExitCode {
     let mut heap = Heap::new();
     let report = match &lowered.root {
-        Some(root) => execute_rooted_main_program_outcome_with_host(
+        Some(root) => execute_rooted_main_program_outcome_with_args(
             &mut heap,
             &lowered.program,
             entry,
             root,
             u64::MAX,
             HostMode::LiveOs,
+            program_args,
         ),
-        None => execute_main_program_outcome_with_host(
+        None => execute_main_program_outcome_with_args(
             &mut heap,
             &lowered.program,
             entry,
             u64::MAX,
             HostMode::LiveOs,
+            program_args,
         ),
     };
     finish_report(&mut heap, report)
@@ -276,16 +283,18 @@ fn execute_tier0(lowered: &lower::LoweredProgram, entry: &MemoryName) -> ExitCod
 fn execute_tier1(
     lowered: &lower::LoweredProgram,
     entry: &MemoryName,
+    program_args: Vec<String>,
     sources: &SourceMap,
     global: &GlobalArguments,
 ) -> ExitCode {
     let mut heap = Heap::new();
-    let report = match tier1::execute_main_program_outcome_with_host(
+    let report = match tier1::execute_main_program_outcome_with_args(
         &mut heap,
         &lowered.program,
         entry,
         u64::MAX,
         HostMode::LiveOs,
+        program_args,
     ) {
         Ok(report) => report,
         Err(err) => {
@@ -312,6 +321,11 @@ fn finish_report(heap: &mut Heap, report: ExecutionReport) -> ExitCode {
         let _ = stdout.write_all(report.stdout.as_bytes());
         let _ = stdout.flush();
     }
+    if !report.stderr.is_empty() {
+        let mut stderr = io::stderr().lock();
+        let _ = stderr.write_all(report.stderr.as_bytes());
+        let _ = stderr.flush();
+    }
     match report.outcome {
         ProgramOutcome::Returned(value) => {
             if let Err(err) = heap.drop_value(value) {
@@ -325,27 +339,18 @@ fn finish_report(heap: &mut Heap, report: ExecutionReport) -> ExitCode {
             ExitCode::SUCCESS
         }
         ProgramOutcome::Raised(value) => {
-            eprintln!("error: unhandled failure");
+            let formatted = format_uncaught_raised(heap, &value);
             let _ = heap.drop_value(value);
             let _ = heap.finish();
+            eprintln!("{formatted}");
             ExitCode::from(1)
         }
         ProgramOutcome::Failed(cause) => {
-            let interrupted = heap.cause_reasons(&cause).is_ok_and(|mut reasons| {
-                reasons.len() > 0 && reasons.all(|r| matches!(r, Reason::Interrupt { .. }))
-            });
-            let message = match heap.cause_error(&cause) {
-                Ok(err) | Err(err) => err.to_string(),
-            };
+            let formatted = format_uncaught_cause(heap, &cause);
             let _ = heap.drop_cause(cause);
             let _ = heap.finish();
-            if interrupted {
-                eprintln!("interrupted");
-                ExitCode::from(130)
-            } else {
-                eprintln!("error: {message}");
-                ExitCode::from(1)
-            }
+            eprintln!("{formatted}");
+            ExitCode::from(1)
         }
         ProgramOutcome::Fault(err) => {
             let _ = heap.finish();

@@ -8,14 +8,15 @@ use flick_core::ir::{BinOp, Lit, Pat};
 use flick_core::types::OpClass;
 
 use flick_core::ir::memory::{
-    self, Block, CodeId, Exit, HostPrimitive, Instruction, Intrinsic, Local, Name, Operation,
-    Program,
+    self, Block, CodeId, Exit, HostPrimitive, HostServiceIntrinsic, Instruction, Intrinsic, Local,
+    Name, Operation, Program,
 };
 
 use super::{
     ArenaHandle, ArenaView, CellHandle, Data, Error, ExitData, Heap, HostBridge, HostMode,
-    IteratorHandle, IteratorState, LayerData, LazyHandle, LazyState, Locals, ObjectId, ObjectToken,
-    OwnerHandle, SeqData, Value, VarHandle, patterns, peek, tagged_boundary, take,
+    HostServices, IteratorHandle, IteratorState, LayerData, LazyHandle, LazyState, Locals,
+    ObjectId, ObjectToken, OwnerHandle, SeqData, Value, VarHandle, patterns, peek, tagged_boundary,
+    take,
 };
 use crate::stdlib::runtime::coop::{HOST_CTX_KEY, MEMO_REF_KEY};
 use crate::stdlib::{
@@ -72,6 +73,7 @@ impl ProgramOutcome {
 pub struct ExecutionReport {
     pub outcome: ProgramOutcome,
     pub stdout: String,
+    pub stderr: String,
 }
 
 /// Evaluates with a caller-owned heap and transfers all valid argument tokens.
@@ -113,6 +115,7 @@ pub fn execute_rooted_main_program_outcome(
         return ExecutionReport {
             outcome: ProgramOutcome::Fault(Error::UnknownGlobal(entry.clone())),
             stdout: String::new(),
+            stderr: String::new(),
         };
     }
     let stage = MainStage::Root {
@@ -620,6 +623,9 @@ struct Machine<'p, 'h> {
     pending_handler: Option<Value>,
     top: Option<Value>,
     stdout: String,
+    stderr: String,
+    program_args: Vec<String>,
+    host_services: HostServices,
     fuel: u64,
     main_stage: MainStage,
     /// The provider of `Σ₀`, which no frame holds.

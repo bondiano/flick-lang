@@ -77,6 +77,7 @@ mod std_graph_ops;
 mod std_hash_map;
 mod std_hash_map_ops;
 mod std_hash_set;
+mod std_host_vm;
 mod std_json_decimal_regexp;
 mod std_layer;
 mod std_layer_map;

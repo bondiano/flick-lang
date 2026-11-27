@@ -37,6 +37,31 @@ pub fn execute_tests_program(
     )
 }
 
+/// Evaluates and runs a `List Test.Test` suite with an explicit [`HostMode`].
+#[expect(clippy::too_many_arguments, reason = "explicit host-mode test runner")]
+pub fn execute_tests_program_with_host(
+    heap: &mut Heap,
+    program: &Program,
+    entry: &Name,
+    root: Option<&Name>,
+    seed: i32,
+    fuel_per_test: u64,
+    skip_groups: &[&str],
+    host_mode: HostMode,
+) -> Result<Vec<TestCaseResult>, Error> {
+    execute_tests_program_inner(
+        heap,
+        program,
+        entry,
+        root,
+        seed,
+        fuel_per_test,
+        skip_groups,
+        host_mode,
+        None,
+    )
+}
+
 /// Evaluates and runs a `List Test.Test` suite with an explicit [`HostMode`]
 /// and [`HostBridge`], releasing all Rust heap slots and host handles on return.
 #[expect(clippy::too_many_arguments, reason = "explicit host-bridged test runner")]

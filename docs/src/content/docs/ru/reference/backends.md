@@ -1,6 +1,6 @@
 ---
 title: "Бэкенды"
-source_hash: a410f1806a5e9a3f
+source_hash: ca307ef3d40d35ce
 ---
 
 Генерация кода в Flick выполняется через WebAssembly-компоненты, реализующие контракт `flick:backend@0.1.0`, а не через жёстко встроенный в CLI код таргетов. Команды `flick build`, `flick run`, `flick dev`, `flick test`, `flick pack` и `flick inspect` выбирают, проверяют и запускают компонент бэкенда проекта до записи или запуска любых артефактов.
@@ -15,6 +15,7 @@ source_hash: a410f1806a5e9a3f
 | - | - | - | - |
 | `flick/js` | `js` (по умолчанию) | `js/node` | Официальный бэкенд JavaScript и TypeScript; также поддерживает `js/browser`, `js/bun` и `js/cloudflare`. |
 | `flick/go` | `go` | `go/native` | Официальный бэкенд Go; генерирует модуль Go для каждого входа или набора тестов и запускает `go build` при разрешении `[tools] "flick/go" = ["go"]`. |
+| `flick/vm` | `vm` | `vm/native` | Встроенная внутрипроцессная ВМ на Rust (`flick run --target vm` и `flick test --target vm`) с нативными Rust-сервисами хоста (`Console`, `Clock`, `Random`, `Environment`, `Arguments`, `File`, `FileSystem`, `Process`); не требует Node или Go. |
 | `flick/lua` | `lua` | — | Предварительный компонент (не входит в официальный индекс релизов); выбирается через `[build.backend]` с явным окружением (`lua/love`, `lua/wow-retail` или `lua/wow-forever`). |
 
 `[build] environment` задаёт пару `<backend>/<host>`, например `"js/node"`, `"js/browser"`, `"js/bun"`, `"js/cloudflare"`, `"go/native"` или хост из пакета-библиотеки с разделом `[host]`:

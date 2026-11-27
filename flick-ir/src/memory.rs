@@ -459,6 +459,7 @@ include!("memory/std_intrinsics_more.rs");
 include!("memory/std_intrinsics_schema.rs");
 include!("memory/std_intrinsics_ext.rs");
 include!("memory/std_intrinsics_async.rs");
+include!("memory/std_intrinsics_host.rs");
 include!("memory/operations.rs");
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
