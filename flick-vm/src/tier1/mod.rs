@@ -53,6 +53,9 @@ mod prepare_ops;
 mod prepare_ops_async;
 mod prepare_ops_data;
 mod prepare_ops_handlers;
+pub(crate) mod session;
+pub(crate) mod stepper;
+mod stepper_state;
 
 use flick_core::ir::memory::{Name, Program};
 

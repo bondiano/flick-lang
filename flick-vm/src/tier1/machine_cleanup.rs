@@ -30,7 +30,7 @@ impl Machine<'_, '_> {
         outcome
     }
 
-    fn report_exit(&mut self, exit: LanguageExit) -> Result<ProgramOutcome, Error> {
+    pub(super) fn report_exit(&mut self, exit: LanguageExit) -> Result<ProgramOutcome, Error> {
         match exit {
             LanguageExit::Success(value) => {
                 self.scratch.push(value);

@@ -21,11 +21,11 @@ const FIRST_USER_CODE_ID: CodeId = 3;
 /// Accumulated program with reserved synthetic wrapper code and monotonic `CodeId`s.
 #[derive(Debug, Clone)]
 pub(crate) struct SessionProgram {
-    program: Program,
+    pub(super) program: Program,
     next_code_id: CodeId,
-    known_globals: BTreeSet<Name>,
-    code_owner: BTreeMap<CodeId, String>,
-    retired_codes: BTreeMap<String, Vec<CodeId>>,
+    pub(super) known_globals: BTreeSet<Name>,
+    pub(super) code_owner: BTreeMap<CodeId, String>,
+    pub(super) retired_codes: BTreeMap<String, Vec<CodeId>>,
 }
 
 impl SessionProgram {

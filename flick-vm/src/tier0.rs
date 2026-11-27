@@ -39,10 +39,11 @@ pub use program::{
 };
 pub(crate) use program::{
     SessionHandlerKind, SessionPersistentState, SessionRunSpec, SessionStepStatus,
-    SessionSyntheticCodes, SuspendedSessionEval, abandon_session_eval, allocate_execution_id,
-    build_session_layer_value, execute_main_with_persistent_state,
-    execute_program_with_persistent_state, execute_session_step, shutdown_persistent_state,
-    start_session_eval, step_session_eval,
+    SessionSyntheticCodes, SuspendedSessionEval, SuspendedTier0, Tier0StepResult,
+    abandon_session_eval, abort_tier0_step, allocate_execution_id, build_session_layer_value,
+    execute_main_with_persistent_state, execute_program_with_persistent_state,
+    execute_session_apply_unary, execute_session_step, shutdown_persistent_state,
+    start_session_eval, start_tier0_step, step_session_eval, step_tier0_n,
 };
 #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 pub use program::{

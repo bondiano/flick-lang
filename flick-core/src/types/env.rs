@@ -358,6 +358,47 @@ pub(super) struct StaticLexical {
 
 include!("env_impl.rs");
 
+impl<'b> Env<'b> {
+    /// Builds a standalone type environment from loaded module interfaces and
+    /// `builtins`, without requiring parsed source syntax. Used for hot-swap
+    /// scheme subsumption and migration type checking.
+    pub(super) fn from_interfaces(interfaces: &[Interface], builtins: &'b Builtins) -> Env<'b> {
+        let mut env = Env {
+            module: String::new(),
+            builtins,
+            types: TypeDefs::default(),
+            values: HashMap::new(),
+            parents: HashMap::new(),
+            scope: HashMap::new(),
+            open: HashMap::new(),
+            prelude: true,
+            ambiguous: HashSet::new(),
+            qualifiers: HashMap::new(),
+            imported: HashSet::new(),
+            interfaces: HashMap::new(),
+            open_unknown: false,
+            lost_unknown: false,
+            instances: Vec::new(),
+            invariants: Vec::new(),
+            support_errors: Vec::new(),
+            support_authorities: HashSet::new(),
+            support_roles: HashMap::new(),
+            witness_manifest_aliases: HashSet::new(),
+        };
+        for interface in builtins.interfaces.values() {
+            env.record_support_authorities(interface.as_ref());
+        }
+        for interface in interfaces {
+            if let Err(error) = env.learn(interface) {
+                env.support_errors.push(error);
+            }
+            env.interfaces
+                .insert(interface.module.clone(), Some(interface.clone()));
+        }
+        env
+    }
+}
+
 fn bring(
     scope: &mut HashMap<(Namespace, String), Entity>,
     ambiguous: &mut HashSet<(Namespace, String)>,

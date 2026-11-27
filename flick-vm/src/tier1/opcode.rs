@@ -47,7 +47,7 @@ pub(crate) struct CompiledHandlerOp {
 }
 
 /// A validated, bytecode-compiled tier-1 VM image rooted at one entry global.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Prepared {
     pub(crate) functions: Vec<CompiledFunction>,
     pub(crate) ir_codes: Vec<CodeId>,
@@ -99,7 +99,7 @@ impl Prepared {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct CompiledFunction {
     pub(crate) params: Vec<usize>,
     pub(crate) slots: usize,

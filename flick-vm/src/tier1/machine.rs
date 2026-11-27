@@ -191,7 +191,7 @@ pub(super) fn execute_prepared_cache_stats(
 }
 
 impl<'p, 'h> Machine<'p, 'h> {
-    fn new(
+    pub(super) fn new(
         heap: &'h mut Heap,
         image: &'p Prepared,
         arguments: Vec<Value>,
@@ -310,7 +310,7 @@ impl Machine<'_, '_> {
         self.start_global_top(start)
     }
 
-    fn start_global_top(&mut self, id: usize) -> Result<(), Error> {
+    pub(super) fn start_global_top(&mut self, id: usize) -> Result<(), Error> {
         match &self.globals[id] {
             GlobalState::Ready(reg) => {
                 let dup = match reg {
@@ -342,7 +342,7 @@ impl Machine<'_, '_> {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn run(&mut self) -> Result<LanguageExit, Error> {
+    pub(super) fn run(&mut self) -> Result<LanguageExit, Error> {
         let image = self.image;
         loop {
             if let Some(owner) = self.pending_resume_close.take() {
@@ -465,7 +465,7 @@ impl Machine<'_, '_> {
         }
     }
 
-    fn advance_main(&mut self) -> Result<(), Error> {
+    pub(super) fn advance_main(&mut self) -> Result<(), Error> {
         if let MainStage::Root { main } = self.main_stage {
             self.install_root()?;
             self.main_stage = MainStage::Function;
@@ -511,7 +511,7 @@ impl Machine<'_, '_> {
         self.current_evidence = self.frames.last().and_then(|frame| frame.evidence);
     }
 
-    fn step_at(&mut self, code: usize, pc: usize, instr: &Instr) -> Result<(), Error> {
+    pub(super) fn step_at(&mut self, code: usize, pc: usize, instr: &Instr) -> Result<(), Error> {
         if let Instr::Perform {
             dst,
             op_id,

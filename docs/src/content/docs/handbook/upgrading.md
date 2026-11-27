@@ -71,6 +71,7 @@ change needs.
 | [Hot-swap compatibility and declared state-cell migrations (formal model)](#hot-swap-compatibility-and-declared-state-cell-migrations-formal-model) | no | — |
 | [VM Tier 1 runs std and CLI intrinsics](#vm-tier-1-runs-std-and-cli-intrinsics) | no | — |
 | [`flick-vm` `native-host` feature gate and `wasm32` runtime](#flick-vm-native-host-feature-gate-and-wasm32-runtime) | no | — |
+| [Live VM hot swap and atomic typed state migrations](#live-vm-hot-swap-and-atomic-typed-state-migrations) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -953,3 +954,26 @@ crate, supplying console, clock, random, environment, and capability-gated
 Existing Flick sources require no changes; programs that rely on native
 filesystem, child process, or `HostBridge` APIs remain native-host-only (see
 [Backends](../../reference/backends/#webassembly-vm-runtime-flick-vm-wasm)).
+
+## Live VM hot swap and atomic typed state migrations
+
+`flick-core` and `flick-vm` now ship live hot swap and atomic typed state-cell
+migrations on `VmSession` across both tier 0 and tier 1:
+
+- **Exact scheme compatibility**: `flick_core::types::hot_swap::check_scheme_subsumes`
+  checks `σ_new ≤ σ_old` with contravariant parameters, covariant results and
+  effect/service/error rows, and region/capture qualifiers. Incompatible swaps
+  are refused atomically with `HotSwapError::Incompatible` listing every
+  transitively dependent `(module, binding)` pair.
+- **Two-version execution and invalidation**: swapping updates global cells at
+  safe points while active frames and pre-swap closures finish on their old
+  code. Replacement bytecode is verified before commit, cached fused tier-1
+  bytecode is invalidated for all affected bindings, and pluggable
+  `RegionInvalidator` hooks receive the same invalidation set (native-region
+  invalidation awaits native-region compilation in `#982`/`#983`).
+- **Atomic state migrations**: `declare_state_cell`, `migrate_state_cells`, and
+  `swap_with_migration` run pure `Old -> New` migration functions under pure
+  capabilities and bounded fuel/resource limits, preserving two-version `Ref`
+  cells on commit and rolling back atomically with zero heap leaks on failure.
+
+Existing Flick sources require no changes.

@@ -339,7 +339,7 @@ impl VmSession {
         }
     }
 
-    fn classify_non_value_outcome(
+    pub(super) fn classify_non_value_outcome(
         &mut self,
         outcome: ProgramOutcome,
         stdout: String,

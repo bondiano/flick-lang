@@ -205,7 +205,7 @@ impl Lowering<'_> {
         self.operations.intern((effect.to_owned(), op.to_owned()))
     }
 
-    fn prepare_function(
+    pub(super) fn prepare_function(
         &mut self,
         code: CodeId,
         function: &memory::Function,

@@ -18,6 +18,7 @@ pub mod gadt_rows;
 pub mod generic;
 pub mod hotswap;
 pub mod hotswap_migrations;
+pub mod hotswap_vm_diff;
 pub mod ir_let_types;
 pub mod leaks;
 pub mod live;

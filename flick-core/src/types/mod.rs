@@ -55,6 +55,7 @@ mod holes;
 mod host_exports;
 #[cfg(test)]
 mod host_exports_tests;
+pub mod hot_swap;
 mod infer;
 mod instances;
 mod interpolation;

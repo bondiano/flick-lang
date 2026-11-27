@@ -570,6 +570,7 @@ include!("program/layer_build.rs");
 include!("program/layer_merge.rs");
 include!("program/test_runner.rs");
 include!("program/session_hooks.rs");
+include!("program/hotswap_step.rs");
 include!("program/image_hooks.rs");
 include!("program/sandbox_hooks.rs");
 

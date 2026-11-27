@@ -7,13 +7,18 @@
 
 mod eval;
 pub mod format;
+mod hotswap;
+mod hotswap_types;
 #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
 mod jobs;
 #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
 #[path = "jobs_stub.rs"]
 mod jobs;
+mod migrate;
 pub(crate) mod program;
+mod program_swap;
 mod step;
+mod stepper;
 #[cfg(test)]
 mod tests;
 
@@ -22,13 +27,21 @@ use std::mem;
 
 use flick_core::iface::Interface;
 use flick_core::ir::memory::{MemorySpan, Name};
+use flick_core::types::Type;
 
 pub use format::render_value;
+pub use hotswap_types::{
+    ExecutionTier, HotSwapError, MigratedCellReport, MigrationBatchRequest, RegionInvalidator,
+    StateCellSpec, StateMigration, StepEvalOutcome, StepTaskId, SwapBinding,
+    SwapDefinitionsRequest, SwapReport,
+};
 pub use jobs::{JobId, JobInfo, JobStatus, KillOutcome};
 pub use step::StepOutcome;
 
 use jobs::JobTable;
+use migrate::StateCellRecord;
 pub(crate) use program::SessionProgram;
+use stepper::{CachedPrepared, SuspendedTask};
 
 use crate::image::{
     self, HeapInventory, ImageError, LoadReport, SaveSelection, UnloadReport, VmImage,
@@ -123,6 +136,13 @@ pub struct VmSession {
     pub(crate) root_layer_name: Option<Name>,
     pub(crate) layers: Vec<InstalledLayer>,
     pub(crate) handlers: Vec<InstalledHandler>,
+    pub(crate) tier: ExecutionTier,
+    pub(crate) binding_schemes: BTreeMap<Name, Type>,
+    pub(crate) state_cells: BTreeMap<Name, StateCellRecord>,
+    pub(crate) tier1_cache: BTreeMap<(Name, Option<Name>), CachedPrepared>,
+    pub(crate) region_invalidators: Vec<Box<dyn RegionInvalidator>>,
+    pub(crate) step_tasks: BTreeMap<StepTaskId, SuspendedTask>,
+    pub(crate) next_step_task: StepTaskId,
     jobs: JobTable,
     host_mode: HostMode,
     program_args: Vec<String>,
@@ -170,6 +190,13 @@ impl VmSession {
             root_layer_name: None,
             layers: Vec::new(),
             handlers: Vec::new(),
+            tier: ExecutionTier::Tier0,
+            binding_schemes: BTreeMap::new(),
+            state_cells: BTreeMap::new(),
+            tier1_cache: BTreeMap::new(),
+            region_invalidators: Vec::new(),
+            step_tasks: BTreeMap::new(),
+            next_step_task: 1,
             jobs: JobTable::new(),
             host_mode,
             program_args: Vec::new(),
@@ -348,6 +375,9 @@ impl VmSession {
         self.shutdown_done = true;
         let bg_res = self.jobs.kill_all();
         let mut heap_err: Option<Error> = None;
+        if let Err(err) = self.abort_all_step_tasks() {
+            heap_err.get_or_insert(err);
+        }
         for handler in mem::take(&mut self.handlers) {
             if let Err(err) = self.heap.drop_value(handler.closure) {
                 heap_err.get_or_insert(err);
