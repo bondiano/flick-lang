@@ -7,10 +7,9 @@
 //! concurrency, dynamic layers and contexts, arenas, and full C0-C6 scope
 //! closing while reusing [`crate::stdlib::runtime`] and [`crate::tier0::Heap`].
 //!
-//! Any reachable operation outside tier 1's subset (such as `ForeignCall` or
-//! `HostPrimitive::ProcessSpawn`) fails [`prepare`] with a structured
-//! [`PrepareError`] naming the operation and its source span, with no silent
-//! fallback to tier 0.
+//! Any reachable operation outside tier 1's subset (such as `ForeignCall`)
+//! fails [`prepare`] with a structured [`PrepareError`] naming the operation
+//! and its source span, with no silent fallback to tier 0.
 
 mod machine;
 mod machine_arenas;
@@ -56,11 +55,16 @@ mod prepare_ops_handlers;
 pub(crate) mod session;
 pub(crate) mod stepper;
 mod stepper_state;
+mod test_runner;
 
 use flick_core::ir::memory::{Name, Program};
 
+pub use crate::tier0::TestCaseResult;
 pub use opcode::{PrepareError, Prepared, PreparedStats};
 pub use prepare::{prepare, prepare_rooted};
+pub use test_runner::{
+    execute_prepared_tests, execute_tests_program, execute_tests_program_with_host,
+};
 
 use crate::sandbox::verify_bytecode;
 use crate::tier0::{Error, Executed, ExecutionReport, Heap, HostMode, ProgramOutcome, Value};

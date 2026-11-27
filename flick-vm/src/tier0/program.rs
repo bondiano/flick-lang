@@ -568,6 +568,8 @@ include!("program/context_ops.rs");
 include!("program/manual_scope.rs");
 include!("program/layer_build.rs");
 include!("program/layer_merge.rs");
+#[path = "program/test_helpers.rs"]
+pub(crate) mod test_helpers;
 include!("program/test_runner.rs");
 include!("program/session_hooks.rs");
 include!("program/hotswap_step.rs");

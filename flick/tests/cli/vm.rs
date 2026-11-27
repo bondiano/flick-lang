@@ -204,6 +204,24 @@ let tests = [
         serde_json::from_str(&stdout(&filtered)).expect("filtered JSON");
     assert_eq!(filtered_json["passed"], 1);
     assert_eq!(filtered_json["tests"].as_array().map(Vec::len), Some(1));
+
+    // Tier 0 remains selectable as the reference oracle and matches Tier 1 (default).
+    let tier0_out = flick_no_path(
+        &dir,
+        &[
+            "test",
+            "--target",
+            "vm",
+            "--vm-tier",
+            "0",
+            "--seed",
+            "42",
+            "--reporter",
+            "json",
+        ],
+    );
+    assert!(tier0_out.status.success(), "{}", stderr(&tier0_out));
+    assert_eq!(stdout(&tier0_out), stdout(&json_out));
 }
 
 #[test]
@@ -431,8 +449,8 @@ fn build_target_vm_emits_image_and_doctor_reports_vm() {
         stderr(&doctor_out)
     );
     assert!(
-        stdout(&doctor_out).contains("flick/vm"),
-        "expected flick/vm in doctor output:\n{}",
+        stdout(&doctor_out).contains("flick/vm") && stdout(&doctor_out).contains("tier 1 default"),
+        "expected flick/vm tier 1 default in doctor output:\n{}",
         stdout(&doctor_out)
     );
 }

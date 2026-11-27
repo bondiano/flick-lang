@@ -271,6 +271,7 @@ pub(super) struct Frame {
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum MainStage {
     Root { main: usize },
+    RootValue { main: usize },
     Function,
     Task,
     Done,

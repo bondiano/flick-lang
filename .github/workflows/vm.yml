@@ -74,3 +74,40 @@ jobs:
       - run: cargo build -p flick-vm --target wasm32-unknown-unknown
       - run: cargo build -p flick-vm --no-default-features --target wasm32-unknown-unknown
       - run: just vm-wasm
+
+  # differential check running BOTH Tier 0 and Tier 1 on the full corpus,
+  # generated programs, language test suites, and examples/mtl; fails on any
+  # outcome, stdout, or live-heap difference between tiers
+  vm-tier-diff:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup show active-toolchain || rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: e2e
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@1.59.0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm -C runtime build
+      - run: pnpm -C packages/effect-ts build
+      - name: Tier 0 vs Tier 1 corpus and generated differential suite
+        run: |
+          cargo test --release -p flick-model --test model -- --include-ignored memory_tier1_diff memory_language tier1_full_corpus_inventory
+      - name: Tier 0 vs Tier 1 CLI test suite parity
+        run: |
+          just e2e-compiler
+          FLICK="$PWD/target/e2e/flick"
+          (cd tests/language && "$FLICK" test --target vm --vm-tier 0 --seed 42 --reporter json > ../../target/language-vm-t0.txt)
+          (cd tests/language && "$FLICK" test --target vm --vm-tier 1 --seed 42 --reporter json > ../../target/language-vm-t1.txt)
+          diff -u target/language-vm-t0.txt target/language-vm-t1.txt
+          (cd examples/mtl && "$FLICK" test --target vm --vm-tier 0 --seed 7 --reporter json > ../../target/mtl-vm-t0.txt)
+          (cd examples/mtl && "$FLICK" test --target vm --vm-tier 1 --seed 7 --reporter json > ../../target/mtl-vm-t1.txt)
+          diff -u target/mtl-vm-t0.txt target/mtl-vm-t1.txt

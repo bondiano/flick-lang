@@ -14,6 +14,7 @@ pub(super) struct CorpusSummary {
     pub compile_error: usize,
     pub no_main: usize,
     pub total_profiles: usize,
+    pub tier1_checked: usize,
     pub total_allocations: usize,
     pub total_reuses: usize,
     pub total_reuse_fallbacks: usize,
@@ -48,7 +49,10 @@ impl CorpusSummary {
 
     pub fn print(&self, title: &str) {
         let unsupported_total: usize = self.unsupported.values().sum();
-        println!("=== {title} (profiles={}) ===", self.total_profiles);
+        println!(
+            "=== {title} (profiles={}, tier1_checked={}) ===",
+            self.total_profiles, self.tier1_checked
+        );
         println!(
             "  passed={} expected_failure={} out_of_fuel={} failed_outcome={} leaked={} unsupported={} compile_error={} no_main={}",
             self.passed,

@@ -15,12 +15,14 @@ use flick_model::run;
 use flick_model::syntax::Path as ModelPath;
 use flick_test_support::files as fixture_files;
 use flick_vm::tier0::{
-    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Value,
+    Error as MemoryError, Heap, HostBridge, HostMode, ProgramOutcome, Value, execute_tests_program,
     execute_tests_program_with_bridge,
 };
+use flick_vm::tier1;
 
-use super::CorpusSummary;
 use super::helpers::FsHost;
+use super::{CorpusSummary, verify_tier1_main_diff};
+use crate::memory_tier1_diff::is_tier1_subset;
 
 fn compile_example_roots(project_dir: &Path, roots: Vec<PathBuf>) -> Result<Vec<Compiled>, String> {
     let mut canonical: Vec<PathBuf> = roots
@@ -111,6 +113,11 @@ fn run_example_main(
                 continue;
             }
         }
+        if let Ok(closed) = run::counted_main(modules, entry, release)
+            && is_tier1_subset(&closed.program, &closed.entry, closed.root.as_ref())
+        {
+            verify_tier1_main_diff(&closed, label, profile, fuel, summary);
+        }
         if is_oof {
             summary.out_of_fuel.push(format!("{label} ({profile})"));
             continue;
@@ -198,6 +205,11 @@ fn run_example_tests(
                         "{label} ({profile}): failing tests: {}",
                         failed.join(", ")
                     ));
+                }
+                if let Ok(closed) = run::counted_main(modules, &entry, release)
+                    && is_tier1_subset(&closed.program, &closed.entry, closed.root.as_ref())
+                {
+                    verify_tier1_tests_diff(&closed, label, profile, fuel, summary);
                 }
             }
             Err(MemoryError::OutOfFuel) => {
@@ -323,6 +335,190 @@ fn check_conduit_examples(
                 summary
                     .failed_outcome
                     .push(format!("{label}: compile error: {err}"));
+            }
+        }
+    }
+}
+
+pub(super) fn verify_tier1_tests_diff(
+    closed: &run::CountedMain,
+    label: &str,
+    profile: &str,
+    fuel: u64,
+    summary: &mut CorpusSummary,
+) {
+    summary.tier1_checked += 1;
+    let mut heap0 = Heap::new();
+    let res0 = execute_tests_program(
+        &mut heap0,
+        &closed.program,
+        &closed.entry,
+        closed.root.as_ref(),
+        42,
+        fuel,
+        &[],
+    );
+    match heap0.finish() {
+        Ok(s) if s.live_objects == 0 && s.allocations == s.frees => {}
+        Ok(s) => {
+            summary.leaked.push(format!(
+                "{label} ({profile}) [tier0-closed]: live={} alloc={} free={}",
+                s.live_objects, s.allocations, s.frees
+            ));
+            return;
+        }
+        Err(err) => {
+            summary
+                .leaked
+                .push(format!("{label} ({profile}) [tier0-closed]: {err}"));
+            return;
+        }
+    }
+
+    let mut heap1 = Heap::new();
+    let res1 = tier1::execute_tests_program_with_host(
+        &mut heap1,
+        &closed.program,
+        &closed.entry,
+        closed.root.as_ref(),
+        42,
+        fuel,
+        &[],
+        HostMode::Deterministic,
+    );
+    match heap1.finish() {
+        Ok(s) if s.live_objects == 0 && s.allocations == s.frees => {}
+        Ok(s) => {
+            summary.leaked.push(format!(
+                "{label} ({profile}) [tier1]: live={} alloc={} free={}",
+                s.live_objects, s.allocations, s.frees
+            ));
+            return;
+        }
+        Err(err) => {
+            summary
+                .leaked
+                .push(format!("{label} ({profile}) [tier1]: {err}"));
+            return;
+        }
+    }
+
+    match (res0, res1) {
+        (Ok(r0), Ok(Ok(r1))) => {
+            if r0 != r1 {
+                summary.failed_outcome.push(format!(
+                    "{label} ({profile}) [tier1]: test results differ from tier0"
+                ));
+            }
+        }
+        (Err(MemoryError::OutOfFuel), _) | (_, Ok(Err(MemoryError::OutOfFuel))) => {}
+        (Err(e0), Ok(Err(e1))) if e0 == e1 => {}
+        (r0, r1) => {
+            summary.failed_outcome.push(format!(
+                "{label} ({profile}) [tier1]: test runner mismatch tier0={r0:?} tier1={r1:?}"
+            ));
+        }
+    }
+}
+
+pub(super) fn check_examples_tier1_corpus(repo: &Path, fuel: u64, summary: &mut CorpusSummary) {
+    let standard: &[(&str, Option<&str>)] = &[
+        ("first-slice", Some("App.Main")),
+        ("hom-repository", Some("App.Main")),
+        ("mtl", Some("App.Capabilities")),
+        ("typed-interpreter", Some("App.Main")),
+        ("cli-tool", None),
+    ];
+    for &(name, main_mod) in standard {
+        let dir = repo.join("examples").join(name);
+        let mut roots = fixture_files(&dir.join("src"), "fl");
+        if dir.join("test").is_dir() {
+            roots.extend(fixture_files(&dir.join("test"), "fl"));
+        }
+        let Ok(modules) = compile_example_roots(&dir, roots) else {
+            summary.compile_error += 1;
+            continue;
+        };
+        if let Some(mod_name) = main_mod {
+            let entry = ModelPath::new(mod_name, "main");
+            let label = format!("examples/{name}/{mod_name}");
+            for release in [false, true] {
+                let profile = if release { "release" } else { "debug" };
+                if let Ok(closed) = run::counted_main(&modules, &entry, release)
+                    && is_tier1_subset(&closed.program, &closed.entry, closed.root.as_ref())
+                {
+                    summary.total_profiles += 1;
+                    verify_tier1_main_diff(&closed, &label, profile, fuel, summary);
+                }
+            }
+        }
+        for module in &modules {
+            if !module.interface.exports_value("tests") {
+                continue;
+            }
+            let entry = ModelPath::new(&module.name, "tests");
+            let label = format!("examples/{name}/{}", module.name);
+            for release in [false, true] {
+                let profile = if release { "release" } else { "debug" };
+                if let Ok(closed) = run::counted_main(&modules, &entry, release)
+                    && is_tier1_subset(&closed.program, &closed.entry, closed.root.as_ref())
+                {
+                    summary.total_profiles += 1;
+                    verify_tier1_tests_diff(&closed, &label, profile, fuel, summary);
+                }
+            }
+        }
+    }
+    let conduit = repo.join("examples/conduit");
+    let contract_src = fixture_files(&conduit.join("contract/src"), "fl");
+    let cases: &[(&str, PathBuf, Vec<PathBuf>, &str)] = &[
+        (
+            "examples/conduit/contract/Conduit.InputTest",
+            conduit.join("contract"),
+            {
+                let mut r = contract_src.clone();
+                r.extend(fixture_files(&conduit.join("contract/test"), "fl"));
+                r
+            },
+            "Conduit.InputTest",
+        ),
+        (
+            "examples/conduit/server/Conduit.Server.CoreTest",
+            conduit.join("server"),
+            {
+                let mut r = contract_src.clone();
+                r.push(conduit.join("server/src/Conduit/Server/Slug.fl"));
+                r.push(conduit.join("server/src/Conduit/Server/Validate.fl"));
+                r.push(conduit.join("server/test/Conduit/Server/CoreTest.fl"));
+                r
+            },
+            "Conduit.Server.CoreTest",
+        ),
+        (
+            "examples/conduit/client/Conduit.Client.PagesTest",
+            conduit.join("client"),
+            {
+                let mut r = contract_src;
+                r.extend(fixture_files(&conduit.join("client/src"), "fl"));
+                r.extend(fixture_files(&conduit.join("client/test"), "fl"));
+                r
+            },
+            "Conduit.Client.PagesTest",
+        ),
+    ];
+    for (label, dir, roots, test_mod) in cases {
+        let Ok(modules) = compile_example_roots(dir, roots.clone()) else {
+            summary.compile_error += 1;
+            continue;
+        };
+        let entry = ModelPath::new(test_mod, "tests");
+        for release in [false, true] {
+            let profile = if release { "release" } else { "debug" };
+            if let Ok(closed) = run::counted_main(&modules, &entry, release)
+                && is_tier1_subset(&closed.program, &closed.entry, closed.root.as_ref())
+            {
+                summary.total_profiles += 1;
+                verify_tier1_tests_diff(&closed, label, profile, fuel, summary);
             }
         }
     }

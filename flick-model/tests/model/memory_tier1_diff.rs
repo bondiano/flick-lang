@@ -10,9 +10,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use flick_core::ir::memory::{
-    Block, CodeId, Exit, HostPrimitive, Instruction, Intrinsic, Name, Operation, Program,
-};
+use flick_core::ir::memory::{Block, CodeId, Exit, Instruction, Name, Operation, Program};
 use flick_model::run;
 use flick_test_support::files as fixture_files;
 use flick_vm::tier0::{Error as MemoryError, Heap, ProgramOutcome, Value};
@@ -64,9 +62,6 @@ fn block_is_tier1_supported(
         };
         match value {
             Operation::ForeignCall { .. } => return false,
-            Operation::Intrinsic { kind, .. } if !intrinsic_is_tier1_supported(*kind) => {
-                return false;
-            }
             Operation::Global(name) => {
                 let Some(&code) = initializers.get(name) else {
                     return false;
@@ -92,10 +87,6 @@ fn block_is_tier1_supported(
                 && block_is_tier1_supported(else_, initializers, queue)
         }
     }
-}
-
-fn intrinsic_is_tier1_supported(kind: Intrinsic) -> bool {
-    !matches!(kind, Intrinsic::Host(HostPrimitive::ProcessSpawn))
 }
 
 fn outcome_tag(outcome: &ProgramOutcome) -> &'static str {

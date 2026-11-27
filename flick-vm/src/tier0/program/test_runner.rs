@@ -422,25 +422,49 @@ impl Machine<'_, '_> {
             };
             self.heap.drop_value(pair)?;
 
-            let c = self.heap.dup(&check_fn)?;
+            let drawn_copy = match self.heap.dup(&drawn) {
+                Ok(v) => v,
+                Err(err) => {
+                    self.heap.drop_values(vec![drawn, gen_fn, check_fn])?;
+                    return Err(err);
+                }
+            };
+            let c = match self.heap.dup(&check_fn) {
+                Ok(v) => v,
+                Err(err) => {
+                    self.heap
+                        .drop_values(vec![drawn, drawn_copy, gen_fn, check_fn])?;
+                    return Err(err);
+                }
+            };
             self.reset_test_state(fuel);
             self.scratch.extend([c, drawn]);
             self.apply_fresh(Destination::Top)?;
             let check_exit = match self.run() {
                 Ok(exit) => exit,
                 Err(err) => {
-                    self.heap.drop_values(vec![gen_fn, check_fn])?;
+                    self.heap.drop_values(vec![drawn_copy, gen_fn, check_fn])?;
                     return Err(err);
                 }
             };
-            let case_outcome = self.collect_assertion_outcome(name.clone(), check_exit)?;
+            let case_outcome = match self.collect_assertion_outcome(name.clone(), check_exit) {
+                Ok(outcome) => outcome,
+                Err(err) => {
+                    self.heap.drop_values(vec![drawn_copy, gen_fn, check_fn])?;
+                    return Err(err);
+                }
+            };
             if !case_outcome.passed {
+                let shown = primitives::preview_property_value(self.heap, &drawn_copy);
+                self.heap.drop_value(drawn_copy)?;
+                let shown = shown?;
                 failure_msg = Some(format!(
-                    "{} (case {case_idx})",
+                    "{} (case {case_idx}: {shown})",
                     case_outcome.message.unwrap_or_default()
                 ));
                 break;
             }
+            self.heap.drop_value(drawn_copy)?;
         }
         self.heap.drop_values(vec![gen_fn, check_fn])?;
         Ok(TestCaseResult {
@@ -471,102 +495,18 @@ impl Machine<'_, '_> {
         name: String,
         exit: LanguageExit,
     ) -> Result<TestCaseResult, Error> {
-        let val = match exit {
-            LanguageExit::Success(v) => v,
-            LanguageExit::Failure(cause) => {
-                let msg = self.describe_test_failure(&cause)?;
-                self.heap.drop_cause(cause)?;
-                return Ok(TestCaseResult {
-                    name,
-                    passed: false,
-                    skipped: false,
-                    message: Some(msg),
-                });
-            }
-        };
-        let tag = self.heap.tag(&val)?.to_owned();
-        let res = if tag == "Test.Assertion.Pass" {
-            TestCaseResult {
-                name,
-                passed: true,
-                skipped: false,
-                message: None,
-            }
-        } else if tag == "Test.Assertion.Failed" {
-            let msg = self.string_field(&val, 0)?;
-            TestCaseResult {
-                name,
-                passed: false,
-                skipped: false,
-                message: Some(msg),
-            }
-        } else {
-            self.heap.drop_value(val)?;
-            return Err(Error::UnsupportedOperation(
-                "unexpected test assertion value",
-            ));
-        };
-        self.heap.drop_value(val)?;
-        Ok(res)
+        test_helpers::collect_assertion_outcome(self.heap, name, exit)
     }
 
     fn describe_test_failure(&self, cause: &CauseToken) -> Result<String, Error> {
-        let mut parts = Vec::new();
-        for reason in self.heap.cause_reasons(cause)? {
-            match reason {
-                Reason::Fail(v) => {
-                    if let Ok("Test.AssertionFailed.AssertionFailed") = self.heap.tag(v) {
-                        parts.push(self.string_field(v, 0)?);
-                    } else {
-                        parts.push(format!("fail: {}", primitives::show_value(self.heap, v)?));
-                    }
-                }
-                Reason::Die(d) => {
-                    parts.push(format!("die: {}", primitives::describe_defect(self.heap, d)?));
-                }
-                Reason::Interrupt { .. } => parts.push("interrupted".into()),
-            }
-        }
-        Ok(parts.join("; "))
+        test_helpers::describe_test_failure(self.heap, cause)
     }
 
     fn string_field(&self, val: &Value, index: usize) -> Result<String, Error> {
-        let field = self.heap.field(val, index)?;
-        let Value::Object(tok) = field else {
-            return Err(Error::UnsupportedOperation("expected string field"));
-        };
-        match &self.heap.object(tok.id)?.data {
-            Data::String(s) => Ok(s.clone()),
-            Data::Utf16(u) => Ok(String::from_utf16_lossy(u)),
-            _ => Err(Error::UnsupportedOperation("expected string field")),
-        }
+        test_helpers::string_field(self.heap, val, index)
     }
 
     fn list_reps(&self, val: &Value) -> Result<Vec<Value>, Error> {
-        let Value::Object(tok) = val else {
-            return Err(Error::UnsupportedOperation("expected list"));
-        };
-        match &self.heap.object(tok.id)?.data {
-            Data::Tagged { tag, fields, .. } if tag == "$list" => {
-                Ok(fields.iter().map(Value::representation).collect())
-            }
-            Data::ListSlice {
-                backing,
-                offset,
-                len,
-            } => {
-                let Value::Object(btok) = backing else {
-                    return Err(Error::UnsupportedOperation("invalid list slice backing"));
-                };
-                let Data::Tagged { fields, .. } = &self.heap.object(btok.id)?.data else {
-                    return Err(Error::UnsupportedOperation("invalid list slice backing"));
-                };
-                Ok(fields[*offset..*offset + *len]
-                    .iter()
-                    .map(Value::representation)
-                    .collect())
-            }
-            _ => Err(Error::UnsupportedOperation("expected list")),
-        }
+        test_helpers::list_reps(self.heap, val)
     }
 }

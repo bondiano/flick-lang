@@ -11,6 +11,7 @@ use flick_core::ir::memory::Name as MemoryName;
 use flick_model::run;
 use flick_model::syntax::Path as ModelPath;
 use flick_vm::tier0::{Heap, execute_tests_program};
+use flick_vm::tier1;
 
 const STAGE3_PURE_SUITES: &[&str] = &[
     "Adts",
@@ -85,6 +86,31 @@ fn stage3_language_suites_pass_with_zero_leaks() {
                 stats.allocations, stats.frees,
                 "{suite} (release={release}) allocation mismatch: {stats:?}"
             );
+
+            let mut heap1 = Heap::new();
+            let results1 = tier1::execute_tests_program(
+                &mut heap1,
+                &program,
+                &entry,
+                root.as_ref(),
+                42,
+                5_000_000,
+                skip_groups,
+            )
+            .unwrap_or_else(|err| panic!("{suite} (release={release}) tier1 prepare error: {err}"))
+            .unwrap_or_else(|err| panic!("{suite} (release={release}) tier1 runner error: {err}"));
+            let stats1 = heap1
+                .finish()
+                .unwrap_or_else(|err| panic!("{suite} (release={release}) tier1 heap leak: {err}"));
+            assert_eq!(stats1.live_objects, 0);
+            assert_eq!(
+                stats1.allocations, stats1.frees,
+                "{suite} (release={release}) tier1 allocation mismatch: {stats1:?}"
+            );
+            assert_eq!(
+                results, results1,
+                "{suite} (release={release}) tier0 vs tier1 test results diverged"
+            );
             let failures: Vec<_> = results
                 .iter()
                 .filter(|r| !r.passed)
@@ -136,6 +162,28 @@ fn stage3_language_recursion_stress_with_zero_leaks() {
             .finish()
             .unwrap_or_else(|err| panic!("Recursion (release={release}) heap leak: {err}"));
         assert_eq!(stats.allocations, stats.frees);
+
+        let mut heap1 = Heap::new();
+        let results1 = tier1::execute_tests_program(
+            &mut heap1,
+            &program,
+            &entry,
+            root.as_ref(),
+            42,
+            200_000_000,
+            &[],
+        )
+        .unwrap_or_else(|err| panic!("Recursion (release={release}) tier1 prepare error: {err}"))
+        .unwrap_or_else(|err| panic!("Recursion (release={release}) tier1 runner error: {err}"));
+        let stats1 = heap1
+            .finish()
+            .unwrap_or_else(|err| panic!("Recursion (release={release}) tier1 heap leak: {err}"));
+        assert_eq!(stats1.live_objects, 0);
+        assert_eq!(stats1.allocations, stats1.frees);
+        assert_eq!(
+            results, results1,
+            "Recursion (release={release}) tier0 vs tier1 mismatch"
+        );
         let failures: Vec<_> = results
             .iter()
             .filter(|r| !r.passed)

@@ -19,11 +19,15 @@ use flick_vm::tier0::{
     Error as MemoryError, ExecutionReport, Heap, HostBridge, HostMode, ProgramOutcome, Value,
 };
 
+use crate::memory_tier1_diff::is_tier1_subset;
+
 mod examples;
 mod helpers;
 mod summary;
+mod tier1;
 use helpers::{FsHost, compile_self_spawn_entry, describe_outcome_detail, load_doc_expectations};
 use summary::CorpusSummary;
+use tier1::verify_tier1_main_diff;
 
 /// Fuel cap for debug `just model` runs so the inventory finishes quickly while
 /// still executing every corpus program and verifying zero leaks on `OutOfFuel`.
@@ -167,6 +171,22 @@ fn check_file_fixture_with_expect(
             expects_nonzero_exit,
             summary,
         );
+        if let Ok(closed) = run::counted_main(&modules, &main, release)
+            && is_tier1_subset(&closed.program, &closed.entry, closed.root.as_ref())
+        {
+            verify_tier1_main_diff(&closed, label, profile, fuel, summary);
+        }
+    }
+}
+
+fn outcome_tag(outcome: &ProgramOutcome) -> &'static str {
+    match outcome {
+        ProgramOutcome::Returned(Value::Unit) => "returned_unit",
+        ProgramOutcome::Returned(_) => "returned_non_unit",
+        ProgramOutcome::Raised(_) => "raised",
+        ProgramOutcome::Failed(_) => "failed",
+        ProgramOutcome::Fault(MemoryError::OutOfFuel) => "out_of_fuel",
+        ProgramOutcome::Fault(_) => "fault",
     }
 }
 
@@ -179,14 +199,7 @@ fn record_fixture_report(
     expects_nonzero_exit: bool,
     summary: &mut CorpusSummary,
 ) {
-    let outcome_tag = match &report.outcome {
-        ProgramOutcome::Returned(Value::Unit) => "returned_unit",
-        ProgramOutcome::Returned(_) => "returned_non_unit",
-        ProgramOutcome::Raised(_) => "raised",
-        ProgramOutcome::Failed(_) => "failed",
-        ProgramOutcome::Fault(MemoryError::OutOfFuel) => "out_of_fuel",
-        ProgramOutcome::Fault(_) => "fault",
-    };
+    let outcome_tag = outcome_tag(&report.outcome);
     let fault_detail = describe_outcome_detail(heap, &report.outcome);
     let release_err = report.outcome.release(heap).err();
     let finish_res = heap.finish();
@@ -327,6 +340,11 @@ fn check_language_exports(fuel: u64, bridge: &mut HostBridge, summary: &mut Corp
                     module.name
                 ));
             }
+            if let Ok(closed) = run::counted_main(&compilation.modules, &entry, release)
+                && is_tier1_subset(&closed.program, &closed.entry, closed.root.as_ref())
+            {
+                verify_tier1_main_diff(&closed, &module.name, profile, fuel, summary);
+            }
         }
     }
 }
@@ -440,6 +458,14 @@ fn assert_inventory_gate(filtered: bool, corpora: &[(&str, &CorpusSummary)]) {
         total_leaks, 0,
         "counted execution must never leak heap slots"
     );
+    if !filtered {
+        for (name, s) in corpora {
+            assert!(
+                s.tier1_checked > 0,
+                "{name} corpus ran zero tier1 differential checks"
+            );
+        }
+    }
     if !cfg!(debug_assertions) && !filtered {
         for (name, s) in corpora {
             assert!(

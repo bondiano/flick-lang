@@ -390,7 +390,8 @@ impl Lowering<'_> {
                     | HostPrimitive::CurrentTimeMillis
                     | HostPrimitive::CurrentTimeNanos
                     | HostPrimitive::MonotonicTimeNanos
-                    | HostPrimitive::RandomNext,
+                    | HostPrimitive::RandomNext
+                    | HostPrimitive::ProcessSpawn,
                 ),
                 [src],
             ) => Ok(Instr::HostIntrinsic {

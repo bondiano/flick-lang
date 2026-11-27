@@ -141,7 +141,7 @@ pub(crate) fn resolve_tier(
     if !diagnostics.is_empty() {
         return Err(diagnostics);
     }
-    Ok(cli_parsed.or(toml_tier).unwrap_or(VmTier::Tier0))
+    Ok(cli_parsed.or(toml_tier).unwrap_or(VmTier::Tier1))
 }
 
 /// Builds the compiler `TargetOverride` for the `vm` target.
@@ -225,7 +225,7 @@ pub(crate) fn doctor_lines() -> Vec<(Option<bool>, String, String)> {
         vec![(
             Some(true),
             "backend".to_owned(),
-            "flick/vm (in-process, tier 0 / tier 1)".to_owned(),
+            "flick/vm (in-process, tier 1 default; tier 0 oracle available)".to_owned(),
         )]
     }
     #[cfg(not(feature = "vm"))]
@@ -290,6 +290,12 @@ mod tests {
 
     #[test]
     fn resolve_tier_accepts_default_and_tier0_and_rejects_invalid() {
+        assert_eq!(resolve_tier(None, None), Ok(VmTier::Tier1));
+        let proj_default = project_from(
+            "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\ntarget = \"vm\"\n",
+        );
+        assert_eq!(resolve_tier(None, Some(&proj_default)), Ok(VmTier::Tier1));
+
         let proj = project_from(
             "schema-version = 1\n[project]\nkind = \"lib\"\n[build]\ntarget = \"vm\"\n\
              [target.vm]\ntier = \"tier0\"\n",

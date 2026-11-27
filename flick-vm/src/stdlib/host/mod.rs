@@ -124,6 +124,20 @@ impl HostServices {
         self.next_handle = self.next_handle.wrapping_add(1);
         id
     }
+
+    /// Returns the number of currently live native OS handles (open files,
+    /// filesystem file handles, scoped temp paths, and child processes).
+    #[must_use]
+    pub fn live_handle_count(&self) -> usize {
+        #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]
+        {
+            self.files.len() + self.fs_files.len() + self.scoped_temps.len() + self.processes.len()
+        }
+        #[cfg(not(all(feature = "native-host", not(target_arch = "wasm32"))))]
+        {
+            0
+        }
+    }
 }
 
 #[cfg(all(feature = "native-host", not(target_arch = "wasm32")))]

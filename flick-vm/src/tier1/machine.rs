@@ -301,8 +301,11 @@ impl<'p, 'h> Machine<'p, 'h> {
 }
 
 impl Machine<'_, '_> {
-    fn start_entry(&mut self) -> Result<(), Error> {
-        let start = if matches!(self.main_stage, MainStage::Root { .. }) {
+    pub(super) fn start_entry(&mut self) -> Result<(), Error> {
+        let start = if matches!(
+            self.main_stage,
+            MainStage::Root { .. } | MainStage::RootValue { .. }
+        ) {
             self.image.root.expect("rooted image has root global")
         } else {
             self.image.entry
@@ -469,6 +472,11 @@ impl Machine<'_, '_> {
         if let MainStage::Root { main } = self.main_stage {
             self.install_root()?;
             self.main_stage = MainStage::Function;
+            return self.start_global_top(main);
+        }
+        if let MainStage::RootValue { main } = self.main_stage {
+            self.install_root()?;
+            self.main_stage = MainStage::Done;
             return self.start_global_top(main);
         }
         let stage = self.main_stage;

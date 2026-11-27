@@ -50,13 +50,13 @@ fn run_vm_repl(options: &ReplArguments, global: &GlobalArguments) -> ExitCode {
     use signal_hook::consts::SIGINT;
     use signal_hook::flag;
 
-    match vm::resolve_tier(options.vm_tier.as_deref(), None) {
+    match vm::resolve_tier(options.vm_tier.as_deref().or(Some("0")), None) {
         Ok(vm::VmTier::Tier0) => {}
         Ok(vm::VmTier::Tier1) => {
             let diag = Diagnostic::new(
                 codes::P012,
                 Severity::Error,
-                "`flick repl --vm-tier 1` is not supported yet; use `--vm-tier 0` (default)",
+                "`flick repl --vm-tier 1` is not supported yet; use `--vm-tier 0`",
             );
             report::render(global, &SourceMap::default(), &[diag]);
             return ExitCode::from(2);

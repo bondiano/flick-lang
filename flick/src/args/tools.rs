@@ -65,7 +65,7 @@ pub struct RunArguments {
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
 
-    /// VM execution tier for `--target vm` (`0` or `tier0`; defaults to tier 0).
+    /// VM execution tier for `--target vm` (`0`, `tier0`, `1`, or `tier1`; defaults to tier 1).
     #[arg(long = "vm-tier", value_name = "TIER")]
     pub vm_tier: Option<String>,
 
@@ -92,7 +92,7 @@ pub struct ReplArguments {
     #[arg(long, value_name = "NAME")]
     pub target: Option<String>,
 
-    /// VM execution tier for `--target vm` (`0` or `tier0`; defaults to tier 0).
+    /// VM execution tier for `--target vm` (`0` or `tier0`; defaults to tier 0 for REPL).
     #[arg(long = "vm-tier", value_name = "TIER")]
     pub vm_tier: Option<String>,
 }

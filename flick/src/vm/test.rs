@@ -1,4 +1,4 @@
-//! In-process `flick test --target vm` execution on `flick_vm::tier0`.
+//! In-process `flick test --target vm` execution on `flick_vm::{tier0, tier1}`.
 
 use std::io::{self, IsTerminal as _, Write as _};
 use std::path::PathBuf;
@@ -9,8 +9,9 @@ use std::{env, fmt::Write as _};
 use flick_core::diagnostics::{Diagnostic, Severity, codes};
 use flick_core::ir::memory::Name as MemoryName;
 use flick_core::project;
-use flick_core::source::SourceMap;
+use flick_core::source::{FileId, SourceMap, Span};
 use flick_vm::tier0::{Heap, HostMode, TestCaseResult, execute_tests_program_with_host};
+use flick_vm::tier1;
 
 use super::{VmTier, lower, resolve_tier, target_override};
 use crate::args::{Color, GlobalArguments, Reporter, TestArguments};
@@ -150,7 +151,7 @@ pub(super) fn test(options: &TestArguments, global: &GlobalArguments) -> ExitCod
             );
         }
     };
-    execute_suites(tier, &lowered, &entries, seed, options, global)
+    execute_suites(tier, &lowered, &entries, seed, options, &sources, global)
 }
 
 fn default_seed() -> u32 {
@@ -162,39 +163,67 @@ fn default_seed() -> u32 {
     seed
 }
 
+fn render_prepare_error(
+    err: &tier1::PrepareError,
+    sources: &SourceMap,
+    global: &GlobalArguments,
+) -> ExitCode {
+    let diagnostic = match err.span() {
+        Some(mem_span) if (mem_span.file as usize) < sources.files().count() => Diagnostic::error(
+            codes::P012,
+            err.to_string(),
+            Span::new(FileId::new(mem_span.file), mem_span.start, mem_span.end),
+        ),
+        _ => Diagnostic::new(codes::P012, Severity::Error, err.to_string()),
+    };
+    report::render(global, sources, &[diagnostic]);
+    ExitCode::from(1)
+}
+
 fn execute_suites(
     tier: VmTier,
     lowered: &lower::LoweredProgram,
     entries: &[MemoryName],
     seed: u32,
     options: &TestArguments,
+    sources: &SourceMap,
     global: &GlobalArguments,
 ) -> ExitCode {
-    if tier == VmTier::Tier1 {
-        let diag = Diagnostic::new(
-            codes::P012,
-            Severity::Error,
-            "tier 1 VM does not support `flick test --target vm` yet; use `--vm-tier 0`",
-        );
-        report::render(global, &SourceMap::default(), &[diag]);
-        return ExitCode::from(1);
-    }
     let started = Instant::now();
     #[allow(clippy::cast_possible_wrap)]
     let seed_i32 = seed as i32;
     let mut raw_results: Vec<TestCaseResult> = Vec::new();
     for entry in entries {
         let mut heap = Heap::new();
-        let results = match execute_tests_program_with_host(
-            &mut heap,
-            &lowered.program,
-            entry,
-            lowered.root.as_ref(),
-            seed_i32,
-            u64::MAX,
-            &[],
-            HostMode::LiveOs,
-        ) {
+        let run_res = match tier {
+            VmTier::Tier0 => execute_tests_program_with_host(
+                &mut heap,
+                &lowered.program,
+                entry,
+                lowered.root.as_ref(),
+                seed_i32,
+                u64::MAX,
+                &[],
+                HostMode::LiveOs,
+            ),
+            VmTier::Tier1 => match tier1::execute_tests_program_with_host(
+                &mut heap,
+                &lowered.program,
+                entry,
+                lowered.root.as_ref(),
+                seed_i32,
+                u64::MAX,
+                &[],
+                HostMode::LiveOs,
+            ) {
+                Ok(res) => res,
+                Err(err) => {
+                    let _ = heap.finish();
+                    return render_prepare_error(&err, sources, global);
+                }
+            },
+        };
+        let results = match run_res {
             Ok(results) => results,
             Err(err) => {
                 let _ = heap.finish();

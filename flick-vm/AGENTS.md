@@ -21,9 +21,10 @@ reference-counted tier-0 executor (`tier0`) specified in
   deterministic host constants from `stdlib` for API compatibility.
 - `src/tier1/` — register bytecode compiler (`prepare.rs`, `prepare_ops.rs`,
   `prepare_ops_data.rs`, `prepare_fuse.rs`), opcode/error types (`opcode.rs`),
-  and register machine (`machine.rs`, `machine_ops.rs`, `machine_cli.rs`,
-  `machine_dict.rs`, `machine_call.rs`, `machine_recovery.rs`) running over
-  `tier0::Heap` and `crate::stdlib`.
+  register machine (`machine.rs`, `machine_ops.rs`, `machine_cli.rs`,
+  `machine_dict.rs`, `machine_call.rs`, `machine_recovery.rs`, etc.), and
+  bytecode test runner (`test_runner.rs`) running over `tier0::Heap` and
+  `crate::stdlib`.
 - `tests/kernel_primitives.rs` — direct primitive-kernel boundary tests against
   `flick_vm::stdlib` and its accounting/host hooks.
 - `tests/tier1_numeric.rs` — numeric-policy boundary tests, unsupported-operation

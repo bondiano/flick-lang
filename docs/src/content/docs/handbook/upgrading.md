@@ -72,6 +72,7 @@ change needs.
 | [VM Tier 1 runs std and CLI intrinsics](#vm-tier-1-runs-std-and-cli-intrinsics) | no | — |
 | [`flick-vm` `native-host` feature gate and `wasm32` runtime](#flick-vm-native-host-feature-gate-and-wasm32-runtime) | no | — |
 | [Live VM hot swap and atomic typed state migrations](#live-vm-hot-swap-and-atomic-typed-state-migrations) | no | — |
+| [VM Tier 1 is the default for `--target vm`](#vm-tier-1-is-the-default-for---target-vm) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -977,3 +978,13 @@ migrations on `VmSession` across both tier 0 and tier 1:
   cells on commit and rolling back atomically with zero heap leaks on failure.
 
 Existing Flick sources require no changes.
+
+## VM Tier 1 is the default for `--target vm`
+
+`flick run --target vm` and `flick test --target vm` now execute on the tier-1
+register bytecode VM by default, including pure, effectful, virtual-clock, and
+seeded 100-draw property tests (with exact draw and shrink parity against JS
+and Go) and native `Host.Process.spawn`. The tier-0 reference VM remains
+selectable as an oracle via `--vm-tier 0`, `--vm-tier tier0`, or
+`[target.vm] tier = "0"` in `flick.toml` (and remains the default for
+`flick repl`). Existing Flick sources require no edits.
