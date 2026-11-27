@@ -28,6 +28,7 @@ import Formal.MemoryArena
 import Formal.MemoryScopes
 import Formal.MemoryReuse
 import Formal.MemoryAggregate
+import Formal.HotSwap
 
 /-!
 # The axioms of the main theorems
@@ -452,3 +453,59 @@ prints, and `#guard_msgs` turns the difference into an error.
 /-- info: 'Flick.FixedWidth.ordNaNLast_greatest' depends on axioms: [propext] -/
 #guard_msgs in
 #print axioms Flick.FixedWidth.ordNaNLast_greatest
+
+/-- info: 'Flick.HotSwap.subsumes_generalize_mono' depends on axioms: [propext, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.subsumes_generalize_mono
+
+/-- info: 'Flick.HotSwap.not_subsumes_narrow_poly' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.not_subsumes_narrow_poly
+
+/-- info: 'Flick.HotSwap.not_subsumes_widen_effect' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.not_subsumes_widen_effect
+
+/-- info: 'Flick.HotSwap.not_subsumes_narrow_param_cap' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.not_subsumes_narrow_param_cap
+
+/-- info: 'Flick.HotSwap.swap_preserves_cfgTy' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.swap_preserves_cfgTy
+
+/-- info: 'Flick.HotSwap.swap_old_frame_and_new_call' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.swap_old_frame_and_new_call
+
+/-- info: 'Flick.HotSwap.migration_preserves_cfgTy' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.migration_preserves_cfgTy
+
+/-- info: 'Flick.HotSwap.migration_rollback_atomic' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.migration_rollback_atomic
+
+/-- info: 'Flick.HotSwap.migration_in_place_preserves_cfgTy' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.migration_in_place_preserves_cfgTy
+
+/-- info: 'Flick.HotSwap.SessionOk.exec' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.SessionOk.exec
+
+/-- info: 'Flick.HotSwap.SessionOk.swap' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.SessionOk.swap
+
+/-- info: 'Flick.HotSwap.SessionOk.migrate' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.SessionOk.migrate
+
+/-- info: 'Flick.HotSwap.old_frame_well_typed_under_extended_store' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.old_frame_well_typed_under_extended_store
+
+/-- info: 'Flick.HotSwap.hotSwap_progress_unaffected' depends on axioms: [propext, Classical.choice, Quot.sound] -/
+#guard_msgs in
+#print axioms Flick.HotSwap.hotSwap_progress_unaffected

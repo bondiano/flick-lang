@@ -15,6 +15,7 @@
 //! Preservation can be checked on the states of the machine (the model properties, `just model`).
 
 mod bindings;
+pub mod compat;
 mod constants;
 mod dicts;
 mod expr;
@@ -59,6 +60,10 @@ use crate::eval::Program;
 use crate::syntax::{Name, Path, Term};
 use crate::types::{Caps, Fields, Kind, Row, Scheme, Stage, Type, Var};
 
+pub use compat::{
+    CompatibilityError, check_migration_fn, check_scheme_compatibility, check_swap_value,
+    format_scheme, is_closed_source_term, is_closed_source_value,
+};
 pub(crate) use constants::prim_scheme;
 pub(crate) use generalize::{Inst, in_regions, substitute};
 pub(crate) use regions::{live_service, scope_service};

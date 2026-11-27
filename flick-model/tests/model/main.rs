@@ -16,6 +16,8 @@ pub mod disagreements;
 pub mod foreign_staging;
 pub mod gadt_rows;
 pub mod generic;
+pub mod hotswap;
+pub mod hotswap_migrations;
 pub mod ir_let_types;
 pub mod leaks;
 pub mod live;

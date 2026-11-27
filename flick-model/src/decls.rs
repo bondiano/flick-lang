@@ -64,7 +64,7 @@ pub struct ModuleContract {
     pub packable: bool,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Decls {
     pub values: HashMap<Path, Scheme>,
     /// Compiler-only raw foreign aliases. These have source schemes but do

@@ -12,6 +12,57 @@ impl<'p> Machine<'p> {
         }
     }
 
+    pub(crate) fn from_state(program: &'p Program, state: MachineState) -> Self {
+        Machine {
+            program,
+            mem: state.mem,
+            lambda: state.lambda,
+            frames: state.frames,
+            roots: state.roots,
+            stdout: state.stdout,
+            fuel: state.fuel,
+            handlers: state.handlers,
+        }
+    }
+
+    pub(crate) fn into_state(self) -> MachineState {
+        MachineState {
+            mem: self.mem,
+            lambda: self.lambda,
+            frames: self.frames,
+            roots: self.roots,
+            stdout: self.stdout,
+            fuel: self.fuel,
+            handlers: self.handlers,
+        }
+    }
+
+    /// Executes exactly one small step from `control`, leaving `self.frames`
+    /// intact when the run continues.
+    pub(crate) fn step_once(&mut self, control: Control) -> Result<Control, Outcome> {
+        if self.fuel == 0 {
+            return Err(Outcome::OutOfFuel);
+        }
+        self.fuel -= 1;
+        match control {
+            Control::Eval(e) => self.eval(e),
+            Control::Ret(v) => match self.frames.pop() {
+                None => Err(Outcome::Value(v)),
+                Some(f) => self.ret(f, v),
+            },
+            Control::Raise(v) => self.unwind(v),
+        }
+    }
+
+    /// Reconstructs `E[e]` from an explicit frame stack and control state.
+    pub(crate) fn plug_control(frames: &[Frame], control: &Control) -> Term {
+        let e = match control {
+            Control::Eval(e) | Control::Ret(e) => e.clone(),
+            Control::Raise(v) => Term::Raise(Rc::new(v.clone())),
+        };
+        frames.iter().rev().fold(e, |acc, f| f.plug(acc))
+    }
+
     /// `Σ₀ := build(v)` for the value `v` of `layer`: the services the
     /// runner provides, which answer an operation no handler of the run does.
     pub fn provide_roots(&mut self, layer: Term) -> Result<(), Outcome> {

@@ -24,7 +24,7 @@ use crate::subst::{matches, subst};
 use crate::syntax::{Arm, Const, Env, GETTER, Head, Lit, Name, Path, Term};
 
 /// The top-level values of a program, by name.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Program {
     pub globals: HashMap<Path, Term>,
     /// The derived instances, which the model writes itself: the checker
@@ -33,7 +33,7 @@ pub struct Program {
 }
 
 /// How a run ends (§3.1), or why the model could not take a step.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Outcome {
     Value(Term),
     /// An expected error that no `try` took.
@@ -46,10 +46,25 @@ pub enum Outcome {
 }
 
 /// What the machine does next.
-enum Control {
+#[derive(Clone, Debug)]
+pub(crate) enum Control {
     Eval(Term),
     Ret(Term),
     Raise(Term),
+}
+
+/// Owned machine execution state detached from `&Program` so a live session
+/// can inspect, type-check, hot-swap globals, or migrate state cells between
+/// individual small steps.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct MachineState {
+    pub(crate) mem: Vec<Term>,
+    pub(crate) lambda: Lambda,
+    pub(crate) frames: Vec<Frame>,
+    pub(crate) roots: Env,
+    pub(crate) stdout: String,
+    pub(crate) fuel: u64,
+    pub(crate) handlers: usize,
 }
 
 type Step = Result<Control, Outcome>;

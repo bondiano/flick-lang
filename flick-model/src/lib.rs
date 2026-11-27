@@ -20,6 +20,7 @@ pub mod elab;
 pub mod eval;
 pub mod generate;
 pub mod handler;
+pub mod hotswap;
 #[cfg(test)]
 mod modules;
 pub mod native;

@@ -9,7 +9,7 @@ use crate::handler::{Cont, Handler};
 use crate::syntax::{Arm, Env, Lit, Name, Pat, Path, Term};
 use crate::types::Scheme;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Frame {
     /// `□ e`.
     AppL(Rc<Term>),

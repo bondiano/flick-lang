@@ -214,3 +214,4 @@ import Formal.MemoryAggregate
 import Formal.MemoryArena
 import Formal.MemoryScopes
 import Formal.RecordOrder
+import Formal.HotSwap

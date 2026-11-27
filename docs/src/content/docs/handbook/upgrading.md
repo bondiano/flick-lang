@@ -68,6 +68,7 @@ change needs.
 | [Plugin protocol `0.5.0`](#plugin-protocol-050) | no | `FLICK-P035`, `FLICK-P036`, `FLICK-P044` |
 | [The kernel's defects](#the-kernels-defects) | no | — |
 | [`Math.log` in the kernel, and an exact `Float.next_pow2`](#mathlog-in-the-kernel-and-an-exact-floatnext_pow2) | no | — |
+| [Hot-swap compatibility and declared state-cell migrations (formal model)](#hot-swap-compatibility-and-declared-state-cell-migrations-formal-model) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -899,3 +900,27 @@ port of fdlibm's function; a third-party backend implements it too.
 JS `rt` runtime and on Go it went through a ratio of logarithms, which made
 `next_pow2 536870912.0` (2^29) `1073741824.0`. It is `536870912.0` now, as on
 the `effect` runtime, and a negative `n` gives NaN everywhere.
+
+## Hot-swap compatibility and declared state-cell migrations (formal model)
+
+The λFlick reference model (`flick-model::hotswap`) and Lean mechanization
+(`formal/Formal/HotSwap.lean`) now specify live-session hot swap and atomic
+state-cell migrations:
+
+- **Swap compatibility**: a replacement value must be closed and its scheme
+  must subsume the previous scheme (`σ_new ≤ σ_old`). Generalizing a scheme or
+  narrowing an effect row is accepted; narrowing a polymorphic scheme, widening
+  an effect row, or narrowing a contravariant capture/region qualifier is
+  rejected.
+- **Two-version execution**: frames and closures already running keep their
+  captured code and references to pre-migration store cells, while subsequent
+  calls to the global cell enter the new code.
+- **Atomic migrations**: pure `Old -> New` migration functions apply only to
+  declared state cells. Committing extends the store typing with both versions;
+  a failing or fuel-exhausted migration rolls back atomically with no state
+  change.
+
+Existing Flick sources require no changes. Differential `.fvm` image save/load
+and migrations outside declared state cells are out of scope for this model
+milestone; runtime VM hot swap builds on the exported compatibility checker and
+session oracle.

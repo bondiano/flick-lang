@@ -130,6 +130,25 @@ signature and golden certificates.
   shape matching, invariant atomic groups, captured closure evaluation,
   public-member projection and explicit/local/global dictionary precedence;
   see the [module boundary model](../docs/formal/modules.md).
+- **Hot swap and typed migrations** (`Formal/HotSwap.lean`, [`hot-swap.md`](../docs/formal/hot-swap.md)):
+  models a live session with global cells, compatible swaps (`SchemeSubsumes`:
+  generalizing schemes accepted, narrowing schemes, widening effect rows, and
+  narrowing contravariant capture/region qualifiers rejected; witnessed by
+  `subsumes_generalize_mono`, `not_subsumes_narrow_poly`,
+  `not_subsumes_widen_effect`, and `not_subsumes_narrow_param_cap`), two-version
+  dispatch (`swap_old_frame_and_new_call`), and atomic pure `Old -> New`
+  state-cell migrations (`MigrateStep`, `CellMigrationOk`). Proves preservation
+  of configuration typing under compatible swaps (`swap_preserves_cfgTy`,
+  `SessionOk.swap`), preservation under well-typed migrations extending the
+  store typing with both old and new versions plus atomicity on failure or
+  divergence (`migration_preserves_cfgTy`, `migration_rollback_atomic`,
+  `migration_in_place_preserves_cfgTy`, `SessionOk.migrate`), and that progress
+  is unaffected with old frames remaining well typed against the extended store
+  typing (`old_frame_well_typed_under_extended_store`,
+  `hotSwap_progress_unaffected`). All theorems are pinned in
+  `Formal/Axioms.lean` with `#guard_msgs` (standard Lean axioms only; zero
+  `sorry`). Separate from the Rust VM implementation (`#990`) and does not cover
+  migrations outside declared state cells or differential image save/load.
 - **The core** (`Formal/`, the top-level modules), with rows of services and errors that
   take variables, generalized and instantiated as variables of the other kinds, and arms on
   the constructors of a GADT typed under every unifier of what the constructor builds with
