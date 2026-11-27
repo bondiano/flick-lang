@@ -1,4 +1,5 @@
-//! Effect handler installation, epoch-cached lookup, and tail/abort/control dispatch for tier 1.
+//! Effect handler installation, epoch-cached lookup, service fallback, and
+//! tail/abort/control dispatch for tier 1.
 
 use std::collections::VecDeque;
 use std::{iter, mem};
@@ -6,10 +7,11 @@ use std::{iter, mem};
 use flick_core::ir::memory::MemorySpan;
 use flick_core::types::OpClass;
 
-use crate::stdlib::{self, HostContext};
-use crate::tier0::{Data, Error, Value};
+use crate::stdlib::runtime::layers as std_layers;
+use crate::stdlib::{self, FuelCounter, HostContext};
+use crate::tier0::{Data, Error, HostMode, Value};
 
-use super::machine::{End, Machine, RegVal};
+use super::machine::{End, Machine, OwnerEvidence, RegVal};
 use super::machine_unwind::{CapturedFrames, Discard, TransferNext};
 use super::opcode::CompiledHandlerOp;
 
@@ -52,12 +54,14 @@ pub(super) enum InvocationEnd {
     Tail(usize),
     Abort(usize),
     Control { cont_id: usize, dst: usize },
+    Caller(usize),
 }
 
 pub(super) struct Invocation {
     pub(super) callee: Option<RegVal>,
     pub(super) arguments: VecDeque<RegVal>,
     pub(super) end: InvocationEnd,
+    pub(super) evidence: Option<OwnerEvidence>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -65,6 +69,12 @@ pub(super) struct CachedHandlerHit {
     pub(super) frame_index: usize,
     pub(super) activation_id: usize,
     pub(super) op_index: usize,
+}
+
+enum PerformLookup {
+    Handler(CachedHandlerHit),
+    Service(Value),
+    None,
 }
 
 impl Machine<'_, '_> {
@@ -188,7 +198,7 @@ impl Machine<'_, '_> {
         )
     }
 
-    pub(super) fn lookup_handler(&mut self, op_id: usize) -> Option<CachedHandlerHit> {
+    fn lookup_perform(&mut self, op_id: usize) -> Result<PerformLookup, Error> {
         if self.handler_cache_epoch != self.handler_epoch {
             self.handler_cache.clear();
             self.handler_cache_epoch = self.handler_epoch;
@@ -198,14 +208,24 @@ impl Machine<'_, '_> {
             {
                 self.handler_cache_hits += 1;
             }
-            return cached;
+            return Ok(cached.map_or(PerformLookup::None, PerformLookup::Handler));
         }
         #[cfg(test)]
         {
             self.handler_cache_misses += 1;
         }
+        let effect = &self.image.operations[op_id].effect;
         let mut found = None;
         for at in (0..self.frames.len()).rev() {
+            if let Some(impl_rep) = Self::find_end_service(
+                self.heap,
+                &self.frames[at].end,
+                &self.providers,
+                effect,
+                &mut self.fuel,
+            )? {
+                return Ok(PerformLookup::Service(impl_rep));
+            }
             if let End::Handle { activation, .. } = self.frames[at].end
                 && let Some(handler) = self.activations.get(&activation)
                 && let Some(op_index) = handler.operations.iter().position(|op| op.op_id == op_id)
@@ -219,7 +239,7 @@ impl Machine<'_, '_> {
             }
         }
         self.handler_cache.insert(op_id, found);
-        found
+        Ok(found.map_or(PerformLookup::None, PerformLookup::Handler))
     }
 
     pub(super) fn exec_perform(
@@ -232,23 +252,15 @@ impl Machine<'_, '_> {
     ) -> Result<(), Error> {
         self.stage_slots(dicts)?;
         self.stage_slots(args)?;
-        let Some(hit) = self.lookup_handler(op_id) else {
-            let prep_op = &self.image.operations[op_id];
-            if let Some(kind) = prep_op.console_fallback
-                && dicts.is_empty()
-                && args.len() == 1
-            {
-                let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
-                    .with_stderr(&mut self.stderr)
-                    .with_program_args(&self.program_args)
-                    .with_host_services(&mut self.host_services);
-                let res = stdlib::eval_intrinsic(self.heap, kind, &self.scratch[0], &mut hooks)?;
-                return self.finish_primitive(dst, res);
+        let hit = match self.lookup_perform(op_id)? {
+            PerformLookup::Service(impl_rep) => {
+                let op = self.image.operations[op_id].op.clone();
+                return self.invoke_service_impl(&impl_rep, dst, &op);
             }
-            let effect = prep_op.effect.clone();
-            let op = prep_op.op.clone();
-            self.charge_fuel(effect.len().saturating_add(op.len()).saturating_add(1))?;
-            return Err(Error::MissingHandler { effect, op });
+            PerformLookup::Handler(hit) => hit,
+            PerformLookup::None => {
+                return self.perform_fallback(dst, op_id, dicts.len(), args.len());
+            }
         };
 
         let End::Handle {
@@ -297,10 +309,92 @@ impl Machine<'_, '_> {
         )
     }
 
+    fn perform_fallback(
+        &mut self,
+        dst: usize,
+        op_id: usize,
+        dict_count: usize,
+        arg_count: usize,
+    ) -> Result<(), Error> {
+        let prep_op = &self.image.operations[op_id];
+        let effect = prep_op.effect.clone();
+        let op_name = prep_op.op.clone();
+        let console_fallback = prep_op.console_fallback;
+        let mut inherited_rep = None;
+        for s in &self.inherited_services {
+            if let Some(imp) = std_layers::lookup_layer_service(
+                self.heap,
+                s,
+                &effect,
+                &mut FuelCounter(&mut self.fuel),
+            )? {
+                inherited_rep = Some(imp.representation());
+                break;
+            }
+        }
+        if let Some(rep) = inherited_rep {
+            return self.invoke_service_impl(&rep, dst, &op_name);
+        }
+        let inherited_op = self
+            .inherited_tail_ops
+            .iter()
+            .find(|cand| cand.op_id == op_id)
+            .map(|cand| {
+                let func = match &cand.function {
+                    RegVal::StaticClosure(code) => Ok(RegVal::StaticClosure(*code)),
+                    RegVal::Value(val) => {
+                        let rep = val.representation();
+                        self.heap.dup(&rep).map(RegVal::Value)
+                    }
+                };
+                (cand.dicts, cand.arity, func)
+            });
+        if let Some((expected_dicts, expected_args, func_res)) = inherited_op {
+            if expected_dicts != dict_count || expected_args != arg_count {
+                if let Ok(func) = func_res {
+                    self.drop_reg(func)?;
+                }
+                return Err(Error::OperationArgumentCount {
+                    effect,
+                    op: op_name,
+                    expected_dicts,
+                    actual_dicts: dict_count,
+                    expected_args,
+                    actual_args: arg_count,
+                });
+            }
+            let func = func_res?;
+            return self.queue_service_invocation(func, dst);
+        }
+        if let Some(root) = self.root_with(&effect)? {
+            return self.invoke_provider(root, dst, &effect, &op_name);
+        }
+        if self.root.is_none()
+            && let Some(kind) = console_fallback
+            && dict_count == 0
+            && arg_count == 1
+        {
+            let mut hooks = HostContext::new(&mut self.fuel, self.host_mode, &mut self.stdout)
+                .with_stderr(&mut self.stderr)
+                .with_program_args(&self.program_args)
+                .with_host_services(&mut self.host_services);
+            if self.host_mode == HostMode::Deterministic || self.test_clock_mode {
+                hooks = hooks.with_virtual_now_ns(self.virtual_now_ns);
+            }
+            let res = stdlib::eval_intrinsic(self.heap, kind, &self.scratch[0], &mut hooks)?;
+            return self.finish_primitive(dst, res);
+        }
+        self.charge_fuel(effect.len().saturating_add(op_name.len()).saturating_add(1))?;
+        Err(Error::MissingHandler {
+            effect,
+            op: op_name,
+        })
+    }
+
     fn maybe_cutoff_control(&mut self, at: usize) -> Result<bool, Error> {
         let mut cutoff_at = None;
         for idx in (at + 1..self.frames.len()).rev() {
-            if Self::is_cutoff_cleanup_end(&self.frames[idx].end) {
+            if self.is_cutoff_cleanup_end(&self.frames[idx].end)? {
                 cutoff_at = Some(idx);
                 break;
             }
@@ -414,6 +508,7 @@ impl Machine<'_, '_> {
                 callee: Some(func),
                 arguments: args,
                 end,
+                evidence: self.current_evidence,
             },
         );
         if matches!(class, OpClass::Tail | OpClass::Control) {

@@ -49,6 +49,7 @@ impl Heap {
     }
 
     pub(crate) fn allocate(&mut self, data: Data) -> Value {
+        let bytes = data_byte_size(&data);
         self.stats.cells_allocated += usize::from(matches!(data, Data::Cell { .. }));
         self.stats.arenas_allocated += usize::from(matches!(data, Data::Arena { .. }));
         let (index, generation) = if let Some(index) = self.free_list.pop() {
@@ -56,6 +57,7 @@ impl Heap {
             slot.object = Some(Object {
                 references: 1,
                 owner_module: self.active_module,
+                bytes,
                 data,
             });
             (index, slot.generation)
@@ -66,6 +68,7 @@ impl Heap {
                 object: Some(Object {
                     references: 1,
                     owner_module: self.active_module,
+                    bytes,
                     data,
                 }),
             });
@@ -79,6 +82,13 @@ impl Heap {
         self.stats.allocations += 1;
         self.stats.live_objects += 1;
         self.stats.peak_live_objects = self.stats.peak_live_objects.max(self.stats.live_objects);
+        self.live_bytes = self.live_bytes.saturating_add(bytes);
+        self.peak_live_bytes = self.peak_live_bytes.max(self.live_bytes);
+        if let Some(cap) = self.byte_limit
+            && self.live_bytes > cap
+        {
+            self.byte_limit_exceeded = true;
+        }
         Value::Object(ObjectToken { id })
     }
 
@@ -104,7 +114,7 @@ impl Heap {
             .ok_or(Error::InvalidObject(id))
     }
 
-    fn cell_contents<'a>(
+    pub(crate) fn cell_contents<'a>(
         &'a self,
         execution: usize,
         cell: &CellHandle,
@@ -125,7 +135,7 @@ impl Heap {
         contents.as_ref().ok_or(Error::ClosedCell)
     }
 
-    fn cell_contents_mut<'a>(
+    pub(crate) fn cell_contents_mut<'a>(
         &'a mut self,
         execution: usize,
         cell: &CellHandle,
@@ -146,7 +156,7 @@ impl Heap {
         contents.as_mut().ok_or(Error::ClosedCell)
     }
 
-    fn arena_contents<'a>(
+    pub(crate) fn arena_contents<'a>(
         &'a self,
         execution: usize,
         arena: &ArenaHandle,
@@ -177,7 +187,7 @@ impl Heap {
         Ok(contents)
     }
 
-    fn arena_contents_mut<'a>(
+    pub(crate) fn arena_contents_mut<'a>(
         &'a mut self,
         execution: usize,
         arena: &ArenaHandle,
@@ -314,6 +324,7 @@ impl Heap {
                         self.free_list.push(id.id.index);
                         self.stats.frees += 1;
                         self.stats.live_objects -= 1;
+                        self.live_bytes = self.live_bytes.saturating_sub(object.bytes);
                         self.release_data(id.id, object.data, &mut pending);
                     }
                 }

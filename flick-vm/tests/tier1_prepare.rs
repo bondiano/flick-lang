@@ -7,12 +7,12 @@ use std::path::{Path, PathBuf};
 
 use flick_core::diagnostics::Severity;
 use flick_core::ir::memory::{
-    Block, Exit, Function, Global, HostPrimitive, HostServiceIntrinsic, Instruction, Intrinsic,
-    MemorySpan, Name, Operation, Program, ValueRep,
+    Block, Exit, ForeignCallSpec, Function, Global, HostPrimitive, HostServiceIntrinsic,
+    Instruction, Intrinsic, MemorySpan, Name, Operation, Program, ValueRep, WireHint,
 };
-use flick_core::ir::{Lit, Pat};
+use flick_core::ir::{Adapter, ForeignMode, Lit, Pat};
 use flick_core::opt::perceus;
-use flick_core::source::{FileId, SourceMap};
+use flick_core::source::SourceMap;
 use flick_core::{build, project};
 use flick_vm::tier0::{self, Error, Heap, HostMode, ProgramOutcome, Value};
 use flick_vm::tier1::{self, PrepareError};
@@ -88,6 +88,28 @@ fn lower_source(src: &str, entry: &Name) -> (Program, SourceMap) {
     (program, sources)
 }
 
+fn dummy_foreign_call(name: &str) -> Operation {
+    Operation::ForeignCall {
+        spec: Box::new(ForeignCallSpec {
+            module: "Test".to_owned(),
+            source_dir: None,
+            from: Some("node:fs".to_owned()),
+            name: name.to_owned(),
+            mode: ForeignMode::Pure,
+            dicts: 0,
+            arity: 0,
+            taken: 0,
+            runtime: false,
+            has_catch: false,
+            adapter: Adapter::default(),
+            arg_hints: Vec::new(),
+            result_hint: WireHint::Any,
+            remaining_stages: Vec::new(),
+        }),
+        args: Vec::new(),
+    }
+}
+
 #[test]
 fn unsupported_reachable_operations_report_name_and_source_span() {
     let source = "\
@@ -98,8 +120,27 @@ let main () =
   await (task { 42 })
 ";
     let entry = Name::new("App.Main", "main");
-    let (program, sources) = lower_source(source, &entry);
-    let err = tier1::prepare(&program, &entry).expect_err("Task must fail tier1 prepare");
+    let (program, _sources) = lower_source(source, &entry);
+    let mut heap = Heap::new();
+    let exec = tier1::execute_main_program(&mut heap, &program, &entry, 10_000)
+        .expect("tier1 prepares task/await")
+        .expect("task/await executes");
+    assert_eq!(exec.value, Value::Int(42));
+    heap.drop_value(exec.value).expect("drop");
+    heap.finish().expect("zero leaks");
+
+    let mut foreign_prog =
+        single_op_program(vec![let_op(0, dummy_foreign_call("readFileSync"))], 0);
+    foreign_prog.op_spans.insert(
+        (0, 0),
+        MemorySpan {
+            file: 3,
+            start: 10,
+            end: 24,
+        },
+    );
+    let err = tier1::prepare(&foreign_prog, &main_name())
+        .expect_err("ForeignCall must fail tier1 prepare");
     let PrepareError::Unsupported {
         operation,
         span: Some(MemorySpan { file, start, end }),
@@ -108,51 +149,31 @@ let main () =
     else {
         panic!("expected Unsupported with source span, got {err:?}");
     };
-    assert_eq!(operation, "Task");
-    let text = &sources.get(FileId::new(file)).text;
-    let snippet = &text[start as usize..end as usize];
-    assert!(
-        snippet.contains("task") && snippet.contains("42"),
-        "expected span to point at task expression, got {snippet:?}"
-    );
+    assert_eq!(operation, "ForeignCall(readFileSync)");
+    assert_eq!((file, start, end), (3, 10, 24));
 }
 
 #[test]
 fn unreachable_unsupported_global_does_not_block_pure_entry() {
     let mut program = single_op_program(vec![let_op(0, Operation::Literal(Lit::Int(7)))], 0);
-    let task_body = perceus::insert(&Function {
-        params: vec![0, 1],
-        body: Block {
-            instructions: vec![let_op(2, Operation::Literal(Lit::Int(1)))],
-            exit: Exit::Return(2),
-        },
-    })
-    .expect("valid task body");
     let bad = perceus::insert(&Function {
         params: vec![],
         body: Block {
-            instructions: vec![let_op(
-                0,
-                Operation::Task {
-                    code: 2,
-                    captures: vec![],
-                },
-            )],
+            instructions: vec![let_op(0, dummy_foreign_call("nativeHook"))],
             exit: Exit::Return(0),
         },
     })
     .expect("valid bad fn");
     program.functions.insert(1, bad);
-    program.functions.insert(2, task_body);
     program.globals.push(Global {
-        name: Name::new("Test", "unused_task"),
+        name: Name::new("Test", "unused_foreign"),
         initializer: 1,
     });
 
     assert!(tier1::prepare(&program, &main_name()).is_ok());
-    let err = tier1::prepare(&program, &Name::new("Test", "unused_task"))
-        .expect_err("reachable Task must fail prepare");
-    assert_eq!(err.operation(), Some("Task"));
+    let err = tier1::prepare(&program, &Name::new("Test", "unused_foreign"))
+        .expect_err("reachable ForeignCall must fail prepare");
+    assert_eq!(err.operation(), Some("ForeignCall(nativeHook)"));
 }
 
 #[test]

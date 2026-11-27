@@ -6,10 +6,10 @@
 use std::collections::BTreeSet;
 use std::mem;
 
-use flick_core::ir::{BinOp, Lit, Pat};
+use flick_core::ir::Lit;
 
 use crate::stdlib::{self, FuelCounter, HostContext};
-use crate::tier0::{Data, Error, Value, VarHandle, patterns};
+use crate::tier0::{Data, Error, HostMode, Value, VarHandle, patterns};
 
 use super::machine::{Machine, RegVal};
 use super::opcode::{Instr, ValueSource};
@@ -37,8 +37,11 @@ impl Machine<'_, '_> {
                 let val = self.heap.service_tag(key)?;
                 self.store_raw(*dst, RegVal::Value(val));
             }
-            Instr::NoOwner { dst } => {
-                self.store_raw(*dst, RegVal::Value(Value::Unit));
+            Instr::ReadOwnerEvidence { dst } => {
+                let value = self
+                    .current_evidence
+                    .map_or(Value::Unit, super::machine_state::OwnerEvidence::value);
+                self.store_raw(*dst, RegVal::Value(value));
             }
             Instr::Dup { src, dst } => {
                 let reg = self.peek_reg(*src)?;
@@ -121,6 +124,14 @@ impl Machine<'_, '_> {
                     .with_stderr(&mut self.stderr)
                     .with_program_args(&self.program_args)
                     .with_host_services(&mut self.host_services);
+                if self.host_mode == HostMode::Deterministic || self.test_clock_mode {
+                    hooks = hooks.with_virtual_now_ns(self.virtual_now_ns);
+                }
+                if let Some(rng_id) = self.seeded_random
+                    && let Some(rng) = self.isaac_rngs.get_mut(&rng_id)
+                {
+                    hooks = hooks.with_seeded_rng(rng);
+                }
                 let res = stdlib::eval_intrinsic(self.heap, *kind, &self.scratch[0], &mut hooks)?;
                 self.finish_primitive(*dst, res)?;
             }
@@ -130,6 +141,14 @@ impl Machine<'_, '_> {
                     .with_stderr(&mut self.stderr)
                     .with_program_args(&self.program_args)
                     .with_host_services(&mut self.host_services);
+                if self.host_mode == HostMode::Deterministic || self.test_clock_mode {
+                    hooks = hooks.with_virtual_now_ns(self.virtual_now_ns);
+                }
+                if let Some(rng_id) = self.seeded_random
+                    && let Some(rng) = self.isaac_rngs.get_mut(&rng_id)
+                {
+                    hooks = hooks.with_seeded_rng(rng);
+                }
                 let res = stdlib::eval_host_service(self.heap, *op, &self.scratch, &mut hooks)?;
                 self.finish_primitive(*dst, res)?;
             }
@@ -316,6 +335,11 @@ impl Machine<'_, '_> {
                     self.store_raw(*dst, RegVal::Value(val));
                 }
             }
+            Instr::Task {
+                dst,
+                code,
+                captures,
+            } => self.exec_task(*dst, *code, captures)?,
             Instr::Dictionary { dst, entries } => self.exec_dictionary(*dst, entries)?,
             Instr::Method {
                 dst,
@@ -413,66 +437,5 @@ impl Machine<'_, '_> {
             other => self.step_control(other)?,
         }
         Ok(())
-    }
-
-    fn eval_match_flag(&mut self, object: usize, pattern: &Pat) -> Result<bool, Error> {
-        let receiver = self.peek_value(object)?.representation();
-        patterns::test_only(self.heap, &receiver, pattern, &mut self.fuel)
-    }
-
-    pub(super) fn eval_compute(
-        &mut self,
-        op: BinOp,
-        left: ValueSource,
-        right: ValueSource,
-    ) -> Result<Value, Error> {
-        let left_val = self.read_source(left)?;
-        self.scratch.push(left_val);
-        let right_val = self.read_source(right)?;
-        self.scratch.push(right_val);
-        let res = stdlib::eval_binary_slice(
-            self.heap,
-            op,
-            &self.scratch,
-            &mut FuelCounter(&mut self.fuel),
-        )?;
-        self.pending = Some(RegVal::Value(res));
-        self.release_operands()?;
-        let Some(RegVal::Value(val)) = self.pending.take() else {
-            unreachable!("staged compute result");
-        };
-        Ok(val)
-    }
-
-    fn read_source(&mut self, source: ValueSource) -> Result<Value, Error> {
-        match source {
-            ValueSource::Slot(slot) => self.take_value(slot),
-            ValueSource::Cell(slot) => {
-                let handle = Self::expect_var(self.peek_value(slot)?)?;
-                let current = self
-                    .heap
-                    .var_contents(self.execution, &handle)?
-                    .representation();
-                self.heap.dup(&current)
-            }
-            ValueSource::Immediate(imm) => Ok(imm.to_value()),
-        }
-    }
-
-    fn expect_var(value: &Value) -> Result<VarHandle, Error> {
-        let Value::Var(handle) = value else {
-            return Err(Error::ExpectedVar);
-        };
-        Ok(VarHandle {
-            id: handle.id,
-            execution: handle.execution,
-        })
-    }
-
-    pub(super) fn finish_primitive(&mut self, dst: usize, result: Value) -> Result<(), Error> {
-        self.pending = Some(RegVal::Value(result));
-        self.release_operands()?;
-        let reg = self.pending.take().expect("staged primitive result");
-        self.store_reg(dst, reg)
     }
 }

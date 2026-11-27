@@ -14,6 +14,7 @@
 )]
 
 pub mod image;
+pub mod sandbox;
 pub mod session;
 pub mod stdlib;
 pub mod tier0;

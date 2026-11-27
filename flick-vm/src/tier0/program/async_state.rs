@@ -503,6 +503,7 @@ impl<'p, 'h> Machine<'p, 'h> {
             bridge: None,
             foreign: ForeignState::default(),
             external_interrupt: None,
+            sandbox: SandboxRuntime::default(),
         }
     }
 }

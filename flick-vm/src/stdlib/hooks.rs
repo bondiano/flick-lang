@@ -1,6 +1,7 @@
 //! Caller-supplied fuel, allocation, and host environment hooks for the
 //! tier-neutral stdlib interface.
 
+use crate::sandbox::CapabilitySet;
 use crate::tier0::{Error, Heap};
 
 use super::host::{HostMode, HostServices};
@@ -59,6 +60,12 @@ pub trait HostEnv {
     /// [`HostMode::LiveOs`]).
     fn next_seeded_random(&mut self) -> Option<f64> {
         None
+    }
+
+    /// Capability set enforced dynamically on host primitives and services.
+    /// Defaults to [`CapabilitySet::all`] for backward compatibility.
+    fn capabilities(&self) -> CapabilitySet {
+        CapabilitySet::all()
     }
 }
 
@@ -159,6 +166,7 @@ pub struct HostContext<'a> {
     virtual_now_ns: Option<u64>,
     seeded_rng: Option<&'a mut IsaacRng>,
     host_services: Option<&'a mut HostServices>,
+    capabilities: CapabilitySet,
 }
 
 impl<'a> HostContext<'a> {
@@ -172,7 +180,14 @@ impl<'a> HostContext<'a> {
             virtual_now_ns: None,
             seeded_rng: None,
             host_services: None,
+            capabilities: CapabilitySet::all(),
         }
+    }
+
+    #[must_use]
+    pub fn with_capabilities(mut self, capabilities: CapabilitySet) -> Self {
+        self.capabilities = capabilities;
+        self
     }
 
     #[must_use]
@@ -240,5 +255,9 @@ impl HostEnv for HostContext<'_> {
 
     fn next_seeded_random(&mut self) -> Option<f64> {
         self.seeded_rng.as_deref_mut().map(IsaacRng::next_f64)
+    }
+
+    fn capabilities(&self) -> CapabilitySet {
+        self.capabilities
     }
 }

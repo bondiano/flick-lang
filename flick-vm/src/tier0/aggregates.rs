@@ -53,12 +53,12 @@ impl Heap {
         }
         fields.extend(dicts);
         match rep {
-            ValueRep::Cell => Ok(self.allocate(Data::Tagged {
+            ValueRep::Cell => self.try_allocate(Data::Tagged {
                 tag: tag.to_owned(),
                 ordinary_fields,
                 fields,
                 layout,
-            })),
+            }),
             ValueRep::Aggregate => Ok(Value::Aggregate {
                 tag: tag.to_owned(),
                 ordinary_fields,
@@ -83,10 +83,10 @@ impl Heap {
             self.drop_value(value)?;
             return Err(Error::ExpectedAggregate);
         }
-        Ok(self.allocate(Data::BoxedAggregate {
+        self.try_allocate(Data::BoxedAggregate {
             layout,
             value: Box::new(value),
-        }))
+        })
     }
 
     /// Borrows a boxed fallback cell and returns an owned copy of its
@@ -132,6 +132,7 @@ impl Heap {
             self.stats.drops += 1;
             self.stats.frees += 1;
             self.stats.live_objects -= 1;
+            self.live_bytes = self.live_bytes.saturating_sub(freed.bytes);
             let Data::BoxedAggregate { value, .. } = freed.data else {
                 unreachable!("verified boxed aggregate");
             };

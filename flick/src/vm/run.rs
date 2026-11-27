@@ -412,14 +412,26 @@ fn execute_tier1(
     global: &GlobalArguments,
 ) -> ExitCode {
     let mut heap = Heap::new();
-    let report = match tier1::execute_main_program_outcome_with_args(
-        &mut heap,
-        &lowered.program,
-        entry,
-        u64::MAX,
-        HostMode::LiveOs,
-        program_args,
-    ) {
+    let result = match &lowered.root {
+        Some(root) => tier1::execute_rooted_main_program_outcome_with_args(
+            &mut heap,
+            &lowered.program,
+            entry,
+            root,
+            u64::MAX,
+            HostMode::LiveOs,
+            program_args,
+        ),
+        None => tier1::execute_main_program_outcome_with_args(
+            &mut heap,
+            &lowered.program,
+            entry,
+            u64::MAX,
+            HostMode::LiveOs,
+            program_args,
+        ),
+    };
+    let report = match result {
         Ok(report) => report,
         Err(err) => {
             let diagnostic = match err.span() {

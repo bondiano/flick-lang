@@ -338,6 +338,7 @@ pub(crate) enum Data {
 pub(crate) struct Object {
     references: usize,
     owner_module: Option<u32>,
+    bytes: usize,
     pub(crate) data: Data,
 }
 
@@ -353,6 +354,10 @@ pub struct Heap {
     objects: Vec<Slot>,
     free_list: Vec<usize>,
     stats: Stats,
+    live_bytes: usize,
+    peak_live_bytes: usize,
+    byte_limit: Option<usize>,
+    byte_limit_exceeded: bool,
     reuse_enabled: bool,
     // Weak metadata: only live tag identities, never owned language tokens.
     service_tags: BTreeMap<String, ObjectId>,

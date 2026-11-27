@@ -674,6 +674,7 @@ struct Machine<'p, 'h> {
     bridge: Option<&'h mut HostBridge>,
     foreign: ForeignState<'p>,
     external_interrupt: Option<Arc<AtomicBool>>,
+    sandbox: SandboxRuntime,
 }
 
 include!("program/async_state.rs");
@@ -715,6 +716,7 @@ include!("program/layer_merge.rs");
 include!("program/test_runner.rs");
 include!("program/session_hooks.rs");
 include!("program/image_hooks.rs");
+include!("program/sandbox_hooks.rs");
 
 #[cfg(test)]
 mod tests {

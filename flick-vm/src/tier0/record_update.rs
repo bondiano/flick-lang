@@ -95,6 +95,7 @@ fn update_inner<T>(
             }
         }
         operands.extend(overwritten);
+        heap.refresh_object_bytes(object)?;
         heap.stats.reuses += 1;
         return Ok(base_value);
     }
@@ -122,11 +123,11 @@ fn update_inner<T>(
     charge(fuel, 1)?;
     let values = operands.split_off(checkpoint);
     heap.stats.reuse_fallbacks += 1;
-    Ok(heap.allocate(Data::Record(
+    heap.try_allocate(Data::Record(
         sources
             .into_iter()
             .map(|(label, _)| label)
             .zip(values)
             .collect(),
-    )))
+    ))
 }
