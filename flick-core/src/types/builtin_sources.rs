@@ -22,6 +22,7 @@ macro_rules! builtin_source {
 pub(super) const CORE: &[(&str, &str)] = &[
     ("Prelude", builtin_source!("core", "Prelude.fl")),
     ("Instances", builtin_source!("core", "Instances.fl")),
+    ("Flick.Defect", builtin_source!("core", "Flick/Defect.fl")),
     ("Record", builtin_source!("core", "Record.fl")),
     ("Enum", builtin_source!("core", "Enum.fl")),
     ("TypeEq", builtin_source!("core", "TypeEq.fl")),

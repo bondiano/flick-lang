@@ -48,6 +48,7 @@ the full hierarchy, laws, instance matrix and complexity bounds.
 | `Monoids` | `Sum` and `Product` of numbers, `First` and `Last` of an `Option`, `Min` and `Max` by `Ord`: `fold_map Sum xs` says how numbers combine |
 | `Generic` | `Generic a rep` with `to_rep` and `from_rep`, which `deriving Generic` gives a type, and its representation `Sum`, `Con`, `Field` (see [Deriving](../classes/#deriving)) |
 | `Validation` | `Validation e a`, a `Result` whose `map2` combines the errors of both with their `Semigroup`: an `and` group of `do` reports every error; `valid`, `invalid`, `from_result`, `to_result` |
+| `Flick.Defect` | `defect`, which stops pure code with a message the nearest handler of defects receives, as `Int.unsafe_div` by zero does (see [the kernel](../kernel/#defects)) |
 | `Form` | forms of a record type that derives `Form`: `draft`, `input`, `validate`, `report` (see [Forms](../form/)) |
 | `Route` | URLs of a type that derives `Url`: `print` and `parse`; `Atom.route` holds the current page (see [Routes](../route/)) |
 | `NonEmpty` | lists with at least one element |

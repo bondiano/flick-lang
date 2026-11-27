@@ -152,6 +152,7 @@ natives! {
     "flick:Exit", "flickIsFailure", 1 => exit::is_failure;
     "flick:Exit", "flickIsSuccess", 1 => exit::is_success;
     RT, "flickTodo", 1 => todo;
+    RT, "defect", 1 => todo;
     STRING, "includes", 2 => includes;
     STRING, "startsWith", 2 => starts_with;
     MODEL, "structShow", 2 => struct_ops::struct_show;

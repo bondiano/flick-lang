@@ -9,6 +9,11 @@ export const stdoutLine = (text: string): void => writeStdout(`${text}\n`);
 
 export const stderrLine = (text: string): void => writeStderr(`${text}\n`);
 
+/** The kernel's defect: pure code that stops with `message`. */
+export const defect = (message: string): never => {
+  throw new Error(message);
+};
+
 /** `todo`: code not written yet fails when it runs. */
 export const flickTodo = (message: string): never => {
   throw new Error(message);

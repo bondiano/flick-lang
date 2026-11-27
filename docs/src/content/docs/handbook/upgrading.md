@@ -66,6 +66,7 @@ change needs.
 | [`FuncRef` and callback retention in IR `0.18.0`](#funcref-and-callback-retention-in-ir-0180) | no | `FLICK-F015`, `FLICK-F013` |
 | [Host exports and library build artifacts (`0.19.0`)](#host-exports-and-library-build-artifacts-0190) | no | `FLICK-F004`, `FLICK-P012`, `FLICK-S014` |
 | [Plugin protocol `0.5.0`](#plugin-protocol-050) | no | `FLICK-P035`, `FLICK-P036`, `FLICK-P044` |
+| [The kernel's defects](#the-kernels-defects) | no | — |
 
 `flick check --fix page.md` rewrites the `flick` code blocks of a Markdown
 page, each checked on its own.
@@ -871,3 +872,17 @@ The `flick:plugin` component protocol moves from `0.4.0` to `0.5.0`:
 - WASM plugin components built for `flick:plugin@0.4.0` are rejected with
   `FLICK-P035` until rebuilt against `flick-plugin` (`0.5.0`). Existing Flick
   programs require no source changes.
+
+## The kernel's defects
+
+The primitive kernel `0.1.0` has two more primitives, `defect` and
+`flickAssert` of `flick:rt` (see [the kernel](../../reference/kernel/#defects)).
+`defect`, which the new core module `Flick.Defect` binds, stops pure code with
+a message; `Int.unsafe_div`, `Int.unsafe_rem` and `todo` have Flick bodies over
+it, so a backend without `@native` clauses of its own runs them through it.
+`flickAssert`, a failed `let assert`, is a primitive now, as no Flick body can
+render the value it missed.
+
+A third-party backend implements both; a program that reaches one it lacks is
+refused there. Flick sources need no change, unless a module of the project is
+named `Flick.Defect`.

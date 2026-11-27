@@ -194,6 +194,7 @@ platformEnv PlatformEnv
 platformVars PlatformVars
 processSpawn *ChildProcessSpawn
 flickTodo Todo
+defect RaiseDefect
 flickAssert Assert
 flickEcho Echo
 refMake RefMake

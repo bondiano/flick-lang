@@ -1,0 +1,14 @@
+// The kernel's defect: `Flick.Defect.defect` stops pure code, and code that
+// does not reach it does not stop. The kernel has no handler of defects, so
+// the message a handler receives is Language.Defects's to check.
+module Kernel.Defects exposing (tests)
+
+same : a -> a
+let same x = x
+
+tests : List Test.Test
+let tests = [
+  Test.test "a defect not reached does not stop" (fun () ->
+    Test.equal 1 (if same false then Flick.Defect.defect "never" else 1)
+  ),
+]

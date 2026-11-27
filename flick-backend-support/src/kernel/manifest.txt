@@ -194,6 +194,11 @@ bytesDecodeUtf8 kernel
 listLength kernel
 listGet kernel
 listInitialize kernel
+# data kernel, defects: pure code that stops, with a message and, after a
+# failed `let assert`, a rendering of the value it missed that each
+# backend chooses for debugging
+defect kernel
+flickAssert kernel
 # data kernel, mutable cells
 refMake kernel
 refGet kernel

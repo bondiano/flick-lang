@@ -1,6 +1,6 @@
 ---
 title: "Стандартная библиотека"
-source_hash: 15763c6a35b70d8c
+source_hash: cabef96653f92bec
 ---
 
 Стандартная библиотека написана на Flick и использует адаптер среды выполнения
@@ -51,6 +51,7 @@ source_hash: 15763c6a35b70d8c
 | `Monoids` | `Sum` и `Product` чисел, `First` и `Last` от `Option`, `Min` и `Max` по `Ord`: `fold_map Sum xs` говорит, как складывать числа |
 | `Generic` | `Generic a rep` с `to_rep` и `from_rep`, который даёт типу `deriving Generic`, и его представление `Sum`, `Con`, `Field` (см. [автоматический вывод](../classes/#автоматический-вывод-экземпляров-классов)) |
 | `Validation` | `Validation e a` — `Result`, у которого `map2` объединяет ошибки обоих значений через их `Semigroup`: группа `and` в `do` сообщает обо всех ошибках; `valid`, `invalid`, `from_result`, `to_result` |
+| `Flick.Defect` | `defect`, останавливающая чистый код с сообщением, которое получает ближайший обработчик дефектов, как при `Int.unsafe_div` на ноль (см. [ядро](../kernel/#дефекты)) |
 | `Form` | формы типа-записи с `deriving Form`: `draft`, `input`, `validate`, `report` (см. [Формы](../form/)) |
 | `Route` | URL типа с `deriving Url`: `print` и `parse`; текущую страницу держит `Atom.route` (см. [Маршруты](../route/)) |
 | `Option`, `Result` | `map`, `bind`, `with_default` и преобразования |
