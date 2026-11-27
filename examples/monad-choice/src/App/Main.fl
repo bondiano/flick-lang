@@ -1,0 +1,98 @@
+/// CLI entrypoint running one polymorphic `MonadChoice` release blueprint
+/// across four modes: `matrix`, `solve`, `sample` and `wizard`.
+module App.Main exposing (main)
+
+import App.View as View
+import Cli
+import Cli.Prompt
+import Deploy.Domain exposing (Constraints, Tier(..))
+import Deploy.Interpreters as Interpreters
+import Host
+import Terminal
+
+refined type NonNegativeInt = Int where fun n -> n >= 0
+  deriving Cli.Value
+
+refined type PositiveInt = Int where fun n -> n >= 1
+  deriving Cli.Value
+
+refined type SlaBps = Int where fun bps -> bps >= 0 && bps <= 10000
+  deriving Cli.Value
+
+matrix_command : Cli.Command {Host.Console} none
+let matrix_command = cli "matrix" {
+  description "Enumerate every valid release configuration for a tier"
+  /// Target environment tier: preview or production
+  flag tier "t" : Tier = Production
+  handle fun { tier } ->
+    let plans = Interpreters.enumerate tier
+    for line <- View.matrix_report tier plans do Platform.stdout_line line
+}
+
+solve_command : Cli.Command {Host.Console} {AppError}
+let solve_command = cli "solve" {
+  description "Search for a valid release plan with backtracking"
+  /// Target environment tier: preview or production
+  flag tier "t" : Tier = Production
+  /// Maximum monthly infrastructure cost in USD
+  flag max_cost "c" : NonNegativeInt
+  /// Maximum acceptable p95 latency in milliseconds (default: 50)
+  flag max_latency "l" : Option PositiveInt
+  /// Minimum availability in basis points, e.g. 9995 = 99.95% (default: 9990)
+  flag min_sla "s" : Option SlaBps
+  /// Require zero-downtime deployments
+  flag zero_downtime "z" : Bool
+  handle fun { tier; max_cost; max_latency; min_sla; zero_downtime } ->
+    let constraints : Constraints = {
+      maxCostUsd = NonNegativeInt.value max_cost
+      maxLatencyMs = Option.with_default 50 (map PositiveInt.value max_latency)
+      minAvailabilityBps = Option.with_default 9990 (map SlaBps.value min_sla)
+      requireZeroDowntime = zero_downtime
+    }
+    let (found, stats) = Interpreters.solve tier constraints
+    match found with
+    | Some plan ->
+      for line <- View.solve_success_report tier constraints plan stats do Platform.stdout_line line
+    | None -> App.fail (View.solve_failure_message tier constraints stats)
+}
+
+sample_command : Cli.Command {Host.Console, Host.Random} none
+let sample_command = cli "sample" {
+  description "Sample reproducible random release plans using UniformRandom"
+  /// Target environment tier: preview or production
+  flag tier "t" : Tier = Production
+  /// Deterministic PRNG seed
+  flag seed : Int = 42
+  /// Number of plans to sample (default: 3)
+  flag count "n" : Option PositiveInt
+  handle fun { tier; seed; count } ->
+    let total = Option.with_default 3 (map PositiveInt.value count)
+    let plans = Interpreters.sample_seeded (Int.to_float seed) total tier
+    for line <- View.sample_report tier seed plans do Platform.stdout_line line
+}
+
+wizard_command : Cli.Command {Host.Console, Async} {AppError}
+let wizard_command = cli "wizard" {
+  description "Interactively choose a release plan step by step in the terminal"
+  /// Target environment tier: preview or production
+  flag tier "t" : Tier = Production
+  handle fun { tier } ->
+    let plan =
+      try provide Cli.Prompt.node { Interpreters.interactive tier } with
+      | Terminal.QuitError -> App.fail "wizard cancelled"
+    for line <- View.wizard_report plan do Platform.stdout_line line
+}
+
+command : Cli.Command {Host.Console, Host.Random, Async} {AppError}
+let command = cli "monad-choice" {
+  description "Cloud release configurator built on MonadChoice and ChoiceT"
+  subcommand matrix_command
+  subcommand solve_command
+  subcommand sample_command
+  subcommand wizard_command
+}
+
+main : Unit ->{Host.Environment, Host.Arguments, Host.Console, Host.Random, Async; AppError} Unit
+let main () =
+  try Cli.run_version "0.1.0" command (Platform.args ()) with
+  | Cli.CliError message -> App.fail message

@@ -1,0 +1,107 @@
+/// Property tests for `Choice.Covariant` and `Choice.Invariant` laws.
+module Choice.ChoiceLawsTest exposing (tests)
+
+import Choice.Choices exposing (Choices(..))
+import Choice.Class exposing (MonadChoice(..), MonadTrans(..))
+import Choice.Covariant as Covariant
+import Choice.Invariant as Invariant
+import Gen
+
+small_ints : Gen.Gen Int
+let small_ints = Gen.int (0 - 25) 25
+
+int_fns : Gen.Gen (Int -> Int)
+let int_fns = Gen.function small_ints
+
+covariant_pair : Int -> Covariant.Choice Choices Int
+let covariant_pair base = do {
+  delta <- choose (Choices 1 [2, 3])
+  scale <- choose (Choices 10 [base + delta])
+  pure (delta * scale)
+}
+
+invariant_pair : Int -> Invariant.ChoiceT Choices Choices Int
+let invariant_pair base = do {
+  delta <- choose (Choices 1 [2, 3])
+  scale <- choose (Choices 10 [base + delta])
+  pure (delta * scale)
+}
+
+run_cov_all : Covariant.Choice Choices a -> Choices a
+let run_cov_all tree = Covariant.run_choice_m identity tree
+
+run_inv_all : Invariant.ChoiceT Choices Choices a -> Choices a
+let run_inv_all action = Invariant.run_choice_t identity action
+
+reverse_choices : (Choices a)^c -> (Choices a)^c
+let reverse_choices (Choices first rest) =
+  rev_into : a^c -> (List a)^c -> (List a)^c -> (Choices a)^c
+  let rec rev_into head_acc tail_acc remaining =
+    match remaining with
+    | [] -> Choices head_acc tail_acc
+    | [item, ...more] -> rev_into item ([head_acc] ++ tail_acc) more
+  rev_into first [] rest
+
+tests : List Test.Test
+let tests = [
+  Test.property
+    "Covariant.ChoiceT satisfies Functor, Applicative and Monad laws"
+    (Gen.pair small_ints (Gen.pair int_fns int_fns))
+    (fun (n, (f, g)) ->
+      let tree = covariant_pair n
+      u : Covariant.Choice Choices (Int -> Int)
+      let u = map (fun k x -> f x + k) (choose (Choices 1 [2]))
+      v : Covariant.Choice Choices (Int -> Int)
+      let v = map (fun k x -> g x - k) (choose (Choices 3 [4]))
+      step : Int -> Covariant.Choice Choices Int
+      let step x = map (fun d -> f x + d) (choose (Choices 0 [5]))
+      next : Int -> Covariant.Choice Choices Int
+      let next x = map (fun d -> g x * d) (choose (Choices 1 [2]))
+      let ap = fun mf mx -> map2 (fun fn x -> fn x) mf mx
+      let comp = ap (ap (pure (fun fn gn x -> fn (gn x))) u) v
+      Test.all [
+        Test.equal (run_cov_all tree) (run_cov_all (map identity tree)),
+        Test.equal (run_cov_all (map (fun x -> f (g x)) tree)) (run_cov_all (map f (map g tree))),
+        Test.equal (run_cov_all tree) (run_cov_all (ap (pure identity) tree)),
+        Test.equal (run_cov_all (ap comp tree)) (run_cov_all (ap u (ap v tree))),
+        Test.equal (run_cov_all (pure (f n))) (run_cov_all (ap (pure f) (pure n))),
+        Test.equal (run_cov_all (ap u (pure n))) (run_cov_all (ap (pure (fun fn -> fn n)) u)),
+        Test.equal (run_cov_all (step n)) (run_cov_all (flat_map step (pure n))),
+        Test.equal (run_cov_all tree) (run_cov_all (flat_map pure tree)),
+        Test.equal
+          (run_cov_all (flat_map next (flat_map step tree)))
+          (run_cov_all (flat_map (fun x -> flat_map next (step x)) tree)),
+      ]
+    ),
+  Test.property
+    "Invariant.ChoiceT satisfies Monad laws, low_map laws and agrees with Covariant"
+    (Gen.pair small_ints (Gen.pair int_fns int_fns))
+    (fun (n, (f, g)) ->
+      let cov = covariant_pair n
+      let inv = invariant_pair n
+      step : Int -> Invariant.ChoiceT Choices Choices Int
+      let step x = map (fun d -> f x + d) (choose (Choices 0 [5]))
+      next : Int -> Invariant.ChoiceT Choices Choices Int
+      let next x = map (fun d -> g x * d) (choose (Choices 1 [2]))
+      base : Choices Int
+      let base = Choices n [n + 1]
+      let lifted : Invariant.ChoiceT Choices Choices Int = lift base
+      let mirrored = Invariant.invmap_choice_t reverse_choices (map show) inv
+      Test.all [
+        Test.equal (run_cov_all cov) (run_inv_all inv),
+        Test.equal (run_inv_all (step n)) (run_inv_all (flat_map step (pure n))),
+        Test.equal (run_inv_all inv) (run_inv_all (flat_map pure inv)),
+        Test.equal
+          (run_inv_all (flat_map next (flat_map step inv)))
+          (run_inv_all (flat_map (fun x -> flat_map next (step x)) inv)),
+        // lowMap f . lift == lift . f  and  lowMap id == id
+        Test.equal
+          (run_inv_all (Invariant.low_map reverse_choices lifted))
+          (run_inv_all (lift (reverse_choices base))),
+        Test.equal (run_inv_all inv) (run_inv_all (Invariant.low_map identity inv)),
+        Test.equal
+          (map show (Invariant.run_choice_t reverse_choices inv))
+          (Invariant.run_choice_t identity mirrored),
+      ]
+    ),
+]

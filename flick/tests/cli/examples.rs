@@ -507,3 +507,6 @@ fn exchange_runs(emit: &str) {
         "{refused:?}"
     );
 }
+
+#[path = "examples/monad_choice.rs"]
+mod monad_choice;

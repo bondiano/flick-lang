@@ -1,0 +1,210 @@
+/// Polymorphic `MonadChoice` specifications.
+///
+/// `berry` is the three-step example from `monad-choice`'s README.
+/// `blueprint` configures a cloud release in four dependent steps of different
+/// types (`Topology`, `Storage`, `Cache`, `Rollout`), pruning invalid pairings
+/// before they can be constructed.
+module Deploy.Blueprint exposing (berry, blueprint)
+
+import Choice.Choices exposing (Choices(..))
+import Choice.Class exposing (MonadChoice(..))
+import Deploy.Domain as Domain exposing (
+  Cache(..),
+  ReleasePlan,
+  Rollout(..),
+  Storage(..),
+  Tier(..),
+  Topology(..),
+)
+import Deploy.Question exposing (Question, option, question)
+
+/// Classic berry generator from `monad-choice`'s Hackage README.
+berry : MonadChoice Choices m => m String
+let berry = do {
+  color <- choose (Choices "red" ["blue", "orange", "yellow", "black"])
+  flavor <- choose (Choices "sweet" ["sour", "bitter"])
+  stem <- choose (Choices color [flavor, "\{color}-\{flavor}"])
+  pure "\{stem}berry"
+}
+
+topology_question : Tier -> Question Topology
+let topology_question tier =
+  match tier with
+  | Preview ->
+    question
+      "topology"
+      "Select compute topology for preview"
+      (option "single-node" "Single node" "One VM in a single zone ($25/mo)" SingleNode)
+      [
+        option
+          "regional-2az"
+          "Regional HA (2 AZ)"
+          "Active-active across 2 zones ($110/mo)"
+          (RegionalHa { zones = 2 }),
+      ]
+  | Production ->
+    question
+      "topology"
+      "Select production compute topology"
+      (option
+        "regional-2az"
+        "Regional HA (2 AZ)"
+        "Two availability zones ($110/mo)"
+        (RegionalHa { zones = 2 }))
+      [
+        option
+          "regional-3az"
+          "Regional HA (3 AZ)"
+          "Three availability zones ($165/mo)"
+          (RegionalHa { zones = 3 }),
+        option
+          "global-3reg"
+          "Global edge (3 regions)"
+          "Geo-routed across 3 regions ($330/mo)"
+          (GlobalEdge { regions = 3 }),
+      ]
+
+storage_question : Tier -> Topology -> Question Storage
+let storage_question tier topology =
+  match (tier, topology) with
+  | (Preview, SingleNode) ->
+    question
+      "storage"
+      "Select database engine"
+      (option "sqlite" "Embedded SQLite" "Local NVMe file, single writer ($5/mo)" EmbeddedSqlite)
+      [
+        option
+          "pg-single"
+          "Managed Postgres (single AZ)"
+          "Managed primary without standby ($65/mo)"
+          (ManagedPostgres { replicas = 0; multiAz = false }),
+      ]
+  | (_, SingleNode) ->
+    question
+      "storage"
+      "Select database engine"
+      (option
+        "pg-single"
+        "Managed Postgres (single AZ)"
+        "Managed primary without standby ($65/mo)"
+        (ManagedPostgres { replicas = 0; multiAz = false }))
+      []
+  | (_, RegionalHa _) ->
+    question
+      "storage"
+      "Select regional database engine"
+      (option
+        "pg-ha-1"
+        "Managed Postgres HA (1 replica)"
+        "Multi-AZ primary + 1 read replica ($145/mo)"
+        (ManagedPostgres { replicas = 1; multiAz = true }))
+      [
+        option
+          "pg-ha-2"
+          "Managed Postgres HA (2 replicas)"
+          "Multi-AZ primary + 2 read replicas ($190/mo)"
+          (ManagedPostgres { replicas = 2; multiAz = true }),
+      ]
+  | (_, GlobalEdge { regions }) ->
+    question
+      "storage"
+      "Select multi-region database engine"
+      (option
+        "pg-global-2"
+        "Managed Postgres HA (cross-region replicas)"
+        "Primary + 2 cross-region read replicas ($190/mo)"
+        (ManagedPostgres { replicas = 2; multiAz = true }))
+      [
+        option
+          "dist-sql"
+          "Distributed SQL"
+          "Consensus SQL across all regions ($390/mo)"
+          (DistributedSql { regions = regions }),
+      ]
+
+cache_question : Topology -> Storage -> Question Cache
+let cache_question topology storage =
+  match (topology, storage) with
+  | (SingleNode, EmbeddedSqlite) ->
+    question
+      "cache"
+      "Select caching tier"
+      (option "none" "No cache" "Direct SQLite page cache ($0/mo)" NoCache)
+      [
+        option "local" "In-process memory" "Bounded LRU in app memory ($10/mo)" LocalMemory,
+      ]
+  | (SingleNode, _) ->
+    question
+      "cache"
+      "Select caching tier"
+      (option "none" "No cache" "Query Postgres directly ($0/mo)" NoCache)
+      [
+        option "local" "In-process memory" "Bounded LRU in app memory ($10/mo)" LocalMemory,
+        option "redis" "Managed Redis" "Shared cache with persistence ($50/mo)" RedisReplica,
+      ]
+  | (RegionalHa _, _) ->
+    question
+      "cache"
+      "Select shared regional cache"
+      (option "none" "No cache" "Read directly from Postgres replicas ($0/mo)" NoCache)
+      [
+        option "redis" "Managed Redis HA" "Multi-AZ shared Redis ($50/mo)" RedisReplica,
+        option "valkey" "Global Valkey" "Low-latency replicated Valkey ($120/mo)" GlobalValkey,
+      ]
+  | (GlobalEdge _, ManagedPostgres _) ->
+    question
+      "cache"
+      "Select edge cache for cross-region Postgres"
+      (option "redis" "Regional Redis" "Replicated cache near primary ($50/mo)" RedisReplica)
+      [
+        option "valkey" "Global Valkey" "Edge-replicated Valkey ($120/mo)" GlobalValkey,
+      ]
+  | (GlobalEdge _, _) ->
+    question
+      "cache"
+      "Select edge cache for distributed SQL"
+      (option "none" "No cache" "Local-region SQL reads ($0/mo)" NoCache)
+      [
+        option "valkey" "Global Valkey" "Sub-millisecond edge cache ($120/mo)" GlobalValkey,
+      ]
+
+rollout_question : Tier -> Topology -> Storage -> Question Rollout
+let rollout_question tier topology storage =
+  match (tier, topology, storage) with
+  | (_, _, EmbeddedSqlite) ->
+    question
+      "rollout"
+      "Select deployment strategy"
+      (option "recreate" "Recreate" "Stop old pod before starting new ($0/mo)" Recreate)
+      []
+  | (Preview, SingleNode, _) ->
+    question
+      "rollout"
+      "Select deployment strategy"
+      (option "recreate" "Recreate" "Brief restart window ($0/mo)" Recreate)
+      [
+        option "rolling" "Rolling update" "Surge replacement ($15/mo)" Rolling,
+      ]
+  | (_, _, _) ->
+    question
+      "rollout"
+      "Select zero-downtime rollout strategy"
+      (option "rolling" "Rolling update" "Gradual pod replacement ($15/mo)" Rolling)
+      [
+        option "blue-green" "Blue-green" "Full standby fleet cutover ($60/mo)" BlueGreen,
+        option
+          "canary-10"
+          "Canary (10%)"
+          "Shift 10% traffic with automatic rollback ($35/mo)"
+          (Canary { initialPercent = 10 }),
+      ]
+
+/// One polymorphic deployment workflow interpreted across all execution modes.
+blueprint : MonadChoice Question m => Tier -> m ReleasePlan
+let blueprint tier = do {
+  topology <- choose (topology_question tier)
+  storage <- choose (storage_question tier topology)
+  cache <- choose (cache_question topology storage)
+  rollout <- choose (rollout_question tier topology storage)
+  pure (Domain.evaluate tier topology storage cache rollout)
+}

@@ -1,0 +1,56 @@
+/// Generator-driven property tests for backtracking `solve` and `RollChoice`.
+module Deploy.DeployPropertyTest exposing (tests)
+
+import Choice.Choices as Choices
+import Deploy.Domain as Domain exposing (Constraints, Tier(..))
+import Deploy.Interpreters as Interpreters
+import Gen
+
+constraints_gen : Gen.Gen (Tier, Constraints)
+let constraints_gen =
+  let tier_gen = Gen.map (fun b -> if b then Production else Preview) Gen.bool
+  let cost_gen = Gen.int 20 950
+  let lat_gen = Gen.int 12 75
+  let sla_gen = Gen.one_of [9850, 9900, 9950, 9990, 9995, 9999, 10000]
+  Gen.pair
+    tier_gen
+    (Gen.map
+      (fun ((cost, lat), (sla, zd)) -> {
+        maxCostUsd = cost
+        maxLatencyMs = lat
+        minAvailabilityBps = sla
+        requireZeroDowntime = zd
+      })
+      (Gen.pair (Gen.pair cost_gen lat_gen) (Gen.pair sla_gen Gen.bool)))
+
+tests : List Test.Test
+let tests = [
+  Test.property
+    "backtracking solver finds the exact same plan as linear scan over the full matrix"
+    constraints_gen
+    (fun (tier, constraints) ->
+      let expected =
+        List.find (Domain.satisfies constraints) (Choices.to_list (Interpreters.enumerate tier))
+      let (actual, stats) = Interpreters.solve tier constraints
+      Test.all [
+        Test.equal expected actual,
+        Test.is_true "solver explores at least one choice node" (stats.explored > 0),
+        Test.is_true
+          "unsatisfiable constraints always record backtracks"
+          (Option.is_some actual || stats.backtracks > 0),
+      ]
+    ),
+  Test.property
+    "Gen-driven RollChoice always produces valid plans from the tier's matrix"
+    (Gen.pair (Interpreters.plan_generator Preview) (Interpreters.plan_generator Production))
+    (fun (preview_plan, prod_plan) ->
+      let preview_all = Choices.to_list (Interpreters.enumerate Preview)
+      let prod_all = Choices.to_list (Interpreters.enumerate Production)
+      Test.all [
+        Test.is_true "preview plan valid" (Domain.valid_architecture preview_plan),
+        Test.is_true "production plan valid" (Domain.valid_architecture prod_plan),
+        Test.is_true "preview plan in matrix" (List.contains preview_plan preview_all),
+        Test.is_true "production plan in matrix" (List.contains prod_plan prod_all),
+      ]
+    ),
+]

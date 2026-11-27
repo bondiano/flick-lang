@@ -1,0 +1,284 @@
+/// Domain model of the cloud release configurator.
+///
+/// Four choices of distinct types (`Topology`, `Storage`, `Cache`, `Rollout`)
+/// combine into a `ReleasePlan` with monthly cost, p95 latency, availability
+/// in basis points (`9995` = `99.95%`), and zero-downtime rollout guarantees.
+module Deploy.Domain exposing (
+  Tier(..),
+  Topology(..),
+  Storage(..),
+  Cache(..),
+  Rollout(..),
+  ReleasePlan,
+  Constraints,
+  tier_name,
+  evaluate,
+  satisfies,
+  valid_architecture,
+  format_sla,
+)
+
+import Cli
+
+type Tier = Preview | Production
+  deriving Eq, Show, Cli.Value
+
+type Topology = SingleNode | RegionalHa { zones : Int } | GlobalEdge { regions : Int }
+  deriving Eq, Show
+
+type Storage =
+  | EmbeddedSqlite
+  | ManagedPostgres { replicas : Int; multiAz : Bool }
+  | DistributedSql { regions : Int }
+  deriving Eq, Show
+
+type Cache = NoCache | LocalMemory | RedisReplica | GlobalValkey
+  deriving Eq, Show
+
+type Rollout = Recreate | Rolling | BlueGreen | Canary { initialPercent : Int }
+  deriving Eq, Show
+
+type alias ReleasePlan = {
+  tier : Tier
+  topology : Topology
+  storage : Storage
+  cache : Cache
+  rollout : Rollout
+  summary : String
+  monthlyCostUsd : Int
+  p95LatencyMs : Int
+  availabilityBps : Int
+  zeroDowntime : Bool
+}
+
+type alias Constraints = {
+  maxCostUsd : Int
+  maxLatencyMs : Int
+  minAvailabilityBps : Int
+  requireZeroDowntime : Bool
+}
+
+tier_name : Tier -> String
+let tier_name tier =
+  match tier with
+  | Preview -> "preview"
+  | Production -> "production"
+
+topology_slug : Topology -> String
+let topology_slug topology =
+  match topology with
+  | SingleNode -> "single-node"
+  | RegionalHa { zones } -> "regional-\{zones}az"
+  | GlobalEdge { regions } -> "global-\{regions}reg"
+
+storage_slug : Storage -> String
+let storage_slug storage =
+  match storage with
+  | EmbeddedSqlite -> "sqlite-nvme"
+  | ManagedPostgres { replicas; multiAz } ->
+    let az = if multiAz then "ha" else "single"
+    "postgres-\{az}-r\{replicas}"
+  | DistributedSql { regions } -> "dist-sql-\{regions}reg"
+
+cache_slug : Cache -> String
+let cache_slug cache =
+  match cache with
+  | NoCache -> "no-cache"
+  | LocalMemory -> "local-mem"
+  | RedisReplica -> "redis-ha"
+  | GlobalValkey -> "valkey-global"
+
+rollout_slug : Rollout -> String
+let rollout_slug rollout =
+  match rollout with
+  | Recreate -> "recreate"
+  | Rolling -> "rolling"
+  | BlueGreen -> "blue-green"
+  | Canary { initialPercent } -> "canary-\{initialPercent}pct"
+
+topology_cost : Topology -> Int
+let topology_cost topology =
+  match topology with
+  | SingleNode -> 25
+  | RegionalHa { zones } -> zones * 55
+  | GlobalEdge { regions } -> regions * 110
+
+storage_cost : Storage -> Int
+let storage_cost storage =
+  match storage with
+  | EmbeddedSqlite -> 5
+  | ManagedPostgres { replicas; multiAz } -> 65 + replicas * 45 + (if multiAz then 35 else 0)
+  | DistributedSql { regions } -> regions * 130
+
+cache_cost : Cache -> Int
+let cache_cost cache =
+  match cache with
+  | NoCache -> 0
+  | LocalMemory -> 10
+  | RedisReplica -> 50
+  | GlobalValkey -> 120
+
+rollout_cost : Rollout -> Int
+let rollout_cost rollout =
+  match rollout with
+  | Recreate -> 0
+  | Rolling -> 15
+  | BlueGreen -> 60
+  | Canary _ -> 35
+
+base_topology_latency : Topology -> Int
+let base_topology_latency topology =
+  match topology with
+  | SingleNode -> 42
+  | RegionalHa { zones } -> if zones >= 3 then 28 else 32
+  | GlobalEdge _ -> 18
+
+storage_latency_ms : Storage -> Int
+let storage_latency_ms storage =
+  match storage with
+  | EmbeddedSqlite -> 4
+  | ManagedPostgres { replicas } -> if replicas >= 2 then 10 else 14
+  | DistributedSql _ -> 16
+
+cache_latency_delta : Cache -> Int
+let cache_latency_delta cache =
+  match cache with
+  | NoCache -> 12
+  | LocalMemory -> -8
+  | RedisReplica -> -10
+  | GlobalValkey -> -14
+
+rollout_latency_overhead : Rollout -> Int
+let rollout_latency_overhead rollout =
+  match rollout with
+  | Recreate -> 0
+  | Rolling -> 0
+  | BlueGreen -> 0
+  | Canary _ -> 2
+
+compute_latency : Topology -> Storage -> Cache -> Rollout -> Int
+let compute_latency topology storage cache rollout =
+  let raw =
+    base_topology_latency topology
+      + storage_latency_ms storage
+      + cache_latency_delta cache
+      + rollout_latency_overhead rollout
+  Int.max 8 raw
+
+topology_sla_bps : Topology -> Int
+let topology_sla_bps topology =
+  match topology with
+  | SingleNode -> 9900
+  | RegionalHa { zones } -> if zones >= 3 then 9995 else 9990
+  | GlobalEdge _ -> 9999
+
+storage_sla_bps : Storage -> Int
+let storage_sla_bps storage =
+  match storage with
+  | EmbeddedSqlite -> 9900
+  | ManagedPostgres { multiAz; replicas } ->
+    if multiAz && replicas >= 2 then 9996 else if multiAz then 9992 else 9950
+  | DistributedSql _ -> 9999
+
+rollout_sla_penalty : Rollout -> Int
+let rollout_sla_penalty rollout =
+  match rollout with
+  | Recreate -> 40
+  | Rolling -> 2
+  | BlueGreen -> 0
+  | Canary _ -> 0
+
+compute_sla : Topology -> Storage -> Rollout -> Int
+let compute_sla topology storage rollout =
+  Int.min (topology_sla_bps topology) (storage_sla_bps storage) - rollout_sla_penalty rollout
+
+evaluate : Tier -> Topology -> Storage -> Cache -> Rollout -> ReleasePlan
+let evaluate tier topology storage cache rollout =
+  let summary =
+    String.join " / " [
+      topology_slug topology,
+      storage_slug storage,
+      cache_slug cache,
+      rollout_slug rollout,
+    ]
+  {
+    tier = tier
+    topology = topology
+    storage = storage
+    cache = cache
+    rollout = rollout
+    summary = summary
+    monthlyCostUsd =
+      topology_cost topology + storage_cost storage + cache_cost cache + rollout_cost rollout
+    p95LatencyMs = compute_latency topology storage cache rollout
+    availabilityBps = compute_sla topology storage rollout
+    zeroDowntime = rollout != Recreate
+  }
+
+satisfies : Constraints -> ReleasePlan -> Bool
+let satisfies constraints plan =
+  plan.monthlyCostUsd <= constraints.maxCostUsd
+    && plan.p95LatencyMs <= constraints.maxLatencyMs
+    && plan.availabilityBps >= constraints.minAvailabilityBps
+    && (not constraints.requireZeroDowntime || plan.zeroDowntime)
+
+prod_tier_valid : ReleasePlan -> Bool
+let prod_tier_valid plan =
+  match plan.tier with
+  | Preview -> true
+  | Production ->
+    plan.topology != SingleNode && plan.storage != EmbeddedSqlite && plan.rollout != Recreate
+
+sqlite_valid : ReleasePlan -> Bool
+let sqlite_valid plan =
+  match plan.storage with
+  | EmbeddedSqlite -> plan.topology == SingleNode && plan.rollout == Recreate
+  | ManagedPostgres _ -> true
+  | DistributedSql _ -> true
+
+local_cache_valid : ReleasePlan -> Bool
+let local_cache_valid plan =
+  match plan.cache with
+  | LocalMemory -> plan.topology == SingleNode
+  | NoCache -> true
+  | RedisReplica -> true
+  | GlobalValkey -> true
+
+global_storage_valid : Storage -> Bool
+let global_storage_valid storage =
+  match storage with
+  | DistributedSql _ -> true
+  | ManagedPostgres { replicas; multiAz } -> multiAz && replicas >= 2
+  | EmbeddedSqlite -> false
+
+global_cache_valid : Storage -> Cache -> Bool
+let global_cache_valid storage cache =
+  match storage with
+  | ManagedPostgres _ -> cache == RedisReplica || cache == GlobalValkey
+  | DistributedSql _ -> cache != LocalMemory
+  | EmbeddedSqlite -> false
+
+global_edge_valid : ReleasePlan -> Bool
+let global_edge_valid plan =
+  match plan.topology with
+  | SingleNode -> true
+  | RegionalHa _ -> true
+  | GlobalEdge _ -> global_storage_valid plan.storage && global_cache_valid plan.storage plan.cache
+
+/// Architectural invariants that every valid combination produced by the
+/// dependent `blueprint` must satisfy by construction.
+valid_architecture : ReleasePlan -> Bool
+let valid_architecture plan =
+  prod_tier_valid plan
+    && sqlite_valid plan
+    && local_cache_valid plan
+    && global_edge_valid plan
+    && (plan.zeroDowntime == (plan.rollout != Recreate))
+
+/// Formats basis points such as `9995` as `"99.95%"`.
+format_sla : Int -> String
+let format_sla bps =
+  let whole = bps / 100
+  let frac = Int.abs (bps % 100)
+  let padded = if frac < 10 then "0\{frac}" else "\{frac}"
+  "\{whole}.\{padded}%"

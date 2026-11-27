@@ -1,0 +1,55 @@
+/// Stateful transformer `StateT s m a` with `MonadChoice` lifting:
+/// drives cursor-based backtracking and deterministic roll streams.
+module Choice.StateT exposing (StateT(..), run, eval, exec, get, put, modify)
+
+import Choice.Class exposing (MonadChoice(..), MonadTrans(..))
+
+type StateT s (m : Type -> Type) a = StateT (s -> m (a, s))
+
+run : (StateT s m a)^c -> s^d -> (m (a, s))^(c + d)
+let run (StateT step) initial = step initial
+
+eval : Functor m => s^d -> (StateT s m a)^c -> (m a)^(c + d)
+let eval initial action = map (fun (value, _) -> value) (run action initial)
+
+exec : Functor m => s^d -> (StateT s m a)^c -> (m s)^(c + d)
+let exec initial action = map (fun (_, next) -> next) (run action initial)
+
+get : Applicative m => StateT s m s
+let get = StateT (fun current -> pure (current, current))
+
+put : Applicative m => s^c -> (StateT s m Unit)^c
+let put next = StateT (fun _ -> pure ((), next))
+
+modify : Applicative m => (s^v -> s^(c + v))^c -> (StateT s m Unit)^c
+let modify update = StateT (fun current -> pure ((), update current))
+
+instance Functor m => Functor (StateT s m) =
+  let map f (StateT step) =
+    StateT (fun current -> map (fun (value, next) -> (f value, next)) (step current))
+
+instance Monad m => Applicative (StateT s m) =
+  let pure value = StateT (fun current -> pure (value, current))
+  let map2 f left right =
+    StateT (fun current -> do {
+      (a, middle) <- run left current
+      (b, final) <- run right middle
+      pure (f a b, final)
+    })
+
+instance Monad m => Monad (StateT s m) =
+  let flat_map f action =
+    StateT (fun current -> do {
+      (value, next) <- run action current
+      run (f value) next
+    })
+
+instance MonadTrans (StateT s) =
+  let lift action =
+    StateT (fun current -> do {
+      value <- action
+      pure (value, current)
+    })
+
+instance MonadChoice f m => MonadChoice f (StateT s m) =
+  let choose options = lift (choose options)

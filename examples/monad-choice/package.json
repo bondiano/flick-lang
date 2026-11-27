@@ -1,0 +1,14 @@
+{
+  "dependencies": {
+    "@flick-lang/runtime": "0.2.0",
+    "@flick-lang/effect-ts": "0.2.0"
+  },
+  "flick": {
+    "compiler": "0.2.0"
+  },
+  "name": "monad-choice",
+  "packageManager": "pnpm@12.16.1",
+  "private": true,
+  "type": "module",
+  "version": "0.1.0"
+}

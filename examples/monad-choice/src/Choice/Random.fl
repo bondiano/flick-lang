@@ -1,0 +1,94 @@
+/// Port of `Control.Monad.Choice.Random` plus deterministic roll-driven sampling.
+///
+/// `UniformRandom r a` equips any `MonadRandom r` (including `Eff {Host.Random | …}`)
+/// with a `MonadChoice` instance that picks uniformly among `ChoiceOptions`.
+/// `RollChoice a` consumes integer rolls from a `List Int` so `Gen` and `Arbitrary`
+/// property tests can drive dependent monadic choices without discarding.
+module Choice.Random exposing (
+  MonadRandom(..),
+  UniformRandom(..),
+  lift,
+  colift,
+  RollChoice(..),
+  eval_rolls,
+)
+
+import Choice.Choices exposing (Choices)
+import Choice.Choices as Choices
+import Choice.Class exposing (ChoiceOptions(..), MonadChoice(..))
+import Host
+import Random
+
+class Monad m => MonadRandom (m : Type -> Type) =
+  uniform_choices : forall c a. (Choices a)^c -> (m a)^c
+
+instance MonadRandom (Eff {Host.Random | r} e) =
+  let uniform_choices options = task {
+    let len = Choices.length options
+    let index = Random.next_int_between { halfOpen = Some true } 0 len
+    Choices.at_modulo index options
+  }
+
+type UniformRandom (r : Type -> Type) a = UniformRandom (r a)
+
+lift : (r a)^c -> (UniformRandom r a)^c
+let lift action = UniformRandom action
+
+colift : (UniformRandom r a)^c -> (r a)^c
+let colift (UniformRandom action) = action
+
+instance Functor r => Functor (UniformRandom r) =
+  let map f (UniformRandom action) = UniformRandom (map f action)
+
+instance Applicative r => Applicative (UniformRandom r) =
+  let pure value = UniformRandom (pure value)
+  let map2 f (UniformRandom left) (UniformRandom right) = UniformRandom (map2 f left right)
+
+instance Monad r => Monad (UniformRandom r) =
+  let flat_map f (UniformRandom action) =
+    UniformRandom (flat_map (fun value -> colift (f value)) action)
+
+instance (ChoiceOptions f, MonadRandom m) => MonadChoice f (UniformRandom m) =
+  let choose options = lift (uniform_choices (to_choices options))
+
+/// Pure roll consumer for `Gen` and `Arbitrary`: draws one `Int` per choice step,
+/// defaulting to `0` (the first option) once the roll list ends.
+type RollChoice a = RollChoice (List Int -> (a, List Int))
+
+eval_rolls : List Int -> (RollChoice a)^c -> a^c
+let eval_rolls rolls (RollChoice step) =
+  let (value, _) = step rolls
+  value
+
+instance Functor RollChoice =
+  let map f (RollChoice step) =
+    RollChoice (fun rolls ->
+      let (value, rest) = step rolls
+      (f value, rest)
+    )
+
+instance Applicative RollChoice =
+  let pure value = RollChoice (fun rolls -> (value, rolls))
+  let map2 f (RollChoice left) (RollChoice right) =
+    RollChoice (fun rolls ->
+      let (a, middle) = left rolls
+      let (b, rest) = right middle
+      (f a b, rest)
+    )
+
+instance Monad RollChoice =
+  let flat_map f (RollChoice step) =
+    RollChoice (fun rolls ->
+      let (value, middle) = step rolls
+      let RollChoice next = f value
+      next middle
+    )
+
+instance ChoiceOptions f => MonadChoice f RollChoice =
+  let choose options =
+    RollChoice (fun rolls ->
+      let candidates = to_choices options
+      match rolls with
+      | [] -> (Choices.head candidates, [])
+      | [roll, ...rest] -> (Choices.at_modulo roll candidates, rest)
+    )

@@ -1,0 +1,4 @@
+Constraints (production): budget <= $450/mo, p95 <= 35ms, SLA >= 99.95%, zero-downtime: required
+Solver: explored 50 choice steps, backtracked 46 times
+Selected: regional-3az / postgres-ha-r2 / redis-ha / canary-10pct
+Metrics: $440/mo | p95 30ms | SLA 99.95% | zero-downtime
