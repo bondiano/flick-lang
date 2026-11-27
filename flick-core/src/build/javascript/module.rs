@@ -80,6 +80,7 @@ pub(super) fn compiled_module(
         foreign: ctx.foreign,
         path: ctx.path,
         rt: ctx.settings.backend == Backend::Rt,
+        natives: ctx.natives,
     };
     let (shared, issues) = shared_files(
         &module.name,

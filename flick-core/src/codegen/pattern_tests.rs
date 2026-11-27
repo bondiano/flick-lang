@@ -29,6 +29,7 @@ fn emit_target(text: &str, release: bool, typescript: bool, rt: bool) -> String 
             foreign: &foreign,
             path: &path,
             rt,
+            natives: None,
         };
         typing.prepare(&ir)
     });

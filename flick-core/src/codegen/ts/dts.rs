@@ -24,7 +24,7 @@ fn declared_value(projection: &Projection, interface: &Interface, export: &Expor
     matches!(entity.namespace, Namespace::Value | Namespace::Constructor)
         && entity.module == projection.module
         && export.decl != Decl::Method
-        && !(entity.namespace == Namespace::Constructor && parent.is_some_and(super::native_on_js))
+        && !(entity.namespace == Namespace::Constructor && parent.is_some_and(|d| projection.native_on_js(d)))
 }
 
 pub fn declaration_file(
